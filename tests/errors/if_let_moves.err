@@ -1,0 +1,3 @@
+if_let_moves.anti:15:9: error: `x` was moved into `b`
+if_let_moves.anti:20:13: error: `?Box` has `own` fields, use `dup` instead of `=`
+if_let_moves.anti:29:13: error: `?Box` has `own` fields, use `dup` instead of `=`

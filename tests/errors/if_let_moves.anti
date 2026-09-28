@@ -1,0 +1,38 @@
+//! `if let` binds its value as `let` does. An `own` parameter moves into the
+//! binding and is not named after it. A local or a parameter of the caller
+//! whose value owns memory stays where it is and is refused.
+
+class Box
+{
+	pub own inner: ?*int = none,
+}
+
+fn moved(own x: ?Box) -> bool
+{
+	if let b = x {
+		return true;
+	}
+	return x != none;
+}
+
+fn borrowed(x: ?Box) -> bool
+{
+	if let b = x {
+		return true;
+	}
+	return false;
+}
+
+fn local() -> bool
+{
+	let o: ?Box = none;
+	if let b = o {
+		return true;
+	}
+	return false;
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -2082,6 +2082,52 @@ struct ir_operand lower_argument(struct lowerer *l,
     return value;
 }
 
+/* DESIGN: a call result or a literal passed to a parameter that takes a
+   value and is not `own` has no owner but the caller, which tears it
+   down once the call returns, as a `let` would be torn down at the end of
+   its statement. The callee copies what it keeps. A parameter of a
+   pointer type, `self` among them, takes the address of the value and
+   never its ownership, and an `own` parameter takes the value, which the
+   callee tears down. A call through a function value carries no `own`
+   marks, so its arguments are left alone. sym is the function called,
+   fn its type, arg the argument at the parameter index. */
+static const struct type *fresh_argument(const struct symbol *sym,
+                                         const struct type *fn, size_t index,
+                                         const struct expr *arg)
+{
+    const struct type *t;
+
+    if (sym == NULL || fn == NULL || index >= fn->param_count ||
+        fn->params[index]->kind == TYPE_POINTER || arg->to_iface != NULL ||
+        arg->to_context || arg->moves ||
+        (index < sym->owned_count && sym->owned[index])) {
+        return NULL;
+    }
+    if (arg->kind != EXPR_CALL && arg->kind != EXPR_STRUCT_LIT &&
+        arg->kind != EXPR_TUPLE) {
+        return NULL;
+    }
+    t = wraps(arg) ? arg->to_optional : arg->type;
+    return t != NULL && lower_needs_teardown(t) ? t : NULL;
+}
+
+void lower_drop_arguments(struct lowerer *l, const struct symbol *sym,
+                          const struct type *fn, const struct expr *const *args,
+                          const struct ir_operand *values, size_t count,
+                          size_t first)
+{
+    size_t i;
+
+    for (i = count; i > 0 && l->b != NULL; i--) {
+        const struct type *t = fresh_argument(sym, fn, first + i - 1,
+                                              args[i - 1]);
+        if (t != NULL) {
+            lower_destroy_owned(l, t, values[i - 1], ir_int_op(IR_PTR, 0),
+                                false);
+        }
+    }
+}
+
 /* The parameters that the dispatched function of the call e declares,
    `self` among them. The out pointer of a `may fail` call is none of
    them, so the count comes from the callee where there is one. */
@@ -2114,6 +2160,7 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     struct ir_operand bound = lower_none();
     struct ir_operand context = lower_none();
     struct ir_operand *args;
+    struct ir_operand *values;
     uint32_t result;
     uint32_t slot;
     enum ir_type declared;
@@ -2155,6 +2202,7 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
         target = lower_expr(l, callee);
     }
     args = ir_alloc(2 * n + 3, sizeof *args);
+    values = ir_alloc(n + 1, sizeof *values);
     given = 0;
     if (bound.kind != IR_NONE) {
         args[given++] = bound;
@@ -2163,6 +2211,7 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
        words. */
     for (i = 0; i < n; i++) {
         struct ir_operand value = lower_argument(l, e->as.call.args[i]);
+        values[i] = value;
         lower_push_argument(l, args, &given, value,
                             fn != NULL && i < fn->param_count ? fn->params[i]
                                                               : NULL);
@@ -2228,6 +2277,12 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
         }
     }
     free(args);
+    if (bound.kind == IR_NONE && context.kind == IR_NONE) {
+        lower_drop_arguments(l, callee->symbol, fn,
+                             (const struct expr *const *)e->as.call.args,
+                             values, e->as.call.arg_count, 0);
+    }
+    free(values);
     return result == IR_NO_RESULT ? lower_none() : lower_temp(l, result);
 }
 

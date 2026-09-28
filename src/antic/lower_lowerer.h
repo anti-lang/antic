@@ -537,6 +537,14 @@ bool lower_optional_needs_destruct(const struct type *t);
    moves the new one in: a value with a teardown, in an array at any
    depth, or a `?T` of one. */
 bool lower_needs_teardown(const struct type *t);
+/* Tear down the call results and the literals among the count arguments
+   args, lowered to values, that the call of sym with type fn took at
+   parameters that neither keep them nor take a pointer. The first
+   argument stands at parameter first. */
+void lower_drop_arguments(struct lowerer *l, const struct symbol *sym,
+                          const struct type *fn, const struct expr *const *args,
+                          const struct ir_operand *values, size_t count,
+                          size_t first);
 void lower_clear_tables(struct lowerer *l, struct ir_operand base,
                         const struct type *t);
 void lower_handle_error(struct lowerer *l, const struct expr *call,

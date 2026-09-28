@@ -361,6 +361,11 @@ bool sema_reads_existing(const struct expr *e);
 struct name sema_place_name(const struct expr *e);
 bool sema_move_local(struct checker *c, struct expr *e,
                      const struct name *into, const struct name *by);
+/* The value of `if let`, which binds it as `let` does: an `own` parameter
+   moves into the name into, and any other existing value that owns
+   memory is refused. */
+void sema_bind_value(struct checker *c, struct expr *value, struct name into,
+                     struct type *t);
 void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
                             struct type *t);
 bool sema_holds_mutex(const struct type *t);

@@ -656,10 +656,13 @@ bool sema_reads_existing(const struct expr *e)
     }
 }
 
-/* DESIGN: an `own` parameter owns its value, so `=` and `let` move one
-   that owns memory rather than copy it, and the function tears it down
-   no more. A value of a type parameter may own memory in a copy, so it
-   moves as well. into names the place. Returns whether value moved. */
+/* DESIGN: an `own` parameter owns its value, so `=`, `let`, `if let` and
+   `let ... else` move one that owns memory or has a teardown rather than
+   copy it, and the function tears it down no more. A copy would run the
+   teardown twice, once for the parameter and once for the place. A value
+   of a type parameter may own memory in a copy, so it moves as well. A
+   function moves by the rules of a snapshot, which the conversion to
+   the place checks. into names the place. Returns whether value moved. */
 static bool moves_own_param(struct checker *c, struct expr *value,
                             struct name into)
 {
@@ -668,11 +671,21 @@ static bool moves_own_param(struct checker *c, struct expr *value,
 
     if (sym == NULL || !sym->own_param || value->type == NULL ||
         sema_is_error(value->type) ||
-        !(sema_type_owns(value->type) || sema_has_params(value->type))) {
+        value->type->kind == TYPE_FN ||
+        !(sema_type_owns(value->type) || sema_needs_teardown(value->type) ||
+          sema_has_params(value->type))) {
         return false;
     }
     sema_move_local(c, value, &into, &no_name);
     return true;
+}
+
+void sema_bind_value(struct checker *c, struct expr *value, struct name into,
+                     struct type *t)
+{
+    if (!moves_own_param(c, value, into)) {
+        sema_refuse_owned_copy(c, value, t);
+    }
 }
 
 /* DESIGN: `=` refuses to copy an existing value that owns memory, since

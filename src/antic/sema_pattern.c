@@ -790,6 +790,7 @@ void sema_if_let_none(struct checker *c, struct stmt *s, struct type *t)
         sym->type = t;
         sym->stmt = let;
         let->as.let.symbol = sym;
+        sema_bind_value(c, value, let->as.let.name, t);
         /* A failing call writes its result through a pointer into the
            local, as it does for any `let`. */
         if (value->kind == EXPR_CALL && value->as.call.out != NULL) {

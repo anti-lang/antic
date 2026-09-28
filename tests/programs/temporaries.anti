@@ -1,0 +1,190 @@
+//! Fresh values that no local holds: a call result or a literal passed to a
+//! parameter that is not `own`, and a call result that a statement drops. The
+//! caller tears each down once, after the call that took it or at the end of
+//! its statement. An `own` parameter bound with `if let` or `let ... else`
+//! moves into the binding, which tears it down once. `Box` has an `own` field
+//! and `Plain` only counts itself in a `destruct`. Each counts itself alive, so
+//! a teardown missed or run twice shows in the count.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box
+{
+	pub own inner: ?*Box = none,
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	pub fn make(n: int) -> Box
+	{
+		Box.live.add(1);
+		return Box { n: n };
+	}
+
+	concrete fn destruct(self)
+	{
+		Box.live.sub(1);
+	}
+}
+
+class Plain
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	pub fn make(n: int) -> Plain
+	{
+		Plain.live.add(1);
+		return Plain { n: n };
+	}
+
+	concrete fn destruct(self)
+	{
+		Plain.live.sub(1);
+	}
+}
+
+/// A class whose `construct` and whose function with `self` take a `Box` they
+/// do not keep.
+class Shelf
+{
+	pub seen: int = 0,
+
+	fn construct(self, b: Box)
+	{
+		self.seen = b.n;
+	}
+
+	pub fn look(self, b: Box) -> int
+	{
+		self.seen = b.n;
+		return b.n;
+	}
+}
+
+/// A struct that owns what its `Box` owns.
+struct Pair
+{
+	a: Box,
+	n: int,
+}
+
+fn look(b: Box) -> int
+{
+	return b.n;
+}
+
+fn look_at<T>(x: T) -> int
+{
+	return size_of(T);
+}
+
+fn held(b: ?Box) -> bool
+{
+	return b != none;
+}
+
+fn pair_n(p: Pair) -> int
+{
+	return p.n;
+}
+
+fn take(own b: Box) -> int
+{
+	return b.n;
+}
+
+fn found(n: int) -> ?Box
+{
+	if n > 0 {
+		return Box.make(n);
+	}
+	return none;
+}
+
+fn pair_of(n: int) -> Pair
+{
+	return Pair { a: Box.make(n), n: n };
+}
+
+fn first(own x: ?Box) -> int
+{
+	if let b = x {
+		return b.n;
+	}
+	return -1;
+}
+
+fn first_else(own x: ?Box) -> int
+{
+	let b = x else {
+		return -1;
+	};
+	return b.n;
+}
+
+fn first_plain(own x: ?Plain) -> int
+{
+	if let p = x {
+		return p.n;
+	}
+	return -1;
+}
+
+fn kept_plain(own x: Plain) -> int
+{
+	let y = x;
+	return y.n;
+}
+
+fn live(label: str)
+{
+	printf("%.*s: %d boxes, %d plain\n".ptr, label.len as c_int, label.ptr,
+		Box.live.load() as c_int, Plain.live.load() as c_int);
+}
+
+fn arguments()
+{
+	let n = look(Box.make(1));
+	n += look_at<Box>(Box.make(2)) * 0;
+	let shelf = Shelf(Box.make(3));
+	n += shelf.look(Box.make(4));
+	if held(Box.make(5)) && held(found(6)) && !held(found(0)) {
+		n += 1;
+	}
+	n += pair_n(Pair { a: Box.make(7), n: 7 });
+	n += take(Box.make(8));
+	printf("arguments: %d %d\n".ptr, n as c_int, shelf.seen as c_int);
+	live("after the arguments");
+}
+
+fn dropped()
+{
+	Box.make(1);
+	found(2);
+	found(0);
+	pair_of(3);
+	Plain.make(4);
+	live("after the dropped results");
+}
+
+fn bound()
+{
+	printf("if let: %d %d\n".ptr, first(found(1)) as c_int,
+		first(found(0)) as c_int);
+	printf("let else: %d %d\n".ptr, first_else(found(2)) as c_int,
+		first_else(found(0)) as c_int);
+	let p: ?Plain = Plain.make(3);
+	printf("plain: %d %d\n".ptr, first_plain(p) as c_int,
+		kept_plain(Plain.make(4)) as c_int);
+	live("after the bindings");
+}
+
+fn main() -> int
+{
+	arguments();
+	dropped();
+	bound();
+	return 0;
+}

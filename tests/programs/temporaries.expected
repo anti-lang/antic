@@ -1,0 +1,8 @@
+exit 0
+arguments: 21 4
+after the arguments: 0 boxes, 0 plain
+after the dropped results: 0 boxes, 0 plain
+if let: 1 -1
+let else: 2 -1
+plain: 3 4
+after the bindings: 0 boxes, 0 plain

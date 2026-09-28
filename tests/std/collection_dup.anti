@@ -133,12 +133,11 @@ class Every
 	/// and the ring as many as fit.
 	pub fn of(n: int, from: *mem.Allocator) -> Every
 	{
-		let fill = Item.of(0);
 		let e = Every {
 			list: List<Item>.new(0, from),
 			deque: Deque<Item>.new(0, from),
 			ring: Ring<Item, 4>.new(from),
-			grid: Grid<Item>.new(2, 2, fill, from),
+			grid: Grid<Item>.new(2, 2, Item.of(0), from),
 			map: Map<str, Item>.new(0, from),
 			hashed: HashMap<int, Item>.new(0, from),
 			set: Set<Item>.new(0, from),
@@ -212,7 +211,7 @@ fn show(s: str)
 }
 
 /// The number of the element `x` holds, or -1 when it holds none.
-fn number(x: ?Item) -> int
+fn number(own x: ?Item) -> int
 {
 	if let got = x {
 		return got.value();
@@ -252,7 +251,7 @@ fn handles()
 		let a = e.pool.add(Item.of(1));
 		let b = e.pool.add(Item.of(2));
 		let c = e.pool.add(Item.of(3));
-		let removed = e.pool.remove(b);
+		e.pool.remove(b);
 		let root = e.tree.add_root(Item.of(10));
 		let child = e.tree.add_child(root, Item.of(11)) catch fatal;
 		let gone = e.tree.add_child(root, Item.of(12)) catch fatal;

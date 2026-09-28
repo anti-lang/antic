@@ -1140,6 +1140,20 @@ void lower_clear_tables(struct lowerer *l, struct ir_operand base,
     l->b = done;
 }
 
+/* DESIGN: a call whose result the statement drops gives a value that no
+   local holds, so the statement tears it down where it ends, as a `let`
+   of it would be torn down at the end of its block. value is what the
+   call lowered to. */
+static void drop_result(struct lowerer *l, const struct expr *e,
+                        struct ir_operand value)
+{
+    if (e->kind != EXPR_CALL || e->as.call.hashes || e->type == NULL ||
+        l->b == NULL || !lower_needs_teardown(e->type)) {
+        return;
+    }
+    lower_destroy_owned(l, e->type, value, ir_int_op(IR_PTR, 0), false);
+}
+
 /* A local that may have moved, and an `own` parameter, are torn down
    only when their table is not zero. */
 static void destroy_local(struct lowerer *l, const struct symbol *sym)
@@ -1333,6 +1347,7 @@ struct ir_operand lower_construct(struct lowerer *l,
     const struct type *t = e->as.call.builds;
     const struct type *up;
     struct ir_operand *args;
+    struct ir_operand *values;
     const struct item *m = NULL;
     uint32_t result;
     bool fails;
@@ -1380,6 +1395,7 @@ struct ir_operand lower_construct(struct lowerer *l,
         return lower_none();
     }
     args = ir_alloc(2 * e->as.call.arg_count + 1, sizeof *args);
+    values = ir_alloc(e->as.call.arg_count + 1, sizeof *values);
     args[0] = dest;
     count = 1;
     /* An argument at a parameter of the form of two words, a `keep own`
@@ -1387,6 +1403,7 @@ struct ir_operand lower_construct(struct lowerer *l,
     for (i = 0; i < e->as.call.arg_count; i++) {
         const struct type *sig = m->symbol->type;
         struct ir_operand value = lower_argument(l, e->as.call.args[i]);
+        values[i] = value;
         lower_push_argument(l, args, &count, value,
                             i + 1 < sig->param_count ? sig->params[i + 1]
                                                      : NULL);
@@ -1398,6 +1415,11 @@ struct ir_operand lower_construct(struct lowerer *l,
                      ir_func_op(lower_callee_function(l, m->symbol)), args,
                      count);
     free(args);
+    /* The arguments follow `self`, the first parameter. */
+    lower_drop_arguments(l, m->symbol, m->symbol->type,
+                         (const struct expr *const *)e->as.call.args, values,
+                         e->as.call.arg_count, 1);
+    free(values);
     if (!fails) {
         lower_hook_object(l, HOOK_CREATED, dest);
         return lower_none();
@@ -1547,6 +1569,7 @@ static void lower_let_unwrap(struct lowerer *l, const struct stmt *s)
     if (l->b == NULL || sym == NULL) {
         return;
     }
+    lower_clear_moved(l, s->as.let.value);
     place = lower_temp(l, sym->ir);
     ir_branch(l->f, l->b,
               lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8,
@@ -1985,7 +2008,7 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
                                lower_none());
             return;
         }
-        lower_expr(l, s->as.expr);
+        drop_result(l, s->as.expr, lower_expr(l, s->as.expr));
         return;
     case STMT_ASSIGN:
         lower_assign(l, s);
