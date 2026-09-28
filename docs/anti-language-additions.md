@@ -1089,7 +1089,7 @@ The collections are split into modules by family, one file each. Each can then b
 | `anti.collection.pool` | `Pool<T>`, `Handle<T>` |
 | `anti.collection.tree` | `Tree<T>` |
 | `anti.collection.queue` | `PriorityQueue<T>` |
-| `anti.collection.sync` | `SyncList<T>`, `SyncMap<K, V>`, `SyncSet<T>`, `SyncPool<T>` |
+| `anti.collection.synchronized` | `SyncList<T>`, `SyncMap<K, V>`, `SyncSet<T>`, `SyncPool<T>` |
 | `anti.collection.concurrent` | `ConcurrentMap<K, V>`, `SpscRing<T, N>` |
 
 ### Principles
@@ -1202,7 +1202,7 @@ The collections are split into modules by family, one file each. Each can then b
 
 ## Thread-safe collections
 
-Collections shared between threads follow [Concurrent classes](#concurrent-classes). Each is a thread-safe type, so a closure at a `concurrent` parameter and a worker may change it.
+Collections shared between threads follow [Concurrent classes](#concurrent-classes). Each is a thread-safe type, so a closure at a `concurrent` parameter and a worker may change it. The `synchronized` ones stand in `anti.collection.synchronized` and the `concurrent` ones in `anti.collection.concurrent`, each module named after the kind of class it holds. `sync` is a keyword, and no keyword is a segment of a module path.
 
 | Type | Kind | For |
 |---|---|---|
