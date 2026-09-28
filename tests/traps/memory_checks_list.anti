@@ -1,0 +1,26 @@
+//! A pointer into a collection kept across a change of its size is a use after
+//! free, which `--memory-checks` finds. The list is made without a capacity, so
+//! its room holds eight elements. The walk lends the first one, and the push
+//! inside the walk grows the room and frees the old one. The read through the
+//! lent pointer after the push then reads freed memory.
+
+import anti.collection.list.{List};
+
+fn kept_across_push() -> int
+{
+	let l = List<int>.new();
+	for i in 0..8 {
+		l.push(i);
+	}
+	let n = 0;
+	for x in &l {
+		l.push(8);
+		n += *x;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	return kept_across_push();
+}

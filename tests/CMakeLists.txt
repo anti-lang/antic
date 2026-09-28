@@ -2777,6 +2777,18 @@ add_test(NAME memory_checks
         "-DHOST=${ANTIC_HOST_TARGET}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_memory_checks.cmake")
 set_tests_properties(memory_checks PROPERTIES TIMEOUT 120)
+# --memory-checks finds a pointer into a List kept across a push that grows
+# the list, as a read after free.
+add_test(NAME memory_checks_list
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_list.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_memory_checks_list.cmake")
+set_tests_properties(memory_checks_list PROPERTIES TIMEOUT 120)
 
 # The ABI probe compares the layouts of C and antic on the host.
 if(NOT WIN32)
