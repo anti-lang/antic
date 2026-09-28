@@ -1,0 +1,180 @@
+//! Equal collections hash alike.
+//!
+//! A sequence compares and hashes its elements in order. A map and a set
+//! compare as collections of entries whatever their order, and their hash does
+//! not depend on it either, so two maps with the same entries added in another
+//! order are equal and hash alike. Each case builds two equal collections, then
+//! changes one of them, and prints whether they are equal and whether their
+//! hashes agree. A class that holds collections hashes alike too.
+
+import anti.collection.concurrent.{ConcurrentMap};
+import anti.collection.deque.{Deque};
+import anti.collection.grid.{Grid};
+import anti.collection.list.{List};
+import anti.collection.map.{HashMap, Map};
+import anti.collection.pool.{Pool};
+import anti.collection.queue.{PriorityQueue};
+import anti.collection.ring.{Ring};
+import anti.collection.set.{BitSet, HashSet, Set};
+import anti.collection.sorted.{SortedMap, SortedSet};
+import anti.collection.tree.{Tree};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A class with a list and a map, whose default `==` and hash reach the
+/// operators of both.
+class Owner
+{
+	pub items: List<str>,
+	pub named: Map<str, int>,
+}
+
+fn show(label: str, same: bool, alike: bool)
+{
+	printf("%.*s: equal %d, hash alike %d\n".ptr, label.len as c_int, label.ptr,
+		same as c_int, alike as c_int);
+}
+
+fn sequences()
+{
+	let a = List<int>.new();
+	let b = List<int>.new();
+	for i in 0..5 {
+		a.push(i + 0);
+		b.push(i);
+	}
+	show("list", a == b, a.hash() == b.hash());
+	b[0] = 4;
+	b[4] = 0;
+	show("list reordered", a == b, a.hash() == b.hash());
+	let d = Deque<str>.new();
+	let e = Deque<str>.new();
+	d.push_back("x");
+	d.push_back("y");
+	e.push_front("y");
+	e.push_front("x");
+	show("deque", d == e, d.hash() == e.hash());
+	let r = Ring<int, 4>.new();
+	let s = Ring<int, 4>.new();
+	r.push(9);
+	r.push(1);
+	r.push(2);
+	r.pop();
+	s.push(1);
+	s.push(2);
+	show("ring", r == s, r.hash() == s.hash());
+	let g = Grid<int>.new(2, 2, 0);
+	let h = Grid<int>.new(2, 2, 0);
+	g[1, 0] = 5;
+	h[1, 0] = 5;
+	show("grid", g == h, g.hash() == h.hash());
+	let p = PriorityQueue<int>.new();
+	let q = PriorityQueue<int>.new();
+	p.push(3);
+	p.push(1);
+	q.push(3);
+	q.push(1);
+	show("queue", p == q, p.hash() == q.hash());
+	let o = Pool<int>.new();
+	let n = Pool<int>.new();
+	o.add(7);
+	n.add(7);
+	show("pool", o == n, o.hash() == n.hash());
+	let t = Tree<int>.new();
+	let u = Tree<int>.new();
+	t.add_root(1);
+	u.add_root(1);
+	show("tree", t == u, t.hash() == u.hash());
+}
+
+fn maps()
+{
+	let a = Map<str, int>.new();
+	let b = Map<str, int>.new();
+	a.set("one", 1);
+	a.set("two", 2);
+	a.set("three", 3);
+	b.set("three", 3);
+	b.set("one", 1);
+	b.set("two", 2);
+	show("map in another order", a == b, a.hash() == b.hash());
+	b.set("two", 20);
+	show("map with another value", a == b, a.hash() == b.hash());
+	let h = HashMap<int, str>.new();
+	let k = HashMap<int, str>.new();
+	for i in 0..20 {
+		h.set(i, "v");
+		k.set(19 - i, "v");
+	}
+	show("hash map in another order", h == k, h.hash() == k.hash());
+	let s = SortedMap<int, int>.new();
+	let m = SortedMap<int, int>.new();
+	s.set(2, 20);
+	s.set(1, 10);
+	m.set(1, 10);
+	m.set(2, 20);
+	show("sorted map in another order", s == m, s.hash() == m.hash());
+	let c = ConcurrentMap<int, int>.new();
+	let w = ConcurrentMap<int, int>.new();
+	for i in 0..20 {
+		c.set(i, i + 0);
+		w.set(19 - i, 19 - i);
+	}
+	show("concurrent map in another order", c == w, c.hash() == w.hash());
+}
+
+fn sets()
+{
+	let a = Set<str>.new();
+	let b = Set<str>.new();
+	a.add("x");
+	a.add("y");
+	b.add("y");
+	b.add("x");
+	show("set in another order", a == b, a.hash() == b.hash());
+	b.add("z");
+	show("set with more", a == b, a.hash() == b.hash());
+	let h = HashSet<int>.new();
+	let k = HashSet<int>.new();
+	for i in 0..20 {
+		k.add(19 - i);
+		h.add(i);
+	}
+	show("hash set in another order", h == k, h.hash() == k.hash());
+	let s = SortedSet<int>.new();
+	let t = SortedSet<int>.new();
+	s.add(2);
+	s.add(1);
+	t.add(1);
+	t.add(2);
+	show("sorted set in another order", s == t, s.hash() == t.hash());
+	let x = BitSet.new();
+	let y = BitSet.new();
+	x.add(3);
+	x.add(70);
+	y.add(70);
+	y.add(3);
+	show("bit set in another order", x == y, x.hash() == y.hash());
+}
+
+fn owners()
+{
+	let a = Owner { items: List<str>.new(), named: Map<str, int>.new() };
+	let b = Owner { items: List<str>.new(), named: Map<str, int>.new() };
+	a.items.push("x");
+	b.items.push("x");
+	a.named.set("one", 1);
+	a.named.set("two", 2);
+	b.named.set("two", 2);
+	b.named.set("one", 1);
+	show("owner", a == b, a.hash() == b.hash());
+}
+
+fn main() -> int
+{
+	sequences();
+	maps();
+	sets();
+	owners();
+	return 0;
+}

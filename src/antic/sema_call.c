@@ -525,14 +525,22 @@ struct symbol *sema_method_symbol(const struct checker *c,
                                   const struct type *s,
                                   const struct name *name)
 {
-    const struct interface *lib;
     struct item *m = reached_member(s, name);
-    struct symbol *shared;
 
     if (m != NULL && m->kind == ITEM_FN && m->symbol != NULL &&
         member_visible(c, s, m)) {
         return m->symbol;
     }
+    return sema_module_function(c, s, name);
+}
+
+struct symbol *sema_module_function(const struct checker *c,
+                                    const struct type *s,
+                                    const struct name *name)
+{
+    const struct interface *lib;
+    struct symbol *shared;
+
     shared = shared_operator(c, s, name);
     if (shared != NULL) {
         return shared;

@@ -968,6 +968,10 @@ struct item {
        where the chain declares its own. */
     struct expr *default_eq;
     struct expr *default_hash;
+    /* The call of the `operator fn hash` of the module that the default
+       hash of the class calls instead of walking its fields, or NULL. Set
+       by the checker. */
+    struct expr *operator_hash;
     /* DESIGN: `synchronized class` runs every function that is not
        private under a hidden lock of the object, and `concurrent class`
        has the checker prove every field guarded, atomic or fixed. Both

@@ -1531,6 +1531,74 @@ static struct type *check_operator(struct checker *c, struct expr *e,
     return sig->result;
 }
 
+/* DESIGN: a module that gives a class `==` with a free `operator fn eq`
+   gives it its hash with an `operator fn hash` beside it, which a
+   collection declares as `operator fn hash<T: hash>(a: List<T>) -> u64`.
+   It is then the hash of every value of the class: the compiler writes
+   the class's `hash` as a call of it, so the table, the default hash of a
+   holder and `x.hash()` agree. A copy of a generic class whose arguments
+   miss a constraint of the operator keeps the default hash, as it has no
+   `==` either. The call is checked with the errors held back, and the
+   constraints are read after it. */
+struct expr *sema_class_hash_operator(struct checker *c, struct type *t,
+                                      struct pos pos)
+{
+    static const struct name hash_name = {LANG_HOOK_HASH,
+                                          sizeof LANG_HOOK_HASH - 1};
+    struct symbol *fn = sema_module_function(c, t, &hash_name);
+    const struct item *it;
+    struct expr *call;
+    struct expr *callee;
+    struct expr *hole;
+    struct expr *at;
+    struct expr **args;
+    struct type *sig;
+    size_t i;
+    bool ok;
+
+    if (fn == NULL || fn->kind != SYMBOL_FN || !symbol_is_operator(fn) ||
+        !takes_first(fn, t)) {
+        return NULL;
+    }
+    it = fn->item;
+    call = sema_new_node(c, EXPR_CALL, pos);
+    callee = sema_new_node(c, EXPR_NAME, pos);
+    hole = sema_new_node(c, EXPR_NONE, pos);
+    at = sema_new_node(c, EXPR_UNARY, pos);
+    args = arena_alloc(c->arena, sizeof *args);
+    hole->type = types_pointer(c->types, t);
+    hole->prechecked = true;
+    at->as.unary.op = TOKEN_STAR;
+    at->as.unary.operand = hole;
+    at->type = t;
+    at->prechecked = true;
+    c->quiet++;
+    sig = sema_operator_copy(c, call, fn->type, fn, t, NULL);
+    c->quiet--;
+    if (sig == NULL || sema_is_error(sig) || sig->param_count != 1 ||
+        sig->result == NULL || sig->result->kind != TYPE_U64) {
+        return NULL;
+    }
+    ok = it != NULL && call->as.call.copy_count == it->type_param_count;
+    for (i = 0; ok && i < call->as.call.copy_count; i++) {
+        ok = call->as.call.copy_args[i] == NULL ||
+             sema_meets_param(c, call->as.call.copy_args[i],
+                              it->type_params[i].type);
+    }
+    if (!ok) {
+        return NULL;
+    }
+    callee->symbol = fn;
+    callee->type = sig;
+    callee->as.name = fn->name;
+    args[0] = operator_receiver(c, at, sig->params[0]);
+    call->as.call.callee = callee;
+    call->as.call.args = args;
+    call->as.call.arg_count = 1;
+    call->type = sig->result;
+    return call;
+}
+
 /* DESIGN: `==` on two class pointers compares the identity of the
    objects. A pointer to one interface of an object and a pointer to
    another are therefore equal. Their types differ, and the comparison is

@@ -528,5 +528,6 @@ void sema_class_defaults(struct checker *c, struct item *it)
             }
         }
         it->default_hash = e;
+        it->operator_hash = sema_class_hash_operator(c, t, it->pos);
     }
 }

@@ -1,6 +1,6 @@
 exit 0
 owner eq: true false true
-owner hash: true
+owner hash: true false
 {"type":"Owner","items":[{"type":"Item","number":0,"n":null},{"type":"Item","number":1,"n":null}],"named":{"first":{"type":"Item","number":12,"n":null}},"pool":[{"type":"Item","number":22,"n":null}]}
 after push: false 3
 owners: 0 blocks alive

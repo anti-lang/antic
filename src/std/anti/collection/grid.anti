@@ -298,3 +298,10 @@ pub operator fn eq<T: eq>(a: Grid<T>, b: Grid<T>) -> bool
 	}
 	return collection.equal<T>(&a, &b);
 }
+
+/// The hash of the width, the height and the cells row by row, which equal
+/// grids share.
+pub operator fn hash<T: hash>(a: Grid<T>) -> u64
+{
+	return (a.width, a.height, collection.hash_in_order<T>(&a)).hash();
+}

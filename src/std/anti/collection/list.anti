@@ -362,6 +362,12 @@ pub operator fn eq<T: eq>(a: List<T>, b: List<T>) -> bool
 	return collection.equal<T>(&a, &b);
 }
 
+/// The hash of the elements in order, which equal lists share.
+pub operator fn hash<T: hash>(a: List<T>) -> u64
+{
+	return collection.hash_in_order<T>(&a);
+}
+
 /// Sort the elements of `l` in place, smallest first. The sort is stable, so
 /// equal elements keep their order, and it allocates nothing. A call on a list
 /// reaches it as `l.sort()`.

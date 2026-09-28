@@ -716,6 +716,18 @@ pub operator fn eq<K: eq + hash, V: eq>(a: ConcurrentMap<K, V>,
 	return true;
 }
 
+/// The hash of the entries whatever their order, which equal maps share.
+pub operator fn hash<K: eq + hash, V: hash>(a: ConcurrentMap<K, V>) -> u64
+{
+	let sum: u64 = 0;
+	let n = 0;
+	for (k, v) in a {
+		sum +%= (k.hash(), v.hash()).hash();
+		n += 1;
+	}
+	return (n, sum).hash();
+}
+
 /// The room of the `PARTS` parts from `from`, each with an empty table of its
 /// own and room for its share of `capacity`. The program stops when the
 /// allocator has run out.
@@ -1283,6 +1295,15 @@ pub operator fn eq<T: eq, N: int>(a: SpscRing<T, N>, b: SpscRing<T, N>) -> bool
 		return true;
 	});
 	return collection.equal<T>(&mine, &theirs);
+}
+
+/// The hash of the elements from the oldest, which equal rings share.
+pub operator fn hash<T: hash, N: int>(a: SpscRing<T, N>) -> u64
+{
+	let mine = a.find_all(fn(x) {
+		return true;
+	});
+	return collection.hash_in_order<T>(&mine);
 }
 
 /// Room for `n` elements from `from`, all zero. The program stops when the

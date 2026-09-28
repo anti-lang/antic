@@ -301,3 +301,10 @@ pub operator fn eq<T: eq>(a: Tree<T>, b: Tree<T>) -> bool
 {
 	return collection.equal<T>(&a, &b);
 }
+
+/// The hash of the elements in the order of their slots, which equal trees
+/// share.
+pub operator fn hash<T: hash>(a: Tree<T>) -> u64
+{
+	return collection.hash_in_order<T>(&a);
+}

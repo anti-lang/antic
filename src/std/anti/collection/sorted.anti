@@ -1239,6 +1239,12 @@ pub operator fn eq<K: Ordered, V: eq>(a: SortedMap<K, V>, b: SortedMap<K, V>) ->
 	return collection.equal<(K, V)>(&a, &b);
 }
 
+/// The hash of the entries whatever their order, which equal maps share.
+pub operator fn hash<K: Ordered + hash, V: hash>(a: SortedMap<K, V>) -> u64
+{
+	return collection.hash_in_any_order<(K, V)>(&a);
+}
+
 /// A set that walks its elements in order.
 ///
 /// An element is found in logarithmic time. `for x in s` gives a copy of each
@@ -1552,6 +1558,12 @@ pub class SortedSet<T: Ordered> inherits BTree<T>
 pub operator fn eq<T: Ordered>(a: SortedSet<T>, b: SortedSet<T>) -> bool
 {
 	return collection.equal<T>(&a, &b);
+}
+
+/// The hash of the elements whatever their order, which equal sets share.
+pub operator fn hash<T: Ordered + hash>(a: SortedSet<T>) -> u64
+{
+	return collection.hash_in_any_order<T>(&a);
 }
 
 /// A walk of copies of the elements of a sorted collection, from one place up

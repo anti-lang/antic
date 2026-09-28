@@ -1588,7 +1588,7 @@ static void walk_plain(struct copies *k, struct item *it)
 }
 
 /* The calls of generics that the default `==` and hash of the class it
-   holds name their copies. A field is the only place that reaches a copy
+   holds, and the `operator fn hash` its hash calls, name their copies. A field is the only place that reaches a copy
    of a collection when no statement of the program compares or hashes
    one. */
 static void walk_defaults(struct copies *k, struct item *it)
@@ -1605,6 +1605,9 @@ static void walk_defaults(struct copies *k, struct item *it)
     if (it->default_hash != NULL) {
         xlist(&cl, it->default_hash->as.call.hash_calls,
               it->default_hash->as.call.hash_count);
+    }
+    if (it->operator_hash != NULL) {
+        xe(&cl, it->operator_hash);
     }
 }
 

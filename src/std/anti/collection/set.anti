@@ -162,10 +162,19 @@ pub class Set<T: eq + hash> inherits map.EntryTable<T>
 	}
 }
 
-/// Whether `a` and `b` hold equal elements in the same order.
+/// Whether `a` and `b` hold equal elements, whatever their order.
 pub operator fn eq<T: eq + hash>(a: Set<T>, b: Set<T>) -> bool
 {
-	return collection.equal<T>(&a, &b);
+	if a.count != b.count {
+		return false;
+	}
+	return a.is_subset(b);
+}
+
+/// The hash of the elements whatever their order, which equal sets share.
+pub operator fn hash<T: eq + hash>(a: Set<T>) -> u64
+{
+	return collection.hash_in_any_order<T>(&a);
 }
 
 /// The iterator of `Set<T>`, which gives a copy of each element.
@@ -425,6 +434,12 @@ pub operator fn eq<T: eq + hash>(a: HashSet<T>, b: HashSet<T>) -> bool
 	return a.is_subset(b);
 }
 
+/// The hash of the elements whatever their order, which equal sets share.
+pub operator fn hash<T: eq + hash>(a: HashSet<T>) -> u64
+{
+	return collection.hash_in_any_order<T>(&a);
+}
+
 /// The iterator of `HashSet<T>`, which gives a copy of each element, from a
 /// random slot by a random odd stride.
 pub class HashSetWalk<T>
@@ -618,6 +633,12 @@ pub class BitSet inherits collection.Collection<int>
 			return false;
 		}
 		return self.is_subset(other);
+	}
+
+	/// The hash of the numbers whatever their order, which equal sets share.
+	concrete fn hash(self) -> u64
+	{
+		return collection.hash_in_any_order<int>(self);
 	}
 
 	operator fn iter(self) -> BitWalk

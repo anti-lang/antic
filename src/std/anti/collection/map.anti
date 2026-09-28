@@ -878,12 +878,28 @@ pub class Map<K: eq + hash, V> inherits EntryTable<(K, V)>
 	}
 }
 
-/// Whether `a` and `b` hold equal entries in the same order.
+/// Whether `a` and `b` hold equal entries, whatever their order.
 pub operator fn eq<K: eq + hash, V: eq>(a: Map<K, V>, b: Map<K, V>) -> bool
 {
-	return a.equal_by(&b, fn(x, y) {
-		return x.0 == y.0 && x.1 == y.1;
-	});
+	if a.count != b.count {
+		return false;
+	}
+	for (k, v) in a {
+		let same = false;
+		b.read(k, fn(w) {
+			same = *w == v;
+		});
+		if !same {
+			return false;
+		}
+	}
+	return true;
+}
+
+/// The hash of the entries whatever their order, which equal maps share.
+pub operator fn hash<K: eq + hash, V: hash>(a: Map<K, V>) -> u64
+{
+	return collection.hash_in_any_order<(K, V)>(&a);
 }
 
 /// The iterator of `Map<K, V>`, which gives each key as a copy and lends its
@@ -1269,6 +1285,12 @@ pub operator fn eq<K: eq + hash, V: eq>(a: HashMap<K, V>, b: HashMap<K, V>) -> b
 		}
 	}
 	return true;
+}
+
+/// The hash of the entries whatever their order, which equal maps share.
+pub operator fn hash<K: eq + hash, V: hash>(a: HashMap<K, V>) -> u64
+{
+	return collection.hash_in_any_order<(K, V)>(&a);
 }
 
 /// The iterator of `HashMap<K, V>`, which gives each key as a copy and lends

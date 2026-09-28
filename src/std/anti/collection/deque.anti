@@ -307,3 +307,9 @@ pub operator fn eq<T: eq>(a: Deque<T>, b: Deque<T>) -> bool
 {
 	return collection.equal<T>(&a, &b);
 }
+
+/// The hash of the elements from the front, which equal deques share.
+pub operator fn hash<T: hash>(a: Deque<T>) -> u64
+{
+	return collection.hash_in_order<T>(&a);
+}

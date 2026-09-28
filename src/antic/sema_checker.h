@@ -302,6 +302,19 @@ bool sema_singleton_type(const struct type *t);
 struct symbol *sema_method_symbol(const struct checker *c,
                                   const struct type *s,
                                   const struct name *name);
+/* The free function name of the module of the type s, a shared `operator
+   fn` among them, without the functions of the body of s. */
+struct symbol *sema_module_function(const struct checker *c,
+                                    const struct type *s,
+                                    const struct name *name);
+/* Whether t meets the constraints of the type parameter p, reporting
+   nothing. */
+bool sema_meets_param(struct checker *c, struct type *t, const struct type *p);
+/* The checked call of the `operator fn hash` that the module of the class
+   t declares for it, on a value that stands for the object, or NULL when
+   the module declares none or t does not meet its constraints. */
+struct expr *sema_class_hash_operator(struct checker *c, struct type *t,
+                                      struct pos pos);
 bool sema_implemented_in(const struct type *t, const struct type *iface);
 struct symbol *sema_null_pointer_maker(struct checker *c, struct pos pos);
 struct symbol *sema_error_maker(struct checker *c, struct pos pos);

@@ -507,6 +507,40 @@ pub fn equal<T: eq>(a: *Collection<T>, b: *Collection<T>) -> bool
 	});
 }
 
+/// The hash of the elements of `c` in the order of its places, so two
+/// collections that hold equal elements in the same order hash alike.
+///
+/// A sequence gives its class a hash through it, as `operator fn hash<T:
+/// hash>(a: List<T>) -> u64` beside its `==`.
+pub fn hash_in_order<T: hash>(c: *Collection<T>) -> u64
+{
+	let h = c.count.hash();
+	let at = c.first_place();
+	while at >= 0 do {
+		c.lend_place(at, fn(p) {
+			h = (h, (*p).hash()).hash();
+		});
+		at = c.next_place(at);
+	}
+	return h;
+}
+
+/// The hash of the elements of `c` whatever their order, the sum of the hash of
+/// each with their count, so two maps or two sets that hold equal entries hash
+/// alike.
+pub fn hash_in_any_order<T: hash>(c: *Collection<T>) -> u64
+{
+	let sum: u64 = 0;
+	let at = c.first_place();
+	while at >= 0 do {
+		c.lend_place(at, fn(p) {
+			sum +%= (*p).hash();
+		});
+		at = c.next_place(at);
+	}
+	return (c.count, sum).hash();
+}
+
 /// The alignment of the room of an element: the largest power of two that
 /// divides its size, which every alignment the layout gives it divides.
 fn element_align<T>() -> int

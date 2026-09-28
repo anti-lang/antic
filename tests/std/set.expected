@@ -11,7 +11,7 @@ intersect: 2 4 6
 minus: 1 3 5
 union: 1 2 3 4 5 6 8
 union the other way: 8 4 2 6 1 3 5
-eq: true false false false true
+eq: true true false true false
 is_subset: true false true true
 empty results: 0 0 6
 [2, 4, 6, 8]

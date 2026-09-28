@@ -304,6 +304,13 @@ pub operator fn eq<T: Ordered>(a: PriorityQueue<T>, b: PriorityQueue<T>) -> bool
 	return collection.equal<T>(&a, &b);
 }
 
+/// The hash of the elements in the order of the array, which equal queues
+/// share.
+pub operator fn hash<T: Ordered + hash>(a: PriorityQueue<T>) -> u64
+{
+	return collection.hash_in_order<T>(&a);
+}
+
 /// The iterator of `PriorityQueue<T>`, which gives a copy of each element in
 /// the order of the array. The loop tears each copy down.
 pub class QueueWalk<T: Ordered>

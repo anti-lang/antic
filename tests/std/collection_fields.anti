@@ -127,7 +127,7 @@ fn owners()
 		let b = Owner.of(2);
 		let c = Owner.of(3);
 		show(f"owner eq: {a == b} {a == c} {a != c}");
-		show(f"owner hash: {a.hash() == a.hash()}");
+		show(f"owner hash: {a.hash() == b.hash()} {a.hash() == c.hash()}");
 		let out = text.Builder.new();
 		a.serialize(&out);
 		show(out.take());
@@ -146,7 +146,7 @@ fn boxes()
 		a.pool.add(Item.of(2));
 		b.items.push(Item.of(1));
 		b.pool.add(Item.of(2));
-		show(f"box eq: {a == b} {a.hash() == a.hash()}");
+		show(f"box eq: {a == b} {a.hash() == b.hash()}");
 		b.items.push(Item.of(3));
 		show(f"box after push: {a == b}");
 		let numbers = Box<int> { items: List<int>.new(), pool: Pool<int>.new() };
@@ -163,7 +163,7 @@ fn holders()
 		let b = Holder { items: List<Item>.new() };
 		a.items.push(Item.of(1));
 		b.items.push(Item.of(1));
-		show(f"holder eq: {a == b} {a.hash() == a.hash()}");
+		show(f"holder eq: {a == b} {a.hash() == b.hash()}");
 	}
 	show(f"holders: {Item.live.load()} blocks alive");
 }

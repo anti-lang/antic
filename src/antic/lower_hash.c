@@ -476,6 +476,13 @@ void lower_class_hash(struct lowerer *l, const struct item *it)
     l->f = f;
     l->b = ir_block_add(f);
     self = lower_temp(l, f->params[0].temp);
+    /* A class whose module gives it `operator fn hash` hashes by it. */
+    if (it->operator_hash != NULL) {
+        const struct symbol *op = it->operator_hash->as.call.callee->symbol;
+        ir_ret(l->f, l->b, IR_I64,
+               call_hash(l, lower_callee_function(l, op), self));
+        return;
+    }
     for (up = t; up != NULL; up = up->base) {
         for (i = 0; i < up->field_count; i++) {
             const struct struct_field *fd = &up->fields[i];

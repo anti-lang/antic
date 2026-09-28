@@ -1119,9 +1119,9 @@ foreach(name IN ITEMS concurrent_map concurrent_map_threads spsc_ring
         FIXTURES_REQUIRED
             "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object;collection_map_dev_object;collection_pool_dev_object;collection_concurrent_dev_object")
 endforeach()
-# `dup` of every collection in dev mode. The owner holds a field of each,
-# so the link names the object of every collection module and of
-# anti.reflect, which anti.collection.sorted imports.
+# `dup` and the hash of every collection in dev mode. Each program holds
+# every collection, so the link names the object of every collection
+# module and of anti.reflect, which anti.collection.sorted imports.
 set(dup_objects "${collection_dev_objects},${CMAKE_CURRENT_BINARY_DIR}/anti_reflect_dev${anti_object}")
 set(dup_fixtures lang_dev_object mem_dev_object text_dev_object
     collection_dev_object reflect_dev_object)
@@ -1131,18 +1131,20 @@ foreach(module IN ITEMS list deque ring grid map set sorted pool tree queue
         ",${CMAKE_CURRENT_BINARY_DIR}/anti_collection_${module}_dev${anti_object}")
     list(APPEND dup_fixtures collection_${module}_dev_object)
 endforeach()
-add_test(NAME std_collection_dup_dev
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/collection_dup.anti"
-        "-DOPTIONS=--dev"
-        "-DOBJECTS=${dup_objects}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-set_tests_properties(std_collection_dup_dev PROPERTIES
-    FIXTURES_REQUIRED "${dup_fixtures}")
+foreach(name IN ITEMS dup hash)
+    add_test(NAME std_collection_${name}_dev
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/collection_${name}.anti"
+            "-DOPTIONS=--dev"
+            "-DOBJECTS=${dup_objects}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    set_tests_properties(std_collection_${name}_dev PROPERTIES
+        FIXTURES_REQUIRED "${dup_fixtures}")
+endforeach()
 # The runs with threads spin while the ring is full or empty and wait on the
 # locks of the map. A side that stops for good leaves the other spinning,
 # and the timeout reports it.

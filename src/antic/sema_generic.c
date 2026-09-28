@@ -677,6 +677,23 @@ static void meets(struct checker *c, struct type *t, const struct type *p,
     pc->pos = pos;
 }
 
+bool sema_meets_param(struct checker *c, struct type *t, const struct type *p)
+{
+    size_t i;
+
+    for (i = 0; i < HOOK_COUNT; i++) {
+        if ((p->hooks & (1u << i)) != 0 && !meets_hook(c, t, hook_names[i])) {
+            return false;
+        }
+    }
+    for (i = 0; i < p->iface_count; i++) {
+        if (!meets_iface(c, t, p->ifaces[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void sema_run_pending(struct checker *c)
 {
     size_t i;

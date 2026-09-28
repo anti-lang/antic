@@ -1,0 +1,20 @@
+exit 0
+list: equal 1, hash alike 1
+list reordered: equal 0, hash alike 0
+deque: equal 1, hash alike 1
+ring: equal 1, hash alike 1
+grid: equal 1, hash alike 1
+queue: equal 1, hash alike 1
+pool: equal 1, hash alike 1
+tree: equal 1, hash alike 1
+map in another order: equal 1, hash alike 1
+map with another value: equal 0, hash alike 0
+hash map in another order: equal 1, hash alike 1
+sorted map in another order: equal 1, hash alike 1
+concurrent map in another order: equal 1, hash alike 1
+set in another order: equal 1, hash alike 1
+set with more: equal 0, hash alike 0
+hash set in another order: equal 1, hash alike 1
+sorted set in another order: equal 1, hash alike 1
+bit set in another order: equal 1, hash alike 1
+owner: equal 1, hash alike 1

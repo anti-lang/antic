@@ -3164,6 +3164,8 @@ static void require_filled_chain(struct checker *c, const struct item *it,
    it with `concrete fn hash(self) -> u64`, as it replaces every function
    of the root. `operator fn hash` in a class body would declare a second
    function of that name, so it is refused with the form that replaces
+   it. A free `operator fn hash` of the module of a class, beside its
+   free `operator fn eq`, is the class's hash, as a collection declares
    it. */
 static void check_hook(struct checker *c, const struct item *m,
                        struct type *owner)
@@ -3211,7 +3213,7 @@ static void check_hook(struct checker *c, const struct item *m,
                           "`operator fn index(%s, i: I) -> T`", self);
         }
     } else if (sema_name_is(&m->name, LANG_HOOK_HASH)) {
-        if (owner != NULL && owner->kind == TYPE_CLASS) {
+        if (owner != NULL && owner->kind == TYPE_CLASS && m->has_self) {
             sema_error_at(c, m->name_pos, "a class replaces `hash` of "
                           "`Object` with `concrete fn hash(self) -> u64`");
             return;

@@ -541,6 +541,13 @@ pub operator fn eq<T: eq>(a: Pool<T>, b: Pool<T>) -> bool
 	return collection.equal<T>(&a, &b);
 }
 
+/// The hash of the elements in the order of their slots, which equal pools
+/// share.
+pub operator fn hash<T: hash>(a: Pool<T>) -> u64
+{
+	return collection.hash_in_order<T>(&a);
+}
+
 /// The iterator of `Pool<T>` and `Tree<T>`, which lends each element in the
 /// order of the slots.
 pub class SlotsWalk<T>
