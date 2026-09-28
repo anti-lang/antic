@@ -32,8 +32,8 @@ find_one 3, remove_all 3: [2, 4, 6, 70, 80], count 5
 handle of 3 finds -1
 11 reuses slot 4 in generation 1
 walked in place: [3, 5, 12, 7, 71, 81]
-copied by a walk: [3, 5, 12, 7, 71, 81]
-clear: 0 true -1
+copied by a walk: [3, 5, 12, 7, 71, 81], equal true
+clear: 0 true -1, equal false
 [one, other, one]
 set: torn 4
 remove: torn 5

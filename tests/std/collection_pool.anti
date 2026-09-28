@@ -4,7 +4,7 @@
 //! element, read through a lending function, shows that it never moves. A
 //! handle of a removed element finds nothing, even once its slot holds another
 //! element. The versioned forms compare and set, and the shared parts of every
-//! collection work over the slots.
+//! collection work over the slots. `==` compares the elements in slot order.
 
 import anti.collection.{Copies};
 import anti.collection.pool.{Handle, Pool};
@@ -253,9 +253,9 @@ fn shared() may fail
 		let y = x;
 		q.add(y);
 	}
-	show(f"copied by a walk: {q.to_text()}");
+	show(f"copied by a walk: {q.to_text()}, equal {p == q}");
 	p.clear();
-	show(f"clear: {p.count} {p.is_empty()} {p.get(h) ?? -1}");
+	show(f"clear: {p.count} {p.is_empty()} {p.get(h) ?? -1}, equal {p == q}");
 }
 
 fn owned()

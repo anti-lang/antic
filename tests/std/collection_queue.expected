@@ -22,3 +22,4 @@ pop 1, torn 4
 removed 1, torn 5
 pop 2
 after the block, torn 9
+equal true, after a push false

@@ -21,3 +21,4 @@ clear: 0 false
 removed 3, torn 3
 stale parent 1, torn 4
 after the block, torn 6
+equal true, after a child false

@@ -229,6 +229,21 @@ fn owned()
 	printf("after the block, torn %d\n".ptr, Job.torn.load() as c_int);
 }
 
+/// `==` of two queues compares their arrays in order, so two queues given the
+/// same pushes are equal and one more push tells them apart.
+fn equality()
+{
+	let a = PriorityQueue<int>.new();
+	let b = PriorityQueue<int>.new();
+	for i in 0..5 {
+		a.push(i * 3 % 5);
+		b.push(i * 3 % 5);
+	}
+	let same = a == b;
+	b.push(9);
+	show(f"equal {same}, after a push {a == b}");
+}
+
 fn main() -> int
 {
 	numbers();
@@ -236,5 +251,6 @@ fn main() -> int
 	shared() catch fatal;
 	allocation();
 	owned();
+	equality();
 	return 0;
 }

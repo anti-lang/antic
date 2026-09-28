@@ -167,10 +167,26 @@ fn owned()
 	printf("after the block, torn %d\n".ptr, Node.torn.load() as c_int);
 }
 
+/// `==` of two trees compares their elements in slot order, so two trees built
+/// the same way are equal and one more child tells them apart.
+fn equality()
+{
+	let a = Tree<int>.new();
+	let b = Tree<int>.new();
+	let ra = a.add_root(1);
+	let rb = b.add_root(1);
+	a.add_child(ra, 2);
+	b.add_child(rb, 2);
+	let same = a == b;
+	b.add_child(rb, 3);
+	show(f"equal {same}, after a child {a == b}");
+}
+
 fn main() -> int
 {
 	shape();
 	forms() catch fatal;
 	owned();
+	equality();
 	return 0;
 }
