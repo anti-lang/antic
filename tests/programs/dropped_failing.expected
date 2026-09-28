@@ -1,0 +1,7 @@
+exit 0
+after a result: 0 boxes
+after a value the handler gave: 0 boxes
+after a result under catch fatal: 0 boxes
+after two optional results: 0 boxes
+relay failed
+after a result dropped under try: 0 boxes

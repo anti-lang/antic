@@ -537,6 +537,11 @@ bool lower_optional_needs_destruct(const struct type *t);
    moves the new one in: a value with a teardown, in an array at any
    depth, or a `?T` of one. */
 bool lower_needs_teardown(const struct type *t);
+/* The value of the call e, whose error a handler takes, written into a
+   slot of the frame whose tables are zeroed first. An aggregate is the
+   address of its slot. */
+struct ir_operand lower_handled_operand(struct lowerer *l,
+                                        const struct expr *e);
 /* Tear down the call results and the literals among the count arguments
    args, lowered to values, that the call of sym with type fn took at
    parameters that neither keep them nor take a pointer. The first

@@ -622,8 +622,8 @@ static struct ir_operand lower_join(struct lowerer *l, const struct expr *e);
    frame, whose tables are zeroed first so that the `=` the callee runs
    destroys nothing, and the value is read from there. An aggregate is
    its slot, as the value of any other call is its memory. */
-static struct ir_operand handled_operand(struct lowerer *l,
-                                         const struct expr *e)
+struct ir_operand lower_handled_operand(struct lowerer *l,
+                                        const struct expr *e)
 {
     bool has_out = e->as.call.out != NULL;
     struct ir_operand out = lower_none();
@@ -1011,7 +1011,7 @@ struct ir_operand lower_address(struct lowerer *l,
         return lower_expr(l, e->as.unary.operand);
     case EXPR_CALL:
         if (lower_is_handled_call(e)) {
-            return handled_operand(l, e);
+            return lower_handled_operand(l, e);
         }
         return lower_call(l, e);
     case EXPR_PARALLEL:
@@ -2903,7 +2903,7 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         return lower_cast(l, e);
     case EXPR_CALL:
         if (lower_is_handled_call(e)) {
-            return handled_operand(l, e);
+            return lower_handled_operand(l, e);
         }
         return lower_call(l, e);
     case EXPR_PARALLEL:

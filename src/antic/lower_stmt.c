@@ -2002,10 +2002,21 @@ static void lower_stmt(struct lowerer *l, const struct stmt *s)
            constant operand. */
         return;
     case STMT_EXPR:
+        /* DESIGN: a call whose error a handler takes and whose result the
+           statement drops writes the result into a slot of its own, as
+           an operand does, since no place of a `let` is there to take
+           it. What the call or a `yield` of the handler left there is
+           torn down where the statement ends. A handler that leaves no
+           value leaves the zero tables, which the teardown passes
+           over. */
         if (lower_is_handled_call(s->as.expr)) {
-            struct ir_operand err = lower_call(l, s->as.expr);
-            lower_handle_error(l, s->as.expr, err, lower_none(), false,
-                               lower_none());
+            const struct expr *call = s->as.expr;
+            struct ir_operand value = lower_handled_operand(l, call);
+            if (call->as.call.out != NULL && l->b != NULL &&
+                lower_needs_teardown(call->type)) {
+                lower_destroy_owned(l, call->type, value,
+                                    ir_int_op(IR_PTR, 0), true);
+            }
             return;
         }
         drop_result(l, s->as.expr, lower_expr(l, s->as.expr));

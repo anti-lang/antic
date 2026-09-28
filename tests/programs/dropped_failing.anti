@@ -1,0 +1,92 @@
+//! A statement that drops the result of a `may fail` call with a handler. The
+//! call writes its result into a place of its own, the handler runs where the
+//! call fails, and the statement tears down what the call or the handler gave.
+//! Each `Box` counts itself alive, so a teardown missed or run twice shows in
+//! the count.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box
+{
+	pub own inner: ?*Box = none,
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	pub fn make(n: int) -> Box
+	{
+		Box.live.add(1);
+		return Box { n: n };
+	}
+
+	concrete fn destruct(self)
+	{
+		Box.live.sub(1);
+	}
+}
+
+fn made(n: int) -> Box may fail
+{
+	if n < 0 {
+		fail "negative";
+	}
+	return Box.make(n);
+}
+
+fn maybe(n: int) -> ?Box may fail
+{
+	if n < 0 {
+		fail "negative";
+	}
+	if n == 0 {
+		return none;
+	}
+	return Box.make(n);
+}
+
+fn relay(n: int) may fail
+{
+	try made(n);
+}
+
+fn live(label: str)
+{
+	printf("%.*s: %d boxes\n".ptr, label.len as c_int, label.ptr,
+		Box.live.load() as c_int);
+}
+
+fn dropped() -> int
+{
+	made(1) catch {
+		return 1;
+	};
+	live("after a result");
+	made(-1) catch {
+		yield Box.make(2);
+	};
+	live("after a value the handler gave");
+	made(3) catch fatal;
+	live("after a result under catch fatal");
+	maybe(4) catch {
+		return 1;
+	};
+	maybe(0) catch {
+		return 1;
+	};
+	live("after two optional results");
+	relay(5) catch {
+		return 1;
+	};
+	relay(-1) catch {
+		printf("relay failed\n".ptr);
+	};
+	live("after a result dropped under try");
+	return 0;
+}
+
+fn main() -> int
+{
+	return dropped();
+}
