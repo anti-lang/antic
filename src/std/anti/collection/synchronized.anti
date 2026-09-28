@@ -2,20 +2,21 @@
 //!
 //! `SyncList<T>`, `SyncMap<K, V>`, `SyncSet<T>` and `SyncPool<T>` hold a
 //! `List`, a `Map`, a `Set` and a `Pool`. Each is a synchronized class, so
-//! every public function runs under the hidden lock of its object and a
-//! closure at a `concurrent` parameter or a worker may change one.
+//! every public function runs under the hidden lock of its object and a closure
+//! at a `concurrent` parameter or a worker may change one.
 //!
 //! They have the operations of the plain collections, less every operation by
-//! position and `lend_slice`. Between threads a position can go stale at any
-//! moment, so an element is addressed by criteria, key or handle, and a slice
-//! of the whole buffer would be reached without the lock. Reading gives a copy,
-//! and no pointer to an element leaves them except through a `lent` parameter.
+//! position and the lending of the whole buffer. Between threads a position can
+//! go stale at any moment, so an element is addressed by criteria, key or
+//! handle, and a slice of the whole buffer would be reached without the lock.
+//! Reading gives a copy, and no pointer to an element leaves them except
+//! through a parameter that lends it.
 //!
-//! `read`, `modify` and the functions given to the `find`, `update` and
-//! `remove` forms run inside the lock. A slow function holds up every other
-//! thread that uses the collection. The lock counts, so such a function may
-//! read the collection again, but it must not change it, since the plain
-//! collection inside is walking its elements.
+//! `read`, `modify` and the functions given to the find, update and remove
+//! forms run inside the lock. A slow function holds up every other thread that
+//! uses the collection. The lock counts, so such a function may read the
+//! collection again, but it must not change it, since the plain collection
+//! inside is walking its elements.
 //!
 //! Every element carries a version, so a thread can read, compute and write
 //! back only if nothing changed meanwhile. `set_if_version` fails with
@@ -55,9 +56,9 @@ struct Stamp
 /// or leaves. `find_first_versioned` and `find_one_versioned` give it, and
 /// `set_if_version` takes it back.
 ///
-/// The functions given to the `find`, `update` and `remove` forms and to
-/// `sort_with` run inside the lock. A slow function holds up every other
-/// thread that uses the list.
+/// The functions given to the find, update and remove forms and to `sort_with`
+/// run inside the lock. A slow function holds up every other thread that uses
+/// the list.
 pub synchronized class SyncList<T>
 {
 	/// The allocator of every block the list holds.
@@ -108,7 +109,8 @@ pub synchronized class SyncList<T>
 	///
 	/// DESIGN: the pair of the list holds a copy of `x`, and `x` is torn down
 	/// when the call returns. A literal takes no owning value from a parameter,
-	/// `use dup instead of =`, and a copy of a generic is held to the same rule.
+	/// `use dup instead of =`, and a copy of a generic is held to the same
+	/// rule.
 	pub fn push(self, own x: T)
 	{
 		self.clock += 1;
@@ -199,8 +201,8 @@ pub synchronized class SyncList<T>
 	/// version, so a thread can read, compute and write back only if nothing
 	/// changed meanwhile.
 	///
-	/// It fails with `anti.collection.pool.Changed`, whose `found` is -1, and
-	/// tears `x` down, when no element holds `version`: the element changed
+	/// It fails with `anti.collection.pool.Changed`, which found version -1,
+	/// and tears `x` down, when no element holds `version`: the element changed
 	/// since or is gone.
 	pub fn set_if_version(self, own x: T, version: int) may fail
 	{
@@ -478,8 +480,8 @@ fn blank_pool<T>(from: *mem.Allocator) -> SyncPool<T>
 ///
 /// DESIGN: the functions of `SyncList` that give a `?T` call it or `taken`,
 /// since antic fails to lower a public function of a synchronized class that
-/// returns a value where its result is a `?T`. The element comes apart from
-/// the result of a call, which hands each part to its name.
+/// returns a value where its result is a `?T`. The element comes apart from the
+/// result of a call, which hands each part to its name.
 fn copied<T>(items: *list.List<(T, int)>, at: int) -> ?T
 {
 	if at < 0 || at >= items.count {
@@ -500,8 +502,8 @@ fn taken<T>(items: *list.List<(T, int)>, at: int) -> ?T
 	return x;
 }
 
-/// A copy of the value under `k` in `entries` and its version in `versions`,
-/// or `none`, for the reason of `copied`.
+/// A copy of the value under `k` in `entries` and its version in `versions`, or
+/// `none`, for the reason of `copied`.
 fn versioned<K: eq + hash, V>(entries: *maps.Map<K, V>,
 	versions: *maps.Map<K, Stamp>, k: K) -> ?(V, int)
 {
@@ -519,8 +521,8 @@ fn versioned<K: eq + hash, V>(entries: *maps.Map<K, V>,
 /// change of each `update_*` give the entry the next stamp. An entry removed
 /// and added again takes a stamp it never had.
 ///
-/// `read`, `modify`, `update` and the functions given to the `find`, `update`
-/// and `remove` forms run inside the lock. A slow function holds up every other
+/// `read`, `modify`, `update` and the functions given to the find, update and
+/// remove forms run inside the lock. A slow function holds up every other
 /// thread that uses the map.
 pub synchronized class SyncMap<K: eq + hash, V>
 {
@@ -839,11 +841,12 @@ pub synchronized class SyncMap<K: eq + hash, V>
 /// Each element carries a version: a stamp from a clock of the set. `add` and
 /// `set_if_version` give the element the next stamp, and an element removed and
 /// added again takes a stamp it never had. The elements of a set that `union`,
-/// `intersect` or `minus` made start at version 0, which no stamp is. An element of a set is its own key
-/// and never changes in place, so `version_of` gives the version alone.
+/// `intersect` or `minus` made start at version 0, which no stamp is. An
+/// element of a set is its own key and never changes in place, so `version_of`
+/// gives the version alone.
 ///
-/// The functions given to the `find`, `update` and `remove` forms run inside
-/// the lock. A slow function holds up every other thread that uses the set.
+/// The functions given to the find, update and remove forms run inside the
+/// lock. A slow function holds up every other thread that uses the set.
 pub synchronized class SyncSet<T: eq + hash>
 {
 	/// The allocator of every block the set holds.
@@ -1124,9 +1127,9 @@ pub synchronized class SyncSet<T: eq + hash>
 		made.clock = self.clock;
 	}
 
-	/// The version of the element equal to `x`, which the set holds. An
-	/// element of a set that `union`, `intersect` or `minus` made has version 0
-	/// until it is replaced.
+	/// The version of the element equal to `x`, which the set holds. An element
+	/// of a set that `union`, `intersect` or `minus` made has version 0 until
+	/// it is replaced.
 	fn version(self, x: T) -> int
 	{
 		let stamp = self.versions.get(x) ?? Stamp { version: 0 };
@@ -1159,9 +1162,9 @@ pub synchronized class SyncSet<T: eq + hash>
 /// the change of each `update_*` count one. A walk with `for` takes copies and
 /// counts none.
 ///
-/// `read`, `modify` and the functions given to the `find`, `update` and
-/// `remove` forms run inside the lock. A slow function holds up every other
-/// thread that uses the pool.
+/// `read`, `modify` and the functions given to the find, update and remove
+/// forms run inside the lock. A slow function holds up every other thread that
+/// uses the pool.
 pub synchronized class SyncPool<T>
 {
 	/// The allocator of every block the pool holds.

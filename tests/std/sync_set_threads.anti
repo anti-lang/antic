@@ -1,14 +1,13 @@
 //! Many threads on one `SyncSet` at once.
 //!
 //! The chunks of a `parallel` add their numbers, add a few numbers that every
-//! chunk shares, and remove the multiples of three again, while a dispatched job
-//! walks and searches the set. Each shared number is added once, whichever
+//! chunk shares, and remove the multiples of three again, while a dispatched
+//! job walks and searches the set. Each shared number is added once, whichever
 //! chunk comes first. Every chunk then replaces the shared elements with a loop
 //! of `version_of` and `set_if_version`, trying again when another thread came
-//! first.
-//! A versioned set fails once another thread replaced the element, and a copy
-//! made with `dup` takes a lock of its own. The totals come out the same on
-//! every run.
+//! first. A versioned set fails once another thread replaced the element, and a
+//! copy made with `dup` takes a lock of its own. The totals come out the same
+//! on every run.
 
 import anti.collection.pool;
 import anti.collection.synchronized.{SyncSet};

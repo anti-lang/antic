@@ -1,5 +1,5 @@
-//! `SyncMap<K, V>` of `anti.collection.synchronized` through every operation
-//! on one thread.
+//! `SyncMap<K, V>` of `anti.collection.synchronized` through every operation on
+//! one thread.
 //!
 //! The map keeps insertion order, so `serialize` and `to_text` print it. Keys
 //! and values that own memory count the blocks alive, and an allocator counts

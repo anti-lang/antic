@@ -5,8 +5,8 @@
 //! then counts on a few shared counters, with `update_first` and with a loop of
 //! `find_first_versioned` and `set_if_version`, so no count goes missing when
 //! two threads change one element. A versioned set fails once another thread
-//! changed the element, and a copy made with `dup` takes a lock of its own.
-//! The totals come out the same on every run.
+//! changed the element, and a copy made with `dup` takes a lock of its own. The
+//! totals come out the same on every run.
 
 import anti.collection.pool;
 import anti.collection.synchronized.{SyncList};
