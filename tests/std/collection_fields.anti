@@ -1,0 +1,177 @@
+//! Copies of generic collections that a program reaches only through the fields
+//! of its own types.
+//!
+//! `Owner` holds a `List<Item>`, a `Map<str, Item>` and a `Pool<Item>`, the
+//! generic `Box<T>` holds a list and a pool of `T`, and the struct `Holder`
+//! holds a list. No statement of the program calls `==` or `hash` of those
+//! copies, yet the default `equals` and `hash` of each owner reach them, and
+//! its teardown and `serialize` reach the rest. Every element owns a block
+//! counted in `Item.live`, which reads 0 after each case.
+
+import anti.collection.list.{List};
+import anti.collection.map.{Map};
+import anti.collection.pool.{Pool};
+import anti.lang;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+
+/// An element that owns memory, with `==` and `hash` over its number. Its copy
+/// makes a block of its own, and every block counts in `Item.live`.
+class Item
+{
+	pub number: int = 0,
+	pub n: ?*int = none,
+
+	static atomic live: int = 0;
+
+	pub fn of(n: int) -> Item
+	{
+		return Item { number: n, n: block(n) };
+	}
+
+	pub fn value(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	operator fn eq(self, other: Item) -> bool
+	{
+		return self.value() == other.value();
+	}
+
+	concrete fn hash(self) -> u64
+	{
+		return self.value().hash();
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Item;
+		made.n = block(self.value());
+	}
+
+	concrete fn to_text(self) -> str
+	{
+		return f"{self.value()}";
+	}
+
+	fn destruct(self)
+	{
+		let p = self.n else {
+			return;
+		};
+		Item.live.add(-1);
+		free(p);
+	}
+}
+
+/// A block that holds `n`, counted in `Item.live`.
+fn block(n: int) -> *int
+{
+	let p = alloc(int, 1) catch fatal;
+	p[0] = n;
+	Item.live.add(1);
+	return p;
+}
+
+/// A plain class with a field of each collection.
+class Owner
+{
+	pub items: List<Item>,
+	pub named: Map<str, Item>,
+	pub pool: Pool<Item>,
+
+	pub fn of(n: int) -> Owner
+	{
+		let o = Owner {
+			items: List<Item>.new(),
+			named: Map<str, Item>.new(),
+			pool: Pool<Item>.new(),
+		};
+		for i in 0..n {
+			o.items.push(Item.of(i));
+		}
+		o.named.set("first", Item.of(10 + n));
+		o.pool.add(Item.of(20 + n));
+		return o;
+	}
+}
+
+/// A generic class whose copy holds copies of the collections.
+class Box<T>
+{
+	pub items: List<T>,
+	pub pool: Pool<T>,
+}
+
+/// A struct with a field of a copy.
+struct Holder
+{
+	items: List<Item>,
+}
+
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+fn owners()
+{
+	{
+		let a = Owner.of(2);
+		let b = Owner.of(2);
+		let c = Owner.of(3);
+		show(f"owner eq: {a == b} {a == c} {a != c}");
+		show(f"owner hash: {a.hash() == a.hash()}");
+		let out = text.Builder.new();
+		a.serialize(&out);
+		show(out.take());
+		b.items.push(Item.of(7));
+		show(f"after push: {a == b} {b.items.count}");
+	}
+	show(f"owners: {Item.live.load()} blocks alive");
+}
+
+fn boxes()
+{
+	{
+		let a = Box<Item> { items: List<Item>.new(), pool: Pool<Item>.new() };
+		let b = Box<Item> { items: List<Item>.new(), pool: Pool<Item>.new() };
+		a.items.push(Item.of(1));
+		a.pool.add(Item.of(2));
+		b.items.push(Item.of(1));
+		b.pool.add(Item.of(2));
+		show(f"box eq: {a == b} {a.hash() == a.hash()}");
+		b.items.push(Item.of(3));
+		show(f"box after push: {a == b}");
+		let numbers = Box<int> { items: List<int>.new(), pool: Pool<int>.new() };
+		numbers.items.push(4);
+		show(f"box of int: {numbers.items.count}");
+	}
+	show(f"boxes: {Item.live.load()} blocks alive");
+}
+
+fn holders()
+{
+	{
+		let a = Holder { items: List<Item>.new() };
+		let b = Holder { items: List<Item>.new() };
+		a.items.push(Item.of(1));
+		b.items.push(Item.of(1));
+		show(f"holder eq: {a == b} {a.hash() == a.hash()}");
+	}
+	show(f"holders: {Item.live.load()} blocks alive");
+}
+
+fn main() -> int
+{
+	owners();
+	boxes();
+	holders();
+	return 0;
+}

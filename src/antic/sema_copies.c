@@ -1587,6 +1587,45 @@ static void walk_plain(struct copies *k, struct item *it)
     k->c->function = outer_function;
 }
 
+/* The calls of generics that the default `==` and hash of the class it
+   holds name their copies. A field is the only place that reaches a copy
+   of a collection when no statement of the program compares or hashes
+   one. */
+static void walk_defaults(struct copies *k, struct item *it)
+{
+    struct clone cl;
+
+    memset(&cl, 0, sizeof cl);
+    cl.k = k;
+    cl.fresh = false;
+    if (it->default_eq != NULL) {
+        xlist(&cl, it->default_eq->as.binary.eq_calls,
+              it->default_eq->as.binary.eq_count);
+    }
+    if (it->default_hash != NULL) {
+        xlist(&cl, it->default_hash->as.call.hash_calls,
+              it->default_hash->as.call.hash_count);
+    }
+}
+
+/* Give each class copy added since *from its defaults, and walk them.
+   Returns whether it reached one. */
+static bool defaults_of_copies(struct copies *k, size_t *from)
+{
+    bool reached = false;
+
+    while (*from < k->added_count && !k->failed) {
+        struct item *it = k->added[(*from)++];
+        if (it->kind != ITEM_CLASS) {
+            continue;
+        }
+        sema_class_defaults(k->c, it);
+        walk_defaults(k, it);
+        reached = true;
+    }
+    return reached;
+}
+
 static bool generic_type_item(const struct item *it)
 {
     return it->type_param_count > 0 && it->symbol != NULL &&
@@ -1644,6 +1683,7 @@ void sema_compile_copies(struct checker *c)
     struct copies k;
     struct item **items;
     size_t done = 0;
+    size_t defaulted = 0;
     size_t count = module->item_count;
     size_t i;
     size_t j;
@@ -1683,13 +1723,15 @@ void sema_compile_copies(struct checker *c)
                 walk_plain(&k, it->members[j]);
             }
         }
+        walk_defaults(&k, it);
     }
     do {
         while (done < k.work_count && !k.failed) {
             struct work w = k.work[done++];
             make_body(&k, &w);
         }
-    } while (!k.failed && copies_without_items(&k));
+    } while (!k.failed && (copies_without_items(&k) ||
+                           defaults_of_copies(&k, &defaulted)));
     if (!k.failed && k.added_count > 0) {
         items = types_alloc_array(c->arena, count + k.added_count + 1,
                                   sizeof *items);

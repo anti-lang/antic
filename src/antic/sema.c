@@ -3718,13 +3718,15 @@ bool sema_check(struct module *module, const char *module_name,
     report_program(&c);
     check_boundary(&c);
     sema_report_unfixed(&c);
-    if (c.ok && module->compile_copies) {
-        sema_compile_copies(&c);
-    }
+    /* The defaults come before the copies, whose pass makes the copies
+       their calls name and gives each class copy it makes its own. */
     if (c.ok) {
         for (i = 0; i < module->item_count; i++) {
             sema_class_defaults(&c, module->items[i]);
         }
+    }
+    if (c.ok && module->compile_copies) {
+        sema_compile_copies(&c);
     }
     free(c.module_scope.entries);
     return c.ok;

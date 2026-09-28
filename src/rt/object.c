@@ -409,6 +409,7 @@ int anti_rt_element_walked(int64_t type, const struct anti_descriptor *d)
 
 static void serialize_into(struct anti_builder *b, const void *object,
                            const struct anti_descriptor *d);
+static void serialize_object(struct anti_builder *b, const void *object);
 static void put_value(struct anti_builder *b, const void *bytes,
                       int64_t type, const struct anti_descriptor *d,
                       int64_t owned);
@@ -534,8 +535,7 @@ static void put_value(struct anti_builder *b, const void *bytes,
         if (value == NULL) {
             put(b, "null");
         } else if (owned && ANTI_TYPE_ELEMENT(type) == ANTI_TYPE_CLASS) {
-            value = anti_rt_object_of(value);
-            serialize_into(b, value, anti_rt_descriptor(value));
+            serialize_object(b, anti_rt_object_of(value));
         } else if (owned && t == ANTI_TYPE_PTR &&
                    anti_rt_element_walked(type, d)) {
             put_value(b, value, ANTI_TYPE_ELEMENT(type), d, 0);
@@ -556,7 +556,7 @@ static void put_value(struct anti_builder *b, const void *bytes,
         }
         return;
     case ANTI_TYPE_CLASS:
-        serialize_into(b, bytes, d);
+        serialize_object(b, bytes);
         return;
     /* A variant is an object whose one member names the case and holds
        its fields, `{"Circle":{"r":2}}`, and a `?T` is its value or null. */
@@ -703,12 +703,14 @@ static int64_t array_length(const struct anti_field *arg)
     return size == 0 ? 0 : arg->offset / (int64_t)size;
 }
 
-/* A class value in place, written by the `serialize` of its table, so a
-   class that replaces it, a collection among them, writes its own form. */
-static void serialize_object(struct anti_builder *b, void *object)
+/* DESIGN: a class value, in place or behind an `own` pointer, as an
+   element or as a field, is written by the `serialize` of its table, so a
+   class that replaces it, a collection among them, writes its own form.
+   One that does not reaches the default through the root's entry. */
+static void serialize_object(struct anti_builder *b, const void *object)
 {
-    void (*write)(struct anti_object *, void *) =
-        (void (*)(struct anti_object *, void *))anti_rt_entry_body(
+    void (*write)(const void *, void *) =
+        (void (*)(const void *, void *))anti_rt_entry_body(
             object, ANTI_ENTRY_SERIALIZE);
 
     if (write == NULL) {
