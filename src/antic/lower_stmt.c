@@ -966,7 +966,7 @@ bool lower_type_needs_destruct(const struct type *t)
 {
     return t != NULL &&
            (t->kind == TYPE_CLASS || t->kind == TYPE_STRUCT ||
-            t->kind == TYPE_TUPLE) &&
+            t->kind == TYPE_TUPLE || t->kind == TYPE_VARIANT) &&
            sema_needs_teardown(t);
 }
 
@@ -1028,7 +1028,8 @@ static void destroy_value(struct lowerer *l, struct ir_operand p,
     struct ir_operand args[2];
     struct ir_block *after;
 
-    if (t->kind == TYPE_STRUCT || t->kind == TYPE_TUPLE) {
+    if (t->kind == TYPE_STRUCT || t->kind == TYPE_TUPLE ||
+        t->kind == TYPE_VARIANT) {
         lower_destroy_owned(l, t, p, ir_int_op(IR_PTR, 0), replaced);
         return;
     }
@@ -2130,6 +2131,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
         size_t k;
         const struct type *variant = s->as.switch_stmt.value->type;
         struct ir_operand address = lower_none();
+        struct defers arm_scope;
         over = lower_expr(l, s->as.switch_stmt.value);
         /* DESIGN: a switch on a variant reads the tag once and compares it
            with the number of each arm's case. The value stays where it
@@ -2172,6 +2174,13 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
             ir_branch(l->f, l->b, test, arm, next_test);
             l->b = arm;
             entry[k] = arm;
+            memset(&arm_scope, 0, sizeof arm_scope);
+            arm_scope.outer = l->defers;
+            l->defers = &arm_scope;
+            /* DESIGN: an arm that binds gets a copy of the fields of its
+               case. What they own is copied as `dup` copies it, and the
+               arm tears the copy down on every exit, so the variant keeps
+               its own. */
             if (at->bound != NULL) {
                 /* The address and the type are bound first, since C
                    leaves the order of two calls with effects in one
@@ -2181,8 +2190,18 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
                 struct ir_vtype bound = lower_vtype_of(l, at->bound->type);
                 ir_memcopy(l->f, l->b, lower_temp(l, at->bound->ir), fields,
                            bound);
+                if (lower_needs_teardown(at->bound->type)) {
+                    lower_copy_owned(l, at->bound->type, fields,
+                                     lower_temp(l, at->bound->ir));
+                    push_exit_action(l, NULL, at->bound, false);
+                }
             }
             lower_stmt(l, body);
+            if (l->b != NULL) {
+                lower_run_defers(l, &arm_scope, false);
+            }
+            l->defers = arm_scope.outer;
+            free(arm_scope.items);
             if ((falls[k] = sema_arm_fallthrough(body)) != NULL) {
                 tail[k] = l->b;
             } else {

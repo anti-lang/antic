@@ -1,0 +1,12 @@
+exit 0
+pushed: torn 0, leaves 3
+popped plain 1
+popped full 1
+pop: torn 1, leaves 2
+removed all 1
+remove_all: torn 1, leaves 2
+copied 2
+dup: torn 3, leaves 2
+got full 1
+get: torn 4, leaves 2
+after the block: torn 6, leaves 0

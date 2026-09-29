@@ -314,7 +314,7 @@ struct ir_operand lower_case_address(struct lowerer *l, const struct type *v,
                                 lower_field_offset(l, v, &union_name));
 }
 
-/* DESIGN: a local that a struct or class literal names moved into
+/* DESIGN: a local that a struct, class or variant literal names moved into
    it, and its tables are cleared once every part is stored, so the
    teardown of its block passes over it. A part after it may read it
    before. */
@@ -357,6 +357,7 @@ static void build_variant(struct lowerer *l, const struct expr *e,
             lower_offset_address(l, fields,
                                  lower_field_offset(l, payload, &field->name)));
     }
+    clear_moved_inits(l, e);
 }
 
 static void build_value_into(struct lowerer *l, const struct expr *e,
@@ -1051,11 +1052,12 @@ struct ir_operand lower_address(struct lowerer *l,
     case EXPR_FN:
         return lower_closure(l, e);
     /* `dup` of an `own fn` copies the snapshot into a new pair. `dup` of
-       a struct or a tuple copies its bytes, then what its parts own. */
+       a struct, a tuple or a variant copies its bytes, then what its
+       parts own. */
     case EXPR_OBJECT:
         slot = ir_entry_slot(l->f, lower_vtype_of(l, e->type));
         if (e->type->kind == TYPE_STRUCT || e->type->kind == TYPE_TUPLE ||
-            e->as.object.value) {
+            e->type->kind == TYPE_VARIANT || e->as.object.value) {
             struct ir_operand from = lower_expr(l, e->as.object.operand);
             ir_memcopy(l->f, l->b, lower_temp(l, slot), from,
                        lower_vtype_of(l, e->type));

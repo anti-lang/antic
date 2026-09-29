@@ -549,7 +549,9 @@ bool sema_has_body(const struct item *fn)
    array of an owning type, and an owning struct or tuple. An owning one
    follows the value rules of a class value, and one that owns nothing
    stays plain data. A union owns nothing, since no teardown knows which
-   of its fields it holds. */
+   of its fields it holds. A variant is owning when the struct of any of
+   its cases is, since its tag names the case it holds, and its teardown
+   tears down the fields of that case. */
 bool sema_needs_teardown(const struct type *t)
 {
     static const struct name destruct_name = {"destruct", 8};
@@ -573,6 +575,13 @@ bool sema_needs_teardown(const struct type *t)
             const struct struct_field *f = &t->fields[i];
             if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
                 sema_needs_teardown(f->type)) {
+                return true;
+            }
+        }
+        return false;
+    case TYPE_VARIANT:
+        for (i = 0; i < t->param_count; i++) {
+            if (sema_needs_teardown(t->params[i])) {
                 return true;
             }
         }
@@ -679,6 +688,10 @@ static void owns_reason(char *out, size_t size, const struct type *t)
         snprintf(out, size, "has a `destruct`");
         return;
     }
+    if (t->kind == TYPE_VARIANT) {
+        snprintf(out, size, "owns what its parts own");
+        return;
+    }
     f = owning_field(t);
     inner = f != NULL ? f->type : NULL;
     while (inner != NULL &&
@@ -687,7 +700,8 @@ static void owns_reason(char *out, size_t size, const struct type *t)
     }
     if (inner == NULL || (inner->kind != TYPE_CLASS &&
                           inner->kind != TYPE_STRUCT &&
-                          inner->kind != TYPE_TUPLE)) {
+                          inner->kind != TYPE_TUPLE &&
+                          inner->kind != TYPE_VARIANT)) {
         snprintf(out, size, "%s", own_fields_phrase);
         return;
     }

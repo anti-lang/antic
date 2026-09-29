@@ -1,7 +1,7 @@
 //! An owning local named in a tuple or struct literal moves into it, and naming
 //! it after the move is refused, as after a move into an `own` parameter. A
-//! parameter that is not `own` belongs to the caller and does not move. A
-//! variant is not torn down yet, so the literal of a case takes no local.
+//! parameter that is not `own` belongs to the caller and does not move. The
+//! literal of a variant case moves a local as well.
 
 class Key
 {
@@ -48,6 +48,7 @@ fn main() -> int
 	}
 	let v = Key { };
 	let s = Slot.Full { k: v };
+	let vn = v.n;
 	let w = Key { };
 	let q = (w, w);
 	return n;

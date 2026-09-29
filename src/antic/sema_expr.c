@@ -417,11 +417,12 @@ static bool holds_param(const struct type *t)
     }
 }
 
-/* DESIGN: an owning local named in a tuple literal, a struct literal or a
-   class literal moves into it, as into an `own` parameter. A copy would give what it owns two owners, the local and
-   the literal, and both would tear it down. So does an `own` parameter,
-   and a local of a type parameter, which may own something in a copy. A
-   parameter that is not `own` belongs to the caller, and
+/* DESIGN: an owning local named in a tuple literal, a struct literal, a
+   class literal or the literal of a variant case moves into it, as into
+   an `own` parameter. A copy would give what it owns two owners, the
+   local and the literal, and both would tear it down. So does an `own`
+   parameter, and a local of a type parameter, which may own something in
+   a copy. A parameter that is not `own` belongs to the caller, and
    `sema_move_local` refuses one that owns something. Anything else that
    reads an existing value is refused as `=` refuses it. */
 bool sema_literal_moves(const struct expr *value)
@@ -3498,11 +3499,13 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             e->as.object.value = true;
             return t;
         }
-        /* DESIGN: `dup` of a struct or a tuple value gives a copy of it,
-           in which every part that owns something is copied as `dup`
-           copies it. One that owns nothing gives its bytes. */
+        /* DESIGN: `dup` of a struct, a tuple or a variant value gives a
+           copy of it, in which every part that owns something is copied
+           as `dup` copies it. A variant copies the fields of the case its
+           tag names. One that owns nothing gives its bytes. */
         if (e->as.object.op == TOKEN_DUP &&
-            (t->kind == TYPE_STRUCT || t->kind == TYPE_TUPLE) &&
+            (t->kind == TYPE_STRUCT || t->kind == TYPE_TUPLE ||
+             t->kind == TYPE_VARIANT) &&
             !t->is_union && !types_is_chan(t) && !types_is_mutex(t) &&
             !types_is_object_lock(t) && !types_is_job(t)) {
             return t;

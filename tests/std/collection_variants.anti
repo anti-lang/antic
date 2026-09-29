@@ -1,0 +1,101 @@
+//! A collection of a variant with an owning case tears each element down by its
+//! tag when it removes it and at its own end, and copies what an element owns
+//! when it copies the element. The leak check counts the leaves alive and the
+//! teardowns of the keys, which a second teardown of one key would raise.
+
+import anti.collection.list.{List};
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn destruct(self)
+	{
+		Leaf.live.sub(1);
+	}
+}
+
+/// A key that owns a leaf and counts its teardowns.
+class Key
+{
+	pub own leaf: ?*Leaf = none,
+
+	static atomic torn: int = 0;
+
+	pub fn number(self) -> int
+	{
+		let l = self.leaf catch fatal;
+		return l.n;
+	}
+
+	fn destruct(self)
+	{
+		Key.torn.add(1);
+	}
+}
+
+variant Slot
+{
+	Full { k: Key },
+	Plain { n: int },
+}
+
+fn full(n: int) -> Slot
+{
+	Leaf.live.add(1);
+	return Slot.Full { k: Key { leaf: alloc Leaf { n: n } } };
+}
+
+fn check(step: str)
+{
+	printf("%.*s: torn %d, leaves %d\n".ptr, step.len as c_int, step.ptr,
+		Key.torn.load() as c_int, Leaf.live.load() as c_int);
+}
+
+fn main() -> int
+{
+	{
+		let slots = List<Slot>.new();
+		slots.push(full(1));
+		slots.push(Slot.Plain { n: 2 });
+		slots.push(full(3));
+		slots.push(full(4));
+		slots.push(Slot.Plain { n: 5 });
+		check("pushed");
+		{
+			let last = slots.pop() catch fatal;
+			printf("popped plain %d\n".ptr, (last is Slot.Plain) as c_int);
+			let gone = slots.pop() catch fatal;
+			printf("popped full %d\n".ptr, (gone is Slot.Full) as c_int);
+		}
+		check("pop");
+		let n = slots.remove_all(fn(s) {
+			return s is Slot.Plain;
+		});
+		printf("removed all %d\n".ptr, n as c_int);
+		check("remove_all");
+		{
+			let copy = dup(&slots);
+			// The copy of each key made a leaf, which no constructor
+			// counted.
+			Leaf.live.add(copy.count);
+			printf("copied %d\n".ptr, copy.count as c_int);
+			delete(copy);
+		}
+		check("dup");
+		{
+			let got = slots.get(0) catch fatal;
+			// The same, for the copy `get` gives.
+			Leaf.live.add(1);
+			printf("got full %d\n".ptr, (got is Slot.Full) as c_int);
+		}
+		check("get");
+	}
+	check("after the block");
+	return 0;
+}

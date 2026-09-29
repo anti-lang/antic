@@ -1,0 +1,42 @@
+//! A variant with a case that owns something follows the value rules of an
+//! owning struct: `=` refuses to copy it, the repeat form refuses it, a name
+//! that moved is refused, and a parameter that is not `own` does not move.
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Key = none,
+}
+
+variant Slot
+{
+	Full { k: Key },
+	Empty,
+}
+
+class Box
+{
+	pub s: Slot,
+}
+
+fn take(own s: Slot)
+{
+}
+
+fn keep(s: Slot)
+{
+	take(s);
+}
+
+fn main() -> int
+{
+	let a = Slot.Full { k: Key { } };
+	let b = a;
+	b = a;
+	let all = [Slot.Empty; 2];
+	let box = Box { s: Slot.Empty };
+	let c = box.s;
+	take(a);
+	let t = a.tag;
+	return 0;
+}

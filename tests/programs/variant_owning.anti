@@ -1,0 +1,166 @@
+//! A variant with a case that owns something is owning. It is torn down by its
+//! tag, the fields of the case it holds, at the end of its block, as an owning
+//! struct is. It moves when returned or passed to an `own` parameter, `dup`
+//! copies it, and it is torn down with its owner as a field, an array element
+//! and inside a `?T`. A local named in the literal of a case moves into it. An
+//! arm that binds a case gets a copy of its fields, which the arm tears down.
+//! Each case runs under a leak check: the count of the leaves alive and the
+//! count of the teardowns of the keys, which a second teardown of the same key
+//! would raise.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn destruct(self)
+	{
+		Leaf.live.sub(1);
+	}
+}
+
+/// A key that owns a leaf and counts its teardowns.
+class Key
+{
+	pub own leaf: ?*Leaf = none,
+
+	static atomic torn: int = 0;
+
+	pub fn number(self) -> int
+	{
+		let l = self.leaf else {
+			return -1;
+		};
+		return l.n;
+	}
+
+	fn destruct(self)
+	{
+		Key.torn.add(1);
+	}
+}
+
+variant Slot
+{
+	Full { k: Key, n: int },
+	Plain { n: int },
+	Empty,
+}
+
+class Box
+{
+	pub s: Slot,
+}
+
+struct Pair
+{
+	s: Slot,
+	n: int,
+}
+
+fn key(n: int) -> Key
+{
+	Leaf.live.add(1);
+	return Key { leaf: alloc Leaf { n: n } };
+}
+
+fn full(n: int) -> Slot
+{
+	return Slot.Full { k: key(n), n: n };
+}
+
+/// A variant kept past another that the function tears down.
+fn kept(n: int) -> Slot
+{
+	let s = full(n);
+	let other = full(n + 1);
+	return s;
+}
+
+fn take(own s: Slot) -> int
+{
+	return s.tag as int;
+}
+
+/// The number of the key a slot holds, read through the copy an arm binds.
+fn number(s: *Slot) -> int
+{
+	let n = 0;
+	switch *s {
+		Full f => {
+			// The copy of the key made a leaf, which no constructor
+			// counted.
+			Leaf.live.add(1);
+			n = f.k.number();
+		},
+		Plain p => n = p.n,
+		Empty => n = 0,
+	}
+	return n;
+}
+
+fn check(name: str)
+{
+	printf("%.*s: torn %d, leaves %d\n".ptr, name.len as c_int, name.ptr,
+		Key.torn.load() as c_int, Leaf.live.load() as c_int);
+}
+
+fn main() -> int
+{
+	{
+		let s = full(1);
+		let p = Slot.Plain { n: 2 };
+		let e = Slot.Empty;
+	}
+	check("let");
+	{
+		let k = key(2);
+		let s = Slot.Full { k: k, n: 2 };
+		printf("literal %d\n".ptr, number(&s) as c_int);
+	}
+	check("literal moves");
+	{
+		let s = kept(3);
+		printf("returned %d\n".ptr, number(&s) as c_int);
+	}
+	check("return");
+	{
+		let s = full(5);
+		printf("own tag %d\n".ptr, take(s) as c_int);
+	}
+	check("own parameter");
+	{
+		let b = Box { s: full(6) };
+		let p = Pair { s: full(7), n: 7 };
+		printf("fields %d %d\n".ptr, number(&b.s) as c_int, number(&p.s) as c_int);
+	}
+	check("field");
+	{
+		let all = [full(8), Slot.Empty, full(9)];
+		let maybe: ?Slot = full(10);
+		printf("array %d\n".ptr, number(&all[2]) as c_int);
+	}
+	check("array and ?T");
+	{
+		let s = full(11);
+		let copy = dup(s);
+		// The copy of the key made a leaf, which no constructor counted.
+		Leaf.live.add(1);
+		printf("dup %d %d\n".ptr, number(&s) as c_int, number(&copy) as c_int);
+	}
+	check("dup");
+	{
+		let s = full(12);
+		if let Full f = s {
+			// The copy the arm binds made a leaf, which no constructor
+			// counted.
+			Leaf.live.add(1);
+			printf("if let %d\n".ptr, f.k.number() as c_int);
+		}
+	}
+	check("if let");
+	return 0;
+}

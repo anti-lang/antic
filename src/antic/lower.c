@@ -2421,6 +2421,59 @@ static void each_element(struct lowerer *l, const struct type *t,
                          struct ir_operand from, bool made_only,
                          enum each what);
 
+/* What each_case does to the fields of the case a variant holds. */
+enum case_work { CASE_DESTROY, CASE_COPY, CASE_CLEAR };
+
+/* DESIGN: a variant tears down, copies or clears the fields of the case
+   its tag names, and nothing else, since the bytes of the other cases are
+   never written. The tag is read once, and each case whose struct owns
+   something is one branch. A variant at into of a copy holds the same tag
+   and bytes already. */
+static void each_case(struct lowerer *l, const struct type *t,
+                      struct ir_operand at, struct ir_operand into,
+                      struct ir_operand from, bool made_only,
+                      enum case_work what)
+{
+    struct ir_block *after = lower_new_block(l);
+    struct ir_operand tag = lower_load_tag(l, t, at);
+    enum ir_type tag_type = lower_ir_type_of(t->base);
+    size_t i;
+
+    for (i = 0; i < t->param_count; i++) {
+        const struct type *payload = t->params[i];
+        struct ir_block *held;
+        struct ir_block *next;
+        struct ir_operand fields;
+        if (payload == NULL ||
+            (what == CASE_COPY ? !lower_copies_parts(payload)
+                               : !sema_needs_teardown(payload))) {
+            continue;
+        }
+        held = lower_new_block(l);
+        next = lower_new_block(l);
+        ir_branch(l->f, l->b,
+                  lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, tag,
+                                          ir_int_op(tag_type,
+                                                    t->base->fields[i]
+                                                        .number))),
+                  held, next);
+        l->b = held;
+        fields = lower_case_address(l, t, at);
+        if (what == CASE_DESTROY) {
+            lower_destroy_owned(l, payload, fields, from, made_only);
+        } else if (what == CASE_CLEAR) {
+            lower_clear_owned(l, payload, fields);
+        } else {
+            struct ir_operand copy = lower_case_address(l, t, into);
+            lower_copy_owned(l, payload, fields, copy);
+        }
+        ir_jump(l->f, l->b, after);
+        l->b = next;
+    }
+    ir_jump(l->f, l->b, after);
+    l->b = after;
+}
+
 void lower_destroy_owned(struct lowerer *l, const struct type *t,
                          struct ir_operand at, struct ir_operand from,
                          bool made_only)
@@ -2482,6 +2535,9 @@ void lower_destroy_owned(struct lowerer *l, const struct type *t,
             }
         }
         return;
+    case TYPE_VARIANT:
+        each_case(l, t, at, lower_none(), from, made_only, CASE_DESTROY);
+        return;
     default:
         return;
     }
@@ -2520,6 +2576,9 @@ void lower_clear_owned(struct lowerer *l, const struct type *t,
                                          lower_field_offset(l, t, &f->name)));
             }
         }
+        return;
+    case TYPE_VARIANT:
+        each_case(l, t, at, lower_none(), lower_none(), false, CASE_CLEAR);
         return;
     default:
         return;
@@ -2583,6 +2642,9 @@ void lower_copy_owned(struct lowerer *l, const struct type *t,
             lower_copy_owned(l, f->type, part, copy);
         }
         return;
+    case TYPE_VARIANT:
+        each_case(l, t, from, into, lower_none(), false, CASE_COPY);
+        return;
     default:
         return;
     }
@@ -2600,6 +2662,14 @@ bool lower_copies_parts(const struct type *t)
     }
     if (t->kind == TYPE_FN) {
         return t->owned;
+    }
+    if (t->kind == TYPE_VARIANT) {
+        for (i = 0; i < t->param_count; i++) {
+            if (t->params[i] != NULL && lower_copies_parts(t->params[i])) {
+                return true;
+            }
+        }
+        return false;
     }
     if ((t->kind != TYPE_STRUCT && t->kind != TYPE_TUPLE) || t->is_union) {
         return false;
@@ -2680,11 +2750,11 @@ static void teardown_field(struct lowerer *l, const struct type *up,
     if (f->form != FIELD_PLAIN && f->form != FIELD_USE) {
         return;
     }
-    /* A struct, a tuple or an array held inline that owns something is
-       torn down part by part with its owner. */
+    /* A struct, a tuple, a variant or an array held inline that owns
+       something is torn down part by part with its owner. */
     if (!f->owned &&
         (f->type->kind == TYPE_STRUCT || f->type->kind == TYPE_TUPLE ||
-         f->type->kind == TYPE_ARRAY ||
+         f->type->kind == TYPE_VARIANT || f->type->kind == TYPE_ARRAY ||
          (f->type->kind == TYPE_OPTIONAL &&
           f->type->element->kind != TYPE_CLASS)) &&
         sema_needs_teardown(f->type)) {
@@ -2845,11 +2915,11 @@ static void copy_field(struct lowerer *l, const struct type *up,
         ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), into);
         return;
     }
-    /* A struct, a tuple or an array held inline copies each part that
-       a copy reaches, as `dup` of it does. */
+    /* A struct, a tuple, a variant or an array held inline copies each
+       part that a copy reaches, as `dup` of it does. */
     if (!f->owned &&
         (f->type->kind == TYPE_STRUCT || f->type->kind == TYPE_TUPLE ||
-         f->type->kind == TYPE_ARRAY ||
+         f->type->kind == TYPE_VARIANT || f->type->kind == TYPE_ARRAY ||
          (f->type->kind == TYPE_OPTIONAL &&
           f->type->element->kind != TYPE_CLASS)) &&
         lower_copies_parts(f->type)) {

@@ -1,0 +1,16 @@
+exit 0
+let: torn 1, leaves 0
+literal 2
+literal moves: torn 3, leaves 0
+returned 3
+return: torn 6, leaves 0
+own tag 0
+own parameter: torn 7, leaves 0
+fields 6 7
+field: torn 11, leaves 0
+array 9
+array and ?T: torn 15, leaves 0
+dup 11 11
+dup: torn 19, leaves 0
+if let 12
+if let: torn 21, leaves 0
