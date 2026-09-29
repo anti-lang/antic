@@ -728,19 +728,11 @@ Functions, structs, classes, variants and interfaces take type parameters betwee
 
 <!-- overview: context, docs-style:ignore
 ```anti
+import anti.collection.list.{List};
+
 class Person
 {
 	pub name: str,
-}
-
-class List<T>
-{
-	count: int,
-
-	pub fn new() -> List<T>
-	{
-		return List<T> { count: 0 };
-	}
 }
 ```
 -->
@@ -756,6 +748,7 @@ fn max<T: lt>(own a: T, own b: T) -> T
 struct Pair<A, B> { first: A, second: B, }
 struct Ring<T, N: int> { items: [N]T, head: int, }
 variant Result<T, E> { Ok { value: T }, Err { error: E }, }
+abstract class Source<T> { abstract fn next(self) -> ?T; }
 constraint Key = eq + hash;
 
 let p: Pair<int, str> = Pair { first: 1, second: "one" };
@@ -764,6 +757,39 @@ let people = List<Person>.new();
 
 type People = List<Person>;
 export type PersonList = List<Person>;
+```
+
+A generic interface is a constraint with its type arguments. `Iterable<T>` of `anti.collection` is met by any type whose `iter` hook gives an iterator of `T`, with no extra code.
+
+<!-- overview: context, docs-style:ignore
+```anti
+import anti.collection;
+import anti.collection.map.{Map};
+```
+-->
+```anti
+fn count<C: iter>(c: *C) -> int
+{
+	let n = 0;
+	for x in c {
+		n += 1;
+	}
+	return n;
+}
+
+fn total<C: collection.Iterable<int>>(c: *C) -> int
+{
+	let n = 0;
+	for x in c {
+		n += x;
+	}
+	return n;
+}
+
+fn find<K: eq + hash, V>(m: *Map<K, V>, k: K) -> ?V
+{
+	return m.get(k);
+}
 ```
 
 Type arguments are inferred from the arguments of a call and written out where nothing gives them. In an expression, `<` after a name opens type arguments when a list of types closed by `>` follows and the token after it is `(`, `.` or `{`, so `a < b > c` stays two comparisons. `>>` closes two lists. Every use with concrete arguments gets its own compiled copy, with no boxing, and two uses with the same arguments are one type in every module. The whole-program pass merges copies whose code is identical. A method with type parameters of its own is called directly and never stands in the table, so it cannot be `abstract` or replaced. A library file stores a generic as its checked syntax tree with its parameters open, and each use lowers that tree with its arguments. C sees no open generic: `export type PersonList = List<Person>;` writes a copy into the header as an exported class, and a generic `export fn` is refused.
@@ -826,7 +852,7 @@ class Buffer
 }
 ```
 
-A class value with `destruct`, an `own` field or an owning part owns something, and so does a collection. A struct or a tuple with a part that owns something follows the value rules of a class value: it is torn down part by part at the end of its block, `=` refuses it, `dup` copies it and it moves into an `own` parameter. A variant with a case that owns something follows the same rules and is torn down by its tag, the fields of the case it holds. One that owns nothing stays plain data. An owning local named in a tuple, struct, class or case literal moves into it, and naming it afterwards is refused. In generic code a local of a type parameter moves on `let` and `=` for every `T`, and `dup(x)` is the copy. `destroy(p)` tears down a value of any type in place, and `dup(x)` of a value of a type parameter copies the value. A parameter that is not `own` belongs to the caller: `let`, `=`, a literal, an `own` argument and `return` refuse one whose value owns something, or whose type is a type parameter. `own` takes it over and `dup(p)` copies it, and `dup(x)` of a class value gives a value. `*dup(p)` and `*alloc T { }` are refused, since nothing could free the new object, and `dup(*p)` copies the value instead. A value that owns nothing and holds no pointer is copied into an `own` parameter and stays with its caller. `own` before a parameter takes ownership of the argument, for a value of any type. Passing a local moves it, and naming the local again is refused. `lent` before a pointer parameter says the pointer is valid only during the call. The function may read and change through it and pass it on to another `lent` parameter, and may not store it, return it, capture it in a closure that outlives the call or pass it to a `keep` or `own` place. `lent` before a slice parameter, `fn(lent []T)`, follows the same rules. A pointer or a slice derived from a lent one, `s.ptr`, `&p.field`, `&s[i]` or a part of a slice, is lent as well, and its one exit is an argument of an `extern fn`, whose contract decides whether C keeps it. `anti.mem.Shared<T>` gives an object more than one owner through an atomic count: `share()` gives another handle and counts it, `=` stays refused, and the object is destroyed when its last handle is freed. Two shared objects that hold each other are never freed.
+A class value with `destruct`, an `own` field or an owning part owns something, and so does a collection. A struct or a tuple with a part that owns something follows the value rules of a class value: it is torn down part by part at the end of its block, `=` refuses it, `dup` copies it and it moves into an `own` parameter. A variant with a case that owns something follows the same rules and is torn down by its tag, the fields of the case it holds. One that owns nothing stays plain data. An owning local named in a tuple, struct, class or case literal moves into it, and naming it afterwards is refused. In generic code a local of a type parameter moves on `let` and `=` for every `T`, and `dup(x)` is the copy. `destroy(p)` tears down a value of any type in place, and `dup(x)` of a value of a type parameter copies the value. A parameter that is not `own` belongs to the caller: `let`, `=`, a literal, an `own` argument and `return` refuse one whose value owns something, or whose type is a type parameter. `own` takes it over and `dup(p)` copies it, and `dup(x)` of a class value gives a value. `*dup(p)` and `*alloc T { }` are refused, since nothing could free the new object, and `dup(*p)` copies the value instead. A value that owns nothing and holds no pointer is copied into an `own` parameter and stays with its caller. `own` before a parameter takes ownership of the argument, for a value of any type. Passing a local moves it, and naming the local again is refused. `lent` before a pointer parameter says the pointer is valid only during the call. The function may read and change through it and pass it on to another `lent` parameter, and may not store it, return it, capture it in a closure that outlives the call or pass it to a `keep` or `own` place. `lent` before a slice parameter, `fn(lent []T)`, follows the same rules. A pointer or a slice derived from a lent one, `s.ptr`, `&p.field`, `&s[i]` or a part of a slice, is lent as well, and its one exit is an argument of an `extern fn`, whose contract decides whether C keeps it. `anti.mem.Shared<T>` gives an object more than one owner through an atomic count: `share()` gives another handle and counts it, `=` stays refused, `read(f)` and `modify(f)` lend the object, and the object is destroyed when its last handle is freed. Two shared objects that hold each other are never freed.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -852,10 +878,22 @@ take(t);
 lend(fn(p) { p.age += 1; });
 ```
 
-```anti not-built
+<!-- overview: context, docs-style:ignore
+```anti
+import anti.collection.list.{List};
+import anti.mem.{Shared};
+
+class Circle
+{
+	pub r: f32 = 0.0,
+}
+```
+-->
+```anti
 let c = Shared<Circle>.new(Circle { r: 2.0 });
 let shapes = List<Shared<Circle>>.new();
 shapes.push(c.share());
+c.modify(fn(p) { p.r = 3.0; });
 ```
 
 Built: `own` and `transient` fields, the `own` parameter of any type and `lent`. A local passed to an `own` parameter moves, unless its value owns nothing and holds no pointer, and the caller then tears it down no more and names it no more, and the function tears it down at every exit unless it moves on by a call, `=`, `let` or `return`. A `lent` parameter has the type `lent *T`, which goes to another `lent` parameter, the object of a call and a comparison, and which `=`, `return`, a parameter without `lent`, `own`, a snapshot and `delete` refuse. A `lent` slice parameter has the type `lent []T` under the same rules. A pointer or a slice derived from a lent one is lent, and goes to an `extern fn` as its one exit. `tests/programs/own_params.anti`, `tests/programs/lent_params.anti` and `tests/programs/lent_slices.anti` run them, and `tests/errors/own_params.anti`, `tests/errors/lent_params.anti` and `tests/errors/lent_slices.anti` hold the refusals. `Shared<T>` of `anti.mem` is built: `tests/std/shared.anti` runs it in both modes, and `tests/errors/shared_handles.anti` holds the refusals. The moves of an owning local into a literal are built: `tests/programs/literal_moves.anti` runs them, and `tests/errors/literal_moves.anti` holds the refusals. The moves of a generic local on `let` and `=` are built: `tests/programs/generic_moves.anti` runs them, and `tests/errors/generic_moves.anti` holds the refusals. The refusal of `*` on the result of `dup` or `alloc` is built, and `tests/errors/deref_new.anti` holds both forms. The rule of a parameter that belongs to the caller is built for every way out of the function, with `dup(x)` of a class value and the copy of a value that owns nothing into an `own` parameter: `tests/programs/caller_params.anti` runs both fixes, and `tests/errors/caller_params.anti` holds the refusals.
@@ -892,11 +930,12 @@ Built.
 
 <!-- overview: context, docs-style:ignore
 ```anti
+import anti.collection.list.{List};
+import anti.collection.map.{Map};
+
 struct User { id: int, }
-class Ages { pub fn get(self, name: str) -> ?int { return none; } }
-class Queue { pub fn first(self) -> ?int { return none; } }
-let ages = Ages { };
-let queue = Queue { };
+let ages = Map<str, int>.new();
+let queue = List<int>.new();
 ```
 -->
 ```anti
@@ -1478,29 +1517,103 @@ Built: `ByteRegex` and `ByteRegex.compile`, the mode of a pattern literal taken 
 
 The collections of `anti.collection` are generic classes used as values, one module per family: `List<T>`, `Deque<T>`, `Ring<T, N>` and `Grid<T>`, `Map<K, V>` and `HashMap<K, V>`, `Set<T>`, `HashSet<T>` and `BitSet`, `SortedMap<K, V>` and `SortedSet<T>`, `Pool<T>` with `Handle<T>`, `Tree<T>` and `PriorityQueue<T>`. `anti.collection` itself holds `Iterable<T>` and `Iterator<T>`. A collection owns its storage and stores its elements by value. It is freed at the end of its block, moves on return, is refused by `=` and is copied by `dup`. No pointer to an element leaves it except through a `lent` parameter: reading gives a copy, as a `?T` where nothing may be there, and `read` and `modify` lend an element to a function. `union` stays a keyword and names a function after `fn` and a member after `.`, as `alloc` and `free` do, so a set has `union(o)`.
 
-```anti not-built
+<!-- overview: context, docs-style:ignore
+```anti
+import anti.mem;
+let arena = mem.ArenaAllocator.new(mem.Allocator.default(), 4096);
+```
+-->
+```anti
 import anti.collection.list.{List};
 import anti.collection.map.{Map};
+import anti.io;
 import anti.text;
 
-let people = List<Person>.new(capacity: 1000);
+class Person
+{
+	pub name: str = "",
+	pub age: int = 0,
+	pub retired: bool = false,
+}
+
+let people = List<Person>.new(1000);
 people.push(Person { name: "Ann", age: 41 });
 let first = people.get(0) ?? Person { };
+people.read(0, fn(p) { io.println(p.name); });
 people.modify(0, fn(p) { p.age += 1; });
 let n = people.update_all(fn(p) { return p.age >= 65; }, fn(p) { p.retired = true; });
 let ann = people.find_one(fn(p) { return text.equal(p.name, "Ann"); }) catch fatal;
+for p in &people {
+	p.age += 1;
+}
 
-let ages = Map<str, int>.new(from: &arena);
+let ages = Map<str, int>.new(0, &arena);
 ages.set("Ann", 41);
 let age = ages.get("Ann") ?? 0;
 for (k, v) in ages { }
+for (k, v) in &ages {
+	*v += 1;
+}
 ```
 
-Criteria come in three forms: `_all` acts on every match and gives the count, `_first` on the first match in the collection's order, and `_one` on the one match, failing when none or more than one matches. Every collection takes an optional allocator, `from: &arena`, and one that grows takes an initial `capacity`, with `reserve(n)` and `shrink()`. `Map` walks in insertion order, the same on every run. `SortedMap` is a B-tree and walks in key order. `HashMap` walks in an order that differs on every walk, so no program depends on it. A hashing collection mixes its hashes with a seed chosen at start. `Ring<T, N>` allocates nothing after it is made, for real-time code. A `Pool` keeps its elements at fixed addresses and gives handles of a slot and a generation, so a stale handle finds nothing, and a `Tree` holds a hierarchy on the same handles.
+Criteria come in three forms: `_all` acts on every match and gives the count, `_first` on the first match in the collection's order, and `_one` on the one match, failing when none or more than one matches. Every collection takes an optional allocator, `from`, and one that grows takes an initial `capacity`, with `reserve(n)` and `shrink()`. Until named arguments are built, `new` takes both by position, `capacity` first, as the example above does. The named form is the one the specification gives:
+
+```anti not-built
+let people = List<Person>.new(capacity: 1000);
+let ages = Map<str, int>.new(from: &arena);
+```
+
+`Map` walks in insertion order, the same on every run. `SortedMap` is a B-tree and walks in key order. `HashMap` walks in an order that differs on every walk, so no program depends on it. A hashing collection mixes its hashes with a seed chosen at start. `Ring<T, N>` allocates nothing after it is made, for real-time code. A `Pool` keeps its elements at fixed addresses and gives handles of a slot and a generation, so a stale handle finds nothing, and a `Tree` holds a hierarchy on the same handles. `PriorityQueue<T>` gives its smallest element first, and `Grid<T>` is indexed by two positions.
+
+```anti
+import anti.collection.grid.{Grid};
+import anti.collection.list.{List};
+import anti.collection.pool.{Pool};
+import anti.collection.queue.{PriorityQueue};
+import anti.collection.set.{BitSet, Set};
+
+let scores = List<int>.new();
+scores.push(3);
+scores.push(1);
+scores.sort();
+let labels = scores.map<int, str>(fn(n) { return "score"; });
+
+let seen = Set<str>.new();
+seen.add("Ann");
+let both = seen.union(Set<str>.new());
+let small = BitSet.new();
+small.add(3);
+for n in small { }
+
+let staff = Pool<str>.new();
+let h = staff.add("Bo");
+let entry = staff.get_versioned(h) else { return 1; };
+staff.set_if_version(h, "Bea", entry.1) catch fatal;
+
+let jobs = PriorityQueue<int>.new();
+jobs.push(5);
+let next = jobs.pop() ?? 0;
+
+let g = Grid<int>.new(4, 4, 0);
+g[1, 2] = 7;
+```
 
 The thread-safe collections of `anti.collection.synchronized` and `anti.collection.concurrent`, each module named after the kind of class it holds, follow [Concurrent classes](#concurrent-classes). `SyncList<T>`, `SyncMap<K, V>`, `SyncSet<T>` and `SyncPool<T>` are `synchronized`. `ConcurrentMap<K, V>` is `concurrent`, split into parts locked apart. `SpscRing<T, N>` passes values from one thread to one other with two atomic counters and no lock. They have no operation by position and no `lend_slice`, and every one has versioned `set`. `==` and the hash of each compare and hash its elements only, never a version, a change count or a lock, and `ConcurrentMap` holds the locks of all its parts in their fixed order meanwhile. A queue between threads is `chan T`.
 
-Built: every collection of this section. `List<T>`, `Deque<T>`, `Ring<T, N>` and `Grid<T>` stand in `anti.collection.list`, `deque`, `ring` and `grid`, `Map<K, V>` and `HashMap<K, V>` in `anti.collection.map`, `Set<T>`, `HashSet<T>` and `BitSet` in `anti.collection.set`, `SortedMap<K, V>` and `SortedSet<T>` in `anti.collection.sorted`, `Pool<T>` with `Handle<T>` in `anti.collection.pool`, `Tree<T>` in `anti.collection.tree` and `PriorityQueue<T>` in `anti.collection.queue`. `SyncList<T>`, `SyncMap<K, V>`, `SyncSet<T>` and `SyncPool<T>` stand in `anti.collection.synchronized`, and `ConcurrentMap<K, V>` and `SpscRing<T, N>` in `anti.collection.concurrent`. Each has the operations of its family and those every collection has. `Iterable<T>`, `Iterator<T>` and `Collection<T>` stand in `anti.collection`, `find_all` gives a `Copies<T>`, and `_one` fails with `NotOne`, which carries the count. A collection has `==` when its elements have `eq`, and a hash of its elements, so equal collections hash alike: a sequence in order, and a map or a set whatever the order of its entries. Its `equals` through `*Object` is its `==`. `dup` copies every collection with room of its own, and a copy of a `Pool` or a `Tree` keeps the handles of the original. The seed of the hashing collections is built: the runtime chooses it at start from the random source of the system, `lang.hash_seed()` gives it, `lang.seeded(h, seed)` mixes it into a hash, and `--anti.hash_seed=<n>` or the key `hash_seed` fixes it for a test. `List`, `Map` and `IntMap` of `anti.collection` over `*Object` stand beside them. `tests/std/` runs every collection in both modes, and `tests/checks/` holds the traps of a dev build. A thread-safe collection walks, and writes its text, over copies of its elements, and `read`, `modify` and the functions of the criteria forms run under its lock. Not built yet: named arguments, which the example above writes, `deserialize` of a collection and the versioned `set` of `SpscRing`, which a `[provisional]` entry of `docs/decisions.md` leaves out, since the ring has no `set`.
+```anti
+import anti.collection.concurrent.{ConcurrentMap, SpscRing};
+import anti.collection.synchronized.{SyncMap};
+
+let hits = SyncMap<str, int>.new();
+hits.set("home", 1);
+let busy = ConcurrentMap<str, int>.new();
+busy.set("home", hits.get("home") ?? 0);
+let samples = SpscRing<f32, 1024>.new();
+let pushed = samples.push(0.5);
+let s = samples.pop() ?? 0.0;
+```
+
+Built: every collection of this section. `List<T>`, `Deque<T>`, `Ring<T, N>` and `Grid<T>` stand in `anti.collection.list`, `deque`, `ring` and `grid`, `Map<K, V>` and `HashMap<K, V>` in `anti.collection.map`, `Set<T>`, `HashSet<T>` and `BitSet` in `anti.collection.set`, `SortedMap<K, V>` and `SortedSet<T>` in `anti.collection.sorted`, `Pool<T>` with `Handle<T>` in `anti.collection.pool`, `Tree<T>` in `anti.collection.tree` and `PriorityQueue<T>` in `anti.collection.queue`. `SyncList<T>`, `SyncMap<K, V>`, `SyncSet<T>` and `SyncPool<T>` stand in `anti.collection.synchronized`, and `ConcurrentMap<K, V>` and `SpscRing<T, N>` in `anti.collection.concurrent`. Each has the operations of its family and those every collection has. `Iterable<T>`, `Iterator<T>` and `Collection<T>` stand in `anti.collection`, `find_all` gives a `Copies<T>`, and `_one` fails with `NotOne`, which carries the count. A collection has `==` when its elements have `eq`, and a hash of its elements, so equal collections hash alike: a sequence in order, and a map or a set whatever the order of its entries. Its `equals` through `*Object` is its `==`. `dup` copies every collection with room of its own, and a copy of a `Pool` or a `Tree` keeps the handles of the original. The seed of the hashing collections is built: the runtime chooses it at start from the random source of the system, `lang.hash_seed()` gives it, `lang.seeded(h, seed)` mixes it into a hash, and `--anti.hash_seed=<n>` or the key `hash_seed` fixes it for a test. `List`, `Map` and `IntMap` of `anti.collection` over `*Object` stand beside them. `tests/std/` runs every collection in both modes, and `tests/checks/` holds the traps of a dev build. A thread-safe collection walks, and writes its text, over copies of its elements, and `read`, `modify` and the functions of the criteria forms run under its lock. `sort`, `sort_by` and `map` are functions of `anti.collection.list` that a call on a list reaches as its own, and `map` names both its types, `scores.map<int, str>(f)`. The versioned set is `set_if_version`, with the version after the value, `staff.set_if_version(h, x, version)`. It fails with `anti.collection.pool.Changed` when the element changed or is gone, and `get_versioned` gives the element with its version. Not built yet: named arguments, which the not-built example above writes, `deserialize` of a collection and the versioned `set` of `SpscRing`, which a `[provisional]` entry of `docs/decisions.md` leaves out, since the ring has no `set`.
 
 ## Standard library
 
