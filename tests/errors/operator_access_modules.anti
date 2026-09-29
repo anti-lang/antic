@@ -1,0 +1,33 @@
+//! The operators of another module reach the private fields and functions of
+//! its classes, and those of this module do not. An ordinary function of this
+//! module does not either.
+
+import com.example.ledger;
+
+struct Wrapper
+{
+	account: *ledger.Account,
+}
+
+operator fn eq(a: Wrapper, b: Wrapper) -> bool
+{
+	return a.account.cents == b.account.balance();
+}
+
+fn peek(a: *ledger.Account) -> int
+{
+	return a.cents;
+}
+
+fn main() -> int
+{
+	let a = alloc ledger.Account { };
+	let b = alloc ledger.Account { };
+	let same = *a == *b;
+	let w = Wrapper { account: a };
+	let v = Wrapper { account: b };
+	let wrapped = w == v;
+	free(a);
+	free(b);
+	return 0;
+}

@@ -1,0 +1,28 @@
+//! A program that compares and hashes the classes of another module. The
+//! operators of that module reach the private fields and functions of its
+//! classes, a generic one included, in the copies this module makes.
+
+import com.example.ledger;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let a = alloc ledger.Account { };
+	let b = alloc ledger.Account { };
+	a.add(5);
+	b.add(2);
+	b.add(3);
+	printf("accounts: equal %d, same hash %d\n".ptr, (*a == *b) as c_int,
+		(a.hash() == b.hash()) as c_int);
+	b.add(1);
+	printf("accounts: equal %d\n".ptr, (*a == *b) as c_int);
+	let x = ledger.Box<int>.of(7);
+	let y = ledger.Box<int>.of(7);
+	let opened = x.open();
+	printf("boxes: equal %d, same hash %d\n".ptr, (x == y) as c_int,
+		(x.hash() == y.hash()) as c_int);
+	free(a);
+	free(b);
+	return 0;
+}

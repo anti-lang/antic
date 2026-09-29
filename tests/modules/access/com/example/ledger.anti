@@ -1,0 +1,66 @@
+//! The classes of a library whose `==` and hash stand in operators of the
+//! module. Each operator reaches private fields and functions of the class it
+//! takes, which no other function of the module and no other module reaches.
+
+/// An account whose balance is private. Its `==` and hash compare the balance
+/// alone and leave out the count of its changes.
+pub class Account
+{
+	cents: int = 0,
+	changes: int = 0,
+
+	pub fn add(self, n: int)
+	{
+		self.cents += n;
+		self.changes += 1;
+	}
+
+	fn balance(self) -> int
+	{
+		return self.cents;
+	}
+}
+
+/// Whether both accounts hold the same balance, read from its private field and
+/// its private function.
+pub operator fn eq(a: *Account, b: *Account) -> bool
+{
+	return a.cents == b.cents && a.balance() == b.balance();
+}
+
+/// The hash of the balance alone.
+pub operator fn hash(a: *Account) -> u64
+{
+	return a.balance().hash();
+}
+
+/// A generic box whose operators reach its private field in every copy.
+pub class Box<T: eq + hash>
+{
+	item: T,
+	opened: int = 0,
+
+	/// A box of `item`.
+	pub fn of(own item: T) -> Box<T>
+	{
+		return Box<T> { item: item };
+	}
+
+	pub fn open(self) -> T
+	{
+		self.opened += 1;
+		return self.item;
+	}
+}
+
+/// Whether both boxes hold equal items.
+pub operator fn eq<T: eq + hash>(a: *Box<T>, b: *Box<T>) -> bool
+{
+	return a.item == b.item;
+}
+
+/// The hash of the item alone.
+pub operator fn hash<T: eq + hash>(a: *Box<T>) -> u64
+{
+	return a.item.hash();
+}

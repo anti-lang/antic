@@ -595,7 +595,7 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 	/// the order of their addresses, so two threads that compare the same two
 	/// maps either way round never wait for each other. A map equals itself
 	/// without a lock.
-	pub fn equal_entries(self, other: *ConcurrentMap<K, V>,
+	fn equal_entries(self, other: *ConcurrentMap<K, V>,
 		same: fn(lent *V, lent *V) -> bool) -> bool
 	{
 		let mine = self.parts catch fatal;
@@ -618,7 +618,7 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 	/// The hash of the entries whatever their order, with `value_hash` giving
 	/// the hash of each value. Every part stays locked meanwhile, so the hash
 	/// is that of one state of the map. The hash of a map calls it.
-	pub fn hash_entries(self, value_hash: fn(lent *V) -> u64) -> u64
+	fn hash_entries(self, value_hash: fn(lent *V) -> u64) -> u64
 	{
 		let sum: u64 = 0;
 		let n = 0;

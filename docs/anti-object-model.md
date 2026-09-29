@@ -139,6 +139,7 @@ Four levels, and each applies where it makes sense:
 - `internal` items go into the `.antl` interface marked as internal. The loader checks that the importing module shares the package root. `anti doc` puts them in the developer docs.
 - `abstract fn`, `concrete fn` and `operator fn` are `pub`. `export fn` inside a class requires `pub`.
 - A private or protected function is always a direct call. It has no table entry and does not appear in the C header.
+- An `operator fn` at module level reaches the private and protected fields and functions of the classes declared in its own module. It gives them their `==`, hash and order. An ordinary function of the module does not, and neither does an operator of another module.
 - Visibility is checked in name resolution and costs nothing at run time. The C header declares every field regardless, with `/* private */` on the ones that are.
 - `use` promotes `pub` members only. Reflection reaches every field.
 

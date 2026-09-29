@@ -1,0 +1,54 @@
+//! An operator at module level reaches the private fields and functions of the
+//! classes of its own module, and so does a closure inside it. An ordinary
+//! function of the module does not, and neither does a function of another
+//! class.
+
+class Account
+{
+	cents: int = 0,
+
+	fn balance(self) -> int
+	{
+		return self.cents;
+	}
+}
+
+struct Pair
+{
+	left: *Account,
+	right: *Account,
+}
+
+operator fn eq(a: *Account, b: *Account) -> bool
+{
+	let read = fn(x: *Account) -> int {
+		return x.balance();
+	};
+	return a.cents == b.cents && read(a) == read(b);
+}
+
+operator fn lt(a: Pair, b: Pair) -> bool
+{
+	return a.left.cents < b.left.cents;
+}
+
+fn peek(a: *Account) -> int
+{
+	return a.cents + a.balance();
+}
+
+class Auditor
+{
+	pub fn check(self, a: *Account) -> int
+	{
+		return a.cents;
+	}
+}
+
+fn main() -> int
+{
+	let a = alloc Account { };
+	let same = *a == *a;
+	free(a);
+	return 0;
+}

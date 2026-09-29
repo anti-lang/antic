@@ -332,6 +332,30 @@ static bool from_test_block(const struct checker *c, const struct type *t)
 
 static bool descends_or_copies(const struct type *a, const struct type *b);
 
+/* DESIGN: an `operator fn` at module level belongs with the classes of
+   its module, whose `==`, hash and order it gives. It reaches their
+   private and protected fields and functions, so a class keeps no public
+   function for its operators alone. An ordinary function of the module
+   and an operator of another module reach none. A copy of a generic
+   operator of a library keeps the module of the generic, which its
+   home names. A closure inside the operator reaches what it reaches. */
+static bool from_module_operator(const struct checker *c,
+                                 const struct type *t)
+{
+    const struct item *named = sema_named_function(c);
+
+    if (named == NULL || !named->is_operator || named->owner != NULL ||
+        t == NULL) {
+        return false;
+    }
+    if (named->home_module != NULL) {
+        return strlen(named->home_module) == t->module.length &&
+               memcmp(named->home_module, t->module.text,
+                      t->module.length) == 0;
+    }
+    return sema_same_name(&t->module, &c->module_name);
+}
+
 /* DESIGN: the four levels of the object model document. A public member
    is visible everywhere. A protected one reaches the class that declares
    it and every class below it. A private one reaches its own class
@@ -344,7 +368,8 @@ static bool level_allows(const struct checker *c, enum visibility vis,
     if (vis == VIS_PUB) {
         return true;
     }
-    if (from_test_block(c, declared_in != NULL ? declared_in : t)) {
+    if (from_test_block(c, declared_in != NULL ? declared_in : t) ||
+        from_module_operator(c, declared_in != NULL ? declared_in : t)) {
         return true;
     }
     if (from == NULL) {

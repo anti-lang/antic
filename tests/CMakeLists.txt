@@ -2468,6 +2468,26 @@ foreach(mode release dev)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
+# The operators of a library reach the private fields and functions of its
+# classes, a generic one among them, in the copies another module makes.
+foreach(mode release dev)
+    if(mode STREQUAL "dev" AND WIN32)
+        continue()
+    endif()
+    add_test(NAME access_modules_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/access"
+            "-DLIBRARIES=ledger"
+            "-DSTD=lang"
+            "-DPROGRAM=client"
+            "-DMODE=${mode}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/access-${mode}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+endforeach()
+
 # A generic class with operator hooks in a library, which another module
 # compares, adds, indexes and walks. The library file carries the mark of
 # each hook, in the class and at module level.
@@ -2670,6 +2690,24 @@ add_test(NAME error_concurrent_modules
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
 set_tests_properties(error_concurrent_modules PROPERTIES
     FIXTURES_REQUIRED queue_antl)
+
+# The private fields and functions of a library's classes stay closed to
+# the operators and functions of the importer.
+file(MAKE_DIRECTORY "${LIBS}/access/com/example")
+add_test(NAME antl_ledger
+    COMMAND antic -c -I "${MODULES}/access"
+            -o "${LIBS}/access/com/example/ledger.antl"
+            "${MODULES}/access/com/example/ledger.anti")
+set_tests_properties(antl_ledger PROPERTIES FIXTURES_SETUP ledger_antl)
+add_test(NAME error_operator_access_modules
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        "-DCOMMAND=-S,-I,${LIBS}/access,-o,${CMAKE_CURRENT_BINARY_DIR}/operator_access_modules.s,operator_access_modules.anti"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/operator_access_modules.err"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
+set_tests_properties(error_operator_access_modules PROPERTIES
+    FIXTURES_REQUIRED ledger_antl)
 
 # A qualified base that the module does not declare as a public class
 add_test(NAME error_inherits_module
@@ -3532,6 +3570,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "snapshots|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/snapshots.s,snapshots.anti"
         "synchronized|-S,-o,${LISTINGS}/synchronized.s,synchronized.anti"
         "sync_pairs|-S,-o,${LISTINGS}/sync_pairs.s,sync_pairs.anti"
+        "operator_access|-S,-o,${LISTINGS}/operator_access.s,operator_access.anti"
         "concurrent|-S,-o,${LISTINGS}/concurrent.s,concurrent.anti"
         "concurrent_forms|-S,-o,${LISTINGS}/concurrent_forms.s,concurrent_forms.anti"
         "pointer_leak|-S,-o,${LISTINGS}/pointer_leak.s,pointer_leak.anti"

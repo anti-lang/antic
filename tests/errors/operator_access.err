@@ -1,0 +1,3 @@
+operator_access.anti:37:9: error: `cents` is private to `Account`
+operator_access.anti:37:19: error: `balance` is private to `Account`
+operator_access.anti:44:10: error: `cents` is private to `Account`
