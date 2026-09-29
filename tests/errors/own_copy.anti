@@ -50,7 +50,7 @@ fn f(shelf: *Shelf, p: *Item)
 
 	shelf.items[0] = Item { n: 4 };
 	let c = Item(5) catch fatal;
-	b = *dup(p);
+	b = dup(*p);
 	b = make();
 	let x = Plain { n: 6 };
 	let y = x;

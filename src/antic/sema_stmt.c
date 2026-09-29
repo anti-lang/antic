@@ -745,7 +745,7 @@ bool sema_type_owns(const struct type *t)
 }
 
 /* Whether e reads a value that already lives somewhere. A literal, a
-   call and `*dup(p)` make a fresh one instead. */
+   call and `dup(x)` make a fresh one instead. */
 bool sema_reads_existing(const struct expr *e)
 {
     switch (e->kind) {
@@ -754,9 +754,7 @@ bool sema_reads_existing(const struct expr *e)
     case EXPR_INDEX:
         return true;
     case EXPR_UNARY:
-        return e->as.unary.op == TOKEN_STAR &&
-               !(e->as.unary.operand->kind == EXPR_OBJECT &&
-                 e->as.unary.operand->as.object.op == TOKEN_DUP);
+        return e->as.unary.op == TOKEN_STAR;
     default:
         return false;
     }

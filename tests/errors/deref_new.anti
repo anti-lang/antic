@@ -1,0 +1,25 @@
+//! `*` applied directly to the result of `dup` or `alloc` is refused, since the
+//! object it points at could never be freed. `dup(*p)` or `dup(x)` copies the
+//! value, and a `let` keeps the pointer.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+fn copies(p: *Leaf, x: Leaf)
+{
+	let a = *dup(p);
+	let b = *alloc Leaf { n: 1 };
+	let c = dup(*p);
+	let d = dup(x);
+	let kept = dup(p);
+	let made = alloc Leaf { n: 2 };
+	delete(kept);
+	delete(made);
+}
+
+fn main() -> int
+{
+	return 0;
+}

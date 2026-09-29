@@ -3464,6 +3464,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "variant_owning|-S,-o,${LISTINGS}/variant_owning.s,variant_owning.anti"
         "generic_moves|-S,-o,${LISTINGS}/generic_moves.s,generic_moves.anti"
         "caller_params|-S,-o,${LISTINGS}/caller_params.s,caller_params.anti"
+        "deref_new|-S,-o,${LISTINGS}/deref_new.s,deref_new.anti"
         "collection_copy|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/collection_copy.s,collection_copy.anti"
         "lent_params|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/lent_params.s,lent_params.anti"
         "lent_slices|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/lent_slices.s,lent_slices.anti"

@@ -1050,6 +1050,20 @@ static struct type *check_unary(struct checker *c, struct expr *e,
                           sema_tn(t));
             return sema_builtin(c, TYPE_ERROR);
         }
+        /* DESIGN: `*` of the result of `dup` or `alloc` reads the value of
+           a new object and drops the only pointer to it, so nothing could
+           ever free it. It is refused, and nothing frees the object
+           behind the program's back. `dup(*p)` or `dup(x)` copies the
+           value, and a `let` keeps the pointer. */
+        if ((operand->kind == EXPR_OBJECT &&
+             operand->as.object.op == TOKEN_DUP && !operand->as.object.value) ||
+            operand->kind == EXPR_ALLOC) {
+            sema_error_at(c, e->pos, "`*` of a new object drops its only "
+                          "pointer, so nothing could free it. Copy the value "
+                          "with `dup(*p)` or `dup(x)`, or keep the pointer "
+                          "in a `let`");
+            return sema_builtin(c, TYPE_ERROR);
+        }
         return sema_usable_pointer(c, operand, t)->element;
     case TOKEN_AMP:
         t = sema_check_storage(c, operand);

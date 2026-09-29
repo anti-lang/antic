@@ -1,0 +1,2 @@
+deref_new.anti:12:10: error: `*` of a new object drops its only pointer, so nothing could free it. Copy the value with `dup(*p)` or `dup(x)`, or keep the pointer in a `let`
+deref_new.anti:13:10: error: `*` of a new object drops its only pointer, so nothing could free it. Copy the value with `dup(*p)` or `dup(x)`, or keep the pointer in a `let`
