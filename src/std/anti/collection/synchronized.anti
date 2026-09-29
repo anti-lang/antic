@@ -395,6 +395,51 @@ pub synchronized class SyncList<T>
 		}
 		return -1;
 	}
+
+	/// Whether this list and `other` hold elements in the same order that
+	/// `same` finds equal, whatever their versions. `==` of two lists calls it
+	/// with both locked.
+	fn equal_items(self, other: *SyncList<T>,
+		same: fn(lent *T, lent *T) -> bool) -> bool
+	{
+		return self.items.equal_by(&other.items, fn(x, y) {
+			return same(&x.0, &y.0);
+		});
+	}
+
+	/// The hash of the elements in order with `element_hash` giving the hash of
+	/// each, as `collection.hash_in_order` takes it over a `List`, so an equal
+	/// `List` hashes alike. The hash of a list calls it with the list locked.
+	fn hash_items(self, element_hash: fn(lent *T) -> u64) -> u64
+	{
+		let h = self.items.count.hash();
+		for p in &self.items {
+			h = (h, element_hash(&p.0)).hash();
+		}
+		return h;
+	}
+}
+
+/// Whether `a` and `b` hold equal elements in the same order, with both lists
+/// locked while they are compared. The versions are no part of the value.
+pub operator fn eq<T: eq>(a: *SyncList<T>, b: *SyncList<T>) -> bool
+{
+	sync a, b {
+		return a.equal_items(b, fn(x, y) {
+			return *x == *y;
+		});
+	}
+}
+
+/// The hash of the elements in order, which an equal `List` shares, with the
+/// list locked while it is taken.
+pub operator fn hash<T: hash>(a: *SyncList<T>) -> u64
+{
+	sync a {
+		return a.hash_items(fn(x) {
+			return (*x).hash();
+		});
+	}
 }
 
 /// Sort the elements of `l` in place, smallest first. The sort is stable and
@@ -829,6 +874,32 @@ pub synchronized class SyncMap<K: eq + hash, V>
 		self.clock += 1;
 		self.versions.set(k, Stamp { version: self.clock });
 	}
+
+	/// The map of the entries, for `==` and the hash of the map, which hold its
+	/// lock while they read it. The versions stand apart.
+	fn held(self) -> *maps.Map<K, V>
+	{
+		return &self.entries;
+	}
+}
+
+/// Whether `a` and `b` hold equal entries whatever their order, with both maps
+/// locked while they are compared. The versions are no part of the value.
+pub operator fn eq<K: eq + hash, V: eq>(a: *SyncMap<K, V>, b: *SyncMap<K, V>)
+	-> bool
+{
+	sync a, b {
+		return *a.held() == *b.held();
+	}
+}
+
+/// The hash of the entries whatever their order, which an equal `Map` shares,
+/// with the map locked while it is taken.
+pub operator fn hash<K: eq + hash, V: hash>(a: *SyncMap<K, V>) -> u64
+{
+	sync a {
+		return a.held().hash();
+	}
 }
 
 /// A shared membership set, in the order the elements were first added.
@@ -1148,6 +1219,38 @@ pub synchronized class SyncSet<T: eq + hash>
 		self.clock += 1;
 		self.versions.set(x, Stamp { version: self.clock });
 	}
+
+	/// Whether this set and `other` hold equal elements, whatever their order
+	/// and their versions. `==` of two sets calls it with both locked.
+	fn equal_items(self, other: *SyncSet<T>) -> bool
+	{
+		return self.items == other.items;
+	}
+
+	/// The hash of the elements whatever their order, which an equal `Set`
+	/// shares. The hash of a set calls it with the set locked.
+	fn hash_items(self) -> u64
+	{
+		return self.items.hash();
+	}
+}
+
+/// Whether `a` and `b` hold equal elements whatever their order, with both sets
+/// locked while they are compared. The versions are no part of the value.
+pub operator fn eq<T: eq + hash>(a: *SyncSet<T>, b: *SyncSet<T>) -> bool
+{
+	sync a, b {
+		return a.equal_items(b);
+	}
+}
+
+/// The hash of the elements whatever their order, which an equal `Set` shares,
+/// with the set locked while it is taken.
+pub operator fn hash<T: eq + hash>(a: *SyncSet<T>) -> u64
+{
+	sync a {
+		return a.hash_items();
+	}
 }
 
 /// Objects that threads share by handle.
@@ -1357,5 +1460,31 @@ pub synchronized class SyncPool<T>
 		memcpy(to as ?*byte, &blank as ?*byte, size_of(SyncPool<T>) as c_size_t);
 		let made = to as *SyncPool<T>;
 		self.items.copy(&made.items as *Object);
+	}
+
+	/// The pool of the elements, for `==` and the hash of the pool, which hold
+	/// its lock while they read it.
+	fn held(self) -> *pool.Pool<T>
+	{
+		return &self.items;
+	}
+}
+
+/// Whether `a` and `b` hold equal elements in the order of their slots, with
+/// both pools locked while they are compared. The versions are no part of the
+/// value.
+pub operator fn eq<T: eq>(a: *SyncPool<T>, b: *SyncPool<T>) -> bool
+{
+	sync a, b {
+		return *a.held() == *b.held();
+	}
+}
+
+/// The hash of the elements in the order of their slots, which an equal `Pool`
+/// shares, with the pool locked while it is taken.
+pub operator fn hash<T: hash>(a: *SyncPool<T>) -> u64
+{
+	sync a {
+		return a.held().hash();
 	}
 }

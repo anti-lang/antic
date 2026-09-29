@@ -1,0 +1,23 @@
+exit 0
+list: equal 1, hash alike 1
+list itself: equal 1, hash alike 1
+list and plain list: equal 1, hash alike 1
+list with another element: equal 0, hash alike 1
+list reversed: equal 0, hash alike 0
+list both orders: 600 of 600 equal, 19200 rewritten
+map in another order: equal 1, hash alike 1
+map itself: equal 1, hash alike 1
+map and plain map: equal 1, hash alike 1
+map with another value: equal 0, hash alike 1
+map with one key more: equal 0, hash alike 0
+map both orders: 600 of 600 equal, 19200 rewritten
+set in another order: equal 1, hash alike 1
+set itself: equal 1, hash alike 1
+set and plain set: equal 1, hash alike 1
+set with one element less: equal 0, hash alike 1
+set both orders: 600 of 600 equal, 19200 rewritten
+pool: equal 1, hash alike 1
+pool itself: equal 1, hash alike 1
+pool and plain pool: equal 1, hash alike 1
+pool with another element: equal 0, hash alike 1
+pool both orders: 600 of 600 equal, 19200 rewritten

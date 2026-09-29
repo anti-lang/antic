@@ -1,0 +1,298 @@
+//! `==` and the hash of the collections of anti.collection.synchronized.
+//!
+//! Each compares and hashes its elements alone, as its plain collection does,
+//! with both objects locked while it reads them. Two collections that hold the
+//! same elements are equal and hash alike however often an element changed
+//! before, which its version counts, and the hash is that of the plain
+//! collection with the same elements. A dispatched job and the main thread then
+//! compare the same two collections over and over, each the other way round,
+//! while another job writes every element of one back unchanged. They never
+//! wait for each other for good, and every comparison finds the two equal,
+//! since a new version is no part of the value.
+
+import anti.collection.list;
+import anti.collection.map as maps;
+import anti.collection.pool;
+import anti.collection.set;
+import anti.collection.synchronized.{SyncList, SyncMap, SyncPool, SyncSet};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The comparisons each of the two comparing threads makes.
+const ROUNDS: int = 300;
+
+/// The elements of each collection.
+const ELEMENTS: int = 64;
+
+/// Print one line of `label` with the answers of `==` and of the hashes.
+fn show(label: str, equal: bool, alike: bool)
+{
+	printf("%.*s: equal %d, hash alike %d\n".ptr, label.len as c_int, label.ptr,
+		equal as c_int, alike as c_int);
+}
+
+/// Compare `l == other` `rounds` times and give the number of times they were
+/// equal.
+worker fn compare_lists(l: *SyncList<int>, other: *SyncList<int>,
+	rounds: int) -> int
+{
+	let equal = 0;
+	for i in 0..rounds {
+		if *l == *other {
+			equal += 1;
+		}
+	}
+	return equal;
+}
+
+/// Write every element of `l` back unchanged `rounds` times, each a new
+/// version.
+worker fn rewrite_list(l: *SyncList<int>, rounds: int) -> int
+{
+	let n = 0;
+	for i in 0..rounds {
+		n += l.update_all(fn(x) {
+			return true;
+		}, fn(p) {
+			*p = *p;
+		});
+	}
+	return n;
+}
+
+/// Compare `m == other` `rounds` times and give the number of times they were
+/// equal.
+worker fn compare_maps(m: *SyncMap<int, int>, other: *SyncMap<int, int>,
+	rounds: int) -> int
+{
+	let equal = 0;
+	for i in 0..rounds {
+		if *m == *other {
+			equal += 1;
+		}
+	}
+	return equal;
+}
+
+/// Set every key of `m` to its own value again `rounds` times.
+worker fn rewrite_map(m: *SyncMap<int, int>, rounds: int) -> int
+{
+	let n = 0;
+	for i in 0..rounds {
+		for k in 0..ELEMENTS {
+			m.set(k, 2 * k);
+			n += 1;
+		}
+	}
+	return n;
+}
+
+/// Compare `s == other` `rounds` times and give the number of times they were
+/// equal.
+worker fn compare_sets(s: *SyncSet<int>, other: *SyncSet<int>,
+	rounds: int) -> int
+{
+	let equal = 0;
+	for i in 0..rounds {
+		if *s == *other {
+			equal += 1;
+		}
+	}
+	return equal;
+}
+
+/// Put every element of `s` back with its own version `rounds` times, which
+/// moves it to the end of the order and gives it a new version.
+worker fn rewrite_set(s: *SyncSet<int>, rounds: int) -> int
+{
+	let n = 0;
+	for i in 0..rounds {
+		for x in 0..ELEMENTS {
+			let version = s.version_of(x) ?? -1;
+			s.set_if_version(x, version) catch fatal;
+			n += 1;
+		}
+	}
+	return n;
+}
+
+/// Compare `p == other` `rounds` times and give the number of times they were
+/// equal.
+worker fn compare_pools(p: *SyncPool<int>, other: *SyncPool<int>,
+	rounds: int) -> int
+{
+	let equal = 0;
+	for i in 0..rounds {
+		if *p == *other {
+			equal += 1;
+		}
+	}
+	return equal;
+}
+
+/// Write every element of `p` back unchanged `rounds` times.
+worker fn rewrite_pool(p: *SyncPool<int>, rounds: int) -> int
+{
+	let n = 0;
+	for i in 0..rounds {
+		n += p.update_all(fn(x) {
+			return true;
+		}, fn(e) {
+			*e = *e;
+		});
+	}
+	return n;
+}
+
+fn list_cases()
+{
+	let a = SyncList<int>.new();
+	let b = SyncList<int>.new(ELEMENTS);
+	let plain = list.List<int>.new();
+	for i in 0..ELEMENTS {
+		a.push(i);
+		b.push(-1);
+		let gone = b.pop();
+		b.push(i);
+		plain.push(i);
+	}
+	show("list", a == b, a.hash() == b.hash());
+	show("list itself", a == a, a.hash() == a.hash());
+	show("list and plain list", true, a.hash() == plain.hash());
+	b.update_first(fn(x) {
+		return x == 7;
+	}, fn(p) {
+		*p = 8;
+	});
+	show("list with another element", a == b, a != b);
+	b.update_first(fn(x) {
+		return x == 8;
+	}, fn(p) {
+		*p = 7;
+	});
+	b.reverse();
+	show("list reversed", a == b, false);
+	b.reverse();
+
+	let there = dispatch &a -> compare_lists(&b, ROUNDS);
+	let rewritten = dispatch &b -> rewrite_list(ROUNDS);
+	let back = compare_lists(&b, &a, ROUNDS);
+	let met = join(there) + back;
+	let written = join(rewritten);
+	printf("list both orders: %d of %d equal, %d rewritten\n".ptr, met as c_int,
+		(2 * ROUNDS) as c_int, written as c_int);
+}
+
+fn map_cases()
+{
+	let a = SyncMap<int, int>.new();
+	let b = SyncMap<int, int>.new(ELEMENTS);
+	let plain = maps.Map<int, int>.new();
+	for k in 0..ELEMENTS {
+		a.set(k, 2 * k);
+		plain.set(k, 2 * k);
+	}
+	let k = ELEMENTS - 1;
+	while k >= 0 do {
+		b.set(k, 0);
+		b.set(k, 2 * k);
+		b.set(ELEMENTS + k, 1);
+		let gone = b.remove(ELEMENTS + k);
+		k -= 1;
+	}
+	show("map in another order", a == b, a.hash() == b.hash());
+	show("map itself", a == a, a.hash() == a.hash());
+	show("map and plain map", true, a.hash() == plain.hash());
+	b.set(7, 15);
+	show("map with another value", a == b, a != b);
+	b.set(7, 14);
+	b.set(ELEMENTS, 0);
+	show("map with one key more", a == b, false);
+	let extra = b.remove(ELEMENTS);
+
+	let there = dispatch &a -> compare_maps(&b, ROUNDS);
+	let rewritten = dispatch &b -> rewrite_map(ROUNDS);
+	let back = compare_maps(&b, &a, ROUNDS);
+	let met = join(there) + back;
+	let written = join(rewritten);
+	printf("map both orders: %d of %d equal, %d rewritten\n".ptr, met as c_int,
+		(2 * ROUNDS) as c_int, written as c_int);
+}
+
+fn set_cases()
+{
+	let a = SyncSet<int>.new();
+	let b = SyncSet<int>.new(ELEMENTS);
+	let plain = set.Set<int>.new();
+	for x in 0..ELEMENTS {
+		let added = a.add(x);
+		let again = plain.add(x);
+	}
+	let x = ELEMENTS - 1;
+	while x >= 0 do {
+		let added = b.add(x);
+		let other = b.add(ELEMENTS + x);
+		let gone = b.remove(ELEMENTS + x);
+		x -= 1;
+	}
+	show("set in another order", a == b, a.hash() == b.hash());
+	show("set itself", a == a, a.hash() == a.hash());
+	show("set and plain set", true, a.hash() == plain.hash());
+	let gone = b.remove(7);
+	show("set with one element less", a == b, a != b);
+	let back_in = b.add(7);
+
+	let there = dispatch &a -> compare_sets(&b, ROUNDS);
+	let rewritten = dispatch &b -> rewrite_set(ROUNDS);
+	let back = compare_sets(&b, &a, ROUNDS);
+	let met = join(there) + back;
+	let written = join(rewritten);
+	printf("set both orders: %d of %d equal, %d rewritten\n".ptr, met as c_int,
+		(2 * ROUNDS) as c_int, written as c_int);
+}
+
+fn pool_cases()
+{
+	let a = SyncPool<int>.new();
+	let b = SyncPool<int>.new(ELEMENTS);
+	let plain = pool.Pool<int>.new();
+	for x in 0..ELEMENTS {
+		let h = a.add(x);
+		let p = plain.add(x);
+		let old = b.add(-1);
+		let gone = b.remove(old);
+		let kept = b.add(x);
+		let changed = b.set(kept, x);
+	}
+	show("pool", a == b, a.hash() == b.hash());
+	show("pool itself", a == a, a.hash() == a.hash());
+	show("pool and plain pool", true, a.hash() == plain.hash());
+	b.update_first(fn(x) {
+		return x == 7;
+	}, fn(p) {
+		*p = 8;
+	});
+	show("pool with another element", a == b, a != b);
+	b.update_first(fn(x) {
+		return x == 8;
+	}, fn(p) {
+		*p = 7;
+	});
+
+	let there = dispatch &a -> compare_pools(&b, ROUNDS);
+	let rewritten = dispatch &b -> rewrite_pool(ROUNDS);
+	let back = compare_pools(&b, &a, ROUNDS);
+	let met = join(there) + back;
+	let written = join(rewritten);
+	printf("pool both orders: %d of %d equal, %d rewritten\n".ptr, met as c_int,
+		(2 * ROUNDS) as c_int, written as c_int);
+}
+
+fn main() -> int
+{
+	list_cases();
+	map_cases();
+	set_cases();
+	pool_cases();
+	return 0;
+}

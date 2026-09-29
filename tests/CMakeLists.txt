@@ -1142,7 +1142,7 @@ foreach(module IN ITEMS list map set pool concurrent synchronized)
     list(APPEND synchronized_fixtures collection_${module}_dev_object)
 endforeach()
 foreach(name IN ITEMS sync_list sync_list_threads sync_map sync_map_threads
-        sync_set sync_set_threads sync_pool sync_pool_threads)
+        sync_set sync_set_threads sync_pool sync_pool_threads sync_equal)
     add_test(NAME std_${name}_dev
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -1194,6 +1194,7 @@ foreach(kind IN ITEMS list map set pool)
     set_tests_properties(std_sync_${kind}_threads std_sync_${kind}_threads_dev
         PROPERTIES TIMEOUT 120)
 endforeach()
+set_tests_properties(std_sync_equal std_sync_equal_dev PROPERTIES TIMEOUT 120)
 
 # Every failing function of src/std/ is written with `may fail`, apart from
 # a binding, which refuses it.
