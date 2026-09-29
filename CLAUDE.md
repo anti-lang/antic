@@ -338,8 +338,8 @@ generic, the other features with generics, the optional values, ownership
 at a call and lending, are built. So are the language part of walking a
 collection, hashing and order, direct imports, the parts every collection
 shares in `anti.collection`, `Shared<T>` of `anti.mem`, the collections of
-`anti.collection` and `--memory-checks`. The thread-safe collections are not.
-See `docs/notes/collections.md`.
+`anti.collection`, the thread-safe collections and `--memory-checks`. See
+`docs/notes/collections.md`.
 
 `docs/work-order-completion.md` is the work order those items come from, with
 its book steps removed. `docs/reports/2026-09-20-object-model-completion.md`
@@ -664,11 +664,14 @@ reports what it finished.
   `src/std/anti/collection/`: `List<T>`, `Deque<T>`, `Ring<T, N>` and
   `Grid<T>`, `Map<K, V>` and `HashMap<K, V>`, `Set<T>`, `HashSet<T>` and
   `BitSet`, `SortedMap<K, V>` and `SortedSet<T>`, `Pool<T>` with `Handle<T>`,
-  `Tree<T>` and `PriorityQueue<T>`. Each has the operations of its family and
-  those of `Collection<T>`, and takes an optional allocator when it is made.
-  `dup` copies every collection, and `=` between two collections is refused.
-  `deserialize` of a collection and the thread-safe collections are not
-  built. See "Generics and collections" in `docs/decisions.md`.
+  `Tree<T>` and `PriorityQueue<T>`. The thread-safe ones are `SyncList<T>`,
+  `SyncMap<K, V>`, `SyncSet<T>` and `SyncPool<T>` of
+  `anti.collection.synchronized` and `ConcurrentMap<K, V>` and
+  `SpscRing<T, N>` of `anti.collection.concurrent`. Each has the operations of
+  its family and those of `Collection<T>`, and takes an optional allocator when
+  it is made. `dup` copies every collection, and `=` between two collections is
+  refused. `deserialize` of a collection is not built. See "Generics and
+  collections" in `docs/decisions.md`.
 - `--memory-checks` is built for antic, `anti build`, `anti run` and `anti
   test`. The back end calls the checks of AddressSanitizer at every load and
   store, the program links its runtime from the runtime archive, the runtime
