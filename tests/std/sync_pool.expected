@@ -21,3 +21,5 @@ clear: 0 true []
 owned stale: the element changed from version 0 to 1
 owned: 101 51 50 true 10 10 3500 1000
 owned: 0 blocks alive, 0 allocations held
+owned removal: 7000 0 10 11 7001 9 0
+owned removal: 0 blocks alive, 0 allocations held

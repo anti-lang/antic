@@ -279,6 +279,35 @@ fn owned()
 	show(f"owned: {Id.live.load()} blocks alive, {counting.allocs - counting.frees} allocations held");
 }
 
+/// The forms that take an owning element out of its slot: each element has one
+/// owner after it, so every block is freed once.
+fn owned_removal() may fail
+{
+	let counting = Counting { };
+	{
+		let p = SyncPool<Id>.new(4, &counting);
+		for i in 0..20 {
+			let h = p.add(Id.of(i));
+		}
+		let seven = p.add(Id.of(7000));
+		let (got, version) = p.get_versioned(seven) ?? (Id.of(-1), -1);
+		try p.set_if_version(seven, Id.of(got.value() + 1), version);
+		let gone = p.remove_all(fn(x) {
+			return x.value() % 2 == 0;
+		});
+		let first = p.remove_first(fn(x) {
+			return x.value() > 10;
+		}) ?? Id.of(-1);
+		let only = try p.remove_one(fn(x) {
+			return x.value() == 7001;
+		});
+		let left = p.count();
+		p.clear();
+		show(f"owned removal: {got.value()} {version} {gone} {first.value()} {only.value()} {left} {p.count()}");
+	}
+	show(f"owned removal: {Id.live.load()} blocks alive, {counting.allocs - counting.frees} allocations held");
+}
+
 fn main() -> int
 {
 	handles();
@@ -289,5 +318,8 @@ fn main() -> int
 		show(f"criteria: {e.message}");
 	};
 	owned();
+	owned_removal() catch e {
+		show(f"owned removal: {e.message}");
+	};
 	return 0;
 }

@@ -106,15 +106,10 @@ pub synchronized class SyncList<T>
 	}
 
 	/// Add `x` after the last element, with a version of its own.
-	///
-	/// DESIGN: the pair of the list holds a copy of `x`, and `x` is torn down
-	/// when the call returns. A literal takes no owning value from a parameter,
-	/// `use dup instead of =`, and a copy of a generic is held to the same
-	/// rule.
 	pub fn push(self, own x: T)
 	{
 		self.clock += 1;
-		self.items.push((dup(x), self.clock));
+		self.items.push((x, self.clock));
 	}
 
 	/// Take the last element off, or `none` when the list is empty.
@@ -211,7 +206,7 @@ pub synchronized class SyncList<T>
 			fail pool.Changed.found_version(version, -1);
 		}
 		self.clock += 1;
-		self.items[at] = (dup(x), self.clock);
+		self.items[at] = (x, self.clock);
 	}
 
 	/// Run `change` on every element that `test` accepts, in place, and give
