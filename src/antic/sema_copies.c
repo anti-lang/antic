@@ -1610,6 +1610,9 @@ static void walk_defaults(struct copies *k, struct item *it)
     if (it->operator_hash != NULL) {
         xe(&cl, it->operator_hash);
     }
+    if (it->operator_eq != NULL) {
+        xe(&cl, it->operator_eq);
+    }
 }
 
 /* Give each class copy added since *from its defaults, and walk them.

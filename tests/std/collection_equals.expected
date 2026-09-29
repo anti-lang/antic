@@ -1,0 +1,9 @@
+exit 0
+list: == 1, equals 1
+list with one more: == 0, equals 0
+map: == 1, equals 1
+hash map: == 1, equals 1
+hash set: == 1, equals 1
+pool: == 1, equals 1
+concurrent map: == 1, equals 1
+concurrent map with one more: == 0, equals 0

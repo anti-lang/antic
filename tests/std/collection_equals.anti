@@ -1,0 +1,79 @@
+//! `equals` of a collection agrees with its `==`.
+//!
+//! Two collections with the same elements and another history, a push and a pop
+//! more, a key that came and went or a slot freed and taken again, differ in
+//! their counts of changes, their room and their versions. None of that is part
+//! of the value, so `equals` through `*Object` compares the elements alone, as
+//! `==` does. A collection that differs in an element is unequal both ways.
+
+import anti.collection.concurrent.{ConcurrentMap};
+import anti.collection.list.{List};
+import anti.collection.map.{HashMap, Map};
+import anti.collection.pool.{Pool};
+import anti.collection.set.{HashSet};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Print whether `a == b` and `a.equals(b)` through `*Object` agree.
+fn both(label: str, equal: bool, a: *Object, b: *Object)
+{
+	printf("%.*s: == %d, equals %d\n".ptr, label.len as c_int, label.ptr,
+		equal as c_int, a.equals(b) as c_int);
+}
+
+fn main() -> int
+{
+	let la = List<int>.new();
+	let lb = List<int>.new(64);
+	la.push(1);
+	lb.push(1);
+	lb.push(2);
+	let popped = lb.pop();
+	both("list", la == lb, &la, &lb);
+	lb.push(3);
+	both("list with one more", la == lb, &la, &lb);
+
+	let ma = Map<str, int>.new();
+	let mb = Map<str, int>.new();
+	ma.set("a", 1);
+	ma.set("b", 2);
+	mb.set("b", 2);
+	mb.set("c", 3);
+	mb.set("a", 1);
+	let gone = mb.remove("c");
+	both("map", ma == mb, &ma, &mb);
+
+	let ha = HashMap<int, int>.new();
+	let hb = HashMap<int, int>.new(100);
+	for i in 0..20 {
+		ha.set(i, i);
+		hb.set(19 - i, 19 - i);
+	}
+	both("hash map", ha == hb, &ha, &hb);
+
+	let sa = HashSet<int>.new();
+	let sb = HashSet<int>.new();
+	sa.add(4);
+	sb.add(5);
+	sb.add(4);
+	let dropped = sb.remove(5);
+	both("hash set", sa == sb, &sa, &sb);
+
+	let pa = Pool<int>.new();
+	let pb = Pool<int>.new();
+	let first = pa.add(7);
+	let second = pb.add(7);
+	pb.set(second, 8);
+	pb.set(second, 7);
+	both("pool", pa == pb, &pa, &pb);
+
+	let ca = ConcurrentMap<int, int>.new();
+	let cb = ConcurrentMap<int, int>.new(32);
+	ca.set(1, 10);
+	cb.set(1, 0);
+	cb.set(1, 10);
+	both("concurrent map", ca == cb, &ca, &cb);
+	cb.set(2, 20);
+	both("concurrent map with one more", ca == cb, &ca, &cb);
+	return 0;
+}

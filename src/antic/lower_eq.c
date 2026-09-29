@@ -542,6 +542,34 @@ static void compare_locked(struct lowerer *l, const struct item *it,
     cmp->differ = before;
 }
 
+/* Two objects of the class of it through the `operator fn eq` of its
+   module, under both hidden locks for a synchronized class. */
+static void compare_by_operator(struct lowerer *l, const struct item *it,
+                                struct comparison *cmp,
+                                struct ir_operand self,
+                                struct ir_operand other,
+                                struct ir_block *done)
+{
+    const struct type *t = it->symbol->type;
+    const struct symbol *op = it->operator_eq->as.call.callee->symbol;
+    bool locked = t->safety == SAFETY_SYNCHRONIZED;
+    struct ir_operand ours = lower_none();
+    struct ir_operand theirs = lower_none();
+    struct ir_operand same;
+
+    if (locked) {
+        ours = lower_object_lock_address(l, t, self);
+        theirs = lower_object_lock_address(l, t, other);
+        lower_lock_pair_call(l, ours, theirs, it->pos.line);
+    }
+    same = call_eq(l, lower_callee_function(l, op), self, other);
+    ir_assign(l->f, l->b, cmp->result, same);
+    if (locked) {
+        lower_unlock_pair_call(l, ours, theirs);
+    }
+    ir_jump(l->f, l->b, done);
+}
+
 /* DESIGN: the default `equals` of a class is code the compiler writes,
    `C.equals`, so it reads no field list and works under `--no-reflect`.
    The same object is equal to itself. Two objects of different classes
@@ -550,9 +578,11 @@ static void compare_locked(struct lowerer *l, const struct item *it,
    `own` slice compares element by element and an `own fn` by its code and
    its snapshot. A lock, a `transient` field, the sub-object of an
    interface and a field that holds a union or a Match are passed over.
+   A class whose module gives it `operator fn eq` compares through it.
    A synchronized class compares under `sync self, other`, which takes
    both locks in the runtime's order. A concurrent class has no default
-   `==`, and the entry of its table compares identity. */
+   `==`, and the entry of its table compares identity unless its module
+   gives it an operator. */
 void lower_class_equals(struct lowerer *l, const struct item *it)
 {
     static const enum ir_type one[] = {IR_PTR};
@@ -579,7 +609,7 @@ void lower_class_equals(struct lowerer *l, const struct item *it)
               lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, self, other)),
               done, next);
     l->b = next;
-    if (t->safety == SAFETY_CONCURRENT) {
+    if (t->safety == SAFETY_CONCURRENT && it->operator_eq == NULL) {
         ir_jump(l->f, l->b, cmp.differ);
     } else {
         require(l, &cmp, lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8,
@@ -590,7 +620,9 @@ void lower_class_equals(struct lowerer *l, const struct item *it)
                                1);
         require(l, &cmp, lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8,
                                                  ours, theirs)));
-        if (t->safety == SAFETY_SYNCHRONIZED) {
+        if (it->operator_eq != NULL) {
+            compare_by_operator(l, it, &cmp, self, other, done);
+        } else if (t->safety == SAFETY_SYNCHRONIZED) {
             compare_locked(l, it, &cmp, self, other, done);
         } else {
             compare_members(l, e, &cmp, t, self, other);

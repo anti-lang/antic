@@ -581,6 +581,7 @@ void sema_class_defaults(struct checker *c, struct item *it)
             }
         }
         it->default_eq = e;
+        it->operator_eq = sema_class_eq_operator(c, t, it->pos);
     }
     if (!declares(t, "hash")) {
         struct expr *e = sema_new_node(c, EXPR_CALL, it->pos);

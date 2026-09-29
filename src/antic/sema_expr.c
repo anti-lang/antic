@@ -1678,31 +1678,46 @@ static struct type *check_operator(struct checker *c, struct expr *e,
     return sig->result;
 }
 
-/* DESIGN: a module that gives a class `==` with a free `operator fn eq`
-   gives it its hash with an `operator fn hash` beside it, which a
-   collection declares as `operator fn hash<T: hash>(a: List<T>) -> u64`.
-   It is then the hash of every value of the class: the compiler writes
-   the class's `hash` as a call of it, so the table, the default hash of a
-   holder and `x.hash()` agree. A copy of a generic class whose arguments
-   miss a constraint of the operator keeps the default hash, as it has no
-   `==` either. The call is checked with the errors held back, and the
-   constraints are read after it. */
-struct expr *sema_class_hash_operator(struct checker *c, struct type *t,
-                                      struct pos pos)
+/* A stand-in for a value of type t that the caller holds, `*p`. It is
+   checked already and never lowered. */
+static struct expr *held_value(struct checker *c, struct type *t,
+                               struct pos pos)
 {
-    static const struct name hash_name = {LANG_HOOK_HASH,
-                                          sizeof LANG_HOOK_HASH - 1};
-    struct symbol *fn = sema_module_function(c, t, &hash_name);
+    struct expr *hole = sema_new_node(c, EXPR_NONE, pos);
+    struct expr *at = sema_new_node(c, EXPR_UNARY, pos);
+
+    hole->type = types_pointer(c->types, t);
+    hole->prechecked = true;
+    at->as.unary.op = TOKEN_STAR;
+    at->as.unary.operand = hole;
+    at->type = t;
+    at->prechecked = true;
+    return at;
+}
+
+/* The checked call of the `operator fn text` that the module of the class
+   t gives it, on count stand-ins, when its result has the kind result and
+   the arguments of t meet the constraints of the operator. NULL
+   otherwise, and NULL for an operator that would copy a lock. The call is
+   checked with the errors held back, and the constraints are read after
+   it. */
+static struct expr *class_operator(struct checker *c, struct type *t,
+                                   struct pos pos, const char *text,
+                                   size_t count, enum type_kind result)
+{
+    struct name name;
+    struct symbol *fn;
     const struct item *it;
     struct expr *call;
     struct expr *callee;
-    struct expr *hole;
-    struct expr *at;
     struct expr **args;
     struct type *sig;
     size_t i;
     bool ok;
 
+    name.text = text;
+    name.length = strlen(text);
+    fn = sema_module_function(c, t, &name);
     if (fn == NULL || fn->kind != SYMBOL_FN || !symbol_is_operator(fn) ||
         !takes_first(fn, t)) {
         return NULL;
@@ -1710,20 +1725,12 @@ struct expr *sema_class_hash_operator(struct checker *c, struct type *t,
     it = fn->item;
     call = sema_new_node(c, EXPR_CALL, pos);
     callee = sema_new_node(c, EXPR_NAME, pos);
-    hole = sema_new_node(c, EXPR_NONE, pos);
-    at = sema_new_node(c, EXPR_UNARY, pos);
-    args = arena_alloc(c->arena, sizeof *args);
-    hole->type = types_pointer(c->types, t);
-    hole->prechecked = true;
-    at->as.unary.op = TOKEN_STAR;
-    at->as.unary.operand = hole;
-    at->type = t;
-    at->prechecked = true;
+    args = arena_alloc(c->arena, count * sizeof *args);
     c->quiet++;
-    sig = sema_operator_copy(c, call, fn->type, fn, t, NULL);
+    sig = sema_operator_copy(c, call, fn->type, fn, t, count > 1 ? t : NULL);
     c->quiet--;
-    if (sig == NULL || sema_is_error(sig) || sig->param_count != 1 ||
-        sig->result == NULL || sig->result->kind != TYPE_U64) {
+    if (sig == NULL || sema_is_error(sig) || sig->param_count != count ||
+        sig->result == NULL || sig->result->kind != result) {
         return NULL;
     }
     ok = it != NULL && call->as.call.copy_count == it->type_param_count;
@@ -1732,18 +1739,48 @@ struct expr *sema_class_hash_operator(struct checker *c, struct type *t,
              sema_meets_param(c, call->as.call.copy_args[i],
                               it->type_params[i].type);
     }
+    for (i = 0; ok && i < count; i++) {
+        ok = sig->params[i]->kind == TYPE_POINTER || !sema_holds_mutex(t);
+    }
     if (!ok) {
         return NULL;
     }
     callee->symbol = fn;
     callee->type = sig;
     callee->as.name = fn->name;
-    args[0] = operator_receiver(c, at, sig->params[0]);
+    for (i = 0; i < count; i++) {
+        args[i] = operator_receiver(c, held_value(c, t, pos), sig->params[i]);
+    }
     call->as.call.callee = callee;
     call->as.call.args = args;
-    call->as.call.arg_count = 1;
+    call->as.call.arg_count = count;
     call->type = sig->result;
     return call;
+}
+
+/* DESIGN: a module that gives a class `==` with a free `operator fn eq`
+   gives it its hash with an `operator fn hash` beside it, which a
+   collection declares as `operator fn hash<T: hash>(a: List<T>) -> u64`.
+   It is then the hash of every value of the class: the compiler writes
+   the class's `hash` as a call of it, so the table, the default hash of a
+   holder and `x.hash()` agree. A copy of a generic class whose arguments
+   miss a constraint of the operator keeps the default hash, as it has no
+   `==` either. */
+struct expr *sema_class_hash_operator(struct checker *c, struct type *t,
+                                      struct pos pos)
+{
+    return class_operator(c, t, pos, LANG_HOOK_HASH, 1, TYPE_U64);
+}
+
+/* DESIGN: the `equals` of a class whose module gives it `operator fn eq`
+   calls that operator, as its `hash` calls `operator fn hash`. `equals`
+   through `*Object` and `==` then agree, and a collection compares its
+   elements alone in both, never its count of changes, its room or its
+   versions. */
+struct expr *sema_class_eq_operator(struct checker *c, struct type *t,
+                                    struct pos pos)
+{
+    return class_operator(c, t, pos, LANG_HOOK_EQ, 2, TYPE_BOOL);
 }
 
 /* DESIGN: `==` on two class pointers compares the identity of the

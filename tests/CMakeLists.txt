@@ -1134,7 +1134,7 @@ foreach(module IN ITEMS list deque ring grid map set sorted pool tree queue
         ",${CMAKE_CURRENT_BINARY_DIR}/anti_collection_${module}_dev${anti_object}")
     list(APPEND dup_fixtures collection_${module}_dev_object)
 endforeach()
-foreach(name IN ITEMS dup hash)
+foreach(name IN ITEMS dup hash equals)
     add_test(NAME std_collection_${name}_dev
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"

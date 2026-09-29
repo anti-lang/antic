@@ -315,6 +315,8 @@ bool sema_meets_param(struct checker *c, struct type *t, const struct type *p);
    the module declares none or t does not meet its constraints. */
 struct expr *sema_class_hash_operator(struct checker *c, struct type *t,
                                       struct pos pos);
+struct expr *sema_class_eq_operator(struct checker *c, struct type *t,
+                                    struct pos pos);
 bool sema_implemented_in(const struct type *t, const struct type *iface);
 struct symbol *sema_null_pointer_maker(struct checker *c, struct pos pos);
 struct symbol *sema_error_maker(struct checker *c, struct pos pos);
