@@ -387,8 +387,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1260 ctest tests pass on the development Mac and none is skipped. The ASan
-  and the UBSan builds run 1259 each, without the `no_paths` test, which needs a
+- 1265 ctest tests pass on the development Mac and none is skipped. The ASan
+  and the UBSan builds run 1264 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
@@ -441,7 +441,8 @@ reports what it finished.
   the order of their addresses, and the default `==` and hash of a
   synchronized class run under them. A concurrent class has no default `==`
   or hash. `equals` of a class whose module gives it `operator fn eq` calls
-  it. See "Concurrent classes" in
+  it, and an operator at module level reaches the private members of the
+  classes of its module. See "Concurrent classes" in
   `docs/decisions.md` and `docs/notes/concurrent-classes.md`.
 - `anti.mem.Allocator` is built, with `alloc(size, align)` and `free(p)`, the
   default `LibcAllocator` over `src/rt/mem.c` and `ArenaAllocator` over blocks of
