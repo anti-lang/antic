@@ -674,6 +674,9 @@ static void dump_stmt(struct dumper *d, int depth, const struct stmt *s)
     case STMT_SYNC:
         simple(d, depth, "sync_stmt", NULL);
         dump_expr(d, depth + 1, s->as.sync.mutex);
+        if (s->as.sync.second != NULL) {
+            dump_expr(d, depth + 1, s->as.sync.second);
+        }
         dump_block(d, depth + 1, s->as.sync.body);
         break;
     case STMT_SELECT:

@@ -1298,6 +1298,22 @@ static struct symbol *operator_symbol(struct checker *c, struct type *t,
     return NULL;
 }
 
+bool sema_module_operator(struct checker *c, struct type *t,
+                          const char *text)
+{
+    struct name name;
+    struct symbol *fn;
+
+    if (operator_symbol(c, t, text) != NULL) {
+        return true;
+    }
+    name.text = text;
+    name.length = strlen(text);
+    fn = sema_module_function(c, t, &name);
+    return fn != NULL && fn->kind == SYMBOL_FN && symbol_is_operator(fn) &&
+           takes_first(fn, t);
+}
+
 static struct expr *format_word(struct checker *c, struct pos pos,
                                 const struct name *name);
 static struct expr *format_field(struct checker *c, struct expr *base,
@@ -1628,9 +1644,20 @@ static struct type *check_operator(struct checker *c, struct expr *e,
                       "own", (int)fn->name.length, fn->name.text);
         return sema_builtin(c, TYPE_ERROR);
     }
+    /* DESIGN: an operator that takes a pointer takes the address of
+       either operand, as a function with `self` takes its receiver. A
+       synchronized class hands its objects themselves to its operators
+       that way, which lock them, since a copy would copy the lock. */
+    if (sig->params[1]->kind == TYPE_POINTER &&
+        right == sig->params[1]->element) {
+        b = operator_receiver(c, b, sig->params[1]);
+        right = sig->params[1];
+    }
     if (!sema_require(c, b, right, sig->params[1])) {
         return sema_builtin(c, TYPE_ERROR);
     }
+    sema_refuse_lock_copy(c, a, sig->params[0]);
+    sema_refuse_lock_copy(c, b, sig->params[1]);
     callee->symbol = fn;
     callee->type = sig;
     callee->as.name = fn->name;
@@ -1943,9 +1970,15 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
                 }
                 gap = left->kind == TYPE_STRUCT && !left->is_union
                           ? sema_eq_gap(c, left)
-                      : left->kind == TYPE_CLASS ? sema_class_gap(left)
+                      : left->kind == TYPE_CLASS ? sema_class_gap(c, left)
                                                  : NULL;
-                if (gap != NULL) {
+                if (sema_concurrent_lacks(c, left, LANG_HOOK_EQ)) {
+                    sema_error_at(c, e->pos, "`%s` is not defined on `%s`. "
+                                  "A concurrent class has no default `==` "
+                                  "and declares `concrete fn equals` or "
+                                  "`operator fn eq` of its own", o,
+                                  sema_tn(left));
+                } else if (gap != NULL) {
                     sema_error_at(c, e->pos, "`%s` is not defined on `%s`, "
                                   "whose field `%.*s` has no `eq`", o,
                                   sema_tn(left), (int)gap->name.length,

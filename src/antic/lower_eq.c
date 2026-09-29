@@ -499,6 +499,49 @@ static void compare_member(struct lowerer *l, const struct expr *e,
     compare_at(l, e, cmp, a, b, f->type);
 }
 
+/* Every field of the chain of t, at self and at other. */
+static void compare_members(struct lowerer *l, const struct expr *e,
+                            struct comparison *cmp, const struct type *t,
+                            struct ir_operand self, struct ir_operand other)
+{
+    const struct type *up;
+    size_t i;
+
+    for (up = t; up != NULL; up = up->base) {
+        for (i = 0; i < up->field_count; i++) {
+            compare_member(l, e, cmp, up, i, self, other);
+        }
+    }
+}
+
+/* The fields of two objects of the synchronized class of it, with both
+   hidden locks held. Both ends of the comparison give the locks back
+   before they reach done, and a difference found before the locks were
+   taken goes on to cmp->differ as before. */
+static void compare_locked(struct lowerer *l, const struct item *it,
+                           struct comparison *cmp, struct ir_operand self,
+                           struct ir_operand other, struct ir_block *done)
+{
+    const struct type *t = it->symbol->type;
+    struct ir_operand ours = lower_object_lock_address(l, t, self);
+    struct ir_operand theirs = lower_object_lock_address(l, t, other);
+    struct ir_block *before = cmp->differ;
+    struct ir_block *release = lower_new_block(l);
+    struct ir_block *differ = lower_new_block(l);
+
+    lower_lock_pair_call(l, ours, theirs, it->pos.line);
+    cmp->differ = differ;
+    compare_members(l, it->default_eq, cmp, t, self, other);
+    ir_jump(l->f, l->b, release);
+    l->b = differ;
+    ir_assign(l->f, l->b, cmp->result, ir_int_op(IR_I8, 0));
+    ir_jump(l->f, l->b, release);
+    l->b = release;
+    lower_unlock_pair_call(l, ours, theirs);
+    ir_jump(l->f, l->b, done);
+    cmp->differ = before;
+}
+
 /* DESIGN: the default `equals` of a class is code the compiler writes,
    `C.equals`, so it reads no field list and works under `--no-reflect`.
    The same object is equal to itself. Two objects of different classes
@@ -506,14 +549,16 @@ static void compare_member(struct lowerer *l, const struct expr *e,
    is then compared as the default `==` of a struct compares a part. An
    `own` slice compares element by element and an `own fn` by its code and
    its snapshot. A lock, a `transient` field, the sub-object of an
-   interface and a field that holds a union or a Match are passed over. */
+   interface and a field that holds a union or a Match are passed over.
+   A synchronized class compares under `sync self, other`, which takes
+   both locks in the runtime's order. A concurrent class has no default
+   `==`, and the entry of its table compares identity. */
 void lower_class_equals(struct lowerer *l, const struct item *it)
 {
     static const enum ir_type one[] = {IR_PTR};
     const struct type *t = it->symbol->type;
     struct ir_function *f = lower_class_function(l, t, "equals");
     const struct expr *e = it->default_eq;
-    const struct type *up;
     struct comparison cmp;
     struct ir_block *done;
     struct ir_block *next;
@@ -521,7 +566,6 @@ void lower_class_equals(struct lowerer *l, const struct item *it)
     struct ir_operand other;
     struct ir_operand ours;
     struct ir_operand theirs;
-    size_t i;
 
     l->f = f;
     l->b = ir_block_add(f);
@@ -535,18 +579,24 @@ void lower_class_equals(struct lowerer *l, const struct item *it)
               lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, self, other)),
               done, next);
     l->b = next;
-    require(l, &cmp, lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, other,
-                                             ir_int_op(IR_PTR, 0))));
-    ours = lower_rt_call(l, "anti_rt_descriptor", IR_PTR, one, &self, 1);
-    theirs = lower_rt_call(l, "anti_rt_descriptor", IR_PTR, one, &other, 1);
-    require(l, &cmp, lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, ours,
-                                             theirs)));
-    for (up = t; up != NULL; up = up->base) {
-        for (i = 0; i < up->field_count; i++) {
-            compare_member(l, e, &cmp, up, i, self, other);
+    if (t->safety == SAFETY_CONCURRENT) {
+        ir_jump(l->f, l->b, cmp.differ);
+    } else {
+        require(l, &cmp, lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8,
+                                                 other,
+                                                 ir_int_op(IR_PTR, 0))));
+        ours = lower_rt_call(l, "anti_rt_descriptor", IR_PTR, one, &self, 1);
+        theirs = lower_rt_call(l, "anti_rt_descriptor", IR_PTR, one, &other,
+                               1);
+        require(l, &cmp, lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8,
+                                                 ours, theirs)));
+        if (t->safety == SAFETY_SYNCHRONIZED) {
+            compare_locked(l, it, &cmp, self, other, done);
+        } else {
+            compare_members(l, e, &cmp, t, self, other);
+            ir_jump(l->f, l->b, done);
         }
     }
-    ir_jump(l->f, l->b, done);
     l->b = cmp.differ;
     ir_assign(l->f, l->b, cmp.result, ir_int_op(IR_I8, 0));
     ir_jump(l->f, l->b, done);

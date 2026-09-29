@@ -1,0 +1,64 @@
+//! A synchronized class with `==` and a hash of its own, from the operators of
+//! its module over pointers. `a == b` passes the address of each operand, so
+//! the operator holds `sync a, b` on the objects themselves and compares what
+//! they hold alone, leaving out the count of their changes. The hash of the
+//! class runs its operator under the lock of its object.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+synchronized class Tally
+{
+	total: int = 0,
+	changes: int = 0,
+
+	pub fn add(self, n: int)
+	{
+		self.total += n;
+		self.changes += 1;
+	}
+
+	pub fn sum(self) -> int
+	{
+		return self.total;
+	}
+
+	pub fn count(self) -> int
+	{
+		return self.changes;
+	}
+}
+
+/// Whether `a` and `b` hold the same total, whatever their changes.
+pub operator fn eq(a: *Tally, b: *Tally) -> bool
+{
+	sync a, b {
+		return a.sum() == b.sum();
+	}
+}
+
+/// The hash of the total alone, which equal tallies share.
+pub operator fn hash(a: *Tally) -> u64
+{
+	sync a {
+		return a.sum().hash();
+	}
+}
+
+fn main() -> int
+{
+	let a = alloc Tally { };
+	let b = alloc Tally { };
+	a.add(5);
+	b.add(2);
+	b.add(3);
+	printf("changes %d %d\n".ptr, a.count() as c_int, b.count() as c_int);
+	printf("equal %d, same hash %d\n".ptr, (*a == *b) as c_int,
+		(a.hash() == b.hash()) as c_int);
+	b.add(1);
+	printf("equal %d, not equal %d\n".ptr, (*a == *b) as c_int,
+		(*a != *b) as c_int);
+	printf("itself %d\n".ptr, (*a == *a) as c_int);
+	free(a);
+	free(b);
+	return 0;
+}

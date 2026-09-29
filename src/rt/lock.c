@@ -366,3 +366,55 @@ void anti_rt_object_unlock_at(void *lock)
         order_give(lock);
     }
 }
+
+/* DESIGN: `sync a, b { }` takes the hidden locks of two objects in the
+   order of their addresses, so two threads that name the same two objects
+   in opposite orders take them in one order and never wait for each other
+   in a cycle. The same object twice is one lock, taken once. A dev build
+   records the order it takes them in, which is the same for every pair of
+   the two, so the check of the orders accepts it. */
+void anti_rt_object_lock_pair(void *a, void *b)
+{
+    void *first = (uintptr_t)a <= (uintptr_t)b ? a : b;
+    void *second = first == a ? b : a;
+
+    anti_rt_object_lock(first);
+    if (second != first) {
+        anti_rt_object_lock(second);
+    }
+}
+
+void anti_rt_object_unlock_pair(void *a, void *b)
+{
+    if (a != b) {
+        anti_rt_object_unlock(b);
+    }
+    anti_rt_object_unlock(a);
+}
+
+void anti_rt_object_lock_pair_at(void *a, void *b, const char *site)
+{
+    void *first = (uintptr_t)a <= (uintptr_t)b ? a : b;
+    void *second = first == a ? b : a;
+
+    anti_rt_object_lock_at(first, site);
+    if (second != first) {
+        anti_rt_object_lock_at(second, site);
+    }
+}
+
+void anti_rt_object_unlock_pair_at(void *a, void *b)
+{
+    if (a != b) {
+        anti_rt_object_unlock_at(b);
+    }
+    anti_rt_object_unlock_at(a);
+}
+
+/* Whether a lies below b in memory. The standard library takes locks of
+   its own in the order of their addresses with it, as `sync a, b` does,
+   since Anti has no order of pointers. */
+int anti_rt_address_below(const void *a, const void *b)
+{
+    return (uintptr_t)a < (uintptr_t)b;
+}

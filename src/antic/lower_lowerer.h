@@ -51,6 +51,10 @@ struct exit_action {
     const struct type *error_type;
     bool unlock;                /* `sync`: unlock the mutex in mutex. */
     uint32_t mutex;             /* the address of the lock. */
+    /* `sync a, b`: the address of the second lock. Both go back
+       through lower_unlock_pair_call. */
+    bool pair;
+    uint32_t second;
     const char *unlock_fn;      /* the function of the runtime that does. */
     /* DESIGN: the `leave` hook of an instrumented function is an exit
        action of a scope around its body. Every exit therefore runs it,
@@ -305,6 +309,12 @@ struct ir_operand lower_object_lock_address(struct lowerer *l,
                                             struct ir_operand object);
 void lower_hold_lock(struct lowerer *l, struct ir_operand at, bool object,
                      int line);
+void lower_object_lock_call(struct lowerer *l, struct ir_operand at, int line);
+void lower_object_unlock_call(struct lowerer *l, struct ir_operand at);
+void lower_lock_pair_call(struct lowerer *l, struct ir_operand a,
+                          struct ir_operand b, int line);
+void lower_unlock_pair_call(struct lowerer *l, struct ir_operand a,
+                            struct ir_operand b);
 extern const struct name lower_len_name;
 extern const struct name lower_entry_name;
 struct ir_operand lower_field_offset(struct lowerer *l, const struct type *s,

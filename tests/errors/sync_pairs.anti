@@ -1,0 +1,96 @@
+//! `sync a, b { }` takes two synchronized objects, and a Mutex or a plain
+//! object is refused. A concurrent class has no default `==` or hash, since the
+//! compiler cannot know which locks guard what: `==`, `hash()` and the default
+//! `==` of a struct or a class that holds one in place are refused until the
+//! class declares its own. An operator that takes a synchronized object by
+//! value would copy its lock, and a pointer is the form it takes.
+
+concurrent class Counter
+{
+	lock: Mutex,
+	count: int = 0 guarded by lock,
+
+	pub fn add(self)
+	{
+		sync self.lock {
+			self.count += 1;
+		}
+	}
+}
+
+concurrent class Named
+{
+	lock: Mutex,
+	name: int = 0 guarded by lock,
+
+	concrete fn equals(self, other: *Object) -> bool
+	{
+		return true;
+	}
+
+	concrete fn hash(self) -> u64
+	{
+		return 1;
+	}
+}
+
+synchronized class Cell
+{
+	n: int = 0,
+}
+
+synchronized class Copied
+{
+	n: int = 0,
+}
+
+pub operator fn eq(a: Copied, b: Copied) -> bool
+{
+	return true;
+}
+
+class Plain
+{
+	n: int = 0,
+}
+
+struct Holder
+{
+	c: Counter,
+}
+
+class Keeper
+{
+	pub c: Counter,
+}
+
+fn main() -> int
+{
+	let a = alloc Counter { };
+	let b = alloc Counter { };
+	let same = *a == *b;
+	let h = a.hash();
+	let n = alloc Named { };
+	let m = alloc Named { };
+	let fine = *n == *m;
+	let fine_hash = n.hash();
+	let c = alloc Cell { };
+	let p = alloc Plain { };
+	let lock = Mutex.new();
+	sync c, p {
+	}
+	sync c, lock {
+	}
+	sync c, c {
+	}
+	let x = Holder { c: Counter { } };
+	let y = Holder { c: Counter { } };
+	let held = x == y;
+	let k = alloc Keeper { c: Counter { } };
+	let j = alloc Keeper { c: Counter { } };
+	let kept = *k == *j;
+	let one = alloc Copied { };
+	let two = alloc Copied { };
+	let copied = *one == *two;
+	return 0;
+}

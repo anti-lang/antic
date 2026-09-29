@@ -107,6 +107,35 @@ channels.
 - The records of a lock whose memory is freed without `destroy` stay. A later
   lock at the same address can then meet an order it never took.
 
+## Two objects and equality
+
+- `sync a, b { }` is a `STMT_SYNC` with a second operand, which library format
+  73 carries. `check_sync_pair` takes a synchronized object or a pointer to one
+  on each side and refuses a Mutex. Lowering takes both lock addresses once and
+  calls `anti_rt_object_lock_pair`, and an exit action of the block's scope
+  calls `anti_rt_object_unlock_pair` with both. The runtime locks the lower
+  address first and the higher one after it, and one lock when both are the
+  same. A dev build passes the site to both, so the order it records between
+  two objects is always the order of their addresses.
+- `lower_class_equals` of a synchronized class leaves on the same object and on
+  a descriptor that differs before it locks. It then takes both locks with the
+  pair call, compares the fields, and gives both locks back on the paths of
+  equal and unequal alike. `lower_class_hash` takes the lock of `self` around
+  the fields, and around the call of `operator fn hash` when the module gives
+  the class one.
+- `sema_concurrent_lacks` answers whether a concurrent class lacks `==` or a
+  hash: no `concrete fn equals` or `concrete fn hash` in its chain and no
+  operator of its module. `==`, `x.hash()` and the constraint `hash` refuse
+  such a class, and `sema_class_gap` refuses a struct or class that holds one
+  in place. The table entries of such a class compare identity and hash the
+  address, so they read no field.
+- `check_operator` takes the address of the second operand as it takes the
+  first when the operator's parameter is a pointer. It refuses an operand that
+  holds a Mutex at a parameter that takes it by value.
+- `ConcurrentMap` locks the parts of both maps through `locked_parts`, the map
+  whose room lies lower first. `anti_rt_address_below` of `src/rt/lock.c`
+  answers which one that is, since Anti has no order of pointers.
+
 ## Tests
 
 - `programs/synchronized.anti` and `programs/concurrent.anti` run workers of
@@ -117,3 +146,10 @@ channels.
   hold the refusals. `sync_modules` takes both classes across a library,
   `clib_ledger` calls a synchronized class from two threads of C, and
   `mutex_size` reads the size of a Mutex from the listing of each target.
+- `programs/sync_pairs.anti` runs `sync a, b`, `sync b, a` and `==` both ways
+  round on two threads. A reader hashes and compares objects that a writer
+  changes under `sync a, b`, and `sync a, a` gives its lock back once. `programs/sync_operators.anti`
+  runs operators over pointers. `traps/lock_order.anti` takes a pair both ways
+  in a dev build and expects no report. `errors/sync_pairs.anti` holds the
+  refusals, and `std/concurrent_map_equal.anti` compares and hashes maps built
+  in different orders.

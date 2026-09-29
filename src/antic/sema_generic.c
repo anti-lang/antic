@@ -544,6 +544,10 @@ static bool meets_hook(struct checker *c, struct type *t, const char *hook)
     if (t->kind == TYPE_ARRAY && strcmp(hook, LANG_HOOK_EQ) == 0) {
         return sema_default_eq(c, t);
     }
+    if (strcmp(hook, LANG_HOOK_HASH) == 0 &&
+        sema_concurrent_lacks(c, t, hook)) {
+        return false;
+    }
     if (type_has_fields(t) && strcmp(hook, LANG_HOOK_HASH) != 0) {
         return sema_operator_symbol(c, t, hook) != NULL ||
                (strcmp(hook, LANG_HOOK_EQ) == 0 && sema_default_eq(c, t));
@@ -1782,7 +1786,12 @@ struct type *sema_operator_copy(struct checker *c, struct expr *call,
               &map);
     }
     if (fn->param_count > 1 && right != NULL) {
-        unify(fn->params[1], right, &map);
+        struct type *second = fn->params[1];
+        unify(second,
+              second->kind == TYPE_POINTER && right->kind != TYPE_POINTER
+                  ? types_pointer(c->types, right)
+                  : right,
+              &map);
     }
     return finish_copy(c, call, fn, it, &map);
 }

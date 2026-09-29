@@ -1,0 +1,5 @@
+exit 0
+changes 1 2
+equal 1, same hash 1
+equal 0, not equal 1
+itself 1

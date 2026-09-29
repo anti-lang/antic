@@ -254,6 +254,7 @@ static void walk_stmt(struct worker_walk *w, const struct stmt *s)
         return;
     case STMT_SYNC:
         walk_expr(w, s->as.sync.mutex);
+        walk_expr(w, s->as.sync.second);
         walk_block(w, s->as.sync.body);
         return;
     case STMT_SELECT:
@@ -1883,22 +1884,70 @@ static void spell_mutex(struct text *out, const struct expr *e)
     sema_spell(out, e);
 }
 
+/* The class of the object a `sync` names, through a pointer, or t when
+   it is none. */
+static struct type *sync_target(struct checker *c, struct expr *e,
+                                struct type *t)
+{
+    if (!sema_is_error(t) && t->kind == TYPE_POINTER) {
+        return sema_usable_pointer(c, e, t)->element;
+    }
+    return t;
+}
+
+static bool is_synchronized(const struct type *t)
+{
+    return !sema_is_error(t) && t->kind == TYPE_CLASS &&
+           t->safety == SAFETY_SYNCHRONIZED;
+}
+
+/* DESIGN: `sync a, b { }` holds the hidden locks of two synchronized
+   objects. The runtime takes them in the order of their addresses, and
+   once when both are the same object, so two threads that name the same
+   two objects in opposite orders never wait for each other. A Mutex has
+   no pair form: it is not taken again by the thread that holds it, and a
+   program orders two of them itself. */
+static void check_sync_pair(struct checker *c, struct stmt *s)
+{
+    struct expr *operands[2];
+    size_t i;
+
+    operands[0] = s->as.sync.mutex;
+    operands[1] = s->as.sync.second;
+    for (i = 0; i < 2; i++) {
+        struct type *t = sema_check_expr(c, operands[i], NULL);
+        t = sync_target(c, operands[i], t);
+        if (!sema_is_error(t) && !is_synchronized(t)) {
+            sema_error_at(c, operands[i]->pos,
+                          "`sync a, b` takes two synchronized objects or "
+                          "pointers to them, found `%s`", sema_tn(t));
+        }
+    }
+    s->as.sync.object = true;
+    sema_check_block(c, s->as.sync.body);
+}
+
 /* `sync m { }` holds m, a Mutex or a pointer to one, for the block. A
    `sync` on the mutex that an enclosing one of the function holds would
    wait for itself. `sync obj { }` holds the hidden lock of a
    synchronized object, which its thread takes again without waiting. */
 static void check_sync(struct checker *c, struct stmt *s)
 {
-    struct type *t = sema_check_expr(c, s->as.sync.mutex, NULL);
+    struct type *t;
     const struct held_mutex *h;
     struct held_mutex here;
-    bool pointer = !sema_is_error(t) && t->kind == TYPE_POINTER;
+    bool pointer;
 
+    if (s->as.sync.second != NULL) {
+        check_sync_pair(c, s);
+        return;
+    }
+    t = sema_check_expr(c, s->as.sync.mutex, NULL);
+    pointer = !sema_is_error(t) && t->kind == TYPE_POINTER;
     if (pointer) {
         t = sema_usable_pointer(c, s->as.sync.mutex, t)->element;
     }
-    if (!sema_is_error(t) && t->kind == TYPE_CLASS &&
-        t->safety == SAFETY_SYNCHRONIZED) {
+    if (is_synchronized(t)) {
         s->as.sync.object = true;
     } else if (!sema_is_error(t) && !types_is_mutex(t)) {
         sema_error_at(c, s->as.sync.mutex->pos, "`sync` takes a `" LANG_MUTEX

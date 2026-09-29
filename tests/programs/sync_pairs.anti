@@ -1,0 +1,159 @@
+//! `sync a, b { }` holds the hidden locks of two synchronized objects, taken in
+//! the order of their addresses, and once when both are the same object. The
+//! default `==` of a synchronized class runs under `sync a, b` and its default
+//! hash under `sync a`. Two threads compare `a == b` and `b == a` in a tight
+//! loop and hold `sync a, b` and `sync b, a` without waiting for each other. A
+//! reader hashes an object and compares it with a second one while a writer
+//! changes both together, and never sees either half written.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const ROUNDS: int = 100000;
+
+synchronized class Pair
+{
+	x: int = 0,
+	y: int = 0,
+
+	/// Moves both fields to `v`, one after the other, with a pause between them
+	/// that a reader without the lock would see.
+	pub fn set(self, v: int)
+	{
+		self.x = v;
+		let spin: atomic int = 0;
+		while spin.load() < 64 do {
+			spin.add(1);
+		}
+		self.y = v;
+	}
+
+	pub fn sum(self) -> int
+	{
+		return self.x + self.y;
+	}
+}
+
+/// What the workers share: the object each worker names beside its own, and the
+/// hashes of the two states a reader may see.
+class Run
+{
+	pub other: *Pair,
+	pub zero_hash: u64,
+	pub one_hash: u64,
+}
+
+/// Compares `a == other` and holds `sync a, other`, round after round.
+worker fn forward(r: *Run, a: *Pair) -> int
+{
+	let equal = 0;
+	for i in 0..ROUNDS {
+		if *a == *r.other {
+			equal += 1;
+		}
+		sync a, r.other {
+			a.set(i % 2);
+			r.other.set(i % 2);
+		}
+	}
+	return equal;
+}
+
+/// Compares `other == a` and holds `sync other, a`, the other way round.
+worker fn backward(r: *Run, a: *Pair) -> int
+{
+	let equal = 0;
+	for i in 0..ROUNDS {
+		if *r.other == *a {
+			equal += 1;
+		}
+		sync r.other, a {
+			r.other.set(i % 2);
+			a.set(i % 2);
+		}
+	}
+	return equal;
+}
+
+/// Moves `p` and `other` between their two states together, so the two are
+/// equal whenever neither is half written.
+worker fn writer(r: *Run, p: *Pair) -> int
+{
+	for i in 0..ROUNDS {
+		sync p, r.other {
+			p.set(i % 2);
+			r.other.set(i % 2);
+		}
+	}
+	return 0;
+}
+
+/// The hashes of `p` and the comparisons of `p` with `other` that saw either
+/// half written.
+worker fn reader(r: *Run, p: *Pair) -> int
+{
+	let torn = 0;
+	for i in 0..ROUNDS {
+		let h = p.hash();
+		if h != r.zero_hash && h != r.one_hash {
+			torn += 1;
+		}
+		if !(*p == *r.other) {
+			torn += 1;
+		}
+	}
+	return torn;
+}
+
+fn main() -> int
+{
+	let a = alloc Pair { };
+	let b = alloc Pair { };
+	let zero = alloc Pair { };
+	let one = alloc Pair { };
+	one.set(1);
+	let there = alloc Run {
+		other: b,
+		zero_hash: zero.hash(),
+		one_hash: one.hash(),
+	};
+	let back = alloc Run {
+		other: a,
+		zero_hash: zero.hash(),
+		one_hash: one.hash(),
+	};
+	let watch = alloc Run {
+		other: b,
+		zero_hash: zero.hash(),
+		one_hash: one.hash(),
+	};
+
+	let first = dispatch there -> forward(a);
+	let second = dispatch back -> backward(b);
+	let met = join(first) + join(second);
+	printf("both orders done, %d equal\n".ptr, (met > 0) as c_int);
+
+	let written = dispatch there -> writer(a);
+	let read = dispatch watch -> reader(a);
+	let torn = join(read);
+	join(written);
+	printf("torn %d\n".ptr, torn as c_int);
+
+	/* The same object twice: its lock is taken once, and given back once, so
+	   another thread takes it afterwards. */
+	sync a, a {
+		a.set(7);
+	}
+	printf("same %d\n".ptr, (*a == *a) as c_int);
+	let after = dispatch back -> writer(b);
+	join(after);
+	printf("after %d\n".ptr, a.sum() as c_int);
+
+	free(there);
+	free(back);
+	free(watch);
+	free(a);
+	free(b);
+	free(zero);
+	free(one);
+	return 0;
+}

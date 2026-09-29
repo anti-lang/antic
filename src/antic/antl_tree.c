@@ -1279,6 +1279,7 @@ static void io_stmt_body(struct io *io, struct stmt *s)
         break;
     case STMT_SYNC:
         io_expr(io, &s->as.sync.mutex);
+        io_expr(io, &s->as.sync.second);
         io_block(io, &s->as.sync.body);
         io_bool(io, &s->as.sync.object);
         break;

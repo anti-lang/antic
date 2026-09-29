@@ -543,7 +543,13 @@ bool sema_equals(struct checker *c, struct expr *e, struct type *t);
 /* The first field of the chain of the class t that holds a union in
    place, which the `equals` of `Object` cannot compare, or NULL. A class
    that replaces `equals` has none. */
-const struct struct_field *sema_class_gap(const struct type *t);
+const struct struct_field *sema_class_gap(struct checker *c, struct type *t);
+bool sema_concurrent_lacks(struct checker *c, struct type *t,
+                           const char *hook);
+/* Whether the module of t, or t itself, gives it `operator fn text`, a
+   free function of the module that takes t or a pointer to it first. */
+bool sema_module_operator(struct checker *c, struct type *t,
+                          const char *text);
 /* Give the class it the checked `==` and `x.hash()` of the default
    `equals` and `hash` the compiler writes for it, where its chain declares
    neither. */

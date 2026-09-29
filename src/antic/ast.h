@@ -736,9 +736,12 @@ struct stmt {
         struct block *block;        /* STMT_BLOCK */
         /* `sync m { }`: the mutex, a `Mutex` or a pointer to one, and the
            block that holds it. object marks a synchronized object in
-           place of the mutex, whose hidden lock the block holds. */
+           place of the mutex, whose hidden lock the block holds.
+           `sync a, b { }` names a second synchronized object in second,
+           NULL otherwise. */
         struct {
             struct expr *mutex;
+            struct expr *second;
             struct block *body;
             bool object;
         } sync;                     /* STMT_SYNC */

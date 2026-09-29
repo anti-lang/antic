@@ -21,6 +21,7 @@ import anti.text;
 
 extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
 extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
+extern fn anti_rt_address_below(a: ?*byte, b: ?*byte) -> c_int;
 
 /// The number of parts of a `ConcurrentMap`, each with a lock of its own.
 ///
@@ -587,6 +588,54 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 		made.size.store(total);
 	}
 
+	/// Whether this map and `other` hold the same keys, with values under them
+	/// that `same` finds equal. `==` of two maps calls it.
+	///
+	/// Every part of both maps stays locked while they are compared, taken in
+	/// the order of their addresses, so two threads that compare the same two
+	/// maps either way round never wait for each other. A map equals itself
+	/// without a lock.
+	pub fn equal_entries(self, other: *ConcurrentMap<K, V>,
+		same: fn(lent *V, lent *V) -> bool) -> bool
+	{
+		let mine = self.parts catch fatal;
+		let theirs = other.parts catch fatal;
+		if mine == theirs {
+			return true;
+		}
+		let equal = false;
+		let compare = fn() {
+			equal = self.equal_locked(other, same);
+		};
+		if anti_rt_address_below(mine as ?*byte, theirs as ?*byte) != 0 {
+			locked_parts<K, V>(mine, theirs, 0, compare);
+		} else {
+			locked_parts<K, V>(theirs, mine, 0, compare);
+		}
+		return equal;
+	}
+
+	/// The hash of the entries whatever their order, with `value_hash` giving
+	/// the hash of each value. Every part stays locked meanwhile, so the hash
+	/// is that of one state of the map. The hash of a map calls it.
+	pub fn hash_entries(self, value_hash: fn(lent *V) -> u64) -> u64
+	{
+		let sum: u64 = 0;
+		let n = 0;
+		self.whole(fn() {
+			let i = 0;
+			while i < PARTS do {
+				let part = self.part(i);
+				for (k, v) in part.entries {
+					sum +%= (k.hash(), value_hash(&v)).hash();
+					n += 1;
+				}
+				i += 1;
+			}
+		});
+		return (n, sum).hash();
+	}
+
 	/// The part of the key `k`, chosen by the top bits of its seeded hash,
 	/// which the table of the part does not use to choose a slot.
 	fn part_of(self, k: K) -> *Part<K, V>
@@ -619,6 +668,42 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 		sync part.lock {
 			self.locked_from(i + 1, f);
 		}
+	}
+
+	/// Whether this map and `other` hold the same keys with values that `same`
+	/// finds equal, with every part of both locked.
+	fn equal_locked(self, other: *ConcurrentMap<K, V>,
+		same: fn(lent *V, lent *V) -> bool) -> bool
+	{
+		let mine = 0;
+		let theirs = 0;
+		let i = 0;
+		while i < PARTS do {
+			let ours = self.part(i);
+			let others = other.part(i);
+			mine += ours.entries.count;
+			theirs += others.entries.count;
+			i += 1;
+		}
+		if mine != theirs {
+			return false;
+		}
+		i = 0;
+		while i < PARTS do {
+			let part = self.part(i);
+			for (k, v) in part.entries {
+				let equal = false;
+				let there = other.part_of(k);
+				let found = there.entries.read(k, fn(w) {
+					equal = same(&v, w);
+				});
+				if !found || !equal {
+					return false;
+				}
+			}
+			i += 1;
+		}
+		return true;
 	}
 
 	/// The number of entries that `test` accepts, with every part locked.
@@ -700,38 +785,41 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 	}
 }
 
-/// Whether `a` and `b` hold the same keys with equal values.
-///
-/// It takes copies of the entries of `a` part by part and looks each up in `b`,
-/// so it holds one lock at a time and never waits for a thread that compares
-/// the two the other way round.
+/// Whether `a` and `b` hold the same keys with equal values, with every part of
+/// both maps locked while they are compared.
 pub operator fn eq<K: eq + hash, V: eq>(a: ConcurrentMap<K, V>,
 	b: ConcurrentMap<K, V>) -> bool
 {
-	if a.count() != b.count() {
-		return false;
-	}
-	for (k, v) in a {
-		let theirs = b.get(k) else {
-			return false;
-		};
-		if !(theirs == v) {
-			return false;
-		}
-	}
-	return true;
+	return a.equal_entries(&b, fn(x, y) {
+		return *x == *y;
+	});
 }
 
-/// The hash of the entries whatever their order, which equal maps share.
+/// The hash of the entries whatever their order, which equal maps share, with
+/// every part of the map locked while it is taken.
 pub operator fn hash<K: eq + hash, V: hash>(a: ConcurrentMap<K, V>) -> u64
 {
-	let sum: u64 = 0;
-	let n = 0;
-	for (k, v) in a {
-		sum +%= (k.hash(), v.hash()).hash();
-		n += 1;
+	return a.hash_entries(fn(v) {
+		return (*v).hash();
+	});
+}
+
+/// Run `f` with every part of `first` and then every part of `second` locked,
+/// from the part at `i` on.
+fn locked_parts<K: eq + hash, V>(first: *Part<K, V>, second: *Part<K, V>,
+	i: int, f: fn())
+{
+	if i == 2 * PARTS {
+		f();
+		return;
 	}
-	return (n, sum).hash();
+	let part = &first[i];
+	if i >= PARTS {
+		part = &second[i - PARTS];
+	}
+	sync part.lock {
+		locked_parts<K, V>(first, second, i + 1, f);
+	}
 }
 
 /// The room of the `PARTS` parts from `from`, each with an empty table of its

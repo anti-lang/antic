@@ -781,6 +781,8 @@ pub synchronized class PeopleList
 - Every operation on the object waits for every other. That is always correct and fast enough for most objects. A structure whose threads wait on each other more than a profiler allows becomes a concurrent class.
 - `anti doc` and the C header mark every public function of a synchronized class as running under the object's lock. The documentation says it at the function.
 - `sync obj { }` takes the hidden lock of a synchronized object for a whole block, for a sequence that no method covers.
+- `sync a, b { }` takes the hidden locks of two synchronized objects in an order the runtime fixes, by address, and once when `a` and `b` are the same object. Two threads that compare `a == b` and `b == a` therefore cannot deadlock, and the dev check of lock orders accepts it.
+- The default `==` of a synchronized class runs under `sync a, b`, and its default hash under `sync a`. An operator of the module that takes the class through pointers, `operator fn eq(a: *Tally, b: *Tally)`, receives the objects themselves and takes their locks with `sync`. One that takes the class by value is refused at each use, since the copy would copy the lock.
 
 ### Concurrent classes
 
@@ -815,6 +817,8 @@ pub concurrent class PeopleList
 ```
 
 `add` holds the list's lock only for the two pointer moves. A change to one person holds only that node's lock, so both run at once. The check proves every field is guarded. It cannot prove the design right. The order in which locks are taken, and whether a sequence of calls is safe, stay the programmer's responsibility.
+
+A concurrent class has no default `==` or hash, since the compiler cannot know which locks guard what. One it needs, it declares, with `concrete fn equals` and `concrete fn hash` or with `operator fn eq` and `operator fn hash` of its module. `==` and `x.hash()` on one that declares neither are refused, and so is the default `==` of a struct or class that holds one in place.
 
 A field that is none of the three fails the safety check `unguarded-field`. `unchecked` overrules it where the checker cannot follow, with the rules of [Errors, warnings and checks](#errors-warnings-and-checks). After a field's type it covers that field alone, so every other field stays checked. A lock-free structure marks the fields it swaps with `compare_swap`. In the class header it covers the whole class. That suits a class that wraps a C library doing its own locking.
 
@@ -1223,6 +1227,7 @@ Collections shared between threads follow [Concurrent classes](#concurrent-class
 - They have the operations of the plain collections, less every operation by position: no `l[i]`, no `get(i)`, no `insert(i, x)`. Between threads a position can go stale at any moment, so an element is addressed by criteria, key or handle.
 - They have no `lend_slice`, since a slice of the whole buffer would be reached without the lock.
 - They all have versioned `set`, so a thread can read, compute, and write back only if nothing changed meanwhile.
+- `==` and the hash of a thread-safe collection compare and hash its elements only, as those of the plain collections do. A version counter, a change count or a lock is never part of the value. `ConcurrentMap` takes the locks of all its parts, those of both maps for `==`, in the order of their addresses. It then compares or hashes the entries whatever their order.
 - `read`, `modify` and the functions given to `update_*` and `remove_*` run inside the lock. A slow function holds up other threads, and the documentation says so.
 - `SpscRing` passes samples or messages between an audio thread and the rest of a program. Neither side ever waits, since it holds only two atomic counters, one per side. It is marked `unchecked` with its reason, because its correctness rests on atomics in a pattern the checker cannot follow. Its tests exercise both sides at full speed on every host.
 

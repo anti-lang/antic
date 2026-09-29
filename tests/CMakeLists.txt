@@ -609,7 +609,7 @@ add_test(NAME dev_object_lang
             "${ANTIC_RUNTIME_DIR}/std/anti/lang.antl")
 set_tests_properties(dev_object_lang PROPERTIES FIXTURES_SETUP lang_dev_object)
 foreach(name IN ITEMS sync_exits sync_workers channels select_two
-        channel_workers synchronized concurrent
+        channel_workers synchronized concurrent sync_pairs sync_operators
         lock_free_queue)
     set(objects "")
     if(name STREQUAL "sync_exits")
@@ -872,7 +872,7 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
     set_tests_properties(program_nullable_macos-x86_64 PROPERTIES
         ENVIRONMENT "ANTI_TEST_NULLABLE=set from C")
     foreach(name IN ITEMS sync_exits sync_workers channels select_two
-            channel_workers parallel_join synchronized concurrent
+            channel_workers parallel_join synchronized concurrent sync_pairs
         lock_free_queue)
         set_tests_properties(program_${name}_macos-x86_64 PROPERTIES
             TIMEOUT 120)
@@ -907,7 +907,7 @@ endif()
 # timeout reports it. tests/programs/parallel_join.anti passes
 # --anti.threads=6 for the joiner, the job it waits for and a chunk.
 foreach(name IN ITEMS sync_exits sync_workers channels select_two
-        channel_workers parallel_join synchronized concurrent
+        channel_workers parallel_join synchronized concurrent sync_pairs
         lock_free_queue)
     set_tests_properties(program_${name} PROPERTIES TIMEOUT 120)
 endforeach()
@@ -1106,8 +1106,8 @@ add_test(NAME dev_object_collection_concurrent
             "${ANTIC_RUNTIME_DIR}/std/anti/collection/concurrent.antl")
 set_tests_properties(dev_object_collection_concurrent PROPERTIES
     FIXTURES_SETUP collection_concurrent_dev_object)
-foreach(name IN ITEMS concurrent_map concurrent_map_threads spsc_ring
-        spsc_ring_threads)
+foreach(name IN ITEMS concurrent_map concurrent_map_threads
+        concurrent_map_equal spsc_ring spsc_ring_threads)
     add_test(NAME std_${name}_dev
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -1152,7 +1152,8 @@ endforeach()
 # locks of the map. A side that stops for good leaves the other spinning,
 # and the timeout reports it.
 foreach(name IN ITEMS std_concurrent_map_threads std_spsc_ring_threads
-        std_concurrent_map_threads_dev std_spsc_ring_threads_dev)
+        std_concurrent_map_threads_dev std_spsc_ring_threads_dev
+        std_concurrent_map_equal std_concurrent_map_equal_dev)
     set_tests_properties(${name} PROPERTIES TIMEOUT 120)
 endforeach()
 
@@ -3530,6 +3531,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "optional_values|-S,-o,${LISTINGS}/optional_values.s,optional_values.anti"
         "snapshots|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/snapshots.s,snapshots.anti"
         "synchronized|-S,-o,${LISTINGS}/synchronized.s,synchronized.anti"
+        "sync_pairs|-S,-o,${LISTINGS}/sync_pairs.s,sync_pairs.anti"
         "concurrent|-S,-o,${LISTINGS}/concurrent.s,concurrent.anti"
         "concurrent_forms|-S,-o,${LISTINGS}/concurrent_forms.s,concurrent_forms.anti"
         "pointer_leak|-S,-o,${LISTINGS}/pointer_leak.s,pointer_leak.anti"

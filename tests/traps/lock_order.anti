@@ -60,6 +60,28 @@ worker fn backward(t: *Task, box: *Box) -> int
 	return 0;
 }
 
+/// Holds `sync box, other` and compares `box == other`. Both take the two locks
+/// in the order of their addresses, so this worker and the next record one
+/// order between them and no conflict.
+worker fn pair_forward(t: *Task, box: *Box, other: *Box) -> int
+{
+	sync box, other {
+		box.bump();
+		other.bump();
+	}
+	return (*box == *other) as int;
+}
+
+/// Names the same two objects the other way round.
+worker fn pair_backward(t: *Task, box: *Box, other: *Box) -> int
+{
+	sync other, box {
+		other.bump();
+		box.bump();
+	}
+	return (*other == *box) as int;
+}
+
 fn main() -> int
 {
 	let pair = alloc Pair { n: 0 };
@@ -70,6 +92,14 @@ fn main() -> int
 	join(one);
 	let two = dispatch second -> backward(box);
 	join(two);
+	let x = alloc Box { };
+	let y = alloc Box { };
+	let three = dispatch first -> pair_forward(x, y);
+	join(three);
+	let four = dispatch second -> pair_backward(x, y);
+	join(four);
+	free(x);
+	free(y);
 	printf("%d\n".ptr, pair.n as c_int);
 	free(first);
 	free(second);

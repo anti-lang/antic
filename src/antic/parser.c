@@ -2542,12 +2542,20 @@ static struct stmt *statement_level(struct parser *p)
         return expect(p, TOKEN_RBRACE) ? s : NULL;
     }
     /* DESIGN: `sync m { }` holds the mutex m for the block. The operand
-       is read as a condition is, so its `{` opens the block. */
+       is read as a condition is, so its `{` opens the block. `sync a, b
+       { }` names two synchronized objects, whose locks the runtime takes
+       in an order of its own. */
     case TOKEN_SYNC:
         next(p);
         s = new_stmt(p, STMT_SYNC, t);
-        if ((s->as.sync.mutex = condition(p)) == NULL ||
-            (s->as.sync.body = block(p)) == NULL) {
+        if ((s->as.sync.mutex = condition(p)) == NULL) {
+            return NULL;
+        }
+        if (accept(p, TOKEN_COMMA) &&
+            (s->as.sync.second = condition(p)) == NULL) {
+            return NULL;
+        }
+        if ((s->as.sync.body = block(p)) == NULL) {
             return NULL;
         }
         return s;

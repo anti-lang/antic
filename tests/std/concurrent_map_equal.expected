@@ -1,0 +1,7 @@
+exit 0
+equal 1, same hash 1
+itself 1, own hash 1
+one value differs: equal 0
+one key more: equal 0
+back: equal 1, same hash 1
+both orders: 400 of 400 equal

@@ -174,6 +174,18 @@ bool sema_hash_call(struct checker *c, struct expr *e, struct type *t,
         *result = e->type;
         return true;
     }
+    if (t->kind == TYPE_POINTER && !t->nullable &&
+        sema_concurrent_lacks(c, t->element, LANG_HOOK_HASH)) {
+        hashed = t->element;
+    }
+    if (sema_concurrent_lacks(c, hashed, LANG_HOOK_HASH)) {
+        sema_error_at(c, e->pos, "`hash` is not defined on `%s`. A concurrent "
+                      "class has no default hash and declares `concrete fn "
+                      "hash` or `operator fn hash` of its own",
+                      sema_tn(hashed));
+        *result = sema_builtin(c, TYPE_ERROR);
+        return true;
+    }
     if (has_own_hash(c, t)) {
         return false;
     }
@@ -395,7 +407,60 @@ static bool own_equals(const struct type *t)
     return declares(t, "equals");
 }
 
-const struct struct_field *sema_class_gap(const struct type *t)
+/* DESIGN: a concurrent class guards its fields with locks, atomics and
+   fixed values of its own choosing, and the compiler cannot know which
+   lock guards what. It therefore writes no `==` and no hash that read
+   them. The class declares `concrete fn equals` and `concrete fn hash`,
+   or its module gives it `operator fn eq` and `operator fn hash`. */
+bool sema_concurrent_lacks(struct checker *c, struct type *t,
+                           const char *hook)
+{
+    bool eq = strcmp(hook, LANG_HOOK_EQ) == 0;
+
+    if (t->kind != TYPE_CLASS || t->safety != SAFETY_CONCURRENT) {
+        return false;
+    }
+    if (declares(t, eq ? "equals" : LANG_HOOK_HASH)) {
+        return false;
+    }
+    return !sema_module_operator(c, t, hook);
+}
+
+/* Whether a value of type t holds in place a concurrent class without
+   `==`, directly or in a struct, an array, a `?T` or a case of a
+   variant. A struct with `operator fn eq` compares by that alone. */
+static bool holds_concurrent(struct checker *c, struct type *t)
+{
+    size_t i;
+
+    while (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL) {
+        t = t->element;
+    }
+    if (t->kind == TYPE_CLASS) {
+        return sema_concurrent_lacks(c, t, LANG_HOOK_EQ);
+    }
+    if (t->kind == TYPE_VARIANT) {
+        for (i = 0; i < t->param_count; i++) {
+            if (t->params[i] != NULL && holds_concurrent(c, t->params[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+    if (t->kind != TYPE_STRUCT ||
+        sema_operator_symbol(c, t, LANG_HOOK_EQ) != NULL) {
+        return false;
+    }
+    for (i = 0; i < t->field_count; i++) {
+        if (!type_field_is_unit_break(&t->fields[i]) &&
+            holds_concurrent(c, t->fields[i].type)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+const struct struct_field *sema_class_gap(struct checker *c, struct type *t)
 {
     size_t i;
 
@@ -406,7 +471,7 @@ const struct struct_field *sema_class_gap(const struct type *t)
         for (i = 0; i < t->field_count; i++) {
             const struct struct_field *f = &t->fields[i];
             if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
-                holds_union(f->type)) {
+                (holds_union(f->type) || holds_concurrent(c, f->type))) {
                 return f;
             }
         }
@@ -435,7 +500,8 @@ bool sema_default_eq(struct checker *c, struct type *t)
 
     switch (t->kind) {
     case TYPE_CLASS:
-        return sema_class_gap(t) == NULL;
+        return sema_class_gap(c, t) == NULL &&
+               !sema_concurrent_lacks(c, t, LANG_HOOK_EQ);
     case TYPE_STRUCT:
         return !t->is_union && !type_is_simd(t) && !types_is_mutex(t) &&
                !types_is_match(t) && sema_eq_gap(c, t) == NULL;

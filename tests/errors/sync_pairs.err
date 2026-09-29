@@ -1,0 +1,8 @@
+sync_pairs.anti:71:13: error: `==` is not defined on `Counter`. A concurrent class has no default `==` and declares `concrete fn equals` or `operator fn eq` of its own
+sync_pairs.anti:72:10: error: `hash` is not defined on `Counter`. A concurrent class has no default hash and declares `concrete fn hash` or `operator fn hash` of its own
+sync_pairs.anti:80:10: error: `sync a, b` takes two synchronized objects or pointers to them, found `Plain`
+sync_pairs.anti:82:10: error: `sync a, b` takes two synchronized objects or pointers to them, found `Mutex`
+sync_pairs.anti:88:13: error: `==` is not defined on `Holder`, whose field `c` has no `eq`
+sync_pairs.anti:91:13: error: `==` is not defined on `Keeper`, whose field `c` has no `eq`
+sync_pairs.anti:94:15: error: `Copied` holds a `Mutex` and cannot be copied, pass a pointer to it
+sync_pairs.anti:94:23: error: `Copied` holds a `Mutex` and cannot be copied, pass a pointer to it

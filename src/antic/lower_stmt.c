@@ -49,6 +49,8 @@ static void push_exit_action(struct lowerer *l, const struct stmt *stmt,
     action->error_type = NULL;
     action->unlock = false;
     action->mutex = 0;
+    action->pair = false;
+    action->second = 0;
     action->unlock_fn = NULL;
     action->leave = false;
     action->snapshot = false;
@@ -94,6 +96,8 @@ static void push_error_action(struct lowerer *l, const struct symbol *sym,
     action->error_type = error_type;
     action->unlock = false;
     action->mutex = 0;
+    action->pair = false;
+    action->second = 0;
     action->unlock_fn = NULL;
     action->leave = false;
     action->snapshot = false;
@@ -117,6 +121,8 @@ static void push_unlock_action(struct lowerer *l, uint32_t mutex,
     action->error_type = NULL;
     action->unlock = true;
     action->mutex = mutex;
+    action->pair = false;
+    action->second = 0;
     action->unlock_fn = unlock_fn;
     action->leave = false;
     action->snapshot = false;
@@ -135,6 +141,21 @@ static void jump_to_join(struct lowerer *l, struct ir_block **join)
 
 static void lower_stmt(struct lowerer *l, const struct stmt *s);
 
+/* The site of a lock in a dev build, `file:line`, as a literal. */
+static struct ir_operand lock_site(struct lowerer *l, int line)
+{
+    struct text site = {0};
+    struct token_text text;
+    struct ir_operand at;
+
+    text_appendf(&site, "%s:%d", l->file, line);
+    text.bytes = text_cstr(&site);
+    text.length = site.length;
+    at = lower_literal_address(l, &text);
+    text_free(&site);
+    return at;
+}
+
 /* DESIGN: a lock is taken by its address, the word of a Mutex or the
    hidden lock of a synchronized object. A thread that holds the hidden
    lock takes it again without waiting. A dev build passes the site of
@@ -152,13 +173,7 @@ void lower_hold_lock(struct lowerer *l, struct ir_operand at, bool object,
 
     args[0] = lower_temp(l, lock);
     if (l->dev) {
-        struct text site = {0};
-        struct token_text text;
-        text_appendf(&site, "%s:%d", l->file, line);
-        text.bytes = text_cstr(&site);
-        text.length = site.length;
-        args[1] = lower_literal_address(l, &text);
-        text_free(&site);
+        args[1] = lock_site(l, line);
         lower_sync_call(l, object ? "anti_rt_object_lock_at"
                                   : "anti_rt_mutex_lock_at",
                         IR_VOID, two, args, 2);
@@ -172,6 +187,103 @@ void lower_hold_lock(struct lowerer *l, struct ir_operand at, bool object,
                                        : "anti_rt_mutex_unlock");
 }
 
+/* Take the hidden lock at `at`, with its site in a dev build. The caller
+   gives it back on every path with lower_object_unlock_call. */
+void lower_object_lock_call(struct lowerer *l, struct ir_operand at, int line)
+{
+    static const enum ir_type one[] = {IR_PTR};
+    static const enum ir_type two[] = {IR_PTR, IR_PTR};
+    struct ir_operand args[2];
+
+    args[0] = at;
+    if (l->dev) {
+        args[1] = lock_site(l, line);
+        lower_sync_call(l, "anti_rt_object_lock_at", IR_VOID, two, args, 2);
+        return;
+    }
+    lower_sync_call(l, "anti_rt_object_lock", IR_VOID, one, args, 1);
+}
+
+void lower_object_unlock_call(struct lowerer *l, struct ir_operand at)
+{
+    static const enum ir_type one[] = {IR_PTR};
+
+    lower_sync_call(l, l->dev ? "anti_rt_object_unlock_at"
+                              : "anti_rt_object_unlock",
+                    IR_VOID, one, &at, 1);
+}
+
+/* DESIGN: the runtime takes the two hidden locks of `sync a, b` in the
+   order of their addresses, and one alone when a and b are the same
+   lock, so the order the program names them in never matters. */
+void lower_lock_pair_call(struct lowerer *l, struct ir_operand a,
+                          struct ir_operand b, int line)
+{
+    static const enum ir_type two[] = {IR_PTR, IR_PTR};
+    static const enum ir_type three[] = {IR_PTR, IR_PTR, IR_PTR};
+    struct ir_operand args[3];
+
+    args[0] = a;
+    args[1] = b;
+    if (l->dev) {
+        args[2] = lock_site(l, line);
+        lower_sync_call(l, "anti_rt_object_lock_pair_at", IR_VOID, three,
+                        args, 3);
+        return;
+    }
+    lower_sync_call(l, "anti_rt_object_lock_pair", IR_VOID, two, args, 2);
+}
+
+void lower_unlock_pair_call(struct lowerer *l, struct ir_operand a,
+                            struct ir_operand b)
+{
+    static const enum ir_type two[] = {IR_PTR, IR_PTR};
+    struct ir_operand args[2];
+
+    args[0] = a;
+    args[1] = b;
+    lower_sync_call(l, l->dev ? "anti_rt_object_unlock_pair_at"
+                              : "anti_rt_object_unlock_pair",
+                    IR_VOID, two, args, 2);
+}
+
+/* The address of the hidden lock of the synchronized object that e
+   names, in place or through a pointer, in a temporary of its own. */
+static uint32_t object_lock_of(struct lowerer *l, const struct expr *e)
+{
+    const struct type *t = e->type->kind == TYPE_POINTER ? e->type->element
+                                                          : e->type;
+    struct ir_operand at = e->type->kind == TYPE_POINTER ? lower_expr(l, e)
+                                                          : lower_address(l, e);
+
+    return ir_unary(l->f, l->b, IR_COPY, IR_PTR,
+                    lower_object_lock_address(l, t, at));
+}
+
+/* `sync a, b { }` takes both locks, and an exit action of its scope
+   gives both back on every exit of the block. */
+static void lower_sync_pair(struct lowerer *l, const struct stmt *s)
+{
+    uint32_t first = object_lock_of(l, s->as.sync.mutex);
+    uint32_t second = object_lock_of(l, s->as.sync.second);
+    struct exit_action *action;
+    struct defers scope;
+
+    memset(&scope, 0, sizeof scope);
+    scope.outer = l->defers;
+    l->defers = &scope;
+    lower_lock_pair_call(l, lower_temp(l, first), lower_temp(l, second),
+                         s->pos.line);
+    push_unlock_action(l, first, NULL);
+    action = &l->defers->items[l->defers->count - 1];
+    action->pair = true;
+    action->second = second;
+    lower_block(l, s->as.sync.body);
+    lower_run_defers(l, &scope, false);
+    l->defers = scope.outer;
+    free(scope.items);
+}
+
 /* DESIGN: `sync m { }` takes the address of m once, locks it, and
    records its unlock as the first exit action of a scope around the
    block. Every exit of the block runs the actions of the scopes it
@@ -181,10 +293,15 @@ void lower_hold_lock(struct lowerer *l, struct ir_operand at, bool object,
 static void lower_sync(struct lowerer *l, const struct stmt *s)
 {
     const struct expr *m = s->as.sync.mutex;
-    struct ir_operand at = m->type->kind == TYPE_POINTER ? lower_expr(l, m)
-                                                         : lower_address(l, m);
+    struct ir_operand at;
     struct defers scope;
 
+    if (s->as.sync.second != NULL) {
+        lower_sync_pair(l, s);
+        return;
+    }
+    at = m->type->kind == TYPE_POINTER ? lower_expr(l, m)
+                                       : lower_address(l, m);
     memset(&scope, 0, sizeof scope);
     scope.outer = l->defers;
     l->defers = &scope;
@@ -2387,6 +2504,9 @@ void lower_run_defers(struct lowerer *l, const struct defers *scope,
                 lower_hook_failed(l, l->failing_error);
             }
             lower_hook_call(l, HOOK_LEAVE);
+        } else if (action->unlock && action->pair) {
+            lower_unlock_pair_call(l, lower_temp(l, action->mutex),
+                                   lower_temp(l, action->second));
         } else if (action->unlock) {
             static const enum ir_type handle[] = {IR_PTR};
             struct ir_operand mutex = lower_temp(l, action->mutex);

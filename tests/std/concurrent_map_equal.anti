@@ -1,0 +1,92 @@
+//! `==` and the hash of `ConcurrentMap`.
+//!
+//! Both take the locks of all the parts they read, in one order that the
+//! addresses of the parts fix, and compare or hash the entries alone. Two maps
+//! that hold the same entries are equal and hash alike, whatever order the
+//! entries went in, whatever capacity each map started with and however often
+//! an entry changed before, which its version counts. Two threads compare the
+//! same two maps over and over, each the other way round, without waiting for
+//! each other, and a map equals itself.
+
+import anti.collection.concurrent.{ConcurrentMap};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The number of keys of each map.
+const KEYS: int = 2000;
+
+/// The comparisons each of the two threads makes.
+const ROUNDS: int = 200;
+
+/// Set the keys of `chunk` to three times their value.
+worker fn fill(chunk: []int, m: *ConcurrentMap<int, int>) -> int
+{
+	for k in chunk {
+		m.set(k, 3 * k);
+	}
+	return chunk.len;
+}
+
+/// Compare `m == other` `rounds` times and give the number of times they were
+/// equal.
+worker fn compare(m: *ConcurrentMap<int, int>, other: *ConcurrentMap<int, int>,
+	rounds: int) -> int
+{
+	let equal = 0;
+	for i in 0..rounds {
+		if *m == *other {
+			equal += 1;
+		}
+	}
+	return equal;
+}
+
+fn main() -> int
+{
+	let keys = alloc([KEYS]int, 1) else {
+		return 1;
+	};
+	for i in 0..KEYS {
+		(*keys)[i] = i;
+	}
+
+	/* a takes its keys from the chunks of a `parallel`, in no order. */
+	let a = ConcurrentMap<int, int>.new();
+	let filled = parallel (*keys)[0..KEYS] by 8 -> fill(&a);
+	free(filled.ptr);
+
+	/* b takes them one by one from the last, with room for all of them, and
+	   each entry changes twice first. Keys that come and go leave the clocks
+	   of the parts ahead of those of a. */
+	let b = ConcurrentMap<int, int>.new(KEYS);
+	let i = KEYS - 1;
+	while i >= 0 do {
+		b.set(i, 0);
+		b.set(i, -1);
+		b.set(i, 3 * i);
+		b.set(KEYS + i, 1);
+		let gone = b.remove(KEYS + i);
+		i -= 1;
+	}
+	printf("equal %d, same hash %d\n".ptr, (a == b) as c_int,
+		(a.hash() == b.hash()) as c_int);
+	printf("itself %d, own hash %d\n".ptr, (a == a) as c_int,
+		(a.hash() == a.hash()) as c_int);
+
+	b.set(7, 8);
+	printf("one value differs: equal %d\n".ptr, (a == b) as c_int);
+	b.set(7, 21);
+	b.set(KEYS, 0);
+	printf("one key more: equal %d\n".ptr, (a == b) as c_int);
+	let extra = b.remove(KEYS);
+	printf("back: equal %d, same hash %d\n".ptr, (a == b) as c_int,
+		(a.hash() == b.hash()) as c_int);
+
+	let there = dispatch &a -> compare(&b, ROUNDS);
+	let back = dispatch &b -> compare(&a, ROUNDS);
+	let met = join(there) + join(back);
+	printf("both orders: %d of %d equal\n".ptr, met as c_int,
+		(2 * ROUNDS) as c_int);
+	free(keys);
+	return 0;
+}

@@ -1429,6 +1429,7 @@ static struct stmt *xs(struct clone *cl, struct stmt *s)
         break;
     case STMT_SYNC:
         n->as.sync.mutex = xe(cl, s->as.sync.mutex);
+        n->as.sync.second = xe(cl, s->as.sync.second);
         n->as.sync.body = xb(cl, s->as.sync.body);
         break;
     case STMT_SELECT:

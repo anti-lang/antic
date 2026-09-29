@@ -462,7 +462,8 @@ struct ir_operand lower_hash(struct lowerer *l, const struct expr *e)
 /* DESIGN: the default `hash` of a class is code the compiler writes,
    `C.hash`. It takes the same fields its default `equals` compares, so
    two equal objects hash alike. Each field goes into the hash as a part of a
-   struct does, an `own` slice element by element. */
+   struct does, an `own` slice element by element. The hash of a
+   synchronized class runs under `sync self`. */
 void lower_class_hash(struct lowerer *l, const struct item *it)
 {
     const struct type *t = it->symbol->type;
@@ -471,6 +472,7 @@ void lower_class_hash(struct lowerer *l, const struct item *it)
     const struct type *up;
     struct ir_operand self;
     struct ir_operand h = i64(ANTI_HASH_START);
+    struct ir_operand lock = lower_none();
     size_t i;
 
     l->f = f;
@@ -479,9 +481,28 @@ void lower_class_hash(struct lowerer *l, const struct item *it)
     /* A class whose module gives it `operator fn hash` hashes by it. */
     if (it->operator_hash != NULL) {
         const struct symbol *op = it->operator_hash->as.call.callee->symbol;
-        ir_ret(l->f, l->b, IR_I64,
-               call_hash(l, lower_callee_function(l, op), self));
+        struct ir_operand result;
+        if (t->safety == SAFETY_SYNCHRONIZED) {
+            lock = lower_object_lock_address(l, t, self);
+            lower_object_lock_call(l, lock, it->pos.line);
+        }
+        result = call_hash(l, lower_callee_function(l, op), self);
+        if (t->safety == SAFETY_SYNCHRONIZED) {
+            lower_object_unlock_call(l, lock);
+        }
+        ir_ret(l->f, l->b, IR_I64, result);
         return;
+    }
+    /* A concurrent class has no default hash, and a program that asks
+       for one is refused. The entry of its table hashes the address, as
+       its `equals` compares it. */
+    if (t->safety == SAFETY_CONCURRENT) {
+        ir_ret(l->f, l->b, IR_I64, hash_address(l, self));
+        return;
+    }
+    if (t->safety == SAFETY_SYNCHRONIZED) {
+        lock = lower_object_lock_address(l, t, self);
+        lower_object_lock_call(l, lock, it->pos.line);
     }
     for (up = t; up != NULL; up = up->base) {
         for (i = 0; i < up->field_count; i++) {
@@ -514,6 +535,9 @@ void lower_class_hash(struct lowerer *l, const struct item *it)
             }
             h = combine(l, h, part);
         }
+    }
+    if (t->safety == SAFETY_SYNCHRONIZED) {
+        lower_object_unlock_call(l, lock);
     }
     ir_ret(l->f, l->b, IR_I64, h);
 }
