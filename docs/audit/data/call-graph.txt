@@ -1,0 +1,758 @@
+# Call graph between the files of the checker and of lowering.
+# A call counts when a non-static function of one file is named
+# before "(" in another. Function pointers taken by name are not counted.
+## sema*.c: 11 files, 189 non-static functions
+src/antic/sema.c -> src/antic/sema_call.c: 7 functions, 32 calls
+    sema_dotted 2
+    sema_find_field 3
+    sema_find_member 4
+    sema_inherited 19
+    sema_interface_named 1
+    sema_refuse_abstract_value 1
+    sema_struct_of 2
+src/antic/sema.c -> src/antic/sema_const.c: 2 functions, 7 calls
+    sema_const_symbol 1
+    sema_eval_const 6
+src/antic/sema.c -> src/antic/sema_copies.c: 1 functions, 1 calls
+    sema_compile_copies 1
+src/antic/sema.c -> src/antic/sema_export.c: 2 functions, 2 calls
+    sema_check_export 1
+    sema_check_extern_fn 1
+src/antic/sema.c -> src/antic/sema_expr.c: 6 functions, 17 calls
+    sema_check_expr 7
+    sema_descends_from 1
+    sema_hook 1
+    sema_is_iterator 1
+    sema_operator_named 1
+    sema_require 6
+src/antic/sema.c -> src/antic/sema_generic.c: 10 functions, 14 calls
+    sema_alias_type 2
+    sema_check_generic_item 1
+    sema_copy_of 3
+    sema_declare_generics 1
+    sema_generic_ready 2
+    sema_member_type 1
+    sema_nested_own 1
+    sema_resolve_generics 1
+    sema_run_pending 1
+    sema_type_param_find 1
+src/antic/sema.c -> src/antic/sema_hash.c: 1 functions, 1 calls
+    sema_class_defaults 1
+src/antic/sema.c -> src/antic/sema_safety.c: 6 functions, 7 calls
+    sema_check_guards 1
+    sema_hidden_lock 1
+    sema_needs_hidden_lock 1
+    sema_report_unfixed 1
+    sema_safety_base 1
+    sema_safety_declare 2
+src/antic/sema.c -> src/antic/sema_stmt.c: 6 functions, 8 calls
+    sema_check_function 2
+    sema_check_main 1
+    sema_check_test_block 1
+    sema_filled_somewhere 2
+    sema_fills 1
+    sema_walk_worker 1
+src/antic/sema_call.c -> src/antic/sema.c: 23 functions, 414 calls
+    sema_builtin 120
+    sema_chan_element 1
+    sema_declare 2
+    sema_deserialize_type 1
+    sema_direct_item 1
+    sema_enter_scope 2
+    sema_error_at 105
+    sema_error_class 2
+    sema_find_library 4
+    sema_format_to 1
+    sema_is_error 33
+    sema_leave_scope 2
+    sema_library_item 6
+    sema_location_type 1
+    sema_lookup 12
+    sema_module_find 1
+    sema_name_is 52
+    sema_refuses_half 1
+    sema_same_name 14
+    sema_scope_find_local 3
+    sema_std_item 2
+    sema_tn 47
+    sema_warn_catch_shadow 1
+src/antic/sema_call.c -> src/antic/sema_const.c: 2 functions, 2 calls
+    sema_const_symbol 1
+    sema_eval_const 1
+src/antic/sema_call.c -> src/antic/sema_expr.c: 13 functions, 69 calls
+    sema_check_binary 1
+    sema_check_expr 34
+    sema_check_storage 1
+    sema_descends_from 2
+    sema_holds_param 1
+    sema_is_place 2
+    sema_literal_moves 1
+    sema_mark_address_taken 2
+    sema_move_into_literal 1
+    sema_refuse_caller_value 1
+    sema_require 18
+    sema_simd_numeric 1
+    sema_usable_pointer 4
+src/antic/sema_call.c -> src/antic/sema_generic.c: 10 functions, 15 calls
+    sema_alias_type 2
+    sema_copy_of 2
+    sema_generic_call 1
+    sema_generic_named 2
+    sema_has_params 2
+    sema_member_type 2
+    sema_member_type_in 1
+    sema_param_iface 1
+    sema_refuse_type_args 1
+    sema_worker_copy 1
+src/antic/sema_call.c -> src/antic/sema_hash.c: 1 functions, 1 calls
+    sema_hash_call 1
+src/antic/sema_call.c -> src/antic/sema_pattern.c: 2 functions, 2 calls
+    sema_match_field 1
+    sema_pattern_call 1
+src/antic/sema_call.c -> src/antic/sema_safety.c: 3 functions, 3 calls
+    sema_check_leak_arg 1
+    sema_check_reach 1
+    sema_note_field_write 1
+src/antic/sema_call.c -> src/antic/sema_stmt.c: 11 functions, 19 calls
+    sema_check_block 1
+    sema_named_function 3
+    sema_needs_teardown 1
+    sema_note_call 1
+    sema_owns_phrase 1
+    sema_reads_existing 1
+    sema_refuse_lock_copy 4
+    sema_refuse_owned_copy 2
+    sema_refuse_worker_closure 2
+    sema_thread_safe 1
+    sema_type_owns 2
+src/antic/sema_const.c -> src/antic/sema.c: 10 functions, 40 calls
+    sema_builtin 3
+    sema_error_at 12
+    sema_is_error 2
+    sema_lookup 1
+    sema_name_is 3
+    sema_resolve_type 1
+    sema_same_name 1
+    sema_signed_bits 11
+    sema_tn 4
+    sema_within 2
+src/antic/sema_const.c -> src/antic/sema_call.c: 2 functions, 2 calls
+    sema_find_field 1
+    sema_new_node 1
+src/antic/sema_const.c -> src/antic/sema_expr.c: 4 functions, 4 calls
+    sema_check_expr 1
+    sema_format_name 1
+    sema_op_text 1
+    sema_require 1
+src/antic/sema_const.c -> src/antic/sema_stmt.c: 1 functions, 2 calls
+    sema_ptr_set_add 2
+src/antic/sema_copies.c -> src/antic/sema.c: 4 functions, 8 calls
+    sema_enter_scope 2
+    sema_error_at 2
+    sema_is_error 2
+    sema_leave_scope 2
+src/antic/sema_copies.c -> src/antic/sema_call.c: 1 functions, 1 calls
+    sema_new_node 1
+src/antic/sema_copies.c -> src/antic/sema_expr.c: 4 functions, 4 calls
+    sema_check_expr 1
+    sema_iterate 1
+    sema_mark_address_taken 1
+    sema_require 1
+src/antic/sema_copies.c -> src/antic/sema_generic.c: 5 functions, 14 calls
+    sema_copy_map 1
+    sema_copy_named 2
+    sema_has_params 6
+    sema_subst 3
+    sema_subst_symbolic 2
+src/antic/sema_copies.c -> src/antic/sema_hash.c: 2 functions, 2 calls
+    sema_class_defaults 1
+    sema_is_hash_call 1
+src/antic/sema_copies.c -> src/antic/sema_stmt.c: 1 functions, 1 calls
+    sema_set_index 1
+src/antic/sema_export.c -> src/antic/sema.c: 6 functions, 28 calls
+    sema_error_at 7
+    sema_format_to 10
+    sema_is_error 4
+    sema_name_is 2
+    sema_same_name 1
+    sema_tn 4
+src/antic/sema_export.c -> src/antic/sema_stmt.c: 1 functions, 1 calls
+    sema_ptr_set_add 1
+src/antic/sema_expr.c -> src/antic/sema.c: 22 functions, 492 calls
+    sema_array_of 1
+    sema_builtin 155
+    sema_check_at 1
+    sema_check_object_from 1
+    sema_declare 5
+    sema_enter_scope 5
+    sema_error_at 122
+    sema_find_library 2
+    sema_format_to 2
+    sema_imported_struct 3
+    sema_is_error 81
+    sema_leave_scope 6
+    sema_library_item 1
+    sema_location_type 1
+    sema_lookup 3
+    sema_module_find 1
+    sema_name_is 7
+    sema_narrow 1
+    sema_narrowed_type 1
+    sema_refuses_half 4
+    sema_resolve_type 4
+    sema_tn 85
+src/antic/sema_expr.c -> src/antic/sema_call.c: 22 functions, 68 calls
+    sema_case_name 2
+    sema_chain_fields 2
+    sema_check_call 1
+    sema_check_dispatch 1
+    sema_check_field 1
+    sema_check_field_inits 3
+    sema_check_join 1
+    sema_check_parallel 1
+    sema_check_sync_op 1
+    sema_checking_class 1
+    sema_find_field 1
+    sema_find_member 3
+    sema_implemented_in 1
+    sema_inherited 3
+    sema_method_symbol 3
+    sema_module_function 2
+    sema_move_local 2
+    sema_new_node 30
+    sema_refuse_abstract_value 2
+    sema_singleton_type 2
+    sema_struct_of 3
+    sema_variant_literal 2
+src/antic/sema_expr.c -> src/antic/sema_const.c: 2 functions, 3 calls
+    sema_eval_const 1
+    sema_undefined_on_constants 2
+src/antic/sema_expr.c -> src/antic/sema_generic.c: 9 functions, 14 calls
+    sema_alias_type 1
+    sema_generic_named 2
+    sema_has_params 2
+    sema_meets_param 1
+    sema_operator_copy 2
+    sema_param_index 1
+    sema_param_iterate 2
+    sema_param_operator 2
+    sema_refuse_type_args 1
+src/antic/sema_expr.c -> src/antic/sema_hash.c: 5 functions, 5 calls
+    sema_class_gap 1
+    sema_concurrent_lacks 1
+    sema_eq_gap 1
+    sema_equals 1
+    sema_no_order 1
+src/antic/sema_expr.c -> src/antic/sema_pattern.c: 1 functions, 3 calls
+    sema_check_test 3
+src/antic/sema_expr.c -> src/antic/sema_stmt.c: 12 functions, 18 calls
+    sema_capture 1
+    sema_check_anonymous 1
+    sema_holds_mutex 1
+    sema_needs_teardown 1
+    sema_note_write 1
+    sema_owns_phrase 1
+    sema_proved_names 1
+    sema_proved_type 1
+    sema_refuse_lock_copy 3
+    sema_refuse_owned_copy 2
+    sema_thread_safe_symbol 2
+    sema_type_owns 3
+src/antic/sema_generic.c -> src/antic/sema.c: 12 functions, 76 calls
+    sema_builtin 15
+    sema_error_at 26
+    sema_find_library 1
+    sema_is_error 10
+    sema_library_item 1
+    sema_lookup 1
+    sema_module_find 1
+    sema_name_is 6
+    sema_resolve_type 2
+    sema_same_name 3
+    sema_scope_find_local 1
+    sema_tn 9
+src/antic/sema_generic.c -> src/antic/sema_call.c: 6 functions, 7 calls
+    sema_checking_class 1
+    sema_dotted 1
+    sema_find_member 1
+    sema_implemented_in 1
+    sema_interface_named 1
+    sema_struct_of 2
+src/antic/sema_generic.c -> src/antic/sema_const.c: 1 functions, 1 calls
+    sema_const_symbol 1
+src/antic/sema_generic.c -> src/antic/sema_expr.c: 5 functions, 10 calls
+    sema_check_expr 3
+    sema_descends_from 2
+    sema_hook 3
+    sema_op_text 1
+    sema_operator_symbol 1
+src/antic/sema_generic.c -> src/antic/sema_hash.c: 3 functions, 4 calls
+    sema_concurrent_lacks 1
+    sema_default_eq 2
+    sema_no_order 1
+src/antic/sema_hash.c -> src/antic/sema.c: 5 functions, 10 calls
+    sema_builtin 4
+    sema_error_at 1
+    sema_is_error 2
+    sema_name_is 2
+    sema_tn 1
+src/antic/sema_hash.c -> src/antic/sema_call.c: 1 functions, 9 calls
+    sema_new_node 9
+src/antic/sema_hash.c -> src/antic/sema_expr.c: 6 functions, 10 calls
+    sema_check_expr 2
+    sema_class_eq_operator 1
+    sema_class_hash_operator 1
+    sema_hook 3
+    sema_module_operator 1
+    sema_operator_symbol 2
+src/antic/sema_hash.c -> src/antic/sema_generic.c: 4 functions, 6 calls
+    sema_meets_hook 2
+    sema_param_has 1
+    sema_param_hash 2
+    sema_param_iface 1
+src/antic/sema_pattern.c -> src/antic/sema.c: 11 functions, 59 calls
+    sema_builtin 9
+    sema_declare 1
+    sema_enter_scope 2
+    sema_error_at 21
+    sema_find_library 1
+    sema_is_error 6
+    sema_leave_scope 2
+    sema_library_item 1
+    sema_name_is 13
+    sema_narrow 1
+    sema_tn 2
+src/antic/sema_pattern.c -> src/antic/sema_call.c: 2 functions, 10 calls
+    sema_check_call 1
+    sema_new_node 9
+src/antic/sema_pattern.c -> src/antic/sema_expr.c: 4 functions, 15 calls
+    sema_check_expr 8
+    sema_require 5
+    sema_usable_pointer 1
+    sema_whole_optional 1
+src/antic/sema_pattern.c -> src/antic/sema_stmt.c: 2 functions, 3 calls
+    sema_bind_value 1
+    sema_check_block 2
+src/antic/sema_safety.c -> src/antic/sema.c: 5 functions, 25 calls
+    sema_check_at 3
+    sema_error_at 9
+    sema_name_is 3
+    sema_same_name 4
+    sema_tn 6
+src/antic/sema_safety.c -> src/antic/sema_call.c: 2 functions, 6 calls
+    sema_find_field 5
+    sema_struct_of 1
+src/antic/sema_safety.c -> src/antic/sema_expr.c: 1 functions, 3 calls
+    sema_descends_from 3
+src/antic/sema_safety.c -> src/antic/sema_stmt.c: 1 functions, 3 calls
+    sema_named_function 3
+src/antic/sema_stmt.c -> src/antic/sema.c: 21 functions, 270 calls
+    sema_builtin 38
+    sema_declare 12
+    sema_end_narrowing 1
+    sema_enter_scope 8
+    sema_error_at 86
+    sema_error_class 1
+    sema_find_library 1
+    sema_is_error 54
+    sema_leave_scope 8
+    sema_lent_form 1
+    sema_library_item 1
+    sema_lookup 2
+    sema_name_is 7
+    sema_narrow 2
+    sema_param_form 1
+    sema_refuses_half 1
+    sema_resolve_type 3
+    sema_same_name 2
+    sema_signed_bits 1
+    sema_tn 39
+    sema_within 1
+src/antic/sema_stmt.c -> src/antic/sema_call.c: 19 functions, 35 calls
+    sema_arm_fallthrough 3
+    sema_case_name 2
+    sema_caught_error 2
+    sema_declare_caught 2
+    sema_declaring_class 2
+    sema_error_maker 1
+    sema_field_takes_literal 1
+    sema_find_field 2
+    sema_implemented_in 1
+    sema_in_failing_function 1
+    sema_move_local 1
+    sema_new_node 3
+    sema_null_pointer_maker 1
+    sema_place_name 1
+    sema_refuse_abstract_value 2
+    sema_refuse_escaping_error 3
+    sema_resolve_origin 1
+    sema_singleton_type 2
+    sema_struct_of 4
+src/antic/sema_stmt.c -> src/antic/sema_const.c: 2 functions, 5 calls
+    sema_const_symbol 1
+    sema_eval_const 4
+src/antic/sema_stmt.c -> src/antic/sema_expr.c: 14 functions, 65 calls
+    sema_check_expr 33
+    sema_check_storage 1
+    sema_descends_from 2
+    sema_holds_param 1
+    sema_hook 3
+    sema_hook_call 1
+    sema_is_place 1
+    sema_iterate 1
+    sema_op_text 4
+    sema_refuse_caller_value 2
+    sema_refuse_lent_tuple 2
+    sema_require 11
+    sema_spell 1
+    sema_usable_pointer 2
+src/antic/sema_stmt.c -> src/antic/sema_generic.c: 2 functions, 2 calls
+    sema_has_params 1
+    sema_param_index 1
+src/antic/sema_stmt.c -> src/antic/sema_pattern.c: 2 functions, 2 calls
+    sema_check_test 1
+    sema_if_let_none 1
+src/antic/sema_stmt.c -> src/antic/sema_safety.c: 3 functions, 3 calls
+    sema_check_leak_return 1
+    sema_note_field_write 1
+    sema_points_into_fields 1
+# matrix of sema*.c, calls from the row into the column
+caller\callee sema sema_call sema_const sema_copies sema_export sema_expr sema_generic sema_hash sema_pattern sema_safety sema_stmt
+sema . 32 7 1 2 17 14 1 - 7 8
+sema_call 414 . 2 - - 69 15 1 2 3 19
+sema_const 40 2 . - - 4 - - - - 2
+sema_copies 8 1 - . - 4 14 2 - - 1
+sema_export 28 - - - . - - - - - 1
+sema_expr 492 68 3 - - . 14 5 3 - 18
+sema_generic 76 7 1 - - 10 . 4 - - -
+sema_hash 10 9 - - - 10 6 . - - -
+sema_pattern 59 10 - - - 15 - - . - 3
+sema_safety 25 6 - - - 3 - - - . 3
+sema_stmt 270 35 5 - - 65 2 - 2 3 .
+
+## lower*.c: 7 files, 166 non-static functions
+src/antic/lower.c -> src/antic/lower_desc.c: 13 functions, 30 calls
+    lower_class_descriptor 5
+    lower_class_function 6
+    lower_class_global 1
+    lower_class_table 4
+    lower_declared_copy 2
+    lower_has_body 1
+    lower_hook_name 1
+    lower_interface_table 2
+    lower_level_fn 1
+    lower_run_construct 2
+    lower_same_name 2
+    lower_store_interface_tables 2
+    lower_struct_descriptor 1
+src/antic/lower.c -> src/antic/lower_eq.c: 1 functions, 1 calls
+    lower_class_equals 1
+src/antic/lower.c -> src/antic/lower_expr.c: 15 functions, 44 calls
+    lower_address 6
+    lower_case_address 2
+    lower_check_table 5
+    lower_expr 6
+    lower_has_default 3
+    lower_init_function 2
+    lower_init_name 1
+    lower_load_tag 1
+    lower_object_call 1
+    lower_rt_function 8
+    lower_rt_function_giving 1
+    lower_static_descriptor 3
+    lower_store_default 1
+    lower_store_field_default 1
+    lower_sym_of 3
+src/antic/lower.c -> src/antic/lower_hash.c: 1 functions, 1 calls
+    lower_class_hash 1
+src/antic/lower.c -> src/antic/lower_stmt.c: 11 functions, 13 calls
+    lower_array_count 1
+    lower_block 1
+    lower_hold_lock 1
+    lower_keep_temp 3
+    lower_optional_needs_destruct 1
+    lower_push_leave_action 1
+    lower_push_own_action 1
+    lower_push_snapshot_action 1
+    lower_reserve_slots 1
+    lower_run_defers 1
+    lower_type_needs_destruct 1
+src/antic/lower_desc.c -> src/antic/lower.c: 20 functions, 76 calls
+    lower_add_param 2
+    lower_agg_of 5
+    lower_array_agg 2
+    lower_callee_function 4
+    lower_copy_text 2
+    lower_cstr 3
+    lower_field_of 4
+    lower_field_offset 3
+    lower_find_function 3
+    lower_find_global 7
+    lower_hook_object 1
+    lower_ir_type_of 4
+    lower_literal_global 8
+    lower_none 2
+    lower_offset_address 3
+    lower_result_agg 4
+    lower_signature 1
+    lower_table_agg 3
+    lower_temp 11
+    lower_vtype_of 4
+src/antic/lower_desc.c -> src/antic/lower_expr.c: 1 functions, 1 calls
+    lower_load_table 1
+src/antic/lower_eq.c -> src/antic/lower.c: 15 functions, 108 calls
+    lower_agg_of 3
+    lower_callee_function 5
+    lower_field_offset 1
+    lower_ir_type_of 4
+    lower_is_aggregate 1
+    lower_new_block 19
+    lower_none 2
+    lower_object_lock_address 4
+    lower_offset_address 6
+    lower_optional_flag 2
+    lower_rt_call 3
+    lower_size_operand 2
+    lower_slice_length 4
+    lower_temp 51
+    lower_zero 1
+src/antic/lower_eq.c -> src/antic/lower_desc.c: 2 functions, 3 calls
+    lower_class_function 2
+    lower_level_fn 1
+src/antic/lower_eq.c -> src/antic/lower_expr.c: 6 functions, 9 calls
+    lower_binary_op 1
+    lower_case_address 2
+    lower_compare_text 1
+    lower_expr 2
+    lower_load_tag 2
+    lower_sym_of 1
+src/antic/lower_eq.c -> src/antic/lower_stmt.c: 2 functions, 4 calls
+    lower_lock_pair_call 2
+    lower_unlock_pair_call 2
+src/antic/lower_expr.c -> src/antic/lower.c: 61 functions, 538 calls
+    lower_agg_of 5
+    lower_anonymous_function 1
+    lower_binary_checks 1
+    lower_bound_is_direct 1
+    lower_bound_signature 1
+    lower_c_function 3
+    lower_callee_function 5
+    lower_calloc_function 1
+    lower_captures_agg 1
+    lower_check_branch 5
+    lower_check_text 5
+    lower_const_address 3
+    lower_constant 4
+    lower_context_signature 1
+    lower_context_word 3
+    lower_copy_owned 1
+    lower_cstr 1
+    lower_destroy_owned 2
+    lower_dup_snapshot 1
+    lower_element_address 1
+    lower_element_offset 1
+    lower_field_address 1
+    lower_field_of 2
+    lower_field_offset 22
+    lower_field_owner 1
+    lower_find_function 2
+    lower_find_global 1
+    lower_first_element 1
+    lower_float_literal 2
+    lower_hook_copied 2
+    lower_hook_object 1
+    lower_ir_type_of 49
+    lower_is_aggregate 20
+    lower_is_context 4
+    lower_literal_address 1
+    lower_literal_global 2
+    lower_location_value 1
+    lower_name_is 1
+    lower_narrows 4
+    lower_new_block 25
+    lower_none 33
+    lower_none_in_first_word 4
+    lower_offset_address 32
+    lower_optional_flag 3
+    lower_pattern 1
+    lower_place 4
+    lower_provider_signature 1
+    lower_push_argument 2
+    lower_rt_call 5
+    lower_set_optional 3
+    lower_signature 1
+    lower_size_operand 14
+    lower_slice_length 2
+    lower_snapshot_agg 1
+    lower_static_global 1
+    lower_struct_of_expr 1
+    lower_temp 203
+    lower_vtype_of 34
+    lower_widen_operand 2
+    lower_zero 1
+    lower_zero_lock 1
+src/antic/lower_expr.c -> src/antic/lower_desc.c: 10 functions, 18 calls
+    lower_class_depth 3
+    lower_class_descriptor 4
+    lower_class_table 1
+    lower_defines 1
+    lower_descriptor_agg 1
+    lower_entry_offset 3
+    lower_reach_thunk 1
+    lower_run_construct 1
+    lower_store_interface_tables 1
+    lower_table_index 2
+src/antic/lower_expr.c -> src/antic/lower_eq.c: 1 functions, 1 calls
+    lower_equals 1
+src/antic/lower_expr.c -> src/antic/lower_hash.c: 1 functions, 1 calls
+    lower_hash 1
+src/antic/lower_expr.c -> src/antic/lower_simd.c: 4 functions, 5 calls
+    lower_simd 2
+    lower_simd_binary 1
+    lower_simd_cast 1
+    lower_simd_unary 1
+src/antic/lower_expr.c -> src/antic/lower_stmt.c: 9 functions, 15 calls
+    lower_clear_moved 3
+    lower_clear_tables 1
+    lower_construct 1
+    lower_end_temps 1
+    lower_handle_error 2
+    lower_is_handled_call 2
+    lower_keep_temp 2
+    lower_move_argument 1
+    lower_needs_teardown 2
+src/antic/lower_hash.c -> src/antic/lower.c: 15 functions, 72 calls
+    lower_agg_of 3
+    lower_callee_function 4
+    lower_field_offset 1
+    lower_ir_type_of 5
+    lower_is_aggregate 2
+    lower_new_block 8
+    lower_none 1
+    lower_object_lock_address 2
+    lower_offset_address 3
+    lower_optional_flag 1
+    lower_rt_call 2
+    lower_size_operand 2
+    lower_slice_length 3
+    lower_temp 34
+    lower_zero 1
+src/antic/lower_hash.c -> src/antic/lower_desc.c: 2 functions, 3 calls
+    lower_class_function 2
+    lower_level_fn 1
+src/antic/lower_hash.c -> src/antic/lower_eq.c: 1 functions, 1 calls
+    lower_unreadable 1
+src/antic/lower_hash.c -> src/antic/lower_expr.c: 5 functions, 6 calls
+    lower_address 1
+    lower_case_address 1
+    lower_expr 2
+    lower_load_tag 1
+    lower_sym_of 1
+src/antic/lower_hash.c -> src/antic/lower_stmt.c: 2 functions, 4 calls
+    lower_object_lock_call 2
+    lower_object_unlock_call 2
+src/antic/lower_simd.c -> src/antic/lower.c: 14 functions, 92 calls
+    lower_agg_of 9
+    lower_binary_checks 1
+    lower_check_branch 2
+    lower_check_text 1
+    lower_field_offset 1
+    lower_ir_type_of 6
+    lower_new_block 5
+    lower_none 2
+    lower_offset_address 1
+    lower_size_operand 2
+    lower_slice_length 1
+    lower_temp 56
+    lower_vtype_of 4
+    lower_zero 1
+src/antic/lower_simd.c -> src/antic/lower_expr.c: 4 functions, 19 calls
+    lower_address 12
+    lower_binary_op 1
+    lower_expr 4
+    lower_is_comparison 2
+src/antic/lower_stmt.c -> src/antic/lower.c: 34 functions, 297 calls
+    lower_binary_checks 1
+    lower_c_function 2
+    lower_callee_function 4
+    lower_clear_owned 1
+    lower_const_address 1
+    lower_context_word 1
+    lower_copy_owned 1
+    lower_destroy_owned 4
+    lower_fatal_signature 1
+    lower_field_of 1
+    lower_field_offset 8
+    lower_free_snapshot 2
+    lower_hook_call 1
+    lower_hook_failed 1
+    lower_hook_object 3
+    lower_ir_type_of 19
+    lower_is_aggregate 12
+    lower_literal_address 1
+    lower_literal_global 2
+    lower_location_value 1
+    lower_new_block 49
+    lower_none 11
+    lower_none_in_first_word 2
+    lower_object_lock_address 2
+    lower_offset_address 12
+    lower_optional_flag 2
+    lower_place 3
+    lower_push_argument 1
+    lower_set_optional 1
+    lower_size_operand 4
+    lower_temp 124
+    lower_traced_class 1
+    lower_vtype_of 17
+    lower_when_made 1
+src/antic/lower_stmt.c -> src/antic/lower_desc.c: 11 functions, 12 calls
+    lower_class_fields 1
+    lower_class_function 1
+    lower_class_table 1
+    lower_entry_offset 1
+    lower_fields_agg 1
+    lower_listed_field 1
+    lower_own_fields 1
+    lower_run_construct_bodies 1
+    lower_same_name 2
+    lower_store_interface_tables 1
+    lower_table_index 1
+src/antic/lower_stmt.c -> src/antic/lower_expr.c: 27 functions, 73 calls
+    lower_address 3
+    lower_argument 1
+    lower_binary_op 1
+    lower_bind_cursor 1
+    lower_bind_value 2
+    lower_branch 4
+    lower_build_into 3
+    lower_call 3
+    lower_case_address 1
+    lower_copy_parts 1
+    lower_drop_arguments 1
+    lower_expr 21
+    lower_flag_operation 2
+    lower_handled_operand 1
+    lower_has_default 2
+    lower_load_handle 1
+    lower_load_table 1
+    lower_load_tag 1
+    lower_object_call 2
+    lower_read_place 1
+    lower_rt_function 4
+    lower_rt_function_giving 1
+    lower_shift_wrap 1
+    lower_store_field_default 1
+    lower_store_value 2
+    lower_sym_of 2
+    lower_sync_call 9
+# matrix of lower*.c, calls from the row into the column
+caller\callee lower lower_desc lower_eq lower_expr lower_hash lower_simd lower_stmt
+lower . 30 1 44 1 - 13
+lower_desc 76 . - 1 - - -
+lower_eq 108 3 . 9 - - 4
+lower_expr 538 18 1 . 1 5 15
+lower_hash 72 3 1 6 . - 4
+lower_simd 92 - - 19 - . -
+lower_stmt 297 12 - 73 - - .
+

@@ -1,0 +1,91 @@
+# warnings-unique.txt now, against the first audit at ab03345.
+# A warning matches one of then with the same file, or a file split
+# from it, and the same text; line numbers moved and are not compared.
+# status | now | then
+kept | 1 src/anti/bindclang.c:290:33: warning: diagnostic behavior may be improved by adding the 'format(printf, 2, 3)' attribute to the declaration of 'refuse' [-Wmissing-format-attribute] | src/anti/bindclang.c:242
+new | 1 src/antic/diagnostic.c:31:5: warning: diagnostic behavior may be improved by adding the 'format(printf, 7, 0)' attribute to the declaration of 'add' [-Wmissing-format-attribute] |
+kept | 1 src/antic/sema.c:296:31: warning: format string is not a string literal [-Wformat-nonliteral] | src/antic/sema.c:250
+new | 1 src/antic/sema.c:34:13: warning: diagnostic behavior may be improved by adding the 'format(printf, 3, 0)' attribute to the declaration of 'vformat_to' [-Wmissing-format-attribute] |
+new | 3 src/rt/assert.c:10:34: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 0)' attribute to the declaration of 'write_line' [-Wmissing-format-attribute] |
+new | 3 src/rt/assert.c:20:28: warning: diagnostic behavior may be improved by adding the 'format(printf, 2, 3)' attribute to the declaration of 'anti_rt_fail_exit' [-Wmissing-format-attribute] |
+new | 3 src/rt/assert.c:30:28: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'anti_rt_fail_abort' [-Wmissing-format-attribute] |
+new | 3 src/rt/assert.c:40:28: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'anti_rt_note' [-Wmissing-format-attribute] |
+new | 2 src/rt/conf.c:120:40: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'format_text' [-Wmissing-format-attribute] |
+new | 1 src/rt/conf.c:120:9: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'format_text' [-Wmissing-format-attribute] |
+kept | 3 src/rt/errno.c:39:9: warning: no previous prototype for function 'anti_rt_last_error' [-Wmissing-prototypes] | src/rt/errno.c:39
+kept | 3 src/rt/errno.c:48:22: warning: no previous prototype for function 'anti_rt_last_error_text' [-Wmissing-prototypes] | src/rt/errno.c:48
+new | 3 src/rt/lock.c:284:6: warning: no previous prototype for function 'anti_rt_mutex_lock' [-Wmissing-prototypes] |
+new | 3 src/rt/lock.c:286:6: warning: no previous prototype for function 'anti_rt_mutex_unlock' [-Wmissing-prototypes] |
+new | 3 src/rt/lock.c:288:6: warning: no previous prototype for function 'anti_rt_mutex_lock_at' [-Wmissing-prototypes] |
+new | 3 src/rt/lock.c:294:6: warning: no previous prototype for function 'anti_rt_mutex_unlock_at' [-Wmissing-prototypes] |
+new | 3 src/rt/lock.c:302:6: warning: no previous prototype for function 'anti_rt_mutex_destroy' [-Wmissing-prototypes] |
+new | 3 src/rt/lock.c:342:6: warning: no previous prototype for function 'anti_rt_object_lock' [-Wmissing-prototypes] |
+new | 3 src/rt/lock.c:351:6: warning: no previous prototype for function 'anti_rt_object_unlock' [-Wmissing-prototypes] |
+new | 3 src/rt/lock.c:353:6: warning: no previous prototype for function 'anti_rt_object_lock_at' [-Wmissing-prototypes] |
+new | 3 src/rt/lock.c:363:6: warning: no previous prototype for function 'anti_rt_object_unlock_at' [-Wmissing-prototypes] |
+new | 3 src/rt/lock.c:376:6: warning: no previous prototype for function 'anti_rt_object_lock_pair' [-Wmissing-prototypes] |
+new | 3 src/rt/lock.c:387:6: warning: no previous prototype for function 'anti_rt_object_unlock_pair' [-Wmissing-prototypes] |
+new | 3 src/rt/lock.c:395:6: warning: no previous prototype for function 'anti_rt_object_lock_pair_at' [-Wmissing-prototypes] |
+new | 3 src/rt/lock.c:406:6: warning: no previous prototype for function 'anti_rt_object_unlock_pair_at' [-Wmissing-prototypes] |
+new | 3 src/rt/lock.c:417:5: warning: no previous prototype for function 'anti_rt_address_below' [-Wmissing-prototypes] |
+kept | 3 src/rt/object.c:1005:10: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align] | src/rt/object.c:624
+kept | 3 src/rt/object.c:1005:39: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align] | src/rt/object.c:624
+kept | 3 src/rt/object.c:1087:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align] | src/rt/object.c:706
+kept | 3 src/rt/object.c:1088:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align] | src/rt/object.c:707
+new | 3 src/rt/patterns.c:33:7: warning: no previous prototype for function 'anti_rt_regex_literal' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:358:9: warning: no previous prototype for function 'anti_rt_regex_begin' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:410:9: warning: no previous prototype for function 'anti_rt_regex_next' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:427:20: warning: no previous prototype for function 'anti_rt_regex_current' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:441:9: warning: no previous prototype for function 'anti_rt_regex_first' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:461:9: warning: no previous prototype for function 'anti_rt_regex_test' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:53:7: warning: no previous prototype for function 'anti_rt_regex_literal_bytes' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:541:9: warning: no previous prototype for function 'anti_rt_regex_group' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:561:9: warning: no previous prototype for function 'anti_rt_regex_group_named' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:579:9: warning: no previous prototype for function 'anti_rt_regex_template_fits' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:665:9: warning: no previous prototype for function 'anti_rt_regex_replace' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:713:9: warning: no previous prototype for function 'anti_rt_regex_patch' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:792:9: warning: no previous prototype for function 'anti_rt_bytes_patch' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:82:18: warning: no previous prototype for function 'anti_rt_regex_message' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:833:6: warning: no previous prototype for function 'anti_rt_regex_append' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:840:18: warning: no previous prototype for function 'anti_rt_regex_take' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:855:16: warning: no previous prototype for function 'anti_rt_regex_stop_limit' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:871:16: warning: no previous prototype for function 'anti_rt_regex_stop_group' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:884:16: warning: no previous prototype for function 'anti_rt_regex_stop_name' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:894:16: warning: no previous prototype for function 'anti_rt_regex_stop_template' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:912:9: warning: no previous prototype for function 'anti_rt_regex_first_bytes' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:919:9: warning: no previous prototype for function 'anti_rt_regex_next_bytes' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:925:20: warning: no previous prototype for function 'anti_rt_regex_current_bytes' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:931:9: warning: no previous prototype for function 'anti_rt_regex_group_bytes' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:937:9: warning: no previous prototype for function 'anti_rt_regex_group_named_bytes' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:944:9: warning: no previous prototype for function 'anti_rt_regex_replace_bytes' [-Wmissing-prototypes] |
+new | 3 src/rt/patterns.c:954:18: warning: no previous prototype for function 'anti_rt_regex_take_bytes' [-Wmissing-prototypes] |
+kept | 1 src/rt/plugin.c:57:15: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'fail' [-Wmissing-format-attribute] | src/rt/plugin.c:37
+kept | 2 src/rt/plugin.c:57:62: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'fail' [-Wmissing-format-attribute] | src/rt/plugin.c:37
+kept | 3 src/rt/sync.c:133:7: warning: no previous prototype for function 'anti_rt_chan_new' [-Wmissing-prototypes] | src/rt/sync.c:174
+kept | 3 src/rt/sync.c:175:6: warning: no previous prototype for function 'anti_rt_chan_send' [-Wmissing-prototypes] | src/rt/sync.c:219
+kept | 3 src/rt/sync.c:199:7: warning: no previous prototype for function 'anti_rt_chan_recv' [-Wmissing-prototypes] | src/rt/sync.c:243
+kept | 3 src/rt/sync.c:218:6: warning: no previous prototype for function 'anti_rt_chan_close' [-Wmissing-prototypes] | src/rt/sync.c:262
+kept | 3 src/rt/sync.c:231:6: warning: no previous prototype for function 'anti_rt_chan_delete' [-Wmissing-prototypes] | src/rt/sync.c:275
+kept | 3 src/rt/sync.c:285:9: warning: no previous prototype for function 'anti_rt_select' [-Wmissing-prototypes] | src/rt/sync.c:329
+new | 3 src/rt/text.c:33:18: warning: no previous prototype for function 'anti_rt_text_copy' [-Wmissing-prototypes] |
+new | 3 src/rt/text.c:51:18: warning: no previous prototype for function 'anti_rt_bytes_copy' [-Wmissing-prototypes] |
+new | 3 src/rt/text.c:58:9: warning: no previous prototype for function 'anti_rt_text_invalid' [-Wmissing-prototypes] |
+kept | 3 src/rt/threads.c:297:6: warning: no previous prototype for function 'anti_rt_parallel' [-Wmissing-prototypes] | src/rt/threads.c:276
+kept | 3 src/rt/threads.c:381:7: warning: no previous prototype for function 'anti_rt_dispatch' [-Wmissing-prototypes] | src/rt/threads.c:350
+kept | 3 src/rt/threads.c:425:6: warning: no previous prototype for function 'anti_rt_join' [-Wmissing-prototypes] | src/rt/threads.c:394
+kept | 3 src/rt/threads.c:471:6: warning: no previous prototype for function 'anti_rt_join_all' [-Wmissing-prototypes] | src/rt/threads.c:440
+kept | 3 src/rt/threads.c:485:6: warning: no previous prototype for function 'anti_rt_join_hooked' [-Wmissing-prototypes] | src/rt/threads.c:454
+kept | 3 src/rt/threads.c:496:6: warning: no previous prototype for function 'anti_rt_join_all_hooked' [-Wmissing-prototypes] | src/rt/threads.c:465
+gone | | 1 src/antic/diagnostic.c:28:5: warning: diagnostic behavior may be improved by adding the 'format(printf, 6, 0)' attribute to the declaration of 'add' [-Wmissing-format-attribute]
+gone | | 3 src/rt/conf.c:82:34: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'startup_error' [-Wmissing-format-attribute]
+gone | | 3 src/rt/hooks.c:79:43: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+gone | | 3 src/rt/object.c:642:28: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+gone | | 3 src/rt/platform.c:10:9: warning: no previous prototype for function 'anti_rt_is_windows' [-Wmissing-prototypes]
+gone | | 3 src/rt/registry.c:161:35: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+gone | | 3 src/rt/registry.c:226:35: warning: arithmetic between different enumeration types ('enum anti_entry' and 'enum anti_hook') [-Wenum-enum-conversion]
+gone | | 3 src/rt/sync.c:100:6: warning: no previous prototype for function 'anti_rt_mutex_destroy' [-Wmissing-prototypes]
+gone | | 3 src/rt/sync.c:111:6: warning: no previous prototype for function 'anti_rt_mutex_lock' [-Wmissing-prototypes]
+gone | | 3 src/rt/sync.c:119:6: warning: no previous prototype for function 'anti_rt_mutex_unlock' [-Wmissing-prototypes]
+gone | | 3 src/rt/sync.c:88:7: warning: no previous prototype for function 'anti_rt_mutex_new' [-Wmissing-prototypes]
+gone | | 1 src/rt/trace.c:228:62: warning: implicit conversion changes signedness: 'int' to 'uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+# counts: new 52, kept 22, gone 12

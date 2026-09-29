@@ -1,0 +1,78 @@
+# Duplicated blocks of 10 or more significant lines between two
+# files of src/antic, src/rt, src/anti and src/std. A significant line
+# is a line without comments that holds more than braces or
+# punctuation. exact: the lines agree after whitespace is collapsed.
+# near: they agree once identifiers, numbers and strings are
+# replaced, and the block is not inside an exact one. A near
+# window needs at least 5 lines that call, test or assign, so lists
+# of enum names, fields or cases do not count.
+# kind lines fileA:first-last fileB:first-last
+exact 22 src/antic/arm64.c:2067-2088 src/antic/x86_64.c:2411-2432
+exact 22 src/std/anti/collection/deque.anti:149-189 src/std/anti/collection/ring.anti:106-146
+exact 20 src/antic/arm64.c:2019-2038 src/antic/x86_64.c:2357-2376
+near 18 src/anti/bindtype.c:416-433 src/antic/main.c:178-203
+near 18 src/anti/bindtype.c:416-433 src/antic/main.c:175-200
+exact 18 src/antic/arm64.c:2600-2617 src/antic/x86_64.c:2916-2933
+near 17 src/anti/bindtype.c:416-432 src/antic/main.c:181-205
+near 17 src/antic/lower_eq.c:377-402 src/antic/sema_hash.c:359-384
+near 16 src/anti/bindtype.c:418-433 src/antic/main.c:175-197
+near 16 src/antic/arm64.c:326-351 src/antic/x86_64.c:410-435
+exact 16 src/antic/arm64.c:2045-2060 src/antic/x86_64.c:2383-2398
+near 16 src/antic/arm64.c:2594-2611 src/antic/x86_64.c:2910-2927
+exact 16 src/std/anti/collection/grid.anti:190-221 src/std/anti/collection/list.anti:236-266
+near 15 src/anti/bindtype.c:416-430 src/antic/main.c:184-205
+exact 15 src/antic/arm64.c:1887-1907 src/antic/x86_64.c:1422-1442
+exact 15 src/antic/arm64.c:1954-1978 src/antic/x86_64.c:1488-1511
+near 14 src/anti/bindtype.c:420-433 src/antic/main.c:175-194
+exact 14 src/antic/arm64.c:1779-1793 src/antic/x86_64.c:1299-1313
+near 14 src/antic/sema_safety.c:223-245 src/antic/sema_stmt.c:1849-1873
+near 14 src/std/anti/collection.anti:628-649 src/std/anti/collection/list.anti:212-233
+near 13 src/anti/bindtype.c:416-428 src/antic/main.c:187-205
+near 13 src/antic/arm64.c:560-576 src/antic/x86_64.c:1631-1647
+near 13 src/antic/lexer.c:16-30 src/antic/warnings.c:9-25
+near 13 src/antic/lower.c:2704-2716 src/antic/lower_stmt.c:1241-1253
+exact 13 src/std/anti/collection/deque.anti:142-167 src/std/anti/collection/list.anti:230-254
+near 12 src/anti/bindtype.c:422-433 src/antic/main.c:175-191
+near 12 src/antic/antl.c:14-25 src/antic/antl_tree.c:29-40
+near 12 src/antic/antl.c:15-26 src/antic/antl_tree.c:29-40
+near 12 src/antic/antl.c:16-27 src/antic/antl_tree.c:29-40
+near 12 src/antic/antl.c:17-28 src/antic/antl_tree.c:29-40
+exact 12 src/antic/arm64.c:560-575 src/antic/x86_64.c:1631-1646
+exact 12 src/antic/lower.c:2705-2716 src/antic/lower_stmt.c:1242-1253
+exact 12 src/antic/lower.c:2705-2716 src/antic/lower_stmt.c:1179-1190
+exact 12 src/antic/optimize.c:987-999 src/antic/whole.c:394-406
+exact 12 src/std/anti/collection.anti:605-623 src/std/anti/collection/list.anti:255-273
+near 12 src/std/anti/collection/grid.anti:269-294 src/std/anti/collection/list.anti:336-360
+near 11 src/anti/bindtype.c:416-426 src/antic/main.c:190-205
+near 11 src/anti/build.c:960-970 src/anti/manifest.c:419-429
+near 11 src/antic/antl.c:14-24 src/antic/antl_tree.c:30-40
+near 11 src/antic/antl.c:18-28 src/antic/antl_tree.c:29-39
+exact 11 src/antic/arm64.c:1795-1808 src/antic/x86_64.c:1316-1329
+near 11 src/antic/lexer.c:274-285 src/antic/sema.c:268-279
+near 11 src/antic/lexer.c:1189-1200 src/antic/sema.c:268-279
+exact 11 src/std/anti/collection.anti:636-649 src/std/anti/collection/list.anti:220-233
+near 11 src/std/anti/collection.anti:684-703 src/std/anti/collection/list.anti:336-355
+near 11 src/std/anti/collection.anti:684-703 src/std/anti/collection/grid.anti:269-288
+exact 11 src/std/anti/collection/deque.anti:284-301 src/std/anti/collection/ring.anti:199-216
+exact 11 src/std/anti/collection/grid.anti:190-209 src/std/anti/collection/queue.anti:87-108
+exact 11 src/std/anti/collection/list.anti:236-255 src/std/anti/collection/queue.anti:87-108
+near 11 src/std/anti/collection/map.anti:826-842 src/std/anti/collection/sorted.anti:1070-1087
+near 10 src/anti/bindtype.c:424-433 src/antic/main.c:175-188
+near 10 src/anti/build.c:962-971 src/anti/manifest.c:420-429
+near 10 src/anti/build.c:963-972 src/anti/manifest.c:420-429
+near 10 src/anti/build.c:964-973 src/anti/manifest.c:420-429
+near 10 src/antic/antl.c:14-23 src/antic/antl_tree.c:31-40
+near 10 src/antic/antl.c:19-28 src/antic/antl_tree.c:29-38
+near 10 src/antic/arm64.c:79-90 src/antic/x86_64.c:72-83
+exact 10 src/antic/arm64.c:1930-1948 src/antic/x86_64.c:1463-1482
+near 10 src/antic/sema_const.c:909-922 src/antic/sema_stmt.c:133-146
+near 10 src/std/anti/collection.anti:666-684 src/std/anti/collection/list.anti:318-336
+exact 10 src/std/anti/collection/concurrent.anti:1242-1266 src/std/anti/collection/synchronized.anti:323-346
+exact 10 src/std/anti/collection/deque.anti:149-167 src/std/anti/collection/grid.anti:190-208
+exact 10 src/std/anti/collection/deque.anti:149-167 src/std/anti/collection/queue.anti:87-107
+exact 10 src/std/anti/collection/deque.anti:191-206 src/std/anti/collection/ring.anti:148-163
+near 10 src/std/anti/collection/deque.anti:253-272 src/std/anti/collection/ring.anti:168-187
+exact 10 src/std/anti/collection/grid.anti:190-208 src/std/anti/collection/ring.anti:106-124
+exact 10 src/std/anti/collection/list.anti:236-254 src/std/anti/collection/ring.anti:106-124
+exact 10 src/std/anti/collection/queue.anti:87-107 src/std/anti/collection/ring.anti:106-124
+# 28 exact blocks, 40 near blocks

@@ -1,0 +1,39 @@
+# The checker and the back end lay out a struct with a unit break differently.
+# Run on macos-arm64 with the antic and runtime of build/host at 70e8860:
+#   build/host/antic --dump-ir unitbreak.anti
+#   build/host/antic --runtime build/host/runtime unitbreak.anti -o unitbreak && ./unitbreak
+#   the same with --memory-checks
+## unitbreak.anti
+// A plain struct that ends in a unit break, cast to a simd struct of the
+// size the checker computes for it. The checker takes S as 8 bytes, and
+// the layout of every target makes it 4.
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct S { a: i16, _: i32 : 0 }
+simd struct V { x: i32, y: i32 }
+
+fn main() -> int
+{
+	let s = S { a: 1 };
+	let v = s as V;
+	printf("%d %d %d\n".ptr, size_of(S) as c_int, v.x as c_int, v.y as c_int);
+	return 0;
+}
+## IR of main, the cast copies the 8 bytes of V out of the slot of S
+global unitbreak.11 size 10 align 1 bytes 25 64 20 25 64 20 25 64 0a 00
+global unitbreak.12 size 46 align 1 bytes 75 6e 69 74 62 72 65 61 6b 2e 61 6e 74 69 3a 31 33 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00
+fn unitbreak.main() -> i64 {
+b0:
+    %0 = slot unitbreak.S
+    %1 = slot unitbreak.V
+    %2 = slot unitbreak.V
+    %3 = slot str
+    store i16 1, %0
+    memcopy %2, %0, unitbreak.V
+    memcopy %1, %2, unitbreak.V
+    %4 = addr @unitbreak.11
+    store ptr %4, %3
+## output: size_of(S), v.x, v.y
+4 75628545 1
+## output with --memory-checks, which reports nothing
+4 1 24608

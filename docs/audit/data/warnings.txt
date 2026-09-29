@@ -1,0 +1,1648 @@
+### host-antic_core src/antic/antl.c
+### host-antic_core src/antic/antl_tree.c
+### host-antic_core src/antic/applesdk.c
+### host-antic_core src/antic/arena.c
+### host-antic_core src/antic/arith.c
+### host-antic_core src/antic/arm64.c
+### host-antic_core src/antic/ast_dump.c
+### host-antic_core src/antic/coff.c
+### host-antic_core src/antic/cpu.c
+### host-antic_core src/antic/debug.c
+### host-antic_core src/antic/diagnostic.c
+src/antic/diagnostic.c:31:5: warning: diagnostic behavior may be improved by adding the 'format(printf, 7, 0)' attribute to the declaration of 'add' [-Wmissing-format-attribute]
+   31 |     vsnprintf(item->message, sizeof item->message, format, args);
+      |     ^
+/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/secure/_stdio.h:124:34: note: expanded from macro 'vsnprintf'
+  124 | #define vsnprintf(str, len, ...) __vsnprintf_chk_func (str, len, 0, __VA_ARGS__)
+      |                                  ^
+/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/secure/_stdio.h:81:75: note: expanded from macro '__vsnprintf_chk_func'
+   81 |         __builtin___vsnprintf_chk (str, len, flag, __darwin_obsz(str), format, ap)
+      |                                                                                  ^
+src/antic/diagnostic.c:7:13: note: 'add' declared here
+    7 | static void add(struct diagnostics *d, enum diag_name name, int line,
+      |             ^
+1 warning generated.
+### host-antic_core src/antic/driver.c
+### host-antic_core src/antic/emit.c
+### host-antic_core src/antic/expand.c
+### host-antic_core src/antic/header.c
+### host-antic_core src/antic/ir.c
+### host-antic_core src/antic/ir_print.c
+### host-antic_core src/antic/ir_verify.c
+### host-antic_core src/antic/layout.c
+### host-antic_core src/antic/lexer.c
+### host-antic_core src/antic/linker.c
+### host-antic_core src/antic/lower.c
+### host-antic_core src/antic/lower_desc.c
+### host-antic_core src/antic/lower_eq.c
+### host-antic_core src/antic/lower_expr.c
+### host-antic_core src/antic/lower_hash.c
+### host-antic_core src/antic/lower_simd.c
+### host-antic_core src/antic/lower_stmt.c
+### host-antic_core src/antic/mach.c
+### host-antic_core src/antic/memcheck.c
+### host-antic_core src/antic/modpath.c
+### host-antic_core src/antic/notice.c
+### host-antic_core src/antic/optimize.c
+### host-antic_core src/antic/parser.c
+### host-antic_core src/antic/pattern.c
+### host-antic_core src/antic/platform.c
+### host-antic_core src/antic/process.c
+### host-antic_core src/antic/regalloc.c
+### host-antic_core src/antic/select.c
+### host-antic_core src/antic/selfpath.c
+### host-antic_core src/antic/sema.c
+src/antic/sema.c:34:13: warning: diagnostic behavior may be improved by adding the 'format(printf, 3, 0)' attribute to the declaration of 'vformat_to' [-Wmissing-format-attribute]
+   34 |     int n = vsnprintf(out, size, format, args);
+      |             ^
+/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/secure/_stdio.h:124:34: note: expanded from macro 'vsnprintf'
+  124 | #define vsnprintf(str, len, ...) __vsnprintf_chk_func (str, len, 0, __VA_ARGS__)
+      |                                  ^
+/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/secure/_stdio.h:81:75: note: expanded from macro '__vsnprintf_chk_func'
+   81 |         __builtin___vsnprintf_chk (str, len, flag, __darwin_obsz(str), format, ap)
+      |                                                                                  ^
+src/antic/sema.c:31:13: note: 'vformat_to' declared here
+   31 | static void vformat_to(char *out, size_t size, const char *format,
+      |             ^
+src/antic/sema.c:296:31: warning: format string is not a string literal [-Wformat-nonliteral]
+  296 |         sema_error_at(c, pos, duplicate_message, (int)name->length, name->text);
+      |                               ^~~~~~~~~~~~~~~~~
+2 warnings generated.
+### host-antic_core src/antic/sema_call.c
+### host-antic_core src/antic/sema_const.c
+### host-antic_core src/antic/sema_copies.c
+### host-antic_core src/antic/sema_export.c
+### host-antic_core src/antic/sema_expr.c
+### host-antic_core src/antic/sema_generic.c
+### host-antic_core src/antic/sema_hash.c
+### host-antic_core src/antic/sema_pattern.c
+### host-antic_core src/antic/sema_safety.c
+### host-antic_core src/antic/sema_stmt.c
+### host-antic_core src/antic/sha256.c
+### host-antic_core src/antic/target.c
+### host-antic_core src/antic/text.c
+### host-antic_core src/antic/types.c
+### host-antic_core src/antic/userdirs.c
+### host-antic_core src/antic/warnings.c
+### host-antic_core src/antic/whole.c
+### host-antic_core src/antic/x86_64.c
+### host-antic_core src/rt/digest.c
+### host-antic_core src/rt/regex.c
+### host-antic_core src/rt/utf.c
+### host-antic src/antic/main.c
+### host-anti src/anti/bind.c
+### host-anti src/anti/bindapi.c
+### host-anti src/anti/bindclang.c
+src/anti/bindclang.c:290:33: warning: diagnostic behavior may be improved by adding the 'format(printf, 2, 3)' attribute to the declaration of 'refuse' [-Wmissing-format-attribute]
+  290 |     fprintf(stderr, format, name);
+      |                                 ^
+src/anti/bindclang.c:287:13: note: 'refuse' declared here
+  287 | static void refuse(struct reader *r, const char *format, const char *name)
+      |             ^
+1 warning generated.
+### host-anti src/anti/bindexpr.c
+### host-anti src/anti/bindtype.c
+### host-anti src/anti/bindwrite.c
+### host-anti src/anti/build.c
+### host-anti src/anti/check.c
+### host-anti src/anti/deps.c
+### host-anti src/anti/doc.c
+### host-anti src/anti/files.c
+### host-anti src/anti/fmt.c
+### host-anti src/anti/jsontree.c
+### host-anti src/anti/main.c
+### host-anti src/anti/manifest.c
+### host-anti src/anti/repo.c
+### host-anti src/anti/sdk.c
+### host-anti src/anti/symmap.c
+### host-anti src/anti/syms.c
+### host-anti src/anti/test.c
+### host-anti src/anti/units.c
+### host-anti src/anti/zip.c
+### host-anti src/rt/json.c
+### host-anti src/rt/symbols.c
+### host-anti src/rt/toml.c
+### rt-macos-arm64_armv8.5 src/rt/license_stub.c
+### rt-macos-arm64_armv8.5 src/rt/assert.c
+src/rt/assert.c:10:34: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 0)' attribute to the declaration of 'write_line' [-Wmissing-format-attribute]
+   10 |     vfprintf(stderr, format, rest);
+      |                                  ^
+src/rt/assert.c:7:13: note: 'write_line' declared here
+    7 | static void write_line(const char *format, va_list rest)
+      |             ^
+src/rt/assert.c:20:28: warning: diagnostic behavior may be improved by adding the 'format(printf, 2, 3)' attribute to the declaration of 'anti_rt_fail_exit' [-Wmissing-format-attribute]
+   20 |     write_line(format, rest);
+      |                            ^
+src/rt/std.h:28:16: note: 'anti_rt_fail_exit' declared here
+   28 | _Noreturn void anti_rt_fail_exit(int status, const char *format, ...);
+      |                ^
+src/rt/assert.c:30:28: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'anti_rt_fail_abort' [-Wmissing-format-attribute]
+   30 |     write_line(format, rest);
+      |                            ^
+src/rt/std.h:29:16: note: 'anti_rt_fail_abort' declared here
+   29 | _Noreturn void anti_rt_fail_abort(const char *format, ...);
+      |                ^
+src/rt/assert.c:40:28: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'anti_rt_note' [-Wmissing-format-attribute]
+   40 |     write_line(format, rest);
+      |                            ^
+src/rt/std.h:33:6: note: 'anti_rt_note' declared here
+   33 | void anti_rt_note(const char *format, ...);
+      |      ^
+4 warnings generated.
+### rt-macos-arm64_armv8.5 src/rt/atomic.c
+### rt-macos-arm64_armv8.5 src/rt/backtrace.c
+### rt-macos-arm64_armv8.5 src/rt/call.c
+### rt-macos-arm64_armv8.5 src/rt/cast.c
+### rt-macos-arm64_armv8.5 src/rt/check.c
+### rt-macos-arm64_armv8.5 src/rt/conf.c
+src/rt/conf.c:120:9: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'format_text' [-Wmissing-format-attribute]
+  120 |     n = vsnprintf(NULL, 0, format, rest);
+      |         ^
+build/host/runtime/sysroot/macos-arm64/usr/include/secure/_stdio.h:124:34: note: expanded from macro 'vsnprintf'
+  124 | #define vsnprintf(str, len, ...) __vsnprintf_chk_func (str, len, 0, __VA_ARGS__)
+      |                                  ^
+build/host/runtime/sysroot/macos-arm64/usr/include/secure/_stdio.h:81:75: note: expanded from macro '__vsnprintf_chk_func'
+   81 |         __builtin___vsnprintf_chk (str, len, flag, __darwin_obsz(str), format, ap)
+      |                                                                                  ^
+src/rt/conf.c:113:14: note: 'format_text' declared here
+  113 | static char *format_text(const char *format, ...)
+      |              ^
+1 warning generated.
+### rt-macos-arm64_armv8.5 src/rt/cpu.c
+### rt-macos-arm64_armv8.5 src/rt/digest.c
+### rt-macos-arm64_armv8.5 src/rt/errno.c
+src/rt/errno.c:39:9: warning: no previous prototype for function 'anti_rt_last_error' [-Wmissing-prototypes]
+   39 | int32_t anti_rt_last_error(void)
+      |         ^
+src/rt/errno.c:39:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   39 | int32_t anti_rt_last_error(void)
+      | ^
+      | static 
+src/rt/errno.c:48:22: warning: no previous prototype for function 'anti_rt_last_error_text' [-Wmissing-prototypes]
+   48 | const unsigned char *anti_rt_last_error_text(int32_t code)
+      |                      ^
+src/rt/errno.c:48:7: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   48 | const unsigned char *anti_rt_last_error_text(int32_t code)
+      |       ^
+      | static 
+2 warnings generated.
+### rt-macos-arm64_armv8.5 src/rt/f16.c
+### rt-macos-arm64_armv8.5 src/rt/fs.c
+### rt-macos-arm64_armv8.5 src/rt/hash.c
+### rt-macos-arm64_armv8.5 src/rt/hooks.c
+### rt-macos-arm64_armv8.5 src/rt/init.c
+### rt-macos-arm64_armv8.5 src/rt/io.c
+### rt-macos-arm64_armv8.5 src/rt/json.c
+### rt-macos-arm64_armv8.5 src/rt/license.c
+### rt-macos-arm64_armv8.5 src/rt/loaded.c
+### rt-macos-arm64_armv8.5 src/rt/lock.c
+src/rt/lock.c:284:6: warning: no previous prototype for function 'anti_rt_mutex_lock' [-Wmissing-prototypes]
+  284 | void anti_rt_mutex_lock(void *word) { word_lock(word); }
+      |      ^
+src/rt/lock.c:284:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  284 | void anti_rt_mutex_lock(void *word) { word_lock(word); }
+      | ^
+      | static 
+src/rt/lock.c:286:6: warning: no previous prototype for function 'anti_rt_mutex_unlock' [-Wmissing-prototypes]
+  286 | void anti_rt_mutex_unlock(void *word) { word_unlock(word); }
+      |      ^
+src/rt/lock.c:286:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  286 | void anti_rt_mutex_unlock(void *word) { word_unlock(word); }
+      | ^
+      | static 
+src/rt/lock.c:288:6: warning: no previous prototype for function 'anti_rt_mutex_lock_at' [-Wmissing-prototypes]
+  288 | void anti_rt_mutex_lock_at(void *word, const char *site)
+      |      ^
+src/rt/lock.c:288:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  288 | void anti_rt_mutex_lock_at(void *word, const char *site)
+      | ^
+      | static 
+src/rt/lock.c:294:6: warning: no previous prototype for function 'anti_rt_mutex_unlock_at' [-Wmissing-prototypes]
+  294 | void anti_rt_mutex_unlock_at(void *word)
+      |      ^
+src/rt/lock.c:294:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  294 | void anti_rt_mutex_unlock_at(void *word)
+      | ^
+      | static 
+src/rt/lock.c:302:6: warning: no previous prototype for function 'anti_rt_mutex_destroy' [-Wmissing-prototypes]
+  302 | void anti_rt_mutex_destroy(void *word)
+      |      ^
+src/rt/lock.c:302:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  302 | void anti_rt_mutex_destroy(void *word)
+      | ^
+      | static 
+src/rt/lock.c:342:6: warning: no previous prototype for function 'anti_rt_object_lock' [-Wmissing-prototypes]
+  342 | void anti_rt_object_lock(void *lock)
+      |      ^
+src/rt/lock.c:342:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  342 | void anti_rt_object_lock(void *lock)
+      | ^
+      | static 
+src/rt/lock.c:351:6: warning: no previous prototype for function 'anti_rt_object_unlock' [-Wmissing-prototypes]
+  351 | void anti_rt_object_unlock(void *lock) { object_leave(lock); }
+      |      ^
+src/rt/lock.c:351:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  351 | void anti_rt_object_unlock(void *lock) { object_leave(lock); }
+      | ^
+      | static 
+src/rt/lock.c:353:6: warning: no previous prototype for function 'anti_rt_object_lock_at' [-Wmissing-prototypes]
+  353 | void anti_rt_object_lock_at(void *lock, const char *site)
+      |      ^
+src/rt/lock.c:353:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  353 | void anti_rt_object_lock_at(void *lock, const char *site)
+      | ^
+      | static 
+src/rt/lock.c:363:6: warning: no previous prototype for function 'anti_rt_object_unlock_at' [-Wmissing-prototypes]
+  363 | void anti_rt_object_unlock_at(void *lock)
+      |      ^
+src/rt/lock.c:363:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  363 | void anti_rt_object_unlock_at(void *lock)
+      | ^
+      | static 
+src/rt/lock.c:376:6: warning: no previous prototype for function 'anti_rt_object_lock_pair' [-Wmissing-prototypes]
+  376 | void anti_rt_object_lock_pair(void *a, void *b)
+      |      ^
+src/rt/lock.c:376:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  376 | void anti_rt_object_lock_pair(void *a, void *b)
+      | ^
+      | static 
+src/rt/lock.c:387:6: warning: no previous prototype for function 'anti_rt_object_unlock_pair' [-Wmissing-prototypes]
+  387 | void anti_rt_object_unlock_pair(void *a, void *b)
+      |      ^
+src/rt/lock.c:387:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  387 | void anti_rt_object_unlock_pair(void *a, void *b)
+      | ^
+      | static 
+src/rt/lock.c:395:6: warning: no previous prototype for function 'anti_rt_object_lock_pair_at' [-Wmissing-prototypes]
+  395 | void anti_rt_object_lock_pair_at(void *a, void *b, const char *site)
+      |      ^
+src/rt/lock.c:395:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  395 | void anti_rt_object_lock_pair_at(void *a, void *b, const char *site)
+      | ^
+      | static 
+src/rt/lock.c:406:6: warning: no previous prototype for function 'anti_rt_object_unlock_pair_at' [-Wmissing-prototypes]
+  406 | void anti_rt_object_unlock_pair_at(void *a, void *b)
+      |      ^
+src/rt/lock.c:406:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  406 | void anti_rt_object_unlock_pair_at(void *a, void *b)
+      | ^
+      | static 
+src/rt/lock.c:417:5: warning: no previous prototype for function 'anti_rt_address_below' [-Wmissing-prototypes]
+  417 | int anti_rt_address_below(const void *a, const void *b)
+      |     ^
+src/rt/lock.c:417:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  417 | int anti_rt_address_below(const void *a, const void *b)
+      | ^
+      | static 
+14 warnings generated.
+### rt-macos-arm64_armv8.5 src/rt/mem.c
+### rt-macos-arm64_armv8.5 src/rt/object.c
+src/rt/object.c:1005:10: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+ 1005 |     copy((struct anti_object *)start, (struct anti_object *)made);
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:1005:39: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+ 1005 |     copy((struct anti_object *)start, (struct anti_object *)made);
+      |                                       ^~~~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:1087:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+ 1087 |             copy((struct anti_object *)at,
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:1088:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+ 1088 |                  (struct anti_object *)((char *)into + i * type->size));
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+4 warnings generated.
+### rt-macos-arm64_armv8.5 src/rt/platform_posix.c
+### rt-macos-arm64_armv8.5 src/rt/platform_windows.c
+### rt-macos-arm64_armv8.5 src/rt/plugin.c
+src/rt/plugin.c:57:15: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'fail' [-Wmissing-format-attribute]
+   57 |     written = vsnprintf(message, sizeof message, format, args);
+      |               ^
+build/host/runtime/sysroot/macos-arm64/usr/include/secure/_stdio.h:124:34: note: expanded from macro 'vsnprintf'
+  124 | #define vsnprintf(str, len, ...) __vsnprintf_chk_func (str, len, 0, __VA_ARGS__)
+      |                                  ^
+build/host/runtime/sysroot/macos-arm64/usr/include/secure/_stdio.h:81:75: note: expanded from macro '__vsnprintf_chk_func'
+   81 |         __builtin___vsnprintf_chk (str, len, flag, __darwin_obsz(str), format, ap)
+      |                                                                                  ^
+src/rt/plugin.c:51:13: note: 'fail' declared here
+   51 | static void fail(const char *format, ...)
+      |             ^
+1 warning generated.
+### rt-macos-arm64_armv8.5 src/rt/reflect.c
+### rt-macos-arm64_armv8.5 src/rt/registry.c
+### rt-macos-arm64_armv8.5 src/rt/signal.c
+### rt-macos-arm64_armv8.5 src/rt/snapshot.c
+### rt-macos-arm64_armv8.5 src/rt/start.c
+### rt-macos-arm64_armv8.5 src/rt/symbols.c
+### rt-macos-arm64_armv8.5 src/rt/sync.c
+src/rt/sync.c:133:7: warning: no previous prototype for function 'anti_rt_chan_new' [-Wmissing-prototypes]
+  133 | void *anti_rt_chan_new(int64_t size, int64_t capacity)
+      |       ^
+src/rt/sync.c:133:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  133 | void *anti_rt_chan_new(int64_t size, int64_t capacity)
+      | ^
+      | static 
+src/rt/sync.c:175:6: warning: no previous prototype for function 'anti_rt_chan_send' [-Wmissing-prototypes]
+  175 | void anti_rt_chan_send(void *handle, const void *value)
+      |      ^
+src/rt/sync.c:175:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  175 | void anti_rt_chan_send(void *handle, const void *value)
+      | ^
+      | static 
+src/rt/sync.c:199:7: warning: no previous prototype for function 'anti_rt_chan_recv' [-Wmissing-prototypes]
+  199 | void *anti_rt_chan_recv(void *handle, void *out)
+      |       ^
+src/rt/sync.c:199:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  199 | void *anti_rt_chan_recv(void *handle, void *out)
+      | ^
+      | static 
+src/rt/sync.c:218:6: warning: no previous prototype for function 'anti_rt_chan_close' [-Wmissing-prototypes]
+  218 | void anti_rt_chan_close(void *handle)
+      |      ^
+src/rt/sync.c:218:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  218 | void anti_rt_chan_close(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:231:6: warning: no previous prototype for function 'anti_rt_chan_delete' [-Wmissing-prototypes]
+  231 | void anti_rt_chan_delete(void *handle)
+      |      ^
+src/rt/sync.c:231:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  231 | void anti_rt_chan_delete(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:285:9: warning: no previous prototype for function 'anti_rt_select' [-Wmissing-prototypes]
+  285 | int64_t anti_rt_select(void *const *chans, void *const *slots,
+      |         ^
+src/rt/sync.c:285:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  285 | int64_t anti_rt_select(void *const *chans, void *const *slots,
+      | ^
+      | static 
+6 warnings generated.
+### rt-macos-arm64_armv8.5 src/rt/text.c
+src/rt/text.c:33:18: warning: no previous prototype for function 'anti_rt_text_copy' [-Wmissing-prototypes]
+   33 | struct anti_text anti_rt_text_copy(const unsigned char *bytes, int64_t len)
+      |                  ^
+src/rt/text.c:33:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   33 | struct anti_text anti_rt_text_copy(const unsigned char *bytes, int64_t len)
+      | ^
+      | static 
+src/rt/text.c:51:18: warning: no previous prototype for function 'anti_rt_bytes_copy' [-Wmissing-prototypes]
+   51 | struct anti_text anti_rt_bytes_copy(const unsigned char *bytes, int64_t len)
+      |                  ^
+src/rt/text.c:51:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   51 | struct anti_text anti_rt_bytes_copy(const unsigned char *bytes, int64_t len)
+      | ^
+      | static 
+src/rt/text.c:58:9: warning: no previous prototype for function 'anti_rt_text_invalid' [-Wmissing-prototypes]
+   58 | int64_t anti_rt_text_invalid(const unsigned char *bytes, int64_t len)
+      |         ^
+src/rt/text.c:58:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   58 | int64_t anti_rt_text_invalid(const unsigned char *bytes, int64_t len)
+      | ^
+      | static 
+3 warnings generated.
+### rt-macos-arm64_armv8.5 src/rt/threads.c
+src/rt/threads.c:297:6: warning: no previous prototype for function 'anti_rt_parallel' [-Wmissing-prototypes]
+  297 | void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
+      |      ^
+src/rt/threads.c:297:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  297 | void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
+      | ^
+      | static 
+src/rt/threads.c:381:7: warning: no previous prototype for function 'anti_rt_dispatch' [-Wmissing-prototypes]
+  381 | void *anti_rt_dispatch(void *object, int64_t result_size,
+      |       ^
+src/rt/threads.c:381:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  381 | void *anti_rt_dispatch(void *object, int64_t result_size,
+      | ^
+      | static 
+src/rt/threads.c:425:6: warning: no previous prototype for function 'anti_rt_join' [-Wmissing-prototypes]
+  425 | void anti_rt_join(void *handle, int64_t result_size, void *out)
+      |      ^
+src/rt/threads.c:425:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  425 | void anti_rt_join(void *handle, int64_t result_size, void *out)
+      | ^
+      | static 
+src/rt/threads.c:471:6: warning: no previous prototype for function 'anti_rt_join_all' [-Wmissing-prototypes]
+  471 | void anti_rt_join_all(void *const *handles, int64_t count)
+      |      ^
+src/rt/threads.c:471:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  471 | void anti_rt_join_all(void *const *handles, int64_t count)
+      | ^
+      | static 
+src/rt/threads.c:485:6: warning: no previous prototype for function 'anti_rt_join_hooked' [-Wmissing-prototypes]
+  485 | void anti_rt_join_hooked(void *handle, int64_t result_size, void *out)
+      |      ^
+src/rt/threads.c:485:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  485 | void anti_rt_join_hooked(void *handle, int64_t result_size, void *out)
+      | ^
+      | static 
+src/rt/threads.c:496:6: warning: no previous prototype for function 'anti_rt_join_all_hooked' [-Wmissing-prototypes]
+  496 | void anti_rt_join_all_hooked(void *const *handles, int64_t count)
+      |      ^
+src/rt/threads.c:496:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  496 | void anti_rt_join_all_hooked(void *const *handles, int64_t count)
+      | ^
+      | static 
+6 warnings generated.
+### rt-macos-arm64_armv8.5 src/rt/toml.c
+### rt-macos-arm64_armv8.5 src/rt/trace.c
+### rt-macos-arm64_armv8.5 src/rt/utf.c
+### rt-linux-x86_64_v3 src/rt/license_stub.c
+### rt-linux-x86_64_v3 src/rt/assert.c
+src/rt/assert.c:10:34: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 0)' attribute to the declaration of 'write_line' [-Wmissing-format-attribute]
+   10 |     vfprintf(stderr, format, rest);
+      |                                  ^
+src/rt/assert.c:7:13: note: 'write_line' declared here
+    7 | static void write_line(const char *format, va_list rest)
+      |             ^
+src/rt/assert.c:20:28: warning: diagnostic behavior may be improved by adding the 'format(printf, 2, 3)' attribute to the declaration of 'anti_rt_fail_exit' [-Wmissing-format-attribute]
+   20 |     write_line(format, rest);
+      |                            ^
+src/rt/std.h:28:16: note: 'anti_rt_fail_exit' declared here
+   28 | _Noreturn void anti_rt_fail_exit(int status, const char *format, ...);
+      |                ^
+src/rt/assert.c:30:28: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'anti_rt_fail_abort' [-Wmissing-format-attribute]
+   30 |     write_line(format, rest);
+      |                            ^
+src/rt/std.h:29:16: note: 'anti_rt_fail_abort' declared here
+   29 | _Noreturn void anti_rt_fail_abort(const char *format, ...);
+      |                ^
+src/rt/assert.c:40:28: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'anti_rt_note' [-Wmissing-format-attribute]
+   40 |     write_line(format, rest);
+      |                            ^
+src/rt/std.h:33:6: note: 'anti_rt_note' declared here
+   33 | void anti_rt_note(const char *format, ...);
+      |      ^
+4 warnings generated.
+### rt-linux-x86_64_v3 src/rt/atomic.c
+### rt-linux-x86_64_v3 src/rt/backtrace.c
+### rt-linux-x86_64_v3 src/rt/call.c
+### rt-linux-x86_64_v3 src/rt/cast.c
+### rt-linux-x86_64_v3 src/rt/check.c
+### rt-linux-x86_64_v3 src/rt/conf.c
+src/rt/conf.c:120:40: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'format_text' [-Wmissing-format-attribute]
+  120 |     n = vsnprintf(NULL, 0, format, rest);
+      |                                        ^
+src/rt/conf.c:113:14: note: 'format_text' declared here
+  113 | static char *format_text(const char *format, ...)
+      |              ^
+1 warning generated.
+### rt-linux-x86_64_v3 src/rt/cpu.c
+### rt-linux-x86_64_v3 src/rt/digest.c
+### rt-linux-x86_64_v3 src/rt/errno.c
+src/rt/errno.c:39:9: warning: no previous prototype for function 'anti_rt_last_error' [-Wmissing-prototypes]
+   39 | int32_t anti_rt_last_error(void)
+      |         ^
+src/rt/errno.c:39:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   39 | int32_t anti_rt_last_error(void)
+      | ^
+      | static 
+src/rt/errno.c:48:22: warning: no previous prototype for function 'anti_rt_last_error_text' [-Wmissing-prototypes]
+   48 | const unsigned char *anti_rt_last_error_text(int32_t code)
+      |                      ^
+src/rt/errno.c:48:7: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   48 | const unsigned char *anti_rt_last_error_text(int32_t code)
+      |       ^
+      | static 
+2 warnings generated.
+### rt-linux-x86_64_v3 src/rt/f16.c
+### rt-linux-x86_64_v3 src/rt/fs.c
+### rt-linux-x86_64_v3 src/rt/hash.c
+### rt-linux-x86_64_v3 src/rt/hooks.c
+### rt-linux-x86_64_v3 src/rt/init.c
+### rt-linux-x86_64_v3 src/rt/io.c
+### rt-linux-x86_64_v3 src/rt/json.c
+### rt-linux-x86_64_v3 src/rt/license.c
+### rt-linux-x86_64_v3 src/rt/loaded.c
+### rt-linux-x86_64_v3 src/rt/lock.c
+src/rt/lock.c:284:6: warning: no previous prototype for function 'anti_rt_mutex_lock' [-Wmissing-prototypes]
+  284 | void anti_rt_mutex_lock(void *word) { word_lock(word); }
+      |      ^
+src/rt/lock.c:284:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  284 | void anti_rt_mutex_lock(void *word) { word_lock(word); }
+      | ^
+      | static 
+src/rt/lock.c:286:6: warning: no previous prototype for function 'anti_rt_mutex_unlock' [-Wmissing-prototypes]
+  286 | void anti_rt_mutex_unlock(void *word) { word_unlock(word); }
+      |      ^
+src/rt/lock.c:286:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  286 | void anti_rt_mutex_unlock(void *word) { word_unlock(word); }
+      | ^
+      | static 
+src/rt/lock.c:288:6: warning: no previous prototype for function 'anti_rt_mutex_lock_at' [-Wmissing-prototypes]
+  288 | void anti_rt_mutex_lock_at(void *word, const char *site)
+      |      ^
+src/rt/lock.c:288:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  288 | void anti_rt_mutex_lock_at(void *word, const char *site)
+      | ^
+      | static 
+src/rt/lock.c:294:6: warning: no previous prototype for function 'anti_rt_mutex_unlock_at' [-Wmissing-prototypes]
+  294 | void anti_rt_mutex_unlock_at(void *word)
+      |      ^
+src/rt/lock.c:294:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  294 | void anti_rt_mutex_unlock_at(void *word)
+      | ^
+      | static 
+src/rt/lock.c:302:6: warning: no previous prototype for function 'anti_rt_mutex_destroy' [-Wmissing-prototypes]
+  302 | void anti_rt_mutex_destroy(void *word)
+      |      ^
+src/rt/lock.c:302:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  302 | void anti_rt_mutex_destroy(void *word)
+      | ^
+      | static 
+src/rt/lock.c:342:6: warning: no previous prototype for function 'anti_rt_object_lock' [-Wmissing-prototypes]
+  342 | void anti_rt_object_lock(void *lock)
+      |      ^
+src/rt/lock.c:342:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  342 | void anti_rt_object_lock(void *lock)
+      | ^
+      | static 
+src/rt/lock.c:351:6: warning: no previous prototype for function 'anti_rt_object_unlock' [-Wmissing-prototypes]
+  351 | void anti_rt_object_unlock(void *lock) { object_leave(lock); }
+      |      ^
+src/rt/lock.c:351:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  351 | void anti_rt_object_unlock(void *lock) { object_leave(lock); }
+      | ^
+      | static 
+src/rt/lock.c:353:6: warning: no previous prototype for function 'anti_rt_object_lock_at' [-Wmissing-prototypes]
+  353 | void anti_rt_object_lock_at(void *lock, const char *site)
+      |      ^
+src/rt/lock.c:353:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  353 | void anti_rt_object_lock_at(void *lock, const char *site)
+      | ^
+      | static 
+src/rt/lock.c:363:6: warning: no previous prototype for function 'anti_rt_object_unlock_at' [-Wmissing-prototypes]
+  363 | void anti_rt_object_unlock_at(void *lock)
+      |      ^
+src/rt/lock.c:363:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  363 | void anti_rt_object_unlock_at(void *lock)
+      | ^
+      | static 
+src/rt/lock.c:376:6: warning: no previous prototype for function 'anti_rt_object_lock_pair' [-Wmissing-prototypes]
+  376 | void anti_rt_object_lock_pair(void *a, void *b)
+      |      ^
+src/rt/lock.c:376:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  376 | void anti_rt_object_lock_pair(void *a, void *b)
+      | ^
+      | static 
+src/rt/lock.c:387:6: warning: no previous prototype for function 'anti_rt_object_unlock_pair' [-Wmissing-prototypes]
+  387 | void anti_rt_object_unlock_pair(void *a, void *b)
+      |      ^
+src/rt/lock.c:387:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  387 | void anti_rt_object_unlock_pair(void *a, void *b)
+      | ^
+      | static 
+src/rt/lock.c:395:6: warning: no previous prototype for function 'anti_rt_object_lock_pair_at' [-Wmissing-prototypes]
+  395 | void anti_rt_object_lock_pair_at(void *a, void *b, const char *site)
+      |      ^
+src/rt/lock.c:395:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  395 | void anti_rt_object_lock_pair_at(void *a, void *b, const char *site)
+      | ^
+      | static 
+src/rt/lock.c:406:6: warning: no previous prototype for function 'anti_rt_object_unlock_pair_at' [-Wmissing-prototypes]
+  406 | void anti_rt_object_unlock_pair_at(void *a, void *b)
+      |      ^
+src/rt/lock.c:406:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  406 | void anti_rt_object_unlock_pair_at(void *a, void *b)
+      | ^
+      | static 
+src/rt/lock.c:417:5: warning: no previous prototype for function 'anti_rt_address_below' [-Wmissing-prototypes]
+  417 | int anti_rt_address_below(const void *a, const void *b)
+      |     ^
+src/rt/lock.c:417:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  417 | int anti_rt_address_below(const void *a, const void *b)
+      | ^
+      | static 
+14 warnings generated.
+### rt-linux-x86_64_v3 src/rt/mem.c
+### rt-linux-x86_64_v3 src/rt/object.c
+src/rt/object.c:1005:10: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+ 1005 |     copy((struct anti_object *)start, (struct anti_object *)made);
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:1005:39: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+ 1005 |     copy((struct anti_object *)start, (struct anti_object *)made);
+      |                                       ^~~~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:1087:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+ 1087 |             copy((struct anti_object *)at,
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:1088:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+ 1088 |                  (struct anti_object *)((char *)into + i * type->size));
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+4 warnings generated.
+### rt-linux-x86_64_v3 src/rt/platform_posix.c
+### rt-linux-x86_64_v3 src/rt/platform_windows.c
+### rt-linux-x86_64_v3 src/rt/plugin.c
+src/rt/plugin.c:57:62: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'fail' [-Wmissing-format-attribute]
+   57 |     written = vsnprintf(message, sizeof message, format, args);
+      |                                                              ^
+src/rt/plugin.c:51:13: note: 'fail' declared here
+   51 | static void fail(const char *format, ...)
+      |             ^
+1 warning generated.
+### rt-linux-x86_64_v3 src/rt/reflect.c
+### rt-linux-x86_64_v3 src/rt/registry.c
+### rt-linux-x86_64_v3 src/rt/signal.c
+### rt-linux-x86_64_v3 src/rt/snapshot.c
+### rt-linux-x86_64_v3 src/rt/start.c
+### rt-linux-x86_64_v3 src/rt/symbols.c
+### rt-linux-x86_64_v3 src/rt/sync.c
+src/rt/sync.c:133:7: warning: no previous prototype for function 'anti_rt_chan_new' [-Wmissing-prototypes]
+  133 | void *anti_rt_chan_new(int64_t size, int64_t capacity)
+      |       ^
+src/rt/sync.c:133:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  133 | void *anti_rt_chan_new(int64_t size, int64_t capacity)
+      | ^
+      | static 
+src/rt/sync.c:175:6: warning: no previous prototype for function 'anti_rt_chan_send' [-Wmissing-prototypes]
+  175 | void anti_rt_chan_send(void *handle, const void *value)
+      |      ^
+src/rt/sync.c:175:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  175 | void anti_rt_chan_send(void *handle, const void *value)
+      | ^
+      | static 
+src/rt/sync.c:199:7: warning: no previous prototype for function 'anti_rt_chan_recv' [-Wmissing-prototypes]
+  199 | void *anti_rt_chan_recv(void *handle, void *out)
+      |       ^
+src/rt/sync.c:199:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  199 | void *anti_rt_chan_recv(void *handle, void *out)
+      | ^
+      | static 
+src/rt/sync.c:218:6: warning: no previous prototype for function 'anti_rt_chan_close' [-Wmissing-prototypes]
+  218 | void anti_rt_chan_close(void *handle)
+      |      ^
+src/rt/sync.c:218:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  218 | void anti_rt_chan_close(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:231:6: warning: no previous prototype for function 'anti_rt_chan_delete' [-Wmissing-prototypes]
+  231 | void anti_rt_chan_delete(void *handle)
+      |      ^
+src/rt/sync.c:231:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  231 | void anti_rt_chan_delete(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:285:9: warning: no previous prototype for function 'anti_rt_select' [-Wmissing-prototypes]
+  285 | int64_t anti_rt_select(void *const *chans, void *const *slots,
+      |         ^
+src/rt/sync.c:285:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  285 | int64_t anti_rt_select(void *const *chans, void *const *slots,
+      | ^
+      | static 
+6 warnings generated.
+### rt-linux-x86_64_v3 src/rt/text.c
+src/rt/text.c:33:18: warning: no previous prototype for function 'anti_rt_text_copy' [-Wmissing-prototypes]
+   33 | struct anti_text anti_rt_text_copy(const unsigned char *bytes, int64_t len)
+      |                  ^
+src/rt/text.c:33:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   33 | struct anti_text anti_rt_text_copy(const unsigned char *bytes, int64_t len)
+      | ^
+      | static 
+src/rt/text.c:51:18: warning: no previous prototype for function 'anti_rt_bytes_copy' [-Wmissing-prototypes]
+   51 | struct anti_text anti_rt_bytes_copy(const unsigned char *bytes, int64_t len)
+      |                  ^
+src/rt/text.c:51:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   51 | struct anti_text anti_rt_bytes_copy(const unsigned char *bytes, int64_t len)
+      | ^
+      | static 
+src/rt/text.c:58:9: warning: no previous prototype for function 'anti_rt_text_invalid' [-Wmissing-prototypes]
+   58 | int64_t anti_rt_text_invalid(const unsigned char *bytes, int64_t len)
+      |         ^
+src/rt/text.c:58:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   58 | int64_t anti_rt_text_invalid(const unsigned char *bytes, int64_t len)
+      | ^
+      | static 
+3 warnings generated.
+### rt-linux-x86_64_v3 src/rt/threads.c
+src/rt/threads.c:297:6: warning: no previous prototype for function 'anti_rt_parallel' [-Wmissing-prototypes]
+  297 | void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
+      |      ^
+src/rt/threads.c:297:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  297 | void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
+      | ^
+      | static 
+src/rt/threads.c:381:7: warning: no previous prototype for function 'anti_rt_dispatch' [-Wmissing-prototypes]
+  381 | void *anti_rt_dispatch(void *object, int64_t result_size,
+      |       ^
+src/rt/threads.c:381:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  381 | void *anti_rt_dispatch(void *object, int64_t result_size,
+      | ^
+      | static 
+src/rt/threads.c:425:6: warning: no previous prototype for function 'anti_rt_join' [-Wmissing-prototypes]
+  425 | void anti_rt_join(void *handle, int64_t result_size, void *out)
+      |      ^
+src/rt/threads.c:425:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  425 | void anti_rt_join(void *handle, int64_t result_size, void *out)
+      | ^
+      | static 
+src/rt/threads.c:471:6: warning: no previous prototype for function 'anti_rt_join_all' [-Wmissing-prototypes]
+  471 | void anti_rt_join_all(void *const *handles, int64_t count)
+      |      ^
+src/rt/threads.c:471:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  471 | void anti_rt_join_all(void *const *handles, int64_t count)
+      | ^
+      | static 
+src/rt/threads.c:485:6: warning: no previous prototype for function 'anti_rt_join_hooked' [-Wmissing-prototypes]
+  485 | void anti_rt_join_hooked(void *handle, int64_t result_size, void *out)
+      |      ^
+src/rt/threads.c:485:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  485 | void anti_rt_join_hooked(void *handle, int64_t result_size, void *out)
+      | ^
+      | static 
+src/rt/threads.c:496:6: warning: no previous prototype for function 'anti_rt_join_all_hooked' [-Wmissing-prototypes]
+  496 | void anti_rt_join_all_hooked(void *const *handles, int64_t count)
+      |      ^
+src/rt/threads.c:496:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  496 | void anti_rt_join_all_hooked(void *const *handles, int64_t count)
+      | ^
+      | static 
+6 warnings generated.
+### rt-linux-x86_64_v3 src/rt/toml.c
+### rt-linux-x86_64_v3 src/rt/trace.c
+### rt-linux-x86_64_v3 src/rt/utf.c
+### rt-windows-x86_64_v3 src/rt/license_stub.c
+### rt-windows-x86_64_v3 src/rt/assert.c
+src/rt/assert.c:10:34: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 0)' attribute to the declaration of 'write_line' [-Wmissing-format-attribute]
+   10 |     vfprintf(stderr, format, rest);
+      |                                  ^
+src/rt/assert.c:7:13: note: 'write_line' declared here
+    7 | static void write_line(const char *format, va_list rest)
+      |             ^
+src/rt/assert.c:20:28: warning: diagnostic behavior may be improved by adding the 'format(printf, 2, 3)' attribute to the declaration of 'anti_rt_fail_exit' [-Wmissing-format-attribute]
+   20 |     write_line(format, rest);
+      |                            ^
+src/rt/std.h:28:16: note: 'anti_rt_fail_exit' declared here
+   28 | _Noreturn void anti_rt_fail_exit(int status, const char *format, ...);
+      |                ^
+src/rt/assert.c:30:28: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'anti_rt_fail_abort' [-Wmissing-format-attribute]
+   30 |     write_line(format, rest);
+      |                            ^
+src/rt/std.h:29:16: note: 'anti_rt_fail_abort' declared here
+   29 | _Noreturn void anti_rt_fail_abort(const char *format, ...);
+      |                ^
+src/rt/assert.c:40:28: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'anti_rt_note' [-Wmissing-format-attribute]
+   40 |     write_line(format, rest);
+      |                            ^
+src/rt/std.h:33:6: note: 'anti_rt_note' declared here
+   33 | void anti_rt_note(const char *format, ...);
+      |      ^
+4 warnings generated.
+### rt-windows-x86_64_v3 src/rt/atomic.c
+### rt-windows-x86_64_v3 src/rt/backtrace.c
+### rt-windows-x86_64_v3 src/rt/call.c
+### rt-windows-x86_64_v3 src/rt/cast.c
+### rt-windows-x86_64_v3 src/rt/check.c
+### rt-windows-x86_64_v3 src/rt/conf.c
+src/rt/conf.c:120:40: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'format_text' [-Wmissing-format-attribute]
+  120 |     n = vsnprintf(NULL, 0, format, rest);
+      |                                        ^
+src/rt/conf.c:113:14: note: 'format_text' declared here
+  113 | static char *format_text(const char *format, ...)
+      |              ^
+1 warning generated.
+### rt-windows-x86_64_v3 src/rt/cpu.c
+### rt-windows-x86_64_v3 src/rt/digest.c
+### rt-windows-x86_64_v3 src/rt/errno.c
+src/rt/errno.c:39:9: warning: no previous prototype for function 'anti_rt_last_error' [-Wmissing-prototypes]
+   39 | int32_t anti_rt_last_error(void)
+      |         ^
+src/rt/errno.c:39:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   39 | int32_t anti_rt_last_error(void)
+      | ^
+      | static 
+src/rt/errno.c:48:22: warning: no previous prototype for function 'anti_rt_last_error_text' [-Wmissing-prototypes]
+   48 | const unsigned char *anti_rt_last_error_text(int32_t code)
+      |                      ^
+src/rt/errno.c:48:7: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   48 | const unsigned char *anti_rt_last_error_text(int32_t code)
+      |       ^
+      | static 
+2 warnings generated.
+### rt-windows-x86_64_v3 src/rt/f16.c
+### rt-windows-x86_64_v3 src/rt/fs.c
+### rt-windows-x86_64_v3 src/rt/hash.c
+### rt-windows-x86_64_v3 src/rt/hooks.c
+### rt-windows-x86_64_v3 src/rt/init.c
+### rt-windows-x86_64_v3 src/rt/io.c
+### rt-windows-x86_64_v3 src/rt/json.c
+### rt-windows-x86_64_v3 src/rt/license.c
+### rt-windows-x86_64_v3 src/rt/loaded.c
+### rt-windows-x86_64_v3 src/rt/lock.c
+src/rt/lock.c:284:6: warning: no previous prototype for function 'anti_rt_mutex_lock' [-Wmissing-prototypes]
+  284 | void anti_rt_mutex_lock(void *word) { word_lock(word); }
+      |      ^
+src/rt/lock.c:284:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  284 | void anti_rt_mutex_lock(void *word) { word_lock(word); }
+      | ^
+      | static 
+src/rt/lock.c:286:6: warning: no previous prototype for function 'anti_rt_mutex_unlock' [-Wmissing-prototypes]
+  286 | void anti_rt_mutex_unlock(void *word) { word_unlock(word); }
+      |      ^
+src/rt/lock.c:286:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  286 | void anti_rt_mutex_unlock(void *word) { word_unlock(word); }
+      | ^
+      | static 
+src/rt/lock.c:288:6: warning: no previous prototype for function 'anti_rt_mutex_lock_at' [-Wmissing-prototypes]
+  288 | void anti_rt_mutex_lock_at(void *word, const char *site)
+      |      ^
+src/rt/lock.c:288:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  288 | void anti_rt_mutex_lock_at(void *word, const char *site)
+      | ^
+      | static 
+src/rt/lock.c:294:6: warning: no previous prototype for function 'anti_rt_mutex_unlock_at' [-Wmissing-prototypes]
+  294 | void anti_rt_mutex_unlock_at(void *word)
+      |      ^
+src/rt/lock.c:294:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  294 | void anti_rt_mutex_unlock_at(void *word)
+      | ^
+      | static 
+src/rt/lock.c:302:6: warning: no previous prototype for function 'anti_rt_mutex_destroy' [-Wmissing-prototypes]
+  302 | void anti_rt_mutex_destroy(void *word)
+      |      ^
+src/rt/lock.c:302:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  302 | void anti_rt_mutex_destroy(void *word)
+      | ^
+      | static 
+src/rt/lock.c:342:6: warning: no previous prototype for function 'anti_rt_object_lock' [-Wmissing-prototypes]
+  342 | void anti_rt_object_lock(void *lock)
+      |      ^
+src/rt/lock.c:342:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  342 | void anti_rt_object_lock(void *lock)
+      | ^
+      | static 
+src/rt/lock.c:351:6: warning: no previous prototype for function 'anti_rt_object_unlock' [-Wmissing-prototypes]
+  351 | void anti_rt_object_unlock(void *lock) { object_leave(lock); }
+      |      ^
+src/rt/lock.c:351:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  351 | void anti_rt_object_unlock(void *lock) { object_leave(lock); }
+      | ^
+      | static 
+src/rt/lock.c:353:6: warning: no previous prototype for function 'anti_rt_object_lock_at' [-Wmissing-prototypes]
+  353 | void anti_rt_object_lock_at(void *lock, const char *site)
+      |      ^
+src/rt/lock.c:353:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  353 | void anti_rt_object_lock_at(void *lock, const char *site)
+      | ^
+      | static 
+src/rt/lock.c:363:6: warning: no previous prototype for function 'anti_rt_object_unlock_at' [-Wmissing-prototypes]
+  363 | void anti_rt_object_unlock_at(void *lock)
+      |      ^
+src/rt/lock.c:363:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  363 | void anti_rt_object_unlock_at(void *lock)
+      | ^
+      | static 
+src/rt/lock.c:376:6: warning: no previous prototype for function 'anti_rt_object_lock_pair' [-Wmissing-prototypes]
+  376 | void anti_rt_object_lock_pair(void *a, void *b)
+      |      ^
+src/rt/lock.c:376:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  376 | void anti_rt_object_lock_pair(void *a, void *b)
+      | ^
+      | static 
+src/rt/lock.c:387:6: warning: no previous prototype for function 'anti_rt_object_unlock_pair' [-Wmissing-prototypes]
+  387 | void anti_rt_object_unlock_pair(void *a, void *b)
+      |      ^
+src/rt/lock.c:387:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  387 | void anti_rt_object_unlock_pair(void *a, void *b)
+      | ^
+      | static 
+src/rt/lock.c:395:6: warning: no previous prototype for function 'anti_rt_object_lock_pair_at' [-Wmissing-prototypes]
+  395 | void anti_rt_object_lock_pair_at(void *a, void *b, const char *site)
+      |      ^
+src/rt/lock.c:395:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  395 | void anti_rt_object_lock_pair_at(void *a, void *b, const char *site)
+      | ^
+      | static 
+src/rt/lock.c:406:6: warning: no previous prototype for function 'anti_rt_object_unlock_pair_at' [-Wmissing-prototypes]
+  406 | void anti_rt_object_unlock_pair_at(void *a, void *b)
+      |      ^
+src/rt/lock.c:406:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  406 | void anti_rt_object_unlock_pair_at(void *a, void *b)
+      | ^
+      | static 
+src/rt/lock.c:417:5: warning: no previous prototype for function 'anti_rt_address_below' [-Wmissing-prototypes]
+  417 | int anti_rt_address_below(const void *a, const void *b)
+      |     ^
+src/rt/lock.c:417:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  417 | int anti_rt_address_below(const void *a, const void *b)
+      | ^
+      | static 
+14 warnings generated.
+### rt-windows-x86_64_v3 src/rt/mem.c
+### rt-windows-x86_64_v3 src/rt/object.c
+src/rt/object.c:1005:10: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+ 1005 |     copy((struct anti_object *)start, (struct anti_object *)made);
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:1005:39: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+ 1005 |     copy((struct anti_object *)start, (struct anti_object *)made);
+      |                                       ^~~~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:1087:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+ 1087 |             copy((struct anti_object *)at,
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~
+src/rt/object.c:1088:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align]
+ 1088 |                  (struct anti_object *)((char *)into + i * type->size));
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+4 warnings generated.
+### rt-windows-x86_64_v3 src/rt/platform_posix.c
+### rt-windows-x86_64_v3 src/rt/platform_windows.c
+### rt-windows-x86_64_v3 src/rt/plugin.c
+src/rt/plugin.c:57:62: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'fail' [-Wmissing-format-attribute]
+   57 |     written = vsnprintf(message, sizeof message, format, args);
+      |                                                              ^
+src/rt/plugin.c:51:13: note: 'fail' declared here
+   51 | static void fail(const char *format, ...)
+      |             ^
+1 warning generated.
+### rt-windows-x86_64_v3 src/rt/reflect.c
+### rt-windows-x86_64_v3 src/rt/registry.c
+### rt-windows-x86_64_v3 src/rt/signal.c
+### rt-windows-x86_64_v3 src/rt/snapshot.c
+### rt-windows-x86_64_v3 src/rt/start.c
+### rt-windows-x86_64_v3 src/rt/symbols.c
+### rt-windows-x86_64_v3 src/rt/sync.c
+src/rt/sync.c:133:7: warning: no previous prototype for function 'anti_rt_chan_new' [-Wmissing-prototypes]
+  133 | void *anti_rt_chan_new(int64_t size, int64_t capacity)
+      |       ^
+src/rt/sync.c:133:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  133 | void *anti_rt_chan_new(int64_t size, int64_t capacity)
+      | ^
+      | static 
+src/rt/sync.c:175:6: warning: no previous prototype for function 'anti_rt_chan_send' [-Wmissing-prototypes]
+  175 | void anti_rt_chan_send(void *handle, const void *value)
+      |      ^
+src/rt/sync.c:175:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  175 | void anti_rt_chan_send(void *handle, const void *value)
+      | ^
+      | static 
+src/rt/sync.c:199:7: warning: no previous prototype for function 'anti_rt_chan_recv' [-Wmissing-prototypes]
+  199 | void *anti_rt_chan_recv(void *handle, void *out)
+      |       ^
+src/rt/sync.c:199:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  199 | void *anti_rt_chan_recv(void *handle, void *out)
+      | ^
+      | static 
+src/rt/sync.c:218:6: warning: no previous prototype for function 'anti_rt_chan_close' [-Wmissing-prototypes]
+  218 | void anti_rt_chan_close(void *handle)
+      |      ^
+src/rt/sync.c:218:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  218 | void anti_rt_chan_close(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:231:6: warning: no previous prototype for function 'anti_rt_chan_delete' [-Wmissing-prototypes]
+  231 | void anti_rt_chan_delete(void *handle)
+      |      ^
+src/rt/sync.c:231:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  231 | void anti_rt_chan_delete(void *handle)
+      | ^
+      | static 
+src/rt/sync.c:285:9: warning: no previous prototype for function 'anti_rt_select' [-Wmissing-prototypes]
+  285 | int64_t anti_rt_select(void *const *chans, void *const *slots,
+      |         ^
+src/rt/sync.c:285:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  285 | int64_t anti_rt_select(void *const *chans, void *const *slots,
+      | ^
+      | static 
+6 warnings generated.
+### rt-windows-x86_64_v3 src/rt/text.c
+src/rt/text.c:33:18: warning: no previous prototype for function 'anti_rt_text_copy' [-Wmissing-prototypes]
+   33 | struct anti_text anti_rt_text_copy(const unsigned char *bytes, int64_t len)
+      |                  ^
+src/rt/text.c:33:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   33 | struct anti_text anti_rt_text_copy(const unsigned char *bytes, int64_t len)
+      | ^
+      | static 
+src/rt/text.c:51:18: warning: no previous prototype for function 'anti_rt_bytes_copy' [-Wmissing-prototypes]
+   51 | struct anti_text anti_rt_bytes_copy(const unsigned char *bytes, int64_t len)
+      |                  ^
+src/rt/text.c:51:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   51 | struct anti_text anti_rt_bytes_copy(const unsigned char *bytes, int64_t len)
+      | ^
+      | static 
+src/rt/text.c:58:9: warning: no previous prototype for function 'anti_rt_text_invalid' [-Wmissing-prototypes]
+   58 | int64_t anti_rt_text_invalid(const unsigned char *bytes, int64_t len)
+      |         ^
+src/rt/text.c:58:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   58 | int64_t anti_rt_text_invalid(const unsigned char *bytes, int64_t len)
+      | ^
+      | static 
+3 warnings generated.
+### rt-windows-x86_64_v3 src/rt/threads.c
+src/rt/threads.c:297:6: warning: no previous prototype for function 'anti_rt_parallel' [-Wmissing-prototypes]
+  297 | void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
+      |      ^
+src/rt/threads.c:297:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  297 | void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
+      | ^
+      | static 
+src/rt/threads.c:381:7: warning: no previous prototype for function 'anti_rt_dispatch' [-Wmissing-prototypes]
+  381 | void *anti_rt_dispatch(void *object, int64_t result_size,
+      |       ^
+src/rt/threads.c:381:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  381 | void *anti_rt_dispatch(void *object, int64_t result_size,
+      | ^
+      | static 
+src/rt/threads.c:425:6: warning: no previous prototype for function 'anti_rt_join' [-Wmissing-prototypes]
+  425 | void anti_rt_join(void *handle, int64_t result_size, void *out)
+      |      ^
+src/rt/threads.c:425:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  425 | void anti_rt_join(void *handle, int64_t result_size, void *out)
+      | ^
+      | static 
+src/rt/threads.c:471:6: warning: no previous prototype for function 'anti_rt_join_all' [-Wmissing-prototypes]
+  471 | void anti_rt_join_all(void *const *handles, int64_t count)
+      |      ^
+src/rt/threads.c:471:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  471 | void anti_rt_join_all(void *const *handles, int64_t count)
+      | ^
+      | static 
+src/rt/threads.c:485:6: warning: no previous prototype for function 'anti_rt_join_hooked' [-Wmissing-prototypes]
+  485 | void anti_rt_join_hooked(void *handle, int64_t result_size, void *out)
+      |      ^
+src/rt/threads.c:485:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  485 | void anti_rt_join_hooked(void *handle, int64_t result_size, void *out)
+      | ^
+      | static 
+src/rt/threads.c:496:6: warning: no previous prototype for function 'anti_rt_join_all_hooked' [-Wmissing-prototypes]
+  496 | void anti_rt_join_all_hooked(void *const *handles, int64_t count)
+      |      ^
+src/rt/threads.c:496:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  496 | void anti_rt_join_all_hooked(void *const *handles, int64_t count)
+      | ^
+      | static 
+6 warnings generated.
+### rt-windows-x86_64_v3 src/rt/toml.c
+### rt-windows-x86_64_v3 src/rt/trace.c
+### rt-windows-x86_64_v3 src/rt/utf.c
+### rt-macos-arm64_armv8.5-glue src/rt/patterns.c
+src/rt/patterns.c:33:7: warning: no previous prototype for function 'anti_rt_regex_literal' [-Wmissing-prototypes]
+   33 | void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length)
+      |       ^
+src/rt/patterns.c:33:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   33 | void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length)
+      | ^
+      | static 
+src/rt/patterns.c:53:7: warning: no previous prototype for function 'anti_rt_regex_literal_bytes' [-Wmissing-prototypes]
+   53 | void *anti_rt_regex_literal_bytes(const unsigned char *bytes, int64_t length)
+      |       ^
+src/rt/patterns.c:53:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   53 | void *anti_rt_regex_literal_bytes(const unsigned char *bytes, int64_t length)
+      | ^
+      | static 
+src/rt/patterns.c:82:18: warning: no previous prototype for function 'anti_rt_regex_message' [-Wmissing-prototypes]
+   82 | struct anti_text anti_rt_regex_message(int32_t code)
+      |                  ^
+src/rt/patterns.c:82:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   82 | struct anti_text anti_rt_regex_message(int32_t code)
+      | ^
+      | static 
+src/rt/patterns.c:358:9: warning: no previous prototype for function 'anti_rt_regex_begin' [-Wmissing-prototypes]
+  358 | int64_t anti_rt_regex_begin(struct anti_cursor *c, const void *pattern,
+      |         ^
+src/rt/patterns.c:358:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  358 | int64_t anti_rt_regex_begin(struct anti_cursor *c, const void *pattern,
+      | ^
+      | static 
+src/rt/patterns.c:410:9: warning: no previous prototype for function 'anti_rt_regex_next' [-Wmissing-prototypes]
+  410 | int64_t anti_rt_regex_next(struct anti_cursor *c,
+      |         ^
+src/rt/patterns.c:410:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  410 | int64_t anti_rt_regex_next(struct anti_cursor *c,
+      | ^
+      | static 
+src/rt/patterns.c:427:20: warning: no previous prototype for function 'anti_rt_regex_current' [-Wmissing-prototypes]
+  427 | struct anti_match *anti_rt_regex_current(struct anti_maybe_match *current)
+      |                    ^
+src/rt/patterns.c:427:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  427 | struct anti_match *anti_rt_regex_current(struct anti_maybe_match *current)
+      | ^
+      | static 
+src/rt/patterns.c:441:9: warning: no previous prototype for function 'anti_rt_regex_first' [-Wmissing-prototypes]
+  441 | int64_t anti_rt_regex_first(const void *pattern, const unsigned char *s,
+      |         ^
+src/rt/patterns.c:441:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  441 | int64_t anti_rt_regex_first(const void *pattern, const unsigned char *s,
+      | ^
+      | static 
+src/rt/patterns.c:461:9: warning: no previous prototype for function 'anti_rt_regex_test' [-Wmissing-prototypes]
+  461 | int64_t anti_rt_regex_test(const void *pattern, const unsigned char *s,
+      |         ^
+src/rt/patterns.c:461:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  461 | int64_t anti_rt_regex_test(const void *pattern, const unsigned char *s,
+      | ^
+      | static 
+src/rt/patterns.c:541:9: warning: no previous prototype for function 'anti_rt_regex_group' [-Wmissing-prototypes]
+  541 | int64_t anti_rt_regex_group(const struct anti_match *m, int64_t n,
+      |         ^
+src/rt/patterns.c:541:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  541 | int64_t anti_rt_regex_group(const struct anti_match *m, int64_t n,
+      | ^
+      | static 
+src/rt/patterns.c:561:9: warning: no previous prototype for function 'anti_rt_regex_group_named' [-Wmissing-prototypes]
+  561 | int64_t anti_rt_regex_group_named(const struct anti_match *m,
+      |         ^
+src/rt/patterns.c:561:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  561 | int64_t anti_rt_regex_group_named(const struct anti_match *m,
+      | ^
+      | static 
+src/rt/patterns.c:579:9: warning: no previous prototype for function 'anti_rt_regex_template_fits' [-Wmissing-prototypes]
+  579 | int64_t anti_rt_regex_template_fits(const void *pattern,
+      |         ^
+src/rt/patterns.c:579:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  579 | int64_t anti_rt_regex_template_fits(const void *pattern,
+      | ^
+      | static 
+src/rt/patterns.c:665:9: warning: no previous prototype for function 'anti_rt_regex_replace' [-Wmissing-prototypes]
+  665 | int64_t anti_rt_regex_replace(const void *pattern, const unsigned char *s,
+      |         ^
+src/rt/patterns.c:665:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  665 | int64_t anti_rt_regex_replace(const void *pattern, const unsigned char *s,
+      | ^
+      | static 
+src/rt/patterns.c:713:9: warning: no previous prototype for function 'anti_rt_regex_patch' [-Wmissing-prototypes]
+  713 | int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
+      |         ^
+src/rt/patterns.c:713:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  713 | int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
+      | ^
+      | static 
+src/rt/patterns.c:792:9: warning: no previous prototype for function 'anti_rt_bytes_patch' [-Wmissing-prototypes]
+  792 | int64_t anti_rt_bytes_patch(unsigned char *data, int64_t length,
+      |         ^
+src/rt/patterns.c:792:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  792 | int64_t anti_rt_bytes_patch(unsigned char *data, int64_t length,
+      | ^
+      | static 
+src/rt/patterns.c:833:6: warning: no previous prototype for function 'anti_rt_regex_append' [-Wmissing-prototypes]
+  833 | void anti_rt_regex_append(struct growing *g, const unsigned char *bytes,
+      |      ^
+src/rt/patterns.c:833:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  833 | void anti_rt_regex_append(struct growing *g, const unsigned char *bytes,
+      | ^
+      | static 
+src/rt/patterns.c:840:18: warning: no previous prototype for function 'anti_rt_regex_take' [-Wmissing-prototypes]
+  840 | struct anti_text anti_rt_regex_take(struct growing *g)
+      |                  ^
+src/rt/patterns.c:840:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  840 | struct anti_text anti_rt_regex_take(struct growing *g)
+      | ^
+      | static 
+src/rt/patterns.c:855:16: warning: no previous prototype for function 'anti_rt_regex_stop_limit' [-Wmissing-prototypes]
+  855 | _Noreturn void anti_rt_regex_stop_limit(const unsigned char *file,
+      |                ^
+src/rt/patterns.c:855:11: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  855 | _Noreturn void anti_rt_regex_stop_limit(const unsigned char *file,
+      |           ^
+      |           static 
+src/rt/patterns.c:871:16: warning: no previous prototype for function 'anti_rt_regex_stop_group' [-Wmissing-prototypes]
+  871 | _Noreturn void anti_rt_regex_stop_group(const unsigned char *file,
+      |                ^
+src/rt/patterns.c:871:11: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  871 | _Noreturn void anti_rt_regex_stop_group(const unsigned char *file,
+      |           ^
+      |           static 
+src/rt/patterns.c:884:16: warning: no previous prototype for function 'anti_rt_regex_stop_name' [-Wmissing-prototypes]
+  884 | _Noreturn void anti_rt_regex_stop_name(const unsigned char *file,
+      |                ^
+src/rt/patterns.c:884:11: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  884 | _Noreturn void anti_rt_regex_stop_name(const unsigned char *file,
+      |           ^
+      |           static 
+src/rt/patterns.c:894:16: warning: no previous prototype for function 'anti_rt_regex_stop_template' [-Wmissing-prototypes]
+  894 | _Noreturn void anti_rt_regex_stop_template(const unsigned char *file,
+      |                ^
+src/rt/patterns.c:894:11: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  894 | _Noreturn void anti_rt_regex_stop_template(const unsigned char *file,
+      |           ^
+      |           static 
+src/rt/patterns.c:912:9: warning: no previous prototype for function 'anti_rt_regex_first_bytes' [-Wmissing-prototypes]
+  912 | int64_t anti_rt_regex_first_bytes(const void *pattern, const unsigned char *s,
+      |         ^
+src/rt/patterns.c:912:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  912 | int64_t anti_rt_regex_first_bytes(const void *pattern, const unsigned char *s,
+      | ^
+      | static 
+src/rt/patterns.c:919:9: warning: no previous prototype for function 'anti_rt_regex_next_bytes' [-Wmissing-prototypes]
+  919 | int64_t anti_rt_regex_next_bytes(struct anti_cursor *c,
+      |         ^
+src/rt/patterns.c:919:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  919 | int64_t anti_rt_regex_next_bytes(struct anti_cursor *c,
+      | ^
+      | static 
+src/rt/patterns.c:925:20: warning: no previous prototype for function 'anti_rt_regex_current_bytes' [-Wmissing-prototypes]
+  925 | struct anti_match *anti_rt_regex_current_bytes(
+      |                    ^
+src/rt/patterns.c:925:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  925 | struct anti_match *anti_rt_regex_current_bytes(
+      | ^
+      | static 
+src/rt/patterns.c:931:9: warning: no previous prototype for function 'anti_rt_regex_group_bytes' [-Wmissing-prototypes]
+  931 | int64_t anti_rt_regex_group_bytes(const struct anti_match *m, int64_t n,
+      |         ^
+src/rt/patterns.c:931:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  931 | int64_t anti_rt_regex_group_bytes(const struct anti_match *m, int64_t n,
+      | ^
+      | static 
+src/rt/patterns.c:937:9: warning: no previous prototype for function 'anti_rt_regex_group_named_bytes' [-Wmissing-prototypes]
+  937 | int64_t anti_rt_regex_group_named_bytes(const struct anti_match *m,
+      |         ^
+src/rt/patterns.c:937:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  937 | int64_t anti_rt_regex_group_named_bytes(const struct anti_match *m,
+      | ^
+      | static 
+src/rt/patterns.c:944:9: warning: no previous prototype for function 'anti_rt_regex_replace_bytes' [-Wmissing-prototypes]
+  944 | int64_t anti_rt_regex_replace_bytes(const void *pattern,
+      |         ^
+src/rt/patterns.c:944:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  944 | int64_t anti_rt_regex_replace_bytes(const void *pattern,
+      | ^
+      | static 
+src/rt/patterns.c:954:18: warning: no previous prototype for function 'anti_rt_regex_take_bytes' [-Wmissing-prototypes]
+  954 | struct anti_text anti_rt_regex_take_bytes(struct growing *g)
+      |                  ^
+src/rt/patterns.c:954:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  954 | struct anti_text anti_rt_regex_take_bytes(struct growing *g)
+      | ^
+      | static 
+27 warnings generated.
+### rt-macos-arm64_armv8.5-glue src/rt/regex.c
+### rt-linux-x86_64_v3-glue src/rt/patterns.c
+src/rt/patterns.c:33:7: warning: no previous prototype for function 'anti_rt_regex_literal' [-Wmissing-prototypes]
+   33 | void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length)
+      |       ^
+src/rt/patterns.c:33:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   33 | void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length)
+      | ^
+      | static 
+src/rt/patterns.c:53:7: warning: no previous prototype for function 'anti_rt_regex_literal_bytes' [-Wmissing-prototypes]
+   53 | void *anti_rt_regex_literal_bytes(const unsigned char *bytes, int64_t length)
+      |       ^
+src/rt/patterns.c:53:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   53 | void *anti_rt_regex_literal_bytes(const unsigned char *bytes, int64_t length)
+      | ^
+      | static 
+src/rt/patterns.c:82:18: warning: no previous prototype for function 'anti_rt_regex_message' [-Wmissing-prototypes]
+   82 | struct anti_text anti_rt_regex_message(int32_t code)
+      |                  ^
+src/rt/patterns.c:82:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   82 | struct anti_text anti_rt_regex_message(int32_t code)
+      | ^
+      | static 
+src/rt/patterns.c:358:9: warning: no previous prototype for function 'anti_rt_regex_begin' [-Wmissing-prototypes]
+  358 | int64_t anti_rt_regex_begin(struct anti_cursor *c, const void *pattern,
+      |         ^
+src/rt/patterns.c:358:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  358 | int64_t anti_rt_regex_begin(struct anti_cursor *c, const void *pattern,
+      | ^
+      | static 
+src/rt/patterns.c:410:9: warning: no previous prototype for function 'anti_rt_regex_next' [-Wmissing-prototypes]
+  410 | int64_t anti_rt_regex_next(struct anti_cursor *c,
+      |         ^
+src/rt/patterns.c:410:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  410 | int64_t anti_rt_regex_next(struct anti_cursor *c,
+      | ^
+      | static 
+src/rt/patterns.c:427:20: warning: no previous prototype for function 'anti_rt_regex_current' [-Wmissing-prototypes]
+  427 | struct anti_match *anti_rt_regex_current(struct anti_maybe_match *current)
+      |                    ^
+src/rt/patterns.c:427:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  427 | struct anti_match *anti_rt_regex_current(struct anti_maybe_match *current)
+      | ^
+      | static 
+src/rt/patterns.c:441:9: warning: no previous prototype for function 'anti_rt_regex_first' [-Wmissing-prototypes]
+  441 | int64_t anti_rt_regex_first(const void *pattern, const unsigned char *s,
+      |         ^
+src/rt/patterns.c:441:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  441 | int64_t anti_rt_regex_first(const void *pattern, const unsigned char *s,
+      | ^
+      | static 
+src/rt/patterns.c:461:9: warning: no previous prototype for function 'anti_rt_regex_test' [-Wmissing-prototypes]
+  461 | int64_t anti_rt_regex_test(const void *pattern, const unsigned char *s,
+      |         ^
+src/rt/patterns.c:461:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  461 | int64_t anti_rt_regex_test(const void *pattern, const unsigned char *s,
+      | ^
+      | static 
+src/rt/patterns.c:541:9: warning: no previous prototype for function 'anti_rt_regex_group' [-Wmissing-prototypes]
+  541 | int64_t anti_rt_regex_group(const struct anti_match *m, int64_t n,
+      |         ^
+src/rt/patterns.c:541:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  541 | int64_t anti_rt_regex_group(const struct anti_match *m, int64_t n,
+      | ^
+      | static 
+src/rt/patterns.c:561:9: warning: no previous prototype for function 'anti_rt_regex_group_named' [-Wmissing-prototypes]
+  561 | int64_t anti_rt_regex_group_named(const struct anti_match *m,
+      |         ^
+src/rt/patterns.c:561:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  561 | int64_t anti_rt_regex_group_named(const struct anti_match *m,
+      | ^
+      | static 
+src/rt/patterns.c:579:9: warning: no previous prototype for function 'anti_rt_regex_template_fits' [-Wmissing-prototypes]
+  579 | int64_t anti_rt_regex_template_fits(const void *pattern,
+      |         ^
+src/rt/patterns.c:579:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  579 | int64_t anti_rt_regex_template_fits(const void *pattern,
+      | ^
+      | static 
+src/rt/patterns.c:665:9: warning: no previous prototype for function 'anti_rt_regex_replace' [-Wmissing-prototypes]
+  665 | int64_t anti_rt_regex_replace(const void *pattern, const unsigned char *s,
+      |         ^
+src/rt/patterns.c:665:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  665 | int64_t anti_rt_regex_replace(const void *pattern, const unsigned char *s,
+      | ^
+      | static 
+src/rt/patterns.c:713:9: warning: no previous prototype for function 'anti_rt_regex_patch' [-Wmissing-prototypes]
+  713 | int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
+      |         ^
+src/rt/patterns.c:713:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  713 | int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
+      | ^
+      | static 
+src/rt/patterns.c:792:9: warning: no previous prototype for function 'anti_rt_bytes_patch' [-Wmissing-prototypes]
+  792 | int64_t anti_rt_bytes_patch(unsigned char *data, int64_t length,
+      |         ^
+src/rt/patterns.c:792:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  792 | int64_t anti_rt_bytes_patch(unsigned char *data, int64_t length,
+      | ^
+      | static 
+src/rt/patterns.c:833:6: warning: no previous prototype for function 'anti_rt_regex_append' [-Wmissing-prototypes]
+  833 | void anti_rt_regex_append(struct growing *g, const unsigned char *bytes,
+      |      ^
+src/rt/patterns.c:833:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  833 | void anti_rt_regex_append(struct growing *g, const unsigned char *bytes,
+      | ^
+      | static 
+src/rt/patterns.c:840:18: warning: no previous prototype for function 'anti_rt_regex_take' [-Wmissing-prototypes]
+  840 | struct anti_text anti_rt_regex_take(struct growing *g)
+      |                  ^
+src/rt/patterns.c:840:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  840 | struct anti_text anti_rt_regex_take(struct growing *g)
+      | ^
+      | static 
+src/rt/patterns.c:855:16: warning: no previous prototype for function 'anti_rt_regex_stop_limit' [-Wmissing-prototypes]
+  855 | _Noreturn void anti_rt_regex_stop_limit(const unsigned char *file,
+      |                ^
+src/rt/patterns.c:855:11: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  855 | _Noreturn void anti_rt_regex_stop_limit(const unsigned char *file,
+      |           ^
+      |           static 
+src/rt/patterns.c:871:16: warning: no previous prototype for function 'anti_rt_regex_stop_group' [-Wmissing-prototypes]
+  871 | _Noreturn void anti_rt_regex_stop_group(const unsigned char *file,
+      |                ^
+src/rt/patterns.c:871:11: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  871 | _Noreturn void anti_rt_regex_stop_group(const unsigned char *file,
+      |           ^
+      |           static 
+src/rt/patterns.c:884:16: warning: no previous prototype for function 'anti_rt_regex_stop_name' [-Wmissing-prototypes]
+  884 | _Noreturn void anti_rt_regex_stop_name(const unsigned char *file,
+      |                ^
+src/rt/patterns.c:884:11: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  884 | _Noreturn void anti_rt_regex_stop_name(const unsigned char *file,
+      |           ^
+      |           static 
+src/rt/patterns.c:894:16: warning: no previous prototype for function 'anti_rt_regex_stop_template' [-Wmissing-prototypes]
+  894 | _Noreturn void anti_rt_regex_stop_template(const unsigned char *file,
+      |                ^
+src/rt/patterns.c:894:11: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  894 | _Noreturn void anti_rt_regex_stop_template(const unsigned char *file,
+      |           ^
+      |           static 
+src/rt/patterns.c:912:9: warning: no previous prototype for function 'anti_rt_regex_first_bytes' [-Wmissing-prototypes]
+  912 | int64_t anti_rt_regex_first_bytes(const void *pattern, const unsigned char *s,
+      |         ^
+src/rt/patterns.c:912:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  912 | int64_t anti_rt_regex_first_bytes(const void *pattern, const unsigned char *s,
+      | ^
+      | static 
+src/rt/patterns.c:919:9: warning: no previous prototype for function 'anti_rt_regex_next_bytes' [-Wmissing-prototypes]
+  919 | int64_t anti_rt_regex_next_bytes(struct anti_cursor *c,
+      |         ^
+src/rt/patterns.c:919:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  919 | int64_t anti_rt_regex_next_bytes(struct anti_cursor *c,
+      | ^
+      | static 
+src/rt/patterns.c:925:20: warning: no previous prototype for function 'anti_rt_regex_current_bytes' [-Wmissing-prototypes]
+  925 | struct anti_match *anti_rt_regex_current_bytes(
+      |                    ^
+src/rt/patterns.c:925:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  925 | struct anti_match *anti_rt_regex_current_bytes(
+      | ^
+      | static 
+src/rt/patterns.c:931:9: warning: no previous prototype for function 'anti_rt_regex_group_bytes' [-Wmissing-prototypes]
+  931 | int64_t anti_rt_regex_group_bytes(const struct anti_match *m, int64_t n,
+      |         ^
+src/rt/patterns.c:931:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  931 | int64_t anti_rt_regex_group_bytes(const struct anti_match *m, int64_t n,
+      | ^
+      | static 
+src/rt/patterns.c:937:9: warning: no previous prototype for function 'anti_rt_regex_group_named_bytes' [-Wmissing-prototypes]
+  937 | int64_t anti_rt_regex_group_named_bytes(const struct anti_match *m,
+      |         ^
+src/rt/patterns.c:937:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  937 | int64_t anti_rt_regex_group_named_bytes(const struct anti_match *m,
+      | ^
+      | static 
+src/rt/patterns.c:944:9: warning: no previous prototype for function 'anti_rt_regex_replace_bytes' [-Wmissing-prototypes]
+  944 | int64_t anti_rt_regex_replace_bytes(const void *pattern,
+      |         ^
+src/rt/patterns.c:944:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  944 | int64_t anti_rt_regex_replace_bytes(const void *pattern,
+      | ^
+      | static 
+src/rt/patterns.c:954:18: warning: no previous prototype for function 'anti_rt_regex_take_bytes' [-Wmissing-prototypes]
+  954 | struct anti_text anti_rt_regex_take_bytes(struct growing *g)
+      |                  ^
+src/rt/patterns.c:954:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  954 | struct anti_text anti_rt_regex_take_bytes(struct growing *g)
+      | ^
+      | static 
+27 warnings generated.
+### rt-linux-x86_64_v3-glue src/rt/regex.c
+### rt-windows-x86_64_v3-glue src/rt/patterns.c
+src/rt/patterns.c:33:7: warning: no previous prototype for function 'anti_rt_regex_literal' [-Wmissing-prototypes]
+   33 | void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length)
+      |       ^
+src/rt/patterns.c:33:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   33 | void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length)
+      | ^
+      | static 
+src/rt/patterns.c:53:7: warning: no previous prototype for function 'anti_rt_regex_literal_bytes' [-Wmissing-prototypes]
+   53 | void *anti_rt_regex_literal_bytes(const unsigned char *bytes, int64_t length)
+      |       ^
+src/rt/patterns.c:53:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   53 | void *anti_rt_regex_literal_bytes(const unsigned char *bytes, int64_t length)
+      | ^
+      | static 
+src/rt/patterns.c:82:18: warning: no previous prototype for function 'anti_rt_regex_message' [-Wmissing-prototypes]
+   82 | struct anti_text anti_rt_regex_message(int32_t code)
+      |                  ^
+src/rt/patterns.c:82:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+   82 | struct anti_text anti_rt_regex_message(int32_t code)
+      | ^
+      | static 
+src/rt/patterns.c:358:9: warning: no previous prototype for function 'anti_rt_regex_begin' [-Wmissing-prototypes]
+  358 | int64_t anti_rt_regex_begin(struct anti_cursor *c, const void *pattern,
+      |         ^
+src/rt/patterns.c:358:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  358 | int64_t anti_rt_regex_begin(struct anti_cursor *c, const void *pattern,
+      | ^
+      | static 
+src/rt/patterns.c:410:9: warning: no previous prototype for function 'anti_rt_regex_next' [-Wmissing-prototypes]
+  410 | int64_t anti_rt_regex_next(struct anti_cursor *c,
+      |         ^
+src/rt/patterns.c:410:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  410 | int64_t anti_rt_regex_next(struct anti_cursor *c,
+      | ^
+      | static 
+src/rt/patterns.c:427:20: warning: no previous prototype for function 'anti_rt_regex_current' [-Wmissing-prototypes]
+  427 | struct anti_match *anti_rt_regex_current(struct anti_maybe_match *current)
+      |                    ^
+src/rt/patterns.c:427:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  427 | struct anti_match *anti_rt_regex_current(struct anti_maybe_match *current)
+      | ^
+      | static 
+src/rt/patterns.c:441:9: warning: no previous prototype for function 'anti_rt_regex_first' [-Wmissing-prototypes]
+  441 | int64_t anti_rt_regex_first(const void *pattern, const unsigned char *s,
+      |         ^
+src/rt/patterns.c:441:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  441 | int64_t anti_rt_regex_first(const void *pattern, const unsigned char *s,
+      | ^
+      | static 
+src/rt/patterns.c:461:9: warning: no previous prototype for function 'anti_rt_regex_test' [-Wmissing-prototypes]
+  461 | int64_t anti_rt_regex_test(const void *pattern, const unsigned char *s,
+      |         ^
+src/rt/patterns.c:461:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  461 | int64_t anti_rt_regex_test(const void *pattern, const unsigned char *s,
+      | ^
+      | static 
+src/rt/patterns.c:541:9: warning: no previous prototype for function 'anti_rt_regex_group' [-Wmissing-prototypes]
+  541 | int64_t anti_rt_regex_group(const struct anti_match *m, int64_t n,
+      |         ^
+src/rt/patterns.c:541:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  541 | int64_t anti_rt_regex_group(const struct anti_match *m, int64_t n,
+      | ^
+      | static 
+src/rt/patterns.c:561:9: warning: no previous prototype for function 'anti_rt_regex_group_named' [-Wmissing-prototypes]
+  561 | int64_t anti_rt_regex_group_named(const struct anti_match *m,
+      |         ^
+src/rt/patterns.c:561:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  561 | int64_t anti_rt_regex_group_named(const struct anti_match *m,
+      | ^
+      | static 
+src/rt/patterns.c:579:9: warning: no previous prototype for function 'anti_rt_regex_template_fits' [-Wmissing-prototypes]
+  579 | int64_t anti_rt_regex_template_fits(const void *pattern,
+      |         ^
+src/rt/patterns.c:579:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  579 | int64_t anti_rt_regex_template_fits(const void *pattern,
+      | ^
+      | static 
+src/rt/patterns.c:665:9: warning: no previous prototype for function 'anti_rt_regex_replace' [-Wmissing-prototypes]
+  665 | int64_t anti_rt_regex_replace(const void *pattern, const unsigned char *s,
+      |         ^
+src/rt/patterns.c:665:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  665 | int64_t anti_rt_regex_replace(const void *pattern, const unsigned char *s,
+      | ^
+      | static 
+src/rt/patterns.c:713:9: warning: no previous prototype for function 'anti_rt_regex_patch' [-Wmissing-prototypes]
+  713 | int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
+      |         ^
+src/rt/patterns.c:713:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  713 | int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
+      | ^
+      | static 
+src/rt/patterns.c:792:9: warning: no previous prototype for function 'anti_rt_bytes_patch' [-Wmissing-prototypes]
+  792 | int64_t anti_rt_bytes_patch(unsigned char *data, int64_t length,
+      |         ^
+src/rt/patterns.c:792:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  792 | int64_t anti_rt_bytes_patch(unsigned char *data, int64_t length,
+      | ^
+      | static 
+src/rt/patterns.c:833:6: warning: no previous prototype for function 'anti_rt_regex_append' [-Wmissing-prototypes]
+  833 | void anti_rt_regex_append(struct growing *g, const unsigned char *bytes,
+      |      ^
+src/rt/patterns.c:833:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  833 | void anti_rt_regex_append(struct growing *g, const unsigned char *bytes,
+      | ^
+      | static 
+src/rt/patterns.c:840:18: warning: no previous prototype for function 'anti_rt_regex_take' [-Wmissing-prototypes]
+  840 | struct anti_text anti_rt_regex_take(struct growing *g)
+      |                  ^
+src/rt/patterns.c:840:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  840 | struct anti_text anti_rt_regex_take(struct growing *g)
+      | ^
+      | static 
+src/rt/patterns.c:855:16: warning: no previous prototype for function 'anti_rt_regex_stop_limit' [-Wmissing-prototypes]
+  855 | _Noreturn void anti_rt_regex_stop_limit(const unsigned char *file,
+      |                ^
+src/rt/patterns.c:855:11: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  855 | _Noreturn void anti_rt_regex_stop_limit(const unsigned char *file,
+      |           ^
+      |           static 
+src/rt/patterns.c:871:16: warning: no previous prototype for function 'anti_rt_regex_stop_group' [-Wmissing-prototypes]
+  871 | _Noreturn void anti_rt_regex_stop_group(const unsigned char *file,
+      |                ^
+src/rt/patterns.c:871:11: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  871 | _Noreturn void anti_rt_regex_stop_group(const unsigned char *file,
+      |           ^
+      |           static 
+src/rt/patterns.c:884:16: warning: no previous prototype for function 'anti_rt_regex_stop_name' [-Wmissing-prototypes]
+  884 | _Noreturn void anti_rt_regex_stop_name(const unsigned char *file,
+      |                ^
+src/rt/patterns.c:884:11: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  884 | _Noreturn void anti_rt_regex_stop_name(const unsigned char *file,
+      |           ^
+      |           static 
+src/rt/patterns.c:894:16: warning: no previous prototype for function 'anti_rt_regex_stop_template' [-Wmissing-prototypes]
+  894 | _Noreturn void anti_rt_regex_stop_template(const unsigned char *file,
+      |                ^
+src/rt/patterns.c:894:11: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  894 | _Noreturn void anti_rt_regex_stop_template(const unsigned char *file,
+      |           ^
+      |           static 
+src/rt/patterns.c:912:9: warning: no previous prototype for function 'anti_rt_regex_first_bytes' [-Wmissing-prototypes]
+  912 | int64_t anti_rt_regex_first_bytes(const void *pattern, const unsigned char *s,
+      |         ^
+src/rt/patterns.c:912:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  912 | int64_t anti_rt_regex_first_bytes(const void *pattern, const unsigned char *s,
+      | ^
+      | static 
+src/rt/patterns.c:919:9: warning: no previous prototype for function 'anti_rt_regex_next_bytes' [-Wmissing-prototypes]
+  919 | int64_t anti_rt_regex_next_bytes(struct anti_cursor *c,
+      |         ^
+src/rt/patterns.c:919:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  919 | int64_t anti_rt_regex_next_bytes(struct anti_cursor *c,
+      | ^
+      | static 
+src/rt/patterns.c:925:20: warning: no previous prototype for function 'anti_rt_regex_current_bytes' [-Wmissing-prototypes]
+  925 | struct anti_match *anti_rt_regex_current_bytes(
+      |                    ^
+src/rt/patterns.c:925:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  925 | struct anti_match *anti_rt_regex_current_bytes(
+      | ^
+      | static 
+src/rt/patterns.c:931:9: warning: no previous prototype for function 'anti_rt_regex_group_bytes' [-Wmissing-prototypes]
+  931 | int64_t anti_rt_regex_group_bytes(const struct anti_match *m, int64_t n,
+      |         ^
+src/rt/patterns.c:931:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  931 | int64_t anti_rt_regex_group_bytes(const struct anti_match *m, int64_t n,
+      | ^
+      | static 
+src/rt/patterns.c:937:9: warning: no previous prototype for function 'anti_rt_regex_group_named_bytes' [-Wmissing-prototypes]
+  937 | int64_t anti_rt_regex_group_named_bytes(const struct anti_match *m,
+      |         ^
+src/rt/patterns.c:937:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  937 | int64_t anti_rt_regex_group_named_bytes(const struct anti_match *m,
+      | ^
+      | static 
+src/rt/patterns.c:944:9: warning: no previous prototype for function 'anti_rt_regex_replace_bytes' [-Wmissing-prototypes]
+  944 | int64_t anti_rt_regex_replace_bytes(const void *pattern,
+      |         ^
+src/rt/patterns.c:944:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  944 | int64_t anti_rt_regex_replace_bytes(const void *pattern,
+      | ^
+      | static 
+src/rt/patterns.c:954:18: warning: no previous prototype for function 'anti_rt_regex_take_bytes' [-Wmissing-prototypes]
+  954 | struct anti_text anti_rt_regex_take_bytes(struct growing *g)
+      |                  ^
+src/rt/patterns.c:954:1: note: declare 'static' if the function is not intended to be used outside of this translation unit
+  954 | struct anti_text anti_rt_regex_take_bytes(struct growing *g)
+      | ^
+      | static 
+27 warnings generated.
+### rt-windows-x86_64_v3-glue src/rt/regex.c

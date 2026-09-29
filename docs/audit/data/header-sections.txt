@@ -1,0 +1,39 @@
+# The shared headers of the checker and of lowering group their
+# declarations under a comment naming a file, as /* sema_call.c */.
+# Each line is a declaration whose function that file does not define.
+src/antic/sema_checker.h:266 sema_member_type_in under sema_expr.c, defined in src/antic/sema_generic.c:1332
+src/antic/sema_checker.h:272 sema_shared_name under sema_expr.c, defined in src/antic/sema.c:2223
+src/antic/sema_checker.h:312 sema_meets_param under sema_call.c, defined in src/antic/sema_generic.c:684
+src/antic/sema_checker.h:316 sema_class_hash_operator under sema_call.c, defined in src/antic/sema_expr.c:1769
+src/antic/sema_checker.h:318 sema_class_eq_operator under sema_call.c, defined in src/antic/sema_expr.c:1780
+src/antic/sema_checker.h:376 sema_place_name under sema_stmt.c, defined in src/antic/sema_call.c:1243
+src/antic/sema_checker.h:377 sema_move_local under sema_stmt.c, defined in src/antic/sema_call.c:1292
+src/antic/sema_checker.h:389 sema_literal_moves under sema_stmt.c, defined in src/antic/sema_expr.c:452
+src/antic/sema_checker.h:393 sema_holds_param under sema_stmt.c, defined in src/antic/sema_expr.c:391
+src/antic/sema_checker.h:397 sema_refuse_caller_value under sema_stmt.c, defined in src/antic/sema_expr.c:426
+src/antic/sema_checker.h:398 sema_move_into_literal under sema_stmt.c, defined in src/antic/sema_expr.c:474
+src/antic/sema_checker.h:427 sema_capture under sema_safety.c, defined in src/antic/sema_stmt.c:3129
+src/antic/sema_checker.h:428 sema_note_write under sema_safety.c, defined in src/antic/sema_stmt.c:3167
+src/antic/sema_checker.h:429 sema_note_call under sema_safety.c, defined in src/antic/sema_stmt.c:3186
+src/antic/sema_checker.h:430 sema_refuse_worker_closure under sema_safety.c, defined in src/antic/sema_stmt.c:3209
+src/antic/sema_checker.h:432 sema_check_anonymous under sema_safety.c, defined in src/antic/sema_stmt.c:3410
+src/antic/sema_checker.h:434 sema_check_function under sema_safety.c, defined in src/antic/sema_stmt.c:2988
+src/antic/sema_checker.h:435 sema_check_main under sema_safety.c, defined in src/antic/sema_stmt.c:3492
+src/antic/sema_checker.h:436 sema_check_test_block under sema_safety.c, defined in src/antic/sema_stmt.c:3515
+src/antic/sema_checker.h:523 sema_set_index under sema_copies.c, defined in src/antic/sema_stmt.c:933
+src/antic/sema_checker.h:553 sema_module_operator under sema_hash.c, defined in src/antic/sema_expr.c:1301
+src/antic/lower_lowerer.h:310 lower_hold_lock under lower.c, defined in src/antic/lower_stmt.c:166
+src/antic/lower_lowerer.h:312 lower_object_lock_call under lower.c, defined in src/antic/lower_stmt.c:192
+src/antic/lower_lowerer.h:313 lower_object_unlock_call under lower.c, defined in src/antic/lower_stmt.c:207
+src/antic/lower_lowerer.h:314 lower_lock_pair_call under lower.c, defined in src/antic/lower_stmt.c:219
+src/antic/lower_lowerer.h:316 lower_unlock_pair_call under lower.c, defined in src/antic/lower_stmt.c:237
+src/antic/lower_lowerer.h:377 lower_copy_parts under lower.c, defined in src/antic/lower_expr.c:420
+src/antic/lower_lowerer.h:467 lower_pattern under lower_expr.c, defined in src/antic/lower.c:1515
+src/antic/lower_lowerer.h:543 lower_destroy_owned under lower_stmt.c, defined in src/antic/lower.c:2477
+src/antic/lower_lowerer.h:549 lower_copy_owned under lower_stmt.c, defined in src/antic/lower.c:2590
+src/antic/lower_lowerer.h:554 lower_clear_owned under lower_stmt.c, defined in src/antic/lower.c:2546
+src/antic/lower_lowerer.h:557 lower_copies_parts under lower_stmt.c, defined in src/antic/lower.c:2653
+src/antic/lower_lowerer.h:578 lower_handled_operand under lower_stmt.c, defined in src/antic/lower_expr.c:643
+src/antic/lower_lowerer.h:584 lower_drop_arguments under lower_stmt.c, defined in src/antic/lower_expr.c:2156
+src/antic/lower_lowerer.h:603 lower_defines under lower_stmt.c, defined in src/antic/lower_desc.c:281
+# 35 of 346 declarations under a section stand under the wrong file

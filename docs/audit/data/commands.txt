@@ -1,0 +1,69 @@
+Tool pass of the second audit, run on 2026-09-29 at 70e8860 on macOS arm64.
+Compiler: build/deps/clang/bin/clang, the pinned clang 23.1.1.
+Paths are relative to the checkout. No build file was changed. The scratch
+scripts and objects stand in build/audit/2026-09-29/ and are not committed.
+
+Compile lines: every line is the one the host build runs, read from
+build/host/CMakeFiles/<target>.dir/flags.make for the host targets and
+from the build.make of each runtime target, with -Werror removed.
+  host-antic_core  src/antic/*.c except main.c, and src/rt/digest.c,
+                   regex.c and utf.c, which antic compiles
+  host-antic       src/antic/main.c
+  host-anti        src/anti/*.c, and src/rt/json.c, symbols.c and toml.c
+  rt-macos-arm64_armv8.5, rt-linux-x86_64_v3, rt-windows-x86_64_v3
+                   every file of anti_rt for three targets, so each
+                   platform branch is read
+  rt-<target>-glue src/rt/regex.c and patterns.c as src/native/pcre2.cmake
+                   compiles them into anti_rt_regex, the glue of PCRE2.
+                   src/native/ holds no C file of its own; its recipes
+                   compile these two runtime files beside the libraries.
+208 compile lines in all.
+
+analyzer.txt     <compile line> --analyze -Xanalyzer -analyzer-output=text
+                 <file> -o /dev/null, one "### <build> <file>" header each
+analyzer-unique.txt  every warning of analyzer.txt once, column dropped,
+                 with the number of builds that reported it
+analyzer-compared.txt  analyzer-unique.txt against the first audit's
+                 docs/audit/2026-09-23/data/analyzer-unique.txt: a warning
+                 matches one with the same text in the same file or a file
+                 split from it (sema*.c, lower*.c); line numbers moved
+warnings.txt     <compile line> -Wall -Wextra -Wconversion -Wshadow
+                 -Wcast-align -Wformat=2 -Wvla -Wstrict-prototypes
+                 -Wmissing-prototypes -Wnull-dereference -c <file>
+                 -o build/audit/2026-09-29/obj/<build>/<file>.o
+warnings-unique.txt  every warning of warnings.txt once, with its count
+warnings-compared.txt  the same comparison as analyzer-compared.txt
+banned-calls.txt grep -nE for strcpy, strcat, sprintf, vsprintf, gets,
+                 strncpy and every scanf form over src/rt, src/antic and
+                 src/anti, *.c and *.h
+function-metrics.txt  build/audit/metrics.py of the first audit, unchanged,
+                 over src/rt, src/antic and src/anti, *.c and *.h: per
+                 function the file:line of its signature, its name, its
+                 lines, its deepest nest of brace blocks without
+                 initializer braces, and its parameter count
+file-lengths.txt lines per file, from the same script
+thresholds.txt   the functions past 100 lines, a nest of 4 or 6 parameters,
+                 longest first
+thresholds-compared.txt  thresholds.txt against the first audit's list,
+                 each marked new or kept, and the functions that left it.
+                 Fourteen functions renamed since are matched by their old
+                 names, each checked in the source.
+file-lengths-compared.txt  the files past 3000 lines now and then
+include-graph.txt  every quoted #include of src/antic, src/anti and
+                 src/rt, resolved as the build resolves it, listed where
+                 the header belongs to another part. The parts of antic
+                 are named in the file's header.
+call-graph.txt   for sema*.c and for lower*.c, each non-static function of
+                 one file named before "(" in another, per pair, and a
+                 matrix of the call counts
+header-sections.txt  the declarations of sema_checker.h and
+                 lower_lowerer.h that stand under the comment of a file
+                 that does not define them
+duplication.txt  blocks of 10 or more significant lines that two files of
+                 src/antic, src/rt, src/anti and src/std share, exact or
+                 with names replaced; the header of the file gives the
+                 method
+platform-conditionals.txt  every #if on the host system outside the
+                 platform layer that rule 22 names
+probe-unit-break-cast.txt  a program the checker accepts that copies 8
+                 bytes out of a struct of 4, with its IR and output

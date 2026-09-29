@@ -1,0 +1,13 @@
+# Files past 3000 lines now or at the first audit, ab03345.
+# file lines-now lines-then status
+src/antic/parser.c 4340 2975 new
+src/antic/antl.c 3788 2733 new
+src/antic/sema_expr.c 3752 absent new
+src/antic/sema.c 3735 11491 kept
+src/antic/sema_call.c 3544 absent new
+src/antic/sema_stmt.c 3531 absent new
+src/antic/lower.c 3323 9026 kept
+src/antic/lower_expr.c 3199 absent new
+src/antic/driver.c 3017 2597 new
+src/antic/x86_64.c 2950 3005 gone
+# all files: 203 now with 116781 lines, 166 then with 84138 lines
