@@ -8,11 +8,11 @@ The session built Eddie's answer to the question of
 - An `operator fn` declared at module level reaches the private and
   protected fields and functions of the classes declared in its own module.
   An ordinary function of the module and an operator of another module reach
-  none. `from_module_operator` of `src/antic/sema_call.c` decides it beside
-  the rule of `tests` blocks.
+  none. `from_module_operator` of `src/antic/sema_call.c` decides it. It
+  stands beside the rule of `tests` blocks.
 - A closure inside the operator reaches what the operator reaches. A copy of
   a generic operator of a library keeps the module of the generic through its
-  home, so the copies another module makes reach the class as well.
+  home. The copies another module makes therefore reach the class as well.
 - `equal_entries` and `hash_entries` of `ConcurrentMap` are private again.
 - `docs/decisions.md`, the object model, the additions and the overview carry
   the rule in the same commit.
@@ -39,8 +39,8 @@ docs-style checker reports nothing on each changed `.md` file.
 
 ## Provisional decisions
 
-- The operator reaches protected members as well as private ones, a closure
-  inside it reaches the same, and a copy of a generic operator keeps the
+- The operator reaches protected members as well as private ones, and a
+  closure inside it reaches the same. A copy of a generic operator keeps the
   module of its generic.
 
 ## Questions
