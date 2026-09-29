@@ -28,8 +28,13 @@ step folds them into "Generics and collections" in `docs/decisions.md`.
 - `std_sync_pool` takes `get_versioned`, `remove_all`, `remove_first`,
   `remove_one` and `clear` through a `SyncPool` of an owning element, under the
   count of live blocks and allocations.
-- Not built: an `==` and a hash that compare the elements alone. The reason
-  stands under "Found" below.
+- `==` and the hash of each compare and hash its elements alone, as those of
+  its plain collection do. The module gives each class `operator fn eq` and
+  `operator fn hash` over pointers, which hold `sync a, b` or `sync a` while
+  they read. A version, the clock and the allocator are no part of the value,
+  and the hash equals that of the plain collection with the same elements.
+  `std_sync_equal` checks both, and compares both ways round on two threads
+  while a job writes every element back unchanged, in release and dev mode.
 
 ## Provisional
 
@@ -81,29 +86,35 @@ step folds them into "Generics and collections" in `docs/decisions.md`.
   each collection of the object into it. Reason: `dup` hands `copy` memory that
   nothing has written, and the bytes of the object hold its hidden lock as this
   thread holds it. The empty object gives the table and a free lock.
+- [provisional] The operators read through private functions of each class:
+  `equal_items` and `hash_items` of `SyncList` and `SyncSet`, and `held` of
+  `SyncMap` and `SyncPool`, which gives a pointer to the plain collection.
+  `SyncList` passes a comparison and a hash of `T` to its two, as
+  `ConcurrentMap` does. Reason: a field of a synchronized class is closed to
+  every function outside the class, a module operator included, while a
+  private function is open to it. A function of a class with type parameters
+  of its own, which could take `T: eq`, is not carried by a library file yet.
 - `push` and `set_if_version` of `SyncList` move `x` into the pair they
   store. An `own` parameter moves into a literal since `b9ea9c5`. The
   provisional copy of the first run is gone.
 
 ## Found
 
-- `==` of a class value hands the `operator fn eq` of its module a byte copy of
-  each operand, the hidden lock included. A lock that another thread holds at
-  that moment is copied as held, and the comparison waits on the copy forever.
-  An `operator fn eq` over pointers is refused by `==` and by the default `==`
-  of any class with such a field, and the table entry `equals` of a collection
-  is the default. The fix lies in `src/antic/`: `==` of a synchronized class
-  passes the address of each operand.
+- `==` of a class value handed the `operator fn eq` of its module a byte copy
+  of each operand, the hidden lock included. Main fixed it with `sync a, b`
+  and operators over pointers, which the four classes now use.
 - A public function of a synchronized class that returns a plain value where
   its result is a `?T` fails the verification of the IR, `copy i64 has an
   operand of type ptr`. The module returns such values through plain
   functions of the module, `copied`, `taken` and `versioned`.
-- The default `==` and hash of each class take every field, the lock aside,
-  as "Hashing and order" gives them. They compare the versions, the clock and
-  the allocator beside the elements, so two `SyncList` values that hold `[1]`
-  are unequal once one of them took a `push` and a `pop` before it. The
-  default also reads the fields without the hidden lock, while another thread
-  may change them.
+- The default `==` and hash of a synchronized class take every field but the
+  lock. For the four classes they would compare the versions, the clock and
+  the allocator beside the elements. The operators of the module replace them for the four
+  classes.
+- A dispatch of an object already in flight gives a job whose handle is
+  `none`, as "Threads" in `docs/anti-object-model.md` says, and `join` of it
+  gave 0 here. A test that dispatches two jobs on one object sees the second do
+  nothing, so `std_sync_equal` runs one comparison on the main thread.
 - The first run found that `take_place` and `get_versioned` of `Pool` freed an
   owning element twice. `b9ea9c5` on main fixed it in the compiler, and
   `SyncPool` needed no change.
