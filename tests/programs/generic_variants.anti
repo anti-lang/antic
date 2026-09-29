@@ -41,10 +41,10 @@ fn half(n: int) -> Result<int, str>
 
 fn value_or<T, E>(r: Result<T, E>, fallback: T) -> T
 {
-	let v = fallback;
+	let v = dup(fallback);
 	switch r {
 		Ok o => v = o.value,
-		Err e => v = fallback,
+		Err e => v = dup(fallback),
 	}
 	return v;
 }
@@ -56,7 +56,7 @@ fn wrap<T>(v: T) -> Result<T, int>
 
 fn sum<T: add>(t: *Tree<T>, zero: T) -> T
 {
-	let total = zero;
+	let total = dup(zero);
 	switch *t {
 		Leaf l => total = l.value,
 		Node n => {

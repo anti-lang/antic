@@ -74,7 +74,7 @@ class Stack<T>
 	pub fn walk(self, zero: T) -> T
 	{
 		let w = Walker { at: self.head };
-		let last = zero;
+		let last = dup(zero);
 		while w.more() do {
 			last = w.take(zero);
 		}
@@ -143,7 +143,7 @@ class Grid<T, N: int>
 	{
 		for i in 0..2 {
 			for j in 0..N {
-				self.rows[i].cells[j] = v;
+				self.rows[i].cells[j] = dup(v);
 			}
 		}
 	}

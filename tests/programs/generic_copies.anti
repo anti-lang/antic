@@ -53,7 +53,7 @@ class List<T>
 			free(self.items.ptr);
 			self.items = []T { ptr: grown, len: self.items.len * 2 + 4 };
 		}
-		self.items[self.count] = value;
+		self.items[self.count] = dup(value);
 		self.count = self.count + 1;
 	}
 
@@ -70,7 +70,7 @@ class List<T>
 
 fn sum<T: add>(items: *List<T>, zero: T) -> T
 {
-	let total = zero;
+	let total = dup(zero);
 	for i in 0..items.count {
 		total = total + items.get(i);
 	}
@@ -117,8 +117,8 @@ class Counter<T: add> inherits Source<T>
 
 	fn construct(self, start: T, step: T)
 	{
-		self.at = start;
-		self.step = step;
+		self.at = dup(start);
+		self.step = dup(step);
 	}
 
 	concrete fn next(self) -> T

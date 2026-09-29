@@ -389,6 +389,13 @@ bool sema_literal_moves(const struct expr *value);
    parameter, or a value that holds one in place. A pointer or a slice
    to one owns nothing. */
 bool sema_holds_param(const struct type *t);
+/* Refuse value when it names a parameter that is not `own` and whose
+   type holds a type parameter, and give whether it did. */
+bool sema_refuse_caller_value(struct checker *c, const struct expr *value);
+/* The refusal of `let` and `=` of an existing value: a parameter of a type
+   parameter that belongs to the caller, then an owning copy. */
+void sema_refuse_param_copy(struct checker *c, const struct expr *value,
+                            struct type *t);
 void sema_move_into_literal(struct checker *c, struct expr *value,
                             const char *literal);
 bool sema_holds_mutex(const struct type *t);

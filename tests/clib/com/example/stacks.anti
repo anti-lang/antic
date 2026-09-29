@@ -13,7 +13,7 @@ pub class Stack<T>
 	pub fn push(self, value: T)
 	{
 		if self.count < 8 {
-			self.items[self.count as int] = value;
+			self.items[self.count as int] = dup(value);
 			self.count = self.count + 1;
 		}
 	}

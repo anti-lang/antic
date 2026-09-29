@@ -57,7 +57,7 @@ pub class List<T>
 		if self.count == self.items.len {
 			self.grow();
 		}
-		self.items[self.count] = value;
+		self.items[self.count] = dup(value);
 		self.count = self.count + 1;
 	}
 
@@ -89,7 +89,7 @@ pub class List<T>
 /// The sum of a list.
 pub fn sum<T: add>(items: *List<T>, zero: T) -> T
 {
-	let total = zero;
+	let total = dup(zero);
 	for i in 0..items.count {
 		total = total + items.get(i);
 	}

@@ -1,0 +1,7 @@
+exit 0
+taken 1
+own: torn 1, leaves 0
+copied 2 2
+dup: torn 3, leaves 0
+plain 4 5
+plain: torn 3, leaves 0

@@ -19,7 +19,7 @@ class List<T>
 
 	pub fn push(self, v: T)
 	{
-		self.items[self.count] = v;
+		self.items[self.count] = dup(v);
 		self.count += 1;
 	}
 
@@ -35,7 +35,7 @@ class List<T>
 
 	operator fn set_index(self, i: int, v: T)
 	{
-		self.items[i] = v;
+		self.items[i] = dup(v);
 	}
 }
 
@@ -73,7 +73,7 @@ operator fn lt<T: add + lt>(a: Money<T>, b: Money<T>) -> bool
 
 fn total<T: add>(list: *List<T>, zero: T) -> T
 {
-	let sum = zero;
+	let sum = dup(zero);
 	for x in list {
 		sum = sum + x;
 	}

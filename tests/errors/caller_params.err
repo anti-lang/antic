@@ -1,0 +1,4 @@
+caller_params.anti:15:10: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
+caller_params.anti:21:6: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
+caller_params.anti:26:13: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
+caller_params.anti:32:10: error: `Key` has `own` fields, use `dup` instead of `=`

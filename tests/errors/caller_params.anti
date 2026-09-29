@@ -1,0 +1,45 @@
+//! A parameter that is not `own` belongs to the caller. In generic code `let`
+//! and `=` refuse one whose type is a type parameter, since the `T` of a copy
+//! may own something and a copy of its bytes would give it two owners. The
+//! message names both fixes: `own` to take it over, `dup` to copy. It extends
+//! the refusal of a parameter of an owning class type.
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Key = none,
+}
+
+fn by_let<T>(p: T)
+{
+	let a = p;
+}
+
+fn by_assign<T>(p: T, own q: T)
+{
+	let a = q;
+	a = p;
+}
+
+fn by_if_let<T>(p: ?T)
+{
+	if let a = p {
+	}
+}
+
+fn class_let(p: Key)
+{
+	let a = p;
+}
+
+fn fixed<T>(own p: T, q: T) -> (T, T)
+{
+	let a = p;
+	let b = dup(q);
+	return (a, b);
+}
+
+fn main() -> int
+{
+	return 0;
+}

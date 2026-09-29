@@ -16,7 +16,7 @@ class Box<T>
 		};
 		let i = 0;
 		while i < n do {
-			room[i] = fill;
+			room[i] = dup(fill);
 			i += 1;
 		}
 		return Box<T> { items: []T { ptr: room, len: n }, count: n };

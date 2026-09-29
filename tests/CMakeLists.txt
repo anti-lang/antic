@@ -559,7 +559,7 @@ add_test(NAME program_eq_compiled_no_reflect
 # the patterns of `for`.
 foreach(name IN ITEMS hash_builtin hash_default for_patterns lent_derived
         lent_tuples owning_values destroy_locals temporaries owning_destruct
-        statement_temps literal_moves variant_owning generic_moves)
+        statement_temps literal_moves variant_owning generic_moves caller_params)
     add_test(NAME program_${name}_dev
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -3463,6 +3463,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "literal_moves|-S,-o,${LISTINGS}/literal_moves.s,literal_moves.anti"
         "variant_owning|-S,-o,${LISTINGS}/variant_owning.s,variant_owning.anti"
         "generic_moves|-S,-o,${LISTINGS}/generic_moves.s,generic_moves.anti"
+        "caller_params|-S,-o,${LISTINGS}/caller_params.s,caller_params.anti"
         "collection_copy|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/collection_copy.s,collection_copy.anti"
         "lent_params|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/lent_params.s,lent_params.anti"
         "lent_slices|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/lent_slices.s,lent_slices.anti"

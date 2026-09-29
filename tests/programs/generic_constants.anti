@@ -28,7 +28,7 @@ class Ring<T, N: int>
 
 	pub fn push(self, v: T)
 	{
-		self.items[self.next] = v;
+		self.items[self.next] = dup(v);
 		self.next = (self.next + 1) % N;
 		if self.count < N {
 			self.count += 1;
@@ -53,7 +53,7 @@ struct Matrix<T, R: int, C: int>
 
 fn trace<T: add, R: int, C: int>(m: *Matrix<T, R, C>, zero: T) -> T
 {
-	let total = zero;
+	let total = dup(zero);
 	for i in 0..R {
 		if i < C {
 			total = total + m.cells[i][i];

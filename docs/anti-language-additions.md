@@ -980,6 +980,7 @@ abstract class Iterable<T> { ... }
 - A generic function may be `may fail`, with the usual two channels.
 - Function types, closures and snapshots may appear as type arguments: `List<fn(int) -> int>`. The rules of `keep` and `concurrent` apply as for any value of a function type.
 - Each copy of a generic class has its own descriptor, named with its arguments: `List<Person>`. Reflection and `type_name` give that name.
+- A parameter of a type parameter that is not `own` belongs to the caller, and `let` and `=` of it are refused for every `T`, since the `T` of a copy may own something. `own` on the parameter takes the value over, and `dup(p)` copies it.
 
 ### Libraries and C
 

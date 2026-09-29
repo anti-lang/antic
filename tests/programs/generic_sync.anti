@@ -17,7 +17,7 @@ synchronized class Tally<T: add>
 
 	fn construct(self, zero: T)
 	{
-		self.sum = zero;
+		self.sum = dup(zero);
 	}
 
 	pub fn add(self, n: T)
@@ -52,14 +52,14 @@ concurrent class Bag<T>
 
 	fn construct(self, first: T)
 	{
-		self.first = first;
-		self.last = first;
+		self.first = dup(first);
+		self.last = dup(first);
 	}
 
 	pub fn put(self, v: T)
 	{
 		sync self.lock {
-			self.last = v;
+			self.last = dup(v);
 		}
 		self.added.add(1);
 	}

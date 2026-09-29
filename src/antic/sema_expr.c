@@ -414,6 +414,32 @@ bool sema_holds_param(const struct type *t)
     }
 }
 
+/* DESIGN: a parameter that is not `own` belongs to the caller, so a copy
+   of its bytes would give what it owns two owners, the caller and the
+   place. In generic code `let` and `=` refuse one whose type holds a type
+   parameter, since the `T` of a copy may own something, whatever `T` is.
+   It extends the refusal of a parameter of an owning class type, which
+   `sema_refuse_owned_copy` gives. The message names both fixes: `own`
+   takes the value over, and `dup` copies it. Returns whether value was
+   refused. */
+bool sema_refuse_caller_value(struct checker *c, const struct expr *value)
+{
+    const struct symbol *sym =
+        value->kind == EXPR_NAME ? value->symbol : NULL;
+    const struct type *t = value->type;
+
+    if (sym == NULL || sym->kind != SYMBOL_PARAM || sym->own_param ||
+        sym->caught || t == NULL || sema_is_error(t) || t->kind == TYPE_FN ||
+        sema_type_owns(t) || !sema_holds_param(t)) {
+        return false;
+    }
+    sema_error_at(c, value->pos, "`%.*s` belongs to the caller and does not "
+                  "move. Mark it `own` to take it over, or copy it with "
+                  "`dup(%.*s)`", (int)sym->name.length, sym->name.text,
+                  (int)sym->name.length, sym->name.text);
+    return true;
+}
+
 /* DESIGN: an owning local named in a tuple literal, a struct literal, a
    class literal or the literal of a variant case moves into it, as into
    an `own` parameter. A copy would give what it owns two owners, the

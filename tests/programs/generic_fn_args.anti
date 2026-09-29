@@ -27,7 +27,7 @@ class Table<T>
 
 	pub fn push(self, v: T)
 	{
-		self.items[self.count] = v;
+		self.items[self.count] = dup(v);
 		self.count += 1;
 	}
 

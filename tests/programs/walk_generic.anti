@@ -20,7 +20,7 @@ class Stack<T>
 
 	pub fn push(self, v: T, at: lang.SourceLocation = here)
 	{
-		self.items[self.count] = v;
+		self.items[self.count] = dup(v);
 		self.count += 1;
 		self.changes.count += 1;
 		self.changes.at = at;
@@ -69,7 +69,7 @@ fn count_of<T>(s: *Stack<T>) -> int
 fn fill<T>(s: *Stack<T>, v: T)
 {
 	for x in &s {
-		*x = v;
+		*x = dup(v);
 	}
 }
 

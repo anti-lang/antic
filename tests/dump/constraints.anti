@@ -176,7 +176,7 @@ struct Slot<T>
 
 fn hold<T>(a: T, items: []T) -> Slot<T>
 {
-	let copy = a;
+	let copy = dup(a);
 	let other: T = items[0];
 	let bytes = size_of(T);
 	return Slot<T> { value: pass(other) };

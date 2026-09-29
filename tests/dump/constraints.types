@@ -460,7 +460,8 @@ function hold              fn(T, []T) -> Slot<T>
         type T
   block
     let_stmt copy          T
-      ident a              T
+      dup                  T
+        ident a            T
     let_stmt other         T
       type T
       index                T
