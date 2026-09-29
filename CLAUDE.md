@@ -387,8 +387,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1231 ctest tests pass on the development Mac and none is skipped. The ASan
-  and the UBSan builds run 1230 each, without the `no_paths` test, which needs a
+- 1260 ctest tests pass on the development Mac and none is skipped. The ASan
+  and the UBSan builds run 1259 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
@@ -437,7 +437,11 @@ reports what it finished.
   rest unless `unchecked` covers it. A public function of either gives out no
   pointer into the fields, `let n: atomic int = 0;` is an atomic local, and a
   worker takes a pointer to a thread-safe object. A dev build reports two
-  locks taken in opposite orders. See "Concurrent classes" in
+  locks taken in opposite orders. `sync a, b { }` takes two hidden locks in
+  the order of their addresses, and the default `==` and hash of a
+  synchronized class run under them. A concurrent class has no default `==`
+  or hash. `equals` of a class whose module gives it `operator fn eq` calls
+  it. See "Concurrent classes" in
   `docs/decisions.md` and `docs/notes/concurrent-classes.md`.
 - `anti.mem.Allocator` is built, with `alloc(size, align)` and `free(p)`, the
   default `LibcAllocator` over `src/rt/mem.c` and `ArenaAllocator` over blocks of
@@ -740,7 +744,7 @@ reports what it finished.
   source, which the test `anti_doc` checks. `--dev` and `--private` read the
   syntax tree for the private items and the `//#` notes and refuse a library
   file. The library file now carries the parameter names of a function of a
-  class body and the `worker` mark, and its format version is 72. See "The doc
+  class body and the `worker` mark, and its format version is 73. See "The doc
   command" in `docs/decisions.md` and `docs/notes/doc.md`.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops
