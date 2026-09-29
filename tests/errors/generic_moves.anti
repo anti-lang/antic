@@ -1,0 +1,39 @@
+//! In generic code a local of a type parameter moves on `let` and `=`, for
+//! every `T`, and naming it after the move is refused. `dup` is the copy.
+
+fn named_after<T>(own x: T) -> T
+{
+	let a = x;
+	let b = a;
+	let c = a;
+	return b;
+}
+
+fn assigned<T>(own x: T, own y: T) -> T
+{
+	let a = x;
+	let b = y;
+	b = a;
+	return a;
+}
+
+fn in_loop<T>(own x: T, n: int)
+{
+	let a = x;
+	for i in 0..n {
+		let b = a;
+	}
+}
+
+fn copied<T>(own x: T) -> T
+{
+	let a = x;
+	let b = dup(a);
+	let c = a;
+	return b;
+}
+
+fn main() -> int
+{
+	return named_after<int>(1);
+}

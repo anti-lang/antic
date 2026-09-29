@@ -1,0 +1,12 @@
+exit 0
+relet: torn 1, leaves 0
+relet back 2
+relet back: torn 2, leaves 0
+assign 4
+assign: torn 4, leaves 0
+pair 5 1
+pair: torn 5, leaves 0
+copied 6
+copied: torn 7, leaves 0
+plain 8 10 11
+plain: torn 7, leaves 0

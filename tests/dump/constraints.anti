@@ -145,7 +145,7 @@ fn count<C: iter>(c: C) -> int
 {
 	let n = 0;
 	for x in c {
-		let kept = x;
+		let kept = dup(x);
 		n = n + 1;
 	}
 	return n;

@@ -1,0 +1,3 @@
+generic_moves.anti:8:10: error: `a` was moved into `b`
+generic_moves.anti:17:9: error: `a` was moved into `b`
+generic_moves.anti:24:11: error: `a` moves into `b` inside a loop, which would move it again

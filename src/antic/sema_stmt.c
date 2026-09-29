@@ -768,15 +768,24 @@ bool sema_reads_existing(const struct expr *e)
    teardown twice, once for the parameter and once for the place. A value
    of a type parameter may own memory in a copy, so it moves as well. A
    function moves by the rules of a snapshot, which the conversion to
-   the place checks. into names the place. Returns whether value moved. */
+   the place checks. into names the place. Returns whether value moved.
+
+   DESIGN: in generic code a local of a type parameter, or of a value that
+   holds one in place, moves on `let` and `=` too, for every `T`. The
+   checker cannot know whether the `T` of a copy owns something, and the
+   copy for an owning `T` would otherwise give the value two owners. `dup`
+   is the copy. */
 static bool moves_own_param(struct checker *c, struct expr *value,
                             struct name into)
 {
     static const struct name no_name = {"", 0};
     struct symbol *sym = value->kind == EXPR_NAME ? value->symbol : NULL;
+    bool generic_local = sym != NULL && sym->kind == SYMBOL_LOCAL &&
+                         !sym->caught && value->type != NULL &&
+                         sema_holds_param(value->type);
 
-    if (sym == NULL || !sym->own_param || value->type == NULL ||
-        sema_is_error(value->type) ||
+    if (sym == NULL || !(sym->own_param || generic_local) ||
+        value->type == NULL || sema_is_error(value->type) ||
         value->type->kind == TYPE_FN ||
         !(sema_type_owns(value->type) || sema_needs_teardown(value->type) ||
           sema_has_params(value->type))) {

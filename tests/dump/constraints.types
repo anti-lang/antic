@@ -389,7 +389,8 @@ function count             fn(C) -> int
         ident c            C
       block
         let_stmt kept      C.value
-          ident x          C.value
+          dup              C.value
+            ident x        C.value
         simple_stmt =
           ident n          int
           additive +       int

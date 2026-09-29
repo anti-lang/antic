@@ -388,10 +388,7 @@ static void refuse_moved(struct checker *c, const struct expr *e,
     }
 }
 
-/* Whether a value of t may own something in a copy of a generic: a type
-   parameter, or a value that holds one in place. A pointer or a slice
-   to one owns nothing. */
-static bool holds_param(const struct type *t)
+bool sema_holds_param(const struct type *t)
 {
     size_t i;
 
@@ -400,10 +397,10 @@ static bool holds_param(const struct type *t)
         return true;
     case TYPE_ARRAY:
     case TYPE_OPTIONAL:
-        return holds_param(t->element);
+        return sema_holds_param(t->element);
     case TYPE_TUPLE:
         for (i = 0; i < t->param_count; i++) {
-            if (holds_param(t->params[i])) {
+            if (sema_holds_param(t->params[i])) {
                 return true;
             }
         }
@@ -439,7 +436,7 @@ bool sema_literal_moves(const struct expr *value)
     if (sema_type_owns(t) || sema_needs_teardown(t)) {
         return true;
     }
-    return holds_param(t) && (sym->kind == SYMBOL_LOCAL || sym->own_param);
+    return sema_holds_param(t) && (sym->kind == SYMBOL_LOCAL || sym->own_param);
 }
 
 /* DESIGN: the parts move once the literal has read every part, so a part

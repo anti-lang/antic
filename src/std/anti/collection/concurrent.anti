@@ -331,10 +331,13 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 	{
 		let n = 0;
 		let found: ?(K, V) = none;
+		// The closure writes through a pointer, so it captures no `found`,
+		// which then moves out.
+		let into = &found;
 		self.whole(fn() {
 			n = self.matches(test);
 			if n == 1 {
-				found = self.first_locked(test);
+				*into = self.first_locked(test);
 			}
 		});
 		let e = found else {
@@ -453,12 +456,15 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 	{
 		let n = 0;
 		let taken: ?(K, V) = none;
+		// The closure writes through a pointer, so it captures no `taken`,
+		// which then moves out.
+		let into = &taken;
 		self.whole(fn() {
 			n = self.matches(test);
 			let i = 0;
 			while n == 1 && i < PARTS do {
 				if let e = self.remove_in(self.part(i), test) {
-					taken = e;
+					*into = e;
 					return;
 				}
 				i += 1;

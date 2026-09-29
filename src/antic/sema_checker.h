@@ -385,6 +385,10 @@ void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
    it, and the move of such a part once the literal has read every part.
    literal names the type of the literal. */
 bool sema_literal_moves(const struct expr *value);
+/* Whether a value of t may own something in a copy of a generic: a type
+   parameter, or a value that holds one in place. A pointer or a slice
+   to one owns nothing. */
+bool sema_holds_param(const struct type *t);
 void sema_move_into_literal(struct checker *c, struct expr *value,
                             const char *literal);
 bool sema_holds_mutex(const struct type *t);
