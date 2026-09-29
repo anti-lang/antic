@@ -66,3 +66,18 @@ The docs-style checker reports nothing on every file this step touched,
 
 Nothing in the tree. Each sanitizer suite ran past the ten minutes of a tool
 call. The session waited for its log to report the end before the next step.
+
+## Proof of the push
+
+After the push of `15049f2`:
+
+```text
+$ git log --oneline -3
+15049f2 Report the merge of the thread-safe collection lanes
+e6ceb15 Fold the decisions of the thread-safe collections into docs/decisions.md
+c6db336 Record the equality of the synchronized collections and report the step
+$ git status --short
+$ git rev-parse HEAD origin/main
+15049f25ec6c540fd17114b7c5ddd89096b036eb
+15049f25ec6c540fd17114b7c5ddd89096b036eb
+```
