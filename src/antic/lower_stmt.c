@@ -1203,8 +1203,9 @@ struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
     return lower_temp(l, slot);
 }
 
-/* An `own` parameter that `=` or `let` moved into a place holds its value
-   no more, so its table is cleared once the bytes are copied. */
+/* An `own` parameter that `=` or `let` moved into a place, and a local
+   that moved into a literal, hold their value no more, so the tables are
+   cleared once the bytes are copied. */
 void lower_clear_moved(struct lowerer *l, const struct expr *value)
 {
     if (value->kind != EXPR_NAME || !value->moves || value->symbol == NULL ||

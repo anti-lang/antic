@@ -40,3 +40,19 @@ remove: torn 5
 stale set 0: torn 6
 copy of 3
 after the block, torn 10
+added: torn 0, leaves 8
+removed 1
+remove: torn 1, leaves 7
+removed all 2
+remove_all: torn 3, leaves 5
+removed first 4
+remove_first: torn 4, leaves 4
+removed one 5
+remove_one: torn 5, leaves 3
+versioned 6
+get_versioned: torn 6, leaves 3
+set_if_version: torn 7, leaves 3
+stale version refused
+stale set_if_version: torn 8, leaves 3
+clear: torn 11, leaves 0
+after the block: torn 11, leaves 0

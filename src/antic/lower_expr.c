@@ -314,6 +314,19 @@ struct ir_operand lower_case_address(struct lowerer *l, const struct type *v,
                                 lower_field_offset(l, v, &union_name));
 }
 
+/* DESIGN: a local that a struct or class literal names moved into
+   it, and its tables are cleared once every part is stored, so the
+   teardown of its block passes over it. A part after it may read it
+   before. */
+static void clear_moved_inits(struct lowerer *l, const struct expr *e)
+{
+    size_t i;
+
+    for (i = 0; i < e->as.struct_lit.field_count; i++) {
+        lower_clear_moved(l, e->as.struct_lit.fields[i].value);
+    }
+}
+
 /* DESIGN: a literal of a variant writes the tag of its case and the
    fields of that case, and nothing else. The bytes of the union that
    the case leaves are never read, since `switch` reads the fields of the
@@ -518,6 +531,7 @@ static void build_value_into(struct lowerer *l, const struct expr *e,
             lower_store_field_default(l, owner, i, dest);
         }
         }
+        clear_moved_inits(l, e);
         lower_run_construct(l, t, dest);
         break;
     case EXPR_ARRAY_LIT:
@@ -536,6 +550,9 @@ static void build_value_into(struct lowerer *l, const struct expr *e,
                 l, t->fields[i].type, e->as.tuple.elements[i],
                 lower_offset_address(
                     l, dest, lower_field_offset(l, t, &t->fields[i].name)));
+        }
+        for (i = 0; i < e->as.tuple.count; i++) {
+            lower_clear_moved(l, e->as.tuple.elements[i]);
         }
         break;
     case EXPR_ARRAY_REPEAT:

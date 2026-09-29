@@ -381,6 +381,12 @@ void sema_bind_value(struct checker *c, struct expr *value, struct name into,
                      struct type *t);
 void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
                             struct type *t);
+/* Whether value, a part of a tuple, struct or variant literal, moves into
+   it, and the move of such a part once the literal has read every part.
+   literal names the type of the literal. */
+bool sema_literal_moves(const struct expr *value);
+void sema_move_into_literal(struct checker *c, struct expr *value,
+                            const char *literal);
 bool sema_holds_mutex(const struct type *t);
 void sema_refuse_lock_copy(struct checker *c, const struct expr *value,
                            const struct type *t);

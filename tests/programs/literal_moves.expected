@@ -1,0 +1,17 @@
+exit 0
+tuple 1
+tuple let: torn 1, leaves 0
+struct 2
+struct let: torn 2, leaves 0
+class 3
+class let: torn 3, leaves 0
+tuple returned 5
+tuple returned: torn 4, leaves 0
+struct returned 6
+struct returned: torn 5, leaves 0
+own tuple 7
+own tuple: torn 6, leaves 0
+generic tuple 8
+generic tuple: torn 7, leaves 0
+generic plain 9 9
+generic plain: torn 7, leaves 0

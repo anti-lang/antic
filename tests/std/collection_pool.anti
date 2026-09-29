@@ -71,6 +71,45 @@ class Tag
 	}
 }
 
+/// A block that counts the ones alive.
+class Leaf
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn destruct(self)
+	{
+		Leaf.live.sub(1);
+	}
+}
+
+/// A class that owns a leaf and counts its teardowns, which a second teardown
+/// of the same element would raise above the leaves it made.
+class Held
+{
+	pub own leaf: ?*Leaf = none,
+
+	static atomic torn: int = 0;
+
+	pub fn of(n: int) -> Held
+	{
+		Leaf.live.add(1);
+		return Held { leaf: alloc Leaf { n: n } };
+	}
+
+	pub fn number(self) -> int
+	{
+		let l = self.leaf catch fatal;
+		return l.n;
+	}
+
+	fn destruct(self)
+	{
+		Held.torn.add(1);
+	}
+}
+
 struct Point
 {
 	x: int,
@@ -279,6 +318,73 @@ fn owned()
 	printf("after the block, torn %d\n".ptr, Tag.torn.load() as c_int);
 }
 
+fn counts(step: str)
+{
+	printf("%.*s: torn %d, leaves %d\n".ptr, step.len as c_int, step.ptr,
+		Held.torn.load() as c_int, Leaf.live.load() as c_int);
+}
+
+/// Every form that takes an element out of the pool, or copies one, leaves each
+/// element one owner. The teardowns count each element once and the leaves
+/// alive fall to 0.
+fn held()
+{
+	{
+		let p = Pool<Held>.new();
+		let first = p.add(Held.of(1));
+		p.add(Held.of(2));
+		p.add(Held.of(3));
+		p.add(Held.of(4));
+		p.add(Held.of(5));
+		let sixth = p.add(Held.of(6));
+		p.add(Held.of(7));
+		p.add(Held.of(8));
+		counts("added");
+		{
+			let gone = p.remove(first) catch fatal;
+			printf("removed %d\n".ptr, gone.number() as c_int);
+		}
+		counts("remove");
+		let n = p.remove_all(fn(x) {
+			return x.number() <= 3;
+		});
+		printf("removed all %d\n".ptr, n as c_int);
+		counts("remove_all");
+		{
+			let one = p.remove_first(fn(x) {
+				return x.number() == 4;
+			}) catch fatal;
+			printf("removed first %d\n".ptr, one.number() as c_int);
+		}
+		counts("remove_first");
+		{
+			let only = p.remove_one(fn(x) {
+				return x.number() == 5;
+			}) catch fatal;
+			printf("removed one %d\n".ptr, only.number() as c_int);
+		}
+		counts("remove_one");
+		let version = 0;
+		if let read = p.get_versioned(sixth) {
+			// The copy of the element made a leaf, which no constructor
+			// counted.
+			Leaf.live.add(1);
+			version = read.1;
+			printf("versioned %d\n".ptr, read.0.number() as c_int);
+		}
+		counts("get_versioned");
+		p.set_if_version(sixth, Held.of(9), version) catch fatal;
+		counts("set_if_version");
+		p.set_if_version(sixth, Held.of(10), version) catch e {
+			printf("stale version refused\n".ptr);
+		};
+		counts("stale set_if_version");
+		p.clear();
+		counts("clear");
+	}
+	counts("after the block");
+}
+
 fn main() -> int
 {
 	blocks();
@@ -286,5 +392,6 @@ fn main() -> int
 	versions() catch fatal;
 	shared() catch fatal;
 	owned();
+	held();
 	return 0;
 }

@@ -35,6 +35,45 @@ class Node
 	}
 }
 
+/// A block that counts the ones alive.
+class Leaf
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn destruct(self)
+	{
+		Leaf.live.sub(1);
+	}
+}
+
+/// A class that owns a leaf and counts its teardowns, which a second teardown
+/// of the same element would raise above the leaves it made.
+class Held
+{
+	pub own leaf: ?*Leaf = none,
+
+	static atomic torn: int = 0;
+
+	pub fn of(n: int) -> Held
+	{
+		Leaf.live.add(1);
+		return Held { leaf: alloc Leaf { n: n } };
+	}
+
+	pub fn number(self) -> int
+	{
+		let l = self.leaf catch fatal;
+		return l.n;
+	}
+
+	fn destruct(self)
+	{
+		Held.torn.add(1);
+	}
+}
+
 fn show(s: str)
 {
 	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
@@ -167,6 +206,42 @@ fn owned()
 	printf("after the block, torn %d\n".ptr, Node.torn.load() as c_int);
 }
 
+fn counts(step: str)
+{
+	printf("%.*s: torn %d, leaves %d\n".ptr, step.len as c_int, step.ptr,
+		Held.torn.load() as c_int, Leaf.live.load() as c_int);
+}
+
+/// The shared forms that take an element out of the tree leave each element one
+/// owner. The teardowns count each element once and the leaves alive fall to 0.
+fn held()
+{
+	{
+		let t = Tree<Held>.new();
+		let root = t.add_root(Held.of(1));
+		t.add_child(root, Held.of(2));
+		t.add_child(root, Held.of(3));
+		t.add_child(root, Held.of(4));
+		t.add_child(root, Held.of(5));
+		counts("added");
+		let n = t.remove_all(fn(x) {
+			return x.number() == 2;
+		});
+		printf("removed all %d\n".ptr, n as c_int);
+		counts("remove_all");
+		{
+			let one = t.remove_first(fn(x) {
+				return x.number() == 3;
+			}) catch fatal;
+			printf("removed first %d\n".ptr, one.number() as c_int);
+		}
+		counts("remove_first");
+		t.clear();
+		counts("clear");
+	}
+	counts("after the block");
+}
+
 /// `==` of two trees compares their elements in slot order, so two trees built
 /// the same way are equal and one more child tells them apart.
 fn equality()
@@ -187,6 +262,7 @@ fn main() -> int
 	shape();
 	forms() catch fatal;
 	owned();
+	held();
 	equality();
 	return 0;
 }

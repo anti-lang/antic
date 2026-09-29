@@ -388,6 +388,87 @@ static void refuse_moved(struct checker *c, const struct expr *e,
     }
 }
 
+/* Whether a value of t may own something in a copy of a generic: a type
+   parameter, or a value that holds one in place. A pointer or a slice
+   to one owns nothing. */
+static bool holds_param(const struct type *t)
+{
+    size_t i;
+
+    switch (t->kind) {
+    case TYPE_PARAM:
+        return true;
+    case TYPE_ARRAY:
+    case TYPE_OPTIONAL:
+        return holds_param(t->element);
+    case TYPE_TUPLE:
+        for (i = 0; i < t->param_count; i++) {
+            if (holds_param(t->params[i])) {
+                return true;
+            }
+        }
+        return false;
+    case TYPE_STRUCT:
+    case TYPE_CLASS:
+    case TYPE_VARIANT:
+        return !types_is_chan(t) && sema_has_params(t);
+    default:
+        return false;
+    }
+}
+
+/* DESIGN: an owning local named in a tuple literal, a struct literal or a
+   class literal moves into it, as into an `own` parameter. A copy would give what it owns two owners, the local and
+   the literal, and both would tear it down. So does an `own` parameter,
+   and a local of a type parameter, which may own something in a copy. A
+   parameter that is not `own` belongs to the caller, and
+   `sema_move_local` refuses one that owns something. Anything else that
+   reads an existing value is refused as `=` refuses it. */
+bool sema_literal_moves(const struct expr *value)
+{
+    const struct symbol *sym =
+        value->kind == EXPR_NAME ? value->symbol : NULL;
+    const struct type *t = value->type;
+
+    if (sym == NULL || t == NULL || sema_is_error(t) || t->kind == TYPE_FN ||
+        (sym->kind != SYMBOL_LOCAL && sym->kind != SYMBOL_PARAM) ||
+        sym->caught) {
+        return false;
+    }
+    if (sema_type_owns(t) || sema_needs_teardown(t)) {
+        return true;
+    }
+    return holds_param(t) && (sym->kind == SYMBOL_LOCAL || sym->own_param);
+}
+
+/* DESIGN: the parts move once the literal has read every part, so a part
+   after the local may still read it, and lowering clears the local's
+   tables after the last part is stored. A local that a part of the same
+   literal already moved, `(k, k)` or `(k, take(k))`, is refused. literal
+   names the type of the literal. */
+void sema_move_into_literal(struct checker *c, struct expr *value,
+                            const char *literal)
+{
+    static const struct name no_name = {"", 0};
+    struct name into;
+    char *text;
+    size_t length;
+
+    if (!sema_literal_moves(value)) {
+        return;
+    }
+    if (value->symbol->moved) {
+        refuse_moved(c, value, value->symbol);
+        return;
+    }
+    length = strlen(literal);
+    text = types_alloc_array(c->arena, length + 1, 1);
+    memcpy(text, literal, length + 1);
+    into.text = text;
+    into.length = length;
+    sema_move_local(c, value, &into, &no_name);
+}
+
 /* The variable that the place or the address e starts from, or NULL. */
 static const struct symbol *root_of(const struct expr *e)
 {
@@ -3276,13 +3357,21 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                 ok = sema_require(c, item, elements[i], element) && ok;
                 elements[i] = element;
             }
-            sema_refuse_owned_copy(c, item, elements[i]);
+            if (sema_literal_moves(item)) {
+                sema_refuse_lock_copy(c, item, elements[i]);
+            } else {
+                sema_refuse_owned_copy(c, item, elements[i]);
+            }
             ok = ok && !sema_is_error(elements[i]);
         }
         if (!ok) {
             return sema_builtin(c, TYPE_ERROR);
         }
-        return types_tuple(c->types, elements, e->as.tuple.count);
+        t = types_tuple(c->types, elements, e->as.tuple.count);
+        for (i = 0; i < e->as.tuple.count; i++) {
+            sema_move_into_literal(c, e->as.tuple.elements[i], sema_tn(t));
+        }
+        return t;
     }
     case EXPR_ARRAY_REPEAT: {
         struct type *element = expected != NULL && expected->kind == TYPE_ARRAY

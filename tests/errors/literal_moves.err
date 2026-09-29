@@ -1,0 +1,7 @@
+literal_moves.anti:26:10: error: `k` belongs to the caller and does not move. Mark it `own` or pass `dup(k)`
+literal_moves.anti:33:11: error: `y` was moved into `(T, int)`
+literal_moves.anti:41:10: error: `k` was moved into `(Key, int)`
+literal_moves.anti:44:2: error: `j` was moved into `Pair`
+literal_moves.anti:47:12: error: `m` moves into `(Key, int)` inside a loop, which would move it again
+literal_moves.anti:50:25: error: `Key` has `own` fields, use `dup` instead of `=`
+literal_moves.anti:52:14: error: `w` was moved into `(Key, Key)`

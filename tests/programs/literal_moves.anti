@@ -1,0 +1,139 @@
+//! An owning local named in a tuple literal, a struct literal or a class
+//! literal moves into it, as into an `own` parameter. The literal then holds
+//! the only owner, and the local is torn down no more. Each case runs under a
+//! leak check: the count of the leaves alive and the count of the teardowns of
+//! the keys, which a second teardown of the same key would raise.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn destruct(self)
+	{
+		Leaf.live.sub(1);
+	}
+}
+
+/// A key that owns a leaf and counts its teardowns.
+class Key
+{
+	pub own leaf: ?*Leaf = none,
+
+	static atomic torn: int = 0;
+
+	pub fn number(self) -> int
+	{
+		let l = self.leaf else {
+			return -1;
+		};
+		return l.n;
+	}
+
+	fn destruct(self)
+	{
+		Key.torn.add(1);
+	}
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+class Holder
+{
+	pub k: Key,
+}
+
+fn key(n: int) -> Key
+{
+	Leaf.live.add(1);
+	return Key { leaf: alloc Leaf { n: n } };
+}
+
+/// A local placed in a tuple that the function returns.
+fn tuple_of(n: int) -> (Key, int)
+{
+	let k = key(n);
+	return (k, n);
+}
+
+/// A local placed in a struct that the function returns.
+fn pair_of(n: int) -> Pair
+{
+	let k = key(n);
+	return Pair { k: k, n: n };
+}
+
+/// An `own` parameter placed in a tuple.
+fn tuple_own(own k: Key, n: int) -> (Key, int)
+{
+	return (k, n);
+}
+
+/// A local of a type parameter placed in a tuple, as `take_place` of a
+/// collection builds its result.
+fn tuple_generic<T>(own x: T, n: int) -> (T, int)
+{
+	let taken = x;
+	return (taken, n);
+}
+
+fn check(name: str)
+{
+	printf("%.*s: torn %d, leaves %d\n".ptr, name.len as c_int, name.ptr,
+		Key.torn.load() as c_int, Leaf.live.load() as c_int);
+}
+
+fn main() -> int
+{
+	{
+		let k = key(1);
+		let t = (k, 1);
+		printf("tuple %d\n".ptr, t.0.number() as c_int);
+	}
+	check("tuple let");
+	{
+		let k = key(2);
+		let p = Pair { k: k, n: 2 };
+		printf("struct %d\n".ptr, p.k.number() as c_int);
+	}
+	check("struct let");
+	{
+		let k = key(3);
+		let h = Holder { k: k };
+		printf("class %d\n".ptr, h.k.number() as c_int);
+	}
+	check("class let");
+	{
+		let t = tuple_of(5);
+		printf("tuple returned %d\n".ptr, t.0.number() as c_int);
+	}
+	check("tuple returned");
+	{
+		let p = pair_of(6);
+		printf("struct returned %d\n".ptr, p.k.number() as c_int);
+	}
+	check("struct returned");
+	{
+		let t = tuple_own(key(7), 7);
+		printf("own tuple %d\n".ptr, t.0.number() as c_int);
+	}
+	check("own tuple");
+	{
+		let t = tuple_generic<Key>(key(8), 8);
+		printf("generic tuple %d\n".ptr, t.0.number() as c_int);
+	}
+	check("generic tuple");
+	{
+		let t = tuple_generic<int>(9, 9);
+		printf("generic plain %d %d\n".ptr, t.0 as c_int, t.1 as c_int);
+	}
+	check("generic plain");
+	return 0;
+}

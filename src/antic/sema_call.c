@@ -3186,6 +3186,11 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
                             size_t field_count, const char *type_name,
                             bool skip_missing)
 {
+    /* DESIGN: a variant is not torn down yet, so the literal of a case
+       takes no local, which would then leak. It copies as before, and a
+       part that owns something is refused. */
+    bool moves = e->kind != EXPR_STRUCT_LIT ||
+                 e->as.struct_lit.variant_case == 0;
     bool ok = true;
     size_t i;
     size_t j;
@@ -3230,13 +3235,18 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
                           inits[i].name.text);
             ok = false;
         }
-        if (sema_require(c, inits[i].value,
-                         sema_check_expr(c, inits[i].value, f->type),
-                         f->type)) {
-            sema_refuse_owned_copy(c, inits[i].value, f->type);
-        } else {
+        if (!sema_require(c, inits[i].value,
+                          sema_check_expr(c, inits[i].value, f->type),
+                          f->type)) {
             ok = false;
+        } else if (moves && sema_literal_moves(inits[i].value)) {
+            sema_refuse_lock_copy(c, inits[i].value, f->type);
+        } else {
+            sema_refuse_owned_copy(c, inits[i].value, f->type);
         }
+    }
+    for (i = 0; i < count && moves; i++) {
+        sema_move_into_literal(c, inits[i].value, type_name);
     }
     if (!ok || skip_missing) {
         return ok;

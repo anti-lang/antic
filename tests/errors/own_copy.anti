@@ -57,7 +57,7 @@ fn f(shelf: *Shelf, p: *Item)
 	y = x;
 	let pair = [a, a];
 	let rep = [Item { n: 7 }; 2];
-	let h2 = Holder { item: a };
+	let h2 = Holder { item: h.item };
 	let fresh = [Item { n: 8 }, Item { n: 9 }];
 	let h3 = Holder { item: Item { n: 10 } };
 	let plains = [x, x];

@@ -21,4 +21,11 @@ clear: 0 false
 removed 3, torn 3
 stale parent 1, torn 4
 after the block, torn 6
+added: torn 0, leaves 5
+removed all 1
+remove_all: torn 1, leaves 4
+removed first 3
+remove_first: torn 2, leaves 3
+clear: torn 5, leaves 0
+after the block: torn 5, leaves 0
 equal true, after a child false

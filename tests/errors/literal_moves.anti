@@ -1,0 +1,54 @@
+//! An owning local named in a tuple or struct literal moves into it, and naming
+//! it after the move is refused, as after a move into an `own` parameter. A
+//! parameter that is not `own` belongs to the caller and does not move. A
+//! variant is not torn down yet, so the literal of a case takes no local.
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Key = none,
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+variant Slot
+{
+	Full { k: Key },
+	Empty,
+}
+
+fn borrowed(k: Key) -> (Key, int)
+{
+	return (k, 1);
+}
+
+fn generic<T>(own x: T) -> (T, int)
+{
+	let y = x;
+	let t = (y, 1);
+	let z = (y, 2);
+	return t;
+}
+
+fn main() -> int
+{
+	let k = Key { };
+	let t = (k, 1);
+	let n = k.n;
+	let j = Key { };
+	let p = Pair { k: j, n: 2 };
+	j.n = 3;
+	let m = Key { };
+	for i in 0..2 {
+		let u = (m, i);
+	}
+	let v = Key { };
+	let s = Slot.Full { k: v };
+	let w = Key { };
+	let q = (w, w);
+	return n;
+}
