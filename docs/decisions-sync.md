@@ -25,8 +25,11 @@ step folds them into "Generics and collections" in `docs/decisions.md`.
   with a loop of a versioned read and `set_if_version`, check that a versioned
   set fails after a worker changed the element, and use a `dup` copy from
   another thread. All eight run in release and dev mode.
-- Not built: `==` and the hash of the four classes. The reason stands under
-  "Found" below.
+- `std_sync_pool` takes `get_versioned`, `remove_all`, `remove_first`,
+  `remove_one` and `clear` through a `SyncPool` of an owning element, under the
+  count of live blocks and allocations.
+- Not built: an `==` and a hash that compare the elements alone. The reason
+  stands under "Found" below.
 
 ## Provisional
 
@@ -78,9 +81,9 @@ step folds them into "Generics and collections" in `docs/decisions.md`.
   each collection of the object into it. Reason: `dup` hands `copy` memory that
   nothing has written, and the bytes of the object hold its hidden lock as this
   thread holds it. The empty object gives the table and a free lock.
-- [provisional] `push` and `set_if_version` of `SyncList` put a copy of `x` in
-  the pair they store. Reason: a literal takes no owning value from a
-  parameter, `use dup instead of =`.
+- `push` and `set_if_version` of `SyncList` move `x` into the pair they
+  store. An `own` parameter moves into a literal since `b9ea9c5`. The
+  provisional copy of the first run is gone.
 
 ## Found
 
@@ -95,15 +98,15 @@ step folds them into "Generics and collections" in `docs/decisions.md`.
   its result is a `?T` fails the verification of the IR, `copy i64 has an
   operand of type ptr`. The module returns such values through plain
   functions of the module, `copied`, `taken` and `versioned`.
-- A copy of a generic skips the refusal of an owning local or parameter in a
-  tuple literal, which a plain function reports. The value is torn down twice.
-  `take_place` and `get_versioned` of `Slots` in
-  `src/std/anti/collection/pool.anti` write `(taken, after)` and
-  `(copy, ...)`, so `remove_all`, `remove_first`, `remove_one`, `clear` and
-  `get_versioned` of a `Pool` of an owning type free an element twice, and so
-  do those of `SyncPool`. `get_versioned` of `ConcurrentMap` writes
-  `(value, ...)` the same way. Taking apart an `own` parameter with
-  `let (x, v) = e;` tears `x` down twice as well.
+- The default `==` and hash of each class take every field, the lock aside,
+  as "Hashing and order" gives them. They compare the versions, the clock and
+  the allocator beside the elements, so two `SyncList` values that hold `[1]`
+  are unequal once one of them took a `push` and a `pop` before it. The
+  default also reads the fields without the hidden lock, while another thread
+  may change them.
+- The first run found that `take_place` and `get_versioned` of `Pool` freed an
+  owning element twice. `b9ea9c5` on main fixed it in the compiler, and
+  `SyncPool` needed no change.
 - A call of `SyncList<T>.new` in a function of the class reports that nothing
   in the arguments gives `T`. The module calls `blank_list` and the other
   `blank_` functions instead.
