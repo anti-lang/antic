@@ -90,7 +90,7 @@ struct Slot<T>
 	value: ?T,
 }
 
-fn fill<T>(v: T) -> Slot<T>
+fn fill<T>(own v: T) -> Slot<T>
 {
 	return Slot { value: v };
 }

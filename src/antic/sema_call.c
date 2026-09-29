@@ -1262,7 +1262,8 @@ static struct name bare_name(const struct symbol *sym)
    after it, or a closure that captures it runs later. All three are
    refused, and so is a move inside a closure, which may run more than
    once. A parameter that is not `own` belongs to the caller, so one
-   whose value owns memory does not move. Returns whether e moved. */
+   whose value may own memory does not move, as
+   `sema_refuse_caller_value` says. Returns whether e moved. */
 bool sema_move_local(struct checker *c, struct expr *e,
                      const struct name *into, const struct name *by)
 {
@@ -1297,12 +1298,7 @@ bool sema_move_local(struct checker *c, struct expr *e,
                       sym->name.text, (int)target->length, target->text);
         return false;
     }
-    if (sym->kind == SYMBOL_PARAM && !sym->own_param && e->type != NULL &&
-        sema_type_owns(e->type)) {
-        sema_error_at(c, e->pos, "`%.*s` belongs to the caller and does not "
-                      "move. Mark it `own` or pass `dup(%.*s)`",
-                      (int)sym->name.length, sym->name.text,
-                      (int)sym->name.length, sym->name.text);
+    if (sema_refuse_caller_value(c, e)) {
         return false;
     }
     e->moves = true;
@@ -1310,6 +1306,19 @@ bool sema_move_local(struct checker *c, struct expr *e,
     sym->moved_to = *into;
     sym->moved_by = *by;
     return true;
+}
+
+/* DESIGN: a value that owns nothing and holds no pointer is copied into
+   an `own` parameter and does not move, so a caller that passes `int`
+   locals to `max<T>(own a: T, own b: T)` keeps them. The type is concrete
+   at the call site. A value that owns something, one of a type parameter
+   and one that holds a pointer move, since the callee takes over what a
+   pointer reaches. A channel and a Mutex are handles, and they move. */
+static bool moves_at_call(const struct type *t)
+{
+    return sema_type_owns(t) || sema_needs_teardown(t) ||
+           sema_holds_param(t) || !type_pointer_free(t) || types_is_chan(t) ||
+           types_is_mutex(t);
 }
 
 /* DESIGN: the error a handler binds moves into an `own` parameter, and
@@ -1370,6 +1379,9 @@ static void note_move(struct checker *c, const struct symbol *callee,
     }
     into = sema_place_name(receiver);
     by = bare_name(callee);
+    if (!moves_at_call(arg->type)) {
+        return;
+    }
     if (moved != NULL &&
         (moved->kind == SYMBOL_LOCAL || moved->kind == SYMBOL_PARAM)) {
         if (receiver == NULL) {

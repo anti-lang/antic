@@ -48,13 +48,13 @@ fn key<T: hash>(v: T) -> u64
 	return v.hash();
 }
 
-fn with_one<T: hash>(v: T) -> u64
+fn with_one<T: hash>(own v: T) -> u64
 {
 	let t = (v, 1);
 	return t.hash();
 }
 
-fn larger<T: Ordered>(a: T, b: T) -> T
+fn larger<T: Ordered>(own a: T, own b: T) -> T
 {
 	if a < b {
 		return b;
@@ -62,7 +62,7 @@ fn larger<T: Ordered>(a: T, b: T) -> T
 	return a;
 }
 
-fn smaller<T: lang.Ordered>(a: T, b: T) -> T
+fn smaller<T: lang.Ordered>(own a: T, own b: T) -> T
 {
 	if a < b || a == b {
 		return a;

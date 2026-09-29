@@ -3,7 +3,7 @@
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
-fn max<T: lt>(a: T, b: T) -> T
+fn max<T: lt>(own a: T, own b: T) -> T
 {
 	if a < b {
 		return b;
@@ -37,7 +37,7 @@ class Counter
 		return self.count;
 	}
 
-	pub fn keep<T>(self, value: T) -> T
+	pub fn keep<T>(self, own value: T) -> T
 	{
 		return value;
 	}

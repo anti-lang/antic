@@ -81,7 +81,7 @@ pub class Holder<T>
 pub constraint Ordered = eq + lt;
 
 /// The larger of two values.
-pub fn larger<T: Ordered>(a: T, b: T) -> T
+pub fn larger<T: Ordered>(own a: T, own b: T) -> T
 {
 	if a < b {
 		return b;

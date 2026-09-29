@@ -1,4 +1,4 @@
-literal_moves.anti:26:10: error: `k` belongs to the caller and does not move. Mark it `own` or pass `dup(k)`
+literal_moves.anti:26:10: error: `k` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(k)`
 literal_moves.anti:33:11: error: `y` was moved into `(T, int)`
 literal_moves.anti:41:10: error: `k` was moved into `(Key, int)`
 literal_moves.anti:44:2: error: `j` was moved into `Pair`

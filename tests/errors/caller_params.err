@@ -1,4 +1,12 @@
-caller_params.anti:15:10: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
-caller_params.anti:21:6: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
-caller_params.anti:26:13: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
-caller_params.anti:32:10: error: `Key` has `own` fields, use `dup` instead of `=`
+caller_params.anti:37:10: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
+caller_params.anti:43:6: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
+caller_params.anti:48:13: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
+caller_params.anti:54:10: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
+caller_params.anti:59:10: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
+caller_params.anti:64:9: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
+caller_params.anti:69:10: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
+caller_params.anti:74:9: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
+caller_params.anti:79:19: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
+caller_params.anti:84:21: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
+caller_params.anti:89:24: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
+caller_params.anti:94:12: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`

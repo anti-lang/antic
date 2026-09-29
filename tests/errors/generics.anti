@@ -25,7 +25,7 @@ class Plain
 	size: int,
 }
 
-fn max<T: lt>(a: T, b: T) -> T
+fn max<T: lt>(own a: T, own b: T) -> T
 {
 	if a < b {
 		return b;
@@ -76,7 +76,7 @@ class List<T>
 	pub abstract fn map<U>(self) -> int;
 }
 
-export fn exported<T>(a: T) -> T
+export fn exported<T>(own a: T) -> T
 {
 	return a;
 }
@@ -86,12 +86,12 @@ export type Exported = Circle;
 constraint Loop = Again;
 constraint Again = Loop;
 
-fn loose<T: nothing>(a: T) -> T
+fn loose<T: nothing>(own a: T) -> T
 {
 	return a;
 }
 
-fn classy<T: Plain>(a: T) -> T
+fn classy<T: Plain>(own a: T) -> T
 {
 	return a;
 }
@@ -129,7 +129,7 @@ fn uses(a: int, b: int, c: int, size: int, circles: []*Circle)
 
 abstract class Figure
 {
-	pub fn scale<U>(self, u: U) -> U
+	pub fn scale<U>(self, own u: U) -> U
 	{
 		return u;
 	}
@@ -137,7 +137,7 @@ abstract class Figure
 
 class Tile inherits Figure
 {
-	concrete fn scale<U>(self, u: U) -> U
+	concrete fn scale<U>(self, own u: U) -> U
 	{
 		return u;
 	}

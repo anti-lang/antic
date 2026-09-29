@@ -1,4 +1,4 @@
-variant_owning.anti:28:7: error: `s` belongs to the caller and does not move. Mark it `own` or pass `dup(s)`
+variant_owning.anti:28:7: error: `s` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(s)`
 variant_owning.anti:34:10: error: `Slot` owns what its parts own, use `dup` instead of `=`
 variant_owning.anti:35:6: error: `Slot` owns what its parts own, use `dup` instead of `=`
 variant_owning.anti:36:13: error: `Slot` owns what its parts own, and the repeat form copies one value into every element

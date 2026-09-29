@@ -85,7 +85,7 @@ class NumbersIter
 	}
 }
 
-fn least<T: gen.Ordered>(a: T, b: T) -> T
+fn least<T: gen.Ordered>(own a: T, own b: T) -> T
 {
 	if a < b {
 		return a;

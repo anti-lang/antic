@@ -99,8 +99,8 @@ fn same<T: eq>(a: T, b: T) -> bool
 
 fn twins<T: eq>(a: T, b: T) -> bool
 {
-	let p = Pair<T> { first: a, second: b };
-	let q = Pair<T> { first: a, second: a };
+	let p = Pair<T> { first: dup(a), second: dup(b) };
+	let q = Pair<T> { first: dup(a), second: dup(a) };
 	return p == q;
 }
 

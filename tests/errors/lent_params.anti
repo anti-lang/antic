@@ -100,7 +100,7 @@ fn owned_and_lent(own lent p: *Person)
 
 extern fn c_side(lent p: ?*Person);
 
-fn hold<T>(x: T) -> T
+fn hold<T>(own x: T) -> T
 {
 	return x;
 }

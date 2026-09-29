@@ -3,5 +3,12 @@ taken 1
 own: torn 1, leaves 0
 copied 2 2
 dup: torn 3, leaves 0
+max 4
+max: torn 5, leaves 0
+copies 5 5 5
+copies of a generic parameter: torn 9, leaves 0
+class copies 6 6 6 6
+copies of a class value: torn 13, leaves 0
+int locals 7 8 8
 plain 4 5
-plain: torn 3, leaves 0
+plain: torn 13, leaves 0

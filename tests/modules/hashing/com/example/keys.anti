@@ -33,14 +33,14 @@ pub fn key<T: hash>(v: T) -> u64
 }
 
 /// The hash of `v` with 1 after it, as the default hash of a tuple gives.
-pub fn with_one<T: hash>(v: T) -> u64
+pub fn with_one<T: hash>(own v: T) -> u64
 {
 	let t = (v, 1);
 	return t.hash();
 }
 
 /// The larger of `a` and `b`.
-pub fn larger<T: Ordered>(a: T, b: T) -> T
+pub fn larger<T: Ordered>(own a: T, own b: T) -> T
 {
 	if a < b {
 		return b;
@@ -106,7 +106,7 @@ pub fn same_pair<A: eq, B: eq>(a: (A, B), b: (A, B)) -> bool
 }
 
 /// `x` when `a` and `b` are equal by the default `==`, and `y` otherwise.
-pub fn pick<T>(a: Coded, b: Coded, x: T, y: T) -> T
+pub fn pick<T>(a: Coded, b: Coded, own x: T, own y: T) -> T
 {
 	if a == b {
 		return x;

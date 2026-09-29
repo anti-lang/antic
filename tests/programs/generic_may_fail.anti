@@ -10,7 +10,7 @@ import anti.lang;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
-fn ordered<T: lt>(a: T, b: T) -> T may fail
+fn ordered<T: lt>(a: T, own b: T) -> T may fail
 {
 	if b < a {
 		fail lang.Error.new(1, "descending");
@@ -19,16 +19,16 @@ fn ordered<T: lt>(a: T, b: T) -> T may fail
 }
 
 /// The largest of three, and the first failure forwarded.
-fn chain<T: lt>(a: T, b: T, c: T) -> T may fail
+fn chain<T: lt>(own a: T, own b: T, own c: T) -> T may fail
 {
 	let first = try ordered(a, b);
 	return try ordered(first, c);
 }
 
-fn split<T: lt>(a: T, b: T) -> (T, T) may fail
+fn split<T: lt>(own a: T, own b: T) -> (T, T) may fail
 {
 	undo printf("undo\n".ptr);
-	let high = try ordered(a, b);
+	let high = try ordered(dup(a), b);
 	return (a, high);
 }
 
@@ -50,12 +50,12 @@ class Stock<T: lt>
 {
 	pub top: T,
 
-	pub fn raise(self, to: T) may fail
+	pub fn raise(self, own to: T) may fail
 	{
-		self.top = try ordered(self.top, to);
+		self.top = try ordered(dup(self.top), to);
 	}
 
-	pub fn pick<U>(self, when: bool, u: U, other: U) -> U may fail
+	pub fn pick<U>(self, when: bool, own u: U, other: U) -> U may fail
 	{
 		if !when {
 			fail "not picked";

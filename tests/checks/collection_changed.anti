@@ -10,7 +10,7 @@ class Pair<T> inherits collection.Collection<T>
 {
 	items: [2]T,
 
-	pub fn of(a: T, b: T) -> Pair<T>
+	pub fn of(own a: T, own b: T) -> Pair<T>
 	{
 		return Pair<T> { from: collection.allocator(none), items: [a, b], count: 2 };
 	}

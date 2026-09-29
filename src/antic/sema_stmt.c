@@ -799,17 +799,10 @@ void sema_bind_value(struct checker *c, struct expr *value, struct name into,
                      struct type *t)
 {
     if (!moves_own_param(c, value, into)) {
-        sema_refuse_param_copy(c, value, t);
-    }
-}
-
-void sema_refuse_param_copy(struct checker *c, const struct expr *value,
-                            struct type *t)
-{
-    if (!sema_refuse_caller_value(c, value)) {
         sema_refuse_owned_copy(c, value, t);
     }
 }
+
 
 /* DESIGN: `=` refuses to copy an existing value that owns memory, since
    the bytes would give it two owners. A fresh value on the right has no
@@ -818,6 +811,9 @@ void sema_refuse_param_copy(struct checker *c, const struct expr *value,
 void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
                             struct type *t)
 {
+    if (sema_refuse_caller_value(c, value)) {
+        return;
+    }
     if (!sema_is_error(t) && sema_type_owns(t) && sema_reads_existing(value)) {
         sema_error_at(c, value->pos, "`%s` %s, use `dup` instead of `=`",
                       sema_tn(t), sema_owns_phrase(t));
@@ -1250,7 +1246,7 @@ static void check_assign(struct checker *c, struct stmt *s)
     }
     if (op == TOKEN_ASSIGN) {
         if (!moves_own_param(c, s->as.assign.value, sema_place_name(target))) {
-            sema_refuse_param_copy(c, s->as.assign.value, t);
+            sema_refuse_owned_copy(c, s->as.assign.value, t);
         }
         check_closure_lifetime(c, target, s->as.assign.value);
         return;
@@ -1835,7 +1831,7 @@ static void check_destructuring_let(struct checker *c, struct stmt *s)
         sema_refuse_lent_tuple(c, s->as.let.value);
         t = sema_builtin(c, TYPE_ERROR);
     } else {
-        sema_refuse_param_copy(c, s->as.let.value, t);
+        sema_refuse_owned_copy(c, s->as.let.value, t);
     }
     value = arena_alloc(c->arena, sizeof *value);
     value->kind = SYMBOL_LOCAL;
@@ -2057,7 +2053,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
         if (declared != NULL) {
             if (sema_require(c, s->as.let.value, t, declared) &&
                 !moves_own_param(c, s->as.let.value, s->as.let.name)) {
-                sema_refuse_param_copy(c, s->as.let.value, declared);
+                sema_refuse_owned_copy(c, s->as.let.value, declared);
             }
             t = declared;
         } else if (!sema_is_error(t) && t->kind == TYPE_VOID) {
@@ -2067,7 +2063,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
             sema_refuse_lent_tuple(c, s->as.let.value);
             t = sema_builtin(c, TYPE_ERROR);
         } else if (!moves_own_param(c, s->as.let.value, s->as.let.name)) {
-            sema_refuse_param_copy(c, s->as.let.value, t);
+            sema_refuse_owned_copy(c, s->as.let.value, t);
         }
         if (sema_refuse_abstract_value(c, s->as.let.name_pos, "this local",
                                        t)) {
@@ -2601,6 +2597,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
             held = sema_require(c, s->as.return_value, given, result);
             c->lent_use = LENT_STORED;
             if (held) {
+                sema_refuse_caller_value(c, s->as.return_value);
                 sema_refuse_lock_copy(c, s->as.return_value, result);
                 sema_check_leak_return(c, s->as.return_value, result);
             }

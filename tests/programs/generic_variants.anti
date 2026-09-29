@@ -49,7 +49,7 @@ fn value_or<T, E>(r: Result<T, E>, fallback: T) -> T
 	return v;
 }
 
-fn wrap<T>(v: T) -> Result<T, int>
+fn wrap<T>(own v: T) -> Result<T, int>
 {
 	return Result<T, int>.Ok { value: v };
 }

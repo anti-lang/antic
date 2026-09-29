@@ -764,7 +764,7 @@ pub synchronized class PeopleList
 	head: ?*Node = none,
 	count: int = 0,
 
-	pub fn add(self, p: Person)
+	pub fn add(self, own p: Person)
 	{
 		self.head = alloc Node { person: p, next: self.head };
 		self.count += 1;
@@ -803,7 +803,7 @@ pub concurrent class PeopleList
 	lock: Mutex,
 	head: ?*Node = none guarded by lock,
 
-	pub fn add(self, p: Person)
+	pub fn add(self, own p: Person)
 	{
 		let n = alloc Node { person: p };
 		sync self.lock {
@@ -916,7 +916,7 @@ Generics add type parameters to the language. Every collection of [Collections](
 Type parameters and type arguments stand between `<` and `>`, as in C, C++ and Rust.
 
 ```anti
-fn max<T: lt>(a: T, b: T) -> T { ... }
+fn max<T: lt>(own a: T, own b: T) -> T { ... }
 struct Pair<A, B> { first: A, second: B, }
 class List<T> { ... }
 
@@ -945,7 +945,7 @@ Every use of a generic with concrete arguments gets its own compiled copy, as in
 A generic states what it needs from each type parameter. The compiler checks the body against those needs where the generic is written. It checks every use against them where it is used. An error therefore lands in the code that made it. That is either a body that uses more than it declared, or a call with a type that lacks something. The message names the missing hook or interface.
 
 ```anti
-fn max<T: lt>(a: T, b: T) -> T { ... }
+fn max<T: lt>(own a: T, own b: T) -> T { ... }
 fn sum<T: add>(items: []T) -> T { ... }
 fn count<C: iter>(c: C) -> int { ... }
 fn save<T: Serializable>(items: []*T) { ... }
@@ -956,7 +956,7 @@ fn find<K: eq + hash, V>(m: Map<K, V>, k: K) -> V { ... }
 - An interface is a constraint: `T: Serializable` requires a class that declares it implements `Serializable`.
 - Constraints combine with `+`.
 - `constraint Ordered = eq + lt;` names a set for reuse, used as `T: Ordered`. `anti.lang` ships `constraint Number = add + sub + mul + div + neg + lt;` for numeric code. A user's own number type joins it by having those hooks, so the set is open.
-- A type parameter without constraints can be stored, copied, moved and passed on, and measured with `size_of`. That is what a container needs, so containers usually take unconstrained parameters.
+- A type parameter without constraints can be stored, moved, passed on, copied with `dup` and measured with `size_of`. That is what a container needs, so containers usually take unconstrained parameters.
 - A constraint violation at a call gives: `` `Circle` has no `lt`, which `max` needs for `T` ``.
 
 Considered and left for later: requiring an ordinary method of a type, such as `T: fn area(self) -> f32`. Nothing designed so far needs it. A type that must provide a method can be a class implementing an interface. It can be added when real code needs it, and adding it breaks nothing.
@@ -983,7 +983,7 @@ abstract class Iterable<T> { ... }
 - Function types, closures and snapshots may appear as type arguments: `List<fn(int) -> int>`. The rules of `keep` and `concurrent` apply as for any value of a function type.
 - Each copy of a generic class has its own descriptor, named with its arguments: `List<Person>`. Reflection and `type_name` give that name.
 - In generic code a local of a type parameter moves on `let` and `=`, and into a literal, for every `T`, since the checker cannot know whether the `T` of a copy owns something. So does a local of a value that holds a type parameter in place, such as `(T, int)` or `?T`. Naming it after the move is refused, and `dup(x)` is the copy. The copy that a `for` walk gives stays with its collection, so `dup(x)` copies it.
-- A parameter of a type parameter that is not `own` belongs to the caller, and `let` and `=` of it are refused for every `T`, since the `T` of a copy may own something. `own` on the parameter takes the value over, and `dup(p)` copies it.
+- A parameter of a type parameter that is not `own` belongs to the caller for every `T`, since the `T` of a copy may own something. It leaves the function in no way that gives it a second owner, as [Ownership at a call](#ownership-at-a-call) gives. `own` on the parameter takes the value over, and `dup(p)` copies it.
 
 ### Libraries and C
 
@@ -1016,7 +1016,9 @@ let first = queue.first() else { return; };
 ## Ownership at a call
 
 - `own` before a parameter takes ownership of the argument: `pub fn push(self, own item: T)`. Passing a local moves it, and naming the local again is refused: `` `c` was moved into `shapes` by `push` ``. A literal or a call result passed there needs nothing. This extends the `own` parameter of errors to every type.
-- For a type that owns no memory, a move is a copy of its bytes. For one that does, the move is what keeps one owner.
+- A value that owns nothing and holds no pointer is copied into an `own` parameter and does not move, so the caller keeps its local. The type is concrete at the call site: `max(a, b)` with `int` locals leaves both usable. A value that owns something, one of a type parameter and one that holds a pointer move, and the move is what keeps one owner.
+- A parameter that is not `own` belongs to the caller, and it leaves the function in no way that gives it a second owner. `let` and `=`, a tuple, struct, class or variant literal, an `own` argument and `return` refuse one whose value owns something, and in generic code one whose type is a type parameter. That holds for generic and non-generic parameters alike. The message names both fixes: `` `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)` ``. `fn max<T: lt>(own a: T, own b: T) -> T` takes both values, returns one and tears down the other.
+- `dup` gives the kind it is given. `dup(x)` of a value gives a value, for a class value as for a struct, and `dup(p)` of a pointer gives a new object and a pointer.
 - A class value is owning when its chain declares `destruct` or holds an `own` field or an owning part, and a collection is one. A struct or a tuple is owning when any of its parts owns something, transitively: an owning class value, a collection, an `own fn`, a `?T` or an array of an owning type, or an owning struct, tuple or variant. A variant is owning when a field of any of its cases owns something, and it is torn down by its tag. An owning struct, tuple or variant follows the value rules of a class value. It is torn down at the end of its block on every exit, `=` refuses it and `dup` copies it. It moves when returned or passed to an `own` parameter, naming it after a move is refused, and it is torn down with its owner as a field, an array element, an element inside a collection or inside a `?T`. A struct, a tuple or a variant that owns nothing keeps the rules of plain C data: `=` copies it and nothing is torn down. The C header writes an owning struct, tuple or variant with its layout unchanged and marks it as owning in a comment. Structs still take no `own` field.
 - An owning local named in a tuple literal, a struct literal, a class literal or the literal of a variant case moves into it, as into an `own` parameter, and naming it after the move is refused: `` `k` was moved into `(Key, int)` ``. The local moves once the literal has read every part, and `(k, k)` is refused. A parameter that is not `own` belongs to the caller and does not move.
 

@@ -1,13 +1,35 @@
-//! A parameter that is not `own` belongs to the caller. In generic code `let`
-//! and `=` refuse one whose type is a type parameter, since the `T` of a copy
-//! may own something and a copy of its bytes would give it two owners. The
-//! message names both fixes: `own` to take it over, `dup` to copy. It extends
-//! the refusal of a parameter of an owning class type.
+//! A parameter that is not `own` belongs to the caller and cannot leave the
+//! function in any way that gives it a second owner: not by `let` or `=`, not
+//! in a tuple, struct, class or variant literal, not as an `own` argument and
+//! not by `return`. It holds for a parameter whose value owns something and, in
+//! generic code, for one whose type is a type parameter. The message names both
+//! fixes: `own` to take it over, `dup` to copy.
 
 class Key
 {
 	pub n: int = 0,
 	pub own leaf: ?*Key = none,
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+class Holder
+{
+	pub k: Key,
+}
+
+variant Slot
+{
+	Full { k: Key },
+	Empty,
+}
+
+fn take<T>(own x: T)
+{
 }
 
 fn by_let<T>(p: T)
@@ -27,9 +49,49 @@ fn by_if_let<T>(p: ?T)
 	}
 }
 
+fn by_tuple<T>(p: T) -> (T, int)
+{
+	return (p, 1);
+}
+
+fn by_own<T>(p: T)
+{
+	take<T>(p);
+}
+
+fn by_return<T>(p: T) -> T
+{
+	return p;
+}
+
 fn class_let(p: Key)
 {
 	let a = p;
+}
+
+fn class_return(p: Key) -> Key
+{
+	return p;
+}
+
+fn class_struct(p: Key) -> Pair
+{
+	return Pair { k: p, n: 1 };
+}
+
+fn class_class(p: Key) -> Holder
+{
+	return Holder { k: p };
+}
+
+fn class_variant(p: Key) -> Slot
+{
+	return Slot.Full { k: p };
+}
+
+fn class_own(p: Key)
+{
+	take<Key>(p);
 }
 
 fn fixed<T>(own p: T, q: T) -> (T, T)
@@ -37,6 +99,12 @@ fn fixed<T>(own p: T, q: T) -> (T, T)
 	let a = p;
 	let b = dup(q);
 	return (a, b);
+}
+
+fn plain(p: int) -> (int, int)
+{
+	let a = p;
+	return (p, a);
 }
 
 fn main() -> int

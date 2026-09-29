@@ -8,7 +8,7 @@
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
-fn max<T: lt>(a: T, b: T) -> T
+fn max<T: lt>(own a: T, own b: T) -> T
 {
 	if a < b {
 		return b;
@@ -83,7 +83,7 @@ struct Pair<A, B>
 	second: B,
 }
 
-fn make<A, B>(a: A, b: B) -> Pair<A, B>
+fn make<A, B>(own a: A, own b: B) -> Pair<A, B>
 {
 	return Pair<A, B> { first: a, second: b };
 }
@@ -94,7 +94,7 @@ variant Maybe<T>
 	Nothing,
 }
 
-fn wrap<T>(v: T) -> Maybe<T>
+fn wrap<T>(own v: T) -> Maybe<T>
 {
 	return Maybe<T>.Some { value: v };
 }

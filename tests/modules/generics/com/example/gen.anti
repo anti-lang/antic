@@ -6,7 +6,7 @@ import anti.lang;
 import anti.text;
 
 /// The larger of two values.
-pub fn max<T: lt>(a: T, b: T) -> T
+pub fn max<T: lt>(own a: T, own b: T) -> T
 {
 	if a < b {
 		return b;
@@ -104,7 +104,7 @@ pub struct Pair<A, B>
 }
 
 /// A pair of two values.
-pub fn make<A, B>(a: A, b: B) -> Pair<A, B>
+pub fn make<A, B>(own a: A, own b: B) -> Pair<A, B>
 {
 	return Pair<A, B> { first: a, second: b };
 }
@@ -117,7 +117,7 @@ pub variant Maybe<T>
 }
 
 /// A value of `T`.
-pub fn some<T>(v: T) -> Maybe<T>
+pub fn some<T>(own v: T) -> Maybe<T>
 {
 	return Maybe<T>.Some { value: v };
 }
@@ -129,7 +129,7 @@ pub fn nothing_like<T>(v: T) -> Maybe<T>
 }
 
 /// The value of `m`, or `d` without one.
-pub fn value_or<T>(m: Maybe<T>, d: T) -> T
+pub fn value_or<T>(m: Maybe<T>, own d: T) -> T
 {
 	if let Some s = m {
 		return s.value;

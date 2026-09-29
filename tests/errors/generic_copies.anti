@@ -15,7 +15,7 @@ worker fn count<T>(chunk: []T) -> int
 	return chunk.len;
 }
 
-worker fn echo<T>(chunk: []int, v: T) -> T
+worker fn echo<T>(chunk: []int, own v: T) -> T
 {
 	return v;
 }
@@ -30,7 +30,7 @@ class Holder<T>
 	pub item: T,
 }
 
-fn keep_it<T>(v: T) -> Holder<T>
+fn keep_it<T>(own v: T) -> Holder<T>
 {
 	return Holder<T> { item: v };
 }

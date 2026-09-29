@@ -6,4 +6,4 @@ owning_destruct.anti:56:10: error: `Holder` holds `Counted` in `counted`, which 
 owning_destruct.anti:58:20: error: `Outer` holds `Holder` in `holder`, which holds `Counted` in `counted`, which has a `destruct`, use `dup` instead of `=`
 owning_destruct.anti:60:19: error: `Wrap` holds `Pair` in `pair`, which holds `Counted` in `c`, which has a `destruct`, use `dup` instead of `=`
 owning_destruct.anti:62:14: error: `Pair` owns what its parts own, use `dup` instead of `=`
-owning_destruct.anti:63:13: error: `?Counted` has a `destruct`, use `dup` instead of `=`
+owning_destruct.anti:63:13: error: `o` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(o)`

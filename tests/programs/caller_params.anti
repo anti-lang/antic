@@ -1,9 +1,11 @@
-//! A parameter that is not `own` belongs to the caller, and generic code takes
-//! its value with one of the two fixes the refusal names: `own` on the
-//! parameter takes it over, and `dup` copies it. With `T = Key`, which owns a
-//! leaf, each value then has one owner. Each case runs under a leak check: the
-//! count of the leaves alive and the count of the teardowns of the keys, which
-//! a second teardown of the same key would raise.
+//! A parameter that is not `own` belongs to the caller, and a function takes
+//! its value out with one of the two fixes the refusal names: `own` on the
+//! parameter takes it over, and `dup` copies it. `dup(x)` of a class value
+//! gives a value. With `T = Key`, which owns a leaf, each value then has one
+//! owner, and a caller that passes `int` locals to `own` parameters keeps them,
+//! since a value that owns nothing does not move. Each case runs under a leak
+//! check: the count of the leaves alive and the count of the teardowns of the
+//! keys, which a second teardown of the same key would raise.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -34,6 +36,11 @@ class Key
 		return l.n;
 	}
 
+	operator fn lt(self, o: Key) -> bool
+	{
+		return self.number() < o.number();
+	}
+
 	fn destruct(self)
 	{
 		Key.torn.add(1);
@@ -60,6 +67,56 @@ fn copied<T>(p: T) -> (T, int)
 	return (a, 1);
 }
 
+/// The larger of two values. Each argument is taken over, and the one that is
+/// not returned is torn down.
+fn max<T: lt>(own a: T, own b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+fn take<T>(own x: T)
+{
+}
+
+/// A copy of a parameter, returned.
+fn returned<T>(p: T) -> T
+{
+	return dup(p);
+}
+
+/// A copy of a parameter, in a tuple.
+fn in_tuple<T>(p: T) -> (T, int)
+{
+	return (dup(p), 1);
+}
+
+/// A copy of a parameter, passed to an `own` parameter.
+fn handed_on<T>(p: T)
+{
+	take<T>(dup(p));
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+/// A copy of a class value parameter, returned.
+fn key_copy(p: Key) -> Key
+{
+	return dup(p);
+}
+
+/// A copy of a class value parameter, in a struct literal.
+fn key_pair(p: Key) -> Pair
+{
+	return Pair { k: dup(p), n: 1 };
+}
+
 fn check(name: str)
 {
 	printf("%.*s: torn %d, leaves %d\n".ptr, name.len as c_int, name.ptr,
@@ -82,6 +139,40 @@ fn main() -> int
 		printf("copied %d %d\n".ptr, k.number() as c_int, r.0.number() as c_int);
 	}
 	check("dup");
+	{
+		let m = max<Key>(key(3), key(4));
+		printf("max %d\n".ptr, m.number() as c_int);
+	}
+	check("max");
+	{
+		let k = key(5);
+		let r = returned<Key>(k);
+		let t = in_tuple<Key>(k);
+		handed_on<Key>(k);
+		// Each of the three copies made a leaf, which no constructor
+		// counted.
+		Leaf.live.add(3);
+		printf("copies %d %d %d\n".ptr, k.number() as c_int, r.number() as c_int,
+			t.0.number() as c_int);
+	}
+	check("copies of a generic parameter");
+	{
+		let k = key(6);
+		let c = key_copy(k);
+		let p = key_pair(k);
+		let d = dup(k);
+		// The same, for the three copies of the class value.
+		Leaf.live.add(3);
+		printf("class copies %d %d %d %d\n".ptr, k.number() as c_int,
+			c.number() as c_int, p.k.number() as c_int, d.number() as c_int);
+	}
+	check("copies of a class value");
+	{
+		let a = 7;
+		let b = 8;
+		let m = max<int>(a, b);
+		printf("int locals %d %d %d\n".ptr, a as c_int, b as c_int, m as c_int);
+	}
 	printf("plain %d %d\n".ptr, taken<int>(4) as c_int, copied<int>(5).0 as c_int);
 	check("plain");
 	return 0;

@@ -24,7 +24,7 @@ class Stack<T>
 			return self.at != none;
 		}
 
-		pub fn take(self, fallback: T) -> T
+		pub fn take(self, own fallback: T) -> T
 		{
 			let n = self.at else {
 				return fallback;
@@ -50,7 +50,7 @@ class Stack<T>
 	pub size: int = 0,
 	last: Mode = Mode.Pop,
 
-	pub fn push(self, v: T)
+	pub fn push(self, own v: T)
 	{
 		self.head = alloc Node { value: v, next: self.head };
 		self.size += 1;
@@ -76,7 +76,7 @@ class Stack<T>
 		let w = Walker { at: self.head };
 		let last = dup(zero);
 		while w.more() do {
-			last = w.take(zero);
+			last = w.take(dup(zero));
 		}
 		return last;
 	}
@@ -87,7 +87,7 @@ class Stack<T>
 		return w.type_name();
 	}
 
-	pub fn tagged(self, zero: T) -> int
+	pub fn tagged(self, own zero: T) -> int
 	{
 		let t = Tagged<str> { value: zero, tag: "top" };
 		return t.tag.len;
@@ -125,7 +125,7 @@ class Grid<T, N: int>
 			count: int,
 		}
 
-		pub fn measure(self, row: Row) -> int
+		pub fn measure(self, own row: Row) -> int
 		{
 			let inner = Inner { row: row, count: N };
 			return inner.count + size_of(Inner) as int;

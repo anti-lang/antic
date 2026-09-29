@@ -29,7 +29,7 @@ fn plain<T>(v: T) -> u64
 	return v.hash();
 }
 
-fn wrapped<T>(v: T) -> u64
+fn wrapped<T>(own v: T) -> u64
 {
 	let t = (v, 1);
 	return t.hash();
@@ -40,7 +40,7 @@ fn total<T: Ordered>(a: T, b: T) -> T
 	return a + b;
 }
 
-fn larger<T: Ordered>(a: T, b: T) -> T
+fn larger<T: Ordered>(own a: T, own b: T) -> T
 {
 	if a < b {
 		return b;

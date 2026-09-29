@@ -1257,7 +1257,7 @@ static void keeps_generic_marks(void)
                   "pub operator fn hash(a: Name) -> u64 {\n"
                   "    return a.n as u64;\n"
                   "}\n"
-                  "pub fn mixed<T: hash>(v: T) -> u64 {\n"
+                  "pub fn mixed<T: hash>(own v: T) -> u64 {\n"
                   "    return (v, Name { n: 1 }).hash();\n"
                   "}\n",
                   &bytes);

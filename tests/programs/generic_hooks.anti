@@ -122,7 +122,7 @@ operator fn index<T>(s: *Span<T>, i: int) -> T
 	return s.values[i];
 }
 
-fn largest<T: lt>(a: T, b: T) -> T
+fn largest<T: lt>(own a: T, own b: T) -> T
 {
 	if a < b {
 		return b;

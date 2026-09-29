@@ -35,7 +35,7 @@ struct Sorted<T: lt>
 	first: T,
 }
 
-fn max<T: lt>(a: T, b: T) -> T
+fn max<T: lt>(own a: T, own b: T) -> T
 {
 	if a < b {
 		return b;
@@ -146,7 +146,7 @@ fn test<T>(a: T) -> bool
 
 fn nested<U>(a: U) -> U
 {
-	return max(a, a);
+	return max(dup(a), dup(a));
 }
 
 fn uses(p: *Plain, bytes: u8, texts: str)

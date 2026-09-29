@@ -1,4 +1,4 @@
-owning_values.anti:26:7: error: `p` belongs to the caller and does not move. Mark it `own` or pass `dup(p)`
+owning_values.anti:26:7: error: `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)`
 owning_values.anti:31:10: error: the object is lent for the call and stays with its owner, so `destroy` does not take it
 owning_values.anti:36:9: error: `delete` needs a class pointer, found `*Pair`
 owning_values.anti:42:10: error: `Pair` owns what its parts own, use `dup` instead of `=`

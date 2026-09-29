@@ -157,7 +157,7 @@ pub synchronized class Tray
 pub constraint Ordered = eq + lt;
 
 /// The larger of two measurements.
-pub fn larger<T: lt>(a: T, b: T) -> T
+pub fn larger<T: lt>(own a: T, own b: T) -> T
 {
 	if a < b {
 		return b;

@@ -17,7 +17,7 @@ class Square inherits Measured
 	}
 }
 
-fn least<T: Ordered>(a: T, b: T) -> T
+fn least<T: Ordered>(own a: T, own b: T) -> T
 {
 	if a < b {
 		return a;

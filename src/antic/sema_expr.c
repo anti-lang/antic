@@ -416,12 +416,13 @@ bool sema_holds_param(const struct type *t)
 
 /* DESIGN: a parameter that is not `own` belongs to the caller, so a copy
    of its bytes would give what it owns two owners, the caller and the
-   place. In generic code `let` and `=` refuse one whose type holds a type
-   parameter, since the `T` of a copy may own something, whatever `T` is.
-   It extends the refusal of a parameter of an owning class type, which
-   `sema_refuse_owned_copy` gives. The message names both fixes: `own`
-   takes the value over, and `dup` copies it. Returns whether value was
-   refused. */
+   place. It leaves the function in no way that gives it one: not by `let`
+   or `=`, not in a tuple, struct, class or variant literal, not as an
+   `own` argument and not by `return`. That holds for a parameter whose
+   value owns something and, in generic code, for one whose type holds a
+   type parameter, since the `T` of a copy may own something, whatever `T`
+   is. The message names both fixes: `own` takes the value over, and `dup`
+   copies it. Returns whether value was refused. */
 bool sema_refuse_caller_value(struct checker *c, const struct expr *value)
 {
     const struct symbol *sym =
@@ -430,7 +431,7 @@ bool sema_refuse_caller_value(struct checker *c, const struct expr *value)
 
     if (sym == NULL || sym->kind != SYMBOL_PARAM || sym->own_param ||
         sym->caught || t == NULL || sema_is_error(t) || t->kind == TYPE_FN ||
-        sema_type_owns(t) || !sema_holds_param(t)) {
+        !(sema_type_owns(t) || sema_holds_param(t))) {
         return false;
     }
     sema_error_at(c, value->pos, "`%.*s` belongs to the caller and does not "
@@ -446,8 +447,8 @@ bool sema_refuse_caller_value(struct checker *c, const struct expr *value)
    local and the literal, and both would tear it down. So does an `own`
    parameter, and a local of a type parameter, which may own something in
    a copy. A parameter that is not `own` belongs to the caller, and
-   `sema_move_local` refuses one that owns something. Anything else that
-   reads an existing value is refused as `=` refuses it. */
+   `sema_refuse_owned_copy` refuses it. Anything else that reads an
+   existing value is refused as `=` refuses it. */
 bool sema_literal_moves(const struct expr *value)
 {
     const struct symbol *sym =
@@ -456,7 +457,7 @@ bool sema_literal_moves(const struct expr *value)
 
     if (sym == NULL || t == NULL || sema_is_error(t) || t->kind == TYPE_FN ||
         (sym->kind != SYMBOL_LOCAL && sym->kind != SYMBOL_PARAM) ||
-        sym->caught) {
+        (sym->kind == SYMBOL_PARAM && !sym->own_param) || sym->caught) {
         return false;
     }
     if (sema_type_owns(t) || sema_needs_teardown(t)) {
@@ -3519,6 +3520,13 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
            address. The mark keeps that meaning in every copy. */
         if (e->as.object.op == TOKEN_DUP &&
             (t->kind == TYPE_PARAM || e->as.object.value)) {
+            e->as.object.value = true;
+            return t;
+        }
+        /* DESIGN: `dup` gives the kind it is given. `dup(x)` of a class
+           value gives a value, copied as a class value part is copied,
+           and `dup(p)` of a pointer gives a new object and a pointer. */
+        if (e->as.object.op == TOKEN_DUP && t->kind == TYPE_CLASS) {
             e->as.object.value = true;
             return t;
         }

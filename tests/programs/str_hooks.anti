@@ -8,7 +8,7 @@ import anti.text;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
-fn larger<T: Ordered>(a: T, b: T) -> T
+fn larger<T: Ordered>(own a: T, own b: T) -> T
 {
 	if a < b {
 		return b;

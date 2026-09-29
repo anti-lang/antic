@@ -13,7 +13,7 @@ pub fn corner<T>(items: []T) -> Point
 /// A pair of the same value twice.
 pub fn twice<T>(v: T) -> Pair<T>
 {
-	return Pair<T> { a: v, b: v };
+	return Pair<T> { a: dup(v), b: dup(v) };
 }
 
 /// The area through the module name, which the direct import keeps.

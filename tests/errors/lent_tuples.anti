@@ -68,7 +68,7 @@ fn take(t: (int, *int))
 
 fn hold<T>(x: T) -> T
 {
-	return x;
+	return dup(x);
 }
 
 fn walks(m: *Split) -> int

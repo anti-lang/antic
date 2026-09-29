@@ -1052,8 +1052,9 @@ struct ir_operand lower_address(struct lowerer *l,
     case EXPR_FN:
         return lower_closure(l, e);
     /* `dup` of an `own fn` copies the snapshot into a new pair. `dup` of
-       a struct, a tuple or a variant copies its bytes, then what its
-       parts own. */
+       a struct, a tuple, a variant or a class value copies its bytes,
+       then what its parts own. A class value then dispatches `copied`,
+       as `dup` of a pointer does. */
     case EXPR_OBJECT:
         slot = ir_entry_slot(l->f, lower_vtype_of(l, e->type));
         if (e->type->kind == TYPE_STRUCT || e->type->kind == TYPE_TUPLE ||
@@ -1062,6 +1063,9 @@ struct ir_operand lower_address(struct lowerer *l,
             ir_memcopy(l->f, l->b, lower_temp(l, slot), from,
                        lower_vtype_of(l, e->type));
             lower_copy_owned(l, e->type, from, lower_temp(l, slot));
+            if (e->type->kind == TYPE_CLASS) {
+                lower_hook_copied(l, lower_temp(l, slot), from);
+            }
             return lower_temp(l, slot);
         }
         lower_dup_snapshot(l, e->type, lower_expr(l, e->as.object.operand),

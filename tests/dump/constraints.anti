@@ -103,7 +103,7 @@ class NumbersIter
 	}
 }
 
-fn max<T: lt>(a: T, b: T) -> T
+fn max<T: lt>(own a: T, own b: T) -> T
 {
 	if a < b {
 		return b;
@@ -120,7 +120,7 @@ fn middle<T: Number>(a: T, b: T) -> T
 	return half;
 }
 
-fn both<T: add + lt>(a: T, b: T) -> T
+fn both<T: add + lt>(a: T, own b: T) -> T
 {
 	if a > b {
 		return a + b;
@@ -182,7 +182,7 @@ fn hold<T>(a: T, items: []T) -> Slot<T>
 	return Slot<T> { value: pass(other) };
 }
 
-fn pass<T>(a: T) -> T
+fn pass<T>(own a: T) -> T
 {
 	return a;
 }
