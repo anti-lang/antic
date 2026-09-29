@@ -21,7 +21,9 @@ and is not a concern here.
 `docs/anti-syntax-overview.md` summarises the two specifications and adds
 nothing. A change to either specification changes it in the same commit. Its
 "Built" and "Not built yet" lines are the status page of the implementation,
-and a commit that builds a feature changes them.
+and a commit that builds a feature changes them. A decision that changes the
+language goes into the specifications and the overview in the same commit as
+its entry in `docs/decisions.md`.
 
 The choices inside a compiler pass are in `docs/notes/`.
 `docs/notes/value-rules.md` holds the pinned outputs a change rewrites, the

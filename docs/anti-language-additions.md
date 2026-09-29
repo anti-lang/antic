@@ -239,6 +239,8 @@ tests
 - A variant is a value type with C layout. It may be a struct field, an array element, a parameter and a result. It passes by value under the struct rules. It cannot have functions, since it is a struct.
 - `anti bind` never produces a variant, because C declares none. An exported variant is written as above.
 - A variant has a descriptor with its tag and each case's fields, so `==`, `hash`, `serialize`, `deserialize` and `reflect` handle a field of variant type, in a struct and in a class alike.
+- A variant with a case that owns something is owning, as [Ownership at a call](#ownership-at-a-call) gives. At the end of its block it is torn down by its tag, the fields of the case it holds, as an owning struct is. `=` refuses it, `dup` copies the fields of its case, it moves when returned or passed to an `own` parameter, and it is torn down with its owner as a field, an element or inside a `?T`. A local named in the literal of a case moves into it.
+- An arm of `switch` or an `if let` that binds an owning case gets a copy of the fields of the case. What the fields own is copied as `dup` copies it. The arm tears the copy down on every exit, and the variant keeps its own.
 
 ## Locking and channels
 
@@ -980,6 +982,7 @@ abstract class Iterable<T> { ... }
 - A generic function may be `may fail`, with the usual two channels.
 - Function types, closures and snapshots may appear as type arguments: `List<fn(int) -> int>`. The rules of `keep` and `concurrent` apply as for any value of a function type.
 - Each copy of a generic class has its own descriptor, named with its arguments: `List<Person>`. Reflection and `type_name` give that name.
+- In generic code a local of a type parameter moves on `let` and `=`, and into a literal, for every `T`, since the checker cannot know whether the `T` of a copy owns something. So does a local of a value that holds a type parameter in place, such as `(T, int)` or `?T`. Naming it after the move is refused, and `dup(x)` is the copy. The copy that a `for` walk gives stays with its collection, so `dup(x)` copies it.
 - A parameter of a type parameter that is not `own` belongs to the caller, and `let` and `=` of it are refused for every `T`, since the `T` of a copy may own something. `own` on the parameter takes the value over, and `dup(p)` copies it.
 
 ### Libraries and C
@@ -1014,7 +1017,8 @@ let first = queue.first() else { return; };
 
 - `own` before a parameter takes ownership of the argument: `pub fn push(self, own item: T)`. Passing a local moves it, and naming the local again is refused: `` `c` was moved into `shapes` by `push` ``. A literal or a call result passed there needs nothing. This extends the `own` parameter of errors to every type.
 - For a type that owns no memory, a move is a copy of its bytes. For one that does, the move is what keeps one owner.
-- A struct or a tuple is owning when any of its parts owns something, transitively: a class value, a collection, an `own fn`, a `?T` of an owning type, or an owning struct or tuple. It follows the value rules of a class value. It is torn down part by part at the end of its block on every exit, `=` refuses it and `dup` copies it. It moves when returned or passed to an `own` parameter, naming it after a move is refused, and it is torn down with its owner as a field, an array element, an element inside a collection or inside a `?T`. A struct or a tuple that owns nothing keeps the rules of plain C data: `=` copies it and nothing is torn down. The C header writes an owning struct with its layout unchanged and marks it as owning in a comment. Structs still take no `own` field.
+- A class value is owning when its chain declares `destruct` or holds an `own` field or an owning part, and a collection is one. A struct or a tuple is owning when any of its parts owns something, transitively: an owning class value, a collection, an `own fn`, a `?T` or an array of an owning type, or an owning struct, tuple or variant. A variant is owning when a field of any of its cases owns something, and it is torn down by its tag. An owning struct, tuple or variant follows the value rules of a class value. It is torn down at the end of its block on every exit, `=` refuses it and `dup` copies it. It moves when returned or passed to an `own` parameter, naming it after a move is refused, and it is torn down with its owner as a field, an array element, an element inside a collection or inside a `?T`. A struct, a tuple or a variant that owns nothing keeps the rules of plain C data: `=` copies it and nothing is torn down. The C header writes an owning struct, tuple or variant with its layout unchanged and marks it as owning in a comment. Structs still take no `own` field.
+- An owning local named in a tuple literal, a struct literal, a class literal or the literal of a variant case moves into it, as into an `own` parameter, and naming it after the move is refused: `` `k` was moved into `(Key, int)` ``. The local moves once the literal has read every part, and `(k, k)` is refused. A parameter that is not `own` belongs to the caller and does not move.
 
 ## Lending
 
