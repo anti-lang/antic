@@ -2309,6 +2309,111 @@ static void tree_file(void (*damage)(struct session *),
     close_session(&s);
 }
 
+/* `tpair(x, n, n)`, the last argument shared. Every table keeps its
+   size, and the first byte that differs is the count of the arguments. */
+static void arg_repeated(struct session *s)
+{
+    struct expr *call = tree_let(s, "kept");
+    struct expr **args = arena_alloc(&s->arena, 3 * sizeof *args);
+
+    args[0] = call->as.call.args[0];
+    args[1] = call->as.call.args[1];
+    args[2] = call->as.call.args[1];
+    call->as.call.args = args;
+    call->as.call.arg_count = 3;
+}
+
+/* `tpair(x)`: the table of expressions of the tree loses `n`, and the
+   first byte that differs is the count of that table. */
+static void arg_dropped(struct session *s)
+{
+    tree_let(s, "kept")->as.call.arg_count = 1;
+}
+
+/* The first byte where the file of tree_source written with damage
+   differs from the one written without, or SIZE_MAX. */
+static size_t tree_difference(const struct text *plain,
+                              void (*damage)(struct session *))
+{
+    struct session s;
+    struct text other = {0};
+    size_t at = SIZE_MAX;
+    size_t i;
+
+    open_session(&s);
+    if (build_damaged(&s, "tt", tree_source, damage, &other)) {
+        for (i = 0; i < plain->length && i < other.length; i++) {
+            if (plain->data[i] != other.data[i]) {
+                at = i;
+                break;
+            }
+        }
+    }
+    text_free(&other);
+    close_session(&s);
+    return at;
+}
+
+/* plain with the u32 value at byte at is refused at the byte after it,
+   where the count stands, and not later. */
+static void refuses_count(const struct text *plain, size_t at, uint32_t value)
+{
+    uint8_t *copy;
+    char expected[64];
+    int k;
+
+    if (at == SIZE_MAX || at + 4 > plain->length) {
+        check_failures++;
+        fprintf(stderr, "no count at %zu\n", at);
+        return;
+    }
+    copy = malloc(plain->length);
+    CHECK(copy != NULL);
+    if (copy == NULL) {
+        return;
+    }
+    memcpy(copy, plain->data, plain->length);
+    for (k = 0; k < 4; k++) {
+        copy[at + (size_t)k] = (uint8_t)(value >> (8 * k));
+    }
+    snprintf(expected, sizeof expected, "is damaged at byte %zu", at + 4);
+    refuses_file(copy, plain->length, expected);
+    free(copy);
+}
+
+/* M33: a count of a tree is measured against the rest of the file before
+   the reader allocates for it. A list of arguments takes four bytes per
+   element and a record of the table of expressions more than two. */
+static void tree_counts(void)
+{
+    struct session s;
+    struct text plain = {0};
+    size_t list;
+    size_t table;
+
+    open_session(&s);
+    if (!build_damaged(&s, "tt", tree_source, NULL, &plain)) {
+        close_session(&s);
+        return;
+    }
+    close_session(&s);
+    list = tree_difference(&plain, arg_repeated);
+    table = tree_difference(&plain, arg_dropped);
+    if (list == SIZE_MAX || table == SIZE_MAX) {
+        check_failures++;
+        fprintf(stderr, "no counts in the tree\n");
+        text_free(&plain);
+        return;
+    }
+    CHECK((uint8_t)plain.data[list] == 2);
+    CHECK((uint8_t)plain.data[table] > 2);
+    refuses_count(&plain, list, (uint32_t)((plain.length - list - 4) / 3));
+    refuses_count(&plain, table, (uint32_t)((plain.length - table - 4) / 2));
+    refuses_count(&plain, list, UINT32_MAX);
+    refuses_count(&plain, table, UINT32_MAX);
+    text_free(&plain);
+}
+
 static void damaged_trees(void)
 {
     void (*const damages[])(struct session *) = {
@@ -2333,6 +2438,7 @@ static void damaged_trees(void)
 void test_modules(void)
 {
     damaged_trees();
+    tree_counts();
     deep_tables();
     imports();
     cycles();

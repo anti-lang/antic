@@ -684,16 +684,35 @@ static void io_csym(struct io *io, const struct symbol **s)
 
 /* Lists */
 
-/* A count, and in the reader an array of that many zeroed elements. */
-static void io_count(struct io *io, void **array, size_t *count, size_t size)
+/* The bytes each field takes in the file, which give the least size of
+   an element of a list below. A reference is the index of a record, a
+   symbol or a type. A name and a text are their count, which the bytes
+   follow. */
+enum {
+    W_BYTE = 1,
+    W_U32 = 4,
+    W_REF = 4,
+    W_NAME = 4,
+    W_POS = 8
+};
+
+/* A count, and in the reader an array of that many zeroed elements.
+   least is the fewest bytes one element takes in the file, the sum of
+   the widths of the fields the walker reads for each. The reader
+   refuses a count the rest of the file cannot hold before it allocates.
+   A field added to an element only raises its size, so the sum stays a
+   bound. */
+static void io_count(struct io *io, void **array, size_t *count, size_t size,
+                     size_t least)
 {
-    io_size(io, count);
-    if (reading(io)) {
-        *array = *count == 0 ? NULL
-                             : antl_allocate(io->r, *count, size);
-        if (failed(io)) {
-            *count = 0;
-        }
+    if (!reading(io)) {
+        io_size(io, count);
+        return;
+    }
+    *count = antl_get_count(io->r, least);
+    *array = *count == 0 ? NULL : antl_allocate(io->r, *count, size);
+    if (failed(io)) {
+        *count = 0;
     }
 }
 
@@ -702,7 +721,7 @@ static void io_exprs(struct io *io, struct expr ***list, size_t *count)
     void *array = *list;
     size_t i;
 
-    io_count(io, &array, count, sizeof **list);
+    io_count(io, &array, count, sizeof **list, W_REF);
     *list = array;
     for (i = 0; i < *count && !failed(io); i++) {
         io_expr(io, &(*list)[i]);
@@ -714,7 +733,7 @@ static void io_inits(struct io *io, struct field_init **list, size_t *count)
     void *array = *list;
     size_t i;
 
-    io_count(io, &array, count, sizeof **list);
+    io_count(io, &array, count, sizeof **list, W_NAME + W_POS + W_REF);
     *list = array;
     for (i = 0; i < *count && !failed(io); i++) {
         io_name(io, &(*list)[i].name);
@@ -728,7 +747,8 @@ static void io_bindings(struct io *io, struct binding **list, size_t *count)
     void *array = *list;
     size_t i;
 
-    io_count(io, &array, count, sizeof **list);
+    io_count(io, &array, count, sizeof **list,
+             W_NAME + W_POS + W_REF + W_BYTE);
     *list = array;
     for (i = 0; i < *count && !failed(io); i++) {
         io_name(io, &(*list)[i].name);
@@ -743,7 +763,8 @@ static void io_arms(struct io *io, struct switch_arm **list, size_t *count)
     void *array = *list;
     size_t i;
 
-    io_count(io, &array, count, sizeof **list);
+    io_count(io, &array, count, sizeof **list,
+             4 * W_REF + 2 * W_POS + W_NAME + W_U32);
     *list = array;
     for (i = 0; i < *count && !failed(io); i++) {
         struct switch_arm *a = &(*list)[i];
@@ -798,7 +819,7 @@ static void io_typex_body(struct io *io, struct type_expr *x)
     io_bool(io, &x->nullable);
     io_expr(io, &x->length);
     array = x->params;
-    io_count(io, &array, &x->param_count, sizeof *x->params);
+    io_count(io, &array, &x->param_count, sizeof *x->params, W_REF);
     x->params = array;
     for (i = 0; i < x->param_count && !failed(io); i++) {
         io_typex(io, &x->params[i]);
@@ -855,7 +876,8 @@ static void io_params(struct io *io, struct param **list, size_t *count)
     void *array = *list;
     size_t i;
 
-    io_count(io, &array, count, sizeof **list);
+    io_count(io, &array, count, sizeof **list,
+             W_NAME + W_POS + 2 * W_REF + 4 * W_BYTE);
     *list = array;
     for (i = 0; i < *count && !failed(io); i++) {
         struct param *p = &(*list)[i];
@@ -893,7 +915,8 @@ static void io_item_body(struct io *io, struct item *it)
     io_sym(io, &it->self);
     io_item(io, &it->enclosing);
     array = it->captures;
-    io_count(io, &array, &it->capture_count, sizeof *it->captures);
+    io_count(io, &array, &it->capture_count, sizeof *it->captures,
+             W_REF + 2 * W_BYTE + 2 * W_POS);
     it->captures = array;
     it->capture_capacity = it->capture_count;
     for (i = 0; i < it->capture_count && !failed(io); i++) {
@@ -915,7 +938,7 @@ static void io_block_body(struct io *io, struct block *b)
 
     io_pos(io, &b->pos);
     io_pos(io, &b->end);
-    io_count(io, &array, &b->count, sizeof *b->stmts);
+    io_count(io, &array, &b->count, sizeof *b->stmts, W_REF);
     b->stmts = array;
     for (i = 0; i < b->count && !failed(io); i++) {
         io_stmt(io, &b->stmts[i]);
@@ -927,7 +950,8 @@ static void io_format(struct io *io, struct expr *e)
     void *array = e->as.format.parts;
     size_t i;
 
-    io_count(io, &array, &e->as.format.count, sizeof *e->as.format.parts);
+    io_count(io, &array, &e->as.format.count, sizeof *e->as.format.parts,
+             2 * W_NAME + 4 * W_REF + 3 * W_BYTE + 2 * W_U32 + W_POS);
     e->as.format.parts = array;
     for (i = 0; i < e->as.format.count && !failed(io); i++) {
         struct format_part *p = &e->as.format.parts[i];
@@ -971,7 +995,7 @@ static void io_call(struct io *io, struct expr *e)
     io_exprs(io, &e->as.call.hash_calls, &e->as.call.hash_count);
     array = e->as.call.copy_args;
     io_count(io, &array, &e->as.call.copy_count,
-             sizeof *e->as.call.copy_args);
+             sizeof *e->as.call.copy_args, W_REF + W_BYTE);
     e->as.call.copy_args = array;
     if (reading(io)) {
         e->as.call.copy_values =
@@ -1158,7 +1182,7 @@ static void io_expr_body(struct io *io, struct expr *e)
                     ? e->as.simd.simd->field_count
                     : 0;
         array = e->as.simd.lanes;
-        io_count(io, &array, &lanes, sizeof *e->as.simd.lanes);
+        io_count(io, &array, &lanes, sizeof *e->as.simd.lanes, W_U32);
         e->as.simd.lanes = array;
         if (reading(io) && lanes != 0 &&
             (e->as.simd.simd == NULL ||
@@ -1218,7 +1242,7 @@ static void io_stmt_body(struct io *io, struct stmt *s)
     case STMT_IF:
         array = s->as.if_chain.branches;
         io_count(io, &array, &s->as.if_chain.count,
-                 sizeof *s->as.if_chain.branches);
+                 sizeof *s->as.if_chain.branches, 2 * W_REF);
         s->as.if_chain.branches = array;
         for (i = 0; i < s->as.if_chain.count && !failed(io); i++) {
             io_expr(io, &s->as.if_chain.branches[i].cond);
@@ -1985,6 +2009,23 @@ static void read_tree(struct reader *r, struct symbol **externs,
         sizeof(struct symbol), sizeof(struct item), sizeof(struct block),
         sizeof(struct stmt), sizeof(struct expr), sizeof(struct type_expr)
     };
+    /* The fewest bytes a record of each table takes in the file: the
+       fields its walker reads before any that depend on its kind. A
+       symbol has its kind, name, position, type, item, statement and
+       the byte of its value. An anonymous function has its kind, two
+       positions, its name, the count of its parameters and its result.
+       A block has two positions and a count, a statement its kind, a
+       position and a flag. An expression has its kind, its position,
+       its spelling, its type, its symbol and two flags. A written type
+       has its kind, its position, a token and three names. */
+    static const size_t least[T_COUNT] = {
+        W_BYTE + W_NAME + W_POS + 3 * W_REF + W_BYTE,
+        W_BYTE + 2 * W_POS + W_NAME + W_U32 + W_REF,
+        2 * W_POS + W_U32,
+        W_BYTE + W_POS + W_BYTE,
+        W_BYTE + W_POS + W_NAME + 2 * W_REF + 2 * W_BYTE,
+        W_BYTE + W_POS + W_BYTE + 3 * W_NAME
+    };
     struct tree t;
     struct io io;
     struct item *fn;
@@ -2011,7 +2052,7 @@ static void read_tree(struct reader *r, struct symbol **externs,
     t.fn = fn;
     for (k = 0; k < T_COUNT && !r->failed; k++) {
         struct table *table = &t.tables[k];
-        counts[k] = antl_get_count(r, 1);
+        counts[k] = antl_get_count(r, least[k]);
         records[k] = antl_allocate(r, counts[k], sizes[k]);
         /* Item 0 is the function, which the reader has. */
         table->count = counts[k] + (k == T_ITEM ? 1 : 0);
