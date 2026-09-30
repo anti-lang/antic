@@ -101,6 +101,31 @@ if(status EQUAL 0 OR NOT err MATCHES "names a library, and `--closed` loads")
     message(FATAL_ERROR "a closed build took a library provider\n${err}")
 endif()
 
+# `unload` counts the objects of a library in the hooks its own code
+# calls, so a library built with `--no-hooks` is refused, and so is a
+# program that loads libraries. A closed program loads none and may drop
+# them.
+execute_process(COMMAND "${ANTIC}" --no-hooks --lib shared --no-runtime
+                        --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+                        -I "${SOURCES}" -I "${WORK}"
+                        -o "${WORK}/closed/libfancy${SUFFIX}"
+                        "${SOURCES}/net/example/fancy.anti"
+                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+if(status EQUAL 0 OR NOT err MATCHES "`--no-hooks` drops the hooks that count the objects of a plugin")
+    message(FATAL_ERROR "a plugin was built without its hooks\n${err}")
+endif()
+execute_process(COMMAND "${ANTIC}" --no-hooks --runtime "${RUNTIME}"
+                        --llvm-mc "${LLVM_MC}" -I "${SOURCES}" -I "${WORK}"
+                        -o "${WORK}/closed/hookless${EXE}"
+                        "${SOURCES}/host.anti"
+                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+if(status EQUAL 0 OR NOT err MATCHES "the program loads libraries, and `--no-hooks` drops")
+    message(FATAL_ERROR "a host was built without its hooks\n${err}")
+endif()
+run(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
+    -I "${WORK}" --closed --no-hooks -o "${WORK}/closed/hookless${EXE}"
+    "${SOURCES}/host.anti")
+
 # `plugin:<path>` of the manifest fills the slot of an injected field
 # from that library, and `discover` finds it through the index.
 library_dir(named dir)

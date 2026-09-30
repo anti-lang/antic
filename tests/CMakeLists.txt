@@ -3654,6 +3654,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "inject_cycle|-S,--inject,inject_cycle.Logger=inject_cycle.Console.get,--inject,inject_cycle.Clock=inject_cycle.Watch.get,-o,${LISTINGS}/inject_cycle.s,inject_cycle.anti"
         "provides_lines|-S,-o,${LISTINGS}/provides_lines.s,provides_lines.anti"
         "plugin_calls|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/plugin_calls.s,plugin_calls.anti"
+        "no_hooks_plugins|-S,--no-hooks,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/no_hooks_plugins.s,no_hooks_plugins.anti"
         "compound_wrapping|-S,-o,${LISTINGS}/compound_wrapping.s,compound_wrapping.anti"
         "long_float|-S,-o,${LISTINGS}/long_float.s,long_float.anti"
         "allow_names|-S,-o,${LISTINGS}/allow_names.s,allow_names.anti"

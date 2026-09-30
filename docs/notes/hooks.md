@@ -86,6 +86,14 @@ built under `--trace` and `--trace writes`.
 then call `anti_rt_join` and `anti_rt_join_all`, which fire nothing, so
 the option reaches the one site that lives in the runtime.
 
+`unload` counts the objects of a library in the `created` and
+`destroyed` hooks, and the code of the library's classes calls both.
+`driver_run` of `src/antic/driver.c` therefore refuses `--no-hooks` with
+`--no-runtime`, and `compile` refuses it for a program that loads
+libraries, the one `whole_hosts_plugins` finds and `--closed` does not
+shut. `tests/errors/no_hooks_plugins.anti` and `tests/run_plugin.cmake`
+check both, and that a closed host builds without hooks.
+
 `--trace` and `--no-trace` decide for marked code instead of the mode,
 which is on in dev and off in release. `--trace <pattern>` adds a class
 that did not ask, in any mode. `--trace writes` adds the `changed` hook.

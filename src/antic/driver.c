@@ -1205,6 +1205,17 @@ static int back_end(const struct options *o, struct module *tree,
        carry them. */
     extras->hosts_plugins = !o->closed && o->lib == LIB_NONE && !o->library &&
                             whole_hosts_plugins(program);
+    /* DESIGN: a program that loads libraries keeps the hooks as well,
+       which Eddie decided for audit finding S29. A closed one loads
+       none. */
+    if (o->no_hooks && extras->hosts_plugins) {
+        fprintf(stderr,
+                "%s: error: the program loads libraries, and `--no-hooks` "
+                "drops the hooks that count their objects for `unload`; "
+                "build it without `--no-hooks`, or with `--closed`\n",
+                o->input);
+        return 1;
+    }
     extras->regex = holds_module(program, REGEX_MODULE);
     for (i = 0; is_plugin(o) && i < program->class_count; i++) {
         const struct ir_class *c = program->classes[i];
@@ -2913,6 +2924,15 @@ int driver_run(const struct options *o)
     if (o->memory_checks && !memcheck_available(o->target)) {
         fprintf(stderr, "antic: `--memory-checks` is not available for %s\n",
                 target_name(o->target));
+        return 2;
+    }
+    /* DESIGN: `unload` refuses while an object of the library is alive,
+       and the `created` and `destroyed` hooks count them. The code of the
+       library's own classes calls both, so a plugin keeps its hooks. */
+    if (o->no_hooks && is_plugin(o)) {
+        fputs("antic: `--no-hooks` drops the hooks that count the objects of "
+              "a plugin for `unload`, and `--no-runtime` builds a plugin\n",
+              stderr);
         return 2;
     }
     memset(&extras, 0, sizeof extras);

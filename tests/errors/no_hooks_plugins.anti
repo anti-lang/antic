@@ -1,0 +1,12 @@
+//! `unload` counts the objects of a library in the `created` and `destroyed`
+//! hooks. A program that loads libraries therefore cannot drop the hooks with
+//! `--no-hooks`, and antic refuses the pair.
+import anti.plugin;
+
+fn main() -> int
+{
+	let lib = plugin.load("x.so") catch fatal;
+	lib.unload() catch fatal;
+	delete(lib);
+	return 0;
+}

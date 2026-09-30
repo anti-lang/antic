@@ -1,0 +1,1 @@
+no_hooks_plugins.anti: error: the program loads libraries, and `--no-hooks` drops the hooks that count their objects for `unload`; build it without `--no-hooks`, or with `--closed`
