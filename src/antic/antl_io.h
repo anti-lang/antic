@@ -1,11 +1,12 @@
 #ifndef ANTIC_ANTL_IO_H
 #define ANTIC_ANTL_IO_H
 
-/* The inside of the library file, which antl.c and antl_tree.c share.
-   antl.c writes and reads the header, the type table, the items and the
-   IR. antl_tree.c writes and reads the section of the generics: their
-   declarations and the checked tree of each body. No other file includes
-   this one. */
+/* The inside of the library file, which antl.c, antl_tree.c and
+   antl_verify.c share. antl.c writes and reads the header, the type
+   table, the items and the IR. antl_tree.c writes and reads the section
+   of the generics: their declarations and the checked tree of each body.
+   antl_verify.c holds what the reader built to the rules a file must
+   meet. No other file includes this one. */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -99,5 +100,30 @@ void antl_put_generics(struct writer *w);
 /* Read the section of the generics into the interface, and link each
    generic of its items to its declaration. */
 void antl_read_generics(struct reader *r);
+
+/* antl_verify.c */
+
+/* The records of the tree of one body as the reader made them, each
+   table one array in the order of the file. fn is the function the tree
+   belongs to, which stands outside the tables. */
+struct antl_tree {
+    struct item *fn;
+    struct symbol *syms;
+    size_t sym_count;
+    struct item *fns;               /* the anonymous functions */
+    size_t fn_count;
+    struct block *blocks;
+    size_t block_count;
+    struct stmt *stmts;
+    size_t stmt_count;
+    struct expr *exprs;
+    size_t expr_count;
+    struct type_expr *typexes;
+    size_t typex_count;
+};
+
+/* Whether the tree t keeps the rules the checker keeps for a tree it
+   checked. The copy pass and lowering rely on each of them. */
+bool antl_verify_tree(struct reader *r, const struct antl_tree *t);
 
 #endif

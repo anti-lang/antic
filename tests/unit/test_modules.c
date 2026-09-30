@@ -23,6 +23,8 @@ struct session {
     size_t token_lists;
     const struct interface *libraries[8];
     size_t library_count;
+    /* The interface build_damaged writes, which its damage changes. */
+    struct interface *written;
 };
 
 static void open_session(struct session *s)
@@ -239,8 +241,12 @@ static void lowers_imports(void)
 }
 
 /* Check, lower and write a library, and add its interface. */
-static bool build_library(struct session *s, const char *name,
-                          const char *source, struct text *bytes)
+/* Compile a library and write its file. damage, when set, changes the
+   checked trees of its generics before the writer reads them. */
+static bool build_damaged(struct session *s, const char *name,
+                          const char *source,
+                          void (*damage)(struct session *),
+                          struct text *bytes)
 {
     struct interface *iface = arena_alloc(&s->arena, sizeof *iface);
     struct ir_module ir;
@@ -261,10 +267,20 @@ static bool build_library(struct session *s, const char *name,
     } else {
         sema_interface(module, name, &s->arena, iface);
         s->libraries[s->library_count++] = iface;
+        if (damage != NULL) {
+            s->written = iface;
+            damage(s);
+        }
         antl_write(bytes, iface, &ir, false);
     }
     ir_module_free(&ir);
     return ok;
+}
+
+static bool build_library(struct session *s, const char *name,
+                          const char *source, struct text *bytes)
+{
+    return build_damaged(s, name, source, NULL, bytes);
 }
 
 static const char scale_source[] = "pub const SCALE: uint = 6;\n"
@@ -2036,8 +2052,287 @@ static void deep_tables(void)
     }
 }
 
+/* S01: the checked tree of a generic that a library file carries. Each
+   test below writes the tree of `tree` with one relation the checker
+   never leaves, and the reader refuses the file. */
+static const char tree_source[] =
+    "pub variant TShape { Circle { r: int }, Empty }\n"
+    "pub enum TColor: u8 { Red, Green }\n"
+    "pub fn tpair<T, U>(own x: T, y: U) -> T {\n"
+    "    return x;\n"
+    "}\n"
+    "pub fn tree<T>(own x: T, n: int, s: TShape, pairs: [](int, int),"
+    " xs: []int) -> int {\n"
+    "    let total = 0;\n"
+    "    switch s {\n"
+    "        Circle c => total = total + c.r,\n"
+    "        else => total = total + 1,\n"
+    "    }\n"
+    "    let tested = s is TShape.Circle;\n"
+    "    let made = TShape.Circle { r: n };\n"
+    "    let color = TColor.Green;\n"
+    "    for (a, b) in pairs {\n"
+    "        total = total + a + b;\n"
+    "    }\n"
+    "    for v in xs {\n"
+    "        total = total + v;\n"
+    "    }\n"
+    "    while total > 100 do {\n"
+    "        break;\n"
+    "    }\n"
+    "    {\n"
+    "        total = total + 3;\n"
+    "    }\n"
+    "    let kept = tpair(x, n);\n"
+    "    let neg = -n;\n"
+    "    let sum = total + n;\n"
+    "    let f = fn(k: int) -> int { return k + 1; };\n"
+    "    return f(sum);\n"
+    "}\n";
+
+/* The tree of the generic `tree` among the generics s writes. */
+static struct item *tree_of(struct session *s)
+{
+    size_t i;
+
+    for (i = 0; i < s->written->generic_count; i++) {
+        struct item *it = s->written->generics[i];
+        if (it->name.length == 4 && memcmp(it->name.text, "tree", 4) == 0) {
+            return it;
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no generic `tree`\n");
+    return NULL;
+}
+
+/* The statement of kind among the top statements of the body of `tree`,
+   the nth of that kind. */
+static struct stmt *tree_stmt(struct session *s, enum stmt_kind kind,
+                              size_t nth)
+{
+    struct item *it = tree_of(s);
+    size_t i;
+
+    for (i = 0; it != NULL && i < it->body->count; i++) {
+        struct stmt *st = it->body->stmts[i];
+        if (st->kind == kind && nth-- == 0) {
+            return st;
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no statement of kind %d\n", (int)kind);
+    return NULL;
+}
+
+/* The value of `let name` in the body of `tree`. */
+static struct expr *tree_let(struct session *s, const char *name)
+{
+    struct item *it = tree_of(s);
+    size_t i;
+
+    for (i = 0; it != NULL && i < it->body->count; i++) {
+        struct stmt *st = it->body->stmts[i];
+        if (st->kind == STMT_LET && st->as.let.name.length == strlen(name) &&
+            memcmp(st->as.let.name.text, name, strlen(name)) == 0) {
+            return st->as.let.value;
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no `let %s`\n", name);
+    return NULL;
+}
+
+static void otherwise_past_arms(struct session *s)
+{
+    tree_stmt(s, STMT_SWITCH, 0)->as.switch_stmt.otherwise_at = 2;
+}
+
+static void arm_case_past_cases(struct session *s)
+{
+    tree_stmt(s, STMT_SWITCH, 0)->as.switch_stmt.arms[0].variant_case =
+        65536;
+}
+
+static void cast_case_past_cases(struct session *s)
+{
+    tree_let(s, "tested")->as.cast.variant_case = 3;
+}
+
+static void literal_case_past_cases(struct session *s)
+{
+    tree_let(s, "made")->as.struct_lit.variant_case = 7;
+}
+
+static void enum_value_past_values(struct session *s)
+{
+    tree_let(s, "color")->as.field.enum_value = 9;
+}
+
+static void name_without_symbol(struct session *s)
+{
+    tree_let(s, "sum")->as.binary.right->symbol = NULL;
+}
+
+static void operand_without_type(struct session *s)
+{
+    tree_let(s, "neg")->as.unary.operand->type = NULL;
+}
+
+static void pattern_without_element(struct session *s)
+{
+    tree_stmt(s, STMT_FOR, 0)->as.for_loop.element = NULL;
+}
+
+/* Three names for the two parts of `(int, int)`. */
+static void pattern_past_parts(struct session *s)
+{
+    struct stmt *loop = tree_stmt(s, STMT_FOR, 0);
+    struct binding *names = arena_alloc(&s->arena, 3 * sizeof *names);
+
+    names[0] = loop->as.for_loop.names[0];
+    names[1] = loop->as.for_loop.names[1];
+    names[2] = loop->as.for_loop.names[1];
+    loop->as.for_loop.names = names;
+    loop->as.for_loop.name_count = 3;
+}
+
+static void walk_without_name(struct session *s)
+{
+    tree_stmt(s, STMT_FOR, 1)->as.for_loop.name_count = 0;
+}
+
+/* The `break` of the `while` in place of the loop, outside it. */
+static void break_outside_loop(struct session *s)
+{
+    struct item *it = tree_of(s);
+    size_t i;
+
+    for (i = 0; i < it->body->count; i++) {
+        struct stmt *loop = it->body->stmts[i];
+        if (loop->kind == STMT_WHILE) {
+            it->body->stmts[i] = loop->as.loop.body->stmts[0];
+            return;
+        }
+    }
+}
+
+/* Two parameters on a function whose type takes one. */
+static void closure_past_params(struct session *s)
+{
+    struct item *fn = tree_let(s, "f")->as.fn;
+    struct param *params = arena_alloc(&s->arena, 2 * sizeof *params);
+
+    params[0] = fn->params[0];
+    params[1] = fn->params[0];
+    fn->params = params;
+    fn->param_count = 2;
+}
+
+static void generic_short_of_params(struct session *s)
+{
+    tree_of(s)->param_count = 4;
+}
+
+/* One argument recorded for a copy of a generic of two. */
+static void copy_short_of_args(struct session *s)
+{
+    tree_let(s, "kept")->as.call.copy_count = 1;
+}
+
+/* The nested block holds the statement that holds it. */
+static void block_holds_itself(struct session *s)
+{
+    struct stmt *nested = tree_stmt(s, STMT_BLOCK, 0);
+
+    nested->as.block->stmts[0] = nested;
+}
+
+static void expr_holds_itself(struct session *s)
+{
+    struct expr *sum = tree_let(s, "sum");
+
+    sum->as.binary.left = sum;
+}
+
+/* One statement in two places of the body. */
+static void stmt_twice(struct session *s)
+{
+    struct stmt *nested = tree_stmt(s, STMT_BLOCK, 0);
+    struct item *it = tree_of(s);
+
+    it->body->stmts[0] = nested;
+}
+
+/* A chain of `-` as deep as depth, with the operand of `-n` at its end. */
+static void unary_chain(struct session *s, size_t depth)
+{
+    struct expr *neg = tree_let(s, "neg");
+    struct expr *chain = neg->as.unary.operand;
+    size_t k;
+
+    for (k = 0; k < depth; k++) {
+        struct expr *link = arena_alloc(&s->arena, sizeof *link);
+        *link = *neg;
+        link->as.unary.operand = chain;
+        chain = link;
+    }
+    neg->as.unary.operand = chain;
+}
+
+static void short_chain(struct session *s)
+{
+    unary_chain(s, 16);
+}
+
+static void deep_chain(struct session *s)
+{
+    unary_chain(s, ANTL_TREE_DEPTH_MAX + 16);
+}
+
+/* Read the library of tree_source written with damage, or refuse it. */
+static void tree_file(void (*damage)(struct session *),
+                      bool reads)
+{
+    struct session s;
+    struct text bytes = {0};
+
+    open_session(&s);
+    if (build_damaged(&s, "tt", tree_source, damage, &bytes)) {
+        if (reads) {
+            CHECK(reads_file(&bytes));
+        } else {
+            refuses_file((const uint8_t *)bytes.data, bytes.length, NULL);
+        }
+    }
+    text_free(&bytes);
+    close_session(&s);
+}
+
+static void damaged_trees(void)
+{
+    void (*const damages[])(struct session *) = {
+        otherwise_past_arms,     arm_case_past_cases,
+        cast_case_past_cases,    literal_case_past_cases,
+        enum_value_past_values,  name_without_symbol,
+        operand_without_type,    pattern_without_element,
+        pattern_past_parts,      walk_without_name,
+        break_outside_loop,      closure_past_params,
+        generic_short_of_params, copy_short_of_args,
+        block_holds_itself,      expr_holds_itself,
+        stmt_twice,              deep_chain};
+    size_t i;
+
+    tree_file(NULL, true);
+    tree_file(short_chain, true);
+    for (i = 0; i < sizeof damages / sizeof damages[0]; i++) {
+        tree_file(damages[i], false);
+    }
+}
+
 void test_modules(void)
 {
+    damaged_trees();
     deep_tables();
     imports();
     cycles();

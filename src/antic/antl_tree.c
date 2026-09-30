@@ -1155,6 +1155,12 @@ static void io_expr_body(struct io *io, struct expr *e)
                     ? (uint8_t)e->as.simd.simd->field_count
                     : 0;
         io_u8(io, &lanes);
+        if (reading(io) && lanes != 0 &&
+            (e->as.simd.simd == NULL ||
+             lanes != e->as.simd.simd->field_count)) {
+            bad(io);
+            lanes = 0;
+        }
         if (reading(io)) {
             e->as.simd.lanes =
                 lanes == 0 ? NULL
@@ -1970,6 +1976,9 @@ static struct item *tree_owner(struct reader *r, uint8_t kind, uint32_t owner,
     return kind == 0 ? it : it->members[member];
 }
 
+/* DESIGN: the reader gives each table of a tree one array of its
+   records, in the order of the file. The verifier then finds the mark of
+   a record from its address alone. */
 static void read_tree(struct reader *r, struct symbol **externs,
                       uint32_t extern_count)
 {
@@ -1980,6 +1989,9 @@ static void read_tree(struct reader *r, struct symbol **externs,
     struct tree t;
     struct io io;
     struct item *fn;
+    struct antl_tree nodes;
+    void *records[T_COUNT];
+    uint32_t counts[T_COUNT];
     uint8_t kind = antl_get_u8(r);
     uint32_t owner = antl_get_u32(r);
     uint32_t member = antl_get_u32(r);
@@ -1995,19 +2007,25 @@ static void read_tree(struct reader *r, struct symbol **externs,
         return;
     }
     memset(&t, 0, sizeof t);
+    memset(counts, 0, sizeof counts);
+    memset(records, 0, sizeof records);
     t.fn = fn;
     for (k = 0; k < T_COUNT && !r->failed; k++) {
-        uint32_t n = antl_get_count(r, 1);
         struct table *table = &t.tables[k];
-        table->count = n + (k == T_ITEM ? 1 : 0);
+        counts[k] = antl_get_count(r, 1);
+        records[k] = antl_allocate(r, counts[k], sizes[k]);
+        /* Item 0 is the function, which the reader has. */
+        table->count = counts[k] + (k == T_ITEM ? 1 : 0);
         table->items = calloc(table->count + 1, sizeof *table->items);
         if (table->items == NULL) {
             out_of_memory();
         }
-        for (i = 0; i < table->count; i++) {
-            table->items[i] = k == T_ITEM && i == 0
-                                  ? (void *)fn
-                                  : antl_allocate(r, 1, sizes[k]);
+        for (i = 0; i < counts[k]; i++) {
+            table->items[i + (k == T_ITEM ? 1 : 0)] =
+                (char *)records[k] + i * sizes[k];
+        }
+        if (k == T_ITEM) {
+            table->items[0] = fn;
         }
     }
     memset(&io, 0, sizeof io);
@@ -2037,11 +2055,26 @@ static void read_tree(struct reader *r, struct symbol **externs,
     for (i = 0; i < t.tables[T_TYPEX].count && !r->failed; i++) {
         io_typex_body(&io, t.tables[T_TYPEX].items[i]);
     }
-    if (fn->body == NULL && !r->failed) {
-        antl_damaged(r);
-    }
     if (fn->self != NULL) {
         fn->has_self = true;
+    }
+    if (!r->failed) {
+        nodes.fn = fn;
+        nodes.syms = records[T_SYM];
+        nodes.sym_count = counts[T_SYM];
+        nodes.fns = records[T_ITEM];
+        nodes.fn_count = counts[T_ITEM];
+        nodes.blocks = records[T_BLOCK];
+        nodes.block_count = counts[T_BLOCK];
+        nodes.stmts = records[T_STMT];
+        nodes.stmt_count = counts[T_STMT];
+        nodes.exprs = records[T_EXPR];
+        nodes.expr_count = counts[T_EXPR];
+        nodes.typexes = records[T_TYPEX];
+        nodes.typex_count = counts[T_TYPEX];
+        if (!antl_verify_tree(r, &nodes)) {
+            antl_damaged(r);
+        }
     }
     for (k = 0; k < T_COUNT; k++) {
         free(t.tables[k].items);

@@ -11,6 +11,7 @@
 set(ANTIC_CORE_SOURCES
     src/antic/antl.c
     src/antic/antl_tree.c
+    src/antic/antl_verify.c
     src/antic/applesdk.c
     src/antic/arith.c
     src/antic/arm64.c

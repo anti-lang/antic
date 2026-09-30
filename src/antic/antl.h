@@ -18,6 +18,11 @@
 #define ANTL_SUFFIX ".antl"
 #define ANTL_VERSION 73
 
+/* How deep the checked tree of a generic in a library file may nest,
+   counted in its blocks, statements, expressions, written types and
+   anonymous functions. The reader refuses a deeper tree. */
+#define ANTL_TREE_DEPTH_MAX 1024
+
 /* Append the library file of a checked and lowered module to out, with
    the package header of iface. strip_docs leaves the doc text out.
    Returns false when a count or an index does not fit in the 32 bits the
