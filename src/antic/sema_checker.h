@@ -220,6 +220,7 @@ void sema_check_at(struct checker *c, enum diag_name name, struct pos pos,
                    const char *format, ...)
     ATTRIBUTE_PRINTF(4, 5);
 const char *sema_tn(const struct type *t);
+void sema_check_nesting(struct checker *c, struct type *t, struct pos pos);
 struct type *sema_builtin(struct checker *c, enum type_kind kind);
 bool sema_is_error(const struct type *t);
 bool sema_same_name(const struct name *a, const struct name *b);

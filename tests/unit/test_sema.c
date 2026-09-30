@@ -1143,3 +1143,61 @@ void test_sema_generic_copies(void)
     rejects("class Box<T> { }\nclass Box<T> { struct Node { x: int } }\n",
             2, 7, "`Box` is already declared");
 }
+
+/* Chains of types the program writes are walked without a recursion
+   per link, and the values of a struct nest at most 256 levels. */
+void test_sema_chains(void)
+{
+    struct text source = {0};
+    int i;
+
+    /* Each struct holds the next by value. */
+    for (i = 0; i < 20000; i++) {
+        text_appendf(&source, "struct S%d { a: S%d }\n", i, i + 1);
+    }
+    text_append(&source, "struct S20000 { x: int }\n");
+    rejects(text_cstr(&source), 1, 8,
+            "the values of struct `S0` nest deeper than 256 levels");
+    text_free(&source);
+    /* 256 levels fit, and 257 do not. */
+    for (i = 0; i < 255; i++) {
+        text_appendf(&source, "struct S%d { a: S%d }\n", i, i + 1);
+    }
+    text_append(&source, "struct S255 { x: int }\n"
+                         "fn f(s: S254) -> int { return s.a.x; }\n");
+    accepts(text_cstr(&source));
+    text_free(&source);
+    text_append(&source, "struct T { s: S0 }\n");
+    for (i = 0; i < 255; i++) {
+        text_appendf(&source, "struct S%d { a: S%d }\n", i, i + 1);
+    }
+    text_append(&source, "struct S255 { x: int }\n");
+    rejects(text_cstr(&source), 1, 8,
+            "the values of struct `T` nest deeper than 256 levels");
+    text_free(&source);
+    /* An array is a level, and so is a tuple and a `?T`. */
+    for (i = 0; i < 128; i++) {
+        text_appendf(&source, "class C%d { a: [2]C%d, }\n", i, i + 1);
+    }
+    text_append(&source, "class C128 { x: int = 0, }\n");
+    rejects(text_cstr(&source), 1, 7,
+            "the values of class `C0` nest deeper than 256 levels");
+    text_free(&source);
+    for (i = 0; i < 100; i++) {
+        text_appendf(&source, "struct P%d { a: (int, ?P%d) }\n", i, i + 1);
+    }
+    text_append(&source, "struct P100 { x: int }\n");
+    rejects(text_cstr(&source), 1, 8,
+            "the values of struct `P0` nest deeper than 256 levels");
+    text_free(&source);
+    /* A struct measured before stands deeper in the next one. */
+    text_append(&source, "struct E { a: S0 }\n");
+    for (i = 0; i < 254; i++) {
+        text_appendf(&source, "struct S%d { a: S%d }\n", i, i + 1);
+    }
+    text_append(&source, "struct S254 { x: int }\n"
+                         "struct D { a: [1][1][1]S0 }\n");
+    rejects(text_cstr(&source), 257, 8,
+            "the values of struct `D` nest deeper than 256 levels");
+    text_free(&source);
+}

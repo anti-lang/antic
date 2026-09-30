@@ -302,7 +302,10 @@ struct type {
        NULL for any other parameter. */
     struct type *hook_owner;
 
-    enum layout_state layout;       /* TYPE_STRUCT, for the cycle check */
+    /* The walk of types_nest: its state, and the number of levels the
+       values of the type nest once it is done. */
+    enum layout_state layout;
+    uint32_t nest;
     struct type *next;              /* the list of derived types */
 };
 
@@ -783,16 +786,25 @@ void types_set_fields(struct types *types, struct type *s,
                       const struct struct_field *fields, size_t count);
 
 /* DESIGN: the front end computes no layout, because the back end lays out
-   types for its target. The front end checks only that no struct contains
-   itself by value, directly or through size_of in an array length.
-   Returns NULL, or the struct that contains itself. */
-struct type *types_find_cycle(struct type *s);
+   types for its target. It checks that no struct contains itself by
+   value, directly or through size_of in an array length, and that the
+   values of a struct nest at most TYPES_NEST_MAX levels deep. A level is
+   each struct, class, union, tuple, variant, `?T` and array a value holds
+   inside another. The checker, the layout and the passes walk the
+   nesting by recursion, and a library file is held to the same limit.
+   See docs/decisions.md. */
+#define TYPES_NEST_MAX 256
 
-/* DESIGN: a struct that contains itself has been reported, and the
-   checker goes on to find more. Every field of s, or of a struct inside
-   it, that closes a cycle takes the type error. No later walk over fields
-   then recurses without end, and each use of such a field is quiet. */
-void types_break_cycles(struct type *s, struct type *error);
+enum nest_result { NEST_FITS, NEST_CYCLE, NEST_DEEP };
+
+/* Measure how deep the values of s nest. The walk recurses no deeper
+   than TYPES_NEST_MAX and measures each struct once. Without error it
+   stops at the first field that closes a cycle or passes the limit.
+   With error, each such field takes the type error and the walk goes on,
+   so no later walk over fields recurses without end or past the limit,
+   and each use of such a field is quiet. A cycle is reported before a
+   nesting that is too deep. */
+enum nest_result types_nest(struct type *s, struct type *error);
 
 /* The name of t as a program writes it, with int, float and byte for the
    aliased types. */

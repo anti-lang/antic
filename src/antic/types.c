@@ -714,6 +714,7 @@ struct type *types_flags(struct types *types)
     }
     types_set_fields(types, types->flags, fields, 4);
     types->flags->layout = LAYOUT_DONE;
+    types->flags->nest = 1;
     return types->flags;
 }
 
@@ -754,6 +755,7 @@ struct type *types_field_descriptor(struct types *types)
                                             types_builtin(types, TYPE_U8));
     types_set_fields(types, types->field_record, fields, 5);
     types->field_record->layout = LAYOUT_DONE;
+    types->field_record->nest = 1;
     return types->field_record;
 }
 
@@ -795,6 +797,7 @@ static struct type *handle_struct(struct types *types, const char *name,
     }
     types_set_fields(types, t, &field, 1);
     t->layout = LAYOUT_DONE;
+    t->nest = 1;
     return t;
 }
 
@@ -841,6 +844,7 @@ struct type *types_object_lock(struct types *types)
     fields[0].type = types_mutex(types);
     types_set_fields(types, types->object_lock, fields, 3);
     types->object_lock->layout = LAYOUT_DONE;
+    types->object_lock->nest = 2;
     return types->object_lock;
 }
 
@@ -887,6 +891,7 @@ static struct type *pattern_struct(struct types *types, const char *name)
     field.vis = VIS_PUB;
     types_set_fields(types, t, &field, 1);
     t->layout = LAYOUT_DONE;
+    t->nest = 1;
     return t;
 }
 
@@ -934,6 +939,7 @@ static struct type *match_struct(struct types *types, const char *name,
     types->derived = t;
     types_set_fields(types, t, fields, count);
     t->layout = LAYOUT_DONE;
+    t->nest = 1;
     return t;
 }
 
@@ -1195,6 +1201,7 @@ struct type *types_mask(struct types *types, struct type *s)
     }
     types_set_fields(types, m, fields, s->field_count);
     m->layout = LAYOUT_DONE;
+    m->nest = 1;
     s->mask = m;
     return m;
 }
@@ -1375,89 +1382,119 @@ void types_set_fields(struct types *types, struct type *s,
     }
 }
 
-static struct type *cycle_in(struct type *t);
+/* What one walk of types_nest found, and the type a closing field takes,
+   or NULL when the walk only measures. */
+struct nest_walk {
+    struct type *error;
+    bool cycle;
+    bool deep;
+};
 
-/* The struct that a symbolic value measures with size_of and that holds
-   the struct being checked. */
-static struct type *cycle_in_symbolic(const struct symbolic *s)
+/* The height of a value that closes a cycle or passes the limit. */
+#define NEST_CLOSED UINT32_MAX
+
+static uint32_t nest_value(struct nest_walk *w, struct type *t,
+                           uint32_t depth);
+
+/* The larger of two heights, either of which may be NEST_CLOSED. */
+static uint32_t nest_max(uint32_t a, uint32_t b)
 {
-    struct type *cycle = NULL;
+    return a > b ? a : b;
+}
+
+/* How deep the structs that a symbolic value measures with size_of
+   nest, at the depth of the array whose length it is. */
+static uint32_t nest_symbolic(struct nest_walk *w, const struct symbolic *s,
+                              uint32_t depth)
+{
+    uint32_t a;
 
     if (s == NULL) {
-        return NULL;
+        return 0;
     }
     if (s->kind == SYMBOLIC_SIZE_OF) {
-        return cycle_in(s->of);
+        return nest_value(w, s->of, depth);
     }
-    cycle = cycle_in_symbolic(s->a);
-    return cycle != NULL ? cycle : cycle_in_symbolic(s->b);
+    a = nest_symbolic(w, s->a, depth);
+    return a == NEST_CLOSED ? a : nest_max(a, nest_symbolic(w, s->b, depth));
 }
 
-/* A struct inside a value of type t that contains itself. Pointers,
-   slices and function pointers hold no value of their element. t is NULL
-   for the base field of a class whose base was refused. */
-static struct type *cycle_in(struct type *t)
+/* How many levels the struct s nests, standing depth levels inside the
+   struct the walk began with. */
+static uint32_t nest_fields(struct nest_walk *w, struct type *s,
+                            uint32_t depth)
 {
-    struct type *cycle;
-
-    while (t != NULL && t->kind == TYPE_ARRAY) {
-        if ((cycle = cycle_in_symbolic(t->length_of)) != NULL) {
-            return cycle;
-        }
-        t = t->element;
-    }
-    return type_has_fields(t) ? types_find_cycle(t) : NULL;
-}
-
-struct type *types_find_cycle(struct type *s)
-{
-    struct type *cycle;
+    uint32_t height = 0;
     size_t i;
 
     if (s->layout == LAYOUT_DONE) {
-        return NULL;
+        return s->nest;
     }
     if (s->layout == LAYOUT_BUSY) {
-        return s;
+        w->cycle = true;
+        return NEST_CLOSED;
+    }
+    if (depth >= TYPES_NEST_MAX) {
+        w->deep = true;
+        return NEST_CLOSED;
     }
     s->layout = LAYOUT_BUSY;
     for (i = 0; i < s->field_count; i++) {
-        if ((cycle = cycle_in(s->fields[i].type)) != NULL) {
-            s->layout = LAYOUT_NONE;
-            return cycle;
+        uint32_t h = nest_value(w, s->fields[i].type, depth + 1);
+        /* A struct measured before may stand too deep here. */
+        if (h != NEST_CLOSED && h > TYPES_NEST_MAX - depth - 1) {
+            w->deep = true;
+            h = NEST_CLOSED;
         }
+        if (h == NEST_CLOSED) {
+            if (w->error == NULL) {
+                s->layout = LAYOUT_NONE;
+                return NEST_CLOSED;
+            }
+            s->fields[i].type = w->error;
+            h = 0;
+        }
+        height = nest_max(height, h);
     }
     s->layout = LAYOUT_DONE;
-    return NULL;
+    s->nest = height + 1;
+    return s->nest;
 }
 
-/* A walk in depth from s. A field closes a cycle when its value holds a
-   struct still on the path, or its array length measures a struct that
-   contains itself. */
-void types_break_cycles(struct type *s, struct type *error)
+/* How many levels a value of type t nests: 0 for one that holds no
+   struct and is no array. t is NULL for the base field of a class whose
+   base was refused. Pointers, slices and function pointers hold no value
+   of their element. */
+static uint32_t nest_value(struct nest_walk *w, struct type *t,
+                           uint32_t depth)
 {
-    size_t i;
+    uint32_t length;
+    uint32_t element;
 
-    if (s->layout != LAYOUT_NONE) {
-        return;
+    if (t != NULL && t->kind == TYPE_ARRAY) {
+        if (depth >= TYPES_NEST_MAX) {
+            w->deep = true;
+            return NEST_CLOSED;
+        }
+        length = nest_symbolic(w, t->length_of, depth + 1);
+        element = length == NEST_CLOSED
+                      ? NEST_CLOSED
+                      : nest_value(w, t->element, depth + 1);
+        return element == NEST_CLOSED ? NEST_CLOSED
+                                      : nest_max(length, element) + 1;
     }
-    s->layout = LAYOUT_BUSY;
-    for (i = 0; i < s->field_count; i++) {
-        struct type *t = s->fields[i].type;
-        bool closes = false;
-        while (t != NULL && t->kind == TYPE_ARRAY && !closes) {
-            closes = cycle_in_symbolic(t->length_of) != NULL;
-            t = t->element;
-        }
-        if (!closes && type_has_fields(t)) {
-            closes = t->layout == LAYOUT_BUSY;
-            types_break_cycles(t, error);
-        }
-        if (closes) {
-            s->fields[i].type = error;
-        }
-    }
-    s->layout = LAYOUT_DONE;
+    return type_has_fields(t) ? nest_fields(w, t, depth) : 0;
+}
+
+enum nest_result types_nest(struct type *s, struct type *error)
+{
+    struct nest_walk w;
+
+    w.error = error;
+    w.cycle = false;
+    w.deep = false;
+    nest_fields(&w, s, 0);
+    return w.cycle ? NEST_CYCLE : w.deep ? NEST_DEEP : NEST_FITS;
 }
 
 void type_name(struct text *out, const struct type *t)

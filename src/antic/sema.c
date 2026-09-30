@@ -2779,8 +2779,27 @@ static void declare_fields(struct checker *c, struct item *it)
     sema_generic_ready(c, it->symbol->type);
 }
 
+/* Refuse a struct, a union, a class or a variant t that contains
+   itself or nests deeper than TYPES_NEST_MAX levels, at pos. The field
+   that closes it takes the type error. */
+void sema_check_nesting(struct checker *c, struct type *t, struct pos pos)
+{
+    const char *kind = t->kind == TYPE_VARIANT ? "variant"
+                       : t->kind == TYPE_CLASS ? "class"
+                       : t->is_union           ? "union"
+                                               : "struct";
+    enum nest_result nest = types_nest(t, sema_builtin(c, TYPE_ERROR));
+
+    if (nest == NEST_CYCLE) {
+        sema_error_at(c, pos, "%s `%s` contains itself", kind, sema_tn(t));
+    } else if (nest == NEST_DEEP) {
+        sema_error_at(c, pos, "the values of %s `%s` nest deeper than %d "
+                      "levels", kind, sema_tn(t), TYPES_NEST_MAX);
+    }
+}
+
 /* The fields of every struct, union and class, then the refusal of a
-   type that contains itself. */
+   type that contains itself or nests too deep. */
 static void declare_all_fields(struct checker *c)
 {
     const struct module *module = c->module;
@@ -2799,16 +2818,10 @@ static void declare_all_fields(struct checker *c)
     }
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
-        const char *kind = it->kind == ITEM_STRUCT    ? "struct"
-                           : it->kind == ITEM_UNION   ? "union"
-                           : it->kind == ITEM_CLASS   ? "class"
-                           : it->kind == ITEM_VARIANT ? "variant"
-                                                      : NULL;
-        if (it->symbol != NULL && kind != NULL &&
-            types_find_cycle(it->symbol->type) != NULL) {
-            sema_error_at(c, it->name_pos, "%s `%.*s` contains itself", kind,
-                          (int)it->name.length, it->name.text);
-            types_break_cycles(it->symbol->type, sema_builtin(c, TYPE_ERROR));
+        if (it->symbol != NULL &&
+            (it->kind == ITEM_STRUCT || it->kind == ITEM_UNION ||
+             it->kind == ITEM_CLASS || it->kind == ITEM_VARIANT)) {
+            sema_check_nesting(c, it->symbol->type, it->name_pos);
         }
     }
 }

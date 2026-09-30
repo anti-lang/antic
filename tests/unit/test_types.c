@@ -109,7 +109,8 @@ void test_types(void)
     fields[2].name = name_of("flag");
     fields[2].type = u8;
     types_set_fields(&types, pixel, fields, 3);
-    CHECK(types_find_cycle(pixel) == NULL);
+    CHECK(types_nest(pixel, NULL) == NEST_FITS);
+    CHECK(pixel->nest == 1);
 
     /* A length computed from size_of is a symbolic value. Equal values
        are one node, so arrays of equal length are one type. */
@@ -147,7 +148,11 @@ void test_types(void)
     fields[1].name = name_of("value");
     fields[1].type = node;
     types_set_fields(&types, node, fields, 2);
-    CHECK(types_find_cycle(node) == node);
+    CHECK(types_nest(node, NULL) == NEST_CYCLE);
+    CHECK(types_nest(node, types_builtin(&types, TYPE_ERROR)) == NEST_CYCLE);
+    CHECK(node->fields[1].type == types_builtin(&types, TYPE_ERROR));
+    CHECK(node->fields[0].type == types_pointer(&types, node));
+    CHECK(types_nest(node, NULL) == NEST_FITS);
 
     CHECK(type_pointer_free(i64));
     CHECK(type_pointer_free(str));

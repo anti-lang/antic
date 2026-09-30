@@ -1451,14 +1451,15 @@ void antl_read_param_owned(struct reader *r, struct symbol *sym)
 
 enum { MAP_NONE, MAP_BUSY, MAP_DONE };
 
-/* DESIGN: one limit bounds how deep the tables of a library file nest.
-   It covers the structs of the type table and the aggregates and the
-   symbolic values of the IR. The reader recurses no deeper than the
-   limit when it follows an index on demand. A table whose entries point
-   back is read without recursion, and it is refused when it nests
-   deeper. The checker, the layout and the passes walk the same nesting
-   recursively. See docs/decisions.md. */
-enum { NEST_LIMIT = 256 };
+/* DESIGN: one limit bounds how deep the tables of a library file nest,
+   TYPES_NEST_MAX of types.h, the limit of the checker as well. It covers
+   the structs of the type table and the aggregates and the symbolic
+   values of the IR. The reader recurses no deeper than the limit when it
+   follows an index on demand. A table whose entries point back is read
+   without recursion, and it is refused when it nests deeper. types_nest
+   measures the type table as it measures the types of the source. The
+   checker, the layout and the passes walk the same nesting recursively.
+   See docs/decisions.md. */
 
 /* The larger of two heights. */
 static uint32_t nest_max(uint32_t height, uint32_t h)
@@ -1466,146 +1467,19 @@ static uint32_t nest_max(uint32_t height, uint32_t h)
     return h > height ? h : height;
 }
 
-/* The types of a type table that hold fields, each once and sorted by
-   address, with how deep each nests. */
-struct nest {
-    const struct type **types;
-    uint32_t *heights;
-    uint8_t *states;
-    size_t count;
-};
-
-static int compare_types(const void *a, const void *b)
-{
-    uintptr_t x = (uintptr_t)*(const struct type *const *)a;
-    uintptr_t y = (uintptr_t)*(const struct type *const *)b;
-
-    return x < y ? -1 : x > y ? 1 : 0;
-}
-
-/* The place of t in n, or SIZE_MAX for a type of a library read before,
-   whose reader bounded it. */
-static size_t nest_find(const struct nest *n, const struct type *t)
-{
-    size_t low = 0;
-    size_t high = n->count;
-
-    while (low < high) {
-        size_t mid = low + (high - low) / 2;
-        if ((uintptr_t)n->types[mid] < (uintptr_t)t) {
-            low = mid + 1;
-        } else {
-            high = mid;
-        }
-    }
-    return low < n->count && n->types[low] == t ? low : SIZE_MAX;
-}
-
-static uint32_t fields_height(struct nest *n, const struct type *t,
-                              uint32_t depth);
-
-static uint32_t value_height(struct nest *n, const struct type *t,
-                             uint32_t depth);
-
-/* How deep the structs that a symbolic value measures nest. Its own
-   depth is bounded by read_symbolic. */
-static uint32_t symbolic_height(struct nest *n, const struct symbolic *s,
-                                uint32_t depth)
-{
-    uint32_t a;
-
-    if (s == NULL) {
-        return 0;
-    }
-    if (s->kind == SYMBOLIC_SIZE_OF) {
-        return value_height(n, s->of, depth);
-    }
-    a = symbolic_height(n, s->a, depth);
-    return nest_max(a, symbolic_height(n, s->b, depth));
-}
-
-/* How deep the structs inside a value of type t nest, 0 for none. The
-   elements of an array are walked without recursion. */
-static uint32_t value_height(struct nest *n, const struct type *t,
-                             uint32_t depth)
-{
-    uint32_t height = 0;
-
-    while (t->kind == TYPE_ARRAY) {
-        height = nest_max(height, symbolic_height(n, t->length_of, depth));
-        t = t->element;
-    }
-    return type_has_fields(t) ? nest_max(height, fields_height(n, t, depth))
-                              : height;
-}
-
-/* How deep the struct t nests: 1 when no field holds a struct. A cycle,
-   or a nesting deeper than NEST_LIMIT, gives UINT32_MAX. */
-static uint32_t fields_height(struct nest *n, const struct type *t,
-                              uint32_t depth)
-{
-    size_t at = nest_find(n, t);
-    uint32_t height = 0;
-    size_t i;
-
-    if (at == SIZE_MAX) {
-        return 1;
-    }
-    if (n->states[at] == MAP_DONE) {
-        return n->heights[at];
-    }
-    if (n->states[at] == MAP_BUSY || depth >= NEST_LIMIT) {
-        return UINT32_MAX;
-    }
-    n->states[at] = MAP_BUSY;
-    for (i = 0; i < t->field_count && height != UINT32_MAX; i++) {
-        height = nest_max(height, value_height(n, t->fields[i].type,
-                                               depth + 1));
-    }
-    if (height == UINT32_MAX) {
-        return UINT32_MAX;
-    }
-    n->states[at] = MAP_DONE;
-    n->heights[at] = height + 1;
-    return height + 1;
-}
-
-/* Refuse a type table whose structs, tuples and variants nest deeper
-   than NEST_LIMIT or hold themselves. types_find_cycle then recurses no
-   deeper than the limit. */
+/* Refuse a type table whose values nest deeper than TYPES_NEST_MAX or
+   hold themselves. A type of a library read before was measured by its
+   reader. */
 static void check_nesting(struct reader *r, uint32_t count)
 {
-    struct nest n;
-    size_t kept = 0;
     uint32_t i;
 
-    n.types = calloc((size_t)count + 1, sizeof *n.types);
-    n.heights = calloc((size_t)count + 1, sizeof *n.heights);
-    n.states = calloc((size_t)count + 1, sizeof *n.states);
-    if (n.types == NULL || n.heights == NULL || n.states == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
-    for (i = 0; i < count; i++) {
-        if (type_has_fields(r->table[i])) {
-            n.types[kept++] = r->table[i];
-        }
-    }
-    qsort((void *)n.types, kept, sizeof *n.types, compare_types);
-    n.count = 0;
-    for (i = 0; i < kept; i++) {
-        if (n.count == 0 || n.types[n.count - 1] != n.types[i]) {
-            n.types[n.count++] = n.types[i];
-        }
-    }
-    for (i = 0; i < n.count && !r->failed; i++) {
-        if (fields_height(&n, n.types[i], 0) > NEST_LIMIT) {
+    for (i = 0; i < count && !r->failed; i++) {
+        if (type_has_fields(r->table[i]) &&
+            types_nest(r->table[i], NULL) != NEST_FITS) {
             antl_damaged(r);
         }
     }
-    free((void *)n.types);
-    free(n.heights);
-    free(n.states);
 }
 
 /* The number of hooks a type parameter can meet, one bit each. */
@@ -2262,11 +2136,6 @@ static void read_types(struct reader *r)
     if (!r->failed) {
         check_nesting(r, count);
     }
-    for (i = 0; i < struct_count && !r->failed; i++) {
-        if (types_find_cycle(structs[i].s) != NULL) {
-            antl_damaged(r);
-        }
-    }
     free(structs);
 }
 
@@ -2479,7 +2348,7 @@ static uint32_t map_agg_at(struct reader *r, struct ir_module *program,
     size_t i;
 
     if (agg >= maps->agg_count || maps->agg_state[agg] == MAP_BUSY ||
-        depth >= NEST_LIMIT) {
+        depth >= TYPES_NEST_MAX) {
         antl_damaged(r);
         return 0;
     }
@@ -2520,7 +2389,7 @@ static uint32_t map_agg_at(struct reader *r, struct ir_module *program,
     }
     maps->agg_state[agg] = MAP_DONE;
     maps->agg_height[agg] = height + 1;
-    if (height + 1 > NEST_LIMIT) {
+    if (height + 1 > TYPES_NEST_MAX) {
         antl_damaged(r);
     }
     return maps->agg_map[agg];
@@ -2533,7 +2402,7 @@ static uint32_t map_sym_at(struct reader *r, struct ir_module *program,
     uint32_t height = 0;
 
     if (sym >= maps->sym_count || maps->sym_state[sym] == MAP_BUSY ||
-        depth >= NEST_LIMIT) {
+        depth >= TYPES_NEST_MAX) {
         antl_damaged(r);
         return 0;
     }
@@ -2586,7 +2455,7 @@ static uint32_t map_sym_at(struct reader *r, struct ir_module *program,
     }
     maps->sym_state[sym] = MAP_DONE;
     maps->sym_height[sym] = height + 1;
-    if (height + 1 > NEST_LIMIT) {
+    if (height + 1 > TYPES_NEST_MAX) {
         antl_damaged(r);
     }
     return maps->sym_map[sym];
