@@ -1,0 +1,28 @@
+//! A constant of a class is evaluated on its first use. Here that use is the
+//! type of a public constant, which the check of the nested types resolves
+//! without reporting what is wrong with it. The error of the constant is still
+//! reported, once, at the constant, whether a body names it later or not.
+
+class Named
+{
+	struct Inner { x: int }
+	const A: int = 1 / 0;
+	pub const B: [Named.A]u8 = [0; Named.A];
+
+	pub fn size(self) -> int
+	{
+		return Named.A;
+	}
+}
+
+class Unnamed
+{
+	struct Inner { x: int }
+	const A: int = 2 / 0;
+	pub const B: [Unnamed.A]u8 = [0; Unnamed.A];
+}
+
+fn main() -> int
+{
+	return 0;
+}

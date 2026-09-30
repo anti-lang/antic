@@ -36,6 +36,37 @@ struct narrowing {
     struct type *type;
 };
 
+/* One `try` block being checked. Each failing call of its body without a
+   handler of its own reaches the handler of the block, and the first one
+   gives the error that handler binds. */
+struct try_record {
+    struct type *error_type;    /* `?*Error` of the first failing call */
+};
+
+/* DESIGN: the context of the code being checked is where it stands and
+   how it is checked. sema_enter makes one current and sema_leave puts the
+   one before it back, and nothing else writes it. A switch written by
+   hand saved some fields and not others, so a constant first evaluated in
+   a signature resolved its names there and a `try` lost the error type of
+   the one around it (S04 of the audit). A declaration that is resolved on
+   its first use, a constant, an alias or a constraint set, is resolved in
+   the context of the declaration, which sema_declaration_context gives.
+   That context is never quiet, so a probe caches no result a loud check
+   would not, and the declaration reports its own errors at its place. */
+struct context {
+    struct scope *scope;        /* the innermost block, or the module's */
+    struct item *function;      /* the function whose body is checked */
+    /* The item whose nested types, and those of the classes around it,
+       are named as written. NULL at module level. */
+    const struct item *within;
+    /* The function whose signature is resolved now, whose type
+       parameters its types name. NULL outside a signature. */
+    const struct item *signature;
+    struct try_record *in_try;  /* the enclosing `try` block, or NULL */
+    int quiet;                  /* above 0, errors are not reported */
+    bool target_sized;          /* a symbolic array length is allowed */
+};
+
 struct scope {
     struct scope *parent;
     struct scope_entry *entries;
@@ -45,6 +76,7 @@ struct scope {
     size_t narrowed_count;
     size_t narrowed_capacity;
     int depth;                  /* the blocks around it, 0 for a module */
+    struct context outer;       /* the context sema_leave_scope puts back */
 };
 
 /* A field of a concurrent class of the module that a write outside
@@ -74,23 +106,15 @@ struct checker {
     const struct interface *const *libraries;
     size_t library_count;
     struct scope module_scope;
-    struct scope *scope;
-    struct item *function;      /* the function whose body is checked */
-    /* The item whose nested types, and those of the classes around it,
-       are named as written. NULL at module level. */
-    const struct item *within;
+    struct context ctx;         /* written by sema_enter and sema_leave */
     int loop_depth;
     struct stmt *fallthrough;   /* the one that ends the arm checked now */
-    bool target_sized;          /* a symbolic array length is allowed */
     bool atomic_place;          /* the place of an atomic operation */
     bool program;               /* the build writes a program, not a library */
     struct type *yields;        /* the type `yield` gives in a handler */
     int handler_depth;          /* above 0, a `yield` has a place to go */
-    struct block *try_block;    /* the body of the enclosing `try` block */
-    struct type *error_type;    /* `*Error` of the first failing call */
     bool saw_fail;              /* the body holds a `fail` or a `try` */
     const struct expr *top_call; /* the first statement's call, or NULL */
-    int quiet;                  /* above 0, errors are not reported */
     int deferring;              /* above 0, a `defer` or `undo` is checked */
     const struct expr *field_base; /* the base of the field checked now */
     const struct held_mutex *held; /* the `sync` blocks around it */
@@ -105,9 +129,6 @@ struct checker {
     /* What a `lent` pointer refused where it stands would be: stored,
        returned or passed on. The message of the refusal names it. */
     enum lent_use lent_use;
-    /* The function whose signature is resolved now, whose type
-       parameters its types name. NULL outside a signature. */
-    const struct item *signature;
     /* The callee of the call checked now, which may name a generic
        function without its arguments. */
     const struct expr *callee;
@@ -222,6 +243,22 @@ void sema_warn_catch_shadow(struct checker *c, const struct name *name,
                             struct pos pos);
 void sema_enter_scope(struct checker *c, struct scope *s);
 void sema_leave_scope(struct checker *c, struct scope *s);
+/* The only writers of c->ctx. sema_enter makes next the context and
+   keeps the one it replaces in saved, and sema_leave puts saved back. */
+void sema_enter(struct checker *c, const struct context *next,
+                struct context *saved);
+void sema_leave(struct checker *c, const struct context *saved);
+/* sema_enter with the context that differs from the current one in the
+   one field each names. */
+void sema_enter_quiet(struct checker *c, struct context *saved);
+void sema_enter_sized(struct checker *c, struct context *saved);
+void sema_enter_within(struct checker *c, const struct item *within,
+                       struct context *saved);
+/* The context of a declaration at module level, or in the body of the
+   class within: the module scope, no function and no signature, and
+   never quiet. */
+struct context sema_declaration_context(struct checker *c,
+                                        const struct item *within);
 struct type *sema_narrowed_type(const struct checker *c,
                                 const struct symbol *sym);
 void sema_narrow(struct checker *c, struct symbol *sym, struct type *t);

@@ -277,16 +277,17 @@ bool sema_undefined_on_constants(struct checker *c, struct expr *e,
 {
     struct const_value a;
     struct const_value b;
+    struct context saved;
     bool constant;
 
-    c->quiet++;
+    sema_enter_quiet(c, &saved);
     if (e->kind == EXPR_CAST) {
         constant = sema_eval_const(c, e->as.cast.operand, &a);
     } else {
         constant = sema_eval_const(c, e->as.binary.left, &a) &&
                    sema_eval_const(c, e->as.binary.right, &b);
     }
-    c->quiet--;
+    sema_leave(c, &saved);
     return constant &&
            reports_undefined(c, e, result, &a,
                              e->kind == EXPR_CAST ? NULL : &b);
@@ -947,22 +948,29 @@ static void const_deps_of(struct const_deps *d, const struct expr *e)
     }
 }
 
-/* Add the constants the value of sym names to d, in the scope the value
-   is checked in. */
+/* Enter the context the value of sym is checked in. A constant of the
+   module or of a class takes that of its declaration, wherever it is
+   first named, and a local constant stays in the body it stands in. */
+static void enter_const(struct checker *c, const struct symbol *sym,
+                        struct context *saved)
+{
+    struct context at =
+        sym->item != NULL ? sema_declaration_context(c, sema_within(sym->item))
+                          : c->ctx;
+
+    sema_enter(c, &at, saved);
+}
+
+/* Add the constants the value of sym names to d, in the context the
+   value is checked in. */
 static void const_deps_of_symbol(struct const_deps *d, struct symbol *sym)
 {
-    struct scope *saved = d->c->scope;
-    const struct item *within = d->c->within;
+    struct context saved;
 
-    if (sym->item != NULL) {
-        d->c->scope = &d->c->module_scope;
-        d->c->within = sema_within(sym->item);
-        const_deps_of(d, sym->item->value);
-    } else {
-        const_deps_of(d, sym->stmt->as.let.value);
-    }
-    d->c->scope = saved;
-    d->c->within = within;
+    enter_const(d->c, sym, &saved);
+    const_deps_of(d, sym->item != NULL ? sym->item->value
+                                       : sym->stmt->as.let.value);
+    sema_leave(d->c, &saved);
 }
 
 /* Whether a value of type t holds a class, itself or in a field or an
@@ -1093,8 +1101,7 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
 {
     struct type_expr *type_expr;
     struct expr *value;
-    struct scope *saved = c->scope;
-    const struct item *within = c->within;
+    struct context saved;
     struct type *t;
     bool ok;
 
@@ -1114,9 +1121,13 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
             return sym->value != NULL;
         }
     }
+    /* The refusal is kept, so it is reported in the context of the
+       constant, which a quiet probe does not silence. */
     if (c->const_depth >= CONST_DEPTH_MAX) {
+        enter_const(c, sym, &saved);
         sema_error_at(c, use, "`%.*s` needs a chain of more than %d constants",
                       (int)sym->name.length, sym->name.text, CONST_DEPTH_MAX);
+        sema_leave(c, &saved);
         sym->type = sema_builtin(c, TYPE_ERROR);
         sym->state = EVAL_DONE;
         return false;
@@ -1126,12 +1137,11 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
     if (sym->item != NULL) {
         type_expr = sym->item->type;
         value = sym->item->value;
-        c->scope = &c->module_scope;
-        c->within = sema_within(sym->item);
     } else {
         type_expr = sym->stmt->as.let.type;
         value = sym->stmt->as.let.value;
     }
+    enter_const(c, sym, &saved);
     t = sema_resolve_type(c, type_expr);
     ok = !sema_is_error(t);
     /* DESIGN: a class holds its base, its tables and the defaults of
@@ -1154,7 +1164,6 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
     sym->type = ok ? t : sema_builtin(c, TYPE_ERROR);
     sym->state = EVAL_DONE;
     c->const_depth--;
-    c->scope = saved;
-    c->within = within;
+    sema_leave(c, &saved);
     return ok;
 }

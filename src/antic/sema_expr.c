@@ -707,13 +707,13 @@ static bool require_owned(struct checker *c, struct expr *e,
     if (is_fn_dup(e)) {
         return true;
     }
-    if (sym != NULL && sym->kind == SYMBOL_PARAM && sym->frame != c->function) {
+    if (sym != NULL && sym->kind == SYMBOL_PARAM && sym->frame != c->ctx.function) {
         sema_error_at(c, e->pos, "`%.*s` is captured, and a closure does not "
                       "move what it captures", (int)sym->name.length,
                       sym->name.text);
         return false;
     }
-    if (sym != NULL && sym->kind == SYMBOL_PARAM && c->quiet == 0) {
+    if (sym != NULL && sym->kind == SYMBOL_PARAM && c->ctx.quiet == 0) {
         if (c->loop_depth > 0) {
             sema_error_at(c, e->pos, "`%.*s` moves into an owner inside a "
                           "loop, which would move it again",
@@ -865,20 +865,22 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
        test the program wrote. */
     if (expected->kind == TYPE_OPTIONAL && got->kind != TYPE_OPTIONAL &&
         got->kind != TYPE_NONE) {
+        struct context quiet;
         bool held;
-        c->quiet++;
+        sema_enter_quiet(c, &quiet);
         held = sema_require(c, e, got, expected->element);
-        c->quiet--;
+        sema_leave(c, &quiet);
         if (held) {
             e->to_optional = expected;
             return true;
         }
     }
     if (got->kind == TYPE_OPTIONAL && expected->kind != TYPE_OPTIONAL) {
+        struct context quiet;
         bool held;
-        c->quiet++;
+        sema_enter_quiet(c, &quiet);
         held = sema_require(c, e, got->element, expected);
-        c->quiet--;
+        sema_leave(c, &quiet);
         if (held) {
             e->to_iface = NULL;
             e->to_context = false;
@@ -1712,6 +1714,7 @@ static struct expr *class_operator(struct checker *c, struct type *t,
     struct expr *callee;
     struct expr **args;
     struct type *sig;
+    struct context quiet;
     size_t i;
     bool ok;
 
@@ -1726,9 +1729,9 @@ static struct expr *class_operator(struct checker *c, struct type *t,
     call = sema_new_node(c, EXPR_CALL, pos);
     callee = sema_new_node(c, EXPR_NAME, pos);
     args = arena_alloc(c->arena, count * sizeof *args);
-    c->quiet++;
+    sema_enter_quiet(c, &quiet);
     sig = sema_operator_copy(c, call, fn->type, fn, t, count > 1 ? t : NULL);
-    c->quiet--;
+    sema_leave(c, &quiet);
     if (sig == NULL || sema_is_error(sig) || sig->param_count != count ||
         sig->result == NULL || sig->result->kind != result) {
         return NULL;
@@ -2933,10 +2936,11 @@ static struct type *check_coalesce(struct checker *c, struct expr *e,
     if (!type_is_nullable(got) && got->kind != TYPE_NONE &&
         !sema_is_error(got)) {
         struct type *bare = types_without_none(c->types, left);
+        struct context quiet;
         bool held;
-        c->quiet++;
+        sema_enter_quiet(c, &quiet);
         held = sema_require(c, right, got, bare);
-        c->quiet--;
+        sema_leave(c, &quiet);
         if (held) {
             return bare;
         }
@@ -3121,7 +3125,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         /* A local of another frame is a variable an anonymous function
            captures. */
         if ((sym->kind == SYMBOL_LOCAL || sym->kind == SYMBOL_PARAM) &&
-            sym->frame != NULL && sym->frame != c->function) {
+            sym->frame != NULL && sym->frame != c->ctx.function) {
             sema_capture(c, sym);
         }
         if (sym->kind == SYMBOL_EXTERN_FN && sym->variadic) {
@@ -3173,7 +3177,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         /* A closure may run after the variable has changed, so a
            captured variable keeps its declared type. */
         if (sym->type != NULL && type_is_nullable(sym->type) &&
-            sym->frame == c->function) {
+            sym->frame == c->ctx.function) {
             struct type *proved = sema_narrowed_type(c, sym);
             if (proved != NULL) {
                 return proved;

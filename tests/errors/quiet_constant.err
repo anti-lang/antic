@@ -1,0 +1,2 @@
+quiet_constant.anti:9:17: error: `1 / 0` divides by zero
+quiet_constant.anti:21:17: error: `2 / 0` divides by zero

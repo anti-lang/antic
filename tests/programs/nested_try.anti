@@ -1,0 +1,30 @@
+//! A `try` inside another `try` hands the error type of the outer block back
+//! when it ends, whatever its handler, so the outer `catch e` binds an
+//! `*Error`. The inner block holds no failing call and ends in `catch fatal`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Fail for a positive n and give n back otherwise.
+fn failing(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "outer";
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	try {
+		let n = failing(1);
+		printf("%d\n".ptr, n as c_int);
+		try {
+			printf("inner\n".ptr);
+		} catch fatal
+	} catch e {
+		printf("handled %s\n".ptr, e.text().ptr);
+	}
+	return 0;
+}

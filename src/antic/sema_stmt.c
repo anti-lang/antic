@@ -1204,8 +1204,8 @@ static void check_assign(struct checker *c, struct stmt *s)
             owner != NULL ? sema_find_field(owner,
                                             &target->as.field.name) : NULL;
         if (f != NULL && !f->writable && sema_singleton_type(owner) &&
-            (c->function == NULL ||
-             !sema_name_is(&c->function->name, "construct"))) {
+            (c->ctx.function == NULL ||
+             !sema_name_is(&c->ctx.function->name, "construct"))) {
             sema_error_at(c, target->pos,
                           "`%.*s` of singleton `%s` is read-only "
                           "after creation, and `mutable` marks a field the "
@@ -1607,7 +1607,7 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
    names the declared result and not the result of the ABI. */
 static struct type *declared_result(struct checker *c)
 {
-    const struct item *it = c->function;
+    const struct item *it = c->ctx.function;
     const struct type *t = it->symbol->type;
 
     if (!it->may_fail) {
@@ -1806,11 +1806,12 @@ static void check_flags_assign(struct checker *c, struct stmt *s)
 static void check_destructuring_let(struct checker *c, struct stmt *s)
 {
     struct symbol *value;
+    struct context sized;
     struct type *t;
 
-    c->target_sized = true;
+    sema_enter_sized(c, &sized);
     t = sema_check_expr(c, s->as.let.value, NULL);
-    c->target_sized = false;
+    sema_leave(c, &sized);
     if (s->as.let.name_count == 2 && s->as.let.guard.kind == HANDLE_NONE &&
         !sema_is_error(t) && t->kind != TYPE_TUPLE &&
         (s->as.let.value->kind == EXPR_BINARY ||
@@ -2026,11 +2027,12 @@ static void check_stmt(struct checker *c, struct stmt *s)
     switch (s->kind) {
     case STMT_LET: {
         struct type *declared;
+        struct context sized;
         if (s->as.let.name_count > 0) {
             check_destructuring_let(c, s);
             return;
         }
-        c->target_sized = true;
+        sema_enter_sized(c, &sized);
         declared = s->as.let.type != NULL ? sema_resolve_type(c, s->as.let.type)
                                           : NULL;
         /* `let m: *T = p else { }` names the type the binding has, and
@@ -2043,7 +2045,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
         } else {
             t = sema_check_expr(c, s->as.let.value, declared);
         }
-        c->target_sized = false;
+        sema_leave(c, &sized);
         /* `let m = p catch fatal` and `let m = p catch e { }` guard the
            pointer with the error forms. A call that gives a `?*T` keeps
            its handler, and the `let` takes it over here. So does the
@@ -2124,7 +2126,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
             s->as.let.symbol = sym;
             sym->holds = held_deepest(s->as.let.value);
             sym->into_fields = sema_points_into_fields(s->as.let.value,
-                                                       c->function, t);
+                                                       c->ctx.function, t);
             /* DESIGN: an atomic local lives in memory, where the atomic
                operations reach it through its address. It holds what
                one operation of the runtime moves: an integer, a `bool`,
@@ -2269,28 +2271,30 @@ static void check_stmt(struct checker *c, struct stmt *s)
     case STMT_TRY: {
         struct scope try_scope;
         struct handler *h = &s->as.try_block.handler;
-        struct block *outer_try = c->try_block;
-        struct type *outer_error = c->error_type;
+        struct try_record record = {0};
+        struct context at = c->ctx;
+        struct context saved;
         if (h->none) {
             sema_error_at(c, h->pos, "`catch none` needs a result that can "
                           "be `none`, and a `try` block gives none");
             return;
         }
-        c->try_block = s->as.try_block.body;
-        c->error_type = NULL;
+        /* The handler stands outside the block, so a failing call there
+           reaches the `try` around this one. */
+        at.in_try = &record;
+        sema_enter(c, &at, &saved);
         sema_check_block(c, s->as.try_block.body);
-        c->try_block = outer_try;
+        sema_leave(c, &saved);
         if (h->kind != HANDLE_BLOCK) {
             return;
         }
         sema_enter_scope(c, &try_scope);
         sema_declare_caught(c, h,
-                            c->error_type != NULL
-                                ? sema_caught_error(c, c->error_type)
+                            record.error_type != NULL
+                                ? sema_caught_error(c, record.error_type)
                                 : sema_builtin(c, TYPE_ERROR));
         sema_check_block(c, h->body);
         sema_leave_scope(c, &try_scope);
-        c->error_type = outer_error;
         return;
     }
     case STMT_FOR: {
@@ -2608,7 +2612,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
                          sema_check_expr(c, s->as.fail.value, t), t);
             return;
         }
-        error = c->function->symbol->type->result;
+        error = c->ctx.function->symbol->type->result;
         t = sema_caught_error(c, error);
         sema_require(c, s->as.fail.value,
                      sema_check_expr(c, s->as.fail.value, t), t);
@@ -2632,8 +2636,8 @@ static void check_stmt(struct checker *c, struct stmt *s)
         if (result->kind == TYPE_VOID) {
             sema_check_expr(c, s->as.return_value, NULL);
             sema_error_at(c, s->as.return_value->pos, "`%.*s` returns no value",
-                          (int)c->function->name.length,
-                          c->function->name.text);
+                          (int)c->ctx.function->name.length,
+                          c->ctx.function->name.text);
             return;
         }
         {
@@ -2987,16 +2991,19 @@ static void check_construct_sets(struct checker *c, const struct item *it)
 
 void sema_check_function(struct checker *c, struct item *it)
 {
+    struct context at = c->ctx;
+    struct context saved;
     struct scope params;
     size_t i;
-
-    const struct item *within = c->within;
 
     if (sema_is_error(it->symbol->type)) {
         return;
     }
-    c->function = it;
-    c->within = sema_within(it);
+    at.function = it;
+    at.within = sema_within(it);
+    at.signature = NULL;
+    at.in_try = NULL;
+    sema_enter(c, &at, &saved);
     sema_enter_scope(c, &params);
     if (it->has_self) {
         static const struct name self_name = {"self", 4};
@@ -3052,8 +3059,7 @@ void sema_check_function(struct checker *c, struct item *it)
                          (int)it->name.length, it->name.text);
     }
     c->saw_fail = false;
-    c->function = NULL;
-    c->within = within;
+    sema_leave(c, &saved);
 }
 
 /* Anonymous functions and closures */
@@ -3062,7 +3068,7 @@ void sema_check_function(struct checker *c, struct item *it)
    function that stands in it. NULL outside a function. */
 const struct item *sema_named_function(const struct checker *c)
 {
-    const struct item *it = c->function;
+    const struct item *it = c->ctx.function;
 
     while (it != NULL && it->enclosing != NULL) {
         it = it->enclosing;
@@ -3132,7 +3138,7 @@ void sema_capture(struct checker *c, struct symbol *sym)
 
     sym->address_taken = true;
     sym->captured = true;
-    for (it = c->function; it != NULL && it != sym->frame;
+    for (it = c->ctx.function; it != NULL && it != sym->frame;
          it = it->enclosing) {
         capture_in(c, it, sym);
     }
@@ -3156,7 +3162,7 @@ static struct symbol *captured_root(const struct checker *c,
     if (e->kind != EXPR_NAME || e->symbol == NULL ||
         (e->symbol->kind != SYMBOL_LOCAL &&
          e->symbol->kind != SYMBOL_PARAM) ||
-        e->symbol->frame == NULL || e->symbol->frame == c->function) {
+        e->symbol->frame == NULL || e->symbol->frame == c->ctx.function) {
         return NULL;
     }
     return e->symbol;
@@ -3170,7 +3176,7 @@ void sema_note_write(struct checker *c, const struct expr *e)
     struct item *it;
 
     sema_note_field_write(c, e);
-    for (it = c->function; sym != NULL && it != NULL && it != sym->frame;
+    for (it = c->ctx.function; sym != NULL && it != NULL && it != sym->frame;
          it = it->enclosing) {
         struct capture *cap = capture_in(c, it, sym);
         if (!cap->written) {
@@ -3193,7 +3199,7 @@ void sema_note_call(struct checker *c, const struct expr *callee)
         sym->type->concurrent) {
         return;
     }
-    for (it = c->function; it != NULL && it != sym->frame;
+    for (it = c->ctx.function; it != NULL && it != sym->frame;
          it = it->enclosing) {
         struct capture *cap = capture_in(c, it, sym);
         if (!cap->called) {
@@ -3220,13 +3226,10 @@ void sema_refuse_worker_closure(struct checker *c, const struct expr *arg,
 /* The checker's state of one function body, which an anonymous function
    sets aside while its own body is checked. */
 struct body_state {
-    struct item *function;
     int loop_depth;
     struct stmt *fallthrough;
     struct type *yields;
     int handler_depth;
-    struct block *try_block;
-    struct type *error_type;
     bool saw_fail;
     const struct expr *top_call;
     int deferring;
@@ -3236,13 +3239,10 @@ struct body_state {
 
 static void set_aside(struct checker *c, struct body_state *s)
 {
-    s->function = c->function;
     s->loop_depth = c->loop_depth;
     s->fallthrough = c->fallthrough;
     s->yields = c->yields;
     s->handler_depth = c->handler_depth;
-    s->try_block = c->try_block;
-    s->error_type = c->error_type;
     s->saw_fail = c->saw_fail;
     s->top_call = c->top_call;
     s->deferring = c->deferring;
@@ -3252,8 +3252,6 @@ static void set_aside(struct checker *c, struct body_state *s)
     c->fallthrough = NULL;
     c->yields = NULL;
     c->handler_depth = 0;
-    c->try_block = NULL;
-    c->error_type = NULL;
     c->deferring = 0;
     c->field_base = NULL;
     c->held = NULL;
@@ -3261,13 +3259,10 @@ static void set_aside(struct checker *c, struct body_state *s)
 
 static void take_back(struct checker *c, const struct body_state *s)
 {
-    c->function = s->function;
     c->loop_depth = s->loop_depth;
     c->fallthrough = s->fallthrough;
     c->yields = s->yields;
     c->handler_depth = s->handler_depth;
-    c->try_block = s->try_block;
-    c->error_type = s->error_type;
     c->saw_fail = s->saw_fail;
     c->top_call = s->top_call;
     c->deferring = s->deferring;
@@ -3413,13 +3408,15 @@ struct type *sema_check_anonymous(struct checker *c, struct expr *e,
     struct item *it = e->as.fn;
     const struct type *target = NULL;
     struct body_state state;
+    struct context at;
+    struct context saved;
     struct scope params;
     struct symbol *sym;
     struct type *fn;
     size_t i;
     bool safe = true;
 
-    if (c->function == NULL) {
+    if (c->ctx.function == NULL) {
         sema_error_at(c, e->pos, "an anonymous function stands in the body "
                       "of a function");
         return sema_builtin(c, TYPE_ERROR);
@@ -3427,7 +3424,7 @@ struct type *sema_check_anonymous(struct checker *c, struct expr *e,
     if (expected != NULL && expected->kind == TYPE_FN && !expected->bound) {
         target = expected;
     }
-    it->enclosing = c->function;
+    it->enclosing = c->ctx.function;
     it->capture_count = 0;
     fn = anonymous_type(c, it, target);
     if (fn == NULL) {
@@ -3442,7 +3439,10 @@ struct type *sema_check_anonymous(struct checker *c, struct expr *e,
     sym->may_fail = it->may_fail;
     it->symbol = sym;
     set_aside(c, &state);
-    c->function = it;
+    at = c->ctx;
+    at.function = it;
+    at.in_try = NULL;
+    sema_enter(c, &at, &saved);
     c->saw_fail = false;
     c->top_call = NULL;
     sema_enter_scope(c, &params);
@@ -3467,6 +3467,7 @@ struct type *sema_check_anonymous(struct checker *c, struct expr *e,
                          it->may_fail_pos.column,
                          "the anonymous function may fail and never does");
     }
+    sema_leave(c, &saved);
     take_back(c, &state);
     if (it->snapshot) {
         check_snapshot(c, e);

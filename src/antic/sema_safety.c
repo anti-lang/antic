@@ -521,7 +521,7 @@ bool sema_points_into_fields(const struct expr *e, const struct item *fn,
 void sema_check_leak_return(struct checker *c, const struct expr *value,
                             const struct type *result)
 {
-    const struct item *fn = c->function;
+    const struct item *fn = c->ctx.function;
     const struct type *t = guarded_api(fn);
 
     if (t != NULL && sema_points_into_fields(value, fn, result)) {

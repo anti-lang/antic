@@ -71,7 +71,7 @@ struct symbol *sema_type_param_find(const struct checker *c,
     const struct item *w;
     size_t i;
 
-    for (f = c->signature != NULL ? c->signature : c->function; f != NULL;
+    for (f = c->ctx.signature != NULL ? c->ctx.signature : c->ctx.function; f != NULL;
          f = f->enclosing) {
         for (i = 0; i < f->type_param_count; i++) {
             if (f->type_params[i].symbol != NULL &&
@@ -80,7 +80,7 @@ struct symbol *sema_type_param_find(const struct checker *c,
             }
         }
     }
-    for (w = c->within; w != NULL; w = w->outer) {
+    for (w = c->ctx.within; w != NULL; w = w->outer) {
         for (i = 0; i < w->type_param_count; i++) {
             if (w->type_params[i].symbol != NULL &&
                 sema_same_name(&w->type_params[i].name, name)) {
@@ -98,13 +98,13 @@ static bool in_generic(const struct checker *c)
     const struct item *f;
     const struct item *w;
 
-    for (f = c->signature != NULL ? c->signature : c->function; f != NULL;
+    for (f = c->ctx.signature != NULL ? c->ctx.signature : c->ctx.function; f != NULL;
          f = f->enclosing) {
         if (f->type_param_count > 0) {
             return true;
         }
     }
-    for (w = c->within; w != NULL; w = w->outer) {
+    for (w = c->ctx.within; w != NULL; w = w->outer) {
         if (w->type_param_count > 0) {
             return true;
         }
@@ -270,6 +270,8 @@ static void add_iface(struct checker *c, struct type *p,
 static bool resolve_set(struct checker *c, struct symbol *sym)
 {
     const struct item *it = sym->item;
+    struct context at = sema_declaration_context(c, NULL);
+    struct context saved;
     size_t i;
 
     if (sym->state == EVAL_DONE) {
@@ -281,9 +283,11 @@ static bool resolve_set(struct checker *c, struct symbol *sym)
         return false;
     }
     sym->state = EVAL_BUSY;
+    sema_enter(c, &at, &saved);
     for (i = 0; i < it->constraint_count; i++) {
         add_constraint(c, sym->type, &it->constraints[i]);
     }
+    sema_leave(c, &saved);
     sym->state = EVAL_DONE;
     return true;
 }
@@ -388,28 +392,27 @@ static void add_constraint(struct checker *c, struct type *p,
 
 static void resolve_params(struct checker *c, struct item *it)
 {
-    const struct item *within = c->within;
-    const struct item *signature = c->signature;
+    struct context at;
+    struct context saved;
     size_t i;
     size_t j;
 
     /* The type arguments of a constraint may name the parameters of the
        generic, or those of the class around a function. */
     if (it->kind == ITEM_FN) {
-        c->signature = it;
-        c->within = it->owner;
+        at = sema_declaration_context(c, it->owner);
+        at.signature = it;
     } else {
-        c->signature = NULL;
-        c->within = it;
+        at = sema_declaration_context(c, it);
     }
+    sema_enter(c, &at, &saved);
     for (i = 0; i < it->type_param_count; i++) {
         struct type_param *tp = &it->type_params[i];
         for (j = 0; j < tp->constraint_count; j++) {
             add_constraint(c, tp->type, &tp->constraints[j]);
         }
     }
-    c->within = within;
-    c->signature = signature;
+    sema_leave(c, &saved);
 }
 
 /* DESIGN: `type Name = T;` names T, and every use of the name is T.
@@ -418,9 +421,8 @@ static void resolve_params(struct checker *c, struct item *it)
 struct type *sema_alias_type(struct checker *c, struct symbol *sym)
 {
     struct item *it = sym->item;
-    const struct item *within = c->within;
-    const struct item *signature = c->signature;
-    struct item *function = c->function;
+    struct context at = sema_declaration_context(c, NULL);
+    struct context saved;
     struct type *t;
 
     if (sym->state == EVAL_DONE) {
@@ -433,13 +435,9 @@ struct type *sema_alias_type(struct checker *c, struct symbol *sym)
         return sym->type;
     }
     sym->state = EVAL_BUSY;
-    c->within = NULL;
-    c->signature = NULL;
-    c->function = NULL;
+    sema_enter(c, &at, &saved);
     t = sema_resolve_type(c, it->type);
-    c->within = within;
-    c->signature = signature;
-    c->function = function;
+    sema_leave(c, &saved);
     if (sym->state == EVAL_BUSY) {
         sym->type = t;
     }

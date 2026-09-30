@@ -3582,6 +3582,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "qualified_bodies|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/qualified_bodies.s,qualified_bodies.anti"
         "qualified_calls|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/qualified_calls.s,qualified_calls.anti"
         "abstract_call|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/abstract_call.s,abstract_call.anti"
+        "quiet_constant|-S,-o,${LISTINGS}/quiet_constant.s,quiet_constant.anti"
         "link_framework|-S,-o,${LISTINGS}/link_framework.s,link_framework.anti"
         "link_framework_syntax|-S,-o,${LISTINGS}/link_framework_syntax.s,link_framework_syntax.anti"
         "link_linux|-S,-o,${LISTINGS}/link_linux.s,link_linux.anti"

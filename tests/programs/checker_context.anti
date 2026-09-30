@@ -1,0 +1,21 @@
+//! A constant of the module is evaluated in the context of its declaration. `M`
+//! is first evaluated inside the signature of `sized`, whose parameter `K`
+//! hides the constant `K`, and still has the value 4 of the module.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const K: int = 3;
+const M: int = K + 1;
+
+/// The length of the array, which the module's M gives.
+fn sized<K: int>(x: [M]u8) -> int
+{
+	return M;
+}
+
+fn main() -> int
+{
+	let a: [4]u8 = [1, 2, 3, 4];
+	printf("sized %d %d\n".ptr, sized<9>(a) as c_int, M as c_int);
+	return 0;
+}

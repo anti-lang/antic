@@ -760,6 +760,7 @@ static bool atomic_call(struct checker *c, struct expr *e, struct type **out)
     struct expr *callee = e->as.call.callee;
     struct expr *place;
     struct type *t;
+    struct context quiet;
     size_t i;
 
     bool was;
@@ -781,10 +782,10 @@ static bool atomic_call(struct checker *c, struct expr *e, struct type **out)
        what is wrong with it. A probe inside another keeps its flag. */
     was = c->atomic_place;
     c->atomic_place = true;
-    c->quiet++;
+    sema_enter_quiet(c, &quiet);
     /* The place is storage, so an f16 there stays an f16. */
     t = sema_check_storage(c, place);
-    c->quiet--;
+    sema_leave(c, &quiet);
     c->atomic_place = was;
     if (t == NULL || sema_is_error(t)) {
         return false;
@@ -1012,8 +1013,8 @@ static bool method_call(struct checker *c, struct expr *call)
        reads it, and a base that fails stops the body there. A call
        anywhere else, or in any other function, is refused. */
     if (member != NULL && sema_name_is(&field->as.field.name, "construct") &&
-        (call != c->top_call || c->function == NULL ||
-         !sema_name_is(&c->function->name, "construct"))) {
+        (call != c->top_call || c->ctx.function == NULL ||
+         !sema_name_is(&c->ctx.function->name, "construct"))) {
         sema_error_at(c, field->pos, "`self.super.construct` is called at the "
                       "top of the body of `construct`");
         return false;
@@ -1223,7 +1224,7 @@ static bool is_failing(const struct type *fn)
 /* Whether the function whose body is checked may fail. */
 bool sema_in_failing_function(const struct checker *c)
 {
-    return c->function != NULL && c->function->may_fail;
+    return c->ctx.function != NULL && c->ctx.function->may_fail;
 }
 
 /* DESIGN: the error a `catch` binds belongs to the handler, which ends
@@ -1295,10 +1296,10 @@ bool sema_move_local(struct checker *c, struct expr *e,
     struct symbol *sym = e->symbol;
     const struct name *target = by->length > 0 ? by : into;
 
-    if (c->quiet > 0) {
+    if (c->ctx.quiet > 0) {
         return true;
     }
-    if (sym->frame != c->function) {
+    if (sym->frame != c->ctx.function) {
         sema_error_at(c, e->pos, "`%.*s` is captured, and a closure does not "
                       "move what it captures", (int)sym->name.length,
                       sym->name.text);
@@ -1371,7 +1372,7 @@ static void note_move(struct checker *c, const struct symbol *callee,
 
     if (callee == NULL || callee->owned == NULL ||
         index >= callee->owned_count || !callee->owned[index] ||
-        c->quiet > 0 || arg->type == NULL || sema_is_error(arg->type)) {
+        c->ctx.quiet > 0 || arg->type == NULL || sema_is_error(arg->type)) {
         return;
     }
     if (moved != NULL && moved->caught) {
@@ -1463,10 +1464,10 @@ static struct type *check_handled(struct checker *c, struct expr *e,
 
     /* Inside a `try` block every failing call reaches the one handler,
        so it needs none of its own. */
-    if (h->kind == HANDLE_NONE && c->try_block != NULL) {
+    if (h->kind == HANDLE_NONE && c->ctx.in_try != NULL) {
         h->kind = HANDLE_ENCLOSING;
-        if (c->error_type == NULL) {
-            c->error_type = fn->result;
+        if (c->ctx.in_try->error_type == NULL) {
+            c->ctx.in_try->error_type = fn->result;
         }
     }
     switch (h->kind) {

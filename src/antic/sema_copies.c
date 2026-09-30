@@ -1551,7 +1551,8 @@ static struct item *xi(struct clone *cl, struct item *it)
 static void make_body(struct copies *k, struct work *w)
 {
     struct checker *c = k->c;
-    struct item *outer_function = c->function;
+    struct context at = c->ctx;
+    struct context saved;
     struct scope scope;
     struct clone cl;
 
@@ -1563,11 +1564,12 @@ static void make_body(struct copies *k, struct work *w)
     cl.generic = w->from->owner != NULL ? w->from->owner : w->from;
     map_put(&cl.nodes, w->from, w->to);
     xparams(&cl, w->to, w->from);
-    c->function = w->to;
+    at.function = w->to;
+    sema_enter(c, &at, &saved);
     sema_enter_scope(c, &scope);
     w->to->body = xb(&cl, w->from->body);
     sema_leave_scope(c, &scope);
-    c->function = outer_function;
+    sema_leave(c, &saved);
     map_free(&cl.nodes);
 }
 
@@ -1575,7 +1577,8 @@ static void make_body(struct copies *k, struct work *w)
 static void walk_plain(struct copies *k, struct item *it)
 {
     struct clone cl;
-    struct item *outer_function = k->c->function;
+    struct context at = k->c->ctx;
+    struct context saved;
 
     if (it->body == NULL || it->type_param_count > 0) {
         return;
@@ -1583,9 +1586,10 @@ static void walk_plain(struct copies *k, struct item *it)
     memset(&cl, 0, sizeof cl);
     cl.k = k;
     cl.fresh = false;
-    k->c->function = it;
+    at.function = it;
+    sema_enter(k->c, &at, &saved);
     xb(&cl, it->body);
-    k->c->function = outer_function;
+    sema_leave(k->c, &saved);
 }
 
 /* The calls of generics that the default `==` and hash of the class it

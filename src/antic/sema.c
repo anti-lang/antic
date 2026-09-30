@@ -55,7 +55,7 @@ void sema_error_at(struct checker *c, struct pos pos, const char *format,
     char message[160];
     va_list args;
 
-    if (c->quiet > 0) {
+    if (c->ctx.quiet > 0) {
         return;
     }
     va_start(args, format);
@@ -71,7 +71,7 @@ void sema_check_at(struct checker *c, enum diag_name name, struct pos pos,
     char message[160];
     va_list args;
 
-    if (c->quiet > 0) {
+    if (c->ctx.quiet > 0) {
         return;
     }
     va_start(args, format);
@@ -148,7 +148,7 @@ static struct symbol *nested_find(const struct checker *c,
     const struct item *it;
     size_t i;
 
-    for (it = c->within; it != NULL; it = it->outer) {
+    for (it = c->ctx.within; it != NULL; it = it->outer) {
         for (i = 0; i < it->nested_count; i++) {
             const struct item *inner = it->nested[i];
             if (inner->symbol != NULL &&
@@ -160,7 +160,7 @@ static struct symbol *nested_find(const struct checker *c,
     return NULL;
 }
 
-/* An item of the module by name, the nested types of c->within first. */
+/* An item of the module by name, the nested types of c->ctx.within first. */
 struct symbol *sema_module_find(const struct checker *c,
                                 const struct name *name)
 {
@@ -179,7 +179,7 @@ struct symbol *sema_lookup(const struct checker *c, const struct name *name)
 {
     const struct scope *s;
 
-    for (s = c->scope; s != NULL; s = s->parent) {
+    for (s = c->ctx.scope; s != NULL; s = s->parent) {
         struct symbol *found = s == &c->module_scope
                                    ? sema_module_find(c, name)
                                    : sema_scope_find_local(s, name);
@@ -289,7 +289,7 @@ struct symbol *sema_declare(struct checker *c, enum symbol_kind kind,
                             const struct name *name, struct pos pos,
                             const char *duplicate_message)
 {
-    struct scope *s = c->scope;
+    struct scope *s = c->ctx.scope;
     struct symbol *sym;
 
     if (sema_scope_find_local(s, name) != NULL) {
@@ -300,7 +300,7 @@ struct symbol *sema_declare(struct checker *c, enum symbol_kind kind,
     sym->kind = kind;
     sym->name = *name;
     sym->pos = pos;
-    sym->frame = c->function;
+    sym->frame = c->ctx.function;
     sym->depth = s->depth;
     sym->loops = c->loop_depth;
     scope_put(s, name, sym);
@@ -325,7 +325,7 @@ void sema_warn_catch_shadow(struct checker *c, const struct name *name,
 {
     const struct symbol *outer;
 
-    if (c->quiet > 0 || name->length == 0) {
+    if (c->ctx.quiet > 0 || name->length == 0) {
         return;
     }
     outer = sema_lookup(c, name);
@@ -338,17 +338,68 @@ void sema_warn_catch_shadow(struct checker *c, const struct name *name,
                      name->text, (int)name->length, name->text);
 }
 
+void sema_enter(struct checker *c, const struct context *next,
+                struct context *saved)
+{
+    *saved = c->ctx;
+    c->ctx = *next;
+}
+
+void sema_leave(struct checker *c, const struct context *saved)
+{
+    c->ctx = *saved;
+}
+
+void sema_enter_quiet(struct checker *c, struct context *saved)
+{
+    struct context next = c->ctx;
+
+    next.quiet++;
+    sema_enter(c, &next, saved);
+}
+
+void sema_enter_sized(struct checker *c, struct context *saved)
+{
+    struct context next = c->ctx;
+
+    next.target_sized = true;
+    sema_enter(c, &next, saved);
+}
+
+void sema_enter_within(struct checker *c, const struct item *within,
+                       struct context *saved)
+{
+    struct context next = c->ctx;
+
+    next.within = within;
+    sema_enter(c, &next, saved);
+}
+
+struct context sema_declaration_context(struct checker *c,
+                                        const struct item *within)
+{
+    struct context at;
+
+    memset(&at, 0, sizeof at);
+    at.scope = &c->module_scope;
+    at.within = within;
+    return at;
+}
+
 void sema_enter_scope(struct checker *c, struct scope *s)
 {
+    struct context next = c->ctx;
+
     memset(s, 0, sizeof *s);
-    s->parent = c->scope;
-    s->depth = c->scope != NULL ? c->scope->depth + 1 : 0;
-    c->scope = s;
+    s->parent = c->ctx.scope;
+    s->depth = c->ctx.scope != NULL ? c->ctx.scope->depth + 1 : 0;
+    next.scope = s;
+    sema_enter(c, &next, &s->outer);
 }
 
 void sema_leave_scope(struct checker *c, struct scope *s)
 {
-    c->scope = s->parent;
+    sema_leave(c, &s->outer);
     free(s->entries);
     free(s->narrowed);
 }
@@ -362,7 +413,7 @@ struct type *sema_narrowed_type(const struct checker *c,
     const struct scope *s;
     size_t i;
 
-    for (s = c->scope; s != NULL; s = s->parent) {
+    for (s = c->ctx.scope; s != NULL; s = s->parent) {
         for (i = 0; i < s->narrowed_count; i++) {
             if (s->narrowed[i].symbol == sym) {
                 return s->narrowed[i].type;
@@ -375,7 +426,7 @@ struct type *sema_narrowed_type(const struct checker *c,
 /* Record that sym has type t for the rest of the current block. */
 void sema_narrow(struct checker *c, struct symbol *sym, struct type *t)
 {
-    struct scope *s = c->scope;
+    struct scope *s = c->ctx.scope;
     size_t i;
 
     for (i = 0; i < s->narrowed_count; i++) {
@@ -410,7 +461,7 @@ void sema_end_narrowing(struct checker *c, const struct symbol *sym)
     struct scope *s;
     size_t i;
 
-    for (s = c->scope; s != NULL; s = s->parent) {
+    for (s = c->ctx.scope; s != NULL; s = s->parent) {
         for (i = 0; i < s->narrowed_count; i++) {
             if (s->narrowed[i].symbol == sym) {
                 s->narrowed[i].type = sym->type;
@@ -502,7 +553,7 @@ struct type *sema_array_of(struct checker *c, struct expr *e,
         return sema_builtin(c, TYPE_ERROR);
     }
     if (v.kind == CONST_SYMBOLIC) {
-        if (!c->target_sized && !params_alone(v.as.symbolic)) {
+        if (!c->ctx.target_sized && !params_alone(v.as.symbolic)) {
             sema_error_at(c, e->pos,
                           "a length computed from `size_of` is allowed "
                           "only in a struct field or a local variable");
@@ -1159,12 +1210,14 @@ static struct type *function_type_of(struct checker *c, struct item *it);
    types are. */
 static struct type *function_type(struct checker *c, struct item *it)
 {
-    const struct item *saved = c->signature;
+    struct context next = c->ctx;
+    struct context saved;
     struct type *t;
 
-    c->signature = it;
+    next.signature = it;
+    sema_enter(c, &next, &saved);
     t = function_type_of(c, it);
-    c->signature = saved;
+    sema_leave(c, &saved);
     return t;
 }
 
@@ -1486,6 +1539,7 @@ static void declare_cases(struct checker *c, struct item *it)
     struct type **payloads =
         types_alloc_array(c->arena, count + 1, sizeof *payloads);
     struct type *tag;
+    struct context sized;
     size_t i;
     size_t j;
     size_t k;
@@ -1534,9 +1588,9 @@ static void declare_cases(struct checker *c, struct item *it)
             fields[j].pos = one->fields[j].pos;
             fields[j].doc = one->fields[j].doc;
             fields[j].vis = VIS_PUB;
-            c->target_sized = true;
+            sema_enter_sized(c, &sized);
             fields[j].type = sema_resolve_type(c, one->fields[j].type);
-            c->target_sized = false;
+            sema_leave(c, &sized);
             for (k = 0; k < j; k++) {
                 if (sema_same_name(&fields[k].name, &fields[j].name)) {
                     sema_error_at(c, fields[j].pos,
@@ -2302,7 +2356,7 @@ static void declare_items(struct checker *c)
         struct item *it = module->items[i];
         struct name name = declared_name(c, it);
         if (it->overloaded &&
-            sema_scope_find_local(c->scope, &name) != NULL) {
+            sema_scope_find_local(c->ctx.scope, &name) != NULL) {
             struct name type = first_type_name(it);
             sema_error_at(c, it->name_pos, "`operator fn %.*s` is already "
                           "declared for `%.*s`", (int)it->name.length,
@@ -2446,9 +2500,10 @@ static void resolve_bases(struct checker *c)
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         if (it->kind == ITEM_CLASS && it->symbol != NULL) {
-            c->within = it;
+            struct context outer;
+            sema_enter_within(c, it, &outer);
             resolve_base(c, it);
-            c->within = NULL;
+            sema_leave(c, &outer);
         }
     }
 }
@@ -2504,17 +2559,19 @@ static void declare_enums_and_variants(struct checker *c)
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         if (it->symbol != NULL && it->kind == ITEM_ENUM) {
-            c->within = it;
+            struct context outer;
+            sema_enter_within(c, it, &outer);
             declare_enum_values(c, it);
-            c->within = NULL;
+            sema_leave(c, &outer);
         }
     }
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         if (it->symbol != NULL && it->kind == ITEM_VARIANT) {
-            c->within = it;
+            struct context outer;
+            sema_enter_within(c, it, &outer);
             declare_cases(c, it);
-            c->within = NULL;
+            sema_leave(c, &outer);
         }
     }
 }
@@ -2600,6 +2657,7 @@ static void check_inject_field(struct checker *c, const struct struct_field *f,
 static void resolve_fields(struct checker *c, struct item *it,
                            struct struct_field *fields)
 {
+    struct context sized;
     size_t j;
 
     for (j = 0; j < it->param_count; j++) {
@@ -2617,9 +2675,9 @@ static void resolve_fields(struct checker *c, struct item *it,
         fields[j].inject_final = it->params[j].inject_final;
 
         fields[j].value = it->params[j].value;
-        c->target_sized = true;
+        sema_enter_sized(c, &sized);
         fields[j].type = sema_resolve_type(c, it->params[j].type);
-        c->target_sized = false;
+        sema_leave(c, &sized);
         /* An `own` field of function type holds `own fn`, which frees
            its snapshot with the object. */
         if (fields[j].owned && fields[j].type->kind == TYPE_FN &&
@@ -2733,9 +2791,10 @@ static void declare_all_fields(struct checker *c)
         if (it->symbol != NULL &&
             (it->kind == ITEM_STRUCT || it->kind == ITEM_UNION ||
              it->kind == ITEM_CLASS)) {
-            c->within = it;
+            struct context outer;
+            sema_enter_within(c, it, &outer);
             declare_fields(c, it);
-            c->within = NULL;
+            sema_leave(c, &outer);
         }
     }
     for (i = 0; i < module->item_count; i++) {
@@ -2838,9 +2897,10 @@ static void declare_all_members(struct checker *c)
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         if (it->symbol != NULL && it->symbol->type != NULL) {
-            c->within = it;
+            struct context outer;
+            sema_enter_within(c, it, &outer);
             declare_members(c, it);
-            c->within = NULL;
+            sema_leave(c, &outer);
         }
     }
     for (i = 0; i < module->item_count; i++) {
@@ -2870,18 +2930,19 @@ static void check_signatures(struct checker *c)
 
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
+        struct context outer;
         if (it->kind == ITEM_FN || it->kind == ITEM_EXTERN_FN) {
             check_defaults(c, it);
             check_owned(c, it);
         }
-        c->within = it;
+        sema_enter_within(c, it, &outer);
         for (j = 0; it->symbol != NULL && j < it->member_count; j++) {
             if (it->members[j]->kind == ITEM_FN) {
                 check_defaults(c, it->members[j]);
                 check_owned(c, it->members[j]);
             }
         }
-        c->within = NULL;
+        sema_leave(c, &outer);
     }
     /* DESIGN: a singleton has one instance, which `Config.get()` makes
        on the first call. The program never allocates one, so the checker
@@ -3500,9 +3561,10 @@ static void refuse_nested_in_signatures(struct checker *c,
         if (m->kind == ITEM_FN) {
             mt = m->symbol->type;
         } else if (m->type != NULL) {
-            c->quiet++;
+            struct context quiet;
+            sema_enter_quiet(c, &quiet);
             mt = sema_resolve_type(c, m->type);
-            c->quiet--;
+            sema_leave(c, &quiet);
         }
         if ((found = names_nested(mt, it)) == NULL) {
             continue;
@@ -3559,9 +3621,10 @@ static void check_types(struct checker *c)
         check_qualifiers(c, it, t);
         require_filled_interfaces(c, it, t);
         if (it->kind == ITEM_CLASS && it->nested_count > 0) {
-            c->within = it;
+            struct context outer;
+            sema_enter_within(c, it, &outer);
             refuse_nested_in_signatures(c, it, t);
-            c->within = NULL;
+            sema_leave(c, &outer);
         }
     }
 }
@@ -3681,6 +3744,8 @@ bool sema_check(struct module *module, const char *module_name,
                 bool program)
 {
     struct checker c;
+    struct context top;
+    struct context outside;
     size_t i;
 
     memset(&c, 0, sizeof c);
@@ -3693,7 +3758,8 @@ bool sema_check(struct module *module, const char *module_name,
     c.package = package != NULL ? package : module_name;
     c.libraries = libraries;
     c.library_count = library_count;
-    c.scope = &c.module_scope;
+    top = sema_declaration_context(&c, NULL);
+    sema_enter(&c, &top, &outside);
     c.ok = true;
     c.program = program;
     declare_root(&c);
@@ -3730,6 +3796,7 @@ bool sema_check(struct module *module, const char *module_name,
     if (c.ok && module->compile_copies) {
         sema_compile_copies(&c);
     }
+    sema_leave(&c, &outside);
     free(c.module_scope.entries);
     return c.ok;
 }
