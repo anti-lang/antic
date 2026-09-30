@@ -117,7 +117,9 @@ struct struct_field {
     uint64_t number;                /* TYPE_ENUM: the value of the name */
 };
 
-enum layout_state { LAYOUT_NONE, LAYOUT_BUSY, LAYOUT_DONE };
+/* LAYOUT_OPEN marks a type measured in one walk of types_nest that holds
+   a copy not filled yet, whose height that walk alone keeps. */
+enum layout_state { LAYOUT_NONE, LAYOUT_BUSY, LAYOUT_DONE, LAYOUT_OPEN };
 
 enum thread_safety { SAFETY_NONE, SAFETY_SYNCHRONIZED, SAFETY_CONCURRENT };
 
@@ -285,6 +287,10 @@ struct type {
        other type, whose C name is its name. */
     struct name c_name;
     bool generic_ready;             /* a generic: its fields are known */
+    /* A copy whose generic has not given it its fields yet. types_nest
+       measures it as empty and keeps no height of a type that holds it,
+       and the copy is measured when it is filled. */
+    bool unfilled;
     /* TYPE_PARAM: the declaration, the hooks its constraints give and
        the interfaces they name. The hooks hold one bit per entry of the
        hook table. The item is the generic that declares it. A `constraint` holds its set

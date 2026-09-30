@@ -1142,6 +1142,26 @@ void test_sema_generic_copies(void)
        type named the type of that symbol. */
     rejects("class Box<T> { }\nclass Box<T> { struct Node { x: int } }\n",
             2, 7, "`Box` is already declared");
+
+    /* A copy made after the pass over the items holds a copy that holds
+       it. The walk of its fields overflowed the stack. */
+    rejects_also("struct A<T> { b: B<T>, }\nstruct B<T> { a: A<T>, }\n"
+                 "fn f(c: chan A<int>) { }\n",
+                 1, 10, "struct `A<int>` contains itself");
+    /* The cycle closes when its last copy is filled, after a check of
+       the first measured the second as empty. */
+    rejects_also("struct A<T> { b: B<T>, }\ntype X = A<int>;\n"
+                 "struct B<T> { a: A<T>, }\nfn f(x: X) { }\n",
+                 3, 10, "struct `B<int>` contains itself");
+    /* A copy whose base is the copy itself, and a base that comes back
+       through the copy of another generic. The search for a function
+       looped without end. */
+    rejects("class A<T> inherits A<int> { }\n"
+            "fn f(a: *A<int>) -> int { return a.n; }\n",
+            1, 9, "class `A<int>` inherits itself");
+    rejects("class A<T> inherits B<T> { }\nclass B<T> inherits A<T> { }\n"
+            "fn f(a: *A<int>) -> int { return a.n; }\n",
+            1, 9, "class `A<T>` inherits itself");
 }
 
 /* Chains of types the program writes are walked without a recursion

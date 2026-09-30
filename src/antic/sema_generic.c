@@ -828,7 +828,12 @@ void sema_run_pending(struct checker *c)
 
 /* Substitution */
 
-bool sema_has_params(const struct type *t)
+/* Whether t names a type parameter. answered holds the tuples, the
+   function types and the copies met so far, each of which names none,
+   since the walk ends at the first that does. A copy may name another
+   twice, as `Pair<T, T>` does, and a chain of them would be walked
+   once per path through it. */
+static bool has_params(const struct type *t, struct ptr_set *answered)
 {
     size_t i;
 
@@ -841,28 +846,34 @@ bool sema_has_params(const struct type *t)
     case TYPE_POINTER:
     case TYPE_SLICE:
     case TYPE_OPTIONAL:
-        return sema_has_params(t->element);
+        return has_params(t->element, answered);
     case TYPE_ARRAY:
-        return sema_has_params(t->element) ||
+        return has_params(t->element, answered) ||
                (t->length_of != NULL &&
                 t->length_of->kind == SYMBOLIC_PARAM);
     case TYPE_FN:
     case TYPE_TUPLE:
+        if (!sema_ptr_set_add(answered, t)) {
+            return false;
+        }
         for (i = 0; i < t->param_count; i++) {
-            if (sema_has_params(t->params[i])) {
+            if (has_params(t->params[i], answered)) {
                 return true;
             }
         }
-        return t->kind == TYPE_FN && sema_has_params(t->result);
+        return t->kind == TYPE_FN && has_params(t->result, answered);
     case TYPE_STRUCT:
     case TYPE_CLASS:
     case TYPE_VARIANT:
         if (types_is_chan(t)) {
-            return sema_has_params(t->element);
+            return has_params(t->element, answered);
+        }
+        if (t->generic != NULL && !sema_ptr_set_add(answered, t)) {
+            return false;
         }
         for (i = 0; t->generic != NULL && i < t->generic->type_param_count;
              i++) {
-            if ((t->args[i] != NULL && sema_has_params(t->args[i])) ||
+            if ((t->args[i] != NULL && has_params(t->args[i], answered)) ||
                 (t->values[i] != NULL &&
                  t->values[i]->kind == SYMBOLIC_PARAM)) {
                 return true;
@@ -872,6 +883,17 @@ bool sema_has_params(const struct type *t)
     default:
         return false;
     }
+}
+
+bool sema_has_params(const struct type *t)
+{
+    struct ptr_set answered;
+    bool found;
+
+    memset(&answered, 0, sizeof answered);
+    found = has_params(t, &answered);
+    free(answered.slots);
+    return found;
 }
 
 static struct type *subst(struct checker *c, struct type *t,
@@ -1194,6 +1216,39 @@ static void fill_copy(struct checker *c, struct type *copy)
     types_set_fields(c->types, copy, fields, g->field_count);
 }
 
+/* DESIGN: the passes that refuse a class that inherits itself and a
+   type that contains itself run over the items of the module. A copy
+   of a generic filled after them has a base and fields of its own, and
+   is checked when it is filled. Each cycle through copies closes when
+   its last copy is filled, so the check of that copy finds it. The
+   base of a copy that still names a type parameter may be a generic, as
+   in `class A<T> inherits B<T>` with `class B<T> inherits A<T>`, and it
+   is checked as well. Its fields belong to the body of a generic, which
+   the pass over the items checks. The message stands at the first type
+   parameter of the generic, as the refusal of a chain of copies does. */
+static void check_copy(struct checker *c, struct type *copy)
+{
+    struct pos pos = copy->generic->type_params[0]->param->pos;
+    const struct type *b;
+    size_t i;
+
+    for (b = copy->base; b != NULL; b = b->base) {
+        if (b == copy) {
+            sema_error_at(c, pos, "class `%s` inherits itself", sema_tn(copy));
+            copy->base = NULL;
+            for (i = 0; i < copy->field_count; i++) {
+                if (copy->fields[i].form == FIELD_BASE) {
+                    copy->fields[i].type = NULL;
+                }
+            }
+            break;
+        }
+    }
+    if (!sema_has_params(copy) && type_has_fields(copy)) {
+        sema_check_nesting(c, copy, pos);
+    }
+}
+
 /* DESIGN: filling a copy may name another copy, which is filled in
    turn. A generic may name a copy of itself with other arguments, as
    `W<T>` holding a `W<Box<T>>` does. It names new copies without end, so
@@ -1218,7 +1273,9 @@ static void fill_one(struct checker *c, struct type *copy)
     }
     c->copy_depth++;
     fill_copy(c, copy);
+    copy->unfilled = false;
     c->copy_depth--;
+    check_copy(c, copy);
 }
 
 void sema_generic_ready(struct checker *c, struct type *generic)
@@ -1290,6 +1347,7 @@ static struct type *copy_named(struct checker *c, struct type *generic,
                       sema_tn(generic), COPY_NAME_MAX);
     }
     copy->kind = generic->kind;
+    copy->unfilled = true;
     copy->generic = generic;
     copy->args = args;
     copy->values = values;

@@ -1423,6 +1423,11 @@ struct nest_walk {
     struct type *error;
     bool cycle;
     bool deep;
+    /* The walk met a copy not filled yet, and the types it left open. */
+    bool open;
+    struct type **opened;
+    size_t opened_count;
+    size_t opened_capacity;
 };
 
 /* The height of a value that closes a cycle or passes the limit. */
@@ -1460,10 +1465,15 @@ static uint32_t nest_fields(struct nest_walk *w, struct type *s,
                             uint32_t depth)
 {
     uint32_t height = 0;
+    bool around = w->open;
     size_t i;
 
     if (s->layout == LAYOUT_DONE) {
         return s->nest;
+    }
+    if (s->layout == LAYOUT_OPEN || s->unfilled) {
+        w->open = true;
+        return s->unfilled ? 0 : s->nest;
     }
     if (s->layout == LAYOUT_BUSY) {
         w->cycle = true;
@@ -1474,6 +1484,7 @@ static uint32_t nest_fields(struct nest_walk *w, struct type *s,
         return NEST_CLOSED;
     }
     s->layout = LAYOUT_BUSY;
+    w->open = false;
     for (i = 0; i < s->field_count; i++) {
         uint32_t h = nest_value(w, s->fields[i].type, depth + 1);
         /* A struct measured before may stand too deep here. */
@@ -1491,8 +1502,29 @@ static uint32_t nest_fields(struct nest_walk *w, struct type *s,
         }
         height = nest_max(height, h);
     }
-    s->layout = LAYOUT_DONE;
     s->nest = height + 1;
+    s->layout = LAYOUT_DONE;
+    /* A copy filled later may change the height of what holds it, so
+       the height is kept for this walk alone. */
+    if (w->open) {
+        if (w->opened_count == w->opened_capacity) {
+            size_t capacity =
+                w->opened_capacity == 0 ? 16 : w->opened_capacity * 2;
+            struct type **grown =
+                capacity <= SIZE_MAX / sizeof *grown
+                    ? realloc(w->opened, capacity * sizeof *grown)
+                    : NULL;
+            if (grown == NULL) {
+                fputs("antic: out of memory\n", stderr);
+                exit(70);
+            }
+            w->opened = grown;
+            w->opened_capacity = capacity;
+        }
+        w->opened[w->opened_count++] = s;
+        s->layout = LAYOUT_OPEN;
+    }
+    w->open = w->open || around;
     return s->nest;
 }
 
@@ -1525,10 +1557,15 @@ enum nest_result types_nest(struct type *s, struct type *error)
 {
     struct nest_walk w;
 
+    size_t i;
+
+    memset(&w, 0, sizeof w);
     w.error = error;
-    w.cycle = false;
-    w.deep = false;
     nest_fields(&w, s, 0);
+    for (i = 0; i < w.opened_count; i++) {
+        w.opened[i]->layout = LAYOUT_NONE;
+    }
+    free(w.opened);
     return w.cycle ? NEST_CYCLE : w.deep ? NEST_DEEP : NEST_FITS;
 }
 
