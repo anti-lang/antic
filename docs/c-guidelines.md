@@ -73,7 +73,7 @@ The bar differs by where the code runs.
 ### Consistency
 
 24. A pointer to data a function does not change is `const`.
-25. The names of a module share its prefix. Every exported symbol of the runtime starts with `anti_rt_`, with no other prefix.
+25. The names of a module share its prefix. Every exported symbol of the runtime starts with `anti_rt_`, with no other prefix. The one exception is a C function that implements an item of an Anti module: it carries that module's mangled name, as `anti_lang_Object_*` does for `anti.lang.Object`.
 26. No function is unused, and no block of code is repeated where one helper would serve.
 
 ### Comments

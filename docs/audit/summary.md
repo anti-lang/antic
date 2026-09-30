@@ -417,7 +417,7 @@ finding at. Paths without a directory are in `src/antic/`.
 | 20 | 3 | `sema.c:2223` (front-end), `memcheck.h:43` (back-end), `src/rt/object.c:218` (rt). |
 | 23 | 1 | `sema_tn` of `sema.c:85` returns a static buffer kept across calls (front-end). |
 | 24 | 3 | `sema.c:1927` (front-end), `memcheck.h:55` (back-end), `src/anti/test.h:21` (anti-tool). |
-| 25 | 3 | Front end names, `sema.h:271` (front-end). `anti_lang_` of the root, `src/rt/object.c:65` (rt). `json_*` of `src/anti/jsontree.h:48` (anti-tool). |
+| 25 | 3 | Front end names, `sema.h:271` (front-end). `anti_lang_` of the root, `src/rt/object.c:65` (rt), which the exception Eddie added to the rule answers. `json_*` of `src/anti/jsontree.h:48` (anti-tool). |
 | 26 | 9 | Type and place rules twice, `lower_eq.c:375`, loops over array elements, `lower.c:2687`, and the `neon` dead store, `header.c:619` (tool-pass). Out-of-memory exits, `lower.c:1542` (structure, back-end). Repeated blocks and dead code of the front end, `sema_expr.c:1683` (front-end). Repeated blocks of the back end, with the blocks the two targets share, `optimize.c:94` and `arm64.c:1779` (back-end, tool-pass). Dead code of the back end, `lower.c:3188` (back-end). Growing buffers five times, `src/rt/patterns.c:606` (rt). Small helpers of `anti`, `src/anti/deps.c:457` (anti-tool). |
 | 27 | 3 | `sema_expr.c:1095` (front-end), `lower_lowerer.h:4` (back-end), `src/anti/doc.c:780` (anti-tool). |
 | Warnings | 1 | `(void)` on 26 parameters without a reason, `arm64.c:406` (back-end). |
@@ -425,8 +425,8 @@ finding at. Paths without a directory are in `src/antic/`.
 | Tests | 10 | Tests that drop out on some hosts, `tests/CMakeLists.txt:1313`. Dev objects compiled in four places, `tests/run_checks.cmake:96`. Registrations without a helper, `tests/CMakeLists.txt:479`. Copied unit test helpers, `tests/unit/test_sema.c:28`. The descriptor pinned in 28 texts, `tests/unit/test_lower.c:547`. Directories that hold more than one kind, `tests/CMakeLists.txt:320`. Test names, `tests/CMakeLists.txt:3678`. Smaller uncovered features, `main.c:265`. Dead runner code, `tests/run_start.cmake:1`. A comment above the wrong test, `tests/CMakeLists.txt:1305` (tests). |
 
 `front-end` also lists six defects no rule names, `rt` one, `anti-tool`
-four and `back-end` none. They are not counted. Two need a decision,
-under "Decisions a fix step needs" below.
+four and `back-end` none. They are not counted. Two needed a decision,
+which "Decisions a fix step needs" below records.
 
 ## Compared with the first audit
 
@@ -536,18 +536,26 @@ After these three come the contracts at antic's edges, the runtime ABI
 
 ## Decisions a fix step needs
 
-- S29 has two fixes. `rt` names a count of live objects that the
-  compiler writes for every class of a library. The other is a refusal
-  of `--no-hooks` in a program that loads one. The refusal stays inside
-  antic, and step 10 takes it. The count crosses into the runtime.
-- M01 removes `List`, `Map` and `IntMap` of `anti.collection`, which
-  `docs/decisions.md` keeps until Eddie confirms.
-- `rt.configure` records `[injections]` and applies none of it. `rt`
-  leaves refusing or applying the table to Eddie.
-- `anti_lang_` of the root functions stands against rule 25. `rt` leaves
-  an exception in the rule to Eddie.
-- M25 in one walk shared by the runtime and `anti` crosses the boundary.
-  Step 29 takes one constant and one message in both instead.
+Eddie answered all five on 2026-09-30. `docs/decisions.md` holds each
+answer, and `docs/c-guidelines.md` holds the fourth.
+
+- S29: a program that loads plugins cannot be built with `--no-hooks`.
+  antic refuses the combination with a message that names both. Step 10
+  builds it, and no count crosses into the runtime.
+- M01: the `List`, `Map` and `IntMap` over objects of `anti.collection`
+  from before generics are removed. Every use moves to the generic
+  collections. Step 38 does it.
+- `rt.configure` refuses a table `[injections]` with an error that says
+  injections are fixed at start, through `--anti.conf` or `ANTI_CONF`.
+  Step 31 builds it.
+- Rule 25 gains one exception: a C function that implements an item of
+  an Anti module carries that module's mangled name, as
+  `anti_lang_Object_*` does for `anti.lang.Object`. The rule 25 finding
+  on `anti_lang_` of the root is then no defect.
+- M25: the runtime and `anti` keep their own walks of configuration
+  includes, with no code shared across the boundary. One shared
+  constant holds the include limit, and both give one wording of the
+  message. Step 29 builds it.
 
 ## Fix steps
 
@@ -648,14 +656,17 @@ that reader. Steps 1 to 13 close every severe finding.
     header.
 28. anti platform layer. M30 and M31 for `anti`. Files:
     `src/anti/platform.c`, `files.c`, `sdk.c`, `syms.c`.
-29. anti copies that drifted. M23, M24, M25, M26 and the minor names
-    spelled twice. Files: `build.c`, `test.c`, `doc.c`, `check.c`,
-    `main.c`, `symmap.c`, `syms.c`, `bind.c`, `bindclang.c`.
+29. anti copies that drifted. M23, M24, M25 with one constant for the
+    include limit and one message in both walks, M26 and the minor
+    names spelled twice. Files: `build.c`, `test.c`, `doc.c`, `check.c`,
+    `main.c`, `symmap.c`, `syms.c`, `bind.c`, `bindclang.c`,
+    `src/rt/conf.c`.
 30. anti inputs. M39, M40, M41, M42 and M46. Files: `fmt.c`, `doc.c`,
     `zip.c`, `syms.c`.
 31. runtime text and `Object.deserialize`. M32, M38 and M22, with the
-    variant, `?T` and cut text tests of M43. Files: `errno.c`,
-    `platform_windows.c`, `registry.c`.
+    variant, `?T` and cut text tests of M43, and the refusal of
+    `[injections]` in `rt.configure`. Files: `errno.c`,
+    `platform_windows.c`, `registry.c`, `conf.c`.
 32. runtime platform layer, locks and threads. M30 for the lock, the
     condition variable, the thread and the loader queries. Files:
     `lock.c`, `sync.c`, `threads.c`, `loaded.c`, `signal.c`, the
@@ -675,8 +686,8 @@ that reader. Steps 1 to 13 close every severe finding.
     `tests/programs/`.
 37. Test runners. M59, M60, M61 and M62. Files: `tests/*.cmake`,
     `tests/CMakeLists.txt`.
-38. Standard collections. M27, M08 and M28, then M01 once Eddie
-    confirms. Files: `src/std/anti/collection.anti`,
+38. Standard collections. M27, M08 and M28, then M01, which removes
+    the collections over objects and moves every use. Files: `src/std/anti/collection.anti`,
     `src/std/anti/collection/`.
 39. Standard `json` and `log`. M29 and M09. Files: `json.anti`,
     `log.anti`.
