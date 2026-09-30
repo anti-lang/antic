@@ -2453,6 +2453,33 @@ static void tree_counts(void)
     text_free(&plain);
 }
 
+/* Every prefix of a file that carries trees is refused, and the reader
+   reads no byte past its end. Each prefix stands in memory of its own
+   length, so a sanitizer sees a read past it. */
+static void truncated_trees(void)
+{
+    struct session s;
+    struct text bytes = {0};
+    size_t n;
+
+    open_session(&s);
+    if (build_library(&s, "tt", tree_source, &bytes)) {
+        CHECK(reads_file(&bytes));
+        for (n = 0; n < bytes.length; n++) {
+            uint8_t *prefix = malloc(n == 0 ? 1 : n);
+            CHECK(prefix != NULL);
+            if (prefix == NULL) {
+                break;
+            }
+            memcpy(prefix, bytes.data, n);
+            refuses_file(prefix, n, NULL);
+            free(prefix);
+        }
+    }
+    text_free(&bytes);
+    close_session(&s);
+}
+
 /* The negative step of `for j in 0..10 by -3` reads back as -3. */
 static void signed_numbers(void)
 {
@@ -2519,6 +2546,7 @@ void test_modules(void)
     damaged_trees();
     tree_counts();
     signed_numbers();
+    truncated_trees();
     deep_tables();
     imports();
     cycles();
