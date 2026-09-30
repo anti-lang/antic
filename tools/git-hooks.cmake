@@ -15,7 +15,8 @@ if(ANTI_GIT)
     execute_process(COMMAND "${ANTI_GIT}" -C "${PROJECT_SOURCE_DIR}"
                         rev-parse --show-toplevel
                     OUTPUT_VARIABLE anti_git_top OUTPUT_STRIP_TRAILING_WHITESPACE
-                    RESULT_VARIABLE anti_not_git ERROR_QUIET)
+                    RESULT_VARIABLE anti_not_git ERROR_QUIET
+                    ENCODING NONE)
     if(NOT anti_not_git)
         get_filename_component(anti_git_top "${anti_git_top}" REALPATH)
         get_filename_component(anti_source_top "${PROJECT_SOURCE_DIR}" REALPATH)
@@ -24,7 +25,8 @@ if(ANTI_GIT)
         execute_process(COMMAND "${ANTI_GIT}" -C "${PROJECT_SOURCE_DIR}"
                             config core.hooksPath
                         OUTPUT_VARIABLE anti_hooks_path
-                        OUTPUT_STRIP_TRAILING_WHITESPACE)
+                        OUTPUT_STRIP_TRAILING_WHITESPACE
+                        ENCODING NONE)
         if(NOT anti_hooks_path STREQUAL ANTI_HOOKS_DIR)
             execute_process(COMMAND "${ANTI_GIT}" -C "${PROJECT_SOURCE_DIR}"
                                 config core.hooksPath "${ANTI_HOOKS_DIR}"

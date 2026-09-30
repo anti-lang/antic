@@ -29,14 +29,16 @@ endif()
 # where there is no configuration to read.
 execute_process(COMMAND "${GIT}" -C "${ROOT}" rev-parse --show-toplevel
                 OUTPUT_VARIABLE top OUTPUT_STRIP_TRAILING_WHITESPACE
-                RESULT_VARIABLE not_git ERROR_QUIET)
+                RESULT_VARIABLE not_git ERROR_QUIET
+                ENCODING NONE)
 if(NOT not_git)
     get_filename_component(top_real "${top}" REALPATH)
     get_filename_component(root_real "${ROOT}" REALPATH)
 endif()
 if(NOT not_git AND top_real STREQUAL root_real)
     execute_process(COMMAND "${GIT}" -C "${ROOT}" config core.hooksPath
-                    OUTPUT_VARIABLE hooks_path OUTPUT_STRIP_TRAILING_WHITESPACE)
+                    OUTPUT_VARIABLE hooks_path OUTPUT_STRIP_TRAILING_WHITESPACE
+                    ENCODING NONE)
     if(NOT hooks_path STREQUAL HOOKS)
         message(FATAL_ERROR "core.hooksPath of ${ROOT} is '${hooks_path}', "
                             "not ${HOOKS}. Run the configure step.")
@@ -52,7 +54,8 @@ set(git "${CMAKE_COMMAND}" -E env "GIT_CONFIG_GLOBAL=${WORK}/gitconfig"
 
 function(git_ok)
     execute_process(COMMAND ${git} ${ARGN} RESULT_VARIABLE status
-                    OUTPUT_VARIABLE out ERROR_VARIABLE out)
+                    OUTPUT_VARIABLE out ERROR_VARIABLE out
+                    ENCODING NONE)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "git ${ARGN} failed with ${status}:\n${out}")
     endif()
@@ -60,7 +63,8 @@ endfunction()
 
 function(head_of out_var)
     execute_process(COMMAND ${git} rev-parse -q --verify HEAD
-                    OUTPUT_VARIABLE head OUTPUT_STRIP_TRAILING_WHITESPACE)
+                    OUTPUT_VARIABLE head OUTPUT_STRIP_TRAILING_WHITESPACE
+                    ENCODING NONE)
     set(${out_var} "${head}" PARENT_SCOPE)
 endfunction()
 
@@ -75,7 +79,8 @@ function(commit what)
         set(all -a)
     endif()
     execute_process(COMMAND ${git} commit -q ${all} -m "${what}"
-                    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE out)
+                    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE out
+                    ENCODING NONE)
     head_of(after)
     if(arg_REFUSED)
         if(status EQUAL 0 OR NOT before STREQUAL after)
