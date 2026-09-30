@@ -1,0 +1,34 @@
+//! A load whose result is the base of its own address. `p = p.link` loads into
+//! p, so the address of the next `p.link` is new, and store forwarding must not
+//! reuse the value of the first load. S17 of the second audit printed 2, the
+//! `v` of `n.link`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn calloc(count: u64, size: u64) -> ?*Node;
+
+struct Node
+{
+	link: *Node,
+	v: int,
+}
+
+fn second(n: *Node) -> int
+{
+	let p = n;
+	p = p.link;
+	return p.link.v;
+}
+
+fn main() -> int
+{
+	let c = calloc(1, size_of(Node) as u64) else {
+		return 1;
+	};
+	c.link = c;
+	c.v = 3;
+	let b = Node { link: c, v: 2 };
+	let a = Node { link: &b, v: 1 };
+	printf("%d\n".ptr, second(&a) as c_int);
+	free(c);
+	return 0;
+}

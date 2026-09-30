@@ -1077,6 +1077,13 @@ static bool forward_stores(struct ir_function *f)
                     changed = true;
                     break;
                 }
+                /* A load into the base or the offset of its own address
+                   leaves that address stale. */
+                if (names_temp(at.base, inst->result) ||
+                    names_temp(at.offset, inst->result)) {
+                    memset(&held, 0, sizeof held);
+                    break;
+                }
                 held = at;
                 type = inst->type;
                 value = ir_temp_op(f, inst->result);
