@@ -1133,3 +1133,13 @@ void test_sema_constants(void)
     rejects_also("variant V { }\nfn f(v: V) -> bool { return v is X; }\n",
                  2, 29, "`is` on `V` names one of its cases");
 }
+
+/* The copies of generics are checked as the types a program writes, and
+   a declaration the checker refused makes no copy of a type in it. */
+void test_sema_generic_copies(void)
+{
+    /* The second `Box` is refused and keeps no symbol, and its nested
+       type named the type of that symbol. */
+    rejects("class Box<T> { }\nclass Box<T> { struct Node { x: int } }\n",
+            2, 7, "`Box` is already declared");
+}

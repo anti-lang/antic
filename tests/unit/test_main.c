@@ -14,6 +14,7 @@ void test_types(void);
 void test_sema(void);
 void test_sema_cycles(void);
 void test_sema_constants(void);
+void test_sema_generic_copies(void);
 void test_nullable(void);
 void test_variant(void);
 void test_sync(void);
@@ -63,6 +64,7 @@ int main(void)
     test_sema();
     test_sema_cycles();
     test_sema_constants();
+    test_sema_generic_copies();
     test_nullable();
     test_variant();
     test_sync();

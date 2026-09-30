@@ -187,7 +187,9 @@ void sema_declare_generics(struct checker *c)
     }
     /* A type nested in a generic class takes the parameters of the
        class, then its own. Each class stands after the types nested in
-       it, so the walk from the end reaches a class first. */
+       it, so the walk from the end reaches a class first. A class the
+       checker refused, a second one of its name, has no symbol, and
+       the types nested in it take nothing from it. */
     for (i = module->item_count; i-- > 0;) {
         struct item *it = module->items[i];
         const struct item *outer = it->outer;
@@ -195,7 +197,7 @@ void sema_declare_generics(struct checker *c)
         struct type *t;
         size_t count;
         if (it->symbol == NULL || it->symbol->type == NULL || outer == NULL ||
-            outer->type_param_count == 0 ||
+            outer->symbol == NULL || outer->type_param_count == 0 ||
             (it->kind != ITEM_STRUCT && it->kind != ITEM_CLASS &&
              it->kind != ITEM_VARIANT)) {
             continue;
