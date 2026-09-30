@@ -74,10 +74,18 @@ not re-open a settled decision without asking Eddie.
   `ASAN_OPTIONS=detect_leaks=1`. UndefinedBehaviorSanitizer found a real
   defect on its first run here, a `bool` field read as 64 that the ordinary
   build passed over.
+- Each of the three suites finishes in under 9 minutes with `ctest -j14`,
+  the number of cores of the development Mac. Measured on 2026-09-30 at
+  `f6c5bc2`: `host` 120 s, and 185 s on the first run after a build, `asan`
+  300 s and `ubsan` 199 s. `emit_identity` alone takes 299 s under ASan and
+  sets its time. A suite past 9 minutes gets faster tests, never fewer: see
+  "Repository layout" in `docs/decisions.md`.
 - Every comment and every `.md` file follows the docs-style rules. The checker
   reads `.md` files alone. Run `python3 tools/docs-style/check_docs.py <files>`
   on the `.md` files before committing, read its exit status without a pipe,
-  and fix every finding. Comments in source and CMake files follow the rules
+  and fix every finding. The configure step installs `tools/hooks/pre-commit`,
+  which runs the checker on the staged `.md` files and refuses a commit with a
+  finding. Comments in source and CMake files follow the rules
   for comments without the checker. The tool output under `docs/audit/data/`
   stays as the tools wrote it. The copy under `tools/` is pinned on purpose, so
   the rules do not change when the skill it came from syncs.
@@ -387,8 +395,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1284 ctest tests pass on the development Mac and none is skipped. The ASan
-  and the UBSan builds run 1283 each, without the `no_paths` test, which needs a
+- 1285 ctest tests pass on the development Mac and none is skipped. The ASan
+  and the UBSan builds run 1284 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
