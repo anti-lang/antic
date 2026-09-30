@@ -53,6 +53,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/selfpath.c
     src/antic/sha256.c
     src/antic/userdirs.c
+    src/antic/ptrset.c
     src/antic/sema.c
     src/antic/sema_call.c
     src/antic/sema_chain.c

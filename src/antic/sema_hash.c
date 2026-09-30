@@ -6,6 +6,7 @@
 /* The default `==` of a struct and of a class value lives here as well,
    since it keeps the rule that two values equal by `eq` hash alike. */
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "sema_checker.h"
@@ -105,8 +106,11 @@ static void add_call(struct checker *c, struct expr *e, struct type *t)
    Give e the call of every function of a struct or a variant inside it.
    A class value calls the `hash` of its chain, which lowering finds in
    its members. A pointer is hashed by its address and reaches
-   nothing. A value of a type parameter needs the hook. */
-static void walk(struct checker *c, struct expr *e, struct type *t)
+   nothing. A value of a type parameter needs the hook. walked holds the
+   structs, the tuples and the variants walked for e, whose calls e
+   holds already. */
+static void walk(struct checker *c, struct expr *e, struct type *t,
+                 struct ptr_set *walked)
 {
     size_t i;
 
@@ -116,19 +120,22 @@ static void walk(struct checker *c, struct expr *e, struct type *t)
         return;
     case TYPE_ARRAY:
     case TYPE_SLICE:
-        walk(c, e, t->element);
+        walk(c, e, t->element, walked);
         return;
     case TYPE_OPTIONAL:
-        walk(c, e, t->element);
+        walk(c, e, t->element, walked);
         return;
     case TYPE_VARIANT:
         if (sema_hook(c, t, LANG_HOOK_HASH) != NULL) {
             add_call(c, e, t);
             return;
         }
+        if (!ptr_set_add(walked, t)) {
+            return;
+        }
         for (i = 0; i < t->param_count; i++) {
             if (t->params[i] != NULL) {
-                walk(c, e, t->params[i]);
+                walk(c, e, t->params[i], walked);
             }
         }
         return;
@@ -140,12 +147,12 @@ static void walk(struct checker *c, struct expr *e, struct type *t)
         }
         /* A union has no field that holds its value, so its default
            hash reads its bytes. */
-        if (t->is_union) {
+        if (t->is_union || !ptr_set_add(walked, t)) {
             return;
         }
         for (i = 0; i < t->field_count; i++) {
             if (!type_field_is_unit_break(&t->fields[i])) {
-                walk(c, e, t->fields[i].type);
+                walk(c, e, t->fields[i].type, walked);
             }
         }
         return;
@@ -196,7 +203,10 @@ bool sema_hash_call(struct checker *c, struct expr *e, struct type *t,
     e->as.call.hash_calls = NULL;
     e->as.call.hash_count = 0;
     if (hashed->kind != TYPE_POINTER) {
-        walk(c, e, hashed);
+        struct ptr_set walked;
+        memset(&walked, 0, sizeof walked);
+        walk(c, e, hashed, &walked);
+        free(walked.slots);
     }
     e->type = sema_builtin(c, TYPE_U64);
     *result = e->type;
@@ -252,16 +262,22 @@ static struct expr *nested_eq(struct checker *c, struct pos pos,
     return e;
 }
 
-static void walk_eq(struct checker *c, struct expr *e, struct type *t);
+static void walk_eq(struct checker *c, struct expr *e, struct type *t,
+                    struct ptr_set *walked);
 
-/* Walk each part of the struct, tuple or case t with walk_eq. */
-static void walk_parts(struct checker *c, struct expr *e, struct type *t)
+/* Walk each part of the struct, tuple or case t with walk_eq, once for
+   e. walked holds the types walked for e. */
+static void walk_parts(struct checker *c, struct expr *e, struct type *t,
+                       struct ptr_set *walked)
 {
     size_t i;
 
+    if (!ptr_set_add(walked, t)) {
+        return;
+    }
     for (i = 0; i < t->field_count; i++) {
         if (!type_field_is_unit_break(&t->fields[i])) {
-            walk_eq(c, e, t->fields[i].type);
+            walk_eq(c, e, t->fields[i].type, walked);
         }
     }
 }
@@ -271,29 +287,30 @@ static void walk_parts(struct checker *c, struct expr *e, struct type *t)
    It is also the value a `?T` holds and the elements of an array. A class
    value calls the `equals` of its chain, which lowering finds in its
    members. */
-static void walk_inside(struct checker *c, struct expr *e, struct type *t)
+static void walk_inside(struct checker *c, struct expr *e, struct type *t,
+                        struct ptr_set *walked)
 {
     size_t i;
 
     switch (t->kind) {
     case TYPE_STRUCT:
         if (!t->is_union) {
-            walk_parts(c, e, t);
+            walk_parts(c, e, t, walked);
         }
         return;
     case TYPE_TUPLE:
-        walk_parts(c, e, t);
+        walk_parts(c, e, t, walked);
         return;
     case TYPE_VARIANT:
         for (i = 0; i < t->param_count; i++) {
             if (t->params[i] != NULL) {
-                walk_parts(c, e, t->params[i]);
+                walk_parts(c, e, t->params[i], walked);
             }
         }
         return;
     case TYPE_OPTIONAL:
     case TYPE_ARRAY:
-        walk_eq(c, e, t->element);
+        walk_eq(c, e, t->element, walked);
         return;
     default:
         return;
@@ -303,7 +320,8 @@ static void walk_inside(struct checker *c, struct expr *e, struct type *t)
 /* Give the default `==` e the call of the `operator fn eq` of a part of
    type t, once per type. A part without one is walked inside. A part of
    a type parameter is read again in each copy. */
-static void walk_eq(struct checker *c, struct expr *e, struct type *t)
+static void walk_eq(struct checker *c, struct expr *e, struct type *t,
+                    struct ptr_set *walked)
 {
     struct expr *call;
 
@@ -319,7 +337,7 @@ static void walk_eq(struct checker *c, struct expr *e, struct type *t)
         }
         return;
     }
-    walk_inside(c, e, t);
+    walk_inside(c, e, t, walked);
 }
 
 /* Whether a part of type t of a struct, a tuple or a variant has `==`. A
@@ -353,17 +371,23 @@ const struct struct_field *sema_eq_gap(struct checker *c, struct type *t)
 
 /* Whether a value of type t holds a union or a Match in place. It may
    stand there directly or in a struct, an array, a `?T` or a case of a
-   variant. Neither can be compared. A class value compares through its own `equals`. */
-static bool holds_union(const struct type *t)
+   variant. Neither can be compared. A class value compares through its own `equals`.
+   answered holds the variants and the structs met in this walk, none of
+   which holds a union. */
+static bool union_in(const struct type *t, struct ptr_set *answered)
 {
     size_t i;
 
     while (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL) {
         t = t->element;
     }
+    if ((t->kind == TYPE_VARIANT || t->kind == TYPE_STRUCT) &&
+        !ptr_set_add(answered, t)) {
+        return false;
+    }
     if (t->kind == TYPE_VARIANT) {
         for (i = 0; i < t->param_count; i++) {
-            if (t->params[i] != NULL && holds_union(t->params[i])) {
+            if (t->params[i] != NULL && union_in(t->params[i], answered)) {
                 return true;
             }
         }
@@ -377,11 +401,22 @@ static bool holds_union(const struct type *t)
     }
     for (i = 0; i < t->field_count; i++) {
         if (!type_field_is_unit_break(&t->fields[i]) &&
-            holds_union(t->fields[i].type)) {
+            union_in(t->fields[i].type, answered)) {
             return true;
         }
     }
     return false;
+}
+
+static bool holds_union(const struct type *t)
+{
+    struct ptr_set answered;
+    bool holds;
+
+    memset(&answered, 0, sizeof answered);
+    holds = union_in(t, &answered);
+    free(answered.slots);
+    return holds;
 }
 
 /* Whether a class of the chain of t below the root declares the function
@@ -428,20 +463,28 @@ bool sema_concurrent_lacks(struct checker *c, struct type *t,
 
 /* Whether a value of type t holds in place a concurrent class without
    `==`, directly or in a struct, an array, a `?T` or a case of a
-   variant. A struct with `operator fn eq` compares by that alone. */
-static bool holds_concurrent(struct checker *c, struct type *t)
+   variant. A struct with `operator fn eq` compares by that alone.
+   answered holds the variants and the structs met in this walk, none of
+   which holds such a class. */
+static bool concurrent_in(struct checker *c, struct type *t,
+                          struct ptr_set *answered)
 {
     size_t i;
 
     while (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL) {
         t = t->element;
     }
+    if ((t->kind == TYPE_VARIANT || t->kind == TYPE_STRUCT) &&
+        !ptr_set_add(answered, t)) {
+        return false;
+    }
     if (t->kind == TYPE_CLASS) {
         return sema_concurrent_lacks(c, t, LANG_HOOK_EQ);
     }
     if (t->kind == TYPE_VARIANT) {
         for (i = 0; i < t->param_count; i++) {
-            if (t->params[i] != NULL && holds_concurrent(c, t->params[i])) {
+            if (t->params[i] != NULL &&
+                concurrent_in(c, t->params[i], answered)) {
                 return true;
             }
         }
@@ -453,11 +496,22 @@ static bool holds_concurrent(struct checker *c, struct type *t)
     }
     for (i = 0; i < t->field_count; i++) {
         if (!type_field_is_unit_break(&t->fields[i]) &&
-            holds_concurrent(c, t->fields[i].type)) {
+            concurrent_in(c, t->fields[i].type, answered)) {
             return true;
         }
     }
     return false;
+}
+
+static bool holds_concurrent(struct checker *c, struct type *t)
+{
+    struct ptr_set answered;
+    bool holds;
+
+    memset(&answered, 0, sizeof answered);
+    holds = concurrent_in(c, t, &answered);
+    free(answered.slots);
+    return holds;
 }
 
 const struct struct_field *sema_class_gap(struct checker *c, struct type *t)
@@ -494,7 +548,7 @@ const struct struct_field *sema_class_gap(struct checker *c, struct type *t)
    part, a variant by its case and then the fields of that case, a `?T`
    by its flag and then the value it holds. An array compares element by
    element through every level of it, alone as well as as a part. */
-bool sema_default_eq(struct checker *c, struct type *t)
+static bool default_eq(struct checker *c, struct type *t)
 {
     size_t i;
 
@@ -523,15 +577,52 @@ bool sema_default_eq(struct checker *c, struct type *t)
     }
 }
 
+/* The types whose default `==` one question answered, yes or no. A
+   part of a type asks again through sema_meets_hook, and a type that
+   holds another twice is answered once. */
+struct eq_answers {
+    struct ptr_set yes;
+    struct ptr_set no;
+};
+
+bool sema_default_eq(struct checker *c, struct type *t)
+{
+    struct eq_answers answers;
+    bool eq;
+
+    if (c->eq_answers != NULL) {
+        if (ptr_set_has(&c->eq_answers->yes, t)) {
+            return true;
+        }
+        if (ptr_set_has(&c->eq_answers->no, t)) {
+            return false;
+        }
+        eq = default_eq(c, t);
+        ptr_set_add(eq ? &c->eq_answers->yes : &c->eq_answers->no, t);
+        return eq;
+    }
+    memset(&answers, 0, sizeof answers);
+    c->eq_answers = &answers;
+    eq = default_eq(c, t);
+    c->eq_answers = NULL;
+    free(answers.yes.slots);
+    free(answers.no.slots);
+    return eq;
+}
+
 bool sema_equals(struct checker *c, struct expr *e, struct type *t)
 {
+    struct ptr_set walked;
+
     if (!sema_default_eq(c, t)) {
         return false;
     }
     e->as.binary.equals = true;
     e->as.binary.eq_calls = NULL;
     e->as.binary.eq_count = 0;
-    walk_inside(c, e, t);
+    memset(&walked, 0, sizeof walked);
+    walk_inside(c, e, t, &walked);
+    free(walked.slots);
     return true;
 }
 
@@ -567,6 +658,8 @@ void sema_class_defaults(struct checker *c, struct item *it)
     t = it->symbol->type;
     if (!declares(t, "equals")) {
         struct expr *e = sema_new_node(c, EXPR_BINARY, it->pos);
+        struct ptr_set walked;
+        memset(&walked, 0, sizeof walked);
         e->as.binary.op = TOKEN_EQ;
         e->as.binary.equals = true;
         for (up = t; up != NULL; up = up->base) {
@@ -575,25 +668,31 @@ void sema_class_defaults(struct checker *c, struct item *it)
                 if (f->form != FIELD_PLAIN && f->form != FIELD_USE) {
                     continue;
                 }
-                walk_eq(c, e, f->owned && f->type->kind == TYPE_SLICE
-                                  ? f->type->element
-                                  : f->type);
+                walk_eq(c, e,
+                        f->owned && f->type->kind == TYPE_SLICE
+                            ? f->type->element
+                            : f->type,
+                        &walked);
             }
         }
+        free(walked.slots);
         it->default_eq = e;
         it->operator_eq = sema_class_eq_operator(c, t, it->pos);
     }
     if (!declares(t, "hash")) {
         struct expr *e = sema_new_node(c, EXPR_CALL, it->pos);
+        struct ptr_set walked;
+        memset(&walked, 0, sizeof walked);
         e->as.call.hashes = true;
         for (up = t; up != NULL; up = up->base) {
             for (i = 0; i < up->field_count; i++) {
                 const struct struct_field *f = &up->fields[i];
                 if (f->form == FIELD_PLAIN || f->form == FIELD_USE) {
-                    walk(c, e, f->type);
+                    walk(c, e, f->type, &walked);
                 }
             }
         }
+        free(walked.slots);
         it->default_hash = e;
         it->operator_hash = sema_class_hash_operator(c, t, it->pos);
     }

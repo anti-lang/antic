@@ -172,6 +172,50 @@ static void imports(void)
             3, 12, "`Rect` has no function `area`");
 }
 
+/* Sixteen damaged libraries that each import all the others. The search
+   for a cycle went down every path to the depth of the library count,
+   15^16 of them. */
+static void damaged_imports(void)
+{
+    enum { COUNT = 16 };
+    static char names[COUNT][4];
+    static const char *imports[COUNT][COUNT - 1];
+    static struct interface libs[COUNT];
+    static const char source[] = "import l0;\n";
+    const struct interface *list[COUNT];
+    struct token_list *tokens;
+    struct module *module = NULL;
+    struct session s;
+    bool ok;
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < COUNT; i++) {
+        snprintf(names[i], sizeof names[i], "l%zu", i);
+    }
+    for (i = 0; i < COUNT; i++) {
+        size_t n = 0;
+        for (j = 0; j < COUNT; j++) {
+            if (j != i) {
+                imports[i][n++] = names[j];
+            }
+        }
+        memset(&libs[i], 0, sizeof libs[i]);
+        libs[i].module = names[i];
+        libs[i].imports = imports[i];
+        libs[i].import_count = n;
+        list[i] = &libs[i];
+    }
+    open_session(&s);
+    tokens = &s.tokens[s.token_lists++];
+    ok = lex(source, strlen(source), &s.arena, &s.diags, tokens) &&
+         parse(source, tokens, &s.arena, &s.diags, &module) &&
+         sema_check(module, "main", NULL, list, COUNT, &s.types, &s.arena,
+                    &s.diags, true);
+    CHECK(ok);
+    close_session(&s);
+}
+
 static void cycles(void)
 {
     struct session s;
@@ -194,6 +238,7 @@ static void cycles(void)
                   "`b` depends on `main`, so the import forms a cycle");
     }
     close_session(&s);
+    damaged_imports();
 }
 
 static void lowers_imports(void)

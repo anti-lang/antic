@@ -33,83 +33,6 @@
    `List<int>.push`. The symbol of a copy follows from the generic and its
    arguments alone. */
 
-/* A map of pointers to pointers, open addressed and at most half full. */
-struct ptr_map {
-    const void **keys;
-    void **values;
-    size_t capacity;
-    size_t count;
-};
-
-static size_t ptr_hash(const void *p, size_t capacity)
-{
-    uintptr_t v = (uintptr_t)p;
-
-    v ^= v >> 17;
-    v *= (uintptr_t)0x9e3779b97f4a7c15ull;
-    v ^= v >> 29;
-    return (size_t)v & (capacity - 1);
-}
-
-static void *map_get(const struct ptr_map *m, const void *key)
-{
-    size_t i;
-
-    if (m->capacity == 0) {
-        return NULL;
-    }
-    for (i = ptr_hash(key, m->capacity); m->keys[i] != NULL;
-         i = (i + 1) & (m->capacity - 1)) {
-        if (m->keys[i] == key) {
-            return m->values[i];
-        }
-    }
-    return NULL;
-}
-
-static void map_put(struct ptr_map *m, const void *key, void *value)
-{
-    size_t i;
-
-    if ((m->count + 1) * 2 > m->capacity) {
-        struct ptr_map grown;
-        size_t k;
-        grown.capacity = m->capacity == 0 ? 64 : m->capacity * 2;
-        grown.count = 0;
-        grown.keys = calloc(grown.capacity, sizeof *grown.keys);
-        grown.values = calloc(grown.capacity, sizeof *grown.values);
-        if (grown.keys == NULL || grown.values == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        for (k = 0; k < m->capacity; k++) {
-            if (m->keys[k] != NULL) {
-                map_put(&grown, m->keys[k], m->values[k]);
-            }
-        }
-        free(m->keys);
-        free(m->values);
-        *m = grown;
-    }
-    for (i = ptr_hash(key, m->capacity); m->keys[i] != NULL;
-         i = (i + 1) & (m->capacity - 1)) {
-        if (m->keys[i] == key) {
-            m->values[i] = value;
-            return;
-        }
-    }
-    m->keys[i] = key;
-    m->values[i] = value;
-    m->count++;
-}
-
-static void map_free(struct ptr_map *m)
-{
-    free(m->keys);
-    free(m->values);
-    memset(m, 0, sizeof *m);
-}
-
 static void *grow(void *items, size_t *capacity, size_t count, size_t size)
 {
     size_t want;
@@ -320,17 +243,17 @@ static struct symbol *xsym(struct clone *cl, struct symbol *s)
         !(s->kind == SYMBOL_CONST && (s->stmt != NULL || symbol_open(s)))) {
         return s;
     }
-    n = map_get(&cl->nodes, s);
+    n = ptr_map_get(&cl->nodes, s);
     if (n != NULL) {
         return n;
     }
     n = arena_alloc(cl->k->c->arena, sizeof *n);
     *n = *s;
     n->ir = 0;
-    map_put(&cl->nodes, s, n);
+    ptr_map_put(&cl->nodes, s, n);
     n->type = ty(cl, s->type, s->pos);
-    if (s->frame != NULL && map_get(&cl->nodes, s->frame) != NULL) {
-        n->frame = map_get(&cl->nodes, s->frame);
+    if (s->frame != NULL && ptr_map_get(&cl->nodes, s->frame) != NULL) {
+        n->frame = ptr_map_get(&cl->nodes, s->frame);
     }
     if (s->kind == SYMBOL_CONST && s->value != NULL &&
         s->value->kind == CONST_SYMBOLIC) {
@@ -478,7 +401,7 @@ static struct item *member_copy(struct copies *k, struct item *owner,
    made on its first use. */
 static struct item *type_item(struct copies *k, struct type *copy)
 {
-    struct item *made = map_get(&k->items, copy);
+    struct item *made = ptr_map_get(&k->items, copy);
     struct item *generic;
     struct item **members;
     struct item **fns;
@@ -489,13 +412,13 @@ static struct item *type_item(struct copies *k, struct type *copy)
     if (made != NULL) {
         return made;
     }
-    generic = map_get(&k->generics, copy->generic);
+    generic = ptr_map_get(&k->generics, copy->generic);
     if (generic == NULL) {
         return NULL;
     }
     made = arena_alloc(k->c->arena, sizeof *made);
     *made = *generic;
-    map_put(&k->items, copy, made);
+    ptr_map_put(&k->items, copy, made);
     sym = arena_alloc(k->c->arena, sizeof *sym);
     *sym = *generic->symbol;
     sym->ir = 0;
@@ -1107,13 +1030,13 @@ static struct expr *xe(struct clone *cl, struct expr *e)
         return NULL;
     }
     if (cl->fresh) {
-        n = map_get(&cl->nodes, e);
+        n = ptr_map_get(&cl->nodes, e);
         if (n != NULL) {
             return n;
         }
         n = arena_alloc(cl->k->c->arena, sizeof *n);
         *n = *e;
-        map_put(&cl->nodes, e, n);
+        ptr_map_put(&cl->nodes, e, n);
     } else {
         n = e;
     }
@@ -1571,13 +1494,13 @@ static struct item *xi(struct clone *cl, struct item *it)
         it->body = xb(cl, it->body);
         return it;
     }
-    n = map_get(&cl->nodes, it);
+    n = ptr_map_get(&cl->nodes, it);
     if (n != NULL) {
         return n;
     }
     n = arena_alloc(cl->k->c->arena, sizeof *n);
     *n = *it;
-    map_put(&cl->nodes, it, n);
+    ptr_map_put(&cl->nodes, it, n);
     if (it->symbol != NULL) {
         struct symbol *sym = arena_alloc(cl->k->c->arena, sizeof *sym);
         *sym = *it->symbol;
@@ -1586,8 +1509,8 @@ static struct item *xi(struct clone *cl, struct item *it)
         sym->type = ty(cl, it->symbol->type, it->pos);
         n->symbol = sym;
     }
-    if (it->enclosing != NULL && map_get(&cl->nodes, it->enclosing) != NULL) {
-        n->enclosing = map_get(&cl->nodes, it->enclosing);
+    if (it->enclosing != NULL && ptr_map_get(&cl->nodes, it->enclosing) != NULL) {
+        n->enclosing = ptr_map_get(&cl->nodes, it->enclosing);
     }
     if (it->capture_count > 0) {
         n->captures = types_alloc_array(cl->k->c->arena, it->capture_count + 1,
@@ -1620,7 +1543,7 @@ static void make_body(struct copies *k, struct work *w)
     cl.map_capacity = 0;
     cl.fresh = true;
     cl.generic = w->from->owner != NULL ? w->from->owner : w->from;
-    map_put(&cl.nodes, w->from, w->to);
+    ptr_map_put(&cl.nodes, w->from, w->to);
     xparams(&cl, w->to, w->from);
     at.function = w->to;
     sema_enter(c, &at, &saved);
@@ -1630,7 +1553,7 @@ static void make_body(struct copies *k, struct work *w)
     k->making = 0;
     sema_leave_scope(c, &scope);
     sema_leave(c, &saved);
-    map_free(&cl.nodes);
+    ptr_map_free(&cl.nodes);
 }
 
 /* The calls of generics in code that is not generic name their copies. */
@@ -1717,7 +1640,7 @@ static bool items_of_copies(struct copies *k, const struct item *it)
     }
     for (copy = it->symbol->type->copies; copy != NULL;
          copy = copy->next_copy) {
-        if (!sema_has_params(copy) && map_get(&k->items, copy) == NULL) {
+        if (!sema_has_params(copy) && ptr_map_get(&k->items, copy) == NULL) {
             type_item(k, copy);
             made = true;
         }
@@ -1764,7 +1687,7 @@ void sema_compile_copies(struct checker *c)
     for (i = 0; i < count; i++) {
         struct item *it = module->items[i];
         if (generic_type_item(it)) {
-            map_put(&k.generics, it->symbol->type, it);
+            ptr_map_put(&k.generics, it->symbol->type, it);
         }
     }
     for (i = 0; i < c->library_count; i++) {
@@ -1772,7 +1695,7 @@ void sema_compile_copies(struct checker *c)
         for (j = 0; j < lib->generic_count; j++) {
             struct item *it = lib->generics[j];
             if (generic_type_item(it)) {
-                map_put(&k.generics, it->symbol->type, it);
+                ptr_map_put(&k.generics, it->symbol->type, it);
             }
         }
     }
@@ -1817,6 +1740,6 @@ void sema_compile_copies(struct checker *c)
     free(k.fns);
     free(k.work);
     free(k.added);
-    map_free(&k.generics);
-    map_free(&k.items);
+    ptr_map_free(&k.generics);
+    ptr_map_free(&k.items);
 }

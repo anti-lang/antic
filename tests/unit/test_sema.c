@@ -1201,6 +1201,71 @@ void test_sema_copy_bounds(void)
     text_free(&source);
 }
 
+/* The walks over the parts of a type meet each type once. Each of the
+   40 types below holds the one before it twice, so a walk that goes down
+   every path makes 2^40 steps. */
+void test_sema_shared_parts(void)
+{
+    static const char vec4[] =
+        "simd struct V { x: f32, y: f32, z: f32, w: f32 }\n";
+    struct text source = {0};
+    int i;
+
+    /* A literal leaves out every field that takes `T { }`, and a copy
+       of the class tears down and holds no Mutex. */
+    text_append(&source, "class C0 { pub x: int = 0, }\n");
+    for (i = 1; i <= 40; i++) {
+        text_appendf(&source, "class C%d { pub a: C%d, pub b: C%d, }\n", i,
+                     i - 1, i - 1);
+    }
+    text_append(&source, "fn f() -> int { let c = C40 { }; let d = c; "
+                         "return d.a.a.a.a.b.b.b.b.a.a.a.a.b.b.b.b.a.a.a.a"
+                         ".b.b.b.b.a.a.a.a.b.b.b.b.a.a.a.a.b.b.b.b.x; }\n"
+                         "worker fn w(chunk: []C40) -> int { return 0; }\n");
+    accepts(text_cstr(&source));
+    text_free(&source);
+    /* A name that no `use` field promotes, and one that both do. */
+    text_append(&source, "class U0 { pub x: int = 0, }\n");
+    for (i = 1; i <= 40; i++) {
+        text_appendf(&source, "class U%d { use a: U%d, use b: U%d, }\n", i,
+                     i - 1, i - 1);
+    }
+    text_append(&source, "fn f(u: *U40) -> int { return u.y; }\n");
+    rejects(text_cstr(&source), 42, 31, "`U40` has no field `y`");
+    text_free(&source);
+    text_append(&source, "class U0 { pub x: int = 0, }\n");
+    for (i = 1; i <= 40; i++) {
+        text_appendf(&source, "class U%d { use a: U%d, use b: U%d, }\n", i,
+                     i - 1, i - 1);
+    }
+    text_append(&source, "fn f(u: *U40) -> int { return u.x; }\n");
+    rejects(text_cstr(&source), 2, 23,
+            "`x` is provided by both `a` and `b`");
+    text_free(&source);
+    /* The bytes of a struct, a constant that holds no class, and the
+       default `==`. */
+    text_append(&source, vec4);
+    text_append(&source, "struct S0 { x: f32 }\n");
+    for (i = 1; i <= 40; i++) {
+        text_appendf(&source, "struct S%d { a: S%d, b: S%d }\n", i, i - 1,
+                     i - 1);
+    }
+    text_append(&source, "fn f(v: V) { let s = v as S40; }\n");
+    rejects(text_cstr(&source), 43, 22,
+            "cannot convert `V` of 16 bytes to `S40` of 4398046511104");
+    text_free(&source);
+    text_append(&source, "struct S0 { x: f32 }\n");
+    for (i = 1; i <= 40; i++) {
+        text_appendf(&source, "struct S%d { a: S%d, b: S%d }\n", i, i - 1,
+                     i - 1);
+    }
+    text_append(&source, "fn f(a: S40, b: S40) -> bool { return a == b; }\n"
+                         "const K: S40 = S40 { };\n");
+    rejects_also(text_cstr(&source), 43, 16,
+                 "the literal of `S40` misses the field `a`");
+    text_free(&source);
+}
+
 /* Chains of types the program writes are walked without a recursion
    per link, and the values of a struct nest at most 256 levels. */
 void test_sema_chains(void)

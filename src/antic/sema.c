@@ -205,14 +205,19 @@ const struct interface *sema_find_library(const struct checker *c,
     return NULL;
 }
 
-/* Whether lib imports module, directly or through its own imports. The
-   depth limit ends the search when damaged libraries import each other. */
-static bool depends_on(const struct checker *c, const struct interface *lib,
-                       const struct name *module, size_t depth)
+/* Whether lib imports module, directly or through its own imports.
+   searched holds the libraries met, none of which imports module, since
+   the search ends at the first that does. Each library is searched once,
+   so libraries that import each other end the search as well. The
+   library count bounds how deep it goes. */
+static bool imports_module(const struct checker *c,
+                           const struct interface *lib,
+                           const struct name *module,
+                           struct ptr_set *searched)
 {
     size_t i;
 
-    if (depth > c->library_count) {
+    if (!ptr_set_add(searched, lib)) {
         return false;
     }
     for (i = 0; i < lib->import_count; i++) {
@@ -224,11 +229,23 @@ static bool depends_on(const struct checker *c, const struct interface *lib,
             return true;
         }
         next = sema_find_library(c, &imported);
-        if (next != NULL && depends_on(c, next, module, depth + 1)) {
+        if (next != NULL && imports_module(c, next, module, searched)) {
             return true;
         }
     }
     return false;
+}
+
+static bool depends_on(const struct checker *c, const struct interface *lib,
+                       const struct name *module)
+{
+    struct ptr_set searched;
+    bool depends;
+
+    memset(&searched, 0, sizeof searched);
+    depends = imports_module(c, lib, module, &searched);
+    free(searched.slots);
+    return depends;
 }
 
 /* DESIGN: an `internal` item reaches the modules of its own package and
@@ -1763,7 +1780,7 @@ static void declare_import(struct checker *c, const struct import *imp)
                       (int)module->length, module->text);
         return;
     }
-    if (depends_on(c, lib, &c->module_name, 0)) {
+    if (depends_on(c, lib, &c->module_name)) {
         sema_error_at(c, imp->module_pos,
                       "`%.*s` depends on `%.*s`, so the import "
                       "forms a cycle", (int)module->length, module->text,

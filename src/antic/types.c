@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ptrset.h"
+
 void *types_alloc_array(struct arena *arena, size_t count, size_t size)
 {
     if (size != 0 && count > SIZE_MAX / size) {
@@ -1805,7 +1807,11 @@ int type_bits(const struct type *t)
     }
 }
 
-bool type_pointer_free(const struct type *t)
+/* answered holds the structs, the classes, the tuples and the variants
+   met in this walk. Each of them is pointer-free, since the walk ends at
+   the first that is not, and a type that holds another twice is walked
+   once. */
+static bool pointer_free(const struct type *t, struct ptr_set *answered)
 {
     size_t i;
 
@@ -1816,7 +1822,7 @@ bool type_pointer_free(const struct type *t)
         return false;
     case TYPE_ARRAY:
     case TYPE_OPTIONAL:
-        return type_pointer_free(t->element);
+        return pointer_free(t->element, answered);
     case TYPE_STRUCT:
     case TYPE_CLASS:
     case TYPE_TUPLE:
@@ -1827,7 +1833,8 @@ bool type_pointer_free(const struct type *t)
            takes a pointer to one, and a class that holds one stays
            pointer-free. A Regex never changes after it is compiled, so a
            worker takes one as it takes a `str`. */
-        if (types_is_mutex(t) || types_is_chan(t) || types_is_regex(t)) {
+        if (types_is_mutex(t) || types_is_chan(t) || types_is_regex(t) ||
+            !ptr_set_add(answered, t)) {
             return true;
         }
         /* DESIGN: the pointer-free test of `parallel` exempts the table
@@ -1840,7 +1847,7 @@ bool type_pointer_free(const struct type *t)
             if (t->fields[i].form == FIELD_TABLE || t->fields[i].owned) {
                 continue;
             }
-            if (!type_pointer_free(t->fields[i].type)) {
+            if (!pointer_free(t->fields[i].type, answered)) {
                 return false;
             }
         }
@@ -1848,4 +1855,15 @@ bool type_pointer_free(const struct type *t)
     default:
         return true;
     }
+}
+
+bool type_pointer_free(const struct type *t)
+{
+    struct ptr_set answered;
+    bool free_of;
+
+    memset(&answered, 0, sizeof answered);
+    free_of = pointer_free(t, &answered);
+    free(answered.slots);
+    return free_of;
 }

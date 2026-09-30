@@ -232,7 +232,7 @@ static void check_nested_fields(struct checker *c, const struct item *cls,
         const struct struct_field *f = &t->fields[i];
         const struct type *inner = held_nested(f->type, cls);
         size_t j;
-        if (inner == NULL || !sema_ptr_set_add(seen, inner) ||
+        if (inner == NULL || !ptr_set_add(seen, inner) ||
             inner->kind == TYPE_ENUM) {
             continue;
         }

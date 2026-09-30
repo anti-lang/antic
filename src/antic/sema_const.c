@@ -947,8 +947,9 @@ static void const_deps_of_symbol(struct chain_deps *d, struct symbol *sym)
 }
 
 /* Whether a value of type t holds a class, itself or in a field or an
-   element. */
-static bool holds_class(const struct type *t)
+   element. answered holds the types with fields met in this walk, none
+   of which holds a class. */
+static bool class_in(const struct type *t, struct ptr_set *answered)
 {
     size_t i;
 
@@ -959,17 +960,31 @@ static bool holds_class(const struct type *t)
         return true;
     }
     if (t->kind == TYPE_ARRAY) {
-        return holds_class(t->element);
+        return class_in(t->element, answered);
     }
     if (!type_has_fields(t)) {
         return false;
     }
+    if (!ptr_set_add(answered, t)) {
+        return false;
+    }
     for (i = 0; i < t->field_count; i++) {
-        if (holds_class(t->fields[i].type)) {
+        if (class_in(t->fields[i].type, answered)) {
             return true;
         }
     }
     return false;
+}
+
+static bool holds_class(const struct type *t)
+{
+    struct ptr_set answered;
+    bool holds;
+
+    memset(&answered, 0, sizeof answered);
+    holds = class_in(t, &answered);
+    free(answered.slots);
+    return holds;
 }
 
 /* Evaluate a constant that a chain names. */

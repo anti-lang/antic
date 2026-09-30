@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "arith.h"
@@ -2255,15 +2256,58 @@ static struct type *check_variant_test(struct checker *c, struct expr *e,
     return sema_builtin(c, TYPE_BOOL);
 }
 
-/* The size and the alignment of t, which are the same on every target,
-   as the C rules lay it out. False for a type that holds a width the
-   target decides, a symbolic length, a bitfield or a table. */
-static bool fixed_layout(const struct type *t, uint64_t *size,
-                         uint64_t *align)
+/* What fixed_layout found for one struct or tuple. */
+struct fixed_answer {
+    bool fixed;
+    uint64_t size;
+    uint64_t align;
+};
+
+static bool layout_in(const struct type *t, uint64_t *size, uint64_t *align,
+                      struct ptr_map *answered);
+
+/* The size and the alignment of the fields of a struct or a tuple. */
+static bool fields_layout(const struct type *t, uint64_t *size,
+                          uint64_t *align, struct ptr_map *answered)
 {
     uint64_t offset = 0;
     uint64_t most = 1;
     size_t i;
+
+    for (i = 0; i < t->field_count; i++) {
+        uint64_t n;
+        uint64_t a;
+        if (t->fields[i].bits != 0 ||
+            !layout_in(t->fields[i].type, &n, &a, answered)) {
+            return false;
+        }
+        a = t->packed ? 1 : a;
+        most = a > most ? a : most;
+        if (t->is_union) {
+            offset = n > offset ? n : offset;
+        } else if (offset > UINT64_MAX - (a - 1) ||
+                   (offset + a - 1) / a * a > UINT64_MAX - n) {
+            return false;
+        } else {
+            offset = (offset + a - 1) / a * a + n;
+        }
+    }
+    if (t->simd) {
+        most = offset < 16 ? offset : 16;
+    }
+    most = t->align > most ? t->align : most;
+    if (offset > UINT64_MAX - (most - 1)) {
+        return false;
+    }
+    *size = (offset + most - 1) / most * most;
+    *align = most;
+    return true;
+}
+
+static bool layout_in(const struct type *t, uint64_t *size, uint64_t *align,
+                      struct ptr_map *answered)
+{
+    struct fixed_answer *known;
 
     switch (t->kind) {
     case TYPE_POINTER:
@@ -2277,9 +2321,10 @@ static bool fixed_layout(const struct type *t, uint64_t *size,
         *align = 8;
         return true;
     case TYPE_ENUM:
-        return fixed_layout(t->base, size, align);
+        return layout_in(t->base, size, align, answered);
     case TYPE_ARRAY:
-        if (t->length_of != NULL || !fixed_layout(t->element, size, align) ||
+        if (t->length_of != NULL ||
+            !layout_in(t->element, size, align, answered) ||
             (t->length != 0 && *size > UINT64_MAX / t->length)) {
             return false;
         }
@@ -2287,39 +2332,46 @@ static bool fixed_layout(const struct type *t, uint64_t *size,
         return true;
     case TYPE_STRUCT:
     case TYPE_TUPLE:
-        for (i = 0; i < t->field_count; i++) {
-            uint64_t n;
-            uint64_t a;
-            if (t->fields[i].bits != 0 ||
-                !fixed_layout(t->fields[i].type, &n, &a)) {
-                return false;
+        known = ptr_map_get(answered, t);
+        if (known == NULL) {
+            known = calloc(1, sizeof *known);
+            if (known == NULL) {
+                fputs("antic: out of memory\n", stderr);
+                exit(70);
             }
-            a = t->packed ? 1 : a;
-            most = a > most ? a : most;
-            if (t->is_union) {
-                offset = n > offset ? n : offset;
-            } else if (offset > UINT64_MAX - (a - 1) ||
-                       (offset + a - 1) / a * a > UINT64_MAX - n) {
-                return false;
-            } else {
-                offset = (offset + a - 1) / a * a + n;
-            }
+            known->fixed = fields_layout(t, &known->size, &known->align,
+                                         answered);
+            ptr_map_put(answered, t, known);
         }
-        if (t->simd) {
-            most = offset < 16 ? offset : 16;
-        }
-        most = t->align > most ? t->align : most;
-        if (offset > UINT64_MAX - (most - 1)) {
-            return false;
-        }
-        *size = (offset + most - 1) / most * most;
-        *align = most;
-        return true;
+        *size = known->size;
+        *align = known->align;
+        return known->fixed;
     default:
         *size = type_lane_bytes(t);
         *align = *size;
         return *size != 0;
     }
+}
+
+/* The size and the alignment of t, which are the same on every target,
+   as the C rules lay it out. False for a type that holds a width the
+   target decides, a symbolic length, a bitfield or a table. answered
+   holds the answer for each struct and tuple met, so a struct that holds
+   another twice measures it once. */
+static bool fixed_layout(const struct type *t, uint64_t *size,
+                         uint64_t *align)
+{
+    struct ptr_map answered;
+    bool fixed;
+    size_t i;
+
+    memset(&answered, 0, sizeof answered);
+    fixed = layout_in(t, size, align, &answered);
+    for (i = 0; i < answered.capacity; i++) {
+        free(answered.values[i]);
+    }
+    ptr_map_free(&answered);
+    return fixed;
 }
 
 /* DESIGN: `as` between a simd struct and an array or a plain struct of

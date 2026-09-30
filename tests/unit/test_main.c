@@ -17,6 +17,7 @@ void test_sema_constants(void);
 void test_sema_generic_copies(void);
 void test_sema_chains(void);
 void test_sema_copy_bounds(void);
+void test_sema_shared_parts(void);
 void test_nullable(void);
 void test_variant(void);
 void test_sync(void);
@@ -69,6 +70,7 @@ int main(void)
     test_sema_generic_copies();
     test_sema_chains();
     test_sema_copy_bounds();
+    test_sema_shared_parts();
     test_nullable();
     test_variant();
     test_sync();

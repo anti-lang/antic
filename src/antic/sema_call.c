@@ -3,6 +3,7 @@
    the calls of `anti.simd`, plugins and workers. */
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "sema_checker.h"
@@ -227,10 +228,20 @@ const struct type *sema_inherited(const struct type *t)
    and `v.f(args)` into `T.f(&v.name, args)`, so nothing below the checker
    knows about promotion. The containing struct's own names win, and a
    name that two fields both provide is an error at the use. */
-static const struct struct_field *promoting_field(struct checker *c,
-                                                  const struct type *s,
-                                                  const struct name *name,
-                                                  bool *ambiguous);
+/* The answers of one search for a promoted name: the types met that
+   provide it and those that do not, apart for a search of the public
+   members alone. A type that two fields hold is searched once, and an
+   ambiguity inside it is reported once. */
+struct promotion {
+    struct ptr_set yes[2];
+    struct ptr_set no[2];
+};
+
+static const struct struct_field *promotes(struct checker *c,
+                                           const struct type *s,
+                                           const struct name *name,
+                                           bool *ambiguous,
+                                           struct promotion *p);
 
 /* Whether the type t provides name as a field or as a public function,
    directly or through its own promoting fields. */
@@ -238,31 +249,42 @@ static const struct struct_field *promoting_field(struct checker *c,
    members of their type and nothing else. A base promotes what the class
    itself may see, because the chain is one namespace. */
 static bool provides(struct checker *c, const struct type *t,
-                     const struct name *name, bool pub_only)
+                     const struct name *name, bool pub_only,
+                     struct promotion *p)
 {
     const struct struct_field *f;
     const struct item *m;
     bool ambiguous = false;
+    bool found;
 
     if (!type_has_fields(t)) {
         return false;
     }
-    f = sema_find_field(t, name);
-    if (f != NULL) {
-        return !pub_only || t->kind != TYPE_CLASS || f->vis == VIS_PUB ||
-               f->form != FIELD_PLAIN;
-    }
-    m = sema_find_member(t, name);
-    if (m != NULL && m->pub) {
+    if (ptr_set_has(&p->yes[pub_only], t)) {
         return true;
     }
-    return promoting_field(c, t, name, &ambiguous) != NULL;
+    if (ptr_set_has(&p->no[pub_only], t)) {
+        return false;
+    }
+    f = sema_find_field(t, name);
+    m = f == NULL ? sema_find_member(t, name) : NULL;
+    if (f != NULL) {
+        found = !pub_only || t->kind != TYPE_CLASS || f->vis == VIS_PUB ||
+                f->form != FIELD_PLAIN;
+    } else if (m != NULL && m->pub) {
+        found = true;
+    } else {
+        found = promotes(c, t, name, &ambiguous, p) != NULL;
+    }
+    ptr_set_add(found ? &p->yes[pub_only] : &p->no[pub_only], t);
+    return found;
 }
 
-static const struct struct_field *promoting_field(struct checker *c,
-                                                  const struct type *s,
-                                                  const struct name *name,
-                                                  bool *ambiguous)
+static const struct struct_field *promotes(struct checker *c,
+                                           const struct type *s,
+                                           const struct name *name,
+                                           bool *ambiguous,
+                                           struct promotion *p)
 {
     const struct struct_field *found = NULL;
     size_t i;
@@ -270,7 +292,7 @@ static const struct struct_field *promoting_field(struct checker *c,
     for (i = 0; s != NULL && i < s->field_count; i++) {
         const struct struct_field *f = &s->fields[i];
         if (f->form == FIELD_PLAIN ||
-            !provides(c, f->type, name, f->form != FIELD_BASE)) {
+            !provides(c, f->type, name, f->form != FIELD_BASE, p)) {
             continue;
         }
         if (found != NULL) {
@@ -283,6 +305,25 @@ static const struct struct_field *promoting_field(struct checker *c,
             return NULL;
         }
         found = f;
+    }
+    return found;
+}
+
+/* The field of s that promotes name, or NULL. */
+static const struct struct_field *promoting_field(struct checker *c,
+                                                  const struct type *s,
+                                                  const struct name *name,
+                                                  bool *ambiguous)
+{
+    struct promotion p;
+    const struct struct_field *found;
+    size_t i;
+
+    memset(&p, 0, sizeof p);
+    found = promotes(c, s, name, ambiguous, &p);
+    for (i = 0; i < 2; i++) {
+        free(p.yes[i].slots);
+        free(p.no[i].slots);
     }
     return found;
 }
@@ -441,8 +482,13 @@ static bool constructs_with_arguments(const struct type *t)
    has a default, written or taken this way, or T has none. `construct`
    runs on it as on any literal, so a `construct` with arguments rules it
    out. Any other such field is required in a literal, like any field
-   without a default. */
-static bool literal_complete(const struct type *t)
+   without a default. answered holds the classes met in this walk. Each
+   of them may leave every field out, since the walk ends at the first
+   that may not, and classes that hold another twice are walked once. */
+static bool takes_literal(const struct struct_field *f,
+                          struct ptr_set *answered);
+
+static bool literal_complete(const struct type *t, struct ptr_set *answered)
 {
     const struct type *up;
     size_t i;
@@ -450,6 +496,9 @@ static bool literal_complete(const struct type *t)
     if (t == NULL || t->kind != TYPE_CLASS || t->has_abstract ||
         sema_singleton_type(t) || constructs_with_arguments(t)) {
         return false;
+    }
+    if (!ptr_set_add(answered, t)) {
+        return true;
     }
     for (up = t; up != NULL && up->kind == TYPE_CLASS; up = up->base) {
         for (i = 0; i < up->field_count; i++) {
@@ -459,7 +508,7 @@ static bool literal_complete(const struct type *t)
                 continue;
             }
             if (f->value == NULL && f->constant == NULL &&
-                !sema_field_takes_literal(f)) {
+                !takes_literal(f, answered)) {
                 return false;
             }
         }
@@ -483,12 +532,24 @@ struct stmt *sema_arm_fallthrough(const struct stmt *body)
 /* DESIGN: a Mutex field without a default starts free, as `Mutex.new()`
    gives it, so a literal and `construct` may leave it out. So does the
    hidden lock of a synchronized class. */
-bool sema_field_takes_literal(const struct struct_field *f)
+static bool takes_literal(const struct struct_field *f,
+                          struct ptr_set *answered)
 {
     return f->value == NULL && f->constant == NULL &&
            (f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
-           (literal_complete(f->type) || types_is_mutex(f->type) ||
-            types_is_object_lock(f->type));
+           (literal_complete(f->type, answered) ||
+            types_is_mutex(f->type) || types_is_object_lock(f->type));
+}
+
+bool sema_field_takes_literal(const struct struct_field *f)
+{
+    struct ptr_set answered;
+    bool takes;
+
+    memset(&answered, 0, sizeof answered);
+    takes = takes_literal(f, &answered);
+    free(answered.slots);
+    return takes;
 }
 
 /* DESIGN: every field of a struct is readable and writable everywhere,

@@ -18,6 +18,7 @@
 #include "ast.h"
 #include "diagnostic.h"
 #include "lexer.h"
+#include "ptrset.h"
 #include "sema.h"
 #include "text.h"
 #include "types.h"
@@ -149,6 +150,9 @@ struct checker {
     bool copy_name_refused;         /* a cut copy name was reported */
     const struct type *copy_root;   /* the generic the chain began with */
     const struct type *copy_cut;    /* a copy in the chain has a cut name */
+    /* The answers of the question of a default `==` being asked, which
+       sema_default_eq keeps while its parts ask again. */
+    struct eq_answers *eq_answers;
     /* The fields of concurrent classes that the module writes after
        `construct`, reported at their declarations at the end. */
     struct written_field *written;
@@ -210,14 +214,6 @@ struct generic_call {
 #define COPY_DEPTH_MAX 64
 #define COPY_COUNT_MAX 16384
 #define COPY_NAME_MAX 65536
-
-/* A set of pointers, open addressed and at most half full. The owner
-   frees slots with free(). */
-struct ptr_set {
-    const void **slots;
-    size_t capacity;
-    size_t count;
-};
 
 /* sema.c */
 
@@ -435,7 +431,6 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
 
 /* sema_stmt.c */
 
-bool sema_ptr_set_add(struct ptr_set *s, const void *p);
 void sema_walk_worker(struct checker *c, const struct item *worker);
 bool sema_fills(const struct type *t, const struct type *abstract);
 bool sema_filled_somewhere(const struct checker *c, const struct type *t);

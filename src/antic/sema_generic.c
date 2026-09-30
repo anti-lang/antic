@@ -853,7 +853,7 @@ static bool has_params(const struct type *t, struct ptr_set *answered)
                 t->length_of->kind == SYMBOLIC_PARAM);
     case TYPE_FN:
     case TYPE_TUPLE:
-        if (!sema_ptr_set_add(answered, t)) {
+        if (!ptr_set_add(answered, t)) {
             return false;
         }
         for (i = 0; i < t->param_count; i++) {
@@ -868,7 +868,7 @@ static bool has_params(const struct type *t, struct ptr_set *answered)
         if (types_is_chan(t)) {
             return has_params(t->element, answered);
         }
-        if (t->generic != NULL && !sema_ptr_set_add(answered, t)) {
+        if (t->generic != NULL && !ptr_set_add(answered, t)) {
             return false;
         }
         for (i = 0; t->generic != NULL && i < t->generic->type_param_count;

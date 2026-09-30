@@ -84,7 +84,7 @@ void sema_chain_prepare(struct checker *c, struct symbol *root,
     memset(&deps, 0, sizeof deps);
     memset(&seen, 0, sizeof seen);
     deps.c = c;
-    sema_ptr_set_add(&seen, root);
+    ptr_set_add(&seen, root);
     for (;;) {
         struct chain_frame *top;
         if (next != NULL) {
@@ -105,7 +105,7 @@ void sema_chain_prepare(struct checker *c, struct symbol *root,
         top = &stack[stack_count - 1];
         if (top->next < top->end) {
             struct symbol *dep = deps.items[top->next++];
-            if (dep->state == EVAL_NONE && sema_ptr_set_add(&seen, dep)) {
+            if (dep->state == EVAL_NONE && ptr_set_add(&seen, dep)) {
                 next = dep;
             }
             continue;

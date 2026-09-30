@@ -13,52 +13,6 @@ struct worker_walk;
 
 static void walk_function(struct worker_walk *w, const struct item *it);
 
-static size_t ptr_slot(const void *p, size_t capacity)
-{
-    uint64_t h = (uint64_t)(uintptr_t)p;
-
-    h ^= h >> 33;
-    h *= UINT64_C(0xff51afd7ed558ccd);
-    h ^= h >> 33;
-    return (size_t)(h & (capacity - 1));
-}
-
-/* Add p to s. True when p was not in s before. */
-bool sema_ptr_set_add(struct ptr_set *s, const void *p)
-{
-    size_t i;
-
-    if ((s->count + 1) * 2 > s->capacity) {
-        size_t capacity = s->capacity == 0 ? 64 : s->capacity * 2;
-        const void **slots = calloc(capacity, sizeof *slots);
-        if (slots == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        for (i = 0; i < s->capacity; i++) {
-            if (s->slots[i] != NULL) {
-                size_t at = ptr_slot(s->slots[i], capacity);
-                while (slots[at] != NULL) {
-                    at = (at + 1) & (capacity - 1);
-                }
-                slots[at] = s->slots[i];
-            }
-        }
-        free(s->slots);
-        s->slots = slots;
-        s->capacity = capacity;
-    }
-    for (i = ptr_slot(p, s->capacity); s->slots[i] != NULL;
-         i = (i + 1) & (s->capacity - 1)) {
-        if (s->slots[i] == p) {
-            return false;
-        }
-    }
-    s->slots[i] = p;
-    s->count++;
-    return true;
-}
-
 /* DESIGN: analysis that only reports runs over every function a worker
    can reach. A worker may not `delete` its object, and it may not touch
    a `mutable` field of a singleton, because another worker may hold the
@@ -281,7 +235,7 @@ static void walk_block(struct worker_walk *w, const struct block *b)
 static void walk_function(struct worker_walk *w, const struct item *it)
 {
     if (it == NULL || it->kind != ITEM_FN || it->body == NULL ||
-        !sema_ptr_set_add(&w->seen, it)) {
+        !ptr_set_add(&w->seen, it)) {
         return;
     }
     if (w->queue_count == w->queue_capacity) {
@@ -552,8 +506,11 @@ bool sema_has_body(const struct item *fn)
    stays plain data. A union owns nothing, since no teardown knows which
    of its fields it holds. A variant is owning when the struct of any of
    its cases is, since its tag names the case it holds, and its teardown
-   tears down the fields of that case. */
-bool sema_needs_teardown(const struct type *t)
+   tears down the fields of that case. answered holds the structs, the
+   tuples, the variants and the classes met in this walk. None of them
+   needs a teardown, since the walk ends at the first that does, and a
+   type that holds another twice is walked once. */
+static bool needs_teardown(const struct type *t, struct ptr_set *answered)
 {
     static const struct name destruct_name = {"destruct", 8};
     size_t i;
@@ -564,30 +521,36 @@ bool sema_needs_teardown(const struct type *t)
     switch (t->kind) {
     case TYPE_OPTIONAL:
     case TYPE_ARRAY:
-        return sema_needs_teardown(t->element);
+        return needs_teardown(t->element, answered);
     case TYPE_FN:
         return t->owned;
     case TYPE_STRUCT:
     case TYPE_TUPLE:
-        if (t->is_union) {
+        if (t->is_union || !ptr_set_add(answered, t)) {
             return false;
         }
         for (i = 0; i < t->field_count; i++) {
             const struct struct_field *f = &t->fields[i];
             if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
-                sema_needs_teardown(f->type)) {
+                needs_teardown(f->type, answered)) {
                 return true;
             }
         }
         return false;
     case TYPE_VARIANT:
+        if (!ptr_set_add(answered, t)) {
+            return false;
+        }
         for (i = 0; i < t->param_count; i++) {
-            if (sema_needs_teardown(t->params[i])) {
+            if (needs_teardown(t->params[i], answered)) {
                 return true;
             }
         }
         return false;
     case TYPE_CLASS:
+        if (!ptr_set_add(answered, t)) {
+            return false;
+        }
         break;
     default:
         return false;
@@ -609,12 +572,23 @@ bool sema_needs_teardown(const struct type *t)
                 return true;
             }
             if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
-                sema_needs_teardown(f->type)) {
+                needs_teardown(f->type, answered)) {
                 return true;
             }
         }
     }
     return false;
+}
+
+bool sema_needs_teardown(const struct type *t)
+{
+    struct ptr_set answered;
+    bool needs;
+
+    memset(&answered, 0, sizeof answered);
+    needs = needs_teardown(t, &answered);
+    free(answered.slots);
+    return needs;
 }
 
 static const char own_fields_phrase[] = "has `own` fields";
@@ -822,8 +796,10 @@ void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
 
 /* Whether a value of t holds a Mutex. It does when it is one, or a
    struct, a class, a tuple, a variant or an array with one inside it. A
-   pointer holds none. */
-bool sema_holds_mutex(const struct type *t)
+   pointer holds none. answered holds the types with fields met in this
+   walk, none of which holds a Mutex, since the walk ends at the first
+   that does. */
+static bool holds_mutex(const struct type *t, struct ptr_set *answered)
 {
     size_t i;
 
@@ -834,18 +810,32 @@ bool sema_holds_mutex(const struct type *t)
         return true;
     }
     if (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL) {
-        return sema_holds_mutex(t->element);
+        return holds_mutex(t->element, answered);
     }
     if (t->kind != TYPE_STRUCT && t->kind != TYPE_CLASS &&
         t->kind != TYPE_TUPLE && t->kind != TYPE_VARIANT) {
         return false;
     }
+    if (!ptr_set_add(answered, t)) {
+        return false;
+    }
     for (i = 0; i < t->field_count; i++) {
-        if (sema_holds_mutex(t->fields[i].type)) {
+        if (holds_mutex(t->fields[i].type, answered)) {
             return true;
         }
     }
     return false;
+}
+
+bool sema_holds_mutex(const struct type *t)
+{
+    struct ptr_set answered;
+    bool holds;
+
+    memset(&answered, 0, sizeof answered);
+    holds = holds_mutex(t, &answered);
+    free(answered.slots);
+    return holds;
 }
 
 /* DESIGN: a Mutex is the lock word itself, so a copy would be a second
