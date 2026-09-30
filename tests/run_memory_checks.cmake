@@ -8,7 +8,8 @@
 #   HOST      the host target
 #
 # A build without the option carries no check. windows-arm64 refuses the
-# option with its message. The module that links gets the options hook
+# option with its message, and a windows-arm64 host reports the test
+# skipped after that check, since it has no runtime of AddressSanitizer. The module that links gets the options hook
 # and the function that marks the blocks of the runtime as kept, except
 # on Windows, whose runtime has no leak check. On every other host a
 # build with the option reports a read after free, a double free and a
@@ -82,6 +83,7 @@ if(status EQUAL 0 OR NOT err STREQUAL
 endif()
 
 if(HOST STREQUAL "windows-arm64")
+    message("SKIP: windows-arm64 has no runtime of AddressSanitizer")
     return()
 endif()
 

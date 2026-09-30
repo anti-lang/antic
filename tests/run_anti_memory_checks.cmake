@@ -15,9 +15,11 @@
 # ones of SOURCE and TESTS. A build without the option before and after
 # shows that the cache keeps the objects of the two apart. Windows keeps
 # the symbolizer of AddressSanitizer and has no leak check, so there the
-# run reads the kind of each error alone.
+# run reads the kind of each error alone. windows-arm64 has no runtime of
+# AddressSanitizer, so the test reports itself skipped there.
 
 if(HOST STREQUAL "windows-arm64")
+    message("SKIP: windows-arm64 has no runtime of AddressSanitizer")
     return()
 endif()
 file(REMOVE_RECURSE "${WORK}")

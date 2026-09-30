@@ -5,7 +5,6 @@
 #   RUNTIME   the runtime archive
 #   SOURCES   the directory of the check programs
 #   WORK      a directory for the files
-#   STRINGS   a tool that lists the strings of a file
 #   OBJECT    the suffix of an object of the host, .o or .obj
 #
 # Each program runs to its end and exits with 7 when the checks are
@@ -30,8 +29,7 @@ endfunction()
 function(check name phrase pattern runs)
     set(source "${SOURCES}/${name}.anti")
     build("${name}.release" "${source}")
-    execute_process(COMMAND "${STRINGS}" "${WORK}/${name}.release"
-                    OUTPUT_VARIABLE text ENCODING NONE)
+    file(STRINGS "${WORK}/${name}.release" text)
     if(text MATCHES "${phrase}")
         message(FATAL_ERROR "the release build of ${name} carries `${phrase}`")
     endif()
@@ -243,8 +241,7 @@ foreach(name quiet trap)
     endif()
     execute_process(COMMAND "${WORK}/${name}" RESULT_VARIABLE code
                     ERROR_VARIABLE ran ENCODING NONE)
-    execute_process(COMMAND "${STRINGS}" "${WORK}/${name}"
-                    OUTPUT_VARIABLE text ENCODING NONE)
+    file(STRINGS "${WORK}/${name}" text)
     if(name STREQUAL "quiet")
         if(text MATCHES "index out of bounds")
             message(FATAL_ERROR "a library check reached a release program")

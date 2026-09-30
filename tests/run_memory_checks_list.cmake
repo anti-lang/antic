@@ -12,9 +12,10 @@
 # the program with status 1. On macOS, whose runtime symbolizes the frames,
 # it also names the function that read, and `push` of the list among the
 # frames that freed the room. windows-arm64 has no runtime of
-# AddressSanitizer and runs nothing.
+# AddressSanitizer, so the test reports itself skipped there.
 
 if(HOST STREQUAL "windows-arm64")
+    message("SKIP: windows-arm64 has no runtime of AddressSanitizer")
     return()
 endif()
 file(MAKE_DIRECTORY "${WORK}")

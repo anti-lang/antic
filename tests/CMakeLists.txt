@@ -1363,21 +1363,18 @@ add_test(NAME program_abi_wchar
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/abi"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 
-# A small raylib binding: the raymath functions of the pinned raylib
-# release, which tools/get-raylib.cmake downloads. tools/raylib-pin holds
-# the version, so the default directory below cannot name another one.
 # A user receives these files. None of them may name a directory of the
 # machine that built it.
 # An ordinary build maps its paths away with -ffile-prefix-map. A
 # sanitizer writes the path of the module into its own metadata, which no
 # flag maps, so the test runs on a build without one.
-find_program(ANTIC_STRINGS strings)
 string(FIND "${CMAKE_C_FLAGS}" "-fsanitize" antic_sanitized)
-if(ANTIC_STRINGS AND antic_sanitized EQUAL -1)
+if(antic_sanitized EQUAL -1)
     add_test(NAME no_paths
         COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}" "-DSTRINGS=${ANTIC_STRINGS}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DANTIC=$<TARGET_FILE:antic>"
+                "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_no_paths.cmake")
 endif()
 
@@ -1459,7 +1456,8 @@ add_test(NAME anti_memory_checks
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-memory-checks"
         "-DHOST=${ANTIC_HOST_TARGET}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_memory_checks.cmake")
-set_tests_properties(anti_memory_checks PROPERTIES TIMEOUT 300)
+set_tests_properties(anti_memory_checks PROPERTIES TIMEOUT 300
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # `anti build`, `anti run` and `anti new` over a two-module project: the
 # dev cache, release mode, the -g rule, --target, --cpu and the lock file.
@@ -1762,6 +1760,9 @@ add_test(NAME release_dry_run
 set_tests_properties(release_dry_run PROPERTIES
     SKIP_REGULAR_EXPRESSION "SKIP: ")
 
+# A small raylib binding: the raymath functions of the pinned raylib
+# release, which tools/get-raylib.cmake downloads. tools/raylib-pin holds
+# the version, so the default of ANTIC_RAYLIB_DIR cannot name another one.
 if(EXISTS "${ANTIC_RAYLIB_DIR}/src/raymath.h")
     add_library(abi_raymath OBJECT abi/raymath.c)
     target_compile_options(abi_raymath PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
@@ -2837,7 +2838,7 @@ set_tests_properties(error_duplicate_library PROPERTIES
 
 # The five behaviours of `assert`: a release build without it, a forced
 # build with it, dev mode keeping it and --no-asserts dropping it.
-if(ANTIC_LLVM_MC AND ANTIC_STRINGS)
+if(ANTIC_LLVM_MC)
     add_test(NAME asserts
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2845,13 +2846,12 @@ if(ANTIC_LLVM_MC AND ANTIC_STRINGS)
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/asserts.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asserts"
-            "-DSTRINGS=${ANTIC_STRINGS}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_asserts.cmake")
 endif()
 
 # Every dev-mode check: bounds, overflow, a narrowing `as`, division and
 # shifts, in a build that keeps them and a build that drops them.
-if(ANTIC_LLVM_MC AND ANTIC_STRINGS)
+if(ANTIC_LLVM_MC)
     add_test(NAME checks
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2859,7 +2859,6 @@ if(ANTIC_LLVM_MC AND ANTIC_STRINGS)
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/checks"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/checks"
-            "-DSTRINGS=${ANTIC_STRINGS}"
             "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_checks.cmake")
 endif()
@@ -2957,7 +2956,8 @@ add_test(NAME memory_checks
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         "-DHOST=${ANTIC_HOST_TARGET}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_memory_checks.cmake")
-set_tests_properties(memory_checks PROPERTIES TIMEOUT 120)
+set_tests_properties(memory_checks PROPERTIES TIMEOUT 120
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
 # --memory-checks finds a pointer into a List kept across a push that grows
 # the list, as a read after free.
 add_test(NAME memory_checks_list
@@ -2969,7 +2969,8 @@ add_test(NAME memory_checks_list
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         "-DHOST=${ANTIC_HOST_TARGET}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_memory_checks_list.cmake")
-set_tests_properties(memory_checks_list PROPERTIES TIMEOUT 120)
+set_tests_properties(memory_checks_list PROPERTIES TIMEOUT 120
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # The ABI probe compares the layouts of C and antic on the host.
 if(NOT WIN32)

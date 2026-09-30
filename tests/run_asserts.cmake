@@ -4,7 +4,6 @@
 #   RUNTIME   the runtime archive
 #   SOURCE    a program whose assertion fails
 #   WORK      a directory for the files
-#   STRINGS   a tool that lists the strings of a file
 #
 # A release build runs the program to its end and carries no text of the
 # assertion. A dev build, and any build with --asserts, prints the text
@@ -30,8 +29,7 @@ if(NOT code EQUAL 7)
     message(FATAL_ERROR "the release build exited with ${code}, expected 7"
                         "\n${out}${err}")
 endif()
-execute_process(COMMAND "${STRINGS}" "${WORK}/release" OUTPUT_VARIABLE text
-                ENCODING NONE)
+file(STRINGS "${WORK}/release" text)
 if(text MATCHES "assertion failed")
     message(FATAL_ERROR "the release build carries the text of an assertion")
 endif()
@@ -95,8 +93,7 @@ foreach(case "quiet;" "trap;--asserts")
     endif()
     execute_process(COMMAND "${WORK}/${name}" RESULT_VARIABLE code
                     ERROR_VARIABLE ran ENCODING NONE)
-    execute_process(COMMAND "${STRINGS}" "${WORK}/${name}"
-                    OUTPUT_VARIABLE text ENCODING NONE)
+    file(STRINGS "${WORK}/${name}" text)
     if(name STREQUAL "quiet")
         if(NOT code EQUAL 0 OR text MATCHES "assertion failed")
             message(FATAL_ERROR "the library assertion reached a release "
