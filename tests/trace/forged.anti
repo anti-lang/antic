@@ -1,0 +1,57 @@
+//! `symbolize` takes the image of a frame from its address and never from the
+//! base or the module the frame records. A trace read back from text whose
+//! frames name a base where no image lies and a module that does not exist
+//! names the same functions as the trace it was written from.
+
+import anti.lang;
+import anti.mem;
+import anti.regex;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The trace of the calls that lead here, the innermost first.
+fn inner() -> *lang.StackTrace
+{
+	return lang.StackTrace.capture();
+}
+
+/// One call more on the trace.
+fn outer() -> *lang.StackTrace
+{
+	return inner();
+}
+
+/// Print the function of each of the three innermost frames.
+fn put(label: str, named: []lang.Frame)
+{
+	for i in 0..3 {
+		let f = named[i];
+		printf("%.*s %.*s\n".ptr, label.len as c_int, label.ptr,
+			f.function.len as c_int, f.function.ptr);
+	}
+}
+
+fn main() -> int
+{
+	let t = outer();
+	defer delete(t);
+	let out = text.Builder.new();
+	t.serialize(&out);
+	put("captured", t.symbolize());
+	let based = out.text().replace(re"\x22base\x22:\d+", "\"base\":16");
+	let forged = based.replace(re"\x22module\x22:\x22[^\x22]*\x22",
+		"\"module\":\"/nonexistent/forged\"");
+	free(based.ptr);
+	let from = mem.LibcAllocator.get();
+	let back = Object.deserialize(forged, from);
+	free(forged.ptr);
+	if back == none || !(back is *lang.StackTrace) {
+		return 1;
+	}
+	let read = back as *lang.StackTrace;
+	printf("forged base %d\n".ptr, (read.frames[0].base == 16) as c_int);
+	put("read back", read.symbolize());
+	delete(read, from);
+	return 0;
+}

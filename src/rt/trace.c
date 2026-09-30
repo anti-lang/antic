@@ -342,6 +342,15 @@ static struct anti_text image_id(const uint8_t *header)
     return id;
 }
 
+/* The image that holds the byte before the return address, as dyld
+   knows it. false for an address outside every image. */
+static bool image_at(uint64_t address, Dl_info *info)
+{
+    return address != 0 &&
+           dladdr((void *)(uintptr_t)(address - 1), info) != 0 &&
+           info->dli_fbase != NULL;
+}
+
 void anti_rt_trace_frame(uint64_t address, struct anti_raw_frame *out)
 {
     Dl_info info;
@@ -350,8 +359,7 @@ void anti_rt_trace_frame(uint64_t address, struct anti_raw_frame *out)
     out->address = address;
     out->module = text_of(NULL);
     out->build_id = text_of(NULL);
-    if (address == 0 || dladdr((void *)(uintptr_t)(address - 1), &info) == 0 ||
-        info.dli_fbase == NULL) {
+    if (!image_at(address, &info)) {
         return;
     }
     out->module = text_of(info.dli_fname);
@@ -364,7 +372,8 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
 {
     struct anti_macho_table t;
     struct anti_found found;
-    const uint8_t *header = (const uint8_t *)(uintptr_t)frame->base;
+    const uint8_t *header;
+    Dl_info info;
     const char *object;
     const char *symbol;
     uint64_t start;
@@ -376,9 +385,10 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
     out->address = frame->address;
     out->function = text_of(NULL);
     out->file = text_of(NULL);
-    if (header == NULL || frame->address == 0) {
+    if (!image_at(frame->address, &info)) {
         return;
     }
+    header = info.dli_fbase;
     slide = image_slide(header);
     if (!anti_rt_macho_table(header, SIZE_MAX, true, slide, &t)) {
         return;
@@ -519,8 +529,8 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
                              struct anti_frame *out)
 {
     struct anti_found found;
+    struct module_of m;
     const struct loaded *l;
-    char path[4096];
     uint64_t vaddr;
 
     memset(out, 0, sizeof *out);
@@ -528,19 +538,17 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
     out->address = frame->address;
     out->function = text_of(NULL);
     out->file = text_of(NULL);
-    if (frame->address == 0 || frame->module.len <= 0 ||
-        (size_t)frame->module.len >= sizeof path) {
+    if (frame->address == 0 ||
+        !module_at((uintptr_t)frame->address - 1, &m)) {
         return;
     }
-    memcpy(path, frame->module.ptr, (size_t)frame->module.len);
-    path[frame->module.len] = 0;
-    l = load(path, false);
+    l = load(m.name, false);
     if (l == NULL) {
         return;
     }
     /* A return address follows the call, so the lookup takes the byte
        before it, which is the call and names its line. */
-    vaddr = frame->address - 1 - frame->base;
+    vaddr = frame->address - 1 - (uint64_t)m.bias;
     if (anti_rt_elf_function(l->bytes, l->size, vaddr, &found)) {
         out->function = function_name(found.function, found.function_length,
                                        true);
@@ -616,9 +624,24 @@ int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip)
     return count;
 }
 
-void anti_rt_trace_frame(uint64_t address, struct anti_raw_frame *out)
+/* The module that holds the byte before the return address, as the
+   loader knows it. NULL for an address outside every module. */
+static HMODULE module_at(uint64_t address)
 {
     HMODULE module = NULL;
+
+    if (address == 0 ||
+        !GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                                GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                            (LPCWSTR)(uintptr_t)(address - 1), &module)) {
+        return NULL;
+    }
+    return module;
+}
+
+void anti_rt_trace_frame(uint64_t address, struct anti_raw_frame *out)
+{
+    HMODULE module = module_at(address);
     HMODULE self = NULL;
     wchar_t name[1024];
     uint16_t units[1024];
@@ -631,10 +654,7 @@ void anti_rt_trace_frame(uint64_t address, struct anti_raw_frame *out)
     out->address = address;
     out->module = text_of(NULL);
     out->build_id = text_of(NULL);
-    if (address == 0 ||
-        !GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                                GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                            (LPCWSTR)(uintptr_t)(address - 1), &module)) {
+    if (module == NULL) {
         return;
     }
     out->base = (uint64_t)(uintptr_t)module;
@@ -774,6 +794,7 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
     DWORD64 displacement = 0;
     DWORD column = 0;
     DWORD64 pc;
+    HMODULE module;
 
     memset(out, 0, sizeof *out);
     out->address = frame->address;
@@ -789,8 +810,9 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
     if (!help_tried) {
         open_help();
     }
-    if (frame->base != 0) {
-        search_module(frame->base);
+    module = module_at(frame->address);
+    if (module != NULL) {
+        search_module((uint64_t)(uintptr_t)module);
     }
     memset(&symbol, 0, sizeof symbol);
     symbol.info.SizeOfStruct = sizeof(SYMBOL_INFO);

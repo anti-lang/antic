@@ -45,7 +45,12 @@ unsigned char *anti_rt_trace_text(const struct anti_raw_frame *frames,
                                   int64_t count);
 
 /* Fill out with the function of the frame from the symbol table. Its
-   file and line come from the line table when the build carries one. */
+   file and line come from the line table when the build carries one.
+   DESIGN: the image and its file come from the address, as the loader of
+   this process knows it, never from the module and base the frame
+   records. `deserialize` of a StackTrace writes those from text, so a
+   record that named them would let the text choose the memory and the
+   file symbolize reads. */
 void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
                              struct anti_frame *out);
 

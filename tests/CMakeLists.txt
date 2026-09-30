@@ -3037,6 +3037,7 @@ foreach(case
         "stack|stack_trace|||stack_trace.pattern||0"
         "stack_g|stack_trace|-g||stack_trace.g.pattern||0"
         "stack_dev|stack_trace|--dev||stack_trace.pattern||0"
+        "forged|forged|||forged.pattern||0"
         "copies|copies|||copies.pattern||0"
         "copies_g|copies|-g||copies.pattern||0"
         "copies_dev|copies|--dev||copies.pattern||0"
