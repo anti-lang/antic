@@ -31,59 +31,15 @@ static const uint8_t magic[4] = {'A', 'N', 'T', 'L'};
 
 /* Writing */
 
-static void put_u8(struct writer *w, uint8_t v)
-{
-    text_append_bytes(w->out, &v, 1);
-}
-
-static void put_u32(struct writer *w, uint32_t v)
-{
-    uint8_t b[4];
-    int i;
-
-    for (i = 0; i < 4; i++) {
-        b[i] = (uint8_t)(v >> (8 * i));
-    }
-    text_append_bytes(w->out, b, sizeof b);
-}
-
-/* A count or an index, which the file holds in 32 bits. A larger one
-   marks the writer failed, and the file is refused. */
-static void put_count(struct writer *w, size_t n)
-{
-    if (n > UINT32_MAX) {
-        w->failed = true;
-        n = 0;
-    }
-    put_u32(w, (uint32_t)n);
-}
-
-static void put_u64(struct writer *w, uint64_t v)
-{
-    uint8_t b[8];
-    int i;
-
-    for (i = 0; i < 8; i++) {
-        b[i] = (uint8_t)(v >> (8 * i));
-    }
-    text_append_bytes(w->out, b, sizeof b);
-}
-
-static void put_bytes(struct writer *w, const char *s, size_t length)
-{
-    put_count(w, length);
-    text_append_bytes(w->out, s, length);
-}
-
 static void put_str(struct writer *w, const char *s)
 {
-    put_bytes(w, s, s == NULL ? 0 : strlen(s));
+    antl_put_bytes(w, s, s == NULL ? 0 : strlen(s));
 }
 
 /* Doc text, or nothing for --strip-docs. */
 static void put_doc(struct writer *w, const char *text, size_t length)
 {
-    put_bytes(w, text, w->strip_docs || text == NULL ? 0 : length);
+    antl_put_bytes(w, text, w->strip_docs || text == NULL ? 0 : length);
 }
 
 static uint64_t float_bits(double d)
@@ -214,51 +170,49 @@ static void add_type(struct writer *w, const struct type *t)
     w->types[w->type_count++] = t;
 }
 
-/* Give t and every type inside it an index. A type comes after the types
-   it is built from. A struct comes before its field types, so a struct
-   can hold a pointer to itself. */
-static void visit_type(struct writer *w, const struct type *t);
-
 /* The types a symbolic value names: its own and those it measures. */
-static void visit_symbolic(struct writer *w, const struct symbolic *s)
+void antl_visit_symbolic(struct writer *w, const struct symbolic *s)
 {
     if (s == NULL) {
         return;
     }
-    visit_type(w, s->type);
+    antl_visit_type(w, s->type);
     if (s->of != NULL) {
-        visit_type(w, s->of);
+        antl_visit_type(w, s->of);
     }
-    visit_symbolic(w, s->a);
-    visit_symbolic(w, s->b);
+    antl_visit_symbolic(w, s->a);
+    antl_visit_symbolic(w, s->b);
 }
 
-static void visit_value(struct writer *w, const struct const_value *v)
+void antl_visit_value(struct writer *w, const struct const_value *v)
 {
     size_t i;
 
     if (v->kind == CONST_SYMBOLIC) {
-        visit_symbolic(w, v->as.symbolic);
+        antl_visit_symbolic(w, v->as.symbolic);
     } else if (v->kind == CONST_ARRAY || v->kind == CONST_STRUCT) {
         for (i = 0; i < v->as.aggregate.count; i++) {
-            visit_value(w, &v->as.aggregate.items[i]);
+            antl_visit_value(w, &v->as.aggregate.items[i]);
         }
     }
 }
 
 /* The types the constant defaults of a function's parameters name. */
-static void visit_defaults(struct writer *w, const struct symbol *sym)
+void antl_visit_defaults(struct writer *w, const struct symbol *sym)
 {
     size_t i;
 
     for (i = 0; sym->defaults != NULL && i < sym->default_count; i++) {
         if (sym->defaults[i].value != NULL) {
-            visit_value(w, sym->defaults[i].value);
+            antl_visit_value(w, sym->defaults[i].value);
         }
     }
 }
 
-static void visit_type(struct writer *w, const struct type *t)
+/* Give t and every type inside it an index. A type comes after the types
+   it is built from. A struct comes before its field types, so a struct
+   can hold a pointer to itself. */
+void antl_visit_type(struct writer *w, const struct type *t)
 {
     size_t i;
     size_t index;
@@ -268,25 +222,25 @@ static void visit_type(struct writer *w, const struct type *t)
     }
     switch (t->kind) {
     case TYPE_ARRAY:
-        visit_symbolic(w, t->length_of);
-        visit_type(w, t->element);
+        antl_visit_symbolic(w, t->length_of);
+        antl_visit_type(w, t->element);
         break;
     case TYPE_POINTER:
     case TYPE_SLICE:
     case TYPE_OPTIONAL:
-        visit_type(w, t->element);
+        antl_visit_type(w, t->element);
         break;
     case TYPE_FN:
         for (i = 0; i < t->param_count; i++) {
-            visit_type(w, t->params[i]);
+            antl_visit_type(w, t->params[i]);
         }
-        visit_type(w, t->result);
+        antl_visit_type(w, t->result);
         break;
     /* A tuple is its elements in order, and nothing else, because two
        tuples of the same elements are one type. */
     case TYPE_TUPLE:
         for (i = 0; i < t->param_count; i++) {
-            visit_type(w, t->params[i]);
+            antl_visit_type(w, t->params[i]);
         }
         break;
     case TYPE_STRUCT:
@@ -296,18 +250,18 @@ static void visit_type(struct writer *w, const struct type *t)
            parameters of a generic, and the generic and the arguments of
            a copy. */
         if (types_is_chan(t)) {
-            visit_type(w, t->element);
+            antl_visit_type(w, t->element);
         }
         for (i = 0; i < t->type_param_count; i++) {
-            visit_type(w, t->type_params[i]);
+            antl_visit_type(w, t->type_params[i]);
         }
         if (t->generic != NULL) {
-            visit_type(w, t->generic);
+            antl_visit_type(w, t->generic);
             for (i = 0; i < t->generic->type_param_count; i++) {
                 if (t->values[i] != NULL) {
-                    visit_symbolic(w, t->values[i]);
+                    antl_visit_symbolic(w, t->values[i]);
                 } else {
-                    visit_type(w, t->args[i]);
+                    antl_visit_type(w, t->args[i]);
                 }
             }
         }
@@ -318,16 +272,16 @@ static void visit_type(struct writer *w, const struct type *t)
         add_type(w, t);
         if (is_local_struct(w, t)) {
             for (i = 0; i < t->field_count; i++) {
-                visit_type(w, t->fields[i].type);
+                antl_visit_type(w, t->fields[i].type);
                 if (t->fields[i].constant != NULL) {
-                    visit_value(w, t->fields[i].constant);
+                    antl_visit_value(w, t->fields[i].constant);
                 }
             }
             for (i = 0; t->generic == NULL && i < t->member_count; i++) {
                 const struct item *m = t->members[i];
                 if (carried_member(t, m)) {
-                    visit_type(w, m->symbol->type);
-                    visit_defaults(w, m->symbol);
+                    antl_visit_type(w, m->symbol->type);
+                    antl_visit_defaults(w, m->symbol);
                 }
             }
         }
@@ -336,26 +290,26 @@ static void visit_type(struct writer *w, const struct type *t)
        parameter follows the interfaces of its constraints. */
     case TYPE_PARAM:
         if (t->hook_owner != NULL) {
-            visit_type(w, t->hook_owner);
+            antl_visit_type(w, t->hook_owner);
         }
         for (i = 0; i < t->iface_count; i++) {
-            visit_type(w, t->ifaces[i]);
+            antl_visit_type(w, t->ifaces[i]);
         }
         if (find_type(w, t, &index)) {
             return;
         }
         add_type(w, t);
         if (t->walked != NULL) {
-            visit_type(w, t->walked);
+            antl_visit_type(w, t->walked);
         }
         if (t->indexed != NULL) {
-            visit_type(w, t->indexed);
+            antl_visit_type(w, t->indexed);
         }
         return;
     /* The underlying integer comes first, because an enum names it by
        index and a reference reaches back only. */
     case TYPE_ENUM:
-        visit_type(w, t->base);
+        antl_visit_type(w, t->base);
         add_type(w, t);
         return;
     default:
@@ -364,7 +318,7 @@ static void visit_type(struct writer *w, const struct type *t)
     add_type(w, t);
 }
 
-static void put_type_ref(struct writer *w, const struct type *t)
+void antl_put_type_ref(struct writer *w, const struct type *t)
 {
     size_t index;
 
@@ -373,33 +327,33 @@ static void put_type_ref(struct writer *w, const struct type *t)
         w->failed = true;
         index = 0;
     }
-    put_count(w, index);
+    antl_put_count(w, index);
 }
 
-static void put_symbolic(struct writer *w, const struct symbolic *s)
+void antl_put_symbolic(struct writer *w, const struct symbolic *s)
 {
-    put_u8(w, (uint8_t)s->kind);
-    put_type_ref(w, s->type);
+    antl_put_u8(w, (uint8_t)s->kind);
+    antl_put_type_ref(w, s->type);
     switch (s->kind) {
     case SYMBOLIC_INT:
-        put_u64(w, s->value);
+        antl_put_u64(w, s->value);
         break;
     case SYMBOLIC_SIZE_OF:
-        put_type_ref(w, s->of);
+        antl_put_type_ref(w, s->of);
         break;
     case SYMBOLIC_UNARY:
     case SYMBOLIC_CAST:
-        put_u8(w, (uint8_t)s->op);
-        put_symbolic(w, s->a);
+        antl_put_u8(w, (uint8_t)s->op);
+        antl_put_symbolic(w, s->a);
         break;
     case SYMBOLIC_BINARY:
-        put_u8(w, (uint8_t)s->op);
-        put_symbolic(w, s->a);
-        put_symbolic(w, s->b);
+        antl_put_u8(w, (uint8_t)s->op);
+        antl_put_symbolic(w, s->a);
+        antl_put_symbolic(w, s->b);
         break;
     /* A constant parameter of a generic, `N`, names its parameter. */
     case SYMBOLIC_PARAM:
-        put_type_ref(w, s->of);
+        antl_put_type_ref(w, s->of);
         break;
     }
 }
@@ -412,10 +366,10 @@ static void put_constraint_refs(struct writer *w,
 {
     size_t i;
 
-    put_count(w, count);
+    antl_put_count(w, count);
     for (i = 0; i < count; i++) {
-        put_bytes(w, refs[i].module.text, refs[i].module.length);
-        put_bytes(w, refs[i].name.text, refs[i].name.length);
+        antl_put_bytes(w, refs[i].module.text, refs[i].module.length);
+        antl_put_bytes(w, refs[i].name.text, refs[i].name.length);
     }
 }
 
@@ -431,17 +385,17 @@ static void put_param_type(struct writer *w, const struct type *t)
 {
     size_t i;
 
-    put_bytes(w, t->name.text, t->name.length);
+    antl_put_bytes(w, t->name.text, t->name.length);
     if (t->hook_owner != NULL) {
-        put_u8(w, t->hook_owner->walked == t ? 1 : 2);
-        put_type_ref(w, t->hook_owner);
+        antl_put_u8(w, t->hook_owner->walked == t ? 1 : 2);
+        antl_put_type_ref(w, t->hook_owner);
     } else if (t->param != NULL) {
-        put_u8(w, 0);
-        put_u8(w, t->param->constant);
+        antl_put_u8(w, 0);
+        antl_put_u8(w, t->param->constant);
         put_constraint_refs(w, t->param->constraints,
                             t->param->constraint_count);
     } else {
-        put_u8(w, 3);
+        antl_put_u8(w, 3);
         put_constraint_refs(w,
                             t->declared_by != NULL
                                 ? t->declared_by->constraints
@@ -450,10 +404,10 @@ static void put_param_type(struct writer *w, const struct type *t)
                                 ? t->declared_by->constraint_count
                                 : 0);
     }
-    put_u32(w, t->hooks);
-    put_count(w, t->iface_count);
+    antl_put_u32(w, t->hooks);
+    antl_put_count(w, t->iface_count);
     for (i = 0; i < t->iface_count; i++) {
-        put_type_ref(w, t->ifaces[i]);
+        antl_put_type_ref(w, t->ifaces[i]);
     }
 }
 
@@ -462,31 +416,32 @@ static void put_type(struct writer *w, const struct type *t)
     size_t i;
     size_t j;
 
-    put_u8(w, (uint8_t)t->kind);
+    antl_put_u8(w, (uint8_t)t->kind);
     switch (t->kind) {
     case TYPE_POINTER:
-        put_type_ref(w, t->element);
+        antl_put_type_ref(w, t->element);
         /* `*T`, `?*T` and their `lent` forms are four types, and a module
            that imports this one reads which of them a signature names.
            Bit 0 is `?` and bit 1 `lent`. */
-        put_u8(w, (uint8_t)((unsigned)t->nullable | (unsigned)t->lent << 1));
+        antl_put_u8(w, (uint8_t)((unsigned)t->nullable |
+                                 (unsigned)t->lent << 1));
         break;
     /* `[]T` and `lent []T` are two types, told apart by one byte. */
     case TYPE_SLICE:
-        put_type_ref(w, t->element);
-        put_u8(w, (uint8_t)t->lent);
+        antl_put_type_ref(w, t->element);
+        antl_put_u8(w, (uint8_t)t->lent);
         break;
     /* `?T` is its value type alone, since one element makes one. */
     case TYPE_OPTIONAL:
-        put_type_ref(w, t->element);
+        antl_put_type_ref(w, t->element);
         break;
     case TYPE_ARRAY:
-        put_type_ref(w, t->element);
-        put_u8(w, t->length_of != NULL);
+        antl_put_type_ref(w, t->element);
+        antl_put_u8(w, t->length_of != NULL);
         if (t->length_of != NULL) {
-            put_symbolic(w, t->length_of);
+            antl_put_symbolic(w, t->length_of);
         } else {
-            put_u64(w, t->length);
+            antl_put_u64(w, t->length);
         }
         break;
     /* DESIGN: a function type ends with a byte of its flags. Bit 0 is
@@ -497,22 +452,23 @@ static void put_type(struct writer *w, const struct type *t)
        another type, and a module that imports this one reads the type
        the signature names. */
     case TYPE_FN:
-        put_count(w, t->param_count);
+        antl_put_count(w, t->param_count);
         for (i = 0; i < t->param_count; i++) {
-            put_type_ref(w, t->params[i]);
+            antl_put_type_ref(w, t->params[i]);
         }
-        put_type_ref(w, t->result);
-        put_u8(w, (uint8_t)((unsigned)t->nullable | (unsigned)t->bound << 1 |
-                            (unsigned)t->may_fail << 2 |
-                            (unsigned)t->has_out << 3 |
-                            (unsigned)t->context << 4 |
-                            (unsigned)t->concurrent << 5 |
-                            (unsigned)t->owned << 6));
+        antl_put_type_ref(w, t->result);
+        antl_put_u8(w, (uint8_t)((unsigned)t->nullable |
+                                 (unsigned)t->bound << 1 |
+                                 (unsigned)t->may_fail << 2 |
+                                 (unsigned)t->has_out << 3 |
+                                 (unsigned)t->context << 4 |
+                                 (unsigned)t->concurrent << 5 |
+                                 (unsigned)t->owned << 6));
         break;
     case TYPE_TUPLE:
-        put_count(w, t->param_count);
+        antl_put_count(w, t->param_count);
         for (i = 0; i < t->param_count; i++) {
-            put_type_ref(w, t->params[i]);
+            antl_put_type_ref(w, t->params[i]);
         }
         break;
     /* DESIGN: a class is written like a struct, with the form and the
@@ -524,98 +480,98 @@ static void put_type(struct writer *w, const struct type *t)
     case TYPE_STRUCT:
     case TYPE_CLASS:
     case TYPE_VARIANT:
-        put_bytes(w, t->module.text, t->module.length);
-        put_bytes(w, t->name.text, t->name.length);
+        antl_put_bytes(w, t->module.text, t->module.length);
+        antl_put_bytes(w, t->name.text, t->name.length);
         /* DESIGN: a form byte follows the name. A generic carries its
            parameters after its body. A copy names its generic and its
            arguments, a type or a constant each, before its body. It
            carries that body in full wherever it stands. A reader that
            has the copy already takes that one. The copies of one generic
            with the same arguments are then one type in the program. */
-        put_u8(w, struct_form(t));
+        antl_put_u8(w, struct_form(t));
         if (t->generic != NULL) {
-            put_type_ref(w, t->generic);
+            antl_put_type_ref(w, t->generic);
             for (i = 0; i < t->generic->type_param_count; i++) {
-                put_u8(w, t->values[i] != NULL);
+                antl_put_u8(w, t->values[i] != NULL);
                 if (t->values[i] != NULL) {
-                    put_symbolic(w, t->values[i]);
+                    antl_put_symbolic(w, t->values[i]);
                 } else {
-                    put_type_ref(w, t->args[i]);
+                    antl_put_type_ref(w, t->args[i]);
                 }
             }
         }
         /* `chan T` is one struct per element type, so the element
            follows its name. */
         if (types_is_chan(t)) {
-            put_type_ref(w, t->element);
+            antl_put_type_ref(w, t->element);
         }
         if (is_local_struct(w, t)) {
-            put_u8(w, (uint8_t)((unsigned)t->is_union |
-                                (unsigned)t->packed << 1 |
-                                (unsigned)t->has_abstract << 2 |
-                                (unsigned)t->is_final << 3 |
-                                (unsigned)t->simd << 4 |
-                                (unsigned)t->traced << 5));
+            antl_put_u8(w, (uint8_t)((unsigned)t->is_union |
+                                     (unsigned)t->packed << 1 |
+                                     (unsigned)t->has_abstract << 2 |
+                                     (unsigned)t->is_final << 3 |
+                                     (unsigned)t->simd << 4 |
+                                     (unsigned)t->traced << 5));
             /* A thread-safe class, and `unchecked(unguarded-field)` in
                its header. */
-            put_u8(w, (uint8_t)((unsigned)t->safety |
-                                (unsigned)t->unchecked_fields << 2));
+            antl_put_u8(w, (uint8_t)((unsigned)t->safety |
+                                     (unsigned)t->unchecked_fields << 2));
             /* The `compatible` line of an abstract class, empty where
                the body has none. Every module that names the class
                writes the same descriptor, so the floor travels with
                it. */
-            put_bytes(w, t->compatible.text, t->compatible.length);
-            put_u64(w, t->align);
-            put_count(w, t->field_count);
+            antl_put_bytes(w, t->compatible.text, t->compatible.length);
+            antl_put_u64(w, t->align);
+            antl_put_count(w, t->field_count);
             for (i = 0; i < t->field_count; i++) {
-                put_bytes(w, t->fields[i].name.text, t->fields[i].name.length);
-                put_type_ref(w, t->fields[i].type);
-                put_u8(w, t->fields[i].bits);
-                put_u8(w, (uint8_t)((unsigned)t->fields[i].form |
-                                    (unsigned)t->fields[i].owned << 4 |
-                                    (unsigned)t->fields[i].atomic << 5 |
-                                    (unsigned)t->fields[i].writable << 6 |
-                                    (unsigned)t->fields[i].transient << 7));
-                put_u8(w, (uint8_t)t->fields[i].vis);
+                const struct struct_field *f = &t->fields[i];
+                antl_put_bytes(w, f->name.text, f->name.length);
+                antl_put_type_ref(w, f->type);
+                antl_put_u8(w, f->bits);
+                antl_put_u8(w, (uint8_t)((unsigned)f->form |
+                                         (unsigned)f->owned << 4 |
+                                         (unsigned)f->atomic << 5 |
+                                         (unsigned)f->writable << 6 |
+                                         (unsigned)f->transient << 7));
+                antl_put_u8(w, (uint8_t)f->vis);
                 /* DESIGN: `inject` and `inject final` travel with the
                    field. A module that builds a class of another
                    module then calls the same provider through the same
                    slot, and `anti build` reports what a dependency
                    needs. */
-                put_u8(w, (uint8_t)((unsigned)t->fields[i].injected |
-                                    (unsigned)t->fields[i].inject_final << 1 |
-                                    (unsigned)t->fields[i].hidden << 2 |
-                                    (unsigned)t->fields[i].unchecked << 3));
+                antl_put_u8(w, (uint8_t)((unsigned)f->injected |
+                                         (unsigned)f->inject_final << 1 |
+                                         (unsigned)f->hidden << 2 |
+                                         (unsigned)f->unchecked << 3));
                 /* DESIGN: the lock that guards the field travels by its
                    name. A lock of an enclosing class guards a field of
                    a nested type alone, which no other module reaches.
                    So the class it names stays behind. */
-                put_bytes(w, t->fields[i].guard.text,
-                          t->fields[i].guard.length);
+                antl_put_bytes(w, f->guard.text, f->guard.length);
                 /* DESIGN: /// on a private item is never stored, and
                    the fields of a private struct are private items. */
-                put_doc(w, t->fields[i].doc.text,
-                        is_public_struct(w, t) ? t->fields[i].doc.length : 0);
+                put_doc(w, f->doc.text,
+                        is_public_struct(w, t) ? f->doc.length : 0);
             }
             /* The public functions of the body, so a call on a value of
                another module resolves and reaches the right symbol. */
-            put_count(w, public_members(t));
+            antl_put_count(w, public_members(t));
             for (i = 0; t->generic == NULL && i < t->member_count; i++) {
                 const struct item *m = t->members[i];
                 if (!carried_member(t, m)) {
                     continue;
                 }
-                put_bytes(w, m->name.text, m->name.length);
+                antl_put_bytes(w, m->name.text, m->name.length);
                 /* The qualifier decides the table a body fills and
                    the symbol it has, so an importing module builds
                    the same tables. */
-                put_bytes(w, m->qualifier.text, m->qualifier.length);
-                put_type_ref(w, m->symbol->type);
-                put_u8(w, (uint8_t)((unsigned)m->contract |
-                                    (unsigned)m->is_final << 4 |
-                                    (unsigned)m->is_operator << 5 |
-                                    (unsigned)m->may_fail << 6));
-                put_u8(w, (uint8_t)m->vis);
+                antl_put_bytes(w, m->qualifier.text, m->qualifier.length);
+                antl_put_type_ref(w, m->symbol->type);
+                antl_put_u8(w, (uint8_t)((unsigned)m->contract |
+                                         (unsigned)m->is_final << 4 |
+                                         (unsigned)m->is_operator << 5 |
+                                         (unsigned)m->may_fail << 6));
+                antl_put_u8(w, (uint8_t)m->vis);
                 put_doc(w, m->doc.text, m->doc.length);
                 /* DESIGN: the public interface keeps the parameter
                    names of every function. A function of a class body is
@@ -624,18 +580,18 @@ static void put_type(struct writer *w, const struct type *t)
                    Neither `self` nor the out pointer of `may fail`
                    stands among them, so the reader needs no type to take
                    them. */
-                put_count(w, m->param_count);
+                antl_put_count(w, m->param_count);
                 for (j = 0; j < m->param_count; j++) {
                     const struct name *n = m->symbol->params != NULL
                                                ? &m->symbol->params[j]
                                                : &m->params[j].name;
-                    put_bytes(w, n->text, n->length);
+                    antl_put_bytes(w, n->text, n->length);
                 }
             }
             if (t->type_param_count > 0) {
-                put_count(w, t->type_param_count);
+                antl_put_count(w, t->type_param_count);
                 for (i = 0; i < t->type_param_count; i++) {
-                    put_type_ref(w, t->type_params[i]);
+                    antl_put_type_ref(w, t->type_params[i]);
                 }
             }
         }
@@ -646,13 +602,13 @@ static void put_type(struct writer *w, const struct type *t)
     /* An enum is its module, its name, its underlying integer and the
        name and number of each value. */
     case TYPE_ENUM:
-        put_bytes(w, t->module.text, t->module.length);
-        put_bytes(w, t->name.text, t->name.length);
-        put_type_ref(w, t->base);
-        put_count(w, t->field_count);
+        antl_put_bytes(w, t->module.text, t->module.length);
+        antl_put_bytes(w, t->name.text, t->name.length);
+        antl_put_type_ref(w, t->base);
+        antl_put_count(w, t->field_count);
         for (i = 0; i < t->field_count; i++) {
-            put_bytes(w, t->fields[i].name.text, t->fields[i].name.length);
-            put_u64(w, t->fields[i].number);
+            antl_put_bytes(w, t->fields[i].name.text, t->fields[i].name.length);
+            antl_put_u64(w, t->fields[i].number);
             put_doc(w, t->fields[i].doc.text, t->fields[i].doc.length);
         }
         break;
@@ -661,38 +617,38 @@ static void put_type(struct writer *w, const struct type *t)
     }
 }
 
-static void put_value(struct writer *w, const struct const_value *v)
+void antl_put_value(struct writer *w, const struct const_value *v)
 {
     size_t i;
 
-    put_u8(w, (uint8_t)v->kind);
+    antl_put_u8(w, (uint8_t)v->kind);
     switch (v->kind) {
     case CONST_INT:
-        put_u64(w, v->as.integer);
+        antl_put_u64(w, v->as.integer);
         break;
     case CONST_FLOAT:
-        put_u64(w, float_bits(v->as.floating));
+        antl_put_u64(w, float_bits(v->as.floating));
         break;
     case CONST_BOOL:
-        put_u8(w, v->as.boolean);
+        antl_put_u8(w, v->as.boolean);
         break;
     case CONST_CHAR:
-        put_u32(w, v->as.character);
+        antl_put_u32(w, v->as.character);
         break;
     case CONST_NULL:
         break;
     case CONST_TEXT:
-        put_bytes(w, v->as.text.bytes, v->as.text.length);
+        antl_put_bytes(w, v->as.text.bytes, v->as.text.length);
         break;
     case CONST_ARRAY:
     case CONST_STRUCT:
-        put_count(w, v->as.aggregate.count);
+        antl_put_count(w, v->as.aggregate.count);
         for (i = 0; i < v->as.aggregate.count; i++) {
-            put_value(w, &v->as.aggregate.items[i]);
+            antl_put_value(w, &v->as.aggregate.items[i]);
         }
         break;
     case CONST_SYMBOLIC:
-        put_symbolic(w, v->as.symbolic);
+        antl_put_symbolic(w, v->as.symbolic);
         break;
     }
 }
@@ -701,29 +657,29 @@ static void put_value(struct writer *w, const struct const_value *v)
    count gives the parameters, `self` included, and is 0 when none has a
    default. Each parameter then has a byte: 0 without a default, 1 before
    a constant and 2 for `here`, which the call fills with its position. */
-static void put_param_defaults(struct writer *w, const struct symbol *sym)
+void antl_put_param_defaults(struct writer *w, const struct symbol *sym)
 {
     size_t i;
 
-    put_count(w, sym->defaults != NULL ? sym->default_count : 0);
+    antl_put_count(w, sym->defaults != NULL ? sym->default_count : 0);
     for (i = 0; sym->defaults != NULL && i < sym->default_count; i++) {
         const struct param_default *d = &sym->defaults[i];
-        put_u8(w, d->here ? 2 : d->value != NULL ? 1 : 0);
+        antl_put_u8(w, d->here ? 2 : d->value != NULL ? 1 : 0);
         if (!d->here && d->value != NULL) {
-            put_value(w, d->value);
+            antl_put_value(w, d->value);
         }
     }
 }
 
 /* The `own` parameters follow the defaults: a count, `self` included and
    0 when none is `own`, then a byte of 0 or 1 per parameter. */
-static void put_param_owned(struct writer *w, const struct symbol *sym)
+void antl_put_param_owned(struct writer *w, const struct symbol *sym)
 {
     size_t i;
 
-    put_count(w, sym->owned != NULL ? sym->owned_count : 0);
+    antl_put_count(w, sym->owned != NULL ? sym->owned_count : 0);
     for (i = 0; sym->owned != NULL && i < sym->owned_count; i++) {
-        put_u8(w, sym->owned[i] ? 1 : 0);
+        antl_put_u8(w, sym->owned[i] ? 1 : 0);
     }
 }
 
@@ -739,25 +695,25 @@ static void put_defaults(struct writer *w, const struct type *t)
         return;
     }
     for (i = 0; i < t->field_count; i++) {
-        put_u8(w, t->fields[i].constant != NULL);
+        antl_put_u8(w, t->fields[i].constant != NULL);
         if (t->fields[i].constant != NULL) {
-            put_value(w, t->fields[i].constant);
+            antl_put_value(w, t->fields[i].constant);
         }
     }
     /* The functions of the body, in the order the type carries them, so
        the reader has their types in place. */
     for (i = 0; t->generic == NULL && i < t->member_count; i++) {
         if (carried_member(t, t->members[i])) {
-            put_param_defaults(w, t->members[i]->symbol);
-            put_param_owned(w, t->members[i]->symbol);
+            antl_put_param_defaults(w, t->members[i]->symbol);
+            antl_put_param_owned(w, t->members[i]->symbol);
         }
     }
 }
 
 static void put_vtype(struct writer *w, struct ir_vtype v)
 {
-    put_u8(w, (uint8_t)v.type);
-    put_u32(w, v.agg);
+    antl_put_u8(w, (uint8_t)v.type);
+    antl_put_u32(w, v.agg);
 }
 
 /* An aggregate constant, as the tree the back end lays out. Its type and
@@ -766,57 +722,57 @@ static void put_const(struct writer *w, const struct ir_const *c)
 {
     size_t i;
 
-    put_u8(w, (uint8_t)c->kind);
-    put_u8(w, (uint8_t)c->scalar);
+    antl_put_u8(w, (uint8_t)c->kind);
+    antl_put_u8(w, (uint8_t)c->scalar);
     switch (c->kind) {
     case IR_CONST_INT:
-        put_u64(w, c->integer);
+        antl_put_u64(w, c->integer);
         break;
     case IR_CONST_FLOAT:
-        put_u64(w, float_bits(c->floating));
+        antl_put_u64(w, float_bits(c->floating));
         break;
     case IR_CONST_SYM:
-        put_u64(w, c->sym);
+        antl_put_u64(w, c->sym);
         break;
     case IR_CONST_ADDR:
     case IR_CONST_FUNC:
-        put_u64(w, c->global);
+        antl_put_u64(w, c->global);
         break;
     case IR_CONST_AGG:
-        put_u64(w, c->item_count);
+        antl_put_u64(w, c->item_count);
         put_vtype(w, c->type);
         for (i = 0; i < c->item_count; i++) {
             put_const(w, &c->items[i]);
         }
         break;
     default: /* IR_CONST_NONE */
-        put_u64(w, 0);
+        antl_put_u64(w, 0);
         break;
     }
 }
 
 static void put_operand(struct writer *w, const struct ir_operand *o)
 {
-    put_u8(w, (uint8_t)o->kind);
-    put_u8(w, (uint8_t)o->type);
+    antl_put_u8(w, (uint8_t)o->kind);
+    antl_put_u8(w, (uint8_t)o->type);
     switch (o->kind) {
     case IR_TEMP:
-        put_u64(w, o->as.temp);
+        antl_put_u64(w, o->as.temp);
         break;
     case IR_INT:
-        put_u64(w, o->as.integer);
+        antl_put_u64(w, o->as.integer);
         break;
     case IR_FLOAT:
-        put_u64(w, float_bits(o->as.floating));
+        antl_put_u64(w, float_bits(o->as.floating));
         break;
     case IR_GLOBAL:
     case IR_FUNC:
     case IR_BLOCK:
     case IR_SYM:
-        put_u64(w, o->as.index);
+        antl_put_u64(w, o->as.index);
         break;
     default:
-        put_u64(w, 0);
+        antl_put_u64(w, 0);
         break;
     }
 }
@@ -825,16 +781,16 @@ static void put_inst(struct writer *w, const struct ir_inst *inst)
 {
     size_t i;
 
-    put_u8(w, (uint8_t)inst->op);
-    put_u8(w, (uint8_t)inst->type);
-    put_u32(w, inst->line);
-    put_u32(w, inst->result);
+    antl_put_u8(w, (uint8_t)inst->op);
+    antl_put_u8(w, (uint8_t)inst->type);
+    antl_put_u32(w, inst->line);
+    antl_put_u32(w, inst->result);
     put_operand(w, &inst->a);
     put_operand(w, &inst->b);
     put_operand(w, &inst->c);
     put_vtype(w, inst->of);
-    put_u32(w, inst->field);
-    put_count(w, inst->arg_count);
+    antl_put_u32(w, inst->field);
+    antl_put_count(w, inst->arg_count);
     for (i = 0; i < inst->arg_count; i++) {
         put_operand(w, &inst->args[i]);
     }
@@ -849,81 +805,82 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
     /* The source files of the module, which its functions name by index.
        A path comes from the search root, so the bytes are the same on
        every host. */
-    put_count(w, ir->file_count);
+    antl_put_count(w, ir->file_count);
     for (i = 0; i < ir->file_count; i++) {
         put_str(w, ir->files[i]);
     }
-    put_count(w, ir->sym_count);
+    antl_put_count(w, ir->sym_count);
     for (i = 0; i < ir->sym_count; i++) {
         const struct ir_sym *sym = &ir->syms[i];
-        put_u8(w, (uint8_t)sym->kind);
-        put_u8(w, (uint8_t)sym->type);
-        put_u64(w, sym->value);
+        antl_put_u8(w, (uint8_t)sym->kind);
+        antl_put_u8(w, (uint8_t)sym->type);
+        antl_put_u64(w, sym->value);
         put_vtype(w, sym->of);
-        put_u32(w, sym->field);
-        put_u8(w, (uint8_t)sym->op);
-        put_u32(w, sym->a);
-        put_u32(w, sym->b);
+        antl_put_u32(w, sym->field);
+        antl_put_u8(w, (uint8_t)sym->op);
+        antl_put_u32(w, sym->a);
+        antl_put_u32(w, sym->b);
     }
-    put_count(w, ir->agg_count);
+    antl_put_count(w, ir->agg_count);
     for (i = 0; i < ir->agg_count; i++) {
         const struct ir_aggtype *t = ir->aggs[i];
-        put_u8(w, (uint8_t)t->kind);
+        antl_put_u8(w, (uint8_t)t->kind);
         put_str(w, t->name);
-        put_u8(w, (uint8_t)((unsigned)t->packed | (unsigned)t->simd << 1));
-        put_u64(w, t->align);
-        put_u32(w, t->length);
+        antl_put_u8(w, (uint8_t)((unsigned)t->packed | (unsigned)t->simd << 1));
+        antl_put_u64(w, t->align);
+        antl_put_u32(w, t->length);
         put_str(w, t->length_text);
-        put_count(w, t->field_count);
+        antl_put_count(w, t->field_count);
         for (j = 0; j < t->field_count; j++) {
             put_str(w, t->fields[j].name);
             put_vtype(w, t->fields[j].type);
-            put_u8(w, t->fields[j].bits);
-            put_u8(w, (uint8_t)t->fields[j].ext);
+            antl_put_u8(w, t->fields[j].bits);
+            antl_put_u8(w, (uint8_t)t->fields[j].ext);
         }
     }
-    put_count(w, ir->global_count);
+    antl_put_count(w, ir->global_count);
     for (i = 0; i < ir->global_count; i++) {
         const struct ir_global *g = ir->globals[i];
         put_str(w, g->module);
         put_str(w, g->name);
-        put_u64(w, g->size);
-        put_u64(w, g->align);
+        antl_put_u64(w, g->size);
+        antl_put_u64(w, g->align);
         if (g->size > 0) {
             text_append_bytes(w->out, g->bytes, g->size);
         }
-        put_count(w, g->reloc_count);
+        antl_put_count(w, g->reloc_count);
         for (j = 0; j < g->reloc_count; j++) {
-            put_u64(w, g->relocs[j].offset);
-            put_u32(w, g->relocs[j].global);
-            put_u8(w, g->relocs[j].fn ? 1 : 0);
+            antl_put_u64(w, g->relocs[j].offset);
+            antl_put_u32(w, g->relocs[j].global);
+            antl_put_u8(w, g->relocs[j].fn ? 1 : 0);
         }
-        put_u8(w, (uint8_t)((g->value != NULL ? 1 : 0) |
-                            (g->exported ? 2 : 0) |
-                            (g->is_extern ? 4 : 0) |
-                            (g->mutable ? 8 : 0)));
+        antl_put_u8(w, (uint8_t)((g->value != NULL ? 1 : 0) |
+                                 (g->exported ? 2 : 0) |
+                                 (g->is_extern ? 4 : 0) |
+                                 (g->mutable ? 8 : 0)));
         if (g->value != NULL) {
             put_const(w, g->value);
         }
     }
     /* All signatures come before the first body, so a body can call a
        function that the file lists later. */
-    put_count(w, ir->function_count);
+    antl_put_count(w, ir->function_count);
     for (i = 0; i < ir->function_count; i++) {
         const struct ir_function *f = ir->functions[i];
-        put_u8(w, (uint8_t)((f->is_extern ? 1 : 0) | (f->variadic ? 2 : 0) |
-                            (f->exported ? 4 : 0) | (f->worker ? 8 : 0)));
+        antl_put_u8(w, (uint8_t)((f->is_extern ? 1 : 0) |
+                                 (f->variadic ? 2 : 0) |
+                                 (f->exported ? 4 : 0) | (f->worker ? 8 : 0)));
         put_str(w, f->module);
         put_str(w, f->name);
-        put_u8(w, (uint8_t)f->result);
-        put_u32(w, f->result_agg);
-        put_u32(w, f->file);
-        put_u32(w, f->decl_line);
-        put_count(w, f->param_count);
+        antl_put_u8(w, (uint8_t)f->result);
+        antl_put_u32(w, f->result_agg);
+        antl_put_u32(w, f->file);
+        antl_put_u32(w, f->decl_line);
+        antl_put_count(w, f->param_count);
         for (j = 0; j < f->param_count; j++) {
-            put_u8(w, (uint8_t)f->params[j].type);
-            put_u8(w, (uint8_t)f->params[j].ext);
-            put_u32(w, f->params[j].agg);
+            antl_put_u8(w, (uint8_t)f->params[j].type);
+            antl_put_u8(w, (uint8_t)f->params[j].ext);
+            antl_put_u32(w, f->params[j].agg);
         }
     }
     for (i = 0; i < ir->function_count; i++) {
@@ -931,59 +888,59 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         if (f->is_extern) {
             continue;
         }
-        put_u32(w, f->temp_count);
+        antl_put_u32(w, f->temp_count);
         for (j = 0; j < f->temp_count; j++) {
-            put_u8(w, (uint8_t)f->temps[j]);
+            antl_put_u8(w, (uint8_t)f->temps[j]);
         }
-        put_count(w, f->block_count);
+        antl_put_count(w, f->block_count);
         for (j = 0; j < f->block_count; j++) {
             /* The failure block of an assertion carries its flag, so the
                build that compiles the program can still drop it. */
-            put_u8(w, (uint8_t)f->blocks[j]->fail);
-            put_count(w, f->blocks[j]->count);
+            antl_put_u8(w, (uint8_t)f->blocks[j]->fail);
+            antl_put_count(w, f->blocks[j]->count);
             for (k = 0; k < f->blocks[j]->count; k++) {
                 put_inst(w, &f->blocks[j]->insts[k]);
             }
         }
     }
-    put_count(w, ir->class_count);
+    antl_put_count(w, ir->class_count);
     for (i = 0; i < ir->class_count; i++) {
         const struct ir_class *c = ir->classes[i];
         put_str(w, c->module);
         put_str(w, c->name);
-        put_u8(w, (uint8_t)c->flags);
-        put_u32(w, c->descriptor);
-        put_u32(w, c->base);
-        put_u32(w, c->table);
-        put_u32(w, c->init);
-        put_u32(w, c->agg);
-        put_count(w, c->subtable_count);
+        antl_put_u8(w, (uint8_t)c->flags);
+        antl_put_u32(w, c->descriptor);
+        antl_put_u32(w, c->base);
+        antl_put_u32(w, c->table);
+        antl_put_u32(w, c->init);
+        antl_put_u32(w, c->agg);
+        antl_put_count(w, c->subtable_count);
         for (j = 0; j < c->subtable_count; j++) {
-            put_u32(w, c->subtables[j].interface);
-            put_u32(w, c->subtables[j].table);
-            put_u32(w, c->subtables[j].agg);
-            put_u32(w, c->subtables[j].field);
+            antl_put_u32(w, c->subtables[j].interface);
+            antl_put_u32(w, c->subtables[j].table);
+            antl_put_u32(w, c->subtables[j].agg);
+            antl_put_u32(w, c->subtables[j].field);
         }
-        put_count(w, c->mutable_count);
+        antl_put_count(w, c->mutable_count);
         for (j = 0; j < c->mutable_count; j++) {
-            put_u32(w, c->mutable_fields[j]);
+            antl_put_u32(w, c->mutable_fields[j]);
         }
         /* The `inject` fields, so the pass over the whole program finds
            every interface of the program and the class that needs a
            provider for it. */
-        put_count(w, c->inject_count);
+        antl_put_count(w, c->inject_count);
         for (j = 0; j < c->inject_count; j++) {
             put_str(w, c->injects[j].interface);
             put_str(w, c->injects[j].field);
-            put_u32(w, c->injects[j].descriptor);
-            put_u8(w, (uint8_t)(c->injects[j].final ? 1 : 0));
+            antl_put_u32(w, c->injects[j].descriptor);
+            antl_put_u8(w, (uint8_t)(c->injects[j].final ? 1 : 0));
         }
         /* The `provides` lines, so a library file carries what its
            module offers to a host that loads it. */
-        put_count(w, c->provides_count);
+        antl_put_count(w, c->provides_count);
         for (j = 0; j < c->provides_count; j++) {
             put_str(w, c->provides[j].interface);
-            put_u32(w, c->provides[j].descriptor);
+            antl_put_u32(w, c->provides[j].descriptor);
         }
     }
 }
@@ -997,10 +954,10 @@ static void put_header(struct writer *w, const struct interface *iface)
     size_t i;
 
     text_append_bytes(out, magic, sizeof magic);
-    put_u32(w, ANTL_VERSION);
+    antl_put_u32(w, ANTL_VERSION);
     put_str(w, p->name != NULL ? p->name : iface->module);
     put_str(w, p->version != NULL ? p->version : PACKAGE_VERSION_DEFAULT);
-    put_count(w, p->dependency_count);
+    antl_put_count(w, p->dependency_count);
     for (i = 0; i < p->dependency_count; i++) {
         put_str(w, p->dependencies[i].name);
         put_str(w, p->dependencies[i].constraint);
@@ -1008,20 +965,20 @@ static void put_header(struct writer *w, const struct interface *iface)
     }
     put_str(w, p->license);
     put_str(w, p->license_text);
-    put_count(w, p->attribution_count);
+    antl_put_count(w, p->attribution_count);
     for (i = 0; i < p->attribution_count; i++) {
         put_str(w, p->attribution[i]);
     }
     put_str(w, iface->module);
-    put_count(w, iface->import_count);
+    antl_put_count(w, iface->import_count);
     for (i = 0; i < iface->import_count; i++) {
         put_str(w, iface->imports[i]);
     }
-    put_count(w, iface->framework_count);
+    antl_put_count(w, iface->framework_count);
     for (i = 0; i < iface->framework_count; i++) {
         put_str(w, iface->frameworks[i]);
     }
-    put_count(w, iface->linux_library_count);
+    antl_put_count(w, iface->linux_library_count);
     for (i = 0; i < iface->linux_library_count; i++) {
         put_str(w, iface->linux_libraries[i]);
     }
@@ -1050,27 +1007,27 @@ bool antl_write(struct text *out, const struct interface *iface,
     w.iface = iface;
     w.strip_docs = strip_docs;
     for (i = 0; i < iface->item_count; i++) {
-        visit_type(&w, iface->items[i]->type);
+        antl_visit_type(&w, iface->items[i]->type);
         if (iface->items[i]->kind == SYMBOL_CONST) {
-            visit_value(&w, iface->items[i]->value);
+            antl_visit_value(&w, iface->items[i]->value);
         }
-        visit_defaults(&w, iface->items[i]);
+        antl_visit_defaults(&w, iface->items[i]);
     }
     antl_visit_generics(&w);
     put_header(&w, iface);
-    put_count(&w, w.type_count);
+    antl_put_count(&w, w.type_count);
     for (i = 0; i < w.type_count; i++) {
         put_type(&w, w.types[i]);
     }
     for (i = 0; i < w.type_count; i++) {
         put_defaults(&w, w.types[i]);
     }
-    put_count(&w, iface->item_count);
+    antl_put_count(&w, iface->item_count);
     for (i = 0; i < iface->item_count; i++) {
         const struct symbol *sym = iface->items[i];
-        put_u8(&w, (uint8_t)sym->kind);
-        put_bytes(&w, sym->name.text, sym->name.length);
-        put_type_ref(&w, sym->type);
+        antl_put_u8(&w, (uint8_t)sym->kind);
+        antl_put_bytes(&w, sym->name.text, sym->name.length);
+        antl_put_type_ref(&w, sym->type);
         /* DESIGN: the `may fail` flag is recorded, so a reader of the
            file sees the form the declaration wrote. The type alone gives
            the `?*Error` of the ABI and never the form. `worker` is
@@ -1079,31 +1036,31 @@ bool antl_write(struct text *out, const struct interface *iface,
            function, whose declaration the section of the generics
            holds, and bit 6 a function written `operator fn`, which an
            importing module finds as the hook of a struct. */
-        put_u8(&w, (uint8_t)((unsigned)sym->exported |
-                             (unsigned)sym->internal << 1 |
-                             (unsigned)sym->may_fail << 2 |
-                             (unsigned)sym->worker << 3 |
-                             (unsigned)sym->alias << 4 |
-                             (unsigned)(sym->kind == SYMBOL_FN &&
-                                        sym->item != NULL &&
-                                        sym->item->type_param_count > 0)
-                                 << 5 |
-                             (unsigned)(sym->kind == SYMBOL_FN &&
-                                        sym->is_operator)
-                                 << 6));
+        antl_put_u8(&w, (uint8_t)((unsigned)sym->exported |
+                                  (unsigned)sym->internal << 1 |
+                                  (unsigned)sym->may_fail << 2 |
+                                  (unsigned)sym->worker << 3 |
+                                  (unsigned)sym->alias << 4 |
+                                  (unsigned)(sym->kind == SYMBOL_FN &&
+                                             sym->item != NULL &&
+                                             sym->item->type_param_count > 0)
+                                      << 5 |
+                                  (unsigned)(sym->kind == SYMBOL_FN &&
+                                             sym->is_operator)
+                                      << 6));
         put_doc(&w, sym->doc.text, sym->doc.length);
         if (sym->kind == SYMBOL_FN || sym->kind == SYMBOL_EXTERN_FN) {
             size_t j;
             for (j = 0; j < sym->type->param_count; j++) {
-                put_bytes(&w, sym->params[j].text, sym->params[j].length);
+                antl_put_bytes(&w, sym->params[j].text, sym->params[j].length);
             }
-            put_param_defaults(&w, sym);
-            put_param_owned(&w, sym);
+            antl_put_param_defaults(&w, sym);
+            antl_put_param_owned(&w, sym);
         }
         if (sym->kind == SYMBOL_EXTERN_FN) {
-            put_u8(&w, sym->variadic);
+            antl_put_u8(&w, sym->variadic);
         } else if (sym->kind == SYMBOL_CONST) {
-            put_value(&w, sym->value);
+            antl_put_value(&w, sym->value);
         }
     }
     antl_put_generics(&w);
@@ -1115,122 +1072,14 @@ bool antl_write(struct text *out, const struct interface *iface,
 
 /* Reading */
 
-static void fail(struct reader *r, const char *format, ...)
-#if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 2, 3)))
-#endif
-    ;
-
-static void fail(struct reader *r, const char *format, ...)
-{
-    va_list args;
-    int n;
-
-    if (r->failed) {
-        return;
-    }
-    va_start(args, format);
-    n = vsnprintf(r->error, r->error_size, format, args);
-    va_end(args);
-    /* A message cut to fit ends in three dots. */
-    if (n >= 0 && (size_t)n >= r->error_size && r->error_size >= 4) {
-        memcpy(r->error + r->error_size - 4, "...", 4);
-    }
-    r->failed = true;
-}
-
-static void damaged(struct reader *r)
-{
-    fail(r, "is damaged at byte %zu", r->pos);
-}
-
-static bool take(struct reader *r, size_t n)
-{
-    if (r->failed || n > r->size - r->pos) {
-        if (!r->failed) {
-            r->pos = r->size;
-            damaged(r);
-        }
-        return false;
-    }
-    return true;
-}
-
-static uint64_t get_uint(struct reader *r, int bytes)
-{
-    uint64_t v = 0;
-    int i;
-
-    if (!take(r, (size_t)bytes)) {
-        return 0;
-    }
-    for (i = 0; i < bytes; i++) {
-        v |= (uint64_t)r->data[r->pos + (size_t)i] << (8 * i);
-    }
-    r->pos += (size_t)bytes;
-    return v;
-}
-
-static uint8_t get_u8(struct reader *r)
-{
-    return (uint8_t)get_uint(r, 1);
-}
-
-static uint32_t get_u32(struct reader *r)
-{
-    return (uint32_t)get_uint(r, 4);
-}
-
-static uint64_t get_u64(struct reader *r)
-{
-    return get_uint(r, 8);
-}
-
-/* A count of records that each take at least min bytes. A larger count
-   cannot fit in the rest of the file, which keeps a damaged count from
-   causing a huge allocation. */
-static uint32_t get_count(struct reader *r, size_t min)
-{
-    uint32_t n = get_u32(r);
-
-    if (!r->failed && n > (r->size - r->pos) / min) {
-        damaged(r);
-        return 0;
-    }
-    return n;
-}
-
-static void *allocate(struct reader *r, size_t count, size_t size)
-{
-    return types_alloc_array(r->arena, count + 1, size);
-}
-
-/* A string as a name that points into the memory pool. */
-static struct name get_name(struct reader *r)
-{
-    struct name n = {"", 0};
-    uint32_t length = get_count(r, 1);
-    char *text;
-
-    if (r->failed || !take(r, length)) {
-        return n;
-    }
-    text = allocate(r, length, 1);
-    memcpy(text, r->data + r->pos, length);
-    r->pos += length;
-    n.text = text;
-    n.length = length;
-    return n;
-}
-
 /* A string that the reader uses as a C string, such as a module path. A
    NUL inside it would cut it short, so the file is damaged then. */
 static const char *get_cstr(struct reader *r)
 {
-    struct name n = get_name(r);
+    struct name n = antl_get_name(r);
 
     if (n.length > 0 && memchr(n.text, '\0', n.length) != NULL) {
-        damaged(r);
+        antl_damaged(r);
     }
     return n.text;
 }
@@ -1240,8 +1089,8 @@ static bool name_equals(const struct name *n, const char *s)
     return n->length == strlen(s) && memcmp(n->text, s, n->length) == 0;
 }
 
-static const struct interface *library(const struct reader *r,
-                                       const struct name *module)
+const struct interface *antl_library(const struct reader *r,
+                                     const struct name *module)
 {
     size_t i;
 
@@ -1258,14 +1107,14 @@ static bool read_magic(struct reader *r)
     uint32_t version;
 
     if (r->size < sizeof magic || memcmp(r->data, magic, sizeof magic) != 0) {
-        fail(r, "is not a library file");
+        antl_fail(r, "is not a library file");
         return false;
     }
     r->pos = sizeof magic;
-    version = get_u32(r);
+    version = antl_get_u32(r);
     if (!r->failed && version != ANTL_VERSION) {
-        fail(r, "has format version %u, and antic reads version %u",
-             (unsigned)version, (unsigned)ANTL_VERSION);
+        antl_fail(r, "has format version %u, and antic reads version %u",
+                  (unsigned)version, (unsigned)ANTL_VERSION);
     }
     return !r->failed;
 }
@@ -1283,8 +1132,8 @@ static void read_header(struct reader *r, struct interface *out)
     }
     p->name = get_cstr(r);
     p->version = get_cstr(r);
-    p->dependency_count = get_count(r, 12);
-    deps = allocate(r, p->dependency_count, sizeof *deps);
+    p->dependency_count = antl_get_count(r, 12);
+    deps = antl_allocate(r, p->dependency_count, sizeof *deps);
     for (i = 0; i < p->dependency_count && !r->failed; i++) {
         deps[i].name = get_cstr(r);
         deps[i].constraint = get_cstr(r);
@@ -1293,27 +1142,27 @@ static void read_header(struct reader *r, struct interface *out)
     p->dependencies = deps;
     p->license = get_cstr(r);
     p->license_text = get_cstr(r);
-    p->attribution_count = get_count(r, 4);
-    lines = allocate(r, p->attribution_count, sizeof *lines);
+    p->attribution_count = antl_get_count(r, 4);
+    lines = antl_allocate(r, p->attribution_count, sizeof *lines);
     for (i = 0; i < p->attribution_count && !r->failed; i++) {
         lines[i] = get_cstr(r);
     }
     p->attribution = lines;
     out->module = get_cstr(r);
-    out->import_count = get_count(r, 4);
-    out->imports = allocate(r, out->import_count, sizeof *out->imports);
+    out->import_count = antl_get_count(r, 4);
+    out->imports = antl_allocate(r, out->import_count, sizeof *out->imports);
     for (i = 0; i < out->import_count && !r->failed; i++) {
         out->imports[i] = get_cstr(r);
     }
-    out->framework_count = get_count(r, 4);
-    out->frameworks = allocate(r, out->framework_count,
-                               sizeof *out->frameworks);
+    out->framework_count = antl_get_count(r, 4);
+    out->frameworks = antl_allocate(r, out->framework_count,
+                                    sizeof *out->frameworks);
     for (i = 0; i < out->framework_count && !r->failed; i++) {
         out->frameworks[i] = get_cstr(r);
     }
-    out->linux_library_count = get_count(r, 4);
-    out->linux_libraries = allocate(r, out->linux_library_count,
-                                    sizeof *out->linux_libraries);
+    out->linux_library_count = antl_get_count(r, 4);
+    out->linux_libraries = antl_allocate(r, out->linux_library_count,
+                                         sizeof *out->linux_libraries);
     for (i = 0; i < out->linux_library_count && !r->failed; i++) {
         out->linux_libraries[i] = get_cstr(r);
     }
@@ -1354,12 +1203,12 @@ static bool bitfield_fits(const struct struct_field *f)
            f->bits <= (unsigned)type_bits(f->type);
 }
 
-static struct type *type_ref(struct reader *r, uint32_t limit)
+struct type *antl_type_ref(struct reader *r, uint32_t limit)
 {
-    uint32_t index = get_u32(r);
+    uint32_t index = antl_get_u32(r);
 
     if (r->failed || index >= limit) {
-        damaged(r);
+        antl_damaged(r);
         return NULL;
     }
     return r->table[index];
@@ -1403,9 +1252,9 @@ static struct type *foreign_struct(struct reader *r, const struct name *module,
     if (names_lang(module, name, LANG_FIELD_DESCRIPTOR)) {
         return types_field_descriptor(r->types);
     }
-    lib = library(r, module);
+    lib = antl_library(r, module);
     if (lib == NULL) {
-        fail(r, "needs module `%.*s`", (int)module->length, module->text);
+        antl_fail(r, "needs module `%.*s`", (int)module->length, module->text);
         return NULL;
     }
     for (i = 0; i < lib->item_count; i++) {
@@ -1424,8 +1273,8 @@ static struct type *foreign_struct(struct reader *r, const struct name *module,
             return it->symbol->type;
         }
     }
-    fail(r, "needs struct `%.*s.%.*s`", (int)module->length, module->text,
-         (int)name->length, name->text);
+    antl_fail(r, "needs struct `%.*s.%.*s`", (int)module->length, module->text,
+              (int)name->length, name->text);
     return NULL;
 }
 
@@ -1444,51 +1293,51 @@ static bool symbolic_op_ok(enum symbolic_kind kind, uint8_t op)
 
 /* A symbolic value whose types are the first limit entries of the type
    table. */
-static const struct symbolic *read_symbolic(struct reader *r, uint32_t limit,
-                                            int depth)
+const struct symbolic *antl_read_symbolic(struct reader *r, uint32_t limit,
+                                          int depth)
 {
     struct symbolic key;
-    uint8_t kind = get_u8(r);
+    uint8_t kind = antl_get_u8(r);
 
     memset(&key, 0, sizeof key);
     key.kind = (enum symbolic_kind)kind;
-    key.type = type_ref(r, limit);
+    key.type = antl_type_ref(r, limit);
     if (r->failed || kind > SYMBOLIC_PARAM || depth > 64) {
-        damaged(r);
+        antl_damaged(r);
         return NULL;
     }
     switch (key.kind) {
     case SYMBOLIC_INT:
-        key.value = get_u64(r);
+        key.value = antl_get_u64(r);
         break;
     case SYMBOLIC_SIZE_OF:
-        key.of = type_ref(r, limit);
+        key.of = antl_type_ref(r, limit);
         break;
     case SYMBOLIC_UNARY:
     case SYMBOLIC_CAST:
     case SYMBOLIC_BINARY:
-        key.op = (enum token_kind)get_u8(r);
+        key.op = (enum token_kind)antl_get_u8(r);
         if (!r->failed && !symbolic_op_ok(key.kind, (uint8_t)key.op)) {
-            damaged(r);
+            antl_damaged(r);
             return NULL;
         }
-        key.a = read_symbolic(r, limit, depth + 1);
+        key.a = antl_read_symbolic(r, limit, depth + 1);
         if (key.kind == SYMBOLIC_BINARY && !r->failed) {
-            key.b = read_symbolic(r, limit, depth + 1);
+            key.b = antl_read_symbolic(r, limit, depth + 1);
         }
         break;
     case SYMBOLIC_PARAM:
-        key.of = type_ref(r, limit);
+        key.of = antl_type_ref(r, limit);
         if (!r->failed && (key.of->kind != TYPE_PARAM ||
                            key.of->param == NULL ||
                            !key.of->param->constant)) {
-            damaged(r);
+            antl_damaged(r);
             return NULL;
         }
         break;
     }
     if (r->failed || !(type_is_integer(key.type) || key.type->kind == TYPE_BOOL)) {
-        damaged(r);
+        antl_damaged(r);
         return NULL;
     }
     return types_symbolic(r->types, &key);
@@ -1506,13 +1355,10 @@ struct field_refs {
     uint32_t *member_types;
 };
 
-static bool read_value(struct reader *r, struct type *t, struct const_value *v,
-                       int depth);
-
 /* The defaults of the parameters of sym, whose type is in place. */
-static void read_param_defaults(struct reader *r, struct symbol *sym)
+void antl_read_param_defaults(struct reader *r, struct symbol *sym)
 {
-    uint32_t count = get_u32(r);
+    uint32_t count = antl_get_u32(r);
     struct param_default *list;
     uint32_t i;
 
@@ -1521,25 +1367,25 @@ static void read_param_defaults(struct reader *r, struct symbol *sym)
     }
     if (sym->type == NULL || sym->type->kind != TYPE_FN ||
         count > sym->type->param_count) {
-        damaged(r);
+        antl_damaged(r);
         return;
     }
-    list = allocate(r, count, sizeof *list);
+    list = antl_allocate(r, count, sizeof *list);
     for (i = 0; i < count && !r->failed; i++) {
-        uint8_t kind = get_u8(r);
+        uint8_t kind = antl_get_u8(r);
         struct const_value *v;
         memset(&list[i], 0, sizeof list[i]);
         if (kind == 2) {
             list[i].here = true;
         } else if (kind == 1) {
-            v = allocate(r, 1, sizeof *v);
-            if (!read_value(r, sym->type->params[i], v, 0)) {
-                damaged(r);
+            v = antl_allocate(r, 1, sizeof *v);
+            if (!antl_read_value(r, sym->type->params[i], v, 0)) {
+                antl_damaged(r);
                 return;
             }
             list[i].value = v;
         } else if (kind != 0) {
-            damaged(r);
+            antl_damaged(r);
             return;
         }
     }
@@ -1548,9 +1394,9 @@ static void read_param_defaults(struct reader *r, struct symbol *sym)
 }
 
 /* The `own` parameters of sym, whose type is in place. */
-static void read_param_owned(struct reader *r, struct symbol *sym)
+void antl_read_param_owned(struct reader *r, struct symbol *sym)
 {
-    uint32_t count = get_u32(r);
+    uint32_t count = antl_get_u32(r);
     bool *list;
     uint32_t i;
 
@@ -1559,14 +1405,14 @@ static void read_param_owned(struct reader *r, struct symbol *sym)
     }
     if (sym->type == NULL || sym->type->kind != TYPE_FN ||
         count > sym->type->param_count) {
-        damaged(r);
+        antl_damaged(r);
         return;
     }
-    list = allocate(r, count, sizeof *list);
+    list = antl_allocate(r, count, sizeof *list);
     for (i = 0; i < count && !r->failed; i++) {
-        uint8_t owned = get_u8(r);
+        uint8_t owned = antl_get_u8(r);
         if (owned > 1) {
-            damaged(r);
+            antl_damaged(r);
             return;
         }
         list[i] = owned == 1;
@@ -1726,7 +1572,7 @@ static void check_nesting(struct reader *r, uint32_t count)
     }
     for (i = 0; i < n.count && !r->failed; i++) {
         if (fields_height(&n, n.types[i], 0) > NEST_LIMIT) {
-            damaged(r);
+            antl_damaged(r);
         }
     }
     free((void *)n.types);
@@ -1741,14 +1587,14 @@ enum { HOOK_BITS = 20 };
 static struct constraint_ref *read_constraint_refs(struct reader *r,
                                                    size_t *count)
 {
-    uint32_t n = get_count(r, 8);
-    struct constraint_ref *refs = allocate(r, n, sizeof *refs);
+    uint32_t n = antl_get_count(r, 8);
+    struct constraint_ref *refs = antl_allocate(r, n, sizeof *refs);
     uint32_t i;
 
     for (i = 0; i < n && !r->failed; i++) {
         memset(&refs[i], 0, sizeof refs[i]);
-        refs[i].module = get_name(r);
-        refs[i].name = get_name(r);
+        refs[i].module = antl_get_name(r);
+        refs[i].name = antl_get_name(r);
     }
     *count = r->failed ? 0 : n;
     return refs;
@@ -1757,8 +1603,8 @@ static struct constraint_ref *read_constraint_refs(struct reader *r,
 /* A type parameter of the table, entry at, as put_param_type wrote it. */
 static struct type *read_param_type(struct reader *r, uint32_t at)
 {
-    struct name name = get_name(r);
-    uint8_t role = get_u8(r);
+    struct name name = antl_get_name(r);
+    uint8_t role = antl_get_u8(r);
     struct type *t;
     uint32_t n;
     uint32_t i;
@@ -1768,10 +1614,10 @@ static struct type *read_param_type(struct reader *r, uint32_t at)
     }
     t = types_param(r->types, name);
     if (role == 1 || role == 2) {
-        struct type *owner = type_ref(r, at);
+        struct type *owner = antl_type_ref(r, at);
         if (r->failed || owner->kind != TYPE_PARAM || owner->param == NULL ||
             (role == 1 ? owner->walked : owner->indexed) != NULL) {
-            damaged(r);
+            antl_damaged(r);
             return NULL;
         }
         if (role == 1) {
@@ -1781,36 +1627,36 @@ static struct type *read_param_type(struct reader *r, uint32_t at)
         }
         t->hook_owner = owner;
     } else if (role == 0) {
-        struct type_param *tp = allocate(r, 1, sizeof *tp);
-        uint8_t constant = get_u8(r);
+        struct type_param *tp = antl_allocate(r, 1, sizeof *tp);
+        uint8_t constant = antl_get_u8(r);
         tp->name = name;
         tp->constant = constant == 1;
         tp->constraints = read_constraint_refs(r, &tp->constraint_count);
         tp->type = t;
         t->param = tp;
         if (constant > 1) {
-            damaged(r);
+            antl_damaged(r);
         }
     } else if (role == 3) {
-        struct item *set = allocate(r, 1, sizeof *set);
+        struct item *set = antl_allocate(r, 1, sizeof *set);
         set->kind = ITEM_CONSTRAINT;
         set->name = name;
         set->constraints = read_constraint_refs(r, &set->constraint_count);
         t->declared_by = set;
     } else {
-        damaged(r);
+        antl_damaged(r);
         return NULL;
     }
-    t->hooks = get_u32(r);
+    t->hooks = antl_get_u32(r);
     if (t->hooks >> HOOK_BITS != 0) {
-        damaged(r);
+        antl_damaged(r);
     }
-    n = get_count(r, 4);
-    t->ifaces = allocate(r, n, sizeof *t->ifaces);
+    n = antl_get_count(r, 4);
+    t->ifaces = antl_allocate(r, n, sizeof *t->ifaces);
     for (i = 0; i < n && !r->failed; i++) {
-        const struct type *iface = type_ref(r, at);
+        const struct type *iface = antl_type_ref(r, at);
         if (r->failed || iface->kind != TYPE_CLASS || !iface->has_abstract) {
-            damaged(r);
+            antl_damaged(r);
             return NULL;
         }
         t->ifaces[i] = iface;
@@ -1822,20 +1668,20 @@ static struct type *read_param_type(struct reader *r, uint32_t at)
 /* The parameters of the generic t, which follow its body. */
 static void read_type_params(struct reader *r, uint32_t at, struct type *t)
 {
-    uint32_t n = get_count(r, 4);
+    uint32_t n = antl_get_count(r, 4);
     uint32_t i;
 
-    t->type_params = allocate(r, n, sizeof *t->type_params);
+    t->type_params = antl_allocate(r, n, sizeof *t->type_params);
     for (i = 0; i < n && !r->failed; i++) {
-        struct type *p = type_ref(r, at);
+        struct type *p = antl_type_ref(r, at);
         if (r->failed || p->kind != TYPE_PARAM || p->param == NULL) {
-            damaged(r);
+            antl_damaged(r);
             return;
         }
         t->type_params[i] = p;
     }
     if (n == 0) {
-        damaged(r);
+        antl_damaged(r);
         return;
     }
     t->type_param_count = n;
@@ -1848,29 +1694,29 @@ static struct type *read_copy_args(struct reader *r, uint32_t at,
                                    uint8_t kind, struct type ***args_out,
                                    const struct symbolic ***values_out)
 {
-    struct type *generic = type_ref(r, at);
+    struct type *generic = antl_type_ref(r, at);
     struct type **args;
     const struct symbolic **values;
     size_t i;
 
     if (r->failed || generic->type_param_count == 0 ||
         generic->kind != (enum type_kind)kind) {
-        damaged(r);
+        antl_damaged(r);
         return NULL;
     }
-    args = allocate(r, generic->type_param_count, sizeof *args);
-    values = allocate(r, generic->type_param_count, sizeof *values);
+    args = antl_allocate(r, generic->type_param_count, sizeof *args);
+    values = antl_allocate(r, generic->type_param_count, sizeof *values);
     for (i = 0; i < generic->type_param_count && !r->failed; i++) {
         bool constant = generic->type_params[i]->param->constant;
-        uint8_t is_value = get_u8(r);
+        uint8_t is_value = antl_get_u8(r);
         if (r->failed || is_value != (constant ? 1 : 0)) {
-            damaged(r);
+            antl_damaged(r);
             return NULL;
         }
         if (constant) {
-            values[i] = read_symbolic(r, at, 0);
+            values[i] = antl_read_symbolic(r, at, 0);
         } else {
-            args[i] = type_ref(r, at);
+            args[i] = antl_type_ref(r, at);
         }
     }
     if (r->failed) {
@@ -1904,7 +1750,7 @@ static struct type *copy_among(struct type *generic, struct type **args,
 
 static void read_types(struct reader *r)
 {
-    uint32_t count = get_count(r, 1);
+    uint32_t count = antl_get_count(r, 1);
     struct field_refs *structs = calloc((size_t)count + 1, sizeof *structs);
     uint32_t struct_count = 0;
     uint32_t i;
@@ -1914,16 +1760,16 @@ static void read_types(struct reader *r)
         fputs("antic: out of memory\n", stderr);
         exit(70);
     }
-    r->table = allocate(r, count, sizeof *r->table);
+    r->table = antl_allocate(r, count, sizeof *r->table);
     for (i = 0; i < count && !r->failed; i++) {
-        uint8_t kind = get_u8(r);
+        uint8_t kind = antl_get_u8(r);
         struct type *t = NULL;
         switch (kind) {
         case TYPE_POINTER: {
-            struct type *element = type_ref(r, i);
-            uint8_t form = get_u8(r);
+            struct type *element = antl_type_ref(r, i);
+            uint8_t form = antl_get_u8(r);
             if (form > 3) {
-                damaged(r);
+                antl_damaged(r);
             }
             if (element != NULL && !r->failed) {
                 t = types_pointer_of(r->types, element, (form & 1) != 0);
@@ -1934,10 +1780,10 @@ static void read_types(struct reader *r)
             break;
         }
         case TYPE_SLICE: {
-            struct type *element = type_ref(r, i);
-            uint8_t lent = get_u8(r);
+            struct type *element = antl_type_ref(r, i);
+            uint8_t lent = antl_get_u8(r);
             if (lent > 1) {
-                damaged(r);
+                antl_damaged(r);
             }
             if (element != NULL && !r->failed) {
                 t = types_slice(r->types, element);
@@ -1950,11 +1796,11 @@ static void read_types(struct reader *r)
         /* The element of a `?T` is never a `*U` or a `fn(...)`, which
            would make a `?*U` of it. */
         case TYPE_OPTIONAL:
-            t = type_ref(r, i);
+            t = antl_type_ref(r, i);
             if (t != NULL &&
                 ((t->kind == TYPE_POINTER || t->kind == TYPE_FN) &&
                  !t->nullable)) {
-                damaged(r);
+                antl_damaged(r);
                 t = NULL;
             }
             if (t != NULL) {
@@ -1962,14 +1808,14 @@ static void read_types(struct reader *r)
             }
             break;
         case TYPE_ARRAY: {
-            struct type *element = type_ref(r, i);
-            if (get_u8(r) != 0) {
-                const struct symbolic *length = read_symbolic(r, i, 0);
+            struct type *element = antl_type_ref(r, i);
+            if (antl_get_u8(r) != 0) {
+                const struct symbolic *length = antl_read_symbolic(r, i, 0);
                 if (element != NULL && length != NULL) {
                     t = types_array_symbolic(r->types, element, length);
                 }
             } else {
-                uint64_t length = get_u64(r);
+                uint64_t length = antl_get_u64(r);
                 if (element != NULL && !r->failed && length > 0) {
                     t = types_array(r->types, element, length);
                 }
@@ -1977,14 +1823,14 @@ static void read_types(struct reader *r)
             break;
         }
         case TYPE_FN: {
-            uint32_t n = get_count(r, 4);
-            struct type **params = allocate(r, n, sizeof *params);
+            uint32_t n = antl_get_count(r, 4);
+            struct type **params = antl_allocate(r, n, sizeof *params);
             uint8_t flags;
             for (j = 0; j < n && !r->failed; j++) {
-                params[j] = type_ref(r, i);
+                params[j] = antl_type_ref(r, i);
             }
-            t = type_ref(r, i);
-            flags = get_u8(r);
+            t = antl_type_ref(r, i);
+            flags = antl_get_u8(r);
             if (r->failed) {
                 break;
             }
@@ -1998,7 +1844,7 @@ static void read_types(struct reader *r)
                  ((flags & 4) == 0 || n == 0 ||
                   params[n - 1] == NULL ||
                   params[n - 1]->kind != TYPE_POINTER))) {
-                damaged(r);
+                antl_damaged(r);
                 t = NULL;
                 break;
             }
@@ -2018,13 +1864,13 @@ static void read_types(struct reader *r)
            module reads is the one every other module of the program
            interns. */
         case TYPE_TUPLE: {
-            uint32_t n = get_count(r, 4);
-            struct type **elements = allocate(r, n, sizeof *elements);
+            uint32_t n = antl_get_count(r, 4);
+            struct type **elements = antl_allocate(r, n, sizeof *elements);
             for (j = 0; j < n && !r->failed; j++) {
-                elements[j] = type_ref(r, i);
+                elements[j] = antl_type_ref(r, i);
             }
             if (n < 2) {
-                damaged(r);
+                antl_damaged(r);
             }
             if (!r->failed) {
                 t = types_tuple(r->types, elements, n);
@@ -2034,9 +1880,9 @@ static void read_types(struct reader *r)
         case TYPE_STRUCT:
         case TYPE_CLASS:
         case TYPE_VARIANT: {
-            struct name module = get_name(r);
-            struct name name = get_name(r);
-            uint8_t struct_form_byte = get_u8(r);
+            struct name module = antl_get_name(r);
+            struct name name = antl_get_name(r);
+            uint8_t struct_form_byte = antl_get_u8(r);
             struct type *generic = NULL;
             struct type **args = NULL;
             const struct symbolic **values = NULL;
@@ -2047,7 +1893,7 @@ static void read_types(struct reader *r)
                 break;
             }
             if (struct_form_byte > FORM_COPY) {
-                damaged(r);
+                antl_damaged(r);
                 break;
             }
             if (struct_form_byte == FORM_COPY) {
@@ -2058,7 +1904,7 @@ static void read_types(struct reader *r)
                 existing = copy_among(generic, args, values);
             } else if (kind == TYPE_STRUCT &&
                        names_lang(&module, &name, LANG_CHAN)) {
-                struct type *element = type_ref(r, i);
+                struct type *element = antl_type_ref(r, i);
                 if (!r->failed) {
                     t = types_chan(r->types, element);
                 }
@@ -2107,63 +1953,63 @@ static void read_types(struct reader *r)
             struct field_refs *s = &structs[struct_count++];
             t = types_struct(r->types, module, name);
             t->kind = (enum type_kind)kind;
-            flags = get_u8(r);
+            flags = antl_get_u8(r);
             t->is_union = (flags & 1) != 0;
             t->packed = (flags & 2) != 0;
             t->has_abstract = (flags & 4) != 0;
             t->is_final = (flags & 8) != 0;
             t->simd = (flags & 16) != 0;
             t->traced = (flags & 32) != 0;
-            safety = get_u8(r);
+            safety = antl_get_u8(r);
             t->safety = (enum thread_safety)(safety & 3);
             t->unchecked_fields = (safety >> 2 & 1) != 0;
             if ((safety & 3) > SAFETY_CONCURRENT || safety > 7) {
-                damaged(r);
+                antl_damaged(r);
             }
-            t->compatible = get_name(r);
-            t->align = get_u64(r);
+            t->compatible = antl_get_name(r);
+            t->align = antl_get_u64(r);
             if (flags > 63 || (t->align & (t->align - 1)) != 0) {
-                damaged(r);
+                antl_damaged(r);
             }
             s->s = t;
-            s->count = get_count(r, 9);
-            s->fields = allocate(r, s->count, sizeof *s->fields);
-            s->types = allocate(r, s->count, sizeof *s->types);
+            s->count = antl_get_count(r, 9);
+            s->fields = antl_allocate(r, s->count, sizeof *s->fields);
+            s->types = antl_allocate(r, s->count, sizeof *s->types);
             for (j = 0; j < s->count && !r->failed; j++) {
                 struct name doc;
                 uint8_t form;
                 uint8_t marks;
-                s->fields[j].name = get_name(r);
-                s->types[j] = get_u32(r);
-                s->fields[j].bits = get_u8(r);
-                form = get_u8(r);
+                s->fields[j].name = antl_get_name(r);
+                s->types[j] = antl_get_u32(r);
+                s->fields[j].bits = antl_get_u8(r);
+                form = antl_get_u8(r);
                 s->fields[j].form = (enum field_form)(form & 15);
                 s->fields[j].owned = (form >> 4 & 1) != 0;
                 s->fields[j].atomic = (form >> 5 & 1) != 0;
                 s->fields[j].writable = (form >> 6 & 1) != 0;
                 s->fields[j].transient = (form >> 7 & 1) != 0;
-                s->fields[j].vis = (enum visibility)get_u8(r);
-                marks = get_u8(r);
+                s->fields[j].vis = (enum visibility)antl_get_u8(r);
+                marks = antl_get_u8(r);
                 s->fields[j].injected = (marks & 1) != 0;
                 s->fields[j].inject_final = (marks >> 1 & 1) != 0;
                 s->fields[j].hidden = (marks >> 2 & 1) != 0;
                 s->fields[j].unchecked = (marks >> 3 & 1) != 0;
-                s->fields[j].guard = get_name(r);
+                s->fields[j].guard = antl_get_name(r);
                 if ((form & 15) > FIELD_IMPL || s->fields[j].vis > VIS_PUB ||
                     marks > 15) {
-                    damaged(r);
+                    antl_damaged(r);
                 }
-                doc = get_name(r);
+                doc = antl_get_name(r);
                 s->fields[j].doc.text = doc.text;
                 s->fields[j].doc.length = doc.length;
             }
             if (s->count == 0) {
-                damaged(r);
+                antl_damaged(r);
             }
-            s->member_count = get_count(r, 8);
-            s->members = allocate(r, s->member_count, sizeof *s->members);
+            s->member_count = antl_get_count(r, 8);
+            s->members = antl_allocate(r, s->member_count, sizeof *s->members);
             s->member_types =
-                allocate(r, s->member_count, sizeof *s->member_types);
+                antl_allocate(r, s->member_count, sizeof *s->member_types);
             for (j = 0; j < s->member_count && !r->failed; j++) {
                 struct item *m = arena_alloc(r->arena, sizeof *m);
                 struct symbol *sym = arena_alloc(r->arena, sizeof *sym);
@@ -2171,19 +2017,19 @@ static void read_types(struct reader *r)
                 struct name note;
                 memset(m, 0, sizeof *m);
                 memset(sym, 0, sizeof *sym);
-                m->name = get_name(r);
-                m->qualifier = get_name(r);
-                s->member_types[j] = get_u32(r);
-                marks = get_u8(r);
+                m->name = antl_get_name(r);
+                m->qualifier = antl_get_name(r);
+                s->member_types[j] = antl_get_u32(r);
+                marks = antl_get_u8(r);
                 m->contract = (enum fn_contract)(marks & 15);
                 m->is_final = (marks >> 4 & 1) != 0;
                 m->is_operator = (marks >> 5 & 1) != 0;
                 m->may_fail = (marks >> 6 & 1) != 0;
-                m->vis = (enum visibility)get_u8(r);
+                m->vis = (enum visibility)antl_get_u8(r);
                 if ((marks & 15) > FN_CONCRETE || m->vis > VIS_PUB) {
-                    damaged(r);
+                    antl_damaged(r);
                 }
-                note = get_name(r);
+                note = antl_get_name(r);
                 m->doc.text = note.text;
                 m->doc.length = note.length;
                 m->kind = ITEM_FN;
@@ -2192,12 +2038,12 @@ static void read_types(struct reader *r)
                 /* The parameter names the declaration wrote, which
                    `anti doc` and the generated header print. */
                 {
-                    uint32_t total = get_count(r, 4);
-                    struct name *names = allocate(r, total, sizeof *names);
-                    struct param *list = allocate(r, total, sizeof *list);
+                    uint32_t total = antl_get_count(r, 4);
+                    struct name *names = antl_allocate(r, total, sizeof *names);
+                    struct param *list = antl_allocate(r, total, sizeof *list);
                     uint32_t k;
                     for (k = 0; k < total && !r->failed; k++) {
-                        names[k] = get_name(r);
+                        names[k] = antl_get_name(r);
                         memset(&list[k], 0, sizeof list[k]);
                         list[k].name = names[k];
                     }
@@ -2222,7 +2068,7 @@ static void read_types(struct reader *r)
                 t = existing;
             } else if (struct_form_byte == FORM_COPY) {
                 if (s->member_count > 0) {
-                    damaged(r);
+                    antl_damaged(r);
                 }
                 t->generic = generic;
                 t->args = args;
@@ -2237,17 +2083,17 @@ static void read_types(struct reader *r)
             break;
         /* An enum carries its values, each with a name and a number. */
         case TYPE_ENUM: {
-            struct name module = get_name(r);
-            struct name name = get_name(r);
+            struct name module = antl_get_name(r);
+            struct name name = antl_get_name(r);
             struct type *base;
             uint32_t n;
             struct struct_field *values;
             if (r->failed) {
                 break;
             }
-            base = type_ref(r, i);
-            n = get_count(r, 8);
-            values = allocate(r, n, sizeof *values);
+            base = antl_type_ref(r, i);
+            n = antl_get_count(r, 8);
+            values = antl_allocate(r, n, sizeof *values);
             /* The values of an enum are integers. */
             t = base != NULL && type_is_integer(base)
                     ? types_enum(r->types, module, name, base)
@@ -2255,15 +2101,15 @@ static void read_types(struct reader *r)
             for (j = 0; j < n && !r->failed; j++) {
                 struct name doc;
                 memset(&values[j], 0, sizeof values[j]);
-                values[j].name = get_name(r);
-                values[j].number = get_u64(r);
+                values[j].name = antl_get_name(r);
+                values[j].number = antl_get_u64(r);
                 values[j].type = t;
-                doc = get_name(r);
+                doc = antl_get_name(r);
                 values[j].doc.text = doc.text;
                 values[j].doc.length = doc.length;
             }
             if (n == 0 || t == NULL) {
-                damaged(r);
+                antl_damaged(r);
             } else if (!r->failed) {
                 types_set_fields(r->types, t, values, n);
             }
@@ -2276,12 +2122,12 @@ static void read_types(struct reader *r)
             if (kind <= TYPE_ERROR) {
                 t = types_builtin(r->types, (enum type_kind)kind);
             } else {
-                damaged(r);
+                antl_damaged(r);
             }
             break;
         }
         if (t == NULL) {
-            damaged(r);
+            antl_damaged(r);
         }
         r->table[i] = t;
     }
@@ -2291,12 +2137,12 @@ static void read_types(struct reader *r)
         for (j = 0; j < s->count; j++) {
             if (s->types[j] >= count ||
                 r->table[s->types[j]]->kind == TYPE_VOID) {
-                damaged(r);
+                antl_damaged(r);
                 break;
             }
             s->fields[j].type = r->table[s->types[j]];
             if (s->fields[j].bits != 0 && !bitfield_fits(&s->fields[j])) {
-                damaged(r);
+                antl_damaged(r);
                 break;
             }
         }
@@ -2318,7 +2164,7 @@ static void read_types(struct reader *r)
             struct item *m = s->members[j];
             struct type *fn;
             if (s->member_types[j] >= count) {
-                damaged(r);
+                antl_damaged(r);
                 break;
             }
             /* A member is a function. It takes `self` when its first
@@ -2328,13 +2174,13 @@ static void read_types(struct reader *r)
                `may fail`. */
             fn = r->table[s->member_types[j]];
             if (fn->kind != TYPE_FN || fn->bound) {
-                damaged(r);
+                antl_damaged(r);
                 break;
             }
             m->has_self = takes_self(fn, s->s);
             if (fn->param_count != m->param_count + (m->has_self ? 1u : 0u) +
                                        (fn->has_out ? 1u : 0u)) {
-                damaged(r);
+                antl_damaged(r);
                 break;
             }
             m->symbol->type = fn;
@@ -2360,26 +2206,26 @@ static void read_types(struct reader *r)
     for (i = 0; i < struct_count && !r->failed; i++) {
         if (structs[i].s->kind == TYPE_VARIANT &&
             !types_cases_from_fields(r->types, structs[i].s)) {
-            damaged(r);
+            antl_damaged(r);
         }
     }
     for (i = 0; i < struct_count && !r->failed; i++) {
         struct type *t = structs[i].s;
         for (j = 0; j < t->field_count && !r->failed; j++) {
             struct const_value *v;
-            if (get_u8(r) == 0) {
+            if (antl_get_u8(r) == 0) {
                 continue;
             }
-            v = allocate(r, 1, sizeof *v);
-            if (!read_value(r, t->fields[j].type, v, 0)) {
-                damaged(r);
+            v = antl_allocate(r, 1, sizeof *v);
+            if (!antl_read_value(r, t->fields[j].type, v, 0)) {
+                antl_damaged(r);
                 break;
             }
             t->fields[j].constant = v;
         }
         for (j = 0; j < structs[i].member_count && !r->failed; j++) {
-            read_param_defaults(r, structs[i].members[j]->symbol);
-            read_param_owned(r, structs[i].members[j]->symbol);
+            antl_read_param_defaults(r, structs[i].members[j]->symbol);
+            antl_read_param_owned(r, structs[i].members[j]->symbol);
         }
     }
     if (!r->failed) {
@@ -2387,7 +2233,7 @@ static void read_types(struct reader *r)
     }
     for (i = 0; i < struct_count && !r->failed; i++) {
         if (types_find_cycle(structs[i].s) != NULL) {
-            damaged(r);
+            antl_damaged(r);
         }
     }
     free(structs);
@@ -2395,10 +2241,10 @@ static void read_types(struct reader *r)
 
 /* A constant of type t. Aggregates hold one value per element or field,
    which the constant evaluator relies on. */
-static bool read_value(struct reader *r, struct type *t, struct const_value *v,
-                       int depth)
+bool antl_read_value(struct reader *r, struct type *t, struct const_value *v,
+                     int depth)
 {
-    uint8_t kind = get_u8(r);
+    uint8_t kind = antl_get_u8(r);
     uint32_t i;
     uint32_t n;
 
@@ -2406,29 +2252,29 @@ static bool read_value(struct reader *r, struct type *t, struct const_value *v,
     v->type = t;
     v->kind = (enum const_kind)kind;
     if (r->failed || depth > 64) {
-        damaged(r);
+        antl_damaged(r);
         return false;
     }
     switch (kind) {
     case CONST_INT:
-        v->as.integer = get_u64(r);
+        v->as.integer = antl_get_u64(r);
         return !r->failed && (type_is_integer(t) || t->kind == TYPE_BOOL ||
                               t->kind == TYPE_ENUM);
     case CONST_FLOAT: {
-        uint64_t bits = get_u64(r);
+        uint64_t bits = antl_get_u64(r);
         memcpy(&v->as.floating, &bits, sizeof bits);
         return !r->failed && (type_is_float(t) || t->kind == TYPE_F16);
     }
     case CONST_BOOL:
-        v->as.boolean = get_u8(r) != 0;
+        v->as.boolean = antl_get_u8(r) != 0;
         return !r->failed && t->kind == TYPE_BOOL;
     case CONST_CHAR:
-        v->as.character = get_u32(r);
+        v->as.character = antl_get_u32(r);
         return !r->failed && t->kind == TYPE_CHAR;
     case CONST_NULL:
         return t->kind == TYPE_POINTER || t->kind == TYPE_FN;
     case CONST_TEXT: {
-        struct name bytes = get_name(r);
+        struct name bytes = antl_get_name(r);
         v->as.text.bytes = bytes.text;
         v->as.text.length = bytes.length;
         /* Text is a `str` or the bytes of `b"..."`. */
@@ -2437,11 +2283,11 @@ static bool read_value(struct reader *r, struct type *t, struct const_value *v,
                 (t->kind == TYPE_SLICE && t->element->kind == TYPE_U8));
     }
     case CONST_SYMBOLIC:
-        v->as.symbolic = read_symbolic(r, r->table_count, 0);
+        v->as.symbolic = antl_read_symbolic(r, r->table_count, 0);
         return !r->failed && v->as.symbolic->type == t;
     case CONST_ARRAY:
     case CONST_STRUCT:
-        n = get_count(r, 1);
+        n = antl_get_count(r, 1);
         if (r->failed || (kind == CONST_ARRAY
                               ? t->kind != TYPE_ARRAY || n != t->length
                               : !type_has_fields(t) ||
@@ -2449,11 +2295,13 @@ static bool read_value(struct reader *r, struct type *t, struct const_value *v,
             return false;
         }
         v->as.aggregate.count = n;
-        v->as.aggregate.items = allocate(r, n, sizeof *v->as.aggregate.items);
+        v->as.aggregate.items =
+            antl_allocate(r, n, sizeof *v->as.aggregate.items);
         for (i = 0; i < n; i++) {
             struct type *item = kind == CONST_ARRAY ? t->element
                                                     : t->fields[i].type;
-            if (!read_value(r, item, &v->as.aggregate.items[i], depth + 1)) {
+            if (!antl_read_value(r, item, &v->as.aggregate.items[i],
+                                 depth + 1)) {
                 return false;
             }
         }
@@ -2466,20 +2314,20 @@ static bool read_value(struct reader *r, struct type *t, struct const_value *v,
 static void read_items(struct reader *r)
 {
     struct interface *iface = r->iface;
-    uint32_t count = get_count(r, 14);
+    uint32_t count = antl_get_count(r, 14);
     uint32_t i;
 
-    iface->items = allocate(r, count, sizeof *iface->items);
-    r->marked_generic = allocate(r, count, sizeof *r->marked_generic);
+    iface->items = antl_allocate(r, count, sizeof *iface->items);
+    r->marked_generic = antl_allocate(r, count, sizeof *r->marked_generic);
     for (i = 0; i < count && !r->failed; i++) {
         struct symbol *sym = arena_alloc(r->arena, sizeof *sym);
-        uint8_t kind = get_u8(r);
+        uint8_t kind = antl_get_u8(r);
         bool generic = false;
         bool ok;
-        sym->name = get_name(r);
-        sym->type = type_ref(r, r->table_count);
+        sym->name = antl_get_name(r);
+        sym->type = antl_type_ref(r, r->table_count);
         {
-            uint8_t marks = get_u8(r);
+            uint8_t marks = antl_get_u8(r);
             sym->exported = (marks & 1) != 0;
             sym->internal = (marks >> 1 & 1) != 0;
             sym->may_fail = (marks >> 2 & 1) != 0;
@@ -2491,11 +2339,11 @@ static void read_items(struct reader *r)
             sym->is_operator = (marks >> 6 & 1) != 0;
             if (marks > 127 || (sym->alias && kind != SYMBOL_STRUCT) ||
                 ((generic || sym->is_operator) && kind != SYMBOL_FN)) {
-                damaged(r);
+                antl_damaged(r);
             }
         }
         {
-            struct name doc = get_name(r);
+            struct name doc = antl_get_name(r);
             sym->doc.text = doc.text;
             sym->doc.length = doc.length;
         }
@@ -2514,17 +2362,17 @@ static void read_items(struct reader *r)
             ok = sym->type->kind == TYPE_FN;
             if (ok) {
                 size_t j;
-                struct name *names = allocate(r, sym->type->param_count,
-                                              sizeof *names);
+                struct name *names = antl_allocate(r, sym->type->param_count,
+                                                   sizeof *names);
                 for (j = 0; j < sym->type->param_count; j++) {
-                    names[j] = get_name(r);
+                    names[j] = antl_get_name(r);
                 }
                 sym->params = names;
-                read_param_defaults(r, sym);
-                read_param_owned(r, sym);
+                antl_read_param_defaults(r, sym);
+                antl_read_param_owned(r, sym);
             }
             if (kind == SYMBOL_EXTERN_FN) {
-                sym->variadic = get_u8(r) != 0;
+                sym->variadic = antl_get_u8(r) != 0;
             }
             ok = ok && !r->failed;
             break;
@@ -2543,14 +2391,14 @@ static void read_items(struct reader *r)
             break;
         case SYMBOL_CONST:
             sym->value = arena_alloc(r->arena, sizeof *sym->value);
-            ok = read_value(r, sym->type, sym->value, 0);
+            ok = antl_read_value(r, sym->type, sym->value, 0);
             break;
         default:
             ok = false;
             break;
         }
         if (!ok) {
-            damaged(r);
+            antl_damaged(r);
         }
         r->marked_generic[iface->item_count] = generic;
         iface->items[iface->item_count++] = sym;
@@ -2600,7 +2448,7 @@ static uint32_t map_agg_at(struct reader *r, struct ir_module *program,
 
     if (agg >= maps->agg_count || maps->agg_state[agg] == MAP_BUSY ||
         depth >= NEST_LIMIT) {
-        damaged(r);
+        antl_damaged(r);
         return 0;
     }
     if (maps->agg_state[agg] == MAP_DONE) {
@@ -2641,7 +2489,7 @@ static uint32_t map_agg_at(struct reader *r, struct ir_module *program,
     maps->agg_state[agg] = MAP_DONE;
     maps->agg_height[agg] = height + 1;
     if (height + 1 > NEST_LIMIT) {
-        damaged(r);
+        antl_damaged(r);
     }
     return maps->agg_map[agg];
 }
@@ -2654,7 +2502,7 @@ static uint32_t map_sym_at(struct reader *r, struct ir_module *program,
 
     if (sym >= maps->sym_count || maps->sym_state[sym] == MAP_BUSY ||
         depth >= NEST_LIMIT) {
-        damaged(r);
+        antl_damaged(r);
         return 0;
     }
     if (maps->sym_state[sym] == MAP_DONE) {
@@ -2672,7 +2520,7 @@ static uint32_t map_sym_at(struct reader *r, struct ir_module *program,
         if (!r->failed && s.kind == IR_SYM_OFFSET_OF &&
             (s.of.type != IR_AGG ||
              s.field >= program->aggs[s.of.agg]->field_count)) {
-            damaged(r);
+            antl_damaged(r);
         }
     } else if (s.kind == IR_SYM_OP) {
         s.a = map_sym_at(r, program, maps, s.a, depth + 1);
@@ -2707,7 +2555,7 @@ static uint32_t map_sym_at(struct reader *r, struct ir_module *program,
     maps->sym_state[sym] = MAP_DONE;
     maps->sym_height[sym] = height + 1;
     if (height + 1 > NEST_LIMIT) {
-        damaged(r);
+        antl_damaged(r);
     }
     return maps->sym_map[sym];
 }
@@ -2727,13 +2575,13 @@ static uint32_t map_sym(struct reader *r, struct ir_module *program,
 static struct ir_vtype read_vtype(struct reader *r, bool scalar_only)
 {
     struct ir_vtype v;
-    uint8_t type = get_u8(r);
+    uint8_t type = antl_get_u8(r);
 
-    v.agg = get_u32(r);
+    v.agg = antl_get_u32(r);
     v.type = (enum ir_type)type;
     if (!r->failed && (!valid_type(type) || (scalar_only && type == IR_AGG) ||
                        ((type == IR_AGG) != (v.agg != IR_NO_AGG)))) {
-        damaged(r);
+        antl_damaged(r);
     }
     return v;
 }
@@ -2805,79 +2653,83 @@ static void read_tables(struct reader *r, struct ir_module *program,
     uint32_t j;
     uint32_t a = 0;
 
-    maps->file_count = get_count(r, 4);
-    maps->files = allocate(r, maps->file_count, sizeof *maps->files);
+    maps->file_count = antl_get_count(r, 4);
+    maps->files = antl_allocate(r, maps->file_count, sizeof *maps->files);
     for (i = 0; i < maps->file_count && !r->failed; i++) {
         const char *path = get_cstr(r);
         if (!r->failed) {
             maps->files[i] = ir_file_add(program, path);
         }
     }
-    maps->sym_count = get_count(r, 27);
-    maps->syms = allocate(r, maps->sym_count, sizeof *maps->syms);
-    maps->sym_map = allocate(r, maps->sym_count, sizeof *maps->sym_map);
-    maps->sym_state = allocate(r, maps->sym_count, sizeof *maps->sym_state);
-    maps->sym_height = allocate(r, maps->sym_count, sizeof *maps->sym_height);
+    maps->sym_count = antl_get_count(r, 27);
+    maps->syms = antl_allocate(r, maps->sym_count, sizeof *maps->syms);
+    maps->sym_map = antl_allocate(r, maps->sym_count, sizeof *maps->sym_map);
+    maps->sym_state =
+        antl_allocate(r, maps->sym_count, sizeof *maps->sym_state);
+    maps->sym_height =
+        antl_allocate(r, maps->sym_count, sizeof *maps->sym_height);
     for (i = 0; i < maps->sym_count && !r->failed; i++) {
         struct ir_sym *s = &maps->syms[i];
-        uint8_t kind = get_u8(r);
-        uint8_t type = get_u8(r);
+        uint8_t kind = antl_get_u8(r);
+        uint8_t type = antl_get_u8(r);
         s->kind = (enum ir_sym_kind)kind;
         s->type = (enum ir_type)type;
-        s->value = get_u64(r);
+        s->value = antl_get_u64(r);
         s->of = read_vtype(r, false);
-        s->field = get_u32(r);
-        s->op = get_u8(r);
-        s->a = get_u32(r);
-        s->b = get_u32(r);
+        s->field = antl_get_u32(r);
+        s->op = antl_get_u8(r);
+        s->a = antl_get_u32(r);
+        s->b = antl_get_u32(r);
         if (kind > IR_SYM_OP || type < IR_I8 ||
             (type > IR_I64 && type != IR_CLONG && type != IR_CWCHAR &&
              type != IR_LOCK) ||
             s->op > IR_RET ||
             ((kind == IR_SYM_SIZE_OF || kind == IR_SYM_OFFSET_OF) &&
              s->of.type == IR_VOID)) {
-            damaged(r);
+            antl_damaged(r);
         }
     }
-    maps->agg_count = get_count(r, 26);
-    maps->aggs = allocate(r, maps->agg_count, sizeof *maps->aggs);
-    maps->agg_map = allocate(r, maps->agg_count, sizeof *maps->agg_map);
-    maps->agg_state = allocate(r, maps->agg_count, sizeof *maps->agg_state);
-    maps->agg_height = allocate(r, maps->agg_count, sizeof *maps->agg_height);
+    maps->agg_count = antl_get_count(r, 26);
+    maps->aggs = antl_allocate(r, maps->agg_count, sizeof *maps->aggs);
+    maps->agg_map = antl_allocate(r, maps->agg_count, sizeof *maps->agg_map);
+    maps->agg_state =
+        antl_allocate(r, maps->agg_count, sizeof *maps->agg_state);
+    maps->agg_height =
+        antl_allocate(r, maps->agg_count, sizeof *maps->agg_height);
     for (i = 0; i < maps->agg_count && !r->failed; i++) {
         struct ir_aggtype *t = &maps->aggs[i];
-        uint8_t kind = get_u8(r);
+        uint8_t kind = antl_get_u8(r);
         uint8_t flags;
         t->kind = (enum ir_agg_kind)kind;
         t->name = get_cstr(r);
-        flags = get_u8(r);
+        flags = antl_get_u8(r);
         t->packed = (flags & 1) != 0;
         t->simd = (flags & 2) != 0;
-        t->align = get_u64(r);
+        t->align = antl_get_u64(r);
         if (flags > 3 || (t->align & (t->align - 1)) != 0) {
-            damaged(r);
+            antl_damaged(r);
         }
-        t->length = get_u32(r);
+        t->length = antl_get_u32(r);
         t->length_text = get_cstr(r);
-        t->field_count = get_count(r, 10);
-        t->fields = allocate(r, t->field_count, sizeof *t->fields);
+        t->field_count = antl_get_count(r, 10);
+        t->fields = antl_allocate(r, t->field_count, sizeof *t->fields);
         for (j = 0; j < t->field_count && !r->failed; j++) {
             uint8_t ext;
             t->fields[j].name = get_cstr(r);
             t->fields[j].type = read_vtype(r, false);
-            t->fields[j].bits = get_u8(r);
-            ext = get_u8(r);
+            t->fields[j].bits = antl_get_u8(r);
+            ext = antl_get_u8(r);
             t->fields[j].ext = (enum ir_ext)ext;
             if (ext > IR_EXT_ZERO || t->fields[j].type.type == IR_VOID ||
                 (t->fields[j].bits != 0 && !ir_bitfield_fits(&t->fields[j])) ||
                 (t->simd && !ir_lane(&t->fields[j]))) {
-                damaged(r);
+                antl_damaged(r);
             }
         }
         if (kind > IR_AGG_ARRAY || t->name[0] == '\0' ||
             t->field_count == 0 ||
             (kind == IR_AGG_ARRAY && t->field_count != 1)) {
-            damaged(r);
+            antl_damaged(r);
         }
     }
     /* DESIGN: the file keeps the aggregates and the symbolic values each
@@ -2907,10 +2759,10 @@ static void read_tables(struct reader *r, struct ir_module *program,
 static uint32_t read_agg_ref(struct reader *r, struct ir_module *program,
                              struct ir_maps *maps, uint8_t type)
 {
-    uint32_t agg = get_u32(r);
+    uint32_t agg = antl_get_u32(r);
 
     if (r->failed || (type == IR_AGG) != (agg != IR_NO_AGG)) {
-        damaged(r);
+        antl_damaged(r);
         return IR_NO_AGG;
     }
     return type == IR_AGG ? map_agg(r, program, maps, agg) : IR_NO_AGG;
@@ -2929,14 +2781,14 @@ static struct ir_const *read_const(struct reader *r, struct ir_module *program,
     uint64_t i;
 
     if (depth > 32) {
-        damaged(r);
+        antl_damaged(r);
         return NULL;
     }
-    kind = get_u8(r);
-    scalar = get_u8(r);
-    payload = get_u64(r);
+    kind = antl_get_u8(r);
+    scalar = antl_get_u8(r);
+    payload = antl_get_u64(r);
     if (r->failed || kind > IR_CONST_AGG || !valid_type(scalar)) {
-        damaged(r);
+        antl_damaged(r);
         return NULL;
     }
     c = arena_alloc(r->arena, sizeof *c);
@@ -2951,7 +2803,7 @@ static struct ir_const *read_const(struct reader *r, struct ir_module *program,
         break;
     case IR_CONST_SYM:
         if (payload >= maps->sym_count) {
-            damaged(r);
+            antl_damaged(r);
             return NULL;
         }
         c->sym = map_sym(r, program, maps, (uint32_t)payload);
@@ -2963,14 +2815,14 @@ static struct ir_const *read_const(struct reader *r, struct ir_module *program,
     case IR_CONST_AGG:
         c->type = read_vtype(r, false);
         if (r->failed || c->type.type != IR_AGG) {
-            damaged(r);
+            antl_damaged(r);
             return NULL;
         }
         c->type.agg = map_agg(r, program, maps, c->type.agg);
         /* An item costs at least its kind, its type and its payload, so
            a count past that many bytes cannot be honest. */
         if (payload > (uint64_t)(r->size - r->pos) / 10) {
-            damaged(r);
+            antl_damaged(r);
             return NULL;
         }
         c->item_count = (size_t)payload;
@@ -3001,13 +2853,13 @@ static void remap_const(struct reader *r, struct ir_const *c,
 
     if (c->kind == IR_CONST_ADDR && !functions) {
         if (c->global >= maps->global_count) {
-            damaged(r);
+            antl_damaged(r);
             return;
         }
         c->global = maps->globals[c->global];
     } else if (c->kind == IR_CONST_FUNC && functions) {
         if (c->global >= maps->function_count) {
-            damaged(r);
+            antl_damaged(r);
             return;
         }
         c->global = maps->functions[c->global];
@@ -3036,15 +2888,15 @@ static struct ir_operand read_operand(struct reader *r,
                                       const struct ir_maps *maps)
 {
     struct ir_operand o = {IR_NONE, IR_VOID, {0}};
-    uint8_t kind = get_u8(r);
-    uint8_t type = get_u8(r);
-    uint64_t payload = get_u64(r);
+    uint8_t kind = antl_get_u8(r);
+    uint8_t type = antl_get_u8(r);
+    uint64_t payload = antl_get_u64(r);
 
     if (r->failed) {
         return o;
     }
     if (kind > IR_SYM || !valid_type(type)) {
-        damaged(r);
+        antl_damaged(r);
         return o;
     }
     o.kind = (enum ir_operand_kind)kind;
@@ -3052,7 +2904,7 @@ static struct ir_operand read_operand(struct reader *r,
     switch (o.kind) {
     case IR_TEMP:
         if (payload >= f->temp_count || f->temps[payload] != o.type) {
-            damaged(r);
+            antl_damaged(r);
         } else {
             o.as.temp = (uint32_t)payload;
         }
@@ -3065,21 +2917,21 @@ static struct ir_operand read_operand(struct reader *r,
         break;
     case IR_GLOBAL:
         if (payload >= maps->global_count) {
-            damaged(r);
+            antl_damaged(r);
         } else {
             o.as.index = maps->globals[payload];
         }
         break;
     case IR_FUNC:
         if (payload >= maps->function_count) {
-            damaged(r);
+            antl_damaged(r);
         } else {
             o.as.index = maps->functions[payload];
         }
         break;
     case IR_BLOCK:
         if (payload >= f->block_count) {
-            damaged(r);
+            antl_damaged(r);
         } else {
             o.as.index = (uint32_t)payload;
         }
@@ -3087,7 +2939,7 @@ static struct ir_operand read_operand(struct reader *r,
     case IR_SYM:
         if (payload >= maps->sym_count ||
             maps->syms[payload].type != o.type) {
-            damaged(r);
+            antl_damaged(r);
         } else {
             o.as.index = maps->sym_map[payload];
         }
@@ -3101,31 +2953,31 @@ static struct ir_operand read_operand(struct reader *r,
 static void read_body(struct reader *r, struct ir_module *program,
                       struct ir_function *f, struct ir_maps *maps)
 {
-    uint32_t temps = get_count(r, 1);
+    uint32_t temps = antl_get_count(r, 1);
     uint32_t blocks;
     uint32_t i;
     uint32_t j;
     uint32_t k;
 
     for (i = 0; i < temps && !r->failed; i++) {
-        uint8_t type = get_u8(r);
+        uint8_t type = antl_get_u8(r);
         if (i < f->param_count) {
             if (type != f->temps[i]) {
-                damaged(r);
+                antl_damaged(r);
             }
         } else if (!valid_type(type) || type == IR_VOID || type == IR_AGG) {
-            damaged(r);
+            antl_damaged(r);
         } else {
             ir_temp(f, (enum ir_type)type);
         }
     }
     if (temps < f->param_count) {
-        damaged(r);
+        antl_damaged(r);
     }
-    blocks = get_count(r, 4);
+    blocks = antl_get_count(r, 4);
     /* A body starts at block 0, so it has one. */
     if (blocks == 0) {
-        damaged(r);
+        antl_damaged(r);
     }
     for (i = 0; i < blocks && !r->failed; i++) {
         ir_block_add(f);
@@ -3133,36 +2985,36 @@ static void read_body(struct reader *r, struct ir_module *program,
     for (i = 0; i < blocks && !r->failed; i++) {
         uint32_t count;
         uint8_t fail_kind;
-        fail_kind = get_u8(r);
+        fail_kind = antl_get_u8(r);
         if (fail_kind > IR_FAIL_CHECK) {
-            damaged(r);
+            antl_damaged(r);
         }
         f->blocks[i]->fail = (enum ir_fail)fail_kind;
-        count = get_count(r, 50);
+        count = antl_get_count(r, 50);
         for (j = 0; j < count && !r->failed; j++) {
             struct ir_inst inst;
             struct ir_operand *args;
-            uint8_t op = get_u8(r);
-            uint8_t type = get_u8(r);
+            uint8_t op = antl_get_u8(r);
+            uint8_t type = antl_get_u8(r);
             memset(&inst, 0, sizeof inst);
-            inst.line = get_u32(r);
-            inst.result = get_u32(r);
+            inst.line = antl_get_u32(r);
+            inst.result = antl_get_u32(r);
             inst.op = (enum ir_op)op;
             inst.type = (enum ir_type)type;
             if (op > IR_RET || !valid_type(type) ||
                 (inst.result != IR_NO_RESULT && inst.result >= f->temp_count)) {
-                damaged(r);
+                antl_damaged(r);
                 break;
             }
             inst.a = read_operand(r, f, maps);
             inst.b = read_operand(r, f, maps);
             inst.c = read_operand(r, f, maps);
             if (!targets_blocks(&inst)) {
-                damaged(r);
+                antl_damaged(r);
                 break;
             }
             inst.of = read_vtype(r, false);
-            inst.field = get_u32(r);
+            inst.field = antl_get_u32(r);
             if (!r->failed && inst.of.type == IR_AGG) {
                 inst.of.agg = map_agg(r, program, maps, inst.of.agg);
             }
@@ -3175,10 +3027,10 @@ static void read_body(struct reader *r, struct ir_module *program,
                   (inst.of.type != IR_AGG ||
                    inst.field >= program->aggs[inst.of.agg]->field_count ||
                    program->aggs[inst.of.agg]->fields[inst.field].bits == 0)))) {
-                damaged(r);
+                antl_damaged(r);
             }
-            inst.arg_count = get_count(r, 10);
-            args = allocate(r, inst.arg_count, sizeof *args);
+            inst.arg_count = antl_get_count(r, 10);
+            args = antl_allocate(r, inst.arg_count, sizeof *args);
             for (k = 0; k < inst.arg_count && !r->failed; k++) {
                 args[k] = read_operand(r, f, maps);
             }
@@ -3203,14 +3055,14 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
                                struct ir_maps *maps, bool *has_body,
                                bool *skip)
 {
-    uint8_t flags = get_u8(r);
+    uint8_t flags = antl_get_u8(r);
     const char *module = get_cstr(r);
     const char *name = get_cstr(r);
-    uint8_t result = get_u8(r);
+    uint8_t result = antl_get_u8(r);
     uint32_t result_agg = read_agg_ref(r, program, maps, result);
-    uint32_t file = get_u32(r);
-    uint32_t decl_line = get_u32(r);
-    uint32_t param_count = get_count(r, 6);
+    uint32_t file = antl_get_u32(r);
+    uint32_t decl_line = antl_get_u32(r);
+    uint32_t param_count = antl_get_count(r, 6);
     struct ir_function *f = NULL;
     size_t i;
 
@@ -3223,7 +3075,7 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
         ((flags & 1) == 0 && module[0] == '\0') ||
         (module[0] != '\0' && (flags & 2) != 0) ||
         (module[0] == '\0' && (flags & 4) != 0)) {
-        damaged(r);
+        antl_damaged(r);
         return 0;
     }
     if (module[0] == '\0') {
@@ -3251,11 +3103,12 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
             *skip = true;
         }
     } else if (f != NULL && (flags & 1) == 0) {
-        fail(r, "defines `%s.%s`, which another library defines", module, name);
+        antl_fail(r, "defines `%s.%s`, which another library defines",
+                  module, name);
         return 0;
     }
     if (file != IR_NO_INDEX && file >= maps->file_count) {
-        damaged(r);
+        antl_damaged(r);
         return 0;
     }
     if (f == NULL) {
@@ -3280,13 +3133,13 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
         f->file = file == IR_NO_INDEX ? IR_NO_INDEX : maps->files[file];
         f->decl_line = decl_line;
         for (i = 0; i < param_count && !r->failed; i++) {
-            uint8_t type = get_u8(r);
-            uint8_t ext = get_u8(r);
+            uint8_t type = antl_get_u8(r);
+            uint8_t ext = antl_get_u8(r);
             uint32_t agg = read_agg_ref(r, program, maps, type);
             bool narrow = type == IR_I8 || type == IR_I16;
             if (!valid_type(type) || type == IR_VOID || ext > IR_EXT_ZERO ||
                 (ext != IR_EXT_NONE) != narrow) {
-                damaged(r);
+                antl_damaged(r);
             } else {
                 ir_param_add(f, (enum ir_type)type, agg);
                 f->params[f->param_count - 1].ext = (enum ir_ext)ext;
@@ -3294,8 +3147,8 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
         }
     } else {
         for (i = 0; i < param_count && !r->failed; i++) {
-            uint8_t type = get_u8(r);
-            get_u8(r);
+            uint8_t type = antl_get_u8(r);
+            antl_get_u8(r);
             read_agg_ref(r, program, maps, type);
         }
     }
@@ -3311,7 +3164,7 @@ static uint32_t map_global(struct reader *r, const struct ir_maps *maps,
         return g;
     }
     if (g >= maps->global_count) {
-        damaged(r);
+        antl_damaged(r);
         return 0;
     }
     return maps->globals[g];
@@ -3336,19 +3189,19 @@ static bool has_class(const struct ir_module *program, const struct ir_class *c)
 static void read_classes(struct reader *r, struct ir_module *program,
                          struct ir_maps *maps)
 {
-    uint32_t count = get_count(r, 37);
+    uint32_t count = antl_get_count(r, 37);
     uint32_t i;
     uint32_t j;
 
     for (i = 0; i < count && !r->failed; i++) {
         const char *module = get_cstr(r);
         const char *name = get_cstr(r);
-        uint8_t flags = get_u8(r);
-        uint32_t descriptor = get_u32(r);
-        uint32_t base = get_u32(r);
-        uint32_t table = get_u32(r);
-        uint32_t init = get_u32(r);
-        uint32_t agg = get_u32(r);
+        uint8_t flags = antl_get_u8(r);
+        uint32_t descriptor = antl_get_u32(r);
+        uint32_t base = antl_get_u32(r);
+        uint32_t table = antl_get_u32(r);
+        uint32_t init = antl_get_u32(r);
+        uint32_t agg = antl_get_u32(r);
         uint32_t subtables;
         uint32_t mutables;
         uint32_t injects;
@@ -3360,7 +3213,7 @@ static void read_classes(struct reader *r, struct ir_module *program,
                      IR_CLASS_ARGS | IR_CLASS_REQUIRED) ||
             module[0] == '\0' ||
             (init != IR_NO_INDEX && init >= maps->function_count)) {
-            damaged(r);
+            antl_damaged(r);
             return;
         }
         c = ir_class_add(program, module, name);
@@ -3370,17 +3223,17 @@ static void read_classes(struct reader *r, struct ir_module *program,
         c->table = map_global(r, maps, table, true);
         c->init = init == IR_NO_INDEX ? init : maps->functions[init];
         c->agg = map_agg(r, program, maps, agg);
-        subtables = get_count(r, 16);
+        subtables = antl_get_count(r, 16);
         for (j = 0; j < subtables && !r->failed; j++) {
-            uint32_t interface = get_u32(r);
-            uint32_t at = get_u32(r);
-            uint32_t sub_agg = get_u32(r);
-            uint32_t sub_field = get_u32(r);
+            uint32_t interface = antl_get_u32(r);
+            uint32_t at = antl_get_u32(r);
+            uint32_t sub_agg = antl_get_u32(r);
+            uint32_t sub_field = antl_get_u32(r);
             uint32_t mapped = map_agg(r, program, maps, sub_agg);
             uint32_t mapped_interface;
             uint32_t mapped_at;
             if (r->failed || sub_field >= program->aggs[mapped]->field_count) {
-                damaged(r);
+                antl_damaged(r);
                 return;
             }
             /* Each call may mark the file damaged, so each has a line
@@ -3390,33 +3243,33 @@ static void read_classes(struct reader *r, struct ir_module *program,
             ir_class_subtable(c, mapped_interface, mapped_at, mapped,
                               sub_field);
         }
-        mutables = get_count(r, 4);
+        mutables = antl_get_count(r, 4);
         for (j = 0; j < mutables && !r->failed; j++) {
-            uint32_t field = get_u32(r);
+            uint32_t field = antl_get_u32(r);
             if (r->failed || field >= program->aggs[c->agg]->field_count) {
-                damaged(r);
+                antl_damaged(r);
             }
             ir_class_mutable(c, field);
         }
-        injects = get_count(r, 13);
+        injects = antl_get_count(r, 13);
         for (j = 0; j < injects && !r->failed; j++) {
             const char *path = get_cstr(r);
             const char *named = get_cstr(r);
-            uint32_t of = get_u32(r);
-            uint8_t last = get_u8(r);
+            uint32_t of = antl_get_u32(r);
+            uint8_t last = antl_get_u8(r);
             if (r->failed || path[0] == '\0' || last > 1) {
-                damaged(r);
+                antl_damaged(r);
                 return;
             }
             ir_class_inject(program, c, path, named,
                             map_global(r, maps, of, false), last != 0);
         }
-        provides = get_count(r, 8);
+        provides = antl_get_count(r, 8);
         for (j = 0; j < provides && !r->failed; j++) {
             const char *path = get_cstr(r);
-            uint32_t of = get_u32(r);
+            uint32_t of = antl_get_u32(r);
             if (r->failed || path[0] == '\0') {
-                damaged(r);
+                antl_damaged(r);
                 return;
             }
             ir_class_provides(program, c, path, map_global(r, maps, of,
@@ -3507,42 +3360,43 @@ static void read_ir(struct reader *r, struct ir_module *program)
 
     memset(&maps, 0, sizeof maps);
     read_tables(r, program, &maps);
-    maps.global_count = get_count(r, 28);
-    maps.globals = allocate(r, maps.global_count, sizeof *maps.globals);
-    relocs = allocate(r, maps.global_count, sizeof *relocs);
-    twins = allocate(r, maps.global_count, sizeof *twins);
+    maps.global_count = antl_get_count(r, 28);
+    maps.globals = antl_allocate(r, maps.global_count, sizeof *maps.globals);
+    relocs = antl_allocate(r, maps.global_count, sizeof *relocs);
+    twins = antl_allocate(r, maps.global_count, sizeof *twins);
     for (i = 0; i < maps.global_count && !r->failed; i++) {
         const char *module = get_cstr(r);
         const char *name = get_cstr(r);
-        uint64_t size = get_u64(r);
-        uint64_t align = get_u64(r);
+        uint64_t size = antl_get_u64(r);
+        uint64_t align = antl_get_u64(r);
         struct ir_global *g;
         /* A global of the runtime has no module, and an empty name is
            how the file spells that. */
         if (module != NULL && module[0] == '\0') {
             module = NULL;
         }
-        if (!take(r, size)) {
+        if (!antl_take(r, size)) {
             break;
         }
         g = ir_global_add(program, module, name, r->data + r->pos, size, align);
         r->pos += size;
         maps.globals[i] = g->index;
-        relocs[i].count = get_count(r, 13);
-        relocs[i].offsets = allocate(r, relocs[i].count, sizeof(uint64_t));
-        relocs[i].targets = allocate(r, relocs[i].count, sizeof(uint32_t));
-        relocs[i].functions = allocate(r, relocs[i].count, sizeof(uint8_t));
+        relocs[i].count = antl_get_count(r, 13);
+        relocs[i].offsets = antl_allocate(r, relocs[i].count, sizeof(uint64_t));
+        relocs[i].targets = antl_allocate(r, relocs[i].count, sizeof(uint32_t));
+        relocs[i].functions =
+            antl_allocate(r, relocs[i].count, sizeof(uint8_t));
         for (j = 0; j < relocs[i].count && !r->failed; j++) {
-            relocs[i].offsets[j] = get_u64(r);
-            relocs[i].targets[j] = get_u32(r);
-            relocs[i].functions[j] = get_u8(r) != 0 ? 1 : 0;
+            relocs[i].offsets[j] = antl_get_u64(r);
+            relocs[i].targets[j] = antl_get_u32(r);
+            relocs[i].functions[j] = antl_get_u8(r) != 0 ? 1 : 0;
             if (relocs[i].offsets[j] > size ||
                 size - relocs[i].offsets[j] < 8) {
-                damaged(r);
+                antl_damaged(r);
             }
         }
         {
-            uint8_t marks = get_u8(r);
+            uint8_t marks = antl_get_u8(r);
             g->exported = (marks & 2) != 0;
             g->is_extern = (marks & 4) != 0;
             g->mutable = (marks & 8) != 0;
@@ -3574,17 +3428,18 @@ static void read_ir(struct reader *r, struct ir_module *program)
                 continue;
             }
             if (relocs[i].targets[j] >= maps.global_count) {
-                damaged(r);
+                antl_damaged(r);
                 break;
             }
             ir_global_reloc(program, g, relocs[i].offsets[j],
                             maps.globals[relocs[i].targets[j]]);
         }
     }
-    maps.function_count = get_count(r, 15);
-    maps.functions = allocate(r, maps.function_count, sizeof *maps.functions);
-    bodies = allocate(r, maps.function_count, sizeof *bodies);
-    skips = allocate(r, maps.function_count, sizeof *skips);
+    maps.function_count = antl_get_count(r, 15);
+    maps.functions =
+        antl_allocate(r, maps.function_count, sizeof *maps.functions);
+    bodies = antl_allocate(r, maps.function_count, sizeof *bodies);
+    skips = antl_allocate(r, maps.function_count, sizeof *skips);
     for (i = 0; i < maps.function_count && !r->failed; i++) {
         bool has_body;
         maps.functions[i] = read_signature(r, program, &maps, &has_body,
@@ -3614,7 +3469,7 @@ static void read_ir(struct reader *r, struct ir_module *program)
                 continue;
             }
             if (relocs[i].targets[j] >= maps.function_count) {
-                damaged(r);
+                antl_damaged(r);
                 break;
             }
             ir_global_reloc_fn(program, g, relocs[i].offsets[j],
@@ -3624,121 +3479,6 @@ static void read_ir(struct reader *r, struct ir_module *program)
     if (!r->failed) {
         read_classes(r, program, &maps);
     }
-}
-
-/* The helpers antl_tree.c shares, see antl_io.h. */
-
-void antl_put_u8(struct writer *w, uint8_t v) { put_u8(w, v); }
-void antl_put_u32(struct writer *w, uint32_t v) { put_u32(w, v); }
-void antl_put_u64(struct writer *w, uint64_t v) { put_u64(w, v); }
-void antl_put_count(struct writer *w, size_t n) { put_count(w, n); }
-
-void antl_put_bytes(struct writer *w, const char *s, size_t length)
-{
-    put_bytes(w, s, length);
-}
-
-void antl_put_type_ref(struct writer *w, const struct type *t)
-{
-    put_type_ref(w, t);
-}
-
-void antl_visit_type(struct writer *w, const struct type *t)
-{
-    visit_type(w, t);
-}
-
-void antl_visit_value(struct writer *w, const struct const_value *v)
-{
-    visit_value(w, v);
-}
-
-void antl_visit_defaults(struct writer *w, const struct symbol *sym)
-{
-    visit_defaults(w, sym);
-}
-
-void antl_visit_symbolic(struct writer *w, const struct symbolic *s)
-{
-    visit_symbolic(w, s);
-}
-
-void antl_put_symbolic(struct writer *w, const struct symbolic *s)
-{
-    put_symbolic(w, s);
-}
-
-const struct symbolic *antl_read_symbolic(struct reader *r)
-{
-    return read_symbolic(r, r->table_count, 0);
-}
-
-void antl_put_value(struct writer *w, const struct const_value *v)
-{
-    put_value(w, v);
-}
-
-void antl_put_param_defaults(struct writer *w, const struct symbol *sym)
-{
-    put_param_defaults(w, sym);
-}
-
-void antl_put_param_owned(struct writer *w, const struct symbol *sym)
-{
-    put_param_owned(w, sym);
-}
-
-uint64_t antl_float_bits(double d) { return float_bits(d); }
-
-void antl_damaged(struct reader *r) { damaged(r); }
-
-void antl_fail_needs(struct reader *r, const char *what, const char *module,
-                     const struct name *name)
-{
-    fail(r, "needs %s `%s.%.*s`", what, module, (int)name->length,
-         name->text);
-}
-
-uint8_t antl_get_u8(struct reader *r) { return get_u8(r); }
-uint32_t antl_get_u32(struct reader *r) { return get_u32(r); }
-uint64_t antl_get_u64(struct reader *r) { return get_u64(r); }
-
-uint32_t antl_get_count(struct reader *r, size_t min)
-{
-    return get_count(r, min);
-}
-
-void *antl_allocate(struct reader *r, size_t count, size_t size)
-{
-    return allocate(r, count, size);
-}
-
-struct name antl_get_name(struct reader *r) { return get_name(r); }
-
-struct type *antl_type_ref(struct reader *r, uint32_t limit)
-{
-    return type_ref(r, limit);
-}
-
-bool antl_read_value(struct reader *r, struct type *t, struct const_value *v)
-{
-    return read_value(r, t, v, 0);
-}
-
-void antl_read_param_defaults(struct reader *r, struct symbol *sym)
-{
-    read_param_defaults(r, sym);
-}
-
-void antl_read_param_owned(struct reader *r, struct symbol *sym)
-{
-    read_param_owned(r, sym);
-}
-
-const struct interface *antl_library(const struct reader *r,
-                                     const struct name *module)
-{
-    return library(r, module);
 }
 
 struct interface *antl_read(const uint8_t *data, size_t size,
@@ -3765,8 +3505,8 @@ struct interface *antl_read(const uint8_t *data, size_t size,
         struct name imported;
         imported.text = r.iface->imports[i];
         imported.length = strlen(imported.text);
-        if (library(&r, &imported) == NULL) {
-            fail(&r, "needs module `%s`", imported.text);
+        if (antl_library(&r, &imported) == NULL) {
+            antl_fail(&r, "needs module `%s`", imported.text);
         }
     }
     if (!r.failed) {
@@ -3782,7 +3522,7 @@ struct interface *antl_read(const uint8_t *data, size_t size,
         read_ir(&r, program);
     }
     if (!r.failed && r.pos != r.size) {
-        damaged(&r);
+        antl_damaged(&r);
     }
     return r.failed ? NULL : r.iface;
 }

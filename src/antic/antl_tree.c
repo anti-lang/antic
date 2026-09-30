@@ -405,7 +405,7 @@ static void io_symbolic(struct io *io, const struct symbolic **s)
         antl_put_symbolic(io->w, *s);
         break;
     case IO_READ:
-        *s = antl_read_symbolic(io->r);
+        *s = antl_read_symbolic(io->r, io->r->table_count, 0);
         break;
     }
 }
@@ -437,7 +437,7 @@ static void io_value(struct io *io, struct const_value **v)
             return;
         }
         *v = antl_allocate(io->r, 1, sizeof **v);
-        if (!antl_read_value(io->r, type, *v)) {
+        if (!antl_read_value(io->r, type, *v, 0)) {
             bad(io);
         }
         break;
@@ -1515,9 +1515,8 @@ static struct symbol *read_extern(struct reader *r)
     lib = name_is(&home, r->iface->module) ? r->iface
                                            : antl_library(r, &home);
     if (lib == NULL && !r->failed) {
-        char module[256];
-        snprintf(module, sizeof module, "%.*s", (int)home.length, home.text);
-        antl_fail_needs(r, "module of", module, &sym->name);
+        antl_fail(r, "needs module of `%.*s.%.*s`", (int)home.length,
+                  home.text, (int)sym->name.length, sym->name.text);
         return NULL;
     }
     sym->home = lib;
@@ -1549,7 +1548,7 @@ static struct symbol *read_extern(struct reader *r)
     }
     if (antl_get_u8(r) != 0) {
         sym->value = antl_allocate(r, 1, sizeof *sym->value);
-        if (!antl_read_value(r, sym->type, sym->value)) {
+        if (!antl_read_value(r, sym->type, sym->value, 0)) {
             antl_damaged(r);
         }
     }
@@ -1569,7 +1568,8 @@ static struct symbol *read_extern(struct reader *r)
     if (lookup == LOOK_GENERIC) {
         struct item *g = generic_named(lib, &sym->name, true);
         if (g == NULL) {
-            antl_fail_needs(r, "generic", lib->module, &sym->name);
+            antl_fail(r, "needs generic `%s.%.*s`", lib->module,
+                      (int)sym->name.length, sym->name.text);
             return NULL;
         }
         return g->symbol;

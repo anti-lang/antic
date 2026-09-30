@@ -56,36 +56,81 @@ struct reader {
    generics. The type table itself never names one. */
 #define ANTL_NO_TYPE UINT32_MAX
 
+/* antl_io.c: the primitives of the format. */
+
+/* Write v in one byte, in four and in eight, little-endian. */
 void antl_put_u8(struct writer *w, uint8_t v);
 void antl_put_u32(struct writer *w, uint32_t v);
 void antl_put_u64(struct writer *w, uint64_t v);
+/* Write a count or an index, which the file holds in 32 bits. A larger
+   one marks the writer failed, and the file is refused. */
 void antl_put_count(struct writer *w, size_t n);
+/* Write length bytes of s after their count. */
 void antl_put_bytes(struct writer *w, const char *s, size_t length);
-void antl_put_type_ref(struct writer *w, const struct type *t);
-void antl_visit_type(struct writer *w, const struct type *t);
-void antl_visit_value(struct writer *w, const struct const_value *v);
-void antl_visit_defaults(struct writer *w, const struct symbol *sym);
-void antl_put_value(struct writer *w, const struct const_value *v);
-void antl_visit_symbolic(struct writer *w, const struct symbolic *s);
-void antl_put_symbolic(struct writer *w, const struct symbolic *s);
-void antl_put_param_defaults(struct writer *w, const struct symbol *sym);
-void antl_put_param_owned(struct writer *w, const struct symbol *sym);
-uint64_t antl_float_bits(double d);
 
+/* Refuse the file with the message format gives, unless it is refused
+   already. The first message stands. */
+void antl_fail(struct reader *r, const char *format, ...)
+#if defined(__GNUC__) || defined(__clang__)
+    __attribute__((format(printf, 2, 3)))
+#endif
+    ;
+/* Refuse the file as damaged at the byte the reader stands at. */
 void antl_damaged(struct reader *r);
-void antl_fail_needs(struct reader *r, const char *what, const char *module,
-                     const struct name *name);
+/* Whether n more bytes remain. The file is damaged when they do not. */
+bool antl_take(struct reader *r, size_t n);
+/* Read one byte, four and eight, little-endian. Past the end of the
+   file each gives 0 and refuses the file. */
 uint8_t antl_get_u8(struct reader *r);
 uint32_t antl_get_u32(struct reader *r);
 uint64_t antl_get_u64(struct reader *r);
+/* Read a count of records that each take at least min bytes, and refuse
+   one the rest of the file cannot hold. This keeps a damaged count from
+   causing a huge allocation. */
 uint32_t antl_get_count(struct reader *r, size_t min);
+/* count zeroed elements of size bytes from the memory pool of the
+   reader, and one more, so a count of 0 gives memory as well. The pool
+   frees it with everything else it holds. */
 void *antl_allocate(struct reader *r, size_t count, size_t size);
+/* Read a string as a name. Its text is memory of the pool of the
+   reader, and the pool frees it. */
 struct name antl_get_name(struct reader *r);
+
+/* antl.c: the types, the values and the libraries, which the section
+   of the generics names as the tables do. */
+
+/* Give t and every type inside it an index in the type table. */
+void antl_visit_type(struct writer *w, const struct type *t);
+/* Give the types that v, the default values of the parameters of sym
+   and the symbolic value s name their indices. */
+void antl_visit_value(struct writer *w, const struct const_value *v);
+void antl_visit_defaults(struct writer *w, const struct symbol *sym);
+void antl_visit_symbolic(struct writer *w, const struct symbolic *s);
+/* Write the index of t, which antl_visit_type gave it. */
+void antl_put_type_ref(struct writer *w, const struct type *t);
+/* Write a constant, a symbolic value, and the default values and the
+   `own` marks of the parameters of sym. */
+void antl_put_value(struct writer *w, const struct const_value *v);
+void antl_put_symbolic(struct writer *w, const struct symbolic *s);
+void antl_put_param_defaults(struct writer *w, const struct symbol *sym);
+void antl_put_param_owned(struct writer *w, const struct symbol *sym);
+
+/* The type of the index the file holds next, which lies below limit. */
 struct type *antl_type_ref(struct reader *r, uint32_t limit);
-bool antl_read_value(struct reader *r, struct type *t, struct const_value *v);
-const struct symbolic *antl_read_symbolic(struct reader *r);
+/* Read a constant of type t into v. depth counts the values around it,
+   0 for one that stands alone. Its parts are memory of the pool. */
+bool antl_read_value(struct reader *r, struct type *t, struct const_value *v,
+                     int depth);
+/* Read a symbolic value whose types lie below limit, at depth as for
+   antl_read_value. It is memory of the pool. */
+const struct symbolic *antl_read_symbolic(struct reader *r, uint32_t limit,
+                                          int depth);
+/* Read the default values and the `own` marks of the parameters of sym,
+   into memory of the pool. */
 void antl_read_param_defaults(struct reader *r, struct symbol *sym);
 void antl_read_param_owned(struct reader *r, struct symbol *sym);
+/* The interface of module among the libraries the reader was given, or
+   NULL. */
 const struct interface *antl_library(const struct reader *r,
                                      const struct name *module);
 

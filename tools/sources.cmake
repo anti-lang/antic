@@ -10,6 +10,7 @@
 # src/rt/ in it are the code that the runtime and the host share.
 set(ANTIC_CORE_SOURCES
     src/antic/antl.c
+    src/antic/antl_io.c
     src/antic/antl_tree.c
     src/antic/antl_verify.c
     src/antic/applesdk.c
