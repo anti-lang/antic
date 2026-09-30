@@ -23,6 +23,8 @@ function(file_url path out)
     endif()
 endfunction()
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 file(COPY "${FIXTURE}/units" "${FIXTURE}/consumer" DESTINATION "${WORK}")
@@ -61,11 +63,8 @@ endif()
 # A dependency of a path names a project, which is built first.
 build("the consumer of a path" "${WORK}/consumer" build)
 set(program "${WORK}/consumer/dist/${HOST}/dev/consumer")
-execute_process(COMMAND "${program}" RESULT_VARIABLE status
-    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 8 OR NOT out MATCHES "^consumer")
-    message(FATAL_ERROR "the consumer ended with ${status} and wrote ${out}${err}")
-endif()
+program_expect("the consumer" COMMAND "${program}" STATUS 8
+               OUT "consumer\n")
 file(READ "${WORK}/consumer/anti.lock" lock)
 if(NOT lock MATCHES "com.example.units")
     message(FATAL_ERROR "the lock file names no dependency:\n${lock}")
@@ -106,12 +105,9 @@ file(WRITE "${WORK}/fetched/consumer/anti.toml"
      "[dependencies]\n"
      "\"com.example.units\" = { version = \"1.2.0\", repo = \"local\" }\n")
 build("the consumer of a repository" "${WORK}/fetched/consumer" build)
-execute_process(COMMAND "${WORK}/fetched/consumer/dist/${HOST}/dev/consumer"
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 8)
-    message(FATAL_ERROR "the fetched consumer ended with ${status}\n${err}")
-endif()
+program_expect("the fetched consumer"
+               COMMAND "${WORK}/fetched/consumer/dist/${HOST}/dev/consumer"
+               STATUS 8 OUT "consumer\n")
 file(READ "${WORK}/fetched/consumer/anti.lock" lock)
 if(NOT lock MATCHES "${digest}" OR NOT lock MATCHES "file://")
     message(FATAL_ERROR "the lock file names no repository and digest:\n${lock}")

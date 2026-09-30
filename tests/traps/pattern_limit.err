@@ -1,0 +1,1 @@
+pattern_limit.anti:13: the pattern `(*LIMIT_MATCH=1000)^(\w+\s?)*$` reached the match limit

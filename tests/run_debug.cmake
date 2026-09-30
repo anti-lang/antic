@@ -11,6 +11,8 @@
 # The programs are written here rather than kept as fixtures, because the
 # test names the line of every breakpoint.
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 set(root "${WORK}/root")
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${root}/com/example" "${WORK}/lib/com/example")
@@ -90,11 +92,7 @@ endif()
 # The program runs the same either way, and returns 0 from 3 + 1 times 2,
 # doubled, less 16.
 foreach(name app plain)
-    execute_process(COMMAND "${WORK}/${name}" RESULT_VARIABLE code
-                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(NOT code EQUAL 0)
-        message(FATAL_ERROR "${name} exited with ${code}\n${out}${err}")
-    endif()
+    program_expect("${name}" COMMAND "${WORK}/${name}")
 endforeach()
 
 # A breakpoint by file and line, then a backtrace. The frame that stops

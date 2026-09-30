@@ -10,6 +10,8 @@
 #   WORK      a directory for the executable
 #   NEEDS     the text the message must name
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 file(GLOB runtime_library "${RUNTIME}/lib/${TARGET}/*/libanti_rt.a")
 if(runtime_library STREQUAL "")
     message("SKIP: the runtime archive has no runtime for ${TARGET}")
@@ -24,12 +26,6 @@ execute_process(
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed for ${TARGET}\n${err}")
 endif()
-execute_process(COMMAND "${exe}"
-    RESULT_VARIABLE ran OUTPUT_VARIABLE out ERROR_VARIABLE said ENCODING NONE)
-if(ran EQUAL 0)
-    message(FATAL_ERROR
-        "${exe} ran on a machine below its level instead of refusing")
-endif()
-if(NOT said MATCHES "this program needs a processor with ${NEEDS}")
-    message(FATAL_ERROR "the refusal of ${exe} reads\n${said}")
-endif()
+# The runtime refuses at start with the status of a startup error.
+program_expect("cpu check ${TARGET}" COMMAND "${exe}" STATUS 70
+               ERR_MATCH "this program needs a processor with ${NEEDS}")

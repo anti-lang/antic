@@ -87,6 +87,8 @@ if(HOST STREQUAL "windows-arm64")
     return()
 endif()
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 set(program "${WORK}/memory_checks_run")
 execute_process(COMMAND "${ANTIC}" --memory-checks --llvm-mc "${LLVM_MC}"
                         --runtime "${RUNTIME}" -o "${program}" "${SOURCE}"
@@ -99,12 +101,9 @@ endif()
 # has one on macOS alone. `anti run` puts the report through Anti's
 # symbolizer on the other hosts, which run_anti_memory_checks.cmake checks.
 function(reports case)
-    execute_process(COMMAND "${program}" ${case} RESULT_VARIABLE code
-                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(NOT code EQUAL 1)
-        message(FATAL_ERROR "${case} exited with ${code} and "
-                            "printed `${err}`")
-    endif()
+    program_expect("memory checks ${case}" COMMAND "${program}" ${case}
+                   STATUS 1 ANY_ERR)
+    set(err "${program_stderr}")
     foreach(pattern IN LISTS ARGN)
         if(NOT HOST MATCHES "^macos" AND pattern MATCHES "memory_checks")
             continue()
@@ -137,9 +136,4 @@ endif()
 
 # The leak check is on: the runtime marks the arguments, the environment,
 # the pattern literal and the blocks of the pool as kept until exit.
-execute_process(COMMAND "${program}" clean RESULT_VARIABLE code
-                OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-if(NOT code EQUAL 0 OR NOT err STREQUAL "")
-    message(FATAL_ERROR "clean exited with ${code} and "
-                        "printed `${err}`")
-endif()
+program_expect("memory checks clean" COMMAND "${program}" clean)

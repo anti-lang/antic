@@ -9,26 +9,13 @@
 # assertion. A dev build, and any build with --asserts, prints the text
 # and aborts. --no-asserts drops them in dev mode too.
 
-function(build name)
-    execute_process(COMMAND "${ANTIC}" ${ARGN} --llvm-mc "${LLVM_MC}"
-                            --runtime "${RUNTIME}" -o "${WORK}/${name}"
-                            "${SOURCE}"
-                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic failed for ${name}\n${err}")
-    endif()
-endfunction()
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 file(MAKE_DIRECTORY "${WORK}")
 
 # Release is the default, so the assertion is gone.
-build(release)
-execute_process(COMMAND "${WORK}/release" RESULT_VARIABLE code
-                OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-if(NOT code EQUAL 7)
-    message(FATAL_ERROR "the release build exited with ${code}, expected 7"
-                        "\n${out}${err}")
-endif()
+antic_program("${WORK}/release" "${SOURCE}")
+program_expect("release" COMMAND "${WORK}/release" STATUS 7)
 file(STRINGS "${WORK}/release" text)
 if(text MATCHES "assertion failed")
     message(FATAL_ERROR "the release build carries the text of an assertion")
@@ -36,15 +23,9 @@ endif()
 
 # --asserts overrides the mode, and the failure names file, line and the
 # source of the condition.
-build(forced --asserts)
-execute_process(COMMAND "${WORK}/forced" RESULT_VARIABLE code
-                ERROR_VARIABLE err ENCODING NONE)
-if(code EQUAL 7)
-    message(FATAL_ERROR "the assertion did not stop the program")
-endif()
-if(NOT err MATCHES "asserts\\.anti:[0-9]+: assertion failed: n > 0")
-    message(FATAL_ERROR "the failure printed `${err}`")
-endif()
+antic_program("${WORK}/forced" "${SOURCE}" --asserts)
+program_expect("forced" COMMAND "${WORK}/forced" ABORTS
+               ERR_MATCH "^asserts\\.anti:[0-9]+: assertion failed: n > 0\n$")
 
 # Dev mode keeps them without a flag, and --no-asserts drops them.
 execute_process(COMMAND "${ANTIC}" --dev -S -o "${WORK}/dev.s" "${SOURCE}"
@@ -77,30 +58,23 @@ endif()
 file(WRITE "${WORK}/consumer.anti"
      "import com.example.checked;\n\nfn main() -> int\n{\n\treturn checked.halve(0);\n}\n")
 foreach(case "quiet;" "trap;--asserts")
-    string(REPLACE ";" " " ignored "${case}")
     list(GET case 0 name)
     list(LENGTH case parts)
     set(flag "")
     if(parts GREATER 1)
         list(GET case 1 flag)
     endif()
-    execute_process(COMMAND "${ANTIC}" ${flag} --llvm-mc "${LLVM_MC}"
-                            --runtime "${RUNTIME}" -I "${WORK}/lib"
-                            -o "${WORK}/${name}" "${WORK}/consumer.anti"
-                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic failed for ${name}\n${err}")
-    endif()
-    execute_process(COMMAND "${WORK}/${name}" RESULT_VARIABLE code
-                    ERROR_VARIABLE ran ENCODING NONE)
-    file(STRINGS "${WORK}/${name}" text)
+    antic_program("${WORK}/${name}" "${WORK}/consumer.anti" ${flag}
+                  -I "${WORK}/lib")
     if(name STREQUAL "quiet")
-        if(NOT code EQUAL 0 OR text MATCHES "assertion failed")
+        program_expect("${name}" COMMAND "${WORK}/${name}")
+        file(STRINGS "${WORK}/${name}" text)
+        if(text MATCHES "assertion failed")
             message(FATAL_ERROR "the library assertion reached a release "
-                                "program, exit ${code}")
+                                "program")
         endif()
-    elseif(NOT ran MATCHES "assertion failed: n > 0")
-        message(FATAL_ERROR "--asserts did not keep the library assertion"
-                            "\n${ran}")
+    else()
+        program_expect("${name}" COMMAND "${WORK}/${name}" ABORTS
+                       ERR_MATCH "^com/example/checked\\.anti:3: assertion failed: n > 0\n$")
     endif()
 endforeach()

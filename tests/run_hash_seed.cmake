@@ -8,27 +8,17 @@
 #   SOURCE    the .anti file, which prints its seed
 #   WORK      a directory for the executable
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 get_filename_component(name "${SOURCE}" NAME_WE)
 file(MAKE_DIRECTORY "${WORK}")
 set(exe "${WORK}/${name}")
-execute_process(
-    COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
-            -o "${exe}" "${SOURCE}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
-    message(FATAL_ERROR "antic failed with ${status}\n${out}${err}")
-endif()
+antic_program("${exe}" "${SOURCE}")
 set(seeds "")
 foreach(run 1 2)
-    execute_process(COMMAND "${exe}"
-        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-        ENCODING NONE)
-    if(NOT status EQUAL 0 OR NOT err STREQUAL "")
-        message(FATAL_ERROR "run ${run} exited with ${status}\n${out}${err}")
-    endif()
-    if(NOT out MATCHES "^seed ([0-9]+)\n")
-        message(FATAL_ERROR "run ${run} printed no seed\n${out}")
+    program_expect("run ${run}" COMMAND "${exe}" ANY_OUT)
+    if(NOT program_stdout MATCHES "^seed ([0-9]+)\n")
+        message(FATAL_ERROR "run ${run} printed no seed\n${program_stdout}")
     endif()
     list(APPEND seeds "${CMAKE_MATCH_1}")
 endforeach()

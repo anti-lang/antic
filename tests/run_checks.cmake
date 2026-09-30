@@ -12,15 +12,7 @@
 # values, then aborts. Release mode drops them and dev mode keeps them,
 # and --checks and --no-checks override either mode.
 
-function(build name source)
-    execute_process(COMMAND "${ANTIC}" ${ARGN} --llvm-mc "${LLVM_MC}"
-                            --runtime "${RUNTIME}" -o "${WORK}/${name}"
-                            "${source}"
-                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic failed for ${name}\n${err}")
-    endif()
-endfunction()
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 # One check: the release build carries no text of it and runs to its end,
 # and the dev build prints the failure and aborts. A program whose
@@ -28,28 +20,18 @@ endfunction()
 # and not run. Further arguments are objects that the dev build links.
 function(check name phrase pattern runs)
     set(source "${SOURCES}/${name}.anti")
-    build("${name}.release" "${source}")
+    antic_program("${WORK}/${name}.release" "${source}")
     file(STRINGS "${WORK}/${name}.release" text)
     if(text MATCHES "${phrase}")
         message(FATAL_ERROR "the release build of ${name} carries `${phrase}`")
     endif()
     if(runs)
-        execute_process(COMMAND "${WORK}/${name}.release" RESULT_VARIABLE code
-                        OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-        if(NOT code EQUAL 7)
-            message(FATAL_ERROR "the release build of ${name} exited with "
-                                "${code}, expected 7\n${out}${err}")
-        endif()
+        program_expect("${name} release" COMMAND "${WORK}/${name}.release"
+                       STATUS 7)
     endif()
-    build("${name}.dev" "${source}" --dev ${ARGN})
-    execute_process(COMMAND "${WORK}/${name}.dev" RESULT_VARIABLE code
-                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(code EQUAL 7)
-        message(FATAL_ERROR "the check of ${name} did not stop the program")
-    endif()
-    if(NOT err MATCHES "${pattern}")
-        message(FATAL_ERROR "${name} printed `${err}`, expected `${pattern}`")
-    endif()
+    antic_program("${WORK}/${name}.dev" "${source}" --dev ${ARGN})
+    program_expect("${name} dev" COMMAND "${WORK}/${name}.dev" ABORTS
+                   ERR_MATCH "${pattern}")
 endfunction()
 
 file(MAKE_DIRECTORY "${WORK}")
@@ -193,12 +175,9 @@ check(set_changed "was changed while"
 # --checks puts them into a release build, and --no-checks takes them out
 # of a dev build. Both override the mode.
 set(bounds "${SOURCES}/bounds_array.anti")
-build(forced "${bounds}" --checks)
-execute_process(COMMAND "${WORK}/forced" RESULT_VARIABLE code
-                ERROR_VARIABLE err ENCODING NONE)
-if(code EQUAL 7 OR NOT err MATCHES "index out of bounds: index 5, length 4")
-    message(FATAL_ERROR "--checks did not reach a release build\n${err}")
-endif()
+antic_program("${WORK}/forced" "${bounds}" --checks)
+program_expect("forced" COMMAND "${WORK}/forced" ABORTS
+               ERR_MATCH "index out of bounds: index 5, length 4")
 execute_process(COMMAND "${ANTIC}" --dev --no-checks -S -o "${WORK}/off.s"
                         "${bounds}" RESULT_VARIABLE status)
 file(READ "${WORK}/off.s" off)
@@ -227,26 +206,14 @@ if(NOT status EQUAL 0)
 endif()
 file(WRITE "${WORK}/consumer.anti"
      "import com.example.nth;\n\nfn main() -> int\n{\n\tlet a = [1, 2];\n\treturn nth.nth(a[0..2], 5);\n}\n")
-foreach(name quiet trap)
-    set(flag "")
-    if(name STREQUAL "trap")
-        set(flag --checks)
-    endif()
-    execute_process(COMMAND "${ANTIC}" ${flag} --llvm-mc "${LLVM_MC}"
-                            --runtime "${RUNTIME}" -I "${WORK}/lib"
-                            -o "${WORK}/${name}" "${WORK}/consumer.anti"
-                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic failed for ${name}\n${err}")
-    endif()
-    execute_process(COMMAND "${WORK}/${name}" RESULT_VARIABLE code
-                    ERROR_VARIABLE ran ENCODING NONE)
-    file(STRINGS "${WORK}/${name}" text)
-    if(name STREQUAL "quiet")
-        if(text MATCHES "index out of bounds")
-            message(FATAL_ERROR "a library check reached a release program")
-        endif()
-    elseif(NOT ran MATCHES "nth\\.anti:[0-9]+: index out of bounds: index 5, length 2")
-        message(FATAL_ERROR "--checks did not keep the library check\n${ran}")
-    endif()
-endforeach()
+# The release program reads past the slice, so it is not run: what it
+# returns is whatever lies there.
+antic_program("${WORK}/quiet" "${WORK}/consumer.anti" -I "${WORK}/lib")
+file(STRINGS "${WORK}/quiet" text)
+if(text MATCHES "index out of bounds")
+    message(FATAL_ERROR "a library check reached a release program")
+endif()
+antic_program("${WORK}/trap" "${WORK}/consumer.anti" --checks
+              -I "${WORK}/lib")
+program_expect("trap" COMMAND "${WORK}/trap" ABORTS
+               ERR_MATCH "nth\\.anti:[0-9]+: index out of bounds: index 5, length 2")

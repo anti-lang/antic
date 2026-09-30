@@ -47,11 +47,61 @@ foreach(c_file IN LISTS c_files)
     endif()
 endforeach()
 
+# program_expect compares both outputs as bytes and holds the status. Each
+# case runs it in a script of its own over a child that must be refused:
+# one that writes a CRLF where an LF is expected, one that prints what it
+# was not asked to, one that exits with 1 where an abort is expected and
+# one that exits with 1 where 0 is. file(WRITE) writes a line feed as a
+# CRLF on Windows, so the two inputs name their line ends.
+file(CONFIGURE OUTPUT "${WORK}/crlf.txt" CONTENT "2\n" NEWLINE_STYLE CRLF)
+set(cat "\"${CMAKE_COMMAND}\" -E cat \"${WORK}/crlf.txt\"")
+set(echo "\"${CMAKE_COMMAND}\" -E echo stray")
+set(false "\"${CMAKE_COMMAND}\" -E false")
+set(refused
+    "crlf|COMMAND ${cat} OUT \"2\\n\"|the standard output differs"
+    "stray|COMMAND ${echo}|the standard output differs"
+    "abort|COMMAND ${false} ABORTS|expected an abort"
+    "status|COMMAND ${false}|expected the status 0")
+foreach(case IN LISTS refused)
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 call)
+    list(GET parts 2 refusal)
+    file(WRITE "${WORK}/expect_${name}.cmake"
+         "set(WORK \"${WORK}\")\n"
+         "include(\"${ROOT}/tests/program_output.cmake\")\n"
+         "program_expect(${name} ${call})\n")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -P "${WORK}/expect_${name}.cmake"
+                    RESULT_VARIABLE status OUTPUT_VARIABLE out
+                    ERROR_VARIABLE err ENCODING NONE)
+    # CMake wraps the text of an error, so the lines are joined first.
+    string(REGEX REPLACE "[ \n]+" " " err "${err}")
+    string(FIND "${err}" "${refusal}" at)
+    if(status EQUAL 0 OR at EQUAL -1)
+        message(FATAL_ERROR "program_expect gave ${status} for ${name}, "
+                            "expected `${refusal}`\n${out}${err}")
+    endif()
+endforeach()
+file(CONFIGURE OUTPUT "${WORK}/expect_lf.txt" CONTENT "2\n" NEWLINE_STYLE UNIX)
+program_expect(lf COMMAND "${CMAKE_COMMAND}" -E cat "${WORK}/expect_lf.txt"
+               OUT "2\n")
+
 # CMake decodes the output of execute_process on Windows by the console
 # code page unless ENCODING NONE says otherwise. Every other call of a test
 # script that captures output names it.
+#
+# A call that captures output in a variable runs a tool, named by the
+# variable that holds it. A program the test built goes through
+# program_expect or program_output of tests/program_output.cmake, which
+# read its output from a file. ARGN and command stand for the helpers of
+# a script that run a tool given as their arguments, and PROBE and RENAME
+# for C tools of the harness.
+set(tools ANTI ANTIC ARGN CC CLANG CMAKE_COMMAND GIT LLVM_AR LLVM_BIN
+          LLVM_DIR LLVM_MC LLVM_OBJDUMP OBJDUMP PROBE READOBJ RENAME command
+          compiler copy git)
 file(GLOB scripts "${ROOT}/tests/run_*.cmake")
 set(missing "")
+set(captured "")
 foreach(script IN LISTS scripts)
     file(READ "${script}" text)
     get_filename_component(name "${script}" NAME)
@@ -81,12 +131,17 @@ foreach(script IN LISTS scripts)
         endwhile()
         math(EXPR length "${i} - ${start} + 1")
         string(SUBSTRING "${text}" ${start} ${length} call)
+        string(SUBSTRING "${text}" 0 ${start} before)
+        string(REGEX MATCHALL "\n" lines "${before}")
+        list(LENGTH lines line)
+        math(EXPR line "${line} + 1")
         if(call MATCHES "(OUTPUT|ERROR)_VARIABLE" AND NOT call MATCHES "ENCODING NONE")
-            string(SUBSTRING "${text}" 0 ${start} before)
-            string(REGEX MATCHALL "\n" lines "${before}")
-            list(LENGTH lines line)
-            math(EXPR line "${line} + 1")
             list(APPEND missing "${name}:${line}")
+        endif()
+        if(call MATCHES "(OUTPUT|ERROR)_VARIABLE" AND
+           call MATCHES "COMMAND[ \t\n]+\"?\\$\\{([A-Za-z_]+)\\}" AND
+           NOT CMAKE_MATCH_1 IN_LIST tools)
+            list(APPEND captured "${name}:${line}")
         endif()
         math(EXPR from "${i} + 1")
     endwhile()
@@ -95,4 +150,9 @@ if(missing)
     list(JOIN missing ", " missing)
     message(FATAL_ERROR "these calls capture output without ENCODING NONE, so "
                         "Windows decodes it through the console: ${missing}")
+endif()
+if(captured)
+    list(JOIN captured ", " captured)
+    message(FATAL_ERROR "these calls read the output of a program into a "
+                        "variable, which loses a CR or a NUL: ${captured}")
 endif()

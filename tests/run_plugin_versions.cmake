@@ -13,13 +13,15 @@
 # A Windows library links against the import library of its host, so
 # each host there takes a library of its own.
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
+# Run antic, which must succeed and print nothing.
 function(run)
-    execute_process(COMMAND ${ARGV} RESULT_VARIABLE status
+    execute_process(COMMAND "${ANTIC}" ${ARGV} RESULT_VARIABLE status
                     OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0 OR NOT err STREQUAL "")
-        message(FATAL_ERROR "failed with ${status}: ${ARGV}\n${out}${err}")
+    if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
+        message(FATAL_ERROR "antic failed with ${status}: ${ARGV}\n${out}${err}")
     endif()
-    set(output "${out}" PARENT_SCOPE)
 endfunction()
 
 # The library of the version name for the host, built on its first use.
@@ -33,7 +35,7 @@ function(library host name out)
     set(path "${dir}/libfancy${SUFFIX}")
     if(NOT EXISTS "${path}")
         file(MAKE_DIRECTORY "${dir}")
-        run("${ANTIC}" --lib shared --no-runtime --runtime "${RUNTIME}"
+        run(--lib shared --no-runtime --runtime "${RUNTIME}"
             --llvm-mc "${LLVM_MC}" -I "${root_${name}}" -I "${WORK}/${name}"
             -o "${path}" "${root_${name}}/net/example/fancy.anti" ${imports})
     endif()
@@ -42,22 +44,15 @@ endfunction()
 
 # Load the library of the version name into the host and check what it
 # printed against a regular expression. want is "yes" for a load that
-# must succeed.
+# must succeed, and the host exits with 1 on a refusal.
 function(loads host name want pattern)
     library("${host}" "${name}" library)
-    set(host "${WORK}/${host}${EXE}")
-    execute_process(COMMAND "${host}" "${library}" RESULT_VARIABLE status
-                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(want STREQUAL "yes" AND NOT status EQUAL 0)
-        message(FATAL_ERROR "${host} refused ${library}\n${out}${err}")
+    set(status 1)
+    if(want STREQUAL "yes")
+        set(status 0)
     endif()
-    if(NOT want STREQUAL "yes" AND status EQUAL 0)
-        message(FATAL_ERROR "${host} took ${library}\n${out}")
-    endif()
-    if(NOT out MATCHES "${pattern}")
-        message(FATAL_ERROR "${host} printed\n${out}and none of it matches "
-                            "${pattern}")
-    endif()
+    program_expect("${host} ${name}" COMMAND "${WORK}/${host}${EXE}" "${library}"
+                   STATUS ${status} OUT_MATCH "${pattern}")
 endfunction()
 
 set(versions "${SOURCES}/versions")
@@ -75,7 +70,7 @@ foreach(part "base|${SOURCES}|0.0.0" "one|${versions}/one|0.0.0"
     list(GET one 1 root)
     list(GET one 2 version)
     file(MAKE_DIRECTORY "${WORK}/${name}/net/example")
-    run("${ANTIC}" -c --package-version "${version}" -I "${root}"
+    run(-c --package-version "${version}" -I "${root}"
         -o "${WORK}/${name}/net/example/greet.antl"
         "${root}/net/example/greet.anti")
 endforeach()
@@ -99,7 +94,7 @@ foreach(part "reader|base" "caller|base" "floor|floor-1.1")
     else()
         set(source "${versions}/${name}.anti")
     endif()
-    run("${ANTIC}" --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+    run(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
         -I "${versions}" -I "${SOURCES}" -I "${WORK}/${interface}"
         -o "${WORK}/${name}${EXE}" "${source}")
 endforeach()

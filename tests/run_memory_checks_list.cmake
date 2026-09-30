@@ -20,6 +20,8 @@ if(HOST STREQUAL "windows-arm64")
 endif()
 file(MAKE_DIRECTORY "${WORK}")
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 set(program "${WORK}/memory_checks_list")
 execute_process(COMMAND "${ANTIC}" --memory-checks --llvm-mc "${LLVM_MC}"
                         --runtime "${RUNTIME}" -o "${program}" "${SOURCE}"
@@ -28,11 +30,8 @@ if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed\n${err}")
 endif()
 
-execute_process(COMMAND "${program}" RESULT_VARIABLE code
-                OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-if(NOT code EQUAL 1)
-    message(FATAL_ERROR "the program exited with ${code} and printed `${err}`")
-endif()
+program_expect("memory checks list" COMMAND "${program}" STATUS 1 ANY_ERR)
+set(err "${program_stderr}")
 set(patterns
     "ERROR: AddressSanitizer: heap-use-after-free"
     "READ of size 8")

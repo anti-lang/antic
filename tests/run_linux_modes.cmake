@@ -14,6 +14,8 @@
 #   HOST     the target name of this host
 #   WORK     a directory this run writes into
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 file(COPY "${FIXTURE}/app" "${FIXTURE}/window" DESTINATION "${WORK}")
@@ -74,15 +76,8 @@ foreach(target linux-arm64 linux-x86_64)
         if(NOT target STREQUAL HOST)
             continue()
         endif()
-        execute_process(COMMAND "${app}" RESULT_VARIABLE status
-                        OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-        if(NOT status EQUAL 7 OR NOT out STREQUAL "one\n")
-            message(FATAL_ERROR "${app} gave ${status}\n${out}${err}")
-        endif()
-        execute_process(COMMAND "${window}" RESULT_VARIABLE status
-                        OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-        if(NOT status EQUAL 0 OR NOT out STREQUAL "no display\nno context\n")
-            message(FATAL_ERROR "${window} gave ${status}\n${out}${err}")
-        endif()
+        program_expect("app ${mode}" COMMAND "${app}" STATUS 7 OUT "one\n")
+        program_expect("window ${mode}" COMMAND "${window}"
+                       OUT "no display\nno context\n")
     endforeach()
 endforeach()

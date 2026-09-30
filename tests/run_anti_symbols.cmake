@@ -17,6 +17,8 @@
 # plugins it also holds a plugin in a `plugins` directory, named once
 # more by `[injections]`, with an archive of its own.
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 set(project "${WORK}/tracer")
 set(deploy "${WORK}/deploy")
 file(REMOVE_RECURSE "${WORK}")
@@ -148,18 +150,13 @@ endif()
 # A release trace comes out with the function and the file and line of
 # every frame of the program. The frame outside it stays raw, and so
 # does every frame when no archive holds its module.
-execute_process(COMMAND "${deploy}/tracer" RESULT_VARIABLE status
-                OUTPUT_FILE "${WORK}/trace.txt" ERROR_VARIABLE err
-                ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "the program ended with ${status}\n${err}")
-endif()
-file(READ "${WORK}/trace.txt" trace)
+program_expect("trace" COMMAND "${deploy}/tracer" ANY_OUT)
+set(trace "${program_stdout}")
 set(archives --symbols "${WORK}/all.zip")
 if(DEFINED plugin_id)
     list(APPEND archives --symbols "${deploy}/plugins/libfancy-symbols.zip")
 endif()
-symbols(status text resolve "${WORK}/trace.txt" ${archives})
+symbols(status text resolve "${WORK}/trace.stdout" ${archives})
 set(frame "0x[0-9a-f]+ 0\\+0x[0-9a-f]+")
 foreach(name inner outer main "through<float, str>")
     if(NOT text MATCHES "\n${frame} com\\.example\\.tracer\\.${name} tracer\\.anti:[0-9]+\n")
@@ -189,7 +186,7 @@ foreach(line IN LISTS raw_lines)
     endif()
 endforeach()
 if(DEFINED plugin_id)
-    symbols(status text resolve "${WORK}/trace.txt" --symbols
+    symbols(status text resolve "${WORK}/trace.stdout" --symbols
             "${deploy}/plugins/libfancy-symbols.zip")
     if(NOT status EQUAL 0 OR NOT text STREQUAL trace)
         message(FATAL_ERROR "an archive that matches no frame changed the "

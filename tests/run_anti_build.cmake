@@ -17,6 +17,8 @@
 # release mode, the `-g` rule of docs/tooling.md, --target, --cpu, the
 # lock file, `anti run` and the project `anti new` writes.
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 set(project "${WORK}/app")
 # A Windows host writes app.exe and its assembly app.exe.s, and its
 # symbols lie in a PDB, so the map of its archive names no function.
@@ -59,11 +61,7 @@ set(program "${project}/dist/${HOST}/dev/app${exe}")
 if(NOT EXISTS "${program}")
     message(FATAL_ERROR "the dev build wrote no ${program}")
 endif()
-execute_process(COMMAND "${program}" RESULT_VARIABLE status
-    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 7 OR NOT out MATCHES "^one")
-    message(FATAL_ERROR "the program ended with ${status} and wrote ${out}${err}")
-endif()
+program_expect("the dev program" COMMAND "${program}" STATUS 7 OUT "one\n")
 
 # The lock file stands beside the manifest, even for a project with no
 # dependency.
@@ -96,11 +94,8 @@ file(SHA256 "${object}" digest_changed)
 if(digest_before STREQUAL digest_changed)
     message(FATAL_ERROR "the changed module wrote the same ${object}")
 endif()
-execute_process(COMMAND "${program}" RESULT_VARIABLE status
-    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 9)
-    message(FATAL_ERROR "the changed program ended with ${status}")
-endif()
+program_expect("the changed program" COMMAND "${program}" STATUS 9
+               OUT "one\n")
 
 # `anti run` builds for the host and runs what it wrote.
 run_anti(status text run --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
@@ -111,11 +106,8 @@ endif()
 # Release mode compiles the whole program in one call.
 build("the release build" build --release)
 set(release "${project}/dist/${HOST}/release/app${exe}")
-execute_process(COMMAND "${release}" RESULT_VARIABLE status
-    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 9 OR NOT out MATCHES "^one")
-    message(FATAL_ERROR "the release program ended with ${status}")
-endif()
+program_expect("the release program" COMMAND "${release}" STATUS 9
+               OUT "one\n")
 
 # A release binary carries no symbol data, so the build writes the
 # archive that names it: the same link with the debug sections kept and
@@ -140,11 +132,8 @@ foreach(name app.debug app.map)
 endforeach()
 # The link with the debug sections is the same program at the same
 # addresses, so the map answers for the binary beside it.
-execute_process(COMMAND "${WORK}/symbols/app.debug" RESULT_VARIABLE status
-    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 9 OR NOT out MATCHES "^one")
-    message(FATAL_ERROR "app.debug ended with ${status} and wrote ${out}${err}")
-endif()
+program_expect("app.debug" COMMAND "${WORK}/symbols/app.debug" STATUS 9
+               OUT "one\n")
 file(STRINGS "${release}" lines REGEX "^build [0-9a-f]+$")
 string(REGEX MATCH "^build ([0-9a-f]+)$" line "${lines}")
 set(id "${CMAKE_MATCH_1}")

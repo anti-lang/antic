@@ -18,6 +18,8 @@
 #   TARGET    the target name
 #   WORK      a directory for the executable
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 file(MAKE_DIRECTORY "${WORK}")
 set(exe "${WORK}/probe-${TARGET}")
 string(REPLACE "," ";" libraries "${LIBRARY}")
@@ -68,15 +70,4 @@ endif()
 if(NOT HOST STREQUAL TARGET)
     return()
 endif()
-execute_process(COMMAND "${exe}" RESULT_VARIABLE status
-                OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-file(READ "${EXPECTED}" expected)
-if(NOT expected MATCHES "^exit ([0-9]+)\n(.*)$")
-    message(FATAL_ERROR "${EXPECTED} does not start with an exit line")
-endif()
-set(want_status "${CMAKE_MATCH_1}")
-set(want_out "${CMAKE_MATCH_2}")
-if(NOT status STREQUAL want_status OR NOT out STREQUAL want_out)
-    message(FATAL_ERROR "${exe} exited ${status} and wrote\n${out}${err}\n"
-                        "expected exit ${want_status} and\n${want_out}")
-endif()
+program_expect("the probe" COMMAND "${exe}" EXPECTED "${EXPECTED}")

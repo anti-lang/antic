@@ -11,29 +11,17 @@
 # inline. A dispatch, `is` and `as` check in dev mode, and release mode
 # keeps the raw load.
 
-function(build name)
-    execute_process(COMMAND "${ANTIC}" ${ARGN} --llvm-mc "${LLVM_MC}"
-                            --runtime "${RUNTIME}" -o "${WORK}/${name}"
-                            "${SOURCE}"
-                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic failed for ${name}\n${err}")
-    endif()
-endfunction()
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 function(traps build case class)
-    execute_process(COMMAND "${WORK}/${build}" ${case} RESULT_VARIABLE code
-                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(code EQUAL 0 OR
-       NOT err MATCHES "^table not set: the object is no ${class}\n$")
-        message(FATAL_ERROR "${case} in ${build} exited with ${code} and "
-                            "printed `${err}`")
-    endif()
+    program_expect("table ${build} ${case}"
+                   COMMAND "${WORK}/table_${build}" ${case} ABORTS
+                   ERR "table not set: the object is no ${class}\n")
 endfunction()
 
 file(MAKE_DIRECTORY "${WORK}")
-build(release)
-build(dev --dev)
+antic_program("${WORK}/table_release" "${SOURCE}")
+antic_program("${WORK}/table_dev" "${SOURCE}" --dev)
 foreach(case delete destroy dup)
     traps(release ${case} Square)
     traps(dev ${case} Square)

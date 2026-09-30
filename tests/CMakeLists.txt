@@ -2890,7 +2890,7 @@ add_test(NAME parallel_size
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/parallel_size.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_parallel_size.cmake")
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trap.cmake")
 
 # A search with a pattern literal that reaches the match limit stops the
 # program with the pattern and the line.
@@ -2901,7 +2901,7 @@ add_test(NAME pattern_limit
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/pattern_limit.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_pattern_limit.cmake")
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trap.cmake")
 
 # The size of a Mutex per target: four bytes on Linux and macOS, eight on
 # Windows.

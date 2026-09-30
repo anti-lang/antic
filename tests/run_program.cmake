@@ -70,31 +70,7 @@ if(DEFINED UNSET AND NOT UNSET STREQUAL "")
         list(APPEND runner "--unset=${name}")
     endforeach()
 endif()
-program_output(stdout_hex exit_code "${exe}.stdout" ${runner} "${exe}"
-               ${program_args})
-
-file(READ "${expected_file}" expected)
-if(NOT expected MATCHES "^exit ([0-9]+)\n")
-    message(FATAL_ERROR "${expected_file} does not start with 'exit N'")
-endif()
-set(expected_exit "${CMAKE_MATCH_1}")
-string(LENGTH "exit ${expected_exit}\n" skip)
-file(READ "${expected_file}" expected_hex OFFSET ${skip} HEX)
-
-# DESIGN: an expected file records the exit code that POSIX shows, which
-# is the low eight bits of what the program returned. Windows reports all
-# thirty-two, so a program that returns 521 gives 521 there and 9 on
-# Linux. The comparison takes the low eight bits on a Windows host.
-if(CMAKE_HOST_WIN32 AND exit_code MATCHES "^-?[0-9]+$")
-    math(EXPR exit_code "((${exit_code}) % 256 + 256) % 256")
-endif()
-if(NOT exit_code STREQUAL expected_exit)
-    message(FATAL_ERROR "exit code ${exit_code}, expected ${expected_exit}")
-endif()
-if(NOT stdout_hex STREQUAL expected_hex)
-    string(REGEX REPLACE "^exit [0-9]+\n" "" expected_stdout "${expected}")
-    file(READ "${exe}.stdout" stdout)
-    message(FATAL_ERROR "standard output differs\nexpected:\n${expected_stdout}\n"
-                        "got:\n${stdout}\nexpected bytes: ${expected_hex}\n"
-                        "got bytes: ${stdout_hex}")
-endif()
+# The standard error of a test program is its own business: a program
+# that reports an error writes it there.
+program_expect("${name}" COMMAND ${runner} "${exe}" ${program_args}
+               EXPECTED "${expected_file}" ANY_ERR)

@@ -21,6 +21,8 @@
 # pattern that starts with "+ " matches one line or more, and one that
 # starts with "* " matches any number of lines.
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 if(NOT DEFINED STATUS)
     set(STATUS 0)
 endif()
@@ -53,13 +55,10 @@ file(STRINGS "${exe}" ids REGEX "^build [0-9a-f]+$")
 list(GET ids 0 id)
 string(REPLACE "build " "" id "${id}")
 
-execute_process(COMMAND "${exe}" ${arguments}
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL STATUS)
-    message(FATAL_ERROR "the program exited with ${status}, not ${STATUS}\n"
-                        "${out}${err}")
-endif()
+program_expect("${name}" COMMAND "${exe}" ${arguments} STATUS ${STATUS}
+               ANY_OUT ANY_ERR)
+set(out "${program_stdout}")
+set(err "${program_stderr}")
 
 # Match the lines of text against the patterns of the file, and stop with
 # what differs.
