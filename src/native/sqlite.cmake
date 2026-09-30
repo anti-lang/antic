@@ -118,4 +118,9 @@ endforeach()
 
 add_test(NAME sqlite_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-            -P "${PROJECT_SOURCE_DIR}/tests/run_sqlite_pin.cmake")
+            -DNAME=sqlite
+            -DSCRIPT=src/native/get-sqlite.cmake
+            "-DFILES=src/native/sqlite.cmake"
+            -DHASH=SHA3_256 -DPARTS=3
+            -DYEAR=ON
+            -P "${PROJECT_SOURCE_DIR}/tests/run_native_pin.cmake")

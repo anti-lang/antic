@@ -115,4 +115,8 @@ endforeach()
 
 add_test(NAME miniaudio_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-            -P "${PROJECT_SOURCE_DIR}/tests/run_miniaudio_pin.cmake")
+            -DNAME=miniaudio
+            -DSCRIPT=src/native/get-miniaudio.cmake
+            "-DFILES=src/native/miniaudio.cmake"
+            -DHASH=SHA256 -DPARTS=3
+            -P "${PROJECT_SOURCE_DIR}/tests/run_native_pin.cmake")

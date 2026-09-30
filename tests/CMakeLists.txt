@@ -1702,8 +1702,17 @@ if(EXISTS "${ANTIC_SYSROOT_DIR}/linux-x86_64" AND
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package.cmake")
 endif()
 add_test(NAME raylib_pin
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_raylib_pin.cmake")
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}" -DNAME=raylib
+            -DSCRIPT=tools/get-raylib.cmake -DFILES=src/native/raylib.cmake
+            -DHASH=SHA256 -DPARTS=2
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_native_pin.cmake")
+# The check of the pins refuses a copy of a version or a digest and passes
+# a text one dot short of the version.
+add_test(NAME native_pin_self
+    COMMAND "${CMAKE_COMMAND}"
+            "-DPIN=${CMAKE_CURRENT_SOURCE_DIR}/run_native_pin.cmake"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/native-pin-self"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_native_pin_self.cmake")
 add_test(NAME package_api
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package_api.cmake")

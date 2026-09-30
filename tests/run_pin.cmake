@@ -33,8 +33,11 @@ foreach(host IN LISTS hosts)
     endif()
 endforeach()
 
+# The version is searched as a literal: as a regular expression its dots
+# would match any byte.
 file(READ "${pin}" text)
-if(text MATCHES "${version}")
+string(FIND "${text}" "${version}" at)
+if(NOT at EQUAL -1)
     message(FATAL_ERROR "tools/${NAME}-pin spells ${version}, which belongs "
                         "in tools/${NAME}-version alone")
 endif()
@@ -42,7 +45,9 @@ if(NOT EXISTS "${script}")
     return()
 endif()
 file(READ "${script}" text)
-if(text MATCHES "${version}" OR text MATCHES "https://")
+string(FIND "${text}" "${version}" at)
+string(FIND "${text}" "https://" url)
+if(NOT at EQUAL -1 OR NOT url EQUAL -1)
     message(FATAL_ERROR "tools/get-${NAME}.cmake spells a version or a URL, "
                         "which belong in tools/${NAME}-version and "
                         "tools/${NAME}-pin")

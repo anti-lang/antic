@@ -111,6 +111,13 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
             -P "${PROJECT_SOURCE_DIR}/tests/run_native_link.cmake")
 endforeach()
 
+# JIT stays off: the definitions of the build never name SUPPORT_JIT.
 add_test(NAME pcre2_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-            -P "${PROJECT_SOURCE_DIR}/tests/run_pcre2_pin.cmake")
+            -DNAME=pcre2
+            -DSCRIPT=src/native/get-pcre2.cmake
+            "-DFILES=src/native/pcre2.cmake,src/native/pcre2-source.cmake,src/native/pcre2-files.cmake"
+            -DHASH=SHA256 -DPARTS=2
+            "-DABSENT=-DSUPPORT_JIT"
+            -DABSENT_IN=src/native/pcre2-files.cmake
+            -P "${PROJECT_SOURCE_DIR}/tests/run_native_pin.cmake")

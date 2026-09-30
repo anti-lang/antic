@@ -132,4 +132,8 @@ endforeach()
 
 add_test(NAME mbedtls_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-            -P "${PROJECT_SOURCE_DIR}/tests/run_mbedtls_pin.cmake")
+            -DNAME=mbedtls
+            -DSCRIPT=src/native/get-mbedtls.cmake
+            "-DFILES=src/native/mbedtls.cmake"
+            -DHASH=SHA256 -DPARTS=3
+            -P "${PROJECT_SOURCE_DIR}/tests/run_native_pin.cmake")
