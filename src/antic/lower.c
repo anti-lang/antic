@@ -1757,7 +1757,7 @@ static void take_trace_name(struct lowerer *l)
     struct token_text text;
     struct text name = {0};
 
-    text_appendf(&name, "%s.%s", l->f->module, l->f->name);
+    ir_name_append(&name, l->f->module, l->f->name);
     text.bytes = text_cstr(&name);
     text.length = name.length;
     l->trace_name = lower_literal_global(l, &text);

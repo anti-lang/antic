@@ -21,11 +21,11 @@ type anti.rt.Trampolines = struct { count: i64, items: ptr }
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 global copies_merge.9 size 36 align 1 bytes 63 6f 70 69 65 73 5f 6d 65 72 67 65 2e 61 6e 74 69 3a 32 37 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 global copies_merge.10 size 42 align 1 bytes 63 6f 70 69 65 73 5f 6d 65 72 67 65 2e 61 6e 74 69 3a 31 37 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00
-global (null).anti_rt_registry anti.rt.Registry { i64 0, ptr 0 }
-global (null).anti_rt_backtrace_default anti.rt.BacktraceDefault { i64 1 }
-global (null).anti_rt_slots anti.rt.SlotTable { i64 0, ptr 0, i64 0 }
-global (null).anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
-global (null).anti_rt_trampolines anti.rt.Trampolines { i64 0, ptr 0 }
+global anti_rt_registry anti.rt.Registry { i64 0, ptr 0 }
+global anti_rt_backtrace_default anti.rt.BacktraceDefault { i64 1 }
+global anti_rt_slots anti.rt.SlotTable { i64 0, ptr 0, i64 0 }
+global anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
+global anti_rt_trampolines anti.rt.Trampolines { i64 0, ptr 0 }
 fn copies_merge.main() -> i64 {
 b0:
     %0 = slot copies_merge.Person

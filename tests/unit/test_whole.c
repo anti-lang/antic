@@ -436,7 +436,7 @@ static void registry(bool reads, bool reflect, bool bundled,
     options.bundled = bundled;
     CHECK(whole_program(&p.ir, &options, &errors));
     print_lines(&out, &p.ir, "global anti.rt.");
-    print_lines(&out, &p.ir, "global (null).anti_rt_registry");
+    print_lines(&out, &p.ir, "global anti_rt_registry");
     CHECK_STR(text_cstr(&out), expected);
     text_free(&errors);
     text_free(&out);
@@ -459,14 +459,14 @@ static void writes_registry(void)
              "@anti.rt.registry.0, i64 4, i64 0 }, "
              "anti.rt.Class { @main.Tile.descriptor, @main.Tile.init, "
              "@anti.rt.registry.0, i64 4, i64 0 } }\n"
-             "global (null).anti_rt_registry anti.rt.Registry { i64 2, "
+             "global anti_rt_registry anti.rt.Registry { i64 2, "
              "@anti.rt.registry.classes }\n");
     registry(true, false, false,
-             "global (null).anti_rt_registry anti.rt.Registry { i64 0, "
+             "global anti_rt_registry anti.rt.Registry { i64 0, "
              "ptr 0 }\n");
     registry(false, true, false, "");
     registry(false, true, true,
-             "global (null).anti_rt_registry anti.rt.Registry { i64 0, "
+             "global anti_rt_registry anti.rt.Registry { i64 0, "
              "ptr 0 }\n");
 }
 
@@ -580,7 +580,7 @@ static void records_slots(void)
     options.entry = "main";
     CHECK(whole_program(&p.ir, &options, &errors));
     print_lines(&out, &p.ir, "global anti.rt.");
-    print_lines(&out, &p.ir, "global (null).anti_rt_slots");
+    print_lines(&out, &p.ir, "global anti_rt_slots");
     CHECK_STR(text_cstr(&out),
               "global anti.rt.slots.0 size 3 align 1 bytes 04 00 02\n"
               "global anti.rt.slots.1 size 3 align 1 bytes 04 00 02\n"
@@ -589,7 +589,7 @@ static void records_slots(void)
               "@anti.rt.slots.0 }, "
               "anti.rt.Slots { @main.Named.descriptor, i64 18, "
               "@anti.rt.slots.1 } }\n"
-              "global (null).anti_rt_slots anti.rt.SlotTable { i64 2, "
+              "global anti_rt_slots anti.rt.SlotTable { i64 2, "
               "@anti.rt.slots.list, i64 0 }\n");
     text_free(&errors);
     text_free(&out);
@@ -688,12 +688,12 @@ static void writes_trampolines(void)
                   "%2: ptr, %3: i64, %4: ptr) -> i8 {\n"
                   "fn anti.rt.trampoline.i64(%0: ptr, %1: ptr, %2: ptr, "
                   "%3: i64, %4: ptr) -> i8 {\n");
-    reflect_calls(true, true, "global (null).anti_rt_trampolines",
-                  "global (null).anti_rt_trampolines anti.rt.Trampolines "
+    reflect_calls(true, true, "global anti_rt_trampolines",
+                  "global anti_rt_trampolines anti.rt.Trampolines "
                   "{ i64 8, @anti.rt.trampolines.list }\n");
-    reflect_calls(false, true, "global (null).anti_rt_trampolines", "");
-    reflect_calls(true, false, "global (null).anti_rt_trampolines",
-                  "global (null).anti_rt_trampolines anti.rt.Trampolines "
+    reflect_calls(false, true, "global anti_rt_trampolines", "");
+    reflect_calls(true, false, "global anti_rt_trampolines",
+                  "global anti_rt_trampolines anti.rt.Trampolines "
                   "{ i64 0, ptr 0 }\n");
 }
 
@@ -704,11 +704,11 @@ static void writes_trampolines(void)
    with a stub rather than refusing the library. */
 static void reflection_marks_the_table(void)
 {
-    reflect_calls(true, true, "global (null).anti_rt_slots",
-                  "global (null).anti_rt_slots anti.rt.SlotTable { i64 0, "
+    reflect_calls(true, true, "global anti_rt_slots",
+                  "global anti_rt_slots anti.rt.SlotTable { i64 0, "
                   "ptr 0, i64 1 }\n");
-    reflect_calls(false, true, "global (null).anti_rt_slots",
-                  "global (null).anti_rt_slots anti.rt.SlotTable { i64 0, "
+    reflect_calls(false, true, "global anti_rt_slots",
+                  "global anti_rt_slots anti.rt.SlotTable { i64 0, "
                   "ptr 0, i64 0 }\n");
 }
 

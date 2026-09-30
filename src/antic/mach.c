@@ -133,7 +133,8 @@ void mach_print(struct text *out, const struct target_desc *target,
     size_t b;
     size_t i;
 
-    text_appendf(out, "%s.%s:\n", f->ir->module, f->ir->name);
+    ir_name_append(out, f->ir->module, f->ir->name);
+    text_append(out, ":\n");
     for (b = 0; b < f->block_count; b++) {
         text_appendf(out, "b%zu:\n", b);
         for (i = 0; i < f->blocks[b].count; i++) {
@@ -162,8 +163,7 @@ void mach_symbol(struct text *out, const struct ir_module *m,
     case MACH_FUNC:
         f = m->functions[o->value];
         if (names == NULL) {
-            text_appendf(out, "%s%s%s", f->module != NULL ? f->module : "",
-                         f->module != NULL ? "." : "", f->name);
+            ir_name_append(out, f->module, f->name);
         } else {
             mach_function_symbol(out, names->target, f);
         }
@@ -171,7 +171,7 @@ void mach_symbol(struct text *out, const struct ir_module *m,
     case MACH_GLOBAL:
         g = m->globals[o->value];
         if (names == NULL) {
-            text_appendf(out, "%s.%s", g->module, g->name);
+            ir_name_append(out, g->module, g->name);
         } else if (g->exported) {
             c_symbol(out, names->target, g->name);
         } else {

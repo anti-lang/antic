@@ -324,7 +324,7 @@ void test_optimize(void)
               "signature: ptr }\n"
               "type [16]anti.rt.Function = array 16 of anti.rt.Function\n"
               "type str = struct { ptr: ptr, len: i64 }\n"
-              "global (null).anti_lang_Object_descriptor size 0 align 1 "
+              "global anti_lang_Object_descriptor size 0 align 1 "
               "bytes\n"
               "fn main.main() -> i64 {\n"
               "b0:\n"

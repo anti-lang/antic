@@ -461,6 +461,29 @@ static void out_of_range(void)
     arena_free(&arena);
 }
 
+/* A global of the runtime and a function of a library have no module.
+   The printer and the verifier write the name alone, where they once
+   passed the NULL module to %s. */
+static void no_module(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *f;
+    struct ir_block *b0;
+    static const uint8_t zero[8] = {0};
+
+    ir_module_init(&m, &arena, "main");
+    ir_global_add(&m, NULL, "anti_rt_slots", zero, sizeof zero, 8);
+    printed(&m, "global anti_rt_slots size 8 align 8 bytes 00 00 00 00 00 "
+                "00 00 00\n");
+    f = ir_function_add(&m, NULL, "f", IR_I64, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    ir_ret(f, b0, IR_I32, ir_int_op(IR_I32, 0));
+    verified(&m, "f b0: ret i32 in a function that returns i64\n");
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 void test_ir(void)
 {
     constants();
@@ -475,4 +498,5 @@ void test_ir(void)
     positions();
     symbolic();
     verifier();
+    no_module();
 }

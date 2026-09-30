@@ -58,13 +58,18 @@ const char *ir_op_name(enum ir_op op)
     return names[op];
 }
 
-static void symbol(struct text *out, const char *module, const char *name)
+void ir_name_append(struct text *out, const char *module, const char *name)
 {
     if (module != NULL) {
-        text_appendf(out, "@%s.%s", module, name);
-    } else {
-        text_appendf(out, "@%s", name);
+        text_appendf(out, "%s.", module);
     }
+    text_append(out, name);
+}
+
+static void symbol(struct text *out, const char *module, const char *name)
+{
+    text_append(out, "@");
+    ir_name_append(out, module, name);
 }
 
 /* Append the text form of a type in memory. */
@@ -216,10 +221,8 @@ static void signature(struct text *out, const struct ir_module *m,
     text_append(out, f->exported ? "export " : "");
     text_append(out, f->worker ? "worker " : "");
     text_append(out, f->is_extern ? "extern fn " : "fn ");
-    if (f->module != NULL) {
-        text_appendf(out, "%s.", f->module);
-    }
-    text_appendf(out, "%s(", f->name);
+    ir_name_append(out, f->module, f->name);
+    text_append(out, "(");
     for (i = 0; i < f->param_count; i++) {
         if (i > 0) {
             text_append(out, ", ");
@@ -439,7 +442,8 @@ static void class_record(struct text *out, const struct ir_module *m,
 {
     size_t i;
 
-    text_appendf(out, "class %s.%s", c->module, c->name);
+    text_append(out, "class ");
+    ir_name_append(out, c->module, c->name);
     text_append(out, (c->flags & IR_CLASS_ABSTRACT) != 0 ? " abstract" : "");
     text_append(out, (c->flags & IR_CLASS_FINAL) != 0 ? " final" : "");
     text_append(out,
@@ -481,7 +485,8 @@ void ir_print(struct text *out, const struct ir_module *m)
     }
     for (i = 0; i < m->global_count; i++) {
         const struct ir_global *g = m->globals[i];
-        text_appendf(out, "global %s.%s", g->module, g->name);
+        text_append(out, "global ");
+        ir_name_append(out, g->module, g->name);
         if (g->value != NULL) {
             text_append(out, " ");
             constant(out, m, g->value);

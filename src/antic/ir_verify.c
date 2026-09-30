@@ -32,13 +32,11 @@ static void fail(struct verifier *v, const char *format, ...)
     va_start(args, format);
     ir_vformat(message, sizeof message, format, args);
     va_end(args);
+    ir_name_append(v->errors, v->f->module, v->f->name);
     if (v->b != NULL) {
-        text_appendf(v->errors, "%s.%s b%" PRIu32 ": %s\n", v->f->module,
-                     v->f->name, v->b->index, message);
-    } else {
-        text_appendf(v->errors, "%s.%s: %s\n", v->f->module, v->f->name,
-                     message);
+        text_appendf(v->errors, " b%" PRIu32, v->b->index);
     }
+    text_appendf(v->errors, ": %s\n", message);
     v->ok = false;
 }
 
@@ -576,8 +574,9 @@ static bool check_class(const struct ir_module *m, const struct ir_class *c,
         ok = c->mutable_fields[i] < m->aggs[c->agg]->field_count;
     }
     if (!ok) {
-        text_appendf(errors, "class %s.%s names what the module does not "
-                             "hold\n", c->module, c->name);
+        text_append(errors, "class ");
+        ir_name_append(errors, c->module, c->name);
+        text_append(errors, " names what the module does not hold\n");
     }
     return ok;
 }

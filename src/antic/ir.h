@@ -699,6 +699,11 @@ void ir_ret(struct ir_function *f, struct ir_block *b, enum ir_type type,
 const char *ir_type_name(enum ir_type type);
 const char *ir_op_name(enum ir_op op);
 
+/* Append `module.name`, or the name alone for a symbol without a module:
+   a global of the runtime or a function of a library. Every text that
+   names a function or a global writes it through this one. */
+void ir_name_append(struct text *out, const char *module, const char *name);
+
 /* Append the text form of m to out. */
 void ir_print(struct text *out, const struct ir_module *m);
 

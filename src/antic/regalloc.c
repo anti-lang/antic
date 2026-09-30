@@ -1057,6 +1057,7 @@ bool regalloc_function(enum target t, struct mach_function *f, char *error,
     struct alloc a;
     struct frame frame;
     struct rewrite rw;
+    struct text name = {0};
     size_t b;
     size_t i;
     size_t k;
@@ -1083,9 +1084,10 @@ bool regalloc_function(enum target t, struct mach_function *f, char *error,
     frame.unwind = target_info(t)->format == FORMAT_COFF;
     f->unwind = frame.unwind && frame.needed;
     if (!ok) {
-        snprintf(error, error_size, "the stack frame of `%s.%s` needs more "
-                 "than %llu bytes, the most an %s frame holds", f->ir->module,
-                 f->ir->name, (unsigned long long)a.target->frame_limit,
+        ir_name_append(&name, f->ir->module, f->ir->name);
+        snprintf(error, error_size, "the stack frame of `%s` needs more "
+                 "than %llu bytes, the most an %s frame holds",
+                 text_cstr(&name), (unsigned long long)a.target->frame_limit,
                  a.target->name);
     }
     for (b = 0; ok && b < f->block_count; b++) {
@@ -1110,9 +1112,10 @@ bool regalloc_function(enum target t, struct mach_function *f, char *error,
         f->blocks[b] = rw.out;
     }
     if (ok && a.refused) {
-        snprintf(error, error_size, "an instruction of `%s.%s` reads more "
-                 "spilled registers than %s can load for it", f->ir->module,
-                 f->ir->name, a.target->name);
+        ir_name_append(&name, f->ir->module, f->ir->name);
+        snprintf(error, error_size, "an instruction of `%s` reads more "
+                 "spilled registers than %s can load for it",
+                 text_cstr(&name), a.target->name);
         ok = false;
     }
     for (b = 0; b < f->block_count; b++) {
@@ -1129,5 +1132,6 @@ bool regalloc_function(enum target t, struct mach_function *f, char *error,
     free(a.live_in);
     free(a.live_out);
     free(a.intervals);
+    text_free(&name);
     return ok;
 }

@@ -37,7 +37,7 @@ extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 global devirt.Only.table [18]ptr { @devirt.Only.descriptor, @anti_lang_Object_type_name, @anti_lang_Object_to_text, @devirt.Only.equals, @devirt.Only.hash, @anti_lang_Object_serialize, @devirt.Only.destroy, @devirt.Only.copy, @anti_lang_Object_created, @anti_lang_Object_destroyed, @anti_lang_Object_copied, @anti_lang_Object_dispatched, @anti_lang_Object_joined, @anti_lang_Object_enter, @anti_lang_Object_leave, @anti_lang_Object_failed, @anti_lang_Object_changed, @devirt.Only.value }
 global devirt.Only.descriptor anti.rt.Descriptor { @devirt.2, i64 4, @anti_lang_Object_descriptor, size_of devirt.Only, i64 1, @devirt.Only.ancestors, i64 1, @devirt.Only.fields, ptr 0, i64 0, i64 17, @devirt.Only.functions, @devirt.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global devirt.2 size 5 align 1 bytes 4f 6e 6c 79 00
-global (null).anti_lang_Object_descriptor size 0 align 1 bytes
+global anti_lang_Object_descriptor size 0 align 1 bytes
 global devirt.Only.ancestors [2]ptr { @anti_lang_Object_descriptor, @devirt.Only.descriptor }
 global devirt.4 size 2 align 1 bytes 6e 00
 global devirt.Only.fields [1]anti.rt.Field { anti.rt.Field { @devirt.4, i64 1, offset_of devirt.Only.n, i64 6, i64 0, ptr 0 } }
