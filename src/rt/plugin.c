@@ -379,11 +379,43 @@ static void *build(const struct anti_plugin *p,
     return sub;
 }
 
-/* Take a slot for the library that anti_rt_library_open gave. The caller holds
-   the lock of the slots. Gives the slot, or NULL with the reason in
-   message. *same is 1 when the library is open already, in the slot it
-   gives, and the caller then closes the handle it opened. */
-static struct anti_plugin *claim(const char *name, void *handle,
+/* Whether every entry of the table provides an interface of the host
+   that the library matches. Gives 0 with the reason in message.
+
+   DESIGN: the checks run before the lock of the slots, because they ask
+   the platform for the image of a descriptor, which the lock of the
+   slots must never wait for. They read the table and the host's
+   descriptors alone, so a second load of an open library passes them
+   again. */
+static int matches_host(const char *name, const struct anti_provided *table,
+                        const void *base)
+{
+    int64_t i;
+
+    for (i = 0; i < table->count; i++) {
+        const struct anti_provides *e = &table->entries[i];
+        /* The interface is the host's, because the library was bound
+           against the host. One that brought its own would give objects
+           that no `is` of the program answers for. */
+        if (e->descriptor == NULL ||
+            anti_rt_plugin_image(e->descriptor) == base) {
+            fail("%s carries an `%.*s` of its own, and the host's is the one "
+                 "it provides", name, (int)e->path_length, e->path);
+            return 0;
+        }
+        if (!checked(name, e)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* Take a slot for the library that anti_rt_library_open gave, whose table
+   matches_host passed. The caller holds the lock of the slots. Gives the
+   slot, or NULL with the reason in message. *same is 1 when the library
+   is open already, in the slot it gives, and the caller then closes the
+   handle it opened. */
+static struct anti_plugin *claim(void *handle,
                                  const struct anti_provided *table,
                                  const void *base, int *same)
 {
@@ -409,21 +441,6 @@ static struct anti_plugin *claim(const char *name, void *handle,
         if (open->used != 0 && open->table == table) {
             *same = 1;
             return open;
-        }
-    }
-    for (i = 0; i < table->count; i++) {
-        const struct anti_provides *e = &table->entries[i];
-        /* The interface is the host's, because the library was bound
-           against the host. One that brought its own would give objects
-           that no `is` of the program answers for. */
-        if (e->descriptor == NULL ||
-            anti_rt_plugin_image(e->descriptor) == base) {
-            fail("%s carries an `%.*s` of its own, and the host's is the one "
-                 "it provides", name, (int)e->path_length, e->path);
-            return NULL;
-        }
-        if (!checked(name, e)) {
-            return NULL;
         }
     }
     p->stubbed = NULL;
@@ -528,6 +545,7 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
     char why[64];
     const struct anti_provided *table;
     const char *damage;
+    const void *base;
     struct anti_plugin *p = NULL;
     void *handle;
     int same = 0;
@@ -561,8 +579,12 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
              (int)version.len, version.ptr);
         goto close;
     }
+    base = anti_rt_plugin_image(table);
+    if (!matches_host(name, table, base)) {
+        goto close;
+    }
     anti_rt_plugin_hold();
-    p = claim(name, handle, table, anti_rt_plugin_image(table), &same);
+    p = claim(handle, table, base, &same);
     anti_rt_plugin_release();
     if (p != NULL && !same) {
         return p;
@@ -574,34 +596,74 @@ close:
     return p;
 }
 
-void *anti_rt_plugin_instance(void *handle, const struct anti_descriptor *d)
+/* DESIGN: the object the loader builds counts against its library from
+   before the lock is given back. `build` reads the loader's tables and
+   calls `init` in the library's image, and an `unload` on another thread
+   would otherwise find no live object and close the library under it.
+   The `created` hook of the class counts the object once `init` has
+   run, and the loader then gives its own count back. */
+
+/* The slot of the handle and its entry for the interface, by its
+   descriptor or by its path, with one object counted against the slot.
+   NULL with the reason in message when the library is not open or
+   provides none. The caller builds the object and then calls built. */
+static const struct anti_provides *reserve(void *handle,
+                                           const struct anti_descriptor *d,
+                                           const unsigned char *path,
+                                           int64_t length,
+                                           struct anti_plugin **slot)
 {
     const struct anti_provides *e = NULL;
     struct anti_plugin *p;
 
-    message[0] = '\0';
     anti_rt_plugin_hold();
     p = slot_of(handle);
     if (p != NULL) {
-        e = entry_of(p, d, NULL, 0);
+        e = entry_of(p, d, path, length);
+    }
+    if (e != NULL) {
+        anti_rt_atomic_add(&p->live, (int64_t)sizeof p->live, 1);
     }
     anti_rt_plugin_release();
+    *slot = p;
+    return e;
+}
+
+/* Build an object of the entry reserve gave and give the count of the
+   reservation back. */
+static void *built(struct anti_plugin *p, const struct anti_provides *e)
+{
+    void *sub = build(p, e);
+
+    anti_rt_atomic_sub(&p->live, (int64_t)sizeof p->live, 1);
+    return sub;
+}
+
+void *anti_rt_plugin_instance(void *handle, const struct anti_descriptor *d)
+{
+    const struct anti_provides *e;
+    struct anti_plugin *p;
+
+    message[0] = '\0';
+    e = reserve(handle, d, NULL, 0, &p);
     if (p == NULL) {
-        fail("the library is not open");
         return NULL;
     }
     if (e == NULL) {
         fail("the library provides no `%.*s`", (int)d->name_length, d->name);
         return NULL;
     }
-    return build(p, e);
+    return built(p, e);
 }
 
+/* The walk stands under the lock, because the list lies in the library's
+   image, which an unload would take away. */
 int8_t anti_rt_plugin_supports(void *handle, const struct anti_descriptor *d,
                                const unsigned char *name, int64_t length)
 {
     const struct anti_provides *e = NULL;
     struct anti_plugin *p;
+    int8_t found = 0;
     int64_t i;
 
     anti_rt_plugin_hold();
@@ -609,17 +671,14 @@ int8_t anti_rt_plugin_supports(void *handle, const struct anti_descriptor *d,
     if (p != NULL) {
         e = entry_of(p, d, NULL, 0);
     }
-    anti_rt_plugin_release();
-    if (e == NULL) {
-        return 0;
-    }
-    for (i = 0; i < e->class_of->function_count; i++) {
+    for (i = 0; e != NULL && i < e->class_of->function_count && !found; i++) {
         const struct anti_function *f = &e->class_of->functions[i];
         if (anti_rt_same_bytes(f->name, f->name_length, name, length)) {
-            return 1;
+            found = 1;
         }
     }
-    return 0;
+    anti_rt_plugin_release();
+    return found;
 }
 
 int64_t anti_rt_plugin_live(void *handle)
@@ -637,7 +696,8 @@ int64_t anti_rt_plugin_live(void *handle)
 }
 
 /* DESIGN: the check of live and the release of the slot stand under one
-   hold of the lock. A `created` hook counts under the same lock. An
+   hold of the lock. A `created` hook counts under the same lock, and the
+   loader counts an object it builds under it before the build starts. An
    object made while the check runs is then either counted before it, or
    finds no library open. */
 int8_t anti_rt_plugin_unload(void *handle)
@@ -866,10 +926,10 @@ void *anti_rt_plugin_provider(const unsigned char *path, int64_t path_length,
     if (handle == NULL) {
         return NULL;
     }
-    p = handle;
-    anti_rt_plugin_hold();
-    e = entry_of(p, NULL, path, path_length);
-    anti_rt_plugin_release();
+    e = reserve(handle, NULL, path, path_length, &p);
+    if (p == NULL) {
+        return NULL;
+    }
     if (e == NULL) {
         /* The unload clears the reason, so it comes first. */
         anti_rt_plugin_unload(handle);
@@ -877,5 +937,5 @@ void *anti_rt_plugin_provider(const unsigned char *path, int64_t path_length,
              (int)path_length, path);
         return NULL;
     }
-    return build(p, e);
+    return built(p, e);
 }

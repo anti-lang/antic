@@ -11,9 +11,16 @@
 #define EXPORTED
 #endif
 
+/* What init calls before it returns, set by the test. A load or an
+   unload there stands where the `created` hook of a real class runs. */
+EXPORTED void (*anti_bad_during_init)(void);
+
 static void init(void *object)
 {
     (void)object;
+    if (anti_bad_during_init != NULL) {
+        anti_bad_during_init();
+    }
 }
 
 static const int64_t chain[1] = {1};

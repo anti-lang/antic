@@ -87,6 +87,7 @@ static struct anti_provided *table;
 static struct anti_provides *entry;
 static struct anti_descriptor *class_of;
 static struct anti_class *classes;
+static void (**during_init)(void);
 
 static struct anti_provided table_good;
 static struct anti_provides entry_good;
@@ -124,8 +125,9 @@ static int open_bad(void)
     entry = symbol(library, "anti_bad_entry");
     class_of = symbol(library, "anti_bad_class");
     classes = symbol(library, "anti_bad_classes");
+    during_init = symbol(library, "anti_bad_during_init");
     if (table == NULL || entry == NULL || class_of == NULL ||
-        classes == NULL) {
+        classes == NULL || during_init == NULL) {
         return 0;
     }
     entry->descriptor = &service;
@@ -142,6 +144,7 @@ static void restore(void)
     *entry = entry_good;
     *class_of = class_good;
     *classes = classes_good;
+    *during_init = NULL;
     versions.floor = (const unsigned char *)"1.0";
     versions.floor_length = 3;
 }
@@ -152,8 +155,8 @@ static void *load(void)
                                (int64_t)strlen(PLUGIN_BAD));
 }
 
-/* The load refuses and names the damage. */
-static void refused(int line)
+/* The load refuses with a reason that holds want. */
+static void refused_with(int line, const char *want)
 {
     void *handle = load();
     struct anti_text why = anti_rt_plugin_message();
@@ -162,17 +165,18 @@ static void refused(int line)
     snprintf(text, sizeof text, "%.*s", (int)why.len, why.ptr);
     if (handle != NULL) {
         check_failures++;
-        fprintf(stderr, "line %d: a damaged table loaded\n", line);
+        fprintf(stderr, "line %d: a refused table loaded\n", line);
         anti_rt_plugin_unload(handle);
-    } else if (strstr(text, "damaged table") == NULL) {
+    } else if (strstr(text, want) == NULL) {
         check_failures++;
-        fprintf(stderr, "line %d: the refusal names no damage: %s\n", line,
-                text);
+        fprintf(stderr, "line %d: the refusal does not say `%s`: %s\n", line,
+                want, text);
     }
     restore();
 }
 
-#define REFUSED() refused(__LINE__)
+/* The load refuses and names the damage. */
+#define REFUSED() refused_with(__LINE__, "damaged table")
 
 /* The table as the library carries it loads, builds and unloads. */
 static void good_table_loads(void)
@@ -266,6 +270,61 @@ static void damaged_offsets(void)
     REFUSED();
 }
 
+/* An unload while an object of the library is being built. A load of the
+   open library gives the slot it has. */
+static int8_t unloaded_during_build;
+
+static void unload_during_build(void)
+{
+    void *handle = load();
+
+    unloaded_during_build = handle != NULL ? anti_rt_plugin_unload(handle)
+                                           : -2;
+}
+
+/* The object the loader builds counts from before the lock is given back
+   until its init has run, where the `created` hook of the class counts
+   it. An unload in between refuses, and the library stays open. */
+static void unload_waits_for_build(void)
+{
+    const unsigned char path[] = "host.Service";
+    void *handle = load();
+    void *sub;
+
+    CHECK(handle != NULL);
+    if (handle == NULL) {
+        return;
+    }
+    unloaded_during_build = -1;
+    *during_init = unload_during_build;
+    sub = anti_rt_plugin_instance(handle, &service);
+    CHECK(unloaded_during_build == 0);
+    CHECK(sub != NULL);
+    if (sub != NULL) {
+        free((unsigned char *)sub - entry->offset);
+    }
+    CHECK(anti_rt_plugin_live(handle) == 0);
+    CHECK(anti_rt_plugin_unload(handle) == 1);
+
+    /* The provider of an interface builds the same way. */
+    unloaded_during_build = -1;
+    sub = anti_rt_plugin_provider(path, (int64_t)sizeof path - 1,
+                                  (const unsigned char *)PLUGIN_BAD,
+                                  (int64_t)strlen(PLUGIN_BAD), NULL);
+    CHECK(unloaded_during_build == 0);
+    CHECK(sub != NULL);
+    if (sub != NULL) {
+        free((unsigned char *)sub - entry->offset);
+    }
+    restore();
+    handle = load();
+    CHECK(handle != NULL);
+    if (handle != NULL) {
+        CHECK(anti_rt_plugin_live(handle) == 0);
+        CHECK(anti_rt_plugin_unload(handle) == 1);
+    }
+}
+
 /* A part of a version longer than an int64_t compares by its digits. */
 static void long_versions(void)
 {
@@ -312,6 +371,7 @@ int main(void)
     damaged_counts();
     damaged_pointers();
     damaged_offsets();
+    unload_waits_for_build();
     long_versions();
     good_table_loads();
     if (check_failures != 0) {

@@ -16,6 +16,7 @@
 #include "plugin.h"
 
 #include "atomic.h"
+#include "std.h"
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -35,16 +36,43 @@ static struct anti_plugin loaded[ANTI_PLUGIN_MAX];
    never takes the lock. */
 static int64_t open_count;
 
+/* DESIGN: the loader of the platform holds a lock of its own while it
+   answers anti_rt_plugin_image, and while it runs the constructors of a
+   library. A constructor that makes an object takes this lock inside
+   that one. A thread that held this lock and asked for an image would
+   wait for the other in the opposite order. The flag says whether the
+   thread holds this lock, and anti_rt_plugin_image refuses to run under
+   it. */
+static _Thread_local int8_t holding;
+
 #if defined(_WIN32)
 static SRWLOCK lock = SRWLOCK_INIT;
 
-void anti_rt_plugin_hold(void) { AcquireSRWLockExclusive(&lock); }
-void anti_rt_plugin_release(void) { ReleaseSRWLockExclusive(&lock); }
+void anti_rt_plugin_hold(void)
+{
+    AcquireSRWLockExclusive(&lock);
+    holding = 1;
+}
+
+void anti_rt_plugin_release(void)
+{
+    holding = 0;
+    ReleaseSRWLockExclusive(&lock);
+}
 #else
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
-void anti_rt_plugin_hold(void) { pthread_mutex_lock(&lock); }
-void anti_rt_plugin_release(void) { pthread_mutex_unlock(&lock); }
+void anti_rt_plugin_hold(void)
+{
+    pthread_mutex_lock(&lock);
+    holding = 1;
+}
+
+void anti_rt_plugin_release(void)
+{
+    holding = 0;
+    pthread_mutex_unlock(&lock);
+}
 #endif
 
 int64_t anti_rt_plugin_open(void)
@@ -82,6 +110,10 @@ const struct anti_registry *anti_rt_plugin_registry(int64_t index)
    count of live objects rests on nothing else. */
 const void *anti_rt_plugin_image(const void *address)
 {
+    if (holding != 0) {
+        anti_rt_fail_abort("anti: the image of an address was asked for "
+                           "under the lock of the loaded libraries");
+    }
 #if defined(_WIN32)
     HMODULE module = NULL;
     if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |

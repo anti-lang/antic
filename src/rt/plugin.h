@@ -110,7 +110,9 @@ int64_t anti_rt_plugin_open(void);
 struct anti_plugin *anti_rt_plugin_at(int64_t index);
 
 /* The image an address lies in, which tells a library from the
-   program. */
+   program. The platform answers under a lock of its own, so a thread
+   that holds the lock of the slots never calls it, and a call there ends
+   the program. */
 const void *anti_rt_plugin_image(const void *address);
 
 /* Count a library that was opened, or one that was closed. */
@@ -143,7 +145,8 @@ int8_t anti_rt_plugin_supports(void *handle, const struct anti_descriptor *d,
                                const unsigned char *name, int64_t length);
 
 /* The objects of the library that are alive, counted through the
-   `created` and `destroyed` hooks. */
+   `created` and `destroyed` hooks, and the objects the loader is
+   building. */
 int64_t anti_rt_plugin_live(void *handle);
 
 /* Close the library. Gives 0 while an object of it is alive, and the
