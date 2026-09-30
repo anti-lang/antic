@@ -681,12 +681,13 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
                                ? s->as.for_loop.names[0].symbol
                                : NULL;
     const struct expr *over = s->as.for_loop.over;
-    struct ir_block *test = lower_new_block(l);
+    struct ir_block *test = over != NULL ? lower_new_block(l) : NULL;
     struct ir_block *body = lower_new_block(l);
     struct ir_block *step = lower_new_block(l);
     struct ir_block *exit = lower_new_block(l);
     struct loop loop;
-    struct ir_operand limit;
+    struct ir_operand low = lower_none();
+    struct ir_operand high = lower_none();
     struct ir_operand base = lower_none();
     const struct type *seq = NULL;
     enum ir_type counter_type = IR_I64;
@@ -695,8 +696,9 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
        checker stores `by k` as an int64_t, so a step of 2^63 on an
        unsigned range reads as INT64_MIN. A range of an unsigned type
        walks up, since the checker refuses a negative step on it, and its
-       test compares unsigned. The magnitude is negated in uint64_t,
-       where -2^63 has one. */
+       bounds compare unsigned. The magnitude is negated in uint64_t,
+       where -2^63 has one. The checker refuses a step that does not fit
+       the type of the range, so k fits the unsigned type of its width. */
     int64_t stride = s->as.for_loop.step_value;
     bool unsigned_range =
         over == NULL && !type_is_signed(s->as.for_loop.low->type);
@@ -705,6 +707,8 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
 
     /* The bound is read once, before the loop. */
     if (over != NULL) {
+        struct ir_operand limit;
+
         seq = over->type;
         base = lower_address(l, over);
         if (seq->kind == TYPE_SLICE) {
@@ -720,51 +724,67 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
                         : ir_int_op(IR_I64, seq->length);
         }
         counter = ir_unary(l->f, l->b, IR_COPY, IR_I64, ir_int_op(IR_I64, 0));
+        ir_jump(l->f, l->b, test);
+        l->b = test;
+        ir_branch(l->f, l->b,
+                  lower_temp(l, ir_binary(l->f, l->b, IR_SLT, IR_I8,
+                                          lower_temp(l, counter), limit)),
+                  body, exit);
     } else {
-        struct ir_operand low = lower_expr(l, s->as.for_loop.low);
-        struct ir_operand high;
+        struct ir_block *first = down ? lower_new_block(l) : body;
+        struct ir_operand read;
+        /* DESIGN: a range never computes a value past its ends. The
+           counter holds the value of this turn, and the step measures
+           the distance to the bound that ends the walk before it moves:
+           `high - counter` upward, `counter - low` downward. Both are
+           differences of two values inside the range, so they fit the
+           unsigned type of the width and never wrap. The walk leaves when
+           the distance is at most k upward and below k downward, where
+           the next value would be past the end. A test of the moved
+           counter against the bound would wrap at the end of the type:
+           `0 as u8..255 by 10` would never stop. Every comparison and the
+           division are unsigned for that reason, and only the test of an
+           empty range compares by the sign of the type.
+
+           The bounds are copied, since the body may assign the variable
+           a bound names. */
         counter_type = lower_ir_type_of(s->as.for_loop.low->type);
-        high = lower_expr(l, s->as.for_loop.high);
+        read = lower_expr(l, s->as.for_loop.low);
+        low = lower_temp(l, ir_unary(l->f, l->b, IR_COPY, counter_type,
+                                     read));
+        read = lower_expr(l, s->as.for_loop.high);
+        high = lower_temp(l, ir_unary(l->f, l->b, IR_COPY, counter_type,
+                                      read));
+        counter = ir_unary(l->f, l->b, IR_COPY, counter_type, low);
+        ir_branch(l->f, l->b,
+                  lower_temp(l, ir_binary(l->f, l->b,
+                                          unsigned_range ? IR_ULT : IR_SLT,
+                                          IR_I8, low, high)),
+                  first, exit);
         /* DESIGN: `by -k` walks the values of `by k` in reverse, so it
            starts at the largest of them and not at the high bound. That
            value is `low + ((high - low - 1) / k) * k`, and the division
-           is by a constant and runs once.
-
-           The counter holds the next value plus k, and the body
-           subtracts before it reads. The test is then `counter >= low +
-           k`, which never wraps below zero the way `counter - k` would
-           on an unsigned type. An empty range leaves the counter at
-           `low`, where the first test already fails. */
+           is by a constant and runs once. */
         if (down) {
-            struct ir_block *first = lower_new_block(l);
-            struct ir_operand span =
-                lower_temp(l, ir_binary(l->f, l->b, IR_SUB, counter_type,
-                                        high, low));
-            limit = lower_temp(l, ir_binary(l->f, l->b, IR_ADD, counter_type,
-                                            low, ir_int_op(counter_type, k)));
-            counter = ir_unary(l->f, l->b, IR_COPY, counter_type, low);
-            ir_branch(l->f, l->b,
-                      lower_temp(l, ir_binary(l->f, l->b, IR_SGT, IR_I8, span,
-                                              ir_int_op(counter_type, 0))),
-                      first, test);
+            struct ir_operand span;
+            struct ir_operand steps;
+            struct ir_operand last;
+
             l->b = first;
-            ir_assign(
-                l->f, l->b, counter,
-                lower_temp(l, ir_binary(
-                    l->f, l->b, IR_ADD, counter_type, limit,
-                    lower_temp(l, ir_binary(
-                        l->f, l->b, IR_MUL, counter_type,
-                        lower_temp(l, ir_binary(
-                            l->f, l->b, IR_SDIV, counter_type,
-                            lower_temp(l, ir_binary(l->f, l->b, IR_SUB,
-                                                    counter_type, span,
-                                                    ir_int_op(counter_type,
-                                                              1))),
-                            ir_int_op(counter_type, k))),
-                        ir_int_op(counter_type, k))))));
-        } else {
-            limit = high;
-            counter = ir_unary(l->f, l->b, IR_COPY, counter_type, low);
+            span = lower_temp(l, ir_binary(l->f, l->b, IR_SUB, counter_type,
+                                           high, low));
+            span = lower_temp(l, ir_binary(l->f, l->b, IR_SUB, counter_type,
+                                           span, ir_int_op(counter_type, 1)));
+            steps = lower_temp(l, ir_binary(l->f, l->b, IR_UDIV, counter_type,
+                                            span,
+                                            ir_int_op(counter_type, k)));
+            last = lower_temp(l, ir_binary(l->f, l->b, IR_MUL, counter_type,
+                                           steps,
+                                           ir_int_op(counter_type, k)));
+            ir_assign(l->f, l->b, counter,
+                      lower_temp(l, ir_binary(l->f, l->b, IR_ADD,
+                                              counter_type, low, last)));
+            ir_jump(l->f, l->b, body);
         }
     }
     loop.continue_to = step;
@@ -773,27 +793,12 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
     loop.defers_at = l->defers;
     loop.temps_at = l->temp_count;
     l->loop_depth++;
-    ir_jump(l->f, l->b, test);
-    l->b = test;
-    ir_branch(l->f, l->b,
-              lower_temp(l, ir_binary(l->f, l->b,
-                                      down             ? IR_SGE
-                                      : unsigned_range ? IR_ULT
-                                                       : IR_SLT,
-                                      IR_I8, lower_temp(l, counter), limit)),
-              body, exit);
     l->loop = &loop;
     l->b = body;
     /* The variable of the body: the counter of a range, or the element
        that the index reaches. A range without a name counts and reads
        nothing. */
     if (over == NULL) {
-        if (down) {
-            ir_assign(l->f, l->b, counter,
-                      lower_temp(l, ir_binary(l->f, l->b, IR_SUB, counter_type,
-                                              lower_temp(l, counter),
-                                              ir_int_op(counter_type, k))));
-        }
         if (sym != NULL) {
             bind_loop_name(l, sym, counter_type, lower_temp(l, counter));
         }
@@ -837,13 +842,33 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
     l->loop = loop.outer;
     l->loop_depth--;
     l->b = step;
-    if (!down) {
+    if (over == NULL) {
+        struct ir_block *advance = lower_new_block(l);
+        struct ir_operand left =
+            down ? lower_temp(l, ir_binary(l->f, l->b, IR_SUB, counter_type,
+                                           lower_temp(l, counter), low))
+                 : lower_temp(l, ir_binary(l->f, l->b, IR_SUB, counter_type,
+                                           high, lower_temp(l, counter)));
+
+        ir_branch(l->f, l->b,
+                  lower_temp(l, ir_binary(l->f, l->b, down ? IR_ULT : IR_ULE,
+                                          IR_I8, left,
+                                          ir_int_op(counter_type, k))),
+                  exit, advance);
+        l->b = advance;
         ir_assign(l->f, l->b, counter,
-                  lower_temp(l, ir_binary(l->f, l->b, IR_ADD, counter_type,
+                  lower_temp(l, ir_binary(l->f, l->b, down ? IR_SUB : IR_ADD,
+                                          counter_type,
                                           lower_temp(l, counter),
                                           ir_int_op(counter_type, k))));
+        ir_jump(l->f, l->b, body);
+    } else {
+        ir_assign(l->f, l->b, counter,
+                  lower_temp(l, ir_binary(l->f, l->b, IR_ADD, IR_I64,
+                                          lower_temp(l, counter),
+                                          ir_int_op(IR_I64, k))));
+        ir_jump(l->f, l->b, test);
     }
-    ir_jump(l->f, l->b, test);
     l->b = exit;
 }
 
