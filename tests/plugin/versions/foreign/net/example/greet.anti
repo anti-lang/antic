@@ -1,0 +1,12 @@
+//! An interface with the name of the program's and another structure: `words`
+//! gives a number where the program's gives a text.
+
+/// A greeting a program prints.
+pub abstract class Greeter
+{
+	/// The letters of the greeting.
+	pub abstract fn words(self) -> int;
+
+	/// How often the greeting was asked for.
+	pub abstract fn asked(self) -> int;
+}

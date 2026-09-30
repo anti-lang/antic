@@ -1,6 +1,8 @@
-# Build one host and five libraries of the same interface, each against
-# another version of it, and load each into the host. A newer library and
-# an older one load, and the three checks of "Versions" refuse the rest.
+# Build one host and six libraries of an interface of the same name, each
+# against another version of it, and load each into the host. A newer
+# library and an older one load, and the checks of "Versions" refuse the
+# rest: a field added, a version below the floor, a slot the program
+# calls and the library lacks, and an interface of another structure.
 # Run with cmake -P and these values:
 #   ANTIC     the antic executable
 #   LLVM_MC   the llvm-mc executable
@@ -63,6 +65,7 @@ file(REMOVE_RECURSE "${WORK}")
 foreach(part "base|${SOURCES}|0.0.0" "one|${versions}/one|0.0.0"
              "three|${versions}/three|0.0.0"
              "field|${versions}/field|0.0.0"
+             "foreign|${versions}/foreign|0.0.0"
              "floor-1.0|${versions}/floor|1.0"
              "floor-1.1|${versions}/floor|1.1")
     string(REPLACE "|" ";" one "${part}")
@@ -80,6 +83,7 @@ endforeach()
 set(root_one "${versions}/one")
 set(root_three "${versions}/three")
 set(root_field "${versions}/field")
+set(root_foreign "${versions}/foreign")
 set(root_floor-1.0 "${versions}/floor")
 set(root_floor-1.1 "${versions}/floor")
 
@@ -109,6 +113,10 @@ loads(caller one no "calls `asked` of `net.example.greet.Greeter`")
 loads(caller three yes "from the newer library")
 # A field added to the interface ends the compatibility.
 loads(reader field no "a field was added to `net.example.greet.Greeter`")
+# An interface of the same name whose `words` gives another type is
+# another interface, and the chains differ at the first function.
+loads(reader foreign no
+      "`net.example.greet.Greeter` of .* is not the interface this program carries")
 # `compatible 1.1;` refuses a library built for 1.0.
 loads(floor floor-1.0 no "this program takes 1.1 and above")
 loads(floor floor-1.1 yes "from the floor library")

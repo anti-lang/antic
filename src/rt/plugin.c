@@ -478,13 +478,96 @@ static int text_sound(const unsigned char *text, int64_t length)
     return length >= 0 && length <= INT_MAX && (length == 0 || text != NULL);
 }
 
-/* Whether a descriptor of a class lies in an image of the process. Its
-   name, its version and its size must be ones the loader may use. */
+/* Whether count records of size bytes from list lie in one image of the
+   process, which the first byte and the last tell. The address of the
+   last byte is computed as an integer, since a count that is damaged
+   would put a pointer past the object it points into. */
+static int list_sound(const void *list, int64_t count, size_t size)
+{
+    uintptr_t first = (uintptr_t)list;
+    const void *image;
+
+    if (count == 0) {
+        return 1;
+    }
+    if (count < 0 || list == NULL ||
+        (uint64_t)count > (UINTPTR_MAX - first) / size) {
+        return 0;
+    }
+    image = anti_rt_plugin_image(list);
+    return image != NULL &&
+           anti_rt_plugin_image((const void *)(first + (uintptr_t)count * size -
+                                               1)) == image;
+}
+
+/* Whether a list of fields lies in an image, and each field has a name
+   and an offset inside an object of size bytes. */
+static int fields_sound(const struct anti_field *fields, int64_t count,
+                        int64_t size)
+{
+    int64_t i;
+
+    if (!list_sound(fields, count, sizeof *fields)) {
+        return 0;
+    }
+    for (i = 0; i < count; i++) {
+        if (!text_sound(fields[i].name, fields[i].name_length) ||
+            fields[i].offset < 0 || fields[i].offset > size) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* Whether a descriptor lies in an image of the process, and its name,
+   its version, its size and its lists are ones the loader and the walks
+   of reflection and Object.deserialize may use. */
+static int descriptor_sound(const struct anti_descriptor *d)
+{
+    int64_t i;
+
+    if (d == NULL || anti_rt_plugin_image(d) == NULL ||
+        !text_sound(d->name, d->name_length) ||
+        !text_sound(d->version, d->version_length) || d->size <= 0 ||
+        !fields_sound(d->fields, d->field_count, d->size) ||
+        !fields_sound(d->type_args, d->type_arg_count, INT64_MAX) ||
+        !list_sound(d->functions, d->function_count, sizeof *d->functions)) {
+        return 0;
+    }
+    for (i = 0; i < d->function_count; i++) {
+        const struct anti_function *f = &d->functions[i];
+        if (!text_sound(f->name, f->name_length) || f->slot < 0 ||
+            f->param_count < 0 ||
+            (f->signature != NULL &&
+             anti_rt_plugin_image(f->signature) == NULL)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* Whether a descriptor of a class and every descriptor of its chain are
+   sound. The chain holds as many parents as the depth says, and the list
+   of ancestors, where there is one, ends in the class itself. */
 static int class_sound(const struct anti_descriptor *d)
 {
-    return d != NULL && anti_rt_plugin_image(d) != NULL &&
-           text_sound(d->name, d->name_length) &&
-           text_sound(d->version, d->version_length) && d->size > 0;
+    const struct anti_descriptor *up;
+    int64_t steps;
+
+    if (!descriptor_sound(d) || d->depth < 0 || d->depth == INT64_MAX ||
+        (d->ancestors != NULL &&
+         (!list_sound(d->ancestors, d->depth + 1, sizeof *d->ancestors) ||
+          d->ancestors[d->depth] != d))) {
+        return 0;
+    }
+    up = d->parent;
+    for (steps = 0; up != NULL && steps < d->depth; steps++) {
+        if (!descriptor_sound(up)) {
+            return 0;
+        }
+        up = up->parent;
+    }
+    return up == NULL && steps == d->depth;
 }
 
 /* What is damaged in the table of a library, or NULL when every value

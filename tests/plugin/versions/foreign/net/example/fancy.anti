@@ -1,0 +1,23 @@
+//! A library built against an interface of the same name and another structure.
+
+import net.example.greet;
+
+provides net.example.greet.Greeter as Fancy;
+
+/// The greeting of the foreign library.
+pub class Fancy
+{
+	implements g: greet.Greeter,
+
+	/// The letters of the greeting.
+	pub concrete fn words(self) -> int
+	{
+		return 22;
+	}
+
+	/// How often the greeting was asked for.
+	pub concrete fn asked(self) -> int
+	{
+		return 0;
+	}
+}

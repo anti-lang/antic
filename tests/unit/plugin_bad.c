@@ -25,9 +25,20 @@ static void init(void *object)
 
 static const int64_t chain[1] = {1};
 
+/* One public function and one field of the class, which the test damages
+   as it damages the table. */
+EXPORTED struct anti_function anti_bad_functions[1] = {
+    {(const unsigned char *)"words", 5, 8, 0, NULL}
+};
+
+EXPORTED struct anti_field anti_bad_fields[1] = {
+    {(const unsigned char *)"count", 5, 0, 0, 0, NULL}
+};
+
 EXPORTED struct anti_descriptor anti_bad_class = {
-    (const unsigned char *)"Impl", 4, NULL, 32, 0, NULL, 0, NULL, NULL, 0, 0,
-    NULL, (const unsigned char *)"1.0.0", 5, NULL, 0, NULL
+    (const unsigned char *)"Impl", 4, NULL, 32, 0, NULL, 1, anti_bad_fields,
+    NULL, 0, 1, anti_bad_functions, (const unsigned char *)"1.0.0", 5, NULL,
+    0, NULL
 };
 
 EXPORTED struct anti_provides anti_bad_entry = {

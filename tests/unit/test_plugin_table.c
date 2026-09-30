@@ -87,12 +87,16 @@ static struct anti_provided *table;
 static struct anti_provides *entry;
 static struct anti_descriptor *class_of;
 static struct anti_class *classes;
+static struct anti_function *functions;
+static struct anti_field *fields;
 static void (**during_init)(void);
 
 static struct anti_provided table_good;
 static struct anti_provides entry_good;
 static struct anti_descriptor class_good;
 static struct anti_class classes_good;
+static struct anti_function functions_good;
+static struct anti_field fields_good;
 
 static void *symbol(void *library, const char *name)
 {
@@ -125,9 +129,12 @@ static int open_bad(void)
     entry = symbol(library, "anti_bad_entry");
     class_of = symbol(library, "anti_bad_class");
     classes = symbol(library, "anti_bad_classes");
+    functions = symbol(library, "anti_bad_functions");
+    fields = symbol(library, "anti_bad_fields");
     during_init = symbol(library, "anti_bad_during_init");
     if (table == NULL || entry == NULL || class_of == NULL ||
-        classes == NULL || during_init == NULL) {
+        classes == NULL || functions == NULL || fields == NULL ||
+        during_init == NULL) {
         return 0;
     }
     entry->descriptor = &service;
@@ -135,6 +142,8 @@ static int open_bad(void)
     entry_good = *entry;
     class_good = *class_of;
     classes_good = *classes;
+    functions_good = *functions;
+    fields_good = *fields;
     return 1;
 }
 
@@ -144,6 +153,8 @@ static void restore(void)
     *entry = entry_good;
     *class_of = class_good;
     *classes = classes_good;
+    *functions = functions_good;
+    *fields = fields_good;
     *during_init = NULL;
     versions.floor = (const unsigned char *)"1.0";
     versions.floor_length = 3;
@@ -270,6 +281,82 @@ static void damaged_offsets(void)
     REFUSED();
 }
 
+/* The lists of the class lie inside the library's image and hold what
+   their counts say. supports and Object.deserialize walk them. */
+static void damaged_lists(void)
+{
+    class_of->function_count = 100000;
+    REFUSED();
+    class_of->function_count = INT64_MAX;
+    REFUSED();
+    class_of->function_count = -1;
+    REFUSED();
+    class_of->functions = NULL;
+    REFUSED();
+    class_of->field_count = 100000;
+    REFUSED();
+    class_of->field_count = INT64_MAX / 2;
+    REFUSED();
+    class_of->field_count = -1;
+    REFUSED();
+    class_of->fields = NULL;
+    REFUSED();
+    class_of->type_arg_count = 3;
+    REFUSED();
+    functions->name_length = -1;
+    REFUSED();
+    functions->slot = -1;
+    REFUSED();
+    fields->name = NULL;
+    REFUSED();
+    fields->offset = 4096;
+    REFUSED();
+    fields->offset = -1;
+    REFUSED();
+}
+
+/* The chain of parents ends after as many steps as the depth says, and
+   every descriptor of it is sound. */
+static void damaged_parents(void)
+{
+    void *heap = malloc(sizeof(struct anti_descriptor));
+
+    class_of->parent = class_of;
+    REFUSED();
+    class_of->depth = -1;
+    REFUSED();
+    class_of->depth = 1;
+    REFUSED();
+    class_of->parent = heap;
+    class_of->depth = 1;
+    REFUSED();
+    class_of->parent = &service;
+    class_of->depth = 1;
+    class_of->ancestors = (const struct anti_descriptor *const *)(void *)heap;
+    REFUSED();
+    free(heap);
+}
+
+/* The two refusals of a sound table that belongs to another program:
+   one built for another runtime, and one whose interface has the name of
+   the host's and another structure. */
+static void other_program(void)
+{
+    static const int64_t other_chain[1] = {2};
+
+    table->version = (const unsigned char *)"9.9.9";
+    table->version_length = 5;
+    refused_with(__LINE__, "was built for runtime 9.9.9, and this program "
+                           "carries 0.0.0");
+    entry->chain = other_chain;
+    refused_with(__LINE__, "`host.Service` of " PLUGIN_BAD
+                           " is not the interface this program carries");
+    /* A library that carries the interface in its own image was not bound
+       against the host. */
+    entry->descriptor = class_of;
+    refused_with(__LINE__, "carries an `host.Service` of its own");
+}
+
 /* An unload while an object of the library is being built. A load of the
    open library gives the slot it has. */
 static int8_t unloaded_during_build;
@@ -371,6 +458,9 @@ int main(void)
     damaged_counts();
     damaged_pointers();
     damaged_offsets();
+    damaged_lists();
+    damaged_parents();
+    other_program();
     unload_waits_for_build();
     long_versions();
     good_table_loads();
