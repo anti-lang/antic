@@ -1,0 +1,2 @@
+types.anti:3:19: error: expected `bool`, found an integer literal
+types.anti:4:9: error: expected `int`, found `bool`

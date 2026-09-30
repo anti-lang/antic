@@ -1414,6 +1414,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - `catch none` counts a failure as `none` where the result can be `none`. It is `catch { yield none; }`, so it deletes the error as every handler does, and it stands wherever a handler of a call stands: after a `let`, an assignment and a call statement. A `let` that names `?*T` over a call that gives `*T` takes it, as `yield none` does. `programs/catch_none.anti` runs it under a leak check.
 - [provisional] `catch none` is refused on a call that gives a value that cannot be `none` or no result, after a `try` block, on a `catch` that guards a pointer and on a call that cannot fail. Reason: each has no failure to count or no `none` to give.
 - The safety check `unguarded-field` is built with concurrent classes, and `exponential-pattern` with pattern literals, as "Regular expressions" below records. A safety check is an error with a name, which leaves the checker going and which a clause drops. Before 2026-09-24 neither check was built.
+- [provisional] antic exits with 1 when it refuses a program, with 2 when it refuses its command line and with 70 when it runs out of memory. A test of a refusal names the status it expects, and a test of a warning expects 0. Every such test runs through `tests/run_expect.cmake`, and no test sets `PASS_REGULAR_EXPRESSION`, which the test `expect_runner` checks. Reason: ctest ignores the status of a test with that property, so a program that printed the message and then exited 0 or crashed passed.
 
 ## Nested types
 

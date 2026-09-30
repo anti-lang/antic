@@ -1,0 +1,2 @@
+lexical.anti:3:14: error: unknown escape `\q`
+lexical.anti:4:10: error: a character literal holds one character

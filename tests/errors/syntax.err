@@ -1,0 +1,2 @@
+syntax.anti:3:10: error: expected an expression
+syntax.anti:5:2: error: expected `;`

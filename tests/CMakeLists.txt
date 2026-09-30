@@ -179,11 +179,56 @@ target_compile_definitions(rt_plugin_table_tests PRIVATE
 add_dependencies(rt_plugin_table_tests plugin_bad)
 add_test(NAME rt_plugin_table COMMAND rt_plugin_table_tests)
 
+# add_expect_test(<name> STATUS <status> [DIRECTORY <dir>]
+#                 EXPECTED <file> | PATTERN <regex>
+#                 COMMAND <program> <arguments>...)
+# registers a test of run_expect.cmake, which checks the exit status of
+# the program beside its output. Every test of a refusal or of a warning
+# goes through it, and none sets PASS_REGULAR_EXPRESSION, under which
+# ctest ignores the status. The command line of the test carries no `;`,
+# no `,` inside an argument and no line break, so a pattern holds neither
+# and a test that needs one compares a file with EXPECTED.
+function(add_expect_test name)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "STATUS;DIRECTORY;EXPECTED;PATTERN"
+                          "COMMAND")
+    foreach(argument IN LISTS arg_COMMAND)
+        if(argument MATCHES ",")
+            message(FATAL_ERROR "${name}: the argument `${argument}` holds a `,`")
+        endif()
+    endforeach()
+    if(arg_PATTERN MATCHES "[;\n]")
+        message(FATAL_ERROR "${name}: the pattern holds a `;` or a line break")
+    endif()
+    list(JOIN arg_COMMAND "," command)
+    set(values "-DCOMMAND=${command}" "-DSTATUS=${arg_STATUS}")
+    if(DEFINED arg_DIRECTORY)
+        list(APPEND values "-DDIRECTORY=${arg_DIRECTORY}")
+    endif()
+    if(DEFINED arg_EXPECTED)
+        list(APPEND values "-DEXPECTED=${arg_EXPECTED}")
+    endif()
+    if(DEFINED arg_PATTERN)
+        list(APPEND values "-DPATTERN=${arg_PATTERN}")
+    endif()
+    add_test(NAME ${name}
+        COMMAND "${CMAKE_COMMAND}" ${values}
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_expect.cmake")
+endfunction()
+
+# run_expect.cmake refuses a program that prints the message of a refusal
+# and exits 0, which a pattern of ctest lets pass, and no CMake file of
+# the repository sets such a pattern.
+add_test(NAME expect_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DEXPECT=${CMAKE_CURRENT_SOURCE_DIR}/run_expect.cmake"
+        "-DROOT=${CMAKE_SOURCE_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/expect-runner"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_expect_self.cmake")
+
 # The runtime archive holds the licence text of every component.
-add_test(NAME runtime_licenses
+add_expect_test(runtime_licenses STATUS 0
+    PATTERN "^BSD Zero Clause License"
     COMMAND "${CMAKE_COMMAND}" -E cat "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt")
-set_tests_properties(runtime_licenses PROPERTIES
-    PASS_REGULAR_EXPRESSION "^BSD Zero Clause License")
 
 # The processor levels. src/antic/cpu.c holds the table for antic and
 # tools/cpu-levels holds it for the build, so the two are compared.
@@ -403,18 +448,25 @@ set_tests_properties(pre_commit_hook PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: "
 
 # The version stands in tools/version alone, and both programs print
 # that one. Step 10 of the release reads them from a fresh install.
-add_test(NAME antic_version COMMAND antic --version)
-set_tests_properties(antic_version PROPERTIES
-    PASS_REGULAR_EXPRESSION "^antic ${PROJECT_VERSION}\n")
-add_test(NAME anti_version COMMAND anti --version)
-set_tests_properties(anti_version PROPERTIES
-    PASS_REGULAR_EXPRESSION "^anti ${PROJECT_VERSION}\n")
+# Each prints its line and nothing else, which the files below hold.
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_version"
+     "antic ${PROJECT_VERSION}\n")
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_version"
+     "anti ${PROJECT_VERSION}\n")
+add_expect_test(antic_version STATUS 0
+    EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_version"
+    COMMAND "$<TARGET_FILE:antic>" --version)
+add_expect_test(anti_version STATUS 0
+    EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_version"
+    COMMAND "$<TARGET_FILE:anti>" --version)
 
 # The host target name has two spellings: ANTIC_HOST_TARGET here and the
 # detection in src/antic/target.c. This test fails when they disagree.
-add_test(NAME antic_host_target COMMAND antic --print-host-target)
-set_tests_properties(antic_host_target PROPERTIES
-    PASS_REGULAR_EXPRESSION "^${ANTIC_HOST_TARGET}\n$")
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_host_target"
+     "${ANTIC_HOST_TARGET}\n")
+add_expect_test(antic_host_target STATUS 0
+    EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_host_target"
+    COMMAND "$<TARGET_FILE:antic>" --print-host-target)
 
 # DESIGN: a test that compiles C or C++ beside Anti takes the compiler of
 # the build, so a build with the pinned clang runs no compiler of the
@@ -1744,30 +1796,28 @@ else()
         FAIL_REGULAR_EXPRESSION "raylib not found")
 endif()
 
-# Diagnostics. Each test passes when antic's output matches the pattern.
-add_test(NAME error_missing_semicolon
-    COMMAND antic -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/missing_semicolon.s"
-            "${CMAKE_CURRENT_SOURCE_DIR}/errors/missing_semicolon.anti")
-set_tests_properties(error_missing_semicolon PROPERTIES
-    PASS_REGULAR_EXPRESSION "missing_semicolon.anti:4:1: error: expected `[;]`")
-# A ';' in a property value separates list elements, so a pattern writes
-# the semicolon as [;].
+# Diagnostics. A refusal of a program exits with 1, and its messages
+# equal the .err file beside it.
+add_expect_test(error_missing_semicolon STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/missing_semicolon.err"
+    COMMAND "$<TARGET_FILE:antic>" -S
+            -o "${CMAKE_CURRENT_BINARY_DIR}/errors/missing_semicolon.s"
+            missing_semicolon.anti)
 
 # The runtime's module path belongs to no compilation, the anti root needs
 # --anti-internal for a library, and a library path of one segment warns.
-add_test(NAME error_runtime_module
-    COMMAND antic -S -I "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+add_expect_test(error_runtime_module STATUS 1
+    PATTERN "^antic: .*/errors/anti/rt\\.anti: the module path `anti\\.rt` is the runtime's"
+    COMMAND "$<TARGET_FILE:antic>" -S -I "${CMAKE_CURRENT_SOURCE_DIR}/errors"
             -o "${CMAKE_CURRENT_BINARY_DIR}/errors/rt.s"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/anti/rt.anti")
-set_tests_properties(error_runtime_module PROPERTIES
-    PASS_REGULAR_EXPRESSION "the module path `anti.rt` is the runtime's")
 
-add_test(NAME error_reserved_library
-    COMMAND antic -c -I "${CMAKE_CURRENT_SOURCE_DIR}/modules"
+add_expect_test(error_reserved_library STATUS 1
+    PATTERN "^antic: .*/modules/anti/text\\.anti: the module path `anti\\.text` is reserved for the language's own libraries"
+    COMMAND "$<TARGET_FILE:antic>" -c -I "${CMAKE_CURRENT_SOURCE_DIR}/modules"
             -o "${CMAKE_CURRENT_BINARY_DIR}/anti_text.antl"
             "${CMAKE_CURRENT_SOURCE_DIR}/modules/anti/text.anti")
-set_tests_properties(error_reserved_library PROPERTIES
-    PASS_REGULAR_EXPRESSION "the module path `anti.text` is reserved for the language's own libraries")
 
 add_test(NAME antl_internal
     COMMAND antic -c --anti-internal -I "${CMAKE_CURRENT_SOURCE_DIR}/modules"
@@ -1777,12 +1827,11 @@ add_test(NAME antl_internal
 # A `may fail` function without a `fail` and without a `try` is a warning,
 # not an error, because an interface function may fail in one
 # implementation and not in another. A dev build prints it and carries on.
-add_test(NAME warning_never_fails
-    COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" --dev -S
+add_expect_test(warning_never_fails STATUS 0
+    PATTERN "never_fails.anti:3:21: warning: `close_it` may fail and never does \\[never-fails\\]"
+    COMMAND "$<TARGET_FILE:antic>" --runtime "${ANTIC_RUNTIME_DIR}" --dev -S
             -o "${CMAKE_CURRENT_BINARY_DIR}/never_fails.s"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/never_fails.anti")
-set_tests_properties(warning_never_fails PROPERTIES
-    PASS_REGULAR_EXPRESSION "never_fails.anti:3:21: warning: `close_it` may fail and never does \\[never-fails\\]")
 
 # A release build accepts no warning, and --warnings-as-errors gives a dev
 # build the same behaviour. The warning is then an error with its name.
@@ -1790,13 +1839,13 @@ foreach(mode "release|-S" "strict|--dev,--warnings-as-errors,-S")
     string(REPLACE "|" ";" parts "${mode}")
     list(GET parts 0 name)
     list(GET parts 1 flags)
-    add_test(NAME error_never_fails_${name}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-            "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},${flags},-o,${CMAKE_CURRENT_BINARY_DIR}/never_fails_${name}.s,never_fails.anti"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/never_fails.err"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
+    string(REPLACE "," ";" flags "${flags}")
+    add_expect_test(error_never_fails_${name} STATUS 1
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/never_fails.err"
+        COMMAND "$<TARGET_FILE:antic>" --runtime "${ANTIC_RUNTIME_DIR}" ${flags}
+                -o "${CMAKE_CURRENT_BINARY_DIR}/never_fails_${name}.s"
+                never_fails.anti)
 endforeach()
 
 # `allow` at every level silences its warning, so a release build and a
@@ -1842,21 +1891,19 @@ add_test(NAME warning_names
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_warning_names.cmake")
 
 # Doc warnings come only with --doc-warnings, which anti check passes.
-add_test(NAME warning_note
-    COMMAND antic --doc-warnings -S -o "${CMAKE_CURRENT_BINARY_DIR}/note.s"
+add_expect_test(warning_note STATUS 0
+    PATTERN "note.anti:2:8: warning: the pub item `warm` has a `//#` note and no `///` comment"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings -S -o "${CMAKE_CURRENT_BINARY_DIR}/note.s"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/note.anti")
-set_tests_properties(warning_note PROPERTIES
-    PASS_REGULAR_EXPRESSION "note.anti:2:8: warning: the pub item `warm` has a `//#` note and no `///` comment")
 add_test(NAME silent_note
     COMMAND antic -S -o "${CMAKE_CURRENT_BINARY_DIR}/note_silent.s"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/note.anti")
 set_tests_properties(silent_note PROPERTIES FAIL_REGULAR_EXPRESSION "warning")
 
-add_test(NAME warning_dropped
-    COMMAND antic --doc-warnings -S -o "${CMAKE_CURRENT_BINARY_DIR}/dropped.s"
+add_expect_test(warning_dropped STATUS 0
+    PATTERN "dropped.anti:3:2: warning: the `/\\*\\*` comment is dropped, because no item or field follows it"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings -S -o "${CMAKE_CURRENT_BINARY_DIR}/dropped.s"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/dropped.anti")
-set_tests_properties(warning_dropped PROPERTIES
-    PASS_REGULAR_EXPRESSION "dropped.anti:3:2: warning: the `/\\*\\*` comment is dropped, because no item or field follows it")
 add_test(NAME silent_dropped
     COMMAND antic -S -o "${CMAKE_CURRENT_BINARY_DIR}/dropped_silent.s"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/dropped.anti")
@@ -1926,18 +1973,16 @@ add_test(NAME overview_examples
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/overview"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_overview_examples.cmake")
 
-add_test(NAME warning_one_segment
-    COMMAND antic -c -o "${CMAKE_CURRENT_BINARY_DIR}/geometry.antl"
+add_expect_test(warning_one_segment STATUS 0
+    PATTERN "geometry.anti:1:1: warning: the module path `geometry` has one segment, which is for a program's own files \\[single-segment-path\\]"
+    COMMAND "$<TARGET_FILE:antic>" -c -o "${CMAKE_CURRENT_BINARY_DIR}/geometry.antl"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/geometry.anti")
-set_tests_properties(warning_one_segment PROPERTIES
-    PASS_REGULAR_EXPRESSION "geometry.anti:1:1: warning: the module path `geometry` has one segment, which is for a program's own files \\[single-segment-path\\]")
 
-add_test(NAME error_no_main
-    COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/errors/no_main"
-            "${CMAKE_CURRENT_SOURCE_DIR}/errors/no_main.anti")
-set_tests_properties(error_no_main PROPERTIES
-    PASS_REGULAR_EXPRESSION "no_main.anti: the program has no function `main`")
+add_expect_test(error_no_main STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/no_main.err"
+    COMMAND "$<TARGET_FILE:antic>" --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/errors/no_main" no_main.anti)
 
 # lld links a program for every target on this host. The test of a
 # target without a sysroot in the runtime archive is skipped. The second
@@ -2091,27 +2136,25 @@ if(ANTIC_HOST_OS STREQUAL "linux")
 else()
     set(foreign_target linux-x86_64)
 endif()
-add_test(NAME error_foreign_link
-    COMMAND antic --target ${foreign_target} --linker platform
+add_expect_test(error_foreign_link STATUS 2
+    PATTERN "^antic: linking for ${foreign_target} with the platform linker needs a host with the same operating system"
+    COMMAND "$<TARGET_FILE:antic>" --target ${foreign_target} --linker platform
             --runtime "${ANTIC_RUNTIME_DIR}" --llvm-mc "${ANTIC_LLVM_MC}"
             -o "${CMAKE_CURRENT_BINARY_DIR}/errors/return42"
             "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
-set_tests_properties(error_foreign_link PROPERTIES
-    PASS_REGULAR_EXPRESSION "linking for ${foreign_target} with the platform linker needs a host with the same operating system")
 
 # The back end folds an array length from size_of and names the target.
-add_test(NAME error_array_length
-    COMMAND antic -S --target linux-x86_64
+add_expect_test(error_array_length STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/zero_length.err"
+    COMMAND "$<TARGET_FILE:antic>" -S --target linux-x86_64
             -o "${CMAKE_CURRENT_BINARY_DIR}/errors/zero_length.s"
-            "${CMAKE_CURRENT_SOURCE_DIR}/errors/zero_length.anti")
-set_tests_properties(error_array_length PROPERTIES
-    PASS_REGULAR_EXPRESSION "antic: the array length `size_of\\(Pair\\) - 8` is 0 on linux-x86_64, and an array length is at least 1")
+            zero_length.anti)
 
-add_test(NAME error_missing_runtime
-    COMMAND antic -o "${CMAKE_CURRENT_BINARY_DIR}/errors/return42"
+add_expect_test(error_missing_runtime STATUS 2
+    PATTERN "^antic: linking needs --runtime"
+    COMMAND "$<TARGET_FILE:antic>" -o "${CMAKE_CURRENT_BINARY_DIR}/errors/return42"
             "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
-set_tests_properties(error_missing_runtime PROPERTIES
-    PASS_REGULAR_EXPRESSION "antic: linking needs --runtime")
 
 # Dumps of compiler stages, compared with expected files in tests/dump.
 # scale.tokens is the token listing that chapter 1 prints.
@@ -2132,11 +2175,11 @@ add_test(NAME dump_tokens_docs
         "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/docs.tokens"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
 
-add_test(NAME error_lexical
-    COMMAND antic -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/lexical.s"
-            "${CMAKE_CURRENT_SOURCE_DIR}/errors/lexical.anti")
-set_tests_properties(error_lexical PROPERTIES
-    PASS_REGULAR_EXPRESSION "lexical.anti:3:14: error: unknown escape `\\\\q`\n[^\n]*lexical.anti:4:10: error: a character literal holds one character\n")
+add_expect_test(error_lexical STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/lexical.err"
+    COMMAND "$<TARGET_FILE:antic>" -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/lexical.s"
+            lexical.anti)
 
 # A source of 64 MiB passes the front end, and one a byte longer is
 # refused when it is read, before the lexer sees it.
@@ -2184,11 +2227,11 @@ add_test(NAME dump_ast_format
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
 
 # Two mistakes produce exactly two messages.
-add_test(NAME error_syntax
-    COMMAND antic -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/syntax.s"
-            "${CMAKE_CURRENT_SOURCE_DIR}/errors/syntax.anti")
-set_tests_properties(error_syntax PROPERTIES
-    PASS_REGULAR_EXPRESSION "^[^\n]*syntax.anti:3:10: error: expected an expression\n[^\n]*syntax.anti:5:2: error: expected `[;]`\n$")
+add_expect_test(error_syntax STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/syntax.err"
+    COMMAND "$<TARGET_FILE:antic>" -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/syntax.s"
+            syntax.anti)
 
 # scale.types is the typed tree listing that chapter 1 prints.
 add_test(NAME dump_types_scale
@@ -2671,15 +2714,13 @@ set_tests_properties(antl_board PROPERTIES FIXTURES_SETUP board_antl)
 foreach(mode release dev)
     set(flag "")
     if(mode STREQUAL "dev")
-        set(flag "--dev,")
+        set(flag --dev)
     endif()
-    add_test(NAME error_worker_reach_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-            "-DCOMMAND=${flag}-S,-I,${LIBS},-o,${CMAKE_CURRENT_BINARY_DIR}/worker_reach.s,worker_reach.anti"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/worker_reach.err"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
+    add_expect_test(error_worker_reach_${mode} STATUS 1
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/worker_reach.err"
+        COMMAND "$<TARGET_FILE:antic>" ${flag} -S -I "${LIBS}"
+                -o "${CMAKE_CURRENT_BINARY_DIR}/worker_reach.s" worker_reach.anti)
     set_tests_properties(error_worker_reach_${mode} PROPERTIES
         FIXTURES_REQUIRED board_antl)
 endforeach()
@@ -2693,13 +2734,11 @@ add_test(NAME antl_walk
             -o "${LIBS}/closures/com/example/walk.antl"
             "${MODULES}/closures/com/example/walk.anti")
 set_tests_properties(antl_walk PROPERTIES FIXTURES_SETUP walk_antl)
-add_test(NAME error_closures_modules
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-        "-DCOMMAND=-S,-I,${LIBS}/closures,-o,${CMAKE_CURRENT_BINARY_DIR}/closures_modules.s,closures_modules.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/closures_modules.err"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
+add_expect_test(error_closures_modules STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/closures_modules.err"
+    COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/closures"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/closures_modules.s" closures_modules.anti)
 set_tests_properties(error_closures_modules PROPERTIES
     FIXTURES_REQUIRED walk_antl)
 
@@ -2711,13 +2750,11 @@ add_test(NAME antl_parts
             -o "${LIBS}/owned/com/example/parts.antl"
             "${MODULES}/owned/com/example/parts.anti")
 set_tests_properties(antl_parts PROPERTIES FIXTURES_SETUP parts_antl)
-add_test(NAME error_own_modules
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-        "-DCOMMAND=-S,-I,${LIBS}/owned,-o,${CMAKE_CURRENT_BINARY_DIR}/own_modules.s,own_modules.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/own_modules.err"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
+add_expect_test(error_own_modules STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/own_modules.err"
+    COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/owned"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/own_modules.s" own_modules.anti)
 set_tests_properties(error_own_modules PROPERTIES
     FIXTURES_REQUIRED parts_antl)
 
@@ -2729,13 +2766,11 @@ add_test(NAME antl_queue
             -o "${LIBS}/sync/com/example/queue.antl"
             "${MODULES}/sync/com/example/queue.anti")
 set_tests_properties(antl_queue PROPERTIES FIXTURES_SETUP queue_antl)
-add_test(NAME error_concurrent_modules
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-        "-DCOMMAND=-S,-I,${LIBS}/sync,-o,${CMAKE_CURRENT_BINARY_DIR}/concurrent_modules.s,concurrent_modules.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/concurrent_modules.err"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
+add_expect_test(error_concurrent_modules STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/concurrent_modules.err"
+    COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/sync"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/concurrent_modules.s" concurrent_modules.anti)
 set_tests_properties(error_concurrent_modules PROPERTIES
     FIXTURES_REQUIRED queue_antl)
 
@@ -2747,41 +2782,37 @@ add_test(NAME antl_ledger
             -o "${LIBS}/access/com/example/ledger.antl"
             "${MODULES}/access/com/example/ledger.anti")
 set_tests_properties(antl_ledger PROPERTIES FIXTURES_SETUP ledger_antl)
-add_test(NAME error_operator_access_modules
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-        "-DCOMMAND=-S,-I,${LIBS}/access,-o,${CMAKE_CURRENT_BINARY_DIR}/operator_access_modules.s,operator_access_modules.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/operator_access_modules.err"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
+add_expect_test(error_operator_access_modules STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/operator_access_modules.err"
+    COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/access"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/operator_access_modules.s" operator_access_modules.anti)
 set_tests_properties(error_operator_access_modules PROPERTIES
     FIXTURES_REQUIRED ledger_antl)
 
 # A qualified base that the module does not declare as a public class
-add_test(NAME error_inherits_module
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-        "-DCOMMAND=-S,-I,${LIBS},-o,${CMAKE_CURRENT_BINARY_DIR}/inherits_module.s,inherits_module.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/inherits_module.err"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
+add_expect_test(error_inherits_module STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/inherits_module.err"
+    COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/inherits_module.s" inherits_module.anti)
 set_tests_properties(error_inherits_module PROPERTIES
     FIXTURES_REQUIRED board_antl)
 
-add_test(NAME error_missing_library
-    COMMAND antic --dump-ir "${MODULES}/main.anti"
+add_expect_test(error_missing_library STATUS 1
+    PATTERN "twice\\.antl needs module `com\\.example\\.scale`"
+    COMMAND "$<TARGET_FILE:antic>" --dump-ir "${MODULES}/main.anti"
             "${LIBS}/com/example/twice.antl")
 set_tests_properties(error_missing_library PROPERTIES
-    FIXTURES_REQUIRED twice_antl
-    PASS_REGULAR_EXPRESSION "twice.antl needs module `com.example.scale`")
+    FIXTURES_REQUIRED twice_antl)
 
-add_test(NAME error_library_cycle
-    COMMAND antic -c -I "${MODULES}" -o "${LIBS}/cycle.antl"
+add_expect_test(error_library_cycle STATUS 1
+    PATTERN "twice\\.antl depends on `com\\.example\\.scale`, so the import forms a cycle"
+    COMMAND "$<TARGET_FILE:antic>" -c -I "${MODULES}" -o "${LIBS}/cycle.antl"
             "${MODULES}/com/example/scale.anti"
             "${LIBS}/com/example/twice.antl")
 set_tests_properties(error_library_cycle PROPERTIES
-    FIXTURES_REQUIRED twice_antl
-    PASS_REGULAR_EXPRESSION "twice.antl depends on `com.example.scale`, so the import forms a cycle")
+    FIXTURES_REQUIRED twice_antl)
 
 add_test(NAME antl_one
     COMMAND antic -c -I "${MODULES}" -o "${LIBS}/com/example/one.antl"
@@ -2789,20 +2820,20 @@ add_test(NAME antl_one
 set_tests_properties(antl_one PROPERTIES FIXTURES_SETUP one_antl)
 
 # The first library loads, and the second one is stuck on the cycle.
-add_test(NAME error_library_cycle_later
-    COMMAND antic -c -I "${MODULES}" -o "${LIBS}/cycle.antl"
+add_expect_test(error_library_cycle_later STATUS 1
+    PATTERN "twice\\.antl depends on `com\\.example\\.scale`, so the import forms a cycle"
+    COMMAND "$<TARGET_FILE:antic>" -c -I "${MODULES}" -o "${LIBS}/cycle.antl"
             "${MODULES}/com/example/scale.anti"
             "${LIBS}/com/example/one.antl" "${LIBS}/com/example/twice.antl")
 set_tests_properties(error_library_cycle_later PROPERTIES
-    FIXTURES_REQUIRED "one_antl;twice_antl"
-    PASS_REGULAR_EXPRESSION "twice.antl depends on `com.example.scale`, so the import forms a cycle")
+    FIXTURES_REQUIRED "one_antl;twice_antl")
 
-add_test(NAME error_duplicate_library
-    COMMAND antic --dump-ir "${MODULES}/main.anti"
+add_expect_test(error_duplicate_library STATUS 1
+    PATTERN "scale\\.antl and .*scale\\.antl both hold module `com\\.example\\.scale`"
+    COMMAND "$<TARGET_FILE:antic>" --dump-ir "${MODULES}/main.anti"
             "${LIBS}/com/example/scale.antl" "${LIBS}/com/example/scale.antl")
 set_tests_properties(error_duplicate_library PROPERTIES
-    FIXTURES_REQUIRED scale_antl
-    PASS_REGULAR_EXPRESSION "scale.antl and [^ ]*scale.antl both hold module `com.example.scale`")
+    FIXTURES_REQUIRED scale_antl)
 
 # The five behaviours of `assert`: a release build without it, a forced
 # build with it, dev mode keeping it and --no-asserts dropping it.
@@ -3161,14 +3192,13 @@ foreach(mode dev release)
     if(mode STREQUAL "release")
         set(extra --release)
     endif()
-    add_test(NAME inject_manifest_${mode}
-        COMMAND anti test ${extra}
+    add_expect_test(inject_manifest_${mode} STATUS 0
+        DIRECTORY "${INJECT}/project"
+        PATTERN "1 tests in 1 modules, 0 modules failed"
+        COMMAND "$<TARGET_FILE:anti>" test ${extra}
                 --work "${CMAKE_CURRENT_BINARY_DIR}/inject-manifest-${mode}"
                 -I src --runtime "${ANTIC_RUNTIME_DIR}"
                 --llvm-mc "${ANTIC_LLVM_MC}" src/com/example/app.anti)
-    set_tests_properties(inject_manifest_${mode} PROPERTIES
-        WORKING_DIRECTORY "${INJECT}/project"
-        PASS_REGULAR_EXPRESSION "1 tests in 1 modules, 0 modules failed")
 endforeach()
 
 # The six standard interfaces under `anti test`. The project names no
@@ -3180,14 +3210,13 @@ foreach(mode dev release)
     if(mode STREQUAL "release")
         set(extra --release)
     endif()
-    add_test(NAME inject_standard_${mode}
-        COMMAND anti test ${extra}
+    add_expect_test(inject_standard_${mode} STATUS 0
+        DIRECTORY "${INJECT}/standard"
+        PATTERN "1 tests in 1 modules, 0 modules failed"
+        COMMAND "$<TARGET_FILE:anti>" test ${extra}
                 --work "${CMAKE_CURRENT_BINARY_DIR}/inject-standard-${mode}"
                 -I src --runtime "${ANTIC_RUNTIME_DIR}"
                 --llvm-mc "${ANTIC_LLVM_MC}" src/com/example/standard.anti)
-    set_tests_properties(inject_standard_${mode} PROPERTIES
-        WORKING_DIRECTORY "${INJECT}/standard"
-        PASS_REGULAR_EXPRESSION "1 tests in 1 modules, 0 modules failed")
 endforeach()
 
 # Plugins. The library of tests/plugin is built with --lib shared
@@ -3649,13 +3678,11 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)
-    add_test(NAME listing_error_${name}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-            "-DCOMMAND=${arguments}"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/${name}.err"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
+    string(REPLACE "," ";" arguments "${arguments}")
+    add_expect_test(listing_error_${name} STATUS 1
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/${name}.err"
+        COMMAND "$<TARGET_FILE:antic>" ${arguments})
 endforeach()
 # A program of tests/errors that no test reads is refused.
 add_test(NAME errors_registered
@@ -3924,9 +3951,9 @@ foreach(source ${opt_sources})
 endforeach()
 
 # Semantic analysis reports every error it finds.
-add_test(NAME error_types
-    COMMAND antic -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/types.s"
-            "${CMAKE_CURRENT_SOURCE_DIR}/errors/types.anti")
-set_tests_properties(error_types PROPERTIES
-    PASS_REGULAR_EXPRESSION "^[^\n]*types.anti:3:19: error: expected `bool`, found an integer literal\n[^\n]*types.anti:4:9: error: expected `int`, found `bool`\n$")
+add_expect_test(error_types STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/types.err"
+    COMMAND "$<TARGET_FILE:antic>" -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/types.s"
+            types.anti)
 
