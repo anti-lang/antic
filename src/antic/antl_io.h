@@ -106,8 +106,10 @@ void antl_visit_type(struct writer *w, const struct type *t);
 void antl_visit_value(struct writer *w, const struct const_value *v);
 void antl_visit_defaults(struct writer *w, const struct symbol *sym);
 void antl_visit_symbolic(struct writer *w, const struct symbolic *s);
-/* Write the index of t, which antl_visit_type gave it. */
+/* Write the index of t, which antl_visit_type gave it. The second form
+   writes ANTL_NO_TYPE for a NULL t. */
 void antl_put_type_ref(struct writer *w, const struct type *t);
+void antl_put_type_or_none(struct writer *w, const struct type *t);
 /* Write a constant, a symbolic value, and the default values and the
    `own` marks of the parameters of sym. */
 void antl_put_value(struct writer *w, const struct const_value *v);
@@ -117,6 +119,8 @@ void antl_put_param_owned(struct writer *w, const struct symbol *sym);
 
 /* The type of the index the file holds next, which lies below limit. */
 struct type *antl_type_ref(struct reader *r, uint32_t limit);
+/* The same below the count of the type table, or NULL for ANTL_NO_TYPE. */
+struct type *antl_type_or_none(struct reader *r);
 /* Read a constant of type t into v. depth counts the values around it,
    0 for one that stands alone. Its parts are memory of the pool. */
 bool antl_read_value(struct reader *r, struct type *t, struct const_value *v,
@@ -170,5 +174,8 @@ struct antl_tree {
 /* Whether the tree t keeps the rules the checker keeps for a tree it
    checked. The copy pass and lowering rely on each of them. */
 bool antl_verify_tree(struct reader *r, const struct antl_tree *t);
+/* Whether sym, a symbol of another item that a tree names, is one the
+   checker makes: its kind agrees with its type and its value. */
+bool antl_verify_extern(const struct symbol *sym);
 
 #endif

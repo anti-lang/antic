@@ -30,7 +30,11 @@
    - A count matches what it counts: the parameters of a function against
      its type, the arguments of the copy of a generic against its type
      parameters, and the names of a pattern against its tuple.
-   - `break` and `continue` stand inside a loop of their own function. */
+   - `break` and `continue` stand inside a loop of their own function.
+
+   The symbols of other items that the trees name are held to the rules
+   of the tables as well: a function has the type of a function, a
+   constant has its value, and a local or a parameter is never one. */
 
 /* A record not reached yet, one the walk is inside, one walked, and the
    name of a case in an arm of a `switch`, which stands in that place
@@ -924,6 +928,26 @@ static struct seen walk_fn(struct verify *v, const struct item *it,
         return s;
     }
     return leave(m, walk_body(v, it, depth + 1));
+}
+
+bool antl_verify_extern(const struct symbol *sym)
+{
+    switch (sym->kind) {
+    case SYMBOL_LOCAL:
+    case SYMBOL_PARAM:
+        /* The table of the tree holds these. */
+        return false;
+    case SYMBOL_FN:
+    case SYMBOL_EXTERN_FN:
+        /* Lowering calls it by its type, as the member reader of the
+           tables requires. */
+        return sym->type != NULL && sym->type->kind == TYPE_FN;
+    case SYMBOL_CONST:
+        /* Lowering reads the value of a constant where it is named. */
+        return sym->value != NULL;
+    default:
+        return true;
+    }
 }
 
 bool antl_verify_tree(struct reader *r, const struct antl_tree *t)

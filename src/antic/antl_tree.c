@@ -350,8 +350,6 @@ static void io_text(struct io *io, struct token_text *t)
 
 static void io_type(struct io *io, struct type **t)
 {
-    uint32_t index;
-
     switch (io->mode) {
     case IO_COLLECT:
         if (*t != NULL) {
@@ -359,21 +357,10 @@ static void io_type(struct io *io, struct type **t)
         }
         break;
     case IO_WRITE:
-        if (*t == NULL) {
-            antl_put_u32(io->w, ANTL_NO_TYPE);
-        } else {
-            antl_put_type_ref(io->w, *t);
-        }
+        antl_put_type_or_none(io->w, *t);
         break;
     case IO_READ:
-        index = antl_get_u32(io->r);
-        if (index == ANTL_NO_TYPE) {
-            *t = NULL;
-        } else if (index >= io->r->table_count) {
-            bad(io);
-        } else {
-            *t = io->r->table[index];
-        }
+        *t = antl_type_or_none(io->r);
         break;
     }
 }
@@ -1551,6 +1538,9 @@ static struct symbol *read_extern(struct reader *r)
         if (!antl_read_value(r, sym->type, sym->value, 0)) {
             antl_damaged(r);
         }
+    }
+    if (!r->failed && !antl_verify_extern(sym)) {
+        antl_damaged(r);
     }
     if (r->failed) {
         return NULL;

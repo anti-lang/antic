@@ -330,6 +330,15 @@ void antl_put_type_ref(struct writer *w, const struct type *t)
     antl_put_count(w, index);
 }
 
+void antl_put_type_or_none(struct writer *w, const struct type *t)
+{
+    if (t == NULL) {
+        antl_put_u32(w, ANTL_NO_TYPE);
+    } else {
+        antl_put_type_ref(w, t);
+    }
+}
+
 void antl_put_symbolic(struct writer *w, const struct symbolic *s)
 {
     antl_put_u8(w, (uint8_t)s->kind);
@@ -1203,15 +1212,34 @@ static bool bitfield_fits(const struct struct_field *f)
            f->bits <= (unsigned)type_bits(f->type);
 }
 
-struct type *antl_type_ref(struct reader *r, uint32_t limit)
+/* The type of the index the file holds next, below limit. ANTL_NO_TYPE
+   gives NULL where none is allowed. */
+static struct type *read_type_index(struct reader *r, uint32_t limit,
+                                    bool none)
 {
     uint32_t index = antl_get_u32(r);
 
-    if (r->failed || index >= limit) {
+    if (r->failed) {
+        return NULL;
+    }
+    if (none && index == ANTL_NO_TYPE) {
+        return NULL;
+    }
+    if (index >= limit) {
         antl_damaged(r);
         return NULL;
     }
     return r->table[index];
+}
+
+struct type *antl_type_ref(struct reader *r, uint32_t limit)
+{
+    return read_type_index(r, limit, false);
+}
+
+struct type *antl_type_or_none(struct reader *r)
+{
+    return read_type_index(r, r->table_count, true);
 }
 
 static bool name_equals_name(const struct name *a, const struct name *b)

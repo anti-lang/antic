@@ -2061,6 +2061,10 @@ static const char tree_source[] =
     "pub fn tpair<T, U>(own x: T, y: U) -> T {\n"
     "    return x;\n"
     "}\n"
+    "fn thelper(k: int) -> int {\n"
+    "    return k;\n"
+    "}\n"
+    "const TLIMIT: int = 5;\n"
     "pub fn tree<T>(own x: T, n: int, s: TShape, pairs: [](int, int),"
     " xs: []int) -> int {\n"
     "    let total = 0;\n"
@@ -2086,6 +2090,7 @@ static const char tree_source[] =
     "    let kept = tpair(x, n);\n"
     "    let neg = -n;\n"
     "    let sum = total + n;\n"
+    "    let helped = thelper(sum) + TLIMIT;\n"
     "    let f = fn(k: int) -> int { return k + 1; };\n"
     "    return f(sum);\n"
     "}\n";
@@ -2264,6 +2269,31 @@ static void stmt_twice(struct session *s)
     it->body->stmts[0] = nested;
 }
 
+/* A copy of the symbol that e names, which the file then writes as an
+   extern of its own. */
+static struct symbol *own_symbol(struct session *s, struct expr *e)
+{
+    struct symbol *copy = arena_alloc(&s->arena, sizeof *copy);
+
+    *copy = *e->symbol;
+    e->symbol = copy;
+    return copy;
+}
+
+/* The private function `thelper` written with the type `int`. */
+static void extern_fn_not_fn(struct session *s)
+{
+    struct expr *call = tree_let(s, "helped")->as.binary.left;
+
+    own_symbol(s, call->as.call.callee)->type = call->type;
+}
+
+/* The private constant `TLIMIT` written without its value. */
+static void extern_const_without_value(struct session *s)
+{
+    own_symbol(s, tree_let(s, "helped")->as.binary.right)->value = NULL;
+}
+
 /* A chain of `-` as deep as depth, with the operand of `-n` at its end. */
 static void unary_chain(struct session *s, size_t depth)
 {
@@ -2425,7 +2455,8 @@ static void damaged_trees(void)
         break_outside_loop,      closure_past_params,
         generic_short_of_params, copy_short_of_args,
         block_holds_itself,      expr_holds_itself,
-        stmt_twice,              deep_chain};
+        stmt_twice,              deep_chain,
+        extern_fn_not_fn,        extern_const_without_value};
     size_t i;
 
     tree_file(NULL, true);
