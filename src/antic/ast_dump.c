@@ -49,7 +49,11 @@ static void label_name(struct dumper *d, const char *label,
     if (module != NULL && module->length > 0) {
         text_appendf(d->out, "%.*s.", (int)module->length, module->text);
     }
-    text_appendf(d->out, "%.*s", (int)name->length, name->text);
+    /* An empty name may hold no text, which `%.*s` must not receive
+       even with a precision of 0 (S16 of the audit). */
+    if (name->length > 0) {
+        text_appendf(d->out, "%.*s", (int)name->length, name->text);
+    }
 }
 
 /* Print doc text in quotes, with newlines, quotes and backslashes escaped
@@ -427,8 +431,14 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
     case EXPR_ALLOC:
         text_append(d->out, "alloc");
         end(d, start, type);
-        dump_type(d, depth + 1, e->as.alloc.type);
-        dump_expr(d, depth + 1, e->as.alloc.count);
+        /* `alloc T { }` holds its literal alone, and `alloc(T, n)` a
+           type and a count (S15 of the audit). */
+        if (e->as.alloc.value != NULL) {
+            dump_expr(d, depth + 1, e->as.alloc.value);
+        } else {
+            dump_type(d, depth + 1, e->as.alloc.type);
+            dump_expr(d, depth + 1, e->as.alloc.count);
+        }
         break;
     case EXPR_FREE:
         text_append(d->out, "free");

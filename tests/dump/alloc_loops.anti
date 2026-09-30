@@ -1,0 +1,16 @@
+// `alloc P { x: 1 }` holds the literal alone, and `alloc(int, 4)` a type
+// and a count. `for 0..3 { }` binds no name.
+struct P { x: int }
+
+fn main() -> int
+{
+	let p = alloc P { x: 1 };
+	let q = alloc(int, 4);
+	for 0..3 {
+	}
+	for i in 0..3 {
+	}
+	free(p);
+	free(q);
+	return 0;
+}

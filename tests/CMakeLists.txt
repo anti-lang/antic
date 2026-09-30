@@ -2237,6 +2237,17 @@ add_test(NAME dump_ast_format
         "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/format.ast"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
 
+# `alloc T { }` holds its literal alone and `for 0..3` binds no name, in
+# the tree and in the typed tree.
+foreach(stage ast types)
+    add_test(NAME dump_${stage}_alloc_loops
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DOPTION=--dump-${stage}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/alloc_loops.anti"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/alloc_loops.${stage}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+endforeach()
 # Two mistakes produce exactly two messages.
 add_expect_test(error_syntax STATUS 1
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"

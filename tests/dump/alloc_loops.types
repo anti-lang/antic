@@ -1,0 +1,36 @@
+struct_decl P
+  field x                  int
+    type int
+function main              fn() -> int
+  result
+    type int
+  block
+    let_stmt p             *P
+      alloc                *P
+        struct_lit P       P
+          field_init x
+            int_lit 1      int
+    let_stmt q             ?*int
+      alloc                ?*int
+        type int
+        int_lit 4          int
+    for_stmt 
+      from
+        int_lit 0          int
+      to
+        int_lit 3          int
+      block
+    for_stmt i             int
+      from
+        int_lit 0          int
+      to
+        int_lit 3          int
+      block
+    simple_stmt
+      free
+        ident p            *P
+    simple_stmt
+      free
+        ident q            ?*int
+    return_stmt
+      int_lit 0            int
