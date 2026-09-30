@@ -1,0 +1,29 @@
+//! A plugin runs inside a program it does not see whole. The host and every
+//! other library it loads may hold a class that inherits `Speaker`, and hand
+//! the plugin an object of it. So a release build keeps `s.speak()` a call
+//! through the table, although `Dog` is the only class of `Speaker` here.
+
+provides Speaker as Dog;
+
+/// Something that speaks.
+pub abstract class Speaker
+{
+	/// The sound.
+	pub abstract fn speak(self) -> int;
+}
+
+/// The speaker of the plugin.
+pub class Dog inherits Speaker
+{
+	/// The sound of a dog.
+	pub concrete fn speak(self) -> int
+	{
+		return 3;
+	}
+}
+
+/// The sound of any speaker.
+pub fn talk(s: *Speaker) -> int
+{
+	return s.speak();
+}

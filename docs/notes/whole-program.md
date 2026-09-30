@@ -92,8 +92,18 @@ language or a user of the tools can observe.
   plus one, which `slot_count` holds. The table itself is `anti_rt_slots`, a count and an
   array of `anti.rt.Slots` records: descriptor, slot count, bits. Its byte globals are
   `slots.<n>` of module `anti.rt`.
-- Nothing reads the table yet. The plugin loader will, and so will a devirtualisation that
-  must keep a call through an injectable interface indirect once plugins exist.
+- The plugin loader reads the table.
+
+## Devirtualisation
+
+- `devirtualise` runs in release mode alone. A table call becomes direct when every table
+  that serves its static class holds one function at the slot.
+- It does not run for a plugin, nor for a program that injects an interface or calls
+  `plugin.load` and is not built with `--closed`. An object there may come from a class
+  of a library the IR does not hold, and that class may replace any function of a class
+  that is not final. `tests/dump/devirt_plugin.opt` pins the plugin side. The host of
+  `tests/plugin/` and the program with an injected provider each hold a class of their
+  own that implements `Greeter`, and print the library's words through it.
 
 ## The trampolines of reflect.call
 

@@ -1,5 +1,7 @@
 //! A host that loads the library its first argument names, asks it for a
-//! `Greeter` and closes it.
+//! `Greeter` and closes it. A class of the host inherits the interface as well,
+//! so a release build sees one table of `Greeter` and must still call the
+//! library's function on the library's object.
 
 import anti.io;
 import anti.plugin;
@@ -7,10 +9,29 @@ import anti.reflect;
 import anti.text;
 import net.example.greet;
 
+/// The greeting of the host.
+class Local inherits greet.Greeter
+{
+	/// The words of the greeting.
+	concrete fn words(self) -> str
+	{
+		return "from the host";
+	}
+
+	/// How often the greeting was asked for, which the host never counts.
+	concrete fn asked(self) -> int
+	{
+		return 0;
+	}
+}
+
 fn main(args: []str) -> int
 {
 	let lib = plugin.load(args[1]) catch fatal;
 	let g = lib.instance(greet.Greeter) catch fatal;
+	let local = alloc Local { };
+	io.println(local.words());
+	delete(local);
 	io.println(g.words());
 	io.println(g.words());
 	let asked = f"asked {g.asked()}";

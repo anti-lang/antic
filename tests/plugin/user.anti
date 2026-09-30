@@ -1,5 +1,7 @@
 //! A program whose class injects the interface, whose provider the build takes
-//! from a library.
+//! from a library. A class of the program inherits the interface as well, so a
+//! release build sees one table of `Greeter` and must still call the library's
+//! function on the object the library gave.
 
 import anti.io;
 import net.example.greet;
@@ -16,10 +18,29 @@ class Page
 	}
 }
 
+/// The greeting of the program.
+class Local inherits greet.Greeter
+{
+	/// The words of the greeting.
+	concrete fn words(self) -> str
+	{
+		return "from the program";
+	}
+
+	/// How often the greeting was asked for, which the program never counts.
+	concrete fn asked(self) -> int
+	{
+		return 0;
+	}
+}
+
 fn main() -> int
 {
 	let p = alloc Page { };
 	p.show();
 	delete(p);
+	let local = alloc Local { };
+	io.println(local.words());
+	delete(local);
 	return 0;
 }

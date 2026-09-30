@@ -236,7 +236,14 @@ size_t whole_entries(struct whole *w, uint32_t descriptor, uint32_t slot,
    program then replaces it for the static type of the call. Dev mode
    compiles one module against objects it does not see, so it keeps the
    call through the table. A call with no concrete class to read keeps
-   it as well. */
+   it as well.
+
+   A program that can load a library, and the library itself, see no
+   more than dev mode does: an object may come from a class of another
+   library, whose table the IR does not hold. That class may inherit any
+   class that is not final, concrete ones included, and replace its
+   functions. whole_program therefore runs this pass on neither, and
+   every call there that lowering left in the table stays in it. */
 static void devirtualise(struct whole *w, struct ir_module *m)
 {
     size_t i;
@@ -2565,7 +2572,10 @@ bool whole_program(struct ir_module *program,
         write_trampolines(program, (calls || partial) && options->reflect);
     }
     if (options->release) {
-        devirtualise(w, program);
+        if (!options->plugin &&
+            (options->closed || !whole_hosts_plugins(program))) {
+            devirtualise(w, program);
+        }
         merge_copies(program);
     }
     whole_free(w);
