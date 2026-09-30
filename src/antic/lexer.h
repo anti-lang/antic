@@ -150,6 +150,13 @@ struct token_list {
    length before it reads a byte. */
 #define LEX_SOURCE_MAX ((size_t)64 << 20)
 
+/* DESIGN: an `f"..."` nests at most this many levels in the `{expr}` of
+   the one around it, and lex refuses a deeper literal with a diagnostic.
+   The lexer recurses once per level, and the cap of the source still
+   leaves room for thousands. The parser gives each level at least one of
+   its PARSE_DEPTH_MAX levels, so a deeper literal could not parse. */
+#define LEX_FORMAT_DEPTH_MAX 256
+
 /* Split source into tokens, ending with TOKEN_EOF. Report every error to
    diags and keep going, so that one run reports all of them. Returns true
    when no error occurred. The array of out is allocated with realloc,

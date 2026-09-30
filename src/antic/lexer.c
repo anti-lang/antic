@@ -211,6 +211,7 @@ struct lexer {
     struct diagnostics *diags;
     struct token_list *out;
     bool ok;
+    int depth;                  /* `f"..."` literals open around pos */
 };
 
 /* How escapes and NUL behave in a literal. */
@@ -1340,7 +1341,22 @@ static void interpolated(struct lexer *lx, const struct string_prefix *prefix,
         push(lx, TOKEN_ERROR, start, line, column);
         return;
     }
+    if (lx->depth >= LEX_FORMAT_DEPTH_MAX) {
+        snprintf(message, sizeof message,
+                 "interpolated string literals nested deeper than %d levels",
+                 LEX_FORMAT_DEPTH_MAX);
+        error_at(lx, line, column, message);
+        while (lx->pos < end) {
+            advance(lx);
+        }
+        for (k = 0; k <= hashes; k++) {
+            advance(lx); /* the closing quote and its hashes */
+        }
+        push(lx, TOKEN_ERROR, start, line, column);
+        return;
+    }
 
+    lx->depth++;
     while (lx->pos < end) {
         int c = at(lx, 0);
 
@@ -1377,6 +1393,7 @@ static void interpolated(struct lexer *lx, const struct string_prefix *prefix,
             advance(lx);
         }
     }
+    lx->depth--;
     for (k = 0; k <= hashes; k++) {
         advance(lx); /* the closing quote and its hashes */
     }
@@ -1478,7 +1495,7 @@ static void lex_token(struct lexer *lx)
 bool lex(const char *source, size_t length, struct arena *arena,
          struct diagnostics *diags, struct token_list *out)
 {
-    struct lexer lx = {source, length, 0, 1, 1, arena, diags, out, true};
+    struct lexer lx = {source, length, 0, 1, 1, arena, diags, out, true, 0};
 
     if (length > LEX_SOURCE_MAX) {
         error_at(&lx, 1, 1, "the source is larger than 64 MiB");

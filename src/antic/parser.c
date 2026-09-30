@@ -24,12 +24,14 @@ struct parser {
     size_t *origin;                 /* index in all of each token */
     bool *taken;                    /* the doc comments that were read */
     size_t pos;
+    size_t last;                    /* index of the TOKEN_EOF of tokens */
     struct arena *arena;
     struct diagnostics *diags;
     bool panic;
     bool ok;
     bool no_struct_literal;         /* inside a condition */
     int depth;                      /* levels entered by descend */
+    int reach;                      /* deepest level of the chain's tree */
     struct list *clauses;           /* every `allow` and `unchecked` */
     enum fn_block block;            /* the test block being read */
     /* DESIGN: `>>` closes two lists of type arguments. The inner list
@@ -85,15 +87,12 @@ static const struct token *peek(const struct parser *p)
     return &p->tokens[p->pos];
 }
 
+/* The token ahead places after the current one, or the TOKEN_EOF at the
+   end. PERF DECISION: one step, since the lookaheads and the scan of `<`
+   ask for tokens far ahead once per token they pass. */
 static const struct token *peek_at(const struct parser *p, size_t ahead)
 {
-    size_t i = p->pos;
-
-    while (ahead > 0 && p->tokens[i].kind != TOKEN_EOF) {
-        i++;
-        ahead--;
-    }
-    return &p->tokens[i];
+    return &p->tokens[ahead < p->last - p->pos ? p->pos + ahead : p->last];
 }
 
 static bool check(const struct parser *p, enum token_kind kind)
@@ -136,28 +135,71 @@ static void error_here(struct parser *p, const char *message)
     diagnostics_add(p->diags, peek(p)->line, peek(p)->column, "%s", message);
 }
 
+static void too_deep(struct parser *p)
+{
+    p->ok = false;
+    if (!p->panic) {
+        p->panic = true;
+        diagnostics_add(p->diags, peek(p)->line, peek(p)->column,
+                        "nesting deeper than %d levels", PARSE_DEPTH_MAX);
+    }
+}
+
 /* Enter one level of nesting. Past PARSE_DEPTH_MAX it reports the
    source and returns false, and the caller returns NULL without
    entering. Each true return is paired with one ascend. */
 static bool descend(struct parser *p)
 {
     if (p->depth >= PARSE_DEPTH_MAX) {
-        p->ok = false;
-        if (!p->panic) {
-            p->panic = true;
-            diagnostics_add(p->diags, peek(p)->line, peek(p)->column,
-                            "nesting deeper than %d levels",
-                            PARSE_DEPTH_MAX);
-        }
+        too_deep(p);
         return false;
     }
     p->depth++;
+    if (p->reach < p->depth) {
+        p->reach = p->depth;
+    }
     return true;
 }
 
 static void ascend(struct parser *p)
 {
     p->depth--;
+}
+
+/* DESIGN: a chain that the parser builds in a loop, `a + b + c`,
+   `a.b.c`, `f()()` or `x as T as U`, nests its tree one level per link
+   with no call of descend, and the walks over the tree recurse along it.
+   The reach is the deepest level the tree built since the chain began
+   stands at. Each link lifts it one level above everything in the chain,
+   and a reach past PARSE_DEPTH_MAX is refused as descend refuses a
+   depth. So the tree, and not only the parser's own recursion, stays
+   within the limit. */
+struct chain {
+    int saved;                      /* the reach around the chain */
+};
+
+static void chain_begin(struct parser *p, struct chain *c)
+{
+    c->saved = p->reach;
+    p->reach = p->depth;
+}
+
+/* One link, a node that holds everything the chain built so far. */
+static bool chain_link(struct parser *p)
+{
+    if (p->reach >= PARSE_DEPTH_MAX) {
+        too_deep(p);
+        return false;
+    }
+    p->reach++;
+    return true;
+}
+
+static void chain_end(struct parser *p, const struct chain *c)
+{
+    if (p->reach < c->saved) {
+        p->reach = c->saved;
+    }
 }
 
 static bool expect(struct parser *p, enum token_kind kind)
@@ -451,10 +493,13 @@ static bool is_builtin_type(enum token_kind kind)
 /* DESIGN: the rule of C# for `<` in an expression. The tokens from the
    `<` are read as a list of types without building anything. A scan
    holds the token it stands at, as a count ahead of the parser, and
-   whether the first `>` of a `>>` there is taken. */
+   whether the first `>` of a `>>` there is taken. depth counts the
+   levels of the parser and the types the scan is inside, and a scan that
+   would pass PARSE_DEPTH_MAX reads no list, as type would refuse it. */
 struct angle_scan {
     size_t at;
     bool half;
+    int depth;
 };
 
 static bool scan_type(const struct parser *p, struct angle_scan *s);
@@ -526,7 +571,7 @@ static bool scan_types(const struct parser *p, struct angle_scan *s)
     return true;
 }
 
-static bool scan_type(const struct parser *p, struct angle_scan *s)
+static bool scan_type_level(const struct parser *p, struct angle_scan *s)
 {
     enum token_kind k = peek_at(p, s->at)->kind;
 
@@ -584,6 +629,20 @@ static bool scan_type(const struct parser *p, struct angle_scan *s)
     }
 }
 
+/* Every recursion of the scan passes here, once per type. */
+static bool scan_type(const struct parser *p, struct angle_scan *s)
+{
+    bool ok;
+
+    if (s->depth >= PARSE_DEPTH_MAX) {
+        return false;
+    }
+    s->depth++;
+    ok = scan_type_level(p, s);
+    s->depth--;
+    return ok;
+}
+
 /* Where the list of type arguments whose `<` stands at ahead ends, as a
    count ahead of the parser, or 0. It is a list when its tokens read as
    types closed by `>` and the token after it is `(`, `.` or `{`. */
@@ -597,6 +656,7 @@ static size_t generic_end(const struct parser *p, size_t ahead)
     }
     s.at = ahead;
     s.half = false;
+    s.depth = p->depth;
     if (!scan_list(p, &s) || s.half) {
         return 0;
     }
@@ -974,13 +1034,26 @@ static struct expr *placeholder(struct parser *p,
                                 const struct format_piece *piece)
 {
     struct parser inner = *p;
+    size_t *origin = malloc(piece->token_count * sizeof *origin);
     struct expr *e;
+    size_t i;
 
+    if (origin == NULL) {
+        fputs("antic: out of memory\n", stderr);
+        exit(70);
+    }
+    /* The tokens of the piece are both lists at once, so each token is
+       its own origin, no doc comment lies between two of them and taken
+       is never read. */
+    for (i = 0; i < piece->token_count; i++) {
+        origin[i] = i;
+    }
     inner.tokens = piece->tokens;
     inner.all = piece->tokens;
-    inner.origin = NULL;
+    inner.origin = origin;
     inner.taken = NULL;
     inner.pos = 0;
+    inner.last = piece->token_count - 1;
     inner.panic = false;
     inner.ok = true;
     inner.no_struct_literal = false;
@@ -988,6 +1061,7 @@ static struct expr *placeholder(struct parser *p,
     if (inner.ok && !check(&inner, TOKEN_EOF)) {
         error_here(&inner, "expected `}` or `:` after the expression");
     }
+    free(origin);
     if (!inner.ok) {
         p->ok = false;
         return NULL;
@@ -1483,7 +1557,7 @@ static bool element_name(struct parser *p, struct name *out)
     return true;
 }
 
-static struct expr *postfix(struct parser *p)
+static struct expr *postfix_links(struct parser *p)
 {
     struct expr *e = primary(p);
 
@@ -1578,9 +1652,23 @@ static struct expr *postfix(struct parser *p)
         } else {
             return e;
         }
+        if (!chain_link(p)) {
+            return NULL;
+        }
         e = outer;
     }
     return NULL;
+}
+
+static struct expr *postfix(struct parser *p)
+{
+    struct chain c;
+    struct expr *e;
+
+    chain_begin(p, &c);
+    e = postfix_links(p);
+    chain_end(p, &c);
+    return e;
 }
 
 static struct expr *unary(struct parser *p);
@@ -1638,8 +1726,7 @@ static struct expr *unary(struct parser *p)
     return e;
 }
 
-/* unary { "as" type }: as binds tighter than the binary operators. */
-static struct expr *cast(struct parser *p)
+static struct expr *cast_links(struct parser *p)
 {
     struct expr *e = unary(p);
 
@@ -1665,8 +1752,23 @@ static struct expr *cast(struct parser *p)
             next(p);
             expect_name(p, &c->as.cast.type->member);
         }
+        if (!chain_link(p)) {
+            return NULL;
+        }
         e = c;
     }
+    return e;
+}
+
+/* unary { "as" type }: as binds tighter than the binary operators. */
+static struct expr *cast(struct parser *p)
+{
+    struct chain c;
+    struct expr *e;
+
+    chain_begin(p, &c);
+    e = cast_links(p);
+    chain_end(p, &c);
     return e;
 }
 
@@ -1739,7 +1841,7 @@ static struct expr *in_range(struct parser *p, struct expr *value)
    bind tighter, which makes each level group from left to right. `??`
    groups from the right, so `a ?? b ?? c` is `a ?? (b ?? c)` and each
    operand but the last is a `?*T`. */
-static struct expr *binary(struct parser *p, int min)
+static struct expr *binary_links(struct parser *p, int min)
 {
     struct expr *left = cast(p);
 
@@ -1753,6 +1855,9 @@ static struct expr *binary(struct parser *p, int min)
                 break;
             }
             left = in_range(p, left);
+            if (left != NULL && !chain_link(p)) {
+                return NULL;
+            }
             continue;
         }
         if (precedence(op->kind) == 0 || precedence(op->kind) < min) {
@@ -1775,11 +1880,22 @@ static struct expr *binary(struct parser *p, int min)
         } else {
             e->as.binary.right = binary(p, precedence(op->kind) + 1);
         }
-        if (e->as.binary.right == NULL) {
+        if (e->as.binary.right == NULL || !chain_link(p)) {
             return NULL;
         }
         left = e;
     }
+    return left;
+}
+
+static struct expr *binary(struct parser *p, int min)
+{
+    struct chain c;
+    struct expr *left;
+
+    chain_begin(p, &c);
+    left = binary_links(p, min);
+    chain_end(p, &c);
     return left;
 }
 
@@ -3269,7 +3385,13 @@ static bool nested_type(struct parser *p, struct list *nested)
     default:
         break;
     }
+    /* Each type nested in a class body is one level, since the item
+       reaches class_item and this function again. */
+    if (!descend(p)) {
+        return false;
+    }
     inner = item(p);
+    ascend(p);
     if (inner == NULL) {
         return false;
     }
@@ -4185,9 +4307,9 @@ bool parse(const char *source, const struct token_list *tokens,
            struct module **out)
 {
     struct list clauses = {NULL, 0, 0, sizeof(struct clause)};
-    struct parser p = {source, NULL, tokens->items, NULL, NULL, 0, arena,
-                       diags, false, true, false, 0, &clauses, BLOCK_NONE,
-                       false, 0};
+    struct parser p = {source, NULL, tokens->items, NULL, NULL, 0, 0, arena,
+                       diags, false, true, false, 0, 0, &clauses,
+                       BLOCK_NONE, false, 0};
     struct module *m = arena_alloc(arena, sizeof *m);
     struct list imports = {NULL, 0, 0, sizeof(struct import)};
     struct list items = {NULL, 0, 0, sizeof(struct item *)};
@@ -4217,6 +4339,7 @@ bool parse(const char *source, const struct token_list *tokens,
         }
     }
     p.tokens = kept;
+    p.last = count - 1;
     p.origin = origin;
     p.taken = taken;
     m->doc = doc_before(&p, TOKEN_MODULE_DOC);

@@ -151,12 +151,111 @@ static void depth_limit(void)
         depth(nested("fn f() -> int { return f\"{", "(", n, "1", ")",
                      "}\"; }\n"),
               deep);
+        /* A chain the parser builds in a loop is as deep as it is
+           long, and every walk over the tree recurses along it. */
+        depth(nested("fn f() -> int { return 1", " + 1", n, "", "",
+                     "; }\n"),
+              deep);
+        depth(nested("fn f() -> bool { return 1", " < 1", n, "", "",
+                     "; }\n"),
+              deep);
+        depth(nested("fn f() -> int { return a", ".b", n, "", "",
+                     "; }\n"),
+              deep);
+        depth(nested("fn f() { g", "()", n, "", "", "; }\n"), deep);
+        depth(nested("fn f() -> int { return a", "[0]", n, "", "",
+                     "; }\n"),
+              deep);
+        depth(nested("fn f() -> int { return 1", " as int", n, "", "",
+                     "; }\n"),
+              deep);
+        depth(nested("fn f() -> bool { return x", " in 0..1", n, "", "",
+                     "; }\n"),
+              deep);
+        depth(nested("", "class A { ", n, "", "} ", "\n"), deep);
+        /* The scan of `<` for type arguments recurses once per `<`, `(`
+           and prefix of a type. */
+        depth(nested("fn f() -> bool { return ", "a < ", n, "a", "",
+                     "; }\n"),
+              deep);
+        depth(nested("fn f() -> int { return a<", "*", n, "int>()", "",
+                     "; }\n"),
+              deep);
+        if (deep) {
+            depth(nested("fn f() { let x = a<", "(", n, "", "", "; }\n"),
+                  deep);
+        }
+    }
+    /* A chain inside a nesting counts from where it stands. */
+    for (i = 0; i < 2; i++) {
+        char *chain = nested("1", " + 1", i == 0 ? 100 : 200, "", "", "");
+        depth(nested("fn f() -> int { return ", "(", 100, chain, ")",
+                     "; }\n"),
+              i == 1);
+        free(chain);
+    }
+}
+
+/* The expression of an `{expr}` may be an anonymous function, whose
+   statements read the source of what they hold. */
+static void placeholder_source(void)
+{
+    struct parsed p;
+    const struct stmt *s;
+
+    parse_source(&p, "fn f(a: []int) {\n"
+                     "    g(f\"{fn() { assert(a[0] == 1); }}\");\n"
+                     "}\n");
+    CHECK(p.ok);
+    s = p.ok ? p.module->items[0]->body->stmts[0] : NULL;
+    s = s != NULL ? s->as.expr->as.call.args[0]->as.format.parts[0]
+                        .value->as.fn->body->stmts[0]
+                  : NULL;
+    CHECK(s != NULL && s->kind == STMT_ASSERT);
+    if (s != NULL) {
+        CHECK(s->as.assertion.text.length == 9 &&
+              memcmp(s->as.assertion.text.bytes, "a[0] == 1", 9) == 0);
+    }
+    release(&p);
+    parse_source(&p, "fn f(a: []int) {\n"
+                     "    g(f\"{fn() { for x in a { } }}\");\n"
+                     "}\n");
+    CHECK(p.ok);
+    release(&p);
+}
+
+/* Sources cut off where a lookahead or the scan of `<` reads past the
+   end, in the file and in an `{expr}`, which ends at its own TOKEN_EOF. */
+static void truncated(void)
+{
+    static const char *const sources[] = {
+        "fn f() -> bool { return a<",
+        "fn f() -> bool { return a<b<(",
+        "fn f() -> bool { return a<b.",
+        "fn f() -> int { return a<fn(",
+        "fn f() -> str { return f\"{a<}\"; }",
+        "fn f() -> str { return f\"{a<b.c<}\"; }",
+        "fn f() -> str { return f\"{fn() { assert() }}\"; }",
+        "fn f() -> str { return f\"{fn() { for x in }}\"; }",
+        "class A { class B { ",
+        "fn f() { for (a, b",
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof sources / sizeof sources[0]; i++) {
+        struct parsed p;
+        parse_source(&p, sources[i]);
+        CHECK(!p.ok);
+        CHECK(p.diags.count >= 1);
+        release(&p);
     }
 }
 
 void test_parser(void)
 {
     depth_limit();
+    placeholder_source();
+    truncated();
     tree("fn scale(x: int) -> int {\n"
          "    let k = 2 + 4;\n"
          "    return x * k;\n"

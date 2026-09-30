@@ -5,6 +5,8 @@
 #include "lexer.h"
 #include "text.h"
 
+#include <stdlib.h>
+
 struct lexed {
     struct arena arena;
     struct diagnostics diags;
@@ -199,8 +201,62 @@ static void docs(const char *source, const char *expected)
     done(&l);
 }
 
+/* An `f"..."` nested n levels deep in the `{expr}` of the one around it.
+   Each level needs one `#` more than the level inside it. */
+static char *nested_formats(size_t n)
+{
+    struct text out = {0};
+    size_t level;
+    size_t k;
+
+    text_append(&out, "1");
+    for (level = 0; level < n; level++) {
+        struct text around = {0};
+        text_append(&around, "f");
+        for (k = 0; k < level; k++) {
+            text_append(&around, "#");
+        }
+        text_append(&around, "\"{");
+        text_append_bytes(&around, out.data, out.length);
+        text_append(&around, "}\"");
+        for (k = 0; k < level; k++) {
+            text_append(&around, "#");
+        }
+        text_free(&out);
+        out = around;
+    }
+    return out.data;
+}
+
+/* The lexer recurses once per level of nested `f"..."`, and refuses a
+   literal nested deeper than LEX_FORMAT_DEPTH_MAX. */
+static void format_depth(void)
+{
+    struct lexed l;
+    char *source = nested_formats(LEX_FORMAT_DEPTH_MAX);
+
+    lex_s(&l, source);
+    CHECK(l.ok);
+    CHECK(l.tokens.count == 2 && l.tokens.items[0].kind == TOKEN_FORMAT);
+    done(&l);
+    free(source);
+    source = nested_formats(LEX_FORMAT_DEPTH_MAX + 1);
+    lex_s(&l, source);
+    CHECK(!l.ok);
+    CHECK(l.diags.count == 1);
+    if (l.diags.count == 1) {
+        CHECK_STR(l.diags.items[0].message,
+                  "interpolated string literals nested deeper than 256 "
+                  "levels");
+    }
+    CHECK(l.tokens.count == 2 && l.tokens.items[0].kind == TOKEN_ERROR);
+    done(&l);
+    free(source);
+}
+
 void test_lexer(void)
 {
+    format_depth();
     /* Consecutive lines of one marker form one token. Common leading
        whitespace is stripped, so the line and block forms give one text. */
     docs("/// Dot product.\n///\n///     indented\nfn f() {}",
