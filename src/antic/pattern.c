@@ -40,33 +40,35 @@ bool pattern_compiles(const char *bytes, size_t length, bool bytes_mode,
     return false;
 }
 
-long pattern_group_count(const char *bytes, size_t length, bool bytes_mode)
+int64_t pattern_group_count(const char *bytes, size_t length,
+                            bool bytes_mode)
 {
     int32_t code = 0;
     int64_t at = 0;
     void *compiled = compile(bytes, length, bytes_mode, &code, &at);
-    long count;
+    int64_t count;
 
     if (compiled == NULL) {
         return 0;
     }
-    count = (long)anti_rt_regex_group_count(compiled);
+    count = anti_rt_regex_group_count(compiled);
     anti_rt_regex_free(compiled);
     return count;
 }
 
-long pattern_group_number(const char *bytes, size_t length, bool bytes_mode,
-                          const char *name, size_t name_length)
+int64_t pattern_group_number(const char *bytes, size_t length,
+                             bool bytes_mode, const char *name,
+                             size_t name_length)
 {
     int32_t code = 0;
     int64_t at = 0;
     void *compiled = compile(bytes, length, bytes_mode, &code, &at);
-    long number;
+    int64_t number;
 
     if (compiled == NULL) {
         return -1;
     }
-    number = (long)anti_rt_regex_group_number(
+    number = anti_rt_regex_group_number(
         compiled, (const unsigned char *)name, (int64_t)name_length);
     anti_rt_regex_free(compiled);
     return number;
@@ -1147,7 +1149,7 @@ static long least(const struct node *n)
     return 0;
 }
 
-static const struct node *find_group(const struct node *n, long group)
+static const struct node *find_group(const struct node *n, int64_t group)
 {
     const struct node *found;
     size_t i;
@@ -1169,13 +1171,14 @@ static const struct node *find_group(const struct node *n, long group)
    empty, and a branch reset, `(?n)` and `\K` give no answer at all, so
    the count is 0 and only an empty `with` fits. Counting too few can
    refuse a call that would have fit, and never passes one that cannot. */
-long pattern_least_bytes(const char *bytes, size_t length, long group)
+int64_t pattern_least_bytes(const char *bytes, size_t length,
+                            int64_t group)
 {
     struct arena arena = {0};
     struct reader r;
     const struct node *root;
     const struct node *n;
-    long count = 0;
+    int64_t count = 0;
 
     memset(&r, 0, sizeof r);
     r.s = (const unsigned char *)bytes;

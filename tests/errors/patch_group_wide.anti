@@ -1,0 +1,13 @@
+//! A group of `patch` is the u64 the literal holds. 4294967297 is no group of a
+//! pattern with one, on every host, and a host whose long is 32 bits took it as
+//! group 1.
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	let n = data.patch(re"(a)", b"x", 4294967297);
+	let m = data.patch(re"(a)", b"x", 2);
+	return 0;
+}

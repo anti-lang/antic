@@ -1,0 +1,2 @@
+regex_damaged.anti:8:10: error: `s.replace` calls `anti.regex.replace_literal` with 4 arguments, and this `anti.regex` gives it 1 parameter
+regex_damaged.anti:11:10: error: `patch_fixed` takes `str` as its parameter 8, where the call passes `int`

@@ -1,0 +1,2 @@
+patch_group_wide.anti:10:36: error: the pattern has 1 group, and 4294967297 is none of them
+patch_group_wide.anti:11:36: error: the pattern has 1 group, and 2 is none of them

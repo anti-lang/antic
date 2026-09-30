@@ -1835,6 +1835,30 @@ add_test(NAME antl_internal
             -o "${CMAKE_CURRENT_BINARY_DIR}/anti_text.antl"
             "${CMAKE_CURRENT_SOURCE_DIR}/modules/anti/text.anti")
 
+# An `anti.regex` whose functions take fewer parameters, or other types,
+# than the calls the checker writes. The checker refuses each call and
+# reads no parameter the function lacks.
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/damaged/anti")
+add_test(NAME antl_regex_damaged
+    COMMAND antic -c --anti-internal -I "${CMAKE_CURRENT_SOURCE_DIR}/modules"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/damaged/anti/regex.antl"
+            "${CMAKE_CURRENT_SOURCE_DIR}/modules/anti/regex.anti")
+set_tests_properties(antl_regex_damaged PROPERTIES
+    FIXTURES_SETUP regex_damaged)
+add_expect_test(error_regex_damaged STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/regex_damaged.err"
+    COMMAND "$<TARGET_FILE:antic>" --front-end --runtime "${ANTIC_RUNTIME_DIR}"
+            -I "${CMAKE_CURRENT_BINARY_DIR}/damaged" regex_damaged.anti)
+set_tests_properties(error_regex_damaged PROPERTIES
+    FIXTURES_REQUIRED regex_damaged)
+# A group of `patch` is compared as the u64 its literal holds.
+add_expect_test(error_patch_group_wide STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/patch_group_wide.err"
+    COMMAND "$<TARGET_FILE:antic>" --front-end --runtime "${ANTIC_RUNTIME_DIR}"
+            patch_group_wide.anti)
+
 # A `may fail` function without a `fail` and without a `try` is a warning,
 # not an error, because an interface function may fail in one
 # implementation and not in another. A dev build prints it and carries on.

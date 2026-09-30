@@ -63,11 +63,15 @@ static bool is_byte_slice(const struct type *t)
 }
 
 /* The function text of the module named module, which the call at pos
-   names in the place of what, or NULL after an error. */
+   names in the place of what with count arguments, or NULL after an
+   error. The callers index its parameters by the position of each
+   argument, so a function of fewer parameters is refused here. A damaged
+   or older library file gave one, and the checker read past its
+   parameters (S14 of the audit). */
 static struct symbol *module_function(struct checker *c,
                                       const struct name *module,
                                       struct pos pos, const char *what,
-                                      const char *text)
+                                      const char *text, size_t count)
 {
     const struct interface *lib = sema_find_library(c, module);
     struct name name;
@@ -88,28 +92,59 @@ static struct symbol *module_function(struct checker *c,
                       (int)module->length, module->text, text);
         return NULL;
     }
+    if (f->type->param_count < count) {
+        sema_error_at(c, pos, "`%s` calls `%.*s.%s` with %zu arguments, and "
+                      "this `%.*s` gives it %zu parameter%s", what,
+                      (int)module->length, module->text, text, count,
+                      (int)module->length, module->text,
+                      f->type->param_count,
+                      f->type->param_count == 1 ? "" : "s");
+        return NULL;
+    }
     return f;
 }
 
 static struct symbol *regex_function(struct checker *c, struct pos pos,
-                                     const char *what, const char *text)
+                                     const char *what, const char *text,
+                                     size_t count)
 {
-    return module_function(c, &regex_module, pos, what, text);
+    return module_function(c, &regex_module, pos, what, text, count);
 }
 
 /* Point the call e at the function f with the count arguments args,
-   every one of which is checked. */
-static void call_of(struct checker *c, struct expr *e, struct symbol *f,
+   every one of which is checked, or false after an error. The call
+   checks none of them again, so each is held against the parameter of
+   f that takes it here. A library file whose function takes another type
+   there is refused before lowering passes the argument. */
+static bool call_of(struct checker *c, struct expr *e, struct symbol *f,
                     struct expr **args, size_t count)
 {
-    struct expr *callee = sema_new_node(c, EXPR_NAME, e->as.call.callee->pos);
+    struct expr *callee;
+    struct context quiet;
+    size_t i;
 
+    for (i = 0; i < count; i++) {
+        struct type *param = f->type->params[i];
+        bool fits;
+        sema_enter_quiet(c, &quiet);
+        fits = sema_require(c, args[i], args[i]->type, param);
+        sema_leave(c, &quiet);
+        if (!fits) {
+            sema_error_at(c, e->pos, "`%.*s` takes `%s` as its parameter "
+                          "%zu, where the call passes `%s`",
+                          (int)f->name.length, f->name.text, sema_tn(param),
+                          i + 1, sema_tn(args[i]->type));
+            return false;
+        }
+    }
+    callee = sema_new_node(c, EXPR_NAME, e->as.call.callee->pos);
     callee->as.name = f->name;
     callee->symbol = f;
     callee->type = f->type;
     e->as.call.callee = callee;
     e->as.call.args = args;
     e->as.call.arg_count = count;
+    return true;
 }
 
 static bool check_arg(struct checker *c, struct expr *arg,
@@ -126,7 +161,7 @@ static bool group_known(struct checker *c, const struct expr *pattern,
     const char *bytes = pattern->as.text.bytes;
     size_t length = pattern->as.text.length;
     bool mode = types_is_byte_regex(pattern->type);
-    long count;
+    int64_t count;
 
     if (named && arg->kind == EXPR_STRING &&
         pattern_group_number(bytes, length, mode, arg->as.text.bytes,
@@ -137,8 +172,8 @@ static bool group_known(struct checker *c, const struct expr *pattern,
     }
     count = pattern_group_count(bytes, length, mode);
     if (!named && arg->kind == EXPR_INT && arg->as.integer > (uint64_t)count) {
-        sema_error_at(c, arg->pos, "the pattern has %ld group%s, and %llu is "
-                      "none of them", count, count == 1 ? "" : "s",
+        sema_error_at(c, arg->pos, "the pattern has %lld group%s, and %llu is "
+                      "none of them", (long long)count, count == 1 ? "" : "s",
                       (unsigned long long)arg->as.integer);
         return false;
     }
@@ -154,8 +189,8 @@ static bool template_fits(struct checker *c, const struct expr *pattern,
     const unsigned char *bytes = (const unsigned char *)t->as.text.bytes;
     int64_t length = (int64_t)t->as.text.length;
     bool mode = types_is_byte_regex(pattern->type);
-    long count = pattern_group_count(pattern->as.text.bytes,
-                                     pattern->as.text.length, mode);
+    int64_t count = pattern_group_count(pattern->as.text.bytes,
+                                        pattern->as.text.length, mode);
     struct anti_rt_piece piece;
     int64_t offset = 0;
     bool ok = true;
@@ -163,8 +198,8 @@ static bool template_fits(struct checker *c, const struct expr *pattern,
     while (anti_rt_regex_piece(bytes, length, &offset, &piece)) {
         if (piece.kind == ANTI_RT_PIECE_NUMBER && piece.number > count) {
             sema_error_at(c, t->pos, "the template names group %lld, and the "
-                          "pattern has %ld group%s", (long long)piece.number,
-                          count, count == 1 ? "" : "s");
+                          "pattern has %lld group%s", (long long)piece.number,
+                          (long long)count, count == 1 ? "" : "s");
             ok = false;
         } else if (piece.kind == ANTI_RT_PIECE_NAME &&
                    pattern_group_number(pattern->as.text.bytes,
@@ -277,10 +312,10 @@ static bool method_call(struct checker *c, struct expr *e, bool bytes)
     snprintf(name, sizeof name, "%s%s%s", bytes ? "bytes_" : "", base,
              literal != NULL ? "_literal" : "");
     snprintf(what, sizeof what, "%s.%s", bytes ? "data" : "s", m->name);
-    if ((f = regex_function(c, field->pos, what, name)) == NULL) {
+    count = given + 1 + (literal != NULL ? 1 : 0);
+    if ((f = regex_function(c, field->pos, what, name, count)) == NULL) {
         return false;
     }
-    count = given + 1 + (literal != NULL ? 1 : 0);
     args = types_alloc_array(c->arena, count, sizeof *args);
     args[0] = field->as.field.base;
     args[1] = pattern;
@@ -307,7 +342,9 @@ static bool method_call(struct checker *c, struct expr *e, bool bytes)
         !template_fits(c, literal, with)) {
         return false;
     }
-    call_of(c, e, f, args, count);
+    if (!call_of(c, e, f, args, count)) {
+        return false;
+    }
     e->as.call.pattern = literal;
     return true;
 }
@@ -315,13 +352,13 @@ static bool method_call(struct checker *c, struct expr *e, bool bytes)
 /* The group of the pattern literal that `patch` writes into, when into
    is absent or a literal, or -1 after an error. into 0 takes the one group
    of a pattern with one and the whole match of a pattern without. */
-static long patch_group(struct checker *c, const struct expr *literal,
-                        const struct expr *into, struct pos pos)
+static int64_t patch_group(struct checker *c, const struct expr *literal,
+                           const struct expr *into, struct pos pos)
 {
     const char *bytes = literal->as.text.bytes;
     size_t length = literal->as.text.length;
-    long count = pattern_group_count(bytes, length, true);
-    long group;
+    int64_t count = pattern_group_count(bytes, length, true);
+    int64_t group;
 
     if (into != NULL && into->kind == EXPR_STRING) {
         group = pattern_group_number(bytes, length, true, into->as.text.bytes,
@@ -332,16 +369,21 @@ static long patch_group(struct checker *c, const struct expr *literal,
         }
         return group;
     }
-    group = into != NULL ? (long)into->as.integer : 0;
-    if (group > count) {
-        sema_error_at(c, into->pos, "the pattern has %ld group%s, and %ld is "
-                      "none of them", count, count == 1 ? "" : "s", group);
+    /* The literal is compared as the u64 it is before it becomes a
+       group. A long of 32 bits took 4294967297 as group 1 (M44 of the
+       audit). */
+    if (into != NULL && into->as.integer > (uint64_t)count) {
+        sema_error_at(c, into->pos, "the pattern has %lld group%s, and %llu "
+                      "is none of them", (long long)count,
+                      count == 1 ? "" : "s",
+                      (unsigned long long)into->as.integer);
         return -1;
     }
+    group = into != NULL ? (int64_t)into->as.integer : 0;
     if (group == 0 && count > 1) {
-        sema_error_at(c, into != NULL ? into->pos : pos, "the pattern has %ld "
-                      "groups, so `patch` names the one it writes into with "
-                      "`into`", count);
+        sema_error_at(c, into != NULL ? into->pos : pos, "the pattern has "
+                      "%lld groups, so `patch` names the one it writes into "
+                      "with `into`", (long long)count);
         return -1;
     }
     return group == 0 ? count : group;
@@ -443,7 +485,7 @@ static bool patch_call(struct checker *c, struct expr *e)
             return false;
         }
         f = regex_function(c, field->pos, "data." METHOD_PATCH,
-                           fixed ? "patch_bytes_fixed" : "patch_bytes");
+                           fixed ? "patch_bytes_fixed" : "patch_bytes", 5);
         if (f == NULL) {
             return false;
         }
@@ -453,14 +495,13 @@ static bool patch_call(struct checker *c, struct expr *e)
         args[2] = with;
         args[3] = offset;
         args[4] = limit;
-        call_of(c, e, f, args, 5);
-        return true;
+        return call_of(c, e, f, args, 5);
     }
     if (find->kind == EXPR_PATTERN) {
         /* The group is known when into is absent or a literal. */
         bool known = name->kind == EXPR_STRING &&
                      (into == NULL || into->kind == EXPR_INT);
-        long group = -1;
+        int64_t group = -1;
         fixed = fixed && known;
         if (known) {
             group = patch_group(c, find, name->as.text.length > 0 ? name
@@ -473,26 +514,27 @@ static bool patch_call(struct checker *c, struct expr *e)
             name = text_literal(c, e->pos, "", 0);
         }
         if (fixed) {
-            long least = pattern_least_bytes(find->as.text.bytes,
+            int64_t least = pattern_least_bytes(find->as.text.bytes,
                                              find->as.text.length, group);
             if (offset->as.integer + with->as.text.length >
                 (uint64_t)least) {
                 if (group == 0) {
                     sema_error_at(c, with->pos, "`with` of %zu byte%s at "
                                   "offset %llu does not fit the match, which "
-                                  "can be %ld byte%s long",
+                                  "can be %lld byte%s long",
                                   with->as.text.length,
                                   with->as.text.length == 1 ? "" : "s",
                                   (unsigned long long)offset->as.integer,
-                                  least, least == 1 ? "" : "s");
+                                  (long long)least, least == 1 ? "" : "s");
                 } else {
                     sema_error_at(c, with->pos, "`with` of %zu byte%s at "
-                                  "offset %llu does not fit group %ld of the "
-                                  "pattern, which can be %ld byte%s long",
+                                  "offset %llu does not fit group %lld of the "
+                                  "pattern, which can be %lld byte%s long",
                                   with->as.text.length,
                                   with->as.text.length == 1 ? "" : "s",
                                   (unsigned long long)offset->as.integer,
-                                  group, least, least == 1 ? "" : "s");
+                                  (long long)group, (long long)least,
+                                  least == 1 ? "" : "s");
                 }
                 return false;
             }
@@ -504,7 +546,8 @@ static bool patch_call(struct checker *c, struct expr *e)
     f = regex_function(c, field->pos, "data." METHOD_PATCH,
                        find->kind != EXPR_PATTERN ? "patch"
                        : fixed                    ? "patch_fixed"
-                                                  : "patch_literal");
+                                                  : "patch_literal",
+                       find->kind == EXPR_PATTERN ? 8 : 7);
     if (f == NULL) {
         return false;
     }
@@ -521,8 +564,7 @@ static bool patch_call(struct checker *c, struct expr *e)
     args[i++] = name;
     args[i++] = offset;
     args[i++] = limit;
-    call_of(c, e, f, args, i);
-    return true;
+    return call_of(c, e, f, args, i);
 }
 
 /* DESIGN: `s.to_bytes()` and `data.to_text()` are the calls `to_bytes(s)`
@@ -542,14 +584,13 @@ static bool convert_call(struct checker *c, struct expr *e, bool bytes)
         return false;
     }
     snprintf(what, sizeof what, "%s.%s", bytes ? "data" : "s", function);
-    f = module_function(c, &text_module, field->pos, what, function);
+    f = module_function(c, &text_module, field->pos, what, function, 1);
     if (f == NULL) {
         return false;
     }
     args = types_alloc_array(c->arena, 1, sizeof *args);
     args[0] = field->as.field.base;
-    call_of(c, e, f, args, 1);
-    return true;
+    return call_of(c, e, f, args, 1);
 }
 
 /* `m.group(n)`, `m.group("name")` and the same of `took_part`: the calls
@@ -594,14 +635,13 @@ static bool match_call(struct checker *c, struct expr *e, struct type *t)
              types_is_byte_match(t) ? "bytes_" : "", method,
              named ? "_named" : "");
     snprintf(what, sizeof what, "m.%s", method);
-    if ((f = regex_function(c, field->pos, what, name)) == NULL) {
+    if ((f = regex_function(c, field->pos, what, name, 2)) == NULL) {
         return false;
     }
     args = types_alloc_array(c->arena, 2, sizeof *args);
     args[0] = field->as.field.base;
     args[1] = arg;
-    call_of(c, e, f, args, 2);
-    return true;
+    return call_of(c, e, f, args, 2);
 }
 
 /* Whether name is a method of `str`, `[]byte` or a match that the

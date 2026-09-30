@@ -1,0 +1,15 @@
+//! An `anti.regex` whose functions do not take what the checker passes, as a
+//! damaged or an older library file would give them. `replace_literal` takes
+//! one parameter where a call with a template passes four, and the last
+//! parameter of `patch_fixed` is a `str` where the call passes an `int`.
+
+pub fn replace_literal(s: str) -> str
+{
+	return s;
+}
+
+pub fn patch_fixed(data: []byte, r: ByteRegex, pattern: str, with: []byte,
+	into: int, name: str, offset: int, limit: str) -> int
+{
+	return data.len;
+}

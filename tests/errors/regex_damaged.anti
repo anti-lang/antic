@@ -1,0 +1,13 @@
+//! Calls of `anti.regex` against a library file whose functions take other
+//! parameters. The checker refuses each, and reads no parameter the function
+//! lacks.
+import anti.regex;
+
+fn main() -> int
+{
+	let s = "abc".replace(re"b", "x");
+	let data: [3]byte = [1, 2, 3];
+	let part = data[0..3];
+	let n = part.patch(re"(a)", b"x");
+	return 0;
+}
