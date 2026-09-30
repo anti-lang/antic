@@ -267,6 +267,42 @@ static void add_iface(struct checker *c, struct type *p,
     p->ifaces = ifaces;
 }
 
+/* DESIGN: a `constraint` set and a `type` line that name others
+   resolve them first. sema_chain_prepare takes a long chain apart, and
+   a chain of more than CHAIN_DEPTH_MAX of them resolved inside each
+   other is refused, which a cycle through a long chain reaches. */
+#define CHAIN_DEPTH_MAX 64
+
+static bool resolve_set(struct checker *c, struct symbol *sym);
+
+/* Add to d the `constraint` sets that the set sym names. */
+static void set_deps(struct chain_deps *d, struct symbol *sym)
+{
+    const struct item *it = sym->item;
+    struct context at = sema_declaration_context(d->c, NULL);
+    struct context saved;
+    size_t i;
+
+    sema_enter(d->c, &at, &saved);
+    for (i = 0; i < it->constraint_count; i++) {
+        const struct constraint_ref *r = &it->constraints[i];
+        struct symbol *named;
+        if (r->module.length > 0 || hook_index(&r->name) >= 0) {
+            continue;
+        }
+        named = sema_module_find(d->c, &r->name);
+        if (named != NULL && named->kind == SYMBOL_CONSTRAINT) {
+            sema_chain_add(d, named);
+        }
+    }
+    sema_leave(d->c, &saved);
+}
+
+static void set_resolve(struct checker *c, struct symbol *sym)
+{
+    resolve_set(c, sym);
+}
+
 /* The set a `constraint` names, resolved on its first use. A set that
    names itself, directly or through others, is refused. */
 static bool resolve_set(struct checker *c, struct symbol *sym)
@@ -284,12 +320,29 @@ static bool resolve_set(struct checker *c, struct symbol *sym)
                       (int)it->name.length, it->name.text);
         return false;
     }
+    if (c->set_depth == 0) {
+        c->set_depth++;
+        sema_chain_prepare(c, sym, set_deps, set_resolve);
+        c->set_depth--;
+        if (sym->state == EVAL_DONE) {
+            return true;
+        }
+    }
+    if (c->set_depth >= CHAIN_DEPTH_MAX) {
+        sema_error_at(c, it->name_pos, "constraint `%.*s` needs a chain of "
+                      "more than %d constraints", (int)it->name.length,
+                      it->name.text, CHAIN_DEPTH_MAX);
+        sym->state = EVAL_DONE;
+        return false;
+    }
     sym->state = EVAL_BUSY;
+    c->set_depth++;
     sema_enter(c, &at, &saved);
     for (i = 0; i < it->constraint_count; i++) {
         add_constraint(c, sym->type, &it->constraints[i]);
     }
     sema_leave(c, &saved);
+    c->set_depth--;
     sym->state = EVAL_DONE;
     return true;
 }
@@ -417,6 +470,48 @@ static void resolve_params(struct checker *c, struct item *it)
     sema_leave(c, &saved);
 }
 
+/* Add to d the `type` lines that the written type t names. The parser
+   bounds how deep t nests. */
+static void alias_deps_of(struct chain_deps *d, const struct type_expr *t)
+{
+    size_t i;
+
+    if (t == NULL) {
+        return;
+    }
+    if (t->kind == TYPEX_NAMED && t->module.length == 0) {
+        struct symbol *named = sema_module_find(d->c, &t->name);
+        if (named != NULL && named->item != NULL &&
+            named->item->kind == ITEM_TYPE) {
+            sema_chain_add(d, named);
+        }
+    }
+    alias_deps_of(d, t->element);
+    alias_deps_of(d, t->result);
+    for (i = 0; i < t->param_count; i++) {
+        alias_deps_of(d, t->params[i]);
+    }
+    for (i = 0; i < t->arg_count; i++) {
+        alias_deps_of(d, t->args[i]);
+    }
+}
+
+/* Add to d the `type` lines that the `type` line sym names. */
+static void alias_deps(struct chain_deps *d, struct symbol *sym)
+{
+    struct context at = sema_declaration_context(d->c, NULL);
+    struct context saved;
+
+    sema_enter(d->c, &at, &saved);
+    alias_deps_of(d, sym->item->type);
+    sema_leave(d->c, &saved);
+}
+
+static void alias_resolve(struct checker *c, struct symbol *sym)
+{
+    sema_alias_type(c, sym);
+}
+
 /* DESIGN: `type Name = T;` names T, and every use of the name is T.
    The target is resolved on the first use, so a name may stand before
    the types it names. One that names itself is refused. */
@@ -436,10 +531,28 @@ struct type *sema_alias_type(struct checker *c, struct symbol *sym)
         sym->type = sema_builtin(c, TYPE_ERROR);
         return sym->type;
     }
+    if (c->alias_depth == 0) {
+        c->alias_depth++;
+        sema_chain_prepare(c, sym, alias_deps, alias_resolve);
+        c->alias_depth--;
+        if (sym->state == EVAL_DONE) {
+            return sym->type;
+        }
+    }
+    if (c->alias_depth >= CHAIN_DEPTH_MAX) {
+        sema_error_at(c, it->name_pos, "type `%.*s` needs a chain of more "
+                      "than %d types", (int)it->name.length, it->name.text,
+                      CHAIN_DEPTH_MAX);
+        sym->type = sema_builtin(c, TYPE_ERROR);
+        sym->state = EVAL_DONE;
+        return sym->type;
+    }
     sym->state = EVAL_BUSY;
+    c->alias_depth++;
     sema_enter(c, &at, &saved);
     t = sema_resolve_type(c, it->type);
     sema_leave(c, &saved);
+    c->alias_depth--;
     if (sym->state == EVAL_BUSY) {
         sym->type = t;
     }
@@ -1155,8 +1268,21 @@ static struct type *copy_named(struct checker *c, struct type *generic,
             return copy;
         }
     }
+    /* The arguments of a copy in a generic take the arguments of the
+       copy around it, so a chain of copies builds a type deeper than
+       the program writes. */
+    if (types_depth_above(args, count) > TYPES_NEST_MAX) {
+        if (!c->copy_refused) {
+            c->copy_refused = true;
+            sema_error_at(c, generic->type_params[0]->param->pos,
+                          "a copy of `%s` nests deeper than %d levels",
+                          sema_tn(generic), TYPES_NEST_MAX);
+        }
+        return sema_builtin(c, TYPE_ERROR);
+    }
     copy = types_struct(c->types, generic->module,
                         copy_name(c, generic, args, values, &cut));
+    copy->depth = types_depth_above(args, count);
     if (cut && c->copy_depth == 0 && !c->copy_name_refused) {
         c->copy_name_refused = true;
         sema_error_at(c, generic->type_params[0]->param->pos,

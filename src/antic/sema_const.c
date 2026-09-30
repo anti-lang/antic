@@ -849,50 +849,23 @@ bool sema_eval_const(struct checker *c, struct expr *e,
     return false;
 }
 
-/* DESIGN: a constant that names another evaluates that one first, and
-   the checker recursed once per link of a chain. A chain deeper than
-   CONST_CHAIN_DIRECT links is taken apart first. A walk with a stack of
-   its own finds the constants the first one depends on. Each is then
-   evaluated after the ones it names, so no evaluation goes more than one
-   link deep. A shallower chain is evaluated as it is met, which keeps
-   the order of the messages. CONST_DEPTH_MAX bounds what is left: a
-   cycle through a long chain, or a form the walk does not follow. */
-#define CONST_CHAIN_DIRECT 16
-
+/* DESIGN: a constant that names another evaluates that one first. A
+   long chain is taken apart by sema_chain_prepare. CONST_DEPTH_MAX
+   bounds what is left: a cycle through a long chain, or a form the walk
+   does not follow. */
 #define CONST_DEPTH_MAX 64
 
-/* The constants that expressions name, collected on one stack. */
-struct const_deps {
-    struct checker *c;
-    struct symbol **items;
-    size_t count;
-    size_t capacity;
-};
-
-static void const_deps_add(struct const_deps *d, struct symbol *sym)
+/* Add sym to d when it is a constant with no value yet. */
+static void const_deps_add(struct chain_deps *d, struct symbol *sym)
 {
-    if (sym == NULL || sym->kind != SYMBOL_CONST || sym->state != EVAL_NONE) {
-        return;
+    if (sym != NULL && sym->kind == SYMBOL_CONST) {
+        sema_chain_add(d, sym);
     }
-    if (d->count == d->capacity) {
-        size_t capacity = d->capacity == 0 ? 64 : d->capacity * 2;
-        struct symbol **items =
-            capacity <= SIZE_MAX / sizeof *items
-                ? realloc(d->items, capacity * sizeof *items)
-                : NULL;
-        if (items == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        d->items = items;
-        d->capacity = capacity;
-    }
-    d->items[d->count++] = sym;
 }
 
 /* Collect the constants e names that have no value yet. The walk
    follows the forms of a constant expression. */
-static void const_deps_of(struct const_deps *d, const struct expr *e)
+static void const_deps_of(struct chain_deps *d, const struct expr *e)
 {
     size_t i;
 
@@ -963,7 +936,7 @@ static void enter_const(struct checker *c, const struct symbol *sym,
 
 /* Add the constants the value of sym names to d, in the context the
    value is checked in. */
-static void const_deps_of_symbol(struct const_deps *d, struct symbol *sym)
+static void const_deps_of_symbol(struct chain_deps *d, struct symbol *sym)
 {
     struct context saved;
 
@@ -999,100 +972,10 @@ static bool holds_class(const struct type *t)
     return false;
 }
 
-/* One constant on the stack of const_prepare, and its range of deps. */
-struct const_frame {
-    struct symbol *sym;
-    size_t start;
-    size_t next;
-    size_t end;
-};
-
-/* Evaluate the constants root depends on, each after the ones it names,
-   when the chain below root is deeper than CONST_CHAIN_DIRECT. */
-static void const_prepare(struct checker *c, struct symbol *root)
+/* Evaluate a constant that a chain names. */
+static void const_resolve(struct checker *c, struct symbol *sym)
 {
-    struct const_deps deps;
-    struct ptr_set seen;
-    struct const_frame *stack = NULL;
-    size_t stack_count = 0;
-    size_t stack_capacity = 0;
-    size_t deepest = 0;
-    struct symbol **order = NULL;
-    size_t order_count = 0;
-    size_t order_capacity = 0;
-    struct symbol *next = root;
-    size_t i;
-
-    memset(&deps, 0, sizeof deps);
-    memset(&seen, 0, sizeof seen);
-    deps.c = c;
-    sema_ptr_set_add(&seen, root);
-    for (;;) {
-        struct const_frame *top;
-        if (next != NULL) {
-            if (stack_count == stack_capacity) {
-                size_t capacity = stack_capacity == 0 ? 64 : stack_capacity * 2;
-                struct const_frame *grown =
-                    capacity <= SIZE_MAX / sizeof *grown
-                        ? realloc(stack, capacity * sizeof *grown)
-                        : NULL;
-                if (grown == NULL) {
-                    fputs("antic: out of memory\n", stderr);
-                    exit(70);
-                }
-                stack = grown;
-                stack_capacity = capacity;
-            }
-            top = &stack[stack_count++];
-            top->sym = next;
-            top->start = deps.count;
-            const_deps_of_symbol(&deps, next);
-            top->next = top->start;
-            top->end = deps.count;
-            deepest = stack_count > deepest ? stack_count : deepest;
-            next = NULL;
-            continue;
-        }
-        if (stack_count == 0) {
-            break;
-        }
-        top = &stack[stack_count - 1];
-        if (top->next < top->end) {
-            struct symbol *dep = deps.items[top->next++];
-            if (dep->state == EVAL_NONE && sema_ptr_set_add(&seen, dep)) {
-                next = dep;
-            }
-            continue;
-        }
-        if (order_count == order_capacity) {
-            size_t capacity = order_capacity == 0 ? 64 : order_capacity * 2;
-            struct symbol **grown =
-                capacity <= SIZE_MAX / sizeof *grown
-                    ? realloc(order, capacity * sizeof *grown)
-                    : NULL;
-            if (grown == NULL) {
-                fputs("antic: out of memory\n", stderr);
-                exit(70);
-            }
-            order = grown;
-            order_capacity = capacity;
-        }
-        order[order_count++] = top->sym;
-        deps.count = top->start;
-        stack_count--;
-    }
-    /* The last in the order is root, which the caller evaluates. */
-    if (deepest > CONST_CHAIN_DIRECT) {
-        for (i = 0; i + 1 < order_count; i++) {
-            if (order[i]->state == EVAL_NONE) {
-                sema_const_symbol(c, order[i], order[i]->pos);
-            }
-        }
-    }
-    free(order);
-    free(stack);
-    free(deps.items);
-    free(seen.slots);
+    sema_const_symbol(c, sym, sym->pos);
 }
 
 /* Give a constant symbol its type and value, once. */
@@ -1115,7 +998,7 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
     }
     if (c->const_depth == 0) {
         c->const_depth++;
-        const_prepare(c, sym);
+        sema_chain_prepare(c, sym, const_deps_of_symbol, const_resolve);
         c->const_depth--;
         if (sym->state == EVAL_DONE) {
             return sym->value != NULL;

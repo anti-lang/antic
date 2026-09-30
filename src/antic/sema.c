@@ -1078,10 +1078,19 @@ struct type *sema_lent_form(struct checker *c, struct type *t, bool lent,
     return types_lent(c->types, t);
 }
 
-/* Resolve t and record the result in the node for later stages. */
+/* Resolve t and record the result in the node for later stages. A
+   `type` line and a copy of a generic put a type inside another, so a
+   type may nest deeper than any the program writes. */
 struct type *sema_resolve_type(struct checker *c, struct type_expr *t)
 {
-    t->type = resolve_type_inner(c, t);
+    struct type *resolved = resolve_type_inner(c, t);
+
+    if (resolved->depth > TYPES_NEST_MAX) {
+        sema_error_at(c, t->pos, "the type nests deeper than %d levels",
+                      TYPES_NEST_MAX);
+        resolved = sema_builtin(c, TYPE_ERROR);
+    }
+    t->type = resolved;
     return t->type;
 }
 

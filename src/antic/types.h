@@ -302,6 +302,13 @@ struct type {
        NULL for any other parameter. */
     struct type *hook_owner;
 
+    /* DESIGN: how many levels of pointers, arrays, slices, function
+       types, tuples, `?T`, channels, Jobs and type arguments the type
+       stands above the names in it, 0 for a name. Each constructor sets
+       it from the parts, so the checker refuses a type deeper than
+       TYPES_NEST_MAX where it is made from what the program writes,
+       and no walk over the parts of a type recurses past the limit. */
+    uint32_t depth;
     /* The walk of types_nest: its state, and the number of levels the
        values of the type nest once it is done. */
     enum layout_state layout;
@@ -805,6 +812,9 @@ enum nest_result { NEST_FITS, NEST_CYCLE, NEST_DEEP };
    and each use of such a field is quiet. A cycle is reported before a
    nesting that is too deep. */
 enum nest_result types_nest(struct type *s, struct type *error);
+
+/* The depth of a type made of these parts: one above the deepest. */
+uint32_t types_depth_above(struct type *const *parts, size_t count);
 
 /* The name of t as a program writes it, with int, float and byte for the
    aliased types. */

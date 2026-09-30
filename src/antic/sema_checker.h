@@ -4,7 +4,8 @@
 /* The state of the checker and the functions its files share. sema.c
    declares the items of a module and runs the passes over them.
    sema_expr.c checks expressions, sema_call.c calls and members, and
-   sema_const.c evaluates constants. sema_stmt.c checks statements and
+   sema_const.c evaluates constants, and sema_chain.c takes chains of
+   declarations apart. sema_stmt.c checks statements and
    function bodies and walks what a worker reaches. sema_export.c checks
    what crosses to C and the doc comments. */
 
@@ -119,6 +120,8 @@ struct checker {
     const struct expr *field_base; /* the base of the field checked now */
     const struct held_mutex *held; /* the `sync` blocks around it */
     int const_depth;            /* constants evaluated inside each other */
+    int alias_depth;            /* `type` lines resolved inside each other */
+    int set_depth;              /* `constraint` sets resolved likewise */
     /* Above 0, a function type holds one C function pointer in every
        place, a parameter of it included. The signature of an `extern fn`
        is checked so. */
@@ -387,6 +390,29 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
 struct type *sema_check_parallel(struct checker *c, struct expr *e);
 struct type *sema_check_dispatch(struct checker *c, struct expr *e);
 struct type *sema_check_join(struct checker *c, struct expr *e);
+
+/* sema_chain.c */
+
+/* The declarations that one depends on, collected on one stack. */
+struct chain_deps {
+    struct checker *c;
+    struct symbol **items;
+    size_t count;
+    size_t capacity;
+};
+
+/* Add sym to d when it is not resolved yet. */
+void sema_chain_add(struct chain_deps *d, struct symbol *sym);
+/* Add to d the declarations that the declaration sym names. */
+typedef void sema_chain_deps_fn(struct chain_deps *d, struct symbol *sym);
+/* Resolve the declaration sym, which is not resolved yet. */
+typedef void sema_chain_resolve_fn(struct checker *c, struct symbol *sym);
+/* Resolve the declarations root depends on, each after the ones it
+   names, when the chain below root is deeper than a few links. The
+   caller resolves root. */
+void sema_chain_prepare(struct checker *c, struct symbol *root,
+                        sema_chain_deps_fn *deps_of,
+                        sema_chain_resolve_fn *resolve);
 
 /* sema_const.c */
 

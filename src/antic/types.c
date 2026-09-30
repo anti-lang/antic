@@ -30,6 +30,30 @@ struct type *types_builtin(struct types *types, enum type_kind kind)
     return &types->builtins[kind];
 }
 
+/* How many levels t stands above a name, 0 for NULL. */
+static uint32_t depth_of(const struct type *t)
+{
+    return t != NULL ? t->depth : 0;
+}
+
+/* The depth of a type made of parts whose deepest stands at part. */
+static uint32_t depth_above(uint32_t part)
+{
+    return part < UINT32_MAX ? part + 1 : part;
+}
+
+uint32_t types_depth_above(struct type *const *parts, size_t count)
+{
+    uint32_t deepest = 0;
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        uint32_t d = depth_of(parts[i]);
+        deepest = d > deepest ? d : deepest;
+    }
+    return depth_above(deepest);
+}
+
 /* DESIGN: derived types sit in one linked list and every constructor
    searches it before it creates a type. A program has few distinct
    types, so a linear search is enough and keeps identity a pointer
@@ -68,6 +92,13 @@ static struct type *find_or_add_params(struct types *types,
         t->params = types_alloc_array(types->arena, key->param_count,
                                       sizeof *t->params);
         memcpy(t->params, params, key->param_count * sizeof *t->params);
+    }
+    t->depth = types_depth_above(t->params, t->param_count);
+    if (depth_above(depth_of(t->element)) > t->depth) {
+        t->depth = depth_above(depth_of(t->element));
+    }
+    if (depth_above(depth_of(t->result)) > t->depth) {
+        t->depth = depth_above(depth_of(t->result));
     }
     t->next = types->derived;
     types->derived = t;
@@ -219,6 +250,7 @@ static struct type *optional_of(struct types *types, struct type *element)
     key.nullable = true;
     t = arena_alloc(types->arena, sizeof *t);
     *t = key;
+    t->depth = depth_above(depth_of(element));
     memset(fields, 0, sizeof fields);
     fields[0].name.text = OPTIONAL_VALUE;
     fields[0].name.length = sizeof OPTIONAL_VALUE - 1;
@@ -676,6 +708,7 @@ struct type *types_job(struct types *types, struct type *result)
     }
     t = arena_alloc(types->arena, sizeof *t);
     *t = key;
+    t->depth = depth_above(depth_of(result));
     t->next = types->derived;
     types->derived = t;
     memset(&field, 0, sizeof field);
@@ -777,6 +810,7 @@ static struct type *handle_struct(struct types *types, const char *name,
     t->name.text = name;
     t->name.length = strlen(name);
     t->element = element;
+    t->depth = element != NULL ? depth_above(depth_of(element)) : 0;
     t->next = types->derived;
     types->derived = t;
     memset(&field, 0, sizeof field);
@@ -1126,6 +1160,7 @@ struct type *types_tuple(struct types *types, struct type *const *elements,
     *t = key;
     t->params = types_alloc_array(types->arena, count, sizeof *t->params);
     memcpy(t->params, elements, count * sizeof *t->params);
+    t->depth = types_depth_above(elements, count);
     fields = types_alloc_array(types->arena, count, sizeof *fields);
     for (i = 0; i < count; i++) {
         fields[i].name = element_name(types, i);

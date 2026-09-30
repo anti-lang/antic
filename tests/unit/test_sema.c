@@ -1200,4 +1200,54 @@ void test_sema_chains(void)
     rejects(text_cstr(&source), 257, 8,
             "the values of struct `D` nest deeper than 256 levels");
     text_free(&source);
+
+    /* Each `type` line names the next, and so does each `constraint`. */
+    for (i = 0; i < 30000; i++) {
+        text_appendf(&source, "type T%d = T%d;\n", i, i + 1);
+    }
+    text_append(&source, "type T30000 = int;\n"
+                         "fn f() -> T0 { let x: T0 = 1; return x; }\n");
+    accepts(text_cstr(&source));
+    text_free(&source);
+    for (i = 0; i < 30000; i++) {
+        text_appendf(&source, "constraint C%d = C%d;\n", i, i + 1);
+    }
+    text_append(&source, "constraint C30000 = eq;\n"
+                         "fn same<T: C0>(a: T, b: T) -> bool "
+                         "{ return a == b; }\n");
+    accepts(text_cstr(&source));
+    text_free(&source);
+    /* A cycle through the whole chain is refused where the resolution
+       nests too deep. */
+    for (i = 0; i < 3000; i++) {
+        text_appendf(&source, "type T%d = T%d;\n", i, (i + 1) % 3000);
+    }
+    rejects(text_cstr(&source), 63, 6,
+            "type `T62` needs a chain of more than 64 types");
+    text_free(&source);
+    for (i = 0; i < 3000; i++) {
+        text_appendf(&source, "constraint C%d = C%d;\n", i, (i + 1) % 3000);
+    }
+    rejects(text_cstr(&source), 63, 12,
+            "constraint `C62` needs a chain of more than 64 constraints");
+    text_free(&source);
+    /* A short cycle keeps its message. */
+    rejects("type A = B;\ntype B = A;\nfn f(a: A) { }\n", 1, 6,
+            "type `A` names itself");
+    /* A chain of `type` lines puts types inside each other, deeper than
+       any the program writes. */
+    for (i = 0; i < 300; i++) {
+        text_appendf(&source, "type P%d = *P%d;\n", i, i + 1);
+    }
+    text_append(&source, "type P300 = int;\nfn f(p: P0) { }\n");
+    rejects(text_cstr(&source), 44, 12,
+            "the type nests deeper than 256 levels");
+    text_free(&source);
+    for (i = 0; i < 150; i++) {
+        text_appendf(&source, "type Q%d = ?(Q%d, int);\n", i, i + 1);
+    }
+    text_append(&source, "type Q150 = int;\nfn f(q: Q0) { }\n");
+    rejects(text_cstr(&source), 22, 13,
+            "the type nests deeper than 256 levels");
+    text_free(&source);
 }

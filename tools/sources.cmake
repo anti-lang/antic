@@ -55,6 +55,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/userdirs.c
     src/antic/sema.c
     src/antic/sema_call.c
+    src/antic/sema_chain.c
     src/antic/sema_generic.c
     src/antic/sema_hash.c
     src/antic/sema_copies.c
