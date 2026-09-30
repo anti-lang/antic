@@ -277,6 +277,22 @@ uint32_t ir_struct_add(struct ir_module *m, enum ir_agg_kind kind,
     return add_agg(m, &key, fields, count);
 }
 
+/* DESIGN: a lane is a scalar of one width on every target, as the
+   checker requires of a lane of a simd struct. The width is part of the
+   type's name, so the IR stays free of sizes the target chooses. */
+unsigned ir_lane_bytes(enum ir_type type)
+{
+    switch (type) {
+    case IR_I8: return 1;
+    case IR_I16: return 2;
+    case IR_I32:
+    case IR_F32: return 4;
+    case IR_I64:
+    case IR_F64: return 8;
+    default: return 0;
+    }
+}
+
 uint32_t ir_simd_add(struct ir_module *m, const char *name,
                      const struct ir_field *fields, size_t count)
 {

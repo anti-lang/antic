@@ -519,6 +519,10 @@ uint32_t ir_file_add(struct ir_module *m, const char *path);
 uint32_t ir_struct_add(struct ir_module *m, enum ir_agg_kind kind,
                        const char *name, const struct ir_field *fields,
                        size_t count, bool packed, uint64_t align);
+/* The bytes of a lane of type type in a simd struct, or 0 for a type
+   that is no lane: one whose width follows the target, an aggregate or
+   void. */
+unsigned ir_lane_bytes(enum ir_type type);
 /* Add a simd struct of count lanes, or find the one of that name. */
 uint32_t ir_simd_add(struct ir_module *m, const char *name,
                      const struct ir_field *fields, size_t count);

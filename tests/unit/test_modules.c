@@ -1736,6 +1736,211 @@ static void damaged_records(void)
     close_session(&s);
 }
 
+/* Whether the file reads into a program whose IR passes the verifier,
+   as the driver takes a library it links. */
+static bool verifies_file(const uint8_t *data, size_t size)
+{
+    struct session s;
+    struct ir_module program;
+    struct text errors = {0};
+    char error[160] = "";
+    bool ok;
+
+    open_session(&s);
+    ir_module_init(&program, &s.arena, "main");
+    ok = antl_read(data, size, NULL, 0, &s.types, &s.arena, &program, error,
+                   sizeof error) != NULL &&
+         ir_verify(&program, &errors);
+    text_free(&errors);
+    ir_module_free(&program);
+    close_session(&s);
+    return ok;
+}
+
+/* Whether the file with the count bytes of value written at byte at
+   verifies as verifies_file does. */
+static bool verifies_poke(const struct text *bytes, size_t at,
+                          const void *value, size_t count)
+{
+    uint8_t *copy;
+    bool ok;
+
+    if (at == SIZE_MAX || at + count > bytes->length) {
+        check_failures++;
+        fprintf(stderr, "no place to poke at %zu\n", at);
+        return false;
+    }
+    copy = malloc(bytes->length);
+    CHECK(copy != NULL);
+    if (copy == NULL) {
+        return false;
+    }
+    memcpy(copy, bytes->data, bytes->length);
+    memcpy(copy + at, value, count);
+    ok = verifies_file(copy, bytes->length);
+    free(copy);
+    return ok;
+}
+
+/* The flags of the struct whose first field is field, in the type table.
+   Between them stand the byte of its thread safety, its empty
+   `compatible` line, its alignment and the count of its fields. */
+static size_t type_flags(const struct text *bytes, const char *field)
+{
+    return name_end(bytes, field, false) - strlen(field) - 4 - 4 - 8 - 4 -
+           1 - 1;
+}
+
+/* The flags of the aggregate of the IR whose first field is field.
+   Between them stand its alignment, its length, its empty length text
+   and the count of its fields. */
+static size_t agg_flags(const struct text *bytes, const char *field)
+{
+    return name_end(bytes, field, true) - strlen(field) - 4 - 4 - 4 - 4 -
+           8 - 1;
+}
+
+/* The aggregate a `vreduce` of f32 lanes names, as an offset into the
+   file. An instruction is its op, its type, its line, its result and
+   three operands of 10 bytes, then the type and the index of its
+   aggregate and its field, which is the operation of a lane. */
+static size_t vreduce_agg(const struct text *bytes)
+{
+    const uint8_t *p = (const uint8_t *)bytes->data;
+    size_t i;
+
+    for (i = 0; i + 49 <= bytes->length; i++) {
+        if (p[i] == IR_VREDUCE && p[i + 1] == IR_F32 &&
+            p[i + 40] == IR_AGG && u32_at(bytes, i + 45) == IR_FADD) {
+            return i + 41;
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no vreduce\n");
+    return SIZE_MAX;
+}
+
+/* A library of simd structs. The checker holds a simd struct to its
+   rules, and a library file reaches lowering and the back ends without
+   the checker. `ZZ` has no bytes. `Z3` and `Z1` break the rules of a
+   simd struct once their flags say they are one. */
+static const char simd_source[] =
+    "pub struct ZZ { _: i64 : 0 }\n"
+    "pub struct Z3 { za: i32, zb: i32, zc: i32 }\n"
+    "pub struct Z1 { zo: i32 }\n"
+    "pub simd struct ZV { zq: f32, zr: f32 }\n"
+    "pub fn zz(z: ZZ, t: Z3, o: Z1) -> int { return 0; }\n"
+    "pub fn zlane(v: ZV) -> f32 { return v.zq; }\n"
+    "pub fn zsum(v: ZV) -> f32 { return v.sum(); }\n";
+
+static void damaged_simd(void)
+{
+    struct session s;
+    struct text source = {0};
+    struct text bytes = {0};
+    uint8_t value[8];
+    size_t lane;
+    size_t at;
+    uint32_t own;
+    uint32_t i;
+
+    /* `ZW` is 512 bytes of f32 lanes, above the vector cap, and each
+       operation on it is a loop. */
+    text_append(&source, simd_source);
+    text_append(&source, "pub simd struct ZW { w0: f32");
+    for (i = 1; i < 128; i++) {
+        text_appendf(&source, ", w%u: f32", i);
+    }
+    text_append(&source, " }\npub fn zwide(w: ZW) -> f32 { return w.w0; }\n");
+    open_session(&s);
+    if (!build_library(&s, "zs", text_cstr(&source), &bytes)) {
+        text_free(&source);
+        close_session(&s);
+        return;
+    }
+    CHECK(verifies_file((const uint8_t *)bytes.data, bytes.length));
+
+    /* S03: the lane `zq` of `ZV` in the type table, as every other type
+       of the table, `ZZ` of no bytes and `f64` among them. */
+    lane = name_end(&bytes, "zq", false);
+    own = u32_at(&bytes, lane);
+    for (i = 0; i < 64; i++) {
+        if (i != own) {
+            poke_u32(value, i);
+            refuses_poke(&bytes, lane, value, 4);
+        }
+    }
+    /* S03: the same lane in the IR, as every other scalar and as each
+       aggregate, `ZZ` among them. */
+    lane = name_end(&bytes, "zq", true);
+    for (i = IR_VOID; i <= IR_LOCK; i++) {
+        if (i != IR_F32 && i != IR_AGG) {
+            value[0] = (uint8_t)i;
+            poke_u32(value + 1, IR_NO_AGG);
+            refuses_poke(&bytes, lane, value, 5);
+        }
+    }
+    for (i = 0; i < 64; i++) {
+        value[0] = IR_AGG;
+        poke_u32(value + 1, i);
+        refuses_poke(&bytes, lane, value, 5);
+    }
+
+    /* The places of the flags hold what the source gave. */
+    CHECK(((const uint8_t *)bytes.data)[type_flags(&bytes, "zq")] == 16);
+    CHECK(((const uint8_t *)bytes.data)[agg_flags(&bytes, "zq")] == 2);
+    CHECK(((const uint8_t *)bytes.data)[type_flags(&bytes, "za")] == 0);
+    CHECK(((const uint8_t *)bytes.data)[agg_flags(&bytes, "za")] == 0);
+
+    /* S24: three lanes, and one lane of four bytes, in both tables. */
+    value[0] = 16;
+    refuses_poke(&bytes, type_flags(&bytes, "za"), value, 1);
+    refuses_poke(&bytes, type_flags(&bytes, "zo"), value, 1);
+    value[0] = 2;
+    refuses_poke(&bytes, agg_flags(&bytes, "za"), value, 1);
+    refuses_poke(&bytes, agg_flags(&bytes, "zo"), value, 1);
+    /* S24: `ZV` packed, and `ZV` aligned to 16, in both tables. The
+       alignment follows the flags, the safety and the empty `compatible`
+       line in the type table, and the flags in the IR. */
+    value[0] = 16 | 2;
+    refuses_poke(&bytes, type_flags(&bytes, "zq"), value, 1);
+    value[0] = 2 | 1;
+    refuses_poke(&bytes, agg_flags(&bytes, "zq"), value, 1);
+    memset(value, 0, sizeof value);
+    value[0] = 16;
+    refuses_poke(&bytes, type_flags(&bytes, "zq") + 1 + 1 + 4, value, 8);
+    refuses_poke(&bytes, agg_flags(&bytes, "zq") + 1, value, 8);
+
+    /* The count of the lanes of `ZV` in the IR, one short, one over and
+       past every byte of the file. It follows the alignment, the length
+       and the empty length text. */
+    poke_u32(value, 1);
+    refuses_poke(&bytes, agg_flags(&bytes, "zq") + 1 + 8 + 4 + 4, value, 4);
+    poke_u32(value, 3);
+    refuses_poke(&bytes, agg_flags(&bytes, "zq") + 1 + 8 + 4 + 4, value, 4);
+    poke_u32(value, UINT32_MAX);
+    refuses_poke(&bytes, agg_flags(&bytes, "zq") + 1 + 8 + 4 + 4, value, 4);
+    /* Every shorter file fails without reading past its end. */
+    for (at = 8; at < bytes.length; at++) {
+        refuses_file((const uint8_t *)bytes.data, at, NULL);
+    }
+
+    /* S24: the sum over `ZV` made a sum over each other aggregate, `ZW`
+       above the vector cap among them. */
+    at = vreduce_agg(&bytes);
+    own = at == SIZE_MAX ? 0 : u32_at(&bytes, at);
+    for (i = 0; i < 64 && at != SIZE_MAX; i++) {
+        if (i != own) {
+            poke_u32(value, i);
+            CHECK(!verifies_poke(&bytes, at, value, 4));
+        }
+    }
+
+    text_free(&bytes);
+    text_free(&source);
+    close_session(&s);
+}
+
 /* A library file keeps the class records, the mark of a `worker fn` and
    the class and slot of a call through a table. The passes over the
    whole program read them. The program read back prints as the module
@@ -2573,4 +2778,5 @@ void test_modules(void)
     dependencies();
     damaged_files();
     damaged_records();
+    damaged_simd();
 }

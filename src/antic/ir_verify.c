@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "attributes.h"
+#include "cpu.h"
 
 /* Check what every later stage relies on. Each block ends with exactly
    one terminator. Every operand refers to something that exists, and
@@ -208,8 +209,11 @@ static bool lane_op_ok(enum ir_op kind, enum ir_op op, enum ir_type lane)
     }
 }
 
-/* A simd operation names a simd struct, the type of its lanes and an
-   operation of one lane, and takes addresses of values. */
+/* A simd operation names a simd struct at or below the vector cap, the
+   type of its lanes and an operation of one lane, and takes addresses of
+   values. Lowering writes each operation on a struct above the cap as a
+   loop over its lanes, and the back ends fold at most the registers of
+   the cap. */
 static void vector_ok(struct verifier *v, const struct ir_inst *inst)
 {
     const char *name = ir_op_name(inst->op);
@@ -224,6 +228,11 @@ static void vector_ok(struct verifier *v, const struct ir_inst *inst)
     }
     t = v->m->aggs[inst->of.agg];
     lane = t->fields[0].type.type;
+    if ((uint64_t)ir_lane_bytes(lane) * t->field_count > CPU_VECTOR_BYTE_CAP) {
+        fail(v, "%s names a simd struct of %zu lanes of %s, above the "
+             "vector cap of %d bytes", name, t->field_count,
+             ir_type_name(lane), CPU_VECTOR_BYTE_CAP);
+    }
     if (inst->type != lane) {
         fail(v, "%s works on lanes of %s in a simd struct of %s", name,
              ir_type_name(inst->type), ir_type_name(lane));

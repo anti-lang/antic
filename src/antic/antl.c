@@ -2176,6 +2176,9 @@ static void read_types(struct reader *r)
         }
         if (!r->failed) {
             types_set_fields(r->types, s->s, s->fields, s->count);
+            if (s->s->simd && !antl_verify_simd_type(s->s)) {
+                antl_damaged(r);
+            }
             /* The base of a class is the type of its field 0, so the
                chain is whole once the field types are in place. */
             if (s->s->kind == TYPE_CLASS && s->count > 0 &&
@@ -2667,13 +2670,6 @@ static bool ir_bitfield_fits(const struct ir_field *f)
     }
 }
 
-/* Every field of a simd aggregate is a lane: a whole value, and not the
-   unit break `_`, which has no bytes. */
-static bool ir_lane(const struct ir_field *f)
-{
-    return f->bits == 0 && strcmp(f->name, "_") != 0;
-}
-
 static void read_tables(struct reader *r, struct ir_module *program,
                         struct ir_maps *maps)
 {
@@ -2749,14 +2745,14 @@ static void read_tables(struct reader *r, struct ir_module *program,
             ext = antl_get_u8(r);
             t->fields[j].ext = (enum ir_ext)ext;
             if (ext > IR_EXT_ZERO || t->fields[j].type.type == IR_VOID ||
-                (t->fields[j].bits != 0 && !ir_bitfield_fits(&t->fields[j])) ||
-                (t->simd && !ir_lane(&t->fields[j]))) {
+                (t->fields[j].bits != 0 && !ir_bitfield_fits(&t->fields[j]))) {
                 antl_damaged(r);
             }
         }
         if (kind > IR_AGG_ARRAY || t->name[0] == '\0' ||
             t->field_count == 0 ||
-            (kind == IR_AGG_ARRAY && t->field_count != 1)) {
+            (kind == IR_AGG_ARRAY && t->field_count != 1) ||
+            (!r->failed && t->simd && !antl_verify_simd_agg(t))) {
             antl_damaged(r);
         }
     }

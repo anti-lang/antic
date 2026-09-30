@@ -1,6 +1,9 @@
 #include <stdint.h>
+#include <string.h>
 
 #include "antl_io.h"
+#include "ir.h"
+#include "types.h"
 
 /* DESIGN: the verifier of library files. The reader takes each record of
    a file as its encoding allows. The copy pass and lowering then take a
@@ -34,7 +37,18 @@
 
    The symbols of other items that the trees name are held to the rules
    of the tables as well: a function has the type of a function, a
-   constant has its value, and a local or a parameter is never one. */
+   constant has its value, and a local or a parameter is never one.
+
+   The tables hold the rules the checker and lowering keep for what the
+   back ends read:
+
+   - A simd struct of the type table and a simd aggregate of the IR have
+     the shape the checker gives a `simd struct`. Every field is a whole
+     lane, every lane has one type of one width on every target, the
+     count is a power of two and the size a multiple of 8 bytes. A mask
+     is the one exception to the size, since it has a lane of one byte
+     per lane of the struct it compares. Neither is packed or aligned by
+     `align(N)`. One function holds the shape for both tables. */
 
 /* A record not reached yet, one the walk is inside, one walked, and the
    name of a case in an arm of a `switch`, which stands in that place
@@ -948,6 +962,59 @@ bool antl_verify_extern(const struct symbol *sym)
     default:
         return true;
     }
+}
+
+/* Whether count lanes of lane_bytes each have the shape the checker
+   requires of a `simd struct`. A lane of no bytes is no lane. mask says
+   the lanes are those of a mask, of one byte per lane of the struct it
+   compares, whose size follows that struct's count. */
+static bool simd_shape(uint64_t lane_bytes, size_t count, bool mask)
+{
+    return lane_bytes != 0 && count != 0 && (count & (count - 1)) == 0 &&
+           (mask || lane_bytes * count % 8 == 0);
+}
+
+bool antl_verify_simd_type(const struct type *t)
+{
+    const struct type *lane;
+    size_t i;
+
+    if (t->kind != TYPE_STRUCT || t->is_union || t->packed || t->align != 0 ||
+        t->field_count == 0) {
+        return false;
+    }
+    lane = t->fields[0].type;
+    for (i = 0; i < t->field_count; i++) {
+        const struct struct_field *f = &t->fields[i];
+        if (f->type != lane || f->bits != 0 || f->form != FIELD_PLAIN ||
+            type_field_is_unit_break(f)) {
+            return false;
+        }
+    }
+    return simd_shape(type_lane_bytes(lane), t->field_count,
+                      lane->kind == TYPE_BOOL);
+}
+
+bool antl_verify_simd_agg(const struct ir_aggtype *t)
+{
+    enum ir_type lane;
+    size_t i;
+
+    if (t->kind != IR_AGG_STRUCT || t->packed || t->align != 0 ||
+        t->field_count == 0) {
+        return false;
+    }
+    lane = t->fields[0].type.type;
+    for (i = 0; i < t->field_count; i++) {
+        const struct ir_field *f = &t->fields[i];
+        if (f->type.type != lane || f->bits != 0 || f->ext != IR_EXT_NONE ||
+            f->name == NULL || strcmp(f->name, "_") == 0) {
+            return false;
+        }
+    }
+    /* A bool is an i8 in the IR, so the lanes of a mask are those of
+       i8. */
+    return simd_shape(ir_lane_bytes(lane), t->field_count, lane == IR_I8);
 }
 
 bool antl_verify_tree(struct reader *r, const struct antl_tree *t)

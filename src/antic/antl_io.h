@@ -183,5 +183,11 @@ bool antl_verify_tree(struct reader *r, const struct antl_tree *t);
 /* Whether sym, a symbol of another item that a tree names, is one the
    checker makes: its kind agrees with its type and its value. */
 bool antl_verify_extern(const struct symbol *sym);
+/* Whether t, a struct of the type table marked simd, has the shape the
+   checker gives a `simd struct`. */
+bool antl_verify_simd_type(const struct type *t);
+/* Whether t, an aggregate of the IR marked simd, has the shape lowering
+   gives a `simd struct`. */
+bool antl_verify_simd_agg(const struct ir_aggtype *t);
 
 #endif
