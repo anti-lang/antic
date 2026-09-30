@@ -3570,6 +3570,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "abstract_call|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/abstract_call.s,abstract_call.anti"
         "link_framework|-S,-o,${LISTINGS}/link_framework.s,link_framework.anti"
         "link_framework_syntax|-S,-o,${LISTINGS}/link_framework_syntax.s,link_framework_syntax.anti"
+        "link_linux|-S,-o,${LISTINGS}/link_linux.s,link_linux.anti"
+        "link_linux_syntax|-S,-o,${LISTINGS}/link_linux_syntax.s,link_linux_syntax.anti"
         "inherits_body|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/inherits_body.s,inherits_body.anti"
         "fail_forms|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fail_forms.s,fail_forms.anti"
         "fail_no_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fail_no_import.s,fail_no_import.anti"
@@ -3655,6 +3657,10 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
             "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/errors/${name}.err"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_error.cmake")
 endforeach()
+# A program of tests/errors that no test reads is refused.
+add_test(NAME errors_registered
+    COMMAND "${CMAKE_COMMAND}" "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_errors_registered.cmake")
 set(DUMP "${CMAKE_CURRENT_SOURCE_DIR}/dump")
 foreach(case "symbolic.types|--dump-types,${DUMP}/symbolic.anti"
         "generics.types|--dump-types,${DUMP}/generics.anti"
