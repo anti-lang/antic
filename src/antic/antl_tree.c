@@ -238,23 +238,26 @@ static void io_u32(struct io *io, uint32_t *v)
     }
 }
 
+/* A number that is never negative, such as a line or a count of loops.
+   The writer refuses a negative one, and the reader one above INT_MAX. */
 static void io_int(struct io *io, int *v)
 {
-    uint32_t u = (uint32_t)*v;
-
-    io_u32(io, &u);
-    if (reading(io)) {
-        *v = (int)u;
+    if (io->mode == IO_WRITE) {
+        if (*v < 0) {
+            bad(io);
+        }
+        antl_put_u32(io->w, (uint32_t)*v);
+    } else if (io->mode == IO_READ) {
+        *v = antl_get_int(io->r);
     }
 }
 
 static void io_i32(struct io *io, int32_t *v)
 {
-    uint32_t u = (uint32_t)*v;
-
-    io_u32(io, &u);
-    if (reading(io)) {
-        *v = (int32_t)u;
+    if (io->mode == IO_WRITE) {
+        antl_put_u32(io->w, (uint32_t)*v);
+    } else if (io->mode == IO_READ) {
+        *v = antl_get_i32(io->r);
     }
 }
 
@@ -269,11 +272,10 @@ static void io_u64(struct io *io, uint64_t *v)
 
 static void io_i64(struct io *io, int64_t *v)
 {
-    uint64_t u = (uint64_t)*v;
-
-    io_u64(io, &u);
-    if (reading(io)) {
-        *v = (int64_t)u;
+    if (io->mode == IO_WRITE) {
+        antl_put_u64(io->w, (uint64_t)*v);
+    } else if (io->mode == IO_READ) {
+        *v = antl_get_i64(io->r);
     }
 }
 
@@ -290,12 +292,21 @@ static void io_size(struct io *io, size_t *v)
     }
 }
 
+/* A character of a format specification, which is ASCII. A byte above
+   127 would give a char whose value depends on its signedness. */
 static void io_char(struct io *io, char *v)
 {
     uint8_t b = (uint8_t)*v;
 
+    if (!reading(io) && (*v < 0 || b > 127)) {
+        bad(io);
+    }
     io_u8(io, &b);
     if (reading(io)) {
+        if (b > 127) {
+            bad(io);
+            b = 0;
+        }
         *v = (char)b;
     }
 }
@@ -375,10 +386,10 @@ static void io_ctype(struct io *io, const struct type **t)
 
 static void io_symbolic(struct io *io, const struct symbolic **s)
 {
-    uint8_t present = *s != NULL;
+    bool present = *s != NULL;
 
-    io_u8(io, &present);
-    if (present == 0) {
+    io_bool(io, &present);
+    if (!present) {
         if (reading(io)) {
             *s = NULL;
         }
@@ -400,11 +411,11 @@ static void io_symbolic(struct io *io, const struct symbolic **s)
 /* A constant with its type, or none. */
 static void io_value(struct io *io, struct const_value **v)
 {
-    uint8_t present = *v != NULL;
+    bool present = *v != NULL;
     struct type *type = *v != NULL ? (*v)->type : NULL;
 
-    io_u8(io, &present);
-    if (present == 0) {
+    io_bool(io, &present);
+    if (!present) {
         if (reading(io)) {
             *v = NULL;
         }
@@ -1677,8 +1688,8 @@ static struct item *read_declaration(struct reader *r)
     size_t i;
 
     it->name = antl_get_name(r);
-    it->pos.line = (int)antl_get_u32(r);
-    it->pos.column = (int)antl_get_u32(r);
+    it->pos.line = antl_get_int(r);
+    it->pos.column = antl_get_int(r);
     it->name_pos = it->pos;
     it->vis = (enum visibility)antl_get_u8(r);
     type = antl_type_ref(r, r->table_count);

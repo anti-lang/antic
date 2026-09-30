@@ -2081,6 +2081,9 @@ static const char tree_source[] =
     "    for v in xs {\n"
     "        total = total + v;\n"
     "    }\n"
+    "    for j in 0..10 by -3 {\n"
+    "        total = total + j;\n"
+    "    }\n"
     "    while total > 100 do {\n"
     "        break;\n"
     "    }\n"
@@ -2294,6 +2297,12 @@ static void extern_const_without_value(struct session *s)
     own_symbol(s, tree_let(s, "helped")->as.binary.right)->value = NULL;
 }
 
+/* A line above INT_MAX, which a negative line of the compiler writes. */
+static void line_negative(struct session *s)
+{
+    tree_let(s, "sum")->pos.line = -1;
+}
+
 /* A chain of `-` as deep as depth, with the operand of `-n` at its end. */
 static void unary_chain(struct session *s, size_t depth)
 {
@@ -2444,6 +2453,44 @@ static void tree_counts(void)
     text_free(&plain);
 }
 
+/* The negative step of `for j in 0..10 by -3` reads back as -3. */
+static void signed_numbers(void)
+{
+    struct session s;
+    struct text bytes = {0};
+    struct ir_module program;
+    const struct interface *read = NULL;
+    char error[160] = "";
+    size_t found = 0;
+    size_t i;
+
+    open_session(&s);
+    if (build_library(&s, "tt", tree_source, &bytes)) {
+        ir_module_init(&program, &s.arena, "main");
+        read = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
+                         &s.types, &s.arena, &program, error, sizeof error);
+        CHECK(read != NULL);
+        for (i = 0; read != NULL && i < read->generic_count; i++) {
+            const struct item *it = read->generics[i];
+            size_t k;
+            if (it->name.length != 4 || memcmp(it->name.text, "tree", 4) != 0) {
+                continue;
+            }
+            for (k = 0; k < it->body->count; k++) {
+                const struct stmt *st = it->body->stmts[k];
+                if (st->kind == STMT_FOR && st->as.for_loop.step != NULL) {
+                    CHECK(st->as.for_loop.step_value == -3);
+                    found++;
+                }
+            }
+        }
+        ir_module_free(&program);
+        CHECK(found == 1);
+    }
+    text_free(&bytes);
+    close_session(&s);
+}
+
 static void damaged_trees(void)
 {
     void (*const damages[])(struct session *) = {
@@ -2456,7 +2503,8 @@ static void damaged_trees(void)
         generic_short_of_params, copy_short_of_args,
         block_holds_itself,      expr_holds_itself,
         stmt_twice,              deep_chain,
-        extern_fn_not_fn,        extern_const_without_value};
+        extern_fn_not_fn,        extern_const_without_value,
+        line_negative};
     size_t i;
 
     tree_file(NULL, true);
@@ -2470,6 +2518,7 @@ void test_modules(void)
 {
     damaged_trees();
     tree_counts();
+    signed_numbers();
     deep_tables();
     imports();
     cycles();

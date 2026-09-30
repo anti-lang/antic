@@ -1,5 +1,6 @@
 #include "antl_io.h"
 
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -120,6 +121,40 @@ uint64_t antl_get_u64(struct reader *r)
     return get_uint(r, 8);
 }
 
+/* DESIGN: a signed number is its two's complement bits. The reader
+   rebuilds it by arithmetic, since C leaves the conversion of an
+   unsigned value above the largest signed one to the implementation. */
+int32_t antl_get_i32(struct reader *r)
+{
+    uint32_t u = antl_get_u32(r);
+
+    if (u <= INT32_MAX) {
+        return (int32_t)u;
+    }
+    return (int32_t)(u - (uint32_t)INT32_MAX - 1u) + INT32_MIN;
+}
+
+int64_t antl_get_i64(struct reader *r)
+{
+    uint64_t u = antl_get_u64(r);
+
+    if (u <= INT64_MAX) {
+        return (int64_t)u;
+    }
+    return (int64_t)(u - (uint64_t)INT64_MAX - 1u) + INT64_MIN;
+}
+
+int antl_get_int(struct reader *r)
+{
+    uint32_t u = antl_get_u32(r);
+
+    if (u > INT_MAX) {
+        antl_damaged(r);
+        return 0;
+    }
+    return (int)u;
+}
+
 uint32_t antl_get_count(struct reader *r, size_t min)
 {
     uint32_t n = antl_get_u32(r);
@@ -142,6 +177,10 @@ struct name antl_get_name(struct reader *r)
     uint32_t length = antl_get_count(r, 1);
     char *text;
 
+    /* A name is printed with `%.*s`, whose precision is an int. */
+    if (!r->failed && length > INT_MAX) {
+        antl_damaged(r);
+    }
     if (r->failed || !antl_take(r, length)) {
         return n;
     }

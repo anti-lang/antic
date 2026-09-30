@@ -84,6 +84,12 @@ bool antl_take(struct reader *r, size_t n);
 uint8_t antl_get_u8(struct reader *r);
 uint32_t antl_get_u32(struct reader *r);
 uint64_t antl_get_u64(struct reader *r);
+/* Read a signed number of four and eight bytes, two's complement. */
+int32_t antl_get_i32(struct reader *r);
+int64_t antl_get_i64(struct reader *r);
+/* Read a number the compiler keeps in an int and never makes negative,
+   such as a line, and refuse one above INT_MAX. */
+int antl_get_int(struct reader *r);
 /* Read a count of records that each take at least min bytes, and refuse
    one the rest of the file cannot hold. This keeps a damaged count from
    causing a huge allocation. */
@@ -92,8 +98,8 @@ uint32_t antl_get_count(struct reader *r, size_t min);
    reader, and one more, so a count of 0 gives memory as well. The pool
    frees it with everything else it holds. */
 void *antl_allocate(struct reader *r, size_t count, size_t size);
-/* Read a string as a name. Its text is memory of the pool of the
-   reader, and the pool frees it. */
+/* Read a string as a name, at most INT_MAX bytes. Its text is memory of
+   the pool of the reader, and the pool frees it. */
 struct name antl_get_name(struct reader *r);
 
 /* antl.c: the types, the values and the libraries, which the section
