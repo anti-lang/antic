@@ -1483,6 +1483,7 @@ add_test(NAME anti_build
         "-DCHECK_PDB=${PROJECT_SOURCE_DIR}/tools/check-pdb.cmake"
         "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build"
+        "-DOBJECT=${anti_object}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build.cmake")
 
 # `anti symbols` over a deployment of a release program, with a plugin
@@ -2325,9 +2326,6 @@ add_test(NAME classlib
 # library here is built with --trace and without --trace writes, and the
 # program with both.
 foreach(mode release dev)
-    if(mode STREQUAL "dev" AND WIN32)
-        continue()
-    endif()
     add_test(NAME hooks_modules_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2341,6 +2339,7 @@ foreach(mode release dev)
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/hooks-modules-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
@@ -2348,9 +2347,6 @@ endforeach()
 # so `is`, `==`, `equals` and `reflect.new` agree whichever module made
 # the object, in release mode and in dev mode
 foreach(mode release dev)
-    if(mode STREQUAL "dev" AND WIN32)
-        continue()
-    endif()
     add_test(NAME shared_class_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2362,6 +2358,7 @@ foreach(mode release dev)
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/shared-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
     # A chain of classes over three modules, each naming its base with
     # the module it comes from
@@ -2376,6 +2373,7 @@ foreach(mode release dev)
             "-DPROGRAM=chain"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/chain-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
     # Ownership over two modules: the teardown and the copy of a class
     # call those of the base, the inline field and the elements that
@@ -2391,6 +2389,7 @@ foreach(mode release dev)
             "-DPROGRAM=crate"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/owned-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
@@ -2400,9 +2399,6 @@ endforeach()
 # make is one type and one symbol. Release mode and dev mode print the
 # same.
 foreach(mode release dev)
-    if(mode STREQUAL "dev" AND WIN32)
-        continue()
-    endif()
     add_test(NAME generics_modules_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2414,6 +2410,7 @@ foreach(mode release dev)
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/generics-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
@@ -2421,9 +2418,6 @@ endforeach()
 # library without its module name, and reach the module by its name as
 # well. A generic among them has its copy made in the program.
 foreach(mode release dev)
-    if(mode STREQUAL "dev" AND WIN32)
-        continue()
-    endif()
     add_test(NAME direct_modules_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2435,6 +2429,7 @@ foreach(mode release dev)
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/direct-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
@@ -2442,9 +2437,6 @@ endforeach()
 # the program handles the error, `try` forwards it and `undo` runs on the
 # fail path alone.
 foreach(mode release dev)
-    if(mode STREQUAL "dev" AND WIN32)
-        continue()
-    endif()
     add_test(NAME failing_modules_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2456,6 +2448,7 @@ foreach(mode release dev)
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/failing-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
@@ -2463,9 +2456,6 @@ endforeach()
 # default of each parameter, and `here` is the position of the call in the
 # program.
 foreach(mode release dev)
-    if(mode STREQUAL "dev" AND WIN32)
-        continue()
-    endif()
     add_test(NAME default_modules_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2477,6 +2467,7 @@ foreach(mode release dev)
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/defaults-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
@@ -2484,9 +2475,6 @@ endforeach()
 # each signature, so the two modules name one type and the program takes
 # the elements apart.
 foreach(mode release dev)
-    if(mode STREQUAL "dev" AND WIN32)
-        continue()
-    endif()
     add_test(NAME tuple_modules_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2498,6 +2486,7 @@ foreach(mode release dev)
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/tuples-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
@@ -2505,9 +2494,6 @@ endforeach()
 # with every case named. It tests one with `is` and `if let` and passes
 # it back inside a struct of the library.
 foreach(mode release dev)
-    if(mode STREQUAL "dev" AND WIN32)
-        continue()
-    endif()
     add_test(NAME variant_modules_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2518,15 +2504,13 @@ foreach(mode release dev)
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/variants-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
 # A public class of a library whose layout holds types nested in it,
 # which another module lays out, builds and calls.
 foreach(mode release dev)
-    if(mode STREQUAL "dev" AND WIN32)
-        continue()
-    endif()
     add_test(NAME nested_modules_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2537,15 +2521,13 @@ foreach(mode release dev)
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/nested-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
 # The hash of the types of a library and its generics that hash and order,
 # which another module uses and hashes inside a struct of its own.
 foreach(mode release dev)
-    if(mode STREQUAL "dev" AND WIN32)
-        continue()
-    endif()
     add_test(NAME hashing_modules_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2557,15 +2539,13 @@ foreach(mode release dev)
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/hashing-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
 # The operators of a library reach the private fields and functions of its
 # classes, a generic one among them, in the copies another module makes.
 foreach(mode release dev)
-    if(mode STREQUAL "dev" AND WIN32)
-        continue()
-    endif()
     add_test(NAME access_modules_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2577,6 +2557,7 @@ foreach(mode release dev)
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/access-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
@@ -2584,9 +2565,6 @@ endforeach()
 # compares, adds, indexes and walks. The library file carries the mark of
 # each hook, in the class and at module level.
 foreach(mode release dev)
-    if(mode STREQUAL "dev" AND WIN32)
-        continue()
-    endif()
     add_test(NAME generic_hooks_modules_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2598,15 +2576,13 @@ foreach(mode release dev)
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/generic-hooks-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
 # A collection, its iterator and a struct with the language hooks in a
 # library, which another module walks, indexes and collects.
 foreach(mode release dev)
-    if(mode STREQUAL "dev" AND WIN32)
-        continue()
-    endif()
     add_test(NAME iteration_modules_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2618,6 +2594,7 @@ foreach(mode release dev)
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/iteration-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
@@ -2626,9 +2603,6 @@ endforeach()
 # reaches the workers of `parallel`, and a `keep` one stores a C function
 # pointer.
 foreach(mode release dev)
-    if(mode STREQUAL "dev" AND WIN32)
-        continue()
-    endif()
     add_test(NAME closures_modules_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2639,15 +2613,13 @@ foreach(mode release dev)
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/closures-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
 endforeach()
 
 # A Mutex in a struct of a library and channels that pass between the
 # program and a library, which drains one and selects over two.
 foreach(mode release dev)
-    if(mode STREQUAL "dev" AND WIN32)
-        continue()
-    endif()
     add_test(NAME sync_modules_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2658,6 +2630,7 @@ foreach(mode release dev)
             "-DPROGRAM=client"
             "-DMODE=${mode}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/sync-${mode}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
     set_tests_properties(sync_modules_${mode} PROPERTIES TIMEOUT 120)
 endforeach()
@@ -2682,18 +2655,17 @@ add_test(NAME dump_ir_modules
 set_tests_properties(dump_ir_modules PROPERTIES FIXTURES_REQUIRED twice_antl)
 
 # Dev mode: one object per module, linked into the same program.
-if(NOT WIN32)
-    add_test(NAME dev_modules
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DMODULES=${MODULES}"
-            "-DLIBS=${LIBS}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/dev"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dev.cmake")
-    set_tests_properties(dev_modules PROPERTIES FIXTURES_REQUIRED twice_antl)
-endif()
+add_test(NAME dev_modules
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DMODULES=${MODULES}"
+        "-DLIBS=${LIBS}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/dev"
+        "-DOBJECT=${anti_object}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dev.cmake")
+set_tests_properties(dev_modules PROPERTIES FIXTURES_REQUIRED twice_antl)
 
 add_executable(poke_byte modules/poke_byte.c ../src/antic/platform.c)
 add_test(NAME dev_library_verify
@@ -3050,6 +3022,7 @@ foreach(case
             "-DSTD=${std}"
             "-DSTATUS=${status}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/trace-${name}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trace.cmake")
 endforeach()
 
@@ -3125,6 +3098,7 @@ foreach(case
             "-DSTD=${std}"
             "-DSTATUS=${status}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-${name}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trace.cmake")
 endforeach()
 
@@ -3179,6 +3153,7 @@ foreach(case
             ${error_patterns}
             "-DSTATUS=${status}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/inject-${name}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trace.cmake")
 endforeach()
 

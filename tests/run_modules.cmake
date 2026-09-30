@@ -17,6 +17,7 @@
 #   OPTIONS    optional options of antic for the program, separated by
 #              commas
 #   LIB_OPTIONS  optional options of antic for the library modules
+#   OBJECT     the suffix antic gives an object of the host, .o or .obj
 
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
@@ -50,7 +51,7 @@ foreach(library IN LISTS libraries)
             message(FATAL_ERROR
                 "antic --dev of ${library} failed with ${status}\n${err}")
         endif()
-        list(APPEND program_inputs "${WORK}/${library}.o")
+        list(APPEND program_inputs "${WORK}/${library}${OBJECT}")
     else()
         list(APPEND program_inputs "${WORK}/com/example/${library}.antl")
     endif()
@@ -68,7 +69,7 @@ if(MODE STREQUAL "dev")
             message(FATAL_ERROR
                 "antic --dev of anti.${module} failed with ${status}\n${err}")
         endif()
-        list(APPEND program_inputs "${WORK}/std_${module}.o")
+        list(APPEND program_inputs "${WORK}/std_${module}${OBJECT}")
     endforeach()
 endif()
 execute_process(

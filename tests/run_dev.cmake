@@ -9,6 +9,7 @@
 #   MODULES   the search root of the sources
 #   LIBS      the search root of the library files
 #   WORK      a directory for the objects and the executable
+#   OBJECT    the suffix antic gives an object of the host, .o or .obj
 
 file(MAKE_DIRECTORY "${WORK}")
 foreach(module scale twice)
@@ -26,7 +27,7 @@ endforeach()
 execute_process(
     COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
             -I "${LIBS}" -o "${WORK}/main" "${MODULES}/main.anti"
-            "${WORK}/scale.o" "${WORK}/twice.o"
+            "${WORK}/scale${OBJECT}" "${WORK}/twice${OBJECT}"
     RESULT_VARIABLE status
     ERROR_VARIABLE err
     ENCODING NONE)
@@ -58,7 +59,7 @@ endforeach()
 execute_process(
     COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
             -I "${LIBS}" -o "${WORK}/main_antl" "${MODULES}/main.anti"
-            "${WORK}/scale_antl.o" "${WORK}/twice_antl.o"
+            "${WORK}/scale_antl${OBJECT}" "${WORK}/twice_antl${OBJECT}"
     RESULT_VARIABLE status
     ERROR_VARIABLE err
     ENCODING NONE)

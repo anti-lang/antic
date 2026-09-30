@@ -11,20 +11,18 @@
 #   CHECK_PDB tools/check-pdb.cmake
 #   READOBJ  llvm-readobj of the runtime archive
 #   WORK     a directory this run writes into
+#   OBJECT   the suffix of an object of the host, .o or .obj
 #
 # It covers the dev mode of docs/tooling-addendum.md with its cache,
 # release mode, the `-g` rule of docs/tooling.md, --target, --cpu, the
 # lock file, `anti run` and the project `anti new` writes.
 
 set(project "${WORK}/app")
-# A Windows host writes app.exe, its assembly app.exe.s and objects named
-# .obj, and its symbols lie in a PDB, so the map of its archive names no
-# function.
+# A Windows host writes app.exe and its assembly app.exe.s, and its
+# symbols lie in a PDB, so the map of its archive names no function.
 set(exe "")
-set(obj ".o")
 if(HOST MATCHES "^windows-")
     set(exe ".exe")
-    set(obj ".obj")
 endif()
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
@@ -76,7 +74,7 @@ endif()
 # The cache key of a module is the digest of its input, the compiler
 # version and the target, so a build that changes nothing writes no
 # object again.
-set(object "${project}/build/${HOST}/dev/obj/com/example/greet${obj}")
+set(object "${project}/build/${HOST}/dev/obj/com/example/greet${OBJECT}")
 if(NOT EXISTS "${object}")
     message(FATAL_ERROR "the dev build wrote no ${object}")
 endif()
