@@ -907,6 +907,13 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
                           (int)t->name.length, t->name.text);
             return sema_builtin(c, TYPE_ERROR);
         }
+        /* A type whose own declaration names it, as `enum A: A`, has no
+           type yet while that declaration is resolved. */
+        if (sym->type == NULL) {
+            sema_error_at(c, t->pos, "`%.*s` names itself in its own "
+                          "declaration", (int)t->name.length, t->name.text);
+            return sema_builtin(c, TYPE_ERROR);
+        }
         return sym->type;
     case TYPEX_POINTER:
         element = sema_resolve_type(c, t->element);
@@ -2435,6 +2442,18 @@ static void declare_items(struct checker *c)
             struct type *base = it->base != NULL
                                     ? sema_resolve_type(c, it->base)
                                     : types_builtin(c->types, TYPE_I32);
+            /* The values of an enum are integers, as the reader of a
+               library file requires. A base that is no integer, or the
+               enum itself, gave lowering a NULL or a struct to read (S10
+               of the audit). The error keeps c_int in its place. */
+            if (!type_is_integer(base)) {
+                if (!sema_is_error(base)) {
+                    sema_error_at(c, it->base->pos, "the underlying type of an "
+                                  "enum is an integer type, found `%s`",
+                                  sema_tn(base));
+                }
+                base = types_builtin(c->types, TYPE_I32);
+            }
             it->symbol->type =
                 types_enum(c->types, c->module_name, it->name, base);
         }

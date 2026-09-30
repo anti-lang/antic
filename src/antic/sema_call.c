@@ -3002,7 +3002,14 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
     struct name *name = &e->as.field.name;
     struct item *m = reached_member(t, name);
     const struct struct_field *f;
+    struct expr *base = e->as.field.base;
 
+    /* DESIGN: the base of a member reached through a type names that
+       type and has it as its type, `E` of `E.A` and `m.T` of `m.T.x`
+       alike, so every reader of a field's base finds one. A name of a
+       type is no place. An untyped base was read through NULL by `&E.A`,
+       `E.A = 1` and `1 + E.carry` (S09 of the audit). */
+    base->type = t;
     if (t->kind == TYPE_VARIANT) {
         return variant_case_value(c, e, t);
     }

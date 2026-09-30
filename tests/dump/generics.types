@@ -311,14 +311,14 @@ function uses              fn([]*Square, []byte)
     let_stmt boxed         Box<int>
       call                 Box<int>
         field make         fn(int) -> Box<int>
-          ident Box
+          ident Box        Box<int>
             type_args
               type int
         int_lit 5          int
     let_stmt inferred      Box<float>
       call                 Box<float>
         field make         fn(float) -> Box<float>
-          ident Box
+          ident Box        Box
         float_lit 2.5      float
     let_stmt nested        Box<Box<int>>
       type Box
@@ -328,7 +328,7 @@ function uses              fn([]*Square, []byte)
               type int
       call                 Box<Box<int>>
         field make         fn(Box<int>) -> Box<Box<int>>
-          ident Box
+          ident Box        Box<Box<int>>
             type_args
               type Box
                 type_args

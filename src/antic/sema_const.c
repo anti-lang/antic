@@ -722,10 +722,12 @@ bool sema_eval_const(struct checker *c, struct expr *e,
                 e->type->fields[e->as.field.enum_value - 1].number;
             return true;
         }
-        base = e->as.field.base->type;
-        if (base == NULL) {
+        /* A function, a static or a constant of a type is read at run
+           time. */
+        if (e->symbol != NULL) {
             return fail_const(c, e, "this field");
         }
+        base = e->as.field.base->type;
         /* The value of a class literal keeps the filler above in its
            base, its tables and the fields it does not name. A field of
            it is therefore read only at run time. */

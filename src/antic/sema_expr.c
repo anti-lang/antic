@@ -29,6 +29,12 @@ bool sema_is_place(const struct expr *e)
         return base->kind == TYPE_POINTER || base->kind == TYPE_SLICE ||
                (base->kind == TYPE_ARRAY && sema_is_place(e->as.index.base));
     case EXPR_FIELD:
+        /* A field that names a function, a static or a constant, of a
+           value or of a type, is no field of its base. `&v.area` of a
+           bound function passed as a place (S12 of the audit). */
+        if (e->symbol != NULL) {
+            return false;
+        }
         base = e->as.field.base->type;
         /* The tag of a variant changes with the whole value alone. */
         if ((base->kind == TYPE_POINTER ? base->element : base)->kind ==
@@ -2277,7 +2283,11 @@ static bool fields_layout(const struct type *t, uint64_t *size,
     for (i = 0; i < t->field_count; i++) {
         uint64_t n;
         uint64_t a;
+        /* A unit break `_` takes no bytes and aligns what follows by
+           the rules of each target, so it has no one layout (S02 of the
+           audit). */
         if (t->fields[i].bits != 0 ||
+            type_field_is_unit_break(&t->fields[i]) ||
             !layout_in(t->fields[i].type, &n, &a, answered)) {
             return false;
         }
@@ -2347,6 +2357,11 @@ static bool layout_in(const struct type *t, uint64_t *size, uint64_t *align,
         *align = known->align;
         return known->fixed;
     default:
+        /* The word of a Mutex is as wide as the lock of the target, and
+           a Mutex is never made of bytes (S02 of the audit). */
+        if (t->lock_word) {
+            return false;
+        }
         *size = type_lane_bytes(t);
         *align = *size;
         return *size != 0;
@@ -2355,7 +2370,8 @@ static bool layout_in(const struct type *t, uint64_t *size, uint64_t *align,
 
 /* The size and the alignment of t, which are the same on every target,
    as the C rules lay it out. False for a type that holds a width the
-   target decides, a symbolic length, a bitfield or a table. answered
+   target decides, a symbolic length, a bitfield, a unit break, the word
+   of a Mutex or a table. answered
    holds the answer for each struct and tuple met, so a struct that holds
    another twice measures it once. */
 static bool fixed_layout(const struct type *t, uint64_t *size,
