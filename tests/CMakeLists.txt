@@ -3660,7 +3660,9 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "handles|--front-end,--runtime,${ANTIC_RUNTIME_DIR},handles.anti"
         "sorted|--front-end,--runtime,${ANTIC_RUNTIME_DIR},sorted.anti"
         "shared_handles|--front-end,--runtime,${ANTIC_RUNTIME_DIR},shared_handles.anti"
-        "generic_copies|-S,-o,${LISTINGS}/generic_copies.s,generic_copies.anti")
+        "generic_copies|-S,-o,${LISTINGS}/generic_copies.s,generic_copies.anti"
+        "copies_deep|-S,-o,${LISTINGS}/copies_deep.s,copies_deep.anti"
+        "copies_many|-S,-o,${LISTINGS}/copies_many.s,copies_many.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

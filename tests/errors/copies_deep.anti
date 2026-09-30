@@ -1,0 +1,17 @@
+// A function whose copy names a deeper copy of it names copies without
+// end. The chain is refused where it passes 64 copies.
+
+struct Tag<T>
+{
+	v: T,
+}
+
+fn deep<T>(n: int) -> int
+{
+	return deep<Tag<T>>(n);
+}
+
+fn main() -> int
+{
+	return deep<int>(1);
+}

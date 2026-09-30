@@ -1104,9 +1104,11 @@ static struct type *subst(struct checker *c, struct type *t,
    periods. Every name then stays below a few times the bound, so a chain
    that the depth bound below refuses costs little memory on the way. A
    copy is found by its arguments and never by its name, so a cut name
-   finds no other copy. Outside a chain of copies a cut name is refused
-   once, since the symbols of two copies could then be one. */
-#define COPY_NAME_MAX 65536
+   finds no other copy. A cut name is refused once, since the symbols of
+   two copies could then be one and a symbol spells the arguments in
+   full. Outside a chain of copies it is refused at once. Inside one it
+   is refused when the chain ends, unless the chain was refused for its
+   depth. */
 
 /* The name of a copy as a program writes it, `Pair<int, str>`, and
    whether it was cut. */
@@ -1254,18 +1256,18 @@ static void check_copy(struct checker *c, struct type *copy)
    `W<T>` holding a `W<Box<T>>` does. It names new copies without end, so
    a chain of copies past COPY_DEPTH_MAX is refused once. The message
    stands at the first type parameter of the generic the chain began
-   with. */
-#define COPY_DEPTH_MAX 64
-
+   with. A generic that names two such copies names twice as many at
+   each step, so no copy is filled after a refusal. */
 static void fill_one(struct checker *c, struct type *copy)
 {
+    if (c->copy_refused) {
+        return;
+    }
     if (c->copy_depth >= COPY_DEPTH_MAX) {
-        if (!c->copy_refused) {
-            c->copy_refused = true;
-            sema_error_at(c, c->copy_root->type_params[0]->param->pos,
-                          "the copies of `%s` name ever deeper copies of it",
-                          sema_tn(c->copy_root));
-        }
+        c->copy_refused = true;
+        sema_error_at(c, c->copy_root->type_params[0]->param->pos,
+                      "the copies of `%s` name ever deeper copies of it",
+                      sema_tn(c->copy_root));
         return;
     }
     if (c->copy_depth == 0) {
@@ -1276,6 +1278,17 @@ static void fill_one(struct checker *c, struct type *copy)
     copy->unfilled = false;
     c->copy_depth--;
     check_copy(c, copy);
+    /* The chain ends here, and it was not refused. */
+    if (c->copy_depth == 0 && c->copy_cut != NULL && !c->copy_refused &&
+        !c->copy_name_refused) {
+        c->copy_name_refused = true;
+        sema_error_at(c, c->copy_cut->type_params[0]->param->pos,
+                      "a copy of `%s` has a name longer than %d bytes",
+                      sema_tn(c->copy_cut), COPY_NAME_MAX);
+    }
+    if (c->copy_depth == 0) {
+        c->copy_cut = NULL;
+    }
 }
 
 void sema_generic_ready(struct checker *c, struct type *generic)
@@ -1337,15 +1350,32 @@ static struct type *copy_named(struct checker *c, struct type *generic,
         }
         return sema_builtin(c, TYPE_ERROR);
     }
+    /* DESIGN: the copies a module names are bounded in number as well
+       as in depth. `G<T>` holding a `H<A<T>>` and a `H<B<T>>`, and each
+       generic after it the same, names twice as many copies at each
+       generic, which no chain of COPY_DEPTH_MAX reaches. */
+    if (c->copy_count >= COPY_COUNT_MAX) {
+        if (!c->copy_refused) {
+            c->copy_refused = true;
+            sema_error_at(c, generic->type_params[0]->param->pos,
+                          "the module names more than %d copies of "
+                          "generic types", COPY_COUNT_MAX);
+        }
+        return sema_builtin(c, TYPE_ERROR);
+    }
     copy = types_struct(c->types, generic->module,
                         copy_name(c, generic, args, values, &cut));
     copy->depth = types_depth_above(args, count);
+    if (cut && c->copy_depth > 0 && c->copy_cut == NULL) {
+        c->copy_cut = generic;
+    }
     if (cut && c->copy_depth == 0 && !c->copy_name_refused) {
         c->copy_name_refused = true;
         sema_error_at(c, generic->type_params[0]->param->pos,
                       "a copy of `%s` has a name longer than %d bytes",
                       sema_tn(generic), COPY_NAME_MAX);
     }
+    c->copy_count++;
     copy->kind = generic->kind;
     copy->unfilled = true;
     copy->generic = generic;

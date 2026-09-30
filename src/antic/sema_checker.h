@@ -144,9 +144,11 @@ struct checker {
     /* The copies being filled, one inside another, and whether a chain
        too deep was refused. */
     int copy_depth;
+    size_t copy_count;          /* the copies of generic types made */
     bool copy_refused;
     bool copy_name_refused;         /* a cut copy name was reported */
     const struct type *copy_root;   /* the generic the chain began with */
+    const struct type *copy_cut;    /* a copy in the chain has a cut name */
     /* The fields of concurrent classes that the module writes after
        `construct`, reported at their declarations at the end. */
     struct written_field *written;
@@ -200,6 +202,14 @@ struct generic_call {
    the one they never have by default. */
 #define LANG_HOOK_EQ "eq"
 #define LANG_HOOK_LT "lt"
+
+/* The bounds of the copies of generics, in sema_generic.c and
+   sema_copies.c: how deep a chain of copies goes, how many copies of
+   types and of functions a module names, and how long the name of a copy
+   is. */
+#define COPY_DEPTH_MAX 64
+#define COPY_COUNT_MAX 16384
+#define COPY_NAME_MAX 65536
 
 /* A set of pointers, open addressed and at most half full. The owner
    frees slots with free(). */

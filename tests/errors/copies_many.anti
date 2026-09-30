@@ -1,0 +1,87 @@
+// Each function names two copies of the next, so the copies double at
+// each function. The module is refused past 16384 copies of functions.
+
+fn f0<T>() -> int
+{
+	return f1<*T>() + f1<[]T>();
+}
+
+fn f1<T>() -> int
+{
+	return f2<*T>() + f2<[]T>();
+}
+
+fn f2<T>() -> int
+{
+	return f3<*T>() + f3<[]T>();
+}
+
+fn f3<T>() -> int
+{
+	return f4<*T>() + f4<[]T>();
+}
+
+fn f4<T>() -> int
+{
+	return f5<*T>() + f5<[]T>();
+}
+
+fn f5<T>() -> int
+{
+	return f6<*T>() + f6<[]T>();
+}
+
+fn f6<T>() -> int
+{
+	return f7<*T>() + f7<[]T>();
+}
+
+fn f7<T>() -> int
+{
+	return f8<*T>() + f8<[]T>();
+}
+
+fn f8<T>() -> int
+{
+	return f9<*T>() + f9<[]T>();
+}
+
+fn f9<T>() -> int
+{
+	return f10<*T>() + f10<[]T>();
+}
+
+fn f10<T>() -> int
+{
+	return f11<*T>() + f11<[]T>();
+}
+
+fn f11<T>() -> int
+{
+	return f12<*T>() + f12<[]T>();
+}
+
+fn f12<T>() -> int
+{
+	return f13<*T>() + f13<[]T>();
+}
+
+fn f13<T>() -> int
+{
+	return f14<*T>() + f14<[]T>();
+}
+
+fn f14<T>() -> int
+{
+	return f15<*T>() + f15<[]T>();
+}
+
+fn f15<T>() -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	return f0<int>();
+}

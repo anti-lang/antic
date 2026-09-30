@@ -1164,6 +1164,43 @@ void test_sema_generic_copies(void)
             1, 9, "class `A<T>` inherits itself");
 }
 
+/* The copies of generic types are bounded in depth, in number and in the
+   length of their names. */
+void test_sema_copy_bounds(void)
+{
+    struct text source = {0};
+    int i;
+
+    /* Two deeper copies at each of 64 levels. Filling went on after the
+       refusal of the first chain, about 2^64 copies. */
+    rejects("struct Box<T> { v: T }\nstruct Opt<T> { v: T }\n"
+            "struct W<T> { a: ?*W<Box<T>>, b: ?*W<Opt<T>> }\n"
+            "fn f(w: W<int>) { }\n",
+            3, 10, "the copies of `W` name ever deeper copies of it");
+    /* Each generic names two copies of the next, 2^15 in all, in a chain
+       no deeper than 16. */
+    text_append(&source, "struct A<T> { v: T }\nstruct B<T> { v: T }\n");
+    for (i = 0; i < 15; i++) {
+        text_appendf(&source, "struct G%d<T> { a: ?*G%d<A<T>>, "
+                     "b: ?*G%d<B<T>> }\n", i, i + 1, i + 1);
+    }
+    text_append(&source, "struct G15<T> { v: T }\nfn f(g: G0<int>) { }\n");
+    rejects(text_cstr(&source), 1, 10,
+            "the module names more than 16384 copies of generic types");
+    text_free(&source);
+    /* The names double along a chain of 20 generics, which no depth
+       bound refuses. A symbol spells the arguments in full. */
+    text_append(&source, "struct Pair<A, B> { a: A, b: B }\n");
+    for (i = 0; i < 20; i++) {
+        text_appendf(&source, "struct H%d<T> { a: ?*H%d<Pair<T, T>> }\n",
+                     i, i + 1);
+    }
+    text_append(&source, "struct H20<T> { v: T }\nfn f(h: H0<int>) { }\n");
+    rejects(text_cstr(&source), 1, 13,
+            "a copy of `Pair` has a name longer than 65536 bytes");
+    text_free(&source);
+}
+
 /* Chains of types the program writes are walked without a recursion
    per link, and the values of a struct nest at most 256 levels. */
 void test_sema_chains(void)

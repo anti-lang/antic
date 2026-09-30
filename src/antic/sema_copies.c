@@ -143,6 +143,7 @@ struct work {
     struct item *from;
     struct item *to;
     struct generic_map map;
+    int depth;                      /* the copies made to reach it */
 };
 
 struct copies {
@@ -158,6 +159,7 @@ struct copies {
     struct item **added;
     size_t added_count;
     size_t added_capacity;
+    int making;                     /* the depth of the body being made */
     bool failed;
 };
 
@@ -353,13 +355,61 @@ static struct item *fn_copy(struct copies *k, struct item *generic,
                             struct type **args,
                             const struct symbolic **values);
 
+/* Where a refusal of the copies of the generic it stands: its first
+   type parameter, or its name when it has none of its own. */
+static struct pos generic_pos(const struct item *it)
+{
+    return it->type_param_count > 0 ? it->type_params[0].pos : it->name_pos;
+}
+
+/* Refuse the copies of generic once, for the reason why: "name ever
+   deeper copies of it", "a name longer than" the bound, or the count. */
+enum refusal { REFUSE_DEPTH, REFUSE_NAME, REFUSE_COUNT };
+
+static void refuse(struct copies *k, const struct item *generic,
+                   enum refusal why)
+{
+    const struct name *name = &generic->name;
+
+    if (k->failed) {
+        return;
+    }
+    k->failed = true;
+    switch (why) {
+    case REFUSE_DEPTH:
+        sema_error_at(k->c, generic_pos(generic), "the copies of `%.*s` name "
+                      "ever deeper copies of it", (int)name->length,
+                      name->text);
+        return;
+    case REFUSE_NAME:
+        sema_error_at(k->c, generic_pos(generic), "a copy of `%.*s` has a "
+                      "name longer than %d bytes", (int)name->length,
+                      name->text, COPY_NAME_MAX);
+        return;
+    case REFUSE_COUNT:
+        sema_error_at(k->c, generic_pos(generic), "the module names more "
+                      "than %d copies of generic functions", COPY_COUNT_MAX);
+        return;
+    }
+}
+
+/* DESIGN: a body of a copy may name a copy of another function, and
+   `deep<T>` calling `deep<Tag<T>>` names new copies without end. A body
+   made at the end of a chain of COPY_DEPTH_MAX copies is refused, as a
+   chain of copies of types is, and so is a module that names more than
+   COPY_COUNT_MAX copies of functions. */
 static void add_work(struct copies *k, struct item *from, struct item *to,
                      const struct generic_map *map)
 {
+    if (k->making >= COPY_DEPTH_MAX) {
+        refuse(k, from, REFUSE_DEPTH);
+        return;
+    }
     k->work = grow(k->work, &k->work_capacity, k->work_count, sizeof *k->work);
     k->work[k->work_count].from = from;
     k->work[k->work_count].to = to;
     k->work[k->work_count].map = *map;
+    k->work[k->work_count].depth = k->making + 1;
     k->work_count++;
 }
 
@@ -554,6 +604,12 @@ static struct item *copy_function(struct copies *k, struct item *generic,
             return k->fns[i].copy;
         }
     }
+    if (k->fn_count >= COPY_COUNT_MAX) {
+        refuse(k, generic, REFUSE_COUNT);
+    }
+    if (name.length > COPY_NAME_MAX) {
+        refuse(k, generic, REFUSE_NAME);
+    }
     n = arena_alloc(k->c->arena, sizeof *n);
     *n = *generic;
     sym = arena_alloc(k->c->arena, sizeof *sym);
@@ -590,7 +646,9 @@ static struct item *copy_function(struct copies *k, struct item *generic,
     k->added = grow(k->added, &k->added_capacity, k->added_count,
                     sizeof *k->added);
     k->added[k->added_count++] = n;
-    add_work(k, generic, n, map);
+    if (!k->failed) {
+        add_work(k, generic, n, map);
+    }
     return n;
 }
 
@@ -1567,7 +1625,9 @@ static void make_body(struct copies *k, struct work *w)
     at.function = w->to;
     sema_enter(c, &at, &saved);
     sema_enter_scope(c, &scope);
+    k->making = w->depth;
     w->to->body = xb(&cl, w->from->body);
+    k->making = 0;
     sema_leave_scope(c, &scope);
     sema_leave(c, &saved);
     map_free(&cl.nodes);
