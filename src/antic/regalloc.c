@@ -352,6 +352,29 @@ static bool defines_constant(const struct target_desc *target,
     return defines;
 }
 
+/* The virtual registers that operand i of inst reads: a register in a
+   use role, or the base and the index of a memory operand. Stores the
+   address of each in out and returns their count. */
+static size_t read_vregs(const struct alloc *a, struct mach_inst *inst,
+                         size_t i, uint32_t *out[2])
+{
+    struct mach_operand *o = &inst->operands[i];
+    size_t count = 0;
+
+    if (o->kind == MACH_MEM) {
+        if (o->base_vreg) {
+            out[count++] = &o->reg;
+        }
+        if (o->scale != 0 && o->index_vreg) {
+            out[count++] = &o->index_reg;
+        }
+    } else if (o->kind == MACH_VREG &&
+               (a->target->opcodes[inst->op].roles[i] & ROLE_USE) != 0) {
+        out[count++] = &o->reg;
+    }
+    return count;
+}
+
 static void rematerialise_constants(struct alloc *a)
 {
     struct mach_function *f = a->f;
@@ -391,30 +414,29 @@ static void rematerialise_constants(struct alloc *a)
         rebuilt.loop_depth = f->blocks[b].loop_depth;
         for (i = 0; i < f->blocks[b].count; i++) {
             struct mach_inst *inst = &f->blocks[b].insts[i];
-            const struct mach_opcode *op = &a->target->opcodes[inst->op];
             uint32_t made = 0;
             for (j = 0; j < inst->count; j++) {
-                struct mach_operand *o = &inst->operands[j];
-                struct mach_inst *copy;
-                uint32_t v;
-                size_t k;
-                if (o->kind != MACH_VREG || (op->roles[j] & ROLE_USE) == 0) {
-                    continue;
-                }
-                v = o->reg;
-                if (many[v] || definition[v].count == 0) {
-                    continue;
-                }
-                made = mach_vreg_add(f, f->fp[v]);
-                copy = mach_append(&rebuilt);
-                *copy = definition[v];
-                for (k = 0; k < copy->count; k++) {
-                    if ((a->target->opcodes[copy->op].roles[k] & ROLE_DEF) !=
-                        0) {
-                        copy->operands[k].reg = made;
+                uint32_t *reads[2];
+                size_t count = read_vregs(a, inst, j, reads);
+                size_t r;
+                for (r = 0; r < count; r++) {
+                    struct mach_inst *copy;
+                    uint32_t v = *reads[r];
+                    size_t k;
+                    if (many[v] || definition[v].count == 0) {
+                        continue;
                     }
+                    made = mach_vreg_add(f, f->fp[v]);
+                    copy = mach_append(&rebuilt);
+                    *copy = definition[v];
+                    for (k = 0; k < copy->count; k++) {
+                        if ((a->target->opcodes[copy->op].roles[k] &
+                             ROLE_DEF) != 0) {
+                            copy->operands[k].reg = made;
+                        }
+                    }
+                    *reads[r] = made;
                 }
-                o->reg = made;
             }
             /* The original definition goes, since every use has one. */
             if (defines_constant(a->target, inst, &made) && !many[made] &&

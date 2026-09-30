@@ -151,6 +151,49 @@ static void constant_in_register_0(enum target target)
     arena_free(&arena);
 }
 
+/* A constant that a memory operand reads, as its base or as its index,
+   is written again before the load, as one in a register operand is. M53
+   dropped its one definition and left the address in a register nothing
+   wrote. */
+static void constant_in_address(enum target target)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *f;
+    struct ir_block *b0;
+    struct text out = {0};
+    uint32_t base;
+    uint32_t index;
+    uint32_t at;
+    uint32_t first;
+    uint32_t second;
+    uint32_t sum;
+
+    ir_module_init(&m, &arena, "main");
+    f = ir_function_add(&m, "main", "f", IR_I64, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    base = ir_temp(f, IR_PTR);
+    ir_assign(f, b0, base, ir_int_op(IR_PTR, 40960));
+    first = ir_load(f, b0, IR_I64, ir_temp_op(f, base));
+    index = ir_temp(f, IR_I64);
+    ir_assign(f, b0, index, ir_int_op(IR_I64, 12345));
+    at = ir_ptradd(f, b0, ir_temp_op(f, first), ir_temp_op(f, index));
+    second = ir_load(f, b0, IR_I64, ir_temp_op(f, at));
+    sum = ir_binary(f, b0, IR_ADD, IR_I64, ir_temp_op(f, first),
+                    ir_temp_op(f, second));
+    ir_ret(f, b0, IR_I64, ir_temp_op(f, sum));
+    run_ir(&m, target, &out);
+    if (strstr(text_cstr(&out), "40960") == NULL ||
+        strstr(text_cstr(&out), "12345") == NULL) {
+        check_failures++;
+        fprintf(stderr, "a constant of an address is lost:\n%s",
+                text_cstr(&out));
+    }
+    text_free(&out);
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 static const char scale[] = "fn scale(x: int) -> int {\n"
                             "    let k = 2 + 4;\n"
                             "    return x * k;\n"
@@ -177,6 +220,8 @@ void test_regalloc(void)
 {
     constant_in_register_0(TARGET_MACOS_ARM64);
     constant_in_register_0(TARGET_LINUX_X86_64);
+    constant_in_address(TARGET_MACOS_ARM64);
+    constant_in_address(TARGET_LINUX_X86_64);
     /* The instructions of the assembly listing in chapter 1. */
     allocates(scale, TARGET_MACOS_ARM64,
               "main.scale:\n"
