@@ -1122,7 +1122,9 @@ static bool forward_stores(struct ir_function *f)
    address never leaves the function is split into one temporary per
    field. The allocator then keeps the fields in registers. An address
    escapes when `&` is taken of it or of a field. It escapes when it is
-   passed as a pointer and when it is stored into another object. `self`
+   passed as a pointer and when it is stored into another object. It
+   escapes when the temporary that holds it is written a second time,
+   since a use of that temporary may then reach another object. `self`
    is a parameter and escapes by nature. */
 
 /* One field of a split slot, named by the offset that reaches it. */
@@ -1181,6 +1183,26 @@ static bool escapes_in(const struct ir_inst *inst, uint32_t temp)
     return false;
 }
 
+/* Whether an instruction of f other than def writes temp. The IR is not
+   in SSA form, so a temporary written again may hold another address
+   there, and a slot reached through it cannot be split. */
+static bool written_again(const struct ir_function *f,
+                          const struct ir_inst *def, uint32_t temp)
+{
+    size_t b;
+    size_t i;
+
+    for (b = 0; b < f->block_count; b++) {
+        for (i = 0; i < f->blocks[b]->count; i++) {
+            const struct ir_inst *inst = &f->blocks[b]->insts[i];
+            if (inst != def && inst->result == temp) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 static bool split_slots(struct ir_function *f)
 {
     struct slot_field fields[32];
@@ -1200,6 +1222,9 @@ static bool split_slots(struct ir_function *f)
                 continue;
             }
             base = slot->result;
+            if (written_again(f, slot, base)) {
+                continue;
+            }
             /* Every use is a direct load or store, or a ptradd whose
                result only addresses one. */
             for (j = 0; j < f->block_count && !escaped; j++) {
@@ -1226,7 +1251,8 @@ static bool split_slots(struct ir_function *f)
                            symbolic offset. An index computed at run time
                            reaches a different element on every pass, so a
                            slot addressed that way is not split. */
-                        if (use->b.kind != IR_INT && use->b.kind != IR_SYM) {
+                        if ((use->b.kind != IR_INT && use->b.kind != IR_SYM) ||
+                            written_again(f, use, use->result)) {
                             escaped = true;
                             break;
                         }

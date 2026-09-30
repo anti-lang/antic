@@ -1,0 +1,30 @@
+//! A pointer to a field of one slot that a branch points at a field of another.
+//! Scalar replacement must keep both slots in memory, since q holds either
+//! address. S18 of the second audit printed `1 1`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pair
+{
+	x: int,
+	y: int,
+}
+
+fn pick(c: bool, a: int, b: int) -> int
+{
+	let s = Pair { x: 0, y: a };
+	let t = Pair { x: 0, y: b };
+	let q = &s.y;
+	if c {
+		q = &t.y;
+	}
+	return *q;
+}
+
+fn main() -> int
+{
+	let first = pick(true, 1, 2);
+	let second = pick(false, 1, 2);
+	printf("%d %d\n".ptr, first as c_int, second as c_int);
+	return 0;
+}
