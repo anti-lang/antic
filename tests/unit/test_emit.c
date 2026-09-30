@@ -118,6 +118,35 @@ static const char letters[] = "extern fn putchar(c: i32) -> i32;\n"
                               "    return i;\n"
                               "}\n";
 
+/* A frame of 3000000000 bytes, past 2 GiB. */
+static const char big_frame[] = "fn main() -> int {\n"
+                                "    let a = [7 as u8; 3000000000];\n"
+                                "    return a[2999999999] as int;\n"
+                                "}\n";
+
+/* Eight slots whose sizes add up past 2^64. */
+static const char wrapping_frame[] = "extern fn take(p: ?*u8);\n"
+                                     "\n"
+                                     "fn main() -> int {\n"
+                                     "    let a0 = [0 as u8; 2305843009213693951];\n"
+                                     "    take(&a0[0]);\n"
+                                     "    let a1 = [0 as u8; 2305843009213693951];\n"
+                                     "    take(&a1[0]);\n"
+                                     "    let a2 = [0 as u8; 2305843009213693951];\n"
+                                     "    take(&a2[0]);\n"
+                                     "    let a3 = [0 as u8; 2305843009213693951];\n"
+                                     "    take(&a3[0]);\n"
+                                     "    let a4 = [0 as u8; 2305843009213693951];\n"
+                                     "    take(&a4[0]);\n"
+                                     "    let a5 = [0 as u8; 2305843009213693951];\n"
+                                     "    take(&a5[0]);\n"
+                                     "    let a6 = [0 as u8; 2305843009213693951];\n"
+                                     "    take(&a6[0]);\n"
+                                     "    let a7 = [0 as u8; 2305843009213693951];\n"
+                                     "    take(&a7[0]);\n"
+                                     "    return 0;\n"
+                                     "}\n";
+
 /* The address of a function on Mach-O: a page and a page offset. */
 static void page_offsets(void)
 {
@@ -504,13 +533,22 @@ void test_emit(void)
 
     /* x86_64 subtracts the frame size and addresses slots with 32-bit
        displacements, so a frame of 2 GiB or more is an error. */
-    emits("fn main() -> int {\n"
-          "    let a = [7 as u8; 3000000000];\n"
-          "    return a[2999999999] as int;\n"
-          "}\n",
-          TARGET_LINUX_X86_64,
-          "the stack frame of `main.main` needs 3000000000 bytes, and an "
-          "x86_64 frame holds at most 2147483647");
+    emits(big_frame, TARGET_LINUX_X86_64,
+          "the stack frame of `main.main` needs more than 2147483647 bytes, "
+          "the most an x86_64 frame holds");
+    /* ARM64 has the same limit, so a program that one target compiles
+       compiles for every target. */
+    emits(big_frame, TARGET_LINUX_ARM64,
+          "the stack frame of `main.main` needs more than 2147483647 bytes, "
+          "the most an arm64 frame holds");
+    /* Eight slots of 2^61 - 1 bytes wrap a sum of 64 bits. S21 of the second
+       audit laid them out in 48 bytes on x86_64, over each other. */
+    emits(wrapping_frame, TARGET_LINUX_X86_64,
+          "the stack frame of `main.main` needs more than 2147483647 bytes, "
+          "the most an x86_64 frame holds");
+    emits(wrapping_frame, TARGET_MACOS_ARM64,
+          "the stack frame of `main.main` needs more than 2147483647 bytes, "
+          "the most an arm64 frame holds");
 
     /* A module compiled on its own keeps every function, global and hidden,
        for the objects of the other modules in the same link. */

@@ -2615,7 +2615,10 @@ static const struct target_desc desc = {
     .slot_address = slot_address,
     .incoming_address = incoming_address,
     .copy_memory = copy_memory,
-    .frame_limit = 0,
+    /* DESIGN: the limit of x86_64, so that a program one target compiles
+       compiles for every target. ARM64 reaches any offset through x16, and
+       no frame of 2 GiB fits the stack of a thread. See docs/decisions.md. */
+    .frame_limit = 0x7fffffff,
     .flags_native = flags_native,
     .vector_native = vector_native,
     .load_spill = load_spill,

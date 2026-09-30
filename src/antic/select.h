@@ -127,7 +127,7 @@ struct target_desc {
                              int64_t offset);
     void (*copy_memory)(struct selector *s, struct mach_operand dst,
                         struct mach_operand src, uint64_t size);
-    uint64_t frame_limit;               /* 0 for no limit */
+    uint64_t frame_limit;               /* the largest frame, below 2^32 */
     /* Whether the target selects the flag operation inst and reads its
        flags where the instruction leaves them. The back end expands every
        other one into plain operations. */

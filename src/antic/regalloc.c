@@ -979,9 +979,17 @@ static uint64_t save_end(const struct alloc *a, uint8_t preg, uint64_t used)
     return align_up(used, size) + size;
 }
 
-static void layout_frame(struct alloc *a, struct frame *frame)
+/* Lay out the slots and the saved registers of the frame. Returns false
+   when the frame passes the limit of the target.
+   DESIGN: each sum is checked against the limit before it is made. Layout
+   allows an aggregate of up to 2^61 bytes, so eight of them wrap a sum of
+   64 bits. A frame that wrapped would pass the limit and lay its locals
+   over each other. The limit is below 2^32, so a sum of two values within
+   it never wraps. */
+static bool layout_frame(struct alloc *a, struct frame *frame)
 {
     struct mach_function *f = a->f;
+    uint64_t limit = a->target->frame_limit;
     uint64_t saved_bytes = 0;
     uint64_t offset = 0;
     uint64_t used = 0;
@@ -1009,15 +1017,30 @@ static void layout_frame(struct alloc *a, struct frame *frame)
         }
     }
     offset = f->outgoing;
+    if (offset > limit) {
+        return false;
+    }
     for (i = 0; i < f->slot_count; i++) {
+        if (f->slots[i].align > limit) {
+            return false;
+        }
         offset = align_up(offset, f->slots[i].align);
+        if (offset > limit || f->slots[i].size > limit - offset) {
+            return false;
+        }
         f->slots[i].offset = (int64_t)offset;
         offset += f->slots[i].size;
     }
     for (i = 0; i < frame->saved_count; i++) {
         saved_bytes = save_end(a, frame->saved[i], saved_bytes);
     }
+    if (saved_bytes > limit - offset) {
+        return false;
+    }
     frame->size = align_up(offset + saved_bytes, 16);
+    if (frame->size > limit) {
+        return false;
+    }
     saved_bytes = 0;
     for (i = 0; i < frame->saved_count; i++) {
         saved_bytes = save_end(a, frame->saved[i], saved_bytes);
@@ -1025,6 +1048,7 @@ static void layout_frame(struct alloc *a, struct frame *frame)
     }
     frame->needed = calls || frame->size > 0 || f->stack_params;
     frame->probe = a->abi->probe_stack && frame->size >= 4096;
+    return true;
 }
 
 bool regalloc_function(enum target t, struct mach_function *f, char *error,
@@ -1054,16 +1078,15 @@ bool regalloc_function(enum target t, struct mach_function *f, char *error,
     build_intervals(&a);
     linear_scan(&a);
     reserve_borrow_slots(&a);
-    layout_frame(&a, &frame);
+    ok = layout_frame(&a, &frame);
     frame.convention = target_info(t)->convention;
     frame.unwind = target_info(t)->format == FORMAT_COFF;
     f->unwind = frame.unwind && frame.needed;
-    ok = a.target->frame_limit == 0 || frame.size <= a.target->frame_limit;
     if (!ok) {
-        snprintf(error, error_size, "the stack frame of `%s.%s` needs %llu "
-                 "bytes, and an %s frame holds at most %llu", f->ir->module,
-                 f->ir->name, (unsigned long long)frame.size, a.target->name,
-                 (unsigned long long)a.target->frame_limit);
+        snprintf(error, error_size, "the stack frame of `%s.%s` needs more "
+                 "than %llu bytes, the most an %s frame holds", f->ir->module,
+                 f->ir->name, (unsigned long long)a.target->frame_limit,
+                 a.target->name);
     }
     for (b = 0; ok && b < f->block_count; b++) {
         memset(&rw, 0, sizeof rw);
