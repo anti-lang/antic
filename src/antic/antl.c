@@ -2303,7 +2303,8 @@ bool antl_read_value(struct reader *r, struct type *t, struct const_value *v,
         v->as.character = antl_get_u32(r);
         return !r->failed && t->kind == TYPE_CHAR;
     case CONST_NULL:
-        return t->kind == TYPE_POINTER || t->kind == TYPE_FN;
+        /* `none` stands for a pointer or a function that may be none. */
+        return (t->kind == TYPE_POINTER || t->kind == TYPE_FN) && t->nullable;
     case CONST_TEXT: {
         struct name bytes = antl_get_name(r);
         v->as.text.bytes = bytes.text;
@@ -2863,6 +2864,9 @@ static struct ir_const *read_const(struct reader *r, struct ir_module *program,
     default: /* IR_CONST_NONE */
         break;
     }
+    if (!r->failed && !antl_verify_const(c)) {
+        antl_damaged(r);
+    }
     return r->failed ? NULL : c;
 }
 
@@ -3398,6 +3402,10 @@ static void read_ir(struct reader *r, struct ir_module *program)
            how the file spells that. */
         if (module != NULL && module[0] == '\0') {
             module = NULL;
+        }
+        /* The back end writes the alignment as a power of two. */
+        if ((align & (align - 1)) != 0) {
+            antl_damaged(r);
         }
         if (!antl_take(r, size)) {
             break;

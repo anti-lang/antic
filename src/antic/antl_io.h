@@ -189,5 +189,8 @@ bool antl_verify_simd_type(const struct type *t);
 /* Whether t, an aggregate of the IR marked simd, has the shape lowering
    gives a `simd struct`. */
 bool antl_verify_simd_agg(const struct ir_aggtype *t);
+/* Whether the constant c of the IR has a type the back end lays out as
+   the value it holds. Its items are held one by one as they are read. */
+bool antl_verify_const(const struct ir_const *c);
 
 #endif

@@ -48,7 +48,9 @@
      count is a power of two and the size a multiple of 8 bytes. A mask
      is the one exception to the size, since it has a lane of one byte
      per lane of the struct it compares. Neither is packed or aligned by
-     `align(N)`. One function holds the shape for both tables. */
+     `align(N)`. One function holds the shape for both tables.
+   - A scalar constant of the IR has a scalar type, so the back end lays
+     it out as the value it writes. */
 
 /* A record not reached yet, one the walk is inside, one walked, and the
    name of a case in an arm of a `switch`, which stands in that place
@@ -1015,6 +1017,19 @@ bool antl_verify_simd_agg(const struct ir_aggtype *t)
     /* A bool is an i8 in the IR, so the lanes of a mask are those of
        i8. */
     return simd_shape(ir_lane_bytes(lane), t->field_count, lane == IR_I8);
+}
+
+bool antl_verify_const(const struct ir_const *c)
+{
+    switch (c->kind) {
+    case IR_CONST_AGG:
+        return true;
+    case IR_CONST_NONE:
+        /* No value, whose type still lays out when it is a global's. */
+        return c->scalar != IR_AGG;
+    default:
+        return c->scalar != IR_AGG && c->scalar != IR_VOID;
+    }
 }
 
 bool antl_verify_tree(struct reader *r, const struct antl_tree *t)

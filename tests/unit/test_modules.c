@@ -1941,6 +1941,152 @@ static void damaged_simd(void)
     close_session(&s);
 }
 
+/* A library of constants: a class with defaults, and a class whose
+   descriptor is a global with a value. */
+static const char const_source[] =
+    "pub class ZN { zp: ?*int = none, zi: int = 3 }\n"
+    "pub class ZD\n"
+    "{\n"
+    "    n: int = 0,\n"
+    "    pub fn zdn(self) -> int\n"
+    "    {\n"
+    "        return self.n;\n"
+    "    }\n"
+    "}\n";
+
+static bool same_name(const struct name *n, const char *text)
+{
+    return n->length == strlen(text) && memcmp(n->text, text, n->length) == 0;
+}
+
+/* The type of the field field of the class or struct name of the file,
+   or NULL when the file is refused. */
+static const struct type *field_type_of(const struct text *bytes,
+                                        struct session *s, const char *name,
+                                        const char *field)
+{
+    struct ir_module program;
+    const struct interface *iface;
+    const struct type *found = NULL;
+    char error[160] = "";
+    size_t i;
+    size_t j;
+
+    ir_module_init(&program, &s->arena, "main");
+    iface = antl_read((const uint8_t *)bytes->data, bytes->length, NULL, 0,
+                      &s->types, &s->arena, &program, error, sizeof error);
+    for (i = 0; iface != NULL && i < iface->item_count; i++) {
+        const struct type *t = iface->items[i]->type;
+        if (iface->items[i]->kind != SYMBOL_STRUCT ||
+            !same_name(&t->name, name)) {
+            continue;
+        }
+        for (j = 0; j < t->field_count; j++) {
+            if (same_name(&t->fields[j].name, field)) {
+                found = t->fields[j].type;
+            }
+        }
+    }
+    ir_module_free(&program);
+    return found;
+}
+
+/* The first global of the program whose value is an aggregate that
+   opens with a scalar item. */
+static const struct ir_global *valued_global(const struct ir_module *program)
+{
+    size_t i;
+
+    for (i = 0; i < program->global_count; i++) {
+        const struct ir_global *g = program->globals[i];
+        if (g->value != NULL && g->value->kind == IR_CONST_AGG &&
+            g->value->item_count > 0 &&
+            g->value->items[0].kind != IR_CONST_NONE &&
+            g->value->items[0].kind != IR_CONST_AGG) {
+            return g;
+        }
+    }
+    return NULL;
+}
+
+static void damaged_constants(void)
+{
+    struct session s;
+    struct session r;
+    struct text bytes = {0};
+    struct ir_module program;
+    const struct ir_global *g;
+    char error[160] = "";
+    uint8_t value[8];
+    size_t at;
+    uint32_t own;
+    uint32_t i;
+
+    open_session(&s);
+    if (!build_library(&s, "zk", const_source, &bytes)) {
+        close_session(&s);
+        return;
+    }
+    CHECK(reads_file(&bytes));
+
+    /* The default `none` of `zp` given each other type of the table:
+       a file that reads has a pointer or a function that may be `none`
+       there, and never `*ZD`. */
+    at = name_end(&bytes, "zp", false);
+    own = u32_at(&bytes, at);
+    for (i = 0; i < 64; i++) {
+        struct session t;
+        struct text poked = {0};
+        const struct type *type;
+        if (i == own) {
+            continue;
+        }
+        text_append_bytes(&poked, bytes.data, bytes.length);
+        poke_u32((uint8_t *)poked.data + at, i);
+        open_session(&t);
+        type = field_type_of(&poked, &t, "ZN", "zp");
+        CHECK(type == NULL || type_is_nullable(type));
+        close_session(&t);
+        text_free(&poked);
+    }
+
+    /* S23: the scalar of the first item of a global's value made an
+       aggregate and void. The global's name, its size, its alignment,
+       its bytes, its relocations and its marks come before the value,
+       and the value opens with its kind, its scalar, its count and its
+       aggregate. */
+    open_session(&r);
+    ir_module_init(&program, &r.arena, "main");
+    CHECK(antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
+                    &r.types, &r.arena, &program, error,
+                    sizeof error) != NULL);
+    g = valued_global(&program);
+    CHECK(g != NULL);
+    if (g != NULL) {
+        size_t name = name_end(&bytes, g->name, false);
+        uint64_t size = (uint64_t)u32_at(&bytes, name) |
+                        (uint64_t)u32_at(&bytes, name + 4) << 32;
+        size_t relocs = name + 8 + 8 + (size_t)size;
+        size_t item = relocs + 4 + 13 * (size_t)u32_at(&bytes, relocs) + 1 +
+                      1 + 1 + 8 + 5;
+        CHECK(((const uint8_t *)bytes.data)[item] ==
+              (uint8_t)g->value->items[0].kind);
+        value[0] = IR_AGG;
+        refuses_poke(&bytes, item + 1, value, 1);
+        value[0] = IR_VOID;
+        refuses_poke(&bytes, item + 1, value, 1);
+        /* The alignment of the global, 3. */
+        memset(value, 0, sizeof value);
+        value[0] = 3;
+        refuses_poke(&bytes, name + 8, value, 8);
+    }
+    ir_module_free(&program);
+    close_session(&r);
+
+    text_free(&bytes);
+    close_session(&s);
+}
+
 /* A library file keeps the class records, the mark of a `worker fn` and
    the class and slot of a call through a table. The passes over the
    whole program read them. The program read back prints as the module
@@ -2779,4 +2925,5 @@ void test_modules(void)
     damaged_files();
     damaged_records();
     damaged_simd();
+    damaged_constants();
 }
