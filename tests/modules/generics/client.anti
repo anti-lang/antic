@@ -173,5 +173,13 @@ fn main() -> int
 	let odd = gen.half(7);
 	printf("%d %d %d %d\n".ptr, end as c_int, none_end as c_int,
 		halved as c_int, (odd == none) as c_int);
+
+	let bytes: [256]u8 = [0; 256];
+	for i in 0..256 {
+		bytes[i] = i as u8;
+	}
+	let (turned, tag) = gen.reversed(gen.Bytes256.load(bytes[0..256], 0), 7);
+	printf("%d %d %d %d\n".ptr, turned.l0 as c_int, turned.l1 as c_int,
+		turned.l255 as c_int, tag as c_int);
 	return 0;
 }

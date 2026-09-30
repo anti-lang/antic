@@ -16,7 +16,7 @@
    host writes the same file. */
 
 #define ANTL_SUFFIX ".antl"
-#define ANTL_VERSION 73
+#define ANTL_VERSION 74
 
 /* How deep the checked tree of a generic in a library file may nest,
    counted in its blocks, statements, expressions, written types and

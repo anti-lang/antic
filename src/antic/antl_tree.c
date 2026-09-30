@@ -986,7 +986,8 @@ static void io_call(struct io *io, struct expr *e)
 
 static void io_expr_body(struct io *io, struct expr *e)
 {
-    uint8_t lanes;
+    void *array;
+    size_t lanes;
     size_t i;
 
     IO_ENUM(io, e->kind, EXPR_PATTERN);
@@ -1150,22 +1151,20 @@ static void io_expr_body(struct io *io, struct expr *e)
         IO_ENUM(io, e->as.simd.op, SIMD_OP_ALL);
         io_exprs(io, &e->as.simd.args, &e->as.simd.arg_count);
         io_ctype(io, &e->as.simd.simd);
-        /* The lanes of a shuffle, one per field of its simd struct. */
+        /* The lanes of a shuffle, one per field of its simd struct. A
+           simd struct may hold more than 255 lanes, so the count takes
+           the 32 bits of every other count. */
         lanes = e->as.simd.lanes != NULL && e->as.simd.simd != NULL
-                    ? (uint8_t)e->as.simd.simd->field_count
+                    ? e->as.simd.simd->field_count
                     : 0;
-        io_u8(io, &lanes);
+        array = e->as.simd.lanes;
+        io_count(io, &array, &lanes, sizeof *e->as.simd.lanes);
+        e->as.simd.lanes = array;
         if (reading(io) && lanes != 0 &&
             (e->as.simd.simd == NULL ||
              lanes != e->as.simd.simd->field_count)) {
             bad(io);
             lanes = 0;
-        }
-        if (reading(io)) {
-            e->as.simd.lanes =
-                lanes == 0 ? NULL
-                           : antl_allocate(io->r, lanes,
-                                           sizeof *e->as.simd.lanes);
         }
         for (i = 0; i < lanes && !failed(io); i++) {
             io_u32(io, &e->as.simd.lanes[i]);
