@@ -2,8 +2,10 @@
 //! value, and tears each one down at the end of its turn, on every exit of the
 //! body: its end, `break`, `continue`, `return` and `fail`. The lent parts are
 //! borrowed and never torn down. An iterator here builds a fresh key per turn
-//! that owns a leaf, and each walk runs under a leak check, the count of the
-//! leaves alive. A value given whole by value is torn down each turn as well.
+//! that owns a leaf, and each walk runs under a leak check: the count of the
+//! leaves alive and the count of the keys alive, which each teardown of a key
+//! lowers, so a second teardown of the same key shows as a count below zero. A
+//! value given whole by value is torn down each turn as well.
 
 import anti.lang;
 
@@ -21,16 +23,24 @@ class Leaf
 	}
 }
 
-/// A key that owns a leaf.
+/// A key that owns a leaf and counts its teardowns.
 class Key
 {
 	pub n: int = 0,
 	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
 }
 
 fn key(n: int) -> Key
 {
 	Leaf.live.add(1);
+	Key.live.add(1);
 	return Key { n: n, leaf: alloc Leaf { n: n } };
 }
 
@@ -81,8 +91,8 @@ class Keys
 
 fn check(name: str)
 {
-	printf("%.*s %d\n".ptr, name.len as c_int, name.ptr,
-		Leaf.live.load() as c_int);
+	printf("%.*s %d %d\n".ptr, name.len as c_int, name.ptr,
+		Leaf.live.load() as c_int, Key.live.load() as c_int);
 }
 
 fn first_at_least(m: *Counts, least: int) -> int

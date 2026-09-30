@@ -1,7 +1,10 @@
 //! `alloc(T, n)` of a struct, a tuple or a `?T` that holds a class value
 //! zero-fills its elements, as it does for a class. `=` into an element then
 //! finds a zero table and destroys nothing. Before the fix it destroyed what
-//! the memory held last, which here is the bytes a freed block left behind.
+//! the memory held last, which here is the bytes a freed block left behind. The
+//! program counts the leaves alive and the keys alive. A teardown of a key that
+//! was never made, or a second teardown of one, lowers the count of the keys
+//! below zero while the count of the leaves stays right.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -17,10 +20,18 @@ class Leaf
 	}
 }
 
+/// A key that owns a leaf and counts its teardowns.
 class Key
 {
 	pub n: int = 0,
 	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
 }
 
 struct Pair
@@ -32,6 +43,7 @@ struct Pair
 fn key(n: int) -> Key
 {
 	Leaf.live.add(1);
+	Key.live.add(1);
 	return Key { n: n, leaf: alloc Leaf { n: n } };
 }
 
@@ -83,6 +95,7 @@ fn main() -> int
 	destroy(&optionals[0]);
 	free(optionals);
 
-	printf("live %d\n".ptr, Leaf.live.load() as c_int);
+	printf("live %d %d\n".ptr, Leaf.live.load() as c_int,
+		Key.live.load() as c_int);
 	return 0;
 }

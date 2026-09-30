@@ -3,8 +3,10 @@
 //! moves when returned or passed to an `own` parameter, and it is torn down
 //! with its owner as a field of a class or of another struct, as an element of
 //! an array and inside a `?T`. `dup` copies it. Each case runs under a leak
-//! check, the count of the leaves alive. A struct or a tuple that owns nothing
-//! stays plain data that `=` copies.
+//! check: the count of the leaves alive and the count of the keys alive, which
+//! each teardown of a key lowers, so a second teardown of the same key shows as
+//! a count below zero. A struct or a tuple that owns nothing stays plain data
+//! that `=` copies.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -20,11 +22,18 @@ class Leaf
 	}
 }
 
-/// A key that owns a leaf.
+/// A key that owns a leaf and counts its teardowns.
 class Key
 {
 	pub n: int = 0,
 	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
 }
 
 struct Pair
@@ -54,6 +63,7 @@ class Holder
 fn key(n: int) -> Key
 {
 	Leaf.live.add(1);
+	Key.live.add(1);
 	return Key { n: n, leaf: alloc Leaf { n: n } };
 }
 
@@ -107,8 +117,8 @@ fn clear<T>(p: *T)
 
 fn check(name: str)
 {
-	printf("%.*s %d\n".ptr, name.len as c_int, name.ptr,
-		Leaf.live.load() as c_int);
+	printf("%.*s %d %d\n".ptr, name.len as c_int, name.ptr,
+		Leaf.live.load() as c_int, Key.live.load() as c_int);
 }
 
 fn main() -> int
@@ -167,8 +177,10 @@ fn main() -> int
 		let q = dup(p);
 		let t = make_tuple(9);
 		let u = dup(t);
-		/* Each `dup` copies one leaf, which no constructor counts. */
+		/* Each `dup` copies one key and its leaf, which no constructor
+		 * counts. */
 		Leaf.live.add(2);
+		Key.live.add(2);
 		printf("dup %d %d\n".ptr, (q.k.leaf != p.k.leaf) as c_int,
 			(u.0.leaf != t.0.leaf) as c_int);
 		check("dup alive");
@@ -203,8 +215,10 @@ fn main() -> int
 	{
 		let p = make_pair(14);
 		let q = copy_of(&p);
-		/* The leaf the copy makes, and the one `alloc` makes below. */
+		/* The key and the leaf the copy makes, and the leaf `alloc` makes
+		 * below. */
 		Leaf.live.add(2);
+		Key.live.add(1);
 		let leaf = alloc Leaf { };
 		let same = copy_of(&leaf);
 		printf("generic dup %d %d\n".ptr, (q.k.leaf != p.k.leaf) as c_int,

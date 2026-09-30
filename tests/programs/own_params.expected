@@ -25,7 +25,9 @@ bin 13
 held 14
 hold 7
 destruct 14
+destruct bin
 destruct 13
+destruct shelf
 destruct 10
 destruct 4
 live 0

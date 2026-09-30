@@ -4,7 +4,10 @@
 //! `return`. A move on one path of an `if` leaves the other path to tear the
 //! local down at the end of its block. A literal and a call result need
 //! nothing. Each `Box` counts itself alive, so a teardown missed or run twice
-//! shows in the count and in the lines it prints.
+//! shows in the count and in the lines it prints. `Shelf` and `Bin` hold a
+//! `Box` by value and print a line for each of their own teardowns, since a
+//! second teardown of either finds its `Box` torn down already and leaves the
+//! count right.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -35,6 +38,11 @@ class Shelf
 	{
 		self.slot = b;
 	}
+
+	fn destruct(self)
+	{
+		printf("destruct shelf\n".ptr);
+	}
 }
 
 class Bin<T>
@@ -44,6 +52,11 @@ class Bin<T>
 	pub fn put(self, own x: T)
 	{
 		self.held = x;
+	}
+
+	fn destruct(self)
+	{
+		printf("destruct bin\n".ptr);
 	}
 }
 
