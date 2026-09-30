@@ -11,6 +11,13 @@ no match [none]
 empty [-]
 unset group [[]]
 template in a variable [<k>v]
+open $ [<$v]
+open ${ [<${v]
+open ${1 [<${1v]
+open ${k [<${kv]
+open ${ in a variable [<${v]
+open ${1 in a variable [<${1v]
+open ${k in a variable [<${kv]
 0 [a#b#c#d#]
 2 [a#b#c3d4]
 -1 [a1b2c3d#]
@@ -28,4 +35,6 @@ compiled fn [a@b d]
 compiled calls 1
 missing group 1
 missing name 1
+compiled open [${2]
+huge group 1
 expensive 1, asked 0

@@ -6,6 +6,7 @@
 #include "rt.h"
 #include "std.h"
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -472,6 +473,14 @@ int64_t anti_rt_regex_test(const void *pattern, const unsigned char *s,
     return rc < 0 ? failure(rc) : FOUND;
 }
 
+/* DESIGN: a group number is bounded by the groups of the pattern alone.
+   `count` of a match is a field the program may write, so no read of the
+   ovector trusts it. */
+static bool has_group(const void *pattern, int64_t n)
+{
+    return n >= 0 && n <= anti_rt_regex_group_count(pattern);
+}
+
 /* The text of group n in the ovector ov of the match m, and whether the
    group took part. */
 static int64_t group_of(const struct anti_match *m, const PCRE2_SIZE *ov,
@@ -544,7 +553,7 @@ int64_t anti_rt_regex_group(const struct anti_match *m, int64_t n,
     pcre2_match_data *md;
     int64_t status;
 
-    if (n < 0 || n > m->count) {
+    if (!has_group(m->pattern, n)) {
         *out = slice(&m->subject, 0, 0);
         return NO_GROUP;
     }
@@ -648,7 +657,7 @@ static void expand(struct growing *g, const struct anti_match *m,
                          ? piece.number
                          : named_group(m->pattern, ov, bytes + piece.start,
                                        piece.length);
-            if (number >= 0 && number <= m->count) {
+            if (has_group(m->pattern, number)) {
                 (void)group_of(m, ov, number, &group);
                 grow_append(g, group.ptr, group.len);
             }
@@ -701,6 +710,14 @@ int64_t anti_rt_regex_replace(const void *pattern, const unsigned char *s,
 #define MISFIT (-2)
 #define MISSING (-3)
 
+/* Whether length bytes written at offset at stay inside a span of span
+   bytes. at comes from the program unchanged, so the test takes no sum
+   that an offset near INT64_MAX could overflow. */
+static bool fits_span(int64_t at, int64_t length, int64_t span)
+{
+    return at >= 0 && length >= 0 && length <= span && at <= span - length;
+}
+
 /* DESIGN: `patch` with a pattern writes with at offset at inside the
    group into of every match the limit takes. The data never changes
    length. into 0 takes the one group of a pattern with one, or the whole
@@ -731,7 +748,7 @@ int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
             return MISSING;
         }
         group = count;
-    } else if (into < 0 || into > count) {
+    } else if (!has_group(pattern, into)) {
         return MISSING;
     }
     if (at < 0) {
@@ -750,7 +767,7 @@ int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
             if (ov[2 * group] == PCRE2_UNSET) {
                 continue;
             }
-            if (at + with_length > end - start) {
+            if (!fits_span(at, with_length, end - start)) {
                 status = MISFIT;
                 break;
             }
@@ -799,7 +816,7 @@ int64_t anti_rt_bytes_patch(unsigned char *data, int64_t length,
     int64_t places = 0;
     int64_t i;
 
-    if (at < 0 || at + with_length > find_length) {
+    if (!fits_span(at, with_length, find_length)) {
         return MISFIT;
     }
     if (find_length == 0) {
@@ -870,10 +887,12 @@ _Noreturn void anti_rt_regex_stop_limit(const unsigned char *file,
 
 _Noreturn void anti_rt_regex_stop_group(const unsigned char *file,
                                         int64_t length, int64_t line,
-                                        int64_t count, int64_t n,
+                                        const struct anti_match *m, int64_t n,
                                         const unsigned char *what,
                                         int64_t what_length)
 {
+    int64_t count = anti_rt_regex_group_count(m->pattern);
+
     anti_rt_fail_abort("%.*s:%lld: the pattern has %lld group%s, and "
                        "`%.*s(%lld)` names none of them", (int)length,
                        (const char *)file, (long long)line, (long long)count,
@@ -932,6 +951,16 @@ int64_t anti_rt_regex_group_bytes(const struct anti_match *m, int64_t n,
                                   struct anti_text *out)
 {
     return anti_rt_regex_group(m, n, out);
+}
+
+_Noreturn void anti_rt_regex_stop_group_bytes(const unsigned char *file,
+                                              int64_t length, int64_t line,
+                                              const struct anti_match *m,
+                                              int64_t n,
+                                              const unsigned char *what,
+                                              int64_t what_length)
+{
+    anti_rt_regex_stop_group(file, length, line, m, n, what, what_length);
 }
 
 int64_t anti_rt_regex_group_named_bytes(const struct anti_match *m,

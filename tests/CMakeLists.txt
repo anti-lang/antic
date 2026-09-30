@@ -2938,6 +2938,17 @@ add_test(NAME pattern_limit
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trap.cmake")
 
+# A match whose `count` the program raised reads no group past those of
+# its pattern, and stops with the count of the pattern.
+add_test(NAME pattern_group_count
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/pattern_group_count.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trap.cmake")
+
 # The size of a Mutex per target: four bytes on Linux and macOS, eight on
 # Windows.
 add_test(NAME mutex_size

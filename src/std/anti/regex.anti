@@ -48,7 +48,7 @@ extern fn anti_rt_regex_take(g: ?*Growing) -> str;
 extern fn anti_rt_regex_stop_limit(file: ?*byte, length: int, line: int,
 	pattern: ?*byte, pattern_length: int);
 extern fn anti_rt_regex_stop_group(file: ?*byte, length: int, line: int,
-	count: int, n: int, what: ?*byte, what_length: int);
+	m: ?*Match, n: int, what: ?*byte, what_length: int);
 extern fn anti_rt_regex_stop_name(file: ?*byte, length: int, line: int,
 	name: ?*byte, name_length: int);
 extern fn anti_rt_regex_compile_bytes(bytes: ?*byte, length: int,
@@ -57,6 +57,8 @@ extern fn anti_rt_regex_first_bytes(pattern: ?*byte, s: ?*byte, length: int,
 	out: ?*?ByteMatch) -> int;
 extern fn anti_rt_regex_next_bytes(c: ?*Cursor, current: ?*?ByteMatch) -> int;
 extern fn anti_rt_regex_current_bytes(current: ?*?ByteMatch) -> ?*ByteMatch;
+extern fn anti_rt_regex_stop_group_bytes(file: ?*byte, length: int, line: int,
+	m: ?*ByteMatch, n: int, what: ?*byte, what_length: int);
 extern fn anti_rt_regex_group_bytes(m: ?*ByteMatch, n: int,
 	out: ?*[]byte) -> int;
 extern fn anti_rt_regex_group_named_bytes(m: ?*ByteMatch, name: ?*byte,
@@ -502,7 +504,7 @@ pub fn group(m: Match, n: int, at: lang.SourceLocation = here) -> str
 {
 	let out = "";
 	if anti_rt_regex_group(&m, n, &out) < 0 {
-		anti_rt_regex_stop_group(at.file.ptr, at.file.len, at.line, m.count, n,
+		anti_rt_regex_stop_group(at.file.ptr, at.file.len, at.line, &m, n,
 			"group".ptr, 5);
 	}
 	return out;
@@ -530,7 +532,7 @@ pub fn took_part(m: Match, n: int, at: lang.SourceLocation = here) -> bool
 	let out = "";
 	let status = anti_rt_regex_group(&m, n, &out);
 	if status < 0 {
-		anti_rt_regex_stop_group(at.file.ptr, at.file.len, at.line, m.count, n,
+		anti_rt_regex_stop_group(at.file.ptr, at.file.len, at.line, &m, n,
 			"took_part".ptr, 9);
 	}
 	return status > 0;
@@ -829,7 +831,7 @@ pub fn bytes_group(m: ByteMatch, n: int, at: lang.SourceLocation = here) -> []by
 {
 	let out = m.all[0..0];
 	if anti_rt_regex_group_bytes(&m, n, &out) < 0 {
-		anti_rt_regex_stop_group(at.file.ptr, at.file.len, at.line, m.count, n,
+		anti_rt_regex_stop_group_bytes(at.file.ptr, at.file.len, at.line, &m, n,
 			"group".ptr, 5);
 	}
 	return out;
@@ -856,7 +858,7 @@ pub fn bytes_took_part(m: ByteMatch, n: int,
 	let out = m.all[0..0];
 	let status = anti_rt_regex_group_bytes(&m, n, &out);
 	if status < 0 {
-		anti_rt_regex_stop_group(at.file.ptr, at.file.len, at.line, m.count, n,
+		anti_rt_regex_stop_group_bytes(at.file.ptr, at.file.len, at.line, &m, n,
 			"took_part".ptr, 9);
 	}
 	return status > 0;

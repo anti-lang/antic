@@ -5,7 +5,8 @@
 //! function, an anonymous one and a closure that changes a variable of its
 //! frame. `limit` takes matches from the start or from the end. Against a
 //! pattern compiled at run time a template that names a group the pattern lacks
-//! fails with `MissingGroup`.
+//! fails with `MissingGroup`. A template that ends inside a form, as `<${1`
+//! does, writes the rest as it stands.
 
 import anti.lang;
 import anti.regex;
@@ -47,6 +48,16 @@ fn templates()
 	show("unset group", "ab".replace(re"a(x)?b", "[$1]"));
 	let template = "<$1>";
 	show("template in a variable", "k=v".replace(re"(\w)=", template));
+	show("open $", "k=v".replace(re"(\w)=", "<$"));
+	show("open ${", "k=v".replace(re"(\w)=", "<${"));
+	show("open ${1", "k=v".replace(re"(\w)=", "<${1"));
+	show("open ${k", "k=v".replace(re"(?<k>\w)=", "<${k"));
+	let open = "<${";
+	show("open ${ in a variable", "k=v".replace(re"(\w)=", open));
+	let digits = "<${1";
+	show("open ${1 in a variable", "k=v".replace(re"(\w)=", digits));
+	let name = "<${k";
+	show("open ${k in a variable", "k=v".replace(re"(?<k>\w)=", name));
 }
 
 fn limits()
@@ -104,6 +115,11 @@ fn compiled() may fail
 	};
 	let named = "me@home".replace(r, "${who}") catch e {
 		printf("missing name %d\n".ptr, (e is *regex.MissingGroup) as c_int);
+		yield "";
+	};
+	show("compiled open", try "me@home".replace(r, "${2"));
+	let huge = "me@home".replace(r, "$99999999999999999999") catch e {
+		printf("huge group %d\n".ptr, (e is *regex.MissingGroup) as c_int);
 		yield "";
 	};
 	let slow = try Regex.compile(r"(*LIMIT_MATCH=1000)(\w+\s?)*$");

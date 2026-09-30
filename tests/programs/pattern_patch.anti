@@ -5,7 +5,9 @@
 //! keeps its bytes, so a longer span keeps its tail. `limit` takes places from
 //! the start or from the end. A `with` computed at run time that does not fit
 //! fails with `LengthMismatch` before any byte changes, and a compiled pattern
-//! of several groups without `into` fails with `MissingGroup`.
+//! of several groups without `into` fails with `MissingGroup`. An offset read
+//! from input as large as an `int` holds fails with `LengthMismatch` as well,
+//! and never writes outside the data.
 
 import anti.lang;
 import anti.regex;
@@ -71,6 +73,16 @@ fn sequences()
 		yield -1;
 	};
 	show("unchanged", n, bytes);
+	let far = text.parse_int("9223372036854775807") catch fatal;
+	n = bytes.patch(x"81 10", x"01", 0, far) catch e {
+		failed("offset at the top", e);
+		yield -1;
+	};
+	n = bytes.patch(x"81 10", x"01", 0, far - 1) catch e {
+		failed("offset below the top", e);
+		yield -1;
+	};
+	show("unchanged", n, bytes);
 }
 
 fn patterns()
@@ -101,6 +113,16 @@ fn patterns()
 		yield -1;
 	};
 	show("unchanged", n, rows);
+	let far = text.parse_int("9223372036854775807") catch fatal;
+	n = rows.patch(re"V=(.)", b"8", 0, far) catch e {
+		failed("offset at the top", e);
+		yield -1;
+	};
+	n = rows.patch(re"V=(.)", b"8", 0, far - 1) catch e {
+		failed("offset below the top", e);
+		yield -1;
+	};
+	show("unchanged", n, rows);
 	free(rows.ptr);
 }
 
@@ -123,6 +145,12 @@ fn compiled()
 	};
 	n = data.patch(two, b"x", 3) catch e {
 		failed("no group 3", e);
+		yield -1;
+	};
+	show("unchanged", n, data);
+	let far = text.parse_int("9223372036854775807") catch fatal;
+	n = data.patch(two, b"x", 1, far) catch e {
+		failed("offset at the top", e);
 		yield -1;
 	};
 	show("unchanged", n, data);

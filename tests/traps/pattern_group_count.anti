@@ -1,0 +1,20 @@
+//! `count` is a field of a match the program may write, and `group` bounds its
+//! number by the groups of the pattern and not by that field. A group past them
+//! stops the program with the count of the pattern, as `group(4)` does on a
+//! match whose field says nothing else.
+
+import anti.lang;
+import anti.regex;
+import anti.text;
+
+fn main() -> int
+{
+	let line = "2026-09-30";
+	let m = line.matches(re"(\d+)-(\d+)-(\d+)") else {
+		return 1;
+	};
+	let n = text.parse_int("50") catch fatal;
+	m.count = n;
+	let g = m.group(n);
+	return g.len as int;
+}
