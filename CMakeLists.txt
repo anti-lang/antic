@@ -455,6 +455,9 @@ foreach(module IN LISTS ANTIC_STD_MODULES)
 endforeach()
 add_custom_target(anti_std ALL DEPENDS ${std_files})
 
+# The pre-commit hook of tools/hooks, installed in the checkout.
+include(tools/git-hooks.cmake)
+
 enable_testing()
 add_subdirectory(tests)
 # The native libraries of the runtime archive and their tests.

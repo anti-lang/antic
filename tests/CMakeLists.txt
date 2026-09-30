@@ -392,6 +392,15 @@ add_test(NAME repo_layout
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_repo_layout.cmake")
 
+# The pre-commit hook refuses staged .md files that fail the docs-style
+# checker, and the configure step installed it in this checkout.
+add_test(NAME pre_commit_hook
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        "-DHOOKS=${ANTI_HOOKS_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/pre-commit"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_pre_commit.cmake")
+set_tests_properties(pre_commit_hook PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+
 # The version stands in tools/version alone, and both programs print
 # that one. Step 10 of the release reads them from a fresh install.
 add_test(NAME antic_version COMMAND antic --version)

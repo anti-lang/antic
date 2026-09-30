@@ -1,0 +1,33 @@
+#!/bin/sh
+# Refuse a commit whose staged .md files fail the docs-style checker.
+#
+# The configure step points core.hooksPath at this directory, through
+# tools/git-hooks.cmake. With no .md file staged the hook does nothing.
+#
+# DESIGN: the checker reads the staged text, which git checkout-index
+# writes into a scratch directory under the same relative paths, so a fix
+# left unstaged does not let a failing file through and the findings name
+# the paths of the repository. git sets GIT_INDEX_FILE for commit -a and
+# for a commit of named paths, and both commands below read that index.
+set -eu
+
+checker=$(cd "$(dirname "$0")/.." && pwd)/docs-style/check_docs.py
+
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+
+git diff --cached --name-only -z --diff-filter=ACMR -- ':(icase)*.md' \
+    > "$scratch/staged"
+[ -s "$scratch/staged" ] || exit 0
+
+if [ ! -f "$checker" ]; then
+    echo "pre-commit: no docs-style checker at $checker" >&2
+    exit 1
+fi
+mkdir "$scratch/tree"
+git checkout-index -z --stdin --prefix="$scratch/tree/" < "$scratch/staged"
+
+if ! (cd "$scratch/tree" && xargs -0 python3 "$checker" < "$scratch/staged"); then
+    echo "pre-commit: the docs-style checker refused the staged .md files" >&2
+    exit 1
+fi
