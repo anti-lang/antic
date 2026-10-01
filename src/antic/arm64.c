@@ -379,6 +379,50 @@ static void emit_imm12(struct selector *s, enum a64_op op, size_t count,
     append_imm12(s->b, op, count, ops, v);
 }
 
+/* Append dst = base + offset. An offset that no 12-bit immediate holds,
+   shifted or not, goes into dst first, so dst is not base. */
+static void append_add_offset(struct mach_block *b, struct mach_operand dst,
+                              struct mach_operand base, int64_t offset)
+{
+    struct mach_operand ops[4];
+
+    ops[0] = dst;
+    ops[1] = base;
+    if (fits_imm12(offset)) {
+        append_imm12(b, A64_ADD, 2, ops, offset);
+        return;
+    }
+    load_into(b, dst, (uint64_t)offset);
+    ops[2] = dst;
+    mach_add(b, A64_ADD, 3, ops);
+}
+
+/* A load or a store adds an unsigned 12-bit offset scaled by the size of
+   its width bits, or a signed 9-bit offset, to its base. */
+static bool fits_offset(uint8_t width, int64_t offset)
+{
+    int64_t size = width / 8;
+
+    return (offset >= 0 && offset % size == 0 && offset / size <= 4095) ||
+           (offset >= -256 && offset <= 255);
+}
+
+/* The memory operand of width bits at offset from base. An offset that no
+   load or store holds goes into a new register with base added. */
+static struct mach_operand based_memory(struct selector *s,
+                                        struct mach_operand base,
+                                        int64_t offset, uint8_t width)
+{
+    struct mach_operand address;
+
+    if (fits_offset(width, offset)) {
+        return mach_mem(base, offset, width);
+    }
+    address = select_new_vreg(s, 64);
+    append_add_offset(s->b, address, base, offset);
+    return mach_mem(address, 0, width);
+}
+
 static unsigned popcount(uint64_t v)
 {
     unsigned n = 0;
@@ -647,12 +691,9 @@ static void slot_address(struct selector *s, struct mach_operand dst,
 static void incoming_address(struct selector *s, struct mach_operand dst,
                              int64_t offset)
 {
-    struct mach_operand ops[4];
-
     s->out->stack_params = true;
-    ops[0] = mach_widened(dst, 64);
-    ops[1] = mach_preg(X29, 64);
-    emit_imm12(s, A64_ADD, 2, ops, 16 + offset);
+    append_add_offset(s->b, mach_widened(dst, 64), mach_preg(X29, 64),
+                      16 + offset);
 }
 
 /* An aggregate argument on the stack is copied into the argument area. An
@@ -664,20 +705,18 @@ static struct mach_operand copy_argument(struct selector *s,
                                          struct mach_operand value)
 {
     struct mach_operand address = select_new_vreg(s, 64);
-    struct mach_operand ops[4];
 
     if (loc->indirect) {
         slot_address(s, address, mach_slot_add(s->out, agg->size, 16));
         copy_memory(s, address, value, agg->size);
         if (loc->stack) {
-            emit2(s, A64_STR, address,
-                  mach_mem(mach_preg(SP, 64), loc->offset, 64));
+            struct mach_operand to =
+                based_memory(s, mach_preg(SP, 64), loc->offset, 64);
+            emit2(s, A64_STR, address, to);
         }
         return address;
     }
-    ops[0] = address;
-    ops[1] = mach_preg(SP, 64);
-    emit_imm12(s, A64_ADD, 2, ops, loc->offset);
+    append_add_offset(s->b, address, mach_preg(SP, 64), loc->offset);
     copy_memory(s, address, value, agg->size);
     return address;
 }
@@ -1806,7 +1845,9 @@ static void emit_call(struct selector *s, const struct ir_inst *inst)
     }
     for (i = 0; i < inst->arg_count; i++) {
         const struct ir_operand *arg = &inst->args[i];
-        struct mach_operand slot = memory(mach_preg(SP, 64), arg->type);
+        uint8_t n = bits(arg->type);
+        struct mach_operand value;
+        struct mach_operand slot;
         if (types[i] == IR_AGG && (locations[i].indirect ||
                                    locations[i].stack)) {
             copies[i] = copy_argument(s, &locations[i],
@@ -1826,17 +1867,16 @@ static void emit_call(struct selector *s, const struct ir_inst *inst)
         if (types[i] == IR_AGG || !locations[i].stack) {
             continue;
         }
-        slot.value = locations[i].offset;
         if (i >= callee->param_count) {
-            slot.width = select_is_float(arg->type) ? width(arg->type) : 64;
+            n = select_is_float(arg->type) ? width(arg->type) : 64;
         }
-        emit2(s, A64_STR,
-              arg->kind == IR_INT && arg->as.integer == 0
-                  ? mach_imm(0)
-                  : select_reg(s, arg),
-              slot);
-        if (slot.value + slot.width / 8 > next) {
-            next = slot.value + slot.width / 8;
+        value = arg->kind == IR_INT && arg->as.integer == 0
+                    ? mach_imm(0)
+                    : select_reg(s, arg);
+        slot = based_memory(s, mach_preg(SP, 64), locations[i].offset, n);
+        emit2(s, A64_STR, value, slot);
+        if (locations[i].offset + n / 8 > next) {
+            next = locations[i].offset + n / 8;
         }
     }
     next = (next + 7) / 8 * 8;
@@ -1917,18 +1957,11 @@ static void emit_ret(struct selector *s, const struct ir_inst *inst)
     ret->uses = uses;
 }
 
+/* A load or a store of type moves bits(type) bits, and the operand's width
+   is that size. */
 static struct mach_operand memory(struct mach_operand base, enum ir_type type)
 {
-    struct mach_operand m = base;
-
-    m.kind = MACH_MEM;
-    m.base_vreg = base.kind == MACH_VREG;
-    m.width = type == IR_I8    ? 8
-              : type == IR_I16 ? 16
-              : type == IR_I32 ? 32
-                               : 64;
-    m.value = 0;
-    return m;
+    return mach_mem(base, 0, bits(type));
 }
 
 static bool match_scalar(const struct selector *s, const struct ir_inst *inst)
@@ -1970,25 +2003,19 @@ static struct mach_operand address_of(struct selector *s,
     return m;
 }
 
-/* A load or a store adds an unsigned 12-bit offset scaled by the size, a
-   signed 9-bit offset or an index to the base. The index shifts by 0 or
-   by the scale of the size. A store with an index takes only zero from
-   wzr or xzr, so that it reads two registers. */
+/* A load or a store adds an offset that fits_offset holds or an index to
+   the base. The index shifts by 0 or by the scale of the size. A store
+   with an index takes only zero from wzr or xzr, so that it reads two
+   registers. */
 static bool fits_address(const struct selector *s, const struct address *a,
                          const struct ir_inst *use)
 {
     enum ir_type type = use->op == IR_STORE ? use->a.type : use->type;
-    uint8_t scale = type == IR_I8    ? 0
-                    : type == IR_I16 ? 1
-                    : type == IR_I32 ? 2
-                                     : 3;
-    int64_t size = (int64_t)1 << scale;
+    uint8_t scale = (uint8_t)popcount(bits(type) / 8 - 1);
 
     (void)s;
     if (a->index == NULL) {
-        return (a->offset >= 0 && a->offset % size == 0 &&
-                a->offset / size <= 4095) ||
-               (a->offset >= -256 && a->offset <= 255);
+        return fits_offset(bits(type), a->offset);
     }
     if (a->offset != 0 || (a->shift != 0 && a->shift != scale)) {
         return false;
@@ -2298,16 +2325,12 @@ static struct mach_operand stack_indexed(uint8_t index)
     return m;
 }
 
-/* ldr and str of 64 bits take an offset from sp that is a multiple of 8
-   up to 32760. A larger offset goes into a register first: ldr uses the
-   register it loads, and str the scratch register that it does not
-   store. */
-static bool fits_scaled(int64_t offset)
-{
-    return offset >= 0 && offset % 8 == 0 && offset / 8 <= 4095;
-}
+/* ldr and str of 64 bits take an offset from sp that fits_offset holds.
+   A spill lies at a multiple of 8, so that is one up to 32760. A larger
+   offset goes into a register first: ldr uses the register it loads, and
+   str the scratch register that it does not store.
 
-/* A float register cannot hold the offset, so its load goes through x16.
+   A float register cannot hold the offset, so its load goes through x16.
    A store names its value before its address, so the allocator loads a
    spilled float value before a spilled integer address into x16. */
 static void load_spill(struct mach_block *b, uint8_t reg, int64_t offset)
@@ -2317,7 +2340,7 @@ static void load_spill(struct mach_block *b, uint8_t reg, int64_t offset)
 
     ops[0] = mach_preg(reg, 64);
     ops[1] = stack(offset, INDEX_NONE);
-    if (!fits_scaled(offset)) {
+    if (!fits_offset(64, offset)) {
         load_into(b, mach_preg(index, 64), (uint64_t)offset);
         ops[1] = stack_indexed(index);
     }
@@ -2331,7 +2354,7 @@ static void store_spill(struct mach_block *b, uint8_t reg, int64_t offset)
 
     ops[0] = mach_preg(reg, 64);
     ops[1] = stack(offset, INDEX_NONE);
-    if (!fits_scaled(offset)) {
+    if (!fits_offset(64, offset)) {
         load_into(b, mach_preg(other, 64), (uint64_t)offset);
         ops[1] = stack_indexed(other);
     }
@@ -2342,7 +2365,6 @@ static void store_spill(struct mach_block *b, uint8_t reg, int64_t offset)
    immediate holds, shifted or not, goes into dst first. */
 static void expand(struct mach_block *b, const struct mach_inst *inst)
 {
-    struct mach_operand ops[4];
     int64_t offset;
 
     if (inst->op != A64_ADD || inst->count != 3 ||
@@ -2352,15 +2374,7 @@ static void expand(struct mach_block *b, const struct mach_inst *inst)
         return;
     }
     offset = inst->operands[2].value;
-    ops[0] = inst->operands[0];
-    ops[1] = inst->operands[1];
-    if (fits_imm12(offset)) {
-        append_imm12(b, A64_ADD, 2, ops, offset);
-        return;
-    }
-    load_into(b, ops[0], (uint64_t)offset);
-    ops[2] = ops[0];
-    mach_add(b, A64_ADD, 3, ops);
+    append_add_offset(b, inst->operands[0], inst->operands[1], offset);
 }
 
 /* Move sp down by size bytes of the frame, through x16 when no 12-bit
@@ -2578,19 +2592,17 @@ static void stack_param(struct selector *s, int64_t offset,
                         struct mach_operand dst)
 {
     const struct ir_function *f = s->f;
-    struct mach_operand m = mach_preg(X29, 64);
+    uint8_t n = dst.width;
+    struct mach_operand m;
     size_t i;
 
-    m.kind = MACH_MEM;
-    m.value = 16 + offset;
-    m.width = dst.width;
     for (i = 0; i < f->param_count; i++) {
         if (f->params[i].temp == dst.reg) {
-            m = memory(mach_preg(X29, 64), f->params[i].type);
-            m.value = 16 + offset;
+            n = bits(f->params[i].type);
         }
     }
     s->out->stack_params = true;
+    m = based_memory(s, mach_preg(X29, 64), 16 + offset, n);
     emit2(s, A64_LDR, dst, m);
 }
 

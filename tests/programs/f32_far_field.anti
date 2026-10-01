@@ -1,0 +1,52 @@
+//! A load or a store of an `f32` at a large offset from its pointer. `ldr s0`
+//! and `str s0` take an offset that is a multiple of 4 up to 16380, so the
+//! field at 20000 needs its address in a register first, and the field at 16380
+//! does not. A scale of 8 for `f32` let 20000 through to llvm-mc, which refused
+//! it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Big { pad: [5000]f32, x: f32 }
+
+struct Edge { pad: [4095]f32, x: f32 }
+
+fn read(b: *Big) -> f32
+{
+	return b.x;
+}
+
+fn write(b: *Big, v: f32)
+{
+	b.x = v;
+}
+
+fn read_edge(e: *Edge) -> f32
+{
+	return e.x;
+}
+
+fn write_edge(e: *Edge, v: f32)
+{
+	e.x = v;
+}
+
+fn main() -> int
+{
+	let b = alloc(Big, 1) else {
+		return 1;
+	};
+	b.x = 1.5;
+	printf("big %g\n".ptr, read(b) as f64);
+	write(b, 2.5);
+	printf("big %g\n".ptr, read(b) as f64);
+	let e = alloc(Edge, 1) else {
+		return 1;
+	};
+	e.x = 3.5;
+	printf("edge %g\n".ptr, read_edge(e) as f64);
+	write_edge(e, 4.5);
+	printf("edge %g\n".ptr, read_edge(e) as f64);
+	free(b);
+	free(e);
+	return 0;
+}
