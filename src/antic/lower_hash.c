@@ -126,12 +126,11 @@ static struct ir_operand hash_at(struct lowerer *l, const struct expr *call,
 static struct ir_operand hash_bytes(struct lowerer *l, struct ir_operand p,
                                     struct ir_operand count)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_I64};
     struct ir_operand args[2];
 
     args[0] = p;
     args[1] = count;
-    return lower_rt_call(l, "anti_rt_hash_bytes", IR_I64, params, args, 2);
+    return lower_rt_call(l, RT_FN_HASH_BYTES, args);
 }
 
 /* Whether an element of type t is one byte, whose run hashes as bytes. */
@@ -370,11 +369,9 @@ static struct ir_operand hash_at(struct lowerer *l, const struct expr *call,
         return class_hash(l, at, t);
     case LOWER_PART_PATTERN: {
         /* A Regex hashes its text and its mode, as its `==` compares. */
-        static const enum ir_type params[] = {IR_PTR};
         struct ir_operand handle =
             lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
-        return mix(l, lower_rt_call(l, "anti_rt_pattern_hash", IR_I64,
-                                    params, &handle, 1));
+        return mix(l, lower_rt_call(l, RT_FN_PATTERN_HASH, &handle));
     }
     case LOWER_PART_UNION:
         /* A union holds one of its fields and says not which, so it

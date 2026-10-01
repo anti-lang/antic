@@ -10,6 +10,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "std.h"
+
 /* DESIGN: the handle of a compiled pattern holds the code PCRE2 compiled,
    the pattern as it was written and whether it searches bytes. `==` of a
    Regex compares the text and the mode, which PCRE2 keeps no copy of, so
@@ -89,5 +91,15 @@ struct anti_rt_piece {
    the template and 1 otherwise. */
 int anti_rt_regex_piece(const unsigned char *bytes, int64_t length,
                         int64_t *offset, struct anti_rt_piece *piece);
+
+/* The pattern literal of length bytes at bytes, compiled before main by
+   the constructor of the module that holds it. A literal that does not
+   compile stops the program. */
+void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length);
+
+/* The byte pattern literal of length bytes at bytes, compiled as
+   anti_rt_regex_literal compiles a pattern of text. */
+void *anti_rt_regex_literal_bytes(const unsigned char *bytes,
+                                  int64_t length);
 
 #endif

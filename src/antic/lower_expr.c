@@ -467,7 +467,6 @@ static void store_value(struct lowerer *l, const struct expr *current,
    slice whose ptr is zero, which `free` accepts. */
 static struct ir_operand lower_collect(struct lowerer *l, const struct expr *e)
 {
-    static const enum ir_type grow_params[] = {IR_PTR, IR_I64};
     const struct iteration *it = &e->as.collect;
     const struct type *element = e->type->element;
     uint32_t slot = ir_entry_slot(l->f, lower_vtype_of(l, e->type));
@@ -512,7 +511,7 @@ static struct ir_operand lower_collect(struct lowerer *l, const struct expr *e)
                                     lower_temp(l, capacity), size));
     args[0] = lower_temp(l, data);
     args[1] = bytes;
-    grown = lower_rt_call(l, "anti_rt_grow", IR_PTR, grow_params, args, 2);
+    grown = lower_rt_call(l, RT_FN_GROW, args);
     ir_assign(l->f, l->b, data, grown);
     ir_jump(l->f, l->b, put);
     l->b = put;
@@ -940,13 +939,7 @@ static bool may_be_sub(const struct type *t)
 
 static struct ir_operand object_of(struct lowerer *l, struct ir_operand p)
 {
-    static const enum ir_type params[] = {IR_PTR};
-
-    return lower_temp(
-        l, ir_call(l->f, l->b, IR_PTR,
-                   ir_func_op(lower_rt_function(l, "anti_rt_object_of",
-                                                params, 1)),
-                   &p, 1));
+    return lower_rt_call(l, RT_FN_OBJECT_OF, &p);
 }
 
 /* A bool of 0 or 1 as a value of type, which is itself for an i8. */
@@ -1090,7 +1083,6 @@ struct ir_operand lower_compare_text(struct lowerer *l, enum token_kind op,
                                      const struct type *t,
                                      struct ir_operand a, struct ir_operand b)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_I64, IR_PTR, IR_I64};
     struct ir_operand args[4];
     struct ir_operand result;
     enum ir_op test;
@@ -1100,14 +1092,12 @@ struct ir_operand lower_compare_text(struct lowerer *l, enum token_kind op,
     args[2] = lower_temp(l, ir_load(l->f, l->b, IR_PTR, b));
     args[3] = lower_slice_length(l, b, t);
     if (op == TOKEN_EQ || op == TOKEN_NE) {
-        result = lower_rt_call(l, "anti_rt_same_bytes", IR_I32, params, args,
-                               4);
+        result = lower_rt_call(l, RT_FN_SAME_BYTES, args);
         return lower_temp(l, ir_binary(l->f, l->b,
                                        op == TOKEN_EQ ? IR_NE : IR_EQ, IR_I8,
                                        result, ir_int_op(IR_I32, 0)));
     }
-    result = lower_rt_call(l, "anti_rt_compare_bytes", IR_I64, params, args,
-                           4);
+    result = lower_rt_call(l, RT_FN_COMPARE_BYTES, args);
     test = op == TOKEN_LT   ? IR_SLT
            : op == TOKEN_LE ? IR_SLE
            : op == TOKEN_GT ? IR_SGT
@@ -1218,7 +1208,6 @@ struct ir_operand lower_load_table(struct lowerer *l, struct ir_operand p,
 void lower_check_table(struct lowerer *l, struct ir_operand table,
                        const struct type *t)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_I64};
     struct ir_block *bad;
     struct ir_block *join;
     struct token_text text;
@@ -1237,9 +1226,7 @@ void lower_check_table(struct lowerer *l, struct ir_operand table,
                                     ir_global_op(lower_literal_global(l,
                                                                       &text))));
     args[1] = ir_int_op(IR_I64, t->name.length);
-    ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(lower_rt_function(l, "anti_rt_table_unset", params, 2)),
-            args, 2);
+    lower_rt_call(l, RT_FN_TABLE_UNSET, args);
     ir_jump(l->f, l->b, join);
     l->b = join;
 }
@@ -1282,13 +1269,15 @@ static struct ir_operand class_test(struct lowerer *l, struct ir_operand p,
     }
     table = lower_load_table(l, p, from);
     descriptor = lower_temp(l, ir_load(l->f, l->b, IR_PTR, table));
-    object_depth = descriptor_field(l, descriptor, 4, IR_I64);
+    object_depth =
+        descriptor_field(l, descriptor, RT_DESCRIPTOR_DEPTH, IR_I64);
     ir_branch(l->f, l->b,
               lower_temp(l, ir_binary(l->f, l->b, IR_SGE, IR_I8, object_depth,
                                       ir_int_op(IR_I64, depth))),
               deep, join);
     l->b = deep;
-    ancestors = descriptor_field(l, descriptor, 5, IR_PTR);
+    ancestors =
+        descriptor_field(l, descriptor, RT_DESCRIPTOR_ANCESTORS, IR_PTR);
     at = lower_temp(
         l, ir_load(l->f, l->b, IR_PTR,
                    lower_offset_address(l, ancestors,
@@ -1310,7 +1299,6 @@ static struct ir_operand checked_cast(struct lowerer *l, struct ir_operand p,
                                       const struct type *to, bool gives_null,
                                       bool from_sub)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_I64};
     struct ir_operand ok = class_test(l, p, from, to);
     struct ir_block *bad = lower_new_block(l);
     struct ir_block *join = lower_new_block(l);
@@ -1326,7 +1314,7 @@ static struct ir_operand checked_cast(struct lowerer *l, struct ir_operand p,
         struct ir_operand descriptor =
             lower_temp(l, ir_load(l->f, l->b, IR_PTR, table));
         struct ir_operand offset =
-            descriptor_field(l, descriptor, 9, IR_I64);
+            descriptor_field(l, descriptor, RT_DESCRIPTOR_OFFSET, IR_I64);
         ir_assign(l->f, l->b, result,
                   lower_temp(l, ir_ptradd(
                                     l->f, l->b, p,
@@ -1346,10 +1334,7 @@ static struct ir_operand checked_cast(struct lowerer *l, struct ir_operand p,
         name = lower_literal_global(l, &text);
         args[0] = lower_temp(l, ir_addr(l->f, l->b, ir_global_op(name)));
         args[1] = ir_int_op(IR_I64, to->name.length);
-        ir_call(l->f, l->b, IR_VOID,
-                ir_func_op(lower_rt_function(l, "anti_rt_cast_failed", params,
-                                             2)),
-                args, 2);
+        lower_rt_call(l, RT_FN_CAST_FAILED, args);
     }
     ir_jump(l->f, l->b, join);
     l->b = join;
@@ -2117,17 +2102,16 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
        x86_64, `ldaddal` and `casal` on an ARM64 with LSE, and a
        load-store-exclusive loop on one without it. */
     case EXPR_ATOMIC: {
-        static const char *const names[] = {
-            "anti_rt_atomic_load", "anti_rt_atomic_store",
-            "anti_rt_atomic_swap", "anti_rt_atomic_add",
-            "anti_rt_atomic_sub", "anti_rt_atomic_and",
-            "anti_rt_atomic_or", "anti_rt_atomic_compare_swap"
+        static const enum rt_function functions[] = {
+            RT_FN_ATOMIC_LOAD, RT_FN_ATOMIC_STORE, RT_FN_ATOMIC_SWAP,
+            RT_FN_ATOMIC_ADD, RT_FN_ATOMIC_SUB, RT_FN_ATOMIC_AND,
+            RT_FN_ATOMIC_OR, RT_FN_ATOMIC_COMPARE_SWAP
         };
-        static const enum ir_type four[] = {IR_PTR, IR_I64, IR_I64, IR_I64};
         const struct type *of = e->as.atomic.place->type;
         /* The runtime gives an i64 back. A field of pointer width is
            the same bits, so the call takes that type and no conversion
-           stands between them. */
+           stands between them. The declaration keeps the i64 of the
+           runtime. */
         enum ir_type result = e->type->kind == TYPE_VOID ? IR_VOID
                               : e->as.atomic.op == ATOMIC_CAS ? IR_I8
                               : lower_ir_type_of(e->type) == IR_PTR ? IR_PTR
@@ -2144,8 +2128,7 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         if (e->as.atomic.b != NULL) {
             args[n++] = widen_to_i64(l, e->as.atomic.b);
         }
-        f = lower_rt_function(l, names[e->as.atomic.op], four, n);
-        f->result = result;
+        f = lower_rt_declare(l, functions[e->as.atomic.op]);
         call = ir_call(l->f, l->b, result, ir_func_op(f), args, n);
         if (result == IR_VOID) {
             return lower_none();
@@ -2158,10 +2141,10 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
     /* The three read the table of the object, so the runtime does the
        walk. The compiler passes the pointer and the class it has. */
     case EXPR_OBJECT: {
-        const char *name = e->as.object.op == TOKEN_DUP    ? "anti_rt_dup"
-                           : e->as.object.op == TOKEN_DELETE
-                               ? "anti_rt_delete"
-                               : "anti_rt_destroy";
+        enum rt_function f = e->as.object.op == TOKEN_DUP ? RT_FN_DUP
+                             : e->as.object.op == TOKEN_DELETE
+                                 ? RT_FN_DELETE
+                                 : RT_FN_DESTROY;
         const struct type *pointee = e->as.object.operand->type->element;
         /* `dup` of a value that is no aggregate is its bytes. */
         if (e->as.object.value) {
@@ -2183,16 +2166,15 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
             return lower_none();
         }
         if (e->as.object.from != NULL) {
-            static const enum ir_type three[] = {IR_PTR, IR_PTR, IR_PTR};
             struct ir_operand args[3];
             args[0] = v;
             args[1] = lower_static_descriptor(l, e->as.object.operand->type);
             args[2] = lower_expr(l, e->as.object.from);
             lower_rt_call(l,
                           e->as.object.op == TOKEN_DELETE
-                              ? "anti_rt_delete_from"
-                              : "anti_rt_destroy_from",
-                          IR_VOID, three, args, 3);
+                              ? RT_FN_DELETE_FROM
+                              : RT_FN_DESTROY_FROM,
+                          args);
             if (e->as.object.op == TOKEN_DESTROY) {
                 destroyed_local(l, e->as.object.operand);
             }
@@ -2200,11 +2182,11 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         }
         if (e->as.object.op == TOKEN_DUP) {
             struct ir_operand made =
-                lower_object_call(l, name, v, e->as.object.operand->type);
+                lower_object_call(l, f, v, e->as.object.operand->type);
             lower_hook_copied(l, made, v);
             return made;
         }
-        lower_object_call(l, name, v, e->as.object.operand->type);
+        lower_object_call(l, f, v, e->as.object.operand->type);
         if (e->as.object.op == TOKEN_DESTROY) {
             destroyed_local(l, e->as.object.operand);
         }

@@ -49,8 +49,6 @@ static void check_call(struct lowerer *l, struct ir_block *fail,
                        enum check_kind kind, struct ir_operand a,
                        struct ir_operand b, const struct type *widen)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_I64, IR_I32, IR_I64,
-                                          IR_I64};
     struct ir_operand args[5];
 
     l->b = fail;
@@ -65,9 +63,7 @@ static void check_call(struct lowerer *l, struct ir_block *fail,
     args[2] = ir_int_op(IR_I32, (uint64_t)kind);
     args[3] = a;
     args[4] = b.kind == IR_NONE ? ir_int_op(IR_I64, 0) : b;
-    ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(lower_rt_function(l, "anti_rt_check_failed", params, 5)),
-            args, 5);
+    lower_rt_call(l, RT_FN_CHECK_FAILED, args);
     ir_jump(l->f, l->b, rest);
     l->b = rest;
 }

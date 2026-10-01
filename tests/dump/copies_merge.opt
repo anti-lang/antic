@@ -11,7 +11,7 @@ type [1]*copies_merge.Order = array 1 of ptr
 type [1]int = array 1 of i64
 type anti.rt.Slots = struct { descriptor: ptr, slot_count: i64, bits: ptr }
 type anti.rt.SlotTable = struct { count: i64, interfaces: ptr, reflect: i64 }
-type anti.rt.Injectable = struct { name: ptr, class: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr, descriptor: ptr }
+type anti.rt.Injectable = struct { name: ptr, owner: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr, descriptor: ptr }
 type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 global copies_merge.9 size 36 align 1 bytes 63 6f 70 69 65 73 5f 6d 65 72 67 65 2e 61 6e 74 69 3a 32 37 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00

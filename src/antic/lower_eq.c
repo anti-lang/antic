@@ -76,12 +76,11 @@ static struct ir_operand class_equals(struct lowerer *l, const struct type *t,
 static struct ir_operand same_pattern(struct lowerer *l, struct ir_operand a,
                                       struct ir_operand b)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_PTR};
     struct ir_operand args[2];
 
     args[0] = lower_temp(l, ir_load(l->f, l->b, IR_PTR, a));
     args[1] = lower_temp(l, ir_load(l->f, l->b, IR_PTR, b));
-    return lower_rt_call(l, "anti_rt_pattern_same", IR_I8, params, args, 2);
+    return lower_rt_call(l, RT_FN_PATTERN_SAME, args);
 }
 
 /* Whether t is a lock or an array of locks, which no default reads. */
@@ -626,7 +625,6 @@ static void compare_by_operator(struct lowerer *l, const struct item *it,
    gives it an operator. */
 void lower_class_equals(struct lowerer *l, const struct item *it)
 {
-    static const enum ir_type one[] = {IR_PTR};
     const struct type *t = it->symbol->type;
     struct ir_function *f = lower_class_function(l, t, "equals");
     const struct expr *e = it->default_eq;
@@ -656,9 +654,8 @@ void lower_class_equals(struct lowerer *l, const struct item *it)
         require(l, &cmp, lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8,
                                                  other,
                                                  ir_int_op(IR_PTR, 0))));
-        ours = lower_rt_call(l, "anti_rt_descriptor", IR_PTR, one, &self, 1);
-        theirs = lower_rt_call(l, "anti_rt_descriptor", IR_PTR, one, &other,
-                               1);
+        ours = lower_rt_call(l, RT_FN_DESCRIPTOR, &self);
+        theirs = lower_rt_call(l, RT_FN_DESCRIPTOR, &other);
         require(l, &cmp, lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8,
                                                  ours, theirs)));
         if (it->operator_eq != NULL) {

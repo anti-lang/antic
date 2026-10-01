@@ -271,10 +271,7 @@ static void write_origin(struct lowerer *l, const struct stmt *s,
     place = lower_const_address(l, lower_location_value(l, s->pos, location),
                                 location);
     ir_memcopy(l->f, l->b, at, place, lower_vtype_of(l, location));
-    on = lower_temp(l, ir_call(l->f, l->b, IR_I8,
-                               ir_func_op(lower_rt_function_giving(
-                                   l, "anti_rt_backtrace_on", IR_I8, NULL, 0)),
-                               NULL, 0));
+    on = lower_rt_call(l, RT_FN_BACKTRACE_ON, NULL);
     ir_branch(l->f, l->b, on, capture, rest);
     l->b = capture;
     skip = ir_int_op(IR_I64, 0);

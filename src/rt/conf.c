@@ -800,7 +800,7 @@ static void fill_injections(void)
                           (const char *)in->name, (int)why.len, why.ptr);
         }
         *in->holder = provider;
-        *in->slot = in->thunk;
+        in->slot->provider = in->thunk;
     }
 }
 

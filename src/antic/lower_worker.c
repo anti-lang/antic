@@ -216,7 +216,6 @@ static struct ir_function *dispatch_thunk(struct lowerer *l,
 struct ir_operand lower_dispatch(struct lowerer *l,
                                  const struct expr *e)
 {
-    static const enum ir_type signature[] = {IR_PTR, IR_I64, IR_PTR, IR_PTR};
     const struct expr *call = e->as.dispatch.call;
     const struct expr *callee = call->kind == EXPR_CALL
                                     ? call->as.call.callee : call;
@@ -226,7 +225,7 @@ struct ir_operand lower_dispatch(struct lowerer *l,
     struct ir_operand args[4];
     struct ir_function *f;
     uint32_t agg;
-    uint32_t handle;
+    struct ir_operand handle;
     uint32_t out;
     char name[32];
 
@@ -238,14 +237,10 @@ struct ir_operand lower_dispatch(struct lowerer *l,
     f = dispatch_thunk(l, e, name, agg);
     args[2] = lower_temp(l, ir_addr(l->f, l->b, ir_func_op(f)));
     args[3] = context;
-    handle = ir_call(l->f, l->b, IR_PTR,
-                     ir_func_op(lower_rt_function(l, "anti_rt_dispatch",
-                                                  signature,
-                                                  4)),
-                     args, 4);
+    handle = lower_rt_call(l, RT_FN_DISPATCH, args);
     lower_hook_object(l, HOOK_DISPATCHED, args[0]);
     out = ir_slot(l->f, l->b, lower_vtype_of(l, e->type));
-    ir_store(l->f, l->b, IR_PTR, lower_temp(l, handle), lower_temp(l, out));
+    ir_store(l->f, l->b, IR_PTR, handle, lower_temp(l, out));
     return lower_temp(l, out);
 }
 
@@ -253,8 +248,6 @@ struct ir_operand lower_dispatch(struct lowerer *l,
    `join_all` walks the slice of jobs. */
 struct ir_operand lower_join(struct lowerer *l, const struct expr *e)
 {
-    static const enum ir_type one[] = {IR_PTR, IR_I64, IR_PTR};
-    static const enum ir_type all[] = {IR_PTR, IR_I64};
     const struct type *job = e->as.join.job->type;
     struct ir_operand value = lower_address(l, e->as.join.job);
     struct ir_operand args[3];
@@ -267,32 +260,22 @@ struct ir_operand lower_join(struct lowerer *l, const struct expr *e)
                        lower_offset_address(
                            l, value,
                            lower_field_offset(l, job, &lower_len_name))));
-        ir_call(l->f, l->b, IR_VOID,
-                ir_func_op(lower_rt_function(
-                    l,
-                    l->hooks ? "anti_rt_join_all_hooked" : "anti_rt_join_all",
-                    all, 2)),
-                args, 2);
+        lower_rt_call(l,
+                      l->hooks ? RT_FN_JOIN_ALL_HOOKED : RT_FN_JOIN_ALL,
+                      args);
         return lower_none();
     }
     args[0] = lower_temp(l, ir_load(l->f, l->b, IR_PTR, value));
     if (e->type->kind == TYPE_VOID) {
         args[1] = ir_int_op(IR_I64, 0);
         args[2] = ir_int_op(IR_PTR, 0);
-        ir_call(l->f, l->b, IR_VOID,
-                ir_func_op(lower_rt_function(
-                    l, l->hooks ? "anti_rt_join_hooked" : "anti_rt_join",
-                    one, 3)),
-                args, 3);
+        lower_rt_call(l, l->hooks ? RT_FN_JOIN_HOOKED : RT_FN_JOIN, args);
         return lower_none();
     }
     out = ir_slot(l->f, l->b, lower_vtype_of(l, e->type));
     args[1] = lower_size_operand(l, e->type);
     args[2] = lower_temp(l, out);
-    ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(lower_rt_function(
-                l, l->hooks ? "anti_rt_join_hooked" : "anti_rt_join", one, 3)),
-            args, 3);
+    lower_rt_call(l, l->hooks ? RT_FN_JOIN_HOOKED : RT_FN_JOIN, args);
     if (lower_is_aggregate(e->type)) {
         return lower_temp(l, out);
     }
@@ -308,9 +291,6 @@ struct ir_operand lower_join(struct lowerer *l, const struct expr *e)
 struct ir_operand lower_parallel(struct lowerer *l,
                                  const struct expr *e)
 {
-    static const enum ir_type signature[] = {IR_PTR, IR_I64, IR_I64, IR_I64,
-                                             IR_I64, IR_PTR, IR_PTR, IR_PTR,
-                                             IR_PTR};
     const struct expr *call = e->as.parallel.call;
     const struct expr *callee = call->kind == EXPR_CALL
                                     ? call->as.call.callee : call;
@@ -349,9 +329,7 @@ struct ir_operand lower_parallel(struct lowerer *l,
     args[6] = context;
     args[7] = lower_temp(l, results);
     args[8] = lower_temp(l, count);
-    ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(lower_rt_function(l, "anti_rt_parallel", signature, 9)),
-            args, 9);
+    lower_rt_call(l, RT_FN_PARALLEL, args);
     out = ir_slot(l->f, l->b, lower_vtype_of(l, e->type));
     ir_store(l->f, l->b, IR_PTR, lower_temp(l, ir_load(l->f, l->b, IR_PTR,
                                                        lower_temp(l, results))),

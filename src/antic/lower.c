@@ -970,65 +970,48 @@ static void declare_function(struct lowerer *l, const struct item *it)
     it->symbol->ir = f->index;
 }
 
-/* An extern declaration of a runtime function whose parameters are all
-   scalars. A module that calls it twice shares the declaration. */
-struct ir_function *lower_rt_function_giving(struct lowerer *l,
-                                             const char *name,
-                                             enum ir_type result,
-                                             const enum ir_type *params,
-                                             size_t count)
+/* The extern declaration of the runtime function f, with the signature
+   its row of RT_FUNCTIONS gives. A module that calls it twice shares the
+   declaration. */
+struct ir_function *lower_rt_declare(struct lowerer *l, enum rt_function f)
 {
-    struct ir_function *f = lower_find_function(l->m, NULL, name);
+    const struct rt_signature *s = rt_signature(f);
+    struct ir_function *fn = lower_find_function(l->m, NULL, s->name);
     size_t i;
 
-    if (f == NULL) {
-        f = ir_extern_add(l->m, name, result, false);
-        for (i = 0; i < count; i++) {
-            ir_param_add(f, params[i], IR_NO_AGG);
+    if (fn == NULL) {
+        fn = ir_extern_add(l->m, s->name, s->types[0], false);
+        for (i = 0; i < s->param_count; i++) {
+            ir_param_add(fn, s->types[1 + i], IR_NO_AGG);
         }
     }
-    return f;
-}
-
-struct ir_function *lower_rt_function(struct lowerer *l, const char *name,
-                                      const enum ir_type *params,
-                                      size_t count)
-{
-    return lower_rt_function_giving(l, name, IR_VOID, params, count);
+    return fn;
 }
 
 /* A call of anti_rt_delete, anti_rt_destroy or anti_rt_dup on object,
    which the program holds as a t. Only dup gives a value. */
-struct ir_operand lower_object_call(struct lowerer *l, const char *name,
+struct ir_operand lower_object_call(struct lowerer *l, enum rt_function f,
                                     struct ir_operand object,
                                     const struct type *t)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_PTR};
-    enum ir_type result =
-        strcmp(name, "anti_rt_dup") == 0 ? IR_PTR : IR_VOID;
     struct ir_operand args[2];
-    struct ir_function *f;
-    uint32_t call;
 
     args[0] = object;
     args[1] = lower_static_descriptor(l, t);
-    f = lower_rt_function_giving(l, name, result, params, 2);
-    call = ir_call(l->f, l->b, result, ir_func_op(f), args, 2);
-    return result == IR_PTR ? lower_temp(l, call) : lower_none();
+    return lower_rt_call(l, f, args);
 }
 
-/* A call of the runtime function name with the count arguments of the
-   types in params. It gives the result when there is one. */
-struct ir_operand lower_rt_call(struct lowerer *l, const char *name,
-                                enum ir_type result,
-                                const enum ir_type *params,
-                                struct ir_operand *args, size_t count)
+/* A call of the runtime function f on the arguments its row counts. It
+   gives the result when there is one. */
+struct ir_operand lower_rt_call(struct lowerer *l, enum rt_function f,
+                                const struct ir_operand *args)
 {
-    struct ir_function *f = lower_rt_function_giving(l, name, result, params,
-                                                     count);
-    uint32_t call = ir_call(l->f, l->b, result, ir_func_op(f), args, count);
+    const struct rt_signature *s = rt_signature(f);
+    struct ir_function *fn = lower_rt_declare(l, f);
+    uint32_t call = ir_call(l->f, l->b, s->types[0], ir_func_op(fn), args,
+                            s->param_count);
 
-    return result == IR_VOID ? lower_none() : lower_temp(l, call);
+    return s->types[0] == IR_VOID ? lower_none() : lower_temp(l, call);
 }
 
 /* The memory of one object of `alloc T { }`, `alloc T(args)` or a
@@ -1037,7 +1020,6 @@ struct ir_operand lower_rt_call(struct lowerer *l, const char *name,
    the code after it writes through the result. */
 struct ir_operand lower_new_memory(struct lowerer *l, struct ir_operand size)
 {
-    static const enum ir_type one[] = {IR_I64};
     struct ir_function *malloc_fn =
         lower_c_function(l, "malloc", IR_PTR, IR_I64);
     struct ir_operand made =
@@ -1050,7 +1032,7 @@ struct ir_operand lower_new_memory(struct lowerer *l, struct ir_operand size)
 
     ir_branch(l->f, l->b, none, lost, rest);
     l->b = lost;
-    lower_rt_call(l, "anti_rt_out_of_memory", IR_VOID, one, &size, 1);
+    lower_rt_call(l, RT_FN_OUT_OF_MEMORY, &size);
     ir_jump(l->f, l->b, rest);
     l->b = rest;
     return made;

@@ -12,12 +12,6 @@
 #include "atomic.h"
 #include "rt.h"
 
-struct anti_backtrace_default {
-    int64_t on;
-};
-
-extern const struct anti_backtrace_default anti_rt_backtrace_default;
-
 /* rt.configure may set the option on one thread while another fails, so
    the option is read atomically. */
 bool anti_rt_backtrace_on(void)

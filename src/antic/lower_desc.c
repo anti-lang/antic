@@ -136,130 +136,43 @@ struct ir_operand lower_entry_offset(struct lowerer *l, size_t index)
 /* DESIGN: the function record of a descriptor names one public function
    of the class and where its entry sits. A program reads the list and
    calls through the table, so reflection needs no name of its own. */
-static uint32_t function_agg(struct lowerer *l)
-{
-    static const char name[] = "anti.rt.Function";
-    struct ir_field fields[5];
-    uint32_t agg = ir_agg_find(l->m, name);
-
-    if (agg != IR_NO_AGG) {
-        return agg;
-    }
-    memset(fields, 0, sizeof fields);
-    fields[0].name = "name";
-    fields[0].type = ir_scalar(IR_PTR);
-    fields[1].name = "name_length";
-    fields[1].type = ir_scalar(IR_I64);
-    fields[2].name = "slot";
-    fields[2].type = ir_scalar(IR_I64);
-    fields[3].name = "param_count";
-    fields[3].type = ir_scalar(IR_I64);
-    fields[4].name = "signature";
-    fields[4].type = ir_scalar(IR_PTR);
-    return ir_struct_add(l->m, IR_AGG_STRUCT, name, fields, 5, false, 0);
-}
-
 /* The aggregate of a function list of n records. */
 static uint32_t functions_agg(struct lowerer *l, size_t n)
 {
-    uint32_t record = function_agg(l);
+    uint32_t record = rt_record_agg(l->m, RT_RECORD_FUNCTION);
 
-    return lower_array_agg(l, "anti.rt.Function", ir_aggregate(record), n);
-}
-
-/* The aggregate of one field record of a descriptor. */
-static uint32_t field_agg(struct lowerer *l)
-{
-    static const char name[] = "anti.rt.Field";
-    struct ir_field fields[6];
-    uint32_t agg = ir_agg_find(l->m, name);
-
-    if (agg != IR_NO_AGG) {
-        return agg;
-    }
-    memset(fields, 0, sizeof fields);
-    fields[0].name = "name";
-    fields[0].type = ir_scalar(IR_PTR);
-    fields[1].name = "name_length";
-    fields[1].type = ir_scalar(IR_I64);
-    fields[2].name = "offset";
-    fields[2].type = ir_scalar(IR_I64);
-    fields[3].name = "type";
-    fields[3].type = ir_scalar(IR_I64);
-    fields[4].name = "owned";
-    fields[4].type = ir_scalar(IR_I64);
-    fields[5].name = "descriptor";
-    fields[5].type = ir_scalar(IR_PTR);
-    return ir_struct_add(l->m, IR_AGG_STRUCT, name, fields, 6, false, 0);
+    return lower_array_agg(l, rt_record_name(RT_RECORD_FUNCTION),
+                           ir_aggregate(record), n);
 }
 
 /* The aggregate of an array of n field records. */
 uint32_t lower_fields_agg(struct lowerer *l, size_t n)
 {
-    uint32_t record = field_agg(l);
+    uint32_t record = rt_record_agg(l->m, RT_RECORD_FIELD);
 
-    return lower_array_agg(l, "anti.rt.Field", ir_aggregate(record), n);
+    return lower_array_agg(l, rt_record_name(RT_RECORD_FIELD),
+                           ir_aggregate(record), n);
 }
 
-/* The aggregate of a class descriptor. Every class shares it. */
+/* The aggregate of a class descriptor. Every class shares it.
+
+   DESIGN: the descriptor of an interface table records how far the
+   sub-object sits from the start of the object, in RT_DESCRIPTOR_OFFSET.
+   A pointer to the sub-object therefore leads back to the object itself,
+   which is what `is`, `as`, `delete` and identity need. The descriptor of
+   a class has zero there.
+
+   DESIGN: every descriptor carries the version of the package that
+   declared the class. An abstract class points at the record of its
+   chain and its floor. The loader of a plugin reads both.
+
+   DESIGN: a copy of a generic class records its type arguments, one
+   field record each. The offset of a record holds the size of its
+   argument. A generic collection then writes, copies and tears down its
+   elements through the runtime, as a walk of the fields does. */
 uint32_t lower_descriptor_agg(struct lowerer *l)
 {
-    static const char name[] = "anti.rt.Descriptor";
-    struct ir_field fields[DESCRIPTOR_ITEMS];
-    uint32_t agg = ir_agg_find(l->m, name);
-
-    if (agg != IR_NO_AGG) {
-        return agg;
-    }
-    memset(fields, 0, sizeof fields);
-    fields[0].name = "name";
-    fields[0].type = ir_scalar(IR_PTR);
-    fields[1].name = "name_length";
-    fields[1].type = ir_scalar(IR_I64);
-    fields[2].name = "parent";
-    fields[2].type = ir_scalar(IR_PTR);
-    fields[3].name = "size";
-    fields[3].type = ir_scalar(IR_I64);
-    fields[4].name = "depth";
-    fields[4].type = ir_scalar(IR_I64);
-    fields[5].name = "ancestors";
-    fields[5].type = ir_scalar(IR_PTR);
-    fields[6].name = "field_count";
-    fields[6].type = ir_scalar(IR_I64);
-    fields[7].name = "fields";
-    fields[7].type = ir_scalar(IR_PTR);
-    fields[8].name = "destruct";
-    fields[8].type = ir_scalar(IR_PTR);
-    /* DESIGN: the descriptor of an interface table records how far the
-       sub-object sits from the start of the object. A pointer to the
-       sub-object therefore leads back to the object itself, which is
-       what `is`, `as`, `delete` and identity need. The descriptor of a
-       class has zero there. */
-    fields[9].name = "offset";
-    fields[9].type = ir_scalar(IR_I64);
-    fields[10].name = "function_count";
-    fields[10].type = ir_scalar(IR_I64);
-    fields[11].name = "functions";
-    fields[11].type = ir_scalar(IR_PTR);
-    /* DESIGN: every descriptor carries the version of the package that
-       declared the class. An abstract class points at the record of its
-       chain and its floor. The loader of a plugin reads both. */
-    fields[12].name = "version";
-    fields[12].type = ir_scalar(IR_PTR);
-    fields[13].name = "version_length";
-    fields[13].type = ir_scalar(IR_I64);
-    fields[14].name = "versions";
-    fields[14].type = ir_scalar(IR_PTR);
-    /* DESIGN: a copy of a generic class records its type arguments, one
-       field record each. The offset of a record holds the size of its
-       argument. A generic collection then writes, copies and tears down
-       its elements through the runtime, as a walk of the fields does. */
-    fields[15].name = "type_arg_count";
-    fields[15].type = ir_scalar(IR_I64);
-    fields[16].name = "type_args";
-    fields[16].type = ir_scalar(IR_PTR);
-    return ir_struct_add(l->m, IR_AGG_STRUCT, name, fields, DESCRIPTOR_ITEMS,
-                         false, 0);
+    return rt_record_agg(l->m, RT_RECORD_DESCRIPTOR);
 }
 
 /* The depth of a class in its chain. The root anti.lang.Object is 0. */
@@ -603,40 +516,42 @@ static struct ir_const *field_record(struct lowerer *l, const struct name *name,
                                      uint64_t type, uint64_t word,
                                      const struct type *reach)
 {
-    struct ir_const *item = ir_const_agg(l->m, ir_aggregate(field_agg(l)), 6);
+    struct ir_const *item =
+        ir_const_agg(l->m, ir_aggregate(rt_record_agg(l->m, RT_RECORD_FIELD)),
+                     RT_FIELD_ITEM_COUNT);
     const struct ir_global *descriptor;
     struct token_text text;
 
     text.bytes = name->text;
     text.length = name->length;
-    item->items[0].kind = IR_CONST_ADDR;
-    item->items[0].scalar = IR_PTR;
-    item->items[0].global = lower_literal_global(l, &text)->index;
-    item->items[1].kind = IR_CONST_INT;
-    item->items[1].scalar = IR_I64;
-    item->items[1].integer = name->length;
-    item->items[2].scalar = IR_I64;
+    item->items[RT_FIELD_NAME].kind = IR_CONST_ADDR;
+    item->items[RT_FIELD_NAME].scalar = IR_PTR;
+    item->items[RT_FIELD_NAME].global = lower_literal_global(l, &text)->index;
+    item->items[RT_FIELD_NAME_LENGTH].kind = IR_CONST_INT;
+    item->items[RT_FIELD_NAME_LENGTH].scalar = IR_I64;
+    item->items[RT_FIELD_NAME_LENGTH].integer = name->length;
+    item->items[RT_FIELD_OFFSET].scalar = IR_I64;
     if (agg == IR_NO_AGG) {
-        item->items[2].kind = IR_CONST_INT;
-        item->items[2].integer = 0;
+        item->items[RT_FIELD_OFFSET].kind = IR_CONST_INT;
+        item->items[RT_FIELD_OFFSET].integer = 0;
     } else {
-        item->items[2].kind = IR_CONST_SYM;
-        item->items[2].sym = ir_sym_offset_of(l->m, agg, index);
+        item->items[RT_FIELD_OFFSET].kind = IR_CONST_SYM;
+        item->items[RT_FIELD_OFFSET].sym = ir_sym_offset_of(l->m, agg, index);
     }
-    item->items[3].kind = IR_CONST_INT;
-    item->items[3].scalar = IR_I64;
-    item->items[3].integer = type;
-    item->items[4].kind = IR_CONST_INT;
-    item->items[4].scalar = IR_I64;
-    item->items[4].integer = word;
-    item->items[5].scalar = IR_PTR;
+    item->items[RT_FIELD_TYPE].kind = IR_CONST_INT;
+    item->items[RT_FIELD_TYPE].scalar = IR_I64;
+    item->items[RT_FIELD_TYPE].integer = type;
+    item->items[RT_FIELD_OWNED].kind = IR_CONST_INT;
+    item->items[RT_FIELD_OWNED].scalar = IR_I64;
+    item->items[RT_FIELD_OWNED].integer = word;
+    item->items[RT_FIELD_DESCRIPTOR].scalar = IR_PTR;
     descriptor = reach != NULL ? field_descriptor(l, reach) : NULL;
     if (descriptor != NULL) {
-        item->items[5].kind = IR_CONST_ADDR;
-        item->items[5].global = descriptor->index;
+        item->items[RT_FIELD_DESCRIPTOR].kind = IR_CONST_ADDR;
+        item->items[RT_FIELD_DESCRIPTOR].global = descriptor->index;
     } else {
-        item->items[5].kind = IR_CONST_INT;
-        item->items[5].integer = 0;
+        item->items[RT_FIELD_DESCRIPTOR].kind = IR_CONST_INT;
+        item->items[RT_FIELD_DESCRIPTOR].integer = 0;
     }
     return item;
 }
@@ -650,24 +565,24 @@ static struct ir_global *value_descriptor(struct lowerer *l,
                                           const struct token_text *text)
 {
     struct ir_const *value = ir_const_agg(
-        l->m, ir_aggregate(lower_descriptor_agg(l)), DESCRIPTOR_ITEMS);
+        l->m, ir_aggregate(lower_descriptor_agg(l)), RT_DESCRIPTOR_ITEM_COUNT);
     struct ir_global *g = ir_global_add_value(l->m, module, name, value);
     size_t k;
 
-    for (k = 0; k < DESCRIPTOR_ITEMS; k++) {
+    for (k = 0; k < RT_DESCRIPTOR_ITEM_COUNT; k++) {
         value->items[k].kind = IR_CONST_INT;
         value->items[k].scalar =
             l->m->aggs[lower_descriptor_agg(l)]->fields[k].type.type;
         value->items[k].integer = 0;
     }
-    value->items[0].kind = IR_CONST_ADDR;
-    value->items[0].global = lower_literal_global(l, text)->index;
-    value->items[1].integer = text->length;
-    value->items[3].kind = IR_CONST_SYM;
-    value->items[3].sym = ir_sym_size_of(l->m, lower_vtype_of(l, t));
-    value->items[12].kind = IR_CONST_ADDR;
-    value->items[12].global = version_global(l)->index;
-    value->items[13].integer = (uint64_t)strlen(l->version);
+    value->items[RT_DESCRIPTOR_NAME].kind = IR_CONST_ADDR;
+    value->items[RT_DESCRIPTOR_NAME].global = lower_literal_global(l, text)->index;
+    value->items[RT_DESCRIPTOR_NAME_LENGTH].integer = text->length;
+    value->items[RT_DESCRIPTOR_SIZE].kind = IR_CONST_SYM;
+    value->items[RT_DESCRIPTOR_SIZE].sym = ir_sym_size_of(l->m, lower_vtype_of(l, t));
+    value->items[RT_DESCRIPTOR_VERSION].kind = IR_CONST_ADDR;
+    value->items[RT_DESCRIPTOR_VERSION].global = version_global(l)->index;
+    value->items[RT_DESCRIPTOR_VERSION_LENGTH].integer = (uint64_t)strlen(l->version);
     return g;
 }
 
@@ -683,9 +598,9 @@ static void give_fields(struct lowerer *l, struct ir_global *g,
     if (l->no_reflect) {
         return;
     }
-    value->items[6].integer = count;
-    value->items[7].kind = IR_CONST_ADDR;
-    value->items[7].global = ir_global_add_value(l->m, module, name, list)->index;
+    value->items[RT_DESCRIPTOR_FIELD_COUNT].integer = count;
+    value->items[RT_DESCRIPTOR_FIELDS].kind = IR_CONST_ADDR;
+    value->items[RT_DESCRIPTOR_FIELDS].global = ir_global_add_value(l->m, module, name, list)->index;
 }
 
 /* DESIGN: a variant has a descriptor of its own, written by the module
@@ -916,37 +831,38 @@ static struct ir_global *class_type_args(struct lowerer *l,
         const struct type *arg = t->args[i];
         const struct ir_global *descriptor =
             arg != NULL ? arg_descriptor(l, arg) : NULL;
-        struct ir_const *item = ir_const_agg(l->m, ir_aggregate(field_agg(l)),
-                                             6);
+        struct ir_const *item = ir_const_agg(
+            l->m, ir_aggregate(rt_record_agg(l->m, RT_RECORD_FIELD)),
+            RT_FIELD_ITEM_COUNT);
         text.bytes = param->name.text;
         text.length = param->name.length;
-        item->items[0].kind = IR_CONST_ADDR;
-        item->items[0].scalar = IR_PTR;
-        item->items[0].global = lower_literal_global(l, &text)->index;
-        item->items[1].kind = IR_CONST_INT;
-        item->items[1].scalar = IR_I64;
-        item->items[1].integer = param->name.length;
-        item->items[2].scalar = IR_I64;
+        item->items[RT_FIELD_NAME].kind = IR_CONST_ADDR;
+        item->items[RT_FIELD_NAME].scalar = IR_PTR;
+        item->items[RT_FIELD_NAME].global = lower_literal_global(l, &text)->index;
+        item->items[RT_FIELD_NAME_LENGTH].kind = IR_CONST_INT;
+        item->items[RT_FIELD_NAME_LENGTH].scalar = IR_I64;
+        item->items[RT_FIELD_NAME_LENGTH].integer = param->name.length;
+        item->items[RT_FIELD_OFFSET].scalar = IR_I64;
         if (arg != NULL) {
-            item->items[2].kind = IR_CONST_SYM;
-            item->items[2].sym = ir_sym_size_of(l->m, lower_vtype_of(l, arg));
+            item->items[RT_FIELD_OFFSET].kind = IR_CONST_SYM;
+            item->items[RT_FIELD_OFFSET].sym = ir_sym_size_of(l->m, lower_vtype_of(l, arg));
         } else {
-            item->items[2].kind = IR_CONST_INT;
-            item->items[2].integer = 0;
+            item->items[RT_FIELD_OFFSET].kind = IR_CONST_INT;
+            item->items[RT_FIELD_OFFSET].integer = 0;
         }
-        item->items[3].kind = IR_CONST_INT;
-        item->items[3].scalar = IR_I64;
-        item->items[3].integer = arg != NULL ? type_id(arg) : TYPE_ID_NONE;
-        item->items[4].kind = IR_CONST_INT;
-        item->items[4].scalar = IR_I64;
-        item->items[4].integer = 0;
-        item->items[5].scalar = IR_PTR;
+        item->items[RT_FIELD_TYPE].kind = IR_CONST_INT;
+        item->items[RT_FIELD_TYPE].scalar = IR_I64;
+        item->items[RT_FIELD_TYPE].integer = arg != NULL ? type_id(arg) : TYPE_ID_NONE;
+        item->items[RT_FIELD_OWNED].kind = IR_CONST_INT;
+        item->items[RT_FIELD_OWNED].scalar = IR_I64;
+        item->items[RT_FIELD_OWNED].integer = 0;
+        item->items[RT_FIELD_DESCRIPTOR].scalar = IR_PTR;
         if (descriptor != NULL) {
-            item->items[5].kind = IR_CONST_ADDR;
-            item->items[5].global = descriptor->index;
+            item->items[RT_FIELD_DESCRIPTOR].kind = IR_CONST_ADDR;
+            item->items[RT_FIELD_DESCRIPTOR].global = descriptor->index;
         } else {
-            item->items[5].kind = IR_CONST_INT;
-            item->items[5].integer = 0;
+            item->items[RT_FIELD_DESCRIPTOR].kind = IR_CONST_INT;
+            item->items[RT_FIELD_DESCRIPTOR].integer = 0;
         }
         value->items[i] = *item;
     }
@@ -1102,7 +1018,9 @@ static struct ir_global *class_functions(struct lowerer *l,
                          table.count);
     for (i = 0; i < table.count; i++) {
         struct ir_const *item =
-            ir_const_agg(l->m, ir_aggregate(function_agg(l)), 5);
+            ir_const_agg(l->m,
+                         ir_aggregate(rt_record_agg(l->m, RT_RECORD_FUNCTION)),
+                         RT_FUNCTION_ITEM_COUNT);
         const struct item *fn = table.entries[i].fn;
         const struct ir_global *signature =
             fn != NULL && fn->symbol != NULL
@@ -1110,29 +1028,29 @@ static struct ir_global *class_functions(struct lowerer *l,
                 : NULL;
         text.bytes = table.entries[i].name.text;
         text.length = table.entries[i].name.length;
-        item->items[0].kind = IR_CONST_ADDR;
-        item->items[0].scalar = IR_PTR;
-        item->items[0].global = lower_literal_global(l, &text)->index;
-        item->items[1].kind = IR_CONST_INT;
-        item->items[1].scalar = IR_I64;
-        item->items[1].integer = table.entries[i].name.length;
-        item->items[2].kind = IR_CONST_INT;
-        item->items[2].scalar = IR_I64;
-        item->items[2].integer = i + 1;
-        item->items[3].kind = IR_CONST_INT;
-        item->items[3].scalar = IR_I64;
-        item->items[3].integer =
+        item->items[RT_FUNCTION_NAME].kind = IR_CONST_ADDR;
+        item->items[RT_FUNCTION_NAME].scalar = IR_PTR;
+        item->items[RT_FUNCTION_NAME].global = lower_literal_global(l, &text)->index;
+        item->items[RT_FUNCTION_NAME_LENGTH].kind = IR_CONST_INT;
+        item->items[RT_FUNCTION_NAME_LENGTH].scalar = IR_I64;
+        item->items[RT_FUNCTION_NAME_LENGTH].integer = table.entries[i].name.length;
+        item->items[RT_FUNCTION_SLOT].kind = IR_CONST_INT;
+        item->items[RT_FUNCTION_SLOT].scalar = IR_I64;
+        item->items[RT_FUNCTION_SLOT].integer = i + 1;
+        item->items[RT_FUNCTION_PARAM_COUNT].kind = IR_CONST_INT;
+        item->items[RT_FUNCTION_PARAM_COUNT].scalar = IR_I64;
+        item->items[RT_FUNCTION_PARAM_COUNT].integer =
             fn != NULL && fn->symbol != NULL &&
                     fn->symbol->type->kind == TYPE_FN
                 ? fn->symbol->type->param_count
                 : 1;
-        item->items[4].scalar = IR_PTR;
+        item->items[RT_FUNCTION_SIGNATURE].scalar = IR_PTR;
         if (signature != NULL) {
-            item->items[4].kind = IR_CONST_ADDR;
-            item->items[4].global = signature->index;
+            item->items[RT_FUNCTION_SIGNATURE].kind = IR_CONST_ADDR;
+            item->items[RT_FUNCTION_SIGNATURE].global = signature->index;
         } else {
-            item->items[4].kind = IR_CONST_INT;
-            item->items[4].integer = 0;
+            item->items[RT_FUNCTION_SIGNATURE].kind = IR_CONST_INT;
+            item->items[RT_FUNCTION_SIGNATURE].integer = 0;
         }
         value->items[i] = *item;
     }
@@ -1239,28 +1157,6 @@ static struct ir_global *class_chain(struct lowerer *l, const struct type *t,
     return g;
 }
 
-/* The aggregate of the version record of an abstract class. */
-static uint32_t versions_agg(struct lowerer *l)
-{
-    static const char name[] = "anti.rt.Versions";
-    struct ir_field fields[4];
-    uint32_t agg = ir_agg_find(l->m, name);
-
-    if (agg != IR_NO_AGG) {
-        return agg;
-    }
-    memset(fields, 0, sizeof fields);
-    fields[0].name = "chain";
-    fields[0].type = ir_scalar(IR_PTR);
-    fields[1].name = "chain_length";
-    fields[1].type = ir_scalar(IR_I64);
-    fields[2].name = "floor";
-    fields[2].type = ir_scalar(IR_PTR);
-    fields[3].name = "floor_length";
-    fields[3].type = ir_scalar(IR_I64);
-    return ir_struct_add(l->m, IR_AGG_STRUCT, name, fields, 4, false, 0);
-}
-
 /* DESIGN: the version record of an abstract class holds its chain and
    the floor a `compatible` line names. The descriptor of a class that
    is no interface points at none. */
@@ -1279,26 +1175,28 @@ static struct ir_global *class_versions(struct lowerer *l,
         return g;
     }
     chain = class_chain(l, t, &count);
-    value = ir_const_agg(l->m, ir_aggregate(versions_agg(l)), 4);
-    value->items[0].kind = IR_CONST_ADDR;
-    value->items[0].scalar = IR_PTR;
-    value->items[0].global = chain->index;
-    value->items[1].kind = IR_CONST_INT;
-    value->items[1].scalar = IR_I64;
-    value->items[1].integer = count;
-    value->items[2].scalar = IR_PTR;
-    value->items[3].kind = IR_CONST_INT;
-    value->items[3].scalar = IR_I64;
-    value->items[3].integer = t->compatible.length;
+    value = ir_const_agg(l->m,
+                         ir_aggregate(rt_record_agg(l->m, RT_RECORD_VERSIONS)),
+                         RT_VERSIONS_ITEM_COUNT);
+    value->items[RT_VERSIONS_CHAIN].kind = IR_CONST_ADDR;
+    value->items[RT_VERSIONS_CHAIN].scalar = IR_PTR;
+    value->items[RT_VERSIONS_CHAIN].global = chain->index;
+    value->items[RT_VERSIONS_CHAIN_LENGTH].kind = IR_CONST_INT;
+    value->items[RT_VERSIONS_CHAIN_LENGTH].scalar = IR_I64;
+    value->items[RT_VERSIONS_CHAIN_LENGTH].integer = count;
+    value->items[RT_VERSIONS_FLOOR].scalar = IR_PTR;
+    value->items[RT_VERSIONS_FLOOR_LENGTH].kind = IR_CONST_INT;
+    value->items[RT_VERSIONS_FLOOR_LENGTH].scalar = IR_I64;
+    value->items[RT_VERSIONS_FLOOR_LENGTH].integer = t->compatible.length;
     if (t->compatible.length > 0) {
         struct token_text floor;
         floor.bytes = t->compatible.text;
         floor.length = t->compatible.length;
-        value->items[2].kind = IR_CONST_ADDR;
-        value->items[2].global = lower_literal_global(l, &floor)->index;
+        value->items[RT_VERSIONS_FLOOR].kind = IR_CONST_ADDR;
+        value->items[RT_VERSIONS_FLOOR].global = lower_literal_global(l, &floor)->index;
     } else {
-        value->items[2].kind = IR_CONST_INT;
-        value->items[2].integer = 0;
+        value->items[RT_VERSIONS_FLOOR].kind = IR_CONST_INT;
+        value->items[RT_VERSIONS_FLOOR].integer = 0;
     }
     g = ir_global_add_value(l->m, module, name, value);
     free(module);
@@ -1332,53 +1230,53 @@ struct ir_global *lower_class_descriptor(struct lowerer *l,
     /* The global is added before its ancestors, so a chain that comes
        back around finds it and does not build it twice. */
     value = ir_const_agg(l->m, ir_aggregate(lower_descriptor_agg(l)),
-                         DESCRIPTOR_ITEMS);
+                         RT_DESCRIPTOR_ITEM_COUNT);
     g = ir_global_add_value(l->m, module, name, value);
     g->exported = t->item_exported;
     free(module);
     free(name);
     text.bytes = t->name.text;
     text.length = t->name.length;
-    value->items[0].kind = IR_CONST_ADDR;
-    value->items[0].scalar = IR_PTR;
-    value->items[0].global = lower_literal_global(l, &text)->index;
-    value->items[1].kind = IR_CONST_INT;
-    value->items[1].scalar = IR_I64;
-    value->items[1].integer = t->name.length;
-    value->items[2].scalar = IR_PTR;
+    value->items[RT_DESCRIPTOR_NAME].kind = IR_CONST_ADDR;
+    value->items[RT_DESCRIPTOR_NAME].scalar = IR_PTR;
+    value->items[RT_DESCRIPTOR_NAME].global = lower_literal_global(l, &text)->index;
+    value->items[RT_DESCRIPTOR_NAME_LENGTH].kind = IR_CONST_INT;
+    value->items[RT_DESCRIPTOR_NAME_LENGTH].scalar = IR_I64;
+    value->items[RT_DESCRIPTOR_NAME_LENGTH].integer = t->name.length;
+    value->items[RT_DESCRIPTOR_PARENT].scalar = IR_PTR;
     if (t->base != NULL) {
-        value->items[2].kind = IR_CONST_ADDR;
-        value->items[2].global = lower_class_descriptor(l, t->base)->index;
+        value->items[RT_DESCRIPTOR_PARENT].kind = IR_CONST_ADDR;
+        value->items[RT_DESCRIPTOR_PARENT].global = lower_class_descriptor(l, t->base)->index;
     } else {
-        value->items[2].kind = IR_CONST_INT;
-        value->items[2].integer = 0;
+        value->items[RT_DESCRIPTOR_PARENT].kind = IR_CONST_INT;
+        value->items[RT_DESCRIPTOR_PARENT].integer = 0;
     }
-    value->items[3].kind = IR_CONST_SYM;
-    value->items[3].scalar = IR_I64;
-    value->items[3].sym = ir_sym_size_of(l->m, lower_vtype_of(l, t));
-    value->items[4].kind = IR_CONST_INT;
-    value->items[4].scalar = IR_I64;
-    value->items[4].integer = lower_class_depth(t);
-    value->items[5].kind = IR_CONST_ADDR;
-    value->items[5].scalar = IR_PTR;
-    value->items[5].global = class_ancestors(l, t)->index;
-    value->items[6].kind = IR_CONST_INT;
-    value->items[6].scalar = IR_I64;
-    value->items[6].integer = l->no_reflect ? 0 : lower_own_fields(t);
-    value->items[7].scalar = IR_PTR;
+    value->items[RT_DESCRIPTOR_SIZE].kind = IR_CONST_SYM;
+    value->items[RT_DESCRIPTOR_SIZE].scalar = IR_I64;
+    value->items[RT_DESCRIPTOR_SIZE].sym = ir_sym_size_of(l->m, lower_vtype_of(l, t));
+    value->items[RT_DESCRIPTOR_DEPTH].kind = IR_CONST_INT;
+    value->items[RT_DESCRIPTOR_DEPTH].scalar = IR_I64;
+    value->items[RT_DESCRIPTOR_DEPTH].integer = lower_class_depth(t);
+    value->items[RT_DESCRIPTOR_ANCESTORS].kind = IR_CONST_ADDR;
+    value->items[RT_DESCRIPTOR_ANCESTORS].scalar = IR_PTR;
+    value->items[RT_DESCRIPTOR_ANCESTORS].global = class_ancestors(l, t)->index;
+    value->items[RT_DESCRIPTOR_FIELD_COUNT].kind = IR_CONST_INT;
+    value->items[RT_DESCRIPTOR_FIELD_COUNT].scalar = IR_I64;
+    value->items[RT_DESCRIPTOR_FIELD_COUNT].integer = l->no_reflect ? 0 : lower_own_fields(t);
+    value->items[RT_DESCRIPTOR_FIELDS].scalar = IR_PTR;
     if (l->no_reflect || lower_own_fields(t) == 0) {
-        value->items[7].kind = IR_CONST_INT;
-        value->items[7].integer = 0;
+        value->items[RT_DESCRIPTOR_FIELDS].kind = IR_CONST_INT;
+        value->items[RT_DESCRIPTOR_FIELDS].integer = 0;
     } else {
-        value->items[7].kind = IR_CONST_ADDR;
-        value->items[7].global = lower_class_fields(l, t)->index;
+        value->items[RT_DESCRIPTOR_FIELDS].kind = IR_CONST_ADDR;
+        value->items[RT_DESCRIPTOR_FIELDS].global = lower_class_fields(l, t)->index;
     }
     /* DESIGN: the destruct body the class declares, and not the one it
        inherits, because `delete` runs one body per level of the chain.
        The table holds the last one, which is a different question. */
-    value->items[8].scalar = IR_PTR;
-    value->items[8].kind = IR_CONST_INT;
-    value->items[8].integer = 0;
+    value->items[RT_DESCRIPTOR_DESTRUCT].scalar = IR_PTR;
+    value->items[RT_DESCRIPTOR_DESTRUCT].kind = IR_CONST_INT;
+    value->items[RT_DESCRIPTOR_DESTRUCT].integer = 0;
     {
         static const struct name destruct_name = {"destruct", 8};
         size_t i;
@@ -1387,61 +1285,61 @@ struct ir_global *lower_class_descriptor(struct lowerer *l,
             if (m->kind == ITEM_FN &&
                 lower_same_name(&m->name, &destruct_name) &&
                 m->body != NULL && m->symbol != NULL) {
-                value->items[8].kind = IR_CONST_FUNC;
-                value->items[8].global = m->symbol->ir;
+                value->items[RT_DESCRIPTOR_DESTRUCT].kind = IR_CONST_FUNC;
+                value->items[RT_DESCRIPTOR_DESTRUCT].global = m->symbol->ir;
             }
         }
     }
-    value->items[9].kind = IR_CONST_INT;
-    value->items[9].scalar = IR_I64;
-    value->items[9].integer = 0;
+    value->items[RT_DESCRIPTOR_OFFSET].kind = IR_CONST_INT;
+    value->items[RT_DESCRIPTOR_OFFSET].scalar = IR_I64;
+    value->items[RT_DESCRIPTOR_OFFSET].integer = 0;
     /* The function list names every public function of the chain and
        the entry of each. `--no-reflect` drops it with the field list. */
     {
         size_t function_count = 0;
         const struct ir_global *list =
             l->no_reflect ? NULL : class_functions(l, t, &function_count);
-        value->items[10].kind = IR_CONST_INT;
-        value->items[10].scalar = IR_I64;
-        value->items[10].integer = list != NULL ? function_count : 0;
-        value->items[11].scalar = IR_PTR;
+        value->items[RT_DESCRIPTOR_FUNCTION_COUNT].kind = IR_CONST_INT;
+        value->items[RT_DESCRIPTOR_FUNCTION_COUNT].scalar = IR_I64;
+        value->items[RT_DESCRIPTOR_FUNCTION_COUNT].integer = list != NULL ? function_count : 0;
+        value->items[RT_DESCRIPTOR_FUNCTIONS].scalar = IR_PTR;
         if (list != NULL) {
-            value->items[11].kind = IR_CONST_ADDR;
-            value->items[11].global = list->index;
+            value->items[RT_DESCRIPTOR_FUNCTIONS].kind = IR_CONST_ADDR;
+            value->items[RT_DESCRIPTOR_FUNCTIONS].global = list->index;
         } else {
-            value->items[11].kind = IR_CONST_INT;
-            value->items[11].integer = 0;
+            value->items[RT_DESCRIPTOR_FUNCTIONS].kind = IR_CONST_INT;
+            value->items[RT_DESCRIPTOR_FUNCTIONS].integer = 0;
         }
     }
     /* The version of the package that declares the class. The module
        that declares it writes the descriptor, and every other module
        refers to the one it wrote. The version of this build is then the
        class's own. */
-    value->items[12].kind = IR_CONST_ADDR;
-    value->items[12].scalar = IR_PTR;
-    value->items[12].global = version_global(l)->index;
-    value->items[13].kind = IR_CONST_INT;
-    value->items[13].scalar = IR_I64;
-    value->items[13].integer = (uint64_t)strlen(l->version);
-    value->items[14].scalar = IR_PTR;
+    value->items[RT_DESCRIPTOR_VERSION].kind = IR_CONST_ADDR;
+    value->items[RT_DESCRIPTOR_VERSION].scalar = IR_PTR;
+    value->items[RT_DESCRIPTOR_VERSION].global = version_global(l)->index;
+    value->items[RT_DESCRIPTOR_VERSION_LENGTH].kind = IR_CONST_INT;
+    value->items[RT_DESCRIPTOR_VERSION_LENGTH].scalar = IR_I64;
+    value->items[RT_DESCRIPTOR_VERSION_LENGTH].integer = (uint64_t)strlen(l->version);
+    value->items[RT_DESCRIPTOR_VERSIONS].scalar = IR_PTR;
     if (t->has_abstract) {
-        value->items[14].kind = IR_CONST_ADDR;
-        value->items[14].global = class_versions(l, t)->index;
+        value->items[RT_DESCRIPTOR_VERSIONS].kind = IR_CONST_ADDR;
+        value->items[RT_DESCRIPTOR_VERSIONS].global = class_versions(l, t)->index;
     } else {
-        value->items[14].kind = IR_CONST_INT;
-        value->items[14].integer = 0;
+        value->items[RT_DESCRIPTOR_VERSIONS].kind = IR_CONST_INT;
+        value->items[RT_DESCRIPTOR_VERSIONS].integer = 0;
     }
-    value->items[15].kind = IR_CONST_INT;
-    value->items[15].scalar = IR_I64;
-    value->items[15].integer = 0;
-    value->items[16].kind = IR_CONST_INT;
-    value->items[16].scalar = IR_PTR;
-    value->items[16].integer = 0;
+    value->items[RT_DESCRIPTOR_TYPE_ARG_COUNT].kind = IR_CONST_INT;
+    value->items[RT_DESCRIPTOR_TYPE_ARG_COUNT].scalar = IR_I64;
+    value->items[RT_DESCRIPTOR_TYPE_ARG_COUNT].integer = 0;
+    value->items[RT_DESCRIPTOR_TYPE_ARGS].kind = IR_CONST_INT;
+    value->items[RT_DESCRIPTOR_TYPE_ARGS].scalar = IR_PTR;
+    value->items[RT_DESCRIPTOR_TYPE_ARGS].integer = 0;
     if (t->generic != NULL && t->args != NULL &&
         t->generic->type_param_count > 0) {
-        value->items[15].integer = t->generic->type_param_count;
-        value->items[16].kind = IR_CONST_ADDR;
-        value->items[16].global = class_type_args(l, t)->index;
+        value->items[RT_DESCRIPTOR_TYPE_ARG_COUNT].integer = t->generic->type_param_count;
+        value->items[RT_DESCRIPTOR_TYPE_ARGS].kind = IR_CONST_ADDR;
+        value->items[RT_DESCRIPTOR_TYPE_ARGS].global = class_type_args(l, t)->index;
     }
     return g;
 }
@@ -1478,11 +1376,11 @@ struct ir_global *lower_struct_descriptor(struct lowerer *l,
     /* The global is added before the field list, so a struct that
        points at itself finds it. */
     value = ir_const_agg(l->m, ir_aggregate(lower_descriptor_agg(l)),
-                         DESCRIPTOR_ITEMS);
+                         RT_DESCRIPTOR_ITEM_COUNT);
     g = ir_global_add_value(l->m, module, name, value);
     free(module);
     free(name);
-    for (k = 0; k < DESCRIPTOR_ITEMS; k++) {
+    for (k = 0; k < RT_DESCRIPTOR_ITEM_COUNT; k++) {
         value->items[k].kind = IR_CONST_INT;
         value->items[k].scalar = l->m->aggs[lower_descriptor_agg(l)]
                                      ->fields[k].type.type;
@@ -1490,19 +1388,19 @@ struct ir_global *lower_struct_descriptor(struct lowerer *l,
     }
     text.bytes = t->name.text;
     text.length = t->name.length;
-    value->items[0].kind = IR_CONST_ADDR;
-    value->items[0].global = lower_literal_global(l, &text)->index;
-    value->items[1].integer = t->name.length;
-    value->items[3].kind = IR_CONST_SYM;
-    value->items[3].sym = ir_sym_size_of(l->m, lower_vtype_of(l, t));
+    value->items[RT_DESCRIPTOR_NAME].kind = IR_CONST_ADDR;
+    value->items[RT_DESCRIPTOR_NAME].global = lower_literal_global(l, &text)->index;
+    value->items[RT_DESCRIPTOR_NAME_LENGTH].integer = t->name.length;
+    value->items[RT_DESCRIPTOR_SIZE].kind = IR_CONST_SYM;
+    value->items[RT_DESCRIPTOR_SIZE].sym = ir_sym_size_of(l->m, lower_vtype_of(l, t));
     if (!l->no_reflect && count > 0) {
-        value->items[6].integer = count;
-        value->items[7].kind = IR_CONST_ADDR;
-        value->items[7].global = lower_class_fields(l, t)->index;
+        value->items[RT_DESCRIPTOR_FIELD_COUNT].integer = count;
+        value->items[RT_DESCRIPTOR_FIELDS].kind = IR_CONST_ADDR;
+        value->items[RT_DESCRIPTOR_FIELDS].global = lower_class_fields(l, t)->index;
     }
-    value->items[12].kind = IR_CONST_ADDR;
-    value->items[12].global = version_global(l)->index;
-    value->items[13].integer = (uint64_t)strlen(l->version);
+    value->items[RT_DESCRIPTOR_VERSION].kind = IR_CONST_ADDR;
+    value->items[RT_DESCRIPTOR_VERSION].global = version_global(l)->index;
+    value->items[RT_DESCRIPTOR_VERSION_LENGTH].integer = (uint64_t)strlen(l->version);
     return g;
 }
 
@@ -1529,12 +1427,12 @@ static struct ir_global *interface_descriptor(struct lowerer *l,
         return g;
     }
     value = ir_const_agg(l->m, ir_aggregate(lower_descriptor_agg(l)),
-                         DESCRIPTOR_ITEMS);
+                         RT_DESCRIPTOR_ITEM_COUNT);
     memcpy(value->items, l->m->globals[of->index]->value->items,
-           DESCRIPTOR_ITEMS * sizeof *value->items);
-    value->items[9].kind = IR_CONST_SYM;
-    value->items[9].scalar = IR_I64;
-    value->items[9].sym =
+           RT_DESCRIPTOR_ITEM_COUNT * sizeof *value->items);
+    value->items[RT_DESCRIPTOR_OFFSET].kind = IR_CONST_SYM;
+    value->items[RT_DESCRIPTOR_OFFSET].scalar = IR_I64;
+    value->items[RT_DESCRIPTOR_OFFSET].sym =
         ir_sym_offset_of(l->m, lower_agg_of(l, sub->home),
                          (uint32_t)(sub - sub->home->fields));
     g = ir_global_add_value(l->m, module, name, value);

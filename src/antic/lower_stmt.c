@@ -47,7 +47,7 @@ static void push_exit_action(struct lowerer *l, const struct stmt *stmt,
     action->mutex = 0;
     action->pair = false;
     action->second = 0;
-    action->unlock_fn = NULL;
+    action->unlock_fn = RT_FUNCTION_COUNT;
     action->leave = false;
 }
 
@@ -81,7 +81,7 @@ void lower_push_error_action(struct lowerer *l, const struct symbol *sym,
     action->mutex = 0;
     action->pair = false;
     action->second = 0;
-    action->unlock_fn = NULL;
+    action->unlock_fn = RT_FUNCTION_COUNT;
     action->leave = false;
 }
 
@@ -89,7 +89,7 @@ void lower_push_error_action(struct lowerer *l, const struct symbol *sym,
    `sync` holds until its block ends and a synchronized function until
    it returns. unlock_fn names the function of the runtime. */
 void lower_push_unlock_action(struct lowerer *l, uint32_t mutex,
-                              const char *unlock_fn)
+                              enum rt_function unlock_fn)
 {
     struct exit_action *action;
 
@@ -201,8 +201,6 @@ static void lower_loop(struct lowerer *l, const struct stmt *s)
    ordinary passes remove the block, the call and the text. */
 static void walk_check(struct lowerer *l, const struct stmt *s)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_I64, IR_PTR, IR_I64,
-                                          IR_I64};
     const struct iteration *it = &s->as.for_loop.hooks;
     struct token_text text;
     struct text message = {0};
@@ -228,10 +226,7 @@ static void walk_check(struct lowerer *l, const struct stmt *s)
     args[2] = lower_expr(l, it->change_file);
     args[3] = lower_expr(l, it->change_file_length);
     args[4] = lower_expr(l, it->change_line);
-    ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(lower_rt_function(l, "anti_rt_walk_changed", params,
-                                         5)),
-            args, 5);
+    lower_rt_call(l, RT_FN_WALK_CHANGED, args);
     ir_jump(l->f, l->b, rest);
     l->b = rest;
 }
@@ -1079,7 +1074,6 @@ static void lower_let(struct lowerer *l, const struct stmt *s)
 static void assert_branch(struct lowerer *l, struct ir_operand cond,
                           const struct ir_global *text)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_I64};
     struct ir_block *fail = lower_new_block(l);
     struct ir_block *rest = lower_new_block(l);
     struct ir_operand args[2];
@@ -1089,10 +1083,7 @@ static void assert_branch(struct lowerer *l, struct ir_operand cond,
     l->b = fail;
     args[0] = lower_temp(l, ir_addr(l->f, l->b, ir_global_op(text)));
     args[1] = ir_int_op(IR_I64, text->size - 1);
-    ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(lower_rt_function(l, "anti_rt_assert_failed", params,
-                                         2)),
-            args, 2);
+    lower_rt_call(l, RT_FN_ASSERT_FAILED, args);
     ir_jump(l->f, l->b, rest);
     l->b = rest;
 }
@@ -1548,20 +1539,15 @@ void lower_run_defers(struct lowerer *l, const struct defers *scope,
                 lower_hook_failed(l, l->failing_error);
             }
             lower_hook_call(l, HOOK_LEAVE);
-        } else if (action->unlock && action->pair) {
-            lower_unlock_pair_call(l, lower_temp(l, action->mutex),
-                                   lower_temp(l, action->second));
         } else if (action->unlock) {
-            static const enum ir_type handle[] = {IR_PTR};
-            struct ir_operand mutex = lower_temp(l, action->mutex);
-            ir_call(l->f, l->b, IR_VOID,
-                    ir_func_op(lower_rt_function(l, action->unlock_fn,
-                                                 handle,
-                                                 1)),
-                    &mutex, 1);
+            struct ir_operand locks[2];
+            locks[0] = lower_temp(l, action->mutex);
+            locks[1] = action->pair ? lower_temp(l, action->second)
+                                    : lower_none();
+            lower_rt_call(l, action->unlock_fn, locks);
         } else if (action->error) {
             if (action->local == NULL || action->local != l->moved) {
-                lower_object_call(l, "anti_rt_delete",
+                lower_object_call(l, RT_FN_DELETE,
                                   lower_temp(l, action->error_temp),
                                   action->error_type);
             }

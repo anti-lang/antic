@@ -504,13 +504,9 @@ struct type *types_object(struct types *types);
    call of `compile_bytes` of `anti.regex`. */
 #define LANG_BYTE_REGEX "ByteRegex"
 #define REGEX_COMPILE_BYTES "compile_bytes"
-#define REGEX_LITERAL_BYTES "anti_rt_regex_literal_bytes"
 #define REGEX_HANDLE "handle"
 #define REGEX_COMPILE "compile"
 #define REGEX_MODULE "anti.regex"
-/* The runtime function that compiles one pattern literal before main,
-   which IR_PATTERNS_START of each module calls. */
-#define REGEX_LITERAL "anti_rt_regex_literal"
 /* The fields of a `?T`, as the C header names them: the value and the
    flag that says it is there. */
 #define OPTIONAL_VALUE "value"

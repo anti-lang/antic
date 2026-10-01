@@ -12,6 +12,22 @@
 #include "sema.h"
 #include "types.h"
 
+#include "atomic.h"
+#include "conf.h"
+#include "f16.h"
+#include "hooks.h"
+#include "layout.h"
+#include "plugin.h"
+#include "reflect.h"
+#include "regex.h"
+#include "registry.h"
+#include "rt.h"
+#include "rt_abi.h"
+#include "sync.h"
+#include "target.h"
+#include "threads.h"
+#include "trace.h"
+
 struct lowered {
     struct arena arena;
     struct diagnostics diags;
@@ -534,6 +550,196 @@ static void flag_reads(void)
     CHECK(strstr(text, " = addfl i8 %0, %0, %") != NULL);
     text_free(&out);
     release(&l);
+}
+
+/* The IR type a C type takes as the result or a parameter of a runtime
+   function. Every integer type of C stands in the list, so the default is
+   a pointer. The type is read as the result of a function, so void has a
+   place too. */
+#define RT_IR_OF_C(c)                                                      \
+    _Generic((c (*)(void))0,                                               \
+        void (*)(void): IR_VOID,                                           \
+        _Bool (*)(void): IR_I8,                                            \
+        char (*)(void): IR_I8,                                             \
+        signed char (*)(void): IR_I8,                                      \
+        unsigned char (*)(void): IR_I8,                                    \
+        short (*)(void): IR_I16,                                           \
+        unsigned short (*)(void): IR_I16,                                  \
+        int (*)(void): IR_I32,                                             \
+        unsigned (*)(void): IR_I32,                                        \
+        long (*)(void): sizeof(long) == 8 ? IR_I64 : IR_I32,               \
+        unsigned long (*)(void): sizeof(long) == 8 ? IR_I64 : IR_I32,      \
+        long long (*)(void): IR_I64,                                       \
+        unsigned long long (*)(void): IR_I64,                              \
+        float (*)(void): IR_F32,                                           \
+        double (*)(void): IR_F64,                                          \
+        default: IR_PTR)
+
+#define RT_C(ir, c) c
+#define RT_APPLY(m, x) m x
+#define RT_FIRST(...) RT_FIRST_(__VA_ARGS__, ~)
+#define RT_FIRST_(a, ...) a
+#define RT_AGREES(ir, c) (RT_IR_OF_C(c) == IR_##ir)
+
+/* The parameter list of a row in C. */
+#define RT_PROTO(...) RT_CAT(RT_PROTO_, RT_COUNT(__VA_ARGS__))(__VA_ARGS__)
+#define RT_PROTO_0(r) (void)
+#define RT_PROTO_1(r, a) (RT_C a)
+#define RT_PROTO_2(r, a, b) (RT_C a, RT_C b)
+#define RT_PROTO_3(r, a, b, c) (RT_C a, RT_C b, RT_C c)
+#define RT_PROTO_4(r, a, b, c, d) (RT_C a, RT_C b, RT_C c, RT_C d)
+#define RT_PROTO_5(r, a, b, c, d, e)                                       \
+    (RT_C a, RT_C b, RT_C c, RT_C d, RT_C e)
+#define RT_PROTO_6(r, a, b, c, d, e, f)                                    \
+    (RT_C a, RT_C b, RT_C c, RT_C d, RT_C e, RT_C f)
+#define RT_PROTO_7(r, a, b, c, d, e, f, g)                                 \
+    (RT_C a, RT_C b, RT_C c, RT_C d, RT_C e, RT_C f, RT_C g)
+#define RT_PROTO_8(r, a, b, c, d, e, f, g, h)                              \
+    (RT_C a, RT_C b, RT_C c, RT_C d, RT_C e, RT_C f, RT_C g, RT_C h)
+#define RT_PROTO_9(r, a, b, c, d, e, f, g, h, i)                           \
+    (RT_C a, RT_C b, RT_C c, RT_C d, RT_C e, RT_C f, RT_C g, RT_C h, RT_C i)
+
+/* Whether the prototype of name in src/rt/ has the type the row gives.
+   The operand of _Generic is not evaluated, so the test links no
+   runtime. */
+#define RT_DECLARED(name, ...)                                             \
+    _Generic(&name,                                                        \
+        RT_APPLY(RT_C, RT_FIRST(__VA_ARGS__))(*) RT_PROTO(__VA_ARGS__): 1, \
+        default: 0)
+
+struct rt_row {
+    enum rt_function id;
+    const char *name;
+    int declared;
+    size_t param_count;
+    int agrees[1 + RT_PARAMS_MAX];
+};
+
+#define RT_TEST_ROW(id, name, ...)                                         \
+    {id, #name, RT_DECLARED(name, __VA_ARGS__), RT_COUNT(__VA_ARGS__),     \
+     {RT_EACH(RT_AGREES, __VA_ARGS__)}},
+
+/* DESIGN: lowering declares every runtime function it calls from the
+   IR column of RT_FUNCTIONS in src/antic/rt_abi.h. This test reads the C
+   column of each row against the prototype in src/rt/, and the IR type
+   of each result and parameter against its C type. A function the
+   runtime changes, adds a parameter to or does not declare fails here
+   rather than at a call on one target. */
+static void runtime_functions(void)
+{
+    static const struct rt_row rows[] = {RT_FUNCTIONS(RT_TEST_ROW)};
+    size_t i;
+    size_t k;
+
+    CHECK(sizeof rows / sizeof rows[0] == (size_t)RT_FUNCTION_COUNT);
+    for (i = 0; i < sizeof rows / sizeof rows[0]; i++) {
+        const struct rt_signature *s = rt_signature(rows[i].id);
+        CHECK((size_t)rows[i].id == i);
+        CHECK_STR(s->name, rows[i].name);
+        CHECK(s->param_count == rows[i].param_count);
+        if (!rows[i].declared) {
+            check_failures++;
+            fprintf(stderr, "%s is declared otherwise in src/rt/\n",
+                    rows[i].name);
+        }
+        for (k = 0; k <= rows[i].param_count; k++) {
+            if (!rows[i].agrees[k]) {
+                check_failures++;
+                fprintf(stderr, "%s: the IR type of %s %zu is not its C "
+                        "type\n", rows[i].name,
+                        k == 0 ? "the result" : "parameter", k);
+            }
+        }
+    }
+}
+
+/* The layout of a C struct: the offset and the size of each member that
+   a record lists, and the size of the whole. */
+struct c_layout {
+    const size_t *offsets;
+    const size_t *sizes;
+    size_t count;
+    size_t size;
+};
+
+#define RT_MEMBER_OFFSET(id, member, type) offsetof(rt_probe, member),
+#define RT_MEMBER_SIZE(id, member, type) sizeof(((rt_probe *)0)->member),
+#define RT_C_LAYOUT(id, ir_name, c_struct, list, n)                        \
+    static void c_layout_##c_struct(struct c_layout *out)                  \
+    {                                                                      \
+        typedef struct c_struct rt_probe;                                  \
+        static const size_t offsets[n] = {list(RT_MEMBER_OFFSET)};         \
+        static const size_t sizes[n] = {list(RT_MEMBER_SIZE)};             \
+        out->offsets = offsets;                                            \
+        out->sizes = sizes;                                                \
+        out->count = n;                                                    \
+        out->size = sizeof(rt_probe);                                      \
+    }
+RT_RECORDS(RT_C_LAYOUT)
+
+#define RT_C_LAYOUT_ENTRY(id, ir_name, c_struct, list, count)              \
+    c_layout_##c_struct,
+static void (*const c_layouts[])(struct c_layout *) = {
+    RT_RECORDS(RT_C_LAYOUT_ENTRY)
+};
+
+/* DESIGN: antic writes each record of RT_RECORDS in src/antic/rt_abi.h
+   from its IR column, and the runtime reads it as the struct of
+   src/rt/ that the row names. This test lays out every record for the
+   host and compares each item with the member of the same name, its
+   offset and its size, and the size of the whole. A member added,
+   dropped or moved on one side fails here. */
+static void runtime_records(void)
+{
+    enum target host;
+    size_t r;
+
+    CHECK(sizeof c_layouts / sizeof c_layouts[0] == (size_t)RT_RECORD_COUNT);
+    if (!target_host(&host)) {
+        check_failures++;
+        return;
+    }
+    for (r = 0; r < (size_t)RT_RECORD_COUNT; r++) {
+        struct arena arena = {0};
+        struct ir_module m;
+        struct layouts layouts;
+        struct c_layout c;
+        const struct layout *ir;
+        char error[256];
+        uint32_t agg;
+        size_t k;
+
+        c_layouts[r](&c);
+        ir_module_init(&m, &arena, "abi");
+        agg = rt_record_agg(&m, (enum rt_record)r);
+        CHECK(rt_record_items((enum rt_record)r) == c.count);
+        CHECK(m.aggs[agg]->field_count == c.count);
+        CHECK(layouts_init(&layouts, host, &m, error, sizeof error));
+        ir = layout_agg(&layouts, agg);
+        if (ir->size != c.size) {
+            check_failures++;
+            fprintf(stderr, "%s: %llu bytes in antic, %zu in src/rt/\n",
+                    rt_record_name((enum rt_record)r),
+                    (unsigned long long)ir->size, c.size);
+        }
+        for (k = 0; k < c.count && k < m.aggs[agg]->field_count; k++) {
+            uint64_t bytes =
+                layout_size(&layouts, m.aggs[agg]->fields[k].type);
+            if (ir->offsets[k] != c.offsets[k] || bytes != c.sizes[k]) {
+                check_failures++;
+                fprintf(stderr, "%s.%s: offset %llu and %llu bytes in "
+                        "antic, %zu and %zu in src/rt/\n",
+                        rt_record_name((enum rt_record)r),
+                        m.aggs[agg]->fields[k].name,
+                        (unsigned long long)ir->offsets[k],
+                        (unsigned long long)bytes, c.offsets[k],
+                        c.sizes[k]);
+            }
+        }
+        layouts_free(&layouts);
+        ir_module_free(&m);
+        arena_free(&arena);
+    }
 }
 
 void test_lower(void)
@@ -1797,4 +2003,6 @@ void test_lower(void)
     records_hook_entries();
     records_check_kinds();
     allocates_zeroed_classes();
+    runtime_functions();
+    runtime_records();
 }

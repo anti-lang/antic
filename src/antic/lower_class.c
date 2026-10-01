@@ -210,14 +210,12 @@ static struct ir_global *singleton_instance(struct lowerer *l,
 
 void lower_singleton_get(struct lowerer *l, const struct item *it)
 {
-    static const enum ir_type load_params[] = {IR_PTR, IR_I64};
-    static const enum ir_type swap_params[] = {IR_PTR, IR_I64, IR_I64,
-                                               IR_I64};
     const struct type *t = it->owner->symbol->type;
     struct ir_operand address;
     struct ir_operand args[4];
     struct ir_operand made;
     struct ir_operand first;
+    struct ir_operand swapped;
     struct ir_block *build;
     struct ir_block *lost;
     struct ir_block *done;
@@ -236,11 +234,12 @@ void lower_singleton_get(struct lowerer *l, const struct item *it)
     width = ir_sym_size_of(l->m, ir_scalar(IR_PTR));
     args[0] = address;
     args[1] = ir_sym_operand(l->m, width);
+    /* The runtime gives an i64 back, and a pointer is the same bits, so
+       the call takes the pointer type with no conversion between. */
     first = lower_temp(
         l, ir_call(l->f, l->b, IR_PTR,
-                   ir_func_op(lower_rt_function(l, "anti_rt_atomic_load",
-                                                load_params, 2)),
-                   args, 2));
+                   ir_func_op(lower_rt_declare(l, RT_FN_ATOMIC_LOAD)), args,
+                   2));
     result = ir_unary(l->f, l->b, IR_COPY, IR_PTR, first);
     build = lower_new_block(l);
     lost = lower_new_block(l);
@@ -259,13 +258,8 @@ void lower_singleton_get(struct lowerer *l, const struct item *it)
     args[1] = ir_sym_operand(l->m, width);
     args[2] = ir_int_op(IR_PTR, 0);
     args[3] = made;
-    ir_branch(l->f, l->b,
-              lower_temp(l, ir_call(l->f, l->b, IR_I8,
-                                    ir_func_op(lower_rt_function(
-                                        l, "anti_rt_atomic_compare_swap",
-                                        swap_params, 4)),
-                                    args, 4)),
-              done, lost);
+    swapped = lower_rt_call(l, RT_FN_ATOMIC_COMPARE_SWAP, args);
+    ir_branch(l->f, l->b, swapped, done, lost);
     l->b = lost;
     ir_call(l->f, l->b, IR_VOID,
             ir_func_op(lower_c_function(l, "free", IR_VOID, IR_PTR)), &made, 1);
@@ -273,9 +267,8 @@ void lower_singleton_get(struct lowerer *l, const struct item *it)
     args[1] = ir_sym_operand(l->m, width);
     ir_assign(l->f, l->b, result,
               lower_temp(l, ir_call(l->f, l->b, IR_PTR,
-                                    ir_func_op(lower_rt_function(
-                                        l, "anti_rt_atomic_load",
-                                        load_params, 2)),
+                                    ir_func_op(lower_rt_declare(
+                                        l, RT_FN_ATOMIC_LOAD)),
                                     args, 2)));
     ir_jump(l->f, l->b, done);
     l->b = done;

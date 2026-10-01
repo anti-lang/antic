@@ -23,6 +23,7 @@
 
 #include "atomic.h"
 #include "std.h"
+#include "sync.h"
 
 #if defined(_WIN32)
 

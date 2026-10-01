@@ -32,6 +32,7 @@
 
 #include "ast.h"
 #include "ir.h"
+#include "rt_abi.h"
 #include "sema.h"
 #include "text.h"
 #include "types.h"
@@ -72,7 +73,9 @@ struct exit_action {
        through lower_unlock_pair_call. */
     bool pair;
     uint32_t second;
-    const char *unlock_fn;      /* the function of the runtime that does. */
+    /* The function of the runtime that unlocks, and RT_FUNCTION_COUNT
+       where the action unlocks nothing. */
+    enum rt_function unlock_fn;
     /* DESIGN: the `leave` hook of an instrumented function is an exit
        action of a scope around its body. Every exit therefore runs it,
        after the locals of the body are gone. An exit that gives an error
@@ -322,21 +325,12 @@ uint32_t lower_table_agg(struct lowerer *l, size_t n);
 const struct type *lower_struct_of_expr(const struct expr *e);
 bool lower_bound_is_direct(const struct expr *e, const struct type *s);
 struct ir_operand lower_new_memory(struct lowerer *l, struct ir_operand size);
-struct ir_operand lower_rt_call(struct lowerer *l, const char *name,
-                                enum ir_type result,
-                                const enum ir_type *params,
-                                struct ir_operand *args, size_t count);
+struct ir_operand lower_rt_call(struct lowerer *l, enum rt_function f,
+                                const struct ir_operand *args);
 struct ir_operand lower_slice_length(struct lowerer *l, struct ir_operand p,
                                      const struct type *slice);
-struct ir_function *lower_rt_function_giving(struct lowerer *l,
-                                             const char *name,
-                                             enum ir_type result,
-                                             const enum ir_type *params,
-                                             size_t count);
-struct ir_function *lower_rt_function(struct lowerer *l, const char *name,
-                                      const enum ir_type *params,
-                                      size_t count);
-struct ir_operand lower_object_call(struct lowerer *l, const char *name,
+struct ir_function *lower_rt_declare(struct lowerer *l, enum rt_function f);
+struct ir_operand lower_object_call(struct lowerer *l, enum rt_function f,
                                     struct ir_operand object,
                                     const struct type *t);
 size_t lower_globals_of_module(struct lowerer *l);
@@ -438,9 +432,6 @@ size_t lower_table_index(const struct type *t, const struct name *name,
                          size_t params);
 struct ir_operand lower_entry_offset(struct lowerer *l, size_t index);
 uint32_t lower_fields_agg(struct lowerer *l, size_t n);
-/* The number of items of a class descriptor, as struct anti_descriptor
-   of src/rt/object.h lays them out. */
-#define DESCRIPTOR_ITEMS 17
 uint32_t lower_descriptor_agg(struct lowerer *l);
 uint32_t lower_class_depth(const struct type *t);
 struct ir_global *lower_class_global(struct lowerer *l, const struct type *t,
@@ -601,7 +592,7 @@ bool lower_has_defers(const struct lowerer *l);
 void lower_push_error_action(struct lowerer *l, const struct symbol *sym,
                              uint32_t error, const struct type *error_type);
 void lower_push_unlock_action(struct lowerer *l, uint32_t mutex,
-                              const char *unlock_fn);
+                              enum rt_function unlock_fn);
 void lower_jump_to_join(struct lowerer *l, struct ir_block **join);
 void lower_stmt(struct lowerer *l, const struct stmt *s);
 void lower_run_defers_to(struct lowerer *l, const struct defers *stop,

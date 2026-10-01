@@ -17,7 +17,6 @@
 void lower_hook_object(struct lowerer *l, enum hook_kind hook,
                        struct ir_operand object)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_I64};
     struct ir_operand args[2];
 
     if (!l->hooks || l->b == NULL || object.kind == IR_NONE) {
@@ -25,9 +24,7 @@ void lower_hook_object(struct lowerer *l, enum hook_kind hook,
     }
     args[0] = object;
     args[1] = ir_int_op(IR_I64, (uint64_t)hook);
-    ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(lower_rt_function(l, "anti_rt_hook", params, 2)), args,
-            2);
+    lower_rt_call(l, RT_FN_HOOK, args);
 }
 
 /* Whether the `--trace` pattern names the module path of the class, a
@@ -75,7 +72,6 @@ bool lower_traced_class(const struct lowerer *l, const struct type *t)
    names itself. A function that is not instrumented writes none. */
 void lower_hook_call(struct lowerer *l, enum hook_kind hook)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_I64, IR_PTR, IR_I64};
     struct ir_operand args[4];
 
     if (l->trace_name == NULL || l->b == NULL) {
@@ -85,16 +81,12 @@ void lower_hook_call(struct lowerer *l, enum hook_kind hook)
     args[1] = ir_int_op(IR_I64, (uint64_t)hook);
     args[2] = lower_temp(l, ir_addr(l->f, l->b, ir_global_op(l->trace_name)));
     args[3] = ir_int_op(IR_I64, (uint64_t)l->trace_name_length);
-    ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(lower_rt_function(l, "anti_rt_hook_call", params, 4)),
-            args,
-            4);
+    lower_rt_call(l, RT_FN_HOOK_CALL, args);
 }
 
 /* The `failed` hook, before the `leave` of an exit that gives an error. */
 void lower_hook_failed(struct lowerer *l, struct ir_operand err)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_PTR, IR_I64, IR_PTR};
     struct ir_operand args[4];
 
     if (l->trace_name == NULL || l->b == NULL ||
@@ -105,9 +97,7 @@ void lower_hook_failed(struct lowerer *l, struct ir_operand err)
     args[1] = lower_temp(l, ir_addr(l->f, l->b, ir_global_op(l->trace_name)));
     args[2] = ir_int_op(IR_I64, (uint64_t)l->trace_name_length);
     args[3] = err;
-    ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(lower_rt_function(l, "anti_rt_hook_failed", params, 4)),
-            args, 4);
+    lower_rt_call(l, RT_FN_HOOK_FAILED, args);
 }
 
 /* The `copied` hook, after `dup` made the object at `made` out of the
@@ -115,7 +105,6 @@ void lower_hook_failed(struct lowerer *l, struct ir_operand err)
 void lower_hook_copied(struct lowerer *l, struct ir_operand made,
                        struct ir_operand from)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_PTR};
     struct ir_operand args[2];
 
     if (!l->hooks || l->b == NULL || made.kind == IR_NONE) {
@@ -123,9 +112,7 @@ void lower_hook_copied(struct lowerer *l, struct ir_operand made,
     }
     args[0] = made;
     args[1] = from;
-    ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(lower_rt_function(l, "anti_rt_hook_copied", params, 2)),
-            args, 2);
+    lower_rt_call(l, RT_FN_HOOK_COPIED, args);
 }
 
 /* The level of the chain of t that declares the field name, with the
@@ -163,7 +150,6 @@ static const struct type *record_of_field(const struct type *t,
 void lower_hook_changed(struct lowerer *l, const struct place *p,
                         const struct expr *target)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_PTR};
     struct ir_operand args[2];
     struct ir_operand list;
     struct ir_operand at;
@@ -188,7 +174,5 @@ void lower_hook_changed(struct lowerer *l, const struct place *p,
                                          (uint32_t)index));
     args[0] = p->object;
     args[1] = lower_offset_address(l, list, at);
-    ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(lower_rt_function(l, "anti_rt_hook_changed", params, 2)),
-            args, 2);
+    lower_rt_call(l, RT_FN_HOOK_CHANGED, args);
 }

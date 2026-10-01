@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "regalloc.h"
+#include "rt_abi.h"
 
 /* The x86_64 back end: registers, opcodes and the pattern table of
    instruction selection. Register numbers follow the instruction encoding,
@@ -1617,7 +1618,7 @@ static void emit_half_convert(struct selector *s, const struct ir_inst *inst)
     } else {
         move_float(s, mach_preg(in, 32), a);
     }
-    call_named(s, widen ? "anti_rt_f16_to_f32" : "anti_rt_f32_to_f16",
+    call_named(s, rt_name(widen ? RT_FN_F16_TO_F32 : RT_FN_F32_TO_F16),
                BIT(in));
     if (widen) {
         move_float(s, r, mach_preg(s->abi->fp_result, 32));

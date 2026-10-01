@@ -427,8 +427,6 @@ static struct ir_operand lower_snapshot(struct lowerer *l,
                                         const struct expr *e,
                                         struct ir_operand code)
 {
-    static const enum ir_type one[] = {IR_I64};
-    static const enum ir_type four[] = {IR_PTR, IR_I64, IR_PTR, IR_I64};
     const struct item *it = e->as.fn;
     uint32_t agg = lower_snapshot_agg(l, it);
     struct ir_operand fixed =
@@ -454,8 +452,7 @@ static struct ir_operand lower_snapshot(struct lowerer *l,
             size = lower_temp(l, ir_binary(l->f, l->b, IR_ADD, IR_I64, size,
                                            len));
         }
-        block = lower_rt_call(l, "anti_rt_snapshot_new", IR_PTR, one, &size,
-                              1);
+        block = lower_rt_call(l, RT_FN_SNAPSHOT_NEW, &size);
     } else {
         block = lower_temp(l, ir_entry_slot(l->f, ir_aggregate(agg)));
         ir_store(l->f, l->b, IR_I64, fixed, block);
@@ -483,7 +480,7 @@ static struct ir_operand lower_snapshot(struct lowerer *l,
         args[1] = cursor;
         args[2] = lower_temp(l, ir_load(l->f, l->b, IR_PTR, src));
         args[3] = len;
-        lower_rt_call(l, "anti_rt_snapshot_text", IR_VOID, four, args, 4);
+        lower_rt_call(l, RT_FN_SNAPSHOT_TEXT, args);
         ir_store(l->f, l->b, IR_I64, cursor, dst);
         ir_store(l->f, l->b, IR_I64, len,
                  lower_offset_address(l, dst, len_offset));

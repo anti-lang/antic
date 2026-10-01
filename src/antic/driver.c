@@ -21,6 +21,7 @@
 #include "optimize.h"
 #include "whole.h"
 #include "regalloc.h"
+#include "rt_abi.h"
 #include "select.h"
 #include "sha256.h"
 #include "parser.h"
@@ -1292,7 +1293,7 @@ static int back_end(const struct options *o, struct module *tree,
         /* The host has run the runtime's start already, so a plugin
            brings no constructor of its own. */
         if (ok && o->lib == LIB_SHARED && !is_plugin(o)) {
-            emit_constructor(assembly, o->target, "anti_rt_init");
+            emit_constructor(assembly, o->target, rt_name(RT_FN_INIT));
         }
         if (ok && extras->notice.length > 0 && status != 3 &&
             !o->assembly_only && o->lib != LIB_STATIC) {

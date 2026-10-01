@@ -23,6 +23,7 @@
 #include "object.h"
 #include "rt.h"
 #include "std.h"
+#include "threads.h"
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -36,7 +37,7 @@
    of the dispatch until the worker returns. A second dispatch of the
    same object gives no job. */
 struct one {
-    void (*run)(void *context, void *object, void *out);
+    anti_rt_dispatch_body *run;
     void *context;
     void *object;
     unsigned char *result;
@@ -47,7 +48,7 @@ struct one {
 
 /* One call of `parallel`, shared by the caller and the pool. */
 struct jobs {
-    void (*run)(void *context, const void *ptr, int64_t len, void *out);
+    anti_rt_parallel_body *run;
     void *context;
     const unsigned char *base;
     int64_t element_size;
@@ -296,9 +297,8 @@ static void start(void)
    wrote `parallel` frees them. */
 void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
                       int64_t chunks, int64_t result_size,
-                      void (*run)(void *context, const void *ptr, int64_t len,
-                                  void *out),
-                      void *context, void **results_out, int64_t *chunks_out)
+                      anti_rt_parallel_body *run, void *context,
+                      void **results_out, int64_t *chunks_out)
 {
     struct jobs j;
     int64_t index;
@@ -379,8 +379,7 @@ void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
    one object. The result waits in the job until `join` takes it. The
    job is on the heap, and anti_rt_join frees it, which `join` calls. */
 void *anti_rt_dispatch(void *object, int64_t result_size,
-                       void (*run)(void *context, void *object, void *out),
-                       void *context)
+                       anti_rt_dispatch_body *run, void *context)
 {
     struct one *job = calloc(1, sizeof *job);
     struct one *at;

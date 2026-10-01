@@ -47,26 +47,9 @@ struct ir_operand lower_object_lock_address(struct lowerer *l,
                                 lower_field_offset(l, owner, &lock));
 }
 
-/* A call of the runtime function name on count arguments. */
-static struct ir_operand lower_sync_call(struct lowerer *l, const char *name,
-                                         enum ir_type result,
-                                         const enum ir_type *params,
-                                         const struct ir_operand *args,
-                                         size_t count)
-{
-    struct ir_function *f = lower_rt_function_giving(l, name, result, params,
-                                                     count);
-    uint32_t value = ir_call(l->f, l->b, result, ir_func_op(f), args, count);
-
-    return result == IR_VOID ? lower_none() : lower_temp(l, value);
-}
-
 struct ir_operand lower_sync_op(struct lowerer *l,
                                 const struct expr *e)
 {
-    static const enum ir_type one[] = {IR_PTR};
-    static const enum ir_type two[] = {IR_PTR, IR_PTR};
-    static const enum ir_type sizes[] = {IR_I64, IR_I64};
     const struct expr *target = e->as.sync_op.target;
     const struct type *element = NULL;
     struct ir_operand args[2];
@@ -84,7 +67,7 @@ struct ir_operand lower_sync_op(struct lowerer *l,
     case SYNC_CHAN_NEW:
         args[0] = lower_size_operand(l, e->type->element);
         args[1] = lower_expr(l, e->as.sync_op.value);
-        handle = lower_sync_call(l, "anti_rt_chan_new", IR_PTR, sizes, args, 2);
+        handle = lower_rt_call(l, RT_FN_CHAN_NEW, args);
         break;
     /* The word holds nothing of the system, and a dev build forgets the
        orders it recorded for the lock. */
@@ -92,7 +75,7 @@ struct ir_operand lower_sync_op(struct lowerer *l,
         args[0] = target->type->kind == TYPE_POINTER
                       ? lower_expr(l, target)
                       : lower_address(l, target);
-        lower_sync_call(l, "anti_rt_mutex_destroy", IR_VOID, one, args, 1);
+        lower_rt_call(l, RT_FN_MUTEX_DESTROY, args);
         return lower_none();
     case SYNC_SEND:
         element = target->type->element;
@@ -100,7 +83,7 @@ struct ir_operand lower_sync_op(struct lowerer *l,
         slot = ir_entry_slot(l->f, lower_vtype_of(l, element));
         lower_store_value(l, element, e->as.sync_op.value, lower_temp(l, slot));
         args[1] = lower_temp(l, slot);
-        lower_sync_call(l, "anti_rt_chan_send", IR_VOID, two, args, 2);
+        lower_rt_call(l, RT_FN_CHAN_SEND, args);
         return lower_none();
     /* `recv` gives the address of the slot it filled, or `none` when
        the channel is closed and empty. */
@@ -109,14 +92,14 @@ struct ir_operand lower_sync_op(struct lowerer *l,
         args[0] = lower_load_handle(l, target);
         slot = ir_entry_slot(l->f, lower_vtype_of(l, element));
         args[1] = lower_temp(l, slot);
-        return lower_sync_call(l, "anti_rt_chan_recv", IR_PTR, two, args, 2);
+        return lower_rt_call(l, RT_FN_CHAN_RECV, args);
     case SYNC_CLOSE:
     case SYNC_CHAN_DELETE:
         args[0] = lower_load_handle(l, target);
-        lower_sync_call(l,
-                        e->as.sync_op.op == SYNC_CLOSE ? "anti_rt_chan_close"
-                                                       : "anti_rt_chan_delete",
-                        IR_VOID, one, args, 1);
+        lower_rt_call(l,
+                      e->as.sync_op.op == SYNC_CLOSE ? RT_FN_CHAN_CLOSE
+                                                     : RT_FN_CHAN_DELETE,
+                      args);
         return lower_none();
     }
     /* A new channel is a slot that holds the handle. */
@@ -150,51 +133,50 @@ static struct ir_operand lock_site(struct lowerer *l, int line)
 void lower_hold_lock(struct lowerer *l, struct ir_operand at, bool object,
                      int line)
 {
-    static const enum ir_type one[] = {IR_PTR};
-    static const enum ir_type two[] = {IR_PTR, IR_PTR};
     struct ir_operand args[2];
     uint32_t lock = ir_unary(l->f, l->b, IR_COPY, IR_PTR, at);
 
     args[0] = lower_temp(l, lock);
     if (l->dev) {
         args[1] = lock_site(l, line);
-        lower_sync_call(l, object ? "anti_rt_object_lock_at"
-                                  : "anti_rt_mutex_lock_at",
-                        IR_VOID, two, args, 2);
-        lower_push_unlock_action(l, lock, object ? "anti_rt_object_unlock_at"
-                                                 : "anti_rt_mutex_unlock_at");
+        lower_rt_call(l, object ? RT_FN_OBJECT_LOCK_AT : RT_FN_MUTEX_LOCK_AT,
+                      args);
+        lower_push_unlock_action(l, lock,
+                                 object ? RT_FN_OBJECT_UNLOCK_AT
+                                        : RT_FN_MUTEX_UNLOCK_AT);
         return;
     }
-    lower_sync_call(l, object ? "anti_rt_object_lock" : "anti_rt_mutex_lock",
-                    IR_VOID, one, args, 1);
-    lower_push_unlock_action(l, lock, object ? "anti_rt_object_unlock"
-                                             : "anti_rt_mutex_unlock");
+    lower_rt_call(l, object ? RT_FN_OBJECT_LOCK : RT_FN_MUTEX_LOCK, args);
+    lower_push_unlock_action(l, lock,
+                             object ? RT_FN_OBJECT_UNLOCK
+                                    : RT_FN_MUTEX_UNLOCK);
 }
 
 /* Take the hidden lock at `at`, with its site in a dev build. The caller
    gives it back on every path with lower_object_unlock_call. */
 void lower_object_lock_call(struct lowerer *l, struct ir_operand at, int line)
 {
-    static const enum ir_type one[] = {IR_PTR};
-    static const enum ir_type two[] = {IR_PTR, IR_PTR};
     struct ir_operand args[2];
 
     args[0] = at;
     if (l->dev) {
         args[1] = lock_site(l, line);
-        lower_sync_call(l, "anti_rt_object_lock_at", IR_VOID, two, args, 2);
+        lower_rt_call(l, RT_FN_OBJECT_LOCK_AT, args);
         return;
     }
-    lower_sync_call(l, "anti_rt_object_lock", IR_VOID, one, args, 1);
+    lower_rt_call(l, RT_FN_OBJECT_LOCK, args);
 }
 
 void lower_object_unlock_call(struct lowerer *l, struct ir_operand at)
 {
-    static const enum ir_type one[] = {IR_PTR};
+    lower_rt_call(l, l->dev ? RT_FN_OBJECT_UNLOCK_AT : RT_FN_OBJECT_UNLOCK,
+                  &at);
+}
 
-    lower_sync_call(l, l->dev ? "anti_rt_object_unlock_at"
-                              : "anti_rt_object_unlock",
-                    IR_VOID, one, &at, 1);
+/* The runtime function that gives back the two locks of `sync a, b`. */
+static enum rt_function unlock_pair(const struct lowerer *l)
+{
+    return l->dev ? RT_FN_OBJECT_UNLOCK_PAIR_AT : RT_FN_OBJECT_UNLOCK_PAIR;
 }
 
 /* DESIGN: the runtime takes the two hidden locks of `sync a, b` in the
@@ -203,32 +185,26 @@ void lower_object_unlock_call(struct lowerer *l, struct ir_operand at)
 void lower_lock_pair_call(struct lowerer *l, struct ir_operand a,
                           struct ir_operand b, int line)
 {
-    static const enum ir_type two[] = {IR_PTR, IR_PTR};
-    static const enum ir_type three[] = {IR_PTR, IR_PTR, IR_PTR};
     struct ir_operand args[3];
 
     args[0] = a;
     args[1] = b;
     if (l->dev) {
         args[2] = lock_site(l, line);
-        lower_sync_call(l, "anti_rt_object_lock_pair_at", IR_VOID, three,
-                        args, 3);
+        lower_rt_call(l, RT_FN_OBJECT_LOCK_PAIR_AT, args);
         return;
     }
-    lower_sync_call(l, "anti_rt_object_lock_pair", IR_VOID, two, args, 2);
+    lower_rt_call(l, RT_FN_OBJECT_LOCK_PAIR, args);
 }
 
 void lower_unlock_pair_call(struct lowerer *l, struct ir_operand a,
                             struct ir_operand b)
 {
-    static const enum ir_type two[] = {IR_PTR, IR_PTR};
     struct ir_operand args[2];
 
     args[0] = a;
     args[1] = b;
-    lower_sync_call(l, l->dev ? "anti_rt_object_unlock_pair_at"
-                              : "anti_rt_object_unlock_pair",
-                    IR_VOID, two, args, 2);
+    lower_rt_call(l, unlock_pair(l), args);
 }
 
 /* The address of the hidden lock of the synchronized object that e
@@ -258,7 +234,7 @@ static void lower_sync_pair(struct lowerer *l, const struct stmt *s)
     l->defers = &scope;
     lower_lock_pair_call(l, lower_temp(l, first), lower_temp(l, second),
                          s->pos.line);
-    lower_push_unlock_action(l, first, NULL);
+    lower_push_unlock_action(l, first, unlock_pair(l));
     action = &l->defers->items[l->defers->count - 1];
     action->pair = true;
     action->second = second;
@@ -330,7 +306,6 @@ static uint32_t pointer_array(struct lowerer *l, size_t count)
    its values. */
 void lower_select(struct lowerer *l, const struct stmt *s)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_PTR, IR_I64, IR_PTR};
     size_t count = s->as.select.count;
     uint32_t agg = pointer_array(l, count);
     uint32_t chans = ir_entry_slot(l->f, ir_aggregate(agg));
@@ -361,7 +336,7 @@ void lower_select(struct lowerer *l, const struct stmt *s)
     args[1] = lower_temp(l, slots);
     args[2] = ir_int_op(IR_I64, count);
     args[3] = lower_temp(l, got);
-    index = lower_sync_call(l, "anti_rt_select", IR_I64, params, args, 4);
+    index = lower_rt_call(l, RT_FN_SELECT, args);
     for (i = 0; i < count && l->b != NULL; i++) {
         const struct switch_arm *arm = &s->as.select.arms[i];
         struct ir_block *body = lower_new_block(l);

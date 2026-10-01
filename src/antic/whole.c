@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "rt_abi.h"
 #include "target.h"
 
 /* DESIGN: a module that names a class of another module refers to its
@@ -715,22 +716,6 @@ static bool reads_registry(const struct ir_module *m, const struct reach *r)
     return false;
 }
 
-static uint32_t struct_agg(struct ir_module *m, const char *name,
-                           const char *const *names,
-                           const enum ir_type *types, size_t count)
-{
-    struct ir_field *fields = ir_alloc(count, sizeof *fields);
-    uint32_t agg;
-    size_t i;
-
-    for (i = 0; i < count; i++) {
-        fields[i].name = names[i];
-        fields[i].type = ir_scalar(types[i]);
-    }
-    agg = ir_struct_add(m, IR_AGG_STRUCT, name, fields, count, false, 0);
-    free(fields);
-    return agg;
-}
 
 static void const_int(struct ir_const *c, enum ir_type type, uint64_t value)
 {
@@ -782,14 +767,7 @@ static uint32_t module_text(struct ir_module *m, const char *module,
 static uint32_t write_class_list(struct ir_module *m, bool reflect,
                                  size_t *out_count)
 {
-    static const char *const class_names[] = {
-        "descriptor", "init", "module", "module_length", "flags"
-    };
-    static const enum ir_type class_types[] = {
-        IR_PTR, IR_PTR, IR_PTR, IR_I64, IR_I64
-    };
-    uint32_t class_agg = struct_agg(m, "anti.rt.Class", class_names,
-                                    class_types, 5);
+    uint32_t class_agg = rt_record_agg(m, RT_RECORD_CLASS);
     size_t class_count = m->class_count;
     const char **seen = ir_alloc(class_count, sizeof *seen);
     uint32_t *texts = ir_alloc(class_count, sizeof *texts);
@@ -807,15 +785,15 @@ static uint32_t write_class_list(struct ir_module *m, bool reflect,
             (c->flags & IR_CLASS_SINGLETON) != 0) {
             continue;
         }
-        item = ir_const_agg(m, ir_aggregate(class_agg), 5);
-        const_addr(&item->items[0], c->descriptor);
-        item->items[1].kind = IR_CONST_FUNC;
-        item->items[1].scalar = IR_PTR;
-        item->items[1].global = c->init;
-        const_addr(&item->items[2],
+        item = ir_const_agg(m, ir_aggregate(class_agg), RT_CLASS_ITEM_COUNT);
+        const_addr(&item->items[RT_CLASS_DESCRIPTOR], c->descriptor);
+        item->items[RT_CLASS_INIT].kind = IR_CONST_FUNC;
+        item->items[RT_CLASS_INIT].scalar = IR_PTR;
+        item->items[RT_CLASS_INIT].global = c->init;
+        const_addr(&item->items[RT_CLASS_MODULE],
                    module_text(m, c->module, seen, texts, &modules));
-        const_int(&item->items[3], IR_I64, strlen(c->module));
-        const_int(&item->items[4], IR_I64,
+        const_int(&item->items[RT_CLASS_MODULE_LENGTH], IR_I64, strlen(c->module));
+        const_int(&item->items[RT_CLASS_FLAGS], IR_I64,
                   ((c->flags & IR_CLASS_ARGS) != 0 ? 1 : 0) |
                       ((c->flags & IR_CLASS_REQUIRED) != 0 ? 2 : 0));
         items[n++] = *item;
@@ -823,7 +801,8 @@ static uint32_t write_class_list(struct ir_module *m, bool reflect,
     if (n > 0) {
         char length[32];
         struct ir_const *list;
-        snprintf(length, sizeof length, "[%zu]anti.rt.Class", n);
+        snprintf(length, sizeof length, "[%zu]%s", n,
+                 rt_record_name(RT_RECORD_CLASS));
         list = ir_const_agg(m, ir_aggregate(ir_array_add(
                                    m, length, ir_aggregate(class_agg),
                                    ir_sym_int(m, IR_I64, n), NULL)),
@@ -841,21 +820,18 @@ static uint32_t write_class_list(struct ir_module *m, bool reflect,
 
 static void write_registry(struct ir_module *m, bool reflect)
 {
-    static const char *const registry_names[] = {"count", "classes"};
-    static const enum ir_type registry_types[] = {IR_I64, IR_PTR};
-    uint32_t registry_agg = struct_agg(m, "anti.rt.Registry", registry_names,
-                                       registry_types, 2);
+    uint32_t registry_agg = rt_record_agg(m, RT_RECORD_REGISTRY);
     struct ir_const *value;
     struct ir_global *g;
     size_t n = 0;
     uint32_t list = write_class_list(m, reflect, &n);
 
-    value = ir_const_agg(m, ir_aggregate(registry_agg), 2);
-    const_int(&value->items[0], IR_I64, n);
+    value = ir_const_agg(m, ir_aggregate(registry_agg), RT_REGISTRY_ITEM_COUNT);
+    const_int(&value->items[RT_REGISTRY_COUNT], IR_I64, n);
     if (list != IR_NO_INDEX) {
-        const_addr(&value->items[1], list);
+        const_addr(&value->items[RT_REGISTRY_CLASSES], list);
     } else {
-        const_int(&value->items[1], IR_PTR, 0);
+        const_int(&value->items[RT_REGISTRY_CLASSES], IR_PTR, 0);
     }
     g = ir_global_add_value(m, NULL, "anti_rt_registry", value);
     g->exported = true;
@@ -869,7 +845,8 @@ static bool asks_backtrace(const struct ir_module *m, const struct reach *r)
 
     for (i = 0; i < m->function_count; i++) {
         if (r->functions[i] && m->functions[i]->module == NULL &&
-            strcmp(m->functions[i]->name, "anti_rt_backtrace_on") == 0) {
+            strcmp(m->functions[i]->name, rt_name(RT_FN_BACKTRACE_ON)) ==
+                0) {
             return true;
         }
     }
@@ -885,13 +862,12 @@ static bool asks_backtrace(const struct ir_module *m, const struct reach *r)
    whatever the reach says, for the reason the `dev` option gives. */
 static void write_backtrace_default(struct ir_module *m, bool release)
 {
-    static const char *const names[] = {"on"};
-    static const enum ir_type types[] = {IR_I64};
-    uint32_t agg = struct_agg(m, "anti.rt.BacktraceDefault", names, types, 1);
-    struct ir_const *value = ir_const_agg(m, ir_aggregate(agg), 1);
+    uint32_t agg = rt_record_agg(m, RT_RECORD_BACKTRACE_DEFAULT);
+    struct ir_const *value =
+        ir_const_agg(m, ir_aggregate(agg), RT_BACKTRACE_DEFAULT_ITEM_COUNT);
     struct ir_global *g;
 
-    const_int(&value->items[0], IR_I64, release ? 0 : 1);
+    const_int(&value->items[RT_BACKTRACE_DEFAULT_ON], IR_I64, release ? 0 : 1);
     g = ir_global_add_value(m, NULL, "anti_rt_backtrace_default", value);
     g->exported = true;
 }
@@ -1124,29 +1100,31 @@ static const char *signature_of(const struct ir_module *m,
 {
     const struct ir_global *g;
 
-    if (item->kind != IR_CONST_AGG || item->item_count < 5 ||
-        item->items[4].kind != IR_CONST_ADDR) {
+    if (item->kind != IR_CONST_AGG ||
+        item->item_count <= RT_FUNCTION_SIGNATURE ||
+        item->items[RT_FUNCTION_SIGNATURE].kind != IR_CONST_ADDR) {
         return NULL;
     }
-    g = m->globals[item->items[4].global];
+    g = m->globals[item->items[RT_FUNCTION_SIGNATURE].global];
     return g->bytes != NULL && g->size > 0 && g->bytes[g->size - 1] == 0
                ? (const char *)g->bytes
                : NULL;
 }
 
-/* The function list of the class record c, item 11 of its descriptor,
-   or NULL when it has none. */
+/* The function list of the descriptor of the class record c, or NULL
+   when it has none. */
 static const struct ir_const *function_list(const struct ir_module *m,
                                             const struct ir_class *c)
 {
     const struct ir_const *descriptor = m->globals[c->descriptor]->value;
 
     if (descriptor == NULL || descriptor->kind != IR_CONST_AGG ||
-        descriptor->item_count < 12 ||
-        descriptor->items[11].kind != IR_CONST_ADDR) {
+        descriptor->item_count <= RT_DESCRIPTOR_FUNCTIONS ||
+        descriptor->items[RT_DESCRIPTOR_FUNCTIONS].kind != IR_CONST_ADDR) {
         return NULL;
     }
-    return m->globals[descriptor->items[11].global]->value;
+    return m->globals[descriptor->items[RT_DESCRIPTOR_FUNCTIONS].global]
+        ->value;
 }
 
 /* Add each signature of the function list of the class record c to
@@ -1178,14 +1156,8 @@ static void add_signatures(const struct ir_module *m, const struct ir_class *c,
    `--no-reflect` empties it along with the function lists. */
 static void write_trampolines(struct ir_module *m, bool full)
 {
-    static const char *const item_names[] = {"signature", "call"};
-    static const enum ir_type item_types[] = {IR_PTR, IR_PTR};
-    static const char *const table_names[] = {"count", "items"};
-    static const enum ir_type table_types[] = {IR_I64, IR_PTR};
-    uint32_t item_agg = struct_agg(m, "anti.rt.Trampoline", item_names,
-                                   item_types, 2);
-    uint32_t table_agg = struct_agg(m, "anti.rt.Trampolines", table_names,
-                                    table_types, 2);
+    uint32_t item_agg = rt_record_agg(m, RT_RECORD_TRAMPOLINE);
+    uint32_t table_agg = rt_record_agg(m, RT_RECORD_TRAMPOLINES);
     uint32_t value_agg = ir_agg_find(m, "anti.reflect.Value");
     uint32_t str_agg = ir_agg_find(m, "str");
     size_t max = 0;
@@ -1225,29 +1197,32 @@ static void write_trampolines(struct ir_module *m, bool full)
         snprintf(name, sizeof name, "trampolines.%zu", n);
         text = ir_global_add(m, "anti.rt", name, (const uint8_t *)seen[i],
                              strlen(seen[i]) + 1, 1)->index;
-        item = ir_const_agg(m, ir_aggregate(item_agg), 2);
-        const_addr(&item->items[0], text);
-        item->items[1].kind = IR_CONST_FUNC;
-        item->items[1].scalar = IR_PTR;
-        item->items[1].global = function;
+        item = ir_const_agg(m, ir_aggregate(item_agg),
+                            RT_TRAMPOLINE_ITEM_COUNT);
+        const_addr(&item->items[RT_TRAMPOLINE_SIGNATURE], text);
+        item->items[RT_TRAMPOLINE_CALL].kind = IR_CONST_FUNC;
+        item->items[RT_TRAMPOLINE_CALL].scalar = IR_PTR;
+        item->items[RT_TRAMPOLINE_CALL].global = function;
         items[n++] = *item;
     }
-    value = ir_const_agg(m, ir_aggregate(table_agg), 2);
-    const_int(&value->items[0], IR_I64, n);
+    value = ir_const_agg(m, ir_aggregate(table_agg),
+                         RT_TRAMPOLINES_ITEM_COUNT);
+    const_int(&value->items[RT_TRAMPOLINES_COUNT], IR_I64, n);
     if (n > 0) {
         char length[48];
         struct ir_const *list;
         uint32_t array;
-        snprintf(length, sizeof length, "[%zu]anti.rt.Trampoline", n);
+        snprintf(length, sizeof length, "[%zu]%s", n,
+                 rt_record_name(RT_RECORD_TRAMPOLINE));
         array = ir_array_add(m, length, ir_aggregate(item_agg),
                              ir_sym_int(m, IR_I64, n), NULL);
         list = ir_const_agg(m, ir_aggregate(array), n);
         memcpy(list->items, items, n * sizeof *items);
-        const_addr(&value->items[1],
+        const_addr(&value->items[RT_TRAMPOLINES_ITEMS],
                    ir_global_add_value(m, "anti.rt", "trampolines.list",
                                        list)->index);
     } else {
-        const_int(&value->items[1], IR_PTR, 0);
+        const_int(&value->items[RT_TRAMPOLINES_ITEMS], IR_PTR, 0);
     }
     g = ir_global_add_value(m, NULL, "anti_rt_trampolines", value);
     g->exported = true;
@@ -1468,12 +1443,6 @@ static bool at_or_below(const struct whole *w, uint32_t record, uint32_t above)
 static void write_slots(struct whole *w, struct ir_module *m,
                         const struct reach *r, bool every, bool force)
 {
-    static const char *const slot_names[] = {"descriptor", "slot_count",
-                                             "bits"};
-    static const enum ir_type slot_types[] = {IR_PTR, IR_I64, IR_PTR};
-    static const char *const table_names[] = {"count", "interfaces",
-                                              "reflect"};
-    static const enum ir_type table_types[] = {IR_I64, IR_PTR, IR_I64};
     size_t classes = m->class_count;
     struct slots *slots = ir_alloc(classes, sizeof *slots);
     size_t emitted = 0;
@@ -1508,16 +1477,15 @@ static void write_slots(struct whole *w, struct ir_module *m,
         emitted += slots[i].count > 0 ? 1 : 0;
     }
     if (emitted > 0 || force) {
-        uint32_t slot_agg = struct_agg(m, "anti.rt.Slots", slot_names,
-                                       slot_types, 3);
-        uint32_t table_agg = struct_agg(m, "anti.rt.SlotTable", table_names,
-                                        table_types, 3);
+        uint32_t slot_agg = rt_record_agg(m, RT_RECORD_SLOTS);
+        uint32_t table_agg = rt_record_agg(m, RT_RECORD_SLOT_TABLE);
         char name[48];
         struct ir_const *list;
         struct ir_const *value;
         struct ir_global *g;
         size_t n = 0;
-        snprintf(name, sizeof name, "[%zu]anti.rt.Slots", emitted);
+        snprintf(name, sizeof name, "[%zu]%s", emitted,
+                 rt_record_name(RT_RECORD_SLOTS));
         list = emitted > 0
                    ? ir_const_agg(m, ir_aggregate(ir_array_add(
                                          m, name, ir_aggregate(slot_agg),
@@ -1534,22 +1502,24 @@ static void write_slots(struct whole *w, struct ir_module *m,
             snprintf(name, sizeof name, "slots.%zu", n);
             bits = ir_global_add(m, "anti.rt", name, slots[i].bits,
                                  (slots[i].count + 7) / 8, 1)->index;
-            item = ir_const_agg(m, ir_aggregate(slot_agg), 3);
-            const_addr(&item->items[0], m->classes[i]->descriptor);
-            const_int(&item->items[1], IR_I64, slots[i].count);
-            const_addr(&item->items[2], bits);
+            item = ir_const_agg(m, ir_aggregate(slot_agg),
+                                RT_SLOTS_ITEM_COUNT);
+            const_addr(&item->items[RT_SLOTS_DESCRIPTOR], m->classes[i]->descriptor);
+            const_int(&item->items[RT_SLOTS_SLOT_COUNT], IR_I64, slots[i].count);
+            const_addr(&item->items[RT_SLOTS_BITS], bits);
             list->items[n++] = *item;
         }
-        value = ir_const_agg(m, ir_aggregate(table_agg), 3);
-        const_int(&value->items[0], IR_I64, emitted);
+        value = ir_const_agg(m, ir_aggregate(table_agg),
+                             RT_SLOT_TABLE_ITEM_COUNT);
+        const_int(&value->items[RT_SLOT_TABLE_COUNT], IR_I64, emitted);
         if (list != NULL) {
-            const_addr(&value->items[1],
+            const_addr(&value->items[RT_SLOT_TABLE_INTERFACES],
                        ir_global_add_value(m, "anti.rt", "slots.list",
                                            list)->index);
         } else {
-            const_int(&value->items[1], IR_PTR, 0);
+            const_int(&value->items[RT_SLOT_TABLE_INTERFACES], IR_PTR, 0);
         }
-        const_int(&value->items[2], IR_I64, every ? 1 : 0);
+        const_int(&value->items[RT_SLOT_TABLE_REFLECT], IR_I64, every ? 1 : 0);
         g = ir_global_add_value(m, NULL, "anti_rt_slots", value);
         g->exported = true;
     }
@@ -1788,19 +1758,17 @@ static uint32_t write_provider_thunk(struct ir_module *m, uint32_t provider,
 static void write_slot(struct ir_module *m, struct injectable *in,
                        uint32_t provider)
 {
-    static const char *const slot_names[] = {"provider"};
-    static const enum ir_type slot_types[] = {IR_PTR};
-    uint32_t agg = struct_agg(m, "anti.rt.InjectSlot", slot_names, slot_types,
-                              1);
-    struct ir_const *value = ir_const_agg(m, ir_aggregate(agg), 1);
+    uint32_t agg = rt_record_agg(m, RT_RECORD_INJECT_SLOT);
+    struct ir_const *value =
+        ir_const_agg(m, ir_aggregate(agg), RT_INJECT_SLOT_ITEM_COUNT);
     struct ir_global *g = m->globals[in->slot];
 
     if (provider == IR_NO_INDEX) {
-        const_int(&value->items[0], IR_PTR, 0);
+        const_int(&value->items[RT_INJECT_SLOT_PROVIDER], IR_PTR, 0);
     } else {
-        value->items[0].kind = IR_CONST_FUNC;
-        value->items[0].scalar = IR_PTR;
-        value->items[0].global = provider;
+        value->items[RT_INJECT_SLOT_PROVIDER].kind = IR_CONST_FUNC;
+        value->items[RT_INJECT_SLOT_PROVIDER].scalar = IR_PTR;
+        value->items[RT_INJECT_SLOT_PROVIDER].global = provider;
     }
     g->bytes = NULL;
     g->size = 0;
@@ -2096,35 +2064,26 @@ static void check_cycles(const struct ir_module *m, struct injectable *list,
 static void write_injectable(struct ir_module *m,
                              const struct injectable *list, size_t count)
 {
-    static const char *const item_names[] = {
-        "name", "class", "field", "final", "slot", "library",
-        "library_length", "discover", "holder", "thunk", "descriptor"
-    };
-    static const enum ir_type item_types[] = {
-        IR_PTR, IR_PTR, IR_PTR, IR_I64, IR_PTR, IR_PTR, IR_I64, IR_I64,
-        IR_PTR, IR_PTR, IR_PTR
-    };
-    static const char *const table_names[] = {"count", "interfaces"};
-    static const enum ir_type table_types[] = {IR_I64, IR_PTR};
-    uint32_t item_agg = struct_agg(m, "anti.rt.Injectable", item_names,
-                                   item_types, 11);
-    uint32_t table_agg = struct_agg(m, "anti.rt.Injectables", table_names,
-                                    table_types, 2);
-    struct ir_const *value = ir_const_agg(m, ir_aggregate(table_agg), 2);
+    uint32_t item_agg = rt_record_agg(m, RT_RECORD_INJECTABLE);
+    uint32_t table_agg = rt_record_agg(m, RT_RECORD_INJECTABLES);
+    struct ir_const *value =
+        ir_const_agg(m, ir_aggregate(table_agg), RT_INJECTABLES_ITEM_COUNT);
     struct ir_global *g;
     size_t i;
 
-    const_int(&value->items[0], IR_I64, count);
+    const_int(&value->items[RT_INJECTABLES_COUNT], IR_I64, count);
     if (count > 0) {
         char length[48];
         struct ir_const *list_value;
         uint32_t array;
-        snprintf(length, sizeof length, "[%zu]anti.rt.Injectable", count);
+        snprintf(length, sizeof length, "[%zu]%s", count,
+                 rt_record_name(RT_RECORD_INJECTABLE));
         array = ir_array_add(m, length, ir_aggregate(item_agg),
                              ir_sym_int(m, IR_I64, count), NULL);
         list_value = ir_const_agg(m, ir_aggregate(array), count);
         for (i = 0; i < count; i++) {
-            struct ir_const *item = ir_const_agg(m, ir_aggregate(item_agg), 11);
+            struct ir_const *item = ir_const_agg(m, ir_aggregate(item_agg),
+                                                 RT_INJECTABLE_ITEM_COUNT);
             struct text name = {0};
             char global[48];
             uint32_t text;
@@ -2132,53 +2091,53 @@ static void write_injectable(struct ir_module *m,
             text = ir_global_add(m, "anti.rt", global,
                                  (const uint8_t *)list[i].interface,
                                  strlen(list[i].interface) + 1, 1)->index;
-            const_addr(&item->items[0], text);
+            const_addr(&item->items[RT_INJECTABLE_NAME], text);
             text_appendf(&name, "%s.%s", list[i].module, list[i].name);
             snprintf(global, sizeof global, "injectable.%zu.class", i);
             text = ir_global_add(m, "anti.rt", global,
                                  (const uint8_t *)text_cstr(&name),
                                  name.length + 1, 1)->index;
             text_free(&name);
-            const_addr(&item->items[1], text);
+            const_addr(&item->items[RT_INJECTABLE_OWNER], text);
             snprintf(global, sizeof global, "injectable.%zu.field", i);
             text = ir_global_add(m, "anti.rt", global,
                                  (const uint8_t *)list[i].field,
                                  strlen(list[i].field) + 1, 1)->index;
-            const_addr(&item->items[2], text);
-            const_int(&item->items[3], IR_I64, list[i].final ? 1 : 0);
-            const_addr(&item->items[4], list[i].slot);
+            const_addr(&item->items[RT_INJECTABLE_FIELD], text);
+            const_int(&item->items[RT_INJECTABLE_FINAL], IR_I64, list[i].final ? 1 : 0);
+            const_addr(&item->items[RT_INJECTABLE_SLOT], list[i].slot);
             if (list[i].library != NULL && list[i].library[0] != '\0') {
                 snprintf(global, sizeof global, "injectable.%zu.library", i);
                 text = ir_global_add(m, "anti.rt", global,
                                      (const uint8_t *)list[i].library,
                                      strlen(list[i].library) + 1, 1)->index;
-                const_addr(&item->items[5], text);
-                const_int(&item->items[6], IR_I64, strlen(list[i].library));
+                const_addr(&item->items[RT_INJECTABLE_LIBRARY], text);
+                const_int(&item->items[RT_INJECTABLE_LIBRARY_LENGTH], IR_I64, strlen(list[i].library));
             } else {
-                const_int(&item->items[5], IR_PTR, 0);
-                const_int(&item->items[6], IR_I64, 0);
+                const_int(&item->items[RT_INJECTABLE_LIBRARY], IR_PTR, 0);
+                const_int(&item->items[RT_INJECTABLE_LIBRARY_LENGTH], IR_I64, 0);
             }
-            const_int(&item->items[7], IR_I64,
+            const_int(&item->items[RT_INJECTABLE_DISCOVER], IR_I64,
                       list[i].discover || list[i].library != NULL ? 1 : 0);
             if (list[i].holder != IR_NO_INDEX) {
-                const_addr(&item->items[8], list[i].holder);
-                item->items[9].kind = IR_CONST_FUNC;
-                item->items[9].scalar = IR_PTR;
-                item->items[9].global = list[i].thunk;
+                const_addr(&item->items[RT_INJECTABLE_HOLDER], list[i].holder);
+                item->items[RT_INJECTABLE_THUNK].kind = IR_CONST_FUNC;
+                item->items[RT_INJECTABLE_THUNK].scalar = IR_PTR;
+                item->items[RT_INJECTABLE_THUNK].global = list[i].thunk;
             } else {
-                const_int(&item->items[8], IR_PTR, 0);
-                const_int(&item->items[9], IR_PTR, 0);
+                const_int(&item->items[RT_INJECTABLE_HOLDER], IR_PTR, 0);
+                const_int(&item->items[RT_INJECTABLE_THUNK], IR_PTR, 0);
             }
             /* `--anti.inspect` reads the version and the used slots of
                the interface through its descriptor. */
-            const_addr(&item->items[10], list[i].descriptor);
+            const_addr(&item->items[RT_INJECTABLE_DESCRIPTOR], list[i].descriptor);
             list_value->items[i] = *item;
         }
-        const_addr(&value->items[1],
+        const_addr(&value->items[RT_INJECTABLES_INTERFACES],
                    ir_global_add_value(m, "anti.rt", "injectable.list",
                                        list_value)->index);
     } else {
-        const_int(&value->items[1], IR_PTR, 0);
+        const_int(&value->items[RT_INJECTABLES_INTERFACES], IR_PTR, 0);
     }
     g = ir_global_add_value(m, NULL, "anti_rt_injectable", value);
     g->exported = true;
@@ -2272,13 +2231,13 @@ static const struct ir_const *chain_of(const struct ir_module *m,
     uint64_t n;
     size_t i;
 
-    if (record->kind != IR_CONST_AGG || record->item_count < 2 ||
-        record->items[0].kind != IR_CONST_ADDR ||
-        record->items[1].kind != IR_CONST_INT) {
+    if (record->kind != IR_CONST_AGG || record->item_count <= RT_VERSIONS_CHAIN_LENGTH ||
+        record->items[RT_VERSIONS_CHAIN].kind != IR_CONST_ADDR ||
+        record->items[RT_VERSIONS_CHAIN_LENGTH].kind != IR_CONST_INT) {
         return NULL;
     }
-    from = global_value(m, record->items[0].global);
-    n = record->items[1].integer;
+    from = global_value(m, record->items[RT_VERSIONS_CHAIN].global);
+    n = record->items[RT_VERSIONS_CHAIN_LENGTH].integer;
     if (from == NULL || from->kind != IR_CONST_AGG || n == 0 ||
         n > from->item_count) {
         return NULL;
@@ -2317,26 +2276,8 @@ static uint32_t copy_chain(struct ir_module *m, const struct ir_const *from,
 static void write_provides(struct whole *w, struct ir_module *m,
                            struct text *errors)
 {
-    static const char *const entry_names[] = {
-        "path", "path_length", "descriptor", "class", "init", "offset",
-        "flags", "chain", "chain_length", "fields", "size", "built",
-        "built_length"
-    };
-    static const enum ir_type entry_types[] = {
-        IR_PTR, IR_I64, IR_PTR, IR_PTR, IR_PTR, IR_I64, IR_I64, IR_PTR,
-        IR_I64, IR_I64, IR_I64, IR_PTR, IR_I64
-    };
-    static const char *const table_names[] = {
-        "count", "entries", "version", "version_length", "class_count",
-        "classes"
-    };
-    static const enum ir_type table_types[] = {
-        IR_I64, IR_PTR, IR_PTR, IR_I64, IR_I64, IR_PTR
-    };
-    uint32_t entry_agg = struct_agg(m, "anti.rt.Provides", entry_names,
-                                    entry_types, 13);
-    uint32_t table_agg = struct_agg(m, "anti.rt.Provided", table_names,
-                                    table_types, 6);
+    uint32_t entry_agg = rt_record_agg(m, RT_RECORD_PROVIDES);
+    uint32_t table_agg = rt_record_agg(m, RT_RECORD_PROVIDED);
     size_t total = 0;
     struct ir_const *items;
     struct ir_const *value;
@@ -2370,23 +2311,24 @@ static void write_provides(struct whole *w, struct ir_module *m,
                                  (const uint8_t *)c->provides[j].interface,
                                  strlen(c->provides[j].interface) + 1,
                                  1)->index;
-            item = ir_const_agg(m, ir_aggregate(entry_agg), 13);
-            const_addr(&item->items[0], text);
-            const_int(&item->items[1], IR_I64,
+            item = ir_const_agg(m, ir_aggregate(entry_agg),
+                                RT_PROVIDES_ITEM_COUNT);
+            const_addr(&item->items[RT_PROVIDES_PATH], text);
+            const_int(&item->items[RT_PROVIDES_PATH_LENGTH], IR_I64,
                       strlen(c->provides[j].interface));
-            const_addr(&item->items[2], c->provides[j].descriptor);
-            const_addr(&item->items[3], c->descriptor);
-            item->items[4].kind = IR_CONST_FUNC;
-            item->items[4].scalar = IR_PTR;
-            item->items[4].global = c->init;
+            const_addr(&item->items[RT_PROVIDES_DESCRIPTOR], c->provides[j].descriptor);
+            const_addr(&item->items[RT_PROVIDES_CLASS_OF], c->descriptor);
+            item->items[RT_PROVIDES_INIT].kind = IR_CONST_FUNC;
+            item->items[RT_PROVIDES_INIT].scalar = IR_PTR;
+            item->items[RT_PROVIDES_INIT].global = c->init;
             if (offset == INJECT_AT_ZERO) {
-                const_int(&item->items[5], IR_I64, 0);
+                const_int(&item->items[RT_PROVIDES_OFFSET], IR_I64, 0);
             } else {
-                item->items[5].kind = IR_CONST_SYM;
-                item->items[5].scalar = IR_I64;
-                item->items[5].sym = offset;
+                item->items[RT_PROVIDES_OFFSET].kind = IR_CONST_SYM;
+                item->items[RT_PROVIDES_OFFSET].scalar = IR_I64;
+                item->items[RT_PROVIDES_OFFSET].sym = offset;
             }
-            const_int(&item->items[6], IR_I64,
+            const_int(&item->items[RT_PROVIDES_FLAGS], IR_I64,
                       ((c->flags & IR_CLASS_ARGS) != 0 ? 1 : 0) |
                           ((c->flags & IR_CLASS_REQUIRED) != 0 ? 2 : 0));
             /* What the interface looked like where the library was
@@ -2394,15 +2336,15 @@ static void write_provides(struct whole *w, struct ir_module *m,
                its package. The loader compares each with the host's. */
             {
                 const struct ir_const *record =
-                    descriptor_item(m, c->provides[j].descriptor, 14);
+                    descriptor_item(m, c->provides[j].descriptor, RT_DESCRIPTOR_VERSIONS);
                 const struct ir_const *fields =
-                    descriptor_item(m, c->provides[j].descriptor, 6);
+                    descriptor_item(m, c->provides[j].descriptor, RT_DESCRIPTOR_FIELD_COUNT);
                 const struct ir_const *size =
-                    descriptor_item(m, c->provides[j].descriptor, 3);
+                    descriptor_item(m, c->provides[j].descriptor, RT_DESCRIPTOR_SIZE);
                 const struct ir_const *version =
-                    descriptor_item(m, c->provides[j].descriptor, 12);
+                    descriptor_item(m, c->provides[j].descriptor, RT_DESCRIPTOR_VERSION);
                 const struct ir_const *length =
-                    descriptor_item(m, c->provides[j].descriptor, 13);
+                    descriptor_item(m, c->provides[j].descriptor, RT_DESCRIPTOR_VERSION_LENGTH);
                 const struct ir_const *chain =
                     record != NULL && record->kind == IR_CONST_ADDR
                         ? global_value(m, record->global)
@@ -2413,7 +2355,7 @@ static void write_provides(struct whole *w, struct ir_module *m,
                         ? m->globals[version->global]
                         : NULL;
                 const struct ir_const *hashes;
-                if (chain == NULL || chain->item_count < 2 ||
+                if (chain == NULL || chain->item_count <= RT_VERSIONS_CHAIN_LENGTH ||
                     fields == NULL || size == NULL || length == NULL ||
                     built == NULL || built->bytes == NULL) {
                     text_appendf(errors, "`%s.%s` provides `%s`, and this "
@@ -2433,22 +2375,22 @@ static void write_provides(struct whole *w, struct ir_module *m,
                                  c->provides[j].interface);
                     continue;
                 }
-                const_addr(&item->items[7],
+                const_addr(&item->items[RT_PROVIDES_CHAIN],
                            copy_chain(m, hashes,
-                                      (size_t)chain->items[1].integer, n));
-                const_int(&item->items[8], IR_I64,
-                          (uint64_t)chain->items[1].integer);
-                item->items[9] = *fields;
-                item->items[9].scalar = IR_I64;
-                item->items[10] = *size;
-                item->items[10].scalar = IR_I64;
+                                      (size_t)chain->items[RT_VERSIONS_CHAIN_LENGTH].integer, n));
+                const_int(&item->items[RT_PROVIDES_CHAIN_LENGTH], IR_I64,
+                          (uint64_t)chain->items[RT_VERSIONS_CHAIN_LENGTH].integer);
+                item->items[RT_PROVIDES_FIELDS] = *fields;
+                item->items[RT_PROVIDES_FIELDS].scalar = IR_I64;
+                item->items[RT_PROVIDES_SIZE] = *size;
+                item->items[RT_PROVIDES_SIZE].scalar = IR_I64;
                 snprintf(name, sizeof name, "provides.built.%zu", n);
-                const_addr(&item->items[11],
+                const_addr(&item->items[RT_PROVIDES_BUILT],
                            ir_global_add(m, RUNTIME_MODULE, name,
                                          built->bytes, built->size,
                                          1)->index);
-                item->items[12] = *length;
-                item->items[12].scalar = IR_I64;
+                item->items[RT_PROVIDES_BUILT_LENGTH] = *length;
+                item->items[RT_PROVIDES_BUILT_LENGTH].scalar = IR_I64;
             }
             items[n++] = *item;
         }
@@ -2457,33 +2399,34 @@ static void write_provides(struct whole *w, struct ir_module *m,
         text_append(errors, "a plugin has at least one `provides` line\n");
     }
     list_global = write_class_list(m, true, &classes);
-    value = ir_const_agg(m, ir_aggregate(table_agg), 6);
-    const_int(&value->items[0], IR_I64, n);
+    value = ir_const_agg(m, ir_aggregate(table_agg), RT_PROVIDED_ITEM_COUNT);
+    const_int(&value->items[RT_PROVIDED_COUNT], IR_I64, n);
     if (n > 0) {
         char length[32];
         struct ir_const *list;
-        snprintf(length, sizeof length, "[%zu]anti.rt.Provides", n);
+        snprintf(length, sizeof length, "[%zu]%s", n,
+                 rt_record_name(RT_RECORD_PROVIDES));
         list = ir_const_agg(m, ir_aggregate(ir_array_add(
                                    m, length, ir_aggregate(entry_agg),
                                    ir_sym_int(m, IR_I64, n), NULL)),
                             n);
         memcpy(list->items, items, n * sizeof *items);
-        const_addr(&value->items[1],
+        const_addr(&value->items[RT_PROVIDED_ENTRIES],
                    ir_global_add_value(m, RUNTIME_MODULE, "provides.entries",
                                        list)->index);
     } else {
-        const_int(&value->items[1], IR_PTR, 0);
+        const_int(&value->items[RT_PROVIDED_ENTRIES], IR_PTR, 0);
     }
-    const_addr(&value->items[2],
+    const_addr(&value->items[RT_PROVIDED_VERSION],
                ir_global_add(m, RUNTIME_MODULE, "provides.version",
                              (const uint8_t *)ANTIC_VERSION,
                              strlen(ANTIC_VERSION) + 1, 1)->index);
-    const_int(&value->items[3], IR_I64, strlen(ANTIC_VERSION));
-    const_int(&value->items[4], IR_I64, classes);
+    const_int(&value->items[RT_PROVIDED_VERSION_LENGTH], IR_I64, strlen(ANTIC_VERSION));
+    const_int(&value->items[RT_PROVIDED_CLASS_COUNT], IR_I64, classes);
     if (list_global != IR_NO_INDEX) {
-        const_addr(&value->items[5], list_global);
+        const_addr(&value->items[RT_PROVIDED_CLASSES], list_global);
     } else {
-        const_int(&value->items[5], IR_PTR, 0);
+        const_int(&value->items[RT_PROVIDED_CLASSES], IR_PTR, 0);
     }
     g = ir_global_add_value(m, NULL, "anti_rt_provides", value);
     g->exported = true;

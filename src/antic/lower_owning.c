@@ -407,12 +407,11 @@ static bool lower_copies_parts(const struct type *t)
 static void lower_free_snapshot(struct lowerer *l, const struct type *t,
                                 struct ir_operand pair)
 {
-    static const enum ir_type one[] = {IR_PTR};
     struct ir_operand word = lower_context_word(l, t, pair);
     struct ir_operand snapshot =
         lower_temp(l, ir_load(l->f, l->b, IR_PTR, word));
 
-    lower_rt_call(l, "anti_rt_snapshot_free", IR_VOID, one, &snapshot, 1);
+    lower_rt_call(l, RT_FN_SNAPSHOT_FREE, &snapshot);
     ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), word);
 }
 
@@ -421,15 +420,13 @@ static void lower_free_snapshot(struct lowerer *l, const struct type *t,
 void lower_dup_snapshot(struct lowerer *l, const struct type *t,
                         struct ir_operand from, struct ir_operand into)
 {
-    static const enum ir_type one[] = {IR_PTR};
     struct ir_operand snapshot = lower_temp(
         l, ir_load(l->f, l->b, IR_PTR, lower_context_word(l, t, from)));
     struct ir_operand made;
 
     ir_store(l->f, l->b, IR_PTR,
              lower_temp(l, ir_load(l->f, l->b, IR_PTR, from)), into);
-    made = lower_rt_call(l, "anti_rt_snapshot_dup", IR_PTR, one, &snapshot,
-                         1);
+    made = lower_rt_call(l, RT_FN_SNAPSHOT_DUP, &snapshot);
     ir_store(l->f, l->b, IR_PTR, made, lower_context_word(l, t, into));
 }
 
@@ -451,8 +448,6 @@ static bool owns_buffer(const struct struct_field *f)
 static void destroy_buffer(struct lowerer *l, const struct type *t,
                            struct ir_operand at, struct ir_operand from)
 {
-    static const enum ir_type two[] = {IR_PTR, IR_PTR};
-    static const enum ir_type three[] = {IR_PTR, IR_PTR, IR_PTR};
     const struct type *element = t->element;
     struct ir_operand v = lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
     struct ir_operand args[3];
@@ -461,7 +456,7 @@ static void destroy_buffer(struct lowerer *l, const struct type *t,
         args[0] = v;
         args[1] = lower_static_descriptor(l, element);
         args[2] = from;
-        lower_rt_call(l, "anti_rt_delete_from", IR_VOID, three, args, 3);
+        lower_rt_call(l, RT_FN_DELETE_FROM, args);
     } else {
         if (sema_needs_teardown(element)) {
             struct ir_block *after = when_set(l, v);
@@ -474,7 +469,7 @@ static void destroy_buffer(struct lowerer *l, const struct type *t,
         }
         args[0] = from;
         args[1] = v;
-        lower_rt_call(l, "anti_rt_give", IR_VOID, two, args, 2);
+        lower_rt_call(l, RT_FN_GIVE, args);
     }
     ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
 }
@@ -487,13 +482,12 @@ static void destroy_buffer(struct lowerer *l, const struct type *t,
 static void copy_buffer(struct lowerer *l, const struct type *t,
                         struct ir_operand from, struct ir_operand into)
 {
-    static const enum ir_type two[] = {IR_PTR, IR_I64};
     const struct type *element = t->element;
     struct ir_operand v = lower_temp(l, ir_load(l->f, l->b, IR_PTR, from));
     struct ir_operand made;
 
     if (t->kind == TYPE_POINTER && element->kind == TYPE_CLASS) {
-        made = lower_object_call(l, "anti_rt_dup", v, element);
+        made = lower_object_call(l, RT_FN_DUP, v, element);
     } else {
         struct ir_operand count = t->kind == TYPE_SLICE
                                       ? lower_slice_length(l, from, t)
@@ -502,7 +496,7 @@ static void copy_buffer(struct lowerer *l, const struct type *t,
         args[0] = v;
         args[1] = lower_temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64, count,
                                           lower_size_operand(l, element)));
-        made = lower_rt_call(l, "anti_rt_copy_buffer", IR_PTR, two, args, 2);
+        made = lower_rt_call(l, RT_FN_COPY_BUFFER, args);
         if (lower_copies_parts(element)) {
             struct ir_block *after = when_set(l, made);
             each_element(l, element, count, v, made, lower_none(), false,

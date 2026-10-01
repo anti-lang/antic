@@ -59,7 +59,6 @@ struct ir_operand lower_pattern(struct lowerer *l, const struct expr *e)
    object, so it runs before main in a program and when a library loads. */
 void lower_patterns_start(struct lowerer *l)
 {
-    static const enum ir_type params[] = {IR_PTR, IR_I64};
     struct ir_operand args[2];
     struct ir_operand made;
     size_t i;
@@ -75,8 +74,10 @@ void lower_patterns_start(struct lowerer *l)
         args[0] = lower_temp(l, ir_addr(l->f, l->b,
                                         ir_global_op(l->m->globals[p->text])));
         args[1] = ir_int_op(IR_I64, (uint64_t)p->length);
-        made = lower_rt_call(l, p->bytes ? REGEX_LITERAL_BYTES : REGEX_LITERAL,
-                             IR_PTR, params, args, 2);
+        made = lower_rt_call(l,
+                             p->bytes ? RT_FN_REGEX_LITERAL_BYTES
+                                      : RT_FN_REGEX_LITERAL,
+                             args);
         ir_store(l->f, l->b, IR_PTR, made,
                  lower_temp(l, ir_addr(l->f, l->b,
                                        ir_global_op(l->m->globals[p->slot]))));

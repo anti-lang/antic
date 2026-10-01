@@ -8,18 +8,25 @@
 #include "object.h"
 #include "std.h"
 
+/* The slot of one injectable interface, which every site calls through.
+   It holds the function that gives the provider, or NULL until the
+   runtime fills it. */
+struct anti_inject_slot {
+    void *provider;
+};
+
 /* DESIGN: the link step writes the injectable interfaces of the
    program, one entry per interface. Each names the class and the field
    that need it, and says whether `inject final` keeps the run-time
    configuration from replacing the provider. The table stands in every
    program, empty where nothing injects, because the runtime reads it
-   before `main`. `slot` is the pointer that holds the provider. */
+   before `main`. `slot` is the slot that holds the provider. */
 struct anti_injectable {
     const unsigned char *name;
     const unsigned char *owner;     /* `module.Class` of the field */
     const unsigned char *field;
     int64_t final;
-    void **slot;
+    struct anti_inject_slot *slot;
     /* DESIGN: `plugin:<path>` and `discover` of the manifest name a
        library rather than a function of the program. The slot is then
        empty at the link, and the runtime fills it before `main`. */
