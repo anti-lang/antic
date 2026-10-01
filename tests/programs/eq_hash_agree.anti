@@ -1,0 +1,97 @@
+//! The default `==` and the default hash take every part by one rule, so two
+//! values that `==` finds equal hash alike. A union with `operator fn eq`
+//! inside a struct compares through it. An `f16` compares as its `f32`, so zero
+//! of either sign is one value in a class as in a struct of `f32`. A function
+//! with its context compares and hashes by its code. A Mutex in an array is no
+//! data, whether or not it is held.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+union Word
+{
+	whole: u32,
+	half: u16,
+}
+
+operator fn eq(a: Word, b: Word) -> bool
+{
+	return a.whole == b.whole;
+}
+
+struct Boxed
+{
+	w: Word,
+	n: int,
+}
+
+class Halves
+{
+	pub small: f16 = 0.0 as f16,
+	pub wide: f32 = 0.0,
+}
+
+class Locks
+{
+	pub locks: [2]Mutex,
+	pub n: int = 0,
+}
+
+fn b(v: bool) -> c_int
+{
+	return v as c_int;
+}
+
+fn same(a: u64, b: u64) -> c_int
+{
+	return (a == b) as c_int;
+}
+
+fn compare(f: fn(int) -> int, g: fn(int) -> int)
+{
+	printf("closures %d %d %d\n".ptr, b(f == g), same(f.hash(), g.hash()),
+		b((f, 1) == (g, 1)));
+	printf("tuple hash %d\n".ptr, same((f, 1).hash(), (g, 1).hash()));
+}
+
+fn step(k: int, first: ?fn(int) -> int, f: fn(int) -> int)
+{
+	let seen = first else {
+		visit(k + 1, f);
+		return;
+	};
+	compare(seen, f);
+}
+
+fn visit(k: int, first: ?fn(int) -> int)
+{
+	step(k, first, fn(n) {
+		return n + k;
+	});
+}
+
+fn main() -> int
+{
+	let x = Boxed { w: Word { whole: 1 }, n: 1 };
+	let y = Boxed { w: Word { whole: 2 }, n: 1 };
+	let z = Boxed { w: Word { whole: 1 }, n: 1 };
+	printf("union %d %d\n".ptr, b(x == y), b(x == z));
+
+	let p = alloc Halves { small: -0.0 as f16, wide: -0.0 };
+	let q = alloc Halves { small: 0.0 as f16, wide: 0.0 };
+	printf("f16 %d %d\n".ptr, b(*p == *q), same(p.hash(), q.hash()));
+	delete(p);
+	delete(q);
+
+	visit(0, none);
+
+	let g = alloc Locks { locks: [Mutex.new(), Mutex.new()], n: 1 };
+	let h = alloc Locks { locks: [Mutex.new(), Mutex.new()], n: 1 };
+	sync g.locks[0] {
+		printf("locks %d %d\n".ptr, b(*g == *h), same(g.hash(), h.hash()));
+	}
+	delete(g);
+	delete(h);
+	return 0;
+}

@@ -494,6 +494,51 @@ void lower_drop_arguments(struct lowerer *l, const struct symbol *sym,
 
 /* lower_eq.c */
 
+/* How the default `==` and the default hash take a part of a value of
+   type t. Both switch over every kind without a default case, so a kind
+   one of them leaves out is a warning. */
+enum lower_part {
+    LOWER_PART_NONE,     /* a lock, an array of locks: no data */
+    LOWER_PART_VALUE,    /* a scalar, read as lower_part_scalar gives it */
+    LOWER_PART_TEXT,     /* a `str`: its bytes */
+    LOWER_PART_VIEW,     /* a slice: its address and its length */
+    LOWER_PART_CODE,     /* a function with its context: its code */
+    LOWER_PART_OWN,      /* a type with an operator the checker listed */
+    LOWER_PART_CLASS,    /* a class value: the function of its chain */
+    LOWER_PART_PATTERN,  /* a Regex: its text and its mode */
+    LOWER_PART_UNION,    /* a union without an operator: its bytes */
+    LOWER_PART_FIELDS,   /* a struct or a tuple: its fields in order */
+    LOWER_PART_ARRAY,    /* an array: its elements through every level */
+    LOWER_PART_CASES,    /* a variant: its tag, then the fields of its case */
+    LOWER_PART_OPTIONAL  /* a `?T`: its flag, then the value it holds */
+};
+
+/* The kind of a part of type t. calls holds the count operator calls the
+   checker gave the default, and *own receives the one of t for
+   LOWER_PART_OWN. */
+enum lower_part lower_part_of(const struct type *t, struct expr *const *calls,
+                              size_t count, const struct expr **own);
+
+/* The scalar v of type t as the default `==` and hash read it, with its
+   IR type in *type. An `f16` reads as its `f32`. */
+struct ir_operand lower_part_scalar(struct lowerer *l, const struct type *t,
+                                    struct ir_operand v, enum ir_type *type);
+
+/* Whether the field f of a struct, a tuple or a case holds no part of the
+   value: a unit break or a lock. */
+bool lower_field_skipped(const struct struct_field *f);
+
+/* How the default `equals` and `hash` of a class take the field f. */
+enum lower_member {
+    LOWER_MEMBER_NONE,     /* no part of the value, a lock or a union */
+    LOWER_MEMBER_BITS,     /* a bitfield: its value */
+    LOWER_MEMBER_ELEMENTS, /* an `own` slice: its elements */
+    LOWER_MEMBER_SNAPSHOT, /* an `own fn`: its code and its snapshot */
+    LOWER_MEMBER_PART      /* every other field: as a part of a struct */
+};
+
+enum lower_member lower_member_of(const struct struct_field *f);
+
 /* The default `==` or `!=` e, which the checker marked `equals`. */
 struct ir_operand lower_equals(struct lowerer *l, const struct expr *e);
 

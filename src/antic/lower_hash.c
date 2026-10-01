@@ -14,7 +14,13 @@
    It takes eight bytes at a time through the same finalizer. The
    constants stand in src/rt/hash.h, which both sides read. Every target
    gives the same hash for the same value. A hashing collection mixes its
-   seed in itself. */
+   seed in itself.
+
+   DESIGN: a part hashes by the rule lower_part_of gives, the rule the
+   default `==` of lower_eq.c compares it by. A slice inside a value
+   hashes as the view `==` compares, and a function with its context by
+   its code. The elements of a slice count where the slice is the value
+   hashed, `x.hash()` on it or an `own` slice of a class. */
 
 static const struct name hash_name = {"hash", 4};
 
@@ -95,13 +101,10 @@ static struct ir_operand hash_address(struct lowerer *l, struct ir_operand v)
 static struct ir_operand hash_value(struct lowerer *l, struct ir_operand v,
                                     const struct type *t)
 {
-    enum ir_type type = lower_ir_type_of(t);
     const struct type *form = t->kind == TYPE_ENUM ? t->base : t;
+    enum ir_type type;
 
-    if (t->kind == TYPE_F16) {
-        v = lower_temp(l, ir_unary(l->f, l->b, IR_HEXT, IR_F32, v));
-        type = IR_F32;
-    }
+    v = lower_part_scalar(l, t, v, &type);
     if (type == IR_F32 || type == IR_F64) {
         return mix(l, float_bits(l, v, type));
     }
@@ -181,21 +184,6 @@ static struct ir_operand hash_run(struct lowerer *l, const struct expr *call,
     return lower_temp(l, h);
 }
 
-/* The call of the `operator fn hash` of the struct or variant t, among
-   the calls the checker gave the default hash, or NULL. */
-static const struct expr *own_hash(const struct expr *call,
-                                   const struct type *t)
-{
-    size_t i;
-
-    for (i = 0; i < call->as.call.hash_count; i++) {
-        if (types_hash_call_type(call->as.call.hash_calls[i]) == t) {
-            return call->as.call.hash_calls[i];
-        }
-    }
-    return NULL;
-}
-
 /* Call the function fn with the address of the value at, which is the
    receiver whether fn takes it by value or through a pointer. */
 static struct ir_operand call_hash(struct lowerer *l, struct ir_function *fn,
@@ -237,9 +225,8 @@ static struct ir_operand hash_view(struct lowerer *l, struct ir_operand at,
     return combine(l, h, mix(l, lower_slice_length(l, at, t)));
 }
 
-/* The fields of the struct or tuple t at at, taken into h in order. A
-   unit break holds no value, and a Mutex is no part of a value. A slice
-   part hashes as the view it is, as the default `==` compares it. */
+/* The fields of the struct or tuple t at at, taken into h in order, but
+   those lower_field_skipped passes over. */
 static struct ir_operand hash_fields(struct lowerer *l, const struct expr *call,
                                      struct ir_operand at, const struct type *t,
                                      struct ir_operand h)
@@ -250,8 +237,7 @@ static struct ir_operand hash_fields(struct lowerer *l, const struct expr *call,
     for (i = 0; i < t->field_count; i++) {
         const struct struct_field *f = &t->fields[i];
         struct ir_operand part;
-        if (type_field_is_unit_break(f) || types_is_mutex(f->type) ||
-            types_is_object_lock(f->type)) {
+        if (lower_field_skipped(f)) {
             continue;
         }
         if (f->bits != 0) {
@@ -267,9 +253,7 @@ static struct ir_operand hash_fields(struct lowerer *l, const struct expr *call,
                        : ir_sym_operand(l->m, ir_sym_offset_of(l->m, agg,
                                                                (uint32_t)i));
             struct ir_operand field = lower_offset_address(l, at, offset);
-            part = f->type->kind == TYPE_SLICE
-                       ? hash_view(l, field, f->type)
-                       : hash_at(l, call, field, f->type);
+            part = hash_at(l, call, field, f->type);
         }
         h = combine(l, h, part);
     }
@@ -340,89 +324,77 @@ static struct ir_operand hash_variant(struct lowerer *l,
     return lower_temp(l, h);
 }
 
+/* The hash of the elements of the slice of type t at at, in order. */
+static struct ir_operand hash_elements(struct lowerer *l,
+                                       const struct expr *call,
+                                       struct ir_operand at,
+                                       const struct type *t)
+{
+    struct ir_operand p = lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
+    struct ir_operand count = lower_slice_length(l, at, t);
+
+    return hash_run(l, call, p, count, t->element);
+}
+
 /* The hash of the value of type t in memory at at. */
 static struct ir_operand hash_at(struct lowerer *l, const struct expr *call,
                                  struct ir_operand at, const struct type *t)
 {
     const struct expr *own;
-    struct ir_operand p;
-    struct ir_operand count;
 
-    if (types_is_mutex(t)) {
+    switch (lower_part_of(t, call->as.call.hash_calls,
+                          call->as.call.hash_count, &own)) {
+    case LOWER_PART_NONE:
         return i64(ANTI_HASH_START);
-    }
-    if (!lower_is_aggregate(t)) {
+    case LOWER_PART_VALUE: {
         struct ir_operand v =
             lower_temp(l, ir_load(l->f, l->b, lower_ir_type_of(t), at));
         return hash_value(l, v, t);
     }
-    switch (t->kind) {
-    case TYPE_STR:
-    case TYPE_SLICE:
-        p = lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
-        count = lower_slice_length(l, at, t);
-        if (t->kind == TYPE_STR) {
-            return hash_bytes(l, p, count);
-        }
-        return hash_run(l, call, p, count, t->element);
-    case TYPE_ARRAY: {
+    case LOWER_PART_TEXT: {
+        struct ir_operand p = lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
+        struct ir_operand count = lower_slice_length(l, at, t);
+        return hash_bytes(l, p, count);
+    }
+    case LOWER_PART_VIEW:
+        return hash_view(l, at, t);
+    case LOWER_PART_CODE:
+        /* The code alone, as `==` compares a function with its context,
+           so it hashes as the same function without one. */
+        return hash_address(l, lower_temp(l, ir_load(l->f, l->b, IR_PTR, at)));
+    case LOWER_PART_OWN:
+        return call_hash(l, lower_callee_function(
+                                l, own->as.call.callee->symbol),
+                         at);
+    case LOWER_PART_CLASS:
+        return class_hash(l, at, t);
+    case LOWER_PART_PATTERN: {
+        /* A Regex hashes its text and its mode, as its `==` compares. */
+        static const enum ir_type params[] = {IR_PTR};
+        struct ir_operand handle =
+            lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
+        return mix(l, lower_rt_call(l, "anti_rt_pattern_hash", IR_I64,
+                                    params, &handle, 1));
+    }
+    case LOWER_PART_UNION:
+        /* A union holds one of its fields and says not which, so it
+           hashes its bytes. */
+        return hash_bytes(l, at, lower_size_operand(l, t));
+    case LOWER_PART_FIELDS:
+        return hash_fields(l, call, at, t, i64(ANTI_HASH_START));
+    case LOWER_PART_ARRAY: {
         const struct type *element = t;
         while (element->kind == TYPE_ARRAY) {
             element = element->element;
         }
-        count = lower_array_count(l, t);
-        return hash_run(l, call, at, count, element);
+        return hash_run(l, call, at, lower_array_count(l, t), element);
     }
-    case TYPE_FN: {
-        /* A function with its context, or a bound one: two words. */
-        uint32_t agg = lower_agg_of(l, t);
-        struct ir_operand second = lower_offset_address(
-            l, at, ir_sym_operand(l->m, ir_sym_offset_of(l->m, agg, 1)));
-        struct ir_operand code = lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
-        struct ir_operand word = lower_temp(l, ir_load(l->f, l->b, IR_PTR,
-                                                       second));
-        struct ir_operand h =
-            combine(l, i64(ANTI_HASH_START), hash_value(l, code, t));
-        return combine(l, h, hash_value(l, word, t));
-    }
-    case TYPE_CLASS:
-        return class_hash(l, at, t);
-    case TYPE_OPTIONAL:
-        return hash_optional(l, call, at, t);
-    case TYPE_VARIANT:
-        own = own_hash(call, t);
-        if (own != NULL) {
-            return call_hash(l, lower_callee_function(
-                                    l, own->as.call.callee->symbol),
-                             at);
-        }
+    case LOWER_PART_CASES:
         return hash_variant(l, call, at, t);
-    case TYPE_STRUCT:
-        /* A Regex hashes its text and its mode, as its `==` compares. */
-        if (types_is_regex(t)) {
-            static const enum ir_type params[] = {IR_PTR};
-            struct ir_operand handle =
-                lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
-            return mix(l, lower_rt_call(l, "anti_rt_pattern_hash", IR_I64,
-                                        params, &handle, 1));
-        }
-        own = own_hash(call, t);
-        if (own != NULL) {
-            return call_hash(l, lower_callee_function(
-                                    l, own->as.call.callee->symbol),
-                             at);
-        }
-        /* A union holds one of its fields and says not which, so it
-           hashes its bytes. */
-        if (t->is_union) {
-            return hash_bytes(l, at, lower_size_operand(l, t));
-        }
-        return hash_fields(l, call, at, t, i64(ANTI_HASH_START));
-    case TYPE_TUPLE:
-        return hash_fields(l, call, at, t, i64(ANTI_HASH_START));
-    default:
-        return i64(ANTI_HASH_START);
+    case LOWER_PART_OPTIONAL:
+        return hash_optional(l, call, at, t);
     }
+    return i64(ANTI_HASH_START);
 }
 
 struct ir_operand lower_hash(struct lowerer *l, const struct expr *e)
@@ -437,11 +409,61 @@ struct ir_operand lower_hash(struct lowerer *l, const struct expr *e)
         struct ir_operand at = lower_expr(l, receiver);
         return hash_at(l, e, at, t->element);
     }
+    if (t->kind == TYPE_SLICE) {
+        struct ir_operand at = lower_address(l, receiver);
+        return hash_elements(l, e, at, t);
+    }
     if (lower_is_aggregate(t)) {
         struct ir_operand at = lower_address(l, receiver);
         return hash_at(l, e, at, t);
     }
     return hash_value(l, lower_expr(l, receiver), t);
+}
+
+/* The hash so far, h, with field index of level up of a class at self,
+   taken as lower_member_of says, as the default `equals` compares it. */
+static struct ir_operand hash_member(struct lowerer *l, const struct expr *e,
+                                     const struct type *up, size_t index,
+                                     struct ir_operand self,
+                                     struct ir_operand h)
+{
+    const struct struct_field *f = &up->fields[index];
+    enum lower_member member = lower_member_of(f);
+    struct ir_operand at;
+
+    if (member == LOWER_MEMBER_NONE) {
+        return h;
+    }
+    if (member == LOWER_MEMBER_BITS) {
+        struct ir_operand v = lower_temp(
+            l, ir_bitload(l->f, l->b, lower_ir_type_of(f->type), self,
+                          lower_agg_of(l, up), (uint32_t)index));
+        return combine(l, h, hash_value(l, v, f->type));
+    }
+    at = lower_offset_address(l, self, lower_field_offset(l, up, &f->name));
+    switch (member) {
+    case LOWER_MEMBER_ELEMENTS:
+        return combine(l, h, hash_elements(l, e, at, f->type));
+    case LOWER_MEMBER_SNAPSHOT: {
+        /* The code and the snapshot, each hashed as a pointer is. */
+        uint32_t agg = lower_agg_of(l, f->type);
+        struct ir_operand second = lower_offset_address(
+            l, at, ir_sym_operand(l->m, ir_sym_offset_of(l->m, agg, 1)));
+        struct ir_operand code = lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
+        struct ir_operand snapshot =
+            lower_temp(l, ir_load(l->f, l->b, IR_PTR, second));
+        struct ir_operand first = hash_address(l, code);
+        struct ir_operand part = combine(l, i64(ANTI_HASH_START), first);
+        struct ir_operand rest = hash_address(l, snapshot);
+        return combine(l, h, combine(l, part, rest));
+    }
+    case LOWER_MEMBER_PART:
+        return combine(l, h, hash_at(l, e, at, f->type));
+    case LOWER_MEMBER_NONE:
+    case LOWER_MEMBER_BITS:
+        return h;
+    }
+    return h;
 }
 
 /* DESIGN: the default `hash` of a class is code the compiler writes,
@@ -491,34 +513,7 @@ void lower_class_hash(struct lowerer *l, const struct item *it)
     }
     for (up = t; up != NULL; up = up->base) {
         for (i = 0; i < up->field_count; i++) {
-            const struct struct_field *fd = &up->fields[i];
-            struct ir_operand at;
-            struct ir_operand part;
-            if ((fd->form != FIELD_PLAIN && fd->form != FIELD_USE) ||
-                fd->transient || types_is_mutex(fd->type) ||
-                types_is_object_lock(fd->type) || types_holds_union(fd->type)) {
-                continue;
-            }
-            if (fd->bits != 0) {
-                struct ir_operand v = lower_temp(
-                    l, ir_bitload(l->f, l->b, lower_ir_type_of(fd->type), self,
-                                  lower_agg_of(l, up), (uint32_t)i));
-                h = combine(l, h, hash_value(l, v, fd->type));
-                continue;
-            }
-            at = lower_offset_address(l, self,
-                                      lower_field_offset(l, up, &fd->name));
-            if (fd->owned && fd->type->kind == TYPE_SLICE) {
-                struct ir_operand p =
-                    lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
-                part = hash_run(l, e, p, lower_slice_length(l, at, fd->type),
-                                fd->type->element);
-            } else if (fd->type->kind == TYPE_SLICE) {
-                part = hash_view(l, at, fd->type);
-            } else {
-                part = hash_at(l, e, at, fd->type);
-            }
-            h = combine(l, h, part);
+            h = hash_member(l, e, up, i, self, h);
         }
     }
     if (t->safety == SAFETY_SYNCHRONIZED) {
