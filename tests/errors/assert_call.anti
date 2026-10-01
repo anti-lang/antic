@@ -1,6 +1,6 @@
-//! A condition of `assert` that calls a function is a warning wherever the
-//! call stands, since a release build drops the condition and the call with
-//! it. A release build refuses each.
+//! A condition of `assert` that calls a function is a warning wherever the call
+//! stands, since a release build drops the condition and the call with it. A
+//! release build refuses each.
 
 fn count() -> int
 {
