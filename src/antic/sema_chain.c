@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "sema_checker.h"
 
 /* DESIGN: a declaration that names another resolves that one first, and
@@ -21,19 +22,7 @@ void sema_chain_add(struct chain_deps *d, struct symbol *sym)
     if (sym == NULL || sym->state != EVAL_NONE) {
         return;
     }
-    if (d->count == d->capacity) {
-        size_t capacity = d->capacity == 0 ? 64 : d->capacity * 2;
-        struct symbol **items =
-            capacity <= SIZE_MAX / sizeof *items
-                ? realloc(d->items, capacity * sizeof *items)
-                : NULL;
-        if (items == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        d->items = items;
-        d->capacity = capacity;
-    }
+    d->items = alloc_grow(d->items, &d->capacity, d->count, sizeof *d->items);
     d->items[d->count++] = sym;
 }
 
@@ -45,25 +34,6 @@ struct chain_frame {
     size_t next;
     size_t end;
 };
-
-/* Grow the array items of capacity to hold one more of size bytes. */
-static void *grow(void *items, size_t *capacity, size_t count, size_t size)
-{
-    size_t want;
-    void *p;
-
-    if (count < *capacity) {
-        return items;
-    }
-    want = *capacity == 0 ? 64 : *capacity * 2;
-    p = want <= SIZE_MAX / size ? realloc(items, want * size) : NULL;
-    if (p == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
-    *capacity = want;
-    return p;
-}
 
 void sema_chain_prepare(struct checker *c, struct symbol *root,
                         sema_chain_deps_fn *deps_of,
@@ -88,7 +58,8 @@ void sema_chain_prepare(struct checker *c, struct symbol *root,
     for (;;) {
         struct chain_frame *top;
         if (next != NULL) {
-            stack = grow(stack, &stack_capacity, stack_count, sizeof *stack);
+            stack = alloc_grow(stack, &stack_capacity, stack_count,
+                               sizeof *stack);
             top = &stack[stack_count++];
             top->sym = next;
             top->start = deps.count;
@@ -110,7 +81,8 @@ void sema_chain_prepare(struct checker *c, struct symbol *root,
             }
             continue;
         }
-        order = grow(order, &order_capacity, order_count, sizeof *order);
+        order = alloc_grow(order, &order_capacity, order_count,
+                           sizeof *order);
         order[order_count++] = top->sym;
         deps.count = top->start;
         stack_count--;

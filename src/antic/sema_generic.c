@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "sema_checker.h"
 
 /* DESIGN: the checker's part of generics. A generic declares its type
@@ -772,19 +773,8 @@ static void meets(struct checker *c, struct type *t, const struct type *p,
         check_meets(c, t, p, generic, pos);
         return;
     }
-    if (c->pending_count == c->pending_capacity) {
-        size_t capacity =
-            c->pending_capacity == 0 ? 16 : c->pending_capacity * 2;
-        pc = capacity <= SIZE_MAX / sizeof *pc
-                 ? realloc(c->pending, capacity * sizeof *pc)
-                 : NULL;
-        if (pc == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        c->pending = pc;
-        c->pending_capacity = capacity;
-    }
+    c->pending = alloc_grow(c->pending, &c->pending_capacity,
+                            c->pending_count, sizeof *c->pending);
     pc = &c->pending[c->pending_count++];
     pc->type = t;
     pc->param = p;

@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "../rt/f16.h"
+#include "alloc.h"
 #include "arith.h"
 #include "ir_fold.h"
 #include "reach.h"
@@ -136,10 +137,10 @@ static void count(const struct ir_function *f, struct counts *c)
     size_t i;
     size_t k;
 
-    c->defs = ir_alloc(f->temp_count, sizeof *c->defs);
-    c->uses = ir_alloc(f->temp_count, sizeof *c->uses);
-    c->block = ir_alloc(f->temp_count, sizeof *c->block);
-    c->index = ir_alloc(f->temp_count, sizeof *c->index);
+    c->defs = alloc_zeroed(f->temp_count, sizeof *c->defs);
+    c->uses = alloc_zeroed(f->temp_count, sizeof *c->uses);
+    c->block = alloc_zeroed(f->temp_count, sizeof *c->block);
+    c->index = alloc_zeroed(f->temp_count, sizeof *c->index);
     for (i = 0; i < f->param_count; i++) {
         c->defs[f->params[i].temp]++;
     }
@@ -373,8 +374,8 @@ static bool replace_uses(struct ir_function *f, uint32_t temp,
    definition of x or of v reads v. */
 static bool propagate_in_block(struct ir_function *f, struct ir_block *b)
 {
-    struct ir_operand *known = ir_alloc(f->temp_count, sizeof *known);
-    uint32_t *active = ir_alloc(f->temp_count, sizeof *active);
+    struct ir_operand *known = alloc_zeroed(f->temp_count, sizeof *known);
+    uint32_t *active = alloc_zeroed(f->temp_count, sizeof *active);
     size_t active_count = 0;
     bool changed = false;
     size_t i;
@@ -674,7 +675,7 @@ static bool remove_unused_results(struct ir_function *f)
    blocks of f. */
 static void mark_reachable(const struct ir_function *f, bool *reached)
 {
-    uint32_t *pending = ir_alloc(f->block_count, sizeof *pending);
+    uint32_t *pending = alloc_zeroed(f->block_count, sizeof *pending);
     size_t count = 0;
 
     if (f->block_count == 0) {
@@ -713,8 +714,8 @@ static void mark_reachable(const struct ir_function *f, bool *reached)
    others again in their order. */
 static bool remove_unreachable_blocks(struct ir_function *f)
 {
-    bool *reached = ir_alloc(f->block_count, sizeof *reached);
-    uint32_t *map = ir_alloc(f->block_count, sizeof *map);
+    bool *reached = alloc_zeroed(f->block_count, sizeof *reached);
+    uint32_t *map = alloc_zeroed(f->block_count, sizeof *map);
     size_t n = 0;
     size_t b;
     size_t i;
@@ -756,7 +757,7 @@ static bool remove_unreachable_blocks(struct ir_function *f)
    takes over that block's instructions. */
 static bool merge_blocks(struct ir_function *f)
 {
-    uint32_t *preds = ir_alloc(f->block_count, sizeof *preds);
+    uint32_t *preds = alloc_zeroed(f->block_count, sizeof *preds);
     bool changed = false;
     size_t b;
 
@@ -790,8 +791,8 @@ static bool merge_blocks(struct ir_function *f)
             next->count == 0) {
             continue;
         }
-        insts = ir_resize(block->insts, block->count - 1 + next->count,
-                          sizeof *insts);
+        insts = alloc_resize(block->insts, block->count - 1 + next->count,
+                             sizeof *insts);
         memcpy(insts + block->count - 1, next->insts,
                next->count * sizeof *insts);
         block->insts = insts;
@@ -825,8 +826,8 @@ static bool remove_dead_code(struct ir_function *f)
    temporary in the order of its first appearance. */
 static void renumber_temps(struct ir_function *f)
 {
-    uint32_t *map = ir_alloc(f->temp_count, sizeof *map);
-    enum ir_type *types = ir_alloc(f->temp_count, sizeof *types);
+    uint32_t *map = alloc_zeroed(f->temp_count, sizeof *map);
+    enum ir_type *types = alloc_zeroed(f->temp_count, sizeof *types);
     uint32_t next = 0;
     size_t b;
     size_t i;
@@ -1343,8 +1344,8 @@ static void remove_unused_functions(struct ir_module *m, const char *entry,
     struct ir_reach reach;
     const bool *live;
     const bool *live_globals;
-    uint32_t *map = ir_alloc(m->function_count, sizeof *map);
-    uint32_t *global_map = ir_alloc(m->global_count, sizeof *global_map);
+    uint32_t *map = alloc_zeroed(m->function_count, sizeof *map);
+    uint32_t *global_map = alloc_zeroed(m->global_count, sizeof *global_map);
     size_t n = 0;
     size_t i;
     size_t j;

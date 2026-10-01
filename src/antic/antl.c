@@ -1,4 +1,5 @@
 #include "antl.h"
+#include "alloc.h"
 #include "antl_io.h"
 
 #include <stdarg.h>
@@ -156,17 +157,8 @@ static bool find_type(const struct writer *w, const struct type *t,
 
 static void add_type(struct writer *w, const struct type *t)
 {
-    if (w->type_count == w->type_capacity) {
-        size_t capacity = w->type_capacity == 0 ? 16 : w->type_capacity * 2;
-        const struct type **types = realloc((void *)w->types,
-                                            capacity * sizeof *types);
-        if (types == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        w->types = types;
-        w->type_capacity = capacity;
-    }
+    w->types = alloc_grow(w->types, &w->type_capacity, w->type_count,
+                          sizeof *w->types);
     w->types[w->type_count++] = t;
 }
 
@@ -1653,15 +1645,12 @@ static struct type *copy_among(struct type *generic, struct type **args,
 static void read_types(struct reader *r)
 {
     uint32_t count = antl_get_count(r, 1);
-    struct field_refs *structs = calloc((size_t)count + 1, sizeof *structs);
+    struct field_refs *structs =
+        alloc_zeroed((size_t)count + 1, sizeof *structs);
     uint32_t struct_count = 0;
     uint32_t i;
     uint32_t j;
 
-    if (structs == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
     r->table = antl_allocate(r, count, sizeof *r->table);
     for (i = 0; i < count && !r->failed; i++) {
         uint8_t kind = antl_get_u8(r);
@@ -3191,11 +3180,7 @@ static void skip_body(struct reader *r, struct ir_module *program,
     memset(&scratch, 0, sizeof scratch);
     scratch.params = f->params;
     scratch.param_count = f->param_count;
-    scratch.temps = malloc((f->param_count + 1) * sizeof *scratch.temps);
-    if (scratch.temps == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    scratch.temps = alloc_zeroed(f->param_count + 1, sizeof *scratch.temps);
     memcpy(scratch.temps, f->temps, f->param_count * sizeof *scratch.temps);
     scratch.temp_count = (uint32_t)f->param_count;
     scratch.temp_capacity = f->param_count + 1;

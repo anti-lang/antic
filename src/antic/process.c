@@ -6,6 +6,8 @@
 
 #include <stdio.h>
 
+#include "alloc.h"
+
 #if defined(_WIN32)
 
 #include <stdbool.h>
@@ -50,8 +52,9 @@ static void quote(const char *arg, struct text *out)
     text_append(out, "\"");
 }
 
-/* The UTF-16 of text, which every wide Windows function takes. antic
-   holds its strings as UTF-8. */
+/* The UTF-16 of text, which every wide Windows function takes, or NULL
+   when text is not UTF-8. antic holds its strings as UTF-8. The caller
+   frees the result with free. */
 static wchar_t *widen(const char *text)
 {
     int count = MultiByteToWideChar(CP_UTF8, 0, text, -1, NULL, 0);
@@ -60,10 +63,7 @@ static wchar_t *widen(const char *text)
     if (count <= 0) {
         return NULL;
     }
-    wide = malloc((size_t)count * sizeof *wide);
-    if (wide == NULL) {
-        return NULL;
-    }
+    wide = alloc_zeroed((size_t)count, sizeof *wide);
     if (MultiByteToWideChar(CP_UTF8, 0, text, -1, wide, count) <= 0) {
         free(wide);
         return NULL;
@@ -136,7 +136,8 @@ static int start(const char *directory, const char *const argv[],
         wide_directory = widen(directory);
     }
     if (wide == NULL || (directory != NULL && wide_directory == NULL)) {
-        fprintf(stderr, "antic: cannot run %s: out of memory\n", argv[0]);
+        fprintf(stderr, "antic: cannot run %s: a path is not UTF-8\n",
+                argv[0]);
         free(wide);
         return -1;
     }
@@ -348,10 +349,7 @@ static char **environment_with(const char *name, const char *value,
     while (environ != NULL && environ[count] != NULL) {
         count++;
     }
-    list = malloc((count + 2) * sizeof *list);
-    if (list == NULL) {
-        return NULL;
-    }
+    list = alloc_zeroed(count + 2, sizeof *list);
     for (i = 0; i < count; i++) {
         if (strncmp(environ[i], name, length) != 0 ||
             environ[i][length] != '=') {
@@ -381,11 +379,6 @@ int process_run_lines(const char *const argv[], const char *name,
     int err;
 
     env = environment_with(name, value, &entry);
-    if (env == NULL) {
-        fprintf(stderr, "antic: cannot run %s: out of memory\n", argv[0]);
-        text_free(&entry);
-        return -1;
-    }
     if (pipe(fds) != 0) {
         fprintf(stderr, "antic: pipe: %s\n", strerror(errno));
         free(env);

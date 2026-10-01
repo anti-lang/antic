@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "sema.h"
 #include "text.h"
 #include "types.h"
@@ -22,8 +23,8 @@ bool lower_has_defers(const struct lowerer *l)
 /* Room for one more exit action in scope. */
 static struct exit_action *grow_defers(struct defers *scope)
 {
-    scope->items = ir_grow(scope->items, &scope->capacity, scope->count,
-                           sizeof *scope->items);
+    scope->items = alloc_grow(scope->items, &scope->capacity, scope->count,
+                              sizeof *scope->items);
     return scope->items;
 }
 
@@ -1114,8 +1115,8 @@ void lower_keep_temp(struct lowerer *l, const struct expr *e,
         e->type->kind == TYPE_POINTER || !sema_needs_teardown(e->type)) {
         return;
     }
-    l->temps = ir_grow(l->temps, &l->temp_capacity, l->temp_count,
-                       sizeof *l->temps);
+    l->temps = alloc_grow(l->temps, &l->temp_capacity, l->temp_count,
+                          sizeof *l->temps);
     t = &l->temps[l->temp_count++];
     t->holder = ir_entry_zero_slot(l->f);
     t->type = e->type;
@@ -1276,11 +1277,11 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
         const struct stmt *otherwise = s->as.switch_stmt.otherwise;
         size_t arms = s->as.switch_stmt.count + (otherwise != NULL ? 1 : 0);
         struct ir_block **entry =
-            arena_alloc(l->m->arena, ir_product(arms + 1, sizeof *entry));
+            arena_alloc(l->m->arena, alloc_product(arms + 1, sizeof *entry));
         struct ir_block **tail =
-            arena_alloc(l->m->arena, ir_product(arms + 1, sizeof *tail));
+            arena_alloc(l->m->arena, alloc_product(arms + 1, sizeof *tail));
         const struct stmt **falls =
-            arena_alloc(l->m->arena, ir_product(arms + 1, sizeof *falls));
+            arena_alloc(l->m->arena, alloc_product(arms + 1, sizeof *falls));
         uint32_t line;
         size_t i;
         size_t k;

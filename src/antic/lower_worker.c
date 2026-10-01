@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "sema.h"
 #include "text.h"
 #include "types.h"
@@ -46,9 +47,9 @@ static uint32_t context_aggregate(struct lowerer *l, const struct expr *call,
     size_t n = call->as.call.arg_count;
     size_t i;
 
-    fields = ir_alloc(n, sizeof *fields);
+    fields = alloc_zeroed(n, sizeof *fields);
     for (i = 0; i < n; i++) {
-        char *field = ir_alloc(24, 1);
+        char *field = alloc_zeroed(24, 1);
         snprintf(field, 24, "a%zu", i);
         fields[i].name = field;
         fields[i].type = lower_vtype_of(l, worker_param(call, i));
@@ -109,7 +110,7 @@ static void call_worker(struct lowerer *l, const struct expr *call,
     size_t extra = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
     struct ir_function *f = l->f;
     struct ir_block *entry = l->b;
-    struct ir_operand *args = ir_alloc(2 * extra + 1, sizeof *args);
+    struct ir_operand *args = alloc_zeroed(2 * extra + 1, sizeof *args);
     struct ir_operand at_out;
     uint32_t value;
     size_t count = 1;

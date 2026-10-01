@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "ir.h"
 
 static bool ends_with(const char *s, const char *suffix)
@@ -27,7 +28,7 @@ static void add_inputs(struct link_command *c, const struct link_inputs *in);
 
 static void add(struct link_command *c, const char *arg)
 {
-    c->argv = ir_grow(c->argv, &c->capacity, c->argc + 1, sizeof *c->argv);
+    c->argv = alloc_grow(c->argv, &c->capacity, c->argc + 1, sizeof *c->argv);
     c->argv[c->argc++] = arg;
     c->argv[c->argc] = NULL;
 }

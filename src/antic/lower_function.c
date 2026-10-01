@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "sema.h"
 #include "text.h"
 #include "types.h"
@@ -255,7 +256,7 @@ static void lower_function_body(struct lowerer *l, const struct item *it)
    the caller waits and the bytes stay. */
 static uint32_t lower_snapshot_agg(struct lowerer *l, const struct item *it)
 {
-    struct ir_field *fields = ir_alloc(it->capture_count + 1,
+    struct ir_field *fields = alloc_zeroed(it->capture_count + 1,
                                        sizeof *fields);
     struct text name = {0};
     uint32_t agg;
@@ -330,7 +331,7 @@ static void snapshot_entry(struct lowerer *l, const struct item *it,
    variable it captures, in the order of the captures. */
 static uint32_t lower_captures_agg(struct lowerer *l, const struct item *it)
 {
-    struct ir_field *fields = ir_alloc(it->capture_count, sizeof *fields);
+    struct ir_field *fields = alloc_zeroed(it->capture_count, sizeof *fields);
     struct text name = {0};
     uint32_t agg;
     size_t i;
@@ -380,8 +381,8 @@ static struct ir_function *lower_anonymous_function(struct lowerer *l,
         ir_param_add(f, IR_PTR, IR_NO_AGG);
     }
     it->symbol->ir = f->index;
-    l->anonymous = ir_grow(l->anonymous, &l->anonymous_capacity,
-                           l->anonymous_count, sizeof *l->anonymous);
+    l->anonymous = alloc_grow(l->anonymous, &l->anonymous_capacity,
+                              l->anonymous_count, sizeof *l->anonymous);
     l->anonymous[l->anonymous_count++] = it;
     return f;
 }

@@ -2,6 +2,8 @@
 
 #include <stdlib.h>
 
+#include "alloc.h"
+
 /* The IR type of one (IR type, C type) pair of a row. */
 #define RT_IR(ir, c) IR_##ir
 
@@ -66,7 +68,7 @@ uint32_t rt_record_agg(struct ir_module *m, enum rt_record r)
     if (agg != IR_NO_AGG) {
         return agg;
     }
-    fields = ir_alloc(form->count, sizeof *fields);
+    fields = alloc_zeroed(form->count, sizeof *fields);
     for (i = 0; i < form->count; i++) {
         fields[i].name = form->items[i].name;
         fields[i].type = ir_scalar(form->items[i].type);

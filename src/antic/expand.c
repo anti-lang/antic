@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
+
 /* DESIGN: a saturating operation becomes the plain operation and a test
    whether it left the range. A choice between its result and the bound
    it passed follows. The choice is a mask of all ones or of zero, so no branch is
@@ -364,16 +366,12 @@ static struct ir_operand fold_lanes(struct expander *x, const struct ir_inst *in
     enum ir_op op = (enum ir_op)inst->field;
     bool pick = op != IR_ADD && op != IR_FADD && op != IR_OR && op != IR_AND;
     bool is_float = lane == IR_F32 || lane == IR_F64;
-    struct ir_operand *v = calloc(n + 1, sizeof *v);
-    struct ir_operand *at = calloc(n + 1, sizeof *at);
+    struct ir_operand *v = alloc_zeroed(n + 1, sizeof *v);
+    struct ir_operand *at = alloc_zeroed(n + 1, sizeof *at);
     struct ir_operand result;
     size_t half;
     size_t i;
 
-    if (v == NULL || at == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
     for (i = 0; i < n; i++) {
         at[i] = ir_int_op(IR_I64, layout->offsets[i]);
         v[i] = load_lane(x, lane, inst->a, layout->offsets[i]);
@@ -460,11 +458,7 @@ static void expand_vector(struct expander *x, const struct ir_inst *inst,
         }
         break;
     case IR_VSHUFFLE:
-        values = calloc(n + 1, sizeof *values);
-        if (values == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
+        values = alloc_zeroed(n + 1, sizeof *values);
         for (i = 0; i < n; i++) {
             values[i] = load_lane(x, lane, inst->b,
                                   layout->offsets[inst->args[i].as.integer]);

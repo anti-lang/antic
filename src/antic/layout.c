@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "arith.h"
 #include "attributes.h"
 #include "ir_fold.h"
@@ -23,8 +24,8 @@ static void fail(struct layouts *l, const char *format, ...)
         return;
     }
     va_start(args, format);
-    /* ir_vformat marks a message cut to fit with three dots. */
-    ir_vformat(l->error, l->error_size, format, args);
+    /* text_vformat marks a message cut to fit with three dots. */
+    text_vformat(l->error, l->error_size, format, args);
     va_end(args);
     l->failed = true;
 }
@@ -243,8 +244,8 @@ static void compute(struct layouts *l, uint32_t agg)
         return;
     }
     l->agg_state[agg] = BUSY;
-    out->offsets = ir_alloc(t->field_count, sizeof *out->offsets);
-    out->bits = ir_alloc(t->field_count, sizeof *out->bits);
+    out->offsets = alloc_zeroed(t->field_count, sizeof *out->offsets);
+    out->bits = alloc_zeroed(t->field_count, sizeof *out->bits);
     if (t->kind == IR_AGG_ARRAY) {
         struct ir_vtype element = t->fields[0].type;
         if (!layout_fold(l, t->length, &length)) {
@@ -361,7 +362,7 @@ static void compute(struct layouts *l, uint32_t agg)
     if (out->size <= LAYOUT_MEMBER_LIMIT) {
         members.count = 0;
         flatten(l, ir_aggregate(agg), 0, &members);
-        out->members = ir_alloc(members.count, sizeof *out->members);
+        out->members = alloc_zeroed(members.count, sizeof *out->members);
         memcpy(out->members, members.items,
                members.count * sizeof *out->members);
         out->member_count = members.count;
@@ -475,10 +476,10 @@ bool layouts_init(struct layouts *l, enum target t, const struct ir_module *m,
     l->m = m;
     l->error = error;
     l->error_size = error_size;
-    l->aggs = ir_alloc(m->agg_count, sizeof *l->aggs);
-    l->agg_state = ir_alloc(m->agg_count, sizeof *l->agg_state);
-    l->values = ir_alloc(m->sym_count, sizeof *l->values);
-    l->sym_state = ir_alloc(m->sym_count, sizeof *l->sym_state);
+    l->aggs = alloc_zeroed(m->agg_count, sizeof *l->aggs);
+    l->agg_state = alloc_zeroed(m->agg_count, sizeof *l->agg_state);
+    l->values = alloc_zeroed(m->sym_count, sizeof *l->values);
+    l->sym_state = alloc_zeroed(m->sym_count, sizeof *l->sym_state);
     for (i = 0; i < m->agg_count && !l->failed; i++) {
         layout_agg(l, (uint32_t)i);
     }

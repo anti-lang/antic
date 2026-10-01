@@ -5,26 +5,22 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
+
 /* Grow to hold extra more bytes plus the terminating NUL. The compiler
    stops on an allocation failure, because it has no way to continue. */
 static void reserve(struct text *t, size_t extra)
 {
-    size_t needed = t->length + extra + 1;
+    size_t needed = alloc_sum(alloc_sum(t->length, extra), 1);
     size_t capacity = t->capacity == 0 ? 64 : t->capacity;
-    char *data;
 
     if (needed <= t->capacity) {
         return;
     }
     while (capacity < needed) {
-        capacity *= 2;
+        capacity = alloc_product(capacity, 2);
     }
-    data = realloc(t->data, capacity);
-    if (data == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
-    t->data = data;
+    t->data = alloc_resize(t->data, capacity, 1);
     t->capacity = capacity;
 }
 
@@ -77,4 +73,29 @@ void text_free(struct text *t)
     t->data = NULL;
     t->length = 0;
     t->capacity = 0;
+}
+
+void text_vformat(char *buffer, size_t size, const char *format,
+                  va_list args)
+{
+    int n;
+
+    if (size == 0) {
+        return;
+    }
+    n = vsnprintf(buffer, size, format, args);
+    if (n < 0) {
+        buffer[0] = '\0';
+    } else if ((size_t)n >= size && size >= 4) {
+        memcpy(buffer + size - 4, "...", 4);
+    }
+}
+
+void text_format(char *buffer, size_t size, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    text_vformat(buffer, size, format, args);
+    va_end(args);
 }

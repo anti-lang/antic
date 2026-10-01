@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "antl_io.h"
 #include "ptrset.h"
 
@@ -44,12 +45,6 @@ _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
    a symbol of the extern table with this bit set. */
 #define SYM_EXTERN 0x80000000u
 
-static void out_of_memory(void)
-{
-    fputs("antic: out of memory\n", stderr);
-    exit(70);
-}
-
 /* A table of one kind of record of a tree. */
 struct table {
     void **items;
@@ -60,15 +55,7 @@ struct table {
 
 static uint32_t table_add(struct table *t, void *p)
 {
-    if (t->count == t->capacity) {
-        size_t capacity = t->capacity == 0 ? 16 : t->capacity * 2;
-        void **items = realloc(t->items, capacity * sizeof *items);
-        if (items == NULL) {
-            out_of_memory();
-        }
-        t->items = items;
-        t->capacity = capacity;
-    }
+    t->items = alloc_grow(t->items, &t->capacity, t->count, sizeof *t->items);
     t->items[t->count] = p;
     ptr_index_put(&t->index, p, (uint32_t)t->count);
     return (uint32_t)t->count++;
@@ -1304,16 +1291,8 @@ static void add_extern(struct io *io, const struct symbol *sym)
     if (ptr_index_get(&io->all->externs, sym, &index)) {
         return;
     }
-    if (w->extern_count == w->extern_capacity) {
-        size_t capacity = w->extern_capacity == 0 ? 16 : w->extern_capacity * 2;
-        const struct symbol **list =
-            realloc((void *)w->externs, capacity * sizeof *list);
-        if (list == NULL) {
-            out_of_memory();
-        }
-        w->externs = list;
-        w->extern_capacity = capacity;
-    }
+    w->externs = alloc_grow(w->externs, &w->extern_capacity,
+                            w->extern_count, sizeof *w->externs);
     ptr_index_put(&io->all->externs, sym, (uint32_t)w->extern_count);
     w->externs[w->extern_count++] = sym;
     if (sym->type != NULL) {
@@ -1762,15 +1741,8 @@ static void collect_tree(struct writer *w, struct trees *all,
     struct io io;
     struct tree *t;
 
-    if (all->count == all->capacity) {
-        size_t capacity = all->capacity == 0 ? 8 : all->capacity * 2;
-        struct tree *items = realloc(all->items, capacity * sizeof *items);
-        if (items == NULL) {
-            out_of_memory();
-        }
-        all->items = items;
-        all->capacity = capacity;
-    }
+    all->items = alloc_grow(all->items, &all->capacity, all->count,
+                            sizeof *all->items);
     t = &all->items[all->count++];
     memset(t, 0, sizeof *t);
     t->fn = fn;
@@ -1790,13 +1762,10 @@ static void collect_tree(struct writer *w, struct trees *all,
 void antl_visit_generics(struct writer *w)
 {
     const struct interface *iface = w->iface;
-    struct trees *all = calloc(1, sizeof *all);
+    struct trees *all = alloc_zeroed(1, sizeof *all);
     size_t i;
     size_t j;
 
-    if (all == NULL) {
-        out_of_memory();
-    }
     w->trees = all;
     for (i = 0; i < iface->generic_count; i++) {
         struct item *it = iface->generics[i];
@@ -1984,10 +1953,7 @@ static void read_tree(struct reader *r, struct symbol **externs,
         records[k] = antl_allocate(r, counts[k], sizes[k]);
         /* Item 0 is the function, which the reader has. */
         table->count = counts[k] + (k == T_ITEM ? 1 : 0);
-        table->items = calloc(table->count + 1, sizeof *table->items);
-        if (table->items == NULL) {
-            out_of_memory();
-        }
+        table->items = alloc_zeroed(table->count + 1, sizeof *table->items);
         for (i = 0; i < counts[k]; i++) {
             table->items[i + (k == T_ITEM ? 1 : 0)] =
                 (char *)records[k] + i * sizes[k];

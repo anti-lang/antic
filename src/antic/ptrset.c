@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
+
 /* DESIGN: the set, the map and the index are one table with values of
    three kinds: none, a pointer and a uint32_t. All three hash a key and
    probe for it in probe, and grow in make_room, so the three cannot
@@ -33,24 +35,14 @@ static size_t probe(const void *const *keys, size_t capacity, const void *p)
     return i;
 }
 
-static void *zeroed(size_t count, size_t size)
-{
-    void *p = calloc(count, size);
-
-    if (p == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
-    return p;
-}
-
 /* Make room among *keys for one key more than count, by twice the room
    once the table is half full. *values holds a value of size bytes per
    key, or nothing when size is 0. */
 static void make_room(const void ***keys, void **values, size_t size,
                       size_t count, size_t *capacity)
 {
-    size_t room = *capacity == 0 ? FIRST_CAPACITY : *capacity * 2;
+    size_t room =
+        *capacity == 0 ? FIRST_CAPACITY : alloc_product(*capacity, 2);
     const void **old_keys = *keys;
     const unsigned char *old_values = *values;
     const void **new_keys;
@@ -60,9 +52,9 @@ static void make_room(const void ***keys, void **values, size_t size,
     if ((count + 1) * 2 <= *capacity) {
         return;
     }
-    new_keys = zeroed(room, sizeof *new_keys);
+    new_keys = alloc_zeroed(room, sizeof *new_keys);
     if (size > 0) {
-        new_values = zeroed(room, size);
+        new_values = alloc_zeroed(room, size);
     }
     for (i = 0; i < *capacity; i++) {
         if (old_keys[i] != NULL) {

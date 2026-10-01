@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "antl.h"
 #include "applesdk.h"
 #include "coff.h"
@@ -716,11 +717,7 @@ static bool native_inputs(const struct options *o, const struct extras *extras,
     }
     link_native_library(glue, o->runtime, o->target, NATIVE_REGEX_GLUE);
     link_native_library(pcre2, o->runtime, o->target, NATIVE_PCRE2);
-    list = malloc((o->object_count + 2) * sizeof *list);
-    if (list == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        return false;
-    }
+    list = alloc_zeroed(o->object_count + 2, sizeof *list);
     if (o->object_count > 0) {
         memcpy(list, o->objects, o->object_count * sizeof *list);
     }
@@ -1266,11 +1263,7 @@ static int back_end(const struct options *o, struct module *tree,
                          o->lib == LIB_NONE && has_main(program, module),
                          o->target);
     }
-    functions = calloc(program->function_count + 1, sizeof *functions);
-    if (functions == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    functions = alloc_zeroed(program->function_count + 1, sizeof *functions);
     ok = select_module(o->target, o->cpu, program, functions, error,
                        sizeof error);
     for (i = 0; ok && !(o->dump_select && !o->dump_alloc) &&
@@ -1445,14 +1438,7 @@ struct paths {
 
 static void add_path(struct paths *p, const char *path)
 {
-    if (p->count == p->capacity) {
-        p->capacity = p->capacity == 0 ? 16 : p->capacity * 2;
-        p->items = realloc((void *)p->items, p->capacity * sizeof *p->items);
-        if (p->items == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-    }
+    p->items = alloc_grow(p->items, &p->capacity, p->count, sizeof *p->items);
     p->items[p->count++] = path;
 }
 
@@ -1631,16 +1617,7 @@ static bool link_names(const char *const *paths, size_t count,
             if (k < n) {
                 continue;
             }
-            if (n == room) {
-                const char **grown;
-                room = room == 0 ? 8 : room * 2;
-                grown = realloc((void *)list, room * sizeof *list);
-                if (grown == NULL) {
-                    fputs("antic: out of memory\n", stderr);
-                    exit(70);
-                }
-                list = grown;
-            }
+            list = alloc_grow(list, &room, n, sizeof *list);
             list[n++] = name;
         }
     }
@@ -1676,20 +1653,16 @@ static bool load_libraries(const struct paths *paths, const char *module,
                            const struct interface **out)
 {
     size_t n = paths->count;
-    struct text *files = calloc(n + 1, sizeof *files);
-    struct interface *headers = calloc(n + 1, sizeof *headers);
-    bool *loaded = calloc(n + 1, sizeof *loaded);
+    struct text *files = alloc_zeroed(n + 1, sizeof *files);
+    struct interface *headers = alloc_zeroed(n + 1, sizeof *headers);
+    bool *loaded = alloc_zeroed(n + 1, sizeof *loaded);
     size_t count = 0;
     size_t i;
     size_t j;
     size_t k;
     char error[200];
-    bool ok = files != NULL && headers != NULL && loaded != NULL;
+    bool ok = true;
 
-    if (!ok) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
     for (i = 0; i < n && ok; i++) {
         ok = read_bytes(paths->items[i], &files[i]);
         if (ok && !antl_header((const uint8_t *)files[i].data,
@@ -1854,7 +1827,7 @@ static bool build_notice(const struct options *o, const struct interface *own,
                          const struct interface *const *libraries,
                          size_t count, struct arena *arena, struct text *out)
 {
-    const struct package **list = calloc(count + 3, sizeof *list);
+    const struct package **list = alloc_zeroed(count + 3, sizeof *list);
     struct package runtime;
     struct text path = {0};
     struct text text = {0};
@@ -1862,10 +1835,6 @@ static bool build_notice(const struct options *o, const struct interface *own,
     size_t i;
     size_t j;
 
-    if (list == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
     memset(&runtime, 0, sizeof runtime);
     runtime.name = RUNTIME_MODULE;
     runtime.version = ANTIC_VERSION;
@@ -1952,11 +1921,7 @@ static int compile(const struct options *o, struct text *source,
     if (!find_libraries(o, tree, &arena, &paths)) {
         goto done;
     }
-    libraries = malloc((paths.count + 1) * sizeof *libraries);
-    if (libraries == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    libraries = alloc_zeroed(paths.count + 1, sizeof *libraries);
     if (!load_libraries(&paths, text_cstr(module), &arena, &types, &program,
                         libraries)) {
         goto done;
@@ -2020,11 +1985,7 @@ static int compile(const struct options *o, struct text *source,
     if (o->lib != LIB_NONE || links(o)) {
         struct interface own;
         const struct interface **all =
-            malloc((paths.count + 2) * sizeof *all);
-        if (all == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
+            alloc_zeroed(paths.count + 2, sizeof *all);
         if (!own_interface(o, tree, text_cstr(module), &arena, &own) ||
             !build_notice(o, &own, libraries, paths.count, &arena,
                           &extras->notice)) {
@@ -2117,11 +2078,7 @@ const struct interface *driver_interface(const struct options *o,
         struct interface header;
         memset(&empty, 0, sizeof empty);
         with_input.libraries =
-            malloc((o->library_count + 1) * sizeof *with_input.libraries);
-        if (with_input.libraries == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
+            alloc_zeroed(o->library_count + 1, sizeof *with_input.libraries);
         with_input.libraries[0] = o->input;
         /* memcpy takes no null pointer, even for no bytes, and o->libraries
            is null when no library was named. */
@@ -2145,11 +2102,7 @@ const struct interface *driver_interface(const struct options *o,
             goto done;
         }
         free((void *)with_input.libraries);
-        libraries = malloc((paths.count + 1) * sizeof *libraries);
-        if (libraries == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
+        libraries = alloc_zeroed(paths.count + 1, sizeof *libraries);
         if (!load_libraries(&paths, "", arena, types, program, libraries)) {
             goto done;
         }
@@ -2184,11 +2137,7 @@ const struct interface *driver_interface(const struct options *o,
     if (!find_libraries(o, parsed, arena, &paths)) {
         goto done;
     }
-    libraries = malloc((paths.count + 1) * sizeof *libraries);
-    if (libraries == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    libraries = alloc_zeroed(paths.count + 1, sizeof *libraries);
     if (!load_libraries(&paths, text_cstr(&module), arena, types, program,
                         libraries)) {
         goto done;
@@ -2243,11 +2192,7 @@ bool driver_library_header(const struct options *o, struct text *out)
     types_init(&types, &arena);
     ir_module_init(&program, &arena, "");
     with_input.libraries =
-        malloc((o->library_count + 1) * sizeof *with_input.libraries);
-    if (with_input.libraries == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+        alloc_zeroed(o->library_count + 1, sizeof *with_input.libraries);
     with_input.libraries[0] = o->input;
     /* memcpy takes no null pointer, even for no bytes, and o->libraries
        is null when no library was named. */
@@ -2267,11 +2212,7 @@ bool driver_library_header(const struct options *o, struct text *out)
     if (!find_libraries(&with_input, &empty, &arena, &paths)) {
         goto done;
     }
-    libraries = malloc((paths.count + 1) * sizeof *libraries);
-    if (libraries == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    libraries = alloc_zeroed(paths.count + 1, sizeof *libraries);
     if (!load_libraries(&paths, "", &arena, &types, &program, libraries)) {
         goto done;
     }
@@ -2340,11 +2281,7 @@ static int compile_library_file(const struct options *o,
     ir_module_init(&program, &arena, "");
     types_init(&types, &arena);
     with_input.libraries =
-        malloc((o->library_count + 1) * sizeof *with_input.libraries);
-    if (with_input.libraries == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+        alloc_zeroed(o->library_count + 1, sizeof *with_input.libraries);
     with_input.libraries[0] = o->input;
     /* memcpy takes no null pointer, even for no bytes, and o->libraries
        is null when no library was named. */
@@ -2364,11 +2301,7 @@ static int compile_library_file(const struct options *o,
     if (!find_libraries(&with_input, &empty, &arena, &paths)) {
         goto done;
     }
-    libraries = malloc((paths.count + 1) * sizeof *libraries);
-    if (libraries == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    libraries = alloc_zeroed(paths.count + 1, sizeof *libraries);
     if (!load_libraries(&paths, "", &arena, &types, &program, libraries)) {
         goto done;
     }
@@ -2476,11 +2409,11 @@ static bool run_command(const struct link_command *c, const char *what)
    because no linker of COFF writes a relocatable object. */
 static bool join_coff(const struct paths *objects, const char *output)
 {
-    struct coff_input *inputs = calloc(objects->count, sizeof *inputs);
-    struct text *bytes = calloc(objects->count, sizeof *bytes);
+    struct coff_input *inputs = alloc_zeroed(objects->count, sizeof *inputs);
+    struct text *bytes = alloc_zeroed(objects->count, sizeof *bytes);
     struct text joined = {0};
     struct text error = {0};
-    bool ok = inputs != NULL && bytes != NULL;
+    bool ok = true;
     size_t i;
 
     for (i = 0; ok && i < objects->count; i++) {
@@ -2495,7 +2428,7 @@ static bool join_coff(const struct paths *objects, const char *output)
         ok = false;
     }
     ok = ok && write_file(output, &joined);
-    for (i = 0; bytes != NULL && i < objects->count; i++) {
+    for (i = 0; i < objects->count; i++) {
         text_free(&bytes[i]);
     }
     free(inputs);

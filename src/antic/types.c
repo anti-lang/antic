@@ -5,15 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "ptrset.h"
 
 void *types_alloc_array(struct arena *arena, size_t count, size_t size)
 {
-    if (size != 0 && count > SIZE_MAX / size) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
-    return arena_alloc(arena, count * size);
+    return arena_alloc(arena, alloc_product(count, size));
 }
 
 void types_init(struct types *types, struct arena *arena)
@@ -1618,20 +1615,8 @@ static uint32_t nest_fields(struct nest_walk *w, struct type *s,
     /* A copy filled later may change the height of what holds it, so
        the height is kept for this walk alone. */
     if (w->open) {
-        if (w->opened_count == w->opened_capacity) {
-            size_t capacity =
-                w->opened_capacity == 0 ? 16 : w->opened_capacity * 2;
-            struct type **grown =
-                capacity <= SIZE_MAX / sizeof *grown
-                    ? realloc(w->opened, capacity * sizeof *grown)
-                    : NULL;
-            if (grown == NULL) {
-                fputs("antic: out of memory\n", stderr);
-                exit(70);
-            }
-            w->opened = grown;
-            w->opened_capacity = capacity;
-        }
+        w->opened = alloc_grow(w->opened, &w->opened_capacity,
+                               w->opened_count, sizeof *w->opened);
         w->opened[w->opened_count++] = s;
         s->layout = LAYOUT_OPEN;
     }

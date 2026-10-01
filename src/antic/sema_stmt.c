@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "sema_checker.h"
 
 struct worker_walk;
@@ -88,19 +89,8 @@ static void walk_function(struct worker_walk *w, const struct item *it)
         !ptr_set_add(&w->seen, it)) {
         return;
     }
-    if (w->queue_count == w->queue_capacity) {
-        size_t capacity = w->queue_capacity == 0 ? 16 : w->queue_capacity * 2;
-        const struct item **queue =
-            capacity <= SIZE_MAX / sizeof *queue
-                ? realloc(w->queue, capacity * sizeof *queue)
-                : NULL;
-        if (queue == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        w->queue = queue;
-        w->queue_capacity = capacity;
-    }
+    w->queue = alloc_grow(w->queue, &w->queue_capacity,
+                          w->queue_count, sizeof *w->queue);
     w->queue[w->queue_count++] = it;
 }
 

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "debug.h"
 #include "select.h"
 
@@ -398,18 +399,18 @@ static bool relocations_fit(const struct ir_global *g, char *error,
     for (j = 0; j < g->reloc_count; j++) {
         uint64_t at = g->relocs[j].offset;
         if (g->size < 8 || at > g->size - 8) {
-            ir_format(error, error_size,
-                      "the address at %" PRIu64 " of `%s.%s` ends past its "
-                      "%" PRIu64 " bytes", at, g->module, g->name, g->size);
+            text_format(error, error_size,
+                        "the address at %" PRIu64 " of `%s.%s` ends past its "
+                        "%" PRIu64 " bytes", at, g->module, g->name, g->size);
             return false;
         }
         for (k = 0; k < j; k++) {
             uint64_t other = g->relocs[k].offset;
             if ((at > other ? at - other : other - at) < 8) {
-                ir_format(error, error_size,
-                          "the addresses at %" PRIu64 " and %" PRIu64
-                          " of `%s.%s` overlap", at < other ? at : other,
-                          at < other ? other : at, g->module, g->name);
+                text_format(error, error_size,
+                            "the addresses at %" PRIu64 " and %" PRIu64
+                            " of `%s.%s` overlap", at < other ? at : other,
+                            at < other ? other : at, g->module, g->name);
                 return false;
             }
         }
@@ -555,9 +556,9 @@ void emit_licenses(struct text *out, enum target t, const char *bytes,
                    size_t length)
 {
     struct text symbol = {0};
-    unsigned char *text = ir_alloc(length + 1, 1);
+    unsigned char *text = alloc_zeroed(length + 1, 1);
 
-    /* The texts end in a NUL, which ir_alloc left there. */
+    /* The texts end in a NUL, which alloc_zeroed left there. */
     if (length > 0) {
         memcpy(text, bytes, length);
     }

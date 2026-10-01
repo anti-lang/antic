@@ -98,6 +98,22 @@ add_test(NAME files_oom
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/files-oom"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_files_oom.cmake")
 
+# The allocation helpers of antic when the memory is refused or a size
+# overflows, in a program of its own, since each ends the process.
+add_executable(alloc_oom_tests unit/test_alloc_oom.c)
+target_link_libraries(alloc_oom_tests PRIVATE antic_core)
+add_test(NAME alloc_oom
+    COMMAND "${CMAKE_COMMAND}"
+        "-DPROGRAM=$<TARGET_FILE:alloc_oom_tests>"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/alloc-oom"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_alloc_oom.cmake")
+
+# antic allocates through src/antic/alloc.c alone, and the front end
+# includes no header of the IR for its memory.
+add_test(NAME one_allocator
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_one_allocator.cmake")
+
 # The suffix antic gives an object of the host target, the one that
 # src/antic/target.c names: .obj on Windows and .o elsewhere. Every dev
 # object a test links is named with it.

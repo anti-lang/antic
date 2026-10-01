@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "ast.h"
 
 struct name_entry {
@@ -159,11 +160,7 @@ void warnings_apply(const struct module *module, struct diagnostics *diags,
     if (module == NULL || module->clause_count == 0) {
         return;
     }
-    used = calloc(module->clause_count, sizeof *used);
-    if (used == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    used = alloc_zeroed(module->clause_count, sizeof *used);
     drop_silenced(module, diags, 0, used);
     if (complete) {
         first = diags->count;

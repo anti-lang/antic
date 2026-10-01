@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
+
 bool memcheck_available(enum target t)
 {
     return t != TARGET_WINDOWS_ARM64;
@@ -78,7 +80,7 @@ void memcheck_declare(struct ir_module *m, const char *module, bool links,
    global carries poisoned bytes. */
 static bool *frame_addresses(const struct ir_function *f)
 {
-    bool *frame = ir_alloc(f->temp_count + 1, sizeof *frame);
+    bool *frame = alloc_zeroed(f->temp_count + 1, sizeof *frame);
     bool changed = true;
     size_t b;
     size_t i;
@@ -144,7 +146,7 @@ static void check(struct checker *c, bool store, struct ir_operand address,
     inst->a.type = IR_PTR;
     inst->a.as.index = store ? c->m->memcheck_store : c->m->memcheck_load;
     inst->arg_count = 2;
-    inst->args = ir_alloc(2, sizeof *inst->args);
+    inst->args = alloc_zeroed(2, sizeof *inst->args);
     inst->args[0] = address;
     inst->args[1] = ir_int_op(IR_I64, size);
 }
@@ -227,8 +229,8 @@ void memcheck_function(struct ir_module *m, struct ir_function *f,
     for (b = 0; b < f->block_count; b++) {
         struct ir_block *block = f->blocks[b];
         /* An instruction takes four checks at most, a vselect. */
-        size_t capacity = ir_product(block->count, 5) + 1;
-        c.out = ir_alloc(capacity, sizeof *c.out);
+        size_t capacity = alloc_product(block->count, 5) + 1;
+        c.out = alloc_zeroed(capacity, sizeof *c.out);
         c.count = 0;
         for (i = 0; i < block->count; i++) {
             check_inst(&c, &block->insts[i]);

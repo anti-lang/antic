@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "arith.h"
 #include "regalloc.h"
 
@@ -1821,10 +1822,11 @@ static void emit_call(struct selector *s, const struct ir_inst *inst)
     bool indirect = inst->b.kind == IR_FUNC;
     struct mach_operand target = indirect ? select_reg(s, &inst->a)
                                           : mach_imm(0);
-    enum ir_type *types = ir_alloc(inst->arg_count, sizeof *types);
+    enum ir_type *types = alloc_zeroed(inst->arg_count, sizeof *types);
     struct arg_location *locations =
-        ir_alloc(inst->arg_count, sizeof *locations);
-    struct mach_operand *copies = ir_alloc(inst->arg_count, sizeof *copies);
+        alloc_zeroed(inst->arg_count, sizeof *locations);
+    struct mach_operand *copies =
+        alloc_zeroed(inst->arg_count, sizeof *copies);
     struct arg_location result;
     struct mach_operand result_address;
     struct mach_operand f = mach_imm(inst->a.as.index);

@@ -1,6 +1,7 @@
 #include <stdlib.h>
 
 #include "../binary_stdio.h"
+#include "alloc.h"
 #include "check.h"
 #include "arena.h"
 #include "ast.h"
@@ -144,7 +145,7 @@ static void deep_chain(void)
     struct arena arena = {0};
     struct ir_module m;
     struct ir_function *f;
-    struct ir_block **blocks = ir_alloc(CHAIN + 1, sizeof *blocks);
+    struct ir_block **blocks = alloc_zeroed(CHAIN + 1, sizeof *blocks);
     struct ir_operand c;
     size_t i;
 

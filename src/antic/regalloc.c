@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "select.h"
 
 /* DESIGN: linear scan in the form of Poletto and Sarkar. Each virtual
@@ -201,16 +202,16 @@ static void compute_liveness(struct alloc *a)
     bool changed = true;
 
     a->words = a->f->vreg_count / 64 + 1;
-    a->use = ir_alloc(n, sizeof *a->use);
-    a->def = ir_alloc(n, sizeof *a->def);
-    a->live_in = ir_alloc(n, sizeof *a->live_in);
-    a->live_out = ir_alloc(n, sizeof *a->live_out);
+    a->use = alloc_zeroed(n, sizeof *a->use);
+    a->def = alloc_zeroed(n, sizeof *a->def);
+    a->live_in = alloc_zeroed(n, sizeof *a->live_in);
+    a->live_out = alloc_zeroed(n, sizeof *a->live_out);
     for (b = 0; b < n; b++) {
         struct block_ctx ctx;
-        a->use[b].bits = ir_alloc(a->words, sizeof(uint64_t));
-        a->def[b].bits = ir_alloc(a->words, sizeof(uint64_t));
-        a->live_in[b].bits = ir_alloc(a->words, sizeof(uint64_t));
-        a->live_out[b].bits = ir_alloc(a->words, sizeof(uint64_t));
+        a->use[b].bits = alloc_zeroed(a->words, sizeof(uint64_t));
+        a->def[b].bits = alloc_zeroed(a->words, sizeof(uint64_t));
+        a->live_in[b].bits = alloc_zeroed(a->words, sizeof(uint64_t));
+        a->live_out[b].bits = alloc_zeroed(a->words, sizeof(uint64_t));
         ctx.a = a;
         ctx.block = b;
         for (i = 0; i < a->f->blocks[b].count; i++) {
@@ -264,8 +265,8 @@ struct scan_ctx {
 
 static void add_range(struct fixed *fx, int64_t from, int64_t to)
 {
-    fx->ranges = ir_grow(fx->ranges, &fx->capacity, fx->count,
-                         sizeof *fx->ranges);
+    fx->ranges = alloc_grow(fx->ranges, &fx->capacity, fx->count,
+                            sizeof *fx->ranges);
     fx->ranges[fx->count].from = from;
     fx->ranges[fx->count].to = to;
     fx->count++;
@@ -379,9 +380,9 @@ static void rematerialise_constants(struct alloc *a)
 {
     struct mach_function *f = a->f;
     struct mach_inst *definition =
-        ir_alloc(f->vreg_count, sizeof *definition);
-    bool *once = ir_alloc(f->vreg_count, sizeof *once);
-    bool *many = ir_alloc(f->vreg_count, sizeof *many);
+        alloc_zeroed(f->vreg_count, sizeof *definition);
+    bool *once = alloc_zeroed(f->vreg_count, sizeof *once);
+    bool *many = alloc_zeroed(f->vreg_count, sizeof *many);
     size_t b;
     size_t i;
     size_t j;
@@ -462,7 +463,7 @@ static void build_intervals(struct alloc *a)
     uint32_t v;
     int64_t k = 0;
 
-    a->intervals = ir_alloc(f->vreg_count, sizeof *a->intervals);
+    a->intervals = alloc_zeroed(f->vreg_count, sizeof *a->intervals);
     for (v = 0; v < f->vreg_count; v++) {
         a->intervals[v].vreg = v;
         a->intervals[v].start = INT64_MAX;
@@ -603,8 +604,8 @@ static int choose(const struct alloc *a, struct interval **active,
 static void linear_scan(struct alloc *a)
 {
     struct mach_function *f = a->f;
-    struct interval **order = ir_alloc(f->vreg_count, sizeof *order);
-    struct interval **active = ir_alloc(f->vreg_count, sizeof *active);
+    struct interval **order = alloc_zeroed(f->vreg_count, sizeof *order);
+    struct interval **active = alloc_zeroed(f->vreg_count, sizeof *active);
     size_t count = 0;
     size_t active_count = 0;
     size_t i;

@@ -4,23 +4,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "alloc.h"
+
 static void add(struct diagnostics *d, enum diag_name name, int line,
                 int column, bool warning, bool doc, const char *format,
                 va_list args)
 {
     struct diagnostic *item;
 
-    if (d->count == d->capacity) {
-        size_t capacity = d->capacity == 0 ? 8 : d->capacity * 2;
-        struct diagnostic *items =
-            realloc(d->items, capacity * sizeof *items);
-        if (items == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        d->items = items;
-        d->capacity = capacity;
-    }
+    d->items = alloc_grow(d->items, &d->capacity, d->count, sizeof *d->items);
     item = &d->items[d->count++];
     item->line = line;
     item->column = column;

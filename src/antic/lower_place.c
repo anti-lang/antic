@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "sema.h"
 #include "text.h"
 #include "types.h"
@@ -316,7 +317,7 @@ const struct const_value *lower_location_value(struct lowerer *l,
     v->type = (struct type *)t;
     v->as.aggregate.count = t->field_count;
     v->as.aggregate.items =
-        arena_alloc(l->m->arena, ir_product(t->field_count + 1, sizeof *v));
+        arena_alloc(l->m->arena, alloc_product(t->field_count + 1, sizeof *v));
     if (l->f != NULL) {
         text_appendf(&function, "%s.%s", l->module_name, l->f->name);
     }

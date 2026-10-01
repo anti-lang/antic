@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "text.h"
 #include "warnings.h"
 
@@ -52,18 +53,7 @@ struct list {
 
 static void list_push(struct list *l, const void *element)
 {
-    if (l->count == l->capacity) {
-        size_t capacity = l->capacity == 0 ? 8 : l->capacity * 2;
-        void *data = capacity <= SIZE_MAX / l->size
-                         ? realloc(l->data, capacity * l->size)
-                         : NULL;
-        if (data == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        l->data = data;
-        l->capacity = capacity;
-    }
+    l->data = alloc_grow(l->data, &l->capacity, l->count, l->size);
     memcpy((char *)l->data + l->count * l->size, element, l->size);
     l->count++;
 }
@@ -1034,14 +1024,10 @@ static struct expr *placeholder(struct parser *p,
                                 const struct format_piece *piece)
 {
     struct parser inner = *p;
-    size_t *origin = malloc(piece->token_count * sizeof *origin);
+    size_t *origin = alloc_zeroed(piece->token_count, sizeof *origin);
     struct expr *e;
     size_t i;
 
-    if (origin == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
     /* The tokens of the piece are both lists at once, so each token is
        its own origin, no doc comment lies between two of them and taken
        is never read. */
@@ -4317,18 +4303,14 @@ bool parse(const char *source, const struct token_list *tokens,
     struct list frameworks = {NULL, 0, 0, sizeof(struct link_name)};
     struct list linux_libraries = {NULL, 0, 0, sizeof(struct link_name)};
     struct list dropped = {NULL, 0, 0, sizeof(struct dropped_doc)};
-    struct token *kept = malloc(tokens->count * sizeof *kept);
-    size_t *origin = malloc(tokens->count * sizeof *origin);
-    bool *taken = calloc(tokens->count, sizeof *taken);
+    struct token *kept = alloc_zeroed(tokens->count, sizeof *kept);
+    size_t *origin = alloc_zeroed(tokens->count, sizeof *origin);
+    bool *taken = alloc_zeroed(tokens->count, sizeof *taken);
     size_t count = 0;
     size_t i;
     bool saw_tests = false;
     bool saw_fixtures = false;
 
-    if (kept == NULL || origin == NULL || taken == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
     /* DESIGN: the grammar rules never see a doc comment. Items, fields and
        the module ask for the comments that precede them, so a comment in
        any other place is dropped. */

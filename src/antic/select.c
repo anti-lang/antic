@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "arith.h"
 #include "attributes.h"
 #include "expand.h"
@@ -249,7 +250,7 @@ static void fail(struct selector *s, const char *format, ...)
         return;
     }
     va_start(args, format);
-    ir_vformat(s->error, s->error_size, format, args);
+    text_vformat(s->error, s->error_size, format, args);
     va_end(args);
     s->failed = true;
 }
@@ -309,7 +310,7 @@ static void count_uses(struct selector *s)
     size_t i;
     size_t k;
 
-    s->uses = ir_alloc(f->temp_count, sizeof *s->uses);
+    s->uses = alloc_zeroed(f->temp_count, sizeof *s->uses);
     for (b = 0; b < f->block_count; b++) {
         for (i = 0; i < f->blocks[b]->count; i++) {
             const struct ir_inst *inst = &f->blocks[b]->insts[i];
@@ -398,9 +399,9 @@ static size_t fold_address(struct selector *s, const struct ir_block *b,
 static void select_params(struct selector *s)
 {
     const struct ir_function *f = s->f;
-    enum ir_type *types = ir_alloc(f->param_count, sizeof *types);
+    enum ir_type *types = alloc_zeroed(f->param_count, sizeof *types);
     struct arg_location *locations =
-        ir_alloc(f->param_count, sizeof *locations);
+        alloc_zeroed(f->param_count, sizeof *locations);
     struct arg_location result;
     size_t i;
 
@@ -459,7 +460,7 @@ static void select_function(struct selector *s)
         mach_vreg_add(s->out, select_is_float(f->temps[v]));
     }
     s->out->block_count = f->block_count;
-    s->out->blocks = ir_alloc(f->block_count, sizeof *s->out->blocks);
+    s->out->blocks = alloc_zeroed(f->block_count, sizeof *s->out->blocks);
     count_uses(s);
     s->b = &s->out->blocks[0];
     select_params(s);
@@ -577,7 +578,7 @@ bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
         if (m->functions[i]->is_extern) {
             continue;
         }
-        out[i] = ir_alloc(1, sizeof *out[i]);
+        out[i] = alloc_zeroed(1, sizeof *out[i]);
         s.f = m->functions[i];
         s.out = out[i];
         select_function(&s);

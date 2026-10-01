@@ -461,37 +461,6 @@ struct ir_module {
     uint32_t memcheck_store;
 };
 
-/* Checked heap memory for the back end. The compiler cannot continue
-   after an allocation fails. These functions then write "antic: out of
-   memory" and end the run with status 70, and never return NULL. A size
-   whose product overflows size_t fails the same way. */
-_Noreturn void ir_out_of_memory(void);
-
-/* Return a * b, and end the run as an allocation failure does when the
-   product overflows size_t. */
-size_t ir_product(size_t a, size_t b);
-
-/* Return zeroed memory for count items of size bytes, or for one item when
-   count is 0, so the result is never NULL. The caller frees it with
-   free. */
-void *ir_alloc(size_t count, size_t size);
-
-/* Resize items to count items of size bytes, as realloc does. The caller
-   frees the result with free. */
-void *ir_resize(void *items, size_t count, size_t size);
-
-/* Return items with room for at least count + 1 items. *capacity starts
-   at 8 and doubles. The caller frees the result with free. */
-void *ir_grow(void *items, size_t *capacity, size_t count, size_t size);
-
-/* Format a message into buffer of size bytes, as vsnprintf does. A
-   message cut to fit ends in three dots, so a reader sees that the rest
-   is missing. */
-void ir_vformat(char *buffer, size_t size, const char *format, va_list args)
-    ATTRIBUTE_PRINTF(3, 0);
-void ir_format(char *buffer, size_t size, const char *format, ...)
-    ATTRIBUTE_PRINTF(3, 4);
-
 void ir_module_init(struct ir_module *m, struct arena *arena,
                     const char *name);
 void ir_module_free(struct ir_module *m);

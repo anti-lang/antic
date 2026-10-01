@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "cpu.h"
 #include "sema_checker.h"
 
@@ -298,19 +299,8 @@ struct symbol *sema_library_item(const struct checker *c,
 static void scope_put(struct scope *s, const struct name *name,
                       struct symbol *sym)
 {
-    if (s->count == s->capacity) {
-        size_t capacity = s->capacity == 0 ? 16 : s->capacity * 2;
-        struct scope_entry *entries =
-            capacity <= SIZE_MAX / sizeof *entries
-                ? realloc(s->entries, capacity * sizeof *entries)
-                : NULL;
-        if (entries == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        s->entries = entries;
-        s->capacity = capacity;
-    }
+    s->entries = alloc_grow(s->entries, &s->capacity, s->count,
+                            sizeof *s->entries);
     s->entries[s->count].name = *name;
     s->entries[s->count].symbol = sym;
     s->count++;
@@ -468,20 +458,8 @@ void sema_narrow(struct checker *c, struct symbol *sym, struct type *t)
             return;
         }
     }
-    if (s->narrowed_count == s->narrowed_capacity) {
-        size_t capacity =
-            s->narrowed_capacity == 0 ? 4 : s->narrowed_capacity * 2;
-        struct narrowing *grown =
-            capacity <= SIZE_MAX / sizeof *grown
-                ? realloc(s->narrowed, capacity * sizeof *grown)
-                : NULL;
-        if (grown == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        s->narrowed = grown;
-        s->narrowed_capacity = capacity;
-    }
+    s->narrowed = alloc_grow(s->narrowed, &s->narrowed_capacity,
+                             s->narrowed_count, sizeof *s->narrowed);
     s->narrowed[s->narrowed_count].symbol = sym;
     s->narrowed[s->narrowed_count].type = t;
     s->narrowed_count++;

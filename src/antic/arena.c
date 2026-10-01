@@ -1,8 +1,9 @@
 #include "arena.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "alloc.h"
 
 /* DESIGN: hand out memory from large blocks and free all of it at the end
    of the compilation. The compiler never frees one node or one token on
@@ -19,7 +20,7 @@ enum { BLOCK_SIZE = 64 * 1024 };
 static size_t align_up(size_t n)
 {
     size_t align = _Alignof(max_align_t);
-    return (n + align - 1) / align * align;
+    return alloc_sum(n, align - 1) / align * align;
 }
 
 void *arena_alloc(struct arena *a, size_t size)
@@ -30,12 +31,9 @@ void *arena_alloc(struct arena *a, size_t size)
 
     size = align_up(size == 0 ? 1 : size);
     if (b == NULL || b->size - b->used < size) {
-        size_t block_size = header + (size > BLOCK_SIZE ? size : BLOCK_SIZE);
-        b = malloc(block_size);
-        if (b == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
+        size_t block_size =
+            alloc_sum(header, size > BLOCK_SIZE ? size : BLOCK_SIZE);
+        b = alloc_resize(NULL, block_size, 1);
         b->next = a->head;
         b->used = header;
         b->size = block_size;

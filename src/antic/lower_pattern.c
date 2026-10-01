@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "alloc.h"
 #include "sema.h"
 #include "text.h"
 #include "types.h"
@@ -35,17 +36,8 @@ struct ir_operand lower_pattern(struct lowerer *l, const struct expr *e)
     /* The one field of a Regex is a pointer, 8 bytes on every target. */
     slot = ir_global_add(l->m, l->module_name, name, empty, sizeof empty, 8);
     slot->mutable = true;
-    if (l->regex_count == l->regex_capacity) {
-        size_t capacity = l->regex_capacity == 0 ? 4 : 2 * l->regex_capacity;
-        struct lower_pattern *grown =
-            realloc(l->regex_literals, capacity * sizeof *grown);
-        if (grown == NULL) {
-            fprintf(stderr, "antic: out of memory\n");
-            exit(1);
-        }
-        l->regex_literals = grown;
-        l->regex_capacity = capacity;
-    }
+    l->regex_literals = alloc_grow(l->regex_literals, &l->regex_capacity,
+                                   l->regex_count, sizeof *l->regex_literals);
     l->regex_literals[l->regex_count].text = text->index;
     l->regex_literals[l->regex_count].length = (int64_t)e->as.text.length;
     l->regex_literals[l->regex_count].slot = slot->index;

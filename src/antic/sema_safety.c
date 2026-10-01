@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "sema_checker.h"
 
 /* The class a function of a body belongs to, or NULL. */
@@ -362,7 +363,6 @@ static bool is_free_field(const struct struct_field *f)
 void sema_note_field_write(struct checker *c, const struct expr *e)
 {
     const struct struct_field *f = written_field(e);
-    struct written_field *w;
 
     if (f == NULL || is_free_field(f) || in_lifecycle_of(c, f->home)) {
         return;
@@ -376,17 +376,8 @@ void sema_note_field_write(struct checker *c, const struct expr *e)
                       (int)f->name.length, f->name.text);
         return;
     }
-    if (c->written_count == c->written_capacity) {
-        size_t capacity = c->written_capacity == 0 ? 8
-                                                   : c->written_capacity * 2;
-        w = realloc(c->written, capacity * sizeof *w);
-        if (w == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        c->written = w;
-        c->written_capacity = capacity;
-    }
+    c->written = alloc_grow(c->written, &c->written_capacity,
+                            c->written_count, sizeof *c->written);
     c->written[c->written_count++].field = f;
 }
 

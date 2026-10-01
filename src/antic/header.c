@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "ir.h"
+#include "alloc.h"
 
 /* The C name of a scalar type. DESIGN: a sized type maps to its <stdint.h>
    name, and int, uint and float to int64_t, uint64_t and double. c_long,
@@ -410,7 +410,7 @@ static bool was_emitted(const struct emitted *e, const struct type *t)
    bounds them. */
 static void mark_emitted(struct emitted *e, const struct type *t)
 {
-    e->items = ir_grow(e->items, &e->capacity, e->count, sizeof *e->items);
+    e->items = alloc_grow(e->items, &e->capacity, e->count, sizeof *e->items);
     e->items[e->count++] = t;
 }
 
@@ -1223,10 +1223,10 @@ static void class_view(struct text *out, const struct symbol *sym,
                        size_t iface_count, struct emitted *done)
 {
     const struct type *t = sym->type;
-    struct table_entry *entries = ir_alloc(sema_table_bound(t),
+    struct table_entry *entries = alloc_zeroed(sema_table_bound(t),
                                            sizeof *entries);
     size_t count = sema_table_of(t, entries);
-    struct text *slots = ir_alloc(count + 1, sizeof *slots);
+    struct text *slots = alloc_zeroed(count + 1, sizeof *slots);
     struct text name = {0};
     struct text to_root = {0};
     const struct item *made;

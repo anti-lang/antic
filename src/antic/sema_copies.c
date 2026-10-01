@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "sema_checker.h"
 
 /* DESIGN: the compiled copies of generics. A generic is checked once,
@@ -32,24 +33,6 @@
    then reach the copy. The names carry the arguments, `max<int>` and
    `List<int>.push`. The symbol of a copy follows from the generic and its
    arguments alone. */
-
-static void *grow(void *items, size_t *capacity, size_t count, size_t size)
-{
-    size_t want;
-    void *p;
-
-    if (count < *capacity) {
-        return items;
-    }
-    want = *capacity == 0 ? 16 : *capacity * 2;
-    p = want <= SIZE_MAX / size ? realloc(items, want * size) : NULL;
-    if (p == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
-    *capacity = want;
-    return p;
-}
 
 /* A copy of a generic function, by the generic and its arguments. */
 struct fn_copy {
@@ -328,7 +311,8 @@ static void add_work(struct copies *k, struct item *from, struct item *to,
         refuse(k, from, REFUSE_DEPTH);
         return;
     }
-    k->work = grow(k->work, &k->work_capacity, k->work_count, sizeof *k->work);
+    k->work = alloc_grow(k->work, &k->work_capacity, k->work_count,
+                         sizeof *k->work);
     k->work[k->work_count].from = from;
     k->work[k->work_count].to = to;
     k->work[k->work_count].map = *map;
@@ -468,8 +452,8 @@ static struct item *type_item(struct copies *k, struct type *copy)
             copy->fields[i].home = copy;
         }
     }
-    k->added = grow(k->added, &k->added_capacity, k->added_count,
-                    sizeof *k->added);
+    k->added = alloc_grow(k->added, &k->added_capacity, k->added_count,
+                          sizeof *k->added);
     k->added[k->added_count++] = made;
     return made;
 }
@@ -545,15 +529,15 @@ static struct item *copy_function(struct copies *k, struct item *generic,
         n->home_module = generic_home(generic);
         n->vis = VIS_PRIVATE;
     }
-    k->fns = grow(k->fns, &k->fn_capacity, k->fn_count, sizeof *k->fns);
+    k->fns = alloc_grow(k->fns, &k->fn_capacity, k->fn_count, sizeof *k->fns);
     k->fns[k->fn_count].generic = generic;
     k->fns[k->fn_count].args = map->args;
     k->fns[k->fn_count].values = map->values;
     k->fns[k->fn_count].count = count;
     k->fns[k->fn_count].copy = n;
     k->fn_count++;
-    k->added = grow(k->added, &k->added_capacity, k->added_count,
-                    sizeof *k->added);
+    k->added = alloc_grow(k->added, &k->added_capacity, k->added_count,
+                          sizeof *k->added);
     k->added[k->added_count++] = n;
     if (!k->failed) {
         add_work(k, generic, n, map);

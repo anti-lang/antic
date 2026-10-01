@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "text.h"
 #include "../rt/utf.h"
 
@@ -272,19 +273,8 @@ static struct token *push(struct lexer *lx, enum token_kind kind,
     struct token_list *list = lx->out;
     struct token *t;
 
-    if (list->count == list->capacity) {
-        size_t capacity = list->capacity == 0 ? 256 : list->capacity * 2;
-        struct token *items =
-            capacity <= SIZE_MAX / sizeof *items
-                ? realloc(list->items, capacity * sizeof *items)
-                : NULL;
-        if (items == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        list->items = items;
-        list->capacity = capacity;
-    }
+    list->items = alloc_grow(list->items, &list->capacity, list->count,
+                             sizeof *list->items);
     t = &list->items[list->count++];
     memset(t, 0, sizeof *t);
     t->kind = kind;
@@ -1187,19 +1177,8 @@ static struct format_piece *add_piece(struct piece_list *list)
 {
     struct format_piece *piece;
 
-    if (list->count == list->capacity) {
-        size_t capacity = list->capacity == 0 ? 4 : list->capacity * 2;
-        struct format_piece *items =
-            capacity <= SIZE_MAX / sizeof *items
-                ? realloc(list->items, capacity * sizeof *items)
-                : NULL;
-        if (items == NULL) {
-            fputs("antic: out of memory\n", stderr);
-            exit(70);
-        }
-        list->items = items;
-        list->capacity = capacity;
-    }
+    list->items = alloc_grow(list->items, &list->capacity, list->count,
+                             sizeof *list->items);
     piece = &list->items[list->count++];
     memset(piece, 0, sizeof *piece);
     return piece;

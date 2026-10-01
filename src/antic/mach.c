@@ -6,13 +6,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "select.h"
 
 struct mach_inst *mach_append(struct mach_block *b)
 {
     struct mach_inst *inst;
 
-    b->insts = ir_grow(b->insts, &b->capacity, b->count, sizeof *b->insts);
+    b->insts = alloc_grow(b->insts, &b->capacity, b->count, sizeof *b->insts);
     inst = &b->insts[b->count++];
     memset(inst, 0, sizeof *inst);
     return inst;
@@ -89,10 +90,10 @@ uint32_t mach_slot_add(struct mach_function *f, uint64_t size,
                        uint64_t align)
 {
     if (f->slot_count >= UINT32_MAX) {
-        ir_out_of_memory();
+        alloc_out_of_memory();
     }
-    f->slots = ir_grow(f->slots, &f->slot_capacity, f->slot_count,
-                       sizeof *f->slots);
+    f->slots = alloc_grow(f->slots, &f->slot_capacity, f->slot_count,
+                          sizeof *f->slots);
     f->slots[f->slot_count].size = size;
     f->slots[f->slot_count].align = align;
     f->slots[f->slot_count].offset = 0;
@@ -102,9 +103,9 @@ uint32_t mach_slot_add(struct mach_function *f, uint64_t size,
 uint32_t mach_vreg_add(struct mach_function *f, bool fp)
 {
     if (f->vreg_count >= UINT32_MAX) {
-        ir_out_of_memory();
+        alloc_out_of_memory();
     }
-    f->fp = ir_grow(f->fp, &f->fp_capacity, f->vreg_count, sizeof *f->fp);
+    f->fp = alloc_grow(f->fp, &f->fp_capacity, f->vreg_count, sizeof *f->fp);
     f->fp[f->vreg_count] = fp;
     return f->vreg_count++;
 }

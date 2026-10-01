@@ -5,6 +5,7 @@
 
 #include <stdlib.h>
 
+#include "alloc.h"
 #include "sema.h"
 #include "target.h"
 #include "text.h"
@@ -338,7 +339,7 @@ void lower_class_construct(struct lowerer *l, const struct item *it)
     self = lower_temp(l, f->params[0].temp);
     ir_call(l->f, l->b, IR_VOID, ir_func_op(lower_init_function(l, t)), &self,
             1);
-    args = ir_alloc(f->param_count, sizeof *args);
+    args = alloc_zeroed(f->param_count, sizeof *args);
     for (i = 0; i < f->param_count; i++) {
         args[i] = lower_temp(l, f->params[i].temp);
     }
@@ -432,7 +433,7 @@ struct ir_function *lower_interface_thunk(struct lowerer *l,
     l->b = entry;
     /* The thunk passes on each IR parameter as it came, so a parameter
        of two words passes as two. */
-    args = ir_alloc(f->param_count + 1, sizeof *args);
+    args = alloc_zeroed(f->param_count + 1, sizeof *args);
     back = lower_temp(l, ir_binary(f, entry, IR_SUB, IR_I64,
                                    ir_int_op(IR_I64, 0),
                                    lower_field_offset(l, sub->home,
@@ -501,7 +502,7 @@ struct ir_function *lower_reach_thunk(struct lowerer *l,
     }
     l->f = f;
     l->b = ir_block_add(f);
-    args = ir_alloc(f->param_count + 1, sizeof *args);
+    args = alloc_zeroed(f->param_count + 1, sizeof *args);
     args[0] = lower_offset_address(l, lower_temp(l, f->params[0].temp),
                                    lower_field_offset(l, sub->home,
                                                       &sub->name));
@@ -631,8 +632,8 @@ struct ir_operand lower_construct(struct lowerer *l,
         lower_hook_object(l, HOOK_CREATED, dest);
         return lower_none();
     }
-    args = ir_alloc(2 * e->as.call.arg_count + 1, sizeof *args);
-    values = ir_alloc(e->as.call.arg_count + 1, sizeof *values);
+    args = alloc_zeroed(2 * e->as.call.arg_count + 1, sizeof *args);
+    values = alloc_zeroed(e->as.call.arg_count + 1, sizeof *values);
     args[0] = dest;
     count = 1;
     /* An argument at a parameter of the form of two words, a `keep own`

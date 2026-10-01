@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
+
 /* The walk over what the entries reach. The work list holds functions,
    then globals plus the count of functions, each once, so it never
    grows past the sum of the two counts. */
@@ -117,7 +119,7 @@ static uint64_t global_hash(const struct ir_global *g)
    by index, or IR_NO_INDEX, found through a table hashed by the name. */
 static uint32_t *definitions_of(const struct ir_module *m)
 {
-    uint32_t *out = ir_alloc(m->global_count, sizeof *out);
+    uint32_t *out = alloc_zeroed(m->global_count, sizeof *out);
     uint32_t *table;
     size_t capacity = 1;
     size_t i;
@@ -125,7 +127,7 @@ static uint32_t *definitions_of(const struct ir_module *m)
     while (capacity < 2 * m->global_count + 2) {
         capacity *= 2;
     }
-    table = ir_alloc(capacity, sizeof *table);
+    table = alloc_zeroed(capacity, sizeof *table);
     for (i = 0; i < capacity; i++) {
         table[i] = IR_NO_INDEX;
     }
@@ -179,12 +181,12 @@ void ir_reach(const struct ir_module *m, const char *entry, bool all,
     bool has_main = false;
     size_t i;
 
-    out->functions = ir_alloc(m->function_count, sizeof *out->functions);
-    out->globals = ir_alloc(m->global_count, sizeof *out->globals);
+    out->functions = alloc_zeroed(m->function_count, sizeof *out->functions);
+    out->globals = alloc_zeroed(m->global_count, sizeof *out->globals);
     w.m = m;
     w.out = out;
     w.defined = defined;
-    w.work = ir_alloc(m->function_count + m->global_count, sizeof *w.work);
+    w.work = alloc_zeroed(m->function_count + m->global_count, sizeof *w.work);
     w.work_count = 0;
     for (i = 0; entry != NULL && !all && i < m->function_count; i++) {
         has_main = has_main || is_main_of(m->functions[i], entry);

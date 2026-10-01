@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "antl.h"
 #include "cpu.h"
 #include "driver.h"
@@ -441,29 +442,23 @@ static int run(int argc, char **argv, struct options *o)
 int main(int argc, char **argv)
 {
     struct options options = {0};
-    int status = 70;
+    int status;
 
     /* At most argc - 1 arguments are library files or link inputs. */
-    options.libraries = malloc((size_t)argc * sizeof *options.libraries);
-    options.objects = malloc((size_t)argc * sizeof *options.objects);
-    options.roots = malloc((size_t)argc * sizeof *options.roots);
-    options.dependencies = malloc((size_t)argc * sizeof *options.dependencies);
-    options.attribution = malloc((size_t)argc * sizeof *options.attribution);
-    options.frameworks = malloc((size_t)argc * sizeof *options.frameworks);
+    options.libraries = alloc_zeroed((size_t)argc, sizeof *options.libraries);
+    options.objects = alloc_zeroed((size_t)argc, sizeof *options.objects);
+    options.roots = alloc_zeroed((size_t)argc, sizeof *options.roots);
+    options.dependencies =
+        alloc_zeroed((size_t)argc, sizeof *options.dependencies);
+    options.attribution =
+        alloc_zeroed((size_t)argc, sizeof *options.attribution);
+    options.frameworks = alloc_zeroed((size_t)argc, sizeof *options.frameworks);
     options.linux_libraries =
-        malloc((size_t)argc * sizeof *options.linux_libraries);
+        alloc_zeroed((size_t)argc, sizeof *options.linux_libraries);
     options.trace_patterns =
-        malloc((size_t)argc * sizeof *options.trace_patterns);
-    options.inject = malloc((size_t)argc * sizeof *options.inject);
-    if (options.libraries == NULL || options.objects == NULL ||
-        options.roots == NULL || options.dependencies == NULL ||
-        options.attribution == NULL || options.frameworks == NULL ||
-        options.linux_libraries == NULL || options.trace_patterns == NULL || options.inject == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        goto done;
-    }
+        alloc_zeroed((size_t)argc, sizeof *options.trace_patterns);
+    options.inject = alloc_zeroed((size_t)argc, sizeof *options.inject);
     status = run(argc, argv, &options);
-done:
     free((void *)options.libraries);
     free((void *)options.objects);
     free((void *)options.roots);

@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "arith.h"
 #include "pattern.h"
 #include "sema_checker.h"
@@ -2223,11 +2224,7 @@ static bool layout_in(const struct type *t, uint64_t *size, uint64_t *align,
     case TYPE_TUPLE:
         known = ptr_map_get(answered, t);
         if (known == NULL) {
-            known = calloc(1, sizeof *known);
-            if (known == NULL) {
-                fputs("antic: out of memory\n", stderr);
-                exit(70);
-            }
+            known = alloc_zeroed(1, sizeof *known);
             known->fixed = fields_layout(t, &known->size, &known->align,
                                          answered);
             ptr_map_put(answered, t, known);

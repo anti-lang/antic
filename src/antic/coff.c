@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "arith.h"
 #include "ir.h"
 
@@ -165,7 +166,7 @@ static struct entry *find(struct table *t, const char *name, size_t length,
     if (insert && 2 * (t->count + 1) > t->capacity) {
         struct table grown = {0};
         grown.capacity = t->capacity > 0 ? 2 * t->capacity : 64;
-        grown.items = ir_alloc(grown.capacity, sizeof *grown.items);
+        grown.items = alloc_zeroed(grown.capacity, sizeof *grown.items);
         for (i = 0; i < t->capacity; i++) {
             if (t->items[i].name != NULL) {
                 *find(&grown, t->items[i].name, t->items[i].length, true) =
@@ -336,9 +337,9 @@ static bool parse(struct join *j, struct object *o, uint16_t *machine)
         text_appendf(j->error, "%s has a damaged string table", o->in->name);
         return false;
     }
-    o->sections = ir_alloc(o->section_count, sizeof *o->sections);
-    o->map = ir_alloc(o->symbol_count, sizeof *o->map);
-    o->emits = ir_alloc(o->symbol_count, sizeof *o->emits);
+    o->sections = alloc_zeroed(o->section_count, sizeof *o->sections);
+    o->map = alloc_zeroed(o->symbol_count, sizeof *o->map);
+    o->emits = alloc_zeroed(o->symbol_count, sizeof *o->emits);
     for (i = 0; i < o->section_count; i++) {
         struct section *s = &o->sections[i];
         const unsigned char *h = d + HEADER_SIZE + SECTION_SIZE * i;
@@ -895,7 +896,7 @@ bool coff_join(const struct coff_input *inputs, size_t count,
     size_t k;
 
     memset(&j, 0, sizeof j);
-    j.objects = ir_alloc(count, sizeof *j.objects);
+    j.objects = alloc_zeroed(count, sizeof *j.objects);
     j.count = count;
     j.error = error;
     for (k = 0; ok && k < count; k++) {
@@ -932,7 +933,7 @@ bool coff_join(const struct coff_input *inputs, size_t count,
         }
     }
     if (ok) {
-        headers = ir_alloc(sections, SECTION_SIZE);
+        headers = alloc_zeroed(sections, SECTION_SIZE);
         /* The body starts after the headers, so its offsets are those of
            the file. */
         text_append_bytes(&body, headers, HEADER_SIZE);
@@ -1055,12 +1056,10 @@ static bool read_index(const unsigned char *data, size_t size,
         return false;
     }
     index->offsets = member + 4;
-    index->names = calloc((size_t)index->count + 1, sizeof *index->names);
-    index->lengths = calloc((size_t)index->count + 1, sizeof *index->lengths);
-    if (index->names == NULL || index->lengths == NULL) {
-        fputs("antic: out of memory\n", stderr);
-        exit(70);
-    }
+    index->names =
+        alloc_zeroed((size_t)index->count + 1, sizeof *index->names);
+    index->lengths =
+        alloc_zeroed((size_t)index->count + 1, sizeof *index->lengths);
     names = (const char *)member + 4 + 4 * (size_t)index->count;
     end = (const char *)member + length;
     for (i = 0; i < index->count; i++) {

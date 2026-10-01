@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "target.h"
 #include "text.h"
 #include "types.h"
@@ -17,7 +18,7 @@ bool lower_same_name(const struct name *a, const struct name *b)
    C header reads as well. The caller frees the entries. */
 static void table_of(const struct type *t, struct table *out)
 {
-    out->entries = ir_alloc(sema_table_bound(t), sizeof *out->entries);
+    out->entries = alloc_zeroed(sema_table_bound(t), sizeof *out->entries);
     out->count = sema_table_of(t, out->entries);
 }
 

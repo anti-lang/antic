@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
+
 /* DESIGN: `.file` and `.loc` give llvm-mc a line table and nothing else.
    A debugger needs a compile unit as well: without one it finds no source
    file, and `breakpoint set --file --line` resolves to nothing. llvm-mc
@@ -96,7 +98,7 @@ static void mark(const struct debug *d, const struct text *out, size_t start)
         s->items[s->count - 1].end = out->length;
         return;
     }
-    s->items = ir_grow(s->items, &s->capacity, s->count, sizeof *s->items);
+    s->items = alloc_grow(s->items, &s->capacity, s->count, sizeof *s->items);
     s->items[s->count].start = start;
     s->items[s->count].end = out->length;
     s->count++;

@@ -5,94 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
+
 /* Growable arrays of the module are plain heap arrays, released by
    ir_module_free. Names and global bytes go into the memory pool. */
-
-void ir_out_of_memory(void)
-{
-    fputs("antic: out of memory\n", stderr);
-    exit(70);
-}
-
-size_t ir_product(size_t a, size_t b)
-{
-    if (b != 0 && a > SIZE_MAX / b) {
-        ir_out_of_memory();
-    }
-    return a * b;
-}
-
-void *ir_alloc(size_t count, size_t size)
-{
-    void *items;
-
-    if (count == 0) {
-        count = 1;
-    }
-    if (size != 0 && count > SIZE_MAX / size) {
-        ir_out_of_memory();
-    }
-    items = calloc(count, size == 0 ? 1 : size);
-    if (items == NULL) {
-        ir_out_of_memory();
-    }
-    return items;
-}
-
-void *ir_resize(void *items, size_t count, size_t size)
-{
-    void *resized;
-
-    if (size != 0 && count > SIZE_MAX / size) {
-        ir_out_of_memory();
-    }
-    resized = realloc(items, count * size == 0 ? 1 : count * size);
-    if (resized == NULL) {
-        ir_out_of_memory();
-    }
-    return resized;
-}
-
-void *ir_grow(void *items, size_t *capacity, size_t count, size_t size)
-{
-    size_t next;
-    void *resized;
-
-    if (count < *capacity) {
-        return items;
-    }
-    if (*capacity > SIZE_MAX / 2) {
-        ir_out_of_memory();
-    }
-    next = *capacity == 0 ? 8 : *capacity * 2;
-    resized = ir_resize(items, next, size);
-    *capacity = next;
-    return resized;
-}
-
-void ir_vformat(char *buffer, size_t size, const char *format, va_list args)
-{
-    int n;
-
-    if (size == 0) {
-        return;
-    }
-    n = vsnprintf(buffer, size, format, args);
-    if (n < 0) {
-        buffer[0] = '\0';
-    } else if ((size_t)n >= size && size >= 4) {
-        memcpy(buffer + size - 4, "...", 4);
-    }
-}
-
-void ir_format(char *buffer, size_t size, const char *format, ...)
-{
-    va_list args;
-
-    va_start(args, format);
-    ir_vformat(buffer, size, format, args);
-    va_end(args);
-}
 
 static const char *keep(struct arena *arena, const char *s)
 {
@@ -236,14 +152,14 @@ static uint32_t add_agg(struct ir_module *m, const struct ir_aggtype *key,
     t->name = keep(m->arena, key->name);
     t->length_text = keep(m->arena, key->length_text);
     t->fields = arena_alloc(m->arena,
-                            ir_product(count + 1, sizeof *t->fields));
+                            alloc_product(count + 1, sizeof *t->fields));
     for (i = 0; i < count; i++) {
         t->fields[i] = fields[i];
         t->fields[i].name = keep(m->arena, fields[i].name);
     }
     t->field_count = count;
-    m->aggs = ir_grow(m->aggs, &m->agg_capacity, m->agg_count,
-                      sizeof *m->aggs);
+    m->aggs = alloc_grow(m->aggs, &m->agg_capacity, m->agg_count,
+                         sizeof *m->aggs);
     m->aggs[m->agg_count] = t;
     return (uint32_t)m->agg_count++;
 }
@@ -257,7 +173,7 @@ uint32_t ir_file_add(struct ir_module *m, const char *path)
             return (uint32_t)i;
         }
     }
-    m->files = ir_grow(m->files, &m->file_capacity, m->file_count,
+    m->files = alloc_grow(m->files, &m->file_capacity, m->file_count,
                     sizeof *m->files);
     m->files[m->file_count] = keep(m->arena, path);
     return (uint32_t)m->file_count++;
@@ -335,8 +251,8 @@ static uint32_t add_sym(struct ir_module *m, const struct ir_sym *key)
             return (uint32_t)i;
         }
     }
-    m->syms = ir_grow(m->syms, &m->sym_capacity, m->sym_count,
-                      sizeof *m->syms);
+    m->syms = alloc_grow(m->syms, &m->sym_capacity, m->sym_count,
+                         sizeof *m->syms);
     m->syms[m->sym_count] = *key;
     return (uint32_t)m->sym_count++;
 }
@@ -409,7 +325,7 @@ static struct ir_function *new_function(struct ir_module *m,
 {
     struct ir_function *f = arena_alloc(m->arena, sizeof *f);
 
-    m->functions = ir_grow(m->functions, &m->function_capacity,
+    m->functions = alloc_grow(m->functions, &m->function_capacity,
                         m->function_count, sizeof *m->functions);
     f->index = (uint32_t)m->function_count;
     f->file = IR_NO_INDEX;
@@ -465,10 +381,10 @@ uint32_t ir_temp(struct ir_function *f, enum ir_type type)
 {
     /* A temporary is a 32-bit index, and IR_NO_RESULT is the last one. */
     if (f->temp_count >= IR_NO_RESULT - 1) {
-        ir_out_of_memory();
+        alloc_out_of_memory();
     }
-    f->temps = ir_grow(f->temps, &f->temp_capacity, f->temp_count,
-                       sizeof *f->temps);
+    f->temps = alloc_grow(f->temps, &f->temp_capacity, f->temp_count,
+                          sizeof *f->temps);
     f->temps[f->temp_count] = type;
     return f->temp_count++;
 }
@@ -477,7 +393,7 @@ uint32_t ir_param_add(struct ir_function *f, enum ir_type type, uint32_t agg)
 {
     struct ir_param *p;
 
-    f->params = ir_grow(f->params, &f->param_capacity, f->param_count,
+    f->params = alloc_grow(f->params, &f->param_capacity, f->param_count,
                      sizeof *f->params);
     p = &f->params[f->param_count++];
     p->type = type;
@@ -490,9 +406,9 @@ uint32_t ir_param_add(struct ir_function *f, enum ir_type type, uint32_t agg)
 
 struct ir_block *ir_block_add(struct ir_function *f)
 {
-    struct ir_block *b = ir_alloc(1, sizeof *b);
+    struct ir_block *b = alloc_zeroed(1, sizeof *b);
 
-    f->blocks = ir_grow(f->blocks, &f->block_capacity, f->block_count,
+    f->blocks = alloc_grow(f->blocks, &f->block_capacity, f->block_count,
                      sizeof *f->blocks);
     b->index = (uint32_t)f->block_count;
     f->blocks[f->block_count++] = b;
@@ -506,7 +422,7 @@ struct ir_global *ir_global_add(struct ir_module *m, const char *module,
     struct ir_global *g = arena_alloc(m->arena, sizeof *g);
 
     memset(g, 0, sizeof *g);
-    m->globals = ir_grow(m->globals, &m->global_capacity, m->global_count,
+    m->globals = alloc_grow(m->globals, &m->global_capacity, m->global_count,
                       sizeof *m->globals);
     g->index = (uint32_t)m->global_count;
     g->module = keep(m->arena, module);
@@ -538,7 +454,7 @@ struct ir_class *ir_class_add(struct ir_module *m, const char *module,
     struct ir_class *c = arena_alloc(m->arena, sizeof *c);
 
     memset(c, 0, sizeof *c);
-    m->classes = ir_grow(m->classes, &m->class_capacity, m->class_count,
+    m->classes = alloc_grow(m->classes, &m->class_capacity, m->class_count,
                       sizeof *m->classes);
     c->module = keep(m->arena, module);
     c->name = keep(m->arena, name);
@@ -555,7 +471,7 @@ void ir_class_subtable(struct ir_class *c, uint32_t interface, uint32_t table,
                        uint32_t agg, uint32_t field)
 {
     struct ir_subtable *grown =
-        ir_resize(c->subtables, c->subtable_count + 1, sizeof *grown);
+        alloc_resize(c->subtables, c->subtable_count + 1, sizeof *grown);
 
     c->subtables = grown;
     c->subtables[c->subtable_count].interface = interface;
@@ -570,7 +486,7 @@ void ir_class_inject(struct ir_module *m, struct ir_class *c,
                      uint32_t descriptor, bool final)
 {
     struct ir_inject *grown =
-        ir_resize(c->injects, c->inject_count + 1, sizeof *grown);
+        alloc_resize(c->injects, c->inject_count + 1, sizeof *grown);
 
     c->injects = grown;
     c->injects[c->inject_count].interface = keep(m->arena, interface);
@@ -584,7 +500,7 @@ void ir_class_provides(struct ir_module *m, struct ir_class *c,
                        const char *interface, uint32_t descriptor)
 {
     struct ir_provides *grown =
-        ir_resize(c->provides, c->provides_count + 1, sizeof *grown);
+        alloc_resize(c->provides, c->provides_count + 1, sizeof *grown);
 
     c->provides = grown;
     c->provides[c->provides_count].interface = keep(m->arena, interface);
@@ -595,7 +511,7 @@ void ir_class_provides(struct ir_module *m, struct ir_class *c,
 void ir_class_mutable(struct ir_class *c, uint32_t field)
 {
     uint32_t *grown =
-        ir_resize(c->mutable_fields, c->mutable_count + 1, sizeof *grown);
+        alloc_resize(c->mutable_fields, c->mutable_count + 1, sizeof *grown);
 
     c->mutable_fields = grown;
     c->mutable_fields[c->mutable_count++] = field;
@@ -610,7 +526,7 @@ struct ir_const *ir_const_agg(struct ir_module *m, struct ir_vtype type,
     c->type = type;
     c->item_count = count;
     if (count > SIZE_MAX / sizeof *c->items) {
-        ir_out_of_memory();
+        alloc_out_of_memory();
     }
     c->items = arena_alloc(m->arena, (count == 0 ? 1 : count) *
                                      sizeof *c->items);
@@ -751,7 +667,7 @@ static struct ir_inst *append(const struct ir_function *f,
 {
     struct ir_inst *inst;
 
-    b->insts = ir_grow(b->insts, &b->capacity, b->count, sizeof *b->insts);
+    b->insts = alloc_grow(b->insts, &b->capacity, b->count, sizeof *b->insts);
     inst = &b->insts[b->count++];
     memset(inst, 0, sizeof *inst);
     inst->of = ir_scalar(IR_VOID);
@@ -770,7 +686,7 @@ void ir_inst_add(struct ir_block *b, const struct ir_inst *inst)
     *copy = *inst;
     copy->args = NULL;
     if (inst->arg_count > 0) {
-        copy->args = ir_alloc(inst->arg_count, sizeof *copy->args);
+        copy->args = alloc_zeroed(inst->arg_count, sizeof *copy->args);
         memcpy(copy->args, inst->args, inst->arg_count * sizeof *copy->args);
     }
 }
@@ -835,7 +751,7 @@ uint32_t ir_entry_slot(struct ir_function *f, struct ir_vtype of)
     while (at < b->count && b->insts[at].op == IR_SLOT) {
         at++;
     }
-    b->insts = ir_grow(b->insts, &b->capacity, b->count, sizeof *b->insts);
+    b->insts = alloc_grow(b->insts, &b->capacity, b->count, sizeof *b->insts);
     memmove(&b->insts[at + 1], &b->insts[at],
             (b->count - at) * sizeof *b->insts);
     b->count++;
@@ -875,7 +791,7 @@ uint32_t ir_entry_zero_slot(struct ir_function *f)
     while (at < b->count && b->insts[at].op == IR_SLOT) {
         at++;
     }
-    b->insts = ir_grow(b->insts, &b->capacity, b->count, sizeof *b->insts);
+    b->insts = alloc_grow(b->insts, &b->capacity, b->count, sizeof *b->insts);
     memmove(&b->insts[at + 1], &b->insts[at],
             (b->count - at) * sizeof *b->insts);
     b->count++;
@@ -991,7 +907,7 @@ void ir_vsplat(struct ir_function *f, struct ir_block *b, enum ir_type lane,
 
 static struct ir_operand *operand_list(size_t count)
 {
-    return ir_alloc(count, sizeof(struct ir_operand));
+    return alloc_zeroed(count, sizeof(struct ir_operand));
 }
 
 void ir_vselect(struct ir_function *f, struct ir_block *b, enum ir_type lane,
@@ -1048,7 +964,7 @@ uint32_t ir_call(struct ir_function *f, struct ir_block *b, enum ir_type type,
     inst->a = callee;
     inst->arg_count = arg_count;
     if (arg_count > 0) {
-        inst->args = ir_alloc(arg_count, sizeof *inst->args);
+        inst->args = alloc_zeroed(arg_count, sizeof *inst->args);
         memcpy(inst->args, args, arg_count * sizeof *inst->args);
     }
     return result;

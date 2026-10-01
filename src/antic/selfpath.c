@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
+
 #if !defined(_WIN32)
 #include <sys/stat.h>
 #endif
@@ -35,10 +37,7 @@ static bool self_path(struct text *out)
     if (count <= 0) {
         return false;
     }
-    path = malloc((size_t)count);
-    if (path == NULL) {
-        return false;
-    }
+    path = alloc_zeroed((size_t)count, 1);
     if (WideCharToMultiByte(CP_UTF8, 0, wide, -1, path, count, NULL,
                             NULL) <= 0) {
         free(path);
@@ -63,8 +62,8 @@ static bool self_path(struct text *out)
     if (size == 0) {
         return false;
     }
-    path = malloc(size);
-    if (path == NULL || _NSGetExecutablePath(path, &size) != 0) {
+    path = alloc_zeroed(size, 1);
+    if (_NSGetExecutablePath(path, &size) != 0) {
         free(path);
         return false;
     }
@@ -133,15 +132,16 @@ bool absolute_path(const char *path, struct text *out)
     bool ok = false;
     int i;
 
-    if (count <= 0 || (wide = malloc((size_t)count * sizeof *wide)) == NULL) {
+    if (count <= 0) {
         return false;
     }
+    wide = alloc_zeroed((size_t)count, sizeof *wide);
     MultiByteToWideChar(CP_UTF8, 0, path, -1, wide, count);
     length = GetFullPathNameW(wide, 0, NULL, NULL);
-    full = length > 0 ? malloc((size_t)length * sizeof *full) : NULL;
+    full = length > 0 ? alloc_zeroed(length, sizeof *full) : NULL;
     if (full != NULL && GetFullPathNameW(wide, length, full, NULL) > 0) {
         count = WideCharToMultiByte(CP_UTF8, 0, full, -1, NULL, 0, NULL, NULL);
-        bytes = count > 0 ? malloc((size_t)count) : NULL;
+        bytes = count > 0 ? alloc_zeroed((size_t)count, 1) : NULL;
         if (bytes != NULL &&
             WideCharToMultiByte(CP_UTF8, 0, full, -1, bytes, count, NULL,
                                 NULL) > 0) {

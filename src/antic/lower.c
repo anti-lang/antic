@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "../rt/f16.h"
+#include "alloc.h"
 #include "arith.h"
 #include "sema.h"
 #include "target.h"
@@ -155,7 +156,7 @@ static char *name_of_type(const struct type *t, bool qualified)
 static char *pair_name(void)
 {
     static const char name[] = "fn(...)";
-    char *copy = ir_alloc(sizeof name, 1);
+    char *copy = alloc_zeroed(sizeof name, 1);
 
     memcpy(copy, name, sizeof name);
     return copy;
@@ -180,7 +181,7 @@ uint32_t lower_agg_of(struct lowerer *l, const struct type *t)
         free(name);
         return agg;
     }
-    fields = ir_alloc(count + 1, sizeof *fields);
+    fields = alloc_zeroed(count + 1, sizeof *fields);
     if (t->kind == TYPE_ARRAY) {
         struct text text = {0};
         struct ir_vtype element = lower_vtype_of(l, t->element);
@@ -196,7 +197,7 @@ uint32_t lower_agg_of(struct lowerer *l, const struct type *t)
         text_free(&text);
     } else if (type_has_fields(t)) {
         for (i = 0; i < count; i++) {
-            char *field = ir_alloc(t->fields[i].name.length + 1, 1);
+            char *field = alloc_zeroed(t->fields[i].name.length + 1, 1);
             memcpy(field, t->fields[i].name.text, t->fields[i].name.length);
             field[t->fields[i].name.length] = '\0';
             fields[i].name = field;
@@ -294,7 +295,7 @@ struct ir_block *lower_new_block(struct lowerer *l)
    NUL-terminated copy of name, which the caller frees with free. */
 char *lower_cstr(const struct name *name)
 {
-    char *s = ir_alloc(name->length + 1, 1);
+    char *s = alloc_zeroed(name->length + 1, 1);
 
     memcpy(s, name->text, name->length);
     s[name->length] = '\0';
@@ -342,7 +343,7 @@ struct ir_global *lower_find_global(const struct ir_module *m,
 /* A copy of the text of t, which the caller frees with free. */
 char *lower_copy_text(const struct text *t)
 {
-    char *copy = ir_alloc(t->length + 1, 1);
+    char *copy = alloc_zeroed(t->length + 1, 1);
 
     memcpy(copy, text_cstr(t), t->length + 1);
     return copy;

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "attributes.h"
 #include "cpu.h"
 
@@ -30,7 +31,7 @@ static void fail(struct verifier *v, const char *format, ...)
     va_list args;
 
     va_start(args, format);
-    ir_vformat(message, sizeof message, format, args);
+    text_vformat(message, sizeof message, format, args);
     va_end(args);
     ir_name_append(v->errors, v->f->module, v->f->name);
     if (v->b != NULL) {
@@ -507,8 +508,8 @@ static void check_definitions(struct verifier *v)
     const struct ir_function *f = v->f;
     size_t words = f->temp_count / 64 + 1;
     size_t n = f->block_count;
-    uint64_t *out = ir_alloc(ir_product(n + 1, words), sizeof *out);
-    uint64_t *in = ir_alloc(words, sizeof *in);
+    uint64_t *out = alloc_zeroed(alloc_product(n + 1, words), sizeof *out);
+    uint64_t *in = alloc_zeroed(words, sizeof *in);
     bool changed = true;
     size_t b;
     size_t i;

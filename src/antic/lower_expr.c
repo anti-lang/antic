@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "alloc.h"
 #include "sema.h"
 #include "target.h"
 #include "text.h"
@@ -1820,8 +1821,8 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     } else if (!direct) {
         target = lower_expr(l, callee);
     }
-    args = ir_alloc(2 * n + 3, sizeof *args);
-    values = ir_alloc(n + 1, sizeof *values);
+    args = alloc_zeroed(2 * n + 3, sizeof *args);
+    values = alloc_zeroed(n + 1, sizeof *values);
     given = 0;
     if (bound.kind != IR_NONE) {
         args[given++] = bound;
