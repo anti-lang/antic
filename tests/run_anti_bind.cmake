@@ -24,7 +24,7 @@
 # elsewhere, as on the test machines, puts that one first on PATH.
 if(CLANG_DIR)
     file(TO_NATIVE_PATH "${CLANG_DIR}/bin" clang_bin)
-    if(WIN32)
+    if(HOST MATCHES "^windows-")
         set(ENV{PATH} "${clang_bin};$ENV{PATH}")
     else()
         set(ENV{PATH} "${clang_bin}:$ENV{PATH}")
@@ -147,6 +147,30 @@ if(CASE STREQUAL "header")
             message(FATAL_ERROR "${name}.h differs from ${DUMP}/${name}.h\n${got}")
         endif()
     endforeach()
+    # M26: the header takes the last segment of the module path, whatever
+    # the library file is called and however its path is written. A
+    # Windows host names it with backslashes as well.
+    file(MAKE_DIRECTORY "${WORK}/renamed")
+    file(COPY_FILE "${WORK}/geo.antl" "${WORK}/renamed/other.antl")
+    set(spellings "${WORK}/renamed/other.antl")
+    if(HOST MATCHES "^windows-")
+        file(TO_NATIVE_PATH "${WORK}/renamed/other.antl" native)
+        list(APPEND spellings "${native}")
+    endif()
+    foreach(library IN LISTS spellings)
+        file(REMOVE_RECURSE "${WORK}/renamed-out")
+        run("${ANTI}" bind --header "${library}" -o "${WORK}/renamed-out"
+            --runtime "${RUNTIME}" -I "${SOURCES}")
+        file(GLOB written RELATIVE "${WORK}/renamed-out" "${WORK}/renamed-out/*")
+        if(NOT written STREQUAL "geo.h")
+            message(FATAL_ERROR "${library} gave ${written}, not geo.h")
+        endif()
+        file(READ "${WORK}/renamed-out/geo.h" got)
+        file(READ "${DUMP}/geo.h" wanted)
+        if(NOT got STREQUAL wanted)
+            message(FATAL_ERROR "the header of ${library} differs from geo.h")
+        endif()
+    endforeach()
 elseif(CASE STREQUAL "clang")
     # tests/bind/layout.h holds one of each form. The module, the shim and
     # the warnings are fixed, the module compiles, the two probes agree and
@@ -169,7 +193,7 @@ elseif(CASE STREQUAL "escaped_path")
     # path stands on every host.
     # file() reads a backslash as a separator, so a POSIX host makes the
     # directory and the copy with its own commands.
-    if(WIN32)
+    if(HOST MATCHES "^windows-")
         file(MAKE_DIRECTORY "${WORK}/escaped")
         file(COPY_FILE "${BIND}/layout.h" "${WORK}/escaped/layout.h")
         file(TO_NATIVE_PATH "${WORK}/escaped/layout.h" header)

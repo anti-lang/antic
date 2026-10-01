@@ -5,48 +5,48 @@
 #include <string.h>
 
 #include "antic.h"
+#include "arena.h"
 #include "bind.h"
 #include "bindmodel.h"
+#include "deps.h"
 #include "driver.h"
 #include "files.h"
 #include "fmt.h"
 #include "modpath.h"
 #include "text.h"
+#include "units.h"
 
 /* DESIGN: the header comes from the same driver call that `antic --lib`
    writes its header with, over the interfaces of the library file and
    its imports. The two cannot drift, and the test anti_bind_header
    compares their bytes. The file takes the name of the last segment of
-   the module, as the library of --lib does without -o. */
+   the module, as the library of --lib does without -o. The module path
+   comes from the package header of the library file, so the name of the
+   file and the separators of its path decide nothing. */
 int bind_header(const char *library, const char *out_dir,
                 const char *runtime, const char **roots, size_t root_count)
 {
     struct options o;
+    struct arena arena = {0};
+    struct package package;
     struct text header = {0};
     struct text path = {0};
-    const char *base;
-    const char *dot;
+    enum target target;
+    enum cpu_level cpu;
+    const char *module;
     int status = 1;
 
-    memset(&o, 0, sizeof o);
-    o.input = library;
-    o.roots = roots;
-    o.root_count = root_count;
-    o.runtime = runtime;
-    if (!target_host(&o.target)) {
-        fputs("anti: unknown host target\n", stderr);
+    if (!unit_host(&target, &cpu)) {
         return 2;
     }
-    o.cpu = cpu_default(o.target);
-    if (!files_make_dirs(out_dir) || !driver_library_header(&o, &header)) {
+    unit_options(&o, NULL, runtime, roots, root_count, target, cpu);
+    o.input = library;
+    if (!deps_library_header(library, &arena, &package, &module) ||
+        !files_make_dirs(out_dir) || !driver_library_header(&o, &header)) {
         goto done;
     }
-    base = strrchr(library, '/');
-    base = base != NULL ? base + 1 : library;
-    dot = strrchr(base, '.');
-    text_appendf(&path, "%s/%.*s%s", out_dir,
-                 (int)(dot != NULL ? (size_t)(dot - base) : strlen(base)),
-                 base, HEADER_SUFFIX);
+    text_appendf(&path, "%s/%s%s", out_dir, module_path_last(module),
+                 HEADER_SUFFIX);
     if (files_write(text_cstr(&path), &header)) {
         status = 0;
     }
@@ -54,6 +54,7 @@ int bind_header(const char *library, const char *out_dir,
 done:
     text_free(&header);
     text_free(&path);
+    arena_free(&arena);
     return status;
 }
 

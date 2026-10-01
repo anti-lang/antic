@@ -4,8 +4,17 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "antic.h"
+#include "arena.h"
 #include "manifest.h"
 #include "text.h"
+
+/* Read the package header and the module path of the library file at
+   file into the memory pool. This is the one reader of the header of a
+   library file in anti. Prints the reason and returns false when the
+   file cannot be read or is no library file of this version. */
+bool deps_library_header(const char *file, struct arena *arena,
+                         struct package *package, const char **module);
 
 /* One module of a resolved package: its module path, the digest of its
    library file and where that file stands on this machine. */

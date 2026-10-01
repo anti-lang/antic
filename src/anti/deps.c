@@ -297,6 +297,26 @@ static void resolve_path(const struct resolver *r, const char *path,
     text_appendf(out, "%s/%s", r->root, path);
 }
 
+bool deps_library_header(const char *file, struct arena *arena,
+                         struct package *package, const char **module)
+{
+    struct text bytes = {0};
+    char message[256];
+    bool ok = false;
+
+    if (!files_read(file, &bytes)) {
+        fprintf(stderr, "anti: cannot read %s\n", file);
+    } else if (!antic_library_header((const uint8_t *)bytes.data,
+                                     bytes.length, arena, package, module,
+                                     message, sizeof message)) {
+        fprintf(stderr, "anti: %s: %s\n", file, message);
+    } else {
+        ok = true;
+    }
+    text_free(&bytes);
+    return ok;
+}
+
 /* The package header of a library file: its package name, its version
    and, with r, the dependencies it carries as requirements. */
 static bool library_header(const char *file, struct text *name,
@@ -305,19 +325,10 @@ static bool library_header(const char *file, struct text *name,
     struct arena arena = {0};
     struct package package;
     const char *module;
-    struct text bytes = {0};
-    char message[256];
     size_t i;
     bool ok = false;
 
-    if (!files_read(file, &bytes)) {
-        fprintf(stderr, "anti: cannot read %s\n", file);
-        goto done;
-    }
-    if (!antic_library_header((const uint8_t *)bytes.data, bytes.length,
-                              &arena, &package, &module, message,
-                              sizeof message)) {
-        fprintf(stderr, "anti: %s: %s\n", file, message);
+    if (!deps_library_header(file, &arena, &package, &module)) {
         goto done;
     }
     name->length = 0;
@@ -331,7 +342,6 @@ static bool library_header(const char *file, struct text *name,
     }
     ok = true;
 done:
-    text_free(&bytes);
     arena_free(&arena);
     return ok;
 }

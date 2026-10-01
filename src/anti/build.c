@@ -324,24 +324,11 @@ static bool library_module(const char *file, struct text *out)
     struct arena arena = {0};
     struct package package;
     const char *module;
-    struct text bytes = {0};
-    char error[256];
-    bool ok = false;
+    bool ok = deps_library_header(file, &arena, &package, &module);
 
-    if (!files_read(file, &bytes)) {
-        fprintf(stderr, "anti: cannot read %s\n", file);
-        goto done;
+    if (ok) {
+        text_append(out, module);
     }
-    if (!antic_library_header((const uint8_t *)bytes.data, bytes.length,
-                              &arena, &package, &module, error,
-                              sizeof error)) {
-        fprintf(stderr, "anti: %s: %s\n", file, error);
-        goto done;
-    }
-    text_append(out, module);
-    ok = true;
-done:
-    text_free(&bytes);
     arena_free(&arena);
     return ok;
 }
