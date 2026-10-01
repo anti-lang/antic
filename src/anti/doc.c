@@ -192,6 +192,56 @@ static bool resolve_name(const struct doc_page *page, const char *s,
     return false;
 }
 
+/* Whether the scheme before the colon at n of a URL is the word, in
+   either case, as RFC 3986 reads a scheme. */
+static bool scheme_is(const char *s, size_t n, const char *word)
+{
+    size_t i;
+
+    if (n != strlen(word)) {
+        return false;
+    }
+    for (i = 0; i < n; i++) {
+        char c = s[i] >= 'A' && s[i] <= 'Z' ? (char)(s[i] - 'A' + 'a') : s[i];
+        if (c != word[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* DESIGN: a page writes a link of a doc comment as a link only when it
+   leads to a web page: an `http:` or `https:` URL, a path relative to
+   the page, or a `#` anchor on it. The doc text may come from a library
+   file of any repository, and a `javascript:` or `data:` URL would run
+   in the page of the reader who follows it. A URL with a blank or a
+   control byte is refused too, since a browser drops a tab or a line
+   end inside a scheme. So is `//host`, which leaves the site of the
+   page. Any other link stays text, as written. */
+static bool safe_url(const char *s, size_t n)
+{
+    size_t i;
+
+    if (n == 0 || (n >= 2 && s[0] == '/' && s[1] == '/')) {
+        return false;
+    }
+    for (i = 0; i < n; i++) {
+        unsigned char c = (unsigned char)s[i];
+        if (c <= ' ' || c == 0x7f) {
+            return false;
+        }
+    }
+    for (i = 0; i < n; i++) {
+        if (s[i] == '/' || s[i] == '?' || s[i] == '#') {
+            return true;
+        }
+        if (s[i] == ':') {
+            return scheme_is(s, i, "http") || scheme_is(s, i, "https");
+        }
+    }
+    return true;
+}
+
 /* Inline code in backticks and a link written `[text](url)`. Everything
    else is text, and the forms the subset leaves out stand as they are
    written. */
@@ -238,7 +288,7 @@ static void inline_html(struct text *out, const char *s, size_t n,
             }
             at = (size_t)(close - s) + 2;
             end = memchr(s + at, ')', n - at);
-            if (end == NULL) {
+            if (end == NULL || !safe_url(s + at, (size_t)(end - (s + at)))) {
                 escape_html(out, &s[i], 1);
                 i++;
                 continue;

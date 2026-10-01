@@ -15,6 +15,12 @@ let a = shapes.area(c);
 
 The rules of the plane stand in [the handbook](https://example.com/plane).
 
+The plane is also drawn in [the atlas](http://example.com/atlas), the
+[guide](guide.html#plane) and [the top](#Circle). A link of another scheme
+stays text: [run](javascript:alert), [load](data:text/html,x),
+[mail](mailto:a@example.com), [far](//example.com/far) and
+[hidden](java	script:alert).
+
 ## Stroke
 
 ```anti

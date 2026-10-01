@@ -1605,6 +1605,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - The command writes the interface file of every source into a work directory first, in the order the imports ask for, and reads them back through a search root of its own. `--work` names the directory and `build/doc-work` stands without one. Reason: a module of the project that imports another needs that module's interface file, and `antic -c` is what writes one. `anti check` writes the same files for the same reason, and `src/anti/units.c` holds the list both commands read.
 - Without a file the command takes every `.anti` file under the source directory that `[layout]` names, and not the test directory. Reason: a module of the tests is no module a reader of the library documents.
 - [provisional] `anti doc` refuses a library file whose module path is not lowercase identifiers joined by dots, and escapes every name it writes into HTML.
+- [provisional] The HTML of `anti doc` writes a link `[text](url)` of a doc comment as a link only when the URL is `http:` or `https:` in either case, a path relative to the page or a `#` anchor. A URL of any other scheme, one that starts with `//` and one that holds a blank or a control byte stay text as written. `--markdown` passes the doc text through unchanged. Reason: the doc text may come from a library file of any repository, and a `javascript:` or `data:` URL runs in the page of the reader who follows it. A browser drops a tab inside a scheme, and `//host` leaves the site. Audit finding M40.
 
 ## The formatter
 
