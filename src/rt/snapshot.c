@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "atomic.h"
 #include "object.h"
 #include "std.h"
 
@@ -22,7 +23,7 @@ void *anti_rt_snapshot_new(int64_t size)
                            (long long)size);
     }
     memcpy(made, &size, sizeof size);
-    __atomic_fetch_add(&snapshots_alive, 1, __ATOMIC_RELAXED);
+    anti_rt_atomic_add(&snapshots_alive, (int64_t)sizeof snapshots_alive, 1);
     return made;
 }
 
@@ -39,7 +40,7 @@ void anti_rt_snapshot_free(void *snapshot)
     if (snapshot == NULL) {
         return;
     }
-    __atomic_fetch_sub(&snapshots_alive, 1, __ATOMIC_RELAXED);
+    anti_rt_atomic_sub(&snapshots_alive, (int64_t)sizeof snapshots_alive, 1);
     free(snapshot);
 }
 
@@ -59,5 +60,6 @@ void *anti_rt_snapshot_dup(const void *snapshot)
 
 int64_t anti_rt_snapshots_alive(void)
 {
-    return __atomic_load_n(&snapshots_alive, __ATOMIC_RELAXED);
+    return anti_rt_atomic_load(&snapshots_alive,
+                               (int64_t)sizeof snapshots_alive);
 }

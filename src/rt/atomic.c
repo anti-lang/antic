@@ -1,4 +1,5 @@
 #include "atomic.h"
+#include "platform.h"
 
 /* DESIGN: every operation is sequentially consistent, which is the one
    memory order the language offers. The width comes with the address,
@@ -6,30 +7,108 @@
    names per width. A release build holds the instructions the target
    gives: `lock xadd` and `lock cmpxchg` on x86_64, and `ldaddal` and
    `casal` on an ARM64 with LSE, or a load-store-exclusive loop without
-   it. */
+   it.
 
-#if defined(_MSC_VER)
+   DESIGN: the form follows the compiler, never the host. clang and gcc
+   take the builtins below on every target, Windows included, and clang
+   compiles every runtime of the archive. MSVC has none of them and takes
+   the Interlocked functions of the other branch. */
+
+#if defined(__clang__) || defined(__GNUC__)
+
+/* One body per width, written once through a macro, because the builtins
+   take a typed pointer and the widths differ in nothing else. */
+#define WIDTHS(op)                                                            \
+    switch (width) {                                                          \
+    case 1: op(int8_t);                                                       \
+    case 2: op(int16_t);                                                      \
+    case 4: op(int32_t);                                                      \
+    default: op(int64_t);                                                     \
+    }
+
+int64_t anti_rt_atomic_load(const void *address, int64_t width)
+{
+#define LOAD(T) return __atomic_load_n((const T *)address, __ATOMIC_SEQ_CST)
+    WIDTHS(LOAD);
+#undef LOAD
+}
+
+void anti_rt_atomic_store(void *address, int64_t width, int64_t value)
+{
+#define STORE(T)                                                              \
+    __atomic_store_n((T *)address, (T)value, __ATOMIC_SEQ_CST);               \
+    return
+    WIDTHS(STORE);
+#undef STORE
+}
+
+int64_t anti_rt_atomic_swap(void *address, int64_t width, int64_t value)
+{
+#define SWAP(T)                                                               \
+    return __atomic_exchange_n((T *)address, (T)value, __ATOMIC_SEQ_CST)
+    WIDTHS(SWAP);
+#undef SWAP
+}
+
+int64_t anti_rt_atomic_add(void *address, int64_t width, int64_t value)
+{
+#define ADD(T)                                                                \
+    return __atomic_fetch_add((T *)address, (T)value, __ATOMIC_SEQ_CST)
+    WIDTHS(ADD);
+#undef ADD
+}
+
+int64_t anti_rt_atomic_sub(void *address, int64_t width, int64_t value)
+{
+#define SUB(T)                                                                \
+    return __atomic_fetch_sub((T *)address, (T)value, __ATOMIC_SEQ_CST)
+    WIDTHS(SUB);
+#undef SUB
+}
+
+int64_t anti_rt_atomic_and(void *address, int64_t width, int64_t value)
+{
+#define AND(T)                                                                \
+    return __atomic_fetch_and((T *)address, (T)value, __ATOMIC_SEQ_CST)
+    WIDTHS(AND);
+#undef AND
+}
+
+int64_t anti_rt_atomic_or(void *address, int64_t width, int64_t value)
+{
+#define OR(T)                                                                 \
+    return __atomic_fetch_or((T *)address, (T)value, __ATOMIC_SEQ_CST)
+    WIDTHS(OR);
+#undef OR
+}
+
+int8_t anti_rt_atomic_compare_swap(void *address, int64_t width,
+                                   int64_t expected, int64_t desired)
+{
+#define CAS(T) {                                                              \
+        T want = (T)expected;                                                 \
+        return __atomic_compare_exchange_n((T *)address, &want, (T)desired,    \
+                                           0, __ATOMIC_SEQ_CST,               \
+                                           __ATOMIC_SEQ_CST);                 \
+    }
+    WIDTHS(CAS);
+#undef CAS
+}
+
+#else
+
 #include <intrin.h>
 
 /* DESIGN: a load through `volatile` is a plain load on ARM64, and a
-   later load to another address may pass it. clang compiles every
-   runtime of the archive. It gives the load of the other branch, ldar
-   on ARM64 and a plain load on x86_64. There the locked exchange of
-   every store keeps the order. MSVC compiles atomic.c into the tools of
-   a Windows host. It loads as its own C++ library does, with a full
-   barrier after the load on ARM64. The types are signed by name, so a
-   byte loads the same whether `char` is signed or not. */
+   later load to another address may pass it. MSVC compiles atomic.c
+   into the tools of a Windows host. It loads as its own C++ library
+   does, with a full barrier after the load on ARM64. On x86_64 the
+   locked exchange of every store keeps the order of a plain load. The
+   types are signed by name, so a byte loads the same whether `char` is
+   signed or not. */
 int64_t anti_rt_atomic_load(const void *address, int64_t width)
 {
-#if defined(__clang__)
-    switch (width) {
-    case 1: return __atomic_load_n((const int8_t *)address, __ATOMIC_SEQ_CST);
-    case 2: return __atomic_load_n((const int16_t *)address, __ATOMIC_SEQ_CST);
-    case 4: return __atomic_load_n((const int32_t *)address, __ATOMIC_SEQ_CST);
-    default: return __atomic_load_n((const int64_t *)address,
-                                    __ATOMIC_SEQ_CST);
-    }
-#elif defined(_M_ARM64)
+#if defined(ANTI_RT_ARM64)
     int64_t value;
 
     switch (width) {
@@ -140,87 +219,6 @@ int8_t anti_rt_atomic_compare_swap(void *address, int64_t width,
         return _InterlockedCompareExchange64((long long *)address, desired,
                                              expected) == expected;
     }
-}
-
-#else
-
-/* One body per width, written once through a macro, because the builtins
-   take a typed pointer and the widths differ in nothing else. */
-#define WIDTHS(op)                                                            \
-    switch (width) {                                                          \
-    case 1: op(int8_t);                                                       \
-    case 2: op(int16_t);                                                      \
-    case 4: op(int32_t);                                                      \
-    default: op(int64_t);                                                     \
-    }
-
-int64_t anti_rt_atomic_load(const void *address, int64_t width)
-{
-#define LOAD(T) return __atomic_load_n((const T *)address, __ATOMIC_SEQ_CST)
-    WIDTHS(LOAD);
-#undef LOAD
-}
-
-void anti_rt_atomic_store(void *address, int64_t width, int64_t value)
-{
-#define STORE(T)                                                              \
-    __atomic_store_n((T *)address, (T)value, __ATOMIC_SEQ_CST);               \
-    return
-    WIDTHS(STORE);
-#undef STORE
-}
-
-int64_t anti_rt_atomic_swap(void *address, int64_t width, int64_t value)
-{
-#define SWAP(T)                                                               \
-    return __atomic_exchange_n((T *)address, (T)value, __ATOMIC_SEQ_CST)
-    WIDTHS(SWAP);
-#undef SWAP
-}
-
-int64_t anti_rt_atomic_add(void *address, int64_t width, int64_t value)
-{
-#define ADD(T)                                                                \
-    return __atomic_fetch_add((T *)address, (T)value, __ATOMIC_SEQ_CST)
-    WIDTHS(ADD);
-#undef ADD
-}
-
-int64_t anti_rt_atomic_sub(void *address, int64_t width, int64_t value)
-{
-#define SUB(T)                                                                \
-    return __atomic_fetch_sub((T *)address, (T)value, __ATOMIC_SEQ_CST)
-    WIDTHS(SUB);
-#undef SUB
-}
-
-int64_t anti_rt_atomic_and(void *address, int64_t width, int64_t value)
-{
-#define AND(T)                                                                \
-    return __atomic_fetch_and((T *)address, (T)value, __ATOMIC_SEQ_CST)
-    WIDTHS(AND);
-#undef AND
-}
-
-int64_t anti_rt_atomic_or(void *address, int64_t width, int64_t value)
-{
-#define OR(T)                                                                 \
-    return __atomic_fetch_or((T *)address, (T)value, __ATOMIC_SEQ_CST)
-    WIDTHS(OR);
-#undef OR
-}
-
-int8_t anti_rt_atomic_compare_swap(void *address, int64_t width,
-                                   int64_t expected, int64_t desired)
-{
-#define CAS(T) {                                                              \
-        T want = (T)expected;                                                 \
-        return __atomic_compare_exchange_n((T *)address, &want, (T)desired,    \
-                                           0, __ATOMIC_SEQ_CST,               \
-                                           __ATOMIC_SEQ_CST);                 \
-    }
-    WIDTHS(CAS);
-#undef CAS
 }
 
 #endif

@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "atomic.h"
 #include "platform.h"
 #include "std.h"
 #include "sync.h"
@@ -102,7 +103,8 @@ static void orders_grow(void)
     if (orders == NULL) {
         anti_rt_fail_abort("out of memory for the order of the locks");
     }
-    __atomic_store_n(&order_capacity, capacity, __ATOMIC_RELAXED);
+    anti_rt_atomic_store(&order_capacity, (int64_t)sizeof order_capacity,
+                         (int64_t)capacity);
     order_count = 0;
     for (i = 0; i < old_capacity; i++) {
         if (old[i].first != NULL && old[i].first != GONE) {
@@ -230,7 +232,8 @@ void anti_rt_mutex_unlock_at(void *word)
    orders of a dev build are forgotten. */
 void anti_rt_mutex_destroy(void *word)
 {
-    if (__atomic_load_n(&order_capacity, __ATOMIC_RELAXED) != 0) {
+    if (anti_rt_atomic_load(&order_capacity,
+                            (int64_t)sizeof order_capacity) != 0) {
         order_forget(word);
     }
 }
@@ -244,7 +247,7 @@ void anti_rt_mutex_destroy(void *word)
    by other threads, so it is read and written atomically. */
 static int object_enter(struct object_lock *l, int64_t me)
 {
-    if (__atomic_load_n(&l->owner, __ATOMIC_RELAXED) == me) {
+    if (anti_rt_atomic_load(&l->owner, (int64_t)sizeof l->owner) == me) {
         l->depth++;
         return 1;
     }
@@ -254,7 +257,7 @@ static int object_enter(struct object_lock *l, int64_t me)
 static void object_hold(struct object_lock *l, int64_t me)
 {
     anti_rt_word_lock(&l->word);
-    __atomic_store_n(&l->owner, me, __ATOMIC_RELAXED);
+    anti_rt_atomic_store(&l->owner, (int64_t)sizeof l->owner, me);
     l->depth = 1;
 }
 
@@ -263,7 +266,7 @@ static int object_leave(struct object_lock *l)
     if (--l->depth > 0) {
         return 0;
     }
-    __atomic_store_n(&l->owner, 0, __ATOMIC_RELAXED);
+    anti_rt_atomic_store(&l->owner, (int64_t)sizeof l->owner, 0);
     anti_rt_word_unlock(&l->word);
     return 1;
 }

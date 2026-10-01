@@ -126,6 +126,12 @@ add_test(NAME platform_layer
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_platform_layer.cmake")
 
+# Every compiler extension of the runtime stands in its platform layer or
+# in src/rt/atomic.c.
+add_test(NAME rt_extensions
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_rt_extensions.cmake")
+
 # The runtime calls the UTF-16 entry points of Windows alone.
 add_test(NAME rt_wide_text
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
