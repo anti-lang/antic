@@ -23,7 +23,7 @@
 #include "linker.h"
 #include "manifest.h"
 #include "modpath.h"
-#include "process.h"
+#include "../antic/platform.h"
 #include "syms.h"
 #include "sha256.h"
 #include "symmap.h"

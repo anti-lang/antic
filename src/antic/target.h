@@ -83,7 +83,8 @@ const char *object_format_name(enum object_format format);
 const char *convention_name(enum convention convention);
 
 /* Store the target antic runs on. Returns false on a host that is not
-   one of the six targets. */
+   one of the six targets, and stores TARGET_COUNT. The platform layer,
+   platform.c, defines it, since the answer is the host's. */
 bool target_host(enum target *t);
 bool target_from_name(const char *name, enum target *t);
 

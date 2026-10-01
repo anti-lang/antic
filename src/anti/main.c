@@ -13,7 +13,7 @@
 #include "manifest.h"
 #include "modpath.h"
 #include "sdk.h"
-#include "selfpath.h"
+#include "../antic/platform.h"
 #include "syms.h"
 #include "userdirs.h"
 #include "test.h"

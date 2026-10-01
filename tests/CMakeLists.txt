@@ -114,6 +114,11 @@ add_test(NAME one_allocator
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_one_allocator.cmake")
 
+# Every host branch of antic stands in src/antic/platform.c and platform.h.
+add_test(NAME platform_layer
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_platform_layer.cmake")
+
 # The suffix antic gives an object of the host target, the one that
 # src/antic/target.c names: .obj on Windows and .o elsewhere. Every dev
 # object a test links is named with it.
@@ -1638,7 +1643,8 @@ add_test(NAME anti_check
 # The documentation generator: the pages of the fixture, the doc
 # equivalence of docs/tooling.md, the two forms and the two options that
 # need the source.
-add_executable(antl_rename doc/antl_rename.c ../src/antic/platform.c)
+add_executable(antl_rename doc/antl_rename.c)
+target_link_libraries(antl_rename PRIVATE antic_core)
 add_test(NAME anti_doc
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
@@ -2110,6 +2116,17 @@ add_test(NAME runtime_from_data_dir
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/datadir"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_runtime_from_data_dir.cmake")
+
+# Paths outside ASCII on the command line, in the place of antic and in the
+# data directory of the user. Windows reads each through UTF-16.
+add_test(NAME unicode_paths
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/unicode-paths"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_unicode_paths.cmake")
 
 # A Windows executable carries the CodeView record of the PDB that
 # lld-link wrote beside it. It holds no path of the machine that linked it
@@ -2765,7 +2782,8 @@ add_test(NAME dev_modules
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dev.cmake")
 set_tests_properties(dev_modules PROPERTIES FIXTURES_REQUIRED twice_antl)
 
-add_executable(poke_byte modules/poke_byte.c ../src/antic/platform.c)
+add_executable(poke_byte modules/poke_byte.c)
+target_link_libraries(poke_byte PRIVATE antic_core)
 add_test(NAME dev_library_verify
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
@@ -3401,8 +3419,8 @@ set_tests_properties(conf_environment_utf8 PROPERTIES
 
 # The readers of the symbol table and the line table, on the binaries
 # that this host links for the other targets.
-add_executable(symbols_probe unit/symbols_probe.c ../src/rt/symbols.c
-    ../src/antic/platform.c)
+add_executable(symbols_probe unit/symbols_probe.c ../src/rt/symbols.c)
+target_link_libraries(symbols_probe PRIVATE antic_core)
 target_include_directories(symbols_probe PRIVATE ../src/rt)
 foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64)
     add_test(NAME trace_symbols_${target}

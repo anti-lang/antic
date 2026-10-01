@@ -10,8 +10,7 @@
 #include "bindmodel.h"
 #include "files.h"
 #include "jsontree.h"
-#include "process.h"
-#include "selfpath.h"
+#include "../antic/platform.h"
 #include "target.h"
 
 /* DESIGN: anti bind accepts the major version of clang it was tested

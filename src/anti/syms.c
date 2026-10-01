@@ -18,8 +18,7 @@
 #include <string.h>
 
 #include "files.h"
-#include "process.h"
-#include "selfpath.h"
+#include "../antic/platform.h"
 #include "symbols.h"
 #include "text.h"
 #include "toml.h"

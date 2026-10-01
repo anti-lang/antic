@@ -27,9 +27,7 @@
 #include "sha256.h"
 #include "parser.h"
 #include "sema.h"
-#include "selfpath.h"
 #include "types.h"
-#include "process.h"
 #include "text.h"
 #include "warnings.h"
 #include "../rt/toml.h"
@@ -565,21 +563,10 @@ static bool windows_link_paths(struct windows_link *w, struct link_inputs *in,
                                const char **def_file)
 {
     const char *exe = in->executable;
-    const char *cut = NULL;
+    const char *cut = platform_last_separator(exe);
     const char **extra;
-    const char *p;
     size_t i;
 
-    for (p = exe; *p != '\0'; p++) {
-#if defined(_WIN32)
-        if (*p == '\\') {
-            cut = p;
-        }
-#endif
-        if (*p == '/') {
-            cut = p;
-        }
-    }
     if (cut != NULL) {
         text_appendf(&w->directory, "%.*s", cut == exe ? 1 : (int)(cut - exe),
                      exe);
@@ -591,13 +578,11 @@ static bool windows_link_paths(struct windows_link *w, struct link_inputs *in,
     if (cut != NULL) {
         w->directory.length = 0;
         text_append(&w->directory, text_cstr(&w->base));
-#if defined(_WIN32)
         for (i = 0; i < w->directory.length; i++) {
             if (w->directory.data[i] == '/') {
-                w->directory.data[i] = '\\';
+                w->directory.data[i] = platform_separator();
             }
         }
-#endif
     }
     in->object = windows_path(w, in->object, true);
     in->executable = windows_path(w, in->executable, true);
@@ -736,13 +721,9 @@ static bool copy_memcheck_dll(const struct options *o, const char *executable)
     struct text from = {0};
     struct text to = {0};
     struct text bytes = {0};
-    const char *slash = strrchr(executable, '/');
-    const char *back = strrchr(executable, '\\');
+    const char *slash = platform_last_separator(executable);
     bool ok;
 
-    if (back != NULL && (slash == NULL || back > slash)) {
-        slash = back;
-    }
     link_memcheck_file(&from, o->runtime, o->target, false,
                        MEMCHECK_WINDOWS_DLL);
     if (slash != NULL) {
@@ -2821,7 +2802,7 @@ static bool build_c_library(const struct options *o, const char *object,
              bundle(o, extras, object, base, &arena, &members);
         if (ok) {
             add_path(&members, text_cstr(&package));
-            remove(text_cstr(&path));
+            platform_remove(text_cstr(&path));
             archive_command(&c, o->target,
                             o->llvm_ar != NULL ? o->llvm_ar : "llvm-ar",
                             text_cstr(&path), members.items, members.count);

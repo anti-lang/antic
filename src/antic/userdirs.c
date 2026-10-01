@@ -5,7 +5,7 @@
 
 #include "linker.h"
 #include "platform.h"
-#include "selfpath.h"
+#include "target.h"
 
 /* DESIGN: an XDG variable counts only when it holds an absolute path.
    The specification says so. The reason that matters here is another
@@ -132,26 +132,25 @@ static const char *from_environment(const char *name)
 
 bool user_dir(struct text *out, enum user_dir which, const char *app)
 {
-#ifdef _WIN32
-    enum user_dir_os os = USER_DIR_WINDOWS;
-#else
-    enum user_dir_os os = USER_DIR_UNIX;
-#endif
+    enum target host;
+    enum user_dir_os os =
+        target_host(&host) && target_info(host)->os == OS_WINDOWS
+            ? USER_DIR_WINDOWS
+            : USER_DIR_UNIX;
+
     return user_dir_of(out, os, which, app, from_environment);
 }
 
 /* The directory above path, without its trailing separator. */
 static bool parent_of(struct text *out, const struct text *path)
 {
-    size_t cut = path->length;
+    const char *bytes = text_cstr(path);
+    const char *cut = platform_last_separator(bytes);
 
-    while (cut > 0 && path->data[cut - 1] != '/' && path->data[cut - 1] != '\\') {
-        cut--;
-    }
-    if (cut <= 1) {
+    if (cut == NULL || cut == bytes) {
         return false;
     }
-    text_append_bytes(out, path->data, cut - 1);
+    text_append_bytes(out, bytes, (size_t)(cut - bytes));
     return true;
 }
 

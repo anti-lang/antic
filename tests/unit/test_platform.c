@@ -18,6 +18,7 @@
 #include "../../src/rt/platform.h"
 #include "../../src/rt/std.h"
 #include "check.h"
+#include "path_rules.h"
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -114,31 +115,20 @@ static void environment(void)
     CHECK(value == NULL);
 }
 
+/* Every case of path_rules.h, which the platform layer of the tools
+   answers the same way. */
 static void paths(void)
 {
-    const char *path = "a/b/c.toml";
+    size_t i;
 
-    CHECK(anti_rt_path_is_absolute("/etc/anti.toml"));
-    CHECK(!anti_rt_path_is_absolute("anti.toml"));
-    CHECK(!anti_rt_path_is_absolute("a/anti.toml"));
-    CHECK(anti_rt_path_last_separator(path) == path + 3);
-    CHECK(anti_rt_path_last_separator("anti.toml") == NULL);
-#if defined(_WIN32)
-    {
-        /* A drive, a root of the drive and a share are absolute, and a
-           backslash separates as a slash does, whichever comes last. */
-        const char *mixed = "a\\b/c\\d.toml";
-        const char *slash_last = "a\\b/c.toml";
-        CHECK(anti_rt_path_is_absolute("C:\\anti\\anti.toml"));
-        CHECK(anti_rt_path_is_absolute("c:/anti.toml"));
-        CHECK(anti_rt_path_is_absolute("\\anti.toml"));
-        CHECK(anti_rt_path_is_absolute("\\\\server\\share\\anti.toml"));
-        CHECK(!anti_rt_path_is_absolute("anti\\anti.toml"));
-        CHECK(!anti_rt_path_is_absolute("1:anti.toml"));
-        CHECK(anti_rt_path_last_separator(mixed) == mixed + 5);
-        CHECK(anti_rt_path_last_separator(slash_last) == slash_last + 3);
+    for (i = 0; i < PATH_RULE_COUNT; i++) {
+        const struct path_rule *r = &path_rules[i];
+        const char *last = anti_rt_path_last_separator(r->path);
+
+        CHECK(anti_rt_path_is_absolute(r->path) == r->absolute);
+        CHECK(r->separator < 0 ? last == NULL
+                               : last == r->path + r->separator);
     }
-#endif
 }
 
 /* The monotonic clock never goes back, and the wall clock stands after

@@ -156,32 +156,3 @@ void block_label(struct text *out, enum target t, const char *function,
     text_appendf(out, "%s%s.b%zu",
                  infos[t].format == FORMAT_MACHO ? "L" : ".L", function, block);
 }
-
-/* DESIGN: the host is fixed when antic is compiled, from the compiler's
-   predefined macros. The antic_host_target test compares the result with
-   the name CMake computes. */
-bool target_host(enum target *t)
-{
-#if defined(__APPLE__) && defined(__aarch64__)
-    *t = TARGET_MACOS_ARM64;
-    return true;
-#elif defined(__APPLE__) && defined(__x86_64__)
-    *t = TARGET_MACOS_X86_64;
-    return true;
-#elif defined(__linux__) && defined(__aarch64__)
-    *t = TARGET_LINUX_ARM64;
-    return true;
-#elif defined(__linux__) && defined(__x86_64__)
-    *t = TARGET_LINUX_X86_64;
-    return true;
-#elif defined(_WIN32) && defined(_M_ARM64)
-    *t = TARGET_WINDOWS_ARM64;
-    return true;
-#elif defined(_WIN32) && defined(_M_X64)
-    *t = TARGET_WINDOWS_X86_64;
-    return true;
-#else
-    (void)t;
-    return false;
-#endif
-}

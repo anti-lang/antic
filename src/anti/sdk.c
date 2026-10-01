@@ -9,7 +9,7 @@
 #include "applesdk.h"
 #include "files.h"
 #include "linker.h"
-#include "process.h"
+#include "../antic/platform.h"
 #include "sha256.h"
 #include "text.h"
 

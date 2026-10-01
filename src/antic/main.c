@@ -7,7 +7,7 @@
 #include "cpu.h"
 #include "driver.h"
 #include "linker.h"
-#include "selfpath.h"
+#include "platform.h"
 #include "userdirs.h"
 #include "target.h"
 
@@ -444,6 +444,7 @@ int main(int argc, char **argv)
     struct options options = {0};
     int status;
 
+    argv = platform_arguments(argv);
     /* At most argc - 1 arguments are library files or link inputs. */
     options.libraries = alloc_zeroed((size_t)argc, sizeof *options.libraries);
     options.objects = alloc_zeroed((size_t)argc, sizeof *options.objects);

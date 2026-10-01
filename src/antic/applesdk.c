@@ -2,9 +2,9 @@
 
 #include <limits.h>
 #include <string.h>
-#if defined(__APPLE__)
-#include <dirent.h>
-#endif
+
+#include "platform.h"
+#include "target.h"
 
 /* Read the decimal digits at *s into *value and move *s past them. At
    least one digit, and a value that fits an int. */
@@ -46,40 +46,39 @@ bool apple_sdk_version(const char *name, int *major, int *minor)
     return version_number(&s, minor) && strcmp(s, ".sdk") == 0;
 }
 
+/* The newest version of an SDK name that ld64.lld reads, so far. */
+struct newest {
+    int major;
+    int minor;
+};
+
+static void consider(void *context, const char *name)
+{
+    struct newest *best = context;
+    int major;
+    int minor;
+
+    if (!apple_sdk_version(name, &major, &minor) ||
+        major > APPLE_SDK_NEWEST_MAJOR || major < best->major ||
+        (major == best->major && minor <= best->minor)) {
+        return;
+    }
+    best->major = major;
+    best->minor = minor;
+}
+
 bool apple_clt_sdk(struct text *path, struct text *version)
 {
-#if defined(__APPLE__)
-    DIR *dir = opendir(APPLE_CLT_SDKS);
-    struct dirent *entry;
-    int best_major = -1;
-    int best_minor = -1;
+    struct newest best = {-1, -1};
+    enum target host;
 
-    if (dir == NULL) {
+    if (!target_host(&host) || target_info(host)->os != OS_MACOS ||
+        !platform_list_directory(APPLE_CLT_SDKS, consider, &best) ||
+        best.major < 0) {
         return false;
     }
-    while ((entry = readdir(dir)) != NULL) {
-        int major;
-        int minor;
-
-        if (!apple_sdk_version(entry->d_name, &major, &minor) ||
-            major > APPLE_SDK_NEWEST_MAJOR ||
-            major < best_major || (major == best_major && minor <= best_minor)) {
-            continue;
-        }
-        best_major = major;
-        best_minor = minor;
-    }
-    closedir(dir);
-    if (best_major < 0) {
-        return false;
-    }
-    text_appendf(path, "%s/MacOSX%d.%d.sdk", APPLE_CLT_SDKS, best_major,
-                 best_minor);
-    text_appendf(version, "%d.%d", best_major, best_minor);
+    text_appendf(path, "%s/MacOSX%d.%d.sdk", APPLE_CLT_SDKS, best.major,
+                 best.minor);
+    text_appendf(version, "%d.%d", best.major, best.minor);
     return true;
-#else
-    (void)path;
-    (void)version;
-    return false;
-#endif
 }

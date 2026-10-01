@@ -18,7 +18,7 @@
 #include "antl.h"
 #include "deps.h"
 #include "files.h"
-#include "process.h"
+#include "../antic/platform.h"
 #include "sha256.h"
 #include "text.h"
 #include "userdirs.h"
