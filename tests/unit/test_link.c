@@ -235,8 +235,9 @@ static void relative_paths(void)
     }
 }
 
-/* src/rt/start.c names the runtime entry in the form that mangle writes for
-   each object format, so that the link finds it. */
+/* src/rt/platform.h names the runtime entry that src/rt/start.c calls in
+   the form that mangle writes for each object format, as an assembler
+   label, so that the link finds it. */
 static void runtime_entry(void)
 {
     static const enum target formats[] = {
@@ -244,7 +245,7 @@ static void runtime_entry(void)
     };
     struct text start = {0};
     char buffer[4096];
-    FILE *f = platform_open(ANTIC_SOURCE_DIR "/src/rt/start.c", false);
+    FILE *f = platform_open(ANTIC_SOURCE_DIR "/src/rt/platform.h", false);
     size_t n;
     size_t i;
 
@@ -259,12 +260,7 @@ static void runtime_entry(void)
         struct text symbol = {0};
         struct text quoted = {0};
         mangle(&symbol, formats[i], RUNTIME_MODULE, RUNTIME_ENTRY);
-        /* COFF symbols are C identifiers, and the others labels. */
-        text_appendf(&quoted,
-                     target_info(formats[i])->format == FORMAT_COFF
-                         ? "%s(struct anti_slice args"
-                         : "\"%s\"",
-                     text_cstr(&symbol));
+        text_appendf(&quoted, "__asm__(\"%s\")", text_cstr(&symbol));
         CHECK(strstr(text_cstr(&start), text_cstr(&quoted)) != NULL);
         text_free(&symbol);
         text_free(&quoted);

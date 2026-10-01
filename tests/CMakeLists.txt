@@ -161,7 +161,7 @@ set(ANTIC_RUNTIME_READOBJ
 # threads, and so does the reader of the platform layer.
 find_package(Threads REQUIRED)
 add_executable(rt_signal_tests unit/test_signal.c ../src/rt/signal.c
-    ../src/rt/atomic.c ../src/rt/platform_posix.c
+    ../src/rt/atomic.c ../src/rt/utf.c ../src/rt/platform_posix.c
     ../src/rt/platform_windows.c)
 target_link_libraries(rt_signal_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
@@ -203,7 +203,7 @@ add_test(NAME rt_plugin_race COMMAND rt_plugin_tests)
 # threads of the layer. The library of
 # an empty plugin table is copied into a directory whose name is outside
 # ASCII, which a loader that takes the ANSI code page cannot open.
-add_executable(rt_platform_tests unit/test_platform.c
+add_executable(rt_platform_tests unit/test_platform.c ../src/rt/utf.c
     ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
 target_link_libraries(rt_platform_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
@@ -217,7 +217,9 @@ target_compile_definitions(rt_platform_tests PRIVATE
     "PLUGIN_DIR=\"${CMAKE_CURRENT_BINARY_DIR}\""
     "PLUGIN_NAME=\"$<TARGET_FILE_NAME:plugin_table_one>\"")
 add_dependencies(rt_platform_tests plugin_table_one)
-add_test(NAME rt_platform COMMAND rt_platform_tests)
+# The arguments after the name of the program are the ones
+# test_platform.c reads back, one with a blank and one outside ASCII.
+add_test(NAME rt_platform COMMAND rt_platform_tests one "two words" "ü")
 
 # The loader against a table of a plugin with one value damaged at a time.
 add_library(plugin_bad SHARED unit/plugin_bad.c)

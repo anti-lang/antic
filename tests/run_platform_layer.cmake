@@ -9,10 +9,6 @@
 # ROOT, the root of the repository.
 
 set(layer "platform.c" "platform.h" "platform_posix.c" "platform_windows.c")
-# The runtime files whose host branches steps 33 and 34 of "Fix steps" in
-# docs/audit/summary.md move into the layer. A step that moves one takes
-# it off this list.
-set(pending_rt "cpu.c" "mem.c" "start.c" "errno.c" "init.c" "atomic.c")
 set(system_locks "pthread_mutex_t|pthread_cond_t|pthread_once|SRWLOCK|CONDITION_VARIABLE|CRITICAL_SECTION|INIT_ONCE|os_unfair_lock")
 set(failures "")
 
@@ -31,9 +27,6 @@ foreach(part antic anti rt)
                 string(STRIP "${line}" shown)
                 string(APPEND failures
                     "\nsrc/${part}/${source}: a lock of its own: ${shown}")
-            endif()
-            if(part STREQUAL "rt" AND source IN_LIST pending_rt)
-                continue()
             endif()
             if(line MATCHES "^[ ]*#[ ]*(if|ifdef|ifndef|elif)[ (]" AND
                line MATCHES "(_WIN32|__APPLE__|__linux__|_MSC_VER|_M_ARM64|_M_X64)")

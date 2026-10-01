@@ -6,7 +6,9 @@
    the threads and the word of a Mutex across threads it starts, and the
    image an address lies in. Last the files and the directories under a
    name outside ASCII, the walk of the stack, the module of an address and
-   the debugger library of the system. */
+   the debugger library of the system. Then the memory at an alignment,
+   the arguments and the environment of the process and what the
+   processor reports. */
 #if defined(__APPLE__)
 #define _DARWIN_C_SOURCE
 #elif !defined(_WIN32)
@@ -20,7 +22,9 @@
 #include <string.h>
 
 #include "../binary_stdio.h"
+#include "../../src/rt/cpu_level.h"
 #include "../../src/rt/platform.h"
+#include "../../src/rt/rt.h"
 #include "../../src/rt/std.h"
 #include "check.h"
 #include "path_rules.h"
@@ -461,7 +465,131 @@ static void traces(void)
     }
 }
 
-int main(void)
+/* Memory at every alignment from 1 to 4096 lies on it, holds what is
+   written to it and goes back. The runtime may mark it as kept. */
+static void aligned_memory(void)
+{
+    size_t align;
+
+    for (align = 1; align <= 4096; align *= 2) {
+        unsigned char *p = anti_rt_aligned_alloc(100, align);
+        CHECK(p != NULL);
+        if (p == NULL) {
+            continue;
+        }
+        CHECK((uintptr_t)p % align == 0);
+        memset(p, 0xA5, 100);
+        CHECK(p[0] == 0xA5 && p[99] == 0xA5);
+        anti_rt_memory_kept(p);
+        anti_rt_aligned_free(p);
+    }
+    anti_rt_aligned_free(NULL);
+}
+
+/* A list of the layer and its count strings. A program keeps them until
+   exit, and the test gives them back. */
+static void free_list(char **list, size_t count)
+{
+    size_t i;
+
+    for (i = 0; list != NULL && i < count; i++) {
+        free(list[i]);
+    }
+    free(list);
+}
+
+/* The arguments of the process as UTF-8, which rt_platform passes as
+   `one`, `two words` and u with diaeresis. macOS and Linux take them from
+   argv and repair a byte that is no UTF-8. Windows reads them from the
+   command line in UTF-16. */
+static void process_arguments(int argc, char **argv)
+{
+    size_t count = 0;
+    char **list = anti_rt_process_arguments(argc, argv, &count);
+
+    CHECK(list != NULL);
+    if (list == NULL) {
+        return;
+    }
+    CHECK(count == 4);
+    CHECK(count == (size_t)argc);
+    if (count == 4) {
+        CHECK(list[0][0] != '\0');
+        CHECK_STR(list[1], "one");
+        CHECK_STR(list[2], "two words");
+        CHECK_STR(list[3], "\xc3\xbc");
+    }
+    free_list(list, count);
+#if !defined(_WIN32)
+    {
+        char name[] = "program";
+        char broken[] = "a\xff" "b";
+        char *given[3] = {name, broken, NULL};
+
+        count = 0;
+        list = anti_rt_process_arguments(2, given, &count);
+        CHECK(list != NULL && count == 2);
+        if (list != NULL && count == 2) {
+            CHECK_STR(list[0], "program");
+            CHECK_STR(list[1], "a\xef\xbf\xbd" "b");
+        }
+        free_list(list, count);
+    }
+#endif
+}
+
+/* The environment of the process holds a variable set by the program,
+   with its value outside ASCII, as name=value in UTF-8. */
+static void process_environment(void)
+{
+    size_t count = 0;
+    size_t i;
+    int found = 0;
+    char **list;
+
+    put("ANTI_RT_PLATFORM_START", "\xc3\xbc\xe2\x82\xac");
+    list = anti_rt_process_environment(&count);
+    CHECK(list != NULL && count > 0);
+    for (i = 0; list != NULL && i < count; i++) {
+        if (strcmp(list[i], "ANTI_RT_PLATFORM_START=\xc3\xbc\xe2\x82\xac") ==
+            0) {
+            found = 1;
+        }
+    }
+    CHECK(found);
+    free_list(list, count);
+}
+
+/* What the processor reports. CPUID of x86_64 gives leaf 1 at least, and
+   XCR0 has the x87 state set whenever the system turned XSAVE on. ARM64
+   gives one level of the table, armv8.5 on Apple Silicon. */
+static void processor(void)
+{
+#if defined(ANTI_RT_X86_64)
+    uint32_t zero[4] = {0, 0, 0, 0};
+    uint32_t one[4] = {0, 0, 0, 0};
+
+    anti_rt_cpuid(0, 0, zero);
+    CHECK(zero[0] >= 1);
+    CHECK(zero[1] != 0);
+    anti_rt_cpuid(1, 0, one);
+    if ((one[2] & 1u << 27) != 0) {
+        CHECK((anti_rt_xcr0() & 1u) != 0);
+    }
+#elif defined(ANTI_RT_ARM64)
+    int32_t level = anti_rt_arm64_level();
+
+    CHECK(level == ANTI_CPU_ARMV8_0 || level == ANTI_CPU_ARMV8_2 ||
+          level == ANTI_CPU_ARMV8_5);
+#if defined(__APPLE__)
+    CHECK(level == ANTI_CPU_ARMV8_5);
+#endif
+#else
+#error "the platform layer names no processor of the host"
+#endif
+}
+
+int main(int argc, char **argv)
 {
     sleep_steps();
     environment();
@@ -472,6 +600,10 @@ int main(void)
     images();
     files();
     traces();
+    aligned_memory();
+    process_arguments(argc, argv);
+    process_environment();
+    processor();
     if (check_failures != 0) {
         fprintf(stderr, "%d check(s) failed\n", check_failures);
         return 1;

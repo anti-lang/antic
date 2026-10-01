@@ -19,6 +19,75 @@
 /* 1 in the runtime of a Windows target and 0 elsewhere. anti.os asks it. */
 int64_t anti_rt_is_windows(void);
 
+/* The architecture the runtime is compiled for, as a name of the layer.
+   clang names it the same on every system, and MSVC by names of its
+   own. */
+#if defined(__x86_64__) || defined(_M_X64)
+#define ANTI_RT_X86_64 1
+#elif defined(__aarch64__) || defined(_M_ARM64)
+#define ANTI_RT_ARM64 1
+#endif
+
+/* DESIGN: the C main of src/rt/start.c calls the main of the program
+   through anti.rt.main, the entry symbol that antic defines. A symbol with
+   a dot is no C identifier, so the declaration names it with an assembler
+   label, which this macro gives. Mach-O adds `_` to the symbols of C and
+   ELF does not. COFF spells the symbol as an identifier, which the label
+   names as it stands. */
+#if defined(_WIN32)
+#define ANTI_RT_ENTRY_LABEL __asm__("_A4anti2rt_main")
+#elif defined(__APPLE__)
+#define ANTI_RT_ENTRY_LABEL __asm__("_anti.rt.main")
+#else
+#define ANTI_RT_ENTRY_LABEL __asm__("anti.rt.main")
+#endif
+
+/* DESIGN: the C main of src/rt/start.c takes the arguments and the
+   environment of the process from the layer, as strings of valid UTF-8
+   ended by a NUL. macOS and Linux give bytes, argv and the environment of
+   the C library, and the layer repairs a byte that is no UTF-8 into
+   U+FFFD. Windows gives UTF-16, the command line split by the rules of
+   the C runtime of Microsoft and GetEnvironmentStringsW. The argv of the
+   C runtime there is in the ANSI code page and is not read. Each string
+   is a block of its own that lives until exit, and the list one block
+   the caller frees. NULL when memory runs out. */
+
+/* The arguments of the process into a list of *count strings. argc and
+   argv are the ones of main. */
+char **anti_rt_process_arguments(int argc, char **argv, size_t *count);
+
+/* The variables of the environment as name=value, into a list of *count
+   strings. */
+char **anti_rt_process_environment(size_t *count);
+
+/* Make stdout and stderr write every byte as it stands. The C streams of
+   Windows start in text mode, which writes CRLF for each LF, and the
+   streams of macOS and Linux write bytes already. */
+void anti_rt_streams_binary(void);
+
+/* Memory of size bytes, at least 1, at align, a power of two, or NULL.
+   anti_rt_aligned_free gives it back, and nothing else may: Windows keeps
+   it apart from the memory of malloc. NULL is no memory and is left. */
+void *anti_rt_aligned_alloc(size_t size, size_t align);
+void anti_rt_aligned_free(void *p);
+
+/* DESIGN: the processor check of src/rt/cpu.c reads what the machine
+   offers. x86_64 reads it with the instructions CPUID and XGETBV, the same
+   on every system, which C has no words for, so the layer gives the two.
+   ARM64 has the system answer by a query of its own, and the layer gives
+   the level the answer means. */
+#if defined(ANTI_RT_X86_64)
+/* eax, ebx, ecx and edx of CPUID for leaf and sub-leaf, into out. */
+void anti_rt_cpuid(uint32_t leaf, uint32_t sub, uint32_t out[4]);
+/* XCR0, which says whether the system saves the SSE and the AVX state.
+   Only a processor whose CPUID gives OSXSAVE runs the instruction. */
+uint64_t anti_rt_xcr0(void);
+#elif defined(ANTI_RT_ARM64)
+/* The level of enum anti_cpu_level of src/rt/cpu_level.h that the system
+   reports for the machine. */
+int32_t anti_rt_arm64_level(void);
+#endif
+
 /* DESIGN: a monitor is a lock of the system with two condition
    variables, numbered 0 and 1. A thread waits on one while it holds the
    lock, and the wait gives the lock back until a wake. A monitor is the

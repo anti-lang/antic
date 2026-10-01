@@ -15,7 +15,7 @@ int anti_rt_ready(void);
    of a program of --memory-checks leaves it out of its report. The
    module that links such a program defines the function and calls the
    leak checker's own `__lsan_ignore_object`. The runtime's definition in
-   src/rt/init.c does nothing. */
+   the platform layer does nothing. */
 void anti_rt_memory_kept(const void *p);
 
 /* --anti.backtrace of the command line: 1 on, 0 off and -1 when the

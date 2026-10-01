@@ -6,7 +6,8 @@
    level. Where a platform has no query for a feature the level needs, the
    level passes. macOS and Linux answer for every level of the table.
    Windows on ARM64 answers up to the ARMv8.2 dot products and has no
-   query above them, so armv8.5 passes there. */
+   query above them, so armv8.5 passes there. The platform layer reads
+   the machine, and this file holds the levels. */
 #include "cpu_level.h"
 #include "platform.h"
 #include "std.h"
@@ -14,44 +15,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#if defined(__x86_64__) || defined(_M_X64)
-#define ANTI_CPU_X86_64 1
-#elif defined(__aarch64__) || defined(_M_ARM64)
-#define ANTI_CPU_ARM64 1
-#endif
-
-#if defined(_MSC_VER)
-#include <intrin.h>
-#endif
-
-#if defined(ANTI_CPU_ARM64)
-#if defined(_WIN32)
-#include <windows.h>
-/* The values of IsProcessorFeaturePresent, which an older SDK may not
-   declare. */
-#ifndef PF_ARM_V81_ATOMIC_INSTRUCTIONS_AVAILABLE
-#define PF_ARM_V81_ATOMIC_INSTRUCTIONS_AVAILABLE 34
-#endif
-#ifndef PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE
-#define PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE 43
-#endif
-#elif defined(__APPLE__)
-#include <sys/sysctl.h>
-#else
-#include <sys/auxv.h>
-/* The AT_HWCAP bits of the features the levels need. A musl header of the
-   sysroot declares none of them. */
-#define ANTI_HWCAP_ATOMICS (1UL << 8)
-#define ANTI_HWCAP_FPHP (1UL << 9)
-#define ANTI_HWCAP_ASIMDHP (1UL << 10)
-#define ANTI_HWCAP_SB (1UL << 29)
-#define ANTI_HWCAP2_FRINT (1UL << 8)
-#ifndef AT_HWCAP2
-#define AT_HWCAP2 26
-#endif
-#endif
-#endif
 
 /* The build compiles one runtime per target and level and names the level
    here. A build that leaves it out would ship a runtime that checks the
@@ -108,56 +71,21 @@ const char *anti_rt_cpu_level_message(int32_t level)
     return r == NULL ? "" : r->message;
 }
 
-#if defined(ANTI_CPU_X86_64)
-
-static void cpuid_count(uint32_t leaf, uint32_t sub, uint32_t out[4])
-{
-#if defined(_MSC_VER)
-    int regs[4];
-
-    __cpuidex(regs, (int)leaf, (int)sub);
-    out[0] = (uint32_t)regs[0];
-    out[1] = (uint32_t)regs[1];
-    out[2] = (uint32_t)regs[2];
-    out[3] = (uint32_t)regs[3];
-#else
-    __asm__ volatile("cpuid"
-                     : "=a"(out[0]), "=b"(out[1]), "=c"(out[2]), "=d"(out[3])
-                     : "a"(leaf), "c"(sub));
-#endif
-}
-
-/* The extended control register that says whether the operating system
-   saves the SSE and AVX state. AVX without it faults. */
-static uint64_t control_register(void)
-{
-#if defined(_MSC_VER)
-    return _xgetbv(0);
-#else
-    uint32_t low;
-    uint32_t high;
-
-    /* xgetbv by its bytes, so that the assembler needs no xsave option. */
-    __asm__ volatile(".byte 0x0f, 0x01, 0xd0"
-                     : "=a"(low), "=d"(high)
-                     : "c"(0));
-    return (uint64_t)high << 32 | low;
-#endif
-}
+#if defined(ANTI_RT_X86_64)
 
 static int has_v2(void)
 {
     uint32_t one[4];
     uint32_t extended[4];
 
-    cpuid_count(1, 0, one);
+    anti_rt_cpuid(1, 0, one);
     /* SSE3, SSSE3, CMPXCHG16B, SSE4.1, SSE4.2 and POPCNT of leaf 1. */
     if ((one[2] & (1u << 0 | 1u << 9 | 1u << 13 | 1u << 19 | 1u << 20 |
                    1u << 23)) !=
         (1u << 0 | 1u << 9 | 1u << 13 | 1u << 19 | 1u << 20 | 1u << 23)) {
         return 0;
     }
-    cpuid_count(0x80000001u, 0, extended);
+    anti_rt_cpuid(0x80000001u, 0, extended);
     /* LAHF and SAHF in long mode. */
     return (extended[2] & 1u) != 0;
 }
@@ -168,23 +96,23 @@ static int has_v3(void)
     uint32_t seven[4];
     uint32_t extended[4];
 
-    cpuid_count(1, 0, one);
+    anti_rt_cpuid(1, 0, one);
     /* FMA, MOVBE, OSXSAVE, AVX and F16C of leaf 1. */
     if ((one[2] & (1u << 12 | 1u << 22 | 1u << 27 | 1u << 28 | 1u << 29)) !=
         (1u << 12 | 1u << 22 | 1u << 27 | 1u << 28 | 1u << 29)) {
         return 0;
     }
     /* The operating system saves the SSE and the AVX state. */
-    if ((control_register() & 6u) != 6u) {
+    if ((anti_rt_xcr0() & 6u) != 6u) {
         return 0;
     }
-    cpuid_count(7, 0, seven);
+    anti_rt_cpuid(7, 0, seven);
     /* BMI1, AVX2 and BMI2 of leaf 7. */
     if ((seven[1] & (1u << 3 | 1u << 5 | 1u << 8)) !=
         (1u << 3 | 1u << 5 | 1u << 8)) {
         return 0;
     }
-    cpuid_count(0x80000001u, 0, extended);
+    anti_rt_cpuid(0x80000001u, 0, extended);
     /* LZCNT, which CPUID calls ABM. */
     return (extended[2] & 1u << 5) != 0;
 }
@@ -197,69 +125,12 @@ static int32_t machine_level(void)
     return has_v2() ? ANTI_CPU_X86_64_V2 : ANTI_CPU_X86_64_V1;
 }
 
-#elif defined(ANTI_CPU_ARM64)
-
-#if defined(_WIN32)
+#elif defined(ANTI_RT_ARM64)
 
 static int32_t machine_level(void)
 {
-    /* DESIGN: Windows answers for the ARMv8.1 atomics and the ARMv8.2 dot
-       products and has no query above them. Where a feature has no flag
-       the level is assumed, because every Windows-on-ARM machine sold is
-       armv8.2 or later. A machine with both flags therefore reports
-       armv8.5 as well. */
-    if (IsProcessorFeaturePresent(
-            PF_ARM_V81_ATOMIC_INSTRUCTIONS_AVAILABLE) &&
-        IsProcessorFeaturePresent(PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE)) {
-        return ANTI_CPU_ARMV8_5;
-    }
-    return ANTI_CPU_ARMV8_0;
+    return anti_rt_arm64_level();
 }
-
-#elif defined(__APPLE__)
-
-static int feature(const char *name)
-{
-    int32_t value = 0;
-    size_t size = sizeof value;
-
-    if (sysctlbyname(name, &value, &size, NULL, 0) != 0) {
-        return 0;
-    }
-    return value != 0;
-}
-
-static int32_t machine_level(void)
-{
-    if (feature("hw.optional.arm.FEAT_SB") &&
-        feature("hw.optional.arm.FEAT_FRINTTS")) {
-        return ANTI_CPU_ARMV8_5;
-    }
-    if (feature("hw.optional.arm.FEAT_LSE") &&
-        feature("hw.optional.arm.FEAT_FP16")) {
-        return ANTI_CPU_ARMV8_2;
-    }
-    return ANTI_CPU_ARMV8_0;
-}
-
-#else
-
-static int32_t machine_level(void)
-{
-    unsigned long one = getauxval(AT_HWCAP);
-    unsigned long two = getauxval(AT_HWCAP2);
-
-    if ((one & ANTI_HWCAP_SB) != 0 && (two & ANTI_HWCAP2_FRINT) != 0) {
-        return ANTI_CPU_ARMV8_5;
-    }
-    if ((one & ANTI_HWCAP_ATOMICS) != 0 && (one & ANTI_HWCAP_FPHP) != 0 &&
-        (one & ANTI_HWCAP_ASIMDHP) != 0) {
-        return ANTI_CPU_ARMV8_2;
-    }
-    return ANTI_CPU_ARMV8_0;
-}
-
-#endif
 
 #else
 

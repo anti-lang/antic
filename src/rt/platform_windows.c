@@ -6,8 +6,10 @@
 #define _CRT_RAND_S
 
 #include <errno.h>
+#include <fcntl.h>
 #include <io.h>
 #include <limits.h>
+#include <malloc.h>
 #include <share.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -19,9 +21,16 @@
 #include <windows.h>
 #include <DbgHelp.h>
 
+#include "cpu_level.h"
 #include "platform.h"
+#include "rt.h"
 #include "signal.h"
 #include "std.h"
+#include "utf.h"
+
+#if defined(ANTI_RT_X86_64)
+#include <intrin.h>
+#endif
 
 /* See the DESIGN comment of the same function in platform_posix.c. */
 int64_t anti_rt_is_windows(void)
@@ -903,6 +912,193 @@ void anti_rt_sleep(int64_t nanoseconds)
         nanoseconds -= (int64_t)step * 1000000;
     }
 }
+
+/* The n UTF-16 units at units as UTF-8 ended by a NUL, in a block of its
+   own, or NULL when memory runs out. One unit gives at most 3 bytes. */
+static char *utf8_block(const uint16_t *units, size_t n)
+{
+    unsigned char *bytes = malloc(3 * n + 1);
+    size_t written;
+
+    if (bytes == NULL) {
+        return NULL;
+    }
+    written = anti_rt_utf16_to_utf8(units, n, bytes);
+    bytes[written] = 0;
+    return (char *)bytes;
+}
+
+/* The n units at s and the 0 unit after them as uint16_t, which the
+   wchar_t of Windows holds but may not be read as, in memory the caller
+   frees, or NULL. */
+static uint16_t *units_of(const wchar_t *s, size_t n)
+{
+    uint16_t *units = malloc((n + 1) * sizeof *units);
+    size_t i;
+
+    if (units == NULL) {
+        return NULL;
+    }
+    for (i = 0; i <= n; i++) {
+        units[i] = (uint16_t)s[i];
+    }
+    return units;
+}
+
+/* The count strings at p, each ended by a 0 unit, as a list of UTF-8
+   blocks. NULL when memory runs out, with every block of the call given
+   back. */
+static char **utf8_list(const uint16_t *p, size_t count)
+{
+    char **out = malloc((count + 1) * sizeof *out);
+    size_t i;
+
+    if (out == NULL) {
+        return NULL;
+    }
+    for (i = 0; i < count; i++) {
+        size_t n = 0;
+        while (p[n] != 0) {
+            n++;
+        }
+        out[i] = utf8_block(p, n);
+        if (out[i] == NULL) {
+            while (i > 0) {
+                free(out[--i]);
+            }
+            free(out);
+            return NULL;
+        }
+        p += n + 1;
+    }
+    out[count] = NULL;
+    return out;
+}
+
+char **anti_rt_process_arguments(int argc, char **argv, size_t *count)
+{
+    const wchar_t *line = GetCommandLineW();
+    size_t n = wcslen(line);
+    uint16_t *units = units_of(line, n);
+    uint16_t *split = malloc((2 * n + 2) * sizeof *split);
+    char **list = NULL;
+
+    /* The argv of the C runtime is in the ANSI code page, which platform.h
+       says is not read, and the count is the one of the same split. */
+    (void)argc;
+    (void)argv;
+    *count = 0;
+    if (units != NULL && split != NULL) {
+        *count = anti_rt_split_command_line(units, split);
+        list = utf8_list(split, *count);
+    }
+    free(units);
+    free(split);
+    return list;
+}
+
+char **anti_rt_process_environment(size_t *count)
+{
+    wchar_t *block = GetEnvironmentStringsW();
+    const wchar_t *p = block;
+    uint16_t *units;
+    char **list = NULL;
+    size_t n = 0;
+
+    *count = 0;
+    if (block == NULL) {
+        return utf8_list(NULL, 0);
+    }
+    while (*p != 0) {
+        n++;
+        p += wcslen(p) + 1;
+    }
+    units = units_of(block, (size_t)(p - block));
+    if (units != NULL) {
+        *count = n;
+        list = utf8_list(units, n);
+        free(units);
+    }
+    FreeEnvironmentStringsW(block);
+    return list;
+}
+
+/* DESIGN: the raw-bytes rule. An Anti program writes the bytes it was
+   given, and the runtime never translates them. */
+void anti_rt_streams_binary(void)
+{
+    _setmode(_fileno(stdout), _O_BINARY);
+    _setmode(_fileno(stderr), _O_BINARY);
+}
+
+/* DESIGN: the Universal C Runtime has no aligned_alloc, so the memory at
+   an alignment comes from _aligned_malloc, whose memory only
+   _aligned_free releases. */
+void *anti_rt_aligned_alloc(size_t size, size_t align)
+{
+    return _aligned_malloc(size, align);
+}
+
+void anti_rt_aligned_free(void *p)
+{
+    _aligned_free(p);
+}
+
+/* See rt.h. Windows has no leak check in its runtime of
+   AddressSanitizer, so no program replaces this definition, and it is
+   not weak. */
+void anti_rt_memory_kept(const void *p)
+{
+    /* The block serves the leak checker of a program that replaces this
+       definition on the other systems alone. */
+    (void)p;
+}
+
+#if defined(ANTI_RT_X86_64)
+
+void anti_rt_cpuid(uint32_t leaf, uint32_t sub, uint32_t out[4])
+{
+    int regs[4];
+
+    __cpuidex(regs, (int)leaf, (int)sub);
+    out[0] = (uint32_t)regs[0];
+    out[1] = (uint32_t)regs[1];
+    out[2] = (uint32_t)regs[2];
+    out[3] = (uint32_t)regs[3];
+}
+
+uint64_t anti_rt_xcr0(void)
+{
+    return _xgetbv(0);
+}
+
+#elif defined(ANTI_RT_ARM64)
+
+/* The values of IsProcessorFeaturePresent, which an older SDK may not
+   declare. */
+#ifndef PF_ARM_V81_ATOMIC_INSTRUCTIONS_AVAILABLE
+#define PF_ARM_V81_ATOMIC_INSTRUCTIONS_AVAILABLE 34
+#endif
+#ifndef PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE
+#define PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE 43
+#endif
+
+int32_t anti_rt_arm64_level(void)
+{
+    /* DESIGN: Windows answers for the ARMv8.1 atomics and the ARMv8.2 dot
+       products and has no query above them. Where a feature has no flag
+       the level is assumed, because every Windows-on-ARM machine sold is
+       armv8.2 or later. A machine with both flags therefore reports
+       armv8.5 as well. */
+    if (IsProcessorFeaturePresent(
+            PF_ARM_V81_ATOMIC_INSTRUCTIONS_AVAILABLE) &&
+        IsProcessorFeaturePresent(PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE)) {
+        return ANTI_CPU_ARMV8_5;
+    }
+    return ANTI_CPU_ARMV8_0;
+}
+
+#endif
 
 #else
 

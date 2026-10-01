@@ -2,8 +2,8 @@
 #if !defined(_WIN32)
 
 /* clock_gettime, nanosleep, dladdr, sysconf, syscall, fseeko,
-   pthread_getattr_np, dl_iterate_phdr and readlink sit behind a feature
-   macro, and the two systems spell it differently. */
+   pthread_getattr_np, dl_iterate_phdr, readlink and posix_memalign sit
+   behind a feature macro, and the two systems spell it differently. */
 #if defined(__APPLE__)
 #define _DARWIN_C_SOURCE
 #else
@@ -22,15 +22,21 @@
 #include <time.h>
 #include <unistd.h>
 #if defined(__APPLE__)
+#include <crt_externs.h>
 #include <os/lock.h>
+#include <sys/sysctl.h>
 #else
 #include <link.h>
+#include <sys/auxv.h>
 #include <sys/random.h>
 #include <sys/syscall.h>
 #endif
 
+#include "cpu_level.h"
 #include "platform.h"
+#include "rt.h"
 #include "std.h"
+#include "utf.h"
 
 /* DESIGN: anti.os builds the per-user directories, and the conventions
    differ between Windows and the two Unix platforms. The runtime is
@@ -712,6 +718,185 @@ void anti_rt_sleep(int64_t nanoseconds)
         /* A signal interrupted the wait, and wait holds what is left. */
     }
 }
+
+/* The count strings of list as valid UTF-8, each in a block of its own,
+   in a list of one block. NULL when memory runs out, with every block of
+   the call given back. */
+static char **utf8_list(char *const *list, size_t count)
+{
+    char **out = malloc((count + 1) * sizeof *out);
+    size_t i;
+
+    if (out == NULL) {
+        return NULL;
+    }
+    for (i = 0; i < count; i++) {
+        size_t n = strlen(list[i]);
+        unsigned char *bytes = malloc(3 * n + 1);
+        size_t written;
+        if (bytes == NULL) {
+            while (i > 0) {
+                free(out[--i]);
+            }
+            free(out);
+            return NULL;
+        }
+        written = anti_rt_utf8_repair((const unsigned char *)list[i], n, bytes);
+        bytes[written] = 0;
+        out[i] = (char *)bytes;
+    }
+    out[count] = NULL;
+    return out;
+}
+
+char **anti_rt_process_arguments(int argc, char **argv, size_t *count)
+{
+    *count = argc > 0 ? (size_t)argc : 0;
+    return utf8_list(argv, *count);
+}
+
+#if defined(__APPLE__)
+/* DESIGN: environ is defined by the start code of an executable, so a
+   shared library on macOS cannot link against it. The runtime of a
+   library for C asks _NSGetEnviron of libSystem, which every image may
+   call. */
+static char **environment_list(void)
+{
+    return *_NSGetEnviron();
+}
+#else
+extern char **environ;
+
+static char **environment_list(void)
+{
+    return environ;
+}
+#endif
+
+char **anti_rt_process_environment(size_t *count)
+{
+    char **list = environment_list();
+    size_t n = 0;
+
+    while (list != NULL && list[n] != NULL) {
+        n++;
+    }
+    *count = n;
+    return utf8_list(list, n);
+}
+
+void anti_rt_streams_binary(void)
+{
+}
+
+/* DESIGN: posix_memalign gives memory at any power of two that is a
+   multiple of the size of a pointer, and free releases it. A smaller
+   alignment is raised to that size, which every smaller one divides. */
+void *anti_rt_aligned_alloc(size_t size, size_t align)
+{
+    void *p = NULL;
+
+    if (align < sizeof(void *)) {
+        align = sizeof(void *);
+    }
+    if (posix_memalign(&p, align, size) != 0) {
+        return NULL;
+    }
+    return p;
+}
+
+void anti_rt_aligned_free(void *p)
+{
+    free(p);
+}
+
+/* DESIGN: the runtime marks what it keeps until exit through a function
+   that a program of --memory-checks replaces, see rt.h. The definition
+   here is weak on ELF and Mach-O, so the one of the program wins and
+   every other program pays one call that returns. */
+__attribute__((weak)) void anti_rt_memory_kept(const void *p)
+{
+    /* The block serves the leak checker of the program that replaces
+       this definition alone. */
+    (void)p;
+}
+
+#if defined(ANTI_RT_X86_64)
+
+void anti_rt_cpuid(uint32_t leaf, uint32_t sub, uint32_t out[4])
+{
+    __asm__ volatile("cpuid"
+                     : "=a"(out[0]), "=b"(out[1]), "=c"(out[2]), "=d"(out[3])
+                     : "a"(leaf), "c"(sub));
+}
+
+uint64_t anti_rt_xcr0(void)
+{
+    uint32_t low;
+    uint32_t high;
+
+    /* xgetbv by its bytes, so that the assembler needs no xsave option. */
+    __asm__ volatile(".byte 0x0f, 0x01, 0xd0"
+                     : "=a"(low), "=d"(high)
+                     : "c"(0));
+    return (uint64_t)high << 32 | low;
+}
+
+#elif defined(ANTI_RT_ARM64) && defined(__APPLE__)
+
+static int feature(const char *name)
+{
+    int32_t value = 0;
+    size_t size = sizeof value;
+
+    if (sysctlbyname(name, &value, &size, NULL, 0) != 0) {
+        return 0;
+    }
+    return value != 0;
+}
+
+int32_t anti_rt_arm64_level(void)
+{
+    if (feature("hw.optional.arm.FEAT_SB") &&
+        feature("hw.optional.arm.FEAT_FRINTTS")) {
+        return ANTI_CPU_ARMV8_5;
+    }
+    if (feature("hw.optional.arm.FEAT_LSE") &&
+        feature("hw.optional.arm.FEAT_FP16")) {
+        return ANTI_CPU_ARMV8_2;
+    }
+    return ANTI_CPU_ARMV8_0;
+}
+
+#elif defined(ANTI_RT_ARM64)
+
+/* The AT_HWCAP bits of the features the levels need. A musl header of the
+   sysroot declares none of them. */
+#define ANTI_HWCAP_ATOMICS (1UL << 8)
+#define ANTI_HWCAP_FPHP (1UL << 9)
+#define ANTI_HWCAP_ASIMDHP (1UL << 10)
+#define ANTI_HWCAP_SB (1UL << 29)
+#define ANTI_HWCAP2_FRINT (1UL << 8)
+#ifndef AT_HWCAP2
+#define AT_HWCAP2 26
+#endif
+
+int32_t anti_rt_arm64_level(void)
+{
+    unsigned long one = getauxval(AT_HWCAP);
+    unsigned long two = getauxval(AT_HWCAP2);
+
+    if ((one & ANTI_HWCAP_SB) != 0 && (two & ANTI_HWCAP2_FRINT) != 0) {
+        return ANTI_CPU_ARMV8_5;
+    }
+    if ((one & ANTI_HWCAP_ATOMICS) != 0 && (one & ANTI_HWCAP_FPHP) != 0 &&
+        (one & ANTI_HWCAP_ASIMDHP) != 0) {
+        return ANTI_CPU_ARMV8_2;
+    }
+    return ANTI_CPU_ARMV8_0;
+}
+
+#endif
 
 #else
 

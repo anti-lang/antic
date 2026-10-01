@@ -8,15 +8,9 @@
 #include <string.h>
 #include "conf.h"
 #include "cpu_level.h"
+#include "platform.h"
 #include "rt.h"
 #include "std.h"
-#include "utf.h"
-
-#if defined(_WIN32)
-#include <fcntl.h>
-#include <io.h>
-#include <windows.h>
-#endif
 
 /* The layouts of Anti's str and []str. */
 struct anti_str {
@@ -31,23 +25,10 @@ struct anti_slice {
 
 /* DESIGN: the entry always passes args and env. All six calling
    conventions pass both slices, or pointers to them, in registers. A main
-   with fewer parameters ignores those registers. */
-
-/* A symbol with a dot is not a C identifier, so the declaration names it
-   with an assembler label. Mach-O adds '_' to C symbols, ELF does not.
-   The COFF symbol is an identifier, and MSVC has no assembler labels. */
-#if defined(_WIN32)
-extern int64_t _A4anti2rt_main(struct anti_slice args, struct anti_slice env);
-#define anti_main _A4anti2rt_main
-#else
-#if defined(__APPLE__)
-#define ANTI_ENTRY_SYMBOL "_anti.rt.main"
-#else
-#define ANTI_ENTRY_SYMBOL "anti.rt.main"
-#endif
+   with fewer parameters ignores those registers. The symbol has a dot,
+   which platform.h names with a label. */
 extern int64_t anti_main(struct anti_slice args, struct anti_slice env)
-    __asm__(ANTI_ENTRY_SYMBOL);
-#endif
+    ANTI_RT_ENTRY_LABEL;
 
 /* DESIGN: the runtime takes every argument under the reserved prefix
    `--anti.` in one pass before main sees the list. It hands the rest on
@@ -108,128 +89,23 @@ static void kept(struct anti_slice s)
     }
 }
 
-/* A str holding UTF-8 bytes, with a NUL after them. */
-static struct anti_str make_str(unsigned char *bytes, size_t length)
-{
-    struct anti_str s;
-
-    bytes[length] = 0;
-    s.ptr = bytes;
-    s.len = (int64_t)length;
-    return s;
-}
-
-#if defined(_WIN32)
-/* The UTF-16 units of s up to its 0 unit, as UTF-8. */
-static struct anti_str from_utf16(const uint16_t *s)
-{
-    size_t n = 0;
-
-    while (s[n] != 0) {
-        n++;
-    }
-    unsigned char *bytes = allocate(3 * n + 1);
-    return make_str(bytes, anti_rt_utf16_to_utf8(s, n, bytes));
-}
-
-static uint16_t *copy_units(const wchar_t *s, size_t n)
-{
-    uint16_t *units = allocate((n + 1) * sizeof *units);
-    size_t i;
-
-    for (i = 0; i <= n; i++) {
-        units[i] = (uint16_t)s[i];
-    }
-    return units;
-}
-
-static struct anti_slice arguments(void)
-{
-    const wchar_t *line = GetCommandLineW();
-    size_t n = wcslen(line);
-    uint16_t *units = copy_units(line, n);
-    uint16_t *split = allocate((2 * n + 2) * sizeof *split);
-    struct anti_slice args;
-    size_t count = anti_rt_split_command_line(units, split);
-    const uint16_t *p = split;
-    size_t i;
-
-    args.ptr = allocate(count * sizeof *args.ptr);
-    args.len = (int64_t)count;
-    for (i = 0; i < count; i++) {
-        args.ptr[i] = from_utf16(p);
-        while (*p != 0) {
-            p++;
-        }
-        p++;
-    }
-    free(units);
-    free(split);
-    return args;
-}
-
-static struct anti_slice environment(void)
-{
-    wchar_t *block = GetEnvironmentStringsW();
-    const wchar_t *p;
-    struct anti_slice env;
-    size_t count = 0;
-    size_t i;
-
-    for (p = block; p != NULL && *p != 0; p += wcslen(p) + 1) {
-        count++;
-    }
-    env.ptr = allocate(count * sizeof *env.ptr);
-    env.len = (int64_t)count;
-    for (i = 0, p = block; i < count; i++, p += wcslen(p) + 1) {
-        size_t n = wcslen(p);
-        uint16_t *units = copy_units(p, n);
-        env.ptr[i] = from_utf16(units);
-        free(units);
-    }
-    if (block != NULL) {
-        FreeEnvironmentStringsW(block);
-    }
-    return env;
-}
-
-int main(void)
-{
-    struct anti_slice args;
-    struct anti_slice env;
-
-    /* DESIGN: the raw-bytes rule. An Anti program writes the bytes it was
-       given, and the runtime never translates them. The C streams of
-       Windows start in text mode, which writes CRLF for each LF. */
-    _setmode(_fileno(stdout), _O_BINARY);
-    _setmode(_fileno(stderr), _O_BINARY);
-    anti_rt_cpu_check();
-    anti_rt_init();
-    args = arguments();
-    kept(args);
-    runtime_options(&args);
-    env = environment();
-    kept(env);
-    return (int)anti_main(args, env);
-}
-#else
-extern char **environ;
-
-/* Byte strings from the system as str values of valid UTF-8. */
-static struct anti_slice strings(char **list, size_t count)
+/* The strings of the platform layer as a []str. The strings stay, and
+   the list that held them goes back. */
+static struct anti_slice slice_of(char **list, size_t count)
 {
     struct anti_slice slice;
     size_t i;
 
+    if (list == NULL) {
+        anti_rt_fail_exit(70, "anti: out of memory at program start");
+    }
     slice.ptr = allocate(count * sizeof *slice.ptr);
     slice.len = (int64_t)count;
     for (i = 0; i < count; i++) {
-        size_t n = strlen(list[i]);
-        unsigned char *bytes = allocate(3 * n + 1);
-        size_t written =
-            anti_rt_utf8_repair((const unsigned char *)list[i], n, bytes);
-        slice.ptr[i] = make_str(bytes, written);
+        slice.ptr[i].ptr = (const unsigned char *)list[i];
+        slice.ptr[i].len = (int64_t)strlen(list[i]);
     }
+    free(list);
     return slice;
 }
 
@@ -238,17 +114,17 @@ int main(int argc, char **argv)
     struct anti_slice args;
     struct anti_slice env;
     size_t count = 0;
+    char **list;
 
+    anti_rt_streams_binary();
     anti_rt_cpu_check();
     anti_rt_init();
-    args = strings(argv, (size_t)argc);
+    list = anti_rt_process_arguments(argc, argv, &count);
+    args = slice_of(list, count);
     kept(args);
     runtime_options(&args);
-    while (environ != NULL && environ[count] != NULL) {
-        count++;
-    }
-    env = strings(environ, count);
+    list = anti_rt_process_environment(&count);
+    env = slice_of(list, count);
     kept(env);
     return (int)anti_main(args, env);
 }
-#endif
