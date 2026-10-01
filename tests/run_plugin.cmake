@@ -157,3 +157,54 @@ file(WRITE "${dir}/anti-plugins.toml" "${broken}")
 program_expect("a broken digest"
                COMMAND "${WORK}/found${EXE}" "--anti.plugins=${dir}"
                STATUS 70 ERR_MATCH "does not match the digest")
+
+# antic keeps the entries of the other libraries of an index it rewrites,
+# whatever form of TOML the runtime reads in it: line ends of Windows, a
+# comment and strings in double quotes. The stale entry of the library
+# goes, a path that holds a quote of its own comes back in the other
+# quotes, and the runtime reads the result.
+set(kept "${WORK}/kept")
+file(MAKE_DIRECTORY "${kept}")
+set(zeros "0000000000000000000000000000000000000000000000000000000000000000")
+set(other "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+file(WRITE "${kept}/anti-plugins.toml"
+     "# libraries built elsewhere\r\n"
+     "[[library]]\r\npath = \"libother${SUFFIX}\"\r\nruntime = \"0.0.1\"\r\n"
+     "digest = \"${other}\"\r\ninterfaces = [\"x.Other\", \"x.Y\"]\r\n\r\n"
+     "[[library]]\r\npath = \"libfancy${SUFFIX}\"\r\nruntime = \"0.0.1\"\r\n"
+     "digest = \"${zeros}\"\r\ninterfaces = [\"${interface}\"]\r\n"
+     "[[library]]\r\npath = \"lib'q${SUFFIX}\"\r\nruntime = \"0.0.1\"\r\n"
+     "digest = \"${other}\"\r\ninterfaces = [\"x.Q\"]\r\n")
+set(host "")
+if(SUFFIX STREQUAL ".dll")
+    set(host "${WORK}/found.lib")
+endif()
+run(--lib shared --no-runtime --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+    -I "${SOURCES}" -I "${WORK}" -o "${kept}/libfancy${SUFFIX}"
+    "${SOURCES}/net/example/fancy.anti" ${host})
+file(READ "${kept}/anti-plugins.toml" index)
+file(SHA256 "${kept}/libfancy${SUFFIX}" digest)
+string(REGEX MATCHALL "libfancy" fancies "${index}")
+list(LENGTH fancies fancy_count)
+if(NOT index MATCHES "path = 'libother${SUFFIX}'" OR
+   NOT index MATCHES "digest = '${other}'" OR
+   NOT index MATCHES "interfaces = \\['x\\.Other', 'x\\.Y'\\]" OR
+   NOT index MATCHES "path = \"lib'q${SUFFIX}\"" OR
+   NOT index MATCHES "digest = '${digest}'" OR
+   index MATCHES "${zeros}" OR NOT fancy_count EQUAL 1)
+    message(FATAL_ERROR "the index lost or kept the wrong entries\n${index}")
+endif()
+program_expect("discovery through a rewritten index"
+               COMMAND "${WORK}/found${EXE}" "--anti.plugins=${kept}"
+               OUT_FILE "${PROVIDED}")
+
+# An index cut off inside an entry is no TOML, and antic replaces it with
+# the entry of its own library.
+file(WRITE "${kept}/anti-plugins.toml" "[[library]]\npath = 'libot")
+run(--lib shared --no-runtime --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+    -I "${SOURCES}" -I "${WORK}" -o "${kept}/libfancy${SUFFIX}"
+    "${SOURCES}/net/example/fancy.anti" ${host})
+file(READ "${kept}/anti-plugins.toml" index)
+if(index MATCHES "libot" OR NOT index MATCHES "path = 'libfancy${SUFFIX}'")
+    message(FATAL_ERROR "a cut index stayed\n${index}")
+endif()

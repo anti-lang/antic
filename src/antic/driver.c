@@ -31,6 +31,7 @@
 #include "process.h"
 #include "text.h"
 #include "warnings.h"
+#include "../rt/toml.h"
 
 #define ASSEMBLY_SUFFIX ".s"
 #define PACKAGE_SUFFIX ".package"
@@ -325,6 +326,7 @@ struct link_facts {
     struct text crt_dir;
     struct text sysroot;
     struct text lld_dir;
+    struct text rpath;
 };
 
 static void link_facts_free(struct link_facts *f)
@@ -334,6 +336,7 @@ static void link_facts_free(struct link_facts *f)
     text_free(&f->crt_dir);
     text_free(&f->sysroot);
     text_free(&f->lld_dir);
+    text_free(&f->rpath);
 }
 
 static bool file_exists(const char *path)
@@ -397,21 +400,16 @@ static bool apple_sdk(const struct options *o, struct link_facts *f)
 /* The facts of a link for the target. lld takes the sysroot and the lld
    programs of the runtime archive, and the SDK version of a macOS
    sysroot. The platform linker takes the macOS SDK from xcrun and the
-   glibc start files of the host. */
+   glibc start files of the host. in->glibc and in->frameworks are set. */
 static bool link_facts(const struct options *o, struct link_inputs *in,
                        struct link_facts *f)
 {
     enum target t = o->target;
     enum target_os os = target_info(t)->os;
-    static const char *const flavours[] = {
-        [OS_LINUX] = "ld.lld", [OS_MACOS] = "ld64.lld",
-        [OS_WINDOWS] = "lld-link",
-    };
     struct text marker = {0};
     enum target host;
     bool present;
 
-    memset(f, 0, sizeof *f);
     in->linker = o->linker;
     in->cpu = o->cpu;
     in->debug = o->debug;
@@ -434,22 +432,16 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
     text_appendf(&f->lld_dir, "%s/%s", o->runtime, RUNTIME_BIN_DIR);
     /* The flavour of lld is a program of the host, which ends in .exe on
        Windows. The command line may leave the suffix out. */
-    text_appendf(&marker, "%s/%s%s", text_cstr(&f->lld_dir), flavours[os],
+    text_appendf(&marker, "%s/%s%s", text_cstr(&f->lld_dir),
+                 link_lld_flavour(t),
                  target_host(&host) ? target_info(host)->executable_suffix : "");
     in->lld_dir = file_exists(text_cstr(&marker)) ? text_cstr(&f->lld_dir)
                                                   : NULL;
     text_free(&marker);
     text_appendf(&f->sysroot, "%s/%s/", o->runtime, RUNTIME_SYSROOT_DIR);
     link_target_dir(&f->sysroot, t, in->glibc);
-    /* The builtins are the last file tools/get-sysroot.cmake writes into
-       a glibc sysroot. */
-    text_appendf(&marker, "%s/%s", text_cstr(&f->sysroot),
-                 os == OS_LINUX && in->glibc ? "usr/lib/libclang_rt.builtins.a"
-                 : os == OS_LINUX            ? "usr/lib/libc.a"
-                 : os == OS_MACOS ? SYSROOT_SDK_VERSION
-                 : target_info(t)->arch == ARCH_ARM64
-                     ? "crt/lib/aarch64/msvcrt.lib"
-                     : "crt/lib/x86_64/msvcrt.lib");
+    text_appendf(&marker, "%s/", text_cstr(&f->sysroot));
+    link_sysroot_marker(&marker, t, in->glibc);
     present = file_exists(text_cstr(&marker)) &&
               (os != OS_MACOS || read_bytes(text_cstr(&marker), &f->sdk_version));
     text_free(&marker);
@@ -462,7 +454,7 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
         return false;
     }
     in->sysroot = present ? text_cstr(&f->sysroot) : NULL;
-    if (os == OS_MACOS && o->framework_count > 0) {
+    if (os == OS_MACOS && in->framework_count > 0) {
         if (!apple_sdk(o, f)) {
             return false;
         }
@@ -475,6 +467,50 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
     }
     in->sdk_version = text_cstr(&f->sdk_version);
     return true;
+}
+
+/* DESIGN: every link of a module takes its inputs from link_inputs_of:
+   a program, a library for C, a plugin and the join of a bundled runtime
+   alike. The frameworks, the libraries of `link linux`, the glibc mode
+   and the memory checks of the module then reach each of them. A shared
+   library once filled its own and lost all four. */
+/* The inputs of a link of object into executable, with the extra inputs
+   of the command line. The caller frees f with link_facts_free, also
+   when this fails. */
+static bool link_inputs_of(const struct options *o, const struct extras *extras,
+                           const char *object, const char *executable,
+                           struct link_inputs *in, struct link_facts *f)
+{
+    enum target_os os = target_info(o->target)->os;
+    bool ok = true;
+
+    memset(in, 0, sizeof *in);
+    memset(f, 0, sizeof *f);
+    in->object = object;
+    in->executable = executable;
+    in->runtime = o->runtime;
+    in->extra = o->objects;
+    in->extra_count = o->object_count;
+    in->frameworks = o->frameworks;
+    in->framework_count = o->framework_count;
+    in->linux_libraries = o->linux_libraries;
+    in->linux_library_count = o->linux_library_count;
+    in->exports = extras->hosts_plugins;
+    /* DESIGN: the runtime of AddressSanitizer is built against glibc,
+       so a Linux link of --memory-checks takes the glibc mode. */
+    in->glibc = os == OS_LINUX &&
+                (o->linux_library_count > 0 || extras->hosts_plugins ||
+                 o->memory_checks);
+    in->memory_checks = o->memory_checks;
+    if (o->memory_checks && os == OS_MACOS) {
+        struct text dir = {0};
+        text_appendf(&dir, "%s/%s/", o->runtime, RUNTIME_LIB_DIR);
+        link_target_dir(&dir, o->target, false);
+        ok = absolute_path(text_cstr(&dir), &f->rpath);
+        text_free(&dir);
+        in->rpath = text_cstr(&f->rpath);
+    }
+    return ok && link_facts(o, in, f);
 }
 
 /* DESIGN: a Windows link runs in the directory of its output. The object
@@ -729,7 +765,6 @@ static bool link_program(const struct options *o, const char *object,
 {
     struct text glue = {0};
     struct text pcre2 = {0};
-    struct text rpath = {0};
     const char **extra;
     size_t extra_count;
     struct link_inputs in;
@@ -739,47 +774,24 @@ static bool link_program(const struct options *o, const char *object,
     struct text def = {0};
     struct text implib = {0};
     enum target_os os = target_info(o->target)->os;
-    bool ok = true;
+    bool ok;
 
     if (!native_inputs(o, extras, &glue, &pcre2, &extra, &extra_count)) {
         text_free(&glue);
         text_free(&pcre2);
         return false;
     }
-    memset(&in, 0, sizeof in);
-    in.object = object;
-    in.executable = executable;
-    in.runtime = o->runtime;
+    memset(&w, 0, sizeof w);
+    ok = link_inputs_of(o, extras, object, executable, &in, &facts);
     in.extra = extra;
     in.extra_count = extra_count;
-    in.frameworks = o->frameworks;
-    in.framework_count = o->framework_count;
-    in.linux_libraries = o->linux_libraries;
-    in.linux_library_count = o->linux_library_count;
-    in.exports = extras->hosts_plugins;
-    /* DESIGN: the runtime of AddressSanitizer is built against glibc,
-       so a Linux program of --memory-checks links in the glibc mode. */
-    in.glibc = os == OS_LINUX &&
-               (o->linux_library_count > 0 || extras->hosts_plugins ||
-                o->memory_checks);
-    in.memory_checks = o->memory_checks;
-    if (o->memory_checks && os == OS_MACOS) {
-        struct text dir = {0};
-        text_appendf(&dir, "%s/%s/", o->runtime, RUNTIME_LIB_DIR);
-        link_target_dir(&dir, o->target, false);
-        ok = absolute_path(text_cstr(&dir), &rpath);
-        text_free(&dir);
-        in.rpath = text_cstr(&rpath);
-    }
-    memset(&w, 0, sizeof w);
-    memset(&facts, 0, sizeof facts);
-    if (in.exports && os == OS_WINDOWS) {
+    if (ok && in.exports && os == OS_WINDOWS) {
         ok = host_exports(o, object, executable, &extras->host_names, &def,
                           &implib);
         in.def_file = text_cstr(&def);
         in.import_library = text_cstr(&implib);
     }
-    ok = ok && link_facts(o, &in, &facts) &&
+    ok = ok &&
          (os != OS_WINDOWS || windows_link_paths(&w, &in, &in.def_file));
     if (ok && in.import_library != NULL) {
         in.import_library = windows_path(&w, in.import_library, true);
@@ -801,7 +813,6 @@ static bool link_program(const struct options *o, const char *object,
     }
     text_free(&glue);
     text_free(&pcre2);
-    text_free(&rpath);
     return ok;
 }
 
@@ -2497,8 +2508,8 @@ static bool join_coff(const struct paths *objects, const char *output)
 /* The members of a static library besides the package header. They are
    the compiled object, or with a bundled runtime one relocatable object
    of it and the runtime's members. The paths are in the memory pool. */
-static bool bundle(const struct options *o, const char *object,
-                   const char *base, struct arena *arena,
+static bool bundle(const struct options *o, const struct extras *extras,
+                   const char *object, const char *base, struct arena *arena,
                    struct paths *members)
 {
     const char *llvm_ar = o->llvm_ar != NULL ? o->llvm_ar : "llvm-ar";
@@ -2568,8 +2579,7 @@ static bool bundle(const struct options *o, const char *object,
             struct link_command c;
             struct link_inputs in;
             struct link_facts facts;
-            memset(&in, 0, sizeof in);
-            ok = link_facts(o, &in, &facts);
+            ok = link_inputs_of(o, extras, NULL, NULL, &in, &facts);
             if (ok) {
                 relocatable_command(&c, o->target, &in, text_cstr(&joined),
                                     objects.items, objects.count);
@@ -2622,67 +2632,188 @@ static bool assemble_package(const struct options *o, const struct text *bytes,
    the directory. Each entry holds the interfaces, the runtime version
    it was built against and the digest of its bytes. Discovery reads it
    and opens no library to find out what is inside one. antic writes the
-   file, because `anti build` is not built, and it keeps the entries of
-   the other libraries as they stand. */
-static void index_entry(struct text *out, const char *name, const char *digest,
+   file, because `anti build` is not built. It reads the file with
+   src/rt/toml.c, the reader the runtime loads it with, so the two agree
+   on every line end and every quote. It keeps the entries of the other
+   libraries and writes them back in its own form. A file that reader
+   refuses is replaced. */
+
+/* Append the length bytes at value as a string that src/rt/toml.c reads
+   back: in single quotes, or in double quotes when value holds a single
+   quote. That reader knows no escapes, so a value with both quotes or a
+   line break has no form, and the result is false. */
+static bool index_string(struct text *out, const unsigned char *value,
+                         size_t length)
+{
+    const char *quote;
+
+    if (length == 0) {
+        text_append(out, "''");
+        return true;
+    }
+    quote = memchr(value, '\'', length) == NULL ? "'" : "\"";
+    if ((quote[0] == '"' && memchr(value, '"', length) != NULL) ||
+        memchr(value, '\n', length) != NULL) {
+        return false;
+    }
+    text_append(out, quote);
+    text_append_bytes(out, value, length);
+    text_append(out, quote);
+    return true;
+}
+
+/* Append the line `key = value` of an entry. */
+static bool index_line(struct text *out, const char *key,
+                       const unsigned char *value, size_t length)
+{
+    bool ok;
+
+    text_appendf(out, "%s = ", key);
+    ok = index_string(out, value, length);
+    text_append(out, "\n");
+    return ok;
+}
+
+/* Append the start of the entry of a library, up to its interfaces. */
+static bool index_start(struct text *out, const struct anti_text *path,
+                        const struct anti_text *runtime,
+                        const struct anti_text *digest)
+{
+    text_append(out, "[[library]]\n");
+    return index_line(out, "path", path->ptr, (size_t)path->len) &&
+           index_line(out, "runtime", runtime->ptr, (size_t)runtime->len) &&
+           index_line(out, "digest", digest->ptr, (size_t)digest->len);
+}
+
+/* Append the interface name of the list that index_start opened. */
+static bool index_interface(struct text *out, bool first,
+                            const unsigned char *name, size_t length)
+{
+    text_append(out, first ? "interfaces = [" : ", ");
+    return index_string(out, name, length);
+}
+
+/* Close the list of interfaces, which may be empty. */
+static void index_end(struct text *out, bool empty)
+{
+    text_append(out, empty ? "interfaces = []\n" : "]\n");
+}
+
+static struct anti_text index_text(const char *s)
+{
+    struct anti_text t;
+
+    t.ptr = (const unsigned char *)s;
+    t.len = (int64_t)strlen(s);
+    return t;
+}
+
+/* Append the entry of the library name with the interfaces of provides,
+   one per line before a tab. */
+static bool index_entry(struct text *out, const char *name, const char *digest,
                         const struct text *provides)
 {
     const char *line = text_cstr(provides);
+    struct anti_text path = index_text(name);
+    struct anti_text runtime = index_text(ANTIC_VERSION);
+    struct anti_text sum = index_text(digest);
     bool first = true;
+    bool ok = index_start(out, &path, &runtime, &sum);
 
-    text_appendf(out, "[[library]]\npath = '%s'\nruntime = '%s'\n"
-                 "digest = '%s'\ninterfaces = [", name, ANTIC_VERSION,
-                 digest);
-    while (*line != '\0') {
-        size_t n = strcspn(line, "\t");
-        text_appendf(out, "%s'%.*s'", first ? "" : ", ", (int)n, line);
+    while (ok && *line != '\0') {
+        size_t n = strcspn(line, "\t\n");
+        ok = index_interface(out, first, (const unsigned char *)line, n);
         first = false;
         line += strcspn(line, "\n");
         line += *line == '\n';
     }
-    text_append(out, "]\n");
+    index_end(out, first);
+    return ok;
 }
 
-/* Whether the entry of length bytes at block names the library `name`. */
-static bool index_names(const char *block, size_t length, const char *name)
+/* The value of `library.<n>.<field>` of the index, or false without one. */
+static bool index_value(const struct anti_toml *doc, int64_t n,
+                        const char *field, struct anti_text *value)
 {
-    struct text wanted = {0};
-    const char *found;
-    bool named;
+    struct text key = {0};
+    int64_t at;
 
-    text_appendf(&wanted, "\npath = '%s'\n", name);
-    found = strstr(block, text_cstr(&wanted));
-    named = found != NULL && (size_t)(found - block) < length;
-    text_free(&wanted);
-    return named;
+    text_appendf(&key, "library.%lld.%s", (long long)n, field);
+    at = anti_rt_toml_find(doc, (const unsigned char *)text_cstr(&key),
+                           (int64_t)key.length);
+    text_free(&key);
+    if (at < 0) {
+        return false;
+    }
+    *value = anti_rt_toml_value(doc, at);
+    return true;
 }
 
-/* The entries of the index that name another library, as they stand. A
-   file that is no index of this form is replaced. */
-static void index_others(struct text *out, const char *path, const char *name)
+/* Append entry n of the index, unless it names no library or names the
+   library `name`. */
+static bool index_other(struct text *out, const struct anti_toml *doc,
+                        int64_t n, const char *name)
+{
+    struct anti_text path;
+    struct anti_text runtime = index_text("");
+    struct anti_text digest = index_text("");
+    struct anti_text interface;
+    struct text key = {0};
+    int64_t k;
+    bool ok;
+
+    if (!index_value(doc, n, "path", &path) ||
+        ((size_t)path.len == strlen(name) &&
+         memcmp(path.ptr, name, (size_t)path.len) == 0)) {
+        return true;
+    }
+    index_value(doc, n, "runtime", &runtime);
+    index_value(doc, n, "digest", &digest);
+    ok = index_start(out, &path, &runtime, &digest);
+    for (k = 0; ok; k++) {
+        key.length = 0;
+        text_appendf(&key, "interfaces.%lld", (long long)k);
+        if (!index_value(doc, n, text_cstr(&key), &interface)) {
+            break;
+        }
+        ok = index_interface(out, k == 0, interface.ptr,
+                             (size_t)interface.len);
+    }
+    index_end(out, k == 0);
+    text_free(&key);
+    return ok;
+}
+
+/* Append the entries of the index at path that name another library.
+   An index that is no TOML of src/rt/toml.c keeps nothing. */
+static bool index_others(struct text *out, const char *path, const char *name)
 {
     struct text file = {0};
-    const char *block;
+    struct anti_toml *doc = NULL;
     FILE *f = platform_open(path, false);
+    bool ok = true;
+    int64_t count;
+    int64_t n;
 
     if (f == NULL) {
-        return;
+        return true;
     }
     fclose(f);
-    if (!read_source(path, &file)) {
-        text_free(&file);
-        return;
-    }
-    block = strstr(text_cstr(&file), "[[library]]\n");
-    while (block != NULL) {
-        const char *next = strstr(block + 11, "[[library]]\n");
-        size_t n = next != NULL ? (size_t)(next - block) : strlen(block);
-        if (!index_names(block, n, name)) {
-            text_append_bytes(out, block, n);
-        }
-        block = next;
+    if (read_bytes(path, &file)) {
+        doc = anti_rt_toml_read((const unsigned char *)file.data,
+                                (int64_t)file.length);
     }
     text_free(&file);
+    if (doc == NULL) {
+        return true;
+    }
+    /* Every entry holds a key, so the count of keys bounds the entries. */
+    count = anti_rt_toml_count(doc);
+    for (n = 0; ok && n < count; n++) {
+        ok = index_other(out, doc, n, name);
+    }
+    anti_rt_toml_free(doc);
+    return ok;
 }
 
 static bool write_plugin_index(const char *dir, const char *name,
@@ -2696,12 +2827,16 @@ static bool write_plugin_index(const char *dir, const char *name,
 
     text_appendf(&path, "%s%s", dir, PLUGIN_INDEX);
     ok = sha256_file(library, digest);
-    if (ok) {
-        index_others(&content, text_cstr(&path), name);
-        index_entry(&content, name, digest, provides);
-        ok = write_file(text_cstr(&path), &content);
-    } else {
+    if (!ok) {
         fprintf(stderr, "antic: cannot read %s\n", library);
+    } else if (!index_others(&content, text_cstr(&path), name) ||
+               !index_entry(&content, name, digest, provides)) {
+        fprintf(stderr, "antic: %s cannot hold a name with both quotes or "
+                        "a line break: %s\n",
+                text_cstr(&path), name);
+        ok = false;
+    } else {
+        ok = write_file(text_cstr(&path), &content);
     }
     text_free(&path);
     text_free(&content);
@@ -2750,7 +2885,7 @@ static bool build_c_library(const struct options *o, const char *object,
         struct link_command c;
         text_appendf(&package, "%s%s%s", text_cstr(&dir), name, PACKAGE_SUFFIX);
         ok = assemble_package(o, &extras->package, &package) &&
-             bundle(o, object, base, &arena, &members);
+             bundle(o, extras, object, base, &arena, &members);
         if (ok) {
             add_path(&members, text_cstr(&package));
             remove(text_cstr(&path));
@@ -2790,12 +2925,8 @@ static bool build_c_library(const struct options *o, const char *object,
                                &extra_count);
         }
         memset(&in, 0, sizeof in);
-        in.object = object;
-        in.runtime = o->runtime;
-        in.extra = extra;
-        in.extra_count = extra_count;
-        in.executable = text_cstr(&path);
-        if (o->soname) {
+        memset(&facts, 0, sizeof facts);
+        if (ok && o->soname) {
             const char *version = o->package_version;
             if (version == NULL) {
                 fputs("antic: --soname needs --package-version\n", stderr);
@@ -2810,8 +2941,13 @@ static bool build_c_library(const struct options *o, const char *object,
         if (ok && info->os == OS_LINUX && o->soname) {
             text_appendf(&versioned, "%s.%s", text_cstr(&path),
                          text_cstr(&major));
-            in.executable = text_cstr(&versioned);
         }
+        ok = ok && link_inputs_of(o, extras, object,
+                                  versioned.length > 0 ? text_cstr(&versioned)
+                                                       : text_cstr(&path),
+                                  &in, &facts);
+        in.extra = extra;
+        in.extra_count = extra_count;
         /* DESIGN: the exported surface of a shared library for C is
            the export functions and anti_licenses. Windows takes it as
            a .def file and macOS as an -exported_symbols_list. Linux
@@ -2858,9 +2994,8 @@ static bool build_c_library(const struct options *o, const char *object,
             s.def_file = text_cstr(&def);
             text_free(&content);
         }
-        memset(&facts, 0, sizeof facts);
         memset(&w, 0, sizeof w);
-        ok = ok && link_facts(o, &in, &facts) &&
+        ok = ok &&
              (info->os != OS_WINDOWS || windows_link_paths(&w, &in, &s.def_file));
         if (ok) {
             link_shared_command(&c, o->target, &in, &s);

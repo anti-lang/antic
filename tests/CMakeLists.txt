@@ -69,8 +69,7 @@ add_executable(antic_unit_tests
     ../src/rt/platform_posix.c
     ../src/rt/platform_windows.c
     ../src/rt/symbols.c
-    ../src/rt/text.c
-    ../src/rt/toml.c)
+    ../src/rt/text.c)
 target_link_libraries(antic_unit_tests PRIVATE antic_core ${CMAKE_DL_LIBS})
 # test_f16.c calls nextafterf, which glibc keeps in libm. libSystem and the
 # CRT of Windows hold it themselves.
@@ -2178,6 +2177,18 @@ foreach(target macos-arm64 macos-x86_64)
     set_tests_properties(framework_${target} PROPERTIES
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
+
+# A shared library takes the frameworks, the `link linux` libraries, the
+# glibc mode and the memory checks of a program of its module.
+add_test(NAME shared_inputs
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/shared-inputs"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_shared_inputs.cmake")
 
 # The platform linker of the host links the first executable of chapter 3.
 if(NOT WIN32)

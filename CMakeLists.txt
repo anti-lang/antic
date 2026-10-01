@@ -133,7 +133,7 @@ target_link_libraries(antic PRIVATE antic_core)
 # that links a program naming a framework, and test, which runs the
 # `tests` and `fixtures` blocks of a module. It reads the `[inject]`
 # table of anti.toml with src/rt/toml.c, the one parser that anti.toml, the
-# logger and the runtime configuration share.
+# logger, the runtime configuration and the index of plugins share.
 add_executable(anti ${ANTI_SOURCES})
 target_link_libraries(anti PRIVATE antic_core)
 target_include_directories(anti PRIVATE ${ANTI_INCLUDE_DIRS})

@@ -103,21 +103,69 @@ const char *const *link_crt_dirs(enum target t)
     return target_info(t)->arch == ARCH_ARM64 ? arm64 : x86_64;
 }
 
-/* The program of the linker: flavour of lld in its directory, or the
-   platform linker. */
-static const char *program(struct link_command *c, const struct link_inputs *in,
-                           const char *flavour, const char *platform)
+/* The flavour of lld and the platform linker of each system. */
+static const char *const lld_flavours[] = {
+    [OS_LINUX] = "ld.lld", [OS_MACOS] = "ld64.lld", [OS_WINDOWS] = "lld-link",
+};
+static const char *const platform_linkers[] = {
+    [OS_LINUX] = "ld", [OS_MACOS] = "ld", [OS_WINDOWS] = "link.exe",
+};
+
+const char *link_lld_flavour(enum target t)
 {
+    return lld_flavours[target_info(t)->os];
+}
+
+/* DESIGN: the files of a sysroot that the links name, and the file whose
+   presence shows that a sysroot is complete, which the driver reads
+   before a link. Both come from these names alone. The builtins are the
+   last file tools/get-sysroot.cmake writes into a glibc sysroot. */
+#define SYSROOT_LIB "usr/lib"
+#define SYSROOT_BUILTINS "libclang_rt.builtins.a"
+#define SYSROOT_MUSL_LIBC "libc.a"
+#define SYSROOT_WINDOWS_CRT "crt/lib"
+#define WINDOWS_MSVCRT "msvcrt.lib"
+
+/* The directory of the processor in the library directories of a Windows
+   sysroot. */
+static const char *windows_arch(enum target t)
+{
+    return target_info(t)->arch == ARCH_ARM64 ? "aarch64" : "x86_64";
+}
+
+void link_sysroot_marker(struct text *out, enum target t, bool glibc)
+{
+    switch (target_info(t)->os) {
+    case OS_LINUX:
+        text_appendf(out, "%s/%s", SYSROOT_LIB,
+                     glibc ? SYSROOT_BUILTINS : SYSROOT_MUSL_LIBC);
+        break;
+    case OS_MACOS:
+        text_append(out, SYSROOT_SDK_VERSION);
+        break;
+    case OS_WINDOWS:
+        text_appendf(out, "%s/%s/%s", SYSROOT_WINDOWS_CRT, windows_arch(t),
+                     WINDOWS_MSVCRT);
+        break;
+    }
+}
+
+/* The program of the linker of target t: the flavour of lld in its
+   directory, or the platform linker. */
+static const char *program(struct link_command *c, const struct link_inputs *in,
+                           enum target t)
+{
+    enum target_os os = target_info(t)->os;
     struct text *path;
 
     if (in->linker == LINKER_PLATFORM) {
-        return platform;
+        return platform_linkers[os];
     }
     if (in->lld_dir == NULL) {
-        return flavour;
+        return lld_flavours[os];
     }
     path = next(c);
-    text_appendf(path, "%s/%s", in->lld_dir, flavour);
+    text_appendf(path, "%s/%s", in->lld_dir, lld_flavours[os]);
     return text_cstr(path);
 }
 
@@ -127,7 +175,7 @@ static const char *program(struct link_command *c, const struct link_inputs *in,
 static void macos_start(struct link_command *c, enum target t,
                         const struct link_inputs *in, bool dylib)
 {
-    const char *linker = program(c, in, "ld64.lld", "ld");
+    const char *linker = program(c, in, t);
     struct text *version = next(c);
 
     text_appendf(version, "%d.%d", MACOS_MIN_MAJOR, MACOS_MIN_MINOR);
@@ -161,6 +209,23 @@ static void macos_frameworks(struct link_command *c,
     }
 }
 
+/* The runtime of AddressSanitizer of a macOS link, and its directory as
+   an rpath, where the program or the library finds it at run time. */
+static void macos_memcheck(struct link_command *c, enum target t,
+                           const struct link_inputs *in)
+{
+    struct text *dylib;
+
+    if (!in->memory_checks) {
+        return;
+    }
+    dylib = next(c);
+    link_memcheck_file(dylib, in->runtime, t, false, MEMCHECK_MACOS_DYLIB);
+    add(c, text_cstr(dylib));
+    add(c, "-rpath");
+    add(c, in->rpath);
+}
+
 static void macos(struct link_command *c, enum target t,
                   const struct link_inputs *in)
 {
@@ -177,13 +242,7 @@ static void macos(struct link_command *c, enum target t,
     }
     add_inputs(c, in);
     add(c, text_cstr(library));
-    if (in->memory_checks) {
-        struct text *dylib = next(c);
-        link_memcheck_file(dylib, in->runtime, t, false, MEMCHECK_MACOS_DYLIB);
-        add(c, text_cstr(dylib));
-        add(c, "-rpath");
-        add(c, in->rpath);
-    }
+    macos_memcheck(c, t, in);
     add(c, "-lSystem");
     macos_frameworks(c, in);
 }
@@ -247,6 +306,40 @@ static void linux_libraries(struct link_command *c,
     }
 }
 
+/* The directory of the libraries of glibc in its sysroot. */
+static const char *glibc_triple(enum target t)
+{
+    return target_info(t)->arch == ARCH_ARM64 ? "aarch64-linux-gnu"
+                                              : "x86_64-linux-gnu";
+}
+
+/* The libraries of the glibc mode after the runtime: the directories of
+   the sysroot, the libraries of `link linux`, those of AddressSanitizer
+   for an executable, libm, libc and the builtins. A shared library
+   leaves the runtime of AddressSanitizer to the program that loads it. */
+static void glibc_libraries(struct link_command *c, enum target t,
+                            const struct link_inputs *in, bool executable)
+{
+    struct text *search = next(c);
+    struct text *shared = next(c);
+    struct text *builtins = next(c);
+
+    text_appendf(search, "-L%s/%s/%s", in->sysroot, SYSROOT_LIB,
+                 glibc_triple(t));
+    text_appendf(shared, "-L%s/lib/%s", in->sysroot, glibc_triple(t));
+    text_appendf(builtins, "%s/%s/%s", in->sysroot, SYSROOT_LIB,
+                 SYSROOT_BUILTINS);
+    add(c, text_cstr(search));
+    add(c, text_cstr(shared));
+    linux_libraries(c, in);
+    if (executable) {
+        linux_memcheck_libraries(c, in);
+    }
+    add(c, "-lm");
+    add(c, "-lc");
+    add(c, text_cstr(builtins));
+}
+
 /* DESIGN: the glibc mode links a position-independent executable against
    glibc 2.35 of the sysroot, with its dynamic linker. --sysroot makes
    the absolute paths of the linker script libc.so name files of the
@@ -258,26 +351,18 @@ static void linux_glibc(struct link_command *c, enum target t,
                         const struct link_inputs *in)
 {
     static const char *const before[] = {"Scrt1.o", "crti.o"};
-    const char *triple = target_info(t)->arch == ARCH_ARM64
-                             ? "aarch64-linux-gnu"
-                             : "x86_64-linux-gnu";
-    const char *linker = program(c, in, "ld.lld", "ld");
+    const char *triple = glibc_triple(t);
+    const char *linker = program(c, in, t);
     struct text *library = next(c);
     struct text *sysroot = next(c);
     struct text *interpreter = next(c);
-    struct text *search = next(c);
-    struct text *shared = next(c);
-    struct text *builtins = next(c);
     struct text *crtn = next(c);
     size_t i;
 
     runtime_library(library, in->runtime, t, in->cpu, true);
     text_appendf(sysroot, "--sysroot=%s", in->sysroot);
     text_appendf(interpreter, "--dynamic-linker=%s", glibc_interpreter(t));
-    text_appendf(search, "-L%s/usr/lib/%s", in->sysroot, triple);
-    text_appendf(shared, "-L%s/lib/%s", in->sysroot, triple);
-    text_appendf(builtins, "%s/usr/lib/libclang_rt.builtins.a", in->sysroot);
-    text_appendf(crtn, "%s/usr/lib/%s/crtn.o", in->sysroot, triple);
+    text_appendf(crtn, "%s/%s/%s/crtn.o", in->sysroot, SYSROOT_LIB, triple);
     add(c, linker);
     add(c, text_cstr(sysroot));
     add(c, "-pie");
@@ -292,19 +377,14 @@ static void linux_glibc(struct link_command *c, enum target t,
     add(c, in->executable);
     for (i = 0; i < 2; i++) {
         struct text *file = next(c);
-        text_appendf(file, "%s/usr/lib/%s/%s", in->sysroot, triple, before[i]);
+        text_appendf(file, "%s/%s/%s/%s", in->sysroot, SYSROOT_LIB, triple,
+                     before[i]);
         add(c, text_cstr(file));
     }
     linux_memcheck(c, t, in);
     add_inputs(c, in);
     add(c, text_cstr(library));
-    add(c, text_cstr(search));
-    add(c, text_cstr(shared));
-    linux_libraries(c, in);
-    linux_memcheck_libraries(c, in);
-    add(c, "-lm");
-    add(c, "-lc");
-    add(c, text_cstr(builtins));
+    glibc_libraries(c, t, in, true);
     add(c, text_cstr(crtn));
 }
 
@@ -318,9 +398,9 @@ static void linux_lld(struct link_command *c, enum target t,
                       const struct link_inputs *in)
 {
     static const char *const before[] = {"rcrt1.o", "crti.o"};
-    static const char *const after[] = {"libc.a", "libclang_rt.builtins.a",
+    static const char *const after[] = {SYSROOT_MUSL_LIBC, SYSROOT_BUILTINS,
                                         "crtn.o"};
-    const char *linker = program(c, in, "ld.lld", "ld");
+    const char *linker = program(c, in, t);
     struct text *library = next(c);
     size_t i;
 
@@ -336,14 +416,14 @@ static void linux_lld(struct link_command *c, enum target t,
     add(c, in->executable);
     for (i = 0; i < 2; i++) {
         struct text *file = next(c);
-        text_appendf(file, "%s/usr/lib/%s", in->sysroot, before[i]);
+        text_appendf(file, "%s/%s/%s", in->sysroot, SYSROOT_LIB, before[i]);
         add(c, text_cstr(file));
     }
     add_inputs(c, in);
     add(c, text_cstr(library));
     for (i = 0; i < 3; i++) {
         struct text *file = next(c);
-        text_appendf(file, "%s/usr/lib/%s", in->sysroot, after[i]);
+        text_appendf(file, "%s/%s/%s", in->sysroot, SYSROOT_LIB, after[i]);
         add(c, text_cstr(file));
     }
 }
@@ -410,10 +490,9 @@ static void windows_output(struct link_command *c, const struct link_inputs *in)
 static void windows_libpaths(struct link_command *c, enum target t,
                              const struct link_inputs *in)
 {
-    static const char *const dirs[] = {"crt/lib", "sdk/lib/um",
+    static const char *const dirs[] = {SYSROOT_WINDOWS_CRT, "sdk/lib/um",
                                        "sdk/lib/ucrt"};
-    const char *arch = target_info(t)->arch == ARCH_ARM64 ? "aarch64"
-                                                          : "x86_64";
+    const char *arch = windows_arch(t);
     size_t i;
 
     if (in->linker != LINKER_LLD || in->sysroot == NULL) {
@@ -444,7 +523,7 @@ static void linux_ld(struct link_command *c, enum target t,
     link_runtime_library(library, in->runtime, t, in->cpu);
     text_appendf(search, "-L%s", in->crt_dir);
     text_appendf(crtn, "%s/crtn.o", in->crt_dir);
-    add(c, "ld");
+    add(c, program(c, in, t));
     add(c, "-pie");
     if (in->exports) {
         add(c, "--export-dynamic");
@@ -467,6 +546,28 @@ static void linux_ld(struct link_command *c, enum target t,
     add(c, text_cstr(crtn));
 }
 
+/* The runtime of AddressSanitizer of a Windows link. The thunk links
+   whole, and the handler of structured exceptions stays, as clang links
+   them for a program or a DLL of the DLL C runtime. */
+static void windows_memcheck(struct link_command *c, enum target t,
+                             const struct link_inputs *in)
+{
+    struct text *dll;
+    struct text *thunk;
+
+    if (!in->memory_checks) {
+        return;
+    }
+    dll = next(c);
+    thunk = next(c);
+    link_memcheck_file(dll, in->runtime, t, false, MEMCHECK_WINDOWS_LIB);
+    text_append(thunk, "/WHOLEARCHIVE:");
+    link_memcheck_file(thunk, in->runtime, t, false, MEMCHECK_WINDOWS_THUNK);
+    add(c, text_cstr(dll));
+    add(c, "/INCLUDE:__asan_seh_interceptor");
+    add(c, text_cstr(thunk));
+}
+
 /* DESIGN: link.exe or lld-link with the C runtime of the machine. The
    Universal CRT is a part of Windows since Windows 10, so ucrt.lib links
    against what the machine already holds. Only vcruntime, the support
@@ -476,7 +577,7 @@ static void linux_ld(struct link_command *c, enum target t,
 static void windows(struct link_command *c, enum target t,
                     const struct link_inputs *in)
 {
-    const char *linker = program(c, in, "lld-link", "link.exe");
+    const char *linker = program(c, in, t);
     struct text *library = next(c);
 
     link_runtime_library(library, in->runtime, t, in->cpu);
@@ -500,22 +601,10 @@ static void windows(struct link_command *c, enum target t,
         add(c, text_cstr(implib));
     }
     windows_libpaths(c, t, in);
-    /* The thunk links whole, and the handler of structured exceptions
-       stays, as clang links them for a program of the DLL C runtime. */
-    if (in->memory_checks) {
-        struct text *dll = next(c);
-        struct text *thunk = next(c);
-        link_memcheck_file(dll, in->runtime, t, false, MEMCHECK_WINDOWS_LIB);
-        text_append(thunk, "/WHOLEARCHIVE:");
-        link_memcheck_file(thunk, in->runtime, t, false,
-                           MEMCHECK_WINDOWS_THUNK);
-        add(c, text_cstr(dll));
-        add(c, "/INCLUDE:__asan_seh_interceptor");
-        add(c, text_cstr(thunk));
-    }
+    windows_memcheck(c, t, in);
     add_inputs(c, in);
     add(c, text_cstr(library));
-    add(c, "msvcrt.lib");
+    add(c, WINDOWS_MSVCRT);
     add(c, "libvcruntime.lib");
     add(c, "ucrt.lib");
     /* DESIGN: printf and its family are inline in the headers of the
@@ -574,12 +663,17 @@ void link_shared_command(struct link_command *c, enum target t,
                          const struct link_inputs *in,
                          const struct shared_options *s)
 {
+    /* DESIGN: a Linux library of the glibc mode links against the glibc
+       sysroot, the glibc runtime and the libraries of `link linux`, as a
+       program of the mode does. */
+    bool glibc = target_info(t)->os == OS_LINUX &&
+                 in->linker == LINKER_LLD && in->glibc;
     struct text *library;
 
     start(c);
     library = next(c);
     if (!s->plugin) {
-        link_runtime_library(library, in->runtime, t, in->cpu);
+        runtime_library(library, in->runtime, t, in->cpu, glibc);
     }
     switch (target_info(t)->os) {
     case OS_MACOS: {
@@ -616,14 +710,20 @@ void link_shared_command(struct link_command *c, enum target t,
         if (!s->plugin) {
             add(c, text_cstr(library));
         }
+        macos_memcheck(c, t, in);
         add(c, "-lSystem");
         macos_frameworks(c, in);
         break;
     }
     case OS_LINUX: {
-        const char *linker = program(c, in, "ld.lld", "ld");
+        const char *linker = program(c, in, t);
         const char *base = strrchr(in->executable, '/');
         add(c, linker);
+        if (glibc) {
+            struct text *sysroot = next(c);
+            text_appendf(sysroot, "--sysroot=%s", in->sysroot);
+            add(c, text_cstr(sysroot));
+        }
         add(c, "-shared");
         /* The runtime comes from an archive, and a shared library for C
            shows its export functions alone. */
@@ -646,17 +746,20 @@ void link_shared_command(struct link_command *c, enum target t,
         }
         /* The platform linker searches the C library beside the start
            files. crt_dir is set for it alone, and lld links no C
-           library. */
-        if (in->linker == LINKER_PLATFORM) {
+           library outside the glibc mode. */
+        if (glibc) {
+            glibc_libraries(c, t, in, false);
+        } else if (in->linker == LINKER_PLATFORM) {
             struct text *search = next(c);
             text_appendf(search, "-L%s", in->crt_dir);
             add(c, text_cstr(search));
+            linux_libraries(c, in);
             add(c, "-lc");
         }
         break;
     }
     case OS_WINDOWS: {
-        const char *linker = program(c, in, "lld-link", "link.exe");
+        const char *linker = program(c, in, t);
         struct text *def = next(c);
         text_appendf(def, "/DEF:%s", s->def_file != NULL ? s->def_file : "");
         add(c, linker);
@@ -674,12 +777,13 @@ void link_shared_command(struct link_command *c, enum target t,
         windows_output(c, in);
         add(c, text_cstr(def));
         windows_libpaths(c, t, in);
+        windows_memcheck(c, t, in);
         /* The inputs of a plugin hold the import library of its host,
            which names every symbol of the runtime and the program. */
         add_inputs(c, in);
         if (!s->plugin) {
             add(c, text_cstr(library));
-            add(c, "msvcrt.lib");
+            add(c, WINDOWS_MSVCRT);
         }
         add(c, "libvcruntime.lib");
         add(c, "ucrt.lib");
@@ -722,7 +826,7 @@ void relocatable_command(struct link_command *c, enum target t,
 
     start(c);
     add(c, target_info(t)->os == OS_MACOS ? "ld"
-                                          : program(c, in, "ld.lld", "ld"));
+                                          : program(c, in, t));
     add(c, "-r");
     if (target_info(t)->os == OS_MACOS) {
         add(c, "-keep_private_externs");

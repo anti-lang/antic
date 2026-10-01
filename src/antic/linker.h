@@ -64,9 +64,10 @@ struct link_inputs {
     const char *const *linux_libraries; /* Linux: -l of the glibc mode */
     size_t linux_library_count;
     /* DESIGN: a Linux program links dynamically against glibc when a
-       module it imports names a library with `link linux` or when it can
-       host a plugin. Every other Linux program links statically against
-       musl. */
+       module it imports names a library with `link linux`, when it can
+       host a plugin or under --memory-checks. Every other Linux program
+       links statically against musl. A shared library of such a module
+       links against the glibc sysroot and the glibc runtime. */
     bool glibc;
     /* Windows: the .def file of the names a program that hosts a plugin
        exports, and the import library the link writes beside it. */
@@ -197,6 +198,15 @@ bool link_relative(struct text *out, const char *path, const char *directory);
    executable: the output with its suffix replaced by `.pdb`, beside it.
    The link and the symbols archive of anti build both name it so. */
 void link_pdb_path(struct text *out, const char *executable);
+
+/* The flavour of lld that links for target t, a program of
+   <runtime>/RUNTIME_BIN_DIR/ without the suffix of the host. */
+const char *link_lld_flavour(enum target t);
+
+/* Append the path, relative to the sysroot of target t, of the file whose
+   presence shows that the sysroot is complete. With glibc it is the
+   sysroot of the glibc mode. */
+void link_sysroot_marker(struct text *out, enum target t, bool glibc);
 
 /* The directories that may hold the glibc start files for a Linux target,
    in the order of search, ending with NULL. */

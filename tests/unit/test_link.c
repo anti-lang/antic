@@ -644,6 +644,120 @@ static void memory_checks_links(void)
           "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
 }
 
+/* A shared library takes the facts of a program of its module: the
+   libraries of `link linux` in the glibc mode, and the runtime of
+   AddressSanitizer under --memory-checks. A Linux library of the glibc
+   mode links against the glibc sysroot and the glibc runtime, and leaves
+   the archives of AddressSanitizer to the program that loads it. */
+static void shared_modes(void)
+{
+    static const char *const names[] = {"X11", "GL"};
+    struct shared_options none = {NULL, NULL, NULL, NULL, false};
+    struct shared_options plugin = {NULL, NULL, NULL, NULL, true};
+    struct shared_options def = {"geo.def", NULL, NULL, NULL, false};
+    struct link_inputs in = lld_inputs;
+    struct link_command c;
+
+    in.object = "geo.o";
+    in.executable = "libgeo.so";
+    in.linux_libraries = names;
+    in.linux_library_count = 2;
+    in.glibc = true;
+    shared(TARGET_LINUX_ARM64, &in, &none,
+           "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -shared --exclude-libs ALL "
+           "--strip-debug -o libgeo.so geo.o shapes.o "
+           "/rt/lib/linux-arm64-glibc/armv8.0/libanti_rt.a "
+           "-L/rt/sysroot/t/usr/lib/aarch64-linux-gnu "
+           "-L/rt/sysroot/t/lib/aarch64-linux-gnu -l X11 -l GL -lm -lc "
+           "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a");
+    in.object = "fancy.o";
+    in.executable = "libfancy.so";
+    in.extra_count = 0;
+    in.linux_library_count = 1;
+    shared(TARGET_LINUX_X86_64, &in, &plugin,
+           "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -shared --strip-debug "
+           "-o libfancy.so fancy.o "
+           "-L/rt/sysroot/t/usr/lib/x86_64-linux-gnu "
+           "-L/rt/sysroot/t/lib/x86_64-linux-gnu -l X11 -lm -lc "
+           "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a");
+    in.linux_library_count = 0;
+    in.memory_checks = true;
+    in.cpu = CPU_V3;
+    link_shared_command(&c, TARGET_LINUX_X86_64, &in, &plugin);
+    CHECK(!holds(&c, "--whole-archive"));
+    CHECK(holds(&c, "-lc"));
+    link_command_free(&c);
+    in = extra_inputs;
+    in.object = "geo.o";
+    in.executable = "libgeo.so";
+    in.extra_count = 0;
+    in.linux_libraries = names;
+    in.linux_library_count = 1;
+    shared(TARGET_LINUX_ARM64, &in, &none,
+           "ld -shared --exclude-libs ALL --strip-debug -o libgeo.so geo.o "
+           "/rt/lib/linux-arm64/armv8.0/libanti_rt.a "
+           "-L/usr/lib/aarch64-linux-gnu -l X11 -lc");
+
+    in = lld_inputs;
+    in.object = "geo.o";
+    in.executable = "libgeo.dylib";
+    in.extra_count = 0;
+    in.memory_checks = true;
+    in.rpath = "/abs/rt/lib/macos-arm64";
+    shared(TARGET_MACOS_ARM64, &in, &none,
+           "/rt/bin/ld64.lld -dylib -S -arch arm64 -platform_version macos "
+           "11.0 26.5 -syslibroot /rt/sysroot/t -o libgeo.dylib geo.o "
+           "/rt/lib/macos-arm64/armv8.5/libanti_rt.a "
+           "/rt/lib/macos-arm64/libclang_rt.asan_osx_dynamic.dylib "
+           "-rpath /abs/rt/lib/macos-arm64 -lSystem");
+    in = lld_windows_inputs;
+    in.object = "geo.obj";
+    in.executable = "geo.dll";
+    in.memory_checks = true;
+    shared(TARGET_WINDOWS_X86_64, &in, &def,
+           "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% "
+           "/pdbsourcepath:. /ignore:4099 /DLL /MACHINE:X64 /OUT:geo.dll "
+           "/PDB:geo.pdb /DEF:geo.def /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
+           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
+           "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/x86_64 "
+           "/rt/lib/windows-x86_64/clang_rt.asan_dynamic.lib "
+           "/INCLUDE:__asan_seh_interceptor "
+           "/WHOLEARCHIVE:/rt/lib/windows-x86_64/"
+           "clang_rt.asan_dynamic_runtime_thunk.lib geo.obj "
+           "/rt/lib/windows-x86_64/v3/anti_rt.lib msvcrt.lib "
+           "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
+}
+
+/* The flavour of lld and the file that shows a sysroot is complete come
+   from the linker, which names the same files on its command lines. */
+static void sysroot_names(void)
+{
+    static const struct {
+        enum target t;
+        bool glibc;
+        const char *flavour;
+        const char *marker;
+    } cases[] = {
+        {TARGET_LINUX_X86_64, false, "ld.lld", "usr/lib/libc.a"},
+        {TARGET_LINUX_ARM64, true, "ld.lld",
+         "usr/lib/libclang_rt.builtins.a"},
+        {TARGET_MACOS_ARM64, false, "ld64.lld", SYSROOT_SDK_VERSION},
+        {TARGET_WINDOWS_X86_64, false, "lld-link",
+         "crt/lib/x86_64/msvcrt.lib"},
+        {TARGET_WINDOWS_ARM64, false, "lld-link",
+         "crt/lib/aarch64/msvcrt.lib"},
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+        struct text marker = {0};
+        link_sysroot_marker(&marker, cases[i].t, cases[i].glibc);
+        CHECK_STR(link_lld_flavour(cases[i].t), cases[i].flavour);
+        CHECK_STR(text_cstr(&marker), cases[i].marker);
+        text_free(&marker);
+    }
+}
+
 /* The version of an SDK directory name, or a refusal of the name. */
 static void sdk_name(const char *name, bool ok, int major, int minor)
 {
@@ -690,6 +804,8 @@ void test_link(void)
     frameworks();
     dynamic_modes();
     memory_checks_links();
+    shared_modes();
+    sysroot_names();
     strips_debug();
     relative_paths();
     pdb_names();

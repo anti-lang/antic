@@ -91,13 +91,15 @@ set(ANTIC_CORE_SOURCES
     src/antic/x86_64.c
     src/rt/digest.c
     src/rt/regex.c
+    src/rt/toml.c
     src/rt/utf.c)
 set(ANTIC_CORE_INCLUDE_DIRS src/antic)
 
 set(ANTIC_MAIN_SOURCES src/antic/main.c)
 
 # anti reads anti.toml, the runtime configuration, JSON and the symbols of
-# a binary with the readers of the runtime in src/rt.
+# a binary with the readers of the runtime in src/rt. src/rt/toml.c stands
+# in the compiler, which reads the index of plugins with it.
 set(ANTI_SOURCES
     src/anti/main.c
     src/anti/bind.c
@@ -122,6 +124,5 @@ set(ANTI_SOURCES
     src/anti/units.c
     src/anti/zip.c
     src/rt/json.c
-    src/rt/symbols.c
-    src/rt/toml.c)
+    src/rt/symbols.c)
 set(ANTI_INCLUDE_DIRS src/rt)

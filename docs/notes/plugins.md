@@ -47,8 +47,10 @@ through `struct extras`, because the optimizer drops the class records
 that carry them.
 
 `write_plugin_index` writes `anti-plugins.toml` beside the library. It
+reads the old index with `src/rt/toml.c`, the reader of the runtime,
 keeps the `[[library]]` entries of the other libraries of the directory
-and replaces the one of the library it wrote.
+and replaces the one of the library it wrote. `index_string` writes each
+value in the quotes that reader reads back.
 
 The driver sets `plugin` of the IR module. On ELF and COFF
 `select_uses_got` then gives every function and every datum of another
