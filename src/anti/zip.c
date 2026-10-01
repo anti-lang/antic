@@ -198,13 +198,54 @@ static bool find_end(const struct text *bytes, size_t *at)
     }
 }
 
-/* The central directory of the archive in out->bytes into out->items. */
-static bool read_directory(const char *path, struct zip_archive *out)
+/* The bytes one entry takes in the file, from its local header to the
+   end of its data. */
+struct zip_span {
+    size_t from;
+    size_t to;
+};
+
+static int span_order(const void *a, const void *b)
 {
+    const struct zip_span *x = a;
+    const struct zip_span *y = b;
+
+    return x->from < y->from ? -1 : x->from > y->from ? 1 : 0;
+}
+
+/* DESIGN: each entry takes bytes of its own, and the entries of one
+   archive unpack to at most ZIP_MAX32 bytes together, the most the writer
+   puts in one archive. Each entry stops at its declared size, which may
+   be 4 GiB. Without the two rules, 65535 central entries could name one
+   local header, and a few megabytes of deflate data asked for terabytes.
+   A writer of the format gives every entry its own bytes, and an archive
+   of Anti packed again by another tool keeps its total. */
+static bool check_spans(const char *path, struct zip_span *spans,
+                        size_t count)
+{
+    size_t i;
+
+    qsort(spans, count, sizeof *spans, span_order);
+    for (i = 1; i < count; i++) {
+        if (spans[i].from < spans[i - 1].to) {
+            fprintf(stderr, "anti: %s has entries whose data overlap\n",
+                    path);
+            return false;
+        }
+    }
+    return true;
+}
+
+/* The central directory of the archive in out->bytes into out->items. */
+static bool read_entries(const char *path, struct zip_archive *out,
+                         struct zip_span **spans_out)
+{
+    struct zip_span *spans;
     const unsigned char *p = (const unsigned char *)out->bytes.data;
     size_t end;
     size_t at;
     size_t count;
+    size_t total = 0;
     size_t i;
 
     if (!find_end(&out->bytes, &end)) {
@@ -214,6 +255,8 @@ static bool read_directory(const char *path, struct zip_archive *out)
     count = get16(p + end + 10);
     at = get32(p + end + 16);
     out->items = files_array(count + 1, sizeof *out->items);
+    spans = files_array(count + 1, sizeof *spans);
+    *spans_out = spans;
     for (i = 0; i < count; i++) {
         struct zip_item *item = &out->items[i];
         size_t name_length;
@@ -241,13 +284,30 @@ static bool read_directory(const char *path, struct zip_archive *out)
                     path, (int)name_length, (const char *)p + at + 46);
             return false;
         }
+        if (item->size > ZIP_MAX32 - total) {
+            fprintf(stderr, "anti: %s unpacks to more than one archive "
+                            "holds\n", path);
+            return false;
+        }
+        total += item->size;
+        spans[i].from = local;
+        spans[i].to = item->offset + item->packed;
         /* The entry is counted with its name, so that
            zip_archive_free frees every name the loop took. */
         text_append_bytes(&item->name, p + at + 46, name_length);
         out->count++;
         at += 46 + name_length + get16(p + at + 30) + get16(p + at + 32);
     }
-    return true;
+    return check_spans(path, spans, count);
+}
+
+static bool read_directory(const char *path, struct zip_archive *out)
+{
+    struct zip_span *spans = NULL;
+    bool ok = read_entries(path, out, &spans);
+
+    free(spans);
+    return ok;
 }
 
 /* On failure out is left empty, so a caller frees nothing. */

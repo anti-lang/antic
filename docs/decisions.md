@@ -1589,6 +1589,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] Each number in a line of a symbols map, and in a frame or `module` line of a trace, is digits alone. `0x` may lead a hex number, and no sign may. A number above 64 bits refuses the line, which is then passed over as another line that is no frame. Blanks may lead a line. A name, a location or an id has no length bound, where `sscanf` cut them at 511, 1023 and 79 bytes.
 - [provisional] A unit of a deployment index with no `id` matches no entry of the archive.
 - [provisional] `anti symbols` decides whether a path of a runtime configuration is absolute by the rules of the host, through `path_is_absolute` of `src/antic/platform.c`. A drive path such as `C:\x` read on macOS or Linux is relative there.
+- [provisional] `zip_read` refuses an archive two of whose entries share bytes of the file. The bytes of an entry run from its local header to the end of its data. It also refuses an archive whose entries declare more than 4 GiB less one byte together, the most `zip_write` puts in one archive. Reason: each entry stops at its declared size. But 65535 central entries could name one local header of 4 GiB, so a few megabytes of deflate data asked for terabytes. Audit finding M41.
 
 ## The doc command
 

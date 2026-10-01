@@ -511,6 +511,81 @@ static void broken_archives(void)
     remove(ARCHIVE);
 }
 
+/* M41: entries whose data overlap, and entries whose sizes add up past
+   what one archive holds. 65535 central entries could name one local
+   header that declares 4 GiB, so a few megabytes of deflate data asked
+   for terabytes. */
+static void archive_bounds(void)
+{
+    static const unsigned char hello[] = "hello";
+    static const unsigned char world[] = "world";
+    struct entry e[2];
+    struct text bad = {0};
+    struct bits b;
+
+    e[0].name = "a.txt";
+    e[0].data = hello;
+    e[0].packed = 5;
+    e[0].size = 5;
+    e[0].crc = crc_of(hello, 5);
+    e[0].method = 0;
+    e[1] = e[0];
+    e[1].name = "b.txt";
+    e[1].data = world;
+    e[1].crc = crc_of(world, 5);
+    write_archive(e, 2);
+    {
+        struct zip_archive z;
+        CHECK(zip_read(ARCHIVE, &z) && z.count == 2);
+        zip_archive_free(&z);
+    }
+
+    /* Both central entries name the local header of the first. Each
+       local entry is 30 + 5 + 5 bytes, and the central entry of the
+       second stands after the 46 + 5 of the first. */
+    read_archive(&bad);
+    bad.data[2 * 40 + 51 + 42] = 0;
+    write_bytes(bad.data, bad.length);
+    CHECK(read_fails_empty());
+    text_free(&bad);
+
+    /* The second names a local header that stands inside the data of
+       the first, at 30 + 5, and is whole there. The first entry is then
+       30 + 5 + 64 bytes long, so the central entry of the second stands
+       at 99 + 40 + 51. */
+    {
+        unsigned char inner[64];
+        memset(inner, 0, sizeof inner);
+        memcpy(inner, "PK\3\4", 4);
+        inner[26] = 5;
+        memcpy(inner + 30, "b.txt", 5);
+        memcpy(inner + 35, "world", 5);
+        e[0].data = inner;
+        e[0].packed = sizeof inner;
+        e[0].size = sizeof inner;
+        e[0].crc = crc_of(inner, sizeof inner);
+        write_archive(e, 2);
+        read_archive(&bad);
+        bad.data[99 + 40 + 51 + 42] = 35;
+        write_bytes(bad.data, bad.length);
+        CHECK(read_fails_empty());
+        text_free(&bad);
+    }
+
+    /* Two deflate entries of a few bytes each declare 3 GiB. */
+    memset(&b, 0, sizeof b);
+    bits_put(&b, 1, 1);
+    bits_put(&b, 1, 2);
+    fixed_literal(&b, 'a');
+    fixed_end(&b);
+    bits_flush(&b);
+    e[0] = deflated("a.txt", &b, 0xc0000000UL, 0);
+    e[1] = deflated("b.txt", &b, 0xc0000000UL, 0);
+    write_archive(e, 2);
+    CHECK(read_fails_empty());
+    remove(ARCHIVE);
+}
+
 /* A name longer than 65535 bytes and more than 65535 entries have no
    field of the format that holds them, so the writer refuses both
    rather than cut them. */
@@ -561,5 +636,6 @@ void test_zip(void)
     deflate_bound();
     broken_deflate();
     broken_archives();
+    archive_bounds();
     write_limits();
 }

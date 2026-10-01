@@ -49,9 +49,10 @@ struct zip_item {
 /* Read the archive at path. The reader takes the stored entries of a
    symbols archive of Anti. It takes the ones another tool compressed
    with deflate as well, so an archive a user packed again opens. Returns
-   false and writes a message when the file is no such archive, and out
-   then holds no allocation. The caller frees an archive read with
-   zip_archive_free. */
+   false and writes a message when the file is no such archive, when two
+   entries share bytes of the file, or when the entries declare more than
+   4 GiB together. out then holds no allocation. The caller frees an
+   archive read with zip_archive_free. */
 bool zip_read(const char *path, struct zip_archive *out);
 
 /* The bytes of the entry at index, unpacked into out. Returns false and
