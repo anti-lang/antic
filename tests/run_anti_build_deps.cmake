@@ -113,6 +113,28 @@ if(NOT lock MATCHES "${digest}" OR NOT lock MATCHES "file://")
     message(FATAL_ERROR "the lock file names no repository and digest:\n${lock}")
 endif()
 
+# S34. The stamp beside a cached index says when it was last checked. A
+# stamp far below 0 overflowed `now - then` and passed for one written
+# within the hour, so the index stayed as cached. It is refused now, and
+# the build fetches the index again. The names of the index and its
+# stamp are REPO_INDEX_FILE and REPO_STAMP_SUFFIX of src/anti/repo.c.
+file(GLOB_RECURSE stamps "${WORK}/cache/*/index.toml.checked")
+list(LENGTH stamps stamp_count)
+if(NOT stamp_count EQUAL 1)
+    message(FATAL_ERROR "the cache holds ${stamp_count} stamps: ${stamps}")
+endif()
+file(WRITE "${stamps}" "-9223372036000000000\n")
+file(READ "${repo}/index.toml" index)
+string(REPLACE "revision = 1" "revision = 2" index "${index}")
+file(WRITE "${repo}/index.toml" "${index}")
+file(WRITE "${WORK}/fetched/consumer/anti.lock" "version = 1\n")
+build("the build after a damaged stamp" "${WORK}/fetched/consumer" build)
+string(REGEX REPLACE "\\.checked$" "" cached "${stamps}")
+file(READ "${cached}" index)
+if(NOT index MATCHES "revision = 2")
+    message(FATAL_ERROR "a stamp below 0 kept the cached index:\n${index}")
+endif()
+
 # The second build reads the lock file and contacts no repository, which
 # --offline proves.
 build("the offline build" "${WORK}/fetched/consumer" build --offline)

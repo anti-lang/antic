@@ -243,8 +243,10 @@ static bool checked_recently(const char *stamp)
         long long now = (long long)time(NULL);
         errno = 0;
         then = strtoll(text_cstr(&bytes), NULL, 10);
-        /* A stamp out of range is no stamp, and the index is checked. */
-        fresh = errno != ERANGE && now >= then &&
+        /* A stamp out of range is no stamp, and the index is checked.
+           write_stamp writes no time before 0, so one below it is a
+           damaged file, and refusing it keeps `now - then` in range. */
+        fresh = errno != ERANGE && then >= 0 && now >= then &&
                 now - then < REPO_INDEX_SECONDS;
     }
     text_free(&bytes);
