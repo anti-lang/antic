@@ -676,7 +676,7 @@ class PeopleList
 }
 ```
 
-Built: everything above, nested types included. The C header writes a nested type as `PeopleList_Node`, and one that the layout of an `export class` reaches stands before the class with its layout alone.
+Built: everything above, nested types included. The C header writes a nested type as `PeopleList_Node`, and one that the layout of an `export class` reaches stands before the class with its layout alone. `tests/errors/final_replace.anti` and `final_modules.anti` hold the refusals of a replaced `final fn` and of a class below a `final class`, in one module and across a library file.
 
 ## Interfaces
 

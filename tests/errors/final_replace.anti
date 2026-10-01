@@ -1,0 +1,106 @@
+//! A `final fn` has no replacement and a `final class` has no class below it,
+//! so a `concrete fn` that reaches a `final fn` is refused, whichever table it
+//! fills, and so is a class that inherits a `final class`.
+
+class Shape
+{
+	pub final fn area(self) -> int
+	{
+		return 1;
+	}
+
+	pub fn size(self) -> int
+	{
+		return 2;
+	}
+}
+
+/* The unqualified body fills the primary table. */
+class Circle inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return 3;
+	}
+}
+
+/* The body qualified by the base fills the same entry. */
+class Square inherits Shape
+{
+	concrete fn Shape::area(self) -> int
+	{
+		return 4;
+	}
+}
+
+/* A level below the class that declares it. */
+class Middle inherits Shape
+{
+	concrete fn size(self) -> int
+	{
+		return 5;
+	}
+}
+
+class Bottom inherits Middle
+{
+	concrete fn area(self) -> int
+	{
+		return 6;
+	}
+}
+
+abstract class Named
+{
+	abstract fn tag(self) -> int;
+
+	pub final fn label(self) -> int
+	{
+		return 7;
+	}
+}
+
+/* An implemented interface, unqualified and qualified. */
+class Card
+{
+	implements n: Named,
+
+	concrete fn tag(self) -> int
+	{
+		return 8;
+	}
+
+	concrete fn label(self) -> int
+	{
+		return 9;
+	}
+}
+
+class Badge
+{
+	implements n: Named,
+
+	concrete fn tag(self) -> int
+	{
+		return 10;
+	}
+
+	concrete fn Named::label(self) -> int
+	{
+		return 11;
+	}
+}
+
+final class Dot
+{
+	pub r: int = 0,
+}
+
+class Spot inherits Dot
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

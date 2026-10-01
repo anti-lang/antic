@@ -1,0 +1,16 @@
+//! A library whose interface holds a `final fn` and a `final class`. The
+//! library file carries both marks, so an importer that replaces the function
+//! or inherits the class is refused as in the module itself.
+
+pub class Shape
+{
+	pub final fn area(self) -> int
+	{
+		return 1;
+	}
+}
+
+pub final class Dot
+{
+	pub r: int = 0,
+}

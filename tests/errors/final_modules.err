@@ -1,0 +1,2 @@
+final_modules.anti:13:12: error: `Spot` cannot inherit `final` class `Dot`
+final_modules.anti:7:14: error: `Circle.area` replaces `final` function `Shape.area`

@@ -1,0 +1,20 @@
+//! The `final` marks of a library reach its importer through the library file.
+
+import com.example.sealed;
+
+class Circle inherits sealed.Shape
+{
+	concrete fn area(self) -> int
+	{
+		return 2;
+	}
+}
+
+class Spot inherits sealed.Dot
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

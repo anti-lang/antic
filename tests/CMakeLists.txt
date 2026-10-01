@@ -2776,6 +2776,22 @@ add_expect_test(error_closures_modules STATUS 1
 set_tests_properties(error_closures_modules PROPERTIES
     FIXTURES_REQUIRED walk_antl)
 
+# The `final` marks of a library reach its importer: a replacement of a
+# `final fn` and a class below a `final class` are refused there.
+file(MAKE_DIRECTORY "${LIBS}/sealed/com/example")
+add_test(NAME antl_sealed
+    COMMAND antic -c -I "${MODULES}/sealed"
+            -o "${LIBS}/sealed/com/example/sealed.antl"
+            "${MODULES}/sealed/com/example/sealed.anti")
+set_tests_properties(antl_sealed PROPERTIES FIXTURES_SETUP sealed_antl)
+add_expect_test(error_final_modules STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/final_modules.err"
+    COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/sealed"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/final_modules.s" final_modules.anti)
+set_tests_properties(error_final_modules PROPERTIES
+    FIXTURES_REQUIRED sealed_antl)
+
 # The `own` and `lent` parameters of a library reach the importer through
 # the library file.
 file(MAKE_DIRECTORY "${LIBS}/owned/com/example")
@@ -3643,6 +3659,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "walk_lent|-S,-o,${LISTINGS}/walk_lent.s,walk_lent.anti"
         "fn_may_fail|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fn_may_fail.s,fn_may_fail.anti"
         "concrete_signature|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/concrete_signature.s,concrete_signature.anti"
+        "final_replace|-S,-o,${LISTINGS}/final_replace.s,final_replace.anti"
         "qualified_bodies|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/qualified_bodies.s,qualified_bodies.anti"
         "qualified_calls|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/qualified_calls.s,qualified_calls.anti"
         "abstract_call|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/abstract_call.s,abstract_call.anti"

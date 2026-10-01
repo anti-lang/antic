@@ -1,0 +1,6 @@
+final_replace.anti:99:12: error: `Spot` cannot inherit `final` class `Dot`
+final_replace.anti:21:14: error: `Circle.area` replaces `final` function `Shape.area`
+final_replace.anti:30:21: error: `Square.area` replaces `final` function `Shape.area`
+final_replace.anti:47:14: error: `Bottom.area` replaces `final` function `Shape.area`
+final_replace.anti:73:14: error: `Card.label` replaces `final` function `Named.label`
+final_replace.anti:88:21: error: `Badge.label` replaces `final` function `Named.label`

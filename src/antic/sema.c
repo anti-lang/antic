@@ -2139,6 +2139,25 @@ static bool one_table(const struct type *t, const struct item *a,
     return false;
 }
 
+/* Whether the `concrete fn` m of the class it may fill entry, which
+   owner declares. A `final fn` has no replacement, since a call of one
+   is direct and would pass over the body of m. Any other entry takes the
+   signature of m as `same_signature` compares it. */
+static bool may_fill(struct checker *c, const struct item *it,
+                     const struct item *m, const struct item *entry,
+                     const struct type *owner)
+{
+    if (entry->is_final) {
+        sema_error_at(c, m->name_pos, "`%.*s.%.*s` replaces `final` "
+                      "function `%.*s.%.*s`", (int)it->name.length,
+                      it->name.text, (int)m->name.length, m->name.text,
+                      (int)owner->name.length, owner->name.text,
+                      (int)entry->name.length, entry->name.text);
+        return false;
+    }
+    return same_signature(c, m, entry, owner);
+}
+
 /* The entries a `concrete fn` m of t fills, each compared with m. A
    qualified body fills the table its qualifier names. An unqualified one
    fills the entry of the base chain, unless a body qualified by a base
@@ -2167,13 +2186,13 @@ static void check_replacement(struct checker *c, const struct item *it,
                           (int)it->name.length, it->name.text);
             return;
         }
-        same_signature(c, m, entry, owner);
+        may_fill(c, it, m, entry, owner);
         return;
     }
     entry = types_holds_entry(t, m)
                 ? chain_entry(sema_inherited(t), &m->name, &owner)
                 : NULL;
-    if (entry != NULL && !same_signature(c, m, entry, owner)) {
+    if (entry != NULL && !may_fill(c, it, m, entry, owner)) {
         return;
     }
     filled = entry != NULL;
@@ -2185,7 +2204,7 @@ static void check_replacement(struct checker *c, const struct item *it,
                 continue;
             }
             entry = chain_entry(iface, &m->name, &owner);
-            if (entry != NULL && !same_signature(c, m, entry, owner)) {
+            if (entry != NULL && !may_fill(c, it, m, entry, owner)) {
                 return;
             }
             filled = filled || entry != NULL;
