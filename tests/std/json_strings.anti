@@ -1,0 +1,186 @@
+//! `json.unquote` reads a JSON string as the runtime reads one, so every text
+//! that `json.write_text` writes comes back byte for byte, a `\u` escape gives
+//! UTF-8, and a malformed string fails after the bytes before the fault.
+//! `json.member` reads a key with its escapes, gives the value without the
+//! space around it, and finds nothing in a text that is no JSON object.
+import anti.io;
+import anti.json;
+import anti.lang;
+import anti.text;
+
+/// Print `n` in decimal.
+fn print_int(n: int)
+{
+	let b = text.Builder.new();
+	b.append_int(n);
+	io.print(b.text());
+}
+
+/// Print `label` and the bytes `source` unquotes to, or the failure.
+fn show(label: str, source: str)
+{
+	let b = text.Builder.new();
+	b.append("kept");
+	io.print(label);
+	io.print(": ");
+	json.unquote(source, &b) catch e {
+		io.print(e.message);
+		io.print(", builder ");
+		io.println(b.text());
+		return;
+	};
+	io.println(b.text());
+}
+
+/// Print the hexadecimal digits of every byte `source` unquotes to.
+fn show_hex(label: str, source: str)
+{
+	let b = text.Builder.new();
+	json.unquote(source, &b) catch e {
+		io.print(label);
+		io.print(": ");
+		io.println(e.message);
+		return;
+	};
+	let got = b.text();
+	io.print(label);
+	io.print(":");
+	let i = 0;
+	while i < got.len do {
+		io.print(" ");
+		print_int(got[i] as int);
+		i += 1;
+	}
+	io.println("");
+}
+
+/// Print the member `name` of `source` between brackets, or `none`.
+fn show_member(label: str, source: str, name: str)
+{
+	let found = "";
+	io.print(label);
+	io.print(": ");
+	if !json.member(source, name, &found) {
+		io.println("none");
+		return;
+	}
+	io.print("[");
+	io.print(found);
+	io.println("]");
+}
+
+/// Every byte from 0 to 255 goes through `write_text` and `unquote`.
+fn round_trip() -> int
+{
+	let room = alloc(byte, 256) else { return -1; };
+	let i = 0;
+	while i < 256 do {
+		room[i] = i as byte;
+		i += 1;
+	}
+	let all = text.from_bytes([]byte { ptr: room, len: 256 });
+	let written = text.Builder.new();
+	json.write_text(all, &written);
+	let back = text.Builder.new();
+	let failed = false;
+	json.unquote(written.text(), &back) catch e {
+		failed = true;
+	};
+	let result = -1;
+	if !failed && text.equal(back.text(), all) {
+		result = 0;
+	} else if !failed {
+		result = 1;
+	}
+	free(room);
+	return result;
+}
+
+/// A JSON value nested `depth` arrays deep under the member `a`.
+fn nested(depth: int, into: *text.Builder)
+{
+	into.append("{\"a\":");
+	let i = 0;
+	while i < depth do {
+		into.append("[");
+		i += 1;
+	}
+	i = 0;
+	while i < depth do {
+		into.append("]");
+		i += 1;
+	}
+	into.append("}");
+}
+
+fn main() -> int
+{
+	io.print("round trip: ");
+	print_int(round_trip());
+	io.println("");
+
+	show_hex("u00e9", "\"\\u00e9\"");
+	show_hex("u20AC", "\"\\u20AC\"");
+	show_hex("u0000", "\"\\u0000\"");
+	show_hex("u0008", "\"\\u0008\"");
+	show_hex("escapes", "\"\\\"\\\\\\/\\b\\f\\n\\r\\t\"");
+	show("space around", " \t\"a\"\n ");
+	show("empty", "\"\"");
+
+	show("unknown escape", "\"a\\qb\"");
+	show("raw control byte", "\"a\tb\"");
+	show("short u", "\"\\u12\"");
+	show("bad hex", "\"\\u12g4\"");
+	show("surrogate", "\"\\ud800\"");
+	show("after the quote", "\"ab\" x");
+	show("two strings", "\"a\"\"b\"");
+	show("unterminated", "\"open");
+	show("backslash at end", "\"ab\\");
+	show("one quote", "\"");
+	show("no text", "");
+	show("no quote", "abc");
+
+	let s = "{\"a\\\"b\":1,\"\\u0061\":2,\"c\" : 3 ,\"d\":\"x, y\"}";
+	show_member("escaped key", s, "a\"b");
+	show_member("u key", s, "a");
+	show_member("spaced", s, "c");
+	show_member("string", s, "d");
+	show_member("prefix", "{\"ab\":1}", "a");
+	show_member("missing", s, "e");
+	show_member("first of two", "{\"a\":1,\"a\":2}", "a");
+	show_member("truncated", "{\"a\":", "a");
+	show_member("unclosed", "{\"a\":1", "a");
+	show_member("no colon", "{\"a\" 1}", "a");
+	show_member("trailing comma", "{\"a\":1,}", "a");
+	show_member("after the object", "{\"a\":1}x", "a");
+	show_member("bad later member", "{\"a\":1,\"b\":\"\\q\"}", "a");
+	show_member("bad key", "{\"\\q\":1}", "a");
+	show_member("array", "[1]", "a");
+	show_member("empty object", "{}", "a");
+	show_member("no text", "", "a");
+	show_member("space only", "  ", "a");
+
+	let deep = text.Builder.new();
+	nested(10, &deep);
+	show_member("10 deep", deep.text(), "a");
+	deep.clear();
+	nested(200, &deep);
+	show_member("200 deep", deep.text(), "a");
+
+	let long = text.Builder.new();
+	long.append("{\"a\":\"");
+	let i = 0;
+	while i < 100000 do {
+		long.append("x");
+		i += 1;
+	}
+	long.append("\"}");
+	let found = "";
+	if !json.member(long.text(), "a", &found) {
+		return 1;
+	}
+	io.print("long: ");
+	print_int(found.len);
+	io.println("");
+	return 0;
+}

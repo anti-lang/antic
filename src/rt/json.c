@@ -54,27 +54,38 @@ static int hex_digit(unsigned char c)
     return -1;
 }
 
-/* Append one byte to out, or fail when out holds room bytes already. A
-   NULL out keeps nothing and counts the bytes. */
-static bool put_byte(unsigned char *out, size_t room, size_t *length,
-                     unsigned char b)
+/* Where the decoded bytes of a string go. out takes them when it is not
+   NULL, and refuses the byte past room. against, when it is not NULL,
+   holds room bytes that are compared with them, and same turns false at
+   the first difference. length counts the bytes in every case. */
+struct sink {
+    unsigned char *out;
+    const unsigned char *against;
+    size_t room;
+    size_t length;
+    bool same;
+};
+
+static bool put_byte(struct sink *k, unsigned char b)
 {
-    if (out != NULL) {
-        if (*length >= room) {
+    if (k->out != NULL) {
+        if (k->length >= k->room) {
             return false;
         }
-        out[*length] = b;
+        k->out[k->length] = b;
     }
-    (*length)++;
+    if (k->against != NULL &&
+        (k->length >= k->room || k->against[k->length] != b)) {
+        k->same = false;
+    }
+    k->length++;
     return true;
 }
 
 /* DESIGN: a \u escape of a surrogate half is refused, since the
    serializer writes none and clang writes UTF-8. */
-bool anti_rt_json_string(struct anti_json *s, unsigned char *out,
-                         size_t room, size_t *length)
+static bool read_string(struct anti_json *s, struct sink *k)
 {
-    *length = 0;
     if (!anti_rt_json_take(s, '"')) {
         return false;
     }
@@ -84,7 +95,7 @@ bool anti_rt_json_string(struct anti_json *s, unsigned char *out,
             return false;
         }
         if (c != '\\') {
-            if (!put_byte(out, room, length, c)) {
+            if (!put_byte(k, c)) {
                 return false;
             }
             continue;
@@ -103,8 +114,8 @@ bool anti_rt_json_string(struct anti_json *s, unsigned char *out,
         case 't': c = '\t'; break;
         case 'u': {
             unsigned long code = 0;
-            int k;
-            for (k = 0; k < 4; k++) {
+            int j;
+            for (j = 0; j < 4; j++) {
                 int d = s->at < s->end ? hex_digit(*s->at++) : -1;
                 if (d < 0) {
                     return false;
@@ -119,7 +130,7 @@ bool anti_rt_json_string(struct anti_json *s, unsigned char *out,
                 size_t count = anti_rt_utf8_encode((uint32_t)code, utf8);
                 size_t i;
                 for (i = 0; i + 1 < count; i++) {
-                    if (!put_byte(out, room, length, utf8[i])) {
+                    if (!put_byte(k, utf8[i])) {
                         return false;
                     }
                 }
@@ -130,11 +141,31 @@ bool anti_rt_json_string(struct anti_json *s, unsigned char *out,
         default:
             return false;
         }
-        if (!put_byte(out, room, length, c)) {
+        if (!put_byte(k, c)) {
             return false;
         }
     }
     return s->at < s->end && *s->at++ == '"';
+}
+
+bool anti_rt_json_string(struct anti_json *s, unsigned char *out,
+                         size_t room, size_t *length)
+{
+    struct sink k = {out, NULL, room, 0, true};
+    bool ok = read_string(s, &k);
+
+    *length = k.length;
+    return ok;
+}
+
+bool anti_rt_json_key(struct anti_json *s, const unsigned char *name,
+                      size_t name_length, bool *same)
+{
+    struct sink k = {NULL, name, name_length, 0, true};
+    bool ok = read_string(s, &k);
+
+    *same = ok && k.same && k.length == name_length;
+    return ok;
 }
 
 bool anti_rt_json_number(struct anti_json *s, const unsigned char **start,
@@ -303,4 +334,57 @@ bool anti_rt_json_skip(struct anti_json *s, int depth)
                anti_rt_json_word(s, "null") ||
                anti_rt_json_number(s, &number, &digits_length);
     }
+}
+
+bool anti_rt_json_value(struct anti_json *s)
+{
+    if (!anti_rt_json_skip(s, 0)) {
+        return false;
+    }
+    anti_rt_json_space(s);
+    return s->at == s->end;
+}
+
+bool anti_rt_json_member(const unsigned char *source, int64_t length,
+                         const unsigned char *name, int64_t name_length,
+                         int64_t *start, int64_t *value_length)
+{
+    struct anti_json s;
+    bool same;
+
+    if (source == NULL || length < 0 || name_length < 0 ||
+        (name == NULL && name_length > 0)) {
+        return false;
+    }
+    s.at = source;
+    s.end = source + length;
+    {
+        struct anti_json whole = s;
+        anti_rt_json_space(&whole);
+        if (whole.at >= whole.end || *whole.at != '{' ||
+            !anti_rt_json_value(&whole)) {
+            return false;
+        }
+    }
+    if (!anti_rt_json_take(&s, '{') || anti_rt_json_take(&s, '}')) {
+        return false;
+    }
+    do {
+        const unsigned char *from;
+        if (!anti_rt_json_key(&s, name, (size_t)name_length, &same) ||
+            !anti_rt_json_take(&s, ':')) {
+            return false;
+        }
+        anti_rt_json_space(&s);
+        from = s.at;
+        if (!anti_rt_json_skip(&s, 1)) {
+            return false;
+        }
+        if (same) {
+            *start = from - source;
+            *value_length = s.at - from;
+            return true;
+        }
+    } while (anti_rt_json_take(&s, ','));
+    return false;
 }

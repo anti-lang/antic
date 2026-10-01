@@ -37,6 +37,11 @@ bool anti_rt_json_word(struct anti_json *s, const char *word);
 bool anti_rt_json_string(struct anti_json *s, unsigned char *out,
                          size_t room, size_t *length);
 
+/* Skip white space and read a string as anti_rt_json_string does, and
+   tell whether its decoded bytes are the name_length bytes at name. */
+bool anti_rt_json_key(struct anti_json *s, const unsigned char *name,
+                      size_t name_length, bool *same);
+
 /* Skip white space and take the bytes that may form a number. They stay
    in the input. The span is not checked against the grammar. */
 bool anti_rt_json_number(struct anti_json *s, const unsigned char **start,
@@ -57,5 +62,18 @@ bool anti_rt_json_unsigned(const unsigned char *start, int64_t length,
 /* Skip one value of any kind, which starts depth levels deep. A value
    that nests deeper than ANTI_JSON_DEPTH is refused. */
 bool anti_rt_json_skip(struct anti_json *s, int depth);
+
+/* Whether the text between at and end is one value with nothing but
+   white space around it. */
+bool anti_rt_json_value(struct anti_json *s);
+
+/* The value of the first member of the JSON object at source whose
+   decoded key is the name_length bytes at name, as start and
+   value_length into source, without the white space around it. False
+   when the text is no single object of the grammar, which a damaged
+   member after the one found also makes it, and when no key matches. */
+bool anti_rt_json_member(const unsigned char *source, int64_t length,
+                         const unsigned char *name, int64_t name_length,
+                         int64_t *start, int64_t *value_length);
 
 #endif

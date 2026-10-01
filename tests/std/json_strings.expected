@@ -1,0 +1,42 @@
+exit 0
+round trip: 0
+u00e9: 195 169
+u20AC: 226 130 172
+u0000: 0
+u0008: 8
+escapes: 34 92 47 8 12 10 13 9
+space around: kepta
+empty: kept
+unknown escape: the text is no JSON string, builder kepta
+raw control byte: the text is no JSON string, builder kepta
+short u: the text is no JSON string, builder kept
+bad hex: the text is no JSON string, builder kept
+surrogate: the text is no JSON string, builder kept
+after the quote: the text is no JSON string, builder keptab
+two strings: the text is no JSON string, builder kepta
+unterminated: the text is no JSON string, builder keptopen
+backslash at end: the text is no JSON string, builder keptab
+one quote: the text is no JSON string, builder kept
+no text: the text is no JSON string, builder kept
+no quote: the text is no JSON string, builder kept
+escaped key: [1]
+u key: [2]
+spaced: [3]
+string: ["x, y"]
+prefix: none
+missing: none
+first of two: [1]
+truncated: none
+unclosed: none
+no colon: none
+trailing comma: none
+after the object: none
+bad later member: none
+bad key: none
+array: none
+empty object: none
+no text: none
+space only: none
+10 deep: [[[[[[[[[[[]]]]]]]]]]]
+200 deep: none
+long: 100002

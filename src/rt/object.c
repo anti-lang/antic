@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "f16.h"
+#include "json.h"
 #include "object.h"
 #include "regex.h"
 #include "std.h"
@@ -354,11 +355,8 @@ static void put_signed(struct anti_builder *b, int64_t value)
                 value < 0);
 }
 
-/* Append bytes as a JSON string, with the escapes that JSON requires.
-   Every other byte goes out as it is, so the text keeps the bytes of a
-   str. */
-static void put_text(struct anti_builder *b, const unsigned char *bytes,
-                     int64_t len)
+void anti_rt_json_write_text(struct anti_builder *b,
+                             const unsigned char *bytes, int64_t len)
 {
     static const char hex[] = "0123456789abcdef";
     int64_t i;
@@ -385,6 +383,40 @@ static void put_text(struct anti_builder *b, const unsigned char *bytes,
         }
     }
     put(b, "\"");
+}
+
+/* DESIGN: the string is read twice by the scanner of src/rt/json.c, once
+   to count the bytes it gives before the end or the fault, and once into
+   the room the first read measured. So json.unquote reads escapes as
+   Object.deserialize does, and a fault leaves the bytes before it in
+   the builder, as "Standard library phase" in docs/decisions.md says. */
+int32_t anti_rt_json_unquote(struct anti_builder *b,
+                             const unsigned char *bytes, int64_t len)
+{
+    struct anti_json s;
+    size_t count;
+    bool read;
+    int64_t at = b->length;
+
+    if (bytes == NULL || len <= 0) {
+        return 0;
+    }
+    s.at = bytes;
+    s.end = bytes + len;
+    read = anti_rt_json_string(&s, NULL, 0, &count);
+    if (read) {
+        anti_rt_json_space(&s);
+        read = s.at == s.end;
+    }
+    if (count > 0) {
+        anti_rt_builder_fill(b, at, 0, (int64_t)count);
+        if (b->length != at + (int64_t)count) {
+            return -1;
+        }
+        s.at = bytes;
+        anti_rt_json_string(&s, b->room + at, count, &count);
+    }
+    return read ? 1 : 0;
 }
 
 size_t anti_rt_element_size(int64_t type, const struct anti_descriptor *d)
@@ -451,7 +483,7 @@ static void put_struct(struct anti_builder *b, const void *bytes,
     for (i = 0; i < d->field_count; i++) {
         const struct anti_field *f = &d->fields[i];
         put(b, i == 0 ? "" : ",");
-        put_text(b, f->name, f->name_length);
+        anti_rt_json_write_text(b, f->name, f->name_length);
         put(b, ":");
         put_value(b, (const char *)bytes + f->offset, f->type, f->descriptor,
                   f->owned);
@@ -499,7 +531,8 @@ static void put_value(struct anti_builder *b, const void *bytes,
         uint32_t c;
         unsigned char utf8[4];
         memcpy(&c, bytes, sizeof c);
-        put_text(b, utf8, (int64_t)anti_rt_utf8_encode(c, utf8));
+        anti_rt_json_write_text(b, utf8,
+                                (int64_t)anti_rt_utf8_encode(c, utf8));
         return;
     }
     /* An f16 is written as the f32 a read gives, which reads back to
@@ -525,7 +558,7 @@ static void put_value(struct anti_builder *b, const void *bytes,
     case ANTI_TYPE_STR: {
         struct anti_text s;
         memcpy(&s, bytes, sizeof s);
-        put_text(b, s.ptr, s.len);
+        anti_rt_json_write_text(b, s.ptr, s.len);
         return;
     }
     case ANTI_TYPE_PTR:
@@ -567,7 +600,7 @@ static void put_value(struct anti_builder *b, const void *bytes,
             return;
         }
         put(b, "{");
-        put_text(b, c->name, c->name_length);
+        anti_rt_json_write_text(b, c->name, c->name_length);
         put(b, ":");
         if (c->descriptor != NULL) {
             put_struct(b, (const char *)bytes + c->offset, c->descriptor);
@@ -641,7 +674,7 @@ static void serialize_into(struct anti_builder *b, const void *object,
         return;
     }
     put(b, "{\"type\":");
-    put_text(b, d->name, d->name_length);
+    anti_rt_json_write_text(b, d->name, d->name_length);
     /* The ancestor list is indexed by depth, so the root comes first and
        the class itself last. */
     for (depth = 0; depth <= d->depth; depth++) {
@@ -652,7 +685,7 @@ static void serialize_into(struct anti_builder *b, const void *object,
         for (i = 0; i < up->field_count; i++) {
             const struct anti_field *f = &up->fields[i];
             put(b, ",");
-            put_text(b, f->name, f->name_length);
+            anti_rt_json_write_text(b, f->name, f->name_length);
             put(b, ":");
             put_value(b, (const char *)object + f->offset, f->type,
                       f->descriptor, f->owned);
@@ -855,7 +888,7 @@ static void show_value(struct anti_builder *b, void *bytes, int64_t type,
         for (i = 0; i < d->field_count; i++) {
             const struct anti_field *f = &d->fields[i];
             put(b, i == 0 ? "" : ", ");
-            put_text(b, f->name, f->name_length);
+            anti_rt_json_write_text(b, f->name, f->name_length);
             put(b, ": ");
             show_value(b, (char *)bytes + f->offset, f->type, f->descriptor,
                        0);
