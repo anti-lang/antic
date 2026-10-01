@@ -298,8 +298,6 @@ struct ir_operand lower_offset_address(struct lowerer *l,
                                        struct ir_operand address,
                                        struct ir_operand offset);
 struct ir_operand lower_zero(void);
-const struct struct_field *lower_field_of(const struct type *s,
-                                          const struct name *name);
 const struct type *lower_field_owner(const struct type *t,
                                      const struct name *name);
 bool lower_name_is(const struct name *name, const char *text);

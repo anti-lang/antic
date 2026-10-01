@@ -157,7 +157,7 @@ static void check_guards_of(struct checker *c, struct item *it)
         if (p->guard.length == 0) {
             continue;
         }
-        f = (struct struct_field *)sema_find_field(t, &p->name);
+        f = (struct struct_field *)type_find_field(t, &p->name);
         if (f == NULL) {
             continue;
         }
@@ -180,7 +180,7 @@ static void check_guards_of(struct checker *c, struct item *it)
         }
         for (lock = NULL; holder != NULL && lock == NULL;
              holder = holder->kind == TYPE_CLASS ? holder->base : NULL) {
-            lock = sema_find_field(holder, &p->guard);
+            lock = type_find_field(holder, &p->guard);
         }
         if (lock == NULL || !types_is_mutex(lock->type)) {
             sema_error_at(c, p->guard_pos, "`%.*s` is no `" LANG_MUTEX
@@ -210,7 +210,7 @@ void sema_check_guards(struct checker *c)
             check_guards_of(c, it);
             for (j = 0; j < it->param_count; j++) {
                 struct struct_field *f = (struct struct_field *)
-                    sema_find_field(it->symbol->type, &it->params[j].name);
+                    type_find_field(it->symbol->type, &it->params[j].name);
                 if (f != NULL) {
                     f->unchecked = it->params[j].unchecked;
                 }
@@ -326,11 +326,11 @@ static const struct struct_field *written_field(const struct expr *e)
         if (e->kind == EXPR_FIELD) {
             struct type *s = sema_struct_of(base->type);
             const struct struct_field *f =
-                s != NULL ? sema_find_field(s, &e->as.field.name) : NULL;
+                s != NULL ? type_find_field(s, &e->as.field.name) : NULL;
             const struct type *t;
             for (t = s; f == NULL && t != NULL && t->kind == TYPE_CLASS;
                  t = t->base) {
-                f = sema_find_field(t, &e->as.field.name);
+                f = type_find_field(t, &e->as.field.name);
             }
             if (f != NULL && f->home != NULL &&
                 f->home->safety == SAFETY_CONCURRENT) {

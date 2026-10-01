@@ -759,20 +759,6 @@ struct ir_operand lower_zero(void)
     return ir_int_op(IR_I64, 0);
 }
 
-const struct struct_field *lower_field_of(const struct type *s,
-                                          const struct name *name)
-{
-    size_t i;
-
-    for (i = 0; i < s->field_count; i++) {
-        if (s->fields[i].name.length == name->length &&
-            memcmp(s->fields[i].name.text, name->text, name->length) == 0) {
-            return &s->fields[i];
-        }
-    }
-    return NULL;
-}
-
 /* DESIGN: the class of the chain that declares the field `name`. A class
    carries its base as field 0, so every class of the chain starts at the
    same address as the object. The address of an inherited field is
@@ -784,7 +770,7 @@ const struct type *lower_field_owner(const struct type *t,
     const struct type *s;
 
     for (s = t; s != NULL; s = s->kind == TYPE_CLASS ? s->base : NULL) {
-        if (lower_field_of(s, name) != NULL) {
+        if (type_find_field(s, name) != NULL) {
             return s;
         }
     }
@@ -844,7 +830,7 @@ const struct name lower_entry_name = {"entry", 5};
 struct ir_operand lower_field_offset(struct lowerer *l, const struct type *s,
                                      const struct name *name)
 {
-    uint32_t index = type_has_fields(s) ? (uint32_t)(lower_field_of(s, name) -
+    uint32_t index = type_has_fields(s) ? (uint32_t)(type_find_field(s, name) -
                                                      s->fields)
                      : lower_name_is(name, "len") || lower_name_is(name,
                                                                    "entry") ? 1
@@ -1300,7 +1286,7 @@ static const struct struct_field *bitfield_of(const struct expr *e,
         return NULL;
     }
     s = lower_field_owner(s, &e->as.field.name);
-    f = lower_field_of(s, &e->as.field.name);
+    f = type_find_field(s, &e->as.field.name);
     *owner = s;
     return f != NULL && f->bits != 0 ? f : NULL;
 }

@@ -1766,6 +1766,20 @@ bool type_field_is_unit_break(const struct struct_field *f)
     return f->name.length == 1 && f->name.text[0] == '_';
 }
 
+const struct struct_field *type_find_field(const struct type *s,
+                                           const struct name *name)
+{
+    size_t i;
+
+    for (i = 0; i < s->field_count; i++) {
+        if (same_text(&s->fields[i].name, name) &&
+            !type_field_is_unit_break(&s->fields[i])) {
+            return &s->fields[i];
+        }
+    }
+    return NULL;
+}
+
 bool type_is_target_sized(const struct type *t)
 {
     return t->kind == TYPE_CLONG || t->kind == TYPE_CULONG ||

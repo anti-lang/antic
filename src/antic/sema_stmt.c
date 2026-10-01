@@ -51,7 +51,7 @@ static bool visit_worker_expr(void *data, const struct expr *e)
                 ? sema_struct_of(e->as.field.base->type)
                 : NULL;
         const struct struct_field *f =
-            owner != NULL ? sema_find_field(owner, &e->as.field.name) : NULL;
+            owner != NULL ? type_find_field(owner, &e->as.field.name) : NULL;
         if (f != NULL && f->writable && sema_singleton_type(owner)) {
             sema_error_at(w->c, e->pos,
                           "`%.*s` is `mutable` in singleton `%s` and "
@@ -672,7 +672,7 @@ static void check_assign(struct checker *c, struct stmt *s)
     if (target->kind == EXPR_FIELD) {
         const struct type *owner = sema_struct_of(target->as.field.base->type);
         const struct struct_field *f =
-            owner != NULL ? sema_find_field(owner,
+            owner != NULL ? type_find_field(owner,
                                             &target->as.field.name) : NULL;
         if (f != NULL && !f->writable && sema_singleton_type(owner) &&
             (c->ctx.function == NULL ||

@@ -28,20 +28,6 @@ struct type *sema_struct_of(struct type *t)
     return type_has_fields(t) ? t : NULL;
 }
 
-const struct struct_field *sema_find_field(const struct type *s,
-                                           const struct name *name)
-{
-    size_t i;
-
-    for (i = 0; i < s->field_count; i++) {
-        if (sema_same_name(&s->fields[i].name, name) &&
-            !type_field_is_unit_break(&s->fields[i])) {
-            return &s->fields[i];
-        }
-    }
-    return NULL;
-}
-
 /* DESIGN: a name used on a value or a type reaches the member that
    find_member gives, less the bodies qualified by an interface. Each of
    those fills the table of its interface alone. At one level a plain
@@ -257,7 +243,7 @@ static bool provides(struct checker *c, const struct type *t,
     if (ptr_set_has(&p->no[pub_only], t)) {
         return false;
     }
-    f = sema_find_field(t, name);
+    f = type_find_field(t, name);
     m = f == NULL ? sema_find_member(t, name) : NULL;
     if (f != NULL) {
         found = !pub_only || t->kind != TYPE_CLASS || f->vis == VIS_PUB ||
@@ -722,7 +708,7 @@ static struct type *atomic_place(const struct expr *e)
     if (s == NULL) {
         return NULL;
     }
-    f = sema_find_field(s, &e->as.field.name);
+    f = type_find_field(s, &e->as.field.name);
     return f != NULL && f->atomic ? f->type : NULL;
 }
 
@@ -762,7 +748,7 @@ static bool unchecked_swap(struct checker *c, struct expr *e,
     }
     s = sema_struct_of(place->as.field.base->type);
     for (; s != NULL && f == NULL; s = s->kind == TYPE_CLASS ? s->base : NULL) {
-        f = sema_find_field(s, &place->as.field.name);
+        f = type_find_field(s, &place->as.field.name);
     }
     if (f == NULL || f->form != FIELD_PLAIN) {
         return false;
@@ -931,7 +917,7 @@ static bool names_sub_object(const struct expr *e)
         return false;
     }
     s = sema_struct_of(e->as.field.base->type);
-    f = s != NULL ? sema_find_field(s, &e->as.field.name) : NULL;
+    f = s != NULL ? type_find_field(s, &e->as.field.name) : NULL;
     return f != NULL && f->form == FIELD_IMPL;
 }
 
@@ -1222,12 +1208,12 @@ void sema_resolve_origin(struct checker *c, struct stmt *s)
                                        sizeof LANG_ERROR_FRAMES - 1};
     struct type *error = sema_error_class(c, s->pos);
     const struct struct_field *where =
-        error != NULL ? sema_find_field(error, &at) : NULL;
+        error != NULL ? type_find_field(error, &at) : NULL;
 
     if (error == NULL) {
         return;
     }
-    if (where == NULL || sema_find_field(error, &frames) == NULL ||
+    if (where == NULL || type_find_field(error, &frames) == NULL ||
         where->type != sema_location_type(c, s->pos)) {
         sema_error_at(c, s->pos, "`fail` writes `" LANG_ERROR_AT "` and `"
                       LANG_ERROR_FRAMES "` of `" LANG_MODULE "." LANG_ERROR
@@ -2486,7 +2472,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
         if (e->as.call.arg_count == 0 &&
             sema_name_is(&callee->as.field.name, LANG_HOOK_HASH) &&
             (base->kind == TYPE_PARAM || sema_struct_of(base) == NULL ||
-             sema_find_field(sema_struct_of(base),
+             type_find_field(sema_struct_of(base),
                              &callee->as.field.name) == NULL)) {
             struct type *hashed;
             if (sema_hash_call(c, e, base, &hashed)) {
@@ -2523,7 +2509,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
             return check_mutex_destroy(c, e, base);
         }
         if (type_is_simd(s) &&
-            sema_find_field(s, &callee->as.field.name) == NULL &&
+            type_find_field(s, &callee->as.field.name) == NULL &&
             simd_value_name(&callee->as.field.name) &&
             !simd_method_declared(c, s, &callee->as.field.name)) {
             return check_simd_value(c, e, base, s);
@@ -2540,7 +2526,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
         /* DESIGN: a union has no methods, so v.f(args) on a union is
            always a call of the function pointer in field f. */
         if (s != NULL && !s->is_union &&
-            sema_find_field(s, &callee->as.field.name) == NULL) {
+            type_find_field(s, &callee->as.field.name) == NULL) {
             if (!method_call(c, e)) {
                 return sema_builtin(c, TYPE_ERROR);
             }
@@ -2824,7 +2810,7 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
     if (t->kind == TYPE_VARIANT) {
         return variant_case_value(c, e, t);
     }
-    if (t->kind == TYPE_ENUM && (f = sema_find_field(t, name)) != NULL) {
+    if (t->kind == TYPE_ENUM && (f = type_find_field(t, name)) != NULL) {
         e->as.field.enum_value = (uint32_t)(f - t->fields) + 1;
         return t;
     }
@@ -2947,7 +2933,7 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
     base = sema_usable_pointer(c, e->as.field.base, base);
     if (types_is_flags(base) && e->as.field.base->kind == EXPR_NAME &&
         e->as.field.base->symbol != NULL &&
-        (f = sema_find_field(base, name)) != NULL) {
+        (f = type_find_field(base, name)) != NULL) {
         e->as.field.base->symbol->flags_read |=
             (uint8_t)(1u << (f - base->fields));
     }
@@ -2960,10 +2946,10 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
                           "`switch` reads the fields of its cases");
             return sema_builtin(c, TYPE_ERROR);
         }
-        if (types_is_match(s) && sema_find_field(s, name) == NULL) {
+        if (types_is_match(s) && type_find_field(s, name) == NULL) {
             return sema_match_field(c, e, s);
         }
-        if ((f = sema_find_field(s, name)) == NULL && e->as.field.element) {
+        if ((f = type_find_field(s, name)) == NULL && e->as.field.element) {
             /* `t.0` names the element `_0`, so the message names the
                number the program wrote. */
             if (s->kind != TYPE_TUPLE) {

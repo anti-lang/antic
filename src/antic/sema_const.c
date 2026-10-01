@@ -738,7 +738,7 @@ bool sema_eval_const(struct checker *c, struct expr *e,
             if (!sema_eval_const(c, e->as.field.base, &a)) {
                 return false;
             }
-            f = sema_find_field(base, &e->as.field.name);
+            f = type_find_field(base, &e->as.field.name);
             if (f == NULL || a.kind != CONST_STRUCT ||
                 (size_t)(f - base->fields) >= a.as.aggregate.count) {
                 return fail_const(c, e, "this field");

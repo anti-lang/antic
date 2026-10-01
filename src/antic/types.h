@@ -847,6 +847,11 @@ bool type_is_integer(const struct type *t);
 /* Whether f is a zero-width bitfield, written `_: T : 0`, which breaks the
    unit of the bitfields and holds no value. */
 bool type_field_is_unit_break(const struct struct_field *f);
+/* The field of s named name, or NULL. A unit break is no field a name
+   reaches, so `_` finds none. The checker and lowering both find a field
+   here. */
+const struct struct_field *type_find_field(const struct type *s,
+                                           const struct name *name);
 /* c_long, c_ulong and c_wchar, whose width the target decides. */
 bool type_is_target_sized(const struct type *t);
 bool type_is_signed(const struct type *t);

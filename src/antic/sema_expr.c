@@ -58,7 +58,7 @@ static bool is_bitfield(const struct expr *e)
         return false;
     }
     s = sema_struct_of(e->as.field.base->type);
-    f = s != NULL ? sema_find_field(s, &e->as.field.name) : NULL;
+    f = s != NULL ? type_find_field(s, &e->as.field.name) : NULL;
     return f != NULL && f->bits != 0;
 }
 

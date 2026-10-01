@@ -701,7 +701,7 @@ static const struct ir_global *variant_descriptor(struct lowerer *l,
     static const struct name tag = {VARIANT_TAG, sizeof VARIANT_TAG - 1};
     static const struct name part = {VARIANT_UNION, sizeof VARIANT_UNION - 1};
     uint32_t agg = lower_agg_of(l, t);
-    uint32_t u = (uint32_t)(lower_field_of(t, &part) - t->fields);
+    uint32_t u = (uint32_t)(type_find_field(t, &part) - t->fields);
     size_t count = t->param_count + 1;
     struct token_text text;
     struct ir_global *g;
@@ -723,7 +723,7 @@ static const struct ir_global *variant_descriptor(struct lowerer *l,
     free(name);
     list = ir_const_agg(l->m, ir_aggregate(lower_fields_agg(l, count)), count);
     list->items[0] = *field_record(
-        l, &tag, agg, (uint32_t)(lower_field_of(t, &tag) - t->fields),
+        l, &tag, agg, (uint32_t)(type_find_field(t, &tag) - t->fields),
         type_id(t->base), 0, NULL);
     for (k = 0; k < t->param_count; k++) {
         const struct type *payload = t->params[k];
@@ -767,10 +767,10 @@ static const struct ir_global *optional_descriptor(struct lowerer *l,
         g = value_descriptor(l, t, l->module_name, text_cstr(&name), &text);
         list = ir_const_agg(l->m, ir_aggregate(lower_fields_agg(l, 2)), 2);
         list->items[0] = *field_record(
-            l, &value, agg, (uint32_t)(lower_field_of(t, &value) - t->fields),
+            l, &value, agg, (uint32_t)(type_find_field(t, &value) - t->fields),
             type_id(t->element), 0, t->element);
         list->items[1] = *field_record(
-            l, &has, agg, (uint32_t)(lower_field_of(t, &has) - t->fields),
+            l, &has, agg, (uint32_t)(type_find_field(t, &has) - t->fields),
             TYPE_ID_BOOL, 0, NULL);
         text_appendf(&fields, "optional.%s.fields", text_cstr(&shown));
         give_fields(l, g, l->module_name, text_cstr(&fields), list, 2);

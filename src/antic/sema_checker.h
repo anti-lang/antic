@@ -355,8 +355,6 @@ struct type *sema_check_storage(struct checker *c, struct expr *e);
 /* sema_call.c */
 
 struct type *sema_struct_of(struct type *t);
-const struct struct_field *sema_find_field(const struct type *s,
-                                           const struct name *name);
 bool sema_refuse_abstract_value(struct checker *c, struct pos pos,
                                 const char *what, const struct type *t);
 const struct type *sema_inherited(const struct type *t);

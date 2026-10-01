@@ -351,7 +351,7 @@ static void build_variant(struct lowerer *l, const struct expr *e,
     fields = lower_case_address(l, v, dest);
     for (i = 0; i < e->as.struct_lit.field_count; i++) {
         const struct field_init *init = &e->as.struct_lit.fields[i];
-        const struct struct_field *field = lower_field_of(payload, &init->name);
+        const struct struct_field *field = type_find_field(payload, &init->name);
         lower_store_value(
             l, field->type, init->value,
             lower_offset_address(l, fields,
@@ -494,7 +494,7 @@ static void build_value_into(struct lowerer *l, const struct expr *e,
         for (i = 0; i < e->as.struct_lit.field_count; i++) {
             const struct field_init *init = &e->as.struct_lit.fields[i];
             const struct type *at = lower_field_owner(t, &init->name);
-            const struct struct_field *field = lower_field_of(at, &init->name);
+            const struct struct_field *field = type_find_field(at, &init->name);
             if (field->bits != 0) {
                 struct ir_operand v = lower_expr(l, init->value);
                 ir_bitstore(l->f, l->b, lower_ir_type_of(field->type), v, dest,
