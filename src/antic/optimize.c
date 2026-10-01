@@ -6,6 +6,7 @@
 
 #include "../rt/f16.h"
 #include "arith.h"
+#include "reach.h"
 #include "target.h"
 
 /* DESIGN: the passes rely on three properties and nothing else.
@@ -1391,56 +1392,6 @@ void ir_optimize_function(struct ir_function *f)
 
 /* The whole program */
 
-static void mark_function(const struct ir_module *m, uint32_t index,
-                          bool *live, bool *live_globals)
-{
-    struct ir_function *f = m->functions[index];
-    size_t b;
-    size_t i;
-    size_t k;
-
-    if (live[index]) {
-        return;
-    }
-    live[index] = true;
-    for (b = 0; b < f->block_count; b++) {
-        for (i = 0; i < f->blocks[b]->count; i++) {
-            struct ir_inst *inst = &f->blocks[b]->insts[i];
-            for (k = 0; k < operand_count(inst); k++) {
-                const struct ir_operand *o = operand(inst, k);
-                if (o->kind == IR_FUNC) {
-                    mark_function(m, o->as.index, live, live_globals);
-                } else if (o->kind == IR_GLOBAL) {
-                    live_globals[o->as.index] = true;
-                }
-            }
-        }
-    }
-}
-
-/* Mark what the addresses inside a constant reach, and set grew when one
-   of them was not marked before. A table entry names a function, so a
-   constant keeps a function alive as well as a global. */
-static void mark_const(const struct ir_module *m, const struct ir_const *c,
-                       bool *live, bool *live_globals, bool *grew)
-{
-    size_t i;
-
-    if (c->kind == IR_CONST_ADDR) {
-        *grew = *grew || !live_globals[c->global];
-        live_globals[c->global] = true;
-    } else if (c->kind == IR_CONST_FUNC) {
-        if (!live[c->global]) {
-            *grew = true;
-            mark_function(m, c->global, live, live_globals);
-        }
-    } else if (c->kind == IR_CONST_AGG) {
-        for (i = 0; i < c->item_count; i++) {
-            mark_const(m, &c->items[i], live, live_globals, grew);
-        }
-    }
-}
-
 /* Move the addresses inside a constant to the indices that remain, of
    the globals and of the functions. */
 static void remap_const(struct ir_const *c, const uint32_t *map,
@@ -1459,148 +1410,25 @@ static void remap_const(struct ir_const *c, const uint32_t *map,
     }
 }
 
-/* Remove the functions and globals that the entry cannot reach. The entry
-   is main in module entry, or every function of that module when it has
-   no main or when all is set. Every export fn is an entry too, because C
-   code may call it. */
-static uint64_t global_hash(const struct ir_global *g)
-{
-    uint64_t h = 1469598103934665603u;
-    const char *p;
-
-    for (p = g->module; *p != '\0'; p++) {
-        h = (h ^ (unsigned char)*p) * 1099511628211u;
-    }
-    h = (h ^ '.') * 1099511628211u;
-    for (p = g->name; *p != '\0'; p++) {
-        h = (h ^ (unsigned char)*p) * 1099511628211u;
-    }
-    return h;
-}
-
-/* DESIGN: a whole program holds the declaration that one module writes
-   for a datum of another beside the definition that module wrote. The
-   library files are read one after the other. A live declaration
-   keeps the definition of the same module and name alive, which the
-   object then holds under that name. The definition of each declaration
-   by index, or IR_NO_INDEX, found through a table hashed by the name. */
-static uint32_t *definitions_of(const struct ir_module *m)
-{
-    uint32_t *out = ir_alloc(m->global_count, sizeof *out);
-    uint32_t *table;
-    size_t capacity = 1;
-    size_t i;
-
-    while (capacity < 2 * m->global_count + 2) {
-        capacity *= 2;
-    }
-    table = ir_alloc(capacity, sizeof *table);
-    for (i = 0; i < capacity; i++) {
-        table[i] = IR_NO_INDEX;
-    }
-    for (i = 0; i < m->global_count; i++) {
-        const struct ir_global *g = m->globals[i];
-        size_t slot;
-        out[i] = IR_NO_INDEX;
-        if (g->is_extern || g->module == NULL) {
-            continue;
-        }
-        slot = (size_t)global_hash(g) & (capacity - 1);
-        while (table[slot] != IR_NO_INDEX) {
-            slot = (slot + 1) & (capacity - 1);
-        }
-        table[slot] = (uint32_t)i;
-    }
-    for (i = 0; i < m->global_count; i++) {
-        const struct ir_global *g = m->globals[i];
-        size_t slot;
-        if (!g->is_extern || g->module == NULL) {
-            continue;
-        }
-        slot = (size_t)global_hash(g) & (capacity - 1);
-        while (table[slot] != IR_NO_INDEX) {
-            const struct ir_global *d = m->globals[table[slot]];
-            if (strcmp(d->module, g->module) == 0 &&
-                strcmp(d->name, g->name) == 0) {
-                out[i] = table[slot];
-                break;
-            }
-            slot = (slot + 1) & (capacity - 1);
-        }
-    }
-    free(table);
-    return out;
-}
-
+/* Remove the functions and globals that the entry cannot reach, as
+   ir_reach decides. */
 static void remove_unused_functions(struct ir_module *m, const char *entry,
                                     bool all)
 {
-    bool *live = ir_alloc(m->function_count, sizeof *live);
-    bool *live_globals = ir_alloc(m->global_count, sizeof *live_globals);
+    struct ir_reach reach;
+    const bool *live;
+    const bool *live_globals;
     uint32_t *map = ir_alloc(m->function_count, sizeof *map);
     uint32_t *global_map = ir_alloc(m->global_count, sizeof *global_map);
-    uint32_t *defined = definitions_of(m);
-    bool has_main = false;
-    bool grew = true;
     size_t n = 0;
     size_t i;
     size_t j;
     size_t b;
     size_t k;
 
-    for (i = 0; i < m->function_count; i++) {
-        const struct ir_function *f = m->functions[i];
-        if (!all && !f->is_extern && strcmp(f->module, entry) == 0 &&
-            strcmp(f->name, "main") == 0) {
-            has_main = true;
-        }
-    }
-    for (i = 0; i < m->function_count; i++) {
-        const struct ir_function *f = m->functions[i];
-        if (!f->is_extern &&
-            (f->exported || ir_is_patterns_start(f) ||
-             (ir_in_unit(f->module, f->unit, entry) &&
-              (!has_main || strcmp(f->name, "main") == 0)))) {
-            mark_function(m, (uint32_t)i, live, live_globals);
-        }
-    }
-    /* The table and the descriptor of an export class are entries of
-       their own, because C code reads them and no Anti code has to. In an
-       object of one module every datum of the module stays, because
-       another module may name a descriptor that no function here does. */
-    for (i = 0; i < m->global_count; i++) {
-        const struct ir_global *g = m->globals[i];
-        if (g->exported || (all && !g->is_extern && g->module != NULL &&
-                            ir_in_unit(g->module, g->unit, entry))) {
-            live_globals[i] = true;
-        }
-    }
-    while (grew) {
-        grew = false;
-        for (i = 0; i < m->global_count; i++) {
-            const struct ir_global *g = m->globals[i];
-            for (j = 0; live_globals[i] && j < g->reloc_count; j++) {
-                uint32_t target = g->relocs[j].global;
-                if (g->relocs[j].fn) {
-                    if (!live[target]) {
-                        grew = true;
-                        mark_function(m, target, live, live_globals);
-                    }
-                    continue;
-                }
-                grew = grew || !live_globals[target];
-                live_globals[target] = true;
-            }
-            if (live_globals[i] && g->value != NULL) {
-                mark_const(m, g->value, live, live_globals, &grew);
-            }
-            if (live_globals[i] && defined[i] != IR_NO_INDEX &&
-                !live_globals[defined[i]]) {
-                live_globals[defined[i]] = true;
-                grew = true;
-            }
-        }
-    }
+    ir_reach(m, entry, all, &reach);
+    live = reach.functions;
+    live_globals = reach.globals;
     /* DESIGN: class records serve the passes over the whole program, which
        run before the optimizer. The removal below renumbers the globals
        and the functions, so the records go rather than name the wrong
@@ -1656,11 +1484,9 @@ static void remove_unused_functions(struct ir_module *m, const char *entry,
             }
         }
     }
-    free(live);
-    free(live_globals);
+    ir_reach_free(&reach);
     free(map);
     free(global_map);
-    free(defined);
 }
 
 void ir_optimize(struct ir_module *program, const char *entry)

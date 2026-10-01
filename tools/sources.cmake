@@ -59,6 +59,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/pattern.c
     src/antic/platform.c
     src/antic/process.c
+    src/antic/reach.c
     src/antic/regalloc.c
     src/antic/rt_abi.c
     src/antic/select.c

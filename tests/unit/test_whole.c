@@ -7,6 +7,7 @@
 #include "ir.h"
 #include "lexer.h"
 #include "lower.h"
+#include "optimize.h"
 #include "parser.h"
 #include "sema.h"
 #include "types.h"
@@ -858,8 +859,130 @@ static void checks_provided_interfaces(void)
     provides_from_library(VERSION_TOO_LONG);
 }
 
+/* Whether the program holds a global of that name without a module. */
+static bool has_runtime_global(const struct ir_module *m, const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < m->global_count; i++) {
+        if (m->globals[i]->module == NULL &&
+            strcmp(m->globals[i]->name, name) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Whether the program holds a function of that module and name. */
+static bool has_function(const struct ir_module *m, const char *module,
+                         const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        if (((module == NULL && f->module == NULL) ||
+             (module != NULL && f->module != NULL &&
+              strcmp(f->module, module) == 0)) &&
+            strcmp(f->name, name) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* A function of module, made in unit, that calls the runtime's reader
+   of the registry. */
+static struct ir_function *reads_registry_in(struct ir_module *m,
+                                             const char *module,
+                                             const char *name,
+                                             const char *unit)
+{
+    struct ir_function *reader =
+        ir_extern_add(m, "anti_rt_reflect_new", IR_PTR, false);
+    struct ir_function *f = ir_function_add(m, module, name, IR_PTR,
+                                            IR_NO_AGG);
+    struct ir_block *b = ir_block_add(f);
+    struct ir_operand args[2];
+    uint32_t v;
+
+    f->unit = unit;
+    args[0] = ir_int_op(IR_PTR, 0);
+    args[1] = ir_int_op(IR_I64, 0);
+    v = ir_call(f, b, IR_PTR, ir_func_op(reader), args, 2);
+    ir_ret(f, b, IR_PTR, ir_temp_op(f, v));
+    return f;
+}
+
+/* The pass over the whole program and the optimizer agree on what the
+   program reaches. Module main names the datum `lib.hook` through a
+   declaration of its own, beside the definition that lib wrote, and
+   only that definition names the function that reads the registry. The
+   optimizer keeps the function, so the pass writes the registry. */
+static void reach_follows_declarations(void)
+{
+    static const uint8_t zero[8];
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *helper;
+    struct ir_function *main_fn;
+    struct ir_global *definition;
+    struct ir_global *declaration;
+    struct ir_block *b;
+    struct whole_options options;
+    struct text errors = {0};
+
+    ir_module_init(&m, &arena, "main");
+    helper = reads_registry_in(&m, "lib", "helper", NULL);
+    definition = ir_global_add(&m, "lib", "hook", zero, 8, 8);
+    ir_global_reloc_fn(&m, definition, 0, helper->index);
+    declaration = ir_global_add(&m, "lib", "hook", NULL, 0, 8);
+    declaration->is_extern = true;
+    main_fn = ir_function_add(&m, "main", "main", IR_PTR, IR_NO_AGG);
+    b = ir_block_add(main_fn);
+    ir_ret(main_fn, b, IR_PTR, ir_global_op(declaration));
+    memset(&options, 0, sizeof options);
+    options.entry = "main";
+    options.release = true;
+    CHECK(whole_program(&m, &options, &errors));
+    CHECK(has_runtime_global(&m, "anti_rt_registry"));
+    ir_optimize(&m, "main");
+    CHECK(has_function(&m, "lib", "helper"));
+    text_free(&errors);
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
+/* A library without main has every function of its unit as an entry,
+   a copy of a generic made in that unit included, whose module is the
+   generic's. The optimizer keeps the copy, so the pass writes the
+   registry it reads. */
+static void reach_takes_the_unit(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct whole_options options;
+    struct text errors = {0};
+
+    ir_module_init(&m, &arena, "lib");
+    reads_registry_in(&m, "anti.collection.list", "List<int>.make", "lib");
+    memset(&options, 0, sizeof options);
+    options.entry = "lib";
+    options.release = true;
+    options.library = true;
+    CHECK(whole_program(&m, &options, &errors));
+    CHECK(has_runtime_global(&m, "anti_rt_registry"));
+    ir_optimize(&m, "lib");
+    CHECK(has_function(&m, "anti.collection.list", "List<int>.make"));
+    text_free(&errors);
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 void test_whole(void)
 {
+    reach_follows_declarations();
+    reach_takes_the_unit();
     finds_entries();
     joins_modules();
     devirtualises();

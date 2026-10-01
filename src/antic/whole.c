@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "reach.h"
 #include "rt_abi.h"
 #include "target.h"
 
@@ -565,133 +566,6 @@ static void merge_copies(struct ir_module *m)
     free(rep);
 }
 
-/* What the entries of the program reach. */
-struct reach {
-    bool *functions;
-    bool *globals;
-    uint32_t *work;                 /* functions, then globals + count */
-    size_t work_count;
-};
-
-static void reach_function(struct reach *r, uint32_t f)
-{
-    if (!r->functions[f]) {
-        r->functions[f] = true;
-        r->work[r->work_count++] = f;
-    }
-}
-
-static void reach_global(struct reach *r, const struct ir_module *m,
-                         uint32_t g)
-{
-    if (!r->globals[g]) {
-        r->globals[g] = true;
-        r->work[r->work_count++] = (uint32_t)m->function_count + g;
-    }
-}
-
-static void reach_const(struct reach *r, const struct ir_module *m,
-                        const struct ir_const *c)
-{
-    size_t i;
-
-    if (c->kind == IR_CONST_ADDR) {
-        reach_global(r, m, c->global);
-    } else if (c->kind == IR_CONST_FUNC) {
-        reach_function(r, c->global);
-    } else if (c->kind == IR_CONST_AGG) {
-        for (i = 0; i < c->item_count; i++) {
-            reach_const(r, m, &c->items[i]);
-        }
-    }
-}
-
-static void reach_operand(struct reach *r, const struct ir_module *m,
-                          const struct ir_operand *o)
-{
-    if (o->kind == IR_FUNC) {
-        reach_function(r, o->as.index);
-    } else if (o->kind == IR_GLOBAL) {
-        reach_global(r, m, o->as.index);
-    }
-}
-
-/* DESIGN: the functions and globals that the entries of the program
-   reach, as the optimizer's removal of unused functions marks them. The
-   entry is main of the main module, or every function of that module
-   when it has none, and every export fn and export global. What the
-   entries do not reach never links, so a pass that asks whether the
-   program uses something asks this. */
-static void reach_program(struct reach *r, const struct ir_module *m,
-                          const char *entry)
-{
-    bool has_main = false;
-    size_t i;
-    size_t b;
-    size_t k;
-
-    r->functions = ir_alloc(m->function_count, sizeof *r->functions);
-    r->globals = ir_alloc(m->global_count, sizeof *r->globals);
-    r->work = ir_alloc(m->function_count + m->global_count, sizeof *r->work);
-    for (i = 0; entry != NULL && i < m->function_count; i++) {
-        const struct ir_function *f = m->functions[i];
-        has_main = has_main || (!f->is_extern && f->module != NULL &&
-                                strcmp(f->module, entry) == 0 &&
-                                strcmp(f->name, "main") == 0);
-    }
-    for (i = 0; i < m->function_count; i++) {
-        const struct ir_function *f = m->functions[i];
-        if (!f->is_extern &&
-            (entry == NULL || f->exported || ir_is_patterns_start(f) ||
-             (f->module != NULL && strcmp(f->module, entry) == 0 &&
-              (!has_main || strcmp(f->name, "main") == 0)))) {
-            reach_function(r, (uint32_t)i);
-        }
-    }
-    for (i = 0; i < m->global_count; i++) {
-        if (m->globals[i]->exported) {
-            reach_global(r, m, (uint32_t)i);
-        }
-    }
-    while (r->work_count > 0) {
-        uint32_t item = r->work[--r->work_count];
-        if (item < m->function_count) {
-            const struct ir_function *f = m->functions[item];
-            for (b = 0; b < f->block_count; b++) {
-                for (i = 0; i < f->blocks[b]->count; i++) {
-                    const struct ir_inst *inst = &f->blocks[b]->insts[i];
-                    reach_operand(r, m, &inst->a);
-                    reach_operand(r, m, &inst->b);
-                    reach_operand(r, m, &inst->c);
-                    for (k = 0; k < inst->arg_count; k++) {
-                        reach_operand(r, m, &inst->args[k]);
-                    }
-                }
-            }
-        } else {
-            const struct ir_global *g =
-                m->globals[item - m->function_count];
-            if (g->value != NULL) {
-                reach_const(r, m, g->value);
-            }
-            for (k = 0; k < g->reloc_count; k++) {
-                if (g->relocs[k].fn) {
-                    reach_function(r, g->relocs[k].global);
-                } else {
-                    reach_global(r, m, g->relocs[k].global);
-                }
-            }
-        }
-    }
-}
-
-static void reach_free(struct reach *r)
-{
-    free(r->functions);
-    free(r->globals);
-    free(r->work);
-}
-
 /* The runtime functions that read the registry. The loader is one of
    them. It adds the classes of a library to the registry, so a program
    that loads one carries the table those classes join. */
@@ -699,7 +573,8 @@ static const char *const registry_readers[] = {
     "anti_rt_reflect_new", RUNTIME_ROOT "deserialize", PLUGIN_LOAD
 };
 
-static bool reads_registry(const struct ir_module *m, const struct reach *r)
+static bool reads_registry(const struct ir_module *m,
+                           const struct ir_reach *r)
 {
     size_t i;
     size_t k;
@@ -839,7 +714,8 @@ static void write_registry(struct ir_module *m, bool reflect)
 
 /* The runtime function that every `fail` asks whether backtraces are
    on. */
-static bool asks_backtrace(const struct ir_module *m, const struct reach *r)
+static bool asks_backtrace(const struct ir_module *m,
+                           const struct ir_reach *r)
 {
     size_t i;
 
@@ -1081,7 +957,7 @@ static uint32_t write_trampoline(struct ir_module *m, const char *text,
 
 /* Whether the entries reach the runtime function of reflect.call. */
 static bool calls_through_reflection(const struct ir_module *m,
-                                     const struct reach *r)
+                                     const struct ir_reach *r)
 {
     size_t i;
 
@@ -1441,7 +1317,7 @@ static bool at_or_below(const struct whole *w, uint32_t record, uint32_t above)
    misses a slot of a bitmap, and fills a slot that reflection alone
    reaches with a stub. */
 static void write_slots(struct whole *w, struct ir_module *m,
-                        const struct reach *r, bool every, bool force)
+                        const struct ir_reach *r, bool every, bool force)
 {
     size_t classes = m->class_count;
     struct slots *slots = ir_alloc(classes, sizeof *slots);
@@ -2458,7 +2334,7 @@ bool whole_program(struct ir_module *program,
                    const struct whole_options *options, struct text *errors)
 {
     struct whole *w = whole_build(program);
-    struct reach reach;
+    struct ir_reach reach;
     size_t inject_errors;
     bool partial;
     bool calls;
@@ -2472,8 +2348,9 @@ bool whole_program(struct ir_module *program,
        in one IR. It writes what that program reaches. */
     partial = options->dev;
     ok = check_singletons(w, program, errors);
-    memset(&reach, 0, sizeof reach);
-    reach_program(&reach, program, options->entry);
+    /* What the program reaches, as the optimizer that follows decides
+       it. */
+    ir_reach(program, options->entry, false, &reach);
     if (options->plugin) {
         /* The host holds the registry, the default of the backtraces and
            the slots. A plugin reads all three through the host. */
@@ -2508,7 +2385,7 @@ bool whole_program(struct ir_module *program,
         write_injections(w, program, options, errors);
     }
     ok = ok && errors->length == inject_errors;
-    reach_free(&reach);
+    ir_reach_free(&reach);
     /* The trampolines come after every reader of the reach, because they
        add functions that it does not cover. */
     if (calls || options->bundled || partial) {
