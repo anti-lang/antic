@@ -9,7 +9,8 @@
 #   HOST     the target name of this host
 #   WORK     a directory this run writes into
 
-# The program takes the last segment of the package name.
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 set(project "${WORK}/internal")
 set(exe "")
 if(HOST MATCHES "^windows-")
@@ -39,22 +40,10 @@ function(run_anti what)
     endif()
 endfunction()
 
-function(run_program what program)
-    execute_process(COMMAND "${program}" RESULT_VARIABLE status
-                    OUTPUT_VARIABLE out ERROR_VARIABLE err)
-    if(NOT status EQUAL 41)
-        set(failures "${failures}${what} ended with ${status}\n${out}${err}\n"
-            PARENT_SCOPE)
-    endif()
-endfunction()
-
 run_anti("anti check" check --runtime "${RUNTIME}")
 run_anti("the dev build" build --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
-run_program("the dev program" "${project}/dist/${HOST}/dev/example${exe}")
 run_anti("the release build" build --release --runtime "${RUNTIME}"
          --llvm-mc "${LLVM_MC}")
-run_program("the release program"
-            "${project}/dist/${HOST}/release/example${exe}")
 run_anti("anti test" test --work "${WORK}/tests" -I src
          --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
          src/com/example/core.anti src/com/example/near.anti)
@@ -66,3 +55,10 @@ endif()
 if(NOT failures STREQUAL "")
     message(FATAL_ERROR "${failures}")
 endif()
+# The program of both modes, named for the last segment of the package
+# name, returns the internal item.
+program_expect("dev" COMMAND "${project}/dist/${HOST}/dev/example${exe}"
+               STATUS 41)
+program_expect("release"
+               COMMAND "${project}/dist/${HOST}/release/example${exe}"
+               STATUS 41)

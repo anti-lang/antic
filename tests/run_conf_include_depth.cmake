@@ -14,7 +14,10 @@ set(exe "")
 if(HOST MATCHES "^windows-")
     set(exe ".exe")
 endif()
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
+file(MAKE_DIRECTORY "${WORK}")
 set(failures "")
 
 # A chain of count files in dir, c0.toml at its head. Each includes the
@@ -44,16 +47,14 @@ endfunction()
 # the status the program ends with, and message the one both print, or
 # empty for none.
 function(expect_chain dir status message)
-    execute_process(
-        COMMAND "${dir}/report${exe}" "--anti.conf=${dir}/c0.toml"
-        RESULT_VARIABLE got OUTPUT_VARIABLE out ERROR_VARIABLE err
-        ENCODING NONE)
-    if(NOT got EQUAL status OR (message STREQUAL "" AND NOT err STREQUAL ""))
-        string(APPEND failures
-               "the program over ${dir} ended with ${got}\n${err}\n")
-    endif()
-    if(NOT message STREQUAL "" AND NOT err MATCHES "${message}")
-        string(APPEND failures "the program over ${dir} said\n${err}\n")
+    get_filename_component(label "${dir}" NAME)
+    if(message STREQUAL "")
+        program_expect("${label}" COMMAND "${dir}/report${exe}"
+                       "--anti.conf=${dir}/c0.toml" STATUS ${status} ANY_OUT)
+    else()
+        program_expect("${label}" COMMAND "${dir}/report${exe}"
+                       "--anti.conf=${dir}/c0.toml" STATUS ${status}
+                       ERR_MATCH "${message}")
     endif()
     execute_process(
         COMMAND "${ANTI}" symbols inventory --conf "${dir}/c0.toml"
