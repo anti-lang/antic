@@ -443,6 +443,12 @@ add_test(NAME rt_names
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_rt_names.cmake")
 set_tests_properties(rt_names PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
 
+# Each declaration of sema_checker.h and lower_lowerer.h stands under the
+# file that defines it, and the comment of each header names every file.
+add_test(NAME header_sections
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_header_sections.cmake")
+
 # The layout rule of "Repository layout" in CLAUDE.md, over git ls-files.
 add_test(NAME repo_layout
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"

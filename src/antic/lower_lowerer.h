@@ -7,7 +7,8 @@
    the descriptors and the tables of classes, structs and interfaces.
    lower_expr.c lowers expressions and calls, lower_simd.c the operations
    of simd structs, and lower_stmt.c statements, loops and the exits of a
-   block. */
+   block. lower_eq.c writes the default `==`, and lower_hash.c the
+   default hash. */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -307,14 +308,6 @@ void lower_zero_lock(struct lowerer *l, const struct type *t,
 struct ir_operand lower_object_lock_address(struct lowerer *l,
                                             const struct type *t,
                                             struct ir_operand object);
-void lower_hold_lock(struct lowerer *l, struct ir_operand at, bool object,
-                     int line);
-void lower_object_lock_call(struct lowerer *l, struct ir_operand at, int line);
-void lower_object_unlock_call(struct lowerer *l, struct ir_operand at);
-void lower_lock_pair_call(struct lowerer *l, struct ir_operand a,
-                          struct ir_operand b, int line);
-void lower_unlock_pair_call(struct lowerer *l, struct ir_operand a,
-                            struct ir_operand b);
 extern const struct name lower_len_name;
 extern const struct name lower_entry_name;
 struct ir_operand lower_field_offset(struct lowerer *l, const struct type *s,
@@ -372,11 +365,26 @@ struct ir_operand lower_rt_call(struct lowerer *l, const char *name,
                                 struct ir_operand *args, size_t count);
 struct ir_operand lower_slice_length(struct lowerer *l, struct ir_operand p,
                                      const struct type *slice);
-/* The copy of every part of the value lent of an iterator at src into the
-   tuple copy at dest. A lent part gives what it points at. */
-void lower_copy_parts(struct lowerer *l, const struct type *lent,
-                      const struct type *copy, struct ir_operand src,
-                      struct ir_operand dest);
+struct ir_operand lower_pattern(struct lowerer *l, const struct expr *e);
+/* The teardown of the value of type t at at, part by part for a struct,
+   a tuple, an array and a `?T`. A class value runs its teardown, which
+   gives what it owns back to the allocator from. made_only passes over a
+   class value whose table is zero, which moved away or was never made. */
+void lower_destroy_owned(struct lowerer *l, const struct type *t,
+                         struct ir_operand at, struct ir_operand from,
+                         bool made_only);
+/* The copy of what the value of type t at from owns into the value at
+   into, whose bytes are already the same. Each class value, each `own fn`
+   and each part that holds one is copied as `dup` copies it. */
+void lower_copy_owned(struct lowerer *l, const struct type *t,
+                      struct ir_operand from, struct ir_operand into);
+/* Clear what the value of type t at at would tear down, so that its
+   teardown passes over it. That is the table of each class value, the
+   flag of each `?T` and the snapshot of each `own fn`. */
+void lower_clear_owned(struct lowerer *l, const struct type *t,
+                       struct ir_operand at);
+/* Whether a copy of a value of type t copies more than its bytes. */
+bool lower_copies_parts(const struct type *t);
 
 /* lower_desc.c */
 
@@ -422,6 +430,8 @@ void lower_run_construct(struct lowerer *l, const struct type *t,
 void lower_store_interface_tables(struct lowerer *l, const struct type *t,
                                   struct ir_operand dest);
 bool lower_hook_name(const struct name *name);
+bool lower_defines(const struct lowerer *l, const struct type *t,
+                   const char *module);
 
 /* lower_expr.c */
 
@@ -464,7 +474,6 @@ uint32_t lower_sym_of(struct lowerer *l, const struct symbolic *s);
 struct ir_operand lower_argument(struct lowerer *l,
                                  const struct expr *arg);
 struct ir_operand lower_call(struct lowerer *l, const struct expr *e);
-struct ir_operand lower_pattern(struct lowerer *l, const struct expr *e);
 struct ir_function *lower_rt_function_giving(struct lowerer *l,
                                              const char *name,
                                              enum ir_type result,
@@ -493,6 +502,24 @@ void lower_branch(struct lowerer *l, const struct expr *e,
 struct ir_operand lower_compare_text(struct lowerer *l, enum token_kind op,
                                      const struct type *t,
                                      struct ir_operand a, struct ir_operand b);
+/* The copy of every part of the value lent of an iterator at src into the
+   tuple copy at dest. A lent part gives what it points at. */
+void lower_copy_parts(struct lowerer *l, const struct type *lent,
+                      const struct type *copy, struct ir_operand src,
+                      struct ir_operand dest);
+/* The value of the call e, whose error a handler takes, written into a
+   slot of the frame whose tables are zeroed first. An aggregate is the
+   address of its slot. */
+struct ir_operand lower_handled_operand(struct lowerer *l,
+                                        const struct expr *e);
+/* Tear down the call results and the literals among the count arguments
+   args, lowered to values, that the call of sym with type fn took at
+   parameters that neither keep them nor take a pointer. The first
+   argument stands at parameter first. */
+void lower_drop_arguments(struct lowerer *l, const struct symbol *sym,
+                          const struct type *fn, const struct expr *const *args,
+                          const struct ir_operand *values, size_t count,
+                          size_t first);
 
 /* lower_eq.c */
 
@@ -536,25 +563,6 @@ struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
                                       struct ir_operand value);
 void lower_clear_moved(struct lowerer *l, const struct expr *value);
 bool lower_type_needs_destruct(const struct type *t);
-/* The teardown of the value of type t at at, part by part for a struct,
-   a tuple, an array and a `?T`. A class value runs its teardown, which
-   gives what it owns back to the allocator from. made_only passes over a
-   class value whose table is zero, which moved away or was never made. */
-void lower_destroy_owned(struct lowerer *l, const struct type *t,
-                         struct ir_operand at, struct ir_operand from,
-                         bool made_only);
-/* The copy of what the value of type t at from owns into the value at
-   into, whose bytes are already the same. Each class value, each `own fn`
-   and each part that holds one is copied as `dup` copies it. */
-void lower_copy_owned(struct lowerer *l, const struct type *t,
-                      struct ir_operand from, struct ir_operand into);
-/* Clear what the value of type t at at would tear down, so that its
-   teardown passes over it. That is the table of each class value, the
-   flag of each `?T` and the snapshot of each `own fn`. */
-void lower_clear_owned(struct lowerer *l, const struct type *t,
-                       struct ir_operand at);
-/* Whether a copy of a value of type t copies more than its bytes. */
-bool lower_copies_parts(const struct type *t);
 /* The count of elements of the innermost element type of the array t. */
 struct ir_operand lower_array_count(struct lowerer *l, const struct type *t);
 /* Whether t is a `?T` of a class value that needs the teardown. */
@@ -572,19 +580,6 @@ void lower_keep_temp(struct lowerer *l, const struct expr *e,
    which the end of a statement does and an exit of the function does
    not, since other paths still reach them. */
 void lower_end_temps(struct lowerer *l, size_t mark, bool pop);
-/* The value of the call e, whose error a handler takes, written into a
-   slot of the frame whose tables are zeroed first. An aggregate is the
-   address of its slot. */
-struct ir_operand lower_handled_operand(struct lowerer *l,
-                                        const struct expr *e);
-/* Tear down the call results and the literals among the count arguments
-   args, lowered to values, that the call of sym with type fn took at
-   parameters that neither keep them nor take a pointer. The first
-   argument stands at parameter first. */
-void lower_drop_arguments(struct lowerer *l, const struct symbol *sym,
-                          const struct type *fn, const struct expr *const *args,
-                          const struct ir_operand *values, size_t count,
-                          size_t first);
 void lower_clear_tables(struct lowerer *l, struct ir_operand base,
                         const struct type *t);
 void lower_handle_error(struct lowerer *l, const struct expr *call,
@@ -599,8 +594,13 @@ void lower_run_defers(struct lowerer *l, const struct defers *scope,
 void lower_block(struct lowerer *l, const struct block *b);
 void lower_reserve_slots(struct lowerer *l, struct ir_block *entry,
                          const struct block *b);
-
-bool lower_defines(const struct lowerer *l, const struct type *t,
-                   const char *module);
+void lower_hold_lock(struct lowerer *l, struct ir_operand at, bool object,
+                     int line);
+void lower_object_lock_call(struct lowerer *l, struct ir_operand at, int line);
+void lower_object_unlock_call(struct lowerer *l, struct ir_operand at);
+void lower_lock_pair_call(struct lowerer *l, struct ir_operand a,
+                          struct ir_operand b, int line);
+void lower_unlock_pair_call(struct lowerer *l, struct ir_operand a,
+                            struct ir_operand b);
 
 #endif
