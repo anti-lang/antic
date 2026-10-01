@@ -38,9 +38,8 @@ struct anti_backtrace_default {
 
 extern const struct anti_backtrace_default anti_rt_backtrace_default;
 
-/* The return addresses of the caller and the calls above it, at most
-   room of them into into, less the skip innermost. Gives the count. */
-int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip);
+/* anti_rt_trace_walk, the walk of the frames, is a call of the platform
+   layer in platform.h. */
 
 /* Fill out with the module that address lies in, the build id of the
    module and its load base. Both texts are empty and the base is 0 for

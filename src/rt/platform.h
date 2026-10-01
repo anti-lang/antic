@@ -11,8 +11,10 @@
 #ifndef ANTI_RT_PLATFORM_H
 #define ANTI_RT_PLATFORM_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 /* 1 in the runtime of a Windows target and 0 elsewhere. anti.os asks it. */
 int64_t anti_rt_is_windows(void);
@@ -35,6 +37,9 @@ enum anti_rt_lock {
     ANTI_RT_LOCK_POOL,          /* the pool and its jobs, src/rt/threads.c */
     ANTI_RT_LOCK_SELECT,        /* the selects that wait, src/rt/sync.c */
     ANTI_RT_LOCK_ORDERS,        /* the orders of the locks, src/rt/lock.c */
+    ANTI_RT_LOCK_TRACE_TEXTS,   /* the kept texts of src/rt/trace.c */
+    ANTI_RT_LOCK_TRACE_FILES,   /* the files and build ids, src/rt/trace.c */
+    ANTI_RT_LOCK_DEBUG,         /* the debugger library of the system */
     ANTI_RT_LOCK_COUNT
 };
 
@@ -114,6 +119,45 @@ int anti_rt_path_is_absolute(const char *path);
    none. `/` on every system, and `\` as well on Windows. */
 const char *anti_rt_path_last_separator(const char *path);
 
+/* DESIGN: a path in the calls of files below is UTF-8 ended by a NUL.
+   Each call reports a failure through errno alone, so anti.fs builds
+   every error with SystemError.from_errno on every system. Windows takes
+   its paths as UTF-16, through the wide functions of the C runtime,
+   which set errno as well. The Win32 calls set an error of their own and
+   are not used. A path that is no valid UTF-8 fails there with EINVAL. */
+
+/* Open the file for reading, or for writing when writing is not 0. Both
+   are binary, so no byte is translated on Windows. Writing creates the
+   file or empties the one that is there. NULL with errno set when it
+   fails. */
+FILE *anti_rt_file_open(const char *path, int writing);
+
+/* The offset of the stream in 64 bits, or -1 with errno set. */
+int64_t anti_rt_file_tell(FILE *file);
+
+/* Move the stream to offset from whence, SEEK_SET, SEEK_CUR or SEEK_END.
+   Returns 0, or -1 with errno set. */
+int anti_rt_file_seek(FILE *file, int64_t offset, int whence);
+
+/* 1 when the stream reads a directory and 0 otherwise. macOS and Linux
+   open a directory as a stream, and Windows opens none. */
+int anti_rt_file_is_directory(FILE *file);
+
+/* Remove the file, or rename it. Each returns 0, or -1 with errno set. */
+int anti_rt_file_remove(const char *path);
+int anti_rt_file_rename(const char *from, const char *to);
+
+/* Call each with the name of every entry of the directory at path, in
+   UTF-8 and the order the system gives them, `.` and `..` included. each
+   returns 0 to go on, or -1 with errno set to stop the listing. Returns
+   0, or -1 with errno set, from each or from the system. An empty path
+   names no directory and gives ENOENT. */
+int anti_rt_directory_list(const char *path,
+                           int (*each)(void *context,
+                                       const unsigned char *name,
+                                       size_t length),
+                           void *context);
+
 /* The system's loader of shared libraries. open takes a path in UTF-8
    and gives NULL when it fails, and error then gives the reason. A reason
    the system writes itself goes to text, of size bytes. The reason
@@ -127,6 +171,73 @@ const char *anti_rt_library_error(char *text, size_t size);
    lies in, or NULL when it lies in none. The loader of the system holds
    a lock of its own while it answers. */
 const void *anti_rt_library_image(const void *address);
+
+/* DESIGN: a stack trace asks the system three things: the walk of the
+   frames, the module an address lies in and, on Windows, the debugger
+   library for a name and a line. src/rt/trace.c reads the symbol tables
+   and the line tables itself. The format of the module tells it which
+   reader, a value of the run and not a `#if`. */
+
+/* The return addresses of the caller and the calls above it, at most
+   room of them into into, less the skip innermost. Gives the count.
+   anti.lang.StackTrace calls it. */
+int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip);
+
+enum anti_rt_image_format {
+    /* The header of the image lies at base, and its symbol table is read
+       in memory. The line table stands in the objects of its debug map. */
+    ANTI_RT_IMAGE_MACHO,
+    /* The file at path holds the symbol table and the line table, and
+       base is the bias of its addresses in memory. */
+    ANTI_RT_IMAGE_ELF,
+    /* The debugger library reads the PDB, through anti_rt_debug_lookup. */
+    ANTI_RT_IMAGE_PE
+};
+
+/* The room of a path the layer gives, its NUL included. */
+#define ANTI_RT_PATH_ROOM 4096
+
+/* The module an address lies in, as the loader of the system knows it. */
+struct anti_rt_module {
+    enum anti_rt_image_format format;
+    /* Where the module lies in memory, which the text of a trace counts
+       offsets from. */
+    uint64_t base;
+    /* ELF alone: the program headers of the module in memory, 56 bytes
+       each, and their count. */
+    const void *headers;
+    size_t header_count;
+    /* true when the layer found the notice `anti_licenses` of the module,
+       which notice then gives in memory or NULL for none. false leaves it
+       to the reader of the format: Mach-O on macOS, and ELF on Linux for
+       every module but the runtime's own. */
+    bool notice_read;
+    const char *notice;
+    /* The path of the file in UTF-8, empty when it does not fit. */
+    char path[ANTI_RT_PATH_ROOM];
+};
+
+/* Fill out with the module that holds the byte at address. false for an
+   address outside every module. */
+bool anti_rt_module_at(uint64_t address, struct anti_rt_module *out);
+
+/* The room of the name of a symbol the debugger library gives, its NUL
+   included. */
+#define ANTI_RT_SYMBOL_ROOM 513
+
+/* What the debugger library of the system knows of the code at an
+   address. A text is empty and line 0 where it knows nothing. */
+struct anti_rt_debug_answer {
+    char function[ANTI_RT_SYMBOL_ROOM];   /* as the symbol table spells it */
+    char file[ANTI_RT_PATH_ROOM];
+    int64_t line;
+};
+
+/* Ask the debugger library of the system for the code at address in the
+   module at base: DbgHelp on Windows, which reads the PDB of every
+   Windows link. macOS and Linux have none, and the answer is empty. */
+void anti_rt_debug_lookup(uint64_t address, uint64_t base,
+                          struct anti_rt_debug_answer *out);
 
 /* DESIGN: a signal handler runs on a stack the program knows nothing
    about, so it does the least it can. On macOS and Linux it writes one

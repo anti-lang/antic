@@ -54,8 +54,9 @@ A cycle is found by the paths on the stack of files being read, compared
 as text. Two spellings of one path escape that comparison, and the depth
 limit of thirty-two catches them with the same message.
 
-The file is opened through `anti_rt_fs_open` of `src/rt/fs.c`, so the path of
-Windows goes through UTF-16 as every other path of the runtime does.
+The file is opened through `anti_rt_fs_open` of `src/rt/fs.c`, which calls the
+platform layer. The path of Windows therefore goes through UTF-16 as every
+other path of the runtime does.
 
 ## Who reads a key
 

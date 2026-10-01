@@ -4,15 +4,8 @@
 
    DESIGN: every function reports a failure through errno and nothing
    else, so the module builds each error with SystemError.from_errno on
-   every system. Windows takes its paths as UTF-16. The functions there
-   are the wide ones of the C runtime, which set errno as well. The Win32
-   calls set an error of their own and are not used. */
-#if defined(__APPLE__)
-#define _DARWIN_C_SOURCE
-#elif !defined(_WIN32)
-#define _POSIX_C_SOURCE 200809L
-#endif
-
+   every system. The calls of the system stand in the platform layer,
+   which takes a path in UTF-8 on every system. */
 #include <errno.h>
 #include <limits.h>
 #include <stdint.h>
@@ -20,27 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(_WIN32)
-#include <io.h>
-#include <share.h>
-#include <wchar.h>
-#include <windows.h>
-#else
-#include <dirent.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#endif
-
+#include "platform.h"
 #include "std.h"
-#if defined(_WIN32)
-#include "utf.h"
-#endif
-
-#if defined(_WIN32)
-typedef wchar_t path_char;
-#else
-typedef char path_char;
-#endif
 
 /* Free p and keep errno, which a free before POSIX.1-2024 may change. */
 static void release(void *p)
@@ -51,52 +25,31 @@ static void release(void *p)
     errno = saved;
 }
 
-/* The path of the len bytes at bytes, ended by a NUL and with room for
-   extra more characters, or NULL with errno set.
+/* The path of the len bytes at bytes, ended by a NUL, or NULL with
+   errno set.
 
    DESIGN: a str carries its length, and a slice of one ends where its
    bytes do and not at a NUL. So the bytes are copied. A NUL inside
    them would name another file than the one the program wrote. The copy
    refuses it with EINVAL. */
-static path_char *native_path(const unsigned char *bytes, int64_t len,
-                              size_t extra)
+static char *native_path(const unsigned char *bytes, int64_t len)
 {
-    path_char *path;
-    size_t units = (size_t)len;
+    char *path;
 
     if (len < 0 || len > INT_MAX / 2 ||
         (len > 0 && memchr(bytes, 0, (size_t)len) != NULL)) {
         errno = EINVAL;
         return NULL;
     }
-#if defined(_WIN32)
-    if (len > 0) {
-        int counted = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-                                          (const char *)bytes, (int)len,
-                                          NULL, 0);
-        if (counted <= 0) {
-            errno = EINVAL;
-            return NULL;
-        }
-        units = (size_t)counted;
-    }
-#endif
-    path = malloc((units + extra + 1) * sizeof *path);
+    path = malloc((size_t)len + 1);
     if (path == NULL) {
         errno = ENOMEM;
         return NULL;
     }
-#if defined(_WIN32)
     if (len > 0) {
-        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, (const char *)bytes,
-                            (int)len, path, (int)units);
+        memcpy(path, bytes, (size_t)len);
     }
-#else
-    if (len > 0) {
-        memcpy(path, bytes, units);
-    }
-#endif
-    path[units] = 0;
+    path[len] = '\0';
     return path;
 }
 
@@ -105,20 +58,13 @@ static path_char *native_path(const unsigned char *bytes, int64_t len,
    file or empties the one that is there. */
 void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t writing)
 {
-    path_char *name = native_path(path, len, 0);
+    char *name = native_path(path, len);
     FILE *file;
 
     if (name == NULL) {
         return NULL;
     }
-#if defined(_WIN32)
-    /* _wfopen is _wfsopen without a lock on the file, which is what fopen
-       gives on the other systems. The C runtime deprecates the first and
-       not the second. */
-    file = _wfsopen(name, writing != 0 ? L"wb" : L"rb", _SH_DENYNO);
-#else
-    file = fopen(name, writing != 0 ? "wb" : "rb");
-#endif
+    file = anti_rt_file_open(name, writing);
     release(name);
     return file;
 }
@@ -133,28 +79,16 @@ void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t writing)
 int64_t anti_rt_fs_size(void *file)
 {
     FILE *f = file;
-    int64_t at;
+    int64_t at = anti_rt_file_tell(f);
     int64_t end;
 
-#if defined(_WIN32)
-    at = _ftelli64(f);
-    if (at < 0 || _fseeki64(f, 0, SEEK_END) != 0) {
+    if (at < 0 || anti_rt_file_seek(f, 0, SEEK_END) != 0) {
         return -1;
     }
-    end = _ftelli64(f);
-    if (_fseeki64(f, at, SEEK_SET) != 0) {
+    end = anti_rt_file_tell(f);
+    if (anti_rt_file_seek(f, at, SEEK_SET) != 0) {
         return -1;
     }
-#else
-    at = (int64_t)ftello(f);
-    if (at < 0 || fseeko(f, 0, SEEK_END) != 0) {
-        return -1;
-    }
-    end = (int64_t)ftello(f);
-    if (fseeko(f, (off_t)at, SEEK_SET) != 0) {
-        return -1;
-    }
-#endif
     return end;
 }
 
@@ -168,19 +102,14 @@ unsigned char *anti_rt_fs_read(const char *path, int64_t *length)
     if (f == NULL) {
         return NULL;
     }
-#if !defined(_WIN32)
-    /* A directory opens as a stream on POSIX, and on Linux its end lies at
-       the largest offset, so the size below would ask for 2^63 bytes.
-       Windows opens no directory. */
-    {
-        struct stat info;
-        if (fstat(fileno(f), &info) == 0 && S_ISDIR(info.st_mode)) {
-            fclose(f);
-            errno = EISDIR;
-            return NULL;
-        }
+    /* A directory opens as a stream on macOS and Linux, and on Linux its
+       end lies at the largest offset, so the size below would ask for
+       2^63 bytes. */
+    if (anti_rt_file_is_directory(f)) {
+        fclose(f);
+        errno = EISDIR;
+        return NULL;
     }
-#endif
     size = anti_rt_fs_size(f);
     if (size >= 0 && (uint64_t)size >= SIZE_MAX) {
         errno = ENOMEM;
@@ -279,90 +208,29 @@ static struct anti_text *finish(struct names *n, int64_t *count)
     return texts;
 }
 
+/* Add each entry but `.` and `..` to the names at context. */
+static int add_entry(void *context, const unsigned char *name, size_t len)
+{
+    return is_dot_entry(name, len) ? 0 : add_name(context, name, len);
+}
+
 /* The entries of the directory, without `.` and `..`, in the order the
    system gives them, or NULL with errno set. */
 struct anti_text *anti_rt_fs_list(const unsigned char *path, int64_t len,
                                   int64_t *count)
 {
     struct names n = {NULL, 0, 0, 0};
-    int failed = 0;
+    char *name = native_path(path, len);
+    int status;
     int saved;
-#if defined(_WIN32)
-    /* The pattern of the search is the directory, a separator and `*`. */
-    path_char *pattern = native_path(path, len, 2);
-    struct _wfinddata64_t data;
-    unsigned char name[3 * (sizeof data.name / sizeof data.name[0])];
-    intptr_t search;
-    size_t units;
-
-    if (pattern == NULL) {
-        return NULL;
-    }
-    units = wcslen(pattern);
-    search = -1;
-    if (units == 0) {
-        errno = ENOENT;
-    } else {
-        if (pattern[units - 1] != L'/' && pattern[units - 1] != L'\\') {
-            pattern[units++] = L'\\';
-        }
-        pattern[units++] = L'*';
-        pattern[units] = 0;
-        search = _wfindfirst64(pattern, &data);
-    }
-    release(pattern);
-    if (search == -1) {
-        return NULL;
-    }
-    do {
-        size_t written = anti_rt_utf16_to_utf8((const uint16_t *)data.name,
-                                               wcslen(data.name), name);
-        if (!is_dot_entry(name, written) &&
-            add_name(&n, name, written) != 0) {
-            failed = 1;
-            break;
-        }
-    } while (_wfindnext64(search, &data) == 0);
-    /* The search ends with ENOENT when no entry is left. */
-    if (!failed && errno != ENOENT) {
-        failed = 1;
-    }
-    saved = errno;
-    _findclose(search);
-#else
-    path_char *name = native_path(path, len, 0);
-    struct dirent *entry;
-    DIR *dir;
 
     if (name == NULL) {
         return NULL;
     }
-    dir = opendir(name);
-    release(name);
-    if (dir == NULL) {
-        return NULL;
-    }
-    for (;;) {
-        size_t length;
-        /* readdir gives NULL at the end and on a failure, and only a
-           failure sets errno. */
-        errno = 0;
-        entry = readdir(dir);
-        if (entry == NULL) {
-            failed = errno != 0;
-            break;
-        }
-        length = strlen(entry->d_name);
-        if (!is_dot_entry((const unsigned char *)entry->d_name, length) &&
-            add_name(&n, (const unsigned char *)entry->d_name, length) != 0) {
-            failed = 1;
-            break;
-        }
-    }
+    status = anti_rt_directory_list(name, add_entry, &n);
     saved = errno;
-    closedir(dir);
-#endif
-    if (failed) {
+    release(name);
+    if (status != 0) {
         free(n.bytes);
         errno = saved;
         return NULL;
@@ -373,38 +241,29 @@ struct anti_text *anti_rt_fs_list(const unsigned char *path, int64_t len,
 /* Remove the file, or give -1 with errno set. */
 int32_t anti_rt_fs_remove(const unsigned char *path, int64_t len)
 {
-    path_char *name = native_path(path, len, 0);
+    char *name = native_path(path, len);
     int status;
 
     if (name == NULL) {
         return -1;
     }
-#if defined(_WIN32)
-    status = _wremove(name);
-#else
-    status = remove(name);
-#endif
+    status = anti_rt_file_remove(name);
     release(name);
-    return status == 0 ? 0 : -1;
+    return status;
 }
 
 /* Give the file at from the path to, or give -1 with errno set. */
 int32_t anti_rt_fs_rename(const unsigned char *from, int64_t from_len,
                           const unsigned char *to, int64_t to_len)
 {
-    path_char *old_name = native_path(from, from_len, 0);
-    path_char *new_name =
-        old_name != NULL ? native_path(to, to_len, 0) : NULL;
+    char *old_name = native_path(from, from_len);
+    char *new_name = old_name != NULL ? native_path(to, to_len) : NULL;
     int status = -1;
 
     if (new_name != NULL) {
-#if defined(_WIN32)
-        status = _wrename(old_name, new_name);
-#else
-        status = rename(old_name, new_name);
-#endif
+        status = anti_rt_file_rename(old_name, new_name);
     }
     release(old_name);
     release(new_name);
-    return status == 0 ? 0 : -1;
+    return status;
 }

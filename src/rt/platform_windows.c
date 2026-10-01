@@ -5,14 +5,19 @@
    that includes stdlib.h. */
 #define _CRT_RAND_S
 
+#include <errno.h>
+#include <io.h>
 #include <limits.h>
+#include <share.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <wchar.h>
 #include <windows.h>
+#include <DbgHelp.h>
 
 #include "platform.h"
 #include "signal.h"
@@ -192,24 +197,38 @@ int64_t anti_rt_processors(void)
     return n > 0 ? (int64_t)n : 1;
 }
 
-/* The UTF-16 form of the UTF-8 text, in memory the caller frees. NULL
-   when it is no valid UTF-8, is too long or memory runs out. */
-static wchar_t *wide_of(const char *text)
+/* Free p and keep errno, which free may change. */
+static void release(void *p)
+{
+    int saved = errno;
+
+    free(p);
+    errno = saved;
+}
+
+/* The UTF-16 form of the UTF-8 text, with room for extra more units
+   after its NUL, in memory the caller frees. NULL with errno set: EINVAL
+   when it is no valid UTF-8 or is too long, and ENOMEM when memory runs
+   out. */
+static wchar_t *wide_of(const char *text, size_t extra)
 {
     size_t length = strlen(text);
     int units;
     wchar_t *wide;
 
     if (length >= INT_MAX) {
+        errno = EINVAL;
         return NULL;
     }
     units = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text,
                                 (int)length + 1, NULL, 0);
     if (units <= 0) {
+        errno = EINVAL;
         return NULL;
     }
-    wide = malloc((size_t)units * sizeof *wide);
+    wide = malloc(((size_t)units + extra) * sizeof *wide);
     if (wide == NULL) {
+        errno = ENOMEM;
         return NULL;
     }
     MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, (int)length + 1,
@@ -217,14 +236,33 @@ static wchar_t *wide_of(const char *text)
     return wide;
 }
 
+/* The units UTF-16 units at wide as UTF-8 into the room bytes at out,
+   ended by a NUL. A unit that pairs with no other gives U+FFFD. Gives
+   the bytes before the NUL, and 0 with an empty text when they do not
+   fit. */
+static size_t utf8_of(const wchar_t *wide, size_t units, char *out,
+                      size_t room)
+{
+    int bytes = 0;
+
+    if (units > 0 && units < INT_MAX / 3 && room > 1 && room <= INT_MAX) {
+        bytes = WideCharToMultiByte(CP_UTF8, 0, wide, (int)units, out,
+                                    (int)room - 1, NULL, NULL);
+    }
+    if (room > 0) {
+        out[bytes > 0 ? bytes : 0] = '\0';
+    }
+    return bytes > 0 ? (size_t)bytes : 0;
+}
+
 /* DESIGN: GetEnvironmentVariableW reports the length the value needs, and
    another thread may change the value between that call and the read. So
    the read repeats until the value fits the buffer it was sized for. The
    UTF-16 then becomes the UTF-8 the rest of the runtime reads, as
-   anti_rt_fs_open reads a path. */
+   anti_rt_file_open reads a path. */
 int anti_rt_getenv(const char *name, char **value)
 {
-    wchar_t *wide_name = wide_of(name);
+    wchar_t *wide_name = wide_of(name, 0);
     wchar_t *wide = NULL;
     DWORD size = 0;
     DWORD length;
@@ -337,9 +375,123 @@ static bool fill_imports(HMODULE handle)
     return ok;
 }
 
+FILE *anti_rt_file_open(const char *path, int writing)
+{
+    wchar_t *name = wide_of(path, 0);
+    FILE *file;
+
+    if (name == NULL) {
+        return NULL;
+    }
+    /* _wfopen is _wfsopen without a lock on the file, which is what fopen
+       gives on the other systems. The C runtime deprecates the first and
+       not the second. */
+    file = _wfsopen(name, writing != 0 ? L"wb" : L"rb", _SH_DENYNO);
+    release(name);
+    return file;
+}
+
+int64_t anti_rt_file_tell(FILE *file)
+{
+    return _ftelli64(file);
+}
+
+int anti_rt_file_seek(FILE *file, int64_t offset, int whence)
+{
+    return _fseeki64(file, offset, whence) == 0 ? 0 : -1;
+}
+
+int anti_rt_file_is_directory(FILE *file)
+{
+    struct _stat64 info;
+
+    return _fstat64(_fileno(file), &info) == 0 &&
+                   (info.st_mode & _S_IFMT) == _S_IFDIR
+               ? 1
+               : 0;
+}
+
+int anti_rt_file_remove(const char *path)
+{
+    wchar_t *name = wide_of(path, 0);
+    int status;
+
+    if (name == NULL) {
+        return -1;
+    }
+    status = _wremove(name);
+    release(name);
+    return status == 0 ? 0 : -1;
+}
+
+int anti_rt_file_rename(const char *from, const char *to)
+{
+    wchar_t *old_name = wide_of(from, 0);
+    wchar_t *new_name = old_name != NULL ? wide_of(to, 0) : NULL;
+    int status = -1;
+
+    if (new_name != NULL) {
+        status = _wrename(old_name, new_name);
+    }
+    release(old_name);
+    release(new_name);
+    return status == 0 ? 0 : -1;
+}
+
+int anti_rt_directory_list(const char *path,
+                           int (*each)(void *context,
+                                       const unsigned char *name,
+                                       size_t length),
+                           void *context)
+{
+    /* The pattern of the search is the directory, a separator and `*`. */
+    wchar_t *pattern = wide_of(path, 2);
+    struct _wfinddata64_t data;
+    char name[3 * (sizeof data.name / sizeof data.name[0]) + 1];
+    intptr_t search = -1;
+    size_t units;
+    int status = 0;
+    int saved;
+
+    if (pattern == NULL) {
+        return -1;
+    }
+    units = wcslen(pattern);
+    if (units == 0) {
+        errno = ENOENT;
+    } else {
+        if (pattern[units - 1] != L'/' && pattern[units - 1] != L'\\') {
+            pattern[units++] = L'\\';
+        }
+        pattern[units++] = L'*';
+        pattern[units] = 0;
+        search = _wfindfirst64(pattern, &data);
+    }
+    release(pattern);
+    if (search == -1) {
+        return -1;
+    }
+    do {
+        size_t written =
+            utf8_of(data.name, wcslen(data.name), name, sizeof name);
+        if (each(context, (const unsigned char *)name, written) != 0) {
+            status = -1;
+            break;
+        }
+    } while (_wfindnext64(search, &data) == 0);
+    /* The search ends with ENOENT when no entry is left. */
+    if (status == 0 && errno != ENOENT) {
+        status = -1;
+    }
+    saved = errno;
+    _findclose(search);
+    errno = saved;
+    return status;
+}
+
 void *anti_rt_library_open(const char *path)
 {
-    wchar_t *wide = wide_of(path);
+    wchar_t *wide = wide_of(path, 0);
     HMODULE handle;
 
     if (wide == NULL) {
@@ -386,7 +538,9 @@ const char *anti_rt_library_error(char *text, size_t size)
     return text;
 }
 
-const void *anti_rt_library_image(const void *address)
+/* The module that holds the byte at address, as the loader knows it, or
+   NULL outside every module. */
+static HMODULE module_holding(const void *address)
 {
     HMODULE module = NULL;
 
@@ -396,6 +550,264 @@ const void *anti_rt_library_image(const void *address)
         return NULL;
     }
     return module;
+}
+
+const void *anti_rt_library_image(const void *address)
+{
+    return module_holding(address);
+}
+
+/* DESIGN: the x64 convention of Windows keeps no chain of frame pointers
+   through C code. The walk takes the unwind data instead, which antic
+   writes for every function and the C compiler for its own. The names
+   come from DbgHelp, which reads the PDB that every Windows link
+   writes.
+
+   The walk unwinds one frame at a time with RtlVirtualUnwind.
+   RtlCaptureStackBackTrace follows the chain of frame records on ARM64.
+   A C function that builds no record, as anti_rt_trace_walk, then hides
+   the frame of its caller. A frame without unwind data ends the walk, and
+   so does one that does not move up the stack. */
+int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip)
+{
+    CONTEXT context;
+    int64_t count = 0;
+    int64_t depth;
+
+    if (room > 64) {
+        room = 64;
+    }
+    if (room <= 0 || skip < 0 || skip > 1000) {
+        return 0;
+    }
+    RtlCaptureContext(&context);
+    /* The first frame is the one of anti_rt_trace_walk, which the trace
+       leaves out. */
+    for (depth = 0; count < room; depth++) {
+#if defined(_M_ARM64)
+        DWORD64 pc = context.Pc;
+        DWORD64 sp = context.Sp;
+#else
+        DWORD64 pc = context.Rip;
+        DWORD64 sp = context.Rsp;
+#endif
+        DWORD64 base = 0;
+        PVOID data = NULL;
+        DWORD64 establisher = 0;
+        PRUNTIME_FUNCTION entry;
+
+        if (pc == 0) {
+            break;
+        }
+        if (depth > skip) {
+            into[count++] = (uint64_t)pc;
+        }
+        entry = RtlLookupFunctionEntry(pc, &base, NULL);
+        if (entry == NULL) {
+            break;
+        }
+        RtlVirtualUnwind(UNW_FLAG_NHANDLER, base, pc, entry, &context, &data,
+                         &establisher, NULL);
+#if defined(_M_ARM64)
+        if (context.Sp <= sp) {
+            break;
+        }
+#else
+        if (context.Rsp <= sp) {
+            break;
+        }
+#endif
+    }
+    return count;
+}
+
+/* DESIGN: a static library for C has no notice, so the runtime names
+   `anti_licenses` without needing it. COFF names a default that the
+   linker takes when nothing defines the notice. */
+const char anti_rt_no_licenses[1] = {0};
+#pragma comment(linker, "/alternatename:anti_licenses=anti_rt_no_licenses")
+extern const char anti_licenses[];
+
+/* The runtime reads its own notice by the name above, and the loader
+   gives the notice of every other module by its export. */
+bool anti_rt_module_at(uint64_t address, struct anti_rt_module *out)
+{
+    HMODULE module = module_holding((const void *)(uintptr_t)address);
+    wchar_t name[1024];
+    DWORD n;
+
+    out->format = ANTI_RT_IMAGE_PE;
+    out->base = 0;
+    out->headers = NULL;
+    out->header_count = 0;
+    out->notice_read = false;
+    out->notice = NULL;
+    out->path[0] = '\0';
+    if (module == NULL) {
+        return false;
+    }
+    out->base = (uint64_t)(uintptr_t)module;
+    n = GetModuleFileNameW(module, name, 1024);
+    if (n > 0 && n < 1024) {
+        utf8_of(name, n, out->path, sizeof out->path);
+    }
+    out->notice_read = true;
+    if (module ==
+        module_holding((const void *)(uintptr_t)anti_rt_trace_walk)) {
+        out->notice = anti_licenses;
+    } else {
+        out->notice = anti_rt_library_symbol(module, "anti_licenses");
+    }
+    return true;
+}
+
+typedef BOOL(WINAPI *sym_initialize)(HANDLE, PCSTR, BOOL);
+typedef DWORD(WINAPI *sym_set_options)(DWORD);
+typedef BOOL(WINAPI *sym_from_addr)(HANDLE, DWORD64, PDWORD64, PSYMBOL_INFO);
+typedef BOOL(WINAPI *sym_line)(HANDLE, DWORD64, PDWORD, PIMAGEHLP_LINE64);
+typedef BOOL(WINAPI *sym_search_path)(HANDLE, PWSTR, DWORD);
+typedef BOOL(WINAPI *sym_set_search_path)(HANDLE, PCWSTR);
+
+/* DbgHelp serves one thread at a time, so ANTI_RT_LOCK_DEBUG covers
+   every call and the state below. */
+static bool help_tried;
+static sym_from_addr help_from_addr;
+static sym_line help_line;
+static sym_search_path help_get_path;
+static sym_set_search_path help_set_path;
+
+/* The modules whose directory the search path of DbgHelp holds. The
+   record in an executable names its PDB by file name alone. DbgHelp looks
+   for it in the working directory of the process and not beside the
+   module. */
+#define SEARCHED_MAX 32
+static uint64_t searched[SEARCHED_MAX];
+static size_t searched_count;
+
+static void open_help(void)
+{
+    HMODULE help = LoadLibraryW(L"dbghelp.dll");
+    sym_initialize initialize;
+    sym_set_options options;
+
+    help_tried = true;
+    if (help == NULL) {
+        return;
+    }
+    initialize = (sym_initialize)(void (*)(void))GetProcAddress(
+        help, "SymInitialize");
+    options = (sym_set_options)(void (*)(void))GetProcAddress(
+        help, "SymSetOptions");
+    if (initialize == NULL || options == NULL) {
+        return;
+    }
+    options(SYMOPT_LOAD_LINES | SYMOPT_DEFERRED_LOADS);
+    if (!initialize(GetCurrentProcess(), NULL, TRUE)) {
+        return;
+    }
+    help_from_addr = (sym_from_addr)(void (*)(void))GetProcAddress(
+        help, "SymFromAddr");
+    help_line = (sym_line)(void (*)(void))GetProcAddress(
+        help, "SymGetLineFromAddr64");
+    help_get_path = (sym_search_path)(void (*)(void))GetProcAddress(
+        help, "SymGetSearchPathW");
+    help_set_path = (sym_set_search_path)(void (*)(void))GetProcAddress(
+        help, "SymSetSearchPathW");
+}
+
+/* Put the directory of the module at base on the search path, before
+   DbgHelp loads the symbols of that module. */
+static void search_module(uint64_t base)
+{
+    wchar_t path[4096];
+    wchar_t file[1024];
+    size_t length;
+    size_t used;
+    size_t i;
+    DWORD n;
+
+    for (i = 0; i < searched_count; i++) {
+        if (searched[i] == base) {
+            return;
+        }
+    }
+    if (searched_count == SEARCHED_MAX || help_get_path == NULL ||
+        help_set_path == NULL) {
+        return;
+    }
+    searched[searched_count++] = base;
+    n = GetModuleFileNameW((HMODULE)(uintptr_t)base, file, 1024);
+    if (n == 0 || n >= 1024) {
+        return;
+    }
+    length = n;
+    while (length > 0 && file[length - 1] != L'\\' &&
+           file[length - 1] != L'/') {
+        length--;
+    }
+    if (length > 0) {
+        length--;
+    }
+    if (length == 0 ||
+        !help_get_path(GetCurrentProcess(), path, (DWORD)(sizeof path /
+                                                           sizeof path[0]))) {
+        return;
+    }
+    used = wcslen(path);
+    if (used + 1 + length + 1 > sizeof path / sizeof path[0]) {
+        return;
+    }
+    if (used > 0) {
+        path[used++] = L';';
+    }
+    memcpy(path + used, file, length * sizeof file[0]);
+    path[used + length] = 0;
+    help_set_path(GetCurrentProcess(), path);
+}
+
+/* A name or a file that does not fit its room is left empty. */
+void anti_rt_debug_lookup(uint64_t address, uint64_t base,
+                          struct anti_rt_debug_answer *out)
+{
+    union {
+        SYMBOL_INFO info;
+        char room[sizeof(SYMBOL_INFO) + ANTI_RT_SYMBOL_ROOM];
+    } symbol;
+    IMAGEHLP_LINE64 line;
+    DWORD64 displacement = 0;
+    DWORD column = 0;
+
+    out->function[0] = '\0';
+    out->file[0] = '\0';
+    out->line = 0;
+    anti_rt_lock_hold(ANTI_RT_LOCK_DEBUG);
+    if (!help_tried) {
+        open_help();
+    }
+    if (base != 0) {
+        search_module(base);
+    }
+    memset(&symbol, 0, sizeof symbol);
+    symbol.info.SizeOfStruct = sizeof(SYMBOL_INFO);
+    symbol.info.MaxNameLen = ANTI_RT_SYMBOL_ROOM - 1;
+    if (help_from_addr != NULL &&
+        help_from_addr(GetCurrentProcess(), (DWORD64)address, &displacement,
+                       &symbol.info)) {
+        size_t n = strnlen(symbol.info.Name, symbol.info.NameLen);
+        if (n < sizeof out->function) {
+            memcpy(out->function, symbol.info.Name, n);
+            out->function[n] = '\0';
+        }
+    }
+    memset(&line, 0, sizeof line);
+    line.SizeOfStruct = sizeof line;
+    if (help_line != NULL &&
+        help_line(GetCurrentProcess(), (DWORD64)address, &column, &line) &&
+        line.FileName != NULL && strlen(line.FileName) < sizeof out->file) {
+        memcpy(out->file, line.FileName, strlen(line.FileName) + 1);
+        out->line = (int64_t)line.LineNumber;
+    }
+    anti_rt_lock_release(ANTI_RT_LOCK_DEBUG);
 }
 
 /* The function both handlers below call. It is set once, under

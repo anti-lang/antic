@@ -5,15 +5,9 @@
    of that module and its load base. It reads nothing from a file.
    Symbolising reads the symbol table and the line table. It runs only
    when a program asks for the names, so an error that is handled costs
-   the walk alone. */
-/* pthread_getattr_np, dl_iterate_phdr and readlink sit behind feature
-   macros, which the two systems spell differently. */
-#if defined(__APPLE__)
-#define _DARWIN_C_SOURCE
-#elif !defined(_WIN32)
-#define _GNU_SOURCE
-#endif
-
+   the walk alone. The walk and the module of an address are calls of
+   the platform layer, and the format of the module chooses the reader
+   of its tables here. */
 #include "trace.h"
 
 #include <inttypes.h>
@@ -22,21 +16,9 @@
 #include <string.h>
 
 #include "license.h"
+#include "platform.h"
 #include "rt.h"
 #include "symbols.h"
-
-#if defined(_WIN32)
-#include <windows.h>
-#include <DbgHelp.h>
-#include "utf.h"
-#else
-#include <dlfcn.h>
-#include <pthread.h>
-#include <unistd.h>
-#if !defined(__APPLE__)
-#include <link.h>
-#endif
-#endif
 
 static struct anti_text text_of(const char *s)
 {
@@ -57,30 +39,25 @@ static struct anti_text text_part(const char *s, size_t n)
 }
 
 /* The texts a lookup makes, kept for the life of the program so a frame
-   may point at them. Equal texts are kept once. */
+   may point at them. Equal texts are kept once. The paths of the modules
+   stand in a list of their own, which every capture searches, and the
+   names and files that symbolising makes in another. Both are guarded by
+   ANTI_RT_LOCK_TRACE_TEXTS. */
 struct kept {
     struct kept *next;
     size_t length;
     char bytes[1];
 };
 
-static struct kept *kept_texts;
-#if defined(_WIN32)
-static SRWLOCK kept_lock = SRWLOCK_INIT;
-#else
-static pthread_mutex_t kept_lock = PTHREAD_MUTEX_INITIALIZER;
-#endif
+static struct kept *kept_names;
+static struct kept *kept_paths;
 
-static struct anti_text keep(const char *s, size_t n)
+static struct anti_text keep_in(struct kept **list, const char *s, size_t n)
 {
     struct kept *k;
 
-#if defined(_WIN32)
-    AcquireSRWLockExclusive(&kept_lock);
-#else
-    pthread_mutex_lock(&kept_lock);
-#endif
-    for (k = kept_texts; k != NULL; k = k->next) {
+    anti_rt_lock_hold(ANTI_RT_LOCK_TRACE_TEXTS);
+    for (k = *list; k != NULL; k = k->next) {
         if (k->length == n && memcmp(k->bytes, s, n) == 0) {
             break;
         }
@@ -91,16 +68,17 @@ static struct anti_text keep(const char *s, size_t n)
             memcpy(k->bytes, s, n);
             k->bytes[n] = 0;
             k->length = n;
-            k->next = kept_texts;
-            kept_texts = k;
+            k->next = *list;
+            *list = k;
         }
     }
-#if defined(_WIN32)
-    ReleaseSRWLockExclusive(&kept_lock);
-#else
-    pthread_mutex_unlock(&kept_lock);
-#endif
+    anti_rt_lock_release(ANTI_RT_LOCK_TRACE_TEXTS);
     return k != NULL ? text_part(k->bytes, k->length) : text_of(NULL);
+}
+
+static struct anti_text keep(const char *s, size_t n)
+{
+    return keep_in(&kept_names, s, n);
 }
 
 /* The name of a function as a person reads it, from the n bytes of its
@@ -128,19 +106,6 @@ static struct anti_text function_name(const char *s, size_t n, bool stable)
     return t;
 }
 
-/* DESIGN: a static library for C has no notice, so the runtime names
-   `anti_licenses` without needing it. ELF takes a weak reference, which
-   is 0 without a definition. COFF names a default that the linker takes
-   when nothing defines the notice. Mach-O reads the symbol from the table
-   of the image at run time, as it does for every other image. */
-#if defined(_WIN32)
-const char anti_rt_no_licenses[1] = {0};
-#pragma comment(linker, "/alternatename:anti_licenses=anti_rt_no_licenses")
-extern const char anti_licenses[];
-#elif !defined(__APPLE__)
-extern const char anti_licenses[] __attribute__((weak));
-#endif
-
 /* The build id of a notice, the digits of its line `build <id>` after
    the begin marker, or an empty text. No byte at or past room is read,
    and a notice of this program or of a table in memory passes
@@ -162,11 +127,11 @@ static struct anti_text notice_id(const char *notice, size_t room)
     return text_part(notice + sizeof head - 1, at - (sizeof head - 1));
 }
 
-#if !defined(_WIN32)
 /* DESIGN: the files a symbol lookup reads stay in memory for the life of
    the program. They are the binaries of the modules on Linux and the
    objects of the debug map on macOS, a few of each. A second trace would
-   read them again for nothing. */
+   read them again for nothing. ANTI_RT_LOCK_TRACE_FILES guards them and
+   the build ids of the Mach-O images below. */
 struct loaded {
     char *path;
     uint8_t *bytes;
@@ -177,7 +142,6 @@ enum { LOADED_MAX = 32 };
 
 static struct loaded files[LOADED_MAX];
 static size_t file_count;
-static pthread_mutex_t files_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /* The bytes of the file at path, read whole, or NULL. The relocations of
    a Mach-O object are resolved once, as it is read. */
@@ -186,11 +150,11 @@ static const struct loaded *load(const char *path, bool object)
     const struct loaded *found = NULL;
     size_t i;
 
-    pthread_mutex_lock(&files_lock);
+    anti_rt_lock_hold(ANTI_RT_LOCK_TRACE_FILES);
     for (i = 0; i < file_count; i++) {
         if (strcmp(files[i].path, path) == 0) {
             found = files[i].bytes != NULL ? &files[i] : NULL;
-            pthread_mutex_unlock(&files_lock);
+            anti_rt_lock_release(ANTI_RT_LOCK_TRACE_FILES);
             return found;
         }
     }
@@ -211,76 +175,10 @@ static const struct loaded *load(const char *path, bool object)
         }
         found = l->path != NULL && l->bytes != NULL ? l : NULL;
     }
-    pthread_mutex_unlock(&files_lock);
+    anti_rt_lock_release(ANTI_RT_LOCK_TRACE_FILES);
     return found;
 }
 
-/* The lowest and the highest address of the stack of this thread. */
-static void stack_bounds(uintptr_t *low, uintptr_t *high)
-{
-#if defined(__APPLE__)
-    pthread_t self = pthread_self();
-    *high = (uintptr_t)pthread_get_stackaddr_np(self);
-    *low = *high - pthread_get_stacksize_np(self);
-#else
-    pthread_attr_t attr;
-    void *start;
-    size_t size;
-
-    *low = 0;
-    *high = UINTPTR_MAX;
-    if (pthread_getattr_np(pthread_self(), &attr) == 0) {
-        if (pthread_attr_getstack(&attr, &start, &size) == 0) {
-            *low = (uintptr_t)start;
-            *high = (uintptr_t)start + size;
-        }
-        pthread_attr_destroy(&attr);
-    }
-#endif
-}
-
-/* DESIGN: the walk follows the chain of frame records, which antic keeps
-   in every function on both architectures. A record holds the frame
-   pointer of the caller and the return address. The walk stops at a
-   record outside the stack of the thread and at one that does not move
-   up the stack. It stops at a return address of 0 as well. A C frame
-   without a record then ends the trace rather than the program. */
-int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip)
-{
-    void **fp = __builtin_frame_address(0);
-    uintptr_t low;
-    uintptr_t high;
-    int64_t n = 0;
-
-    stack_bounds(&low, &high);
-    while (fp != NULL && n < room) {
-        uintptr_t at = (uintptr_t)fp;
-        void **next;
-        uintptr_t back;
-        if (at < low || at > high - 2 * sizeof(void *) ||
-            at % sizeof(void *) != 0) {
-            break;
-        }
-        next = fp[0];
-        back = (uintptr_t)fp[1];
-        if (back == 0) {
-            break;
-        }
-        if (skip > 0) {
-            skip--;
-        } else {
-            into[n++] = (uint64_t)back;
-        }
-        if ((uintptr_t)next <= at) {
-            break;
-        }
-        fp = next;
-    }
-    return n;
-}
-#endif
-
-#if defined(__APPLE__)
 /* The distance between where the image lies and where it was linked,
    which is its header against the address of its __TEXT segment. 0 where
    the header names no __TEXT. */
@@ -306,10 +204,10 @@ enum { KNOWN_MAX = 32 };
 static struct known_id known[KNOWN_MAX];
 static size_t known_count;
 
-/* The build id of the image at header, read by the symbol
+/* The build id of the Mach-O image at header, read by the symbol
    `anti_licenses`, which only an Anti binary has. An image of the system
    cache has none, and its table is not read. */
-static struct anti_text image_id(const uint8_t *header)
+static struct anti_text macho_id(const uint8_t *header)
 {
     struct anti_macho_table t;
     struct anti_text id = text_of(NULL);
@@ -318,11 +216,11 @@ static struct anti_text image_id(const uint8_t *header)
     intptr_t slide;
     size_t i;
 
-    pthread_mutex_lock(&files_lock);
+    anti_rt_lock_hold(ANTI_RT_LOCK_TRACE_FILES);
     for (i = 0; i < known_count; i++) {
         if (known[i].header == header) {
             id = known[i].id;
-            pthread_mutex_unlock(&files_lock);
+            anti_rt_lock_release(ANTI_RT_LOCK_TRACE_FILES);
             return id;
         }
     }
@@ -339,64 +237,87 @@ static struct anti_text image_id(const uint8_t *header)
         known[known_count].id = id;
         known_count++;
     }
-    pthread_mutex_unlock(&files_lock);
+    anti_rt_lock_release(ANTI_RT_LOCK_TRACE_FILES);
     return id;
 }
 
-/* The image that holds the byte before the return address, as dyld
-   knows it. false for an address outside every image. */
-static bool image_at(uint64_t address, Dl_info *info)
+/* The build id of an ELF module, read by the symbol `anti_licenses` of
+   its file, which only an Anti binary has. The file on disk may no
+   longer be the one mapped, so the notice is read only inside a loaded
+   segment of the module. */
+static struct anti_text elf_id(const struct anti_rt_module *m)
 {
-    return address != 0 &&
-           dladdr((void *)(uintptr_t)(address - 1), info) != 0 &&
-           info->dli_fbase != NULL;
+    const struct loaded *l = load(m->path, false);
+    uint64_t vaddr;
+    uint64_t room;
+
+    if (l == NULL || !anti_rt_elf_symbol(l->bytes, l->size, "anti_licenses",
+                                         &vaddr)) {
+        return text_of(NULL);
+    }
+    room = anti_rt_elf_loaded_room((const uint8_t *)m->headers,
+                                   m->header_count, vaddr);
+    if (room == 0) {
+        return text_of(NULL);
+    }
+    return notice_id((const char *)(uintptr_t)(m->base + vaddr),
+                     room < SIZE_MAX ? (size_t)room : SIZE_MAX);
+}
+
+/* The build id of the module, from the notice the platform layer found
+   or from the reader of its format. */
+static struct anti_text module_id(const struct anti_rt_module *m)
+{
+    if (m->notice_read) {
+        return notice_id(m->notice, SIZE_MAX);
+    }
+    switch (m->format) {
+    case ANTI_RT_IMAGE_MACHO:
+        return macho_id((const uint8_t *)(uintptr_t)m->base);
+    case ANTI_RT_IMAGE_ELF:
+        return elf_id(m);
+    case ANTI_RT_IMAGE_PE:
+        break;
+    }
+    return text_of(NULL);
 }
 
 void anti_rt_trace_frame(uint64_t address, struct anti_raw_frame *out)
 {
-    Dl_info info;
+    struct anti_rt_module m;
 
     memset(out, 0, sizeof *out);
     out->address = address;
     out->module = text_of(NULL);
     out->build_id = text_of(NULL);
-    if (!image_at(address, &info)) {
+    /* A return address follows the call, so the module is the one of the
+       byte before it, which is the call. */
+    if (address == 0 || !anti_rt_module_at(address - 1, &m)) {
         return;
     }
-    out->module = text_of(info.dli_fname);
-    out->base = (uint64_t)(uintptr_t)info.dli_fbase;
-    out->build_id = image_id(info.dli_fbase);
+    out->module = keep_in(&kept_paths, m.path, strlen(m.path));
+    out->base = m.base;
+    out->build_id = module_id(&m);
 }
 
-void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
-                             struct anti_frame *out)
+/* The function and the line of address in the Mach-O image at header,
+   from its symbol table in memory and the objects of its debug map. */
+static void symbolize_macho(const uint8_t *header, uint64_t address,
+                            struct anti_frame *out)
 {
     struct anti_macho_table t;
     struct anti_found found;
-    const uint8_t *header;
-    Dl_info info;
     const char *object;
     const char *symbol;
     uint64_t start;
     uint64_t vaddr;
-    intptr_t slide;
+    intptr_t slide = image_slide(header);
 
-    memset(out, 0, sizeof *out);
     memset(&found, 0, sizeof found);
-    out->address = frame->address;
-    out->function = text_of(NULL);
-    out->file = text_of(NULL);
-    if (!image_at(frame->address, &info)) {
-        return;
-    }
-    header = info.dli_fbase;
-    slide = image_slide(header);
     if (!anti_rt_macho_table(header, SIZE_MAX, true, slide, &t)) {
         return;
     }
-    /* A return address follows the call, so the lookup takes the byte
-       before it, which is the call and names its line. */
-    vaddr = frame->address - 1 - (uint64_t)slide;
+    vaddr = address - (uint64_t)slide;
     if (anti_rt_macho_function(&t, vaddr, &found)) {
         out->function = function_name(found.function, found.function_length,
                                        true);
@@ -411,145 +332,20 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
         }
     }
 }
-#elif !defined(_WIN32)
-/* The path of the program, which the list of modules gives no name. */
-static char program_path[4096];
-static pthread_once_t program_once = PTHREAD_ONCE_INIT;
 
-static void read_program_path(void)
-{
-    ssize_t n = readlink("/proc/self/exe", program_path,
-                         sizeof program_path - 1);
-
-    program_path[n > 0 ? n : 0] = 0;
-}
-
-/* anti_rt_elf_loaded_room reads the program headers as the 56 bytes of
-   the 64-bit form, which every Linux target has. */
-_Static_assert(sizeof(ElfW(Phdr)) == 56, "a program header is 56 bytes");
-
-/* The module an address lies in, as the list of modules gives it. */
-struct module_of {
-    uintptr_t address;
-    const char *name;
-    uintptr_t bias;
-    const ElfW(Phdr) *headers;      /* read by anti_rt_elf_loaded_room */
-    size_t header_count;
-    size_t visited;
-    bool found;
-    bool program;
-};
-
-static int visit_module(struct dl_phdr_info *info, size_t size, void *context)
-{
-    struct module_of *m = context;
-    int i;
-
-    (void)size;
-    m->visited++;
-    for (i = 0; i < info->dlpi_phnum; i++) {
-        const ElfW(Phdr) *p = &info->dlpi_phdr[i];
-        uintptr_t from = info->dlpi_addr + p->p_vaddr;
-        if (p->p_type == PT_LOAD && m->address >= from &&
-            m->address - from < p->p_memsz) {
-            m->name = info->dlpi_name;
-            m->bias = info->dlpi_addr;
-            m->headers = info->dlpi_phdr;
-            m->header_count = info->dlpi_phnum;
-            m->found = true;
-            m->program = m->visited == 1;
-            return 1;
-        }
-    }
-    return 0;
-}
-
-/* The module of address with its path, where the program itself has the
-   path of its executable. dl_iterate_phdr visits the program first. glibc
-   names it with an empty text and musl `/proc/self/exe` in a static
-   program, so its path is read from that link. */
-static bool module_at(uintptr_t address, struct module_of *m)
-{
-    memset(m, 0, sizeof *m);
-    m->address = address;
-    dl_iterate_phdr(visit_module, m);
-    if (m->found && m->program) {
-        pthread_once(&program_once, read_program_path);
-        m->name = program_path;
-    }
-    return m->found;
-}
-
-/* The build id of the module. The one of this runtime reads its own
-   notice. Another one is read by the symbol `anti_licenses` of its file,
-   which only an Anti binary has. The file on disk may no longer be the
-   one mapped, so the notice is read only inside a loaded segment of the
-   module. */
-static struct anti_text module_id(const struct module_of *m)
-{
-    struct module_of self;
-    const struct loaded *l;
-    uint64_t vaddr;
-    uint64_t room;
-
-    if (module_at((uintptr_t)anti_rt_trace_walk, &self) &&
-        self.bias == m->bias) {
-        return notice_id(anti_licenses, SIZE_MAX);
-    }
-    l = load(m->name, false);
-    if (l == NULL || !anti_rt_elf_symbol(l->bytes, l->size, "anti_licenses",
-                                         &vaddr)) {
-        return text_of(NULL);
-    }
-    room = anti_rt_elf_loaded_room((const uint8_t *)m->headers,
-                                   m->header_count, vaddr);
-    if (room == 0) {
-        return text_of(NULL);
-    }
-    return notice_id((const char *)(m->bias + (uintptr_t)vaddr),
-                     room < SIZE_MAX ? (size_t)room : SIZE_MAX);
-}
-
-void anti_rt_trace_frame(uint64_t address, struct anti_raw_frame *out)
-{
-    struct module_of m;
-
-    memset(out, 0, sizeof *out);
-    out->address = address;
-    out->module = text_of(NULL);
-    out->build_id = text_of(NULL);
-    if (address == 0 || !module_at((uintptr_t)address - 1, &m)) {
-        return;
-    }
-    out->module = text_of(m.name);
-    out->base = (uint64_t)m.bias;
-    out->build_id = module_id(&m);
-}
-
-void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
-                             struct anti_frame *out)
+/* The function and the line of address in the ELF module, from the
+   tables of its file. */
+static void symbolize_elf(const struct anti_rt_module *m, uint64_t address,
+                          struct anti_frame *out)
 {
     struct anti_found found;
-    struct module_of m;
-    const struct loaded *l;
-    uint64_t vaddr;
+    const struct loaded *l = load(m->path, false);
+    uint64_t vaddr = address - m->base;
 
-    memset(out, 0, sizeof *out);
     memset(&found, 0, sizeof found);
-    out->address = frame->address;
-    out->function = text_of(NULL);
-    out->file = text_of(NULL);
-    if (frame->address == 0 ||
-        !module_at((uintptr_t)frame->address - 1, &m)) {
-        return;
-    }
-    l = load(m.name, false);
     if (l == NULL) {
         return;
     }
-    /* A return address follows the call, so the lookup takes the byte
-       before it, which is the call and names its line. */
-    vaddr = frame->address - 1 - (uint64_t)m.bias;
     if (anti_rt_elf_function(l->bytes, l->size, vaddr, &found)) {
         out->function = function_name(found.function, found.function_length,
                                        true);
@@ -560,284 +356,56 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
         out->line = found.line;
     }
 }
-#else
-/* DESIGN: the x64 convention of Windows keeps no chain of frame pointers
-   through C code. The walk takes the unwind data instead, which antic
-   writes for every function and the C compiler for its own. The names
-   come from DbgHelp, which reads the PDB that every Windows link
-   writes.
 
-   The walk unwinds one frame at a time with RtlVirtualUnwind.
-   RtlCaptureStackBackTrace follows the chain of frame records on ARM64.
-   A C function that builds no record, as anti_rt_trace_walk, then hides
-   the frame of its caller. A frame without unwind data ends the walk, and
-   so does one that does not move up the stack. */
-int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip)
+/* The function and the line of address from the debugger library of the
+   system, which reads the PDB. A name of C++ is demangled. */
+static void symbolize_pe(const struct anti_rt_module *m, uint64_t address,
+                         struct anti_frame *out)
 {
-    CONTEXT context;
-    int64_t count = 0;
-    int64_t depth;
+    struct anti_rt_debug_answer answer;
+    char name[ANTI_RT_SYMBOL_ROOM];
 
-    if (room > 64) {
-        room = 64;
+    anti_rt_debug_lookup(address, m->base, &answer);
+    if (answer.function[0] != '\0') {
+        size_t n = strlen(answer.function);
+        size_t named =
+            anti_rt_coff_demangle(answer.function, n, name, sizeof name);
+        out->function = named > 0 ? function_name(name, named, false)
+                                  : function_name(answer.function, n, false);
     }
-    if (room <= 0 || skip < 0 || skip > 1000) {
-        return 0;
+    if (answer.file[0] != '\0') {
+        out->file = keep(answer.file, strlen(answer.file));
+        out->line = answer.line;
     }
-    RtlCaptureContext(&context);
-    /* The first frame is the one of anti_rt_trace_walk, which the trace
-       leaves out. */
-    for (depth = 0; count < room; depth++) {
-#if defined(_M_ARM64)
-        DWORD64 pc = context.Pc;
-        DWORD64 sp = context.Sp;
-#else
-        DWORD64 pc = context.Rip;
-        DWORD64 sp = context.Rsp;
-#endif
-        DWORD64 base = 0;
-        PVOID data = NULL;
-        DWORD64 establisher = 0;
-        PRUNTIME_FUNCTION entry;
-
-        if (pc == 0) {
-            break;
-        }
-        if (depth > skip) {
-            into[count++] = (uint64_t)pc;
-        }
-        entry = RtlLookupFunctionEntry(pc, &base, NULL);
-        if (entry == NULL) {
-            break;
-        }
-        RtlVirtualUnwind(UNW_FLAG_NHANDLER, base, pc, entry, &context, &data,
-                         &establisher, NULL);
-#if defined(_M_ARM64)
-        if (context.Sp <= sp) {
-            break;
-        }
-#else
-        if (context.Rsp <= sp) {
-            break;
-        }
-#endif
-    }
-    return count;
-}
-
-/* The module that holds the byte before the return address, as the
-   loader knows it. NULL for an address outside every module. */
-static HMODULE module_at(uint64_t address)
-{
-    HMODULE module = NULL;
-
-    if (address == 0 ||
-        !GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                                GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                            (LPCWSTR)(uintptr_t)(address - 1), &module)) {
-        return NULL;
-    }
-    return module;
-}
-
-void anti_rt_trace_frame(uint64_t address, struct anti_raw_frame *out)
-{
-    HMODULE module = module_at(address);
-    HMODULE self = NULL;
-    wchar_t name[1024];
-    uint16_t units[1024];
-    unsigned char bytes[3 * 1024 + 1];
-    DWORD n;
-    DWORD i;
-    FARPROC notice;
-
-    memset(out, 0, sizeof *out);
-    out->address = address;
-    out->module = text_of(NULL);
-    out->build_id = text_of(NULL);
-    if (module == NULL) {
-        return;
-    }
-    out->base = (uint64_t)(uintptr_t)module;
-    n = GetModuleFileNameW(module, name, 1024);
-    if (n > 0 && n < 1024) {
-        for (i = 0; i < n; i++) {
-            units[i] = (uint16_t)name[i];
-        }
-        out->module = keep((const char *)bytes,
-                           anti_rt_utf16_to_utf8(units, n, bytes));
-    }
-    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                           GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                       (LPCWSTR)(uintptr_t)anti_rt_trace_walk, &self);
-    if (module == self) {
-        out->build_id = notice_id(anti_licenses, SIZE_MAX);
-        return;
-    }
-    notice = GetProcAddress(module, "anti_licenses");
-    if (notice != NULL) {
-        out->build_id = notice_id((const char *)(uintptr_t)notice, SIZE_MAX);
-    }
-}
-
-typedef BOOL(WINAPI *sym_initialize)(HANDLE, PCSTR, BOOL);
-typedef DWORD(WINAPI *sym_set_options)(DWORD);
-typedef BOOL(WINAPI *sym_from_addr)(HANDLE, DWORD64, PDWORD64, PSYMBOL_INFO);
-typedef BOOL(WINAPI *sym_line)(HANDLE, DWORD64, PDWORD, PIMAGEHLP_LINE64);
-typedef BOOL(WINAPI *sym_search_path)(HANDLE, PWSTR, DWORD);
-typedef BOOL(WINAPI *sym_set_search_path)(HANDLE, PCWSTR);
-
-/* DbgHelp serves one thread at a time, so one lock covers every call. */
-static SRWLOCK help_lock = SRWLOCK_INIT;
-static bool help_tried;
-static sym_from_addr help_from_addr;
-static sym_line help_line;
-static sym_search_path help_get_path;
-static sym_set_search_path help_set_path;
-
-/* The modules whose directory the search path of DbgHelp holds. The
-   record in an executable names its PDB by file name alone. DbgHelp looks
-   for it in the working directory of the process and not beside the
-   module. */
-#define SEARCHED_MAX 32
-static uint64_t searched[SEARCHED_MAX];
-static size_t searched_count;
-
-static void open_help(void)
-{
-    HMODULE help = LoadLibraryW(L"dbghelp.dll");
-    sym_initialize initialize;
-    sym_set_options options;
-
-    help_tried = true;
-    if (help == NULL) {
-        return;
-    }
-    initialize = (sym_initialize)(void (*)(void))GetProcAddress(
-        help, "SymInitialize");
-    options = (sym_set_options)(void (*)(void))GetProcAddress(
-        help, "SymSetOptions");
-    if (initialize == NULL || options == NULL) {
-        return;
-    }
-    options(SYMOPT_LOAD_LINES | SYMOPT_DEFERRED_LOADS);
-    if (!initialize(GetCurrentProcess(), NULL, TRUE)) {
-        return;
-    }
-    help_from_addr = (sym_from_addr)(void (*)(void))GetProcAddress(
-        help, "SymFromAddr");
-    help_line = (sym_line)(void (*)(void))GetProcAddress(
-        help, "SymGetLineFromAddr64");
-    help_get_path = (sym_search_path)(void (*)(void))GetProcAddress(
-        help, "SymGetSearchPathW");
-    help_set_path = (sym_set_search_path)(void (*)(void))GetProcAddress(
-        help, "SymSetSearchPathW");
-}
-
-/* Put the directory of the module at base on the search path, before
-   DbgHelp loads the symbols of that module. */
-static void search_module(uint64_t base)
-{
-    wchar_t path[4096];
-    wchar_t file[1024];
-    size_t length;
-    size_t used;
-    size_t i;
-    DWORD n;
-
-    for (i = 0; i < searched_count; i++) {
-        if (searched[i] == base) {
-            return;
-        }
-    }
-    if (searched_count == SEARCHED_MAX || help_get_path == NULL ||
-        help_set_path == NULL) {
-        return;
-    }
-    searched[searched_count++] = base;
-    n = GetModuleFileNameW((HMODULE)(uintptr_t)base, file, 1024);
-    if (n == 0 || n >= 1024) {
-        return;
-    }
-    length = n;
-    while (length > 0 && file[length - 1] != L'\\' &&
-           file[length - 1] != L'/') {
-        length--;
-    }
-    if (length > 0) {
-        length--;
-    }
-    if (length == 0 ||
-        !help_get_path(GetCurrentProcess(), path, (DWORD)(sizeof path /
-                                                           sizeof path[0]))) {
-        return;
-    }
-    used = wcslen(path);
-    if (used + 1 + length + 1 > sizeof path / sizeof path[0]) {
-        return;
-    }
-    if (used > 0) {
-        path[used++] = L';';
-    }
-    memcpy(path + used, file, length * sizeof file[0]);
-    path[used + length] = 0;
-    help_set_path(GetCurrentProcess(), path);
 }
 
 void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
                              struct anti_frame *out)
 {
-    union {
-        SYMBOL_INFO info;
-        char room[sizeof(SYMBOL_INFO) + 512];
-    } symbol;
-    IMAGEHLP_LINE64 line;
-    DWORD64 displacement = 0;
-    DWORD column = 0;
-    DWORD64 pc;
-    HMODULE module;
+    struct anti_rt_module m;
+    uint64_t address = frame->address - 1;
 
     memset(out, 0, sizeof *out);
     out->address = frame->address;
     out->function = text_of(NULL);
     out->file = text_of(NULL);
-    if (frame->address == 0) {
-        return;
-    }
     /* A return address follows the call, so the lookup takes the byte
        before it, which is the call and names its line. */
-    pc = (DWORD64)(frame->address - 1);
-    AcquireSRWLockExclusive(&help_lock);
-    if (!help_tried) {
-        open_help();
+    if (frame->address == 0 || !anti_rt_module_at(address, &m)) {
+        return;
     }
-    module = module_at(frame->address);
-    if (module != NULL) {
-        search_module((uint64_t)(uintptr_t)module);
+    switch (m.format) {
+    case ANTI_RT_IMAGE_MACHO:
+        symbolize_macho((const uint8_t *)(uintptr_t)m.base, address, out);
+        break;
+    case ANTI_RT_IMAGE_ELF:
+        symbolize_elf(&m, address, out);
+        break;
+    case ANTI_RT_IMAGE_PE:
+        symbolize_pe(&m, address, out);
+        break;
     }
-    memset(&symbol, 0, sizeof symbol);
-    symbol.info.SizeOfStruct = sizeof(SYMBOL_INFO);
-    symbol.info.MaxNameLen = 512;
-    if (help_from_addr != NULL &&
-        help_from_addr(GetCurrentProcess(), pc, &displacement, &symbol.info)) {
-        size_t n = strnlen(symbol.info.Name, symbol.info.NameLen);
-        char name[512];
-        size_t named = anti_rt_coff_demangle(symbol.info.Name, n, name,
-                                             sizeof name);
-        out->function = named > 0 ? function_name(name, named, false)
-                                  : function_name(symbol.info.Name, n, false);
-    }
-    memset(&line, 0, sizeof line);
-    line.SizeOfStruct = sizeof line;
-    if (help_line != NULL &&
-        help_line(GetCurrentProcess(), pc, &column, &line) &&
-        line.FileName != NULL) {
-        out->file = keep(line.FileName, strlen(line.FileName));
-        out->line = (int64_t)line.LineNumber;
-    }
-    ReleaseSRWLockExclusive(&help_lock);
 }
-#endif
 
 /* A text that grows, for the text of a trace. It turns NULL when the
    memory runs out. */

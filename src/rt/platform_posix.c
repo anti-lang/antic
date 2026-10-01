@@ -1,24 +1,30 @@
 /* The platform layer on macOS and Linux. See platform.h. */
 #if !defined(_WIN32)
 
-/* clock_gettime, nanosleep, dladdr, sysconf and syscall sit behind a
-   feature macro, and the two systems spell it differently. */
+/* clock_gettime, nanosleep, dladdr, sysconf, syscall, fseeko,
+   pthread_getattr_np, dl_iterate_phdr and readlink sit behind a feature
+   macro, and the two systems spell it differently. */
 #if defined(__APPLE__)
 #define _DARWIN_C_SOURCE
 #else
 #define _GNU_SOURCE
 #endif
 
+#include <dirent.h>
 #include <dlfcn.h>
+#include <errno.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 #if defined(__APPLE__)
 #include <os/lock.h>
 #else
+#include <link.h>
 #include <sys/random.h>
 #include <sys/syscall.h>
 #endif
@@ -64,6 +70,7 @@ struct anti_rt_monitor {
      {PTHREAD_COND_INITIALIZER, PTHREAD_COND_INITIALIZER}}
 
 static struct anti_rt_monitor monitors[] = {
+    MONITOR_INIT, MONITOR_INIT, MONITOR_INIT,
     MONITOR_INIT, MONITOR_INIT, MONITOR_INIT,
     MONITOR_INIT, MONITOR_INIT, MONITOR_INIT,
 };
@@ -271,6 +278,73 @@ const char *anti_rt_path_last_separator(const char *path)
     return strrchr(path, '/');
 }
 
+FILE *anti_rt_file_open(const char *path, int writing)
+{
+    return fopen(path, writing != 0 ? "wb" : "rb");
+}
+
+int64_t anti_rt_file_tell(FILE *file)
+{
+    return (int64_t)ftello(file);
+}
+
+int anti_rt_file_seek(FILE *file, int64_t offset, int whence)
+{
+    return fseeko(file, (off_t)offset, whence) == 0 ? 0 : -1;
+}
+
+int anti_rt_file_is_directory(FILE *file)
+{
+    struct stat info;
+
+    return fstat(fileno(file), &info) == 0 && S_ISDIR(info.st_mode) ? 1 : 0;
+}
+
+int anti_rt_file_remove(const char *path)
+{
+    return remove(path) == 0 ? 0 : -1;
+}
+
+int anti_rt_file_rename(const char *from, const char *to)
+{
+    return rename(from, to) == 0 ? 0 : -1;
+}
+
+int anti_rt_directory_list(const char *path,
+                           int (*each)(void *context,
+                                       const unsigned char *name,
+                                       size_t length),
+                           void *context)
+{
+    DIR *dir = opendir(path);
+    int status = 0;
+    int saved;
+
+    if (dir == NULL) {
+        return -1;
+    }
+    for (;;) {
+        struct dirent *entry;
+        /* readdir gives NULL at the end and on a failure, and only a
+           failure sets errno. */
+        errno = 0;
+        entry = readdir(dir);
+        if (entry == NULL) {
+            status = errno != 0 ? -1 : 0;
+            break;
+        }
+        if (each(context, (const unsigned char *)entry->d_name,
+                 strlen(entry->d_name)) != 0) {
+            status = -1;
+            break;
+        }
+    }
+    saved = errno;
+    closedir(dir);
+    errno = saved;
+    return status;
+}
+
 void *anti_rt_library_open(const char *path)
 {
     return dlopen(path, RTLD_NOW | RTLD_LOCAL);
@@ -303,6 +377,228 @@ const void *anti_rt_library_image(const void *address)
         return NULL;
     }
     return info.dli_fbase;
+}
+
+/* The lowest and the highest address of the stack of this thread. */
+static void stack_bounds(uintptr_t *low, uintptr_t *high)
+{
+#if defined(__APPLE__)
+    pthread_t self = pthread_self();
+    *high = (uintptr_t)pthread_get_stackaddr_np(self);
+    *low = *high - pthread_get_stacksize_np(self);
+#else
+    pthread_attr_t attr;
+    void *start;
+    size_t size;
+
+    *low = 0;
+    *high = UINTPTR_MAX;
+    if (pthread_getattr_np(pthread_self(), &attr) == 0) {
+        if (pthread_attr_getstack(&attr, &start, &size) == 0) {
+            *low = (uintptr_t)start;
+            *high = (uintptr_t)start + size;
+        }
+        pthread_attr_destroy(&attr);
+    }
+#endif
+}
+
+/* DESIGN: the walk follows the chain of frame records, which antic keeps
+   in every function on both architectures. A record holds the frame
+   pointer of the caller and the return address. The walk stops at a
+   record outside the stack of the thread and at one that does not move
+   up the stack. It stops at a return address of 0 as well. A C frame
+   without a record then ends the trace rather than the program. */
+int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip)
+{
+    void **fp = __builtin_frame_address(0);
+    uintptr_t low;
+    uintptr_t high;
+    int64_t n = 0;
+
+    stack_bounds(&low, &high);
+    while (fp != NULL && n < room) {
+        uintptr_t at = (uintptr_t)fp;
+        void **next;
+        uintptr_t back;
+        if (at < low || at > high - 2 * sizeof(void *) ||
+            at % sizeof(void *) != 0) {
+            break;
+        }
+        next = fp[0];
+        back = (uintptr_t)fp[1];
+        if (back == 0) {
+            break;
+        }
+        if (skip > 0) {
+            skip--;
+        } else {
+            into[n++] = (uint64_t)back;
+        }
+        if ((uintptr_t)next <= at) {
+            break;
+        }
+        fp = next;
+    }
+    return n;
+}
+
+/* Copy name into the path of out, or leave the path empty when it is
+   NULL or does not fit. */
+static void copy_path(struct anti_rt_module *out, const char *name)
+{
+    size_t length = name != NULL ? strlen(name) : 0;
+
+    if (name == NULL || length >= sizeof out->path) {
+        out->path[0] = '\0';
+        return;
+    }
+    memcpy(out->path, name, length + 1);
+}
+
+static void module_init(struct anti_rt_module *out,
+                        enum anti_rt_image_format format)
+{
+    out->format = format;
+    out->base = 0;
+    out->headers = NULL;
+    out->header_count = 0;
+    out->notice_read = false;
+    out->notice = NULL;
+    out->path[0] = '\0';
+}
+
+#if defined(__APPLE__)
+
+/* dyld knows the image of every address. The reader of Mach-O finds the
+   notice of each in the symbol table of its header, so the layer reads
+   none. */
+bool anti_rt_module_at(uint64_t address, struct anti_rt_module *out)
+{
+    Dl_info info;
+
+    module_init(out, ANTI_RT_IMAGE_MACHO);
+    if (dladdr((const void *)(uintptr_t)address, &info) == 0 ||
+        info.dli_fbase == NULL) {
+        return false;
+    }
+    out->base = (uint64_t)(uintptr_t)info.dli_fbase;
+    copy_path(out, info.dli_fname);
+    return true;
+}
+
+#else
+
+/* DESIGN: a static library for C has no notice, so the runtime names
+   `anti_licenses` without needing it. ELF takes a weak reference, which
+   is 0 without a definition. */
+extern const char anti_licenses[] __attribute__((weak));
+
+/* The path of the program, which the list of modules gives no name. */
+static char program_path[ANTI_RT_PATH_ROOM];
+static pthread_once_t program_once = PTHREAD_ONCE_INIT;
+
+static void read_program_path(void)
+{
+    ssize_t n = readlink("/proc/self/exe", program_path,
+                         sizeof program_path - 1);
+
+    program_path[n > 0 ? n : 0] = 0;
+}
+
+/* The reader of ELF takes the program headers as the 56 bytes of the
+   64-bit form, which every Linux target has. */
+_Static_assert(sizeof(ElfW(Phdr)) == 56, "a program header is 56 bytes");
+
+/* The module an address lies in, as the list of modules gives it. */
+struct module_of {
+    uintptr_t address;
+    const char *name;
+    uintptr_t bias;
+    const ElfW(Phdr) *headers;
+    size_t header_count;
+    size_t visited;
+    bool found;
+    bool program;
+};
+
+static int visit_module(struct dl_phdr_info *info, size_t size, void *context)
+{
+    struct module_of *m = context;
+    int i;
+
+    /* dl_iterate_phdr passes the size of info, which only a caller that
+       reads fields past dlpi_phnum needs. */
+    (void)size;
+    m->visited++;
+    for (i = 0; i < info->dlpi_phnum; i++) {
+        const ElfW(Phdr) *p = &info->dlpi_phdr[i];
+        uintptr_t from = info->dlpi_addr + p->p_vaddr;
+        if (p->p_type == PT_LOAD && m->address >= from &&
+            m->address - from < p->p_memsz) {
+            m->name = info->dlpi_name;
+            m->bias = info->dlpi_addr;
+            m->headers = info->dlpi_phdr;
+            m->header_count = info->dlpi_phnum;
+            m->found = true;
+            m->program = m->visited == 1;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static bool find_module(uintptr_t address, struct module_of *m)
+{
+    memset(m, 0, sizeof *m);
+    m->address = address;
+    dl_iterate_phdr(visit_module, m);
+    return m->found;
+}
+
+/* dl_iterate_phdr visits the program first. glibc names it with an empty
+   text and musl `/proc/self/exe` in a static program, so its path is read
+   from that link. The runtime reads its own notice by the weak reference
+   above. The reader of ELF finds the notice of every other module in its
+   file. */
+bool anti_rt_module_at(uint64_t address, struct anti_rt_module *out)
+{
+    struct module_of m;
+    struct module_of self;
+
+    module_init(out, ANTI_RT_IMAGE_ELF);
+    if (!find_module((uintptr_t)address, &m)) {
+        return false;
+    }
+    out->base = (uint64_t)m.bias;
+    out->headers = m.headers;
+    out->header_count = m.header_count;
+    if (m.program) {
+        pthread_once(&program_once, read_program_path);
+        copy_path(out, program_path);
+    } else {
+        copy_path(out, m.name);
+    }
+    if (find_module((uintptr_t)anti_rt_trace_walk, &self) &&
+        self.bias == m.bias) {
+        out->notice_read = true;
+        out->notice = anti_licenses;
+    }
+    return true;
+}
+
+#endif
+
+void anti_rt_debug_lookup(uint64_t address, uint64_t base,
+                          struct anti_rt_debug_answer *out)
+{
+    /* The system has no debugger library, and the address and the base
+       serve the one of Windows alone. */
+    (void)address;
+    (void)base;
+    out->function[0] = '\0';
+    out->file[0] = '\0';
+    out->line = 0;
 }
 
 /* The function the reader calls with each signal of the pipe. It is set
