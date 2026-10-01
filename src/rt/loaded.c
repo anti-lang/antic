@@ -5,25 +5,11 @@
    site of every program reaches it. A program that loads nothing pays
    one load and one compare per object. It links no loader, no digest
    and no reader of an index. */
-/* dladdr sits behind a feature macro, which the two systems spell
-   differently. */
-#if defined(__APPLE__)
-#define _DARWIN_C_SOURCE
-#elif !defined(_WIN32)
-#define _GNU_SOURCE
-#endif
-
 #include "plugin.h"
 
 #include "atomic.h"
+#include "platform.h"
 #include "std.h"
-
-#if defined(_WIN32)
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#include <pthread.h>
-#endif
 
 /* DESIGN: any thread may load and unload a library. Any thread makes
    objects, and the hooks of each look up its library. One lock guards
@@ -32,8 +18,8 @@
 static struct anti_plugin loaded[ANTI_PLUGIN_MAX];
 /* The open libraries. Every hook site reads it, so it is the first
    thing a count asks and the only cost of a program with none. It is
-   atomic and stands outside the lock, so a program with no library open
-   never takes the lock. */
+   atomic and stands outside ANTI_RT_LOCK_PLUGINS, so a program with no
+   library open never takes the lock. */
 static int64_t open_count;
 
 /* DESIGN: the loader of the platform holds a lock of its own while it
@@ -45,35 +31,17 @@ static int64_t open_count;
    it. */
 static _Thread_local int8_t holding;
 
-#if defined(_WIN32)
-static SRWLOCK lock = SRWLOCK_INIT;
-
 void anti_rt_plugin_hold(void)
 {
-    AcquireSRWLockExclusive(&lock);
+    anti_rt_lock_hold(ANTI_RT_LOCK_PLUGINS);
     holding = 1;
 }
 
 void anti_rt_plugin_release(void)
 {
     holding = 0;
-    ReleaseSRWLockExclusive(&lock);
+    anti_rt_lock_release(ANTI_RT_LOCK_PLUGINS);
 }
-#else
-static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-
-void anti_rt_plugin_hold(void)
-{
-    pthread_mutex_lock(&lock);
-    holding = 1;
-}
-
-void anti_rt_plugin_release(void)
-{
-    holding = 0;
-    pthread_mutex_unlock(&lock);
-}
-#endif
 
 int64_t anti_rt_plugin_open(void)
 {
@@ -114,21 +82,7 @@ const void *anti_rt_plugin_image(const void *address)
         anti_rt_fail_abort("anti: the image of an address was asked for "
                            "under the lock of the loaded libraries");
     }
-#if defined(_WIN32)
-    HMODULE module = NULL;
-    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                                GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                            (LPCWSTR)address, &module)) {
-        return NULL;
-    }
-    return module;
-#else
-    Dl_info info;
-    if (dladdr(address, &info) == 0) {
-        return NULL;
-    }
-    return info.dli_fbase;
-#endif
+    return anti_rt_library_image(address);
 }
 
 /* Add delta to the count of live objects of the library the table of a

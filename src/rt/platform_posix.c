@@ -1,21 +1,26 @@
 /* The platform layer on macOS and Linux. See platform.h. */
 #if !defined(_WIN32)
 
-/* clock_gettime, nanosleep and setenv sit behind a feature macro, and
-   the two systems spell it differently. */
+/* clock_gettime, nanosleep, dladdr, sysconf and syscall sit behind a
+   feature macro, and the two systems spell it differently. */
 #if defined(__APPLE__)
 #define _DARWIN_C_SOURCE
 #else
-#define _POSIX_C_SOURCE 200809L
+#define _GNU_SOURCE
 #endif
 
 #include <dlfcn.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#if !defined(__APPLE__)
+#include <unistd.h>
+#if defined(__APPLE__)
+#include <os/lock.h>
+#else
 #include <sys/random.h>
+#include <sys/syscall.h>
 #endif
 
 #include "platform.h"
@@ -49,18 +54,193 @@ const unsigned char *anti_rt_last_error_text(int32_t code)
     return (const unsigned char *)"";
 }
 
-static pthread_mutex_t locks[ANTI_RT_LOCK_COUNT] = {
-    PTHREAD_MUTEX_INITIALIZER
+struct anti_rt_monitor {
+    pthread_mutex_t lock;
+    pthread_cond_t conditions[2];
 };
 
-void anti_rt_lock_hold(enum anti_rt_lock which)
+#define MONITOR_INIT                                                       \
+    {PTHREAD_MUTEX_INITIALIZER,                                            \
+     {PTHREAD_COND_INITIALIZER, PTHREAD_COND_INITIALIZER}}
+
+static struct anti_rt_monitor monitors[] = {
+    MONITOR_INIT, MONITOR_INIT, MONITOR_INIT,
+    MONITOR_INIT, MONITOR_INIT, MONITOR_INIT,
+};
+
+_Static_assert(sizeof monitors / sizeof monitors[0] == ANTI_RT_LOCK_COUNT,
+               "one initializer per name of enum anti_rt_lock");
+
+struct anti_rt_monitor *anti_rt_monitor_of(enum anti_rt_lock which)
 {
-    pthread_mutex_lock(&locks[which]);
+    return &monitors[which];
 }
 
-void anti_rt_lock_release(enum anti_rt_lock which)
+struct anti_rt_monitor *anti_rt_monitor_new(void)
 {
-    pthread_mutex_unlock(&locks[which]);
+    struct anti_rt_monitor *m = malloc(sizeof *m);
+
+    if (m == NULL) {
+        return NULL;
+    }
+    if (pthread_mutex_init(&m->lock, NULL) != 0) {
+        free(m);
+        return NULL;
+    }
+    if (pthread_cond_init(&m->conditions[0], NULL) != 0) {
+        pthread_mutex_destroy(&m->lock);
+        free(m);
+        return NULL;
+    }
+    if (pthread_cond_init(&m->conditions[1], NULL) != 0) {
+        pthread_cond_destroy(&m->conditions[0]);
+        pthread_mutex_destroy(&m->lock);
+        free(m);
+        return NULL;
+    }
+    return m;
+}
+
+void anti_rt_monitor_free(struct anti_rt_monitor *m)
+{
+    pthread_cond_destroy(&m->conditions[1]);
+    pthread_cond_destroy(&m->conditions[0]);
+    pthread_mutex_destroy(&m->lock);
+    free(m);
+}
+
+void anti_rt_monitor_hold(struct anti_rt_monitor *m)
+{
+    pthread_mutex_lock(&m->lock);
+}
+
+void anti_rt_monitor_release(struct anti_rt_monitor *m)
+{
+    pthread_mutex_unlock(&m->lock);
+}
+
+void anti_rt_monitor_wait(struct anti_rt_monitor *m, int condition)
+{
+    pthread_cond_wait(&m->conditions[condition], &m->lock);
+}
+
+void anti_rt_monitor_wake_one(struct anti_rt_monitor *m, int condition)
+{
+    pthread_cond_signal(&m->conditions[condition]);
+}
+
+void anti_rt_monitor_wake_all(struct anti_rt_monitor *m, int condition)
+{
+    pthread_cond_broadcast(&m->conditions[condition]);
+}
+
+#if defined(__APPLE__)
+
+_Static_assert(sizeof(struct anti_rt_word) == sizeof(os_unfair_lock) &&
+                   _Alignof(struct anti_rt_word) == _Alignof(os_unfair_lock),
+               "the word of a Mutex is an os_unfair_lock");
+
+void anti_rt_word_lock(struct anti_rt_word *w)
+{
+    os_unfair_lock_lock((os_unfair_lock_t)w);
+}
+
+void anti_rt_word_unlock(struct anti_rt_word *w)
+{
+    os_unfair_lock_unlock((os_unfair_lock_t)w);
+}
+
+#else
+
+/* The private operations of futex(2), which the headers of musl do not
+   name. */
+#define FUTEX_WAIT_PRIVATE 128
+#define FUTEX_WAKE_PRIVATE 129
+
+/* DESIGN: the word is 0 when free, 1 when held and 2 when held with a
+   thread waiting, the mutex of Drepper's "Futexes Are Tricky". An
+   unlock that finds 2 wakes one waiter, and a free lock costs one
+   compare-and-swap to take and one exchange to give back. */
+void anti_rt_word_lock(struct anti_rt_word *w)
+{
+    uint32_t c = 0;
+
+    if (__atomic_compare_exchange_n(&w->opaque, &c, 1, 0, __ATOMIC_ACQUIRE,
+                                    __ATOMIC_RELAXED)) {
+        return;
+    }
+    if (c != 2) {
+        c = __atomic_exchange_n(&w->opaque, 2, __ATOMIC_ACQUIRE);
+    }
+    while (c != 0) {
+        syscall(SYS_futex, &w->opaque, FUTEX_WAIT_PRIVATE, 2, NULL, NULL, 0);
+        c = __atomic_exchange_n(&w->opaque, 2, __ATOMIC_ACQUIRE);
+    }
+}
+
+void anti_rt_word_unlock(struct anti_rt_word *w)
+{
+    if (__atomic_exchange_n(&w->opaque, 0, __ATOMIC_RELEASE) == 2) {
+        syscall(SYS_futex, &w->opaque, FUTEX_WAKE_PRIVATE, 1, NULL, NULL, 0);
+    }
+}
+
+#endif
+
+/* The body of a thread, on the heap until the thread takes it. */
+struct start {
+    void (*body)(void);
+};
+
+#if defined(__APPLE__)
+/* DESIGN: on macOS the thread-local variables of a thread live in one
+   heap block per image, which dyld allocates on the first access and
+   frees when the thread ends. Taking the address of this variable makes
+   the block of the runtime's image. */
+static _Thread_local char thread_block;
+
+const void *anti_rt_thread_block(void)
+{
+    return &thread_block;
+}
+#else
+const void *anti_rt_thread_block(void)
+{
+    return NULL;
+}
+#endif
+
+static void *thread_main(void *start)
+{
+    void (*body)(void) = ((struct start *)start)->body;
+
+    free(start);
+    body();
+    return NULL;
+}
+
+int anti_rt_thread_start(void (*body)(void))
+{
+    struct start *start = malloc(sizeof *start);
+    pthread_t thread;
+
+    if (start == NULL) {
+        return -1;
+    }
+    start->body = body;
+    if (pthread_create(&thread, NULL, thread_main, start) != 0) {
+        free(start);
+        return -1;
+    }
+    pthread_detach(thread);
+    return 0;
+}
+
+int64_t anti_rt_processors(void)
+{
+    long n = sysconf(_SC_NPROCESSORS_ONLN);
+
+    return n > 0 ? (int64_t)n : 1;
 }
 
 int anti_rt_getenv(const char *name, char **value)
@@ -113,6 +293,73 @@ const char *anti_rt_library_error(char *text, size_t size)
     (void)text;
     (void)size;
     return reason != NULL ? reason : "cannot open the file";
+}
+
+const void *anti_rt_library_image(const void *address)
+{
+    Dl_info info;
+
+    if (dladdr(address, &info) == 0) {
+        return NULL;
+    }
+    return info.dli_fbase;
+}
+
+/* The function the reader calls with each signal of the pipe. It is set
+   once, under ANTI_RT_LOCK_SIGNALS and before the reader starts. A signal
+   number of C fits the byte the handler writes. */
+static int (*deliver_signal)(int64_t sig);
+
+/* Written once, under ANTI_RT_LOCK_SIGNALS and before any handler that
+   reads the write end is installed. */
+static int pipe_ends[2] = {-1, -1};
+
+/* The handler writes one byte and nothing else. Every function it could
+   call beside write is undefined in a handler. */
+static void on_raise(int sig)
+{
+    unsigned char byte = (unsigned char)sig;
+    ssize_t written = write(pipe_ends[1], &byte, 1);
+
+    /* A write that fails loses the signal, and a handler can do nothing
+       else about it. */
+    (void)written;
+}
+
+static void signal_reader(void)
+{
+    unsigned char byte;
+
+    while (read(pipe_ends[0], &byte, 1) == 1) {
+        deliver_signal((int64_t)byte);
+    }
+}
+
+/* A pipe whose reader did not start is closed, so a later call starts
+   afresh. */
+int anti_rt_signal_route(int (*deliver)(int64_t sig))
+{
+    if (deliver_signal != NULL) {
+        return 0;
+    }
+    if (pipe(pipe_ends) != 0) {
+        return -1;
+    }
+    deliver_signal = deliver;
+    if (anti_rt_thread_start(signal_reader) != 0) {
+        deliver_signal = NULL;
+        close(pipe_ends[0]);
+        close(pipe_ends[1]);
+        pipe_ends[0] = -1;
+        pipe_ends[1] = -1;
+        return -1;
+    }
+    return 0;
+}
+
+void anti_rt_signal_catch(int64_t sig)
+{
+    signal((int)sig, on_raise);
 }
 
 int anti_rt_entropy(void *out, size_t count)

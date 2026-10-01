@@ -22,7 +22,8 @@ channels.
   place that holds a Mutex is refused whatever the value. A copy of an object
   writes a free lock in each Mutex field and in the hidden lock.
 - `sync` takes the address of its Mutex, so the operand is a place or a pointer.
-  `src/rt/lock.c` holds the lock of each system.
+  `anti_rt_word_lock` of the platform layer holds the lock of each system, and
+  `src/rt/lock.c` calls it.
 
 ## Synchronized classes
 

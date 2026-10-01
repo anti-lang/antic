@@ -2,7 +2,9 @@
    checks the steps of a long sleep and the environment in full length
    and in UTF-8. It also checks the path rules every system shares, the
    forms of a Windows path, the clocks, the entropy and a library opened
-   from a path outside ASCII. */
+   from a path outside ASCII. Then the locks, the condition variables,
+   the threads and the word of a Mutex across threads it starts, and the
+   image an address lies in. */
 #if defined(__APPLE__)
 #define _DARWIN_C_SOURCE
 #elif !defined(_WIN32)
@@ -174,6 +176,114 @@ static void library_outside_ascii(void)
     CHECK(strlen(anti_rt_library_error(text, sizeof text)) > 0);
 }
 
+/* The state the threads below share. stage moves 0, 1, 2 under the
+   lock of the monitor, and each side waits on its own condition. */
+enum { TO_THREAD, TO_MAIN };
+enum { ROUNDS = 20000 };
+
+static struct anti_rt_monitor *shared;
+static int stage;
+static struct anti_rt_word word;
+static int64_t counted;
+
+static void counter(void)
+{
+    int64_t i;
+
+    for (i = 0; i < ROUNDS; i++) {
+        anti_rt_word_lock(&word);
+        counted++;
+        anti_rt_word_unlock(&word);
+    }
+    anti_rt_monitor_hold(shared);
+    stage++;
+    anti_rt_monitor_wake_all(shared, TO_MAIN);
+    anti_rt_monitor_release(shared);
+}
+
+static void answer(void)
+{
+    anti_rt_monitor_hold(shared);
+    while (stage == 0) {
+        anti_rt_monitor_wait(shared, TO_THREAD);
+    }
+    stage = 2;
+    anti_rt_monitor_wake_one(shared, TO_MAIN);
+    anti_rt_monitor_release(shared);
+}
+
+/* A thread waits on one condition until main wakes it, and main waits on
+   the other until it answers. Two threads count under the word of a
+   Mutex beside main, and none of the counts is lost. A named lock holds
+   and gives back. */
+static void locks_and_threads(void)
+{
+    int64_t i;
+
+    CHECK(anti_rt_processors() >= 1);
+#if defined(__APPLE__)
+    CHECK(anti_rt_thread_block() != NULL);
+#else
+    CHECK(anti_rt_thread_block() == NULL);
+#endif
+    shared = anti_rt_monitor_new();
+    CHECK(shared != NULL);
+    if (shared == NULL) {
+        return;
+    }
+    CHECK(anti_rt_thread_start(answer) == 0);
+    anti_rt_monitor_hold(shared);
+    stage = 1;
+    anti_rt_monitor_wake_all(shared, TO_THREAD);
+    while (stage != 2) {
+        anti_rt_monitor_wait(shared, TO_MAIN);
+    }
+    stage = 0;
+    anti_rt_monitor_release(shared);
+
+    CHECK(anti_rt_thread_start(counter) == 0);
+    CHECK(anti_rt_thread_start(counter) == 0);
+    for (i = 0; i < ROUNDS; i++) {
+        anti_rt_word_lock(&word);
+        counted++;
+        anti_rt_word_unlock(&word);
+    }
+    anti_rt_monitor_hold(shared);
+    while (stage != 2) {
+        anti_rt_monitor_wait(shared, TO_MAIN);
+    }
+    anti_rt_monitor_release(shared);
+    anti_rt_word_lock(&word);
+    CHECK(counted == 3 * ROUNDS);
+    anti_rt_word_unlock(&word);
+    anti_rt_monitor_free(shared);
+
+    for (i = 0; i < ANTI_RT_LOCK_COUNT; i++) {
+        anti_rt_lock_hold((enum anti_rt_lock)i);
+        anti_rt_lock_release((enum anti_rt_lock)i);
+    }
+}
+
+/* Two variables of this program lie in one image, and a symbol of a
+   library lies in another. */
+static void images(void)
+{
+    void *handle = anti_rt_library_open(PLUGIN_UTF8);
+    const void *program = anti_rt_library_image((const void *)&shared);
+
+    CHECK(program != NULL);
+    CHECK(anti_rt_library_image((const void *)&stage) == program);
+    CHECK(handle != NULL);
+    if (handle != NULL) {
+        const void *symbol =
+            anti_rt_library_symbol(handle, "anti_rt_provides");
+        const void *library = anti_rt_library_image(symbol);
+        CHECK(library != NULL);
+        CHECK(library != program);
+        anti_rt_library_close(handle);
+    }
+}
+
 int main(void)
 {
     sleep_steps();
@@ -181,6 +291,8 @@ int main(void)
     paths();
     clocks_and_entropy();
     library_outside_ascii();
+    locks_and_threads();
+    images();
     if (check_failures != 0) {
         fprintf(stderr, "%d check(s) failed\n", check_failures);
         return 1;

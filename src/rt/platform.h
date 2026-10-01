@@ -17,16 +17,87 @@
 /* 1 in the runtime of a Windows target and 0 elsewhere. anti.os asks it. */
 int64_t anti_rt_is_windows(void);
 
-/* DESIGN: the locks the runtime keeps at file scope. Each has an
-   initializer of the system, so it is ready before main, and the
-   storage stands in the platform file. A new one is a new name here. */
+/* DESIGN: a monitor is a lock of the system with two condition
+   variables, numbered 0 and 1. A thread waits on one while it holds the
+   lock, and the wait gives the lock back until a wake. A monitor is the
+   one form of a lock and a condition the runtime has: the pool of
+   src/rt/threads.c, the channels and the selects of src/rt/sync.c and
+   every lock at file scope. */
+struct anti_rt_monitor;
+
+/* The locks the runtime keeps at file scope. Each is a monitor with an
+   initializer of the system, so it is ready before main, and the storage
+   stands in the platform file. A new one is a new name here. */
 enum anti_rt_lock {
     ANTI_RT_LOCK_CONF,          /* the keys of src/rt/conf.c */
+    ANTI_RT_LOCK_PLUGINS,       /* the slots of src/rt/loaded.c */
+    ANTI_RT_LOCK_SIGNALS,       /* the functions of src/rt/signal.c */
+    ANTI_RT_LOCK_POOL,          /* the pool and its jobs, src/rt/threads.c */
+    ANTI_RT_LOCK_SELECT,        /* the selects that wait, src/rt/sync.c */
+    ANTI_RT_LOCK_ORDERS,        /* the orders of the locks, src/rt/lock.c */
     ANTI_RT_LOCK_COUNT
 };
 
-void anti_rt_lock_hold(enum anti_rt_lock which);
-void anti_rt_lock_release(enum anti_rt_lock which);
+struct anti_rt_monitor *anti_rt_monitor_of(enum anti_rt_lock which);
+
+/* A monitor on the heap, or NULL when the system or the memory gives
+   none. anti_rt_monitor_free ends it, and no thread may hold it then. */
+struct anti_rt_monitor *anti_rt_monitor_new(void);
+void anti_rt_monitor_free(struct anti_rt_monitor *m);
+
+void anti_rt_monitor_hold(struct anti_rt_monitor *m);
+void anti_rt_monitor_release(struct anti_rt_monitor *m);
+
+/* Wait on condition, 0 or 1, while the thread holds m. A wait may end
+   without a wake, so the caller checks its own state in a loop. */
+void anti_rt_monitor_wait(struct anti_rt_monitor *m, int condition);
+void anti_rt_monitor_wake_one(struct anti_rt_monitor *m, int condition);
+void anti_rt_monitor_wake_all(struct anti_rt_monitor *m, int condition);
+
+static inline void anti_rt_lock_hold(enum anti_rt_lock which)
+{
+    anti_rt_monitor_hold(anti_rt_monitor_of(which));
+}
+
+static inline void anti_rt_lock_release(enum anti_rt_lock which)
+{
+    anti_rt_monitor_release(anti_rt_monitor_of(which));
+}
+
+/* DESIGN: the word of a Mutex and of the hidden lock of a synchronized
+   object is one word of the program's own memory, and the system keeps
+   nothing for it until a thread has to wait: a futex word on Linux,
+   os_unfair_lock on macOS and SRWLOCK on Windows. Zero is the unlocked
+   state of all three, so memory that nothing wrote holds an unlocked
+   word. The word is four bytes on Linux and macOS and eight on Windows,
+   which the layout of the compiler gives per target. The platform files
+   check that the struct has the size and the alignment of the lock of
+   the system. */
+#if defined(_WIN32)
+struct anti_rt_word {
+    void *opaque;
+};
+#else
+struct anti_rt_word {
+    uint32_t opaque;
+};
+#endif
+
+void anti_rt_word_lock(struct anti_rt_word *w);
+void anti_rt_word_unlock(struct anti_rt_word *w);
+
+/* Start a thread that runs body and ends with it. Nothing joins the
+   thread. Returns 0, or -1 when the system starts none. */
+int anti_rt_thread_start(void (*body)(void));
+
+/* The block of the heap that holds the thread-local variables of the
+   calling thread in the image of the runtime, made by the call, or NULL
+   where the system keeps them elsewhere. Only macOS has one. */
+const void *anti_rt_thread_block(void);
+
+/* The processors the machine that runs the program has online, at
+   least 1. */
+int64_t anti_rt_processors(void);
 
 /* The value of the environment variable name in UTF-8, in memory the
    caller frees, into *value. *value is NULL when the variable is unset
@@ -51,6 +122,30 @@ void *anti_rt_library_open(const char *path);
 void anti_rt_library_close(void *handle);
 void *anti_rt_library_symbol(void *handle, const char *name);
 const char *anti_rt_library_error(char *text, size_t size);
+
+/* The base of the image of the program or of a library that address
+   lies in, or NULL when it lies in none. The loader of the system holds
+   a lock of its own while it answers. */
+const void *anti_rt_library_image(const void *address);
+
+/* DESIGN: a signal handler runs on a stack the program knows nothing
+   about, so it does the least it can. On macOS and Linux it writes one
+   byte into a pipe of the runtime's own, and a thread of the runtime
+   reads the pipe and calls deliver. That self-pipe is what makes the
+   function of the program an ordinary function. Anything else would run
+   Anti code inside a handler, where a call of malloc or of the runtime
+   is undefined. Windows has no signals of that kind. Its console control
+   handler runs on a thread of its own, and the C runtime calls a handler
+   of raise on the thread that raised. Both call deliver directly.
+   deliver returns 1 when the program has a function for the signal. */
+
+/* Start the route of signals to deliver, once. The caller holds
+   ANTI_RT_LOCK_SIGNALS. Returns 0, or -1 when the system gave no pipe or
+   no thread, and a later call then tries again. */
+int anti_rt_signal_route(int (*deliver)(int64_t sig));
+
+/* Send the signal sig through the route from now on. */
+void anti_rt_signal_catch(int64_t sig);
 
 /* Fill the count bytes at out from the random source of the system:
    arc4random on macOS, getrandom on Linux and rand_s on Windows. Returns

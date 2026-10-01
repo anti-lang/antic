@@ -5,14 +5,6 @@
    DESIGN: the caller blocks until every chunk is done, so the array it
    splits cannot change while the workers read it. The runtime does the
    splitting, which is what makes the construct free of data races. */
-/* sysconf and the processor count sit behind a feature macro, and the
-   two systems spell it differently. */
-#if defined(__APPLE__)
-#define _DARWIN_C_SOURCE
-#elif !defined(_WIN32)
-#define _POSIX_C_SOURCE 200809L
-#endif
-
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,16 +13,10 @@
 #include "conf.h"
 #include "hooks.h"
 #include "object.h"
+#include "platform.h"
 #include "rt.h"
 #include "std.h"
 #include "threads.h"
-
-#if defined(_WIN32)
-#include <windows.h>
-#else
-#include <pthread.h>
-#include <unistd.h>
-#endif
 
 /* DESIGN: one dispatched object. The pool runs it and `join` waits for
    it. The in-flight map holds the address of the object from the moment
@@ -58,61 +44,39 @@ struct jobs {
     unsigned char *results;
 };
 
-#if defined(_WIN32)
+/* The pool stands on the monitor ANTI_RT_LOCK_POOL. The workers wait on
+   WORK_READY, and the callers of `parallel` and `join` on WORK_DONE. */
+enum { WORK_READY, WORK_DONE };
 
-static CRITICAL_SECTION lock;
-static CONDITION_VARIABLE work_ready;
-static CONDITION_VARIABLE work_done;
-static INIT_ONCE once = INIT_ONCE_STATIC_INIT;
-
-static void hold(void) { EnterCriticalSection(&lock); }
-static void release(void) { LeaveCriticalSection(&lock); }
+static void hold(void) { anti_rt_lock_hold(ANTI_RT_LOCK_POOL); }
+static void release(void) { anti_rt_lock_release(ANTI_RT_LOCK_POOL); }
 static void wait_ready(void)
 {
-    SleepConditionVariableCS(&work_ready, &lock, INFINITE);
+    anti_rt_monitor_wait(anti_rt_monitor_of(ANTI_RT_LOCK_POOL), WORK_READY);
 }
 static void wait_done(void)
 {
-    SleepConditionVariableCS(&work_done, &lock, INFINITE);
+    anti_rt_monitor_wait(anti_rt_monitor_of(ANTI_RT_LOCK_POOL), WORK_DONE);
 }
-static void wake_all(void) { WakeAllConditionVariable(&work_ready); }
-static void wake_caller(void) { WakeAllConditionVariable(&work_done); }
-
-static int processors(void)
+static void wake_all(void)
 {
-    return (int)GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+    anti_rt_monitor_wake_all(anti_rt_monitor_of(ANTI_RT_LOCK_POOL),
+                             WORK_READY);
 }
-
-#else
-
-static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t work_ready = PTHREAD_COND_INITIALIZER;
-static pthread_cond_t work_done = PTHREAD_COND_INITIALIZER;
-static pthread_once_t once = PTHREAD_ONCE_INIT;
-
-static void hold(void) { pthread_mutex_lock(&lock); }
-static void release(void) { pthread_mutex_unlock(&lock); }
-static void wait_ready(void) { pthread_cond_wait(&work_ready, &lock); }
-static void wait_done(void) { pthread_cond_wait(&work_done, &lock); }
-static void wake_all(void) { pthread_cond_broadcast(&work_ready); }
-static void wake_caller(void) { pthread_cond_broadcast(&work_done); }
-
-static int processors(void)
+static void wake_caller(void)
 {
-    long n = sysconf(_SC_NPROCESSORS_ONLN);
-
-    return n > 0 ? (int)n : 1;
+    anti_rt_monitor_wake_all(anti_rt_monitor_of(ANTI_RT_LOCK_POOL),
+                             WORK_DONE);
 }
 
-#endif
-
-/* DESIGN: two kinds of thread wait on work_done, the caller of
+/* DESIGN: two kinds of thread wait on WORK_DONE, the caller of
    `parallel` and each caller of `join`. The end of a chunk or of a job
    wakes all of them, and each checks its own condition. One wake-up
    could go to a waiter whose work is not done, and the other would
    sleep for good. */
 
-/* The state the lock guards. */
+/* The state the lock guards. started is 1 once the workers run. */
+static int started;
 static struct jobs *active;
 static int64_t taken;
 static int64_t finished;
@@ -131,8 +95,7 @@ static int worker_count(void)
     if (n > 0) {
         return n;
     }
-    n = processors();
-    return n > 0 ? n : 1;
+    return (int)anti_rt_processors();
 }
 
 /* The first element and the length of chunk index. The first
@@ -178,26 +141,17 @@ static void finish_one(struct one *job)
     job->done = 1;
 }
 
-#if defined(__APPLE__)
-/* DESIGN: on macOS the thread-local variables of a thread live in one
-   heap block per image, which dyld allocates on the first access and
-   frees when the thread ends. A worker of the pool runs until exit, and
-   the leak check of a program of --memory-checks finds no pointer to its
-   block. The worker takes the address of this variable once as it
-   starts, which makes the block, and marks the block as kept. */
-static _Thread_local char thread_block;
-#endif
-
-#if defined(_WIN32)
-static DWORD WINAPI worker_main(LPVOID unused)
-#else
-static void *worker_main(void *unused)
-#endif
+/* DESIGN: a worker of the pool runs until exit. The leak check of a
+   program of --memory-checks finds no pointer to the block of its
+   thread-local variables where the system keeps them on the heap, so
+   the worker marks the block as kept as it starts. */
+static void worker_main(void)
 {
-    (void)unused;
-#if defined(__APPLE__)
-    anti_rt_memory_kept(&thread_block);
-#endif
+    const void *block = anti_rt_thread_block();
+
+    if (block != NULL) {
+        anti_rt_memory_kept(block);
+    }
     for (;;) {
         struct jobs *j;
         struct one *single;
@@ -235,60 +189,25 @@ static void *worker_main(void *unused)
         wake_caller();
         release();
     }
-    /* The loop never ends, and the thread lives as long as the program.
-       gcc asks for the return of a function with a result all the same. */
-#if defined(_WIN32)
-    return 0;
-#else
-    return NULL;
-#endif
 }
 
-static void start_pool(void)
+/* Start the workers on the first call. The caller holds the lock, so a
+   worker waits for it before it looks for work. */
+static void start_locked(void)
 {
-    int n = worker_count() - 1;
+    int n;
     int i;
 
-#if defined(_WIN32)
-    InitializeCriticalSection(&lock);
-    InitializeConditionVariable(&work_ready);
-    InitializeConditionVariable(&work_done);
-#endif
-    for (i = 0; i < n; i++) {
-#if defined(_WIN32)
-        HANDLE thread = CreateThread(NULL, 0, worker_main, NULL, 0, NULL);
-        if (thread == NULL) {
-            break;
-        }
-        CloseHandle(thread);
-#else
-        pthread_t thread;
-        if (pthread_create(&thread, NULL, worker_main, NULL) != 0) {
-            break;
-        }
-        pthread_detach(thread);
-#endif
+    if (started) {
+        return;
     }
-}
-
-#if defined(_WIN32)
-static BOOL CALLBACK start_once(PINIT_ONCE o, PVOID p, PVOID *c)
-{
-    (void)o;
-    (void)p;
-    (void)c;
-    start_pool();
-    return TRUE;
-}
-#endif
-
-static void start(void)
-{
-#if defined(_WIN32)
-    InitOnceExecuteOnce(&once, start_once, NULL, NULL);
-#else
-    pthread_once(&once, start_pool);
-#endif
+    started = 1;
+    n = worker_count() - 1;
+    for (i = 0; i < n; i++) {
+        if (anti_rt_thread_start(worker_main) != 0) {
+            break;
+        }
+    }
 }
 
 /* Split base into chunks, run one worker over each through the pool, and
@@ -340,8 +259,8 @@ void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
         return;
     }
 
-    start();
     hold();
+    start_locked();
     /* DESIGN: one call of `parallel` uses the pool at a time. A second
        one comes from a worker or from another thread. It runs its chunks
        in the thread that asked for them, rather than waiting for a pool
@@ -396,8 +315,8 @@ void *anti_rt_dispatch(void *object, int64_t result_size,
             anti_rt_fail_abort("anti: no memory for the result of a job");
         }
     }
-    start();
     hold();
+    start_locked();
     for (at = in_flight; at != NULL; at = at->live) {
         if (at->object == object) {
             release();

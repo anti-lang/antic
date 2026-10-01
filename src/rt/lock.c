@@ -1,92 +1,21 @@
 /* The lock of a Mutex, the hidden lock of a synchronized object and the
    record of the orders in which a dev build takes them.
 
-   DESIGN: a Mutex is one word of the program's own memory, and the
-   operating system keeps nothing for it until a thread has to wait: a
-   futex word on Linux, os_unfair_lock on macOS and SRWLOCK on Windows.
-   Zero is the unlocked state of all three, so memory that nothing wrote
-   holds an unlocked Mutex and `Mutex.new()` gives zero. The word is four
-   bytes on Linux and macOS and eight on Windows, which the layout of the
-   compiler gives per target. */
-#if defined(__APPLE__)
-#define _DARWIN_C_SOURCE
-#elif !defined(_WIN32)
-#define _GNU_SOURCE
-#endif
-
+   DESIGN: a Mutex is one word of the program's own memory, the word of
+   the platform layer, and `Mutex.new()` gives zero, its unlocked state.
+   See struct anti_rt_word in platform.h. */
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(_WIN32)
-#include <windows.h>
-#elif defined(__APPLE__)
-#include <os/lock.h>
-#else
-#include <sys/syscall.h>
-#include <unistd.h>
-#endif
-
+#include "platform.h"
 #include "std.h"
 #include "sync.h"
-
-#if defined(_WIN32)
-
-typedef SRWLOCK word_t;
-
-static void word_lock(word_t *w) { AcquireSRWLockExclusive(w); }
-static void word_unlock(word_t *w) { ReleaseSRWLockExclusive(w); }
-
-#elif defined(__APPLE__)
-
-typedef os_unfair_lock word_t;
-
-static void word_lock(word_t *w) { os_unfair_lock_lock(w); }
-static void word_unlock(word_t *w) { os_unfair_lock_unlock(w); }
-
-#else
-
-typedef uint32_t word_t;
-
-/* The private operations of futex(2), which the headers of musl do not
-   name. */
-#define FUTEX_WAIT_PRIVATE 128
-#define FUTEX_WAKE_PRIVATE 129
-
-/* DESIGN: the word is 0 when free, 1 when held and 2 when held with a
-   thread waiting, the mutex of Drepper's "Futexes Are Tricky". An
-   unlock that finds 2 wakes one waiter, and a free lock costs one
-   compare-and-swap to take and one exchange to give back. */
-static void word_lock(word_t *w)
-{
-    uint32_t c = 0;
-
-    if (__atomic_compare_exchange_n(w, &c, 1, 0, __ATOMIC_ACQUIRE,
-                                    __ATOMIC_RELAXED)) {
-        return;
-    }
-    if (c != 2) {
-        c = __atomic_exchange_n(w, 2, __ATOMIC_ACQUIRE);
-    }
-    while (c != 0) {
-        syscall(SYS_futex, w, FUTEX_WAIT_PRIVATE, 2, NULL, NULL, 0);
-        c = __atomic_exchange_n(w, 2, __ATOMIC_ACQUIRE);
-    }
-}
-
-static void word_unlock(word_t *w)
-{
-    if (__atomic_exchange_n(w, 0, __ATOMIC_RELEASE) == 2) {
-        syscall(SYS_futex, w, FUTEX_WAKE_PRIVATE, 1, NULL, NULL, 0);
-    }
-}
-
-#endif
 
 /* The hidden lock of a synchronized object, which the compiler lays out
    as a Mutex and two `int` fields. */
 struct object_lock {
-    word_t word;
+    struct anti_rt_word word;
     int64_t owner;
     int64_t depth;
 };
@@ -107,7 +36,7 @@ static int64_t thread_tag(void)
    the lock held and the lock taken, with the site of each, once per
    pair. An order whose reverse is recorded already is a conflict, which
    is reported once with the four sites, before the thread waits. The
-   records stand in a table that one internal lock guards, open
+   records stand in a table that ANTI_RT_LOCK_ORDERS guards, open
    addressed by the pair of addresses. A lock deeper than HELD_MAX is
    taken without a record. */
 #define HELD_MAX 32
@@ -131,7 +60,6 @@ struct order {
 /* A record that `destroy` cleared. A search goes on past it. */
 #define GONE ((const void *)1)
 
-static word_t orders_lock;
 static struct order *orders;
 static size_t order_count;
 static size_t order_capacity;
@@ -206,7 +134,7 @@ static void order_take(const void *lock, const char *site)
     int64_t count = held_count < HELD_MAX ? held_count : HELD_MAX;
 
     if (count > 0) {
-        word_lock(&orders_lock);
+        anti_rt_lock_hold(ANTI_RT_LOCK_ORDERS);
         for (i = 0; i < count; i++) {
             const struct held *h = &held[i];
             struct order *reverse;
@@ -233,7 +161,7 @@ static void order_take(const void *lock, const char *site)
                 order_put(&one);
             }
         }
-        word_unlock(&orders_lock);
+        anti_rt_lock_release(ANTI_RT_LOCK_ORDERS);
     }
     if (held_count < HELD_MAX) {
         held[held_count].lock = lock;
@@ -270,32 +198,32 @@ static void order_forget(const void *lock)
 {
     size_t i;
 
-    word_lock(&orders_lock);
+    anti_rt_lock_hold(ANTI_RT_LOCK_ORDERS);
     for (i = 0; i < order_capacity; i++) {
         if (orders[i].first == lock || orders[i].second == lock) {
             orders[i].first = GONE;
             orders[i].second = GONE;
         }
     }
-    word_unlock(&orders_lock);
+    anti_rt_lock_release(ANTI_RT_LOCK_ORDERS);
 }
 
 /* Mutex */
 
-void anti_rt_mutex_lock(void *word) { word_lock(word); }
+void anti_rt_mutex_lock(void *word) { anti_rt_word_lock(word); }
 
-void anti_rt_mutex_unlock(void *word) { word_unlock(word); }
+void anti_rt_mutex_unlock(void *word) { anti_rt_word_unlock(word); }
 
 void anti_rt_mutex_lock_at(void *word, const char *site)
 {
     order_take(word, site);
-    word_lock(word);
+    anti_rt_word_lock(word);
 }
 
 void anti_rt_mutex_unlock_at(void *word)
 {
     order_give(word);
-    word_unlock(word);
+    anti_rt_word_unlock(word);
 }
 
 /* `m.destroy()`. The word holds nothing of the system, so only the
@@ -325,7 +253,7 @@ static int object_enter(struct object_lock *l, int64_t me)
 
 static void object_hold(struct object_lock *l, int64_t me)
 {
-    word_lock(&l->word);
+    anti_rt_word_lock(&l->word);
     __atomic_store_n(&l->owner, me, __ATOMIC_RELAXED);
     l->depth = 1;
 }
@@ -336,7 +264,7 @@ static int object_leave(struct object_lock *l)
         return 0;
     }
     __atomic_store_n(&l->owner, 0, __ATOMIC_RELAXED);
-    word_unlock(&l->word);
+    anti_rt_word_unlock(&l->word);
     return 1;
 }
 

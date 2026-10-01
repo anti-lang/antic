@@ -119,8 +119,9 @@ add_test(NAME one_allocator
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_one_allocator.cmake")
 
-# Every host branch of antic and anti stands in their platform layers,
-# src/antic/platform.c and src/anti/platform.c with their headers.
+# Every host branch of antic, anti and the runtime stands in their
+# platform layers, src/antic/platform.c and src/anti/platform.c with their
+# headers and src/rt/platform.h with its two files.
 add_test(NAME platform_layer
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_platform_layer.cmake")
@@ -157,11 +158,13 @@ set(ANTIC_RUNTIME_READOBJ
 # The signal table of the runtime, in a program of its own. src/rt/signal.h
 # shares its name with the header of C, so the include path of the unit
 # tests would hide the one of C from src/rt/signal.c. The test starts
-# threads, and so does the reader of the runtime.
+# threads, and so does the reader of the platform layer.
 find_package(Threads REQUIRED)
 add_executable(rt_signal_tests unit/test_signal.c ../src/rt/signal.c
-    ../src/rt/atomic.c)
-target_link_libraries(rt_signal_tests PRIVATE Threads::Threads)
+    ../src/rt/atomic.c ../src/rt/platform_posix.c
+    ../src/rt/platform_windows.c)
+target_link_libraries(rt_signal_tests PRIVATE Threads::Threads
+    ${CMAKE_DL_LIBS})
 add_test(NAME rt_signal COMMAND rt_signal_tests)
 
 # rt.configure while another thread reads the keys, in a program of its own
@@ -196,12 +199,14 @@ add_dependencies(rt_plugin_tests plugin_table_one plugin_table_two)
 add_test(NAME rt_plugin_race COMMAND rt_plugin_tests)
 
 # The platform layer of the runtime on the host. Both platform files go
-# in, and the one of the other system compiles to nothing. The library of
+# in, and the one of the other system compiles to nothing. The test starts
+# threads of the layer. The library of
 # an empty plugin table is copied into a directory whose name is outside
 # ASCII, which a loader that takes the ANSI code page cannot open.
 add_executable(rt_platform_tests unit/test_platform.c
     ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
-target_link_libraries(rt_platform_tests PRIVATE ${CMAKE_DL_LIBS})
+target_link_libraries(rt_platform_tests PRIVATE Threads::Threads
+    ${CMAKE_DL_LIBS})
 set(platform_plugin "${CMAKE_CURRENT_BINARY_DIR}/platform-ü")
 add_custom_command(TARGET rt_platform_tests POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${platform_plugin}"

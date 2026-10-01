@@ -6,6 +6,7 @@
 #define _CRT_RAND_S
 
 #include <limits.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,6 +15,7 @@
 #include <windows.h>
 
 #include "platform.h"
+#include "signal.h"
 #include "std.h"
 
 /* See the DESIGN comment of the same function in platform_posix.c. */
@@ -72,16 +74,122 @@ const unsigned char *anti_rt_last_error_text(int32_t code)
     return (const unsigned char *)text;
 }
 
-static SRWLOCK locks[ANTI_RT_LOCK_COUNT] = {SRWLOCK_INIT};
+struct anti_rt_monitor {
+    SRWLOCK lock;
+    CONDITION_VARIABLE conditions[2];
+};
 
-void anti_rt_lock_hold(enum anti_rt_lock which)
+/* SRWLOCK_INIT and CONDITION_VARIABLE_INIT are all zero, so the storage
+   of a static monitor is ready before main without an initializer. */
+static struct anti_rt_monitor monitors[ANTI_RT_LOCK_COUNT];
+
+struct anti_rt_monitor *anti_rt_monitor_of(enum anti_rt_lock which)
 {
-    AcquireSRWLockExclusive(&locks[which]);
+    return &monitors[which];
 }
 
-void anti_rt_lock_release(enum anti_rt_lock which)
+struct anti_rt_monitor *anti_rt_monitor_new(void)
 {
-    ReleaseSRWLockExclusive(&locks[which]);
+    struct anti_rt_monitor *m = malloc(sizeof *m);
+
+    if (m == NULL) {
+        return NULL;
+    }
+    InitializeSRWLock(&m->lock);
+    InitializeConditionVariable(&m->conditions[0]);
+    InitializeConditionVariable(&m->conditions[1]);
+    return m;
+}
+
+/* An SRWLOCK and a condition variable hold nothing of the system. */
+void anti_rt_monitor_free(struct anti_rt_monitor *m)
+{
+    free(m);
+}
+
+void anti_rt_monitor_hold(struct anti_rt_monitor *m)
+{
+    AcquireSRWLockExclusive(&m->lock);
+}
+
+void anti_rt_monitor_release(struct anti_rt_monitor *m)
+{
+    ReleaseSRWLockExclusive(&m->lock);
+}
+
+void anti_rt_monitor_wait(struct anti_rt_monitor *m, int condition)
+{
+    SleepConditionVariableSRW(&m->conditions[condition], &m->lock, INFINITE,
+                              0);
+}
+
+void anti_rt_monitor_wake_one(struct anti_rt_monitor *m, int condition)
+{
+    WakeConditionVariable(&m->conditions[condition]);
+}
+
+void anti_rt_monitor_wake_all(struct anti_rt_monitor *m, int condition)
+{
+    WakeAllConditionVariable(&m->conditions[condition]);
+}
+
+_Static_assert(sizeof(struct anti_rt_word) == sizeof(SRWLOCK) &&
+                   _Alignof(struct anti_rt_word) == _Alignof(SRWLOCK),
+               "the word of a Mutex is an SRWLOCK");
+
+void anti_rt_word_lock(struct anti_rt_word *w)
+{
+    AcquireSRWLockExclusive((PSRWLOCK)w);
+}
+
+void anti_rt_word_unlock(struct anti_rt_word *w)
+{
+    ReleaseSRWLockExclusive((PSRWLOCK)w);
+}
+
+/* The body of a thread, on the heap until the thread takes it. */
+struct start {
+    void (*body)(void);
+};
+
+static DWORD WINAPI thread_main(LPVOID start)
+{
+    void (*body)(void) = ((struct start *)start)->body;
+
+    free(start);
+    body();
+    return 0;
+}
+
+int anti_rt_thread_start(void (*body)(void))
+{
+    struct start *start = malloc(sizeof *start);
+    HANDLE thread;
+
+    if (start == NULL) {
+        return -1;
+    }
+    start->body = body;
+    thread = CreateThread(NULL, 0, thread_main, start, 0, NULL);
+    if (thread == NULL) {
+        free(start);
+        return -1;
+    }
+    CloseHandle(thread);
+    return 0;
+}
+
+/* The thread-local variables of Windows stand in no block of the heap. */
+const void *anti_rt_thread_block(void)
+{
+    return NULL;
+}
+
+int64_t anti_rt_processors(void)
+{
+    DWORD n = GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+
+    return n > 0 ? (int64_t)n : 1;
 }
 
 /* The UTF-16 form of the UTF-8 text, in memory the caller frees. NULL
@@ -276,6 +384,56 @@ const char *anti_rt_library_error(char *text, size_t size)
         text[0] = '\0';
     }
     return text;
+}
+
+const void *anti_rt_library_image(const void *address)
+{
+    HMODULE module = NULL;
+
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                                GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                            (LPCWSTR)address, &module)) {
+        return NULL;
+    }
+    return module;
+}
+
+/* The function both handlers below call. It is set once, under
+   ANTI_RT_LOCK_SIGNALS and before either handler is installed. */
+static int (*deliver_signal)(int64_t sig);
+
+/* The console control handler runs on a thread Windows makes, so it
+   calls the function of the program without a pipe. */
+static BOOL WINAPI on_console(DWORD event)
+{
+    int64_t sig = event == CTRL_BREAK_EVENT ? ANTI_SIGBREAK : ANTI_SIGINT;
+
+    return deliver_signal(sig) ? TRUE : FALSE;
+}
+
+/* The C runtime of Windows answers raise from a table of its own. Its
+   default ends the program with code 3, and the console handler above
+   never sees a raised signal. The C runtime resets the handler before it
+   calls it, so the handler installs itself again. */
+static void __cdecl on_raise(int sig)
+{
+    signal(sig, on_raise);
+    deliver_signal((int64_t)sig);
+}
+
+int anti_rt_signal_route(int (*deliver)(int64_t sig))
+{
+    if (deliver_signal != NULL) {
+        return 0;
+    }
+    deliver_signal = deliver;
+    SetConsoleCtrlHandler(on_console, TRUE);
+    return 0;
+}
+
+void anti_rt_signal_catch(int64_t sig)
+{
+    signal((int)sig, on_raise);
 }
 
 int anti_rt_entropy(void *out, size_t count)

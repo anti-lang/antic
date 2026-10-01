@@ -2,75 +2,17 @@
    with the handle that the channel holds, the object that
    anti_rt_chan_new made. src/rt/lock.c holds the Mutex.
 
-   DESIGN: a channel stands on the platform layer of the threading
-   chapter. That is the one src/rt/threads.c uses, a lock and a condition
-   variable of the system. */
-#if defined(__APPLE__)
-#define _DARWIN_C_SOURCE
-#elif !defined(_WIN32)
-#define _POSIX_C_SOURCE 200809L
-#endif
-
+   DESIGN: a channel and a select stand on the monitors of the platform
+   layer, a lock and condition variables of the system, as the pool of
+   src/rt/threads.c does. */
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(_WIN32)
-#include <windows.h>
-#else
-#include <pthread.h>
-#endif
-
 #include "atomic.h"
+#include "platform.h"
 #include "std.h"
 #include "sync.h"
-
-#if defined(_WIN32)
-
-typedef SRWLOCK lock_t;
-typedef CONDITION_VARIABLE cond_t;
-#define LOCK_INIT SRWLOCK_INIT
-#define COND_INIT CONDITION_VARIABLE_INIT
-
-static int lock_init(lock_t *l)
-{
-    InitializeSRWLock(l);
-    return 0;
-}
-static void lock_end(lock_t *l) { (void)l; }
-static void hold(lock_t *l) { AcquireSRWLockExclusive(l); }
-static void release(lock_t *l) { ReleaseSRWLockExclusive(l); }
-static int cond_init(cond_t *c)
-{
-    InitializeConditionVariable(c);
-    return 0;
-}
-static void cond_end(cond_t *c) { (void)c; }
-static void wait_on(cond_t *c, lock_t *l)
-{
-    SleepConditionVariableSRW(c, l, INFINITE, 0);
-}
-static void wake_one(cond_t *c) { WakeConditionVariable(c); }
-static void wake_all(cond_t *c) { WakeAllConditionVariable(c); }
-
-#else
-
-typedef pthread_mutex_t lock_t;
-typedef pthread_cond_t cond_t;
-#define LOCK_INIT PTHREAD_MUTEX_INITIALIZER
-#define COND_INIT PTHREAD_COND_INITIALIZER
-
-static int lock_init(lock_t *l) { return pthread_mutex_init(l, NULL); }
-static void lock_end(lock_t *l) { pthread_mutex_destroy(l); }
-static void hold(lock_t *l) { pthread_mutex_lock(l); }
-static void release(lock_t *l) { pthread_mutex_unlock(l); }
-static int cond_init(cond_t *c) { return pthread_cond_init(c, NULL); }
-static void cond_end(cond_t *c) { pthread_cond_destroy(c); }
-static void wait_on(cond_t *c, lock_t *l) { pthread_cond_wait(c, l); }
-static void wake_one(cond_t *c) { pthread_cond_signal(c); }
-static void wake_all(cond_t *c) { pthread_cond_broadcast(c); }
-
-#endif
 
 /* DESIGN: the language has no way to report these, and a program that
    reaches one cannot go on, as src/rt/threads.c decides for memory. */
@@ -82,13 +24,14 @@ static _Noreturn void fatal(const char *message)
 /* Channels */
 
 /* DESIGN: a channel is a ring of capacity values of size bytes each,
-   behind one lock. A receiver waits on not_empty and a sender on
-   not_full. `close` wakes both, so a receiver takes what is left and
-   then gets `none`. The values follow the struct in the same block. */
+   behind the lock of its monitor. A receiver waits on NOT_EMPTY and a
+   sender on NOT_FULL. `close` wakes both, so a receiver takes what is
+   left and then gets `none`. The values follow the struct in the same
+   block. */
+enum { NOT_EMPTY, NOT_FULL };
+
 struct channel {
-    lock_t lock;
-    cond_t not_empty;
-    cond_t not_full;
+    struct anti_rt_monitor *monitor;
     int64_t size;
     int64_t capacity;
     int64_t head;               /* the oldest value */
@@ -103,9 +46,10 @@ struct channel {
    lock beside its channel's. A select counts itself before it looks at
    its channels, and a send looks at the count after it put its value, so
    one of the two sees the other. */
-static lock_t select_lock = LOCK_INIT;
-static cond_t select_ready = COND_INIT;
 static int64_t waiting;
+
+/* The one condition of ANTI_RT_LOCK_SELECT. */
+enum { SELECT_READY };
 
 /* The arm where the next select of this thread starts to look. It moves
    on each time, so a channel that is always ready, a closed one among
@@ -115,9 +59,10 @@ static _Thread_local uint32_t turn;
 static void wake_selects(void)
 {
     if (anti_rt_atomic_load(&waiting, 8) > 0) {
-        hold(&select_lock);
-        wake_all(&select_ready);
-        release(&select_lock);
+        anti_rt_lock_hold(ANTI_RT_LOCK_SELECT);
+        anti_rt_monitor_wake_all(anti_rt_monitor_of(ANTI_RT_LOCK_SELECT),
+                                 SELECT_READY);
+        anti_rt_lock_release(ANTI_RT_LOCK_SELECT);
     }
 }
 
@@ -147,8 +92,8 @@ void *anti_rt_chan_new(int64_t size, int64_t capacity)
         anti_rt_fail_abort("anti: no memory for a channel of %lld values",
                            (long long)capacity);
     }
-    if (lock_init(&ch->lock) != 0 || cond_init(&ch->not_empty) != 0 ||
-        cond_init(&ch->not_full) != 0) {
+    ch->monitor = anti_rt_monitor_new();
+    if (ch->monitor == NULL) {
         fatal("no mutex for a channel");
     }
     ch->size = size;
@@ -167,7 +112,7 @@ static void take(struct channel *ch, void *out)
     memcpy(out, ch->values + ch->head * ch->size, (size_t)ch->size);
     ch->head = (ch->head + 1) % ch->capacity;
     ch->count--;
-    wake_one(&ch->not_full);
+    anti_rt_monitor_wake_one(ch->monitor, NOT_FULL);
 }
 
 /* DESIGN: a value sent after `close` would never be received. The send
@@ -179,19 +124,19 @@ void anti_rt_chan_send(void *handle, const void *value)
                                             "holds no queue");
     int64_t at;
 
-    hold(&ch->lock);
+    anti_rt_monitor_hold(ch->monitor);
     while (ch->count == ch->capacity && !ch->closed) {
-        wait_on(&ch->not_full, &ch->lock);
+        anti_rt_monitor_wait(ch->monitor, NOT_FULL);
     }
     if (ch->closed) {
-        release(&ch->lock);
+        anti_rt_monitor_release(ch->monitor);
         fatal("`send` on a closed channel");
     }
     at = (ch->head + ch->count) % ch->capacity;
     memcpy(ch->values + at * ch->size, value, (size_t)ch->size);
     ch->count++;
-    wake_one(&ch->not_empty);
-    release(&ch->lock);
+    anti_rt_monitor_wake_one(ch->monitor, NOT_EMPTY);
+    anti_rt_monitor_release(ch->monitor);
     wake_selects();
 }
 
@@ -203,15 +148,15 @@ void *anti_rt_chan_recv(void *handle, void *out)
                                             "holds no queue");
     void *got = NULL;
 
-    hold(&ch->lock);
+    anti_rt_monitor_hold(ch->monitor);
     while (ch->count == 0 && !ch->closed) {
-        wait_on(&ch->not_empty, &ch->lock);
+        anti_rt_monitor_wait(ch->monitor, NOT_EMPTY);
     }
     if (ch->count > 0) {
         take(ch, out);
         got = out;
     }
-    release(&ch->lock);
+    anti_rt_monitor_release(ch->monitor);
     return got;
 }
 
@@ -221,11 +166,11 @@ void anti_rt_chan_close(void *handle)
     struct channel *ch = channel_of(handle, "`close` on a channel that "
                                             "holds no queue");
 
-    hold(&ch->lock);
+    anti_rt_monitor_hold(ch->monitor);
     ch->closed = 1;
-    wake_all(&ch->not_empty);
-    wake_all(&ch->not_full);
-    release(&ch->lock);
+    anti_rt_monitor_wake_all(ch->monitor, NOT_EMPTY);
+    anti_rt_monitor_wake_all(ch->monitor, NOT_FULL);
+    anti_rt_monitor_release(ch->monitor);
     wake_selects();
 }
 
@@ -236,9 +181,7 @@ void anti_rt_chan_delete(void *handle)
     if (ch == NULL) {
         return;
     }
-    cond_end(&ch->not_full);
-    cond_end(&ch->not_empty);
-    lock_end(&ch->lock);
+    anti_rt_monitor_free(ch->monitor);
     free(ch);
 }
 
@@ -252,7 +195,7 @@ static int try_arm(void *const *chans, void *const *slots, int64_t index,
                                                   "that holds no queue");
     int ready = 1;
 
-    hold(&ch->lock);
+    anti_rt_monitor_hold(ch->monitor);
     if (ch->count > 0) {
         take(ch, slots[index]);
         *got = slots[index];
@@ -261,7 +204,7 @@ static int try_arm(void *const *chans, void *const *slots, int64_t index,
     } else {
         ready = 0;
     }
-    release(&ch->lock);
+    anti_rt_monitor_release(ch->monitor);
     return ready;
 }
 
@@ -273,9 +216,9 @@ static int any_ready(void *const *chans, int64_t count)
 
     for (i = 0; i < count && !ready; i++) {
         struct channel *ch = chans[i];
-        hold(&ch->lock);
+        anti_rt_monitor_hold(ch->monitor);
         ready = ch->count > 0 || ch->closed;
-        release(&ch->lock);
+        anti_rt_monitor_release(ch->monitor);
     }
     return ready;
 }
@@ -297,11 +240,12 @@ int64_t anti_rt_select(void *const *chans, void *const *slots,
             }
         }
         anti_rt_atomic_add(&waiting, 8, 1);
-        hold(&select_lock);
+        anti_rt_lock_hold(ANTI_RT_LOCK_SELECT);
         if (!any_ready(chans, count)) {
-            wait_on(&select_ready, &select_lock);
+            anti_rt_monitor_wait(anti_rt_monitor_of(ANTI_RT_LOCK_SELECT),
+                                 SELECT_READY);
         }
-        release(&select_lock);
+        anti_rt_lock_release(ANTI_RT_LOCK_SELECT);
         anti_rt_atomic_sub(&waiting, 8, 1);
     }
 }
