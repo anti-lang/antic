@@ -1649,6 +1649,8 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] `anti bind` refuses a literal that no 64-bit integer, no double or, with the suffix `f`, no float holds, where it took the saturated value. The define or macro is skipped with the usual warning. A float literal below the smallest double reads as zero or nearly so, as C reads it.
 - [provisional] An array length of a C type past `INT64_MAX` does not parse, and a field of a `COLOR` define past a `long long` skips the define.
 - [provisional] A message of the JSON reader of `anti bind` that the caller's buffer cannot hold is cut and ends in `...`.
+- [provisional] `anti bind --clang` counts every line in `int64_t` and refuses a line marker of `clang -E` that names a line above 4294967295, with a message that names the marker and says it is out of range. Reason: clang keeps a line in an unsigned of 32 bits and writes no higher marker, and the bound keeps the count of the lines after a marker far inside its type. `#line 2147483647`, the last line C allows, binds.
+- [provisional] An enumerator without a value after `INT64_MAX` takes the bits of 2^63, through the unsigned sum, as an enumerator written above `INT64_MAX` does.
 
 ## Regular expressions
 
