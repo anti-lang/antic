@@ -3,7 +3,8 @@
 //! A sequence compares and hashes its elements in order. A map and a set
 //! compare as collections of entries whatever their order, and their hash does
 //! not depend on it either, so two maps with the same entries added in another
-//! order are equal and hash alike. Each case builds two equal collections, then
+//! order are equal and hash alike. A thread-safe map hashes as the plain map
+//! of the same entries does. Each case builds two equal collections, then
 //! changes one of them, and prints whether they are equal and whether their
 //! hashes agree. A class that holds collections hashes alike too.
 
@@ -121,6 +122,12 @@ fn maps()
 		w.set(19 - i, 19 - i);
 	}
 	show("concurrent map in another order", c == w, c.hash() == w.hash());
+	let plain = HashMap<int, int>.new();
+	for i in 0..20 {
+		plain.set(i, i + 0);
+	}
+	printf("concurrent map against hash map: hash alike %d\n".ptr,
+		(c.hash() == plain.hash()) as c_int);
 }
 
 fn sets()

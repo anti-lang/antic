@@ -12,6 +12,7 @@ map with another value: equal 0, hash alike 0
 hash map in another order: equal 1, hash alike 1
 sorted map in another order: equal 1, hash alike 1
 concurrent map in another order: equal 1, hash alike 1
+concurrent map against hash map: hash alike 1
 set in another order: equal 1, hash alike 1
 set with more: equal 0, hash alike 0
 hash set in another order: equal 1, hash alike 1

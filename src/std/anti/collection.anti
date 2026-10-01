@@ -530,6 +530,14 @@ pub fn hash_in_order<T: hash>(c: *Collection<T>) -> u64
 /// alike.
 pub fn hash_in_any_order<T: hash>(c: *Collection<T>) -> u64
 {
+	return hash_of_sum(c.count, hash_sum<T>(c));
+}
+
+/// The sum of the hash of each element of `c`, which does not depend on their
+/// order. A collection kept in parts adds the sum of each part and gives the
+/// total to `hash_of_sum`, so it hashes as one collection of the same elements.
+pub fn hash_sum<T: hash>(c: *Collection<T>) -> u64
+{
 	let sum: u64 = 0;
 	let at = c.first_place();
 	while at >= 0 do {
@@ -538,7 +546,14 @@ pub fn hash_in_any_order<T: hash>(c: *Collection<T>) -> u64
 		});
 		at = c.next_place(at);
 	}
-	return (c.count, sum).hash();
+	return sum;
+}
+
+/// The hash of `count` elements whose hashes add up to `sum`, as
+/// `hash_in_any_order` gives it.
+pub fn hash_of_sum(count: int, sum: u64) -> u64
+{
+	return (count, sum).hash();
 }
 
 /// The alignment of the room of an element: the largest power of two that

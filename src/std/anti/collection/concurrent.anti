@@ -615,10 +615,15 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 		return equal;
 	}
 
-	/// The hash of the entries whatever their order, with `value_hash` giving
-	/// the hash of each value. Every part stays locked meanwhile, so the hash
-	/// is that of one state of the map. The hash of a map calls it.
-	fn hash_entries(self, value_hash: fn(lent *V) -> u64) -> u64
+	/// The hash of the entries whatever their order, with `part_sum` giving
+	/// the sum of the hashes of the entries of one part. Every part stays
+	/// locked meanwhile, so the hash is that of one state of the map. The hash
+	/// of a map calls it.
+	///
+	/// DESIGN: the parts add up as `collection.hash_in_any_order` adds up the
+	/// entries of one `HashMap`, so the map hashes as a `HashMap` of the same
+	/// entries does.
+	fn hash_entries(self, part_sum: fn(*map.HashMap<K, V>) -> u64) -> u64
 	{
 		let sum: u64 = 0;
 		let n = 0;
@@ -626,14 +631,12 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 			let i = 0;
 			while i < PARTS do {
 				let part = self.part(i);
-				for (k, v) in part.entries {
-					sum +%= (k.hash(), value_hash(&v)).hash();
-					n += 1;
-				}
+				sum +%= part_sum(&part.entries);
+				n += part.entries.count;
 				i += 1;
 			}
 		});
-		return (n, sum).hash();
+		return collection.hash_of_sum(n, sum);
 	}
 
 	/// The part of the key `k`, chosen by the top bits of its seeded hash,
@@ -799,8 +802,8 @@ pub operator fn eq<K: eq + hash, V: eq>(a: ConcurrentMap<K, V>,
 /// every part of the map locked while it is taken.
 pub operator fn hash<K: eq + hash, V: hash>(a: ConcurrentMap<K, V>) -> u64
 {
-	return a.hash_entries(fn(v) {
-		return (*v).hash();
+	return a.hash_entries(fn(m) {
+		return collection.hash_sum<(K, V)>(m);
 	});
 }
 
