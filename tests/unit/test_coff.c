@@ -651,6 +651,343 @@ static void test_section_limit(void)
     text_free(&error);
 }
 
+/* Join the first size bytes of first, copied into memory of exactly that
+   size, with second. The sanitizer builds catch a read past the copy. */
+static bool join_cut(const struct text *first, size_t size,
+                     const struct text *second, struct text *error)
+{
+    struct text out = {0};
+    struct coff_input inputs[2];
+    unsigned char *copy = malloc(size > 0 ? size : 1);
+    bool ok;
+
+    if (size > 0) {
+        memcpy(copy, first->data, size);
+    }
+    inputs[0].name = "a.o";
+    inputs[0].data = copy;
+    inputs[0].size = size;
+    inputs[1].name = "b.o";
+    inputs[1].data = (const unsigned char *)second->data;
+    inputs[1].size = second->length;
+    error->length = 0;
+    ok = coff_join(inputs, 2, &out, error);
+    free(copy);
+    text_free(&out);
+    return ok;
+}
+
+/* The join refuses the object, and the reason holds want. */
+static void refuses(int line, const struct text *first,
+                    const struct text *second, const char *want)
+{
+    struct text error = {0};
+
+    if (join_cut(first, first->length, second, &error)) {
+        check_failures++;
+        fprintf(stderr, "line %d: a damaged object was joined\n", line);
+    } else if (strstr(text_cstr(&error), want) == NULL) {
+        check_failures++;
+        fprintf(stderr, "line %d: the refusal does not say `%s`: %s\n", line,
+                want, text_cstr(&error));
+    }
+    text_free(&error);
+}
+
+#define REFUSES(first, second, want) \
+    refuses(__LINE__, first, second, want)
+
+/* An object cut off anywhere loses the end of its string table, and the
+   join refuses it. Each table, relocation and record that points past
+   the data, and each index past its table, is refused with a reason. */
+static void test_truncated(void)
+{
+    struct t_object a = {AMD64, {{".text", CODE, call, 8, {{1, 2}, {1, 3}}, 2},
+                                 {".data$a_long_name", DATA, "u", 1, {{0}}, 0}}, 2,
+                         {{".text", 0, 1, STATIC, true, 0, 0},
+                          {"a_long_function_name", 0, 0, EXTERNAL, false, 0, 0},
+                          {"printf", 0, 0, EXTERNAL, false, 0, 0},
+                          {"foo", 0, 1, EXTERNAL, false, 0, 0}}, 4};
+    struct t_object b = {AMD64, {{".text", CODE, call, 8, {{0}}, 0}}, 1,
+                         {{"a_long_function_name", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct text good = {0};
+    struct text first = {0};
+    struct text second = {0};
+    struct text error = {0};
+    size_t symbols;
+    size_t strings;
+    size_t cut;
+
+    build(&a, &good);
+    build(&b, &second);
+    CHECK(join_cut(&good, good.length, &second, &error));
+    CHECK_STR(text_cstr(&error), "");
+    for (cut = 0; cut < good.length; cut++) {
+        CHECK(!join_cut(&good, cut, &second, &error));
+        CHECK(error.length > 0);
+    }
+    symbols = get(&good, 8, 4);
+    strings = symbols + 18 * symbols_of(&good);
+
+#define DAMAGED(at, value, want)                         \
+    do {                                                 \
+        first.length = 0;                                \
+        text_append_bytes(&first, good.data, good.length); \
+        patch32(&first, at, value);                      \
+        REFUSES(&first, &second, want);                  \
+    } while (0)
+
+    /* The symbol table outside the data, or more symbols than it holds. */
+    DAMAGED(8, (uint32_t)good.length + 1, "is no COFF object");
+    DAMAGED(8, 0xFFFFFFF0u, "is no COFF object");
+    DAMAGED(12, (uint32_t)((good.length - symbols) / 18 + 1),
+            "is no COFF object");
+    DAMAGED(12, 0xFFFFFFFFu, "is no COFF object");
+    /* The string table: a size below its own field, and one past the end. */
+    DAMAGED(strings, 3, "damaged string table");
+    DAMAGED(strings, (uint32_t)(good.length - strings) + 1,
+            "damaged string table");
+    /* More sections than the data holds headers for. */
+    first.length = 0;
+    text_append_bytes(&first, good.data, good.length);
+    first.data[2] = (char)0xF0;
+    REFUSES(&first, &second, "is no COFF object");
+    /* The raw data, the relocations and the count of relocations of a
+       section outside the data. */
+    DAMAGED(section_at(1) + 20, (uint32_t)good.length - 4, "has a section .text");
+    DAMAGED(section_at(1) + 16, (uint32_t)good.length, "has a section .text");
+    DAMAGED(section_at(1) + 24, (uint32_t)good.length - 10,
+            "has a section .text");
+    DAMAGED(section_at(1) + 24, 0xFFFFFFF0u, "has a section .text");
+    DAMAGED(section_at(1) + 32, 0xFFFF, "has a section .text");
+    /* The overflow form of the count: the first relocation holds the
+       count, here past the data or the relocations themselves past it. */
+    first.length = 0;
+    text_append_bytes(&first, good.data, good.length);
+    patch32(&first, section_at(1) + 32, 0xFFFF);
+    patch32(&first, section_at(1) + 36, CODE | 0x01000000u);
+    patch32(&first, get(&good, section_at(1) + 24, 4), 0x7FFFFFFF);
+    REFUSES(&first, &second, "has a section .text");
+    patch32(&first, section_at(1) + 24, (uint32_t)good.length - 2);
+    REFUSES(&first, &second, "has a section .text");
+    /* A long name of a section past the string table. */
+    first.length = 0;
+    text_append_bytes(&first, good.data, good.length);
+    memcpy(first.data + section_at(2), "/999\0\0\0\0", 8);
+    REFUSES(&first, &second, "names a section it lacks");
+    /* An auxiliary count past the table, a symbol name past the strings
+       and a section number past the sections. The last record is foo. */
+    first.length = 0;
+    text_append_bytes(&first, good.data, good.length);
+    first.data[symbols + 18 * 4 + 17] = 1;
+    REFUSES(&first, &second, "damaged symbol table");
+    DAMAGED(symbols + 18 * 2 + 4, (uint32_t)(good.length - strings),
+            "damaged symbol table");
+    DAMAGED(symbols + 18 * 2 + 4, 2, "damaged symbol table");
+    first.length = 0;
+    text_append_bytes(&first, good.data, good.length);
+    first.data[symbols + 18 * 4 + 12] = 3;
+    REFUSES(&first, &second, "a section number outside the object for foo");
+    /* A relocation of a symbol past the table. */
+    DAMAGED(get(&good, section_at(1) + 24, 4) + 4, 5, "names a symbol");
+    DAMAGED(get(&good, section_at(1) + 24, 4) + 4, 0xFFFFFFFFu,
+            "names a symbol");
+#undef DAMAGED
+    text_free(&good);
+    text_free(&first);
+    text_free(&second);
+    text_free(&error);
+}
+
+/* An associative COMDAT names its parent section by number, and a number
+   past the sections is refused. */
+static void test_associative_parent(void)
+{
+    struct t_object a = {AMD64, {{".text", CODE | COMDAT, call, 8, {{0}}, 0},
+                                 {".xdata", RDATA | COMDAT, "u", 1, {{0}}, 0}}, 2,
+                         {{".text", 0, 1, STATIC, true, ANY, 0},
+                          {"foo", 0, 1, EXTERNAL, false, 0, 0},
+                          {".xdata", 0, 2, STATIC, true, ASSOCIATIVE, 1}}, 3};
+    struct t_object b = {AMD64, {{".text", CODE, call, 8, {{0}}, 0}}, 1,
+                         {{"bar", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct text first = {0};
+    struct text second = {0};
+    struct text error = {0};
+    size_t parent;
+
+    build(&a, &first);
+    build(&b, &second);
+    CHECK(join_cut(&first, first.length, &second, &error));
+    CHECK_STR(text_cstr(&error), "");
+    /* The auxiliary record of .xdata follows its symbol, the fifth. */
+    parent = get(&first, 8, 4) + 18 * 4 + 12;
+    first.data[parent] = 3;
+    REFUSES(&first, &second, "names no section");
+    first.data[parent] = 0;
+    REFUSES(&first, &second, "names no section");
+    text_free(&first);
+    text_free(&second);
+    text_free(&error);
+}
+
+/* The header of an archive member: its name, then a size field of ten
+   bytes, and zeros and spaces in the other fields. */
+static void member_header(struct text *t, const char *name, const char *size)
+{
+    char header[61];
+
+    snprintf(header, sizeof header, "%-16s%-12s%-6s%-6s%-8s%-10s`\n", name,
+             "0", "0", "0", "644", size);
+    text_append_bytes(t, header, 60);
+}
+
+/* An archive whose index names foo in one member and bar in the next. The
+   member of foo needs bar. Its members follow without padding, since
+   both objects are of even size. */
+static void build_archive(struct text *out, size_t *index_at, size_t *foo_at,
+                          size_t *bar_at)
+{
+    struct t_object foo = {AMD64, {{".text", CODE, call, 8, {{1, 1}}, 1}}, 1,
+                           {{"foo", 0, 1, EXTERNAL, false, 0, 0},
+                            {"bar", 0, 0, EXTERNAL, false, 0, 0}}, 2};
+    struct t_object bar = {AMD64, {{".text", CODE, call, 8, {{0}}, 0}}, 1,
+                           {{"bar", 0, 1, EXTERNAL, false, 0, 0},
+                            {"baz", 0, 1, STATIC, false, 0, 0}}, 2};
+    struct text first = {0};
+    struct text second = {0};
+    char size[16];
+    unsigned char word[4];
+    size_t at;
+
+    build(&foo, &first);
+    build(&bar, &second);
+    CHECK(first.length % 2 == 0 && second.length % 2 == 0);
+    text_append(out, "!<arch>\n");
+    *index_at = out->length;
+    member_header(out, "/", "20");
+    at = 8 + 60 + 20;
+    *foo_at = at;
+    *bar_at = at + 60 + first.length;
+    word[0] = 0;
+    word[1] = 0;
+    word[2] = 0;
+    word[3] = 2;
+    text_append_bytes(out, word, 4);
+    word[3] = (unsigned char)*foo_at;
+    text_append_bytes(out, word, 4);
+    word[3] = (unsigned char)*bar_at;
+    word[2] = (unsigned char)(*bar_at >> 8);
+    text_append_bytes(out, word, 4);
+    text_append_bytes(out, "foo\0bar\0", 8);
+    snprintf(size, sizeof size, "%zu", first.length);
+    member_header(out, "foo.obj/", size);
+    text_append_bytes(out, first.data, first.length);
+    snprintf(size, sizeof size, "%zu", second.length);
+    member_header(out, "bar.obj/", size);
+    text_append_bytes(out, second.data, second.length);
+    text_free(&first);
+    text_free(&second);
+}
+
+/* The exports of the first size bytes of archive, copied into memory of
+   exactly that size, for an object that needs foo. */
+static bool exports_of(const struct text *archive, size_t size,
+                       struct text *out)
+{
+    struct t_object user = {AMD64, {{".text", CODE, call, 8, {{1, 0}}, 1}}, 1,
+                            {{"foo", 0, 0, EXTERNAL, false, 0, 0}}, 1};
+    struct text object = {0};
+    unsigned char *copy = malloc(size > 0 ? size : 1);
+    bool ok;
+
+    if (size > 0) {
+        memcpy(copy, archive->data, size);
+    }
+    build(&user, &object);
+    out->length = 0;
+    ok = coff_archive_exports(copy, size, (const unsigned char *)object.data,
+                              object.length, out);
+    free(copy);
+    text_free(&object);
+    return ok;
+}
+
+/* The archive index of coff_archive_exports: the closure from the object
+   through the index, then every damage of the index and of a member
+   header. */
+static void test_archive_index(void)
+{
+    static const char *const sizes[] = {"+%zu", " %zu", "%zux", "%zu 1",
+                                        "-%zu", "", "0x%zx", "99999999999"};
+    struct text archive = {0};
+    struct text damaged = {0};
+    struct text out = {0};
+    size_t index_at;
+    size_t foo_at;
+    size_t bar_at;
+    size_t cut;
+    size_t i;
+
+    build_archive(&archive, &index_at, &foo_at, &bar_at);
+    CHECK(exports_of(&archive, archive.length, &out));
+    CHECK_STR(text_cstr(&out), "foo\nbar\n");
+    /* Every archive cut short loses a member that the closure reads. */
+    for (cut = 0; cut < archive.length; cut++) {
+        CHECK(!exports_of(&archive, cut, &out));
+    }
+
+#define DAMAGE(at, bytes, n)                                    \
+    do {                                                        \
+        damaged.length = 0;                                     \
+        text_append_bytes(&damaged, archive.data, archive.length); \
+        memcpy(damaged.data + (at), bytes, n);                  \
+    } while (0)
+
+    /* No archive, and a first member that is no index. */
+    DAMAGE(0, "!<arch>?", 8);
+    CHECK(!exports_of(&damaged, damaged.length, &out));
+    DAMAGE(index_at, "x ", 2);
+    CHECK(!exports_of(&damaged, damaged.length, &out));
+    /* A count of names past the index, and names without their NUL. */
+    DAMAGE(index_at + 60, "\0\0\0\4", 4);
+    CHECK(!exports_of(&damaged, damaged.length, &out));
+    DAMAGE(index_at + 60, "\xff\xff\xff\xff", 4);
+    CHECK(!exports_of(&damaged, damaged.length, &out));
+    DAMAGE(index_at + 60 + 19, "x", 1);
+    CHECK(!exports_of(&damaged, damaged.length, &out));
+    /* An index shorter than its count field. */
+    DAMAGE(index_at + 48, "3         ", 10);
+    CHECK(!exports_of(&damaged, damaged.length, &out));
+    /* A member offset past the archive, and one whose header would end
+       past it. */
+    DAMAGE(index_at + 60 + 8, "\xff\xff\xff\xf0", 4);
+    CHECK(!exports_of(&damaged, damaged.length, &out));
+    DAMAGE(index_at + 60 + 8, "\0\0\0\0", 4);
+    damaged.data[index_at + 60 + 8 + 2] = (char)((archive.length - 30) >> 8);
+    damaged.data[index_at + 60 + 8 + 3] = (char)(archive.length - 30);
+    CHECK(!exports_of(&damaged, damaged.length, &out));
+    /* A size field of a member that is no plain decimal, each around the
+       size of the member, or past the archive. */
+    for (i = 0; i < sizeof sizes / sizeof sizes[0]; i++) {
+        char size[32];
+        char field[11];
+        snprintf(size, sizeof size, sizes[i], archive.length - bar_at - 60);
+        snprintf(field, sizeof field, "%-10s", size);
+        DAMAGE(bar_at + 48, field, 10);
+        if (exports_of(&damaged, damaged.length, &out)) {
+            check_failures++;
+            fprintf(stderr, "the size field `%s` was read\n", field);
+        }
+    }
+    /* A member whose size cuts its object short. */
+    DAMAGE(bar_at + 48, "40        ", 10);
+    CHECK(!exports_of(&damaged, damaged.length, &out));
+#undef DAMAGE
+    text_free(&archive);
+    text_free(&damaged);
+    text_free(&out);
+}
+
 void test_coff(void)
 {
     test_across();
@@ -662,4 +999,7 @@ void test_coff(void)
     test_uninitialised();
     test_long_names();
     test_section_limit();
+    test_truncated();
+    test_associative_parent();
+    test_archive_index();
 }

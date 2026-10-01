@@ -1010,20 +1010,38 @@ static uint32_t big_endian(const unsigned char *p)
            (uint32_t)p[2] << 8 | p[3];
 }
 
+/* The size field of a member header: decimal digits, then spaces to the
+   end of its 10 bytes. Any other byte is refused, where strtoul would
+   skip a space, take a sign or stop early. */
+static bool member_size(const unsigned char *field, size_t *size)
+{
+    size_t value = 0;
+    size_t i = 0;
+
+    while (i < 10 && field[i] >= '0' && field[i] <= '9') {
+        value = value * 10 + (size_t)(field[i] - '0');
+        i++;
+    }
+    if (i == 0) {
+        return false;
+    }
+    for (; i < 10; i++) {
+        if (field[i] != ' ') {
+            return false;
+        }
+    }
+    *size = value;
+    return true;
+}
+
 /* The bytes and the size of the member whose header stands at offset,
    from the size field of its header. */
 static bool member_at(const unsigned char *data, size_t size, size_t offset,
                       const unsigned char **bytes, size_t *length)
 {
-    char field[11];
-
-    if (offset > size || size - offset < 60) {
-        return false;
-    }
-    memcpy(field, data + offset + 48, 10);
-    field[10] = '\0';
-    *length = (size_t)strtoul(field, NULL, 10);
-    if (*length > size - offset - 60) {
+    if (offset > size || size - offset < 60 ||
+        !member_size(data + offset + 48, length) ||
+        *length > size - offset - 60) {
         return false;
     }
     *bytes = data + offset + 60;
