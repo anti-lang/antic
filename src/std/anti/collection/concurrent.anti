@@ -615,10 +615,10 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 		return equal;
 	}
 
-	/// The hash of the entries whatever their order, with `part_sum` giving
-	/// the sum of the hashes of the entries of one part. Every part stays
-	/// locked meanwhile, so the hash is that of one state of the map. The hash
-	/// of a map calls it.
+	/// The hash of the entries whatever their order, with `part_sum` giving the
+	/// sum of the hashes of the entries of one part. Every part stays locked
+	/// meanwhile, so the hash is that of one state of the map. The hash of a
+	/// map calls it.
 	///
 	/// DESIGN: the parts add up as `collection.hash_in_any_order` adds up the
 	/// entries of one `HashMap`, so the map hashes as a `HashMap` of the same

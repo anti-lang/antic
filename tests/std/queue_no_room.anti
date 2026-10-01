@@ -1,0 +1,30 @@
+//! A `PriorityQueue` made with room from an allocator that has run out stops
+//! the program in `new`, as a `List` and a `Deque` do. It does not go on empty
+//! and fail later at a `push`.
+
+import anti.collection.queue.{PriorityQueue};
+import anti.mem;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// An allocator that has run out and refuses every request.
+class Refusing inherits mem.Allocator
+{
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		return none;
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+	}
+}
+
+fn main() -> int
+{
+	let none_left = Refusing { };
+	printf("before new\n".ptr);
+	let q = PriorityQueue<int>.new(4, &none_left);
+	printf("not reached: %d elements\n".ptr, q.count as c_int);
+	return 0;
+}

@@ -557,13 +557,13 @@ pub fn hash_of_sum(count: int, sum: u64) -> u64
 	return (count, sum).hash();
 }
 
-/// Whether the record `arg` of a type argument names `str`. A map whose key
-/// is `str` writes a JSON object, `{"Ann":41}`, and any other map an array of
+/// Whether the record `arg` of a type argument names `str`. A map whose key is
+/// `str` writes a JSON object, `{"Ann":41}`, and any other map an array of
 /// pairs, `[[1,10],[2,20]]`.
 ///
-/// DESIGN: the runtime reads the record, so no module of the library copies
-/// the layout of `struct anti_field` or the numbers of the types, and none
-/// imports `anti.reflect` for them.
+/// DESIGN: the runtime reads the record, so no module of the library copies the
+/// layout of `struct anti_field` or the numbers of the types, and none imports
+/// `anti.reflect` for them.
 pub fn text_keys(arg: ?*byte) -> bool
 {
 	return anti_rt_arg_is_str(arg) != 0;
@@ -590,9 +590,9 @@ pub fn close_entries(out: *text.Builder, named: bool)
 	}
 }
 
-/// Write one entry of a map as JSON, the key at `k` of the record `key` and
-/// the value at `v` of the record `value`, each as `serialize` writes a field
-/// of its type: a member of an object when `named` and a pair in an array
+/// Write one entry of a map as JSON, the key at `k` of the record `key` and the
+/// value at `v` of the record `value`, each as `serialize` writes a field of
+/// its type: a member of an object when `named` and a pair in an array
 /// otherwise. `first` is the first entry, which no comma precedes.
 pub fn write_entry(out: *text.Builder, named: bool, first: bool, k: ?*byte,
 	key: ?*byte, v: ?*byte, value: ?*byte)
@@ -671,34 +671,29 @@ fn element_align<T>() -> int
 	return size & -size;
 }
 
-/// Copies of elements of another collection, which `find_all` gives.
+/// The base of the collections that keep their elements in one block of room
+/// and reach each by its position from 0: `List`, `Deque`, `Ring`, `Grid`,
+/// `PriorityQueue` and `Copies`.
 ///
-/// It is a collection of its own and owns its copies, which it tears down at
-/// the end of its block. Its room comes from the allocator of the collection
-/// that made it.
-pub class Copies<T> inherits Collection<T>
+/// The element at position `i` stands in the slot `slot(i)`. The slots count
+/// from `head` and wrap at `capacity`, so a collection whose `head` stays 0
+/// keeps its elements side by side from the start of the room, and a ring that
+/// moves `head` keeps them in a ring. The place of an element is its position,
+/// so the class fills the five functions of `Collection<T>`, and it holds the
+/// growth, the walk, the copy and the teardown once for all of them.
+pub abstract class Indexed<T> inherits Collection<T>
 {
-	items: ?*T = none,
-	capacity: int = 0,
-
-	/// An empty collection with room for `capacity` copies from `from`, or from
-	/// the C library when it is `none`.
-	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> Copies<T>
-	{
-		let made = Copies<T> { from: allocator(from) };
-		if capacity > 0 {
-			made.items = made.room(capacity);
-			if made.items != none {
-				made.capacity = capacity;
-			}
-		}
-		return made;
-	}
-
-	operator fn iter(self) -> CopiesWalk<T>
-	{
-		return CopiesWalk<T>.over(self.items, self.count, self.watch());
-	}
+	/// The room, `capacity` slots and `spare` more, or `none` before any.
+	protected items: ?*T = none,
+	/// The number of slots that hold elements or room for them.
+	protected capacity: int = 0,
+	/// The slot of the element at position 0.
+	protected head: int = 0,
+	/// The slots past `capacity` that the room holds for the class itself.
+	protected spare: int = 0,
+	/// Whether the elements stand in a ring, so that the first leaves by moving
+	/// `head` on. Otherwise `head` stays 0 and the elements stand side by side.
+	protected ring: bool = false,
 
 	concrete fn first_place(self) -> int
 	{
@@ -718,18 +713,19 @@ pub class Copies<T> inherits Collection<T>
 
 	concrete fn lend_place(self, at: int, f: fn(lent *T))
 	{
-		let items = self.items else {
-			return;
-		};
-		f(&items[at]);
+		let items = self.items catch fatal;
+		f(&items[self.slot(at)]);
 	}
 
 	concrete fn copy_place(self, at: int) -> T
 	{
 		let items = self.items catch fatal;
-		return self.copy_element(&items[at]);
+		return self.copy_element(&items[self.slot(at)]);
 	}
 
+	/// The element at `at` leaves, and the elements after it move one slot back
+	/// as bytes to close the gap. In a ring the first element leaves by moving
+	/// `head` on instead.
 	concrete fn take_place(self, at: int) -> (T, int)
 	{
 		let items = self.items catch fatal;
@@ -737,49 +733,116 @@ pub class Copies<T> inherits Collection<T>
 		if at + 1 < self.count {
 			after = at;
 		}
-		let taken = (items[at], after);
-		self.close_gap(items, at, self.count);
+		let taken = (items[self.slot(at)], after);
+		if !self.ring {
+			self.close_gap(items, at, self.count);
+			return taken;
+		}
+		if at == 0 {
+			memset(&items[self.head] as ?*byte, 0, size_of(T) as c_size_t);
+			self.head = self.slot(1);
+			return taken;
+		}
+		let i = at;
+		while i + 1 < self.count do {
+			memcpy(&items[self.slot(i)] as ?*byte,
+				&items[self.slot(i + 1)] as ?*byte, size_of(T) as c_size_t);
+			i += 1;
+		}
+		memset(&items[self.slot(self.count - 1)] as ?*byte, 0,
+			size_of(T) as c_size_t);
 		return taken;
 	}
 
-	/// Copies in `to` with room of their own for `count` elements from the same
-	/// allocator, and a copy of each element in it, as `dup` makes one.
-	concrete fn copy(self, to: *Object)
+	/// The slot that holds the element at position `i`, which lies between 0
+	/// and `capacity`.
+	protected fn slot(self, i: int) -> int
 	{
-		/* DESIGN: `dup` gives a replaced `copy` memory that nothing has
-		   written, and a collection gives it the bytes of the element. The
-		   bytes of these copies go into `to` first in both cases, its table
-		   among them, and the copy then takes room of its own. */
-		memcpy(to as ?*byte, self as ?*byte, size_of(Copies<T>) as c_size_t);
-		let made = to as *Copies<T>;
-		made.items = none;
-		made.capacity = 0;
-		if self.count == 0 {
-			return;
+		let s = self.head + i;
+		if s >= self.capacity {
+			s -= self.capacity;
 		}
-		let items = self.items catch fatal;
-		let room = self.room(self.count) catch fatal;
-		let i = 0;
-		while i < self.count do {
-			room[i] = self.copy_element(&items[i]);
-			i += 1;
-		}
-		made.items = room;
-		made.capacity = self.count;
+		return s;
 	}
 
-	/// Add `x` at the end, which the collection now owns.
-	pub fn add(self, own x: T, at: lang.SourceLocation = here)
+	/// A walk of the elements from position 0, which lends each in turn.
+	protected fn walk(self) -> IndexedWalk<T>
 	{
-		if self.count == self.capacity {
-			let size = self.grown(self.capacity, self.count + 1);
-			let made = self.moved(self.items, self.count, size) catch fatal;
-			self.items = made;
-			self.capacity = size;
+		return IndexedWalk<T>.over(self.items, self.capacity, self.head,
+			self.count, self.watch());
+	}
+
+	/// Make room for `n` more elements, doubling the capacity as often as it
+	/// takes.
+	protected fn make_room(self, n: int)
+	{
+		if self.count + n > self.capacity {
+			self.resize(self.grown(self.capacity, self.count + n));
 		}
-		let items = self.items catch fatal;
-		items[self.count] = x;
-		self.resized(1, at);
+	}
+
+	/// Move the elements in order into room for `n` and the spare slots, the
+	/// first at the start, and give back the old room. `n` is at least `count`,
+	/// and room for no slot at all gives back the room. Stops the program when
+	/// the allocator has run out.
+	protected fn resize(self, n: int)
+	{
+		if n + self.spare == 0 {
+			self.give_back(self.items);
+			self.items = none;
+			self.capacity = 0;
+			self.head = 0;
+			return;
+		}
+		let made = self.room(n + self.spare) catch fatal;
+		if let items = self.items {
+			let first = self.capacity - self.head;
+			if first > self.count {
+				first = self.count;
+			}
+			if first > 0 {
+				memcpy(made as ?*byte, &items[self.head] as ?*byte,
+					(first * size_of(T)) as c_size_t);
+			}
+			if self.count > first {
+				memcpy(&made[first] as ?*byte, items as ?*byte,
+					((self.count - first) * size_of(T)) as c_size_t);
+			}
+			self.give_back(items);
+		}
+		self.items = made;
+		self.capacity = n;
+		self.head = 0;
+	}
+
+	/// Give `made`, whose bytes are a copy of this collection's, room of its
+	/// own for `n` elements and the spare slots from the same allocator, and a
+	/// copy of each element in order from the start. `n` is at least `count`.
+	/// The copy of a class calls it after it copied its bytes, as `dup` makes
+	/// one.
+	///
+	/// DESIGN: `dup` gives a replaced `copy` memory that nothing has written,
+	/// and a collection gives it the bytes of the element. The class copies its
+	/// own bytes into `to` first in both cases, its table among them, since
+	/// only it knows its size, and the copy then takes room of its own here.
+	protected fn copy_into(self, made: *Indexed<T>, n: int)
+	{
+		made.items = none;
+		made.capacity = 0;
+		made.head = 0;
+		if n + self.spare == 0 {
+			return;
+		}
+		let room = self.room(n + self.spare) catch fatal;
+		if let items = self.items {
+			let i = 0;
+			while i < self.count do {
+				room[i] = self.copy_element(&items[self.slot(i)]);
+				i += 1;
+			}
+		}
+		made.items = room;
+		made.capacity = n;
 	}
 
 	fn destruct(self)
@@ -789,25 +852,36 @@ pub class Copies<T> inherits Collection<T>
 		};
 		let i = self.count - 1;
 		while i >= 0 do {
-			self.destroy_element(&items[i]);
+			self.destroy_element(&items[self.slot(i)]);
 			i -= 1;
 		}
 		self.give_back(items);
 	}
 }
 
-/// The iterator of `Copies<T>`, which lends each copy in turn.
-pub class CopiesWalk<T>
+/// The iterator of the collections over `Indexed<T>` that lend their elements,
+/// which lends each element in turn from position 0.
+pub class IndexedWalk<T>
 {
 	watch: lang.Watch,
 	items: ?*T,
+	capacity: int,
+	head: int,
 	count: int,
 	at: int = -1,
 
-	/// A walk of the `count` elements at `items`, which `watch` guards.
-	pub fn over(items: ?*T, count: int, watch: lang.Watch) -> CopiesWalk<T>
+	/// A walk of the `count` elements that stand from the slot `head` of the
+	/// `capacity` slots at `items`, which `watch` guards.
+	pub fn over(items: ?*T, capacity: int, head: int, count: int,
+		watch: lang.Watch) -> IndexedWalk<T>
 	{
-		return CopiesWalk<T> { watch: watch, items: items, count: count };
+		return IndexedWalk<T> {
+			watch: watch,
+			items: items,
+			capacity: capacity,
+			head: head,
+			count: count,
+		};
 	}
 
 	operator fn next(self) -> bool
@@ -819,7 +893,53 @@ pub class CopiesWalk<T>
 	operator fn value(self) -> lent *T
 	{
 		let items = self.items catch fatal;
-		return &items[self.at];
+		let s = self.head + self.at;
+		if s >= self.capacity {
+			s -= self.capacity;
+		}
+		return &items[s];
+	}
+}
+
+/// Copies of elements of another collection, which `find_all` gives.
+///
+/// It is a collection of its own and owns its copies, which it tears down at
+/// the end of its block. Its room comes from the allocator of the collection
+/// that made it.
+pub class Copies<T> inherits Indexed<T>
+{
+	/// An empty collection with room for `capacity` copies from `from`, or from
+	/// the C library when it is `none`. The room comes in one allocation, and
+	/// the program stops when the allocator has run out.
+	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> Copies<T>
+	{
+		let made = Copies<T> { from: allocator(from) };
+		if capacity > 0 {
+			made.resize(capacity);
+		}
+		return made;
+	}
+
+	operator fn iter(self) -> IndexedWalk<T>
+	{
+		return self.walk();
+	}
+
+	/// Copies in `to` with room of their own for `count` elements from the same
+	/// allocator, and a copy of each element in it, as `dup` makes one.
+	concrete fn copy(self, to: *Object)
+	{
+		memcpy(to as ?*byte, self as ?*byte, size_of(Copies<T>) as c_size_t);
+		self.copy_into(to as *Copies<T>, self.count);
+	}
+
+	/// Add `x` at the end, which the collection now owns.
+	pub fn add(self, own x: T, at: lang.SourceLocation = here)
+	{
+		self.make_room(1);
+		let items = self.items catch fatal;
+		items[self.count] = x;
+		self.resized(1, at);
 	}
 }
 

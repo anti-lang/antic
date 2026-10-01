@@ -5,31 +5,27 @@
 //! the end of the room, so both ends take and give an element without moving
 //! the others. It grows by doubling, or by `reserve` in one allocation, and
 //! `shrink` gives back the room past the last element. It has every operation
-//! of `anti.collection.Collection<T>`.
+//! of `anti.collection.Collection<T>`, and `anti.collection.Indexed<T>` holds
+//! its ring.
 
 import anti.collection;
 import anti.lang;
 import anti.mem;
 
 extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
-extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
 
 /// A sequence of elements of type `T` that grows and shrinks at both ends.
 ///
 /// `push_front` and `push_back` add an element, `pop_front` and `pop_back` take
 /// one off, and `front` and `back` give a copy. The last four give `none` when
 /// the deque is empty.
-pub class Deque<T> inherits collection.Collection<T>
+pub class Deque<T> inherits collection.Indexed<T>
 {
-	items: ?*T = none,
-	capacity: int = 0,
-	head: int = 0,
-
 	/// An empty deque with room for `capacity` elements from `from`, or from
 	/// the C library when it is `none`. The room comes in one allocation.
 	pub fn new(capacity: int = 0, from: ?*mem.Allocator = none) -> Deque<T>
 	{
-		let made = Deque<T> { from: collection.allocator(from) };
+		let made = Deque<T> { from: collection.allocator(from), ring: true };
 		if capacity > 0 {
 			made.resize(capacity);
 		}
@@ -111,10 +107,9 @@ pub class Deque<T> inherits collection.Collection<T>
 		}
 	}
 
-	operator fn iter(self) -> DequeWalk<T>
+	operator fn iter(self) -> collection.IndexedWalk<T>
 	{
-		return DequeWalk<T>.over(self.items, self.capacity, self.head,
-			self.count, self.watch());
+		return self.walk();
 	}
 
 	/// A deque in `to` with room of its own for `count` elements from the same
@@ -122,183 +117,8 @@ pub class Deque<T> inherits collection.Collection<T>
 	/// one.
 	concrete fn copy(self, to: *Object)
 	{
-		/* DESIGN: `dup` gives a replaced `copy` memory that nothing has
-		   written, and a collection gives it the bytes of the element. The
-		   bytes of this deque go into `to` first in both cases, its table
-		   among them, and the copy then takes room of its own. */
 		memcpy(to as ?*byte, self as ?*byte, size_of(Deque<T>) as c_size_t);
-		let made = to as *Deque<T>;
-		made.items = none;
-		made.capacity = 0;
-		made.head = 0;
-		if self.count == 0 {
-			return;
-		}
-		let items = self.items catch fatal;
-		let room = self.room(self.count) catch fatal;
-		let i = 0;
-		while i < self.count do {
-			room[i] = self.copy_element(&items[self.slot(i)]);
-			i += 1;
-		}
-		made.items = room;
-		made.capacity = self.count;
-	}
-
-	/// A place is the position of an element from the front, 0 for the first.
-	concrete fn first_place(self) -> int
-	{
-		if self.count == 0 {
-			return -1;
-		}
-		return 0;
-	}
-
-	concrete fn next_place(self, at: int) -> int
-	{
-		if at + 1 >= self.count {
-			return -1;
-		}
-		return at + 1;
-	}
-
-	concrete fn lend_place(self, at: int, f: fn(lent *T))
-	{
-		let items = self.items catch fatal;
-		f(&items[self.slot(at)]);
-	}
-
-	concrete fn copy_place(self, at: int) -> T
-	{
-		let items = self.items catch fatal;
-		return self.copy_element(&items[self.slot(at)]);
-	}
-
-	/// The first element leaves by moving `head` on and the last by leaving its
-	/// slot. Any other element leaves a gap that the elements after it close,
-	/// each moved one slot back as bytes.
-	concrete fn take_place(self, at: int) -> (T, int)
-	{
-		let items = self.items catch fatal;
-		let after = -1;
-		if at + 1 < self.count {
-			after = at;
-		}
-		let taken = (items[self.slot(at)], after);
-		if at == 0 {
-			memset(&items[self.head] as ?*byte, 0, size_of(T) as c_size_t);
-			self.head = (self.head + 1) % self.capacity;
-			return taken;
-		}
-		let i = at;
-		while i + 1 < self.count do {
-			memcpy(&items[self.slot(i)] as ?*byte,
-				&items[self.slot(i + 1)] as ?*byte, size_of(T) as c_size_t);
-			i += 1;
-		}
-		memset(&items[self.slot(self.count - 1)] as ?*byte, 0,
-			size_of(T) as c_size_t);
-		return taken;
-	}
-
-	/// The slot of the room that holds the element at position `i` from the
-	/// front.
-	fn slot(self, i: int) -> int
-	{
-		return (self.head + i) % self.capacity;
-	}
-
-	/// Make room for `n` more elements, doubling the capacity as often as it
-	/// takes.
-	fn make_room(self, n: int)
-	{
-		if self.count + n > self.capacity {
-			self.resize(self.grown(self.capacity, self.count + n));
-		}
-	}
-
-	/// Move the elements in order into room for `n`, which is at least `count`,
-	/// the first at the start. Stops the program when the allocator has run
-	/// out.
-	fn resize(self, n: int)
-	{
-		if n == 0 {
-			self.give_back(self.items);
-			self.items = none;
-			self.capacity = 0;
-			self.head = 0;
-			return;
-		}
-		let made = self.room(n) catch fatal;
-		if let items = self.items {
-			let first = self.capacity - self.head;
-			if first > self.count {
-				first = self.count;
-			}
-			if first > 0 {
-				memcpy(made as ?*byte, &items[self.head] as ?*byte,
-					(first * size_of(T)) as c_size_t);
-			}
-			if self.count > first {
-				memcpy(&made[first] as ?*byte, items as ?*byte,
-					((self.count - first) * size_of(T)) as c_size_t);
-			}
-			self.give_back(items);
-		}
-		self.items = made;
-		self.capacity = n;
-		self.head = 0;
-	}
-
-	fn destruct(self)
-	{
-		let items = self.items else {
-			return;
-		};
-		let i = self.count - 1;
-		while i >= 0 do {
-			self.destroy_element(&items[self.slot(i)]);
-			i -= 1;
-		}
-		self.give_back(items);
-	}
-}
-
-/// The iterator of `Deque<T>`, which lends each element in turn, from the
-/// front.
-pub class DequeWalk<T>
-{
-	watch: lang.Watch,
-	items: ?*T,
-	capacity: int,
-	head: int,
-	count: int,
-	at: int = -1,
-
-	/// A walk of the `count` elements that stand from the slot `head` of the
-	/// `capacity` slots at `items`, which `watch` guards.
-	pub fn over(items: ?*T, capacity: int, head: int, count: int,
-		watch: lang.Watch) -> DequeWalk<T>
-	{
-		return DequeWalk<T> {
-			watch: watch,
-			items: items,
-			capacity: capacity,
-			head: head,
-			count: count,
-		};
-	}
-
-	operator fn next(self) -> bool
-	{
-		self.at += 1;
-		return self.at < self.count;
-	}
-
-	operator fn value(self) -> lent *T
-	{
-		let items = self.items catch fatal;
-		return &items[(self.head + self.at) % self.capacity];
+		self.copy_into(to as *Deque<T>, self.count);
 	}
 }
 
