@@ -227,10 +227,10 @@ static void end_sequence(struct blob *p)
     add_int(p, 1, 1);
 }
 
-/* The rows 0x1000 at line 1 + delta and 0x1010. */
-static void two_rows(struct blob *p, int64_t delta)
+/* The rows address at line 1 + delta and address + 0x10. */
+static void two_rows_at(struct blob *p, uint64_t address, int64_t delta)
 {
-    set_address(p, 0x1000);
+    set_address(p, address);
     add_int(p, 3, 1);           /* advance_line */
     add_sleb(p, delta);
     add_int(p, 1, 1);           /* copy */
@@ -238,6 +238,12 @@ static void two_rows(struct blob *p, int64_t delta)
     add_uleb(p, 0x10);
     add_int(p, 1, 1);
     end_sequence(p);
+}
+
+/* The rows 0x1000 at line 1 + delta and 0x1010. */
+static void two_rows(struct blob *p, int64_t delta)
+{
+    two_rows_at(p, 0x1000, delta);
 }
 
 enum {
@@ -620,6 +626,390 @@ static void macho_text(void)
     CHECK(vmaddr == 0x100000000);
 }
 
+/* Malformed Mach-O symbol tables, debug maps and object line tables.
+   Each file is built in a buffer and copied into memory of exactly its
+   size, so the sanitizer builds catch a read or a write past it. */
+
+/* One nlist_64 record: the offset of its name, its type, its section and
+   its value. */
+struct t_nlist {
+    uint32_t name;
+    uint8_t type;
+    uint8_t sect;
+    uint64_t value;
+};
+
+enum {
+    N_OSO = 0x66, N_FUN = 0x24, N_SECT_EXT = 0x0f, N_SECT = 0x0e,
+    MACHO_VMADDR = 0x4000
+};
+
+/* The names of the symbols below: "" at 0, "/tmp/a.o" at 1, "_f" at 10,
+   "_g" at 13 and "/tmp/b.o" at 16. */
+static const char macho_names[] = "\0/tmp/a.o\0_f\0_g\0/tmp/b.o";
+
+/* A debug map of a.o with f, and the symbols f at 0x1000 and g at 0x1040. */
+static const struct t_nlist macho_one[] = {
+    {1, N_OSO, 0, 0}, {10, N_FUN, 1, 0x1000}, {0, N_FUN, 0, 0x20},
+    {10, N_SECT_EXT, 1, 0x1000}, {13, N_SECT_EXT, 1, 0x1040}
+};
+
+/* A Mach-O file of a header, a __LINKEDIT segment at MACHO_VMADDR and
+   offset 0, and a symbol table of the records with macho_names after
+   them. The names end the file. Gives its size. */
+static size_t macho_image(uint8_t *out, size_t room, const struct t_nlist *n,
+                          uint32_t count)
+{
+    size_t symbols = 32 + 72 + 24;
+    size_t strings = symbols + 16 * (size_t)count;
+    uint32_t i;
+
+    CHECK(strings + sizeof macho_names <= room);
+    memset(out, 0, room);
+    put(out, 0xfeedfacf, 4);
+    put(out + 16, 2, 4);
+    put(out + 20, 72 + 24, 4);
+    put(out + 32, 0x19, 4);
+    put(out + 36, 72, 4);
+    memcpy(out + 40, "__LINKEDIT", 10);
+    put(out + 32 + 24, MACHO_VMADDR, 8);
+    put(out + 104, 0x2, 4);
+    put(out + 108, 24, 4);
+    put(out + 112, symbols, 4);
+    put(out + 116, count, 4);
+    put(out + 120, strings, 4);
+    put(out + 124, sizeof macho_names, 4);
+    for (i = 0; i < count; i++) {
+        uint8_t *r = out + symbols + 16 * (size_t)i;
+        put(r, n[i].name, 4);
+        r[4] = n[i].type;
+        r[5] = n[i].sect;
+        put(r + 8, n[i].value, 8);
+    }
+    memcpy(out + strings, macho_names, sizeof macho_names);
+    return strings + sizeof macho_names;
+}
+
+/* A copy of the first size bytes of image in memory of its own. */
+static uint8_t *exactly(const uint8_t *image, size_t size)
+{
+    uint8_t *copy = malloc(size > 0 ? size : 1);
+
+    if (copy != NULL && size > 0) {
+        memcpy(copy, image, size);
+    }
+    return copy;
+}
+
+static bool count_any(void *context, const char *name, uint64_t vaddr,
+                      uint64_t size)
+{
+    int *count = context;
+
+    (void)name;
+    (void)vaddr;
+    (void)size;
+    *count += 1;
+    return false;
+}
+
+/* The functions of the table, counted. */
+static int macho_count(const struct anti_macho_table *t)
+{
+    int count = 0;
+
+    anti_rt_macho_functions(t, count_any, &count);
+    return count;
+}
+
+/* Whether the debug map names object and symbol for vaddr. */
+static bool maps_to(const struct anti_macho_table *t, uint64_t vaddr,
+                    const char *object, const char *symbol)
+{
+    const char *o = NULL;
+    const char *s = NULL;
+    uint64_t start = 0;
+
+    return anti_rt_macho_debug_map(t, vaddr, &o, &s, &start) &&
+           strcmp(o, object) == 0 && strcmp(s, symbol) == 0;
+}
+
+static void macho_symbols(void)
+{
+    uint8_t image[512];
+    struct anti_macho_table t;
+    struct anti_found found;
+    const char *object = NULL;
+    const char *symbol = NULL;
+    uint64_t start = 0;
+    uint64_t vaddr = 0;
+    size_t size = macho_image(image, sizeof image, macho_one, 5);
+    size_t cut;
+
+    /* The whole file, read from its bytes and as a mapped image. */
+    CHECK(anti_rt_macho_table(image, size, false, 0, &t));
+    CHECK(t.count == 5 && macho_count(&t) == 2);
+    memset(&found, 0, sizeof found);
+    CHECK(anti_rt_macho_function(&t, 0x1010, &found));
+    CHECK(found.function != NULL && strcmp(found.function, "f") == 0);
+    CHECK(anti_rt_macho_function(&t, 0x1050, &found));
+    CHECK(found.function != NULL && strcmp(found.function, "g") == 0);
+    CHECK(!anti_rt_macho_function(&t, 0xfff, &found));
+    CHECK(anti_rt_macho_symbol(&t, "g", &vaddr) && vaddr == 0x1040);
+    CHECK(anti_rt_macho_debug_map(&t, 0x1010, &object, &symbol, &start));
+    CHECK(object != NULL && strcmp(object, "/tmp/a.o") == 0);
+    CHECK(symbol != NULL && strcmp(symbol, "_f") == 0 && start == 0x1000);
+    CHECK(!anti_rt_macho_debug_map(&t, 0x1020, &object, &symbol, &start));
+    CHECK(anti_rt_macho_table(image, SIZE_MAX, true,
+                              (intptr_t)((uintptr_t)image - MACHO_VMADDR), &t));
+    CHECK(t.count == 5 && macho_count(&t) == 2);
+
+    /* Every file cut short loses the end of its names. */
+    for (cut = 0; cut < size; cut++) {
+        uint8_t *copy = exactly(image, cut);
+        CHECK(!anti_rt_macho_table(copy, cut, false, 0, &t));
+        free(copy);
+    }
+
+    /* The table or the names past the end of the file, or a count or a
+       size that runs past it. */
+    put(image + 112, size, 4);
+    CHECK(!anti_rt_macho_table(image, size, false, 0, &t));
+    put(image + 112, 0xfffffff0u, 4);
+    CHECK(!anti_rt_macho_table(image, size, false, 0, &t));
+    put(image + 112, 128, 4);
+    put(image + 116, 7, 4);
+    CHECK(!anti_rt_macho_table(image, size, false, 0, &t));
+    put(image + 116, 0xffffffffu, 4);
+    CHECK(!anti_rt_macho_table(image, size, false, 0, &t));
+    put(image + 116, 5, 4);
+    put(image + 124, sizeof macho_names + 1, 4);
+    CHECK(!anti_rt_macho_table(image, size, false, 0, &t));
+    put(image + 124, 0xffffffffu, 4);
+    CHECK(!anti_rt_macho_table(image, size, false, 0, &t));
+    put(image + 120, 0xfffffff0u, 4);
+    put(image + 124, sizeof macho_names, 4);
+    CHECK(!anti_rt_macho_table(image, size, false, 0, &t));
+
+    /* A symbol table command too short to hold its fields, and none. */
+    size = macho_image(image, sizeof image, macho_one, 5);
+    put(image + 108, 16, 4);
+    CHECK(!anti_rt_macho_table(image, size, false, 0, &t));
+    put(image + 108, 24, 4);
+    put(image + 104, 0x99, 4);
+    CHECK(!anti_rt_macho_table(image, size, false, 0, &t));
+    put(image + 104, 0x2, 4);
+    /* A mapped image finds its table through __LINKEDIT alone. */
+    memcpy(image + 40, "__DATA\0\0\0\0", 10);
+    CHECK(anti_rt_macho_table(image, size, false, 0, &t));
+    CHECK(!anti_rt_macho_table(image, SIZE_MAX, true, 0, &t));
+
+    /* A name past the names, at their end, and one that runs off it.
+       Each symbol is passed over, and the others stay. */
+    size = macho_image(image, sizeof image, macho_one, 5);
+    put(image + 128 + 16 * 4, 500, 4);
+    CHECK(anti_rt_macho_table(image, size, false, 0, &t));
+    CHECK(macho_count(&t) == 1 && !anti_rt_macho_symbol(&t, "g", &vaddr));
+    put(image + 128 + 16 * 4, sizeof macho_names, 4);
+    CHECK(macho_count(&t) == 1 && !anti_rt_macho_symbol(&t, "g", &vaddr));
+    put(image + 128 + 16 * 4, 16, 4);
+    image[size - 1] = 'x';
+    CHECK(macho_count(&t) == 1 && !anti_rt_macho_symbol(&t, "g", &vaddr));
+    CHECK(anti_rt_macho_symbol(&t, "f", &vaddr) && vaddr == 0x1000);
+}
+
+/* The debug map against damaged entries. A function belongs to the object
+   entry before it, and an entry whose name is damaged names no object
+   and no function. */
+static void macho_debug_map(void)
+{
+    static const struct t_nlist two[] = {
+        {1, N_OSO, 0, 0}, {10, N_FUN, 1, 0x1000}, {0, N_FUN, 0, 0x20},
+        {16, N_OSO, 0, 0}, {13, N_FUN, 1, 0x1040}, {0, N_FUN, 0, 0x20}
+    };
+    static const struct t_nlist open[] = {
+        {1, N_OSO, 0, 0}, {10, N_FUN, 1, 0x1000}, {500, N_FUN, 1, 0x1040},
+        {0, N_FUN, 0, 0x80}
+    };
+    static const struct t_nlist stray[] = {
+        {1, N_OSO, 0, 0}, {0, N_FUN, 0, 0x20}, {10, N_FUN, 1, 0x1000},
+        {0, N_FUN, 0, 0}, {13, N_FUN, 1, 0x1040}, {0, N_FUN, 0, UINT64_MAX}
+    };
+    uint8_t image[512];
+    struct anti_macho_table t;
+    size_t size;
+
+    size = macho_image(image, sizeof image, two, 6);
+    CHECK(anti_rt_macho_table(image, size, false, 0, &t));
+    CHECK(maps_to(&t, 0x1010, "/tmp/a.o", "_f"));
+    CHECK(maps_to(&t, 0x1050, "/tmp/b.o", "_g"));
+    /* The name of b.o lies past the names. */
+    put(image + 128 + 16 * 3, 500, 4);
+    CHECK(maps_to(&t, 0x1010, "/tmp/a.o", "_f"));
+    CHECK(!maps_to(&t, 0x1050, "/tmp/a.o", "_g"));
+    CHECK(!maps_to(&t, 0x1050, "/tmp/b.o", "_g"));
+
+    /* The start of g is damaged, so the end after it closes no function,
+       and f, which has no end, takes no address. */
+    size = macho_image(image, sizeof image, open, 4);
+    CHECK(anti_rt_macho_table(image, size, false, 0, &t));
+    CHECK(!maps_to(&t, 0x1010, "/tmp/a.o", "_f"));
+    CHECK(!maps_to(&t, 0x1050, "/tmp/a.o", "_f"));
+
+    /* An end before any start, an end of size 0, and one whose size runs
+       to the end of the address space. */
+    size = macho_image(image, sizeof image, stray, 6);
+    CHECK(anti_rt_macho_table(image, size, false, 0, &t));
+    CHECK(!maps_to(&t, 0x1000, "/tmp/a.o", "_f"));
+    CHECK(!maps_to(&t, 0x0, "/tmp/a.o", ""));
+    CHECK(maps_to(&t, 0x1040, "/tmp/a.o", "_g"));
+    CHECK(maps_to(&t, UINT64_MAX, "/tmp/a.o", "_g"));
+    CHECK(!maps_to(&t, 0x103f, "/tmp/a.o", "_g"));
+}
+
+/* An object file with one section, __debug_line of __DWARF, the symbol
+   _f at 0x1000 and the line table line. Its relocations follow the
+   section, and the symbol table and its names end the file. Gives the
+   size. */
+static size_t macho_object(uint8_t *out, size_t room, const struct blob *line,
+                           const uint8_t *relocs, uint32_t nreloc)
+{
+    static const struct t_nlist f[] = {{10, N_SECT, 1, 0x1000}};
+    size_t section = 32 + 152 + 24;
+    size_t reloff = section + line->size;
+    size_t symbols = reloff + 8 * (size_t)nreloc;
+    size_t strings = symbols + 16;
+    uint8_t *s = out + 32 + 72;
+
+    CHECK(strings + sizeof macho_names <= room);
+    memset(out, 0, room);
+    put(out, 0xfeedfacf, 4);
+    put(out + 16, 2, 4);
+    put(out + 20, 152 + 24, 4);
+    put(out + 32, 0x19, 4);
+    put(out + 36, 152, 4);
+    put(out + 32 + 64, 1, 4);
+    memcpy(s, "__debug_line", 12);
+    memcpy(s + 16, "__DWARF", 7);
+    put(s + 40, line->size, 8);
+    put(s + 48, section, 4);
+    put(s + 56, reloff, 4);
+    put(s + 60, nreloc, 4);
+    put(out + 184, 0x2, 4);
+    put(out + 188, 24, 4);
+    put(out + 192, symbols, 4);
+    put(out + 196, 1, 4);
+    put(out + 200, strings, 4);
+    put(out + 204, sizeof macho_names, 4);
+    memcpy(out + section, line->bytes, line->size);
+    if (nreloc > 0) {
+        memcpy(out + reloff, relocs, 8 * (size_t)nreloc);
+    }
+    put(out + symbols, f[0].name, 4);
+    out[symbols + 4] = f[0].type;
+    out[symbols + 5] = f[0].sect;
+    put(out + symbols + 8, f[0].value, 8);
+    memcpy(out + strings, macho_names, sizeof macho_names);
+    return strings + sizeof macho_names;
+}
+
+/* The line of _f + 4 in the object, from a copy of exactly size bytes
+   that the relocations resolve first. 0 for none. */
+static int64_t object_line(const uint8_t *image, size_t size)
+{
+    uint8_t *copy = exactly(image, size);
+    struct anti_found found;
+    int64_t line = 0;
+
+    memset(&found, 0, sizeof found);
+    anti_rt_macho_relocate(copy, size);
+    if (anti_rt_macho_object_line(copy, size, "_f", 4, &found)) {
+        line = found.line;
+        CHECK(found.file != NULL && strcmp(found.file, "a.anti") == 0);
+    }
+    free(copy);
+    return line;
+}
+
+/* A relocation of the plain unsigned kind at address, against symbol
+   index, of 1 << length bytes. */
+static void relocation(uint8_t *r, uint32_t address, uint32_t index,
+                       uint32_t length)
+{
+    put(r, address, 4);
+    put(r + 4, index | length << 25 | 1u << 27, 4);
+}
+
+static void macho_object_lines(void)
+{
+    struct blob h = {{0}, 0};
+    struct blob p = {{0}, 0};
+    struct blob line = {{0}, 0};
+    struct blob zero = {{0}, 0};
+    uint8_t image[1024];
+    uint8_t r[16];
+    uint32_t operand;
+    size_t size;
+    size_t cut;
+
+    simple_lines(&line, 6);
+    size = macho_object(image, sizeof image, &line, NULL, 0);
+    CHECK(object_line(image, size) == 7);
+    for (cut = 0; cut < size; cut++) {
+        CHECK(object_line(image, cut) == 0);
+    }
+    /* The section past the end of the file, or running past it. */
+    put(image + 32 + 72 + 48, (uint32_t)size, 4);
+    CHECK(object_line(image, size) == 0);
+    put(image + 32 + 72 + 48, 208, 4);
+    put(image + 32 + 72 + 40, size, 8);
+    CHECK(object_line(image, size) == 0);
+    put(image + 32 + 72 + 40, UINT64_MAX, 8);
+    CHECK(object_line(image, size) == 0);
+    put(image + 32 + 72 + 40, line.size, 8);
+    /* A count of sections the command has no room for reads the one it
+       holds. */
+    put(image + 32 + 64, 1000, 4);
+    CHECK(object_line(image, size) == 7);
+
+    /* The address of the rows as a relocation against _f, which the
+       relocation completes. The operand of DW_LNE_set_address follows
+       the unit length, the version, the header length, the header and
+       the three bytes of the opcode. */
+    line_header(&h, 4, 0, 0, 0, 0);
+    two_rows_at(&p, 0, 6);
+    line_unit(&zero, 4, &h, &p);
+    operand = (uint32_t)(4 + 2 + 4 + h.size + 3);
+    relocation(r, operand, 0, 3);
+    size = macho_object(image, sizeof image, &zero, r, 1);
+    CHECK(object_line(image, size) == 7);
+    for (cut = 0; cut < size; cut++) {
+        CHECK(object_line(image, cut) == 0);
+    }
+    /* A symbol past the table, an address past the section, a field of 4
+       bytes and a scattered relocation are each passed over. */
+    relocation(r, operand, 1, 3);
+    size = macho_object(image, sizeof image, &zero, r, 1);
+    CHECK(object_line(image, size) == 0);
+    relocation(r, (uint32_t)zero.size - 7, 0, 3);
+    size = macho_object(image, sizeof image, &zero, r, 1);
+    CHECK(object_line(image, size) == 0);
+    relocation(r, operand, 0, 2);
+    size = macho_object(image, sizeof image, &zero, r, 1);
+    CHECK(object_line(image, size) == 0);
+    relocation(r, operand | 0x80000000u, 0, 3);
+    size = macho_object(image, sizeof image, &zero, r, 1);
+    CHECK(object_line(image, size) == 0);
+    /* Relocations past the end of the file, or more than it holds. */
+    relocation(r, operand, 0, 3);
+    size = macho_object(image, sizeof image, &zero, r, 1);
+    put(image + 32 + 72 + 56, (uint32_t)size, 4);
+    CHECK(object_line(image, size) == 0);
+    put(image + 32 + 72 + 56, 208 + (uint32_t)zero.size, 4);
+    put(image + 32 + 72 + 60, 0xffffffffu, 4);
+    CHECK(object_line(image, size) == 0);
+}
+
 void test_symbols(void)
 {
     /* The forms of "Symbols" in docs/decisions.md. */
@@ -654,4 +1044,7 @@ void test_symbols(void)
     long_leb();
     loaded_room();
     macho_text();
+    macho_symbols();
+    macho_debug_map();
+    macho_object_lines();
 }

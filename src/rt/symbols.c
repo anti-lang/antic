@@ -1072,7 +1072,11 @@ bool anti_rt_macho_symbol(const struct anti_macho_table *t, const char *name,
    names them in its symbol table, the debug map. An object path stands
    before the functions it holds, and each function has two entries, its
    start and its size. A link can give two names to one function and the
-   size to one of them, so an entry of size 0 matches no address. */
+   size to one of them, so an entry of size 0 matches no address. An
+   entry whose name lies outside the names ends what it would replace:
+   an object entry leaves the functions after it without an object, and
+   a function start closes the function before it. Either would otherwise
+   lend its range or its file to a function it does not describe. */
 bool anti_rt_macho_debug_map(const struct anti_macho_table *t, uint64_t vaddr,
                              const char **object, const char **symbol,
                              uint64_t *start)
@@ -1087,12 +1091,9 @@ bool anti_rt_macho_debug_map(const struct anti_macho_table *t, uint64_t vaddr,
         uint8_t sect;
         uint64_t value;
         const char *s = macho_symbol(t, i, &type, &sect, &value);
-        if (s == NULL) {
-            continue;
-        }
         if (type == MACHO_N_OSO) {
             current = s;
-        } else if (type == MACHO_N_FUN && s[0] != 0) {
+        } else if (type == MACHO_N_FUN && (s == NULL || s[0] != 0)) {
             name = s;
             begin = value;
         } else if (type == MACHO_N_FUN && name != NULL) {
