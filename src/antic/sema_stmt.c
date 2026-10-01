@@ -1,6 +1,7 @@
 /* The checks of statements and function bodies: narrowing, assignment,
-   `switch`, `sync`, the fields a `construct` sets, and the walk over
-   every function a worker reaches. */
+   `switch`, `sync`, the fields a `construct` sets, closures and what
+   they capture, `main` and the `tests` blocks, and the walk over every
+   function a worker reaches. */
 
 #include <stdint.h>
 #include <stdio.h>
@@ -487,377 +488,6 @@ struct type *sema_proved_type(struct checker *c, const struct symbol *sym)
 static void check_block_narrowing(struct checker *c, struct block *b,
                                   struct symbol **proved, size_t count);
 
-/* Whether a value of t owns memory: an `own` field anywhere in the chain
-   of a class, or a class value held inline that does. An array holds its
-   elements inline, and a `?T` its value, so one of them makes the array
-   or the `?T` an owner too. */
-bool sema_has_body(const struct item *fn)
-{
-    return fn->body != NULL || fn->runtime != NULL ||
-           (fn->symbol != NULL && fn->symbol->home != NULL &&
-            fn->contract != FN_ABSTRACT);
-}
-
-/* DESIGN: a struct or a tuple is owning when any of its parts owns
-   something, transitively. Such a part is a class value that needs a
-   teardown, and a collection is one. So is an `own fn`, a `?T` or an
-   array of an owning type, and an owning struct or tuple. An owning one
-   follows the value rules of a class value, and one that owns nothing
-   stays plain data. A union owns nothing, since no teardown knows which
-   of its fields it holds. A variant is owning when the struct of any of
-   its cases is, since its tag names the case it holds, and its teardown
-   tears down the fields of that case. answered holds the structs, the
-   tuples, the variants and the classes met in this walk. None of them
-   needs a teardown, since the walk ends at the first that does, and a
-   type that holds another twice is walked once. */
-static bool needs_teardown(const struct type *t, struct ptr_set *answered)
-{
-    static const struct name destruct_name = {"destruct", 8};
-    size_t i;
-
-    if (t == NULL) {
-        return false;
-    }
-    switch (t->kind) {
-    case TYPE_OPTIONAL:
-    case TYPE_ARRAY:
-        return needs_teardown(t->element, answered);
-    case TYPE_FN:
-        return t->owned;
-    case TYPE_STRUCT:
-    case TYPE_TUPLE:
-        if (t->is_union || !ptr_set_add(answered, t)) {
-            return false;
-        }
-        for (i = 0; i < t->field_count; i++) {
-            const struct struct_field *f = &t->fields[i];
-            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
-                needs_teardown(f->type, answered)) {
-                return true;
-            }
-        }
-        return false;
-    case TYPE_VARIANT:
-        if (!ptr_set_add(answered, t)) {
-            return false;
-        }
-        for (i = 0; i < t->param_count; i++) {
-            if (needs_teardown(t->params[i], answered)) {
-                return true;
-            }
-        }
-        return false;
-    case TYPE_CLASS:
-        if (!ptr_set_add(answered, t)) {
-            return false;
-        }
-        break;
-    default:
-        return false;
-    }
-    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
-        for (i = 0; i < t->member_count; i++) {
-            const struct item *m = t->members[i];
-            /* The root's `destruct` is empty and never asks for one. */
-            if (m->kind == ITEM_FN && m->name.length == destruct_name.length &&
-                memcmp(m->name.text, destruct_name.text,
-                       destruct_name.length) == 0 &&
-                m->runtime == NULL && sema_has_body(m)) {
-                return true;
-            }
-        }
-        for (i = 0; i < t->field_count; i++) {
-            const struct struct_field *f = &t->fields[i];
-            if (f->owned) {
-                return true;
-            }
-            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
-                needs_teardown(f->type, answered)) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-bool sema_needs_teardown(const struct type *t)
-{
-    struct ptr_set answered;
-    bool needs;
-
-    memset(&answered, 0, sizeof answered);
-    needs = needs_teardown(t, &answered);
-    free(answered.slots);
-    return needs;
-}
-
-static const char own_fields_phrase[] = "has `own` fields";
-
-/* Whether a class of the chain of t declares a field `own`. */
-static bool own_field_in_chain(const struct type *t)
-{
-    size_t i;
-
-    for (; t != NULL && t->kind == TYPE_CLASS; t = t->base) {
-        for (i = 0; i < t->field_count; i++) {
-            if (t->fields[i].owned) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-/* Whether a class of the chain of t below the root has a `destruct` with
-   a body. */
-static bool destruct_in_chain(const struct type *t)
-{
-    size_t i;
-
-    for (; t != NULL && t->kind == TYPE_CLASS; t = t->base) {
-        for (i = 0; i < t->member_count; i++) {
-            const struct item *m = t->members[i];
-            if (m->kind == ITEM_FN && sema_name_is(&m->name, "destruct") &&
-                m->runtime == NULL && sema_has_body(m)) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-/* The first field of the class, struct or tuple t whose type owns
-   something, through the chain of a class, or NULL. */
-static const struct struct_field *owning_field(const struct type *t)
-{
-    size_t i;
-
-    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
-        for (i = 0; i < t->field_count; i++) {
-            const struct struct_field *f = &t->fields[i];
-            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
-                sema_type_owns(f->type)) {
-                return f;
-            }
-        }
-    }
-    return NULL;
-}
-
-/* DESIGN: the refusal of a copy names what makes the class owning. Its own
-   `own` fields and its `destruct` come first. Otherwise the message follows
-   the first field that owns something down to its reason, `holds `Counted`
-   in `counted`, which has a `destruct``. A field whose class has `own`
-   fields keeps the phrase of the class itself. Writes into out. */
-static void owns_reason(char *out, size_t size, const struct type *t)
-{
-    const struct struct_field *f;
-    const struct type *inner;
-    char sub[160];
-
-    if (t->kind == TYPE_CLASS && own_field_in_chain(t)) {
-        snprintf(out, size, "%s", own_fields_phrase);
-        return;
-    }
-    if (t->kind == TYPE_CLASS && destruct_in_chain(t)) {
-        snprintf(out, size, "has a `destruct`");
-        return;
-    }
-    if (t->kind == TYPE_VARIANT) {
-        snprintf(out, size, "owns what its parts own");
-        return;
-    }
-    f = owning_field(t);
-    inner = f != NULL ? f->type : NULL;
-    while (inner != NULL &&
-           (inner->kind == TYPE_ARRAY || inner->kind == TYPE_OPTIONAL)) {
-        inner = inner->element;
-    }
-    if (inner == NULL || (inner->kind != TYPE_CLASS &&
-                          inner->kind != TYPE_STRUCT &&
-                          inner->kind != TYPE_TUPLE &&
-                          inner->kind != TYPE_VARIANT)) {
-        snprintf(out, size, "%s", own_fields_phrase);
-        return;
-    }
-    owns_reason(sub, sizeof sub, inner);
-    if (inner->kind == TYPE_CLASS && strcmp(sub, own_fields_phrase) == 0) {
-        snprintf(out, size, "%s", own_fields_phrase);
-        return;
-    }
-    snprintf(out, size, "holds `%s` in `%.*s`, which %s", sema_tn(inner),
-             (int)f->name.length, f->name.text, sub);
-}
-
-const char *sema_owns_phrase(const struct type *t)
-{
-    static char buffers[2][160];
-    static size_t next;
-    char *buffer = buffers[next++ % 2];
-
-    while (t != NULL && (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL)) {
-        t = t->element;
-    }
-    if (t == NULL || t->kind != TYPE_CLASS) {
-        return "owns what its parts own";
-    }
-    owns_reason(buffer, sizeof buffers[0], t);
-    return buffer;
-}
-
-/* DESIGN: one rule says what owns something. A type owns something when
-   its teardown does anything: an `own` field, a part that owns something,
-   or a `destruct` of its own in its chain. `sema_needs_teardown` is that
-   rule. A function moves by the rules of a snapshot instead. A value of
-   an owning type is not copied by `=`, `let` or `if let`, and `dup`
-   copies it. */
-bool sema_type_owns(const struct type *t)
-{
-    while (t != NULL && (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL)) {
-        t = t->element;
-    }
-    return t != NULL && t->kind != TYPE_FN && sema_needs_teardown(t);
-}
-
-/* Whether e reads a value that already lives somewhere. A literal, a
-   call and `dup(x)` make a fresh one instead. */
-bool sema_reads_existing(const struct expr *e)
-{
-    switch (e->kind) {
-    case EXPR_NAME:
-    case EXPR_FIELD:
-    case EXPR_INDEX:
-        return true;
-    case EXPR_UNARY:
-        return e->as.unary.op == TOKEN_STAR;
-    default:
-        return false;
-    }
-}
-
-/* DESIGN: an `own` parameter owns its value, so `=`, `let`, `if let` and
-   `let ... else` move one that owns memory or has a teardown rather than
-   copy it, and the function tears it down no more. A copy would run the
-   teardown twice, once for the parameter and once for the place. A value
-   of a type parameter may own memory in a copy, so it moves as well. A
-   function moves by the rules of a snapshot, which the conversion to
-   the place checks. into names the place. Returns whether value moved.
-
-   DESIGN: in generic code a local of a type parameter, or of a value that
-   holds one in place, moves on `let` and `=` too, for every `T`. The
-   checker cannot know whether the `T` of a copy owns something, and the
-   copy for an owning `T` would otherwise give the value two owners. `dup`
-   is the copy. */
-static bool moves_own_param(struct checker *c, struct expr *value,
-                            struct name into)
-{
-    static const struct name no_name = {"", 0};
-    struct symbol *sym = value->kind == EXPR_NAME ? value->symbol : NULL;
-    bool generic_local = sym != NULL && sym->kind == SYMBOL_LOCAL &&
-                         !sym->caught && value->type != NULL &&
-                         sema_holds_param(value->type);
-
-    if (sym == NULL || !(sym->own_param || generic_local) ||
-        value->type == NULL || sema_is_error(value->type) ||
-        value->type->kind == TYPE_FN ||
-        !(sema_type_owns(value->type) || sema_needs_teardown(value->type) ||
-          sema_has_params(value->type))) {
-        return false;
-    }
-    sema_move_local(c, value, &into, &no_name);
-    return true;
-}
-
-void sema_bind_value(struct checker *c, struct expr *value, struct name into,
-                     struct type *t)
-{
-    if (!moves_own_param(c, value, into)) {
-        sema_refuse_owned_copy(c, value, t);
-    }
-}
-
-
-/* DESIGN: `=` refuses to copy an existing value that owns memory, since
-   the bytes would give it two owners. A fresh value on the right has no
-   other owner, so `=` moves it. The bytes it replaces are not destroyed:
-   the element of an `alloc(T, n)` it fills has no value yet. */
-void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
-                            struct type *t)
-{
-    if (sema_refuse_caller_value(c, value)) {
-        return;
-    }
-    if (!sema_is_error(t) && sema_type_owns(t) && sema_reads_existing(value)) {
-        sema_error_at(c, value->pos, "`%s` %s, use `dup` instead of `=`",
-                      sema_tn(t), sema_owns_phrase(t));
-    }
-    sema_refuse_lock_copy(c, value, t);
-}
-
-/* Whether a value of t holds a Mutex. It does when it is one, or a
-   struct, a class, a tuple, a variant or an array with one inside it. A
-   pointer holds none. answered holds the types with fields met in this
-   walk, none of which holds a Mutex, since the walk ends at the first
-   that does. */
-static bool holds_mutex(const struct type *t, struct ptr_set *answered)
-{
-    size_t i;
-
-    if (t == NULL) {
-        return false;
-    }
-    if (types_is_mutex(t)) {
-        return true;
-    }
-    if (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL) {
-        return holds_mutex(t->element, answered);
-    }
-    if (t->kind != TYPE_STRUCT && t->kind != TYPE_CLASS &&
-        t->kind != TYPE_TUPLE && t->kind != TYPE_VARIANT) {
-        return false;
-    }
-    if (!ptr_set_add(answered, t)) {
-        return false;
-    }
-    for (i = 0; i < t->field_count; i++) {
-        if (holds_mutex(t->fields[i].type, answered)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool sema_holds_mutex(const struct type *t)
-{
-    struct ptr_set answered;
-    bool holds;
-
-    memset(&answered, 0, sizeof answered);
-    holds = holds_mutex(t, &answered);
-    free(answered.slots);
-    return holds;
-}
-
-/* DESIGN: a Mutex is the lock word itself, so a copy would be a second
-   lock that guards nothing. A value that holds one is never copied out
-   of the place it lives in: not by `=`, not into a parameter and not by
-   `return`. A fresh value, a literal, a call or `Mutex.new()`, moves. */
-void sema_refuse_lock_copy(struct checker *c, const struct expr *value,
-                           const struct type *t)
-{
-    if (!sema_is_error(t) && sema_holds_mutex(t) &&
-        sema_reads_existing(value)) {
-        if (types_is_mutex(t)) {
-            sema_error_at(c, value->pos, "a `" LANG_MUTEX "` cannot be "
-                          "copied, pass a pointer to it");
-        } else {
-            sema_error_at(c, value->pos, "`%s` holds a `" LANG_MUTEX "` and "
-                          "cannot be copied, pass a pointer to it",
-                          sema_tn(t));
-        }
-    }
-}
-
 static void check_flags_assign(struct checker *c, struct stmt *s);
 
 /* DESIGN: `e[i] = v` on a type with the `index` or the `set_index` hook
@@ -1234,9 +864,7 @@ static void check_assign(struct checker *c, struct stmt *s)
         return;
     }
     if (op == TOKEN_ASSIGN) {
-        if (!moves_own_param(c, s->as.assign.value, sema_place_name(target))) {
-            sema_refuse_owned_copy(c, s->as.assign.value, t);
-        }
+        sema_bind_value(c, s->as.assign.value, sema_place_name(target), t);
         check_closure_lifetime(c, target, s->as.assign.value);
         return;
     }
@@ -2090,9 +1718,8 @@ static void check_stmt(struct checker *c, struct stmt *s)
             declared = types_fn_form(c->types, t, true, true);
         }
         if (declared != NULL) {
-            if (sema_require(c, s->as.let.value, t, declared) &&
-                !moves_own_param(c, s->as.let.value, s->as.let.name)) {
-                sema_refuse_owned_copy(c, s->as.let.value, declared);
+            if (sema_require(c, s->as.let.value, t, declared)) {
+                sema_bind_value(c, s->as.let.value, s->as.let.name, declared);
             }
             t = declared;
         } else if (!sema_is_error(t) && t->kind == TYPE_VOID) {
@@ -2101,8 +1728,8 @@ static void check_stmt(struct checker *c, struct stmt *s)
         } else if (type_holds_lent(t)) {
             sema_refuse_lent_tuple(c, s->as.let.value);
             t = sema_builtin(c, TYPE_ERROR);
-        } else if (!moves_own_param(c, s->as.let.value, s->as.let.name)) {
-            sema_refuse_owned_copy(c, s->as.let.value, t);
+        } else {
+            sema_bind_value(c, s->as.let.value, s->as.let.name, t);
         }
         if (sema_refuse_abstract_value(c, s->as.let.name_pos, "this local",
                                        t)) {
@@ -3064,23 +2691,6 @@ const struct item *sema_named_function(const struct checker *c)
         it = it->enclosing;
     }
     return it;
-}
-
-/* DESIGN: a type is thread-safe when it is built to be changed from more
-   than one thread at once. Such are a `Mutex`, a channel, a synchronized
-   class and a concurrent class. An atomic is a field or a local marked
-   `atomic`, so sema_thread_safe_symbol asks the variable as well. */
-bool sema_thread_safe(const struct type *t)
-{
-    return t != NULL &&
-           (types_is_mutex(t) || types_is_chan(t) ||
-            ((t->kind == TYPE_CLASS || t->kind == TYPE_STRUCT) &&
-             t->safety != SAFETY_NONE));
-}
-
-bool sema_thread_safe_symbol(const struct symbol *sym)
-{
-    return sym->atomic || sema_thread_safe(sym->type);
 }
 
 /* The capture of sym in the anonymous function it, added when it is not

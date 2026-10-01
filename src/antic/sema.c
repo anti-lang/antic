@@ -115,6 +115,22 @@ bool sema_name_is(const struct name *a, const char *text)
     return a->length == strlen(text) && memcmp(a->text, text, a->length) == 0;
 }
 
+struct expr *sema_new_node(struct checker *c, enum expr_kind kind,
+                           struct pos pos)
+{
+    struct expr *e = arena_alloc(c->arena, sizeof *e);
+    e->kind = kind;
+    e->pos = pos;
+    return e;
+}
+
+bool sema_has_body(const struct item *fn)
+{
+    return fn->body != NULL || fn->runtime != NULL ||
+           (fn->symbol != NULL && fn->symbol->home != NULL &&
+            fn->contract != FN_ABSTRACT);
+}
+
 /* Scopes */
 
 struct symbol *sema_scope_find_local(const struct scope *s,
@@ -2307,8 +2323,10 @@ static void check_provides(struct checker *c, struct module *module)
    `module->items` once, and a later pass reads what an earlier one
    declared. */
 
-struct name sema_shared_name(struct arena *arena, const struct name *op,
-                             const struct name *type)
+/* The shared name `op:Type` of a module-level `operator fn` whose name
+   another one of its module has. */
+static struct name shared_name(struct arena *arena, const struct name *op,
+                               const struct name *type)
 {
     char *text = arena_alloc(arena, op->length + type->length + 2);
     struct name out;
@@ -2375,7 +2393,7 @@ static struct name declared_name(struct checker *c, struct item *it)
         return it->name;
     }
     it->overloaded = true;
-    return sema_shared_name(c->arena, &it->name, &type);
+    return shared_name(c->arena, &it->name, &type);
 }
 
 /* Declare every item first, so each can be used before its

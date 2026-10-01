@@ -549,3 +549,20 @@ void sema_check_leak_arg(struct checker *c, const struct expr *callee,
                       fn->name.text, sema_tn(t));
     }
 }
+
+/* DESIGN: a type is thread-safe when it is built to be changed from more
+   than one thread at once. Such are a `Mutex`, a channel, a synchronized
+   class and a concurrent class. An atomic is a field or a local marked
+   `atomic`, so sema_thread_safe_symbol asks the variable as well. */
+bool sema_thread_safe(const struct type *t)
+{
+    return t != NULL &&
+           (types_is_mutex(t) || types_is_chan(t) ||
+            ((t->kind == TYPE_CLASS || t->kind == TYPE_STRUCT) &&
+             t->safety != SAFETY_NONE));
+}
+
+bool sema_thread_safe_symbol(const struct symbol *sym)
+{
+    return sym->atomic || sema_thread_safe(sym->type);
+}

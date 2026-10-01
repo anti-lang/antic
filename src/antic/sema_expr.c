@@ -373,134 +373,6 @@ static void refuse_kept(struct checker *c, const struct expr *e)
     }
 }
 
-/* Refuse the name e of sym, which moved before it in the order of the
-   text. */
-static void refuse_moved(struct checker *c, const struct expr *e,
-                         const struct symbol *sym)
-{
-    if (sym->moved_by.length > 0 && sym->moved_to.length > 0) {
-        sema_error_at(c, e->pos, "`%.*s` was moved into `%.*s` by `%.*s`",
-                      (int)e->as.name.length, e->as.name.text,
-                      (int)sym->moved_to.length, sym->moved_to.text,
-                      (int)sym->moved_by.length, sym->moved_by.text);
-    } else if (sym->moved_by.length == 0 && sym->moved_to.length == 0) {
-        sema_error_at(c, e->pos, "`%.*s` was moved", (int)e->as.name.length,
-                      e->as.name.text);
-    } else {
-        const struct name *to = sym->moved_by.length > 0 ? &sym->moved_by
-                                                         : &sym->moved_to;
-        sema_error_at(c, e->pos, "`%.*s` was moved into `%.*s`",
-                      (int)e->as.name.length, e->as.name.text,
-                      (int)to->length, to->text);
-    }
-}
-
-bool sema_holds_param(const struct type *t)
-{
-    size_t i;
-
-    switch (t->kind) {
-    case TYPE_PARAM:
-        return true;
-    case TYPE_ARRAY:
-    case TYPE_OPTIONAL:
-        return sema_holds_param(t->element);
-    case TYPE_TUPLE:
-        for (i = 0; i < t->param_count; i++) {
-            if (sema_holds_param(t->params[i])) {
-                return true;
-            }
-        }
-        return false;
-    case TYPE_STRUCT:
-    case TYPE_CLASS:
-    case TYPE_VARIANT:
-        return !types_is_chan(t) && sema_has_params(t);
-    default:
-        return false;
-    }
-}
-
-/* DESIGN: a parameter that is not `own` belongs to the caller, so a copy
-   of its bytes would give what it owns two owners, the caller and the
-   place. It leaves the function in no way that gives it one: not by `let`
-   or `=`, not in a tuple, struct, class or variant literal, not as an
-   `own` argument and not by `return`. That holds for a parameter whose
-   value owns something and, in generic code, for one whose type holds a
-   type parameter, since the `T` of a copy may own something, whatever `T`
-   is. The message names both fixes: `own` takes the value over, and `dup`
-   copies it. Returns whether value was refused. */
-bool sema_refuse_caller_value(struct checker *c, const struct expr *value)
-{
-    const struct symbol *sym =
-        value->kind == EXPR_NAME ? value->symbol : NULL;
-    const struct type *t = value->type;
-
-    if (sym == NULL || sym->kind != SYMBOL_PARAM || sym->own_param ||
-        sym->caught || t == NULL || sema_is_error(t) || t->kind == TYPE_FN ||
-        !(sema_type_owns(t) || sema_holds_param(t))) {
-        return false;
-    }
-    sema_error_at(c, value->pos, "`%.*s` belongs to the caller and does not "
-                  "move. Mark it `own` to take it over, or copy it with "
-                  "`dup(%.*s)`", (int)sym->name.length, sym->name.text,
-                  (int)sym->name.length, sym->name.text);
-    return true;
-}
-
-/* DESIGN: an owning local named in a tuple literal, a struct literal, a
-   class literal or the literal of a variant case moves into it, as into
-   an `own` parameter. A copy would give what it owns two owners, the
-   local and the literal, and both would tear it down. So does an `own`
-   parameter, and a local of a type parameter, which may own something in
-   a copy. A parameter that is not `own` belongs to the caller, and
-   `sema_refuse_owned_copy` refuses it. Anything else that reads an
-   existing value is refused as `=` refuses it. */
-bool sema_literal_moves(const struct expr *value)
-{
-    const struct symbol *sym =
-        value->kind == EXPR_NAME ? value->symbol : NULL;
-    const struct type *t = value->type;
-
-    if (sym == NULL || t == NULL || sema_is_error(t) || t->kind == TYPE_FN ||
-        (sym->kind != SYMBOL_LOCAL && sym->kind != SYMBOL_PARAM) ||
-        (sym->kind == SYMBOL_PARAM && !sym->own_param) || sym->caught) {
-        return false;
-    }
-    if (sema_type_owns(t) || sema_needs_teardown(t)) {
-        return true;
-    }
-    return sema_holds_param(t) && (sym->kind == SYMBOL_LOCAL || sym->own_param);
-}
-
-/* DESIGN: the parts move once the literal has read every part, so a part
-   after the local may still read it, and lowering clears the local's
-   tables after the last part is stored. A local that a part of the same
-   literal already moved, `(k, k)` or `(k, take(k))`, is refused. literal
-   names the type of the literal. */
-void sema_move_into_literal(struct checker *c, struct expr *value,
-                            const char *literal)
-{
-    static const struct name no_name = {"", 0};
-    struct name into;
-    char *text;
-    size_t length;
-
-    if (!sema_literal_moves(value)) {
-        return;
-    }
-    if (value->symbol->moved) {
-        refuse_moved(c, value, value->symbol);
-        return;
-    }
-    length = strlen(literal);
-    text = types_alloc_array(c->arena, length + 1, 1);
-    memcpy(text, literal, length + 1);
-    into.text = text;
-    into.length = length;
-    sema_move_local(c, value, &into, &no_name);
-}
-
 /* The variable that the place or the address e starts from, or NULL. */
 static const struct symbol *root_of(const struct expr *e)
 {
@@ -3210,7 +3082,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             return sema_builtin(c, TYPE_ERROR);
         }
         if (sym->moved) {
-            refuse_moved(c, e, sym);
+            sema_refuse_moved(c, e, sym);
             return sema_builtin(c, TYPE_ERROR);
         }
         if ((sym->kind == SYMBOL_LOCAL || sym->kind == SYMBOL_PARAM) &&

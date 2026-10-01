@@ -2,12 +2,20 @@
 #define ANTIC_SEMA_CHECKER_H
 
 /* The state of the checker and the functions its files share. sema.c
-   declares the items of a module and runs the passes over them.
-   sema_expr.c checks expressions, sema_call.c calls and members, and
-   sema_const.c evaluates constants, and sema_chain.c takes chains of
-   declarations apart. sema_stmt.c checks statements and
-   function bodies and walks what a worker reaches. sema_export.c checks
-   what crosses to C and the doc comments. */
+   holds the helpers every file uses, scopes and lookup, and the
+   resolution of types. It declares the items of a module, checks the
+   class model and runs the passes over the items. sema_chain.c takes
+   chains of declarations apart, and sema_const.c evaluates constants.
+   sema_expr.c checks expressions, and sema_call.c calls and members.
+   sema_stmt.c checks statements and function bodies with the closures in
+   them, and walks what a worker reaches. sema_value.c holds the value
+   rules: what a value owns, and when it moves, when it is copied and
+   when a copy is refused. sema_safety.c checks the thread-safe classes
+   and says which types are thread-safe. sema_generic.c checks generics,
+   and sema_copies.c compiles their copies. sema_hash.c checks hashing
+   and the default `==`, and sema_pattern.c the pattern literals and
+   their calls. sema_export.c checks what crosses to C and the doc
+   comments. */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -234,6 +242,9 @@ struct type *sema_builtin(struct checker *c, enum type_kind kind);
 bool sema_is_error(const struct type *t);
 bool sema_same_name(const struct name *a, const struct name *b);
 bool sema_name_is(const struct name *a, const char *text);
+/* A node of kind at pos, in the arena of the checker, which owns it. */
+struct expr *sema_new_node(struct checker *c, enum expr_kind kind,
+                           struct pos pos);
 struct symbol *sema_scope_find_local(const struct scope *s,
                                      const struct name *name);
 struct symbol *sema_lookup(const struct checker *c, const struct name *name);
@@ -310,14 +321,19 @@ bool sema_simd_numeric(const struct type *lane);
 const char *sema_op_text(enum token_kind op, char buffer[OP_TEXT]);
 bool sema_operator_named(const struct name *name);
 struct symbol *sema_hook(struct checker *c, struct type *t, const char *text);
-struct type *sema_member_type_in(struct checker *c, struct type *fn,
-                                 const struct item *owner, struct type *s);
 struct symbol *sema_operator_symbol(struct checker *c, struct type *t,
                                     const char *text);
-/* The shared name `op:Type` of a module-level `operator fn` whose name
-   another one of its module has. */
-struct name sema_shared_name(struct arena *arena, const struct name *op,
-                             const struct name *type);
+/* The checked call of the `operator fn hash` that the module of the class
+   t declares for it, on a value that stands for the object, or NULL when
+   the module declares none or t does not meet its constraints. */
+struct expr *sema_class_hash_operator(struct checker *c, struct type *t,
+                                      struct pos pos);
+struct expr *sema_class_eq_operator(struct checker *c, struct type *t,
+                                    struct pos pos);
+/* Whether the module of t, or t itself, gives it `operator fn text`, a
+   free function of the module that takes t or a pointer to it first. */
+bool sema_module_operator(struct checker *c, struct type *t,
+                          const char *text);
 bool sema_is_iterator(struct checker *c, struct type *t);
 struct expr *sema_hook_call(struct checker *c, struct expr *base,
                             const char *name, struct expr **args,
@@ -338,8 +354,6 @@ struct type *sema_check_storage(struct checker *c, struct expr *e);
 struct type *sema_struct_of(struct type *t);
 const struct struct_field *sema_find_field(const struct type *s,
                                            const struct name *name);
-struct expr *sema_new_node(struct checker *c, enum expr_kind kind,
-                           struct pos pos);
 bool sema_refuse_abstract_value(struct checker *c, struct pos pos,
                                 const char *what, const struct type *t);
 const struct type *sema_inherited(const struct type *t);
@@ -354,16 +368,6 @@ struct symbol *sema_method_symbol(const struct checker *c,
 struct symbol *sema_module_function(const struct checker *c,
                                     const struct type *s,
                                     const struct name *name);
-/* Whether t meets the constraints of the type parameter p, reporting
-   nothing. */
-bool sema_meets_param(struct checker *c, struct type *t, const struct type *p);
-/* The checked call of the `operator fn hash` that the module of the class
-   t declares for it, on a value that stands for the object, or NULL when
-   the module declares none or t does not meet its constraints. */
-struct expr *sema_class_hash_operator(struct checker *c, struct type *t,
-                                      struct pos pos);
-struct expr *sema_class_eq_operator(struct checker *c, struct type *t,
-                                    struct pos pos);
 bool sema_implemented_in(const struct type *t, const struct type *iface);
 struct symbol *sema_null_pointer_maker(struct checker *c, struct pos pos);
 struct symbol *sema_error_maker(struct checker *c, struct pos pos);
@@ -437,6 +441,25 @@ bool sema_filled_somewhere(const struct checker *c, const struct type *t);
 size_t sema_proved_names(const struct expr *cond, bool want_true,
                          struct symbol **out, size_t count);
 struct type *sema_proved_type(struct checker *c, const struct symbol *sym);
+void sema_check_block(struct checker *c, struct block *b);
+const struct item *sema_named_function(const struct checker *c);
+/* e[i] = v in the statement s, which a copy reads again with the type of
+   its argument. Returns false when the base has no hook, and s is then a
+   plain assignment. */
+bool sema_set_index(struct checker *c, struct stmt *s);
+void sema_capture(struct checker *c, struct symbol *sym);
+void sema_note_write(struct checker *c, const struct expr *e);
+void sema_note_call(struct checker *c, const struct expr *callee);
+void sema_refuse_worker_closure(struct checker *c, const struct expr *arg,
+                                const struct type *param);
+struct type *sema_check_anonymous(struct checker *c, struct expr *e,
+                                  struct type *expected);
+void sema_check_function(struct checker *c, struct item *it);
+void sema_check_main(struct checker *c, struct item *it);
+void sema_check_test_block(struct checker *c, struct item *it);
+
+/* sema_value.c */
+
 bool sema_type_owns(const struct type *t);
 /* How a message names what an owning type owns: its `own` fields for a
    class, its parts for a struct or a tuple. */
@@ -445,9 +468,9 @@ bool sema_reads_existing(const struct expr *e);
 struct name sema_place_name(const struct expr *e);
 bool sema_move_local(struct checker *c, struct expr *e,
                      const struct name *into, const struct name *by);
-/* The value of `if let`, which binds it as `let` does: an `own` parameter
-   moves into the name into, and any other existing value that owns
-   memory is refused. */
+/* Bind value of type t to the place named into, as `=`, `let` and `if
+   let` do: an `own` parameter moves into it, and any other existing
+   value that owns memory is refused. */
 void sema_bind_value(struct checker *c, struct expr *value, struct name into,
                      struct type *t);
 void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
@@ -456,6 +479,8 @@ void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
    it, and the move of such a part once the literal has read every part.
    literal names the type of the literal. */
 bool sema_literal_moves(const struct expr *value);
+void sema_move_into_literal(struct checker *c, struct expr *value,
+                            const char *literal);
 /* Whether a value of t may own something in a copy of a generic: a type
    parameter, or a value that holds one in place. A pointer or a slice
    to one owns nothing. */
@@ -464,15 +489,19 @@ bool sema_holds_param(const struct type *t);
    value owns something or whose type holds a type parameter, and give
    whether it did. */
 bool sema_refuse_caller_value(struct checker *c, const struct expr *value);
-void sema_move_into_literal(struct checker *c, struct expr *value,
-                            const char *literal);
 bool sema_holds_mutex(const struct type *t);
 void sema_refuse_lock_copy(struct checker *c, const struct expr *value,
                            const struct type *t);
-void sema_check_block(struct checker *c, struct block *b);
-const struct item *sema_named_function(const struct checker *c);
-bool sema_thread_safe(const struct type *t);
-bool sema_thread_safe_symbol(const struct symbol *sym);
+/* Refuse the name e of sym, which moved before it in the order of the
+   text. */
+void sema_refuse_moved(struct checker *c, const struct expr *e,
+                       const struct symbol *sym);
+/* The move of arg, argument index of a call of callee, into an `own`
+   parameter. receiver is the object of a call of a function of a class,
+   or NULL. */
+void sema_note_move(struct checker *c, const struct symbol *callee,
+                    size_t index, const struct expr *receiver,
+                    struct expr *arg);
 
 /* sema_safety.c */
 
@@ -493,16 +522,8 @@ void sema_check_leak_return(struct checker *c, const struct expr *value,
                             const struct type *result);
 void sema_check_leak_arg(struct checker *c, const struct expr *callee,
                          const struct expr *arg, const struct type *param);
-void sema_capture(struct checker *c, struct symbol *sym);
-void sema_note_write(struct checker *c, const struct expr *e);
-void sema_note_call(struct checker *c, const struct expr *callee);
-void sema_refuse_worker_closure(struct checker *c, const struct expr *arg,
-                                const struct type *param);
-struct type *sema_check_anonymous(struct checker *c, struct expr *e,
-                                  struct type *expected);
-void sema_check_function(struct checker *c, struct item *it);
-void sema_check_main(struct checker *c, struct item *it);
-void sema_check_test_block(struct checker *c, struct item *it);
+bool sema_thread_safe(const struct type *t);
+bool sema_thread_safe_symbol(const struct symbol *sym);
 
 /* sema_generic.c */
 
@@ -545,6 +566,11 @@ struct type *sema_copy_of(struct checker *c, struct type *generic,
                           struct pos pos);
 struct type *sema_member_type(struct checker *c, struct type *fn,
                               const struct type *copy);
+struct type *sema_member_type_in(struct checker *c, struct type *fn,
+                                 const struct item *owner, struct type *s);
+/* Whether t meets the constraints of the type parameter p, reporting
+   nothing. */
+bool sema_meets_param(struct checker *c, struct type *t, const struct type *p);
 void sema_refuse_type_args(struct checker *c, const struct expr *e,
                            const struct name *name);
 struct type *sema_generic_named(struct checker *c, struct expr *e,
@@ -586,10 +612,6 @@ void sema_check_generic_item(struct checker *c, const struct item *it);
 /* Make a compiled copy of every generic the module uses with concrete
    arguments, and add each to the items of the module. */
 void sema_compile_copies(struct checker *c);
-/* e[i] = v in the statement s, which a copy reads again with the type of
-   its argument. Returns false when the base has no hook, and s is then a
-   plain assignment. */
-bool sema_set_index(struct checker *c, struct stmt *s);
 
 /* sema_hash.c */
 
@@ -617,10 +639,6 @@ bool sema_equals(struct checker *c, struct expr *e, struct type *t);
 const struct struct_field *sema_class_gap(struct checker *c, struct type *t);
 bool sema_concurrent_lacks(struct checker *c, struct type *t,
                            const char *hook);
-/* Whether the module of t, or t itself, gives it `operator fn text`, a
-   free function of the module that takes t or a pointer to it first. */
-bool sema_module_operator(struct checker *c, struct type *t,
-                          const char *text);
 /* Give the class it the checked `==` and `x.hash()` of the default
    `equals` and `hash` the compiler writes for it, where its chain declares
    neither. */

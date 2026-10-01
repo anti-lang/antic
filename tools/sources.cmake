@@ -66,6 +66,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/sema_pattern.c
     src/antic/sema_safety.c
     src/antic/sema_stmt.c
+    src/antic/sema_value.c
     src/antic/target.c
     src/antic/text.c
     src/antic/types.c

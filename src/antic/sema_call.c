@@ -42,15 +42,6 @@ const struct struct_field *sema_find_field(const struct type *s,
     return NULL;
 }
 
-struct expr *sema_new_node(struct checker *c, enum expr_kind kind,
-                           struct pos pos)
-{
-    struct expr *e = arena_alloc(c->arena, sizeof *e);
-    e->kind = kind;
-    e->pos = pos;
-    return e;
-}
-
 /* DESIGN: a name used on a value or a type reaches the member that
    find_member gives, less the bodies qualified by an interface. Each of
    those fills the table of its interface alone. At one level a plain
@@ -1300,192 +1291,6 @@ void sema_refuse_escaping_error(struct checker *c, const struct expr *e)
     }
 }
 
-/* The name a message gives the place e: a variable, the last field of
-   a path or the base of an element. Empty for any other expression. */
-struct name sema_place_name(const struct expr *e)
-{
-    static const struct name none_name = {"", 0};
-
-    while (e != NULL) {
-        switch (e->kind) {
-        case EXPR_NAME:
-            return e->as.name;
-        case EXPR_FIELD:
-            return e->as.field.name;
-        case EXPR_INDEX:
-            e = e->as.index.base;
-            break;
-        case EXPR_UNARY:
-            e = e->as.unary.operand;
-            break;
-        default:
-            return none_name;
-        }
-    }
-    return none_name;
-}
-
-/* The name of the function sym without the class before it. */
-static struct name bare_name(const struct symbol *sym)
-{
-    struct name n = sym->name;
-    size_t i;
-
-    for (i = n.length; i > 0; i--) {
-        if (n.text[i - 1] == '.') {
-            n.text += i;
-            n.length -= i;
-            break;
-        }
-    }
-    return n;
-}
-
-/* DESIGN: a local passed to an `own` parameter moves, and so does an
-   `own` parameter that `=` or `let` stores. The local is not named after
-   the move, so the checker refuses a mention after it in the order of
-   the text. That order is the order of execution unless a loop repeats
-   the move, a `defer` or an `undo` that names the local runs at an exit
-   after it, or a closure that captures it runs later. All three are
-   refused, and so is a move inside a closure, which may run more than
-   once. A parameter that is not `own` belongs to the caller, so one
-   whose value may own memory does not move, as
-   `sema_refuse_caller_value` says. Returns whether e moved. */
-bool sema_move_local(struct checker *c, struct expr *e,
-                     const struct name *into, const struct name *by)
-{
-    struct symbol *sym = e->symbol;
-    const struct name *target = by->length > 0 ? by : into;
-
-    if (c->ctx.quiet > 0) {
-        return true;
-    }
-    if (sym->frame != c->ctx.function) {
-        sema_error_at(c, e->pos, "`%.*s` is captured, and a closure does not "
-                      "move what it captures", (int)sym->name.length,
-                      sym->name.text);
-        return false;
-    }
-    if (sym->captured) {
-        sema_error_at(c, e->pos, "`%.*s` is captured by a closure, which may "
-                      "read it after it moves into `%.*s`",
-                      (int)sym->name.length, sym->name.text,
-                      (int)target->length, target->text);
-        return false;
-    }
-    if (c->loop_depth > sym->loops) {
-        sema_error_at(c, e->pos, "`%.*s` moves into `%.*s` inside a loop, "
-                      "which would move it again", (int)sym->name.length,
-                      sym->name.text, (int)target->length, target->text);
-        return false;
-    }
-    if (sym->deferred) {
-        sema_error_at(c, e->pos, "`%.*s` moves into `%.*s` while a `defer` or "
-                      "an `undo` names it", (int)sym->name.length,
-                      sym->name.text, (int)target->length, target->text);
-        return false;
-    }
-    if (sema_refuse_caller_value(c, e)) {
-        return false;
-    }
-    e->moves = true;
-    sym->moved = true;
-    sym->moved_to = *into;
-    sym->moved_by = *by;
-    return true;
-}
-
-/* DESIGN: a value that owns nothing and holds no pointer is copied into
-   an `own` parameter and does not move, so a caller that passes `int`
-   locals to `max<T>(own a: T, own b: T)` keeps them. The type is concrete
-   at the call site. A value that owns something, one of a type parameter
-   and one that holds a pointer move, since the callee takes over what a
-   pointer reaches. A channel and a Mutex are handles, and they move. */
-static bool moves_at_call(const struct type *t)
-{
-    return sema_type_owns(t) || sema_needs_teardown(t) ||
-           sema_holds_param(t) || !type_pointer_free(t) || types_is_chan(t) ||
-           types_is_mutex(t);
-}
-
-/* DESIGN: the error a handler binds moves into an `own` parameter, and
-   the handler then holds it no longer, as after `return e`. Lowering
-   writes `none` into the handler's copy at the move, so the delete on
-   every exit after it passes over the error. The error is not named
-   after the move, so the checker refuses a mention after it in the order
-   of the text. That order is the order of execution unless a loop inside
-   the handler repeats the move, or a `defer` or an `undo` that the
-   handler registered names the error at an exit after it. Both are
-   refused.
-
-   DESIGN: any other local moves by `sema_move_local`. A literal or a
-   call result passed there has no other owner and needs nothing. Any
-   other place holds a value that stays where it is, so one that owns
-   memory is refused, as `=` refuses it. receiver is the object of a
-   call of a function of a class, or NULL. */
-static void note_move(struct checker *c, const struct symbol *callee,
-                      size_t index, const struct expr *receiver,
-                      struct expr *arg)
-{
-    struct symbol *moved = arg->kind == EXPR_NAME ? arg->symbol : NULL;
-    struct name into;
-    struct name by;
-
-    if (callee == NULL || callee->owned == NULL ||
-        index >= callee->owned_count || !callee->owned[index] ||
-        c->ctx.quiet > 0 || arg->type == NULL || sema_is_error(arg->type)) {
-        return;
-    }
-    if (moved != NULL && moved->caught) {
-        if (c->loop_depth > moved->caught_loops) {
-            sema_error_at(c, arg->pos,
-                          "`%.*s` moves into `%.*s` inside a loop of its "
-                          "handler, which would move it again",
-                          (int)arg->as.name.length, arg->as.name.text,
-                          (int)callee->name.length, callee->name.text);
-            return;
-        }
-        if (moved->deferred) {
-            sema_error_at(c, arg->pos,
-                          "`%.*s` moves into `%.*s` while a `defer` or an "
-                          "`undo` of its handler names it",
-                          (int)arg->as.name.length, arg->as.name.text,
-                          (int)callee->name.length, callee->name.text);
-            return;
-        }
-        arg->moves = true;
-        moved->moved_into = callee;
-        return;
-    }
-    /* A `keep own` parameter takes a function by the rules of a
-       snapshot, which the conversion to it checks. */
-    if (callee->type != NULL && callee->type->kind == TYPE_FN &&
-        index < callee->type->param_count &&
-        callee->type->params[index]->kind == TYPE_FN) {
-        return;
-    }
-    into = sema_place_name(receiver);
-    by = bare_name(callee);
-    if (!moves_at_call(arg->type)) {
-        return;
-    }
-    if (moved != NULL &&
-        (moved->kind == SYMBOL_LOCAL || moved->kind == SYMBOL_PARAM)) {
-        if (receiver == NULL) {
-            into = by;
-            by.length = 0;
-        }
-        sema_move_local(c, arg, &into, &by);
-        return;
-    }
-    if (sema_type_owns(arg->type) && sema_reads_existing(arg)) {
-        sema_error_at(c, arg->pos, "`%s` %s, and a value that stays where it "
-                      "is does not move into `%.*s`, use `dup`",
-                      sema_tn(arg->type), sema_owns_phrase(arg->type),
-                      (int)by.length, by.text);
-    }
-}
-
 /* The value a handled call gives: what the out parameter points at, or
    nothing when the function writes no result. */
 static struct type *handled_result(struct checker *c, const struct expr *e,
@@ -1731,7 +1536,7 @@ static struct type *check_construct(struct checker *c, struct expr *e,
         ok = sema_require(c, arg, got, fn->params[i + 1]) && ok;
         c->lent_use = LENT_STORED;
         sema_refuse_lock_copy(c, arg, fn->params[i + 1]);
-        note_move(c, m->symbol, i + 1, NULL, arg);
+        sema_note_move(c, m->symbol, i + 1, NULL, arg);
     }
     if (!ok) {
         return sema_builtin(c, TYPE_ERROR);
@@ -2838,7 +2643,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
             if (sym != NULL && sym->worker) {
                 sema_refuse_worker_closure(c, arg, fn->params[i]);
             }
-            note_move(c, sym, i, fixed == 1 ? e->as.call.args[0] : NULL, arg);
+            sema_note_move(c, sym, i, fixed == 1 ? e->as.call.args[0] : NULL, arg);
         } else {
             struct type *t = sema_check_expr(c, arg, NULL);
             if (!sema_is_error(t) && !variadic_ok(t)) {
