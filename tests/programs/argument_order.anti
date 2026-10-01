@@ -1,6 +1,6 @@
-//! A signed `+` ends its block with the check of its overflow. Lowering a
-//! value into a `?int` read the current block beside the call that lowers the
-//! sum, so the store landed in the block the check ended where C evaluates the
+//! A signed `+` ends its block with the check of its overflow. Lowering a value
+//! into a `?int` read the current block beside the call that lowers the sum, so
+//! the store landed in the block the check ended where C evaluates the
 //! arguments left to right. The IR then failed verification. The values come
 //! from the command line, so no constant folds the sum away.
 
