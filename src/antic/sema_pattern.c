@@ -62,46 +62,17 @@ static bool is_byte_slice(const struct type *t)
            t->element->kind == TYPE_U8;
 }
 
-/* The function text of the module named module, which the call at pos
-   names in the place of what with count arguments, or NULL after an
-   error. The callers index its parameters by the position of each
-   argument, so a function of fewer parameters is refused here. A damaged
-   or older library file gave one, and the checker read past its
-   parameters (S14 of the audit). */
+/* The function text of the module named module, which the call what at
+   pos calls with count arguments, or NULL after an error. */
 static struct symbol *module_function(struct checker *c,
                                       const struct name *module,
                                       struct pos pos, const char *what,
                                       const char *text, size_t count)
 {
-    const struct interface *lib = sema_find_library(c, module);
-    struct name name;
-    struct symbol *f;
+    char named[64];
 
-    if (lib == NULL) {
-        sema_error_at(c, pos, "`%s` calls `%.*s.%s`, so the module imports "
-                      "`%.*s`", what, (int)module->length, module->text, text,
-                      (int)module->length, module->text);
-        return NULL;
-    }
-    name.text = text;
-    name.length = strlen(text);
-    f = sema_library_item(c, lib, &name);
-    if (f == NULL || f->kind != SYMBOL_FN || f->type == NULL ||
-        f->type->kind != TYPE_FN) {
-        sema_error_at(c, pos, "`%.*s` has no function `%s`",
-                      (int)module->length, module->text, text);
-        return NULL;
-    }
-    if (f->type->param_count < count) {
-        sema_error_at(c, pos, "`%s` calls `%.*s.%s` with %zu arguments, and "
-                      "this `%.*s` gives it %zu parameter%s", what,
-                      (int)module->length, module->text, text, count,
-                      (int)module->length, module->text,
-                      f->type->param_count,
-                      f->type->param_count == 1 ? "" : "s");
-        return NULL;
-    }
-    return f;
+    snprintf(named, sizeof named, "`%s` calls", what);
+    return sema_std_function(c, pos, named, module, text, count);
 }
 
 static struct symbol *regex_function(struct checker *c, struct pos pos,

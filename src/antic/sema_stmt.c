@@ -882,24 +882,19 @@ static bool same_arm_value(const struct const_value *a,
 static struct symbol *text_equal(struct checker *c, struct pos pos)
 {
     static const struct name module = {TEXT_MODULE, sizeof TEXT_MODULE - 1};
-    static const struct name name = {TEXT_EQUAL, sizeof TEXT_EQUAL - 1};
-    const struct interface *lib = sema_find_library(c, &module);
-    struct symbol *fn = lib != NULL ? sema_library_item(c, lib, &name) : NULL;
+    struct symbol *fn = sema_std_function(
+        c, pos, "a `switch` on a `str` compares with", &module, TEXT_EQUAL, 2);
     struct type *str = sema_builtin(c, TYPE_STR);
 
-    if (lib == NULL) {
-        sema_error_at(c, pos,
-                      "a `switch` on a `str` compares with `" TEXT_MODULE
-                      "." TEXT_EQUAL "`, so the module imports `" TEXT_MODULE
-                      "`");
+    if (fn == NULL) {
         return NULL;
     }
-    if (fn == NULL || fn->kind != SYMBOL_FN || fn->type == NULL ||
-        fn->type->kind != TYPE_FN || fn->type->param_count != 2 ||
-        fn->type->params[0] != str || fn->type->params[1] != str ||
+    if (fn->type->param_count != 2 || fn->type->params[0] != str ||
+        fn->type->params[1] != str ||
         fn->type->result != sema_builtin(c, TYPE_BOOL)) {
-        sema_error_at(c, pos, "a `switch` on a `str` calls `" TEXT_MODULE "."
-                      TEXT_EQUAL "`, which this `" TEXT_MODULE "` lacks");
+        sema_error_at(c, pos, "a `switch` on a `str` compares with `"
+                      TEXT_MODULE "." TEXT_EQUAL "`, which this `" TEXT_MODULE
+                      "` lacks");
         return NULL;
     }
     return fn;

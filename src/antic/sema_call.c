@@ -1663,6 +1663,8 @@ static struct type *check_regex_compile(struct checker *c, struct expr *e,
                               LANG_BYTE_REGEX);
     const char *type = bytes ? LANG_BYTE_REGEX : LANG_REGEX;
     const char *function = bytes ? REGEX_COMPILE_BYTES : REGEX_COMPILE;
+    const char *what = bytes ? "`" LANG_BYTE_REGEX "." REGEX_COMPILE "` calls"
+                             : "`" LANG_REGEX "." REGEX_COMPILE "` calls";
     const struct interface *lib;
     struct symbol *home;
     struct scope scope;
@@ -1673,13 +1675,10 @@ static struct type *check_regex_compile(struct checker *c, struct expr *e,
                       (int)name->length, name->text);
         return sema_builtin(c, TYPE_ERROR);
     }
-    lib = sema_find_library(c, &module);
-    if (lib == NULL) {
-        sema_error_at(c, e->pos, "`%s." REGEX_COMPILE "` calls `"
-                      REGEX_MODULE ".%s`, so the module imports `"
-                      REGEX_MODULE "`", type, function);
+    if (sema_std_function(c, e->pos, what, &module, function, 1) == NULL) {
         return sema_builtin(c, TYPE_ERROR);
     }
+    lib = sema_find_library(c, &module);
     sema_enter_scope(c, &scope);
     home = sema_declare(c, SYMBOL_MODULE, &hidden_regex, e->pos,
                         "`%.*s` is already declared");

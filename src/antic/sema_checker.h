@@ -300,6 +300,9 @@ struct type *sema_param_form(struct checker *c, struct type *t, bool keep,
                              bool concurrent, bool owned, struct pos pos);
 struct type *sema_lent_form(struct checker *c, struct type *t, bool lent,
                             bool owned, struct pos pos);
+struct symbol *sema_std_function(struct checker *c, struct pos pos,
+                                 const char *what, const struct name *module,
+                                 const char *text, size_t count);
 struct symbol *sema_std_item(struct checker *c, const struct name *module,
                              const struct name *name, bool own);
 struct type *sema_error_class(struct checker *c, struct pos pos);

@@ -1134,6 +1134,48 @@ struct symbol *sema_std_item(struct checker *c, const struct name *module,
                : NULL;
 }
 
+/* The function text of the standard module module, which what calls with
+   count arguments, or NULL after an error at pos. what names the form
+   that calls it and the verb, "`s.matches` calls", as a message reads
+   it. The callers index its parameters
+   by the position of each argument, so a function of fewer parameters is
+   refused here. A damaged or older library file gave one, and the checker
+   read past its parameters (S14 of the audit). */
+struct symbol *sema_std_function(struct checker *c, struct pos pos,
+                                 const char *what, const struct name *module,
+                                 const char *text, size_t count)
+{
+    const struct interface *lib = sema_find_library(c, module);
+    struct name name;
+    struct symbol *f;
+
+    if (lib == NULL) {
+        sema_error_at(c, pos, "%s `%.*s.%s`, so the module imports `%.*s`",
+                      what, (int)module->length, module->text, text,
+                      (int)module->length, module->text);
+        return NULL;
+    }
+    name.text = text;
+    name.length = strlen(text);
+    f = sema_library_item(c, lib, &name);
+    if (f == NULL || f->kind != SYMBOL_FN || f->type == NULL ||
+        f->type->kind != TYPE_FN) {
+        sema_error_at(c, pos, "%s `%.*s.%s`, which this `%.*s` lacks", what, (int)module->length, module->text, text,
+                      (int)module->length, module->text);
+        return NULL;
+    }
+    if (f->type->param_count < count) {
+        sema_error_at(c, pos, "%s `%.*s.%s` with %zu arguments, and "
+                      "this `%.*s` gives it %zu parameter%s", what,
+                      (int)module->length, module->text, text, count,
+                      (int)module->length, module->text,
+                      f->type->param_count,
+                      f->type->param_count == 1 ? "" : "s");
+        return NULL;
+    }
+    return f;
+}
+
 /* DESIGN: `may fail` gives a function the convention a program used to
    write by hand: `?*lang.Error` as the result and an out pointer for
    what it computes. The class is an ordinary imported one, so a module
