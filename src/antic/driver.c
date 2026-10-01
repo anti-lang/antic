@@ -2739,7 +2739,7 @@ static bool write_plugin_index(const char *dir, const char *name,
     char digest[65];
     bool ok;
 
-    text_appendf(&path, "%s%s", dir, PLUGIN_INDEX);
+    text_appendf(&path, "%s%s", dir, ANTI_PLUGIN_INDEX);
     ok = sha256_file(library, digest);
     if (!ok) {
         fprintf(stderr, "antic: cannot read %s\n", library);

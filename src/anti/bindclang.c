@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "antic.h"
 #include "bindexpr.h"
 #include "bindmodel.h"
 #include "files.h"
@@ -152,8 +153,8 @@ static bool target_options(const char *clang, enum target t,
     const char *name = target_name(t);
     bool ok = true;
 
-    text_appendf(&sysroot, "%s/sysroot/%s", runtime != NULL ? runtime : ".",
-                 name);
+    text_appendf(&sysroot, "%s/%s/%s", runtime != NULL ? runtime : ".",
+                 RUNTIME_SYSROOT_DIR, name);
     if (runtime == NULL || !directory_exists(text_cstr(&sysroot))) {
         fprintf(stderr, "anti: the runtime archive holds no sysroot for %s, "
                 "whose headers clang reads. Pass --runtime.\n", name);

@@ -479,6 +479,13 @@ add_test(NAME header_sections
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_header_sections.cmake")
 
+# A name that the tools and the runtime both spell, the markers of the
+# notice, the index of plugins, the suffix of a symbols archive and the
+# sysroot directory, stands in one header.
+add_test(NAME names_once
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_names_once.cmake")
+
 # The layout rule of "Repository layout" in CLAUDE.md, over git ls-files.
 add_test(NAME repo_layout
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"

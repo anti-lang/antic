@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "../rt/plugin_index.h"
 #include "text.h"
 
 /* The minimum macOS version of both macOS targets. */
@@ -38,9 +39,8 @@ enum { MACOS_MIN_MAJOR = 11, MACOS_MIN_MINOR = 0 };
 #define PROVIDER_DISCOVER "discover"
 
 /* The index file that `antic --lib shared --no-runtime` writes beside a
-   plugin. Discovery reads it and opens no library to find out what is
-   inside one. */
-#define PLUGIN_INDEX "anti-plugins.toml"
+   plugin is ANTI_PLUGIN_INDEX of src/rt/plugin_index.h, which the runtime
+   and anti read as well. */
 
 enum target {
     TARGET_LINUX_X86_64,

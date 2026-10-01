@@ -526,8 +526,8 @@ static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
                  target_info(t)->format == FORMAT_COFF ? ".exe" : "");
     text_appendf(&map_path, "%s/%s", text_cstr(&b->build_dir),
                  text_cstr(&map_name));
-    text_appendf(&archive, "%s/%s-symbols.zip", text_cstr(&b->dist_dir),
-                 text_cstr(&stem));
+    text_appendf(&archive, "%s/%s%s", text_cstr(&b->dist_dir),
+                 text_cstr(&stem), SYMS_ARCHIVE_SUFFIX);
     base_options(b, &o, t, cpu);
     o.input = b->units[main_at].source;
     o.output = text_cstr(&debug_path);

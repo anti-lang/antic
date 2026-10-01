@@ -19,6 +19,7 @@
 #include "atomic.h"
 #include "digest.h"
 #include "platform.h"
+#include "plugin_index.h"
 #include "std.h"
 #include "toml.h"
 
@@ -903,7 +904,7 @@ static int discover_in(const char *dir, size_t dir_length,
     int found = 0;
     int64_t n;
 
-    if (!joined(index, sizeof index, dir, dir_length, "anti-plugins.toml")) {
+    if (!joined(index, sizeof index, dir, dir_length, ANTI_PLUGIN_INDEX)) {
         return 0;
     }
     bytes = anti_rt_fs_read(index, &bytes_length);

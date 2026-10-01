@@ -21,17 +21,15 @@
 #include "platform.h"
 #include "conf_include.h"
 #include "license.h"
+#include "plugin_index.h"
 #include "symbols.h"
 #include "symmap.h"
 #include "text.h"
 #include "toml.h"
 #include "zip.h"
 
-/* A build names the archive beside a binary after its stem with this
-   suffix. The index of a deployment archive has the second name. */
-#define ARCHIVE_SUFFIX "-symbols.zip"
+/* The index of a deployment archive. */
 #define INDEX_NAME "index.toml"
-#define PLUGIN_INDEX "anti-plugins.toml"
 
 /* The variable AddressSanitizer reads its options from, and the option
    that leaves the frames of a report to Anti's symbolizer. */
@@ -368,7 +366,7 @@ static bool find_binaries(const char *conf, struct binaries *out)
         struct text bytes = {0};
         struct anti_toml *doc = NULL;
         resolved(text_cstr(&c.dir), text_cstr(&c.plugins.items[i]), &dir);
-        text_appendf(&index, "%s/%s", text_cstr(&dir), PLUGIN_INDEX);
+        text_appendf(&index, "%s/%s", text_cstr(&dir), ANTI_PLUGIN_INDEX);
         if (files_read(text_cstr(&index), &bytes)) {
             doc = anti_rt_toml_read((const unsigned char *)bytes.data,
                                     (int64_t)bytes.length);
@@ -603,8 +601,8 @@ static bool load_archive(const char *path, struct units *out)
     /* The module is the name of the archive without its suffix, which
        is the stem of the binary it belongs to. */
     text_append(&u->module, files_base_name(path));
-    if (ends_with(text_cstr(&u->module), ARCHIVE_SUFFIX)) {
-        u->module.length -= sizeof ARCHIVE_SUFFIX - 1;
+    if (ends_with(text_cstr(&u->module), SYMS_ARCHIVE_SUFFIX)) {
+        u->module.length -= sizeof SYMS_ARCHIVE_SUFFIX - 1;
         u->module.data[u->module.length] = '\0';
     }
     return true;
@@ -652,7 +650,7 @@ static void archive_of(const char *path, const char *from, struct text *out)
     }
     stem_of(path, &stem);
     text_appendf(out, "%s/%s%s", text_cstr(&dir), text_cstr(&stem),
-                 ARCHIVE_SUFFIX);
+                 SYMS_ARCHIVE_SUFFIX);
     text_free(&dir);
     text_free(&stem);
 }

@@ -7,6 +7,10 @@
 
 #include "text.h"
 
+/* `anti build --release` names the symbols archive beside a binary
+   after its stem with this suffix, and `anti symbols` finds it so. */
+#define SYMS_ARCHIVE_SUFFIX "-symbols.zip"
+
 /* `anti symbols`, the three commands over the symbols archives of a
    deployment. Each returns the exit status of the command. */
 
