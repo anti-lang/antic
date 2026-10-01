@@ -11,7 +11,11 @@ The runtime configuration is read the way `src/rt/conf.c` reads it, with
 resolve against the directory of the file that names them. A file that
 sets `plugins` replaces what an include gave, and a line of
 `[injections]` replaces the line of the same interface. A cycle of
-includes, or a chain deeper than thirty-two, ends the command.
+includes, or a file below more than thirty-two others, ends the command
+with the message the runtime gives. The walk is a copy of the runtime's,
+and the bound and the message stand once in `src/rt/conf_include.h`,
+which both read. `conf_include_depth` runs both over a chain of 33 files
+and one of 34.
 
 The program is found in the directory of the configuration. A Mach-O
 file says in its header whether it is an executable. ELF writes a static

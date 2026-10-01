@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include "conf.h"
+#include "conf_include.h"
 #include "platform.h"
 #include "plugin.h"
 
@@ -699,14 +700,12 @@ static void read_file(char *path, const struct including *from)
 
     for (up = from; up != NULL; up = up->from) {
         if (strcmp(up->path, path) == 0) {
-            startup_error("the configuration files include one another at %s",
-                          path);
+            startup_error(ANTI_CONF_INCLUDE_CYCLE, path);
         }
         depth++;
     }
-    if (depth > 32) {
-        startup_error("the configuration files include one another at %s",
-                      path);
+    if (depth > ANTI_CONF_INCLUDE_DEPTH) {
+        startup_error(ANTI_CONF_INCLUDE_CYCLE, path);
     }
     errno = 0;
     bytes = anti_rt_fs_read(path, &length);

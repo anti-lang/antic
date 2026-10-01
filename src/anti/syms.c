@@ -19,6 +19,7 @@
 
 #include "files.h"
 #include "platform.h"
+#include "conf_include.h"
 #include "license.h"
 #include "symbols.h"
 #include "symmap.h"
@@ -36,10 +37,6 @@
    that leaves the frames of a report to Anti's symbolizer. */
 #define SANITIZER_OPTIONS "ASAN_OPTIONS"
 #define NO_SYMBOLIZE "symbolize=0"
-
-/* The runtime refuses an include nested deeper than this, and so does
-   the reader here. */
-enum { INCLUDE_DEPTH = 32 };
 
 static bool ends_with(const char *s, const char *suffix)
 {
@@ -246,11 +243,16 @@ static bool read_configuration(struct configuration *c, const char *path,
     int64_t i;
     bool ok = true;
 
+    /* depth counts the files above this one. The bound and the message
+       are the runtime's, from src/rt/conf_include.h. */
     for (on = from; on != NULL; on = on->from) {
-        if (strcmp(on->path, path) == 0 || depth >= INCLUDE_DEPTH) {
-            fprintf(stderr, "anti: %s includes itself\n", path);
-            return false;
+        if (strcmp(on->path, path) == 0) {
+            break;
         }
+    }
+    if (on != NULL || depth > ANTI_CONF_INCLUDE_DEPTH) {
+        fprintf(stderr, "anti: " ANTI_CONF_INCLUDE_CYCLE "\n", path);
+        return false;
     }
     if (!files_read(path, &bytes)) {
         fprintf(stderr, "anti: cannot read %s\n", path);

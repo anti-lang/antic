@@ -3285,6 +3285,19 @@ foreach(case
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trace.cmake")
 endforeach()
 
+# The runtime and `anti symbols` stop a chain of includes at one depth,
+# with one message.
+add_test(NAME conf_include_depth
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CONF}/report.anti"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-include-depth"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_conf_include_depth.cmake")
+
 # The seed of the hashing collections without a fixed one: two runs of one
 # program choose two seeds.
 add_test(NAME conf_hash_seed_random
