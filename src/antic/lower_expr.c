@@ -665,7 +665,8 @@ static void store_value(struct lowerer *l, const struct expr *current,
 }
 
 /* DESIGN: `to_slice` walks the iterator as `for` does and writes each
-   value into memory from `realloc`. The room doubles plus four elements
+   value into memory from `anti_rt_grow`, which is `realloc` and ends the
+   program when no memory is left. The room doubles plus four elements
    whenever it is full, so a walk of n values moves O(n) bytes. The
    memory is never shrunk, and the program frees it with
    `free(result.ptr)`. An iterator that gives nothing gives an empty
@@ -684,6 +685,7 @@ static struct ir_operand lower_collect(struct lowerer *l, const struct expr *e)
     struct ir_block *exit = lower_new_block(l);
     struct ir_operand args[2];
     struct ir_operand bytes;
+    struct ir_operand grown;
     struct ir_operand room;
     struct ir_operand result;
     uint32_t data;
@@ -716,12 +718,8 @@ static struct ir_operand lower_collect(struct lowerer *l, const struct expr *e)
                                     lower_temp(l, capacity), size));
     args[0] = lower_temp(l, data);
     args[1] = bytes;
-    ir_assign(l->f, l->b, data,
-              lower_temp(l, ir_call(l->f, l->b, IR_PTR,
-                                    ir_func_op(lower_rt_function_giving(
-                                        l, "realloc", IR_PTR, grow_params,
-                                        2)),
-                                    args, 2)));
+    grown = lower_rt_call(l, "anti_rt_grow", IR_PTR, grow_params, args, 2);
+    ir_assign(l->f, l->b, data, grown);
     ir_jump(l->f, l->b, put);
     l->b = put;
     store_value(l, it->current,
@@ -2959,12 +2957,7 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         /* One object of the literal's type, with the literal written
            into it. The count form multiplies by the element size. */
         if (e->as.alloc.value != NULL) {
-            v = lower_size_operand(l, e->type->element);
-            v = lower_temp(l, ir_call(l->f, l->b, IR_PTR,
-                                      ir_func_op(lower_c_function(l, "malloc",
-                                                                  IR_PTR,
-                                                                  IR_I64)),
-                                      &v, 1));
+            v = lower_new_memory(l, lower_size_operand(l, e->type->element));
             lower_build_into(l, e->as.alloc.value, v);
             return v;
         }

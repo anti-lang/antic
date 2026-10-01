@@ -2158,11 +2158,7 @@ static void lower_singleton_get(struct lowerer *l, const struct item *it)
               build, done);
     l->b = build;
     args[0] = lower_size_operand(l, t);
-    made = lower_temp(l, ir_call(l->f, l->b, IR_PTR,
-                                 ir_func_op(lower_c_function(l, "malloc",
-                                                             IR_PTR,
-                                                             IR_I64)),
-                                 args, 1));
+    made = lower_new_memory(l, args[0]);
     lower_prepare_object(l, t, NULL, made);
     lower_run_construct(l, t, made);
     ir_assign(l->f, l->b, result, made);
@@ -2301,6 +2297,16 @@ struct ir_operand lower_rt_call(struct lowerer *l, const char *name,
     uint32_t call = ir_call(l->f, l->b, result, ir_func_op(f), args, count);
 
     return result == IR_VOID ? lower_none() : lower_temp(l, call);
+}
+
+/* The memory of one object of `alloc T { }`, `alloc T(args)` or a
+   singleton, size bytes from anti_rt_new, which ends the program when
+   none is left. */
+struct ir_operand lower_new_memory(struct lowerer *l, struct ir_operand size)
+{
+    static const enum ir_type params[] = {IR_I64};
+
+    return lower_rt_call(l, "anti_rt_new", IR_PTR, params, &size, 1);
 }
 
 /* The count of elements of the `own` slice whose field is at p. */

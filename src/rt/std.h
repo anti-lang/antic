@@ -163,6 +163,16 @@ void *anti_rt_mem_alloc(int64_t size, int64_t align);
 /* Release what anti_rt_mem_alloc gave. NULL does nothing. */
 void anti_rt_mem_free(void *p);
 
+/* size bytes of the C library for one object of `alloc T { }`,
+   `alloc T(args)` or a singleton, never NULL. Out of memory ends the
+   program through the failure routine. In src/rt/mem.c. */
+void *anti_rt_new(int64_t size);
+
+/* The memory at p, which malloc or realloc gave, or NULL, grown to size
+   bytes by realloc, never NULL. Out of memory ends the program as for
+   anti_rt_new, and the memory at p stays. In src/rt/mem.c. */
+void *anti_rt_grow(void *p, int64_t size);
+
 /* The C side of anti.fs, in src/rt/fs.c. A path is the bytes of a str and
    their count. Every function reports a failure through errno. */
 

@@ -1496,12 +1496,7 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         const struct expr *call = s->as.let.value->as.alloc.value;
         struct ir_operand place = lower_temp(l, sym->ir);
         struct ir_operand size = lower_size_operand(l, sym->type->element);
-        struct ir_operand object =
-            lower_temp(l, ir_call(l->f, l->b, IR_PTR,
-                                  ir_func_op(lower_c_function(l, "malloc",
-                                                              IR_PTR,
-                                                              IR_I64)),
-                                  &size, 1));
+        struct ir_operand object = lower_new_memory(l, size);
         struct ir_operand err;
         ir_store(l->f, l->b, IR_PTR, object, place);
         err = lower_construct(l, call, object);

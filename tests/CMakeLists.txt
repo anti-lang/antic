@@ -2970,6 +2970,20 @@ add_test(NAME parallel_size
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trap.cmake")
 
+# Out of memory is fatal for `alloc T { }`, `alloc T(args)` and the first
+# `get` of a singleton, which stop with the failure routine instead of
+# writing through a null pointer.
+foreach(name IN ITEMS alloc_literal alloc_construct singleton_memory)
+    add_test(NAME trap_${name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trap.cmake")
+endforeach()
+
 # A search with a pattern literal that reaches the match limit stops the
 # program with the pattern and the line.
 add_test(NAME pattern_limit

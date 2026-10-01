@@ -50,7 +50,8 @@ and iteration" in `docs/decisions.md`.
   around the loop holds the teardown of the local, and a scope around each
   pass the teardown of the value.
 - `lower_collect` walks the iterator the same way and writes each value into
-  memory from `realloc`. The slice is a slot of the frame with the memory and
+  memory from `anti_rt_grow`, which is `realloc` and ends the program when no
+  memory is left. The slice is a slot of the frame with the memory and
   the count.
 
 ## Walking a collection

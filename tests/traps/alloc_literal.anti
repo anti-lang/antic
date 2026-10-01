@@ -1,0 +1,16 @@
+//! `alloc T { }` of a class no heap holds stops the program with the failure
+//! routine, as out of memory is fatal for one object. Before the fix the table
+//! and the fields were written through the null `malloc` gave, and the store of
+//! a field at a large offset could land in mapped memory.
+
+class Huge
+{
+	pub n: int = 7,
+	pub pad: ?[1 << 60]byte = none,
+}
+
+fn main() -> int
+{
+	let h = alloc Huge { };
+	return h.n as int;
+}

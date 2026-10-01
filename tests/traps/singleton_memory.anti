@@ -1,0 +1,14 @@
+//! The first `get` of a singleton no heap holds stops the program with the
+//! failure routine. Before the fix it wrote the object through the null
+//! `malloc` gave.
+
+singleton class Huge
+{
+	n: int = 7,
+	pad: ?[1 << 60]byte = none,
+}
+
+fn main() -> int
+{
+	return Huge.get().n as int;
+}

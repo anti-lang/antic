@@ -352,6 +352,7 @@ uint32_t lower_table_agg(struct lowerer *l, size_t n);
 const struct type *lower_struct_of_expr(const struct expr *e);
 bool lower_bound_is_direct(const struct expr *e, const struct type *s);
 struct ir_block *lower_when_made(struct lowerer *l, struct ir_operand p);
+struct ir_operand lower_new_memory(struct lowerer *l, struct ir_operand size);
 struct ir_operand lower_rt_call(struct lowerer *l, const char *name,
                                 enum ir_type result,
                                 const enum ir_type *params,

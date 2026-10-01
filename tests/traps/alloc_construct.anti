@@ -1,0 +1,27 @@
+//! `alloc T(args) catch e { }` of a class no heap holds stops the program with
+//! the failure routine before `construct` runs. Before the fix the object was
+//! written through the null `malloc` gave.
+
+import anti.lang;
+
+class Huge
+{
+	pub n: int = 7,
+	pub pad: ?[1 << 60]byte = none,
+
+	fn construct(self, n: int) may fail
+	{
+		if n < 0 {
+			fail "a negative count";
+		}
+		self.n = n;
+	}
+}
+
+fn main() -> int
+{
+	let h = alloc Huge(3) catch e {
+		return 1;
+	};
+	return h.n as int;
+}
