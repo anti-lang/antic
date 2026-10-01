@@ -117,6 +117,7 @@ set(ANTI_SOURCES
     src/anti/fmt.c
     src/anti/jsontree.c
     src/anti/manifest.c
+    src/anti/platform.c
     src/anti/repo.c
     src/anti/sdk.c
     src/anti/symmap.c

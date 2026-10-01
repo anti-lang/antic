@@ -1,6 +1,3 @@
-/* lstat and stat are POSIX, outside the C11 library. */
-#define _POSIX_C_SOURCE 200809L
-
 #include "sdk.h"
 
 #include <stdio.h>
@@ -9,14 +6,10 @@
 #include "antic.h"
 #include "applesdk.h"
 #include "files.h"
-#include "../antic/platform.h"
+#include "platform.h"
 #include "sha256.h"
+#include "target.h"
 #include "text.h"
-
-#if defined(__APPLE__)
-#include <dirent.h>
-#include <sys/stat.h>
-#endif
 
 /* The macOS sysroots that an import fills. */
 static const char *const macos_targets[] = {"macos-arm64", "macos-x86_64"};
@@ -33,7 +26,6 @@ static bool write_line(const char *path, const char *line)
     return ok;
 }
 
-#if defined(__APPLE__)
 /* Append the value of "Version" in the SDKSettings.json of sdk to out. */
 static bool sdk_version(const char *sdk, struct text *out)
 {
@@ -96,56 +88,41 @@ static bool is_stub(const char *name)
    Versions/Current. */
 static bool copy_stubs(const char *dir, const char *rel, const char *stage)
 {
-    DIR *d = opendir(dir);
-    struct dirent *entry;
-    bool ok = true;
+    struct files_list names = {0};
+    bool ok = files_list_names(dir, &names);
+    size_t i;
 
-    if (d == NULL) {
-        return false;
-    }
-    while (ok && (entry = readdir(d)) != NULL) {
+    for (i = 0; ok && i < names.count; i++) {
+        const char *name = text_cstr(&names.items[i]);
         struct text from = {0};
         struct text inside = {0};
-        struct stat link_st;
-        struct stat st;
+        enum platform_kind kind;
 
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-        text_appendf(&from, "%s/%s", dir, entry->d_name);
-        text_appendf(&inside, "%s/%s", rel, entry->d_name);
-        if (lstat(text_cstr(&from), &link_st) == 0) {
-            if (S_ISDIR(link_st.st_mode)) {
-                ok = copy_stubs(text_cstr(&from), text_cstr(&inside), stage);
-            } else if (is_stub(entry->d_name) && stat(text_cstr(&from), &st) == 0 &&
-                       S_ISREG(st.st_mode)) {
-                struct text to = {0};
-                struct text parent = {0};
-                text_appendf(&to, "%s/%s", stage, text_cstr(&inside));
-                text_appendf(&parent, "%s/%s", stage, rel);
-                ok = files_make_dirs(text_cstr(&parent)) &&
-                     files_copy(text_cstr(&from), text_cstr(&to));
-                text_free(&to);
-                text_free(&parent);
-            }
+        text_appendf(&from, "%s/%s", dir, name);
+        text_appendf(&inside, "%s/%s", rel, name);
+        kind = platform_kind(text_cstr(&from), false);
+        if (kind == PLATFORM_DIRECTORY) {
+            ok = copy_stubs(text_cstr(&from), text_cstr(&inside), stage);
+        } else if (is_stub(name) &&
+                   platform_kind(text_cstr(&from), true) == PLATFORM_FILE) {
+            struct text to = {0};
+            struct text parent = {0};
+            text_appendf(&to, "%s/%s", stage, text_cstr(&inside));
+            text_appendf(&parent, "%s/%s", stage, rel);
+            ok = files_make_dirs(text_cstr(&parent)) &&
+                 files_copy(text_cstr(&from), text_cstr(&to));
+            text_free(&to);
+            text_free(&parent);
         }
         text_free(&from);
         text_free(&inside);
     }
-    closedir(d);
+    files_list_free(&names);
     return ok;
 }
-#endif
 
 int sdk_export(const char *sdk, const char *out)
 {
-#if !defined(__APPLE__)
-    (void)sdk;
-    (void)out;
-    fputs("anti: sdk export runs on a Mac, which holds Apple's SDK. Run it on "
-          "a Mac you own and anti sdk import here.\n", stderr);
-    return 1;
-#else
     struct text path = {0};
     struct text version = {0};
     struct text stage = {0};
@@ -154,7 +131,13 @@ int sdk_export(const char *sdk, const char *out)
     int status = 1;
     static const char *const dirs[] = {"usr/lib", "System/Library/Frameworks"};
     size_t i;
+    enum target host;
 
+    if (!target_host(&host) || target_info(host)->os != OS_MACOS) {
+        fputs("anti: sdk export runs on a Mac, which holds Apple's SDK. Run it "
+              "on a Mac you own and anti sdk import here.\n", stderr);
+        goto done;
+    }
     if (sdk != NULL) {
         text_append(&path, sdk);
         if (!sdk_version(sdk, &version)) {
@@ -217,7 +200,6 @@ done:
     text_free(&bundle);
     text_free(&file);
     return status;
-#endif
 }
 
 /* Unpack the bundle into <dir>/sdk through <dir>/sdk.part, so that a file
@@ -250,7 +232,7 @@ static bool unpack(const char *bundle, const char *dir, const char *digest)
         goto done;
     }
     if (!files_remove_tree(text_cstr(&final)) ||
-        rename(text_cstr(&part), text_cstr(&final)) != 0) {
+        !platform_rename(text_cstr(&part), text_cstr(&final))) {
         fprintf(stderr, "anti: cannot replace %s\n", text_cstr(&final));
         goto done;
     }

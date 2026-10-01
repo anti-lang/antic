@@ -1,25 +1,12 @@
-/* lstat, rmdir and unlink are POSIX, outside the C11 library. */
-#define _POSIX_C_SOURCE 200809L
-
 #include "files.h"
 
-#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "../antic/platform.h"
+#include "platform.h"
 #include "text.h"
-
-#if defined(_WIN32)
-#include <direct.h>
-#include <windows.h>
-#else
-#include <dirent.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#endif
 
 void files_out_of_memory(void)
 {
@@ -74,13 +61,24 @@ void *files_grow(void *items, size_t *room, size_t size)
     return bytes;
 }
 
-static bool make_one(const char *path)
+static void list_add(struct files_list *out, const char *path)
 {
-#if defined(_WIN32)
-    return _mkdir(path) == 0 || errno == EEXIST;
-#else
-    return mkdir(path, 0777) == 0 || errno == EEXIST;
-#endif
+    if (out->count == out->capacity) {
+        out->items = files_grow(out->items, &out->capacity, sizeof *out->items);
+    }
+    text_append(&out->items[out->count++], path);
+}
+
+/* The callback of platform_list_directory that adds each name to the
+   list in context. */
+static void add_name(void *context, const char *name)
+{
+    list_add(context, name);
+}
+
+bool files_list_names(const char *dir, struct files_list *out)
+{
+    return platform_list_directory(dir, add_name, out);
 }
 
 bool files_make_dirs(const char *path)
@@ -96,80 +94,41 @@ bool files_make_dirs(const char *path)
         if ((p[i] == '/' || p[i] == '\\') && p[i - 1] != ':') {
             char separator = p[i];
             p[i] = '\0';
-            make_one(p);
+            platform_make_dir(p);
             p[i] = separator;
         }
     }
-    ok = make_one(p);
+    ok = platform_make_dir(p);
     text_free(&t);
     return ok;
 }
 
+/* A link is removed and never followed, so the tree it leads to stays. */
 bool files_remove_tree(const char *path)
 {
-#if defined(_WIN32)
-    DWORD attributes = GetFileAttributesA(path);
-    WIN32_FIND_DATAA found;
-    HANDLE search;
-    struct text pattern = {0};
-    bool ok = true;
+    enum platform_kind kind = platform_kind(path, false);
+    struct files_list names = {0};
+    bool ok;
+    size_t i;
 
-    if (attributes == INVALID_FILE_ATTRIBUTES) {
-        DWORD error = GetLastError();
-        return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
+    if (kind == PLATFORM_MISSING) {
+        return true;
     }
-    if (!(attributes & FILE_ATTRIBUTE_DIRECTORY)) {
-        SetFileAttributesA(path, FILE_ATTRIBUTE_NORMAL);
-        return DeleteFileA(path) != 0;
-    }
-    if (attributes & FILE_ATTRIBUTE_REPARSE_POINT) {
-        return RemoveDirectoryA(path) != 0;
-    }
-    text_appendf(&pattern, "%s\\*", path);
-    search = FindFirstFileA(text_cstr(&pattern), &found);
-    text_free(&pattern);
-    if (search != INVALID_HANDLE_VALUE) {
-        do {
-            struct text child = {0};
-            if (strcmp(found.cFileName, ".") == 0 ||
-                strcmp(found.cFileName, "..") == 0) {
-                continue;
-            }
-            text_appendf(&child, "%s\\%s", path, found.cFileName);
-            ok = files_remove_tree(text_cstr(&child)) && ok;
-            text_free(&child);
-        } while (FindNextFileA(search, &found));
-        FindClose(search);
-    }
-    return RemoveDirectoryA(path) != 0 && ok;
-#else
-    struct stat st;
-    DIR *dir;
-    struct dirent *entry;
-    bool ok = true;
-
-    if (lstat(path, &st) != 0) {
-        return errno == ENOENT;
-    }
-    if (!S_ISDIR(st.st_mode)) {
-        return unlink(path) == 0;
-    }
-    dir = opendir(path);
-    if (dir == NULL) {
+    if (kind == PLATFORM_UNREADABLE) {
         return false;
     }
-    while ((entry = readdir(dir)) != NULL) {
+    if (kind != PLATFORM_DIRECTORY) {
+        return platform_remove_entry(path);
+    }
+    ok = files_list_names(path, &names);
+    for (i = 0; i < names.count; i++) {
         struct text child = {0};
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-        text_appendf(&child, "%s/%s", path, entry->d_name);
+        text_appendf(&child, "%s/%s", path, text_cstr(&names.items[i]));
         ok = files_remove_tree(text_cstr(&child)) && ok;
         text_free(&child);
     }
-    closedir(dir);
-    return rmdir(path) == 0 && ok;
-#endif
+    files_list_free(&names);
+    return platform_remove_entry(path) && ok;
 }
 
 bool files_copy(const char *from, const char *to)
@@ -259,27 +218,7 @@ bool files_write(const char *path, const struct text *bytes)
 
 bool files_copy_program(const char *from, const char *to)
 {
-#if defined(_WIN32)
-    return files_copy(from, to);
-#else
-    struct stat info;
-
-    if (!files_copy(from, to)) {
-        return false;
-    }
-    if (stat(from, &info) != 0) {
-        return false;
-    }
-    return chmod(to, info.st_mode & 07777) == 0;
-#endif
-}
-
-static void list_add(struct files_list *out, const char *path)
-{
-    if (out->count == out->capacity) {
-        out->items = files_grow(out->items, &out->capacity, sizeof *out->items);
-    }
-    text_append(&out->items[out->count++], path);
+    return files_copy(from, to) && platform_copy_permissions(from, to);
 }
 
 static bool ends_with(const char *s, const char *suffix)
@@ -298,6 +237,36 @@ static int by_path(const void *a, const void *b)
     return strcmp(text_cstr(x), text_cstr(y));
 }
 
+static bool walk(const char *dir, const char *suffix, bool deep,
+                 struct files_list *out);
+
+/* One entry of a directory of the walk, at path, whose name is name. */
+static bool walk_entry(const char *path, const char *name, const char *suffix,
+                       bool deep, struct files_list *out)
+{
+    enum platform_kind kind = platform_kind(path, false);
+
+    if (kind == PLATFORM_LINK) {
+        /* A link that leads nowhere names no file, and one that leads to
+           a directory is not followed. */
+        kind = platform_kind(path, true);
+        if (kind == PLATFORM_DIRECTORY) {
+            return true;
+        }
+    }
+    if (kind == PLATFORM_UNREADABLE) {
+        cannot_read(path);
+        return false;
+    }
+    if (kind == PLATFORM_DIRECTORY) {
+        return !deep || walk(path, suffix, deep, out);
+    }
+    if (kind == PLATFORM_FILE && ends_with(name, suffix)) {
+        list_add(out, path);
+    }
+    return true;
+}
+
 /* One directory of the walk. A name that starts with a dot is left alone,
    so a checkout's own directories are no part of a project.
 
@@ -310,101 +279,30 @@ static int by_path(const void *a, const void *b)
 static bool walk(const char *dir, const char *suffix, bool deep,
                  struct files_list *out)
 {
-#if defined(_WIN32)
-    WIN32_FIND_DATAA found;
-    HANDLE search;
-    struct text pattern = {0};
-    DWORD error;
+    struct files_list names = {0};
     bool ok = true;
+    size_t i;
 
-    text_appendf(&pattern, "%s\\*", dir);
-    search = FindFirstFileA(text_cstr(&pattern), &found);
-    text_free(&pattern);
-    if (search == INVALID_HANDLE_VALUE) {
-        error = GetLastError();
-        if (error == ERROR_PATH_NOT_FOUND || error == ERROR_FILE_NOT_FOUND) {
-            return true;
-        }
-        cannot_read(dir);
-        return false;
+    if (platform_kind(dir, true) == PLATFORM_MISSING) {
+        return true;
     }
-    do {
-        struct text child = {0};
-        if (found.cFileName[0] == '.') {
-            continue;
-        }
-        text_appendf(&child, "%s/%s", dir, found.cFileName);
-        if (found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            bool link = (found.dwFileAttributes &
-                         FILE_ATTRIBUTE_REPARSE_POINT) != 0;
-            if (deep && !link && !walk(text_cstr(&child), suffix, deep, out)) {
-                ok = false;
-            }
-        } else if (ends_with(found.cFileName, suffix)) {
-            list_add(out, text_cstr(&child));
-        }
-        text_free(&child);
-    } while (FindNextFileA(search, &found));
-    if (GetLastError() != ERROR_NO_MORE_FILES) {
+    if (!files_list_names(dir, &names)) {
         cannot_read(dir);
         ok = false;
     }
-    FindClose(search);
-    return ok;
-#else
-    DIR *handle = opendir(dir);
-    struct dirent *entry;
-    bool ok = true;
-
-    if (handle == NULL) {
-        if (errno == ENOENT) {
-            return true;
-        }
-        cannot_read(dir);
-        return false;
-    }
-    for (;;) {
+    for (i = 0; i < names.count; i++) {
+        const char *name = text_cstr(&names.items[i]);
         struct text child = {0};
-        struct stat st;
-        errno = 0;
-        entry = readdir(handle);
-        if (entry == NULL) {
-            if (errno != 0) {
-                cannot_read(dir);
-                ok = false;
-            }
-            break;
-        }
-        if (entry->d_name[0] == '.') {
+
+        if (name[0] == '.') {
             continue;
         }
-        text_appendf(&child, "%s/%s", dir, entry->d_name);
-        if (lstat(text_cstr(&child), &st) != 0) {
-            cannot_read(text_cstr(&child));
-            ok = false;
-        } else if (S_ISLNK(st.st_mode)) {
-            /* A link that leads nowhere names no file. */
-            if (stat(text_cstr(&child), &st) != 0) {
-                if (errno != ENOENT) {
-                    cannot_read(text_cstr(&child));
-                    ok = false;
-                }
-            } else if (!S_ISDIR(st.st_mode) &&
-                       ends_with(entry->d_name, suffix)) {
-                list_add(out, text_cstr(&child));
-            }
-        } else if (S_ISDIR(st.st_mode)) {
-            if (deep && !walk(text_cstr(&child), suffix, deep, out)) {
-                ok = false;
-            }
-        } else if (ends_with(entry->d_name, suffix)) {
-            list_add(out, text_cstr(&child));
-        }
+        text_appendf(&child, "%s/%s", dir, name);
+        ok = walk_entry(text_cstr(&child), name, suffix, deep, out) && ok;
         text_free(&child);
     }
-    closedir(handle);
+    files_list_free(&names);
     return ok;
-#endif
 }
 
 bool files_list_tree(const char *dir, const char *suffix,
@@ -458,10 +356,7 @@ const char *files_base_name(const char *path)
 
 bool files_exists(const char *path)
 {
-#if defined(_WIN32)
-    return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
-#else
-    struct stat st;
-    return stat(path, &st) == 0;
-#endif
+    enum platform_kind kind = platform_kind(path, true);
+
+    return kind == PLATFORM_FILE || kind == PLATFORM_DIRECTORY;
 }

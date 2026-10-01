@@ -13,7 +13,7 @@
 #include "manifest.h"
 #include "modpath.h"
 #include "sdk.h"
-#include "../antic/platform.h"
+#include "platform.h"
 #include "syms.h"
 #include "userdirs.h"
 #include "test.h"
@@ -634,6 +634,7 @@ done:
 
 int main(int argc, char **argv)
 {
+    argv = platform_arguments(argv);
     if (argc == 2 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {
         return usage(stdout);
     }

@@ -21,7 +21,7 @@
 #include "files.h"
 #include "manifest.h"
 #include "modpath.h"
-#include "../antic/platform.h"
+#include "platform.h"
 #include "syms.h"
 #include "sha256.h"
 #include "symmap.h"
@@ -148,7 +148,7 @@ static void drop_key(const char *output)
     struct text path = {0};
 
     text_appendf(&path, "%s%s", output, BUILD_KEY_SUFFIX);
-    remove(text_cstr(&path));
+    platform_remove(text_cstr(&path));
     text_free(&path);
 }
 

@@ -51,7 +51,8 @@ bool directory_exists(const char *path);
 
 /* Hand the name of each entry of the directory at path to each, without
    `.` and `..`, in the order the system gives. Returns false when the
-   directory cannot be read. */
+   directory cannot be read, and when the system fails part of the way,
+   after the names it gave. */
 bool platform_list_directory(const char *path,
                              void (*each)(void *context, const char *name),
                              void *context);
@@ -82,6 +83,12 @@ int process_run_in(const char *directory, const char *const argv[]);
 /* Run a program as process_run does and append its standard output to
    out. */
 int process_capture(const char *const argv[], struct text *out);
+
+#if defined(_WIN32)
+/* The UTF-16 of text, or NULL when text is no valid UTF-8. The caller
+   frees the result with free. The layer of anti converts with it. */
+wchar_t *platform_widen(const char *text);
+#endif
 
 #if !defined(_WIN32)
 /* Run a program as process_run does, with the environment variable name

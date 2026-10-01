@@ -53,9 +53,7 @@ bool target_host(enum target *t)
 #include <share.h>
 #include <windows.h>
 
-/* The UTF-16 of text, or NULL when text is no valid UTF-8. The caller
-   frees the result with free. */
-static wchar_t *widen(const char *text)
+wchar_t *platform_widen(const char *text)
 {
     int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1,
                                     NULL, 0);
@@ -124,7 +122,7 @@ static bool append_narrow(struct text *out, const wchar_t *wide)
 
 FILE *platform_open(const char *path, bool writing)
 {
-    wchar_t *wide = widen(path);
+    wchar_t *wide = platform_widen(path);
     const wchar_t *mode = writing ? L"wb" : L"rb";
     FILE *f;
     int tries = 1;
@@ -146,7 +144,7 @@ FILE *platform_open(const char *path, bool writing)
 
 bool platform_remove(const char *path)
 {
-    wchar_t *wide = widen(path);
+    wchar_t *wide = platform_widen(path);
     bool removed = wide != NULL && _wremove(wide) == 0;
 
     free(wide);
@@ -159,7 +157,7 @@ bool platform_remove(const char *path)
    handful of variables, each once. */
 const char *platform_getenv(const char *name)
 {
-    wchar_t *wide_name = widen(name);
+    wchar_t *wide_name = platform_widen(name);
     wchar_t *value = NULL;
     size_t size = 0;
     char *bytes;
@@ -227,7 +225,7 @@ char platform_separator(void)
 
 bool directory_exists(const char *path)
 {
-    wchar_t *wide = widen(path);
+    wchar_t *wide = platform_widen(path);
     DWORD attributes = wide != NULL ? GetFileAttributesW(wide)
                                     : INVALID_FILE_ATTRIBUTES;
 
@@ -244,9 +242,10 @@ bool platform_list_directory(const char *path,
     WIN32_FIND_DATAW entry;
     wchar_t *wide;
     HANDLE find;
+    bool complete;
 
     text_appendf(&pattern, "%s\\*", path);
-    wide = widen(text_cstr(&pattern));
+    wide = platform_widen(text_cstr(&pattern));
     text_free(&pattern);
     if (wide == NULL) {
         return false;
@@ -254,7 +253,9 @@ bool platform_list_directory(const char *path,
     find = FindFirstFileW(wide, &entry);
     free(wide);
     if (find == INVALID_HANDLE_VALUE) {
-        return false;
+        /* The root of a drive has no `.`, so an empty one matches no
+           name. */
+        return GetLastError() == ERROR_FILE_NOT_FOUND;
     }
     do {
         char *name;
@@ -268,8 +269,10 @@ bool platform_list_directory(const char *path,
             free(name);
         }
     } while (FindNextFileW(find, &entry));
+    /* Read before FindClose, which may set the error again. */
+    complete = GetLastError() == ERROR_NO_MORE_FILES;
     FindClose(find);
-    return true;
+    return complete;
 }
 
 static bool self_path(struct text *out)
@@ -285,7 +288,7 @@ static bool self_path(struct text *out)
 
 bool absolute_path(const char *path, struct text *out)
 {
-    wchar_t *wide = widen(path);
+    wchar_t *wide = platform_widen(path);
     wchar_t *full = NULL;
     DWORD length;
     size_t start = out->length;
@@ -376,7 +379,7 @@ static wchar_t *program_in(const char *directory, const char *program)
     }
     text_appendf(&path, "%s\\%s%s", directory, program,
                  strchr(name, '.') == NULL ? ".exe" : "");
-    wide = widen(text_cstr(&path));
+    wide = platform_widen(text_cstr(&path));
     text_free(&path);
     return wide;
 }
@@ -401,10 +404,10 @@ static int start(const char *directory, const char *const argv[],
         }
         quote(argv[i], &line);
     }
-    wide = widen(text_cstr(&line));
+    wide = platform_widen(text_cstr(&line));
     text_free(&line);
     if (directory != NULL) {
-        wide_directory = widen(directory);
+        wide_directory = platform_widen(directory);
     }
     if (wide == NULL || (directory != NULL && wide_directory == NULL)) {
         fprintf(stderr, "antic: cannot run %s: a path is not UTF-8\n",
@@ -557,18 +560,28 @@ bool platform_list_directory(const char *path,
 {
     DIR *dir = opendir(path);
     struct dirent *entry;
+    bool complete;
 
     if (dir == NULL) {
         return false;
     }
-    while ((entry = readdir(dir)) != NULL) {
+    /* readdir gives NULL at the end and on an error alike, and sets errno
+       for the error alone. each may set errno, so it is cleared before
+       every call. */
+    for (;;) {
+        errno = 0;
+        entry = readdir(dir);
+        if (entry == NULL) {
+            complete = errno == 0;
+            break;
+        }
         if (strcmp(entry->d_name, ".") != 0 &&
             strcmp(entry->d_name, "..") != 0) {
             each(context, entry->d_name);
         }
     }
     closedir(dir);
-    return true;
+    return complete;
 }
 
 /* DESIGN: an installed antic sits in bin/ of the runtime archive, so the

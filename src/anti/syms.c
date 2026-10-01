@@ -18,7 +18,7 @@
 #include <string.h>
 
 #include "files.h"
-#include "../antic/platform.h"
+#include "platform.h"
 #include "symbols.h"
 #include "text.h"
 #include "toml.h"
@@ -1247,7 +1247,6 @@ int syms_resolve(const char *trace, const char *const *symbols, size_t count)
     return 0;
 }
 
-#if !defined(_WIN32)
 /* The modules a report names, each read once. A module the read failed
    for holds no bytes. */
 struct report {
@@ -1426,19 +1425,14 @@ static void report_line(void *context, const char *line, size_t length)
     text_free(&m.where);
     fwrite(line, 1, length, stderr);
 }
-#endif
 
+/* Windows keeps the symbolizing of AddressSanitizer, as the DESIGN of
+   platform_run_symbolized in platform.h says. */
 int syms_run_checked(const char *const argv[])
 {
-#if defined(_WIN32)
-    /* DESIGN: Anti's symbolizer reads no PDB and would leave every frame
-       of Windows raw. There the program keeps the symbolizing of
-       AddressSanitizer, which reads the PDB of the link. */
-    return process_run(argv);
-#else
     struct report r;
     struct text value = {0};
-    const char *before = getenv(SANITIZER_OPTIONS);
+    const char *before = platform_getenv(SANITIZER_OPTIONS);
     int status;
 
     memset(&r, 0, sizeof r);
@@ -1446,11 +1440,10 @@ int syms_run_checked(const char *const argv[])
         text_appendf(&value, "%s:", before);
     }
     text_append(&value, NO_SYMBOLIZE);
-    status = process_run_lines(argv, SANITIZER_OPTIONS, text_cstr(&value),
-                               report_line, &r);
+    status = platform_run_symbolized(argv, SANITIZER_OPTIONS,
+                                     text_cstr(&value), report_line, &r);
     texts_free(&r.paths);
     texts_free(&r.files);
     text_free(&value);
     return status;
-#endif
 }

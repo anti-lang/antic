@@ -57,6 +57,7 @@ add_executable(antic_unit_tests
     ../src/anti/files.c
     ../src/anti/jsontree.c
     ../src/anti/manifest.c
+    ../src/anti/platform.c
     ../src/anti/repo.c
     ../src/anti/symmap.c
     ../src/anti/syms.c
@@ -90,7 +91,8 @@ add_test(NAME unit COMMAND antic_unit_tests)
 
 # The allocation helpers of anti when the memory is refused, in a program
 # of its own, since each ends the process.
-add_executable(files_oom_tests unit/test_files_oom.c ../src/anti/files.c)
+add_executable(files_oom_tests unit/test_files_oom.c ../src/anti/files.c
+    ../src/anti/platform.c)
 target_link_libraries(files_oom_tests PRIVATE antic_core)
 target_include_directories(files_oom_tests PRIVATE ../src/anti)
 add_test(NAME files_oom
@@ -115,7 +117,8 @@ add_test(NAME one_allocator
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_one_allocator.cmake")
 
-# Every host branch of antic stands in src/antic/platform.c and platform.h.
+# Every host branch of antic and anti stands in their platform layers,
+# src/antic/platform.c and src/anti/platform.c with their headers.
 add_test(NAME platform_layer
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_platform_layer.cmake")
@@ -2124,11 +2127,13 @@ add_test(NAME runtime_from_data_dir
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/datadir"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_runtime_from_data_dir.cmake")
 
-# Paths outside ASCII on the command line, in the place of antic and in the
-# data directory of the user. Windows reads each through UTF-16.
+# Paths outside ASCII on the command line, in the place of antic, in the
+# data directory of the user and in a project of anti. Windows reads each
+# through UTF-16.
 add_test(NAME unicode_paths
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
+        "-DANTI=$<TARGET_FILE:anti>"
         "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"

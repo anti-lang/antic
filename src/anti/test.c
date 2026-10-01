@@ -16,7 +16,7 @@
 #include "driver.h"
 #include "files.h"
 #include "modpath.h"
-#include "../antic/platform.h"
+#include "platform.h"
 #include "syms.h"
 #include "target.h"
 #include "text.h"

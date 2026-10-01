@@ -84,6 +84,11 @@ bool files_list_tree(const char *dir, const char *suffix,
    does without going below it. */
 bool files_list_dir(const char *dir, struct files_list *out);
 
+/* Append the name of every entry of the directory dir to out, without
+   `.` and `..`, in the order the system gives. Returns false, and prints
+   nothing, when the directory cannot be read, after the names it gave. */
+bool files_list_names(const char *dir, struct files_list *out);
+
 void files_list_free(struct files_list *list);
 
 #endif

@@ -10,8 +10,10 @@
 #      takes the directory as its runtime archive.
 #   3. The data directory of the user under such a name, from HOME or
 #      LOCALAPPDATA, is the runtime archive of an antic in no archive.
+#   4. anti reads a source of such a name given on its command line, and
+#      finds one of such a name in the src/ of a project it made.
 #
-#   cmake -DANTIC=<antic> -DLLVM_MC=<llvm-mc> -DRUNTIME=<dir>
+#   cmake -DANTIC=<antic> -DANTI=<anti> -DLLVM_MC=<llvm-mc> -DRUNTIME=<dir>
 #         -DSOURCE=<return42.anti> -DWORK=<dir>
 #         -P tests/run_unicode_paths.cmake
 
@@ -73,5 +75,29 @@ archive_run(printed "${ANTIC}" "${home}")
 if(NOT printed MATCHES "home-${name}/${data_below}")
     message(FATAL_ERROR "antic did not take ${home}/${data_below} as the "
                         "runtime archive\n${printed}")
+endif()
+
+# 4.
+execute_process(COMMAND "${ANTI}" fmt --check "${source}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+    ENCODING NONE)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "anti fmt --check did not read ${source}\n${out}${err}")
+endif()
+execute_process(COMMAND "${ANTI}" new app.demo
+    WORKING_DIRECTORY "${WORK}/${name}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+    ENCODING NONE)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "anti new failed in ${WORK}/${name}\n${out}${err}")
+endif()
+file(COPY_FILE "${SOURCE}" "${WORK}/${name}/demo/src/${name}.anti")
+execute_process(COMMAND "${ANTI}" fmt --check
+    WORKING_DIRECTORY "${WORK}/${name}/demo"
+    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+    ENCODING NONE)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "anti fmt --check did not read src/${name}.anti\n"
+                        "${out}${err}")
 endif()
 file(REMOVE_RECURSE "${WORK}")

@@ -18,7 +18,7 @@
 #include "antic.h"
 #include "deps.h"
 #include "files.h"
-#include "../antic/platform.h"
+#include "platform.h"
 #include "sha256.h"
 #include "text.h"
 #include "userdirs.h"
@@ -223,7 +223,7 @@ static bool fetch(const char *url, const char *destination, const char *etag)
         }
         text_free(&bytes);
     }
-    remove(text_cstr(&temporary));
+    platform_remove(text_cstr(&temporary));
     text_free(&temporary);
     text_free(&source);
     text_free(&compare);
@@ -388,7 +388,7 @@ bool repo_module(const char *prefix, const char *name, const char *version,
                         "names %s\n", module, name, version, hex, digest);
         /* A cached file is fetched no second time, so one that fails its
            digest leaves the cache and the next build fetches it again. */
-        remove(text_cstr(out));
+        platform_remove(text_cstr(out));
         goto done;
     }
     ok = true;
