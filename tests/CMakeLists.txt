@@ -88,6 +88,17 @@ target_compile_definitions(antic_unit_tests PRIVATE
     ANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${unit_level}})
 add_test(NAME unit COMMAND antic_unit_tests)
 
+# The allocation helpers of anti when the memory is refused, in a program
+# of its own, since each ends the process.
+add_executable(files_oom_tests unit/test_files_oom.c ../src/anti/files.c)
+target_link_libraries(files_oom_tests PRIVATE antic_core)
+target_include_directories(files_oom_tests PRIVATE ../src/anti)
+add_test(NAME files_oom
+    COMMAND "${CMAKE_COMMAND}"
+        "-DPROGRAM=$<TARGET_FILE:files_oom_tests>"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/files-oom"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_files_oom.cmake")
+
 # The suffix antic gives an object of the host target, the one that
 # src/antic/target.c names: .obj on Windows and .o elsewhere. Every dev
 # object a test links is named with it.

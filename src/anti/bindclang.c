@@ -137,14 +137,7 @@ struct arg_list {
 static void arg_add(struct arg_list *list, const char *arg)
 {
     if (list->count == list->room) {
-        size_t room = list->room == 0 ? 16 : list->room * 2;
-        const char **items = realloc(list->items, room * sizeof *items);
-        if (items == NULL) {
-            fputs("anti: out of memory\n", stderr);
-            exit(70);
-        }
-        list->items = items;
-        list->room = room;
+        list->items = files_grow(list->items, &list->room, sizeof *list->items);
     }
     list->items[list->count++] = arg;
 }

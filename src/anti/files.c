@@ -34,8 +34,12 @@ void *files_array(size_t count, size_t size)
     if (size != 0 && count > SIZE_MAX / size) {
         files_out_of_memory();
     }
-    /* calloc may answer NULL for no bytes, which is no failure. */
+    /* calloc may answer NULL for no bytes, which is no failure, so the
+       request is never for none. */
     items = calloc(count == 0 ? 1 : count, size == 0 ? 1 : size);
+    if (items == NULL) {
+        files_out_of_memory();
+    }
     return items;
 }
 
@@ -47,6 +51,9 @@ void *files_resize(void *items, size_t count, size_t size)
         files_out_of_memory();
     }
     grown = realloc(items, count * size == 0 ? 1 : count * size);
+    if (grown == NULL) {
+        files_out_of_memory();
+    }
     return grown;
 }
 
