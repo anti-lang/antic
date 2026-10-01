@@ -1,6 +1,7 @@
 #include "header.h"
 
 #include <inttypes.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -616,13 +617,16 @@ static void variant_view(struct text *out, const struct symbol *sym,
 static void vector_typedef(struct text *out, const struct type *t)
 {
     const struct type *lane = type_simd_lane(t);
-    const char *neon = "uint8x16_t";
+    const char *neon;
     const char *sse = "__m128i";
 
+    /* A bool lane is a byte, as a u8 lane is. The u64 lanes are the
+       rest. */
     switch (lane->kind) {
     case TYPE_F32: neon = "float32x4_t"; sse = "__m128"; break;
     case TYPE_F64: neon = "float64x2_t"; sse = "__m128d"; break;
     case TYPE_I8: neon = "int8x16_t"; break;
+    case TYPE_BOOL:
     case TYPE_U8: neon = "uint8x16_t"; break;
     case TYPE_I16: neon = "int16x8_t"; break;
     case TYPE_U16:
@@ -640,6 +644,22 @@ static void vector_typedef(struct text *out, const struct type *t)
                       "#endif\n\n",
                  neon, (int)t->name.length, t->name.text, sse,
                  (int)t->name.length, t->name.text);
+}
+
+/* An integer as a C literal that fits its type. The least int64_t has
+   no literal of its own, since C reads -9223372036854775808 as the
+   negation of a literal past INT64_MAX, so it is written as a sum. An
+   unsigned value past INT64_MAX takes `u`. */
+static void integer_literal(struct text *out, uint64_t value, bool is_signed)
+{
+    if (is_signed && value == (uint64_t)INT64_MAX + 1) {
+        text_append(out, "(-9223372036854775807 - 1)");
+    } else if (is_signed) {
+        text_appendf(out, "%" PRId64, (int64_t)value);
+    } else {
+        text_appendf(out, "%" PRIu64 "%s", value,
+                     value > (uint64_t)INT64_MAX ? "u" : "");
+    }
 }
 
 /* DESIGN: an enum becomes the C enum of its values, named as the type,
@@ -663,15 +683,9 @@ static void enum_view(struct text *out, const struct type *t,
         struct text buffer = {0};
         c_name(&buffer, &t->fields[i].name);
         doc_comment(out, &t->fields[i].doc, "    ");
-        if (is_signed) {
-            text_appendf(out, "    %s_%s = %" PRId64 "%s\n", text_cstr(&name),
-                         text_cstr(&buffer), (int64_t)t->fields[i].number,
-                         i + 1 < t->field_count ? "," : "");
-        } else {
-            text_appendf(out, "    %s_%s = %" PRIu64 "%s\n", text_cstr(&name),
-                         text_cstr(&buffer), t->fields[i].number,
-                         i + 1 < t->field_count ? "," : "");
-        }
+        text_appendf(out, "    %s_%s = ", text_cstr(&name), text_cstr(&buffer));
+        integer_literal(out, t->fields[i].number, is_signed);
+        text_append(out, i + 1 < t->field_count ? ",\n" : "\n");
         text_free(&buffer);
     }
     text_append(out, "};\n\n");
@@ -1252,10 +1266,26 @@ static void constant(struct text *out, const struct symbol *sym)
         text_appendf(out, "#define %.*s %s\n", (int)sym->name.length,
                      sym->name.text, v->as.boolean ? "true" : "false");
         return;
-    /* A whole value gets `.0`, since C reads `2` as an int and refuses
-       `2f`. */
+    /* DESIGN: infinity and NaN have no literal in C. The header writes
+       INFINITY and NAN of <math.h>, which it then includes, as the
+       float of the type, with the sign of an infinity. A NaN is written
+       as NAN whatever its sign and payload, as antic prints it `nan`. */
     case CONST_FLOAT: {
         struct text digits = {0};
+        const char *as_double = t->kind == TYPE_F32 ? "" : "(double)";
+        if (isnan(v->as.floating)) {
+            text_appendf(out, "#define %.*s (%sNAN)\n", (int)sym->name.length,
+                         sym->name.text, as_double);
+            return;
+        }
+        if (isinf(v->as.floating)) {
+            text_appendf(out, "#define %.*s (%s%sINFINITY)\n",
+                         (int)sym->name.length, sym->name.text,
+                         v->as.floating < 0 ? "-" : "", as_double);
+            return;
+        }
+        /* A whole value gets `.0`, since C reads `2` as an int and refuses
+           `2f`. */
         text_appendf(&digits, "%.17g", v->as.floating);
         text_appendf(out, "#define %.*s %s%s%s\n", (int)sym->name.length,
                      sym->name.text, text_cstr(&digits),
@@ -1280,9 +1310,10 @@ static void constant(struct text *out, const struct symbol *sym)
         text_append(out, "\";\n");
         return;
     default:
-        text_appendf(out, "#define %.*s ((%s)%" PRId64 ")\n",
-                     (int)sym->name.length, sym->name.text, scalar_name(t),
-                     (int64_t)v->as.integer);
+        text_appendf(out, "#define %.*s ((%s)", (int)sym->name.length,
+                     sym->name.text, scalar_name(t));
+        integer_literal(out, v->as.integer, type_is_signed(t));
+        text_append(out, ")\n");
         return;
     }
 }
@@ -1330,6 +1361,26 @@ static void guard_name(struct text *out, const char *name)
                                     : '_');
     }
     text_append(out, "_H");
+}
+
+/* Whether an exported constant of the interfaces is a float that is not
+   finite, which the header writes with <math.h>. */
+static bool needs_math(const struct interface *const *ifaces, size_t count)
+{
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < count; i++) {
+        for (j = 0; j < ifaces[i]->item_count; j++) {
+            const struct symbol *sym = ifaces[i]->items[j];
+            if (sym->exported && sym->kind == SYMBOL_CONST &&
+                sym->value->kind == CONST_FLOAT &&
+                !isfinite(sym->value->as.floating)) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 /* Whether an exported class of the interfaces has an `own fn` field,
@@ -1380,8 +1431,9 @@ void header_write(struct text *out, const char *name,
     guard_name(out, name);
     text_append(out, "\n#define ");
     guard_name(out, name);
-    text_append(out, "\n\n"
-                     "#include <stdbool.h>\n"
+    text_append(out, "\n\n");
+    text_append(out, needs_math(ifaces, count) ? "#include <math.h>\n" : "");
+    text_append(out, "#include <stdbool.h>\n"
                      "#include <stddef.h>\n"
                      "#include <stdint.h>\n\n"
                      "#ifdef __cplusplus\n"

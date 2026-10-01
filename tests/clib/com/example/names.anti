@@ -1,6 +1,6 @@
 //! What the header of a library writes for C: two field names that share their
 //! first 136 bytes, a float constant with a whole value, and a class whose
-//! table holds more than 64 public functions.
+//! table holds more than 64 public functions. Every constant is a C literal.
 
 import anti.lang;
 
@@ -372,3 +372,18 @@ export class Many
 		return 69;
 	}
 }
+
+/// Positive infinity as an f64.
+export const UP: f64 = 1.0 / 0.0;
+
+/// Negative infinity as an f32.
+export const DOWN: f32 = -1.0 / 0.0;
+
+/// Not a number.
+export const NOT_NUMBER: f64 = 0.0 / 0.0;
+
+/// The least int.
+export const LEAST: int = -9223372036854775807 - 1;
+
+/// The largest u64.
+export const MOST: u64 = 18446744073709551615;

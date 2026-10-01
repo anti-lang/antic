@@ -85,6 +85,28 @@ static void owning_structs(void)
     text_free(&out);
 }
 
+/* A simd struct of sixteen bool lanes is sixteen bytes, the NEON vector
+   of sixteen uint8_t, as one of sixteen u8 lanes is. */
+static void simd_bool_lanes(void)
+{
+    struct text out = {0};
+
+    if (header_text("com.example.geo",
+                    "export simd struct Mask16 { a: bool, b: bool, c: bool,"
+                    " d: bool, e: bool, f: bool, g: bool, h: bool, i: bool,"
+                    " j: bool, k: bool, l: bool, m: bool, n: bool, o: bool,"
+                    " p: bool }\n",
+                    false, &out)) {
+        CHECK(strstr(text_cstr(&out),
+                     "#if defined(__aarch64__) || defined(_M_ARM64)\n"
+                     "typedef uint8x16_t Mask16;\n"
+                     "#else\n"
+                     "typedef __m128i Mask16;\n"
+                     "#endif\n") != NULL);
+    }
+    text_free(&out);
+}
+
 void test_header(void)
 {
     header_of("com.example.geo",
@@ -353,4 +375,5 @@ void test_header(void)
               "\n"
               "#endif\n");
     owning_structs();
+    simd_bool_lanes();
 }
