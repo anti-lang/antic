@@ -3248,6 +3248,8 @@ foreach(case
         "configure_dev|configure|--dev|${CONF}/no-backtrace.toml|configure.plain.pattern||0"
         "configure_missing|configure||${CONF}/nowhere.toml|empty.pattern|missing.pattern|70"
         "configure_nul|configure_nul||${CONF}/basic.toml|empty.pattern|configure-nul.pattern|70"
+        "configure_injections|configure||${CONF}/injection.toml|empty.pattern|configure-injections.pattern|70"
+        "configure_injections_include|configure||${CONF}/include-injection.toml|empty.pattern|configure-injections.pattern|70"
         "file_missing|report||--anti.conf=${CONF}/nowhere.toml|empty.pattern|missing.pattern|70"
         "include_missing|report||--anti.conf=${CONF}/missing.toml|empty.pattern|missing.pattern|70"
         "include_cycle|report||--anti.conf=${CONF}/cycle.toml|empty.pattern|cycle.pattern|70"

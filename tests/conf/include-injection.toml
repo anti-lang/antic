@@ -1,0 +1,3 @@
+# An include that holds the table injections, which rt.configure refuses as
+# it refuses the table in the file it names.
+include = 'injection.toml'

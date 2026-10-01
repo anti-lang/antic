@@ -1,0 +1,1 @@
+anti: .*injection\.toml:2: injections are fixed at start, before rt\.configure runs\. Name the file with --anti\.conf or ANTI_CONF

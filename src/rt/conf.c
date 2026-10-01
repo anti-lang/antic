@@ -478,7 +478,14 @@ struct including {
     const struct including *from;
 };
 
-static void read_file(char *path, const struct including *from);
+/* When a file is read. DESIGN: the slots of [injections] are filled
+   before main, and rt.configure runs in main, so a file it reads, or one
+   that file includes, may not hold the table. Eddie decided this on
+   2026-09-30. */
+enum reading { AT_START, IN_MAIN };
+
+static void read_file(char *path, const struct including *from,
+                      enum reading when);
 
 /* Whether the key is the word, or starts with it and a dot. */
 static int key_under(struct anti_text key, const char *word)
@@ -510,7 +517,7 @@ static char *value_text(const struct anti_toml *doc, int64_t index,
 /* The includes of the document, in order, each relative to the file
    that names it. */
 static void read_includes(const struct anti_toml *doc, const char *path,
-                          const struct including *from)
+                          const struct including *from, enum reading when)
 {
     int64_t count = anti_rt_toml_count(doc);
     int64_t i;
@@ -521,7 +528,7 @@ static void read_includes(const struct anti_toml *doc, const char *path,
             continue;
         }
         value = value_text(doc, i, path);
-        read_file(resolve(path, value), from);
+        read_file(resolve(path, value), from, when);
         free(value);
     }
 }
@@ -613,7 +620,8 @@ static char *join_elements(const struct anti_toml *doc, int64_t from,
 /* The key at index of [runtime], or [injections], of the document. It
    ends the program on any other. */
 static void read_key(const struct anti_toml *doc, int64_t i,
-                     const char *path, const char *position)
+                     const char *path, const char *position,
+                     enum reading when)
 {
     struct anti_text name = anti_rt_toml_key(doc, i);
     size_t length;
@@ -623,6 +631,12 @@ static void read_key(const struct anti_toml *doc, int64_t i,
 
     if (name.len > INT_MAX) {
         startup_error("%s: the key is too long", position);
+    }
+    if (key_under(name, "injections") && when == IN_MAIN) {
+        startup_error("%s: injections are fixed at start, before "
+                      "rt.configure runs. Name the file with --anti.conf or "
+                      "ANTI_CONF",
+                      position);
     }
     if (key_under(name, "injections") && name.len > 11) {
         value = value_text(doc, i, path);
@@ -667,7 +681,8 @@ static void read_key(const struct anti_toml *doc, int64_t i,
 }
 
 /* The keys of the document, after its includes. */
-static void read_keys(const struct anti_toml *doc, const char *path)
+static void read_keys(const struct anti_toml *doc, const char *path,
+                      enum reading when)
 {
     int64_t count = anti_rt_toml_count(doc);
     int64_t i;
@@ -679,7 +694,7 @@ static void read_keys(const struct anti_toml *doc, const char *path)
         }
         position = format_text("%s:%lld", path,
                                (long long)anti_rt_toml_line(doc, i));
-        read_key(doc, i, path, position);
+        read_key(doc, i, path, position, when);
         free(position);
     }
 }
@@ -688,7 +703,8 @@ static void read_keys(const struct anti_toml *doc, const char *path)
    order, depth first, then its own keys. The including file therefore
    wins per key. The path is the one the caller resolved, and the reader
    keeps it. */
-static void read_file(char *path, const struct including *from)
+static void read_file(char *path, const struct including *from,
+                      enum reading when)
 {
     struct retired *kept;
     struct including here;
@@ -730,8 +746,8 @@ static void read_file(char *path, const struct including *from)
     release();
     here.path = path;
     here.from = from;
-    read_includes(doc, path, &here);
-    read_keys(doc, path);
+    read_includes(doc, path, &here, when);
+    read_keys(doc, path, when);
     anti_rt_toml_free(doc);
     free(bytes);
     anti_rt_atomic_store(&file_read, (int64_t)sizeof file_read, 1);
@@ -878,12 +894,12 @@ void anti_rt_conf_start(void)
         exit(0);
     }
     if (conf_path != NULL) {
-        read_file(copy(conf_path, strlen(conf_path)), NULL);
+        read_file(copy(conf_path, strlen(conf_path)), NULL, AT_START);
     } else {
         char *path = environment_path();
 
         if (path != NULL) {
-            read_file(path, NULL);
+            read_file(path, NULL, AT_START);
         }
     }
     fill_injections();
@@ -906,7 +922,7 @@ void anti_rt_conf_configure(const unsigned char *path, int64_t length)
                       "byte",
                       (const char *)path);
     }
-    read_file(copy((const char *)path, (size_t)length), NULL);
+    read_file(copy((const char *)path, (size_t)length), NULL, IN_MAIN);
 }
 
 /* DESIGN: the count is read digit by digit against its bound, so every

@@ -46,7 +46,9 @@ once for `include` and `include.<n>`, which it resolves against the
 directory of the file that names them and reads depth first, and once for
 the keys. A key outside `include`, `runtime.` and `injections.` is a
 startup error, as is a key of `[runtime]` that no entry of the table
-names.
+names. A file that `rt.configure` names, and every file it includes,
+refuses a key of `injections.` with the position of the key, since the
+slots of the table are filled before `main`.
 
 A cycle is found by the paths on the stack of files being read, compared
 as text. Two spellings of one path escape that comparison, and the depth
