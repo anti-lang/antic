@@ -53,7 +53,6 @@ static void push_exit_action(struct lowerer *l, const struct stmt *stmt,
     action->second = 0;
     action->unlock_fn = NULL;
     action->leave = false;
-    action->snapshot = false;
 }
 
 /* Record the `leave` hook of the function around the scope. */
@@ -65,18 +64,6 @@ void lower_push_leave_action(struct lowerer *l)
     action = &l->defers->items[l->defers->count++];
     memset(action, 0, sizeof *action);
     action->leave = true;
-}
-
-/* Record the free of the snapshot of the `keep own` parameter param. */
-void lower_push_snapshot_action(struct lowerer *l, const struct symbol *param)
-{
-    struct exit_action *action;
-
-    l->defers->items = grow_defers(l->defers);
-    action = &l->defers->items[l->defers->count++];
-    memset(action, 0, sizeof *action);
-    action->local = param;
-    action->snapshot = true;
 }
 
 /* Record the delete of the error a handler binds, whose name is sym or
@@ -100,7 +87,6 @@ static void push_error_action(struct lowerer *l, const struct symbol *sym,
     action->second = 0;
     action->unlock_fn = NULL;
     action->leave = false;
-    action->snapshot = false;
 }
 
 /* Record the unlock of the lock whose address is in mutex, which a
@@ -125,7 +111,6 @@ static void push_unlock_action(struct lowerer *l, uint32_t mutex,
     action->second = 0;
     action->unlock_fn = unlock_fn;
     action->leave = false;
-    action->snapshot = false;
 }
 
 static void jump_to_join(struct lowerer *l, struct ir_block **join)
@@ -589,7 +574,7 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
     around.outer = l->defers;
     l->defers = &around;
     lower_bind_cursor(l, it);
-    if (lower_needs_teardown(it->cursor->type)) {
+    if (sema_needs_teardown(it->cursor->type)) {
         push_exit_action(l, NULL, it->cursor, false);
     }
     loop.continue_to = test;
@@ -628,7 +613,7 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
        parts gives the loop the parts it receives by value. The teardown
        of the value leaves its pointers alone. */
     if ((it->place == NULL || type_holds_lent(sym->type)) &&
-        lower_needs_teardown(sym->type)) {
+        sema_needs_teardown(sym->type)) {
         push_exit_action(l, NULL, sym, false);
     }
     if (s->as.for_loop.pattern) {
@@ -899,31 +884,6 @@ static enum token_kind compound_op(enum token_kind op)
    assignment reads the old value before it evaluates the new operand, as
    x = x + e reads x first. */
 
-static void destroy_value(struct lowerer *l, struct ir_operand p,
-                          const struct type *t, bool replaced);
-
-/* The teardown of the `?T` at p, which runs on the class value it holds
-   when its flag is set. */
-static void destroy_optional(struct lowerer *l, struct ir_operand p,
-                             const struct type *t, bool replaced)
-{
-    struct ir_block *held = lower_new_block(l);
-    struct ir_block *after = lower_new_block(l);
-
-    ir_branch(l->f, l->b,
-              lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8,
-                                      lower_optional_flag(l, t, p),
-                                      ir_int_op(IR_I8, 0))),
-              held, after);
-    l->b = held;
-    destroy_value(l, p, t->element, replaced);
-    ir_jump(l->f, l->b, after);
-    l->b = after;
-}
-
-static void destroy_array(struct lowerer *l, struct ir_operand base,
-                          const struct type *t, bool replaced);
-
 /* DESIGN: `*p = try f();` gives the call the address of the place it
    assigns to. The place is read once, before the call, so a target that
    computes an address runs its parts exactly once. Nothing is cleared
@@ -1052,18 +1012,9 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
        use, not for assignment into. */
     if (lower_is_aggregate(target->type)) {
         v = lower_expr(l, value);
-        /* An `own fn` place frees the snapshot it held. */
-        if (target->type->kind == TYPE_FN && target->type->owned) {
-            lower_free_snapshot(l, target->type, p.address);
-        }
-        if (lower_needs_teardown(target->type)) {
-            if (target->type->kind == TYPE_OPTIONAL) {
-                destroy_optional(l, p.address, target->type, true);
-            } else if (target->type->kind == TYPE_ARRAY) {
-                destroy_array(l, p.address, target->type, true);
-            } else {
-                destroy_value(l, p.address, target->type, true);
-            }
+        if (sema_needs_teardown(target->type)) {
+            lower_destroy_owned(l, target->type, p.address,
+                                ir_int_op(IR_PTR, 0), true);
         }
         ir_memcopy(l->f, l->b, p.address, v, lower_vtype_of(l, target->type));
         lower_clear_moved(l, value);
@@ -1097,195 +1048,6 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
     hook_changed(l, &p, target);
 }
 
-/* DESIGN: a local of a class whose chain declares `destruct` or owns
-   memory is torn down at the end of its block, as if the program had
-   written `defer destroy(&c)` after the `let`. So is a struct or a tuple
-   that owns something, part by part. A class value held inline
-   is owned, so one that needs the teardown asks for it too. A heap object
-   is never torn down by itself, and `delete` is the only way to free
-   one. */
-bool lower_type_needs_destruct(const struct type *t)
-{
-    return t != NULL &&
-           (t->kind == TYPE_CLASS || t->kind == TYPE_STRUCT ||
-            t->kind == TYPE_TUPLE || t->kind == TYPE_VARIANT) &&
-           sema_needs_teardown(t);
-}
-
-/* DESIGN: a `?T` of a class value that needs the teardown holds an
-   object when its flag is set. It is torn down then, as the class value
-   is. */
-bool lower_optional_needs_destruct(const struct type *t)
-{
-    return t != NULL && t->kind == TYPE_OPTIONAL &&
-           lower_type_needs_destruct(t->element);
-}
-
-/* DESIGN: a local array whose element class needs the teardown is torn
-   down element by element, last to first, as locals are. An array of
-   arrays is one run of elements in memory and is torn down as one. */
-static const struct type *innermost(const struct type *t)
-{
-    while (t != NULL && t->kind == TYPE_ARRAY) {
-        t = t->element;
-    }
-    return t;
-}
-
-bool lower_needs_teardown(const struct type *t)
-{
-    return lower_type_needs_destruct(innermost(t)) ||
-           lower_optional_needs_destruct(t);
-}
-
-/* The count of elements of the class in the array t, through every
-   level of it. */
-static struct ir_operand element_count(struct lowerer *l, const struct type *t)
-{
-    struct ir_operand count = ir_int_op(IR_I64, 1);
-
-    for (; t->kind == TYPE_ARRAY; t = t->element) {
-        struct ir_operand length =
-            t->length_of != NULL ? ir_sym_operand(l->m,
-                                                  lower_sym_of(l, t->length_of))
-                                 : ir_int_op(IR_I64, t->length);
-        count = lower_temp(l,
-                           ir_binary(l->f, l->b, IR_MUL, IR_I64, count,
-                                     length));
-    }
-    return count;
-}
-
-struct ir_operand lower_array_count(struct lowerer *l, const struct type *t)
-{
-    return element_count(l, t);
-}
-
-/* The teardown of the class value at p. The end of a block checks its
-   table in the runtime. An assignment passes over a value whose table is
-   zero, which was never made. A struct or a tuple goes part by part. */
-static void destroy_value(struct lowerer *l, struct ir_operand p,
-                          const struct type *t, bool replaced)
-{
-    struct ir_operand args[2];
-    struct ir_block *after;
-
-    if (t->kind == TYPE_STRUCT || t->kind == TYPE_TUPLE ||
-        t->kind == TYPE_VARIANT) {
-        lower_destroy_owned(l, t, p, ir_int_op(IR_PTR, 0), replaced);
-        return;
-    }
-    if (!replaced) {
-        lower_object_call(l, "anti_rt_destroy", p, t);
-        return;
-    }
-    after = lower_when_made(l, p);
-    args[0] = p;
-    args[1] = ir_int_op(IR_PTR, 0);
-    ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(lower_class_function(l, t, "destroy")),
-            args, 2);
-    ir_jump(l->f, l->b, after);
-    l->b = after;
-}
-
-static void destroy_array(struct lowerer *l, struct ir_operand base,
-                          const struct type *t, bool replaced)
-{
-    const struct type *element = innermost(t);
-    struct ir_operand size = lower_size_operand(l, element);
-    struct ir_block *test = lower_new_block(l);
-    struct ir_block *body = lower_new_block(l);
-    struct ir_block *done = lower_new_block(l);
-    uint32_t index = ir_unary(l->f, l->b, IR_COPY, IR_I64,
-                              element_count(l, t));
-    struct ir_operand at;
-
-    ir_jump(l->f, l->b, test);
-    l->b = test;
-    ir_branch(l->f, l->b,
-              lower_temp(l, ir_binary(l->f, l->b, IR_SGT, IR_I8,
-                                      lower_temp(l, index),
-                                      ir_int_op(IR_I64, 0))),
-              body, done);
-    l->b = body;
-    ir_assign(l->f, l->b, index,
-              lower_temp(l, ir_binary(l->f, l->b, IR_SUB, IR_I64,
-                                      lower_temp(l, index),
-                                      ir_int_op(IR_I64, 1))));
-    at = lower_temp(l, ir_ptradd(l->f, l->b, base,
-                                 lower_temp(l, ir_binary(l->f, l->b, IR_MUL,
-                                                         IR_I64,
-                                                         lower_temp(l, index),
-                                                         size))));
-    destroy_value(l, at, element, replaced);
-    ir_jump(l->f, l->b, test);
-    l->b = done;
-}
-
-/* DESIGN: the out pointer the compiler supplies for `let n = f(args) catch
-   e { }` points at storage that holds no value yet, and the `=` the callee
-   writes destroys the old value first. That `=` reads the table to learn
-   whether there is one, so the table is zero before the call. The bytes an
-   earlier call left in the frame are otherwise a table the callee follows,
-   which is a free of whatever the frame held. It is the zero table of
-   `alloc(T, n)`, in a frame instead of on the heap. */
-void lower_clear_tables(struct lowerer *l, struct ir_operand base,
-                        const struct type *t)
-{
-    const struct type *element = innermost(t);
-    struct ir_block *test;
-    struct ir_block *body;
-    struct ir_block *done;
-    struct ir_operand size;
-    struct ir_operand at;
-    uint32_t index;
-
-    /* A `?T` that holds nothing has nothing for the `=` to destroy. */
-    if (lower_optional_needs_destruct(t)) {
-        lower_set_optional(l, t, NULL, base, 0);
-        return;
-    }
-    if (!lower_type_needs_destruct(element)) {
-        return;
-    }
-    /* A struct or a tuple clears what each of its parts would tear
-       down. */
-    if (element->kind != TYPE_CLASS) {
-        lower_clear_owned(l, t, base);
-        return;
-    }
-    if (t->kind != TYPE_ARRAY) {
-        ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), base);
-        return;
-    }
-    size = lower_size_operand(l, element);
-    test = lower_new_block(l);
-    body = lower_new_block(l);
-    done = lower_new_block(l);
-    index = ir_unary(l->f, l->b, IR_COPY, IR_I64, element_count(l, t));
-    ir_jump(l->f, l->b, test);
-    l->b = test;
-    ir_branch(l->f, l->b,
-              lower_temp(l, ir_binary(l->f, l->b, IR_SGT, IR_I8,
-                                      lower_temp(l, index),
-                                      ir_int_op(IR_I64, 0))),
-              body, done);
-    l->b = body;
-    ir_assign(l->f, l->b, index,
-              lower_temp(l, ir_binary(l->f, l->b, IR_SUB, IR_I64,
-                                      lower_temp(l, index),
-                                      ir_int_op(IR_I64, 1))));
-    at = lower_temp(l, ir_ptradd(l->f, l->b, base,
-                                 lower_temp(l, ir_binary(l->f, l->b, IR_MUL,
-                                                         IR_I64,
-                                                         lower_temp(l, index),
-                                                         size))));
-    ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
-    ir_jump(l->f, l->b, test);
-    l->b = done;
-}
-
 /* DESIGN: a call whose result the statement drops gives a value that no
    local holds, so the statement tears it down where it ends, as a `let`
    of it would be torn down at the end of its block. value is what the
@@ -1294,27 +1056,25 @@ static void drop_result(struct lowerer *l, const struct expr *e,
                         struct ir_operand value)
 {
     if (e->kind != EXPR_CALL || e->as.call.hashes || e->type == NULL ||
-        l->b == NULL || !lower_needs_teardown(e->type)) {
+        l->b == NULL || !sema_needs_teardown(e->type)) {
         return;
     }
     lower_destroy_owned(l, e->type, value, ir_int_op(IR_PTR, 0), false);
 }
 
-/* A local that may have moved, and an `own` parameter, are torn down
-   only when their table is not zero. */
+/* DESIGN: a local whose type owns something is torn down at the end of
+   its block, as if the program had written `defer destroy(&c)` after the
+   `let`: a class value, a struct, a tuple or a variant part by part, an
+   array element by element and a `?T` when its flag is set, at any depth.
+   sema_needs_teardown says which, and lower_destroy_owned is the one
+   teardown. A local that may have moved, and an `own` parameter, are torn
+   down only when their table is not zero. A `keep own` parameter frees
+   its snapshot, which holds `none` once it moved. A heap object is never
+   torn down by itself, and `delete` is the only way to free one. */
 static void destroy_local(struct lowerer *l, const struct symbol *sym)
 {
-    bool made_only = sym->moved || sym->own_param;
-
-    if (sym->type->kind == TYPE_OPTIONAL) {
-        destroy_optional(l, lower_temp(l, sym->ir), sym->type, made_only);
-        return;
-    }
-    if (sym->type->kind == TYPE_ARRAY) {
-        destroy_array(l, lower_temp(l, sym->ir), sym->type, made_only);
-        return;
-    }
-    destroy_value(l, lower_temp(l, sym->ir), sym->type, made_only);
+    lower_destroy_owned(l, sym->type, lower_temp(l, sym->ir),
+                        ir_int_op(IR_PTR, 0), sym->moved || sym->own_param);
 }
 
 /* DESIGN: an `own` parameter belongs to its function, which tears it
@@ -1322,7 +1082,7 @@ static void destroy_local(struct lowerer *l, const struct symbol *sym)
    teardown passes over a value whose table is zero. */
 void lower_push_own_action(struct lowerer *l, const struct symbol *param)
 {
-    if (lower_needs_teardown(param->type)) {
+    if (sema_needs_teardown(param->type)) {
         push_exit_action(l, NULL, param, false);
     }
 }
@@ -1336,13 +1096,13 @@ struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
 {
     uint32_t slot;
 
-    if (!lower_needs_teardown(arg->type) || l->b == NULL) {
+    if (!sema_needs_teardown(arg->type) || l->b == NULL) {
         return value;
     }
     slot = ir_entry_slot(l->f, lower_vtype_of(l, arg->type));
     ir_memcopy(l->f, l->b, lower_temp(l, slot), value,
                lower_vtype_of(l, arg->type));
-    lower_clear_tables(l, value, arg->type);
+    lower_clear_owned(l, arg->type, value);
     return lower_temp(l, slot);
 }
 
@@ -1352,11 +1112,11 @@ struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
 void lower_clear_moved(struct lowerer *l, const struct expr *value)
 {
     if (value->kind != EXPR_NAME || !value->moves || value->symbol == NULL ||
-        value->symbol->caught || !lower_needs_teardown(value->type) ||
+        value->symbol->caught || !sema_needs_teardown(value->type) ||
         l->b == NULL) {
         return;
     }
-    lower_clear_tables(l, lower_temp(l, value->symbol->ir), value->type);
+    lower_clear_owned(l, value->type, lower_temp(l, value->symbol->ir));
 }
 
 /* DESIGN: the error a handler binds is the exit action of a scope around
@@ -1492,7 +1252,6 @@ struct ir_operand lower_construct(struct lowerer *l,
 {
     static const struct name construct_name = {"construct", 9};
     const struct type *t = e->as.call.builds;
-    const struct type *up;
     struct ir_operand *args;
     struct ir_operand *values;
     const struct item *m = NULL;
@@ -1501,33 +1260,7 @@ struct ir_operand lower_construct(struct lowerer *l,
     size_t count;
     size_t i;
 
-    ir_store(l->f, l->b, IR_PTR,
-             lower_temp(l,
-                        ir_addr(l->f, l->b,
-                                ir_global_op(lower_class_table(l, t)))),
-             dest);
-    lower_store_interface_tables(l, t, dest);
-    for (up = t; up != NULL; up = up->kind == TYPE_CLASS ? up->base : NULL) {
-        for (i = 0; i < up->field_count; i++) {
-            const struct struct_field *field = &up->fields[i];
-            /* An `own fn` field holds no snapshot before `construct`
-               runs, since `=` into it frees the one it held. The memory
-               of a local or of `malloc` holds whatever it held. */
-            if (!lower_has_default(field) && field->type->kind == TYPE_FN &&
-                field->type->owned) {
-                struct ir_operand at = lower_offset_address(
-                    l, dest, lower_field_offset(l, up, &field->name));
-                ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
-                ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0),
-                         lower_context_word(l, field->type, at));
-                continue;
-            }
-            if (!lower_has_default(field)) {
-                continue;
-            }
-            lower_store_field_default(l, up, i, dest);
-        }
-    }
+    lower_prepare_object(l, t, NULL, dest);
     if (t->base != NULL) {
         lower_run_construct_bodies(l, t->base, dest);
     }
@@ -1690,7 +1423,7 @@ static void destructure(struct lowerer *l, const struct stmt *s)
         } else {
             bound->ir = ir_load(l->f, l->b, lower_ir_type_of(bound->type), at);
         }
-        if (lower_needs_teardown(bound->type)) {
+        if (sema_needs_teardown(bound->type)) {
             push_exit_action(l, NULL, bound, false);
         }
     }
@@ -1743,7 +1476,7 @@ static void lower_let_unwrap(struct lowerer *l, const struct stmt *s)
         guard_missing(l, s, rest);
     }
     l->b = rest;
-    if (lower_needs_teardown(sym->type)) {
+    if (sema_needs_teardown(sym->type)) {
         push_exit_action(l, NULL, sym, false);
     }
 }
@@ -1784,8 +1517,8 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         struct ir_operand out = lower_temp(l, sym->ir);
         struct ir_operand err;
         bool has_out = s->as.let.value->as.call.out != NULL;
-        if (has_out) {
-            lower_clear_tables(l, out, sym->type);
+        if (has_out && sema_needs_teardown(sym->type)) {
+            lower_clear_owned(l, sym->type, out);
         }
         l->out_address = out;
         err = lower_call(l, s->as.let.value);
@@ -1797,7 +1530,7 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
            A handler that leaves the block never passes here. The defers it
            runs on the way out leave the slot alone. The zero table of a
            call that wrote nothing so reaches no teardown. */
-        if (has_out && lower_needs_teardown(sym->type) &&
+        if (has_out && sema_needs_teardown(sym->type) &&
             s->as.let.name_count == 0) {
             push_exit_action(l, NULL, sym, false);
         }
@@ -1816,7 +1549,7 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         lower_clear_moved(l, s->as.let.value);
         /* A destructuring hands each part to its name, which tears it
            down, so the value it takes apart takes no teardown. */
-        if (lower_needs_teardown(sym->type) && s->as.let.name_count == 0) {
+        if (sema_needs_teardown(sym->type) && s->as.let.name_count == 0) {
             push_exit_action(l, NULL, sym, false);
         }
         if (!lower_none_in_first_word(sym->type)) {
@@ -2098,7 +1831,7 @@ void lower_keep_temp(struct lowerer *l, const struct expr *e,
         (e->kind != EXPR_CALL && e->kind != EXPR_STRUCT_LIT &&
          e->kind != EXPR_TUPLE) ||
         (e->kind == EXPR_CALL && e->as.call.hashes) ||
-        e->type->kind == TYPE_POINTER || !lower_needs_teardown(e->type)) {
+        e->type->kind == TYPE_POINTER || !sema_needs_teardown(e->type)) {
         return;
     }
     l->temps = ir_grow(l->temps, &l->temp_capacity, l->temp_count,
@@ -2224,7 +1957,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
             const struct expr *call = s->as.expr;
             struct ir_operand value = lower_handled_operand(l, call);
             if (call->as.call.out != NULL && l->b != NULL &&
-                lower_needs_teardown(call->type)) {
+                sema_needs_teardown(call->type)) {
                 lower_destroy_owned(l, call->type, value,
                                     ir_int_op(IR_PTR, 0), true);
             }
@@ -2332,7 +2065,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
                 struct ir_vtype bound = lower_vtype_of(l, at->bound->type);
                 ir_memcopy(l->f, l->b, lower_temp(l, at->bound->ir), fields,
                            bound);
-                if (lower_needs_teardown(at->bound->type)) {
+                if (sema_needs_teardown(at->bound->type)) {
                     lower_copy_owned(l, at->bound->type, fields,
                                      lower_temp(l, at->bound->ir));
                     push_exit_action(l, NULL, at->bound, false);
@@ -2521,10 +2254,7 @@ void lower_run_defers(struct lowerer *l, const struct defers *scope,
         if (action->undo) {
             continue;
         }
-        if (action->snapshot) {
-            lower_free_snapshot(l, action->local->type,
-                                lower_temp(l, action->local->ir));
-        } else if (action->leave) {
+        if (action->leave) {
             if (failing) {
                 lower_hook_failed(l, l->failing_error);
             }

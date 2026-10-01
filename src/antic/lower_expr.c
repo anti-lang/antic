@@ -135,8 +135,8 @@ static struct ir_operand default_scalar(struct lowerer *l,
 }
 
 /* Put the default of field at address. */
-void lower_store_default(struct lowerer *l, const struct struct_field *field,
-                         struct ir_operand address)
+static void store_default(struct lowerer *l, const struct struct_field *field,
+                          struct ir_operand address)
 {
     struct ir_operand v;
     struct ir_vtype vtype;
@@ -207,10 +207,10 @@ void lower_store_field_default(struct lowerer *l, const struct type *owner,
                     lower_agg_of(l, owner), (uint32_t)i);
         return;
     }
-    lower_store_default(l, field,
-                        lower_offset_address(l, object,
-                                             lower_field_offset(l, owner,
-                                                                &field->name)));
+    store_default(l, field,
+                  lower_offset_address(l, object,
+                                       lower_field_offset(l, owner,
+                                                          &field->name)));
 }
 
 /* The repeat form of an array literal computes its value once, then
@@ -447,7 +447,6 @@ static void build_value_into(struct lowerer *l, const struct expr *e,
                              struct ir_operand dest)
 {
     const struct type *t = e->type;
-    const struct type *owner;
     struct ir_operand src;
     size_t i;
 
@@ -481,57 +480,7 @@ static void build_value_into(struct lowerer *l, const struct expr *e,
             build_variant(l, e, dest);
             break;
         }
-        /* The table pointer is the first word of every object, and the
-           base of a class sits at offset 0, so it goes at dest. */
-        if (t->kind == TYPE_CLASS) {
-            ir_store(l->f, l->b, IR_PTR,
-                     lower_temp(l, ir_addr(l->f, l->b,
-                                           ir_global_op(lower_class_table(l,
-                                                                          t)))),
-                     dest);
-            lower_store_interface_tables(l, t, dest);
-        }
-        for (i = 0; i < e->as.struct_lit.field_count; i++) {
-            const struct field_init *init = &e->as.struct_lit.fields[i];
-            const struct type *at = lower_field_owner(t, &init->name);
-            const struct struct_field *field = type_find_field(at, &init->name);
-            if (field->bits != 0) {
-                struct ir_operand v = lower_expr(l, init->value);
-                ir_bitstore(l->f, l->b, lower_ir_type_of(field->type), v, dest,
-                            lower_agg_of(l, at),
-                            (uint32_t)(field - at->fields));
-                continue;
-            }
-            lower_store_value(
-                l, field->type, init->value,
-                lower_offset_address(l, dest,
-                                     lower_field_offset(l, at, &field->name)));
-        }
-        /* DESIGN: a field the literal leaves out has a default, which the
-           checker required, and its expression is written here. The value
-           is therefore complete however the literal was written. */
-        for (owner = t; owner != NULL;
-             owner = owner->kind == TYPE_CLASS ? owner->base : NULL) {
-        for (i = 0; i < owner->field_count; i++) {
-            const struct struct_field *field = &owner->fields[i];
-            size_t k;
-            bool given = false;
-            if (!lower_has_default(field)) {
-                continue;
-            }
-            for (k = 0; k < e->as.struct_lit.field_count; k++) {
-                given = given ||
-                        (e->as.struct_lit.fields[k].name.length ==
-                             field->name.length &&
-                         memcmp(e->as.struct_lit.fields[k].name.text,
-                                field->name.text, field->name.length) == 0);
-            }
-            if (given) {
-                continue;
-            }
-            lower_store_field_default(l, owner, i, dest);
-        }
-        }
+        lower_prepare_object(l, t, e, dest);
         clear_moved_inits(l, e);
         lower_run_construct(l, t, dest);
         break;
@@ -649,7 +598,9 @@ struct ir_operand lower_handled_operand(struct lowerer *l,
 
     if (has_out) {
         out = lower_temp(l, ir_entry_slot(l->f, lower_vtype_of(l, e->type)));
-        lower_clear_tables(l, out, e->type);
+        if (sema_needs_teardown(e->type)) {
+            lower_clear_owned(l, e->type, out);
+        }
     }
     l->out_address = out;
     err = lower_call(l, e);
@@ -2131,7 +2082,7 @@ static const struct type *fresh_argument(const struct symbol *sym,
         return NULL;
     }
     t = wraps(arg) ? arg->to_optional : arg->type;
-    return t != NULL && lower_needs_teardown(t) ? t : NULL;
+    return t != NULL && sema_needs_teardown(t) ? t : NULL;
 }
 
 /* A fresh value whose address a call takes, a receiver among them, lives
@@ -3025,7 +2976,7 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
            the old value, and destroys nothing where they are zero.
            Other elements are C's and keep malloc. */
         if (e->type->element->kind == TYPE_CLASS ||
-            lower_needs_teardown(e->type->element)) {
+            sema_needs_teardown(e->type->element)) {
             struct ir_operand args[2];
             args[0] = v;
             args[1] = lower_size_operand(l, e->type->element);

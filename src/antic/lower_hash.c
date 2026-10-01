@@ -181,21 +181,6 @@ static struct ir_operand hash_run(struct lowerer *l, const struct expr *call,
     return lower_temp(l, h);
 }
 
-/* The count of elements of the array t through every level of it. */
-static struct ir_operand element_count(struct lowerer *l, const struct type *t)
-{
-    struct ir_operand count = i64(1);
-
-    for (; t->kind == TYPE_ARRAY; t = t->element) {
-        struct ir_operand length =
-            t->length_of != NULL
-                ? ir_sym_operand(l->m, lower_sym_of(l, t->length_of))
-                : i64(t->length);
-        count = binary(l, IR_MUL, count, length);
-    }
-    return count;
-}
-
 /* The call of the `operator fn hash` of the struct or variant t, among
    the calls the checker gave the default hash, or NULL. */
 static const struct expr *own_hash(const struct expr *call,
@@ -385,7 +370,7 @@ static struct ir_operand hash_at(struct lowerer *l, const struct expr *call,
         while (element->kind == TYPE_ARRAY) {
             element = element->element;
         }
-        count = element_count(l, t);
+        count = lower_array_count(l, t);
         return hash_run(l, call, at, count, element);
     }
     case TYPE_FN: {

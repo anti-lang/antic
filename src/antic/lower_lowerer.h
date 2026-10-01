@@ -7,8 +7,10 @@
    the descriptors and the tables of classes, structs and interfaces.
    lower_expr.c lowers expressions and calls, lower_simd.c the operations
    of simd structs, and lower_stmt.c statements, loops and the exits of a
-   block. lower_eq.c writes the default `==`, and lower_hash.c the
-   default hash. */
+   block. lower_owning.c holds the one teardown, copy and clear of an
+   owning value, the teardown and the copy of each class and the one
+   preparation of a new object. lower_eq.c writes the default `==`, and
+   lower_hash.c the default hash. */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -62,9 +64,6 @@ struct exit_action {
        after the locals of the body are gone. An exit that gives an error
        runs `failed` before it. */
     bool leave;
-    /* A `keep own` parameter in local frees its snapshot at every exit,
-       unless it moved and holds `none`. */
-    bool snapshot;
 };
 
 struct defers {
@@ -284,10 +283,6 @@ uint32_t lower_captures_agg(struct lowerer *l, const struct item *it);
 uint32_t lower_snapshot_agg(struct lowerer *l, const struct item *it);
 struct ir_operand lower_context_word(struct lowerer *l, const struct type *t,
                                      struct ir_operand pair);
-void lower_free_snapshot(struct lowerer *l, const struct type *t,
-                         struct ir_operand pair);
-void lower_dup_snapshot(struct lowerer *l, const struct type *t,
-                        struct ir_operand from, struct ir_operand into);
 const struct ir_function *lower_bound_signature(struct lowerer *l,
                                                 const struct type *t);
 double lower_float_literal(const struct expr *literal, enum ir_type type);
@@ -364,26 +359,6 @@ struct ir_operand lower_rt_call(struct lowerer *l, const char *name,
 struct ir_operand lower_slice_length(struct lowerer *l, struct ir_operand p,
                                      const struct type *slice);
 struct ir_operand lower_pattern(struct lowerer *l, const struct expr *e);
-/* The teardown of the value of type t at at, part by part for a struct,
-   a tuple, an array and a `?T`. A class value runs its teardown, which
-   gives what it owns back to the allocator from. made_only passes over a
-   class value whose table is zero, which moved away or was never made. */
-void lower_destroy_owned(struct lowerer *l, const struct type *t,
-                         struct ir_operand at, struct ir_operand from,
-                         bool made_only);
-/* The copy of what the value of type t at from owns into the value at
-   into, whose bytes are already the same. Each class value, each `own fn`
-   and each part that holds one is copied as `dup` copies it. */
-void lower_copy_owned(struct lowerer *l, const struct type *t,
-                      struct ir_operand from, struct ir_operand into);
-/* Clear what the value of type t at at would tear down, so that its
-   teardown passes over it. That is the table of each class value, the
-   flag of each `?T` and the snapshot of each `own fn`. */
-void lower_clear_owned(struct lowerer *l, const struct type *t,
-                       struct ir_operand at);
-/* Whether a copy of a value of type t copies more than its bytes. */
-bool lower_copies_parts(const struct type *t);
-
 /* lower_desc.c */
 
 bool lower_same_name(const struct name *a, const struct name *b);
@@ -439,8 +414,6 @@ bool lower_has_default(const struct struct_field *field);
 void lower_init_name(const struct type *t, bool exported, struct text *out);
 struct ir_function *lower_init_function(struct lowerer *l,
                                         const struct type *t);
-void lower_store_default(struct lowerer *l, const struct struct_field *field,
-                         struct ir_operand address);
 void lower_store_field_default(struct lowerer *l, const struct type *owner,
                                size_t i, struct ir_operand object);
 struct ir_operand lower_load_tag(struct lowerer *l, const struct type *v,
@@ -552,23 +525,50 @@ struct ir_operand lower_simd_cast(struct lowerer *l,
                                   const struct expr *e);
 struct ir_operand lower_simd(struct lowerer *l, const struct expr *e);
 
+/* lower_owning.c */
+
+/* The teardown of the value of type t at at, part by part for a struct,
+   a tuple, an array and a `?T`. A class value runs its teardown, which
+   gives what it owns back to the allocator from. made_only passes over a
+   class value whose table is zero, which moved away or was never made.
+   The caller asks sema_needs_teardown first. */
+void lower_destroy_owned(struct lowerer *l, const struct type *t,
+                         struct ir_operand at, struct ir_operand from,
+                         bool made_only);
+/* The copy of what the value of type t at from owns into the value at
+   into, whose bytes are already the same. Each class value, each `own fn`
+   and each part that holds one is copied as `dup` copies it. */
+void lower_copy_owned(struct lowerer *l, const struct type *t,
+                      struct ir_operand from, struct ir_operand into);
+/* Clear what the value of type t at at would tear down, so that its
+   teardown passes over it. That is the table of each class value, the
+   flag of each `?T` and the snapshot of each `own fn`. The caller asks
+   sema_needs_teardown first. */
+void lower_clear_owned(struct lowerer *l, const struct type *t,
+                       struct ir_operand at);
+/* Whether a copy of a value of type t copies more than its bytes. */
+bool lower_copies_parts(const struct type *t);
+/* The count of elements of the innermost element type of the array t. */
+struct ir_operand lower_array_count(struct lowerer *l, const struct type *t);
+void lower_free_snapshot(struct lowerer *l, const struct type *t,
+                         struct ir_operand pair);
+void lower_dup_snapshot(struct lowerer *l, const struct type *t,
+                        struct ir_operand from, struct ir_operand into);
+/* The functions `Class.destroy` and `Class.copy` of the class t. */
+void lower_class_teardown(struct lowerer *l, const struct type *t);
+void lower_class_copy(struct lowerer *l, const struct type *t);
+/* Write the tables, the fields the literal lit names and the defaults of
+   every other field into the new object of type t at dest. */
+void lower_prepare_object(struct lowerer *l, const struct type *t,
+                          const struct expr *lit, struct ir_operand dest);
+
 /* lower_stmt.c */
 
 void lower_push_leave_action(struct lowerer *l);
-void lower_push_snapshot_action(struct lowerer *l, const struct symbol *param);
 void lower_push_own_action(struct lowerer *l, const struct symbol *param);
 struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
                                       struct ir_operand value);
 void lower_clear_moved(struct lowerer *l, const struct expr *value);
-bool lower_type_needs_destruct(const struct type *t);
-/* The count of elements of the innermost element type of the array t. */
-struct ir_operand lower_array_count(struct lowerer *l, const struct type *t);
-/* Whether t is a `?T` of a class value that needs the teardown. */
-bool lower_optional_needs_destruct(const struct type *t);
-/* Whether a place of type t holds a value that `=` destroys before it
-   moves the new one in: a value with a teardown, in an array at any
-   depth, or a `?T` of one. */
-bool lower_needs_teardown(const struct type *t);
 /* Keep the fresh value that expression e gave at address to the end of
    its statement, when e is a call result or a literal whose type has a
    teardown. */
@@ -578,8 +578,6 @@ void lower_keep_temp(struct lowerer *l, const struct expr *e,
    which the end of a statement does and an exit of the function does
    not, since other paths still reach them. */
 void lower_end_temps(struct lowerer *l, size_t mark, bool pop);
-void lower_clear_tables(struct lowerer *l, struct ir_operand base,
-                        const struct type *t);
 void lower_handle_error(struct lowerer *l, const struct expr *call,
                         struct ir_operand err, struct ir_operand out,
                         bool has_out, struct ir_operand release);

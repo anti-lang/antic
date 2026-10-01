@@ -1,0 +1,29 @@
+exit 0
+array of optionals
+destruct 2
+destruct 1
+one empty
+destruct 3
+optional array
+destruct 5
+destruct 4
+empty optional array
+destruct 6
+replaced
+destruct 8
+destruct 7
+destruct 10
+destruct 9
+taken 2
+struct
+destruct 12
+destruct 11
+class
+destruct 14
+destruct 13
+derived
+destruct 18
+destruct 17
+destruct 16
+destruct 15
+done

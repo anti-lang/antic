@@ -1,0 +1,107 @@
+//! Every way to make an object writes the same defaults through one
+//! preparation: a literal, `T(args)`, the init that `reflect.new` calls and the
+//! `get` of a singleton. A bitfield goes into its unit, and an `own fn` field
+//! without a default holds no snapshot before `construct` writes it, whatever
+//! the memory held before.
+import anti.reflect;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn malloc(size: u64) -> ?*byte;
+extern fn memset(to: ?*byte, value: c_int, count: u64) -> ?*byte;
+
+fn seven() -> int
+{
+	return 7;
+}
+
+singleton class Bits
+{
+	pub low: u8 : 3 = 5,
+	pub flag: u8 : 1 = 1,
+	pub high: u8 : 4 = 9,
+	own mutable f: fn() -> int,
+
+	fn construct(self)
+	{
+		self.f = seven;
+	}
+
+	pub fn call(self) -> int
+	{
+		return self.f();
+	}
+}
+
+class Plain
+{
+	pub low: u8 : 3 = 5,
+	pub flag: u8 : 1 = 1,
+	pub high: u8 : 4 = 9,
+	pub own mutable f: fn() -> int,
+
+	fn construct(self)
+	{
+		self.f = seven;
+	}
+
+	pub fn call(self) -> int
+	{
+		return self.f();
+	}
+}
+
+class Made
+{
+	pub low: u8 : 3 = 5,
+	pub flag: u8 : 1 = 1,
+	pub high: u8 : 4 = 9,
+	own mutable f: fn() -> int,
+
+	fn construct(self, n: int)
+	{
+		self.f = seven;
+		self.high = n as u8;
+	}
+
+	pub fn call(self) -> int
+	{
+		return self.f();
+	}
+}
+
+fn show(name: str, low: u8, flag: u8, high: u8, n: int)
+{
+	printf("%s %d %d %d %d\n".ptr, name.ptr, low as c_int, flag as c_int,
+		high as c_int, n as c_int);
+}
+
+/* Frees a block of each size up to 256 bytes, full of bytes that are not
+   zero, so the next object of that size is likely to take one of them. */
+fn dirty()
+{
+	for size in 1..33 {
+		let p = malloc((size * 8) as u64);
+		memset(p, 255, (size * 8) as u64);
+		free(p);
+	}
+}
+
+fn main() -> int
+{
+	let p = Plain { f: seven };
+	show("literal", p.low, p.flag, p.high, p.call());
+	let m = Made(12);
+	show("construct", m.low, m.flag, m.high, m.call());
+	dirty();
+	let o = reflect.new("object_defaults.Plain");
+	if o == none || !(o is *Plain) {
+		return 1;
+	}
+	let r = o as *Plain;
+	show("reflect", r.low, r.flag, r.high, r.call());
+	delete(r);
+	dirty();
+	let b = Bits.get();
+	show("singleton", b.low, b.flag, b.high, b.call());
+	return 0;
+}

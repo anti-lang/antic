@@ -1,0 +1,99 @@
+//! An `own` pointer or slice whose element owns something tears down each
+//! element before its buffer goes, and `dup` copies what each element owns. A
+//! struct that holds a class value is such an element, and so is a `?T` of one.
+//! The elements of a slice go last to first. A pointer that holds `none` and an
+//! empty slice tear down and copy nothing. Each `Res` owns a `Tag`, which
+//! counts itself alive, so a copy that shares a tag or a teardown missed shows
+//! in the count.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+
+class Tag
+{
+	static atomic live: int = 0;
+
+	pub fn make() -> *Tag
+	{
+		Tag.live.add(1);
+		return alloc Tag { };
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		Tag.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Tag.live.sub(1);
+	}
+}
+
+class Res
+{
+	pub n: int = 0,
+	pub own tag: ?*Tag = none,
+
+	fn destruct(self)
+	{
+		printf("destruct %d\n".ptr, self.n as c_int);
+	}
+}
+
+struct Pair
+{
+	r: Res,
+	k: int,
+}
+
+class Box
+{
+	pub own p: ?*Pair,
+	pub own s: []Pair,
+	pub own o: [] ?Res,
+}
+
+fn res(n: int) -> Res
+{
+	return Res { n: n, tag: Tag.make() };
+}
+
+fn main() -> int
+{
+	let p = alloc(Pair, 1) else { return 1; };
+	p[0] = Pair { r: res(1), k: 2 };
+	let s = alloc(Pair, 2) else { return 1; };
+	s[0] = Pair { r: res(3), k: 0 };
+	s[1] = Pair { r: res(4), k: 0 };
+	let o = alloc(?Res, 2) else { return 1; };
+	o[0] = res(5);
+	o[1] = none;
+	let b = alloc Box {
+		p: p,
+		s: []Pair { ptr: s, len: 2 },
+		o: [] ?Res { ptr: o, len: 2 }
+	};
+	let c = dup(b);
+	let cp = c.p else { return 2; };
+	cp.r.n = 10;
+	c.s[0].r.n = 30;
+	c.s[1].r.n = 40;
+	printf("%d tags\n".ptr, Tag.live.load() as c_int);
+	c.o[0] = res(50);
+	printf("delete b\n".ptr);
+	delete(b);
+	printf("delete c\n".ptr);
+	delete(c);
+	let empty = alloc Box {
+		p: none,
+		s: []Pair { ptr: none, len: 0 },
+		o: [] ?Res { ptr: none, len: 0 }
+	};
+	let twin = dup(empty);
+	delete(twin);
+	delete(empty);
+	printf("%d tags\n".ptr, Tag.live.load() as c_int);
+	return 0;
+}

@@ -1,17 +1,17 @@
 1 1
 crate out 1
 box out 1
-part out 2
-leaf out 30
 part out 4
 leaf out 50
+part out 2
+leaf out 30
 leaf out 6
 crate out 1
 box out 1
-part out 2
-leaf out 3
 part out 4
 leaf out 5
+part out 2
+leaf out 3
 leaf out 6
 take 7
 part out 7

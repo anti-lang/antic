@@ -38,6 +38,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/lower_expr.c
     src/antic/lower_eq.c
     src/antic/lower_hash.c
+    src/antic/lower_owning.c
     src/antic/lower_simd.c
     src/antic/lower_stmt.c
     src/antic/mach.c

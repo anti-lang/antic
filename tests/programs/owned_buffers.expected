@@ -1,0 +1,14 @@
+exit 0
+8 tags
+destruct 5
+delete b
+destruct 5
+destruct 4
+destruct 3
+destruct 1
+delete c
+destruct 50
+destruct 40
+destruct 30
+destruct 10
+0 tags

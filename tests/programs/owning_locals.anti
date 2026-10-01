@@ -1,0 +1,88 @@
+//! A local, an `own` parameter and the old value of `=` are torn down by the
+//! one rule of what owns something, at any depth of arrays and `?T`. A
+//! `[2]?Res` and a `?[2]Res` hold objects that need a teardown, so each is torn
+//! down at the end of its block. The parts of a class go last to first, as the
+//! parts of a struct and the locals of a block do.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Res
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		printf("destruct %d\n".ptr, self.n as c_int);
+	}
+}
+
+struct Two
+{
+	a: Res,
+	b: Res,
+}
+
+class Holder
+{
+	pub a: Res,
+	pub b: Res,
+}
+
+class Derived inherits Holder
+{
+	pub c: Res,
+	pub d: Res,
+}
+
+fn take(own items: [2] ?Res) -> int
+{
+	return 2;
+}
+
+fn main() -> int
+{
+	{
+		let items: [2] ?Res = [Res { n: 1 }, Res { n: 2 }];
+		printf("array of optionals\n".ptr);
+	}
+	{
+		let items: [2] ?Res = [none, Res { n: 3 }];
+		printf("one empty\n".ptr);
+	}
+	{
+		let items: ?[2]Res = [Res { n: 4 }, Res { n: 5 }];
+		printf("optional array\n".ptr);
+	}
+	{
+		let items: ?[2]Res = none;
+		printf("empty optional array\n".ptr);
+	}
+	{
+		let items: [2] ?Res = [Res { n: 6 }, none];
+		items = [Res { n: 7 }, Res { n: 8 }];
+		printf("replaced\n".ptr);
+	}
+	{
+		let items: [2] ?Res = [Res { n: 9 }, Res { n: 10 }];
+		printf("taken %d\n".ptr, take(items) as c_int);
+	}
+	{
+		let s = Two { a: Res { n: 11 }, b: Res { n: 12 } };
+		printf("struct\n".ptr);
+	}
+	{
+		let h = Holder { a: Res { n: 13 }, b: Res { n: 14 } };
+		printf("class\n".ptr);
+	}
+	{
+		let d = Derived {
+			a: Res { n: 15 },
+			b: Res { n: 16 },
+			c: Res { n: 17 },
+			d: Res { n: 18 }
+		};
+		printf("derived\n".ptr);
+	}
+	printf("done\n".ptr);
+	return 0;
+}

@@ -206,7 +206,7 @@ static void compare_array(struct lowerer *l, const struct expr *e,
                           struct comparison *cmp, struct ir_operand a,
                           struct ir_operand b, const struct type *t)
 {
-    struct ir_operand count = ir_int_op(IR_I64, 1);
+    struct ir_operand count = lower_array_count(l, t);
     const struct type *element = t;
     struct ir_operand size;
     struct ir_block *test = lower_new_block(l);
@@ -215,13 +215,8 @@ static void compare_array(struct lowerer *l, const struct expr *e,
     uint32_t index;
     struct ir_operand offset;
 
-    for (; element->kind == TYPE_ARRAY; element = element->element) {
-        struct ir_operand length =
-            element->length_of != NULL
-                ? ir_sym_operand(l->m, lower_sym_of(l, element->length_of))
-                : ir_int_op(IR_I64, element->length);
-        count = lower_temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64, count,
-                                        length));
+    while (element->kind == TYPE_ARRAY) {
+        element = element->element;
     }
     size = lower_size_operand(l, element);
     index = ir_unary(l->f, l->b, IR_COPY, IR_I64, ir_int_op(IR_I64, 0));

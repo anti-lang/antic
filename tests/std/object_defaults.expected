@@ -1,0 +1,5 @@
+exit 0
+literal 5 1 9 7
+construct 5 1 12 7
+reflect 5 1 9 7
+singleton 5 1 9 7
