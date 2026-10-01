@@ -2300,13 +2300,28 @@ struct ir_operand lower_rt_call(struct lowerer *l, const char *name,
 }
 
 /* The memory of one object of `alloc T { }`, `alloc T(args)` or a
-   singleton, size bytes from anti_rt_new, which ends the program when
-   none is left. */
+   singleton, size bytes of malloc. Out of memory is fatal for them, so a
+   NULL from malloc ends the program through anti_rt_out_of_memory, and
+   the code after it writes through the result. */
 struct ir_operand lower_new_memory(struct lowerer *l, struct ir_operand size)
 {
-    static const enum ir_type params[] = {IR_I64};
+    static const enum ir_type one[] = {IR_I64};
+    struct ir_function *malloc_fn =
+        lower_c_function(l, "malloc", IR_PTR, IR_I64);
+    struct ir_operand made =
+        lower_temp(l, ir_call(l->f, l->b, IR_PTR, ir_func_op(malloc_fn),
+                              &size, 1));
+    struct ir_operand none = lower_temp(
+        l, ir_binary(l->f, l->b, IR_EQ, IR_I8, made, ir_int_op(IR_PTR, 0)));
+    struct ir_block *lost = lower_new_block(l);
+    struct ir_block *rest = lower_new_block(l);
 
-    return lower_rt_call(l, "anti_rt_new", IR_PTR, params, &size, 1);
+    ir_branch(l->f, l->b, none, lost, rest);
+    l->b = lost;
+    lower_rt_call(l, "anti_rt_out_of_memory", IR_VOID, one, &size, 1);
+    ir_jump(l->f, l->b, rest);
+    l->b = rest;
+    return made;
 }
 
 /* The count of elements of the `own` slice whose field is at p. */

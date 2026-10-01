@@ -57,31 +57,22 @@ void anti_rt_mem_free(void *p)
 }
 
 /* DESIGN: `alloc T { }` and `alloc T(args)` give `*T`, and out of memory
-   is fatal for them, so the compiler writes the object through the
-   result unchecked. These two are the one place that tests the result
-   of the C library for the memory lowering makes. A size of zero is one
-   byte, as for anti_rt_mem_alloc, since malloc may give NULL for it. */
-_Noreturn static void out_of_memory(int64_t size)
+   is fatal for them. The compiler calls malloc where the object is made
+   and tests the result there, so a report of AddressSanitizer names the
+   Anti function right under malloc. Only the failure comes here. */
+_Noreturn void anti_rt_out_of_memory(int64_t size)
 {
     anti_rt_fail_abort("anti: out of memory for %lld bytes", (long long)size);
 }
 
-void *anti_rt_new(int64_t size)
-{
-    void *p = size >= 0 ? malloc(size > 0 ? (size_t)size : 1) : NULL;
-
-    if (p == NULL) {
-        out_of_memory(size);
-    }
-    return p;
-}
-
+/* A size of zero is one byte, as for anti_rt_mem_alloc, since realloc may
+   free the memory and give NULL for it. */
 void *anti_rt_grow(void *p, int64_t size)
 {
     void *grown = size >= 0 ? realloc(p, size > 0 ? (size_t)size : 1) : NULL;
 
     if (grown == NULL) {
-        out_of_memory(size);
+        anti_rt_out_of_memory(size);
     }
     return grown;
 }

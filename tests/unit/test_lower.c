@@ -132,7 +132,8 @@ static bool body_holds(const char *source, const char *name,
 
 /* alloc(T, n) of a class fills the memory with zeros, so an element the
    program has not filled has a zero table. A struct and a primitive keep
-   malloc. */
+   malloc, and the result is a ?*T the program tests. alloc T { } ends the
+   program when malloc gives NULL. */
 static void allocates_zeroed_classes(void)
 {
     static const char source[] =
@@ -147,6 +148,8 @@ static void allocates_zeroed_classes(void)
     CHECK(body_holds(source, "main.points", "call ptr @malloc("));
     CHECK(body_holds(source, "main.bytes", "call ptr @malloc("));
     CHECK(body_holds(source, "main.one", "call ptr @malloc("));
+    CHECK(body_holds(source, "main.one", "call void @anti_rt_out_of_memory("));
+    CHECK(!body_holds(source, "main.points", "@anti_rt_out_of_memory("));
 }
 
 /* A class record names the tables of a class, its base, its interfaces
