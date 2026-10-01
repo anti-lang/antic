@@ -73,8 +73,9 @@ should alter may move.
 
 ## Traps
 
-- `sema_needs_teardown` of `sema_stmt.c` is the one rule of what owns
-  something. `lower_type_needs_destruct` asks it. A new form of ownership goes
+- `sema_needs_teardown` of `sema_value.c` is the one rule of what owns
+  something. Every teardown of lowering asks it and goes through
+  `lower_destroy_owned` of `lower_owning.c`. A new form of ownership goes
   there, and the refusal of `=`, the moves and the teardown follow it.
 - A destructuring `let` holds the value in a hidden symbol and gives each part
   to a name. Only the names are torn down. `lower_let_value` checks
