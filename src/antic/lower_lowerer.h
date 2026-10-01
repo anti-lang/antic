@@ -501,10 +501,6 @@ struct ir_operand lower_equals(struct lowerer *l, const struct expr *e);
    checker gave it. */
 void lower_class_equals(struct lowerer *l, const struct item *it);
 
-/* Whether a value of type t holds a union or a Match in place, which the
-   default of a class passes over. */
-bool lower_unreadable(const struct type *t);
-
 /* lower_hash.c */
 
 /* The default hash of the receiver of e, a call that the checker marked

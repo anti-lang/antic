@@ -364,39 +364,6 @@ struct ir_operand lower_equals(struct lowerer *l, const struct expr *e)
     return result;
 }
 
-/* Whether a value of type t holds a union or a Match in place, which no
-   default reads. It may stand there directly or in a struct, an array, a
-   `?T` or a case of a variant. */
-bool lower_unreadable(const struct type *t)
-{
-    size_t i;
-
-    while (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL) {
-        t = t->element;
-    }
-    if (t->kind == TYPE_VARIANT) {
-        for (i = 0; i < t->param_count; i++) {
-            if (t->params[i] != NULL && lower_unreadable(t->params[i])) {
-                return true;
-            }
-        }
-        return false;
-    }
-    if (t->kind != TYPE_STRUCT) {
-        return false;
-    }
-    if (t->is_union || types_is_match(t)) {
-        return true;
-    }
-    for (i = 0; i < t->field_count; i++) {
-        if (!type_field_is_unit_break(&t->fields[i]) &&
-            lower_unreadable(t->fields[i].type)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 /* Two `own` slices of type t at a and b: the same length, and then equal
    elements, one by one. */
 static void compare_owned(struct lowerer *l, const struct expr *e,
@@ -455,7 +422,7 @@ static void compare_member(struct lowerer *l, const struct expr *e,
 
     if ((f->form != FIELD_PLAIN && f->form != FIELD_USE) || f->transient ||
         types_is_mutex(f->type) || types_is_object_lock(f->type) ||
-        lower_unreadable(f->type)) {
+        types_holds_union(f->type)) {
         return;
     }
     if (f->bits != 0) {

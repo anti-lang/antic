@@ -369,56 +369,6 @@ const struct struct_field *sema_eq_gap(struct checker *c, struct type *t)
     return NULL;
 }
 
-/* Whether a value of type t holds a union or a Match in place. It may
-   stand there directly or in a struct, an array, a `?T` or a case of a
-   variant. Neither can be compared. A class value compares through its own `equals`.
-   answered holds the variants and the structs met in this walk, none of
-   which holds a union. */
-static bool union_in(const struct type *t, struct ptr_set *answered)
-{
-    size_t i;
-
-    while (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL) {
-        t = t->element;
-    }
-    if ((t->kind == TYPE_VARIANT || t->kind == TYPE_STRUCT) &&
-        !ptr_set_add(answered, t)) {
-        return false;
-    }
-    if (t->kind == TYPE_VARIANT) {
-        for (i = 0; i < t->param_count; i++) {
-            if (t->params[i] != NULL && union_in(t->params[i], answered)) {
-                return true;
-            }
-        }
-        return false;
-    }
-    if (t->kind != TYPE_STRUCT) {
-        return false;
-    }
-    if (t->is_union || types_is_match(t)) {
-        return true;
-    }
-    for (i = 0; i < t->field_count; i++) {
-        if (!type_field_is_unit_break(&t->fields[i]) &&
-            union_in(t->fields[i].type, answered)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool holds_union(const struct type *t)
-{
-    struct ptr_set answered;
-    bool holds;
-
-    memset(&answered, 0, sizeof answered);
-    holds = union_in(t, &answered);
-    free(answered.slots);
-    return holds;
-}
-
 /* Whether a class of the chain of t below the root declares the function
    name. */
 static bool declares(const struct type *t, const char *name)
@@ -525,7 +475,8 @@ const struct struct_field *sema_class_gap(struct checker *c, struct type *t)
         for (i = 0; i < t->field_count; i++) {
             const struct struct_field *f = &t->fields[i];
             if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
-                (holds_union(f->type) || holds_concurrent(c, f->type))) {
+                (types_holds_union(f->type) ||
+                 holds_concurrent(c, f->type))) {
                 return f;
             }
         }

@@ -726,6 +726,11 @@ bool types_is_match(const struct type *t);
 bool types_is_maybe_match(const struct type *t);
 /* Whether t is a `ByteMatch` of any literal. */
 bool types_is_byte_match(const struct type *t);
+/* Whether a value of type t holds a union or a Match in place, directly or
+   in a struct, an array, a `?T` or a case of a variant. No default `==`
+   reads either, and the default of a class passes over a field that holds
+   one. */
+bool types_holds_union(const struct type *t);
 /* The match t without its literal, a `?Match` for a `?Match`. */
 struct type *types_match_plain(struct types *types, struct type *t);
 /* `chan T`, one per element type. */

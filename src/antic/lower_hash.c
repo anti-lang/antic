@@ -496,7 +496,7 @@ void lower_class_hash(struct lowerer *l, const struct item *it)
             struct ir_operand part;
             if ((fd->form != FIELD_PLAIN && fd->form != FIELD_USE) ||
                 fd->transient || types_is_mutex(fd->type) ||
-                types_is_object_lock(fd->type) || lower_unreadable(fd->type)) {
+                types_is_object_lock(fd->type) || types_holds_union(fd->type)) {
                 continue;
             }
             if (fd->bits != 0) {
