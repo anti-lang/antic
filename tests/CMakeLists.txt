@@ -2347,6 +2347,15 @@ add_test(NAME error_source_cap
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/source-cap"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_source_cap.cmake")
 
+# A source that holds a NUL byte is refused when it is read, wherever the
+# byte stands among the blocks the reader takes.
+add_test(NAME error_source_nul
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DNUL=${CMAKE_CURRENT_SOURCE_DIR}/errors/nul_byte.bin"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/source-nul"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_source_nul.cmake")
+
 # scale.ast is the syntax tree listing that chapter 1 prints.
 add_test(NAME dump_ast_scale
     COMMAND "${CMAKE_COMMAND}"

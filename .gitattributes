@@ -10,3 +10,6 @@
 # The expected file of the raw-bytes test holds a CR, an LF and a NUL, which
 # reach the comparison unchanged.
 tests/raw/raw_bytes.expected -text
+
+# The test of a source with a NUL byte reads one NUL from this file.
+tests/errors/nul_byte.bin -text
