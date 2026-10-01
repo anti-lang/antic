@@ -1,10 +1,11 @@
 //! Files and directories.
 //!
-//! `open` gives a `File`, which `read`, `write` and `size` take and `close`
-//! ends. `list` gives the names of a directory, and `remove` and `rename`
-//! change what a directory holds. Every function of the module may fail, and
-//! the error is a `SystemError` with the number the system gave. A path goes to
-//! the system as the program wrote it, and Windows takes `/` as well as `\`.
+//! `open` gives a `File`, which `read`, `write`, `flush` and `size` take and
+//! `close` ends. `list` gives the names of a directory, and `remove` and
+//! `rename` change what a directory holds. Every function of the module may
+//! fail, and the error is a `SystemError` with the number the system gave. A
+//! path goes to the system as the program wrote it, and Windows takes `/` as
+//! well as `\`.
 //!
 //! `FileSystem` is the standard interface. It works in whole files, so a fake
 //! of it holds the bytes of each path, and `SystemFileSystem` is its default.
@@ -12,7 +13,7 @@
 import anti.error;
 import anti.lang;
 
-extern fn anti_rt_fs_open(path: ?*byte, len: int, writing: c_int) -> ?*byte;
+extern fn anti_rt_fs_open(path: ?*byte, len: int, mode: c_int) -> ?*byte;
 extern fn anti_rt_fs_size(file: ?*byte) -> int;
 extern fn anti_rt_fs_list(path: ?*byte, len: int, count: ?*int) -> ?*str;
 extern fn anti_rt_fs_remove(path: ?*byte, len: int) -> c_int;
@@ -23,13 +24,18 @@ extern fn fread(into: ?*byte, size: c_size_t, count: c_size_t,
 extern fn fwrite(bytes: ?*byte, size: c_size_t, count: c_size_t,
 	file: ?*byte) -> c_size_t;
 extern fn ferror(file: ?*byte) -> c_int;
+extern fn fflush(file: ?*byte) -> c_int;
 extern fn fclose(file: ?*byte) -> c_int;
 
 /// How `open` opens a file.
 ///
 /// `Read` reads from the first byte. `Write` writes into a file that it
-/// creates, or empties when the file is there already.
-pub enum Mode: u8 { Read, Write }
+/// creates, or empties when the file is there already. `Append` writes after
+/// the end of the file, which it creates when it is not there.
+///
+/// The cases stand in the order of the numbers `ANTI_FILE_READ`,
+/// `ANTI_FILE_WRITE` and `ANTI_FILE_APPEND` of `src/rt/platform.h`.
+pub enum Mode: u8 { Read, Write, Append }
 
 /// An open file, which `open` gives and `close` frees.
 ///
@@ -43,11 +49,7 @@ pub struct File
 /// Open the file at `path` in `mode`, which reads when the call leaves it out.
 pub fn open(path: str, mode: Mode = Mode.Read) -> *File may fail
 {
-	let writing: c_int = 0;
-	if mode == Mode.Write {
-		writing = 1;
-	}
-	let handle = anti_rt_fs_open(path.ptr, path.len, writing);
+	let handle = anti_rt_fs_open(path.ptr, path.len, mode as c_int);
 	if handle == none {
 		fail error.SystemError.from_errno();
 	}
@@ -77,6 +79,17 @@ pub fn write(f: *File, bytes: []byte) may fail
 	let count = fwrite(bytes.ptr, 1 as c_size_t, bytes.len as c_size_t,
 		f.handle) as int;
 	if count < bytes.len {
+		fail error.SystemError.from_errno();
+	}
+}
+
+/// Hand every byte written to `f` so far to the system.
+///
+/// `write` keeps bytes in a buffer, and `flush` is where a failure to store
+/// them shows before `close`.
+pub fn flush(f: *File) may fail
+{
+	if fflush(f.handle) != 0 {
 		fail error.SystemError.from_errno();
 	}
 }

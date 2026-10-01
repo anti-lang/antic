@@ -1,6 +1,10 @@
 exit 0
-warn to the file
-error also to the file
+log-slice.out: sliced
+log-slice.out-not-this: no file
+log-été.out: wide one
+wide two
+warn app to the file
+error app also to the file
 info test one
 warn test two
 error test three

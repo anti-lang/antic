@@ -327,7 +327,7 @@ static int saw(void *context, const unsigned char *name, size_t length)
 static void files(void)
 {
     struct seen s = {0, 0, 0, 0};
-    FILE *f = anti_rt_file_open(FILE_UTF8, 1);
+    FILE *f = anti_rt_file_open(FILE_UTF8, ANTI_FILE_WRITE);
     FILE *dir;
 
     CHECK(f != NULL);
@@ -342,6 +342,23 @@ static void files(void)
     CHECK(anti_rt_file_tell(f) == 6);
     CHECK(anti_rt_file_is_directory(f) == 0);
     CHECK(fclose(f) == 0);
+
+    /* Append keeps the six bytes and writes after them, and a mode that
+       is none of the three is refused. */
+    f = anti_rt_file_open(FILE_UTF8, ANTI_FILE_APPEND);
+    CHECK(f != NULL);
+    if (f != NULL) {
+        CHECK(fwrite("gh", 1, 2, f) == 2);
+        CHECK(anti_rt_file_seek(f, 0, SEEK_END) == 0);
+        CHECK(anti_rt_file_tell(f) == 8);
+        CHECK(fclose(f) == 0);
+    }
+    errno = 0;
+    CHECK(anti_rt_file_open(FILE_UTF8, ANTI_FILE_APPEND + 1) == NULL);
+    CHECK(errno == EINVAL);
+    errno = 0;
+    CHECK(anti_rt_file_open(FILE_UTF8, -1) == NULL);
+    CHECK(errno == EINVAL);
 
     CHECK(anti_rt_directory_list(PLUGIN_DIR "/platform-\xc3\xbc", saw, &s) ==
           0);
@@ -363,7 +380,7 @@ static void files(void)
     CHECK(errno == ENOENT);
 
     /* POSIX opens a directory as a stream, and Windows opens none. */
-    dir = anti_rt_file_open(PLUGIN_DIR, 0);
+    dir = anti_rt_file_open(PLUGIN_DIR, ANTI_FILE_READ);
     if (dir != NULL) {
         CHECK(anti_rt_is_windows() == 0);
         CHECK(anti_rt_file_is_directory(dir) == 1);
@@ -372,13 +389,13 @@ static void files(void)
 
     CHECK(anti_rt_file_rename(FILE_UTF8, MOVED_UTF8) == 0);
     errno = 0;
-    CHECK(anti_rt_file_open(FILE_UTF8, 0) == NULL);
+    CHECK(anti_rt_file_open(FILE_UTF8, ANTI_FILE_READ) == NULL);
     CHECK(errno == ENOENT);
-    f = anti_rt_file_open(MOVED_UTF8, 0);
+    f = anti_rt_file_open(MOVED_UTF8, ANTI_FILE_READ);
     CHECK(f != NULL);
     if (f != NULL) {
         CHECK(anti_rt_file_seek(f, 0, SEEK_END) == 0);
-        CHECK(anti_rt_file_tell(f) == 6);
+        CHECK(anti_rt_file_tell(f) == 8);
         fclose(f);
     }
     CHECK(anti_rt_file_remove(MOVED_UTF8) == 0);
@@ -392,7 +409,7 @@ static void files(void)
         /* Windows reads a path as UTF-16, and bytes that are no UTF-8
            name no file. */
         errno = 0;
-        CHECK(anti_rt_file_open("\xff.txt", 1) == NULL);
+        CHECK(anti_rt_file_open("\xff.txt", ANTI_FILE_WRITE) == NULL);
         CHECK(errno == EINVAL);
     }
 }

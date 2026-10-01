@@ -1,0 +1,21 @@
+//! The logger reads every byte of the file that `--anti.logger` names. A NUL
+//! byte in it puts the file outside the TOML subset, so the logger is the
+//! default and its level `info`, rather than what the bytes before the NUL say.
+import anti.fs;
+import anti.io;
+import anti.lang;
+import anti.log;
+import anti.text;
+
+fn main() -> int
+{
+	let config = text.Builder.new();
+	config.append("level = \"error\"\n");
+	config.append_byte(0);
+	config.append("level = \"warn\"\n");
+	let bytes = text.to_bytes(config.text());
+	fs.write_file("log-nul.toml", bytes) catch fatal;
+	free(bytes.ptr);
+	io.println(log.level_name(log.logger().level));
+	return 0;
+}

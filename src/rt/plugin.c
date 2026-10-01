@@ -843,7 +843,7 @@ static int joined(char *out, size_t size, const char *dir, size_t dir_length,
 static int digest_file(const char *path, char hex[65])
 {
     FILE *f = anti_rt_fs_open((const unsigned char *)path,
-                              (int64_t)strlen(path), 0);
+                              (int64_t)strlen(path), ANTI_FILE_READ);
     int ok;
 
     if (f == NULL) {

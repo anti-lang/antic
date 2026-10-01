@@ -195,11 +195,16 @@ const char *anti_rt_path_last_separator(const char *path);
    which set errno as well. The Win32 calls set an error of their own and
    are not used. A path that is no valid UTF-8 fails there with EINVAL. */
 
-/* Open the file for reading, or for writing when writing is not 0. Both
-   are binary, so no byte is translated on Windows. Writing creates the
-   file or empties the one that is there. NULL with errno set when it
-   fails. */
-FILE *anti_rt_file_open(const char *path, int writing);
+/* How anti_rt_file_open opens a file. Every mode is binary, so no byte
+   is translated on Windows. Writing creates the file or empties the one
+   that is there, and appending creates it or writes after its end. */
+#define ANTI_FILE_READ 0
+#define ANTI_FILE_WRITE 1
+#define ANTI_FILE_APPEND 2
+
+/* Open the file in mode, one of the three above. NULL with errno set
+   when it fails, and EINVAL for any other mode. */
+FILE *anti_rt_file_open(const char *path, int mode);
 
 /* The offset of the stream in 64 bits, or -1 with errno set. */
 int64_t anti_rt_file_tell(FILE *file);

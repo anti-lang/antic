@@ -2,6 +2,8 @@ exit 0
 hello, file
 size 12
 size while writing 3
+size after a flush 8
+one two
 listed
 no dot entries
 renamed

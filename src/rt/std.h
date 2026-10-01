@@ -194,10 +194,11 @@ void *anti_rt_grow(void *p, int64_t size);
 /* The C side of anti.fs, in src/rt/fs.c. A path is the bytes of a str and
    their count. Every function reports a failure through errno. */
 
-/* The C stream of the file, opened for reading, or for writing when
-   writing is not 0, or NULL. The caller closes it with fclose, which
-   `close` of anti.fs calls. */
-void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t writing);
+/* The C stream of the file, opened in mode, or NULL. The modes are those
+   of anti_rt_file_open, which `Mode` of anti.fs numbers in the same
+   order. The caller closes it with fclose, which `close` of anti.fs
+   calls. */
+void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t mode);
 
 /* The size in bytes of the file of the stream, or -1. */
 int64_t anti_rt_fs_size(void *file);

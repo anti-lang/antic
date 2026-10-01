@@ -284,9 +284,15 @@ const char *anti_rt_path_last_separator(const char *path)
     return strrchr(path, '/');
 }
 
-FILE *anti_rt_file_open(const char *path, int writing)
+FILE *anti_rt_file_open(const char *path, int mode)
 {
-    return fopen(path, writing != 0 ? "wb" : "rb");
+    static const char *const modes[] = {"rb", "wb", "ab"};
+
+    if (mode < ANTI_FILE_READ || mode > ANTI_FILE_APPEND) {
+        errno = EINVAL;
+        return NULL;
+    }
+    return fopen(path, modes[mode]);
 }
 
 int64_t anti_rt_file_tell(FILE *file)

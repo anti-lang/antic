@@ -384,18 +384,24 @@ static bool fill_imports(HMODULE handle)
     return ok;
 }
 
-FILE *anti_rt_file_open(const char *path, int writing)
+FILE *anti_rt_file_open(const char *path, int mode)
 {
-    wchar_t *name = wide_of(path, 0);
+    static const wchar_t *const modes[] = {L"rb", L"wb", L"ab"};
+    wchar_t *name;
     FILE *file;
 
+    if (mode < ANTI_FILE_READ || mode > ANTI_FILE_APPEND) {
+        errno = EINVAL;
+        return NULL;
+    }
+    name = wide_of(path, 0);
     if (name == NULL) {
         return NULL;
     }
     /* _wfopen is _wfsopen without a lock on the file, which is what fopen
        gives on the other systems. The C runtime deprecates the first and
        not the second. */
-    file = _wfsopen(name, writing != 0 ? L"wb" : L"rb", _SH_DENYNO);
+    file = _wfsopen(name, modes[mode], _SH_DENYNO);
     release(name);
     return file;
 }

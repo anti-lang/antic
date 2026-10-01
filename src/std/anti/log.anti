@@ -17,7 +17,7 @@
 //! program goes on with the default, which is standard error at level `info` in
 //! text. A `log.set` in the program takes precedence over the file.
 
-import anti.error as failure;
+import anti.fs;
 import anti.lang;
 import anti.io;
 import anti.json;
@@ -26,15 +26,6 @@ import anti.time;
 import anti.toml;
 
 extern fn anti_rt_conf_get(key: ?*byte, len: int) -> str;
-extern fn fopen(path: ?*byte, mode: ?*byte) -> ?*byte;
-extern fn fclose(file: ?*byte) -> c_int;
-extern fn fwrite(bytes: ?*byte, size: c_size_t, count: c_size_t,
-	file: ?*byte) -> c_size_t;
-extern fn fflush(file: ?*byte) -> c_int;
-extern fn fseek(file: ?*byte, offset: c_long, whence: c_int) -> c_int;
-extern fn ftell(file: ?*byte) -> c_long;
-extern fn fread(into: ?*byte, size: c_size_t, count: c_size_t,
-	file: ?*byte) -> c_size_t;
 
 /// How much a logger writes, from everything to nothing but a failure.
 pub enum Level: u8 { Trace, Debug, Info, Warn, Error, Fatal, Off }
@@ -68,7 +59,7 @@ pub class StderrSink inherits Sink
 /// A sink that appends to a file.
 pub class FileSink inherits Sink
 {
-	file: ?*byte,
+	file: ?*fs.File,
 
 	/// A sink that appends to the file at `path`, which may fail.
 	///
@@ -76,29 +67,32 @@ pub class FileSink inherits Sink
 	/// system gave.
 	pub fn new(path: str) -> *FileSink may fail
 	{
-		/* Binary, so a line ends with LF on Windows as well. */
-		let file = fopen(path.ptr, "ab".ptr);
-		if file == none {
-			fail failure.SystemError.from_errno();
-		}
+		/* Binary, as every mode of anti.fs is, so a line ends with LF on
+		   Windows as well. */
+		let file = try fs.open(path, fs.Mode.Append);
 		return alloc FileSink { file: file };
 	}
 
 	concrete fn write(self, line: str)
 	{
-		if self.file == none {
+		let file = self.file else {
 			return;
-		}
-		fwrite(line.ptr, 1 as c_size_t, line.len as c_size_t, self.file);
-		fflush(self.file);
+		};
+		/* A sink has no way to report, so a line the system will not
+		   store is lost, as one written to a closed standard error is. */
+		fs.write(file, []byte { ptr: line.ptr, len: line.len }) catch ignored {
+			return;
+		};
+		fs.flush(file) catch ignored { };
 	}
 
 	fn destruct(self)
 	{
-		if self.file != none {
-			fclose(self.file);
-			self.file = none;
-		}
+		let file = self.file else {
+			return;
+		};
+		self.file = none;
+		fs.close(file) catch ignored { };
 	}
 }
 
@@ -189,12 +183,20 @@ pub abstract class Logger
 pub class SinkLogger inherits Logger
 {
 	own sink: *Sink,
+	/// The copy of the name that `new` was given, which `name` holds.
+	own held: ?*byte = none,
 
 	/// A logger with a name, a level and a sink it owns.
+	///
+	/// The logger keeps a copy of `name`, so the text may end before it does.
 	pub fn new(name: str, level: Level, sink: *Sink) -> *SinkLogger
 	{
 		let made = alloc SinkLogger { sink: sink };
-		made.name = name;
+		let copy = text.Builder.new();
+		copy.append(name);
+		let kept = copy.take();
+		made.held = kept.ptr;
+		made.name = kept;
 		made.level = level;
 		return made;
 	}
@@ -418,21 +420,25 @@ fn from_configuration() -> *Logger
 	if path.len == 0 {
 		return SinkLogger.new("", Level.Info, StderrSink.new());
 	}
-	let source = read_file(path) catch e {
+	let source = fs.read_file(path) catch e {
 		io.eprint("anti.log: ");
 		io.eprint(e.message);
 		io.eprint("\n");
-		yield "";
+		return SinkLogger.new("", Level.Info, StderrSink.new());
 	};
 	if source.len == 0 {
 		return SinkLogger.new("", Level.Info, StderrSink.new());
 	}
-	let doc = toml.Document.read(source) catch e {
+	/* The document copies what it reads, so the bytes are freed once it
+	   is read. */
+	let doc = toml.Document.read(text.from_bytes(source)) catch e {
+		free(source.ptr);
 		io.eprint("anti.log: ");
 		io.eprint(e.message);
 		io.eprint("\n");
 		return SinkLogger.new("", Level.Info, StderrSink.new());
 	};
+	free(source.ptr);
 	let level = level_of(doc.text_of("level", "info"), Level.Info);
 	let logger = SinkLogger.new(doc.text_of("name", ""), level,
 		first_sink(&doc));
@@ -470,28 +476,4 @@ fn first_sink(doc: *toml.Document) -> *Sink
 		i += 1;
 	}
 	return StderrSink.new();
-}
-
-/// The bytes of the file at `path`, which may fail.
-fn read_file(path: str) -> str may fail
-{
-	let file = fopen(path.ptr, "rb".ptr);
-	if file == none {
-		fail failure.SystemError.from_errno();
-	}
-	fseek(file, 0 as c_long, 2 as c_int);
-	let size = ftell(file) as int;
-	fseek(file, 0 as c_long, 0 as c_int);
-	if size <= 0 {
-		fclose(file);
-		return "";
-	}
-	let room = alloc(byte, size + 1) else {
-		fclose(file);
-		fail lang.Error.new(1, "out of memory");
-	};
-	let read = fread(room, 1 as c_size_t, size as c_size_t, file) as int;
-	fclose(file);
-	room[read] = 0;
-	return text.from_c(room);
 }

@@ -53,10 +53,7 @@ static char *native_path(const unsigned char *bytes, int64_t len)
     return path;
 }
 
-/* Open the file for reading, or for writing when writing is not 0. Both
-   are binary, so no byte is translated on Windows. Writing creates the
-   file or empties the one that is there. */
-void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t writing)
+void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t mode)
 {
     char *name = native_path(path, len);
     FILE *file;
@@ -64,7 +61,7 @@ void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t writing)
     if (name == NULL) {
         return NULL;
     }
-    file = anti_rt_file_open(name, writing);
+    file = anti_rt_file_open(name, mode);
     release(name);
     return file;
 }
@@ -95,7 +92,7 @@ int64_t anti_rt_fs_size(void *file)
 unsigned char *anti_rt_fs_read(const char *path, int64_t *length)
 {
     FILE *f = anti_rt_fs_open((const unsigned char *)path,
-                              (int64_t)strlen(path), 0);
+                              (int64_t)strlen(path), ANTI_FILE_READ);
     unsigned char *bytes = NULL;
     int64_t size;
 

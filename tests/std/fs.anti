@@ -1,7 +1,9 @@
 //! Files and directories. A file is written, read back four bytes at a time,
-//! measured, found in the listing of its directory, renamed and removed. Every
-//! function of `anti.fs` may fail, and the calls that must fail read a
-//! `SystemError` with the number of a missing file, which is 2 on every system.
+//! measured, found in the listing of its directory, renamed and removed. A file
+//! opened to append keeps what it held, and a flush shows the bytes to a second
+//! reader. Every function of `anti.fs` may fail, and the calls that must fail
+//! read a `SystemError` with the number of a missing file, which is 2 on every
+//! system.
 //!
 //! The test runs in the build directory of the suite and leaves nothing there
 //! when it passes.
@@ -16,6 +18,7 @@ const FIRST: str = "fs-test-first.txt";
 const SECOND: str = "fs-test-second.txt";
 const GROWING: str = "fs-test-growing.txt";
 const MISSING: str = "fs-test-missing.txt";
+const APPENDED: str = "fs-test-appended.txt";
 const TEXT: str = "hello, file\n";
 
 /// Print `label` and `n` on one line.
@@ -115,6 +118,21 @@ fn run() may fail
 	}
 	try g.close();
 	try fs.remove(GROWING);
+
+	/* Append creates the file, and a second open writes after its end. */
+	let one = try fs.open(APPENDED, fs.Mode.Append);
+	try fs.write(one, bytes_of("one "));
+	try fs.close(one);
+	let two = try fs.open(APPENDED, fs.Mode.Append);
+	try fs.write(two, bytes_of("two\n"));
+	try fs.flush(two);
+	let reader = try fs.open(APPENDED, fs.Mode.Read);
+	let flushed = try fs.size(reader);
+	try fs.close(reader);
+	try fs.close(two);
+	number("size after a flush", flushed);
+	try print_file(APPENDED);
+	try fs.remove(APPENDED);
 
 	let names = try fs.list(".");
 	if holds(names, FIRST) {

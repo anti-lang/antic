@@ -1,7 +1,9 @@
-//! A logger reads its level, its format and its sink from the file that
-//! `ANTI_LOGGER` names. It drops what its level drops and writes a text line
-//! and a JSON line. A file sink fails where no file opens, and `try` forwards
-//! its error.
+//! A logger reads its level, its format, its name and its sink from the file
+//! that `--anti.logger` names. It drops what its level drops and writes a text
+//! line and a JSON line. A file sink fails where no file opens, and `try`
+//! forwards its error. A file sink opens the path it is given when that is a
+//! slice of a longer text, and a path outside ASCII.
+import anti.fs;
 import anti.io;
 import anti.json;
 import anti.lang;
@@ -14,7 +16,7 @@ extern fn fwrite(bytes: ?*byte, size: c_size_t, count: c_size_t,
 	file: ?*byte) -> c_size_t;
 extern fn fgets(into: ?*byte, size: c_int, file: ?*byte) -> ?*byte;
 
-const CONFIG: str = "level = \"warn\"\nformat = \"text\"\n\n[[sink]]\nkind = \"file\"\npath = \"log-test.out\"\n";
+const CONFIG: str = "level = \"warn\"\nformat = \"text\"\nname = \"app\"\n\n[[sink]]\nkind = \"file\"\npath = \"log-test.out\"\n";
 
 /// Print the line without the wall clock that opens it.
 fn seen(line: str)
@@ -81,8 +83,49 @@ fn show_file(path: str)
 	free(room);
 }
 
+/// Print the bytes of the file at `path`, or the failure.
+fn show_bytes(path: str)
+{
+	let bytes = fs.read_file(path) catch e {
+		io.print(path);
+		io.println(": no file");
+		return;
+	};
+	io.print(path);
+	io.print(": ");
+	io.print(text.from_bytes(bytes));
+	free(bytes.ptr);
+}
+
+/// Write one line through a file sink at `path`.
+fn sink_line(path: str, line: str)
+{
+	let sink = open_sink(path) catch e {
+		io.print(path);
+		io.println(": the sink did not open");
+		return;
+	};
+	sink.write(line);
+	delete(sink);
+}
+
 fn main() -> int
 {
+	/* A slice ends where its bytes end, and no NUL follows it. */
+	let both = "log-slice.out-not-this";
+	let sliced = text.slice(both, 0, 13);
+	fs.remove(sliced) catch ignored { };
+	fs.remove(both) catch ignored { };
+	sink_line(sliced, "sliced\n");
+	show_bytes(sliced);
+	show_bytes(both);
+
+	let wide = "log-\u{e9}t\u{e9}.out";
+	fs.remove(wide) catch ignored { };
+	sink_line(wide, "wide one\n");
+	sink_line(wide, "wide two\n");
+	show_bytes(wide);
+
 	write_file("log-test.toml", CONFIG);
 	write_file("log-test.out", "");
 
