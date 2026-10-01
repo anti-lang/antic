@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../binary_stdio.h"
 #include "files.h"
 
 /* AddressSanitizer stops the program at an allocation it cannot give,
