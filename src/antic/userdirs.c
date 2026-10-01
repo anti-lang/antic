@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "linker.h"
+#include "antic.h"
 #include "platform.h"
 #include "target.h"
 

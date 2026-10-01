@@ -10,6 +10,7 @@
 # src/rt/ in it are the code that the runtime and the host share.
 set(ANTIC_CORE_SOURCES
     src/antic/alloc.c
+    src/antic/antic.c
     src/antic/antl.c
     src/antic/antl_io.c
     src/antic/antl_tree.c
@@ -24,6 +25,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/cpu.c
     src/antic/debug.c
     src/antic/diagnostic.c
+    src/antic/docpage.c
     src/antic/driver.c
     src/antic/emit.c
     src/antic/expand.c

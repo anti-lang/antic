@@ -7,10 +7,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "antic.h"
 #include "bindmodel.h"
-#include "diagnostic.h"
 #include "files.h"
-#include "lexer.h"
 
 void bind_list_add(struct bind_list *list, void *item)
 {
@@ -105,20 +104,9 @@ static const struct bind_type *bind_known_name(struct bind_module *b,
 
 bool bind_is_keyword(const char *name)
 {
-    struct arena arena = {0};
-    struct diagnostics diags = {0};
-    struct token_list tokens = {0};
-    bool word;
-
     /* A name is free when the lexer reads it as one identifier. That
        covers the keywords, the reserved words and `null`. */
-    word = lex(name, strlen(name), &arena, &diags, &tokens) &&
-           tokens.count >= 1 && tokens.items[0].kind == TOKEN_IDENT &&
-           (tokens.count == 1 || tokens.items[1].kind == TOKEN_EOF);
-    token_list_free(&tokens);
-    diagnostics_free(&diags);
-    arena_free(&arena);
-    return !word;
+    return !antic_is_identifier(name);
 }
 
 /* DESIGN: the frameworks of Apple's SDK that each bundled library needs

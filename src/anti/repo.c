@@ -15,7 +15,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "antl.h"
+#include "antic.h"
 #include "deps.h"
 #include "files.h"
 #include "../antic/platform.h"

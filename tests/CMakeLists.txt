@@ -50,6 +50,7 @@ add_executable(antic_unit_tests
     unit/test_syms.c
     unit/test_files.c
     unit/test_tool_platform.c
+    unit/test_interface.c
     ../src/anti/bindexpr.c
     ../src/anti/bindtype.c
     ../src/anti/deps.c
@@ -118,6 +119,12 @@ add_test(NAME one_allocator
 add_test(NAME platform_layer
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_platform_layer.cmake")
+
+# anti reaches antic through driver.h, antic.h and the shared helpers
+# alone, M02 of the audit.
+add_test(NAME anti_interface
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_interface.cmake")
 
 # The suffix antic gives an object of the host target, the one that
 # src/antic/target.c names: .obj on Windows and .o elsewhere. Every dev

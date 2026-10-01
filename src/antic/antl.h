@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "antic.h"
 #include "arena.h"
 #include "ir.h"
 #include "sema.h"
@@ -15,7 +16,6 @@
    of all its functions. Its bytes depend only on the source, so every
    host writes the same file. */
 
-#define ANTL_SUFFIX ".antl"
 #define ANTL_VERSION 74
 
 /* How deep the checked tree of a generic in a library file may nest,

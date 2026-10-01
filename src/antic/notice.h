@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-#include "sema.h"
+#include "antic.h"
 #include "text.h"
 
 /* The begin and end markers of the licence notice, by which a tool finds

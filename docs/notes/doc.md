@@ -24,11 +24,19 @@ back, and they refuse a library file.
 
 ## The model between the two
 
-A collector fills a list of `struct entry`, one per item, with the entries of a
-body below it. Each entry holds the declaration as text, the anchor, the `///`
-text and the `//#` text. Two collectors fill it: one from the interface and one
-from the syntax tree. Two renderers read it, one per form, and the signature is
-built once per entry.
+A collector fills a list of `struct doc_entry`, one per item, with the entries
+of a body below it. Each entry holds the declaration as text, the anchor, the
+`///` text and the `//#` text. Two collectors fill it: one from the interface
+and one from the syntax tree. Two renderers read it, one per form, and the
+signature is built once per entry.
+
+The collectors stand in `src/antic/docpage.c` and the renderers in
+`src/anti/doc.c`. `antic_doc_page` of `src/antic/antic.h` calls
+`driver_interface`, fills a `struct doc_page` with copies of every text and
+frees the module before it returns. The page also holds the names of the items
+of the interface and the paths of its imports, which a backtick name resolves
+against. `anti` then reads nothing of the checker, which the test
+`anti_interface` holds.
 
 A function of a class body takes its parameter names from the symbol where a
 library file supplied them. A source supplies them on the item. Whether the

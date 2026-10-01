@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "antic.h"
 #include "arena.h"
 #include "ast.h"
 #include "diagnostic.h"
@@ -56,30 +57,6 @@ struct const_value {
 enum eval_state { EVAL_NONE, EVAL_BUSY, EVAL_DONE };
 
 struct interface;
-
-/* A dependency in the package header of a library file. */
-struct package_dependency {
-    const char *name;               /* a module path */
-    const char *constraint;         /* a version constraint, such as ^1.2 */
-    const char *url;                /* the repository */
-};
-
-/* The version of a package whose build names none. It stands in the
-   package header of a library file and in every class descriptor. */
-#define PACKAGE_VERSION_DEFAULT "0.0.0"
-
-/* The package header of a library file. antic alone writes the module
-   path as the name, version 0.0.0 and empty licence fields. */
-struct package {
-    const char *name;
-    const char *version;
-    const struct package_dependency *dependencies;
-    size_t dependency_count;
-    const char *license;            /* an SPDX identifier */
-    const char *license_text;       /* the full text */
-    const char *const *attribution; /* lines copied verbatim */
-    size_t attribution_count;
-};
 
 /* The default of one parameter: a constant, `here`, or neither when the
    parameter has none. */

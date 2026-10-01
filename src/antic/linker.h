@@ -4,38 +4,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "antic.h"
 #include "cpu.h"
 #include "target.h"
 #include "text.h"
-
-/* The runtime archive keeps the runtime of each target and processor
-   level in <runtime>/RUNTIME_LIB_DIR/<target>/<level>/. A program built
-   with --cpu below the target's default then links a runtime of its own
-   level. The native libraries stay in <runtime>/RUNTIME_LIB_DIR/<target>/
-   and are built for the default level alone. The sysroot that lld links
-   against is <runtime>/RUNTIME_SYSROOT_DIR/<target>/, and the pinned LLVM
-   tools are in <runtime>/RUNTIME_BIN_DIR/. A macOS sysroot names the version of
-   its stubs in the file SYSROOT_SDK_VERSION. The stubs of Apple's SDK for
-   a program that names a framework lie in SYSROOT_APPLE_SDK_DIR of it. */
-#define RUNTIME_LIB_DIR "lib"
-#define RUNTIME_SYSROOT_DIR "sysroot"
-#define RUNTIME_BIN_DIR "bin"
-/* The library files of the standard library, a search root of antic. */
-#define RUNTIME_STD_DIR "std"
-/* The object beside the runtime library that a bundled archive carries
-   instead of the licence text of src/rt/license.c. */
-#define RUNTIME_LICENSE_STUB "anti_rt_license_stub"
-/* DESIGN: the Linux link mode against glibc takes the sysroot and the
-   runtime of the target name with this suffix, linux-arm64-glibc beside
-   linux-arm64. tools/get-sysroot.cmake and CMakeLists.txt spell the same
-   names. */
-#define LINUX_GLIBC_SUFFIX "-glibc"
-#define SYSROOT_SDK_VERSION "sdk-version"
-#define SYSROOT_APPLE_SDK_DIR "sdk"
-
-/* DESIGN: lld of the pinned LLVM release links for every target, and
-   --linker platform selects the linker of the host's own toolchain. */
-enum linker { LINKER_LLD, LINKER_PLATFORM };
 
 /* The files of a link and the facts about the host that the command line
    needs. */
@@ -193,11 +165,6 @@ void link_target_dir(struct text *out, enum target t, bool glibc);
    `..`. Returns false when the two stand on different roots, a drive or a
    share of Windows, and no relative path joins them. */
 bool link_relative(struct text *out, const char *path, const char *directory);
-
-/* Append the path of the PDB of a Windows link whose output is
-   executable: the output with its suffix replaced by `.pdb`, beside it.
-   The link and the symbols archive of anti build both name it so. */
-void link_pdb_path(struct text *out, const char *executable);
 
 /* The flavour of lld that links for target t, a program of
    <runtime>/RUNTIME_BIN_DIR/ without the suffix of the host. */

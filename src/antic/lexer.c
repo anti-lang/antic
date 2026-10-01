@@ -638,6 +638,11 @@ bool lexer_is_keyword(const char *s, size_t n)
     return word_kind(s, n) != TOKEN_IDENT || is_null(s, n);
 }
 
+bool token_is_builtin_type(enum token_kind kind)
+{
+    return kind >= TOKEN_BOOL_TYPE && kind <= TOKEN_C_WCHAR;
+}
+
 static void identifier(struct lexer *lx, size_t start, int line, int column)
 {
     while (is_ident_char(at(lx, 0))) {

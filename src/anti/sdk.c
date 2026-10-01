@@ -6,9 +6,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "antic.h"
 #include "applesdk.h"
 #include "files.h"
-#include "linker.h"
 #include "../antic/platform.h"
 #include "sha256.h"
 #include "text.h"

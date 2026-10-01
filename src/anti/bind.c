@@ -4,12 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "antic.h"
 #include "bind.h"
 #include "bindmodel.h"
 #include "driver.h"
 #include "files.h"
 #include "fmt.h"
-#include "header.h"
 #include "modpath.h"
 #include "text.h"
 

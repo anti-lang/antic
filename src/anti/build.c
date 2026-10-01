@@ -13,14 +13,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "antl.h"
+#include "antic.h"
 #include "arena.h"
 #include "cpu.h"
 #include "deps.h"
 #include "driver.h"
 #include "files.h"
-#include "header.h"
-#include "linker.h"
 #include "manifest.h"
 #include "modpath.h"
 #include "../antic/platform.h"
@@ -330,7 +328,8 @@ done:
 static bool library_module(const char *file, struct text *out)
 {
     struct arena arena = {0};
-    struct interface iface;
+    struct package package;
+    const char *module;
     struct text bytes = {0};
     char error[256];
     bool ok = false;
@@ -339,13 +338,13 @@ static bool library_module(const char *file, struct text *out)
         fprintf(stderr, "anti: cannot read %s\n", file);
         goto done;
     }
-    memset(&iface, 0, sizeof iface);
-    if (!antl_header((const uint8_t *)bytes.data, bytes.length, &arena, &iface,
-                     error, sizeof error)) {
+    if (!antic_library_header((const uint8_t *)bytes.data, bytes.length,
+                              &arena, &package, &module, error,
+                              sizeof error)) {
         fprintf(stderr, "anti: %s: %s\n", file, error);
         goto done;
     }
-    text_append(out, iface.module);
+    text_append(out, module);
     ok = true;
 done:
     text_free(&bytes);

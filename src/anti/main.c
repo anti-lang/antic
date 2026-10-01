@@ -3,13 +3,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "antic.h"
 #include "bind.h"
 #include "build.h"
 #include "check.h"
 #include "doc.h"
 #include "files.h"
 #include "fmt.h"
-#include "linker.h"
 #include "manifest.h"
 #include "modpath.h"
 #include "sdk.h"

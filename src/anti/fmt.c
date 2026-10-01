@@ -20,10 +20,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "antic.h"
 #include "arena.h"
-#include "diagnostic.h"
 #include "files.h"
-#include "lexer.h"
 #include "text.h"
 
 /* The width a doc comment is re-wrapped to, and the columns of one tab,
@@ -444,7 +443,7 @@ static bool angle_type(struct angles *a, size_t *at)
 {
     enum token_kind k = angle_kind(a, *at);
 
-    if (k >= TOKEN_BOOL_TYPE && k <= TOKEN_C_WCHAR) {
+    if (token_is_builtin_type(k)) {
         (*at)++;
         return true;
     }
@@ -1806,15 +1805,13 @@ static void name_unions(struct token_list *tokens)
 bool fmt_source(const char *source, size_t length, struct text *out)
 {
     struct arena arena = {0};
-    struct diagnostics diags = {0};
     struct token_list tokens = {0};
     struct piece_list pieces = {0};
     struct emitter e;
     size_t i;
 
-    if (!lex(source, length, &arena, &diags, &tokens)) {
+    if (!antic_tokens(source, length, &arena, &tokens)) {
         token_list_free(&tokens);
-        diagnostics_free(&diags);
         arena_free(&arena);
         return false;
     }
@@ -1859,7 +1856,6 @@ bool fmt_source(const char *source, size_t length, struct text *out)
     text_free(&e.line);
     free(pieces.items);
     token_list_free(&tokens);
-    diagnostics_free(&diags);
     arena_free(&arena);
     return true;
 }

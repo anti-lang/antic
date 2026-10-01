@@ -8,24 +8,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "antl.h"
+#include "antic.h"
 #include "arena.h"
-#include "ast.h"
-#include "diagnostic.h"
 #include "files.h"
-#include "lexer.h"
 #include "modpath.h"
-#include "parser.h"
 #include "text.h"
-
-/* The compiler keeps its own copy of this test private, so the tool has
-   one too rather than widening a header for three calls. */
-static bool named(const struct name *a, const char *text)
-{
-    size_t n = strlen(text);
-
-    return a->length == n && memcmp(a->text, text, n) == 0;
-}
 
 void unit_flat_path(const char *module, struct text *out)
 {
@@ -65,9 +52,7 @@ bool unit_read(const char *source, const char *const *roots,
                       size_t root_count, const char *work, struct unit *out)
 {
     struct arena arena = {0};
-    struct diagnostics diags = {0};
-    struct token_list tokens = {0};
-    struct module *tree = NULL;
+    struct antic_outline outline;
     struct text bytes = {0};
     char message[256];
     size_t i;
@@ -88,42 +73,27 @@ bool unit_read(const char *source, const char *const *roots,
         goto done;
     }
     ok = true;
-    if (!lex(text_cstr(&bytes), bytes.length, &arena, &diags, &tokens) ||
-        !parse(text_cstr(&bytes), &tokens, &arena, &diags, &tree)) {
-        for (i = 0; i < diags.count; i++) {
-            fprintf(stderr, "%s:%d:%d: error: %s\n", source,
-                    diags.items[i].line, diags.items[i].column,
-                    diags.items[i].message);
-        }
+    if (!antic_outline(source, text_cstr(&bytes), bytes.length, true, &arena,
+                       &outline)) {
         goto done;
     }
     out->parsed = true;
-    out->tests = files_array(tree->item_count + 1, sizeof *out->tests);
-    for (i = 0; i < tree->item_count; i++) {
-        const struct item *it = tree->items[i];
-        if (it->kind != ITEM_FN) {
-            continue;
-        }
-        if (it->block == BLOCK_NONE) {
-            out->has_main = out->has_main || named(&it->name, "main");
-        } else if (it->block == BLOCK_FIXTURES) {
-            out->setup = out->setup || named(&it->name, "setup");
-            out->teardown = out->teardown || named(&it->name, "teardown");
-        } else {
-            char *name = files_array(it->name.length + 1, 1);
-            memcpy(name, it->name.text, it->name.length);
-            out->tests[out->test_count++] = name;
-        }
+    out->has_main = outline.has_main;
+    out->setup = outline.setup;
+    out->teardown = outline.teardown;
+    out->tests = files_array(outline.test_count + 1, sizeof *out->tests);
+    for (i = 0; i < outline.test_count; i++) {
+        size_t n = strlen(outline.tests[i]);
+        char *name = files_array(n + 1, 1);
+        memcpy(name, outline.tests[i], n);
+        out->tests[out->test_count++] = name;
     }
-    out->imports = files_array(tree->import_count + 1, sizeof *out->imports);
-    for (i = 0; i < tree->import_count; i++) {
-        text_append_bytes(&out->imports[i], tree->imports[i].module.text,
-                          tree->imports[i].module.length);
+    out->imports = files_array(outline.import_count + 1, sizeof *out->imports);
+    for (i = 0; i < outline.import_count; i++) {
+        text_append(&out->imports[i], outline.imports[i]);
     }
-    out->import_count = tree->import_count;
+    out->import_count = outline.import_count;
 done:
-    token_list_free(&tokens);
-    diagnostics_free(&diags);
     arena_free(&arena);
     text_free(&bytes);
     return ok;

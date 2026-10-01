@@ -475,11 +475,6 @@ static bool lent_mark(struct parser *p)
 
 /* Types */
 
-static bool is_builtin_type(enum token_kind kind)
-{
-    return kind >= TOKEN_BOOL_TYPE && kind <= TOKEN_C_WCHAR;
-}
-
 /* DESIGN: the rule of C# for `<` in an expression. The tokens from the
    `<` are read as a list of types without building anything. A scan
    holds the token it stands at, as a count ahead of the parser, and
@@ -565,7 +560,7 @@ static bool scan_type_level(const struct parser *p, struct angle_scan *s)
 {
     enum token_kind k = peek_at(p, s->at)->kind;
 
-    if (is_builtin_type(k)) {
+    if (token_is_builtin_type(k)) {
         s->at++;
         return true;
     }
@@ -738,7 +733,7 @@ static struct type_expr *type_level(struct parser *p)
         }
         return ty;
     }
-    if (is_builtin_type(t->kind)) {
+    if (token_is_builtin_type(t->kind)) {
         next(p);
         ty->kind = TYPEX_BUILTIN;
         ty->builtin = t->kind;
@@ -3082,7 +3077,7 @@ static bool type_params(struct parser *p, struct item *it)
         if (accept(p, TOKEN_COLON)) {
             if (accept(p, TOKEN_INT_TYPE)) {
                 tp.constant = true;
-            } else if (is_builtin_type(peek(p)->kind)) {
+            } else if (token_is_builtin_type(peek(p)->kind)) {
                 error_here(p, "a constant parameter is written `N: int`");
                 free(list.data);
                 p->angles--;

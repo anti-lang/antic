@@ -55,6 +55,7 @@ void test_zip(void);
 void test_syms(void);
 void test_files(void);
 void test_tool_platform(void);
+void test_interface(void);
 
 int main(void)
 {
@@ -110,6 +111,7 @@ int main(void)
     test_syms();
     test_files();
     test_tool_platform();
+    test_interface();
     if (check_failures != 0) {
         fprintf(stderr, "%d check(s) failed\n", check_failures);
         return 1;

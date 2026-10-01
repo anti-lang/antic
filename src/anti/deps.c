@@ -15,12 +15,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "antl.h"
+#include "antic.h"
 #include "arena.h"
 #include "files.h"
 #include "modpath.h"
 #include "repo.h"
-#include "sema.h"
 #include "sha256.h"
 #include "text.h"
 #include "toml.h"
@@ -304,7 +303,8 @@ static bool library_header(const char *file, struct text *name,
                            struct text *version, struct resolver *r)
 {
     struct arena arena = {0};
-    struct interface iface;
+    struct package package;
+    const char *module;
     struct text bytes = {0};
     char message[256];
     size_t i;
@@ -314,18 +314,18 @@ static bool library_header(const char *file, struct text *name,
         fprintf(stderr, "anti: cannot read %s\n", file);
         goto done;
     }
-    memset(&iface, 0, sizeof iface);
-    if (!antl_header((const uint8_t *)bytes.data, bytes.length, &arena, &iface,
-                     message, sizeof message)) {
+    if (!antic_library_header((const uint8_t *)bytes.data, bytes.length,
+                              &arena, &package, &module, message,
+                              sizeof message)) {
         fprintf(stderr, "anti: %s: %s\n", file, message);
         goto done;
     }
     name->length = 0;
     version->length = 0;
-    text_append(name, iface.package.name);
-    text_append(version, iface.package.version);
-    for (i = 0; r != NULL && i < iface.package.dependency_count; i++) {
-        const struct package_dependency *d = &iface.package.dependencies[i];
+    text_append(name, package.name);
+    text_append(version, package.version);
+    for (i = 0; r != NULL && i < package.dependency_count; i++) {
+        const struct package_dependency *d = &package.dependencies[i];
         require(r, d->name, d->constraint == NULL ? "" : d->constraint,
                 d->url, NULL);
     }

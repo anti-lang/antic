@@ -33,6 +33,8 @@ enum token_kind {
     TOKEN_PUB, TOKEN_RETURN, TOKEN_STRUCT, TOKEN_WHILE, TOKEN_UNION,
     TOKEN_TRUE, TOKEN_FALSE, TOKEN_NONE,
     TOKEN_ALLOC, TOKEN_FREE, TOKEN_SIZE_OF,
+    /* The words of the built-in types, from bool to c_wchar, which
+       token_is_builtin_type reads as one range. */
     TOKEN_BOOL_TYPE, TOKEN_BYTE_TYPE, TOKEN_CHAR_TYPE, TOKEN_F16, TOKEN_F32,
     TOKEN_F64,
     TOKEN_FLOAT_TYPE, TOKEN_I8, TOKEN_I16, TOKEN_I32, TOKEN_I64,
@@ -170,6 +172,10 @@ void token_list_free(struct token_list *list);
 
 /* Whether the n bytes at s spell a keyword or a reserved word. */
 bool lexer_is_keyword(const char *s, size_t n);
+
+/* Whether the kind is the word of a built-in type, such as `int` or
+   `c_wchar`. */
+bool token_is_builtin_type(enum token_kind kind);
 
 /* The kind as the grammar spells it, such as `fn` or identifier. */
 const char *token_kind_name(enum token_kind kind);

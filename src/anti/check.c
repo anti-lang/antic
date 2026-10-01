@@ -14,18 +14,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "antl.h"
+#include "antic.h"
 #include "arena.h"
-#include "ast.h"
 #include "cpu.h"
-#include "diagnostic.h"
 #include "driver.h"
 #include "files.h"
 #include "fmt.h"
-#include "lexer.h"
 #include "manifest.h"
 #include "modpath.h"
-#include "parser.h"
 #include "target.h"
 #include "text.h"
 #include "units.h"
@@ -149,7 +145,7 @@ static void blocks_free(struct doc_blocks *list)
 }
 
 /* The bytes of one line of the doc text, without its line end. */
-static size_t line_end(const struct doc_text *doc, size_t from)
+static size_t line_end(const struct antic_doc_comment *doc, size_t from)
 {
     size_t end = from;
 
@@ -160,7 +156,7 @@ static size_t line_end(const struct doc_text *doc, size_t from)
 }
 
 /* Whether the line is a fence, and what its language tag is. */
-static bool fence(const struct doc_text *doc, size_t from, size_t end,
+static bool fence(const struct antic_doc_comment *doc, size_t from, size_t end,
                   const char **tag, size_t *tag_length)
 {
     size_t lead = from;
@@ -182,8 +178,8 @@ static bool fence(const struct doc_text *doc, size_t from, size_t end,
 /* Every fenced `anti` block of one doc comment. A block of a developer
    comment compiles inside the module and a block of a user comment as a
    module that imports it. */
-static void collect_blocks(const struct doc_text *doc, bool dev,
-                           const struct name *owner, struct doc_blocks *out)
+static void collect_blocks(const struct antic_doc_comment *doc,
+                           struct doc_blocks *out)
 {
     size_t start = 0;
     struct doc_block one;
@@ -202,9 +198,9 @@ static void collect_blocks(const struct doc_text *doc, bool dev,
             } else if (tag_length == 4 && memcmp(tag, "anti", 4) == 0) {
                 open = true;
                 one.line = doc->line;
-                one.dev = dev;
-                if (owner != NULL) {
-                    text_append_bytes(&one.owner, owner->text, owner->length);
+                one.dev = doc->dev;
+                if (doc->owner != NULL) {
+                    text_append(&one.owner, doc->owner);
                 } else {
                     text_append(&one.owner, "the module");
                 }
@@ -221,24 +217,6 @@ static void collect_blocks(const struct doc_text *doc, bool dev,
     if (open) {
         text_free(&one.body);
         text_free(&one.owner);
-    }
-}
-
-static void collect_item_blocks(const struct item *it, struct doc_blocks *out)
-{
-    size_t i;
-
-    collect_blocks(&it->doc, false, &it->name, out);
-    collect_blocks(&it->note, true, &it->name, out);
-    for (i = 0; i < it->param_count; i++) {
-        collect_blocks(&it->params[i].doc, false, &it->params[i].name, out);
-        collect_blocks(&it->params[i].note, true, &it->params[i].name, out);
-    }
-    for (i = 0; i < it->case_count; i++) {
-        collect_blocks(&it->cases[i].doc, false, &it->cases[i].name, out);
-    }
-    for (i = 0; i < it->member_count; i++) {
-        collect_item_blocks(it->members[i], out);
     }
 }
 
@@ -333,9 +311,7 @@ static bool unit_blocks(const struct unit *u, const struct options *base,
                         const char *work, size_t *count, size_t *failed)
 {
     struct arena arena = {0};
-    struct diagnostics diags = {0};
-    struct token_list tokens = {0};
-    struct module *tree = NULL;
+    struct antic_outline outline;
     struct text bytes = {0};
     struct doc_blocks list = {0};
     size_t i;
@@ -345,14 +321,12 @@ static bool unit_blocks(const struct unit *u, const struct options *base,
         ok = false;
         goto done;
     }
-    if (!lex(text_cstr(&bytes), bytes.length, &arena, &diags, &tokens) ||
-        !parse(text_cstr(&bytes), &tokens, &arena, &diags, &tree)) {
+    if (!antic_outline(u->source, text_cstr(&bytes), bytes.length, false,
+                       &arena, &outline)) {
         goto done;
     }
-    collect_blocks(&tree->doc, false, NULL, &list);
-    collect_blocks(&tree->note, true, NULL, &list);
-    for (i = 0; i < tree->item_count; i++) {
-        collect_item_blocks(tree->items[i], &list);
+    for (i = 0; i < outline.comment_count; i++) {
+        collect_blocks(&outline.comments[i], &list);
     }
     *count += list.count;
     for (i = 0; i < list.count; i++) {
@@ -362,8 +336,6 @@ static bool unit_blocks(const struct unit *u, const struct options *base,
     }
 done:
     blocks_free(&list);
-    token_list_free(&tokens);
-    diagnostics_free(&diags);
     arena_free(&arena);
     text_free(&bytes);
     return ok;
