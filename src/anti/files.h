@@ -48,6 +48,11 @@ bool files_copy_program(const char *from, const char *to);
    nothing, since for some callers a missing file is an answer. */
 bool files_read(const char *path, struct text *out);
 
+/* files_read of a regular file alone. A path that an input names reads
+   through it, so that a device or a FIFO is refused rather than read
+   without end or waited on. See platform_open_file. */
+bool files_read_file(const char *path, struct text *out);
+
 /* files_read, which also prints that path cannot be read when it fails. */
 bool files_read_reported(const char *path, struct text *out);
 

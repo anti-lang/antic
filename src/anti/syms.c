@@ -1046,10 +1046,11 @@ static bool resolve_binary(const struct text *binary, uint64_t vaddr,
                         found.function_length);
         }
         /* The link of Mach-O leaves the line table in the objects that
-           its debug map names, which stand where it was built. */
+           its debug map names, which stand where it was built. The
+           archive names the path, so only a regular file is read. */
         if (anti_rt_macho_debug_map(&t, vaddr, &object, &symbol, &start)) {
             struct text file = {0};
-            if (files_read(object, &file)) {
+            if (files_read_file(object, &file)) {
                 anti_rt_macho_relocate((uint8_t *)file.data, file.length);
                 if (anti_rt_macho_object_line((const uint8_t *)file.data,
                                               file.length, symbol,

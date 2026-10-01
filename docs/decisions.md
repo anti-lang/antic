@@ -1590,6 +1590,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] A unit of a deployment index with no `id` matches no entry of the archive.
 - [provisional] `anti symbols` decides whether a path of a runtime configuration is absolute by the rules of the host, through `path_is_absolute` of `src/antic/platform.c`. A drive path such as `C:\x` read on macOS or Linux is relative there.
 - [provisional] `zip_read` refuses an archive two of whose entries share bytes of the file. The bytes of an entry run from its local header to the end of its data. It also refuses an archive whose entries declare more than 4 GiB less one byte together, the most `zip_write` puts in one archive. Reason: each entry stops at its declared size. But 65535 central entries could name one local header of 4 GiB, so a few megabytes of deflate data asked for terabytes. Audit finding M41.
+- [provisional] `resolve` reads the object file that the debug map of a Mach-O twin names only when the path is a regular file, through `files_read_file` of `src/anti/files.c` and `platform_open_file` of `src/anti/platform.c`. A directory, a device, a FIFO or a socket gives the frame no line from the object, and the map answers instead. Reason: the archive names the path, and `/dev/zero` grew the buffer until `anti` ended, while a FIFO waited for a writer without end. Audit finding M42.
 
 ## The doc command
 

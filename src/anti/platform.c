@@ -7,8 +7,8 @@
    entry point is made, since those read the bytes in the code page of
    the machine. */
 
-/* lstat, chmod, mkdir, rmdir and unlink are POSIX, outside the C11
-   library. */
+/* lstat, chmod, mkdir, rmdir, unlink, open, fstat, fcntl and fdopen are
+   POSIX, outside the C11 library. */
 #define _POSIX_C_SOURCE 200809L
 
 #include "platform.h"
@@ -20,6 +20,9 @@
 #if defined(_WIN32)
 
 #include <direct.h>
+#include <fcntl.h>
+#include <io.h>
+#include <stdint.h>
 #include <windows.h>
 
 static bool not_found(DWORD error)
@@ -122,6 +125,41 @@ bool platform_rename(const char *from, const char *to)
     return renamed;
 }
 
+FILE *platform_open_file(const char *path)
+{
+    wchar_t *wide = platform_widen(path);
+    HANDLE handle;
+    int fd;
+    FILE *f;
+
+    if (wide == NULL) {
+        return NULL;
+    }
+    handle = CreateFileW(wide, GENERIC_READ,
+                         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                         NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    free(wide);
+    if (handle == INVALID_HANDLE_VALUE) {
+        return NULL;
+    }
+    /* A device such as CON or NUL is FILE_TYPE_CHAR and a pipe
+       FILE_TYPE_PIPE. */
+    if (GetFileType(handle) != FILE_TYPE_DISK) {
+        CloseHandle(handle);
+        return NULL;
+    }
+    fd = _open_osfhandle((intptr_t)handle, _O_RDONLY | _O_BINARY);
+    if (fd == -1) {
+        CloseHandle(handle);
+        return NULL;
+    }
+    f = _fdopen(fd, "rb");
+    if (f == NULL) {
+        _close(fd);
+    }
+    return f;
+}
+
 /* Windows keeps no permission bits, and the two names are the POSIX
    interface. */
 bool platform_copy_permissions(const char *from, const char *to)
@@ -148,6 +186,7 @@ int platform_run_symbolized(const char *const argv[], const char *name,
 
 #else
 
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -182,6 +221,32 @@ bool platform_remove_entry(const char *path)
 bool platform_rename(const char *from, const char *to)
 {
     return rename(from, to) == 0;
+}
+
+/* O_NONBLOCK lets the open of a FIFO return at once rather than wait
+   for a writer. The read of a regular file ignores it, and the flag is
+   taken off before the stream reads all the same. */
+FILE *platform_open_file(const char *path)
+{
+    struct stat st;
+    int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+    int flags;
+    FILE *f;
+
+    if (fd < 0) {
+        return NULL;
+    }
+    flags = fcntl(fd, F_GETFL);
+    if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode) || flags == -1 ||
+        fcntl(fd, F_SETFL, flags & ~O_NONBLOCK) == -1) {
+        close(fd);
+        return NULL;
+    }
+    f = fdopen(fd, "rb");
+    if (f == NULL) {
+        close(fd);
+    }
+    return f;
 }
 
 bool platform_copy_permissions(const char *from, const char *to)

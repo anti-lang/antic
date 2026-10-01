@@ -163,17 +163,15 @@ static void cannot_read(const char *path)
     fprintf(stderr, "anti: cannot read %s\n", path);
 }
 
-bool files_read(const char *path, struct text *out)
+/* Append what is left of f to out and close it, or leave out as it was
+   when a read fails part of the way. */
+static bool read_stream(FILE *f, struct text *out)
 {
-    FILE *f = platform_open(path, false);
     char buffer[65536];
     size_t start = out->length;
     size_t n;
     bool ok;
 
-    if (f == NULL) {
-        return false;
-    }
     while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
         text_append_bytes(out, buffer, n);
     }
@@ -187,6 +185,20 @@ bool files_read(const char *path, struct text *out)
         }
     }
     return ok;
+}
+
+bool files_read(const char *path, struct text *out)
+{
+    FILE *f = platform_open(path, false);
+
+    return f != NULL && read_stream(f, out);
+}
+
+bool files_read_file(const char *path, struct text *out)
+{
+    FILE *f = platform_open_file(path);
+
+    return f != NULL && read_stream(f, out);
 }
 
 bool files_read_reported(const char *path, struct text *out)

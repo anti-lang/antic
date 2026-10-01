@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
 
 /* The platform layer of antic, which anti calls as well. */
 #include "../antic/platform.h"
@@ -27,6 +28,15 @@ enum platform_kind {
    only without follow. PLATFORM_MISSING means nothing is there and
    PLATFORM_UNREADABLE that the system did not say. */
 enum platform_kind platform_kind(const char *path, bool follow);
+
+/* Open path for reading when it names a regular file, through every
+   link, and return NULL for anything else: a directory, a device, a FIFO
+   or a socket. The open itself does not wait, so a FIFO with no writer
+   is refused at once. A path that an input names, such as the object
+   file of a debug map, is read through it, because /dev/zero would give
+   bytes without end and a pipe would wait for a writer. The caller
+   closes the stream with fclose. */
+FILE *platform_open_file(const char *path);
 
 /* Make the directory path, whose parent exists. Returns true when it was
    made or something of that name is there already. */

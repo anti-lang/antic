@@ -2,11 +2,17 @@
    deployment index with no id, and a program with no function. Each
    used to hand a null pointer to memcmp or qsort with a count of zero,
    which the sanitizer builds catch. */
+#if !defined(_WIN32)
+/* mkfifo is POSIX, outside the C11 library. */
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
-#include "../../src/antic/platform.h"
+#include "../../src/anti/platform.h"
 #include "../binary_stdio.h"
 #include "check.h"
 #include "symmap.h"
@@ -15,10 +21,16 @@
 #include "text.h"
 #include "zip.h"
 
+#if !defined(_WIN32)
+#include <sys/stat.h>
+#endif
+
 #define ARCHIVE "test_syms-symbols.zip"
 #define TRACE "test_syms-trace.txt"
 #define PROGRAM "test_syms-program"
 #define MAP "test_syms.map"
+#define FIFO "test_syms-fifo"
+#define TREE_DIR "test_syms-dir"
 
 static void write_file(const char *path, const char *text)
 {
@@ -138,10 +150,129 @@ static void build_id_of_notice(void)
     remove(PROGRAM);
 }
 
+static void put_le(struct text *out, uint64_t value, int bytes)
+{
+    int i;
+
+    for (i = 0; i < bytes; i++) {
+        char byte = (char)((value >> (8 * i)) & 0xff);
+        text_append_bytes(out, &byte, 1);
+    }
+}
+
+static void put_zeros(struct text *out, size_t count)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        text_append_bytes(out, "", 1);
+    }
+}
+
+/* A Mach-O debug twin whose debug map names object for the function
+   from 0x1000 to 0x1100: a header, a `__TEXT` segment at 0, a symbol
+   table of an N_OSO, an N_FUN and the N_FUN that ends it, and its
+   strings. */
+static void twin_naming(const char *object, struct text *out)
+{
+    size_t length = strlen(object);
+
+    put_le(out, 0xfeedfacfu, 4);
+    put_le(out, 0x0100000c, 4);
+    put_le(out, 0, 4);
+    put_le(out, 0xa, 4);
+    put_le(out, 2, 4);
+    put_le(out, 72 + 24, 4);
+    put_le(out, 0, 8);
+    put_le(out, 0x19, 4);
+    put_le(out, 72, 4);
+    text_append_bytes(out, "__TEXT\0\0\0\0\0\0\0\0\0\0", 16);
+    put_zeros(out, 8 * 4 + 4 * 4);
+    put_le(out, 0x2, 4);
+    put_le(out, 24, 4);
+    put_le(out, 128, 4);
+    put_le(out, 3, 4);
+    put_le(out, 128 + 3 * 16, 4);
+    put_le(out, 1 + length + 1 + 3, 4);
+    put_le(out, 1, 4);
+    put_le(out, 0x66, 1);
+    put_zeros(out, 1 + 2 + 8);
+    put_le(out, 1 + length + 1, 4);
+    put_le(out, 0x24, 1);
+    put_le(out, 1, 1);
+    put_zeros(out, 2);
+    put_le(out, 0x1000, 8);
+    put_le(out, 0, 4);
+    put_le(out, 0x24, 1);
+    put_zeros(out, 1 + 2);
+    put_le(out, 0x100, 8);
+    put_zeros(out, 1);
+    text_append_bytes(out, object, length + 1);
+    text_append_bytes(out, "_f", 3);
+}
+
+/* M42: the object path of a debug map comes from the archive, which
+   need not be the user's. A path to what is no regular file is not
+   read: a directory, and on POSIX a FIFO, which waited for a writer
+   without end, and /dev/zero, which grew the buffer until anti ended.
+   The frame then resolves as far as the twin and the map go. */
+static void object_no_file(void)
+{
+    static const char map[] =
+        "# The map of a symbols archive of Anti.\n"
+        "# build "
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n"
+        "0000000000001000-0000000000001100 f\n";
+    static const char trace[] =
+        "module 0 "
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        " 0x0 prog\n"
+        "0x0000000000001001 0+0x1001\n";
+    static const char *const objects[] = {
+        TREE_DIR,
+#if !defined(_WIN32)
+        FIFO,
+        "/dev/zero",
+#endif
+    };
+    size_t i;
+
+#if !defined(_WIN32)
+    remove(FIFO);
+    CHECK(mkfifo(FIFO, 0600) == 0);
+#endif
+    CHECK(platform_make_dir(TREE_DIR));
+    write_file(TRACE, trace);
+    for (i = 0; i < sizeof objects / sizeof objects[0]; i++) {
+        struct text twin = {0};
+        struct zip_entry entries[2];
+        const char *symbols[1];
+        twin_naming(objects[i], &twin);
+        memset(entries, 0, sizeof entries);
+        entries[0].name = "prog.debug";
+        entries[0].bytes = twin.data;
+        entries[0].size = twin.length;
+        entries[1].name = "prog.map";
+        entries[1].bytes = map;
+        entries[1].size = sizeof map - 1;
+        CHECK(zip_write(ARCHIVE, entries, 2));
+        symbols[0] = ARCHIVE;
+        CHECK(syms_resolve(TRACE, symbols, 1) == 0);
+        text_free(&twin);
+    }
+    remove(ARCHIVE);
+    remove(TRACE);
+    platform_remove_entry(TREE_DIR);
+#if !defined(_WIN32)
+    remove(FIFO);
+#endif
+}
+
 void test_syms(void)
 {
     unit_without_id();
     program_without_functions();
     map_names();
     build_id_of_notice();
+    object_no_file();
 }

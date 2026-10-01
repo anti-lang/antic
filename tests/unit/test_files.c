@@ -3,7 +3,8 @@
    write the disk refuses and a directory that cannot be read. A link
    back up the tree now ends the walk. */
 #if !defined(_WIN32)
-/* chmod, symlink and geteuid are POSIX, outside the C11 library. */
+/* chmod, symlink, mkfifo and geteuid are POSIX, outside the C11
+   library. */
 #define _POSIX_C_SOURCE 200809L
 #endif
 
@@ -236,6 +237,39 @@ static void anti_layer(void)
     text_free(&bytes);
 }
 
+/* M42: files_read_file reads a regular file, also through a link, and
+   refuses a directory, a device and a FIFO, which it neither reads
+   without end nor waits on. */
+static void regular_files(void)
+{
+    struct text bytes = {0};
+    struct text back = {0};
+
+    files_remove_tree(TREE);
+    CHECK(platform_make_dir(TREE));
+    text_append(&bytes, "anti");
+    CHECK(files_write(TREE "/a.bin", &bytes));
+    CHECK(files_read_file(TREE "/a.bin", &back));
+    CHECK_STR(text_cstr(&back), "anti");
+    CHECK(!files_read_file(TREE, &back));
+    CHECK(!files_read_file(TREE "/absent", &back));
+    CHECK_STR(text_cstr(&back), "anti");
+#if defined(_WIN32)
+    CHECK(!files_read_file("NUL", &back));
+#else
+    CHECK(symlink("a.bin", TREE "/link") == 0);
+    CHECK(files_read_file(TREE "/link", &back));
+    CHECK_STR(text_cstr(&back), "antianti");
+    CHECK(!files_read_file("/dev/zero", &back));
+    CHECK(!files_read_file("/dev/null", &back));
+    CHECK(mkfifo(TREE "/fifo", 0600) == 0);
+    CHECK(!files_read_file(TREE "/fifo", &back));
+#endif
+    CHECK(files_remove_tree(TREE));
+    text_free(&bytes);
+    text_free(&back);
+}
+
 /* files_grow keeps the elements, zeroes the new room and doubles it. */
 static void grow_array(void)
 {
@@ -285,6 +319,7 @@ void test_files(void)
     write_errors();
     utf8_names();
     anti_layer();
+    regular_files();
 #if !defined(_WIN32)
     walk_unreadable();
     walk_links();
