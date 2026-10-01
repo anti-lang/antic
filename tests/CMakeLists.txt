@@ -125,6 +125,11 @@ add_test(NAME platform_layer
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_platform_layer.cmake")
 
+# The runtime calls the UTF-16 entry points of Windows alone.
+add_test(NAME rt_wide_text
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_rt_wide_text.cmake")
+
 # anti reaches antic through driver.h, antic.h and the shared helpers
 # alone, M02 of the audit.
 add_test(NAME anti_interface

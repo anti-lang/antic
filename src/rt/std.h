@@ -145,8 +145,22 @@ struct anti_text anti_rt_runtime_version(void);
 int32_t anti_rt_errno(void);
 
 /* The message of an errno value, as a NUL-terminated C string that the
-   caller does not free. */
+   caller does not free. It stays valid on its thread until the next
+   call. */
 const unsigned char *anti_rt_errno_text(int32_t code);
+
+/* DESIGN: Win32 keeps its own error apart from errno, and the message
+   for it comes from FormatMessageW. Every other system has no Win32 to
+   ask, so the code is 0 and the message is empty. That keeps
+   `SystemError.from_win32` one function with one meaning everywhere. */
+
+/* The code of the last failing Win32 call. */
+int32_t anti_rt_last_error(void);
+
+/* The message of a Win32 error code, as NUL-terminated UTF-8 that the
+   caller does not free. It stays valid on its thread until the next
+   call. */
+const unsigned char *anti_rt_last_error_text(int32_t code);
 
 /* Nanoseconds from a clock that never moves backwards, whose zero has no
    meaning of its own. */

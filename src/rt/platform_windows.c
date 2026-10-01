@@ -22,6 +22,56 @@ int64_t anti_rt_is_windows(void)
     return 1;
 }
 
+/* The UCRT deprecates strerror, and strerror_s writes into a buffer the
+   caller owns. One per thread keeps the result alive as long as the
+   caller needs it. */
+const unsigned char *anti_rt_errno_text(int32_t code)
+{
+    static _Thread_local char text[128];
+
+    if (strerror_s(text, sizeof text, (int)code) != 0) {
+        text[0] = '\0';
+    }
+    return (const unsigned char *)text;
+}
+
+int32_t anti_rt_last_error(void)
+{
+    return (int32_t)GetLastError();
+}
+
+/* The most UTF-16 units of the message of a Win32 error. One unit gives
+   at most 3 bytes of UTF-8, and a surrogate pair of two units gives 4. */
+enum { MESSAGE_UNITS = 512 };
+
+/* DESIGN: FormatMessageW writes the message in UTF-16, in the language
+   of the user, and the conversion of the rest of this file makes the
+   UTF-8 of a str of it. FormatMessageA would write the ANSI code page,
+   which is no UTF-8 on a French or a German Windows, M32 of the second
+   audit. A message that does not fit, or that is no valid UTF-16, is
+   empty, as one of an unknown code is. */
+const unsigned char *anti_rt_last_error_text(int32_t code)
+{
+    static _Thread_local wchar_t wide[MESSAGE_UNITS];
+    static _Thread_local char text[MESSAGE_UNITS * 3 + 1];
+    DWORD units = FormatMessageW(
+        FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
+        (DWORD)code, 0, wide, MESSAGE_UNITS, NULL);
+    int bytes = 0;
+
+    while (units > 0 &&
+           (wide[units - 1] == L'\n' || wide[units - 1] == L'\r')) {
+        units--;
+    }
+    if (units > 0) {
+        bytes = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wide,
+                                    (int)units, text, (int)sizeof text - 1,
+                                    NULL, NULL);
+    }
+    text[bytes > 0 ? bytes : 0] = '\0';
+    return (const unsigned char *)text;
+}
+
 static SRWLOCK locks[ANTI_RT_LOCK_COUNT] = {SRWLOCK_INIT};
 
 void anti_rt_lock_hold(enum anti_rt_lock which)

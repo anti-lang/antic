@@ -31,6 +31,24 @@ int64_t anti_rt_is_windows(void)
     return 0;
 }
 
+/* The C library gives the message of strerror in storage of its own. */
+const unsigned char *anti_rt_errno_text(int32_t code)
+{
+    return (const unsigned char *)strerror((int)code);
+}
+
+/* See the DESIGN comment of the declaration in std.h. */
+int32_t anti_rt_last_error(void)
+{
+    return 0;
+}
+
+const unsigned char *anti_rt_last_error_text(int32_t code)
+{
+    (void)code;
+    return (const unsigned char *)"";
+}
+
 static pthread_mutex_t locks[ANTI_RT_LOCK_COUNT] = {
     PTHREAD_MUTEX_INITIALIZER
 };

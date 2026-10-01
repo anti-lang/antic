@@ -116,9 +116,9 @@ const void *anti_rt_plugin_image(const void *address)
     }
 #if defined(_WIN32)
     HMODULE module = NULL;
-    if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
                                 GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                            (LPCSTR)address, &module)) {
+                            (LPCWSTR)address, &module)) {
         return NULL;
     }
     return module;
