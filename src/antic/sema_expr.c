@@ -2614,17 +2614,14 @@ static struct type *check_format(struct checker *c, struct expr *e)
     static const struct name module = {TEXT_MODULE, sizeof TEXT_MODULE - 1};
     static const struct name class_name = {TEXT_BUILDER,
                                            sizeof TEXT_BUILDER - 1};
-    const struct interface *lib = sema_find_library(c, &module);
-    struct symbol *builder =
-        lib != NULL ? sema_library_item(c, lib, &class_name) : NULL;
+    struct symbol *builder = sema_std_item(c, &module, &class_name, false);
     struct scope scope;
     struct symbol *home;
     struct expr *new_callee;
     bool ok;
     size_t i;
 
-    if (builder == NULL || builder->kind != SYMBOL_STRUCT ||
-        builder->type == NULL || builder->type->kind != TYPE_CLASS) {
+    if (builder == NULL || builder->type->kind != TYPE_CLASS) {
         sema_error_at(c, e->pos, "%s builds its text with `" TEXT_MODULE "."
                       TEXT_BUILDER "`, so the module imports `" TEXT_MODULE "`",
                       sema_format_name(e));
@@ -2636,7 +2633,7 @@ static struct type *check_format(struct checker *c, struct expr *e)
     sema_enter_scope(c, &scope);
     home = sema_declare(c, SYMBOL_MODULE, &hidden_module, e->pos,
                         "`%.*s` is already declared");
-    home->home = lib;
+    home->home = sema_find_library(c, &module);
     e->as.format.builder = sema_declare(c, SYMBOL_LOCAL, &hidden_builder,
                                         e->pos,
                                         "`%.*s` is already declared");
