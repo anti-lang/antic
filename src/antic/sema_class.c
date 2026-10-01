@@ -1004,3 +1004,120 @@ void sema_check_classes(struct checker *c)
         }
     }
 }
+
+/* DESIGN: anti.lang.Object declares seven public functions whose bodies
+   live in the runtime, and nine hooks with empty bodies after them.
+   Every class inherits all sixteen, so they take the first entries of
+   every table. A class replaces one with a concrete function of the same
+   name. The order of the nine is `enum anti_hook` of src/rt/object.h, and
+   the unit test records_hook_entries pins the two together. */
+static const char *const root_names[] = {
+    "type_name", ROOT_TO_TEXT, "equals", "hash", "serialize", "destruct",
+    "copy", ROOT_CREATED, ROOT_DESTROYED, ROOT_COPIED, ROOT_DISPATCHED,
+    ROOT_JOINED, ROOT_ENTER, ROOT_LEAVE, ROOT_FAILED, ROOT_CHANGED
+};
+
+/* The parameters of each, `self` among them. */
+static const unsigned char root_params[] = {
+    1, 1, 2, 1, 2, 1, 2, 1, 1, 2, 1, 1, 2, 2, 3, 2
+};
+
+#define ROOT_COUNT (sizeof root_names / sizeof root_names[0])
+/* The seven functions come first, and the nine hooks after them. */
+#define ROOT_FIRST_HOOK 7
+
+/* The parameters of the member m, `self` among them. The out pointer of
+   a `may fail` function is no parameter of the declaration. */
+static size_t member_params(const struct item *m)
+{
+    return m->symbol != NULL && m->symbol->type != NULL
+               ? m->symbol->type->param_count
+               : (size_t)m->param_count + (m->has_self ? 1 : 0);
+}
+
+/* Fill the entry of name and params, or add one after the count entries
+   of out. Returns the new count. */
+static size_t table_add(struct table_entry *out, size_t count,
+                        struct name name, size_t params,
+                        const struct item *m, const char *runtime)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        if (sema_same_name(&out[i].name, &name) && out[i].params == params) {
+            out[i].fn = m;
+            return count;
+        }
+    }
+    out[count].name = name;
+    out[count].params = params;
+    out[count].fn = m;
+    out[count].runtime = runtime;
+    return count + 1;
+}
+
+size_t sema_table_bound(const struct type *t)
+{
+    size_t bound = ROOT_COUNT;
+
+    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
+        bound += t->member_count;
+    }
+    return bound;
+}
+
+size_t sema_table_of(const struct type *t, struct table_entry *out)
+{
+    size_t count = 0;
+    size_t i;
+
+    if (t == NULL) {
+        return 0;
+    }
+    if (t->kind == TYPE_CLASS) {
+        count = sema_table_of(t->base, out);
+    }
+    if (t->kind == TYPE_CLASS && t->base == NULL) {
+        for (i = 0; i < ROOT_COUNT; i++) {
+            struct name name;
+            name.text = root_names[i];
+            name.length = strlen(root_names[i]);
+            count = table_add(out, count, name, root_params[i], NULL,
+                              root_names[i]);
+        }
+    }
+    /* DESIGN: `concrete fn I::f` fills the table of I alone, and the
+       primary table keeps the inherited entry or a plain body. A body
+       qualified by a base fills the primary table. It wins over a plain
+       body of the same level, so it is added after it. The rule is
+       types_body_table's. A function with type parameters of its own
+       stands in no table, since each of its copies is called directly. */
+    for (i = 0; i < t->member_count; i++) {
+        const struct item *m = t->members[i];
+        if (m->kind == ITEM_FN && m->pub && m->type_param_count == 0 &&
+            types_body_table(t, m) == BODY_PLAIN) {
+            count = table_add(out, count, m->name, member_params(m), m, NULL);
+        }
+    }
+    for (i = 0; i < t->member_count; i++) {
+        const struct item *m = t->members[i];
+        if (m->kind == ITEM_FN && m->pub && m->type_param_count == 0 &&
+            types_body_table(t, m) == BODY_BASE) {
+            count = table_add(out, count, m->name, member_params(m), m, NULL);
+        }
+    }
+    return count;
+}
+
+bool sema_root_hook(const struct name *name)
+{
+    size_t i;
+
+    for (i = ROOT_FIRST_HOOK; i < ROOT_COUNT; i++) {
+        if (name->length == strlen(root_names[i]) &&
+            memcmp(name->text, root_names[i], name->length) == 0) {
+            return true;
+        }
+    }
+    return false;
+}

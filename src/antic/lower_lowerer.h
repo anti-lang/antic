@@ -226,26 +226,11 @@ enum hook_kind {
    `concrete fn` takes the entry of the function it replaces. An
    `abstract fn` leaves its entry zero until a class fills it. */
 
-/* One entry of a table. It holds the name a call names, the count of its
-   parameters with `self` among them, and the function of the class that
-   fills it. A function of the root has no source, so it holds the
-   runtime symbol instead. */
-/* DESIGN: an entry is keyed by its name and its parameter count. Anti
-   has no overloading, so two functions of one name in a chain have one
-   signature everywhere but the nine hooks. `anti.lang.TraceHandler`
-   declares each of them again with the object after `self`, and those
-   take entries of their own after the root's. */
-struct entry {
-    struct name name;
-    size_t params;
-    const struct item *fn;
-    const char *runtime;
-};
-
+/* The entries of the primary table of a class, struct table_entry of
+   sema.h, which sema_table_of orders for lowering and the C header. */
 struct table {
-    struct entry *entries;
+    struct table_entry *entries;
     size_t count;
-    size_t capacity;
 };
 
 /* lower.c */
@@ -456,7 +441,6 @@ struct ir_global *lower_class_table(struct lowerer *l, const struct type *t);
 struct ir_global *lower_interface_table(struct lowerer *l,
                                         const struct type *t,
                                         const struct struct_field *sub);
-bool lower_hook_name(const struct name *name);
 bool lower_defines(const struct lowerer *l, const struct type *t,
                    const char *module);
 struct ir_operand lower_static_descriptor(struct lowerer *l,

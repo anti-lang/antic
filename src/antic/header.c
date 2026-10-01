@@ -149,13 +149,33 @@ static bool type_names_error(const struct type *t)
     return false;
 }
 
+static void c_type_name(struct text *out, const struct type *t);
+static void element_c_name(struct text *out, const struct type *t);
+
+/* `tuple` and the name of each element of the tuple t after a `_`. */
+static void tuple_elements(struct text *out, const struct type *t)
+{
+    size_t i;
+
+    text_append(out, "tuple");
+    for (i = 0; i < t->param_count; i++) {
+        text_append(out, "_");
+        element_c_name(out, t->params[i]);
+    }
+}
+
 /* DESIGN: a tuple has no name of its own, so the header makes one from
    its elements: `(int, str)` becomes `anti_tuple_int_str`. A pointer
    writes `ptr_` before what it points at and a nullable pointer `optr_`,
    an array its length, and a tuple its own elements. A `?T` of a value
    has none either, and is `opt_` before its value: `?int` becomes
    `anti_opt_int`. Two tuples of the same elements are one type, and so
-   are two `?T` of one T, so one name stands for one type. */
+   are two `?T` of one T, so one name stands for one type. A tuple inside
+   a name ends with `_end`, so `((int, int), int, int)` and
+   `((int, int, int), int)` have two names. A function writes `fn`, its
+   parameters, `to` and its result, and ends with `_end` as well:
+   `fn_int_to_bool_end`. A named type writes the name C knows it by, the
+   one an `export type` gives a copy of a generic. */
 static void element_c_name(struct text *out, const struct type *t)
 {
     size_t i;
@@ -175,17 +195,27 @@ static void element_c_name(struct text *out, const struct type *t)
         return;
     case TYPE_FN:
         text_append(out, "fn");
+        for (i = 0; i < t->param_count; i++) {
+            text_append(out, "_");
+            element_c_name(out, t->params[i]);
+        }
+        text_append(out, "_to_");
+        element_c_name(out, t->result);
+        text_append(out, "_end");
         return;
     case TYPE_OPTIONAL:
         text_append(out, "opt_");
         element_c_name(out, t->element);
         return;
     case TYPE_TUPLE:
-        text_append(out, "tuple");
-        for (i = 0; i < t->param_count; i++) {
-            text_append(out, "_");
-            element_c_name(out, t->params[i]);
-        }
+        tuple_elements(out, t);
+        text_append(out, "_end");
+        return;
+    case TYPE_STRUCT:
+    case TYPE_CLASS:
+    case TYPE_VARIANT:
+    case TYPE_ENUM:
+        c_type_name(out, t);
         return;
     default:
         type_name(out, t);
@@ -193,10 +223,16 @@ static void element_c_name(struct text *out, const struct type *t)
     }
 }
 
+/* The name of the struct of the tuple or `?T` t. The outermost tuple
+   writes no `_end`. */
 static void tuple_c_name(struct text *out, const struct type *t)
 {
     text_append(out, "anti_");
-    element_c_name(out, t);
+    if (t->kind == TYPE_TUPLE) {
+        tuple_elements(out, t);
+    } else {
+        element_c_name(out, t);
+    }
 }
 
 /* The comment before parameter i of sym when it is `own` or `lent`. The
@@ -381,6 +417,9 @@ static void mark_emitted(struct emitted *e, const struct type *t)
 static void aggregate(struct text *out, const struct symbol *sym,
                       const struct interface *const *ifaces, size_t count,
                       struct emitted *done);
+static void class_view(struct text *out, const struct symbol *sym,
+                       const struct interface *const *ifaces,
+                       size_t iface_count, struct emitted *done);
 static void emit_tuples(struct text *out, const struct type *t,
                         const struct interface *const *ifaces, size_t count,
                         struct emitted *done);
@@ -406,7 +445,8 @@ static void flags_view(struct text *out, const struct type *t,
     text_append(out, "};\n\n");
 }
 
-/* The export aggregate that type t holds by value, emitted first. */
+/* The export aggregate that type t holds by value, and every tuple it
+   names, emitted first. */
 static void emit_uses(struct text *out, const struct type *t,
                       const struct interface *const *ifaces, size_t count,
                       struct emitted *done)
@@ -414,19 +454,13 @@ static void emit_uses(struct text *out, const struct type *t,
     size_t i;
     size_t j;
 
+    emit_tuples(out, t, ifaces, count, done);
     while (t->kind == TYPE_ARRAY) {
         t = t->element;
     }
-    if (t->kind == TYPE_TUPLE || t->kind == TYPE_OPTIONAL) {
-        emit_tuples(out, t, ifaces, count, done);
-        return;
-    }
-    if (types_is_flags(t)) {
-        flags_view(out, t, done);
-        return;
-    }
-    if ((t->kind != TYPE_STRUCT && t->kind != TYPE_VARIANT) ||
-        was_emitted(done, t)) {
+    if ((t->kind != TYPE_STRUCT && t->kind != TYPE_VARIANT &&
+         t->kind != TYPE_CLASS) ||
+        types_is_flags(t) || was_emitted(done, t)) {
         return;
     }
     for (i = 0; i < count; i++) {
@@ -548,7 +582,7 @@ static void variant_view(struct text *out, const struct symbol *sym,
     const struct type *t = sym->type;
     const struct type *tag = t->base;
     const struct type *u = t->field_count > 1 ? t->fields[1].type : NULL;
-    int n = (int)t->name.length;
+    struct text name = {0};
     size_t i;
     size_t j;
 
@@ -558,13 +592,14 @@ static void variant_view(struct text *out, const struct symbol *sym,
             emit_uses(out, payload->fields[j].type, ifaces, count, done);
         }
     }
-    text_appendf(out, "/* The tags of %.*s. */\nenum %.*s_tag {\n", n,
-                 t->name.text, n, t->name.text);
+    c_type_name(&name, t);
+    text_appendf(out, "/* The tags of %s. */\nenum %s_tag {\n",
+                 text_cstr(&name), text_cstr(&name));
     for (i = 0; i < tag->field_count; i++) {
         struct text buffer = {0};
         c_name(&buffer, &tag->fields[i].name);
         doc_comment(out, &tag->fields[i].doc, "    ");
-        text_appendf(out, "    %.*s_%s = %" PRIu64 "%s\n", n, t->name.text,
+        text_appendf(out, "    %s_%s = %" PRIu64 "%s\n", text_cstr(&name),
                      text_cstr(&buffer), tag->fields[i].number,
                      i + 1 < tag->field_count ? "," : "");
         text_free(&buffer);
@@ -575,7 +610,7 @@ static void variant_view(struct text *out, const struct symbol *sym,
     if (t->packed) {
         text_append(out, "#pragma pack(push, 1)\n");
     }
-    text_appendf(out, "typedef struct %.*s {\n    ", n, t->name.text);
+    text_appendf(out, "typedef struct %s {\n    ", text_cstr(&name));
     if (t->align != 0) {
         text_appendf(out, "ANTI_ALIGNAS(%" PRIu64 ") ", t->align);
     }
@@ -603,11 +638,12 @@ static void variant_view(struct text *out, const struct symbol *sym,
         }
         text_append(out, "    } " VARIANT_UNION ";\n");
     }
-    text_appendf(out, "} %.*s;\n", n, t->name.text);
+    text_appendf(out, "} %s;\n", text_cstr(&name));
     if (t->packed) {
         text_append(out, "#pragma pack(pop)\n");
     }
     text_append(out, "\n");
+    text_free(&name);
 }
 
 /* The vector type of C that a simd struct of 16 bytes is, one name per
@@ -832,13 +868,25 @@ static void collect_nested(const struct type *t, const struct type *outer,
    declared.
    A library file carries the types the fields reach, so the header
    written from one equals the header of --lib. */
-static void nested_views(struct text *out, const struct type *t)
+static void nested_views(struct text *out, const struct type *t,
+                         const struct interface *const *ifaces,
+                         size_t iface_count, struct emitted *done)
 {
     struct emitted seen = {0};
     struct emitted order = {0};
     size_t i;
+    size_t j;
 
     collect_nested(t, t, &seen, &order);
+    /* What the fields of each hold by value stands before them. */
+    for (i = 0; i < order.count; i++) {
+        const struct type *n = order.items[i];
+        for (j = 0; j < n->field_count; j++) {
+            if (n->fields[j].form != FIELD_TABLE && !n->fields[j].hidden) {
+                emit_uses(out, n->fields[j].type, ifaces, iface_count, done);
+            }
+        }
+    }
     for (i = 0; i < order.count; i++) {
         const struct type *n = order.items[i];
         struct text name = {0};
@@ -900,6 +948,10 @@ static void aggregate(struct text *out, const struct symbol *sym,
         return;
     }
     mark_emitted(done, t);
+    if (t->kind == TYPE_CLASS) {
+        class_view(out, sym, ifaces, count, done);
+        return;
+    }
     if (t->kind == TYPE_VARIANT) {
         variant_view(out, sym, ifaces, count, done);
         return;
@@ -931,61 +983,6 @@ static void aggregate(struct text *out, const struct symbol *sym,
     text_append(out, "\n");
 }
 
-/* The members of every level of the chain of t, which bounds the entries
-   chain_functions writes. */
-static size_t chain_members(const struct type *t)
-{
-    size_t count = 0;
-
-    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
-        count += t->member_count;
-    }
-    return count;
-}
-
-/* The public functions of the chain of t, base first, in table order. A
-   name that repeats replaces the entry it repeats, as the table does. A
-   body qualified by an interface fills no entry here. One qualified by a
-   base replaces a plain body of its level, as types_body_table says. out
-   holds limit entries, and chain_members(t) of them hold every one. */
-static size_t chain_functions(const struct type *t, const struct item **out,
-                              size_t limit)
-{
-    size_t count = 0;
-    int pass;
-    size_t i;
-    size_t j;
-
-    if (t == NULL) {
-        return 0;
-    }
-    if (t->kind == TYPE_CLASS) {
-        count = chain_functions(t->base, out, limit);
-    }
-    for (pass = 0; pass < 2; pass++) {
-        enum body_table fills = pass == 0 ? BODY_PLAIN : BODY_BASE;
-        for (i = 0; i < t->member_count; i++) {
-            const struct item *m = t->members[i];
-            if (m->kind != ITEM_FN || !m->pub || m->type_param_count > 0 ||
-                types_body_table(t, m) != fills) {
-                continue;
-            }
-            for (j = 0; j < count; j++) {
-                if (out[j]->name.length == m->name.length &&
-                    memcmp(out[j]->name.text, m->name.text,
-                           m->name.length) == 0) {
-                    out[j] = m;
-                    break;
-                }
-            }
-            if (j == count && count < limit) {
-                out[count++] = m;
-            }
-        }
-    }
-    return count;
-}
-
 /* The doc comment says that a function may fail, because the C signature
    alone does not: `?*Error` and a pointer parameter are one type each. */
 static void may_fail_note(struct text *out, const struct symbol *sym,
@@ -998,36 +995,24 @@ static void may_fail_note(struct text *out, const struct symbol *sym,
 }
 
 /* One prototype of a table entry or of a function of a class, with self
-   written out as the first parameter. */
+   written out as the first parameter. callee is what stands before the
+   parameters: the name of a function, or `(*slot)` in a table type. */
 static void member_signature(struct text *out, const struct type *owner,
-                             const struct item *m, const char *prefix,
-                             bool pointer)
+                             const struct item *m, const char *callee)
 {
     const struct type *t = m->symbol->type;
-    struct name c = types_c_name(owner);
     struct text inner = {0};
     struct text decl = {0};
     size_t i;
 
-    if (pointer) {
-        text_appendf(&inner, "(*%.*s)(", (int)m->name.length, m->name.text);
-    } else if (*prefix == '\0' && m->qualifier.length > 0 &&
-               types_body_table(owner, m) == BODY_BASE) {
-        /* A body qualified by a base has the symbol `T.Q.f`, so that
-           a plain body of its name keeps `T.f`. */
-        text_appendf(&inner, "%.*s_%.*s_%.*s(", (int)c.length, c.text,
-                     (int)m->qualifier.length,
-                     m->qualifier.text, (int)m->name.length, m->name.text);
-    } else {
-        text_appendf(&inner, "%s%.*s_%.*s(", prefix, (int)c.length, c.text,
-                     (int)m->name.length, m->name.text);
-    }
+    text_appendf(&inner, "%s(", callee);
     for (i = 0; i < t->param_count; i++) {
         struct text param = {0};
         struct text buffer = {0};
         size_t k = i - (m->has_self ? 1 : 0);
         if (i == 0 && m->has_self) {
-            text_appendf(&inner, "%.*s *self", (int)c.length, c.text);
+            c_type_name(&inner, owner);
+            text_append(&inner, " *self");
             continue;
         }
         if (m->symbol->params != NULL && k < m->param_count) {
@@ -1048,6 +1033,115 @@ static void member_signature(struct text *out, const struct type *owner,
     text_append(out, text_cstr(&decl));
     text_free(&inner);
     text_free(&decl);
+}
+
+/* The symbol of the function m of the class owner, which the library
+   holds: `T_f`, and `T_Q_f` for a body qualified by a base, so that a
+   plain body of its name keeps `T_f`. */
+static void direct_name(struct text *out, const struct type *owner,
+                        const struct item *m)
+{
+    c_type_name(out, owner);
+    if (m->qualifier.length > 0 && types_body_table(owner, m) == BODY_BASE) {
+        text_appendf(out, "_%.*s", (int)m->qualifier.length,
+                     m->qualifier.text);
+    }
+    text_appendf(out, "_%.*s", (int)m->name.length, m->name.text);
+}
+
+/* Whether the entry e is one of the root's, whose function the runtime
+   holds. Its slot is a `void *`, and it has no wrapper. */
+static bool root_entry(const struct table_entry *e)
+{
+    return e->fn == NULL || e->fn->runtime != NULL;
+}
+
+/* DESIGN: a slot of the table type takes the name of its function. Two
+   statics of one name, or a hook of `anti.lang.TraceHandler` beside the
+   root's, are two entries of one name, and a struct of C holds one
+   member per name. A slot whose name an earlier slot has therefore takes
+   `_` until its name is its own, so `make` and `make_`. names holds one
+   text per entry, which the caller frees. */
+static void slot_names(const struct table_entry *entries, size_t count,
+                       struct text *names)
+{
+    size_t i;
+    size_t j;
+    bool taken;
+
+    for (i = 0; i < count; i++) {
+        text_appendf(&names[i], "%.*s", (int)entries[i].name.length,
+                     entries[i].name.text);
+        do {
+            taken = false;
+            for (j = 0; j < i && !taken; j++) {
+                taken = strcmp(text_cstr(&names[i]), text_cstr(&names[j])) == 0;
+            }
+            if (taken) {
+                text_append(&names[i], "_");
+            }
+        } while (taken);
+    }
+}
+
+/* Whether name, of length characters, is one of the helpers the header
+   writes for the class t as `anti_<t>_<name>`: `init`, `construct`,
+   `delete`, `destroy`, `dup`, `descriptor` and `vtable`, and `as_<I>` and
+   `<I>_vtable` for each interface the chain implements. */
+static bool is_helper(const struct type *t, const char *name, size_t length)
+{
+    static const char *const helpers[] = {"init", "construct", "delete",
+                                          "destroy", "dup", "descriptor",
+                                          "vtable"};
+    const struct type *up;
+    size_t i;
+    bool found = false;
+
+    for (i = 0; i < sizeof helpers / sizeof helpers[0]; i++) {
+        if (strlen(helpers[i]) == length &&
+            memcmp(helpers[i], name, length) == 0) {
+            return true;
+        }
+    }
+    for (up = t; up != NULL && !found;
+         up = up->kind == TYPE_CLASS ? up->base : NULL) {
+        for (i = 0; i < up->field_count && !found; i++) {
+            struct text as = {0};
+            struct text table = {0};
+            if (up->fields[i].form != FIELD_IMPL) {
+                continue;
+            }
+            text_append(&as, "as_");
+            c_type_name(&as, up->fields[i].type);
+            c_type_name(&table, up->fields[i].type);
+            text_append(&table, "_vtable");
+            found = (as.length == length &&
+                     memcmp(text_cstr(&as), name, length) == 0) ||
+                    (table.length == length &&
+                     memcmp(text_cstr(&table), name, length) == 0);
+            text_free(&as);
+            text_free(&table);
+        }
+    }
+    return found;
+}
+
+/* DESIGN: the wrapper of a slot is `anti_<C>_<slot>`, beside the helpers
+   of the same prefix. A slot whose name without its trailing `_` is the
+   name of a helper takes one `_` more, so `pub fn init(self)` has the
+   wrapper `anti_C_init_` and `init_` has `anti_C_init__`. No wrapper then
+   takes the name of a helper or of another wrapper. */
+static void wrapper_name(struct text *out, const struct type *t,
+                         const char *slot)
+{
+    size_t length = strlen(slot);
+
+    while (length > 0 && slot[length - 1] == '_') {
+        length--;
+    }
+    text_append(out, "anti_");
+    c_type_name(out, t);
+    text_appendf(out, "_%s%s", slot, is_helper(t, slot, length) ? "_" : "");
 }
 
 /* The `construct` of t that takes arguments, or NULL. */
@@ -1083,92 +1177,139 @@ static void locked_note(struct text *out, const struct type *t,
     }
 }
 
-static void class_view(struct text *out, const struct symbol *sym)
+/* What the parameters and the result of the function type t hold by
+   value. */
+static void signature_uses(struct text *out, const struct type *t,
+                           const struct interface *const *ifaces,
+                           size_t iface_count, struct emitted *done)
+{
+    size_t i;
+
+    for (i = 0; i < t->param_count; i++) {
+        emit_uses(out, t->params[i], ifaces, iface_count, done);
+    }
+    emit_uses(out, t->result, ifaces, iface_count, done);
+}
+
+/* What the class t names before its own definition: the types its fields
+   hold, and what the signatures of its table and its `construct` hold by
+   value. The fields of a nested type are nested_views'. */
+static void class_uses(struct text *out, const struct type *t,
+                       const struct table_entry *entries, size_t count,
+                       const struct interface *const *ifaces,
+                       size_t iface_count, struct emitted *done)
+{
+    const struct item *made = construct_with_arguments(t);
+    size_t i;
+
+    for (i = 0; i < t->field_count; i++) {
+        if (t->fields[i].form != FIELD_TABLE && !t->fields[i].hidden) {
+            emit_uses(out, t->fields[i].type, ifaces, iface_count, done);
+        }
+    }
+    for (i = 0; i < count; i++) {
+        if (!root_entry(&entries[i]) && entries[i].fn->symbol != NULL) {
+            signature_uses(out, entries[i].fn->symbol->type, ifaces,
+                           iface_count, done);
+        }
+    }
+    if (made != NULL && !t->has_abstract) {
+        signature_uses(out, made->symbol->type, ifaces, iface_count, done);
+    }
+}
+
+static void class_view(struct text *out, const struct symbol *sym,
+                       const struct interface *const *ifaces,
+                       size_t iface_count, struct emitted *done)
 {
     const struct type *t = sym->type;
-    size_t limit = chain_members(t);
-    const struct item **entries = ir_alloc(limit, sizeof *entries);
-    int name_length = (int)types_c_name(t).length;
-    const char *name_text = types_c_name(t).text;
-    size_t count;
+    struct table_entry *entries = ir_alloc(sema_table_bound(t),
+                                           sizeof *entries);
+    size_t count = sema_table_of(t, entries);
+    struct text *slots = ir_alloc(count + 1, sizeof *slots);
+    struct text name = {0};
     struct text to_root = {0};
     const struct item *made;
     const struct type *up;
     size_t i;
     size_t j;
 
-    count = chain_functions(t, entries, limit);
+    class_uses(out, t, entries, count, ifaces, iface_count, done);
+    slot_names(entries, count, slots);
+    c_type_name(&name, t);
     /* The table pointer sits in the root, so a wrapper reaches it
        through one `base` per level of the chain. */
     for (up = t; up != NULL && up->base != NULL; up = up->base) {
         text_append(&to_root, "base.");
     }
 
-    text_appendf(out, "typedef struct %.*s %.*s;\n", name_length, name_text,
-                 name_length, name_text);
-    nested_views(out, t);
-    text_appendf(out, "typedef struct %.*s_vtable {\n"
+    text_appendf(out, "typedef struct %s %s;\n", text_cstr(&name),
+                 text_cstr(&name));
+    nested_views(out, t, ifaces, iface_count, done);
+    text_appendf(out, "typedef struct %s_vtable {\n"
                       "    const void *descriptor;\n"
                       "    /* The seven functions of anti.lang.Object. They "
                       "take and give Anti\n       values, so C reads their "
                       "slots and does not call them. */\n",
-                 name_length, name_text);
+                 text_cstr(&name));
     for (i = 0; i < count; i++) {
-        if (entries[i]->runtime != NULL) {
-            text_appendf(out, "    void *%.*s;\n",
-                         (int)entries[i]->name.length, entries[i]->name.text);
+        struct text callee = {0};
+        if (root_entry(&entries[i])) {
+            text_appendf(out, "    void *%s;\n", text_cstr(&slots[i]));
             continue;
         }
+        text_appendf(&callee, "(*%s)", text_cstr(&slots[i]));
         text_append(out, "    ");
-        member_signature(out, t, entries[i], "", true);
+        member_signature(out, t, entries[i].fn, text_cstr(&callee));
         text_append(out, ";\n");
+        text_free(&callee);
     }
-    text_appendf(out, "} %.*s_vtable;\n\n", name_length, name_text);
+    text_appendf(out, "} %s_vtable;\n\n", text_cstr(&name));
 
     doc_comment(out, &sym->doc, "");
-    text_appendf(out, "struct %.*s {\n", name_length, name_text);
+    text_appendf(out, "struct %s {\n", text_cstr(&name));
     class_fields(out, t);
     text_appendf(out, "};\n\n");
 
-    text_appendf(out, "extern const anti_descriptor anti_%.*s_descriptor;\n",
-                 name_length, name_text);
+    text_appendf(out, "extern const anti_descriptor anti_%s_descriptor;\n",
+                 text_cstr(&name));
     if (t->has_abstract) {
-        text_appendf(out, "/* %.*s is abstract: no table and no init, "
+        text_appendf(out, "/* %s is abstract: no table and no init, "
                           "because it has no complete value. */\n",
-                     name_length, name_text);
+                     text_cstr(&name));
     } else {
-        text_appendf(out, "extern const %.*s_vtable anti_%.*s_vtable;\n"
-                          "void anti_%.*s_init(%.*s *self);\n",
-                     name_length, name_text, name_length, name_text,
-                     name_length, name_text, name_length, name_text);
+        text_appendf(out, "extern const %s_vtable anti_%s_vtable;\n"
+                          "void anti_%s_init(%s *self);\n",
+                     text_cstr(&name), text_cstr(&name), text_cstr(&name),
+                     text_cstr(&name));
         /* The counterpart of `Class(args)`, which prepares self as the
            init does and then runs `construct` with the arguments. */
         made = construct_with_arguments(t);
         if (made != NULL) {
+            struct text callee = {0};
+            text_appendf(&callee, "anti_%s_construct", text_cstr(&name));
             doc_comment(out, &made->doc, "");
-            text_appendf(out, "/* Prepares self as anti_%.*s_init does, then "
+            text_appendf(out, "/* Prepares self as anti_%s_init does, then "
                               "runs construct. */\n",
-                         name_length, name_text);
+                         text_cstr(&name));
             may_fail_note(out, made->symbol, "");
-            member_signature(out, t, made, "anti_", false);
+            member_signature(out, t, made, text_cstr(&callee));
             text_append(out, ";\n");
+            text_free(&callee);
         }
     }
     text_appendf(out,
-                 "static inline void anti_%.*s_delete(%.*s *self)\n"
-                 "{\n    anti_rt_delete(self, &anti_%.*s_descriptor);\n}\n"
-                 "static inline void anti_%.*s_destroy(%.*s *self)\n"
-                 "{\n    anti_rt_destroy(self, &anti_%.*s_descriptor);\n}\n"
-                 "static inline %.*s *anti_%.*s_dup(%.*s *self)\n"
-                 "{\n    return (%.*s *)anti_rt_dup(self, "
-                 "&anti_%.*s_descriptor);\n}\n\n",
-                 name_length, name_text, name_length, name_text,
-                 name_length, name_text,
-                 name_length, name_text, name_length, name_text,
-                 name_length, name_text,
-                 name_length, name_text, name_length, name_text,
-                 name_length, name_text, name_length, name_text,
-                 name_length, name_text);
+                 "static inline void anti_%s_delete(%s *self)\n"
+                 "{\n    anti_rt_delete(self, &anti_%s_descriptor);\n}\n"
+                 "static inline void anti_%s_destroy(%s *self)\n"
+                 "{\n    anti_rt_destroy(self, &anti_%s_descriptor);\n}\n"
+                 "static inline %s *anti_%s_dup(%s *self)\n"
+                 "{\n    return (%s *)anti_rt_dup(self, "
+                 "&anti_%s_descriptor);\n}\n\n",
+                 text_cstr(&name), text_cstr(&name), text_cstr(&name),
+                 text_cstr(&name), text_cstr(&name), text_cstr(&name),
+                 text_cstr(&name), text_cstr(&name), text_cstr(&name),
+                 text_cstr(&name), text_cstr(&name));
 
     /* DESIGN: an interface sub-object is a field of the object, so C
        reaches the interface by taking its address. The table of that
@@ -1177,22 +1318,22 @@ static void class_view(struct text *out, const struct symbol *sym)
         for (i = 0; i < up->field_count; i++) {
             const struct struct_field *f = &up->fields[i];
             struct text buffer = {0};
+            struct text iface = {0};
             if (f->form != FIELD_IMPL) {
                 continue;
             }
             c_name(&buffer, &f->name);
+            c_type_name(&iface, f->type);
             text_appendf(out,
-                         "extern const %.*s_vtable anti_%.*s_%.*s_vtable;\n"
-                         "static inline %.*s *anti_%.*s_as_%.*s(%.*s *self)\n"
+                         "extern const %s_vtable anti_%s_%s_vtable;\n"
+                         "static inline %s *anti_%s_as_%s(%s *self)\n"
                          "{\n    return &self->%s%s;\n}\n",
-                         (int)f->type->name.length, f->type->name.text,
-                         name_length, name_text,
-                         (int)f->type->name.length, f->type->name.text,
-                         (int)f->type->name.length, f->type->name.text,
-                         name_length, name_text,
-                         (int)f->type->name.length, f->type->name.text,
-                         name_length, name_text,
-                         up == t ? "" : "base.", text_cstr(&buffer));
+                         text_cstr(&iface), text_cstr(&name),
+                         text_cstr(&iface), text_cstr(&iface),
+                         text_cstr(&name), text_cstr(&iface),
+                         text_cstr(&name), up == t ? "" : "base.",
+                         text_cstr(&buffer));
+            text_free(&iface);
             text_free(&buffer);
         }
     }
@@ -1202,45 +1343,60 @@ static void class_view(struct text *out, const struct symbol *sym)
        entry has no body and no prototype, and its wrapper carries its
        comment. */
     for (i = 0; i < count; i++) {
-        if (entries[i]->runtime != NULL ||
-            entries[i]->contract == FN_ABSTRACT ||
-            types_member_level(t, entries[i]) != t) {
+        const struct item *fn = entries[i].fn;
+        struct text callee = {0};
+        if (root_entry(&entries[i]) || fn->contract == FN_ABSTRACT ||
+            types_member_level(t, fn) != t) {
             continue;
         }
-        doc_comment(out, &entries[i]->doc, "");
-        may_fail_note(out, entries[i]->symbol, "");
-        locked_note(out, t, entries[i]);
-        member_signature(out, t, entries[i], "", false);
+        direct_name(&callee, t, fn);
+        doc_comment(out, &fn->doc, "");
+        /* DESIGN: the symbol of a function named `vtable` is the name of
+           the table type, which C cannot declare twice. C calls it
+           through its wrapper alone. */
+        if (strcmp(text_cstr(&callee) + name.length, "_vtable") == 0) {
+            text_appendf(out, "/* %s is the table type, so C calls this "
+                              "function through its wrapper. */\n",
+                         text_cstr(&callee));
+            text_free(&callee);
+            continue;
+        }
+        may_fail_note(out, fn->symbol, "");
+        locked_note(out, t, fn);
+        member_signature(out, t, fn, text_cstr(&callee));
         text_append(out, ";\n");
+        text_free(&callee);
     }
     text_append(out, "\n");
-    /* A wrapper per entry, which reads the table of the object. */
+    /* A wrapper per entry with `self`, which reads the table of the
+       object. A static has no object and no wrapper, and C calls it by
+       its prototype. */
     for (i = 0; i < count; i++) {
-        if (entries[i]->runtime != NULL) {
+        const struct item *fn = entries[i].fn;
+        struct text callee = {0};
+        if (root_entry(&entries[i]) || !fn->has_self) {
             continue;
         }
-        if (entries[i]->contract == FN_ABSTRACT) {
-            doc_comment(out, &entries[i]->doc, "");
+        if (fn->contract == FN_ABSTRACT) {
+            doc_comment(out, &fn->doc, "");
         }
+        wrapper_name(&callee, t, text_cstr(&slots[i]));
         text_append(out, "static inline ");
-        member_signature(out, t, entries[i], "anti_", false);
+        member_signature(out, t, fn, text_cstr(&callee));
         text_appendf(out,
-                     "\n{\n    %s ((const %.*s_vtable *)self->%svtable)"
-                     "->%.*s(self",
-                     entries[i]->symbol->type->result->kind == TYPE_VOID
-                         ? ""
-                         : "return",
-                     name_length, name_text, text_cstr(&to_root),
-                     (int)entries[i]->name.length, entries[i]->name.text);
-        for (j = 1; j < entries[i]->symbol->type->param_count; j++) {
+                     "\n{\n    %s ((const %s_vtable *)self->%svtable)"
+                     "->%s(self",
+                     fn->symbol->type->result->kind == TYPE_VOID ? ""
+                                                                 : "return",
+                     text_cstr(&name), text_cstr(&to_root),
+                     text_cstr(&slots[i]));
+        for (j = 1; j < fn->symbol->type->param_count; j++) {
             struct text buffer = {0};
             size_t k = j - 1;
-            if (entries[i]->symbol->params != NULL &&
-                k < entries[i]->param_count) {
-                c_name(&buffer, &entries[i]->symbol->params[k]);
-            } else if (entries[i]->params != NULL &&
-                       k < entries[i]->param_count) {
-                c_name(&buffer, &entries[i]->params[k].name);
+            if (fn->symbol->params != NULL && k < fn->param_count) {
+                c_name(&buffer, &fn->symbol->params[k]);
+            } else if (fn->params != NULL && k < fn->param_count) {
+                c_name(&buffer, &fn->params[k].name);
             } else {
                 text_appendf(&buffer, "a%zu", k);
             }
@@ -1248,9 +1404,15 @@ static void class_view(struct text *out, const struct symbol *sym)
             text_free(&buffer);
         }
         text_append(out, ");\n}\n");
+        text_free(&callee);
     }
     text_append(out, "\n");
+    for (i = 0; i < count; i++) {
+        text_free(&slots[i]);
+    }
     text_free(&to_root);
+    text_free(&name);
+    free(slots);
     free(entries);
 }
 
@@ -1517,11 +1679,7 @@ void header_write(struct text *out, const char *name,
         for (j = 0; j < ifaces[i]->item_count; j++) {
             const struct symbol *sym = ifaces[i]->items[j];
             if (sym->exported && sym->kind == SYMBOL_STRUCT) {
-                if (sym->type->kind == TYPE_CLASS) {
-                    class_view(out, sym);
-                } else {
-                    aggregate(out, sym, ifaces, count, &done);
-                }
+                aggregate(out, sym, ifaces, count, &done);
             }
         }
     }

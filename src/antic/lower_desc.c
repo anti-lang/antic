@@ -7,97 +7,18 @@
 #include "types.h"
 #include "lower_lowerer.h"
 
-/* DESIGN: anti.lang.Object declares seven public functions whose bodies
-   live in the runtime, and nine hooks with empty bodies after them.
-   Every class inherits all sixteen, so they take the first entries of
-   every table. A class replaces one with a concrete function of the same
-   name. The order of the nine is `enum anti_hook` of src/rt/object.h, and
-   the unit test records_hook_entries pins the two together. */
-static const char *const root_names[] = {
-    "type_name", ROOT_TO_TEXT, "equals", "hash", "serialize", "destruct",
-    "copy", ROOT_CREATED, ROOT_DESTROYED, ROOT_COPIED, ROOT_DISPATCHED,
-    ROOT_JOINED, ROOT_ENTER, ROOT_LEAVE, ROOT_FAILED, ROOT_CHANGED
-};
-
-/* The parameters of each, `self` among them. */
-static const unsigned char root_params[] = {
-    1, 1, 2, 1, 2, 1, 2, 1, 1, 2, 1, 1, 2, 2, 3, 2
-};
-
 bool lower_same_name(const struct name *a, const struct name *b)
 {
     return a->length == b->length &&
            memcmp(a->text, b->text, a->length) == 0;
 }
 
-/* The parameters of the member m, `self` among them. The out pointer of
-   a `may fail` function is no parameter of the declaration. */
-static size_t member_params(const struct item *m)
-{
-    return m->symbol != NULL && m->symbol->type != NULL
-               ? m->symbol->type->param_count
-               : (size_t)m->param_count + (m->has_self ? 1 : 0);
-}
-
-static void table_add(struct table *t, struct name name, size_t params,
-                      const struct item *m, const char *runtime)
-{
-    size_t i;
-
-    for (i = 0; i < t->count; i++) {
-        if (lower_same_name(&t->entries[i].name, &name) &&
-            t->entries[i].params == params) {
-            t->entries[i].fn = m;
-            return;
-        }
-    }
-    t->entries = ir_grow(t->entries, &t->capacity, t->count,
-                         sizeof *t->entries);
-    t->entries[t->count].name = name;
-    t->entries[t->count].params = params;
-    t->entries[t->count].fn = m;
-    t->entries[t->count].runtime = runtime;
-    t->count++;
-}
-
+/* The primary table of t, in the order sema_table_of gives, which the
+   C header reads as well. The caller frees the entries. */
 static void table_of(const struct type *t, struct table *out)
 {
-    size_t i;
-
-    if (t == NULL) {
-        return;
-    }
-    if (t->kind == TYPE_CLASS) {
-        table_of(t->base, out);
-    }
-    if (t->kind == TYPE_CLASS && t->base == NULL) {
-        for (i = 0; i < sizeof root_names / sizeof root_names[0]; i++) {
-            struct name name;
-            name.text = root_names[i];
-            name.length = strlen(root_names[i]);
-            table_add(out, name, root_params[i], NULL, root_names[i]);
-        }
-    }
-    /* DESIGN: `concrete fn I::f` fills the table of I alone, and the
-       primary table keeps the inherited entry or a plain body. A body
-       qualified by a base fills the primary table. It wins over a plain
-       body of the same level, so it is added after it. The rule is
-       types_body_table's. A function with type parameters of its own
-       stands in no table, since each of its copies is called directly. */
-    for (i = 0; i < t->member_count; i++) {
-        const struct item *m = t->members[i];
-        if (m->kind == ITEM_FN && m->pub && m->type_param_count == 0 &&
-            types_body_table(t, m) == BODY_PLAIN) {
-            table_add(out, m->name, member_params(m), m, NULL);
-        }
-    }
-    for (i = 0; i < t->member_count; i++) {
-        const struct item *m = t->members[i];
-        if (m->kind == ITEM_FN && m->pub && m->type_param_count == 0 &&
-            types_body_table(t, m) == BODY_BASE) {
-            table_add(out, m->name, member_params(m), m, NULL);
-        }
-    }
+    out->entries = ir_alloc(sema_table_bound(t), sizeof *out->entries);
+    out->count = sema_table_of(t, out->entries);
 }
 
 /* The index of the entry that holds the function `name`, or 0 when the
@@ -1784,20 +1705,4 @@ struct ir_operand lower_static_descriptor(struct lowerer *l,
     return lower_temp(l,
                       ir_addr(l->f, l->b,
                               ir_global_op(lower_class_descriptor(l, t))));
-}
-
-/* Whether name is one of the nine hooks, which stand after the seven
-   functions of the root in root_names. */
-bool lower_hook_name(const struct name *name)
-{
-    size_t count = sizeof root_names / sizeof root_names[0];
-    size_t i;
-
-    for (i = count - (size_t)HOOK_COUNT; i < count; i++) {
-        if (name->length == strlen(root_names[i]) &&
-            memcmp(name->text, root_names[i], name->length) == 0) {
-            return true;
-        }
-    }
-    return false;
 }

@@ -24,7 +24,7 @@ static bool traced_function(const struct lowerer *l, const struct item *it)
                                    : NULL;
 
     if (!it->has_self || owner == NULL || owner->kind != TYPE_CLASS ||
-        lower_hook_name(&it->name)) {
+        sema_root_hook(&it->name)) {
         return false;
     }
     if (l->hooks && l->trace_marked && it->trace) {

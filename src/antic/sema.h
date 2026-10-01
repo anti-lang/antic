@@ -249,6 +249,36 @@ bool sema_has_body(const struct item *fn);
    this names. */
 bool sema_needs_teardown(const struct type *t);
 
+/* One entry of the primary table of a class, after the descriptor: the
+   name and the parameters of the function with `self` among them, and
+   the function of the chain that fills it. An entry of the root keeps the
+   name of its runtime function in runtime, and fn is NULL until a
+   function of the chain declares it. */
+/* DESIGN: an entry is keyed by its name and its parameter count. Anti
+   has no overloading, so two functions of one name in a chain have one
+   signature everywhere but the nine hooks and the statics. Two statics of
+   one name and of different parameters take two entries, and
+   `anti.lang.TraceHandler` declares each hook again with the object after
+   `self`, which takes an entry of its own after the root's. Lowering and
+   the C header both read the table through sema_table_of, so a C
+   program reads the slots antic writes. */
+struct table_entry {
+    struct name name;
+    size_t params;
+    const struct item *fn;
+    const char *runtime;
+};
+
+/* The most entries the table of t can hold, which bounds the out array
+   of sema_table_of. */
+size_t sema_table_bound(const struct type *t);
+/* The entries of the primary table of t in order, base first, into out,
+   which holds sema_table_bound(t) of them. Returns their count. */
+size_t sema_table_of(const struct type *t, struct table_entry *out);
+/* Whether name is one of the nine hooks of anti.lang.Object, which take
+   the entries after its seven functions. */
+bool sema_root_hook(const struct name *name);
+
 /* The doc warnings of `anti check`: markup outside the doc subset, a
    backtick name that resolves nowhere, a `pub` item with a `//#` note and
    no `///` comment, a doc comment that documents nothing and, with

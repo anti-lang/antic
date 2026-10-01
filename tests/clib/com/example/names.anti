@@ -1,6 +1,8 @@
 //! What the header of a library writes for C: two field names that share their
 //! first 136 bytes, a float constant with a whole value, and a class whose
-//! table holds more than 64 public functions. Every constant is a C literal.
+//! table holds more than 64 public functions. Every C name stands for one type
+//! or function, the table of a class has the slots of antic's table, a class
+//! field has its type declared first, and every constant is a C literal.
 
 import anti.lang;
 
@@ -371,6 +373,165 @@ export class Many
 	{
 		return 69;
 	}
+}
+
+/// Two statics of one name in a chain take two slots of the table.
+export class Maker
+{
+	/// The static of the base, without `self`.
+	export fn make() -> c_int
+	{
+		return 1;
+	}
+
+	/// A function after the static.
+	export fn first(self) -> c_int
+	{
+		return 10;
+	}
+}
+
+/// The class below Maker, with a static of the same name.
+export class SubMaker inherits Maker
+{
+	/// The static of this level, with one parameter.
+	export fn make(x: c_int) -> c_int
+	{
+		return x;
+	}
+
+	/// A function after both statics.
+	export fn second(self) -> c_int
+	{
+		return 20;
+	}
+}
+
+/// What a Named can be asked.
+export abstract class Asked
+{
+	/// The answer.
+	abstract fn answer(self) -> c_int;
+}
+
+/// A class whose functions take the names of the helpers of the header.
+export class Named
+{
+	implements asked: Asked,
+	n: c_int = 0,
+
+	/// A construct that C reaches through the table as well.
+	export fn construct(self, n: c_int)
+	{
+		self.n = n;
+	}
+
+	/// The name of the helper that prepares an object.
+	export fn init(self) -> c_int
+	{
+		return self.n + 1;
+	}
+
+	/// The name of the helper of the table.
+	export fn vtable(self) -> c_int
+	{
+		return self.n + 2;
+	}
+
+	/// The name of the helper of the interface.
+	export fn as_Asked(self) -> c_int
+	{
+		return self.n + 3;
+	}
+
+	/// The name of the table of the interface.
+	export fn Asked_vtable(self) -> c_int
+	{
+		return self.n + 4;
+	}
+
+	/// A name that ends as an escaped one does.
+	export fn init_(self) -> c_int
+	{
+		return self.n + 5;
+	}
+
+	concrete fn answer(self) -> c_int
+	{
+		return self.n + 6;
+	}
+}
+
+/// A struct declared after the class that holds it.
+export struct Later
+{
+	v: c_int,
+}
+
+/// A class whose fields hold a tuple, a `?T` and a struct declared later, and
+/// whose functions take a tuple and a struct declared later.
+export class Holder
+{
+	pub pair: (c_int, c_int),
+	pub maybe: ?c_int,
+	pub later: Later,
+
+	/// The sum of a tuple that no function outside a class names.
+	export fn sum(self, t: (c_int, c_int, c_int, c_int)) -> c_int
+	{
+		return t.0 + t.1 + t.2 + t.3;
+	}
+
+	/// The value of a struct declared after the class.
+	export fn after(self, a: After) -> c_int
+	{
+		return a.w;
+	}
+}
+
+/// A struct declared after the class whose function takes it.
+export struct After
+{
+	w: c_int,
+}
+
+/// A generic box, whose copy C names IntBox.
+pub struct Box<T>
+{
+	v: T,
+}
+
+/// The box of `c_int` that C uses.
+export type IntBox = Box<c_int>;
+
+/// The second of a tuple that holds a tuple of two first.
+export fn nest_two(t: ((c_int, c_int), c_int, c_int)) -> c_int
+{
+	return t.1;
+}
+
+/// The second of a tuple that holds a tuple of three first.
+export fn nest_three(t: ((c_int, c_int, c_int), c_int)) -> c_int
+{
+	return t.1;
+}
+
+/// A function of one parameter applied to the second.
+export fn apply_one(t: (fn(c_int) -> c_int, c_int)) -> c_int
+{
+	return t.0(t.1);
+}
+
+/// A function of two parameters applied to the second twice.
+export fn apply_two(t: (fn(c_int, c_int) -> c_int, c_int)) -> c_int
+{
+	return t.0(t.1, t.1);
+}
+
+/// The value of a box and the second of the tuple.
+export fn unbox(t: (IntBox, c_int)) -> c_int
+{
+	return t.0.v + t.1;
 }
 
 /// Positive infinity as an f64.
