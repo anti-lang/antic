@@ -562,6 +562,8 @@ const struct symbolic *sema_subst_symbolic(struct checker *c,
                                            const struct generic_map *map);
 /* The map of the generic of copy to the arguments of copy. */
 struct generic_map sema_copy_map(const struct type *copy);
+struct type *sema_copy_in_chain(struct type *t, const struct type *g);
+struct name sema_copy_name(struct checker *c, struct text *out, bool *cut);
 /* The type parameters t declares itself: all of them, but those of the
    class around a type nested in a generic class. */
 size_t sema_nested_own(const struct type *t);

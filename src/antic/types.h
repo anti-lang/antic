@@ -848,6 +848,10 @@ void type_symbol_name(struct text *out, const struct type *t);
 void type_copy_name(struct text *out, const struct type *g,
                     struct type *const *args,
                     const struct symbolic *const *values, bool qualified);
+/* The arguments of a copy as its name spells them, `<int, str>`. */
+void type_copy_args(struct text *out, struct type *const *args,
+                    const struct symbolic *const *values, size_t count,
+                    bool qualified);
 
 bool type_is_integer(const struct type *t);
 /* Whether f is a zero-width bitfield, written `_: T : 0`, which breaks the

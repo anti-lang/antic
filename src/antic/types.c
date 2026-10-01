@@ -1762,7 +1762,6 @@ void type_copy_name(struct text *out, const struct type *g,
 {
     const struct type *outer = g->nested_in;
     size_t start = 0;
-    size_t i;
 
     if (outer != NULL && g->name.length > outer->name.length + 1) {
         start = outer->type_param_count;
@@ -1772,12 +1771,21 @@ void type_copy_name(struct text *out, const struct type *g,
     } else {
         text_appendf(out, "%.*s", (int)g->name.length, g->name.text);
     }
-    if (start == g->type_param_count) {
-        return;
+    if (start < g->type_param_count) {
+        type_copy_args(out, args + start, values + start,
+                       g->type_param_count - start, qualified);
     }
+}
+
+void type_copy_args(struct text *out, struct type *const *args,
+                    const struct symbolic *const *values, size_t count,
+                    bool qualified)
+{
+    size_t i;
+
     text_append(out, "<");
-    for (i = start; i < g->type_param_count; i++) {
-        text_append(out, i > start ? ", " : "");
+    for (i = 0; i < count; i++) {
+        text_append(out, i > 0 ? ", " : "");
         if (values[i] != NULL) {
             symbolic_print(out, values[i], qualified);
         } else {

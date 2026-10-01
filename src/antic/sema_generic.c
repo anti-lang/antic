@@ -48,8 +48,6 @@ static int hook_index(const struct name *name)
     return -1;
 }
 
-static struct type *copy_in_chain(struct type *t, const struct type *g);
-
 static int hook_of(const char *text)
 {
     struct name name;
@@ -1110,27 +1108,36 @@ static struct type *subst(struct checker *c, struct type *t,
    is refused when the chain ends, unless the chain was refused for its
    depth. */
 
-/* The name of a copy as a program writes it, `Pair<int, str>`, and
-   whether it was cut. */
+/* The name of a copy that out holds, cut as the DESIGN above says, in
+   the arena of c. Frees out and sets whether it cut the name. The copies
+   of types and of functions are both named here. */
+struct name sema_copy_name(struct checker *c, struct text *out, bool *cut)
+{
+    struct name name;
+    size_t length;
+    char *text;
+
+    *cut = out->length > COPY_NAME_MAX;
+    length = *cut ? COPY_NAME_MAX : out->length;
+    text = arena_alloc(c->arena, length + 4);
+    memcpy(text, text_cstr(out), length);
+    memcpy(text + length, *cut ? "..." : "", *cut ? 4 : 1);
+    text_free(out);
+    name.text = text;
+    name.length = strlen(text);
+    return name;
+}
+
+/* The name of a copy of a type as a program writes it, `Pair<int, str>`,
+   and whether it was cut. */
 static struct name copy_name(struct checker *c, const struct type *generic,
                              struct type *const *args,
                              const struct symbolic *const *values, bool *cut)
 {
     struct text out = {0};
-    struct name name;
-    size_t length;
-    char *text;
 
     type_copy_name(&out, generic, args, values, false);
-    *cut = out.length > COPY_NAME_MAX;
-    length = *cut ? COPY_NAME_MAX : out.length;
-    text = arena_alloc(c->arena, length + 4);
-    memcpy(text, text_cstr(&out), length);
-    memcpy(text + length, *cut ? "..." : "", *cut ? 4 : 1);
-    text_free(&out);
-    name.text = text;
-    name.length = strlen(text);
-    return name;
+    return sema_copy_name(c, &out, cut);
 }
 
 struct generic_map sema_copy_map(const struct type *copy)
@@ -1549,7 +1556,7 @@ struct type *sema_member_type_in(struct checker *c, struct type *fn,
     struct type *level;
 
     if (owner != NULL && owner->type_param_count > 0 && owner->symbol != NULL &&
-        (level = copy_in_chain(s, owner->symbol->type)) != NULL) {
+        (level = sema_copy_in_chain(s, owner->symbol->type)) != NULL) {
         return sema_member_type(c, fn, level);
     }
     return sema_member_type(c, fn, s);
@@ -1711,10 +1718,12 @@ static void unify(struct type *param, struct type *arg,
     }
 }
 
-/* The copy of the generic class g that the type t is or inherits. */
-static struct type *copy_in_chain(struct type *t, const struct type *g)
+/* The copy of the generic g that the type t, or the type a pointer t
+   points to, is or inherits, or NULL. Inside the body of g a value of it
+   has g itself as its type, which this gives as well. */
+struct type *sema_copy_in_chain(struct type *t, const struct type *g)
 {
-    for (t = sema_struct_of(t); t != NULL;
+    for (t = t != NULL ? sema_struct_of(t) : NULL; t != NULL;
          t = t->kind == TYPE_CLASS ? t->base : NULL) {
         if (t == g || t->generic == g) {
             return t;
@@ -1776,7 +1785,7 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
        of the generic itself is `self` in its body, whose parameters stand
        as they are. `List.new()` leaves them to inference. */
     if (outer != NULL) {
-        copy = g->owner != NULL ? copy_in_chain(g->owner, outer) : NULL;
+        copy = g->owner != NULL ? sema_copy_in_chain(g->owner, outer) : NULL;
         if (copy == outer && fixed == 0) {
             copy = NULL;
         }
@@ -1976,7 +1985,7 @@ struct type *sema_operator_copy(struct checker *c, struct expr *call,
     size_t i;
 
     if (owner != NULL && owner->type_param_count > 0 && count == 0) {
-        struct type *copy = copy_in_chain(left, owner->symbol->type);
+        struct type *copy = sema_copy_in_chain(left, owner->symbol->type);
         return copy != NULL ? sema_member_type(c, fn, copy) : fn;
     }
     if (count == 0 || owner != NULL) {

@@ -475,33 +475,19 @@ static struct item *type_item(struct copies *k, struct type *copy)
 }
 
 /* The name of a copy of the function generic, `max<int>`, with the
-   modules of its arguments as the name of a copied type has them. */
+   modules of its arguments as the name of a copied type has them. A long
+   name is cut as that of a type is, and copy_function refuses it. */
 static struct name copy_name(struct copies *k, const struct name *generic,
                              struct type *const *args,
                              const struct symbolic *const *values,
                              size_t count)
 {
     struct text out = {0};
-    struct name name;
-    char *text;
-    size_t i;
+    bool cut;
 
-    text_appendf(&out, "%.*s<", (int)generic->length, generic->text);
-    for (i = 0; i < count; i++) {
-        text_append(&out, i > 0 ? ", " : "");
-        if (values[i] != NULL) {
-            symbolic_print(&out, values[i], true);
-        } else {
-            type_name_qualified(&out, args[i]);
-        }
-    }
-    text_append(&out, ">");
-    text = arena_alloc(k->c->arena, out.length + 1);
-    memcpy(text, text_cstr(&out), out.length + 1);
-    text_free(&out);
-    name.text = text;
-    name.length = strlen(text);
-    return name;
+    text_appendf(&out, "%.*s", (int)generic->length, generic->text);
+    type_copy_args(&out, args, values, count, true);
+    return sema_copy_name(k->c, &out, &cut);
 }
 
 /* The copy of the function generic with the arguments args and values,
@@ -603,21 +589,6 @@ static struct item *fn_copy(struct copies *k, struct item *generic,
                          NULL);
 }
 
-/* The copy of the generic g in the chain of t, a class, a struct or a
-   pointer to one, or NULL. */
-static struct type *copy_in_chain(struct type *t, const struct type *g)
-{
-    if (t != NULL && t->kind == TYPE_POINTER) {
-        t = t->element;
-    }
-    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
-        if (t->generic == g) {
-            return t;
-        }
-    }
-    return NULL;
-}
-
 /* The function of a copy that a call reaches without the arguments of
    its class: the `construct` a literal runs. The object it builds, or
    the receiver it passes, names the copy. */
@@ -625,13 +596,14 @@ static struct symbol *member_of_receiver(struct clone *cl, const struct expr *e,
                                          const struct item *it)
 {
     struct type *g = it->owner->symbol->type;
-    struct type *copy = copy_in_chain(
+    struct type *copy = sema_copy_in_chain(
         ty(cl, (struct type *)e->as.call.builds, e->pos), g);
     struct item *made;
     size_t i;
 
-    if (copy == NULL && e->as.call.arg_count > 0) {
-        copy = copy_in_chain(ty(cl, e->as.call.args[0]->type, e->pos), g);
+    if ((copy == NULL || copy == g) && e->as.call.arg_count > 0) {
+        copy = sema_copy_in_chain(ty(cl, e->as.call.args[0]->type, e->pos),
+                                  g);
     }
     made = copy != NULL && !sema_has_params(copy)
                ? type_item(cl->k, copy)
@@ -665,7 +637,7 @@ static struct symbol *own_params_copy(struct clone *cl, const struct expr *e,
     struct text out = {0};
     struct name name;
     struct name own_name;
-    char *text;
+    bool cut;
     size_t i;
 
     if (e->as.call.copy_count != outer + own) {
@@ -701,11 +673,7 @@ static struct symbol *own_params_copy(struct clone *cl, const struct expr *e,
         type_symbol_name(&out, g);
     }
     text_appendf(&out, ".%.*s", (int)own_name.length, own_name.text);
-    text = arena_alloc(k->c->arena, out.length + 1);
-    memcpy(text, text_cstr(&out), out.length + 1);
-    text_free(&out);
-    name.text = text;
-    name.length = strlen(text);
+    name = sema_copy_name(k->c, &out, &cut);
     return copy_function(k, it, &map, name, owner)->symbol;
 }
 
