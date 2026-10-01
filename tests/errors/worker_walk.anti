@@ -1,0 +1,59 @@
+//! A `worker fn` deletes no object wherever the `delete` stands: in a function
+//! a struct literal or a tuple calls, in the body of `let ... else` and in the
+//! handler of a `let` that guards a pointer.
+
+import anti.lang;
+
+class Cell
+{
+	pub n: int = 0,
+}
+
+struct Holder
+{
+	n: int,
+}
+
+fn find(part: []int) -> ?*Cell
+{
+	return none;
+}
+
+fn in_literal() -> int
+{
+	let c = alloc Cell { n: 1 };
+	delete(c);
+	return 0;
+}
+
+fn in_tuple() -> int
+{
+	let c = alloc Cell { n: 2 };
+	delete(c);
+	return 0;
+}
+
+worker fn tally(part: []int) -> int
+{
+	let h = Holder { n: in_literal() };
+	let p = find(part) else {
+		let c = alloc Cell { n: 3 };
+		delete(c);
+		return 0;
+	};
+	let q = find(part) catch e {
+		let d = alloc Cell { n: 4 };
+		delete(d);
+		return 0;
+	};
+	let t = (in_tuple(), 1);
+	return h.n + p.n + q.n + t.0;
+}
+
+fn main() -> int
+{
+	let room = alloc([2]int, 1) else { return 1; };
+	let all = (*room)[0..2];
+	let sums = parallel all by 2 -> tally;
+	return sums[0];
+}

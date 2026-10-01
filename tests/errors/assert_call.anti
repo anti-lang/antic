@@ -1,0 +1,16 @@
+//! A condition of `assert` that calls a function is a warning wherever the
+//! call stands, since a release build drops the condition and the call with
+//! it. A release build refuses each.
+
+fn count() -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	assert(count() == 1);
+	assert((count(), 1).1 == 1);
+	assert(1 == 1);
+	return 0;
+}

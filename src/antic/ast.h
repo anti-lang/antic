@@ -1139,4 +1139,18 @@ struct module {
    spaces per level. Chapter 1 shows this output for the function scale. */
 void ast_dump(struct text *out, const struct module *module);
 
+/* A visit of the walk in ast_walk.c. Each function returns whether the
+   walk goes on into the children of the node, and either may be NULL,
+   which goes on. data is passed to both. */
+struct ast_visitor {
+    bool (*expr)(void *data, const struct expr *e);
+    bool (*stmt)(void *data, const struct stmt *s);
+    void *data;
+};
+
+/* Walk e, s or b and everything inside it, as ast_walk.c describes. */
+void ast_walk_expr(const struct ast_visitor *v, const struct expr *e);
+void ast_walk_stmt(const struct ast_visitor *v, const struct stmt *s);
+void ast_walk_block(const struct ast_visitor *v, const struct block *b);
+
 #endif

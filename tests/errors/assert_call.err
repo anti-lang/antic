@@ -1,0 +1,2 @@
+assert_call.anti:12:9: error: this `assert` condition calls a function, which a release build does not run [assert-call]
+assert_call.anti:13:9: error: this `assert` condition calls a function, which a release build does not run [assert-call]

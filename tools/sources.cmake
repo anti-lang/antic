@@ -19,6 +19,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/coff.c
     src/antic/arena.c
     src/antic/ast_dump.c
+    src/antic/ast_walk.c
     src/antic/cpu.c
     src/antic/debug.c
     src/antic/diagnostic.c

@@ -31,15 +31,12 @@ struct worker_walk {
     size_t queue_capacity;
 };
 
-static void walk_block(struct worker_walk *w, const struct block *b);
-
-static void walk_expr(struct worker_walk *w, const struct expr *e)
+/* A visit of the walk: the rules a worker keeps, and the function each
+   call reaches, which joins the queue. */
+static bool visit_worker_expr(void *data, const struct expr *e)
 {
-    size_t i;
+    struct worker_walk *w = data;
 
-    if (e == NULL) {
-        return;
-    }
     switch (e->kind) {
     case EXPR_OBJECT:
         if (e->as.object.op == TOKEN_DELETE) {
@@ -47,9 +44,7 @@ static void walk_expr(struct worker_walk *w, const struct expr *e)
                           "`delete` an object another one may hold",
                           (int)w->worker->name.length, w->worker->name.text);
         }
-        walk_expr(w, e->as.object.operand);
-        walk_expr(w, e->as.object.from);
-        return;
+        return true;
     case EXPR_FIELD: {
         const struct type *owner =
             e->as.field.base != NULL && e->as.field.base->type != NULL
@@ -65,62 +60,13 @@ static void walk_expr(struct worker_walk *w, const struct expr *e)
                           sema_tn(owner), (int)w->worker->name.length,
                           w->worker->name.text);
         }
-        walk_expr(w, e->as.field.base);
-        return;
+        return true;
     }
     case EXPR_CALL:
-        walk_expr(w, e->as.call.callee);
-        for (i = 0; i < e->as.call.arg_count; i++) {
-            walk_expr(w, e->as.call.args[i]);
-        }
-        if (e->as.call.handler.kind == HANDLE_BLOCK) {
-            walk_block(w, e->as.call.handler.body);
-        }
         if (e->as.call.callee != NULL && e->as.call.callee->symbol != NULL) {
             walk_function(w, e->as.call.callee->symbol->item);
         }
-        return;
-    case EXPR_UNARY:
-        walk_expr(w, e->as.unary.operand);
-        return;
-    case EXPR_BINARY:
-        walk_expr(w, e->as.binary.left);
-        walk_expr(w, e->as.binary.right);
-        return;
-    case EXPR_INDEX:
-        walk_expr(w, e->as.index.base);
-        walk_expr(w, e->as.index.index);
-        return;
-    case EXPR_CAST:
-        walk_expr(w, e->as.cast.operand);
-        return;
-    case EXPR_ALLOC:
-        walk_expr(w, e->as.alloc.value);
-        walk_expr(w, e->as.alloc.count);
-        return;
-    case EXPR_FREE:
-        walk_expr(w, e->as.free_pointer);
-        return;
-    case EXPR_FORMAT:
-        for (i = 0; i < e->as.format.count; i++) {
-            walk_expr(w, e->as.format.parts[i].value);
-            walk_expr(w, e->as.format.parts[i].value_call);
-        }
-        return;
-    case EXPR_COLLECT:
-        walk_expr(w, e->as.collect.start);
-        walk_expr(w, e->as.collect.advance);
-        walk_expr(w, e->as.collect.current);
-        return;
-    /* The test holds both bounds and any `lt` it calls. */
-    case EXPR_IN:
-        walk_expr(w, e->as.in.value);
-        walk_expr(w, e->as.in.test);
-        return;
-    case EXPR_OPTIONAL:
-        walk_expr(w, e->as.optional.base);
-        walk_expr(w, e->as.optional.access);
-        return;
+        return true;
     /* A channel is shared between workers as an object is, so a worker
        deletes neither. */
     case EXPR_SYNC_OP:
@@ -129,106 +75,9 @@ static void walk_expr(struct worker_walk *w, const struct expr *e)
                           "`delete` an object another one may hold",
                           (int)w->worker->name.length, w->worker->name.text);
         }
-        walk_expr(w, e->as.sync_op.target);
-        walk_expr(w, e->as.sync_op.value);
-        return;
-    case EXPR_SIMD:
-        for (i = 0; i < e->as.simd.arg_count; i++) {
-            walk_expr(w, e->as.simd.args[i]);
-        }
-        return;
+        return true;
     default:
-        return;
-    }
-}
-
-static void walk_stmt(struct worker_walk *w, const struct stmt *s)
-{
-    size_t i;
-
-    if (s == NULL) {
-        return;
-    }
-    switch (s->kind) {
-    case STMT_LET:
-    case STMT_CONST:
-        walk_expr(w, s->as.let.value);
-        return;
-    case STMT_EXPR:
-        walk_expr(w, s->as.expr);
-        return;
-    case STMT_ASSIGN:
-        walk_expr(w, s->as.assign.target);
-        walk_expr(w, s->as.assign.value);
-        return;
-    case STMT_IF:
-        for (i = 0; i < s->as.if_chain.count; i++) {
-            walk_expr(w, s->as.if_chain.branches[i].cond);
-            walk_block(w, s->as.if_chain.branches[i].body);
-        }
-        walk_block(w, s->as.if_chain.else_body);
-        return;
-    case STMT_WHILE:
-    case STMT_DO_WHILE:
-        walk_expr(w, s->as.loop.cond);
-        walk_block(w, s->as.loop.body);
-        return;
-    case STMT_FOR:
-        walk_expr(w, s->as.for_loop.hooks.start != NULL
-                         ? s->as.for_loop.hooks.start
-                         : s->as.for_loop.over);
-        walk_expr(w, s->as.for_loop.hooks.advance);
-        walk_expr(w, s->as.for_loop.hooks.current);
-        walk_block(w, s->as.for_loop.body);
-        return;
-    case STMT_DEFER:
-    case STMT_UNDO:
-        walk_stmt(w, s->as.deferred);
-        return;
-    case STMT_FAIL:
-        walk_expr(w, s->as.fail.value);
-        return;
-    case STMT_RETURN:
-        walk_expr(w, s->as.return_value);
-        return;
-    case STMT_YIELD:
-        walk_expr(w, s->as.yielded);
-        return;
-    case STMT_TRY:
-        walk_block(w, s->as.try_block.body);
-        walk_block(w, s->as.try_block.handler.body);
-        return;
-    case STMT_BLOCK:
-        walk_block(w, s->as.block);
-        return;
-    case STMT_SWITCH:
-        walk_expr(w, s->as.switch_stmt.value);
-        for (i = 0; i < s->as.switch_stmt.count; i++) {
-            walk_stmt(w, s->as.switch_stmt.arms[i].body);
-        }
-        return;
-    case STMT_SYNC:
-        walk_expr(w, s->as.sync.mutex);
-        walk_expr(w, s->as.sync.second);
-        walk_block(w, s->as.sync.body);
-        return;
-    case STMT_SELECT:
-        for (i = 0; i < s->as.select.count; i++) {
-            walk_expr(w, s->as.select.arms[i].value);
-            walk_stmt(w, s->as.select.arms[i].body);
-        }
-        return;
-    default:
-        return;
-    }
-}
-
-static void walk_block(struct worker_walk *w, const struct block *b)
-{
-    size_t i;
-
-    for (i = 0; b != NULL && i < b->count; i++) {
-        walk_stmt(w, b->stmts[i]);
+        return true;
     }
 }
 
@@ -259,14 +108,16 @@ static void walk_function(struct worker_walk *w, const struct item *it)
 void sema_walk_worker(struct checker *c, const struct item *worker)
 {
     struct worker_walk w;
+    struct ast_visitor v = {visit_worker_expr, NULL, NULL};
     size_t next;
 
     memset(&w, 0, sizeof w);
     w.c = c;
     w.worker = worker;
+    v.data = &w;
     walk_function(&w, worker);
     for (next = 0; next < w.queue_count; next++) {
-        walk_block(&w, w.queue[next]->body);
+        ast_walk_block(&v, w.queue[next]->body);
     }
     free(w.queue);
     free(w.seen.slots);
@@ -1081,14 +932,11 @@ static struct expr *equal_test(struct checker *c, struct symbol *equal,
     return call;
 }
 
-/* Whether e holds a call anywhere inside it. */
-static bool expr_calls(const struct expr *e)
+/* A visit that marks a call anywhere inside an expression. */
+static bool visit_call(void *data, const struct expr *e)
 {
-    size_t i;
+    bool *found = data;
 
-    if (e == NULL) {
-        return false;
-    }
     switch (e->kind) {
     case EXPR_CALL:
     case EXPR_ALLOC:
@@ -1102,43 +950,23 @@ static bool expr_calls(const struct expr *e)
     case EXPR_COLLECT:
     case EXPR_SYNC_OP:
     case EXPR_SIMD:
-        return true;
-    case EXPR_UNARY:
-        return expr_calls(e->as.unary.operand);
-    case EXPR_BINARY:
-        return expr_calls(e->as.binary.left) ||
-               expr_calls(e->as.binary.right);
-    case EXPR_CAST:
-        return expr_calls(e->as.cast.operand);
-    case EXPR_IN:
-        return expr_calls(e->as.in.value) || expr_calls(e->as.in.test);
-    case EXPR_OPTIONAL:
-        return expr_calls(e->as.optional.base) ||
-               expr_calls(e->as.optional.access);
-    case EXPR_FIELD:
-        return expr_calls(e->as.field.base);
-    case EXPR_INDEX:
-        return expr_calls(e->as.index.base) || expr_calls(e->as.index.index);
-    case EXPR_SLICE:
-        return expr_calls(e->as.slice.base) || expr_calls(e->as.slice.low) ||
-               expr_calls(e->as.slice.high);
-    case EXPR_STRUCT_LIT:
-        for (i = 0; i < e->as.struct_lit.field_count; i++) {
-            if (expr_calls(e->as.struct_lit.fields[i].value)) {
-                return true;
-            }
-        }
-        return false;
-    case EXPR_ARRAY_LIT:
-        for (i = 0; i < e->as.array_lit.count; i++) {
-            if (expr_calls(e->as.array_lit.elements[i])) {
-                return true;
-            }
-        }
-        return false;
+        *found = true;
+        break;
     default:
-        return false;
+        break;
     }
+    return !*found;
+}
+
+/* Whether e holds a call anywhere inside it. */
+static bool expr_calls(const struct expr *e)
+{
+    bool found = false;
+    struct ast_visitor v = {visit_call, NULL, NULL};
+
+    v.data = &found;
+    ast_walk_expr(&v, e);
+    return found;
 }
 
 /* Refuse a step of zero, which would never leave the range.

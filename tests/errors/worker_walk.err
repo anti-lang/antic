@@ -1,0 +1,4 @@
+worker_walk.anti:41:3: error: `tally` is a `worker fn` and cannot `delete` an object another one may hold
+worker_walk.anti:46:3: error: `tally` is a `worker fn` and cannot `delete` an object another one may hold
+worker_walk.anti:25:2: error: `tally` is a `worker fn` and cannot `delete` an object another one may hold
+worker_walk.anti:32:2: error: `tally` is a `worker fn` and cannot `delete` an object another one may hold
