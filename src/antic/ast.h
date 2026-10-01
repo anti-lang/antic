@@ -394,8 +394,10 @@ struct expr {
             /* The callee that a bare call of a shared `operator fn`
                becomes, on its first argument. */
             bool bare;
-            /* The checker checked the base already. The call of a method
-               of a pattern that it wrote reads the type there. */
+            /* The checker checked the base already, and every later
+               reading takes its type as it stands. A second check would
+               repeat what the first did, the move of an `own` argument
+               and the rewrite of a call among them. */
             bool checked;
             uint32_t enum_value;    /* the index of an enum value, plus 1 */
             bool promoted;          /* the checker wrote it, not the program */

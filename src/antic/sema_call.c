@@ -320,7 +320,8 @@ static const struct struct_field *promoting_field(struct checker *c,
 }
 
 /* Replace the base of e with `base.name`, the promoting field, so the
-   next check sees the value that really holds the name. */
+   next check sees the value that really holds the name. The base is
+   checked already, and the next check reads the new field alone. */
 static void promote_base(struct checker *c, struct expr *e,
                          const struct struct_field *f)
 {
@@ -329,7 +330,9 @@ static void promote_base(struct checker *c, struct expr *e,
     inner->as.field.base = e->as.field.base;
     inner->as.field.name = f->name;
     inner->as.field.promoted = true;
+    inner->as.field.checked = true;
     e->as.field.base = inner;
+    e->as.field.checked = false;
 }
 
 /* The class a member or field belongs to, or NULL. */
@@ -985,7 +988,8 @@ static bool method_call(struct checker *c, struct expr *call)
             promote_base(c, field, through);
             field->as.field.base->type =
                 sema_check_expr(c, field->as.field.base, NULL);
-            return method_call(c, call);
+            return !sema_is_error(field->as.field.base->type) &&
+                   method_call(c, call);
         }
         if (hidden != NULL && !member_visible(c, s, hidden)) {
             const struct type *owner = sema_declaring_class(hidden);
@@ -1077,7 +1081,8 @@ static bool method_call(struct checker *c, struct expr *call)
             promote_base(c, field, sub);
             field->as.field.base->type =
                 sema_check_expr(c, field->as.field.base, NULL);
-            return method_call(c, call);
+            return !sema_is_error(field->as.field.base->type) &&
+                   method_call(c, call);
         }
     }
     /* DESIGN: a call on a class reached through a pointer goes through
@@ -2543,6 +2548,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
             fn = callee->type;
             fixed = 1;
         } else {
+            callee->as.field.checked = true;
             fn = sema_check_expr(c, callee, NULL);
             fixed = 0;
         }
@@ -2869,18 +2875,12 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
                                    : sema_builtin(c, TYPE_ERROR);
 }
 
-struct type *sema_check_field(struct checker *c, struct expr *e)
+/* e names a member of a type, `T.name`, `Object.name` or `m.T.name`.
+   Sets member to its type and returns true, or returns false when the
+   base of e is a value. */
+static bool type_namespace(struct checker *c, struct expr *e,
+                           struct type **member)
 {
-    const struct symbol *module = qualifier(c, e);
-    const struct expr *saved_base;
-    struct type *base;
-    struct name *name = &e->as.field.name;
-    struct type *s;
-    const struct struct_field *f;
-
-    if (module != NULL) {
-        return check_qualified(c, e, module, false);
-    }
     if (e->as.field.base->kind == EXPR_NAME) {
         struct symbol *sym = sema_lookup(c, &e->as.field.base->as.name);
         if (sym != NULL && sym->kind == SYMBOL_STRUCT) {
@@ -2890,16 +2890,15 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
                                  : sym->type;
             t = sema_generic_named(c, e->as.field.base, t,
                                    &e->as.field.base->as.name, NULL);
-            if (sema_is_error(t)) {
-                return t;
-            }
-            return check_type_member(c, e, t);
+            *member = sema_is_error(t) ? t : check_type_member(c, e, t);
+            return true;
         }
         /* The root reaches its namespace by its name as it does as a
            type, for `Object.deserialize`. */
         if (sym == NULL &&
             sema_name_is(&e->as.field.base->as.name, LANG_OBJECT)) {
-            return check_type_member(c, e, types_object(c->types));
+            *member = check_type_member(c, e, types_object(c->types));
+            return true;
         }
     }
     /* A type of another module reaches its namespace as well, so
@@ -2912,13 +2911,36 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
                                     &e->as.field.base->as.field.name)
                 : NULL;
         if (sym != NULL && sym->kind == SYMBOL_STRUCT) {
-            return check_type_member(c, e, sym->type);
+            *member = check_type_member(c, e, sym->type);
+            return true;
         }
     }
-    saved_base = c->field_base;
-    c->field_base = e->as.field.base;
-    base = sema_check_expr(c, e->as.field.base, NULL);
-    c->field_base = saved_base;
+    return false;
+}
+
+struct type *sema_check_field(struct checker *c, struct expr *e)
+{
+    const struct symbol *module = qualifier(c, e);
+    const struct expr *saved_base;
+    struct type *base;
+    struct name *name = &e->as.field.name;
+    struct type *s;
+    const struct struct_field *f;
+
+    /* A base the caller checked is not read again, which would repeat
+       its effects, the move of an `own` argument among them. */
+    if (e->as.field.checked) {
+        base = e->as.field.base->type;
+    } else if (module != NULL) {
+        return check_qualified(c, e, module, false);
+    } else if (type_namespace(c, e, &base)) {
+        return base;
+    } else {
+        saved_base = c->field_base;
+        c->field_base = e->as.field.base;
+        base = sema_check_expr(c, e->as.field.base, NULL);
+        c->field_base = saved_base;
+    }
     if (sema_is_error(base)) {
         return base;
     }

@@ -1,0 +1,102 @@
+//! The checker reads each subtree once. `-(-a)` calls `neg` twice, a value that
+//! moves into an `own` parameter moves once under `-`, `to_slice`, `[]` and a
+//! promoted function, and a chain of forty calls through function fields checks
+//! each link once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Vec2
+{
+	pub x: int = 0,
+	pub y: int = 0,
+
+	operator fn neg(self) -> Vec2
+	{
+		return Vec2 { x: 0 - self.x, y: 0 - self.y };
+	}
+}
+
+/// A value that holds a pointer, so it moves into an `own` parameter.
+struct Ref
+{
+	n: int,
+	p: ?*int,
+}
+
+operator fn neg(r: Ref) -> Ref
+{
+	return Ref { n: 0 - r.n, p: r.p };
+}
+
+fn to_slice(r: Ref) -> int
+{
+	return r.n * 10;
+}
+
+fn taken(own r: Ref) -> Ref
+{
+	return r;
+}
+
+operator fn index(r: Ref, i: int) -> int
+{
+	return r.n + i;
+}
+
+class Hitbox
+{
+	pub radius: int = 1,
+
+	pub fn reach(self) -> int
+	{
+		return self.radius * 2;
+	}
+}
+
+class Sprite
+{
+	use box: Hitbox,
+	pub r: Ref = Ref { n: 0, p: none },
+}
+
+fn pick(own r: Ref, s: *Sprite) -> *Sprite
+{
+	s.r = r;
+	return s;
+}
+
+struct Step
+{
+	n: int,
+	next: fn(int) -> Step,
+}
+
+fn advance(n: int) -> Step
+{
+	return Step { n: n + 1, next: advance };
+}
+
+fn main() -> int
+{
+	let a = Vec2 { x: 1, y: 2 };
+	let b = -(-a);
+	printf("%d %d\n".ptr, b.x as c_int, b.y as c_int);
+	let k = Ref { n: 3, p: none };
+	let m = -taken(k);
+	printf("%d\n".ptr, m.n as c_int);
+	let j = Ref { n: 4, p: none };
+	printf("%d\n".ptr, taken(j).to_slice() as c_int);
+	let i = Ref { n: 7, p: none };
+	printf("%d\n".ptr, taken(i)[2] as c_int);
+	let sp = Sprite { box: Hitbox { radius: 5 } };
+	let h = Ref { n: 6, p: none };
+	printf("%d\n".ptr, pick(h, &sp).reach() as c_int);
+	let s = advance(0).next(1).next(2).next(3).next(4).next(5).next(6)
+		.next(7).next(8).next(9).next(10).next(11).next(12).next(13)
+		.next(14).next(15).next(16).next(17).next(18).next(19).next(20)
+		.next(21).next(22).next(23).next(24).next(25).next(26).next(27)
+		.next(28).next(29).next(30).next(31).next(32).next(33).next(34)
+		.next(35).next(36).next(37).next(38).next(39).next(40);
+	printf("%d\n".ptr, s.n as c_int);
+	return 0;
+}

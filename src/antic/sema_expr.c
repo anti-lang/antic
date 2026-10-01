@@ -878,6 +878,7 @@ static struct type *check_unary(struct checker *c, struct expr *e,
                 callee->as.field.base = operand;
                 callee->as.field.name = fn->item->name;
                 callee->as.field.promoted = true;
+                callee->as.field.checked = true;
                 call->as.call.callee = callee;
                 call->as.call.arg_count = 0;
                 *e = *call;
@@ -1243,7 +1244,7 @@ bool sema_is_iterator(struct checker *c, struct type *t)
 }
 
 /* The call `base.name(args)` that a construct of the language writes
-   for a hook. */
+   for a hook, on a base the checker has checked. */
 struct expr *sema_hook_call(struct checker *c, struct expr *base,
                             const char *name, struct expr **args,
                             size_t count)
@@ -1251,17 +1252,22 @@ struct expr *sema_hook_call(struct checker *c, struct expr *base,
     struct expr *callee = format_field(c, base, name);
 
     callee->as.field.promoted = true;
+    callee->as.field.checked = true;
     return format_call(c, callee, args, count);
 }
 
 static const struct name hidden_iterator = {"<iterator>", 10};
 
-/* A call of the hook name on the hidden local of an iteration. */
+/* A call of the hook name on the hidden local of an iteration, which the
+   call checks. */
 static struct expr *cursor_call(struct checker *c, struct pos pos,
                                 const char *name)
 {
-    return sema_hook_call(c, format_word(c, pos, &hidden_iterator), name,
-                          NULL, 0);
+    struct expr *callee =
+        format_field(c, format_word(c, pos, &hidden_iterator), name);
+
+    callee->as.field.promoted = true;
+    return format_call(c, callee, NULL, 0);
 }
 
 /* The field name of base, written by the checker, so the visibility of
@@ -1454,7 +1460,8 @@ static bool check_collect(struct checker *c, struct expr *e)
         !sema_name_is(&callee->as.field.name, LANG_HOOK_TO_SLICE)) {
         return false;
     }
-    t = sema_check_expr(c, base, NULL);
+    t = callee->as.field.checked ? base->type : sema_check_expr(c, base, NULL);
+    callee->as.field.checked = true;
     owner = t;
     if (owner->kind == TYPE_POINTER && !owner->nullable) {
         owner = owner->element;
