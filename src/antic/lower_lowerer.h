@@ -1,16 +1,30 @@
 #ifndef ANTIC_LOWER_LOWERER_H
 #define ANTIC_LOWER_LOWERER_H
 
-/* The state of lowering and the functions its files share. lower.c holds
-   the helpers every part uses and lowers the items of a module, with the
-   functions a class carries and the hooks of tracing. lower_desc.c writes
-   the descriptors and the tables of classes, structs and interfaces.
-   lower_expr.c lowers expressions and calls, lower_simd.c the operations
-   of simd structs, and lower_stmt.c statements, loops and the exits of a
-   block. lower_owning.c holds the one teardown, copy and clear of an
-   owning value, the teardown and the copy of each class and the one
-   preparation of a new object. lower_eq.c writes the default `==`, and
-   lower_hash.c the default hash. */
+/* The state of lowering and the functions its files share. Each file
+   holds one part:
+   - lower.c the helpers every part uses, the declarations of runtime
+     functions, and the items of a module, which lower_module lowers.
+   - lower_place.c places, addresses and constant data.
+   - lower_check.c the checks of a dev build.
+   - lower_hook.c the sites of the hooks and which classes are traced.
+   - lower_function.c function bodies, anonymous functions and closures.
+   - lower_pattern.c pattern literals and the constructor that compiles
+     them.
+   - lower_class.c the functions lowering writes for a class: its init,
+     `construct`, the `get` of a singleton and the thunks.
+   - lower_desc.c the descriptors, the tables and the records of classes,
+     structs and interfaces.
+   - lower_expr.c expressions and calls.
+   - lower_error.c the error channel of calls, `fail` and the guards.
+   - lower_worker.c `parallel` and `dispatch`.
+   - lower_sync.c locks and channels.
+   - lower_stmt.c statements, loops and the exits of a block.
+   - lower_eq.c the default `==`, lower_hash.c the default hash and
+     lower_simd.c the operations of simd structs.
+   - lower_owning.c the one teardown, copy and clear of an owning value,
+     the teardown and the copy of each class and the one preparation of
+     a new object. */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -277,10 +291,6 @@ const struct ir_function *lower_context_signature(struct lowerer *l,
 void lower_push_argument(struct lowerer *l, struct ir_operand *args,
                          size_t *count, struct ir_operand value,
                          const struct type *param);
-struct ir_function *lower_anonymous_function(struct lowerer *l,
-                                             struct item *it);
-uint32_t lower_captures_agg(struct lowerer *l, const struct item *it);
-uint32_t lower_snapshot_agg(struct lowerer *l, const struct item *it);
 struct ir_operand lower_context_word(struct lowerer *l, const struct type *t,
                                      struct ir_operand pair);
 const struct ir_function *lower_bound_signature(struct lowerer *l,
@@ -296,11 +306,6 @@ struct ir_operand lower_zero(void);
 const struct type *lower_field_owner(const struct type *t,
                                      const struct name *name);
 bool lower_name_is(const struct name *name, const char *text);
-void lower_zero_lock(struct lowerer *l, const struct type *t,
-                     struct ir_operand at);
-struct ir_operand lower_object_lock_address(struct lowerer *l,
-                                            const struct type *t,
-                                            struct ir_operand object);
 extern const struct name lower_len_name;
 extern const struct name lower_entry_name;
 struct ir_operand lower_field_offset(struct lowerer *l, const struct type *s,
@@ -311,25 +316,33 @@ const struct ir_global *lower_literal_global(struct lowerer *l,
                                              const struct token_text *text);
 struct ir_operand lower_literal_address(struct lowerer *l,
                                         const struct token_text *text);
-void lower_hook_object(struct lowerer *l, enum hook_kind hook,
-                       struct ir_operand object);
-bool lower_traced_class(const struct lowerer *l, const struct type *t);
-void lower_hook_call(struct lowerer *l, enum hook_kind hook);
-void lower_hook_failed(struct lowerer *l, struct ir_operand err);
-void lower_hook_copied(struct lowerer *l, struct ir_operand made,
-                       struct ir_operand from);
-const struct ir_global *lower_check_text(struct lowerer *l, int line,
-                                         const char *operation);
-struct ir_operand lower_widen_operand(struct lowerer *l, struct ir_operand v,
-                                      const struct type *t);
-void lower_check_branch(struct lowerer *l, struct ir_operand cond, bool bad,
-                        const struct ir_global *text, enum check_kind kind,
-                        struct ir_operand a, struct ir_operand b,
-                        const struct type *widen);
-struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
-                                      const struct type *t,
-                                      struct ir_operand left,
-                                      struct ir_operand right, int line);
+uint32_t lower_array_agg(struct lowerer *l, const char *element_name,
+                         struct ir_vtype element, size_t n);
+uint32_t lower_table_agg(struct lowerer *l, size_t n);
+const struct type *lower_struct_of_expr(const struct expr *e);
+bool lower_bound_is_direct(const struct expr *e, const struct type *s);
+struct ir_operand lower_new_memory(struct lowerer *l, struct ir_operand size);
+struct ir_operand lower_rt_call(struct lowerer *l, const char *name,
+                                enum ir_type result,
+                                const enum ir_type *params,
+                                struct ir_operand *args, size_t count);
+struct ir_operand lower_slice_length(struct lowerer *l, struct ir_operand p,
+                                     const struct type *slice);
+struct ir_function *lower_rt_function_giving(struct lowerer *l,
+                                             const char *name,
+                                             enum ir_type result,
+                                             const enum ir_type *params,
+                                             size_t count);
+struct ir_function *lower_rt_function(struct lowerer *l, const char *name,
+                                      const enum ir_type *params,
+                                      size_t count);
+struct ir_operand lower_object_call(struct lowerer *l, const char *name,
+                                    struct ir_operand object,
+                                    const struct type *t);
+size_t lower_globals_of_module(struct lowerer *l);
+
+/* lower_place.c */
+
 struct ir_operand lower_field_address(struct lowerer *l,
                                       const struct expr *e);
 struct ir_operand lower_first_element(struct lowerer *l, const struct expr *e,
@@ -346,20 +359,78 @@ struct ir_operand lower_const_address(struct lowerer *l,
 const struct const_value *lower_location_value(struct lowerer *l,
                                                struct pos pos,
                                                const struct type *t);
-uint32_t lower_array_agg(struct lowerer *l, const char *element_name,
-                         struct ir_vtype element, size_t n);
-uint32_t lower_table_agg(struct lowerer *l, size_t n);
-const struct type *lower_struct_of_expr(const struct expr *e);
-bool lower_bound_is_direct(const struct expr *e, const struct type *s);
-struct ir_block *lower_when_made(struct lowerer *l, struct ir_operand p);
-struct ir_operand lower_new_memory(struct lowerer *l, struct ir_operand size);
-struct ir_operand lower_rt_call(struct lowerer *l, const char *name,
-                                enum ir_type result,
-                                const enum ir_type *params,
-                                struct ir_operand *args, size_t count);
-struct ir_operand lower_slice_length(struct lowerer *l, struct ir_operand p,
-                                     const struct type *slice);
+struct ir_operand lower_read_place(struct lowerer *l, const struct place *p);
+
+/* lower_check.c */
+
+const struct ir_global *lower_check_text(struct lowerer *l, int line,
+                                         const char *operation);
+struct ir_operand lower_widen_operand(struct lowerer *l, struct ir_operand v,
+                                      const struct type *t);
+void lower_check_branch(struct lowerer *l, struct ir_operand cond, bool bad,
+                        const struct ir_global *text, enum check_kind kind,
+                        struct ir_operand a, struct ir_operand b,
+                        const struct type *widen);
+struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
+                                      const struct type *t,
+                                      struct ir_operand left,
+                                      struct ir_operand right, int line);
+void lower_bounds_check(struct lowerer *l, const struct expr *e,
+                        struct ir_operand index, struct ir_operand length);
+
+/* lower_hook.c */
+
+void lower_hook_object(struct lowerer *l, enum hook_kind hook,
+                       struct ir_operand object);
+bool lower_traced_class(const struct lowerer *l, const struct type *t);
+void lower_hook_call(struct lowerer *l, enum hook_kind hook);
+void lower_hook_failed(struct lowerer *l, struct ir_operand err);
+void lower_hook_copied(struct lowerer *l, struct ir_operand made,
+                       struct ir_operand from);
+void lower_hook_changed(struct lowerer *l, const struct place *p,
+                        const struct expr *target);
+
+/* lower_function.c */
+
+void lower_function(struct lowerer *l, const struct item *it);
+struct ir_operand lower_pair(struct lowerer *l, const struct type *t,
+                             struct ir_operand code,
+                             struct ir_operand context);
+struct ir_operand lower_closure(struct lowerer *l,
+                                const struct expr *e);
+
+/* lower_pattern.c */
+
 struct ir_operand lower_pattern(struct lowerer *l, const struct expr *e);
+void lower_patterns_start(struct lowerer *l);
+
+/* lower_class.c */
+
+struct ir_block *lower_when_made(struct lowerer *l, struct ir_operand p);
+struct ir_function *lower_reach_thunk(struct lowerer *l,
+                                      const struct struct_field *sub,
+                                      const struct symbol *sym);
+void lower_run_construct(struct lowerer *l, const struct type *t,
+                         struct ir_operand dest);
+void lower_store_interface_tables(struct lowerer *l, const struct type *t,
+                                  struct ir_operand dest);
+bool lower_has_default(const struct struct_field *field);
+void lower_init_name(const struct type *t, bool exported, struct text *out);
+void lower_store_field_default(struct lowerer *l, const struct type *owner,
+                               size_t i, struct ir_operand object);
+struct ir_operand lower_construct(struct lowerer *l,
+                                  const struct expr *e,
+                                  struct ir_operand dest);
+void lower_singleton_get(struct lowerer *l, const struct item *it);
+void lower_class_init(struct lowerer *l, const struct item *it);
+void lower_class_construct(struct lowerer *l, const struct item *it);
+const struct item *lower_find_member_fn(const struct type *t,
+                                        const struct name *name);
+struct ir_function *lower_interface_thunk(struct lowerer *l,
+                                          const struct type *t,
+                                          const struct struct_field *sub,
+                                          const struct item *fn);
+
 /* lower_desc.c */
 
 bool lower_same_name(const struct name *a, const struct name *b);
@@ -394,29 +465,18 @@ struct ir_global *lower_class_table(struct lowerer *l, const struct type *t);
 struct ir_global *lower_interface_table(struct lowerer *l,
                                         const struct type *t,
                                         const struct struct_field *sub);
-struct ir_function *lower_reach_thunk(struct lowerer *l,
-                                      const struct struct_field *sub,
-                                      const struct symbol *sym);
-void lower_run_construct_bodies(struct lowerer *l, const struct type *t,
-                                struct ir_operand dest);
-void lower_run_construct(struct lowerer *l, const struct type *t,
-                         struct ir_operand dest);
-void lower_store_interface_tables(struct lowerer *l, const struct type *t,
-                                  struct ir_operand dest);
 bool lower_hook_name(const struct name *name);
 bool lower_defines(const struct lowerer *l, const struct type *t,
                    const char *module);
+struct ir_operand lower_static_descriptor(struct lowerer *l,
+                                          const struct type *t);
+void lower_class_record(struct lowerer *l, const struct module *module,
+                        const struct item *it);
 
 /* lower_expr.c */
 
 void lower_store_value(struct lowerer *l, const struct type *t,
                        const struct expr *e, struct ir_operand address);
-bool lower_has_default(const struct struct_field *field);
-void lower_init_name(const struct type *t, bool exported, struct text *out);
-struct ir_function *lower_init_function(struct lowerer *l,
-                                        const struct type *t);
-void lower_store_field_default(struct lowerer *l, const struct type *owner,
-                               size_t i, struct ir_operand object);
 struct ir_operand lower_load_tag(struct lowerer *l, const struct type *v,
                                  struct ir_operand address);
 struct ir_operand lower_case_address(struct lowerer *l, const struct type *v,
@@ -428,7 +488,6 @@ void lower_bind_value(struct lowerer *l, struct symbol *sym,
 void lower_bind_cursor(struct lowerer *l, const struct iteration *it);
 struct ir_operand lower_address(struct lowerer *l,
                                 const struct expr *e);
-struct ir_operand lower_read_place(struct lowerer *l, const struct place *p);
 enum ir_op lower_binary_op(enum token_kind op, const struct type *t);
 bool lower_is_comparison(enum token_kind op);
 struct ir_operand lower_shift_wrap(struct lowerer *l, const struct type *t,
@@ -446,25 +505,6 @@ uint32_t lower_sym_of(struct lowerer *l, const struct symbolic *s);
 struct ir_operand lower_argument(struct lowerer *l,
                                  const struct expr *arg);
 struct ir_operand lower_call(struct lowerer *l, const struct expr *e);
-struct ir_function *lower_rt_function_giving(struct lowerer *l,
-                                             const char *name,
-                                             enum ir_type result,
-                                             const enum ir_type *params,
-                                             size_t count);
-struct ir_function *lower_rt_function(struct lowerer *l, const char *name,
-                                      const enum ir_type *params,
-                                      size_t count);
-struct ir_operand lower_static_descriptor(struct lowerer *l,
-                                          const struct type *t);
-struct ir_operand lower_object_call(struct lowerer *l, const char *name,
-                                    struct ir_operand object,
-                                    const struct type *t);
-struct ir_operand lower_load_handle(struct lowerer *l, const struct expr *e);
-struct ir_operand lower_sync_call(struct lowerer *l, const char *name,
-                                  enum ir_type result,
-                                  const enum ir_type *params,
-                                  const struct ir_operand *args,
-                                  size_t count);
 struct ir_operand lower_expr(struct lowerer *l, const struct expr *e);
 void lower_branch(struct lowerer *l, const struct expr *e,
                   struct ir_block *then_block,
@@ -479,11 +519,6 @@ struct ir_operand lower_compare_text(struct lowerer *l, enum token_kind op,
 void lower_copy_parts(struct lowerer *l, const struct type *lent,
                       const struct type *copy, struct ir_operand src,
                       struct ir_operand dest);
-/* The value of the call e, whose error a handler takes, written into a
-   slot of the frame whose tables are zeroed first. An aggregate is the
-   address of its slot. */
-struct ir_operand lower_handled_operand(struct lowerer *l,
-                                        const struct expr *e);
 /* Tear down the call results and the literals among the count arguments
    args, lowered to values, that the call of sym with type fn took at
    parameters that neither keep them nor take a pointer. The first
@@ -492,6 +527,85 @@ void lower_drop_arguments(struct lowerer *l, const struct symbol *sym,
                           const struct type *fn, const struct expr *const *args,
                           const struct ir_operand *values, size_t count,
                           size_t first);
+
+/* lower_error.c */
+
+/* The value of the call e, whose error a handler takes, written into a
+   slot of the frame whose tables are zeroed first. An aggregate is the
+   address of its slot. */
+struct ir_operand lower_handled_operand(struct lowerer *l,
+                                        const struct expr *e);
+void lower_handle_error(struct lowerer *l, const struct expr *call,
+                        struct ir_operand err, struct ir_operand out,
+                        bool has_out, struct ir_operand release);
+bool lower_is_handled_call(const struct expr *e);
+void lower_handler(struct lowerer *l, const struct handler *h,
+                   uint32_t error, const struct type *error_type,
+                   struct handling *handling);
+void lower_pointer_guard(struct lowerer *l, const struct stmt *s);
+void lower_guard_missing(struct lowerer *l, const struct stmt *s,
+                         struct ir_block *join);
+void lower_fail(struct lowerer *l, const struct stmt *s);
+
+/* lower_worker.c */
+
+struct ir_operand lower_load_handle(struct lowerer *l, const struct expr *e);
+struct ir_operand lower_dispatch(struct lowerer *l,
+                                 const struct expr *e);
+struct ir_operand lower_join(struct lowerer *l, const struct expr *e);
+struct ir_operand lower_parallel(struct lowerer *l,
+                                 const struct expr *e);
+
+/* lower_sync.c */
+
+void lower_zero_lock(struct lowerer *l, const struct type *t,
+                     struct ir_operand at);
+struct ir_operand lower_object_lock_address(struct lowerer *l,
+                                            const struct type *t,
+                                            struct ir_operand object);
+void lower_hold_lock(struct lowerer *l, struct ir_operand at, bool object,
+                     int line);
+void lower_object_lock_call(struct lowerer *l, struct ir_operand at, int line);
+void lower_object_unlock_call(struct lowerer *l, struct ir_operand at);
+void lower_lock_pair_call(struct lowerer *l, struct ir_operand a,
+                          struct ir_operand b, int line);
+void lower_unlock_pair_call(struct lowerer *l, struct ir_operand a,
+                            struct ir_operand b);
+struct ir_operand lower_sync_op(struct lowerer *l,
+                                const struct expr *e);
+void lower_sync(struct lowerer *l, const struct stmt *s);
+void lower_select(struct lowerer *l, const struct stmt *s);
+
+/* lower_stmt.c */
+
+void lower_push_leave_action(struct lowerer *l);
+void lower_push_own_action(struct lowerer *l, const struct symbol *param);
+struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
+                                      struct ir_operand value);
+void lower_clear_moved(struct lowerer *l, const struct expr *value);
+/* Keep the fresh value that expression e gave at address to the end of
+   its statement, when e is a call result or a literal whose type has a
+   teardown. */
+void lower_keep_temp(struct lowerer *l, const struct expr *e,
+                     struct ir_operand address);
+/* Tear down the values kept since mark, last first. pop forgets them,
+   which the end of a statement does and an exit of the function does
+   not, since other paths still reach them. */
+void lower_end_temps(struct lowerer *l, size_t mark, bool pop);
+void lower_run_defers(struct lowerer *l, const struct defers *scope,
+                      bool failing);
+void lower_block(struct lowerer *l, const struct block *b);
+void lower_reserve_slots(struct lowerer *l, struct ir_block *entry,
+                         const struct block *b);
+bool lower_has_defers(const struct lowerer *l);
+void lower_push_error_action(struct lowerer *l, const struct symbol *sym,
+                             uint32_t error, const struct type *error_type);
+void lower_push_unlock_action(struct lowerer *l, uint32_t mutex,
+                              const char *unlock_fn);
+void lower_jump_to_join(struct lowerer *l, struct ir_block **join);
+void lower_stmt(struct lowerer *l, const struct stmt *s);
+void lower_run_defers_to(struct lowerer *l, const struct defers *stop,
+                         bool failing);
 
 /* lower_eq.c */
 
@@ -588,12 +702,8 @@ void lower_copy_owned(struct lowerer *l, const struct type *t,
    sema_needs_teardown first. */
 void lower_clear_owned(struct lowerer *l, const struct type *t,
                        struct ir_operand at);
-/* Whether a copy of a value of type t copies more than its bytes. */
-bool lower_copies_parts(const struct type *t);
 /* The count of elements of the innermost element type of the array t. */
 struct ir_operand lower_array_count(struct lowerer *l, const struct type *t);
-void lower_free_snapshot(struct lowerer *l, const struct type *t,
-                         struct ir_operand pair);
 void lower_dup_snapshot(struct lowerer *l, const struct type *t,
                         struct ir_operand from, struct ir_operand into);
 /* The functions `Class.destroy` and `Class.copy` of the class t. */
@@ -603,42 +713,5 @@ void lower_class_copy(struct lowerer *l, const struct type *t);
    every other field into the new object of type t at dest. */
 void lower_prepare_object(struct lowerer *l, const struct type *t,
                           const struct expr *lit, struct ir_operand dest);
-
-/* lower_stmt.c */
-
-void lower_push_leave_action(struct lowerer *l);
-void lower_push_own_action(struct lowerer *l, const struct symbol *param);
-struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
-                                      struct ir_operand value);
-void lower_clear_moved(struct lowerer *l, const struct expr *value);
-/* Keep the fresh value that expression e gave at address to the end of
-   its statement, when e is a call result or a literal whose type has a
-   teardown. */
-void lower_keep_temp(struct lowerer *l, const struct expr *e,
-                     struct ir_operand address);
-/* Tear down the values kept since mark, last first. pop forgets them,
-   which the end of a statement does and an exit of the function does
-   not, since other paths still reach them. */
-void lower_end_temps(struct lowerer *l, size_t mark, bool pop);
-void lower_handle_error(struct lowerer *l, const struct expr *call,
-                        struct ir_operand err, struct ir_operand out,
-                        bool has_out, struct ir_operand release);
-struct ir_operand lower_construct(struct lowerer *l,
-                                  const struct expr *e,
-                                  struct ir_operand dest);
-bool lower_is_handled_call(const struct expr *e);
-void lower_run_defers(struct lowerer *l, const struct defers *scope,
-                      bool failing);
-void lower_block(struct lowerer *l, const struct block *b);
-void lower_reserve_slots(struct lowerer *l, struct ir_block *entry,
-                         const struct block *b);
-void lower_hold_lock(struct lowerer *l, struct ir_operand at, bool object,
-                     int line);
-void lower_object_lock_call(struct lowerer *l, struct ir_operand at, int line);
-void lower_object_unlock_call(struct lowerer *l, struct ir_operand at);
-void lower_lock_pair_call(struct lowerer *l, struct ir_operand a,
-                          struct ir_operand b, int line);
-void lower_unlock_pair_call(struct lowerer *l, struct ir_operand a,
-                            struct ir_operand b);
 
 #endif

@@ -101,6 +101,8 @@ static void each_array_element(struct lowerer *l, const struct type *t,
     each_element(l, innermost(t), count, at, into, from, made_only, what);
 }
 
+static bool lower_copies_parts(const struct type *t);
+
 /* DESIGN: a variant tears down, copies or clears the fields of the case
    its tag names, and nothing else, since the bytes of the other cases are
    never written. The tag is read once, and each case whose struct owns
@@ -185,6 +187,9 @@ static void join(struct lowerer *l, struct ir_block *after)
     ir_jump(l->f, l->b, after);
     l->b = after;
 }
+
+static void lower_free_snapshot(struct lowerer *l, const struct type *t,
+                                struct ir_operand pair);
 
 void lower_destroy_owned(struct lowerer *l, const struct type *t,
                          struct ir_operand at, struct ir_operand from,
@@ -361,7 +366,7 @@ void lower_copy_owned(struct lowerer *l, const struct type *t,
    snapshot. Every other part follows sema_needs_teardown: a struct, a
    tuple, a variant, an array or a `?T` copies what its parts copy, and a
    union copies its bytes alone. */
-bool lower_copies_parts(const struct type *t)
+static bool lower_copies_parts(const struct type *t)
 {
     size_t i;
 
@@ -399,8 +404,8 @@ bool lower_copies_parts(const struct type *t)
    `none` in the context word. A function that captures nothing holds
    `none` there, and the runtime frees nothing for it. The snapshot is
    memory of the C library whatever allocator the owner came from. */
-void lower_free_snapshot(struct lowerer *l, const struct type *t,
-                         struct ir_operand pair)
+static void lower_free_snapshot(struct lowerer *l, const struct type *t,
+                                struct ir_operand pair)
 {
     static const enum ir_type one[] = {IR_PTR};
     struct ir_operand word = lower_context_word(l, t, pair);

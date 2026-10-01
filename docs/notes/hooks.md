@@ -31,8 +31,7 @@ for any other name of a chain.
 ## The sites
 
 `lower_hook_object`, `lower_hook_copied`, `lower_hook_call` and
-`lower_hook_failed` of `src/antic/lower.c` and `hook_changed` of
-`src/antic/lower_stmt.c` each write one call of the runtime.
+`lower_hook_failed` and `lower_hook_changed` of `src/antic/lower_hook.c` each write one call of the runtime.
 `src/rt/hooks.c` holds what a site does: it loads the handler from one atomic
 word, calls the handler's function when there is one, and dispatches the
 object's own hook unless that entry still holds the root's empty body.
@@ -41,7 +40,7 @@ hook nest around the call.
 
 | Hook | Where the call is written |
 |---|---|
-| `created` | after the `construct` bodies of the chain, in `run_construct` and at the end of `lower_construct` |
+| `created` | after the `construct` bodies of the chain, in `lower_run_construct` and at the end of `lower_construct` |
 | `destroyed` | at the head of the teardown, in `class_teardown` |
 | `copied` | after the `dup` operator, in the `EXPR_OBJECT` arm |
 | `dispatched` | after `anti_rt_dispatch`, in `lower_dispatch` |

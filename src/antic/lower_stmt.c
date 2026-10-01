@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -7,11 +6,8 @@
 #include "types.h"
 #include "lower_lowerer.h"
 
-static void run_defers_to(struct lowerer *l, const struct defers *stop,
-                          bool failing);
-
 /* Whether any block the function is inside has a statement to run. */
-static bool has_defers(const struct lowerer *l)
+bool lower_has_defers(const struct lowerer *l)
 {
     const struct defers *scope;
 
@@ -68,8 +64,8 @@ void lower_push_leave_action(struct lowerer *l)
 
 /* Record the delete of the error a handler binds, whose name is sym or
    which has none. */
-static void push_error_action(struct lowerer *l, const struct symbol *sym,
-                              uint32_t error, const struct type *error_type)
+void lower_push_error_action(struct lowerer *l, const struct symbol *sym,
+                             uint32_t error, const struct type *error_type)
 {
     struct exit_action *action;
 
@@ -92,8 +88,8 @@ static void push_error_action(struct lowerer *l, const struct symbol *sym,
 /* Record the unlock of the lock whose address is in mutex, which a
    `sync` holds until its block ends and a synchronized function until
    it returns. unlock_fn names the function of the runtime. */
-static void push_unlock_action(struct lowerer *l, uint32_t mutex,
-                               const char *unlock_fn)
+void lower_push_unlock_action(struct lowerer *l, uint32_t mutex,
+                              const char *unlock_fn)
 {
     struct exit_action *action;
 
@@ -113,7 +109,7 @@ static void push_unlock_action(struct lowerer *l, uint32_t mutex,
     action->leave = false;
 }
 
-static void jump_to_join(struct lowerer *l, struct ir_block **join)
+void lower_jump_to_join(struct lowerer *l, struct ir_block **join)
 {
     if (l->b == NULL) {
         return;
@@ -122,271 +118,6 @@ static void jump_to_join(struct lowerer *l, struct ir_block **join)
         *join = lower_new_block(l);
     }
     ir_jump(l->f, l->b, *join);
-}
-
-static void lower_stmt(struct lowerer *l, const struct stmt *s);
-
-/* The site of a lock in a dev build, `file:line`, as a literal. */
-static struct ir_operand lock_site(struct lowerer *l, int line)
-{
-    struct text site = {0};
-    struct token_text text;
-    struct ir_operand at;
-
-    text_appendf(&site, "%s:%d", l->file, line);
-    text.bytes = text_cstr(&site);
-    text.length = site.length;
-    at = lower_literal_address(l, &text);
-    text_free(&site);
-    return at;
-}
-
-/* DESIGN: a lock is taken by its address, the word of a Mutex or the
-   hidden lock of a synchronized object. A thread that holds the hidden
-   lock takes it again without waiting. A dev build passes the site of
-   each lock as well, `file:line`. The runtime then records the order in
-   which each thread takes its locks and reports two orders that
-   conflict. The
-   unlock is an exit action of the scope that l->defers holds. */
-void lower_hold_lock(struct lowerer *l, struct ir_operand at, bool object,
-                     int line)
-{
-    static const enum ir_type one[] = {IR_PTR};
-    static const enum ir_type two[] = {IR_PTR, IR_PTR};
-    struct ir_operand args[2];
-    uint32_t lock = ir_unary(l->f, l->b, IR_COPY, IR_PTR, at);
-
-    args[0] = lower_temp(l, lock);
-    if (l->dev) {
-        args[1] = lock_site(l, line);
-        lower_sync_call(l, object ? "anti_rt_object_lock_at"
-                                  : "anti_rt_mutex_lock_at",
-                        IR_VOID, two, args, 2);
-        push_unlock_action(l, lock, object ? "anti_rt_object_unlock_at"
-                                           : "anti_rt_mutex_unlock_at");
-        return;
-    }
-    lower_sync_call(l, object ? "anti_rt_object_lock" : "anti_rt_mutex_lock",
-                    IR_VOID, one, args, 1);
-    push_unlock_action(l, lock, object ? "anti_rt_object_unlock"
-                                       : "anti_rt_mutex_unlock");
-}
-
-/* Take the hidden lock at `at`, with its site in a dev build. The caller
-   gives it back on every path with lower_object_unlock_call. */
-void lower_object_lock_call(struct lowerer *l, struct ir_operand at, int line)
-{
-    static const enum ir_type one[] = {IR_PTR};
-    static const enum ir_type two[] = {IR_PTR, IR_PTR};
-    struct ir_operand args[2];
-
-    args[0] = at;
-    if (l->dev) {
-        args[1] = lock_site(l, line);
-        lower_sync_call(l, "anti_rt_object_lock_at", IR_VOID, two, args, 2);
-        return;
-    }
-    lower_sync_call(l, "anti_rt_object_lock", IR_VOID, one, args, 1);
-}
-
-void lower_object_unlock_call(struct lowerer *l, struct ir_operand at)
-{
-    static const enum ir_type one[] = {IR_PTR};
-
-    lower_sync_call(l, l->dev ? "anti_rt_object_unlock_at"
-                              : "anti_rt_object_unlock",
-                    IR_VOID, one, &at, 1);
-}
-
-/* DESIGN: the runtime takes the two hidden locks of `sync a, b` in the
-   order of their addresses, and one alone when a and b are the same
-   lock, so the order the program names them in never matters. */
-void lower_lock_pair_call(struct lowerer *l, struct ir_operand a,
-                          struct ir_operand b, int line)
-{
-    static const enum ir_type two[] = {IR_PTR, IR_PTR};
-    static const enum ir_type three[] = {IR_PTR, IR_PTR, IR_PTR};
-    struct ir_operand args[3];
-
-    args[0] = a;
-    args[1] = b;
-    if (l->dev) {
-        args[2] = lock_site(l, line);
-        lower_sync_call(l, "anti_rt_object_lock_pair_at", IR_VOID, three,
-                        args, 3);
-        return;
-    }
-    lower_sync_call(l, "anti_rt_object_lock_pair", IR_VOID, two, args, 2);
-}
-
-void lower_unlock_pair_call(struct lowerer *l, struct ir_operand a,
-                            struct ir_operand b)
-{
-    static const enum ir_type two[] = {IR_PTR, IR_PTR};
-    struct ir_operand args[2];
-
-    args[0] = a;
-    args[1] = b;
-    lower_sync_call(l, l->dev ? "anti_rt_object_unlock_pair_at"
-                              : "anti_rt_object_unlock_pair",
-                    IR_VOID, two, args, 2);
-}
-
-/* The address of the hidden lock of the synchronized object that e
-   names, in place or through a pointer, in a temporary of its own. */
-static uint32_t object_lock_of(struct lowerer *l, const struct expr *e)
-{
-    const struct type *t = e->type->kind == TYPE_POINTER ? e->type->element
-                                                          : e->type;
-    struct ir_operand at = e->type->kind == TYPE_POINTER ? lower_expr(l, e)
-                                                          : lower_address(l, e);
-
-    return ir_unary(l->f, l->b, IR_COPY, IR_PTR,
-                    lower_object_lock_address(l, t, at));
-}
-
-/* `sync a, b { }` takes both locks, and an exit action of its scope
-   gives both back on every exit of the block. */
-static void lower_sync_pair(struct lowerer *l, const struct stmt *s)
-{
-    uint32_t first = object_lock_of(l, s->as.sync.mutex);
-    uint32_t second = object_lock_of(l, s->as.sync.second);
-    struct exit_action *action;
-    struct defers scope;
-
-    memset(&scope, 0, sizeof scope);
-    scope.outer = l->defers;
-    l->defers = &scope;
-    lower_lock_pair_call(l, lower_temp(l, first), lower_temp(l, second),
-                         s->pos.line);
-    push_unlock_action(l, first, NULL);
-    action = &l->defers->items[l->defers->count - 1];
-    action->pair = true;
-    action->second = second;
-    lower_block(l, s->as.sync.body);
-    lower_run_defers(l, &scope, false);
-    l->defers = scope.outer;
-    free(scope.items);
-}
-
-/* DESIGN: `sync m { }` takes the address of m once, locks it, and
-   records its unlock as the first exit action of a scope around the
-   block. Every exit of the block runs the actions of the scopes it
-   leaves, `return`, `break`, `continue` and the error forms among them,
-   so each unlocks after the statements of the block's own `defer` have
-   run. `sync obj { }` on a synchronized object takes its hidden lock. */
-static void lower_sync(struct lowerer *l, const struct stmt *s)
-{
-    const struct expr *m = s->as.sync.mutex;
-    struct ir_operand at;
-    struct defers scope;
-
-    if (s->as.sync.second != NULL) {
-        lower_sync_pair(l, s);
-        return;
-    }
-    at = m->type->kind == TYPE_POINTER ? lower_expr(l, m)
-                                       : lower_address(l, m);
-    memset(&scope, 0, sizeof scope);
-    scope.outer = l->defers;
-    l->defers = &scope;
-    if (s->as.sync.object) {
-        const struct type *t = m->type->kind == TYPE_POINTER
-                                   ? m->type->element
-                                   : m->type;
-        lower_hold_lock(l, lower_object_lock_address(l, t, at), true,
-                        s->pos.line);
-    } else {
-        lower_hold_lock(l, at, false, s->pos.line);
-    }
-    lower_block(l, s->as.sync.body);
-    lower_run_defers(l, &scope, false);
-    l->defers = scope.outer;
-    free(scope.items);
-}
-
-/* An array of count pointers, the form in which `select` hands its
-   channels and its slots to the runtime. */
-static uint32_t pointer_array(struct lowerer *l, size_t count)
-{
-    char name[32];
-    char length[24];
-    uint32_t agg;
-
-    snprintf(name, sizeof name, "[%zu]*byte", count);
-    agg = ir_agg_find(l->m, name);
-    if (agg != IR_NO_AGG) {
-        return agg;
-    }
-    snprintf(length, sizeof length, "%zu", count);
-    return ir_array_add(l->m, name, ir_scalar(IR_PTR),
-                        ir_sym_int(l->m, IR_I64, count), length);
-}
-
-/* DESIGN: `select` passes the handle of each arm's channel to
-   anti_rt_select, and a slot of its element type. The runtime waits until
-   one channel has a value or is closed. It gives the index of that arm and writes what
-   `recv` would have given into one pointer, which the arm binds. The
-   arms are then compared with the index in order, as a `switch` compares
-   its values. */
-static void lower_select(struct lowerer *l, const struct stmt *s)
-{
-    static const enum ir_type params[] = {IR_PTR, IR_PTR, IR_I64, IR_PTR};
-    size_t count = s->as.select.count;
-    uint32_t agg = pointer_array(l, count);
-    uint32_t chans = ir_entry_slot(l->f, ir_aggregate(agg));
-    uint32_t slots = ir_entry_slot(l->f, ir_aggregate(agg));
-    uint32_t got = ir_entry_slot(l->f, ir_scalar(IR_PTR));
-    struct ir_operand pointer_size =
-        ir_sym_operand(l->m, ir_sym_size_of(l->m, ir_scalar(IR_PTR)));
-    struct ir_block *join = NULL;
-    struct ir_operand args[4];
-    struct ir_operand index;
-    size_t i;
-
-    for (i = 0; i < count; i++) {
-        const struct switch_arm *arm = &s->as.select.arms[i];
-        struct ir_operand handle = lower_load_handle(l, arm->value);
-        struct ir_operand offset;
-        uint32_t slot;
-        offset = lower_temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
-                                         ir_int_op(IR_I64, i), pointer_size));
-        ir_store(l->f, l->b, IR_PTR, handle,
-                 lower_offset_address(l, lower_temp(l, chans), offset));
-        slot = ir_entry_slot(l->f,
-                             lower_vtype_of(l, arm->value->type->element));
-        ir_store(l->f, l->b, IR_PTR, lower_temp(l, slot),
-                 lower_offset_address(l, lower_temp(l, slots), offset));
-    }
-    args[0] = lower_temp(l, chans);
-    args[1] = lower_temp(l, slots);
-    args[2] = ir_int_op(IR_I64, count);
-    args[3] = lower_temp(l, got);
-    index = lower_sync_call(l, "anti_rt_select", IR_I64, params, args, 4);
-    for (i = 0; i < count && l->b != NULL; i++) {
-        const struct switch_arm *arm = &s->as.select.arms[i];
-        struct ir_block *body = lower_new_block(l);
-        struct ir_block *next = i + 1 < count ? lower_new_block(l) : NULL;
-        if (next != NULL) {
-            struct ir_operand test =
-                lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, index,
-                                        ir_int_op(IR_I64, i)));
-            ir_branch(l->f, l->b, test, body, next);
-        } else {
-            ir_jump(l->f, l->b, body);
-        }
-        l->b = body;
-        if (arm->bound != NULL) {
-            lower_bind_value(l, arm->bound,
-                             lower_temp(l,
-                                        ir_load(l->f, l->b, IR_PTR,
-                                                lower_temp(l, got))));
-        }
-        lower_stmt(l, arm->body);
-        jump_to_join(l, &join);
-        l->b = next;
-    }
-    l->b = join;
 }
 
 /* Each condition of the chain branches to its body or to the next
@@ -414,12 +145,12 @@ static void lower_if(struct lowerer *l, const struct stmt *s)
         lower_branch(l, branch->cond, then_block, next);
         l->b = then_block;
         lower_block(l, branch->body);
-        jump_to_join(l, &join);
+        lower_jump_to_join(l, &join);
         l->b = next;
     }
     if (s->as.if_chain.else_body != NULL) {
         lower_block(l, s->as.if_chain.else_body);
-        jump_to_join(l, &join);
+        lower_jump_to_join(l, &join);
     }
     l->b = join;
 }
@@ -913,71 +644,6 @@ static struct ir_operand call_into_slot(struct lowerer *l,
 
 static void lower_flags_assign(struct lowerer *l, const struct stmt *s);
 
-/* The level of the chain of t that declares the field name, with the
-   index of its record in the field list of that level. NULL when no
-   level lists it, which a bitfield and a table field are. */
-static const struct type *record_of_field(const struct type *t,
-                                          const struct name *name,
-                                          size_t *index)
-{
-    const struct type *up;
-    size_t i;
-    size_t n;
-
-    for (up = t; up != NULL; up = up->kind == TYPE_CLASS ? up->base : NULL) {
-        n = 0;
-        for (i = 0; i < up->field_count; i++) {
-            if (!lower_listed_field(&up->fields[i])) {
-                continue;
-            }
-            if (lower_same_name(&up->fields[i].name, name)) {
-                *index = n;
-                return up;
-            }
-            n++;
-        }
-    }
-    return NULL;
-}
-
-/* DESIGN: the `changed` hook takes the record of the written field from
-   the field list its descriptor carries. It reads what reflection
-   already holds, and the compiler writes no record of its own.
-   `--no-reflect` leaves the descriptor without the list, and the list
-   itself is still written for the hook. */
-static void hook_changed(struct lowerer *l, const struct place *p,
-                         const struct expr *target)
-{
-    static const enum ir_type params[] = {IR_PTR, IR_PTR};
-    struct ir_operand args[2];
-    struct ir_operand list;
-    struct ir_operand at;
-    const struct type *up;
-    size_t index = 0;
-
-    if (!l->trace_writes || l->b == NULL ||
-        target->kind != EXPR_FIELD || p->object.kind == IR_NONE ||
-        !lower_traced_class(l, p->owner)) {
-        return;
-    }
-    up = record_of_field(p->owner, &target->as.field.name, &index);
-    if (up == NULL) {
-        return;
-    }
-    list = lower_temp(l, ir_addr(l->f, l->b,
-                                 ir_global_op(lower_class_fields(l, up))));
-    at = ir_sym_operand(l->m,
-                        ir_sym_offset_of(l->m,
-                                         lower_fields_agg(l,
-                                                          lower_own_fields(up)),
-                                         (uint32_t)index));
-    args[0] = p->object;
-    args[1] = lower_offset_address(l, list, at);
-    ir_call(l->f, l->b, IR_VOID,
-            ir_func_op(lower_rt_function(l, "anti_rt_hook_changed", params, 2)),
-            args, 2);
-}
-
 static void lower_assign(struct lowerer *l, const struct stmt *s)
 {
     const struct expr *target = s->as.assign.target;
@@ -1001,7 +667,7 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
         l->out_address = p.address;
         err = lower_call(l, value);
         lower_handle_error(l, value, err, p.address, true, lower_none());
-        hook_changed(l, &p, target);
+        lower_hook_changed(l, &p, target);
         return;
     }
     /* DESIGN: `=` into a place that holds a value needing a teardown
@@ -1018,7 +684,7 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
         }
         ir_memcopy(l->f, l->b, p.address, v, lower_vtype_of(l, target->type));
         lower_clear_moved(l, value);
-        hook_changed(l, &p, target);
+        lower_hook_changed(l, &p, target);
         return;
     }
     if (s->as.assign.op != TOKEN_ASSIGN) {
@@ -1045,7 +711,7 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
     } else {
         ir_store(l->f, l->b, p.type, v, p.address);
     }
-    hook_changed(l, &p, target);
+    lower_hook_changed(l, &p, target);
 }
 
 /* DESIGN: a call whose result the statement drops gives a value that no
@@ -1117,282 +783,6 @@ void lower_clear_moved(struct lowerer *l, const struct expr *value)
         return;
     }
     lower_clear_owned(l, value->type, lower_temp(l, value->symbol->ir));
-}
-
-/* DESIGN: the error a handler binds is the exit action of a scope around
-   the handler, so every exit of the handler deletes it: `yield`, the
-   closing brace, `break`, `continue`, `return` and `fail`. `return e` and
-   `fail e` hand it to the caller, which skips it as `return` skips the
-   local it hands on. A handler with a result to give takes handling,
-   which `yield` reads. */
-static void lower_handler(struct lowerer *l, const struct handler *h,
-                          uint32_t error, const struct type *error_type,
-                          struct handling *handling)
-{
-    struct defers scope;
-
-    memset(&scope, 0, sizeof scope);
-    scope.outer = l->defers;
-    l->defers = &scope;
-    push_error_action(l, h->symbol, error, error_type);
-    if (handling != NULL) {
-        handling->defers_at = scope.outer;
-        handling->outer = l->handling;
-        l->handling = handling;
-    }
-    if (h->kind == HANDLE_BLOCK) {
-        lower_block(l, h->body);
-    }
-    if (handling != NULL) {
-        l->handling = handling->outer;
-    }
-    lower_run_defers(l, &scope, false);
-    l->defers = scope.outer;
-    free(scope.items);
-}
-
-/* `catch fatal`: call `fatal` of the class of the error err through its
-   table, which the class of type error_type holds, then go on at join. */
-static void call_fatal(struct lowerer *l, struct ir_operand err,
-                       const struct type *error_type, struct ir_block *join)
-{
-    static const struct name fatal_name = {"fatal", 5};
-    size_t index = lower_table_index(error_type->element, &fatal_name, 1);
-    struct ir_operand table = lower_load_table(l, err, error_type);
-    struct ir_operand entry =
-        lower_temp(l, ir_load(l->f, l->b, IR_PTR,
-                              lower_offset_address(
-                                  l, table, lower_entry_offset(l, index))));
-    struct ir_operand self = err;
-
-    ir_call_indirect(l->f, l->b, IR_VOID, entry, lower_fatal_signature(l),
-                     &self,
-                     1);
-    ir_jump(l->f, l->b, join);
-}
-
-/* DESIGN: a call that can fail gives a pointer. A pointer of `none` is
-   success, so the branch after the call is the whole of the error
-   machinery. It is one compare and one branch, and nothing unwinds. */
-void lower_handle_error(struct lowerer *l, const struct expr *call,
-                        struct ir_operand err, struct ir_operand out,
-                        bool has_out, struct ir_operand release)
-{
-    const struct handler *h = &call->as.call.handler;
-    struct ir_block *bad = lower_new_block(l);
-    struct ir_block *join = lower_new_block(l);
-    struct handling scope;
-    uint32_t error;
-
-    ir_branch(l->f, l->b,
-              lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, err,
-                                      ir_int_op(IR_PTR, 0))),
-              join, bad);
-    l->b = bad;
-    /* A `construct` that fails leaves no object behind, so the memory
-       it was given goes back before the handler runs. */
-    if (release.kind != IR_NONE) {
-        ir_call(l->f, l->b, IR_VOID,
-                ir_func_op(lower_c_function(l, "free", IR_VOID, IR_PTR)),
-                &release, 1);
-    }
-    switch (h->kind) {
-    case HANDLE_NONE:
-    case HANDLE_ENCLOSING:
-        /* The `try` block around the call holds the one handler. The
-           error leaves every block between the call and that handler,
-           and each runs its `undo` and `defer` statements on the way. */
-        if (l->try_scope != NULL) {
-            ir_assign(l->f, l->b, l->try_scope->error, err);
-            run_defers_to(l, l->try_scope->defers_at, true);
-            if (l->b != NULL) {
-                ir_jump(l->f, l->b, l->try_scope->handler);
-            }
-        } else {
-            ir_jump(l->f, l->b, join);
-        }
-        break;
-    case HANDLE_TRY:
-        l->failing_error = err;
-        run_defers_to(l, NULL, true);
-        l->failing_error = lower_none();
-        if (l->b != NULL) {
-            ir_ret(l->f, l->b, IR_PTR, err);
-        }
-        break;
-    case HANDLE_FATAL:
-        call_fatal(l, err, call->as.call.callee->type->result, join);
-        break;
-    case HANDLE_BLOCK:
-        error = ir_unary(l->f, l->b, IR_COPY, IR_PTR, err);
-        if (h->symbol != NULL) {
-            h->symbol->ir = error;
-        }
-        scope.join = join;
-        scope.out = out;
-        scope.has_out = has_out;
-        scope.error = error;
-        scope.error_type = call->as.call.callee->type->result;
-        lower_handler(l, h, error, scope.error_type, &scope);
-        if (l->b != NULL) {
-            ir_jump(l->f, l->b, join);
-        }
-        break;
-    }
-    l->b = join;
-}
-
-/* DESIGN: `T(args)` writes the table pointers and the defaults of the
-   whole chain. Then it runs every `construct` without arguments, base
-   first, and last the one the class declares with the arguments. The
-   object is complete before its own body sees it. */
-struct ir_operand lower_construct(struct lowerer *l,
-                                  const struct expr *e,
-                                  struct ir_operand dest)
-{
-    static const struct name construct_name = {"construct", 9};
-    const struct type *t = e->as.call.builds;
-    struct ir_operand *args;
-    struct ir_operand *values;
-    const struct item *m = NULL;
-    uint32_t result;
-    bool fails;
-    size_t count;
-    size_t i;
-
-    lower_prepare_object(l, t, NULL, dest);
-    if (t->base != NULL) {
-        lower_run_construct_bodies(l, t->base, dest);
-    }
-    for (i = 0; i < t->member_count; i++) {
-        if (t->members[i]->kind == ITEM_FN &&
-            lower_same_name(&t->members[i]->name, &construct_name)) {
-            m = t->members[i];
-        }
-    }
-    if (m == NULL || m->symbol == NULL) {
-        lower_hook_object(l, HOOK_CREATED, dest);
-        return lower_none();
-    }
-    args = ir_alloc(2 * e->as.call.arg_count + 1, sizeof *args);
-    values = ir_alloc(e->as.call.arg_count + 1, sizeof *values);
-    args[0] = dest;
-    count = 1;
-    /* An argument at a parameter of the form of two words, a `keep own`
-       one among them, passes as two words, as at any call. */
-    for (i = 0; i < e->as.call.arg_count; i++) {
-        const struct type *sig = m->symbol->type;
-        struct ir_operand value = lower_argument(l, e->as.call.args[i]);
-        values[i] = value;
-        lower_push_argument(l, args, &count, value,
-                            i + 1 < sig->param_count ? sig->params[i + 1]
-                                                     : NULL);
-    }
-    /* A `construct` that may fail returns `?*Error`, which the checker
-       gave its type. One that cannot fail returns nothing. */
-    fails = m->symbol->type->result->kind != TYPE_VOID;
-    result = ir_call(l->f, l->b, fails ? IR_PTR : IR_VOID,
-                     ir_func_op(lower_callee_function(l, m->symbol)), args,
-                     count);
-    free(args);
-    /* The arguments follow `self`, the first parameter. */
-    lower_drop_arguments(l, m->symbol, m->symbol->type,
-                         (const struct expr *const *)e->as.call.args, values,
-                         e->as.call.arg_count, 1);
-    free(values);
-    if (!fails) {
-        lower_hook_object(l, HOOK_CREATED, dest);
-        return lower_none();
-    }
-    /* A `construct` that failed leaves no object, and its memory goes
-       back before the handler runs, so the hook is the success path's. */
-    if (l->hooks && l->b != NULL) {
-        struct ir_block *made = lower_new_block(l);
-        struct ir_block *after = lower_new_block(l);
-        ir_branch(l->f, l->b,
-                  lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8,
-                                          lower_temp(l, result),
-                                          ir_int_op(IR_PTR, 0))),
-                  made, after);
-        l->b = made;
-        lower_hook_object(l, HOOK_CREATED, dest);
-        ir_jump(l->f, l->b, after);
-        l->b = after;
-    }
-    return lower_temp(l, result);
-}
-
-/* Whether the expression is a call whose error a handler takes. */
-bool lower_is_handled_call(const struct expr *e)
-{
-    return e->kind == EXPR_CALL && e->as.call.builds == NULL &&
-           e->as.call.handler.kind != HANDLE_NONE;
-}
-
-/* `let m = p catch fatal` and `let m = p catch e { }`. The handler runs
-   when p is `none`, with an `anti.lang.NoneDereference` in hand, and it
-   leaves the block or gives the binding a pointer with `yield`. */
-static void guard_missing(struct lowerer *l, const struct stmt *s,
-                          struct ir_block *join);
-
-static void lower_pointer_guard(struct lowerer *l, const struct stmt *s)
-{
-    const struct symbol *sym = s->as.let.symbol;
-    struct ir_block *bad = lower_new_block(l);
-    struct ir_block *join = lower_new_block(l);
-    struct ir_operand place;
-
-    if (sym == NULL || l->b == NULL) {
-        return;
-    }
-    place = lower_temp(l, sym->ir);
-    ir_branch(l->f, l->b,
-              lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8,
-                                      lower_temp(l,
-                                                 ir_load(l->f, l->b, IR_PTR,
-                                                         place)),
-                                      ir_int_op(IR_PTR, 0))),
-              bad, join);
-    l->b = bad;
-    guard_missing(l, s, join);
-}
-
-/* The error forms of a `let` guard on the path where the value is `none`,
-   the current block, which ends at join. */
-static void guard_missing(struct lowerer *l, const struct stmt *s,
-                          struct ir_block *join)
-{
-    const struct handler *h = &s->as.let.guard;
-    const struct symbol *sym = s->as.let.symbol;
-    const struct type *error_type = s->as.let.guard_make->type->result;
-    struct ir_operand place = lower_temp(l, sym->ir);
-    struct ir_operand err;
-    struct handling scope;
-    uint32_t error;
-
-    err = lower_temp(
-        l, ir_call(l->f, l->b, IR_PTR,
-                   ir_func_op(lower_callee_function(l, s->as.let.guard_make)),
-                   NULL, 0));
-    if (h->kind == HANDLE_FATAL) {
-        call_fatal(l, err, error_type, join);
-        l->b = join;
-        return;
-    }
-    error = ir_unary(l->f, l->b, IR_COPY, IR_PTR, err);
-    if (h->symbol != NULL) {
-        h->symbol->ir = error;
-    }
-    scope.join = join;
-    scope.out = place;
-    scope.has_out = true;
-    scope.error = error;
-    scope.error_type = error_type;
-    lower_handler(l, h, error, error_type, &scope);
-    if (l->b != NULL) {
-        ir_jump(l->f, l->b, join);
-    }
-    l->b = join;
 }
 
 /* `let (a, b) = e;`. The value stands in the place of the statement,
@@ -1473,7 +863,7 @@ static void lower_let_unwrap(struct lowerer *l, const struct stmt *s)
             ir_jump(l->f, l->b, rest);
         }
     } else {
-        guard_missing(l, s, rest);
+        lower_guard_missing(l, s, rest);
     }
     l->b = rest;
     if (sema_needs_teardown(sym->type)) {
@@ -1707,102 +1097,6 @@ static void assert_branch(struct lowerer *l, struct ir_operand cond,
     l->b = rest;
 }
 
-/* DESIGN: the first `fail` of an error writes its position and, when
-   backtraces are on, its frames. An error whose `at` holds a line
-   already keeps both, so the one that `try` forwards or a handler fails
-   again names where it began. The test is a load and a branch, and the
-   rest runs once per error. Whether backtraces are on is a call of the
-   runtime, which the program's build and the command line decide. */
-static void write_origin(struct lowerer *l, const struct stmt *s,
-                         struct ir_operand err)
-{
-    static const struct name at_name = {LANG_ERROR_AT,
-                                        sizeof LANG_ERROR_AT - 1};
-    static const struct name frames_name = {LANG_ERROR_FRAMES,
-                                            sizeof LANG_ERROR_FRAMES - 1};
-    static const struct name line_name = {LANG_LOCATION_LINE,
-                                          sizeof LANG_LOCATION_LINE - 1};
-    const struct type *error = s->as.fail.error;
-    const struct type *location = type_find_field(error, &at_name)->type;
-    struct ir_block *empty = lower_new_block(l);
-    struct ir_block *capture = lower_new_block(l);
-    struct ir_block *rest = lower_new_block(l);
-    struct ir_operand at;
-    struct ir_operand line;
-    struct ir_operand place;
-    struct ir_operand on;
-    struct ir_operand skip;
-    struct ir_operand trace;
-
-    at = lower_offset_address(l, err, lower_field_offset(l, error, &at_name));
-    line = lower_temp(
-        l, ir_load(l->f, l->b, IR_I64,
-                   lower_offset_address(
-                       l, at, lower_field_offset(l, location, &line_name))));
-    ir_branch(l->f, l->b,
-              lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, line,
-                                      ir_int_op(IR_I64, 0))),
-              empty, rest);
-    l->b = empty;
-    place = lower_const_address(l, lower_location_value(l, s->pos, location),
-                                location);
-    ir_memcopy(l->f, l->b, at, place, lower_vtype_of(l, location));
-    on = lower_temp(l, ir_call(l->f, l->b, IR_I8,
-                               ir_func_op(lower_rt_function_giving(
-                                   l, "anti_rt_backtrace_on", IR_I8, NULL, 0)),
-                               NULL, 0));
-    ir_branch(l->f, l->b, on, capture, rest);
-    l->b = capture;
-    skip = ir_int_op(IR_I64, 0);
-    trace = lower_temp(
-        l, ir_call(l->f, l->b, IR_PTR,
-                   ir_func_op(lower_callee_function(l, s->as.fail.capture)),
-                   &skip, 1));
-    ir_store(l->f, l->b, IR_PTR, trace,
-             lower_offset_address(l, err,
-                                  lower_field_offset(l, error, &frames_name)));
-    ir_jump(l->f, l->b, rest);
-    l->b = rest;
-}
-
-/* `fail e;` and `fail "text";` leave on the error channel. The error is
-   built before the deferred statements of the block run, so an `undo` or
-   a `defer` cannot change what the function reports. */
-static void lower_fail(struct lowerer *l, const struct stmt *s)
-{
-    struct ir_operand err;
-
-    if (s->as.fail.make != NULL) {
-        struct ir_operand args[2];
-        struct ir_function *maker = lower_callee_function(l, s->as.fail.make);
-        args[0] = ir_int_op(IR_I64, 0);
-        args[1] = lower_expr(l, s->as.fail.value);
-        err = lower_temp(
-            l, ir_call(l->f, l->b, IR_PTR, ir_func_op(maker), args, 2));
-    } else {
-        err = lower_expr(l, s->as.fail.value);
-    }
-    if (s->as.fail.error != NULL && s->as.fail.capture != NULL) {
-        err = lower_temp(l, ir_unary(l->f, l->b, IR_COPY, IR_PTR, err));
-        write_origin(l, s, err);
-    }
-    if (has_defers(l)) {
-        err = lower_temp(l, ir_unary(l->f, l->b, IR_COPY, IR_PTR, err));
-    }
-    /* `fail e` hands the error a handler binds to the caller. */
-    if (s->as.fail.value->kind == EXPR_NAME) {
-        l->moved = s->as.fail.value->symbol;
-    }
-    l->failing_error = err;
-    run_defers_to(l, NULL, true);
-    l->failing_error = lower_none();
-    l->moved = NULL;
-    if (l->b != NULL) {
-        ir_ret(l->f, l->b, IR_PTR, err);
-    }
-    l->b = NULL;
-}
-
 /* DESIGN: the cursor moves to the line of the statement before anything
    of it is emitted, so `-g` writes one `.loc` per statement. A statement
    that holds a block leaves the cursor on the last line of the block.
@@ -1863,7 +1157,7 @@ void lower_end_temps(struct lowerer *l, size_t mark, bool pop)
     }
 }
 
-static void lower_stmt(struct lowerer *l, const struct stmt *s)
+void lower_stmt(struct lowerer *l, const struct stmt *s)
 {
     size_t mark = l->temp_count;
 
@@ -1897,7 +1191,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
         /* `yield` is an exit of the handler and of every block inside
            it, so the error ends here with their locals. */
         if (l->b != NULL) {
-            run_defers_to(l, h->defers_at, false);
+            lower_run_defers_to(l, h->defers_at, false);
         }
         if (l->b != NULL) {
             ir_jump(l->f, l->b, h->join);
@@ -2075,7 +1369,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
             if ((falls[k] = sema_arm_fallthrough(body)) != NULL) {
                 tail[k] = l->b;
             } else {
-                jump_to_join(l, &join);
+                lower_jump_to_join(l, &join);
             }
             l->b = next_test;
         }
@@ -2088,7 +1382,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
                 l->b = NULL;
             }
         }
-        jump_to_join(l, &join);
+        lower_jump_to_join(l, &join);
         line = l->f->at_line;
         for (k = 0; k + 1 < arms; k++) {
             if (tail[k] != NULL && entry[k + 1] != NULL) {
@@ -2140,7 +1434,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
        temporaries of the loop itself stay. */
     case STMT_BREAK:
         lower_end_temps(l, l->loop->temps_at, false);
-        run_defers_to(l, l->loop->defers_at, false);
+        lower_run_defers_to(l, l->loop->defers_at, false);
         if (l->b != NULL) {
             ir_jump(l->f, l->b, l->loop->break_to);
         }
@@ -2148,7 +1442,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
         return;
     case STMT_CONTINUE:
         lower_end_temps(l, l->loop->temps_at, false);
-        run_defers_to(l, l->loop->defers_at, false);
+        lower_run_defers_to(l, l->loop->defers_at, false);
         if (l->b != NULL) {
             ir_jump(l->f, l->b, l->loop->continue_to);
         }
@@ -2166,7 +1460,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
             if (s->as.return_value->kind == EXPR_NAME) {
                 l->moved = s->as.return_value->symbol;
             }
-            run_defers_to(l, NULL, false);
+            lower_run_defers_to(l, NULL, false);
             l->moved = NULL;
             if (l->b != NULL) {
                 ir_ret(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0));
@@ -2175,7 +1469,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
             return;
         }
         if (s->as.return_value == NULL) {
-            run_defers_to(l, NULL, false);
+            lower_run_defers_to(l, NULL, false);
             if (l->b == NULL) {
                 return;
             }
@@ -2191,7 +1485,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
             /* The value is computed before the deferred statements run,
                so a `defer` cannot change what the function returns. A
                function without one keeps the value where it is. */
-            if (has_defers(l) &&
+            if (lower_has_defers(l) &&
                 !lower_is_aggregate(s->as.return_value->type)) {
                 v = lower_temp(
                     l, ir_unary(l->f, l->b, IR_COPY,
@@ -2204,7 +1498,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
             if (s->as.return_value->kind == EXPR_NAME) {
                 l->moved = s->as.return_value->symbol;
             }
-            run_defers_to(l, NULL, s->error_exit);
+            lower_run_defers_to(l, NULL, s->error_exit);
             l->moved = NULL;
             if (l->b == NULL) {
                 return;
@@ -2280,8 +1574,8 @@ void lower_run_defers(struct lowerer *l, const struct defers *scope,
 }
 
 /* Run every scope from the innermost out to stop, which is not run. */
-static void run_defers_to(struct lowerer *l, const struct defers *stop,
-                          bool failing)
+void lower_run_defers_to(struct lowerer *l, const struct defers *stop,
+                         bool failing)
 {
     const struct defers *scope;
 

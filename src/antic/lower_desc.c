@@ -1686,94 +1686,6 @@ struct ir_global *lower_class_table(struct lowerer *l, const struct type *t)
     return g;
 }
 
-/* The public function `name` of t or of a class above it. */
-static const struct item *find_member_fn(const struct type *t,
-                                         const struct name *name)
-{
-    size_t i;
-
-    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
-        for (i = 0; i < t->member_count; i++) {
-            const struct item *m = t->members[i];
-            if (m->kind == ITEM_FN && m->pub && m->type_param_count == 0 &&
-                lower_same_name(&m->name, name)) {
-                return m;
-            }
-        }
-    }
-    return NULL;
-}
-
-/* DESIGN: an interface table holds thunks. A thunk takes `self` as a
-   pointer to the sub-object. It subtracts the offset of that sub-object
-   to reach the object, then calls the class's own function. Every
-   function is written once. It serves the direct call and the call
-   through the interface alike. */
-static struct ir_function *interface_thunk(struct lowerer *l,
-                                           const struct type *t,
-                                           const struct struct_field *sub,
-                                           const struct item *fn)
-{
-    const struct type *sig = fn->symbol->type;
-    struct ir_function *outer_f = l->f;
-    struct ir_block *outer_b = l->b;
-    struct ir_function *target = lower_callee_function(l, fn->symbol);
-    struct ir_function *f;
-    struct ir_operand *args;
-    struct ir_block *entry;
-    struct ir_operand back;
-    uint32_t value;
-    struct text name = {0};
-    size_t i;
-
-    type_symbol_name(&name, t);
-    text_appendf(&name, ".%.*s.%.*s.thunk", (int)sub->name.length,
-                 sub->name.text, (int)fn->name.length, fn->name.text);
-    f = lower_find_function(l->m, l->module_name, text_cstr(&name));
-    if (f != NULL) {
-        text_free(&name);
-        return f;
-    }
-    f = ir_function_add(l->m, l->module_name, text_cstr(&name),
-                        lower_ir_type_of(sig->result),
-                        lower_result_agg(l, sig->result));
-    text_free(&name);
-    f->result_agg = lower_result_agg(l, sig->result);
-    for (i = 0; i < sig->param_count; i++) {
-        lower_add_param(l, f, sig->params[i]);
-    }
-    entry = ir_block_add(f);
-    l->f = f;
-    l->b = entry;
-    /* The thunk passes on each IR parameter as it came, so a parameter
-       of two words passes as two. */
-    args = ir_alloc(f->param_count + 1, sizeof *args);
-    back = lower_temp(l, ir_binary(f, entry, IR_SUB, IR_I64,
-                                   ir_int_op(IR_I64, 0),
-                                   lower_field_offset(l, sub->home,
-                                                      &sub->name)));
-    args[0] = lower_temp(l,
-                         ir_ptradd(f, entry, lower_temp(l, f->params[0].temp),
-                                   back));
-    for (i = 1; i < f->param_count; i++) {
-        args[i] = lower_temp(l, f->params[i].temp);
-    }
-    value = ir_call(f, entry, lower_ir_type_of(sig->result),
-                    ir_func_op(target), args, f->param_count);
-    free(args);
-    if (sig->result->kind == TYPE_VOID) {
-        ir_ret(f, entry, IR_VOID, lower_none());
-    } else {
-        /* An aggregate result travels as the address of its storage,
-           which is what the called function already returned. */
-        ir_ret(f, entry, f->result == IR_AGG ? IR_PTR : f->result,
-               lower_temp(l, value));
-    }
-    l->f = outer_f;
-    l->b = outer_b;
-    return f;
-}
-
 /* The table of one interface sub-object of t, whose entries are thunks
    into t's own functions. */
 struct ir_global *lower_interface_table(struct lowerer *l,
@@ -1813,14 +1725,14 @@ struct ir_global *lower_interface_table(struct lowerer *l,
             types_interface_member(t, sub->type, &table.entries[i].name);
         bool own = fn != NULL && fn->symbol != NULL && lower_has_body(fn);
         if (!own) {
-            fn = find_member_fn(sub->type, &table.entries[i].name);
+            fn = lower_find_member_fn(sub->type, &table.entries[i].name);
             own = false;
         }
         value->items[i + 1].scalar = IR_PTR;
         if (fn != NULL && fn->symbol != NULL && lower_has_body(fn)) {
             value->items[i + 1].kind = IR_CONST_FUNC;
             value->items[i + 1].global =
-                own ? interface_thunk(l, t, sub, fn)->index
+                own ? lower_interface_thunk(l, t, sub, fn)->index
                     : lower_callee_function(l, fn->symbol)->index;
         } else {
             value->items[i + 1].kind = IR_CONST_INT;
@@ -1833,144 +1745,147 @@ struct ir_global *lower_interface_table(struct lowerer *l,
     return g;
 }
 
-/* DESIGN: `T.f` of a body qualified by an interface is a function of
-   its own, which the module that names it writes. It moves the object to
-   the sub-object, reads the entry of its table and calls that. A class
-   below that replaces the body is therefore honoured. The call names the
-   interface and the slot, as every call through a table does. */
-struct ir_function *lower_reach_thunk(struct lowerer *l,
-                                      const struct struct_field *sub,
-                                      const struct symbol *sym)
-{
-    const struct type *sig = sym->type;
-    struct ir_function *outer_f = l->f;
-    struct ir_block *outer_b = l->b;
-    size_t index = lower_table_index(sub->type, &sym->item->name,
-                                     sig->param_count);
-    struct ir_function *f;
-    struct ir_operand *args;
-    struct ir_operand table;
-    struct ir_operand target;
-    struct ir_inst *call;
-    uint32_t value;
-    struct text name = {0};
-    size_t i;
-
-    type_symbol_name(&name, sub->home);
-    text_appendf(&name, ".%.*s.%.*s.reach", (int)sub->name.length,
-                 sub->name.text, (int)sym->item->name.length,
-                 sym->item->name.text);
-    f = lower_find_function(l->m, l->module_name, text_cstr(&name));
-    if (f != NULL) {
-        text_free(&name);
-        return f;
-    }
-    f = ir_function_add(l->m, l->module_name, text_cstr(&name),
-                        lower_ir_type_of(sig->result),
-                        lower_result_agg(l, sig->result));
-    text_free(&name);
-    f->result_agg = lower_result_agg(l, sig->result);
-    for (i = 0; i < sig->param_count; i++) {
-        lower_add_param(l, f, sig->params[i]);
-    }
-    l->f = f;
-    l->b = ir_block_add(f);
-    args = ir_alloc(f->param_count + 1, sizeof *args);
-    args[0] = lower_offset_address(l, lower_temp(l, f->params[0].temp),
-                                   lower_field_offset(l, sub->home,
-                                                      &sub->name));
-    for (i = 1; i < f->param_count; i++) {
-        args[i] = lower_temp(l, f->params[i].temp);
-    }
-    table = lower_load_table(l, args[0], sub->type);
-    target = lower_temp(
-        l, ir_load(l->f, l->b, IR_PTR,
-                   lower_offset_address(l, table,
-                                        lower_entry_offset(l, index))));
-    value = ir_call_indirect(l->f, l->b, lower_ir_type_of(sig->result), target,
-                             lower_signature(l, sig), args, f->param_count);
-    call = &l->b->insts[l->b->count - 1];
-    call->c = ir_global_op(lower_class_descriptor(l, sub->type));
-    call->field = (uint32_t)index;
-    free(args);
-    if (sig->result->kind == TYPE_VOID) {
-        ir_ret(l->f, l->b, IR_VOID, lower_none());
-    } else {
-        /* An aggregate result travels as the address of its storage,
-           which is what the called function already returned. */
-        ir_ret(l->f, l->b, f->result == IR_AGG ? IR_PTR : f->result,
-               lower_temp(l, value));
-    }
-    l->f = outer_f;
-    l->b = outer_b;
-    return f;
-}
-
-/* DESIGN: `construct` runs after a literal has written every field,
-   base first down the chain. A base therefore sees its own fields
-   before the class below it adds to them. A class without one adds
-   nothing. */
-void lower_run_construct_bodies(struct lowerer *l, const struct type *t,
-                                struct ir_operand dest)
+/* Whether the class declares a `construct` that takes arguments. */
+static bool constructs_with_arguments(const struct type *t)
 {
     static const struct name construct_name = {"construct", 9};
     size_t i;
 
-    if (t == NULL || t->kind != TYPE_CLASS) {
-        return;
-    }
-    lower_run_construct_bodies(l, t->base, dest);
     for (i = 0; i < t->member_count; i++) {
         const struct item *m = t->members[i];
-        if (m->kind != ITEM_FN || !lower_same_name(&m->name, &construct_name) ||
-            m->symbol == NULL || !lower_has_body(m) ||
-            m->symbol->type->param_count != 1) {
-            continue;
+        if (m->kind == ITEM_FN && lower_same_name(&m->name, &construct_name) &&
+            m->symbol != NULL && m->symbol->type->kind == TYPE_FN &&
+            m->symbol->type->param_count > 1) {
+            return true;
         }
-        ir_call(l->f, l->b, IR_VOID,
-                ir_func_op(lower_callee_function(l, m->symbol)), &dest, 1);
     }
+    return false;
 }
 
-/* The bodies of the chain, and then the `created` hook of the object
-   the literal built. One object gives one hook, whatever its chain
-   declares. */
-void lower_run_construct(struct lowerer *l, const struct type *t,
-                         struct ir_operand dest)
+/* Whether a field of the chain of t holds a class value inline that no
+   default fills. Only a literal that names it then makes the class. */
+static bool requires_class_field(const struct type *t)
 {
-    lower_run_construct_bodies(l, t, dest);
-    if (t != NULL && t->kind == TYPE_CLASS) {
-        lower_hook_object(l, HOOK_CREATED, dest);
-    }
-}
-
-/* Store the table pointer of every interface sub-object of t into the
-   object at dest. */
-void lower_store_interface_tables(struct lowerer *l, const struct type *t,
-                                  struct ir_operand dest)
-{
-    const struct type *up;
     size_t i;
 
-    for (up = t; up != NULL; up = up->kind == TYPE_CLASS ? up->base : NULL) {
-        for (i = 0; i < up->field_count; i++) {
-            const struct struct_field *field = &up->fields[i];
-            struct ir_operand table;
-            struct ir_operand at;
-
-            if (field->form != FIELD_IMPL) {
-                continue;
+    for (; t != NULL && t->kind == TYPE_CLASS; t = t->base) {
+        for (i = 0; i < t->field_count; i++) {
+            const struct struct_field *f = &t->fields[i];
+            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
+                f->type->kind == TYPE_CLASS && !lower_has_default(f)) {
+                return true;
             }
-            /* The table is made before the block is read: the order of
-               the arguments of a C call is unspecified. */
-            struct ir_global *made = lower_interface_table(l, t, field);
-            table = lower_temp(l, ir_addr(l->f, l->b, ir_global_op(made)));
-
-            at = lower_offset_address(l, dest,
-                                      lower_field_offset(l, up, &field->name));
-            ir_store(l->f, l->b, IR_PTR, table, at);
         }
     }
+    return false;
+}
+
+/* The record of a class that the module being lowered declares, for the
+   passes over the whole program. */
+void lower_class_record(struct lowerer *l, const struct module *module,
+                        const struct item *it)
+{
+    const struct type *t = it->symbol->type;
+    struct text symbol = {0};
+    char *module_path;
+    char *name;
+    struct ir_class *c;
+    const struct type *up;
+    size_t k;
+
+    type_symbol_name(&symbol, t);
+    name = lower_copy_text(&symbol);
+    text_free(&symbol);
+    module_path = lower_cstr(&t->module);
+    c = ir_class_add(l->m, module_path, name);
+    free(name);
+    c->flags = (it->is_abstract ? IR_CLASS_ABSTRACT : 0u) |
+               (t->is_final ? IR_CLASS_FINAL : 0u) |
+               (it->is_singleton ? IR_CLASS_SINGLETON : 0u) |
+               (constructs_with_arguments(t) ? IR_CLASS_ARGS : 0u) |
+               (requires_class_field(t) ? IR_CLASS_REQUIRED : 0u);
+    c->descriptor = lower_class_descriptor(l, t)->index;
+    c->base = lower_class_descriptor(l, t->base)->index;
+    c->agg = lower_agg_of(l, t);
+    if (!it->is_abstract) {
+        struct text init = {0};
+        const struct ir_function *f;
+        lower_init_name(t, it->exported, &init);
+        f = lower_find_function(l->m, module_path, text_cstr(&init));
+        text_free(&init);
+        c->init = f != NULL ? f->index : IR_NO_INDEX;
+        c->table = lower_class_table(l, t)->index;
+        for (up = t; up != NULL;
+             up = up->kind == TYPE_CLASS ? up->base : NULL) {
+            for (k = 0; k < up->field_count; k++) {
+                if (up->fields[k].form == FIELD_IMPL) {
+                    uint32_t interface =
+                        lower_class_descriptor(l, up->fields[k].type)->index;
+                    uint32_t table =
+                        lower_interface_table(l, t, &up->fields[k])->index;
+                    ir_class_subtable(c, interface, table, lower_agg_of(l, up),
+                                      (uint32_t)k);
+                }
+            }
+        }
+    }
+    for (k = 0; k < t->field_count; k++) {
+        if (t->fields[k].writable) {
+            ir_class_mutable(c, (uint32_t)k);
+        }
+        /* DESIGN: the record carries the `inject` fields the class
+           declares, never the ones it inherits. The record of the class
+           above carries those. The pass over the whole program then
+           reads one entry per declaration and names the class that
+           needs a provider. */
+        if (t->fields[k].injected) {
+            const struct type *i = t->fields[k].type->element;
+            struct text path = {0};
+            char *field = lower_cstr(&t->fields[k].name);
+            text_appendf(&path, "%.*s.%.*s", (int)i->module.length,
+                         i->module.text, (int)i->name.length, i->name.text);
+            ir_class_inject(l->m, c, text_cstr(&path), field,
+                            lower_class_descriptor(l, i)->index,
+                            t->fields[k].inject_final);
+            free(field);
+            text_free(&path);
+        }
+    }
+    /* DESIGN: a `provides` line stands at module level and names a class
+       of the module, so its record carries the interfaces the library
+       offers for it. The pass over the whole program then writes one
+       table, and nothing of the line reaches a function body. */
+    for (k = 0; k < module->provides_count; k++) {
+        const struct provides *pr = &module->provides[k];
+        struct text path = {0};
+        if (pr->class_type != t || pr->type == NULL) {
+            continue;
+        }
+        text_appendf(&path, "%.*s.%.*s", (int)pr->type->module.length,
+                     pr->type->module.text, (int)pr->type->name.length,
+                     pr->type->name.text);
+        ir_class_provides(l->m, c, text_cstr(&path),
+                          lower_class_descriptor(l, pr->type)->index);
+        text_free(&path);
+    }
+    free(module_path);
+}
+
+/* The address of the descriptor of the class that t is or points at, or
+   zero for any other type. The runtime names that class when the table
+   of the object is zero. */
+struct ir_operand lower_static_descriptor(struct lowerer *l,
+                                          const struct type *t)
+{
+    if (t != NULL && t->kind == TYPE_POINTER) {
+        t = t->element;
+    }
+    if (t == NULL || t->kind != TYPE_CLASS) {
+        return ir_int_op(IR_PTR, 0);
+    }
+    return lower_temp(l,
+                      ir_addr(l->f, l->b,
+                              ir_global_op(lower_class_descriptor(l, t))));
 }
 
 /* Whether name is one of the nine hooks, which stand after the seven

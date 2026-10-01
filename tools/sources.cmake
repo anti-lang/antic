@@ -34,13 +34,22 @@ set(ANTIC_CORE_SOURCES
     src/antic/lexer.c
     src/antic/linker.c
     src/antic/lower.c
+    src/antic/lower_check.c
+    src/antic/lower_class.c
     src/antic/lower_desc.c
-    src/antic/lower_expr.c
     src/antic/lower_eq.c
+    src/antic/lower_error.c
+    src/antic/lower_expr.c
+    src/antic/lower_function.c
     src/antic/lower_hash.c
+    src/antic/lower_hook.c
     src/antic/lower_owning.c
+    src/antic/lower_pattern.c
+    src/antic/lower_place.c
     src/antic/lower_simd.c
     src/antic/lower_stmt.c
+    src/antic/lower_sync.c
+    src/antic/lower_worker.c
     src/antic/mach.c
     src/antic/memcheck.c
     src/antic/modpath.c

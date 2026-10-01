@@ -18,7 +18,7 @@ same form through `name_path`.
 The checker refuses an interface that is not abstract and a class the
 module does not declare. Refused as well are an abstract class, a
 singleton, a class that neither inherits the interface nor implements
-it, and two lines for one interface. `class_record` of `src/antic/lower.c`
+it, and two lines for one interface. `lower_class_record` of `src/antic/lower_desc.c`
 writes one entry per line into the record of the class, and the library
 file carries them from format version 49, and `compatible` from 50.
 

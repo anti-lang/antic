@@ -25,7 +25,7 @@ user of the tools can observe, under "Regular expressions".
   goes through `sema_check_call` as written.
 - Lowering keeps one mutable global of 8 bytes per distinct pattern of the module, named
   `pattern.<n>`, beside the literal global of its bytes. A literal lowers to the address of
-  that global. `patterns_start` of `src/antic/lower.c` writes `patterns.start`, which calls
+  that global. `lower_patterns_start` of `src/antic/lower_pattern.c` writes `patterns.start`, which calls
   `anti_rt_regex_literal` with each text and stores the handle.
 - No call reaches `patterns.start`. `ir_is_patterns_start` therefore makes it a root of the
   removal of unused code in the optimizer and of the reach of the whole-program pass.
