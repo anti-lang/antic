@@ -57,10 +57,12 @@ set(ANTIC_CORE_SOURCES
     src/antic/sema.c
     src/antic/sema_call.c
     src/antic/sema_chain.c
+    src/antic/sema_class.c
     src/antic/sema_generic.c
     src/antic/sema_hash.c
     src/antic/sema_copies.c
     src/antic/sema_const.c
+    src/antic/sema_doc.c
     src/antic/sema_export.c
     src/antic/sema_expr.c
     src/antic/sema_pattern.c

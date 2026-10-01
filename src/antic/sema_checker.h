@@ -3,19 +3,22 @@
 
 /* The state of the checker and the functions its files share. sema.c
    holds the helpers every file uses, scopes and lookup, and the
-   resolution of types. It declares the items of a module, checks the
-   class model and runs the passes over the items. sema_chain.c takes
-   chains of declarations apart, and sema_const.c evaluates constants.
-   sema_expr.c checks expressions, and sema_call.c calls and members.
-   sema_stmt.c checks statements and function bodies with the closures in
-   them, and walks what a worker reaches. sema_value.c holds the value
+   resolution of types. It declares the items of a module and runs the
+   passes over the items. sema_class.c checks the class model: the
+   tables, the contracts and the bodies that fill them, the interfaces,
+   the hooks and the operators. sema_chain.c takes chains of
+   declarations apart, and sema_const.c evaluates constants. sema_expr.c
+   checks expressions, and sema_call.c calls and members. sema_stmt.c
+   checks statements and function bodies with the closures in them, and
+   walks what a worker reaches. sema_value.c holds the value
    rules: what a value owns, and when it moves, when it is copied and
    when a copy is refused. sema_safety.c checks the thread-safe classes
    and says which types are thread-safe. sema_generic.c checks generics,
    and sema_copies.c compiles their copies. sema_hash.c checks hashing
    and the default `==`, and sema_pattern.c the pattern literals and
-   their calls. sema_export.c checks what crosses to C and the doc
-   comments. */
+   their calls. sema_export.c checks what crosses to C and writes the
+   interface of a module, and sema_doc.c the doc warnings, which read the
+   module alone. */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -400,6 +403,11 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
 struct type *sema_check_parallel(struct checker *c, struct expr *e);
 struct type *sema_check_dispatch(struct checker *c, struct expr *e);
 struct type *sema_check_join(struct checker *c, struct expr *e);
+
+/* sema_class.c */
+
+/* Check the class model of every type with fields of the module. */
+void sema_check_classes(struct checker *c);
 
 /* sema_chain.c */
 
