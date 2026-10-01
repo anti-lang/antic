@@ -1961,11 +1961,10 @@ void lower_store_interface_tables(struct lowerer *l, const struct type *t,
             if (field->form != FIELD_IMPL) {
                 continue;
             }
-            /* One call, one argument that emits code: the order of the
-               arguments of a C call is unspecified. */
-            table = lower_temp(
-                l, ir_addr(l->f, l->b,
-                           ir_global_op(lower_interface_table(l, t, field))));
+            /* The table is made before the block is read: the order of
+               the arguments of a C call is unspecified. */
+            struct ir_global *made = lower_interface_table(l, t, field);
+            table = lower_temp(l, ir_addr(l->f, l->b, ir_global_op(made)));
 
             at = lower_offset_address(l, dest,
                                       lower_field_offset(l, up, &field->name));

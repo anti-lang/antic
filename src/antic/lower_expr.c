@@ -31,7 +31,8 @@ void lower_store_value(struct lowerer *l, const struct type *t,
        before the function has its type, so the checker marks no
        conversion. The value is its code, with no snapshot. */
     if (lower_is_context(t) && !e->to_context && !lower_is_context(e->type)) {
-        ir_store(l->f, l->b, IR_PTR, lower_expr(l, e), address);
+        struct ir_operand code = lower_expr(l, e);
+        ir_store(l->f, l->b, IR_PTR, code, address);
         ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0),
                  lower_context_word(l, t, address));
         return;
@@ -384,8 +385,10 @@ void lower_build_into(struct lowerer *l, const struct expr *e,
        written after it. */
     if (wraps(e)) {
         if (e->to_iface != NULL || !lower_is_aggregate(e->type)) {
-            ir_store(l->f, l->b, lower_ir_type_of(e->type),
-                     lower_converted(l, e), dest);
+            /* A signed `+` ends its block, so the value is lowered
+               before the store reads the block. */
+            struct ir_operand value = lower_converted(l, e);
+            ir_store(l->f, l->b, lower_ir_type_of(e->type), value, dest);
         } else {
             build_value_into(l, e, dest);
         }
@@ -2679,9 +2682,8 @@ static struct ir_operand lower_parallel(struct lowerer *l,
                   ? lower_expr(l, e->as.parallel.chunks)
                   : ir_int_op(IR_I64, 0);
     args[4] = lower_size_operand(l, result);
-    args[5] = lower_temp(l, ir_addr(l->f, l->b,
-                                    ir_func_op(parallel_thunk(l, e, name,
-                                                              agg))));
+    struct ir_function *thunk = parallel_thunk(l, e, name, agg);
+    args[5] = lower_temp(l, ir_addr(l->f, l->b, ir_func_op(thunk)));
     args[6] = context;
     args[7] = lower_temp(l, results);
     args[8] = lower_temp(l, count);
@@ -2925,10 +2927,9 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
             return lower_address(l, e);
         }
         if (e->symbol != NULL && e->as.field.through != NULL) {
-            return lower_temp(
-                l, ir_addr(l->f, l->b,
-                           ir_func_op(lower_reach_thunk(
-                               l, e->as.field.through, e->symbol))));
+            struct ir_function *thunk =
+                lower_reach_thunk(l, e->as.field.through, e->symbol);
+            return lower_temp(l, ir_addr(l->f, l->b, ir_func_op(thunk)));
         }
         if (e->symbol != NULL && (e->symbol->kind == SYMBOL_FN ||
                                   e->symbol->kind == SYMBOL_EXTERN_FN)) {

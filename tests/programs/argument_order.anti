@@ -1,0 +1,30 @@
+//! A signed `+` ends its block with the check of its overflow. Lowering a
+//! value into a `?int` read the current block beside the call that lowers the
+//! sum, so the store landed in the block the check ended where C evaluates the
+//! arguments left to right. The IR then failed verification. The values come
+//! from the command line, so no constant folds the sum away.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn sum(a: int, b: int) -> ?int
+{
+	let x: ?int = a + b;
+	return x;
+}
+
+fn main(args: []str) -> int
+{
+	let a: int = args.len as int + 40;
+	let b: int = 1;
+	let s = sum(a, b);
+	if let v = s {
+		printf("sum %lld\n".ptr, v);
+	}
+	let t: ?int = a * b;
+	if let w = t {
+		printf("product %lld\n".ptr, w);
+	}
+	return 0;
+}
