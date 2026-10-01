@@ -1,7 +1,8 @@
 /* The modules of a run over the sources of a project, in the order a
-   compile takes them. `anti check` and `anti doc` both need the module
-   path of each source, the modules it imports and the interface file the
-   run writes for it. The list has one definition. */
+   compile takes them, and the options every compile of the run starts
+   from. `anti check`, `anti doc`, `anti build` and `anti test` need the
+   module path of each source, the modules it imports and the interface
+   file the run writes for it. The list has one definition. */
 #include "units.h"
 
 #include <stdio.h>
@@ -13,6 +14,29 @@
 #include "files.h"
 #include "modpath.h"
 #include "text.h"
+
+void unit_options(struct options *o, const char *package, const char *runtime,
+                  const char **roots, size_t root_count, enum target target,
+                  enum cpu_level cpu)
+{
+    memset(o, 0, sizeof *o);
+    o->package_name = package;
+    o->runtime = runtime;
+    o->roots = roots;
+    o->root_count = root_count;
+    o->target = target;
+    o->cpu = cpu;
+}
+
+bool unit_host(enum target *target, enum cpu_level *cpu)
+{
+    if (!target_host(target)) {
+        fputs("anti: unknown host target\n", stderr);
+        return false;
+    }
+    *cpu = cpu_default(*target);
+    return true;
+}
 
 void unit_flat_path(const char *module, struct text *out)
 {

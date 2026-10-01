@@ -1,0 +1,8 @@
+//! The program of a project whose modules share an internal item.
+
+import com.example.core;
+
+fn main() -> int
+{
+	return core.tuning();
+}

@@ -1534,6 +1534,19 @@ add_test(NAME anti_build
         "-DOBJECT=${anti_object}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build.cmake")
 
+# The package name of the manifest reaches every compile of `anti check`,
+# `anti build` in both modes, `anti test` and `anti doc`, so a module that
+# uses an internal item of another module of its package passes all four.
+add_test(NAME anti_internal
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-internal"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_internal.cmake")
+
 # `anti symbols` over a deployment of a release program, with a plugin
 # on a macOS host. It takes the inventory, the check of present, stale
 # and missing symbols and a release trace resolved into names and lines. A

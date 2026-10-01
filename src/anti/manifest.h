@@ -32,8 +32,8 @@ void manifest_inject_free(struct manifest_inject *table);
    manifest may name, and the package name of `[package]`. The defaults of
    docs/tooling.md stand where the file does not, and a missing file gives
    both defaults and no package name. The package name decides which
-   modules share an `internal` item, so every call of a check carries
-   it. */
+   modules share an `internal` item, so every compile of `anti check`,
+   `anti build`, `anti test` and `anti doc` carries it. */
 bool manifest_layout_read(const char *path, struct text *src,
                           struct text *test, struct text *package);
 

@@ -1,0 +1,17 @@
+//! A module of the same package whose tests reach the internal item.
+
+import com.example.core;
+
+/// The internal item and the public one together.
+pub fn total() -> int
+{
+	return core.open() + core.tuning();
+}
+
+tests
+{
+	fn total_adds_both()
+	{
+		assert(total() == 83);
+	}
+}

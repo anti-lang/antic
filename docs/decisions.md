@@ -1571,6 +1571,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] The TOML of `anti` reads no escape, so the lock file writes each value between double quotes as it is. A value that holds a double quote or a control byte is refused and no lock is written. A backslash stands for itself, so a Windows path reads back as written.
 - [provisional] A fetched library file that fails its digest is removed from the cache, so the next build fetches it again.
 - [provisional] A plain `http://` URL passes the loopback check when its authority holds no `@` and is `127.0.0.1`, `localhost` or `[::1]`, followed by nothing or by `:` and digits.
+- [provisional] Every compile that `anti build`, `anti test` and `anti doc` ask of antic carries the package name of `[package]`, as every call of `anti check` does. `anti test` and `anti doc` read it from `anti.toml` of the current directory also when the sources are named, and a directory without one names no package. `unit_options` of `src/anti/units.c` fills the options every compile of the four starts from. Reason: the package name decides which modules share an `internal` item, so a module that used one of another module of its package passed `anti check` and failed the other three. Audit finding M23.
 
 ## The symbols command
 

@@ -4,6 +4,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "cpu.h"
+#include "driver.h"
+#include "target.h"
 #include "text.h"
 
 /* One module of a run over the sources of a project. `anti check`,
@@ -38,6 +41,24 @@ bool unit_read(const char *source, const char *const *roots,
                size_t root_count, const char *work, struct unit *out);
 
 void unit_free(struct unit *u);
+
+/* DESIGN: every compile of a run over a project starts from
+   unit_options, so what each call carries stands once: the search roots,
+   the runtime archive, the target with its processor level and the
+   package name of `[package]` in the manifest. The package name decides
+   which modules share an `internal` item, and a library file carries the
+   name of the package that wrote it. A compile without it refused an
+   item that a compile with it accepted, so `anti check` passed a project
+   that `anti build`, `anti test` and `anti doc` refused. package is NULL
+   outside a project. Every other field of o is zero. */
+void unit_options(struct options *o, const char *package, const char *runtime,
+                  const char **roots, size_t root_count, enum target target,
+                  enum cpu_level cpu);
+
+/* The host target at its default processor level, which a run of
+   `anti check`, `anti test`, `anti doc` and `anti bind` compiles for.
+   Prints the message and returns false on a host antic does not know. */
+bool unit_host(enum target *target, enum cpu_level *cpu);
 
 /* Append the module path with every dot turned into `_`, a name that
    stands in one file name. */

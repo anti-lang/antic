@@ -38,23 +38,23 @@ static bool read_unit(const char *source, const char *const *roots,
            out->unit.parsed;
 }
 
-/* The options every call of this run shares. */
-static void base_options(struct options *o, const char *runtime,
-                         const char *llvm_mc, const char **roots,
-                         size_t root_count, bool memory_checks)
+/* The options every call of this run shares, over the options of a
+   project compile that unit_options gives. */
+static bool base_options(struct options *o, const char *package,
+                         const char *runtime, const char *llvm_mc,
+                         const char **roots, size_t root_count,
+                         bool memory_checks)
 {
-    memset(o, 0, sizeof *o);
-    o->roots = roots;
-    o->root_count = root_count;
-    o->runtime = runtime;
-    o->llvm_mc = llvm_mc;
-    if (!target_host(&o->target)) {
-        fputs("anti: unknown host target\n", stderr);
-        exit(2);
-    }
+    enum target target;
+    enum cpu_level cpu;
+
     /* A test run builds for the host at the host target's default
        processor level, as a build without --cpu does. */
-    o->cpu = cpu_default(o->target);
+    if (!unit_host(&target, &cpu)) {
+        return false;
+    }
+    unit_options(o, package, runtime, roots, root_count, target, cpu);
+    o->llvm_mc = llvm_mc;
     o->tests = true;
     /* DESIGN: a test names the insides of its own module. `anti test`
        runs the standard library's tests too, so the run allows the
@@ -64,6 +64,7 @@ static void base_options(struct options *o, const char *runtime,
        as it does for antic. */
     o->memory_checks = memory_checks;
     o->debug = memory_checks;
+    return true;
 }
 
 /* Write the library file of a module, which the runner imports. */
@@ -323,8 +324,9 @@ done:
 
 int test_run(const char *const *sources, size_t source_count,
              const char *const *roots, size_t root_count, const char *work,
-             const char *runtime, const char *llvm_mc, bool release,
-             bool memory_checks, const char **inject, size_t inject_count)
+             const char *package, const char *runtime, const char *llvm_mc,
+             bool release, bool memory_checks, const char **inject,
+             size_t inject_count)
 {
     struct options base;
     const char **search;
@@ -349,8 +351,12 @@ int test_run(const char *const *sources, size_t source_count,
     for (i = 0; i < root_count; i++) {
         search[i + 1] = roots[i];
     }
-    base_options(&base, runtime, llvm_mc, search, root_count + 1,
-                 memory_checks);
+    if (!base_options(&base, package, runtime, llvm_mc, search,
+                      root_count + 1, memory_checks)) {
+        free(units);
+        free(search);
+        return 2;
+    }
     /* DESIGN: `[inject.test]` of the manifest lies over `[inject]`, so a
        test run takes the fake of an interface where the manifest names
        one. Every compile of the run carries the same table. */

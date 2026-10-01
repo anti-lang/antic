@@ -383,10 +383,14 @@ static int doc_command(int argc, char **argv)
     /* DESIGN: without a file the command takes the source directory of
        `[layout]`, as `anti check` and `anti fmt` do, so the three read the
        same files. The test directory holds no module a reader of the
-       library documents. */
+       library documents. Every compile carries the package name, with a
+       file or without. */
+    if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package)) {
+        status = 1;
+        goto done;
+    }
     if (count == 0) {
-        if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package) ||
-            !files_list_tree(text_cstr(&src), SOURCE_SUFFIX, &found)) {
+        if (!files_list_tree(text_cstr(&src), SOURCE_SUFFIX, &found)) {
             status = 1;
             goto done;
         }
@@ -397,8 +401,9 @@ static int doc_command(int argc, char **argv)
         }
     }
     status = doc_run(listed != NULL ? listed : sources, count, roots,
-                     root_count, out, work, runtime, form, dev,
-                     private_items);
+                     root_count, out, work,
+                     package.length > 0 ? text_cstr(&package) : NULL, runtime,
+                     form, dev, private_items);
 
 done:
     free((void *)sources);
@@ -470,6 +475,9 @@ static int test_command(int argc, char **argv)
     const char *runtime = NULL;
     const char *llvm_mc = NULL;
     struct manifest_inject inject = {0};
+    struct text src = {0};
+    struct text test = {0};
+    struct text package = {0};
     struct text home = {0};
     size_t count = 0;
     size_t root_count = 0;
@@ -503,18 +511,23 @@ static int test_command(int argc, char **argv)
         runtime = text_cstr(&home);
     }
     /* DESIGN: the manifest is `anti.toml` of the project root, and
-       `anti test` runs there. A project without one injects nothing,
-       which is no error. */
-    if (!manifest_inject_read(MANIFEST_FILE, true, &inject)) {
+       `anti test` runs there. A project without one injects nothing and
+       names no package, which is no error. */
+    if (!manifest_inject_read(MANIFEST_FILE, true, &inject) ||
+        !manifest_layout_read(MANIFEST_FILE, &src, &test, &package)) {
         status = 1;
         goto done;
     }
-    status = test_run(sources, count, roots, root_count, work, runtime,
+    status = test_run(sources, count, roots, root_count, work,
+                      package.length > 0 ? text_cstr(&package) : NULL, runtime,
                       llvm_mc, release, memory_checks, inject.entries,
                       inject.count);
 
 done:
     manifest_inject_free(&inject);
+    text_free(&src);
+    text_free(&test);
+    text_free(&package);
     free((void *)sources);
     free((void *)roots);
     text_free(&home);

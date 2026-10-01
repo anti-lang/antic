@@ -171,14 +171,13 @@ static bool build_debug(const struct build *b)
     return !b->r->release || b->r->memory_checks;
 }
 
-/* The options every call of one target shares. */
+/* The options every call of one target shares, over the options of a
+   project compile that unit_options gives. */
 static void base_options(struct build *b, struct options *o,
                          enum target t, enum cpu_level cpu)
 {
-    memset(o, 0, sizeof *o);
-    o->target = t;
-    o->cpu = cpu;
-    o->runtime = text_cstr(&b->runtime);
+    unit_options(o, text_cstr(&b->m.name), text_cstr(&b->runtime), b->roots,
+                 1, t, cpu);
     o->llvm_mc = b->r->llvm_mc;
     o->llvm_ar = b->r->llvm_ar;
     o->inject = b->m.inject.entries;
@@ -189,8 +188,6 @@ static void base_options(struct build *b, struct options *o,
     if (b->m.version.length > 0) {
         o->package_version = text_cstr(&b->m.version);
     }
-    o->roots = b->roots;
-    o->root_count = 1;
     /* DESIGN: dev mode carries the line of every statement and release
        mode does not, which is the rule of docs/tooling.md. A release
        build of --memory-checks carries them for its reports. */
@@ -202,13 +199,10 @@ static void base_options(struct build *b, struct options *o,
     o->linux_library_count = b->linux_library_count;
 }
 
-/* The package header that every library file of this project carries. */
+/* The package header that every library file of this project carries.
+   The name and the version stand in the options of every call. */
 static void header_options(const struct build *b, struct options *o)
 {
-    o->package_name = text_cstr(&b->m.name);
-    if (b->m.version.length > 0) {
-        o->package_version = text_cstr(&b->m.version);
-    }
     if (b->m.license.length > 0) {
         o->license = text_cstr(&b->m.license);
     }

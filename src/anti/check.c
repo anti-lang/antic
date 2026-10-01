@@ -46,23 +46,24 @@ struct doc_blocks {
     size_t capacity;
 };
 
-/* The options every call of the run shares. */
-static void base_options(struct options *o, const char *runtime,
-                         const char **roots, size_t root_count)
+/* The options every call of the run shares, over the options of a
+   project compile that unit_options gives. */
+static bool base_options(struct options *o, const char *package,
+                         const char *runtime, const char **roots,
+                         size_t root_count)
 {
-    memset(o, 0, sizeof *o);
-    o->roots = roots;
-    o->root_count = root_count;
-    o->runtime = runtime;
+    enum target target;
+    enum cpu_level cpu;
+
+    if (!unit_host(&target, &cpu)) {
+        return false;
+    }
+    unit_options(o, package, runtime, roots, root_count, target, cpu);
     o->front_end = true;
     /* A warning fails the check, as it fails a release build. The doc
        warnings stay a class that fails nothing. */
     o->warnings_as_errors = true;
-    if (!target_host(&o->target)) {
-        fputs("anti: unknown host target\n", stderr);
-        exit(2);
-    }
-    o->cpu = cpu_default(o->target);
+    return true;
 }
 
 /* The front end on every file, and with all_targets once per target. The
@@ -487,9 +488,10 @@ int check_run(const char *const *sources, size_t source_count,
     for (i = 0; i <= path_root_count; i++) {
         block_search[i + 1] = search[i];
     }
-    base_options(&base, runtime, search, path_root_count + 1);
-    if (package.length > 0) {
-        base.package_name = text_cstr(&package);
+    if (!base_options(&base, package.length > 0 ? text_cstr(&package) : NULL,
+                      runtime, search, path_root_count + 1)) {
+        status = 2;
+        goto done;
     }
     blocks = base;
     blocks.roots = block_search;

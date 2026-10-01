@@ -656,8 +656,7 @@ static bool is_library(const char *path)
    check` writes the same files for the same reason, and they are the
    only thing the run writes beside the pages. */
 static bool write_interfaces(const char *const *sources, size_t count,
-                             const char **roots, size_t root_count,
-                             const char *work, const char *runtime,
+                             const struct options *base, const char *work,
                              struct unit *units, size_t *order)
 {
     size_t written = 0;
@@ -669,8 +668,8 @@ static bool write_interfaces(const char *const *sources, size_t count,
         if (is_library(sources[i])) {
             continue;
         }
-        if (!unit_read(sources[i], roots, root_count,
-                       work, &units[i])) {
+        if (!unit_read(sources[i], base->roots, base->root_count, work,
+                       &units[i])) {
             return false;
         }
         written++;
@@ -681,23 +680,13 @@ static bool write_interfaces(const char *const *sources, size_t count,
     unit_order(units, count, order);
     for (i = 0; i < count && ok; i++) {
         const struct unit *u = &units[order[i]];
-        struct options o;
+        struct options o = *base;
         if (u->source == NULL || !u->parsed) {
             continue;
         }
-        memset(&o, 0, sizeof o);
         o.input = u->source;
-        o.roots = roots;
-        o.root_count = root_count;
-        o.runtime = runtime;
-        o.front_end = true;
         o.library = true;
         o.output = text_cstr(&u->library);
-        if (!target_host(&o.target)) {
-            fputs("anti: unknown host target\n", stderr);
-            return false;
-        }
-        o.cpu = cpu_default(o.target);
         ok = driver_run(&o) == 0;
     }
     return ok;
@@ -705,9 +694,12 @@ static bool write_interfaces(const char *const *sources, size_t count,
 
 int doc_run(const char *const *sources, size_t count,
             const char *const *roots, size_t root_count, const char *out,
-            const char *work, const char *runtime, enum doc_form form,
-            bool dev, bool private_items)
+            const char *work, const char *package, const char *runtime,
+            enum doc_form form, bool dev, bool private_items)
 {
+    struct options base;
+    enum target target;
+    enum cpu_level cpu;
     struct doc_page *pages = NULL;
     struct unit *units = NULL;
     const char **search = NULL;
@@ -730,29 +722,23 @@ int doc_run(const char *const *sources, size_t count,
         search[search_count++] = roots[i];
     }
     search[search_count++] = work;
+    if (!unit_host(&target, &cpu)) {
+        status = 2;
+        goto done;
+    }
+    unit_options(&base, package, runtime, search, search_count, target, cpu);
+    base.front_end = true;
     if (!files_make_dirs(out) || !files_make_dirs(work) ||
-        !write_interfaces(sources, count, search, search_count, work, runtime,
-                          units, order)) {
+        !write_interfaces(sources, count, &base, work, units, order)) {
         status = 1;
         goto done;
     }
     for (i = 0; i < count; i++) {
-        struct options o;
+        struct options o = base;
         enum doc_items items = dev             ? DOC_ITEMS_DEV
                                : private_items ? DOC_ITEMS_PRIVATE
                                                : DOC_ITEMS_PUBLIC;
-        memset(&o, 0, sizeof o);
         o.input = sources[i];
-        o.roots = search;
-        o.root_count = search_count;
-        o.runtime = runtime;
-        o.front_end = true;
-        if (!target_host(&o.target)) {
-            fputs("anti: unknown host target\n", stderr);
-            status = 2;
-            goto done;
-        }
-        o.cpu = cpu_default(o.target);
         if ((dev || private_items) && is_library(sources[i])) {
             fprintf(stderr, "anti: %s: %s needs the source\n", sources[i],
                     dev ? "--dev" : "--private");

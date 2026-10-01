@@ -13,11 +13,12 @@ enum doc_form { DOC_HTML, DOC_MARKDOWN };
    docs, which need the source and carry the private items and the `//#`
    notes. private keeps the private items in the user docs. roots are the
    search roots of the module paths, work takes the interface file of
-   every source, and runtime holds the library files of the runtime
+   every source, package is the package name of the manifest or NULL
+   outside a project, and runtime holds the library files of the runtime
    archive. Returns the exit status of the command. */
 int doc_run(const char *const *sources, size_t count,
             const char *const *roots, size_t root_count, const char *out,
-            const char *work, const char *runtime, enum doc_form form,
-            bool dev, bool private_items);
+            const char *work, const char *package, const char *runtime,
+            enum doc_form form, bool dev, bool private_items);
 
 #endif
