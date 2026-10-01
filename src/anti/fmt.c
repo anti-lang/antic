@@ -317,6 +317,7 @@ struct angles {
     size_t *tokens;             /* the index of each token piece */
     size_t count;
     bool half;                  /* the first `>` of a `>>` is taken */
+    size_t depth;               /* the types the scan stands inside */
     /* The pieces a scan would mark, the `<` with 0 and a `>` or `>>`
        with the lists it closes, kept until the scan succeeds. */
     size_t *marks;
@@ -439,7 +440,7 @@ static bool angle_types(struct angles *a, size_t *at)
     return true;
 }
 
-static bool angle_type(struct angles *a, size_t *at)
+static bool angle_type_at(struct angles *a, size_t *at)
 {
     enum token_kind k = angle_kind(a, *at);
 
@@ -496,6 +497,23 @@ static bool angle_type(struct angles *a, size_t *at)
     }
 }
 
+/* A type from *at. Every nested list and every `?`, `*` and `chan` before
+   a type passes here, so the scan is one level deeper per type, as the
+   parser's scan is. A type past PARSE_DEPTH_MAX is none, since the
+   parser refuses it, and the recursion stays within the stack. */
+static bool angle_type(struct angles *a, size_t *at)
+{
+    bool ok;
+
+    if (a->depth >= PARSE_DEPTH_MAX) {
+        return false;
+    }
+    a->depth++;
+    ok = angle_type_at(a, at);
+    a->depth--;
+    return ok;
+}
+
 /* Whether the name at the token index at stands where a type does:
    after `:`, `->`, a pointer, a bracket, `alloc`, `as`, `is`, `chan`,
    `inherits`, the `=` of a `type` item, `size_of(` or `alloc(`. */
@@ -546,6 +564,7 @@ static void mark_angles(struct piece_list *l, const char *src)
     a.closes = files_array(2 * l->count + 2, sizeof *a.closes);
     a.count = 0;
     a.half = false;
+    a.depth = 0;
     for (i = 0; i < l->count; i++) {
         if (l->items[i].kind == PIECE_TOKEN) {
             a.tokens[a.count++] = i;
@@ -1802,6 +1821,21 @@ static void name_unions(struct token_list *tokens)
     }
 }
 
+/* A source may end inside the body of an anonymous function, which
+   still lexes. Its frame then stays on the stack with the open brackets
+   it saved, which only its `}` would have freed. */
+static void emitter_free(struct emitter *e)
+{
+    size_t i;
+
+    for (i = 0; i < e->frame_count; i++) {
+        free(e->frames[i].bracket_type);
+    }
+    free(e->frames);
+    free(e->bracket_type);
+    text_free(&e->line);
+}
+
 bool fmt_source(const char *source, size_t length, struct text *out)
 {
     struct arena arena = {0};
@@ -1851,9 +1885,7 @@ bool fmt_source(const char *source, size_t length, struct text *out)
         }
     }
     flush(&e);
-    free(e.frames);
-    free(e.bracket_type);
-    text_free(&e.line);
+    emitter_free(&e);
     free(pieces.items);
     token_list_free(&tokens);
     arena_free(&arena);

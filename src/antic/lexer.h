@@ -152,6 +152,14 @@ struct token_list {
    length before it reads a byte. */
 #define LEX_SOURCE_MAX ((size_t)64 << 20)
 
+/* DESIGN: the parser descends at most this many levels into nested
+   expressions, types and statements, and refuses a deeper source with a
+   diagnostic. The checker, the dump and the symbolic walks recurse over
+   the same tree, so the one limit keeps each of them on the stack. It
+   stands here, beside the tokens, because `anti fmt` reads the tokens
+   alone and holds its scan of a type to the same limit. */
+#define PARSE_DEPTH_MAX 256
+
 /* DESIGN: an `f"..."` nests at most this many levels in the `{expr}` of
    the one around it, and lex refuses a deeper literal with a diagnostic.
    The lexer recurses once per level, and the cap of the source still

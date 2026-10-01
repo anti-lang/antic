@@ -48,6 +48,7 @@ add_executable(antic_unit_tests
     unit/test_deps.c
     unit/test_zip.c
     unit/test_syms.c
+    unit/test_fmt.c
     unit/test_files.c
     unit/test_tool_platform.c
     unit/test_interface.c
@@ -55,6 +56,7 @@ add_executable(antic_unit_tests
     ../src/anti/bindtype.c
     ../src/anti/deps.c
     ../src/anti/files.c
+    ../src/anti/fmt.c
     ../src/anti/jsontree.c
     ../src/anti/manifest.c
     ../src/anti/platform.c

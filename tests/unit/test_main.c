@@ -53,6 +53,7 @@ void test_bind(void);
 void test_deps(void);
 void test_zip(void);
 void test_syms(void);
+void test_fmt(void);
 void test_files(void);
 void test_tool_platform(void);
 void test_interface(void);
@@ -109,6 +110,7 @@ int main(void)
     test_deps();
     test_zip();
     test_syms();
+    test_fmt();
     test_files();
     test_tool_platform();
     test_interface();
