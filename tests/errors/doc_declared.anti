@@ -1,0 +1,9 @@
+//! Every type the compiler declares resolves in a doc comment: `Object`,
+//! `Job`, `Flags`, `Mutex`, `Regex`, `ByteRegex`, `Match`, `ByteMatch` and
+//! `FieldDescriptor`.
+
+/// Gives zero.
+pub fn zero() -> int
+{
+	return 0;
+}

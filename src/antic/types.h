@@ -683,6 +683,12 @@ struct name types_member_symbol(struct arena *arena, const struct name *owner,
    result type is a distinct type from a Job of another, and every one
    has the layout of one pointer. */
 struct type *types_job(struct types *types, struct type *result);
+/* Whether the compiler declares the type name of `anti.lang` itself. */
+bool types_declares(const char *name, size_t length);
+/* The type name of `anti.lang` that the compiler declares, or NULL. With
+   literal set, NULL as well for one that no struct literal builds. */
+struct type *types_declared(struct types *types, const struct name *name,
+                            bool literal);
 /* Whether t is a Job that types_job made. */
 bool types_is_job(const struct type *t);
 /* The struct `anti.lang.Flags`, one for the compilation. */

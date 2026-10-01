@@ -3290,15 +3290,9 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             }
         } else {
             sym = sema_module_find(c, name);
-            if (sym == NULL && sema_name_is(name, LANG_FLAGS)) {
-                t = types_flags(c->types);
-            } else if (sym == NULL &&
-                       sema_name_is(name, LANG_FIELD_DESCRIPTOR)) {
-                t = types_field_descriptor(c->types);
-            } else if (sym == NULL && sema_name_is(name, LANG_REGEX)) {
-                t = types_regex(c->types);
-            } else if (sym == NULL && sema_name_is(name, LANG_BYTE_REGEX)) {
-                t = types_byte_regex(c->types);
+            if (sym == NULL &&
+                (t = types_declared(c->types, name, true)) != NULL) {
+                /* A type the compiler declares. */
             } else if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
                 sema_error_at(c, e->pos, "unknown struct `%.*s`",
                               (int)name->length, name->text);

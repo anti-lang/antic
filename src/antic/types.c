@@ -686,6 +686,67 @@ struct type *types_object(struct types *types)
     return types->object;
 }
 
+static struct type *lang_match(struct types *types)
+{
+    return types_match_of(types, false);
+}
+
+static struct type *lang_byte_match(struct types *types)
+{
+    return types_match_of(types, true);
+}
+
+/* DESIGN: the types of `anti.lang` that the compiler declares itself,
+   which no module holds. This is the one list of them. The checker
+   resolves a type name and the name of a struct literal through it, and
+   the doc warnings take its names as known. make is NULL for `Job`, the
+   result of a call of a worker, which a program never names as a type.
+   literal marks the types a struct literal builds. */
+static const struct lang_declared {
+    const char *name;
+    struct type *(*make)(struct types *types);
+    bool literal;
+} lang_declared[] = {
+    {LANG_OBJECT, types_object, false},
+    {LANG_JOB, NULL, false},
+    {LANG_FLAGS, types_flags, true},
+    {LANG_MUTEX, types_mutex, false},
+    {LANG_REGEX, types_regex, true},
+    {LANG_BYTE_REGEX, types_byte_regex, true},
+    {LANG_MATCH, lang_match, false},
+    {LANG_BYTE_MATCH, lang_byte_match, false},
+    {LANG_FIELD_DESCRIPTOR, types_field_descriptor, true},
+};
+
+static const struct lang_declared *find_declared(const char *name,
+                                                 size_t length)
+{
+    size_t i;
+
+    for (i = 0; i < sizeof lang_declared / sizeof lang_declared[0]; i++) {
+        if (strlen(lang_declared[i].name) == length &&
+            memcmp(lang_declared[i].name, name, length) == 0) {
+            return &lang_declared[i];
+        }
+    }
+    return NULL;
+}
+
+bool types_declares(const char *name, size_t length)
+{
+    return find_declared(name, length) != NULL;
+}
+
+struct type *types_declared(struct types *types, const struct name *name,
+                            bool literal)
+{
+    const struct lang_declared *d = find_declared(name->text, name->length);
+
+    return d != NULL && d->make != NULL && (d->literal || !literal)
+               ? d->make(types)
+               : NULL;
+}
+
 struct type *types_job(struct types *types, struct type *result)
 {
     static const char module_text[] = LANG_MODULE;

@@ -119,18 +119,15 @@ static bool doc_name_known(const struct doc_scope *s, const char *name,
     size_t head = dot == NULL ? length : (size_t)(dot - name);
     size_t i;
 
-    /* The names the compiler declares itself, which no module holds.
-       They are the root and the other types of `anti.lang`. Two
-       functions of the object model and the entry function of a program
-       follow them. A doc comment names each as a language word. */
+    /* The two functions of the object model and the entry function of a
+       program, which a doc comment names as language words beside the
+       types the compiler declares. */
     static const char *const declared[] = {
-        LANG_OBJECT, LANG_JOB, LANG_FLAGS, LANG_MUTEX, LANG_REGEX,
-        LANG_FIELD_DESCRIPTOR,
         "construct", "deserialize", "main"
     };
     const struct type *object;
 
-    if (lexer_is_keyword(name, head)) {
+    if (lexer_is_keyword(name, head) || types_declares(name, head)) {
         return true;
     }
     for (i = 0; i < sizeof declared / sizeof declared[0]; i++) {

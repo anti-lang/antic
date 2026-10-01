@@ -822,6 +822,7 @@ struct type *sema_chan_element(struct checker *c, struct type_expr *t)
 static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
 {
     struct type *element;
+    struct type *declared;
     struct symbol *sym;
     size_t i;
 
@@ -862,30 +863,11 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
         /* DESIGN: `Object` is the root of every class chain, which the
            compiler declares. A program writes the name where the object
            model uses it, as in `equals(self, other: *Object)`, and a
-           class of that name in the module wins over it. */
-        if (sym == NULL && sema_name_is(&t->name, LANG_OBJECT)) {
-            return types_object(c->types);
-        }
-        if (sym == NULL && sema_name_is(&t->name, LANG_FLAGS)) {
-            return types_flags(c->types);
-        }
-        if (sym == NULL && sema_name_is(&t->name, LANG_MUTEX)) {
-            return types_mutex(c->types);
-        }
-        if (sym == NULL && sema_name_is(&t->name, LANG_REGEX)) {
-            return types_regex(c->types);
-        }
-        if (sym == NULL && sema_name_is(&t->name, LANG_BYTE_REGEX)) {
-            return types_byte_regex(c->types);
-        }
-        if (sym == NULL && sema_name_is(&t->name, LANG_MATCH)) {
-            return types_match_of(c->types, false);
-        }
-        if (sym == NULL && sema_name_is(&t->name, LANG_BYTE_MATCH)) {
-            return types_match_of(c->types, true);
-        }
-        if (sym == NULL && sema_name_is(&t->name, LANG_FIELD_DESCRIPTOR)) {
-            return types_field_descriptor(c->types);
+           class of that name in the module wins over it. The other types
+           the compiler declares in `anti.lang` resolve the same way. */
+        if (sym == NULL &&
+            (declared = types_declared(c->types, &t->name, false)) != NULL) {
+            return declared;
         }
         if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
             sema_error_at(c, t->pos, "unknown type `%.*s`", (int)t->name.length,
