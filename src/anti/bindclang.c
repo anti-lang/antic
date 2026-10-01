@@ -249,7 +249,7 @@ struct fn_macro {
 };
 
 struct pack {
-    long line;
+    int64_t line;
     int value;                  /* 0: no pack */
 };
 
@@ -273,7 +273,7 @@ struct reader {
     struct bind_list fns;       /* struct fn_entry * */
     struct bind_list fn_macros; /* struct fn_macro * */
     const char *file;           /* of the last location clang wrote */
-    long line;
+    int64_t line;
     bool failed;
 };
 
@@ -315,7 +315,7 @@ static void track(struct reader *r, const struct json_value *v)
         if (strcmp(key, "file") == 0 && item->kind == JSON_STRING) {
             r->file = item->text;
         } else if (strcmp(key, "line") == 0 && json_integer(item, &line)) {
-            r->line = (long)line;
+            r->line = line;
         } else if (item->kind == JSON_OBJECT || item->kind == JSON_ARRAY) {
             track(r, item);
         }
@@ -568,7 +568,7 @@ static bool has_attribute(const struct json_value *node, const char *kind,
 }
 
 /* The value of `#pragma pack` at a line of the header. */
-static int pack_at(const struct reader *r, long line)
+static int pack_at(const struct reader *r, int64_t line)
 {
     int value = 0;
     size_t i;
@@ -782,10 +782,14 @@ static void declare_enum(struct reader *r, const struct json_value *node)
             continue;
         }
         /* An enumerator without a value is the one before it plus one,
-           and the first is 0. */
+           and the first is 0. The sum is unsigned, so the one after
+           INT64_MAX has the bits of 2^63, as find_constant gives a value
+           above INT64_MAX. */
         if (!find_constant(item, &next)) {
-            next = e->value_count > 0 ? e->values[e->value_count - 1].value + 1
-                                      : 0;
+            next = e->value_count > 0
+                       ? bind_signed(
+                             (uint64_t)e->values[e->value_count - 1].value + 1)
+                       : 0;
         }
         e->values[e->value_count].name = bind_strdup(r->b, name);
         e->values[e->value_count].value = next;
@@ -1058,13 +1062,34 @@ static const char *marker_file(struct reader *r, const char *from,
     return name;
 }
 
+/* clang keeps the line of a location in an unsigned of 32 bits, so no
+   line marker it writes names a line above this. A line counted from one
+   then stays far inside an int64_t, whatever the length of the text. */
+#define MARKER_LINE_MAX 0xFFFFFFFFll
+
+/* The line a marker names, from the digits at s. False when the digits
+   name a line past MARKER_LINE_MAX. */
+static bool marker_line(const char *s, int64_t *line)
+{
+    long long value;
+
+    errno = 0;
+    value = strtoll(s, NULL, 10);
+    if (errno == ERANGE || value > MARKER_LINE_MAX) {
+        return false;
+    }
+    *line = value;
+    return true;
+}
+
 /* The line markers, the macros and the pragmas of the output of
    `clang -E -dD`. A line marker `# 12 "file" 2` says that the next line
-   is line 12 of file, and every line after it counts one. */
+   is line 12 of file, and every line after it counts one. A marker past
+   the lines clang counts is refused, and the reading stops there. */
 static void read_preprocessed(struct reader *r, char *text)
 {
     const char *file = NULL;
-    long line = 0;
+    int64_t line = 0;
     int stack[64];
     int depth = 0;
     int pack = 0;
@@ -1078,7 +1103,11 @@ static void read_preprocessed(struct reader *r, char *text)
         if (at[0] == '#' && at[1] == ' ' && at[2] >= '0' && at[2] <= '9') {
             char *quote = strchr(at, '"');
             char *close = quote != NULL ? strrchr(quote + 1, '"') : NULL;
-            line = strtol(at + 2, NULL, 10);
+            if (!marker_line(at + 2, &line)) {
+                refuse(r, "the line marker `%s` of clang -E is out of range",
+                       at);
+                return;
+            }
             if (close != NULL) {
                 file = marker_file(r, quote + 1, close);
             }
@@ -1435,6 +1464,9 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
     }
     if (text.data != NULL) {
         read_preprocessed(&r, text.data);
+    }
+    if (r.failed) {
+        goto done;
     }
     if (!json_read((const unsigned char *)json.data, json.length, &tree, error,
                    sizeof error)) {
