@@ -69,12 +69,18 @@ struct anti_text anti_rt_plugin_message(void)
     return text;
 }
 
-/* Copy a str into a NUL-terminated path, or give 0 for one too long. */
+/* Copy a str into a NUL-terminated path. Gives 1, 0 for one too long,
+   and -1 for one that holds a NUL. Such a path would name the file its
+   bytes before the NUL name, another than the one given, so it is
+   refused as native_path of fs.c refuses it. */
 static int path_of(char *out, size_t size, const unsigned char *path,
                    int64_t length)
 {
     if (length < 0 || (size_t)length + 1 > size) {
         return 0;
+    }
+    if (length > 0 && memchr(path, 0, (size_t)length) != NULL) {
+        return -1;
     }
     memcpy(out, path, (size_t)length);
     out[length] = '\0';
@@ -633,11 +639,17 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
     struct anti_plugin *p = NULL;
     void *handle;
     int same = 0;
+    int named;
 
     message[0] = '\0';
-    if (!path_of(name, sizeof name, path, length)) {
+    named = path_of(name, sizeof name, path, length);
+    if (named == 0) {
         fail("the path of a library is at most %d bytes",
              ANTI_PLUGIN_PATH - 1);
+        return NULL;
+    }
+    if (named < 0) {
+        fail("the path of a library holds a NUL byte");
         return NULL;
     }
     handle = anti_rt_library_open(name);
@@ -863,13 +875,16 @@ static struct anti_text index_field(const struct anti_toml *doc, int64_t n,
     return anti_rt_toml_value(doc, at);
 }
 
-/* Whether entry n of the index lists the interface. */
+/* Whether entry n of the index lists the interface. The list has no
+   bound of its own, since a library may provide any number of
+   interfaces, and each of its items is a pair of the document. */
 static int index_lists(const struct anti_toml *doc, int64_t n,
                        const unsigned char *path, int64_t length)
 {
+    int64_t count = anti_rt_toml_count(doc);
     int64_t k;
 
-    for (k = 0; k < 64; k++) {
+    for (k = 0; k < count; k++) {
         char field[32];
         struct anti_text value;
         int written = snprintf(field, sizeof field, "interfaces.%lld",
@@ -937,7 +952,7 @@ static int discover_in(const char *dir, size_t dir_length,
                          version.ptr);
             continue;
         }
-        if (!path_of(file, sizeof file, name.ptr, name.len) ||
+        if (path_of(file, sizeof file, name.ptr, name.len) != 1 ||
             !joined(library, sizeof library, dir, dir_length, file)) {
             continue;
         }

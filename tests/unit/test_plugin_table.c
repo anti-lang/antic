@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "../binary_stdio.h"
+#include "../../src/rt/digest.h"
 #include "../../src/rt/plugin.h"
 #include "../../src/rt/registry.h"
 #include "check.h"
@@ -38,12 +39,25 @@ struct anti_text anti_rt_runtime_version(void)
     return text;
 }
 
+/* The index that the stub of anti_rt_fs_read gives for index_path, its
+   bytes and their count, which may hold a NUL. */
+static char index_path[4200];
+static const char *index_bytes;
+static size_t index_length;
+
+/* A file opened for reading, which discovery digests. A path with a NUL
+   is refused, as the runtime refuses it. */
 void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t writing)
 {
-    (void)path;
-    (void)len;
-    (void)writing;
-    return NULL;
+    char name[8200];
+
+    if (writing != 0 || len < 0 || (size_t)len >= sizeof name ||
+        memchr(path, 0, (size_t)len) != NULL) {
+        return NULL;
+    }
+    memcpy(name, path, (size_t)len);
+    name[len] = '\0';
+    return fopen(name, "rb");
 }
 
 int64_t anti_rt_fs_size(void *file)
@@ -54,9 +68,18 @@ int64_t anti_rt_fs_size(void *file)
 
 unsigned char *anti_rt_fs_read(const char *path, int64_t *length)
 {
-    (void)path;
-    (void)length;
-    return NULL;
+    unsigned char *bytes;
+
+    if (index_bytes == NULL || strcmp(path, index_path) != 0) {
+        return NULL;
+    }
+    bytes = malloc(index_length + 1);
+    if (bytes == NULL) {
+        return NULL;
+    }
+    memcpy(bytes, index_bytes, index_length);
+    *length = (int64_t)index_length;
+    return bytes;
 }
 
 const void *anti_rt_body_entry(anti_rt_body body)
@@ -447,6 +470,220 @@ static void long_versions(void)
     restore();
 }
 
+/* The directory of plugin_bad, which discovery searches, and the name of
+   the library in it. A Windows path loses its drive, because discovery
+   splits the directories at `:`. The path then names the drive of the
+   test's working directory, which is the drive of the build. */
+static char plugin_dir[4096];
+static const char *plugin_name;
+static char plugin_digest[65];
+
+static int find_plugin(void)
+{
+    const char *slash = strrchr(PLUGIN_BAD, '/');
+    const char *dir = PLUGIN_BAD;
+    FILE *f;
+    int ok;
+
+    if (slash == NULL || (size_t)(slash - dir) >= sizeof plugin_dir) {
+        return 0;
+    }
+    if (dir[0] != '\0' && dir[1] == ':') {
+        dir += 2;
+    }
+    memcpy(plugin_dir, dir, (size_t)(slash - dir));
+    plugin_dir[slash - dir] = '\0';
+    plugin_name = slash + 1;
+    snprintf(index_path, sizeof index_path, "%s/anti-plugins.toml",
+             plugin_dir);
+    f = fopen(PLUGIN_BAD, "rb");
+    if (f == NULL) {
+        return 0;
+    }
+    ok = anti_rt_sha256_stream(f, plugin_digest);
+    fclose(f);
+    return ok;
+}
+
+/* Discover the provider of host.Service through an index of length bytes
+   at bytes. want is NULL when the index leads to plugin_bad, and
+   otherwise a part of the refusal. */
+static void discovers_with(int line, const char *bytes, size_t length,
+                           const char *want)
+{
+    void *sub;
+    struct anti_text why;
+    char text[600];
+
+    index_bytes = bytes;
+    index_length = length;
+    sub = anti_rt_plugin_provider((const unsigned char *)"host.Service", 12,
+                                  (const unsigned char *)"", 0, plugin_dir);
+    index_bytes = NULL;
+    why = anti_rt_plugin_message();
+    snprintf(text, sizeof text, "%.*s", (int)why.len, why.ptr);
+    if (sub != NULL) {
+        void *handle = load();
+        free((unsigned char *)sub - entry->offset);
+        CHECK(handle != NULL && anti_rt_plugin_unload(handle) == 1);
+        if (want != NULL) {
+            check_failures++;
+            fprintf(stderr, "line %d: a damaged index found a library\n", line);
+        }
+    } else if (want == NULL) {
+        check_failures++;
+        fprintf(stderr, "line %d: the index found no library: %s\n", line,
+                text);
+    } else if (strstr(text, want) == NULL) {
+        check_failures++;
+        fprintf(stderr, "line %d: the refusal does not say `%s`: %s\n", line,
+                want, text);
+    }
+}
+
+#define DISCOVERS(text, want) \
+    discovers_with(__LINE__, text, strlen(text), want)
+
+/* An index of one entry with the fields given, each a whole line or
+   empty. The entry names plugin_bad unless path says otherwise. */
+static const char *entry_of_index(const char *path, const char *runtime,
+                                  const char *digest, const char *interfaces)
+{
+    static char text[8192];
+    char line[4300];
+
+    snprintf(text, sizeof text, "[[library]]\n");
+    if (path != NULL) {
+        snprintf(line, sizeof line, "path = '%s'\n", path);
+        strncat(text, line, sizeof text - strlen(text) - 1);
+    }
+    if (runtime != NULL) {
+        snprintf(line, sizeof line, "runtime = '%s'\n", runtime);
+        strncat(text, line, sizeof text - strlen(text) - 1);
+    }
+    if (digest != NULL) {
+        snprintf(line, sizeof line, "digest = '%s'\n", digest);
+        strncat(text, line, sizeof text - strlen(text) - 1);
+    }
+    if (interfaces != NULL) {
+        snprintf(line, sizeof line, "interfaces = %s\n", interfaces);
+        strncat(text, line, sizeof text - strlen(text) - 1);
+    }
+    return text;
+}
+
+#define NONE "no library of the search directories provides `host.Service`"
+#define DIGEST "does not match the digest"
+
+/* Discovery reads the index beside the libraries, which a user or a copy
+   can damage. Each damage is refused or passed over, and only an entry
+   that lists the interface and matches its digest is loaded. */
+static void damaged_indexes(void)
+{
+    static char text[8192];
+    static char interfaces[2048];
+    static char long_path[4200];
+    char digest[65];
+    size_t length;
+    int k;
+
+    DISCOVERS(entry_of_index(plugin_name, "0.0.0", plugin_digest,
+                             "['host.Service']"), NULL);
+    /* No TOML, an index cut off in a string, and an empty one. */
+    DISCOVERS("this is no TOML\n", "is no index of plugins");
+    DISCOVERS("[[library]]\npath = 'plugin_b", "is no index of plugins");
+    DISCOVERS("[[library]\n", "is no index of plugins");
+    DISCOVERS("", NONE);
+    /* An entry that does not list the interface. */
+    DISCOVERS(entry_of_index(plugin_name, "0.0.0", plugin_digest, NULL), NONE);
+    DISCOVERS(entry_of_index(plugin_name, "0.0.0", plugin_digest,
+                             "'host.Service'"), NONE);
+    DISCOVERS(entry_of_index(plugin_name, "0.0.0", plugin_digest,
+                             "['host.Other']"), NONE);
+    DISCOVERS(entry_of_index(plugin_name, "0.0.0", plugin_digest, "[]"),
+              NONE);
+    /* A library of another runtime, or of none, is passed over. */
+    DISCOVERS(entry_of_index(plugin_name, "9.9.9", plugin_digest,
+                             "['host.Service']"), NONE);
+    DISCOVERS(entry_of_index(plugin_name, NULL, plugin_digest,
+                             "['host.Service']"), NONE);
+    /* No path, an empty one, one past the room of a path. */
+    DISCOVERS(entry_of_index(NULL, "0.0.0", plugin_digest, "['host.Service']"),
+              NONE);
+    DISCOVERS(entry_of_index("", "0.0.0", plugin_digest, "['host.Service']"),
+              NONE);
+    memset(long_path, 'x', 4100);
+    long_path[4100] = '\0';
+    DISCOVERS(entry_of_index(long_path, "0.0.0", plugin_digest,
+                             "['host.Service']"), NONE);
+    /* A digest that is missing, short, of another file, or a library that
+       is missing or a directory. */
+    DISCOVERS(entry_of_index(plugin_name, "0.0.0", NULL, "['host.Service']"),
+              DIGEST);
+    memcpy(digest, plugin_digest, 63);
+    digest[63] = '\0';
+    DISCOVERS(entry_of_index(plugin_name, "0.0.0", digest, "['host.Service']"),
+              DIGEST);
+    digest[63] = plugin_digest[63] == '0' ? '1' : '0';
+    digest[64] = '\0';
+    DISCOVERS(entry_of_index(plugin_name, "0.0.0", digest, "['host.Service']"),
+              DIGEST);
+    DISCOVERS(entry_of_index("nowhere.so", "0.0.0", plugin_digest,
+                             "['host.Service']"), DIGEST);
+    DISCOVERS(entry_of_index(".", "0.0.0", plugin_digest, "['host.Service']"),
+              DIGEST);
+    /* A path that holds a NUL names no file. Read up to the NUL, it would
+       name plugin_bad, whose digest the entry gives. */
+    snprintf(long_path, sizeof long_path, "%s|x", plugin_name);
+    snprintf(text, sizeof text, "%s",
+             entry_of_index(long_path, "0.0.0", plugin_digest,
+                            "['host.Service']"));
+    length = strlen(text);
+    *strchr(text, '|') = '\0';
+    discovers_with(__LINE__, text, length, NONE);
+    /* Two entries that provide the interface. */
+    snprintf(text, sizeof text, "%s",
+             entry_of_index(plugin_name, "0.0.0", plugin_digest,
+                            "['host.Service']"));
+    strncat(text, entry_of_index(plugin_name, "0.0.0", plugin_digest,
+                                 "['host.Service']"),
+            sizeof text - strlen(text) - 1);
+    DISCOVERS(text, "both provide `host.Service`");
+    /* The interface after 64 others in the list of the entry. */
+    snprintf(interfaces, sizeof interfaces, "[");
+    for (k = 0; k < 64; k++) {
+        char one[32];
+        snprintf(one, sizeof one, "'host.Other%d', ", k);
+        strncat(interfaces, one, sizeof interfaces - strlen(interfaces) - 1);
+    }
+    strncat(interfaces, "'host.Service']",
+            sizeof interfaces - strlen(interfaces) - 1);
+    DISCOVERS(entry_of_index(plugin_name, "0.0.0", plugin_digest, interfaces),
+              NULL);
+}
+
+/* A path holds no NUL, which would name another file than the one the
+   program gave. The bytes up to it name plugin_bad. */
+static void nul_in_path(void)
+{
+    char path[4200];
+    size_t length = strlen(PLUGIN_BAD);
+    void *handle;
+    struct anti_text why;
+
+    snprintf(path, sizeof path, "%s|x", PLUGIN_BAD);
+    path[length] = '\0';
+    handle = anti_rt_plugin_load((const unsigned char *)path,
+                                 (int64_t)length + 2);
+    why = anti_rt_plugin_message();
+    CHECK(handle == NULL);
+    if (handle != NULL) {
+        anti_rt_plugin_unload(handle);
+    }
+    CHECK(why.len > 0 &&
+          strstr((const char *)why.ptr, "holds a NUL byte") != NULL);
+}
+
 int main(void)
 {
     if (!open_bad()) {
@@ -463,6 +700,13 @@ int main(void)
     other_program();
     unload_waits_for_build();
     long_versions();
+    good_table_loads();
+    if (!find_plugin()) {
+        fprintf(stderr, "cannot digest %s\n", PLUGIN_BAD);
+        return 1;
+    }
+    damaged_indexes();
+    nul_in_path();
     good_table_loads();
     if (check_failures != 0) {
         fprintf(stderr, "%d check(s) failed\n", check_failures);
