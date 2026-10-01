@@ -28,6 +28,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/expand.c
     src/antic/header.c
     src/antic/ir.c
+    src/antic/ir_fold.c
     src/antic/ir_print.c
     src/antic/ir_verify.c
     src/antic/layout.c

@@ -320,6 +320,69 @@ static void least_by_minus_one(void)
     }
 }
 
+/* Fold value shifted by count with op on target. Returns whether the
+   fold succeeds, and writes its value or its message. */
+static bool fold_shift(enum target target, enum ir_op op, uint32_t count_of,
+                       bool negative, uint64_t *value, char *error,
+                       size_t error_size)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct layouts layouts;
+    uint32_t count;
+    uint32_t shifted;
+    bool ok;
+
+    ir_module_init(&m, &arena, "main");
+    count = ir_sym_op(&m, IR_MUL, IR_I64,
+                      ir_sym_size_of(&m, ir_scalar(IR_CLONG)),
+                      ir_sym_int(&m, IR_I64, count_of));
+    if (negative) {
+        count = ir_sym_op(&m, IR_NEG, IR_I64, count, IR_NO_AGG);
+    }
+    shifted = ir_sym_op(&m, op, IR_I64, ir_sym_int(&m, IR_I64, 1), count);
+    error[0] = '\0';
+    ok = layouts_init(&layouts, target, &m, error, error_size) &&
+         layout_fold(&layouts, shifted, value);
+    layouts_free(&layouts);
+    ir_module_free(&m);
+    arena_free(&arena);
+    return ok;
+}
+
+/* A shift count at or above the width of the value, or below 0, has no
+   value, so the fold refuses it as the checker refuses it in source.
+   The width of c_long decides it per target: `1 << (size_of(c_long) *
+   8)` is 2^32 on Windows and out of range everywhere else. */
+static void shift_out_of_range(void)
+{
+    static const enum ir_op ops[] = {IR_SHL, IR_SHR_U, IR_SHR_S};
+    char error[200];
+    uint64_t value = 0;
+    size_t i;
+
+    for (i = 0; i < sizeof ops / sizeof ops[0]; i++) {
+        CHECK(!fold_shift(TARGET_LINUX_X86_64, ops[i], 8, false, &value, error,
+                          sizeof error));
+        CHECK_STR(error, "a size expression shifts a 64-bit value out of "
+                         "range on linux-x86_64");
+        CHECK(!fold_shift(TARGET_WINDOWS_X86_64, ops[i], 16, false, &value,
+                          error, sizeof error));
+        CHECK_STR(error, "a size expression shifts a 64-bit value out of "
+                         "range on windows-x86_64");
+        CHECK(!fold_shift(TARGET_WINDOWS_X86_64, ops[i], 1, true, &value,
+                          error, sizeof error));
+        CHECK_STR(error, "a size expression shifts a 64-bit value out of "
+                         "range on windows-x86_64");
+    }
+    CHECK(fold_shift(TARGET_WINDOWS_X86_64, IR_SHL, 8, false, &value, error,
+                     sizeof error));
+    CHECK(value == (uint64_t)1 << 32);
+    CHECK(fold_shift(TARGET_LINUX_X86_64, IR_SHL, 7, false, &value, error,
+                     sizeof error));
+    CHECK(value == (uint64_t)1 << 56);
+}
+
 /* A bitfield is read as one integer of 1, 2, 4 or 8 bytes inside its
    aggregate. A packed aggregate of 3 bytes holds a 20-bit field but no
    4-byte integer, and a unit moved back to fit would start before the
@@ -468,6 +531,7 @@ static void zero_width(void)
 void test_layout(void)
 {
     least_by_minus_one();
+    shift_out_of_range();
     unit_past_aggregate();
     size_overflows();
     zero_width();

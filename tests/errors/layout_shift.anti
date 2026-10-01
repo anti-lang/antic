@@ -1,0 +1,6 @@
+const K: u64 = (1 as u64) << ((size_of(c_long) * 8) as u64);
+
+fn main() -> int
+{
+	return K as int;
+}

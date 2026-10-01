@@ -8,6 +8,7 @@
 
 #include "arith.h"
 #include "attributes.h"
+#include "ir_fold.h"
 
 enum { UNSEEN, BUSY, DONE };
 
@@ -390,80 +391,38 @@ static bool fold_op(struct layouts *l, const struct ir_sym *s,
 {
     enum ir_type result = target_type(l, s->type);
 
-    bool divides = s->op == IR_SDIV || s->op == IR_UDIV ||
-                   s->op == IR_SREM || s->op == IR_UREM;
-
-    if (divides && trim(type, b) == 0) {
-        fail(l, "a size expression divides by zero on %s",
-             target_name(l->target));
-        return false;
-    }
-    if ((s->op == IR_SDIV || s->op == IR_SREM) &&
-        trim(type, a) == (uint64_t)1 << (bits(type) - 1) &&
-        signed_value(type, b) == -1) {
-        fail(l, "a size expression divides the least value of its type by "
-                "-1 on %s",
-             target_name(l->target));
-        return false;
-    }
     switch ((enum ir_op)s->op) {
-    case IR_ADD: *out = a + b; break;
-    case IR_SUB: *out = a - b; break;
-    case IR_MUL: *out = a * b; break;
-    case IR_SDIV:
-        *out = (uint64_t)(signed_value(type, a) / signed_value(type, b));
-        break;
-    case IR_UDIV: *out = trim(type, a) / trim(type, b); break;
-    case IR_SREM:
-        *out = (uint64_t)(signed_value(type, a) % signed_value(type, b));
-        break;
-    case IR_UREM: *out = trim(type, a) % trim(type, b); break;
-    case IR_AND: *out = a & b; break;
-    case IR_OR: *out = a | b; break;
-    case IR_XOR: *out = a ^ b; break;
-    case IR_SHL: *out = a << (b % 64); break;
-    case IR_SHR_S:
-        *out = (uint64_t)arith_shift_right(signed_value(type, a),
-                                           (unsigned)(b % 64));
-        break;
-    case IR_SHR_U: *out = trim(type, a) >> (b % 64); break;
     case IR_NEG: *out = 0 - a; break;
     case IR_NOT: *out = ~a; break;
-    case IR_EQ: *out = trim(type, a) == trim(type, b); break;
-    case IR_NE: *out = trim(type, a) != trim(type, b); break;
-    case IR_SLT: *out = signed_value(type, a) < signed_value(type, b); break;
-    case IR_SLE: *out = signed_value(type, a) <= signed_value(type, b); break;
-    case IR_SGT: *out = signed_value(type, a) > signed_value(type, b); break;
-    case IR_SGE: *out = signed_value(type, a) >= signed_value(type, b); break;
-    case IR_ULT: *out = trim(type, a) < trim(type, b); break;
-    case IR_ULE: *out = trim(type, a) <= trim(type, b); break;
-    case IR_UGT: *out = trim(type, a) > trim(type, b); break;
-    case IR_UGE: *out = trim(type, a) >= trim(type, b); break;
     case IR_TRUNC:
     case IR_ZEXT: *out = trim(type, a); break;
     case IR_SEXT: *out = (uint64_t)signed_value(type, a); break;
-    case IR_MULH_S:
-    case IR_MULH_U:
-        *out = arith_mul_high(a, b, bits(type), s->op == IR_MULH_S);
-        break;
-    case IR_ADD_SAT_S:
-    case IR_ADD_SAT_U:
-    case IR_SUB_SAT_S:
-    case IR_SUB_SAT_U:
-    case IR_MUL_SAT_S:
-    case IR_MUL_SAT_U:
-        *out = arith_saturate(
-            s->op == IR_ADD_SAT_S || s->op == IR_ADD_SAT_U   ? '+'
-            : s->op == IR_SUB_SAT_S || s->op == IR_SUB_SAT_U ? '-'
-                                                             : '*',
-            a, b, bits(type),
-            s->op == IR_ADD_SAT_S || s->op == IR_SUB_SAT_S ||
-                s->op == IR_MUL_SAT_S);
-        break;
     default:
-        fail(l, "a size expression uses `%s`, which does not fold",
-             ir_op_name((enum ir_op)s->op));
-        return false;
+        switch (ir_fold_int((enum ir_op)s->op, type, a, b, out)) {
+        case IR_FOLDED:
+            break;
+        case IR_FOLD_BY_ZERO:
+            fail(l, "a size expression divides by zero on %s",
+                 target_name(l->target));
+            return false;
+        case IR_FOLD_LEAST_BY_MINUS_ONE:
+            fail(l, "a size expression divides the least value of its type "
+                    "by -1 on %s",
+                 target_name(l->target));
+            return false;
+        case IR_FOLD_SHIFT_RANGE:
+            /* The IR does not carry the sign of the count, so the message
+               names the width alone. */
+            fail(l, "a size expression shifts a %d-bit value out of range "
+                    "on %s",
+                 bits(type), target_name(l->target));
+            return false;
+        case IR_FOLD_NOT_BINARY:
+            fail(l, "a size expression uses `%s`, which does not fold",
+                 ir_op_name((enum ir_op)s->op));
+            return false;
+        }
+        break;
     }
     *out = trim(result, *out);
     return true;

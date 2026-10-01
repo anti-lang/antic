@@ -6,6 +6,7 @@
 #include "ast.h"
 #include "diagnostic.h"
 #include "ir.h"
+#include "ir_fold.h"
 #include "lexer.h"
 #include "lower.h"
 #include "optimize.h"
@@ -286,8 +287,33 @@ static void symbolic_offsets(bool slot)
     arena_free(&arena);
 }
 
+/* The one fold of the optimizer and the layout. A shift count at or
+   above the width has no value, whatever its width, and the count is
+   not taken modulo the width. */
+static void folds_one_rule(void)
+{
+    uint64_t v = 7;
+
+    CHECK(ir_fold_int(IR_SHL, IR_I64, 1, 64, &v) == IR_FOLD_SHIFT_RANGE);
+    CHECK(ir_fold_int(IR_SHR_U, IR_I32, 1, 32, &v) == IR_FOLD_SHIFT_RANGE);
+    CHECK(ir_fold_int(IR_SHR_S, IR_I8, 1, UINT64_MAX, &v) ==
+          IR_FOLD_SHIFT_RANGE);
+    CHECK(ir_fold_int(IR_SHL, IR_I8, 1, 256, &v) == IR_FOLD_SHIFT_RANGE);
+    CHECK(v == 7);
+    CHECK(ir_fold_int(IR_SHL, IR_I32, 1, 31, &v) == IR_FOLDED &&
+          v == 0x80000000u);
+    CHECK(ir_fold_int(IR_SHR_S, IR_I8, 0x80, 7, &v) == IR_FOLDED &&
+          v == 0xff);
+    CHECK(ir_fold_int(IR_SHR_U, IR_I8, 0x80, 7, &v) == IR_FOLDED && v == 1);
+    CHECK(ir_fold_int(IR_UDIV, IR_I64, 1, 0, &v) == IR_FOLD_BY_ZERO);
+    CHECK(ir_fold_int(IR_SREM, IR_I16, 0x8000, 0xffff, &v) ==
+          IR_FOLD_LEAST_BY_MINUS_ONE);
+    CHECK(ir_fold_int(IR_NEG, IR_I64, 1, 0, &v) == IR_FOLD_NOT_BINARY);
+}
+
 void test_optimize(void)
 {
+    folds_one_rule();
     int which;
 
     one_module();

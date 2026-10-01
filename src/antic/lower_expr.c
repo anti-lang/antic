@@ -1584,7 +1584,9 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
     return lower_temp(l, ir_unary(l->f, l->b, op, target, v));
 }
 
-/* `a <<% n` of symbolic values, with the mask of shift_wrap. */
+/* `a <<% n` of symbolic values, with the mask of shift_wrap. The fold
+   refuses a count outside the width, so a count outside it shifts by 0
+   here and the mask gives the 0 of the rule. */
 static uint32_t shift_wrap_sym(struct lowerer *l, const struct symbolic *s,
                                uint32_t value, uint32_t count)
 {
@@ -1596,7 +1598,11 @@ static uint32_t shift_wrap_sym(struct lowerer *l, const struct symbolic *s,
     uint32_t width =
         ir_sym_op(l->m, IR_MUL, IR_I64, size, ir_sym_int(l->m, IR_I64, 8));
     uint32_t inside = ir_sym_op(l->m, IR_ULT, IR_I8, wide, width);
-    uint32_t shifted = ir_sym_op(l->m, IR_SHL, type, value, count);
+    uint32_t wide_one = ir_sym_op(l->m, IR_ZEXT, IR_I64, inside, IR_NO_AGG);
+    uint32_t wide_mask =
+        ir_sym_op(l->m, IR_NEG, IR_I64, wide_one, IR_NO_AGG);
+    uint32_t kept = ir_sym_op(l->m, IR_AND, IR_I64, wide, wide_mask);
+    uint32_t shifted = ir_sym_op(l->m, IR_SHL, type, value, kept);
     uint32_t one = ir_sym_op(l->m, IR_ZEXT, type, inside, IR_NO_AGG);
     uint32_t mask = ir_sym_op(l->m, IR_NEG, type, one, IR_NO_AGG);
 

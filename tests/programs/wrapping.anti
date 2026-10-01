@@ -27,6 +27,9 @@ const WRAP_MUL: u16 = 300 *% 300;
 const SHIFT_OUT: int = 1 <<% 64;
 const SHIFT_NEG: i32 = 1 <<% -1;
 const SHIFT_TOP: int = 1 <<% 63;
+/// The width of c_long is known per target, after the checker.
+const SHIFT_SIZE: int = 1 <<% (size_of(c_long) * 16);
+const SHIFT_SIZE_NEG: int = 1 <<% -size_of(c_long);
 
 fn main() -> int
 {
@@ -61,5 +64,7 @@ fn main() -> int
 	line("const out", SHIFT_OUT);
 	line("const neg", SHIFT_NEG as int);
 	line("const top", SHIFT_TOP);
+	line("const size", SHIFT_SIZE);
+	line("const size neg", SHIFT_SIZE_NEG);
 	return 0;
 }

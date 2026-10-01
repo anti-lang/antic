@@ -6,6 +6,7 @@
 
 #include "../rt/f16.h"
 #include "arith.h"
+#include "ir_fold.h"
 #include "reach.h"
 #include "target.h"
 
@@ -169,82 +170,6 @@ static void free_counts(struct counts *c)
 
 /* Constant folding */
 
-static bool fold_int(enum ir_op op, enum ir_type t, uint64_t a, uint64_t b,
-                     uint64_t *out)
-{
-    int n = bits(t);
-    uint64_t min = trim(t, (uint64_t)1 << (n - 1));
-    int64_t x = signed_value(t, a);
-    int64_t y = signed_value(t, b);
-
-    switch (op) {
-    case IR_ADD: *out = a + b; break;
-    case IR_SUB: *out = a - b; break;
-    case IR_MUL: *out = a * b; break;
-    case IR_SDIV:
-    case IR_SREM:
-        if (b == 0 || (a == min && b == trim(t, (uint64_t)-1))) {
-            return false;
-        }
-        *out = (uint64_t)(op == IR_SDIV ? x / y : x % y);
-        break;
-    case IR_UDIV:
-    case IR_UREM:
-        if (b == 0) {
-            return false;
-        }
-        *out = op == IR_UDIV ? a / b : a % b;
-        break;
-    case IR_AND: *out = a & b; break;
-    case IR_OR: *out = a | b; break;
-    case IR_XOR: *out = a ^ b; break;
-    case IR_SHL:
-    case IR_SHR_S:
-    case IR_SHR_U:
-        if (b >= (uint64_t)n) {
-            return false;
-        }
-        if (op == IR_SHL) {
-            *out = a << b;
-        } else if (op == IR_SHR_U) {
-            *out = a >> b;
-        } else {
-            /* C leaves >> of a negative value to the implementation. */
-            *out = x < 0 ? ~(~(uint64_t)x >> b) : (uint64_t)x >> b;
-        }
-        break;
-    case IR_EQ: *out = a == b; return true;
-    case IR_NE: *out = a != b; return true;
-    case IR_SLT: *out = x < y; return true;
-    case IR_SLE: *out = x <= y; return true;
-    case IR_SGT: *out = x > y; return true;
-    case IR_SGE: *out = x >= y; return true;
-    case IR_ULT: *out = a < b; return true;
-    case IR_ULE: *out = a <= b; return true;
-    case IR_UGT: *out = a > b; return true;
-    case IR_UGE: *out = a >= b; return true;
-    case IR_MULH_S:
-    case IR_MULH_U: *out = arith_mul_high(a, b, n, op == IR_MULH_S); break;
-    case IR_ADD_SAT_S:
-    case IR_ADD_SAT_U:
-    case IR_SUB_SAT_S:
-    case IR_SUB_SAT_U:
-    case IR_MUL_SAT_S:
-    case IR_MUL_SAT_U:
-        *out = arith_saturate(
-            op == IR_ADD_SAT_S || op == IR_ADD_SAT_U   ? '+'
-            : op == IR_SUB_SAT_S || op == IR_SUB_SAT_U ? '-'
-                                                       : '*',
-            a, b, n,
-            op == IR_ADD_SAT_S || op == IR_SUB_SAT_S || op == IR_MUL_SAT_S);
-        break;
-    default:
-        return false;
-    }
-    *out = trim(t, *out);
-    return true;
-}
-
 /* f32 arithmetic happens in float, so the result is the f32 result. */
 static bool fold_float(enum ir_op op, enum ir_type t, double a, double b,
                        struct ir_operand *out)
@@ -358,8 +283,8 @@ static bool fold_inst(const struct ir_inst *inst, struct ir_operand *out)
     case IR_SUB_SAT_S: case IR_SUB_SAT_U: case IR_MUL_SAT_S:
     case IR_MUL_SAT_U:
         if (inst->a.kind != IR_INT || inst->b.kind != IR_INT ||
-            !fold_int(inst->op, inst->a.type, inst->a.as.integer,
-                      inst->b.as.integer, &v)) {
+            ir_fold_int(inst->op, inst->a.type, inst->a.as.integer,
+                        inst->b.as.integer, &v) != IR_FOLDED) {
             return false;
         }
         *out = ir_int_op(inst->type, v);
