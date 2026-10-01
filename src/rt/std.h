@@ -77,6 +77,10 @@ void anti_rt_table_unset(const unsigned char *name, int64_t length);
 struct anti_text anti_rt_text_from_c(const unsigned char *bytes);
 struct anti_text anti_rt_text_slice(const unsigned char *bytes, int64_t len);
 
+/* The offset of the first byte of the len bytes at bytes that starts no
+   well-formed UTF-8 sequence, or -1 when they are valid UTF-8. */
+int64_t anti_rt_text_invalid(const unsigned char *bytes, int64_t len);
+
 /* 1 when the a_length bytes at a are the b_length bytes at b, else 0. */
 int anti_rt_same_bytes(const unsigned char *a, int64_t a_length,
                        const unsigned char *b, int64_t b_length);

@@ -1,0 +1,175 @@
+//! `Object.deserialize` reads text from outside the program, and refuses every
+//! text that is not what `serialize` writes or what JSON allows. A number
+//! follows the grammar of JSON: no sign `+`, no leading zero, no bare point,
+//! and an integer field takes no fraction or exponent. A `str` field takes
+//! valid UTF-8 without a NUL byte. A variant takes one member that names a
+//! case, and a `?T` takes `null` or a value of `T`. A text cut off at any byte
+//! is refused. Each line prints what came back, or `refused`.
+import anti.io;
+import anti.mem;
+import anti.text;
+
+variant Shape
+{
+	Circle { r: int },
+	Rect { w: int, h: int },
+	Empty,
+}
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+class Drawing
+{
+	pub shape: Shape,
+	pub at: ?Point = none,
+	pub size: ?int = none,
+	pub label: str = "",
+}
+
+class Numbers
+{
+	pub small: i8 = 0,
+	pub octet: u8 = 0,
+	pub n: int = 0,
+	pub wide: u64 = 0,
+	pub f: f64 = 0.0,
+}
+
+class Named
+{
+	pub name: str = "",
+}
+
+/// Read input and print the text of the object it gives, or `refused`.
+fn read(c: *text.Builder, input: str)
+{
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize(input, &arena);
+	if back == none {
+		io.println("refused");
+		arena.free_all();
+		return;
+	}
+	c.clear();
+	back.serialize(c);
+	io.println(c.text());
+	arena.free_all();
+}
+
+/// Read the text of a `Named` whose name is the bytes before, the byte b and
+/// the bytes after, which need not be valid UTF-8.
+fn named(c: *text.Builder, before: str, b: byte, after: str)
+{
+	let t = text.Builder.new();
+	t.append("{\"type\":\"Named\",\"name\":\"");
+	t.append(before);
+	t.append_byte(b);
+	t.append(after);
+	t.append("\"}");
+	read(c, t.text());
+}
+
+/// Read every text that the whole one is cut down to, and print how many of
+/// them came back. A text cut off at any byte is refused.
+fn cut(whole: str)
+{
+	let accepted = 0;
+	let n = 0;
+	while n < whole.len do {
+		let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+		if Object.deserialize(text.slice(whole, 0, n), &arena) != none {
+			accepted += 1;
+		}
+		arena.free_all();
+		n += 1;
+	}
+	let b = text.Builder.new();
+	b.append("cut ");
+	b.append_int(whole.len);
+	b.append(" accepted ");
+	b.append_int(accepted);
+	io.println(b.text());
+}
+
+fn main() -> int
+{
+	let c = text.Builder.new();
+
+	// Integers.
+	read(&c, "{\"type\":\"Numbers\",\"n\":+5}");
+	read(&c, "{\"type\":\"Numbers\",\"n\":007}");
+	read(&c, "{\"type\":\"Numbers\",\"n\":-0}");
+	read(&c, "{\"type\":\"Numbers\",\"n\":1.0}");
+	read(&c, "{\"type\":\"Numbers\",\"n\":1e2}");
+	read(&c, "{\"type\":\"Numbers\",\"n\":-}");
+	read(&c, "{\"type\":\"Numbers\",\"n\":--1}");
+	read(&c, "{\"type\":\"Numbers\",\"n\":-9223372036854775808}");
+	read(&c, "{\"type\":\"Numbers\",\"n\":9223372036854775808}");
+	read(&c, "{\"type\":\"Numbers\",\"small\":-128}");
+	read(&c, "{\"type\":\"Numbers\",\"small\":-129}");
+	read(&c, "{\"type\":\"Numbers\",\"small\":128}");
+	read(&c, "{\"type\":\"Numbers\",\"octet\":255}");
+	read(&c, "{\"type\":\"Numbers\",\"octet\":256}");
+	read(&c, "{\"type\":\"Numbers\",\"octet\":-1}");
+	read(&c, "{\"type\":\"Numbers\",\"octet\":+0}");
+	read(&c, "{\"type\":\"Numbers\",\"wide\":18446744073709551615}");
+	read(&c, "{\"type\":\"Numbers\",\"wide\":18446744073709551616}");
+	read(&c, "{\"type\":\"Numbers\",\"wide\":-0}");
+
+	// Floats.
+	read(&c, "{\"type\":\"Numbers\",\"f\":-1.5e+2}");
+	read(&c, "{\"type\":\"Numbers\",\"f\":+1.5}");
+	read(&c, "{\"type\":\"Numbers\",\"f\":.5}");
+	read(&c, "{\"type\":\"Numbers\",\"f\":01.5}");
+	read(&c, "{\"type\":\"Numbers\",\"f\":1.}");
+	read(&c, "{\"type\":\"Numbers\",\"f\":1e+}");
+
+	// Texts.
+	read(&c, "{\"type\":\"Named\",\"name\":\"\\u00e9\"}");
+	read(&c, "{\"type\":\"Named\",\"name\":\"a\\u0000b\"}");
+	named(&c, "a", 0xff, "b");
+	named(&c, "a", 0xc3, "");
+	named(&c, "a", 0x80, "");
+
+	// Variants.
+	read(&c, "{\"type\":\"Drawing\",\"shape\":{\"Rect\":{\"w\":2}}}");
+	read(&c, "{\"type\":\"Drawing\",\"shape\":null}");
+	read(&c, "{\"type\":\"Drawing\",\"shape\":{\"Square\":{}}}");
+	read(&c, "{\"type\":\"Drawing\",\"shape\":{}}");
+	read(&c, "{\"type\":\"Drawing\",\"shape\":\"Circle\"}");
+	read(&c, "{\"type\":\"Drawing\",\"shape\":{\"Circle\":1}}");
+	read(&c, "{\"type\":\"Drawing\",\"shape\":{\"Circle\":{\"r\":\"x\"}}}");
+	read(&c,
+		"{\"type\":\"Drawing\",\"shape\":{\"Circle\":{\"r\":1,\"r\":2}}}");
+	read(&c,
+		"{\"type\":\"Drawing\",\"shape\":{\"Circle\":{\"r\":1},\"Empty\":{}}}");
+	read(&c, "{\"type\":\"Drawing\",\"shape\":{\"Empty\":{\"r\":1}}}");
+	read(&c, "{\"type\":\"Drawing\",\"shape\":{\"Empty\":[]}}");
+
+	// Optional values.
+	read(&c, "{\"type\":\"Drawing\",\"at\":{\"x\":1},\"size\":4}");
+	read(&c, "{\"type\":\"Drawing\",\"at\":null,\"size\":null}");
+	read(&c, "{\"type\":\"Drawing\",\"size\":\"4\"}");
+	read(&c, "{\"type\":\"Drawing\",\"size\":4.5}");
+	read(&c, "{\"type\":\"Drawing\",\"size\":[4]}");
+	read(&c, "{\"type\":\"Drawing\",\"size\":nul}");
+	read(&c, "{\"type\":\"Drawing\",\"at\":5}");
+	read(&c, "{\"type\":\"Drawing\",\"at\":[1,2]}");
+	read(&c, "{\"type\":\"Drawing\",\"at\":{\"x\":\"1\"}}");
+
+	// Texts cut off.
+	let d = alloc Drawing {
+		shape: Shape.Rect { w: 2, h: 3 }, at: Point { x: 1, y: 2 }, size: 42,
+		label: "a\u{e9}\"b"
+	};
+	let whole = text.Builder.new();
+	d.serialize(&whole);
+	read(&c, whole.text());
+	cut(whole.text());
+	delete(d);
+	return 0;
+}

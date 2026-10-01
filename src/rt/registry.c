@@ -1,7 +1,5 @@
 /* reflect.new and Object.deserialize, which read the registry of the
    classes of a program. */
-#include <errno.h>
-#include <limits.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -271,24 +269,13 @@ static bool read_string(struct reader *r, unsigned char *out, size_t room,
     return anti_rt_json_string(&r->scan, out, room, length);
 }
 
+/* The bytes of one number, which stay in the input, refused unless they
+   follow the grammar of JSON. */
 static bool number_span(struct reader *r, const unsigned char **start,
                         int64_t *length)
 {
-    return anti_rt_json_number(&r->scan, start, length);
-}
-
-/* Copy a JSON number into out as a C string. */
-static bool read_number(struct reader *r, char *out, size_t size)
-{
-    const unsigned char *start;
-    int64_t length;
-
-    if (!number_span(r, &start, &length) || (size_t)length >= size) {
-        return false;
-    }
-    memcpy(out, start, (size_t)length);
-    out[length] = '\0';
-    return true;
+    return anti_rt_json_number(&r->scan, start, length) &&
+           anti_rt_json_valid_number(*start, *length);
 }
 
 static bool skip_value(struct reader *r, int depth)
@@ -370,31 +357,32 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
                        const struct anti_descriptor *d, int64_t owned,
                        int depth);
 
-/* An integer of the type id, refused when the type cannot hold it. */
+/* An integer of the type id, refused when the type cannot hold it. The
+   integers of src/rt/json.c read the text, as they do for anti bind. */
 static bool read_integer(struct reader *r, void *bytes, int64_t type)
 {
-    char number[64];
-    char *end;
+    const unsigned char *start;
+    int64_t length;
     unsigned bits = (unsigned)(anti_rt_type_size(type) * 8);
 
-    if (!read_number(r, number, sizeof number)) {
+    if (!number_span(r, &start, &length)) {
         return false;
     }
-    errno = 0;
     if (anti_rt_type_signed(type)) {
-        long long high = bits >= 64 ? LLONG_MAX : (1LL << (bits - 1)) - 1;
-        long long value = strtoll(number, &end, 10);
-        if (*end != '\0' || errno != 0 || value > high || value < -high - 1) {
+        int64_t high =
+            bits >= 64 ? INT64_MAX : ((int64_t)1 << (bits - 1)) - 1;
+        int64_t value;
+        if (!anti_rt_json_integer(start, length, &value) || value > high ||
+            value < -high - 1) {
             return false;
         }
         anti_rt_store_integer(bytes, type, (uint64_t)value);
         return true;
     }
     {
-        unsigned long long high =
-            bits >= 64 ? ULLONG_MAX : (1ULL << bits) - 1;
-        unsigned long long value = strtoull(number, &end, 10);
-        if (number[0] == '-' || *end != '\0' || errno != 0 || value > high) {
+        uint64_t high = bits >= 64 ? UINT64_MAX : ((uint64_t)1 << bits) - 1;
+        uint64_t value;
+        if (!anti_rt_json_unsigned(start, length, &value) || value > high) {
             return false;
         }
         anti_rt_store_integer(bytes, type, value);
@@ -405,7 +393,12 @@ static bool read_integer(struct reader *r, void *bytes, int64_t type)
 /* DESIGN: a str that deserialize reads gets bytes of its own from the
    allocator, with the NUL that every str has after them. A str never owns
    its bytes, as the rule of `own` says, so no `destruct` could free them.
-   The caller gives them back through the allocator with the object. */
+   The caller gives them back through the allocator with the object.
+
+   A str holds valid UTF-8 and no NUL byte, as docs/decisions.md says.
+   The scanner takes any byte from 0x20 as it stands and gives a NUL for
+   \u0000, so a text from outside that breaks either rule is refused
+   here, at the member that holds it. */
 static bool read_text(struct reader *r, struct anti_text *out)
 {
     struct reader scan = *r;
@@ -416,7 +409,9 @@ static bool read_text(struct reader *r, struct anti_text *out)
         return false;
     }
     bytes = lend(r, length + 1, 1);
-    if (bytes == NULL || !read_string(r, bytes, length, &length)) {
+    if (bytes == NULL || !read_string(r, bytes, length, &length) ||
+        memchr(bytes, 0, length) != NULL ||
+        anti_rt_text_invalid(bytes, (int64_t)length) >= 0) {
         return false;
     }
     out->ptr = bytes;
@@ -732,13 +727,19 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
         memcpy(bytes, &slice, sizeof slice);
         return true;
     }
+    /* A struct with a descriptor was written as an object, and any
+       other value fails the text. A struct without one was written as
+       null, and keeps its default. */
     case ANTI_TYPE_STRUCT:
+        if (d != NULL) {
+            return fill(r, bytes, d, false, depth + 1);
+        }
+        return skip_value(r, depth + 1);
+    /* A class value without a serialize entry was written as null. */
     case ANTI_TYPE_CLASS:
         if (d != NULL && r->scan.at < r->scan.end && *r->scan.at == '{') {
-            return fill(r, bytes, d, t == ANTI_TYPE_CLASS, depth + 1);
+            return fill(r, bytes, d, true, depth + 1);
         }
-        /* A struct without a descriptor was written as null, and keeps
-           its default. */
         return skip_value(r, depth + 1);
     case ANTI_TYPE_TUPLE:
         if (d == NULL) {

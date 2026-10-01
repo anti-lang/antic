@@ -50,6 +50,10 @@ bool anti_rt_json_valid_number(const unsigned char *start, int64_t length);
 bool anti_rt_json_integer(const unsigned char *start, int64_t length,
                           int64_t *value);
 
+/* The same for an integer from 0 that a uint64_t holds. */
+bool anti_rt_json_unsigned(const unsigned char *start, int64_t length,
+                           uint64_t *value);
+
 /* Skip one value of any kind, which starts depth levels deep. A value
    that nests deeper than ANTI_JSON_DEPTH is refused. */
 bool anti_rt_json_skip(struct anti_json *s, int depth);

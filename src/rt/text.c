@@ -53,8 +53,7 @@ struct anti_text anti_rt_bytes_copy(const unsigned char *bytes, int64_t len)
     return anti_rt_text_copy(bytes, len);
 }
 
-/* The offset of the first byte of the len bytes at bytes that starts no
-   well-formed UTF-8 sequence, or -1 when they are valid UTF-8. */
+/* See std.h. */
 int64_t anti_rt_text_invalid(const unsigned char *bytes, int64_t len)
 {
     int64_t i = 0;

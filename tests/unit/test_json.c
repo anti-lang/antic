@@ -69,6 +69,12 @@ static int integer(const char *text, int64_t *value)
                                 (int64_t)strlen(text), value);
 }
 
+static int unsigned_integer(const char *text, uint64_t *value)
+{
+    return anti_rt_json_unsigned((const unsigned char *)text,
+                                 (int64_t)strlen(text), value);
+}
+
 /* A value cut short anywhere is refused. */
 static void truncated(void)
 {
@@ -156,6 +162,7 @@ static void deep_nesting(void)
 static void numbers(void)
 {
     int64_t value = 0;
+    uint64_t wide = 0;
 
     CHECK(integer("9223372036854775807", &value) == 1);
     CHECK(value == INT64_MAX);
@@ -170,6 +177,16 @@ static void numbers(void)
     CHECK(integer("01", &value) == 0);
     CHECK(integer("+1", &value) == 0);
     CHECK(integer("", &value) == 0);
+    CHECK(unsigned_integer("18446744073709551615", &wide) == 1);
+    CHECK(wide == UINT64_MAX);
+    CHECK(unsigned_integer("-0", &wide) == 1);
+    CHECK(wide == 0);
+    CHECK(unsigned_integer("18446744073709551616", &wide) == 0);
+    CHECK(unsigned_integer("-1", &wide) == 0);
+    CHECK(unsigned_integer("+1", &wide) == 0);
+    CHECK(unsigned_integer("007", &wide) == 0);
+    CHECK(unsigned_integer("1.0", &wide) == 0);
+    CHECK(unsigned_integer("", &wide) == 0);
     CHECK(anti_rt_json_valid_number((const unsigned char *)"-0.5e+10", 8));
     CHECK(!anti_rt_json_valid_number((const unsigned char *)"1.", 2));
     CHECK(!anti_rt_json_valid_number((const unsigned char *)".5", 2));

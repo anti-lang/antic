@@ -196,29 +196,41 @@ bool anti_rt_json_valid_number(const unsigned char *start, int64_t length)
     return i == length;
 }
 
-bool anti_rt_json_integer(const unsigned char *start, int64_t length,
-                          int64_t *value)
+/* The value of the digits after the sign of a JSON integer, refused when
+   the bytes are no integer of the grammar or the value passes limit. */
+static bool magnitude_of(const unsigned char *start, int64_t length,
+                         uint64_t limit, uint64_t *magnitude)
 {
-    bool negative;
-    uint64_t magnitude = 0;
-    uint64_t limit;
     int64_t i;
 
     if (!anti_rt_json_valid_number(start, length)) {
         return false;
     }
-    negative = start[0] == '-';
-    limit = negative ? (uint64_t)INT64_MAX + 1 : (uint64_t)INT64_MAX;
-    for (i = negative ? 1 : 0; i < length; i++) {
+    *magnitude = 0;
+    for (i = start[0] == '-' ? 1 : 0; i < length; i++) {
         uint64_t d;
         if (start[i] < '0' || start[i] > '9') {
             return false;
         }
         d = (uint64_t)(start[i] - '0');
-        if (magnitude > (limit - d) / 10) {
+        if (*magnitude > (limit - d) / 10) {
             return false;
         }
-        magnitude = magnitude * 10 + d;
+        *magnitude = *magnitude * 10 + d;
+    }
+    return true;
+}
+
+bool anti_rt_json_integer(const unsigned char *start, int64_t length,
+                          int64_t *value)
+{
+    uint64_t magnitude;
+    bool negative = length > 0 && start != NULL && start[0] == '-';
+
+    if (!magnitude_of(start, length,
+                      negative ? (uint64_t)INT64_MAX + 1 : (uint64_t)INT64_MAX,
+                      &magnitude)) {
+        return false;
     }
     if (!negative) {
         *value = (int64_t)magnitude;
@@ -227,6 +239,21 @@ bool anti_rt_json_integer(const unsigned char *start, int64_t length,
     } else {
         *value = -(int64_t)magnitude;
     }
+    return true;
+}
+
+/* DESIGN: -0 is an integer of the grammar whose value is 0, so it reads
+   as 0. Any other minus sign gives a value below 0, which is refused. */
+bool anti_rt_json_unsigned(const unsigned char *start, int64_t length,
+                           uint64_t *value)
+{
+    uint64_t magnitude;
+
+    if (!magnitude_of(start, length, UINT64_MAX, &magnitude) ||
+        (start[0] == '-' && magnitude != 0)) {
+        return false;
+    }
+    *value = magnitude;
     return true;
 }
 
