@@ -693,6 +693,11 @@ const struct anti_field *anti_rt_type_arg(const void *object, int64_t depth,
     return &up->type_args[index];
 }
 
+int anti_rt_arg_is_str(const struct anti_field *arg)
+{
+    return arg != NULL && ANTI_TYPE_OF(arg->type) == ANTI_TYPE_STR;
+}
+
 /* The number of elements of an array argument. Its record holds the
    size of the whole array and the descriptor of a struct or a class
    element. */

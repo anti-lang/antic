@@ -12,7 +12,6 @@
 import anti.collection;
 import anti.lang;
 import anti.mem;
-import anti.reflect;
 import anti.text;
 
 extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
@@ -20,10 +19,6 @@ extern fn memmove(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
 extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
 extern fn anti_rt_type_arg(object: ?*byte, depth: int, index: int) -> ?*byte;
 extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
-extern fn anti_rt_element_serialize(out: ?*text.Builder, bytes: ?*byte,
-	arg: ?*byte);
-extern fn anti_rt_element_text(out: ?*text.Builder, bytes: ?*byte,
-	arg: ?*byte);
 
 /// The most elements a node holds.
 ///
@@ -178,26 +173,6 @@ fn element_align<T>() -> int
 		return 1;
 	}
 	return size & -size;
-}
-
-/// Whether the field record `keys` names `str`, whose map `serialize` writes as
-/// a JSON object.
-fn text_keys(keys: ?*byte) -> bool
-{
-	let record = keys as ?*FieldDescriptor else {
-		return false;
-	};
-	return (record.type_id & 0xFF) == reflect.TypeId.Str as int;
-}
-
-/// `object` where a map is written as a JSON object, and `array` where it is
-/// written as an array of pairs.
-fn bracket(named: bool, object: str, array: str) -> str
-{
-	if named {
-		return object;
-	}
-	return array;
 }
 
 /// The failure of a function lent an element of a sorted collection that moved
@@ -1069,12 +1044,8 @@ pub class SortedMap<K: Ordered, V> inherits BTree<(K, V)>
 		out.append("{");
 		while place >= 0 do {
 			let entry = self.slot(place);
-			if place != self.first_place() {
-				out.append(", ");
-			}
-			anti_rt_element_text(&out, &entry.0 as ?*byte, keys);
-			out.append(": ");
-			anti_rt_element_text(&out, &entry.1 as ?*byte, values);
+			collection.write_entry_text(&out, place == self.first_place(),
+				&entry.0 as ?*byte, keys, &entry.1 as ?*byte, values);
 			place = self.next_place(place);
 		}
 		out.append("}");
@@ -1088,22 +1059,16 @@ pub class SortedMap<K: Ordered, V> inherits BTree<(K, V)>
 	{
 		let keys = self.key_type();
 		let values = self.value_type();
-		let named = text_keys(keys);
+		let named = collection.text_keys(keys);
 		let place = self.first_place();
-		out.append(bracket(named, "{", "["));
+		collection.open_entries(out, named);
 		while place >= 0 do {
 			let entry = self.slot(place);
-			if place != self.first_place() {
-				out.append(",");
-			}
-			out.append(bracket(named, "", "["));
-			anti_rt_element_serialize(out, &entry.0 as ?*byte, keys);
-			out.append(bracket(named, ":", ","));
-			anti_rt_element_serialize(out, &entry.1 as ?*byte, values);
-			out.append(bracket(named, "", "]"));
+			collection.write_entry(out, named, place == self.first_place(),
+				&entry.0 as ?*byte, keys, &entry.1 as ?*byte, values);
 			place = self.next_place(place);
 		}
-		out.append(bracket(named, "}", "]"));
+		collection.close_entries(out, named);
 	}
 
 	/// The first slot of the node `n` whose key is not below `k`.

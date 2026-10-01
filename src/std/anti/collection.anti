@@ -25,6 +25,7 @@ extern fn anti_rt_element_serialize(out: ?*text.Builder, bytes: ?*byte,
 	arg: ?*byte);
 extern fn anti_rt_element_text(out: ?*text.Builder, bytes: ?*byte,
 	arg: ?*byte);
+extern fn anti_rt_arg_is_str(arg: ?*byte) -> c_int;
 
 /// The capacity a growing collection starts with when it is made without one.
 const FIRST_CAPACITY: int = 8;
@@ -554,6 +555,109 @@ pub fn hash_sum<T: hash>(c: *Collection<T>) -> u64
 pub fn hash_of_sum(count: int, sum: u64) -> u64
 {
 	return (count, sum).hash();
+}
+
+/// Whether the record `arg` of a type argument names `str`. A map whose key
+/// is `str` writes a JSON object, `{"Ann":41}`, and any other map an array of
+/// pairs, `[[1,10],[2,20]]`.
+///
+/// DESIGN: the runtime reads the record, so no module of the library copies
+/// the layout of `struct anti_field` or the numbers of the types, and none
+/// imports `anti.reflect` for them.
+pub fn text_keys(arg: ?*byte) -> bool
+{
+	return anti_rt_arg_is_str(arg) != 0;
+}
+
+/// Open the entries of a map, written as a JSON object when `named` and as an
+/// array of pairs otherwise.
+pub fn open_entries(out: *text.Builder, named: bool)
+{
+	if named {
+		out.append("{");
+	} else {
+		out.append("[");
+	}
+}
+
+/// Close what `open_entries` opened.
+pub fn close_entries(out: *text.Builder, named: bool)
+{
+	if named {
+		out.append("}");
+	} else {
+		out.append("]");
+	}
+}
+
+/// Write one entry of a map as JSON, the key at `k` of the record `key` and
+/// the value at `v` of the record `value`, each as `serialize` writes a field
+/// of its type: a member of an object when `named` and a pair in an array
+/// otherwise. `first` is the first entry, which no comma precedes.
+pub fn write_entry(out: *text.Builder, named: bool, first: bool, k: ?*byte,
+	key: ?*byte, v: ?*byte, value: ?*byte)
+{
+	start_entry(out, named, first);
+	anti_rt_element_serialize(out, k, key);
+	between_entry(out, named);
+	anti_rt_element_serialize(out, v, value);
+	end_entry(out, named);
+}
+
+/// Write one entry of a map as JSON from the texts `k` and `v`, which
+/// `serialize` wrote before, as `write_entry` writes it.
+pub fn write_entry_texts(out: *text.Builder, named: bool, first: bool, k: str,
+	v: str)
+{
+	start_entry(out, named, first);
+	out.append(k);
+	between_entry(out, named);
+	out.append(v);
+	end_entry(out, named);
+}
+
+/// Write one entry of a map as `to_text` of a map writes it, `"Ann": 41`, the
+/// key at `k` of the record `key` and the value at `v` of the record `value`,
+/// each as `to_text` of a collection writes an element. `first` is the first
+/// entry, which no comma precedes.
+pub fn write_entry_text(out: *text.Builder, first: bool, k: ?*byte,
+	key: ?*byte, v: ?*byte, value: ?*byte)
+{
+	if !first {
+		out.append(", ");
+	}
+	anti_rt_element_text(out, k, key);
+	out.append(": ");
+	anti_rt_element_text(out, v, value);
+}
+
+/// The comma before an entry that is not the first, and the bracket of a pair.
+fn start_entry(out: *text.Builder, named: bool, first: bool)
+{
+	if !first {
+		out.append(",");
+	}
+	if !named {
+		out.append("[");
+	}
+}
+
+/// What stands between the key and the value of an entry.
+fn between_entry(out: *text.Builder, named: bool)
+{
+	if named {
+		out.append(":");
+	} else {
+		out.append(",");
+	}
+}
+
+/// The bracket that closes a pair.
+fn end_entry(out: *text.Builder, named: bool)
+{
+	if !named {
+		out.append("]");
+	}
 }
 
 /// The alignment of the room of an element: the largest power of two that

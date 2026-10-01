@@ -337,6 +337,11 @@ void anti_rt_copy_elements(void *from, void *into, int64_t count,
 const struct anti_field *anti_rt_type_arg(const void *object, int64_t depth,
                                           int64_t index);
 
+/* 1 when the record arg of a type argument names `str`, and 0 for any
+   other type or no record. A map whose key is `str` writes a JSON
+   object, and the library asks here rather than read the record. */
+int anti_rt_arg_is_str(const struct anti_field *arg);
+
 /* Append the element at bytes to the anti.text.Builder out as JSON, as
    `serialize` writes a field of its type. A class writes the
    `serialize` of its own table. */

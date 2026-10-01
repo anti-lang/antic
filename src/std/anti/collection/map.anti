@@ -22,8 +22,6 @@ extern fn anti_rt_entropy(out: ?*byte, count: c_size_t) -> c_int;
 extern fn anti_rt_type_arg(object: ?*byte, depth: int, index: int) -> ?*byte;
 extern fn anti_rt_element_serialize(out: ?*text.Builder, bytes: ?*byte,
 	arg: ?*byte);
-extern fn anti_rt_element_text(out: ?*text.Builder, bytes: ?*byte,
-	arg: ?*byte);
 extern fn anti_rt_text_slice(bytes: ?*byte, len: int) -> str;
 
 /// The bit every kept hash carries, so a live mark is never 0 or `REMOVED`.
@@ -38,31 +36,6 @@ const FIRST_BUCKETS: int = 16;
 /// The depth of a map or a set in its chain of descriptors: the root, then
 /// `Collection`, then the table, then the class.
 pub const TYPE_DEPTH: int = 3;
-
-/// The type ids of the records of a descriptor that the map reads, as `enum
-/// anti_type` of `src/rt/object.h` and `reflect.TypeId` number them.
-///
-/// DESIGN: the map reads them without importing `anti.reflect`, whose
-/// descriptors every program that uses a map would link. `serialize` writes a
-/// map whose key is `str` as a JSON object, which a wrong number turns into an
-/// array of pairs.
-const TYPE_NONE: int = 0;
-const TYPE_STR: int = 16;
-
-/// One record of a type in a descriptor.
-///
-/// DESIGN: the layout is that of `struct anti_field` of `src/rt/object.h`,
-/// which `anti_rt_type_arg` gives for each type argument of a class. The map
-/// reads the type id of its key from it.
-struct Record
-{
-	name: ?*byte,
-	name_length: int,
-	offset: int,
-	type_id: int,
-	owned: int,
-	descriptor: ?*byte,
-}
 
 /// The table of `Map<K, V>` and `Set<T>`: the entries in one array in the order
 /// they were added, and a hash table of their positions.
@@ -822,15 +795,13 @@ pub class Map<K: eq + hash, V> inherits EntryTable<(K, V)>
 		let key = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 0);
 		let value = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 1);
 		out.append("{");
+		let first = true;
 		let place = self.first_place();
 		while place >= 0 do {
 			let e = self.entry(place);
-			if place != self.first_place() {
-				out.append(", ");
-			}
-			anti_rt_element_text(&out, &e.0 as ?*byte, key);
-			out.append(": ");
-			anti_rt_element_text(&out, &e.1 as ?*byte, value);
+			collection.write_entry_text(&out, first, &e.0 as ?*byte, key,
+				&e.1 as ?*byte, value);
+			first = false;
 			place = self.next_place(place);
 		}
 		out.append("}");
@@ -843,18 +814,18 @@ pub class Map<K: eq + hash, V> inherits EntryTable<(K, V)>
 	{
 		let key = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 0);
 		let value = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 1);
-		let object = kind_of(key) == TYPE_STR;
-		open_entries(out, object);
+		let named = collection.text_keys(key);
+		collection.open_entries(out, named);
 		let place = self.first_place();
 		let first = true;
 		while place >= 0 do {
 			let e = self.entry(place);
-			write_entry(out, object, first, &e.0 as ?*byte, key, &e.1 as ?*byte,
-				value);
+			collection.write_entry(out, named, first, &e.0 as ?*byte, key,
+				&e.1 as ?*byte, value);
 			first = false;
 			place = self.next_place(place);
 		}
-		close_entries(out, object);
+		collection.close_entries(out, named);
 	}
 
 	/// The entry found at `found`, or a new one of the marked hash `h` with a
@@ -1171,12 +1142,8 @@ pub class HashMap<K: eq + hash, V> inherits SlotTable<(K, V)>
 		let place = self.first_place();
 		while place >= 0 do {
 			let e = self.entry(self.slot_at(place));
-			if !first {
-				out.append(", ");
-			}
-			anti_rt_element_text(&out, &e.0 as ?*byte, key);
-			out.append(": ");
-			anti_rt_element_text(&out, &e.1 as ?*byte, value);
+			collection.write_entry_text(&out, first, &e.0 as ?*byte, key,
+				&e.1 as ?*byte, value);
 			first = false;
 			place = self.next_place(place);
 		}
@@ -1198,7 +1165,7 @@ pub class HashMap<K: eq + hash, V> inherits SlotTable<(K, V)>
 	{
 		let key = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 0);
 		let value = anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 1);
-		let object = kind_of(key) == TYPE_STR;
+		let named = collection.text_keys(key);
 		let texts = text.Builder.new();
 		let starts = numbers(self.from, 2 * self.count + 1);
 		let order = numbers(self.from, self.count);
@@ -1222,28 +1189,15 @@ pub class HashMap<K: eq + hash, V> inherits SlotTable<(K, V)>
 		starts[2 * found] = texts.len();
 		let all = texts.text();
 		sort_by_text(order, found, all, starts, 2);
-		open_entries(out, object);
+		collection.open_entries(out, named);
 		let n = 0;
 		while n < found do {
-			if n > 0 {
-				out.append(",");
-			}
 			let k = text_at(all, starts, 2 * order[n]);
 			let v = text_at(all, starts, 2 * order[n] + 1);
-			if object {
-				out.append(k);
-				out.append(":");
-				out.append(v);
-			} else {
-				out.append("[");
-				out.append(k);
-				out.append(",");
-				out.append(v);
-				out.append("]");
-			}
+			collection.write_entry_texts(out, named, n == 0, k, v);
 			n += 1;
 		}
-		close_entries(out, object);
+		collection.close_entries(out, named);
 		self.from.free(order as ?*byte);
 		self.from.free(starts as ?*byte);
 	}
@@ -1454,16 +1408,6 @@ fn lend_entry<K: eq, V>(e: *(K, V), f: fn(lent *(K, V)))
 	}
 }
 
-/// The type id of the record `arg` without the type it is built on, or the id 0
-/// of no type when there is no record.
-pub fn kind_of(arg: ?*byte) -> int
-{
-	let record = arg as ?*Record else {
-		return TYPE_NONE;
-	};
-	return record.type_id & 0xFF;
-}
-
 /// Room for `n` numbers from `from`, and for one when `n` is 0.
 pub fn numbers(from: *mem.Allocator, n: int) -> *int
 {
@@ -1541,47 +1485,6 @@ fn sift(order: *int, at: int, n: int, less: fn(int, int) -> bool)
 		order[child] = held;
 		root = child;
 	}
-}
-
-/// Open the entries of a map written as a JSON object or as an array.
-fn open_entries(out: *text.Builder, object: bool)
-{
-	if object {
-		out.append("{");
-	} else {
-		out.append("[");
-	}
-}
-
-/// Close what `open_entries` opened.
-fn close_entries(out: *text.Builder, object: bool)
-{
-	if object {
-		out.append("}");
-	} else {
-		out.append("]");
-	}
-}
-
-/// Write one entry, the key at `k` of the record `key` and the value at `v` of
-/// the record `value`, as a member of an object or as a pair in an array.
-fn write_entry(out: *text.Builder, object: bool, first: bool, k: ?*byte,
-	key: ?*byte, v: ?*byte, value: ?*byte)
-{
-	if !first {
-		out.append(",");
-	}
-	if object {
-		anti_rt_element_serialize(out, k, key);
-		out.append(":");
-		anti_rt_element_serialize(out, v, value);
-		return;
-	}
-	out.append("[");
-	anti_rt_element_serialize(out, k, key);
-	out.append(",");
-	anti_rt_element_serialize(out, v, value);
-	out.append("]");
 }
 
 /// `n` rounded up to a multiple of `to`, a power of two.
