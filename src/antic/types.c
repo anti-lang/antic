@@ -1057,9 +1057,10 @@ static bool literal_bytes(const struct expr *pattern)
 }
 
 /* DESIGN: the fields of a match, in the order `struct anti_match` of
-   src/rt/regex.h holds them. The hidden ones carry names no program can
-   write, so a program reads `all`, `pre`, `post` and `count` alone. A
-   `ByteMatch` has the same fields with `[]byte` for `str`. */
+   src/rt/regex.h holds them, which the unit test match_layout checks.
+   The hidden ones carry names no program can write, so a program reads
+   `all`, `pre`, `post` and `count` alone. A `ByteMatch` has the same
+   fields with `[]byte` for `str`. */
 static struct type *match_form(struct types *types,
                                const struct expr *pattern, bool bytes)
 {

@@ -742,6 +742,52 @@ static void runtime_records(void)
     }
 }
 
+/* DESIGN: antic declares anti.lang.Match in src/antic/types.c, and the
+   runtime fills one as struct anti_match of src/rt/regex.h. This test
+   lays out the Match a program uses for the host and compares it with
+   the struct, member by member. */
+static void match_layout(void)
+{
+    static const size_t offsets[] = {
+        offsetof(struct anti_match, pattern),
+        offsetof(struct anti_match, all),
+        offsetof(struct anti_match, pre),
+        offsetof(struct anti_match, post),
+        offsetof(struct anti_match, count),
+        offsetof(struct anti_match, subject),
+        offsetof(struct anti_match, from),
+        offsetof(struct anti_match, options)
+    };
+    struct lowered l;
+    struct layouts layouts;
+    const struct layout *ir;
+    char error[256];
+    enum target host;
+    uint32_t agg;
+    size_t k;
+
+    run(&l, "fn count(m: Match) -> int { return m.count; }\n"
+            "fn main() -> int { return 0; }\n");
+    CHECK(l.ok);
+    agg = ir_agg_find(&l.ir, "anti.lang.Match");
+    CHECK(agg != IR_NO_AGG);
+    if (!l.ok || agg == IR_NO_AGG || !target_host(&host)) {
+        release(&l);
+        return;
+    }
+    CHECK(l.ir.aggs[agg]->field_count == sizeof offsets / sizeof offsets[0]);
+    CHECK(layouts_init(&layouts, host, &l.ir, error, sizeof error));
+    ir = layout_agg(&layouts, agg);
+    CHECK(ir->size == sizeof(struct anti_match));
+    for (k = 0; k < sizeof offsets / sizeof offsets[0] &&
+                k < l.ir.aggs[agg]->field_count;
+         k++) {
+        CHECK(ir->offsets[k] == offsets[k]);
+    }
+    layouts_free(&layouts);
+    release(&l);
+}
+
 void test_lower(void)
 {
     flag_reads();
@@ -2005,4 +2051,5 @@ void test_lower(void)
     allocates_zeroed_classes();
     runtime_functions();
     runtime_records();
+    match_layout();
 }

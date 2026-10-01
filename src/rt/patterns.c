@@ -121,27 +121,6 @@ struct anti_text anti_rt_regex_message(int32_t code)
 #define PCRE2_STATIC
 #include <pcre2.h>
 
-/* The layout of anti.lang.Match, which types_match of src/antic/types.c
-   declares in this order. from and options are the search that found the
-   match, which group runs again. */
-struct anti_match {
-    const void *pattern;
-    struct anti_text all;
-    struct anti_text pre;
-    struct anti_text post;
-    int64_t count;
-    struct anti_text subject;
-    int64_t from;
-    int64_t options;
-};
-
-/* The layout of a `?Match`, the match and the flag byte that says it is
-   there, as C lays out every `?T` of a value. */
-struct anti_maybe_match {
-    struct anti_match value;
-    uint8_t has;
-};
-
 /* The layout of anti.regex.Cursor. It holds where the next search starts
    and with which options, and the end of the last match given. skip and
    left count the matches to pass over and to give, and left is -1

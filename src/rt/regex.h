@@ -102,4 +102,26 @@ void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length);
 void *anti_rt_regex_literal_bytes(const unsigned char *bytes,
                                   int64_t length);
 
+/* The layout of anti.lang.Match, which match_form of src/antic/types.c
+   declares in this order, and the unit test match_layout compares the
+   two. from and options are the search that found the match, which group
+   runs again. */
+struct anti_match {
+    const void *pattern;
+    struct anti_text all;
+    struct anti_text pre;
+    struct anti_text post;
+    int64_t count;
+    struct anti_text subject;
+    int64_t from;
+    int64_t options;
+};
+
+/* The layout of a `?Match`, the match and the flag byte that says it is
+   there, as C lays out every `?T` of a value. */
+struct anti_maybe_match {
+    struct anti_match value;
+    uint8_t has;
+};
+
 #endif
