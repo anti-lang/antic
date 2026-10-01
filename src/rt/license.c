@@ -1,12 +1,13 @@
 #include <string.h>
+#include "license.h"
 #include "std.h"
 
 /* The notice that antic links into every executable and shared library. */
 extern const char anti_licenses[];
 
-static const char begin[] = "ANTI_LICENSES_BEGIN\n";
-static const char end[] = "ANTI_LICENSES_END\n";
-static const char build[] = "build ";
+static const char begin[] = ANTI_NOTICE_BEGIN;
+static const char end[] = ANTI_NOTICE_END;
+static const char build[] = ANTI_NOTICE_BUILD;
 
 /* DESIGN: the licence text is the notice between the markers without the
    build id, which is a fact of the binary and no licence. */

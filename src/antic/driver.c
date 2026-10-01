@@ -1142,15 +1142,15 @@ static bool build_id(const struct options *o, const struct text *assembly,
 static void identified_notice(struct text *out, const struct text *notice,
                               const char *id)
 {
-    size_t begin = sizeof NOTICE_BEGIN - 1;
+    size_t begin = sizeof ANTI_NOTICE_BEGIN - 1;
 
     if (notice->length < begin ||
-        memcmp(notice->data, NOTICE_BEGIN, begin) != 0) {
+        memcmp(notice->data, ANTI_NOTICE_BEGIN, begin) != 0) {
         text_append_bytes(out, notice->data, notice->length);
         return;
     }
-    text_append(out, NOTICE_BEGIN);
-    text_appendf(out, "build %s\n", id);
+    text_append(out, ANTI_NOTICE_BEGIN);
+    text_appendf(out, "%s%s\n", ANTI_NOTICE_BUILD, id);
     text_append_bytes(out, notice->data + begin, notice->length - begin);
 }
 

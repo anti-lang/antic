@@ -112,9 +112,36 @@ static void map_names(void)
     text_free(&where);
 }
 
+/* M24: the build id of a program is the line after the begin marker of
+   its notice. A line of the same form that the data of the program holds
+   before the notice is not its id. */
+static void build_id_of_notice(void)
+{
+    static const char program[] =
+        "data build "
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
+        "ANTI_LICENSES_BEGIN\nbuild "
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n"
+        "package app 1.0.0 MIT\nANTI_LICENSES_END\n";
+    struct text id = {0};
+
+    write_file(PROGRAM, program);
+    CHECK(symmap_build_id(PROGRAM, &id));
+    CHECK_STR(text_cstr(&id), "0123456789abcdef0123456789abcdef"
+                              "0123456789abcdef0123456789abcdef");
+    text_free(&id);
+    /* A line of the form with no notice is no build id. */
+    write_file(PROGRAM, "data build "
+               "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n");
+    CHECK(!symmap_build_id(PROGRAM, &id));
+    text_free(&id);
+    remove(PROGRAM);
+}
+
 void test_syms(void)
 {
     unit_without_id();
     program_without_functions();
     map_names();
+    build_id_of_notice();
 }

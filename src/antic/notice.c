@@ -28,7 +28,7 @@ void notice_text(struct text *out, const struct package *const *packages,
     size_t j;
     size_t k;
 
-    text_append(out, NOTICE_BEGIN);
+    text_append(out, ANTI_NOTICE_BEGIN);
     for (i = 0; i < count; i++) {
         const struct package *p = packages[i];
         if (repeated(packages, i)) {
@@ -65,5 +65,5 @@ void notice_text(struct text *out, const struct package *const *packages,
             text_append(out, "\n");
         }
     }
-    text_append(out, NOTICE_END);
+    text_append(out, ANTI_NOTICE_END);
 }

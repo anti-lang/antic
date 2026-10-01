@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "license.h"
 #include "rt.h"
 #include "symbols.h"
 
@@ -146,7 +147,7 @@ extern const char anti_licenses[] __attribute__((weak));
    SIZE_MAX. */
 static struct anti_text notice_id(const char *notice, size_t room)
 {
-    static const char head[] = "ANTI_LICENSES_BEGIN\nbuild ";
+    static const char head[] = ANTI_NOTICE_BEGIN ANTI_NOTICE_BUILD;
     size_t at = sizeof head - 1;
 
     if (notice == NULL || room < at || strncmp(notice, head, at) != 0) {

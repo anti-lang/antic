@@ -3,13 +3,12 @@
 
 #include <stddef.h>
 
+/* The begin and end markers of the licence notice, by which a tool finds
+   anti_licenses in any Anti binary, stand in src/rt/license.h, which the
+   runtime and anti read as well. */
+#include "../rt/license.h"
 #include "antic.h"
 #include "text.h"
-
-/* The begin and end markers of the licence notice, by which a tool finds
-   anti_licenses in any Anti binary. */
-#define NOTICE_BEGIN "ANTI_LICENSES_BEGIN\n"
-#define NOTICE_END "ANTI_LICENSES_END\n"
 
 /* Append the licence notice of the packages of a program between the
    markers. Each package name has a line with version and licence and its

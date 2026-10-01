@@ -19,7 +19,9 @@
 
 #include "files.h"
 #include "platform.h"
+#include "license.h"
 #include "symbols.h"
+#include "symmap.h"
 #include "text.h"
 #include "toml.h"
 #include "zip.h"
@@ -38,11 +40,6 @@
 /* The runtime refuses an include nested deeper than this, and so does
    the reader here. */
 enum { INCLUDE_DEPTH = 32 };
-
-/* The notice of every Anti binary begins with these two lines, the
-   second one holding the 64 digits of the id. */
-static const char notice_begin[] = "ANTI_LICENSES_BEGIN\nbuild ";
-enum { ID_LENGTH = 64 };
 
 static bool ends_with(const char *s, const char *suffix)
 {
@@ -129,64 +126,6 @@ static void stem_of(const char *name, struct text *out)
     }
 }
 
-/* The build id and the version of the notice in bytes. The version is
-   the one of the last `package` line, which names the package of the
-   compiled module. Returns false when the bytes hold no notice. */
-static bool notice_of(const struct text *bytes, struct text *id,
-                      struct text *version)
-{
-    size_t marker = sizeof notice_begin - 1;
-    size_t i;
-
-    for (i = 0; i + marker + ID_LENGTH < bytes->length; i++) {
-        const char *at = bytes->data + i;
-        const char *end = bytes->data + bytes->length;
-        const char *line;
-        size_t j;
-        if (memcmp(at, notice_begin, marker) != 0) {
-            continue;
-        }
-        for (j = 0; j < ID_LENGTH; j++) {
-            char c = at[marker + j];
-            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
-                break;
-            }
-        }
-        if (j < ID_LENGTH || at[marker + ID_LENGTH] != '\n') {
-            continue;
-        }
-        text_append_bytes(id, at + marker, ID_LENGTH);
-        line = at + marker + ID_LENGTH + 1;
-        while (line < end && end - line > 8 &&
-               memcmp(line, "package ", 8) == 0) {
-            const char *stop = memchr(line, '\n', (size_t)(end - line));
-            const char *word;
-            const char *after;
-            if (stop == NULL) {
-                break;
-            }
-            word = memchr(line + 8, ' ', (size_t)(stop - line - 8));
-            after = word != NULL
-                        ? memchr(word + 1, ' ', (size_t)(stop - word - 1))
-                        : NULL;
-            if (word != NULL) {
-                version->length = 0;
-                text_append_bytes(version, word + 1,
-                                  (size_t)((after != NULL ? after : stop) -
-                                           word - 1));
-            }
-            line = stop + 1;
-            while (line < end && end - line > 12 &&
-                   memcmp(line, "attribution ", 12) == 0) {
-                stop = memchr(line, '\n', (size_t)(end - line));
-                line = stop != NULL ? stop + 1 : end;
-            }
-        }
-        return true;
-    }
-    return false;
-}
-
 /* Whether the bytes of a file named name are a program: a name without
    a suffix or with `.exe`, and the header of an executable. A Mach-O
    file says so in its header. ELF writes a static program of musl as a
@@ -257,7 +196,7 @@ static void add_binary(struct binaries *list, const char *path)
     }
     b = &list->items[list->count];
     memset(b, 0, sizeof *b);
-    if (!notice_of(&bytes, &b->id, &b->version)) {
+    if (!symmap_notice(&bytes, &b->id, &b->version)) {
         printf("missing %s: it carries no build id of Anti\n", path);
         list->problems++;
         text_free(&b->id);
@@ -407,7 +346,7 @@ static bool find_binaries(const char *conf, struct binaries *out)
         struct text version = {0};
         const char *path = text_cstr(&files.items[i]);
         if (files_read(path, &bytes) && is_program(files_base_name(path), &bytes) &&
-            notice_of(&bytes, &id, &version)) {
+            symmap_notice(&bytes, &id, &version)) {
             add_binary(out, path);
         }
         text_free(&bytes);
@@ -530,16 +469,17 @@ static const struct text *unit_entry(const struct unit *u, const char *suffix)
     return NULL;
 }
 
-/* The id a map names on its `# build` line. */
+/* The id a map names on its `# build` line, which follows the first
+   line of the map. */
 static bool map_id(const struct text *map, struct text *id)
 {
-    static const char line[] = "\n# build ";
+    static const char line[] = "\n" SYMMAP_BUILD_LINE;
     const char *at = strstr(text_cstr(map), line);
 
-    if (at == NULL || strlen(at) < sizeof line - 1 + ID_LENGTH) {
+    if (at == NULL || strlen(at) < sizeof line - 1 + ANTI_BUILD_ID_LENGTH) {
         return false;
     }
-    text_append_bytes(id, at + sizeof line - 1, ID_LENGTH);
+    text_append_bytes(id, at + sizeof line - 1, ANTI_BUILD_ID_LENGTH);
     return true;
 }
 
@@ -651,7 +591,7 @@ static bool load_archive(const char *path, struct units *out)
     }
     twin = unit_entry(u, ".debug");
     map = unit_entry(u, ".map");
-    if (twin == NULL || !notice_of(twin, &u->id, &u->version)) {
+    if (twin == NULL || !symmap_notice(twin, &u->id, &u->version)) {
         u->id.length = 0;
         if (map == NULL || !map_id(map, &u->id)) {
             fprintf(stderr, "anti: %s holds no build id\n", path);

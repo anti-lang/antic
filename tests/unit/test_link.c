@@ -272,30 +272,45 @@ static void runtime_entry(void)
     text_free(&start);
 }
 
-/* src/rt/license.c finds the notice of the program by the markers that the
-   emitter writes, spelled as C strings. */
+/* M24: the markers of the notice stand in src/rt/license.h alone. Every
+   file that writes or reads a notice takes them from there, so the
+   writer and the four readers cannot drift. */
 static void runtime_markers(void)
 {
-    struct text source = {0};
-    char buffer[4096];
-    FILE *f = platform_open(ANTIC_SOURCE_DIR "/src/rt/license.c", false);
-    size_t n;
+    static const char *const files[] = {
+        "/src/antic/notice.h", "/src/rt/license.c", "/src/rt/trace.c",
+        "/src/anti/symmap.c", "/src/anti/syms.c",
+    };
+    size_t i;
 
-    CHECK(f != NULL);
-    while (f != NULL && (n = fread(buffer, 1, sizeof buffer, f)) > 0) {
-        text_append_bytes(&source, buffer, n);
+    CHECK(strcmp(ANTI_NOTICE_BEGIN, "ANTI_LICENSES_BEGIN\n") == 0);
+    CHECK(strcmp(ANTI_NOTICE_END, "ANTI_LICENSES_END\n") == 0);
+    for (i = 0; i < sizeof files / sizeof files[0]; i++) {
+        struct text path = {0};
+        struct text source = {0};
+        char buffer[4096];
+        FILE *f;
+        size_t n;
+        text_appendf(&path, "%s%s", ANTIC_SOURCE_DIR, files[i]);
+        f = platform_open(text_cstr(&path), false);
+        CHECK(f != NULL);
+        while (f != NULL && (n = fread(buffer, 1, sizeof buffer, f)) > 0) {
+            text_append_bytes(&source, buffer, n);
+        }
+        if (f != NULL) {
+            fclose(f);
+        }
+        if (strstr(text_cstr(&source), "ANTI_LICENSES_") != NULL) {
+            fprintf(stderr, "%s spells a marker of the notice\n", files[i]);
+            CHECK(false);
+        }
+        if (strstr(text_cstr(&source), "license.h\"") == NULL) {
+            fprintf(stderr, "%s does not include license.h\n", files[i]);
+            CHECK(false);
+        }
+        text_free(&path);
+        text_free(&source);
     }
-    if (f != NULL) {
-        fclose(f);
-    }
-    CHECK(strlen(NOTICE_BEGIN) > 1 && strlen(NOTICE_END) > 1);
-    snprintf(buffer, sizeof buffer, "\"%.*s\\n\"",
-             (int)strlen(NOTICE_BEGIN) - 1, NOTICE_BEGIN);
-    CHECK(strstr(text_cstr(&source), buffer) != NULL);
-    snprintf(buffer, sizeof buffer, "\"%.*s\\n\"",
-             (int)strlen(NOTICE_END) - 1, NOTICE_END);
-    CHECK(strstr(text_cstr(&source), buffer) != NULL);
-    text_free(&source);
 }
 
 /* The runtime and the standard library carry the 0BSD licence, so a

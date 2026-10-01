@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "files.h"
+#include "license.h"
 #include "symbols.h"
 
 /* One function of the map. */
@@ -141,35 +142,74 @@ static void sort_map(struct map *m)
     }
 }
 
-bool symmap_build_id(const char *program, struct text *out)
+bool symmap_notice(const struct text *bytes, struct text *id,
+                   struct text *version)
 {
-    static const char marker[] = "build ";
-    struct text bytes = {0};
+    static const char head[] = ANTI_NOTICE_BEGIN ANTI_NOTICE_BUILD;
+    size_t marker = sizeof head - 1;
     size_t i;
-    bool found = false;
 
-    if (!files_read_reported(program, &bytes)) {
-        return false;
-    }
-    /* The notice of every program holds the line `build <64 digits>`,
-       which src/rt/license.c writes and `--anti.inspect` prints. */
-    for (i = 0; !found && i + sizeof marker + 64 <= bytes.length; i++) {
+    for (i = 0; i + marker + ANTI_BUILD_ID_LENGTH < bytes->length; i++) {
+        const char *at = bytes->data + i;
+        const char *end = bytes->data + bytes->length;
+        const char *line;
         size_t j;
-        if (memcmp(bytes.data + i, marker, sizeof marker - 1) != 0) {
+        if (memcmp(at, head, marker) != 0) {
             continue;
         }
-        for (j = 0; j < 64; j++) {
-            char c = bytes.data[i + sizeof marker - 1 + j];
+        for (j = 0; j < ANTI_BUILD_ID_LENGTH; j++) {
+            char c = at[marker + j];
             if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
                 break;
             }
         }
-        if (j == 64) {
-            text_append_bytes(out, bytes.data + i + sizeof marker - 1, 64);
-            found = true;
+        if (j < ANTI_BUILD_ID_LENGTH || at[marker + ANTI_BUILD_ID_LENGTH] != '\n') {
+            continue;
         }
+        text_append_bytes(id, at + marker, ANTI_BUILD_ID_LENGTH);
+        line = at + marker + ANTI_BUILD_ID_LENGTH + 1;
+        while (line < end && end - line > 8 &&
+               memcmp(line, "package ", 8) == 0) {
+            const char *stop = memchr(line, '\n', (size_t)(end - line));
+            const char *word;
+            const char *after;
+            if (stop == NULL) {
+                break;
+            }
+            word = memchr(line + 8, ' ', (size_t)(stop - line - 8));
+            after = word != NULL
+                        ? memchr(word + 1, ' ', (size_t)(stop - word - 1))
+                        : NULL;
+            if (word != NULL) {
+                version->length = 0;
+                text_append_bytes(version, word + 1,
+                                  (size_t)((after != NULL ? after : stop) -
+                                           word - 1));
+            }
+            line = stop + 1;
+            while (line < end && end - line > 12 &&
+                   memcmp(line, "attribution ", 12) == 0) {
+                stop = memchr(line, '\n', (size_t)(end - line));
+                line = stop != NULL ? stop + 1 : end;
+            }
+        }
+        return true;
     }
+    return false;
+}
+
+bool symmap_build_id(const char *program, struct text *out)
+{
+    struct text bytes = {0};
+    struct text version = {0};
+    bool found;
+
+    if (!files_read_reported(program, &bytes)) {
+        return false;
+    }
+    found = symmap_notice(&bytes, out, &version);
     text_free(&bytes);
+    text_free(&version);
     if (!found) {
         fprintf(stderr, "anti: %s carries no build id\n", program);
     }
@@ -203,7 +243,7 @@ bool symmap_write(const char *program, enum target t, const char *id,
         macho_lines(&m, &table);
     }
     text_append(&out, "# The map of a symbols archive of Anti.\n");
-    text_appendf(&out, "# build %s\n", id);
+    text_appendf(&out, "%s%s\n", SYMMAP_BUILD_LINE, id);
     text_appendf(&out, "# target %s\n", target_name(t));
     if (info->format == FORMAT_COFF) {
         text_append(&out, "# A Windows program carries no symbol table. The "
