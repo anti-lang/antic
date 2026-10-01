@@ -1,6 +1,10 @@
+#include <stdint.h>
+#include <stdlib.h>
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "arena.h"
+#include "ptrset.h"
 #include "types.h"
 
 static struct name name_of(const char *s)
@@ -169,4 +173,47 @@ void test_types(void)
     CHECK(type_bits(types_builtin(&types, TYPE_U16)) == 16);
 
     arena_free(&arena);
+}
+
+/* The three pointer tables share one probe, and each keeps every key
+   through the growths that 1000 keys take. */
+void test_ptr_tables(void)
+{
+    static int keys[1000];
+    struct ptr_set set;
+    struct ptr_map map;
+    struct ptr_index index;
+    uint32_t found = 0;
+    size_t i;
+    bool all = true;
+
+    memset(&set, 0, sizeof set);
+    memset(&map, 0, sizeof map);
+    memset(&index, 0, sizeof index);
+    CHECK(!ptr_set_has(&set, &keys[0]));
+    CHECK(ptr_map_get(&map, &keys[0]) == NULL);
+    CHECK(!ptr_index_get(&index, &keys[0], &found));
+    for (i = 0; i < 1000; i++) {
+        all = all && ptr_set_add(&set, &keys[i]);
+        ptr_map_put(&map, &keys[i], &keys[999 - i]);
+        ptr_index_put(&index, &keys[i], (uint32_t)i * 3);
+    }
+    CHECK(all);
+    CHECK(!ptr_set_add(&set, &keys[500]));
+    CHECK(set.count == 1000 && map.count == 1000 && index.count == 1000);
+    for (i = 0; i < 1000; i++) {
+        all = all && ptr_set_has(&set, &keys[i]) &&
+              ptr_map_get(&map, &keys[i]) == &keys[999 - i] &&
+              ptr_index_get(&index, &keys[i], &found) && found == i * 3;
+    }
+    CHECK(all);
+    ptr_map_put(&map, &keys[7], &keys[7]);
+    ptr_index_put(&index, &keys[7], 1);
+    CHECK(ptr_map_get(&map, &keys[7]) == &keys[7]);
+    CHECK(ptr_index_get(&index, &keys[7], &found) && found == 1);
+    CHECK(map.count == 1000 && index.count == 1000);
+    free(set.slots);
+    ptr_map_free(&map);
+    ptr_index_free(&index);
+    CHECK(map.capacity == 0 && index.capacity == 0);
 }

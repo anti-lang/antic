@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "antl_io.h"
+#include "ptrset.h"
 
 /* DESIGN: the section of the generics. A library file stores each
    generic body as its checked syntax tree, with its names resolved, its
@@ -43,84 +44,10 @@ _Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
    a symbol of the extern table with this bit set. */
 #define SYM_EXTERN 0x80000000u
 
-/* A map of pointers to indices, open addressed and at most half full. */
-struct index_map {
-    const void **keys;
-    uint32_t *values;
-    size_t capacity;
-    size_t count;
-};
-
-static size_t ptr_hash(const void *p, size_t capacity)
-{
-    uintptr_t v = (uintptr_t)p;
-
-    v ^= v >> 17;
-    v *= (uintptr_t)0x9e3779b97f4a7c15ull;
-    v ^= v >> 29;
-    return (size_t)v & (capacity - 1);
-}
-
-static bool map_find(const struct index_map *m, const void *key,
-                     uint32_t *value)
-{
-    size_t i;
-
-    if (m->capacity == 0) {
-        return false;
-    }
-    for (i = ptr_hash(key, m->capacity); m->keys[i] != NULL;
-         i = (i + 1) & (m->capacity - 1)) {
-        if (m->keys[i] == key) {
-            *value = m->values[i];
-            return true;
-        }
-    }
-    return false;
-}
-
 static void out_of_memory(void)
 {
     fputs("antic: out of memory\n", stderr);
     exit(70);
-}
-
-static void map_add(struct index_map *m, const void *key, uint32_t value)
-{
-    size_t i;
-
-    if ((m->count + 1) * 2 > m->capacity) {
-        struct index_map grown;
-        size_t k;
-        grown.capacity = m->capacity == 0 ? 64 : m->capacity * 2;
-        grown.count = 0;
-        grown.keys = calloc(grown.capacity, sizeof *grown.keys);
-        grown.values = calloc(grown.capacity, sizeof *grown.values);
-        if (grown.keys == NULL || grown.values == NULL) {
-            out_of_memory();
-        }
-        for (k = 0; k < m->capacity; k++) {
-            if (m->keys[k] != NULL) {
-                map_add(&grown, m->keys[k], m->values[k]);
-            }
-        }
-        free(m->keys);
-        free(m->values);
-        *m = grown;
-    }
-    for (i = ptr_hash(key, m->capacity); m->keys[i] != NULL;
-         i = (i + 1) & (m->capacity - 1)) {
-    }
-    m->keys[i] = key;
-    m->values[i] = value;
-    m->count++;
-}
-
-static void map_free(struct index_map *m)
-{
-    free(m->keys);
-    free(m->values);
-    memset(m, 0, sizeof *m);
 }
 
 /* A table of one kind of record of a tree. */
@@ -128,7 +55,7 @@ struct table {
     void **items;
     size_t count;
     size_t capacity;
-    struct index_map index;
+    struct ptr_index index;
 };
 
 static uint32_t table_add(struct table *t, void *p)
@@ -143,14 +70,14 @@ static uint32_t table_add(struct table *t, void *p)
         t->capacity = capacity;
     }
     t->items[t->count] = p;
-    map_add(&t->index, p, (uint32_t)t->count);
+    ptr_index_put(&t->index, p, (uint32_t)t->count);
     return (uint32_t)t->count++;
 }
 
 static void table_free(struct table *t)
 {
     free(t->items);
-    map_free(&t->index);
+    ptr_index_free(&t->index);
     memset(t, 0, sizeof *t);
 }
 
@@ -170,7 +97,7 @@ struct trees {
     struct tree *items;
     size_t count;
     size_t capacity;
-    struct index_map externs;
+    struct ptr_index externs;
 };
 
 enum io_mode { IO_COLLECT, IO_WRITE, IO_READ };
@@ -507,13 +434,13 @@ static void io_ref(struct io *io, int kind, void **p)
 
     switch (io->mode) {
     case IO_COLLECT:
-        if (*p != NULL && !map_find(&t->index, *p, &index)) {
+        if (*p != NULL && !ptr_index_get(&t->index, *p, &index)) {
             collect(io, kind, *p);
         }
         break;
     case IO_WRITE:
         if (*p != NULL) {
-            if (!map_find(&t->index, *p, &index)) {
+            if (!ptr_index_get(&t->index, *p, &index)) {
                 bad(io);
             }
             index++;
@@ -628,7 +555,7 @@ static void io_sym(struct io *io, struct symbol **s)
             break;
         }
         if (local_symbol(*s)) {
-            if (!map_find(&t->index, *s, &index)) {
+            if (!ptr_index_get(&t->index, *s, &index)) {
                 collect(io, T_SYM, *s);
             }
         } else {
@@ -638,11 +565,11 @@ static void io_sym(struct io *io, struct symbol **s)
     case IO_WRITE:
         if (*s != NULL) {
             if (local_symbol(*s)) {
-                if (!map_find(&t->index, *s, &index)) {
+                if (!ptr_index_get(&t->index, *s, &index)) {
                     bad(io);
                 }
                 index++;
-            } else if (map_find(&io->all->externs, *s, &index)) {
+            } else if (ptr_index_get(&io->all->externs, *s, &index)) {
                 index |= SYM_EXTERN;
             } else {
                 bad(io);
@@ -1374,7 +1301,7 @@ static void add_extern(struct io *io, const struct symbol *sym)
     const struct item *it = sym->item;
     uint32_t index;
 
-    if (map_find(&io->all->externs, sym, &index)) {
+    if (ptr_index_get(&io->all->externs, sym, &index)) {
         return;
     }
     if (w->extern_count == w->extern_capacity) {
@@ -1387,7 +1314,7 @@ static void add_extern(struct io *io, const struct symbol *sym)
         w->externs = list;
         w->extern_capacity = capacity;
     }
-    map_add(&io->all->externs, sym, (uint32_t)w->extern_count);
+    ptr_index_put(&io->all->externs, sym, (uint32_t)w->extern_count);
     w->externs[w->extern_count++] = sym;
     if (sym->type != NULL) {
         antl_visit_type(w, sym->type);
@@ -1975,7 +1902,7 @@ void antl_put_generics(struct writer *w)
         }
     }
     free(all->items);
-    map_free(&all->externs);
+    ptr_index_free(&all->externs);
     free(all);
     w->trees = NULL;
 }

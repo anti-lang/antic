@@ -11,6 +11,7 @@ void test_host_target(void);
 void test_lexer(void);
 void test_parser(void);
 void test_types(void);
+void test_ptr_tables(void);
 void test_sema(void);
 void test_sema_cycles(void);
 void test_sema_constants(void);
@@ -65,6 +66,7 @@ int main(void)
     test_lexer();
     test_parser();
     test_types();
+    test_ptr_tables();
     test_sema();
     test_sema_cycles();
     test_sema_constants();
