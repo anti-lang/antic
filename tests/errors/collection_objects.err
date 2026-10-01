@@ -1,0 +1,3 @@
+collection_objects.anti:10:13: error: `collection` has no public item `List`
+collection_objects.anti:11:14: error: `collection` has no public item `Map`
+collection_objects.anti:12:17: error: `collection` has no public item `IntMap`

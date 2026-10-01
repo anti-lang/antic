@@ -1,6 +1,8 @@
-//! A list and two maps hold objects. Anti has no generics, so a collection
-//! holds the root class and the program casts what it takes out.
-import anti.collection;
+//! A list and two maps hold pointers to objects, which the program owns and
+//! deletes. The generic collections hold a `*Item` as any other value and never
+//! the object it points to, so nothing is cast back.
+import anti.collection.list.{List};
+import anti.collection.map.{HashMap, Map};
 import anti.io;
 
 extern fn printf(fmt: ?*byte, ...) -> c_int;
@@ -12,56 +14,52 @@ class Item
 
 fn main() -> int
 {
-	let list = collection.List.new();
+	let list = List<*Item>.new();
 	let i = 0;
 	while i < 100 do {
-		list.push((alloc Item { n: i }) as *Object);
+		list.push(alloc Item { n: i });
 		i += 1;
 	}
-	if list.len() != 100 {
+	if list.count != 100 {
 		return 1;
 	}
-	let third = list.at(3) as *Item;
+	let third = list.get(3) else { return 2; };
 	if third.n != 3 {
 		return 2;
 	}
-	if list.at(100) != none {
+	if list.get(100) != none {
 		return 3;
 	}
-	let last = list.pop() as *Item;
-	if last.n != 99 || list.len() != 99 {
+	let last = list.pop() else { return 4; };
+	if last.n != 99 || list.count != 99 {
 		return 4;
 	}
 
-	let map = collection.Map.new();
-	let first = list.at(1) else { return 11; };
-	let second = list.at(2) else { return 11; };
-	let fifth = list.at(5) else { return 11; };
-	map.set("one", first);
-	map.set("two", second);
-	map.set("one", fifth);
-	if map.len() != 2 {
+	let map = Map<str, *Item>.new();
+	map.set("one", list[1]);
+	map.set("two", list[2]);
+	map.set("one", list[5]);
+	if map.count != 2 {
 		return 5;
 	}
-	let under = map.get("one") as *Item;
+	let under = map.get("one") else { return 6; };
 	if under.n != 5 {
 		return 6;
 	}
-	if map.has("three") {
+	if map.contains("three") {
 		return 7;
 	}
 
-	let numbers = collection.IntMap.new();
+	let numbers = HashMap<int, *Item>.new();
 	i = 0;
 	while i < 50 do {
-		let at = list.at(i) else { return 12; };
-		numbers.set(i * 7, at);
+		numbers.set(i * 7, list[i]);
 		i += 1;
 	}
-	if numbers.len() != 50 {
+	if numbers.count != 50 {
 		return 8;
 	}
-	let found = numbers.get(21) as *Item;
+	let found = numbers.get(21) else { return 9; };
 	if found.n != 3 {
 		return 9;
 	}
@@ -69,15 +67,12 @@ fn main() -> int
 		return 10;
 	}
 
-	printf("%d %d %d\n".ptr, list.len() as c_int, map.len() as c_int,
-		numbers.len() as c_int);
-	i = 0;
-	while i < list.len() do {
-		let item = list.at(i) else { return 13; };
+	printf("%d %d %d\n".ptr, list.count as c_int, map.count as c_int,
+		numbers.count as c_int);
+	for item in list {
 		delete(item);
-		i += 1;
 	}
-	delete(last as *Object);
+	delete(last);
 	io.println("done");
 	return 0;
 }

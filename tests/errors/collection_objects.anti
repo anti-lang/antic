@@ -1,0 +1,14 @@
+//! The list and the two maps over objects from before generics are gone from
+//! `anti.collection`. A program uses the generic collections instead, `List<T>`
+//! of `anti.collection.list` and `Map<K, V>` and `HashMap<K, V>` of
+//! `anti.collection.map`.
+
+import anti.collection;
+
+fn main() -> int
+{
+	let list = collection.List.new();
+	let named = collection.Map.new();
+	let numbered = collection.IntMap.new();
+	return 0;
+}

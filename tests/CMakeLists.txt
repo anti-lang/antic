@@ -3799,6 +3799,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "caller_params|-S,-o,${LISTINGS}/caller_params.s,caller_params.anti"
         "deref_new|-S,-o,${LISTINGS}/deref_new.s,deref_new.anti"
         "collection_copy|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/collection_copy.s,collection_copy.anti"
+        "collection_objects|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/collection_objects.s,collection_objects.anti"
         "lent_params|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/lent_params.s,lent_params.anti"
         "lent_slices|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/lent_slices.s,lent_slices.anti"
         "index_several|-S,-o,${LISTINGS}/index_several.s,index_several.anti"
