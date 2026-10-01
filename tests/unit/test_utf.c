@@ -68,6 +68,49 @@ static void splits(const char *line, const char *expected)
     free(out);
 }
 
+/* Every line of up to six units over the bytes that steer the splitter,
+   split into a buffer of exactly 2 * n + 2 units, which the sanitizer
+   builds check for a write past it. The program name counts even when
+   it is empty, and every further argument takes a blank and a unit. */
+static void splits_every_line(void)
+{
+    static const char alphabet[] = "a \"\\\t";
+    uint16_t units[7];
+    size_t n;
+
+    for (n = 0; n <= 6; n++) {
+        size_t lines = 1;
+        size_t line;
+        size_t i;
+        for (i = 0; i < n; i++) {
+            lines *= sizeof alphabet - 1;
+        }
+        for (line = 0; line < lines; line++) {
+            uint16_t *out = malloc((2 * n + 2) * sizeof *out);
+            size_t rest = line;
+            size_t count;
+            size_t used = 0;
+            size_t arg;
+            for (i = 0; i < n; i++) {
+                units[i] = (uint16_t)(unsigned char)
+                    alphabet[rest % (sizeof alphabet - 1)];
+                rest /= sizeof alphabet - 1;
+            }
+            units[n] = 0;
+            count = anti_rt_split_command_line(units, out);
+            CHECK(count >= 1 && count <= 1 + n / 2);
+            for (arg = 0; arg < count && used < 2 * n + 2; arg++) {
+                while (used < 2 * n + 2 && out[used] != 0) {
+                    used++;
+                }
+                used++;
+            }
+            CHECK(arg == count && used <= 2 * n + 2);
+            free(out);
+        }
+    }
+}
+
 /* One scalar value encoded, then decoded back from its bytes. */
 static void round_trips(uint32_t c, size_t length)
 {
@@ -139,6 +182,26 @@ void test_utf(void)
     /* The program name ends at a space outside quotes and keeps its
        backslashes. */
     splits("\"C:\\Program Files\\x.exe\"\targ  ", "C:\\Program Files\\x.exe|arg");
+    /* Lines no rule of Microsoft's shows. Backslashes at the end are
+       kept, an open quote ends with the line, and two quotes make an
+       empty argument. */
+    splits("prog a\\", "prog|a\\");
+    splits("prog a\\\\", "prog|a\\\\");
+    splits("prog a\\\"", "prog|a\"");
+    splits("prog \\\\\"", "prog|\\");
+    splits("prog \"a b", "prog|a b");
+    splits("prog \"\"", "prog|");
+    splits("prog \"\" \"\"", "prog||");
+    splits("prog \"a\"\"", "prog|a\"");
+    splits("prog \"\"\"", "prog|\"");
+    splits("prog\ta\tb\t", "prog|a|b");
+    splits("C:\\dir\\ x", "C:\\dir\\|x");
+    splits("\"pro g", "pro g");
+    splits("prog", "prog");
+    splits("prog   ", "prog");
+    splits("   ", "");
+    splits("", "");
+    splits_every_line();
 
     round_trips('A', 1);
     round_trips(0xE9, 2);
