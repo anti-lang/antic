@@ -1361,8 +1361,9 @@ static void report_line(void *context, const char *line, size_t length)
             if (m.where.length > 0) {
                 fprintf(stderr, " %s\n", text_cstr(&m.where));
             } else {
-                fprintf(stderr, " %.*s\n", (int)(c.end - c.at + 1),
-                        c.at - 1);
+                fputc(' ', stderr);
+                fwrite(c.at - 1, 1, (size_t)(c.end - c.at + 1), stderr);
+                fputc('\n', stderr);
             }
             text_free(&m.function);
             text_free(&m.where);

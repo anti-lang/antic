@@ -940,7 +940,12 @@ static int discover_in(const char *dir, size_t dir_length,
         char library[ANTI_PLUGIN_PATH];
         char file[ANTI_PLUGIN_PATH];
         char hex[65];
-        if (name.len == 0 || !index_lists(doc, n, path, length)) {
+        /* A path or a runtime longer than any path the loader opens
+           names no library this program can load, so the entry is
+           passed over, and each length the note prints fits an int. */
+        if (name.len == 0 || name.len >= ANTI_PLUGIN_PATH ||
+            built.len >= ANTI_PLUGIN_PATH ||
+            !index_lists(doc, n, path, length)) {
             continue;
         }
         /* A library built for another runtime is logged and passed
