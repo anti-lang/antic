@@ -25,6 +25,18 @@ void test_arith(void)
     CHECK(!arith_decimal("", 0, &value));
     CHECK(arith_decimal("123x", 3, &value) && value == 123);
 
+    /* A quotient by the rules of IEEE 754, a zero divisor included. */
+    CHECK(arith_divide(6.0, 3.0) == 2.0);
+    CHECK(arith_divide(1.0, 0.0) == HUGE_VAL);
+    CHECK(arith_divide(-1.0, 0.0) == -HUGE_VAL);
+    CHECK(arith_divide(1.0, -0.0) == -HUGE_VAL);
+    CHECK(arith_divide(-1.0, -0.0) == HUGE_VAL);
+    CHECK(arith_divide(HUGE_VAL, 0.0) == HUGE_VAL);
+    CHECK(isnan(arith_divide(0.0, 0.0)));
+    CHECK(isnan(arith_divide(-0.0, 0.0)));
+    CHECK(isnan(arith_divide(NAN, 0.0)));
+    CHECK(isnan(arith_divide(NAN, 2.0)));
+
     /* The upper half of the full product. */
     CHECK(arith_mul_high(UINT64_MAX, UINT64_MAX, 64, false) ==
           UINT64_MAX - 1);

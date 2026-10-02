@@ -170,7 +170,9 @@ static void free_counts(struct counts *c)
 
 /* Constant folding */
 
-/* f32 arithmetic happens in float, so the result is the f32 result. */
+/* f32 arithmetic happens in float, so the result is the f32 result. A
+   quotient of two floats computed in double and rounded to float is the
+   float quotient, since 53 bits are at least 2 * 24 + 2. */
 static bool fold_float(enum ir_op op, enum ir_type t, double a, double b,
                        struct ir_operand *out)
 {
@@ -183,7 +185,10 @@ static bool fold_float(enum ir_op op, enum ir_type t, double a, double b,
     case IR_FADD: r = single ? (double)(fa + fb) : a + b; break;
     case IR_FSUB: r = single ? (double)(fa - fb) : a - b; break;
     case IR_FMUL: r = single ? (double)(fa * fb) : a * b; break;
-    case IR_FDIV: r = single ? (double)(fa / fb) : a / b; break;
+    case IR_FDIV:
+        r = single ? (double)arith_to_f32(arith_divide(fa, fb))
+                   : arith_divide(a, b);
+        break;
     case IR_FEQ: *out = ir_int_op(IR_I8, a == b); return true;
     case IR_FNE: *out = ir_int_op(IR_I8, a != b); return true;
     case IR_FLT: *out = ir_int_op(IR_I8, a < b); return true;

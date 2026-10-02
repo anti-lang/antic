@@ -34,6 +34,17 @@ int64_t arith_shift_right(int64_t a, unsigned k)
                  : (int64_t)((uint64_t)a >> k);
 }
 
+double arith_divide(double a, double b)
+{
+    if (b != 0) {
+        return a / b;
+    }
+    if (isnan(a) || a == 0) {
+        return NAN;
+    }
+    return (signbit(a) != 0) != (signbit(b) != 0) ? -HUGE_VAL : HUGE_VAL;
+}
+
 float arith_to_f32(double d)
 {
     /* Halfway between FLT_MAX and 2^128. From there on the nearest float

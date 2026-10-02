@@ -27,6 +27,11 @@ int64_t arith_shift_right(int64_t a, unsigned k);
    6.3.1.5 leaves a cast of such a value undefined. */
 float arith_to_f32(double d);
 
+/* a / b as IEEE 754 divides: NaN for a zero or NaN a over zero, and an
+   infinity with the sign of the two operands for any other a. C11 6.5.5
+   leaves a zero divisor undefined without Annex F. */
+double arith_divide(double a, double b);
+
 /* The upper half of the full product of a and b, which has 2n bits. */
 uint64_t arith_mul_high(uint64_t a, uint64_t b, int n, bool is_signed);
 

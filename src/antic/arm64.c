@@ -1352,8 +1352,9 @@ static void compare(struct selector *s, const struct ir_inst *inst)
         a = wide;
     }
     if (inst->b.kind == IR_INT) {
-        v = n < 32 && !is_signed ? (int64_t)inst->b.as.integer
-                                 : select_signed(inst->b.as.integer, n);
+        v = n < 32 && !is_signed
+                ? (int64_t)(inst->b.as.integer & ((UINT64_C(1) << n) - 1))
+                : select_signed(inst->b.as.integer, n);
         ops[0] = a;
         if (fits_imm12(v)) {
             emit_imm12(s, A64_CMP, 1, ops, v);

@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "alloc.h"
+#include "arith.h"
 #include "regalloc.h"
 #include "rt_abi.h"
 
@@ -687,7 +688,7 @@ static uint64_t float_bits(enum ir_type type, double value)
     uint64_t pattern;
 
     if (type == IR_F32) {
-        float narrow = (float)value;
+        float narrow = arith_to_f32(value);
         uint32_t word;
         memcpy(&word, &narrow, sizeof word);
         return word;
