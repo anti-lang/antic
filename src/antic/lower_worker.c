@@ -43,23 +43,26 @@ static uint32_t context_aggregate(struct lowerer *l, const struct expr *call,
                                   const char *name)
 {
     struct ir_field *fields;
+    char **names;
     uint32_t agg;
     size_t n = call->as.call.arg_count;
     size_t i;
 
     fields = alloc_zeroed(n, sizeof *fields);
+    names = alloc_zeroed(n, sizeof *names);
     for (i = 0; i < n; i++) {
-        char *field = alloc_zeroed(24, 1);
-        snprintf(field, 24, "a%zu", i);
-        fields[i].name = field;
+        names[i] = alloc_zeroed(24, 1);
+        text_format(names[i], 24, "a%zu", i);
+        fields[i].name = names[i];
         fields[i].type = lower_vtype_of(l, worker_param(call, i));
         fields[i].bits = 0;
         fields[i].ext = IR_EXT_NONE;
     }
     agg = ir_struct_add(l->m, IR_AGG_STRUCT, name, fields, n, false, 0);
     for (i = 0; i < n; i++) {
-        free((char *)fields[i].name);
+        free(names[i]);
     }
+    free(names);
     free(fields);
     return agg;
 }

@@ -219,7 +219,7 @@ static void check_inst(struct checker *c, const struct ir_inst *inst)
     }
 }
 
-void memcheck_function(struct ir_module *m, struct ir_function *f,
+void memcheck_function(const struct ir_module *m, struct ir_function *f,
                        struct layouts *l)
 {
     struct checker c;

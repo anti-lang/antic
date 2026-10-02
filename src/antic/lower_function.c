@@ -257,7 +257,8 @@ static void lower_function_body(struct lowerer *l, const struct item *it)
 static uint32_t lower_snapshot_agg(struct lowerer *l, const struct item *it)
 {
     struct ir_field *fields = alloc_zeroed(it->capture_count + 1,
-                                       sizeof *fields);
+                                           sizeof *fields);
+    char **names = alloc_zeroed(it->capture_count + 1, sizeof *names);
     struct text name = {0};
     uint32_t agg;
     size_t i;
@@ -265,7 +266,8 @@ static uint32_t lower_snapshot_agg(struct lowerer *l, const struct item *it)
     fields[0].name = "size";
     fields[0].type = ir_scalar(IR_I64);
     for (i = 0; i < it->capture_count; i++) {
-        fields[i + 1].name = lower_cstr(&it->captures[i].symbol->name);
+        names[i] = lower_cstr(&it->captures[i].symbol->name);
+        fields[i + 1].name = names[i];
         fields[i + 1].type = lower_vtype_of(l, it->captures[i].symbol->type);
     }
     text_appendf(&name, "%s.snapshot", l->m->functions[it->symbol->ir]->name);
@@ -273,8 +275,9 @@ static uint32_t lower_snapshot_agg(struct lowerer *l, const struct item *it)
                         it->capture_count + 1, false, 0);
     text_free(&name);
     for (i = 0; i < it->capture_count; i++) {
-        free((char *)fields[i + 1].name);
+        free(names[i]);
     }
+    free(names);
     free(fields);
     return agg;
 }
@@ -332,12 +335,14 @@ static void snapshot_entry(struct lowerer *l, const struct item *it,
 static uint32_t lower_captures_agg(struct lowerer *l, const struct item *it)
 {
     struct ir_field *fields = alloc_zeroed(it->capture_count, sizeof *fields);
+    char **names = alloc_zeroed(it->capture_count, sizeof *names);
     struct text name = {0};
     uint32_t agg;
     size_t i;
 
     for (i = 0; i < it->capture_count; i++) {
-        fields[i].name = lower_cstr(&it->captures[i].symbol->name);
+        names[i] = lower_cstr(&it->captures[i].symbol->name);
+        fields[i].name = names[i];
         fields[i].type = ir_scalar(IR_PTR);
     }
     text_appendf(&name, "%s.context", l->m->functions[it->symbol->ir]->name);
@@ -345,8 +350,9 @@ static uint32_t lower_captures_agg(struct lowerer *l, const struct item *it)
                         it->capture_count, false, 0);
     text_free(&name);
     for (i = 0; i < it->capture_count; i++) {
-        free((char *)fields[i].name);
+        free(names[i]);
     }
+    free(names);
     free(fields);
     return agg;
 }

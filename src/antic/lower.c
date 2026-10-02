@@ -196,11 +196,11 @@ uint32_t lower_agg_of(struct lowerer *l, const struct type *t)
         agg = ir_array_add(l->m, name, element, length, text_cstr(&text));
         text_free(&text);
     } else if (types_has_fields(t)) {
+        /* ir_struct_add copies the names, so these copies are freed. */
+        char **names = alloc_zeroed(count + 1, sizeof *names);
         for (i = 0; i < count; i++) {
-            char *field = alloc_zeroed(t->fields[i].name.length + 1, 1);
-            memcpy(field, t->fields[i].name.text, t->fields[i].name.length);
-            field[t->fields[i].name.length] = '\0';
-            fields[i].name = field;
+            names[i] = lower_cstr(&t->fields[i].name);
+            fields[i].name = names[i];
             fields[i].type = lower_vtype_of(l, t->fields[i].type);
             fields[i].bits = t->fields[i].bits;
             fields[i].ext = t->fields[i].bits == 0 ? IR_EXT_NONE
@@ -214,8 +214,9 @@ uint32_t lower_agg_of(struct lowerer *l, const struct type *t)
                                       name, fields, count, t->packed,
                                       t->align);
         for (i = 0; i < count; i++) {
-            free((char *)fields[i].name);
+            free(names[i]);
         }
+        free(names);
     } else if (t->kind == TYPE_FN) {
         /* A bound function is the object and the entry of its table, and
            a function with its context the code and the context. The plain

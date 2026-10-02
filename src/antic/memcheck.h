@@ -47,7 +47,7 @@ void memcheck_declare(struct ir_module *m, const char *module, bool links,
 
 /* Put a check before every load and store of f. l holds the layouts of
    the target, which give each access its size. */
-void memcheck_function(struct ir_module *m, struct ir_function *f,
+void memcheck_function(const struct ir_module *m, struct ir_function *f,
                        struct layouts *l);
 
 #endif
