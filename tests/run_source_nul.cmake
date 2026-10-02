@@ -1,8 +1,9 @@
-# Run antic on sources that hold a NUL byte, each of which is refused
-# when it is read, before the lexer sees it. read_source of
-# src/antic/driver.c reads 4095 bytes at a time, so the NUL stands at the
-# start, inside the first block, at its last byte, at the first byte of
-# the next and at the end of the file. Run with cmake -P and these values:
+# Run antic on sources that hold a NUL byte. The lexer holds the rule on
+# the bytes of a source, as anti reaches it too. A NUL outside a literal
+# is refused, and the NUL stands at the start, inside the first block the
+# driver reads, at its last byte, at the first byte of the next and at
+# the end of the file. A NUL inside a bytes literal is a byte of it, and
+# antic takes the source. Run with cmake -P and these values:
 #   ANTIC  the antic executable
 #   NUL    a file of one NUL byte, tests/errors/nul_byte.bin
 #   WORK   a directory for the sources
@@ -56,10 +57,27 @@ foreach(place "0|0" "0|10" "1|0" "100|100" "4094|0" "4094|5" "4095|0"
         message(FATAL_ERROR "antic took a source with a NUL byte after "
                             "${before} bytes")
     endif()
-    if(NOT err STREQUAL "antic: ${source} contains a NUL byte\n" OR
-       NOT out STREQUAL "")
+    math(EXPR column "${before} + 1")
+    if(NOT err MATCHES "^${source}:1:${column}: error: NUL is not allowed here"
+       OR NOT out STREQUAL "")
         message(FATAL_ERROR "antic did not name the NUL byte after ${before} "
                             "bytes\n${out}${err}")
     endif()
 endforeach()
+
+# A NUL byte inside a bytes literal.
+file(WRITE "${WORK}/before.txt" "fn main() -> int\n{\n    let b = b\"a")
+file(WRITE "${WORK}/after.txt" "b\";\n    return b.len as int;\n}\n")
+set(source "${WORK}/bytes.anti")
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E cat "${WORK}/before.txt" "${NUL}"
+            "${WORK}/after.txt"
+    OUTPUT_FILE "${source}" RESULT_VARIABLE status)
+execute_process(
+    COMMAND "${ANTIC}" --front-end "${source}"
+    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "antic refused a NUL byte inside a bytes literal\n"
+                        "${err}")
+endif()
 file(REMOVE_RECURSE "${WORK}")

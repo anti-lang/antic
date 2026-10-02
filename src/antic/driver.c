@@ -87,33 +87,11 @@ static bool ends_with(const char *s, const char *suffix)
 }
 
 /* Read the whole of a binary file. */
-static bool read_bytes(const char *path, struct text *out)
+/* Read the whole file into out. A source stops at LEX_SOURCE_MAX, and a
+   larger one is refused before more of it is read. */
+static bool read_file(const char *path, struct text *out, bool source)
 {
-    FILE *f = platform_open(path, false);
-    char buffer[4096];
-    size_t n;
-    bool ok;
-
-    if (f == NULL) {
-        fprintf(stderr, "antic: cannot open %s\n", path);
-        return false;
-    }
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
-        text_append_bytes(out, buffer, n);
-    }
-    ok = !ferror(f);
-    if (!ok) {
-        fprintf(stderr, "antic: cannot read %s\n", path);
-    }
-    fclose(f);
-    return ok;
-}
-
-/* Read the whole file. A source file holding a NUL byte is rejected,
-   because the text buffer ends at the first NUL. One above
-   LEX_SOURCE_MAX is rejected as well, since the lexer refuses it. */
-static bool read_source(const char *path, struct text *out)
-{
+    size_t limit = source ? LEX_SOURCE_MAX : SIZE_MAX;
     FILE *f = platform_open(path, false);
     char buffer[4096];
     size_t n;
@@ -124,20 +102,15 @@ static bool read_source(const char *path, struct text *out)
         fprintf(stderr, "antic: cannot open %s\n", path);
         return false;
     }
-    while ((n = fread(buffer, 1, sizeof buffer - 1, f)) > 0) {
-        if (n > LEX_SOURCE_MAX - total) {
-            fprintf(stderr, "antic: %s is larger than 64 MiB\n", path);
+    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
+        if (n > limit - total) {
+            fprintf(stderr, "antic: %s is larger than " LEX_SOURCE_MAX_TEXT "\n",
+                    path);
             ok = false;
             break;
         }
         total += n;
-        buffer[n] = '\0';
-        if (strlen(buffer) != n) {
-            fprintf(stderr, "antic: %s contains a NUL byte\n", path);
-            ok = false;
-            break;
-        }
-        text_append(out, buffer);
+        text_append_bytes(out, buffer, n);
     }
     if (ferror(f)) {
         fprintf(stderr, "antic: cannot read %s\n", path);
@@ -145,6 +118,32 @@ static bool read_source(const char *path, struct text *out)
     }
     fclose(f);
     return ok;
+}
+
+static bool read_bytes(const char *path, struct text *out)
+{
+    return read_file(path, out, false);
+}
+
+/* Read a source file. The lexer holds the rules on its bytes, NUL among
+   them, and reading stops at the size the lexer refuses. */
+static bool read_source(const char *path, struct text *out)
+{
+    return read_file(path, out, true);
+}
+
+/* Read a text that antic keeps as a C string, such as a licence text. A
+   NUL byte would end it early, so a file that holds one is refused. */
+static bool read_text(const char *path, struct text *out)
+{
+    if (!read_bytes(path, out)) {
+        return false;
+    }
+    if (memchr(text_cstr(out), '\0', out->length) != NULL) {
+        fprintf(stderr, "antic: %s contains a NUL byte\n", path);
+        return false;
+    }
+    return true;
 }
 
 static bool write_file(const char *path, const struct text *content)
@@ -548,7 +547,7 @@ static const char *windows_path(struct windows_link *w, const char *path,
         return path;
     }
     if (absolute_path(path, &absolute)) {
-        result = link_relative(&from, text_cstr(&absolute), text_cstr(&w->base))
+        result = path_relative(&from, text_cstr(&absolute), text_cstr(&w->base))
                      ? windows_keep(w, &from)
                      : windows_keep(w, &absolute);
     }
@@ -1355,7 +1354,7 @@ static bool package_header(const struct options *o, struct arena *arena,
     if (o->license_text != NULL) {
         struct text text = {0};
         char *copy;
-        if (!read_source(o->license_text, &text)) {
+        if (!read_text(o->license_text, &text)) {
             return false;
         }
         copy = arena_alloc(arena, text.length + 1);
@@ -1819,7 +1818,7 @@ static bool build_notice(const struct options *o, const struct interface *own,
     runtime.license_text = "";
     text_appendf(&path, "%s/licenses/anti_rt.txt",
                  o->runtime != NULL ? o->runtime : ".");
-    if (o->runtime != NULL && read_source(text_cstr(&path), &text)) {
+    if (o->runtime != NULL && read_text(text_cstr(&path), &text)) {
         char *copy = arena_alloc(arena, text.length + 1);
         memcpy(copy, text_cstr(&text), text.length);
         runtime.license_text = copy;

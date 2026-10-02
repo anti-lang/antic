@@ -151,6 +151,7 @@ struct token_list {
    Every reader of a source file stops at it, and lex refuses a longer
    length before it reads a byte. */
 #define LEX_SOURCE_MAX ((size_t)64 << 20)
+#define LEX_SOURCE_MAX_TEXT "64 MiB"
 
 /* DESIGN: the parser descends at most this many levels into nested
    expressions, types and statements, and refuses a deeper source with a

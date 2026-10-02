@@ -1474,6 +1474,8 @@ static void lex_token(struct lexer *lx)
         if (c >= 0x80) {
             error_at(lx, line, column,
                      "unexpected character outside a literal");
+        } else if (c == 0) {
+            error_at(lx, line, column, "NUL is not allowed here");
         } else {
             error_at(lx, line, column, "unexpected character `%c`", c);
         }
@@ -1490,7 +1492,7 @@ bool lexer_lex(const char *source, size_t length, struct arena *arena,
     struct lexer lx = {source, length, 0, 1, 1, arena, diags, out, true, 0, 0};
 
     if (length > LEX_SOURCE_MAX) {
-        error_at(&lx, 1, 1, "the source is larger than 64 MiB");
+        error_at(&lx, 1, 1, "the source is larger than " LEX_SOURCE_MAX_TEXT);
         push(&lx, TOKEN_EOF, 0, 1, 1);
         return false;
     }

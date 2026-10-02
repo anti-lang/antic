@@ -2385,8 +2385,9 @@ add_test(NAME error_source_cap
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/source-cap"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_source_cap.cmake")
 
-# A source that holds a NUL byte is refused when it is read, wherever the
-# byte stands among the blocks the reader takes.
+# The lexer refuses a NUL byte outside a literal, wherever it stands
+# among the blocks the reader takes, and takes one inside a bytes
+# literal.
 add_test(NAME error_source_nul
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
