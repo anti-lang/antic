@@ -191,65 +191,77 @@ static void type_params(struct text *out, const struct type *t)
     text_append(out, ">");
 }
 
+/* One function a page shows: the words before its form word, the form
+   word, the name, the generic that declares it or NULL, its type, the
+   names of its parameters or NULL, how many of them follow self, whether
+   it takes self and whether it is variadic. */
+struct fn_shown {
+    const char *lead;
+    const char *keyword;
+    const struct name *name;
+    const struct item *generic;
+    const struct type *type;
+    const struct name *params;
+    size_t param_count;
+    bool self;
+    bool variadic;
+};
+
 /* DESIGN: a signature carries the visibility, the form word and the name
    of the function, the name, the mark and the type of every parameter,
    the result and `may fail`. It carries no default value, no `own` and no
    body. The library file keeps the first set for every function and the
    rest for some. A page built from the file reads as the page built from
    the source. */
-static void fn_signature(struct text *out, const char *lead,
-                         const char *keyword, const struct name *name,
-                         const struct item *generic, const struct type *t,
-                         const struct name *params, size_t param_count,
-                         bool self, bool variadic)
+static void fn_signature(struct text *out, const struct fn_shown *f)
 {
-    const struct type *result = declared_result(t);
-    size_t first = self ? 1 : 0;
+    const struct type *result = declared_result(f->type);
+    size_t first = f->self ? 1 : 0;
     size_t i;
 
-    text_appendf(out, "%s%s %.*s", lead, keyword, (int)name->length,
-                 name->text);
-    fn_params(out, generic);
+    text_appendf(out, "%s%s %.*s", f->lead, f->keyword, (int)f->name->length,
+                 f->name->text);
+    fn_params(out, f->generic);
     text_append(out, "(");
-    if (self) {
+    if (f->self) {
         text_append(out, "self");
     }
-    for (i = 0; i < param_count && first + i < t->param_count; i++) {
-        const struct type *p = t->params[first + i];
-        text_append(out, i > 0 || self ? ", " : "");
+    for (i = 0; i < f->param_count && first + i < f->type->param_count; i++) {
+        const struct type *p = f->type->params[first + i];
+        text_append(out, i > 0 || f->self ? ", " : "");
         /* A parameter of function type carries its mark in its type. An
            `extern fn` takes C function pointers alone and writes none. */
-        if (p->kind == TYPE_FN && !p->bound && !c_function(keyword)) {
+        if (p->kind == TYPE_FN && !p->bound && !c_function(f->keyword)) {
             text_append(out, p->owned        ? "keep own "
                              : !p->context   ? "keep "
                              : p->concurrent ? "concurrent "
                                              : "");
         }
         /* `lent` stands before the name, as the declaration writes it. */
-        if (types_is_lent(p) && params != NULL &&
-            params[i].length > 0) {
+        if (types_is_lent(p) && f->params != NULL &&
+            f->params[i].length > 0) {
             struct type bare = *p;
             bare.lent = false;
-            text_appendf(out, "lent %.*s: ", (int)params[i].length,
-                         params[i].text);
+            text_appendf(out, "lent %.*s: ", (int)f->params[i].length,
+                         f->params[i].text);
             types_name(out, &bare);
             continue;
         }
-        if (params != NULL && params[i].length > 0) {
-            text_appendf(out, "%.*s: ", (int)params[i].length,
-                         params[i].text);
+        if (f->params != NULL && f->params[i].length > 0) {
+            text_appendf(out, "%.*s: ", (int)f->params[i].length,
+                         f->params[i].text);
         }
         types_name(out, p);
     }
-    if (variadic) {
-        text_append(out, param_count > 0 || self ? ", ..." : "...");
+    if (f->variadic) {
+        text_append(out, f->param_count > 0 || f->self ? ", ..." : "...");
     }
     text_append(out, ")");
     if (result != NULL) {
         text_append(out, " -> ");
         types_name(out, result);
     }
-    if (t->may_fail) {
+    if (f->type->may_fail) {
         text_append(out, " may fail");
     }
 }
@@ -452,6 +464,7 @@ static void body_entries(struct doc_entry *item, const struct type *t, bool all)
     }
     for (i = 0; i < t->member_count; i++) {
         const struct item *m = t->members[i];
+        struct fn_shown shown = {0};
         struct doc_entry *one;
         bool self;
         size_t params;
@@ -493,8 +506,14 @@ static void body_entries(struct doc_entry *item, const struct type *t, bool all)
                                                      : m->params[j].name;
             }
         }
-        fn_signature(&one->signature, "", "fn", &m->name, NULL,
-                     m->symbol->type, names, params, self, false);
+        shown.lead = "";
+        shown.keyword = "fn";
+        shown.name = &m->name;
+        shown.type = m->symbol->type;
+        shown.params = names;
+        shown.param_count = params;
+        shown.self = self;
+        fn_signature(&one->signature, &shown);
         free(names);
         doc_copy(&one->doc, &m->doc);
     }
@@ -536,6 +555,7 @@ static void alias_signature(struct doc_entry *one, const char *lead,
    the two inputs they were built from. */
 static void interface_item(struct doc_page *p, const struct symbol *sym)
 {
+    struct fn_shown fn = {0};
     struct doc_entry *one;
     const char *lead = "pub ";
     struct name shown;
@@ -561,14 +581,24 @@ static void interface_item(struct doc_page *p, const struct symbol *sym)
     }
     switch (sym->kind) {
     case SYMBOL_FN:
-        fn_signature(&one->signature, lead, sym->worker ? "worker fn" : "fn",
-                     &shown, sym->item, sym->type, sym->params,
-                     declared_params(sym->type, false), false, false);
+        fn.lead = lead;
+        fn.keyword = sym->worker ? "worker fn" : "fn";
+        fn.name = &shown;
+        fn.generic = sym->item;
+        fn.type = sym->type;
+        fn.params = sym->params;
+        fn.param_count = declared_params(sym->type, false);
+        fn_signature(&one->signature, &fn);
         break;
     case SYMBOL_EXTERN_FN:
-        fn_signature(&one->signature, lead, "extern fn", &sym->name, NULL,
-                     sym->type, sym->params,
-                     declared_params(sym->type, false), false, sym->variadic);
+        fn.lead = lead;
+        fn.keyword = "extern fn";
+        fn.name = &sym->name;
+        fn.type = sym->type;
+        fn.params = sym->params;
+        fn.param_count = declared_params(sym->type, false);
+        fn.variadic = sym->variadic;
+        fn_signature(&one->signature, &fn);
         break;
     case SYMBOL_CONSTRAINT:
         constraint_signature(&one->signature, lead, &sym->name, sym->type);
@@ -591,6 +621,7 @@ static void interface_item(struct doc_page *p, const struct symbol *sym)
 static void tree_item(struct doc_page *p, const struct item *it, bool notes)
 {
     const struct symbol *sym = it->symbol;
+    struct fn_shown fn = {0};
     struct doc_entry *one;
     const char *lead;
     size_t i;
@@ -621,12 +652,17 @@ static void tree_item(struct doc_page *p, const struct item *it, bool notes)
                 names[i] = it->params[i].name;
             }
         }
-        fn_signature(&one->signature, lead,
-                     it->kind == ITEM_EXTERN_FN
-                         ? "extern fn"
-                         : (it->worker ? "worker fn" : "fn"),
-                     &it->name, it, sym->type, names, it->param_count, false,
-                     it->variadic);
+        fn.lead = lead;
+        fn.keyword = it->kind == ITEM_EXTERN_FN ? "extern fn"
+                     : it->worker               ? "worker fn"
+                                                : "fn";
+        fn.name = &it->name;
+        fn.generic = it;
+        fn.type = sym->type;
+        fn.params = names;
+        fn.param_count = it->param_count;
+        fn.variadic = it->variadic;
+        fn_signature(&one->signature, &fn);
         free(names);
         break;
     }
