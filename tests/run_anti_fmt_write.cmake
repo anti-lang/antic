@@ -28,7 +28,8 @@ execute_process(
             "${source}"
     RESULT_VARIABLE status
     OUTPUT_VARIABLE out
-    ERROR_VARIABLE err)
+    ERROR_VARIABLE err
+    ENCODING NONE)
 if(status EQUAL 0)
     message(FATAL_ERROR "anti fmt wrote past the limit:\n${out}${err}")
 endif()
@@ -45,7 +46,8 @@ execute_process(
     COMMAND "${ANTI}" fmt "${source}"
     RESULT_VARIABLE status
     OUTPUT_VARIABLE out
-    ERROR_VARIABLE err)
+    ERROR_VARIABLE err
+    ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "anti fmt failed with ${status}:\n${out}${err}")
 endif()
