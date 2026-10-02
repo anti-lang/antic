@@ -3,7 +3,6 @@
 
 #include "../rt/hash.h"
 #include "lower_lowerer.h"
-#include "target.h"
 
 /* DESIGN: a scalar hashes as the 64 bits of its value through the
    finalizer of MurmurHash3. The finalizer spreads every bit of the input

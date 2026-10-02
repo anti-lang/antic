@@ -5,7 +5,7 @@
 #include <string.h>
 
 #include "alloc.h"
-#include "select.h"
+#include "target_desc.h"
 
 /* DESIGN: linear scan in the form of Poletto and Sarkar. Each virtual
    register gets one live interval without holes, from its first to its

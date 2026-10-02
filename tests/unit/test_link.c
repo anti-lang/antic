@@ -7,6 +7,7 @@
 #include "cpu.h"
 #include "linker.h"
 #include "notice.h"
+#include "rt_abi.h"
 #include "text.h"
 
 static const char *const extra_unix[] = {"shapes.o", "libm.a"};

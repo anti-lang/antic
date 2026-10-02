@@ -7,7 +7,7 @@
 #include <string.h>
 
 #include "alloc.h"
-#include "select.h"
+#include "target_desc.h"
 
 struct mach_inst *mach_append(struct mach_block *b)
 {

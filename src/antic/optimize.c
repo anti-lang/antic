@@ -8,7 +8,7 @@
 #include "arith.h"
 #include "ir_fold.h"
 #include "reach.h"
-#include "target.h"
+#include "rt_abi.h"
 
 /* DESIGN: the passes rely on three properties and nothing else.
    1. The IR passes ir_verify, including its check that every path to a

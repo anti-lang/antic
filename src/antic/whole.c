@@ -7,7 +7,6 @@
 #include "alloc.h"
 #include "reach.h"
 #include "rt_abi.h"
-#include "target.h"
 
 /* DESIGN: a module that names a class of another module refers to its
    descriptor through a global of its own. That global is extern and

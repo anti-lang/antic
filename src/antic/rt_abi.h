@@ -20,6 +20,34 @@
 
 #include "ir.h"
 
+/* The runtime calls the program's main through the symbol of function
+   RUNTIME_ENTRY in module RUNTIME_MODULE, anti.rt.main. That module path
+   is reserved. */
+#define RUNTIME_MODULE "anti.rt"
+#define RUNTIME_ENTRY "main"
+
+/* The runtime defines the functions of the root class anti.lang.Object,
+   its descriptor and its ancestors under this C prefix. */
+#define RUNTIME_ROOT "anti_lang_Object_"
+
+/* DESIGN: the slot of an injectable interface is one global per
+   interface, of the runtime module. Its name is this prefix and the
+   path of the interface. The passes over the whole program write data
+   of the runtime module, and that data belongs to the object that
+   links. No Anti identifier holds a dot, so no module of the standard
+   library takes such a name. */
+#define INJECT_SLOT_PREFIX "inject."
+
+/* The runtime function that `anti.plugin.load` calls. A program that
+   holds it can host a plugin, so the link exports its symbols. */
+#define PLUGIN_LOAD "anti_rt_plugin_load"
+
+/* The two providers of the manifest that name a library rather than a
+   function of the program. `plugin:` carries the path after it, and
+   `discover` searches the directories of the `plugins` key. */
+#define PROVIDER_PLUGIN "plugin:"
+#define PROVIDER_DISCOVER "discover"
+
 /* The most parameters a runtime function in RT_FUNCTIONS takes. */
 #define RT_PARAMS_MAX 9
 

@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include "alloc.h"
-#include "target.h"
 #include "text.h"
 #include "types.h"
 #include "lower_lowerer.h"

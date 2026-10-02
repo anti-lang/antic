@@ -3,7 +3,6 @@
 
 #include "alloc.h"
 #include "sema.h"
-#include "target.h"
 #include "text.h"
 #include "types.h"
 #include "lower_lowerer.h"

@@ -2,7 +2,6 @@
    `?T`, which `a == b` gives on a type without `operator fn eq`. */
 
 #include "lower_lowerer.h"
-#include "target.h"
 
 /* DESIGN: the default compares the parts of the two values in order and
    leaves at the first that differs, so a part after it is never read and
