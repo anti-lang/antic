@@ -526,6 +526,7 @@ void test_lexer(void)
     error("'\\x80'", 1, 2, "`\\xHH` stops at `\\x7F` outside byte strings");
     error("'\\0'", 1, 2, "NUL is not allowed here");
     error("'\\u{0}'", 1, 2, "NUL is not allowed here");
+    error_n("'\0'", 3, 1, 2, "NUL is not allowed here");
     error("'\\u{D800}'", 1, 2, "`\\u{D800}` is not a Unicode scalar value");
     error("'\\u{110000}'", 1, 2, "`\\u{110000}` is not a Unicode scalar value");
     error("'\\u{}'", 1, 2, "`\\u{}` needs 1 to 6 hexadecimal digits");

@@ -907,7 +907,12 @@ static void character(struct lexer *lx, size_t start, int line, int column)
         push(lx, TOKEN_ERROR, start, line, column);
         return;
     }
-    if (c == '\\') {
+    if (c == 0) {
+        /* A NUL byte between the quotes is refused as `'\0'` is. */
+        error_at(lx, lx->line, lx->column, "NUL is not allowed here");
+        valid = false;
+        advance(lx);
+    } else if (c == '\\') {
         valid = escape(lx, MODE_CHAR, &value, &raw_byte);
     } else {
         size_t n;
