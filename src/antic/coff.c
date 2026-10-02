@@ -64,8 +64,10 @@ enum {
     /* The largest offset that a section name of 8 bytes can hold, as
        `/` and 7 decimal digits. */
     LONG_NAME_LIMIT = 9999999,
-    /* The largest section number of a symbol, IMAGE_SYM_SECTION_MAX. */
-    SECTION_MAX = 0xFEFF
+    /* The largest section number of a symbol, IMAGE_SYM_SECTION_MAX, and
+       the first special one above the reserved range, IMAGE_SYM_DEBUG. */
+    SECTION_MAX = 0xFEFF,
+    SECTION_DEBUG = 0xFFFE
 };
 
 /* A symbol with no index in the joined object, and one that takes the
@@ -194,6 +196,15 @@ static struct entry *find(struct table *t, const char *name, size_t length,
 static const unsigned char *symbol_at(const struct object *o, uint32_t index)
 {
     return o->in->data + o->symbols_at + (size_t)SYMBOL_SIZE * index;
+}
+
+/* The section number of the symbol record s: 1 to SECTION_MAX for a
+   section, 0 for none, -1 for an absolute value and -2 for a debug
+   record. 0xFF00 to 0xFFFD read as -256 to -3, which name nothing and
+   which read_comdats refuses. */
+static int16_t section_number(const unsigned char *s)
+{
+    return (int16_t)arith_signed(get(s + 12, 2), 16);
 }
 
 /* The name of a symbol, from its field or from the string table. */
@@ -401,7 +412,7 @@ static bool read_comdats(struct join *j, struct object *o)
 
     for (i = 0; i < o->symbol_count; i++) {
         const unsigned char *s = symbol_at(o, i);
-        int16_t number = (int16_t)arith_signed(get(s + 12, 2), 16);
+        int16_t number = section_number(s);
         uint8_t storage = s[16];
         uint8_t aux = s[17];
         const char *name;
@@ -410,7 +421,7 @@ static bool read_comdats(struct join *j, struct object *o)
             text_appendf(j->error, "%s has a damaged symbol table", o->in->name);
             return false;
         }
-        if (number > 0 && (size_t)number > o->section_count) {
+        if (number < -2 || (number > 0 && (size_t)number > o->section_count)) {
             return fail(j, "a section number outside the object for", o, name,
                         length);
         }
@@ -567,7 +578,7 @@ static bool enter_definitions(struct join *j)
         uint32_t i;
         for (i = 0; i < o->symbol_count; i += 1 + symbol_at(o, i)[17]) {
             const unsigned char *s = symbol_at(o, i);
-            int16_t number = (int16_t)arith_signed(get(s + 12, 2), 16);
+            int16_t number = section_number(s);
             const char *name;
             size_t length;
             struct entry *e;
@@ -609,7 +620,7 @@ static uint32_t number_symbols(struct join *j, uint32_t *features_index,
         uint32_t i;
         for (i = 0; i < o->symbol_count; i++) {
             const unsigned char *s = symbol_at(o, i);
-            int16_t number = (int16_t)arith_signed(get(s + 12, 2), 16);
+            int16_t number = section_number(s);
             uint8_t aux = s[17];
             const char *name;
             size_t length;
@@ -820,7 +831,7 @@ static bool write_symbols(struct join *j, struct text *out,
         uint32_t i;
         for (i = 0; i < o->symbol_count; i += 1 + symbol_at(o, i)[17]) {
             const unsigned char *s = symbol_at(o, i);
-            int16_t number = (int16_t)arith_signed(get(s + 12, 2), 16);
+            int16_t number = section_number(s);
             uint8_t aux = s[17];
             unsigned char record[SYMBOL_SIZE];
             const char *name;
@@ -1125,6 +1136,9 @@ static bool object_symbols(const unsigned char *data, size_t size,
         uint32_t section = get(sym + 12, 2);
         const char *name = (const char *)sym;
         size_t length = 0;
+        if (section > SECTION_MAX && section < SECTION_DEBUG) {
+            return false;
+        }
         if (sym[16] == CLASS_EXTERNAL &&
             (defined ? section > 0 && section <= SECTION_MAX
                      : section == 0 && get(sym + 8, 4) == 0)) {

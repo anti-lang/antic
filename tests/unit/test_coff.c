@@ -788,6 +788,12 @@ static void test_truncated(void)
     text_append_bytes(&first, good.data, good.length);
     first.data[symbols + 18 * 4 + 12] = 3;
     REFUSES(&first, &second, "a section number outside the object for foo");
+    /* 0xFF00 to 0xFFFD name no section and no special value. */
+    first.data[symbols + 18 * 4 + 12] = 0x00;
+    first.data[symbols + 18 * 4 + 13] = (char)0xFF;
+    REFUSES(&first, &second, "a section number outside the object for foo");
+    first.data[symbols + 18 * 4 + 12] = (char)0xFD;
+    REFUSES(&first, &second, "a section number outside the object for foo");
     /* A relocation of a symbol past the table. */
     DAMAGED(get(&good, section_at(1) + 24, 4) + 4, 5, "names a symbol");
     DAMAGED(get(&good, section_at(1) + 24, 4) + 4, 0xFFFFFFFFu,
@@ -943,6 +949,14 @@ static void test_archive_index(void)
         memcpy(damaged.data + (at), bytes, n);                  \
     } while (0)
 
+    /* A section number from 0xFF00 to 0xFFFD, which names no section and
+       no special value, here on bar of the member of foo. */
+    DAMAGE(foo_at + 60 + get(&archive, foo_at + 60 + 8, 4) + 18 + 12,
+           "\x00\xff", 2);
+    CHECK(!exports_of(&damaged, damaged.length, &out));
+    DAMAGE(foo_at + 60 + get(&archive, foo_at + 60 + 8, 4) + 18 + 12,
+           "\xfd\xff", 2);
+    CHECK(!exports_of(&damaged, damaged.length, &out));
     /* No archive, and a first member that is no index. */
     DAMAGE(0, "!<arch>?", 8);
     CHECK(!exports_of(&damaged, damaged.length, &out));
