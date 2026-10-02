@@ -537,31 +537,27 @@ static bool read_parts(struct reader *r, unsigned char *bytes,
     return take(r, ']');
 }
 
-/* Level k of an array at bytes, of levels levels of the lengths lengths.
-   The elements of the last level have size bytes, the type id inner and
-   the descriptor e. */
+/* Level k of the array of shape a at bytes. */
 static bool read_level(struct reader *r, unsigned char *bytes,
-                       const int64_t *lengths, int64_t levels, int64_t k,
-                       size_t size, int64_t inner,
-                       const struct anti_descriptor *e, int depth)
+                       const struct anti_array_shape *a, int64_t k, int depth)
 {
-    size_t block = size;
+    size_t block = a->size;
     int64_t i;
 
     if (depth > DEPTH_LIMIT || !take(r, '[')) {
         return false;
     }
-    for (i = k + 1; i < levels; i++) {
-        block *= (size_t)lengths[i];
+    for (i = k + 1; i < a->levels; i++) {
+        block *= (size_t)a->lengths[i];
     }
-    for (i = 0; i < lengths[k]; i++) {
+    for (i = 0; i < a->lengths[k]; i++) {
         unsigned char *at = bytes + (size_t)i * block;
         if (i > 0 && !take(r, ',')) {
             return false;
         }
-        if (k + 1 == levels ? !read_value(r, at, inner, e, 0, depth + 1)
-                            : !read_level(r, at, lengths, levels, k + 1, size,
-                                          inner, e, depth + 1)) {
+        if (k + 1 == a->levels
+                ? !read_value(r, at, a->inner, a->element, 0, depth + 1)
+                : !read_level(r, at, a, k + 1, depth + 1)) {
             return false;
         }
     }
@@ -571,16 +567,15 @@ static bool read_level(struct reader *r, unsigned char *bytes,
 static bool read_array(struct reader *r, unsigned char *bytes, int64_t type,
                        const struct anti_descriptor *d, int depth)
 {
-    int64_t lengths[ANTI_ARRAY_LEVELS];
-    int64_t levels = anti_rt_array_levels(type, d, lengths);
+    struct anti_array_shape shape;
 
-    if (levels == 0) {
+    /* An array whose element or length the record does not give was
+       written as null. */
+    if (anti_rt_array_shape(type, d, &shape) == 0 || shape.size == 0 ||
+        ANTI_TYPE_COUNT(type) == 0) {
         return skip_value(r, depth);
     }
-    return read_level(r, bytes, lengths, levels, 0,
-                      anti_rt_array_element_size(type, d),
-                      ANTI_TYPE_INNER(type),
-                      anti_rt_array_element_descriptor(type, d), depth);
+    return read_level(r, bytes, &shape, 0, depth);
 }
 
 /* DESIGN: a variant reads as the object serialize writes, one member
@@ -747,10 +742,6 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
         }
         return read_parts(r, bytes, d, depth + 1);
     case ANTI_TYPE_ARRAY:
-        if (anti_rt_array_element_size(type, d) == 0 ||
-            ANTI_TYPE_COUNT(type) == 0) {
-            return skip_value(r, depth + 1);
-        }
         return read_array(r, bytes, type, d, depth + 1);
     case ANTI_TYPE_VARIANT:
         if (d == NULL || d->field_count < 1 || take_word(r, "null")) {

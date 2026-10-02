@@ -244,8 +244,12 @@ static int optional_has(const unsigned char *bytes,
     return d != NULL && d->field_count >= 2 && bytes[d->fields[1].offset] != 0;
 }
 
-const struct anti_descriptor *
-anti_rt_array_element_descriptor(int64_t type, const struct anti_descriptor *d)
+/* The descriptor of the element of the array of type id type, through
+   every level of it. An array of arrays carries a descriptor of its own
+   in d, and its last record carries the one of the element. An array of
+   one level carries the one of the element itself. */
+static const struct anti_descriptor *
+element_descriptor(int64_t type, const struct anti_descriptor *d)
 {
     if (ANTI_TYPE_ELEMENT(type) != ANTI_TYPE_ARRAY) {
         return d;
@@ -255,31 +259,13 @@ anti_rt_array_element_descriptor(int64_t type, const struct anti_descriptor *d)
                : NULL;
 }
 
-int64_t anti_rt_array_levels(int64_t type, const struct anti_descriptor *d,
-                             int64_t lengths[ANTI_ARRAY_LEVELS])
-{
-    int64_t i;
-
-    if (ANTI_TYPE_ELEMENT(type) != ANTI_TYPE_ARRAY) {
-        lengths[0] = ANTI_TYPE_COUNT(type);
-        return lengths[0] > 0 ? 1 : 0;
-    }
-    if (d == NULL || d->field_count == 0 ||
-        d->field_count > ANTI_ARRAY_LEVELS) {
-        return 0;
-    }
-    for (i = 0; i < d->field_count; i++) {
-        lengths[i] = d->fields[i].owned;
-    }
-    return d->field_count;
-}
-
-size_t anti_rt_array_element_size(int64_t type,
-                                  const struct anti_descriptor *d)
+/* The bytes of one element of the array of type id type through every
+   level of it, or 0 where the record does not give them. */
+static size_t element_size(int64_t type, const struct anti_descriptor *d)
 {
     int64_t inner = ANTI_TYPE_INNER(type);
 
-    d = anti_rt_array_element_descriptor(type, d);
+    d = element_descriptor(type, d);
 
     if (inner == ANTI_TYPE_STRUCT || inner == ANTI_TYPE_CLASS ||
         inner == ANTI_TYPE_VARIANT || inner == ANTI_TYPE_OPTIONAL ||
@@ -287,6 +273,31 @@ size_t anti_rt_array_element_size(int64_t type,
         return d != NULL ? (size_t)d->size : 0;
     }
     return anti_rt_type_size(inner);
+}
+
+int64_t anti_rt_array_shape(int64_t type, const struct anti_descriptor *d,
+                            struct anti_array_shape *out)
+{
+    int64_t i;
+
+    out->levels = 0;
+    out->size = element_size(type, d);
+    out->inner = ANTI_TYPE_INNER(type);
+    out->element = element_descriptor(type, d);
+    if (ANTI_TYPE_ELEMENT(type) != ANTI_TYPE_ARRAY) {
+        out->lengths[0] = ANTI_TYPE_COUNT(type);
+        out->levels = out->lengths[0] > 0 ? 1 : 0;
+        return out->levels;
+    }
+    if (d == NULL || d->field_count == 0 ||
+        d->field_count > ANTI_ARRAY_LEVELS) {
+        return 0;
+    }
+    for (i = 0; i < d->field_count; i++) {
+        out->lengths[i] = d->fields[i].owned;
+    }
+    out->levels = d->field_count;
+    return out->levels;
 }
 
 /* DESIGN: the compiler writes the default `equals` and `hash` of every
@@ -448,28 +459,24 @@ static void put_value(struct anti_builder *b, const void *bytes,
                       int64_t type, const struct anti_descriptor *d,
                       int64_t owned);
 
-/* Level k of an array at bytes, of levels levels of the lengths lengths,
-   as a JSON array. The elements of the last level have size bytes, the
-   type id inner and the descriptor e. */
+/* Level k of the array of shape a at bytes, as a JSON array. */
 static void put_level(struct anti_builder *b, const void *bytes,
-                      const int64_t *lengths, int64_t levels, int64_t k,
-                      size_t size, int64_t inner,
-                      const struct anti_descriptor *e)
+                      const struct anti_array_shape *a, int64_t k)
 {
-    size_t block = size;
+    size_t block = a->size;
     int64_t i;
 
-    for (i = k + 1; i < levels; i++) {
-        block *= (size_t)lengths[i];
+    for (i = k + 1; i < a->levels; i++) {
+        block *= (size_t)a->lengths[i];
     }
     put(b, "[");
-    for (i = 0; i < lengths[k]; i++) {
+    for (i = 0; i < a->lengths[k]; i++) {
         const char *at = (const char *)bytes + (size_t)i * block;
         put(b, i == 0 ? "" : ",");
-        if (k + 1 == levels) {
-            put_value(b, at, inner, e, 0);
+        if (k + 1 == a->levels) {
+            put_value(b, at, a->inner, a->element, 0);
         } else {
-            put_level(b, at, lengths, levels, k + 1, size, inner, e);
+            put_level(b, at, a, k + 1);
         }
     }
     put(b, "]");
@@ -631,15 +638,13 @@ static void put_value(struct anti_builder *b, const void *bytes,
         return;
     }
     case ANTI_TYPE_ARRAY: {
-        int64_t lengths[ANTI_ARRAY_LEVELS];
-        int64_t levels = anti_rt_array_levels(type, d, lengths);
-        size_t size = anti_rt_array_element_size(type, d);
-        if (size == 0 || levels == 0 || ANTI_TYPE_COUNT(type) == 0) {
+        struct anti_array_shape shape;
+        int64_t levels = anti_rt_array_shape(type, d, &shape);
+        if (shape.size == 0 || levels == 0 || ANTI_TYPE_COUNT(type) == 0) {
             put(b, "null");
             return;
         }
-        put_level(b, bytes, lengths, levels, 0, size, ANTI_TYPE_INNER(type),
-                  anti_rt_array_element_descriptor(type, d));
+        put_level(b, bytes, &shape, 0);
         return;
     }
     case ANTI_TYPE_OPTIONAL:
