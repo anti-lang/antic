@@ -35,7 +35,7 @@ const FIRST_BUCKETS: int = 16;
 
 /// The depth of a map or a set in its chain of descriptors: the root, then
 /// `Collection`, then the table, then the class.
-pub const TYPE_DEPTH: int = 3;
+internal const TYPE_DEPTH: int = 3;
 
 /// The table of `Map<K, V>` and `Set<T>`: the entries in one array in the order
 /// they were added, and a hash table of their positions.
@@ -1349,7 +1349,7 @@ pub class HashMapValues<K, V>
 
 /// The order of a walk of a table of slots: from a random slot by a random odd
 /// stride, which visits each slot of a table of a power of two once.
-pub struct Stride
+internal struct Stride
 {
 	size: int,
 	start: int,
@@ -1359,7 +1359,7 @@ pub struct Stride
 }
 
 /// The order of a walk of `size` slots that the random `r` chooses.
-pub fn stride_of(size: int, r: u64) -> Stride
+internal fn stride_of(size: int, r: u64) -> Stride
 {
 	let mask = size - 1;
 	if size == 0 {
@@ -1375,13 +1375,13 @@ pub fn stride_of(size: int, r: u64) -> Stride
 }
 
 /// The slot the walk `s` stands at.
-pub fn stride_at(s: *Stride) -> int
+internal fn stride_at(s: *Stride) -> int
 {
 	return s.at;
 }
 
 /// Move on to the next live slot of `marks`. Gives `false` after the last.
-pub fn advance(s: *Stride, marks: ?*u64) -> bool
+internal fn advance(s: *Stride, marks: ?*u64) -> bool
 {
 	let live = marks else {
 		return false;
@@ -1409,7 +1409,7 @@ fn lend_entry<K: eq, V>(e: *(K, V), f: fn(lent *(K, V)))
 }
 
 /// Room for `n` numbers from `from`, and for one when `n` is 0.
-pub fn numbers(from: *mem.Allocator, n: int) -> *int
+internal fn numbers(from: *mem.Allocator, n: int) -> *int
 {
 	let count = n;
 	if count == 0 {
@@ -1420,7 +1420,7 @@ pub fn numbers(from: *mem.Allocator, n: int) -> *int
 }
 
 /// The text `k` of `all`, the bytes from `starts[k]` up to `starts[k + 1]`.
-pub fn text_at(all: str, starts: *int, k: int) -> str
+internal fn text_at(all: str, starts: *int, k: int) -> str
 {
 	let bytes = all.ptr as *byte;
 	return anti_rt_text_slice(&bytes[starts[k]] as ?*byte,
@@ -1430,13 +1430,13 @@ pub fn text_at(all: str, starts: *int, k: int) -> str
 /// Sort the `n` numbers at `order`, each an entry of `width` texts of `all`
 /// that `starts` bounds, by the bytes of the first text of each entry, then by
 /// those of the next where the first are equal.
-pub fn sort_by_text(order: *int, n: int, all: str, starts: *int, width: int)
+internal fn sort_by_text(order: *int, n: int, all: str, starts: *int, width: int)
 {
-	sort_by_key(order, n, fn(a, b) {
+	collection.sort_stable<int>([]int { ptr: order, len: n }, fn(a, b) {
 		let c = 0;
 		while c < width do {
-			let x = text_at(all, starts, a * width + c);
-			let y = text_at(all, starts, b * width + c);
+			let x = text_at(all, starts, *a * width + c);
+			let y = text_at(all, starts, *b * width + c);
 			if x < y {
 				return true;
 			}
@@ -1447,44 +1447,6 @@ pub fn sort_by_text(order: *int, n: int, all: str, starts: *int, width: int)
 		}
 		return false;
 	});
-}
-
-/// Sort the `n` numbers at `order` in place, with a heap, so that `less` holds
-/// for no number over one before it.
-pub fn sort_by_key(order: *int, n: int, less: fn(int, int) -> bool)
-{
-	let start = n / 2 - 1;
-	while start >= 0 do {
-		sift(order, start, n, less);
-		start -= 1;
-	}
-	let end = n - 1;
-	while end > 0 do {
-		let top = order[0];
-		order[0] = order[end];
-		order[end] = top;
-		sift(order, 0, end, less);
-		end -= 1;
-	}
-}
-
-/// Move the number at `at` down the heap of the first `n` at `order`.
-fn sift(order: *int, at: int, n: int, less: fn(int, int) -> bool)
-{
-	let root = at;
-	while 2 * root + 1 < n do {
-		let child = 2 * root + 1;
-		if child + 1 < n && less(order[child], order[child + 1]) {
-			child += 1;
-		}
-		if !less(order[root], order[child]) {
-			return;
-		}
-		let held = order[root];
-		order[root] = order[child];
-		order[child] = held;
-		root = child;
-	}
 }
 
 /// `n` rounded up to a multiple of `to`, a power of two.

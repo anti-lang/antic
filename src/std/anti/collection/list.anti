@@ -153,7 +153,7 @@ pub class List<T> inherits collection.Indexed<T>
 		let i = 0;
 		let j = self.count - 1;
 		while i < j do {
-			swap(elements, i, j);
+			collection.swap<T>(elements, i, j);
 			i += 1;
 			j -= 1;
 		}
@@ -182,7 +182,7 @@ pub class List<T> inherits collection.Indexed<T>
 	/// and `sort_by` of this module call it.
 	pub fn sort_with(self, less: fn(lent *T, lent *T) -> bool)
 	{
-		stable([]T { ptr: self.items, len: self.count }, less);
+		collection.sort_stable<T>([]T { ptr: self.items, len: self.count }, less);
 	}
 
 	/// Room for `n` more elements, in one allocation.
@@ -277,165 +277,4 @@ pub fn map<T, U>(l: *List<T>, f: fn(T) -> U, from: ?*mem.Allocator = none)
 		out.push(f(*p));
 	}
 	return out;
-}
-
-/// The length of the runs that `stable` sorts by insertion before it merges.
-const RUN: int = 20;
-
-/// Sort `s` in place by `less`, keeping the order of equal elements, without
-/// room of its own: runs of `RUN` elements by insertion, then merges of runs
-/// that double in length, each merged in place by rotations.
-///
-/// PERF DECISION: a merge in place costs a factor of log n over a merge into a
-/// second buffer. It allocates nothing, so a sort never fails and never takes
-/// room from the allocator of the list.
-fn stable<T>(s: []T, less: fn(lent *T, lent *T) -> bool)
-{
-	let n = s.len;
-	let a = 0;
-	while a + RUN <= n do {
-		insertion(s, a, a + RUN, less);
-		a += RUN;
-	}
-	insertion(s, a, n, less);
-	let run = RUN;
-	while run < n do {
-		a = 0;
-		while a + 2 * run <= n do {
-			merge(s, a, a + run, a + 2 * run, less);
-			a += 2 * run;
-		}
-		if a + run < n {
-			merge(s, a, a + run, n, less);
-		}
-		run *= 2;
-	}
-}
-
-/// Sort the elements from `a` up to `b` of `s` by insertion.
-fn insertion<T>(s: []T, a: int, b: int,
-	less: fn(lent *T, lent *T) -> bool)
-{
-	let i = a + 1;
-	while i < b do {
-		let j = i;
-		while j > a && less(&s[j], &s[j - 1]) do {
-			swap(s, j, j - 1);
-			j -= 1;
-		}
-		i += 1;
-	}
-}
-
-/// Merge the sorted runs from `a` up to `m` and from `m` up to `b` of `s` in
-/// place, the SymMerge of Kim and Kutzner, 2004.
-fn merge<T>(s: []T, a: int, m: int, b: int,
-	less: fn(lent *T, lent *T) -> bool)
-{
-	if m - a == 1 {
-		let i = m;
-		let j = b;
-		while i < j do {
-			let h = (i + j) / 2;
-			if less(&s[h], &s[a]) {
-				i = h + 1;
-			} else {
-				j = h;
-			}
-		}
-		let k = a;
-		while k < i - 1 do {
-			swap(s, k, k + 1);
-			k += 1;
-		}
-		return;
-	}
-	if b - m == 1 {
-		let i = a;
-		let j = m;
-		while i < j do {
-			let h = (i + j) / 2;
-			if !less(&s[m], &s[h]) {
-				i = h + 1;
-			} else {
-				j = h;
-			}
-		}
-		let k = m;
-		while k > i do {
-			swap(s, k, k - 1);
-			k -= 1;
-		}
-		return;
-	}
-	let mid = (a + b) / 2;
-	let n = mid + m;
-	let start = a;
-	let r = m;
-	if m > mid {
-		start = n - b;
-		r = mid;
-	}
-	let p = n - 1;
-	while start < r do {
-		let c = (start + r) / 2;
-		if !less(&s[p - c], &s[c]) {
-			start = c + 1;
-		} else {
-			r = c;
-		}
-	}
-	let end = n - start;
-	if start < m && m < end {
-		rotate(s, start, m, end);
-	}
-	if a < start && start < mid {
-		merge(s, a, start, mid, less);
-	}
-	if mid < end && end < b {
-		merge(s, mid, end, b, less);
-	}
-}
-
-/// Turn the elements from `a` up to `b` of `s` so that the one at `m` comes
-/// first, by swaps of blocks.
-fn rotate<T>(s: []T, a: int, m: int, b: int)
-{
-	let i = m - a;
-	let j = b - m;
-	while i != j do {
-		if i > j {
-			swap_run(s, m - i, m, j);
-			i -= j;
-		} else {
-			swap_run(s, m - i, m + j - i, i);
-			j -= i;
-		}
-	}
-	swap_run(s, m - i, m, i);
-}
-
-/// Swap the `n` elements from `a` of `s` with the `n` elements from `b`.
-fn swap_run<T>(s: []T, a: int, b: int, n: int)
-{
-	let i = 0;
-	while i < n do {
-		swap(s, a + i, b + i);
-		i += 1;
-	}
-}
-
-/// Swap the elements `i` and `j` of `s` as bytes, so neither is copied or torn
-/// down.
-fn swap<T>(s: []T, i: int, j: int)
-{
-	let x = &s[i] as *byte;
-	let y = &s[j] as *byte;
-	let k = 0;
-	while k < size_of(T) do {
-		let t = x[k];
-		x[k] = y[k];
-		y[k] = t;
-		k += 1;
-	}
 }
