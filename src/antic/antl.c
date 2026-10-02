@@ -3242,6 +3242,36 @@ struct relocs {
     uint8_t *functions;             /* the target is a function */
 };
 
+static int compare_offsets(const void *a, const void *b)
+{
+    uint64_t x = *(const uint64_t *)a;
+    uint64_t y = *(const uint64_t *)b;
+
+    return x < y ? -1 : x > y;
+}
+
+/* Whether the count addresses at offsets lie at least eight bytes apart,
+   so that no two share a byte of the data. Each takes the eight bytes at
+   its offset. */
+static bool addresses_apart(const uint64_t *offsets, uint32_t count)
+{
+    uint64_t *sorted;
+    uint32_t i;
+    bool apart = true;
+
+    if (count < 2) {
+        return true;
+    }
+    sorted = alloc_zeroed(count, sizeof *sorted);
+    memcpy(sorted, offsets, count * sizeof *sorted);
+    qsort(sorted, count, sizeof *sorted, compare_offsets);
+    for (i = 1; i < count && apart; i++) {
+        apart = sorted[i] - sorted[i - 1] >= 8;
+    }
+    free(sorted);
+    return apart;
+}
+
 static void read_ir(struct reader *r, struct ir_module *program)
 {
     struct ir_maps maps;
@@ -3292,6 +3322,10 @@ static void read_ir(struct reader *r, struct ir_module *program)
                 size - relocs[i].offsets[j] < 8) {
                 antl_damaged(r);
             }
+        }
+        if (!r->failed &&
+            !addresses_apart(relocs[i].offsets, relocs[i].count)) {
+            antl_damaged(r);
         }
         {
             uint8_t marks = antl_get_u8(r);

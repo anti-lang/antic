@@ -7,7 +7,8 @@
 
 #include "alloc.h"
 #include "debug.h"
-#include "select.h"
+#include "rt_abi.h"
+#include "target_desc.h"
 
 /* DESIGN: one assembly file holds the whole program. Every Anti function
    is a local symbol, and only the runtime entry is global. */
@@ -376,37 +377,6 @@ static void emit_imports(struct text *out, enum target t,
     text_free(&places);
 }
 
-/* Whether every address of g lies inside its bytes and apart from the
-   others. The pairs cost no more than the writing of g, which looks each
-   offset up among the addresses. */
-static bool relocations_fit(const struct ir_global *g, char *error,
-                            size_t error_size)
-{
-    size_t j;
-    size_t k;
-
-    for (j = 0; j < g->reloc_count; j++) {
-        uint64_t at = g->relocs[j].offset;
-        if (g->size < 8 || at > g->size - 8) {
-            text_format(error, error_size,
-                        "the address at %" PRIu64 " of `%s.%s` ends past its "
-                        "%" PRIu64 " bytes", at, g->module, g->name, g->size);
-            return false;
-        }
-        for (k = 0; k < j; k++) {
-            uint64_t other = g->relocs[k].offset;
-            if ((at > other ? at - other : other - at) < 8) {
-                text_format(error, error_size,
-                            "the addresses at %" PRIu64 " and %" PRIu64
-                            " of `%s.%s` overlap", at < other ? at : other,
-                            at < other ? other : at, g->module, g->name);
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
 /* The sections of the functions that run before main, one entry of an
    address each. */
 static const char *const constructor_sections[] = {
@@ -428,11 +398,10 @@ static void emit_start(struct text *out, enum target t,
     text_free(&symbol);
 }
 
-static bool emit(struct text *out, enum target t, enum cpu_level cpu,
+static void emit(struct text *out, enum target t, enum cpu_level cpu,
                  const struct ir_module *m, struct mach_function **functions,
                  const char *module, bool one_module, bool exports,
-                 bool debug_info, struct debug_spans *spans, char *error,
-                 size_t error_size)
+                 bool debug_info, struct debug_spans *spans)
 {
     const struct target_info *info = target_info(t);
     struct debug debug;
@@ -440,14 +409,6 @@ static bool emit(struct text *out, enum target t, enum cpu_level cpu,
 
     debug_init(&debug, t, m, module, debug_info, spans);
 
-    /* An address takes the eight bytes at its offset, so it lies inside
-       the data that holds it, and no two share a byte. A library file
-       read from disk is the one source of a global that breaks either. */
-    for (i = 0; i < m->global_count; i++) {
-        if (!relocations_fit(m->globals[i], error, error_size)) {
-            return false;
-        }
-    }
     build_version(out, t);
     text_append(out, "    .text\n");
     emit_entry(out, t, m, module);
@@ -476,25 +437,23 @@ static bool emit(struct text *out, enum target t, enum cpu_level cpu,
     if (info->format == FORMAT_ELF) {
         text_append(out, "    .section .note.GNU-stack,\"\",@progbits\n");
     }
-    return true;
 }
 
-bool emit_program(struct text *out, enum target t, enum cpu_level cpu,
+void emit_program(struct text *out, enum target t, enum cpu_level cpu,
                   const struct ir_module *m, struct mach_function **functions,
                   const char *module, bool exports, bool debug_info,
-                  struct debug_spans *spans, char *error, size_t error_size)
+                  struct debug_spans *spans)
 {
-    return emit(out, t, cpu, m, functions, module, false, exports, debug_info,
-                spans, error, error_size);
+    emit(out, t, cpu, m, functions, module, false, exports, debug_info,
+         spans);
 }
 
-bool emit_module(struct text *out, enum target t, enum cpu_level cpu,
+void emit_module(struct text *out, enum target t, enum cpu_level cpu,
                  const struct ir_module *m, struct mach_function **functions,
                  const char *module, bool exports, bool debug_info,
-                 struct debug_spans *spans, char *error, size_t error_size)
+                 struct debug_spans *spans)
 {
-    return emit(out, t, cpu, m, functions, module, true, exports, debug_info,
-                spans, error, error_size);
+    emit(out, t, cpu, m, functions, module, true, exports, debug_info, spans);
 }
 
 void emit_names(struct text *out, enum target t, const struct ir_module *m,

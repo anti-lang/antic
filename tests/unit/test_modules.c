@@ -2210,6 +2210,73 @@ static void damaged_constants(void)
     close_session(&s);
 }
 
+/* bytes with the relocations of the global named name, which has none,
+   replaced by count addresses at offsets, each of global 0. */
+static void with_relocations(const struct text *bytes, const char *name,
+                             const uint64_t *offsets, uint32_t count,
+                             struct text *out)
+{
+    size_t at = name_end(bytes, name, false);
+    uint64_t size = (uint64_t)u32_at(bytes, at) |
+                    (uint64_t)u32_at(bytes, at + 4) << 32;
+    size_t relocs = at + 8 + 8 + (size_t)size;
+    uint8_t word[8];
+    uint32_t i;
+    int k;
+
+    CHECK(u32_at(bytes, relocs) == 0);
+    out->length = 0;
+    text_append_bytes(out, bytes->data, relocs);
+    poke_u32(word, count);
+    text_append_bytes(out, word, 4);
+    for (i = 0; i < count; i++) {
+        for (k = 0; k < 8; k++) {
+            word[k] = (uint8_t)(offsets[i] >> (8 * k));
+        }
+        text_append_bytes(out, word, 8);
+        poke_u32(word, 0);
+        text_append_bytes(out, word, 4);
+        word[0] = 0;
+        text_append_bytes(out, word, 1);
+    }
+    text_append_bytes(out, bytes->data + relocs + 4,
+                      bytes->length - relocs - 4);
+}
+
+/* The addresses of a global each take eight bytes inside its data, apart
+   from the others. A library file is the one source of a global whose
+   addresses break that, so the reader refuses one that ends past the
+   data or overlaps another. */
+static void damaged_relocations(void)
+{
+    static const char source[] =
+        "pub fn text() -> str\n"
+        "{\n"
+        "    return \"abcdefghijklmnopqrstuvwxyz\";\n"
+        "}\n";
+    static const uint64_t apart[] = {0, 8};
+    static const uint64_t overlap[] = {0, 4};
+    static const uint64_t past[] = {24};
+    struct session s;
+    struct text bytes = {0};
+    struct text changed = {0};
+
+    open_session(&s);
+    if (!build_library(&s, "zr", source, &bytes)) {
+        close_session(&s);
+        return;
+    }
+    with_relocations(&bytes, "0", apart, 2, &changed);
+    CHECK(reads_file(&changed));
+    with_relocations(&bytes, "0", overlap, 2, &changed);
+    refuses_file((const uint8_t *)changed.data, changed.length, NULL);
+    with_relocations(&bytes, "0", past, 1, &changed);
+    refuses_file((const uint8_t *)changed.data, changed.length, NULL);
+    text_free(&changed);
+    text_free(&bytes);
+    close_session(&s);
+}
+
 /* A library file keeps the class records, the mark of a `worker fn` and
    the class and slot of a call through a table. The passes over the
    whole program read them. The program read back prints as the module
@@ -3056,4 +3123,5 @@ void test_modules(void)
     damaged_records();
     damaged_simd();
     damaged_constants();
+    damaged_relocations();
 }

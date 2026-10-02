@@ -538,123 +538,6 @@ static bool is_conversion(enum ir_op op)
     return op == IR_TRUNC || op == IR_SEXT || op == IR_ZEXT;
 }
 
-static struct ir_operand temp_of(const struct ir_function *f, uint32_t t)
-{
-    return ir_temp_op(f, t);
-}
-
-/* Convert v of integer type from to integer type to, extending by ext. */
-static struct ir_operand convert(struct ir_function *f, struct ir_block *b,
-                                 struct ir_operand v, enum ir_type from,
-                                 enum ir_type to, enum ir_ext ext)
-{
-    enum ir_op op;
-
-    if (bits(from) == bits(to)) {
-        return v;
-    }
-    op = bits(to) < bits(from) ? IR_TRUNC
-         : ext == IR_EXT_SIGN  ? IR_SEXT
-                               : IR_ZEXT;
-    return temp_of(f, ir_unary(f, b, op, to, v));
-}
-
-static uint64_t low_bits(uint64_t width)
-{
-    return width == 64 ? UINT64_MAX : ((uint64_t)1 << width) - 1;
-}
-
-/* DESIGN: a bitfield load reads the integer that holds the field. It
-   shifts the field down and masks it. A signed field shifts to the top and
-   back with an arithmetic shift. A store reads the integer, clears the
-   field's bits, puts the new bits in and writes the integer back. It is
-   the sequence a C compiler emits. */
-static void lower_bits(struct layouts *l, struct ir_function *f,
-                       struct ir_block *out, const struct ir_inst *inst)
-{
-    const struct ir_field *field = &l->m->aggs[inst->of.agg]->fields[inst->field];
-    const struct layout_bits *where =
-        &layout_agg(l, inst->of.agg)->bits[inst->field];
-    enum ir_type unit = where->unit_type;
-    int unit_bits = bits(unit);
-    uint64_t width = field->bits;
-    const struct ir_operand *base = inst->op == IR_BITLOAD ? &inst->a
-                                                          : &inst->b;
-    struct ir_operand pointer = *base;
-    struct ir_operand word;
-    struct ir_operand v;
-
-    if (where->unit_offset != 0) {
-        pointer = temp_of(f, ir_ptradd(f, out, pointer,
-                                       ir_int_op(IR_I64, where->unit_offset)));
-    }
-    word = temp_of(f, ir_load(f, out, unit, pointer));
-    if (inst->op == IR_BITLOAD && field->ext == IR_EXT_SIGN) {
-        int up = unit_bits - where->shift - (int)width;
-        v = up == 0 ? word
-                    : temp_of(f, ir_binary(f, out, IR_SHL, unit, word,
-                                           ir_int_op(unit, (uint64_t)up)));
-        if (width < (uint64_t)unit_bits) {
-            v = temp_of(f, ir_binary(f, out, IR_SHR_S, unit, v,
-                                     ir_int_op(unit, (uint64_t)unit_bits - width)));
-        }
-        v = convert(f, out, v, unit, inst->type, IR_EXT_SIGN);
-        ir_assign(f, out, inst->result, v);
-        return;
-    }
-    if (inst->op == IR_BITLOAD) {
-        v = where->shift == 0
-                ? word
-                : temp_of(f, ir_binary(f, out, IR_SHR_U, unit, word,
-                                       ir_int_op(unit, where->shift)));
-        if (width < (uint64_t)unit_bits) {
-            v = temp_of(f, ir_binary(f, out, IR_AND, unit, v,
-                                     ir_int_op(unit, low_bits(width))));
-        }
-        v = convert(f, out, v, unit, inst->type, IR_EXT_ZERO);
-        ir_assign(f, out, inst->result, v);
-        return;
-    }
-    v = convert(f, out, inst->a, inst->type, unit, IR_EXT_ZERO);
-    if (width < (uint64_t)unit_bits) {
-        v = temp_of(f, ir_binary(f, out, IR_AND, unit, v,
-                                 ir_int_op(unit, low_bits(width))));
-    }
-    if (where->shift != 0) {
-        v = temp_of(f, ir_binary(f, out, IR_SHL, unit, v,
-                                 ir_int_op(unit, where->shift)));
-    }
-    word = temp_of(f, ir_binary(f, out, IR_AND, unit, word,
-                                ir_int_op(unit,
-                                          ~(low_bits(width) << where->shift))));
-    v = temp_of(f, ir_binary(f, out, IR_OR, unit, word, v));
-    ir_store(f, out, unit, v, pointer);
-}
-
-/* Replace every bitfield load and store of block b with the instructions
-   that lower_bits gives it. */
-static void lower_block_bits(struct layouts *l, struct ir_function *f,
-                             struct ir_block *b)
-{
-    struct ir_block out;
-    size_t i;
-
-    memset(&out, 0, sizeof out);
-    for (i = 0; i < b->count; i++) {
-        const struct ir_inst *inst = &b->insts[i];
-        if (inst->op == IR_BITLOAD || inst->op == IR_BITSTORE) {
-            lower_bits(l, f, &out, inst);
-        } else {
-            ir_inst_add(&out, inst);
-        }
-        free(b->insts[i].args);
-    }
-    free(b->insts);
-    b->insts = out.insts;
-    b->count = out.count;
-    b->capacity = out.capacity;
-}
-
 /* Whether wchar_t is signed on the target, as clang defines it. It is int
    on Linux x86_64 and macOS, unsigned int on Linux ARM64 and unsigned
    short on Windows. */
@@ -703,7 +586,6 @@ static void wchar_signedness(const struct layouts *l, struct ir_inst *inst)
 
 bool layout_resolve(struct layouts *l, struct ir_function *f, bool *resolved)
 {
-    bool has_bits = false;
     size_t b;
     size_t i;
     size_t k;
@@ -735,14 +617,6 @@ bool layout_resolve(struct layouts *l, struct ir_function *f, bool *resolved)
             if (is_conversion(inst->op) && inst->a.type == inst->type) {
                 inst->op = IR_COPY;
             }
-            if (inst->op == IR_BITLOAD || inst->op == IR_BITSTORE) {
-                has_bits = true;
-            }
-        }
-        if (has_bits) {
-            lower_block_bits(l, f, f->blocks[b]);
-            *resolved = true;
-            has_bits = false;
         }
     }
     return true;

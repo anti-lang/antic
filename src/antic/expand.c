@@ -12,8 +12,9 @@
    it passed follows. The choice is a mask of all ones or of zero, so no branch is
    taken. The test reads the operands and the wrapped result, as the
    carry and the overflow flag of the processor do. Lowering writes one
-   operation, and its expansion waits for the back end. c_long has its
-   width and c_wchar its signedness there alone. */
+   operation, and its expansion waits for the back end, where
+   layout_resolve has given c_long its width and c_wchar its
+   signedness. */
 
 struct expander {
     struct ir_function *f;
@@ -505,6 +506,130 @@ static bool expands(const struct ir_inst *inst, const struct expand_target *t)
            (is_flag_operation(inst->op) && !t->flags_native(inst));
 }
 
+/* Convert v of integer type from to integer type to, extending by ext. */
+static struct ir_operand convert(struct ir_function *f, struct ir_block *b,
+                                 struct ir_operand v, enum ir_type from,
+                                 enum ir_type to, enum ir_ext ext)
+{
+    enum ir_op op;
+
+    if (bits(from) == bits(to)) {
+        return v;
+    }
+    op = bits(to) < bits(from) ? IR_TRUNC
+         : ext == IR_EXT_SIGN  ? IR_SEXT
+                               : IR_ZEXT;
+    return ir_temp_op(f, ir_unary(f, b, op, to, v));
+}
+
+static uint64_t low_bits(uint64_t width)
+{
+    return width == 64 ? UINT64_MAX : ((uint64_t)1 << width) - 1;
+}
+
+/* DESIGN: a bitfield load reads the integer that holds the field. It
+   shifts the field down and masks it. A signed field shifts to the top and
+   back with an arithmetic shift. A store reads the integer, clears the
+   field's bits, puts the new bits in and writes the integer back. It is
+   the sequence a C compiler emits. */
+static void lower_bits(const struct expand_target *t, struct ir_function *f,
+                       struct ir_block *out, const struct ir_inst *inst)
+{
+    const struct ir_field *field =
+        &t->m->aggs[inst->of.agg]->fields[inst->field];
+    const struct layout_bits *where =
+        &layout_agg(t->layouts, inst->of.agg)->bits[inst->field];
+    enum ir_type unit = where->unit_type;
+    int unit_bits = bits(unit);
+    uint64_t width = field->bits;
+    const struct ir_operand *base = inst->op == IR_BITLOAD ? &inst->a
+                                                          : &inst->b;
+    struct ir_operand pointer = *base;
+    struct ir_operand word;
+    struct ir_operand v;
+
+    if (where->unit_offset != 0) {
+        pointer = ir_temp_op(f, ir_ptradd(f, out, pointer,
+                                       ir_int_op(IR_I64, where->unit_offset)));
+    }
+    word = ir_temp_op(f, ir_load(f, out, unit, pointer));
+    if (inst->op == IR_BITLOAD && field->ext == IR_EXT_SIGN) {
+        int up = unit_bits - where->shift - (int)width;
+        v = up == 0 ? word
+                    : ir_temp_op(f, ir_binary(f, out, IR_SHL, unit, word,
+                                           ir_int_op(unit, (uint64_t)up)));
+        if (width < (uint64_t)unit_bits) {
+            v = ir_temp_op(f, ir_binary(f, out, IR_SHR_S, unit, v,
+                                     ir_int_op(unit, (uint64_t)unit_bits - width)));
+        }
+        v = convert(f, out, v, unit, inst->type, IR_EXT_SIGN);
+        ir_assign(f, out, inst->result, v);
+        return;
+    }
+    if (inst->op == IR_BITLOAD) {
+        v = where->shift == 0
+                ? word
+                : ir_temp_op(f, ir_binary(f, out, IR_SHR_U, unit, word,
+                                       ir_int_op(unit, where->shift)));
+        if (width < (uint64_t)unit_bits) {
+            v = ir_temp_op(f, ir_binary(f, out, IR_AND, unit, v,
+                                     ir_int_op(unit, low_bits(width))));
+        }
+        v = convert(f, out, v, unit, inst->type, IR_EXT_ZERO);
+        ir_assign(f, out, inst->result, v);
+        return;
+    }
+    v = convert(f, out, inst->a, inst->type, unit, IR_EXT_ZERO);
+    if (width < (uint64_t)unit_bits) {
+        v = ir_temp_op(f, ir_binary(f, out, IR_AND, unit, v,
+                                 ir_int_op(unit, low_bits(width))));
+    }
+    if (where->shift != 0) {
+        v = ir_temp_op(f, ir_binary(f, out, IR_SHL, unit, v,
+                                 ir_int_op(unit, where->shift)));
+    }
+    word = ir_temp_op(f, ir_binary(f, out, IR_AND, unit, word,
+                                ir_int_op(unit,
+                                          ~(low_bits(width) << where->shift))));
+    v = ir_temp_op(f, ir_binary(f, out, IR_OR, unit, word, v));
+    ir_store(f, out, unit, v, pointer);
+}
+
+/* Replace every bitfield load and store of block b with the instructions
+   that lower_bits gives it, each on the line of the access. Returns
+   whether there was one. */
+static bool expand_block_bits(struct ir_function *f, struct ir_block *b,
+                              const struct expand_target *t)
+{
+    struct ir_block out;
+    bool has_bits = false;
+    size_t i;
+
+    for (i = 0; i < b->count && !has_bits; i++) {
+        has_bits = b->insts[i].op == IR_BITLOAD ||
+                   b->insts[i].op == IR_BITSTORE;
+    }
+    if (!has_bits) {
+        return false;
+    }
+    memset(&out, 0, sizeof out);
+    for (i = 0; i < b->count; i++) {
+        const struct ir_inst *inst = &b->insts[i];
+        if (inst->op == IR_BITLOAD || inst->op == IR_BITSTORE) {
+            f->at_line = inst->line;
+            lower_bits(t, f, &out, inst);
+        } else {
+            ir_inst_add(&out, inst);
+        }
+        free(b->insts[i].args);
+    }
+    free(b->insts);
+    b->insts = out.insts;
+    b->count = out.count;
+    b->capacity = out.capacity;
+    return true;
+}
+
 static bool expand_block(struct ir_function *f, struct ir_block *b,
                          const struct expand_target *t)
 {
@@ -555,6 +680,11 @@ bool expand_function(struct ir_function *f, const struct expand_target *t)
     bool changed = false;
     size_t b;
 
+    /* The bitfields go first, so the operations they give pass through
+       the expansions below as any other operation does. */
+    for (b = 0; b < f->block_count; b++) {
+        changed = expand_block_bits(f, f->blocks[b], t) || changed;
+    }
     for (b = 0; b < f->block_count; b++) {
         changed = expand_block(f, f->blocks[b], t) || changed;
     }

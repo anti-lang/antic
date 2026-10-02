@@ -17,21 +17,19 @@
    entry. debug_info is -g, which adds the directives of the source
    positions. spans takes the ranges of out that -g added, or NULL for a
    caller that reads none. exports makes every name global and hidden by
-   nothing, so a plugin loaded into the program resolves against it.
-   Returns false and writes a message to error for a program that the
-   emitter cannot write yet. */
-bool emit_program(struct text *out, enum target t, enum cpu_level cpu,
+   nothing, so a plugin loaded into the program resolves against it. */
+void emit_program(struct text *out, enum target t, enum cpu_level cpu,
                   const struct ir_module *m, struct mach_function **functions,
                   const char *module, bool exports, bool debug_info,
-                  struct debug_spans *spans, char *error, size_t error_size);
+                  struct debug_spans *spans);
 
 /* Append the assembly file of one module in dev mode. Every function of
    the module is global and hidden, and the functions of other modules are
    symbols that their own objects define. */
-bool emit_module(struct text *out, enum target t, enum cpu_level cpu,
+void emit_module(struct text *out, enum target t, enum cpu_level cpu,
                  const struct ir_module *m, struct mach_function **functions,
                  const char *module, bool exports, bool debug_info,
-                 struct debug_spans *spans, char *error, size_t error_size);
+                 struct debug_spans *spans);
 
 /* Append the names the program defines to out, one per line. The name
    of a datum is followed by ` DATA`, as the EXPORTS of a .def file take

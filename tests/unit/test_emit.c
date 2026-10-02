@@ -58,13 +58,13 @@ static void assemble(const char *source, enum target target, bool one_module,
                                        sizeof error);
             }
         }
-        ok = ok && (one_module
-                        ? emit_module(out, target, cpu_default(target), &ir,
-                                      functions, "main", false, debug_info,
-                                      NULL, error, sizeof error)
-                        : emit_program(out, target, cpu_default(target), &ir,
-                                       functions, "main", false, debug_info,
-                                       NULL, error, sizeof error));
+        if (ok && one_module) {
+            emit_module(out, target, cpu_default(target), &ir, functions,
+                        "main", false, debug_info, NULL);
+        } else if (ok) {
+            emit_program(out, target, cpu_default(target), &ir, functions,
+                         "main", false, debug_info, NULL);
+        }
         if (!ok) {
             text_append(out, error);
         }
@@ -172,9 +172,8 @@ static void page_offsets(void)
         CHECK(regalloc_function(TARGET_MACOS_ARM64, functions[i], error,
                                 sizeof error));
     }
-    CHECK(emit_program(&out, TARGET_MACOS_ARM64,
-                       cpu_default(TARGET_MACOS_ARM64), &m, functions, "main",
-                       false, false, NULL, error, sizeof error));
+    emit_program(&out, TARGET_MACOS_ARM64, cpu_default(TARGET_MACOS_ARM64), &m,
+                 functions, "main", false, false, NULL);
     CHECK_STR(text_cstr(&out), "    .build_version macos, 11, 0\n"
                                "    .text\n"
                                "    .p2align 2\n"
@@ -221,10 +220,8 @@ static void data_section(enum target target, const char *expected)
     CHECK(select_module(target, cpu_default(target), &m, functions, error,
                         sizeof error));
     CHECK(regalloc_function(target, functions[0], error, sizeof error));
-    if (!emit_program(&out, target, cpu_default(target), &m, functions,
-                      "main", false, false, NULL, error, sizeof error)) {
-        text_append(&out, error);
-    }
+    emit_program(&out, target, cpu_default(target), &m, functions, "main",
+                 false, false, NULL);
     CHECK_STR(text_cstr(&out), expected);
     mach_function_free(functions[0]);
     free(functions[0]);
@@ -242,7 +239,6 @@ static void data_relocation(void)
     struct ir_module m;
     struct ir_global *table;
     struct text out = {0};
-    char error[200] = "";
     static const uint8_t hi[] = {'h', 'i', 0};
     static const uint8_t zero[16] = {0};
     struct mach_function *functions[1] = {NULL};
@@ -251,9 +247,8 @@ static void data_relocation(void)
     ir_global_add(&m, "main", "0", hi, sizeof hi, 1);
     table = ir_global_add(&m, "main", "1", zero, sizeof zero, 8);
     ir_global_reloc(&m, table, 0, 0);
-    CHECK(emit_program(&out, TARGET_LINUX_ARM64,
-                       cpu_default(TARGET_LINUX_ARM64), &m, functions, "main",
-                       false, false, NULL, error, sizeof error));
+    emit_program(&out, TARGET_LINUX_ARM64, cpu_default(TARGET_LINUX_ARM64), &m,
+                 functions, "main", false, false, NULL);
     CHECK_STR(text_cstr(&out), "    .text\n"
                                "    .section .rodata\n"
                                "main.0:\n"
@@ -265,55 +260,6 @@ static void data_relocation(void)
                                "    .byte 0x00, 0x00, 0x00, 0x00, 0x00, "
                                "0x00, 0x00, 0x00\n"
                                "    .section .note.GNU-stack,\"\",@progbits\n");
-    text_free(&out);
-    ir_module_free(&m);
-    arena_free(&arena);
-}
-
-/* An address takes eight bytes, so one that starts too late in the data
-   would run past it. */
-static void data_relocation_past_end(void)
-{
-    struct arena arena = {0};
-    struct ir_module m;
-    struct ir_global *table;
-    struct text out = {0};
-    char error[200] = "";
-    static const uint8_t zero[8] = {0};
-    struct mach_function *functions[1] = {NULL};
-
-    ir_module_init(&m, &arena, "main");
-    table = ir_global_add(&m, "main", "0", zero, sizeof zero, 8);
-    ir_global_reloc(&m, table, 4, 0);
-    CHECK(!emit_program(&out, TARGET_LINUX_ARM64,
-                        cpu_default(TARGET_LINUX_ARM64), &m, functions, "main",
-                        false, false, NULL, error, sizeof error));
-    CHECK_STR(error, "the address at 4 of `main.0` ends past its 8 bytes");
-    text_free(&out);
-    ir_module_free(&m);
-    arena_free(&arena);
-}
-
-/* Two addresses less than eight bytes apart overlap, and writing the
-   first as a .quad would drop the second without a word. */
-static void data_relocation_overlap(void)
-{
-    struct arena arena = {0};
-    struct ir_module m;
-    struct ir_global *table;
-    struct text out = {0};
-    char error[200] = "";
-    static const uint8_t zero[16] = {0};
-    struct mach_function *functions[1] = {NULL};
-
-    ir_module_init(&m, &arena, "main");
-    table = ir_global_add(&m, "main", "0", zero, sizeof zero, 8);
-    ir_global_reloc(&m, table, 0, 0);
-    ir_global_reloc(&m, table, 4, 0);
-    CHECK(!emit_program(&out, TARGET_LINUX_ARM64,
-                        cpu_default(TARGET_LINUX_ARM64), &m, functions, "main",
-                        false, false, NULL, error, sizeof error));
-    CHECK_STR(error, "the addresses at 0 and 4 of `main.0` overlap");
     text_free(&out);
     ir_module_free(&m);
     arena_free(&arena);
@@ -454,8 +400,6 @@ void test_emit(void)
     page_offsets();
     symbol_records();
     data_relocation();
-    data_relocation_past_end();
-    data_relocation_overlap();
     debug_paths();
     debug_names();
 

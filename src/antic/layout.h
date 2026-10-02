@@ -75,8 +75,9 @@ uint64_t layout_align(struct layouts *l, struct ir_vtype v);
 bool layout_fold(struct layouts *l, uint32_t sym, uint64_t *out);
 
 /* Replace every symbolic operand of function f of the module with a
-   constant, and set resolved when there was one. Returns false after a
-   folding error. */
+   constant, and set resolved when there was one. c_long and c_wchar take
+   the fixed type of the target, and an operation on c_wchar its signed
+   form where wchar_t is signed. Returns false after a folding error. */
 bool layout_resolve(struct layouts *l, struct ir_function *f, bool *resolved);
 
 /* Write the bytes of every global that holds an aggregate constant, with

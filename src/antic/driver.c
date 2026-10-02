@@ -1262,13 +1262,13 @@ static int back_end(const struct options *o, struct module *tree,
         fputs(text_cstr(&out), stdout);
         status = 2;
     } else if (ok) {
-        ok = o->dev || is_plugin(o)
-                 ? emit_module(assembly, o->target, o->cpu, program, functions,
-                               module, extras->hosts_plugins, o->debug, &spans,
-                               error, sizeof error)
-                 : emit_program(assembly, o->target, o->cpu, program,
-                                functions, module, extras->hosts_plugins,
-                                o->debug, &spans, error, sizeof error);
+        if (o->dev || is_plugin(o)) {
+            emit_module(assembly, o->target, o->cpu, program, functions,
+                        module, extras->hosts_plugins, o->debug, &spans);
+        } else {
+            emit_program(assembly, o->target, o->cpu, program, functions,
+                         module, extras->hosts_plugins, o->debug, &spans);
+        }
         if (ok && o->dev && !has_main(program, module)) {
             status = 3;
         }

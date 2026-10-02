@@ -23,7 +23,8 @@ struct expand_target {
 };
 
 /* The back end expands the operations of the IR that no target selects
-   as instructions of their own into plain operations. It runs after the
+   as instructions of their own into plain operations, a bitfield load or
+   store into the integer that holds it among them. It runs after the
    layout resolved every type of f to a fixed width. The width and the
    signedness of each operation are then those of the target. So are the
    offsets of the lanes of a simd struct. A flag operation stays
