@@ -500,6 +500,12 @@ uint32_t ir_simd_add(struct ir_module *m, const char *name,
 uint32_t ir_array_add(struct ir_module *m, const char *name,
                       struct ir_vtype element, uint32_t length,
                       const char *length_text);
+/* The array of n elements of type element, named `[n]element_name`, or
+   the one of that name. Every use of one length shares it, as any two
+   equal array types do. The caller builds element first, since that may
+   add an aggregate, and the length adds a symbol. */
+uint32_t ir_array_of(struct ir_module *m, const char *element_name,
+                     struct ir_vtype element, size_t n);
 /* The index of the aggregate named name, or IR_NO_AGG. */
 uint32_t ir_agg_find(const struct ir_module *m, const char *name);
 

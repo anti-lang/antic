@@ -622,7 +622,7 @@ static uint32_t module_text(struct ir_module *m, const char *module,
     }
     snprintf(name, sizeof name, "registry.%zu", *count);
     seen[*count] = module;
-    globals[*count] = ir_global_add(m, "anti.rt", name,
+    globals[*count] = ir_global_add(m, RUNTIME_MODULE, name,
                                     (const uint8_t *)module,
                                     strlen(module) + 1, 1)->index;
     return globals[(*count)++];
@@ -675,16 +675,11 @@ static uint32_t write_class_list(struct ir_module *m, bool reflect,
         items[n++] = *item;
     }
     if (n > 0) {
-        char length[32];
-        struct ir_const *list;
-        snprintf(length, sizeof length, "[%zu]%s", n,
-                 rt_record_name(RT_RECORD_CLASS));
-        list = ir_const_agg(m, ir_aggregate(ir_array_add(
-                                   m, length, ir_aggregate(class_agg),
-                                   ir_sym_int(m, IR_I64, n), NULL)),
-                            n);
+        uint32_t array = ir_array_of(m, rt_record_name(RT_RECORD_CLASS),
+                                     ir_aggregate(class_agg), n);
+        struct ir_const *list = ir_const_agg(m, ir_aggregate(array), n);
         memcpy(list->items, items, n * sizeof *items);
-        list_global = ir_global_add_value(m, "anti.rt", "registry.classes",
+        list_global = ir_global_add_value(m, RUNTIME_MODULE, "registry.classes",
                                           list)->index;
     }
     free(seen);
@@ -886,16 +881,17 @@ static uint32_t write_trampoline(struct ir_module *m, const char *text,
     struct ir_operand values;
     struct ir_operand result;
     struct ir_operand bad;
-    char name[256];
+    struct text name = {0};
     uint32_t r;
     uint32_t test;
     size_t k;
 
-    if (count == 0 || strlen(text) + 16 > sizeof name) {
+    if (count == 0) {
         return IR_NO_INDEX;
     }
-    snprintf(name, sizeof name, "signature.%s", text);
-    signature = ir_declare_add(m, "anti.rt", name, types[0]->type,
+    text_appendf(&name, "signature.%s", text);
+    signature = ir_declare_add(m, RUNTIME_MODULE, text_cstr(&name),
+                               types[0]->type,
                                types[0]->type == IR_AGG ? str_agg
                                                         : IR_NO_AGG);
     ir_param_add(signature, IR_PTR, IR_NO_AGG);
@@ -904,8 +900,11 @@ static uint32_t write_trampoline(struct ir_module *m, const char *text,
                      types[k]->type == IR_AGG ? str_agg : IR_NO_AGG);
         signature->params[k].ext = types[k]->ext;
     }
-    snprintf(name, sizeof name, "trampoline.%s", text);
-    f = ir_function_add(m, "anti.rt", name, IR_I8, IR_NO_AGG);
+    name.length = 0;
+    text_appendf(&name, "trampoline.%s", text);
+    f = ir_function_add(m, RUNTIME_MODULE, text_cstr(&name), IR_I8,
+                        IR_NO_AGG);
+    text_free(&name);
     entry = ir_temp_op(f, ir_param_add(f, IR_PTR, IR_NO_AGG));
     object = ir_temp_op(f, ir_param_add(f, IR_PTR, IR_NO_AGG));
     values = ir_temp_op(f, ir_param_add(f, IR_PTR, IR_NO_AGG));
@@ -1072,7 +1071,7 @@ static void write_trampolines(struct ir_module *m, bool full)
             continue;
         }
         snprintf(name, sizeof name, "trampolines.%zu", n);
-        text = ir_global_add(m, "anti.rt", name, (const uint8_t *)seen[i],
+        text = ir_global_add(m, RUNTIME_MODULE, name, (const uint8_t *)seen[i],
                              strlen(seen[i]) + 1, 1)->index;
         item = ir_const_agg(m, ir_aggregate(item_agg),
                             RT_TRAMPOLINE_ITEM_COUNT);
@@ -1086,17 +1085,14 @@ static void write_trampolines(struct ir_module *m, bool full)
                          RT_TRAMPOLINES_ITEM_COUNT);
     const_int(&value->items[RT_TRAMPOLINES_COUNT], IR_I64, n);
     if (n > 0) {
-        char length[48];
         struct ir_const *list;
         uint32_t array;
-        snprintf(length, sizeof length, "[%zu]%s", n,
-                 rt_record_name(RT_RECORD_TRAMPOLINE));
-        array = ir_array_add(m, length, ir_aggregate(item_agg),
-                             ir_sym_int(m, IR_I64, n), NULL);
+        array = ir_array_of(m, rt_record_name(RT_RECORD_TRAMPOLINE),
+                            ir_aggregate(item_agg), n);
         list = ir_const_agg(m, ir_aggregate(array), n);
         memcpy(list->items, items, n * sizeof *items);
         const_addr(&value->items[RT_TRAMPOLINES_ITEMS],
-                   ir_global_add_value(m, "anti.rt", "trampolines.list",
+                   ir_global_add_value(m, RUNTIME_MODULE, "trampolines.list",
                                        list)->index);
     } else {
         const_int(&value->items[RT_TRAMPOLINES_ITEMS], IR_PTR, 0);
@@ -1361,13 +1357,10 @@ static void write_slots(struct whole *w, struct ir_module *m,
         struct ir_const *value;
         struct ir_global *g;
         size_t n = 0;
-        snprintf(name, sizeof name, "[%zu]%s", emitted,
-                 rt_record_name(RT_RECORD_SLOTS));
         list = emitted > 0
-                   ? ir_const_agg(m, ir_aggregate(ir_array_add(
-                                         m, name, ir_aggregate(slot_agg),
-                                         ir_sym_int(m, IR_I64, emitted),
-                                         NULL)),
+                   ? ir_const_agg(m, ir_aggregate(ir_array_of(
+                                         m, rt_record_name(RT_RECORD_SLOTS),
+                                         ir_aggregate(slot_agg), emitted)),
                                   emitted)
                    : NULL;
         for (i = 0; list != NULL && i < classes; i++) {
@@ -1377,7 +1370,7 @@ static void write_slots(struct whole *w, struct ir_module *m,
                 continue;
             }
             snprintf(name, sizeof name, "slots.%zu", n);
-            bits = ir_global_add(m, "anti.rt", name, slots[i].bits,
+            bits = ir_global_add(m, RUNTIME_MODULE, name, slots[i].bits,
                                  (slots[i].count + 7) / 8, 1)->index;
             item = ir_const_agg(m, ir_aggregate(slot_agg),
                                 RT_SLOTS_ITEM_COUNT);
@@ -1391,7 +1384,7 @@ static void write_slots(struct whole *w, struct ir_module *m,
         const_int(&value->items[RT_SLOT_TABLE_COUNT], IR_I64, emitted);
         if (list != NULL) {
             const_addr(&value->items[RT_SLOT_TABLE_INTERFACES],
-                       ir_global_add_value(m, "anti.rt", "slots.list",
+                       ir_global_add_value(m, RUNTIME_MODULE, "slots.list",
                                            list)->index);
         } else {
             const_int(&value->items[RT_SLOT_TABLE_INTERFACES], IR_PTR, 0);
@@ -1614,15 +1607,14 @@ static uint32_t write_provider_thunk(struct ir_module *m, uint32_t provider,
 {
     struct ir_function *f;
     struct ir_block *b;
-    char name[256];
+    struct text name = {0};
     uint32_t call;
     uint32_t at;
 
-    if (strlen(interface) + 16 > sizeof name) {
-        return IR_NO_INDEX;
-    }
-    snprintf(name, sizeof name, "provider.%s", interface);
-    f = ir_function_add(m, "anti.rt", name, IR_PTR, IR_NO_AGG);
+    text_appendf(&name, "provider.%s", interface);
+    f = ir_function_add(m, RUNTIME_MODULE, text_cstr(&name), IR_PTR,
+                        IR_NO_AGG);
+    text_free(&name);
     b = ir_block_add(f);
     call = ir_call(f, b, IR_PTR, ir_func_op(m->functions[provider]), NULL, 0);
     at = ir_ptradd(f, b, ir_temp_op(f, call), ir_sym_operand(m, offset));
@@ -1714,14 +1706,8 @@ static void resolve_named_provider(struct whole *w, struct ir_module *m,
             return;
         }
         if (offset != INJECT_AT_ZERO) {
-            uint32_t thunk = write_provider_thunk(m, function, offset,
-                                                  in->interface);
-            if (thunk == IR_NO_INDEX) {
-                text_appendf(errors, "the name of `%s` is too long for a "
-                                     "provider\n", in->interface);
-                return;
-            }
-            function = thunk;
+            function = write_provider_thunk(m, function, offset,
+                                            in->interface);
         }
     }
     in->provider = function;
@@ -1948,13 +1934,10 @@ static void write_injectable(struct ir_module *m,
 
     const_int(&value->items[RT_INJECTABLES_COUNT], IR_I64, count);
     if (count > 0) {
-        char length[48];
         struct ir_const *list_value;
         uint32_t array;
-        snprintf(length, sizeof length, "[%zu]%s", count,
-                 rt_record_name(RT_RECORD_INJECTABLE));
-        array = ir_array_add(m, length, ir_aggregate(item_agg),
-                             ir_sym_int(m, IR_I64, count), NULL);
+        array = ir_array_of(m, rt_record_name(RT_RECORD_INJECTABLE),
+                            ir_aggregate(item_agg), count);
         list_value = ir_const_agg(m, ir_aggregate(array), count);
         for (i = 0; i < count; i++) {
             struct ir_const *item = ir_const_agg(m, ir_aggregate(item_agg),
@@ -1963,19 +1946,19 @@ static void write_injectable(struct ir_module *m,
             char global[48];
             uint32_t text;
             snprintf(global, sizeof global, "injectable.%zu.name", i);
-            text = ir_global_add(m, "anti.rt", global,
+            text = ir_global_add(m, RUNTIME_MODULE, global,
                                  (const uint8_t *)list[i].interface,
                                  strlen(list[i].interface) + 1, 1)->index;
             const_addr(&item->items[RT_INJECTABLE_NAME], text);
             text_appendf(&name, "%s.%s", list[i].module, list[i].name);
             snprintf(global, sizeof global, "injectable.%zu.class", i);
-            text = ir_global_add(m, "anti.rt", global,
+            text = ir_global_add(m, RUNTIME_MODULE, global,
                                  (const uint8_t *)text_cstr(&name),
                                  name.length + 1, 1)->index;
             text_free(&name);
             const_addr(&item->items[RT_INJECTABLE_OWNER], text);
             snprintf(global, sizeof global, "injectable.%zu.field", i);
-            text = ir_global_add(m, "anti.rt", global,
+            text = ir_global_add(m, RUNTIME_MODULE, global,
                                  (const uint8_t *)list[i].field,
                                  strlen(list[i].field) + 1, 1)->index;
             const_addr(&item->items[RT_INJECTABLE_FIELD], text);
@@ -1983,7 +1966,7 @@ static void write_injectable(struct ir_module *m,
             const_addr(&item->items[RT_INJECTABLE_SLOT], list[i].slot);
             if (list[i].library != NULL && list[i].library[0] != '\0') {
                 snprintf(global, sizeof global, "injectable.%zu.library", i);
-                text = ir_global_add(m, "anti.rt", global,
+                text = ir_global_add(m, RUNTIME_MODULE, global,
                                      (const uint8_t *)list[i].library,
                                      strlen(list[i].library) + 1, 1)->index;
                 const_addr(&item->items[RT_INJECTABLE_LIBRARY], text);
@@ -2009,7 +1992,7 @@ static void write_injectable(struct ir_module *m,
             list_value->items[i] = *item;
         }
         const_addr(&value->items[RT_INJECTABLES_INTERFACES],
-                   ir_global_add_value(m, "anti.rt", "injectable.list",
+                   ir_global_add_value(m, RUNTIME_MODULE, "injectable.list",
                                        list_value)->index);
     } else {
         const_int(&value->items[RT_INJECTABLES_INTERFACES], IR_PTR, 0);
@@ -2136,11 +2119,8 @@ static uint32_t copy_chain(struct ir_module *m, const struct ir_const *from,
     char name[40];
     size_t i;
 
-    snprintf(name, sizeof name, "[%zu]i64", n);
     value = ir_const_agg(
-        m, ir_aggregate(ir_array_add(m, name, ir_scalar(IR_I64),
-                                     ir_sym_int(m, IR_I64, n), NULL)),
-        n);
+        m, ir_aggregate(ir_array_of(m, "i64", ir_scalar(IR_I64), n)), n);
     for (i = 0; i < n; i++) {
         const_int(&value->items[i], IR_I64, from->items[i].integer);
     }
@@ -2277,14 +2257,9 @@ static void write_provides(struct whole *w, struct ir_module *m,
     value = ir_const_agg(m, ir_aggregate(table_agg), RT_PROVIDED_ITEM_COUNT);
     const_int(&value->items[RT_PROVIDED_COUNT], IR_I64, n);
     if (n > 0) {
-        char length[32];
-        struct ir_const *list;
-        snprintf(length, sizeof length, "[%zu]%s", n,
-                 rt_record_name(RT_RECORD_PROVIDES));
-        list = ir_const_agg(m, ir_aggregate(ir_array_add(
-                                   m, length, ir_aggregate(entry_agg),
-                                   ir_sym_int(m, IR_I64, n), NULL)),
-                            n);
+        uint32_t array = ir_array_of(m, rt_record_name(RT_RECORD_PROVIDES),
+                                     ir_aggregate(entry_agg), n);
+        struct ir_const *list = ir_const_agg(m, ir_aggregate(array), n);
         memcpy(list->items, items, n * sizeof *items);
         const_addr(&value->items[RT_PROVIDED_ENTRIES],
                    ir_global_add_value(m, RUNTIME_MODULE, "provides.entries",

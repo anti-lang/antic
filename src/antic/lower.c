@@ -879,31 +879,10 @@ struct ir_operand lower_literal_address(struct lowerer *l,
                               ir_global_op(lower_literal_global(l, text))));
 }
 
-/* The aggregate of an array of n elements of type element, whose name is
-   element_name. Every use of one length shares it, as any two equal
-   array types do. The caller builds element first, since that may add an
-   aggregate and the length adds a symbol. */
-uint32_t lower_array_agg(struct lowerer *l, const char *element_name,
-                         struct ir_vtype element, size_t n)
-{
-    struct text name = {0};
-    uint32_t agg;
-    uint32_t length;
-
-    text_appendf(&name, "[%zu]%s", n, element_name);
-    agg = ir_agg_find(l->m, text_cstr(&name));
-    if (agg == IR_NO_AGG) {
-        length = ir_sym_int(l->m, IR_I64, (uint64_t)n);
-        agg = ir_array_add(l->m, text_cstr(&name), element, length, NULL);
-    }
-    text_free(&name);
-    return agg;
-}
-
 /* The aggregate of a table of n entries: an array of n pointers. */
 uint32_t lower_table_agg(struct lowerer *l, size_t n)
 {
-    return lower_array_agg(l, "ptr", ir_scalar(IR_PTR), n);
+    return ir_array_of(l->m, "ptr", ir_scalar(IR_PTR), n);
 }
 
 /* The class behind a value of type T or *T, or NULL. */

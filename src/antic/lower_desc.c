@@ -63,7 +63,7 @@ static uint32_t functions_agg(struct lowerer *l, size_t n)
 {
     uint32_t record = rt_record_agg(l->m, RT_RECORD_FUNCTION);
 
-    return lower_array_agg(l, rt_record_name(RT_RECORD_FUNCTION),
+    return ir_array_of(l->m, rt_record_name(RT_RECORD_FUNCTION),
                            ir_aggregate(record), n);
 }
 
@@ -72,7 +72,7 @@ uint32_t lower_fields_agg(struct lowerer *l, size_t n)
 {
     uint32_t record = rt_record_agg(l->m, RT_RECORD_FIELD);
 
-    return lower_array_agg(l, rt_record_name(RT_RECORD_FIELD),
+    return ir_array_of(l->m, rt_record_name(RT_RECORD_FIELD),
                            ir_aggregate(record), n);
 }
 
@@ -1029,7 +1029,6 @@ static struct ir_global *class_chain(struct lowerer *l, const struct type *t,
     struct table table = {0};
     struct ir_const *value;
     struct ir_global *g;
-    char array[24];
     char *module;
     char *name;
     uint64_t h = 0xcbf29ce484222325ULL;
@@ -1042,13 +1041,11 @@ static struct ir_global *class_chain(struct lowerer *l, const struct type *t,
         free(table.entries);
         return g;
     }
-    snprintf(array, sizeof array, "[%zu]i64", table.count + 1);
-    value = ir_const_agg(
-        l->m,
-        ir_aggregate(ir_array_add(l->m, array, ir_scalar(IR_I64),
-                                  ir_sym_int(l->m, IR_I64, table.count + 1),
-                                  NULL)),
-        table.count + 1);
+    value = ir_const_agg(l->m,
+                         ir_aggregate(ir_array_of(l->m, "i64",
+                                                  ir_scalar(IR_I64),
+                                                  table.count + 1)),
+                         table.count + 1);
     value->items[0].kind = IR_CONST_INT;
     value->items[0].scalar = IR_I64;
     value->items[0].integer = h;

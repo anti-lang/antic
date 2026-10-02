@@ -284,18 +284,7 @@ void lower_sync(struct lowerer *l, const struct stmt *s)
    channels and its slots to the runtime. */
 static uint32_t pointer_array(struct lowerer *l, size_t count)
 {
-    char name[32];
-    char length[24];
-    uint32_t agg;
-
-    snprintf(name, sizeof name, "[%zu]*byte", count);
-    agg = ir_agg_find(l->m, name);
-    if (agg != IR_NO_AGG) {
-        return agg;
-    }
-    snprintf(length, sizeof length, "%zu", count);
-    return ir_array_add(l->m, name, ir_scalar(IR_PTR),
-                        ir_sym_int(l->m, IR_I64, count), length);
+    return ir_array_of(l->m, "*byte", ir_scalar(IR_PTR), count);
 }
 
 /* DESIGN: `select` passes the handle of each arm's channel to

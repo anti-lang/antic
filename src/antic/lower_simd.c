@@ -323,19 +323,14 @@ static struct ir_operand fold_lanes(struct lowerer *l, enum simd_op op,
     const struct type *lane = types_simd_lane(t);
     enum ir_type math = lane_math(lane);
     enum ir_op fold = fold_op(op, lane);
-    struct text name = {0};
-    char length[24];
     struct ir_operand scratch;
     struct ir_operand result;
     struct lanes c;
     size_t half;
     uint32_t agg;
 
-    text_appendf(&name, "[%zu]%s", t->field_count, ir_type_name(math));
-    snprintf(length, sizeof length, "%zu", t->field_count);
-    agg = ir_array_add(l->m, text_cstr(&name), ir_scalar(math),
-                       ir_sym_int(l->m, IR_I64, t->field_count), length);
-    text_free(&name);
+    agg = ir_array_of(l->m, ir_type_name(math), ir_scalar(math),
+                      t->field_count);
     scratch = lower_temp(l, ir_entry_slot(l->f, ir_aggregate(agg)));
     lanes_begin(l, &c, t->field_count, true);
     {

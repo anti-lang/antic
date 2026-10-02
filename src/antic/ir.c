@@ -238,6 +238,24 @@ uint32_t ir_array_add(struct ir_module *m, const char *name,
     return add_agg(m, &key, &field, 1);
 }
 
+uint32_t ir_array_of(struct ir_module *m, const char *element_name,
+                     struct ir_vtype element, size_t n)
+{
+    struct text name = {0};
+    char digits[24];
+    uint32_t agg;
+
+    text_appendf(&name, "[%zu]%s", n, element_name);
+    agg = ir_agg_find(m, text_cstr(&name));
+    if (agg == IR_NO_AGG) {
+        text_format(digits, sizeof digits, "%zu", n);
+        agg = ir_array_add(m, text_cstr(&name), element,
+                           ir_sym_int(m, IR_I64, (uint64_t)n), digits);
+    }
+    text_free(&name);
+    return agg;
+}
+
 static uint32_t add_sym(struct ir_module *m, const struct ir_sym *key)
 {
     size_t i;

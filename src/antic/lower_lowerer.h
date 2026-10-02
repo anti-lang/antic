@@ -304,8 +304,6 @@ const struct ir_global *lower_literal_global(struct lowerer *l,
                                              const struct token_text *text);
 struct ir_operand lower_literal_address(struct lowerer *l,
                                         const struct token_text *text);
-uint32_t lower_array_agg(struct lowerer *l, const char *element_name,
-                         struct ir_vtype element, size_t n);
 uint32_t lower_table_agg(struct lowerer *l, size_t n);
 const struct type *lower_struct_of_expr(const struct expr *e);
 bool lower_bound_is_direct(const struct expr *e, const struct type *s);
