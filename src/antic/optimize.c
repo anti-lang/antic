@@ -1452,6 +1452,7 @@ static void drop_data(struct ir_global *g)
     g->size = 0;
     g->relocs = NULL;
     g->reloc_count = 0;
+    g->reloc_capacity = 0;
     g->is_extern = true;
 }
 

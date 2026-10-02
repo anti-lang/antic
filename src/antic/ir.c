@@ -533,6 +533,17 @@ struct ir_const *ir_const_agg(struct ir_module *m, struct ir_vtype type,
     return c;
 }
 
+struct ir_const *ir_const_int(struct ir_module *m, enum ir_type type,
+                              uint64_t integer)
+{
+    struct ir_const *c = arena_alloc(m->arena, sizeof *c);
+
+    c->kind = IR_CONST_INT;
+    c->scalar = type;
+    c->integer = integer;
+    return c;
+}
+
 bool ir_const_equal(const struct ir_const *a, const struct ir_const *b)
 {
     size_t i;
@@ -572,16 +583,24 @@ bool ir_const_equal(const struct ir_const *a, const struct ir_const *b)
 static void add_reloc(struct ir_module *m, struct ir_global *g,
                       uint64_t offset, uint32_t target, bool fn)
 {
-    struct ir_reloc *relocs =
-        arena_alloc(m->arena, (g->reloc_count + 1) * sizeof *relocs);
+    struct ir_reloc *relocs = g->relocs;
 
-    if (g->reloc_count > 0) {
-        memcpy(relocs, g->relocs, g->reloc_count * sizeof *relocs);
+    /* The arena keeps every list it gave out, so the list doubles and
+       the copies it leaves behind add up to less than its length. */
+    if (g->reloc_count == g->reloc_capacity) {
+        size_t capacity =
+            g->reloc_capacity == 0 ? 4 : alloc_product(g->reloc_capacity, 2);
+        relocs =
+            arena_alloc(m->arena, alloc_product(capacity, sizeof *relocs));
+        if (g->reloc_count > 0) {
+            memcpy(relocs, g->relocs, g->reloc_count * sizeof *relocs);
+        }
+        g->relocs = relocs;
+        g->reloc_capacity = capacity;
     }
     relocs[g->reloc_count].offset = offset;
     relocs[g->reloc_count].global = target;
     relocs[g->reloc_count].fn = fn;
-    g->relocs = relocs;
     g->reloc_count++;
 }
 

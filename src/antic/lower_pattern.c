@@ -17,7 +17,6 @@
    pattern is compiled lazily and no flag guards a first use. */
 struct ir_operand lower_pattern(struct lowerer *l, const struct expr *e)
 {
-    static const uint8_t empty[8] = {0};
     const struct ir_global *text = lower_literal_global(l, &e->as.text);
     struct ir_global *slot;
     char name[32];
@@ -33,8 +32,9 @@ struct ir_operand lower_pattern(struct lowerer *l, const struct expr *e)
         }
     }
     snprintf(name, sizeof name, "pattern.%zu", l->regex_count);
-    /* The one field of a Regex is a pointer, 8 bytes on every target. */
-    slot = ir_global_add(l->m, l->module_name, name, empty, sizeof empty, 8);
+    /* The one field of a Regex is a pointer, none until the start. */
+    slot = ir_global_add_value(l->m, l->module_name, name,
+                               ir_const_int(l->m, IR_PTR, 0));
     slot->mutable = true;
     l->regex_literals = alloc_grow(l->regex_literals, &l->regex_capacity,
                                    l->regex_count, sizeof *l->regex_literals);

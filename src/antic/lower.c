@@ -447,17 +447,18 @@ struct ir_function *lower_callee_function(struct lowerer *l,
        of the runtime under the prefix RUNTIME_ROOT, declared with the
        signature the checker gave the function. */
     if (sym->item != NULL && sym->item->runtime != NULL) {
-        char symbol[64];
-        snprintf(symbol, sizeof symbol, RUNTIME_ROOT "%s",
-                 sym->item->runtime);
-        f = lower_find_function(l->m, NULL, symbol);
+        struct text symbol = {0};
+        text_appendf(&symbol, RUNTIME_ROOT "%s", sym->item->runtime);
+        f = lower_find_function(l->m, NULL, text_cstr(&symbol));
         if (f == NULL) {
-            f = ir_extern_add(l->m, symbol, lower_ir_type_of(t->result), false);
+            f = ir_extern_add(l->m, text_cstr(&symbol),
+                              lower_ir_type_of(t->result), false);
             f->result_agg = lower_result_agg(l, t->result);
             for (i = 0; i < t->param_count; i++) {
                 lower_add_param(l, f, t->params[i]);
             }
         }
+        text_free(&symbol);
         return f;
     }
     if (sym->home == NULL) {

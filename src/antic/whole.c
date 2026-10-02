@@ -1737,25 +1737,23 @@ static void resolve_named_provider(struct whole *w, struct ir_module *m,
    it, which a replacement at start puts in the slot. */
 static void write_replacement(struct ir_module *m, struct injectable *in)
 {
-    static const uint8_t empty[8] = {0};
-    char name[256];
+    struct text name = {0};
     struct ir_function *f;
     struct ir_block *b;
     struct ir_global *g;
     uint32_t load;
     uint32_t at;
 
-    in->holder = IR_NO_INDEX;
-    in->thunk = IR_NO_INDEX;
-    if (strlen(in->interface) + 16 > sizeof name) {
-        return;
-    }
-    snprintf(name, sizeof name, "plugin.%s", in->interface);
-    g = ir_global_add(m, RUNTIME_MODULE, name, empty, sizeof empty, 8);
+    text_appendf(&name, "plugin.%s", in->interface);
+    g = ir_global_add_value(m, RUNTIME_MODULE, text_cstr(&name),
+                            ir_const_int(m, IR_PTR, 0));
     g->mutable = true;
     in->holder = g->index;
-    snprintf(name, sizeof name, "provided.%s", in->interface);
-    f = ir_function_add(m, RUNTIME_MODULE, name, IR_PTR, IR_NO_AGG);
+    name.length = 0;
+    text_appendf(&name, "provided.%s", in->interface);
+    f = ir_function_add(m, RUNTIME_MODULE, text_cstr(&name), IR_PTR,
+                        IR_NO_AGG);
+    text_free(&name);
     b = ir_block_add(f);
     at = ir_addr(f, b, ir_global_op(g));
     load = ir_load(f, b, IR_PTR, ir_temp_op(f, at));

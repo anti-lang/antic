@@ -341,8 +341,9 @@ struct ir_global {
     uint8_t *bytes;
     uint64_t size;
     uint64_t align;
-    struct ir_reloc *relocs;
+    struct ir_reloc *relocs;        /* in the arena of the module */
     size_t reloc_count;
+    size_t reloc_capacity;
     struct ir_const *value;
     bool mutable;                   /* a static field, which the program
                                        writes. */
@@ -566,6 +567,12 @@ void ir_class_inject(struct ir_module *m, struct ir_class *c,
 /* Room for an aggregate constant of count items, in the memory pool. */
 struct ir_const *ir_const_agg(struct ir_module *m, struct ir_vtype type,
                               size_t count);
+
+/* An integer constant of the scalar type, in the memory pool. A global
+   that holds one takes the size of the type on the target that lays it
+   out. */
+struct ir_const *ir_const_int(struct ir_module *m, enum ir_type type,
+                              uint64_t integer);
 
 /* Whether the two constants hold the same value. */
 bool ir_const_equal(const struct ir_const *a, const struct ir_const *b);

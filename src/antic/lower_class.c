@@ -613,8 +613,9 @@ struct ir_operand lower_construct(struct lowerer *l,
         lower_hook_object(l, HOOK_CREATED, dest);
         return lower_none();
     }
-    args = alloc_zeroed(2 * e->as.call.arg_count + 1, sizeof *args);
-    values = alloc_zeroed(e->as.call.arg_count + 1, sizeof *values);
+    args = alloc_zeroed(alloc_sum(alloc_product(e->as.call.arg_count, 2), 1),
+                        sizeof *args);
+    values = alloc_zeroed(alloc_sum(e->as.call.arg_count, 1), sizeof *values);
     args[0] = dest;
     count = 1;
     /* An argument at a parameter of the form of two words, a `keep own`
