@@ -52,6 +52,16 @@ fn main() -> int
 	io.println(b.text());
 	delete(p);
 
+	b.clear();
+	json.write_int(0, &b);
+	b.append(" ");
+	json.write_int(-7, &b);
+	b.append(" ");
+	json.write_int(9223372036854775807, &b);
+	b.append(" ");
+	json.write_int(-9223372036854775807 - 1, &b);
+	io.println(b.text());
+
 	let n = alloc Named { x: 1, y: 2, mark: 7, tag: none };
 	b.clear();
 	json.write(n, &b);

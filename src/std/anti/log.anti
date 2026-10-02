@@ -218,7 +218,7 @@ pub class SinkLogger inherits Logger
 			json.write_text(message, &line);
 			line.append("}\n");
 		} else {
-			json.write_int(time.wall(), &line);
+			line.append_int(time.wall());
 			line.append(" ");
 			line.append(level_name(level));
 			line.append(" ");
@@ -455,7 +455,7 @@ fn first_sink(doc: *toml.Document) -> *Sink
 	while i < 8 do {
 		let key = text.Builder.new();
 		key.append("sink.");
-		json.write_int(i, &key);
+		key.append_int(i);
 		key.append(".kind");
 		if !doc.has(key.text()) {
 			i += 1;
@@ -464,7 +464,7 @@ fn first_sink(doc: *toml.Document) -> *Sink
 		let kind = doc.text_of(key.text(), "stderr");
 		let where = text.Builder.new();
 		where.append("sink.");
-		json.write_int(i, &where);
+		where.append_int(i);
 		where.append(".path");
 		let sink = made(kind, doc.text_of(where.text(), ""));
 		if sink != none {

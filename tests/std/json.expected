@@ -1,5 +1,6 @@
 exit 0
 {"type":"Point","x":3,"y":-4}
+0 -7 9223372036854775807 -9223372036854775808
 {"type":"Named","name":"a\"b\nc","mark":7,"sharp":true}
 null
 -4

@@ -43,32 +43,11 @@ pub fn write_text(s: str, out: *text.Builder)
 	anti_rt_json_write_text(out, s.ptr, s.len);
 }
 
-/// Write `value` as a JSON number.
+/// Write `value` as a JSON number, the decimal digits that
+/// `text.Builder.append_int` writes.
 pub fn write_int(value: int, out: *text.Builder)
 {
-	if value == 0 {
-		out.append("0");
-		return;
-	}
-	let digits: [20]byte = [0; 20];
-	let n = value;
-	if n < 0 {
-		out.append_byte(0x2D);
-	}
-	let count = 0;
-	while n != 0 do {
-		let last = n % 10;
-		if last < 0 {
-			last = -last;
-		}
-		digits[count] = digit(last as byte);
-		count += 1;
-		n = n / 10;
-	}
-	while count > 0 do {
-		count -= 1;
-		out.append_byte(digits[count]);
-	}
+	out.append_int(value);
 }
 
 /// Write `value` as `true` or `false`.
@@ -115,13 +94,4 @@ pub fn unquote(source: str, out: *text.Builder) may fail
 	if read == 0 {
 		fail "the text is no JSON string";
 	}
-}
-
-/// The byte of the hexadecimal digit `value`.
-fn digit(value: byte) -> byte
-{
-	if value < 10 {
-		return 0x30 + value;
-	}
-	return 0x61 + value - 10;
 }

@@ -57,28 +57,6 @@ fn variable(name: str) -> str
 	return text.from_c(value);
 }
 
-/// The bytes of `b`, in memory of their own.
-///
-/// The three directory functions give memory the caller owns, so the text of a
-/// builder, which the builder frees, does not leave here.
-fn owned(b: *text.Builder) -> str may fail
-{
-	let s = b.text();
-	let from = s.ptr else {
-		return "";
-	};
-	let room = alloc(byte, s.len + 1) else {
-		fail lang.Error.new(1, "out of memory");
-	};
-	let i = 0;
-	while i < s.len do {
-		room[i] = from[i];
-		i += 1;
-	}
-	room[s.len] = 0;
-	return text.from_c(room);
-}
-
 /// Whether this program follows the conventions of Windows.
 ///
 /// The runtime is compiled once per target and answers from its own build.
@@ -128,7 +106,7 @@ fn unix_dir(name: str, fallback: str, app: str) -> str may fail
 	}
 	b.append("/");
 	b.append(app);
-	return try owned(&b);
+	return b.take();
 }
 
 /// `%LOCALAPPDATA%\<app>` with `tail` below it, which may be empty.
@@ -148,7 +126,7 @@ fn windows_dir(app: str, tail: str) -> str may fail
 		b.append("\\");
 		b.append(tail);
 	}
-	return try owned(&b);
+	return b.take();
 }
 
 /// The per-user configuration directory of `app`.
