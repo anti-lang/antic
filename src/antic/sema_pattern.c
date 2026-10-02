@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "../rt/regex.h"
+#include "arith.h"
 #include "pattern.h"
 #include "sema_checker.h"
 
@@ -685,11 +686,14 @@ struct type *sema_match_field(struct checker *c, struct expr *e,
         return sema_builtin(c, TYPE_ERROR);
     }
     if (e->as.field.element) {
-        size_t i;
         arg = sema_new_node(c, EXPR_INT, pos);
-        for (i = 1; i < name.length; i++) {
-            arg->as.integer = arg->as.integer * 10 +
-                              (uint64_t)(name.text[i] - '0');
+        /* The lexer refuses a number past u64, and a library file may
+           still hold any name. */
+        if (!arith_decimal(name.text + 1, name.length - 1,
+                           &arg->as.integer)) {
+            sema_error_at(c, pos, "`%.*s` names no group of a match",
+                          (int)(name.length - 1), name.text + 1);
+            return sema_builtin(c, TYPE_ERROR);
         }
         arg->spelling.bytes = name.text + 1;
         arg->spelling.length = name.length - 1;

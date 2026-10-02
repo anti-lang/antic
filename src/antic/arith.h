@@ -41,4 +41,8 @@ uint64_t arith_saturate(char op, uint64_t a, uint64_t b, int n,
    and the back end read one value. */
 double arith_float_literal(const char *bytes, size_t length, bool single);
 
+/* Whether the length bytes at text are decimal digits alone, at least
+   one, of a value within u64, which it stores in out. */
+bool arith_decimal(const char *text, size_t length, uint64_t *out);
+
 #endif

@@ -188,3 +188,26 @@ double arith_float_literal(const char *bytes, size_t length, bool single)
     text_free(&digits);
     return value;
 }
+
+bool arith_decimal(const char *text, size_t length, uint64_t *out)
+{
+    uint64_t value = 0;
+    size_t i;
+
+    if (length == 0) {
+        return false;
+    }
+    for (i = 0; i < length; i++) {
+        uint64_t digit;
+        if (text[i] < '0' || text[i] > '9') {
+            return false;
+        }
+        digit = (uint64_t)(text[i] - '0');
+        if (value > (UINT64_MAX - digit) / 10) {
+            return false;
+        }
+        value = value * 10 + digit;
+    }
+    *out = value;
+    return true;
+}

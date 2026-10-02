@@ -11,6 +11,20 @@
    and a signed result carries its sign above them. */
 void test_arith(void)
 {
+    uint64_t value = 7;
+
+    /* A decimal number of the digits alone, within u64. */
+    CHECK(arith_decimal("0", 1, &value) && value == 0);
+    CHECK(arith_decimal("18446744073709551615", 20, &value) &&
+          value == UINT64_MAX);
+    CHECK(!arith_decimal("18446744073709551616", 20, &value));
+    CHECK(!arith_decimal("18446744073709551617", 20, &value));
+    CHECK(!arith_decimal("99999999999999999999999", 23, &value));
+    CHECK(!arith_decimal("1'", 2, &value));
+    CHECK(!arith_decimal("1a", 2, &value));
+    CHECK(!arith_decimal("", 0, &value));
+    CHECK(arith_decimal("123x", 3, &value) && value == 123);
+
     /* The upper half of the full product. */
     CHECK(arith_mul_high(UINT64_MAX, UINT64_MAX, 64, false) ==
           UINT64_MAX - 1);
