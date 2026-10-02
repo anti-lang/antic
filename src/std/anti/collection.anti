@@ -290,13 +290,15 @@ pub abstract class Collection<T>
 		let out = text.Builder.new();
 		let arg = self.element_type();
 		let place = self.first_place();
+		let first = true;
 		out.append("[");
 		while place >= 0 do {
 			let copy = self.copy_place(place);
-			if place != self.first_place() {
+			if !first {
 				out.append(", ");
 			}
 			anti_rt_element_text(&out, &copy as ?*byte, arg);
+			first = false;
 			place = self.next_place(place);
 		}
 		out.append("]");
@@ -309,12 +311,14 @@ pub abstract class Collection<T>
 	{
 		let arg = self.element_type();
 		let place = self.first_place();
+		let first = true;
 		out.append("[");
 		while place >= 0 do {
 			let copy = self.copy_place(place);
-			if place != self.first_place() {
+			if !first {
 				out.append(",");
 			}
+			first = false;
 			anti_rt_element_serialize(out, &copy as ?*byte, arg);
 			place = self.next_place(place);
 		}

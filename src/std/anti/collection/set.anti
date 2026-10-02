@@ -342,31 +342,6 @@ pub class HashSet<T: eq + hash> inherits map.SlotTable<T>
 		f(&copy);
 	}
 
-	/// The elements as text, `[1, 2, 3]`, in the order of a walk.
-	///
-	/// DESIGN: the text of `Collection<T>` compares each place with
-	/// `first_place()`, which starts a new random walk here, so the set writes
-	/// its own.
-	concrete fn to_text(self) -> str
-	{
-		let out = text.Builder.new();
-		let arg = anti_rt_type_arg(self as ?*byte, map.TYPE_DEPTH, 0);
-		out.append("[");
-		let first = true;
-		let place = self.first_place();
-		while place >= 0 do {
-			if !first {
-				out.append(", ");
-			}
-			anti_rt_element_text(&out, self.entry(self.slot_at(place)) as ?*byte,
-				arg);
-			first = false;
-			place = self.next_place(place);
-		}
-		out.append("]");
-		return out.take();
-	}
-
 	/// Write the elements to `out` as a JSON array, sorted by the bytes of the
 	/// text of each, as `serialize` of a `HashMap` sorts its keys.
 	concrete fn serialize(self, out: *text.Builder)
