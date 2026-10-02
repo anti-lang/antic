@@ -439,15 +439,9 @@ static void round_trip(void)
               memcmp(first.data, second.data, first.length) == 0);
         CHECK_STR(vec->module, "vec");
         CHECK(vec->item_count == 6);
-        ir_print(&ir_b, &program);
+        ir_print_own(&ir_b, &program);
         CHECK_STR(text_cstr(&ir_b),
-                  "type anti.rt.Descriptor = struct { name: ptr, name_length: "
-                  "i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, "
-                  "field_count: i64, fields: ptr, destruct: ptr, offset: i64, "
-                  "function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }\n"
                   "type vec.V2 = struct { x: i64, y: i64 }\n"
-                  "type anti.rt.Field = struct { name: ptr, name_length: i64, "
-                  "offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
                   "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
                   "type vec.Hidden = struct { v: vec.V2, next: ptr }\n"
                   "extern fn malloc(i64) -> ptr\n"
@@ -1384,15 +1378,9 @@ static void dependencies(void)
         const struct type *box = libs[1]->items[0]->type;
         CHECK(box->kind == TYPE_STRUCT && box->field_count == 1 &&
               box->fields[0].type == v2);
-        ir_print(&ir, &program);
+        ir_print_own(&ir, &program);
         CHECK_STR(text_cstr(&ir),
-                  "type anti.rt.Descriptor = struct { name: ptr, name_length: "
-                  "i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, "
-                  "field_count: i64, fields: ptr, destruct: ptr, offset: i64, "
-                  "function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }\n"
                   "type vec.V2 = struct { x: i64, y: i64 }\n"
-                  "type anti.rt.Field = struct { name: ptr, name_length: i64, "
-                  "offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
                   "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
                   "type vec.Hidden = struct { v: vec.V2, next: ptr }\n"
                   "type shapes.Box = struct { corner: vec.V2 }\n"

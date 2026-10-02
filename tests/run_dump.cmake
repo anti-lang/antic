@@ -5,6 +5,11 @@
 #   EXPECTED  the file with the expected output
 #   OUTPUT    optional file that the command writes, compared instead of
 #             the standard output, which must then be empty
+#
+# The lines of the types the runtime declares, which start with
+# "type anti.rt.", are left out of the output before the comparison. Their
+# layout is the subject of runtime_types in tests/unit/test_lower.c alone,
+# so a change of the descriptor rewrites one expected text.
 
 string(REPLACE "," ";" arguments "${COMMAND}")
 execute_process(
@@ -23,6 +28,8 @@ if(DEFINED OUTPUT)
     endif()
     file(READ "${OUTPUT}" out)
 endif()
+string(REGEX REPLACE "\ntype anti\\.rt\\.[^\n]*" "" out "\n${out}")
+string(SUBSTRING "${out}" 1 -1 out)
 if(NOT out STREQUAL expected)
     message(FATAL_ERROR "output differs from ${EXPECTED}\ngot:\n${out}")
 endif()

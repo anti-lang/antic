@@ -1,18 +1,12 @@
 type [18]ptr = array 18 of ptr
-type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }
 type anti.lang.Object = struct { table: ptr }
 type devirt_plugin.Speaker = struct { super: anti.lang.Object }
 type [2]ptr = array 2 of ptr
-type anti.rt.Function = struct { name: ptr, name_length: i64, slot: i64, param_count: i64, signature: ptr }
 type [17]anti.rt.Function = array 17 of anti.rt.Function
 type [18]i64 = array 18 of i64
-type anti.rt.Versions = struct { chain: ptr, chain_length: i64, floor: ptr, floor_length: i64 }
 type devirt_plugin.Dog = struct { super: devirt_plugin.Speaker }
 type [3]ptr = array 3 of ptr
 type str = struct { ptr: ptr, len: i64 }
-type anti.rt.Provides = struct { path: ptr, path_length: i64, descriptor: ptr, class_of: ptr, init: ptr, offset: i64, flags: i64, chain: ptr, chain_length: i64, fields: i64, size: i64, built: ptr, built_length: i64 }
-type anti.rt.Provided = struct { count: i64, entries: ptr, version: ptr, version_length: i64, class_count: i64, classes: ptr }
-type anti.rt.Class = struct { descriptor: ptr, init: ptr, module: ptr, module_length: i64, flags: i64 }
 type [1]anti.rt.Class = array 1 of anti.rt.Class
 type [1]anti.rt.Provides = array 1 of anti.rt.Provides
 extern fn anti_lang_Object_type_name(ptr) -> agg str

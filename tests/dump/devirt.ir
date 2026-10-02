@@ -1,11 +1,8 @@
 type [18]ptr = array 18 of ptr
-type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }
 type anti.lang.Object = struct { table: ptr }
 type devirt.Only = struct { super: anti.lang.Object, n: i64 }
 type [2]ptr = array 2 of ptr
-type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [1]anti.rt.Field = array 1 of anti.rt.Field
-type anti.rt.Function = struct { name: ptr, name_length: i64, slot: i64, param_count: i64, signature: ptr }
 type [17]anti.rt.Function = array 17 of anti.rt.Function
 type str = struct { ptr: ptr, len: i64 }
 type [19]ptr = array 19 of ptr
@@ -15,7 +12,6 @@ type devirt.Derived = struct { super: devirt.Base }
 type [3]ptr = array 3 of ptr
 type devirt.Speaker = struct { super: anti.lang.Object }
 type [18]i64 = array 18 of i64
-type anti.rt.Versions = struct { chain: ptr, chain_length: i64, floor: ptr, floor_length: i64 }
 type devirt.Dog = struct { super: devirt.Speaker }
 extern fn anti_lang_Object_type_name(ptr) -> agg str
 extern fn anti_lang_Object_to_text(ptr) -> agg str

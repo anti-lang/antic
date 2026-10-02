@@ -3,6 +3,7 @@
 #include "../binary_stdio.h"
 #include "alloc.h"
 #include "check.h"
+#include "pipeline.h"
 #include "arena.h"
 #include "ast.h"
 #include "diagnostic.h"
@@ -19,33 +20,22 @@
    printed IR. The verifier runs before and after the optimizer. */
 static void optimizes(const char *source, const char *expected)
 {
-    struct arena arena = {0};
-    struct diagnostics diags = {0};
-    struct token_list tokens = {0};
-    struct module *module = NULL;
-    struct types types;
-    struct ir_module ir;
+    struct lowered l;
     struct text out = {0};
     struct text errors = {0};
 
-    types_init(&types, &arena);
-    ir_module_init(&ir, &arena, "main");
-    if (!lexer_lex(source, strlen(source), &arena, &diags, &tokens) ||
-        !parser_parse(source, &tokens, &arena, &diags, &module) ||
-        !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true)) {
-        check_failures++;
-        fprintf(stderr, "test source does not check: %s\n%s\n",
-                diags.count > 0 ? diags.items[0].message : "", source);
-    } else if (!ir_verify(&ir, &errors)) {
+    lowered_run(&l, source);
+    if (!l.ok) {
+        /* lowered_run counted the failure. */
+    } else if (!ir_verify(&l.ir, &errors)) {
         check_failures++;
         fprintf(stderr, "lowered IR fails verification:\n%s",
                 text_cstr(&errors));
     } else {
-        lower_module(module, "main", &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
-        optimize_program(&ir, "main");
-        ir_print(&out, &ir);
+        optimize_program(&l.ir, "main");
+        ir_print_own(&out, &l.ir);
         CHECK_STR(text_cstr(&out), expected);
-        if (!ir_verify(&ir, &errors)) {
+        if (!ir_verify(&l.ir, &errors)) {
             check_failures++;
             fprintf(stderr, "optimized IR fails verification:\n%s",
                     text_cstr(&errors));
@@ -53,10 +43,7 @@ static void optimizes(const char *source, const char *expected)
     }
     text_free(&out);
     text_free(&errors);
-    ir_module_free(&ir);
-    lexer_token_list_free(&tokens);
-    diagnostics_free(&diags);
-    arena_free(&arena);
+    lowered_release(&l);
 }
 
 /* A module compiled on its own keeps each of its functions, and the bodies
@@ -336,19 +323,10 @@ void test_optimize(void)
               "    return 0;\n"
               "}\n",
               "type [17]ptr = array 17 of ptr\n"
-              "type anti.rt.Descriptor = struct { name: ptr, "
-              "name_length: i64, parent: ptr, size: i64, depth: i64, "
-              "ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, "
-              "offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }\n"
               "type anti.lang.Object = struct { table: ptr }\n"
               "type main.Box = struct { super: anti.lang.Object, n: i64 }\n"
               "type [2]ptr = array 2 of ptr\n"
-              "type anti.rt.Field = struct { name: ptr, name_length: i64, "
-              "offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
               "type [1]anti.rt.Field = array 1 of anti.rt.Field\n"
-              "type anti.rt.Function = struct { name: ptr, "
-              "name_length: i64, slot: i64, param_count: i64, "
-              "signature: ptr }\n"
               "type [16]anti.rt.Function = array 16 of anti.rt.Function\n"
               "type str = struct { ptr: ptr, len: i64 }\n"
               "global anti_lang_Object_descriptor size 0 align 1 "
@@ -414,9 +392,7 @@ void test_optimize(void)
               "    let n = size_of(H);\n"
               "    return n * 1 + 4 - 4;\n"
               "}\n",
-              "type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }\n"
               "type main.H = struct { tag: i8, n: i32 }\n"
-              "type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
               "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
               "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
               "global main.6 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00\n"

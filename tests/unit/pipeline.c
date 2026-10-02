@@ -144,6 +144,26 @@ void lowered_release(struct lowered *l)
     checked_release(&l->front);
 }
 
+void ir_print_own(struct text *out, const struct ir_module *m)
+{
+    static const char runtime_type[] = "type anti.rt.";
+    struct text all = {0};
+    const char *line;
+
+    ir_print(&all, m);
+    line = text_cstr(&all);
+    while (*line != '\0') {
+        const char *end = strchr(line, '\n');
+        size_t length = end == NULL ? strlen(line) : (size_t)(end - line) + 1;
+
+        if (strncmp(line, runtime_type, sizeof runtime_type - 1) != 0) {
+            text_append_bytes(out, line, length);
+        }
+        line += length;
+    }
+    text_free(&all);
+}
+
 void machine_build(struct machine *m, struct ir_module *ir, enum target t,
                    enum cpu_level level, bool allocate)
 {

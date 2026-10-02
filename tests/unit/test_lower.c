@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "pipeline.h"
 #include "arena.h"
 #include "ast.h"
 #include "diagnostic.h"
@@ -28,52 +29,15 @@
 #include "threads.h"
 #include "trace.h"
 
-struct lowered {
-    struct arena arena;
-    struct diagnostics diags;
-    struct token_list tokens;
-    struct module *module;
-    struct types types;
-    struct ir_module ir;
-    bool ok;
-};
-
-static void run(struct lowered *l, const char *source)
-{
-    memset(l, 0, sizeof *l);
-    types_init(&l->types, &l->arena);
-    ir_module_init(&l->ir, &l->arena, "main");
-    if (!lexer_lex(source, strlen(source), &l->arena, &l->diags, &l->tokens) ||
-        !parser_parse(source, &l->tokens, &l->arena, &l->diags, &l->module) ||
-        !sema_check(l->module, "main", NULL, NULL, 0, &l->types, &l->arena,
-                    &l->diags, true)) {
-        fprintf(stderr, "test source does not check: %d:%d: %s\n%s\n",
-                l->diags.items[0].line, l->diags.items[0].column,
-                l->diags.items[0].message, source);
-        check_failures++;
-        return;
-    }
-    lower_module(l->module, "main", &l->ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
-    l->ok = true;
-}
-
-static void release(struct lowered *l)
-{
-    ir_module_free(&l->ir);
-    lexer_token_list_free(&l->tokens);
-    diagnostics_free(&l->diags);
-    arena_free(&l->arena);
-}
-
 static void lowers(const char *source, const char *expected)
 {
     struct lowered l;
     struct text out = {0};
     struct text errors = {0};
 
-    run(&l, source);
+    lowered_run(&l, source);
     CHECK(l.ok);
-    ir_print(&out, &l.ir);
+    ir_print_own(&out, &l.ir);
     CHECK_STR(text_cstr(&out), expected);
     if (!ir_verify(&l.ir, &errors)) {
         check_failures++;
@@ -81,7 +45,7 @@ static void lowers(const char *source, const char *expected)
     }
     text_free(&out);
     text_free(&errors);
-    release(&l);
+    lowered_release(&l);
 }
 
 /* The class record of the module named name, or NULL. */
@@ -128,7 +92,7 @@ static bool body_holds(const char *source, const char *name,
     const char *end;
     bool found = false;
 
-    run(&l, source);
+    lowered_run(&l, source);
     CHECK(l.ok);
     ir_print(&out, &l.ir);
     snprintf(header, sizeof header, "fn %s(", name);
@@ -143,7 +107,7 @@ static bool body_holds(const char *source, const char *name,
                 text_cstr(&out));
     }
     text_free(&out);
-    release(&l);
+    lowered_release(&l);
     return found;
 }
 
@@ -182,7 +146,7 @@ static void checks_kind_of(const char *source, int kind)
     size_t b;
     size_t k;
 
-    run(&l, source);
+    lowered_run(&l, source);
     CHECK(l.ok);
     for (i = 0; i < l.ir.function_count; i++) {
         const struct ir_function *f = l.ir.functions[i];
@@ -201,7 +165,7 @@ static void checks_kind_of(const char *source, int kind)
         }
     }
     CHECK(found);
-    release(&l);
+    lowered_release(&l);
 }
 
 /* DESIGN: a failed check names the values it prints by the kind of enum
@@ -236,7 +200,7 @@ static void records_classes(void)
     size_t b;
     size_t i;
 
-    run(&l, "abstract class Shape\n"
+    lowered_run(&l, "abstract class Shape\n"
             "{\n"
             "    abstract fn area(self) -> int;\n"
             "}\n"
@@ -323,7 +287,7 @@ static void records_classes(void)
         CHECK_STR(global_name(&l.ir, call->c.as.index), "Shape.descriptor");
         CHECK(call->field == 17);
     }
-    release(&l);
+    lowered_release(&l);
 }
 
 /* The global of the module named name, or NULL. */
@@ -395,7 +359,7 @@ static void records_hook_entries(void)
     const struct ir_global *table;
     size_t i;
 
-    run(&l, "class Cell\n"
+    lowered_run(&l, "class Cell\n"
             "{\n"
             "    pub n: int = 0,\n"
             "    pub fn get(self) -> int { return self.n; }\n"
@@ -405,7 +369,7 @@ static void records_hook_entries(void)
     table = global_of(&l.ir, "Cell.table");
     CHECK(table != NULL && table->value != NULL);
     if (table == NULL || table->value == NULL) {
-        release(&l);
+        lowered_release(&l);
         return;
     }
     /* The descriptor, the seven of the root, the nine hooks and `get`. */
@@ -424,7 +388,7 @@ static void records_hook_entries(void)
                                            : "(none)",
                   names[i]);
     }
-    release(&l);
+    lowered_release(&l);
 }
 
 /* DESIGN: a field record names the type of its field by the type id of
@@ -492,7 +456,7 @@ static void records_type_ids(void)
     struct lowered l;
     const struct ir_global *d;
 
-    run(&l,
+    lowered_run(&l,
         "struct Size { w: i32, h: f64 }\n"
         "union Bits { i: i32, f: f32 }\n"
         "enum Mode: u8 { A, B }\n"
@@ -522,7 +486,7 @@ static void records_type_ids(void)
                   "Size.fields");
     }
     CHECK(global_of(&l.ir, "Bits.descriptor") == NULL);
-    release(&l);
+    lowered_release(&l);
 }
 
 /* The flags form is one flag operation and one read per field that the
@@ -533,7 +497,7 @@ static void flag_reads(void)
     struct text out = {0};
     const char *text;
 
-    run(&l, "fn f(a: int, b: int) -> bool {\n"
+    lowered_run(&l, "fn f(a: int, b: int) -> bool {\n"
             "    let (r, g) = a + b;\n"
             "    return g.carry && r > 0;\n"
             "}\n"
@@ -550,7 +514,7 @@ static void flag_reads(void)
     CHECK(strstr(text, "flag negative") == NULL);
     CHECK(strstr(text, " = addfl i8 %0, %0, %") != NULL);
     text_free(&out);
-    release(&l);
+    lowered_release(&l);
 }
 
 /* The IR type a C type takes as the result or a parameter of a runtime
@@ -767,13 +731,13 @@ static void match_layout(void)
     uint32_t agg;
     size_t k;
 
-    run(&l, "fn count(m: Match) -> int { return m.count; }\n"
+    lowered_run(&l, "fn count(m: Match) -> int { return m.count; }\n"
             "fn main() -> int { return 0; }\n");
     CHECK(l.ok);
     agg = ir_agg_find(&l.ir, "anti.lang.Match");
     CHECK(agg != IR_NO_AGG);
     if (!l.ok || agg == IR_NO_AGG || !target_host(&host)) {
-        release(&l);
+        lowered_release(&l);
         return;
     }
     CHECK(l.ir.aggs[agg]->field_count == sizeof offsets / sizeof offsets[0]);
@@ -786,11 +750,46 @@ static void match_layout(void)
         CHECK(ir->offsets[k] == offsets[k]);
     }
     layout_free(&layouts);
-    release(&l);
+    lowered_release(&l);
+}
+
+/* The records the runtime declares, in the layout of src/rt/object.h.
+   Every other expected text leaves these lines out through ir_print_own,
+   so a change of a record rewrites this test alone. */
+static void runtime_types(void)
+{
+    static const char *const lines[] = {
+        "type anti.rt.Descriptor = struct { name: ptr, name_length: i64, "
+        "parent: ptr, size: i64, depth: i64, ancestors: ptr, "
+        "field_count: i64, fields: ptr, destruct: ptr, offset: i64, "
+        "function_count: i64, functions: ptr, version: ptr, "
+        "version_length: i64, versions: ptr, type_arg_count: i64, "
+        "type_args: ptr }\n",
+        "type anti.rt.Field = struct { name: ptr, name_length: i64, "
+        "offset: i64, type: i64, owned: i64, descriptor: ptr }\n",
+        "type anti.rt.Function = struct { name: ptr, name_length: i64, "
+        "slot: i64, param_count: i64, signature: ptr }\n",
+    };
+    struct lowered l;
+    struct text out = {0};
+    size_t i;
+
+    lowered_run(&l, "class Box\n{\n    n: int = 1,\n}\n");
+    CHECK(l.ok);
+    ir_print(&out, &l.ir);
+    for (i = 0; i < sizeof lines / sizeof lines[0]; i++) {
+        if (strstr(text_cstr(&out), lines[i]) == NULL) {
+            check_failures++;
+            fprintf(stderr, "no line\n%sin\n%s", lines[i], text_cstr(&out));
+        }
+    }
+    text_free(&out);
+    lowered_release(&l);
 }
 
 void test_lower(void)
 {
+    runtime_types();
     flag_reads();
     /* A bitfield is read and written through the address of its struct and
        the field, and the back end lowers both to shifts and masks. */
@@ -800,9 +799,7 @@ void test_lower(void)
            "    p.level -= 2;\n"
            "    return p.level;\n"
            "}\n",
-           "type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }\n"
            "type main.Flags = struct { visible: i32 : 1 zeroext, level: i8 : 3 signext }\n"
-           "type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
            "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
            "global main.Flags.descriptor anti.rt.Descriptor { @main.1, i64 5, ptr 0, size_of main.Flags, i64 0, ptr 0, i64 2, @main.Flags.fields, ptr 0, i64 0, i64 0, ptr 0, @main.package.version, i64 5, ptr 0, i64 0, ptr 0 }\n"
@@ -836,9 +833,7 @@ void test_lower(void)
            "    return p.b + a.a as i32;\n"
            "}\n",
            "type main.A = struct align(16) { a: i8 }\n"
-           "type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }\n"
            "type main.P = packed struct { a: i8, b: i32 }\n"
-           "type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
            "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
            "type [1]anti.rt.Field = array 1 of anti.rt.Field\n"
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
@@ -946,9 +941,7 @@ void test_lower(void)
            "    let a: [size_of(H) - 4]byte = [7; size_of(H) - 4];\n"
            "    return a.len + a[1] as int;\n"
            "}\n",
-           "type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }\n"
            "type main.H = struct { tag: i8, n: i32 }\n"
-           "type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
            "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
            "type [size_of(main.H) - 4]byte = array sub i64(size_of main.H, 4) of i8\n"
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
@@ -1591,8 +1584,6 @@ void test_lower(void)
            "    p.y = 3;\n"
            "}\n",
            "type main.P = struct { x: i64, y: i32 }\n"
-           "type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }\n"
-           "type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
            "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
            "global main.P.descriptor anti.rt.Descriptor { @main.1, i64 1, ptr 0, size_of main.P, i64 0, ptr 0, i64 2, @main.P.fields, ptr 0, i64 0, i64 0, ptr 0, @main.package.version, i64 5, ptr 0, i64 0, ptr 0 }\n"
@@ -1633,12 +1624,6 @@ void test_lower(void)
            "    return w;\n"
            "}\n",
            "type main.V = struct { x: f64, y: f64 }\n"
-           "type anti.rt.Descriptor = struct { name: ptr, name_length: i64, "
-           "parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: "
-           "i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, "
-           "functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }\n"
-           "type anti.rt.Field = struct { name: ptr, name_length: i64, offset: "
-           "i64, type: i64, owned: i64, descriptor: ptr }\n"
            "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
            "global main.V.descriptor anti.rt.Descriptor { @main.1, i64 1, ptr "
            "0, size_of main.V, i64 0, ptr 0, i64 2, @main.V.fields, ptr 0, i64 "
@@ -1770,13 +1755,7 @@ void test_lower(void)
            "fn f(out: *Pair) {\n"
            "    *out = PAIR;\n"
            "}\n",
-           "type anti.rt.Descriptor = struct { name: ptr, name_length: i64, "
-           "parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: "
-           "i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, "
-           "functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }\n"
            "type main.Gap = struct { a: i8, b: i32 }\n"
-           "type anti.rt.Field = struct { name: ptr, name_length: i64, offset: "
-           "i64, type: i64, owned: i64, descriptor: ptr }\n"
            "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
            "type main.Pair = struct { one: main.Gap, two: main.Gap }\n"
            "global main.Gap.descriptor anti.rt.Descriptor { @main.1, i64 3, "
@@ -1818,12 +1797,6 @@ void test_lower(void)
            "    return v.y;\n"
            "}\n",
            "type main.V = struct { x: f64, y: f64 }\n"
-           "type anti.rt.Descriptor = struct { name: ptr, name_length: i64, "
-           "parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: "
-           "i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, "
-           "functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }\n"
-           "type anti.rt.Field = struct { name: ptr, name_length: i64, offset: "
-           "i64, type: i64, owned: i64, descriptor: ptr }\n"
            "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
            "extern fn add(agg main.V, agg main.V) -> agg main.V\n"
            "global main.V.descriptor anti.rt.Descriptor { @main.1, i64 1, ptr "
@@ -2000,9 +1973,7 @@ void test_lower(void)
            "    let same: fn(i32) -> i32 = abs;\n"
            "    return o.unary(x) + same(x) + o.narrow(1) as i32;\n"
            "}\n",
-           "type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }\n"
            "type main.Ops = struct { unary: ptr, narrow: ptr }\n"
-           "type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }\n"
            "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
            "extern fn abs(i32) -> i32\n"
            "extern fn main.fn.0(i32) -> i32\n"

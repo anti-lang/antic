@@ -72,6 +72,13 @@ struct lowered {
 void lowered_run(struct lowered *l, const char *source);
 void lowered_release(struct lowered *l);
 
+/* Append the IR of m to out as ir_print does, without the lines of the
+   types the runtime declares, which start with "type anti.rt.". Their
+   layout is the subject of runtime_types in test_lower.c alone, and every
+   other expected text leaves them out, so a change of the descriptor
+   rewrites one text. */
+void ir_print_own(struct text *out, const struct ir_module *m);
+
 /* The machine functions of a module, after instruction selection at a
    level and, when allocate is set, register allocation. functions holds
    one entry per function of the module, NULL for one without a body, and

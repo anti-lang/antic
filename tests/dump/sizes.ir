@@ -1,6 +1,4 @@
-type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }
 type sizes.Header = struct { tag: i8, count: i32, next: ptr }
-type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [3]anti.rt.Field = array 3 of anti.rt.Field
 type [size_of(sizes.Header) - 12]byte = array sub i64(size_of sizes.Header, 12) of i8
 type sizes.Buffer = struct { head: sizes.Header, pad: [size_of(sizes.Header) - 12]byte }

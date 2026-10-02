@@ -1,18 +1,12 @@
 type []*copies_merge.Person = struct { ptr: ptr, len: i64 }
 type []*copies_merge.Order = struct { ptr: ptr, len: i64 }
 type []int = struct { ptr: ptr, len: i64 }
-type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }
 type copies_merge.Person = struct { age: i64 }
-type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 type [1]anti.rt.Field = array 1 of anti.rt.Field
 type copies_merge.Order = struct { total: i64 }
 type [1]*copies_merge.Person = array 1 of ptr
 type [1]*copies_merge.Order = array 1 of ptr
 type [1]int = array 1 of i64
-type anti.rt.Slots = struct { descriptor: ptr, slot_count: i64, bits: ptr }
-type anti.rt.SlotTable = struct { count: i64, interfaces: ptr, reflect: i64 }
-type anti.rt.Injectable = struct { name: ptr, owner: ptr, field: ptr, final: i64, slot: ptr, library: ptr, library_length: i64, discover: i64, holder: ptr, thunk: ptr, descriptor: ptr }
-type anti.rt.Injectables = struct { count: i64, interfaces: ptr }
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
 global copies_merge.9 size 36 align 1 bytes 63 6f 70 69 65 73 5f 6d 65 72 67 65 2e 61 6e 74 69 3a 32 37 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 global copies_merge.10 size 42 align 1 bytes 63 6f 70 69 65 73 5f 6d 65 72 67 65 2e 61 6e 74 69 3a 31 37 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00
