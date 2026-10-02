@@ -22,23 +22,18 @@ static void fail(struct selector *s, const char *format, ...)
 struct mach_inst *select_emit(struct selector *s, uint16_t op, size_t count,
                               const struct mach_operand *operands)
 {
-    struct mach_inst *inst = mach_append(s->b);
+    struct mach_inst *inst;
 
     /* A pattern that passes more operands is a defect of antic, which the
-       selection reports instead of writing past the array. */
+       selection reports as an error where mach_add, which has no way to
+       report one, would stop the run. */
     if (count > MACH_MAX_OPERANDS) {
         fail(s, "an instruction takes %zu operands, and at most %d fit",
              count, (int)MACH_MAX_OPERANDS);
         count = 0;
     }
+    inst = mach_add(s->b, op, count, operands);
     inst->line = s->line;
-    inst->op = op;
-    inst->count = (uint8_t)count;
-    /* An instruction without operands may pass no array, and memcpy takes
-       no null pointer even for zero bytes. */
-    if (count > 0) {
-        memcpy(inst->operands, operands, count * sizeof *operands);
-    }
     return inst;
 }
 

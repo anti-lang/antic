@@ -2130,10 +2130,9 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
                               : e->as.atomic.op == ATOMIC_CAS ? IR_I8
                               : lower_ir_type_of(e->type) == IR_PTR ? IR_PTR
                                                               : IR_I64;
-        struct ir_function *f;
         struct ir_operand args[4];
+        struct ir_operand given;
         size_t n = 2;
-        uint32_t call;
         args[0] = lower_address(l, e->as.atomic.place);
         args[1] = lower_size_operand(l, of);
         if (e->as.atomic.a != NULL) {
@@ -2142,15 +2141,11 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         if (e->as.atomic.b != NULL) {
             args[n++] = widen_to_i64(l, e->as.atomic.b);
         }
-        f = lower_rt_declare(l, functions[e->as.atomic.op]);
-        call = ir_call(l->f, l->b, result, ir_func_op(f), args, n);
-        if (result == IR_VOID) {
-            return lower_none();
+        given = lower_rt_call_as(l, functions[e->as.atomic.op], result, args);
+        if (result == IR_VOID || result == IR_I8 || result == IR_PTR) {
+            return given;
         }
-        if (result == IR_I8 || result == IR_PTR) {
-            return lower_temp(l, call);
-        }
-        return narrow_from_i64(l, lower_temp(l, call), e->type);
+        return narrow_from_i64(l, given, e->type);
     }
     /* The three read the table of the object, so the runtime does the
        walk. The compiler passes the pointer and the class it has. */

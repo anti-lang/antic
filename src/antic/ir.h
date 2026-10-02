@@ -510,6 +510,10 @@ uint32_t ir_array_of(struct ir_module *m, const char *element_name,
    An index stops below UINT32_MAX, which IR_NO_AGG and IR_NO_INDEX take,
    and a count past it ends the run as a failed allocation does. */
 uint32_t ir_index(size_t count);
+/* The FNV-1a hash of module, a NULL one as empty, then a byte 0xff and
+   name, for the tables that find a function or a global by its two
+   names. */
+uint64_t ir_hash_name(const char *module, const char *name);
 /* The index of the aggregate named name, or IR_NO_AGG. */
 uint32_t ir_agg_find(const struct ir_module *m, const char *name);
 

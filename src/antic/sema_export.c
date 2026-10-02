@@ -22,11 +22,6 @@ static const char *keep_name(struct arena *arena, const char *text,
    the tag itself and C never reads the layout, so an export signature
    names the class without it being an `export class`. A class below it
    has no C name and stays out. */
-static bool is_error_class(const struct type *t)
-{
-    return types_is_lang_error(t);
-}
-
 /* Whether t is a type declared in the body of cls, at any depth. */
 static bool nested_in(const struct type *t, const struct item *cls)
 {
@@ -78,7 +73,7 @@ static bool c_representable(const struct type *t, bool field,
     case TYPE_STRUCT:
     case TYPE_CLASS:
     case TYPE_VARIANT:
-        if (t->item_exported || is_error_class(t) || types_is_flags(t) ||
+        if (t->item_exported || types_is_lang_error(t) || types_is_flags(t) ||
             nested_in(t, cls)) {
             return true;
         }

@@ -175,4 +175,9 @@ void mach_symbol(struct text *out, const struct ir_module *m,
 void mach_function_symbol(struct text *out, enum target t,
                           const struct ir_function *f);
 
+/* Append the symbol of global g for target t. An exported global has
+   its C name, and every other global its mangled name. */
+void mach_global_symbol(struct text *out, enum target t,
+                        const struct ir_global *g);
+
 #endif

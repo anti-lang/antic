@@ -47,14 +47,6 @@ struct whole {
     size_t entry_count;
 };
 
-static uint64_t hash_text(uint64_t h, const char *s)
-{
-    for (; s != NULL && *s != '\0'; s++) {
-        h = (h ^ (unsigned char)*s) * 1099511628211u;
-    }
-    return (h ^ 0xff) * 1099511628211u;
-}
-
 static bool same_text(const char *a, const char *b)
 {
     return a == NULL ? b == NULL : b != NULL && strcmp(a, b) == 0;
@@ -63,9 +55,7 @@ static bool same_text(const char *a, const char *b)
 static struct slot *slot_of(const struct whole *w, const char *module,
                             const char *name)
 {
-    size_t i = (size_t)hash_text(hash_text(1469598103934665603u, module),
-                                 name) &
-               (w->slot_count - 1);
+    size_t i = (size_t)ir_hash_name(module, name) & (w->slot_count - 1);
 
     while (w->slots[i].name != NULL &&
            !(same_text(w->slots[i].module, module) &&

@@ -310,6 +310,12 @@ bool lower_bound_is_direct(const struct expr *e, const struct type *s);
 struct ir_operand lower_new_memory(struct lowerer *l, struct ir_operand size);
 struct ir_operand lower_rt_call(struct lowerer *l, enum rt_function f,
                                 const struct ir_operand *args);
+/* lower_rt_call with the result read as result, which holds the bits of
+   the result of the row: a pointer, or a bool of a compare and swap, for
+   the i64 that the runtime gives back. */
+struct ir_operand lower_rt_call_as(struct lowerer *l, enum rt_function f,
+                                   enum ir_type result,
+                                   const struct ir_operand *args);
 struct ir_operand lower_slice_length(struct lowerer *l, struct ir_operand p,
                                      const struct type *slice);
 struct ir_function *lower_rt_declare(struct lowerer *l, enum rt_function f);

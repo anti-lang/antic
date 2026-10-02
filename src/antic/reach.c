@@ -96,21 +96,6 @@ static void walk_global(struct walk *w, uint32_t index)
     }
 }
 
-static uint64_t global_hash(const struct ir_global *g)
-{
-    uint64_t h = 1469598103934665603u;
-    const char *p;
-
-    for (p = g->module; *p != '\0'; p++) {
-        h = (h ^ (unsigned char)*p) * 1099511628211u;
-    }
-    h = (h ^ '.') * 1099511628211u;
-    for (p = g->name; *p != '\0'; p++) {
-        h = (h ^ (unsigned char)*p) * 1099511628211u;
-    }
-    return h;
-}
-
 /* DESIGN: a whole program holds the declaration that one module writes
    for a datum of another beside the definition that module wrote. The
    library files are read one after the other. A live declaration
@@ -138,7 +123,7 @@ static uint32_t *definitions_of(const struct ir_module *m)
         if (g->is_extern || g->module == NULL) {
             continue;
         }
-        slot = (size_t)global_hash(g) & (capacity - 1);
+        slot = (size_t)ir_hash_name(g->module, g->name) & (capacity - 1);
         while (table[slot] != IR_NO_INDEX) {
             slot = (slot + 1) & (capacity - 1);
         }
@@ -150,7 +135,7 @@ static uint32_t *definitions_of(const struct ir_module *m)
         if (!g->is_extern || g->module == NULL) {
             continue;
         }
-        slot = (size_t)global_hash(g) & (capacity - 1);
+        slot = (size_t)ir_hash_name(g->module, g->name) & (capacity - 1);
         while (table[slot] != IR_NO_INDEX) {
             const struct ir_global *d = m->globals[table[slot]];
             if (strcmp(d->module, g->module) == 0 &&

@@ -100,11 +100,6 @@ static void c_name(struct text *out, const struct name *name)
 /* DESIGN: `anti.lang.Error` crosses to C as `struct anti_Error *`, the
    type the object model gives the generated helpers. C never reads the
    layout, so the header declares the tag and nothing else. */
-static bool is_error_class(const struct type *t)
-{
-    return types_is_lang_error(t);
-}
-
 static const struct item *construct_with_arguments(const struct type *t);
 
 /* Whether a signature names the error class, which the header then
@@ -132,12 +127,13 @@ static bool type_names_error(const struct type *t)
     if (t->kind != TYPE_FN) {
         return false;
     }
-    if (t->result->kind == TYPE_POINTER && is_error_class(t->result->element)) {
+    if (t->result->kind == TYPE_POINTER &&
+        types_is_lang_error(t->result->element)) {
         return true;
     }
     for (i = 0; i < t->param_count; i++) {
         if (t->params[i]->kind == TYPE_POINTER &&
-            is_error_class(t->params[i]->element)) {
+            types_is_lang_error(t->params[i]->element)) {
             return true;
         }
         /* A parameter of a `may fail` function type names the error in
@@ -330,7 +326,7 @@ static void declaration(struct text *out, const struct type *t,
     case TYPE_STRUCT:
     case TYPE_CLASS:
     case TYPE_VARIANT:
-        if (is_error_class(t)) {
+        if (types_is_lang_error(t)) {
             text_append(out, "struct anti_Error");
         } else if (types_is_flags(t)) {
             text_append(out, "struct anti_" LANG_FLAGS);

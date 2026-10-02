@@ -130,6 +130,21 @@ uint32_t ir_index(size_t count)
     return (uint32_t)count;
 }
 
+uint64_t ir_hash_name(const char *module, const char *name)
+{
+    uint64_t h = 1469598103934665603u;
+    const char *p;
+
+    for (p = module; p != NULL && *p != '\0'; p++) {
+        h = (h ^ (unsigned char)*p) * 1099511628211u;
+    }
+    h = (h ^ 0xff) * 1099511628211u;
+    for (p = name; *p != '\0'; p++) {
+        h = (h ^ (unsigned char)*p) * 1099511628211u;
+    }
+    return h;
+}
+
 uint32_t ir_agg_find(const struct ir_module *m, const char *name)
 {
     size_t i;

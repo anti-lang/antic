@@ -218,10 +218,7 @@ void lower_singleton_get(struct lowerer *l, const struct item *it)
     args[1] = ir_sym_operand(l->m, width);
     /* The runtime gives an i64 back, and a pointer is the same bits, so
        the call takes the pointer type with no conversion between. */
-    first = lower_temp(
-        l, ir_call(l->f, l->b, IR_PTR,
-                   ir_func_op(lower_rt_declare(l, RT_FN_ATOMIC_LOAD)), args,
-                   2));
+    first = lower_rt_call_as(l, RT_FN_ATOMIC_LOAD, IR_PTR, args);
     result = ir_unary(l->f, l->b, IR_COPY, IR_PTR, first);
     build = lower_new_block(l);
     lost = lower_new_block(l);
@@ -248,10 +245,7 @@ void lower_singleton_get(struct lowerer *l, const struct item *it)
     args[0] = address;
     args[1] = ir_sym_operand(l->m, width);
     ir_assign(l->f, l->b, result,
-              lower_temp(l, ir_call(l->f, l->b, IR_PTR,
-                                    ir_func_op(lower_rt_declare(
-                                        l, RT_FN_ATOMIC_LOAD)),
-                                    args, 2)));
+              lower_rt_call_as(l, RT_FN_ATOMIC_LOAD, IR_PTR, args));
     ir_jump(l->f, l->b, done);
     l->b = done;
     ir_ret(l->f, l->b, IR_PTR, lower_temp(l, result));

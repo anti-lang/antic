@@ -992,12 +992,19 @@ struct ir_operand lower_object_call(struct lowerer *l, enum rt_function f,
 struct ir_operand lower_rt_call(struct lowerer *l, enum rt_function f,
                                 const struct ir_operand *args)
 {
+    return lower_rt_call_as(l, f, rt_signature(f)->types[0], args);
+}
+
+struct ir_operand lower_rt_call_as(struct lowerer *l, enum rt_function f,
+                                   enum ir_type result,
+                                   const struct ir_operand *args)
+{
     const struct rt_signature *s = rt_signature(f);
     struct ir_function *fn = lower_rt_declare(l, f);
-    uint32_t call = ir_call(l->f, l->b, s->types[0], ir_func_op(fn), args,
+    uint32_t call = ir_call(l->f, l->b, result, ir_func_op(fn), args,
                             s->param_count);
 
-    return s->types[0] == IR_VOID ? lower_none() : lower_temp(l, call);
+    return result == IR_VOID ? lower_none() : lower_temp(l, call);
 }
 
 /* The memory of one object of `alloc T { }`, `alloc T(args)` or a

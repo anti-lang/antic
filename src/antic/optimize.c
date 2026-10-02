@@ -103,18 +103,6 @@ static struct ir_operand *operand(struct ir_inst *inst, size_t i)
     }
 }
 
-/* The operand i of inst for a reader: a, b, c, then the arguments. */
-static const struct ir_operand *operand_at(const struct ir_inst *inst,
-                                           size_t i)
-{
-    switch (i) {
-    case 0: return &inst->a;
-    case 1: return &inst->b;
-    case 2: return &inst->c;
-    default: return &inst->args[i - 3];
-    }
-}
-
 static size_t operand_count(const struct ir_inst *inst)
 {
     return 3 + inst->arg_count;
@@ -1106,8 +1094,12 @@ static bool escapes_in(const struct ir_inst *inst, uint32_t temp)
     if (inst->op == IR_PTRADD) {
         return is_temp(&inst->b, temp);
     }
-    for (i = 0; i < operand_count(inst); i++) {
-        if (is_temp(operand_at(inst, i), temp)) {
+    if (is_temp(&inst->a, temp) || is_temp(&inst->b, temp) ||
+        is_temp(&inst->c, temp)) {
+        return true;
+    }
+    for (i = 0; i < inst->arg_count; i++) {
+        if (is_temp(&inst->args[i], temp)) {
             return true;
         }
     }

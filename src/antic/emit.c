@@ -238,11 +238,8 @@ static bool reloc_at(struct text *out, enum target t,
         }
         if (g->relocs[i].fn) {
             mach_function_symbol(out, t, m->functions[g->relocs[i].global]);
-        } else if (m->globals[g->relocs[i].global]->exported) {
-            target_c_symbol(out, t, m->globals[g->relocs[i].global]->name);
         } else {
-            target_mangle(out, t, m->globals[g->relocs[i].global]->module,
-                          m->globals[g->relocs[i].global]->name);
+            mach_global_symbol(out, t, m->globals[g->relocs[i].global]);
         }
         return true;
     }
@@ -262,11 +259,7 @@ static void emit_global(struct text *out, enum target t,
     uint64_t from = 0;
     bool once = link_once(g->name, module);
 
-    if (g->exported) {
-        target_c_symbol(&name, t, g->name);
-    } else {
-        target_mangle(&name, t, g->module, g->name);
-    }
+    mach_global_symbol(&name, t, g);
     if (once) {
         comdat_open(out, t, section, text_cstr(&name));
     }
@@ -364,11 +357,7 @@ static void emit_imports(struct text *out, enum target t,
         if (g->is_extern) {
             continue;
         }
-        if (g->exported) {
-            target_c_symbol(&name, t, g->name);
-        } else {
-            target_mangle(&name, t, g->module, g->name);
-        }
+        mach_global_symbol(&name, t, g);
         for (j = 0; j < g->reloc_count; j++) {
             if (imported(t, m, &g->relocs[j])) {
                 text_appendf(&places, "    .quad %s+%" PRIu64 "\n",
@@ -528,11 +517,7 @@ void emit_names(struct text *out, enum target t, const struct ir_module *m,
         if (g->is_extern) {
             continue;
         }
-        if (g->exported) {
-            target_c_symbol(&name, t, g->name);
-        } else {
-            target_mangle(&name, t, g->module, g->name);
-        }
+        mach_global_symbol(&name, t, g);
         text_appendf(out, "%s DATA\n", text_cstr(&name));
         text_free(&name);
     }

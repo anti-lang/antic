@@ -25,7 +25,8 @@ struct mach_inst *mach_add(struct mach_block *b, unsigned op, size_t count,
     struct mach_inst *inst;
 
     if (count > MACH_MAX_OPERANDS) {
-        /* Unreachable: every caller passes an array of its own size. */
+        /* Unreachable: select_emit checks the count of a pattern, and
+           every other caller passes an array of its own size. */
         fputs("antic: an instruction takes more than MACH_MAX_OPERANDS "
               "operands\n", stderr);
         abort();
@@ -33,6 +34,8 @@ struct mach_inst *mach_add(struct mach_block *b, unsigned op, size_t count,
     inst = mach_append(b);
     inst->op = (uint16_t)op;
     inst->count = (uint8_t)count;
+    /* An instruction without operands may pass no array, and memcpy takes
+       no null pointer even for zero bytes. */
     if (count > 0) {
         memcpy(inst->operands, operands, count * sizeof *operands);
     }
@@ -203,10 +206,8 @@ void mach_symbol(struct text *out, const struct ir_module *m,
         g = m->globals[o->value];
         if (names == NULL) {
             ir_name_append(out, g->module, g->name);
-        } else if (g->exported) {
-            target_c_symbol(out, names->target, g->name);
         } else {
-            target_mangle(out, names->target, g->module, g->name);
+            mach_global_symbol(out, names->target, g);
         }
         break;
     case MACH_NAME:
@@ -228,5 +229,15 @@ void mach_function_symbol(struct text *out, enum target t,
         target_c_symbol(out, t, f->name);
     } else {
         target_mangle(out, t, f->module, f->name);
+    }
+}
+
+void mach_global_symbol(struct text *out, enum target t,
+                        const struct ir_global *g)
+{
+    if (g->exported) {
+        target_c_symbol(out, t, g->name);
+    } else {
+        target_mangle(out, t, g->module, g->name);
     }
 }
