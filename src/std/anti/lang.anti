@@ -95,6 +95,14 @@ pub struct Frame
 	line: int,
 }
 
+/// The names `symbolize` read, one per frame, which a trace takes itself and
+/// its `destruct` frees.
+struct FrameNames
+{
+	list: *Frame,
+	count: int,
+}
+
 /// The return addresses of the calls that lead to a point of a program, the
 /// innermost first.
 ///
@@ -105,10 +113,10 @@ pub class StackTrace
 {
 	/// The frames as the capture took them, the innermost first.
 	pub own frames: []RawFrame,
-	/// The frames with their names, once `symbolize` ran.
-	own named: []Frame,
-	/// Whether `symbolize` has run.
-	symbolized: bool = false,
+	/// The frames with their names, once `symbolize` ran. The trace takes
+	/// this memory itself, so it never goes to the allocator of a trace that
+	/// `deserialize` made.
+	transient named: ?*FrameNames = none,
 	/// The bytes `text` gave, ended by a NUL.
 	transient text_cache: ?*byte = none,
 
@@ -120,7 +128,6 @@ pub class StackTrace
 		let count = anti_rt_trace_walk(&addresses[0], TRACE_DEPTH, skip + 1);
 		let t = alloc StackTrace {
 			frames: []RawFrame { ptr: none, len: 0 },
-			named: []Frame { ptr: none, len: 0 },
 		};
 		if count <= 0 {
 			return t;
@@ -163,25 +170,34 @@ pub class StackTrace
 	/// is deleted.
 	pub fn symbolize(self) -> []Frame
 	{
-		if self.symbolized || self.frames.len == 0 {
-			return self.named;
+		let made = self.named;
+		if made != none {
+			return []Frame { ptr: made.list, len: made.count };
+		}
+		let none_named = []Frame { ptr: none, len: 0 };
+		if self.frames.len == 0 {
+			return none_named;
 		}
 		let list = alloc(Frame, self.frames.len) else {
-			return self.named;
+			return none_named;
 		};
 		let i = 0;
 		while i < self.frames.len do {
 			anti_rt_trace_symbolize(&self.frames[i], &list[i]);
 			i += 1;
 		}
-		self.named = []Frame { ptr: list, len: self.frames.len };
-		self.symbolized = true;
-		return self.named;
+		self.named = alloc FrameNames { list: list, count: self.frames.len };
+		return []Frame { ptr: list, len: self.frames.len };
 	}
 
 	concrete fn destruct(self)
 	{
 		free(self.text_cache);
+		let made = self.named;
+		if made != none {
+			free(made.list);
+			free(made);
+		}
 	}
 }
 

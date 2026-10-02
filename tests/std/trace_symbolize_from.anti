@@ -1,0 +1,105 @@
+//! A trace deserialized from an allocator goes back to it whole after
+//! `symbolize`. The names `symbolize` makes are memory the trace takes itself,
+//! so its `destruct` frees them, and `delete(read, from)` gives `from` back the
+//! blocks it lent and nothing else. `Strict` counts a block it never lent. The
+//! strings of the trace stay with `from`, and `free_all` gives them back.
+//! Windows ends a program whose `_aligned_free` meets a block of `malloc`, and
+//! the names of `symbolize` reached the allocator there.
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+/// The most blocks that `Strict` lends.
+const ROOM: int = 256;
+
+/// An allocator over the C library that remembers every block it lends and
+/// counts each block it is given back that it never lent.
+class Strict inherits mem.Allocator
+{
+	blocks: ?*?*byte = none,
+	pub lent: int = 0,
+	pub live: int = 0,
+	pub foreign: int = 0,
+
+	/// An allocator with room to remember `ROOM` blocks.
+	pub fn new() -> Strict
+	{
+		return Strict { blocks: alloc(?*byte, ROOM) };
+	}
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		let blocks = self.blocks else { return none; };
+		if self.lent == ROOM {
+			return none;
+		}
+		let p = mem.LibcAllocator.get().alloc(size, align) else {
+			return none;
+		};
+		blocks[self.lent] = p;
+		self.lent += 1;
+		self.live += 1;
+		return p;
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p == none {
+			return;
+		}
+		let blocks = self.blocks else { return; };
+		let i = 0;
+		while i < self.lent do {
+			if blocks[i] == p {
+				blocks[i] = none;
+				self.live -= 1;
+				mem.LibcAllocator.get().free(p);
+				return;
+			}
+			i += 1;
+		}
+		self.foreign += 1;
+	}
+
+	/// Give back every block still lent.
+	pub fn free_all(self)
+	{
+		let blocks = self.blocks else { return; };
+		let i = 0;
+		while i < self.lent do {
+			self.free(blocks[i]);
+			i += 1;
+		}
+	}
+
+	fn destruct(self)
+	{
+		free(self.blocks);
+	}
+}
+
+fn main() -> int
+{
+	let strict = Strict.new();
+	let t = lang.StackTrace.capture();
+	let out = text.Builder.new();
+	t.serialize(&out);
+	delete(t);
+	let written = out.take();
+	let back = Object.deserialize(written, &strict);
+	free(written.ptr);
+	if back == none || !(back is *lang.StackTrace) {
+		printf("no trace\n".ptr);
+		return 1;
+	}
+	let read = back as *lang.StackTrace;
+	let named = read.symbolize();
+	printf("named %d\n".ptr, (named.len == read.frames.len) as c_int);
+	delete(read, &strict);
+	printf("foreign %d\n".ptr, strict.foreign as c_int);
+	strict.free_all();
+	printf("live %d\n".ptr, strict.live as c_int);
+	return 0;
+}
