@@ -375,11 +375,7 @@ pub abstract class Collection<T>
 		if n <= 0 {
 			return none;
 		}
-		let made = self.from.alloc(n * size_of(T), element_align<T>());
-		if made != none {
-			memset(made, 0, (n * size_of(T)) as c_size_t);
-		}
-		return made as ?*T;
+		return room_from<T>(self.from, n);
 	}
 
 	/// Give back room that `room` gave.
@@ -681,6 +677,34 @@ fn element_align<T>() -> int
 		return 1;
 	}
 	return size & -size;
+}
+
+/// The alignment of a block that holds elements of `T` beside words of `int`:
+/// that of the element, and at least that of an `int`.
+internal fn block_align<T>() -> int
+{
+	let align = element_align<T>();
+	if align < size_of(int) {
+		return size_of(int);
+	}
+	return align;
+}
+
+/// Room for `n` elements of `T` from `from`, every byte zero, or `none` when
+/// the allocator has run out. A request for none gives `none`.
+///
+/// `room` of `Collection<T>` takes its room here, and so does a class of a
+/// collection module outside that base.
+internal fn room_from<T>(from: *mem.Allocator, n: int) -> ?*T
+{
+	if n <= 0 {
+		return none;
+	}
+	let made = from.alloc(n * size_of(T), element_align<T>());
+	if made != none {
+		memset(made, 0, (n * size_of(T)) as c_size_t);
+	}
+	return made as ?*T;
 }
 
 /// The base of the collections that keep their elements in one block of room

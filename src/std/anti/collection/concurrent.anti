@@ -831,10 +831,7 @@ fn locked_parts<K: eq + hash, V>(first: *Part<K, V>, second: *Part<K, V>,
 fn made_parts<K: eq + hash, V>(from: *mem.Allocator, capacity: int)
 	-> *Part<K, V>
 {
-	let size = PARTS * size_of(Part<K, V>);
-	let room = from.alloc(size, room_align<Part<K, V>>()) catch fatal;
-	memset(room, 0, size as c_size_t);
-	let parts = room as *Part<K, V>;
+	let parts = collection.room_from<Part<K, V>>(from, PARTS) catch fatal;
 	let each = (capacity + PARTS - 1) / PARTS;
 	let i = 0;
 	while i < PARTS do {
@@ -934,14 +931,13 @@ pub class Snapshot<T>
 		if size == 0 {
 			size = 8;
 		}
-		let room = self.from.alloc(size * size_of(T), room_align<T>()) catch fatal;
-		memset(room, 0, (size * size_of(T)) as c_size_t);
+		let room = collection.room_from<T>(self.from, size) catch fatal;
 		if self.count > 0 {
-			memcpy(room, self.items as ?*byte,
+			memcpy(room as ?*byte, self.items as ?*byte,
 				(self.count * size_of(T)) as c_size_t);
 		}
 		self.from.free(self.items as ?*byte);
-		self.items = room as ?*T;
+		self.items = room;
 		self.capacity = size;
 	}
 
@@ -1401,19 +1397,6 @@ class Held<T> inherits collection.Collection<T>
 /// allocator has run out.
 fn ring_room<T>(from: *mem.Allocator, n: int) -> *T
 {
-	let size = n * size_of(T);
-	let room = from.alloc(size, room_align<T>()) catch fatal;
-	memset(room, 0, size as c_size_t);
-	return room as *T;
-}
-
-/// The alignment of the room of an element: the largest power of two that
-/// divides its size, which every alignment the layout gives it divides.
-fn room_align<T>() -> int
-{
-	let size = size_of(T);
-	if size <= 0 {
-		return 1;
-	}
-	return size & -size;
+	let room = collection.room_from<T>(from, n) catch fatal;
+	return room;
 }

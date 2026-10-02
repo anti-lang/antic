@@ -164,17 +164,6 @@ fn nodes_for(n: int) -> int
 	return (n - 1) / NODE_MIN + 1;
 }
 
-/// The alignment of the room of an element: the largest power of two that
-/// divides its size, which every alignment the layout gives it divides.
-fn element_align<T>() -> int
-{
-	let size = size_of(T);
-	if size <= 0 {
-		return 1;
-	}
-	return size & -size;
-}
-
 /// The failure of a function lent an element of a sorted collection that moved
 /// the element out of the order of its keys.
 fn out_of_order()
@@ -740,11 +729,7 @@ pub abstract class BTree<T> inherits collection.Collection<T>
 		if size > 0 {
 			let elements = self.slot_bytes(size);
 			let bytes = elements + size * LINKS * size_of(int);
-			let align = element_align<T>();
-			if align < size_of(int) {
-				align = size_of(int);
-			}
-			let block = self.from.alloc(bytes, align) catch fatal;
+			let block = self.from.alloc(bytes, collection.block_align<T>()) catch fatal;
 			memset(block, 0, bytes as c_size_t);
 			if self.used > 0 {
 				memcpy(block, self.slots as ?*byte,

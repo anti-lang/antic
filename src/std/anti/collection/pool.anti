@@ -449,7 +449,7 @@ pub abstract class Slots<T> inherits collection.Collection<T>
 		let k = self.blocks_made;
 		let n = 1 << (self.shift + k);
 		let bytes = n * (size_of(T) + (SLOT_WORDS + self.extra_words) * size_of(int));
-		let made = self.from.alloc(bytes, block_align<T>()) catch fatal;
+		let made = self.from.alloc(bytes, collection.block_align<T>()) catch fatal;
 		memset(made, 0, bytes as c_size_t);
 		self.blocks[k] = made;
 		self.blocks_made = k + 1;
@@ -614,16 +614,4 @@ fn highest_bit(n: int) -> int
 		top += 1;
 	}
 	return top;
-}
-
-/// The alignment of a block: that of its words, or that of its elements when
-/// larger, the largest power of two that divides their size.
-fn block_align<T>() -> int
-{
-	let size = size_of(T);
-	let align = size_of(int);
-	if size > 0 && (size & -size) > align {
-		align = size & -size;
-	}
-	return align;
 }

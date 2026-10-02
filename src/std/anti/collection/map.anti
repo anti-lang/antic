@@ -297,7 +297,7 @@ pub abstract class EntryTable<E> inherits collection.Collection<E>
 			let at_hashes = aligned(n * size_of(E), 8);
 			let at_buckets = at_hashes + 8 * n;
 			let total = at_buckets + 16 * buckets;
-			let made = self.from.alloc(total, block_align(size_of(E))) catch fatal;
+			let made = self.from.alloc(total, collection.block_align<E>()) catch fatal;
 			memset(made, 0, total as c_size_t);
 			self.entries = made as ?*E;
 			self.hashes = &made[at_hashes] as ?*u64;
@@ -608,9 +608,9 @@ pub abstract class SlotTable<E> inherits collection.Collection<E>
 		let old_slots = self.slots;
 		let old_size = self.size;
 		if size > 0 {
-			let at_slots = aligned(8 * size, block_align(size_of(E)));
+			let at_slots = aligned(8 * size, collection.block_align<E>());
 			let total = at_slots + size * size_of(E);
-			let made = self.from.alloc(total, block_align(size_of(E))) catch fatal;
+			let made = self.from.alloc(total, collection.block_align<E>()) catch fatal;
 			memset(made, 0, total as c_size_t);
 			self.marks = made as ?*u64;
 			self.slots = &made[at_slots] as ?*E;
@@ -1493,13 +1493,3 @@ fn aligned(n: int, to: int) -> int
 	return (n + to - 1) & -to;
 }
 
-/// The alignment of a block of room whose elements are `size` bytes: that of
-/// the element, and at least that of the words beside it.
-fn block_align(size: int) -> int
-{
-	let align = size & -size;
-	if align < 8 {
-		align = 8;
-	}
-	return align;
-}
