@@ -1278,34 +1278,6 @@ static void check_destructuring_let(struct checker *c, struct stmt *s)
 
 static void check_stmt(struct checker *c, struct stmt *s);
 
-/* The mutex of a `sync` without the `&` or the `*` before it, so `m`,
-   `&m` and `*&m` name one mutex. */
-static const struct expr *mutex_place(const struct expr *e)
-{
-    while (e->kind == EXPR_UNARY && (e->as.unary.op == TOKEN_AMP ||
-                                     e->as.unary.op == TOKEN_STAR)) {
-        e = e->as.unary.operand;
-    }
-    return e;
-}
-
-/* DESIGN: two `sync` blocks hold one mutex when their operands name one
-   place: the same variable, or the same path of fields from it. That is
-   what one function can prove. Two places that hold copies of one
-   handle deadlock at run time instead. */
-static bool same_mutex(const struct expr *a, const struct expr *b)
-{
-    a = mutex_place(a);
-    b = mutex_place(b);
-    if (a->kind == EXPR_NAME && b->kind == EXPR_NAME) {
-        return a->symbol != NULL && a->symbol == b->symbol;
-    }
-    if (a->kind == EXPR_FIELD && b->kind == EXPR_FIELD) {
-        return sema_same_name(&a->as.field.name, &b->as.field.name) &&
-               same_mutex(a->as.field.base, b->as.field.base);
-    }
-    return false;
-}
 
 /* The operand of a `sync` as the program wrote it. */
 static void spell_mutex(struct text *out, const struct expr *e)
@@ -1393,7 +1365,11 @@ static void check_sync(struct checker *c, struct stmt *s)
                       "` that lives in a place, or a pointer to one");
     }
     for (h = c->held; h != NULL && !s->as.sync.object; h = h->outer) {
-        if (same_mutex(h->mutex, s->as.sync.mutex)) {
+        /* DESIGN: two `sync` blocks hold one mutex when their operands
+           name one place: the same variable, or the same path of fields
+           from it. That is what one function can prove. Two places that
+           hold copies of one handle deadlock at run time instead. */
+        if (sema_same_place(h->mutex, s->as.sync.mutex)) {
             struct text inner = {0};
             struct text outer = {0};
             spell_mutex(&inner, s->as.sync.mutex);

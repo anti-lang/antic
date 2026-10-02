@@ -249,6 +249,12 @@ struct type *sema_builtin(struct checker *c, enum type_kind kind);
 bool sema_is_error(const struct type *t);
 bool sema_same_name(const struct name *a, const struct name *b);
 bool sema_name_is(const struct name *a, const char *text);
+/* The place e names with its `&` and `*` taken off, so `m`, `&m` and
+   `*&m` name one place. */
+const struct expr *sema_bare_place(const struct expr *e);
+/* Whether a and b name one place: the same variable, or the same path of
+   fields from it, each after sema_bare_place. */
+bool sema_same_place(const struct expr *a, const struct expr *b);
 /* The shared name `op:Type` of a module-level `operator fn` whose name
    another one of its module has, in arena, which owns it. */
 struct name sema_shared_name(struct arena *arena, const struct name *op,

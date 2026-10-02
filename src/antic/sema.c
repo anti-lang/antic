@@ -95,6 +95,29 @@ bool sema_name_is(const struct name *a, const char *text)
     return a->length == strlen(text) && memcmp(a->text, text, a->length) == 0;
 }
 
+const struct expr *sema_bare_place(const struct expr *e)
+{
+    while (e->kind == EXPR_UNARY && (e->as.unary.op == TOKEN_AMP ||
+                                     e->as.unary.op == TOKEN_STAR)) {
+        e = e->as.unary.operand;
+    }
+    return e;
+}
+
+bool sema_same_place(const struct expr *a, const struct expr *b)
+{
+    a = sema_bare_place(a);
+    b = sema_bare_place(b);
+    if (a->kind == EXPR_NAME && b->kind == EXPR_NAME) {
+        return a->symbol != NULL && a->symbol == b->symbol;
+    }
+    if (a->kind == EXPR_FIELD && b->kind == EXPR_FIELD) {
+        return sema_same_name(&a->as.field.name, &b->as.field.name) &&
+               sema_same_place(a->as.field.base, b->as.field.base);
+    }
+    return false;
+}
+
 struct expr *sema_new_node(struct checker *c, enum expr_kind kind,
                            struct pos pos)
 {

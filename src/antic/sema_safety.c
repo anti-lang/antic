@@ -229,32 +229,6 @@ void sema_check_guards(struct checker *c)
     }
 }
 
-/* The place e names with its `&` and `*` taken off. */
-static const struct expr *bare(const struct expr *e)
-{
-    while (e->kind == EXPR_UNARY && (e->as.unary.op == TOKEN_AMP ||
-                                     e->as.unary.op == TOKEN_STAR)) {
-        e = e->as.unary.operand;
-    }
-    return e;
-}
-
-/* Whether a and b name one object: the same variable, or the same path
-   of fields from it. */
-static bool same_object(const struct expr *a, const struct expr *b)
-{
-    a = bare(a);
-    b = bare(b);
-    if (a->kind == EXPR_NAME && b->kind == EXPR_NAME) {
-        return a->symbol != NULL && a->symbol == b->symbol;
-    }
-    if (a->kind == EXPR_FIELD && b->kind == EXPR_FIELD) {
-        return sema_same_name(&a->as.field.name, &b->as.field.name) &&
-               same_object(a->as.field.base, b->as.field.base);
-    }
-    return false;
-}
-
 /* Whether a `sync` around the code checked now holds the lock of field f
    of the object that e, a field access, reaches. */
 static bool guard_held(const struct checker *c, const struct expr *e,
@@ -263,14 +237,14 @@ static bool guard_held(const struct checker *c, const struct expr *e,
     const struct held_mutex *h;
 
     for (h = c->held; h != NULL; h = h->outer) {
-        const struct expr *m = bare(h->mutex);
+        const struct expr *m = sema_bare_place(h->mutex);
         const struct type *owner;
         if (m->kind != EXPR_FIELD || !sema_same_name(&m->as.field.name,
                                                      &f->guard)) {
             continue;
         }
         if (f->guard_class == NULL) {
-            if (same_object(m->as.field.base, e->as.field.base)) {
+            if (sema_same_place(m->as.field.base, e->as.field.base)) {
                 return true;
             }
             continue;
@@ -459,7 +433,7 @@ static bool in_fields(const struct expr *e, const struct item *fn)
 {
     bool field = false;
 
-    e = bare(e);
+    e = sema_bare_place(e);
     while (e->kind == EXPR_FIELD || e->kind == EXPR_INDEX) {
         const struct expr *base = e->kind == EXPR_FIELD ? e->as.field.base
                                                         : e->as.index.base;
