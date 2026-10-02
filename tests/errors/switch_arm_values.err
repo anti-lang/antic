@@ -1,0 +1,4 @@
+switch_arm_values.anti:15:3: error: a variable is not a constant expression
+switch_arm_values.anti:24:3: error: this value already has an arm
+switch_arm_values.anti:37:3: error: a variable is not a constant expression
+switch_arm_values.anti:36:2: error: this `switch` on `Color` has no arm for `Blue`

@@ -720,9 +720,12 @@ static void check_assign(struct checker *c, struct stmt *s)
 }
 
 /* Every value of an enum needs an arm when a switch has no else. The
-   message names the ones that have none. */
+   message names the ones that have none. values holds the value of each
+   arm where folded is set. */
 static void check_switch_covers(struct checker *c, const struct stmt *s,
-                                const struct type *over)
+                                const struct type *over,
+                                const struct const_value *values,
+                                const bool *folded)
 {
     struct text missing = {0};
     size_t found = 0;
@@ -732,9 +735,8 @@ static void check_switch_covers(struct checker *c, const struct stmt *s,
     for (i = 0; i < over->field_count; i++) {
         bool covered = false;
         for (j = 0; j < s->as.switch_stmt.count && !covered; j++) {
-            struct const_value v;
-            covered = sema_eval_const(c, s->as.switch_stmt.arms[j].value, &v) &&
-                      v.as.integer == over->fields[i].number;
+            covered = folded[j] &&
+                      values[j].as.integer == over->fields[i].number;
         }
         if (covered) {
             continue;
@@ -1884,6 +1886,14 @@ static void check_stmt(struct checker *c, struct stmt *s)
         struct symbol *equal = NULL;
         size_t arms = s->as.switch_stmt.count +
                       (s->as.switch_stmt.otherwise != NULL ? 1 : 0);
+        /* The value of each arm, evaluated once. A value that is no
+           constant is reported once and compared with no other. */
+        struct const_value *values =
+            types_alloc_array(c->arena, s->as.switch_stmt.count + 1,
+                              sizeof *values);
+        bool *folded = types_alloc_array(c->arena,
+                                         s->as.switch_stmt.count + 1,
+                                         sizeof *folded);
         bool variant;
         size_t k;
         size_t j;
@@ -1923,7 +1933,6 @@ static void check_stmt(struct checker *c, struct stmt *s)
         variant = !sema_is_error(over) && over->kind == TYPE_VARIANT;
         for (k = 0, i = 0; k < arms; k++) {
             struct stmt *body;
-            struct const_value v;
             struct scope arm_scope;
             bool scoped = false;
             if (s->as.switch_stmt.otherwise != NULL &&
@@ -1941,16 +1950,15 @@ static void check_stmt(struct checker *c, struct stmt *s)
                                   "an arm binds the fields of "
                                   "a case in a `switch` on a variant alone");
                 }
-                if (sema_require(c, arm->value,
-                                 sema_check_expr(c, arm->value, over),
-                                 over) &&
-                    !sema_is_error(over) &&
-                    sema_eval_const(c, arm->value, &v)) {
+                folded[i] = sema_require(c, arm->value,
+                                         sema_check_expr(c, arm->value, over),
+                                         over) &&
+                            !sema_is_error(over) &&
+                            sema_eval_const(c, arm->value, &values[i]);
+                if (folded[i]) {
                     for (j = 0; j < i; j++) {
-                        struct const_value other;
-                        if (sema_eval_const(c, s->as.switch_stmt.arms[j].value,
-                                            &other) &&
-                            same_arm_value(&other, &v)) {
+                        if (folded[j] && same_arm_value(&values[j],
+                                                        &values[i])) {
                             sema_error_at(c, arm->pos,
                                           "this value already has an arm");
                         }
@@ -1982,7 +1990,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
         c->fallthrough = outer;
         if (s->as.switch_stmt.otherwise == NULL && !sema_is_error(over) &&
             over->kind == TYPE_ENUM) {
-            check_switch_covers(c, s, over);
+            check_switch_covers(c, s, over, values, folded);
         }
         if (s->as.switch_stmt.otherwise == NULL && variant) {
             check_cases_covered(c, s, over);

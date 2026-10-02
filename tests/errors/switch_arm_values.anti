@@ -1,0 +1,53 @@
+//! The value of each arm of a `switch` is evaluated once. An arm whose value is
+//! no constant is reported once, however many arms follow it, and the arms
+//! after it still find a value that has an arm already.
+
+enum Color
+{
+	Red,
+	Green,
+	Blue,
+}
+
+fn pick(x: int, y: int) -> int
+{
+	switch x {
+		y => {
+			return 1;
+		},
+		1 => {
+			return 2;
+		},
+		2 => {
+			return 3;
+		},
+		1 => {
+			return 4;
+		},
+		else => {
+			return 0;
+		},
+	}
+	return 0;
+}
+
+fn name(c: Color, d: Color) -> int
+{
+	switch c {
+		d => {
+			return 1;
+		},
+		Color.Red => {
+			return 2;
+		},
+		Color.Green => {
+			return 3;
+		},
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	return pick(1, 2) + name(Color.Red, Color.Blue);
+}
