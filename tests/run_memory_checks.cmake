@@ -7,22 +7,28 @@
 #   WORK      a directory for the files
 #   HOST      the host target
 #
-# A build without the option carries no check. windows-arm64 refuses the
-# option with its message, and a windows-arm64 host reports the test
-# skipped after that check, since it has no runtime of AddressSanitizer. The module that links gets the options hook
-# and the function that marks the blocks of the runtime as kept, except
-# on Windows, whose runtime has no leak check. On every other host a
-# build with the option reports a read after free, a double free and a
-# write past the end of a heap block, each ending the program with
-# status 1, and on macOS and Linux a leak. The clean case compiles a
+# A build without the option carries no check, and a build with it
+# carries the checks, for the host or, on a windows-arm64 host, for
+# windows-x86_64. windows-arm64 refuses the option with its message, and
+# a windows-arm64 host reports the test skipped after that check, since
+# it has no runtime of AddressSanitizer. The module that links gets the
+# options hook and the function that marks the blocks of the runtime as
+# kept, except on Windows, whose runtime has no leak check. On every
+# other host a build with the option reports a read after free, a double
+# free and a write past the end of a heap block, each ending the program
+# with status 1, and on macOS and Linux a leak. The clean case compiles a
 # pattern literal and runs the worker pool, and runs to its end with the
-# leak check on and no report. On macOS each report names the function of
-# the program that made the error.
+# leak check on and no report. On macOS each report names the function
+# of the program that made the error.
 
 file(MAKE_DIRECTORY "${WORK}")
 
-execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}" -S
-                        -o "${WORK}/memory_checks_off.s" "${SOURCE}"
+set(checked "${HOST}")
+if(HOST STREQUAL "windows-arm64")
+    set(checked windows-x86_64)
+endif()
+execute_process(COMMAND "${ANTIC}" --target ${checked} --runtime "${RUNTIME}"
+                        -S -o "${WORK}/memory_checks_off.s" "${SOURCE}"
                 RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed without --memory-checks\n${err}")
@@ -31,8 +37,9 @@ file(READ "${WORK}/memory_checks_off.s" assembly)
 if(assembly MATCHES "__asan_")
     message(FATAL_ERROR "a build without --memory-checks carries a check")
 endif()
-execute_process(COMMAND "${ANTIC}" --memory-checks --runtime "${RUNTIME}"
-                        -S -o "${WORK}/memory_checks_on.s" "${SOURCE}"
+execute_process(COMMAND "${ANTIC}" --memory-checks --target ${checked}
+                        --runtime "${RUNTIME}" -S
+                        -o "${WORK}/memory_checks_on.s" "${SOURCE}"
                 RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed with --memory-checks\n${err}")

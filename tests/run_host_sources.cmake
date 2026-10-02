@@ -15,7 +15,8 @@ include("${ROOT}/tools/warnings.cmake")
 include("${ROOT}/tools/host-compile.cmake")
 
 execute_process(COMMAND "${CLANG}" -print-resource-dir
-                OUTPUT_VARIABLE resource OUTPUT_STRIP_TRAILING_WHITESPACE)
+                OUTPUT_VARIABLE resource OUTPUT_STRIP_TRAILING_WHITESPACE
+                ENCODING NONE)
 antic_host_compile_options(options "${HOST}" "${ROOT}" "${SYSROOT}"
                            "${resource}" "" "${VERSION}")
 
@@ -38,7 +39,8 @@ foreach(source IN LISTS sources)
     endif()
     execute_process(COMMAND "${CLANG}" ${options} ${ANTIC_C_WARNINGS}
                             ${includes} -fsyntax-only "${ROOT}/${source}"
-                    RESULT_VARIABLE failed ERROR_VARIABLE err)
+                    RESULT_VARIABLE failed ERROR_VARIABLE err
+                    ENCODING NONE)
     if(failed)
         string(APPEND failures "${err}")
     endif()
