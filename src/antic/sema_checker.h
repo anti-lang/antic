@@ -384,10 +384,9 @@ void sema_declare_caught(struct checker *c, struct handler *h,
 bool sema_in_failing_function(const struct checker *c);
 void sema_refuse_escaping_error(struct checker *c, const struct expr *e);
 struct type *sema_check_sync_op(struct checker *c, struct expr *e);
-const struct type *sema_interface_named(struct checker *c,
-                                        const struct name *qualifier,
-                                        const struct name *name,
-                                        struct pos pos);
+struct type *sema_interface_named(struct checker *c,
+                                  const struct name *qualifier,
+                                  const struct name *name, struct pos pos);
 struct type *sema_check_call(struct checker *c, struct expr *e,
                              struct type *expected);
 struct item *sema_find_member(const struct type *t, const struct name *name);

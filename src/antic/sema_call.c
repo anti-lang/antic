@@ -1279,8 +1279,8 @@ static struct type *handled_result(struct checker *c, const struct expr *e,
 {
     if (e->as.call.builds != NULL) {
         return e->as.call.on_heap
-                   ? types_pointer(c->types, (struct type *)e->as.call.builds)
-                   : (struct type *)e->as.call.builds;
+                   ? types_pointer(c->types, e->as.call.builds)
+                   : e->as.call.builds;
     }
     return e->as.call.out != NULL
                ? fn->params[fn->param_count - 1]->element
@@ -1711,7 +1711,7 @@ static struct type *check_mutex_destroy(struct checker *c, struct expr *e,
    is refused. */
 static bool simd_node(struct checker *c, struct expr *e, enum simd_op op,
                       struct expr **args, size_t count,
-                      const struct type *simd)
+                      struct type *simd)
 {
     if (e->as.call.handler.kind != HANDLE_NONE) {
         sema_error_at(c, e->as.call.handler.pos,
@@ -2031,10 +2031,9 @@ struct type *sema_check_sync_op(struct checker *c, struct expr *e)
    checked when the qualifier is empty, and a pub class of another
    module otherwise. The qualifier names that module by its alias or by
    its whole path. NULL when neither answers. */
-const struct type *sema_interface_named(struct checker *c,
-                                        const struct name *qualifier,
-                                        const struct name *name,
-                                        struct pos pos)
+struct type *sema_interface_named(struct checker *c,
+                                  const struct name *qualifier,
+                                  const struct name *name, struct pos pos)
 {
     const struct interface *lib;
     struct symbol *sym;
@@ -2133,14 +2132,13 @@ static bool name_path(struct checker *c, const struct expr *e,
    becomes the call of an ordinary function of `anti.plugin.Library`
    with the descriptor of the interface in the place of the name.
    `instance` then has the type `?*I`, which `catch fatal` narrows. */
-static const struct type *plugin_call(struct checker *c, struct expr *e,
-                                      bool *ok)
+static struct type *plugin_call(struct checker *c, struct expr *e, bool *ok)
 {
     struct expr *callee = e->as.call.callee;
     bool instance = sema_name_is(&callee->as.field.name, "instance");
     size_t wanted = instance ? 1 : 2;
     struct expr *argument;
-    const struct type *iface;
+    struct type *iface;
     struct name qualifier;
     struct name last;
     struct expr *given;
@@ -2318,7 +2316,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
     const struct symbol *module;
     /* `lib.instance(I)` gives `?*I`, which the function it becomes does
        not say. NULL for every other call. */
-    const struct type *provided = NULL;
+    struct type *provided = NULL;
 
     /* An operation on an atomic field becomes one node of its own. */
     if (atomic_call(c, e, &fn)) {
@@ -2359,8 +2357,8 @@ static struct type *check_call(struct checker *c, struct expr *e,
         fixed = 0;
     } else if (callee->kind == EXPR_FIELD &&
                callee->as.field.base->kind == EXPR_NAME &&
-               (sym = (struct symbol *)sema_lookup(c,
-                        &callee->as.field.base->as.name)) != NULL &&
+               (sym = sema_lookup(c, &callee->as.field.base->as.name)) !=
+                   NULL &&
                sym->kind == SYMBOL_STRUCT) {
         struct type *owner = sym->item != NULL && sym->item->kind == ITEM_TYPE
                                  ? sema_alias_type(c, sym)
@@ -2675,8 +2673,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
         e->as.call.guards_pointer = true;
     }
     if (provided != NULL) {
-        return types_with_none(
-            c->types, types_pointer(c->types, (struct type *)provided));
+        return types_with_none(c->types, types_pointer(c->types, provided));
     }
     /* The match of a pattern literal knows its groups. */
     if (e->as.call.pattern != NULL && types_is_maybe_match(fn->result)) {

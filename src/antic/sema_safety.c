@@ -140,6 +140,15 @@ static const struct item *enclosing_named(const struct item *it,
     return NULL;
 }
 
+/* The field of t named name, or NULL, as types_find_field finds it, in a
+   form the checker may write to. */
+static struct struct_field *own_field(struct type *t, const struct name *name)
+{
+    const struct struct_field *f = types_find_field(t, name);
+
+    return f != NULL ? &t->fields[f - t->fields] : NULL;
+}
+
 /* DESIGN: `guarded by lock` names a Mutex field of the same object, and
    `guarded by PeopleList.lock` one of an enclosing object, named by its
    class. A field of a concurrent class or of a type nested in one takes
@@ -158,7 +167,7 @@ static void check_guards_of(struct checker *c, struct item *it)
         if (p->guard.length == 0) {
             continue;
         }
-        f = (struct struct_field *)types_find_field(t, &p->name);
+        f = own_field(t, &p->name);
         if (f == NULL) {
             continue;
         }
@@ -210,8 +219,8 @@ void sema_check_guards(struct checker *c)
             size_t j;
             check_guards_of(c, it);
             for (j = 0; j < it->param_count; j++) {
-                struct struct_field *f = (struct struct_field *)
-                    types_find_field(it->symbol->type, &it->params[j].name);
+                struct struct_field *f = own_field(it->symbol->type,
+                                                   &it->params[j].name);
                 if (f != NULL) {
                     f->unchecked = it->params[j].unchecked;
                 }

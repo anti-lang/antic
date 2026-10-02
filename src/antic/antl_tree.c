@@ -273,7 +273,7 @@ static void io_text(struct io *io, struct token_text *t)
 
 /* Types, symbolic values and constants */
 
-static void io_type(struct io *io, struct type **t)
+static void io_ctype(struct io *io, const struct type **t)
 {
     switch (io->mode) {
     case IO_COLLECT:
@@ -290,12 +290,16 @@ static void io_type(struct io *io, struct type **t)
     }
 }
 
-static void io_ctype(struct io *io, const struct type **t)
+/* A type the tree may change after reading. Writing reads it alone. */
+static void io_type(struct io *io, struct type **t)
 {
-    struct type *v = (struct type *)*t;
+    const struct type *v = *t;
 
-    io_type(io, &v);
-    *t = v;
+    if (io->mode == IO_READ) {
+        *t = antl_type_or_none(io->r);
+        return;
+    }
+    io_ctype(io, &v);
 }
 
 static void io_symbolic(struct io *io, const struct symbolic **s)
@@ -383,18 +387,18 @@ static const struct type *field_owner(const struct struct_field *f,
 static void io_field(struct io *io, const struct struct_field **f,
                      const struct type *hint)
 {
-    struct type *owner = NULL;
+    const struct type *owner = NULL;
     uint32_t index = 0;
 
     if (!reading(io) && *f != NULL) {
-        owner = (struct type *)field_owner(*f, hint);
+        owner = field_owner(*f, hint);
         if (owner == NULL) {
             bad(io);
             return;
         }
         index = (uint32_t)(*f - owner->fields);
     }
-    io_type(io, &owner);
+    io_ctype(io, &owner);
     if (owner != NULL) {
         io_u32(io, &index);
     }
@@ -893,11 +897,11 @@ static void io_call(struct io *io, struct expr *e)
 
     io_expr(io, &e->as.call.callee);
     io_exprs(io, &e->as.call.args, &e->as.call.arg_count);
-    io_ctype(io, &e->as.call.dispatch);
+    io_type(io, &e->as.call.dispatch);
     io_name(io, &e->as.call.entry);
     io_handler(io, &e->as.call.handler);
     io_expr(io, &e->as.call.out);
-    io_ctype(io, &e->as.call.builds);
+    io_type(io, &e->as.call.builds);
     io_bool(io, &e->as.call.on_heap);
     io_bool(io, &e->as.call.guards_pointer);
     io_bool(io, &e->as.call.optional);
@@ -978,7 +982,7 @@ static void io_expr_body(struct io *io, struct expr *e)
         io_bool(io, &e->as.cast.test);
         io_bool(io, &e->as.cast.from_sub);
         io_bool(io, &e->as.cast.promoted);
-        io_ctype(io, &e->as.cast.target);
+        io_type(io, &e->as.cast.target);
         io_u32(io, &e->as.cast.variant_case);
         break;
     case EXPR_CALL:
@@ -1086,7 +1090,7 @@ static void io_expr_body(struct io *io, struct expr *e)
     case EXPR_SIMD:
         IO_ENUM(io, e->as.simd.op, SIMD_OP_ALL);
         io_exprs(io, &e->as.simd.args, &e->as.simd.arg_count);
-        io_ctype(io, &e->as.simd.simd);
+        io_type(io, &e->as.simd.simd);
         /* The lanes of a shuffle, one per field of its simd struct. A
            simd struct may hold more than 255 lanes, so the count takes
            the 32 bits of every other count. */
@@ -1107,7 +1111,7 @@ static void io_expr_body(struct io *io, struct expr *e)
         }
         break;
     case EXPR_DESCRIPTOR:
-        io_ctype(io, &e->as.descriptor_of);
+        io_type(io, &e->as.descriptor_of);
         break;
     case EXPR_COLLECT:
         io_iteration(io, &e->as.collect);
@@ -1189,7 +1193,7 @@ static void io_stmt_body(struct io *io, struct stmt *s)
     case STMT_FAIL:
         io_expr(io, &s->as.fail.value);
         io_sym(io, &s->as.fail.make);
-        io_ctype(io, &s->as.fail.error);
+        io_type(io, &s->as.fail.error);
         io_sym(io, &s->as.fail.capture);
         break;
     case STMT_SWITCH:

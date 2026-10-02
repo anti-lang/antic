@@ -581,7 +581,7 @@ static struct symbol *member_of_receiver(struct clone *cl, const struct expr *e,
 {
     struct type *g = it->owner->symbol->type;
     struct type *copy = sema_copy_in_chain(
-        ty(cl, (struct type *)e->as.call.builds, e->pos), g);
+        ty(cl, e->as.call.builds, e->pos), g);
     struct item *made;
     size_t i;
 
@@ -1032,7 +1032,7 @@ static struct expr *xe(struct clone *cl, struct expr *e)
         n->as.cast.operand = xe(cl, e->as.cast.operand);
         n->as.cast.type = xt(cl, e->as.cast.type);
         n->as.cast.target =
-            ty(cl, (struct type *)e->as.cast.target, e->pos);
+            ty(cl, e->as.cast.target, e->pos);
         break;
     case EXPR_CALL: {
         struct symbol *copy;
@@ -1046,10 +1046,10 @@ static struct expr *xe(struct clone *cl, struct expr *e)
                                           e->as.call.args[0]);
         }
         n->as.call.dispatch =
-            ty(cl, (struct type *)e->as.call.dispatch, e->pos);
+            ty(cl, e->as.call.dispatch, e->pos);
         xh(cl, &n->as.call.handler, &e->as.call.handler);
         n->as.call.out = e->as.call.out == e ? n : xe(cl, e->as.call.out);
-        n->as.call.builds = ty(cl, (struct type *)e->as.call.builds, e->pos);
+        n->as.call.builds = ty(cl, e->as.call.builds, e->pos);
         if (direct_callee(n->as.call.callee) &&
             (copy = callee_copy(cl, e, n->as.call.callee->symbol)) != NULL) {
             n->as.call.callee->symbol = copy;
@@ -1185,11 +1185,11 @@ static struct expr *xe(struct clone *cl, struct expr *e)
         break;
     case EXPR_SIMD:
         n->as.simd.args = xlist(cl, e->as.simd.args, e->as.simd.arg_count);
-        n->as.simd.simd = ty(cl, (struct type *)e->as.simd.simd, e->pos);
+        n->as.simd.simd = ty(cl, e->as.simd.simd, e->pos);
         break;
     case EXPR_DESCRIPTOR:
         n->as.descriptor_of =
-            ty(cl, (struct type *)e->as.descriptor_of, e->pos);
+            ty(cl, e->as.descriptor_of, e->pos);
         break;
     case EXPR_COLLECT:
         xiter(cl, &n->as.collect, &e->as.collect);

@@ -317,7 +317,7 @@ struct expr {
             bool test;              /* `is`, which gives a bool */
             bool from_sub;          /* the source may be a sub-object */
             bool promoted;          /* the checker's read of an f16 */
-            const struct type *target;  /* the class of `is` and `as` */
+            struct type *target;        /* the class of `is` and `as` */
             /* `v is Shape.Circle`: the index of the case plus 1, set by
                the checker, and 0 for every other `is` and `as`. */
             uint32_t variant_case;
@@ -329,7 +329,7 @@ struct expr {
             /* The class whose table holds the entry, when the call goes
                through one, and the name of that entry. dispatch is NULL
                for a direct call. */
-            const struct type *dispatch;
+            struct type *dispatch;
             struct name entry;
             /* DESIGN: a call that can fail carries its handler. The
                checker refuses one that has none, so no program drops an
@@ -338,7 +338,7 @@ struct expr {
             struct expr *out;       /* the place the result is written to */
             /* `T(args)` and `alloc T(args)` build a value and run its
                `construct` with the arguments. */
-            const struct type *builds;
+            struct type *builds;
             bool on_heap;
             /* The call cannot fail and gives a `?*T`, so its `catch`
                guards the pointer and the `let` takes it over. */
@@ -518,13 +518,13 @@ struct expr {
             enum simd_op op;
             struct expr **args;
             size_t arg_count;
-            const struct type *simd;
+            struct type *simd;
             uint32_t *lanes;
         } simd;                     /* EXPR_SIMD */
         /* EXPR_DESCRIPTOR: the class whose descriptor the expression
            gives. `lib.instance(I)` and `lib.supports(I, n)` write one,
            and no source text does. */
-        const struct type *descriptor_of;
+        struct type *descriptor_of;
         /* EXPR_FN: the anonymous function, an ITEM_FN whose enclosing
            names the function it is written in. */
         struct item *fn;
@@ -699,7 +699,7 @@ struct stmt {
                `StackTrace.capture`, which fills `frames` there when
                backtraces are on. The checker resolves both, so lowering
                reads the fields and calls the function directly. */
-            const struct type *error;
+            struct type *error;
             struct symbol *capture;
         } fail;
         struct expr *yielded;       /* STMT_YIELD, NULL without a value */
