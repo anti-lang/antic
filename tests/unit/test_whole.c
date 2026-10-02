@@ -54,8 +54,7 @@ static struct module *compile(struct program *p, const char *name,
     bool ok = lexer_lex(source, strlen(source), &p->arena, &p->diags, tokens) &&
               parser_parse(source, tokens, &p->arena, &p->diags, &module) &&
               sema_check(module, name, NULL, p->libraries, p->library_count,
-                         &p->types, &p->arena, &p->diags, true) &&
-              lower_module(module, name, out, &p->diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
+                         &p->types, &p->arena, &p->diags, true);
 
     if (!ok) {
         check_failures++;
@@ -64,6 +63,7 @@ static struct module *compile(struct program *p, const char *name,
                 source);
         return NULL;
     }
+    lower_module(module, name, out, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
     return module;
 }
 

@@ -32,16 +32,16 @@ static void optimizes(const char *source, const char *expected)
     ir_module_init(&ir, &arena, "main");
     if (!lexer_lex(source, strlen(source), &arena, &diags, &tokens) ||
         !parser_parse(source, &tokens, &arena, &diags, &module) ||
-        !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true) ||
-        !lower_module(module, "main", &ir, &diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT)) {
+        !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true)) {
         check_failures++;
-        fprintf(stderr, "test source does not lower: %s\n%s\n",
+        fprintf(stderr, "test source does not check: %s\n%s\n",
                 diags.count > 0 ? diags.items[0].message : "", source);
     } else if (!ir_verify(&ir, &errors)) {
         check_failures++;
         fprintf(stderr, "lowered IR fails verification:\n%s",
                 text_cstr(&errors));
     } else {
+        lower_module(module, "main", &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
         ir_optimize(&ir, "main");
         ir_print(&out, &ir);
         CHECK_STR(text_cstr(&out), expected);

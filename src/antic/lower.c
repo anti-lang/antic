@@ -629,8 +629,8 @@ const struct ir_function *lower_context_signature(struct lowerer *l,
 static bool fits_fatal(struct lowerer *l, const struct ir_function *g,
                        const struct type *t)
 {
-    (void)l;
-    (void)t;
+    (void)l; /* find_signature fixes the signature */
+    (void)t; /* find_signature fixes the signature */
     return g->param_count == 1 && g->params[0].type == IR_PTR &&
            g->result == IR_VOID;
 }
@@ -652,8 +652,8 @@ const struct ir_function *lower_fatal_signature(struct lowerer *l)
 static bool fits_provider(struct lowerer *l, const struct ir_function *g,
                           const struct type *t)
 {
-    (void)l;
-    (void)t;
+    (void)l; /* find_signature fixes the signature */
+    (void)t; /* find_signature fixes the signature */
     return g->param_count == 0 && g->result == IR_PTR;
 }
 
@@ -674,7 +674,7 @@ static bool fits_bound(struct lowerer *l, const struct ir_function *g,
     size_t at = 1;
     size_t k;
 
-    (void)l;
+    (void)l; /* find_signature fixes the signature */
     if (g->param_count == 0 || g->params[0].type != IR_PTR ||
         g->result != lower_ir_type_of(t->result)) {
         return false;
@@ -1085,10 +1085,10 @@ static bool known_copy(struct lowerer *l, const struct item *it)
     return g != NULL && g->index < l->first_global && !g->is_extern;
 }
 
-bool lower_module(struct module *module, const char *module_name,
-                  struct ir_module *out, struct diagnostics *diags,
-                  unsigned options, const char *const *patterns,
-                  size_t pattern_count, const char *version)
+void lower_module(struct module *module, const char *module_name,
+                  struct ir_module *out, unsigned options,
+                  const char *const *patterns, size_t pattern_count,
+                  const char *version)
 {
     struct lowerer l;
     /* Every function of the module sits past the ones the library files
@@ -1097,9 +1097,6 @@ bool lower_module(struct module *module, const char *module_name,
     size_t done = 0;
     size_t i;
 
-    /* Semantic analysis rejects every module that lowering cannot
-       translate, so no construct reports an error here. */
-    (void)diags;
     memset(&l, 0, sizeof l);
     l.m = out;
     l.module_name = module_name;
@@ -1233,5 +1230,4 @@ bool lower_module(struct module *module, const char *module_name,
             g->unit = module_name;
         }
     }
-    return true;
 }

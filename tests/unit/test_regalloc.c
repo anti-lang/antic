@@ -34,12 +34,12 @@ static void run(const char *source, enum target target, struct text *out)
     ir_module_init(&ir, &arena, "main");
     if (!lexer_lex(source, strlen(source), &arena, &diags, &tokens) ||
         !parser_parse(source, &tokens, &arena, &diags, &module) ||
-        !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true) ||
-        !lower_module(module, "main", &ir, &diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT)) {
+        !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true)) {
         check_failures++;
-        fprintf(stderr, "test source does not lower: %s\n%s\n",
+        fprintf(stderr, "test source does not check: %s\n%s\n",
                 diags.count > 0 ? diags.items[0].message : "", source);
     } else {
+        lower_module(module, "main", &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
         ir_optimize(&ir, "main");
         functions = calloc(ir.function_count + 1, sizeof *functions);
         ok = select_module(target, cpu_default(target), &ir, functions, error,

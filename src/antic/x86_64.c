@@ -405,14 +405,14 @@ static bool is_int_type(enum ir_type type)
    for a copy. */
 static bool match_arith(const struct selector *s, const struct ir_inst *inst)
 {
-    (void)s;
+    (void)s; /* struct pattern fixes the signature */
     return is_int_type(inst->type);
 }
 
 static bool match_not_bool(const struct selector *s,
                            const struct ir_inst *inst)
 {
-    (void)s;
+    (void)s; /* struct pattern fixes the signature */
     return inst->type == IR_I8 && inst->b.kind == IR_INT &&
            inst->b.as.integer == 1;
 }
@@ -420,13 +420,13 @@ static bool match_not_bool(const struct selector *s,
 static bool match_compare(const struct selector *s,
                           const struct ir_inst *inst)
 {
-    (void)s;
+    (void)s; /* struct pattern fixes the signature */
     return is_int_type(inst->a.type);
 }
 
 static bool match_fused(const struct selector *s, const struct ir_inst *inst)
 {
-    (void)inst;
+    (void)inst; /* struct pattern fixes the signature */
     return s->fused != NULL;
 }
 
@@ -657,7 +657,7 @@ static void emit_convert(struct selector *s, const struct ir_inst *inst)
 
 static bool match_convert(const struct selector *s, const struct ir_inst *inst)
 {
-    (void)s;
+    (void)s; /* struct pattern fixes the signature */
     return is_int_type(inst->type) && is_int_type(inst->a.type);
 }
 
@@ -678,7 +678,7 @@ static void emit_addr(struct selector *s, const struct ir_inst *inst)
 
 static bool match_float(const struct selector *s, const struct ir_inst *inst)
 {
-    (void)s;
+    (void)s; /* struct pattern fixes the signature */
     return select_is_float(inst->type);
 }
 
@@ -1471,7 +1471,7 @@ static bool match_scalar(const struct selector *s, const struct ir_inst *inst)
 {
     enum ir_type type = inst->op == IR_STORE ? inst->a.type : inst->type;
 
-    (void)s;
+    (void)s; /* struct pattern fixes the signature */
     return type != IR_AGG;
 }
 
@@ -1513,7 +1513,7 @@ static struct mach_operand address_of(struct selector *s,
 static bool fits_address(const struct selector *s, const struct address *a,
                          const struct ir_inst *use)
 {
-    (void)s;
+    (void)s; /* struct target_desc fixes the signature */
     if (a->offset < INT32_MIN || a->offset > INT32_MAX) {
         return false;
     }

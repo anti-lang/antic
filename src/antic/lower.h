@@ -5,7 +5,6 @@
 #include <stddef.h>
 
 #include "ast.h"
-#include "diagnostic.h"
 #include "ir.h"
 
 enum lower_option {
@@ -25,14 +24,13 @@ enum lower_option {
    of a local or parameter symbol names the temporary of its value, or of
    its slot address when the address is taken. For a function it holds the
    IR function index. Semantic analysis rejects every module that lowering
-   cannot translate, so lowering writes nothing to diags and returns true.
-   patterns holds the `--trace <pattern>` arguments, which instrument a
+   cannot translate, so lowering reports nothing. patterns holds the `--trace <pattern>` arguments, which instrument a
    package or a class by name whether it asked or not. version is the
    version of the package being built, `--package-version`, which the
    descriptor of every class the module declares carries. */
-bool lower_module(struct module *module, const char *module_name,
-                  struct ir_module *out, struct diagnostics *diags,
-                  unsigned options, const char *const *patterns,
-                  size_t pattern_count, const char *version);
+void lower_module(struct module *module, const char *module_name,
+                  struct ir_module *out, unsigned options,
+                  const char *const *patterns, size_t pattern_count,
+                  const char *version);
 
 #endif

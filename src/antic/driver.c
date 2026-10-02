@@ -943,22 +943,19 @@ static const char *recorded_file(const struct options *o)
    names. */
 static bool lower_checked(const char *input, const char *file,
                           struct module *tree, const char *module,
-                          struct ir_module *ir, struct diagnostics *diags,
-                          unsigned options, const char *const *patterns,
-                          size_t pattern_count, const char *version)
+                          struct ir_module *ir, unsigned options,
+                          const char *const *patterns, size_t pattern_count,
+                          const char *version)
 {
     struct text errors = {0};
-    bool ok = false;
+    bool ok;
 
     tree->file = file;
-    if (!lower_module(tree, module, ir, diags, options, patterns,
-                      pattern_count, version)) {
-        print_diagnostics(input, diags);
-    } else if (!ir_verify(ir, &errors)) {
+    lower_module(tree, module, ir, options, patterns, pattern_count, version);
+    ok = ir_verify(ir, &errors);
+    if (!ok) {
         fprintf(stderr, "antic: internal error, the IR of %s fails "
                         "verification\n%s", input, text_cstr(&errors));
-    } else {
-        ok = true;
     }
     text_free(&errors);
     return ok;
@@ -1006,16 +1003,16 @@ static bool has_main(const struct ir_module *program, const char *module);
    build runs them. Returns 2, the status of a finished dump, on success. */
 static int dump_ir(const char *input, const char *file, struct module *tree,
                    const char *module, struct ir_module *program,
-                   bool optimize, bool release, struct diagnostics *diags,
-                   unsigned options, const char *const *patterns,
-                   size_t pattern_count, const struct options *o)
+                   bool optimize, bool release, unsigned options,
+                   const char *const *patterns, size_t pattern_count,
+                   const struct options *o)
 {
     bool no_reflect = (options & LOWER_NO_REFLECT) != 0;
     struct text out = {0};
     struct text errors = {0};
 
-    if (!lower_checked(input, file, tree, module, program, diags, options,
-                       patterns, pattern_count, o->package_version)) {
+    if (!lower_checked(input, file, tree, module, program, options, patterns,
+                       pattern_count, o->package_version)) {
         return 1;
     }
     if (optimize) {
@@ -1161,8 +1158,7 @@ static void identified_notice(struct text *out, const struct text *notice,
    an error. */
 static int back_end(const struct options *o, struct module *tree,
                     const char *module, struct ir_module *program,
-                    struct diagnostics *diags, struct text *assembly,
-                    struct extras *extras)
+                    struct text *assembly, struct extras *extras)
 {
     struct mach_function **functions;
     struct text out = {0};
@@ -1175,7 +1171,7 @@ static int back_end(const struct options *o, struct module *tree,
 
     if (tree != NULL &&
         !lower_checked(o->input, recorded_file(o), tree, module, program,
-                       diags, lower_options(o), o->trace_patterns,
+                       lower_options(o), o->trace_patterns,
                        o->trace_pattern_count, o->package_version)) {
         return 1;
     }
@@ -1376,8 +1372,7 @@ static bool own_interface(const struct options *o, struct module *tree,
 /* Write the library file of the module, by default beside the source.
    Returns 2, the status of a finished command without linking. */
 static int write_library(const struct options *o, struct module *tree,
-                         const char *module, struct arena *arena,
-                         struct diagnostics *diags)
+                         const char *module, struct arena *arena)
 {
     struct ir_module ir;
     struct interface iface;
@@ -1386,7 +1381,7 @@ static int write_library(const struct options *o, struct module *tree,
     int status = 1;
 
     ir_module_init(&ir, arena, module);
-    if (lower_checked(o->input, recorded_file(o), tree, module, &ir, diags,
+    if (lower_checked(o->input, recorded_file(o), tree, module, &ir,
                       lower_options(o), o->trace_patterns,
                       o->trace_pattern_count, o->package_version) &&
         own_interface(o, tree, module, arena, &iface)) {
@@ -1943,7 +1938,7 @@ static int compile(const struct options *o, struct text *source,
         sema_strip_generics(tree, &arena);
     }
     if (o->library) {
-        status = write_library(o, tree, text_cstr(module), &arena, &diags);
+        status = write_library(o, tree, text_cstr(module), &arena);
         goto done;
     }
     /* The front end ends here, before the first pass that writes a file of
@@ -1954,9 +1949,8 @@ static int compile(const struct options *o, struct text *source,
     }
     if (o->dump_ir || o->dump_opt) {
         status = dump_ir(o->input, recorded_file(o), tree, text_cstr(module),
-                         &program, o->dump_opt, !o->dev, &diags,
-                         lower_options(o), o->trace_patterns,
-                         o->trace_pattern_count, o);
+                         &program, o->dump_opt, !o->dev, lower_options(o),
+                         o->trace_patterns, o->trace_pattern_count, o);
         goto done;
     }
     if (o->lib != LIB_NONE && defines_main(tree)) {
@@ -1990,8 +1984,7 @@ static int compile(const struct options *o, struct text *source,
         }
         free((void *)all);
     }
-    status = back_end(o, tree, text_cstr(module), &program, &diags, assembly,
-                      extras);
+    status = back_end(o, tree, text_cstr(module), &program, assembly, extras);
     if (status != 0 && status != 3) {
         goto done;
     }
@@ -2295,8 +2288,7 @@ static int compile_library_file(const struct options *o,
                         "verification\n%s", text_cstr(&verify_errors));
         goto done;
     }
-    status = back_end(o, NULL, header.module, &program, &diags, assembly,
-                      extras);
+    status = back_end(o, NULL, header.module, &program, assembly, extras);
     if (status == 0 || status == 3) {
         status = 3;
         if (o->output != NULL) {

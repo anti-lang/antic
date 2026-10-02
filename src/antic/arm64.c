@@ -313,21 +313,15 @@ static bool is_arith_type(enum ir_type type)
 
 static bool match_arith(const struct selector *s, const struct ir_inst *inst)
 {
-    (void)s;
+    (void)s; /* struct pattern fixes the signature */
     return is_arith_type(inst->type);
-}
-
-static bool match_copy(const struct selector *s, const struct ir_inst *inst)
-{
-    (void)s;
-    return is_arith_type(inst->type) || inst->type == IR_I8;
 }
 
 /* x = xor x, 1 on a bool, the lowering of logical not. */
 static bool match_not_bool(const struct selector *s,
                            const struct ir_inst *inst)
 {
-    (void)s;
+    (void)s; /* struct pattern fixes the signature */
     return inst->type == IR_I8 && inst->b.kind == IR_INT &&
            inst->b.as.integer == 1;
 }
@@ -335,20 +329,20 @@ static bool match_not_bool(const struct selector *s,
 static bool match_compare(const struct selector *s,
                           const struct ir_inst *inst)
 {
-    (void)s;
+    (void)s; /* struct pattern fixes the signature */
     return is_arith_type(inst->a.type);
 }
 
 static bool match_fused(const struct selector *s, const struct ir_inst *inst)
 {
-    (void)inst;
+    (void)inst; /* struct pattern fixes the signature */
     return s->fused != NULL;
 }
 
 static bool match_call(const struct selector *s, const struct ir_inst *inst)
 {
     return (inst->a.kind == IR_FUNC || inst->b.kind == IR_FUNC) &&
-           (inst->type == IR_VOID || match_copy(s, inst) ||
+           (inst->type == IR_VOID || match_arith(s, inst) ||
             select_is_float(inst->type) || inst->type == IR_AGG);
 }
 
@@ -1143,7 +1137,7 @@ static bool vector_native(const struct ir_inst *inst,
     struct shape sh = shape_of(agg, size);
     enum ir_op op = (enum ir_op)inst->field;
 
-    (void)cpu;
+    (void)cpu; /* struct target_desc fixes the signature */
     if (sh.lanes < 2) {
         return false;
     }
@@ -1165,7 +1159,7 @@ static bool vector_native(const struct ir_inst *inst,
 
 static bool match_float(const struct selector *s, const struct ir_inst *inst)
 {
-    (void)s;
+    (void)s; /* struct pattern fixes the signature */
     return select_is_float(inst->type);
 }
 
@@ -1322,7 +1316,7 @@ static void emit_convert(struct selector *s, const struct ir_inst *inst)
 
 static bool match_convert(const struct selector *s, const struct ir_inst *inst)
 {
-    (void)s;
+    (void)s; /* struct pattern fixes the signature */
     return is_arith_type(inst->type) && is_arith_type(inst->a.type);
 }
 
@@ -1970,7 +1964,7 @@ static bool match_scalar(const struct selector *s, const struct ir_inst *inst)
 {
     enum ir_type type = inst->op == IR_STORE ? inst->a.type : inst->type;
 
-    (void)s;
+    (void)s; /* struct pattern fixes the signature */
     return type != IR_AGG;
 }
 
@@ -2015,7 +2009,7 @@ static bool fits_address(const struct selector *s, const struct address *a,
     enum ir_type type = use->op == IR_STORE ? use->a.type : use->type;
     uint8_t scale = (uint8_t)popcount(bits(type) / 8 - 1);
 
-    (void)s;
+    (void)s; /* struct target_desc fixes the signature */
     if (a->index == NULL) {
         return fits_offset(bits(type), a->offset);
     }
@@ -2044,7 +2038,7 @@ static void emit_store(struct selector *s, const struct ir_inst *inst)
 }
 
 static const struct pattern patterns[] = {
-    {IR_COPY, match_copy, emit_copy},
+    {IR_COPY, match_arith, emit_copy},
     {IR_COPY, match_float, emit_float_copy},
     {IR_FADD, NULL, emit_float_binary},
     {IR_FSUB, NULL, emit_float_binary},
