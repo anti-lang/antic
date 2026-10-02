@@ -1,0 +1,56 @@
+//! A `protected fn` called from the classes below its own, two levels down,
+//! with the protected field it writes. A protected function has no table entry
+//! and is a direct call.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Shape
+{
+	pub x: int = 0,
+	protected guard: int = 1,
+
+	protected fn recompute(self, by: int)
+	{
+		self.guard = self.guard * by;
+	}
+}
+
+class Circle inherits Shape
+{
+	r: int = 1,
+
+	pub fn widen(self)
+	{
+		self.recompute(3);
+		self.guard = self.guard + 1;
+		self.r = self.r + self.guard;
+	}
+
+	pub fn radius(self) -> int
+	{
+		return self.r;
+	}
+}
+
+class Ring inherits Circle
+{
+	pub fn thicken(self) -> int
+	{
+		self.recompute(2);
+		self.widen();
+		return self.guard;
+	}
+}
+
+fn main() -> int
+{
+	let c = alloc Circle { x: 0 };
+	c.widen();
+	printf("circle %d\n".ptr, c.radius() as c_int);
+	let r = alloc Ring { x: 0 };
+	printf("ring %d\n".ptr, r.thicken() as c_int);
+	printf("ring radius %d\n".ptr, r.radius() as c_int);
+	delete(c);
+	delete(r);
+	return 0;
+}

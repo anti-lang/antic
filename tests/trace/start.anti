@@ -1,0 +1,37 @@
+//! `trace.start` installs the handler that the `trace` key of the runtime
+//! configuration names, and gives `none` in a program given no key.
+//! `--anti.trace=calls` gives a `CallLogger`, whose lines show that it holds
+//! the hooks.
+
+import anti.lang;
+import anti.trace;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A class that asks for the call hooks.
+trace class Counter
+{
+	pub n: int = 0,
+
+	pub fn bump(self) -> int
+	{
+		self.n += 1;
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	let c = alloc Counter { n: 0 };
+	let watch = trace.start() else {
+		printf("no handler\n".ptr);
+		printf("bump %d\n".ptr, c.bump() as c_int);
+		delete(c);
+		return 0;
+	};
+	printf("bump %d\n".ptr, c.bump() as c_int);
+	delete(c);
+	lang.Trace.install(none);
+	delete(watch);
+	return 0;
+}

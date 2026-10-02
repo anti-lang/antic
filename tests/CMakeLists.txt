@@ -878,6 +878,29 @@ foreach(case "hooks|no_hooks|--no-hooks|hooks.no-hooks.expected"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-hooks/${case_name}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
 endforeach()
+# `trace` follows the mode: a dev build runs the marked code's call hooks
+# as --trace does, and --no-trace turns them off again, which gives the
+# output of release.
+foreach(case "dev|--dev|hook_trace.trace.expected"
+        "dev_no_trace|--dev,--no-trace|hook_trace.expected")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 case_name)
+    list(GET parts 1 case_options)
+    list(GET parts 2 case_expected)
+    add_test(NAME program_hook_trace_${case_name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_trace.anti"
+            "-DOPTIONS=${case_options}"
+            "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object}"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/programs/${case_expected}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-hooks/${case_name}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    set_property(TEST program_hook_trace_${case_name} PROPERTY
+        FIXTURES_REQUIRED lang_dev_object)
+endforeach()
 
 # Ownership without a field list: delete, destroy and dup call the
 # teardown and the copy that the compiler writes for each class.
@@ -3254,7 +3277,9 @@ foreach(case
         "options|options||--anti.backtrace,plain,--anti.backtrace=false,last|options.pattern||0"
         "options_unknown|options||--anti.nonsense|options.empty.pattern|options.unknown.pattern|70"
         "options_value|options||--anti.backtrace=maybe|options.empty.pattern|options.value.pattern|70"
-        "handlers|handler_reports|--trace,--trace,writes||handler_reports.pattern|handler_reports.errors.pattern|0")
+        "handlers|handler_reports|--trace,--trace,writes||handler_reports.pattern|handler_reports.errors.pattern|0"
+        "start|start|--trace|--anti.trace=calls|start.pattern|start.errors.pattern|0"
+        "start_none|start|--trace||start.none.pattern||0")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 source)

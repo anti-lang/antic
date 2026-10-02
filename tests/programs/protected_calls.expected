@@ -1,0 +1,4 @@
+exit 0
+circle 5
+ring 7
+ring radius 8
