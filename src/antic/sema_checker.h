@@ -8,7 +8,10 @@
    tables, the contracts and the bodies that fill them, the interfaces,
    the hooks and the operators. sema_chain.c takes chains of
    declarations apart, and sema_const.c evaluates constants. sema_expr.c
-   checks expressions, and sema_call.c calls and members. sema_stmt.c
+   checks expressions, and sema_call.c calls and members. sema_operator.c
+   checks the binary operators and finds the `operator fn` functions of
+   a type, sema_simd.c checks simd structs, and sema_thread.c the
+   atomics, the locks, the channels and the workers. sema_stmt.c
    checks statements and function bodies with the closures in them, and
    walks what a worker reaches. sema_value.c holds the value
    rules: what a value owns, and when it moves, when it is copied and
@@ -331,23 +334,46 @@ bool sema_check_object_from(struct checker *c, struct expr *e,
 bool sema_is_place(const struct expr *e);
 void sema_mark_address_taken(struct checker *c, struct expr *e);
 bool sema_spell(struct text *out, const struct expr *e);
-/* The value of type t that a hidden operand or a value the caller holds
-   stands for, `*p`, in the arena of the checker. It is checked already
-   and never lowered. */
-struct expr *sema_stand_in(struct checker *c, struct pos pos,
-                           struct type *t);
 struct type *sema_usable_pointer(struct checker *c, const struct expr *e,
                                  struct type *t);
 struct type *sema_whole_optional(struct type *t, struct expr *e);
 void sema_refuse_lent_tuple(struct checker *c, const struct expr *e);
 bool sema_require(struct checker *c, struct expr *e, struct type *got,
                   struct type *expected);
-bool sema_simd_numeric(const struct type *lane);
+/* The checked call of the hook name on base with count arguments, in the
+   arena of the checker, which owns it. */
+struct expr *sema_hook_call(struct checker *c, struct expr *base,
+                            const char *name, struct expr **args,
+                            size_t count);
+bool sema_iterate(struct checker *c, struct expr *e, struct type *t,
+                  struct iteration *it, struct type **element);
+bool sema_descends_from(const struct type *a, const struct type *b);
+extern const struct name sema_hidden_value;
+const char *sema_format_name(const struct expr *e);
+struct type *sema_check_expr(struct checker *c, struct expr *e,
+                             struct type *expected);
+struct type *sema_check_storage(struct checker *c, struct expr *e);
+bool sema_is_untyped(const struct expr *e);
+void sema_error_may_be_none(struct checker *c, const struct expr *e,
+                            const struct type *t);
+
+/* sema_operator.c */
+
 const char *sema_op_text(enum token_kind op, char buffer[OP_TEXT]);
 bool sema_operator_named(const struct name *name);
-struct symbol *sema_hook(struct checker *c, struct type *t, const char *text);
 struct symbol *sema_operator_symbol(struct checker *c, struct type *t,
                                     const char *text);
+/* Whether the module of t, or t itself, gives it `operator fn text`, a
+   free function of the module that takes t or a pointer to it first. */
+bool sema_module_operator(struct checker *c, struct type *t,
+                          const char *text);
+struct symbol *sema_hook(struct checker *c, struct type *t, const char *text);
+bool sema_is_iterator(struct checker *c, struct type *t);
+/* The value of type t that a hidden operand or a value the caller holds
+   stands for, `*p`, in the arena of the checker. It is checked already
+   and never lowered. */
+struct expr *sema_stand_in(struct checker *c, struct pos pos,
+                           struct type *t);
 /* The checked call of the `operator fn hash` that the module of the class
    t declares for it, on a value that stands for the object, or NULL when
    the module declares none or t does not meet its constraints. The call
@@ -357,26 +383,29 @@ struct expr *sema_class_hash_operator(struct checker *c, struct type *t,
 /* The same for `operator fn eq`, on two values. */
 struct expr *sema_class_eq_operator(struct checker *c, struct type *t,
                                     struct pos pos);
-/* Whether the module of t, or t itself, gives it `operator fn text`, a
-   free function of the module that takes t or a pointer to it first. */
-bool sema_module_operator(struct checker *c, struct type *t,
-                          const char *text);
-bool sema_is_iterator(struct checker *c, struct type *t);
-/* The checked call of the hook name on base with count arguments, in the
-   arena of the checker, which owns it. */
-struct expr *sema_hook_call(struct checker *c, struct expr *base,
-                            const char *name, struct expr **args,
-                            size_t count);
-bool sema_iterate(struct checker *c, struct expr *e, struct type *t,
-                  struct iteration *it, struct type **element);
 struct type *sema_check_binary(struct checker *c, struct expr *e,
                                struct type *expected);
-bool sema_descends_from(const struct type *a, const struct type *b);
-extern const struct name sema_hidden_value;
-const char *sema_format_name(const struct expr *e);
-struct type *sema_check_expr(struct checker *c, struct expr *e,
-                             struct type *expected);
-struct type *sema_check_storage(struct checker *c, struct expr *e);
+struct type *sema_check_in(struct checker *c, struct expr *e);
+
+/* sema_simd.c */
+
+bool sema_simd_numeric(const struct type *lane);
+struct type *sema_check_simd_unary(struct checker *c, struct expr *e,
+                                   struct type *t);
+struct type *sema_check_simd_binary(struct checker *c, struct expr *e,
+                                    struct type *left, struct type *right);
+struct type *sema_check_simd_cast(struct checker *c, struct expr *e,
+                                  struct type *from, struct type *to);
+bool sema_simd_module_call(const struct checker *c, const struct expr *e);
+struct type *sema_check_simd_module(struct checker *c, struct expr *e);
+bool sema_simd_static_name(const struct name *name);
+struct type *sema_check_simd_static(struct checker *c, struct expr *e,
+                                    struct type *t);
+bool sema_simd_value_name(const struct name *name);
+struct type *sema_check_simd_value(struct checker *c, struct expr *e,
+                                   struct type *base, struct type *s);
+bool sema_simd_method_declared(struct checker *c, const struct type *s,
+                               const struct name *name);
 
 /* sema_call.c */
 
@@ -404,7 +433,6 @@ void sema_declare_caught(struct checker *c, struct handler *h,
                          struct type *t);
 bool sema_in_failing_function(const struct checker *c);
 void sema_refuse_escaping_error(struct checker *c, const struct expr *e);
-struct type *sema_check_sync_op(struct checker *c, struct expr *e);
 struct type *sema_interface_named(struct checker *c,
                                   const struct name *qualifier,
                                   const struct name *name, struct pos pos);
@@ -423,6 +451,17 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
                             const struct struct_field *fields,
                             size_t field_count, const char *literal_name,
                             bool skip_missing);
+const struct symbol *sema_qualifier(const struct checker *c,
+                                    const struct expr *field);
+
+/* sema_thread.c */
+
+bool sema_atomic_call(struct checker *c, struct expr *e, struct type **out);
+struct type *sema_check_close(struct checker *c, struct expr *e);
+struct type *sema_check_mutex_new(struct checker *c, struct expr *e);
+struct type *sema_check_mutex_destroy(struct checker *c, struct expr *e,
+                                      struct type *base);
+struct type *sema_check_sync_op(struct checker *c, struct expr *e);
 struct type *sema_check_parallel(struct checker *c, struct expr *e);
 struct type *sema_check_dispatch(struct checker *c, struct expr *e);
 struct type *sema_check_join(struct checker *c, struct expr *e);
@@ -695,6 +734,10 @@ struct type *sema_match_field(struct checker *c, struct expr *e,
 struct type *sema_check_test(struct checker *c, struct expr *e);
 /* `if let m = e { }` on the match t of the checked value. */
 void sema_if_let_none(struct checker *c, struct stmt *s, struct type *t);
+struct type *sema_check_pattern(struct checker *c, struct expr *e,
+                                struct type *expected);
+struct type *sema_check_regex_compile(struct checker *c, struct expr *e,
+                                      struct type *expected);
 
 /* sema_export.c */
 

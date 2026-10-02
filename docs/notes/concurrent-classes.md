@@ -67,7 +67,7 @@ channels.
 - A field that code outside the class reaches and that carries `unchecked` is
   reported at its declaration as well, where the clause silences it. The clause
   is therefore used, since another module may write the field.
-- `compare_swap` on a plain field is `unchecked_swap` in `sema_call.c`. It takes
+- `compare_swap` on a plain field is `unchecked_swap` in `sema_thread.c`. It takes
   a field of one word of a concurrent class, or of a type nested in one, that
   `unchecked(unguarded-field)` marks after its type or in the class header, and
   builds the node of an atomic field. It calls `sema_note_field_write`, so the

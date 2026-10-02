@@ -10,7 +10,7 @@ user of the tools can observe, under "Regular expressions".
   positions of the checker.
 - `src/rt/regex.c` compiles a pattern. antic compiles the file into its own program and
   calls it from `src/antic/pattern.c`, so the check and the program read a pattern with
-  one set of options. `pattern_position` of `src/antic/sema_expr.c` walks the source text
+  one set of options. `pattern_position` of `src/antic/sema_pattern.c` walks the source text
   of the literal to the byte PCRE2 names.
 - `pattern_exponential` reads the pattern into a tree of its own: sets, empty matches,
   sequences, alternatives, groups and repeats. A set is 256 bits, one per byte value, and
@@ -63,7 +63,7 @@ user of the tools can observe, under "Regular expressions".
 - `src/rt/patterns.c` holds the walk of every method, the groups found again, the
   templates and the stops. `anti_rt_regex_piece` of `src/rt/regex.c` reads a template for
   the runtime and for the checker alike.
-- `check_pattern` of `src/antic/sema_expr.c` takes the expected type. A literal checked
+- `sema_check_pattern` of `src/antic/sema_pattern.c` takes the expected type. A literal checked
   against a `ByteRegex` compiles in byte mode and has that type, and every other one is
   a `Regex`. The type of the checked literal carries the mode from then on.
   `types_match` gives a `ByteMatch` for a literal whose type is a `ByteRegex`.

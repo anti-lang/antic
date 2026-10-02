@@ -2,7 +2,8 @@
    they give. They are the calls of `anti.regex` that stand in their
    place, the groups of a literal as fields, a match as a condition and
    `if let` on one. `patch` of `[]byte` and the conversions `to_bytes` and
-   `to_text` stand here as well. */
+   `to_text` stand here as well, and so do the pattern literal and
+   `Regex.compile`. */
 
 #include <stdint.h>
 #include <string.h>
@@ -833,4 +834,145 @@ void sema_if_let_none(struct checker *c, struct stmt *s, struct type *t)
     s->kind = STMT_BLOCK;
     memset(&s->as, 0, sizeof s->as);
     s->as.block = both;
+}
+
+/* The position in the file of byte offset of the pattern of the literal
+   e. The pattern holds the bytes between the quotes, with a CR LF read
+   as one LF, and the column counts bytes, as the lexer does. */
+static struct pos pattern_position(const struct expr *e, size_t offset)
+{
+    const char *s = e->spelling.bytes;
+    size_t n = e->spelling.length;
+    struct pos p = e->pos;
+    size_t i = 2;
+    size_t k;
+
+    p.column += 2;
+    while (i < n && s[i] == '#') {
+        i++;
+        p.column++;
+    }
+    i++;
+    p.column++;
+    for (k = 0; k < offset && i < n; k++, i++) {
+        if (s[i] == '\r' && i + 1 < n && s[i + 1] == '\n') {
+            i++;
+        }
+        if (s[i] == '\n') {
+            p.line++;
+            p.column = 1;
+        } else {
+            p.column++;
+        }
+    }
+    return p;
+}
+
+/* The bytes of span of the pattern, cut to fit a message. */
+static void pattern_piece(char *out, size_t size, const struct expr *e,
+                          struct pattern_span span)
+{
+    size_t length = span.end - span.start;
+
+    if (length > 24) {
+        text_format(out, size, "%.*s...", 21,
+                    e->as.text.bytes + span.start);
+    } else {
+        text_format(out, size, "%.*s", (int)length,
+                    e->as.text.bytes + span.start);
+    }
+}
+
+/* DESIGN: a pattern literal is checked where it stands. PCRE2, linked
+   into antic, compiles it with the options the program compiles it with
+   at start, so a malformed pattern is an error at the byte PCRE2 names.
+   The safety check `exponential-pattern` then reads its repeats. The
+   module imports `anti.regex`, whose classes are the failures of a
+   pattern and which names what the program links, as an `f"..."` asks
+   for `anti.text`. A literal takes its mode from where it stands, as an
+   anonymous function takes its types: where a `ByteRegex` is expected it
+   is a byte pattern, and everywhere else a pattern of text. */
+struct type *sema_check_pattern(struct checker *c, struct expr *e,
+                                struct type *expected)
+{
+    static const struct name module = {REGEX_MODULE,
+                                       sizeof REGEX_MODULE - 1};
+    bool bytes = expected != NULL && types_is_byte_regex(expected);
+    struct pattern_span inner;
+    struct pattern_span outer;
+    char message[ANTI_PATTERN_MESSAGE];
+    size_t offset = 0;
+
+    if (sema_find_library(c, &module) == NULL) {
+        sema_error_at(c, e->pos, "a pattern literal is compiled by `"
+                      REGEX_MODULE "`, so the module imports `" REGEX_MODULE
+                      "`");
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (!pattern_compiles(e->as.text.bytes, e->as.text.length, bytes,
+                          &offset, message, sizeof message)) {
+        sema_error_at(c, pattern_position(e, offset), "malformed pattern: %s",
+                      message);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (pattern_exponential(e->as.text.bytes, e->as.text.length, &inner,
+                            &outer)) {
+        char in[32];
+        char around[32];
+        pattern_piece(in, sizeof in, e, inner);
+        pattern_piece(around, sizeof around, e, outer);
+        sema_check_at(c, NAME_EXPONENTIAL_PATTERN,
+                      pattern_position(e, inner.start),
+                      "the repeat `%s` inside `%s` can take exponential time, "
+                      "write a possessive quantifier, `a++`, or an atomic "
+                      "group, `(?>...)`", in, around);
+    }
+    return bytes ? types_byte_regex(c->types) : types_regex(c->types);
+}
+
+/* DESIGN: `Regex.compile(text)` is the call `compile(text)` of
+   `anti.regex`, which the checker writes over the callee and checks as
+   any call, so the argument, the failure and its handler follow the rules
+   of a program's own call. The module it names cannot be written in a
+   program. It stands in a scope of its own, as the one of an `f"..."`
+   does. */
+static const struct name hidden_regex = {"<regex>", 7};
+
+struct type *sema_check_regex_compile(struct checker *c, struct expr *e,
+                                      struct type *expected)
+{
+    static const struct name module = {REGEX_MODULE,
+                                       sizeof REGEX_MODULE - 1};
+    struct expr *callee = e->as.call.callee;
+    const struct name *name = &callee->as.field.name;
+    bool bytes = sema_name_is(&callee->as.field.base->as.name,
+                              LANG_BYTE_REGEX);
+    const char *type = bytes ? LANG_BYTE_REGEX : LANG_REGEX;
+    const char *function = bytes ? REGEX_COMPILE_BYTES : REGEX_COMPILE;
+    const char *what = bytes ? "`" LANG_BYTE_REGEX "." REGEX_COMPILE "` calls"
+                             : "`" LANG_REGEX "." REGEX_COMPILE "` calls";
+    const struct interface *lib;
+    struct symbol *home;
+    struct scope scope;
+    struct type *t;
+
+    if (!sema_name_is(name, REGEX_COMPILE)) {
+        sema_error_at(c, callee->pos, "`%s` has no function `%.*s`", type,
+                      (int)name->length, name->text);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (sema_std_function(c, e->pos, what, &module, function, 1) == NULL) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    lib = sema_find_library(c, &module);
+    sema_enter_scope(c, &scope);
+    home = sema_declare(c, SYMBOL_MODULE, &hidden_regex, e->pos,
+                        "`%.*s` is already declared");
+    home->home = lib;
+    callee->as.field.base->as.name = hidden_regex;
+    callee->as.field.name.text = function;
+    callee->as.field.name.length = strlen(function);
+    t = sema_check_call(c, e, expected);
+    sema_leave_scope(c, &scope);
+    return t;
 }

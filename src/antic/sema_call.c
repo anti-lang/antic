@@ -1,6 +1,6 @@
 /* The checks of calls and members: fields, functions of a class,
-   visibility, `construct`, errors and their handlers, atomics, channels,
-   the calls of `anti.simd`, plugins and workers. */
+   visibility, `construct`, errors and their handlers, `mul_high` and the
+   calls of a plugin library. */
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -617,8 +617,8 @@ struct symbol *sema_module_function(const struct checker *c,
 
 /* The import that the base of module.name refers to, or NULL when the
    base is not the name of a module. */
-static const struct symbol *qualifier(const struct checker *c,
-                                      const struct expr *field)
+const struct symbol *sema_qualifier(const struct checker *c,
+                                    const struct expr *field)
 {
     const struct expr *base = field->as.field.base;
     const struct symbol *sym;
@@ -658,225 +658,6 @@ static struct type *check_qualified(struct checker *c, struct expr *e,
     e->as.name = name;
     e->symbol = item;
     return item->type;
-}
-
-/* DESIGN: an atomic field is read and written by calls alone, so that
-   every access is one sequentially consistent operation. The checker
-   rewrites `p.add(1)` on an atomic place into one node, which lowering
-   turns into a call of the runtime. */
-static const struct {
-    const char *name;
-    enum atomic_op op;
-    size_t args;
-    bool gives_value;
-    bool gives_bool;
-} atomic_ops[] = {
-    {"load", ATOMIC_LOAD, 0, true, false},
-    {"store", ATOMIC_STORE, 1, false, false},
-    {"swap", ATOMIC_SWAP, 1, true, false},
-    {"add", ATOMIC_ADD, 1, true, false},
-    {"sub", ATOMIC_SUB, 1, true, false},
-    {"and", ATOMIC_AND, 1, true, false},
-    {"or", ATOMIC_OR, 1, true, false},
-    {"compare_swap", ATOMIC_CAS, 2, false, true}
-};
-
-/* The type of the atomic field or local that e denotes, or NULL. */
-static struct type *atomic_place(const struct expr *e)
-{
-    const struct struct_field *f;
-    struct type *s;
-
-    if (e->kind == EXPR_NAME) {
-        return e->symbol != NULL && e->symbol->atomic ? e->symbol->type : NULL;
-    }
-    if (e->kind != EXPR_FIELD) {
-        return NULL;
-    }
-    if (e->symbol != NULL && e->symbol->item != NULL &&
-        e->symbol->item->is_static && e->symbol->item->atomic) {
-        return e->symbol->type;
-    }
-    s = e->as.field.base->type != NULL ? sema_struct_of(e->as.field.base->type)
-                                       : NULL;
-    if (s == NULL) {
-        return NULL;
-    }
-    f = types_find_field(s, &e->as.field.name);
-    return f != NULL && f->atomic ? f->type : NULL;
-}
-
-/* Whether t is one word an atomic operation of the runtime moves: an
-   integer, a `bool` or a pointer. */
-static bool swaps_as_word(const struct type *t)
-{
-    return types_is_integer(t) || t->kind == TYPE_BOOL ||
-           t->kind == TYPE_POINTER;
-}
-
-/* DESIGN: `compare_swap` also takes a plain field of one word that
-   `unchecked(unguarded-field)` marks in a concurrent class, after the
-   field's type or in the class header. That is the lock-free structure
-   of "Concurrent classes", whose fields the checker cannot follow. The
-   call is the node of an atomic field, and it counts as a write, so the
-   clause covers the field it marks. A field of a class that declares
-   its own `compare_swap`, or of a pointer to one, keeps the call of that
-   function. Any other field is refused, and the message names both
-   fixes. */
-static bool unchecked_swap(struct checker *c, struct expr *e,
-                           struct type **out)
-{
-    struct expr *callee = e->as.call.callee;
-    struct expr *place = callee->as.field.base;
-    const struct type *s;
-    const struct struct_field *f = NULL;
-    const struct type *home;
-    size_t i;
-
-    if (place->kind != EXPR_FIELD || place->type == NULL) {
-        return false;
-    }
-    s = sema_struct_of(place->type);
-    if (s != NULL && sema_method_symbol(c, s, &callee->as.field.name) != NULL) {
-        return false;
-    }
-    s = sema_struct_of(place->as.field.base->type);
-    for (; s != NULL && f == NULL; s = s->kind == TYPE_CLASS ? s->base : NULL) {
-        f = types_find_field(s, &place->as.field.name);
-    }
-    if (f == NULL || f->form != FIELD_PLAIN) {
-        return false;
-    }
-    home = f->home;
-    if (home == NULL || home->safety != SAFETY_CONCURRENT ||
-        !(f->unchecked || home->unchecked_fields)) {
-        sema_error_at(c, callee->pos, "`compare_swap` takes an atomic field, "
-                      "and `%.*s` is a plain one: mark it `atomic`, or "
-                      "`unchecked(unguarded-field, \"reason\")` in a "
-                      "concurrent class",
-                      (int)f->name.length, f->name.text);
-        *out = sema_builtin(c, TYPE_ERROR);
-        return true;
-    }
-    if (f->bits != 0 || !swaps_as_word(f->type)) {
-        sema_error_at(c, callee->pos, "`compare_swap` on a field that "
-                      "`unchecked` marks takes one word, an integer, a "
-                      "`bool` or a pointer, found `%s`", sema_tn(f->type));
-        *out = sema_builtin(c, TYPE_ERROR);
-        return true;
-    }
-    if (e->as.call.arg_count != 2) {
-        sema_error_at(c, e->pos, "`compare_swap` takes 2 arguments");
-        *out = sema_builtin(c, TYPE_ERROR);
-        return true;
-    }
-    sema_note_field_write(c, place);
-    e->as.atomic.a = e->as.call.args[0];
-    e->as.atomic.b = e->as.call.args[1];
-    e->as.atomic.op = ATOMIC_CAS;
-    e->as.atomic.place = place;
-    e->kind = EXPR_ATOMIC;
-    for (i = 0; i < 2; i++) {
-        struct expr *arg = i == 0 ? e->as.atomic.a : e->as.atomic.b;
-        if (!sema_require(c, arg, sema_check_expr(c, arg, f->type),
-                          f->type)) {
-            *out = sema_builtin(c, TYPE_ERROR);
-            return true;
-        }
-    }
-    *out = sema_builtin(c, TYPE_BOOL);
-    return true;
-}
-
-/* Rewrite a call on an atomic place. Returns false when the callee is no
-   such call, and reports nothing then. */
-static bool atomic_call(struct checker *c, struct expr *e, struct type **out)
-{
-    struct expr *callee = e->as.call.callee;
-    struct expr *place;
-    struct type *t;
-    struct context quiet;
-    size_t i;
-
-    bool was;
-
-    if (callee->kind != EXPR_FIELD) {
-        return false;
-    }
-    place = callee->as.field.base;
-    if (place->kind == EXPR_NAME) {
-        const struct symbol *sym = sema_lookup(c, &place->as.name);
-        if (sym == NULL || !sym->atomic) {
-            return false;
-        }
-    } else if (place->kind != EXPR_FIELD) {
-        return false;
-    }
-    /* DESIGN: the base is checked quietly, because this is a probe. A
-       call on anything else reaches the branches below, which report
-       what is wrong with it. A probe inside another keeps its flag. */
-    was = c->atomic_place;
-    c->atomic_place = true;
-    sema_enter_quiet(c, &quiet);
-    /* The place is storage, so an f16 there stays an f16. */
-    t = sema_check_storage(c, place);
-    sema_leave(c, &quiet);
-    c->atomic_place = was;
-    if (t == NULL || sema_is_error(t)) {
-        return false;
-    }
-    t = atomic_place(place);
-    if (t == NULL) {
-        return sema_name_is(&callee->as.field.name, "compare_swap") &&
-               unchecked_swap(c, e, out);
-    }
-    for (i = 0; i < sizeof atomic_ops / sizeof atomic_ops[0]; i++) {
-        if (!sema_name_is(&callee->as.field.name, atomic_ops[i].name)) {
-            continue;
-        }
-        if (e->as.call.arg_count != atomic_ops[i].args) {
-            sema_error_at(c, e->pos, "`%s` takes %zu argument%s",
-                          atomic_ops[i].name,
-                          atomic_ops[i].args,
-                          atomic_ops[i].args == 1 ? "" : "s");
-            *out = sema_builtin(c, TYPE_ERROR);
-            return true;
-        }
-        /* An f16 has its bits exchanged and compared, and no arithmetic. */
-        if ((atomic_ops[i].op == ATOMIC_ADD || atomic_ops[i].op == ATOMIC_SUB ||
-             atomic_ops[i].op == ATOMIC_AND || atomic_ops[i].op == ATOMIC_OR) &&
-            sema_refuses_half(c, e->pos, t)) {
-            *out = sema_builtin(c, TYPE_ERROR);
-            return true;
-        }
-        e->as.atomic.a = atomic_ops[i].args > 0 ? e->as.call.args[0] : NULL;
-        e->as.atomic.b = atomic_ops[i].args > 1 ? e->as.call.args[1] : NULL;
-        e->as.atomic.op = atomic_ops[i].op;
-        e->as.atomic.place = place;
-        e->kind = EXPR_ATOMIC;
-        if (e->as.atomic.a != NULL &&
-            !sema_require(c, e->as.atomic.a,
-                          sema_check_expr(c, e->as.atomic.a, t), t)) {
-            *out = sema_builtin(c, TYPE_ERROR);
-            return true;
-        }
-        if (e->as.atomic.b != NULL &&
-            !sema_require(c, e->as.atomic.b,
-                          sema_check_expr(c, e->as.atomic.b, t), t)) {
-            *out = sema_builtin(c, TYPE_ERROR);
-            return true;
-        }
-        *out = atomic_ops[i].gives_bool  ? sema_builtin(c, TYPE_BOOL)
-               : atomic_ops[i].gives_value ? t
-                                           : sema_builtin(c, TYPE_VOID);
-        return true;
-    }
-    sema_error_at(c, callee->pos, "an atomic %s has no `%.*s`",
-                  place->kind == EXPR_NAME ? "local" : "field",
-                  (int)callee->as.field.name.length,
-                  callee->as.field.name.text);
-    *out = sema_builtin(c, TYPE_ERROR);
-    return true;
 }
 
 /* Whether any class of the program places a sub-object of t inside
@@ -1561,472 +1342,6 @@ static struct type *check_mul_high(struct checker *c, struct expr *e,
     return sema_check_binary(c, e, expected);
 }
 
-/* Locking and channels */
-
-/* The channel that the operation what reads. A pointer to one is
-   written `*p`, as it is for the value a `switch` takes. */
-static struct type *channel_of(struct checker *c, struct expr *e,
-                               const char *what)
-{
-    struct type *t = sema_check_expr(c, e, NULL);
-
-    if (!sema_is_error(t) && !types_is_chan(t)) {
-        sema_error_at(c, e->pos, "`%s` takes a channel, found `%s`", what,
-                      sema_tn(t));
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    return t;
-}
-
-/* Rewrite the call e into the operation op on target. None of the calls
-   can fail, so a handler on one is refused. */
-static bool sync_call(struct checker *c, struct expr *e, enum sync_op op,
-                      struct expr *target)
-{
-    if (e->as.call.handler.kind != HANDLE_NONE) {
-        sema_error_at(c, e->as.call.handler.pos,
-                      "this call cannot fail, so it has no error to handle");
-        return false;
-    }
-    e->kind = EXPR_SYNC_OP;
-    memset(&e->as, 0, sizeof e->as);
-    e->as.sync_op.op = op;
-    e->as.sync_op.target = target;
-    return true;
-}
-
-/* `close(c)` ends what a channel takes. What it holds is still
-   received. */
-static struct type *check_close(struct checker *c, struct expr *e)
-{
-    struct type *t;
-
-    if (e->as.call.arg_count != 1) {
-        sema_error_at(c, e->pos, "`" CHAN_CLOSE "` takes 1 argument, found %zu",
-                      e->as.call.arg_count);
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    t = channel_of(c, e->as.call.args[0], CHAN_CLOSE);
-    if (sema_is_error(t) || !sync_call(c, e, SYNC_CLOSE, e->as.call.args[0])) {
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    return sema_builtin(c, TYPE_VOID);
-}
-
-/* `Mutex.new()` makes a mutex, which the runtime holds. */
-static struct type *check_mutex_new(struct checker *c, struct expr *e)
-{
-    const struct name *name = &e->as.call.callee->as.field.name;
-
-    if (!sema_name_is(name, MUTEX_NEW)) {
-        sema_error_at(c, e->as.call.callee->pos, "`" LANG_MUTEX "` has no "
-                      "function `%.*s`", (int)name->length, name->text);
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    if (e->as.call.arg_count != 0) {
-        sema_error_at(c, e->pos, "`" LANG_MUTEX "." MUTEX_NEW "` takes no "
-                      "arguments");
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    if (!sync_call(c, e, SYNC_MUTEX_NEW, NULL)) {
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    return types_mutex(c->types);
-}
-
-/* DESIGN: `Regex.compile(text)` is the call `compile(text)` of
-   `anti.regex`, which the checker writes over the callee and checks as
-   any call, so the argument, the failure and its handler follow the rules
-   of a program's own call. The module it names cannot be written in a
-   program. It stands in a scope of its own, as the one of an `f"..."`
-   does. */
-static const struct name hidden_regex = {"<regex>", 7};
-
-static struct type *check_regex_compile(struct checker *c, struct expr *e,
-                                        struct type *expected)
-{
-    static const struct name module = {REGEX_MODULE,
-                                       sizeof REGEX_MODULE - 1};
-    struct expr *callee = e->as.call.callee;
-    const struct name *name = &callee->as.field.name;
-    bool bytes = sema_name_is(&callee->as.field.base->as.name,
-                              LANG_BYTE_REGEX);
-    const char *type = bytes ? LANG_BYTE_REGEX : LANG_REGEX;
-    const char *function = bytes ? REGEX_COMPILE_BYTES : REGEX_COMPILE;
-    const char *what = bytes ? "`" LANG_BYTE_REGEX "." REGEX_COMPILE "` calls"
-                             : "`" LANG_REGEX "." REGEX_COMPILE "` calls";
-    const struct interface *lib;
-    struct symbol *home;
-    struct scope scope;
-    struct type *t;
-
-    if (!sema_name_is(name, REGEX_COMPILE)) {
-        sema_error_at(c, callee->pos, "`%s` has no function `%.*s`", type,
-                      (int)name->length, name->text);
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    if (sema_std_function(c, e->pos, what, &module, function, 1) == NULL) {
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    lib = sema_find_library(c, &module);
-    sema_enter_scope(c, &scope);
-    home = sema_declare(c, SYMBOL_MODULE, &hidden_regex, e->pos,
-                        "`%.*s` is already declared");
-    home->home = lib;
-    callee->as.field.base->as.name = hidden_regex;
-    callee->as.field.name.text = function;
-    callee->as.field.name.length = strlen(function);
-    t = sema_check_call(c, e, expected);
-    sema_leave_scope(c, &scope);
-    return t;
-}
-
-/* `m.destroy()` releases the mutex that m names, a Mutex in a place or
-   a pointer to one. */
-static struct type *check_mutex_destroy(struct checker *c, struct expr *e,
-                                        struct type *base)
-{
-    struct expr *m = e->as.call.callee->as.field.base;
-
-    if (e->as.call.arg_count != 0) {
-        sema_error_at(c, e->pos, "`" MUTEX_DESTROY "` takes no arguments");
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    if (base->kind == TYPE_POINTER) {
-        sema_usable_pointer(c, m, base);
-    } else if (!sema_is_place(m)) {
-        sema_error_at(c, m->pos, "calling `" MUTEX_DESTROY "` needs a place");
-        return sema_builtin(c, TYPE_ERROR);
-    } else {
-        sema_mark_address_taken(c, m);
-    }
-    if (!sync_call(c, e, SYNC_MUTEX_DESTROY, m)) {
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    return sema_builtin(c, TYPE_VOID);
-}
-
-/* Rewrite the call e into the built-in op of the simd struct simd with
-   the operands args. None of the built-ins can fail, so a handler on one
-   is refused. */
-static bool simd_node(struct checker *c, struct expr *e, enum simd_op op,
-                      struct expr **args, size_t count,
-                      struct type *simd)
-{
-    if (e->as.call.handler.kind != HANDLE_NONE) {
-        sema_error_at(c, e->as.call.handler.pos,
-                      "this call cannot fail, so it has no error to handle");
-        return false;
-    }
-    e->kind = EXPR_SIMD;
-    memset(&e->as, 0, sizeof e->as);
-    e->as.simd.op = op;
-    e->as.simd.args = args;
-    e->as.simd.arg_count = count;
-    e->as.simd.simd = simd;
-    return true;
-}
-
-/* Whether the call e names a function of `anti.simd` that the compiler
-   knows, through the import of that module. */
-static bool simd_module_call(const struct checker *c, const struct expr *e)
-{
-    const struct expr *callee = e->as.call.callee;
-    const struct symbol *module;
-
-    if (callee->kind != EXPR_FIELD ||
-        (module = qualifier(c, callee)) == NULL || module->home == NULL ||
-        strcmp(module->home->module, SIMD_MODULE) != 0) {
-        return false;
-    }
-    return sema_name_is(&callee->as.field.name, SIMD_SELECT) ||
-           sema_name_is(&callee->as.field.name, SIMD_ANY) ||
-           sema_name_is(&callee->as.field.name, SIMD_ALL);
-}
-
-/* The type a reduction of lanes of type lane gives. An f16 lane is read
-   as an f32, and so is the value that it reduces to. */
-static struct type *simd_scalar(struct checker *c, struct type *lane)
-{
-    return lane->kind == TYPE_F16 ? sema_builtin(c, TYPE_F32) : lane;
-}
-
-/* `simd.select(mask, a, b)`, `simd.any(mask)` and `simd.all(mask)`. The
-   mask is a simd struct of `bool`, and select takes it with the lane
-   count of a and b. */
-static struct type *check_simd_module(struct checker *c, struct expr *e)
-{
-    const struct name *name = &e->as.call.callee->as.field.name;
-    struct expr **args = e->as.call.args;
-    size_t count = e->as.call.arg_count;
-    bool select = sema_name_is(name, SIMD_SELECT);
-    struct type *mask;
-    struct type *a;
-    struct type *b;
-
-    if (count != (select ? 3u : 1u)) {
-        sema_error_at(c, e->pos, "`simd.%.*s` takes %d argument%s, found %zu",
-                      (int)name->length, name->text, select ? 3 : 1,
-                      select ? "s" : "", count);
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    mask = sema_check_expr(c, args[0], NULL);
-    if (sema_is_error(mask)) {
-        return mask;
-    }
-    if (!types_is_mask(mask)) {
-        sema_error_at(c, args[0]->pos,
-                      "`simd.%.*s` takes a mask, a `simd struct` "
-                      "of `bool`, found `%s`", (int)name->length, name->text,
-                      sema_tn(mask));
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    if (!select) {
-        if (!simd_node(c, e, sema_name_is(name, SIMD_ANY) ? SIMD_OP_ANY
-                                                          : SIMD_OP_ALL,
-                       args, 1, mask)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        return sema_builtin(c, TYPE_BOOL);
-    }
-    a = sema_check_expr(c, args[1], NULL);
-    if (sema_is_error(a)) {
-        return a;
-    }
-    if (!types_is_simd(a)) {
-        sema_error_at(c, args[1]->pos,
-                      "`simd.select` chooses between values of a "
-                      "`simd struct`, found `%s`", sema_tn(a));
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    b = sema_check_expr(c, args[2], a);
-    if (!sema_require(c, args[2], b, a)) {
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    if (mask->field_count != a->field_count) {
-        sema_error_at(c, args[0]->pos,
-                      "the mask of `simd.select` has %zu lanes, "
-                      "and `%s` has %zu", mask->field_count, sema_tn(a),
-                      a->field_count);
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    if (!simd_node(c, e, SIMD_OP_SELECT, args, 3, a)) {
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    return a;
-}
-
-/* Whether name is a built-in on the simd struct itself, `T.splat` or
-   `T.load`. */
-static bool simd_static_name(const struct name *name)
-{
-    return sema_name_is(name, SIMD_SPLAT) || sema_name_is(name, SIMD_LOAD);
-}
-
-/* `T.splat(v)` writes v into every lane, and `T.load(slice, i)` reads
-   the lanes from the elements of slice from i on. */
-static struct type *check_simd_static(struct checker *c, struct expr *e,
-                                      struct type *t)
-{
-    const struct name *name = &e->as.call.callee->as.field.name;
-    struct expr **args = e->as.call.args;
-    size_t count = e->as.call.arg_count;
-    struct type *lane = types_simd_lane(t);
-    struct type *i64 = sema_builtin(c, TYPE_I64);
-
-    if (sema_name_is(name, SIMD_SPLAT)) {
-        if (count != 1) {
-            sema_error_at(c, e->pos,
-                          "`%s." SIMD_SPLAT "` takes 1 argument, found "
-                          "%zu", sema_tn(t), count);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (!sema_require(c, args[0], sema_check_expr(c, args[0], lane),
-                          lane) ||
-            !simd_node(c, e, SIMD_OP_SPLAT, args, 1, t)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        return t;
-    }
-    if (count != 2) {
-        sema_error_at(c, e->pos,
-                      "`%s." SIMD_LOAD "` takes 2 arguments, found %zu",
-                      sema_tn(t), count);
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    {
-        struct type *slice = types_slice(c->types, lane);
-        bool ok = sema_require(c, args[0], sema_check_expr(c, args[0], slice),
-                               slice);
-        ok = sema_require(c, args[1], sema_check_expr(c, args[1], i64),
-                          i64) && ok;
-        if (!ok || !simd_node(c, e, SIMD_OP_LOAD, args, 2, t)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-    }
-    return t;
-}
-
-/* Whether name is a built-in on a value of a simd struct. */
-static bool simd_value_name(const struct name *name)
-{
-    return sema_name_is(name, SIMD_STORE) || sema_name_is(name, SIMD_SHUFFLE) ||
-           sema_name_is(name, SIMD_SUM) || sema_name_is(name, SIMD_MIN) ||
-           sema_name_is(name, SIMD_MAX) || sema_name_is(name, SIMD_DOT);
-}
-
-/* The built-ins on a value v of the simd struct s, or on a pointer to
-   one: `v.store(slice, i)`, `v.shuffle(i, ...)`, `v.sum()`, `v.min()`,
-   `v.max()` and `a.dot(b)`. A shuffle names the lane of v that each lane
-   of its result takes, by a constant index. */
-static struct type *check_simd_value(struct checker *c, struct expr *e,
-                                     struct type *base, struct type *s)
-{
-    struct expr *receiver = e->as.call.callee->as.field.base;
-    const struct name *name = &e->as.call.callee->as.field.name;
-    size_t count = e->as.call.arg_count;
-    struct type *lane = types_simd_lane(s);
-    struct type *i64 = sema_builtin(c, TYPE_I64);
-    struct expr **args = types_alloc_array(c->arena, count + 1, sizeof *args);
-    enum simd_op op;
-    size_t want;
-    size_t i;
-
-    if (base->kind == TYPE_POINTER) {
-        sema_usable_pointer(c, receiver, base);
-    }
-    args[0] = receiver;
-    /* memcpy takes no null pointer, even for no bytes, and a call with no
-       arguments holds none. */
-    if (count > 0) {
-        memcpy(args + 1, e->as.call.args, count * sizeof *args);
-    }
-    op = sema_name_is(name, SIMD_STORE)     ? SIMD_OP_STORE
-         : sema_name_is(name, SIMD_SHUFFLE) ? SIMD_OP_SHUFFLE
-         : sema_name_is(name, SIMD_SUM)     ? SIMD_OP_SUM
-         : sema_name_is(name, SIMD_MIN)     ? SIMD_OP_MIN
-         : sema_name_is(name, SIMD_MAX)     ? SIMD_OP_MAX
-                                            : SIMD_OP_DOT;
-    want = op == SIMD_OP_STORE     ? 2
-           : op == SIMD_OP_SHUFFLE ? s->field_count
-           : op == SIMD_OP_DOT     ? 1
-                                   : 0;
-    if (count != want) {
-        sema_error_at(c, e->pos, "`%.*s` takes %zu argument%s, found %zu",
-                      (int)name->length, name->text, want, want == 1 ? "" : "s",
-                      count);
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    if (op != SIMD_OP_STORE && op != SIMD_OP_SHUFFLE &&
-        !sema_simd_numeric(lane)) {
-        sema_error_at(c, e->pos, "`%.*s` needs lanes of numbers, and `%s` has "
-                      "`%s`", (int)name->length, name->text, sema_tn(s),
-                      sema_tn(lane));
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    switch (op) {
-    case SIMD_OP_STORE: {
-        struct type *slice = types_slice(c->types, lane);
-        bool ok = sema_require(c, args[1], sema_check_expr(c, args[1], slice),
-                               slice);
-        ok = sema_require(c, args[2], sema_check_expr(c, args[2], i64),
-                          i64) && ok;
-        if (!ok || !simd_node(c, e, op, args, 3, s)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        return sema_builtin(c, TYPE_VOID);
-    }
-    case SIMD_OP_SHUFFLE: {
-        uint32_t *lanes = types_alloc_array(c->arena, want, sizeof *lanes);
-        for (i = 0; i < want; i++) {
-            struct const_value v;
-            if (!sema_require(c, args[i + 1],
-                              sema_check_expr(c, args[i + 1], i64), i64)) {
-                return sema_builtin(c, TYPE_ERROR);
-            }
-            if (!sema_eval_const(c, args[i + 1], &v) || v.kind != CONST_INT ||
-                v.as.integer >= want) {
-                sema_error_at(c, args[i + 1]->pos, "`" SIMD_SHUFFLE "` takes "
-                              "constant lane indexes from 0 to %zu", want - 1);
-                return sema_builtin(c, TYPE_ERROR);
-            }
-            lanes[i] = (uint32_t)v.as.integer;
-        }
-        if (!simd_node(c, e, op, args, 1, s)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        e->as.simd.lanes = lanes;
-        return s;
-    }
-    case SIMD_OP_DOT:
-        if (!sema_require(c, args[1], sema_check_expr(c, args[1], s), s) ||
-            !simd_node(c, e, op, args, 2, s)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        return simd_scalar(c, lane);
-    default:
-        if (!simd_node(c, e, op, args, 1, s)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        return simd_scalar(c, lane);
-    }
-}
-
-/* Whether the module of s declares a function that `v.name(args)` calls
-   through the method syntax. Such a function wins over a built-in of
-   that name, as a function named `close` wins over `close(c)`. */
-static bool simd_method_declared(struct checker *c, const struct type *s,
-                                 const struct name *name)
-{
-    struct symbol *f = sema_method_symbol(c, s, name);
-
-    return f != NULL && (f->kind == SYMBOL_FN || f->kind == SYMBOL_EXTERN_FN) &&
-           f->type != NULL && !sema_is_error(f->type) &&
-           f->type->kind == TYPE_FN &&
-           f->type->param_count > 0 &&
-           sema_struct_of(f->type->params[0]) == s;
-}
-
-/* `chan T(n)`, `send(c, v)` and `recv(c)`, which the parser writes. The
-   nodes the checker writes from calls carry their type already. */
-struct type *sema_check_sync_op(struct checker *c, struct expr *e)
-{
-    struct type *i64 = sema_builtin(c, TYPE_I64);
-    struct type *t;
-
-    switch (e->as.sync_op.op) {
-    case SYNC_CHAN_NEW:
-        t = sema_chan_element(c, e->as.sync_op.element);
-        if (!sema_require(c, e->as.sync_op.value,
-                          sema_check_expr(c, e->as.sync_op.value, i64), i64) ||
-            sema_is_error(t)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        return types_chan(c->types, t);
-    case SYNC_SEND:
-        t = channel_of(c, e->as.sync_op.target, "send");
-        if (sema_is_error(t)) {
-            sema_check_expr(c, e->as.sync_op.value, NULL);
-            return t;
-        }
-        if (!sema_require(c, e->as.sync_op.value,
-                          sema_check_expr(c, e->as.sync_op.value, t->element),
-                          t->element)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* The channel holds a copy of the value, which an `own` field
-           would give two owners. */
-        sema_refuse_owned_copy(c, e->as.sync_op.value, t->element);
-        return sema_builtin(c, TYPE_VOID);
-    case SYNC_RECV:
-        t = channel_of(c, e->as.sync_op.target, "recv");
-        return sema_is_error(t) ? t
-                                : types_pointer_nullable(c->types, t->element);
-    default:
-        return e->type;
-    }
-}
-
 /* The class a dotted path names. It is a class of the module being
    checked when the qualifier is empty, and a pub class of another
    module otherwise. The qualifier names that module by its alias or by
@@ -2319,7 +1634,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
     struct type *provided = NULL;
 
     /* An operation on an atomic field becomes one node of its own. */
-    if (atomic_call(c, e, &fn)) {
+    if (sema_atomic_call(c, e, &fn)) {
         return fn;
     }
     if (callee->kind == EXPR_NAME && sema_name_is(&callee->as.name, MUL_HIGH) &&
@@ -2329,26 +1644,26 @@ static struct type *check_call(struct checker *c, struct expr *e,
     if (callee->kind == EXPR_NAME &&
         sema_name_is(&callee->as.name, CHAN_CLOSE) &&
         sema_lookup(c, &callee->as.name) == NULL) {
-        return check_close(c, e);
+        return sema_check_close(c, e);
     }
     if (callee->kind == EXPR_FIELD &&
         callee->as.field.base->kind == EXPR_NAME &&
         sema_name_is(&callee->as.field.base->as.name, LANG_MUTEX) &&
         sema_lookup(c, &callee->as.field.base->as.name) == NULL) {
-        return check_mutex_new(c, e);
+        return sema_check_mutex_new(c, e);
     }
     if (callee->kind == EXPR_FIELD &&
         callee->as.field.base->kind == EXPR_NAME &&
         (sema_name_is(&callee->as.field.base->as.name, LANG_REGEX) ||
          sema_name_is(&callee->as.field.base->as.name, LANG_BYTE_REGEX)) &&
         sema_lookup(c, &callee->as.field.base->as.name) == NULL) {
-        return check_regex_compile(c, e, expected);
+        return sema_check_regex_compile(c, e, expected);
     }
-    if (simd_module_call(c, e)) {
-        return check_simd_module(c, e);
+    if (sema_simd_module_call(c, e)) {
+        return sema_check_simd_module(c, e);
     }
     if (callee->kind == EXPR_FIELD &&
-        (module = qualifier(c, callee)) != NULL) {
+        (module = sema_qualifier(c, callee)) != NULL) {
         fn = check_qualified(c, callee, module, true);
         callee->type = fn;
         if (!sema_is_error(fn) && callee->symbol->kind == SYMBOL_EXTERN_FN) {
@@ -2367,8 +1682,8 @@ static struct type *check_call(struct checker *c, struct expr *e,
             return owner;
         }
         if (types_is_simd(owner) &&
-            simd_static_name(&callee->as.field.name)) {
-            return check_simd_static(c, e, owner);
+            sema_simd_static_name(&callee->as.field.name)) {
+            return sema_check_simd_static(c, e, owner);
         }
         /* `List<int>.new()` names a copy, and `List.new()` leaves the
            arguments of the class to the call. */
@@ -2408,14 +1723,14 @@ static struct type *check_call(struct checker *c, struct expr *e,
         fixed = 0;
     } else if (callee->kind == EXPR_FIELD &&
                callee->as.field.base->kind == EXPR_FIELD &&
-               (module = qualifier(c, callee->as.field.base)) != NULL &&
+               (module = sema_qualifier(c, callee->as.field.base)) != NULL &&
                (sym = sema_library_item(c, module->home,
                         &callee->as.field.base->as.field.name)) != NULL &&
                sym->kind == SYMBOL_STRUCT) {
         struct type *owner = sym->type;
         if (types_is_simd(owner) &&
-            simd_static_name(&callee->as.field.name)) {
-            return check_simd_static(c, e, owner);
+            sema_simd_static_name(&callee->as.field.name)) {
+            return sema_check_simd_static(c, e, owner);
         }
         /* `m.List<int>.new()` names a copy, as `List<int>.new()` does. */
         if (callee->as.field.base->type_arg_count > 0) {
@@ -2493,13 +1808,13 @@ static struct type *check_call(struct checker *c, struct expr *e,
         s = sema_struct_of(base);
         if (types_is_mutex(s) &&
             sema_name_is(&callee->as.field.name, MUTEX_DESTROY)) {
-            return check_mutex_destroy(c, e, base);
+            return sema_check_mutex_destroy(c, e, base);
         }
         if (types_is_simd(s) &&
             types_find_field(s, &callee->as.field.name) == NULL &&
-            simd_value_name(&callee->as.field.name) &&
-            !simd_method_declared(c, s, &callee->as.field.name)) {
-            return check_simd_value(c, e, base, s);
+            sema_simd_value_name(&callee->as.field.name) &&
+            !sema_simd_method_declared(c, s, &callee->as.field.name)) {
+            return sema_check_simd_value(c, e, base, s);
         }
         if (plugin_library(s) &&
             (sema_name_is(&callee->as.field.name, "instance") ||
@@ -2876,7 +2191,7 @@ static bool type_namespace(struct checker *c, struct expr *e,
     /* A type of another module reaches its namespace as well, so
        `m.Kind.Round` and `m.T.f` read like the unqualified forms. */
     if (e->as.field.base->kind == EXPR_FIELD) {
-        const struct symbol *outer = qualifier(c, e->as.field.base);
+        const struct symbol *outer = sema_qualifier(c, e->as.field.base);
         struct symbol *sym =
             outer != NULL
                 ? sema_library_item(c, outer->home,
@@ -2892,7 +2207,7 @@ static bool type_namespace(struct checker *c, struct expr *e,
 
 struct type *sema_check_field(struct checker *c, struct expr *e)
 {
-    const struct symbol *module = qualifier(c, e);
+    const struct symbol *module = sema_qualifier(c, e);
     const struct expr *saved_base;
     struct type *base;
     struct name *name = &e->as.field.name;
@@ -3184,239 +2499,4 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
         }
     }
     return true;
-}
-
-/* DESIGN: the safety of `parallel` rests on the types. The runtime does
-   the splitting, so a worker reaches one contiguous slice of the array
-   and nothing else. Its parameters and its result are pointer-free, so
-   no worker can reach memory that another one writes. The rule is no
-   data race, not memory safety. */
-static bool worker_type(struct checker *c, struct pos pos, const char *what,
-                        struct type *t)
-{
-    if (sema_is_error(t)) {
-        return false;
-    }
-    if (!types_pointer_free(t)) {
-        sema_error_at(c, pos,
-                      "%s has type `%s`, which holds a pointer. A worker "
-                      "takes and returns values alone", what, sema_tn(t));
-        return false;
-    }
-    return true;
-}
-
-/* The function type of the worker that the call at slot of `parallel`
-   or `dispatch` names. It has one parameter before the arguments of the
-   call, for the chunk or the object that first names, of type given. A
-   generic worker gives the signature of its copy. NULL after an error. */
-static struct type *worker_callee(struct checker *c, struct expr **slot,
-                                  const char *form, const char *first,
-                                  struct type *given)
-{
-    struct expr *call = *slot;
-    struct expr *callee = call->kind == EXPR_CALL ? call->as.call.callee : call;
-    size_t arg_count = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
-    const struct expr *outer_callee = c->callee;
-    struct symbol *sym;
-    struct type *fn;
-
-    if (callee->kind != EXPR_NAME) {
-        sema_error_at(c, callee->pos, "`%s` runs a worker named here", form);
-        return NULL;
-    }
-    sym = sema_lookup(c, &callee->as.name);
-    callee->symbol = sym;
-    c->callee = callee;
-    fn = sema_check_expr(c, callee, NULL);
-    c->callee = outer_callee;
-    if (sema_is_error(fn)) {
-        return NULL;
-    }
-    if (fn->kind != TYPE_FN || sym == NULL || !sym->worker) {
-        sema_error_at(c, callee->pos, "`%.*s` is not a `worker fn`",
-                      (int)callee->as.name.length, callee->as.name.text);
-        return NULL;
-    }
-    if (sym->item == NULL || sym->item->type_param_count == 0) {
-        if (callee->type_arg_count > 0) {
-            sema_refuse_type_args(c, callee, &callee->as.name);
-            return NULL;
-        }
-    } else if (fn->param_count == arg_count + 1) {
-        /* The copy is recorded on a call, so a worker named without
-           arguments becomes a call of none. */
-        if (call->kind != EXPR_CALL) {
-            call = sema_new_node(c, EXPR_CALL, callee->pos);
-            call->as.call.callee = callee;
-            *slot = call;
-        }
-        fn = sema_worker_copy(c, call, fn, sym, given);
-        if (fn == NULL) {
-            return NULL;
-        }
-        callee->type = fn;
-    }
-    if (fn->param_count == 0) {
-        sema_error_at(c, call->pos, "`%.*s` has no parameter for the %s",
-                      (int)callee->as.name.length, callee->as.name.text,
-                      first);
-        return NULL;
-    }
-    if (fn->param_count != arg_count + 1) {
-        sema_error_at(c, call->pos,
-                      "`%.*s` takes %zu argument%s beside the %s, "
-                      "found %zu", (int)callee->as.name.length,
-                      callee->as.name.text, fn->param_count - 1,
-                      fn->param_count == 2 ? "" : "s", first, arg_count);
-        return NULL;
-    }
-    return fn;
-}
-
-/* Check the result and the arguments of the call of the worker fn, each
-   a value without a pointer, and give the call its type. */
-static bool worker_args(struct checker *c, struct expr *call,
-                        const struct type *fn)
-{
-    struct expr *callee = call->kind == EXPR_CALL ? call->as.call.callee : call;
-    struct expr **args = call->kind == EXPR_CALL ? call->as.call.args : NULL;
-    size_t arg_count = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
-    bool ok = worker_type(c, callee->pos, "the result of a worker",
-                          fn->result);
-    size_t i;
-
-    /* DESIGN: a worker may take a function value as a parameter. Every
-       thread shares the code of a function. A closure reaches a worker
-       only through a `concurrent` parameter. The checker has proved such
-       a closure safe to call from more than one thread at once. */
-    for (i = 0; i < arg_count; i++) {
-        const struct type *param = fn->params[i + 1];
-        ok = sema_require(c, args[i],
-                          sema_check_expr(c, args[i], fn->params[i + 1]),
-                          fn->params[i + 1]) && ok;
-        sema_refuse_lock_copy(c, args[i], param);
-        sema_refuse_worker_closure(c, args[i], param);
-        /* DESIGN: a worker may take a pointer to a thread-safe object,
-           the one exception to the rule that its parameters hold no
-           pointer. A Mutex counts, since a worker cannot take a copy of
-           one. */
-        if (param->kind == TYPE_POINTER && sema_thread_safe(param->element) &&
-            !types_is_chan(param->element)) {
-            continue;
-        }
-        if (param->kind != TYPE_FN || param->bound) {
-            ok = worker_type(c, args[i]->pos, "an argument of a worker",
-                             fn->params[i + 1]) && ok;
-        }
-    }
-    if (call->kind == EXPR_CALL) {
-        call->type = fn->result;
-    }
-    return ok;
-}
-
-/* Check `parallel a by n -> f(x)`. It splits a into n chunks and runs f
-   on each through the worker pool. The results come back in chunk
-   order. */
-struct type *sema_check_parallel(struct checker *c, struct expr *e)
-{
-    struct expr *call = e->as.parallel.call;
-    struct expr *callee = call->kind == EXPR_CALL ? call->as.call.callee : call;
-    struct type *array = sema_check_expr(c, e->as.parallel.array, NULL);
-    struct type *fn;
-    bool ok = true;
-
-    if (e->as.parallel.chunks != NULL) {
-        struct expr *n = e->as.parallel.chunks;
-        ok = sema_require(c, n,
-                          sema_check_expr(c, n, sema_builtin(c, TYPE_I64)),
-                          sema_builtin(c, TYPE_I64));
-    }
-    if (sema_is_error(array)) {
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    if (array->kind != TYPE_SLICE) {
-        sema_error_at(c, e->as.parallel.array->pos,
-                      "`parallel` splits a slice, and this is `%s`",
-                      sema_tn(array));
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    fn = worker_callee(c, &e->as.parallel.call, "parallel", "chunk", array);
-    if (fn == NULL) {
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    call = e->as.parallel.call;
-    if (fn->params[0]->kind != TYPE_SLICE ||
-        fn->params[0]->element != array->element) {
-        sema_error_at(c, callee->pos, "`%.*s` takes `%s` as its chunk, and the "
-                      "slice is `%s`", (int)callee->as.name.length,
-                      callee->as.name.text, sema_tn(fn->params[0]),
-                      sema_tn(array));
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    ok = worker_type(c, callee->pos, "the chunk", array->element) && ok;
-    ok = worker_args(c, call, fn) && ok;
-    return ok ? types_slice(c->types, fn->result) : sema_builtin(c, TYPE_ERROR);
-}
-
-/* DESIGN: `dispatch obj -> f(args)` gives one object to the pool for a
-   `worker fn` whose first parameter is a pointer to the object's class.
-   The other arguments follow the pointer-free rule of `parallel`, and the
-   expression gives a Job of the worker's result. */
-struct type *sema_check_dispatch(struct checker *c, struct expr *e)
-{
-    struct expr *call = e->as.dispatch.call;
-    struct expr *callee = call->kind == EXPR_CALL ? call->as.call.callee : call;
-    struct type *object = sema_check_expr(c, e->as.dispatch.object, NULL);
-    struct type *fn;
-
-    if (sema_is_error(object)) {
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    if (object->kind != TYPE_POINTER || object->element->kind != TYPE_CLASS) {
-        sema_error_at(c, e->as.dispatch.object->pos,
-                      "`dispatch` submits a class pointer, and this is `%s`",
-                      sema_tn(object));
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    fn = worker_callee(c, &e->as.dispatch.call, "dispatch", "object", object);
-    if (fn == NULL) {
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    call = e->as.dispatch.call;
-    if (fn->params[0] != object) {
-        sema_error_at(c, callee->pos,
-                      "`%.*s` takes `%s` as its object, and this is "
-                      "`%s`", (int)callee->as.name.length, callee->as.name.text,
-                      sema_tn(fn->params[0]), sema_tn(object));
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    return worker_args(c, call, fn) ? types_job(c->types, fn->result)
-                                    : sema_builtin(c, TYPE_ERROR);
-}
-
-/* `join(job)` waits for one job and gives its result. `join_all(jobs)`
-   waits for a slice of jobs and gives nothing. */
-struct type *sema_check_join(struct checker *c, struct expr *e)
-{
-    struct type *t = sema_check_expr(c, e->as.join.job, NULL);
-    const char *what = e->as.join.all ? "join_all" : "join";
-    struct type *job = e->as.join.all && t->kind == TYPE_SLICE ? t->element : t;
-
-    if (sema_is_error(t)) {
-        return t;
-    }
-    if (e->as.join.all && t->kind != TYPE_SLICE) {
-        sema_error_at(c, e->as.join.job->pos, "`join_all` waits for a slice of "
-                      "jobs, and this is `%s`", sema_tn(t));
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    if (!types_is_job(job)) {
-        sema_error_at(c, e->as.join.job->pos,
-                      "`%s` waits for a job of `dispatch`, "
-                      "and this is `%s`", what, sema_tn(t));
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    return e->as.join.all ? sema_builtin(c, TYPE_VOID) : job->result;
 }
