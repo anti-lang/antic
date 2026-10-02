@@ -101,15 +101,15 @@ void link_shared_command(struct link_command *c, enum target t,
                          const struct shared_options *s);
 
 /* Build the llvm-ar command line that writes archive from the members. */
-void archive_command(struct link_command *c, enum target t,
-                     const char *llvm_ar, const char *archive,
-                     const char *const *members, size_t count);
+void link_archive_command(struct link_command *c, enum target t,
+                          const char *llvm_ar, const char *archive,
+                          const char *const *members, size_t count);
 
 /* Build the command line that joins objects into one relocatable object
    for a bundled runtime, with the linker of in. */
-void relocatable_command(struct link_command *c, enum target t,
-                         const struct link_inputs *in, const char *output,
-                         const char *const *objects, size_t count);
+void link_relocatable_command(struct link_command *c, enum target t,
+                              const struct link_inputs *in, const char *output,
+                              const char *const *objects, size_t count);
 
 /* Append the command line that links a C program main.c with the static
    library, as antic prints it. A bundled runtime needs no runtime library. */

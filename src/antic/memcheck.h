@@ -37,11 +37,6 @@
    t. compiler-rt builds none for Windows on ARM64. */
 bool memcheck_available(enum target t);
 
-/* Whether the runtime of AddressSanitizer for t checks for leaks. The
-   one of Windows has no leak check, and ends a program at start that
-   asks for one. */
-bool memcheck_leaks(enum target t);
-
 /* Declare the two check functions in m and mark m for the checks. Where
    the runtime of t checks for leaks, the module that links, the one that
    defines main, also gets the options hook, which turns the leak check

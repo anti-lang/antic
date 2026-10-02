@@ -198,8 +198,6 @@ uint64_t select_size(const struct selector *s, struct ir_vtype v);
 uint64_t select_align(const struct selector *s, struct ir_vtype v);
 
 /* Helpers for the pattern tables of the targets. */
-struct mach_operand mach_preg(uint32_t preg, uint8_t width);
-struct mach_operand mach_imm(int64_t value);
 struct mach_operand select_result(struct selector *s, const struct ir_inst *inst);
 struct mach_operand select_new_vreg(struct selector *s, uint8_t width);
 struct mach_operand select_new_fp_vreg(struct selector *s, uint8_t width);

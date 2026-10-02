@@ -8,9 +8,9 @@ The choices inside the pass. The rules are in "Dev-mode checks" of
 
 Lowering always emits a check. Every failure arm is a block whose `fail`
 field holds `IR_FAIL_CHECK`, and an assertion's arm holds `IR_FAIL_ASSERT`.
-`ir_drop_failures(program, kind)` replaces the branch into such a block with
-a jump to the other arm, and the passes that follow remove the block, the
-call and the text.
+`optimize_drop_failures(program, kind)` replaces the branch into such a
+block with a jump to the other arm, and the passes that follow remove the
+block, the call and the text.
 
 `back_end` in `src/antic/driver.c` runs it twice, once per kind. Release mode drops
 both and dev mode keeps both. `--checks`, `--no-checks`, `--asserts` and
@@ -117,7 +117,7 @@ may come between them.
 
 ## An ordering in the optimizer
 
-`ir_optimize_function` merges the blocks before its first round. A dropped
+`optimize_function` merges the blocks before its first round. A dropped
 check leaves a jump into the block that follows it, and the peephole that
 fuses `t = op` with `x = copy t` needs the two adjacent. A round of
 propagation between the two gives `t` a second use, and the pair never fuses.

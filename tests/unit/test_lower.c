@@ -715,7 +715,7 @@ static void runtime_records(void)
         agg = rt_record_agg(&m, (enum rt_record)r);
         CHECK(rt_record_items((enum rt_record)r) == c.count);
         CHECK(m.aggs[agg]->field_count == c.count);
-        CHECK(layouts_init(&layouts, host, &m, error, sizeof error));
+        CHECK(layout_init(&layouts, host, &m, error, sizeof error));
         ir = layout_agg(&layouts, agg);
         if (ir->size != c.size) {
             check_failures++;
@@ -737,7 +737,7 @@ static void runtime_records(void)
                         c.sizes[k]);
             }
         }
-        layouts_free(&layouts);
+        layout_free(&layouts);
         ir_module_free(&m);
         arena_free(&arena);
     }
@@ -777,7 +777,7 @@ static void match_layout(void)
         return;
     }
     CHECK(l.ir.aggs[agg]->field_count == sizeof offsets / sizeof offsets[0]);
-    CHECK(layouts_init(&layouts, host, &l.ir, error, sizeof error));
+    CHECK(layout_init(&layouts, host, &l.ir, error, sizeof error));
     ir = layout_agg(&layouts, agg);
     CHECK(ir->size == sizeof(struct anti_match));
     for (k = 0; k < sizeof offsets / sizeof offsets[0] &&
@@ -785,7 +785,7 @@ static void match_layout(void)
          k++) {
         CHECK(ir->offsets[k] == offsets[k]);
     }
-    layouts_free(&layouts);
+    layout_free(&layouts);
     release(&l);
 }
 

@@ -19,36 +19,6 @@ static void fail(struct selector *s, const char *format, ...)
    machine code keeps the numbers of the IR. Registers that selection adds,
    such as one for a constant, take the numbers after the temporaries. */
 
-static struct mach_operand mach_vreg(uint32_t vreg, uint8_t width)
-{
-    struct mach_operand o;
-
-    memset(&o, 0, sizeof o);
-    o.kind = MACH_VREG;
-    o.width = width;
-    o.reg = vreg;
-    return o;
-}
-
-struct mach_operand mach_preg(uint32_t preg, uint8_t width)
-{
-    struct mach_operand o = mach_vreg(preg, width);
-
-    o.kind = MACH_PREG;
-    return o;
-}
-
-struct mach_operand mach_imm(int64_t value)
-{
-    struct mach_operand o;
-
-    memset(&o, 0, sizeof o);
-    o.kind = MACH_IMM;
-    o.width = 64;
-    o.value = value;
-    return o;
-}
-
 struct mach_inst *select_emit(struct selector *s, uint16_t op, size_t count,
                               const struct mach_operand *operands)
 {
@@ -540,7 +510,7 @@ bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
        runs the optimizer again on each function that had one. A size
        folded here reaches the same simplifications as a number would
        have before. */
-    if (!layouts_init(&layouts, t, m, error, error_size) ||
+    if (!layout_init(&layouts, t, m, error, error_size) ||
         !layout_data(&layouts, m)) {
         goto done;
     }
@@ -559,7 +529,7 @@ bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
             resolved = true;
         }
         if (resolved && !m->functions[i]->is_extern) {
-            ir_optimize_function(m->functions[i]);
+            optimize_function(m->functions[i]);
         }
         if (m->memory_checks && !m->functions[i]->is_extern) {
             memcheck_function(m, m->functions[i], &layouts);
@@ -585,6 +555,6 @@ bool select_module(enum target t, enum cpu_level cpu, struct ir_module *m,
     }
     ok = !s.failed;
 done:
-    layouts_free(&layouts);
+    layout_free(&layouts);
     return ok;
 }

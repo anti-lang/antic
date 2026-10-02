@@ -11,7 +11,10 @@ bool memcheck_available(enum target t)
     return t != TARGET_WINDOWS_ARM64;
 }
 
-bool memcheck_leaks(enum target t)
+/* Whether the runtime of AddressSanitizer for t checks for leaks. The
+   one of Windows has no leak check, and ends a program at start that
+   asks for one. */
+static bool memcheck_leaks(enum target t)
 {
     return target_info(t)->os != OS_WINDOWS;
 }

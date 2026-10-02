@@ -466,8 +466,8 @@ bool layout_fold(struct layouts *l, uint32_t sym, uint64_t *out)
     return ok && !l->failed;
 }
 
-bool layouts_init(struct layouts *l, enum target t, const struct ir_module *m,
-                  char *error, size_t error_size)
+bool layout_init(struct layouts *l, enum target t, const struct ir_module *m,
+                 char *error, size_t error_size)
 {
     size_t i;
 
@@ -486,7 +486,7 @@ bool layouts_init(struct layouts *l, enum target t, const struct ir_module *m,
     return !l->failed;
 }
 
-void layouts_free(struct layouts *l)
+void layout_free(struct layouts *l)
 {
     size_t i;
 

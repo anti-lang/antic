@@ -252,8 +252,8 @@ static const char *owned_note(const struct symbol *sym, size_t i)
 
 /* DESIGN: the C name of a type is its name. A type nested in a class
    has the full name `PeopleList.Node`, and a dot is no C identifier. The
-   header therefore writes `PeopleList_Node`, as c_symbol writes the
-   symbol of a function of a class. */
+   header therefore writes `PeopleList_Node`, as target_c_symbol writes
+   the symbol of a function of a class. */
 static void c_type_name(struct text *out, const struct type *t)
 {
     struct name name = types_c_name(t);

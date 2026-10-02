@@ -60,11 +60,11 @@ struct layouts {
 
 /* Lay out every aggregate of m for target t. Returns false and writes a
    message to error for an array length below 1 or a layout that depends
-   on itself. layouts_free releases the tables in either case. The tables
+   on itself. layout_free releases the tables in either case. The tables
    cover the aggregates and symbolic values that m holds at this call. */
-bool layouts_init(struct layouts *l, enum target t, const struct ir_module *m,
-                  char *error, size_t error_size);
-void layouts_free(struct layouts *l);
+bool layout_init(struct layouts *l, enum target t, const struct ir_module *m,
+                 char *error, size_t error_size);
+void layout_free(struct layouts *l);
 
 const struct layout *layout_agg(struct layouts *l, uint32_t agg);
 uint64_t layout_size(struct layouts *l, struct ir_vtype v);

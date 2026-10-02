@@ -7,7 +7,7 @@ static void mangles(enum target t, const char *module, const char *name,
                     const char *expected)
 {
     struct text out = {0};
-    mangle(&out, t, module, name);
+    target_mangle(&out, t, module, name);
     CHECK_STR(text_cstr(&out), expected);
     text_free(&out);
 }
@@ -15,7 +15,7 @@ static void mangles(enum target t, const char *module, const char *name,
 static void names_c(enum target t, const char *name, const char *expected)
 {
     struct text out = {0};
-    c_symbol(&out, t, name);
+    target_c_symbol(&out, t, name);
     CHECK_STR(text_cstr(&out), expected);
     text_free(&out);
 }
@@ -24,7 +24,7 @@ static void labels(enum target t, const char *function, size_t block,
                    const char *expected)
 {
     struct text out = {0};
-    block_label(&out, t, function, block);
+    target_block_label(&out, t, function, block);
     CHECK_STR(text_cstr(&out), expected);
     text_free(&out);
 }
@@ -81,8 +81,9 @@ void test_target(void)
     CHECK_STR(target_info(TARGET_WINDOWS_X86_64)->executable_suffix, ".exe");
     CHECK_STR(target_info(TARGET_LINUX_X86_64)->object_suffix, ".o");
     CHECK_STR(target_info(TARGET_LINUX_X86_64)->executable_suffix, "");
-    CHECK_STR(object_format_name(FORMAT_MACHO), "Mach-O");
-    CHECK_STR(convention_name(CONVENTION_WINDOWS_ARM64), "Windows ARM64");
+    CHECK_STR(target_format_name(FORMAT_MACHO), "Mach-O");
+    CHECK_STR(target_convention_name(CONVENTION_WINDOWS_ARM64),
+              "Windows ARM64");
 }
 
 void test_host_target(void)

@@ -46,7 +46,7 @@ const struct target_info *target_info(enum target t)
     return &infos[t];
 }
 
-const char *object_format_name(enum object_format format)
+const char *target_format_name(enum object_format format)
 {
     static const char *const formats[] = {
         [FORMAT_ELF] = "ELF", [FORMAT_MACHO] = "Mach-O", [FORMAT_COFF] = "COFF",
@@ -54,7 +54,7 @@ const char *object_format_name(enum object_format format)
     return formats[format];
 }
 
-const char *convention_name(enum convention convention)
+const char *target_convention_name(enum convention convention)
 {
     static const char *const conventions[] = {
         [CONVENTION_SYSV] = "System V AMD64",
@@ -108,8 +108,8 @@ static void symbol_name(struct text *out, const char *name)
    symbol of another pair. C reserves names that start with _A. On every
    format the function name is written by symbol_name, which keeps '.'
    and escapes the other bytes. */
-void mangle(struct text *out, enum target t, const char *module,
-            const char *name)
+void target_mangle(struct text *out, enum target t, const char *module,
+                   const char *name)
 {
     switch (infos[t].format) {
     case FORMAT_MACHO:
@@ -134,7 +134,7 @@ void mangle(struct text *out, enum target t, const char *module,
 /* DESIGN: a C symbol is the name of the item, with the `_` that Mach-O
    puts in front. A function of a class carries the name `T.f`, and a dot
    is no C identifier, so the symbol of an exported one is `T_f`. */
-void c_symbol(struct text *out, enum target t, const char *name)
+void target_c_symbol(struct text *out, enum target t, const char *name)
 {
     size_t i;
 
@@ -148,8 +148,8 @@ void c_symbol(struct text *out, enum target t, const char *name)
 
 /* DESIGN: llvm-mc leaves a label that starts with L out of a Mach-O symbol
    table. It leaves one that starts with .L out of ELF and COFF tables. */
-void block_label(struct text *out, enum target t, const char *function,
-                 size_t block)
+void target_block_label(struct text *out, enum target t, const char *function,
+                        size_t block)
 {
     text_appendf(out, "%s%s.b%zu",
                  infos[t].format == FORMAT_MACHO ? "L" : ".L", function, block);

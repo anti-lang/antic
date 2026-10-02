@@ -40,7 +40,7 @@ static void run(const char *source, enum target target, struct text *out)
                 diags.count > 0 ? diags.items[0].message : "", source);
     } else {
         lower_module(module, "main", &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
-        ir_optimize(&ir, "main");
+        optimize_program(&ir, "main");
         functions = calloc(ir.function_count + 1, sizeof *functions);
         ok = select_module(target, cpu_default(target), &ir, functions, error,
                            sizeof error);

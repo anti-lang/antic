@@ -99,8 +99,8 @@ static int print_targets(void)
     for (t = 0; t < TARGET_COUNT; t++) {
         const struct target_info *info = target_info((enum target)t);
         printf("%-15s %-7s %-15s %s\n", target_name((enum target)t),
-               object_format_name(info->format),
-               convention_name(info->convention), info->triple);
+               target_format_name(info->format),
+               target_convention_name(info->convention), info->triple);
     }
     return 0;
 }

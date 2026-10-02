@@ -794,9 +794,9 @@ void link_shared_command(struct link_command *c, enum target t,
     }
 }
 
-void archive_command(struct link_command *c, enum target t,
-                     const char *llvm_ar, const char *archive,
-                     const char *const *members, size_t count)
+void link_archive_command(struct link_command *c, enum target t,
+                          const char *llvm_ar, const char *archive,
+                          const char *const *members, size_t count)
 {
     static const char *const formats[] = {
         [FORMAT_ELF] = "--format=gnu",
@@ -819,9 +819,9 @@ void archive_command(struct link_command *c, enum target t,
    object unless -keep_private_externs is given. The runtime symbols stay
    global, so two bundled runtimes in one program are a duplicate. ld64.lld
    writes no relocatable object, so Mach-O always joins with ld64. */
-void relocatable_command(struct link_command *c, enum target t,
-                         const struct link_inputs *in, const char *output,
-                         const char *const *objects, size_t count)
+void link_relocatable_command(struct link_command *c, enum target t,
+                              const struct link_inputs *in, const char *output,
+                              const char *const *objects, size_t count)
 {
     size_t i;
 

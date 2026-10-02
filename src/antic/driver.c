@@ -1021,7 +1021,7 @@ static int dump_ir(const char *input, const char *file, struct module *tree,
                            false, false, !release, o)) {
             return 1;
         }
-        ir_optimize(program, module);
+        optimize_program(program, module);
         if (!ir_verify(program, &errors)) {
             fprintf(stderr, "antic: internal error, the optimized IR of %s "
                             "fails verification\n%s", input,
@@ -1216,18 +1216,18 @@ static int back_end(const struct options *o, struct module *tree,
        library file follows this build and not the one that wrote it. */
     if (o->asserts == ASSERTS_OFF ||
         (o->asserts == ASSERTS_MODE && !o->dev)) {
-        ir_drop_failures(program, IR_FAIL_ASSERT);
+        optimize_drop_failures(program, IR_FAIL_ASSERT);
     }
     if (o->checks == CHECKS_OFF || (o->checks == CHECKS_MODE && !o->dev)) {
-        ir_drop_failures(program, IR_FAIL_CHECK);
+        optimize_drop_failures(program, IR_FAIL_CHECK);
     }
     /* A plugin holds the code of its own module alone. Every other
        module of the program it was checked against belongs to the host,
        which defines it. */
     if (o->dev || is_plugin(o)) {
-        ir_optimize_module(program, module);
+        optimize_module(program, module);
     } else {
-        ir_optimize(program, module);
+        optimize_program(program, module);
     }
     if (!dump && !o->assembly_only && !o->dev && o->lib == LIB_NONE &&
         !has_main(program, module)) {
@@ -2489,8 +2489,8 @@ static bool bundle(const struct options *o, const struct extras *extras,
             struct link_facts facts;
             ok = link_inputs_of(o, extras, NULL, NULL, &in, &facts);
             if (ok) {
-                relocatable_command(&c, o->target, &in, text_cstr(&joined),
-                                    objects.items, objects.count);
+                link_relocatable_command(&c, o->target, &in, text_cstr(&joined),
+                                         objects.items, objects.count);
                 ok = run_command(&c, "joining the runtime into the library");
                 link_command_free(&c);
             }
@@ -2797,9 +2797,10 @@ static bool build_c_library(const struct options *o, const char *object,
         if (ok) {
             add_path(&members, text_cstr(&package));
             platform_remove(text_cstr(&path));
-            archive_command(&c, o->target,
-                            o->llvm_ar != NULL ? o->llvm_ar : "llvm-ar",
-                            text_cstr(&path), members.items, members.count);
+            link_archive_command(&c, o->target,
+                                 o->llvm_ar != NULL ? o->llvm_ar : "llvm-ar",
+                                 text_cstr(&path), members.items,
+                                 members.count);
             ok = run_command(&c, "llvm-ar");
             link_command_free(&c);
         }

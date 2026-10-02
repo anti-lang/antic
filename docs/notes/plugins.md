@@ -40,7 +40,7 @@ host.
 ## The build of a library
 
 `--no-runtime` makes the driver emit the object of the module alone, as
-a dev build does, and `ir_optimize_module` drops the bodies and the data
+a dev build does, and `optimize_module` drops the bodies and the data
 of every other module. The link passes no runtime library and leaves
 every undefined name to the loader. The `provides` lines reach the index
 through `struct extras`, because the optimizer drops the class records

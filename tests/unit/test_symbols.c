@@ -36,8 +36,9 @@ static void unescapes(const char *symbol, size_t room, const char *expected)
     CHECK_STR(out, expected);
 }
 
-/* The symbol mangle writes for name in module on an ELF target, read back
-   gives name, a `$` of the name among the bytes it escapes. */
+/* The symbol target_mangle writes for name in module on an ELF target,
+   read back, gives name, a `$` of the name among the bytes it
+   escapes. */
 static void round_trip(const char *module, const char *name)
 {
     struct text symbol = {0};
@@ -45,7 +46,7 @@ static void round_trip(const char *module, const char *name)
     char out[256];
     size_t length;
 
-    mangle(&symbol, TARGET_LINUX_X86_64, module, name);
+    target_mangle(&symbol, TARGET_LINUX_X86_64, module, name);
     text_appendf(&wanted, "%s.%s", module, name);
     length = anti_rt_symbol_unescape(text_cstr(&symbol), symbol.length, out,
                                      sizeof out);

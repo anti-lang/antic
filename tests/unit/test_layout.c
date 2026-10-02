@@ -38,8 +38,8 @@ static void structs(void)
                          ir_sym_int(&m, IR_I64, 3), "3");
     product = ir_sym_op(&m, IR_MUL, IR_I64, ir_sym_size_of(&m, ir_aggregate(s)),
                         ir_sym_offset_of(&m, s, 2));
-    CHECK(layouts_init(&layouts, TARGET_LINUX_X86_64, &m, error,
-                       sizeof error));
+    CHECK(layout_init(&layouts, TARGET_LINUX_X86_64, &m, error,
+                      sizeof error));
     l = layout_agg(&layouts, s);
     CHECK(l->size == 12 && l->align == 4);
     CHECK(l->offsets[0] == 0 && l->offsets[1] == 4 && l->offsets[2] == 8);
@@ -48,7 +48,7 @@ static void structs(void)
     CHECK(layout_size(&layouts, ir_aggregate(array)) == 36);
     CHECK(layout_align(&layouts, ir_aggregate(array)) == 4);
     CHECK(layout_fold(&layouts, product, &value) && value == 96);
-    layouts_free(&layouts);
+    layout_free(&layouts);
     ir_module_free(&m);
     arena_free(&arena);
 }
@@ -72,8 +72,8 @@ static void modifiers(void)
     u = ir_struct_add(&m, IR_AGG_UNION, "main.U", fields, 3, false, 0);
     p = ir_struct_add(&m, IR_AGG_STRUCT, "main.P", fields, 3, true, 0);
     a = ir_struct_add(&m, IR_AGG_STRUCT, "main.A", fields, 1, false, 16);
-    CHECK(layouts_init(&layouts, TARGET_WINDOWS_ARM64, &m, error,
-                       sizeof error));
+    CHECK(layout_init(&layouts, TARGET_WINDOWS_ARM64, &m, error,
+                      sizeof error));
     l = layout_agg(&layouts, u);
     CHECK(l->size == 8 && l->align == 8);
     CHECK(l->offsets[0] == 0 && l->offsets[1] == 0 && l->offsets[2] == 0);
@@ -82,7 +82,7 @@ static void modifiers(void)
     CHECK(l->offsets[1] == 1 && l->offsets[2] == 9);
     l = layout_agg(&layouts, a);
     CHECK(l->size == 16 && l->align == 16);
-    layouts_free(&layouts);
+    layout_free(&layouts);
     ir_module_free(&m);
     arena_free(&arena);
 }
@@ -107,11 +107,11 @@ static void lengths(void)
                        ir_sym_int(&m, IR_I64, 8));
     ir_array_add(&m, "[size_of(main.S) - 8]i32", ir_scalar(IR_I32), length,
                  "size_of(S) - 8");
-    CHECK(!layouts_init(&layouts, TARGET_MACOS_ARM64, &m, error,
-                        sizeof error));
+    CHECK(!layout_init(&layouts, TARGET_MACOS_ARM64, &m, error,
+                       sizeof error));
     CHECK_STR(error, "the array length `size_of(S) - 8` is 0 on "
                      "macos-arm64, and an array length is at least 1");
-    layouts_free(&layouts);
+    layout_free(&layouts);
     ir_module_free(&m);
     arena_free(&arena);
 }
@@ -131,17 +131,17 @@ static void c_types(void)
     fields[0] = field("n", IR_CLONG);
     fields[1] = field("w", IR_CWCHAR);
     s = ir_struct_add(&m, IR_AGG_STRUCT, "main.C", fields, 2, false, 0);
-    CHECK(layouts_init(&layouts, TARGET_WINDOWS_X86_64, &m, error,
-                       sizeof error));
+    CHECK(layout_init(&layouts, TARGET_WINDOWS_X86_64, &m, error,
+                      sizeof error));
     l = layout_agg(&layouts, s);
     CHECK(l->size == 8 && l->align == 4 && l->offsets[1] == 4);
     CHECK(l->members[0].type == IR_I32 && l->members[1].type == IR_I16);
-    layouts_free(&layouts);
-    CHECK(layouts_init(&layouts, TARGET_LINUX_ARM64, &m, error, sizeof error));
+    layout_free(&layouts);
+    CHECK(layout_init(&layouts, TARGET_LINUX_ARM64, &m, error, sizeof error));
     l = layout_agg(&layouts, s);
     CHECK(l->size == 16 && l->align == 8 && l->offsets[1] == 8);
     CHECK(l->members[0].type == IR_I64 && l->members[1].type == IR_I32);
-    layouts_free(&layouts);
+    layout_free(&layouts);
     ir_module_free(&m);
     arena_free(&arena);
 }
@@ -164,12 +164,12 @@ static void union_members(void)
     same = ir_struct_add(&m, IR_AGG_UNION, "main.FF", fields, 2, false, 0);
     fields[1] = field("i", IR_I32);
     mixed = ir_struct_add(&m, IR_AGG_UNION, "main.Mix", fields, 2, false, 0);
-    CHECK(layouts_init(&layouts, TARGET_LINUX_ARM64, &m, error, sizeof error));
+    CHECK(layout_init(&layouts, TARGET_LINUX_ARM64, &m, error, sizeof error));
     l = layout_agg(&layouts, same);
     CHECK(l->size == 4 && l->member_count == 1);
     l = layout_agg(&layouts, mixed);
     CHECK(l->size == 4 && l->member_count == 2);
-    layouts_free(&layouts);
+    layout_free(&layouts);
     ir_module_free(&m);
     arena_free(&arena);
 }
@@ -194,19 +194,19 @@ static void unaligned(void)
     outer = ir_struct_add(&m, IR_AGG_STRUCT, "main.O", fields, 2, false, 0);
     fields[1] = field("b", IR_I8);
     loose = ir_struct_add(&m, IR_AGG_STRUCT, "main.L", fields, 2, true, 16);
-    CHECK(layouts_init(&layouts, TARGET_LINUX_X86_64, &m, error, sizeof error));
+    CHECK(layout_init(&layouts, TARGET_LINUX_X86_64, &m, error, sizeof error));
     CHECK(layout_agg(&layouts, packed)->unaligned);
     CHECK(layout_agg(&layouts, outer)->unaligned);
     CHECK(!layout_agg(&layouts, loose)->unaligned);
     CHECK(layout_agg(&layouts, loose)->size == 16);
-    layouts_free(&layouts);
+    layout_free(&layouts);
     fields[1] = field("b", IR_CLONG);
     narrow = ir_struct_add(&m, IR_AGG_STRUCT, "main.N", fields, 2, false, 4);
     CHECK(narrow == 3);
-    CHECK(!layouts_init(&layouts, TARGET_LINUX_ARM64, &m, error, sizeof error));
+    CHECK(!layout_init(&layouts, TARGET_LINUX_ARM64, &m, error, sizeof error));
     CHECK_STR(error, "`main.N` has align(4), below its alignment 8 on "
                      "linux-arm64");
-    layouts_free(&layouts);
+    layout_free(&layouts);
     ir_module_free(&m);
     arena_free(&arena);
 }
@@ -245,7 +245,7 @@ static void bitfields(void)
     fields[2] = bitfield("c", IR_I64, 40);
     fields[3] = bitfield("d", IR_I8, 7);
     s4 = ir_struct_add(&m, IR_AGG_STRUCT, "main.S4", fields, 4, false, 0);
-    CHECK(layouts_init(&layouts, TARGET_LINUX_X86_64, &m, error, sizeof error));
+    CHECK(layout_init(&layouts, TARGET_LINUX_X86_64, &m, error, sizeof error));
     l = layout_agg(&layouts, s1);
     CHECK(l->size == 4 && l->align == 4);
     CHECK(l->bits[0].pos == 0 && l->bits[1].pos == 3 && l->bits[2].pos == 16);
@@ -260,9 +260,9 @@ static void bitfields(void)
           l->bits[2].shift == 13);
     CHECK(l->bits[3].unit_offset == 7 && l->bits[3].unit_type == IR_I8 &&
           l->bits[3].shift == 0);
-    layouts_free(&layouts);
-    CHECK(layouts_init(&layouts, TARGET_WINDOWS_ARM64, &m, error,
-                       sizeof error));
+    layout_free(&layouts);
+    CHECK(layout_init(&layouts, TARGET_WINDOWS_ARM64, &m, error,
+                      sizeof error));
     l = layout_agg(&layouts, s1);
     CHECK(l->size == 12 && l->align == 4);
     CHECK(l->bits[0].pos == 0 && l->bits[1].pos == 32 && l->bits[2].pos == 64);
@@ -272,7 +272,7 @@ static void bitfields(void)
     CHECK(l->size == 24 && l->align == 8);
     CHECK(l->bits[1].pos == 32 && l->bits[2].pos == 64 &&
           l->bits[3].pos == 128);
-    layouts_free(&layouts);
+    layout_free(&layouts);
     ir_module_free(&m);
     arena_free(&arena);
 }
@@ -284,9 +284,9 @@ static void refused(struct ir_module *m, enum target target,
     struct layouts layouts;
     char error[200] = "";
 
-    CHECK(!layouts_init(&layouts, target, m, error, sizeof error));
+    CHECK(!layout_init(&layouts, target, m, error, sizeof error));
     CHECK_STR(error, expected);
-    layouts_free(&layouts);
+    layout_free(&layouts);
 }
 
 /* The least signed value divided by -1 has no value at the width of the
@@ -342,9 +342,9 @@ static bool fold_shift(enum target target, enum ir_op op, uint32_t count_of,
     }
     shifted = ir_sym_op(&m, op, IR_I64, ir_sym_int(&m, IR_I64, 1), count);
     error[0] = '\0';
-    ok = layouts_init(&layouts, target, &m, error, error_size) &&
+    ok = layout_init(&layouts, target, &m, error, error_size) &&
          layout_fold(&layouts, shifted, value);
-    layouts_free(&layouts);
+    layout_free(&layouts);
     ir_module_free(&m);
     arena_free(&arena);
     return ok;
@@ -505,7 +505,7 @@ static void zero_width(void)
     s6 = ir_struct_add(&m, IR_AGG_STRUCT, "main.S6", fields, 2, false, 0);
     for (i = 0; i < sizeof facts / sizeof facts[0]; i++) {
         const struct zero_width_facts *f = &facts[i];
-        CHECK(layouts_init(&layouts, f->target, &m, error, sizeof error));
+        CHECK(layout_init(&layouts, f->target, &m, error, sizeof error));
         l = layout_agg(&layouts, s1);
         CHECK(l->size == f->s1_size && l->align == f->s1_align &&
               l->offsets[2] == f->s1_b && l->member_count == 2);
@@ -522,7 +522,7 @@ static void zero_width(void)
               l->bits[2].pos == f->p2_b);
         l = layout_agg(&layouts, s6);
         CHECK(l->size == f->s6_size);
-        layouts_free(&layouts);
+        layout_free(&layouts);
     }
     ir_module_free(&m);
     arena_free(&arena);

@@ -1295,7 +1295,7 @@ static bool split_slots(struct ir_function *f)
     return changed;
 }
 
-void ir_optimize_function(struct ir_function *f)
+void optimize_function(struct ir_function *f)
 {
     bool changed = true;
 
@@ -1419,13 +1419,13 @@ static void remove_unused_functions(struct ir_module *m, const char *entry,
     free(global_map);
 }
 
-void ir_optimize(struct ir_module *program, const char *entry)
+void optimize_program(struct ir_module *program, const char *entry)
 {
     size_t i;
 
     for (i = 0; i < program->function_count; i++) {
         if (!program->functions[i]->is_extern) {
-            ir_optimize_function(program->functions[i]);
+            optimize_function(program->functions[i]);
         }
     }
     remove_unused_functions(program, entry, false);
@@ -1456,7 +1456,7 @@ static void drop_data(struct ir_global *g)
     g->is_extern = true;
 }
 
-void ir_optimize_module(struct ir_module *program, const char *module)
+void optimize_module(struct ir_module *program, const char *module)
 {
     size_t i;
 
@@ -1471,7 +1471,7 @@ void ir_optimize_module(struct ir_module *program, const char *module)
             strcmp(f->module, RUNTIME_MODULE) != 0) {
             drop_body(f);
         } else {
-            ir_optimize_function(f);
+            optimize_function(f);
         }
     }
     /* DESIGN: the object of a module holds the one copy of its data, and
@@ -1504,7 +1504,7 @@ static enum ir_op without_overflow(enum ir_op op)
    the block that follows it. Dropping the checks also turns every
    overflow operation back into its arithmetic, so a build without them
    emits what it emitted before they existed. */
-void ir_drop_failures(struct ir_module *program, enum ir_fail kind)
+void optimize_drop_failures(struct ir_module *program, enum ir_fail kind)
 {
     size_t i;
     size_t b;

@@ -135,7 +135,7 @@ static void emit_function(struct text *out, enum target t, enum cpu_level cpu,
     }
     debug_open(debug, out, f->ir);
     for (b = 0; b < f->block_count; b++) {
-        block_label(out, t, text_cstr(&symbol), b);
+        target_block_label(out, t, text_cstr(&symbol), b);
         text_append(out, ":\n");
         for (i = 0; i < f->blocks[b].count; i++) {
             debug_at(debug, out, f->blocks[b].insts[i].line);
@@ -167,8 +167,8 @@ static void emit_entry(struct text *out, enum target t,
         const struct ir_function *f = m->functions[i];
         if (!f->is_extern && f->module != NULL &&
             strcmp(f->module, module) == 0 && strcmp(f->name, "main") == 0) {
-            mangle(&entry, t, RUNTIME_MODULE, RUNTIME_ENTRY);
-            mangle(&main_symbol, t, module, "main");
+            target_mangle(&entry, t, RUNTIME_MODULE, RUNTIME_ENTRY);
+            target_mangle(&main_symbol, t, module, "main");
             text_appendf(out, "    .globl %s\n", text_cstr(&entry));
             text_appendf(out, "    .set %s, %s\n", text_cstr(&entry),
                          text_cstr(&main_symbol));
@@ -239,10 +239,10 @@ static bool reloc_at(struct text *out, enum target t,
         if (g->relocs[i].fn) {
             mach_function_symbol(out, t, m->functions[g->relocs[i].global]);
         } else if (m->globals[g->relocs[i].global]->exported) {
-            c_symbol(out, t, m->globals[g->relocs[i].global]->name);
+            target_c_symbol(out, t, m->globals[g->relocs[i].global]->name);
         } else {
-            mangle(out, t, m->globals[g->relocs[i].global]->module,
-                   m->globals[g->relocs[i].global]->name);
+            target_mangle(out, t, m->globals[g->relocs[i].global]->module,
+                          m->globals[g->relocs[i].global]->name);
         }
         return true;
     }
@@ -263,9 +263,9 @@ static void emit_global(struct text *out, enum target t,
     bool once = link_once(g->name, module);
 
     if (g->exported) {
-        c_symbol(&name, t, g->name);
+        target_c_symbol(&name, t, g->name);
     } else {
-        mangle(&name, t, g->module, g->name);
+        target_mangle(&name, t, g->module, g->name);
     }
     if (once) {
         comdat_open(out, t, section, text_cstr(&name));
@@ -365,9 +365,9 @@ static void emit_imports(struct text *out, enum target t,
             continue;
         }
         if (g->exported) {
-            c_symbol(&name, t, g->name);
+            target_c_symbol(&name, t, g->name);
         } else {
-            mangle(&name, t, g->module, g->name);
+            target_mangle(&name, t, g->module, g->name);
         }
         for (j = 0; j < g->reloc_count; j++) {
             if (imported(t, m, &g->relocs[j])) {
@@ -378,7 +378,7 @@ static void emit_imports(struct text *out, enum target t,
         }
         text_free(&name);
     }
-    c_symbol(&symbol, t, "anti_rt_imports");
+    target_c_symbol(&symbol, t, "anti_rt_imports");
     text_appendf(out, "    .section %s\n    .p2align 3\n    .globl %s\n%s:\n"
                  "    .quad %zu\n    .quad 0\n%s",
                  mutable_sections[target_info(t)->format], text_cstr(&symbol),
@@ -529,9 +529,9 @@ void emit_names(struct text *out, enum target t, const struct ir_module *m,
             continue;
         }
         if (g->exported) {
-            c_symbol(&name, t, g->name);
+            target_c_symbol(&name, t, g->name);
         } else {
-            mangle(&name, t, g->module, g->name);
+            target_mangle(&name, t, g->module, g->name);
         }
         text_appendf(out, "%s DATA\n", text_cstr(&name));
         text_free(&name);
@@ -545,7 +545,7 @@ void emit_constructor(struct text *out, enum target t, const char *function)
 {
     struct text symbol = {0};
 
-    c_symbol(&symbol, t, function);
+    target_c_symbol(&symbol, t, function);
     text_appendf(out, "    .section %s\n    .p2align 3\n    .quad %s\n",
                  constructor_sections[target_info(t)->format],
                  text_cstr(&symbol));
@@ -562,7 +562,7 @@ void emit_licenses(struct text *out, enum target t, const char *bytes,
     if (length > 0) {
         memcpy(text, bytes, length);
     }
-    c_symbol(&symbol, t, "anti_licenses");
+    target_c_symbol(&symbol, t, "anti_licenses");
     text_appendf(out, "    .section %s\n    .globl %s\n%s:\n",
                  data_sections[target_info(t)->format], text_cstr(&symbol),
                  text_cstr(&symbol));

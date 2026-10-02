@@ -136,10 +136,15 @@ struct mach_inst *mach_append(struct mach_block *b);
 struct mach_inst *mach_add(struct mach_block *b, unsigned op, size_t count,
                            const struct mach_operand *operands);
 
-/* Operands both back ends build. mach_widened gives o with the width w
-   when it is a register. mach_mem gives memory of width bits at offset
+/* Operands both back ends build. mach_vreg and mach_preg give a virtual
+   and a physical register of width bits, and mach_imm an immediate of
+   64 bits. mach_widened gives o with the width w when it is a
+   register. mach_mem gives memory of width bits at offset
    after the address in register base. mach_cond_op gives a condition
    code, and mach_block_op the label of the IR block o names. */
+struct mach_operand mach_vreg(uint32_t vreg, uint8_t width);
+struct mach_operand mach_preg(uint32_t preg, uint8_t width);
+struct mach_operand mach_imm(int64_t value);
 struct mach_operand mach_widened(struct mach_operand o, uint8_t w);
 struct mach_operand mach_mem(struct mach_operand base, int64_t offset,
                              uint8_t bits);

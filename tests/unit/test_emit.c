@@ -45,9 +45,9 @@ static void assemble(const char *source, enum target target, bool one_module,
     } else {
         lower_module(module, "main", &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
         if (one_module) {
-            ir_optimize_module(&ir, "main");
+            optimize_module(&ir, "main");
         } else {
-            ir_optimize(&ir, "main");
+            optimize_program(&ir, "main");
         }
         functions = calloc(ir.function_count + 1, sizeof *functions);
         ok = select_module(target, cpu_default(target), &ir, functions, error,

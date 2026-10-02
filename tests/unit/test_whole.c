@@ -946,7 +946,7 @@ static void reach_follows_declarations(void)
     options.release = true;
     CHECK(whole_program(&m, &options, &errors));
     CHECK(has_runtime_global(&m, "anti_rt_registry"));
-    ir_optimize(&m, "main");
+    optimize_program(&m, "main");
     CHECK(has_function(&m, "lib", "helper"));
     text_free(&errors);
     ir_module_free(&m);
@@ -972,7 +972,7 @@ static void reach_takes_the_unit(void)
     options.library = true;
     CHECK(whole_program(&m, &options, &errors));
     CHECK(has_runtime_global(&m, "anti_rt_registry"));
-    ir_optimize(&m, "lib");
+    optimize_program(&m, "lib");
     CHECK(has_function(&m, "anti.collection.list", "List<int>.make"));
     text_free(&errors);
     ir_module_free(&m);

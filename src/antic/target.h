@@ -79,8 +79,8 @@ struct target_info {
 
 const char *target_name(enum target t);
 const struct target_info *target_info(enum target t);
-const char *object_format_name(enum object_format format);
-const char *convention_name(enum convention convention);
+const char *target_format_name(enum object_format format);
+const char *target_convention_name(enum convention convention);
 
 /* Store the target antic runs on. Returns false on a host that is not
    one of the six targets, and stores TARGET_COUNT. The platform layer,
@@ -90,16 +90,16 @@ bool target_from_name(const char *name, enum target *t);
 
 /* Append the symbol of function name in module to out. t is one of the
    six targets. */
-void mangle(struct text *out, enum target t, const char *module,
-            const char *name);
+void target_mangle(struct text *out, enum target t, const char *module,
+                   const char *name);
 
 /* Append the symbol of the C function name as a C compiler for target t
    writes it. Mach-O adds a leading _, and ELF and COFF keep the name. */
-void c_symbol(struct text *out, enum target t, const char *name);
+void target_c_symbol(struct text *out, enum target t, const char *name);
 
 /* Append the label of block number block in the function with symbol
    function. The prefix keeps the label out of the symbol table. */
-void block_label(struct text *out, enum target t, const char *function,
-                 size_t block);
+void target_block_label(struct text *out, enum target t, const char *function,
+                        size_t block);
 
 #endif

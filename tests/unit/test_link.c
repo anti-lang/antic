@@ -236,8 +236,8 @@ static void relative_paths(void)
 }
 
 /* src/rt/platform.h names the runtime entry that src/rt/start.c calls in
-   the form that mangle writes for each object format, as an assembler
-   label, so that the link finds it. */
+   the form that target_mangle writes for each object format, as an
+   assembler label, so that the link finds it. */
 static void runtime_entry(void)
 {
     static const enum target formats[] = {
@@ -259,7 +259,7 @@ static void runtime_entry(void)
     for (i = 0; i < sizeof formats / sizeof formats[0]; i++) {
         struct text symbol = {0};
         struct text quoted = {0};
-        mangle(&symbol, formats[i], RUNTIME_MODULE, RUNTIME_ENTRY);
+        target_mangle(&symbol, formats[i], RUNTIME_MODULE, RUNTIME_ENTRY);
         text_appendf(&quoted, "__asm__(\"%s\")", text_cstr(&symbol));
         CHECK(strstr(text_cstr(&start), text_cstr(&quoted)) != NULL);
         text_free(&symbol);
@@ -374,16 +374,17 @@ static void libraries(void)
     struct link_command c;
     struct text line = {0};
 
-    archive_command(&c, TARGET_MACOS_ARM64, "/tc/llvm-ar", "libgeo.a",
-                    members, 2);
+    link_archive_command(&c, TARGET_MACOS_ARM64, "/tc/llvm-ar", "libgeo.a",
+                         members, 2);
     joined(&c, "/tc/llvm-ar --format=darwin rcs libgeo.a geo.o "
                "geo.package.o");
     link_command_free(&c);
-    archive_command(&c, TARGET_LINUX_ARM64, "llvm-ar", "libgeo.a", members, 1);
+    link_archive_command(&c, TARGET_LINUX_ARM64, "llvm-ar", "libgeo.a",
+                         members, 1);
     joined(&c, "llvm-ar --format=gnu rcs libgeo.a geo.o");
     link_command_free(&c);
-    archive_command(&c, TARGET_WINDOWS_X86_64, "llvm-ar", "geo.lib", members,
-                    1);
+    link_archive_command(&c, TARGET_WINDOWS_X86_64, "llvm-ar", "geo.lib",
+                         members, 1);
     joined(&c, "llvm-ar --format=coff rcs geo.lib geo.o");
     link_command_free(&c);
 
@@ -415,13 +416,13 @@ static void libraries(void)
            "geo.obj C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
            "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
 
-    relocatable_command(&c, TARGET_MACOS_ARM64, &in, "joined.o",
-                        joined_inputs, 3);
+    link_relocatable_command(&c, TARGET_MACOS_ARM64, &in, "joined.o",
+                             joined_inputs, 3);
     joined(&c, "ld -r -keep_private_externs -arch arm64 -o joined.o geo.o "
                "init.c.o utf.c.o");
     link_command_free(&c);
-    relocatable_command(&c, TARGET_LINUX_X86_64, &in, "joined.o",
-                        joined_inputs, 3);
+    link_relocatable_command(&c, TARGET_LINUX_X86_64, &in, "joined.o",
+                             joined_inputs, 3);
     joined(&c, "ld -r -o joined.o geo.o init.c.o utf.c.o");
     link_command_free(&c);
 
@@ -453,13 +454,13 @@ static void libraries(void)
            "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/aarch64 geo.obj "
            "/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib libvcruntime.lib "
            "ucrt.lib legacy_stdio_definitions.lib");
-    relocatable_command(&c, TARGET_MACOS_ARM64, &in, "joined.o",
-                        joined_inputs, 3);
+    link_relocatable_command(&c, TARGET_MACOS_ARM64, &in, "joined.o",
+                             joined_inputs, 3);
     joined(&c, "ld -r -keep_private_externs -arch arm64 -o joined.o geo.o "
                "init.c.o utf.c.o");
     link_command_free(&c);
-    relocatable_command(&c, TARGET_LINUX_ARM64, &in, "joined.o",
-                        joined_inputs, 3);
+    link_relocatable_command(&c, TARGET_LINUX_ARM64, &in, "joined.o",
+                             joined_inputs, 3);
     joined(&c, "/rt/bin/ld.lld -r -o joined.o geo.o init.c.o utf.c.o");
     link_command_free(&c);
 

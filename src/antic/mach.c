@@ -39,6 +39,36 @@ struct mach_inst *mach_add(struct mach_block *b, unsigned op, size_t count,
     return inst;
 }
 
+struct mach_operand mach_vreg(uint32_t vreg, uint8_t width)
+{
+    struct mach_operand o;
+
+    memset(&o, 0, sizeof o);
+    o.kind = MACH_VREG;
+    o.width = width;
+    o.reg = vreg;
+    return o;
+}
+
+struct mach_operand mach_preg(uint32_t preg, uint8_t width)
+{
+    struct mach_operand o = mach_vreg(preg, width);
+
+    o.kind = MACH_PREG;
+    return o;
+}
+
+struct mach_operand mach_imm(int64_t value)
+{
+    struct mach_operand o;
+
+    memset(&o, 0, sizeof o);
+    o.kind = MACH_IMM;
+    o.width = 64;
+    o.value = value;
+    return o;
+}
+
 struct mach_operand mach_widened(struct mach_operand o, uint8_t w)
 {
     if (o.kind == MACH_VREG || o.kind == MACH_PREG) {
@@ -157,8 +187,8 @@ void mach_symbol(struct text *out, const struct ir_module *m,
         if (names == NULL) {
             text_appendf(out, "b%" PRId64, o->value);
         } else {
-            block_label(out, names->target, names->function,
-                        (size_t)o->value);
+            target_block_label(out, names->target, names->function,
+                               (size_t)o->value);
         }
         break;
     case MACH_FUNC:
@@ -174,16 +204,16 @@ void mach_symbol(struct text *out, const struct ir_module *m,
         if (names == NULL) {
             ir_name_append(out, g->module, g->name);
         } else if (g->exported) {
-            c_symbol(out, names->target, g->name);
+            target_c_symbol(out, names->target, g->name);
         } else {
-            mangle(out, names->target, g->module, g->name);
+            target_mangle(out, names->target, g->module, g->name);
         }
         break;
     case MACH_NAME:
         if (names == NULL) {
             text_append(out, o->name);
         } else {
-            c_symbol(out, names->target, o->name);
+            target_c_symbol(out, names->target, o->name);
         }
         break;
     default:
@@ -195,8 +225,8 @@ void mach_function_symbol(struct text *out, enum target t,
                           const struct ir_function *f)
 {
     if (f->module == NULL || f->exported) {
-        c_symbol(out, t, f->name);
+        target_c_symbol(out, t, f->name);
     } else {
-        mangle(out, t, f->module, f->name);
+        target_mangle(out, t, f->module, f->name);
     }
 }

@@ -42,7 +42,7 @@ static void optimizes(const char *source, const char *expected)
                 text_cstr(&errors));
     } else {
         lower_module(module, "main", &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
-        ir_optimize(&ir, "main");
+        optimize_program(&ir, "main");
         ir_print(&out, &ir);
         CHECK_STR(text_cstr(&out), expected);
         if (!ir_verify(&ir, &errors)) {
@@ -86,7 +86,7 @@ static void one_module(void)
     arg = ir_int_op(IR_I64, 3);
     v = ir_call(main_fn, b, IR_I64, ir_func_op(lib), &arg, 1);
     ir_ret(main_fn, b, IR_I64, ir_temp_op(main_fn, v));
-    ir_optimize_module(&m, "main");
+    optimize_module(&m, "main");
     ir_print(&out, &m);
     CHECK_STR(text_cstr(&out),
               "extern fn com.example.lib.seven(i64) -> i64\n"
@@ -123,7 +123,7 @@ static void jump_cycle(void)
     ir_jump(f, b0, b1);
     ir_jump(f, b1, b2);
     ir_jump(f, b2, b1);
-    ir_optimize(&m, "main");
+    optimize_program(&m, "main");
     ir_print(&out, &m);
     CHECK_STR(text_cstr(&out), "fn main.loop() {\n"
                                "b0:\n"
@@ -160,7 +160,7 @@ static void deep_chain(void)
     }
     ir_ret(f, blocks[CHAIN - 1], IR_VOID, ir_int_op(IR_I64, 0));
     ir_ret(f, blocks[CHAIN], IR_VOID, ir_int_op(IR_I64, 0));
-    ir_optimize(&m, "main");
+    optimize_program(&m, "main");
     CHECK(m.function_count == 1);
     CHECK(m.functions[0]->block_count == CHAIN + 1);
     free(blocks);
@@ -214,7 +214,7 @@ static void forward_after_write(int which)
     at = ir_ptradd(f, b, ir_temp_op(f, p), ir_temp_op(f, off));
     r = ir_load(f, b, IR_I64, ir_temp_op(f, at));
     ir_ret(f, b, IR_I64, ir_temp_op(f, r));
-    ir_optimize(&m, "main");
+    optimize_program(&m, "main");
     ir_print(&out, &m);
     if (strstr(text_cstr(&out), "load i64") == NULL) {
         check_failures++;
@@ -276,7 +276,7 @@ static void symbolic_offsets(bool slot)
     at = ir_ptradd(f, b, ir_temp_op(f, base), clean);
     r = ir_load(f, b, IR_I64, ir_temp_op(f, at));
     ir_ret(f, b, IR_I64, ir_temp_op(f, r));
-    ir_optimize(&m, "main");
+    optimize_program(&m, "main");
     ir_print(&out, &m);
     if (strstr(text_cstr(&out), "ret i64 7") == NULL) {
         check_failures++;
