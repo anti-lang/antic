@@ -16,7 +16,7 @@
 #include "text.h"
 
 void unit_options(struct options *o, const char *package, const char *runtime,
-                  const char **roots, size_t root_count, enum target target,
+                  const char *const *roots, size_t root_count, enum target target,
                   enum cpu_level cpu)
 {
     memset(o, 0, sizeof *o);

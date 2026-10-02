@@ -24,7 +24,7 @@
    comes from the package header of the library file, so the name of the
    file and the separators of its path decide nothing. */
 int bind_header(const char *library, const char *out_dir,
-                const char *runtime, const char **roots, size_t root_count)
+                const char *runtime, const char *const *roots, size_t root_count)
 {
     struct options o;
     struct arena arena = {0};

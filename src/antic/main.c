@@ -143,9 +143,33 @@ static const char *value_of(int argc, char **argv, int *i)
     return argv[*i];
 }
 
-static int run(int argc, char **argv, struct options *o)
+/* The arrays behind the lists of struct options, one slot per argument.
+   run fills them, and the options read them through const. */
+struct lists {
+    const char **libraries;
+    const char **objects;
+    const char **roots;
+    const char **dependencies;
+    const char **attribution;
+    const char **frameworks;
+    const char **linux_libraries;
+    const char **trace_patterns;
+    const char **inject;
+};
+
+static int run(int argc, char **argv, const struct lists *l)
 {
-    struct options options = *o;
+    struct options options = {
+        .libraries = l->libraries,
+        .objects = l->objects,
+        .roots = l->roots,
+        .dependencies = l->dependencies,
+        .attribution = l->attribution,
+        .frameworks = l->frameworks,
+        .linux_libraries = l->linux_libraries,
+        .trace_patterns = l->trace_patterns,
+        .inject = l->inject,
+    };
     bool have_host = target_host(&options.target);
     const char *target = NULL;
     const char *cpu = NULL;
@@ -276,7 +300,7 @@ static int run(int argc, char **argv, struct options *o)
                 if (strcmp(pattern, "writes") == 0) {
                     options.trace_writes = true;
                 } else {
-                    options.trace_patterns[options.trace_pattern_count++] =
+                    l->trace_patterns[options.trace_pattern_count++] =
                         pattern;
                 }
             } else {
@@ -317,14 +341,14 @@ static int run(int argc, char **argv, struct options *o)
             if (value == NULL) {
                 return 2;
             }
-            options.frameworks[options.framework_count++] = value;
+            l->frameworks[options.framework_count++] = value;
             continue;
         } else if (strcmp(arg, "--linux-lib") == 0) {
             const char *value = value_of(argc, argv, &i);
             if (value == NULL) {
                 return 2;
             }
-            options.linux_libraries[options.linux_library_count++] = value;
+            l->linux_libraries[options.linux_library_count++] = value;
             continue;
         } else if (strcmp(arg, "--inject") == 0) {
             const char *value = value_of(argc, argv, &i);
@@ -337,7 +361,7 @@ static int run(int argc, char **argv, struct options *o)
                                 "found %s\n", value);
                 return 2;
             }
-            options.inject[options.inject_count++] = value;
+            l->inject[options.inject_count++] = value;
             continue;
         } else if (strcmp(arg, "--dependency") == 0 ||
                    strcmp(arg, "--attribution") == 0) {
@@ -346,9 +370,9 @@ static int run(int argc, char **argv, struct options *o)
                 return 2;
             }
             if (arg[2] == 'd') {
-                options.dependencies[options.dependency_count++] = value;
+                l->dependencies[options.dependency_count++] = value;
             } else {
-                options.attribution[options.attribution_count++] = value;
+                l->attribution[options.attribution_count++] = value;
             }
             continue;
         } else if (strcmp(arg, "--package-name") == 0) {
@@ -360,7 +384,7 @@ static int run(int argc, char **argv, struct options *o)
         } else if (strcmp(arg, "--license-text") == 0) {
             slot = &options.license_text;
         } else if (strcmp(arg, "-I") == 0) {
-            if ((options.roots[options.root_count] =
+            if ((l->roots[options.root_count] =
                      value_of(argc, argv, &i)) == NULL) {
                 return 2;
             }
@@ -380,10 +404,10 @@ static int run(int argc, char **argv, struct options *o)
             fprintf(stderr, "antic: unknown option %s\n", arg);
             return usage(stderr);
         } else if (ends_with(arg, ANTL_SUFFIX)) {
-            options.libraries[options.library_count++] = arg;
+            l->libraries[options.library_count++] = arg;
             continue;
         } else if (link_is_input(arg)) {
-            options.objects[options.object_count++] = arg;
+            l->objects[options.object_count++] = arg;
             continue;
         } else if (options.input == NULL) {
             options.input = arg;
@@ -441,33 +465,31 @@ static int run(int argc, char **argv, struct options *o)
 
 int main(int argc, char **argv)
 {
-    struct options options = {0};
+    struct lists lists;
     int status;
 
     argv = platform_arguments(argv);
     /* At most argc - 1 arguments are library files or link inputs. */
-    options.libraries = alloc_zeroed((size_t)argc, sizeof *options.libraries);
-    options.objects = alloc_zeroed((size_t)argc, sizeof *options.objects);
-    options.roots = alloc_zeroed((size_t)argc, sizeof *options.roots);
-    options.dependencies =
-        alloc_zeroed((size_t)argc, sizeof *options.dependencies);
-    options.attribution =
-        alloc_zeroed((size_t)argc, sizeof *options.attribution);
-    options.frameworks = alloc_zeroed((size_t)argc, sizeof *options.frameworks);
-    options.linux_libraries =
-        alloc_zeroed((size_t)argc, sizeof *options.linux_libraries);
-    options.trace_patterns =
-        alloc_zeroed((size_t)argc, sizeof *options.trace_patterns);
-    options.inject = alloc_zeroed((size_t)argc, sizeof *options.inject);
-    status = run(argc, argv, &options);
-    free((void *)options.libraries);
-    free((void *)options.objects);
-    free((void *)options.roots);
-    free((void *)options.dependencies);
-    free((void *)options.attribution);
-    free((void *)options.frameworks);
-    free((void *)options.linux_libraries);
-    free((void *)options.trace_patterns);
-    free((void *)options.inject);
+    lists.libraries = alloc_zeroed((size_t)argc, sizeof *lists.libraries);
+    lists.objects = alloc_zeroed((size_t)argc, sizeof *lists.objects);
+    lists.roots = alloc_zeroed((size_t)argc, sizeof *lists.roots);
+    lists.dependencies = alloc_zeroed((size_t)argc, sizeof *lists.dependencies);
+    lists.attribution = alloc_zeroed((size_t)argc, sizeof *lists.attribution);
+    lists.frameworks = alloc_zeroed((size_t)argc, sizeof *lists.frameworks);
+    lists.linux_libraries =
+        alloc_zeroed((size_t)argc, sizeof *lists.linux_libraries);
+    lists.trace_patterns =
+        alloc_zeroed((size_t)argc, sizeof *lists.trace_patterns);
+    lists.inject = alloc_zeroed((size_t)argc, sizeof *lists.inject);
+    status = run(argc, argv, &lists);
+    free(lists.libraries);
+    free(lists.objects);
+    free(lists.roots);
+    free(lists.dependencies);
+    free(lists.attribution);
+    free(lists.frameworks);
+    free(lists.linux_libraries);
+    free(lists.trace_patterns);
+    free(lists.inject);
     return status;
 }

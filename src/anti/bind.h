@@ -10,7 +10,7 @@
    imports, and runtime holds the library files of the runtime archive.
    Returns the exit status of the command. */
 int bind_header(const char *library, const char *out_dir,
-                const char *runtime, const char **roots, size_t root_count);
+                const char *runtime, const char *const *roots, size_t root_count);
 
 /* `anti bind <api.json>` and `anti bind --clang <header>`. */
 struct bind_request {
@@ -20,7 +20,7 @@ struct bind_request {
     const char *out_dir;
     const char *runtime;
     const char *target;         /* NULL: the host */
-    const char **includes;
+    const char *const *includes;
     size_t include_count;
     const char *const *defines;
     size_t define_count;

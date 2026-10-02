@@ -49,7 +49,7 @@ struct doc_blocks {
 /* The options every call of the run shares, over the options of a
    project compile that unit_options gives. */
 static bool base_options(struct options *o, const char *package,
-                         const char *runtime, const char **roots,
+                         const char *runtime, const char *const *roots,
                          size_t root_count)
 {
     enum target target;

@@ -22,11 +22,11 @@ struct options {
     const char *output;         /* NULL: input without .anti. */
     const char *llvm_mc;        /* NULL: llvm-mc from PATH. */
     const char *runtime;        /* Holds lib/<target>/. */
-    const char **libraries;     /* The .antl files. */
+    const char *const *libraries;     /* The .antl files. */
     size_t library_count;
-    const char **objects;       /* Object files and archives to link. */
+    const char *const *objects;       /* Object files and archives to link. */
     size_t object_count;
-    const char **roots;         /* -I, the search roots of module paths. */
+    const char *const *roots;         /* -I, the search roots of module paths. */
     size_t root_count;
     bool internal;              /* --anti-internal, allow anti. paths. */
     bool strip_docs;            /* --strip-docs, no doc text with -c. */
@@ -84,14 +84,14 @@ struct options {
     enum { TRACE_MODE, TRACE_ON, TRACE_OFF } trace;
     bool trace_writes;          /* --trace writes */
     bool no_hooks;              /* --no-hooks */
-    const char **trace_patterns;    /* --trace <pattern> */
+    const char *const *trace_patterns;    /* --trace <pattern> */
     size_t trace_pattern_count;
     /* DESIGN: --inject Interface=Provider names the provider of an
        injectable interface, once per interface. `anti build` passes the
        `[inject]` table of the manifest and `anti test` the
        `[inject.test]` table over it. The link refuses an interface the
        program injects and the table does not name. */
-    const char **inject;            /* --inject Interface=Provider */
+    const char *const *inject;            /* --inject Interface=Provider */
     size_t inject_count;
     enum { LIB_NONE, LIB_STATIC, LIB_SHARED } lib; /* --lib static|shared */
     bool bundle_runtime;        /* --bundle-runtime, with --lib static. */
@@ -107,20 +107,20 @@ struct options {
        because a plugin resolves those symbols against its host. */
     bool closed;
     const char *llvm_ar;        /* NULL: llvm-ar from PATH. */
-    const char **frameworks;    /* --framework, macOS frameworks of Apple's
+    const char *const *frameworks;    /* --framework, macOS frameworks of Apple's
                                    SDK. */
     size_t framework_count;
-    const char **linux_libraries; /* --linux-lib, libraries of the glibc
+    const char *const *linux_libraries; /* --linux-lib, libraries of the glibc
                                      sysroot. */
     size_t linux_library_count;
     enum linker linker;         /* --linker lld|platform, lld by default. */
     const char *package_name;   /* --package-name, of the header. */
     const char *package_version;
-    const char **dependencies;  /* --dependency <name>,<constraint>,<url> */
+    const char *const *dependencies;  /* --dependency <name>,<constraint>,<url> */
     size_t dependency_count;
     const char *license;        /* --license, an SPDX identifier. */
     const char *license_text;   /* --license-text, a file. */
-    const char **attribution;   /* --attribution, one line each. */
+    const char *const *attribution;   /* --attribution, one line each. */
     size_t attribution_count;
     bool library;               /* -c, write a library file. */
     bool assembly_only;         /* -S, stop after assembly. */
@@ -156,14 +156,14 @@ bool driver_libraries(const struct options *options, struct arena *arena,
    against what the binding declares. The names go into the memory pool.
    Returns false when a file cannot be read. */
 bool driver_frameworks(const char *const *paths, size_t count,
-                       struct arena *arena, const char ***names,
+                       struct arena *arena, const char *const **names,
                        size_t *name_count);
 
 /* The libraries that the `link linux` lines of the library files name,
    as driver_frameworks gives the frameworks. `anti` passes them to antic
    as --linux-lib. */
 bool driver_linux_libraries(const char *const *paths, size_t count,
-                            struct arena *arena, const char ***names,
+                            struct arena *arena, const char *const **names,
                             size_t *name_count);
 
 struct interface;

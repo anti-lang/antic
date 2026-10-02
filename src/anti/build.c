@@ -93,9 +93,9 @@ struct build {
        the `link linux` lines of every library file the program reaches.
        The link passes them as --framework and --linux-lib. */
     struct arena framework_arena;
-    const char **frameworks;
+    const char *const *frameworks;
     size_t framework_count;
-    const char **linux_libraries;
+    const char *const *linux_libraries;
     size_t linux_library_count;
 };
 

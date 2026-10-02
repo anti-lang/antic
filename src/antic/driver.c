@@ -678,16 +678,22 @@ static bool host_exports(const struct options *o, const char *object,
    and PCRE2 from lib/<target>/ of the runtime archive after its own
    objects. Both are built for the default level of the target alone. A
    program below that level is refused with the level of each, in the
-   words of "CPU levels" in docs/anti-language-additions.md. out holds the
-   objects of the command line and the two libraries. */
+   words of "CPU levels" in docs/anti-language-additions.md. *out is a new
+   list of the objects of the command line, and of the two libraries when
+   the program holds `anti.regex`. The caller frees it with free, whether
+   the call succeeded or not. */
 static bool native_inputs(const struct options *o, const struct extras *extras,
                           struct text *glue, struct text *pcre2,
                           const char ***out, size_t *count)
 {
     enum cpu_level level = cpu_default(o->target);
-    const char **list;
+    const char **list = alloc_zeroed(o->object_count + 2, sizeof *list);
 
-    *out = o->objects;
+    /* memcpy takes no null pointer, even for no bytes. */
+    if (o->object_count > 0) {
+        memcpy(list, o->objects, o->object_count * sizeof *list);
+    }
+    *out = list;
     *count = o->object_count;
     if (!extras->regex) {
         return true;
@@ -701,13 +707,8 @@ static bool native_inputs(const struct options *o, const struct extras *extras,
     }
     link_native_library(glue, o->runtime, o->target, NATIVE_REGEX_GLUE);
     link_native_library(pcre2, o->runtime, o->target, NATIVE_PCRE2);
-    list = alloc_zeroed(o->object_count + 2, sizeof *list);
-    if (o->object_count > 0) {
-        memcpy(list, o->objects, o->object_count * sizeof *list);
-    }
     list[o->object_count] = text_cstr(glue);
     list[o->object_count + 1] = text_cstr(pcre2);
-    *out = list;
     *count = o->object_count + 2;
     return true;
 }
@@ -742,7 +743,7 @@ static bool link_program(const struct options *o, const char *object,
 {
     struct text glue = {0};
     struct text pcre2 = {0};
-    const char **extra;
+    const char **extra = NULL;
     size_t extra_count;
     struct link_inputs in;
     struct link_command command;
@@ -754,6 +755,7 @@ static bool link_program(const struct options *o, const char *object,
     bool ok;
 
     if (!native_inputs(o, extras, &glue, &pcre2, &extra, &extra_count)) {
+        free(extra);
         text_free(&glue);
         text_free(&pcre2);
         return false;
@@ -785,9 +787,7 @@ static bool link_program(const struct options *o, const char *object,
     link_facts_free(&facts);
     text_free(&def);
     text_free(&implib);
-    if (extra != o->objects) {
-        free((void *)extra);
-    }
+    free(extra);
     text_free(&glue);
     text_free(&pcre2);
     return ok;
@@ -1472,6 +1472,21 @@ static bool contains(const struct paths *p, const char *s)
 /* The library files of the compilation. They are the files on the command
    line and, for every import that none of them holds, the file under the
    search roots. The imports of a found file are looked up too. */
+/* The library files of o with the input in front, for a run whose input
+   is itself a library file. The caller frees the list with free. */
+static const char **libraries_with_input(const struct options *o)
+{
+    const char **list = alloc_zeroed(o->library_count + 1, sizeof *list);
+
+    list[0] = o->input;
+    /* memcpy takes no null pointer, even for no bytes, and o->libraries
+       is null when no library was named. */
+    if (o->library_count > 0) {
+        memcpy(list + 1, o->libraries, o->library_count * sizeof *list);
+    }
+    return list;
+}
+
 static bool find_libraries(const struct options *o, const struct module *tree,
                            struct arena *arena, struct paths *out)
 {
@@ -1555,10 +1570,11 @@ bool driver_libraries(const struct options *options, struct arena *arena,
 /* The names of the `link framework` lines, or with linux of the `link
    linux` lines, of the library files, each once. */
 static bool link_names(const char *const *paths, size_t count,
-                       struct arena *arena, const char ***names,
+                       struct arena *arena, const char *const **names,
                        size_t *name_count, bool linux)
 {
     const char **list = NULL;
+    const char **copy;
     size_t n = 0;
     size_t room = 0;
     size_t i;
@@ -1597,24 +1613,25 @@ static bool link_names(const char *const *paths, size_t count,
             list[n++] = name;
         }
     }
-    *names = arena_alloc(arena, (n + 1) * sizeof **names);
+    copy = arena_alloc(arena, (n + 1) * sizeof *copy);
     if (n > 0) {
-        memcpy((void *)*names, (void *)list, n * sizeof *list);
+        memcpy(copy, list, n * sizeof *list);
     }
+    *names = copy;
     *name_count = n;
     free((void *)list);
     return true;
 }
 
 bool driver_frameworks(const char *const *paths, size_t count,
-                       struct arena *arena, const char ***names,
+                       struct arena *arena, const char *const **names,
                        size_t *name_count)
 {
     return link_names(paths, count, arena, names, name_count, false);
 }
 
 bool driver_linux_libraries(const char *const *paths, size_t count,
-                            struct arena *arena, const char ***names,
+                            struct arena *arena, const char *const **names,
                             size_t *name_count)
 {
     return link_names(paths, count, arena, names, name_count, true);
@@ -2049,18 +2066,11 @@ const struct interface *driver_interface(const struct options *o,
     types_init(types, arena);
     if (library_file) {
         struct options with_input = *o;
+        const char **listed = libraries_with_input(o);
         struct module empty;
         struct interface header;
         memset(&empty, 0, sizeof empty);
-        with_input.libraries =
-            alloc_zeroed(o->library_count + 1, sizeof *with_input.libraries);
-        with_input.libraries[0] = o->input;
-        /* memcpy takes no null pointer, even for no bytes, and o->libraries
-           is null when no library was named. */
-        if (o->library_count > 0) {
-            memcpy((void *)(with_input.libraries + 1), (void *)o->libraries,
-                   o->library_count * sizeof *o->libraries);
-        }
+        with_input.libraries = listed;
         with_input.library_count = o->library_count + 1;
         if (!read_bytes(o->input, &source) ||
             !antl_header((const uint8_t *)source.data, source.length, arena,
@@ -2068,15 +2078,15 @@ const struct interface *driver_interface(const struct options *o,
             if (source.length > 0) {
                 fprintf(stderr, "antic: %s %s\n", o->input, error);
             }
-            free((void *)with_input.libraries);
+            free(listed);
             goto done;
         }
         text_append(&module, header.module);
         if (!find_libraries(&with_input, &empty, arena, &paths)) {
-            free((void *)with_input.libraries);
+            free(listed);
             goto done;
         }
-        free((void *)with_input.libraries);
+        free(listed);
         libraries = alloc_zeroed(paths.count + 1, sizeof *libraries);
         if (!load_libraries(&paths, "", arena, types, program, libraries)) {
             goto done;
@@ -2150,6 +2160,7 @@ bool driver_library_header(const struct options *o, struct text *out)
     struct types types;
     struct ir_module program;
     struct options with_input = *o;
+    const char **listed = NULL;
     struct module empty;
     struct interface header;
     struct paths paths = {0};
@@ -2166,15 +2177,8 @@ bool driver_library_header(const struct options *o, struct text *out)
     memset(&empty, 0, sizeof empty);
     types_init(&types, &arena);
     ir_module_init(&program, &arena, "");
-    with_input.libraries =
-        alloc_zeroed(o->library_count + 1, sizeof *with_input.libraries);
-    with_input.libraries[0] = o->input;
-    /* memcpy takes no null pointer, even for no bytes, and o->libraries
-       is null when no library was named. */
-    if (o->library_count > 0) {
-        memcpy((void *)(with_input.libraries + 1), (void *)o->libraries,
-               o->library_count * sizeof *o->libraries);
-    }
+    listed = libraries_with_input(o);
+    with_input.libraries = listed;
     with_input.library_count = o->library_count + 1;
     if (!read_bytes(o->input, &source) ||
         !antl_header((const uint8_t *)source.data, source.length, &arena,
@@ -2219,7 +2223,7 @@ bool driver_library_header(const struct options *o, struct text *out)
     ok = true;
 
 done:
-    free((void *)with_input.libraries);
+    free(listed);
     free((void *)libraries);
     free((void *)paths.items);
     text_free(&source);
@@ -2244,6 +2248,7 @@ static int compile_library_file(const struct options *o,
     struct ir_module program;
     struct module empty;
     struct options with_input = *o;
+    const char **listed = NULL;
     struct interface header;
     struct text bytes = {0};
     struct text verify_errors = {0};
@@ -2255,15 +2260,8 @@ static int compile_library_file(const struct options *o,
     memset(&empty, 0, sizeof empty);
     ir_module_init(&program, &arena, "");
     types_init(&types, &arena);
-    with_input.libraries =
-        alloc_zeroed(o->library_count + 1, sizeof *with_input.libraries);
-    with_input.libraries[0] = o->input;
-    /* memcpy takes no null pointer, even for no bytes, and o->libraries
-       is null when no library was named. */
-    if (o->library_count > 0) {
-        memcpy((void *)(with_input.libraries + 1), (void *)o->libraries,
-               o->library_count * sizeof *o->libraries);
-    }
+    listed = libraries_with_input(o);
+    with_input.libraries = listed;
     with_input.library_count = o->library_count + 1;
     if (!read_bytes(o->input, &bytes)) {
         goto done;
@@ -2304,7 +2302,7 @@ done:
     ir_module_free(&program);
     free((void *)libraries);
     free((void *)paths.items);
-    free((void *)with_input.libraries);
+    free(listed);
     text_free(&bytes);
     text_free(&verify_errors);
     diagnostics_free(&diags);
@@ -2824,13 +2822,15 @@ static bool build_c_library(const struct options *o, const char *object,
         struct text versioned = {0};
         struct text glue = {0};
         struct text pcre2 = {0};
-        const char **extra = o->objects;
+        const char *const *extra = o->objects;
+        const char **owned = NULL;
         size_t extra_count = o->object_count;
         /* A library for C links PCRE2 as a program does. A plugin links
            no runtime, and the glue it calls is the host's. */
         if (!s.plugin) {
-            ok = native_inputs(o, extras, &glue, &pcre2, &extra,
+            ok = native_inputs(o, extras, &glue, &pcre2, &owned,
                                &extra_count);
+            extra = owned;
         }
         memset(&in, 0, sizeof in);
         memset(&facts, 0, sizeof facts);
@@ -2930,9 +2930,7 @@ static bool build_c_library(const struct options *o, const char *object,
         text_free(&def);
         text_free(&exported);
         text_free(&versioned);
-        if (extra != o->objects) {
-            free((void *)extra);
-        }
+        free(owned);
         text_free(&glue);
         text_free(&pcre2);
     }

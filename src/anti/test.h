@@ -20,7 +20,7 @@
 int test_run(const char *const *sources, size_t source_count,
              const char *const *roots, size_t root_count, const char *work,
              const char *package, const char *runtime, const char *llvm_mc,
-             bool release, bool memory_checks, const char **inject,
+             bool release, bool memory_checks, const char *const *inject,
              size_t inject_count);
 
 #endif
