@@ -5,7 +5,6 @@
    members first, and sema_check_classes checks each class once the
    whole module is declared. */
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -615,10 +614,11 @@ static void check_hook(struct checker *c, const struct item *m,
         return;
     }
     if (m->has_self || m->param_count == 0) {
-        snprintf(self, sizeof self, "self");
+        text_format(self, sizeof self, "self");
     } else {
-        snprintf(self, sizeof self, "%.*s: %s", (int)m->params[0].name.length,
-                 m->params[0].name.text, sema_tn(sig->params[0]));
+        text_format(self, sizeof self, "%.*s: %s",
+                    (int)m->params[0].name.length, m->params[0].name.text,
+                    sema_tn(sig->params[0]));
     }
     if (sema_name_is(&m->name, LANG_HOOK_NEXT)) {
         ok = !sig->may_fail && sig->param_count == 1 &&

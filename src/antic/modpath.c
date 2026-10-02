@@ -1,6 +1,5 @@
 #include "modpath.h"
 
-#include <stdio.h>
 #include <string.h>
 
 #include "lexer.h"
@@ -75,14 +74,14 @@ bool module_path_of_source(const char *source, const char *const *roots,
         size_t n = slash != NULL ? (size_t)(slash - rest)
                                  : (size_t)(end - rest);
         if (!is_lower_identifier(rest, n)) {
-            snprintf(error, error_size,
-                     "`%.*s` in %s is not a lowercase identifier", (int)n,
-                     rest, source);
+            text_format(error, error_size,
+                        "`%.*s` in %s is not a lowercase identifier", (int)n,
+                        rest, source);
             return false;
         }
         if (lexer_is_keyword(rest, n)) {
-            snprintf(error, error_size, "`%.*s` in %s is a keyword", (int)n,
-                     rest, source);
+            text_format(error, error_size, "`%.*s` in %s is a keyword", (int)n,
+                        rest, source);
             return false;
         }
         text_appendf(out, "%s%.*s", out->length > 0 ? "." : "", (int)n, rest);

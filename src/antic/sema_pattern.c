@@ -5,7 +5,6 @@
    `to_text` stand here as well. */
 
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "../rt/regex.h"
@@ -71,7 +70,7 @@ static struct symbol *module_function(struct checker *c,
 {
     char named[64];
 
-    snprintf(named, sizeof named, "`%s` calls", what);
+    text_format(named, sizeof named, "`%s` calls", what);
     return sema_std_function(c, pos, named, module, text, count);
 }
 
@@ -280,9 +279,9 @@ static bool method_call(struct checker *c, struct expr *e, bool bytes)
                e->as.call.tested && !e->as.call.handler.none) {
         base = "matched";
     }
-    snprintf(name, sizeof name, "%s%s%s", bytes ? "bytes_" : "", base,
-             literal != NULL ? "_literal" : "");
-    snprintf(what, sizeof what, "%s.%s", bytes ? "data" : "s", m->name);
+    text_format(name, sizeof name, "%s%s%s", bytes ? "bytes_" : "", base,
+                literal != NULL ? "_literal" : "");
+    text_format(what, sizeof what, "%s.%s", bytes ? "data" : "s", m->name);
     count = given + 1 + (literal != NULL ? 1 : 0);
     if ((f = regex_function(c, field->pos, what, name, count)) == NULL) {
         return false;
@@ -554,7 +553,7 @@ static bool convert_call(struct checker *c, struct expr *e, bool bytes)
         sema_error_at(c, e->pos, "`%s` takes no arguments", function);
         return false;
     }
-    snprintf(what, sizeof what, "%s.%s", bytes ? "data" : "s", function);
+    text_format(what, sizeof what, "%s.%s", bytes ? "data" : "s", function);
     f = module_function(c, &text_module, field->pos, what, function, 1);
     if (f == NULL) {
         return false;
@@ -602,10 +601,10 @@ static bool match_call(struct checker *c, struct expr *e, struct type *t)
     if (t->pattern != NULL && !group_known(c, t->pattern, arg, named)) {
         return false;
     }
-    snprintf(name, sizeof name, "%s%s%s",
-             types_is_byte_match(t) ? "bytes_" : "", method,
-             named ? "_named" : "");
-    snprintf(what, sizeof what, "m.%s", method);
+    text_format(name, sizeof name, "%s%s%s",
+                types_is_byte_match(t) ? "bytes_" : "", method,
+                named ? "_named" : "");
+    text_format(what, sizeof what, "m.%s", method);
     if ((f = regex_function(c, field->pos, what, name, 2)) == NULL) {
         return false;
     }

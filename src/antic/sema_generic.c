@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -2069,8 +2068,9 @@ static struct type *hook_value(struct checker *c, struct type *p,
     size_t length = p->name.length + 1 + strlen(hook);
     char *text = arena_alloc(c->arena, length + 1);
 
-    snprintf(text, length + 1, "%.*s.%s", (int)p->name.length, p->name.text,
-             hook);
+    memcpy(text, p->name.text, p->name.length);
+    text[p->name.length] = '.';
+    memcpy(text + p->name.length + 1, hook, strlen(hook) + 1);
     name.text = text;
     name.length = length;
     t = types_param(c->types, name);

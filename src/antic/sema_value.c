@@ -2,7 +2,6 @@
    and when it is copied, and the copies `=`, `let`, a literal and a call
    refuse. Lowering tears down what sema_needs_teardown names. */
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -166,15 +165,15 @@ static void owns_reason(char *out, size_t size, const struct type *t)
     char sub[160];
 
     if (t->kind == TYPE_CLASS && own_field_in_chain(t)) {
-        snprintf(out, size, "%s", own_fields_phrase);
+        text_format(out, size, "%s", own_fields_phrase);
         return;
     }
     if (t->kind == TYPE_CLASS && destruct_in_chain(t)) {
-        snprintf(out, size, "has a `destruct`");
+        text_format(out, size, "has a `destruct`");
         return;
     }
     if (t->kind == TYPE_VARIANT) {
-        snprintf(out, size, "owns what its parts own");
+        text_format(out, size, "owns what its parts own");
         return;
     }
     f = owning_field(t);
@@ -187,16 +186,16 @@ static void owns_reason(char *out, size_t size, const struct type *t)
                           inner->kind != TYPE_STRUCT &&
                           inner->kind != TYPE_TUPLE &&
                           inner->kind != TYPE_VARIANT)) {
-        snprintf(out, size, "%s", own_fields_phrase);
+        text_format(out, size, "%s", own_fields_phrase);
         return;
     }
     owns_reason(sub, sizeof sub, inner);
     if (inner->kind == TYPE_CLASS && strcmp(sub, own_fields_phrase) == 0) {
-        snprintf(out, size, "%s", own_fields_phrase);
+        text_format(out, size, "%s", own_fields_phrase);
         return;
     }
-    snprintf(out, size, "holds `%s` in `%.*s`, which %s", sema_tn(inner),
-             (int)f->name.length, f->name.text, sub);
+    text_format(out, size, "holds `%s` in `%.*s`, which %s", sema_tn(inner),
+                (int)f->name.length, f->name.text, sub);
 }
 
 const char *sema_owns_phrase(const struct type *t)

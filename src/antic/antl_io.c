@@ -2,8 +2,9 @@
 
 #include <limits.h>
 #include <stdarg.h>
-#include <stdio.h>
 #include <string.h>
+
+#include "text.h"
 
 /* DESIGN: the primitives of the library file, which antl.c and
    antl_tree.c both read and write through. Each check of a length or a
@@ -59,18 +60,13 @@ void antl_put_bytes(struct writer *w, const char *s, size_t length)
 void antl_fail(struct reader *r, const char *format, ...)
 {
     va_list args;
-    int n;
 
     if (r->failed) {
         return;
     }
     va_start(args, format);
-    n = vsnprintf(r->error, r->error_size, format, args);
+    text_vformat(r->error, r->error_size, format, args);
     va_end(args);
-    /* A message cut to fit ends in three dots. */
-    if (n >= 0 && (size_t)n >= r->error_size && r->error_size >= 4) {
-        memcpy(r->error + r->error_size - 4, "...", 4);
-    }
     r->failed = true;
 }
 

@@ -3,7 +3,6 @@
 
 #include <math.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -1065,7 +1064,8 @@ const char *sema_op_text(enum token_kind op, char buffer[OP_TEXT])
 {
     const char *quoted = token_kind_name(op);
 
-    snprintf(buffer, OP_TEXT, "%.*s", (int)(strlen(quoted) - 2), quoted + 1);
+    text_format(buffer, OP_TEXT, "%.*s", (int)(strlen(quoted) - 2),
+                quoted + 1);
     return buffer;
 }
 

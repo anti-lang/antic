@@ -1,9 +1,9 @@
 #include "parser.h"
 
 #include <ctype.h>
+#include <stdarg.h>
 #include <limits.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -116,13 +116,22 @@ static struct pos pos_of(const struct token *t)
     return pos;
 }
 
-static void error_here(struct parser *p, const char *message)
+static void error_here(struct parser *p, const char *format, ...)
+    ATTRIBUTE_PRINTF(2, 3);
+
+static void error_here(struct parser *p, const char *format, ...)
 {
+    va_list args;
+    char message[sizeof p->diags->items->message];
+
     p->ok = false;
     if (p->panic) {
         return;
     }
     p->panic = true;
+    va_start(args, format);
+    text_vformat(message, sizeof message, format, args);
+    va_end(args);
     diagnostics_add(p->diags, peek(p)->line, peek(p)->column, "%s", message);
 }
 
@@ -195,13 +204,11 @@ static void chain_end(struct parser *p, const struct chain *c)
 
 static bool expect(struct parser *p, enum token_kind kind)
 {
-    char message[64];
 
     if (accept(p, kind)) {
         return true;
     }
-    snprintf(message, sizeof message, "expected %s", token_kind_name(kind));
-    error_here(p, message);
+    error_here(p, "expected %s", token_kind_name(kind));
     return false;
 }
 
@@ -2099,7 +2106,7 @@ static struct stmt *arm_body(struct parser *p, const char *refusal)
         return (s->as.assign.value = expression(p)) == NULL ? NULL : s;
     }
     if (e->kind != EXPR_CALL && e->kind != EXPR_SYNC_OP) {
-        error_here(p, refusal);
+        error_here(p, "%s", refusal);
         return NULL;
     }
     s = new_stmt(p, STMT_EXPR, t);
@@ -2356,7 +2363,6 @@ static bool read_clause(struct parser *p, enum clause_level level)
     const struct token *last;
     struct clause c;
     enum diag_name name;
-    char message[160];
 
     memset(&c, 0, sizeof c);
     c.unchecked = is_word(p, word, "unchecked");
@@ -2378,11 +2384,10 @@ static bool read_clause(struct parser *p, enum clause_level level)
     }
     if (c.name.length == 0 || !accept(p, TOKEN_COMMA) ||
         !check(p, TOKEN_STRING)) {
-        snprintf(message, sizeof message,
-                 "`%s` takes a name and a reason, `%s(name, \"reason\")`",
-                 c.unchecked ? "unchecked" : "allow",
-                 c.unchecked ? "unchecked" : "allow");
-        error_here(p, message);
+        error_here(p,
+                   "`%s` takes a name and a reason, `%s(name, \"reason\")`",
+                   c.unchecked ? "unchecked" : "allow",
+                   c.unchecked ? "unchecked" : "allow");
         return false;
     }
     c.reason = next(p)->value.text;
@@ -3203,11 +3208,9 @@ static struct item *member_level(struct parser *p, const struct item *owner)
             return NULL;
         }
         if (!atomic) {
-            char message[96];
-            snprintf(message, sizeof message,
-                     "`%.*s` is `static` and must be `atomic`",
-                     (int)m->name.length, m->name.text);
-            error_here(p, message);
+            error_here(p,
+                       "`%.*s` is `static` and must be `atomic`",
+                       (int)m->name.length, m->name.text);
             return NULL;
         }
         m->atomic = true;
@@ -3328,7 +3331,6 @@ static bool inherits_in_body(struct parser *p, const struct item *it)
     const struct token *dot = peek_at(p, 2);
     const struct token *name = peek_at(p, 3);
     size_t length = 0;
-    char message[192];
 
     if (base->kind == TOKEN_IDENT) {
         length = base->length;
@@ -3336,11 +3338,11 @@ static bool inherits_in_body(struct parser *p, const struct item *it)
             length = name->offset + name->length - base->offset;
         }
     }
-    snprintf(message, sizeof message,
-             "inherits belongs in the class header: class %.*s inherits %.*s",
-             (int)it->name.length, it->name.text, (int)length,
-             p->source + base->offset);
-    error_here(p, message);
+    error_here(p,
+               "inherits belongs in the class header: class %.*s inherits "
+               "%.*s",
+               (int)it->name.length, it->name.text, (int)length,
+               p->source + base->offset);
     next(p);
     if (accept(p, TOKEN_IDENT) && accept(p, TOKEN_DOT)) {
         accept(p, TOKEN_IDENT);
@@ -3470,7 +3472,6 @@ static bool members_of(struct parser *p, struct item *it,
 static bool struct_field_only(struct parser *p, const struct item *it)
 {
     const char *what = NULL;
-    char message[96];
 
     switch (peek(p)->kind) {
     case TOKEN_FN:
@@ -3501,10 +3502,9 @@ static bool struct_field_only(struct parser *p, const struct item *it)
     default:
         return true;
     }
-    snprintf(message, sizeof message,
-             "a %s holds fields alone, and %s belongs to a class",
-             it->kind == ITEM_UNION ? "union" : "struct", what);
-    error_here(p, message);
+    error_here(p,
+               "a %s holds fields alone, and %s belongs to a class",
+               it->kind == ITEM_UNION ? "union" : "struct", what);
     return false;
 }
 
@@ -4310,11 +4310,12 @@ static bool link_line(struct parser *p, struct list *out, const char *kind)
     next(p);
     t = peek(p);
     if (t->kind != TOKEN_STRING) {
-        error_here(p, strcmp(kind, "linux") == 0
-                          ? "`link linux` takes the name of a library as a "
-                            "string"
-                          : "`link framework` takes the name of a framework "
-                            "as a string");
+        error_here(p, "%s",
+                   strcmp(kind, "linux") == 0
+                       ? "`link linux` takes the name of a library as a "
+                         "string"
+                       : "`link framework` takes the name of a framework "
+                         "as a string");
         return false;
     }
     next(p);
