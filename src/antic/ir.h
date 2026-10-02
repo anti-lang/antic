@@ -506,6 +506,10 @@ uint32_t ir_array_add(struct ir_module *m, const char *name,
    add an aggregate, and the length adds a symbol. */
 uint32_t ir_array_of(struct ir_module *m, const char *element_name,
                      struct ir_vtype element, size_t n);
+/* count as an index of 32 bits, the width of every index the IR holds.
+   An index stops below UINT32_MAX, which IR_NO_AGG and IR_NO_INDEX take,
+   and a count past it ends the run as a failed allocation does. */
+uint32_t ir_index(size_t count);
 /* The index of the aggregate named name, or IR_NO_AGG. */
 uint32_t ir_agg_find(const struct ir_module *m, const char *name);
 

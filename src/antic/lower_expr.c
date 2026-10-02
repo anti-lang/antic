@@ -1865,7 +1865,7 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
         size_t index = lower_table_index(e->as.call.dispatch, &e->as.call.entry,
                                          dispatched_params(e, sym, n));
         if (index > 0) {
-            slot = (uint32_t)index;
+            slot = ir_index(index);
             struct ir_operand table =
                 lower_load_table(l, args[0], e->as.call.dispatch);
             target = lower_temp(

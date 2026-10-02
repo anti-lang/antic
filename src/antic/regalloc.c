@@ -59,7 +59,7 @@ struct interval {
     int64_t start;
     int64_t end;
     int hint_preg;
-    int hint_vreg;
+    int64_t hint_vreg;      /* a virtual register is 32 bits, unsigned */
     int preg;               /* NONE when spilled */
     int64_t slot;           /* the spill slot, NONE when in a register */
     bool fp;                /* in the float register class */
@@ -315,10 +315,10 @@ static void record_hint(struct alloc *a, const struct mach_inst *inst)
         a->intervals[src->reg].hint_preg = (int)dst->reg;
     } else if (dst->kind == MACH_VREG && src->kind == MACH_VREG) {
         if (a->intervals[dst->reg].hint_vreg == NONE) {
-            a->intervals[dst->reg].hint_vreg = (int)src->reg;
+            a->intervals[dst->reg].hint_vreg = src->reg;
         }
         if (a->intervals[src->reg].hint_vreg == NONE) {
-            a->intervals[src->reg].hint_vreg = (int)dst->reg;
+            a->intervals[src->reg].hint_vreg = dst->reg;
         }
     }
 }

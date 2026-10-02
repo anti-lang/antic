@@ -122,13 +122,21 @@ struct ir_vtype ir_aggregate(uint32_t agg)
     return v;
 }
 
+uint32_t ir_index(size_t count)
+{
+    if (count >= UINT32_MAX) {
+        alloc_out_of_memory();
+    }
+    return (uint32_t)count;
+}
+
 uint32_t ir_agg_find(const struct ir_module *m, const char *name)
 {
     size_t i;
 
     for (i = 0; i < m->agg_count; i++) {
         if (strcmp(m->aggs[i]->name, name) == 0) {
-            return (uint32_t)i;
+            return ir_index(i);
         }
     }
     return IR_NO_AGG;
@@ -161,7 +169,7 @@ static uint32_t add_agg(struct ir_module *m, const struct ir_aggtype *key,
     m->aggs = alloc_grow(m->aggs, &m->agg_capacity, m->agg_count,
                          sizeof *m->aggs);
     m->aggs[m->agg_count] = t;
-    return (uint32_t)m->agg_count++;
+    return ir_index(m->agg_count++);
 }
 
 uint32_t ir_file_add(struct ir_module *m, const char *path)
@@ -170,13 +178,13 @@ uint32_t ir_file_add(struct ir_module *m, const char *path)
 
     for (i = 0; i < m->file_count; i++) {
         if (strcmp(m->files[i], path) == 0) {
-            return (uint32_t)i;
+            return ir_index(i);
         }
     }
     m->files = alloc_grow(m->files, &m->file_capacity, m->file_count,
                     sizeof *m->files);
     m->files[m->file_count] = keep(m->arena, path);
-    return (uint32_t)m->file_count++;
+    return ir_index(m->file_count++);
 }
 
 uint32_t ir_struct_add(struct ir_module *m, enum ir_agg_kind kind,
@@ -266,13 +274,13 @@ static uint32_t add_sym(struct ir_module *m, const struct ir_sym *key)
             s->value == key->value && s->of.type == key->of.type &&
             s->of.agg == key->of.agg && s->field == key->field &&
             s->op == key->op && s->a == key->a && s->b == key->b) {
-            return (uint32_t)i;
+            return ir_index(i);
         }
     }
     m->syms = alloc_grow(m->syms, &m->sym_capacity, m->sym_count,
                          sizeof *m->syms);
     m->syms[m->sym_count] = *key;
-    return (uint32_t)m->sym_count++;
+    return ir_index(m->sym_count++);
 }
 
 static struct ir_sym sym_key(enum ir_sym_kind kind, enum ir_type type)
@@ -345,7 +353,7 @@ static struct ir_function *new_function(struct ir_module *m,
 
     m->functions = alloc_grow(m->functions, &m->function_capacity,
                         m->function_count, sizeof *m->functions);
-    f->index = (uint32_t)m->function_count;
+    f->index = ir_index(m->function_count);
     f->file = IR_NO_INDEX;
     f->module = keep(m->arena, module);
     f->name = keep(m->arena, name);
@@ -428,7 +436,7 @@ struct ir_block *ir_block_add(struct ir_function *f)
 
     f->blocks = alloc_grow(f->blocks, &f->block_capacity, f->block_count,
                      sizeof *f->blocks);
-    b->index = (uint32_t)f->block_count;
+    b->index = ir_index(f->block_count);
     f->blocks[f->block_count++] = b;
     return b;
 }
@@ -442,7 +450,7 @@ struct ir_global *ir_global_add(struct ir_module *m, const char *module,
     memset(g, 0, sizeof *g);
     m->globals = alloc_grow(m->globals, &m->global_capacity, m->global_count,
                       sizeof *m->globals);
-    g->index = (uint32_t)m->global_count;
+    g->index = ir_index(m->global_count);
     g->module = keep(m->arena, module);
     g->name = keep(m->arena, name);
     g->bytes = arena_alloc(m->arena, size == 0 ? 1 : size);
