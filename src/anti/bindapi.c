@@ -186,6 +186,29 @@ static const struct bind_type *parse(struct api *a, const char *c)
     return t;
 }
 
+/* Whether name is one identifier of C. The binding writes every name the
+   reader takes into Anti and C as it stands, so any other name is refused
+   with a message that names its kind. */
+static bool named(const struct api *a, const char *kind, const char *name)
+{
+    size_t i;
+
+    for (i = 0; name[i] != '\0'; i++) {
+        char c = name[i];
+        bool letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                      c == '_';
+        if (!letter && (i == 0 || c < '0' || c > '9')) {
+            break;
+        }
+    }
+    if (i > 0 && name[i] == '\0') {
+        return true;
+    }
+    fprintf(stderr, "anti: %s names the %s `%s`, which is no C identifier\n",
+            a->b->source, kind, name);
+    return false;
+}
+
 static const char *doc_of(struct api *a, const struct json_value *v)
 {
     const char *d = json_member_string(v, "description");
@@ -193,7 +216,8 @@ static const char *doc_of(struct api *a, const struct json_value *v)
     return d != NULL && d[0] != '\0' ? bind_strdup(a->b, d) : NULL;
 }
 
-/* The structs, or false for a description that names one twice. */
+/* The structs, or false for a description that names one twice or
+   names a struct or a field with no C identifier. */
 static bool read_structs(struct api *a)
 {
     const struct json_value *list = section(a, "structs");
@@ -207,6 +231,9 @@ static bool read_structs(struct api *a)
         struct bind_record *r;
         if (name == NULL) {
             continue;
+        }
+        if (!named(a, "struct", name)) {
+            return false;
         }
         if (record_of(a, name) != NULL) {
             fprintf(stderr, "anti: %s names the struct `%s` twice\n",
@@ -236,6 +263,9 @@ static bool read_structs(struct api *a)
             if (fname == NULL || ftype == NULL) {
                 continue;
             }
+            if (!named(a, "field", fname)) {
+                return false;
+            }
             f->name = bind_strdup(a->b, fname);
             f->c_type = bind_strdup(a->b, ftype);
             f->bits = -1;
@@ -251,7 +281,9 @@ static bool read_structs(struct api *a)
     return true;
 }
 
-static void read_enums(struct api *a)
+/* The enums, or false for a description that names an enum or one of
+   its values with no C identifier. */
+static bool read_enums(struct api *a)
 {
     const struct json_value *list = section(a, "enums");
     size_t i;
@@ -263,6 +295,9 @@ static void read_enums(struct api *a)
         struct bind_enum *e;
         if (name == NULL || values == NULL || values->kind != JSON_ARRAY) {
             continue;
+        }
+        if (!named(a, "enum", name)) {
+            return false;
         }
         e = arena_alloc(&a->b->arena, sizeof *e);
         e->name = bind_strdup(a->b, name);
@@ -278,6 +313,9 @@ static void read_enums(struct api *a)
                 bind_warn(a->b, "a value of the enum `%s` is no integer", name);
                 continue;
             }
+            if (!named(a, "value", vname)) {
+                return false;
+            }
             e->values[e->value_count].name = bind_strdup(a->b, vname);
             e->values[e->value_count].value = value;
             e->values[e->value_count].doc = doc_of(a, values->items[j]);
@@ -285,9 +323,12 @@ static void read_enums(struct api *a)
         }
         bind_list_add(&a->b->enums, e);
     }
+    return true;
 }
 
-static void read_functions(struct api *a)
+/* The functions, or false for a description that names a function or
+   a parameter with no C identifier. */
+static bool read_functions(struct api *a)
 {
     const struct json_value *list = section(a, "functions");
     size_t i;
@@ -303,6 +344,9 @@ static void read_functions(struct api *a)
         bool ok = true;
         if (name == NULL || result == NULL) {
             continue;
+        }
+        if (!named(a, "function", name)) {
+            return false;
         }
         f = arena_alloc(&a->b->arena, sizeof *f);
         f->name = bind_strdup(a->b, name);
@@ -323,6 +367,9 @@ static void read_functions(struct api *a)
                 f->variadic = true;
                 continue;
             }
+            if (pname != NULL && !named(a, "parameter", pname)) {
+                return false;
+            }
             p->name = pname != NULL ? bind_strdup(a->b, pname) : NULL;
             p->c_type = bind_strdup(a->b, ptype);
             p->type = parse(a, ptype);
@@ -335,6 +382,7 @@ static void read_functions(struct api *a)
         }
         bind_list_add(&a->b->functions, f);
     }
+    return true;
 }
 
 /* A name inside the value of a define: a define read before, or a value
@@ -443,8 +491,10 @@ static bool color(struct api *a, const char *name, const char *value,
    of a macro. A define and a macro of a header then become the same
    constant. A FLOAT is a float of C, which raylib writes with the suffix
    f. COLOR is a struct literal. A GUARD, a MACRO and the rest are skipped
-   with a warning, as every macro the generator cannot evaluate is. */
-static void read_defines(struct api *a)
+   with a warning, as every macro the generator cannot evaluate is. A
+   name with a parameter list is a macro of its own and is skipped the
+   same way. Returns false for any other name that is no C identifier. */
+static bool read_defines(struct api *a)
 {
     const struct json_value *list = section(a, "defines");
     size_t i;
@@ -457,9 +507,14 @@ static void read_defines(struct api *a)
         const char *doc = doc_of(a, item);
         struct bind_eval v;
         struct text expr = {0};
+        bool function_like;
         bool ok = false;
         if (name == NULL || kind == NULL || value == NULL) {
             continue;
+        }
+        function_like = strchr(name, '(') != NULL;
+        if (!function_like && !named(a, "define", name)) {
+            return false;
         }
         if (value->kind == JSON_STRING) {
             if (strcmp(kind, "STRING") == 0) {
@@ -479,13 +534,15 @@ static void read_defines(struct api *a)
                 text_append(&expr, "f");
             }
         }
-        if (strcmp(kind, "COLOR") == 0 && value->kind == JSON_STRING) {
+        if (!function_like && strcmp(kind, "COLOR") == 0 &&
+            value->kind == JSON_STRING) {
             ok = color(a, name, value->text, doc);
-        } else if ((strcmp(kind, "INT") == 0 || strcmp(kind, "FLOAT") == 0 ||
+        } else if (!function_like &&
+                   (strcmp(kind, "INT") == 0 || strcmp(kind, "FLOAT") == 0 ||
                     strcmp(kind, "FLOAT_MATH") == 0 ||
                     strcmp(kind, "STRING") == 0 ||
                     strcmp(kind, "UNKNOWN") == 0) &&
-                   strchr(name, '(') == NULL && expr.length > 0 &&
+                   expr.length > 0 &&
                    bind_eval(a->b, text_cstr(&expr), lookup, a, &v)) {
             ok = bind_eval_const(a->b, name, &v, doc);
         }
@@ -494,6 +551,7 @@ static void read_defines(struct api *a)
         }
         text_free(&expr);
     }
+    return true;
 }
 
 bool bind_read_api(struct bind_module *b, const unsigned char *bytes,
@@ -502,27 +560,25 @@ bool bind_read_api(struct bind_module *b, const unsigned char *bytes,
     struct json_tree tree;
     struct api a;
     char error[160];
+    bool ok;
 
     if (!json_read(bytes, length, &tree, error, sizeof error)) {
         fprintf(stderr, "anti: %s is not JSON: %s\n", b->source, error);
         return false;
     }
-    if (tree.root->kind != JSON_OBJECT || json_get(tree.root, "functions") == NULL) {
-        fprintf(stderr, "anti: %s holds no API description of rlparser\n",
-                b->source);
-        json_free(&tree);
-        return false;
-    }
     a.b = b;
     a.root = tree.root;
     a.depth = 0;
-    if (!read_structs(&a)) {
-        json_free(&tree);
-        return false;
+    ok = tree.root->kind == JSON_OBJECT &&
+         json_get(tree.root, "functions") != NULL;
+    if (!ok) {
+        fprintf(stderr, "anti: %s holds no API description of rlparser\n",
+                b->source);
     }
-    read_enums(&a);
-    read_functions(&a);
-    read_defines(&a);
+    /* The structs come first, since the fields and the functions name
+       them. */
+    ok = ok && read_structs(&a) && read_enums(&a) && read_functions(&a) &&
+         read_defines(&a);
     json_free(&tree);
-    return true;
+    return ok;
 }

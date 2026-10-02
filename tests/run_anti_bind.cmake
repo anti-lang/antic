@@ -300,6 +300,34 @@ elseif(CASE STREQUAL "api_malformed")
         {\"name\": \"A\", \"fields\": [${field}]}]}")
     expect_refusal("names the struct `A` twice"
         "${ANTI}" bind "${api}" -o "${WORK}/out")
+    # A name the binding writes into Anti and C is refused where the
+    # reader takes it when it is no C identifier.
+    set(bad "A { x: int } B")
+    set(void_fn "\"returnType\": \"void\"")
+    foreach(pair
+        "struct|\"structs\": [{\"name\": \"${bad}\", \"fields\": []}]"
+        "field|\"structs\": [{\"name\": \"S\", \"fields\": [
+            {\"name\": \"${bad}\", \"type\": \"int\"}]}]"
+        "enum|\"enums\": [{\"name\": \"${bad}\", \"values\": []}]"
+        "value|\"enums\": [{\"name\": \"E\", \"values\": [
+            {\"name\": \"${bad}\", \"value\": 1}]}]"
+        "function|\"structs\": [], \"functions\": [
+            {\"name\": \"${bad}\", ${void_fn}, \"params\": []}]"
+        "parameter|\"structs\": [], \"functions\": [{\"name\": \"f\",
+            ${void_fn}, \"params\": [{\"name\": \"${bad}\", \"type\": \"int\"}]}]"
+        "define|\"defines\": [
+            {\"name\": \"${bad}\", \"type\": \"INT\", \"value\": 1}]")
+        string(FIND "${pair}" "|" bar)
+        string(SUBSTRING "${pair}" 0 ${bar} kind)
+        math(EXPR bar "${bar} + 1")
+        string(SUBSTRING "${pair}" ${bar} -1 members)
+        if(NOT members MATCHES "\"functions\"")
+            set(members "\"functions\": [], ${members}")
+        endif()
+        file(WRITE "${api}" "{${members}}")
+        expect_refusal("names the ${kind} `A .* B`, which is no C identifier"
+            "${ANTI}" bind "${api}" -o "${WORK}/out")
+    endforeach()
     # A struct that holds itself, and values a million deep.
     string(REPEAT "-" 1000000 minus)
     string(REPEAT "*" 1000000 stars)
