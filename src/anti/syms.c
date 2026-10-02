@@ -1014,6 +1014,37 @@ static bool resolve_frame(const struct unit *u, uint64_t offset,
     return out->function.length > 0;
 }
 
+/* The function and the line of the frame that the line at c names, as
+   `<address> <module>+<offset>`, written after it. A line of another form,
+   or of a module no archive answers for, gains nothing. */
+static void resolve_frame_line(struct cursor *c, const struct units *units,
+                               const struct texts *modules)
+{
+    uint64_t address;
+    uint64_t offset;
+    uint64_t number;
+    const struct unit *u;
+    struct mapped m;
+
+    cursor_blank(c);
+    if (!cursor_hex(c, &address) || !cursor_blank(c) ||
+        !cursor_number(c, 10, &number) || !cursor_char(c, '+') ||
+        !cursor_hex(c, &offset) || c->at != c->end ||
+        number >= modules->count) {
+        return;
+    }
+    u = unit_of(units, text_cstr(&modules->items[number]));
+    memset(&m, 0, sizeof m);
+    if (u != NULL && resolve_frame(u, offset, &m)) {
+        printf(" %s", text_cstr(&m.function));
+        if (m.where.length > 0) {
+            printf(" %s", text_cstr(&m.where));
+        }
+    }
+    text_free(&m.function);
+    text_free(&m.where);
+}
+
 /* DESIGN: every line of the trace comes out as it went in. A frame
    whose module has symbols gains its function and its line after it. A
    frame no archive answers for stays raw. So does every line that is no
@@ -1043,8 +1074,6 @@ int syms_resolve(const char *trace, const char *const *symbols, size_t count)
         size_t shown = length > 0 && line[length - 1] == '\r' ? length - 1
                                                               : length;
         struct cursor c;
-        uint64_t address;
-        uint64_t offset;
         uint64_t number;
         const char *id;
         size_t id_length;
@@ -1063,24 +1092,7 @@ int syms_resolve(const char *trace, const char *const *symbols, size_t count)
                 texts_add(&modules, id, id_length);
             }
         } else {
-            cursor_blank(&c);
-            if (cursor_hex(&c, &address) && cursor_blank(&c) &&
-                cursor_number(&c, 10, &number) && cursor_char(&c, '+') &&
-                cursor_hex(&c, &offset) && c.at == c.end &&
-                number < modules.count) {
-                const struct unit *u = unit_of(
-                    &units, text_cstr(&modules.items[number]));
-                struct mapped m;
-                memset(&m, 0, sizeof m);
-                if (u != NULL && resolve_frame(u, offset, &m)) {
-                    printf(" %s", text_cstr(&m.function));
-                    if (m.where.length > 0) {
-                        printf(" %s", text_cstr(&m.where));
-                    }
-                }
-                text_free(&m.function);
-                text_free(&m.where);
-            }
+            resolve_frame_line(&c, &units, &modules);
         }
         fputc('\n', stdout);
         line += length + (stop != NULL ? 1 : 0);

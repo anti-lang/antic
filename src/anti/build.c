@@ -642,6 +642,30 @@ static bool link_frameworks(struct build *b, enum target t,
     return ok;
 }
 
+/* A project without `main` is a library project, whose build writes the
+   library file of each module, files[i] of unit i, into `dist/`. */
+static bool write_library_files(const struct build *b,
+                                const struct text *files)
+{
+    size_t i;
+
+    for (i = 0; i < b->unit_count; i++) {
+        struct text out = {0};
+        bool written =
+            unit_file(text_cstr(&b->dist_dir), text_cstr(&b->units[i].path),
+                      ANTL_SUFFIX, &out) &&
+            files_copy(text_cstr(&files[i]), text_cstr(&out));
+        if (!written) {
+            fprintf(stderr, "anti: cannot write %s\n", text_cstr(&out));
+        }
+        text_free(&out);
+        if (!written) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /* Build one target in one mode. */
 static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
 {
@@ -690,23 +714,7 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
     }
     main_at = linking_module(b);
     if (b->r->lib == BUILD_PROGRAM && main_at == b->unit_count) {
-        /* A project without `main` is a library project, whose build
-           writes the library file of each module into `dist/`. */
-        for (i = 0; i < b->unit_count; i++) {
-            struct text out = {0};
-            bool written =
-                unit_file(text_cstr(&b->dist_dir), text_cstr(&b->units[i].path),
-                          ANTL_SUFFIX, &out) &&
-                files_copy(text_cstr(&files[i]), text_cstr(&out));
-            if (!written) {
-                fprintf(stderr, "anti: cannot write %s\n", text_cstr(&out));
-            }
-            text_free(&out);
-            if (!written) {
-                goto done;
-            }
-        }
-        ok = true;
+        ok = write_library_files(b, files);
         goto done;
     }
     /* The link reads the module that carries `main` as its input, so its
@@ -927,6 +935,38 @@ static void build_free(struct build *b)
     text_free(&b->name);
 }
 
+/* `anti run`: run the program the build of b wrote for the host, and
+   give its status. */
+static int run_built(const struct build *b)
+{
+    const struct build_request *r = b->r;
+    struct text program = {0};
+    enum target host;
+    const char *argv[2];
+    int status;
+
+    if (!target_host(&host)) {
+        fputs("anti: this host is no target of Anti\n", stderr);
+        return 1;
+    }
+    text_appendf(&program, "%s/%s/%s/%s/%s%s", r->root,
+                 text_cstr(&b->m.dist), target_name(host),
+                 r->release ? "release" : "dev",
+                 modpath_last(text_cstr(&b->m.name)),
+                 target_info(host)->executable_suffix);
+    if (!files_exists(text_cstr(&program))) {
+        fprintf(stderr, "anti: %s was not built, so there is nothing "
+                        "to run\n", text_cstr(&program));
+        status = 1;
+    } else {
+        argv[0] = text_cstr(&program);
+        argv[1] = NULL;
+        status = r->memory_checks ? memreport_run(argv) : process_run(argv);
+    }
+    text_free(&program);
+    return status;
+}
+
 static int build_project(const struct build_request *r, int depth)
 {
     struct build b;
@@ -998,33 +1038,7 @@ static int build_project(const struct build_request *r, int depth)
             goto done;
         }
     }
-    status = 0;
-    if (r->run) {
-        struct text program = {0};
-        enum target host;
-        const char *argv[2];
-        if (!target_host(&host)) {
-            fputs("anti: this host is no target of Anti\n", stderr);
-            status = 1;
-        } else {
-            text_appendf(&program, "%s/%s/%s/%s/%s%s", r->root,
-                         text_cstr(&b.m.dist), target_name(host),
-                         r->release ? "release" : "dev",
-                         modpath_last(text_cstr(&b.m.name)),
-                         target_info(host)->executable_suffix);
-            if (!files_exists(text_cstr(&program))) {
-                fprintf(stderr, "anti: %s was not built, so there is nothing "
-                                "to run\n", text_cstr(&program));
-                status = 1;
-            } else {
-                argv[0] = text_cstr(&program);
-                argv[1] = NULL;
-                status = r->memory_checks ? memreport_run(argv)
-                                          : process_run(argv);
-            }
-        }
-        text_free(&program);
-    }
+    status = r->run ? run_built(&b) : 0;
 done:
     build_free(&b);
     text_free(&manifest_path);

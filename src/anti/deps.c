@@ -514,6 +514,127 @@ static const char *value_at(const struct anti_toml *doc, const char *head,
     return value;
 }
 
+/* The highest version of the index doc of the package of req, read
+   from file, that is not yanked and satisfies every requirement on the
+   package, as its place in best. have says whether one answers. Returns
+   false where the index names a version that is no version. */
+static bool best_version(const struct resolver *r,
+                         const struct requirement *req,
+                         const struct anti_toml *doc, const char *file,
+                         size_t *best, bool *have)
+{
+    size_t i;
+
+    for (i = 0;; i++) {
+        const char *version = value_at(doc, "version", i, ".version");
+        const char *yanked = value_at(doc, "version", i, ".yanked");
+        if (version == NULL) {
+            break;
+        }
+        /* S40, S45 and M13: a version reaches the comparison, a path of
+           the cache and the lock file. */
+        if (!repo_version_valid(version)) {
+            fprintf(stderr, "anti: %s names the version %s of %s, which is "
+                            "no version\n", file, version,
+                    text_cstr(&req->name));
+            return false;
+        }
+        if (yanked != NULL && strcmp(yanked, "true") == 0) {
+            continue;
+        }
+        if (!satisfies_all(r, text_cstr(&req->name), version)) {
+            continue;
+        }
+        if (!*have ||
+            deps_version_compare(version,
+                                 value_at(doc, "version", *best,
+                                          ".version")) > 0) {
+            *best = i;
+            *have = true;
+        }
+    }
+    return true;
+}
+
+/* The modules of version best of the index doc, read from file, with
+   the digest of each, into out. Returns false where one is no module
+   path or its digest no SHA-256 digest. */
+static bool index_modules(const struct anti_toml *doc, const char *file,
+                          size_t best, struct dep_package *out)
+{
+    size_t i;
+
+    for (i = 0;; i++) {
+        struct text head = {0};
+        const char *module;
+        const char *digest;
+        struct dep_module *m;
+        text_appendf(&head, "version.%zu.modules", best);
+        module = value_at(doc, text_cstr(&head), i, ".path");
+        digest = value_at(doc, text_cstr(&head), i, ".sha256");
+        text_free(&head);
+        if (module == NULL || digest == NULL) {
+            break;
+        }
+        if (!repo_name_valid(module)) {
+            fprintf(stderr, "anti: %s names the module %s, which is no "
+                            "module path\n", file, module);
+            return false;
+        }
+        if (!repo_digest_valid(digest)) {
+            fprintf(stderr, "anti: %s names the digest %s of %s, which is no "
+                            "SHA-256 digest\n", file, digest, module);
+            return false;
+        }
+        m = package_module(out, module);
+        m->digest.length = 0;
+        text_append(&m->digest, digest);
+    }
+    return true;
+}
+
+/* Require each dependency of version best of the index doc of the
+   package of req, read from file. Returns false where one names no
+   package, no constraint or a repository anti refuses. */
+static bool index_dependencies(struct resolver *r,
+                               const struct requirement *req,
+                               const struct anti_toml *doc, const char *file,
+                               size_t best)
+{
+    size_t i;
+
+    for (i = 0;; i++) {
+        struct text head = {0};
+        const char *name;
+        const char *constraint;
+        const char *url;
+        text_appendf(&head, "version.%zu.dependencies", best);
+        name = value_at(doc, text_cstr(&head), i, ".name");
+        constraint = value_at(doc, text_cstr(&head), i, ".version");
+        url = value_at(doc, text_cstr(&head), i, ".repo");
+        text_free(&head);
+        if (name == NULL) {
+            break;
+        }
+        if (!repo_name_valid(name)) {
+            fprintf(stderr, "anti: %s names the dependency %s, which is no "
+                            "package name\n", file, name);
+            return false;
+        }
+        if (constraint != NULL && !deps_constraint_valid(constraint)) {
+            fprintf(stderr, "anti: %s names the version %s of %s, which is "
+                            "no constraint\n", file, constraint, name);
+            return false;
+        }
+        if (url != NULL && !repo_url_allowed(url)) {
+            return false;
+        }
+        require(r, name, constraint == NULL ? "" : constraint, url, NULL,
+                text_cstr(&req->name));
+    }
+    return true;
+}
+
 /* Read one package from the index of a repository: the highest version
    that is not yanked and satisfies every requirement on the package.
    found is false where the repository holds no index of the package or
@@ -528,7 +649,6 @@ static bool resolve_from_index(struct resolver *r, const struct requirement *req
     struct anti_toml *doc = NULL;
     size_t best = 0;
     bool have_best = false;
-    size_t i;
     bool ok = false;
 
     *found = false;
@@ -552,35 +672,8 @@ static bool resolve_from_index(struct resolver *r, const struct requirement *req
                 text_cstr(&file));
         goto done;
     }
-    for (i = 0;; i++) {
-        const char *version = value_at(doc, "version", i, ".version");
-        const char *yanked = value_at(doc, "version", i, ".yanked");
-        if (version == NULL) {
-            break;
-        }
-        /* S40, S45 and M13: a version reaches the comparison, a path of
-           the cache and the lock file. */
-        if (!repo_version_valid(version)) {
-            fprintf(stderr, "anti: %s names the version %s of %s, which is "
-                            "no version\n", text_cstr(&file), version,
-                    text_cstr(&req->name));
-            goto done;
-        }
-        if (yanked != NULL && strcmp(yanked, "true") == 0) {
-            continue;
-        }
-        if (!satisfies_all(r, text_cstr(&req->name), version)) {
-            continue;
-        }
-        if (!have_best ||
-            deps_version_compare(version,
-                                 value_at(doc, "version", best,
-                                          ".version")) > 0) {
-            best = i;
-            have_best = true;
-        }
-    }
-    if (!have_best) {
+    if (!best_version(r, req, doc, text_cstr(&file), &best, &have_best) ||
+        !have_best) {
         goto done;
     }
     *found = true;
@@ -588,33 +681,8 @@ static bool resolve_from_index(struct resolver *r, const struct requirement *req
     text_append(&out->version, value_at(doc, "version", best, ".version"));
     out->repo.length = 0;
     text_append(&out->repo, prefix);
-    for (i = 0;; i++) {
-        struct text head = {0};
-        const char *module;
-        const char *digest;
-        text_appendf(&head, "version.%zu.modules", best);
-        module = value_at(doc, text_cstr(&head), i, ".path");
-        digest = value_at(doc, text_cstr(&head), i, ".sha256");
-        text_free(&head);
-        if (module == NULL || digest == NULL) {
-            break;
-        }
-        if (!repo_name_valid(module)) {
-            fprintf(stderr, "anti: %s names the module %s, which is no "
-                            "module path\n", text_cstr(&file), module);
-            goto done;
-        }
-        if (!repo_digest_valid(digest)) {
-            fprintf(stderr, "anti: %s names the digest %s of %s, which is no "
-                            "SHA-256 digest\n", text_cstr(&file), digest,
-                    module);
-            goto done;
-        }
-        {
-            struct dep_module *m = package_module(out, module);
-            m->digest.length = 0;
-            text_append(&m->digest, digest);
-        }
+    if (!index_modules(doc, text_cstr(&file), best, out)) {
+        goto done;
     }
     if (out->module_count == 0) {
         fprintf(stderr, "anti: %s names no module of %s %s\n",
@@ -622,37 +690,7 @@ static bool resolve_from_index(struct resolver *r, const struct requirement *req
                 text_cstr(&out->version));
         goto done;
     }
-    for (i = 0;; i++) {
-        struct text head = {0};
-        const char *name;
-        const char *constraint;
-        const char *url;
-        text_appendf(&head, "version.%zu.dependencies", best);
-        name = value_at(doc, text_cstr(&head), i, ".name");
-        constraint = value_at(doc, text_cstr(&head), i, ".version");
-        url = value_at(doc, text_cstr(&head), i, ".repo");
-        text_free(&head);
-        if (name == NULL) {
-            break;
-        }
-        if (!repo_name_valid(name)) {
-            fprintf(stderr, "anti: %s names the dependency %s, which is no "
-                            "package name\n", text_cstr(&file), name);
-            goto done;
-        }
-        if (constraint != NULL && !deps_constraint_valid(constraint)) {
-            fprintf(stderr, "anti: %s names the version %s of %s, which is "
-                            "no constraint\n", text_cstr(&file), constraint,
-                    name);
-            goto done;
-        }
-        if (url != NULL && !repo_url_allowed(url)) {
-            goto done;
-        }
-        require(r, name, constraint == NULL ? "" : constraint, url, NULL,
-                text_cstr(&req->name));
-    }
-    ok = true;
+    ok = index_dependencies(r, req, doc, text_cstr(&file), best);
 done:
     anti_rt_toml_free(doc);
     text_free(&bytes);

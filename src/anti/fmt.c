@@ -1571,19 +1571,17 @@ static void emit_brace_close(struct emitter *e, const struct piece *p)
     e->after_do = f.from_do;
 }
 
-static void emit_token(struct emitter *e, const struct piece_list *l,
-                       size_t index, const struct piece *p)
+/* The braces of a direct import open and close a list as brackets do,
+   so a comma inside it ends nothing. Returns whether p is one. */
+static bool emit_import_brace(struct emitter *e, const struct piece *p)
 {
     enum token_kind kind = p->token->kind;
-    bool space;
 
-    /* The braces of a direct import open and close a list as brackets
-       do, so a comma inside it ends nothing. */
     if (p->import_list && kind == TOKEN_LBRACE) {
         note_token(e, kind);
         append_piece(e, p, space_before(e, p));
         push_bracket(e, false);
-        return;
+        return true;
     }
     if (p->import_list && kind == TOKEN_RBRACE) {
         note_token(e, kind);
@@ -1591,6 +1589,42 @@ static void emit_token(struct emitter *e, const struct piece_list *l,
         if (e->brackets > 0) {
             e->brackets--;
         }
+        return true;
+    }
+    return false;
+}
+
+/* The angle brackets of type arguments open and close a list as
+   brackets do, so a `:` or a `,` inside one ends nothing. Returns
+   whether p is one. */
+static bool emit_angle(struct emitter *e, const struct piece *p)
+{
+    enum token_kind kind = p->token->kind;
+
+    if (p->angle_open) {
+        note_token(e, kind);
+        append_piece(e, p, space_before(e, p));
+        push_bracket(e, true);
+        return true;
+    }
+    if (p->angle_close > 0) {
+        note_token(e, kind);
+        append_piece(e, p, space_before(e, p));
+        e->brackets -= (size_t)p->angle_close <= e->brackets
+                           ? (size_t)p->angle_close
+                           : e->brackets;
+        return true;
+    }
+    return false;
+}
+
+static void emit_token(struct emitter *e, const struct piece_list *l,
+                       size_t index, const struct piece *p)
+{
+    enum token_kind kind = p->token->kind;
+    bool space;
+
+    if (emit_import_brace(e, p)) {
         return;
     }
     switch (kind) {
@@ -1685,20 +1719,7 @@ static void emit_token(struct emitter *e, const struct piece_list *l,
     default:
         break;
     }
-    /* The angle brackets of type arguments open and close a list as
-       brackets do, so a `:` or a `,` inside one ends nothing. */
-    if (p->angle_open) {
-        note_token(e, kind);
-        append_piece(e, p, space_before(e, p));
-        push_bracket(e, true);
-        return;
-    }
-    if (p->angle_close > 0) {
-        note_token(e, kind);
-        append_piece(e, p, space_before(e, p));
-        e->brackets -= (size_t)p->angle_close <= e->brackets
-                           ? (size_t)p->angle_close
-                           : e->brackets;
+    if (emit_angle(e, p)) {
         return;
     }
     if (kind == TOKEN_WHILE && joins_do(e, index)) {

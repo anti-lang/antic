@@ -1094,15 +1094,92 @@ static bool marker_line(const char *s, int64_t *line)
    `clang -E -dD`. A line marker `# 12 "file" 2` says that the next line
    is line 12 of file, and every line after it counts one. A marker past
    the lines clang counts is refused, and the reading stops there. */
+/* The stack of `#pragma pack` values that `push` saves. */
+struct pack_stack {
+    int items[64];
+    int depth;
+};
+
+/* The pack after the pragma at, a `#pragma pack` line, from the pack
+   before it: push, pop, a value and a push with a value, as MSVC and
+   clang read them. */
+static int pragma_pack(const char *at, struct pack_stack *stack, int pack)
+{
+    const char *args = strchr(at, '(');
+    int value = pack;
+
+    if (args != NULL && strstr(args, "pop") != NULL) {
+        value = stack->depth > 0 ? stack->items[--stack->depth] : 0;
+    } else if (args != NULL) {
+        const char *digit = args;
+        bool push = strstr(args, "push") != NULL;
+        int number;
+        while (*digit != '\0' && (*digit < '0' || *digit > '9')) {
+            digit++;
+        }
+        if (push && stack->depth <
+                        (int)(sizeof stack->items / sizeof stack->items[0])) {
+            stack->items[stack->depth++] = pack;
+        }
+        number = leading_int(digit);
+        /* clang ignores a value that does not fit, and the
+           pack stays as it was. */
+        if (*digit == '\0') {
+            value = push ? pack : 0;
+        } else if (number >= 0) {
+            value = number;
+        }
+    }
+    return value;
+}
+
+/* A `#define` of the header, whose name starts at name: a macro with a
+   value, or one that takes arguments, which is kept for the functions
+   and skipped as a constant. */
+static void read_define(struct reader *r, const char *name)
+{
+    size_t n = 0;
+
+    while ((name[n] >= 'a' && name[n] <= 'z') ||
+           (name[n] >= 'A' && name[n] <= 'Z') ||
+           (name[n] >= '0' && name[n] <= '9') || name[n] == '_') {
+        n++;
+    }
+    if (name[n] == '(') {
+        const char *close = strchr(name + n, ')');
+        if (close != NULL && close[1] == ' ') {
+            struct fn_macro *f = arena_alloc(&r->b->arena, sizeof *f);
+            f->name = bind_strndup(r->b, name, n);
+            f->param = bind_strndup(r->b, name + n + 1,
+                                    (size_t)(close - name) - n - 1);
+            f->body = bind_strdup(r->b, close + 2);
+            bind_list_add(&r->fn_macros, f);
+        }
+        bind_warn(r->b, "the macro `%.*s` takes arguments and is "
+                  "skipped", (int)n, name);
+    } else if (n > 0) {
+        const char *macro_name = bind_strndup(r->b, name, n);
+        struct macro *m = macro_named(r, macro_name);
+        if (m == NULL) {
+            m = arena_alloc(&r->b->arena, sizeof *m);
+            m->name = macro_name;
+            bind_list_add(&r->macros, m);
+        }
+        /* A macro defined again takes its last value. */
+        m->text = bind_strdup(r->b, name[n] == ' ' ? name + n + 1
+                                                   : name + n);
+    }
+}
+
 static void read_preprocessed(struct reader *r, char *text)
 {
     const char *file = NULL;
     int64_t line = 0;
-    int stack[64];
-    int depth = 0;
+    struct pack_stack stack;
     int pack = 0;
     char *at = text;
 
+    stack.depth = 0;
     while (*at != '\0') {
         char *end = strchr(at, '\n');
         if (end != NULL) {
@@ -1122,69 +1199,14 @@ static void read_preprocessed(struct reader *r, char *text)
         } else {
             bool here = file != NULL && strcmp(file, r->header) == 0;
             if (here && strncmp(at, "#define ", 8) == 0) {
-                const char *name = at + 8;
-                size_t n = 0;
-                while ((name[n] >= 'a' && name[n] <= 'z') ||
-                       (name[n] >= 'A' && name[n] <= 'Z') ||
-                       (name[n] >= '0' && name[n] <= '9') || name[n] == '_') {
-                    n++;
-                }
-                if (name[n] == '(') {
-                    const char *close = strchr(name + n, ')');
-                    if (close != NULL && close[1] == ' ') {
-                        struct fn_macro *f = arena_alloc(&r->b->arena, sizeof *f);
-                        f->name = bind_strndup(r->b, name, n);
-                        f->param = bind_strndup(r->b, name + n + 1,
-                                                (size_t)(close - name) - n - 1);
-                        f->body = bind_strdup(r->b, close + 2);
-                        bind_list_add(&r->fn_macros, f);
-                    }
-                    bind_warn(r->b, "the macro `%.*s` takes arguments and is "
-                              "skipped", (int)n, name);
-                } else if (n > 0) {
-                    const char *macro_name = bind_strndup(r->b, name, n);
-                    struct macro *m = macro_named(r, macro_name);
-                    if (m == NULL) {
-                        m = arena_alloc(&r->b->arena, sizeof *m);
-                        m->name = macro_name;
-                        bind_list_add(&r->macros, m);
-                    }
-                    /* A macro defined again takes its last value. */
-                    m->text = bind_strdup(r->b, name[n] == ' ' ? name + n + 1
-                                                               : name + n);
-                }
+                read_define(r, at + 8);
             } else if (here && strncmp(at, "#undef ", 7) == 0) {
                 struct macro *m = macro_named(r, at + 7);
                 if (m != NULL) {
                     m->text = NULL;
                 }
             } else if (strncmp(at, "#pragma pack", 12) == 0) {
-                /* push, pop, a value and a push with a value, as MSVC
-                   and clang read them. */
-                const char *args = strchr(at, '(');
-                int value = pack;
-                if (args != NULL && strstr(args, "pop") != NULL) {
-                    value = depth > 0 ? stack[--depth] : 0;
-                } else if (args != NULL) {
-                    const char *digit = args;
-                    bool push = strstr(args, "push") != NULL;
-                    int number;
-                    while (*digit != '\0' && (*digit < '0' || *digit > '9')) {
-                        digit++;
-                    }
-                    if (push && depth < (int)(sizeof stack / sizeof stack[0])) {
-                        stack[depth++] = pack;
-                    }
-                    number = leading_int(digit);
-                    /* clang ignores a value that does not fit, and the
-                       pack stays as it was. */
-                    if (*digit == '\0') {
-                        value = push ? pack : 0;
-                    } else if (number >= 0) {
-                        value = number;
-                    }
-                }
-                pack = value;
+                pack = pragma_pack(at, &stack, pack);
                 if (here) {
                     struct pack *p = arena_alloc(&r->b->arena, sizeof *p);
                     p->line = line;
@@ -1408,11 +1430,56 @@ static void settle_enums(struct reader *r)
     }
 }
 
+/* The two argument vectors of clang for the header of q on target t:
+   ast reads it as C into the JSON of its AST, and pre preprocesses it
+   with its macros. Both share the target, the language, the include
+   directories and the definitions. */
+static bool clang_arguments(struct bind_module *b,
+                            const struct bind_clang_request *q,
+                            const char *clang, enum target t,
+                            struct arg_list *ast, struct arg_list *pre)
+{
+    struct arg_list common = {0};
+    size_t i;
+    bool ok;
+
+    arg_add(&common, clang);
+    ok = target_options(clang, t, q->runtime, &common, b);
+    if (ok) {
+        arg_add(&common, "-x");
+        arg_add(&common, "c");
+        for (i = 0; i < q->include_count; i++) {
+            arg_add(&common, "-I");
+            arg_add(&common, q->includes[i]);
+        }
+        for (i = 0; i < q->define_count; i++) {
+            struct text d = {0};
+            text_appendf(&d, "-D%s", q->defines[i]);
+            arg_add(&common, bind_strdup(b, text_cstr(&d)));
+            text_free(&d);
+        }
+        for (i = 0; i < common.count; i++) {
+            arg_add(ast, common.items[i]);
+            arg_add(pre, common.items[i]);
+        }
+        arg_add(ast, "-fsyntax-only");
+        arg_add(ast, "-Xclang");
+        arg_add(ast, "-ast-dump=json");
+        arg_add(ast, q->header);
+        arg_add(ast, NULL);
+        arg_add(pre, "-E");
+        arg_add(pre, "-dD");
+        arg_add(pre, q->header);
+        arg_add(pre, NULL);
+    }
+    free(common.items);
+    return ok;
+}
+
 bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
 {
     struct reader r;
     struct text clang = {0};
-    struct arg_list common = {0};
     struct arg_list ast = {0};
     struct arg_list pre = {0};
     struct text json = {0};
@@ -1437,35 +1504,9 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
     if (!check_version(text_cstr(&clang))) {
         goto done;
     }
-    arg_add(&common, text_cstr(&clang));
-    if (!target_options(text_cstr(&clang), t, q->runtime, &common, b)) {
+    if (!clang_arguments(b, q, text_cstr(&clang), t, &ast, &pre)) {
         goto done;
     }
-    arg_add(&common, "-x");
-    arg_add(&common, "c");
-    for (i = 0; i < q->include_count; i++) {
-        arg_add(&common, "-I");
-        arg_add(&common, q->includes[i]);
-    }
-    for (i = 0; i < q->define_count; i++) {
-        struct text d = {0};
-        text_appendf(&d, "-D%s", q->defines[i]);
-        arg_add(&common, bind_strdup(b, text_cstr(&d)));
-        text_free(&d);
-    }
-    for (i = 0; i < common.count; i++) {
-        arg_add(&ast, common.items[i]);
-        arg_add(&pre, common.items[i]);
-    }
-    arg_add(&ast, "-fsyntax-only");
-    arg_add(&ast, "-Xclang");
-    arg_add(&ast, "-ast-dump=json");
-    arg_add(&ast, q->header);
-    arg_add(&ast, NULL);
-    arg_add(&pre, "-E");
-    arg_add(&pre, "-dD");
-    arg_add(&pre, q->header);
-    arg_add(&pre, NULL);
     if (!run(&pre, &text, "preprocess the header") ||
         !run(&ast, &json, "read the header as C")) {
         goto done;
@@ -1540,7 +1581,6 @@ done:
     text_free(&clang);
     text_free(&json);
     text_free(&text);
-    free(common.items);
     free(ast.items);
     free(pre.items);
     free(r.tags.items);
