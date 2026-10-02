@@ -113,8 +113,8 @@ pub class StackTrace
 {
 	/// The frames as the capture took them, the innermost first.
 	pub own frames: []RawFrame,
-	/// The frames with their names, once `symbolize` ran. The trace takes
-	/// this memory itself, so it never goes to the allocator of a trace that
+	/// The frames with their names, once `symbolize` ran. The trace takes this
+	/// memory itself, so it never goes to the allocator of a trace that
 	/// `deserialize` made.
 	transient named: ?*FrameNames = none,
 	/// The bytes `text` gave, ended by a NUL.
