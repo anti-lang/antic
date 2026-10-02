@@ -1267,88 +1267,88 @@ pub class SortedSet<T: Ordered> inherits BTree<T>
 		return self.find(&x) >= 0;
 	}
 
-	/// A new set of the elements that this set or `o` holds.
-	pub fn union(self, o: *SortedSet<T>) -> SortedSet<T>
+	/// A new set of the elements that this set or `other` holds.
+	pub fn union(self, other: SortedSet<T>) -> SortedSet<T>
 	{
 		let made = SortedSet<T> { from: self.from };
 		let mine = self.first_place();
-		let theirs = o.first_place();
+		let theirs = other.first_place();
 		while mine >= 0 || theirs >= 0 do {
 			let place = made.append_place(here);
-			if theirs < 0 || mine >= 0 && *self.slot(mine) < *o.slot(theirs) {
+			if theirs < 0 || mine >= 0 && *self.slot(mine) < *other.slot(theirs) {
 				*made.slot(place) = self.copy_place(mine);
 				mine = self.next_place(mine);
-			} else if mine < 0 || *o.slot(theirs) < *self.slot(mine) {
-				*made.slot(place) = o.copy_place(theirs);
-				theirs = o.next_place(theirs);
+			} else if mine < 0 || *other.slot(theirs) < *self.slot(mine) {
+				*made.slot(place) = other.copy_place(theirs);
+				theirs = other.next_place(theirs);
 			} else {
 				*made.slot(place) = self.copy_place(mine);
 				mine = self.next_place(mine);
-				theirs = o.next_place(theirs);
+				theirs = other.next_place(theirs);
 			}
 		}
 		return made;
 	}
 
-	/// A new set of the elements that this set and `o` both hold.
-	pub fn intersect(self, o: *SortedSet<T>) -> SortedSet<T>
+	/// A new set of the elements that this set and `other` both hold.
+	pub fn intersect(self, other: SortedSet<T>) -> SortedSet<T>
 	{
 		let made = SortedSet<T> { from: self.from };
 		let mine = self.first_place();
-		let theirs = o.first_place();
+		let theirs = other.first_place();
 		while mine >= 0 && theirs >= 0 do {
-			if *self.slot(mine) < *o.slot(theirs) {
+			if *self.slot(mine) < *other.slot(theirs) {
 				mine = self.next_place(mine);
-			} else if *o.slot(theirs) < *self.slot(mine) {
-				theirs = o.next_place(theirs);
+			} else if *other.slot(theirs) < *self.slot(mine) {
+				theirs = other.next_place(theirs);
 			} else {
 				let place = made.append_place(here);
 				*made.slot(place) = self.copy_place(mine);
 				mine = self.next_place(mine);
-				theirs = o.next_place(theirs);
+				theirs = other.next_place(theirs);
 			}
 		}
 		return made;
 	}
 
-	/// A new set of the elements of this set that `o` does not hold.
-	pub fn minus(self, o: *SortedSet<T>) -> SortedSet<T>
+	/// A new set of the elements of this set that `other` does not hold.
+	pub fn minus(self, other: SortedSet<T>) -> SortedSet<T>
 	{
 		let made = SortedSet<T> { from: self.from };
 		let mine = self.first_place();
-		let theirs = o.first_place();
+		let theirs = other.first_place();
 		while mine >= 0 do {
-			if theirs < 0 || *self.slot(mine) < *o.slot(theirs) {
+			if theirs < 0 || *self.slot(mine) < *other.slot(theirs) {
 				let place = made.append_place(here);
 				*made.slot(place) = self.copy_place(mine);
 				mine = self.next_place(mine);
-			} else if *o.slot(theirs) < *self.slot(mine) {
-				theirs = o.next_place(theirs);
+			} else if *other.slot(theirs) < *self.slot(mine) {
+				theirs = other.next_place(theirs);
 			} else {
 				mine = self.next_place(mine);
-				theirs = o.next_place(theirs);
+				theirs = other.next_place(theirs);
 			}
 		}
 		return made;
 	}
 
-	/// Whether `o` holds every element of this set.
-	pub fn is_subset(self, o: *SortedSet<T>) -> bool
+	/// Whether `other` holds every element of this set.
+	pub fn is_subset(self, other: SortedSet<T>) -> bool
 	{
-		if self.count > o.count {
+		if self.count > other.count {
 			return false;
 		}
 		let mine = self.first_place();
-		let theirs = o.first_place();
+		let theirs = other.first_place();
 		while mine >= 0 do {
-			if theirs < 0 || *self.slot(mine) < *o.slot(theirs) {
+			if theirs < 0 || *self.slot(mine) < *other.slot(theirs) {
 				return false;
 			}
-			if *o.slot(theirs) < *self.slot(mine) {
-				theirs = o.next_place(theirs);
+			if *other.slot(theirs) < *self.slot(mine) {
+				theirs = other.next_place(theirs);
 			} else {
 				mine = self.next_place(mine);
-				theirs = o.next_place(theirs);
+				theirs = other.next_place(theirs);
 			}
 		}
 		return true;

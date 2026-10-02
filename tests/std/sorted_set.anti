@@ -154,21 +154,21 @@ fn algebra()
 	let middle = [3, 4, 5, 6, 7];
 	let a = of(odds[0..odds.len]);
 	let b = of(middle[0..middle.len]);
-	let both = a.intersect(&b);
-	let only = a.minus(&b);
-	let rest = b.minus(&a);
+	let both = a.intersect(b);
+	let only = a.minus(b);
+	let rest = b.minus(a);
 	show(f"intersect {both.to_text()} minus {only.to_text()} {rest.to_text()}");
-	let joined = a.union(&b);
-	let joined_back = b.union(&a);
+	let joined = a.union(b);
+	let joined_back = b.union(a);
 	show(f"union {joined.to_text()} {joined == joined_back}");
 	let pair = [3, 7];
 	let small = of(pair[0..pair.len]);
 	let empty = SortedSet<int>.new();
-	show(f"subset {small.is_subset(&a)} {small.is_subset(&b)} {a.is_subset(&b)} {empty.is_subset(&a)} {a.is_subset(&a)}");
-	let none_shared = a.intersect(&empty);
-	let all = a.minus(&empty);
-	let kept = a.union(&empty);
-	let taken = empty.union(&a);
+	show(f"subset {small.is_subset(a)} {small.is_subset(b)} {a.is_subset(b)} {empty.is_subset(a)} {a.is_subset(a)}");
+	let none_shared = a.intersect(empty);
+	let all = a.minus(empty);
+	let kept = a.union(empty);
+	let taken = empty.union(a);
 	show(f"with empty {none_shared.to_text()} {all.to_text()} {kept.to_text()} {taken.to_text()}");
 	let big = SortedSet<int>.new();
 	let odd = SortedSet<int>.new();
@@ -181,13 +181,13 @@ fn algebra()
 			added = odd.add(again);
 		}
 	}
-	let even = big.minus(&odd);
-	let shared = big.intersect(&odd);
-	let whole = even.union(&odd);
+	let even = big.minus(odd);
+	let shared = big.intersect(odd);
+	let whole = even.union(odd);
 	let first = even.first() ?? -1;
 	let last = even.last() ?? -1;
-	show(f"large: {even.count} even from {first} to {last}, {shared.count} shared, {odd.is_subset(&big)} {big.is_subset(&odd)}");
-	show(f"large union: {whole.count} {whole == big} {even.is_subset(&whole)} {odd.is_subset(&whole)}");
+	show(f"large: {even.count} even from {first} to {last}, {shared.count} shared, {odd.is_subset(big)} {big.is_subset(odd)}");
+	show(f"large union: {whole.count} {whole == big} {even.is_subset(whole)} {odd.is_subset(whole)}");
 }
 
 fn shared() may fail
@@ -262,7 +262,7 @@ fn owned()
 		let others = SortedSet<Tag>.new();
 		added = others.add(Tag.of(4));
 		added = others.add(Tag.of(2));
-		let joined = tags.union(&others);
+		let joined = tags.union(others);
 		show(joined.to_text());
 		printf("union %d, torn %d\n".ptr, joined.count as c_int, Tag.torn.load() as c_int);
 	}
