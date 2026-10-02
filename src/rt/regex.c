@@ -1,4 +1,5 @@
 #include "regex.h"
+#include "grow.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -73,37 +74,43 @@ void *anti_rt_regex_compile(const unsigned char *bytes, int64_t length,
 #define BYTE_OPTIONS (PCRE2_NEVER_UTF | PCRE2_NEVER_UCP | PCRE2_DOTALL)
 
 /* The pattern that PCRE2 compiles for a byte pattern, and for each of its
-   bytes the byte of the written pattern it comes from. */
+   bytes the byte of the written pattern it comes from. out_room and
+   from_room are the sizes of the two blocks in bytes. */
 struct wide {
     unsigned char *out;
     int64_t *from;
     int64_t n;
-    int64_t room;
+    int64_t out_room;
+    int64_t from_room;
     int failed;
 };
 
 static void put(struct wide *w, unsigned char c, int64_t from)
 {
+    const int64_t word = (int64_t)sizeof *w->from;
+    unsigned char *out;
+    int64_t *map;
+
     if (w->failed) {
         return;
     }
-    if (w->n == w->room) {
-        int64_t room = w->room == 0 ? 64 : 2 * w->room;
-        unsigned char *out = realloc(w->out, (size_t)room);
-        int64_t *map;
-        if (out == NULL) {
-            w->failed = 1;
-            return;
-        }
-        w->out = out;
-        map = realloc(w->from, (size_t)room * sizeof *map);
-        if (map == NULL) {
-            w->failed = 1;
-            return;
-        }
-        w->from = map;
-        w->room = room;
+    if (w->n > INT64_MAX / word - 1) {
+        w->failed = 1;
+        return;
     }
+    out = anti_rt_reserve(w->out, &w->out_room, w->n, 1, 64);
+    if (out == NULL) {
+        w->failed = 1;
+        return;
+    }
+    w->out = out;
+    map = anti_rt_reserve(w->from, &w->from_room, w->n * word, word,
+                          64 * word);
+    if (map == NULL) {
+        w->failed = 1;
+        return;
+    }
+    w->from = map;
     w->out[w->n] = c;
     w->from[w->n] = from;
     w->n++;

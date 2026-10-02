@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "grow.h"
 #include "std.h"
 #include "utf.h"
 
@@ -93,31 +94,16 @@ int64_t anti_rt_compare_bytes(const unsigned char *a, int64_t a_length,
    what it holds. */
 static int reserve(struct anti_builder *b, int64_t count)
 {
-    int64_t need;
-    int64_t size;
     unsigned char *room;
 
-    if (count > INT64_MAX - 1 - b->length) {
+    if (count > INT64_MAX - 1) {
         return 0;
     }
-    need = b->length + count + 1;
-    if (need <= b->capacity) {
-        return 1;
-    }
-    size = b->capacity == 0 ? 32 : b->capacity;
-    while (size < need) {
-        size = size > INT64_MAX / 2 ? need : size * 2;
-    }
-    room = malloc((size_t)size);
+    room = anti_rt_reserve(b->room, &b->capacity, b->length, count + 1, 32);
     if (room == NULL) {
         return 0;
     }
-    if (b->room != NULL) {
-        memcpy(room, b->room, (size_t)b->length);
-        free(b->room);
-    }
     b->room = room;
-    b->capacity = size;
     return 1;
 }
 

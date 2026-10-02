@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "grow.h"
 #include "license.h"
 #include "platform.h"
 #include "rt.h"
@@ -411,30 +412,28 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
    memory runs out. */
 struct growing {
     unsigned char *bytes;
-    size_t used;
-    size_t room;
+    int64_t used;
+    int64_t room;
 };
 
 /* The room of one formatted line of the text of a trace. */
 enum { LINE_ROOM = 128 };
 
-static void add(struct growing *g, const void *bytes, size_t n)
+static void add(struct growing *g, const void *bytes, int64_t n)
 {
+    unsigned char *more;
+
     if (g->bytes == NULL) {
         return;
     }
-    if (g->used + n + 1 > g->room) {
-        size_t room = 2 * (g->used + n + 1);
-        unsigned char *more = realloc(g->bytes, room);
-        if (more == NULL) {
-            free(g->bytes);
-            g->bytes = NULL;
-            return;
-        }
-        g->bytes = more;
-        g->room = room;
+    more = anti_rt_reserve(g->bytes, &g->room, g->used + 1, n, 256);
+    if (more == NULL) {
+        free(g->bytes);
+        g->bytes = NULL;
+        return;
     }
-    memcpy(g->bytes + g->used, bytes, n);
+    g->bytes = more;
+    memcpy(g->bytes + g->used, bytes, (size_t)n);
     g->used += n;
     g->bytes[g->used] = 0;
 }
@@ -448,7 +447,7 @@ static int add_line(struct growing *g, const char *line, int n)
         g->bytes = NULL;
         return 0;
     }
-    add(g, line, (size_t)n);
+    add(g, line, n);
     return 1;
 }
 
@@ -496,7 +495,7 @@ unsigned char *anti_rt_trace_text(const struct anti_raw_frame *frames,
 
     g.room = 256;
     g.used = 0;
-    g.bytes = malloc(g.room);
+    g.bytes = malloc((size_t)g.room);
     if (g.bytes == NULL) {
         return NULL;
     }
@@ -512,7 +511,7 @@ unsigned char *anti_rt_trace_text(const struct anti_raw_frame *frames,
             return NULL;
         }
         if (f->build_id.len > 0) {
-            add(&g, f->build_id.ptr, (size_t)f->build_id.len);
+            add(&g, f->build_id.ptr, f->build_id.len);
         } else {
             add(&g, "-", 1);
         }
@@ -520,7 +519,7 @@ unsigned char *anti_rt_trace_text(const struct anti_raw_frame *frames,
         if (!add_line(&g, line, n)) {
             return NULL;
         }
-        add(&g, f->module.ptr, (size_t)f->module.len);
+        add(&g, f->module.ptr, f->module.len);
     }
     for (i = 0; i < count; i++) {
         const struct anti_raw_frame *f = &frames[i];

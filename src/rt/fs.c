@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "grow.h"
 #include "platform.h"
 #include "std.h"
 
@@ -136,32 +137,29 @@ unsigned char *anti_rt_fs_read(const char *path, int64_t *length)
 /* The names of a listing, each ended by a NUL, one after another. */
 struct names {
     unsigned char *bytes;
-    size_t length;
-    size_t capacity;
+    int64_t length;
+    int64_t capacity;
     int64_t count;
 };
 
 static int add_name(struct names *n, const unsigned char *name, size_t len)
 {
-    if (n->capacity - n->length < len + 1) {
-        size_t want = n->capacity == 0 ? 256 : n->capacity;
-        unsigned char *grown;
-        while (want - n->length < len + 1) {
-            want *= 2;
-        }
-        grown = realloc(n->bytes, want);
-        if (grown == NULL) {
-            errno = ENOMEM;
-            return -1;
-        }
-        n->bytes = grown;
-        n->capacity = want;
+    unsigned char *grown = NULL;
+
+    if (len < (size_t)INT64_MAX) {
+        grown = anti_rt_reserve(n->bytes, &n->capacity, n->length,
+                                (int64_t)len + 1, 256);
     }
+    if (grown == NULL) {
+        errno = ENOMEM;
+        return -1;
+    }
+    n->bytes = grown;
     if (len > 0) {
         memcpy(n->bytes + n->length, name, len);
     }
-    n->bytes[n->length + len] = '\0';
-    n->length += len + 1;
+    n->bytes[n->length + (int64_t)len] = '\0';
+    n->length += (int64_t)len + 1;
     n->count++;
     return 0;
 }
@@ -179,7 +177,8 @@ static int is_dot_entry(const unsigned char *name, size_t len)
 static struct anti_text *finish(struct names *n, int64_t *count)
 {
     size_t head = (size_t)n->count * sizeof(struct anti_text);
-    unsigned char *block = malloc(head + n->length + 1);
+    size_t length = (size_t)n->length;
+    unsigned char *block = malloc(head + length + 1);
     struct anti_text *texts = (struct anti_text *)(void *)block;
     const unsigned char *at;
     int64_t i;
@@ -189,10 +188,10 @@ static struct anti_text *finish(struct names *n, int64_t *count)
         errno = ENOMEM;
         return NULL;
     }
-    if (n->length > 0) {
-        memcpy(block + head, n->bytes, n->length);
+    if (length > 0) {
+        memcpy(block + head, n->bytes, length);
     }
-    block[head + n->length] = '\0';
+    block[head + length] = '\0';
     release(n->bytes);
     at = block + head;
     for (i = 0; i < n->count; i++) {

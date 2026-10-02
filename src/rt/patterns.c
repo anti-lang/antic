@@ -2,6 +2,7 @@
    the messages of the errors of a pattern compiled at run time. */
 #include "atomic.h"
 #include "cpu_level.h"
+#include "grow.h"
 #include "regex.h"
 #include "rt.h"
 #include "std.h"
@@ -594,22 +595,16 @@ struct growing {
 static void grow_append(struct growing *g, const unsigned char *bytes,
                         int64_t length)
 {
+    unsigned char *grown;
+
     if (length <= 0) {
         return;
     }
-    if (g->length + length > g->capacity) {
-        int64_t capacity = g->capacity == 0 ? 64 : g->capacity;
-        unsigned char *grown;
-        while (capacity < g->length + length) {
-            capacity *= 2;
-        }
-        grown = realloc(g->bytes, (size_t)capacity);
-        if (grown == NULL) {
-            out_of_memory();
-        }
-        g->bytes = grown;
-        g->capacity = capacity;
+    grown = anti_rt_reserve(g->bytes, &g->capacity, g->length, length, 64);
+    if (grown == NULL) {
+        out_of_memory();
     }
+    g->bytes = grown;
     memcpy(g->bytes + g->length, bytes, (size_t)length);
     g->length += length;
 }

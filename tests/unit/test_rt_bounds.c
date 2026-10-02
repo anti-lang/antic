@@ -1,12 +1,38 @@
-/* Integer bounds of the runtime: the size of a text builder and atomic
-   subtraction at the minimum of each width. */
+/* Integer bounds of the runtime: the growth of a block, the size of a
+   text builder and atomic subtraction at the minimum of each width. */
 #include <stdint.h>
 #include <stdlib.h>
 
 #include "../binary_stdio.h"
 #include "atomic.h"
 #include "check.h"
+#include "grow.h"
 #include "std.h"
+
+/* A block doubles from its first size until it holds what is asked, and
+   keeps its bytes as it grows. A size that no int64_t holds is refused,
+   and the block and its room stay as they were. */
+static void block_growth(void)
+{
+    int64_t room = 0;
+    unsigned char *block = anti_rt_reserve(NULL, &room, 0, 10, 64);
+    unsigned char *same;
+
+    CHECK(block != NULL && room == 64);
+    memcpy(block, "kept", 4);
+    same = anti_rt_reserve(block, &room, 4, 60, 64);
+    CHECK(same == block && room == 64);
+    block = anti_rt_reserve(block, &room, 64, 1, 64);
+    CHECK(block != NULL && room == 128 && memcmp(block, "kept", 4) == 0);
+    block = anti_rt_reserve(block, &room, 128, 300, 64);
+    CHECK(block != NULL && room == 512 && memcmp(block, "kept", 4) == 0);
+    same = anti_rt_reserve(block, &room, 1, INT64_MAX, 64);
+    CHECK(same == NULL && room == 512);
+    same = anti_rt_reserve(block, &room, INT64_MAX, 1, 64);
+    CHECK(same == NULL && room == 512);
+    CHECK(memcmp(block, "kept", 4) == 0);
+    free(block);
+}
 
 /* A count that the size of the builder cannot hold is refused, and the
    builder keeps what it holds. */
@@ -61,6 +87,7 @@ static void atomic_sub_minimum(void)
 
 void test_rt_bounds(void)
 {
+    block_growth();
     builder_bounds();
     atomic_sub_minimum();
 }
