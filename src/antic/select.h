@@ -127,6 +127,7 @@ struct target_desc {
                              int64_t offset);
     void (*copy_memory)(struct selector *s, struct mach_operand dst,
                         struct mach_operand src, uint64_t size);
+    uint8_t fp_first;                   /* the first float register */
     uint64_t frame_limit;               /* the largest frame, below 2^32 */
     /* Whether the target selects the flag operation inst and reads its
        flags where the instruction leaves them. The back end expands every
@@ -216,6 +217,37 @@ uint64_t select_load_parts(struct selector *s, const struct arg_location *loc,
    a direct call, or the signature of a call through a pointer. */
 const struct ir_function *select_callee(const struct selector *s,
                                         const struct ir_inst *inst);
+/* The facts of a call that both targets read: its callee, the type and
+   the location of each argument, the copy of each aggregate passed in
+   memory, and the location of its result with the memory of an indirect
+   one. select_call_begin fills them and select_call_finish frees them. */
+struct select_call {
+    const struct ir_function *callee;
+    enum ir_type *types;
+    struct arg_location *locations;
+    struct mach_operand *copies;        /* filled by the target */
+    struct arg_location result;
+    struct mach_operand result_address;
+};
+void select_call_begin(struct selector *s, const struct ir_inst *inst,
+                       struct select_call *c);
+/* The end of the stack area of aggregate argument i, which is on the
+   stack: its pointer, or its bytes rounded up to 8. */
+uint64_t select_call_stack_end(const struct selector *s,
+                               const struct select_call *c, size_t i);
+/* Load aggregate argument i of c, which goes in registers, and return
+   the registers it loads. Returns 0 and loads nothing for any other
+   argument. *done tells the two apart. */
+uint64_t select_call_aggregate(struct selector *s, const struct ir_inst *inst,
+                               const struct select_call *c, size_t i,
+                               bool *done);
+/* The register of the memory of an indirect result, loaded, or 0. */
+uint64_t select_call_result_address(struct selector *s,
+                                    const struct select_call *c);
+/* After the call instruction: the result into its temporary or its
+   memory. Then free what select_call_begin made. */
+void select_call_finish(struct selector *s, const struct ir_inst *inst,
+                        struct select_call *c);
 /* DESIGN: a PIE on Linux and macOS reaches a C function in a shared
    library through its GOT entry. Windows links the C runtime statically,
    so its C functions lie in the executable. */
@@ -236,5 +268,24 @@ struct mach_inst *select_emit(struct selector *s, uint16_t op, size_t count,
 enum mach_cond select_cond(enum ir_op op);
 enum mach_cond select_negate(enum mach_cond cond);
 bool select_is_next(const struct selector *s, const struct ir_operand *block);
+/* The bits of a value of type in a register or in memory. */
+uint8_t select_bits(enum ir_type type);
+/* Whether o is a float register, virtual or physical. */
+bool select_is_float_register(const struct selector *s,
+                              struct mach_operand o);
+/* A jump with the instruction op to the IR block target, unless control
+   reaches it as the next block. */
+void select_jump(struct selector *s, const struct ir_operand *target,
+                 uint16_t op);
+/* The pattern of IR_MEMCOPY, through the copy_memory of the target. */
+void select_emit_memcopy(struct selector *s, const struct ir_inst *inst);
+/* The memory of a value of type at the address in base. */
+struct mach_operand select_memory(struct mach_operand base,
+                                  enum ir_type type);
+/* The memory operand of a load or a store of type: the folded address
+   that selection found, or the pointer register itself. */
+struct mach_operand select_address_of(struct selector *s,
+                                      const struct ir_operand *pointer,
+                                      enum ir_type type);
 
 #endif

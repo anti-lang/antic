@@ -219,17 +219,6 @@ static uint8_t width(enum ir_type type)
     return type == IR_I64 || type == IR_PTR || type == IR_F64 ? 64 : 32;
 }
 
-static uint8_t bits(enum ir_type type)
-{
-    switch (type) {
-    case IR_I8: return 8;
-    case IR_I16: return 16;
-    case IR_I32:
-    case IR_F32: return 32;
-    default: return 64;
-    }
-}
-
 /* The instruction that extends an 8-bit or 16-bit value to 32 bits. */
 static enum a64_op extension(uint8_t n, bool is_signed)
 {
@@ -262,9 +251,8 @@ static void emit3(struct selector *s, enum a64_op op, struct mach_operand a,
 static void move(struct selector *s, struct mach_operand dst,
                  struct mach_operand src)
 {
-    bool fp = dst.kind == MACH_VREG ? s->out->fp[dst.reg] : dst.reg >= V0;
-
-    emit2(s, fp ? A64_FMOV : A64_MOV, dst, src);
+    emit2(s, select_is_float_register(s, dst) ? A64_FMOV : A64_MOV, dst,
+          src);
 }
 
 /* An instruction holds a 16-bit immediate. mov takes a value that fits,
@@ -476,7 +464,8 @@ static void emit_add_sub(struct selector *s, const struct ir_inst *inst)
     enum a64_op op = inst->op == IR_SUB ? A64_SUB : A64_ADD;
     enum a64_op other = inst->op == IR_SUB ? A64_ADD : A64_SUB;
     int64_t v = inst->b.kind == IR_INT
-                    ? select_signed(inst->b.as.integer, bits(inst->b.type))
+                    ? select_signed(inst->b.as.integer,
+                                    select_bits(inst->b.type))
                     : 0;
 
     ops[0] = select_result(s, inst);
@@ -514,7 +503,7 @@ static struct mach_operand extended(struct selector *s,
                                     const struct ir_operand *o,
                                     bool is_signed)
 {
-    uint8_t n = bits(o->type);
+    uint8_t n = select_bits(o->type);
     struct mach_operand r;
 
     if (n >= 32) {
@@ -620,12 +609,6 @@ static void copy_memory(struct selector *s, struct mach_operand dst,
     }
 }
 
-static bool is_float_register(const struct selector *s,
-                              struct mach_operand o)
-{
-    return o.kind == MACH_VREG ? s->out->fp[o.reg] : o.reg >= V0;
-}
-
 /* Load bytes of an aggregate at offset after base into register dst. An
    integer part of 3, 5, 6 or 7 bytes combines its pieces with shifts. */
 static void load_bytes(struct selector *s, struct mach_operand dst,
@@ -635,7 +618,7 @@ static void load_bytes(struct selector *s, struct mach_operand dst,
     unsigned low = bytes >= 4 ? 4 : 2;
     struct mach_operand rest;
 
-    if (is_float_register(s, dst) || bytes == 8) {
+    if (select_is_float_register(s, dst) || bytes == 8) {
         emit2(s, A64_LDR, mach_widened(dst, (uint8_t)(bytes * 8)),
               mach_mem(base, offset, (uint8_t)(bytes * 8)));
     } else if (bytes == 4 || bytes == 2 || bytes == 1) {
@@ -658,7 +641,7 @@ static void store_bytes(struct selector *s, struct mach_operand src,
     unsigned low = bytes >= 4 ? 4 : 2;
     struct mach_operand rest;
 
-    if (is_float_register(s, src) || bytes == 8) {
+    if (select_is_float_register(s, src) || bytes == 8) {
         emit2(s, A64_STR, mach_widened(src, (uint8_t)(bytes * 8)),
               mach_mem(base, offset, (uint8_t)(bytes * 8)));
     } else if (bytes == 4 || bytes == 2 || bytes == 1) {
@@ -714,14 +697,6 @@ static struct mach_operand copy_argument(struct selector *s,
     append_add_offset(s->b, address, mach_preg(SP, 64), loc->offset);
     copy_memory(s, address, value, agg->size);
     return address;
-}
-
-static void emit_memcopy(struct selector *s, const struct ir_inst *inst)
-{
-    struct mach_operand to = select_reg(s, &inst->a);
-    struct mach_operand from = select_reg(s, &inst->b);
-
-    copy_memory(s, to, from, select_size(s, inst->of));
 }
 
 /* Simd structs */
@@ -786,7 +761,7 @@ static struct shape shape_of(const struct ir_aggtype *agg, uint64_t size)
     struct shape sh;
 
     sh.lane = agg->fields[0].type.type;
-    sh.lane_bytes = bits(sh.lane) / 8;
+    sh.lane_bytes = select_bits(sh.lane) / 8;
     sh.chunk = size < 16 ? (unsigned)size : 16;
     sh.chunks = (unsigned)(size / sh.chunk);
     sh.lanes = sh.chunk / sh.lane_bytes;
@@ -1293,7 +1268,7 @@ static void emit_addr(struct selector *s, const struct ir_inst *inst)
 static void emit_convert(struct selector *s, const struct ir_inst *inst)
 {
     struct mach_operand r = select_result(s, inst);
-    uint8_t from = bits(inst->a.type);
+    uint8_t from = select_bits(inst->a.type);
     static const enum a64_op sext[] = {A64_SXTB, A64_SXTH, A64_SXTW};
 
     if (inst->a.kind == IR_INT) {
@@ -1340,7 +1315,7 @@ static void emit_unary(struct selector *s, const struct ir_inst *inst)
    A negative constant compares with cmn, which adds its negation. */
 static void compare(struct selector *s, const struct ir_inst *inst)
 {
-    uint8_t n = bits(inst->a.type);
+    uint8_t n = select_bits(inst->a.type);
     bool is_signed = inst->op >= IR_SLT && inst->op <= IR_SGE;
     struct mach_operand a = select_reg(s, &inst->a);
     struct mach_operand ops[3];
@@ -1389,7 +1364,7 @@ static void emit_set(struct selector *s, const struct ir_inst *inst)
    ends in a compare whose NE means overflow. */
 static enum mach_cond overflow_cond(const struct ir_inst *inst)
 {
-    return inst->op != IR_MUL_OV && bits(inst->a.type) >= 32 ? COND_VS
+    return inst->op != IR_MUL_OV && select_bits(inst->a.type) >= 32 ? COND_VS
                                                              : COND_NE;
 }
 
@@ -1402,7 +1377,7 @@ static enum mach_cond overflow_cond(const struct ir_inst *inst)
    gives the result and smulh the half that its sign would be. */
 static void emit_overflow(struct selector *s, const struct ir_inst *inst)
 {
-    uint8_t n = bits(inst->a.type);
+    uint8_t n = select_bits(inst->a.type);
     struct mach_operand r = select_result(s, inst);
     struct mach_operand a = select_reg(s, &inst->a);
     struct mach_operand b = select_reg(s, &inst->b);
@@ -1453,7 +1428,7 @@ static void emit_overflow(struct selector *s, const struct ir_inst *inst)
 static void emit_mul_high(struct selector *s, const struct ir_inst *inst)
 {
     bool is_signed = inst->op == IR_MULH_S;
-    uint8_t n = bits(inst->type);
+    uint8_t n = select_bits(inst->type);
     struct mach_operand r = select_result(s, inst);
     struct mach_operand a;
     struct mach_operand b;
@@ -1507,7 +1482,8 @@ static void emit_flag_op(struct selector *s, const struct ir_inst *inst)
     if (inst->c.kind == IR_NONE) {
         ops[1] = select_reg(s, &inst->a);
         v = inst->b.kind == IR_INT
-                ? select_signed(inst->b.as.integer, bits(inst->b.type))
+                ? select_signed(inst->b.as.integer,
+                                select_bits(inst->b.type))
                 : -1;
         if (inst->b.kind == IR_INT && fits_imm12(v)) {
             emit_imm12(s, add ? A64_ADDS : A64_SUBS, 2, ops, v);
@@ -1543,18 +1519,9 @@ static void emit_flag(struct selector *s, const struct ir_inst *inst)
     emit2(s, A64_CSET, select_result(s, inst), mach_cond_op(c));
 }
 
-static void jump(struct selector *s, const struct ir_operand *target)
-{
-    struct mach_operand b = mach_block_op(target);
-
-    if (!select_is_next(s, target)) {
-        select_emit(s, A64_B, 1, &b);
-    }
-}
-
 static void emit_jump(struct selector *s, const struct ir_inst *inst)
 {
-    jump(s, &inst->a);
+    select_jump(s, &inst->a, A64_B);
 }
 
 /* The arm the condition takes, and the other one after it. When the true
@@ -1569,7 +1536,7 @@ static void conditional(struct selector *s, const struct ir_inst *inst,
         return;
     }
     emit2(s, A64_BCOND, mach_cond_op(c), mach_block_op(&inst->b));
-    jump(s, &inst->c);
+    select_jump(s, &inst->c, A64_B);
 }
 
 /* The operation right before this one left the flags, so the branch
@@ -1596,11 +1563,8 @@ static void emit_branch(struct selector *s, const struct ir_inst *inst)
         return;
     }
     emit2(s, A64_CBNZ, c, mach_block_op(&inst->b));
-    jump(s, &inst->c);
+    select_jump(s, &inst->c, A64_B);
 }
-
-static struct mach_operand memory(struct mach_operand base,
-                                  enum ir_type type);
 
 /* A homogeneous floating-point aggregate: one to four members, all f32 or
    all f64. Returns the number of members, or 0. */
@@ -1698,7 +1662,8 @@ static void locate(const struct selector *s, const struct ir_function *callee,
         bool variadic = i >= callee->param_count;
         bool fp = select_is_float(types[i]) &&
                   !(s->abi == &windows && variadic);
-        int64_t size = s->abi == &apple && !variadic ? bits(types[i]) / 8 : 8;
+        int64_t size =
+            s->abi == &apple && !variadic ? select_bits(types[i]) / 8 : 8;
         memset(&out[i], 0, sizeof out[i]);
         out[i].copy = -1;
         /* The verifier refuses an aggregate among the variadic
@@ -1795,13 +1760,14 @@ static void load_value(struct selector *s, struct mach_operand reg,
     if (value->kind == IR_INT) {
         load(s, reg,
              ext == IR_EXT_SIGN
-                 ? (uint64_t)select_signed(value->as.integer, bits(value->type))
+                 ? (uint64_t)select_signed(value->as.integer,
+                                           select_bits(value->type))
                  : value->as.integer);
     } else if (select_is_float(value->type)) {
         struct mach_operand v = select_reg(s, value);
         emit2(s, A64_FMOV, fp_reg ? reg : mach_widened(reg, v.width), v);
     } else if (ext != IR_EXT_NONE) {
-        emit2(s, extension(bits(value->type), ext == IR_EXT_SIGN), reg,
+        emit2(s, extension(select_bits(value->type), ext == IR_EXT_SIGN), reg,
               select_reg(s, value));
     } else {
         move(s, reg, select_reg(s, value));
@@ -1813,58 +1779,38 @@ static void load_value(struct selector *s, struct mach_operand reg,
    or 16 bits. bl overwrites every caller-saved register. */
 static void emit_call(struct selector *s, const struct ir_inst *inst)
 {
-    const struct ir_function *callee = select_callee(s, inst);
     bool indirect = inst->b.kind == IR_FUNC;
     struct mach_operand target = indirect ? select_reg(s, &inst->a)
                                           : mach_imm(0);
-    enum ir_type *types = alloc_zeroed(inst->arg_count, sizeof *types);
-    struct arg_location *locations =
-        alloc_zeroed(inst->arg_count, sizeof *locations);
-    struct mach_operand *copies =
-        alloc_zeroed(inst->arg_count, sizeof *copies);
-    struct arg_location result;
-    struct mach_operand result_address;
+    struct select_call c;
+    struct arg_location *locations;
     struct mach_operand f = mach_imm(inst->a.as.index);
     struct mach_inst *call;
     uint64_t uses = 0;
-    int64_t next = 0;
+    uint64_t next = 0;
     size_t i;
 
-    memset(&result_address, 0, sizeof result_address);
-    for (i = 0; i < inst->arg_count; i++) {
-        types[i] = i < callee->param_count ? callee->params[i].type
-                                           : inst->args[i].type;
-    }
-    locate(s, callee, types, inst->arg_count, locations);
-    locate_result(s, callee, &result);
-    if (callee->result == IR_AGG && result.indirect) {
-        result_address = select_result_slot(s, inst, select_layout(s, callee->result_agg));
-    }
+    select_call_begin(s, inst, &c);
+    locations = c.locations;
     for (i = 0; i < inst->arg_count; i++) {
         const struct ir_operand *arg = &inst->args[i];
-        uint8_t n = bits(arg->type);
+        uint8_t n = select_bits(arg->type);
         struct mach_operand value;
         struct mach_operand slot;
-        if (types[i] == IR_AGG && (locations[i].indirect ||
-                                   locations[i].stack)) {
-            copies[i] = copy_argument(s, &locations[i],
-                                      select_layout(s, callee->params[i].agg),
-                                      select_reg(s, arg));
+        if (c.types[i] == IR_AGG && (locations[i].indirect ||
+                                     locations[i].stack)) {
+            c.copies[i] = copy_argument(
+                s, &locations[i], select_layout(s, c.callee->params[i].agg),
+                select_reg(s, arg));
         }
-        if (types[i] == IR_AGG && locations[i].stack) {
-            int64_t end = locations[i].offset +
-                          (locations[i].indirect
-                               ? 8
-                               : (int64_t)(select_layout(s, callee->params[i].agg)->size + 7) /
-                                     8 * 8);
-            if (end > next) {
-                next = end;
-            }
+        if (c.types[i] == IR_AGG && locations[i].stack &&
+            select_call_stack_end(s, &c, i) > next) {
+            next = select_call_stack_end(s, &c, i);
         }
-        if (types[i] == IR_AGG || !locations[i].stack) {
+        if (c.types[i] == IR_AGG || !locations[i].stack) {
             continue;
         }
-        if (i >= callee->param_count) {
+        if (i >= c.callee->param_count) {
             n = select_is_float(arg->type) ? width(arg->type) : 64;
         }
         value = arg->kind == IR_INT && arg->as.integer == 0
@@ -1872,60 +1818,38 @@ static void emit_call(struct selector *s, const struct ir_inst *inst)
                     : select_reg(s, arg);
         slot = based_memory(s, mach_preg(SP, 64), locations[i].offset, n);
         emit2(s, A64_STR, value, slot);
-        if (locations[i].offset + n / 8 > next) {
-            next = locations[i].offset + n / 8;
+        if ((uint64_t)locations[i].offset + n / 8 > next) {
+            next = (uint64_t)locations[i].offset + n / 8;
         }
     }
     next = (next + 7) / 8 * 8;
-    if ((uint64_t)next > s->out->outgoing) {
-        s->out->outgoing = (uint64_t)next;
+    if (next > s->out->outgoing) {
+        s->out->outgoing = next;
     }
     for (i = 0; i < inst->arg_count; i++) {
         const struct ir_operand *arg = &inst->args[i];
         enum ir_ext ext = IR_EXT_NONE;
+        bool done;
         if (locations[i].stack) {
             continue;
         }
-        if (types[i] == IR_AGG && locations[i].indirect) {
-            move(s, mach_preg(locations[i].reg, 64), copies[i]);
-            uses |= (uint64_t)1 << locations[i].reg;
+        uses |= select_call_aggregate(s, inst, &c, i, &done);
+        if (done) {
             continue;
         }
-        if (types[i] == IR_AGG) {
-            uses |= select_load_parts(s, &locations[i], select_reg(s, arg));
-            continue;
-        }
-        if (s->abi == &apple && i < callee->param_count) {
-            ext = callee->params[i].ext;
+        if (s->abi == &apple && i < c.callee->param_count) {
+            ext = c.callee->params[i].ext;
         }
         load_value(s, mach_preg(locations[i].reg, width(arg->type)), arg, ext);
         uses |= (uint64_t)1 << locations[i].reg;
     }
-    if (callee->result == IR_AGG && result.indirect) {
-        move(s, mach_preg(result.reg, 64), result_address);
-        uses |= (uint64_t)1 << result.reg;
-    }
-    free(types);
-    free(locations);
-    free(copies);
+    uses |= select_call_result_address(s, &c);
     f.kind = MACH_FUNC;
     call = select_emit(s, indirect ? A64_BLR : A64_BL, 1,
                        indirect ? &target : &f);
     call->uses = uses;
     call->defs = s->abi->caller_saved;
-    if (inst->result != IR_NO_RESULT && callee->result == IR_AGG) {
-        if (!result.indirect) {
-            select_store_parts(s, &result,
-                               select_result_slot(s, inst,
-                                                  select_layout(s, callee->result_agg)));
-        }
-    } else if (inst->result != IR_NO_RESULT && select_is_float(inst->type)) {
-        emit2(s, A64_FMOV, select_result(s, inst),
-              mach_preg(s->abi->fp_result, width(inst->type)));
-    } else if (inst->result != IR_NO_RESULT) {
-        move(s, select_result(s, inst),
-             mach_preg(s->abi->int_result, width(inst->type)));
-    }
+    select_call_finish(s, inst, &c);
 }
 
 static void emit_ret(struct selector *s, const struct ir_inst *inst)
@@ -1954,13 +1878,6 @@ static void emit_ret(struct selector *s, const struct ir_inst *inst)
     ret->uses = uses;
 }
 
-/* A load or a store of type moves bits(type) bits, and the operand's width
-   is that size. */
-static struct mach_operand memory(struct mach_operand base, enum ir_type type)
-{
-    return mach_mem(base, 0, bits(type));
-}
-
 static bool match_scalar(const struct selector *s, const struct ir_inst *inst)
 {
     enum ir_type type = inst->op == IR_STORE ? inst->a.type : inst->type;
@@ -1979,27 +1896,6 @@ static void emit_slot(struct selector *s, const struct ir_inst *inst)
     emit3(s, A64_ADD, select_result(s, inst), mach_preg(SP, 64), slot);
 }
 
-/* The memory operand of a load or a store: the folded address that
-   selection found, or the pointer register itself. */
-static struct mach_operand address_of(struct selector *s,
-                                      const struct ir_operand *pointer,
-                                      enum ir_type type)
-{
-    struct mach_operand m;
-
-    if (!s->has_address) {
-        return memory(select_reg(s, pointer), type);
-    }
-    m = memory(select_reg(s, s->address.base), type);
-    m.value = s->address.offset;
-    if (s->address.index != NULL) {
-        m.index_reg = s->address.index->as.temp;
-        m.index_vreg = true;
-        m.scale = (uint8_t)(1 << s->address.shift);
-    }
-    return m;
-}
-
 /* A load or a store adds an offset that fits_offset holds or an index to
    the base. The index shifts by 0 or by the scale of the size. A store
    with an index takes only zero from wzr or xzr, so that it reads two
@@ -2008,11 +1904,11 @@ static bool fits_address(const struct selector *s, const struct address *a,
                          const struct ir_inst *use)
 {
     enum ir_type type = use->op == IR_STORE ? use->a.type : use->type;
-    uint8_t scale = (uint8_t)popcount(bits(type) / 8 - 1);
+    uint8_t scale = (uint8_t)popcount(select_bits(type) / 8 - 1);
 
     (void)s; /* struct target_desc fixes the signature */
     if (a->index == NULL) {
-        return fits_offset(bits(type), a->offset);
+        return fits_offset(select_bits(type), a->offset);
     }
     if (a->offset != 0 || (a->shift != 0 && a->shift != scale)) {
         return false;
@@ -2024,7 +1920,7 @@ static bool fits_address(const struct selector *s, const struct address *a,
 static void emit_load(struct selector *s, const struct ir_inst *inst)
 {
     emit2(s, A64_LDR, select_result(s, inst),
-          address_of(s, &inst->a, inst->type));
+          select_address_of(s, &inst->a, inst->type));
 }
 
 /* A store of zero reads the zero register, wzr or xzr. */
@@ -2035,7 +1931,7 @@ static void emit_store(struct selector *s, const struct ir_inst *inst)
             ? mach_imm(0)
             : select_reg(s, &inst->a);
 
-    emit2(s, A64_STR, value, address_of(s, &inst->b, inst->a.type));
+    emit2(s, A64_STR, value, select_address_of(s, &inst->b, inst->a.type));
 }
 
 static const struct pattern patterns[] = {
@@ -2088,7 +1984,7 @@ static const struct pattern patterns[] = {
     {IR_LOAD, match_scalar, emit_load},
     {IR_STORE, match_scalar, emit_store},
     {IR_PTRADD, NULL, emit_add_sub},
-    {IR_MEMCOPY, NULL, emit_memcopy},
+    {IR_MEMCOPY, NULL, select_emit_memcopy},
     {IR_SDIV, match_arith, emit_div},
     {IR_UDIV, match_arith, emit_div},
     {IR_SREM, match_arith, emit_div},
@@ -2595,7 +2491,7 @@ static void stack_param(struct selector *s, int64_t offset,
 
     for (i = 0; i < f->param_count; i++) {
         if (f->params[i].temp == dst.reg) {
-            n = bits(f->params[i].type);
+            n = select_bits(f->params[i].type);
         }
     }
     s->out->stack_params = true;
@@ -2624,6 +2520,7 @@ static const struct target_desc desc = {
     .slot_address = slot_address,
     .incoming_address = incoming_address,
     .copy_memory = copy_memory,
+    .fp_first = V0,
     /* DESIGN: the limit of x86_64, so that a program one target compiles
        compiles for every target. ARM64 reaches any offset through x16, and
        no frame of 2 GiB fits the stack of a thread. See docs/decisions.md. */

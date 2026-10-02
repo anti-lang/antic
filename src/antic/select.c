@@ -122,6 +122,87 @@ const struct ir_function *select_callee(const struct selector *s,
                                                    : inst->a.as.index];
 }
 
+void select_call_begin(struct selector *s, const struct ir_inst *inst,
+                       struct select_call *c)
+{
+    size_t i;
+
+    memset(c, 0, sizeof *c);
+    c->callee = select_callee(s, inst);
+    c->types = alloc_zeroed(inst->arg_count, sizeof *c->types);
+    c->locations = alloc_zeroed(inst->arg_count, sizeof *c->locations);
+    c->copies = alloc_zeroed(inst->arg_count, sizeof *c->copies);
+    for (i = 0; i < inst->arg_count; i++) {
+        c->types[i] = i < c->callee->param_count ? c->callee->params[i].type
+                                                 : inst->args[i].type;
+    }
+    s->target->locate(s, c->callee, c->types, inst->arg_count, c->locations);
+    s->target->locate_result(s, c->callee, &c->result);
+    if (c->callee->result == IR_AGG && c->result.indirect) {
+        c->result_address = select_result_slot(
+            s, inst, select_layout(s, c->callee->result_agg));
+    }
+}
+
+uint64_t select_call_stack_end(const struct selector *s,
+                               const struct select_call *c, size_t i)
+{
+    uint64_t bytes =
+        c->locations[i].indirect
+            ? 8
+            : (select_layout(s, c->callee->params[i].agg)->size + 7) / 8 * 8;
+
+    return (uint64_t)c->locations[i].offset + bytes;
+}
+
+uint64_t select_call_aggregate(struct selector *s, const struct ir_inst *inst,
+                               const struct select_call *c, size_t i,
+                               bool *done)
+{
+    const struct arg_location *loc = &c->locations[i];
+
+    *done = c->types[i] == IR_AGG;
+    if (!*done) {
+        return 0;
+    }
+    if (loc->indirect) {
+        s->target->move(s, mach_preg(loc->reg, 64), c->copies[i]);
+        return (uint64_t)1 << loc->reg;
+    }
+    return select_load_parts(s, loc, select_reg(s, &inst->args[i]));
+}
+
+uint64_t select_call_result_address(struct selector *s,
+                                    const struct select_call *c)
+{
+    if (c->callee->result != IR_AGG || !c->result.indirect) {
+        return 0;
+    }
+    s->target->move(s, mach_preg(c->result.reg, 64), c->result_address);
+    return (uint64_t)1 << c->result.reg;
+}
+
+void select_call_finish(struct selector *s, const struct ir_inst *inst,
+                        struct select_call *c)
+{
+    if (inst->result != IR_NO_RESULT && c->callee->result == IR_AGG) {
+        if (!c->result.indirect) {
+            select_store_parts(
+                s, &c->result,
+                select_result_slot(s, inst,
+                                   select_layout(s, c->callee->result_agg)));
+        }
+    } else if (inst->result != IR_NO_RESULT) {
+        uint8_t reg = select_is_float(inst->type) ? s->abi->fp_result
+                                                  : s->abi->int_result;
+        s->target->move(s, select_result(s, inst),
+                        mach_preg(reg, s->target->width(inst->type)));
+    }
+    free(c->types);
+    free(c->locations);
+    free(c->copies);
+}
+
 bool select_uses_got(const struct selector *s, const struct ir_operand *o)
 {
     if (s->imports && o->kind == IR_FUNC) {
@@ -205,6 +286,67 @@ enum mach_cond select_negate(enum mach_cond cond)
 bool select_is_next(const struct selector *s, const struct ir_operand *block)
 {
     return block->as.index == s->block + 1;
+}
+
+uint8_t select_bits(enum ir_type type)
+{
+    switch (type) {
+    case IR_I8: return 8;
+    case IR_I16: return 16;
+    case IR_I32:
+    case IR_F32: return 32;
+    default: return 64;
+    }
+}
+
+bool select_is_float_register(const struct selector *s,
+                              struct mach_operand o)
+{
+    return o.kind == MACH_VREG ? s->out->fp[o.reg]
+                               : o.reg >= s->target->fp_first;
+}
+
+void select_jump(struct selector *s, const struct ir_operand *target,
+                 uint16_t op)
+{
+    struct mach_operand b = mach_block_op(target);
+
+    if (!select_is_next(s, target)) {
+        select_emit(s, op, 1, &b);
+    }
+}
+
+void select_emit_memcopy(struct selector *s, const struct ir_inst *inst)
+{
+    struct mach_operand to = select_reg(s, &inst->a);
+    struct mach_operand from = select_reg(s, &inst->b);
+
+    s->target->copy_memory(s, to, from, select_size(s, inst->of));
+}
+
+struct mach_operand select_memory(struct mach_operand base,
+                                  enum ir_type type)
+{
+    return mach_mem(base, 0, select_bits(type));
+}
+
+struct mach_operand select_address_of(struct selector *s,
+                                      const struct ir_operand *pointer,
+                                      enum ir_type type)
+{
+    struct mach_operand m;
+
+    if (!s->has_address) {
+        return select_memory(select_reg(s, pointer), type);
+    }
+    m = select_memory(select_reg(s, s->address.base), type);
+    m.value = s->address.offset;
+    if (s->address.index != NULL) {
+        m.index_reg = s->address.index->as.temp;
+        m.index_vreg = true;
+        m.scale = (uint8_t)(1 << s->address.shift);
+    }
+    return m;
 }
 
 static void fail(struct selector *s, const char *format, ...)
