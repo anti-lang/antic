@@ -3304,6 +3304,7 @@ foreach(case
         "environment_long|report||--anti.inspect|empty.pattern|missing.pattern|70"
         "environment_utf8|report||--anti.inspect|inspect.file.pattern||0"
         "arguments|report||--anti.threads=2,one,--anti.backtrace,two|arguments.pattern||0"
+        "exit_status|status||4294967299|empty.pattern||3"
         "help|report||--anti.help|help.pattern||0"
         "configure|configure||${CONF}/backtrace.toml|configure.pattern||0"
         "configure_dev|configure|--dev|${CONF}/no-backtrace.toml|configure.plain.pattern||0"

@@ -1,0 +1,11 @@
+//! The status `main` returns is the exit code of the process. Linux and macOS
+//! keep its low 8 bits and Windows its low 32, so a status past 32 bits keeps
+//! its low 32 bits on every system.
+
+import anti.text;
+
+fn main(args: []str) -> int
+{
+	let status = text.parse_int(args[1]) catch fatal;
+	return status;
+}

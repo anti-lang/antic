@@ -109,6 +109,22 @@ static struct anti_slice slice_of(char **list, size_t count)
     return slice;
 }
 
+/* DESIGN: the status of `main` is an int of 64 bits, and the C main
+   gives an int of 32. Windows keeps 32 bits of an exit code, and Linux
+   and macOS keep the low 8 of those, as "Program entry" in
+   docs/decisions.md says. A status of more bits keeps its low 32, read
+   as two's complement through arithmetic C defines, since a conversion
+   of a value out of the range of int is left to the implementation. */
+static int exit_status(int64_t status)
+{
+    uint32_t low = (uint32_t)status;
+
+    if (low <= (uint32_t)INT32_MAX) {
+        return (int)low;
+    }
+    return (int)(low - (uint32_t)INT32_MAX - 1u) + INT32_MIN;
+}
+
 int main(int argc, char **argv)
 {
     struct anti_slice args;
@@ -126,5 +142,5 @@ int main(int argc, char **argv)
     list = anti_rt_process_environment(&count);
     env = slice_of(list, count);
     kept(env);
-    return (int)anti_main(args, env);
+    return exit_status(anti_main(args, env));
 }
