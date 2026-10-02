@@ -358,75 +358,26 @@ struct row {
     int64_t line;
 };
 
-/* Look address up in one unit of the line table. found says whether a row
-   covers it, which is the last row at or below it before the next. */
-static bool unit_line(struct cursor *c, const struct line_sections *s,
-                      uint64_t address, struct anti_found *out)
-{
-    uint64_t length = take(c, 4);
-    bool wide = length == 0xffffffffu;
-    const uint8_t *end;
-    struct cursor unit;
-    struct cursor table;
-    uint64_t header_length;
+/* The header of one unit of the line table: the parameters of its
+   program and the file table, which a lookup reads again for one name. */
+struct line_header {
     int version;
+    bool wide;                  /* 64-bit DWARF */
     uint8_t min_length;
     int8_t line_base;
     uint8_t line_range;
     uint8_t opcode_base;
-    uint8_t lengths[256];
-    struct row r;
-    struct row last;
-    bool have_last = false;
-    int i;
+    uint8_t lengths[256];       /* the operands of each standard opcode */
+    struct cursor table;        /* the directories and files */
+};
 
-    if (wide) {
-        length = take(c, 8);
-    }
-    if (c->bad || (uint64_t)(c->end - c->at) < length) {
-        c->bad = true;
-        return false;
-    }
-    end = c->at + length;
-    unit.at = c->at;
-    unit.end = end;
-    unit.bad = false;
-    c->at = end;
-    version = (int)take(&unit, 2);
-    if (version < 2 || version > 5) {
-        return false;
-    }
-    /* DWARF 5 names the size of an address and of a segment selector,
-       and each set_address carries its own length. */
-    if (version >= 5) {
-        take(&unit, 2);
-    }
-    header_length = take(&unit, wide ? 8 : 4);
-    if (unit.bad || (uint64_t)(unit.end - unit.at) < header_length) {
-        return false;
-    }
-    table.end = unit.at + header_length;
-    min_length = (uint8_t)take(&unit, 1);
-    /* The operations per instruction, from DWARF 4, and the default of
-       is_stmt, which a lookup does not need. */
-    if (version >= 4) {
-        take(&unit, 1);
-    }
-    take(&unit, 1);
-    line_base = (int8_t)take(&unit, 1);
-    line_range = (uint8_t)take(&unit, 1);
-    opcode_base = (uint8_t)take(&unit, 1);
-    memset(lengths, 0, sizeof lengths);
-    for (i = 1; i < opcode_base; i++) {
-        lengths[i] = (uint8_t)take(&unit, 1);
-    }
-    if (unit.bad || line_range == 0) {
-        return false;
-    }
-    /* The directories stand before the files, and the file table is read
-       again for the one name a lookup needs. */
-    if (version >= 5) {
-        uint8_t formats = (uint8_t)take(&unit, 1);
+/* Pass over the directories and the files of the header, which stand
+   before the program. */
+static bool skip_file_table(struct cursor *unit, const struct line_header *h,
+                            const struct line_sections *s)
+{
+    if (h->version >= 5) {
+        uint8_t formats = (uint8_t)take(unit, 1);
         uint64_t forms[16];
         uint64_t count;
         uint8_t k;
@@ -435,88 +386,150 @@ static bool unit_line(struct cursor *c, const struct line_sections *s,
             return false;
         }
         for (k = 0; k < formats; k++) {
-            uleb(&unit);
-            forms[k] = uleb(&unit);
+            uleb(unit);
+            forms[k] = uleb(unit);
         }
-        count = uleb(&unit);
+        count = uleb(unit);
         /* Entries of no format take no bytes, so a count of them would
            loop without reading. */
         if (formats == 0 && count != 0) {
             return false;
         }
-        for (j = 0; j < count && !unit.bad; j++) {
+        for (j = 0; j < count && !unit->bad; j++) {
             for (k = 0; k < formats; k++) {
                 const char *text;
                 uint64_t number;
-                if (!read_form(&unit, forms[k], wide, s, &text, &number)) {
+                if (!read_form(unit, forms[k], h->wide, s, &text, &number)) {
                     return false;
                 }
             }
         }
     } else {
         const char *dir;
-        while ((dir = string_at(&unit)) != NULL && dir[0] != 0) {
+        while ((dir = string_at(unit)) != NULL && dir[0] != 0) {
         }
     }
-    table.at = unit.at;
-    table.bad = unit.bad;
-    unit.at = table.end;
+    return true;
+}
+
+/* Read the header of the unit, which ends with unit at its program. */
+static bool read_line_header(struct cursor *unit, const struct line_sections *s,
+                             struct line_header *h)
+{
+    uint64_t header_length;
+    int i;
+
+    h->version = (int)take(unit, 2);
+    if (h->version < 2 || h->version > 5) {
+        return false;
+    }
+    /* DWARF 5 names the size of an address and of a segment selector,
+       and each set_address carries its own length. */
+    if (h->version >= 5) {
+        take(unit, 2);
+    }
+    header_length = take(unit, h->wide ? 8 : 4);
+    if (unit->bad || (uint64_t)(unit->end - unit->at) < header_length) {
+        return false;
+    }
+    h->table.end = unit->at + header_length;
+    h->min_length = (uint8_t)take(unit, 1);
+    /* The operations per instruction, from DWARF 4, and the default of
+       is_stmt, which a lookup does not need. */
+    if (h->version >= 4) {
+        take(unit, 1);
+    }
+    take(unit, 1);
+    h->line_base = (int8_t)take(unit, 1);
+    h->line_range = (uint8_t)take(unit, 1);
+    h->opcode_base = (uint8_t)take(unit, 1);
+    memset(h->lengths, 0, sizeof h->lengths);
+    for (i = 1; i < h->opcode_base; i++) {
+        h->lengths[i] = (uint8_t)take(unit, 1);
+    }
+    if (unit->bad || h->line_range == 0) {
+        return false;
+    }
+    /* The directories stand before the files, and the file table is read
+       again for the one name a lookup needs. */
+    if (!skip_file_table(unit, h, s)) {
+        return false;
+    }
+    h->table.at = unit->at;
+    h->table.bad = unit->bad;
+    unit->at = h->table.end;
+    return true;
+}
+
+/* Run the line program of the unit until a row covers address, which is
+   the last row at or below it before the next. */
+static bool run_line_program(struct cursor *unit, const struct line_header *h,
+                             const struct line_sections *s, uint64_t address,
+                             struct anti_found *out)
+{
+    struct row r;
+    struct row last;
+    bool have_last = false;
+    int i;
+
     memset(&r, 0, sizeof r);
     r.file = 1;
     r.line = 1;
     memset(&last, 0, sizeof last);
-    while (!unit.bad && unit.at < unit.end) {
-        uint8_t op = (uint8_t)take(&unit, 1);
+    while (!unit->bad && unit->at < unit->end) {
+        uint8_t op = (uint8_t)take(unit, 1);
         bool emit = false;
         bool ends = false;
-        if (op >= opcode_base) {
-            uint8_t adjusted = (uint8_t)(op - opcode_base);
-            r.address += (uint64_t)(adjusted / line_range) * min_length;
-            if (!advance_line(&r.line, line_base + adjusted % line_range)) {
+        if (op >= h->opcode_base) {
+            uint8_t adjusted = (uint8_t)(op - h->opcode_base);
+            r.address += (uint64_t)(adjusted / h->line_range) * h->min_length;
+            if (!advance_line(&r.line,
+                              h->line_base + adjusted % h->line_range)) {
                 return false;
             }
             emit = true;
         } else if (op == 0) {
-            uint64_t n = uleb(&unit);
+            uint64_t n = uleb(unit);
             const uint8_t *next;
             uint8_t sub;
-            if (unit.bad || n == 0 || (uint64_t)(unit.end - unit.at) < n) {
+            if (unit->bad || n == 0 || (uint64_t)(unit->end - unit->at) < n) {
                 break;
             }
-            next = unit.at + n;
-            sub = (uint8_t)take(&unit, 1);
+            next = unit->at + n;
+            sub = (uint8_t)take(unit, 1);
             if (sub == 1) {
                 emit = true;
                 ends = true;
             } else if (sub == 2) {
-                r.address = take(&unit, n - 1 >= 8 ? 8 : (int)(n - 1));
+                r.address = take(unit, n - 1 >= 8 ? 8 : (int)(n - 1));
             }
-            unit.at = next;
+            unit->at = next;
         } else if (op == 1) {
             emit = true;
         } else if (op == 2) {
-            r.address += uleb(&unit) * min_length;
+            r.address += uleb(unit) * h->min_length;
         } else if (op == 3) {
-            if (!advance_line(&r.line, sleb(&unit))) {
+            if (!advance_line(&r.line, sleb(unit))) {
                 return false;
             }
         } else if (op == 4) {
-            r.file = uleb(&unit);
+            r.file = uleb(unit);
         } else if (op == 8) {
-            r.address += (uint64_t)((255 - opcode_base) / line_range) *
-                         min_length;
+            r.address += (uint64_t)((255 - h->opcode_base) / h->line_range) *
+                         h->min_length;
         } else if (op == 9) {
-            r.address += take(&unit, 2);
+            r.address += take(unit, 2);
         } else {
-            for (i = 0; i < lengths[op]; i++) {
-                uleb(&unit);
+            for (i = 0; i < h->lengths[op]; i++) {
+                uleb(unit);
             }
         }
         if (!emit) {
             continue;
         }
         if (have_last && last.address <= address && address < r.address) {
-            const char *name = file_name(table, version, last.file, wide, s);
+            const char *name =
+                file_name(h->table, h->version, last.file, h->wide, s);
             out->file = name;
             out->file_length = name != NULL ? strlen(name) : 0;
             out->line = last.line;
@@ -531,6 +544,31 @@ static bool unit_line(struct cursor *c, const struct line_sections *s,
         }
     }
     return false;
+}
+
+/* Look address up in one unit of the line table. found says whether a row
+   covers it, which is the last row at or below it before the next. */
+static bool unit_line(struct cursor *c, const struct line_sections *s,
+                      uint64_t address, struct anti_found *out)
+{
+    uint64_t length = take(c, 4);
+    struct line_header h;
+    struct cursor unit;
+
+    h.wide = length == 0xffffffffu;
+    if (h.wide) {
+        length = take(c, 8);
+    }
+    if (c->bad || (uint64_t)(c->end - c->at) < length) {
+        c->bad = true;
+        return false;
+    }
+    unit.at = c->at;
+    unit.end = c->at + length;
+    unit.bad = false;
+    c->at = unit.end;
+    return read_line_header(&unit, s, &h) &&
+           run_line_program(&unit, &h, s, address, out);
 }
 
 /* The file and the line of address in the line table of s. */

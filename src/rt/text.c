@@ -680,33 +680,19 @@ static uint64_t rounded_whole(const struct decimal *v, bool dropped)
     return up ? n + 1 : n;
 }
 
-int anti_rt_read_float(const unsigned char *bytes, int64_t length,
-                       int mantissa, int exponent, uint64_t *bits)
+/* Read the digits, the point and the exponent of bytes from i on into
+   v, which keeps the first EXACT_DIGITS significant digits. dropped says
+   whether a digit past them is not zero. Returns false unless the text
+   is a number to its end. */
+static bool read_decimal(const unsigned char *bytes, int64_t length,
+                         int64_t i, struct decimal *v, bool *dropped)
 {
-    /* Entry n is the largest power of 2 below 10^n. It is the most that
-       one step moves a value with n digits before its point. */
-    static const int below_ten[] = {1, 3, 6, 9, 13, 16, 19, 23, 26};
-    int bias = (1 << (exponent - 1)) - 1;
-    uint64_t sign = 0;
-    uint64_t infinite;
-    uint64_t whole;
-    struct decimal v;
-    bool dropped = false;
     bool digits = false;
     bool after_point = false;
     int64_t scale = 0;
-    int64_t power = 0;
-    int64_t i = 0;
 
-    infinite = (((uint64_t)1 << exponent) - 1) << mantissa;
-    if (i < length && (bytes[i] == '+' || bytes[i] == '-')) {
-        if (bytes[i] == '-') {
-            sign = (uint64_t)1 << (mantissa + exponent);
-        }
-        i++;
-    }
-    v.count = 0;
-    v.point = 0;
+    v->count = 0;
+    v->point = 0;
     for (; i < length; i++) {
         unsigned char c = bytes[i];
         if (c == '.' && !after_point) {
@@ -717,19 +703,19 @@ int anti_rt_read_float(const unsigned char *bytes, int64_t length,
             break;
         }
         digits = true;
-        if (c == '0' && v.count == 0) {
-            v.point -= after_point ? 1 : 0;
+        if (c == '0' && v->count == 0) {
+            v->point -= after_point ? 1 : 0;
             continue;
         }
-        v.point += after_point ? 0 : 1;
-        if (v.count < EXACT_DIGITS) {
-            v.d[v.count++] = (char)c;
+        v->point += after_point ? 0 : 1;
+        if (v->count < EXACT_DIGITS) {
+            v->d[v->count++] = (char)c;
         } else if (c != '0') {
-            dropped = true;
+            *dropped = true;
         }
     }
     if (!digits) {
-        return 0;
+        return false;
     }
     if (i < length && (bytes[i] == 'e' || bytes[i] == 'E')) {
         bool minus = false;
@@ -748,11 +734,36 @@ int anti_rt_read_float(const unsigned char *bytes, int64_t length,
             }
         }
         if (!any) {
-            return 0;
+            return false;
         }
-        v.point += minus ? -scale : scale;
+        v->point += minus ? -scale : scale;
     }
-    if (i != length) {
+    return i == length;
+}
+
+int anti_rt_read_float(const unsigned char *bytes, int64_t length,
+                       int mantissa, int exponent, uint64_t *bits)
+{
+    /* Entry n is the largest power of 2 below 10^n. It is the most that
+       one step moves a value with n digits before its point. */
+    static const int below_ten[] = {1, 3, 6, 9, 13, 16, 19, 23, 26};
+    int bias = (1 << (exponent - 1)) - 1;
+    uint64_t sign = 0;
+    uint64_t infinite;
+    uint64_t whole;
+    struct decimal v;
+    bool dropped = false;
+    int64_t power = 0;
+    int64_t i = 0;
+
+    infinite = (((uint64_t)1 << exponent) - 1) << mantissa;
+    if (i < length && (bytes[i] == '+' || bytes[i] == '-')) {
+        if (bytes[i] == '-') {
+            sign = (uint64_t)1 << (mantissa + exponent);
+        }
+        i++;
+    }
+    if (!read_decimal(bytes, length, i, &v, &dropped)) {
         return 0;
     }
     trim(&v);
