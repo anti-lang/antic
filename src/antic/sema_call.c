@@ -1542,8 +1542,8 @@ static struct type *check_mul_high(struct checker *c, struct expr *e,
     struct expr *b;
 
     if (e->as.call.arg_count != 2) {
-        sema_error_at(c, e->pos, "`" MUL_HIGH "` takes 2 arguments, found %d",
-                      (int)e->as.call.arg_count);
+        sema_error_at(c, e->pos, "`" MUL_HIGH "` takes 2 arguments, found %zu",
+                      e->as.call.arg_count);
         return sema_builtin(c, TYPE_ERROR);
     }
     if (e->as.call.handler.kind != HANDLE_NONE) {
@@ -1602,8 +1602,8 @@ static struct type *check_close(struct checker *c, struct expr *e)
     struct type *t;
 
     if (e->as.call.arg_count != 1) {
-        sema_error_at(c, e->pos, "`" CHAN_CLOSE "` takes 1 argument, found %d",
-                      (int)e->as.call.arg_count);
+        sema_error_at(c, e->pos, "`" CHAN_CLOSE "` takes 1 argument, found %zu",
+                      e->as.call.arg_count);
         return sema_builtin(c, TYPE_ERROR);
     }
     t = channel_of(c, e->as.call.args[0], CHAN_CLOSE);
@@ -1765,9 +1765,9 @@ static struct type *check_simd_module(struct checker *c, struct expr *e)
     struct type *b;
 
     if (count != (select ? 3u : 1u)) {
-        sema_error_at(c, e->pos, "`simd.%.*s` takes %d argument%s, found %d",
+        sema_error_at(c, e->pos, "`simd.%.*s` takes %d argument%s, found %zu",
                       (int)name->length, name->text, select ? 3 : 1,
-                      select ? "s" : "", (int)count);
+                      select ? "s" : "", count);
         return sema_builtin(c, TYPE_ERROR);
     }
     mask = sema_check_expr(c, args[0], NULL);
@@ -1838,7 +1838,7 @@ static struct type *check_simd_static(struct checker *c, struct expr *e,
         if (count != 1) {
             sema_error_at(c, e->pos,
                           "`%s." SIMD_SPLAT "` takes 1 argument, found "
-                          "%d", sema_tn(t), (int)count);
+                          "%zu", sema_tn(t), count);
             return sema_builtin(c, TYPE_ERROR);
         }
         if (!sema_require(c, args[0], sema_check_expr(c, args[0], lane),
@@ -1850,8 +1850,8 @@ static struct type *check_simd_static(struct checker *c, struct expr *e,
     }
     if (count != 2) {
         sema_error_at(c, e->pos,
-                      "`%s." SIMD_LOAD "` takes 2 arguments, found %d",
-                      sema_tn(t), (int)count);
+                      "`%s." SIMD_LOAD "` takes 2 arguments, found %zu",
+                      sema_tn(t), count);
         return sema_builtin(c, TYPE_ERROR);
     }
     {
@@ -1912,9 +1912,9 @@ static struct type *check_simd_value(struct checker *c, struct expr *e,
            : op == SIMD_OP_DOT     ? 1
                                    : 0;
     if (count != want) {
-        sema_error_at(c, e->pos, "`%.*s` takes %zu argument%s, found %d",
+        sema_error_at(c, e->pos, "`%.*s` takes %zu argument%s, found %zu",
                       (int)name->length, name->text, want, want == 1 ? "" : "s",
-                      (int)count);
+                      count);
         return sema_builtin(c, TYPE_ERROR);
     }
     if (op != SIMD_OP_STORE && op != SIMD_OP_SHUFFLE &&
@@ -2947,8 +2947,8 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
                               (int)name->length - 1,
                               name->text + 1);
             } else {
-                sema_error_at(c, e->pos, "`%s` has %d elements, and `%.*s` is "
-                              "none of them", sema_tn(s), (int)s->field_count,
+                sema_error_at(c, e->pos, "`%s` has %zu elements, and `%.*s` "
+                              "is none of them", sema_tn(s), s->field_count,
                               (int)name->length - 1, name->text + 1);
             }
             return sema_builtin(c, TYPE_ERROR);
@@ -3255,6 +3255,12 @@ static struct type *worker_callee(struct checker *c, struct expr **slot,
             return NULL;
         }
         callee->type = fn;
+    }
+    if (fn->param_count == 0) {
+        sema_error_at(c, call->pos, "`%.*s` has no parameter for the %s",
+                      (int)callee->as.name.length, callee->as.name.text,
+                      first);
+        return NULL;
     }
     if (fn->param_count != arg_count + 1) {
         sema_error_at(c, call->pos,

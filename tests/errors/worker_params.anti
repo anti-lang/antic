@@ -1,0 +1,15 @@
+//! A worker takes the chunk or the object first. One without parameters has no
+//! place for it, and the message says so rather than counting the arguments.
+
+worker fn nothing() -> int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	let items: [4]int = [1, 2, 3, 4];
+	let all = items[0..4];
+	let counts = parallel all -> nothing();
+	return 0;
+}

@@ -501,9 +501,9 @@ static void bind_pattern(struct checker *c, struct stmt *s,
                           s->as.for_loop.over_text.bytes, sema_tn(tuple));
             tuple = sema_builtin(c, TYPE_ERROR);
         } else if (tuple->param_count != count) {
-            sema_error_at(c, names[0].pos, "`%s` has %d elements, and the "
-                          "pattern names %d", sema_tn(tuple),
-                          (int)tuple->param_count, (int)count);
+            sema_error_at(c, names[0].pos, "`%s` has %zu elements, and the "
+                          "pattern names %zu", sema_tn(tuple),
+                          tuple->param_count, count);
             tuple = sema_builtin(c, TYPE_ERROR);
         }
     }
@@ -1069,8 +1069,8 @@ static void bind_elements(struct checker *c, struct binding *names,
         t = sema_builtin(c, TYPE_ERROR);
     } else if (!sema_is_error(t) && t->param_count != count) {
         sema_error_at(c, pos,
-                      "`%s` has %d elements, and the destructuring names "
-                      "%d", sema_tn(t), (int)t->param_count, (int)count);
+                      "`%s` has %zu elements, and the destructuring names "
+                      "%zu", sema_tn(t), t->param_count, count);
         t = sema_builtin(c, TYPE_ERROR);
     }
     for (i = 0; i < count; i++) {
