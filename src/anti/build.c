@@ -96,15 +96,24 @@ struct build {
     struct unit_links links;
 };
 
-/* The cache key of one output: the digest of its input, the version of
-   the compiler, the target and the processor level. The addendum names
-   the first three. The level joins them because it decides the
-   instructions, and the debug flag because it decides the lines. The
-   strict flag is --warnings-as-errors, which decides whether a warning
-   stops the file. The flag of --memory-checks decides whether the
-   object carries the checks. */
-static void cache_key(const char *input, enum target t, enum cpu_level cpu,
-                      bool debug, bool strict, bool checked, struct text *out)
+/* What decides one output of the cache beside its input. The addendum
+   names the version of the compiler and the target. The level joins them
+   because it decides the instructions, and debug because it decides the
+   lines. strict is --warnings-as-errors, which decides whether a warning
+   stops the file, and checked is --memory-checks, which decides whether
+   the object carries the checks. */
+struct cache_flags {
+    enum target target;
+    enum cpu_level cpu;
+    bool debug;
+    bool strict;
+    bool checked;
+};
+
+/* The cache key of one output: the digest of input, the version of the
+   compiler and the flags f. */
+static void cache_key(const char *input, const struct cache_flags *f,
+                      struct text *out)
 {
     struct anti_sha256 digest;
     struct text bytes = {0};
@@ -116,8 +125,9 @@ static void cache_key(const char *input, enum target t, enum cpu_level cpu,
     }
     anti_rt_sha256_hex(&digest, hex);
     text_appendf(out, "%s %s %s %s %s%s%s\n", hex, ANTIC_VERSION,
-                 target_name(t), cpu_name(cpu), debug ? "g" : "no-g",
-                 strict ? " strict" : "", checked ? " memory-checks" : "");
+                 target_name(f->target), cpu_name(f->cpu),
+                 f->debug ? "g" : "no-g", f->strict ? " strict" : "",
+                 f->checked ? " memory-checks" : "");
     text_free(&bytes);
 }
 
@@ -230,6 +240,7 @@ static bool module_library(struct build *b, const struct unit *u,
                            struct text *output)
 {
     struct options o;
+    struct cache_flags flags = {0};
     struct text key = {0};
     bool ok = false;
 
@@ -241,7 +252,10 @@ static bool module_library(struct build *b, const struct unit *u,
        module of the project with --warnings-as-errors. A library file
        that a dev build wrote was checked without it, and the key keeps
        the two apart. */
-    cache_key(u->source, t, cpu, false, b->r->release, false, &key);
+    flags.target = t;
+    flags.cpu = cpu;
+    flags.strict = b->r->release;
+    cache_key(u->source, &flags, &key);
     if (cached(text_cstr(output), &key)) {
         ok = true;
         goto done;
@@ -271,6 +285,7 @@ static bool module_object(struct build *b, const char *library,
                           struct text *out)
 {
     struct options o;
+    struct cache_flags flags = {0};
     struct strings rest = {0};
     struct text base = {0};
     struct text key = {0};
@@ -282,8 +297,11 @@ static bool module_object(struct build *b, const char *library,
         goto done;
     }
     text_appendf(out, "%s%s", text_cstr(&base), target_info(t)->object_suffix);
-    cache_key(library, t, cpu, build_debug(b), false, b->r->memory_checks,
-              &key);
+    flags.target = t;
+    flags.cpu = cpu;
+    flags.debug = build_debug(b);
+    flags.checked = b->r->memory_checks;
+    cache_key(library, &flags, &key);
     if (cached(text_cstr(out), &key)) {
         ok = true;
         goto done;

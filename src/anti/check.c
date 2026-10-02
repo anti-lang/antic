@@ -411,9 +411,7 @@ static bool project_sources(const char *src, const char *test,
     return ok;
 }
 
-int check_run(const char *const *sources, size_t source_count,
-              const char *const *roots, size_t root_count, const char *work,
-              const char *runtime, bool undocumented, bool all_targets)
+int check_run(const struct check_request *r)
 {
     struct diagnostic_counts counts;
     struct files_list found = {0};
@@ -444,38 +442,38 @@ int check_run(const char *const *sources, size_t source_count,
        directory are search roots of the run, because the directories
        under them mirror the module paths. */
     if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package) ||
-        (source_count == 0 &&
+        (r->source_count == 0 &&
          !project_sources(text_cstr(&src), text_cstr(&test), &found)) ||
-        !files_make_dirs(work)) {
+        !files_make_dirs(r->work)) {
         status = 1;
         goto done;
     }
-    count = source_count > 0 ? source_count : found.count;
+    count = r->source_count > 0 ? r->source_count : found.count;
     units = files_array(count + 1, sizeof *units);
     order = files_array(count + 1, sizeof *order);
-    path_roots = files_array(root_count + 2, sizeof *path_roots);
-    search = files_array(root_count + 3, sizeof *search);
-    block_search = files_array(root_count + 4, sizeof *block_search);
+    path_roots = files_array(r->root_count + 2, sizeof *path_roots);
+    search = files_array(r->root_count + 3, sizeof *search);
+    block_search = files_array(r->root_count + 4, sizeof *block_search);
     path_root_count = 0;
-    for (i = 0; i < root_count; i++) {
-        path_roots[path_root_count++] = roots[i];
+    for (i = 0; i < r->root_count; i++) {
+        path_roots[path_root_count++] = r->roots[i];
     }
     path_roots[path_root_count++] = text_cstr(&src);
     path_roots[path_root_count++] = text_cstr(&test);
     /* The work directory holds the interface files of this run, and the
        roots hold the sources. All of them are search roots, the work
        directory first, so a module of the run wins. */
-    search[0] = work;
+    search[0] = r->work;
     for (i = 0; i < path_root_count; i++) {
         search[i + 1] = path_roots[i];
     }
-    text_appendf(&dev_root, "%s/%s", work, CHECK_DEV_DIR);
+    text_appendf(&dev_root, "%s/%s", r->work, CHECK_DEV_DIR);
     block_search[0] = text_cstr(&dev_root);
     for (i = 0; i <= path_root_count; i++) {
         block_search[i + 1] = search[i];
     }
     if (!base_options(&base, package.length > 0 ? text_cstr(&package) : NULL,
-                      runtime, search, path_root_count + 1)) {
+                      r->runtime, search, path_root_count + 1)) {
         status = 2;
         goto done;
     }
@@ -484,13 +482,13 @@ int check_run(const char *const *sources, size_t source_count,
     blocks.root_count = path_root_count + 2;
     for (i = 0; i < count; i++) {
         const char *source =
-            source_count > 0 ? sources[i] : text_cstr(&found.items[i]);
-        unit_read(source, path_roots, path_root_count, work, &units[i]);
+            r->source_count > 0 ? r->sources[i] : text_cstr(&found.items[i]);
+        unit_read(source, path_roots, path_root_count, r->work, &units[i]);
     }
     unit_order(units, count, order);
 
     failed = front_end_class(units, count, order, &base, &counts,
-                             undocumented, all_targets, &targets);
+                             r->undocumented, r->all_targets, &targets);
     printf("anti check: front end: %zu file%s, %zu target%s, %zu warning%s",
            count, count == 1 ? "" : "s", targets, targets == 1 ? "" : "s",
            counts.warnings, counts.warnings == 1 ? "" : "s");
@@ -502,7 +500,7 @@ int check_run(const char *const *sources, size_t source_count,
     printf("\n");
 
     for (i = 0; i < count; i++) {
-        if (!unit_blocks(&units[order[i]], &blocks, work, &blocks_count,
+        if (!unit_blocks(&units[order[i]], &blocks, r->work, &blocks_count,
                          &blocks_failed)) {
             blocks_failed++;
         }

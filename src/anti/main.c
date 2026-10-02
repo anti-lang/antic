@@ -289,6 +289,7 @@ static int build_command(int argc, char **argv)
 /* `anti check`. */
 static int check_command(int argc, char **argv)
 {
+    struct check_request request = {0};
     const char **sources = files_array((size_t)argc, sizeof *sources);
     const char **roots = files_array((size_t)argc, sizeof *roots);
     const char *work = "build/check";
@@ -324,8 +325,15 @@ static int check_command(int argc, char **argv)
     if (runtime == NULL && default_runtime(&home)) {
         runtime = text_cstr(&home);
     }
-    status = check_run(sources, count, roots, root_count, work, runtime,
-                       undocumented, all_targets);
+    request.sources = sources;
+    request.source_count = count;
+    request.roots = roots;
+    request.root_count = root_count;
+    request.work = work;
+    request.runtime = runtime;
+    request.undocumented = undocumented;
+    request.all_targets = all_targets;
+    status = check_run(&request);
 
 done:
     free((void *)sources);
@@ -337,6 +345,7 @@ done:
 /* `anti doc`. */
 static int doc_command(int argc, char **argv)
 {
+    struct doc_request request = {0};
     const char **sources = files_array((size_t)argc, sizeof *sources);
     const char **roots = files_array((size_t)argc, sizeof *roots);
     const char **listed = NULL;
@@ -401,10 +410,18 @@ static int doc_command(int argc, char **argv)
             roots[root_count++] = text_cstr(&src);
         }
     }
-    status = doc_run(listed != NULL ? listed : sources, count, roots,
-                     root_count, out, work,
-                     package.length > 0 ? text_cstr(&package) : NULL, runtime,
-                     form, dev, private_items);
+    request.sources = listed != NULL ? listed : sources;
+    request.source_count = count;
+    request.roots = roots;
+    request.root_count = root_count;
+    request.out = out;
+    request.work = work;
+    request.package = package.length > 0 ? text_cstr(&package) : NULL;
+    request.runtime = runtime;
+    request.form = form;
+    request.dev = dev;
+    request.private_items = private_items;
+    status = doc_run(&request);
 
 done:
     free((void *)sources);
@@ -470,6 +487,7 @@ done:
 /* `anti test`. */
 static int test_command(int argc, char **argv)
 {
+    struct test_request request = {0};
     const char **sources = files_array((size_t)argc, sizeof *sources);
     const char **roots = files_array((size_t)argc, sizeof *roots);
     const char *work = "build/tests";
@@ -519,10 +537,19 @@ static int test_command(int argc, char **argv)
         status = 1;
         goto done;
     }
-    status = test_run(sources, count, roots, root_count, work,
-                      package.length > 0 ? text_cstr(&package) : NULL, runtime,
-                      llvm_mc, release, memory_checks, inject.entries,
-                      inject.count);
+    request.sources = sources;
+    request.source_count = count;
+    request.roots = roots;
+    request.root_count = root_count;
+    request.work = work;
+    request.package = package.length > 0 ? text_cstr(&package) : NULL;
+    request.runtime = runtime;
+    request.llvm_mc = llvm_mc;
+    request.release = release;
+    request.memory_checks = memory_checks;
+    request.inject = inject.entries;
+    request.inject_count = inject.count;
+    status = test_run(&request);
 
 done:
     manifest_inject_free(&inject);

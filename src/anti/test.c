@@ -322,11 +322,7 @@ done:
     return ok;
 }
 
-int test_run(const char *const *sources, size_t source_count,
-             const char *const *roots, size_t root_count, const char *work,
-             const char *package, const char *runtime, const char *llvm_mc,
-             bool release, bool memory_checks, const char *const *inject,
-             size_t inject_count)
+int test_run(const struct test_request *r)
 {
     struct options base;
     const char **search;
@@ -335,24 +331,24 @@ int test_run(const char *const *sources, size_t source_count,
     size_t failed = 0;
     size_t i;
 
-    if (source_count == 0) {
+    if (r->source_count == 0) {
         fputs("anti: test takes one or more .anti files\n", stderr);
         return 2;
     }
-    if (!files_make_dirs(work)) {
+    if (!files_make_dirs(r->work)) {
         return 1;
     }
-    units = files_array(source_count, sizeof *units);
-    search = files_array(root_count + 1, sizeof *search);
+    units = files_array(r->source_count, sizeof *units);
+    search = files_array(r->root_count + 1, sizeof *search);
     /* The work directory holds the library files this run wrote, and the
        user's roots hold the sources. Both are search roots of every call,
        the work directory first, so a module of the run wins. */
-    search[0] = work;
-    for (i = 0; i < root_count; i++) {
-        search[i + 1] = roots[i];
+    search[0] = r->work;
+    for (i = 0; i < r->root_count; i++) {
+        search[i + 1] = r->roots[i];
     }
-    if (!base_options(&base, package, runtime, llvm_mc, search,
-                      root_count + 1, memory_checks)) {
+    if (!base_options(&base, r->package, r->runtime, r->llvm_mc, search,
+                      r->root_count + 1, r->memory_checks)) {
         free(units);
         free(search);
         return 2;
@@ -360,36 +356,37 @@ int test_run(const char *const *sources, size_t source_count,
     /* DESIGN: `[inject.test]` of the manifest lies over `[inject]`, so a
        test run takes the fake of an interface where the manifest names
        one. Every compile of the run carries the same table. */
-    base.inject = inject;
-    base.inject_count = inject_count;
-    for (i = 0; i < source_count; i++) {
-        if (!read_unit(sources[i], roots, root_count, work, &units[i])) {
-            failed = source_count;
+    base.inject = r->inject;
+    base.inject_count = r->inject_count;
+    for (i = 0; i < r->source_count; i++) {
+        if (!read_unit(r->sources[i], r->roots, r->root_count, r->work,
+                       &units[i])) {
+            failed = r->source_count;
             goto done;
         }
         total += units[i].unit.test_count;
     }
     /* Every library file first, so a module that imports another of the
        run finds it however the files were ordered. */
-    for (i = 0; i < source_count; i++) {
+    for (i = 0; i < r->source_count; i++) {
         if (!compile_library(&units[i], &base) ||
-            (!release && !compile_object(&units[i], &base, work))) {
-            failed = source_count;
+            (!r->release && !compile_object(&units[i], &base, r->work))) {
+            failed = r->source_count;
             goto done;
         }
     }
-    for (i = 0; i < source_count; i++) {
+    for (i = 0; i < r->source_count; i++) {
         if (units[i].unit.test_count == 0) {
             continue;
         }
-        if (!run_unit(&units[i], &base, work, release)) {
+        if (!run_unit(&units[i], &base, r->work, r->release)) {
             failed++;
         }
     }
     printf("anti test: %zu tests in %zu modules, %zu module%s failed\n",
-           total, source_count, failed, failed == 1 ? "" : "s");
+           total, r->source_count, failed, failed == 1 ? "" : "s");
 done:
-    for (i = 0; i < source_count; i++) {
+    for (i = 0; i < r->source_count; i++) {
         unit_free(&units[i].unit);
         text_free(&units[i].object);
     }

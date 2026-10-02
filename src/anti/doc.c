@@ -737,10 +737,7 @@ static bool write_interfaces(const char *const *sources, size_t count,
     return ok;
 }
 
-int doc_run(const char *const *sources, size_t count,
-            const char *const *roots, size_t root_count, const char *out,
-            const char *work, const char *package, const char *runtime,
-            enum doc_form form, bool dev, bool private_items)
+int doc_run(const struct doc_request *r)
 {
     struct options base;
     enum target target;
@@ -755,38 +752,40 @@ int doc_run(const char *const *sources, size_t count,
     size_t i;
     int status = 0;
 
-    if (count == 0) {
+    if (r->source_count == 0) {
         fputs("anti: doc takes a source or a library file\n", stderr);
         return 2;
     }
-    pages = files_array(count, sizeof *pages);
-    units = files_array(count, sizeof *units);
-    order = files_array(count, sizeof *order);
-    search = files_array(root_count + 2, sizeof *search);
-    for (i = 0; i < root_count; i++) {
-        search[search_count++] = roots[i];
+    pages = files_array(r->source_count, sizeof *pages);
+    units = files_array(r->source_count, sizeof *units);
+    order = files_array(r->source_count, sizeof *order);
+    search = files_array(r->root_count + 2, sizeof *search);
+    for (i = 0; i < r->root_count; i++) {
+        search[search_count++] = r->roots[i];
     }
-    search[search_count++] = work;
+    search[search_count++] = r->work;
     if (!unit_host(&target, &cpu)) {
         status = 2;
         goto done;
     }
-    unit_options(&base, package, runtime, search, search_count, target, cpu);
+    unit_options(&base, r->package, r->runtime, search, search_count, target,
+                 cpu);
     base.front_end = true;
-    if (!files_make_dirs(out) || !files_make_dirs(work) ||
-        !write_interfaces(sources, count, &base, work, units, order)) {
+    if (!files_make_dirs(r->out) || !files_make_dirs(r->work) ||
+        !write_interfaces(r->sources, r->source_count, &base, r->work, units,
+                          order)) {
         status = 1;
         goto done;
     }
-    for (i = 0; i < count; i++) {
+    for (i = 0; i < r->source_count; i++) {
         struct options o = base;
-        enum doc_items items = dev             ? DOC_ITEMS_DEV
-                               : private_items ? DOC_ITEMS_PRIVATE
-                                               : DOC_ITEMS_PUBLIC;
-        o.input = sources[i];
-        if ((dev || private_items) && is_library(sources[i])) {
-            fprintf(stderr, "anti: %s: %s needs the source\n", sources[i],
-                    dev ? "--dev" : "--private");
+        enum doc_items items = r->dev             ? DOC_ITEMS_DEV
+                               : r->private_items ? DOC_ITEMS_PRIVATE
+                                                  : DOC_ITEMS_PUBLIC;
+        o.input = r->sources[i];
+        if ((r->dev || r->private_items) && is_library(r->sources[i])) {
+            fprintf(stderr, "anti: %s: %s needs the source\n", r->sources[i],
+                    r->dev ? "--dev" : "--private");
             status = 1;
             goto done;
         }
@@ -798,17 +797,18 @@ int doc_run(const char *const *sources, size_t count,
            page, and a library file may come from a repository. */
         if (!repo_name_valid(text_cstr(&pages[i].module))) {
             fprintf(stderr, "anti: %s names the module %s, which is no module "
-                            "path\n", sources[i], text_cstr(&pages[i].module));
+                            "path\n", r->sources[i],
+                    text_cstr(&pages[i].module));
             status = 1;
             goto done;
         }
     }
-    for (i = 0; i < count; i++) {
+    for (i = 0; i < r->source_count; i++) {
         body.length = 0;
         path.length = 0;
-        page_render(&body, &pages[i], form);
-        text_appendf(&path, "%s/%s%s", out, text_cstr(&pages[i].module),
-                     suffix_of(form));
+        page_render(&body, &pages[i], r->form);
+        text_appendf(&path, "%s/%s%s", r->out, text_cstr(&pages[i].module),
+                     suffix_of(r->form));
         if (!files_write(text_cstr(&path), &body)) {
             status = 1;
             goto done;
@@ -816,16 +816,17 @@ int doc_run(const char *const *sources, size_t count,
     }
     body.length = 0;
     path.length = 0;
-    index_render(&body, pages, count, form);
-    text_appendf(&path, "%s/index%s", out, suffix_of(form));
+    index_render(&body, pages, r->source_count, r->form);
+    text_appendf(&path, "%s/index%s", r->out, suffix_of(r->form));
     if (!files_write(text_cstr(&path), &body)) {
         status = 1;
         goto done;
     }
-    printf("doc: %zu module%s into %s\n", count, count == 1 ? "" : "s", out);
+    printf("doc: %zu module%s into %s\n", r->source_count,
+           r->source_count == 1 ? "" : "s", r->out);
 
 done:
-    for (i = 0; i < count; i++) {
+    for (i = 0; i < r->source_count; i++) {
         doc_page_free(&pages[i]);
         if (units[i].source != NULL) {
             unit_free(&units[i]);
