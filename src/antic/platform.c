@@ -869,3 +869,94 @@ bool self_directory(struct text *out)
     text_free(&path);
     return true;
 }
+
+/* The length of the root of an absolute path. That is a drive such as
+   `C:`, the host and share of a path that starts with `//`, or nothing. */
+static size_t root_length(const char *path)
+{
+    size_t n = 0;
+    int parts = 0;
+
+    if (strncmp(path, "//", 2) != 0) {
+        return strcspn(path, "/");
+    }
+    n = 2;
+    while (parts < 2 && path[n] != '\0') {
+        n += strcspn(path + n, "/");
+        parts++;
+        if (parts < 2 && path[n] == '/') {
+            n++;
+        }
+    }
+    return n;
+}
+
+static bool same_root(const char *a, size_t n, const char *b, size_t m)
+{
+    size_t i;
+
+    if (n != m) {
+        return false;
+    }
+    for (i = 0; i < n; i++) {
+        char x = a[i] >= 'A' && a[i] <= 'Z' ? (char)(a[i] - 'A' + 'a') : a[i];
+        char y = b[i] >= 'A' && b[i] <= 'Z' ? (char)(b[i] - 'A' + 'a') : b[i];
+        if (x != y) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* The next part of a path after at, skipping empty parts. Returns its
+   length, 0 at the end. */
+static size_t part(const char *path, size_t *at)
+{
+    while (path[*at] == '/') {
+        (*at)++;
+    }
+    return strcspn(path + *at, "/");
+}
+
+bool path_relative(struct text *out, const char *path, const char *directory)
+{
+    size_t root = root_length(path);
+    size_t at = root;
+    size_t from = root_length(directory);
+    size_t start = out->length;
+    size_t n;
+    size_t m;
+
+    if (!same_root(path, root, directory, from)) {
+        return false;
+    }
+    /* The parts the two share. */
+    for (;;) {
+        size_t a = at;
+        size_t b = from;
+        n = part(path, &a);
+        m = part(directory, &b);
+        if (n == 0 || n != m || strncmp(path + a, directory + b, n) != 0) {
+            at = a;
+            from = b;
+            break;
+        }
+        at = a + n;
+        from = b + m;
+    }
+    /* A `..` for each part of the directory left, then the rest of the
+       path. */
+    while ((m = part(directory, &from)) > 0) {
+        text_append(out, out->length > start ? "/.." : "..");
+        from += m;
+    }
+    while ((n = part(path, &at)) > 0) {
+        text_appendf(out, "%s%.*s", out->length > start ? "/" : "", (int)n,
+                     path + at);
+        at += n;
+    }
+    if (out->length == start) {
+        text_append(out, ".");
+    }
+    return true;
+}

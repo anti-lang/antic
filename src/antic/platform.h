@@ -38,6 +38,12 @@ char **platform_arguments(char **argv);
    before. src/rt/platform.h follows the same rule. */
 bool path_is_absolute(const char *path);
 
+/* Append the path of path relative to the directory directory. Both are
+   absolute and separate their parts with '/', and neither holds `.` or
+   `..`. Returns false when the two stand on different roots, a drive or a
+   share of Windows, and no relative path joins them. */
+bool path_relative(struct text *out, const char *path, const char *directory);
+
 /* The last separator of the directories of path, or NULL when it has
    none: `/` on every host, and `\` as well on Windows. */
 const char *platform_last_separator(const char *path);

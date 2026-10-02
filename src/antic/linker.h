@@ -160,12 +160,6 @@ void link_native_library(struct text *out, const char *runtime, enum target t,
    sysroot/, with LINUX_GLIBC_SUFFIX in the glibc mode. */
 void link_target_dir(struct text *out, enum target t, bool glibc);
 
-/* Append the path of path relative to the directory directory. Both are
-   absolute and separate their parts with '/', and neither holds `.` or
-   `..`. Returns false when the two stand on different roots, a drive or a
-   share of Windows, and no relative path joins them. */
-bool link_relative(struct text *out, const char *path, const char *directory);
-
 /* The flavour of lld that links for target t, a program of
    <runtime>/RUNTIME_BIN_DIR/ without the suffix of the host. */
 const char *link_lld_flavour(enum target t);

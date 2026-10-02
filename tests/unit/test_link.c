@@ -225,13 +225,13 @@ static void relative_paths(void)
 
     for (i = 0; i < sizeof cases / sizeof cases[0]; i++) {
         struct text out = {0};
-        CHECK(link_relative(&out, cases[i][0], cases[i][1]));
+        CHECK(path_relative(&out, cases[i][0], cases[i][1]));
         CHECK_STR(text_cstr(&out), cases[i][2]);
         text_free(&out);
     }
     for (i = 0; i < sizeof apart / sizeof apart[0]; i++) {
         struct text out = {0};
-        CHECK(!link_relative(&out, apart[i][0], apart[i][1]));
+        CHECK(!path_relative(&out, apart[i][0], apart[i][1]));
         text_free(&out);
     }
 }
