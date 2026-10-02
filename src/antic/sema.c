@@ -26,30 +26,6 @@ int64_t sema_signed_bits(uint64_t v)
     return v <= INT64_MAX ? (int64_t)v : -(int64_t)~v - 1;
 }
 
-/* Format into out, which holds size bytes, size being 4 or more. A text
-   too long for out ends in three periods where it was cut, so that a message
-   never loses its end unmarked. */
-static void vformat_to(char *out, size_t size, const char *format,
-                       va_list args)
-{
-    int n = vsnprintf(out, size, format, args);
-
-    if (n < 0) {
-        out[0] = '\0';
-    } else if ((size_t)n >= size) {
-        memcpy(out + size - 4, "...", 4);
-    }
-}
-
-void sema_format_to(char *out, size_t size, const char *format, ...)
-{
-    va_list args;
-
-    va_start(args, format);
-    vformat_to(out, size, format, args);
-    va_end(args);
-}
-
 void sema_error_at(struct checker *c, struct pos pos, const char *format,
                    ...)
 {
@@ -60,7 +36,7 @@ void sema_error_at(struct checker *c, struct pos pos, const char *format,
         return;
     }
     va_start(args, format);
-    vformat_to(message, sizeof message, format, args);
+    text_vformat(message, sizeof message, format, args);
     va_end(args);
     diagnostics_add(c->diags, pos.line, pos.column, "%s", message);
     c->ok = false;
@@ -76,7 +52,7 @@ void sema_check_at(struct checker *c, enum diag_name name, struct pos pos,
         return;
     }
     va_start(args, format);
-    vformat_to(message, sizeof message, format, args);
+    text_vformat(message, sizeof message, format, args);
     va_end(args);
     diagnostics_check(c->diags, name, pos.line, pos.column, "%s", message);
 }
@@ -91,7 +67,7 @@ const char *sema_tn(const struct type *t)
     char *buffer = buffers[next++ % 4];
 
     type_name(&text, t);
-    sema_format_to(buffer, sizeof buffers[0], "%s", text_cstr(&text));
+    text_format(buffer, sizeof buffers[0], "%s", text_cstr(&text));
     text_free(&text);
     return buffer;
 }

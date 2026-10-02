@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "attributes.h"
+
 /* DESIGN: every warning and every safety check has a stable name, printed
    at the end of its message. The table of src/antic/warnings.c is the
    one place that spells the names. docs/notes/warnings.md lists them with their meaning and their
@@ -56,31 +58,19 @@ struct diagnostics {
 
 void diagnostics_add(struct diagnostics *d, int line, int column,
                      const char *format, ...)
-#if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 4, 5)))
-#endif
-    ;
+    ATTRIBUTE_PRINTF(4, 5);
 void diagnostics_warn(struct diagnostics *d, enum diag_name name, int line,
                       int column, const char *format, ...)
-#if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 5, 6)))
-#endif
-    ;
+    ATTRIBUTE_PRINTF(5, 6);
 /* A safety check, an error with a name, which `unchecked` overrules. */
 void diagnostics_check(struct diagnostics *d, enum diag_name name, int line,
                        int column, const char *format, ...)
-#if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 5, 6)))
-#endif
-    ;
+    ATTRIBUTE_PRINTF(5, 6);
 /* A warning about documentation, which belongs to the doc class of
    `anti check`. */
 void diagnostics_doc(struct diagnostics *d, enum diag_name name, int line,
                      int column, const char *format, ...)
-#if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 5, 6)))
-#endif
-    ;
+    ATTRIBUTE_PRINTF(5, 6);
 void diagnostics_free(struct diagnostics *d);
 
 #endif

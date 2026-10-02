@@ -191,16 +191,16 @@ void sema_check_extern_fn(struct checker *c, struct item *it)
         return;
     }
     for (i = 0; i < it->param_count && i < t->param_count; i++) {
-        sema_format_to(what, sizeof what,
-                       "of the parameter `%.*s` of `extern fn "
-                       "%.*s`", (int)it->params[i].name.length,
-                       it->params[i].name.text, (int)it->name.length,
-                       it->name.text);
+        text_format(what, sizeof what,
+                    "of the parameter `%.*s` of `extern fn "
+                    "%.*s`", (int)it->params[i].name.length,
+                    it->params[i].name.text, (int)it->name.length,
+                    it->name.text);
         check_c_nullable(c, it->params[i].pos, what, t->params[i]);
     }
     if (it->result != NULL && t->result->kind != TYPE_VOID) {
-        sema_format_to(what, sizeof what, "of the result of `extern fn %.*s`",
-                       (int)it->name.length, it->name.text);
+        text_format(what, sizeof what, "of the result of `extern fn %.*s`",
+                    (int)it->name.length, it->name.text);
         check_c_nullable(c, it->result->pos, what, t->result);
     }
 }
@@ -241,12 +241,12 @@ static void check_nested_fields(struct checker *c, const struct item *cls,
             if (g->form == FIELD_BASE || g->form == FIELD_TABLE) {
                 continue;
             }
-            sema_format_to(what, sizeof what,
-                           "the field `%.*s` of `%.*s`, which export class "
-                           "`%.*s` holds,",
-                           (int)g->name.length, g->name.text,
-                           (int)inner->name.length, inner->name.text,
-                           (int)cls->name.length, cls->name.text);
+            text_format(what, sizeof what,
+                        "the field `%.*s` of `%.*s`, which export class "
+                        "`%.*s` holds,",
+                        (int)g->name.length, g->name.text,
+                        (int)inner->name.length, inner->name.text,
+                        (int)cls->name.length, cls->name.text);
             check_c_type(c, g->pos, what, g->type, true, cls);
         }
         check_nested_fields(c, cls, inner, seen);
@@ -272,18 +272,18 @@ void sema_check_export(struct checker *c, struct item *it)
             return;
         }
         for (i = 0; i < it->param_count && t->kind == TYPE_FN; i++) {
-            sema_format_to(what, sizeof what,
-                           "the parameter `%.*s` of export fn "
-                           "`%.*s`", (int)it->params[i].name.length,
-                           it->params[i].name.text, (int)it->name.length,
-                           it->name.text);
+            text_format(what, sizeof what,
+                        "the parameter `%.*s` of export fn "
+                        "`%.*s`", (int)it->params[i].name.length,
+                        it->params[i].name.text, (int)it->name.length,
+                        it->name.text);
             check_c_type(c, it->params[i].pos, what, t->params[i], false,
                          NULL);
         }
         if (it->result != NULL && t->kind == TYPE_FN &&
             t->result->kind != TYPE_VOID) {
-            sema_format_to(what, sizeof what, "the result of export fn `%.*s`",
-                           (int)it->name.length, it->name.text);
+            text_format(what, sizeof what, "the result of export fn `%.*s`",
+                        (int)it->name.length, it->name.text);
             check_c_type(c, it->result->pos, what, t->result, false, NULL);
         }
         for (i = 0; i < c->library_count; i++) {
@@ -314,11 +314,11 @@ void sema_check_export(struct checker *c, struct item *it)
                 t->fields[i].form == FIELD_TABLE) {
                 continue;
             }
-            sema_format_to(what, sizeof what,
-                           "the field `%.*s` of export class `%.*s`",
-                           (int)t->fields[i].name.length,
-                           t->fields[i].name.text,
-                           (int)it->name.length, it->name.text);
+            text_format(what, sizeof what,
+                        "the field `%.*s` of export class `%.*s`",
+                        (int)t->fields[i].name.length,
+                        t->fields[i].name.text,
+                        (int)it->name.length, it->name.text);
             check_c_type(c, t->fields[i].pos, what, t->fields[i].type, true,
                          it);
         }
@@ -337,17 +337,17 @@ void sema_check_export(struct checker *c, struct item *it)
                 continue;
             }
             for (j = m->has_self ? 1 : 0; j < ft->param_count; j++) {
-                sema_format_to(what, sizeof what,
-                               "the parameter %zu of `%.*s.%.*s`",
-                               j, (int)it->name.length, it->name.text,
-                               (int)m->name.length, m->name.text);
+                text_format(what, sizeof what,
+                            "the parameter %zu of `%.*s.%.*s`",
+                            j, (int)it->name.length, it->name.text,
+                            (int)m->name.length, m->name.text);
                 check_c_type(c, m->name_pos, what, ft->params[j], false,
                              NULL);
             }
             if (ft->result->kind != TYPE_VOID) {
-                sema_format_to(what, sizeof what, "the result of `%.*s.%.*s`",
-                               (int)it->name.length, it->name.text,
-                               (int)m->name.length, m->name.text);
+                text_format(what, sizeof what, "the result of `%.*s.%.*s`",
+                            (int)it->name.length, it->name.text,
+                            (int)m->name.length, m->name.text);
                 check_c_type(c, m->name_pos, what, ft->result, false, NULL);
             }
         }
@@ -355,12 +355,12 @@ void sema_check_export(struct checker *c, struct item *it)
     case ITEM_STRUCT:
     case ITEM_UNION:
         for (i = 0; i < t->field_count; i++) {
-            sema_format_to(what, sizeof what,
-                           "the field `%.*s` of export %s `%.*s`",
-                           (int)t->fields[i].name.length,
-                           t->fields[i].name.text,
-                           it->kind == ITEM_UNION ? "union" : "struct",
-                           (int)it->name.length, it->name.text);
+            text_format(what, sizeof what,
+                        "the field `%.*s` of export %s `%.*s`",
+                        (int)t->fields[i].name.length,
+                        t->fields[i].name.text,
+                        it->kind == ITEM_UNION ? "union" : "struct",
+                        (int)it->name.length, it->name.text);
             check_c_type(c, t->fields[i].pos, what, t->fields[i].type, true,
                          NULL);
         }
@@ -385,14 +385,14 @@ void sema_check_export(struct checker *c, struct item *it)
         for (i = 0; i < t->param_count; i++) {
             const struct type *payload = t->params[i];
             for (j = 0; payload != NULL && j < payload->field_count; j++) {
-                sema_format_to(what, sizeof what,
-                               "the field `%.*s` of case `%.*s` "
-                               "of export variant `%.*s`",
-                               (int)payload->fields[j].name.length,
-                               payload->fields[j].name.text,
-                               (int)t->base->fields[i].name.length,
-                               t->base->fields[i].name.text,
-                               (int)it->name.length, it->name.text);
+                text_format(what, sizeof what,
+                            "the field `%.*s` of case `%.*s` "
+                            "of export variant `%.*s`",
+                            (int)payload->fields[j].name.length,
+                            payload->fields[j].name.text,
+                            (int)t->base->fields[i].name.length,
+                            t->base->fields[i].name.text,
+                            (int)it->name.length, it->name.text);
                 check_c_type(c, payload->fields[j].pos, what,
                              payload->fields[j].type, true, NULL);
             }

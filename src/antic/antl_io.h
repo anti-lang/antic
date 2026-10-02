@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 #include "antl.h"
+#include "attributes.h"
 
 struct writer {
     struct text *out;
@@ -71,10 +72,7 @@ void antl_put_bytes(struct writer *w, const char *s, size_t length);
 /* Refuse the file with the message format gives, unless it is refused
    already. The first message stands. */
 void antl_fail(struct reader *r, const char *format, ...)
-#if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 2, 3)))
-#endif
-    ;
+    ATTRIBUTE_PRINTF(2, 3);
 /* Refuse the file as damaged at the byte the reader stands at. */
 void antl_damaged(struct reader *r);
 /* Whether n more bytes remain. The file is damaged when they do not. */

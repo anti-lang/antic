@@ -107,9 +107,9 @@ static const struct type *written_result(const struct type *fn)
 static void returned_text(char *out, size_t size, const struct type *t)
 {
     if (t == NULL) {
-        sema_format_to(out, size, "nothing");
+        text_format(out, size, "nothing");
     } else {
-        sema_format_to(out, size, "`%s`", sema_tn(t));
+        text_format(out, size, "`%s`", sema_tn(t));
     }
 }
 
@@ -164,13 +164,13 @@ static bool same_signature(struct checker *c, const struct item *m,
     /* A function of a copy of a generic takes the arguments of the copy
        in place of the parameters. */
     theirs = sema_member_type(c, (struct type *)theirs, owner);
-    sema_format_to(fn, sizeof fn, "concrete fn %.*s%s%.*s",
-                   (int)m->qualifier.length, m->qualifier.text,
-                   m->qualifier.length > 0 ? "::" : "", (int)m->name.length,
-                   m->name.text);
-    sema_format_to(at, sizeof at, "%s.%.*s", sema_tn(owner),
-                   (int)entry->name.length,
-                   entry->name.text);
+    text_format(fn, sizeof fn, "concrete fn %.*s%s%.*s",
+                (int)m->qualifier.length, m->qualifier.text,
+                m->qualifier.length > 0 ? "::" : "", (int)m->name.length,
+                m->name.text);
+    text_format(at, sizeof at, "%s.%.*s", sema_tn(owner),
+                (int)entry->name.length,
+                entry->name.text);
     if (m->has_self != entry->has_self) {
         sema_error_at(c, m->name_pos, "`%s` %s `self`, and `%s` %s", fn,
                       m->has_self ? "takes" : "does not take", at,
@@ -206,10 +206,10 @@ static bool same_signature(struct checker *c, const struct item *m,
     if (count != their_count) {
         char takes[48];
         if (count == 0) {
-            sema_format_to(takes, sizeof takes, "no parameter");
+            text_format(takes, sizeof takes, "no parameter");
         } else {
-            sema_format_to(takes, sizeof takes, "%zu parameter%s", count,
-                           count == 1 ? "" : "s");
+            text_format(takes, sizeof takes, "%zu parameter%s", count,
+                        count == 1 ? "" : "s");
         }
         sema_error_at(c, m->name_pos, "`%s` takes %s%s, and `%s` takes %zu", fn,
                       takes, m->has_self ? " besides `self`" : "", at,
@@ -415,8 +415,8 @@ static void refuse_abstract_fields(struct checker *c, const struct type *t)
             t->fields[j].form == FIELD_IMPL) {
             continue;
         }
-        sema_format_to(what, sizeof what, "the field `%.*s`",
-                       (int)t->fields[j].name.length, t->fields[j].name.text);
+        text_format(what, sizeof what, "the field `%.*s`",
+                    (int)t->fields[j].name.length, t->fields[j].name.text);
         sema_refuse_abstract_value(c, t->fields[j].pos, what,
                                    t->fields[j].type);
     }

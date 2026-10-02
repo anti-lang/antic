@@ -2702,11 +2702,11 @@ static void pattern_piece(char *out, size_t size, const struct expr *e,
     size_t length = span.end - span.start;
 
     if (length > 24) {
-        sema_format_to(out, size, "%.*s...", 21,
-                       e->as.text.bytes + span.start);
+        text_format(out, size, "%.*s...", 21,
+                    e->as.text.bytes + span.start);
     } else {
-        sema_format_to(out, size, "%.*s", (int)length,
-                       e->as.text.bytes + span.start);
+        text_format(out, size, "%.*s", (int)length,
+                    e->as.text.bytes + span.start);
     }
 }
 

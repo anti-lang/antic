@@ -1,10 +1,14 @@
 #include "diagnostic.h"
 
 #include <stdarg.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "alloc.h"
+#include "text.h"
+
+static void add(struct diagnostics *d, enum diag_name name, int line,
+                int column, bool warning, bool doc, const char *format,
+                va_list args) ATTRIBUTE_PRINTF(7, 0);
 
 static void add(struct diagnostics *d, enum diag_name name, int line,
                 int column, bool warning, bool doc, const char *format,
@@ -20,7 +24,7 @@ static void add(struct diagnostics *d, enum diag_name name, int line,
     item->doc = doc;
     item->promoted = false;
     item->name = name;
-    vsnprintf(item->message, sizeof item->message, format, args);
+    text_vformat(item->message, sizeof item->message, format, args);
 }
 
 void diagnostics_add(struct diagnostics *d, int line, int column,

@@ -2774,9 +2774,9 @@ struct type *sema_variant_literal(struct checker *c, struct expr *e,
     }
     payload = v->params[index];
     e->as.struct_lit.variant_case = (uint32_t)(index + 1);
-    sema_format_to(written, sizeof written, "%s.%.*s", sema_tn(v),
-                   (int)name->length,
-                   name->text);
+    text_format(written, sizeof written, "%s.%.*s", sema_tn(v),
+                (int)name->length,
+                name->text);
     return sema_check_field_inits(c, e, e->as.struct_lit.fields,
                                   e->as.struct_lit.field_count,
                                   payload != NULL ? payload->fields : NULL,

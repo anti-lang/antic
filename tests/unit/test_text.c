@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "diagnostic.h"
 #include "text.h"
 
 void test_text(void)
@@ -29,4 +30,24 @@ void test_text(void)
     CHECK(t.length == 0);
     CHECK_STR(text_cstr(&t), "");
     text_free(&t);
+}
+
+/* A diagnostic too long for its message ends in three dots, so the cut
+   is visible. One that fits stands as written. */
+void test_diagnostic_cut(void)
+{
+    struct diagnostics d = {0};
+    char long_name[400];
+    size_t n;
+
+    memset(long_name, 'x', sizeof long_name - 1);
+    long_name[sizeof long_name - 1] = '\0';
+    diagnostics_add(&d, 1, 1, "unknown name `%s`", long_name);
+    diagnostics_add(&d, 2, 1, "unknown name `%s`", "y");
+    CHECK(d.count == 2);
+    n = strlen(d.items[0].message);
+    CHECK(n == sizeof d.items[0].message - 1);
+    CHECK(n >= 3 && memcmp(d.items[0].message + n - 3, "...", 3) == 0);
+    CHECK_STR(d.items[1].message, "unknown name `y`");
+    diagnostics_free(&d);
 }

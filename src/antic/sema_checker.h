@@ -229,8 +229,6 @@ struct generic_call {
 /* sema.c */
 
 int64_t sema_signed_bits(uint64_t v);
-void sema_format_to(char *out, size_t size, const char *format, ...)
-    ATTRIBUTE_PRINTF(3, 4);
 void sema_error_at(struct checker *c, struct pos pos, const char *format,
                    ...)
     ATTRIBUTE_PRINTF(3, 4);

@@ -7,6 +7,7 @@ void test_target(void);
 void test_cpu(void);
 void test_f16(void);
 void test_text(void);
+void test_diagnostic_cut(void);
 void test_host_target(void);
 void test_lexer(void);
 void test_parser(void);
@@ -64,6 +65,7 @@ int main(void)
     test_cpu();
     test_f16();
     test_text();
+    test_diagnostic_cut();
     test_host_target();
     test_lexer();
     test_parser();
