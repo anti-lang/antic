@@ -98,6 +98,29 @@ int8_t anti_rt_atomic_compare_swap(void *address, int64_t width,
 #else
 
 #include <intrin.h>
+#include <string.h>
+
+/* DESIGN: the Interlocked functions of one byte take and give a `char`,
+   whose signedness is the compiler's choice. A byte goes in by the low 8
+   bits of the value and comes out as int8_t, each copied by its bits, so
+   the value is the same whether `char` is signed or not, as for the
+   load below. */
+static char byte_in(uint64_t value)
+{
+    unsigned char bits = (unsigned char)value;
+    char byte;
+
+    memcpy(&byte, &bits, 1);
+    return byte;
+}
+
+static int64_t byte_out(char byte)
+{
+    int8_t value;
+
+    memcpy(&value, &byte, 1);
+    return value;
+}
 
 /* DESIGN: a load through `volatile` is a plain load on ARM64, and a
    later load to another address may pass it. MSVC compiles atomic.c
@@ -136,7 +159,9 @@ int64_t anti_rt_atomic_load(const void *address, int64_t width)
 void anti_rt_atomic_store(void *address, int64_t width, int64_t value)
 {
     switch (width) {
-    case 1: _InterlockedExchange8((char *)address, (char)value); break;
+    case 1:
+        _InterlockedExchange8((char *)address, byte_in((uint64_t)value));
+        break;
     case 2: _InterlockedExchange16((short *)address, (short)value); break;
     case 4: _InterlockedExchange((long *)address, (long)value); break;
     default: _InterlockedExchange64((long long *)address, value); break;
@@ -146,7 +171,9 @@ void anti_rt_atomic_store(void *address, int64_t width, int64_t value)
 int64_t anti_rt_atomic_swap(void *address, int64_t width, int64_t value)
 {
     switch (width) {
-    case 1: return _InterlockedExchange8((char *)address, (char)value);
+    case 1:
+        return byte_out(
+            _InterlockedExchange8((char *)address, byte_in((uint64_t)value)));
     case 2: return _InterlockedExchange16((short *)address, (short)value);
     case 4: return _InterlockedExchange((long *)address, (long)value);
     default: return _InterlockedExchange64((long long *)address, value);
@@ -156,7 +183,9 @@ int64_t anti_rt_atomic_swap(void *address, int64_t width, int64_t value)
 int64_t anti_rt_atomic_add(void *address, int64_t width, int64_t value)
 {
     switch (width) {
-    case 1: return _InterlockedExchangeAdd8((char *)address, (char)value);
+    case 1:
+        return byte_out(_InterlockedExchangeAdd8((char *)address,
+                                                 byte_in((uint64_t)value)));
     case 2: return _InterlockedExchangeAdd16((short *)address, (short)value);
     case 4: return _InterlockedExchangeAdd((long *)address, (long)value);
     default: return _InterlockedExchangeAdd64((long long *)address, value);
@@ -171,7 +200,9 @@ int64_t anti_rt_atomic_sub(void *address, int64_t width, int64_t value)
     uint64_t negated = 0 - (uint64_t)value;
 
     switch (width) {
-    case 1: return _InterlockedExchangeAdd8((char *)address, (char)negated);
+    case 1:
+        return byte_out(
+            _InterlockedExchangeAdd8((char *)address, byte_in(negated)));
     case 2: return _InterlockedExchangeAdd16((short *)address,
                                              (short)negated);
     case 4: return _InterlockedExchangeAdd((long *)address, (long)negated);
@@ -183,7 +214,9 @@ int64_t anti_rt_atomic_sub(void *address, int64_t width, int64_t value)
 int64_t anti_rt_atomic_and(void *address, int64_t width, int64_t value)
 {
     switch (width) {
-    case 1: return _InterlockedAnd8((char *)address, (char)value);
+    case 1:
+        return byte_out(
+            _InterlockedAnd8((char *)address, byte_in((uint64_t)value)));
     case 2: return _InterlockedAnd16((short *)address, (short)value);
     case 4: return _InterlockedAnd((long *)address, (long)value);
     default: return _InterlockedAnd64((long long *)address, value);
@@ -193,7 +226,9 @@ int64_t anti_rt_atomic_and(void *address, int64_t width, int64_t value)
 int64_t anti_rt_atomic_or(void *address, int64_t width, int64_t value)
 {
     switch (width) {
-    case 1: return _InterlockedOr8((char *)address, (char)value);
+    case 1:
+        return byte_out(
+            _InterlockedOr8((char *)address, byte_in((uint64_t)value)));
     case 2: return _InterlockedOr16((short *)address, (short)value);
     case 4: return _InterlockedOr((long *)address, (long)value);
     default: return _InterlockedOr64((long long *)address, value);
@@ -205,9 +240,10 @@ int8_t anti_rt_atomic_compare_swap(void *address, int64_t width,
 {
     switch (width) {
     case 1:
-        return _InterlockedCompareExchange8((char *)address, (char)desired,
-                                            (char)expected) ==
-               (char)expected;
+        return _InterlockedCompareExchange8((char *)address,
+                                            byte_in((uint64_t)desired),
+                                            byte_in((uint64_t)expected)) ==
+               byte_in((uint64_t)expected);
     case 2:
         return _InterlockedCompareExchange16((short *)address, (short)desired,
                                              (short)expected) ==
