@@ -378,6 +378,180 @@ static void bind_loop_name(struct lowerer *l, struct symbol *sym,
     }
 }
 
+/* The state of the lowering of one `for`: its blocks, its counter, the
+   bounds of a range and the base of a sequence. */
+struct for_walk {
+    struct ir_block *test;      /* the test of a sequence, or NULL */
+    struct ir_block *body;
+    struct ir_block *step;
+    struct ir_block *exit;
+    struct ir_operand low;      /* the bounds of a range */
+    struct ir_operand high;
+    struct ir_operand base;     /* the first element of a sequence */
+    const struct type *seq;     /* the type of the sequence, or NULL */
+    enum ir_type counter_type;
+    uint32_t counter;
+    bool unsigned_range;
+    bool down;
+    uint64_t k;                 /* the magnitude of the step */
+};
+
+/* Read the bound of the sequence over once, before the loop, and enter
+   the test of the counter against it. */
+static void sequence_start(struct lowerer *l, const struct expr *over,
+                           struct for_walk *w)
+{
+    struct ir_operand limit;
+
+    w->seq = over->type;
+    w->base = lower_address(l, over);
+    if (w->seq->kind == TYPE_SLICE) {
+        limit = lower_temp(
+            l, ir_load(l->f, l->b, IR_I64,
+                       lower_offset_address(
+                           l, w->base,
+                           lower_field_offset(l, w->seq, &lower_len_name))));
+        w->base = lower_temp(l, ir_load(l->f, l->b, IR_PTR, w->base));
+    } else {
+        limit = w->seq->length_of != NULL
+                    ? ir_sym_operand(l->m, lower_sym_of(l, w->seq->length_of))
+                    : ir_int_op(IR_I64, w->seq->length);
+    }
+    w->counter = ir_unary(l->f, l->b, IR_COPY, IR_I64, ir_int_op(IR_I64, 0));
+    ir_jump(l->f, l->b, w->test);
+    l->b = w->test;
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_SLT, IR_I8,
+                                      lower_temp(l, w->counter), limit)),
+              w->body, w->exit);
+}
+
+/* Read the bounds of the range of s once, before the loop, and enter the
+   body at the first value, or leave an empty range. */
+static void range_start(struct lowerer *l, const struct stmt *s,
+                        struct for_walk *w)
+{
+    struct ir_block *first = w->down ? lower_new_block(l) : w->body;
+    struct ir_operand read;
+    enum ir_type type;
+
+    /* DESIGN: a range never computes a value past its ends. The
+       counter holds the value of this turn, and the step measures
+       the distance to the bound that ends the walk before it moves:
+       `high - counter` upward, `counter - low` downward. Both are
+       differences of two values inside the range, so they fit the
+       unsigned type of the width and never wrap. The walk leaves when
+       the distance is at most k upward and below k downward, where
+       the next value would be past the end. A test of the moved
+       counter against the bound would wrap at the end of the type:
+       `0 as u8..255 by 10` would never stop. Every comparison and the
+       division are unsigned for that reason, and only the test of an
+       empty range compares by the sign of the type.
+
+       The bounds are copied, since the body may assign the variable
+       a bound names. */
+    w->counter_type = lower_ir_type_of(s->as.for_loop.low->type);
+    type = w->counter_type;
+    read = lower_expr(l, s->as.for_loop.low);
+    w->low = lower_temp(l, ir_unary(l->f, l->b, IR_COPY, type, read));
+    read = lower_expr(l, s->as.for_loop.high);
+    w->high = lower_temp(l, ir_unary(l->f, l->b, IR_COPY, type, read));
+    w->counter = ir_unary(l->f, l->b, IR_COPY, type, w->low);
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b,
+                                      w->unsigned_range ? IR_ULT : IR_SLT,
+                                      IR_I8, w->low, w->high)),
+              first, w->exit);
+    /* DESIGN: `by -k` walks the values of `by k` in reverse, so it
+       starts at the largest of them and not at the high bound. That
+       value is `low + ((high - low - 1) / k) * k`, and the division
+       is by a constant and runs once. */
+    if (w->down) {
+        struct ir_operand span;
+        struct ir_operand steps;
+        struct ir_operand last;
+
+        l->b = first;
+        span = lower_temp(l, ir_binary(l->f, l->b, IR_SUB, type,
+                                       w->high, w->low));
+        span = lower_temp(l, ir_binary(l->f, l->b, IR_SUB, type,
+                                       span, ir_int_op(type, 1)));
+        steps = lower_temp(l, ir_binary(l->f, l->b, IR_UDIV, type,
+                                        span, ir_int_op(type, w->k)));
+        last = lower_temp(l, ir_binary(l->f, l->b, IR_MUL, type,
+                                       steps, ir_int_op(type, w->k)));
+        ir_assign(l->f, l->b, w->counter,
+                  lower_temp(l, ir_binary(l->f, l->b, IR_ADD, type,
+                                          w->low, last)));
+        ir_jump(l->f, l->b, w->body);
+    }
+}
+
+/* Bind the names of a walk over a sequence to the element the counter
+   reaches: sym to the element, and index, if the loop names one, to the
+   counter. */
+static void bind_element(struct lowerer *l, const struct stmt *s,
+                         const struct for_walk *w, struct symbol *sym,
+                         struct symbol *index)
+{
+    struct ir_operand at =
+        lower_temp(l, ir_ptradd(
+                          l->f, l->b, w->base,
+                          lower_temp(l, ir_binary(
+                                            l->f, l->b, IR_MUL, IR_I64,
+                                            lower_temp(l, w->counter),
+                                            lower_size_operand(
+                                                l, w->seq->element)))));
+
+    /* DESIGN: `for i, x in items` destructures the `(int, T)` of
+       each element. The index is the counter the loop already has,
+       and the element is the value at it. The two names take their
+       values from where they stand, and no pair is built. */
+    if (index != NULL) {
+        bind_loop_name(l, index, IR_I64, lower_temp(l, w->counter));
+    }
+    /* A pattern reads its parts where the element stands. */
+    if (s->as.for_loop.pattern) {
+        bind_pattern(l, s, at);
+    } else if (s->as.for_loop.by_pointer) {
+        bind_loop_name(l, sym, IR_PTR, at);
+    } else if (lower_is_aggregate(sym->type)) {
+        ir_memcopy(l->f, l->b, lower_temp(l, sym->ir), at,
+                   lower_vtype_of(l, sym->type));
+    } else if (sym->address_taken) {
+        bind_loop_name(l, sym, lower_ir_type_of(sym->type),
+                       lower_temp(l, ir_load(l->f, l->b,
+                                             lower_ir_type_of(sym->type),
+                                             at)));
+    } else {
+        sym->ir = ir_load(l->f, l->b, lower_ir_type_of(sym->type), at);
+    }
+}
+
+/* The step of a range: leave when the next value would be past the end,
+   and move the counter otherwise. */
+static void range_step(struct lowerer *l, const struct for_walk *w)
+{
+    enum ir_type type = w->counter_type;
+    struct ir_block *advance = lower_new_block(l);
+    struct ir_operand left =
+        w->down ? lower_temp(l, ir_binary(l->f, l->b, IR_SUB, type,
+                                          lower_temp(l, w->counter), w->low))
+                : lower_temp(l, ir_binary(l->f, l->b, IR_SUB, type,
+                                          w->high, lower_temp(l, w->counter)));
+
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, w->down ? IR_ULT : IR_ULE,
+                                      IR_I8, left, ir_int_op(type, w->k))),
+              w->exit, advance);
+    l->b = advance;
+    ir_assign(l->f, l->b, w->counter,
+              lower_temp(l, ir_binary(l->f, l->b, w->down ? IR_SUB : IR_ADD,
+                                      type, lower_temp(l, w->counter),
+                                      ir_int_op(type, w->k))));
+    ir_jump(l->f, l->b, w->body);
+}
+
 /* DESIGN: `for` is a loop of its own rather than a rewrite into `while`,
    because the step is the target of `continue`. A textual rewrite would
    put the step after the body, where `continue` jumps over it and the
@@ -393,17 +567,8 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
                                ? s->as.for_loop.names[0].symbol
                                : NULL;
     const struct expr *over = s->as.for_loop.over;
-    struct ir_block *test = over != NULL ? lower_new_block(l) : NULL;
-    struct ir_block *body = lower_new_block(l);
-    struct ir_block *step = lower_new_block(l);
-    struct ir_block *exit = lower_new_block(l);
+    struct for_walk w;
     struct loop loop;
-    struct ir_operand low = lower_none();
-    struct ir_operand high = lower_none();
-    struct ir_operand base = lower_none();
-    const struct type *seq = NULL;
-    enum ir_type counter_type = IR_I64;
-    uint32_t counter;
     /* DESIGN: the step keeps its sign apart from its magnitude. The
        checker stores `by k` as an int64_t, so a step of 2^63 on an
        unsigned range reads as INT64_MIN. A range of an unsigned type
@@ -412,176 +577,62 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
        where -2^63 has one. The checker refuses a step that does not fit
        the type of the range, so k fits the unsigned type of its width. */
     int64_t stride = s->as.for_loop.step_value;
-    bool unsigned_range =
+
+    memset(&w, 0, sizeof w);
+    w.test = over != NULL ? lower_new_block(l) : NULL;
+    w.body = lower_new_block(l);
+    w.step = lower_new_block(l);
+    w.exit = lower_new_block(l);
+    w.low = lower_none();
+    w.high = lower_none();
+    w.base = lower_none();
+    w.counter_type = IR_I64;
+    w.unsigned_range =
         over == NULL && !types_is_signed(s->as.for_loop.low->type);
-    bool down = stride < 0 && !unsigned_range;
-    uint64_t k = down ? 0 - (uint64_t)stride : (uint64_t)stride;
+    w.down = stride < 0 && !w.unsigned_range;
+    w.k = w.down ? 0 - (uint64_t)stride : (uint64_t)stride;
 
     /* The bound is read once, before the loop. */
     if (over != NULL) {
-        struct ir_operand limit;
-
-        seq = over->type;
-        base = lower_address(l, over);
-        if (seq->kind == TYPE_SLICE) {
-            limit = lower_temp(
-                l, ir_load(l->f, l->b, IR_I64,
-                           lower_offset_address(
-                               l, base,
-                               lower_field_offset(l, seq, &lower_len_name))));
-            base = lower_temp(l, ir_load(l->f, l->b, IR_PTR, base));
-        } else {
-            limit = seq->length_of != NULL
-                        ? ir_sym_operand(l->m, lower_sym_of(l, seq->length_of))
-                        : ir_int_op(IR_I64, seq->length);
-        }
-        counter = ir_unary(l->f, l->b, IR_COPY, IR_I64, ir_int_op(IR_I64, 0));
-        ir_jump(l->f, l->b, test);
-        l->b = test;
-        ir_branch(l->f, l->b,
-                  lower_temp(l, ir_binary(l->f, l->b, IR_SLT, IR_I8,
-                                          lower_temp(l, counter), limit)),
-                  body, exit);
+        sequence_start(l, over, &w);
     } else {
-        struct ir_block *first = down ? lower_new_block(l) : body;
-        struct ir_operand read;
-        /* DESIGN: a range never computes a value past its ends. The
-           counter holds the value of this turn, and the step measures
-           the distance to the bound that ends the walk before it moves:
-           `high - counter` upward, `counter - low` downward. Both are
-           differences of two values inside the range, so they fit the
-           unsigned type of the width and never wrap. The walk leaves when
-           the distance is at most k upward and below k downward, where
-           the next value would be past the end. A test of the moved
-           counter against the bound would wrap at the end of the type:
-           `0 as u8..255 by 10` would never stop. Every comparison and the
-           division are unsigned for that reason, and only the test of an
-           empty range compares by the sign of the type.
-
-           The bounds are copied, since the body may assign the variable
-           a bound names. */
-        counter_type = lower_ir_type_of(s->as.for_loop.low->type);
-        read = lower_expr(l, s->as.for_loop.low);
-        low = lower_temp(l, ir_unary(l->f, l->b, IR_COPY, counter_type,
-                                     read));
-        read = lower_expr(l, s->as.for_loop.high);
-        high = lower_temp(l, ir_unary(l->f, l->b, IR_COPY, counter_type,
-                                      read));
-        counter = ir_unary(l->f, l->b, IR_COPY, counter_type, low);
-        ir_branch(l->f, l->b,
-                  lower_temp(l, ir_binary(l->f, l->b,
-                                          unsigned_range ? IR_ULT : IR_SLT,
-                                          IR_I8, low, high)),
-                  first, exit);
-        /* DESIGN: `by -k` walks the values of `by k` in reverse, so it
-           starts at the largest of them and not at the high bound. That
-           value is `low + ((high - low - 1) / k) * k`, and the division
-           is by a constant and runs once. */
-        if (down) {
-            struct ir_operand span;
-            struct ir_operand steps;
-            struct ir_operand last;
-
-            l->b = first;
-            span = lower_temp(l, ir_binary(l->f, l->b, IR_SUB, counter_type,
-                                           high, low));
-            span = lower_temp(l, ir_binary(l->f, l->b, IR_SUB, counter_type,
-                                           span, ir_int_op(counter_type, 1)));
-            steps = lower_temp(l, ir_binary(l->f, l->b, IR_UDIV, counter_type,
-                                            span,
-                                            ir_int_op(counter_type, k)));
-            last = lower_temp(l, ir_binary(l->f, l->b, IR_MUL, counter_type,
-                                           steps,
-                                           ir_int_op(counter_type, k)));
-            ir_assign(l->f, l->b, counter,
-                      lower_temp(l, ir_binary(l->f, l->b, IR_ADD,
-                                              counter_type, low, last)));
-            ir_jump(l->f, l->b, body);
-        }
+        range_start(l, s, &w);
     }
-    loop.continue_to = step;
-    loop.break_to = exit;
+    loop.continue_to = w.step;
+    loop.break_to = w.exit;
     loop.outer = l->loop;
     loop.defers_at = l->defers;
     loop.temps_at = l->temp_count;
     l->loop_depth++;
     l->loop = &loop;
-    l->b = body;
+    l->b = w.body;
     /* The variable of the body: the counter of a range, or the element
        that the index reaches. A range without a name counts and reads
        nothing. */
     if (over == NULL) {
         if (sym != NULL) {
-            bind_loop_name(l, sym, counter_type, lower_temp(l, counter));
+            bind_loop_name(l, sym, w.counter_type, lower_temp(l, w.counter));
         }
     } else {
-        struct ir_operand at =
-            lower_temp(l, ir_ptradd(
-                              l->f, l->b, base,
-                              lower_temp(l, ir_binary(
-                                                l->f, l->b, IR_MUL, IR_I64,
-                                                lower_temp(l, counter),
-                                                lower_size_operand(
-                                                    l, seq->element)))));
-        /* DESIGN: `for i, x in items` destructures the `(int, T)` of
-           each element. The index is the counter the loop already has,
-           and the element is the value at it. The two names take their
-           values from where they stand, and no pair is built. */
-        if (index != NULL) {
-            bind_loop_name(l, index, IR_I64, lower_temp(l, counter));
-        }
-        /* A pattern reads its parts where the element stands. */
-        if (s->as.for_loop.pattern) {
-            bind_pattern(l, s, at);
-        } else if (s->as.for_loop.by_pointer) {
-            bind_loop_name(l, sym, IR_PTR, at);
-        } else if (lower_is_aggregate(sym->type)) {
-            ir_memcopy(l->f, l->b, lower_temp(l, sym->ir), at,
-                       lower_vtype_of(l, sym->type));
-        } else if (sym->address_taken) {
-            bind_loop_name(l, sym, lower_ir_type_of(sym->type),
-                           lower_temp(l, ir_load(l->f, l->b,
-                                                 lower_ir_type_of(sym->type),
-                                                 at)));
-        } else {
-            sym->ir = ir_load(l->f, l->b, lower_ir_type_of(sym->type), at);
-        }
+        bind_element(l, s, &w, sym, index);
     }
     lower_block(l, s->as.for_loop.body);
     if (l->b != NULL) {
-        ir_jump(l->f, l->b, step);
+        ir_jump(l->f, l->b, w.step);
     }
     l->loop = loop.outer;
     l->loop_depth--;
-    l->b = step;
+    l->b = w.step;
     if (over == NULL) {
-        struct ir_block *advance = lower_new_block(l);
-        struct ir_operand left =
-            down ? lower_temp(l, ir_binary(l->f, l->b, IR_SUB, counter_type,
-                                           lower_temp(l, counter), low))
-                 : lower_temp(l, ir_binary(l->f, l->b, IR_SUB, counter_type,
-                                           high, lower_temp(l, counter)));
-
-        ir_branch(l->f, l->b,
-                  lower_temp(l, ir_binary(l->f, l->b, down ? IR_ULT : IR_ULE,
-                                          IR_I8, left,
-                                          ir_int_op(counter_type, k))),
-                  exit, advance);
-        l->b = advance;
-        ir_assign(l->f, l->b, counter,
-                  lower_temp(l, ir_binary(l->f, l->b, down ? IR_SUB : IR_ADD,
-                                          counter_type,
-                                          lower_temp(l, counter),
-                                          ir_int_op(counter_type, k))));
-        ir_jump(l->f, l->b, body);
+        range_step(l, &w);
     } else {
-        ir_assign(l->f, l->b, counter,
+        ir_assign(l->f, l->b, w.counter,
                   lower_temp(l, ir_binary(l->f, l->b, IR_ADD, IR_I64,
-                                          lower_temp(l, counter),
-                                          ir_int_op(IR_I64, k))));
-        ir_jump(l->f, l->b, test);
+                                          lower_temp(l, w.counter),
+                                          ir_int_op(IR_I64, w.k))));
+        ir_jump(l->f, l->b, w.test);
     }
-    l->b = exit;
+    l->b = w.exit;
 }
 
 static enum token_kind compound_op(enum token_kind op)
@@ -1163,6 +1214,146 @@ void lower_stmt(struct lowerer *l, const struct stmt *s)
     lower_end_temps(l, mark, true);
 }
 
+/* The test of the arm at of a switch on the value over: the call of
+   `text.equal` of a `str`, the tag of a variant against the number of the
+   arm's case, or the value against the arm's. */
+static struct ir_operand arm_test(struct lowerer *l,
+                                  const struct switch_arm *at,
+                                  const struct type *variant,
+                                  struct ir_operand over)
+{
+    struct ir_operand value;
+
+    if (at->test != NULL) {
+        return lower_expr(l, at->test);
+    }
+    if (at->variant_case != 0) {
+        const struct struct_field *number =
+            &variant->base->fields[at->variant_case - 1];
+        return lower_temp(
+            l, ir_binary(l->f, l->b, IR_EQ, IR_I8, over,
+                         ir_int_op(lower_ir_type_of(variant->base),
+                                   number->number)));
+    }
+    value = lower_expr(l, at->value);
+    return lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, over, value));
+}
+
+/* DESIGN: an arm that binds gets a copy of the fields of its case. What
+   they own is copied as `dup` copies it, and the arm tears the copy down
+   on every exit, so the variant keeps its own. */
+static void bind_case_fields(struct lowerer *l, const struct switch_arm *at,
+                             const struct type *variant,
+                             struct ir_operand address)
+{
+    /* The address and the type are bound first, since C leaves the order
+       of two calls with effects in one argument list open. */
+    struct ir_operand fields = lower_case_address(l, variant, address);
+    struct ir_vtype bound = lower_vtype_of(l, at->bound->type);
+
+    ir_memcopy(l->f, l->b, lower_temp(l, at->bound->ir), fields, bound);
+    if (sema_needs_teardown(at->bound->type)) {
+        lower_copy_owned(l, at->bound->type, fields,
+                         lower_temp(l, at->bound->ir));
+        push_exit_action(l, NULL, at->bound, false);
+    }
+}
+
+/* DESIGN: a switch lowers to a chain of comparisons, one block per
+   arm and one join. The back end turns a dense chain into a jump
+   table where it pays. An arm that ends in `fallthrough;` keeps its
+   last block open. Once every arm stands, that block jumps to the
+   first block of the arm the text writes next, which enters its
+   body past its test. The arm's block has closed by then, so its
+   `defer` statements have run. */
+static void lower_switch(struct lowerer *l, const struct stmt *s)
+{
+    struct ir_block *join = NULL;
+    struct ir_operand over;
+    enum ir_type type;
+    const struct stmt *otherwise = s->as.switch_stmt.otherwise;
+    size_t arms = s->as.switch_stmt.count + (otherwise != NULL ? 1 : 0);
+    struct ir_block **entry =
+        arena_alloc(l->m->arena, alloc_product(arms + 1, sizeof *entry));
+    struct ir_block **tail =
+        arena_alloc(l->m->arena, alloc_product(arms + 1, sizeof *tail));
+    const struct stmt **falls =
+        arena_alloc(l->m->arena, alloc_product(arms + 1, sizeof *falls));
+    uint32_t line;
+    size_t i;
+    size_t k;
+    const struct type *variant = s->as.switch_stmt.value->type;
+    struct ir_operand address = lower_none();
+    struct defers arm_scope;
+
+    over = lower_expr(l, s->as.switch_stmt.value);
+    /* DESIGN: a switch on a variant reads the tag once and compares it
+       with the number of each arm's case. The value stays where it
+       is. An arm that binds the fields copies them before its body
+       runs, so the body may replace the value. */
+    if (variant->kind == TYPE_VARIANT) {
+        address = over;
+        over = lower_load_tag(l, variant, address);
+    } else if (s->as.switch_stmt.bound != NULL) {
+        /* A `str` is bound by its address, which each arm's call of
+           `text.equal` reads. */
+        lower_bind_value(l, s->as.switch_stmt.bound, over);
+    } else {
+        type = lower_ir_type_of(s->as.switch_stmt.value->type);
+        over = lower_temp(l, ir_unary(l->f, l->b, IR_COPY, type, over));
+    }
+    for (i = 0; i < s->as.switch_stmt.count && l->b != NULL; i++) {
+        struct ir_block *arm = lower_new_block(l);
+        struct ir_block *next_test = lower_new_block(l);
+        const struct switch_arm *at = &s->as.switch_stmt.arms[i];
+        const struct stmt *body = at->body;
+        struct ir_operand test = arm_test(l, at, variant, over);
+        k = otherwise != NULL && i >= s->as.switch_stmt.otherwise_at
+                ? i + 1
+                : i;
+        ir_branch(l->f, l->b, test, arm, next_test);
+        l->b = arm;
+        entry[k] = arm;
+        memset(&arm_scope, 0, sizeof arm_scope);
+        arm_scope.outer = l->defers;
+        l->defers = &arm_scope;
+        if (at->bound != NULL) {
+            bind_case_fields(l, at, variant, address);
+        }
+        lower_stmt(l, body);
+        if (l->b != NULL) {
+            lower_run_defers(l, &arm_scope, false);
+        }
+        l->defers = arm_scope.outer;
+        free(arm_scope.items);
+        if ((falls[k] = sema_arm_fallthrough(body)) != NULL) {
+            tail[k] = l->b;
+        } else {
+            lower_jump_to_join(l, &join);
+        }
+        l->b = next_test;
+    }
+    if (l->b != NULL && otherwise != NULL) {
+        k = s->as.switch_stmt.otherwise_at;
+        entry[k] = l->b;
+        lower_stmt(l, otherwise);
+        if ((falls[k] = sema_arm_fallthrough(otherwise)) != NULL) {
+            tail[k] = l->b;
+            l->b = NULL;
+        }
+    }
+    lower_jump_to_join(l, &join);
+    line = l->f->at_line;
+    for (k = 0; k + 1 < arms; k++) {
+        if (tail[k] != NULL && entry[k + 1] != NULL) {
+            l->f->at_line = (uint32_t)falls[k]->pos.line;
+            ir_jump(l->f, tail[k], entry[k + 1]);
+        }
+    }
+    l->f->at_line = line;
+    l->b = join;
+}
+
 static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
 {
     struct ir_operand v;
@@ -1269,129 +1460,9 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
         }
         lower_for(l, s);
         return;
-    /* DESIGN: a switch lowers to a chain of comparisons, one block per
-       arm and one join. The back end turns a dense chain into a jump
-       table where it pays. An arm that ends in `fallthrough;` keeps its
-       last block open. Once every arm stands, that block jumps to the
-       first block of the arm the text writes next, which enters its
-       body past its test. The arm's block has closed by then, so its
-       `defer` statements have run. */
-    case STMT_SWITCH: {
-        struct ir_block *join = NULL;
-        struct ir_operand over;
-        enum ir_type type;
-        const struct stmt *otherwise = s->as.switch_stmt.otherwise;
-        size_t arms = s->as.switch_stmt.count + (otherwise != NULL ? 1 : 0);
-        struct ir_block **entry =
-            arena_alloc(l->m->arena, alloc_product(arms + 1, sizeof *entry));
-        struct ir_block **tail =
-            arena_alloc(l->m->arena, alloc_product(arms + 1, sizeof *tail));
-        const struct stmt **falls =
-            arena_alloc(l->m->arena, alloc_product(arms + 1, sizeof *falls));
-        uint32_t line;
-        size_t i;
-        size_t k;
-        const struct type *variant = s->as.switch_stmt.value->type;
-        struct ir_operand address = lower_none();
-        struct defers arm_scope;
-        over = lower_expr(l, s->as.switch_stmt.value);
-        /* DESIGN: a switch on a variant reads the tag once and compares it
-           with the number of each arm's case. The value stays where it
-           is. An arm that binds the fields copies them before its body
-           runs, so the body may replace the value. */
-        if (variant->kind == TYPE_VARIANT) {
-            address = over;
-            over = lower_load_tag(l, variant, address);
-        } else if (s->as.switch_stmt.bound != NULL) {
-            /* A `str` is bound by its address, which each arm's call of
-               `text.equal` reads. */
-            lower_bind_value(l, s->as.switch_stmt.bound, over);
-        } else {
-            type = lower_ir_type_of(s->as.switch_stmt.value->type);
-            over = lower_temp(l, ir_unary(l->f, l->b, IR_COPY, type, over));
-        }
-        for (i = 0; i < s->as.switch_stmt.count && l->b != NULL; i++) {
-            struct ir_block *arm = lower_new_block(l);
-            struct ir_block *next_test = lower_new_block(l);
-            const struct switch_arm *at = &s->as.switch_stmt.arms[i];
-            const struct stmt *body = at->body;
-            struct ir_operand test;
-            if (at->test != NULL) {
-                test = lower_expr(l, at->test);
-            } else if (at->variant_case != 0) {
-                const struct struct_field *number =
-                    &variant->base->fields[at->variant_case - 1];
-                test = lower_temp(
-                    l, ir_binary(l->f, l->b, IR_EQ, IR_I8, over,
-                                 ir_int_op(lower_ir_type_of(variant->base),
-                                           number->number)));
-            } else {
-                struct ir_operand value = lower_expr(l, at->value);
-                test = lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, over,
-                                               value));
-            }
-            k = otherwise != NULL && i >= s->as.switch_stmt.otherwise_at
-                    ? i + 1
-                    : i;
-            ir_branch(l->f, l->b, test, arm, next_test);
-            l->b = arm;
-            entry[k] = arm;
-            memset(&arm_scope, 0, sizeof arm_scope);
-            arm_scope.outer = l->defers;
-            l->defers = &arm_scope;
-            /* DESIGN: an arm that binds gets a copy of the fields of its
-               case. What they own is copied as `dup` copies it, and the
-               arm tears the copy down on every exit, so the variant keeps
-               its own. */
-            if (at->bound != NULL) {
-                /* The address and the type are bound first, since C
-                   leaves the order of two calls with effects in one
-                   argument list open. */
-                struct ir_operand fields =
-                    lower_case_address(l, variant, address);
-                struct ir_vtype bound = lower_vtype_of(l, at->bound->type);
-                ir_memcopy(l->f, l->b, lower_temp(l, at->bound->ir), fields,
-                           bound);
-                if (sema_needs_teardown(at->bound->type)) {
-                    lower_copy_owned(l, at->bound->type, fields,
-                                     lower_temp(l, at->bound->ir));
-                    push_exit_action(l, NULL, at->bound, false);
-                }
-            }
-            lower_stmt(l, body);
-            if (l->b != NULL) {
-                lower_run_defers(l, &arm_scope, false);
-            }
-            l->defers = arm_scope.outer;
-            free(arm_scope.items);
-            if ((falls[k] = sema_arm_fallthrough(body)) != NULL) {
-                tail[k] = l->b;
-            } else {
-                lower_jump_to_join(l, &join);
-            }
-            l->b = next_test;
-        }
-        if (l->b != NULL && otherwise != NULL) {
-            k = s->as.switch_stmt.otherwise_at;
-            entry[k] = l->b;
-            lower_stmt(l, otherwise);
-            if ((falls[k] = sema_arm_fallthrough(otherwise)) != NULL) {
-                tail[k] = l->b;
-                l->b = NULL;
-            }
-        }
-        lower_jump_to_join(l, &join);
-        line = l->f->at_line;
-        for (k = 0; k + 1 < arms; k++) {
-            if (tail[k] != NULL && entry[k + 1] != NULL) {
-                l->f->at_line = (uint32_t)falls[k]->pos.line;
-                ir_jump(l->f, tail[k], entry[k + 1]);
-            }
-        }
-        l->f->at_line = line;
-        l->b = join;
+    case STMT_SWITCH:
+        lower_switch(l, s);
         return;
-    }
     /* The switch that holds the arm makes the jump. */
     case STMT_FALLTHROUGH:
         return;

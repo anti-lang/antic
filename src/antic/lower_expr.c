@@ -1766,13 +1766,87 @@ static size_t dispatched_params(const struct expr *e,
     return e->as.call.out != NULL ? given - 1 : given;
 }
 
+/* What a call goes to: the function a direct call names, or the target
+   of an indirect one with the object of a bound function and the context
+   of a closure. */
+struct call_target {
+    bool direct;
+    struct ir_operand target;
+    struct ir_operand bound;
+    struct ir_operand context;
+};
+
+/* The callee comes before the arguments, from left to right. A bound
+   function gives its object as the first argument and its entry as the
+   target. A function with its context gives its code as the target and
+   its context as the last argument. */
+static void lower_callee(struct lowerer *l, const struct expr *callee,
+                         const struct type *fn, struct call_target *to)
+{
+    if (lower_is_context(fn)) {
+        struct ir_operand value = lower_address(l, callee);
+        to->target = lower_temp(l, ir_load(l->f, l->b, IR_PTR, value));
+        to->context = lower_temp(
+            l, ir_load(l->f, l->b, IR_PTR,
+                       lower_offset_address(
+                           l, value,
+                           ir_sym_operand(l->m,
+                                          ir_sym_offset_of(
+                                              l->m, lower_agg_of(l, fn),
+                                              1)))));
+        to->direct = false;
+    } else if (callee->type != NULL && callee->type->kind == TYPE_FN &&
+        callee->type->bound) {
+        struct ir_operand value = lower_address(l, callee);
+        to->bound = lower_temp(l, ir_load(l->f, l->b, IR_PTR, value));
+        to->target = lower_temp(
+            l, ir_load(l->f, l->b, IR_PTR,
+                       lower_offset_address(
+                           l, value,
+                           lower_field_offset(l, callee->type,
+                                              &lower_entry_name))));
+        to->direct = false;
+    } else if (!to->direct) {
+        to->target = lower_expr(l, callee);
+    }
+}
+
+/* DESIGN: a call through the table loads the table pointer from the
+   object, which is its first word, then the entry of the function.
+   The index is the same in every class of a chain, so the entry the
+   concrete class filled is the one this call reads. The call names
+   the class and the index, so the passes over the whole program see
+   which entries it may reach. Returns the slot of the entry, or 0 for a
+   call that goes elsewhere. */
+static uint32_t table_target(struct lowerer *l, const struct expr *e,
+                             const struct symbol *sym, size_t n,
+                             struct ir_operand object, struct call_target *to)
+{
+    size_t index;
+    struct ir_operand table;
+
+    if (e->as.call.dispatch == NULL || n == 0) {
+        return 0;
+    }
+    index = lower_table_index(e->as.call.dispatch, &e->as.call.entry,
+                              dispatched_params(e, sym, n));
+    if (index == 0) {
+        return 0;
+    }
+    table = lower_load_table(l, object, e->as.call.dispatch);
+    to->target = lower_temp(
+        l, ir_load(l->f, l->b, IR_PTR,
+                   lower_offset_address(
+                       l, table, lower_entry_offset(l, index))));
+    to->direct = false;
+    return ir_index(index);
+}
+
 struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
 {
     const struct expr *callee = e->as.call.callee;
     const struct symbol *sym = callee->kind == EXPR_NAME ? callee->symbol
                                                          : NULL;
-    bool direct = sym != NULL && (sym->kind == SYMBOL_FN ||
-                                  sym->kind == SYMBOL_EXTERN_FN);
     size_t n = e->as.call.arg_count;
     const struct type *fn = callee->type != NULL &&
                                     callee->type->kind == TYPE_FN
@@ -1782,9 +1856,7 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
        the arguments are lowered. A failing call among them sets the out
        address of its own slot, which is no place of this call. */
     struct ir_operand out = l->out_address;
-    struct ir_operand target;
-    struct ir_operand bound = lower_none();
-    struct ir_operand context = lower_none();
+    struct call_target to;
     struct ir_operand *args;
     struct ir_operand *values;
     uint32_t result;
@@ -1793,45 +1865,20 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     size_t given;
     size_t i;
 
+    to.direct = sym != NULL && (sym->kind == SYMBOL_FN ||
+                                sym->kind == SYMBOL_EXTERN_FN);
+    to.bound = lower_none();
+    to.context = lower_none();
     if (e->as.call.hashes) {
         return lower_hash(l, e);
     }
-    target = lower_none();
-    /* The callee comes before the arguments, from left to right. A
-       bound function gives its object as the first argument and its
-       entry as the target. A function with its context gives its code
-       as the target and its context as the last argument. */
-    if (lower_is_context(fn)) {
-        struct ir_operand value = lower_address(l, callee);
-        target = lower_temp(l, ir_load(l->f, l->b, IR_PTR, value));
-        context = lower_temp(
-            l, ir_load(l->f, l->b, IR_PTR,
-                       lower_offset_address(
-                           l, value,
-                           ir_sym_operand(l->m,
-                                          ir_sym_offset_of(
-                                              l->m, lower_agg_of(l, fn),
-                                              1)))));
-        direct = false;
-    } else if (callee->type != NULL && callee->type->kind == TYPE_FN &&
-        callee->type->bound) {
-        struct ir_operand value = lower_address(l, callee);
-        bound = lower_temp(l, ir_load(l->f, l->b, IR_PTR, value));
-        target = lower_temp(
-            l, ir_load(l->f, l->b, IR_PTR,
-                       lower_offset_address(
-                           l, value,
-                           lower_field_offset(l, callee->type,
-                                              &lower_entry_name))));
-        direct = false;
-    } else if (!direct) {
-        target = lower_expr(l, callee);
-    }
+    to.target = lower_none();
+    lower_callee(l, callee, fn, &to);
     args = alloc_zeroed(2 * n + 3, sizeof *args);
     values = alloc_zeroed(n + 1, sizeof *values);
     given = 0;
-    if (bound.kind != IR_NONE) {
-        args[given++] = bound;
+    if (to.bound.kind != IR_NONE) {
+        args[given++] = to.bound;
     }
     /* An argument at a parameter that does not keep it passes as two
        words. */
@@ -1843,37 +1890,17 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
                             fn != NULL && i < fn->param_count ? fn->params[i]
                                                               : NULL);
     }
-    if (bound.kind != IR_NONE) {
+    if (to.bound.kind != IR_NONE) {
         n++;
     }
     if (e->as.call.out != NULL) {
         args[given++] = out;
         n++;
     }
-    if (context.kind != IR_NONE) {
-        args[given++] = context;
+    if (to.context.kind != IR_NONE) {
+        args[given++] = to.context;
     }
-    /* DESIGN: a call through the table loads the table pointer from the
-       object, which is its first word, then the entry of the function.
-       The index is the same in every class of a chain, so the entry the
-       concrete class filled is the one this call reads. The call names
-       the class and the index, so the passes over the whole program see
-       which entries it may reach. */
-    slot = 0;
-    if (e->as.call.dispatch != NULL && n > 0) {
-        size_t index = lower_table_index(e->as.call.dispatch, &e->as.call.entry,
-                                         dispatched_params(e, sym, n));
-        if (index > 0) {
-            slot = ir_index(index);
-            struct ir_operand table =
-                lower_load_table(l, args[0], e->as.call.dispatch);
-            target = lower_temp(
-                l, ir_load(l->f, l->b, IR_PTR,
-                           lower_offset_address(
-                               l, table, lower_entry_offset(l, index))));
-            direct = false;
-        }
-    }
+    slot = table_target(l, e, sym, n, args[0], &to);
     /* A call whose error a handler takes gives the error pointer here.
        The value of the expression is what the out parameter received, so
        the IR type comes from the function and not from the node. */
@@ -1883,15 +1910,15 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     if (e->as.call.handler.kind == HANDLE_NONE) {
         declared = lower_ir_type_of(e->type);
     }
-    if (direct) {
+    if (to.direct) {
         result = ir_call(l->f, l->b, declared,
                          ir_func_op(lower_callee_function(l, sym)), args,
                          given);
     } else {
-        result = ir_call_indirect(l->f, l->b, declared, target,
-                                  bound.kind != IR_NONE
+        result = ir_call_indirect(l->f, l->b, declared, to.target,
+                                  to.bound.kind != IR_NONE
                                       ? lower_bound_signature(l, callee->type)
-                                  : context.kind != IR_NONE
+                                  : to.context.kind != IR_NONE
                                       ? lower_context_signature(l,
                                                                 callee->type)
                                       : lower_signature(l, callee->type),
@@ -1904,7 +1931,7 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
         }
     }
     free(args);
-    if (bound.kind == IR_NONE && context.kind == IR_NONE) {
+    if (to.bound.kind == IR_NONE && to.context.kind == IR_NONE) {
         lower_drop_arguments(l, callee->symbol, fn,
                              (const struct expr *const *)e->as.call.args,
                              values, e->as.call.arg_count, 0);

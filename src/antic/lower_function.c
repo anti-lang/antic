@@ -98,30 +98,23 @@ void lower_function(struct lowerer *l, const struct item *it)
 
 static uint32_t lower_captures_agg(struct lowerer *l, const struct item *it);
 
-static void lower_function_body(struct lowerer *l, const struct item *it)
+/* DESIGN: `self` is the first IR parameter of a member function and has
+   no entry in the declared list. Every declared parameter therefore sits
+   one place further along. One that does not keep its argument takes two
+   places, which a slot joins into its pair. */
+static size_t first_param(const struct item *it)
 {
-    struct defers around;
-    struct ir_block *entry;
-    size_t first;
-    size_t at;
+    return it->has_self ? 1 : 0;
+}
+
+/* Give each parameter of it, and `self`, its temporary or the slot in
+   entry that holds it. */
+static void param_slots(struct lowerer *l, const struct item *it,
+                        struct ir_block *entry)
+{
+    size_t at = first_param(it);
     size_t i;
 
-    l->f = l->m->functions[it->symbol->ir];
-    l->f->decl_line = (uint32_t)it->pos.line;
-    l->loop = NULL;
-    l->defers = NULL;
-    l->trace_name = NULL;
-    l->failing_error = lower_none();
-    l->may_fail = it->may_fail;
-    l->result_out = lower_none();
-    l->temp_count = 0;
-    entry = lower_new_block(l);
-    l->b = entry;
-    /* DESIGN: `self` is the first IR parameter of a member function
-       and has no entry in the declared list. Every declared parameter
-       therefore sits one place further along. One that does not keep its
-       argument takes two places, which a slot joins into its pair. */
-    first = it->has_self ? 1 : 0;
     if (it->self != NULL) {
         it->self->ir = l->f->params[0].temp;
         /* A closure captures `self` by its address. */
@@ -129,7 +122,6 @@ static void lower_function_body(struct lowerer *l, const struct item *it)
             it->self->ir = ir_slot(l->f, entry, ir_scalar(IR_PTR));
         }
     }
-    at = first;
     for (i = 0; i < it->param_count; i++) {
         struct symbol *sym = it->params[i].symbol;
         sym->ir = l->f->params[at].temp;
@@ -139,12 +131,20 @@ static void lower_function_body(struct lowerer *l, const struct item *it)
         }
         at += lower_is_context(sym->type) ? 2 : 1;
     }
-    lower_reserve_slots(l, entry, it->body);
+}
+
+/* Store the arguments that live in slots, a function value as its pair
+   of words, and take the out pointer of a `may fail` function. */
+static void store_params(struct lowerer *l, const struct item *it,
+                         struct ir_block *entry)
+{
+    size_t at = first_param(it);
+    size_t i;
+
     if (it->self != NULL && it->self->address_taken) {
         ir_store(l->f, entry, IR_PTR, lower_temp(l, l->f->params[0].temp),
                  lower_temp(l, it->self->ir));
     }
-    at = first;
     for (i = 0; i < it->param_count; i++) {
         const struct symbol *sym = it->params[i].symbol;
         if (lower_is_context(sym->type)) {
@@ -175,34 +175,44 @@ static void lower_function_body(struct lowerer *l, const struct item *it)
         it->symbol->type->has_out) {
         l->result_out = lower_temp(l, l->f->params[at].temp);
     }
-    /* DESIGN: the context of a closure is its last parameter. It holds
-       the address of every variable the closure captures, in the order
-       of the captures. Each name reaches its variable through the
-       address loaded here. */
-    if (it->capture_count > 0 && it->snapshot) {
+}
+
+/* DESIGN: the context of a closure is its last parameter. It holds the
+   address of every variable the closure captures, in the order of the
+   captures. Each name reaches its variable through the address loaded
+   here. */
+static void bind_captures(struct lowerer *l, const struct item *it,
+                          struct ir_block *entry)
+{
+    struct ir_operand context;
+    uint32_t agg;
+    size_t i;
+
+    if (it->snapshot) {
         snapshot_entry(l, it, entry);
-    } else if (it->capture_count > 0) {
-        struct ir_operand context =
-            lower_temp(l, l->f->params[l->f->param_count - 1].temp);
-        uint32_t agg = lower_captures_agg(l, it);
-        for (i = 0; i < it->capture_count; i++) {
-            it->captures[i].symbol->ir = ir_load(
-                l->f, entry, IR_PTR,
-                lower_offset_address(
-                    l, context,
-                    i == 0 ? lower_zero()
-                           : ir_sym_operand(l->m,
-                                            ir_sym_offset_of(l->m, agg,
-                                                             (uint32_t)i))));
-        }
+        return;
     }
-    l->b = entry;
-    /* DESIGN: the `enter` hook stands before the first statement and the
-       `leave` hook is an exit action of a scope around the whole body,
-       so every `return`, every `fail` and the closing brace run it, and
-       it runs after the locals of the body are gone. */
-    memset(&around, 0, sizeof around);
-    l->defers = &around;
+    context = lower_temp(l, l->f->params[l->f->param_count - 1].temp);
+    agg = lower_captures_agg(l, it);
+    for (i = 0; i < it->capture_count; i++) {
+        it->captures[i].symbol->ir = ir_load(
+            l->f, entry, IR_PTR,
+            lower_offset_address(
+                l, context,
+                i == 0 ? lower_zero()
+                       : ir_sym_operand(l->m,
+                                        ir_sym_offset_of(l->m, agg,
+                                                         (uint32_t)i))));
+    }
+}
+
+/* The exit actions of the scope around the body of it: the owned
+   parameters, the `leave` hook and the hidden lock. The `enter` hook and
+   the lock run here, before the first statement. */
+static void open_body_scope(struct lowerer *l, const struct item *it)
+{
+    size_t i;
+
     for (i = 0; i < it->param_count; i++) {
         const struct symbol *sym = it->params[i].symbol;
         if (sym->own_param ||
@@ -229,6 +239,38 @@ static void lower_function_body(struct lowerer *l, const struct item *it)
                             lower_temp(l, l->f->params[0].temp)),
                         true, it->pos.line);
     }
+}
+
+static void lower_function_body(struct lowerer *l, const struct item *it)
+{
+    struct defers around;
+    struct ir_block *entry;
+
+    l->f = l->m->functions[it->symbol->ir];
+    l->f->decl_line = (uint32_t)it->pos.line;
+    l->loop = NULL;
+    l->defers = NULL;
+    l->trace_name = NULL;
+    l->failing_error = lower_none();
+    l->may_fail = it->may_fail;
+    l->result_out = lower_none();
+    l->temp_count = 0;
+    entry = lower_new_block(l);
+    l->b = entry;
+    param_slots(l, it, entry);
+    lower_reserve_slots(l, entry, it->body);
+    store_params(l, it, entry);
+    if (it->capture_count > 0) {
+        bind_captures(l, it, entry);
+    }
+    l->b = entry;
+    /* DESIGN: the `enter` hook stands before the first statement and the
+       `leave` hook is an exit action of a scope around the whole body,
+       so every `return`, every `fail` and the closing brace run it, and
+       it runs after the locals of the body are gone. */
+    memset(&around, 0, sizeof around);
+    l->defers = &around;
+    open_body_scope(l, it);
     lower_block(l, it->body);
     if (l->b != NULL) {
         lower_run_defers(l, &around, false);
