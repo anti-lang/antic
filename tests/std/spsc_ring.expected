@@ -16,7 +16,9 @@ remove_one 30 -1 [0, 70]
 refilled [0, 70, 100, 101, 102, 103, 104, 105] 8 true
 clear: popped 0, 1 true [7]
 dup: [0, 1, 4, 9] true
+hash: true true
 changed copy: false [0, 1, 4, 9] [1, 4, 9, 9]
+changed hash: false
 owned: front 7, 3 held, 4 alive
 owned copy: true 1 8 true
 owned: 0 alive, 0 allocations held

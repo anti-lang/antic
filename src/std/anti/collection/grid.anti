@@ -103,7 +103,7 @@ pub class Grid<T> inherits collection.Indexed<T>
 		let n = 0;
 		let place = 0;
 		while place < self.count do {
-			if self.holds(place, test) {
+			if self.accepts(place, test) {
 				let (gone, after) = self.take_place(place);
 				n += 1;
 			}
@@ -117,15 +117,12 @@ pub class Grid<T> inherits collection.Indexed<T>
 	concrete fn remove_first(self, test: fn(T) -> bool,
 		at: lang.SourceLocation = here) -> ?T
 	{
-		let place = 0;
-		while place < self.count do {
-			if self.holds(place, test) {
-				let (taken, after) = self.take_place(place);
-				return taken;
-			}
-			place += 1;
+		let place = self.first_match(test);
+		if place < 0 {
+			return none;
 		}
-		return none;
+		let (taken, after) = self.take_place(place);
+		return taken;
 	}
 
 	/// Take the one element that `test` accepts out of its cell, which takes a
@@ -136,22 +133,8 @@ pub class Grid<T> inherits collection.Indexed<T>
 	concrete fn remove_one(self, test: fn(T) -> bool,
 		at: lang.SourceLocation = here) -> T may fail
 	{
-		let found = -1;
-		let n = 0;
-		let place = 0;
-		while place < self.count do {
-			if self.holds(place, test) {
-				if n == 0 {
-					found = place;
-				}
-				n += 1;
-			}
-			place += 1;
-		}
-		if n != 1 {
-			fail collection.NotOne.found("remove_one", n);
-		}
-		let (taken, after) = self.take_place(found);
+		let place = try self.one_match("remove_one", test);
+		let (taken, after) = self.take_place(place);
 		return taken;
 	}
 
@@ -202,13 +185,6 @@ pub class Grid<T> inherits collection.Indexed<T>
 		let across = &row[x];
 		let down = &rows[y];
 		return &cells[y * self.width + x];
-	}
-
-	/// Whether `test` accepts the element at the place `at`.
-	fn holds(self, at: int, test: fn(T) -> bool) -> bool
-	{
-		let items = self.items catch fatal;
-		return test(items[at]);
 	}
 
 	/// Tear down the copy of the fill value. The destruct of

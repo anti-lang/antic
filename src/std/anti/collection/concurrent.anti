@@ -1083,29 +1083,15 @@ pub concurrent class SpscRing<T, N: int>
 	/// allocator of the ring.
 	pub fn find_all(self, test: fn(T) -> bool) -> collection.Copies<T>
 	{
-		let found = collection.Copies<T>.new(0, self.from);
-		let (head, tail) = self.held();
-		let items = self.items catch fatal;
-		let p = head;
-		while p < tail do {
-			if test(items[p % N]) {
-				found.add(dup(items[p % N]));
-			}
-			p += 1;
-		}
-		return found;
+		let held = self.elements();
+		return held.find_all(test);
 	}
 
 	/// A copy of the oldest element that `test` accepts, or `none`.
 	pub fn find_first(self, test: fn(T) -> bool) -> ?T
 	{
-		let (head, tail) = self.held();
-		let p = self.first_match(head, tail, test);
-		if p < 0 {
-			return none;
-		}
-		let items = self.items catch fatal;
-		return dup(items[p % N]);
+		let held = self.elements();
+		return held.find_first(test);
 	}
 
 	/// A copy of the one element that `test` accepts.
@@ -1114,42 +1100,24 @@ pub concurrent class SpscRing<T, N: int>
 	/// matches.
 	pub fn find_one(self, test: fn(T) -> bool) -> T may fail
 	{
-		let (head, tail) = self.held();
-		let p = try self.one_match("find_one", head, tail, test);
-		let items = self.items catch fatal;
-		return dup(items[p % N]);
+		let held = self.elements();
+		return try held.find_one(test);
 	}
 
 	/// Run `change` on every element that `test` accepts, in place, and give
 	/// their number.
 	pub fn update_all(self, test: fn(T) -> bool, change: fn(lent *T)) -> int
 	{
-		let (head, tail) = self.held();
-		let items = self.items catch fatal;
-		let n = 0;
-		let p = head;
-		while p < tail do {
-			if test(items[p % N]) {
-				change(&items[p % N]);
-				n += 1;
-			}
-			p += 1;
-		}
-		return n;
+		let held = self.elements();
+		return held.update_all(test, change);
 	}
 
 	/// Run `change` on the oldest element that `test` accepts, in place. Gives
 	/// `false` when no element matches.
 	pub fn update_first(self, test: fn(T) -> bool, change: fn(lent *T)) -> bool
 	{
-		let (head, tail) = self.held();
-		let p = self.first_match(head, tail, test);
-		if p < 0 {
-			return false;
-		}
-		let items = self.items catch fatal;
-		change(&items[p % N]);
-		return true;
+		let held = self.elements();
+		return held.update_first(test, change);
 	}
 
 	/// Run `change` on the one element that `test` accepts, in place.
@@ -1158,52 +1126,27 @@ pub concurrent class SpscRing<T, N: int>
 	/// element or more than one matches.
 	pub fn update_one(self, test: fn(T) -> bool, change: fn(lent *T)) may fail
 	{
-		let (head, tail) = self.held();
-		let p = try self.one_match("update_one", head, tail, test);
-		let items = self.items catch fatal;
-		change(&items[p % N]);
+		let held = self.elements();
+		try held.update_one(test, change);
 	}
 
 	/// Remove every element that `test` accepts and give their number. The
 	/// others keep their order.
-	///
-	/// DESIGN: the elements the ring keeps move towards the newest, from the
-	/// newest down, and `taken` moves past the room they leave. The producer
-	/// writes no slot below `given`, so the move reaches no slot it uses.
 	pub fn remove_all(self, test: fn(T) -> bool) -> int
 	{
-		let (head, tail) = self.held();
-		let items = self.items catch fatal;
-		let keep = tail;
-		let p = tail - 1;
-		while p >= head do {
-			let slot = &items[p % N];
-			if test(*slot) {
-				destroy(slot);
-				memset(slot as ?*byte, 0, size_of(T) as c_size_t);
-			} else {
-				keep -= 1;
-				if keep != p {
-					let to = &items[keep % N];
-					memcpy(to as ?*byte, slot as ?*byte, size_of(T) as c_size_t);
-					memset(slot as ?*byte, 0, size_of(T) as c_size_t);
-				}
-			}
-			p -= 1;
-		}
-		self.taken.store(keep);
-		return keep - head;
+		let held = self.elements();
+		let n = held.remove_all(test);
+		self.taken.store(held.head);
+		return n;
 	}
 
 	/// Remove the oldest element that `test` accepts and give it, or `none`.
 	pub fn remove_first(self, test: fn(T) -> bool) -> ?T
 	{
-		let (head, tail) = self.held();
-		let p = self.first_match(head, tail, test);
-		if p < 0 {
-			return none;
-		}
-		return self.take_at(head, p);
+		let held = self.elements();
+		let got = held.remove_first(test);
+		self.taken.store(held.head);
+		return got;
 	}
 
 	/// Remove the one element that `test` accepts and give it.
@@ -1212,24 +1155,18 @@ pub concurrent class SpscRing<T, N: int>
 	/// element or more than one matches.
 	pub fn remove_one(self, test: fn(T) -> bool) -> T may fail
 	{
-		let (head, tail) = self.held();
-		let p = try self.one_match("remove_one", head, tail, test);
-		return self.take_at(head, p);
+		let held = self.elements();
+		let got = try held.remove_one(test);
+		self.taken.store(held.head);
+		return got;
 	}
 
 	/// Remove every element the consumer holds.
 	pub fn clear(self)
 	{
-		let (head, tail) = self.held();
-		let items = self.items catch fatal;
-		let p = head;
-		while p < tail do {
-			let slot = &items[p % N];
-			destroy(slot);
-			memset(slot as ?*byte, 0, size_of(T) as c_size_t);
-			p += 1;
-		}
-		self.taken.store(tail);
+		let held = self.elements();
+		held.clear();
+		self.taken.store(held.head);
 	}
 
 	operator fn iter(self) -> Snapshot<T>
@@ -1248,19 +1185,15 @@ pub concurrent class SpscRing<T, N: int>
 	/// The elements as text, `[1, 2, 3]`, oldest first.
 	concrete fn to_text(self) -> str
 	{
-		let all = self.find_all(fn(x) {
-			return true;
-		});
-		return all.to_text();
+		let held = self.elements();
+		return held.to_text();
 	}
 
 	/// Write the elements to `out` as a JSON array, oldest first.
 	concrete fn serialize(self, out: *text.Builder)
 	{
-		let all = self.find_all(fn(x) {
-			return true;
-		});
-		all.serialize(out);
+		let held = self.elements();
+		held.serialize(out);
 	}
 
 	/// A ring in `to` with room of its own for `N` elements from the same
@@ -1309,61 +1242,14 @@ pub concurrent class SpscRing<T, N: int>
 		return got;
 	}
 
-	/// Remove the element at the position `p` of those from `head` and give it.
-	/// The elements before it move one slot towards the newest, and `taken`
-	/// moves past the slot they leave.
-	fn take_at(self, head: int, p: int) -> T
+	/// The elements the consumer holds now, as a collection over the room. The
+	/// consumer alone calls it, and a call that removes stores `head` of the
+	/// view as `taken` after it.
+	fn elements(self) -> Held<T>
 	{
-		let (got, at) = self.take(p);
+		let (head, tail) = self.held();
 		let items = self.items catch fatal;
-		let q = p - 1;
-		while q >= head do {
-			let to = &items[(q + 1) % N];
-			let from = &items[q % N];
-			memcpy(to as ?*byte, from as ?*byte, size_of(T) as c_size_t);
-			q -= 1;
-		}
-		memset(&items[head % N] as ?*byte, 0, size_of(T) as c_size_t);
-		self.taken.store(head + 1);
-		return got;
-	}
-
-	/// The first position from `head` up to `tail` whose element `test`
-	/// accepts, or -1.
-	fn first_match(self, head: int, tail: int, test: fn(T) -> bool) -> int
-	{
-		let items = self.items catch fatal;
-		let p = head;
-		while p < tail do {
-			if test(items[p % N]) {
-				return p;
-			}
-			p += 1;
-		}
-		return -1;
-	}
-
-	/// The one position from `head` up to `tail` whose element `test` accepts.
-	/// It fails with `NotOne`, which names the form, when there are none or
-	/// more.
-	fn one_match(self, form: str, head: int, tail: int, test: fn(T) -> bool)
-		-> int may fail
-	{
-		let items = self.items catch fatal;
-		let found = -1;
-		let n = 0;
-		let p = head;
-		while p < tail do {
-			if test(items[p % N]) {
-				found = p;
-				n += 1;
-			}
-			p += 1;
-		}
-		if n != 1 {
-			fail collection.NotOne.found(form, n);
-		}
-		return found;
+		return Held<T>.over(self.from, items, N, head, tail);
 	}
 
 	fn destruct(self)
@@ -1385,22 +1271,130 @@ pub concurrent class SpscRing<T, N: int>
 /// as the consumer of each holds them.
 pub operator fn eq<T: eq, N: int>(a: SpscRing<T, N>, b: SpscRing<T, N>) -> bool
 {
-	let mine = a.find_all(fn(x) {
-		return true;
-	});
-	let theirs = b.find_all(fn(x) {
-		return true;
-	});
+	let mine = a.elements();
+	let theirs = b.elements();
 	return collection.equal<T>(&mine, &theirs);
 }
 
 /// The hash of the elements from the oldest, which equal rings share.
 pub operator fn hash<T: hash, N: int>(a: SpscRing<T, N>) -> u64
 {
-	let mine = a.find_all(fn(x) {
-		return true;
-	});
+	let mine = a.elements();
 	return collection.hash_in_order<T>(&mine);
+}
+
+/// The elements the consumer of an `SpscRing` holds, as a collection over the
+/// room of the ring, so that the ring takes the criteria forms, `clear`, the
+/// text, `==` and the hash of `Collection<T>` and writes none of them again.
+///
+/// DESIGN: a place is a position of the stream, from `head` up to `tail`, and
+/// the element at the position `p` stands in the slot `p % size`. A removal
+/// moves the elements before it one slot towards the newest and moves `head`
+/// past the slot they leave, so the ring stores `head` as `taken` after the
+/// call. The producer writes no slot below `tail`, so no move reaches a slot it
+/// uses. The view owns nothing: the ring holds the room and tears it down.
+class Held<T> inherits collection.Collection<T>
+{
+	/// The room of the ring.
+	items: *T,
+	/// The number of slots of the room.
+	size: int,
+	/// The position of the oldest element the view holds.
+	pub head: int,
+	/// The position after the newest element the view holds.
+	tail: int,
+
+	/// The elements from `head` up to `tail` of the room `items` of `size`
+	/// slots, whose copies come from `from`.
+	pub fn over(from: *mem.Allocator, items: *T, size: int, head: int,
+		tail: int) -> Held<T>
+	{
+		return Held<T> {
+			count: tail - head,
+			from: from,
+			items: items,
+			size: size,
+			head: head,
+			tail: tail,
+		};
+	}
+
+	concrete fn first_place(self) -> int
+	{
+		if self.head == self.tail {
+			return -1;
+		}
+		return self.head;
+	}
+
+	concrete fn next_place(self, at: int) -> int
+	{
+		if at + 1 >= self.tail {
+			return -1;
+		}
+		return at + 1;
+	}
+
+	concrete fn lend_place(self, at: int, f: fn(lent *T))
+	{
+		f(&self.items[at % self.size]);
+	}
+
+	concrete fn copy_place(self, at: int) -> T
+	{
+		return self.copy_element(&self.items[at % self.size]);
+	}
+
+	/// The element at the position `at`, moved out of its slot. The elements
+	/// before it move one slot towards the newest, and `head` moves past the
+	/// slot they leave, which stays zero.
+	concrete fn take_place(self, at: int) -> (T, int)
+	{
+		let slot = &self.items[at % self.size];
+		let got = (*slot, self.next_place(at));
+		let q = at - 1;
+		while q >= self.head do {
+			let to = &self.items[(q + 1) % self.size];
+			let from = &self.items[q % self.size];
+			memcpy(to as ?*byte, from as ?*byte, size_of(T) as c_size_t);
+			q -= 1;
+		}
+		memset(&self.items[self.head % self.size] as ?*byte, 0,
+			size_of(T) as c_size_t);
+		self.head += 1;
+		return got;
+	}
+
+	/// Remove every element that `test` accepts in one pass and give their
+	/// number. The others keep their order.
+	///
+	/// DESIGN: the elements that stay move towards the newest, from the newest
+	/// down, and `head` moves past the room they leave, so each moves once.
+	concrete fn remove_all(self, test: fn(T) -> bool,
+		at: lang.SourceLocation = here) -> int
+	{
+		let keep = self.tail;
+		let p = self.tail - 1;
+		while p >= self.head do {
+			let slot = &self.items[p % self.size];
+			if self.accepts(p, test) {
+				destroy(slot);
+				memset(slot as ?*byte, 0, size_of(T) as c_size_t);
+			} else {
+				keep -= 1;
+				if keep != p {
+					let to = &self.items[keep % self.size];
+					memcpy(to as ?*byte, slot as ?*byte, size_of(T) as c_size_t);
+					memset(slot as ?*byte, 0, size_of(T) as c_size_t);
+				}
+			}
+			p -= 1;
+		}
+		let n = keep - self.head;
+		self.head = keep;
+		self.resized(-n, at);
+		return n;
+	}
 }
 
 /// Room for `n` elements from `from`, all zero. The program stops when the

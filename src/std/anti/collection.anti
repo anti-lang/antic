@@ -447,7 +447,7 @@ pub abstract class Collection<T>
 	}
 
 	/// Whether `test` accepts the element at the place `at`.
-	fn accepts(self, at: int, test: fn(T) -> bool) -> bool
+	protected fn accepts(self, at: int, test: fn(T) -> bool) -> bool
 	{
 		let yes = false;
 		self.lend_place(at, fn(p) {
@@ -457,7 +457,7 @@ pub abstract class Collection<T>
 	}
 
 	/// The place of the first element `test` accepts, or -1.
-	fn first_match(self, test: fn(T) -> bool) -> int
+	protected fn first_match(self, test: fn(T) -> bool) -> int
 	{
 		let at = self.first_place();
 		while at >= 0 do {
@@ -471,7 +471,7 @@ pub abstract class Collection<T>
 
 	/// The place of the one element `test` accepts. It fails with `NotOne`,
 	/// named after `form`, when no element or more than one matches.
-	fn one_match(self, form: str, test: fn(T) -> bool) -> int may fail
+	protected fn one_match(self, form: str, test: fn(T) -> bool) -> int may fail
 	{
 		let found = -1;
 		let n = 0;

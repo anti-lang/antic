@@ -217,7 +217,7 @@ pub abstract class Slots<T> inherits collection.Collection<T>
 		let n = 0;
 		let i = self.first_place();
 		while i >= 0 do {
-			if test(*self.element(i)) {
+			if self.accepts(i, test) {
 				self.bump(i);
 				change(self.element(i));
 				n += 1;
@@ -231,16 +231,13 @@ pub abstract class Slots<T> inherits collection.Collection<T>
 	/// takes a new version. Gives `false` when no element matches.
 	concrete fn update_first(self, test: fn(T) -> bool, change: fn(lent *T)) -> bool
 	{
-		let i = self.first_place();
-		while i >= 0 do {
-			if test(*self.element(i)) {
-				self.bump(i);
-				change(self.element(i));
-				return true;
-			}
-			i = self.next_place(i);
+		let i = self.first_match(test);
+		if i < 0 {
+			return false;
 		}
-		return false;
+		self.bump(i);
+		change(self.element(i));
+		return true;
 	}
 
 	/// Run `change` on the one element that `test` accepts, in place, which
@@ -250,23 +247,9 @@ pub abstract class Slots<T> inherits collection.Collection<T>
 	/// more than one matches.
 	concrete fn update_one(self, test: fn(T) -> bool, change: fn(lent *T)) may fail
 	{
-		let found = -1;
-		let n = 0;
-		let i = self.first_place();
-		while i >= 0 do {
-			if test(*self.element(i)) {
-				if n == 0 {
-					found = i;
-				}
-				n += 1;
-			}
-			i = self.next_place(i);
-		}
-		if n != 1 {
-			fail collection.NotOne.found("update_one", n);
-		}
-		self.bump(found);
-		change(self.element(found));
+		let i = try self.one_match("update_one", test);
+		self.bump(i);
+		change(self.element(i));
 	}
 
 	operator fn iter(self) -> SlotsWalk<T>

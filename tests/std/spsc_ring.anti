@@ -222,9 +222,15 @@ fn copies()
 	}
 	let b = dup(&a);
 	show(f"dup: {b.to_text()} {a == *b}");
+	let all = a.find_all(fn(x) {
+		return true;
+	});
+	let in_order = collection.hash_in_order<int>(&all);
+	show(f"hash: {a.hash() == b.hash()} {a.hash() == in_order}");
 	b.pop();
 	b.push(9);
 	show(f"changed copy: {a == *b} {a.to_text()} {b.to_text()}");
+	show(f"changed hash: {a.hash() == b.hash()}");
 	delete(b);
 }
 
