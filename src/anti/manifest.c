@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "deps.h"
 #include "files.h"
 #include "text.h"
 #include "toml.h"
@@ -341,6 +342,17 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
     if (out->name.length == 0) {
         fprintf(stderr, "anti: %s: [package] names no `name`, the root module "
                         "path of the package\n", path);
+        manifest_free(out);
+        return false;
+    }
+    /* The version goes into every class descriptor, where the loader of a
+       plugin compares it, and into the index the resolver reads. Both
+       read it alike only in the form the resolver takes. */
+    if (out->version.length > 0 &&
+        !deps_version_valid(text_cstr(&out->version))) {
+        fprintf(stderr, "anti: %s: [package] version `%s` is no version of "
+                        "one to three parts of digits, as `1.2.0`\n",
+                path, text_cstr(&out->version));
         manifest_free(out);
         return false;
     }

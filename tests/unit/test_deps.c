@@ -205,7 +205,9 @@ static void manifest_layout(void)
 
 /* The three refusals: a dependency of a repository and a path, one with
    no version and one naming a repository that `[repositories]` does not.
-   A file without `[package] name` is no manifest either. */
+   A file without `[package] name` is no manifest either, and neither is
+   one whose `[package] version` the resolver would not read: the loader
+   of a plugin compared `1.0.0.1` above `1.0.0`, and the resolver equal. */
 static void manifest_refusals(void)
 {
     static const char both[] =
@@ -224,15 +226,21 @@ static void manifest_refusals(void)
         "[dependencies]\n"
         "\"com.example.tree\" = { version = \"1.0.0\", repo = \"nowhere\" }\n";
     static const char no_name[] = "[package]\nversion = \"1.0.0\"\n";
+    static const char four_parts[] =
+        "[package]\nname = \"com.example.app\"\nversion = \"1.0.0.1\"\n";
+    static const char not_digits[] =
+        "[package]\nname = \"com.example.app\"\nversion = \"1.0-beta\"\n";
     struct manifest m;
     size_t i;
-    const char *texts[4];
+    const char *texts[6];
 
     texts[0] = both;
     texts[1] = no_version;
     texts[2] = no_repo;
     texts[3] = no_name;
-    for (i = 0; i < 4; i++) {
+    texts[4] = four_parts;
+    texts[5] = not_digits;
+    for (i = 0; i < 6; i++) {
         const char *path = fixture("unit-refused.toml", texts[i]);
         CHECK(path != NULL);
         if (path == NULL) {
