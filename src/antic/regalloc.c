@@ -375,18 +375,28 @@ static size_t read_vregs(const struct alloc *a, struct mach_inst *inst,
     return count;
 }
 
-static void rematerialise_constants(struct alloc *a)
+/* The constants of a function that each use may define again: the one
+   definition of each vreg, and the vregs defined more than once. */
+struct constants {
+    struct mach_inst *definition;
+    bool *once;
+    bool *many;
+};
+
+/* Whether vreg v is a constant with one definition. */
+static bool rematerialised(const struct constants *k, uint32_t v)
+{
+    return !k->many[v] && k->definition[v].count != 0;
+}
+
+/* The one definition of each constant, and the vregs with more. */
+static void find_constants(struct alloc *a, struct constants *k)
 {
     struct mach_function *f = a->f;
-    struct mach_inst *definition =
-        alloc_zeroed(f->vreg_count, sizeof *definition);
-    bool *once = alloc_zeroed(f->vreg_count, sizeof *once);
-    bool *many = alloc_zeroed(f->vreg_count, sizeof *many);
     size_t b;
     size_t i;
     size_t j;
 
-    /* The one definition of each constant, and the vregs with more. */
     for (b = 0; b < f->block_count; b++) {
         for (i = 0; i < f->blocks[b].count; i++) {
             struct mach_inst *inst = &f->blocks[b].insts[i];
@@ -395,18 +405,66 @@ static void rematerialise_constants(struct alloc *a)
             for (j = 0; j < inst->count; j++) {
                 if ((op->roles[j] & ROLE_DEF) != 0 &&
                     inst->operands[j].kind == MACH_VREG) {
-                    many[inst->operands[j].reg] =
-                        many[inst->operands[j].reg] || once[inst->operands[j].reg];
-                    once[inst->operands[j].reg] = true;
+                    k->many[inst->operands[j].reg] =
+                        k->many[inst->operands[j].reg] ||
+                        k->once[inst->operands[j].reg];
+                    k->once[inst->operands[j].reg] = true;
                 }
             }
             /* A vreg defined more than once is in many, so an instruction
                that defines no constant clears nothing here. */
             if (defines_constant(a->target, inst, &v)) {
-                definition[v] = *inst;
+                k->definition[v] = *inst;
             }
         }
     }
+}
+
+/* Append to rebuilt a definition of its own for every constant that inst
+   reads, and make inst read it. */
+static void define_reads(struct alloc *a, struct mach_inst *inst,
+                         struct mach_block *rebuilt,
+                         const struct constants *k)
+{
+    struct mach_function *f = a->f;
+    size_t j;
+
+    for (j = 0; j < inst->count; j++) {
+        uint32_t *reads[2];
+        size_t count = read_vregs(a, inst, j, reads);
+        size_t r;
+        for (r = 0; r < count; r++) {
+            struct mach_inst *copy;
+            uint32_t v = *reads[r];
+            uint32_t made;
+            size_t d;
+            if (!rematerialised(k, v)) {
+                continue;
+            }
+            made = mach_vreg_add(f, f->fp[v]);
+            copy = mach_append(rebuilt);
+            *copy = k->definition[v];
+            for (d = 0; d < copy->count; d++) {
+                if ((a->target->opcodes[copy->op].roles[d] & ROLE_DEF) != 0) {
+                    copy->operands[d].reg = made;
+                }
+            }
+            *reads[r] = made;
+        }
+    }
+}
+
+static void rematerialise_constants(struct alloc *a)
+{
+    struct mach_function *f = a->f;
+    struct constants k;
+    size_t b;
+    size_t i;
+
+    k.definition = alloc_zeroed(f->vreg_count, sizeof *k.definition);
+    k.once = alloc_zeroed(f->vreg_count, sizeof *k.once);
+    k.many = alloc_zeroed(f->vreg_count, sizeof *k.many);
+    find_constants(a, &k);
     /* Give every use a definition of its own, right before it. */
     for (b = 0; b < f->block_count; b++) {
         struct mach_block rebuilt;
@@ -414,33 +472,11 @@ static void rematerialise_constants(struct alloc *a)
         rebuilt.loop_depth = f->blocks[b].loop_depth;
         for (i = 0; i < f->blocks[b].count; i++) {
             struct mach_inst *inst = &f->blocks[b].insts[i];
-            uint32_t made = 0;
-            for (j = 0; j < inst->count; j++) {
-                uint32_t *reads[2];
-                size_t count = read_vregs(a, inst, j, reads);
-                size_t r;
-                for (r = 0; r < count; r++) {
-                    struct mach_inst *copy;
-                    uint32_t v = *reads[r];
-                    size_t k;
-                    if (many[v] || definition[v].count == 0) {
-                        continue;
-                    }
-                    made = mach_vreg_add(f, f->fp[v]);
-                    copy = mach_append(&rebuilt);
-                    *copy = definition[v];
-                    for (k = 0; k < copy->count; k++) {
-                        if ((a->target->opcodes[copy->op].roles[k] &
-                             ROLE_DEF) != 0) {
-                            copy->operands[k].reg = made;
-                        }
-                    }
-                    *reads[r] = made;
-                }
-            }
+            uint32_t v = 0;
+            define_reads(a, inst, &rebuilt, &k);
             /* The original definition goes, since every use has one. */
-            if (defines_constant(a->target, inst, &made) && !many[made] &&
-                definition[made].count != 0) {
+            if (defines_constant(a->target, inst, &v) &&
+                rematerialised(&k, v)) {
                 continue;
             }
             *mach_append(&rebuilt) = *inst;
@@ -448,9 +484,9 @@ static void rematerialise_constants(struct alloc *a)
         free(f->blocks[b].insts);
         f->blocks[b] = rebuilt;
     }
-    free(definition);
-    free(once);
-    free(many);
+    free(k.definition);
+    free(k.once);
+    free(k.many);
 }
 
 static void build_intervals(struct alloc *a)

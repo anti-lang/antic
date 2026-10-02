@@ -1158,6 +1158,51 @@ static void check_accesses(const struct ir_module *m,
     }
 }
 
+/* The walk over the functions one worker reaches: each function seen,
+   and the ones still to visit. */
+struct reach_walk {
+    bool *seen;
+    uint32_t *work;
+    size_t pending;
+};
+
+/* Push every function a call of f reaches that the walk has not seen:
+   the one a direct call names, and each one the class model lists for
+   the slot of a call through a table. */
+static void push_callees(struct whole *w, const struct ir_module *m,
+                         const struct ir_function *f, struct reach_walk *walk)
+{
+    size_t b;
+    size_t k;
+
+    for (b = 0; b < f->block_count; b++) {
+        for (k = 0; k < f->blocks[b]->count; k++) {
+            const struct ir_inst *inst = &f->blocks[b]->insts[k];
+            const uint32_t *entries = NULL;
+            size_t n = 0;
+            size_t e;
+            if (inst->op != IR_CALL) {
+                continue;
+            }
+            if (inst->a.kind == IR_FUNC) {
+                entries = &inst->a.as.index;
+                n = 1;
+            } else if (inst->c.kind == IR_GLOBAL) {
+                n = whole_entries(w, inst->c.as.index, inst->field,
+                                  &entries);
+            }
+            for (e = 0; e < n; e++) {
+                uint32_t g = entries[e];
+                if (g != IR_NO_INDEX && !walk->seen[g] &&
+                    !m->functions[g]->is_extern) {
+                    walk->seen[g] = true;
+                    walk->work[walk->pending++] = g;
+                }
+            }
+        }
+    }
+}
+
 /* DESIGN: the singleton check follows every call a worker makes, direct
    or through a table, into every module of the program. A call through
    a table reaches each function that the class model lists for its
@@ -1169,8 +1214,7 @@ static bool check_singletons(struct whole *w, const struct ir_module *m,
 {
     size_t count = 0;
     struct watched *fields;
-    bool *seen;
-    uint32_t *work;
+    struct reach_walk walk;
     size_t i;
     size_t j;
     bool ok = true;
@@ -1191,58 +1235,32 @@ static bool check_singletons(struct whole *w, const struct ir_module *m,
             count++;
         }
     }
-    seen = alloc_zeroed(m->function_count, sizeof *seen);
-    work = alloc_zeroed(m->function_count, sizeof *work);
+    walk.seen = alloc_zeroed(m->function_count, sizeof *walk.seen);
+    walk.work = alloc_zeroed(m->function_count, sizeof *walk.work);
     for (i = 0; i < m->function_count; i++) {
         const struct ir_function *worker = m->functions[i];
-        size_t pending = 0;
         size_t before = errors->length;
         if (!worker->worker || worker->is_extern) {
             continue;
         }
-        memset(seen, 0, m->function_count * sizeof *seen);
+        memset(walk.seen, 0, m->function_count * sizeof *walk.seen);
         for (j = 0; j < count; j++) {
             fields[j].reported = false;
         }
-        seen[i] = true;
-        work[pending++] = (uint32_t)i;
-        while (pending > 0) {
-            const struct ir_function *f = m->functions[work[--pending]];
-            size_t b;
-            size_t k;
+        walk.pending = 0;
+        walk.seen[i] = true;
+        walk.work[walk.pending++] = (uint32_t)i;
+        while (walk.pending > 0) {
+            const struct ir_function *f =
+                m->functions[walk.work[--walk.pending]];
             check_accesses(m, f, worker, fields, count, errors);
-            for (b = 0; b < f->block_count; b++) {
-                for (k = 0; k < f->blocks[b]->count; k++) {
-                    const struct ir_inst *inst = &f->blocks[b]->insts[k];
-                    const uint32_t *entries = NULL;
-                    size_t n = 0;
-                    size_t e;
-                    if (inst->op != IR_CALL) {
-                        continue;
-                    }
-                    if (inst->a.kind == IR_FUNC) {
-                        entries = &inst->a.as.index;
-                        n = 1;
-                    } else if (inst->c.kind == IR_GLOBAL) {
-                        n = whole_entries(w, inst->c.as.index, inst->field,
-                                          &entries);
-                    }
-                    for (e = 0; e < n; e++) {
-                        uint32_t g = entries[e];
-                        if (g != IR_NO_INDEX && !seen[g] &&
-                            !m->functions[g]->is_extern) {
-                            seen[g] = true;
-                            work[pending++] = g;
-                        }
-                    }
-                }
-            }
+            push_callees(w, m, f, &walk);
         }
         ok = ok && errors->length == before;
     }
     free(fields);
-    free(seen);
-    free(work);
+    free(walk.seen);
+    free(walk.work);
     return ok;
 }
 
@@ -1284,6 +1302,85 @@ static bool at_or_below(const struct whole *w, uint32_t record, uint32_t above)
     return false;
 }
 
+/* Mark the slot of every call of f through a table in the bitmap of
+   each abstract class at or below the class of the call. */
+static void mark_calls(struct whole *w, const struct ir_module *m,
+                       const struct ir_function *f, struct slots *slots)
+{
+    size_t b;
+    size_t k;
+
+    for (b = 0; b < f->block_count; b++) {
+        for (k = 0; k < f->blocks[b]->count; k++) {
+            const struct ir_inst *inst = &f->blocks[b]->insts[k];
+            uint32_t above;
+            size_t c;
+            if (inst->op != IR_CALL || inst->c.kind != IR_GLOBAL) {
+                continue;
+            }
+            above = record_of(w, inst->c.as.index);
+            for (c = 0; above != IR_NO_INDEX && c < m->class_count; c++) {
+                if ((m->classes[c]->flags & IR_CLASS_ABSTRACT) != 0 &&
+                    at_or_below(w, (uint32_t)c, above)) {
+                    mark_slot(&slots[c], inst->field);
+                }
+            }
+        }
+    }
+}
+
+/* The table `anti_rt_slots`: a bitmap for each of the emitted abstract
+   classes whose slots a call reaches, and the flag of reflection. */
+static void write_slot_table(struct ir_module *m, const struct slots *slots,
+                         size_t emitted, bool every)
+{
+    size_t classes = m->class_count;
+    size_t i;
+    uint32_t slot_agg = rt_record_agg(m, RT_RECORD_SLOTS);
+    uint32_t table_agg = rt_record_agg(m, RT_RECORD_SLOT_TABLE);
+    char name[48];
+    struct ir_const *list;
+    struct ir_const *value;
+    struct ir_global *g;
+    size_t n = 0;
+
+    list = emitted > 0
+               ? ir_const_agg(m, ir_aggregate(ir_array_of(
+                                     m, rt_record_name(RT_RECORD_SLOTS),
+                                     ir_aggregate(slot_agg), emitted)),
+                              emitted)
+               : NULL;
+    for (i = 0; list != NULL && i < classes; i++) {
+        struct ir_const *item;
+        uint32_t bits;
+        if (slots[i].count == 0) {
+            continue;
+        }
+        snprintf(name, sizeof name, "slots.%zu", n);
+        bits = ir_global_add(m, RUNTIME_MODULE, name, slots[i].bits,
+                             (slots[i].count + 7) / 8, 1)->index;
+        item = ir_const_agg(m, ir_aggregate(slot_agg),
+                            RT_SLOTS_ITEM_COUNT);
+        const_addr(&item->items[RT_SLOTS_DESCRIPTOR], m->classes[i]->descriptor);
+        const_int(&item->items[RT_SLOTS_SLOT_COUNT], IR_I64, slots[i].count);
+        const_addr(&item->items[RT_SLOTS_BITS], bits);
+        list->items[n++] = *item;
+    }
+    value = ir_const_agg(m, ir_aggregate(table_agg),
+                         RT_SLOT_TABLE_ITEM_COUNT);
+    const_int(&value->items[RT_SLOT_TABLE_COUNT], IR_I64, emitted);
+    if (list != NULL) {
+        const_addr(&value->items[RT_SLOT_TABLE_INTERFACES],
+                   ir_global_add_value(m, RUNTIME_MODULE, "slots.list",
+                                       list)->index);
+    } else {
+        const_int(&value->items[RT_SLOT_TABLE_INTERFACES], IR_PTR, 0);
+    }
+    const_int(&value->items[RT_SLOT_TABLE_REFLECT], IR_I64, every ? 1 : 0);
+    g = ir_global_add_value(m, NULL, "anti_rt_slots", value);
+    g->exported = true;
+}
+
 /* DESIGN: a plugin that provides an interface must fill every slot the
    program can call through it. The program therefore carries the slots
    its calls reach, per abstract class. A call at a slot through a class
@@ -1309,78 +1406,17 @@ static void write_slots(struct whole *w, struct ir_module *m,
     struct slots *slots = alloc_zeroed(classes, sizeof *slots);
     size_t emitted = 0;
     size_t i;
-    size_t b;
-    size_t k;
 
     for (i = 0; i < m->function_count; i++) {
-        const struct ir_function *f = m->functions[i];
-        if (!r->functions[i]) {
-            continue;
-        }
-        for (b = 0; b < f->block_count; b++) {
-            for (k = 0; k < f->blocks[b]->count; k++) {
-                const struct ir_inst *inst = &f->blocks[b]->insts[k];
-                uint32_t above;
-                size_t c;
-                if (inst->op != IR_CALL || inst->c.kind != IR_GLOBAL) {
-                    continue;
-                }
-                above = record_of(w, inst->c.as.index);
-                for (c = 0; above != IR_NO_INDEX && c < classes; c++) {
-                    if ((m->classes[c]->flags & IR_CLASS_ABSTRACT) != 0 &&
-                        at_or_below(w, (uint32_t)c, above)) {
-                        mark_slot(&slots[c], inst->field);
-                    }
-                }
-            }
+        if (r->functions[i]) {
+            mark_calls(w, m, m->functions[i], slots);
         }
     }
     for (i = 0; i < classes; i++) {
         emitted += slots[i].count > 0 ? 1 : 0;
     }
     if (emitted > 0 || force) {
-        uint32_t slot_agg = rt_record_agg(m, RT_RECORD_SLOTS);
-        uint32_t table_agg = rt_record_agg(m, RT_RECORD_SLOT_TABLE);
-        char name[48];
-        struct ir_const *list;
-        struct ir_const *value;
-        struct ir_global *g;
-        size_t n = 0;
-        list = emitted > 0
-                   ? ir_const_agg(m, ir_aggregate(ir_array_of(
-                                         m, rt_record_name(RT_RECORD_SLOTS),
-                                         ir_aggregate(slot_agg), emitted)),
-                                  emitted)
-                   : NULL;
-        for (i = 0; list != NULL && i < classes; i++) {
-            struct ir_const *item;
-            uint32_t bits;
-            if (slots[i].count == 0) {
-                continue;
-            }
-            snprintf(name, sizeof name, "slots.%zu", n);
-            bits = ir_global_add(m, RUNTIME_MODULE, name, slots[i].bits,
-                                 (slots[i].count + 7) / 8, 1)->index;
-            item = ir_const_agg(m, ir_aggregate(slot_agg),
-                                RT_SLOTS_ITEM_COUNT);
-            const_addr(&item->items[RT_SLOTS_DESCRIPTOR], m->classes[i]->descriptor);
-            const_int(&item->items[RT_SLOTS_SLOT_COUNT], IR_I64, slots[i].count);
-            const_addr(&item->items[RT_SLOTS_BITS], bits);
-            list->items[n++] = *item;
-        }
-        value = ir_const_agg(m, ir_aggregate(table_agg),
-                             RT_SLOT_TABLE_ITEM_COUNT);
-        const_int(&value->items[RT_SLOT_TABLE_COUNT], IR_I64, emitted);
-        if (list != NULL) {
-            const_addr(&value->items[RT_SLOT_TABLE_INTERFACES],
-                       ir_global_add_value(m, RUNTIME_MODULE, "slots.list",
-                                           list)->index);
-        } else {
-            const_int(&value->items[RT_SLOT_TABLE_INTERFACES], IR_PTR, 0);
-        }
-        const_int(&value->items[RT_SLOT_TABLE_REFLECT], IR_I64, every ? 1 : 0);
-        g = ir_global_add_value(m, NULL, "anti_rt_slots", value);
-        g->exported = true;
+        write_slot_table(m, slots, emitted, every);
     }
     for (i = 0; i < classes; i++) {
         free(slots[i].bits);
@@ -1791,36 +1827,39 @@ static void resolve_provider(struct whole *w, struct ir_module *m,
    calls are followed. A call through a table names no function here,
    and a graph that guessed would refuse a program that has no cycle.
    The walk marks every function a provider may run. */
+static void reach_operand(const struct ir_operand *o,
+                          struct reach_walk *walk, bool *globals)
+{
+    if (o->kind == IR_GLOBAL) {
+        globals[o->as.index] = true;
+    } else if (o->kind == IR_FUNC && !walk->seen[o->as.index]) {
+        walk->seen[o->as.index] = true;
+        walk->work[walk->pending++] = o->as.index;
+    }
+}
+
 static void reach_calls(const struct ir_module *m, uint32_t from, bool *seen,
                         uint32_t *work, bool *globals)
 {
-    size_t count = 0;
+    struct reach_walk walk;
     size_t b;
     size_t k;
 
     if (seen[from]) {
         return;
     }
+    walk.seen = seen;
+    walk.work = work;
+    walk.pending = 0;
     seen[from] = true;
-    work[count++] = from;
-    while (count > 0) {
-        const struct ir_function *f = m->functions[work[--count]];
+    work[walk.pending++] = from;
+    while (walk.pending > 0) {
+        const struct ir_function *f = m->functions[work[--walk.pending]];
         for (b = 0; b < f->block_count; b++) {
             for (k = 0; k < f->blocks[b]->count; k++) {
                 const struct ir_inst *inst = &f->blocks[b]->insts[k];
-                const struct ir_operand *o[2];
-                size_t n;
-                o[0] = &inst->a;
-                o[1] = &inst->b;
-                for (n = 0; n < 2; n++) {
-                    if (o[n]->kind == IR_GLOBAL) {
-                        globals[o[n]->as.index] = true;
-                    } else if (o[n]->kind == IR_FUNC &&
-                               !seen[o[n]->as.index]) {
-                        seen[o[n]->as.index] = true;
-                        work[count++] = o[n]->as.index;
-                    }
-                }
+                reach_operand(&inst->a, &walk, globals);
+                reach_operand(&inst->b, &walk, globals);
             }
         }
     }
@@ -2117,6 +2156,124 @@ static uint32_t copy_chain(struct ir_module *m, const struct ir_const *from,
     return ir_global_add_value(m, RUNTIME_MODULE, name, value)->index;
 }
 
+/* What the interface j that the class c provides looked like where the
+   library was built: its chain, its fields, its size and the version of
+   its package, into item. The loader compares each with the host's. n
+   numbers the record. Returns false after reporting an error. */
+static bool provided_versions(struct ir_module *m, const struct ir_class *c,
+                              size_t j, size_t n, struct ir_const *item,
+                              struct text *errors)
+{
+    const struct ir_const *record =
+        descriptor_item(m, c->provides[j].descriptor, RT_DESCRIPTOR_VERSIONS);
+    const struct ir_const *fields =
+        descriptor_item(m, c->provides[j].descriptor, RT_DESCRIPTOR_FIELD_COUNT);
+    const struct ir_const *size =
+        descriptor_item(m, c->provides[j].descriptor, RT_DESCRIPTOR_SIZE);
+    const struct ir_const *version =
+        descriptor_item(m, c->provides[j].descriptor, RT_DESCRIPTOR_VERSION);
+    const struct ir_const *length =
+        descriptor_item(m, c->provides[j].descriptor, RT_DESCRIPTOR_VERSION_LENGTH);
+    const struct ir_const *chain =
+        record != NULL && record->kind == IR_CONST_ADDR
+            ? global_value(m, record->global)
+            : NULL;
+    const struct ir_global *built =
+        version != NULL && version->kind == IR_CONST_ADDR &&
+                version->global < m->global_count
+            ? m->globals[version->global]
+            : NULL;
+    const struct ir_const *hashes;
+    char name[32];
+
+    if (chain == NULL || chain->item_count <= RT_VERSIONS_CHAIN_LENGTH ||
+        fields == NULL || size == NULL || length == NULL ||
+        built == NULL || built->bytes == NULL) {
+        text_appendf(errors, "`%s.%s` provides `%s`, and this "
+                     "build reads no version of it\n", c->module,
+                     c->name, c->provides[j].interface);
+        return false;
+    }
+    /* The descriptor comes from the library file of another
+       module, so each value is checked before it is read. */
+    hashes = chain_of(m, chain);
+    if (hashes == NULL || !is_integer(fields, false) ||
+        !is_integer(size, true) || !is_integer(length, false) ||
+        length->integer > built->size) {
+        text_appendf(errors, "`%s.%s` provides `%s`, and the "
+                     "library file that describes it is "
+                     "damaged\n", c->module, c->name,
+                     c->provides[j].interface);
+        return false;
+    }
+    const_addr(&item->items[RT_PROVIDES_CHAIN],
+               copy_chain(m, hashes,
+                          (size_t)chain->items[RT_VERSIONS_CHAIN_LENGTH].integer, n));
+    const_int(&item->items[RT_PROVIDES_CHAIN_LENGTH], IR_I64,
+              (uint64_t)chain->items[RT_VERSIONS_CHAIN_LENGTH].integer);
+    item->items[RT_PROVIDES_FIELDS] = *fields;
+    item->items[RT_PROVIDES_FIELDS].scalar = IR_I64;
+    item->items[RT_PROVIDES_SIZE] = *size;
+    item->items[RT_PROVIDES_SIZE].scalar = IR_I64;
+    snprintf(name, sizeof name, "provides.built.%zu", n);
+    const_addr(&item->items[RT_PROVIDES_BUILT],
+               ir_global_add(m, RUNTIME_MODULE, name,
+                             built->bytes, built->size,
+                             1)->index);
+    item->items[RT_PROVIDES_BUILT_LENGTH] = *length;
+    item->items[RT_PROVIDES_BUILT_LENGTH].scalar = IR_I64;
+    return true;
+}
+
+/* The record of the interface j that the class record provides: its
+   path, its descriptor, the class, its init, the offset of the
+   interface in the object and the versions it was built against. n
+   numbers the record. NULL after reporting an error. */
+static struct ir_const *provided_record(struct whole *w, struct ir_module *m,
+                                        uint32_t record, size_t j, size_t n,
+                                        struct text *errors)
+{
+    const struct ir_class *c = m->classes[record];
+    uint32_t offset = interface_offset(w, m, record,
+                                       c->provides[j].descriptor);
+    struct ir_const *item;
+    char name[32];
+    uint32_t text;
+
+    if (c->init == IR_NO_INDEX || offset == IR_NO_INDEX) {
+        text_appendf(errors, "`%s.%s` provides `%s` and is no such "
+                     "interface\n", c->module, c->name,
+                     c->provides[j].interface);
+        return NULL;
+    }
+    snprintf(name, sizeof name, "provides.%zu", n);
+    text = ir_global_add(m, RUNTIME_MODULE, name,
+                         (const uint8_t *)c->provides[j].interface,
+                         strlen(c->provides[j].interface) + 1,
+                         1)->index;
+    item = ir_const_agg(m, ir_aggregate(rt_record_agg(m, RT_RECORD_PROVIDES)),
+                        RT_PROVIDES_ITEM_COUNT);
+    const_addr(&item->items[RT_PROVIDES_PATH], text);
+    const_int(&item->items[RT_PROVIDES_PATH_LENGTH], IR_I64,
+              strlen(c->provides[j].interface));
+    const_addr(&item->items[RT_PROVIDES_DESCRIPTOR], c->provides[j].descriptor);
+    const_addr(&item->items[RT_PROVIDES_CLASS_OF], c->descriptor);
+    item->items[RT_PROVIDES_INIT].kind = IR_CONST_FUNC;
+    item->items[RT_PROVIDES_INIT].scalar = IR_PTR;
+    item->items[RT_PROVIDES_INIT].global = c->init;
+    if (offset == INJECT_AT_ZERO) {
+        const_int(&item->items[RT_PROVIDES_OFFSET], IR_I64, 0);
+    } else {
+        item->items[RT_PROVIDES_OFFSET].kind = IR_CONST_SYM;
+        item->items[RT_PROVIDES_OFFSET].scalar = IR_I64;
+        item->items[RT_PROVIDES_OFFSET].sym = offset;
+    }
+    const_int(&item->items[RT_PROVIDES_FLAGS], IR_I64,
+              ((c->flags & IR_CLASS_ARGS) != 0 ? 1 : 0) |
+                  ((c->flags & IR_CLASS_REQUIRED) != 0 ? 2 : 0));
+    return provided_versions(m, c, j, n, item, errors) ? item : NULL;
+}
+
 static void write_provides(struct whole *w, struct ir_module *m,
                            struct text *errors)
 {
@@ -2137,106 +2294,12 @@ static void write_provides(struct whole *w, struct ir_module *m,
     }
     items = alloc_zeroed(total + 1, sizeof *items);
     for (i = 0; i < m->class_count; i++) {
-        const struct ir_class *c = m->classes[i];
-        for (j = 0; j < c->provides_count; j++) {
-            uint32_t offset = interface_offset(w, m, (uint32_t)i,
-                                               c->provides[j].descriptor);
-            struct ir_const *item;
-            char name[32];
-            uint32_t text;
-            if (c->init == IR_NO_INDEX || offset == IR_NO_INDEX) {
-                text_appendf(errors, "`%s.%s` provides `%s` and is no such "
-                             "interface\n", c->module, c->name,
-                             c->provides[j].interface);
-                continue;
+        for (j = 0; j < m->classes[i]->provides_count; j++) {
+            struct ir_const *item =
+                provided_record(w, m, (uint32_t)i, j, n, errors);
+            if (item != NULL) {
+                items[n++] = *item;
             }
-            snprintf(name, sizeof name, "provides.%zu", n);
-            text = ir_global_add(m, RUNTIME_MODULE, name,
-                                 (const uint8_t *)c->provides[j].interface,
-                                 strlen(c->provides[j].interface) + 1,
-                                 1)->index;
-            item = ir_const_agg(m, ir_aggregate(entry_agg),
-                                RT_PROVIDES_ITEM_COUNT);
-            const_addr(&item->items[RT_PROVIDES_PATH], text);
-            const_int(&item->items[RT_PROVIDES_PATH_LENGTH], IR_I64,
-                      strlen(c->provides[j].interface));
-            const_addr(&item->items[RT_PROVIDES_DESCRIPTOR], c->provides[j].descriptor);
-            const_addr(&item->items[RT_PROVIDES_CLASS_OF], c->descriptor);
-            item->items[RT_PROVIDES_INIT].kind = IR_CONST_FUNC;
-            item->items[RT_PROVIDES_INIT].scalar = IR_PTR;
-            item->items[RT_PROVIDES_INIT].global = c->init;
-            if (offset == INJECT_AT_ZERO) {
-                const_int(&item->items[RT_PROVIDES_OFFSET], IR_I64, 0);
-            } else {
-                item->items[RT_PROVIDES_OFFSET].kind = IR_CONST_SYM;
-                item->items[RT_PROVIDES_OFFSET].scalar = IR_I64;
-                item->items[RT_PROVIDES_OFFSET].sym = offset;
-            }
-            const_int(&item->items[RT_PROVIDES_FLAGS], IR_I64,
-                      ((c->flags & IR_CLASS_ARGS) != 0 ? 1 : 0) |
-                          ((c->flags & IR_CLASS_REQUIRED) != 0 ? 2 : 0));
-            /* What the interface looked like where the library was
-               built: its chain, its fields, its size and the version of
-               its package. The loader compares each with the host's. */
-            {
-                const struct ir_const *record =
-                    descriptor_item(m, c->provides[j].descriptor, RT_DESCRIPTOR_VERSIONS);
-                const struct ir_const *fields =
-                    descriptor_item(m, c->provides[j].descriptor, RT_DESCRIPTOR_FIELD_COUNT);
-                const struct ir_const *size =
-                    descriptor_item(m, c->provides[j].descriptor, RT_DESCRIPTOR_SIZE);
-                const struct ir_const *version =
-                    descriptor_item(m, c->provides[j].descriptor, RT_DESCRIPTOR_VERSION);
-                const struct ir_const *length =
-                    descriptor_item(m, c->provides[j].descriptor, RT_DESCRIPTOR_VERSION_LENGTH);
-                const struct ir_const *chain =
-                    record != NULL && record->kind == IR_CONST_ADDR
-                        ? global_value(m, record->global)
-                        : NULL;
-                const struct ir_global *built =
-                    version != NULL && version->kind == IR_CONST_ADDR &&
-                            version->global < m->global_count
-                        ? m->globals[version->global]
-                        : NULL;
-                const struct ir_const *hashes;
-                if (chain == NULL || chain->item_count <= RT_VERSIONS_CHAIN_LENGTH ||
-                    fields == NULL || size == NULL || length == NULL ||
-                    built == NULL || built->bytes == NULL) {
-                    text_appendf(errors, "`%s.%s` provides `%s`, and this "
-                                 "build reads no version of it\n", c->module,
-                                 c->name, c->provides[j].interface);
-                    continue;
-                }
-                /* The descriptor comes from the library file of another
-                   module, so each value is checked before it is read. */
-                hashes = chain_of(m, chain);
-                if (hashes == NULL || !is_integer(fields, false) ||
-                    !is_integer(size, true) || !is_integer(length, false) ||
-                    length->integer > built->size) {
-                    text_appendf(errors, "`%s.%s` provides `%s`, and the "
-                                 "library file that describes it is "
-                                 "damaged\n", c->module, c->name,
-                                 c->provides[j].interface);
-                    continue;
-                }
-                const_addr(&item->items[RT_PROVIDES_CHAIN],
-                           copy_chain(m, hashes,
-                                      (size_t)chain->items[RT_VERSIONS_CHAIN_LENGTH].integer, n));
-                const_int(&item->items[RT_PROVIDES_CHAIN_LENGTH], IR_I64,
-                          (uint64_t)chain->items[RT_VERSIONS_CHAIN_LENGTH].integer);
-                item->items[RT_PROVIDES_FIELDS] = *fields;
-                item->items[RT_PROVIDES_FIELDS].scalar = IR_I64;
-                item->items[RT_PROVIDES_SIZE] = *size;
-                item->items[RT_PROVIDES_SIZE].scalar = IR_I64;
-                snprintf(name, sizeof name, "provides.built.%zu", n);
-                const_addr(&item->items[RT_PROVIDES_BUILT],
-                           ir_global_add(m, RUNTIME_MODULE, name,
-                                         built->bytes, built->size,
-                                         1)->index);
-                item->items[RT_PROVIDES_BUILT_LENGTH] = *length;
-                item->items[RT_PROVIDES_BUILT_LENGTH].scalar = IR_I64;
-            }
-            items[n++] = *item;
         }
     }
     if (n == 0) {

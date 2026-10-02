@@ -660,6 +660,141 @@ static struct link_command *start(struct link_command *c)
     return c;
 }
 
+/* The link of a shared library on macOS. library is the runtime archive
+   of a library for C. */
+static void macos_shared(struct link_command *c, enum target t,
+                         const struct link_inputs *in,
+                         const struct shared_options *s,
+                         const struct text *library)
+{
+    struct text *install = next(c);
+    struct text *compat = next(c);
+    const char *base = strrchr(in->executable, '/');
+
+    text_appendf(install, "@rpath/%s",
+                 base != NULL ? base + 1 : in->executable);
+    text_appendf(compat, "%s.0.0", s->major != NULL ? s->major : "");
+    macos_start(c, t, in, true);
+    add(c, "-o");
+    add(c, in->executable);
+    if (s->major != NULL) {
+        add(c, "-install_name");
+        add(c, text_cstr(install));
+        add(c, "-compatibility_version");
+        add(c, text_cstr(compat));
+        add(c, "-current_version");
+        add(c, s->version);
+    }
+    /* A plugin names what the host defines, so the link leaves
+       every such name to the loader. */
+    if (s->plugin) {
+        add(c, "-undefined");
+        add(c, "dynamic_lookup");
+    }
+    /* A shared library for C shows its export functions and
+       anti_licenses, and no name of the runtime. */
+    if (s->exported_file != NULL) {
+        add(c, "-exported_symbols_list");
+        add(c, s->exported_file);
+    }
+    add_inputs(c, in);
+    if (!s->plugin) {
+        add(c, text_cstr(library));
+    }
+    macos_memcheck(c, t, in);
+    add(c, "-lSystem");
+    macos_frameworks(c, in);
+}
+
+/* The link of a shared library on Linux, against the glibc sysroot when
+   glibc holds. library is the runtime archive of a library for C. */
+static void linux_shared(struct link_command *c, enum target t,
+                         const struct link_inputs *in,
+                         const struct shared_options *s,
+                         const struct text *library, bool glibc)
+{
+    const char *linker = program(c, in, t);
+    const char *base = strrchr(in->executable, '/');
+
+    add(c, linker);
+    if (glibc) {
+        struct text *sysroot = next(c);
+        text_appendf(sysroot, "--sysroot=%s", in->sysroot);
+        add(c, text_cstr(sysroot));
+    }
+    add(c, "-shared");
+    /* The runtime comes from an archive, and a shared library for C
+       shows its export functions alone. */
+    if (!s->plugin) {
+        add(c, "--exclude-libs");
+        add(c, "ALL");
+    }
+    if (!in->debug) {
+        add(c, "--strip-debug");
+    }
+    add(c, "-o");
+    add(c, in->executable);
+    if (s->major != NULL) {
+        add(c, "-soname");
+        add(c, base != NULL ? base + 1 : in->executable);
+    }
+    add_inputs(c, in);
+    if (!s->plugin) {
+        add(c, text_cstr(library));
+    }
+    /* The platform linker searches the C library beside the start
+       files. crt_dir is set for it alone, and lld links no C
+       library outside the glibc mode. */
+    if (glibc) {
+        glibc_libraries(c, t, in, false);
+    } else if (in->linker == LINKER_PLATFORM) {
+        struct text *search = next(c);
+        text_appendf(search, "-L%s", in->crt_dir);
+        add(c, text_cstr(search));
+        linux_libraries(c, in);
+        add(c, "-lc");
+    }
+}
+
+/* The link of a DLL on Windows. library is the runtime archive of a
+   library for C. */
+static void windows_shared(struct link_command *c, enum target t,
+                           const struct link_inputs *in,
+                           const struct shared_options *s,
+                           const struct text *library)
+{
+    const char *linker = program(c, in, t);
+    struct text *def = next(c);
+
+    text_appendf(def, "/DEF:%s", s->def_file != NULL ? s->def_file : "");
+    add(c, linker);
+    add(c, "/NOLOGO");
+    windows_debug(c, in);
+    add(c, "/DLL");
+    /* DESIGN: a plugin links no C runtime startup, so it has no entry
+       point. The host's runtime has started before the load, and
+       the loader registers what the plugin carries. */
+    if (s->plugin) {
+        add(c, "/NOENTRY");
+    }
+    add(c, target_info(t)->arch == ARCH_ARM64 ? "/MACHINE:ARM64"
+                                              : "/MACHINE:X64");
+    windows_output(c, in);
+    add(c, text_cstr(def));
+    windows_libpaths(c, t, in);
+    windows_memcheck(c, t, in);
+    /* The inputs of a plugin hold the import library of its host,
+       which names every symbol of the runtime and the program. */
+    add_inputs(c, in);
+    if (!s->plugin) {
+        add(c, text_cstr(library));
+        add(c, WINDOWS_MSVCRT);
+    }
+    add(c, "libvcruntime.lib");
+    add(c, "ucrt.lib");
+    add(c, "legacy_stdio_definitions.lib");
+}
+
 void link_shared_command(struct link_command *c, enum target t,
                          const struct link_inputs *in,
                          const struct shared_options *s)
@@ -677,120 +812,9 @@ void link_shared_command(struct link_command *c, enum target t,
         runtime_library(library, in->runtime, t, in->cpu, glibc);
     }
     switch (target_info(t)->os) {
-    case OS_MACOS: {
-        struct text *install = next(c);
-        struct text *compat = next(c);
-        const char *base = strrchr(in->executable, '/');
-        text_appendf(install, "@rpath/%s",
-                     base != NULL ? base + 1 : in->executable);
-        text_appendf(compat, "%s.0.0", s->major != NULL ? s->major : "");
-        macos_start(c, t, in, true);
-        add(c, "-o");
-        add(c, in->executable);
-        if (s->major != NULL) {
-            add(c, "-install_name");
-            add(c, text_cstr(install));
-            add(c, "-compatibility_version");
-            add(c, text_cstr(compat));
-            add(c, "-current_version");
-            add(c, s->version);
-        }
-        /* A plugin names what the host defines, so the link leaves
-           every such name to the loader. */
-        if (s->plugin) {
-            add(c, "-undefined");
-            add(c, "dynamic_lookup");
-        }
-        /* A shared library for C shows its export functions and
-           anti_licenses, and no name of the runtime. */
-        if (s->exported_file != NULL) {
-            add(c, "-exported_symbols_list");
-            add(c, s->exported_file);
-        }
-        add_inputs(c, in);
-        if (!s->plugin) {
-            add(c, text_cstr(library));
-        }
-        macos_memcheck(c, t, in);
-        add(c, "-lSystem");
-        macos_frameworks(c, in);
-        break;
-    }
-    case OS_LINUX: {
-        const char *linker = program(c, in, t);
-        const char *base = strrchr(in->executable, '/');
-        add(c, linker);
-        if (glibc) {
-            struct text *sysroot = next(c);
-            text_appendf(sysroot, "--sysroot=%s", in->sysroot);
-            add(c, text_cstr(sysroot));
-        }
-        add(c, "-shared");
-        /* The runtime comes from an archive, and a shared library for C
-           shows its export functions alone. */
-        if (!s->plugin) {
-            add(c, "--exclude-libs");
-            add(c, "ALL");
-        }
-        if (!in->debug) {
-            add(c, "--strip-debug");
-        }
-        add(c, "-o");
-        add(c, in->executable);
-        if (s->major != NULL) {
-            add(c, "-soname");
-            add(c, base != NULL ? base + 1 : in->executable);
-        }
-        add_inputs(c, in);
-        if (!s->plugin) {
-            add(c, text_cstr(library));
-        }
-        /* The platform linker searches the C library beside the start
-           files. crt_dir is set for it alone, and lld links no C
-           library outside the glibc mode. */
-        if (glibc) {
-            glibc_libraries(c, t, in, false);
-        } else if (in->linker == LINKER_PLATFORM) {
-            struct text *search = next(c);
-            text_appendf(search, "-L%s", in->crt_dir);
-            add(c, text_cstr(search));
-            linux_libraries(c, in);
-            add(c, "-lc");
-        }
-        break;
-    }
-    case OS_WINDOWS: {
-        const char *linker = program(c, in, t);
-        struct text *def = next(c);
-        text_appendf(def, "/DEF:%s", s->def_file != NULL ? s->def_file : "");
-        add(c, linker);
-        add(c, "/NOLOGO");
-        windows_debug(c, in);
-        add(c, "/DLL");
-        /* DESIGN: a plugin links no C runtime startup, so it has no entry
-           point. The host's runtime has started before the load, and
-           the loader registers what the plugin carries. */
-        if (s->plugin) {
-            add(c, "/NOENTRY");
-        }
-        add(c, target_info(t)->arch == ARCH_ARM64 ? "/MACHINE:ARM64"
-                                                  : "/MACHINE:X64");
-        windows_output(c, in);
-        add(c, text_cstr(def));
-        windows_libpaths(c, t, in);
-        windows_memcheck(c, t, in);
-        /* The inputs of a plugin hold the import library of its host,
-           which names every symbol of the runtime and the program. */
-        add_inputs(c, in);
-        if (!s->plugin) {
-            add(c, text_cstr(library));
-            add(c, WINDOWS_MSVCRT);
-        }
-        add(c, "libvcruntime.lib");
-        add(c, "ucrt.lib");
-        add(c, "legacy_stdio_definitions.lib");
-        break;
-    }
+    case OS_MACOS: macos_shared(c, t, in, s, library); break;
+    case OS_LINUX: linux_shared(c, t, in, s, library, glibc); break;
+    case OS_WINDOWS: windows_shared(c, t, in, s, library); break;
     }
 }
 

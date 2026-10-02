@@ -1215,81 +1215,77 @@ static void class_uses(struct text *out, const struct type *t,
     }
 }
 
-static void class_view(struct text *out, const struct symbol *sym,
-                       const struct interface *const *ifaces,
-                       size_t iface_count, struct emitted *done)
+/* What the parts of the C view of one class share. */
+struct class_parts {
+    const struct type *t;
+    struct table_entry *entries;    /* the entries of its table */
+    size_t count;
+    struct text *slots;             /* the name of the slot of each entry */
+    struct text name;               /* the C name of the class */
+    struct text to_root;            /* `base.` once per level to the root */
+};
+
+/* The type of the table of the class: a slot per entry. */
+static void class_table(struct text *out, const struct class_parts *p)
 {
-    const struct type *t = sym->type;
-    struct table_entry *entries = alloc_zeroed(sema_table_bound(t),
-                                           sizeof *entries);
-    size_t count = sema_table_of(t, entries);
-    struct text *slots = alloc_zeroed(count + 1, sizeof *slots);
-    struct text name = {0};
-    struct text to_root = {0};
-    const struct item *made;
-    const struct type *up;
     size_t i;
-    size_t j;
 
-    class_uses(out, t, entries, count, ifaces, iface_count, done);
-    slot_names(entries, count, slots);
-    c_type_name(&name, t);
-    /* The table pointer sits in the root, so a wrapper reaches it
-       through one `base` per level of the chain. */
-    for (up = t; up != NULL && up->base != NULL; up = up->base) {
-        text_append(&to_root, "base.");
-    }
-
-    text_appendf(out, "typedef struct %s %s;\n", text_cstr(&name),
-                 text_cstr(&name));
-    nested_views(out, t, ifaces, iface_count, done);
     text_appendf(out, "typedef struct %s_vtable {\n"
                       "    const void *descriptor;\n"
                       "    /* The seven functions and the nine hooks of "
                       "anti.lang.Object. They\n       take and give Anti "
                       "values, so C reads their slots and does not call\n"
                       "       them. */\n",
-                 text_cstr(&name));
-    for (i = 0; i < count; i++) {
+                 text_cstr(&p->name));
+    for (i = 0; i < p->count; i++) {
         struct text callee = {0};
-        if (root_entry(&entries[i])) {
-            text_appendf(out, "    void *%s;\n", text_cstr(&slots[i]));
+        if (root_entry(&p->entries[i])) {
+            text_appendf(out, "    void *%s;\n", text_cstr(&p->slots[i]));
             continue;
         }
-        text_appendf(&callee, "(*%s)", text_cstr(&slots[i]));
+        text_appendf(&callee, "(*%s)", text_cstr(&p->slots[i]));
         text_append(out, "    ");
-        member_signature(out, t, entries[i].fn, text_cstr(&callee));
+        member_signature(out, p->t, p->entries[i].fn, text_cstr(&callee));
         text_append(out, ";\n");
         text_free(&callee);
     }
-    text_appendf(out, "} %s_vtable;\n\n", text_cstr(&name));
+    text_appendf(out, "} %s_vtable;\n\n", text_cstr(&p->name));
+}
+
+/* The struct of the class sym, its descriptor, its table and init, the
+   counterpart of `Class(args)`, and delete, destroy and dup. */
+static void class_struct(struct text *out, const struct symbol *sym,
+                         const struct class_parts *p)
+{
+    const struct type *t = p->t;
+    const char *name = text_cstr(&p->name);
+    const struct item *made;
 
     doc_comment(out, &sym->doc, "");
-    text_appendf(out, "struct %s {\n", text_cstr(&name));
+    text_appendf(out, "struct %s {\n", name);
     class_fields(out, t);
     text_appendf(out, "};\n\n");
 
     text_appendf(out, "extern const anti_descriptor anti_%s_descriptor;\n",
-                 text_cstr(&name));
+                 name);
     if (t->has_abstract) {
         text_appendf(out, "/* %s is abstract: no table and no init, "
                           "because it has no complete value. */\n",
-                     text_cstr(&name));
+                     name);
     } else {
         text_appendf(out, "extern const %s_vtable anti_%s_vtable;\n"
                           "void anti_%s_init(%s *self);\n",
-                     text_cstr(&name), text_cstr(&name), text_cstr(&name),
-                     text_cstr(&name));
+                     name, name, name, name);
         /* The counterpart of `Class(args)`, which prepares self as the
            init does and then runs `construct` with the arguments. */
         made = construct_with_arguments(t);
         if (made != NULL) {
             struct text callee = {0};
-            text_appendf(&callee, "anti_%s_construct", text_cstr(&name));
+            text_appendf(&callee, "anti_%s_construct", name);
             doc_comment(out, &made->doc, "");
             text_appendf(out, "/* Prepares self as anti_%s_init does, then "
                               "runs construct. */\n",
-                         text_cstr(&name));
+                         name);
             may_fail_note(out, made->symbol, "");
             member_signature(out, t, made, text_cstr(&callee));
             text_append(out, ";\n");
@@ -1304,14 +1300,19 @@ static void class_view(struct text *out, const struct symbol *sym,
                  "static inline %s *anti_%s_dup(%s *self)\n"
                  "{\n    return (%s *)anti_rt_dup(self, "
                  "&anti_%s_descriptor);\n}\n\n",
-                 text_cstr(&name), text_cstr(&name), text_cstr(&name),
-                 text_cstr(&name), text_cstr(&name), text_cstr(&name),
-                 text_cstr(&name), text_cstr(&name), text_cstr(&name),
-                 text_cstr(&name), text_cstr(&name));
+                 name, name, name, name, name, name, name, name, name, name,
+                 name);
+}
 
-    /* DESIGN: an interface sub-object is a field of the object, so C
-       reaches the interface by taking its address. The table of that
-       sub-object belongs to the class t and holds thunks. */
+/* DESIGN: an interface sub-object is a field of the object, so C
+   reaches the interface by taking its address. The table of that
+   sub-object belongs to the class t and holds thunks. */
+static void interface_views(struct text *out, const struct class_parts *p)
+{
+    const struct type *t = p->t;
+    const struct type *up;
+    size_t i;
+
     for (up = t; up != NULL; up = up->kind == TYPE_CLASS ? up->base : NULL) {
         for (i = 0; i < up->field_count; i++) {
             const struct struct_field *f = &up->fields[i];
@@ -1326,24 +1327,31 @@ static void class_view(struct text *out, const struct symbol *sym,
                          "extern const %s_vtable anti_%s_%s_vtable;\n"
                          "static inline %s *anti_%s_as_%s(%s *self)\n"
                          "{\n    return &self->%s%s;\n}\n",
-                         text_cstr(&iface), text_cstr(&name),
+                         text_cstr(&iface), text_cstr(&p->name),
                          text_cstr(&iface), text_cstr(&iface),
-                         text_cstr(&name), text_cstr(&iface),
-                         text_cstr(&name), up == t ? "" : "base.",
+                         text_cstr(&p->name), text_cstr(&iface),
+                         text_cstr(&p->name), up == t ? "" : "base.",
                          text_cstr(&buffer));
             text_free(&iface);
             text_free(&buffer);
         }
     }
-    /* DESIGN: each prototype names a symbol the library holds, so a C
-       call to it links. The section of the class that declares a function
-       declares it once, and a class below does not repeat it. An abstract
-       entry has no body and no prototype, and its wrapper carries its
-       comment. */
-    for (i = 0; i < count; i++) {
-        const struct item *fn = entries[i].fn;
+}
+
+/* DESIGN: each prototype names a symbol the library holds, so a C
+   call to it links. The section of the class that declares a function
+   declares it once, and a class below does not repeat it. An abstract
+   entry has no body and no prototype, and its wrapper carries its
+   comment. */
+static void class_prototypes(struct text *out, const struct class_parts *p)
+{
+    const struct type *t = p->t;
+    size_t i;
+
+    for (i = 0; i < p->count; i++) {
+        const struct item *fn = p->entries[i].fn;
         struct text callee = {0};
-        if (root_entry(&entries[i]) || fn->contract == FN_ABSTRACT ||
+        if (root_entry(&p->entries[i]) || fn->contract == FN_ABSTRACT ||
             types_member_level(t, fn) != t) {
             continue;
         }
@@ -1352,7 +1360,7 @@ static void class_view(struct text *out, const struct symbol *sym,
         /* DESIGN: the symbol of a function named `vtable` is the name of
            the table type, which C cannot declare twice. C calls it
            through its wrapper alone. */
-        if (strcmp(text_cstr(&callee) + name.length, "_vtable") == 0) {
+        if (strcmp(text_cstr(&callee) + p->name.length, "_vtable") == 0) {
             text_appendf(out, "/* %s is the table type, so C calls this "
                               "function through its wrapper. */\n",
                          text_cstr(&callee));
@@ -1366,52 +1374,90 @@ static void class_view(struct text *out, const struct symbol *sym,
         text_free(&callee);
     }
     text_append(out, "\n");
+}
+
+/* The wrapper of entry i, which reads the table of the object. */
+static void class_wrapper(struct text *out, const struct class_parts *p,
+                          size_t i)
+{
+    const struct item *fn = p->entries[i].fn;
+    struct text callee = {0};
+    size_t j;
+
+    if (fn->contract == FN_ABSTRACT) {
+        doc_comment(out, &fn->doc, "");
+    }
+    wrapper_name(&callee, p->t, text_cstr(&p->slots[i]));
+    text_append(out, "static inline ");
+    member_signature(out, p->t, fn, text_cstr(&callee));
+    text_appendf(out,
+                 "\n{\n    %s ((const %s_vtable *)self->%svtable)"
+                 "->%s(self",
+                 fn->symbol->type->result->kind == TYPE_VOID ? ""
+                                                             : "return",
+                 text_cstr(&p->name), text_cstr(&p->to_root),
+                 text_cstr(&p->slots[i]));
+    for (j = 1; j < fn->symbol->type->param_count; j++) {
+        struct text buffer = {0};
+        size_t k = j - 1;
+        if (fn->symbol->params != NULL && k < fn->param_count) {
+            c_name(&buffer, &fn->symbol->params[k]);
+        } else if (fn->params != NULL && k < fn->param_count) {
+            c_name(&buffer, &fn->params[k].name);
+        } else {
+            text_appendf(&buffer, "a%zu", k);
+        }
+        text_appendf(out, ", %s", text_cstr(&buffer));
+        text_free(&buffer);
+    }
+    text_append(out, ");\n}\n");
+    text_free(&callee);
+}
+
+static void class_view(struct text *out, const struct symbol *sym,
+                       const struct interface *const *ifaces,
+                       size_t iface_count, struct emitted *done)
+{
+    struct class_parts p = {0};
+    const struct type *up;
+    size_t i;
+
+    p.t = sym->type;
+    p.entries = alloc_zeroed(sema_table_bound(p.t), sizeof *p.entries);
+    p.count = sema_table_of(p.t, p.entries);
+    p.slots = alloc_zeroed(p.count + 1, sizeof *p.slots);
+    class_uses(out, p.t, p.entries, p.count, ifaces, iface_count, done);
+    slot_names(p.entries, p.count, p.slots);
+    c_type_name(&p.name, p.t);
+    /* The table pointer sits in the root, so a wrapper reaches it
+       through one `base` per level of the chain. */
+    for (up = p.t; up != NULL && up->base != NULL; up = up->base) {
+        text_append(&p.to_root, "base.");
+    }
+
+    text_appendf(out, "typedef struct %s %s;\n", text_cstr(&p.name),
+                 text_cstr(&p.name));
+    nested_views(out, p.t, ifaces, iface_count, done);
+    class_table(out, &p);
+    class_struct(out, sym, &p);
+    interface_views(out, &p);
+    class_prototypes(out, &p);
     /* A wrapper per entry with `self`, which reads the table of the
        object. A static has no object and no wrapper, and C calls it by
        its prototype. */
-    for (i = 0; i < count; i++) {
-        const struct item *fn = entries[i].fn;
-        struct text callee = {0};
-        if (root_entry(&entries[i]) || !fn->has_self) {
-            continue;
+    for (i = 0; i < p.count; i++) {
+        if (!root_entry(&p.entries[i]) && p.entries[i].fn->has_self) {
+            class_wrapper(out, &p, i);
         }
-        if (fn->contract == FN_ABSTRACT) {
-            doc_comment(out, &fn->doc, "");
-        }
-        wrapper_name(&callee, t, text_cstr(&slots[i]));
-        text_append(out, "static inline ");
-        member_signature(out, t, fn, text_cstr(&callee));
-        text_appendf(out,
-                     "\n{\n    %s ((const %s_vtable *)self->%svtable)"
-                     "->%s(self",
-                     fn->symbol->type->result->kind == TYPE_VOID ? ""
-                                                                 : "return",
-                     text_cstr(&name), text_cstr(&to_root),
-                     text_cstr(&slots[i]));
-        for (j = 1; j < fn->symbol->type->param_count; j++) {
-            struct text buffer = {0};
-            size_t k = j - 1;
-            if (fn->symbol->params != NULL && k < fn->param_count) {
-                c_name(&buffer, &fn->symbol->params[k]);
-            } else if (fn->params != NULL && k < fn->param_count) {
-                c_name(&buffer, &fn->params[k].name);
-            } else {
-                text_appendf(&buffer, "a%zu", k);
-            }
-            text_appendf(out, ", %s", text_cstr(&buffer));
-            text_free(&buffer);
-        }
-        text_append(out, ");\n}\n");
-        text_free(&callee);
     }
     text_append(out, "\n");
-    for (i = 0; i < count; i++) {
-        text_free(&slots[i]);
+    for (i = 0; i < p.count; i++) {
+        text_free(&p.slots[i]);
     }
-    text_free(&to_root);
-    text_free(&name);
-    free(slots);
-    free(entries);
+    text_free(&p.to_root);
+    text_free(&p.name);
+    free(p.slots);
+    free(p.entries);
 }
 
 static void constant(struct text *out, const struct symbol *sym)
@@ -1570,15 +1616,12 @@ static bool owns_snapshots(const struct interface *const *ifaces,
     return false;
 }
 
-void header_write(struct text *out, const char *name,
-                  const struct interface *const *ifaces, size_t count,
-                  bool bundled)
+/* The comment at the top, the include guard, the headers of C and the
+   opening of `extern "C"`. */
+static void write_preamble(struct text *out, const char *name,
+                           const struct interface *const *ifaces,
+                           size_t count, bool bundled)
 {
-    struct emitted done = {0};
-    size_t i;
-    size_t j;
-    bool any;
-
     text_appendf(out, "/* %s.h, the C interface of %s, written by antic.\n"
                       "   Do not edit. A failure that Anti cannot report calls "
                       "abort().%s */\n",
@@ -1602,8 +1645,17 @@ void header_write(struct text *out, const char *name,
                      "#else\n"
                      "#define ANTI_ALIGNAS(n) _Alignas(n)\n"
                      "#endif\n\n");
-    /* The vector types of C, which a simd struct of 16 bytes is. Each
-       architecture has its own header for them. */
+}
+
+/* The vector types of C, which a simd struct of 16 bytes is. Each
+   architecture has its own header for them. */
+static void write_vector_types(struct text *out,
+                               const struct interface *const *ifaces,
+                               size_t count)
+{
+    size_t i;
+    size_t j;
+
     for (i = 0; i < count; i++) {
         for (j = 0; j < ifaces[i]->item_count; j++) {
             const struct symbol *sym = ifaces[i]->items[j];
@@ -1616,13 +1668,21 @@ void header_write(struct text *out, const char *name,
                     "#else\n"
                     "#include <immintrin.h>\n"
                     "#endif\n\n");
-                i = count;
-                break;
+                return;
             }
         }
     }
-    /* The error class, declared once when an exported signature names
-       it. A C caller passes the pointer on and never reads it. */
+}
+
+/* The error class, declared once when an exported signature names it. A
+   C caller passes the pointer on and never reads it. */
+static void write_error_class(struct text *out,
+                              const struct interface *const *ifaces,
+                              size_t count)
+{
+    size_t i;
+    size_t j;
+
     for (i = 0; i < count; i++) {
         for (j = 0; j < ifaces[i]->item_count; j++) {
             const struct symbol *sym = ifaces[i]->items[j];
@@ -1634,45 +1694,117 @@ void header_write(struct text *out, const char *name,
                     "pointer to one,\n   or NULL on success. C passes it on "
                     "and never reads its layout. */\n"
                     "struct anti_Error;\n\n");
-                i = count;
-                break;
+                return;
             }
         }
     }
-    /* The root of every class chain, which the base of a class nests. */
+}
+
+/* The root of every class chain, which the base of a class nests,
+   written once when an exported class needs it. */
+static void write_root(struct text *out,
+                       const struct interface *const *ifaces, size_t count)
+{
+    size_t i;
+    size_t j;
+
     for (i = 0; i < count; i++) {
         for (j = 0; j < ifaces[i]->item_count; j++) {
             const struct symbol *sym = ifaces[i]->items[j];
-            if (sym->exported && sym->kind == SYMBOL_STRUCT &&
-                sym->type->kind == TYPE_CLASS) {
+            if (!sym->exported || sym->kind != SYMBOL_STRUCT ||
+                sym->type->kind != TYPE_CLASS) {
+                continue;
+            }
+            text_append(out,
+                "/* The root of every class chain, and the record at "
+                "entry 0 of\n   every table. A C program reads the "
+                "layout and never builds one. */\n"
+                "typedef struct anti_descriptor anti_descriptor;\n"
+                "typedef struct anti_Object {\n"
+                "    const void *vtable;\n"
+                "} anti_Object;\n\n"
+                "/* Run the destruct chain of the object, free what it owns "
+                "and free it. */\n"
+                "void anti_rt_delete(void *object, "
+                "const anti_descriptor *type);\n"
+                "void anti_rt_destroy(void *object, "
+                "const anti_descriptor *type);\n"
+                "void *anti_rt_dup(void *object, "
+                "const anti_descriptor *type);\n\n");
+            if (owns_snapshots(ifaces, count)) {
                 text_append(out,
-                    "/* The root of every class chain, and the record at "
-                    "entry 0 of\n   every table. A C program reads the "
-                    "layout and never builds one. */\n"
-                    "typedef struct anti_descriptor anti_descriptor;\n"
-                    "typedef struct anti_Object {\n"
-                    "    const void *vtable;\n"
-                    "} anti_Object;\n\n"
-                    "/* Run the destruct chain of the object, free what it owns "
-                    "and free it. */\n"
-                    "void anti_rt_delete(void *object, "
-                    "const anti_descriptor *type);\n"
-                    "void anti_rt_destroy(void *object, "
-                    "const anti_descriptor *type);\n"
-                    "void *anti_rt_dup(void *object, "
-                    "const anti_descriptor *type);\n\n");
-                if (owns_snapshots(ifaces, count)) {
-                    text_append(out,
-                        "/* Free the snapshot of an `own fn` field, which "
-                        "the object frees\n   with itself. NULL frees "
-                        "nothing. */\n"
-                        "void anti_rt_snapshot_free(void *snapshot);\n\n");
+                    "/* Free the snapshot of an `own fn` field, which "
+                    "the object frees\n   with itself. NULL frees "
+                    "nothing. */\n"
+                    "void anti_rt_snapshot_free(void *snapshot);\n\n");
+            }
+            return;
+        }
+    }
+}
+
+/* One struct per distinct tuple of an exported signature, after the
+   aggregates an element may hold by value. */
+static void write_tuples(struct text *out,
+                         const struct interface *const *ifaces, size_t count,
+                         struct emitted *done)
+{
+    size_t i;
+    size_t j;
+    size_t k;
+
+    for (i = 0; i < count; i++) {
+        for (j = 0; j < ifaces[i]->item_count; j++) {
+            const struct symbol *sym = ifaces[i]->items[j];
+            if (!sym->exported || sym->kind != SYMBOL_FN) {
+                continue;
+            }
+            for (k = 0; k < sym->type->param_count; k++) {
+                emit_tuples(out, sym->type->params[k], ifaces, count, done);
+            }
+            emit_tuples(out, sym->type->result, ifaces, count, done);
+        }
+    }
+}
+
+/* Each exported symbol of kind: a constant as constant writes it, and a
+   function as its prototype. A blank line follows when any stands. */
+static void write_symbols(struct text *out,
+                          const struct interface *const *ifaces, size_t count,
+                          enum symbol_kind kind)
+{
+    size_t i;
+    size_t j;
+    bool any = false;
+
+    for (i = 0; i < count; i++) {
+        for (j = 0; j < ifaces[i]->item_count; j++) {
+            const struct symbol *sym = ifaces[i]->items[j];
+            if (sym->exported && sym->kind == kind) {
+                if (kind == SYMBOL_CONST) {
+                    constant(out, sym);
+                } else {
+                    prototype(out, sym);
                 }
-                i = count;
-                break;
+                any = true;
             }
         }
     }
+    text_append(out, any ? "\n" : "");
+}
+
+void header_write(struct text *out, const char *name,
+                  const struct interface *const *ifaces, size_t count,
+                  bool bundled)
+{
+    struct emitted done = {0};
+    size_t i;
+    size_t j;
+
+    write_preamble(out, name, ifaces, count, bundled);
+    write_vector_types(out, ifaces, count);
+    write_error_class(out, ifaces, count);
+    write_root(out, ifaces, count);
     for (i = 0; i < count; i++) {
         for (j = 0; j < ifaces[i]->item_count; j++) {
             const struct symbol *sym = ifaces[i]->items[j];
@@ -1681,41 +1813,9 @@ void header_write(struct text *out, const char *name,
             }
         }
     }
-    /* One struct per distinct tuple of an exported signature, after the
-       aggregates an element may hold by value. */
-    for (i = 0; i < count; i++) {
-        for (j = 0; j < ifaces[i]->item_count; j++) {
-            const struct symbol *sym = ifaces[i]->items[j];
-            size_t k;
-            if (!sym->exported || sym->kind != SYMBOL_FN) {
-                continue;
-            }
-            for (k = 0; k < sym->type->param_count; k++) {
-                emit_tuples(out, sym->type->params[k], ifaces, count, &done);
-            }
-            emit_tuples(out, sym->type->result, ifaces, count, &done);
-        }
-    }
-    for (i = 0, any = false; i < count; i++) {
-        for (j = 0; j < ifaces[i]->item_count; j++) {
-            const struct symbol *sym = ifaces[i]->items[j];
-            if (sym->exported && sym->kind == SYMBOL_CONST) {
-                constant(out, sym);
-                any = true;
-            }
-        }
-    }
-    text_append(out, any ? "\n" : "");
-    for (i = 0, any = false; i < count; i++) {
-        for (j = 0; j < ifaces[i]->item_count; j++) {
-            const struct symbol *sym = ifaces[i]->items[j];
-            if (sym->exported && sym->kind == SYMBOL_FN) {
-                prototype(out, sym);
-                any = true;
-            }
-        }
-    }
-    text_append(out, any ? "\n" : "");
+    write_tuples(out, ifaces, count, &done);
+    write_symbols(out, ifaces, count, SYMBOL_CONST);
+    write_symbols(out, ifaces, count, SYMBOL_FN);
     text_append(out, "#ifdef __cplusplus\n}\n#endif\n\n#endif\n");
     free((void *)done.items);
 }

@@ -1126,6 +1126,168 @@ static bool written_again(const struct ir_function *f,
     return false;
 }
 
+/* The ptradd use of a slot addresses loads and stores of one type, and
+   nothing else. Collect the field each reaches into fields. Returns false
+   when the address escapes or the fields are too many. */
+static bool ptradd_fields(struct ir_function *f, const struct ir_inst *use,
+                          struct slot_field *fields, size_t *count)
+{
+    size_t m;
+    size_t n;
+
+    for (m = 0; m < f->block_count; m++) {
+        for (n = 0; n < f->blocks[m]->count; n++) {
+            struct ir_inst *at = &f->blocks[m]->insts[n];
+            if (at == use) {
+                continue;
+            }
+            if (escapes_in(at, use->result) ||
+                (at->op == IR_PTRADD && is_temp(&at->a, use->result))) {
+                return false;
+            }
+            if (((at->op == IR_LOAD && is_temp(&at->a, use->result)) ||
+                 (at->op == IR_STORE && is_temp(&at->b, use->result))) &&
+                field_at(f, fields, count, use->b, at->type) == NULL) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+/* Collect into fields the fields of slot, one per offset and type that
+   its loads and stores use. Every use is a direct load or store, or a
+   ptradd whose result only addresses one. Returns false when the address
+   escapes, and the slot then stays whole. */
+static bool slot_fields(struct ir_function *f, const struct ir_inst *slot,
+                        struct slot_field *fields, size_t *count)
+{
+    uint32_t base = slot->result;
+    size_t j;
+    size_t k;
+
+    for (j = 0; j < f->block_count; j++) {
+        for (k = 0; k < f->blocks[j]->count; k++) {
+            struct ir_inst *use = &f->blocks[j]->insts[k];
+            if (use == slot) {
+                continue;
+            }
+            if (escapes_in(use, base)) {
+                return false;
+            }
+            if ((use->op == IR_LOAD && is_temp(&use->a, base)) ||
+                (use->op == IR_STORE && is_temp(&use->b, base))) {
+                if (field_at(f, fields, count, ir_int_op(IR_I64, 0),
+                             use->type) == NULL) {
+                    return false;
+                }
+            } else if (use->op == IR_PTRADD && is_temp(&use->a, base)) {
+                /* DESIGN: a field is reached by a constant or a
+                   symbolic offset. An index computed at run time
+                   reaches a different element on every pass, so a
+                   slot addressed that way is not split. */
+                if ((use->b.kind != IR_INT && use->b.kind != IR_SYM) ||
+                    written_again(f, use, use->result) ||
+                    !ptradd_fields(f, use, fields, count)) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+/* The offset into the slot base that address names: zero for base
+   itself, or the offset of the ptradd of base whose result address is.
+   Returns false for any other address. */
+static bool slot_offset(const struct ir_function *f, uint32_t base,
+                        const struct ir_operand *address,
+                        struct ir_operand *offset)
+{
+    size_t m;
+    size_t q;
+
+    *offset = ir_int_op(IR_I64, 0);
+    if (is_temp(address, base)) {
+        return true;
+    }
+    /* The address may be a ptradd of the slot. */
+    for (m = 0; m < f->block_count; m++) {
+        for (q = 0; q < f->blocks[m]->count; q++) {
+            const struct ir_inst *at = &f->blocks[m]->insts[q];
+            if (at->op == IR_PTRADD && is_temp(&at->a, base) &&
+                address->kind == IR_TEMP &&
+                at->result == address->as.temp) {
+                *offset = at->b;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/* Rewrite every load and store of the slot base into a copy from or to
+   the temporary of its field. */
+static void rewrite_slot_uses(struct ir_function *f, uint32_t base,
+                              const struct slot_field *fields, size_t count)
+{
+    size_t j;
+    size_t k;
+    size_t m;
+
+    for (j = 0; j < f->block_count; j++) {
+        struct ir_block *block = f->blocks[j];
+        for (k = 0; k < block->count; k++) {
+            struct ir_inst *use = &block->insts[k];
+            struct ir_operand offset;
+            struct ir_operand *address = NULL;
+            if (use->op == IR_LOAD) {
+                address = &use->a;
+            } else if (use->op == IR_STORE) {
+                address = &use->b;
+            } else {
+                continue;
+            }
+            if (!slot_offset(f, base, address, &offset)) {
+                continue;
+            }
+            for (m = 0; m < count; m++) {
+                if (same_operand(&fields[m].offset, &offset)) {
+                    break;
+                }
+            }
+            if (m == count) {
+                continue;
+            }
+            if (use->op == IR_LOAD) {
+                make_copy(use, ir_temp_op(f, fields[m].temp));
+            } else {
+                struct ir_operand v = use->a;
+                make_copy(use, v);
+                use->result = fields[m].temp;
+                use->type = fields[m].type;
+            }
+        }
+    }
+}
+
+/* Delete every ptradd of the slot base. */
+static void drop_slot_addresses(struct ir_function *f, uint32_t base)
+{
+    size_t j;
+    size_t k;
+
+    for (j = 0; j < f->block_count; j++) {
+        struct ir_block *block = f->blocks[j];
+        for (k = block->count; k > 0; k--) {
+            const struct ir_inst *at = &block->insts[k - 1];
+            if (at->op == IR_PTRADD && is_temp(&at->a, base)) {
+                delete_inst(block, k - 1);
+            }
+        }
+    }
+}
+
 static bool split_slots(struct ir_function *f)
 {
     struct slot_field fields[32];
@@ -1138,147 +1300,17 @@ static bool split_slots(struct ir_function *f)
             struct ir_inst *slot = &f->blocks[b]->insts[i];
             uint32_t base;
             size_t count = 0;
-            bool escaped = false;
-            size_t j;
-            size_t k;
             if (slot->op != IR_SLOT || slot->of.type != IR_AGG) {
                 continue;
             }
             base = slot->result;
-            if (written_again(f, slot, base)) {
-                continue;
-            }
-            /* Every use is a direct load or store, or a ptradd whose
-               result only addresses one. */
-            for (j = 0; j < f->block_count && !escaped; j++) {
-                for (k = 0; k < f->blocks[j]->count && !escaped; k++) {
-                    struct ir_inst *use = &f->blocks[j]->insts[k];
-                    struct slot_field *field = NULL;
-                    size_t m;
-                    size_t n;
-                    if (use == slot) {
-                        continue;
-                    }
-                    if (escapes_in(use, base)) {
-                        escaped = true;
-                        break;
-                    }
-                    if (use->op == IR_LOAD && is_temp(&use->a, base)) {
-                        field = field_at(f, fields, &count,
-                                         ir_int_op(IR_I64, 0), use->type);
-                    } else if (use->op == IR_STORE && is_temp(&use->b, base)) {
-                        field = field_at(f, fields, &count,
-                                         ir_int_op(IR_I64, 0), use->type);
-                    } else if (use->op == IR_PTRADD && is_temp(&use->a, base)) {
-                        /* DESIGN: a field is reached by a constant or a
-                           symbolic offset. An index computed at run time
-                           reaches a different element on every pass, so a
-                           slot addressed that way is not split. */
-                        if ((use->b.kind != IR_INT && use->b.kind != IR_SYM) ||
-                            written_again(f, use, use->result)) {
-                            escaped = true;
-                            break;
-                        }
-                        /* The ptradd result addresses loads and stores of
-                           one type, and nothing else. */
-                        for (m = 0; m < f->block_count && !escaped; m++) {
-                            for (n = 0; n < f->blocks[m]->count; n++) {
-                                struct ir_inst *at = &f->blocks[m]->insts[n];
-                                if (at == use) {
-                                    continue;
-                                }
-                                if (escapes_in(at, use->result) ||
-                                    (at->op == IR_PTRADD &&
-                                     is_temp(&at->a, use->result))) {
-                                    escaped = true;
-                                    break;
-                                }
-                                if ((at->op == IR_LOAD &&
-                                     is_temp(&at->a, use->result)) ||
-                                    (at->op == IR_STORE &&
-                                     is_temp(&at->b, use->result))) {
-                                    field = field_at(f, fields, &count,
-                                                     use->b, at->type);
-                                    if (field == NULL) {
-                                        escaped = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        continue;
-                    } else {
-                        continue;
-                    }
-                    if (field == NULL) {
-                        escaped = true;
-                    }
-                }
-            }
-            if (escaped || count == 0) {
+            if (written_again(f, slot, base) ||
+                !slot_fields(f, slot, fields, &count) || count == 0) {
                 continue;
             }
             /* Rewrite every load and store, then drop the addresses. */
-            for (j = 0; j < f->block_count; j++) {
-                struct ir_block *block = f->blocks[j];
-                for (k = 0; k < block->count; k++) {
-                    struct ir_inst *use = &block->insts[k];
-                    struct ir_operand offset = ir_int_op(IR_I64, 0);
-                    struct ir_operand *address = NULL;
-                    size_t m;
-                    if (use->op == IR_LOAD) {
-                        address = &use->a;
-                    } else if (use->op == IR_STORE) {
-                        address = &use->b;
-                    } else {
-                        continue;
-                    }
-                    if (!is_temp(address, base)) {
-                        /* The address may be a ptradd of the slot. */
-                        bool found = false;
-                        for (m = 0; m < f->block_count && !found; m++) {
-                            size_t q;
-                            for (q = 0; q < f->blocks[m]->count; q++) {
-                                struct ir_inst *at = &f->blocks[m]->insts[q];
-                                if (at->op == IR_PTRADD &&
-                                    is_temp(&at->a, base) &&
-                                    address->kind == IR_TEMP &&
-                                    at->result == address->as.temp) {
-                                    offset = at->b;
-                                    found = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (!found) {
-                            continue;
-                        }
-                    }
-                    for (m = 0; m < count; m++) {
-                        if (!same_operand(&fields[m].offset, &offset)) {
-                            continue;
-                        }
-                        if (use->op == IR_LOAD) {
-                            make_copy(use, ir_temp_op(f, fields[m].temp));
-                        } else {
-                            struct ir_operand v = use->a;
-                            make_copy(use, v);
-                            use->result = fields[m].temp;
-                            use->type = fields[m].type;
-                        }
-                        break;
-                    }
-                }
-            }
-            for (j = 0; j < f->block_count; j++) {
-                struct ir_block *block = f->blocks[j];
-                for (k = block->count; k > 0; k--) {
-                    struct ir_inst *at = &block->insts[k - 1];
-                    if (at->op == IR_PTRADD && is_temp(&at->a, base)) {
-                        delete_inst(block, k - 1);
-                    }
-                }
-            }
+            rewrite_slot_uses(f, base, fields, count);
+            drop_slot_addresses(f, base);
             delete_inst(f->blocks[b], i);
             i--;
             changed = true;
@@ -1332,6 +1364,30 @@ static void remap_const(struct ir_const *c, const uint32_t *map,
     }
 }
 
+/* Move the functions and globals that the operands of f name to the
+   indices that remain. */
+static void remap_operands(struct ir_function *f, const uint32_t *map,
+                           const uint32_t *global_map)
+{
+    size_t b;
+    size_t j;
+    size_t k;
+
+    for (b = 0; b < f->block_count; b++) {
+        for (j = 0; j < f->blocks[b]->count; j++) {
+            struct ir_inst *inst = &f->blocks[b]->insts[j];
+            for (k = 0; k < operand_count(inst); k++) {
+                struct ir_operand *o = operand(inst, k);
+                if (o->kind == IR_FUNC) {
+                    o->as.index = map[o->as.index];
+                } else if (o->kind == IR_GLOBAL) {
+                    o->as.index = global_map[o->as.index];
+                }
+            }
+        }
+    }
+}
+
 /* Remove the functions and globals that the entry cannot reach, as
    ir_reach decides. */
 static void remove_unused_functions(struct ir_module *m, const char *entry,
@@ -1345,8 +1401,6 @@ static void remove_unused_functions(struct ir_module *m, const char *entry,
     size_t n = 0;
     size_t i;
     size_t j;
-    size_t b;
-    size_t k;
 
     ir_reach(m, entry, all, &reach);
     live = reach.functions;
@@ -1391,20 +1445,7 @@ static void remove_unused_functions(struct ir_module *m, const char *entry,
         }
     }
     for (i = 0; i < m->function_count; i++) {
-        struct ir_function *f = m->functions[i];
-        for (b = 0; b < f->block_count; b++) {
-            for (j = 0; j < f->blocks[b]->count; j++) {
-                struct ir_inst *inst = &f->blocks[b]->insts[j];
-                for (k = 0; k < operand_count(inst); k++) {
-                    struct ir_operand *o = operand(inst, k);
-                    if (o->kind == IR_FUNC) {
-                        o->as.index = map[o->as.index];
-                    } else if (o->kind == IR_GLOBAL) {
-                        o->as.index = global_map[o->as.index];
-                    }
-                }
-            }
-        }
+        remap_operands(m->functions[i], map, global_map);
     }
     ir_reach_free(&reach);
     free(map);
