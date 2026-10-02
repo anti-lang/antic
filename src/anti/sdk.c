@@ -78,8 +78,7 @@ static bool sdk_version_valid(const char *version)
 
 static bool is_stub(const char *name)
 {
-    size_t n = strlen(name);
-    return n > 4 && strcmp(name + n - 4, ".tbd") == 0;
+    return files_ends_with(name, ".tbd");
 }
 
 /* Copy the stubs below dir, whose path in the SDK is rel, to stage/rel.

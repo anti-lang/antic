@@ -103,18 +103,22 @@ bool manifest_inject_read(const char *path, bool tests,
     return true;
 }
 
-/* The value of one key of the document, or NULL. */
-static const char *value_of(const struct anti_toml *doc, const char *key)
+const char *manifest_value(const struct anti_toml *doc, const char *key)
 {
     int64_t at = anti_rt_toml_find(doc, (const unsigned char *)key,
                                    (int64_t)strlen(key));
-    struct anti_text value;
 
-    if (at < 0) {
-        return NULL;
-    }
-    value = anti_rt_toml_value(doc, at);
-    return value.len > 0 ? (const char *)value.ptr : NULL;
+    return at < 0 ? NULL : (const char *)anti_rt_toml_value(doc, at).ptr;
+}
+
+/* The value of one key of the manifest, or NULL when the key is missing
+   or its value is empty. An empty value of the manifest gives the
+   default, as no value does. */
+static const char *value_of(const struct anti_toml *doc, const char *key)
+{
+    const char *value = manifest_value(doc, key);
+
+    return value != NULL && value[0] != '\0' ? value : NULL;
 }
 
 bool manifest_layout_read(const char *path, struct text *src,

@@ -235,19 +235,18 @@ static bool runner_frameworks(const struct test_unit *u,
                               struct arena *arena, struct options *o)
 {
     struct options search = *base;
+    struct unit_links links;
     const char *seed[1];
-    const char **paths = NULL;
-    size_t count = 0;
 
     seed[0] = text_cstr(&u->unit.library);
     search.libraries = seed;
     search.library_count = 1;
     search.input = NULL;
-    return driver_libraries(&search, arena, &paths, &count) &&
-           driver_frameworks(paths, count, arena, &o->frameworks,
-                             &o->framework_count) &&
-           driver_linux_libraries(paths, count, arena, &o->linux_libraries,
-                                  &o->linux_library_count);
+    if (!unit_links_read(&search, arena, &links)) {
+        return false;
+    }
+    unit_links_apply(&links, o);
+    return true;
 }
 
 /* Build the runner of one module and run it. */

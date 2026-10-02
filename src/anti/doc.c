@@ -693,10 +693,7 @@ static const char *suffix_of(enum doc_form form)
 /* Whether the path names a library file. */
 static bool is_library(const char *path)
 {
-    size_t n = strlen(path);
-    size_t s = strlen(ANTL_SUFFIX);
-
-    return n > s && strcmp(path + n - s, ANTL_SUFFIX) == 0;
+    return files_ends_with(path, ANTL_SUFFIX);
 }
 
 /* DESIGN: a module of the project that imports another needs that

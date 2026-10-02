@@ -74,6 +74,12 @@ bool files_replace(const char *path, const struct text *bytes);
    on the machine that reads it. The result points into path. */
 const char *files_base_name(const char *path);
 
+/* Whether s ends with suffix. */
+bool files_ends_with(const char *s, const char *suffix);
+
+/* Cut suffix off the end of t when t ends with it. */
+void files_cut_suffix(struct text *t, const char *suffix);
+
 /* Whether path names a file or directory that exists. */
 bool files_exists(const char *path);
 

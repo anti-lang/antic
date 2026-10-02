@@ -255,12 +255,22 @@ bool files_copy_program(const char *from, const char *to)
     return files_copy(from, to) && platform_copy_permissions(from, to);
 }
 
-static bool ends_with(const char *s, const char *suffix)
+bool files_ends_with(const char *s, const char *suffix)
 {
     size_t n = strlen(s);
     size_t m = strlen(suffix);
 
     return n >= m && strcmp(s + n - m, suffix) == 0;
+}
+
+void files_cut_suffix(struct text *t, const char *suffix)
+{
+    size_t m = strlen(suffix);
+
+    if (m > 0 && files_ends_with(text_cstr(t), suffix)) {
+        t->length -= m;
+        t->data[t->length] = '\0';
+    }
 }
 
 static int by_path(const void *a, const void *b)
@@ -295,7 +305,7 @@ static bool walk_entry(const char *path, const char *name, const char *suffix,
     if (kind == PLATFORM_DIRECTORY) {
         return !deep || walk(path, suffix, deep, out);
     }
-    if (kind == PLATFORM_FILE && ends_with(name, suffix)) {
+    if (kind == PLATFORM_FILE && files_ends_with(name, suffix)) {
         list_add(out, path);
     }
     return true;

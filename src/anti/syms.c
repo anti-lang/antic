@@ -36,14 +36,6 @@
 #define SANITIZER_OPTIONS "ASAN_OPTIONS"
 #define NO_SYMBOLIZE "symbolize=0"
 
-static bool ends_with(const char *s, const char *suffix)
-{
-    size_t a = strlen(s);
-    size_t b = strlen(suffix);
-
-    return a >= b && strcmp(s + a - b, suffix) == 0;
-}
-
 /* A list of texts. */
 struct texts {
     struct text *items;
@@ -113,7 +105,7 @@ static void stem_of(const char *name, struct text *out)
     text_append(out, files_base_name(name));
     for (i = 0; i < sizeof suffixes / sizeof suffixes[0]; i++) {
         size_t length = strlen(suffixes[i]);
-        if (ends_with(text_cstr(out), suffixes[i]) && out->length > length) {
+        if (files_ends_with(text_cstr(out), suffixes[i]) && out->length > length) {
             out->length -= length;
             out->data[out->length] = '\0';
             break;
@@ -129,7 +121,7 @@ static bool is_program(const char *name, const struct text *bytes)
 {
     const unsigned char *p = (const unsigned char *)bytes->data;
 
-    if (strchr(name, '.') != NULL && !ends_with(name, ".exe")) {
+    if (strchr(name, '.') != NULL && !files_ends_with(name, ".exe")) {
         return false;
     }
     if (bytes->length >= 16 && p[0] == 0xcf && p[1] == 0xfa &&
@@ -386,7 +378,7 @@ static bool find_binaries(const char *conf, struct binaries *out)
             for (n = 0; n < anti_rt_toml_count(doc); n++) {
                 const char *key = (const char *)anti_rt_toml_key(doc, n).ptr;
                 if (strncmp(key, "library.", 8) == 0 &&
-                    ends_with(key, ".path")) {
+                    files_ends_with(key, ".path")) {
                     struct text library = {0};
                     resolved(text_cstr(&dir),
                              (const char *)anti_rt_toml_value(doc, n).ptr,
@@ -469,7 +461,7 @@ static const struct text *unit_entry(const struct unit *u, const char *suffix)
     size_t i;
 
     for (i = 0; i < u->names.count; i++) {
-        if (ends_with(text_cstr(&u->names.items[i]), suffix)) {
+        if (files_ends_with(text_cstr(&u->names.items[i]), suffix)) {
             return &u->bytes.items[i];
         }
     }
@@ -513,7 +505,7 @@ static bool load_deployment(const struct zip_archive *z, const char *path,
         if (strncmp(key, "module.", 7) != 0 || field == NULL) {
             continue;
         }
-        if (ends_with(key, ".module")) {
+        if (files_ends_with(key, ".module")) {
             u = units_add(out);
             text_append(&u->module, value);
             continue;
@@ -608,7 +600,7 @@ static bool load_archive(const char *path, struct units *out)
     /* The module is the name of the archive without its suffix, which
        is the stem of the binary it belongs to. */
     text_append(&u->module, files_base_name(path));
-    if (ends_with(text_cstr(&u->module), SYMS_ARCHIVE_SUFFIX)) {
+    if (files_ends_with(text_cstr(&u->module), SYMS_ARCHIVE_SUFFIX)) {
         u->module.length -= sizeof SYMS_ARCHIVE_SUFFIX - 1;
         u->module.data[u->module.length] = '\0';
     }
@@ -770,7 +762,7 @@ int syms_inventory(const char *conf, const char *from, const char *out)
             entries[entry_count].bytes = u->bytes.items[j].data;
             entries[entry_count].size = u->bytes.items[j].length;
             entries[entry_count].executable =
-                ends_with(text_cstr(&u->names.items[j]), ".debug");
+                files_ends_with(text_cstr(&u->names.items[j]), ".debug");
             entry_count++;
         }
     }

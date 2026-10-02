@@ -38,6 +38,32 @@ bool unit_host(enum target *target, enum cpu_level *cpu)
     return true;
 }
 
+bool unit_links_read(const struct options *search, struct arena *arena,
+                     struct unit_links *out)
+{
+    const char **closure = NULL;
+    size_t count = 0;
+
+    memset(out, 0, sizeof *out);
+    if (driver_libraries(search, arena, &closure, &count) &&
+        driver_frameworks(closure, count, arena, &out->frameworks,
+                          &out->framework_count) &&
+        driver_linux_libraries(closure, count, arena, &out->linux_libraries,
+                               &out->linux_library_count)) {
+        return true;
+    }
+    memset(out, 0, sizeof *out);
+    return false;
+}
+
+void unit_links_apply(const struct unit_links *links, struct options *o)
+{
+    o->frameworks = links->frameworks;
+    o->framework_count = links->framework_count;
+    o->linux_libraries = links->linux_libraries;
+    o->linux_library_count = links->linux_library_count;
+}
+
 void unit_flat_path(const char *module, struct text *out)
 {
     const char *p;

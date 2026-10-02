@@ -60,6 +60,28 @@ void unit_options(struct options *o, const char *package, const char *runtime,
    Prints the message and returns false on a host antic does not know. */
 bool unit_host(enum target *target, enum cpu_level *cpu);
 
+/* DESIGN: a binding names the frameworks of Apple's SDK it needs with
+   `link framework`, and the libraries of the glibc sysroot with `link
+   linux`. Its library file records both. A link reads them from every
+   library file the program reaches and passes them to antic as
+   --framework and --linux-lib, so a program never names one itself. */
+struct unit_links {
+    const char *const *frameworks;
+    size_t framework_count;
+    const char *const *linux_libraries;
+    size_t linux_library_count;
+};
+
+/* The names of the `link framework` and `link linux` lines of the library
+   files of search and of every library file they import, each once. The
+   lists go into arena. Returns false when a library file cannot be read,
+   and out then holds no names. */
+bool unit_links_read(const struct options *search, struct arena *arena,
+                     struct unit_links *out);
+
+/* Pass the names of links to a compile with the options o. */
+void unit_links_apply(const struct unit_links *links, struct options *o);
+
 /* Append the module path with every dot turned into `_`, a name that
    stands in one file name. */
 void unit_flat_path(const char *module, struct text *out);

@@ -419,7 +419,6 @@ static void module_of_file(const char *directory, const char *file,
                            struct text *out)
 {
     size_t skip = strlen(directory);
-    size_t length;
     size_t i;
 
     while (skip > 0 && directory[skip - 1] == '/') {
@@ -429,12 +428,7 @@ static void module_of_file(const char *directory, const char *file,
         file += skip + 1;
     }
     text_append(out, file);
-    length = strlen(ANTL_SUFFIX);
-    if (out->length >= length &&
-        strcmp(out->data + out->length - length, ANTL_SUFFIX) == 0) {
-        out->length -= length;
-        out->data[out->length] = '\0';
-    }
+    files_cut_suffix(out, ANTL_SUFFIX);
     for (i = 0; i < out->length; i++) {
         if (out->data[i] == '/') {
             out->data[i] = '.';
@@ -531,20 +525,6 @@ done:
     return ok;
 }
 
-/* The value of one key of a document, or NULL. */
-static const char *value_of(const struct anti_toml *doc, const char *key)
-{
-    int64_t at = anti_rt_toml_find(doc, (const unsigned char *)key,
-                                   (int64_t)strlen(key));
-    struct anti_text value;
-
-    if (at < 0) {
-        return NULL;
-    }
-    value = anti_rt_toml_value(doc, at);
-    return value.ptr == NULL ? NULL : (const char *)value.ptr;
-}
-
 /* The value of the key `<head>.<index><tail>`, which reads one element of
    an array of inline tables. */
 static const char *value_at(const struct anti_toml *doc, const char *head,
@@ -554,7 +534,7 @@ static const char *value_at(const struct anti_toml *doc, const char *head,
     const char *value;
 
     text_appendf(&key, "%s.%zu%s", head, index, tail);
-    value = value_of(doc, text_cstr(&key));
+    value = manifest_value(doc, text_cstr(&key));
     text_free(&key);
     return value;
 }

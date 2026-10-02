@@ -752,49 +752,6 @@ static bool clause_word(const struct emitter *e, const struct piece *p)
            (p->length == 9 && memcmp(s, "unchecked", 9) == 0);
 }
 
-/* Whether the kind names a type, so that `[8]int` and `chan int(16)`
-   close up and a call of one does too. */
-static bool type_word(enum token_kind kind)
-{
-    switch (kind) {
-    case TOKEN_BOOL_TYPE:
-    case TOKEN_BYTE_TYPE:
-    case TOKEN_CHAR_TYPE:
-    case TOKEN_F16:
-    case TOKEN_F32:
-    case TOKEN_F64:
-    case TOKEN_FLOAT_TYPE:
-    case TOKEN_I8:
-    case TOKEN_I16:
-    case TOKEN_I32:
-    case TOKEN_I64:
-    case TOKEN_INT_TYPE:
-    case TOKEN_STR_TYPE:
-    case TOKEN_U8:
-    case TOKEN_U16:
-    case TOKEN_U32:
-    case TOKEN_U64:
-    case TOKEN_UINT_TYPE:
-    case TOKEN_C_CHAR:
-    case TOKEN_C_DOUBLE:
-    case TOKEN_C_FLOAT:
-    case TOKEN_C_INT:
-    case TOKEN_C_LONG:
-    case TOKEN_C_LONGLONG:
-    case TOKEN_C_SHORT:
-    case TOKEN_C_SIZE_T:
-    case TOKEN_C_UCHAR:
-    case TOKEN_C_UINT:
-    case TOKEN_C_ULONG:
-    case TOKEN_C_ULONGLONG:
-    case TOKEN_C_USHORT:
-    case TOKEN_C_WCHAR:
-        return true;
-    default:
-        return false;
-    }
-}
-
 /* Whether the piece ends a value. The operator after one is binary, and
    a `(` after one opens a call. */
 static bool ends_value(const struct piece *p)
@@ -825,7 +782,7 @@ static bool ends_value(const struct piece *p)
     case TOKEN_HERE:
         return true;
     default:
-        return type_word(p->token->kind);
+        return lexer_token_is_builtin_type(p->token->kind);
     }
 }
 
@@ -910,7 +867,7 @@ static bool opens_type(enum token_kind kind)
 {
     return kind == TOKEN_IDENT || kind == TOKEN_STAR ||
            kind == TOKEN_QUESTION_STAR || kind == TOKEN_LBRACKET ||
-           type_word(kind);
+           lexer_token_is_builtin_type(kind);
 }
 
 /* Whether a `+ - * &` in this place is a prefix, which binds to the value

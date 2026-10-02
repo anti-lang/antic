@@ -12,6 +12,14 @@
 /* The lock file, beside the manifest. `anti build` writes it. */
 #define LOCK_FILE "anti.lock"
 
+struct anti_toml;
+
+/* The value of the key path of a TOML document, as src/rt/toml.c gives
+   it, or NULL when the document has no such key. An empty value is an
+   empty string. The text belongs to the document. Every reader of
+   `anti.toml`, `anti.lock` and a repository index looks a key up here. */
+const char *manifest_value(const struct anti_toml *doc, const char *key);
+
 /* The `[inject]` table of `anti.toml`, one `Interface=Provider` entry
    per interface, in the form `--inject` takes. `anti build` passes the
    table and `anti test` passes `[inject.test]` over it, per key. */

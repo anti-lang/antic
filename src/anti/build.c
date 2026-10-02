@@ -89,14 +89,10 @@ struct build {
     struct text lib_dir;
     struct text obj_dir;
     struct text name;
-    /* The frameworks of the `link framework` lines and the libraries of
-       the `link linux` lines of every library file the program reaches.
-       The link passes them as --framework and --linux-lib. */
+    /* The frameworks and the Linux libraries of every library file the
+       program reaches, in framework_arena. */
     struct arena framework_arena;
-    const char *const *frameworks;
-    size_t framework_count;
-    const char *const *linux_libraries;
-    size_t linux_library_count;
+    struct unit_links links;
 };
 
 /* The cache key of one output: the digest of its input, the version of
@@ -193,10 +189,7 @@ static void base_options(struct build *b, struct options *o,
        build of --memory-checks carries them for its reports. */
     o->debug = build_debug(b);
     o->memory_checks = b->r->memory_checks;
-    o->frameworks = b->frameworks;
-    o->framework_count = b->framework_count;
-    o->linux_libraries = b->linux_libraries;
-    o->linux_library_count = b->linux_library_count;
+    unit_links_apply(&b->links, o);
 }
 
 /* The package header that every library file of this project carries.
@@ -478,15 +471,8 @@ static bool build_release(struct build *b, enum target t, enum cpu_level cpu,
    the entries of a symbols archive carry. */
 static void archive_stem(enum target t, const char *name, struct text *out)
 {
-    const char *suffix = target_info(t)->executable_suffix;
-    size_t length = strlen(suffix);
-
     text_append(out, name);
-    if (length > 0 && out->length >= length &&
-        strcmp(out->data + out->length - length, suffix) == 0) {
-        out->length -= length;
-        out->data[out->length] = '\0';
-    }
+    files_cut_suffix(out, target_info(t)->executable_suffix);
 }
 
 /* DESIGN: a release binary carries no symbol data, so the build writes
@@ -629,19 +615,14 @@ static bool build_c_library(struct build *b, enum target t, enum cpu_level cpu,
     return ok;
 }
 
-/* DESIGN: a binding names the frameworks of Apple's SDK it needs with
-   `link framework`, and the libraries of the glibc sysroot with `link
-   linux`. Its library file records both. The build reads them from every
-   library file the program reaches. It passes them to antic as
-   --framework and --linux-lib, so a program never names one itself. */
+/* The links of every library file the program reaches, which the DESIGN
+   comment of struct unit_links explains. */
 static bool link_frameworks(struct build *b, enum target t,
                             enum cpu_level cpu, const struct text *files,
                             const struct strings *shared)
 {
     struct options search;
     struct strings seed = {0};
-    const char **closure = NULL;
-    size_t count = 0;
     size_t i;
     bool ok;
 
@@ -651,19 +632,11 @@ static bool link_frameworks(struct build *b, enum target t,
     for (i = 0; i < b->unit_count; i++) {
         strings_add(&seed, text_cstr(&files[i]));
     }
-    b->frameworks = NULL;
-    b->framework_count = 0;
-    b->linux_libraries = NULL;
-    b->linux_library_count = 0;
+    memset(&b->links, 0, sizeof b->links);
     base_options(b, &search, t, cpu);
     search.libraries = seed.items;
     search.library_count = seed.count;
-    ok = driver_libraries(&search, &b->framework_arena, &closure, &count) &&
-         driver_frameworks(closure, count, &b->framework_arena,
-                           &b->frameworks, &b->framework_count) &&
-         driver_linux_libraries(closure, count, &b->framework_arena,
-                                &b->linux_libraries,
-                                &b->linux_library_count);
+    ok = unit_links_read(&search, &b->framework_arena, &b->links);
     strings_free(&seed);
     return ok;
 }
