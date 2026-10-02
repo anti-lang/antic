@@ -130,6 +130,11 @@ uint32_t ir_index(size_t count)
     return (uint32_t)count;
 }
 
+bool ir_is_copy_name(const char *name)
+{
+    return strchr(name, '<') != NULL;
+}
+
 uint64_t ir_hash_name(const char *module, const char *name)
 {
     uint64_t h = 1469598103934665603u;

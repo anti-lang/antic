@@ -2940,13 +2940,6 @@ static void read_body(struct reader *r, struct ir_module *program,
     }
 }
 
-/* Whether name is that of a copy of a generic, or of a function or a
-   datum of one. Only a copy carries `<`. */
-static bool copy_name(const char *name)
-{
-    return strchr(name, '<') != NULL;
-}
-
 /* A function signature, mapped to a function of the program. A C function
    and a declaration share an existing entry of the same name. */
 static uint32_t read_signature(struct reader *r, struct ir_module *program,
@@ -2993,7 +2986,8 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
        two library files may both define one. The program keeps the
        first, and the second stands for it. The copies are made from one
        tree with the same arguments, so they are the same code. */
-    if (f != NULL && (flags & 1) == 0 && module != NULL && copy_name(name)) {
+    if (f != NULL && (flags & 1) == 0 && module != NULL &&
+        ir_is_copy_name(name)) {
         if (f->is_extern) {
             f->is_extern = false;
             *has_body = true;
@@ -3175,7 +3169,7 @@ static void read_classes(struct reader *r, struct ir_module *program,
         }
         /* The record of a copy of a generic that the program has
            already stays behind. */
-        if (copy_name(name) && has_class(program, c)) {
+        if (ir_is_copy_name(name) && has_class(program, c)) {
             ir_class_free(c);
             program->class_count--;
         }
@@ -3337,7 +3331,7 @@ static void read_ir(struct reader *r, struct ir_module *program)
             }
         }
         if (!g->is_extern && module != NULL && !r->failed) {
-            if (copy_name(name)) {
+            if (ir_is_copy_name(name)) {
                 twins[i] = merge_copy_global(program, g, &maps.globals[i]);
                 g = program->globals[maps.globals[i]];
             }

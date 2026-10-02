@@ -280,7 +280,7 @@ static void devirtualise(struct whole *w, struct ir_module *m)
 static bool is_copy(const struct ir_function *f)
 {
     return !f->is_extern && !f->exported && f->module != NULL &&
-           f->block_count > 0 && strchr(f->name, '<') != NULL;
+           f->block_count > 0 && ir_is_copy_name(f->name);
 }
 
 static bool same_vtype(const struct ir_module *m, struct ir_vtype a,

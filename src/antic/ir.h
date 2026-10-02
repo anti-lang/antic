@@ -539,6 +539,13 @@ bool ir_is_patterns_start(const struct ir_function *f);
    object of module entry. */
 bool ir_in_unit(const char *module, const char *unit, const char *entry);
 
+/* DESIGN: whether name is that of a copy of a generic, or of a function
+   or a datum of one. types_symbol_name writes the arguments of a copy in
+   `<>`, as `List<int>.push`, and no other name holds `<`. The link-once
+   copies of a dev build, the merge of identical copies in a release
+   build and the library reader all ask here. */
+bool ir_is_copy_name(const char *name);
+
 struct ir_function *ir_function_add(struct ir_module *m, const char *module,
                                     const char *name, enum ir_type result,
                                     uint32_t result_agg);

@@ -29,7 +29,7 @@
    once. */
 static bool link_once(const char *name, bool module)
 {
-    return module && strchr(name, '<') != NULL;
+    return module && ir_is_copy_name(name);
 }
 
 /* On COFF, move to the COMDAT section of symbol, a section like section
