@@ -2,6 +2,7 @@
    JSON, and the macros and pragmas of the preprocessed text. */
 #include <errno.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -277,10 +278,17 @@ struct reader {
     bool failed;
 };
 
-static void refuse(struct reader *r, const char *format, const char *name)
+static void refuse(struct reader *r, const char *format, ...)
+    ATTRIBUTE_PRINTF(2, 3);
+
+static void refuse(struct reader *r, const char *format, ...)
 {
+    va_list args;
+
     fprintf(stderr, "anti: %s: ", r->b->source);
-    fprintf(stderr, format, name);
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
     fputc('\n', stderr);
     r->failed = true;
 }

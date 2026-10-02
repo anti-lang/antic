@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "arena.h"
+#include "attributes.h"
 #include "text.h"
 
 /* The declarations of a C API that anti bind writes as an Anti module.
@@ -140,10 +141,7 @@ const char *bind_strndup(struct bind_module *b, const char *s, size_t n);
 
 /* Print a warning that names the source of the binding. */
 void bind_warn(struct bind_module *b, const char *format, ...)
-#if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 2, 3)))
-#endif
-    ;
+    ATTRIBUTE_PRINTF(2, 3);
 
 /* A type in the memory pool of b. */
 struct bind_type *bind_type_new(struct bind_module *b, enum bind_kind kind);
