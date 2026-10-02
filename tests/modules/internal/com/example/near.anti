@@ -1,7 +1,8 @@
-//! A module of the same package, which sees the internal item.
+//! A module of the same package, which sees the internal items, a generic
+//! among them.
 import com.example.core;
 
 pub fn total() -> int
 {
-	return core.open() + core.tuning();
+	return core.open() + core.tuning() + core.bits<int>();
 }

@@ -1,6 +1,6 @@
 # The internal level of a module item. A module of the same package sees
-# an internal function, and a module of another package does not. Run
-# with cmake -P and these values:
+# an internal function, a generic one included, and a module of another
+# package does not. Run with cmake -P and these values:
 #   ANTIC     the antic executable
 #   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory

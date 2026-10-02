@@ -1611,8 +1611,10 @@ static struct item *read_declaration(struct reader *r)
     }
     it->kind = (enum item_kind)kind;
     it->pub = it->vis == VIS_PUB;
+    /* The items section lists a public and an internal generic, and the
+       declaration joins the symbol listed there. */
     sym = listed(r, &it->name, kind == ITEM_FN ? SYMBOL_FN : SYMBOL_STRUCT);
-    if (!it->pub || sym == NULL) {
+    if (it->vis == VIS_PRIVATE || sym == NULL) {
         sym = antl_allocate(r, 1, sizeof *sym);
         sym->kind = kind == ITEM_FN ? SYMBOL_FN : SYMBOL_STRUCT;
         sym->name = it->name;

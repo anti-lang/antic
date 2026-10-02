@@ -11,3 +11,10 @@ internal fn tuning() -> int
 {
 	return 41;
 }
+
+/// A generic that reaches the modules of this package alone, which the library
+/// file carries with its declaration.
+internal fn bits<T>() -> int
+{
+	return size_of(T) * 8;
+}
