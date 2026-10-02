@@ -9,8 +9,9 @@
 #   ROOT       the search root that holds the sources
 #   LIBRARIES  the library modules under com/example, separated by commas,
 #              each after the ones it imports
-#   STD        the modules of the standard library that the program
-#              reaches, separated by commas, each after the ones it imports
+#   STD_OBJECTS  the dev objects of the modules of the standard library
+#              that the program reaches, separated by commas, which the dev
+#              link takes
 #   PROGRAM    the name of the program's source in ROOT, without .anti
 #   MODE       release or dev
 #   WORK       a directory for the outputs
@@ -22,7 +23,7 @@
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 string(REPLACE "," ";" libraries "${LIBRARIES}")
-string(REPLACE "," ";" std "${STD}")
+string(REPLACE "," ";" std_objects "${STD_OBJECTS}")
 string(REPLACE "," ";" options "${OPTIONS}")
 string(REPLACE "," ";" lib_options "${LIB_OPTIONS}")
 file(MAKE_DIRECTORY "${WORK}/com/example")
@@ -56,21 +57,8 @@ foreach(library IN LISTS libraries)
         list(APPEND program_inputs "${WORK}/com/example/${library}.antl")
     endif()
 endforeach()
-# No tool builds the objects of the standard library in dev mode yet, so
-# the test builds one for each module that the program reaches.
 if(MODE STREQUAL "dev")
-    foreach(module IN LISTS std)
-        execute_process(
-            COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}"
-                    --runtime "${RUNTIME}" -o "${WORK}/std_${module}"
-                    "${RUNTIME}/std/anti/${module}.antl"
-            RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-        if(NOT status EQUAL 0)
-            message(FATAL_ERROR
-                "antic --dev of anti.${module} failed with ${status}\n${err}")
-        endif()
-        list(APPEND program_inputs "${WORK}/std_${module}${OBJECT}")
-    endforeach()
+    list(APPEND program_inputs ${std_objects})
 endif()
 execute_process(
     COMMAND "${ANTIC}" -I "${WORK}" --llvm-mc "${LLVM_MC}"

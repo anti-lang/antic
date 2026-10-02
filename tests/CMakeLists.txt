@@ -159,6 +159,138 @@ else()
     set(anti_object ".o")
 endif()
 
+# DESIGN: the dev objects of the standard library are compiled once per
+# suite, each by the test dev_object_<name> into anti_<name>_dev of this
+# directory with the fixture <name>_dev_object. A test that links one names
+# the module alone, by its path under std/anti/ such as lang or
+# collection/list, and antic_dev_inputs gives the objects and the fixtures
+# from that one list, so the two cannot disagree.
+set(ANTIC_DEV_MODULES lang regex mem text reflect runtime collection
+    collection/pool collection/tree collection/queue collection/list
+    collection/deque collection/ring collection/grid collection/sorted
+    collection/map collection/set collection/concurrent
+    collection/synchronized)
+foreach(module IN LISTS ANTIC_DEV_MODULES)
+    string(REPLACE "/" "_" name "${module}")
+    add_test(NAME dev_object_${name}
+        COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
+                -I "${ANTIC_RUNTIME_DIR}/std"
+                -o "${CMAKE_CURRENT_BINARY_DIR}/anti_${name}_dev"
+                "${ANTIC_RUNTIME_DIR}/std/anti/${module}.antl")
+    set_tests_properties(dev_object_${name} PROPERTIES
+        FIXTURES_SETUP ${name}_dev_object)
+endforeach()
+
+# Set objects to the dev objects of the modules after the two names, and
+# fixtures to the fixtures that compile them.
+function(antic_dev_inputs objects fixtures)
+    set(found_objects "")
+    set(found_fixtures "")
+    foreach(module IN LISTS ARGN)
+        if(NOT module IN_LIST ANTIC_DEV_MODULES)
+            message(FATAL_ERROR "no test compiles the dev object of ${module}")
+        endif()
+        string(REPLACE "/" "_" name "${module}")
+        list(APPEND found_objects
+            "${CMAKE_CURRENT_BINARY_DIR}/anti_${name}_dev${anti_object}")
+        list(APPEND found_fixtures ${name}_dev_object)
+    endforeach()
+    set(${objects} ${found_objects} PARENT_SCOPE)
+    set(${fixtures} ${found_fixtures} PARENT_SCOPE)
+endfunction()
+
+# A program test of run_program.cmake, which builds source with antic,
+# llvm-mc and the runtime archive of this tree, runs it and compares the
+# result with the expected file beside it.
+#   antic_program_test(<name> <source> WORK <dir> [EXPECTED <file>]
+#                      [OPTIONS <option>...] [DEV <module>...]
+#                      [OBJECTS <object>...] [UNSET <variable>...])
+# OPTIONS, OBJECTS and UNSET reach the script as run_program.cmake names
+# them. DEV names the modules whose dev objects the link takes, which
+# antic_dev_inputs resolves.
+function(antic_program_test name source)
+    cmake_parse_arguments(PARSE_ARGV 2 arg "" "WORK;EXPECTED"
+                          "OPTIONS;DEV;OBJECTS;UNSET")
+    if(NOT arg_WORK)
+        message(FATAL_ERROR "antic_program_test(${name}) names no WORK")
+    endif()
+    antic_dev_inputs(dev_objects dev_fixtures ${arg_DEV})
+    list(JOIN arg_OPTIONS "," options)
+    set(objects ${dev_objects} ${arg_OBJECTS})
+    list(JOIN objects "," objects)
+    set(optional "")
+    if(arg_EXPECTED)
+        list(APPEND optional "-DEXPECTED=${arg_EXPECTED}")
+    endif()
+    if(arg_UNSET)
+        list(JOIN arg_UNSET "," unset)
+        list(APPEND optional "-DUNSET=${unset}")
+    endif()
+    add_test(NAME ${name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${source}"
+            "-DOPTIONS=${options}"
+            "-DOBJECTS=${objects}"
+            ${optional}
+            "-DWORK=${arg_WORK}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    if(dev_fixtures)
+        set_property(TEST ${name} PROPERTY FIXTURES_REQUIRED ${dev_fixtures})
+    endif()
+endfunction()
+
+# A program of library modules under com/example and a program module,
+# through run_modules.cmake, once against the library files in release mode
+# and once from an object per module in dev mode: <name>_release and
+# <name>_dev.
+#   antic_modules_test(<name> ROOT <dir> LIBRARIES <module>...
+#                      PROGRAM <module> WORK <prefix> [STD <module>...]
+#                      [OPTIONS <option>...] [LIB_OPTIONS <option>...]
+#                      [TIMEOUT <seconds>])
+# STD names the modules of the standard library the program reaches,
+# whose dev objects the dev link takes from antic_dev_inputs.
+function(antic_modules_test name)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "ROOT;PROGRAM;WORK;TIMEOUT"
+                          "LIBRARIES;STD;OPTIONS;LIB_OPTIONS")
+    antic_dev_inputs(std_objects std_fixtures ${arg_STD})
+    list(JOIN std_objects "," std_objects)
+    list(JOIN arg_LIBRARIES "," libraries)
+    list(JOIN arg_OPTIONS "," options)
+    list(JOIN arg_LIB_OPTIONS "," lib_options)
+    foreach(mode release dev)
+        set(objects "")
+        if(mode STREQUAL "dev")
+            set(objects "${std_objects}")
+        endif()
+        add_test(NAME ${name}_${mode}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DANTIC=$<TARGET_FILE:antic>"
+                "-DLLVM_MC=${ANTIC_LLVM_MC}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DROOT=${arg_ROOT}"
+                "-DLIBRARIES=${libraries}"
+                "-DLIB_OPTIONS=${lib_options}"
+                "-DOPTIONS=${options}"
+                "-DSTD_OBJECTS=${objects}"
+                "-DPROGRAM=${arg_PROGRAM}"
+                "-DMODE=${mode}"
+                "-DWORK=${arg_WORK}-${mode}"
+                "-DOBJECT=${anti_object}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
+        if(mode STREQUAL "dev" AND std_fixtures)
+            set_property(TEST ${name}_${mode} PROPERTY
+                FIXTURES_REQUIRED ${std_fixtures})
+        endif()
+        if(arg_TIMEOUT)
+            set_tests_properties(${name}_${mode} PROPERTIES
+                TIMEOUT ${arg_TIMEOUT})
+        endif()
+    endforeach()
+endfunction()
+
 # llvm-objdump and llvm-readobj of the runtime archive, with the suffix of
 # an executable of the host, .exe on Windows. Every test names them by
 # these two. Spelled without the suffix, the file was missing on Windows,
@@ -421,14 +553,9 @@ endforeach()
 # A simd struct above the vector cap is an array and every operation on
 # it a loop, which a warning at the declaration says. The program allows
 # it, because a release build accepts no warning.
-add_test(NAME program_simd_big
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_big.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+antic_program_test(program_simd_big
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_big.anti"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/programs")
 
 # The native width of a simd operation: one instruction on the registers
 # of 32 bytes at x86-64-v3, and two on the 16 bytes of every other level
@@ -614,100 +741,60 @@ file(GLOB program_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/programs/*.anti")
 foreach(source IN LISTS program_sources)
     get_filename_component(name "${source}" NAME_WE)
-    add_test(NAME program_${name}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${source}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    antic_program_test(program_${name}
+        "${source}"
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/programs")
 endforeach()
 # The program whose calls release mode makes direct, in dev mode, which
 # keeps every call through a table.
-add_test(NAME program_devirtualise_dev
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/devirtualise.anti"
-        "-DOPTIONS=--dev"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+antic_program_test(program_devirtualise_dev
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/devirtualise.anti"
+    OPTIONS "--dev"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-dev")
 # Snapshots in dev mode, where each module is an object of its own.
-add_test(NAME program_snapshots_dev
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/snapshots.anti"
-        "-DOPTIONS=--dev"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+antic_program_test(program_snapshots_dev
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/snapshots.anti"
+    OPTIONS "--dev"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-dev")
 # Qualified bodies in dev mode, where every call through an interface
 # reads a table this module wrote.
 foreach(name IN ITEMS qualified_bodies qualified_chain qualified_single)
-    add_test(NAME program_${name}_dev
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
-            "-DOPTIONS=--dev"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    antic_program_test(program_${name}_dev
+        "${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+        OPTIONS "--dev"
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-dev")
 endforeach()
 # The wrapping and saturating operators, mul_high and the flags form in
 # dev mode, whose checks trap on the plain operators and on none of these.
 foreach(name IN ITEMS wrapping saturating compound_wrapping mul_high flags
         carry_chain variants)
-    add_test(NAME program_${name}_dev
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
-            "-DOPTIONS=--dev"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    antic_program_test(program_${name}_dev
+        "${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+        OPTIONS "--dev"
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-dev")
 endforeach()
 # The two forms of a walk in dev mode, whose loops over a collection
 # carry the check of its changes.
-add_test(NAME program_walk_forms_dev
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/walk_forms.anti"
-        "-DOPTIONS=--dev"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+antic_program_test(program_walk_forms_dev
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/walk_forms.anti"
+    OPTIONS "--dev"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-dev")
 # The default `==` and hash of a class without the field lists, which
 # --no-reflect drops. The compiler writes both as code.
-add_test(NAME program_eq_compiled_no_reflect
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/eq_compiled.anti"
-        "-DOPTIONS=--no-reflect"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-no-reflect"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+antic_program_test(program_eq_compiled_no_reflect
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/eq_compiled.anti"
+    OPTIONS "--no-reflect"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-no-reflect")
 # The default hash in dev mode, which writes it in each module apart, and
 # the patterns of `for`.
 foreach(name IN ITEMS hash_builtin hash_default for_patterns lent_derived
         lent_tuples owning_values destroy_locals temporaries owning_destruct
         statement_temps literal_moves variant_owning generic_moves caller_params
         owning_locals owned_buffers)
-    add_test(NAME program_${name}_dev
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
-            "-DOPTIONS=--dev"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    antic_program_test(program_${name}_dev
+        "${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+        OPTIONS "--dev"
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-dev")
 endforeach()
 # The copies of generics in dev mode, which compiles each module apart and
 # prints what the release build of the same program prints.
@@ -716,137 +803,69 @@ foreach(name IN ITEMS generic_copies generic_constants generic_methods
         generic_fn_args generic_variants construct_keep_own walk_generic
         hash_generic generic_static walk_owned_parts dropped_failing
         handler_exit_temps)
-    set(objects "")
+    set(dev "")
     if(name STREQUAL "generic_may_fail" OR name STREQUAL "generic_fn_args" OR
        name STREQUAL "walk_generic" OR name STREQUAL "hash_generic" OR
        name STREQUAL "walk_owned_parts" OR name STREQUAL "dropped_failing" OR
        name STREQUAL "handler_exit_temps")
-        set(objects "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object}")
+        set(dev lang)
     endif()
-    add_test(NAME program_${name}_dev
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
-            "-DOPTIONS=--dev"
-            "-DOBJECTS=${objects}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-    if(NOT objects STREQUAL "")
-        set_tests_properties(program_${name}_dev PROPERTIES
-            FIXTURES_REQUIRED lang_dev_object)
-    endif()
+    antic_program_test(program_${name}_dev
+        "${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+        OPTIONS "--dev"
+        DEV ${dev}
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-dev")
 endforeach()
 # Locking and channels in dev mode, whose checks run inside every `sync`
 # block and every arm of a `select`. sync_exits fails with the errors of
 # anti.lang, so its dev link names the object of anti.lang.
-add_test(NAME dev_object_lang
-    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
-            -I "${ANTIC_RUNTIME_DIR}/std"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev"
-            "${ANTIC_RUNTIME_DIR}/std/anti/lang.antl")
-set_tests_properties(dev_object_lang PROPERTIES FIXTURES_SETUP lang_dev_object)
 foreach(name IN ITEMS sync_exits sync_workers channels select_two
         channel_workers synchronized concurrent sync_pairs sync_operators
         lock_free_queue)
-    set(objects "")
+    set(dev "")
     if(name STREQUAL "sync_exits")
-        set(objects "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object}")
+        set(dev lang)
     endif()
-    add_test(NAME program_${name}_dev
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
-            "-DOPTIONS=--dev"
-            "-DOBJECTS=${objects}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    antic_program_test(program_${name}_dev
+        "${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+        OPTIONS "--dev"
+        DEV ${dev}
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-dev")
     set_tests_properties(program_${name}_dev PROPERTIES TIMEOUT 120)
 endforeach()
-set_tests_properties(program_sync_exits_dev PROPERTIES
-    FIXTURES_REQUIRED lang_dev_object)
 # The pattern literals in dev mode, where the object of each module runs
 # the constructor that compiles its own literals. The link names the
 # objects of anti.lang and anti.regex, whose classes the registry holds.
-add_test(NAME dev_object_regex
-    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
-            -I "${ANTIC_RUNTIME_DIR}/std"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_regex_dev"
-            "${ANTIC_RUNTIME_DIR}/std/anti/regex.antl")
-set_tests_properties(dev_object_regex PROPERTIES FIXTURES_SETUP regex_dev_object)
-add_test(NAME program_pattern_literals_dev
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/pattern_literals.anti"
-        "-DOPTIONS=--dev"
-        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_regex_dev${anti_object}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-set_property(TEST program_pattern_literals_dev PROPERTY FIXTURES_REQUIRED
-    lang_dev_object regex_dev_object)
+antic_program_test(program_pattern_literals_dev
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/pattern_literals.anti"
+    OPTIONS "--dev"
+    DEV lang regex
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-dev")
 # The methods of `str` in dev mode, where the functions of anti.regex that
 # the checker calls in their place stand in the object of anti.regex.
-add_test(NAME program_pattern_replace_dev
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/pattern_replace.anti"
-        "-DOPTIONS=--dev"
-        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_regex_dev${anti_object}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-set_property(TEST program_pattern_replace_dev PROPERTY FIXTURES_REQUIRED
-    lang_dev_object regex_dev_object)
+antic_program_test(program_pattern_replace_dev
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/pattern_replace.anti"
+    OPTIONS "--dev"
+    DEV lang regex
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-dev")
 # The registry of the classes in dev mode, where the module that links
 # writes it. The program takes its allocator from anti.mem. A dev link
 # names the object of anti.mem on the command line, and that of anti.lang,
 # which anti.mem imports.
-add_test(NAME dev_object_mem
-    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
-            -I "${ANTIC_RUNTIME_DIR}/std"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev"
-            "${ANTIC_RUNTIME_DIR}/std/anti/mem.antl")
-set_tests_properties(dev_object_mem PROPERTIES FIXTURES_SETUP mem_dev_object)
-add_test(NAME program_deserialize_dev
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/deserialize.anti"
-        "-DOPTIONS=--dev"
-        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-set_tests_properties(program_deserialize_dev PROPERTIES
-    FIXTURES_REQUIRED "lang_dev_object;mem_dev_object")
+antic_program_test(program_deserialize_dev
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/deserialize.anti"
+    OPTIONS "--dev"
+    DEV lang mem
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-dev")
 # The methods of `[]byte` and `patch` in dev mode, where the byte
 # literals compile in the constructor of the program's module. The
 # conversions call anti.text, whose object imports anti.mem.
-add_test(NAME dev_object_text
-    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
-            -I "${ANTIC_RUNTIME_DIR}/std"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev"
-            "${ANTIC_RUNTIME_DIR}/std/anti/text.antl")
-set_tests_properties(dev_object_text PROPERTIES FIXTURES_SETUP text_dev_object)
 foreach(name IN ITEMS pattern_bytes pattern_patch)
-    add_test(NAME program_${name}_dev
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
-            "-DOPTIONS=--dev"
-            "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_regex_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-dev"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-    set_property(TEST program_${name}_dev PROPERTY FIXTURES_REQUIRED
-        lang_dev_object regex_dev_object text_dev_object mem_dev_object)
+    antic_program_test(program_${name}_dev
+        "${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+        OPTIONS "--dev"
+        DEV lang regex text mem
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-dev")
 endforeach()
 # The hooks under the options that decide them. hooks.anti,
 # hook_trace.anti and trace_handlers.anti run above without options,
@@ -867,16 +886,11 @@ foreach(case "hooks|no_hooks|--no-hooks|hooks.no-hooks.expected"
     list(GET parts 1 case_name)
     list(GET parts 2 case_options)
     list(GET parts 3 case_expected)
-    add_test(NAME program_${source}_${case_name}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${source}.anti"
-            "-DOPTIONS=${case_options}"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/programs/${case_expected}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-hooks/${case_name}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    antic_program_test(program_${source}_${case_name}
+        "${CMAKE_CURRENT_SOURCE_DIR}/programs/${source}.anti"
+        OPTIONS "${case_options}"
+        EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/${case_expected}"
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-hooks/${case_name}")
 endforeach()
 # `trace` follows the mode: a dev build runs the marked code's call hooks
 # as --trace does, and --no-trace turns them off again, which gives the
@@ -887,32 +901,20 @@ foreach(case "dev|--dev|hook_trace.trace.expected"
     list(GET parts 0 case_name)
     list(GET parts 1 case_options)
     list(GET parts 2 case_expected)
-    add_test(NAME program_hook_trace_${case_name}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_trace.anti"
-            "-DOPTIONS=${case_options}"
-            "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object}"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/programs/${case_expected}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-hooks/${case_name}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-    set_property(TEST program_hook_trace_${case_name} PROPERTY
-        FIXTURES_REQUIRED lang_dev_object)
+    antic_program_test(program_hook_trace_${case_name}
+        "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_trace.anti"
+        OPTIONS "${case_options}"
+        DEV lang
+        EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/${case_expected}"
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-hooks/${case_name}")
 endforeach()
 
 # Ownership without a field list: delete, destroy and dup call the
 # teardown and the copy that the compiler writes for each class.
-add_test(NAME program_delete_owned_no_reflect
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/delete_owned.anti"
-        "-DOPTIONS=--no-reflect"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-no-reflect"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+antic_program_test(program_delete_owned_no_reflect
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/delete_owned.anti"
+    OPTIONS "--no-reflect"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-no-reflect")
 
 # The pinned raylib source, which tools/get-raylib.cmake downloads. The
 # directory is named here, before the first test that reads it.
@@ -971,45 +973,30 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
     abi_wchar_expected(abi_wchar_x86_64_expected _X86_64 -arch x86_64)
     set(abi_structs_x86_64_options "")
     set(abi_simd_x86_64_options "")
-    set(abi_wchar_x86_64_options "-DEXPECTED=${abi_wchar_x86_64_expected}")
+    set(abi_wchar_x86_64_options EXPECTED "${abi_wchar_x86_64_expected}")
     foreach(case structs wchar simd)
-        add_test(NAME program_abi_${case}_macos-x86_64
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_${case}.anti"
-                "-DOBJECTS=$<JOIN:$<TARGET_OBJECTS:abi_${case}_x86_64>,,>"
-                "-DOPTIONS=${ANTIC_X86_64_OPTIONS}"
-                ${abi_${case}_x86_64_options}
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/abi-x86_64"
-                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+        antic_program_test(program_abi_${case}_macos-x86_64
+            "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_${case}.anti"
+            OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_${case}_x86_64>,,>"
+            OPTIONS "${ANTIC_X86_64_OPTIONS}"
+            ${abi_${case}_x86_64_options}
+            WORK "${CMAKE_CURRENT_BINARY_DIR}/abi-x86_64")
     endforeach()
     if(EXISTS "${ANTIC_RAYLIB_DIR}/src/raymath.h")
         abi_x86_64_object(abi_raymath_x86_64 abi/raymath.c)
         target_include_directories(abi_raymath_x86_64 PRIVATE
             "${ANTIC_RAYLIB_DIR}/src")
-        add_test(NAME program_abi_raymath_macos-x86_64
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.anti"
-                "-DOBJECTS=$<JOIN:$<TARGET_OBJECTS:abi_raymath_x86_64>,,>"
-                "-DOPTIONS=${ANTIC_X86_64_OPTIONS}"
-                "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.expected"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/abi-x86_64"
-                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+        antic_program_test(program_abi_raymath_macos-x86_64
+            "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.anti"
+            OPTIONS "${ANTIC_X86_64_OPTIONS}"
+            OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_raymath_x86_64>,,>"
+            EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.expected"
+            WORK "${CMAKE_CURRENT_BINARY_DIR}/abi-x86_64")
     endif()
-    add_test(NAME program_simd_big_macos-x86_64
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_big.anti"
-            "-DOPTIONS=${ANTIC_X86_64_OPTIONS}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-x86_64"
-                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    antic_program_test(program_simd_big_macos-x86_64
+        "${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_big.anti"
+        OPTIONS "${ANTIC_X86_64_OPTIONS}"
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-x86_64")
     # DESIGN: a program that holds anti.regex links PCRE2, which stands at
     # the default level x86-64-v3 alone, and a program below it is refused
     # at link. Rosetta runs no v3 program, so the programs of patterns run
@@ -1019,15 +1006,10 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
     list(FILTER rosetta_sources EXCLUDE REGEX "/(pattern_[a-z]+|regex_compile|eq_handles)\\.anti$")
     foreach(source IN LISTS rosetta_sources)
         get_filename_component(name "${source}" NAME_WE)
-        add_test(NAME program_${name}_macos-x86_64
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DSOURCE=${source}"
-                "-DOPTIONS=${ANTIC_X86_64_OPTIONS}"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/programs-x86_64"
-                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+        antic_program_test(program_${name}_macos-x86_64
+            "${source}"
+            OPTIONS "${ANTIC_X86_64_OPTIONS}"
+            WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-x86_64")
     endforeach()
     set_tests_properties(program_args_macos-x86_64 PROPERTIES
         ENVIRONMENT "ANTI_TEST_GREETING=héllo")
@@ -1090,17 +1072,12 @@ foreach(source IN LISTS std_sources)
     set(expected "")
     set(win32_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.win32.expected")
     if(ANTIC_HOST_TARGET MATCHES "^windows-" AND EXISTS "${win32_expected}")
-        set(expected "-DEXPECTED=${win32_expected}")
+        set(expected EXPECTED "${win32_expected}")
     endif()
-    add_test(NAME std_${name}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${source}"
-            ${expected}
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    antic_program_test(std_${name}
+        "${source}"
+        ${expected}
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/std")
 endforeach()
 
 # Every .anti file under src/std/anti/collection/ is a module the build
@@ -1114,235 +1091,94 @@ add_test(NAME std_collection_modules
 # The parts every collection shares in dev mode. The copies of the
 # generics of anti.collection come from its library file into the module
 # of the program, and the link names an object of each module it imports.
-add_test(NAME dev_object_collection
-    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
-            -I "${ANTIC_RUNTIME_DIR}/std"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev"
-            "${ANTIC_RUNTIME_DIR}/std/anti/collection.antl")
-set_tests_properties(dev_object_collection PROPERTIES
-    FIXTURES_SETUP collection_dev_object)
-add_test(NAME std_collection_parts_dev
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/collection_parts.anti"
-        "-DOPTIONS=--dev"
-        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev${anti_object}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-set_tests_properties(std_collection_parts_dev PROPERTIES
-    FIXTURES_REQUIRED
-        "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object")
+set(collection_dev lang mem text collection)
+antic_program_test(std_collection_parts_dev
+    "${CMAKE_CURRENT_SOURCE_DIR}/std/collection_parts.anti"
+    OPTIONS "--dev"
+    DEV ${collection_dev}
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 
 # The collections on handles and the heap and the sequences in dev mode,
 # and copies of collections that fields of the program reach.
 # Each module below anti.collection writes an object of its own, and a
 # program links the objects of every module it reaches.
-foreach(module IN ITEMS pool tree queue list deque ring grid)
-    add_test(NAME dev_object_collection_${module}
-        COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
-                -I "${ANTIC_RUNTIME_DIR}/std"
-                -o "${CMAKE_CURRENT_BINARY_DIR}/anti_collection_${module}_dev"
-                "${ANTIC_RUNTIME_DIR}/std/anti/collection/${module}.antl")
-    set_tests_properties(dev_object_collection_${module} PROPERTIES
-        FIXTURES_SETUP collection_${module}_dev_object)
-endforeach()
-set(collection_dev_objects
-    "${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev${anti_object}")
 foreach(case "pool|pool" "tree|pool,tree" "queue|queue" "list|list"
         "deque|deque" "ring|ring" "grid|grid" "fields|list,map,pool")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 modules)
     string(REPLACE "," ";" modules "${modules}")
-    set(objects "${collection_dev_objects}")
-    set(fixtures lang_dev_object mem_dev_object text_dev_object
-        collection_dev_object)
-    foreach(module IN LISTS modules)
-        string(APPEND objects
-            ",${CMAKE_CURRENT_BINARY_DIR}/anti_collection_${module}_dev${anti_object}")
-        list(APPEND fixtures collection_${module}_dev_object)
-    endforeach()
-    add_test(NAME std_collection_${name}_dev
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/collection_${name}.anti"
-            "-DOPTIONS=--dev"
-            "-DOBJECTS=${objects}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-    set_tests_properties(std_collection_${name}_dev PROPERTIES
-        FIXTURES_REQUIRED "${fixtures}")
+    list(TRANSFORM modules PREPEND "collection/")
+    antic_program_test(std_collection_${name}_dev
+        "${CMAKE_CURRENT_SOURCE_DIR}/std/collection_${name}.anti"
+        OPTIONS "--dev"
+        DEV ${collection_dev} ${modules}
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 endforeach()
 # Shared<T> in dev mode. Its copies come from the library file of anti.mem
 # into the module of the program, beside those of anti.collection.
-add_test(NAME std_shared_dev
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/shared.anti"
-        "-DOPTIONS=--dev"
-        "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev${anti_object}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-set_tests_properties(std_shared_dev PROPERTIES
-    FIXTURES_REQUIRED
-        "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object")
-# anti.reflect in dev mode, as an object of its own.
-add_test(NAME dev_object_reflect
-    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
-            -I "${ANTIC_RUNTIME_DIR}/std"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_reflect_dev"
-            "${ANTIC_RUNTIME_DIR}/std/anti/reflect.antl")
-set_tests_properties(dev_object_reflect PROPERTIES
-    FIXTURES_SETUP reflect_dev_object)
+antic_program_test(std_shared_dev
+    "${CMAKE_CURRENT_SOURCE_DIR}/std/shared.anti"
+    OPTIONS "--dev"
+    DEV ${collection_dev}
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 # The sorted collections in dev mode, whose copies come from the library
 # file of anti.collection.sorted and whose base comes from anti.collection.
 # The link names no object of anti.reflect, which no collection imports.
-add_test(NAME dev_object_collection_sorted
-    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
-            -I "${ANTIC_RUNTIME_DIR}/std"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_collection_sorted_dev"
-            "${ANTIC_RUNTIME_DIR}/std/anti/collection/sorted.antl")
-set_tests_properties(dev_object_collection_sorted PROPERTIES
-    FIXTURES_SETUP collection_sorted_dev_object)
 foreach(name IN ITEMS sorted_map sorted_set sorted_order sorted_trap)
-    add_test(NAME std_${name}_dev
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
-            "-DOPTIONS=--dev"
-            "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_sorted_dev${anti_object}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-    set_tests_properties(std_${name}_dev PROPERTIES
-        FIXTURES_REQUIRED
-            "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object;collection_sorted_dev_object")
+    antic_program_test(std_${name}_dev
+        "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
+        OPTIONS "--dev"
+        DEV ${collection_dev} collection/sorted
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 endforeach()
 # The maps of anti.collection.map and the sets of anti.collection.set in
 # dev mode, with the object of each module beside those of the modules it
-# imports.
-add_test(NAME dev_object_collection_map
-    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
-            -I "${ANTIC_RUNTIME_DIR}/std"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_collection_map_dev"
-            "${ANTIC_RUNTIME_DIR}/std/anti/collection/map.antl")
-set_tests_properties(dev_object_collection_map PROPERTIES
-    FIXTURES_SETUP collection_map_dev_object)
-# The sets of anti.collection.set, which stand on the tables of the maps.
-add_test(NAME dev_object_collection_set
-    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
-            -I "${ANTIC_RUNTIME_DIR}/std"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_collection_set_dev"
-            "${ANTIC_RUNTIME_DIR}/std/anti/collection/set.antl")
-set_tests_properties(dev_object_collection_set PROPERTIES
-    FIXTURES_SETUP collection_set_dev_object)
+# imports. The sets stand on the tables of the maps.
 foreach(name IN ITEMS map map_tuple hash_map set hash_set)
-    add_test(NAME std_${name}_dev
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
-            "-DOPTIONS=--dev"
-            "-DOBJECTS=${CMAKE_CURRENT_BINARY_DIR}/anti_lang_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_mem_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_text_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_map_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_set_dev${anti_object}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-    set_tests_properties(std_${name}_dev PROPERTIES
-        FIXTURES_REQUIRED
-            "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object;collection_map_dev_object;collection_set_dev_object")
+    antic_program_test(std_${name}_dev
+        "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
+        OPTIONS "--dev"
+        DEV ${collection_dev} collection/map collection/set
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 endforeach()
 # The collections threads share, of anti.collection.concurrent, in dev
 # mode. The module stands on the maps and on the error of a versioned set
 # in anti.collection.pool, so the link names the objects of both.
-add_test(NAME dev_object_collection_concurrent
-    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
-            -I "${ANTIC_RUNTIME_DIR}/std"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_collection_concurrent_dev"
-            "${ANTIC_RUNTIME_DIR}/std/anti/collection/concurrent.antl")
-set_tests_properties(dev_object_collection_concurrent PROPERTIES
-    FIXTURES_SETUP collection_concurrent_dev_object)
 foreach(name IN ITEMS concurrent_map concurrent_map_threads
         concurrent_map_equal spsc_ring spsc_ring_threads)
-    add_test(NAME std_${name}_dev
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
-            "-DOPTIONS=--dev"
-            "-DOBJECTS=${collection_dev_objects},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_map_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_pool_dev${anti_object},${CMAKE_CURRENT_BINARY_DIR}/anti_collection_concurrent_dev${anti_object}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-    set_tests_properties(std_${name}_dev PROPERTIES
-        FIXTURES_REQUIRED
-            "lang_dev_object;mem_dev_object;text_dev_object;collection_dev_object;collection_map_dev_object;collection_pool_dev_object;collection_concurrent_dev_object")
+    antic_program_test(std_${name}_dev
+        "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
+        OPTIONS "--dev"
+        DEV ${collection_dev} collection/map collection/pool
+            collection/concurrent
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 endforeach()
 # The collections behind one lock each, of anti.collection.synchronized, in
 # dev mode. The module stands on the list, the maps, the sets, the pool and
 # the walk of anti.collection.concurrent, so the link names the object of
 # each.
-add_test(NAME dev_object_collection_synchronized
-    COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
-            -I "${ANTIC_RUNTIME_DIR}/std"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/anti_collection_synchronized_dev"
-            "${ANTIC_RUNTIME_DIR}/std/anti/collection/synchronized.antl")
-set_tests_properties(dev_object_collection_synchronized PROPERTIES
-    FIXTURES_SETUP collection_synchronized_dev_object)
-set(synchronized_objects "${collection_dev_objects}")
-set(synchronized_fixtures lang_dev_object mem_dev_object text_dev_object
-    collection_dev_object)
-foreach(module IN ITEMS list map set pool concurrent synchronized)
-    string(APPEND synchronized_objects
-        ",${CMAKE_CURRENT_BINARY_DIR}/anti_collection_${module}_dev${anti_object}")
-    list(APPEND synchronized_fixtures collection_${module}_dev_object)
-endforeach()
 foreach(name IN ITEMS sync_list sync_list_threads sync_map sync_map_threads
         sync_set sync_set_threads sync_pool sync_pool_threads sync_equal)
-    add_test(NAME std_${name}_dev
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
-            "-DOPTIONS=--dev"
-            "-DOBJECTS=${synchronized_objects}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-    set_tests_properties(std_${name}_dev PROPERTIES
-        FIXTURES_REQUIRED "${synchronized_fixtures}")
+    antic_program_test(std_${name}_dev
+        "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
+        OPTIONS "--dev"
+        DEV ${collection_dev} collection/list collection/map collection/set
+            collection/pool collection/concurrent collection/synchronized
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 endforeach()
 # `dup` and the hash of every collection in dev mode. Each program holds
 # every collection, so the link names the object of every collection
 # module.
-set(dup_objects "${collection_dev_objects}")
-set(dup_fixtures lang_dev_object mem_dev_object text_dev_object
-    collection_dev_object)
-foreach(module IN ITEMS list deque ring grid map set sorted pool tree queue
-        concurrent)
-    string(APPEND dup_objects
-        ",${CMAKE_CURRENT_BINARY_DIR}/anti_collection_${module}_dev${anti_object}")
-    list(APPEND dup_fixtures collection_${module}_dev_object)
-endforeach()
 foreach(name IN ITEMS dup hash equals)
-    add_test(NAME std_collection_${name}_dev
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/collection_${name}.anti"
-            "-DOPTIONS=--dev"
-            "-DOBJECTS=${dup_objects}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-dev"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
-    set_tests_properties(std_collection_${name}_dev PROPERTIES
-        FIXTURES_REQUIRED "${dup_fixtures}")
+    antic_program_test(std_collection_${name}_dev
+        "${CMAKE_CURRENT_SOURCE_DIR}/std/collection_${name}.anti"
+        OPTIONS "--dev"
+        DEV ${collection_dev} collection/list collection/deque
+            collection/ring collection/grid collection/map collection/set
+            collection/sorted collection/pool collection/tree
+            collection/queue collection/concurrent
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 endforeach()
 # The runs with threads spin while the ring is full or empty and wait on the
 # locks of the maps and of the synchronized collections. A side that stops
@@ -1384,16 +1220,11 @@ set(no_home "${CMAKE_CURRENT_SOURCE_DIR}/std/userdirs-no-home.expected")
 if(ANTIC_HOST_TARGET MATCHES "^windows-")
     set(no_home "${CMAKE_CURRENT_SOURCE_DIR}/std/userdirs-no-home.win32.expected")
 endif()
-add_test(NAME std_userdirs_no_home
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/userdirs.anti"
-        "-DEXPECTED=${no_home}"
-        "-DUNSET=HOME,LOCALAPPDATA,XDG_CONFIG_HOME,XDG_DATA_HOME,XDG_CACHE_HOME"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-no-home"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+antic_program_test(std_userdirs_no_home
+    "${CMAKE_CURRENT_SOURCE_DIR}/std/userdirs.anti"
+    EXPECTED "${no_home}"
+    UNSET "HOME,LOCALAPPDATA,XDG_CONFIG_HOME,XDG_DATA_HOME,XDG_CACHE_HOME"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/std-no-home")
 
 # The roots that tests/std/userdirs.anti reads. The environment of the
 # test holds them, so one expected output stands on every machine. A
@@ -1414,15 +1245,10 @@ endif()
 if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(abi_structs PRIVATE -fno-sanitize=all)
 endif()
-add_test(NAME program_abi_structs
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_structs.anti"
-        "-DOBJECTS=$<JOIN:$<TARGET_OBJECTS:abi_structs>,,>"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/abi"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+antic_program_test(program_abi_structs
+    "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_structs.anti"
+    OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_structs>,,>"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/abi")
 
 # Simd structs against C: the functions of tests/abi/simd.c take and
 # return the vector types of C by value.
@@ -1434,15 +1260,10 @@ endif()
 if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(abi_simd PRIVATE -fno-sanitize=all)
 endif()
-add_test(NAME program_abi_simd
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_simd.anti"
-        "-DOBJECTS=$<JOIN:$<TARGET_OBJECTS:abi_simd>,,>"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/abi"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+antic_program_test(program_abi_simd
+    "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_simd.anti"
+    OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_simd>,,>"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/abi")
 
 add_library(abi_wchar OBJECT abi/wchar.c)
 target_compile_options(abi_wchar PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
@@ -1453,16 +1274,11 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(abi_wchar PRIVATE -fno-sanitize=all)
 endif()
 abi_wchar_expected(abi_wchar_expected "")
-add_test(NAME program_abi_wchar
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_wchar.anti"
-        "-DOBJECTS=$<JOIN:$<TARGET_OBJECTS:abi_wchar>,,>"
-        "-DEXPECTED=${abi_wchar_expected}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/abi"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+antic_program_test(program_abi_wchar
+    "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_wchar.anti"
+    OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_wchar>,,>"
+    EXPECTED "${abi_wchar_expected}"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/abi")
 
 # A user receives these files. None of them may name a directory of the
 # machine that built it.
@@ -1923,16 +1739,11 @@ if(EXISTS "${ANTIC_RAYLIB_DIR}/src/raymath.h")
     # fused on arm64, and the reference C fuses none now.
     set(raymath_expected
         "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.expected")
-    add_test(NAME program_abi_raymath
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.anti"
-            "-DOBJECTS=$<JOIN:$<TARGET_OBJECTS:abi_raymath>,,>"
-            "-DEXPECTED=${raymath_expected}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/abi"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    antic_program_test(program_abi_raymath
+        "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.anti"
+        OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_raymath>,,>"
+        EXPECTED "${raymath_expected}"
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/abi")
 else()
     # Fail rather than skip, so a missing raylib cannot pass unnoticed.
     add_test(NAME program_abi_raymath
@@ -2342,15 +2153,10 @@ add_test(NAME shared_inputs
 
 # The platform linker of the host links the first executable of chapter 3.
 if(NOT WIN32)
-    add_test(NAME program_platform_linker
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/platform"
-            "-DOPTIONS=--linker,platform"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    antic_program_test(program_platform_linker
+        "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+        OPTIONS "--linker,platform"
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/platform")
 endif()
 
 # The platform linker links only for the operating system it runs on.
@@ -2567,315 +2373,165 @@ add_test(NAME classlib
 # so the build of the module that holds the body decides them. The
 # library here is built with --trace and without --trace writes, and the
 # program with both.
-foreach(mode release dev)
-    add_test(NAME hooks_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/hooks"
-            "-DLIBRARIES=store"
-            "-DLIB_OPTIONS=--trace"
-            "-DOPTIONS=--trace,--trace,writes"
-            "-DSTD=lang"
-            "-DPROGRAM=client"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/hooks-modules-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-endforeach()
+antic_modules_test(hooks_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/hooks"
+    LIBRARIES store
+    PROGRAM client
+    STD lang
+    OPTIONS --trace --trace writes
+    LIB_OPTIONS --trace
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/hooks-modules")
 
 # A program of two modules holds one descriptor and one table per class,
 # so `is`, `==`, `equals` and `reflect.new` agree whichever module made
 # the object, in release mode and in dev mode
-foreach(mode release dev)
-    add_test(NAME shared_class_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/shared"
-            "-DLIBRARIES=points"
-            "-DSTD=lang,mem,text,reflect"
-            "-DPROGRAM=client"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/shared-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-    # A chain of classes over three modules, each naming its base with
-    # the module it comes from
-    add_test(NAME inherits_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/chain"
-            "-DLIBRARIES=animal,dog"
-            "-DSTD=lang"
-            "-DPROGRAM=chain"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/chain-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-    # Ownership over two modules: the teardown and the copy of a class
-    # call those of the base, the inline field and the elements that
-    # another module declares
-    add_test(NAME owned_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/owned"
-            "-DLIBRARIES=parts"
-            "-DSTD="
-            "-DPROGRAM=crate"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/owned-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-endforeach()
+antic_modules_test(shared_class
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/shared"
+    LIBRARIES points
+    PROGRAM client
+    STD lang mem text reflect
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/shared")
+# A chain of classes over three modules, each naming its base with the
+# module it comes from
+antic_modules_test(inherits_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/chain"
+    LIBRARIES animal dog
+    PROGRAM chain
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/chain")
+# Ownership over two modules: the teardown and the copy of a class call
+# those of the base, the inline field and the elements that another module
+# declares
+antic_modules_test(owned_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/owned"
+    LIBRARIES parts
+    PROGRAM crate
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/owned")
 
 # Generics over a module boundary: a program and a second library use the
 # generics of a library with their own arguments. Each makes its copies
 # from the checked tree the library file carries, and a copy two modules
 # make is one type and one symbol. Release mode and dev mode print the
 # same.
-foreach(mode release dev)
-    add_test(NAME generics_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/generics"
-            "-DLIBRARIES=gen,mid"
-            "-DSTD=lang,mem,text"
-            "-DPROGRAM=client"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/generics-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-endforeach()
+antic_modules_test(generics_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generics"
+    LIBRARIES gen mid
+    PROGRAM client
+    STD lang mem text
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/generics")
 
 # Direct imports. A program and a library name the items of another
 # library without its module name, and reach the module by its name as
 # well. A generic among them has its copy made in the program.
-foreach(mode release dev)
-    add_test(NAME direct_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/direct"
-            "-DLIBRARIES=shapes,frame"
-            "-DSTD=lang"
-            "-DPROGRAM=client"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/direct-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-endforeach()
+antic_modules_test(direct_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/direct"
+    LIBRARIES shapes frame
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/direct")
 
 # `may fail` over a module boundary: the library file records the flag, so
 # the program handles the error, `try` forwards it and `undo` runs on the
 # fail path alone.
-foreach(mode release dev)
-    add_test(NAME failing_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/failing"
-            "-DLIBRARIES=counter"
-            "-DSTD=lang"
-            "-DPROGRAM=client"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/failing-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-endforeach()
+antic_modules_test(failing_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/failing"
+    LIBRARIES counter
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/failing")
 
 # Default values over a module boundary: the library file carries the
 # default of each parameter, and `here` is the position of the call in the
 # program.
-foreach(mode release dev)
-    add_test(NAME default_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/defaults"
-            "-DLIBRARIES=greeter"
-            "-DSTD=lang"
-            "-DPROGRAM=client"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/defaults-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-endforeach()
+antic_modules_test(default_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/defaults"
+    LIBRARIES greeter
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/defaults")
 
 # A tuple over a module boundary: the library file carries the tuple of
 # each signature, so the two modules name one type and the program takes
 # the elements apart.
-foreach(mode release dev)
-    add_test(NAME tuple_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/tuples"
-            "-DLIBRARIES=pairs"
-            "-DSTD=lang"
-            "-DPROGRAM=client"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/tuples-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-endforeach()
+antic_modules_test(tuple_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/tuples"
+    LIBRARIES pairs
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/tuples")
 
 # A variant of a library, which another module builds and switches on
 # with every case named. It tests one with `is` and `if let` and passes
 # it back inside a struct of the library.
-foreach(mode release dev)
-    add_test(NAME variant_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/variants"
-            "-DLIBRARIES=geo"
-            "-DPROGRAM=client"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/variants-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-endforeach()
+antic_modules_test(variant_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/variants"
+    LIBRARIES geo
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/variants")
 
 # A public class of a library whose layout holds types nested in it,
 # which another module lays out, builds and calls.
-foreach(mode release dev)
-    add_test(NAME nested_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/nested"
-            "-DLIBRARIES=people"
-            "-DPROGRAM=client"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/nested-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-endforeach()
+antic_modules_test(nested_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/nested"
+    LIBRARIES people
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/nested")
 
 # The hash of the types of a library and its generics that hash and order,
 # which another module uses and hashes inside a struct of its own.
-foreach(mode release dev)
-    add_test(NAME hashing_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/hashing"
-            "-DLIBRARIES=keys"
-            "-DSTD=lang"
-            "-DPROGRAM=client"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/hashing-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-endforeach()
+antic_modules_test(hashing_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/hashing"
+    LIBRARIES keys
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/hashing")
 
 # The operators of a library reach the private fields and functions of its
 # classes, a generic one among them, in the copies another module makes.
-foreach(mode release dev)
-    add_test(NAME access_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/access"
-            "-DLIBRARIES=ledger"
-            "-DSTD=lang"
-            "-DPROGRAM=client"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/access-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-endforeach()
+antic_modules_test(access_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/access"
+    LIBRARIES ledger
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/access")
 
 # A generic class with operator hooks in a library, which another module
 # compares, adds, indexes and walks. The library file carries the mark of
 # each hook, in the class and at module level.
-foreach(mode release dev)
-    add_test(NAME generic_hooks_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_hooks"
-            "-DLIBRARIES=row"
-            "-DSTD=lang"
-            "-DPROGRAM=client"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/generic-hooks-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-endforeach()
+antic_modules_test(generic_hooks_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_hooks"
+    LIBRARIES row
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/generic-hooks")
 
 # A collection, its iterator and a struct with the language hooks in a
 # library, which another module walks, indexes and collects.
-foreach(mode release dev)
-    add_test(NAME iteration_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/iteration"
-            "-DLIBRARIES=bag"
-            "-DSTD=lang"
-            "-DPROGRAM=client"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/iteration-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-endforeach()
+antic_modules_test(iteration_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/iteration"
+    LIBRARIES bag
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/iteration")
 
 # Closures and functions passed to the parameters of a library.
 # The library file carries each parameter in its form. A `concurrent` one
 # reaches the workers of `parallel`, and a `keep` one stores a C function
 # pointer.
-foreach(mode release dev)
-    add_test(NAME closures_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/closures"
-            "-DLIBRARIES=walk"
-            "-DPROGRAM=client"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/closures-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-endforeach()
+antic_modules_test(closures_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/closures"
+    LIBRARIES walk
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/closures")
 
 # A Mutex in a struct of a library and channels that pass between the
 # program and a library, which drains one and selects over two.
-foreach(mode release dev)
-    add_test(NAME sync_modules_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/sync"
-            "-DLIBRARIES=queue"
-            "-DPROGRAM=client"
-            "-DMODE=${mode}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/sync-${mode}"
-            "-DOBJECT=${anti_object}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_modules.cmake")
-    set_tests_properties(sync_modules_${mode} PROPERTIES TIMEOUT 120)
-endforeach()
+antic_modules_test(sync_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/sync"
+    LIBRARIES queue
+    PROGRAM client
+    TIMEOUT 120
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/sync")
 
 # The internal level: a module of the same package sees an internal item
 # of a library, and a module of another package does not.
@@ -3080,17 +2736,119 @@ if(ANTIC_LLVM_MC)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_asserts.cmake")
 endif()
 
-# Every dev-mode check: bounds, overflow, a narrowing `as`, division and
-# shifts, in a build that keeps them and a build that drops them.
+# Every dev-mode check: bounds, overflow, a narrowing `as`, division,
+# shifts and a walk of a collection that changes, one test per program in
+# a build that keeps the check and a build that drops it. A program whose
+# operation traps by itself without the check is built in release mode and
+# not run, which runs gives as OFF. DEV names the modules whose dev objects
+# the dev build links. checks_override runs the options that decide
+# instead of the mode.
+function(antic_check_test name phrase pattern runs)
+    cmake_parse_arguments(PARSE_ARGV 4 arg "" "" "DEV")
+    antic_dev_inputs(objects fixtures ${arg_DEV})
+    list(JOIN objects "," objects)
+    add_test(NAME check_${name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/checks/${name}.anti"
+            "-DPHRASE=${phrase}"
+            "-DPATTERN=${pattern}"
+            "-DRUNS=${runs}"
+            "-DOBJECTS=${objects}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/checks"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_check.cmake")
+    if(fixtures)
+        set_property(TEST check_${name} PROPERTY FIXTURES_REQUIRED ${fixtures})
+    endif()
+endfunction()
 if(ANTIC_LLVM_MC)
-    add_test(NAME checks
+    antic_check_test(bounds_array "index out of bounds"
+        "bounds_array\\.anti:[0-9]+: index out of bounds: index 5, length 4"
+        ON)
+    antic_check_test(bounds_slice "index out of bounds"
+        "bounds_slice\\.anti:[0-9]+: index out of bounds: index 4, length 2"
+        ON)
+    antic_check_test(bounds_simd "index out of bounds"
+        "bounds_simd\\.anti:[0-9]+: index out of bounds: index 7, length 6"
+        ON)
+    antic_check_test(bounds_str "index out of bounds"
+        "bounds_str\\.anti:[0-9]+: index out of bounds: index 7, length 3"
+        ON)
+    antic_check_test(overflow_add "overflow in"
+        "overflow_add\\.anti:[0-9]+: overflow in \\+: left 9223372036854775807, right 1"
+        ON)
+    antic_check_test(overflow_sub "overflow in"
+        "overflow_sub\\.anti:[0-9]+: overflow in -: left -9223372036854775807, right 2"
+        ON)
+    antic_check_test(overflow_mul "overflow in"
+        "overflow_mul\\.anti:[0-9]+: overflow in \\*: left 4000000000, right 4000000000"
+        ON)
+    antic_check_test(overflow_mul32 "overflow in"
+        "overflow_mul32\\.anti:[0-9]+: overflow in \\*: left 100000, right 100000"
+        ON)
+    antic_check_test(overflow_carry "overflow in"
+        "overflow_carry\\.anti:[0-9]+: overflow in \\+: left 9223372036854775806, right 1"
+        ON)
+    antic_check_test(narrow "out of range"
+        "narrow\\.anti:[0-9]+: value out of range for i8: value 300"
+        ON)
+    antic_check_test(narrow_sign "out of range"
+        "narrow_sign\\.anti:[0-9]+: value out of range for u64: value -1"
+        ON)
+    antic_check_test(narrow_char "out of range"
+        "narrow_char\\.anti:[0-9]+: value out of range for char: value 1114112"
+        ON)
+    antic_check_test(narrow_surrogate "out of range"
+        "narrow_surrogate\\.anti:[0-9]+: value out of range for char: value 55296"
+        ON)
+    antic_check_test(narrow_enum "not declared by"
+        "narrow_enum\\.anti:[0-9]+: value not declared by Kind: value 7"
+        ON)
+    antic_check_test(divide "division by zero"
+        "divide\\.anti:[0-9]+: division by zero in /: left 10"
+        OFF)
+    antic_check_test(remainder "division by zero"
+        "remainder\\.anti:[0-9]+: division by zero in %: left 10"
+        OFF)
+    antic_check_test(shift_wide "shift count out of range"
+        "shift_wide\\.anti:[0-9]+: shift count out of range for <<: count 64, width 64"
+        ON)
+    antic_check_test(shift_negative "shift count out of range"
+        "shift_negative\\.anti:[0-9]+: shift count out of range for >>: count -1, width 64"
+        ON)
+    antic_check_test(walk_changed "was changed while"
+        "walk_changed\\.anti:68: `bag` was changed while `for` walked it: changed at walk_changed\\.anti:70"
+        ON DEV lang)
+    antic_check_test(collection_changed "was changed while"
+        "collection_changed\\.anti:82: `pair` was changed while `for` walked it: changed at collection_changed\\.anti:84"
+        ON DEV lang mem text collection)
+    antic_check_test(list_changed "was changed while"
+        "list_changed\\.anti:12: `people` was changed while `for` walked it: changed at list_changed\\.anti:14"
+        ON DEV lang mem text collection collection/list)
+    antic_check_test(list_bounds "index out of bounds"
+        "\\.anti:[0-9]+: index out of bounds: index 5, length 4"
+        ON DEV lang mem text collection collection/list)
+    antic_check_test(grid_bounds "index out of bounds"
+        "\\.anti:[0-9]+: index out of bounds: index 3, length 3"
+        ON DEV lang mem text collection collection/grid)
+    antic_check_test(sorted_changed "was changed while"
+        "sorted_changed\\.anti:13: `ages` was changed while `for` walked it: changed at sorted_changed\\.anti:15"
+        ON DEV lang mem text collection reflect collection/sorted)
+    antic_check_test(map_changed "was changed while"
+        "map_changed\\.anti:12: `ages` was changed while `for` walked it: changed at map_changed\\.anti:14"
+        ON DEV lang mem text collection collection/map)
+    antic_check_test(set_changed "was changed while"
+        "set_changed\\.anti:12: `seen` was changed while `for` walked it: changed at set_changed\\.anti:13"
+        ON DEV lang mem text collection collection/map collection/set)
+    add_test(NAME checks_override
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/checks"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/checks"
-            "-DOBJECT=${anti_object}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/checks-override"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_checks.cmake")
 endif()
 
@@ -3260,7 +3018,7 @@ endif()
 # patterns. Each case is a name, the source in tests/trace, the options of
 # antic and the arguments of the program. The pattern files of the output
 # and of the error output follow, then the exit status. A dev build links
-# the object of anti.lang, which it compiles first.
+# the dev object of anti.lang.
 set(TRACE "${CMAKE_CURRENT_SOURCE_DIR}/trace")
 foreach(case
         "stack|stack_trace|||stack_trace.pattern||0"
@@ -3294,8 +3052,10 @@ foreach(case
     endif()
     set(std "")
     if(options MATCHES "--dev")
-        set(std "lang")
+        set(std lang)
     endif()
+    antic_dev_inputs(std_objects std_fixtures ${std})
+    list(JOIN std_objects "," std_objects)
     add_test(NAME trace_${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -3306,11 +3066,14 @@ foreach(case
             "-DARGS=${arguments}"
             "-DEXPECTED=${TRACE}/${expected}"
             ${error_patterns}
-            "-DSTD=${std}"
+            "-DSTD_OBJECTS=${std_objects}"
             "-DSTATUS=${status}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/trace-${name}"
-            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trace.cmake")
+    if(std_fixtures)
+        set_property(TEST trace_${name} PROPERTY
+            FIXTURES_REQUIRED ${std_fixtures})
+    endif()
 endforeach()
 
 # The runtime configuration: the options under --anti., the file that
@@ -3379,8 +3142,10 @@ foreach(case
     # A dev build links the objects of the modules the program imports.
     set(std "")
     if(options MATCHES "--dev")
-        set(std "lang,runtime")
+        set(std lang runtime)
     endif()
+    antic_dev_inputs(std_objects std_fixtures ${std})
+    list(JOIN std_objects "," std_objects)
     add_test(NAME conf_${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -3391,11 +3156,14 @@ foreach(case
             "-DARGS=${arguments}"
             "-DEXPECTED=${CONF}/${expected}"
             ${error_patterns}
-            "-DSTD=${std}"
+            "-DSTD_OBJECTS=${std_objects}"
             "-DSTATUS=${status}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-${name}"
-            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trace.cmake")
+    if(std_fixtures)
+        set_property(TEST conf_${name} PROPERTY
+            FIXTURES_REQUIRED ${std_fixtures})
+    endif()
 endforeach()
 
 # The runtime and `anti symbols` stop a chain of includes at one depth,
@@ -3462,7 +3230,6 @@ foreach(case
             ${error_patterns}
             "-DSTATUS=${status}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/inject-${name}"
-            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trace.cmake")
 endforeach()
 

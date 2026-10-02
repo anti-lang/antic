@@ -5,15 +5,14 @@
 #   RUNTIME   the runtime directory
 #   SOURCE    the .anti file
 #   OPTIONS   optional options of antic, separated by commas
-#   STD       optional modules of the standard library that a dev build
-#             compiles to objects of their own, separated by commas
+#   STD_OBJECTS  optional dev objects of the modules of the standard
+#             library that a dev build links, separated by commas
 #   ARGS      optional arguments of the program, separated by commas
 #   EXPECTED  the patterns of the standard output
 #   ERRORS    optional patterns of the standard error, which is empty
 #             without them
 #   STATUS    the exit status, 0 when it is not given
 #   WORK      a directory for the executable
-#   OBJECT    the suffix antic gives an object of the host, .o or .obj
 #
 # A trace holds addresses that differ from run to run, so the output is
 # matched rather than compared. Each pattern matches a whole line, and
@@ -31,18 +30,7 @@ file(MAKE_DIRECTORY "${WORK}")
 set(exe "${WORK}/${name}")
 string(REPLACE "," ";" options "${OPTIONS}")
 string(REPLACE "," ";" arguments "${ARGS}")
-string(REPLACE "," ";" std "${STD}")
-set(objects "")
-foreach(module IN LISTS std)
-    execute_process(
-        COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
-                -o "${WORK}/std_${module}" "${RUNTIME}/std/anti/${module}.antl"
-        RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic --dev of anti.${module} failed\n${err}")
-    endif()
-    list(APPEND objects "${WORK}/std_${module}${OBJECT}")
-endforeach()
+string(REPLACE "," ";" objects "${STD_OBJECTS}")
 execute_process(
     COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" ${options}
             -o "${exe}" "${SOURCE}" ${objects}
