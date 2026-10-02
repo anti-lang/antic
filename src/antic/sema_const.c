@@ -382,15 +382,513 @@ static uint64_t const_elements(const struct type *t)
     return total;
 }
 
+/* A cast of a constant operand. */
+static bool const_as(struct checker *c, struct expr *e,
+                     struct const_value *out)
+{
+    struct const_value a;
+
+    if (!sema_eval_const(c, e->as.cast.operand, &a)) {
+        return false;
+    }
+    out->type = e->type;
+    if (a.kind == CONST_SYMBOLIC) {
+        if (!types_is_integer(e->type)) {
+            sema_error_at(c, e->pos,
+                          "a value computed from `size_of` converts "
+                          "only to an integer type in a constant "
+                          "expression");
+            return false;
+        }
+        return symbolic_value(c, out, SYMBOLIC_CAST, TOKEN_AS, &a, NULL);
+    }
+    if (e->type->kind == TYPE_F16) {
+        /* The runtime's own rounding, so a constant and a computed
+           value of one f32 are the same sixteen bits. */
+        out->kind = CONST_FLOAT;
+        out->as.floating =
+            anti_rt_f16_widen(anti_rt_f16_narrow((float)a.as.floating));
+    } else if (types_is_float(e->type)) {
+        out->kind = CONST_FLOAT;
+        out->as.floating = a.kind == CONST_FLOAT ? a.as.floating
+                           : types_is_signed(a.type)
+                               ? (double)sema_signed_bits(a.as.integer)
+                               : (double)a.as.integer;
+        if (e->type->kind == TYPE_F32) {
+            out->as.floating = (float)out->as.floating;
+        }
+    } else if (types_is_integer(e->type)) {
+        out->kind = CONST_INT;
+        if (a.kind == CONST_FLOAT) {
+            if (reports_undefined(c, e, e->type, &a, NULL)) {
+                return false;
+            }
+            out->as.integer = types_is_signed(e->type)
+                                  ? (uint64_t)(int64_t)a.as.floating
+                                  : (uint64_t)a.as.floating;
+        } else if (a.kind == CONST_BOOL) {
+            out->as.integer = a.as.boolean ? 1 : 0;
+        } else if (a.kind == CONST_CHAR) {
+            out->as.integer = a.as.character;
+        } else {
+            out->as.integer = a.as.integer;
+        }
+        wrap(out);
+    } else if (e->type->kind == TYPE_CHAR) {
+        out->kind = CONST_CHAR;
+        out->as.character = (uint32_t)a.as.integer;
+    } else {
+        return fail_const(c, e, "a pointer conversion");
+    }
+    return fits_every_target(c, e, out);
+}
+
+/* A unary operator on a constant operand. */
+static bool const_unary(struct checker *c, struct expr *e,
+                        struct const_value *out)
+{
+    struct const_value a;
+
+    if (e->as.unary.op == TOKEN_AMP || e->as.unary.op == TOKEN_STAR) {
+        return fail_const(c, e, "an address or a dereference");
+    }
+    if (!sema_eval_const(c, e->as.unary.operand, &a)) {
+        return false;
+    }
+    if (a.kind == CONST_SYMBOLIC) {
+        return symbolic_value(c, out, SYMBOLIC_UNARY, e->as.unary.op, &a,
+                              NULL);
+    }
+    *out = a;
+    out->type = e->type;
+    if (e->as.unary.op == TOKEN_BANG) {
+        out->as.boolean = !a.as.boolean;
+    } else if (e->as.unary.op == TOKEN_TILDE) {
+        out->as.integer = ~a.as.integer;
+        wrap(out);
+    } else if (a.kind == CONST_FLOAT) {
+        out->as.floating = -a.as.floating;
+    } else {
+        out->as.integer = (uint64_t)0 - a.as.integer;
+        wrap(out);
+    }
+    return fits_every_target(c, e, out);
+}
+
+/* The comparison op of the constants a and b into the bool out, the
+   operands being signed integers when is_signed holds. */
+static void const_compare(enum token_kind op, const struct const_value *a,
+                          const struct const_value *b, bool is_signed,
+                          struct const_value *out)
+{
+    bool is_float = a->kind == CONST_FLOAT;
+    int cmp;
+
+    out->kind = CONST_BOOL;
+    if (is_float) {
+        cmp = a->as.floating < b->as.floating ? -1
+              : a->as.floating > b->as.floating ? 1 : 0;
+    } else if (a->kind == CONST_NULL || b->kind == CONST_NULL) {
+        cmp = a->kind == b->kind ? 0 : 1;
+    } else if (a->kind == CONST_TEXT && b->kind == CONST_TEXT) {
+        cmp = compare_text(&a->as.text, &b->as.text);
+    } else if (is_signed) {
+        cmp = sema_signed_bits(a->as.integer) <
+                      sema_signed_bits(b->as.integer)
+                  ? -1
+              : sema_signed_bits(a->as.integer) >
+                      sema_signed_bits(b->as.integer)
+                  ? 1
+                  : 0;
+    } else {
+        uint64_t x = a->kind == CONST_CHAR ? a->as.character
+                     : a->kind == CONST_BOOL ? a->as.boolean
+                                             : a->as.integer;
+        uint64_t y = b->kind == CONST_CHAR ? b->as.character
+                     : b->kind == CONST_BOOL ? b->as.boolean
+                                             : b->as.integer;
+        cmp = x < y ? -1 : x > y ? 1 : 0;
+    }
+    out->as.boolean = op == TOKEN_EQ ? cmp == 0
+                      : op == TOKEN_NE ? cmp != 0
+                      : op == TOKEN_LT ? cmp < 0
+                      : op == TOKEN_LE ? cmp <= 0
+                      : op == TOKEN_GT ? cmp > 0
+                                       : cmp >= 0;
+    if (is_float && (isnan(a->as.floating) || isnan(b->as.floating))) {
+        out->as.boolean = op == TOKEN_NE;
+    }
+}
+
+/* The integer operation op of the constants a and b, whose operands have
+   type operand, into out before it wraps. */
+static void const_integer(enum token_kind op, const struct type *operand,
+                          const struct const_value *a,
+                          const struct const_value *b,
+                          struct const_value *out)
+{
+    bool is_signed = types_is_signed(operand);
+    int bits = types_bits(operand);
+
+    switch (op) {
+    case TOKEN_PLUS:
+    case TOKEN_PLUS_WRAP:
+        out->as.integer = a->as.integer + b->as.integer;
+        break;
+    case TOKEN_MINUS:
+    case TOKEN_MINUS_WRAP:
+        out->as.integer = a->as.integer - b->as.integer;
+        break;
+    case TOKEN_STAR:
+    case TOKEN_STAR_WRAP:
+        out->as.integer = a->as.integer * b->as.integer;
+        break;
+    /* A count at or above the width gives 0, and a negative count
+       holds its sign in the bits above, which makes it one. A
+       target-sized type computes at 64 bits and must fit the narrower
+       width, as every constant of it does. */
+    case TOKEN_SHL_WRAP:
+        out->as.integer =
+            b->as.integer >= (uint64_t)(types_is_target_sized(operand)
+                                            ? 64
+                                            : bits)
+                ? 0
+                : a->as.integer << b->as.integer;
+        break;
+    case TOKEN_PLUS_SAT:
+    case TOKEN_MINUS_SAT:
+    case TOKEN_STAR_SAT:
+        out->as.integer = arith_saturate(
+            op == TOKEN_PLUS_SAT ? '+' : op == TOKEN_MINUS_SAT ? '-' : '*',
+            a->as.integer, b->as.integer,
+            types_is_target_sized(operand) ? 64 : bits, is_signed);
+        break;
+    case TOKEN_MUL_HIGH:
+        out->as.integer =
+            arith_mul_high(a->as.integer, b->as.integer, bits, is_signed);
+        break;
+    case TOKEN_AMP: out->as.integer = a->as.integer & b->as.integer; break;
+    case TOKEN_PIPE: out->as.integer = a->as.integer | b->as.integer; break;
+    case TOKEN_CARET: out->as.integer = a->as.integer ^ b->as.integer; break;
+    case TOKEN_SLASH:
+    case TOKEN_PERCENT: {
+        if (is_signed) {
+            int64_t x = sema_signed_bits(a->as.integer);
+            int64_t y = sema_signed_bits(b->as.integer);
+            out->as.integer = (uint64_t)(op == TOKEN_SLASH ? x / y : x % y);
+        } else {
+            out->as.integer = op == TOKEN_SLASH
+                                  ? a->as.integer / b->as.integer
+                                  : a->as.integer % b->as.integer;
+        }
+        break;
+    }
+    case TOKEN_SHL:
+    case TOKEN_SHR:
+        if (op == TOKEN_SHL) {
+            out->as.integer = a->as.integer << b->as.integer;
+        } else if (is_signed) {
+            /* An arithmetic shift in unsigned operations, since C
+               leaves the shift of a negative value to the
+               implementation. */
+            out->as.integer = (a->as.integer >> 63) != 0
+                                  ? ~(~a->as.integer >> b->as.integer)
+                                  : a->as.integer >> b->as.integer;
+        } else {
+            uint64_t mask = bits == 64 ? UINT64_MAX
+                                       : ((uint64_t)1 << bits) - 1;
+            out->as.integer = (a->as.integer & mask) >> b->as.integer;
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+/* A binary operator on constant operands. */
+static bool const_binary(struct checker *c, struct expr *e,
+                         struct const_value *out)
+{
+    struct const_value a;
+    struct const_value b;
+    enum token_kind op = e->as.binary.op;
+    struct type *operand = e->as.binary.left->type;
+    bool is_float;
+
+    if (!sema_eval_const(c, e->as.binary.left, &a)) {
+        return false;
+    }
+    /* A constant pointer is `none`, so `??` gives its right side. */
+    if (op == TOKEN_QUESTION_QUESTION) {
+        return a.kind == CONST_NULL
+                   ? sema_eval_const(c, e->as.binary.right, out)
+                   : fail_const(c, e, "`??`");
+    }
+    if (op == TOKEN_AND_AND || op == TOKEN_OR_OR) {
+        if (a.kind != CONST_SYMBOLIC &&
+            a.as.boolean == (op == TOKEN_OR_OR)) {
+            *out = a;
+            return true;
+        }
+        if (a.kind != CONST_SYMBOLIC) {
+            return sema_eval_const(c, e->as.binary.right, out);
+        }
+    }
+    if (!sema_eval_const(c, e->as.binary.right, &b)) {
+        return false;
+    }
+    if (reports_undefined(c, e, e->type, &a, &b)) {
+        return false;
+    }
+    /* The upper half of a product of c_long has another value at
+       each width, and no symbolic value carries the signedness of
+       c_wchar. */
+    if (op == TOKEN_MUL_HIGH && types_is_target_sized(operand)) {
+        return fail_const(c, e, "`" MUL_HIGH "` of a type whose width "
+                          "the target decides");
+    }
+    if (a.kind == CONST_SYMBOLIC || b.kind == CONST_SYMBOLIC) {
+        out->type = e->type;
+        return symbolic_value(c, out, SYMBOLIC_BINARY, op, &a, &b);
+    }
+    is_float = a.kind == CONST_FLOAT;
+    out->kind = CONST_INT;
+    out->type = e->type;
+    if (e->type->kind == TYPE_BOOL) {
+        const_compare(op, &a, &b, types_is_signed(operand), out);
+        return true;
+    }
+    if (is_float) {
+        out->kind = CONST_FLOAT;
+        out->as.floating = op == TOKEN_PLUS    ? a.as.floating + b.as.floating
+                           : op == TOKEN_MINUS ? a.as.floating - b.as.floating
+                           : op == TOKEN_STAR  ? a.as.floating * b.as.floating
+                                               : a.as.floating / b.as.floating;
+        if (e->type->kind == TYPE_F32) {
+            out->as.floating = (float)out->as.floating;
+        }
+        return true;
+    }
+    const_integer(op, operand, &a, &b, out);
+    wrap(out);
+    return fits_every_target(c, e, out);
+}
+
+/* The constant of kind of the count values, an array or a tuple. */
+static bool const_items(struct checker *c, struct expr *const *values,
+                        size_t count, enum const_kind kind,
+                        struct const_value *out)
+{
+    size_t i;
+
+    out->kind = kind;
+    out->as.aggregate.count = count;
+    out->as.aggregate.items =
+        arena_alloc(c->arena, count * sizeof *out->as.aggregate.items);
+    for (i = 0; i < count; i++) {
+        if (!sema_eval_const(c, values[i], &out->as.aggregate.items[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* `[v; n]` of a constant v. */
+static bool const_repeat(struct checker *c, struct expr *e,
+                         struct const_value *out)
+{
+    struct const_value a;
+    size_t i;
+
+    if (e->type->length_of != NULL) {
+        return fail_const(c, e, "an array with a length from `size_of`");
+    }
+    if (const_elements(e->type) > CONST_ELEMENTS_MAX) {
+        sema_error_at(c, e->pos,
+                      "an array of more than %d elements is not a "
+                      "constant expression", CONST_ELEMENTS_MAX);
+        return false;
+    }
+    if (!sema_eval_const(c, e->as.array_repeat.value, &a)) {
+        return false;
+    }
+    out->kind = CONST_ARRAY;
+    out->as.aggregate.count = e->type->length;
+    out->as.aggregate.items = arena_alloc(
+        c->arena, e->type->length * sizeof *out->as.aggregate.items);
+    for (i = 0; i < e->type->length; i++) {
+        out->as.aggregate.items[i] = a;
+    }
+    return true;
+}
+
+/* A struct literal of constant fields. */
+static bool const_struct(struct checker *c, struct expr *e,
+                         struct const_value *out)
+{
+    struct type *s = e->type;
+    size_t i;
+    size_t j;
+
+    if (s->is_union) {
+        return fail_const(c, e, "a union");
+    }
+    if (s->kind == TYPE_VARIANT) {
+        return fail_const(c, e, "a variant");
+    }
+    if (s->kind == TYPE_CLASS) {
+        return class_value(c, e, s, out);
+    }
+    out->kind = CONST_STRUCT;
+    out->as.aggregate.count = s->field_count;
+    out->as.aggregate.items =
+        types_alloc_array(c->arena, s->field_count,
+                          sizeof *out->as.aggregate.items);
+    /* A zero-width bitfield holds no value and keeps a zero. */
+    for (j = 0; j < s->field_count; j++) {
+        out->as.aggregate.items[j].kind = CONST_INT;
+        out->as.aggregate.items[j].type = s->fields[j].type;
+        out->as.aggregate.items[j].as.integer = 0;
+    }
+    for (i = 0; i < e->as.struct_lit.field_count; i++) {
+        for (j = 0; j < s->field_count; j++) {
+            if (sema_same_name(&s->fields[j].name,
+                               &e->as.struct_lit.fields[i].name) &&
+                !sema_eval_const(c, e->as.struct_lit.fields[i].value,
+                                 &out->as.aggregate.items[j])) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+/* A field of a constant: a value of an enum, a field of a constant
+   struct, or the length of a constant array or a string literal. */
+static bool const_field(struct checker *c, struct expr *e,
+                        struct const_value *out)
+{
+    struct const_value a;
+    const struct struct_field *f;
+    struct type *base;
+
+    /* A value of an enum is the number the declaration folded. Its
+       base is a type name, which carries no value of its own. */
+    if (e->as.field.enum_value != 0 && e->type->kind == TYPE_ENUM) {
+        out->kind = CONST_INT;
+        out->type = e->type;
+        out->as.integer =
+            e->type->fields[e->as.field.enum_value - 1].number;
+        return true;
+    }
+    /* A function, a static or a constant of a type is read at run
+       time. */
+    if (e->symbol != NULL) {
+        return fail_const(c, e, "this field");
+    }
+    base = e->as.field.base->type;
+    /* The value of a class literal leaves its tables and the fields
+       it does not name to lowering, as CONST_DEFAULT. A field of it
+       is therefore read only at run time. */
+    if (base->kind == TYPE_CLASS) {
+        return fail_const(c, e, "a field of a class");
+    }
+    if (types_has_fields(base)) {
+        if (!sema_eval_const(c, e->as.field.base, &a)) {
+            return false;
+        }
+        f = types_find_field(base, &e->as.field.name);
+        if (f == NULL || a.kind != CONST_STRUCT ||
+            (size_t)(f - base->fields) >= a.as.aggregate.count) {
+            return fail_const(c, e, "this field");
+        }
+        *out = a.as.aggregate.items[f - base->fields];
+        return true;
+    }
+    if (sema_name_is(&e->as.field.name, "len") &&
+        base->kind == TYPE_ARRAY &&
+        base->length_of != NULL) {
+        return fail_const(c, e, "the length of an array from `size_of`");
+    }
+    /* The base of .len is a constant array or a string literal. */
+    if (sema_name_is(&e->as.field.name, "len") &&
+        base->kind == TYPE_ARRAY &&
+        !sema_eval_const(c, e->as.field.base, &a)) {
+        return false;
+    }
+    if (sema_name_is(&e->as.field.name, "len") &&
+        (base->kind == TYPE_ARRAY ||
+         e->as.field.base->kind == EXPR_STRING)) {
+        out->kind = CONST_INT;
+        out->as.integer = base->kind == TYPE_ARRAY
+                              ? base->length
+                              : e->as.field.base->as.text.length;
+        return true;
+    }
+    return fail_const(c, e, "this field");
+}
+
+/* An element of a constant array at a constant index. */
+static bool const_index(struct checker *c, struct expr *e,
+                        struct const_value *out)
+{
+    struct const_value a;
+    struct const_value b;
+
+    if (e->as.index.base->type->kind != TYPE_ARRAY) {
+        return fail_const(c, e, "indexing anything but a constant array");
+    }
+    if (!sema_eval_const(c, e->as.index.base, &a) ||
+        !sema_eval_const(c, e->as.index.index, &b)) {
+        return false;
+    }
+    if (b.kind == CONST_SYMBOLIC) {
+        return fail_const(c, e->as.index.index,
+                          "an index computed from `size_of`");
+    }
+    if (b.as.integer >= a.as.aggregate.count) {
+        sema_error_at(c, e->as.index.index->pos,
+                      "the index %lld is outside the "
+                      "constant array", (long long)b.as.integer);
+        return false;
+    }
+    *out = a.as.aggregate.items[b.as.integer];
+    return true;
+}
+
+/* The two comparisons of numbers fold, with the value in both. An
+   `lt` operator is a call and never a constant. */
+static bool const_in(struct checker *c, struct expr *e,
+                     struct const_value *out)
+{
+    struct expr *sides[3];
+    const struct type *t = e->as.in.value->type;
+    size_t i;
+
+    if (!types_is_numeric(t) && t->kind != TYPE_CHAR) {
+        return fail_const(c, e, "a call");
+    }
+    for (i = 0; i < 3; i++) {
+        sides[i] = sema_new_node(c, EXPR_BINARY, e->pos);
+        sides[i]->type = sema_builtin(c, TYPE_BOOL);
+    }
+    sides[0]->as.binary.op = TOKEN_GE;
+    sides[0]->as.binary.left = e->as.in.value;
+    sides[0]->as.binary.right = e->as.in.low;
+    sides[1]->as.binary.op = TOKEN_LT;
+    sides[1]->as.binary.left = e->as.in.value;
+    sides[1]->as.binary.right = e->as.in.high;
+    sides[2]->as.binary.op = TOKEN_AND_AND;
+    sides[2]->as.binary.left = sides[0];
+    sides[2]->as.binary.right = sides[1];
+    return sema_eval_const(c, sides[2], out);
+}
+
 /* Evaluate a checked expression. The expression must use only what
    chapter 2 allows in a constant. */
 bool sema_eval_const(struct checker *c, struct expr *e,
                      struct const_value *out)
 {
-    struct const_value a;
-    struct const_value b;
-    size_t i;
-
     memset(out, 0, sizeof *out);
     out->type = e->type;
     switch (e->kind) {
@@ -440,415 +938,27 @@ bool sema_eval_const(struct checker *c, struct expr *e,
         return !sema_is_error(key.of);
     }
     case EXPR_CAST:
-        if (!sema_eval_const(c, e->as.cast.operand, &a)) {
-            return false;
-        }
-        out->type = e->type;
-        if (a.kind == CONST_SYMBOLIC) {
-            if (!types_is_integer(e->type)) {
-                sema_error_at(c, e->pos,
-                              "a value computed from `size_of` converts "
-                              "only to an integer type in a constant "
-                              "expression");
-                return false;
-            }
-            return symbolic_value(c, out, SYMBOLIC_CAST, TOKEN_AS, &a, NULL);
-        }
-        if (e->type->kind == TYPE_F16) {
-            /* The runtime's own rounding, so a constant and a computed
-               value of one f32 are the same sixteen bits. */
-            out->kind = CONST_FLOAT;
-            out->as.floating =
-                anti_rt_f16_widen(anti_rt_f16_narrow((float)a.as.floating));
-        } else if (types_is_float(e->type)) {
-            out->kind = CONST_FLOAT;
-            out->as.floating = a.kind == CONST_FLOAT ? a.as.floating
-                               : types_is_signed(a.type)
-                                   ? (double)sema_signed_bits(a.as.integer)
-                                   : (double)a.as.integer;
-            if (e->type->kind == TYPE_F32) {
-                out->as.floating = (float)out->as.floating;
-            }
-        } else if (types_is_integer(e->type)) {
-            out->kind = CONST_INT;
-            if (a.kind == CONST_FLOAT) {
-                if (reports_undefined(c, e, e->type, &a, NULL)) {
-                    return false;
-                }
-                out->as.integer = types_is_signed(e->type)
-                                      ? (uint64_t)(int64_t)a.as.floating
-                                      : (uint64_t)a.as.floating;
-            } else if (a.kind == CONST_BOOL) {
-                out->as.integer = a.as.boolean ? 1 : 0;
-            } else if (a.kind == CONST_CHAR) {
-                out->as.integer = a.as.character;
-            } else {
-                out->as.integer = a.as.integer;
-            }
-            wrap(out);
-        } else if (e->type->kind == TYPE_CHAR) {
-            out->kind = CONST_CHAR;
-            out->as.character = (uint32_t)a.as.integer;
-        } else {
-            return fail_const(c, e, "a pointer conversion");
-        }
-        return fits_every_target(c, e, out);
+        return const_as(c, e, out);
     case EXPR_UNARY:
-        if (e->as.unary.op == TOKEN_AMP || e->as.unary.op == TOKEN_STAR) {
-            return fail_const(c, e, "an address or a dereference");
-        }
-        if (!sema_eval_const(c, e->as.unary.operand, &a)) {
-            return false;
-        }
-        if (a.kind == CONST_SYMBOLIC) {
-            return symbolic_value(c, out, SYMBOLIC_UNARY, e->as.unary.op, &a,
-                                  NULL);
-        }
-        *out = a;
-        out->type = e->type;
-        if (e->as.unary.op == TOKEN_BANG) {
-            out->as.boolean = !a.as.boolean;
-        } else if (e->as.unary.op == TOKEN_TILDE) {
-            out->as.integer = ~a.as.integer;
-            wrap(out);
-        } else if (a.kind == CONST_FLOAT) {
-            out->as.floating = -a.as.floating;
-        } else {
-            out->as.integer = (uint64_t)0 - a.as.integer;
-            wrap(out);
-        }
-        return fits_every_target(c, e, out);
-    case EXPR_BINARY: {
-        enum token_kind op = e->as.binary.op;
-        struct type *operand = e->as.binary.left->type;
-        bool is_float;
-        bool is_signed = types_is_signed(operand);
-        int bits = types_bits(operand);
-
-        if (!sema_eval_const(c, e->as.binary.left, &a)) {
-            return false;
-        }
-        /* A constant pointer is `none`, so `??` gives its right side. */
-        if (op == TOKEN_QUESTION_QUESTION) {
-            return a.kind == CONST_NULL
-                       ? sema_eval_const(c, e->as.binary.right, out)
-                       : fail_const(c, e, "`??`");
-        }
-        if (op == TOKEN_AND_AND || op == TOKEN_OR_OR) {
-            if (a.kind != CONST_SYMBOLIC &&
-                a.as.boolean == (op == TOKEN_OR_OR)) {
-                *out = a;
-                return true;
-            }
-            if (a.kind != CONST_SYMBOLIC) {
-                return sema_eval_const(c, e->as.binary.right, out);
-            }
-        }
-        if (!sema_eval_const(c, e->as.binary.right, &b)) {
-            return false;
-        }
-        if (reports_undefined(c, e, e->type, &a, &b)) {
-            return false;
-        }
-        /* The upper half of a product of c_long has another value at
-           each width, and no symbolic value carries the signedness of
-           c_wchar. */
-        if (op == TOKEN_MUL_HIGH && types_is_target_sized(operand)) {
-            return fail_const(c, e, "`" MUL_HIGH "` of a type whose width "
-                              "the target decides");
-        }
-        if (a.kind == CONST_SYMBOLIC || b.kind == CONST_SYMBOLIC) {
-            out->type = e->type;
-            return symbolic_value(c, out, SYMBOLIC_BINARY, op, &a, &b);
-        }
-        is_float = a.kind == CONST_FLOAT;
-        out->kind = CONST_INT;
-        out->type = e->type;
-        if (e->type->kind == TYPE_BOOL) {
-            int cmp;
-            out->kind = CONST_BOOL;
-            if (is_float) {
-                cmp = a.as.floating < b.as.floating ? -1
-                      : a.as.floating > b.as.floating ? 1 : 0;
-            } else if (a.kind == CONST_NULL || b.kind == CONST_NULL) {
-                cmp = a.kind == b.kind ? 0 : 1;
-            } else if (a.kind == CONST_TEXT && b.kind == CONST_TEXT) {
-                cmp = compare_text(&a.as.text, &b.as.text);
-            } else if (is_signed) {
-                cmp = sema_signed_bits(a.as.integer) <
-                              sema_signed_bits(b.as.integer)
-                          ? -1
-                      : sema_signed_bits(a.as.integer) >
-                              sema_signed_bits(b.as.integer)
-                          ? 1
-                          : 0;
-            } else {
-                uint64_t x = a.kind == CONST_CHAR ? a.as.character
-                             : a.kind == CONST_BOOL ? a.as.boolean
-                                                    : a.as.integer;
-                uint64_t y = b.kind == CONST_CHAR ? b.as.character
-                             : b.kind == CONST_BOOL ? b.as.boolean
-                                                    : b.as.integer;
-                cmp = x < y ? -1 : x > y ? 1 : 0;
-            }
-            out->as.boolean = op == TOKEN_EQ ? cmp == 0
-                              : op == TOKEN_NE ? cmp != 0
-                              : op == TOKEN_LT ? cmp < 0
-                              : op == TOKEN_LE ? cmp <= 0
-                              : op == TOKEN_GT ? cmp > 0
-                                               : cmp >= 0;
-            if (is_float && (isnan(a.as.floating) || isnan(b.as.floating))) {
-                out->as.boolean = op == TOKEN_NE;
-            }
-            return true;
-        }
-        if (is_float) {
-            out->kind = CONST_FLOAT;
-            out->as.floating = op == TOKEN_PLUS    ? a.as.floating + b.as.floating
-                               : op == TOKEN_MINUS ? a.as.floating - b.as.floating
-                               : op == TOKEN_STAR  ? a.as.floating * b.as.floating
-                                                   : a.as.floating / b.as.floating;
-            if (e->type->kind == TYPE_F32) {
-                out->as.floating = (float)out->as.floating;
-            }
-            return true;
-        }
-        switch (op) {
-        case TOKEN_PLUS:
-        case TOKEN_PLUS_WRAP:
-            out->as.integer = a.as.integer + b.as.integer;
-            break;
-        case TOKEN_MINUS:
-        case TOKEN_MINUS_WRAP:
-            out->as.integer = a.as.integer - b.as.integer;
-            break;
-        case TOKEN_STAR:
-        case TOKEN_STAR_WRAP:
-            out->as.integer = a.as.integer * b.as.integer;
-            break;
-        /* A count at or above the width gives 0, and a negative count
-           holds its sign in the bits above, which makes it one. A
-           target-sized type computes at 64 bits and must fit the narrower
-           width, as every constant of it does. */
-        case TOKEN_SHL_WRAP:
-            out->as.integer =
-                b.as.integer >= (uint64_t)(types_is_target_sized(operand)
-                                               ? 64
-                                               : bits)
-                    ? 0
-                    : a.as.integer << b.as.integer;
-            break;
-        case TOKEN_PLUS_SAT:
-        case TOKEN_MINUS_SAT:
-        case TOKEN_STAR_SAT:
-            out->as.integer = arith_saturate(
-                op == TOKEN_PLUS_SAT ? '+' : op == TOKEN_MINUS_SAT ? '-' : '*',
-                a.as.integer, b.as.integer,
-                types_is_target_sized(operand) ? 64 : bits, is_signed);
-            break;
-        case TOKEN_MUL_HIGH:
-            out->as.integer =
-                arith_mul_high(a.as.integer, b.as.integer, bits, is_signed);
-            break;
-        case TOKEN_AMP: out->as.integer = a.as.integer & b.as.integer; break;
-        case TOKEN_PIPE: out->as.integer = a.as.integer | b.as.integer; break;
-        case TOKEN_CARET: out->as.integer = a.as.integer ^ b.as.integer; break;
-        case TOKEN_SLASH:
-        case TOKEN_PERCENT: {
-            if (is_signed) {
-                int64_t x = sema_signed_bits(a.as.integer);
-                int64_t y = sema_signed_bits(b.as.integer);
-                out->as.integer = (uint64_t)(op == TOKEN_SLASH ? x / y : x % y);
-            } else {
-                out->as.integer = op == TOKEN_SLASH ? a.as.integer / b.as.integer
-                                                    : a.as.integer % b.as.integer;
-            }
-            break;
-        }
-        case TOKEN_SHL:
-        case TOKEN_SHR:
-            if (op == TOKEN_SHL) {
-                out->as.integer = a.as.integer << b.as.integer;
-            } else if (is_signed) {
-                /* An arithmetic shift in unsigned operations, since C
-                   leaves the shift of a negative value to the
-                   implementation. */
-                out->as.integer = (a.as.integer >> 63) != 0
-                                      ? ~(~a.as.integer >> b.as.integer)
-                                      : a.as.integer >> b.as.integer;
-            } else {
-                uint64_t mask = bits == 64 ? UINT64_MAX
-                                           : ((uint64_t)1 << bits) - 1;
-                out->as.integer = (a.as.integer & mask) >> b.as.integer;
-            }
-            break;
-        default:
-            break;
-        }
-        wrap(out);
-        return fits_every_target(c, e, out);
-    }
+        return const_unary(c, e, out);
+    case EXPR_BINARY:
+        return const_binary(c, e, out);
     case EXPR_ARRAY_LIT:
-        out->kind = CONST_ARRAY;
-        out->as.aggregate.count = e->as.array_lit.count;
-        out->as.aggregate.items = arena_alloc(
-            c->arena, e->as.array_lit.count * sizeof *out->as.aggregate.items);
-        for (i = 0; i < e->as.array_lit.count; i++) {
-            if (!sema_eval_const(c, e->as.array_lit.elements[i],
-                                 &out->as.aggregate.items[i])) {
-                return false;
-            }
-        }
-        return true;
+        return const_items(c, e->as.array_lit.elements,
+                           e->as.array_lit.count, CONST_ARRAY, out);
     /* A tuple is a struct, so a constant one is the constant struct of
        its elements. */
     case EXPR_TUPLE:
-        out->kind = CONST_STRUCT;
-        out->as.aggregate.count = e->as.tuple.count;
-        out->as.aggregate.items = arena_alloc(
-            c->arena, e->as.tuple.count * sizeof *out->as.aggregate.items);
-        for (i = 0; i < e->as.tuple.count; i++) {
-            if (!sema_eval_const(c, e->as.tuple.elements[i],
-                                 &out->as.aggregate.items[i])) {
-                return false;
-            }
-        }
-        return true;
+        return const_items(c, e->as.tuple.elements, e->as.tuple.count,
+                           CONST_STRUCT, out);
     case EXPR_ARRAY_REPEAT:
-        if (e->type->length_of != NULL) {
-            return fail_const(c, e, "an array with a length from `size_of`");
-        }
-        if (const_elements(e->type) > CONST_ELEMENTS_MAX) {
-            sema_error_at(c, e->pos,
-                          "an array of more than %d elements is not a "
-                          "constant expression", CONST_ELEMENTS_MAX);
-            return false;
-        }
-        if (!sema_eval_const(c, e->as.array_repeat.value, &a)) {
-            return false;
-        }
-        out->kind = CONST_ARRAY;
-        out->as.aggregate.count = e->type->length;
-        out->as.aggregate.items = arena_alloc(
-            c->arena, e->type->length * sizeof *out->as.aggregate.items);
-        for (i = 0; i < e->type->length; i++) {
-            out->as.aggregate.items[i] = a;
-        }
-        return true;
-    case EXPR_STRUCT_LIT: {
-        struct type *s = e->type;
-        size_t j;
-        if (s->is_union) {
-            return fail_const(c, e, "a union");
-        }
-        if (s->kind == TYPE_VARIANT) {
-            return fail_const(c, e, "a variant");
-        }
-        if (s->kind == TYPE_CLASS) {
-            return class_value(c, e, s, out);
-        }
-        out->kind = CONST_STRUCT;
-        out->as.aggregate.count = s->field_count;
-        out->as.aggregate.items =
-            types_alloc_array(c->arena, s->field_count,
-                              sizeof *out->as.aggregate.items);
-        /* A zero-width bitfield holds no value and keeps a zero. */
-        for (j = 0; j < s->field_count; j++) {
-            out->as.aggregate.items[j].kind = CONST_INT;
-            out->as.aggregate.items[j].type = s->fields[j].type;
-            out->as.aggregate.items[j].as.integer = 0;
-        }
-        for (i = 0; i < e->as.struct_lit.field_count; i++) {
-            for (j = 0; j < s->field_count; j++) {
-                if (sema_same_name(&s->fields[j].name,
-                                   &e->as.struct_lit.fields[i].name)) {
-                    if (!sema_eval_const(c, e->as.struct_lit.fields[i].value,
-                                         &out->as.aggregate.items[j])) {
-                        return false;
-                    }
-                }
-            }
-        }
-        return true;
-    }
-    case EXPR_FIELD: {
-        const struct struct_field *f;
-        struct type *base;
-        /* A value of an enum is the number the declaration folded. Its
-           base is a type name, which carries no value of its own. */
-        if (e->as.field.enum_value != 0 && e->type->kind == TYPE_ENUM) {
-            out->kind = CONST_INT;
-            out->type = e->type;
-            out->as.integer =
-                e->type->fields[e->as.field.enum_value - 1].number;
-            return true;
-        }
-        /* A function, a static or a constant of a type is read at run
-           time. */
-        if (e->symbol != NULL) {
-            return fail_const(c, e, "this field");
-        }
-        base = e->as.field.base->type;
-        /* The value of a class literal leaves its tables and the fields
-           it does not name to lowering, as CONST_DEFAULT. A field of it
-           is therefore read only at run time. */
-        if (base->kind == TYPE_CLASS) {
-            return fail_const(c, e, "a field of a class");
-        }
-        if (types_has_fields(base)) {
-            if (!sema_eval_const(c, e->as.field.base, &a)) {
-                return false;
-            }
-            f = types_find_field(base, &e->as.field.name);
-            if (f == NULL || a.kind != CONST_STRUCT ||
-                (size_t)(f - base->fields) >= a.as.aggregate.count) {
-                return fail_const(c, e, "this field");
-            }
-            *out = a.as.aggregate.items[f - base->fields];
-            return true;
-        }
-        if (sema_name_is(&e->as.field.name, "len") &&
-            base->kind == TYPE_ARRAY &&
-            base->length_of != NULL) {
-            return fail_const(c, e, "the length of an array from `size_of`");
-        }
-        /* The base of .len is a constant array or a string literal. */
-        if (sema_name_is(&e->as.field.name, "len") &&
-            base->kind == TYPE_ARRAY &&
-            !sema_eval_const(c, e->as.field.base, &a)) {
-            return false;
-        }
-        if (sema_name_is(&e->as.field.name, "len") &&
-            (base->kind == TYPE_ARRAY ||
-             e->as.field.base->kind == EXPR_STRING)) {
-            out->kind = CONST_INT;
-            out->as.integer = base->kind == TYPE_ARRAY
-                                  ? base->length
-                                  : e->as.field.base->as.text.length;
-            return true;
-        }
-        return fail_const(c, e, "this field");
-    }
+        return const_repeat(c, e, out);
+    case EXPR_STRUCT_LIT:
+        return const_struct(c, e, out);
+    case EXPR_FIELD:
+        return const_field(c, e, out);
     case EXPR_INDEX:
-        if (e->as.index.base->type->kind != TYPE_ARRAY) {
-            return fail_const(c, e, "indexing anything but a constant array");
-        }
-        if (!sema_eval_const(c, e->as.index.base, &a) ||
-            !sema_eval_const(c, e->as.index.index, &b)) {
-            return false;
-        }
-        if (b.kind == CONST_SYMBOLIC) {
-            return fail_const(c, e->as.index.index,
-                              "an index computed from `size_of`");
-        }
-        if (b.as.integer >= a.as.aggregate.count) {
-            sema_error_at(c, e->as.index.index->pos,
-                          "the index %lld is outside the "
-                          "constant array", (long long)b.as.integer);
-            return false;
-        }
-        *out = a.as.aggregate.items[b.as.integer];
-        return true;
+        return const_index(c, e, out);
     case EXPR_CALL:
     case EXPR_FREE:
     case EXPR_OBJECT:
@@ -882,29 +992,8 @@ bool sema_eval_const(struct checker *c, struct expr *e,
         return fail_const(c, e, "`to_slice`");
     case EXPR_FN:
         return fail_const(c, e, "an anonymous function");
-    /* The two comparisons of numbers fold, with the value in both. An
-       `lt` operator is a call and never a constant. */
-    case EXPR_IN: {
-        struct expr *sides[3];
-        const struct type *t = e->as.in.value->type;
-        if (!types_is_numeric(t) && t->kind != TYPE_CHAR) {
-            return fail_const(c, e, "a call");
-        }
-        for (i = 0; i < 3; i++) {
-            sides[i] = sema_new_node(c, EXPR_BINARY, e->pos);
-            sides[i]->type = sema_builtin(c, TYPE_BOOL);
-        }
-        sides[0]->as.binary.op = TOKEN_GE;
-        sides[0]->as.binary.left = e->as.in.value;
-        sides[0]->as.binary.right = e->as.in.low;
-        sides[1]->as.binary.op = TOKEN_LT;
-        sides[1]->as.binary.left = e->as.in.value;
-        sides[1]->as.binary.right = e->as.in.high;
-        sides[2]->as.binary.op = TOKEN_AND_AND;
-        sides[2]->as.binary.left = sides[0];
-        sides[2]->as.binary.right = sides[1];
-        return sema_eval_const(c, sides[2], out);
-    }
+    case EXPR_IN:
+        return const_in(c, e, out);
     /* The field or the call reads through a pointer. */
     case EXPR_OPTIONAL:
         return fail_const(c, e, "`?.`");

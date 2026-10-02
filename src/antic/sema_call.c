@@ -713,70 +713,53 @@ static bool descends_or_copies(const struct type *a, const struct type *b)
     return false;
 }
 
-/* Rewrite v.f(args) into f(receiver, args). The struct T of v has no
-   field f, and the module declares a function f whose first parameter is
-   T or *T. Returns false after reporting an error. */
-static bool method_call(struct checker *c, struct expr *call)
+static bool method_call(struct checker *c, struct expr *call);
+
+/* v.f(args) where the module declares no function f that takes the
+   struct s of v first. A field of s that promotes f takes the call,
+   and otherwise it is refused. Returns false after reporting an error. */
+static bool no_method_call(struct checker *c, struct expr *call,
+                           struct type *s)
 {
     struct expr *field = call->as.call.callee;
-    struct expr *receiver = field->as.field.base;
-    struct type *t = receiver->type;
-    struct type *s = sema_struct_of(t);
-    struct symbol *f;
-    const struct item *member = s != NULL
-                                    ? reached_member(s, &field->as.field.name)
-                                    : NULL;
-    struct type *first;
-    struct expr **args;
-    struct expr *callee;
+    const struct item *hidden = reached_member(s, &field->as.field.name);
+    bool ambiguous = false;
+    const struct struct_field *through =
+        promoting_field(c, s, &field->as.field.name, &ambiguous);
 
-    if (ambiguous_member(c, field->pos, s, &field->as.field.name,
-                         "the call")) {
+    if (ambiguous) {
         return false;
     }
-    f = sema_method_symbol(c, s, &field->as.field.name);
-    if (f == NULL || (f->kind != SYMBOL_FN && f->kind != SYMBOL_EXTERN_FN) ||
-        sema_is_error(f->type) || f->type->param_count == 0 ||
-        !descends_or_copies(s, sema_struct_of(f->type->params[0]))) {
-        const struct item *hidden = reached_member(s, &field->as.field.name);
-        bool ambiguous = false;
-        const struct struct_field *through =
-            promoting_field(c, s, &field->as.field.name, &ambiguous);
-        if (ambiguous) {
-            return false;
-        }
-        if (through != NULL) {
-            promote_base(c, field, through);
-            field->as.field.base->type =
-                sema_check_expr(c, field->as.field.base, NULL);
-            return !sema_is_error(field->as.field.base->type) &&
-                   method_call(c, call);
-        }
-        if (hidden != NULL && !member_visible(c, s, hidden)) {
-            const struct type *owner = sema_declaring_class(hidden);
-            sema_error_at(c, field->pos, "`%.*s` is %s `%s`",
-                          (int)field->as.field.name.length,
-                          field->as.field.name.text,
-                          hidden->vis == VIS_PROTECTED ? "protected in"
-                                                       : "private to",
-                          sema_tn(owner != NULL ? owner : s));
-            return false;
-        }
-        sema_error_at(c, field->pos, "`%s` has no function `%.*s`", sema_tn(s),
+    if (through != NULL) {
+        promote_base(c, field, through);
+        field->as.field.base->type =
+            sema_check_expr(c, field->as.field.base, NULL);
+        return !sema_is_error(field->as.field.base->type) &&
+               method_call(c, call);
+    }
+    if (hidden != NULL && !member_visible(c, s, hidden)) {
+        const struct type *owner = sema_declaring_class(hidden);
+        sema_error_at(c, field->pos, "`%.*s` is %s `%s`",
                       (int)field->as.field.name.length,
-                      field->as.field.name.text);
+                      field->as.field.name.text,
+                      hidden->vis == VIS_PROTECTED ? "protected in"
+                                                   : "private to",
+                      sema_tn(owner != NULL ? owner : s));
         return false;
     }
-    first = sema_member_type_in(c, f->type->params[0],
-                                f->item != NULL ? f->item->owner : NULL, s);
-    /* A generic function takes the receiver as it stands, and its call
-       infers the arguments from it. */
-    if (sema_has_params(first) && f->item != NULL &&
-        f->item->type_param_count > 0 && f->item->owner == NULL) {
-        first = first->kind == TYPE_POINTER
-                    ? types_pointer(c->types, types_has_fields(t) ? t : s)
-                    : s;
-    }
+    sema_error_at(c, field->pos, "`%s` has no function `%.*s`", sema_tn(s),
+                  (int)field->as.field.name.length,
+                  field->as.field.name.text);
+    return false;
+}
+
+/* The first argument of a call of f, whose first parameter has type
+   first, on receiver of type t: the address of receiver, the value it
+   points at, or receiver itself. NULL after reporting an error. */
+static struct expr *method_receiver(struct checker *c, struct expr *receiver,
+                                    struct type *t, struct type *first,
+                                    const struct symbol *f)
+{
     /* DESIGN: a call result or a literal may be the receiver. It lives
        to the end of its statement, as a temporary of C++ does, so a
        pointer the function gives out into it stays good there. */
@@ -788,7 +771,7 @@ static bool method_call(struct checker *c, struct expr *call)
         if (!sema_is_place(receiver) && !fresh) {
             sema_error_at(c, receiver->pos, "calling `%.*s` needs a place",
                           (int)f->name.length, f->name.text);
-            return false;
+            return NULL;
         }
         if (!fresh) {
             sema_mark_address_taken(c, receiver);
@@ -804,13 +787,24 @@ static bool method_call(struct checker *c, struct expr *call)
         deref->type = first;
         receiver = deref;
     }
+    return receiver;
+}
+
+/* Refuse a call of `destruct` or `construct` that the program may not
+   write, member being the function the call names. Returns true after
+   reporting an error. */
+static bool refuse_lifecycle_call(struct checker *c, const struct expr *call,
+                                  const struct item *member)
+{
+    const struct expr *field = call->as.call.callee;
+
     /* `destruct` is the one function a program never calls itself. The
        compiler chains it, so `delete` and `destroy` are the spellings. */
     if (member != NULL && member->runtime == NULL &&
         sema_name_is(&field->as.field.name, "destruct")) {
         sema_error_at(c, field->pos, "`destruct` is never called directly, use "
                       "`delete` or `destroy`");
-        return false;
+        return true;
     }
     /* `construct` runs after a literal and after `alloc`. A base with
        arguments is reached through `self.super`, and nowhere else. The
@@ -822,7 +816,7 @@ static bool method_call(struct checker *c, struct expr *call)
         sema_error_at(c, field->pos,
                       "`construct` runs after a literal and after "
                       "`alloc`, and is not called directly");
-        return false;
+        return true;
     }
     /* DESIGN: the `construct` below calls the one of its base at the top
        of its body, as the first statement. The compiler cannot know the
@@ -834,6 +828,72 @@ static bool method_call(struct checker *c, struct expr *call)
          !sema_name_is(&c->ctx.function->name, "construct"))) {
         sema_error_at(c, field->pos, "`self.super.construct` is called at the "
                       "top of the body of `construct`");
+        return true;
+    }
+    return false;
+}
+
+/* Make call a call of f by name, with receiver before its arguments. */
+static void call_by_name(struct checker *c, struct expr *call,
+                         struct symbol *f, struct expr *receiver)
+{
+    struct expr *callee = sema_new_node(c, EXPR_NAME,
+                                        call->as.call.callee->pos);
+    struct expr **args;
+
+    callee->as.name = f->name;
+    callee->symbol = f;
+    callee->type = f->type;
+    args = types_alloc_array(c->arena, call->as.call.arg_count + 1,
+                             sizeof *args);
+    args[0] = receiver;
+    /* A call without arguments holds no array to copy. */
+    if (call->as.call.arg_count > 0) {
+        memcpy(args + 1, call->as.call.args,
+               call->as.call.arg_count * sizeof *args);
+    }
+    call->as.call.callee = callee;
+    call->as.call.args = args;
+    call->as.call.arg_count++;
+}
+
+/* Rewrite v.f(args) into f(receiver, args). The struct T of v has no
+   field f, and the module declares a function f whose first parameter is
+   T or *T. Returns false after reporting an error. */
+static bool method_call(struct checker *c, struct expr *call)
+{
+    struct expr *field = call->as.call.callee;
+    struct expr *receiver = field->as.field.base;
+    struct type *t = receiver->type;
+    struct type *s = sema_struct_of(t);
+    struct symbol *f;
+    const struct item *member = s != NULL
+                                    ? reached_member(s, &field->as.field.name)
+                                    : NULL;
+    struct type *first;
+
+    if (ambiguous_member(c, field->pos, s, &field->as.field.name,
+                         "the call")) {
+        return false;
+    }
+    f = sema_method_symbol(c, s, &field->as.field.name);
+    if (f == NULL || (f->kind != SYMBOL_FN && f->kind != SYMBOL_EXTERN_FN) ||
+        sema_is_error(f->type) || f->type->param_count == 0 ||
+        !descends_or_copies(s, sema_struct_of(f->type->params[0]))) {
+        return no_method_call(c, call, s);
+    }
+    first = sema_member_type_in(c, f->type->params[0],
+                                f->item != NULL ? f->item->owner : NULL, s);
+    /* A generic function takes the receiver as it stands, and its call
+       infers the arguments from it. */
+    if (sema_has_params(first) && f->item != NULL &&
+        f->item->type_param_count > 0 && f->item->owner == NULL) {
+        first = first->kind == TYPE_POINTER
+                    ? types_pointer(c->types, types_has_fields(t) ? t : s)
+                    : s;
+    }
+    receiver = method_receiver(c, receiver, t, first, f);
+    if (receiver == NULL || refuse_lifecycle_call(c, call, member)) {
         return false;
     }
     if (t->kind == TYPE_POINTER || names_sub_object(field->as.field.base)) {
@@ -866,21 +926,7 @@ static bool method_call(struct checker *c, struct expr *call)
         refuse_abstract_call(c, field->pos, s, member)) {
         return false;
     }
-    callee = sema_new_node(c, EXPR_NAME, field->pos);
-    callee->as.name = f->name;
-    callee->symbol = f;
-    callee->type = f->type;
-    args = types_alloc_array(c->arena, call->as.call.arg_count + 1,
-                             sizeof *args);
-    args[0] = receiver;
-    /* A call without arguments holds no array to copy. */
-    if (call->as.call.arg_count > 0) {
-        memcpy(args + 1, call->as.call.args,
-               call->as.call.arg_count * sizeof *args);
-    }
-    call->as.call.callee = callee;
-    call->as.call.args = args;
-    call->as.call.arg_count++;
+    call_by_name(c, call, f, receiver);
     return true;
 }
 
@@ -1616,348 +1662,338 @@ struct type *sema_check_call(struct checker *c, struct expr *e,
     return t;
 }
 
-static struct type *check_call(struct checker *c, struct expr *e,
-                              struct type *expected, struct generic_call *g)
-{
-    struct expr *callee = e->as.call.callee;
-    struct type *fn;
-    struct symbol *sym;
-    bool variadic = false;
-    size_t fixed;
-    size_t given;
-    size_t filled;
-    size_t i;
-    bool ok = true;
-    const struct symbol *module;
+/* What the callee of a call gives the check of its arguments. A function
+   that resolves the callee returns true when the call ends there, with
+   its type in result. */
+struct callee_form {
+    struct expr *callee;        /* the callee, after any rewrite */
+    struct type *fn;            /* the type of the callee */
+    size_t fixed;               /* the arguments a rewrite put first */
+    bool variadic;              /* takes the variadic arguments of C */
     /* `lib.instance(I)` gives `?*I`, which the function it becomes does
        not say. NULL for every other call. */
-    struct type *provided = NULL;
+    struct type *provided;
+    struct type *result;        /* the type of a call that ends early */
+};
+
+/* The calls the compiler gives a meaning of its own before any lookup:
+   an operation on an atomic field, `mul_high`, `close`, `Mutex.new()`,
+   `Regex.compile` and the functions of `anti.simd`. */
+static bool builtin_call(struct checker *c, struct expr *e,
+                         struct type *expected, struct callee_form *form)
+{
+    struct expr *callee = form->callee;
 
     /* An operation on an atomic field becomes one node of its own. */
-    if (sema_atomic_call(c, e, &fn)) {
-        return fn;
+    if (sema_atomic_call(c, e, &form->result)) {
+        return true;
     }
     if (callee->kind == EXPR_NAME && sema_name_is(&callee->as.name, MUL_HIGH) &&
         sema_lookup(c, &callee->as.name) == NULL) {
-        return check_mul_high(c, e, expected);
+        form->result = check_mul_high(c, e, expected);
+        return true;
     }
     if (callee->kind == EXPR_NAME &&
         sema_name_is(&callee->as.name, CHAN_CLOSE) &&
         sema_lookup(c, &callee->as.name) == NULL) {
-        return sema_check_close(c, e);
+        form->result = sema_check_close(c, e);
+        return true;
     }
     if (callee->kind == EXPR_FIELD &&
         callee->as.field.base->kind == EXPR_NAME &&
         sema_name_is(&callee->as.field.base->as.name, LANG_MUTEX) &&
         sema_lookup(c, &callee->as.field.base->as.name) == NULL) {
-        return sema_check_mutex_new(c, e);
+        form->result = sema_check_mutex_new(c, e);
+        return true;
     }
     if (callee->kind == EXPR_FIELD &&
         callee->as.field.base->kind == EXPR_NAME &&
         (sema_name_is(&callee->as.field.base->as.name, LANG_REGEX) ||
          sema_name_is(&callee->as.field.base->as.name, LANG_BYTE_REGEX)) &&
         sema_lookup(c, &callee->as.field.base->as.name) == NULL) {
-        return sema_check_regex_compile(c, e, expected);
+        form->result = sema_check_regex_compile(c, e, expected);
+        return true;
     }
     if (sema_simd_module_call(c, e)) {
-        return sema_check_simd_module(c, e);
+        form->result = sema_check_simd_module(c, e);
+        return true;
     }
+    return false;
+}
+
+/* `T.f(args)` and `m.T.f(args)` on the struct or class owner. */
+static bool type_callee(struct checker *c, struct expr *e,
+                        struct type *owner, struct generic_call *g,
+                        struct callee_form *form)
+{
+    struct expr *callee = form->callee;
+
+    if (types_is_simd(owner) &&
+        sema_simd_static_name(&callee->as.field.name)) {
+        form->result = sema_check_simd_static(c, e, owner);
+        return true;
+    }
+    /* `List<int>.new()` and `m.List<int>.new()` name a copy, and
+       `List.new()` leaves the arguments of the class to the call. */
+    if (callee->as.field.base->type_arg_count > 0) {
+        owner = sema_copy_of(c, owner, callee->as.field.base->type_args,
+                             callee->as.field.base->type_arg_count,
+                             callee->as.field.base->type_args_pos);
+        if (sema_is_error(owner)) {
+            form->result = owner;
+            return true;
+        }
+    }
+    g->owner = owner;
+    /* T.f(args) calls a function of the body of T, of this module or of
+       another, which takes no self. An enum value is not callable. */
+    form->fn = check_type_member(c, callee, owner);
+    callee->type = form->fn;
+    if (sema_is_error(form->fn)) {
+        form->result = form->fn;
+        return true;
+    }
+    if (form->fn->kind != TYPE_FN) {
+        sema_error_at(c, callee->pos, "`%s` is not a function",
+                      sema_tn(form->fn));
+        form->result = sema_builtin(c, TYPE_ERROR);
+        return true;
+    }
+    return false;
+}
+
+/* `v.f(args)` on a value: a function of its type, a built-in of a Mutex,
+   a simd struct or a plugin library, a hook, or a function pointer in
+   field f. */
+static bool method_callee(struct checker *c, struct expr *e,
+                          struct generic_call *g, struct callee_form *form)
+{
+    struct expr *callee = form->callee;
+    struct type *base =
+        callee->as.field.checked
+            ? callee->as.field.base->type
+            : sema_check_expr(c, callee->as.field.base, NULL);
+    struct type *s;
+
+    if (sema_is_error(base)) {
+        form->result = base;
+        return true;
+    }
+    /* `x.hash()` on a type without a function of that name is its
+       default hash, and on a type parameter the hook. */
+    if (e->as.call.arg_count == 0 &&
+        sema_name_is(&callee->as.field.name, LANG_HOOK_HASH) &&
+        (base->kind == TYPE_PARAM || sema_struct_of(base) == NULL ||
+         types_find_field(sema_struct_of(base),
+                          &callee->as.field.name) == NULL)) {
+        if (sema_hash_call(c, e, base, &form->result)) {
+            return true;
+        }
+    }
+    /* A value of a type parameter reaches the functions of the
+       interfaces its constraints name, as a pointer to the one that
+       declares the function. */
+    if (base->kind == TYPE_PARAM ||
+        (base->kind == TYPE_POINTER &&
+         base->element->kind == TYPE_PARAM)) {
+        const struct type *p =
+            base->kind == TYPE_PARAM ? base : base->element;
+        const struct type *iface =
+            sema_param_iface(p, &callee->as.field.name);
+        if (iface == NULL) {
+            sema_error_at(c, callee->pos, "`%s` has no function `%.*s`, "
+                          "since no interface of its constraints "
+                          "declares one", sema_tn(p),
+                          (int)callee->as.field.name.length,
+                          callee->as.field.name.text);
+            form->result = sema_builtin(c, TYPE_ERROR);
+            return true;
+        }
+        base = types_pointer(c->types, (struct type *)iface);
+        callee->as.field.base->param_type = callee->as.field.base->type;
+        callee->as.field.base->type = base;
+        callee->as.field.checked = true;
+    }
+    g->owner = base;
+    s = sema_struct_of(base);
+    if (types_is_mutex(s) &&
+        sema_name_is(&callee->as.field.name, MUTEX_DESTROY)) {
+        form->result = sema_check_mutex_destroy(c, e, base);
+        return true;
+    }
+    if (types_is_simd(s) &&
+        types_find_field(s, &callee->as.field.name) == NULL &&
+        sema_simd_value_name(&callee->as.field.name) &&
+        !sema_simd_method_declared(c, s, &callee->as.field.name)) {
+        form->result = sema_check_simd_value(c, e, base, s);
+        return true;
+    }
+    if (plugin_library(s) &&
+        (sema_name_is(&callee->as.field.name, "instance") ||
+         sema_name_is(&callee->as.field.name, "supports"))) {
+        bool rewritten;
+        form->provided = plugin_call(c, e, &rewritten);
+        if (!rewritten) {
+            form->result = sema_builtin(c, TYPE_ERROR);
+            return true;
+        }
+    }
+    /* DESIGN: a union has no methods, so v.f(args) on a union is
+       always a call of the function pointer in field f. */
+    if (s != NULL && !s->is_union &&
+        types_find_field(s, &callee->as.field.name) == NULL) {
+        if (!method_call(c, e)) {
+            form->result = sema_builtin(c, TYPE_ERROR);
+            return true;
+        }
+        form->callee = e->as.call.callee;
+        form->fn = form->callee->type;
+        form->fixed = 1;
+    } else {
+        callee->as.field.checked = true;
+        form->fn = sema_check_expr(c, callee, NULL);
+    }
+    return false;
+}
+
+/* `f(args)` on a name: a function, a function value, or a class whose
+   name in the place of a function builds a value. */
+static bool name_callee(struct checker *c, struct expr *e,
+                        struct type *expected, struct callee_form *form)
+{
+    struct expr *callee = form->callee;
+    struct symbol *sym = sema_lookup(c, &callee->as.name);
+
+    callee->symbol = sym;
+    /* A class name in the place of a function builds a value. */
+    if (sym != NULL && sym->kind == SYMBOL_STRUCT &&
+        sym->type != NULL && sym->type->kind == TYPE_CLASS) {
+        struct type *built = sema_generic_named(c, callee, sym->type,
+                                                &callee->as.name,
+                                                expected);
+        form->result = sema_is_error(built)
+                           ? built
+                           : check_construct(c, e, built, expected);
+        return true;
+    }
+    if (sym != NULL && sym->kind == SYMBOL_EXTERN_FN) {
+        form->fn = sym->type;
+        callee->type = form->fn;
+        form->variadic = sym->variadic;
+    } else {
+        form->fn = sema_check_expr(c, callee, NULL);
+    }
+    return false;
+}
+
+/* Resolve the callee of e by its form: a function of an imported module,
+   a function of the body of a type, a static function of `Object`, a
+   method with a pattern, a function of a value, a name, or any other
+   expression of function type. */
+static bool resolve_callee(struct checker *c, struct expr *e,
+                           struct type *expected, struct generic_call *g,
+                           struct callee_form *form)
+{
+    struct expr *callee = form->callee;
+    struct symbol *sym;
+    const struct symbol *module;
+
     if (callee->kind == EXPR_FIELD &&
         (module = sema_qualifier(c, callee)) != NULL) {
-        fn = check_qualified(c, callee, module, true);
-        callee->type = fn;
-        if (!sema_is_error(fn) && callee->symbol->kind == SYMBOL_EXTERN_FN) {
-            variadic = callee->symbol->variadic;
+        form->fn = check_qualified(c, callee, module, true);
+        callee->type = form->fn;
+        if (!sema_is_error(form->fn) &&
+            callee->symbol->kind == SYMBOL_EXTERN_FN) {
+            form->variadic = callee->symbol->variadic;
         }
-        fixed = 0;
-    } else if (callee->kind == EXPR_FIELD &&
-               callee->as.field.base->kind == EXPR_NAME &&
-               (sym = sema_lookup(c, &callee->as.field.base->as.name)) !=
-                   NULL &&
-               sym->kind == SYMBOL_STRUCT) {
+        return false;
+    }
+    if (callee->kind == EXPR_FIELD &&
+        callee->as.field.base->kind == EXPR_NAME &&
+        (sym = sema_lookup(c, &callee->as.field.base->as.name)) != NULL &&
+        sym->kind == SYMBOL_STRUCT) {
         struct type *owner = sym->item != NULL && sym->item->kind == ITEM_TYPE
                                  ? sema_alias_type(c, sym)
                                  : sym->type;
         if (sema_is_error(owner)) {
-            return owner;
+            form->result = owner;
+            return true;
         }
-        if (types_is_simd(owner) &&
-            sema_simd_static_name(&callee->as.field.name)) {
-            return sema_check_simd_static(c, e, owner);
-        }
-        /* `List<int>.new()` names a copy, and `List.new()` leaves the
-           arguments of the class to the call. */
-        if (callee->as.field.base->type_arg_count > 0) {
-            owner = sema_copy_of(c, owner, callee->as.field.base->type_args,
-                                 callee->as.field.base->type_arg_count,
-                                 callee->as.field.base->type_args_pos);
-            if (sema_is_error(owner)) {
-                return owner;
-            }
-        }
-        g->owner = owner;
-        /* T.f(args) calls a function of the body of T, which takes no
-           self. An enum value is not callable. */
-        fn = check_type_member(c, callee, owner);
-        callee->type = fn;
-        if (sema_is_error(fn)) {
-            return fn;
-        }
-        if (fn->kind != TYPE_FN) {
-            sema_error_at(c, callee->pos, "`%s` is not a function",
-                          sema_tn(fn));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        fixed = 0;
-    } else if (callee->kind == EXPR_FIELD &&
-               callee->as.field.base->kind == EXPR_NAME &&
-               sema_lookup(c, &callee->as.field.base->as.name) == NULL &&
-               sema_name_is(&callee->as.field.base->as.name, LANG_OBJECT)) {
+        return type_callee(c, e, owner, g, form);
+    }
+    if (callee->kind == EXPR_FIELD &&
+        callee->as.field.base->kind == EXPR_NAME &&
+        sema_lookup(c, &callee->as.field.base->as.name) == NULL &&
+        sema_name_is(&callee->as.field.base->as.name, LANG_OBJECT)) {
         /* `Object.f(args)` calls a static function of the root. */
         struct type *root = types_object(c->types);
-        fn = check_type_member(c, callee, root);
-        callee->type = fn;
-        if (sema_is_error(fn)) {
-            return fn;
+        form->fn = check_type_member(c, callee, root);
+        callee->type = form->fn;
+        if (sema_is_error(form->fn)) {
+            form->result = form->fn;
+            return true;
         }
-        fixed = 0;
-    } else if (callee->kind == EXPR_FIELD &&
-               callee->as.field.base->kind == EXPR_FIELD &&
-               (module = sema_qualifier(c, callee->as.field.base)) != NULL &&
-               (sym = sema_library_item(c, module->home,
-                        &callee->as.field.base->as.field.name)) != NULL &&
-               sym->kind == SYMBOL_STRUCT) {
-        struct type *owner = sym->type;
-        if (types_is_simd(owner) &&
-            sema_simd_static_name(&callee->as.field.name)) {
-            return sema_check_simd_static(c, e, owner);
-        }
-        /* `m.List<int>.new()` names a copy, as `List<int>.new()` does. */
-        if (callee->as.field.base->type_arg_count > 0) {
-            owner = sema_copy_of(c, owner, callee->as.field.base->type_args,
-                                 callee->as.field.base->type_arg_count,
-                                 callee->as.field.base->type_args_pos);
-            if (sema_is_error(owner)) {
-                return owner;
-            }
-        }
-        g->owner = owner;
-        /* `m.T.f(args)` calls a function of the body of a type of
-           another module, which takes no self. */
-        fn = check_type_member(c, callee, owner);
-        callee->type = fn;
-        if (sema_is_error(fn)) {
-            return fn;
-        }
-        if (fn->kind != TYPE_FN) {
-            sema_error_at(c, callee->pos, "`%s` is not a function",
-                          sema_tn(fn));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        fixed = 0;
-    } else if (callee->kind == EXPR_FIELD && sema_pattern_call(c, e, &fn)) {
+        return false;
+    }
+    if (callee->kind == EXPR_FIELD &&
+        callee->as.field.base->kind == EXPR_FIELD &&
+        (module = sema_qualifier(c, callee->as.field.base)) != NULL &&
+        (sym = sema_library_item(c, module->home,
+                 &callee->as.field.base->as.field.name)) != NULL &&
+        sym->kind == SYMBOL_STRUCT) {
+        return type_callee(c, e, sym->type, g, form);
+    }
+    if (callee->kind == EXPR_FIELD && sema_pattern_call(c, e, &form->fn)) {
         /* A method of `str` with a pattern, or a function of a match,
            is now a call of `anti.regex` whose arguments are checked. */
-        callee = e->as.call.callee;
-        fixed = e->as.call.arg_count;
-    } else if (callee->kind == EXPR_FIELD) {
-        struct type *base =
-            callee->as.field.checked
-                ? callee->as.field.base->type
-                : sema_check_expr(c, callee->as.field.base, NULL);
-        struct type *s;
-        if (sema_is_error(base)) {
-            return base;
-        }
-        /* `x.hash()` on a type without a function of that name is its
-           default hash, and on a type parameter the hook. */
-        if (e->as.call.arg_count == 0 &&
-            sema_name_is(&callee->as.field.name, LANG_HOOK_HASH) &&
-            (base->kind == TYPE_PARAM || sema_struct_of(base) == NULL ||
-             types_find_field(sema_struct_of(base),
-                              &callee->as.field.name) == NULL)) {
-            struct type *hashed;
-            if (sema_hash_call(c, e, base, &hashed)) {
-                return hashed;
-            }
-        }
-        /* A value of a type parameter reaches the functions of the
-           interfaces its constraints name, as a pointer to the one that
-           declares the function. */
-        if (base->kind == TYPE_PARAM ||
-            (base->kind == TYPE_POINTER &&
-             base->element->kind == TYPE_PARAM)) {
-            const struct type *p =
-                base->kind == TYPE_PARAM ? base : base->element;
-            const struct type *iface =
-                sema_param_iface(p, &callee->as.field.name);
-            if (iface == NULL) {
-                sema_error_at(c, callee->pos, "`%s` has no function `%.*s`, "
-                              "since no interface of its constraints "
-                              "declares one", sema_tn(p),
-                              (int)callee->as.field.name.length,
-                              callee->as.field.name.text);
-                return sema_builtin(c, TYPE_ERROR);
-            }
-            base = types_pointer(c->types, (struct type *)iface);
-            callee->as.field.base->param_type = callee->as.field.base->type;
-            callee->as.field.base->type = base;
-            callee->as.field.checked = true;
-        }
-        g->owner = base;
-        s = sema_struct_of(base);
-        if (types_is_mutex(s) &&
-            sema_name_is(&callee->as.field.name, MUTEX_DESTROY)) {
-            return sema_check_mutex_destroy(c, e, base);
-        }
-        if (types_is_simd(s) &&
-            types_find_field(s, &callee->as.field.name) == NULL &&
-            sema_simd_value_name(&callee->as.field.name) &&
-            !sema_simd_method_declared(c, s, &callee->as.field.name)) {
-            return sema_check_simd_value(c, e, base, s);
-        }
-        if (plugin_library(s) &&
-            (sema_name_is(&callee->as.field.name, "instance") ||
-             sema_name_is(&callee->as.field.name, "supports"))) {
-            bool rewritten;
-            provided = plugin_call(c, e, &rewritten);
-            if (!rewritten) {
-                return sema_builtin(c, TYPE_ERROR);
-            }
-        }
-        /* DESIGN: a union has no methods, so v.f(args) on a union is
-           always a call of the function pointer in field f. */
-        if (s != NULL && !s->is_union &&
-            types_find_field(s, &callee->as.field.name) == NULL) {
-            if (!method_call(c, e)) {
-                return sema_builtin(c, TYPE_ERROR);
-            }
-            callee = e->as.call.callee;
-            fn = callee->type;
-            fixed = 1;
-        } else {
-            callee->as.field.checked = true;
-            fn = sema_check_expr(c, callee, NULL);
-            fixed = 0;
-        }
-    } else if (callee->kind == EXPR_NAME) {
-        sym = sema_lookup(c, &callee->as.name);
-        callee->symbol = sym;
-        /* A class name in the place of a function builds a value. */
-        if (sym != NULL && sym->kind == SYMBOL_STRUCT &&
-            sym->type != NULL && sym->type->kind == TYPE_CLASS) {
-            struct type *built = sema_generic_named(c, callee, sym->type,
-                                                    &callee->as.name,
-                                                    expected);
-            if (sema_is_error(built)) {
-                return built;
-            }
-            return check_construct(c, e, built, expected);
-        }
-        if (sym != NULL && sym->kind == SYMBOL_EXTERN_FN) {
-            fn = sym->type;
-            callee->type = fn;
-            variadic = sym->variadic;
-        } else {
-            fn = sema_check_expr(c, callee, NULL);
-        }
-        fixed = 0;
+        form->callee = e->as.call.callee;
+        form->fixed = e->as.call.arg_count;
+        return false;
+    }
+    if (callee->kind == EXPR_FIELD) {
+        return method_callee(c, e, g, form);
+    }
+    if (callee->kind == EXPR_NAME) {
+        return name_callee(c, e, expected, form);
+    }
+    form->fn = sema_check_expr(c, callee, NULL);
+    return false;
+}
+
+/* Refuse a call of fn whose count of arguments does not fit, naming the
+   fewest or the most it takes. */
+static void refuse_count(struct checker *c, const struct expr *e,
+                         const struct symbol *sym, const struct type *fn,
+                         const struct callee_form *form)
+{
+    size_t given = e->as.call.arg_count;
+    size_t fixed = form->fixed;
+    size_t least = required_params(sym, fn->param_count);
+    size_t most = sym != NULL && sym->defaults != NULL
+                      ? sym->default_count
+                      : fn->param_count;
+    size_t n = (given < least ? least : most) - fixed;
+    const char *bound = form->variadic || (least < most && given < least)
+                            ? "at least "
+                        : least < most ? "at most "
+                                       : "";
+    if (sym != NULL) {
+        sema_error_at(c, e->pos, "`%.*s` takes %s%zu argument%s, found %zu",
+                      (int)sym->name.length, sym->name.text, bound, n,
+                      n == 1 ? "" : "s", given - fixed);
     } else {
-        fn = sema_check_expr(c, callee, NULL);
-        fixed = 0;
+        sema_error_at(c, e->pos, "the call takes %zu argument%s, found %zu",
+                      n,
+                      n == 1 ? "" : "s", given - fixed);
     }
-    if (sema_is_error(fn)) {
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    if (fn->kind != TYPE_FN) {
-        sema_error_at(c, e->pos, "cannot call `%s`", sema_tn(fn));
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    /* A `?fn(...)` holds no function until the program has checked it. */
-    fn = sema_usable_pointer(c, callee, fn);
-    sema_note_call(c, callee);
-    sym = function_symbol(callee);
-    /* The parameters at the end that the call leaves out take their
-       defaults, which are appended once the given ones are checked. */
-    given = e->as.call.arg_count;
-    filled = variadic ? 0 : filled_by_defaults(sym, given);
-    /* DESIGN: a function that can fail returns `*Error` and writes its
-       result through the last parameter. A call that gives one argument
-       fewer than the function takes leaves that place to the compiler.
-       The compiler passes the address of what the `let` declares. */
-    if (is_failing(fn) && fn->has_out && !variadic &&
-        given + filled + 1 == fn->param_count) {
-        e->as.call.out = e;
-    }
-    if (e->as.call.out != NULL) {
-        /* The out parameter is not written at the call, so the count of
-           arguments the program gave is one less. */
-    } else if (variadic ? given < fn->param_count
-                 : given + filled != fn->param_count) {
-        size_t least = required_params(sym, fn->param_count);
-        size_t most = sym != NULL && sym->defaults != NULL
-                          ? sym->default_count
-                          : fn->param_count;
-        size_t n = (given < least ? least : most) - fixed;
-        const char *bound = variadic || (least < most && given < least)
-                                ? "at least "
-                            : least < most ? "at most "
-                                           : "";
-        if (sym != NULL) {
-            sema_error_at(c, e->pos, "`%.*s` takes %s%zu argument%s, found %zu",
-                          (int)sym->name.length, sym->name.text, bound, n,
-                          n == 1 ? "" : "s", given - fixed);
-        } else {
-            sema_error_at(c, e->pos, "the call takes %zu argument%s, found %zu",
-                          n,
-                          n == 1 ? "" : "s", given - fixed);
-        }
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    /* A generic function, or a function of a generic class, takes the
-       arguments of its copy here, written or inferred. */
-    fn = sema_generic_call(c, e, fn, sym, fixed, g);
-    if (sema_is_error(fn)) {
-        return fn;
-    }
-    callee->type = fn;
-    for (i = fixed; i < given; i++) {
-        struct expr *arg = e->as.call.args[i];
-        if (i < fn->param_count) {
-            struct type *t = g->prechecked[i] != NULL
-                                 ? g->prechecked[i]
-                                 : sema_check_expr(c, arg, fn->params[i]);
-            c->lent_use = sym != NULL && sym->kind == SYMBOL_EXTERN_FN
-                              ? LENT_TO_C
-                              : LENT_PASSED;
-            ok = sema_require(c, arg, t, fn->params[i]) && ok;
-            c->lent_use = LENT_STORED;
-            sema_refuse_lock_copy(c, arg, fn->params[i]);
-            sema_check_leak_arg(c, e->as.call.callee, arg, fn->params[i]);
-            if (sym != NULL && sym->worker) {
-                sema_refuse_worker_closure(c, arg, fn->params[i]);
-            }
-            sema_note_move(c, sym, i, fixed == 1 ? e->as.call.args[0] : NULL, arg);
-        } else {
-            struct type *t = sema_check_expr(c, arg, NULL);
-            if (!sema_is_error(t) && !variadic_ok(t)) {
-                sema_error_at(c, arg->pos,
-                              "a variadic argument has type i32, u32, "
-                              "int, u64, float or a pointer, found `%s`",
-                              sema_tn(t));
-                ok = false;
-            }
-        }
-    }
-    if (!ok) {
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    if (filled > 0) {
-        append_defaults(c, e, sym, fn, given, filled);
-    }
-    if (is_failing(fn)) {
-        return check_handled(c, e, fn, expected);
-    }
+}
+
+/* The type of a call of fn that cannot fail, whose handler, if it has
+   one, guards a `?*T` result. */
+static struct type *unfailing_result(struct checker *c, struct expr *e,
+                                     const struct type *fn,
+                                     struct type *provided)
+{
     /* A call that cannot fail may still give a `?*T`, and a `catch` on
        it guards the pointer rather than an error. The `let` that holds
        it takes the handler over, so the two forms read alike. */
@@ -1996,6 +2032,105 @@ static struct type *check_call(struct checker *c, struct expr *e,
                                types_match(c->types, e->as.call.pattern));
     }
     return fn->result;
+}
+
+static struct type *check_call(struct checker *c, struct expr *e,
+                               struct type *expected, struct generic_call *g)
+{
+    struct callee_form form;
+    struct expr *callee;
+    struct type *fn;
+    struct symbol *sym;
+    size_t given;
+    size_t filled;
+    size_t i;
+    bool ok = true;
+
+    memset(&form, 0, sizeof form);
+    form.callee = e->as.call.callee;
+    if (builtin_call(c, e, expected, &form) ||
+        resolve_callee(c, e, expected, g, &form)) {
+        return form.result;
+    }
+    callee = form.callee;
+    fn = form.fn;
+    if (sema_is_error(fn)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (fn->kind != TYPE_FN) {
+        sema_error_at(c, e->pos, "cannot call `%s`", sema_tn(fn));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* A `?fn(...)` holds no function until the program has checked it. */
+    fn = sema_usable_pointer(c, callee, fn);
+    sema_note_call(c, callee);
+    sym = function_symbol(callee);
+    /* The parameters at the end that the call leaves out take their
+       defaults, which are appended once the given ones are checked. */
+    given = e->as.call.arg_count;
+    filled = form.variadic ? 0 : filled_by_defaults(sym, given);
+    /* DESIGN: a function that can fail returns `*Error` and writes its
+       result through the last parameter. A call that gives one argument
+       fewer than the function takes leaves that place to the compiler.
+       The compiler passes the address of what the `let` declares. */
+    if (is_failing(fn) && fn->has_out && !form.variadic &&
+        given + filled + 1 == fn->param_count) {
+        e->as.call.out = e;
+    }
+    /* The out parameter is not written at the call, so the count of
+       arguments the program gave is one less. */
+    if (e->as.call.out == NULL &&
+        (form.variadic ? given < fn->param_count
+                       : given + filled != fn->param_count)) {
+        refuse_count(c, e, sym, fn, &form);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* A generic function, or a function of a generic class, takes the
+       arguments of its copy here, written or inferred. */
+    fn = sema_generic_call(c, e, fn, sym, form.fixed, g);
+    if (sema_is_error(fn)) {
+        return fn;
+    }
+    callee->type = fn;
+    for (i = form.fixed; i < given; i++) {
+        struct expr *arg = e->as.call.args[i];
+        if (i < fn->param_count) {
+            struct type *t = g->prechecked[i] != NULL
+                                 ? g->prechecked[i]
+                                 : sema_check_expr(c, arg, fn->params[i]);
+            c->lent_use = sym != NULL && sym->kind == SYMBOL_EXTERN_FN
+                              ? LENT_TO_C
+                              : LENT_PASSED;
+            ok = sema_require(c, arg, t, fn->params[i]) && ok;
+            c->lent_use = LENT_STORED;
+            sema_refuse_lock_copy(c, arg, fn->params[i]);
+            sema_check_leak_arg(c, e->as.call.callee, arg, fn->params[i]);
+            if (sym != NULL && sym->worker) {
+                sema_refuse_worker_closure(c, arg, fn->params[i]);
+            }
+            sema_note_move(c, sym, i,
+                           form.fixed == 1 ? e->as.call.args[0] : NULL, arg);
+        } else {
+            struct type *t = sema_check_expr(c, arg, NULL);
+            if (!sema_is_error(t) && !variadic_ok(t)) {
+                sema_error_at(c, arg->pos,
+                              "a variadic argument has type i32, u32, "
+                              "int, u64, float or a pointer, found `%s`",
+                              sema_tn(t));
+                ok = false;
+            }
+        }
+    }
+    if (!ok) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (filled > 0) {
+        append_defaults(c, e, sym, fn, given, filled);
+    }
+    if (is_failing(fn)) {
+        return check_handled(c, e, fn, expected);
+    }
+    return unfailing_result(c, e, fn, form.provided);
 }
 
 /* DESIGN: the function or constant that the body of t declares under
@@ -2205,6 +2340,159 @@ static bool type_namespace(struct checker *c, struct expr *e,
     return false;
 }
 
+/* A name on a value of the struct s that no field of s holds: a name a
+   field of s promotes, a bound function, or a refusal. base is the type
+   of the value, s itself or a pointer to it. */
+static struct type *check_member_name(struct checker *c, struct expr *e,
+                                      struct type *base, struct type *s)
+{
+    struct name *name = &e->as.field.name;
+    const struct item *m = reached_member(s, name);
+    bool ambiguous = false;
+    const struct struct_field *through;
+
+    if (ambiguous_member(c, e->pos, s, name, "the name")) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* A function of the chain wins over a name that a field
+       promotes, as a call finds it. One without an entry of
+       the primary table is bound through its sub-object. */
+    through = m != NULL && m->kind == ITEM_FN
+                  ? NULL
+                  : promoting_field(c, s, name, &ambiguous);
+    if (ambiguous) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (through == NULL &&
+        (base->kind == TYPE_POINTER ||
+         names_sub_object(e->as.field.base))) {
+        through = table_sub_object(s, m);
+    }
+    if (through != NULL) {
+        promote_base(c, e, through);
+        return sema_check_field(c, e);
+    }
+    /* DESIGN: a public function named on a value and not
+       called is a bound function. It holds the object and the
+       entry of its table. Its type is the signature without
+       `self`, and calling it needs no receiver. */
+    if (m != NULL && m->kind == ITEM_FN && m->pub &&
+        m->symbol != NULL && m->symbol->type != NULL &&
+        m->symbol->type->kind == TYPE_FN &&
+        m->symbol->type->param_count > 0) {
+        e->symbol = m->symbol;
+        return types_bound_of(
+            c->types,
+            sema_member_type(c, m->symbol->type, s));
+    }
+    /* DESIGN: a constant of a body is reached as `T.N`, never
+       through a value, so a constant is never mistaken for a
+       field. */
+    if (m != NULL && m->kind == ITEM_CONST) {
+        sema_error_at(c, e->pos,
+                      "`%.*s` is a constant of `%s`, reached as "
+                      "`%s.%.*s`", (int)name->length, name->text,
+                      sema_tn(s),
+                      sema_tn(s), (int)name->length, name->text);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    refuse_field(c, e, s, name);
+    return sema_builtin(c, TYPE_ERROR);
+}
+
+/* A name on a value of the struct, class, tuple or variant s. base is
+   the type of the value, s itself or a pointer to it. */
+static struct type *check_struct_field(struct checker *c, struct expr *e,
+                                       struct type *base, struct type *s)
+{
+    struct name *name = &e->as.field.name;
+    const struct struct_field *f;
+
+    /* DESIGN: a variant gives its tag as a field, and `switch` alone
+       reads the fields of its cases. The union `u` is the header's,
+       and no program names it. */
+    if (s->kind == TYPE_VARIANT && !sema_name_is(name, VARIANT_TAG)) {
+        sema_error_at(c, e->pos, "a variant has the field `tag` alone, and "
+                      "`switch` reads the fields of its cases");
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (types_is_match(s) && types_find_field(s, name) == NULL) {
+        return sema_match_field(c, e, s);
+    }
+    if ((f = types_find_field(s, name)) == NULL && e->as.field.element) {
+        /* `t.0` names the element `_0`, so the message names the
+           number the program wrote. */
+        if (s->kind != TYPE_TUPLE) {
+            sema_error_at(c, e->pos, "`%s` is not a tuple, so it has no "
+                          "element `%.*s`", sema_tn(s),
+                          (int)name->length - 1,
+                          name->text + 1);
+        } else {
+            sema_error_at(c, e->pos, "`%s` has %zu elements, and `%.*s` "
+                          "is none of them", sema_tn(s), s->field_count,
+                          (int)name->length - 1, name->text + 1);
+        }
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (f == NULL) {
+        return check_member_name(c, e, base, s);
+    }
+    /* A field the checker wrote to reach a base or a promoted name
+       carries no level of its own. */
+    if (!e->as.field.promoted && !field_visible(c, s, f)) {
+        sema_error_at(c, e->pos, "`%.*s` is %s `%s`", (int)name->length,
+                      name->text,
+                      f->vis == VIS_PROTECTED ? "protected in"
+                                              : "private to",
+                      sema_tn(s));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* DESIGN: an atomic field is read and written by its own calls
+       alone, so that every access is one operation of the memory
+       model. A mention of it anywhere else is refused. */
+    if (f->atomic && !c->atomic_place) {
+        sema_error_at(c, e->pos, "`%.*s` is atomic, so it is read with "
+                      "`load()` and written with `store(v)`",
+                      (int)name->length, name->text);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (!sema_check_reach(c, e, f)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    return f->type;
+}
+
+/* A name on a value of base, which has no fields: the `len` of a str, a
+   slice or an array, the `ptr` of a str or a slice, or a refusal. */
+static struct type *check_builtin_field(struct checker *c, struct expr *e,
+                                        struct type *base)
+{
+    struct name *name = &e->as.field.name;
+
+    if (sema_name_is(name, "len") && (base->kind == TYPE_STR ||
+                                      base->kind == TYPE_SLICE ||
+                                      base->kind == TYPE_ARRAY)) {
+        return sema_builtin(c, TYPE_I64);
+    }
+    /* The `ptr` of a str and of a slice is `?*T` for the same reason:
+       neither holds an address when it holds no bytes. */
+    if (sema_name_is(name, "ptr") && base->kind == TYPE_STR) {
+        return types_pointer_nullable(c->types, sema_builtin(c, TYPE_U8));
+    }
+    if (sema_name_is(name, "ptr") && base->kind == TYPE_SLICE) {
+        struct type *ptr = types_pointer_nullable(c->types, base->element);
+        return base->lent ? types_lent(c->types, ptr) : ptr;
+    }
+    if (e->as.field.element) {
+        sema_error_at(c, e->pos, "`%s` is not a tuple, so it has no element "
+                      "`%.*s`", sema_tn(base), (int)name->length - 1,
+                      name->text + 1);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    refuse_field(c, e, base, name);
+    return sema_builtin(c, TYPE_ERROR);
+}
+
 struct type *sema_check_field(struct checker *c, struct expr *e)
 {
     const struct symbol *module = sema_qualifier(c, e);
@@ -2239,130 +2527,9 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
             (uint8_t)(1u << (f - base->fields));
     }
     if ((s = sema_struct_of(base)) != NULL) {
-        /* DESIGN: a variant gives its tag as a field, and `switch` alone
-           reads the fields of its cases. The union `u` is the header's,
-           and no program names it. */
-        if (s->kind == TYPE_VARIANT && !sema_name_is(name, VARIANT_TAG)) {
-            sema_error_at(c, e->pos, "a variant has the field `tag` alone, and "
-                          "`switch` reads the fields of its cases");
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (types_is_match(s) && types_find_field(s, name) == NULL) {
-            return sema_match_field(c, e, s);
-        }
-        if ((f = types_find_field(s, name)) == NULL && e->as.field.element) {
-            /* `t.0` names the element `_0`, so the message names the
-               number the program wrote. */
-            if (s->kind != TYPE_TUPLE) {
-                sema_error_at(c, e->pos, "`%s` is not a tuple, so it has no "
-                              "element `%.*s`", sema_tn(s),
-                              (int)name->length - 1,
-                              name->text + 1);
-            } else {
-                sema_error_at(c, e->pos, "`%s` has %zu elements, and `%.*s` "
-                              "is none of them", sema_tn(s), s->field_count,
-                              (int)name->length - 1, name->text + 1);
-            }
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (f == NULL) {
-            const struct item *m = reached_member(s, name);
-            bool ambiguous = false;
-            const struct struct_field *through;
-            if (ambiguous_member(c, e->pos, s, name, "the name")) {
-                return sema_builtin(c, TYPE_ERROR);
-            }
-            /* A function of the chain wins over a name that a field
-               promotes, as a call finds it. One without an entry of
-               the primary table is bound through its sub-object. */
-            through = m != NULL && m->kind == ITEM_FN
-                          ? NULL
-                          : promoting_field(c, s, name, &ambiguous);
-            if (ambiguous) {
-                return sema_builtin(c, TYPE_ERROR);
-            }
-            if (through == NULL &&
-                (base->kind == TYPE_POINTER ||
-                 names_sub_object(e->as.field.base))) {
-                through = table_sub_object(s, m);
-            }
-            if (through != NULL) {
-                promote_base(c, e, through);
-                return sema_check_field(c, e);
-            }
-            /* DESIGN: a public function named on a value and not
-               called is a bound function. It holds the object and the
-               entry of its table. Its type is the signature without
-               `self`, and calling it needs no receiver. */
-            if (m != NULL && m->kind == ITEM_FN && m->pub &&
-                m->symbol != NULL && m->symbol->type != NULL &&
-                m->symbol->type->kind == TYPE_FN &&
-                m->symbol->type->param_count > 0) {
-                e->symbol = m->symbol;
-                return types_bound_of(
-                    c->types,
-                    sema_member_type(c, m->symbol->type, s));
-            }
-            /* DESIGN: a constant of a body is reached as `T.N`, never
-               through a value, so a constant is never mistaken for a
-               field. */
-            if (m != NULL && m->kind == ITEM_CONST) {
-                sema_error_at(c, e->pos,
-                              "`%.*s` is a constant of `%s`, reached as "
-                              "`%s.%.*s`", (int)name->length, name->text,
-                              sema_tn(s),
-                              sema_tn(s), (int)name->length, name->text);
-                return sema_builtin(c, TYPE_ERROR);
-            }
-            refuse_field(c, e, s, name);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* A field the checker wrote to reach a base or a promoted name
-           carries no level of its own. */
-        if (!e->as.field.promoted && !field_visible(c, s, f)) {
-            sema_error_at(c, e->pos, "`%.*s` is %s `%s`", (int)name->length,
-                          name->text,
-                          f->vis == VIS_PROTECTED ? "protected in"
-                                                  : "private to",
-                          sema_tn(s));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* DESIGN: an atomic field is read and written by its own calls
-           alone, so that every access is one operation of the memory
-           model. A mention of it anywhere else is refused. */
-        if (f->atomic && !c->atomic_place) {
-            sema_error_at(c, e->pos, "`%.*s` is atomic, so it is read with "
-                          "`load()` and written with `store(v)`",
-                          (int)name->length, name->text);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (!sema_check_reach(c, e, f)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        return f->type;
+        return check_struct_field(c, e, base, s);
     }
-    if (sema_name_is(name, "len") && (base->kind == TYPE_STR ||
-                                      base->kind == TYPE_SLICE ||
-                                      base->kind == TYPE_ARRAY)) {
-        return sema_builtin(c, TYPE_I64);
-    }
-    /* The `ptr` of a str and of a slice is `?*T` for the same reason:
-       neither holds an address when it holds no bytes. */
-    if (sema_name_is(name, "ptr") && base->kind == TYPE_STR) {
-        return types_pointer_nullable(c->types, sema_builtin(c, TYPE_U8));
-    }
-    if (sema_name_is(name, "ptr") && base->kind == TYPE_SLICE) {
-        struct type *ptr = types_pointer_nullable(c->types, base->element);
-        return base->lent ? types_lent(c->types, ptr) : ptr;
-    }
-    if (e->as.field.element) {
-        sema_error_at(c, e->pos, "`%s` is not a tuple, so it has no element "
-                      "`%.*s`", sema_tn(base), (int)name->length - 1,
-                      name->text + 1);
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    refuse_field(c, e, base, name);
-    return sema_builtin(c, TYPE_ERROR);
+    return check_builtin_field(c, e, base);
 }
 
 /* DESIGN: a class literal names the fields of the whole chain directly,

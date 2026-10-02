@@ -1426,6 +1426,471 @@ static void check_select(struct checker *c, struct stmt *s)
     c->fallthrough = outer;
 }
 
+/* `try { } catch e { }` handles every failing call of the block. */
+static void check_try(struct checker *c, struct stmt *s)
+{
+    struct scope try_scope;
+    struct handler *h = &s->as.try_block.handler;
+    struct try_record record = {0};
+    struct context at = c->ctx;
+    struct context saved;
+
+    if (h->none) {
+        sema_error_at(c, h->pos, "`catch none` needs a result that can "
+                      "be `none`, and a `try` block gives none");
+        return;
+    }
+    /* The handler stands outside the block, so a failing call there
+       reaches the `try` around this one. */
+    at.in_try = &record;
+    sema_enter(c, &at, &saved);
+    sema_check_block(c, s->as.try_block.body);
+    sema_leave(c, &saved);
+    if (h->kind != HANDLE_BLOCK) {
+        return;
+    }
+    sema_enter_scope(c, &try_scope);
+    sema_declare_caught(c, h,
+                        record.error_type != NULL
+                            ? sema_caught_error(c, record.error_type)
+                            : sema_builtin(c, TYPE_ERROR));
+    sema_check_block(c, h->body);
+    sema_leave_scope(c, &try_scope);
+}
+
+/* Refuse the arm of the value values[i] when an arm before it has the
+   same value. */
+static void refuse_same_value(struct checker *c, const struct switch_arm *arm,
+                              const struct const_value *values,
+                              const bool *folded, size_t i)
+{
+    size_t j;
+
+    for (j = 0; j < i; j++) {
+        if (folded[j] && same_arm_value(&values[j], &values[i])) {
+            sema_error_at(c, arm->pos, "this value already has an arm");
+        }
+    }
+}
+
+/* DESIGN: `switch` runs one arm, and it enters the next only where
+   the arm ends in `fallthrough;`. The arms are checked in the order
+   of the text, `else` in its place, so that an assignment that ends
+   a narrowing reaches the arm a `fallthrough` enters. A switch on an
+   enum without `else` covers every value, and the message names the
+   ones it misses. */
+static void check_switch(struct checker *c, struct stmt *s)
+{
+    struct type *over = sema_check_expr(c, s->as.switch_stmt.value, NULL);
+    struct stmt *outer = c->fallthrough;
+    struct symbol *equal = NULL;
+    size_t arms = s->as.switch_stmt.count +
+                  (s->as.switch_stmt.otherwise != NULL ? 1 : 0);
+    /* The value of each arm, evaluated once. A value that is no
+       constant is reported once and compared with no other. */
+    struct const_value *values =
+        types_alloc_array(c->arena, s->as.switch_stmt.count + 1,
+                          sizeof *values);
+    bool *folded = types_alloc_array(c->arena,
+                                     s->as.switch_stmt.count + 1,
+                                     sizeof *folded);
+    bool variant;
+    size_t i;
+    size_t k;
+
+    if (s->as.switch_stmt.if_let && !sema_is_error(over) &&
+        types_is_nullable(over) &&
+        s->as.switch_stmt.arms[0].binds.length == 0) {
+        sema_if_let_none(c, s, over);
+        return;
+    }
+    if (s->as.switch_stmt.if_let && !sema_is_error(over) &&
+        over->kind != TYPE_VARIANT) {
+        sema_error_at(c, s->as.switch_stmt.value->pos, "`if let` takes a "
+                      "variant or a value that may be `none`, found `%s`",
+                      sema_tn(over));
+        over = sema_builtin(c, TYPE_ERROR);
+    }
+    if (!sema_is_error(over) && over->kind == TYPE_STR) {
+        struct symbol *bound;
+        equal = text_equal(c, s->as.switch_stmt.value->pos);
+        if (equal == NULL) {
+            over = sema_builtin(c, TYPE_ERROR);
+        } else {
+            bound = arena_alloc(c->arena, sizeof *bound);
+            bound->kind = SYMBOL_LOCAL;
+            bound->name = sema_hidden_value;
+            bound->pos = s->as.switch_stmt.value->pos;
+            bound->type = over;
+            s->as.switch_stmt.bound = bound;
+        }
+    } else if (!sema_is_error(over) && !types_is_integer(over) &&
+               over->kind != TYPE_ENUM && over->kind != TYPE_VARIANT) {
+        sema_error_at(c, s->as.switch_stmt.value->pos,
+                      "`switch` takes an enum, an integer, a `str` or a "
+                      "variant, found `%s`", sema_tn(over));
+        over = sema_builtin(c, TYPE_ERROR);
+    }
+    variant = !sema_is_error(over) && over->kind == TYPE_VARIANT;
+    for (k = 0, i = 0; k < arms; k++) {
+        struct stmt *body;
+        struct scope arm_scope;
+        bool scoped = false;
+        if (s->as.switch_stmt.otherwise != NULL &&
+            k == s->as.switch_stmt.otherwise_at) {
+            body = s->as.switch_stmt.otherwise;
+        } else if (variant) {
+            body = s->as.switch_stmt.arms[i].body;
+            scoped = check_variant_arm(c, s, i, over, &arm_scope);
+            i++;
+        } else {
+            struct switch_arm *arm = &s->as.switch_stmt.arms[i];
+            body = arm->body;
+            if (arm->binds.length > 0) {
+                sema_error_at(c, arm->binds_pos,
+                              "an arm binds the fields of "
+                              "a case in a `switch` on a variant alone");
+            }
+            folded[i] = sema_require(c, arm->value,
+                                     sema_check_expr(c, arm->value, over),
+                                     over) &&
+                        !sema_is_error(over) &&
+                        sema_eval_const(c, arm->value, &values[i]);
+            if (folded[i]) {
+                refuse_same_value(c, arm, values, folded, i);
+                if (equal != NULL) {
+                    arm->test = equal_test(c, equal,
+                                           s->as.switch_stmt.bound,
+                                           arm->value);
+                }
+            }
+            i++;
+        }
+        /* The block of an `if let` is no arm that `fallthrough`
+           leaves. */
+        c->fallthrough = s->as.switch_stmt.if_let
+                             ? NULL
+                             : sema_arm_fallthrough(body);
+        if (c->fallthrough != NULL && k + 1 == arms) {
+            sema_error_at(c, c->fallthrough->pos,
+                          "`fallthrough` in the last arm");
+        } else if (c->fallthrough != NULL && variant) {
+            refuse_fallthrough_binding(c, s, k + 1);
+        }
+        check_stmt(c, body);
+        if (scoped) {
+            sema_leave_scope(c, &arm_scope);
+        }
+    }
+    c->fallthrough = outer;
+    if (s->as.switch_stmt.otherwise == NULL && !sema_is_error(over) &&
+        over->kind == TYPE_ENUM) {
+        check_switch_covers(c, s, over, values, folded);
+    }
+    if (s->as.switch_stmt.otherwise == NULL && variant) {
+        check_cases_covered(c, s, over);
+    }
+}
+
+/* `let name = value;` and `let name: T = value;`. */
+static void check_let(struct checker *c, struct stmt *s)
+{
+    struct type *declared;
+    struct context sized;
+    struct type *t;
+    struct symbol *sym;
+
+    if (s->as.let.name_count > 0) {
+        check_destructuring_let(c, s);
+        return;
+    }
+    sema_enter_sized(c, &sized);
+    declared = s->as.let.type != NULL ? sema_resolve_type(c, s->as.let.type)
+                                      : NULL;
+    /* `let m: *T = p else { }` names the type the binding has, and
+       the value beside it is the `?*T` of the same element. */
+    if (s->as.let.otherwise != NULL && declared != NULL &&
+        (declared->kind == TYPE_POINTER || declared->kind == TYPE_FN) &&
+        !declared->nullable) {
+        t = sema_check_expr(c, s->as.let.value,
+                            types_with_none(c->types, declared));
+    } else {
+        t = sema_check_expr(c, s->as.let.value, declared);
+    }
+    sema_leave(c, &sized);
+    /* `let m = p catch fatal` and `let m = p catch e { }` guard the
+       pointer with the error forms. A call that gives a `?*T` keeps
+       its handler, and the `let` takes it over here. So does the
+       call after a `?.`, which gives a `?*T` in every case. */
+    if (s->as.let.guard.kind == HANDLE_NONE) {
+        struct expr *guarded = s->as.let.value;
+        if (guarded->kind == EXPR_OPTIONAL) {
+            guarded = guarded->as.optional.access;
+        }
+        if (guarded->kind == EXPR_CALL &&
+            guarded->as.call.guards_pointer) {
+            s->as.let.guard = guarded->as.call.handler;
+            memset(&guarded->as.call.handler, 0,
+                   sizeof guarded->as.call.handler);
+        }
+    }
+    if (s->as.let.guard.kind != HANDLE_NONE) {
+        t = check_pointer_guard(c, s, t);
+    }
+    /* `let m = p else { }` binds m as the `*T` of p's `?*T`. The
+       block runs when p is `none` and leaves, so below the `let` the
+       name holds a pointer on every path. */
+    if (s->as.let.otherwise != NULL) {
+        if (!sema_is_error(t) && !types_is_nullable(t)) {
+            sema_error_at(c, s->as.let.value->pos,
+                          "the `else` of a `let` follows a value of type "
+                          "`?*T` or `?T`, found `%s`", sema_tn(t));
+            t = sema_builtin(c, TYPE_ERROR);
+        } else if (!sema_is_error(t)) {
+            t = types_without_none(c->types, t);
+        }
+        sema_check_block(c, s->as.let.otherwise);
+        if (!block_leaves(s->as.let.otherwise)) {
+            sema_error_at(c, s->as.let.otherwise->pos,
+                          "the `else` of a `let` leaves the block it "
+                          "stands in");
+        }
+        declared = NULL;
+    }
+    /* A local of function type holds a closure in the form of two
+       words, as a parameter that does not keep its argument does. */
+    if (declared != NULL && !sema_is_error(t) && t->kind == TYPE_FN &&
+        t->context && declared->kind == TYPE_FN && !declared->context &&
+        types_fn_form(c->types, t, false, false) ==
+            types_fn_form(c->types, declared, false, false)) {
+        declared = t;
+    }
+    /* A local never owns a function. It borrows an `own fn` in the
+       form of two words, and its owner frees the snapshot. */
+    if (!sema_is_error(t) && t->kind == TYPE_FN && t->owned &&
+        (declared == NULL || declared == t)) {
+        declared = types_fn_form(c->types, t, true, true);
+    }
+    if (declared != NULL) {
+        if (sema_require(c, s->as.let.value, t, declared)) {
+            sema_bind_value(c, s->as.let.value, s->as.let.name, declared);
+        }
+        t = declared;
+    } else if (!sema_is_error(t) && t->kind == TYPE_VOID) {
+        sema_require(c, s->as.let.value, t, sema_builtin(c, TYPE_I64));
+        t = sema_builtin(c, TYPE_ERROR);
+    } else if (types_holds_lent(t)) {
+        sema_refuse_lent_tuple(c, s->as.let.value);
+        t = sema_builtin(c, TYPE_ERROR);
+    } else {
+        sema_bind_value(c, s->as.let.value, s->as.let.name, t);
+    }
+    if (sema_refuse_abstract_value(c, s->as.let.name_pos, "this local",
+                                   t)) {
+        t = sema_builtin(c, TYPE_ERROR);
+    }
+    sym = sema_declare(c, SYMBOL_LOCAL, &s->as.let.name, s->as.let.name_pos,
+                       "`%.*s` is already declared in this block");
+    sema_refuse_escaping_error(c, s->as.let.value);
+    if (sym != NULL) {
+        sym->type = t;
+        s->as.let.symbol = sym;
+        sym->holds = held_deepest(s->as.let.value);
+        sym->into_fields = sema_points_into_fields(s->as.let.value,
+                                                   c->ctx.function, t);
+        /* DESIGN: an atomic local lives in memory, where the atomic
+           operations reach it through its address. It holds what
+           one operation of the runtime moves: an integer, a `bool`,
+           a `char` or a pointer. */
+        if (s->as.let.atomic) {
+            sym->atomic = true;
+            sym->address_taken = true;
+            if (!sema_is_error(t) && !types_is_integer(t) &&
+                t->kind != TYPE_BOOL && t->kind != TYPE_CHAR &&
+                t->kind != TYPE_POINTER) {
+                sema_error_at(c, s->as.let.name_pos, "an atomic local "
+                              "holds an integer, a `bool`, a `char` or "
+                              "a pointer, found `%s`", sema_tn(t));
+            }
+        }
+        if (s->as.let.value->kind == EXPR_FN) {
+            sym->closure = s->as.let.value->as.fn;
+        }
+        /* A failing call writes its result through a pointer, so
+           the local it writes to needs a place of its own. So does
+           the pointer of `alloc T(args)`, which a handler may
+           replace. */
+        if (s->as.let.value->kind == EXPR_CALL &&
+            s->as.let.value->as.call.out != NULL) {
+            sym->address_taken = true;
+        }
+        if (s->as.let.value->kind == EXPR_ALLOC &&
+            s->as.let.value->as.alloc.value != NULL &&
+            s->as.let.value->as.alloc.value->kind == EXPR_CALL &&
+            s->as.let.value->as.alloc.value->as.call.builds != NULL) {
+            sym->address_taken = true;
+        }
+        /* A `catch` handler may put another pointer in the binding
+           with `yield`, so the binding needs a place of its own. So
+           does the value `let ... else` takes out of a `?T`, which
+           the path where it is there writes. */
+        if (s->as.let.guard.kind != HANDLE_NONE ||
+            (s->as.let.otherwise != NULL &&
+             s->as.let.value->type != NULL &&
+             s->as.let.value->type->kind == TYPE_OPTIONAL)) {
+            sym->address_taken = true;
+        }
+    }
+}
+
+/* `for` over a range, a sequence or an iterator. */
+static void check_for(struct checker *c, struct stmt *s)
+{
+    struct scope for_scope;
+    struct type *element = NULL;
+    struct symbol *loop_var;
+    size_t names = s->as.for_loop.name_count;
+
+    sema_enter_scope(c, &for_scope);
+    if (s->as.for_loop.over != NULL) {
+        struct type *over = sema_check_expr(c, s->as.for_loop.over, NULL);
+        /* A range without a name repeats its block. A slice has an
+           element to read, so it names one. */
+        if (names == 0) {
+            sema_error_at(c, s->pos,
+                          "a `for` over a slice names its element");
+        }
+        if (!sema_is_error(over) && over->kind != TYPE_SLICE &&
+            over->kind != TYPE_ARRAY) {
+            if (!sema_iterate(c, s->as.for_loop.over, over,
+                              &s->as.for_loop.hooks, &element)) {
+                sema_error_at(c, s->as.for_loop.over->pos,
+                              "`for` walks a range, a slice, an array, a "
+                              "collection or an iterator, found `%s`",
+                              sema_tn(over));
+                element = sema_builtin(c, TYPE_ERROR);
+            } else if (s->as.for_loop.by_pointer &&
+                       s->as.for_loop.hooks.place != NULL) {
+                element = s->as.for_loop.hooks.place->type;
+            } else if (s->as.for_loop.by_pointer) {
+                const struct symbol *cursor = s->as.for_loop.hooks.cursor;
+                const struct type *walker =
+                    cursor != NULL ? cursor->type : over;
+                if (walker->kind == TYPE_POINTER) {
+                    walker = walker->element;
+                }
+                if (!sema_is_error(element)) {
+                    sema_error_at(c, s->as.for_loop.over->pos,
+                                  "`for x in &e` takes each element in "
+                                  "place, and the `operator fn value` of "
+                                  "`%s` gives a copy of `%s`",
+                                  sema_tn(walker), sema_tn(element));
+                }
+                element = sema_builtin(c, TYPE_ERROR);
+            } else if (types_is_match(element) &&
+                       s->as.for_loop.over->kind == EXPR_CALL &&
+                       s->as.for_loop.over->as.call.pattern != NULL) {
+                /* The matches of a pattern literal know its
+                   groups. */
+                element = types_match(c->types,
+                                      s->as.for_loop.over->as.call.pattern);
+            }
+        } else if (!sema_is_error(over)) {
+            element = over->element;
+            if (s->as.for_loop.by_pointer) {
+                element = types_lent(c->types,
+                                     types_pointer(c->types, element));
+            }
+        } else {
+            element = over;
+        }
+    } else {
+        struct type *low = sema_check_expr(c, s->as.for_loop.low, NULL);
+        struct type *high =
+            sema_check_expr(c, s->as.for_loop.high,
+                            sema_is_error(low) ? NULL : low);
+        if (!sema_is_error(low) && !types_is_integer(low)) {
+            sema_error_at(c, s->as.for_loop.low->pos,
+                          "a `for` range counts over an integer, found "
+                          "`%s`",
+                          sema_tn(low));
+            low = sema_builtin(c, TYPE_ERROR);
+        } else if (!sema_is_error(low)) {
+            sema_require(c, s->as.for_loop.high, high, low);
+        }
+        element = low;
+    }
+    s->as.for_loop.step_value = 1;
+    if (s->as.for_loop.step != NULL) {
+        check_step(c, s, element);
+    }
+    /* DESIGN: `for i, x in items` is the destructuring of the
+       `(int, T)` of each element, and `for i, x in &items` of an
+       `(int, *T)`, so the two names follow the rule that
+       `let (a, b) = e;` follows and bind_elements gives both. One
+       name binds the element itself, and a range without a name
+       repeats its block and counts in a temporary that no body can
+       read. */
+    /* DESIGN: the loop owns every part of the value of an iterator
+       that it receives by value, and tears each down at the end of its
+       turn on every exit of the body, as a `let` is torn down. The lent
+       parts are borrowed. A value with lent parts lives whole in a
+       symbol of no scope that the loop tears down, which leaves the
+       pointers alone, and a pattern or the copy of `for x in e` reads
+       it. `for x in &e` binds such a value itself. */
+    if (s->as.for_loop.hooks.place != NULL &&
+        types_holds_lent(s->as.for_loop.hooks.place->type) &&
+        (s->as.for_loop.pattern || !s->as.for_loop.by_pointer)) {
+        struct symbol *holder = arena_alloc(c->arena, sizeof *holder);
+        holder->kind = SYMBOL_LOCAL;
+        holder->pos = s->pos;
+        holder->type = s->as.for_loop.hooks.place->type;
+        s->as.for_loop.element = holder;
+    }
+    if (s->as.for_loop.pattern) {
+        bind_pattern(c, s, element);
+    } else if (names > 1) {
+        struct type *pair[2];
+        if (names > 2 || s->as.for_loop.over == NULL ||
+            s->as.for_loop.hooks.cursor != NULL) {
+            sema_error_at(c, s->as.for_loop.names[0].pos,
+                          "`for i, x` binds the index and the element of a "
+                          "slice or an array");
+            element = sema_builtin(c, TYPE_ERROR);
+        }
+        pair[0] = sema_builtin(c, TYPE_I64);
+        pair[1] = element;
+        bind_elements(c, s->as.for_loop.names, names,
+                      sema_is_error(element)
+                          ? element
+                          : types_tuple(c->types, pair, 2),
+                      s->pos, true);
+        mark_walked(s, s->as.for_loop.names[names - 1].symbol);
+    } else if (names == 1) {
+        loop_var = sema_declare(c, SYMBOL_LOCAL,
+                                &s->as.for_loop.names[0].name,
+                                s->as.for_loop.names[0].pos,
+                                "`%.*s` is already declared in this block");
+        if (loop_var != NULL) {
+            loop_var->type = element;
+            loop_var->read_only = true;
+            s->as.for_loop.names[0].symbol = loop_var;
+            mark_walked(s, loop_var);
+        }
+    }
+    /* DESIGN: the variable of a range is a new integer on every turn,
+       so it moves as a local of the body does. The copy a walk gives
+       stays with its collection and keeps the rule of the loop. */
+    if (s->as.for_loop.over == NULL && names == 1 &&
+        s->as.for_loop.names[0].symbol != NULL) {
+        s->as.for_loop.names[0].symbol->loops = c->loop_depth + 1;
+    }
+    c->loop_depth++;
+    sema_check_block(c, s->as.for_loop.body);
+    c->loop_depth--;
+    sema_leave_scope(c, &for_scope);
+}
+
 static void check_stmt(struct checker *c, struct stmt *s)
 {
     struct type *t;
@@ -1434,152 +1899,9 @@ static void check_stmt(struct checker *c, struct stmt *s)
     struct type *result = declared_result(c);
 
     switch (s->kind) {
-    case STMT_LET: {
-        struct type *declared;
-        struct context sized;
-        if (s->as.let.name_count > 0) {
-            check_destructuring_let(c, s);
-            return;
-        }
-        sema_enter_sized(c, &sized);
-        declared = s->as.let.type != NULL ? sema_resolve_type(c, s->as.let.type)
-                                          : NULL;
-        /* `let m: *T = p else { }` names the type the binding has, and
-           the value beside it is the `?*T` of the same element. */
-        if (s->as.let.otherwise != NULL && declared != NULL &&
-            (declared->kind == TYPE_POINTER || declared->kind == TYPE_FN) &&
-            !declared->nullable) {
-            t = sema_check_expr(c, s->as.let.value,
-                                types_with_none(c->types, declared));
-        } else {
-            t = sema_check_expr(c, s->as.let.value, declared);
-        }
-        sema_leave(c, &sized);
-        /* `let m = p catch fatal` and `let m = p catch e { }` guard the
-           pointer with the error forms. A call that gives a `?*T` keeps
-           its handler, and the `let` takes it over here. So does the
-           call after a `?.`, which gives a `?*T` in every case. */
-        if (s->as.let.guard.kind == HANDLE_NONE) {
-            struct expr *guarded = s->as.let.value;
-            if (guarded->kind == EXPR_OPTIONAL) {
-                guarded = guarded->as.optional.access;
-            }
-            if (guarded->kind == EXPR_CALL &&
-                guarded->as.call.guards_pointer) {
-                s->as.let.guard = guarded->as.call.handler;
-                memset(&guarded->as.call.handler, 0,
-                       sizeof guarded->as.call.handler);
-            }
-        }
-        if (s->as.let.guard.kind != HANDLE_NONE) {
-            t = check_pointer_guard(c, s, t);
-        }
-        /* `let m = p else { }` binds m as the `*T` of p's `?*T`. The
-           block runs when p is `none` and leaves, so below the `let` the
-           name holds a pointer on every path. */
-        if (s->as.let.otherwise != NULL) {
-            if (!sema_is_error(t) && !types_is_nullable(t)) {
-                sema_error_at(c, s->as.let.value->pos,
-                              "the `else` of a `let` follows a value of type "
-                              "`?*T` or `?T`, found `%s`", sema_tn(t));
-                t = sema_builtin(c, TYPE_ERROR);
-            } else if (!sema_is_error(t)) {
-                t = types_without_none(c->types, t);
-            }
-            sema_check_block(c, s->as.let.otherwise);
-            if (!block_leaves(s->as.let.otherwise)) {
-                sema_error_at(c, s->as.let.otherwise->pos,
-                              "the `else` of a `let` leaves the block it "
-                              "stands in");
-            }
-            declared = NULL;
-        }
-        /* A local of function type holds a closure in the form of two
-           words, as a parameter that does not keep its argument does. */
-        if (declared != NULL && !sema_is_error(t) && t->kind == TYPE_FN &&
-            t->context && declared->kind == TYPE_FN && !declared->context &&
-            types_fn_form(c->types, t, false, false) ==
-                types_fn_form(c->types, declared, false, false)) {
-            declared = t;
-        }
-        /* A local never owns a function. It borrows an `own fn` in the
-           form of two words, and its owner frees the snapshot. */
-        if (!sema_is_error(t) && t->kind == TYPE_FN && t->owned &&
-            (declared == NULL || declared == t)) {
-            declared = types_fn_form(c->types, t, true, true);
-        }
-        if (declared != NULL) {
-            if (sema_require(c, s->as.let.value, t, declared)) {
-                sema_bind_value(c, s->as.let.value, s->as.let.name, declared);
-            }
-            t = declared;
-        } else if (!sema_is_error(t) && t->kind == TYPE_VOID) {
-            sema_require(c, s->as.let.value, t, sema_builtin(c, TYPE_I64));
-            t = sema_builtin(c, TYPE_ERROR);
-        } else if (types_holds_lent(t)) {
-            sema_refuse_lent_tuple(c, s->as.let.value);
-            t = sema_builtin(c, TYPE_ERROR);
-        } else {
-            sema_bind_value(c, s->as.let.value, s->as.let.name, t);
-        }
-        if (sema_refuse_abstract_value(c, s->as.let.name_pos, "this local",
-                                       t)) {
-            t = sema_builtin(c, TYPE_ERROR);
-        }
-        sym = sema_declare(c, SYMBOL_LOCAL, &s->as.let.name, s->as.let.name_pos,
-                           "`%.*s` is already declared in this block");
-        sema_refuse_escaping_error(c, s->as.let.value);
-        if (sym != NULL) {
-            sym->type = t;
-            s->as.let.symbol = sym;
-            sym->holds = held_deepest(s->as.let.value);
-            sym->into_fields = sema_points_into_fields(s->as.let.value,
-                                                       c->ctx.function, t);
-            /* DESIGN: an atomic local lives in memory, where the atomic
-               operations reach it through its address. It holds what
-               one operation of the runtime moves: an integer, a `bool`,
-               a `char` or a pointer. */
-            if (s->as.let.atomic) {
-                sym->atomic = true;
-                sym->address_taken = true;
-                if (!sema_is_error(t) && !types_is_integer(t) &&
-                    t->kind != TYPE_BOOL && t->kind != TYPE_CHAR &&
-                    t->kind != TYPE_POINTER) {
-                    sema_error_at(c, s->as.let.name_pos, "an atomic local "
-                                  "holds an integer, a `bool`, a `char` or "
-                                  "a pointer, found `%s`", sema_tn(t));
-                }
-            }
-            if (s->as.let.value->kind == EXPR_FN) {
-                sym->closure = s->as.let.value->as.fn;
-            }
-            /* A failing call writes its result through a pointer, so
-               the local it writes to needs a place of its own. So does
-               the pointer of `alloc T(args)`, which a handler may
-               replace. */
-            if (s->as.let.value->kind == EXPR_CALL &&
-                s->as.let.value->as.call.out != NULL) {
-                sym->address_taken = true;
-            }
-            if (s->as.let.value->kind == EXPR_ALLOC &&
-                s->as.let.value->as.alloc.value != NULL &&
-                s->as.let.value->as.alloc.value->kind == EXPR_CALL &&
-                s->as.let.value->as.alloc.value->as.call.builds != NULL) {
-                sym->address_taken = true;
-            }
-            /* A `catch` handler may put another pointer in the binding
-               with `yield`, so the binding needs a place of its own. So
-               does the value `let ... else` takes out of a `?T`, which
-               the path where it is there writes. */
-            if (s->as.let.guard.kind != HANDLE_NONE ||
-                (s->as.let.otherwise != NULL &&
-                 s->as.let.value->type != NULL &&
-                 s->as.let.value->type->kind == TYPE_OPTIONAL)) {
-                sym->address_taken = true;
-            }
-        }
+    case STMT_LET:
+        check_let(c, s);
         return;
-    }
     case STMT_CONST:
         sym = sema_declare(c, SYMBOL_CONST, &s->as.let.name, s->as.let.name_pos,
                            "`%.*s` is already declared in this block");
@@ -1675,304 +1997,15 @@ static void check_stmt(struct checker *c, struct stmt *s)
         sema_require(c, s->as.yielded,
                      sema_check_expr(c, s->as.yielded, c->yields), c->yields);
         return;
-    /* `try { } catch e { }` handles every failing call of the block. */
-    case STMT_TRY: {
-        struct scope try_scope;
-        struct handler *h = &s->as.try_block.handler;
-        struct try_record record = {0};
-        struct context at = c->ctx;
-        struct context saved;
-        if (h->none) {
-            sema_error_at(c, h->pos, "`catch none` needs a result that can "
-                          "be `none`, and a `try` block gives none");
-            return;
-        }
-        /* The handler stands outside the block, so a failing call there
-           reaches the `try` around this one. */
-        at.in_try = &record;
-        sema_enter(c, &at, &saved);
-        sema_check_block(c, s->as.try_block.body);
-        sema_leave(c, &saved);
-        if (h->kind != HANDLE_BLOCK) {
-            return;
-        }
-        sema_enter_scope(c, &try_scope);
-        sema_declare_caught(c, h,
-                            record.error_type != NULL
-                                ? sema_caught_error(c, record.error_type)
-                                : sema_builtin(c, TYPE_ERROR));
-        sema_check_block(c, h->body);
-        sema_leave_scope(c, &try_scope);
+    case STMT_TRY:
+        check_try(c, s);
         return;
-    }
-    case STMT_FOR: {
-        struct scope for_scope;
-        struct type *element = NULL;
-        struct symbol *loop_var;
-        size_t names = s->as.for_loop.name_count;
-        sema_enter_scope(c, &for_scope);
-        if (s->as.for_loop.over != NULL) {
-            struct type *over = sema_check_expr(c, s->as.for_loop.over, NULL);
-            /* A range without a name repeats its block. A slice has an
-               element to read, so it names one. */
-            if (names == 0) {
-                sema_error_at(c, s->pos,
-                              "a `for` over a slice names its element");
-            }
-            if (!sema_is_error(over) && over->kind != TYPE_SLICE &&
-                over->kind != TYPE_ARRAY) {
-                if (!sema_iterate(c, s->as.for_loop.over, over,
-                                  &s->as.for_loop.hooks, &element)) {
-                    sema_error_at(c, s->as.for_loop.over->pos,
-                                  "`for` walks a range, a slice, an array, a "
-                                  "collection or an iterator, found `%s`",
-                                  sema_tn(over));
-                    element = sema_builtin(c, TYPE_ERROR);
-                } else if (s->as.for_loop.by_pointer &&
-                           s->as.for_loop.hooks.place != NULL) {
-                    element = s->as.for_loop.hooks.place->type;
-                } else if (s->as.for_loop.by_pointer) {
-                    const struct symbol *cursor = s->as.for_loop.hooks.cursor;
-                    const struct type *walker =
-                        cursor != NULL ? cursor->type : over;
-                    if (walker->kind == TYPE_POINTER) {
-                        walker = walker->element;
-                    }
-                    if (!sema_is_error(element)) {
-                        sema_error_at(c, s->as.for_loop.over->pos,
-                                      "`for x in &e` takes each element in "
-                                      "place, and the `operator fn value` of "
-                                      "`%s` gives a copy of `%s`",
-                                      sema_tn(walker), sema_tn(element));
-                    }
-                    element = sema_builtin(c, TYPE_ERROR);
-                } else if (types_is_match(element) &&
-                           s->as.for_loop.over->kind == EXPR_CALL &&
-                           s->as.for_loop.over->as.call.pattern != NULL) {
-                    /* The matches of a pattern literal know its
-                       groups. */
-                    element = types_match(c->types,
-                                          s->as.for_loop.over->as.call.pattern);
-                }
-            } else if (!sema_is_error(over)) {
-                element = over->element;
-                if (s->as.for_loop.by_pointer) {
-                    element = types_lent(c->types,
-                                         types_pointer(c->types, element));
-                }
-            } else {
-                element = over;
-            }
-        } else {
-            struct type *low = sema_check_expr(c, s->as.for_loop.low, NULL);
-            struct type *high =
-                sema_check_expr(c, s->as.for_loop.high,
-                                sema_is_error(low) ? NULL : low);
-            if (!sema_is_error(low) && !types_is_integer(low)) {
-                sema_error_at(c, s->as.for_loop.low->pos,
-                              "a `for` range counts over an integer, found "
-                              "`%s`",
-                              sema_tn(low));
-                low = sema_builtin(c, TYPE_ERROR);
-            } else if (!sema_is_error(low)) {
-                sema_require(c, s->as.for_loop.high, high, low);
-            }
-            element = low;
-        }
-        s->as.for_loop.step_value = 1;
-        if (s->as.for_loop.step != NULL) {
-            check_step(c, s, element);
-        }
-        /* DESIGN: `for i, x in items` is the destructuring of the
-           `(int, T)` of each element, and `for i, x in &items` of an
-           `(int, *T)`, so the two names follow the rule that
-           `let (a, b) = e;` follows and bind_elements gives both. One
-           name binds the element itself, and a range without a name
-           repeats its block and counts in a temporary that no body can
-           read. */
-        /* DESIGN: the loop owns every part of the value of an iterator
-           that it receives by value, and tears each down at the end of its
-           turn on every exit of the body, as a `let` is torn down. The lent
-           parts are borrowed. A value with lent parts lives whole in a
-           symbol of no scope that the loop tears down, which leaves the
-           pointers alone, and a pattern or the copy of `for x in e` reads
-           it. `for x in &e` binds such a value itself. */
-        if (s->as.for_loop.hooks.place != NULL &&
-            types_holds_lent(s->as.for_loop.hooks.place->type) &&
-            (s->as.for_loop.pattern || !s->as.for_loop.by_pointer)) {
-            struct symbol *holder = arena_alloc(c->arena, sizeof *holder);
-            holder->kind = SYMBOL_LOCAL;
-            holder->pos = s->pos;
-            holder->type = s->as.for_loop.hooks.place->type;
-            s->as.for_loop.element = holder;
-        }
-        if (s->as.for_loop.pattern) {
-            bind_pattern(c, s, element);
-        } else if (names > 1) {
-            struct type *pair[2];
-            if (names > 2 || s->as.for_loop.over == NULL ||
-                s->as.for_loop.hooks.cursor != NULL) {
-                sema_error_at(c, s->as.for_loop.names[0].pos,
-                              "`for i, x` binds the index and the element of a "
-                              "slice or an array");
-                element = sema_builtin(c, TYPE_ERROR);
-            }
-            pair[0] = sema_builtin(c, TYPE_I64);
-            pair[1] = element;
-            bind_elements(c, s->as.for_loop.names, names,
-                          sema_is_error(element)
-                              ? element
-                              : types_tuple(c->types, pair, 2),
-                          s->pos, true);
-            mark_walked(s, s->as.for_loop.names[names - 1].symbol);
-        } else if (names == 1) {
-            loop_var = sema_declare(c, SYMBOL_LOCAL,
-                                    &s->as.for_loop.names[0].name,
-                                    s->as.for_loop.names[0].pos,
-                                    "`%.*s` is already declared in this block");
-            if (loop_var != NULL) {
-                loop_var->type = element;
-                loop_var->read_only = true;
-                s->as.for_loop.names[0].symbol = loop_var;
-                mark_walked(s, loop_var);
-            }
-        }
-        /* DESIGN: the variable of a range is a new integer on every turn,
-           so it moves as a local of the body does. The copy a walk gives
-           stays with its collection and keeps the rule of the loop. */
-        if (s->as.for_loop.over == NULL && names == 1 &&
-            s->as.for_loop.names[0].symbol != NULL) {
-            s->as.for_loop.names[0].symbol->loops = c->loop_depth + 1;
-        }
-        c->loop_depth++;
-        sema_check_block(c, s->as.for_loop.body);
-        c->loop_depth--;
-        sema_leave_scope(c, &for_scope);
+    case STMT_FOR:
+        check_for(c, s);
         return;
-    }
-    /* DESIGN: `switch` runs one arm, and it enters the next only where
-       the arm ends in `fallthrough;`. The arms are checked in the order
-       of the text, `else` in its place, so that an assignment that ends
-       a narrowing reaches the arm a `fallthrough` enters. A switch on an
-       enum without `else` covers every value, and the message names the
-       ones it misses. */
-    case STMT_SWITCH: {
-        struct type *over = sema_check_expr(c, s->as.switch_stmt.value, NULL);
-        struct stmt *outer = c->fallthrough;
-        struct symbol *equal = NULL;
-        size_t arms = s->as.switch_stmt.count +
-                      (s->as.switch_stmt.otherwise != NULL ? 1 : 0);
-        /* The value of each arm, evaluated once. A value that is no
-           constant is reported once and compared with no other. */
-        struct const_value *values =
-            types_alloc_array(c->arena, s->as.switch_stmt.count + 1,
-                              sizeof *values);
-        bool *folded = types_alloc_array(c->arena,
-                                         s->as.switch_stmt.count + 1,
-                                         sizeof *folded);
-        bool variant;
-        size_t k;
-        size_t j;
-        if (s->as.switch_stmt.if_let && !sema_is_error(over) &&
-            types_is_nullable(over) &&
-            s->as.switch_stmt.arms[0].binds.length == 0) {
-            sema_if_let_none(c, s, over);
-            return;
-        }
-        if (s->as.switch_stmt.if_let && !sema_is_error(over) &&
-            over->kind != TYPE_VARIANT) {
-            sema_error_at(c, s->as.switch_stmt.value->pos, "`if let` takes a "
-                          "variant or a value that may be `none`, found `%s`",
-                          sema_tn(over));
-            over = sema_builtin(c, TYPE_ERROR);
-        }
-        if (!sema_is_error(over) && over->kind == TYPE_STR) {
-            struct symbol *bound;
-            equal = text_equal(c, s->as.switch_stmt.value->pos);
-            if (equal == NULL) {
-                over = sema_builtin(c, TYPE_ERROR);
-            } else {
-                bound = arena_alloc(c->arena, sizeof *bound);
-                bound->kind = SYMBOL_LOCAL;
-                bound->name = sema_hidden_value;
-                bound->pos = s->as.switch_stmt.value->pos;
-                bound->type = over;
-                s->as.switch_stmt.bound = bound;
-            }
-        } else if (!sema_is_error(over) && !types_is_integer(over) &&
-                   over->kind != TYPE_ENUM && over->kind != TYPE_VARIANT) {
-            sema_error_at(c, s->as.switch_stmt.value->pos,
-                          "`switch` takes an enum, an integer, a `str` or a "
-                          "variant, found `%s`", sema_tn(over));
-            over = sema_builtin(c, TYPE_ERROR);
-        }
-        variant = !sema_is_error(over) && over->kind == TYPE_VARIANT;
-        for (k = 0, i = 0; k < arms; k++) {
-            struct stmt *body;
-            struct scope arm_scope;
-            bool scoped = false;
-            if (s->as.switch_stmt.otherwise != NULL &&
-                k == s->as.switch_stmt.otherwise_at) {
-                body = s->as.switch_stmt.otherwise;
-            } else if (variant) {
-                body = s->as.switch_stmt.arms[i].body;
-                scoped = check_variant_arm(c, s, i, over, &arm_scope);
-                i++;
-            } else {
-                struct switch_arm *arm = &s->as.switch_stmt.arms[i];
-                body = arm->body;
-                if (arm->binds.length > 0) {
-                    sema_error_at(c, arm->binds_pos,
-                                  "an arm binds the fields of "
-                                  "a case in a `switch` on a variant alone");
-                }
-                folded[i] = sema_require(c, arm->value,
-                                         sema_check_expr(c, arm->value, over),
-                                         over) &&
-                            !sema_is_error(over) &&
-                            sema_eval_const(c, arm->value, &values[i]);
-                if (folded[i]) {
-                    for (j = 0; j < i; j++) {
-                        if (folded[j] && same_arm_value(&values[j],
-                                                        &values[i])) {
-                            sema_error_at(c, arm->pos,
-                                          "this value already has an arm");
-                        }
-                    }
-                    if (equal != NULL) {
-                        arm->test = equal_test(c, equal,
-                                               s->as.switch_stmt.bound,
-                                               arm->value);
-                    }
-                }
-                i++;
-            }
-            /* The block of an `if let` is no arm that `fallthrough`
-               leaves. */
-            c->fallthrough = s->as.switch_stmt.if_let
-                                 ? NULL
-                                 : sema_arm_fallthrough(body);
-            if (c->fallthrough != NULL && k + 1 == arms) {
-                sema_error_at(c, c->fallthrough->pos,
-                              "`fallthrough` in the last arm");
-            } else if (c->fallthrough != NULL && variant) {
-                refuse_fallthrough_binding(c, s, k + 1);
-            }
-            check_stmt(c, body);
-            if (scoped) {
-                sema_leave_scope(c, &arm_scope);
-            }
-        }
-        c->fallthrough = outer;
-        if (s->as.switch_stmt.otherwise == NULL && !sema_is_error(over) &&
-            over->kind == TYPE_ENUM) {
-            check_switch_covers(c, s, over, values, folded);
-        }
-        if (s->as.switch_stmt.otherwise == NULL && variant) {
-            check_cases_covered(c, s, over);
-        }
+    case STMT_SWITCH:
+        check_switch(c, s);
         return;
-    }
     /* DESIGN: the switch above names the one `fallthrough;` of each arm
        that stands where the rule allows it, the last statement of the
        arm's block. It refuses one into an arm that binds the fields of a
