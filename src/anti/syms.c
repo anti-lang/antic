@@ -792,16 +792,15 @@ int syms_check(const char *conf, const char *const *symbols, size_t count)
     struct units given = {0};
     size_t absent;
     size_t i;
+    int status = 1;
 
     for (i = 0; i < count; i++) {
         if (!load_archive(symbols[i], &given)) {
-            units_free(&given);
-            return 1;
+            goto done;
         }
     }
     if (!find_binaries(conf, &binaries)) {
-        units_free(&given);
-        return 1;
+        goto done;
     }
     absent = binaries.problems;
     for (i = 0; i < binaries.count; i++) {
@@ -825,9 +824,12 @@ int syms_check(const char *conf, const char *const *symbols, size_t count)
         units_free(&beside);
         text_free(&archive);
     }
+    status = absent > 0 ? 1 : 0;
+
+done:
     binaries_free(&binaries);
     units_free(&given);
-    return absent > 0 ? 1 : 0;
+    return status;
 }
 
 /* DESIGN: the lines of a map and of a trace come from other machines.
@@ -1128,17 +1130,16 @@ int syms_resolve(const char *trace, const char *const *symbols, size_t count)
     struct text input = {0};
     const char *line;
     size_t i;
+    int status = 1;
 
     for (i = 0; i < count; i++) {
         if (!load_archive(symbols[i], &units)) {
-            units_free(&units);
-            return 1;
+            goto done;
         }
     }
     if (!files_read(trace, &input)) {
         fprintf(stderr, "anti: cannot read %s\n", trace);
-        units_free(&units);
-        return 1;
+        goto done;
     }
     line = text_cstr(&input);
     while (*line != '\0') {
@@ -1189,10 +1190,13 @@ int syms_resolve(const char *trace, const char *const *symbols, size_t count)
         fputc('\n', stdout);
         line += length + (stop != NULL ? 1 : 0);
     }
+    status = 0;
+
+done:
     texts_free(&modules);
     text_free(&input);
     units_free(&units);
-    return 0;
+    return status;
 }
 
 /* The modules a report names, each read once. A module the read failed

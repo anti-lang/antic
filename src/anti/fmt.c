@@ -1843,18 +1843,17 @@ bool fmt_source(const char *source, size_t length, struct text *out)
     struct piece_list pieces = {0};
     struct emitter e;
     size_t i;
+    bool ok = false;
 
+    memset(&e, 0, sizeof e);
     if (!antic_tokens(source, length, &arena, &tokens)) {
-        lexer_token_list_free(&tokens);
-        arena_free(&arena);
-        return false;
+        goto done;
     }
     name_unions(&tokens);
     collect(source, length, &tokens, &pieces);
     pair_braces(&pieces);
     sort_import_lists(&pieces, source);
     mark_angles(&pieces, source);
-    memset(&e, 0, sizeof e);
     e.src = source;
     e.out = out;
     reset_statement(&e);
@@ -1885,11 +1884,14 @@ bool fmt_source(const char *source, size_t length, struct text *out)
         }
     }
     flush(&e);
+    ok = true;
+
+done:
     emitter_free(&e);
     free(pieces.items);
     lexer_token_list_free(&tokens);
     arena_free(&arena);
-    return true;
+    return ok;
 }
 
 int fmt_run(const char *const *paths, size_t count, bool check)

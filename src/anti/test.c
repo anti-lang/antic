@@ -146,14 +146,13 @@ static bool compile_imports(const struct test_unit *u,
     search.library_count = 1;
     search.input = NULL;
     if (!driver_libraries(&search, &arena, &paths, &count)) {
-        arena_free(&arena);
-        return false;
+        ok = false;
+        goto done;
     }
     text_appendf(&directory, "%s/anti/test/imports/%s", work, flat);
     if (!files_make_dirs(text_cstr(&directory))) {
-        text_free(&directory);
-        arena_free(&arena);
-        return false;
+        ok = false;
+        goto done;
     }
     out->items = files_array(count + 1, sizeof *out->items);
     for (i = 0; ok && i < count; i++) {
@@ -180,11 +179,13 @@ static bool compile_imports(const struct test_unit *u,
         }
         text_free(&base_path);
     }
-    text_free(&directory);
-    arena_free(&arena);
     if (!ok) {
         imports_free(out);
     }
+
+done:
+    text_free(&directory);
+    arena_free(&arena);
     return ok;
 }
 

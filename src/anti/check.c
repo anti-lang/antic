@@ -419,19 +419,19 @@ int check_run(const char *const *sources, size_t source_count,
     struct files_list found = {0};
     struct options base;
     struct options blocks;
-    const char **search;
-    const char **block_search;
+    const char **search = NULL;
+    const char **block_search = NULL;
     struct text dev_root = {0};
     struct text package = {0};
     struct text src = {0};
     struct text test = {0};
-    struct unit *units;
-    const char **path_roots;
+    struct unit *units = NULL;
+    const char **path_roots = NULL;
     size_t path_root_count;
-    size_t *order;
+    size_t *order = NULL;
     size_t targets = 1;
     size_t failed;
-    size_t count;
+    size_t count = 0;
     size_t blocks_count = 0;
     size_t blocks_failed = 0;
     size_t i;
@@ -443,28 +443,14 @@ int check_run(const char *const *sources, size_t source_count,
        files this run writes carry the name. The source and the test
        directory are search roots of the run, because the directories
        under them mirror the module paths. */
-    if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package)) {
-        text_free(&src);
-        text_free(&test);
-        text_free(&package);
-        return 1;
-    }
-    if (source_count == 0 &&
-        !project_sources(text_cstr(&src), text_cstr(&test), &found)) {
-        files_list_free(&found);
-        text_free(&src);
-        text_free(&test);
-        text_free(&package);
-        return 1;
+    if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package) ||
+        (source_count == 0 &&
+         !project_sources(text_cstr(&src), text_cstr(&test), &found)) ||
+        !files_make_dirs(work)) {
+        status = 1;
+        goto done;
     }
     count = source_count > 0 ? source_count : found.count;
-    if (!files_make_dirs(work)) {
-        files_list_free(&found);
-        text_free(&src);
-        text_free(&test);
-        text_free(&package);
-        return 1;
-    }
     units = files_array(count + 1, sizeof *units);
     order = files_array(count + 1, sizeof *order);
     path_roots = files_array(root_count + 2, sizeof *path_roots);
