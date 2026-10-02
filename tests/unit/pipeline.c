@@ -22,7 +22,49 @@ static const char *first_message(const struct diagnostics *d)
     return d->count > 0 ? d->items[0].message : "";
 }
 
+void parsed_run(struct parsed *p, const char *source)
+{
+    memset(p, 0, sizeof *p);
+    CHECK(lexer_lex(source, strlen(source), &p->arena, &p->diags,
+                    &p->tokens));
+    p->ok = parser_parse(source, &p->tokens, &p->arena, &p->diags,
+                         &p->module);
+}
+
+void parsed_release(struct parsed *p)
+{
+    lexer_token_list_free(&p->tokens);
+    diagnostics_free(&p->diags);
+    arena_free(&p->arena);
+}
+
+void parses_to(const char *source, const char *expected)
+{
+    struct parsed p;
+    struct text out = {0};
+    size_t i;
+
+    parsed_run(&p, source);
+    CHECK(p.ok);
+    for (i = 0; i < p.diags.count; i++) {
+        check_failures++;
+        fprintf(stderr, "unexpected: %d:%d: %s\n", p.diags.items[i].line,
+                p.diags.items[i].column, p.diags.items[i].message);
+    }
+    if (p.module != NULL) {
+        ast_dump(&out, p.module);
+        CHECK_STR(text_cstr(&out), expected);
+    }
+    text_free(&out);
+    parsed_release(&p);
+}
+
 void checked_run(struct checked *c, const char *source)
+{
+    checked_run_as(c, "main", source);
+}
+
+void checked_run_as(struct checked *c, const char *name, const char *source)
 {
     memset(c, 0, sizeof *c);
     types_init(&c->types, &c->arena);
@@ -36,7 +78,7 @@ void checked_run(struct checked *c, const char *source)
         check_failures++;
         return;
     }
-    c->ok = sema_check(c->module, "main", NULL, NULL, 0, &c->types, &c->arena,
+    c->ok = sema_check(c->module, name, NULL, NULL, 0, &c->types, &c->arena,
                        &c->diags, true);
 }
 

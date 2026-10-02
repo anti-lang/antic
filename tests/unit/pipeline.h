@@ -19,6 +19,23 @@
 #include "text.h"
 #include "types.h"
 
+/* A source lexed and parsed. ok is false when the parser refused it, with
+   its messages in diags. parsed_release frees p whatever the result. */
+struct parsed {
+    struct arena arena;
+    struct diagnostics diags;
+    struct token_list tokens;
+    struct module *module;
+    bool ok;
+};
+
+void parsed_run(struct parsed *p, const char *source);
+void parsed_release(struct parsed *p);
+
+/* Check that source parses without a message and that its tree, as
+   ast_dump writes it, reads expected. */
+void parses_to(const char *source, const char *expected);
+
 /* A source lexed, parsed and checked as the module main. parsed tells a
    refused parse from a refused check. */
 struct checked {
@@ -31,10 +48,12 @@ struct checked {
     bool ok;
 };
 
-/* Check source into c. A source that does not parse counts a failure and
-   prints its first message, since every test source is meant to parse.
-   checked_release frees c whatever the result. */
+/* Check source into c as the module main, or as the module name. A source
+   that does not parse counts a failure and prints its first message,
+   since every test source is meant to parse. checked_release frees c
+   whatever the result. */
 void checked_run(struct checked *c, const char *source);
+void checked_run_as(struct checked *c, const char *name, const char *source);
 void checked_release(struct checked *c);
 
 /* Print every message of d and the source they came from. */

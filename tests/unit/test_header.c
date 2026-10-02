@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "pipeline.h"
 #include "arena.h"
 #include "ast.h"
 #include "diagnostic.h"
@@ -15,31 +16,23 @@
 static bool header_text(const char *path, const char *source, bool bundled,
                         struct text *out)
 {
-    struct arena arena = {0};
-    struct diagnostics diags = {0};
-    struct token_list tokens = {0};
-    struct module *module = NULL;
-    struct types types;
+    struct checked c;
     struct interface iface;
     const struct interface *ifaces[1];
-    bool ok = true;
+    bool ok;
 
-    types_init(&types, &arena);
-    if (!lexer_lex(source, strlen(source), &arena, &diags, &tokens) ||
-        !parser_parse(source, &tokens, &arena, &diags, &module) ||
-        !sema_check(module, path, NULL, NULL, 0, &types, &arena, &diags, true)) {
+    checked_run_as(&c, path, source);
+    ok = c.ok;
+    if (c.parsed && !c.ok) {
         check_failures++;
         fprintf(stderr, "header source does not check: %s\n",
-                diags.count > 0 ? diags.items[0].message : "");
-        ok = false;
-    } else {
-        sema_interface(module, path, &arena, &iface);
+                c.diags.count > 0 ? c.diags.items[0].message : "");
+    } else if (ok) {
+        sema_interface(c.module, path, &c.arena, &iface);
         ifaces[0] = &iface;
         header_write(out, "geo", ifaces, 1, bundled);
     }
-    lexer_token_list_free(&tokens);
-    diagnostics_free(&diags);
-    arena_free(&arena);
+    checked_release(&c);
     return ok;
 }
 

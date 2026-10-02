@@ -14,26 +14,6 @@
    binds the fields of a case and covers every case, and `is`, `if let`
    and `tag` read the tag. */
 
-static void tree(const char *source, const char *expected)
-{
-    struct arena arena = {0};
-    struct diagnostics diags = {0};
-    struct token_list tokens = {0};
-    struct module *module = NULL;
-    struct text out = {0};
-
-    CHECK(lexer_lex(source, strlen(source), &arena, &diags, &tokens));
-    CHECK(parser_parse(source, &tokens, &arena, &diags, &module));
-    if (module != NULL) {
-        ast_dump(&out, module);
-        CHECK_STR(text_cstr(&out), expected);
-    }
-    text_free(&out);
-    lexer_token_list_free(&tokens);
-    diagnostics_free(&diags);
-    arena_free(&arena);
-}
-
 /* The kind of the integer under the tag of a variant of count cases
    without fields. */
 static enum type_kind tag_kind(size_t count)
@@ -81,51 +61,51 @@ void test_variant(void)
     /* The declaration names each case and its fields, and an arm names
        the case and the name that binds its fields. `if let` is a switch
        of one arm and an else. */
-    tree("packed variant Shape align(4) { Circle { r: f32 }, Empty, }\n",
-         "variant_decl Shape\n"
-         "  packed\n"
-         "  align\n"
-         "    int_lit 4\n"
-         "  case Circle\n"
-         "    field r\n"
-         "      type f32\n"
-         "  case Empty\n");
-    tree("fn f(s: Shape) { switch s { Circle c => g(c), Empty => h() } }\n",
-         "function f\n"
-         "  param s\n"
-         "    type Shape\n"
-         "  block\n"
-         "    switch_stmt\n"
-         "      ident s\n"
-         "      arm\n"
-         "        ident Circle\n"
-         "        binds c\n"
-         "        simple_stmt\n"
-         "          call\n"
-         "            ident g\n"
-         "            ident c\n"
-         "      arm\n"
-         "        ident Empty\n"
-         "        simple_stmt\n"
-         "          call\n"
-         "            ident h\n");
-    tree("fn f(s: Shape) { if let Circle c = s { g(c); } }\n",
-         "function f\n"
-         "  param s\n"
-         "    type Shape\n"
-         "  block\n"
-         "    if_let\n"
-         "      ident s\n"
-         "      arm\n"
-         "        ident Circle\n"
-         "        binds c\n"
-         "        block\n"
-         "          simple_stmt\n"
-         "            call\n"
-         "              ident g\n"
-         "              ident c\n"
-         "      else\n"
-         "        block\n");
+    parses_to("packed variant Shape align(4) { Circle { r: f32 }, Empty, }\n",
+              "variant_decl Shape\n"
+              "  packed\n"
+              "  align\n"
+              "    int_lit 4\n"
+              "  case Circle\n"
+              "    field r\n"
+              "      type f32\n"
+              "  case Empty\n");
+    parses_to("fn f(s: Shape) { switch s { Circle c => g(c), Empty => h() } }\n",
+              "function f\n"
+              "  param s\n"
+              "    type Shape\n"
+              "  block\n"
+              "    switch_stmt\n"
+              "      ident s\n"
+              "      arm\n"
+              "        ident Circle\n"
+              "        binds c\n"
+              "        simple_stmt\n"
+              "          call\n"
+              "            ident g\n"
+              "            ident c\n"
+              "      arm\n"
+              "        ident Empty\n"
+              "        simple_stmt\n"
+              "          call\n"
+              "            ident h\n");
+    parses_to("fn f(s: Shape) { if let Circle c = s { g(c); } }\n",
+              "function f\n"
+              "  param s\n"
+              "    type Shape\n"
+              "  block\n"
+              "    if_let\n"
+              "      ident s\n"
+              "      arm\n"
+              "        ident Circle\n"
+              "        binds c\n"
+              "        block\n"
+              "          simple_stmt\n"
+              "            call\n"
+              "              ident g\n"
+              "              ident c\n"
+              "      else\n"
+              "        block\n");
 
     /* Declaration, literals, a switch that covers every case, one with
        `else`, `if let`, `is` and `tag`. */

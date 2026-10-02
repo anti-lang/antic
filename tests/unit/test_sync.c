@@ -40,26 +40,6 @@ static void syntax_error(const char *source, int line, int column,
     arena_free(&arena);
 }
 
-static void tree(const char *source, const char *expected)
-{
-    struct arena arena = {0};
-    struct diagnostics diags = {0};
-    struct token_list tokens = {0};
-    struct module *module = NULL;
-    struct text out = {0};
-
-    CHECK(lexer_lex(source, strlen(source), &arena, &diags, &tokens));
-    CHECK(parser_parse(source, &tokens, &arena, &diags, &module));
-    if (module != NULL) {
-        ast_dump(&out, module);
-        CHECK_STR(text_cstr(&out), expected);
-    }
-    text_free(&out);
-    lexer_token_list_free(&tokens);
-    diagnostics_free(&diags);
-    arena_free(&arena);
-}
-
 /* The type of the first `let` of the last function of source. */
 static void let_type(const char *source, const char *expected)
 {
@@ -109,72 +89,72 @@ void test_sync(void)
     }
 
     /* `sync m { }` holds an operand and a block. */
-    tree("fn f(m: *Mutex) { sync m { g(); } }\n",
-         "function f\n"
-         "  param m\n"
-         "    type *\n"
-         "      type Mutex\n"
-         "  block\n"
-         "    sync_stmt\n"
-         "      ident m\n"
-         "      block\n"
-         "        simple_stmt\n"
-         "          call\n"
-         "            ident g\n");
+    parses_to("fn f(m: *Mutex) { sync m { g(); } }\n",
+              "function f\n"
+              "  param m\n"
+              "    type *\n"
+              "      type Mutex\n"
+              "  block\n"
+              "    sync_stmt\n"
+              "      ident m\n"
+              "      block\n"
+              "        simple_stmt\n"
+              "          call\n"
+              "            ident g\n");
     /* `chan T` is a type, `chan T(n)` makes one, and `send` and `recv`
        name their channel. */
-    tree("fn f(c: chan int) { let d = chan int(16); send(d, 1); "
-         "let v = recv(c); }\n",
-         "function f\n"
-         "  param c\n"
-         "    type chan\n"
-         "      type int\n"
-         "  block\n"
-         "    let_stmt d\n"
-         "      chan\n"
-         "        type int\n"
-         "        int_lit 16\n"
-         "    simple_stmt\n"
-         "      send\n"
-         "        ident d\n"
-         "        int_lit 1\n"
-         "    let_stmt v\n"
-         "      recv\n"
-         "        ident c\n");
+    parses_to("fn f(c: chan int) { let d = chan int(16); send(d, 1); "
+              "let v = recv(c); }\n",
+              "function f\n"
+              "  param c\n"
+              "    type chan\n"
+              "      type int\n"
+              "  block\n"
+              "    let_stmt d\n"
+              "      chan\n"
+              "        type int\n"
+              "        int_lit 16\n"
+              "    simple_stmt\n"
+              "      send\n"
+              "        ident d\n"
+              "        int_lit 1\n"
+              "    let_stmt v\n"
+              "      recv\n"
+              "        ident c\n");
     /* `select` names a channel in each arm and the name that takes what
        it receives. The name may be left out. */
-    tree("fn f(a: chan int, b: chan int) { select { a x => g(x), "
-         "b => { }, } }\n",
-         "function f\n"
-         "  param a\n"
-         "    type chan\n"
-         "      type int\n"
-         "  param b\n"
-         "    type chan\n"
-         "      type int\n"
-         "  block\n"
-         "    select_stmt\n"
-         "      arm\n"
-         "        ident a\n"
-         "        binds x\n"
-         "        simple_stmt\n"
-         "          call\n"
-         "            ident g\n"
-         "            ident x\n"
-         "      arm\n"
-         "        ident b\n"
-         "        block\n");
+    parses_to("fn f(a: chan int, b: chan int) { select { a x => g(x), "
+              "b => { }, } }\n",
+              "function f\n"
+              "  param a\n"
+              "    type chan\n"
+              "      type int\n"
+              "  param b\n"
+              "    type chan\n"
+              "      type int\n"
+              "  block\n"
+              "    select_stmt\n"
+              "      arm\n"
+              "        ident a\n"
+              "        binds x\n"
+              "        simple_stmt\n"
+              "          call\n"
+              "            ident g\n"
+              "            ident x\n"
+              "      arm\n"
+              "        ident b\n"
+              "        block\n");
     /* `destroy` names the function of a Mutex after `.`. */
-    tree("fn f(m: *Mutex) { m.destroy(); }\n",
-         "function f\n"
-         "  param m\n"
-         "    type *\n"
-         "      type Mutex\n"
-         "  block\n"
-         "    simple_stmt\n"
-         "      call\n"
-         "        field destroy\n"
-         "          ident m\n");
+    parses_to("fn f(m: *Mutex) { m.destroy(); }\n",
+              "function f\n"
+              "  param m\n"
+              "    type *\n"
+              "      type Mutex\n"
+              "  block\n"
+              "    simple_stmt\n"
+              "      call\n"
+              "        field destroy\n"
+              "          ident m\n");
     syntax_error("fn f(a: chan int) { select { a x => g(x), else => h() } }\n",
                  1, 43, "a `select` has no `else`");
     syntax_error("fn f() { select { } }\n", 1, 19,
