@@ -206,6 +206,7 @@ static void add_binary(struct binaries *list, const char *path)
 /* What the runtime configuration names: the directories of `plugins`
    and the libraries of `[injections]`, each by interface. */
 struct configuration {
+    int files;
     struct text dir;
     struct texts plugins;
     struct texts interfaces;
@@ -252,6 +253,12 @@ static bool read_configuration(struct configuration *c, const char *path,
         fprintf(stderr, "anti: " ANTI_CONF_INCLUDE_CYCLE "\n", path);
         return false;
     }
+    if (c->files == ANTI_CONF_INCLUDE_FILES) {
+        fprintf(stderr, "anti: " ANTI_CONF_INCLUDE_MANY "\n",
+                ANTI_CONF_INCLUDE_FILES, path);
+        return false;
+    }
+    c->files++;
     if (!files_read(path, &bytes)) {
         fprintf(stderr, "anti: cannot read %s\n", path);
         return false;

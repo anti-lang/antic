@@ -472,10 +472,12 @@ static char *resolve(const char *base, const char *path)
 }
 
 /* One file of the file layer, with the files that include it, so that a
-   cycle names the path it closes on. */
+   cycle names the path it closes on, and the count of the files the
+   configuration has read. */
 struct including {
     const char *path;
     const struct including *from;
+    int *files;
 };
 
 /* When a file is read. DESIGN: the slots of [injections] are filled
@@ -484,7 +486,7 @@ struct including {
    2026-09-30. */
 enum reading { AT_START, IN_MAIN };
 
-static void read_file(char *path, const struct including *from,
+static void read_file(char *path, const struct including *from, int *files,
                       enum reading when);
 
 /* Whether the key is the word, or starts with it and a dot. */
@@ -528,7 +530,7 @@ static void read_includes(const struct anti_toml *doc, const char *path,
             continue;
         }
         value = value_text(doc, i, path);
-        read_file(resolve(path, value), from, when);
+        read_file(resolve(path, value), from, from->files, when);
         free(value);
     }
 }
@@ -702,8 +704,8 @@ static void read_keys(const struct anti_toml *doc, const char *path,
 /* Read one file of the file layer and apply it: its includes first, in
    order, depth first, then its own keys. The including file therefore
    wins per key. The path is the one the caller resolved, and the reader
-   keeps it. */
-static void read_file(char *path, const struct including *from,
+   keeps it. files counts the files the configuration has read. */
+static void read_file(char *path, const struct including *from, int *files,
                       enum reading when)
 {
     struct retired *kept;
@@ -723,6 +725,10 @@ static void read_file(char *path, const struct including *from,
     if (depth > ANTI_CONF_INCLUDE_DEPTH) {
         startup_error(ANTI_CONF_INCLUDE_CYCLE, path);
     }
+    if (*files == ANTI_CONF_INCLUDE_FILES) {
+        startup_error(ANTI_CONF_INCLUDE_MANY, ANTI_CONF_INCLUDE_FILES, path);
+    }
+    (*files)++;
     errno = 0;
     bytes = anti_rt_fs_read(path, &length);
     if (bytes == NULL && errno == ENOMEM) {
@@ -746,6 +752,7 @@ static void read_file(char *path, const struct including *from,
     release();
     here.path = path;
     here.from = from;
+    here.files = files;
     read_includes(doc, path, &here, when);
     read_keys(doc, path, when);
     anti_rt_toml_free(doc);
@@ -889,17 +896,20 @@ static void help(void)
 
 void anti_rt_conf_start(void)
 {
+    int files = 0;
+
     if (help_asked) {
         help();
         exit(0);
     }
     if (conf_path != NULL) {
-        read_file(copy(conf_path, strlen(conf_path)), NULL, AT_START);
+        read_file(copy(conf_path, strlen(conf_path)), NULL, &files,
+                  AT_START);
     } else {
         char *path = environment_path();
 
         if (path != NULL) {
-            read_file(path, NULL, AT_START);
+            read_file(path, NULL, &files, AT_START);
         }
     }
     fill_injections();
@@ -911,6 +921,8 @@ void anti_rt_conf_start(void)
 
 void anti_rt_conf_configure(const unsigned char *path, int64_t length)
 {
+    int files = 0;
+
     if (!anti_rt_atomic_compare_swap(&file_read, (int64_t)sizeof file_read,
                                      0, 1)) {
         return;
@@ -922,7 +934,8 @@ void anti_rt_conf_configure(const unsigned char *path, int64_t length)
                       "byte",
                       (const char *)path);
     }
-    read_file(copy((const char *)path, (size_t)length), NULL, IN_MAIN);
+    read_file(copy((const char *)path, (size_t)length), NULL, &files,
+              IN_MAIN);
 }
 
 /* DESIGN: the count is read digit by digit against its bound, so every
