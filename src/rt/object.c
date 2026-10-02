@@ -216,8 +216,10 @@ uint64_t anti_rt_pattern_hash(const void *p)
     return x->length > 0 ? hash_run(h, x->text, (size_t)x->length) : h;
 }
 
-const struct anti_field *anti_rt_variant_case(const unsigned char *bytes,
-                                              const struct anti_descriptor *d)
+/* The record of the case that the tag of the variant at bytes names,
+   among the records of its descriptor d, or NULL. */
+static const struct anti_field *variant_case(const unsigned char *bytes,
+                                             const struct anti_descriptor *d)
 {
     uint64_t tag;
     int64_t i;
@@ -594,7 +596,7 @@ static void put_value(struct anti_builder *b, const void *bytes,
     /* A variant is an object whose one member names the case and holds
        its fields, `{"Circle":{"r":2}}`, and a `?T` is its value or null. */
     case ANTI_TYPE_VARIANT: {
-        const struct anti_field *c = anti_rt_variant_case(bytes, d);
+        const struct anti_field *c = variant_case(bytes, d);
         if (c == NULL) {
             put(b, "null");
             return;

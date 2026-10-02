@@ -110,11 +110,6 @@ struct anti_descriptor;
 int8_t anti_rt_pattern_same(const void *a, const void *b);
 uint64_t anti_rt_pattern_hash(const void *p);
 
-/* The record of the case that the tag of the variant at bytes names,
-   among the records of its descriptor d, or NULL. */
-const struct anti_field *anti_rt_variant_case(const unsigned char *bytes,
-                                              const struct anti_descriptor *d);
-
 /* The bytes of one element that a pointer or a slice of the type id
    reaches, or 0 when the id does not give them. d is the descriptor of
    a struct or a class element. */
