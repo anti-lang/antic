@@ -100,11 +100,15 @@ static void op_name(struct dumper *d, enum token_kind op)
 }
 
 /* The name at index of a table of count names, or "?" for an index the
-   table lacks. A tree read from a library file may hold any value. */
+   table lacks. A tree read from a library file may hold any value. The
+   index is an enum, which is unsigned under some ABIs and int under the
+   Microsoft one, and int64_t holds either. */
 static const char *name_in(const char *const *names, size_t count,
-                           unsigned index)
+                           int64_t index)
 {
-    return index < count && names[index] != NULL ? names[index] : "?";
+    return index >= 0 && (uint64_t)index < count && names[index] != NULL
+               ? names[index]
+               : "?";
 }
 
 static void dump_expr(struct dumper *d, int depth, const struct expr *e);

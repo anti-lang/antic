@@ -84,22 +84,7 @@ endif()
 # of its own drives that file, so the rule is read where it is written.
 include("${tools_dir}/macos-sdk.cmake")
 
-function(triple_of host out)
-    set(triples
-        "macos-arm64=arm64-apple-macos11"
-        "macos-x86_64=x86_64-apple-macos11"
-        "linux-x86_64=x86_64-unknown-linux-musl"
-        "linux-arm64=aarch64-unknown-linux-musl"
-        "windows-x86_64=x86_64-pc-windows-msvc"
-        "windows-arm64=aarch64-pc-windows-msvc")
-    foreach(row IN LISTS triples)
-        if(row MATCHES "^${host}=(.*)$")
-            set("${out}" "${CMAKE_MATCH_1}" PARENT_SCOPE)
-            return()
-        endif()
-    endforeach()
-    message(FATAL_ERROR "unknown host ${host}")
-endfunction()
+include("${tools_dir}/host-compile.cmake")
 
 # DESIGN: a Linux program of a release links the pinned sysroot and never
 # the libc of the machine that packed it, so it starts on any Linux from
@@ -136,8 +121,6 @@ include("${tools_dir}/warnings.cmake")
 # build wrote. The library of the runtime tree is not taken: it is built
 # for the default level of its target, and antic runs on every level.
 include("${root}/src/native/pcre2-files.cmake")
-include("${root}/tools/clang-release.cmake")
-antic_clang_release(clang_version clang_tag clang_page)
 set(pcre2_work "${build_dir}/native/pcre2")
 set(pcre2_files "")
 if(NOT DEFINED ANTIC)
@@ -158,7 +141,7 @@ if(NOT DEFINED ANTIC)
 endif()
 
 function(build_program host output program)
-    triple_of("${host}" triple)
+    antic_host_triple("${host}" triple)
     set(program_sources ${ANTIC_MAIN_SOURCES})
     set(program_dirs "")
     if(program STREQUAL "anti")
@@ -173,26 +156,13 @@ function(build_program host output program)
     foreach(dir IN LISTS program_dirs)
         list(APPEND program_includes -I "${root}/${dir}")
     endforeach()
-    set(common --target=${triple} -std=c11 -O2 "-ffile-prefix-map=${root}=."
-               "-DANTIC_VERSION=\"${version}\""
-               "-DANTI_CLANG_VERSION=\"${clang_version}\""
-               "-DANTI_CLANG_TAG=\"${clang_tag}\""
-               "-DANTI_CLANG_PAGE=\"${clang_page}\"")
+    antic_host_compile_options(common "${host}" "${root}" "${SYSROOT}"
+                               "${resource}" "${macos_sdk}" "${version}")
     set(link "")
     if(host MATCHES "^macos-")
-        list(APPEND common -isysroot "${macos_sdk}")
         set(link --ld-path=${LLVM_BIN}/ld64.lld)
-    elseif(host MATCHES "^linux-")
-        list(APPEND common --sysroot "${SYSROOT}/${host}")
-    else()
+    elseif(host MATCHES "^windows-")
         set(win "${SYSROOT}/${host}")
-        # antic is a Windows program too, and it takes the C runtime of
-        # the machine as the programs it compiles do.
-        list(APPEND common -fms-runtime-lib=dll
-             -isystem "${resource}/include" -isystem "${win}/crt/include"
-             -isystem "${win}/sdk/include/ucrt"
-             -isystem "${win}/sdk/include/um"
-             -isystem "${win}/sdk/include/shared")
         set(arch x86_64)
         if(host STREQUAL "windows-arm64")
             set(arch aarch64)

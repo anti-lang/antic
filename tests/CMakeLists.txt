@@ -782,6 +782,20 @@ if(NOT ANTIC_SYSTEM_COMPILER)
             "-DOS=${ANTIC_HOST_OS}"
             "-DPROGRAMS=$<TARGET_FILE:antic>,$<TARGET_FILE:anti>"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_pinned_tools.cmake")
+
+    # antic and anti compile for every Linux and Windows host with the
+    # options of a package and the warning set.
+    foreach(host linux-x86_64 linux-arm64 windows-x86_64 windows-arm64)
+        add_test(NAME host_sources_${host}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DROOT=${PROJECT_SOURCE_DIR}"
+                "-DHOST=${host}"
+                "-DCLANG=${CMAKE_C_COMPILER}"
+                "-DSYSROOT=${ANTIC_SYSROOT_DIR}"
+                "-DPCRE2_INCLUDE=${ANTIC_PCRE2_INCLUDE}"
+                "-DVERSION=${PROJECT_VERSION}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_host_sources.cmake")
+    endforeach()
 endif()
 
 file(GLOB program_sources CONFIGURE_DEPENDS
