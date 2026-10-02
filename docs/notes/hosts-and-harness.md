@@ -113,6 +113,11 @@ when started by hand.
   reader that stops at a flag reads once more after it.
 - `MallocScribble=1` fills fresh memory of macOS `malloc` with `0xaa`. A test of memory
   that must be zeroed sets it, as `program_alloc_owning` does.
+- ctest and `cmake -P` on the Mac raise the stack limit of every child to the hard
+  limit, 64 MB, and on Linux a child keeps 8 MB. Under ASan and UBSan at `-O0`,
+  `io_expr_body` of `antl_tree.c` and `walk_at` of `antl_verify.c` take about 8 KB of
+  stack each, so a walk of 1000 levels passes on the Mac and overflows on Linux. A
+  binary run by hand on the Mac gets the 8 MB of the shell, as Linux does.
 
 ## Windows traps
 
@@ -180,6 +185,12 @@ when started by hand.
 - The Windows VM answers ssh with `cmd`, not with a shell. A command with `;`
   or `&&` in it reaches the program as arguments. Send a `.cmd` file, or call
   `cmd /c` with one command.
+- A build compiles antic and anti for its own host alone. `host_sources_<host>`
+  compiles their sources for the Linux and Windows hosts with the options of a
+  package. A warning of another host's headers then fails on the Mac.
+- Run the Windows suite under `vcvarsall.bat`, as `%USERPROFILE%\test.cmd`
+  does. Without it, CMake finds no Ninja and `deps_dir` fails. The full suite
+  with `-j4` took 8 min 36 s on 2026-10-02.
 
 ## For the next session
 
