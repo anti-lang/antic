@@ -18,7 +18,13 @@
    and the default `==`, and sema_pattern.c the pattern literals and
    their calls. sema_export.c checks what crosses to C and writes the
    interface of a module, and sema_doc.c the doc warnings, which read the
-   module alone. */
+   module alone.
+
+   DESIGN: every node, type, name and list a function of the checker
+   makes lies in the arena of the checker, c->arena, which the pool of
+   types c->types allocates from as well. The arena owns it, and
+   arena_free frees all of it at once. No function here returns memory
+   that its caller frees alone. */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -338,9 +344,11 @@ struct symbol *sema_operator_symbol(struct checker *c, struct type *t,
                                     const char *text);
 /* The checked call of the `operator fn hash` that the module of the class
    t declares for it, on a value that stands for the object, or NULL when
-   the module declares none or t does not meet its constraints. */
+   the module declares none or t does not meet its constraints. The call
+   lies in the arena of the checker, which owns it. */
 struct expr *sema_class_hash_operator(struct checker *c, struct type *t,
                                       struct pos pos);
+/* The same for `operator fn eq`, on two values. */
 struct expr *sema_class_eq_operator(struct checker *c, struct type *t,
                                     struct pos pos);
 /* Whether the module of t, or t itself, gives it `operator fn text`, a
@@ -348,6 +356,8 @@ struct expr *sema_class_eq_operator(struct checker *c, struct type *t,
 bool sema_module_operator(struct checker *c, struct type *t,
                           const char *text);
 bool sema_is_iterator(struct checker *c, struct type *t);
+/* The checked call of the hook name on base with count arguments, in the
+   arena of the checker, which owns it. */
 struct expr *sema_hook_call(struct checker *c, struct expr *base,
                             const char *name, struct expr **args,
                             size_t count);
