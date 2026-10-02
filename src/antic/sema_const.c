@@ -59,6 +59,19 @@ static bool fail_const(struct checker *c, const struct expr *e,
     return false;
 }
 
+/* Two texts in the order of their bytes, and a text before every longer
+   one it begins, as `==` and `<` of `str` compare them at run time. */
+static int compare_text(const struct token_text *a, const struct token_text *b)
+{
+    size_t n = a->length < b->length ? a->length : b->length;
+    int cmp = n > 0 ? memcmp(a->bytes, b->bytes, n) : 0;
+
+    if (cmp != 0) {
+        return cmp < 0 ? -1 : 1;
+    }
+    return a->length < b->length ? -1 : a->length > b->length ? 1 : 0;
+}
+
 /* DESIGN: the value of a class literal holds each field of the class at
    its index. The base is field 0, a value of the base class from the
    same literal, since the literal names an inherited field as its own.
@@ -559,6 +572,8 @@ bool sema_eval_const(struct checker *c, struct expr *e,
                       : a.as.floating > b.as.floating ? 1 : 0;
             } else if (a.kind == CONST_NULL || b.kind == CONST_NULL) {
                 cmp = a.kind == b.kind ? 0 : 1;
+            } else if (a.kind == CONST_TEXT && b.kind == CONST_TEXT) {
+                cmp = compare_text(&a.as.text, &b.as.text);
             } else if (is_signed) {
                 cmp = sema_signed_bits(a.as.integer) <
                               sema_signed_bits(b.as.integer)

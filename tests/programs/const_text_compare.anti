@@ -1,0 +1,29 @@
+//! Two text constants compare by their bytes, as two texts do at run time:
+//! equal when every byte is, and in the order of the first byte that differs, a
+//! text before a longer one it begins.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const SAME: bool = "a" == "a";
+const DIFFERENT: bool = "a" == "b";
+const UNLIKE: bool = "abc" != "abd";
+const PREFIX: bool = "ab" == "abc";
+const EMPTY: bool = "" == "";
+const NAME: str = "anti";
+const NAMED: bool = NAME == "anti";
+const BEFORE: bool = "a" < "b";
+const AFTER: bool = "b" < "a";
+const SHORTER: bool = "ab" < "abc";
+const HIGH: bool = "\u{e9}" > "z";
+
+fn main() -> int
+{
+	let a = "a";
+	printf("%d %d %d %d %d %d\n".ptr, SAME as c_int, DIFFERENT as c_int,
+		UNLIKE as c_int, PREFIX as c_int, EMPTY as c_int, NAMED as c_int);
+	printf("%d %d %d %d\n".ptr, BEFORE as c_int, AFTER as c_int,
+		SHORTER as c_int, HIGH as c_int);
+	printf("%d %d %d\n".ptr, (a == "a") as c_int, (a == "b") as c_int,
+		(a < "b") as c_int);
+	return 0;
+}
