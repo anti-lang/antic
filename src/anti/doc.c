@@ -105,8 +105,6 @@ static bool same(const char *s, size_t n, const char *other)
     return strlen(other) == n && memcmp(s, other, n) == 0;
 }
 
-/* The last segment of a module path, which an import declares as its
-   name where the import writes no alias. */
 /* The last `.` of the bytes, or NULL where they hold none. */
 static const char *last_dot(const char *s, size_t n)
 {

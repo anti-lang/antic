@@ -120,12 +120,6 @@ static size_t declared_params(const struct type *t, bool self)
     return self && n > 0 ? n - 1 : n;
 }
 
-/* DESIGN: a signature carries the visibility, the form word, the name,
-   the name, the mark and the type of every parameter, the result and
-   `may fail`. It
-   carries no default value, no `own` and no body. The library file keeps
-   the first set for every function and the rest for some. A page built
-   from the file reads as the page built from the source. */
 /* Whether keyword declares a function of C, whose parameters of function
    type are C function pointers without a mark. */
 static bool c_function(const char *keyword)
@@ -197,6 +191,12 @@ static void type_params(struct text *out, const struct type *t)
     text_append(out, ">");
 }
 
+/* DESIGN: a signature carries the visibility, the form word and the name
+   of the function, the name, the mark and the type of every parameter,
+   the result and `may fail`. It carries no default value, no `own` and no
+   body. The library file keeps the first set for every function and the
+   rest for some. A page built from the file reads as the page built from
+   the source. */
 static void fn_signature(struct text *out, const char *lead,
                          const char *keyword, const struct name *name,
                          const struct item *generic, const struct type *t,
