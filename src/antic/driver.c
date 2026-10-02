@@ -1118,14 +1118,15 @@ static bool build_id(const struct options *o, const struct text *assembly,
     }
     for (i = 0; ok && i < o->object_count; i++) {
         if (!digest_file(&s, o->objects[i])) {
-            snprintf(error, size, "cannot read %s", o->objects[i]);
+            text_format(error, size, "cannot read %s", o->objects[i]);
             ok = false;
         }
     }
     if (ok && o->runtime != NULL) {
         link_runtime_library(&library, o->runtime, o->target, o->cpu);
         if (!digest_file(&s, text_cstr(&library))) {
-            snprintf(error, size, "cannot read %s", text_cstr(&library));
+            text_format(error, size, "cannot read %s",
+                        text_cstr(&library));
             ok = false;
         }
     }

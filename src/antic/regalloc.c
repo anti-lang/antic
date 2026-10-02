@@ -1,7 +1,6 @@
 #include "regalloc.h"
 
 #include <limits.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -1087,10 +1086,11 @@ bool regalloc_function(enum target t, struct mach_function *f, char *error,
     f->unwind = frame.unwind && frame.needed;
     if (!ok) {
         ir_name_append(&name, f->ir->module, f->ir->name);
-        snprintf(error, error_size, "the stack frame of `%s` needs more "
-                 "than %llu bytes, the most an %s frame holds",
-                 text_cstr(&name), (unsigned long long)a.target->frame_limit,
-                 a.target->name);
+        text_format(error, error_size,
+                    "the stack frame of `%s` needs more than %llu bytes, the "
+                    "most an %s frame holds",
+                    text_cstr(&name), (unsigned long long)a.target->frame_limit,
+                    a.target->name);
     }
     for (b = 0; ok && b < f->block_count; b++) {
         memset(&rw, 0, sizeof rw);
@@ -1115,9 +1115,10 @@ bool regalloc_function(enum target t, struct mach_function *f, char *error,
     }
     if (ok && a.refused) {
         ir_name_append(&name, f->ir->module, f->ir->name);
-        snprintf(error, error_size, "an instruction of `%s` reads more "
-                 "spilled registers than %s can load for it",
-                 text_cstr(&name), a.target->name);
+        text_format(error, error_size,
+                    "an instruction of `%s` reads more spilled registers "
+                    "than %s can load for it",
+                    text_cstr(&name), a.target->name);
         ok = false;
     }
     for (b = 0; b < f->block_count; b++) {
