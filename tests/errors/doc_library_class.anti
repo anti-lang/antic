@@ -1,0 +1,16 @@
+//! A doc comment names a function of a class of a library, `take_in` of
+//! `text.Builder`, and its function `append`, as it names those of a struct of
+//! a library, without a warning.
+
+import anti.text;
+
+/// The length of `text`, which `append` would add to a builder.
+fn length(text: str) -> int
+{
+	return text.len as int;
+}
+
+fn main() -> int
+{
+	return length("") as int;
+}

@@ -2042,6 +2042,15 @@ add_test(NAME silent_doc_declared
 set_tests_properties(silent_doc_declared PROPERTIES
     FAIL_REGULAR_EXPRESSION "warning")
 
+# A doc comment names the functions of a class of a library without a
+# warning, as it names those of a struct.
+add_test(NAME silent_doc_library_class
+    COMMAND antic --doc-warnings --runtime "${ANTIC_RUNTIME_DIR}" -S
+            -o "${CMAKE_CURRENT_BINARY_DIR}/doc_library_class.s"
+            "${CMAKE_CURRENT_SOURCE_DIR}/errors/doc_library_class.anti")
+set_tests_properties(silent_doc_library_class PROPERTIES
+    FAIL_REGULAR_EXPRESSION "warning")
+
 # `catch e` shadowing a name of an outer scope is a warning. The three
 # forms that bind a name each report it, and a handler whose name is free
 # reports nothing.
