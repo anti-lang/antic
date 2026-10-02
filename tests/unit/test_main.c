@@ -59,63 +59,92 @@ void test_files(void);
 void test_tool_platform(void);
 void test_interface(void);
 
-int main(void)
+/* Each group of checks under the name of its file, tests/unit/test_<name>.c.
+   ctest runs one file per test, unit_<name>, so a failure names its file. */
+struct group {
+    const char *name;
+    void (*run)(void);
+};
+
+static const struct group groups[] = {
+    {"target", test_target},
+    {"cpu", test_cpu},
+    {"f16", test_f16},
+    {"text", test_text},
+    {"text", test_diagnostic_cut},
+    {"target", test_host_target},
+    {"lexer", test_lexer},
+    {"parser", test_parser},
+    {"types", test_types},
+    {"types", test_ptr_tables},
+    {"sema", test_sema},
+    {"sema", test_sema_cycles},
+    {"sema", test_sema_constants},
+    {"sema", test_sema_generic_copies},
+    {"sema", test_sema_chains},
+    {"sema", test_sema_copy_bounds},
+    {"sema", test_sema_shared_parts},
+    {"sema", test_sema_members},
+    {"nullable", test_nullable},
+    {"variant", test_variant},
+    {"sync", test_sync},
+    {"ir", test_ir},
+    {"layout", test_layout},
+    {"lower", test_lower},
+    {"modules", test_modules},
+    {"header", test_header},
+    {"optimize", test_optimize},
+    {"select", test_select},
+    {"regalloc", test_regalloc},
+    {"x86_64", test_x86_64},
+    {"arm64", test_arm64},
+    {"emit", test_emit},
+    {"link", test_link},
+    {"userdirs", test_userdirs},
+    {"float", test_float},
+    {"struct", test_struct},
+    {"utf", test_utf},
+    {"whole", test_whole},
+    {"sha256", test_sha256},
+    {"arith", test_arith},
+    {"symbols", test_symbols},
+    {"float_read", test_float_read},
+    {"coff", test_coff},
+    {"toml", test_toml},
+    {"rt_bounds", test_rt_bounds},
+    {"fs", test_fs},
+    {"json", test_json},
+    {"bind", test_bind},
+    {"deps", test_deps},
+    {"zip", test_zip},
+    {"syms", test_syms},
+    {"fmt", test_fmt},
+    {"files", test_files},
+    {"tool_platform", test_tool_platform},
+    {"interface", test_interface},
+};
+
+/* Run the groups of the file the one argument names, or every group
+   without one. */
+int main(int argc, char **argv)
 {
-    test_target();
-    test_cpu();
-    test_f16();
-    test_text();
-    test_diagnostic_cut();
-    test_host_target();
-    test_lexer();
-    test_parser();
-    test_types();
-    test_ptr_tables();
-    test_sema();
-    test_sema_cycles();
-    test_sema_constants();
-    test_sema_generic_copies();
-    test_sema_chains();
-    test_sema_copy_bounds();
-    test_sema_shared_parts();
-    test_sema_members();
-    test_nullable();
-    test_variant();
-    test_sync();
-    test_ir();
-    test_layout();
-    test_lower();
-    test_modules();
-    test_header();
-    test_optimize();
-    test_select();
-    test_regalloc();
-    test_x86_64();
-    test_arm64();
-    test_emit();
-    test_link();
-    test_userdirs();
-    test_float();
-    test_struct();
-    test_utf();
-    test_whole();
-    test_sha256();
-    test_arith();
-    test_symbols();
-    test_float_read();
-    test_coff();
-    test_toml();
-    test_rt_bounds();
-    test_fs();
-    test_json();
-    test_bind();
-    test_deps();
-    test_zip();
-    test_syms();
-    test_fmt();
-    test_files();
-    test_tool_platform();
-    test_interface();
+    size_t i;
+    int found = 0;
+
+    if (argc > 2) {
+        fprintf(stderr, "usage: antic_unit_tests [<file>]\n");
+        return 2;
+    }
+    for (i = 0; i < sizeof groups / sizeof groups[0]; i++) {
+        if (argc == 1 || strcmp(argv[1], groups[i].name) == 0) {
+            groups[i].run();
+            found = 1;
+        }
+    }
+    if (!found) {
+        fprintf(stderr, "no unit test file is named %s\n", argv[1]);
+        return 2;
+    }
     if (check_failures != 0) {
         fprintf(stderr, "%d check(s) failed\n", check_failures);
         return 1;

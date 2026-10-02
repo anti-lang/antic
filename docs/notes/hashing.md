@@ -15,7 +15,7 @@ under "Generics and collections".
 - `anti_rt_entropy` of the platform layer fills bytes from `arc4random_buf`, `getrandom` or `rand_s`. `platform_windows.c` defines `_CRT_RAND_S` before its first header for the last.
 - A function of a library file written `operator fn` carries bit 6 of its flags, which `sema_interface` takes from the item and the reader puts in `is_operator` of the symbol. `symbol_is_operator` of `sema_expr.c` reads the item where there is one and the flag otherwise. The tree of a generic carries `hashes` and `hash_calls` after `pattern` of a call.
 - `Ordered` has an item in `src/std/anti/lang.anti` and a bare name in `add_constraint`, `ordered_hooks` beside `number_hooks`.
-- The tests: `programs/hash_builtin.anti`, `hash_default.anti` and `hash_generic.anti` with their `_dev` runs, `hashing_modules_release` and `hashing_modules_dev` over `tests/modules/hashing/`, `listing_error_hashing`, and `conf_hash_seed_option`, `_file`, `_configure`, `_range`, `_text` and `_random`.
+- The tests: `programs/hash_builtin.anti`, `hash_default.anti` and `hash_generic.anti` with their `_dev` runs, `hashing_modules_release` and `hashing_modules_dev` over `tests/modules/hashing/`, `error_hashing`, and `conf_hash_seed_option`, `_file`, `_configure`, `_range`, `_text` and `_random`.
 
 ## The default `==`
 
@@ -31,7 +31,7 @@ under "Generics and collections".
 - `regex.c` returns a `struct anti_pattern` from both compiles and frees it whole. `patterns.c` and `regex.c` hand PCRE2 its first word through `ANTI_PATTERN_CODE`, and two tests that call PCRE2 themselves read that word. `compare_at` and `hash_at` call `anti_rt_pattern_same` and `anti_rt_pattern_hash` for a Regex part.
 - `part_has_eq` takes an array part when its element has `==`, `walk_inside` walks its element, and `compare_array` of `lower_eq.c` loops over the elements of every level as `hash_run` does.
 - `sema_default_eq` takes a tuple and each case of a variant through `sema_eq_gap`, and a `?T` through the hook of its element. `walk_inside` walks the parts of each form and `walk_eq` gives a part with `operator fn eq`, a variant among them, its checked call. `compare_cases` of `lower_eq.c` compares the tags and then branches per case into the fields of the case, and `compare_optional` compares the flags and then the values when both hold one. `binary_operands` lets `==` and `!=` read two `?T` values whole.
-- The tests: `programs/eq_default.anti`, `programs/eq_kinds.anti`, `programs/eq_parts.anti`, `listing_error_equality`, and the default of a library's generics in `hashing_modules_release` and `hashing_modules_dev`.
+- The tests: `programs/eq_default.anti`, `programs/eq_kinds.anti`, `programs/eq_parts.anti`, `error_equality`, and the default of a library's generics in `hashing_modules_release` and `hashing_modules_dev`.
 
 ## Operator functions that share a name
 

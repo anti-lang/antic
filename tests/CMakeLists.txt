@@ -89,7 +89,18 @@ antic_cpu_level(unit_level "${ANTIC_HOST_TARGET}")
 target_compile_definitions(antic_unit_tests PRIVATE
     ANTIC_SOURCE_DIR="${PROJECT_SOURCE_DIR}" ANTI_DEV_CPU
     ANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${unit_level}})
-add_test(NAME unit COMMAND antic_unit_tests)
+# One test per file of the unit tests, unit_<name> for test_<name>.c, each
+# in a directory of its own for the files it writes.
+get_target_property(unit_sources antic_unit_tests SOURCES)
+foreach(source IN LISTS unit_sources)
+    if(source MATCHES "^unit/test_(.+)\\.c$" AND
+       NOT CMAKE_MATCH_1 STREQUAL "main")
+        set(group "${CMAKE_MATCH_1}")
+        file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/unit/${group}")
+        add_test(NAME unit_${group} COMMAND antic_unit_tests ${group}
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/unit/${group}")
+    endif()
+endforeach()
 
 # The allocation helpers of anti when the memory is refused, in a program
 # of its own, since each ends the process.
@@ -289,6 +300,45 @@ function(antic_modules_test name)
                 TIMEOUT ${arg_TIMEOUT})
         endif()
     endforeach()
+endfunction()
+
+# A dump of antic compared byte for byte with an expected file, through
+# run_dump.cmake. The name says the stage and the target:
+# dump_<stage>_<subject>, with _<target> after it for a dump of one target.
+#   antic_dump_test(<stage> <subject> <expected> [TARGET <target>]
+#                   [ARGS <argument>...])
+# tokens, ast, types, ir, opt, select and alloc give --dump-<stage>, and
+# asm gives -S into a file of its own, which the test compares. ARGS are
+# the other arguments of antic, the source among them.
+set(ANTIC_DUMPS "${CMAKE_CURRENT_BINARY_DIR}/dumps")
+file(MAKE_DIRECTORY "${ANTIC_DUMPS}")
+function(antic_dump_test stage subject expected)
+    cmake_parse_arguments(PARSE_ARGV 3 arg "" "TARGET" "ARGS")
+    set(name dump_${stage}_${subject})
+    set(arguments "")
+    if(arg_TARGET)
+        string(APPEND name _${arg_TARGET})
+        set(arguments --target ${arg_TARGET})
+    endif()
+    set(output "")
+    if(stage STREQUAL "asm")
+        set(file "${ANTIC_DUMPS}/${name}.s")
+        list(PREPEND arguments -S -o "${file}")
+        set(output "-DOUTPUT=${file}")
+    elseif(stage MATCHES "^(tokens|ast|types|ir|opt|select|alloc)$")
+        list(PREPEND arguments --dump-${stage})
+    else()
+        message(FATAL_ERROR "antic dumps no stage ${stage}")
+    endif()
+    list(APPEND arguments ${arg_ARGS})
+    list(JOIN arguments "," command)
+    add_test(NAME ${name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DCOMMAND=${command}"
+            ${output}
+            "-DEXPECTED=${expected}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
 endfunction()
 
 # llvm-objdump and llvm-readobj of the runtime archive, with the suffix of
@@ -2187,22 +2237,14 @@ add_expect_test(error_missing_runtime STATUS 2
 
 # Dumps of compiler stages, compared with expected files in tests/dump.
 # scale.tokens is the token listing that chapter 1 prints.
-add_test(NAME dump_tokens_scale
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DOPTION=--dump-tokens"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.tokens"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(tokens scale
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.tokens"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti")
 
 # A doc comment is one token, printed with its first source line.
-add_test(NAME dump_tokens_docs
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DOPTION=--dump-tokens"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/docs.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/docs.tokens"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(tokens docs
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/docs.tokens"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/docs.anti")
 
 add_expect_test(error_lexical STATUS 1
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
@@ -2229,52 +2271,32 @@ add_test(NAME error_source_nul
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_source_nul.cmake")
 
 # scale.ast is the syntax tree listing that chapter 1 prints.
-add_test(NAME dump_ast_scale
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DOPTION=--dump-ast"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.ast"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(ast scale
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.ast"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti")
 
 # `fallthrough;` is a statement of its own in the tree of an arm.
-add_test(NAME dump_ast_switch_fallthrough
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DOPTION=--dump-ast"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/switch_fallthrough.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/switch_fallthrough.ast"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(ast switch_fallthrough
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/switch_fallthrough.ast"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/switch_fallthrough.anti")
 
 # Type parameters and type arguments in the tree: `>>` closes two lists,
 # and `<` in an expression opens a list by the rule of C#.
-add_test(NAME dump_ast_generics_syntax
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DOPTION=--dump-ast"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/generics_syntax.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/generics_syntax.ast"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(ast generics_syntax
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/generics_syntax.ast"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/generics_syntax.anti")
 
 # An `f"..."` is one node, with the value of each `{expr}` below it.
-add_test(NAME dump_ast_format
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DOPTION=--dump-ast"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/format.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/format.ast"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(ast format
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/format.ast"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/format.anti")
 
 # `alloc T { }` holds its literal alone and `for 0..3` binds no name, in
 # the tree and in the typed tree.
 foreach(stage ast types)
-    add_test(NAME dump_${stage}_alloc_loops
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DOPTION=--dump-${stage}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/alloc_loops.anti"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/alloc_loops.${stage}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+    antic_dump_test(${stage} alloc_loops
+        "${CMAKE_CURRENT_SOURCE_DIR}/dump/alloc_loops.${stage}"
+        ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/alloc_loops.anti")
 endforeach()
 # Two mistakes produce exactly two messages.
 add_expect_test(error_syntax STATUS 1
@@ -2284,22 +2306,14 @@ add_expect_test(error_syntax STATUS 1
             syntax.anti)
 
 # scale.types is the typed tree listing that chapter 1 prints.
-add_test(NAME dump_types_scale
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DOPTION=--dump-types"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.types"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(types scale
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.types"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti")
 
 # main.ir is the IR listing that chapter 1 prints for main.anti.
-add_test(NAME dump_ir_main
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DOPTION=--dump-ir"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/main.ir"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(ir main
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.ir"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
 
 # Library files. scale.antl.hex lists the bytes that every host writes for
 # scale.anti. main.ir is the whole program after loading two libraries,
@@ -2544,12 +2558,9 @@ add_test(NAME internal_package
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/internal"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_internal.cmake")
 
-add_test(NAME dump_ir_modules
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--dump-ir,-I,${LIBS},${MODULES}/main.anti"
-        "-DEXPECTED=${MODULES}/main.ir"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(ir modules
+    "${MODULES}/main.ir"
+    ARGS -I "${LIBS}" "${MODULES}/main.anti")
 set_tests_properties(dump_ir_modules PROPERTIES FIXTURES_REQUIRED twice_antl)
 
 # Dev mode: one object per module, linked into the same program.
@@ -3495,68 +3506,48 @@ add_test(NAME print_targets
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
 
 # main.opt is the optimized IR listing that chapter 1 prints.
-add_test(NAME dump_opt_main
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DOPTION=--dump-opt"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/main.opt"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(opt main
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.opt"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
 
 # The selected machine code of main.anti that chapter 12 prints.
-add_test(NAME dump_select_arm64
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--dump-select,--target,macos-arm64,${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/main.arm64.sel"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
-add_test(NAME dump_select_x86_64
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--dump-select,--target,linux-x86_64,${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/main.x86_64.sel"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(select main
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.arm64.sel"
+    TARGET macos-arm64
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
+antic_dump_test(select main
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.x86_64.sel"
+    TARGET linux-x86_64
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
 
 # The allocated machine code of main.anti that chapter 13 prints.
-add_test(NAME dump_alloc_arm64
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--dump-alloc,--target,macos-arm64,${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/main.arm64.alloc"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
-add_test(NAME dump_alloc_x86_64
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--dump-alloc,--target,linux-x86_64,${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/main.x86_64.alloc"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(alloc main
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.arm64.alloc"
+    TARGET macos-arm64
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
+antic_dump_test(alloc main
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.x86_64.alloc"
+    TARGET linux-x86_64
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
 
-add_test(NAME dump_alloc_twice_arm64
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--dump-alloc,--target,macos-arm64,${CMAKE_CURRENT_SOURCE_DIR}/dump/twice.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/twice.arm64.alloc"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
-add_test(NAME dump_alloc_cell_arm64
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--dump-alloc,--target,macos-arm64,${CMAKE_CURRENT_SOURCE_DIR}/dump/cell.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/cell.arm64.alloc"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(alloc twice
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/twice.arm64.alloc"
+    TARGET macos-arm64
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/twice.anti")
+antic_dump_test(alloc cell
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/cell.arm64.alloc"
+    TARGET macos-arm64
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/cell.anti")
 
 # Spilling: more values live across a call than callee-saved registers.
-add_test(NAME dump_alloc_spill_arm64
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--dump-alloc,--target,macos-arm64,${CMAKE_CURRENT_SOURCE_DIR}/dump/spill12.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/spill12.arm64.alloc"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
-add_test(NAME dump_alloc_spill_x86_64
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--dump-alloc,--target,linux-x86_64,${CMAKE_CURRENT_SOURCE_DIR}/dump/spill7.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/spill7.x86_64.alloc"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(alloc spill12
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/spill12.arm64.alloc"
+    TARGET macos-arm64
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/spill12.anti")
+antic_dump_test(alloc spill7
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/spill7.x86_64.alloc"
+    TARGET linux-x86_64
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/spill7.anti")
 
 # The back ends of chapters 14 and 15: addressing modes and calls.
 foreach(case "sum,linux-x86_64,sum.x86_64" "args,linux-x86_64,args.linux-x86_64"
@@ -3579,12 +3570,10 @@ foreach(case "sum,linux-x86_64,sum.x86_64" "args,linux-x86_64,args.linux-x86_64"
     list(GET parts 0 source)
     list(GET parts 1 target)
     list(GET parts 2 expected)
-    add_test(NAME dump_alloc_${expected}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DCOMMAND=--dump-alloc,--target,${target},${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.anti"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/${expected}.alloc"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+    antic_dump_test(alloc ${source}
+        "${CMAKE_CURRENT_SOURCE_DIR}/dump/${expected}.alloc"
+        TARGET ${target}
+        ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.anti")
 endforeach()
 
 # The three ARM64 conventions pass these structs alike. The Windows frame
@@ -3594,16 +3583,14 @@ foreach(target macos-arm64 linux-arm64 windows-arm64)
     if(target STREQUAL "windows-arm64")
         set(expected structs.windows-arm64.alloc)
     endif()
-    add_test(NAME dump_alloc_structs.${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DCOMMAND=--dump-alloc,--target,${target},${CMAKE_CURRENT_SOURCE_DIR}/dump/structs.anti"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/${expected}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+    antic_dump_test(alloc structs
+        "${CMAKE_CURRENT_SOURCE_DIR}/dump/${expected}"
+        TARGET ${target}
+        ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/structs.anti")
 endforeach()
 
-# Listings of the chapters. The error listings name the file alone, so
-# each runs in the directory of its program.
+# The refusals of the programs of tests/errors, error_<name>. A message
+# names the file alone, so each runs in the directory of its program.
 set(LISTINGS "${CMAKE_CURRENT_BINARY_DIR}/listings")
 file(MAKE_DIRECTORY "${LISTINGS}")
 foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.anti"
@@ -3745,7 +3732,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
     list(GET parts 0 name)
     list(GET parts 1 arguments)
     string(REPLACE "," ";" arguments "${arguments}")
-    add_expect_test(listing_error_${name} STATUS 1
+    add_expect_test(error_${name} STATUS 1
         DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
         EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/${name}.err"
         COMMAND "$<TARGET_FILE:antic>" ${arguments})
@@ -3755,99 +3742,76 @@ add_test(NAME errors_registered
     COMMAND "${CMAKE_COMMAND}" "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_errors_registered.cmake")
 set(DUMP "${CMAKE_CURRENT_SOURCE_DIR}/dump")
-foreach(case "symbolic.types|--dump-types,${DUMP}/symbolic.anti"
-        "generics.types|--dump-types,${DUMP}/generics.anti"
-        "constraints.types|--dump-types,${DUMP}/constraints.anti"
-        "header/main.ir|--dump-ir,${DUMP}/header/main.anti"
-        "size_of/main.ir|--dump-ir,${DUMP}/size_of/main.anti"
-        "size_of/main.linux-arm64.sel|--dump-select,--target,linux-arm64,${DUMP}/size_of/main.anti"
-        "c_long/main.linux-x86_64.sel|--dump-select,--target,linux-x86_64,${DUMP}/c_long/main.anti"
-        "c_long/main.windows-x86_64.sel|--dump-select,--target,windows-x86_64,${DUMP}/c_long/main.anti"
-        "devirt.ir|--dump-ir,${DUMP}/devirt.anti"
-        "devirt.dev.ir|--dev,--dump-ir,${DUMP}/devirt.anti"
-        "devirt.opt|--dump-opt,${DUMP}/devirt.anti"
-        "devirt.dev.opt|--dev,--dump-opt,${DUMP}/devirt.anti"
-        "devirt_plugin.opt|--lib,shared,--no-runtime,--runtime,${ANTIC_RUNTIME_DIR},--dump-opt,${DUMP}/devirt_plugin.anti"
-        "copies_merge.opt|--dump-opt,${DUMP}/copies_merge.anti"
-        "copies_merge.dev.opt|--dev,--dump-opt,${DUMP}/copies_merge.anti"
-        "forward.ir|--dump-ir,${DUMP}/forward.anti"
-        "forward.opt|--dump-opt,${DUMP}/forward.anti"
-        "probe.ir|--dump-ir,${CMAKE_CURRENT_SOURCE_DIR}/abi/probe.anti"
-        "sizes.ir|--dump-ir,${CMAKE_CURRENT_SOURCE_DIR}/programs/sizes.anti"
-        "spillweight.linux-x86_64.alloc|--dump-alloc,--target,linux-x86_64,${DUMP}/spillweight.anti"
-        "sizes.linux-x86_64.alloc|--dump-alloc,--target,linux-x86_64,${CMAKE_CURRENT_SOURCE_DIR}/programs/sizes.anti"
-        "bitfields.ir|--dump-ir,${CMAKE_CURRENT_SOURCE_DIR}/programs/bitfields.anti"
-        "bitfields.linux-x86_64.alloc|--dump-alloc,--target,linux-x86_64,${CMAKE_CURRENT_SOURCE_DIR}/programs/bitfields.anti"
-        "bitfields.windows-x86_64.alloc|--dump-alloc,--target,windows-x86_64,${CMAKE_CURRENT_SOURCE_DIR}/programs/bitfields.anti"
-        "measure.opt|--dump-opt,${DUMP}/measure.anti"
-        "measure.linux-arm64.alloc|--dump-alloc,--target,linux-arm64,${DUMP}/measure.anti")
+# Each case is the stage, the subject, the target or nothing, the expected
+# file under tests/dump and the other arguments of antic.
+foreach(case "types|symbolic||symbolic.types|${DUMP}/symbolic.anti"
+        "types|generics||generics.types|${DUMP}/generics.anti"
+        "types|constraints||constraints.types|${DUMP}/constraints.anti"
+        "ir|header_main||header/main.ir|${DUMP}/header/main.anti"
+        "ir|size_of_main||size_of/main.ir|${DUMP}/size_of/main.anti"
+        "select|size_of_main|linux-arm64|size_of/main.linux-arm64.sel|${DUMP}/size_of/main.anti"
+        "select|c_long_main|linux-x86_64|c_long/main.linux-x86_64.sel|${DUMP}/c_long/main.anti"
+        "select|c_long_main|windows-x86_64|c_long/main.windows-x86_64.sel|${DUMP}/c_long/main.anti"
+        "ir|devirt||devirt.ir|${DUMP}/devirt.anti"
+        "ir|devirt_dev||devirt.dev.ir|--dev,${DUMP}/devirt.anti"
+        "opt|devirt||devirt.opt|${DUMP}/devirt.anti"
+        "opt|devirt_dev||devirt.dev.opt|--dev,${DUMP}/devirt.anti"
+        "opt|devirt_plugin||devirt_plugin.opt|--lib,shared,--no-runtime,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/devirt_plugin.anti"
+        "opt|copies_merge||copies_merge.opt|${DUMP}/copies_merge.anti"
+        "opt|copies_merge_dev||copies_merge.dev.opt|--dev,${DUMP}/copies_merge.anti"
+        "ir|forward||forward.ir|${DUMP}/forward.anti"
+        "opt|forward||forward.opt|${DUMP}/forward.anti"
+        "ir|probe||probe.ir|${CMAKE_CURRENT_SOURCE_DIR}/abi/probe.anti"
+        "ir|sizes||sizes.ir|${CMAKE_CURRENT_SOURCE_DIR}/programs/sizes.anti"
+        "alloc|spillweight|linux-x86_64|spillweight.linux-x86_64.alloc|${DUMP}/spillweight.anti"
+        "alloc|sizes|linux-x86_64|sizes.linux-x86_64.alloc|${CMAKE_CURRENT_SOURCE_DIR}/programs/sizes.anti"
+        "ir|bitfields||bitfields.ir|${CMAKE_CURRENT_SOURCE_DIR}/programs/bitfields.anti"
+        "alloc|bitfields|linux-x86_64|bitfields.linux-x86_64.alloc|${CMAKE_CURRENT_SOURCE_DIR}/programs/bitfields.anti"
+        "alloc|bitfields|windows-x86_64|bitfields.windows-x86_64.alloc|${CMAKE_CURRENT_SOURCE_DIR}/programs/bitfields.anti"
+        "opt|measure||measure.opt|${DUMP}/measure.anti"
+        "alloc|measure|linux-arm64|measure.linux-arm64.alloc|${DUMP}/measure.anti"
+        "asm|scale_dev|macos-arm64|scale.dev.macos-arm64.s|--dev,-I,${MODULES},${MODULES}/com/example/scale.anti"
+        "asm|scale_dev|windows-x86_64|scale.dev.windows-x86_64.s|--dev,-I,${MODULES},${MODULES}/com/example/scale.anti"
+        "asm|main_dev|linux-x86_64|main.dev.linux-x86_64.s|--dev,-I,${LIBS},${MODULES}/main.anti"
+        "asm|doubling|linux-x86_64|doubling.linux-x86_64.s|--lib,shared,-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti"
+        "asm|doubling|macos-arm64|doubling.macos-arm64.s|--lib,shared,-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti"
+        "asm|doubling|windows-arm64|doubling.windows-arm64.s|--lib,shared,-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti")
     string(REPLACE "|" ";" parts "${case}")
-    list(GET parts 0 expected)
-    list(GET parts 1 arguments)
-    add_test(NAME listing_${expected}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DCOMMAND=${arguments}"
-            "-DEXPECTED=${DUMP}/${expected}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+    list(GET parts 0 stage)
+    list(GET parts 1 subject)
+    list(GET parts 2 target)
+    list(GET parts 3 expected)
+    list(GET parts 4 arguments)
+    string(REPLACE "," ";" arguments "${arguments}")
+    set(target_argument "")
+    if(NOT target STREQUAL "")
+        set(target_argument TARGET ${target})
+    endif()
+    antic_dump_test(${stage} ${subject} "${DUMP}/${expected}"
+        ${target_argument} ARGS ${arguments})
 endforeach()
-# Assembly files of dev mode and of a shared library for C.
-foreach(case "scale.dev.macos-arm64.s|--dev,-S,--target,macos-arm64,-I,${MODULES},MODULE_SCALE"
-        "scale.dev.windows-x86_64.s|--dev,-S,--target,windows-x86_64,-I,${MODULES},MODULE_SCALE"
-        "main.dev.linux-x86_64.s|--dev,-S,--target,linux-x86_64,-I,${LIBS},${MODULES}/main.anti"
-        "doubling.linux-x86_64.s|--lib,shared,-S,--target,linux-x86_64,-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,CLIB_DOUBLING"
-        "doubling.macos-arm64.s|--lib,shared,-S,--target,macos-arm64,-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,CLIB_DOUBLING"
-        "doubling.windows-arm64.s|--lib,shared,-S,--target,windows-arm64,-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,CLIB_DOUBLING")
-    string(REPLACE "|" ";" parts "${case}")
-    list(GET parts 0 expected)
-    list(GET parts 1 arguments)
-    string(REPLACE "MODULE_SCALE" "${MODULES}/com/example/scale.anti"
-           arguments "${arguments}")
-    string(REPLACE "CLIB_DOUBLING"
-           "${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti"
-           arguments "${arguments}")
-    add_test(NAME listing_${expected}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DCOMMAND=${arguments},-o,${LISTINGS}/${expected}"
-            "-DOUTPUT=${LISTINGS}/${expected}"
-            "-DEXPECTED=${DUMP}/${expected}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
-endforeach()
-set_tests_properties(listing_main.dev.linux-x86_64.s PROPERTIES
+set_tests_properties(dump_asm_main_dev_linux-x86_64 PROPERTIES
     FIXTURES_REQUIRED twice_antl)
 
 # Calls through function pointers in the IR of chapter 20.
-add_test(NAME dump_opt_fnptr
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--dump-opt,${CMAKE_CURRENT_SOURCE_DIR}/dump/fnptr.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/fnptr.opt"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(opt fnptr
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/fnptr.opt"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/fnptr.anti")
 
 # String literals as globals in the IR of chapter 19.
-add_test(NAME dump_opt_strings
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--dump-opt,${CMAKE_CURRENT_SOURCE_DIR}/dump/strings.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/strings.opt"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(opt strings
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/strings.opt"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/strings.anti")
 
 # Aggregates in the IR of chapter 18.
-add_test(NAME dump_opt_structs
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--dump-opt,${CMAKE_CURRENT_SOURCE_DIR}/dump/structs.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/structs.opt"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(opt structs
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/structs.opt"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/structs.anti")
 
 # The parameter extensions of chapter 15 in the IR.
-add_test(NAME dump_opt_arm64
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--dump-opt,${CMAKE_CURRENT_SOURCE_DIR}/dump/arm64.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/arm64.opt"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(opt arm64
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/arm64.opt"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/arm64.anti")
 
 # The assembly files of chapters 16, 19 and 20 for each object format.
 foreach(case "main,macos-arm64" "main,macos-x86_64" "main,linux-x86_64"
@@ -3863,15 +3827,10 @@ foreach(case "main,macos-arm64" "main,macos-x86_64" "main,linux-x86_64"
     else()
         set(path "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.anti")
     endif()
-    set(output "${CMAKE_CURRENT_BINARY_DIR}/emit/${source}.${target}.s")
-    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/emit")
-    add_test(NAME emit_${source}.${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DCOMMAND=-S,--target,${target},-o,${output},${path}"
-            "-DOUTPUT=${output}"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.${target}.s"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+    antic_dump_test(asm ${source}
+        "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.${target}.s"
+        TARGET ${target}
+        ARGS "${path}")
 endforeach()
 
 # Every instruction that antic writes assembles with llvm-mc.
@@ -3982,18 +3941,14 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
     endif()
 endforeach()
 
-add_test(NAME dump_select_loop_arm64
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--dump-select,--target,linux-arm64,${CMAKE_CURRENT_SOURCE_DIR}/dump/loop.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/loop.arm64.sel"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
-add_test(NAME dump_select_loop_x86_64
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--dump-select,--target,macos-x86_64,${CMAKE_CURRENT_SOURCE_DIR}/dump/loop.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/loop.x86_64.sel"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+antic_dump_test(select loop
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/loop.arm64.sel"
+    TARGET linux-arm64
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/loop.anti")
+antic_dump_test(select loop
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/loop.x86_64.sel"
+    TARGET macos-x86_64
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/loop.anti")
 
 # The optimizer examples of chapter 10. Each NAME.anti in tests/opt has its
 # IR before optimization in NAME.ir and after optimization in NAME.opt.
@@ -4001,20 +3956,8 @@ file(GLOB opt_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/opt/*.anti"
 foreach(source ${opt_sources})
     get_filename_component(name "${source}" NAME_WE)
     get_filename_component(dir "${source}" DIRECTORY)
-    add_test(NAME ir_${name}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DOPTION=--dump-ir"
-            "-DSOURCE=${source}"
-            "-DEXPECTED=${dir}/${name}.ir"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
-    add_test(NAME opt_${name}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DOPTION=--dump-opt"
-            "-DSOURCE=${source}"
-            "-DEXPECTED=${dir}/${name}.opt"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+    antic_dump_test(ir ${name} "${dir}/${name}.ir" ARGS "${source}")
+    antic_dump_test(opt ${name} "${dir}/${name}.opt" ARGS "${source}")
 endforeach()
 
 # Semantic analysis reports every error it finds.

@@ -22,7 +22,7 @@ collections".
 - `sema_iterate` hands a `TYPE_PARAM` to `sema_param_iterate`, and `e[i]` and `e[i] = v` hand one to `sema_param_index`. Neither rewrites the node into a hook call, since lowering never reads the body of a generic. The value each gives is a `TYPE_PARAM` without a `param`, cached in `walked` and `indexed` of the parameter, and `param_lacks` words a refusal on one without the fix of adding a constraint.
 - `sema_strip_generics` takes the generics out of the module before a library file or lowering reads it. The functions of a class body with parameters of their own, the types nested in a generic class, every `type` and every `constraint` go with them. The copies stay, since none of them is generic.
 - `anti fmt` marks the angle brackets of a list by the rules of the parser and writes them without spaces. It marks a list after the name of a declaration and a list in a type. In an expression it follows the rule of C#. A list is a bracket to the formatter, so a `:` or a `,` inside one ends nothing.
-- The tests: `dump_ast_generics_syntax` pins the tree of each form of the parser, `listing_generics.types` the types the checker gives, with the inferred arguments. `listing_error_generics`, `listing_error_generic_syntax` and `listing_error_generic_copies` pin the refusals. `listing_constraints.types` and `listing_error_constraints` pin what the constraints give and refuse, and `program_generic_unused` runs a program whose generics nothing uses.
+- The tests: `dump_ast_generics_syntax` pins the tree of each form of the parser, `dump_types_generics` the types the checker gives, with the inferred arguments. `error_generics`, `error_generic_syntax` and `error_generic_copies` pin the refusals. `dump_types_constraints` and `error_constraints` pin what the constraints give and refuse, and `program_generic_unused` runs a program whose generics nothing uses.
 
 ## The copies
 
@@ -39,7 +39,7 @@ collections".
 - `types_symbol_name` writes the name of a copy with the arguments qualified, and lowering names every symbol of a type with it. `target_mangle` writes each byte of a name outside letters, digits, `_` and `.` as `$` and two hex digits. `symbolize`, `anti symbols resolve` and the map read the escapes back, and the debug information names the copy as the program writes it, as `docs/notes/symbols.md` and `docs/notes/debug.md` say.
 - In a dev object `emit` marks a function or a global whose name holds `<` as link-once: `.weak` on ELF, `.weak_definition` on Mach-O, and a section of its own with `discard` on COFF, closed after it. `asm_copies_<target>` checks the line on every target.
 - `merge_copies` of `whole.c` runs after the devirtualisation of a release build. It compares every pair of copies and marks the later one as served by the earlier. It repeats until nothing changes, since a merge can make two callers identical. Then every call, table entry, relocation and init names the copy that stands for it, and the optimizer drops the rest.
-- The tests: `programs/generic_copies.anti` in release and as `program_generic_copies_dev`, `listing_copies_merge.opt` and `listing_copies_merge.dev.opt`, `asm_copies_<target>` and `listing_error_generic_copies`.
+- The tests: `programs/generic_copies.anti` in release and as `program_generic_copies_dev`, `dump_opt_copies_merge` and `dump_opt_copies_merge_dev`, `asm_copies_<target>` and `error_generic_copies`.
 
 
 ## Library files
@@ -72,4 +72,4 @@ collections".
 - `unify` binds a type parameter to the plain form of a function type given in the form of two words. The argument is then required against a type that keeps it.
 - `check_variant_test` takes the generic of a copy as the variant that names the case.
 - The formatter reads `may fail` after a function type in a list, and a type after `size_of(` and `alloc(`.
-- The tests: `program_generic_constants`, `program_generic_methods`, `program_generic_nested`, `program_generic_sync`, `program_generic_hooks`, `program_generic_may_fail`, `program_generic_fn_args` and `program_generic_variants`, each with its `_dev` run, `listing_error_generic_copies` and the refusal of a replaced function in `listing_error_generics`.
+- The tests: `program_generic_constants`, `program_generic_methods`, `program_generic_nested`, `program_generic_sync`, `program_generic_hooks`, `program_generic_may_fail`, `program_generic_fn_args` and `program_generic_variants`, each with its `_dev` run, `error_generic_copies` and the refusal of a replaced function in `error_generics`.
