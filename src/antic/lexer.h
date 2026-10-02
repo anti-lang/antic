@@ -167,6 +167,13 @@ struct token_list {
    its PARSE_DEPTH_MAX levels, so a deeper literal could not parse. */
 #define LEX_FORMAT_DEPTH_MAX 256
 
+/* DESIGN: lex records at most this many errors. The next one ends the
+   run with a diagnostic that says so, and the rest of the source is not
+   read. A source of bad bytes would otherwise give a diagnostic and a
+   token per byte, gigabytes at the cap of the source. Errors inside one
+   literal count toward the same cap and are dropped past it. */
+#define LEX_ERRORS_MAX 100
+
 /* Split source into tokens, ending with TOKEN_EOF. Report every error to
    diags and keep going, so that one run reports all of them. Returns true
    when no error occurred. The array of out is allocated with realloc,

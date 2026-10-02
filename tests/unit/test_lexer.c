@@ -254,8 +254,47 @@ static void format_depth(void)
     free(source);
 }
 
+/* A source of bad bytes gives LEX_ERRORS_MAX errors and one that says the
+   lexer stopped, not one per byte. Errors inside one literal count
+   toward the same cap. */
+static void error_cap(void)
+{
+    struct lexed l;
+    size_t length = 100000;
+    char *source = malloc(length);
+    size_t i;
+
+    CHECK(source != NULL);
+    if (source == NULL) {
+        return;
+    }
+    memset(source, '@', length);
+    lex_n(&l, source, length);
+    CHECK(!l.ok);
+    CHECK(l.diags.count == LEX_ERRORS_MAX + 1);
+    if (l.diags.count == LEX_ERRORS_MAX + 1) {
+        CHECK_STR(l.diags.items[LEX_ERRORS_MAX].message,
+                  "more than 100 errors, the lexer stops here");
+        CHECK(l.diags.items[LEX_ERRORS_MAX].column == LEX_ERRORS_MAX + 1);
+    }
+    CHECK(l.tokens.count == LEX_ERRORS_MAX + 2);
+    CHECK(l.tokens.items[l.tokens.count - 1].kind == TOKEN_EOF);
+    done(&l);
+    source[0] = '"';
+    for (i = 1; i + 1 < length; i += 2) {
+        source[i] = '\\';
+        source[i + 1] = 'q';
+    }
+    lex_n(&l, source, length);
+    CHECK(!l.ok);
+    CHECK(l.diags.count == LEX_ERRORS_MAX + 1);
+    done(&l);
+    free(source);
+}
+
 void test_lexer(void)
 {
+    error_cap();
     format_depth();
     /* Consecutive lines of one marker form one token. Common leading
        whitespace is stripped, so the line and block forms give one text. */

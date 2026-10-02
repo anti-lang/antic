@@ -1,5 +1,6 @@
 #include "lexer.h"
 
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -213,6 +214,7 @@ struct lexer {
     struct token_list *out;
     bool ok;
     int depth;                  /* `f"..."` literals open around pos */
+    int errors;                 /* errors recorded, up to LEX_ERRORS_MAX + 1 */
 };
 
 /* How escapes and NUL behave in a literal. */
@@ -261,10 +263,30 @@ static bool is_ident_char(int c)
 }
 
 static void error_at(struct lexer *lx, int line, int column,
-                     const char *message)
+                     const char *format, ...) ATTRIBUTE_PRINTF(4, 5);
+
+/* Record an error, or past LEX_ERRORS_MAX the one that stops the run. */
+static void error_at(struct lexer *lx, int line, int column,
+                     const char *format, ...)
 {
-    diagnostics_add(lx->diags, line, column, "%s", message);
+    va_list args;
+    char message[sizeof lx->diags->items->message];
+
     lx->ok = false;
+    if (lx->errors > LEX_ERRORS_MAX) {
+        return;
+    }
+    lx->errors++;
+    if (lx->errors > LEX_ERRORS_MAX) {
+        diagnostics_add(lx->diags, line, column,
+                        "more than %d errors, the lexer stops here",
+                        LEX_ERRORS_MAX);
+        return;
+    }
+    va_start(args, format);
+    text_vformat(message, sizeof message, format, args);
+    va_end(args);
+    diagnostics_add(lx->diags, line, column, "%s", message);
 }
 
 static struct token *push(struct lexer *lx, enum token_kind kind,
@@ -504,7 +526,6 @@ static void block_doc(struct lexer *lx, enum token_kind kind, size_t marker)
     int line = lx->line;
     int column = lx->column;
     struct text raw = {0};
-    char message[64];
     size_t i;
 
     for (i = 0; i < marker; i++) {
@@ -531,12 +552,14 @@ static void block_doc(struct lexer *lx, enum token_kind kind, size_t marker)
         return;
     }
     if (at(lx, 0) != '\n') {
-        snprintf(message, sizeof message,
-                 "doc comment text starts on the line after `%.*s`",
-                 (int)marker, lx->src + start);
         /* One message for one comment: a missing end outranks the text. */
-        error_at(lx, line, column,
-                 skip_block(lx, 0) ? message : "unterminated block comment");
+        if (skip_block(lx, 0)) {
+            error_at(lx, line, column,
+                     "doc comment text starts on the line after `%.*s`",
+                     (int)marker, lx->src + start);
+        } else {
+            error_at(lx, line, column, "unterminated block comment");
+        }
         return;
     }
     advance(lx);
@@ -680,7 +703,7 @@ static bool digit_run(struct lexer *lx, bool hex, struct text *digits)
 static void number_error(struct lexer *lx, size_t start, int line,
                          int column, const char *message)
 {
-    error_at(lx, line, column, message);
+    error_at(lx, line, column, "%s", message);
     while (is_ident_char(at(lx, 0)) ||
            (at(lx, 0) == '.' && is_digit(at(lx, 1)))) {
         advance(lx);
@@ -799,7 +822,6 @@ static bool escape(struct lexer *lx, enum literal_mode mode, uint32_t *value,
     int line = lx->line;
     int column = lx->column;
     int c = at(lx, 1);
-    char message[80];
 
     *raw_byte = false;
     advance(lx);
@@ -867,9 +889,8 @@ static bool escape(struct lexer *lx, enum literal_mode mode, uint32_t *value,
         }
         advance(lx);
         if (cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) {
-            snprintf(message, sizeof message,
+            error_at(lx, line, column,
                      "`\\u{%X}` is not a Unicode scalar value", (unsigned)cp);
-            error_at(lx, line, column, message);
             return false;
         }
         if (cp == 0 && mode != MODE_BYTES) {
@@ -880,9 +901,8 @@ static bool escape(struct lexer *lx, enum literal_mode mode, uint32_t *value,
         return true;
     }
     default:
-        snprintf(message, sizeof message, "unknown escape `\\%c`",
+        error_at(lx, line, column, "unknown escape `\\%c`",
                  c < 0x80 ? c : '?');
-        error_at(lx, line, column, message);
         return false;
     }
 }
@@ -1013,7 +1033,6 @@ static void hex_character(struct lexer *lx, int *pending, int *pending_line,
                           int *pending_column, struct text *bytes, bool *valid)
 {
     int c = at(lx, 0);
-    char message[80];
 
     if (is_hex(c)) {
         if (*pending < 0) {
@@ -1026,15 +1045,14 @@ static void hex_character(struct lexer *lx, int *pending, int *pending_line,
         }
     } else if (c != ' ' && c != '\t' && c != '\r' && c != '\n' && *valid) {
         if (c > ' ' && c < 0x7F) {
-            snprintf(message, sizeof message,
+            error_at(lx, lx->line, lx->column,
                      "non-hex character `%c` in `x\"...\"` at column %d", c,
                      lx->column);
         } else {
-            snprintf(message, sizeof message,
+            error_at(lx, lx->line, lx->column,
                      "non-hex character in `x\"...\"` at column %d",
                      lx->column);
         }
-        error_at(lx, lx->line, lx->column, message);
         *valid = false;
     }
     advance(lx);
@@ -1121,11 +1139,8 @@ static void string(struct lexer *lx, const struct string_prefix *prefix,
     }
 
     if (valid && pending >= 0) {
-        char message[80];
-        snprintf(message, sizeof message,
-                 "odd digit count in `x\"...\"` at column %d",
-                 pending_column);
-        error_at(lx, pending_line, pending_column, message);
+        error_at(lx, pending_line, pending_column,
+                 "odd digit count in `x\"...\"` at column %d", pending_column);
         valid = false;
     }
     if (valid) {
@@ -1208,7 +1223,6 @@ static void placeholder(struct lexer *lx, size_t end, bool raw,
     struct format_piece *piece = add_piece(pieces);
     struct token_list tokens = {NULL, 0, 0};
     struct lexer inner = *lx;
-    char message[64];
     int depth = 0;
     int c;
 
@@ -1259,15 +1273,13 @@ static void placeholder(struct lexer *lx, size_t end, bool raw,
         piece->spec.length = inner.pos - from;
     }
     if (c == -1) {
-        snprintf(message, sizeof message, "unterminated `{` in %s",
+        error_at(lx, piece->line, piece->column, "unterminated `{` in %s",
                  interpolated_name(raw));
-        error_at(lx, piece->line, piece->column, message);
         *valid = false;
     } else {
         if (tokens.count == 0) {
-            snprintf(message, sizeof message, "empty `{}` in %s",
+            error_at(lx, piece->line, piece->column, "empty `{}` in %s",
                      interpolated_name(raw));
-            error_at(lx, piece->line, piece->column, message);
             *valid = false;
         }
         push(&inner, TOKEN_EOF, inner.pos, inner.line, inner.column);
@@ -1303,7 +1315,6 @@ static void interpolated(struct lexer *lx, const struct string_prefix *prefix,
     struct piece_list pieces = {NULL, 0, 0};
     struct format_piece *last;
     struct format_piece *kept;
-    char message[64];
     size_t hashes = 0;
     size_t end;
     bool valid = true;
@@ -1318,7 +1329,7 @@ static void interpolated(struct lexer *lx, const struct string_prefix *prefix,
     }
     advance(lx); /* the opening quote */
     if (prefix->refused != NULL) {
-        error_at(lx, line, column, prefix->refused);
+        error_at(lx, line, column, "%s", prefix->refused);
         valid = false;
     }
     end = closing_quote(lx, hashes, raw);
@@ -1331,10 +1342,9 @@ static void interpolated(struct lexer *lx, const struct string_prefix *prefix,
         return;
     }
     if (lx->depth >= LEX_FORMAT_DEPTH_MAX) {
-        snprintf(message, sizeof message,
+        error_at(lx, line, column,
                  "interpolated string literals nested deeper than %d levels",
                  LEX_FORMAT_DEPTH_MAX);
-        error_at(lx, line, column, message);
         while (lx->pos < end) {
             advance(lx);
         }
@@ -1356,9 +1366,8 @@ static void interpolated(struct lexer *lx, const struct string_prefix *prefix,
         } else if (c == '{') {
             placeholder(lx, end, raw, &bytes, &pieces, &valid);
         } else if (c == '}') {
-            snprintf(message, sizeof message, "single `}` in %s, write `}}`",
+            error_at(lx, lx->line, lx->column, "single `}` in %s, write `}}`",
                      interpolated_name(raw));
-            error_at(lx, lx->line, lx->column, message);
             valid = false;
             advance(lx);
         } else if (c == '\\' && !raw) {
@@ -1469,10 +1478,7 @@ static void lex_token(struct lexer *lx)
             error_at(lx, line, column,
                      "unexpected character outside a literal");
         } else {
-            char message[40];
-            snprintf(message, sizeof message, "unexpected character `%c`",
-                     c);
-            error_at(lx, line, column, message);
+            error_at(lx, line, column, "unexpected character `%c`", c);
         }
         while (n-- > 0) {
             advance(lx);
@@ -1484,7 +1490,7 @@ static void lex_token(struct lexer *lx)
 bool lex(const char *source, size_t length, struct arena *arena,
          struct diagnostics *diags, struct token_list *out)
 {
-    struct lexer lx = {source, length, 0, 1, 1, arena, diags, out, true, 0};
+    struct lexer lx = {source, length, 0, 1, 1, arena, diags, out, true, 0, 0};
 
     if (length > LEX_SOURCE_MAX) {
         error_at(&lx, 1, 1, "the source is larger than 64 MiB");
@@ -1503,7 +1509,7 @@ bool lex(const char *source, size_t length, struct arena *arena,
 
     for (;;) {
         skip_trivia(&lx);
-        if (at(&lx, 0) == -1) {
+        if (at(&lx, 0) == -1 || lx.errors > LEX_ERRORS_MAX) {
             push(&lx, TOKEN_EOF, lx.pos, lx.line, lx.column);
             return lx.ok;
         }
