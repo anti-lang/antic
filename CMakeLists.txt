@@ -116,12 +116,13 @@ antic_refuse_host_tools()
 
 # The compiler's code is a library so that the unit tests link the same
 # objects as the antic executable. It links PCRE2 to check every pattern
-# literal.
+# literal, and src/rt/regex.c reads pcre2.h as a system header, as the
+# glue of the runtime does, so the flags of the glue never reach it.
 include(tools/sources.cmake)
 include(src/native/pcre2-source.cmake)
 add_library(antic_core STATIC ${ANTIC_CORE_SOURCES})
 target_include_directories(antic_core PUBLIC ${ANTIC_CORE_INCLUDE_DIRS})
-target_include_directories(antic_core PRIVATE "${ANTIC_PCRE2_INCLUDE}")
+target_include_directories(antic_core SYSTEM PRIVATE "${ANTIC_PCRE2_INCLUDE}")
 target_link_libraries(antic_core PUBLIC antic_pcre2)
 
 add_executable(antic ${ANTIC_MAIN_SOURCES})
@@ -278,6 +279,8 @@ function(anti_cross_runtime_at target triple level root)
     else()
         set(library "${out}/libanti_rt.a")
     endif()
+    # The compiler names the headers each object includes in a dependency
+    # file, so a change of any header rebuilds the objects that read it.
     foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
         set(object "${work}/${source}.o")
         add_custom_command(OUTPUT "${object}"
@@ -286,29 +289,10 @@ function(anti_cross_runtime_at target triple level root)
                 ${ANTIC_C_WARNINGS}
                 "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
                 "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
+                -MMD -MF "${object}.d"
                 -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
             DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
-                "${PROJECT_SOURCE_DIR}/src/rt/rt.h" "${PROJECT_SOURCE_DIR}/src/rt/std.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/object.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/atomic.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/conf.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/cpu_level.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/hooks.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/json.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/platform.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/plugin.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/reflect.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/regex.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/registry.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/digest.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/hash.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/signal.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/symbols.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/sync.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/threads.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/toml.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/trace.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/utf.h"
+            DEPFILE "${object}.d"
             VERBATIM)
         list(APPEND objects "${object}")
     endforeach()
@@ -322,9 +306,10 @@ function(anti_cross_runtime_at target triple level root)
         COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
             ${ANTIC_C_WARNINGS}
             "${march}" "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
+            -MMD -MF "${stub}.d"
             -c "${PROJECT_SOURCE_DIR}/src/rt/license_stub.c" -o "${stub}"
         DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/license_stub.c"
-            "${PROJECT_SOURCE_DIR}/src/rt/std.h"
+        DEPFILE "${stub}.d"
         VERBATIM)
     # The stub stays beside the library, never a member of it.
     add_custom_command(OUTPUT "${library}"

@@ -55,7 +55,10 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     # is a runtime library of its own beside PCRE2 and no part of anti_rt.
     # It stands at the default level of the target, as PCRE2 does, and a
     # program that holds anti.regex links both. anti_rt stays the same
-    # bytes for every program that writes no pattern.
+    # bytes for every program that writes no pattern. The compiler names the
+    # headers of the glue in a dependency file, as for anti_rt, and pcre2.h
+    # stands in DEPENDS because the dependency file leaves out a system
+    # header.
     antic_native_library(glue_name "${target}" anti_rt_regex)
     set(glue "${ANTIC_RUNTIME_DIR}/lib/${target}/${glue_name}")
     set(glue_objects "")
@@ -66,14 +69,11 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
             COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
                 ${ANTIC_C_WARNINGS} ${flags}
                 "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=."
-                -isystem "${ANTIC_PCRE2_INCLUDE}"
+                -isystem "${ANTIC_PCRE2_INCLUDE}" -MMD -MF "${object}.d"
                 -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
             DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
-                "${PROJECT_SOURCE_DIR}/src/rt/regex.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/std.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/atomic.h"
-                "${PROJECT_SOURCE_DIR}/src/rt/cpu_level.h"
                 "${ANTIC_PCRE2_INCLUDE}/pcre2.h"
+            DEPFILE "${object}.d"
             VERBATIM)
         list(APPEND glue_objects "${object}")
     endforeach()
