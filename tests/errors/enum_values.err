@@ -1,0 +1,4 @@
+enum_values.anti:8:2: error: `B` follows `A` and does not fit `byte`
+enum_values.anti:14:2: error: `B` follows `A` and does not fit `i8`
+enum_values.anti:20:2: error: `B` follows `A` and does not fit `u64`
+enum_values.anti:26:2: error: `B` follows `A` and does not fit `int`

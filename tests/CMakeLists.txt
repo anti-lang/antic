@@ -3890,6 +3890,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "constraints|--front-end,constraints.anti"
         "hashing|--front-end,hashing.anti"
         "equality|--front-end,equality.anti"
+        "enum_values|--front-end,enum_values.anti"
         "overloads|--front-end,overloads.anti"
         "no_reflect|--front-end,--no-reflect,--runtime,${ANTIC_RUNTIME_DIR},no_reflect.anti"
         "direct_imports|--front-end,--runtime,${ANTIC_RUNTIME_DIR},direct_imports.anti"

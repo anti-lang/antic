@@ -1,0 +1,39 @@
+//! A value of an enum without `=` follows the one before it, and must fit the
+//! base of the enum as a written value must. Each enum below passes its base at
+//! its second value, apart from `Fits`, whose values stay inside it.
+
+enum Byte: u8
+{
+	A = 255,
+	B,
+}
+
+enum Small: i8
+{
+	A = 127,
+	B,
+}
+
+enum Wide: u64
+{
+	A = 18446744073709551615,
+	B,
+}
+
+enum Signed: i64
+{
+	A = 9223372036854775807,
+	B,
+}
+
+enum Fits: i8
+{
+	A = -2,
+	B,
+	C,
+}
+
+fn main() -> int
+{
+	return Fits.C as int;
+}

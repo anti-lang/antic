@@ -2250,6 +2250,21 @@ static void resolve_bases(struct checker *c)
     }
 }
 
+/* Whether the number after before, the bits of a value of base, is
+   still a value of base. */
+static bool follows_in(const struct type *base, uint64_t before)
+{
+    int bits = type_bits(base);
+    uint64_t top;
+
+    if (type_is_signed(base)) {
+        top = bits < 64 ? ((uint64_t)1 << (bits - 1)) - 1 : INT64_MAX;
+        return sema_signed_bits(before) < (int64_t)top;
+    }
+    top = bits < 64 ? ((uint64_t)1 << bits) - 1 : UINT64_MAX;
+    return before < top;
+}
+
 /* DESIGN: the values of an enum live in its fields, each with the
    enum as its type. A value without `=` follows the one before it,
    starting at 0, as C numbers an enumerator. */
@@ -2268,8 +2283,18 @@ static void declare_enum_values(struct checker *c, struct item *it)
         values[j].type = it->symbol->type;
         values[j].value = it->params[j].value;
         /* DESIGN: a value without `=` follows the one before it and
-           the first is 0, as C numbers an enumerator. */
+           the first is 0, as C numbers an enumerator. It must fit the
+           base, as a value written with `=` must. */
         values[j].number = j == 0 ? 0 : values[j - 1].number + 1;
+        if (j > 0 && it->params[j].value == NULL &&
+            !follows_in(it->symbol->type->base, values[j - 1].number)) {
+            sema_error_at(c, values[j].pos,
+                          "`%.*s` follows `%.*s` and does not fit `%s`",
+                          (int)values[j].name.length, values[j].name.text,
+                          (int)values[j - 1].name.length,
+                          values[j - 1].name.text,
+                          sema_tn(it->symbol->type->base));
+        }
         if (it->params[j].value != NULL) {
             struct const_value v;
             struct type *base = it->symbol->type->base;
