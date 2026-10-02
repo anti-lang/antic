@@ -57,7 +57,11 @@ void sema_check_at(struct checker *c, enum diag_name name, struct pos pos,
 }
 
 /* A type name for a message, kept in one of four rotating buffers so
-   that one message can name up to four types. */
+   that one message can name up to four types. DESIGN: the buffers are
+   global state, which antic may keep since it runs on one thread. The
+   fifth call writes over the first, so a caller that keeps the text
+   while it checks more of the tree copies it, as sema_check_field_inits
+   does. */
 const char *sema_tn(const struct type *t)
 {
     static char buffers[4][96];

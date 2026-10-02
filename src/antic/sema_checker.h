@@ -401,7 +401,7 @@ size_t sema_chain_fields(const struct type *t, struct struct_field *out);
 bool sema_check_field_inits(struct checker *c, struct expr *e,
                             struct field_init *inits, size_t count,
                             const struct struct_field *fields,
-                            size_t field_count, const char *type_name,
+                            size_t field_count, const char *literal_name,
                             bool skip_missing);
 struct type *sema_check_parallel(struct checker *c, struct expr *e);
 struct type *sema_check_dispatch(struct checker *c, struct expr *e);

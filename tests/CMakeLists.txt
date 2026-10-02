@@ -3907,6 +3907,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "hooks|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/hooks.s,hooks.anti"
         "closures|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/closures.s,closures.anti"
         "worker_params|-S,-o,${LISTINGS}/worker_params.s,worker_params.anti"
+        "literal_type_name|-S,-o,${LISTINGS}/literal_type_name.s,literal_type_name.anti"
         "optional_values|-S,-o,${LISTINGS}/optional_values.s,optional_values.anti"
         "snapshots|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/snapshots.s,snapshots.anti"
         "synchronized|-S,-o,${LISTINGS}/synchronized.s,synchronized.anti"

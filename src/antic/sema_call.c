@@ -3091,13 +3091,17 @@ size_t sema_chain_fields(const struct type *t, struct struct_field *out)
 bool sema_check_field_inits(struct checker *c, struct expr *e,
                             struct field_init *inits, size_t count,
                             const struct struct_field *fields,
-                            size_t field_count, const char *type_name,
+                            size_t field_count, const char *literal_name,
                             bool skip_missing)
 {
+    /* literal_name may be a buffer of sema_tn, which the literals nested
+       in this one take again, so the function keeps a copy of its own. */
+    char type_name[160];
     bool ok = true;
     size_t i;
     size_t j;
 
+    text_format(type_name, sizeof type_name, "%s", literal_name);
     for (i = 0; i < count; i++) {
         const struct struct_field *f = NULL;
         for (j = 0; j < field_count; j++) {

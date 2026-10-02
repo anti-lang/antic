@@ -1,0 +1,34 @@
+//! The message on a literal names its own type after the literals nested in it
+//! are checked, however deep they go.
+
+struct A
+{
+	x: int,
+}
+
+struct B
+{
+	a: A,
+}
+
+struct C
+{
+	b: B,
+}
+
+struct D
+{
+	c: C,
+}
+
+struct E
+{
+	d: D,
+	missing: int,
+}
+
+fn main() -> int
+{
+	let e = E { d: D { c: C { b: B { a: A { x: 1 } } } } };
+	return 0;
+}
