@@ -1196,6 +1196,23 @@ static struct expr *anonymous_fn(struct parser *p, const struct token *at)
     return it->body != NULL ? e : NULL;
 }
 
+/* The type arguments after the name of the literal e, with their
+   position. False after an error. */
+static bool literal_type_args(struct parser *p, struct expr *e)
+{
+    e->type_args_pos = pos_of(peek(p));
+    e->type_args = type_args(p, &e->type_arg_count);
+    return e->type_args != NULL;
+}
+
+/* The `{` of the literal e and its fields, or NULL after an error. */
+static struct expr *literal_fields(struct parser *p, struct expr *e)
+{
+    next(p);
+    e->as.struct_lit.fields = field_inits(p, &e->as.struct_lit.field_count);
+    return p->panic ? NULL : e;
+}
+
 static struct expr *primary(struct parser *p)
 {
     const struct token *t = peek(p);
@@ -1280,9 +1297,7 @@ static struct expr *primary(struct parser *p)
                 bool case_of = peek_at(p, end)->kind == TOKEN_DOT;
                 e = new_expr(p, EXPR_STRUCT_LIT, t);
                 expect_name(p, &e->as.struct_lit.name);
-                e->type_args_pos = pos_of(peek(p));
-                e->type_args = type_args(p, &e->type_arg_count);
-                if (e->type_args == NULL) {
+                if (!literal_type_args(p, e)) {
                     return NULL;
                 }
                 if (case_of) {
@@ -1290,10 +1305,7 @@ static struct expr *primary(struct parser *p)
                     next(p);
                     expect_name(p, &e->as.struct_lit.name);
                 }
-                next(p);
-                e->as.struct_lit.fields =
-                    field_inits(p, &e->as.struct_lit.field_count);
-                return p->panic ? NULL : e;
+                return literal_fields(p, e);
             }
             e = new_expr(p, EXPR_NAME, t);
             expect_name(p, &e->as.name);
@@ -1310,15 +1322,7 @@ static struct expr *primary(struct parser *p)
             expect_name(p, &e->as.struct_lit.module);
             next(p);
             expect_name(p, &e->as.struct_lit.name);
-            e->type_args_pos = pos_of(peek(p));
-            e->type_args = type_args(p, &e->type_arg_count);
-            if (e->type_args == NULL) {
-                return NULL;
-            }
-            next(p);
-            e->as.struct_lit.fields =
-                field_inits(p, &e->as.struct_lit.field_count);
-            return p->panic ? NULL : e;
+            return literal_type_args(p, e) ? literal_fields(p, e) : NULL;
         }
         qualified = peek_at(p, 1)->kind == TOKEN_DOT &&
                     peek_at(p, 2)->kind == TOKEN_IDENT &&
@@ -1343,10 +1347,7 @@ static struct expr *primary(struct parser *p)
                 next(p);
                 expect_name(p, &e->as.struct_lit.member);
             }
-            next(p);
-            e->as.struct_lit.fields =
-                field_inits(p, &e->as.struct_lit.field_count);
-            return p->panic ? NULL : e;
+            return literal_fields(p, e);
         }
         e = new_expr(p, EXPR_NAME, t);
         expect_name(p, &e->as.name);
