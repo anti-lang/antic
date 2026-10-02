@@ -16,6 +16,7 @@
 
 #include "../binary_stdio.h"
 #include "../../src/rt/digest.h"
+#include "../../src/rt/platform.h"
 #include "../../src/rt/plugin.h"
 #include "../../src/rt/registry.h"
 #include "check.h"
@@ -57,7 +58,7 @@ void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t writing)
     }
     memcpy(name, path, (size_t)len);
     name[len] = '\0';
-    return fopen(name, "rb");
+    return anti_rt_file_open(name, ANTI_FILE_READ);
 }
 
 int64_t anti_rt_fs_size(void *file)
@@ -504,7 +505,7 @@ static int find_plugin(void)
     plugin_name = slash + 1;
     snprintf(index_path, sizeof index_path, "%s/anti-plugins.toml",
              plugin_dir);
-    f = fopen(PLUGIN_BAD, "rb");
+    f = anti_rt_file_open(PLUGIN_BAD, ANTI_FILE_READ);
     if (f == NULL) {
         return 0;
     }
@@ -552,6 +553,14 @@ static void discovers_with(int line, const char *bytes, size_t length,
 #define DISCOVERS(text, want) \
     discovers_with(__LINE__, text, strlen(text), want)
 
+/* Append s to the text in to, a buffer of size bytes, cut to fit. */
+static void append(char *to, size_t size, const char *s)
+{
+    size_t used = strlen(to);
+
+    snprintf(to + used, size - used, "%s", s);
+}
+
 /* An index of one entry with the fields given, each a whole line or
    empty. The entry names plugin_bad unless path says otherwise. */
 static const char *entry_of_index(const char *path, const char *runtime,
@@ -563,19 +572,19 @@ static const char *entry_of_index(const char *path, const char *runtime,
     snprintf(text, sizeof text, "[[library]]\n");
     if (path != NULL) {
         snprintf(line, sizeof line, "path = '%s'\n", path);
-        strncat(text, line, sizeof text - strlen(text) - 1);
+        append(text, sizeof text, line);
     }
     if (runtime != NULL) {
         snprintf(line, sizeof line, "runtime = '%s'\n", runtime);
-        strncat(text, line, sizeof text - strlen(text) - 1);
+        append(text, sizeof text, line);
     }
     if (digest != NULL) {
         snprintf(line, sizeof line, "digest = '%s'\n", digest);
-        strncat(text, line, sizeof text - strlen(text) - 1);
+        append(text, sizeof text, line);
     }
     if (interfaces != NULL) {
         snprintf(line, sizeof line, "interfaces = %s\n", interfaces);
-        strncat(text, line, sizeof text - strlen(text) - 1);
+        append(text, sizeof text, line);
     }
     return text;
 }
@@ -653,19 +662,18 @@ static void damaged_indexes(void)
     snprintf(text, sizeof text, "%s",
              entry_of_index(plugin_name, "0.0.0", plugin_digest,
                             "['host.Service']"));
-    strncat(text, entry_of_index(plugin_name, "0.0.0", plugin_digest,
-                                 "['host.Service']"),
-            sizeof text - strlen(text) - 1);
+    append(text, sizeof text,
+           entry_of_index(plugin_name, "0.0.0", plugin_digest,
+                          "['host.Service']"));
     DISCOVERS(text, "both provide `host.Service`");
     /* The interface after 64 others in the list of the entry. */
     snprintf(interfaces, sizeof interfaces, "[");
     for (k = 0; k < 64; k++) {
         char one[32];
         snprintf(one, sizeof one, "'host.Other%d', ", k);
-        strncat(interfaces, one, sizeof interfaces - strlen(interfaces) - 1);
+        append(interfaces, sizeof interfaces, one);
     }
-    strncat(interfaces, "'host.Service']",
-            sizeof interfaces - strlen(interfaces) - 1);
+    append(interfaces, sizeof interfaces, "'host.Service']");
     DISCOVERS(entry_of_index(plugin_name, "0.0.0", plugin_digest, interfaces),
               NULL);
 }
