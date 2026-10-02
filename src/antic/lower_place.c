@@ -286,6 +286,65 @@ struct ir_operand lower_const_address(struct lowerer *l,
 
 }
 
+/* DESIGN: a constant that holds a class value is written part by part.
+   A class value needs its tables and the defaults its literal left out,
+   and runs `construct`, which read-only data cannot give. Every other
+   constant is one copy of its data or one store. */
+void lower_store_constant(struct lowerer *l, const struct type *t,
+                          const struct const_value *v, struct ir_operand dest)
+{
+    uint64_t i;
+
+    if (t->kind == TYPE_CLASS) {
+        lower_prepare_value(l, t, v, dest);
+        lower_run_construct(l, t, dest);
+        return;
+    }
+    if (sema_holds_class(t) && t->kind == TYPE_ARRAY) {
+        for (i = 0; i < v->as.aggregate.count; i++) {
+            lower_store_constant(
+                l, t->element, &v->as.aggregate.items[i],
+                lower_offset_address(l, dest,
+                                     lower_element_offset(l, t->element, i)));
+        }
+        return;
+    }
+    if (sema_holds_class(t) && type_has_fields(t)) {
+        for (i = 0; i < t->field_count; i++) {
+            const struct struct_field *f = &t->fields[i];
+            if (type_field_is_unit_break(f)) {
+                continue;
+            }
+            if (f->bits != 0) {
+                ir_bitstore(l->f, l->b, lower_ir_type_of(f->type),
+                            lower_constant(l, &v->as.aggregate.items[i],
+                                           lower_ir_type_of(f->type)),
+                            dest, lower_agg_of(l, t), (uint32_t)i);
+                continue;
+            }
+            lower_store_constant(
+                l, f->type, &v->as.aggregate.items[i],
+                lower_offset_address(l, dest,
+                                     lower_field_offset(l, t, &f->name)));
+        }
+        return;
+    }
+    if (lower_is_aggregate(t)) {
+        ir_memcopy(l->f, l->b, dest, lower_const_address(l, v, t),
+                   lower_vtype_of(l, t));
+        return;
+    }
+    /* A named function as an `own fn` is its code with no snapshot. */
+    if (t->kind == TYPE_FN && t->context) {
+        ir_store(l->f, l->b, IR_PTR, lower_constant(l, v, IR_PTR), dest);
+        ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0),
+                 lower_context_word(l, t, dest));
+        return;
+    }
+    ir_store(l->f, l->b, lower_ir_type_of(t),
+             lower_constant(l, v, lower_ir_type_of(t)), dest);
+}
+
 /* The bytes of s as the text of a constant, kept in the module's memory. */
 static void text_constant(struct lowerer *l, struct const_value *v,
                           const char *s)

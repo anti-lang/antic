@@ -335,6 +335,9 @@ bool lower_place(struct lowerer *l, const struct expr *e,
 struct ir_operand lower_const_address(struct lowerer *l,
                                       const struct const_value *v,
                                       const struct type *t);
+/* Write the constant v of type t to dest. */
+void lower_store_constant(struct lowerer *l, const struct type *t,
+                          const struct const_value *v, struct ir_operand dest);
 const struct const_value *lower_location_value(struct lowerer *l,
                                                struct pos pos,
                                                const struct type *t);
@@ -558,6 +561,9 @@ void lower_push_own_action(struct lowerer *l, const struct symbol *param);
 struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
                                       struct ir_operand value);
 void lower_clear_moved(struct lowerer *l, const struct expr *value);
+/* Whether e makes a fresh value at each use: a call, a literal, or a
+   class literal that defaults a parameter. */
+bool lower_is_fresh(const struct expr *e);
 /* Keep the fresh value that expression e gave at address to the end of
    its statement, when e is a call result or a literal whose type has a
    teardown. */
@@ -688,5 +694,9 @@ void lower_class_copy(struct lowerer *l, const struct type *t);
    every other field into the new object of type t at dest. */
 void lower_prepare_object(struct lowerer *l, const struct type *t,
                           const struct expr *lit, struct ir_operand dest);
+/* The same from value, the constant of a class literal. */
+void lower_prepare_value(struct lowerer *l, const struct type *t,
+                         const struct const_value *value,
+                         struct ir_operand dest);
 
 #endif

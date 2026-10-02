@@ -656,15 +656,18 @@ static bool literal_gives(const struct expr *lit, const struct name *name)
 
 /* DESIGN: every new object is prepared by this one function, whatever
    made it: a literal, `T(args)`, the init that an inline field, C and
-   `reflect.new` call, and the `get` of a singleton. It writes the table
-   pointers, then the fields the literal lit names, then the default of
-   every other field of the chain. A bitfield goes into its unit. An
-   `own fn` field without a default holds no snapshot, since `=` into it
-   in `construct` frees the one it held, and the memory of a frame or of
-   `malloc` holds whatever it held. A struct literal takes the same path
-   without the tables. lit is NULL where no literal names a field. */
-void lower_prepare_object(struct lowerer *l, const struct type *t,
-                          const struct expr *lit, struct ir_operand dest)
+   `reflect.new` call, the `get` of a singleton, and the constant of a
+   class literal that defaults a field or a parameter. It writes the table
+   pointers, then the fields the literal lit or the constant value names,
+   then the default of every other field of the chain. A bitfield goes
+   into its unit. An `own fn` field without a default holds no snapshot,
+   since `=` into it in `construct` frees the one it held, and the memory
+   of a frame or of `malloc` holds whatever it held. A struct literal
+   takes the same path without the tables. lit and value are NULL where
+   neither names a field. */
+static void prepare(struct lowerer *l, const struct type *t,
+                    const struct expr *lit, const struct const_value *value,
+                    struct ir_operand dest)
 {
     const struct type *up;
     size_t i;
@@ -692,14 +695,28 @@ void lower_prepare_object(struct lowerer *l, const struct type *t,
                           field_at(l, at, field, dest));
     }
     /* A field the literal leaves out has a default, which the checker
-       required, so the value is complete however it was made. */
+       required, so the value is complete however it was made. The value
+       of a class holds its base as field 0, a value of the base. */
     for (up = t; up != NULL; up = up->kind == TYPE_CLASS ? up->base : NULL) {
         for (i = 0; i < up->field_count; i++) {
             const struct struct_field *field = &up->fields[i];
+            const struct const_value *item =
+                value != NULL ? &value->as.aggregate.items[i] : NULL;
             if (literal_gives(lit, &field->name)) {
                 continue;
             }
-            if (lower_has_default(field)) {
+            if (item != NULL && item->kind != CONST_DEFAULT &&
+                field->form != FIELD_BASE) {
+                if (field->bits != 0) {
+                    ir_bitstore(l->f, l->b, lower_ir_type_of(field->type),
+                                lower_constant(l, item,
+                                               lower_ir_type_of(field->type)),
+                                dest, lower_agg_of(l, up), (uint32_t)i);
+                } else {
+                    lower_store_constant(l, field->type, item,
+                                         field_at(l, up, field, dest));
+                }
+            } else if (lower_has_default(field)) {
                 lower_store_field_default(l, up, i, dest);
             } else if (field->type->kind == TYPE_FN && field->type->owned) {
                 struct ir_operand at = field_at(l, up, field, dest);
@@ -708,5 +725,22 @@ void lower_prepare_object(struct lowerer *l, const struct type *t,
                          lower_context_word(l, field->type, at));
             }
         }
+        value = value != NULL && up->field_count > 0 &&
+                        up->fields[0].form == FIELD_BASE
+                    ? &value->as.aggregate.items[0]
+                    : NULL;
     }
+}
+
+void lower_prepare_object(struct lowerer *l, const struct type *t,
+                          const struct expr *lit, struct ir_operand dest)
+{
+    prepare(l, t, lit, NULL, dest);
+}
+
+void lower_prepare_value(struct lowerer *l, const struct type *t,
+                         const struct const_value *value,
+                         struct ir_operand dest)
+{
+    prepare(l, t, NULL, value, dest);
 }

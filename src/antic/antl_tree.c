@@ -39,7 +39,7 @@ _Static_assert(ATOMIC_CAS == 7, "raise ANTL_VERSION, then update this");
 _Static_assert(VIS_PUB == 3, "raise ANTL_VERSION, then update this");
 _Static_assert(FN_CONCRETE == 2, "raise ANTL_VERSION, then update this");
 _Static_assert(EVAL_DONE == 2, "raise ANTL_VERSION, then update this");
-_Static_assert(CONST_SYMBOLIC == 8, "raise ANTL_VERSION, then update this");
+_Static_assert(CONST_DEFAULT == 9, "raise ANTL_VERSION, then update this");
 
 /* A reference to a symbol: 0 for none, a local by its index plus 1, and
    a symbol of the extern table with this bit set. */

@@ -14,5 +14,10 @@ fn main() -> int
 	t.add();
 	t.add(5);
 	printf("total %d\n".ptr, t.total as c_int);
+	let h = greeter.Holder { };
+	printf("holder %d %d %d made %d\n".ptr, h.pair.a as c_int,
+		h.pair.b as c_int, h.pair.sum() as c_int, h.pair.made as c_int);
+	printf("count %d\n".ptr, h.count as c_int);
+	greeter.show();
 	return 0;
 }

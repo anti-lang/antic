@@ -59,6 +59,49 @@ static bool fail_const(struct checker *c, const struct expr *e,
     return false;
 }
 
+/* DESIGN: the value of a class literal holds each field of the class at
+   its index. The base is field 0, a value of the base class from the
+   same literal, since the literal names an inherited field as its own.
+   A field the literal names holds its value, and every other field is
+   CONST_DEFAULT. Lowering writes the tables, then each CONST_DEFAULT as
+   a literal writes a field it leaves out, then runs `construct`. A table,
+   a lock, an `inject` field and a default that is no constant all keep
+   their meaning, and the value names no other class's defaults, which
+   may not be evaluated yet. */
+static bool class_value(struct checker *c, const struct expr *lit,
+                        struct type *s, struct const_value *out)
+{
+    size_t i;
+    size_t j;
+
+    out->kind = CONST_STRUCT;
+    out->type = s;
+    out->as.aggregate.count = s->field_count;
+    out->as.aggregate.items =
+        types_alloc_array(c->arena, s->field_count,
+                          sizeof *out->as.aggregate.items);
+    for (j = 0; j < s->field_count; j++) {
+        struct const_value *item = &out->as.aggregate.items[j];
+        item->kind = CONST_DEFAULT;
+        item->type = s->fields[j].type;
+        if (s->fields[j].form == FIELD_BASE) {
+            if (!class_value(c, lit, s->fields[j].type, item)) {
+                return false;
+            }
+            continue;
+        }
+        for (i = 0; i < lit->as.struct_lit.field_count; i++) {
+            if (sema_same_name(&s->fields[j].name,
+                               &lit->as.struct_lit.fields[i].name) &&
+                !sema_eval_const(c, lit->as.struct_lit.fields[i].value,
+                                 item)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 /* A constant as a symbolic node: a symbolic value itself, or a number,
    a bool or a character as a node of its type. */
 static const struct symbolic *as_symbolic(struct checker *c,
@@ -686,6 +729,9 @@ bool sema_eval_const(struct checker *c, struct expr *e,
         if (s->kind == TYPE_VARIANT) {
             return fail_const(c, e, "a variant");
         }
+        if (s->kind == TYPE_CLASS) {
+            return class_value(c, e, s, out);
+        }
         out->kind = CONST_STRUCT;
         out->as.aggregate.count = s->field_count;
         out->as.aggregate.items =
@@ -728,9 +774,9 @@ bool sema_eval_const(struct checker *c, struct expr *e,
             return fail_const(c, e, "this field");
         }
         base = e->as.field.base->type;
-        /* The value of a class literal keeps the filler above in its
-           base, its tables and the fields it does not name. A field of
-           it is therefore read only at run time. */
+        /* The value of a class literal leaves its tables and the fields
+           it does not name to lowering, as CONST_DEFAULT. A field of it
+           is therefore read only at run time. */
         if (base->kind == TYPE_CLASS) {
             return fail_const(c, e, "a field of a class");
         }
@@ -978,7 +1024,7 @@ static bool class_in(const struct type *t, struct ptr_set *answered)
     return false;
 }
 
-static bool holds_class(const struct type *t)
+bool sema_holds_class(const struct type *t)
 {
     struct ptr_set answered;
     bool holds;
@@ -1049,7 +1095,7 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
        constant that holds a class is refused. A default of a field
        still takes a class literal, which lowering writes from the
        expression. */
-    if (ok && holds_class(t)) {
+    if (ok && sema_holds_class(t)) {
         sema_error_at(c, value->pos, "a class is not a constant expression");
         ok = false;
     }

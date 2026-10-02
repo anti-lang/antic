@@ -651,6 +651,8 @@ void antl_put_value(struct writer *w, const struct const_value *v)
     case CONST_SYMBOLIC:
         antl_put_symbolic(w, v->as.symbolic);
         break;
+    case CONST_DEFAULT:
+        break;
     }
 }
 
@@ -2194,8 +2196,17 @@ bool antl_read_value(struct reader *r, struct type *t, struct const_value *v,
                                  depth + 1)) {
                 return false;
             }
+            /* A field a class literal leaves out stands in the value of
+               a class alone, and its base is a value of the base. */
+            if (v->as.aggregate.items[i].kind == CONST_DEFAULT &&
+                (kind != CONST_STRUCT || t->kind != TYPE_CLASS ||
+                 t->fields[i].form == FIELD_BASE)) {
+                return false;
+            }
         }
         return true;
+    case CONST_DEFAULT:
+        return depth > 0;
     default:
         return false;
     }

@@ -1,0 +1,74 @@
+//! A literal of a class as the default of a parameter and of a field. The value
+//! keeps the defaults of the fields the literal leaves out, the tables of the
+//! class and the run of its `construct`. A default argument is torn down after
+//! the call, as a literal argument is.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Pair
+{
+	pub a: int = 5,
+	pub b: int = 6,
+	pub made: int = 0,
+
+	fn construct(self)
+	{
+		self.made += 1;
+	}
+
+	pub fn sum(self) -> int
+	{
+		return self.a + self.b;
+	}
+}
+
+class Labelled inherits Pair
+{
+	pub label: str = "none",
+}
+
+class Holder
+{
+	pub pair: Pair = Pair { a: 1 },
+	pub labelled: Labelled = Labelled { b: 3, label: "set" },
+}
+
+fn show(p: Pair = Pair { b: 2 }) {
+	printf("pair %d %d %d made %d\n".ptr, p.a as c_int, p.b as c_int,
+		p.sum() as c_int, p.made as c_int);
+}
+
+	fn show_labelled(p: Labelled = Labelled { a: 4 }) {
+	printf("labelled %d %d %.*s %d\n".ptr, p.a as c_int, p.b as c_int,
+		p.label.len as c_int, p.label.ptr, p.sum() as c_int);
+}
+
+	class Noted
+{
+	pub n: int = 1,
+
+	fn destruct(self)
+	{
+		printf("gone %d\n".ptr, self.n as c_int);
+	}
+}
+
+fn note(x: Noted = Noted { n: 2 }) {
+	printf("note %d\n".ptr, x.n as c_int);
+}
+
+	fn main() -> int
+{
+	note(Noted { n: 3 });
+	note();
+	show();
+	show();
+	show_labelled();
+	let h = Holder { };
+	printf("holder %d %d made %d\n".ptr, h.pair.a as c_int,
+		h.pair.b as c_int, h.pair.made as c_int);
+	printf("labelled %d %d %.*s\n".ptr, h.labelled.a as c_int,
+		h.labelled.b as c_int, h.labelled.label.len as c_int,
+		h.labelled.label.ptr);
+	return 0;
+}

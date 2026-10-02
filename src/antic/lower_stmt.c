@@ -1095,6 +1095,14 @@ static void assert_branch(struct lowerer *l, struct ir_operand cond,
    That is where the code after the block comes from. */
 static void lower_stmt_kind(struct lowerer *l, const struct stmt *s);
 
+bool lower_is_fresh(const struct expr *e)
+{
+    return e->kind == EXPR_CALL || e->kind == EXPR_STRUCT_LIT ||
+           e->kind == EXPR_TUPLE ||
+           (e->kind == EXPR_NAME && e->symbol != NULL &&
+            e->symbol->kind == SYMBOL_CONST && sema_holds_class(e->type));
+}
+
 /* DESIGN: a fresh value that a statement reads through a field or passes
    as a receiver lives to the end of the statement, as a temporary of C++
    does, and is then torn down. `Box.make(1).n` reads the field and then
@@ -1109,8 +1117,7 @@ void lower_keep_temp(struct lowerer *l, const struct expr *e,
     struct statement_temp *t;
 
     if (l->b == NULL || e == NULL || e->type == NULL ||
-        (e->kind != EXPR_CALL && e->kind != EXPR_STRUCT_LIT &&
-         e->kind != EXPR_TUPLE) ||
+        !lower_is_fresh(e) ||
         (e->kind == EXPR_CALL && e->as.call.hashes) ||
         e->type->kind == TYPE_POINTER || !sema_needs_teardown(e->type)) {
         return;

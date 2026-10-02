@@ -588,6 +588,13 @@ struct ir_operand lower_address(struct lowerer *l,
 
     if (sym != NULL && sym->kind == SYMBOL_CONST &&
         (e->kind == EXPR_NAME || e->kind == EXPR_FIELD)) {
+        /* A class literal that defaults a parameter is written into a
+           slot of its own at each call. */
+        if (sema_holds_class(e->type)) {
+            slot = ir_entry_slot(l->f, lower_vtype_of(l, e->type));
+            lower_store_constant(l, e->type, sym->value, lower_temp(l, slot));
+            return lower_temp(l, slot);
+        }
         return lower_const_address(l, sym->value, e->type);
     }
     /* A static field is a global, and its name is its whole address. */
@@ -1704,8 +1711,7 @@ static const struct type *fresh_argument(const struct symbol *sym,
         (index < sym->owned_count && sym->owned[index])) {
         return NULL;
     }
-    if (arg->kind != EXPR_CALL && arg->kind != EXPR_STRUCT_LIT &&
-        arg->kind != EXPR_TUPLE) {
+    if (!lower_is_fresh(arg)) {
         return NULL;
     }
     t = wraps(arg) ? arg->to_optional : arg->type;

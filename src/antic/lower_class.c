@@ -106,9 +106,6 @@ static struct ir_operand default_scalar(struct lowerer *l,
 static void store_default(struct lowerer *l, const struct struct_field *field,
                           struct ir_operand address)
 {
-    struct ir_operand v;
-    struct ir_vtype vtype;
-
     /* DESIGN: an `inject` field is filled by a call through the slot of
        its interface, before `construct` runs. The call is indirect, so
        a replacement of the slot reaches every site. */
@@ -142,23 +139,7 @@ static void store_default(struct lowerer *l, const struct struct_field *field,
         lower_store_value(l, field->type, field->value, address);
         return;
     }
-    /* A named function as the default of an `own fn` field is its code
-       with no snapshot. */
-    if (field->type->kind == TYPE_FN && field->type->context) {
-        ir_store(l->f, l->b, IR_PTR,
-                 lower_constant(l, field->constant, IR_PTR), address);
-        ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0),
-                 lower_context_word(l, field->type, address));
-        return;
-    }
-    if (lower_is_aggregate(field->type)) {
-        v = lower_const_address(l, field->constant, field->type);
-        vtype = lower_vtype_of(l, field->type);
-        ir_memcopy(l->f, l->b, address, v, vtype);
-        return;
-    }
-    v = default_scalar(l, field);
-    ir_store(l->f, l->b, lower_ir_type_of(field->type), v, address);
+    lower_store_constant(l, field->type, field->constant, address);
 }
 
 /* Put the default of field i of owner into the object at object. A

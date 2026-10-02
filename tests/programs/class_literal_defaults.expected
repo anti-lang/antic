@@ -1,0 +1,10 @@
+exit 0
+note 3
+gone 3
+note 2
+gone 2
+pair 5 2 7 made 1
+pair 5 2 7 made 1
+labelled 4 6 none 10
+holder 1 6 made 1
+labelled 5 3 set

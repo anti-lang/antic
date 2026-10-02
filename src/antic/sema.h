@@ -33,7 +33,8 @@ enum const_kind {
     CONST_TEXT,     /* a string or byte string literal */
     CONST_ARRAY,
     CONST_STRUCT,
-    CONST_SYMBOLIC  /* an integer or bool computed from size_of */
+    CONST_SYMBOLIC, /* an integer or bool computed from size_of */
+    CONST_DEFAULT   /* a field of a class value the literal leaves out */
 };
 
 /* The value of a constant, computed at compile time. */
@@ -216,6 +217,9 @@ struct stmt *sema_arm_fallthrough(const struct stmt *body);
 /* Whether a field without a written default takes `T { }`: an inline
    class value whose class a literal may write with no field named. */
 bool sema_field_takes_literal(const struct struct_field *f);
+/* Whether a value of type t holds a class, itself or in a field or an
+   element. */
+bool sema_holds_class(const struct type *t);
 /* Whether fn has a body: here, in the runtime, or in the module whose
    library file declared it. */
 bool sema_has_body(const struct item *fn);

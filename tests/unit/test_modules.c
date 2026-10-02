@@ -335,7 +335,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 74, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 75, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -1495,9 +1495,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 75;
+    copy[4] = 76;
     refuses_file(copy, sizeof copy,
-                 "has format version 75, and antic reads version 74");
+                 "has format version 76, and antic reads version 75");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -1626,6 +1626,65 @@ static void refuses_poke(const struct text *bytes, size_t at,
     memcpy(copy + at, value, count);
     refuses_file(copy, bytes->length, NULL);
     free(copy);
+}
+
+/* The value of a class literal that defaults a field: its base is a value
+   of the base, and a field the literal leaves out is CONST_DEFAULT. The
+   file reads back to the same bytes. A CONST_DEFAULT in place of the base,
+   or as the whole default, is refused. */
+static void class_literal_defaults(void)
+{
+    /* Box { w: 3 }: the struct of three fields, the base Object with its
+       table left out, w as the integer 3 and h left out. */
+    static const uint8_t value[] = {
+        CONST_STRUCT, 3, 0, 0, 0,
+        CONST_STRUCT, 1, 0, 0, 0, CONST_DEFAULT,
+        CONST_INT, 3, 0, 0, 0, 0, 0, 0, 0,
+        CONST_DEFAULT,
+    };
+    static const uint8_t left_out = CONST_DEFAULT;
+    struct session a;
+    struct session b;
+    struct text first = {0};
+    struct text second = {0};
+    struct ir_module program;
+    struct interface *iface;
+    char error[160] = "";
+    size_t at = SIZE_MAX;
+    size_t i;
+
+    open_session(&a);
+    build_library(&a, "boxes",
+                  "pub class Box { pub w: int = 1, pub h: int = 2 }\n"
+                  "pub class Shelf { pub box: Box = Box { w: 3 }, "
+                  "pub n: int = 4 }\n",
+                  &first);
+    for (i = 0; i + sizeof value <= first.length; i++) {
+        if (memcmp(first.data + i, value, sizeof value) == 0) {
+            at = i;
+        }
+    }
+    CHECK(at != SIZE_MAX);
+    open_session(&b);
+    ir_module_init(&program, &b.arena, "boxes");
+    iface = antl_read((const uint8_t *)first.data, first.length, NULL, 0,
+                      &b.types, &b.arena, &program, error, sizeof error);
+    CHECK_STR(error, "");
+    CHECK(iface != NULL);
+    if (iface != NULL) {
+        antl_write(&second, iface, &program, false);
+        CHECK(first.length == second.length &&
+              memcmp(first.data, second.data, first.length) == 0);
+    }
+    if (at != SIZE_MAX) {
+        refuses_poke(&first, at + 5, &left_out, 1);
+        refuses_poke(&first, at, &left_out, 1);
+    }
+    text_free(&first);
+    text_free(&second);
+    ir_module_free(&program);
+    close_session(&b);
+    close_session(&a);
 }
 
 static void poke_u32(uint8_t out[4], uint32_t v)
@@ -2950,6 +3009,7 @@ void test_modules(void)
     writes_format();
     round_trip();
     round_trip_class();
+    class_literal_defaults();
     keeps_symbolic_sizes();
     package_and_docs();
     private_field_docs();

@@ -29,3 +29,36 @@ pub class Tally
 		self.total += n;
 	}
 }
+
+/// A class whose fields have defaults, and whose `construct` counts.
+pub class Pair
+{
+	pub a: int = 5,
+	pub b: int = 6,
+	pub made: int = 0,
+
+	fn construct(self)
+	{
+		self.made += 1;
+	}
+
+	/// The sum of both fields.
+	pub fn sum(self) -> int
+	{
+		return self.a + self.b;
+	}
+}
+
+/// A class whose field defaults to a literal that names one field of `Pair` and
+/// leaves the other to its default.
+pub class Holder
+{
+	pub pair: Pair = Pair { a: 1 },
+	pub count: int = 9,
+}
+
+/// The fields of `p`, which defaults to a literal of a class.
+pub fn show(p: Pair = Pair { b: 2 }) {
+	printf("pair %d %d %d made %d\n".ptr, p.a as c_int, p.b as c_int,
+		p.sum() as c_int, p.made as c_int);
+}
