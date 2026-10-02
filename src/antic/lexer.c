@@ -1058,18 +1058,11 @@ static void hex_character(struct lexer *lx, int *pending, int *pending_line,
     advance(lx);
 }
 
-/* A string literal: a prefix from the table, then n '#', a quote, the
-   content and a quote followed by n '#'. */
-static void string(struct lexer *lx, const struct string_prefix *prefix,
-                   size_t start, int line, int column)
+/* Read the prefix of a string literal, its hash delimiters and its
+   opening quote. Returns the count of the hashes. */
+static size_t open_quote(struct lexer *lx, const struct string_prefix *prefix)
 {
-    struct text bytes = {0};
-    enum literal_mode mode = prefix->bytes ? MODE_BYTES : MODE_STR;
     size_t hashes = 0;
-    bool valid = true;
-    int pending = -1;
-    int pending_line = 0;
-    int pending_column = 0;
     size_t k;
 
     for (k = 0; prefix->spelling[k] != '\0'; k++) {
@@ -1080,6 +1073,54 @@ static void string(struct lexer *lx, const struct string_prefix *prefix,
         advance(lx);
     }
     advance(lx); /* the opening quote */
+    return hashes;
+}
+
+/* Read one character of the content of a literal into bytes: an escape
+   where escapes is set, CR LF as LF and any other byte as it stands. A
+   NUL stands in a byte string alone. valid turns false after an error. */
+static void content_char(struct lexer *lx, enum literal_mode mode,
+                         bool escapes, struct text *bytes, bool *valid)
+{
+    int c = at(lx, 0);
+
+    if (c == '\\' && escapes) {
+        uint32_t value;
+        bool raw_byte;
+        if (!escape(lx, mode, &value, &raw_byte)) {
+            *valid = false;
+        } else if (raw_byte) {
+            append_byte(bytes, (unsigned char)value);
+        } else {
+            append_utf8(bytes, value);
+        }
+    } else if (c == '\r' && at(lx, 1) == '\n') {
+        append_byte(bytes, '\n');
+        advance(lx);
+        advance(lx);
+    } else if (c == 0 && mode != MODE_BYTES) {
+        error_at(lx, lx->line, lx->column, "NUL is not allowed here");
+        *valid = false;
+        advance(lx);
+    } else {
+        append_byte(bytes, (unsigned char)c);
+        advance(lx);
+    }
+}
+
+/* A string literal: a prefix from the table, then n '#', a quote, the
+   content and a quote followed by n '#'. */
+static void string(struct lexer *lx, const struct string_prefix *prefix,
+                   size_t start, int line, int column)
+{
+    struct text bytes = {0};
+    enum literal_mode mode = prefix->bytes ? MODE_BYTES : MODE_STR;
+    size_t hashes = open_quote(lx, prefix);
+    bool valid = true;
+    int pending = -1;
+    int pending_line = 0;
+    int pending_column = 0;
+
     if (prefix->form == FORM_HEX && hashes > 0) {
         error_at(lx, line, column, "`x\"...\"` takes no hash delimiters");
         valid = false;
@@ -1111,30 +1152,11 @@ static void string(struct lexer *lx, const struct string_prefix *prefix,
         } else if (prefix->form == FORM_HEX) {
             hex_character(lx, &pending, &pending_line, &pending_column,
                           &bytes, &valid);
-        } else if (c == '\\' && prefix->form != FORM_RAW &&
-                   prefix->form != FORM_PATTERN) {
-            uint32_t value;
-            bool raw_byte;
-            if (escape(lx, mode, &value, &raw_byte)) {
-                if (raw_byte) {
-                    append_byte(&bytes, (unsigned char)value);
-                } else {
-                    append_utf8(&bytes, value);
-                }
-            } else {
-                valid = false;
-            }
-        } else if (c == '\r' && at(lx, 1) == '\n') {
-            append_byte(&bytes, '\n');
-            advance(lx);
-            advance(lx);
-        } else if (c == 0 && mode != MODE_BYTES) {
-            error_at(lx, lx->line, lx->column, "NUL is not allowed here");
-            valid = false;
-            advance(lx);
         } else {
-            append_byte(&bytes, (unsigned char)c);
-            advance(lx);
+            content_char(lx, mode,
+                         prefix->form != FORM_RAW &&
+                             prefix->form != FORM_PATTERN,
+                         &bytes, &valid);
         }
     }
 
@@ -1315,19 +1337,11 @@ static void interpolated(struct lexer *lx, const struct string_prefix *prefix,
     struct piece_list pieces = {NULL, 0, 0};
     struct format_piece *last;
     struct format_piece *kept;
-    size_t hashes = 0;
+    size_t hashes = open_quote(lx, prefix);
     size_t end;
     bool valid = true;
     size_t k;
 
-    for (k = 0; prefix->spelling[k] != '\0'; k++) {
-        advance(lx);
-    }
-    while (at(lx, 0) == '#') {
-        hashes++;
-        advance(lx);
-    }
-    advance(lx); /* the opening quote */
     if (prefix->refused != NULL) {
         error_at(lx, line, column, "%s", prefix->refused);
         valid = false;
@@ -1370,25 +1384,8 @@ static void interpolated(struct lexer *lx, const struct string_prefix *prefix,
                      interpolated_name(raw));
             valid = false;
             advance(lx);
-        } else if (c == '\\' && !raw) {
-            uint32_t value;
-            bool raw_byte;
-            if (escape(lx, MODE_STR, &value, &raw_byte)) {
-                append_utf8(&bytes, value);
-            } else {
-                valid = false;
-            }
-        } else if (c == '\r' && at(lx, 1) == '\n') {
-            append_byte(&bytes, '\n');
-            advance(lx);
-            advance(lx);
-        } else if (c == 0) {
-            error_at(lx, lx->line, lx->column, "NUL is not allowed here");
-            valid = false;
-            advance(lx);
         } else {
-            append_byte(&bytes, (unsigned char)c);
-            advance(lx);
+            content_char(lx, MODE_STR, !raw, &bytes, &valid);
         }
     }
     lx->depth--;
