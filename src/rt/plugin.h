@@ -125,7 +125,9 @@ const struct anti_registry *anti_rt_plugin_registry(int64_t index);
 
 /* Open the library at path, check it against the host and take its
    classes into the registry. Gives the handle of the load, or NULL,
-   and a failure leaves its reason in anti_rt_plugin_message. */
+   and a failure leaves its reason in anti_rt_plugin_message. The caller
+   owns the handle and gives it back with anti_rt_plugin_unload, which
+   refuses while an object of the library is alive. */
 void *anti_rt_plugin_load(const unsigned char *path, int64_t length);
 
 /* The reason the last call of this thread failed, empty after one that

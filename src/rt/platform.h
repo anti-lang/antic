@@ -235,7 +235,8 @@ int anti_rt_directory_list(const char *path,
 /* The system's loader of shared libraries. open takes a path in UTF-8
    and gives NULL when it fails, and error then gives the reason. A reason
    the system writes itself goes to text, of size bytes. The reason
-   dlerror gives is kept per thread by the C library. */
+   dlerror gives is kept per thread by the C library. The handle open
+   gives belongs to the caller, and close gives it back. */
 void *anti_rt_library_open(const char *path);
 void anti_rt_library_close(void *handle);
 void *anti_rt_library_symbol(void *handle, const char *name);

@@ -27,7 +27,8 @@ struct anti_pattern {
 
 /* The compiled form of the pattern of length bytes at bytes, or NULL when
    it does not compile. Then *code holds the error number of PCRE2 and
-   *offset the byte of the pattern where PCRE2 stopped. */
+   *offset the byte of the pattern where PCRE2 stopped. The caller owns
+   the handle and gives it back with anti_rt_regex_free. */
 void *anti_rt_regex_compile(const unsigned char *bytes, int64_t length,
                             int32_t *code, int64_t *offset);
 
@@ -37,7 +38,8 @@ void *anti_rt_regex_compile(const unsigned char *bytes, int64_t length,
    bytes, and a class that holds one becomes a choice of byte sequences.
    A negated class that holds one is refused with
    ANTI_RT_REGEX_WIDE_NEGATED, and a range that reaches one with
-   ANTI_RT_REGEX_WIDE_RANGE, at the character. */
+   ANTI_RT_REGEX_WIDE_RANGE, at the character. The caller owns the
+   handle and gives it back with anti_rt_regex_free. */
 void *anti_rt_regex_compile_bytes(const unsigned char *bytes, int64_t length,
                                   int32_t *code, int64_t *offset);
 
@@ -49,7 +51,8 @@ void *anti_rt_regex_compile_bytes(const unsigned char *bytes, int64_t length,
 /* Whether the compiled pattern searches bytes. */
 int anti_rt_regex_is_bytes(const void *compiled);
 
-/* Give back what anti_rt_regex_compile made. */
+/* Give back what anti_rt_regex_compile or anti_rt_regex_compile_bytes
+   made. */
 void anti_rt_regex_free(void *compiled);
 
 /* Write the message PCRE2 gives for the error number code into out, a
