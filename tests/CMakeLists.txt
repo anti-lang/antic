@@ -1648,6 +1648,16 @@ add_test(NAME anti_build_deps
         "-DHOST=${ANTIC_HOST_TARGET}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-deps"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build_deps.cmake")
+# A walk whose pick of a package changes drops the requirements of the
+# old pick, and the packages only it needed.
+add_test(NAME anti_build_resolve
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-resolve"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build_resolve.cmake")
 # A malformed index.toml and anti.lock: names, versions, module paths and
 # digests that are not the grammar of their kind are refused before they
 # reach a path in the cache, a comparison or the lock file.

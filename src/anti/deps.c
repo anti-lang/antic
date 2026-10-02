@@ -148,6 +148,8 @@ struct requirement {
     struct text constraint;
     struct text repo;           /* a URL, empty when none was named */
     struct text path;           /* a directory, empty otherwise */
+    struct text from;           /* the package whose pick needs it, empty
+                                   for the manifest */
 };
 
 struct resolver {
@@ -167,6 +169,7 @@ static void requirement_free(struct requirement *r)
     text_free(&r->constraint);
     text_free(&r->repo);
     text_free(&r->path);
+    text_free(&r->from);
 }
 
 static void package_free(struct dep_package *p)
@@ -241,17 +244,21 @@ static struct dep_module *package_module(struct dep_package *p,
     return &p->modules[p->module_count++];
 }
 
-/* Add one requirement, or widen the one already there. Two requirements
-   on one package keep both constraints, so the pick satisfies each. */
+/* Add one requirement of from, or widen the one already there. Two
+   requirements on one package keep both constraints, so the pick
+   satisfies each. from is the package whose pick needs it, or "" for the
+   manifest. */
 static void require(struct resolver *r, const char *name,
-                    const char *constraint, const char *repo, const char *path)
+                    const char *constraint, const char *repo, const char *path,
+                    const char *from)
 {
     struct requirement *item;
     size_t i;
 
     for (i = 0; i < r->requirement_count; i++) {
         if (strcmp(text_cstr(&r->requirements[i].name), name) == 0 &&
-            strcmp(text_cstr(&r->requirements[i].constraint), constraint) == 0) {
+            strcmp(text_cstr(&r->requirements[i].constraint), constraint) == 0 &&
+            strcmp(text_cstr(&r->requirements[i].from), from) == 0) {
             return;
         }
     }
@@ -267,6 +274,64 @@ static void require(struct resolver *r, const char *name,
     if (path != NULL) {
         text_append(&item->path, path);
     }
+    text_append(&item->from, from);
+}
+
+/* Remove the pick of name from the graph. */
+static void graph_remove(struct dep_graph *g, const char *name)
+{
+    struct dep_package *p = graph_package(g, name);
+    size_t at;
+
+    if (p == NULL) {
+        return;
+    }
+    at = (size_t)(p - g->packages);
+    package_free(p);
+    memmove(&g->packages[at], &g->packages[at + 1],
+            (g->count - at - 1) * sizeof *g->packages);
+    g->count--;
+}
+
+/* DESIGN: a pick holds the requirements its own dependencies make, and
+   nothing else does. Taking the pick of name back drops them. A package
+   that one of them constrained may then take a higher version, or be
+   needed by nothing, so its pick goes back as well, and the walk picks
+   again what is still required. The worklist holds the names whose pick
+   goes back, and a name already out of the graph adds nothing, so a
+   cycle of dependencies ends. */
+static void unpick(struct resolver *r, const char *name)
+{
+    struct text *work = NULL;
+    size_t count = 0;
+    size_t i;
+
+    work = files_resize(work, 1, sizeof *work);
+    memset(&work[0], 0, sizeof *work);
+    text_append(&work[count++], name);
+    while (count > 0) {
+        struct text one = work[--count];
+        const char *gone = text_cstr(&one);
+        graph_remove(&r->graph, gone);
+        for (i = 0; i < r->requirement_count;) {
+            struct requirement *req = &r->requirements[i];
+            if (strcmp(text_cstr(&req->from), gone) != 0) {
+                i++;
+                continue;
+            }
+            if (graph_package(&r->graph, text_cstr(&req->name)) != NULL) {
+                work = files_resize(work, count + 1, sizeof *work);
+                memset(&work[count], 0, sizeof *work);
+                text_append(&work[count++], text_cstr(&req->name));
+            }
+            requirement_free(req);
+            memmove(req, req + 1,
+                    (r->requirement_count - i - 1) * sizeof *req);
+            r->requirement_count--;
+        }
+        text_free(&one);
+    }
+    free(work);
 }
 
 /* Whether version satisfies every requirement on name. */
@@ -318,9 +383,11 @@ bool deps_library_header(const char *file, struct arena *arena,
 }
 
 /* The package header of a library file: its package name, its version
-   and, with r, the dependencies it carries as requirements. */
+   and, with r, the dependencies it carries as requirements of the
+   package from. */
 static bool library_header(const char *file, struct text *name,
-                           struct text *version, struct resolver *r)
+                           struct text *version, struct resolver *r,
+                           const char *from)
 {
     struct arena arena = {0};
     struct package package;
@@ -338,7 +405,7 @@ static bool library_header(const char *file, struct text *name,
     for (i = 0; r != NULL && i < package.dependency_count; i++) {
         const struct package_dependency *d = &package.dependencies[i];
         require(r, d->name, d->constraint == NULL ? "" : d->constraint,
-                d->url, NULL);
+                d->url, NULL, from);
     }
     ok = true;
 done:
@@ -403,7 +470,7 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
         struct text module = {0};
         const char *file = text_cstr(&files.items[i]);
         char hex[65];
-        if (!library_header(file, &name, &version, NULL)) {
+        if (!library_header(file, &name, &version, NULL, NULL)) {
             text_free(&name);
             text_free(&version);
             goto done;
@@ -416,7 +483,8 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
                 text_append(&out->version, text_cstr(&version));
                 out->path.length = 0;
                 text_append(&out->path, text_cstr(&directory));
-                if (!library_header(file, &name, &version, r)) {
+                if (!library_header(file, &name, &version, r,
+                                    text_cstr(&req->name))) {
                     text_free(&name);
                     text_free(&version);
                     text_free(&module);
@@ -617,7 +685,8 @@ static bool resolve_from_index(struct resolver *r, const struct requirement *req
         if (url != NULL && !repo_url_allowed(url)) {
             goto done;
         }
-        require(r, name, constraint == NULL ? "" : constraint, url, NULL);
+        require(r, name, constraint == NULL ? "" : constraint, url, NULL,
+                text_cstr(&req->name));
     }
     ok = true;
 done:
@@ -710,28 +779,42 @@ static const struct requirement *source_of(const struct resolver *r,
 }
 
 /* One round of the walk: resolve every package that has no pick or whose
-   pick no longer satisfies every constraint on it. */
+   pick no longer satisfies every constraint on it. A new pick of a
+   package first takes its old pick back, with the requirements that one
+   made. The round walks the names required when it starts, since a pick
+   adds requirements and taking one back removes them. */
 static bool walk_round(struct resolver *r, bool *changed)
 {
+    struct text *names = NULL;
+    size_t count = 0;
     size_t i;
+    size_t j;
+    bool ok = true;
 
     *changed = false;
+    if (r->requirement_count > 0) {
+        names = files_array(r->requirement_count, sizeof *names);
+    }
     for (i = 0; i < r->requirement_count; i++) {
+        const char *name = text_cstr(&r->requirements[i].name);
+        bool seen = false;
+        for (j = 0; j < count && !seen; j++) {
+            seen = strcmp(text_cstr(&names[j]), name) == 0;
+        }
+        if (!seen) {
+            text_append(&names[count++], name);
+        }
+    }
+    for (i = 0; ok && i < count; i++) {
+        const char *name = text_cstr(&names[i]);
         struct requirement source;
-        struct dep_package *p;
+        struct dep_package *p = graph_package(&r->graph, name);
         const struct requirement *req;
-        struct text name = {0};
-        bool ok;
-        text_append(&name, text_cstr(&r->requirements[i].name));
-        p = graph_package(&r->graph, text_cstr(&name));
-        if (p != NULL &&
-            satisfies_all(r, text_cstr(&name), text_cstr(&p->version))) {
-            text_free(&name);
+        if (p != NULL && satisfies_all(r, name, text_cstr(&p->version))) {
             continue;
         }
-        req = source_of(r, text_cstr(&name));
+        req = source_of(r, name);
         if (req == NULL) {
-            text_free(&name);
             continue;
         }
         /* The pick answers every constraint on the package, so the copy
@@ -739,22 +822,23 @@ static bool walk_round(struct resolver *r, bool *changed)
            adds requirements, which moves the list, so nothing below
            points into it. */
         memset(&source, 0, sizeof source);
-        text_append(&source.name, text_cstr(&name));
+        text_append(&source.name, name);
         text_append(&source.repo, text_cstr(&req->repo));
         text_append(&source.path, text_cstr(&req->path));
-        p = graph_add(&r->graph, text_cstr(&name));
-        package_free(p);
-        text_append(&p->name, text_cstr(&name));
+        if (p != NULL) {
+            unpick(r, name);
+        }
+        p = graph_add(&r->graph, name);
         ok = source.path.length > 0 ? resolve_from_path(r, &source, p)
                                     : resolve_from_repo(r, &source, p);
         requirement_free(&source);
-        text_free(&name);
-        if (!ok) {
-            return false;
-        }
         *changed = true;
     }
-    return true;
+    for (i = 0; i < count; i++) {
+        text_free(&names[i]);
+    }
+    free(names);
+    return ok;
 }
 
 /* Whether the strings of one package of the lock file follow the grammar
@@ -1076,7 +1160,7 @@ bool deps_resolve(const struct manifest *m, const char *root, bool offline,
                               ? NULL
                               : manifest_repository_url(m, text_cstr(&d->repo));
         require(&r, text_cstr(&d->name), text_cstr(&d->version), url,
-                d->path.length == 0 ? NULL : text_cstr(&d->path));
+                d->path.length == 0 ? NULL : text_cstr(&d->path), "");
     }
     for (round = 0; round < DEPS_ROUNDS; round++) {
         bool changed = false;
