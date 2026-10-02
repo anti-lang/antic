@@ -33,10 +33,9 @@
 import anti.io;
 import anti.lang;
 import anti.reflect;
+import anti.runtime;
 import anti.text;
 import anti.time;
-
-extern fn anti_rt_conf_get(key: ?*byte, len: int) -> str;
 
 /// How many distinct functions a `Profiler` measures.
 pub const PROFILE_SLOTS: int = 64;
@@ -830,7 +829,7 @@ pub class Composite inherits lang.TraceHandler
 /// deletes it once it has installed `none` in its place.
 pub fn start() -> ?*lang.TraceHandler
 {
-	return install(anti_rt_conf_get("trace".ptr, 5));
+	return install(runtime.get("trace") ?? "");
 }
 
 /// Install the handlers that `what` names, and give back the one that

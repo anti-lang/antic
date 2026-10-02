@@ -1,7 +1,8 @@
 //! `rt.configure(path)` as the first statement of `main` names the
 //! configuration file of the program. The file this test passes holds
 //! `backtrace = true`, so the `fail` after the call carries the frames of its
-//! trace in a release build, which is off without a file.
+//! trace in a release build, which is off without a file. `rt.get` then gives
+//! the value of the key, and `none` for a key no layer gives a value.
 
 import anti.lang;
 import anti.runtime as rt;
@@ -16,6 +17,10 @@ fn deep() -> int may fail
 fn main(args: []str) -> int
 {
 	rt.configure(args[1]);
+	let backtrace = rt.get("backtrace") ?? "none";
+	let logger = rt.get("logger") ?? "none";
+	printf("backtrace %.*s, logger %.*s\n".ptr, backtrace.len as c_int,
+		backtrace.ptr, logger.len as c_int, logger.ptr);
 	let v = deep() catch e {
 		let t = e.text();
 		printf("%.*s\n".ptr, t.len as c_int, t.ptr);

@@ -1,7 +1,8 @@
 //! The runtime of the program, as far as a program reaches it.
 //!
-//! `configure` names the configuration file the program reads. It stands as the
-//! first statement of `main`, and a desktop application passes a directory of
+//! `configure` names the configuration file the program reads, and `get` gives
+//! the effective value of one of its keys. `configure` stands as the first
+//! statement of `main`, and a desktop application passes a directory of
 //! `anti.os` to it. `--anti.conf` and `ANTI_CONF` name a file before `main`
 //! runs, and either of them keeps the file it named. A program that names none
 //! runs as it was built.
@@ -21,6 +22,7 @@
 //! ```
 
 extern fn anti_rt_conf_configure(path: ?*byte, len: int);
+extern fn anti_rt_conf_get(key: ?*byte, len: int) -> str;
 
 /// Read the configuration file at `path`, with the files it includes, and take
 /// every key of its `[runtime]` table that the command line did not name.
@@ -31,4 +33,18 @@ extern fn anti_rt_conf_configure(path: ?*byte, len: int);
 pub fn configure(path: str)
 {
 	anti_rt_conf_configure(path.ptr, path.len);
+}
+
+/// The effective value of the key `key` of `[runtime]`, as `--anti.inspect`
+/// prints it, or `none` where no layer gives it a value or the value is empty.
+///
+/// The text belongs to the runtime and stays valid until the program ends.
+/// `anti.log` reads `logger` and `anti.trace` reads `trace` through it.
+pub fn get(key: str) -> ?str
+{
+	let value = anti_rt_conf_get(key.ptr, key.len);
+	if value.len == 0 {
+		return none;
+	}
+	return value;
 }

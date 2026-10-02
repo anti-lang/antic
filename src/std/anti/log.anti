@@ -21,11 +21,10 @@ import anti.fs;
 import anti.lang;
 import anti.io;
 import anti.json;
+import anti.runtime;
 import anti.text;
 import anti.time;
 import anti.toml;
-
-extern fn anti_rt_conf_get(key: ?*byte, len: int) -> str;
 
 /// How much a logger writes, from everything to nothing but a failure.
 pub enum Level: u8 { Trace, Debug, Info, Warn, Error, Fatal, Off }
@@ -416,10 +415,9 @@ fn made(name: str, path: str) -> ?*Sink
 /// default one.
 fn from_configuration() -> *Logger
 {
-	let path = anti_rt_conf_get("logger".ptr, 6);
-	if path.len == 0 {
+	let path = runtime.get("logger") else {
 		return SinkLogger.new("", Level.Info, StderrSink.new());
-	}
+	};
 	let source = fs.read_file(path) catch e {
 		io.eprint("anti.log: ");
 		io.eprint(e.message);
