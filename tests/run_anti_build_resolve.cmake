@@ -6,7 +6,7 @@
 #   HOST     the target name of this host
 #   WORK     a directory this run writes into
 #
-# The project needs a 1.x and b 1.x. The walk first picks a 1.1.0, which
+# The first part: the project needs a 1.x and b 1.x. The walk first picks a 1.1.0, which
 # needs c =2.0.0 and d 1.0.0. Then b 1.0.0 needs a =1.0.0, so a goes back
 # to 1.0.0, which needs c =1.0.0 and no d. The requirements of the first
 # pick of a leave with it: c settles on 1.0.0, d leaves the graph, and
@@ -26,6 +26,22 @@ endfunction()
 
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
+
+function(run_anti_status where out_status out_text)
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env
+                "XDG_CACHE_HOME=${WORK}/cache"
+                "LOCALAPPDATA=${WORK}/cache"
+                "${ANTI}" ${ARGN} --runtime "${RUNTIME}"
+                --llvm-mc "${LLVM_MC}"
+        WORKING_DIRECTORY "${where}"
+        RESULT_VARIABLE status
+        OUTPUT_VARIABLE out
+        ERROR_VARIABLE err
+        ENCODING NONE)
+    set(${out_status} "${status}" PARENT_SCOPE)
+    set(${out_text} "${out}${err}" PARENT_SCOPE)
+endfunction()
 
 function(run_anti where)
     execute_process(
@@ -145,4 +161,59 @@ endforeach()
 if(lock MATCHES "com.example.d")
     message(FATAL_ERROR "the lock file keeps com.example.d, which only the "
                         "dropped pick of a needs:\n${lock}")
+endif()
+
+# The second part: a dependency that names no repository is searched for
+# in every repository of the manifest, and two that hold it are an error.
+# A repository that holds no index of the package is no answer for it,
+# and the build goes on. One whose index cannot be read is no answer at
+# all, and the build stops there, since that repository may hold the
+# package too. The resolver took such a repository as one without the
+# package and built from the other.
+set(empty "${WORK}/empty")
+set(broken "${WORK}/broken")
+file(MAKE_DIRECTORY "${empty}" "${broken}/com.example.c")
+file(WRITE "${broken}/com.example.c/index.toml" "[[version\n")
+file_url("${empty}" empty_url)
+file_url("${broken}" broken_url)
+set(project "${WORK}/search")
+function(write_search second)
+    file(WRITE "${project}/anti.toml"
+         "[package]\n"
+         "name = \"com.example.search\"\n"
+         "version = \"0.1.0\"\n"
+         "\n"
+         "[repositories]\n"
+         "local = \"${repo_url}\"\n"
+         "other = \"${second}\"\n"
+         "\n"
+         "[dependencies]\n"
+         "\"com.example.c\" = { version = \"1.0.0\" }\n")
+endfunction()
+file(WRITE "${project}/src/com/example/search.anti"
+     "//! A program over c, from whichever repository holds it.\n"
+     "\n"
+     "import com.example.c;\n"
+     "\n"
+     "fn main() -> int\n"
+     "{\n"
+     "\treturn c.one();\n"
+     "}\n")
+write_search("${empty_url}")
+run_anti("${project}" build)
+file(READ "${project}/anti.lock" lock)
+if(NOT lock MATCHES "name = \"com.example.c\"\nversion = \"1.0.0\"")
+    message(FATAL_ERROR "the lock file names no com.example.c 1.0.0:\n"
+                        "${lock}")
+endif()
+file(REMOVE "${project}/anti.lock")
+write_search("${broken_url}")
+run_anti_status("${project}" status text build)
+if(status EQUAL 0)
+    message(FATAL_ERROR "the build took a repository whose index of "
+                        "com.example.c cannot be read as one without it:\n"
+                        "${text}")
+endif()
+if(NOT text MATCHES "gave no index of com.example.c that anti reads")
+    message(FATAL_ERROR "the build said\n${text}")
 endif()

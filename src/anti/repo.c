@@ -160,30 +160,47 @@ static bool file_url_path(const char *url, struct text *out)
     return true;
 }
 
+/* DESIGN: a repository answers for a file in one of three ways. It holds
+   the file, it holds none, or it gives no answer. A file:// path that is
+   not there and an HTTP status of 404 or 410 are the second. Anything else
+   that fails is the third, since the file may be there all the same. */
+static bool http_absent(const struct text *status)
+{
+    return strcmp(text_cstr(status), "404") == 0 ||
+           strcmp(text_cstr(status), "410") == 0;
+}
+
 /* Fetch url into the file at destination. etag names the file that holds
    the entity tag of an earlier fetch, or NULL for a file that is fetched
-   once. Returns false when the fetch failed, and leaves an unchanged
-   destination where the server answered that nothing changed. */
-static bool fetch(const char *url, const char *destination, const char *etag)
+   once. Leaves an unchanged destination where the server answered that
+   nothing changed. A REPO_FAILED answer comes with a message. */
+static enum repo_answer fetch(const char *url, const char *destination,
+                              const char *etag)
 {
     struct text temporary = {0};
     struct text source = {0};
     struct text compare = {0};
     struct text save = {0};
-    const char *argv[10];
+    struct text status = {0};
+    const char *argv[12];
     size_t argc = 0;
+    enum repo_answer answer = REPO_FAILED;
     bool ok = false;
 
     if (!repo_url_allowed(url)) {
-        return false;
+        return REPO_FAILED;
     }
     text_appendf(&temporary, "%s.new", destination);
     if (strncmp(url, "file://", 7) == 0) {
         if (file_url_path(url, &source)) {
-            ok = files_copy(text_cstr(&source), text_cstr(&temporary));
-            if (!ok) {
-                fprintf(stderr, "anti: %s holds no %s\n", url,
-                        text_cstr(&source));
+            if (!files_exists(text_cstr(&source))) {
+                answer = REPO_ABSENT;
+            } else {
+                ok = files_copy(text_cstr(&source), text_cstr(&temporary));
+                if (!ok) {
+                    fprintf(stderr, "anti: %s: cannot read %s\n", url,
+                            text_cstr(&source));
+                }
             }
         }
     } else {
@@ -204,10 +221,14 @@ static bool fetch(const char *url, const char *destination, const char *etag)
         }
         argv[argc++] = "-o";
         argv[argc++] = text_cstr(&temporary);
+        argv[argc++] = "-w";
+        argv[argc++] = "%{http_code}";
         argv[argc++] = url;
         argv[argc] = NULL;
-        ok = process_run(argv) == 0;
-        if (!ok) {
+        ok = process_capture(argv, &status) == 0;
+        if (!ok && http_absent(&status)) {
+            answer = REPO_ABSENT;
+        } else if (!ok) {
             fprintf(stderr, "anti: %s: curl fetched nothing\n", url);
         }
     }
@@ -222,13 +243,15 @@ static bool fetch(const char *url, const char *destination, const char *etag)
             ok = files_copy(text_cstr(&temporary), destination);
         }
         text_free(&bytes);
+        answer = ok ? REPO_HELD : REPO_FAILED;
     }
     platform_remove(text_cstr(&temporary));
     text_free(&temporary);
     text_free(&source);
     text_free(&compare);
     text_free(&save);
-    return ok;
+    text_free(&status);
+    return answer;
 }
 
 /* Whether the stamp beside a cached index says it was checked within the
@@ -285,14 +308,14 @@ static bool index_dir(const char *prefix, const char *name, struct text *out)
     return files_make_dirs(text_cstr(out));
 }
 
-bool repo_index(const char *prefix, const char *name, bool offline,
-                struct text *out)
+enum repo_answer repo_index(const char *prefix, const char *name,
+                            bool offline, struct text *out)
 {
     struct text directory = {0};
     struct text stamp = {0};
     struct text etag = {0};
     struct text url = {0};
-    bool ok = false;
+    enum repo_answer answer = REPO_FAILED;
 
     if (!index_dir(prefix, name, &directory)) {
         goto done;
@@ -302,7 +325,7 @@ bool repo_index(const char *prefix, const char *name, bool offline,
     text_appendf(&etag, "%s%s", text_cstr(out), REPO_ETAG_SUFFIX);
     if (files_exists(text_cstr(out)) &&
         (offline || checked_recently(text_cstr(&stamp)))) {
-        ok = true;
+        answer = REPO_HELD;
         goto done;
     }
     if (offline) {
@@ -311,8 +334,8 @@ bool repo_index(const char *prefix, const char *name, bool offline,
         goto done;
     }
     text_appendf(&url, "%s/%s/%s", prefix, name, REPO_INDEX_FILE);
-    ok = fetch(text_cstr(&url), text_cstr(out), text_cstr(&etag));
-    if (ok) {
+    answer = fetch(text_cstr(&url), text_cstr(out), text_cstr(&etag));
+    if (answer == REPO_HELD) {
         write_stamp(text_cstr(&stamp));
     }
 done:
@@ -320,7 +343,7 @@ done:
     text_free(&stamp);
     text_free(&etag);
     text_free(&url);
-    return ok;
+    return answer;
 }
 
 bool repo_module(const char *prefix, const char *name, const char *version,
@@ -330,6 +353,7 @@ bool repo_module(const char *prefix, const char *name, const char *version,
     struct text directory = {0};
     struct text url = {0};
     char hex[65];
+    enum repo_answer answer;
     bool ok = false;
 
     /* S45: each of the four stands in a path of the cache or in the
@@ -373,7 +397,12 @@ bool repo_module(const char *prefix, const char *name, const char *version,
         }
         text_appendf(&url, "%s/%s/%s/%s%s", prefix, name, version, module,
                      ANTL_SUFFIX);
-        if (!fetch(text_cstr(&url), text_cstr(out), NULL)) {
+        answer = fetch(text_cstr(&url), text_cstr(out), NULL);
+        if (answer == REPO_ABSENT) {
+            fprintf(stderr, "anti: %s: the repository holds no such file\n",
+                    text_cstr(&url));
+        }
+        if (answer != REPO_HELD) {
             goto done;
         }
     }

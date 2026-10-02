@@ -560,7 +560,10 @@ static const char *value_at(const struct anti_toml *doc, const char *head,
 }
 
 /* Read one package from the index of a repository: the highest version
-   that is not yanked and satisfies every requirement on the package. */
+   that is not yanked and satisfies every requirement on the package.
+   found is false where the repository holds no index of the package or
+   no version of it answers. Returns false where the repository gives no
+   answer or an index that anti refuses. */
 static bool resolve_from_index(struct resolver *r, const struct requirement *req,
                                const char *prefix, struct dep_package *out,
                                bool *found)
@@ -574,7 +577,13 @@ static bool resolve_from_index(struct resolver *r, const struct requirement *req
     bool ok = false;
 
     *found = false;
-    if (!repo_index(prefix, text_cstr(&req->name), r->offline, &file)) {
+    switch (repo_index(prefix, text_cstr(&req->name), r->offline, &file)) {
+    case REPO_HELD:
+        break;
+    case REPO_ABSENT:
+        ok = true;
+        goto done;
+    case REPO_FAILED:
         goto done;
     }
     if (!files_read(text_cstr(&file), &bytes)) {
@@ -725,7 +734,17 @@ static bool resolve_from_repo(struct resolver *r, const struct requirement *req,
         bool here = false;
         memset(&one, 0, sizeof one);
         text_append(&one.name, text_cstr(&req->name));
-        if (resolve_from_index(r, req, prefix, &one, &here) && here) {
+        /* A repository that gives no answer may hold the package, so
+           which one does stays unknown. */
+        if (!resolve_from_index(r, req, prefix, &one, &here)) {
+            fprintf(stderr, "anti: %s gave no index of %s that anti reads, "
+                            "so the build cannot tell which repository "
+                            "holds it\n",
+                    prefix, text_cstr(&req->name));
+            package_free(&one);
+            goto done;
+        }
+        if (here) {
             if (winner.length > 0) {
                 fprintf(stderr, "anti: %s and %s both hold %s, so the "
                                 "dependency names which one\n",

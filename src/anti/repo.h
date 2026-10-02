@@ -26,14 +26,21 @@ bool repo_digest_valid(const char *digest);
    naming the URL and the rule otherwise. */
 bool repo_url_allowed(const char *url);
 
+/* What a repository answered for one file. */
+enum repo_answer {
+    REPO_HELD,      /* the file is there */
+    REPO_ABSENT,    /* the repository holds no such file */
+    REPO_FAILED     /* no answer, which a message names */
+};
+
 /* The index file of package name under prefix, fetched or refreshed into
    the cache. The check of a cached index runs at most once an hour.
    offline contacts no repository and fails when the file is not cached.
-   Returns false when the file cannot be had, and out holds its path
-   otherwise. out may hold text after a failure too, and the caller frees
-   it with text_free either way. */
-bool repo_index(const char *prefix, const char *name, bool offline,
-                struct text *out);
+   out holds the path of the file where the answer is REPO_HELD. out may
+   hold text after another answer too, and the caller frees it with
+   text_free either way. */
+enum repo_answer repo_index(const char *prefix, const char *name,
+                            bool offline, struct text *out);
 
 /* The library file of one module of one version, fetched into the cache
    when it is not there and verified against digest either way. Returns
