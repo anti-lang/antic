@@ -670,8 +670,7 @@ bool sema_param_iterate(struct checker *c, struct expr *e, struct type *p,
                         struct type **element);
 struct type *sema_param_index(struct checker *c, struct expr *e,
                               struct type *p, bool write);
-const struct type *sema_param_iface(const struct type *p,
-                                    const struct name *name);
+struct type *sema_param_iface(const struct type *p, const struct name *name);
 /* Whether the constraints of the parameter p give the hook named hook. */
 bool sema_param_has(const struct type *p, const char *hook);
 bool sema_param_hash(struct checker *c, struct expr *e, const struct type *p);

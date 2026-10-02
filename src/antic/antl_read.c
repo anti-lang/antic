@@ -355,7 +355,7 @@ static struct type *read_param_type(struct reader *r, uint32_t at)
     n = antl_get_count(r, 4);
     t->ifaces = antl_allocate(r, n, sizeof *t->ifaces);
     for (i = 0; i < n && !r->failed; i++) {
-        const struct type *iface = antl_type_ref(r, at);
+        struct type *iface = antl_type_ref(r, at);
         if (r->failed || iface->kind != TYPE_CLASS || !iface->has_abstract) {
             antl_damaged(r);
             return NULL;
@@ -1200,10 +1200,12 @@ void antl_read_items(struct reader *r)
             ok = sym->type->kind == TYPE_PARAM && sym->type->param == NULL &&
                  sym->type->hook_owner == NULL;
             break;
-        case SYMBOL_CONST:
-            sym->value = arena_alloc(r->arena, sizeof *sym->value);
-            ok = antl_read_value(r, sym->type, sym->value, 0);
+        case SYMBOL_CONST: {
+            struct const_value *value = arena_alloc(r->arena, sizeof *value);
+            ok = antl_read_value(r, sym->type, value, 0);
+            sym->value = value;
             break;
+        }
         default:
             ok = false;
             break;

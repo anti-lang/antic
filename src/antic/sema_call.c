@@ -1258,7 +1258,7 @@ static struct expr *default_argument(struct checker *c, const struct expr *call,
     value = arena_alloc(c->arena, sizeof *value);
     value->kind = SYMBOL_CONST;
     value->type = t;
-    value->value = (struct const_value *)d->value;
+    value->value = d->value;
     value->state = EVAL_DONE;
     arg->symbol = value;
     return arg;
@@ -1798,8 +1798,7 @@ static bool method_callee(struct checker *c, struct expr *e,
          base->element->kind == TYPE_PARAM)) {
         const struct type *p =
             base->kind == TYPE_PARAM ? base : base->element;
-        const struct type *iface =
-            sema_param_iface(p, &callee->as.field.name);
+        struct type *iface = sema_param_iface(p, &callee->as.field.name);
         if (iface == NULL) {
             sema_error_at(c, callee->pos, "`%s` has no function `%.*s`, "
                           "since no interface of its constraints "
@@ -1809,7 +1808,7 @@ static bool method_callee(struct checker *c, struct expr *e,
             form->result = sema_builtin(c, TYPE_ERROR);
             return true;
         }
-        base = types_pointer(c->types, (struct type *)iface);
+        base = types_pointer(c->types, iface);
         callee->as.field.base->param_type = callee->as.field.base->type;
         callee->as.field.base->type = base;
         callee->as.field.checked = true;

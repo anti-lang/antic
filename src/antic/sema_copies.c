@@ -46,7 +46,7 @@ struct fn_copy {
 /* A function of a copy whose body is still to be made: the function of
    the generic it comes from and the arguments. */
 struct work {
-    struct item *from;
+    const struct item *from;
     struct item *to;
     struct generic_map map;
     int depth;                      /* the copies made to reach it */
@@ -257,7 +257,7 @@ static struct symbol *xsym(struct clone *cl, struct symbol *s)
 /* Copies of generic functions and types */
 
 static struct item *type_item(struct copies *k, struct type *copy);
-static struct item *fn_copy(struct copies *k, struct item *generic,
+static struct item *fn_copy(struct copies *k, const struct item *generic,
                             struct type **args,
                             const struct symbolic **values);
 
@@ -304,7 +304,7 @@ static void refuse(struct copies *k, const struct item *generic,
    made at the end of a chain of COPY_DEPTH_MAX copies is refused, as a
    chain of copies of types is, and so is a module that names more than
    COPY_COUNT_MAX copies of functions. */
-static void add_work(struct copies *k, struct item *from, struct item *to,
+static void add_work(struct copies *k, const struct item *from, struct item *to,
                      const struct generic_map *map)
 {
     if (k->making >= COPY_DEPTH_MAX) {
@@ -477,9 +477,9 @@ static struct name copy_name(struct copies *k, const struct name *generic,
 /* The copy of the function generic with the arguments args and values,
    one per parameter of map, made once. name is the name of its symbol,
    owner the item of the class that holds it, or NULL. */
-static struct item *copy_function(struct copies *k, struct item *generic,
+static struct item *copy_function(struct copies *k, const struct item *generic,
                                   const struct generic_map *map,
-                                  struct name name, struct item *owner)
+                                  struct name name, const struct item *owner)
 {
     size_t count = map->count;
     struct item *n;
@@ -545,7 +545,7 @@ static struct item *copy_function(struct copies *k, struct item *generic,
     return n;
 }
 
-static struct item *fn_copy(struct copies *k, struct item *generic,
+static struct item *fn_copy(struct copies *k, const struct item *generic,
                             struct type **args,
                             const struct symbolic **values)
 {
@@ -608,11 +608,11 @@ static struct symbol *member_of_receiver(struct clone *cl, const struct expr *e,
    its class as owner, and every call names it directly. args and values
    hold the arguments of the class first, then its own. */
 static struct symbol *own_params_copy(struct clone *cl, const struct expr *e,
-                                      struct item *it, struct type **args,
+                                      const struct item *it, struct type **args,
                                       const struct symbolic **values)
 {
     struct copies *k = cl->k;
-    struct item *owner = (struct item *)it->owner;
+    const struct item *owner = it->owner;
     struct type *g = owner->symbol->type;
     size_t outer = owner->type_param_count;
     size_t own = it->type_param_count;
@@ -668,7 +668,7 @@ static struct symbol *callee_copy(struct clone *cl, const struct expr *e,
                                   struct symbol *sym)
 {
     struct copies *k = cl->k;
-    struct item *it = sym != NULL ? sym->item : NULL;
+    const struct item *it = sym != NULL ? sym->item : NULL;
     const struct item *owner = it != NULL ? it->owner : NULL;
     struct type **args;
     const struct symbolic **values;

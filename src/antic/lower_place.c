@@ -373,6 +373,8 @@ const struct const_value *lower_location_value(struct lowerer *l,
 
     memset(v, 0, sizeof *v);
     v->kind = CONST_STRUCT;
+    /* The type of a value is a handle of the type table, mutable since the
+       substitution of copies hands out the same handles. */
     v->type = (struct type *)t;
     v->as.aggregate.count = t->field_count;
     v->as.aggregate.items =

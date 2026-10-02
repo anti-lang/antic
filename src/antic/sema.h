@@ -71,9 +71,9 @@ struct symbol {
     struct name name;
     struct pos pos;
     struct type *type;
-    struct item *item;              /* a module-level item */
+    const struct item *item;        /* a module-level item */
     struct stmt *stmt;              /* a const in a block */
-    struct const_value *value;      /* SYMBOL_CONST */
+    const struct const_value *value; /* SYMBOL_CONST */
     enum eval_state state;          /* SYMBOL_CONST */
     bool address_taken;             /* SYMBOL_LOCAL, SYMBOL_PARAM */
     bool read_only;                 /* the variable of a `for` */

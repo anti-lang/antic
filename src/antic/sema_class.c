@@ -145,8 +145,7 @@ static bool same_signature(struct checker *c, const struct item *m,
                            const struct item *entry, const struct type *owner)
 {
     const struct type *mine = m->symbol != NULL ? m->symbol->type : NULL;
-    const struct type *theirs =
-        entry->symbol != NULL ? entry->symbol->type : NULL;
+    struct type *theirs = entry->symbol != NULL ? entry->symbol->type : NULL;
     size_t extra = m->has_self ? 1 : 0;
     size_t count;
     size_t their_count;
@@ -162,7 +161,7 @@ static bool same_signature(struct checker *c, const struct item *m,
     }
     /* A function of a copy of a generic takes the arguments of the copy
        in place of the parameters. */
-    theirs = sema_member_type(c, (struct type *)theirs, owner);
+    theirs = sema_member_type(c, theirs, owner);
     text_format(fn, sizeof fn, "concrete fn %.*s%s%.*s",
                 (int)m->qualifier.length, m->qualifier.text,
                 m->qualifier.length > 0 ? "::" : "", (int)m->name.length,

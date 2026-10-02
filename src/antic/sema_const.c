@@ -1205,11 +1205,9 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
     }
     ok = ok && sema_require(c, value, sema_check_expr(c, value, t), t);
     if (ok) {
-        sym->value = arena_alloc(c->arena, sizeof *sym->value);
-        ok = sema_eval_const(c, value, sym->value);
-        if (!ok) {
-            sym->value = NULL;
-        }
+        struct const_value *made = arena_alloc(c->arena, sizeof *made);
+        ok = sema_eval_const(c, value, made);
+        sym->value = ok ? made : NULL;
     }
     sym->type = ok ? t : sema_builtin(c, TYPE_ERROR);
     sym->state = EVAL_DONE;

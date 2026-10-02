@@ -320,7 +320,7 @@ void sema_check_export(struct checker *c, struct item *it)
         if (it->nested_count > 0) {
             struct ptr_set seen = {0};
             check_nested_fields(c, it, t, &seen);
-            free((void *)seen.slots);
+            free(seen.slots);
         }
         for (i = 0; i < it->member_count; i++) {
             const struct item *m = it->members[i];
@@ -515,7 +515,7 @@ void sema_interface(const struct module *module, const char *module_name,
         /* A generic function keeps its declaration, which the section
            of the generics writes. */
         sym->item = it->kind == ITEM_FN && it->type_param_count > 0
-                        ? (struct item *)it
+                        ? it
                         : NULL;
         sym->is_operator = it->kind == ITEM_FN && it->is_operator;
         sym->alias = it->kind == ITEM_TYPE;

@@ -246,10 +246,9 @@ static enum walk_iface walk_iface(const struct type *t)
                                                          : WALK_NONE;
 }
 
-static void add_iface(struct checker *c, struct type *p,
-                      const struct type *iface)
+static void add_iface(struct checker *c, struct type *p, struct type *iface)
 {
-    const struct type **ifaces;
+    struct type **ifaces;
     size_t i;
 
     for (i = 0; i < p->iface_count; i++) {
@@ -348,7 +347,7 @@ static bool resolve_set(struct checker *c, struct symbol *sym)
 static void add_constraint(struct checker *c, struct type *p,
                            const struct constraint_ref *r)
 {
-    const struct type *t;
+    struct type *t;
     struct symbol *sym;
     int hook;
     size_t i;
@@ -426,8 +425,8 @@ static void add_constraint(struct checker *c, struct type *p,
         return;
     }
     if (r->type_arg_count > 0) {
-        struct type *copy = sema_copy_of(c, (struct type *)t, r->type_args,
-                                         r->type_arg_count, r->type_args_pos);
+        struct type *copy = sema_copy_of(c, t, r->type_args, r->type_arg_count,
+                                         r->type_args_pos);
         if (sema_is_error(copy)) {
             return;
         }
@@ -515,7 +514,7 @@ static void alias_resolve(struct checker *c, struct symbol *sym)
    the types it names. One that names itself is refused. */
 struct type *sema_alias_type(struct checker *c, struct symbol *sym)
 {
-    struct item *it = sym->item;
+    const struct item *it = sym->item;
     struct context at = sema_declaration_context(c, NULL);
     struct context saved;
     struct type *t;
@@ -1135,6 +1134,9 @@ struct generic_map sema_copy_map(const struct type *copy)
 
     memset(&map, 0, sizeof map);
     map.from = copy->generic;
+    /* The substitution gives to as the type it makes, and the type
+       table hands out every type as a mutable handle, so the const of
+       the caller's view goes here. */
     map.to = (struct type *)copy;
     map.params = copy->generic->type_params;
     map.args = copy->args;
@@ -2153,8 +2155,7 @@ bool sema_param_hash(struct checker *c, struct expr *e, const struct type *p)
 
 /* The interface among the constraints of the parameter p that declares
    a function name, or NULL. */
-const struct type *sema_param_iface(const struct type *p,
-                                    const struct name *name)
+struct type *sema_param_iface(const struct type *p, const struct name *name)
 {
     size_t i;
 

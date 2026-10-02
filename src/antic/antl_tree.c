@@ -327,8 +327,9 @@ static void io_symbolic(struct io *io, const struct symbolic **s)
 }
 
 /* A constant with its type, or none. */
-static void io_value(struct io *io, struct const_value **v)
+static void io_value(struct io *io, const struct const_value **v)
 {
+    struct const_value *made;
     bool present = *v != NULL;
     struct type *type = *v != NULL ? (*v)->type : NULL;
 
@@ -352,10 +353,11 @@ static void io_value(struct io *io, struct const_value **v)
             bad(io);
             return;
         }
-        *v = antl_allocate(io->r, 1, sizeof **v);
-        if (!antl_read_value(io->r, type, *v, 0)) {
+        made = antl_allocate(io->r, 1, sizeof *made);
+        if (!antl_read_value(io->r, type, made, 0)) {
             bad(io);
         }
+        *v = made;
         break;
     }
 }
@@ -460,6 +462,9 @@ static void io_expr(struct io *io, struct expr **e)
     *e = p;
 }
 
+/* The const forms of the references. One walk reads and writes, and a
+   read fills the reference, so the table of references holds mutable
+   pointers and the const of the field goes at the cast. */
 static void io_cexpr(struct io *io, const struct expr **e)
 {
     void *p = (void *)*e;
@@ -755,7 +760,7 @@ static void io_sym_body(struct io *io, struct symbol *s)
     io_name(io, &s->name);
     io_pos(io, &s->pos);
     io_type(io, &s->type);
-    io_item(io, &s->item);
+    io_citem(io, &s->item);
     io_stmt(io, &s->stmt);
     io_value(io, &s->value);
     IO_ENUM(io, s->state, EVAL_DONE);
@@ -1455,10 +1460,11 @@ static struct symbol *read_extern(struct reader *r)
         sym->item = it;
     }
     if (antl_get_u8(r) != 0) {
-        sym->value = antl_allocate(r, 1, sizeof *sym->value);
-        if (!antl_read_value(r, sym->type, sym->value, 0)) {
+        struct const_value *value = antl_allocate(r, 1, sizeof *value);
+        if (!antl_read_value(r, sym->type, value, 0)) {
             antl_damaged(r);
         }
+        sym->value = value;
     }
     if (!r->failed && !antl_verify_extern(sym)) {
         antl_damaged(r);

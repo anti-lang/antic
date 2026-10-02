@@ -298,7 +298,7 @@ struct type {
     const struct type_param *param;
     const struct item *declared_by;
     uint32_t hooks;
-    const struct type **ifaces;
+    struct type **ifaces;
     size_t iface_count;
     /* TYPE_PARAM: the value a walk of it gives and the value `e[i]`
        reads, each made on its first use. */
