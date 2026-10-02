@@ -245,6 +245,10 @@ struct type *sema_builtin(struct checker *c, enum type_kind kind);
 bool sema_is_error(const struct type *t);
 bool sema_same_name(const struct name *a, const struct name *b);
 bool sema_name_is(const struct name *a, const char *text);
+/* The shared name `op:Type` of a module-level `operator fn` whose name
+   another one of its module has, in arena, which owns it. */
+struct name sema_shared_name(struct arena *arena, const struct name *op,
+                             const struct name *type);
 /* A node of kind at pos, in the arena of the checker, which owns it. */
 struct expr *sema_new_node(struct checker *c, enum expr_kind kind,
                            struct pos pos);

@@ -1,0 +1,45 @@
+//! Two module-level `operator fn eq` share their name, so each is found by
+//! the name of the type it takes first. A type whose name passes 255 bytes
+//! goes through its own operator as a short one does.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A point equal to another on `x` alone.
+struct Short
+{
+	x: int,
+	y: int,
+}
+
+/// The same, under a name of 284 bytes.
+struct LongNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameName
+{
+	x: int,
+	y: int,
+}
+
+operator fn eq(a: Short, b: Short) -> bool
+{
+	return a.x == b.x;
+}
+
+operator fn eq(a: LongNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameName, b: LongNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameName) -> bool
+{
+	return a.x == b.x;
+}
+
+fn b(v: bool) -> c_int
+{
+	return v as c_int;
+}
+
+fn main() -> int
+{
+	let s = Short { x: 1, y: 2 };
+	let t = Short { x: 1, y: 3 };
+	let l = LongNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameName { x: 1, y: 2 };
+	let m = LongNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameNameName { x: 1, y: 3 };
+	printf("short %d\n".ptr, b(s == t));
+	printf("long %d\n".ptr, b(l == m));
+	return 0;
+}

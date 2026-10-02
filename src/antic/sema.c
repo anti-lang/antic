@@ -1998,14 +1998,8 @@ static void check_provides(struct checker *c, struct module *module)
     }
 }
 
-/* The passes of sema_check, in the order it runs them. Each walks
-   `module->items` once, and a later pass reads what an earlier one
-   declared. */
-
-/* The shared name `op:Type` of a module-level `operator fn` whose name
-   another one of its module has. */
-static struct name shared_name(struct arena *arena, const struct name *op,
-                               const struct name *type)
+struct name sema_shared_name(struct arena *arena, const struct name *op,
+                             const struct name *type)
 {
     char *text = arena_alloc(arena, op->length + type->length + 2);
     struct name out;
@@ -2072,7 +2066,7 @@ static struct name declared_name(struct checker *c, struct item *it)
         return it->name;
     }
     it->overloaded = true;
-    return shared_name(c->arena, &it->name, &type);
+    return sema_shared_name(c->arena, &it->name, &type);
 }
 
 /* Declare every item first, so each can be used before its
@@ -2864,6 +2858,9 @@ static void check_boundary(struct checker *c)
                      "linux", "library");
 }
 
+/* DESIGN: sema_check runs its passes in order. Each walks
+   `module->items` once, and a later pass reads what an earlier one
+   declared. */
 bool sema_check(struct module *module, const char *module_name,
                 const char *package,
                 const struct interface *const *libraries,
