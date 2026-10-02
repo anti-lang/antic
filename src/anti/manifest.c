@@ -15,8 +15,9 @@
 #include "text.h"
 #include "toml.h"
 
-/* The interface of a key under `inject.`, or NULL when the key belongs
-   to another table. `inject.test.` names the test table. */
+/* The interface of a key of one table: `inject.test.` when tests is
+   true and `inject.` otherwise. NULL when the key belongs to another
+   table. */
 static const char *interface_of(const char *key, size_t length, bool tests)
 {
     static const char head[] = "inject.";
@@ -26,13 +27,11 @@ static const char *interface_of(const char *key, size_t length, bool tests)
     bool is_test = length > test_length &&
                    memcmp(key, test_head, test_length) == 0;
 
-    if (length <= head_length || memcmp(key, head, head_length) != 0) {
+    if (length <= head_length || memcmp(key, head, head_length) != 0 ||
+        is_test != tests) {
         return NULL;
     }
-    if (is_test) {
-        return tests ? key + test_length : NULL;
-    }
-    return key + head_length;
+    return key + (tests ? test_length : head_length);
 }
 
 /* Put `Interface=Provider` in the table, replacing what an earlier
@@ -79,7 +78,8 @@ bool manifest_inject_read(const char *path, bool tests,
     count = anti_rt_toml_count(doc);
     out->entries = files_array((size_t)count + 1, sizeof *out->entries);
     /* The plain table first, so an entry of `[inject.test]` replaces the
-       one `[inject]` holds for that interface. */
+       one `[inject]` holds for that interface, in whichever order the
+       document writes the two tables. */
     for (i = 0; i < count; i++) {
         struct anti_text key = anti_rt_toml_key(doc, i);
         struct anti_text value = anti_rt_toml_value(doc, i);

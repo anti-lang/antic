@@ -276,6 +276,45 @@ static void manifest_missing(void)
     }
 }
 
+/* `[inject.test]` lays its providers over those of `[inject]` for
+   `anti test`, whichever table the document writes first, and `anti
+   build` takes `[inject]` alone. */
+static void manifest_inject_order(void)
+{
+    static const char test_first[] =
+        "[inject.test]\n"
+        "\"app.Logger\" = \"app.Fake.get\"\n"
+        "[inject]\n"
+        "\"app.Logger\" = \"app.Console.get\"\n"
+        "\"app.Clock\" = \"app.Watch.get\"\n";
+    const char *path = fixture("unit-inject.toml", test_first);
+    struct manifest_inject table;
+    size_t i;
+    const char *logger;
+
+    CHECK(path != NULL);
+    if (path == NULL) {
+        return;
+    }
+    CHECK(manifest_inject_read(path, true, &table));
+    CHECK(table.count == 2);
+    logger = NULL;
+    for (i = 0; i < table.count; i++) {
+        if (strncmp(table.entries[i], "app.Logger=", 11) == 0) {
+            logger = table.entries[i];
+        }
+    }
+    CHECK_STR(logger != NULL ? logger : "", "app.Logger=app.Fake.get");
+    manifest_inject_free(&table);
+    CHECK(manifest_inject_read(path, false, &table));
+    CHECK(table.count == 2);
+    for (i = 0; i < table.count; i++) {
+        CHECK(strcmp(table.entries[i], "app.Logger=app.Fake.get") != 0);
+    }
+    manifest_inject_free(&table);
+    remove(path);
+}
+
 void test_deps(void)
 {
     versions();
@@ -287,4 +326,5 @@ void test_deps(void)
     manifest_layout();
     manifest_refusals();
     manifest_missing();
+    manifest_inject_order();
 }
