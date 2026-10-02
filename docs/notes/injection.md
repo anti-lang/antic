@@ -36,7 +36,7 @@ indirect call of `fn() -> *Interface`.
 
 ## The pass
 
-`write_injections` of `src/antic/whole.c` runs where the program is whole.
+`whole_write_injections` of `src/antic/whole_tables.c` runs where the program is whole.
 That is every release build, and in dev mode the compilation of the
 module that links. The program holds the IR of every module in both
 modes, so the class records of every module are there. Each carries the

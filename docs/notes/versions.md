@@ -48,7 +48,7 @@ descriptor.
 
 ## What a plugin records
 
-`write_provides` of `src/antic/whole.c` reads the descriptor of each provided
+`whole_write_provides` of `src/antic/whole_tables.c` reads the descriptor of each provided
 interface out of the IR, which a library file brought. It copies four
 things into the library's own image: the chain, the field count, the
 size and the version of the interface's package. A reference to the

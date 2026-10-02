@@ -1,7 +1,8 @@
 # The pass over the whole program
 
-Choices made inside the passes over the IR of the whole program, `src/antic/whole.c`. They
-describe the inside of the compiler. `docs/decisions.md` holds what a reader of the
+Choices made inside the passes over the IR of the whole program. `src/antic/whole.c`
+holds the analysis and `src/antic/whole_tables.c` writes the tables the runtime reads.
+They describe the inside of the compiler. `docs/decisions.md` holds what a reader of the
 language or a user of the tools can observe.
 
 ## Where the pass runs

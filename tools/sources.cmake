@@ -105,6 +105,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/types.c
     src/antic/warnings.c
     src/antic/whole.c
+    src/antic/whole_tables.c
     src/antic/x86_64.c
     src/rt/digest.c
     src/rt/regex.c

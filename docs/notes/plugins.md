@@ -24,7 +24,7 @@ file carries them from format version 49, and `compatible` from 50.
 
 ## The table
 
-`write_provides` of `src/antic/whole.c` runs where the build writes a plugin,
+`whole_write_provides` of `src/antic/whole_tables.c` runs where the build writes a plugin,
 which is `--lib shared --no-runtime`. It writes `anti_rt_provides`, an
 entry per `provides` line with the path of the interface, the
 descriptor of the interface and of the class, the function that
