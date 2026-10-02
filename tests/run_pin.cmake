@@ -1,14 +1,16 @@
 # A version lives in tools/<name>-version and the archive of each host in
 # tools/<name>-pin, which spells the version as @VERSION@. No copy of
 # either can drift, and every archive comes over HTTPS. The LLVM pin has a
-# form of its own, which tests/run_llvm_pin.cmake checks.
+# form of its own, which tests/run_release_pins.cmake checks. READERS
+# lists the files under ROOT that download the archive. Each reads the pin,
+# with either separator, and does not spell the version.
 #
-#   cmake -DROOT=<repository> -DNAME=cmake -P tests/run_pin.cmake
+#   cmake -DROOT=<repository> -DNAME=cmake
+#         "-DREADERS=tools/install.sh;tools/install.ps1" -P tests/run_pin.cmake
 
 set(hosts macos-arm64 macos-x86_64 linux-x86_64 linux-arm64 windows-x86_64
           windows-arm64)
 set(pin "${ROOT}/tools/${NAME}-pin")
-set(script "${ROOT}/tools/get-${NAME}.cmake")
 file(READ "${ROOT}/tools/${NAME}-version" version)
 string(STRIP "${version}" version)
 if(NOT version MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
@@ -41,14 +43,24 @@ if(NOT at EQUAL -1)
     message(FATAL_ERROR "tools/${NAME}-pin spells ${version}, which belongs "
                         "in tools/${NAME}-version alone")
 endif()
-if(NOT EXISTS "${script}")
-    return()
+if(READERS STREQUAL "")
+    message(FATAL_ERROR "READERS names no file that reads tools/${NAME}-pin")
 endif()
-file(READ "${script}" text)
-string(FIND "${text}" "${version}" at)
-string(FIND "${text}" "https://" url)
-if(NOT at EQUAL -1 OR NOT url EQUAL -1)
-    message(FATAL_ERROR "tools/get-${NAME}.cmake spells a version or a URL, "
-                        "which belong in tools/${NAME}-version and "
-                        "tools/${NAME}-pin")
-endif()
+foreach(reader IN LISTS READERS)
+    if(NOT EXISTS "${ROOT}/${reader}")
+        message(FATAL_ERROR "${reader} does not exist")
+    endif()
+    file(READ "${ROOT}/${reader}" text)
+    string(FIND "${text}" "tools/${NAME}-pin" reads)
+    if(reads EQUAL -1)
+        string(FIND "${text}" "tools\\${NAME}-pin" reads)
+    endif()
+    string(FIND "${text}" "${version}" at)
+    if(reads EQUAL -1)
+        message(FATAL_ERROR "${reader} does not read tools/${NAME}-pin")
+    endif()
+    if(NOT at EQUAL -1)
+        message(FATAL_ERROR "${reader} spells ${version}, which belongs in "
+                            "tools/${NAME}-version alone")
+    endif()
+endforeach()

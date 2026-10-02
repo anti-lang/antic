@@ -1457,6 +1457,7 @@ endif()
 
 add_test(NAME cmake_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}" -DNAME=cmake
+            "-DREADERS=tools/install.sh$<SEMICOLON>tools/install.ps1"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_pin.cmake")
 add_test(NAME release_pins
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
