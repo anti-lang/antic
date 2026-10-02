@@ -43,20 +43,10 @@ struct Part<K: eq + hash, V>
 	entries: map.HashMap<K, V>,
 	/// The version of each key of `entries`: the value of `clock` at its last
 	/// change.
-	versions: map.HashMap<K, Stamp>,
+	versions: map.HashMap<K, collection.Stamp>,
 	/// The changes of the part so far, which give each change a version the
 	/// part never gave before.
 	clock: int,
-}
-
-/// The version of an entry of a `ConcurrentMap`.
-///
-/// A struct and not an `int`: antic fails to lower `remove` of a map whose
-/// values are `int` and whose key has a `destruct`, as
-/// `docs/reports/2026-09-28-add5-concurrent.md` records.
-struct Stamp
-{
-	version: int,
 }
 
 /// A map from keys to values that many threads use at once.
@@ -261,7 +251,7 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 			let value = part.entries.get(k) else {
 				return none;
 			};
-			let stamp = part.versions.get(k) ?? Stamp { version: 0 };
+			let stamp = part.versions.get(k) ?? collection.Stamp { version: 0 };
 			return (value, stamp.version);
 		}
 	}
@@ -836,7 +826,7 @@ fn made_parts<K: eq + hash, V>(from: *mem.Allocator, capacity: int)
 	let i = 0;
 	while i < PARTS do {
 		parts[i].entries = map.HashMap<K, V>.new(each, from);
-		parts[i].versions = map.HashMap<K, Stamp>.new(each, from);
+		parts[i].versions = map.HashMap<K, collection.Stamp>.new(each, from);
 		i += 1;
 	}
 	return parts;
@@ -847,7 +837,7 @@ fn made_parts<K: eq + hash, V>(from: *mem.Allocator, capacity: int)
 fn changed<K: eq + hash, V>(part: *Part<K, V>, k: K)
 {
 	part.clock += 1;
-	part.versions.set(k, Stamp { version: part.clock });
+	part.versions.set(k, collection.Stamp { version: part.clock });
 }
 
 /// Run `change` on the first entry of `part` that `test` accepts, with the lock

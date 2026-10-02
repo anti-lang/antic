@@ -37,16 +37,6 @@ import anti.text;
 
 extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
 
-/// The version of an entry of a `SyncMap` or an element of a `SyncSet`.
-///
-/// A struct and not an `int`: antic fails to lower `remove` of a map whose
-/// values are `int` and whose key has a `destruct`, as
-/// `docs/reports/2026-09-28-add5-concurrent.md` records.
-struct Stamp
-{
-	version: int,
-}
-
 /// A list that more than one thread adds to and searches.
 ///
 /// Each element carries a version: a stamp from a clock of the list, which
@@ -543,12 +533,12 @@ fn taken<T>(items: *list.List<(T, int)>, at: int) -> ?T
 /// A copy of the value under `k` in `entries` and its version in `versions`, or
 /// `none`, for the reason of `copied`.
 fn versioned<K: eq + hash, V>(entries: *maps.Map<K, V>,
-	versions: *maps.Map<K, Stamp>, k: K) -> ?(V, int)
+	versions: *maps.Map<K, collection.Stamp>, k: K) -> ?(V, int)
 {
 	let value = entries.get(k) else {
 		return none;
 	};
-	let stamp = versions.get(k) ?? Stamp { version: 0 };
+	let stamp = versions.get(k) ?? collection.Stamp { version: 0 };
 	return (dup(value), stamp.version);
 }
 
@@ -569,7 +559,7 @@ pub synchronized class SyncMap<K: eq + hash, V>
 	/// The entries in insertion order.
 	entries: maps.Map<K, V>,
 	/// The version of each key of `entries`.
-	versions: maps.Map<K, Stamp>,
+	versions: maps.Map<K, collection.Stamp>,
 	/// The last version the map gave.
 	clock: int = 0,
 
@@ -581,7 +571,7 @@ pub synchronized class SyncMap<K: eq + hash, V>
 		return SyncMap<K, V> {
 			from: chosen,
 			entries: maps.Map<K, V>.new(capacity, chosen),
-			versions: maps.Map<K, Stamp>.new(capacity, chosen),
+			versions: maps.Map<K, collection.Stamp>.new(capacity, chosen),
 		};
 	}
 
@@ -870,7 +860,7 @@ pub synchronized class SyncMap<K: eq + hash, V>
 	fn stamp(self, k: K)
 	{
 		self.clock += 1;
-		self.versions.set(k, Stamp { version: self.clock });
+		self.versions.set(k, collection.Stamp { version: self.clock });
 	}
 
 	/// The map of the entries, for `==` and the hash of the map, which hold its
@@ -918,7 +908,7 @@ pub synchronized class SyncSet<T: eq + hash>
 	/// The elements in the order they were first added.
 	items: set.Set<T>,
 	/// The version of each element of `items`.
-	versions: maps.Map<T, Stamp>,
+	versions: maps.Map<T, collection.Stamp>,
 	/// The last version the set gave.
 	clock: int = 0,
 
@@ -930,7 +920,7 @@ pub synchronized class SyncSet<T: eq + hash>
 		return SyncSet<T> {
 			from: chosen,
 			items: set.Set<T>.new(capacity, chosen),
-			versions: maps.Map<T, Stamp>.new(capacity, chosen),
+			versions: maps.Map<T, collection.Stamp>.new(capacity, chosen),
 		};
 	}
 
@@ -1033,7 +1023,7 @@ pub synchronized class SyncSet<T: eq + hash>
 		return SyncSet<T> {
 			from: self.from,
 			items: self.items.union(other),
-			versions: maps.Map<T, Stamp>.new(0, self.from),
+			versions: maps.Map<T, collection.Stamp>.new(0, self.from),
 		};
 	}
 
@@ -1044,7 +1034,7 @@ pub synchronized class SyncSet<T: eq + hash>
 		return SyncSet<T> {
 			from: self.from,
 			items: self.items.intersect(other),
-			versions: maps.Map<T, Stamp>.new(0, self.from),
+			versions: maps.Map<T, collection.Stamp>.new(0, self.from),
 		};
 	}
 
@@ -1055,7 +1045,7 @@ pub synchronized class SyncSet<T: eq + hash>
 		return SyncSet<T> {
 			from: self.from,
 			items: self.items.minus(other),
-			versions: maps.Map<T, Stamp>.new(0, self.from),
+			versions: maps.Map<T, collection.Stamp>.new(0, self.from),
 		};
 	}
 
@@ -1196,7 +1186,7 @@ pub synchronized class SyncSet<T: eq + hash>
 	/// it is replaced.
 	fn version(self, x: T) -> int
 	{
-		let stamp = self.versions.get(x) ?? Stamp { version: 0 };
+		let stamp = self.versions.get(x) ?? collection.Stamp { version: 0 };
 		return stamp.version;
 	}
 
@@ -1215,7 +1205,7 @@ pub synchronized class SyncSet<T: eq + hash>
 	fn stamp(self, x: T)
 	{
 		self.clock += 1;
-		self.versions.set(x, Stamp { version: self.clock });
+		self.versions.set(x, collection.Stamp { version: self.clock });
 	}
 
 	/// Whether this set and `other` hold equal elements, whatever their order

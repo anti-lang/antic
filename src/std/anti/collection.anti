@@ -668,6 +668,17 @@ fn end_entry(out: *text.Builder, named: bool)
 	}
 }
 
+/// The version of an entry or an element of a thread-safe collection: of a
+/// `ConcurrentMap`, a `SyncMap` and a `SyncSet`.
+///
+/// A struct and not an `int`: antic fails to lower `remove` of a map whose
+/// values are `int` and whose key has a `destruct`, as
+/// `docs/reports/2026-09-28-add5-concurrent.md` records.
+internal struct Stamp
+{
+	version: int,
+}
+
 /// The alignment of the room of an element: the largest power of two that
 /// divides its size, which every alignment the layout gives it divides.
 fn element_align<T>() -> int
