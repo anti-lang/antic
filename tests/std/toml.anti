@@ -1,7 +1,8 @@
 //! A document of the TOML subset gives its keys in order and finds a value
 //! under a dotted path. It numbers the entries of a repeated table and the
 //! elements of an array, and a value that is no integer gives the fallback of
-//! `int_of`. `try` forwards the error of `read`.
+//! `int_of`, as `int_value` and `bool_value` read a value text. `try` forwards
+//! the error of `read`.
 import anti.io;
 import anti.lang;
 import anti.toml;
@@ -45,6 +46,13 @@ fn main() -> int
 	}
 	if doc.line(1) != 3 {
 		return 6;
+	}
+	if toml.int_value("-12", 0) != -12 || toml.int_value("12a", 5) != 5 {
+		return 10;
+	}
+	if !toml.bool_value("true", false) || toml.bool_value("false", true)
+		|| !toml.bool_value("yes", true) {
+		return 11;
 	}
 	let depth = depth_of(SOURCE) catch fatal;
 	if depth != 32 {

@@ -76,9 +76,7 @@ pub class Document
 		if at < 0 {
 			return fallback;
 		}
-		let v = anti_rt_toml_value(self.handle, at);
-		let n = text.parse_int(v) catch e { yield fallback; };
-		return n;
+		return int_value(anti_rt_toml_value(self.handle, at), fallback);
 	}
 
 	/// The boolean under `path`, or `fallback` for anything else.
@@ -88,14 +86,7 @@ pub class Document
 		if at < 0 {
 			return fallback;
 		}
-		let v = anti_rt_toml_value(self.handle, at);
-		if text.equal(v, "true") {
-			return true;
-		}
-		if text.equal(v, "false") {
-			return false;
-		}
-		return fallback;
+		return bool_value(anti_rt_toml_value(self.handle, at), fallback);
 	}
 
 	fn destruct(self)
@@ -128,4 +119,26 @@ pub class Document
 		}
 		return alloc Document { handle: handle };
 	}
+}
+
+/// The integer the value text `v` spells, or `fallback` when it spells none.
+/// `Document.int_of` and `config.Config.int_of` read a value through it.
+pub fn int_value(v: str, fallback: int) -> int
+{
+	let n = text.parse_int(v) catch e { yield fallback; };
+	return n;
+}
+
+/// The boolean the value text `v` spells, `true` or `false`, or `fallback` for
+/// any other text. `Document.bool_of` and `config.Config.bool_of` read a value
+/// through it.
+pub fn bool_value(v: str, fallback: bool) -> bool
+{
+	if text.equal(v, "true") {
+		return true;
+	}
+	if text.equal(v, "false") {
+		return false;
+	}
+	return fallback;
 }

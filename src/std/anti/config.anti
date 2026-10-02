@@ -34,23 +34,13 @@ pub abstract class Config
 		if !self.has(key) {
 			return fallback;
 		}
-		let n = text.parse_int(self.text_of(key, "")) catch e {
-			yield fallback;
-		};
-		return n;
+		return toml.int_value(self.text_of(key, ""), fallback);
 	}
 
 	/// The boolean under `key`, or `fallback` for anything else.
 	pub fn bool_of(self, key: str, fallback: bool) -> bool
 	{
-		let v = self.text_of(key, "");
-		if text.equal(v, "true") {
-			return true;
-		}
-		if text.equal(v, "false") {
-			return false;
-		}
-		return fallback;
+		return toml.bool_value(self.text_of(key, ""), fallback);
 	}
 
 	/// The provider the link takes where the build names none, which is the
