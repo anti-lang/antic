@@ -1,6 +1,6 @@
-//! Two module-level `operator fn eq` share their name, so each is found by
-//! the name of the type it takes first. A type whose name passes 255 bytes
-//! goes through its own operator as a short one does.
+//! Two module-level `operator fn eq` share their name, so each is found by the
+//! name of the type it takes first. A type whose name passes 255 bytes goes
+//! through its own operator as a short one does.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
