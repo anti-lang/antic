@@ -7,7 +7,7 @@ static void mangles(enum target t, const char *module, const char *name,
                     const char *expected)
 {
     struct text out = {0};
-    CHECK(mangle(&out, t, module, name));
+    mangle(&out, t, module, name);
     CHECK_STR(text_cstr(&out), expected);
     text_free(&out);
 }

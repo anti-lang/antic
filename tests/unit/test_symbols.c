@@ -45,7 +45,7 @@ static void round_trip(const char *module, const char *name)
     char out[256];
     size_t length;
 
-    CHECK(mangle(&symbol, TARGET_LINUX_X86_64, module, name));
+    mangle(&symbol, TARGET_LINUX_X86_64, module, name);
     text_appendf(&wanted, "%s.%s", module, name);
     length = anti_rt_symbol_unescape(text_cstr(&symbol), symbol.length, out,
                                      sizeof out);

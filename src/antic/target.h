@@ -88,9 +88,9 @@ const char *convention_name(enum convention convention);
 bool target_host(enum target *t);
 bool target_from_name(const char *name, enum target *t);
 
-/* Append the symbol of function name in module to out. Returns false for
-   TARGET_COUNT, which names no target. */
-bool mangle(struct text *out, enum target t, const char *module,
+/* Append the symbol of function name in module to out. t is one of the
+   six targets. */
+void mangle(struct text *out, enum target t, const char *module,
             const char *name);
 
 /* Append the symbol of the C function name as a C compiler for target t

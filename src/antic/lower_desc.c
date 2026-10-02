@@ -1166,13 +1166,10 @@ struct ir_global *lower_class_descriptor(struct lowerer *l,
     value->items[RT_DESCRIPTOR_NAME_LENGTH].scalar = IR_I64;
     value->items[RT_DESCRIPTOR_NAME_LENGTH].integer = t->name.length;
     value->items[RT_DESCRIPTOR_PARENT].scalar = IR_PTR;
-    if (t->base != NULL) {
-        value->items[RT_DESCRIPTOR_PARENT].kind = IR_CONST_ADDR;
-        value->items[RT_DESCRIPTOR_PARENT].global = lower_class_descriptor(l, t->base)->index;
-    } else {
-        value->items[RT_DESCRIPTOR_PARENT].kind = IR_CONST_INT;
-        value->items[RT_DESCRIPTOR_PARENT].integer = 0;
-    }
+    /* Only the root has no base, and it returned above. */
+    value->items[RT_DESCRIPTOR_PARENT].kind = IR_CONST_ADDR;
+    value->items[RT_DESCRIPTOR_PARENT].global =
+        lower_class_descriptor(l, t->base)->index;
     value->items[RT_DESCRIPTOR_SIZE].kind = IR_CONST_SYM;
     value->items[RT_DESCRIPTOR_SIZE].scalar = IR_I64;
     value->items[RT_DESCRIPTOR_SIZE].sym = ir_sym_size_of(l->m, lower_vtype_of(l, t));
@@ -1546,7 +1543,6 @@ struct ir_global *lower_interface_table(struct lowerer *l,
         bool own = fn != NULL && fn->symbol != NULL && lower_has_body(fn);
         if (!own) {
             fn = lower_find_member_fn(sub->type, &table.entries[i].name);
-            own = false;
         }
         value->items[i + 1].scalar = IR_PTR;
         if (fn != NULL && fn->symbol != NULL && lower_has_body(fn)) {

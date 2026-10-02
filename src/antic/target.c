@@ -79,12 +79,6 @@ bool target_from_name(const char *name, enum target *t)
     return false;
 }
 
-/* DESIGN: module.name on ELF and Mach-O, as docs/decisions.md settles, with
-   the dots of the module path kept. Mach-O prefixes every C-level symbol
-   with '_'. On COFF the symbol holds only letters, digits and '_': _A,
-   each segment of the module path after its length, '_' and the function
-   name. The lengths keep a '_' inside a name from producing the symbol of
-   another pair. C reserves names that start with _A. */
 /* DESIGN: the name of a copy of a generic carries its arguments, as in
    `List<*Person>.push`, and an assembler reads none of `<`, `>`, `,`,
    `*`, the space and the other marks of a type as part of a symbol. Each
@@ -106,12 +100,17 @@ static void symbol_name(struct text *out, const char *name)
     }
 }
 
-bool mangle(struct text *out, enum target t, const char *module,
+/* DESIGN: module.name on ELF and Mach-O, as docs/decisions.md settles, with
+   the dots of the module path kept. Mach-O prefixes every C-level symbol
+   with '_'. On COFF the module path holds only letters, digits and '_':
+   _A, each segment of the module path after its length, '_' and the
+   function name. The lengths keep a '_' inside a name from producing the
+   symbol of another pair. C reserves names that start with _A. On every
+   format the function name is written by symbol_name, which keeps '.'
+   and escapes the other bytes. */
+void mangle(struct text *out, enum target t, const char *module,
             const char *name)
 {
-    if (t >= TARGET_COUNT) {
-        return false;
-    }
     switch (infos[t].format) {
     case FORMAT_MACHO:
         text_appendf(out, "_%s.", module);
@@ -130,7 +129,6 @@ bool mangle(struct text *out, enum target t, const char *module,
         break;
     }
     symbol_name(out, name);
-    return true;
 }
 
 /* DESIGN: a C symbol is the name of the item, with the `_` that Mach-O
