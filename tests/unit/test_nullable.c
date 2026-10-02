@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "pipeline.h"
 #include "arena.h"
 #include "ast.h"
 #include "diagnostic.h"
@@ -10,72 +11,6 @@
 
 /* The rules of "Nullable pointers" in docs/anti-language-additions.md.
    `*T` never holds `none`, `?*T` may, and narrowing is per block. */
-
-struct checked {
-    struct arena arena;
-    struct diagnostics diags;
-    struct token_list tokens;
-    struct module *module;
-    struct types types;
-    bool ok;
-};
-
-static void run(struct checked *c, const char *source)
-{
-    memset(c, 0, sizeof *c);
-    types_init(&c->types, &c->arena);
-    c->ok = lexer_lex(source, strlen(source), &c->arena, &c->diags,
-                      &c->tokens) &&
-            parser_parse(source, &c->tokens, &c->arena, &c->diags, &c->module);
-    if (!c->ok) {
-        fprintf(stderr, "syntax error in test source: %s\n",
-                c->diags.items[0].message);
-        check_failures++;
-        return;
-    }
-    c->ok = sema_check(c->module, "main", NULL, NULL, 0, &c->types, &c->arena,
-                       &c->diags, true);
-}
-
-static void release(struct checked *c)
-{
-    lexer_token_list_free(&c->tokens);
-    diagnostics_free(&c->diags);
-    arena_free(&c->arena);
-}
-
-static void accepts(const char *source)
-{
-    struct checked c;
-    size_t i;
-
-    run(&c, source);
-    if (!c.ok) {
-        check_failures++;
-        fprintf(stderr, "rejected:\n%s\n", source);
-        for (i = 0; i < c.diags.count; i++) {
-            fprintf(stderr, "  %d:%d: %s\n", c.diags.items[i].line,
-                    c.diags.items[i].column, c.diags.items[i].message);
-        }
-    }
-    release(&c);
-}
-
-static void rejects(const char *source, const char *message)
-{
-    struct checked c;
-
-    run(&c, source);
-    if (c.ok || c.diags.count == 0) {
-        check_failures++;
-        fprintf(stderr, "accepted, expected: %s\n%s\n", message, source);
-    } else if (strcmp(c.diags.items[0].message, message) != 0) {
-        check_failures++;
-        fprintf(stderr, "expected %s\ngot      %s\n%s\n", message,
-                c.diags.items[0].message, source);
-    }
-    release(&c);
-}
 
 /* A function body around a fragment, so each case is one line of source. */
 static void body_accepts(const char *fragment)
@@ -96,21 +31,21 @@ static void body_rejects(const char *fragment, const char *message)
     text_appendf(&source, "fn take(p: *int) { }\n"
                           "fn maybe() -> ?*int { return none; }\n"
                           "fn f() {\n%s\n}\n", fragment);
-    rejects(text_cstr(&source), message);
+    rejects_with(text_cstr(&source), message);
     text_free(&source);
 }
 
 void test_nullable(void)
 {
     /* `*T` never holds `none`. */
-    rejects("fn f() { let p: *int = none; }\n", "`*int` cannot hold `none`");
-    rejects("fn f() -> *int { return none; }\n", "`*int` cannot hold `none`");
+    rejects_with("fn f() { let p: *int = none; }\n", "`*int` cannot hold `none`");
+    rejects_with("fn f() -> *int { return none; }\n", "`*int` cannot hold `none`");
     accepts("fn f() { let p: ?*int = none; }\n");
     accepts("fn f() -> ?*int { return none; }\n");
 
     /* `none` has type `?*T` for every T, and a context gives it the T. */
-    rejects("fn f() { let p = none; }\n",
-            "`none` needs a type that may be `none` from its context");
+    rejects_with("fn f() { let p = none; }\n",
+                 "`none` needs a type that may be `none` from its context");
 
     /* `?*T` cannot be dereferenced, called, indexed or passed where `*T`
        is expected until the program has checked it. */
@@ -229,11 +164,11 @@ void test_nullable(void)
                  "    }");
 
     /* A function value follows the pointer rule. */
-    rejects("fn f() { let g: fn() = none; }\n", "`fn()` cannot hold `none`");
+    rejects_with("fn f() { let g: fn() = none; }\n", "`fn()` cannot hold `none`");
     accepts("fn f() { let g: ?fn() = none; }\n");
-    rejects("fn one() { }\n"
-            "fn f() { let g: ?fn() = one; g(); }\n",
-            "`g` may be `none`, check it or use `?fn(...)`");
+    rejects_with("fn one() { }\n"
+                 "fn f() { let g: ?fn() = one; g(); }\n",
+                 "`g` may be `none`, check it or use `?fn(...)`");
     accepts("fn one() { }\n"
             "fn f() { let g: ?fn() = one; if g != none { g(); } }\n");
     accepts("fn one() { }\n"
@@ -241,9 +176,9 @@ void test_nullable(void)
     /* `fn()` passes where `?fn()` is expected, as `*T` does for `?*T`. */
     accepts("fn takes(g: ?fn()) { }\n"
             "fn f(h: fn()) { takes(h); }\n");
-    rejects("fn takes(g: fn()) { }\n"
-            "fn f(h: ?fn()) { takes(h); }\n",
-            "`h` may be `none`, check it or use `?fn(...)`");
+    rejects_with("fn takes(g: fn()) { }\n"
+                 "fn f(h: ?fn()) { takes(h); }\n",
+                 "`h` may be `none`, check it or use `?fn(...)`");
 
     /* `while p != none { }` narrows its body by the same rule. */
     body_accepts("    let p = maybe();\n"
@@ -276,9 +211,9 @@ void test_nullable(void)
             "fn f() { let p: *P = alloc P { x: 1 }; free(p); }\n");
     accepts("struct P { x: int }\n"
             "fn f() { let p: ?*P = alloc(P, 4); free(p); }\n");
-    rejects("struct P { x: int }\n"
-            "fn f() { let p: *P = alloc(P, 4); free(p); }\n",
-            "the value may be `none`, check it or use `?*T`");
+    rejects_with("struct P { x: int }\n"
+                 "fn f() { let p: *P = alloc(P, 4); free(p); }\n",
+                 "the value may be `none`, check it or use `?*T`");
 
     /* A `?*T` from C: every pointer of an `extern fn` is one, and the
        program checks it before it uses it. */
@@ -288,9 +223,9 @@ void test_nullable(void)
             "    if found == none {\n        return 0;\n    }\n"
             "    return found[0] as int;\n"
             "}\n");
-    rejects("extern fn getenv(name: ?*byte) -> ?*byte;\n"
-            "fn f() -> int { return getenv(\"HOME\".ptr)[0] as int; }\n",
-            "the value may be `none`, check it or use `?*T`");
+    rejects_with("extern fn getenv(name: ?*byte) -> ?*byte;\n"
+                 "fn f() -> int { return getenv(\"HOME\".ptr)[0] as int; }\n",
+                 "the value may be `none`, check it or use `?*T`");
 
     /* `is`, `as` and `as?` take a `?*T`: `none` is of no class. `dup`,
        `delete` and `destroy` read the table and need a checked one. */
@@ -300,30 +235,30 @@ void test_nullable(void)
     accepts("class Shape { pub n: int = 0 }\n"
             "class Circle inherits Shape { pub r: int = 0 }\n"
             "fn f(p: ?*Shape) -> ?*Circle { return p as? *Circle; }\n");
-    rejects("class Shape { pub n: int = 0 }\n"
-            "fn f(p: ?*Shape) { delete(p); }\n",
-            "`p` may be `none`, check it or use `?*T`");
-    rejects("class Shape { pub n: int = 0 }\n"
-            "fn f(p: ?*Shape) -> *Shape { return dup(p); }\n",
-            "`p` may be `none`, check it or use `?*T`");
+    rejects_with("class Shape { pub n: int = 0 }\n"
+                 "fn f(p: ?*Shape) { delete(p); }\n",
+                 "`p` may be `none`, check it or use `?*T`");
+    rejects_with("class Shape { pub n: int = 0 }\n"
+                 "fn f(p: ?*Shape) -> *Shape { return dup(p); }\n",
+                 "`p` may be `none`, check it or use `?*T`");
 
     /* A field of a class follows the same rule as a local. */
-    rejects("class Link { pub own next: ?*Link = none, pub n: int = 0 }\n"
-            "fn f(l: *Link) -> int { return l.next.n; }\n",
-            "`l.next` may be `none`, check it or use `?*T`");
+    rejects_with("class Link { pub own next: ?*Link = none, pub n: int = 0 }\n"
+                 "fn f(l: *Link) -> int { return l.next.n; }\n",
+                 "`l.next` may be `none`, check it or use `?*T`");
 
     /* The `ptr` of a str and of a slice is `?*T`: neither holds an
        address when it holds no bytes. */
-    rejects("fn take(p: *byte) { }\n"
-            "fn f(s: str) { take(s.ptr); }\n",
-            "`s.ptr` may be `none`, check it or use `?*T`");
+    rejects_with("fn take(p: *byte) { }\n"
+                 "fn f(s: str) { take(s.ptr); }\n",
+                 "`s.ptr` may be `none`, check it or use `?*T`");
 
     /* Every pointer of an `extern fn` is `?*T`. */
     accepts("extern fn malloc(n: u64) -> ?*byte;\n"
             "fn f() { let p = malloc(8); if p != none { free(p); } }\n");
-    rejects("extern fn malloc(n: u64) -> *byte;\n"
-            "fn f() { let p = malloc(8); free(p); }\n",
-            "every pointer of the result of `extern fn malloc` is `?*T`");
+    rejects_with("extern fn malloc(n: u64) -> *byte;\n"
+                 "fn f() { let p = malloc(8); free(p); }\n",
+                 "every pointer of the result of `extern fn malloc` is `?*T`");
 
     /* `p ?? q` gives p as `*T` when it is not `none` and q otherwise, and
        the result is `?*T` when q may be `none`. It binds tighter than
@@ -360,39 +295,39 @@ void test_nullable(void)
             "fn f(t: ?*Tag) -> ?*Node { return t?.owner; }\n");
     accepts("struct Hooks { done: fn(int) -> int }\n"
             "fn f(h: ?*Hooks) -> ?fn(int) -> int { return h?.done; }\n");
-    rejects("struct Node { value: int, next: ?*Node }\n"
-            "fn f(p: ?*Node) -> int { let v = p?.value; return 0; }\n",
-            "`?.` on `p.value`, which is not a pointer");
-    rejects("struct Node { value: int, next: ?*Node }\n"
-            "fn f(p: ?*Node) -> int { let v = p?.next?.value; return 0; }\n",
-            "`?.` on `p?.next.value`, which is not a pointer");
-    rejects("struct Node { value: int, next: ?*Node }\n"
-            "fn get(n: *Node, k: int) -> int { return n.value; }\n"
-            "fn f(p: ?*Node) -> int { let v = p?.get(1); return 0; }\n",
-            "`?.` on `p.get(...)`, which is not a pointer");
-    rejects("struct Node { value: int, next: ?*Node }\n"
-            "fn touch(n: *Node) { }\n"
-            "fn f(p: ?*Node) { p?.touch(); }\n",
-            "`?.` on `p.touch()`, which is not a pointer");
+    rejects_with("struct Node { value: int, next: ?*Node }\n"
+                 "fn f(p: ?*Node) -> int { let v = p?.value; return 0; }\n",
+                 "`?.` on `p.value`, which is not a pointer");
+    rejects_with("struct Node { value: int, next: ?*Node }\n"
+                 "fn f(p: ?*Node) -> int { let v = p?.next?.value; return 0; }\n",
+                 "`?.` on `p?.next.value`, which is not a pointer");
+    rejects_with("struct Node { value: int, next: ?*Node }\n"
+                 "fn get(n: *Node, k: int) -> int { return n.value; }\n"
+                 "fn f(p: ?*Node) -> int { let v = p?.get(1); return 0; }\n",
+                 "`?.` on `p.get(...)`, which is not a pointer");
+    rejects_with("struct Node { value: int, next: ?*Node }\n"
+                 "fn touch(n: *Node) { }\n"
+                 "fn f(p: ?*Node) { p?.touch(); }\n",
+                 "`?.` on `p.touch()`, which is not a pointer");
     /* A `?T` of a value is a base of `?.` as a `?*T` is. */
     accepts("struct Node { value: int, next: ?*Node }\n"
             "fn f(p: ?Node) -> ?*Node { return p?.next; }\n");
-    rejects("struct Node { value: int, next: ?*Node }\n"
-            "fn f(p: ?Node) -> int { let v = p?.value; return 0; }\n",
-            "`?.` on `p.value`, which is not a pointer");
-    rejects("struct Node { value: int, next: ?*Node }\n"
-            "fn f(p: *Node) -> ?*Node { return p?.next; }\n",
-            "`?.` follows a value of type `?*T` or `?T`, found `*Node`");
-    rejects("struct Node { value: int, next: ?*Node }\n"
-            "fn f(p: ?*Node) -> ?*Node {\n"
-            "    if p != none { return p?.next; }\n"
-            "    return none;\n"
-            "}\n",
-            "`?.` follows a value of type `?*T` or `?T`, found `*Node`");
-    rejects("struct Node { value: int, next: ?*Node }\n"
-            "fn f(p: ?*Node) -> *Node { return p?.next; }\n",
-            "`p?.next` may be `none`, check it or use `?*T`");
-    rejects("struct Node { value: int, next: ?*Node }\n"
-            "fn f(p: ?*Node) -> int { return p?.next.value; }\n",
-            "`p?.next` may be `none`, check it or use `?*T`");
+    rejects_with("struct Node { value: int, next: ?*Node }\n"
+                 "fn f(p: ?Node) -> int { let v = p?.value; return 0; }\n",
+                 "`?.` on `p.value`, which is not a pointer");
+    rejects_with("struct Node { value: int, next: ?*Node }\n"
+                 "fn f(p: *Node) -> ?*Node { return p?.next; }\n",
+                 "`?.` follows a value of type `?*T` or `?T`, found `*Node`");
+    rejects_with("struct Node { value: int, next: ?*Node }\n"
+                 "fn f(p: ?*Node) -> ?*Node {\n"
+                 "    if p != none { return p?.next; }\n"
+                 "    return none;\n"
+                 "}\n",
+                 "`?.` follows a value of type `?*T` or `?T`, found `*Node`");
+    rejects_with("struct Node { value: int, next: ?*Node }\n"
+                 "fn f(p: ?*Node) -> *Node { return p?.next; }\n",
+                 "`p?.next` may be `none`, check it or use `?*T`");
+    rejects_with("struct Node { value: int, next: ?*Node }\n"
+                 "fn f(p: ?*Node) -> int { return p?.next.value; }\n",
+                 "`p?.next` may be `none`, check it or use `?*T`");
 }

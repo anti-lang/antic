@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "alloc.h"
 #include "arena.h"
 #include "diagnostic.h"
 #include "lexer.h"
@@ -261,13 +262,9 @@ static void error_cap(void)
 {
     struct lexed l;
     size_t length = 100000;
-    char *source = malloc(length);
+    char *source = alloc_zeroed(length, 1);
     size_t i;
 
-    CHECK(source != NULL);
-    if (source == NULL) {
-        return;
-    }
     memset(source, '@', length);
     lex_n(&l, source, length);
     CHECK(!l.ok);

@@ -13,6 +13,7 @@
 
 #include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
+#include "alloc.h"
 #include "symbols.h"
 
 static unsigned char *read_all(const char *path, size_t *size)
@@ -28,14 +29,8 @@ static unsigned char *read_all(const char *path, size_t *size)
     }
     for (;;) {
         if (*size == room) {
-            unsigned char *more = realloc(bytes, room == 0 ? 65536 : 2 * room);
-            if (more == NULL) {
-                free(bytes);
-                fclose(f);
-                return NULL;
-            }
-            bytes = more;
-            room = room == 0 ? 65536 : 2 * room;
+            room = room == 0 ? 65536 : alloc_product(room, 2);
+            bytes = alloc_resize(bytes, room, 1);
         }
         n = fread(bytes + *size, 1, room - *size, f);
         if (n == 0) {

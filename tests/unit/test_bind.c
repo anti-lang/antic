@@ -8,6 +8,7 @@
 #include "bindexpr.h"
 #include "bindmodel.h"
 #include "check.h"
+#include "alloc.h"
 #include "jsontree.h"
 
 static const struct bind_type *no_typedef(void *context, const char *name)
@@ -170,14 +171,12 @@ static char *repeated(const char *head, const char *open, const char *middle,
     size_t lo = strlen(open);
     size_t lm = strlen(middle);
     size_t lc = strlen(close);
-    char *s = malloc(lh + n * (lo + lc) + lm + 1);
+    size_t size = alloc_sum(alloc_sum(lh, lm),
+                            alloc_product(n, alloc_sum(lo, lc)));
+    char *s = alloc_zeroed(alloc_sum(size, 1), 1);
     char *at = s;
     size_t i;
 
-    CHECK(s != NULL);
-    if (s == NULL) {
-        return NULL;
-    }
     memcpy(at, head, lh);
     at += lh;
     for (i = 0; i < n; i++, at += lo) {
@@ -219,8 +218,8 @@ static void deep_input(void)
                               exprs[i].close, 1000000);
         char *shallow = repeated(exprs[i].head, exprs[i].open,
                                  exprs[i].middle, exprs[i].close, 32);
-        CHECK(deep != NULL && !value_of(&b, deep, &v));
-        CHECK(shallow != NULL && value_of(&b, shallow, &v));
+        CHECK(!value_of(&b, deep, &v));
+        CHECK(value_of(&b, shallow, &v));
         free(deep);
         free(shallow);
     }
@@ -229,8 +228,8 @@ static void deep_input(void)
                               types[i].close, 1000000);
         char *shallow = repeated(types[i].head, types[i].open,
                                  types[i].middle, types[i].close, 32);
-        CHECK(deep != NULL && parse(&b, deep) == NULL);
-        CHECK(shallow != NULL && parse(&b, shallow) != NULL);
+        CHECK(parse(&b, deep) == NULL);
+        CHECK(parse(&b, shallow) != NULL);
         free(deep);
         free(shallow);
     }

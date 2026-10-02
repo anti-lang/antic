@@ -18,6 +18,7 @@
 #include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include "check.h"
+#include "alloc.h"
 #include "path_rules.h"
 
 #if defined(_WIN32)
@@ -135,10 +136,8 @@ static char *read_all(const char *path, size_t *length)
     if (f == NULL) {
         return NULL;
     }
-    bytes = malloc(64);
-    if (bytes != NULL) {
-        *length = fread(bytes, 1, 64, f);
-    }
+    bytes = alloc_zeroed(64, 1);
+    *length = fread(bytes, 1, 64, f);
     fclose(f);
     return bytes;
 }

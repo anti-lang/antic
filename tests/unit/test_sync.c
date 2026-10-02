@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "pipeline.h"
 #include "arena.h"
 #include "ast.h"
 #include "diagnostic.h"
@@ -12,78 +13,6 @@
    docs/anti-language-additions.md. `anti.lang.Mutex` and `sync m { }`,
    `chan T` with `send`, `recv` and `close`, and `select` over the
    channels. */
-
-struct checked {
-    struct arena arena;
-    struct diagnostics diags;
-    struct token_list tokens;
-    struct module *module;
-    struct types types;
-    bool ok;
-};
-
-static void run(struct checked *c, const char *source)
-{
-    memset(c, 0, sizeof *c);
-    types_init(&c->types, &c->arena);
-    c->ok = lexer_lex(source, strlen(source), &c->arena, &c->diags,
-                      &c->tokens) &&
-            parser_parse(source, &c->tokens, &c->arena, &c->diags, &c->module);
-    if (!c->ok) {
-        fprintf(stderr, "syntax error in test source: %s\n%s\n",
-                c->diags.count > 0 ? c->diags.items[0].message : "",
-                source);
-        check_failures++;
-        return;
-    }
-    c->ok = sema_check(c->module, "main", NULL, NULL, 0, &c->types, &c->arena,
-                       &c->diags, true);
-}
-
-static void release(struct checked *c)
-{
-    lexer_token_list_free(&c->tokens);
-    diagnostics_free(&c->diags);
-    arena_free(&c->arena);
-}
-
-static void accepts(const char *source)
-{
-    struct checked c;
-    size_t i;
-
-    run(&c, source);
-    if (!c.ok) {
-        check_failures++;
-        fprintf(stderr, "rejected:\n%s\n", source);
-        for (i = 0; i < c.diags.count; i++) {
-            fprintf(stderr, "  %d:%d: %s\n", c.diags.items[i].line,
-                    c.diags.items[i].column, c.diags.items[i].message);
-        }
-    }
-    release(&c);
-}
-
-static void rejects(const char *source, int line, int column,
-                    const char *message)
-{
-    struct checked c;
-
-    run(&c, source);
-    if (c.ok || c.diags.count == 0) {
-        check_failures++;
-        fprintf(stderr, "accepted, expected %d:%d: %s\n%s\n", line, column,
-                message, source);
-    } else if (c.diags.items[0].line != line ||
-               c.diags.items[0].column != column ||
-               strcmp(c.diags.items[0].message, message) != 0) {
-        check_failures++;
-        fprintf(stderr, "expected %d:%d: %s\ngot      %d:%d: %s\n%s\n", line,
-                column, message, c.diags.items[0].line,
-                c.diags.items[0].column, c.diags.items[0].message, source);
-    }
-    release(&c);
-}
 
 /* A source the parser refuses, with its first message. */
 static void syntax_error(const char *source, int line, int column,
@@ -137,7 +66,7 @@ static void let_type(const char *source, const char *expected)
     struct checked c;
     struct text out = {0};
 
-    run(&c, source);
+    checked_run(&c, source);
     CHECK(c.ok);
     if (c.ok) {
         const struct item *f = c.module->items[c.module->item_count - 1];
@@ -149,7 +78,7 @@ static void let_type(const char *source, const char *expected)
         }
     }
     text_free(&out);
-    release(&c);
+    checked_release(&c);
 }
 
 /* A struct with a mutex in it, on line 1 of the cases below. */

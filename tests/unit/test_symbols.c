@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "alloc.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -516,11 +517,7 @@ static void long_leb(void)
     line_header(&h, 4, 0, 0, 0, 0);
     after_length = 2 + 4 + h.size + 1 + CONTINUED + 1;
     length = 4 + after_length;
-    file = malloc(start + length);
-    CHECK(file != NULL);
-    if (file == NULL) {
-        return;
-    }
+    file = alloc_zeroed(alloc_sum(start, length), 1);
     memcpy(file, image, start);
     put(file + 64 + 64 * ELF_DEBUG_LINE + 32, length, 8);
     unit = file + start;
@@ -694,9 +691,9 @@ static size_t macho_image(uint8_t *out, size_t room, const struct t_nlist *n,
 /* A copy of the first size bytes of image in memory of its own. */
 static uint8_t *exactly(const uint8_t *image, size_t size)
 {
-    uint8_t *copy = malloc(size > 0 ? size : 1);
+    uint8_t *copy = alloc_zeroed(size, 1);
 
-    if (copy != NULL && size > 0) {
+    if (size > 0) {
         memcpy(copy, image, size);
     }
     return copy;

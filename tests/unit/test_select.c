@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "pipeline.h"
 #include <inttypes.h>
 #include <stdlib.h>
 #include "arena.h"
@@ -20,51 +21,7 @@
    functions, or the error. */
 static void run(const char *source, enum target target, struct text *out)
 {
-    struct arena arena = {0};
-    struct diagnostics diags = {0};
-    struct token_list tokens = {0};
-    struct module *module = NULL;
-    struct types types;
-    struct ir_module ir;
-    struct mach_function **functions = NULL;
-    char error[200] = "";
-    size_t i;
-
-    types_init(&types, &arena);
-    ir_module_init(&ir, &arena, "main");
-    if (!lexer_lex(source, strlen(source), &arena, &diags, &tokens) ||
-        !parser_parse(source, &tokens, &arena, &diags, &module) ||
-        !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true)) {
-        check_failures++;
-        fprintf(stderr, "test source does not check: %s\n%s\n",
-                diags.count > 0 ? diags.items[0].message : "", source);
-    } else {
-        lower_module(module, "main", &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
-        optimize_program(&ir, "main");
-        functions = calloc(ir.function_count + 1, sizeof *functions);
-        if (select_module(target, cpu_default(target), &ir, functions, error,
-                          sizeof error)) {
-            for (i = 0; i < ir.function_count; i++) {
-                if (functions[i] != NULL) {
-                    mach_print(out, target_desc(target), cpu_default(target), &ir,
-                               functions[i]);
-                }
-            }
-        } else {
-            text_append(out, error);
-        }
-        for (i = 0; i < ir.function_count; i++) {
-            if (functions[i] != NULL) {
-                mach_function_free(functions[i]);
-                free(functions[i]);
-            }
-        }
-        free(functions);
-    }
-    ir_module_free(&ir);
-    lexer_token_list_free(&tokens);
-    diagnostics_free(&diags);
-    arena_free(&arena);
+    machine_of(source, target, cpu_default(target), false, out);
 }
 
 static void selects(const char *source, enum target target,
@@ -81,34 +38,19 @@ static void selects(const char *source, enum target target,
    back end lays out. */
 static void data(const char *source, enum target target, struct text *out)
 {
-    struct arena arena = {0};
-    struct diagnostics diags = {0};
-    struct token_list tokens = {0};
-    struct module *module = NULL;
-    struct types types;
-    struct ir_module ir;
-    struct mach_function **functions = NULL;
-    char error[200] = "";
+    struct lowered l;
+    struct machine m;
     size_t i;
     uint64_t k;
 
-    types_init(&types, &arena);
-    ir_module_init(&ir, &arena, "main");
-    if (!lexer_lex(source, strlen(source), &arena, &diags, &tokens) ||
-        !parser_parse(source, &tokens, &arena, &diags, &module) ||
-        !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true)) {
-        check_failures++;
-        fprintf(stderr, "test source does not check: %s\n%s\n",
-                diags.count > 0 ? diags.items[0].message : "", source);
-    } else {
-        lower_module(module, "main", &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
-        functions = calloc(ir.function_count + 1, sizeof *functions);
-        if (!select_module(target, cpu_default(target), &ir, functions, error,
-                           sizeof error)) {
-            text_append(out, error);
+    lowered_run(&l, source);
+    if (l.ok) {
+        machine_build(&m, &l.ir, target, cpu_default(target), false);
+        if (!m.ok) {
+            text_append(out, m.error);
         }
-        for (i = 0; i < ir.global_count; i++) {
-            const struct ir_global *g = ir.globals[i];
+        for (i = 0; i < l.ir.global_count; i++) {
+            const struct ir_global *g = l.ir.globals[i];
             text_appendf(out, "%s.%s size %" PRIu64 " align %" PRIu64,
                          g->module, g->name, g->size, g->align);
             for (k = 0; k < g->size; k++) {
@@ -116,18 +58,9 @@ static void data(const char *source, enum target target, struct text *out)
             }
             text_append(out, "\n");
         }
-        for (i = 0; i < ir.function_count; i++) {
-            if (functions[i] != NULL) {
-                mach_function_free(functions[i]);
-                free(functions[i]);
-            }
-        }
-        free(functions);
+        machine_release(&m);
     }
-    ir_module_free(&ir);
-    lexer_token_list_free(&tokens);
-    diagnostics_free(&diags);
-    arena_free(&arena);
+    lowered_release(&l);
 }
 
 static void lays_out(const char *source, enum target target,

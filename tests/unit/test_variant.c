@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "pipeline.h"
 #include "arena.h"
 #include "ast.h"
 #include "diagnostic.h"
@@ -12,78 +13,6 @@
    is a tag and a union of its cases, a literal names its case, `switch`
    binds the fields of a case and covers every case, and `is`, `if let`
    and `tag` read the tag. */
-
-struct checked {
-    struct arena arena;
-    struct diagnostics diags;
-    struct token_list tokens;
-    struct module *module;
-    struct types types;
-    bool ok;
-};
-
-static void run(struct checked *c, const char *source)
-{
-    memset(c, 0, sizeof *c);
-    types_init(&c->types, &c->arena);
-    c->ok = lexer_lex(source, strlen(source), &c->arena, &c->diags,
-                      &c->tokens) &&
-            parser_parse(source, &c->tokens, &c->arena, &c->diags, &c->module);
-    if (!c->ok) {
-        fprintf(stderr, "syntax error in test source: %s\n%s\n",
-                c->diags.count > 0 ? c->diags.items[0].message : "",
-                source);
-        check_failures++;
-        return;
-    }
-    c->ok = sema_check(c->module, "main", NULL, NULL, 0, &c->types, &c->arena,
-                       &c->diags, true);
-}
-
-static void release(struct checked *c)
-{
-    lexer_token_list_free(&c->tokens);
-    diagnostics_free(&c->diags);
-    arena_free(&c->arena);
-}
-
-static void accepts(const char *source)
-{
-    struct checked c;
-    size_t i;
-
-    run(&c, source);
-    if (!c.ok) {
-        check_failures++;
-        fprintf(stderr, "rejected:\n%s\n", source);
-        for (i = 0; i < c.diags.count; i++) {
-            fprintf(stderr, "  %d:%d: %s\n", c.diags.items[i].line,
-                    c.diags.items[i].column, c.diags.items[i].message);
-        }
-    }
-    release(&c);
-}
-
-static void rejects(const char *source, int line, int column,
-                    const char *message)
-{
-    struct checked c;
-
-    run(&c, source);
-    if (c.ok || c.diags.count == 0) {
-        check_failures++;
-        fprintf(stderr, "accepted, expected %d:%d: %s\n%s\n", line, column,
-                message, source);
-    } else if (c.diags.items[0].line != line ||
-               c.diags.items[0].column != column ||
-               strcmp(c.diags.items[0].message, message) != 0) {
-        check_failures++;
-        fprintf(stderr, "expected %d:%d: %s\ngot      %d:%d: %s\n%s\n", line,
-                column, message, c.diags.items[0].line,
-                c.diags.items[0].column, c.diags.items[0].message, source);
-    }
-    release(&c);
-}
 
 static void tree(const char *source, const char *expected)
 {
@@ -119,14 +48,14 @@ static enum type_kind tag_kind(size_t count)
         text_appendf(&source, " C%zu,", i);
     }
     text_append(&source, " }\n");
-    run(&c, text_cstr(&source));
+    checked_run(&c, text_cstr(&source));
     CHECK(c.ok);
     if (c.ok) {
         const struct type *v = c.module->items[0]->symbol->type;
         CHECK(v->kind == TYPE_VARIANT && v->param_count == count);
         kind = v->base->base->kind;
     }
-    release(&c);
+    checked_release(&c);
     text_free(&source);
     return kind;
 }

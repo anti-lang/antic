@@ -10,6 +10,7 @@
 #include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include "check.h"
+#include "alloc.h"
 #include "text.h"
 #include "zip.h"
 
@@ -591,18 +592,12 @@ static void archive_bounds(void)
    rather than cut them. */
 static void write_limits(void)
 {
-    struct zip_entry *many = calloc(65536, sizeof *many);
-    char *name = malloc(70000 + 1);
+    struct zip_entry *many = alloc_zeroed(65536, sizeof *many);
+    char *name = alloc_zeroed(70000 + 1, 1);
     struct zip_entry one;
     FILE *f;
     size_t i;
 
-    CHECK(many != NULL && name != NULL);
-    if (many == NULL || name == NULL) {
-        free(many);
-        free(name);
-        return;
-    }
     remove(ARCHIVE);
     memset(name, 'n', 70000);
     name[70000] = '\0';

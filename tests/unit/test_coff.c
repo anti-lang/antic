@@ -9,6 +9,7 @@
 
 #include "../binary_stdio.h"
 #include "check.h"
+#include "alloc.h"
 #include "coff.h"
 #include "text.h"
 
@@ -658,7 +659,7 @@ static bool join_cut(const struct text *first, size_t size,
 {
     struct text out = {0};
     struct coff_input inputs[2];
-    unsigned char *copy = malloc(size > 0 ? size : 1);
+    unsigned char *copy = alloc_zeroed(size, 1);
     bool ok;
 
     if (size > 0) {
@@ -903,7 +904,7 @@ static bool exports_of(const struct text *archive, size_t size,
     struct t_object user = {AMD64, {{".text", CODE, call, 8, {{1, 0}}, 1}}, 1,
                             {{"foo", 0, 0, EXTERNAL, false, 0, 0}}, 1};
     struct text object = {0};
-    unsigned char *copy = malloc(size > 0 ? size : 1);
+    unsigned char *copy = alloc_zeroed(size, 1);
     bool ok;
 
     if (size > 0) {

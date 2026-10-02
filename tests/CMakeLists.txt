@@ -5,8 +5,29 @@
 # pinned release, stand in tools/pinned-compiler.cmake, which runs before
 # the first test reads either.
 
+# The files of src/rt/ a test program compiles, by the names
+# ANTIC_RUNTIME_SOURCES of CMakeLists.txt gives them. A name the runtime does
+# not build stops the configure step, so no test compiles a file the
+# runtime dropped or renamed. Each program of the runtime below takes the
+# part its subject needs, with stand-ins for the rest.
+function(antic_rt_sources out)
+    set(paths "")
+    foreach(name IN LISTS ARGN)
+        if(NOT name IN_LIST ANTIC_RUNTIME_SOURCES)
+            message(FATAL_ERROR "src/rt/${name}.c is no source of the runtime")
+        endif()
+        list(APPEND paths "${PROJECT_SOURCE_DIR}/src/rt/${name}.c")
+    endforeach()
+    set(${out} ${paths} PARENT_SCOPE)
+endfunction()
+
+# The unit tests link anti_core, every file of anti but its main, and the
+# files of the runtime they test.
+antic_rt_sources(unit_rt_sources assert atomic cpu f16 fs platform_posix
+    platform_windows text)
 add_executable(antic_unit_tests
     unit/test_main.c
+    unit/pipeline.c
     unit/test_target.c
     unit/test_cpu.c
     unit/test_text.c
@@ -52,31 +73,8 @@ add_executable(antic_unit_tests
     unit/test_files.c
     unit/test_tool_platform.c
     unit/test_interface.c
-    ../src/anti/bindexpr.c
-    ../src/anti/bindmodel.c
-    ../src/anti/bindtype.c
-    ../src/anti/cursor.c
-    ../src/anti/deps.c
-    ../src/anti/files.c
-    ../src/anti/fmt.c
-    ../src/anti/jsontree.c
-    ../src/anti/manifest.c
-    ../src/anti/platform.c
-    ../src/anti/repo.c
-    ../src/anti/symmap.c
-    ../src/anti/syms.c
-    ../src/anti/zip.c
-    ../src/rt/assert.c
-    ../src/rt/atomic.c
-    ../src/rt/cpu.c
-    ../src/rt/f16.c
-    ../src/rt/fs.c
-    ../src/rt/json.c
-    ../src/rt/platform_posix.c
-    ../src/rt/platform_windows.c
-    ../src/rt/symbols.c
-    ../src/rt/text.c)
-target_link_libraries(antic_unit_tests PRIVATE antic_core ${CMAKE_DL_LIBS})
+    ${unit_rt_sources})
+target_link_libraries(antic_unit_tests PRIVATE anti_core ${CMAKE_DL_LIBS})
 # test_f16.c calls nextafterf, which glibc keeps in libm. libSystem and the
 # CRT of Windows hold it themselves.
 if(UNIX AND NOT APPLE)
@@ -95,9 +93,8 @@ add_test(NAME unit COMMAND antic_unit_tests)
 
 # The allocation helpers of anti when the memory is refused, in a program
 # of its own, since each ends the process.
-add_executable(files_oom_tests unit/test_files_oom.c ../src/anti/files.c
-    ../src/anti/platform.c)
-target_link_libraries(files_oom_tests PRIVATE antic_core)
+add_executable(files_oom_tests unit/test_files_oom.c)
+target_link_libraries(files_oom_tests PRIVATE anti_core)
 target_include_directories(files_oom_tests PRIVATE ../src/anti)
 add_test(NAME files_oom
     COMMAND "${CMAKE_COMMAND}"
@@ -117,8 +114,16 @@ add_test(NAME alloc_oom
 
 # antic allocates through src/antic/alloc.c alone, and the front end
 # includes no header of the IR for its memory.
+# The programs of tests/ that link antic_core take their memory from
+# src/antic/alloc.c as well.
+set(core_test_sources
+    "$<TARGET_PROPERTY:antic_unit_tests,SOURCES>"
+    "$<TARGET_PROPERTY:files_oom_tests,SOURCES>"
+    "$<TARGET_PROPERTY:alloc_oom_tests,SOURCES>"
+    "$<TARGET_PROPERTY:symbols_probe,SOURCES>")
 add_test(NAME one_allocator
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        "-DUNIT_SOURCES=$<JOIN:${core_test_sources},|>"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_one_allocator.cmake")
 
 # Every host branch of antic, anti and the runtime stands in their
@@ -168,9 +173,9 @@ set(ANTIC_RUNTIME_READOBJ
 # tests would hide the one of C from src/rt/signal.c. The test starts
 # threads, and so does the reader of the platform layer.
 find_package(Threads REQUIRED)
-add_executable(rt_signal_tests unit/test_signal.c ../src/rt/signal.c
-    ../src/rt/atomic.c ../src/rt/utf.c ../src/rt/platform_posix.c
-    ../src/rt/platform_windows.c)
+antic_rt_sources(signal_sources signal atomic utf platform_posix
+    platform_windows)
+add_executable(rt_signal_tests unit/test_signal.c ${signal_sources})
 target_link_libraries(rt_signal_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 add_test(NAME rt_signal COMMAND rt_signal_tests)
@@ -178,10 +183,9 @@ add_test(NAME rt_signal COMMAND rt_signal_tests)
 # rt.configure while another thread reads the keys, in a program of its own
 # with stand-ins for the loader. The runtime of an Anti program carries no
 # sanitizer, and this program does in the sanitizer builds.
-add_executable(rt_conf_tests unit/test_conf_race.c ../src/rt/conf.c
-    ../src/rt/assert.c ../src/rt/toml.c ../src/rt/atomic.c ../src/rt/fs.c
-    ../src/rt/hash.c ../src/rt/utf.c ../src/rt/platform_posix.c
-    ../src/rt/platform_windows.c)
+antic_rt_sources(conf_sources conf assert toml atomic fs hash utf
+    platform_posix platform_windows)
+add_executable(rt_conf_tests unit/test_conf_race.c ${conf_sources})
 target_link_libraries(rt_conf_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 target_compile_definitions(rt_conf_tests PRIVATE
@@ -194,10 +198,9 @@ add_test(NAME rt_conf_race COMMAND rt_conf_tests)
 foreach(which one two)
     add_library(plugin_table_${which} SHARED unit/plugin_table.c)
 endforeach()
-add_executable(rt_plugin_tests unit/test_plugin_race.c ../src/rt/plugin.c
-    ../src/rt/assert.c ../src/rt/loaded.c ../src/rt/atomic.c
-    ../src/rt/digest.c ../src/rt/text.c ../src/rt/toml.c ../src/rt/utf.c
-    ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
+antic_rt_sources(plugin_sources plugin assert loaded atomic digest text toml
+    utf platform_posix platform_windows)
+add_executable(rt_plugin_tests unit/test_plugin_race.c ${plugin_sources})
 target_link_libraries(rt_plugin_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 target_compile_definitions(rt_plugin_tests PRIVATE
@@ -211,8 +214,8 @@ add_test(NAME rt_plugin_race COMMAND rt_plugin_tests)
 # threads of the layer. The library of
 # an empty plugin table is copied into a directory whose name is outside
 # ASCII, which a loader that takes the ANSI code page cannot open.
-add_executable(rt_platform_tests unit/test_platform.c ../src/rt/utf.c
-    ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
+antic_rt_sources(platform_sources utf platform_posix platform_windows)
+add_executable(rt_platform_tests unit/test_platform.c ${platform_sources})
 target_link_libraries(rt_platform_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 set(platform_plugin "${CMAKE_CURRENT_BINARY_DIR}/platform-ü")
@@ -232,9 +235,7 @@ add_test(NAME rt_platform COMMAND rt_platform_tests one "two words" "ü")
 # The loader against a table of a plugin with one value damaged at a time.
 add_library(plugin_bad SHARED unit/plugin_bad.c)
 add_executable(rt_plugin_table_tests unit/test_plugin_table.c
-    ../src/rt/plugin.c ../src/rt/assert.c ../src/rt/loaded.c
-    ../src/rt/atomic.c ../src/rt/digest.c ../src/rt/text.c ../src/rt/toml.c
-    ../src/rt/utf.c ../src/rt/platform_posix.c ../src/rt/platform_windows.c)
+    ${plugin_sources})
 target_link_libraries(rt_plugin_table_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 target_compile_definitions(rt_plugin_table_tests PRIVATE
@@ -3544,7 +3545,8 @@ set_tests_properties(conf_environment_utf8 PROPERTIES
 
 # The readers of the symbol table and the line table, on the binaries
 # that this host links for the other targets.
-add_executable(symbols_probe unit/symbols_probe.c ../src/rt/symbols.c)
+antic_rt_sources(probe_sources symbols)
+add_executable(symbols_probe unit/symbols_probe.c ${probe_sources})
 target_link_libraries(symbols_probe PRIVATE antic_core)
 target_include_directories(symbols_probe PRIVATE ../src/rt)
 foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64)

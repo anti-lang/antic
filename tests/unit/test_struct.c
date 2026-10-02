@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "pipeline.h"
 #include "cpu.h"
 #include <stdlib.h>
 #include <string.h>
@@ -20,58 +21,7 @@
    and append the machine code of every function, or the error. */
 static void run(const char *source, enum target target, struct text *out)
 {
-    struct arena arena = {0};
-    struct diagnostics diags = {0};
-    struct token_list tokens = {0};
-    struct module *module = NULL;
-    struct types types;
-    struct ir_module ir;
-    struct mach_function **functions = NULL;
-    char error[200] = "";
-    bool ok;
-    size_t i;
-
-    types_init(&types, &arena);
-    ir_module_init(&ir, &arena, "main");
-    if (!lexer_lex(source, strlen(source), &arena, &diags, &tokens) ||
-        !parser_parse(source, &tokens, &arena, &diags, &module) ||
-        !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true)) {
-        check_failures++;
-        fprintf(stderr, "test source does not check: %s\n%s\n",
-                diags.count > 0 ? diags.items[0].message : "", source);
-    } else {
-        lower_module(module, "main", &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
-        optimize_program(&ir, "main");
-        functions = calloc(ir.function_count + 1, sizeof *functions);
-        ok = select_module(target, cpu_default(target), &ir, functions, error,
-                           sizeof error);
-        for (i = 0; ok && i < ir.function_count; i++) {
-            if (functions[i] != NULL) {
-                ok = regalloc_function(target, functions[i], error,
-                                       sizeof error);
-            }
-        }
-        for (i = 0; ok && i < ir.function_count; i++) {
-            if (functions[i] != NULL) {
-                mach_print(out, target_desc(target), cpu_default(target), &ir,
-                           functions[i]);
-            }
-        }
-        if (!ok) {
-            text_append(out, error);
-        }
-        for (i = 0; i < ir.function_count; i++) {
-            if (functions[i] != NULL) {
-                mach_function_free(functions[i]);
-                free(functions[i]);
-            }
-        }
-        free(functions);
-    }
-    ir_module_free(&ir);
-    lexer_token_list_free(&tokens);
-    diagnostics_free(&diags);
-    arena_free(&arena);
+    machine_of(source, target, cpu_default(target), true, out);
 }
 
 static void emits(const char *source, enum target target,

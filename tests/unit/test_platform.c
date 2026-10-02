@@ -89,6 +89,10 @@ static void put(const char *name, const char *value)
     wchar_t wide_name[64];
     wchar_t *wide = malloc((strlen(value) + 1) * sizeof *wide);
 
+    CHECK(wide != NULL);
+    if (wide == NULL) {
+        return;
+    }
     MultiByteToWideChar(CP_UTF8, 0, name, -1, wide_name, 64);
     MultiByteToWideChar(CP_UTF8, 0, value, -1, wide, (int)strlen(value) + 1);
     SetEnvironmentVariableW(wide_name, wide);
@@ -104,6 +108,10 @@ static void environment(void)
     char *long_value = malloc(LENGTH + 1);
     char *value = NULL;
 
+    CHECK(long_value != NULL);
+    if (long_value == NULL) {
+        return;
+    }
     /* A value past the 1024 bytes of the ANSI reader of old. */
     memset(long_value, 'a', LENGTH);
     long_value[LENGTH] = '\0';

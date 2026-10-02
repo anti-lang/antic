@@ -7,6 +7,7 @@
 
 #include "../binary_stdio.h"
 #include "check.h"
+#include "alloc.h"
 #include "json.h"
 
 /* The text as bytes of their own, with nothing after the last. */
@@ -15,10 +16,8 @@ static unsigned char *copy(const char *text, size_t *length)
     unsigned char *bytes;
 
     *length = strlen(text);
-    bytes = malloc(*length > 0 ? *length : 1);
-    if (bytes != NULL) {
-        memcpy(bytes, text, *length);
-    }
+    bytes = alloc_zeroed(*length, 1);
+    memcpy(bytes, text, *length);
     return bytes;
 }
 
@@ -30,9 +29,6 @@ static int skips(const char *text)
     struct anti_json s;
     int ok;
 
-    if (bytes == NULL) {
-        return -1;
-    }
     s.at = bytes;
     s.end = bytes + length;
     ok = anti_rt_json_skip(&s, 0);
@@ -51,9 +47,6 @@ static int reads_string(const char *text, size_t room)
     struct anti_json s;
     int ok;
 
-    if (bytes == NULL) {
-        return -1;
-    }
     s.at = bytes;
     s.end = bytes + length;
     ok = anti_rt_json_string(&s, out, room, &decoded);
@@ -146,17 +139,15 @@ static void deep_nesting(void)
     CHECK(skips(text) == 1);
     nest(text, ANTI_JSON_DEPTH + 2);
     CHECK(skips(text) == 0);
-    big = malloc(n + 1);
-    if (big != NULL) {
-        memset(big, '[', n);
-        big[n] = '\0';
-        CHECK(skips(big) == 0);
-        for (i = 0; i < n; i += 2) {
-            memcpy(big + i, "{\"", 2);
-        }
-        CHECK(skips(big) == 0);
-        free(big);
+    big = alloc_zeroed(n + 1, 1);
+    memset(big, '[', n);
+    big[n] = '\0';
+    CHECK(skips(big) == 0);
+    for (i = 0; i < n; i += 2) {
+        memcpy(big + i, "{\"", 2);
     }
+    CHECK(skips(big) == 0);
+    free(big);
 }
 
 static void numbers(void)

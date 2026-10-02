@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "alloc.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include "text.h"
@@ -8,7 +9,7 @@
 /* The output of anti_rt_utf8_repair as hex bytes separated by spaces. */
 static void repairs(const unsigned char *in, size_t n, const char *expected)
 {
-    unsigned char *out = malloc(3 * n + 1);
+    unsigned char *out = alloc_zeroed(alloc_sum(alloc_product(3, n), 1), 1);
     struct text hex = {0};
     size_t count;
     size_t i;
@@ -24,7 +25,7 @@ static void repairs(const unsigned char *in, size_t n, const char *expected)
 
 static void converts(const uint16_t *in, size_t n, const char *expected)
 {
-    unsigned char *out = malloc(3 * n + 1);
+    unsigned char *out = alloc_zeroed(alloc_sum(alloc_product(3, n), 1), 1);
     struct text hex = {0};
     size_t count;
     size_t i;
@@ -42,8 +43,9 @@ static void converts(const uint16_t *in, size_t n, const char *expected)
 static void splits(const char *line, const char *expected)
 {
     size_t n = strlen(line);
-    uint16_t *units = malloc((n + 1) * sizeof *units);
-    uint16_t *out = malloc((2 * n + 2) * sizeof *out);
+    uint16_t *units = alloc_zeroed(alloc_sum(n, 1), sizeof *units);
+    uint16_t *out = alloc_zeroed(alloc_sum(alloc_product(2, n), 2),
+                                 sizeof *out);
     struct text joined = {0};
     size_t count;
     size_t arg;
@@ -86,7 +88,8 @@ static void splits_every_line(void)
             lines *= sizeof alphabet - 1;
         }
         for (line = 0; line < lines; line++) {
-            uint16_t *out = malloc((2 * n + 2) * sizeof *out);
+            uint16_t *out = alloc_zeroed(alloc_sum(alloc_product(2, n), 2),
+                                         sizeof *out);
             size_t rest = line;
             size_t count;
             size_t used = 0;

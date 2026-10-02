@@ -135,9 +135,13 @@ target_link_libraries(antic PRIVATE antic_core)
 # `tests` and `fixtures` blocks of a module. It reads the `[inject]`
 # table of anti.toml with src/rt/toml.c, the one parser that anti.toml, the
 # logger, the runtime configuration and the index of plugins share.
-add_executable(anti ${ANTI_SOURCES})
-target_link_libraries(anti PRIVATE antic_core)
-target_include_directories(anti PRIVATE ${ANTI_INCLUDE_DIRS})
+# Every file of anti but its main is a library too, so that the unit tests
+# link the same objects as the anti executable.
+add_library(anti_core STATIC ${ANTI_CORE_SOURCES})
+target_link_libraries(anti_core PUBLIC antic_core)
+target_include_directories(anti_core PUBLIC ${ANTI_INCLUDE_DIRS})
+add_executable(anti ${ANTI_MAIN_SOURCES})
+target_link_libraries(anti PRIVATE anti_core)
 
 target_compile_definitions(antic PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")
@@ -147,12 +151,14 @@ target_compile_definitions(antic_core PRIVATE
 # reads from a fresh install. tools/pack-anti.cmake defines it for both.
 target_compile_definitions(anti PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(anti_core PRIVATE
+    ANTIC_VERSION="${PROJECT_VERSION}")
 
 # The pinned clang that anti bind --clang names, from
 # tools/clang-release.cmake.
 include(tools/clang-release.cmake)
 antic_clang_release(ANTI_CLANG_VERSION ANTI_CLANG_TAG ANTI_CLANG_PAGE)
-target_compile_definitions(anti PRIVATE
+target_compile_definitions(anti_core PRIVATE
     ANTI_CLANG_VERSION="${ANTI_CLANG_VERSION}"
     ANTI_CLANG_TAG="${ANTI_CLANG_TAG}"
     ANTI_CLANG_PAGE="${ANTI_CLANG_PAGE}")

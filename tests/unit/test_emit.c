@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "pipeline.h"
 #include "cpu.h"
 #include "debug.h"
 #include <stdlib.h>
@@ -23,63 +24,29 @@
 static void assemble(const char *source, enum target target, bool one_module,
                      bool debug_info, struct text *out)
 {
-    struct arena arena = {0};
-    struct diagnostics diags = {0};
-    struct token_list tokens = {0};
-    struct module *module = NULL;
-    struct types types;
-    struct ir_module ir;
-    struct mach_function **functions = NULL;
-    char error[200] = "";
-    bool ok;
-    size_t i;
+    struct lowered l;
+    struct machine m;
 
-    types_init(&types, &arena);
-    ir_module_init(&ir, &arena, "main");
-    if (!lexer_lex(source, strlen(source), &arena, &diags, &tokens) ||
-        !parser_parse(source, &tokens, &arena, &diags, &module) ||
-        !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true)) {
-        check_failures++;
-        fprintf(stderr, "test source does not check: %s\n%s\n",
-                diags.count > 0 ? diags.items[0].message : "", source);
-    } else {
-        lower_module(module, "main", &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
+    lowered_run(&l, source);
+    if (l.ok) {
         if (one_module) {
-            optimize_module(&ir, "main");
+            optimize_module(&l.ir, "main");
         } else {
-            optimize_program(&ir, "main");
+            optimize_program(&l.ir, "main");
         }
-        functions = calloc(ir.function_count + 1, sizeof *functions);
-        ok = select_module(target, cpu_default(target), &ir, functions, error,
-                           sizeof error);
-        for (i = 0; ok && i < ir.function_count; i++) {
-            if (functions[i] != NULL) {
-                ok = regalloc_function(target, functions[i], error,
-                                       sizeof error);
-            }
-        }
-        if (ok && one_module) {
-            emit_module(out, target, cpu_default(target), &ir, functions,
+        machine_build(&m, &l.ir, target, cpu_default(target), true);
+        if (m.ok && one_module) {
+            emit_module(out, target, cpu_default(target), &l.ir, m.functions,
                         "main", false, debug_info, NULL);
-        } else if (ok) {
-            emit_program(out, target, cpu_default(target), &ir, functions,
+        } else if (m.ok) {
+            emit_program(out, target, cpu_default(target), &l.ir, m.functions,
                          "main", false, debug_info, NULL);
+        } else {
+            text_append(out, m.error);
         }
-        if (!ok) {
-            text_append(out, error);
-        }
-        for (i = 0; i < ir.function_count; i++) {
-            if (functions[i] != NULL) {
-                mach_function_free(functions[i]);
-                free(functions[i]);
-            }
-        }
-        free(functions);
+        machine_release(&m);
     }
-    ir_module_free(&ir);
-    lexer_token_list_free(&tokens);
-    diagnostics_free(&diags);
-    arena_free(&arena);
+    lowered_release(&l);
 }
 
 static void emits_as(const char *source, enum target target, bool one_module,

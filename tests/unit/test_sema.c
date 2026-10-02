@@ -1,5 +1,6 @@
 #include "../binary_stdio.h"
 #include "check.h"
+#include "pipeline.h"
 #include "arena.h"
 #include "ast.h"
 #include "diagnostic.h"
@@ -9,77 +10,6 @@
 #include "text.h"
 #include "types.h"
 
-struct checked {
-    struct arena arena;
-    struct diagnostics diags;
-    struct token_list tokens;
-    struct module *module;
-    struct types types;
-    bool ok;
-};
-
-static void run(struct checked *c, const char *source)
-{
-    memset(c, 0, sizeof *c);
-    types_init(&c->types, &c->arena);
-    c->ok = lexer_lex(source, strlen(source), &c->arena, &c->diags,
-                      &c->tokens) &&
-            parser_parse(source, &c->tokens, &c->arena, &c->diags, &c->module);
-    if (!c->ok) {
-        fprintf(stderr, "syntax error in test source: %s\n",
-                c->diags.items[0].message);
-        check_failures++;
-        return;
-    }
-    c->ok = sema_check(c->module, "main", NULL, NULL, 0, &c->types, &c->arena,
-                       &c->diags, true);
-}
-
-static void release(struct checked *c)
-{
-    lexer_token_list_free(&c->tokens);
-    diagnostics_free(&c->diags);
-    arena_free(&c->arena);
-}
-
-static void accepts(const char *source)
-{
-    struct checked c;
-    size_t i;
-
-    run(&c, source);
-    if (!c.ok) {
-        check_failures++;
-        fprintf(stderr, "rejected:\n%s\n", source);
-        for (i = 0; i < c.diags.count; i++) {
-            fprintf(stderr, "  %d:%d: %s\n", c.diags.items[i].line,
-                    c.diags.items[i].column, c.diags.items[i].message);
-        }
-    }
-    release(&c);
-}
-
-static void rejects(const char *source, int line, int column,
-                    const char *message)
-{
-    struct checked c;
-
-    run(&c, source);
-    if (c.ok || c.diags.count == 0) {
-        check_failures++;
-        fprintf(stderr, "accepted, expected %d:%d: %s\n%s\n", line, column,
-                message, source);
-    } else if (c.diags.items[0].line != line ||
-               c.diags.items[0].column != column ||
-               strcmp(c.diags.items[0].message, message) != 0) {
-        check_failures++;
-        fprintf(stderr, "expected %d:%d: %s\ngot      %d:%d: %s\n%s\n", line,
-                column, message, c.diags.items[0].line,
-                c.diags.items[0].column, c.diags.items[0].message, source);
-    }
-    release(&c);
-}
-
 /* Check source and expect a failure with message at line:column among
    its messages, which need not be the first. */
 static void rejects_also(const char *source, int line, int column,
@@ -88,7 +18,7 @@ static void rejects_also(const char *source, int line, int column,
     struct checked c;
     size_t i;
 
-    run(&c, source);
+    checked_run(&c, source);
     for (i = 0; i < c.diags.count; i++) {
         if (c.diags.items[i].line == line &&
             c.diags.items[i].column == column &&
@@ -105,7 +35,7 @@ static void rejects_also(const char *source, int line, int column,
                     c.diags.items[i].column, c.diags.items[i].message);
         }
     }
-    release(&c);
+    checked_release(&c);
 }
 
 static void typed(const char *source, const char *expected)
@@ -113,14 +43,14 @@ static void typed(const char *source, const char *expected)
     struct checked c;
     struct text out = {0};
 
-    run(&c, source);
+    checked_run(&c, source);
     CHECK(c.ok);
     if (c.module != NULL) {
         ast_dump_typed(&out, c.module);
         CHECK_STR(text_cstr(&out), expected);
     }
     text_free(&out);
-    release(&c);
+    checked_release(&c);
 }
 
 /* Check source and expect success without any message, then run the doc
@@ -130,7 +60,7 @@ static void warns_option(const char *source, bool undocumented, int line,
 {
     struct checked c;
 
-    run(&c, source);
+    checked_run(&c, source);
     CHECK(c.ok);
     CHECK(c.diags.count == 0);
     sema_doc_warnings(c.module, "main", NULL, 0, &c.types, undocumented,
@@ -149,7 +79,7 @@ static void warns_option(const char *source, bool undocumented, int line,
                     c.diags.items[i].column, c.diags.items[i].message);
         }
     }
-    release(&c);
+    checked_release(&c);
 }
 
 static void warns(const char *source, int line, int column,
@@ -165,7 +95,7 @@ static void documented(const char *source)
     struct checked c;
     size_t i;
 
-    run(&c, source);
+    checked_run(&c, source);
     CHECK(c.ok);
     sema_doc_warnings(c.module, "main", NULL, 0, &c.types, false,
                       &c.diags);
@@ -177,7 +107,7 @@ static void documented(const char *source)
                     c.diags.items[i].column, c.diags.items[i].message);
         }
     }
-    release(&c);
+    checked_release(&c);
 }
 
 void test_sema(void)

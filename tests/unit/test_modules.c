@@ -1,6 +1,8 @@
 #include "../binary_stdio.h"
 #include <stdlib.h>
 #include "check.h"
+#include "alloc.h"
+#include "pipeline.h"
 #include "antl.h"
 #include "modpath.h"
 #include "arena.h"
@@ -44,17 +46,6 @@ static void close_session(struct session *s)
     arena_free(&s->arena);
 }
 
-static void print_diagnostics(const struct session *s, const char *source)
-{
-    size_t i;
-
-    for (i = 0; i < s->diags.count; i++) {
-        fprintf(stderr, "  %d:%d: %s\n", s->diags.items[i].line,
-                s->diags.items[i].column, s->diags.items[i].message);
-    }
-    fprintf(stderr, "%s\n", source);
-}
-
 /* Parse and check source as module name. */
 static struct module *check_module(struct session *s, const char *name,
                                    const char *source, bool *ok)
@@ -79,7 +70,7 @@ static void library(struct session *s, const char *name, const char *source)
     if (!ok) {
         check_failures++;
         fprintf(stderr, "library %s does not check:\n", name);
-        print_diagnostics(s, source);
+        print_diagnostics(&s->diags, source);
         return;
     }
     sema_interface(module, name, &s->arena, iface);
@@ -104,7 +95,7 @@ static const char geometry[] =
     "    return 1;\n"
     "}\n";
 
-static void accepts(const char *source)
+static void geometry_accepts(const char *source)
 {
     struct session s;
     bool ok;
@@ -112,16 +103,12 @@ static void accepts(const char *source)
     open_session(&s);
     library(&s, "geometry", geometry);
     check_module(&s, "main", source, &ok);
-    if (!ok) {
-        check_failures++;
-        fprintf(stderr, "rejected:\n");
-        print_diagnostics(&s, source);
-    }
+    expect_accepted(ok, &s.diags, source);
     close_session(&s);
 }
 
-static void rejects(const char *source, int line, int column,
-                    const char *message)
+static void geometry_rejects(const char *source, int line, int column,
+                                      const char *message)
 {
     struct session s;
     bool ok;
@@ -129,47 +116,38 @@ static void rejects(const char *source, int line, int column,
     open_session(&s);
     library(&s, "geometry", geometry);
     check_module(&s, "main", source, &ok);
-    CHECK(!ok);
-    if (s.diags.count == 0) {
-        check_failures++;
-    } else if (s.diags.items[0].line != line ||
-               s.diags.items[0].column != column ||
-               strcmp(s.diags.items[0].message, message) != 0) {
-        check_failures++;
-        fprintf(stderr, "expected %d:%d: %s\n", line, column, message);
-        print_diagnostics(&s, source);
-    }
+    expect_refused(ok, &s.diags, source, line, column, message);
     close_session(&s);
 }
 
 static void imports(void)
 {
-    accepts("import geometry;\n"
-            "import geometry as g;\n"
-            "const TWICE: int = geometry.SIDES * 2;\n"
-            "fn main() -> int {\n"
-            "    let r = g.make() else { return 1; };\n"
-            "    let v = g.Rect { w: 1, h: TWICE };\n"
-            "    r.release();\n"
-            "    g.putchar(65);\n"
-            "    return geometry.area(v.w, v.h);\n"
-            "}\n");
-    rejects("import geometry;\nfn f() -> int {\n    return geometry.hidden();\n}\n",
-            3, 12, "`geometry` has no public item `hidden`");
-    rejects("import geometry;\nfn f(p: *geometry.Private) {}\n", 2, 10,
-            "`geometry` has no public struct `Private`");
-    rejects("import geometry;\nfn f() {\n    let m = geometry;\n}\n", 3, 13,
-            "`geometry` is a module, not a value");
-    rejects("import geometry;\nfn f() {\n    let t = geometry.Rect;\n}\n", 3, 13,
-            "`geometry.Rect` is a type, not a value");
-    rejects("import geometry;\nfn geometry() {}\n", 2, 4,
-            "`geometry` is already declared");
-    rejects("import main;\n", 1, 8, "`main` cannot import itself");
-    rejects("import shapes;\n", 1, 8, "cannot find module `shapes`");
+    geometry_accepts("import geometry;\n"
+                     "import geometry as g;\n"
+                     "const TWICE: int = geometry.SIDES * 2;\n"
+                     "fn main() -> int {\n"
+                     "    let r = g.make() else { return 1; };\n"
+                     "    let v = g.Rect { w: 1, h: TWICE };\n"
+                     "    r.release();\n"
+                     "    g.putchar(65);\n"
+                     "    return geometry.area(v.w, v.h);\n"
+                     "}\n");
+    geometry_rejects("import geometry;\nfn f() -> int {\n    return geometry.hidden();\n}\n",
+                     3, 12, "`geometry` has no public item `hidden`");
+    geometry_rejects("import geometry;\nfn f(p: *geometry.Private) {}\n", 2, 10,
+                     "`geometry` has no public struct `Private`");
+    geometry_rejects("import geometry;\nfn f() {\n    let m = geometry;\n}\n", 3, 13,
+                     "`geometry` is a module, not a value");
+    geometry_rejects("import geometry;\nfn f() {\n    let t = geometry.Rect;\n}\n", 3, 13,
+                     "`geometry.Rect` is a type, not a value");
+    geometry_rejects("import geometry;\nfn geometry() {}\n", 2, 4,
+                     "`geometry` is already declared");
+    geometry_rejects("import main;\n", 1, 8, "`main` cannot import itself");
+    geometry_rejects("import shapes;\n", 1, 8, "cannot find module `shapes`");
     /* A method comes from the module that declares the struct. */
-    rejects("import geometry;\n"
-            "fn area(r: *geometry.Rect) -> int {\n    return r.area();\n}\n",
-            3, 12, "`Rect` has no function `area`");
+    geometry_rejects("import geometry;\n"
+                     "fn area(r: *geometry.Rect) -> int {\n    return r.area();\n}\n",
+                     3, 12, "`Rect` has no function `area`");
 }
 
 /* Sixteen damaged libraries that each import all the others. The search
@@ -312,7 +290,7 @@ static bool build_damaged(struct session *s, const char *name,
     if (!ok) {
         check_failures++;
         fprintf(stderr, "library %s does not compile:\n", name);
-        print_diagnostics(s, source);
+        print_diagnostics(&s->diags, source);
     } else {
         sema_interface(module, name, &s->arena, iface);
         s->libraries[s->library_count++] = iface;
@@ -1636,11 +1614,7 @@ static void refuses_poke(const struct text *bytes, size_t at,
         fprintf(stderr, "no place to poke at %zu\n", at);
         return;
     }
-    copy = malloc(bytes->length);
-    CHECK(copy != NULL);
-    if (copy == NULL) {
-        return;
-    }
+    copy = alloc_zeroed(bytes->length, 1);
     memcpy(copy, bytes->data, bytes->length);
     memcpy(copy + at, value, count);
     refuses_file(copy, bytes->length, NULL);
@@ -1893,11 +1867,7 @@ static bool verifies_poke(const struct text *bytes, size_t at,
         fprintf(stderr, "no place to poke at %zu\n", at);
         return false;
     }
-    copy = malloc(bytes->length);
-    CHECK(copy != NULL);
-    if (copy == NULL) {
-        return false;
-    }
+    copy = alloc_zeroed(bytes->length, 1);
     memcpy(copy, bytes->data, bytes->length);
     memcpy(copy + at, value, count);
     ok = verifies_file(copy, bytes->length);
@@ -2953,11 +2923,7 @@ static void refuses_count(const struct text *plain, size_t at, uint32_t value)
         fprintf(stderr, "no count at %zu\n", at);
         return;
     }
-    copy = malloc(plain->length);
-    CHECK(copy != NULL);
-    if (copy == NULL) {
-        return;
-    }
+    copy = alloc_zeroed(plain->length, 1);
     memcpy(copy, plain->data, plain->length);
     for (k = 0; k < 4; k++) {
         copy[at + (size_t)k] = (uint8_t)(value >> (8 * k));
@@ -3013,11 +2979,7 @@ static void truncated_trees(void)
     if (build_library(&s, "tt", tree_source, &bytes)) {
         CHECK(reads_file(&bytes));
         for (n = 0; n < bytes.length; n++) {
-            uint8_t *prefix = malloc(n == 0 ? 1 : n);
-            CHECK(prefix != NULL);
-            if (prefix == NULL) {
-                break;
-            }
+            uint8_t *prefix = alloc_zeroed(n, 1);
             memcpy(prefix, bytes.data, n);
             refuses_file(prefix, n, NULL);
             free(prefix);

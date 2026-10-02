@@ -8,6 +8,7 @@
 
 #include "../binary_stdio.h"
 #include "check.h"
+#include "alloc.h"
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -70,7 +71,7 @@ static char *written(double v, int64_t precision, int64_t exponent,
 
     anti_rt_builder_float(&b, v, precision, exponent, single);
     t = anti_rt_builder_text(&b);
-    s = malloc((size_t)t.len + 1);
+    s = alloc_zeroed((size_t)t.len + 1, 1);
     memcpy(s, t.ptr, (size_t)t.len);
     s[t.len] = '\0';
     free(b.room);
@@ -85,8 +86,8 @@ static char *halfway(const char *a, const char *b, size_t places)
     size_t ib = strcspn(b, ".");
     size_t whole = (ia > ib ? ia : ib) + 1;
     size_t count = whole + places + 1;
-    unsigned char *sum = calloc(count, 1);
-    char *out = malloc(count + 2);
+    unsigned char *sum = alloc_zeroed(count, 1);
+    char *out = alloc_zeroed(count + 2, 1);
     unsigned carry = 0;
     unsigned rest = 0;
     size_t i;
@@ -131,7 +132,7 @@ static char *halfway(const char *a, const char *b, size_t places)
 static char *below(const char *text)
 {
     size_t n = strlen(text);
-    char *out = malloc(n + 1);
+    char *out = alloc_zeroed(n + 1, 1);
     size_t i = n;
 
     memcpy(out, text, n + 1);
@@ -152,7 +153,7 @@ static char *below(const char *text)
 static char *above(const char *text)
 {
     size_t n = strlen(text);
-    char *out = malloc(n + 2);
+    char *out = alloc_zeroed(n + 2, 1);
 
     memcpy(out, text, n);
     out[n] = '1';
@@ -299,7 +300,7 @@ static int neighbours(double lo, double hi, uint64_t lo_bits,
     char *middle = halfway(a, b, (size_t)places);
     char *down = below(middle);
     char *up = above(middle);
-    char *negative = malloc(strlen(middle) + 2);
+    char *negative = alloc_zeroed(strlen(middle) + 2, 1);
     uint64_t sign = (uint64_t)1 << (mantissa + exponent);
     uint64_t even = lo_bits % 2 == 0 ? lo_bits : hi_bits;
     int wrong = 0;

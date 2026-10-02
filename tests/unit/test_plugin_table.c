@@ -274,6 +274,10 @@ static void damaged_pointers(void)
 {
     void *heap = malloc(64);
 
+    CHECK(heap != NULL);
+    if (heap == NULL) {
+        return;
+    }
     entry->class_of = NULL;
     REFUSED();
     entry->init = NULL;
@@ -344,6 +348,10 @@ static void damaged_parents(void)
 {
     void *heap = malloc(sizeof(struct anti_descriptor));
 
+    CHECK(heap != NULL);
+    if (heap == NULL) {
+        return;
+    }
     class_of->parent = class_of;
     REFUSED();
     class_of->depth = -1;
