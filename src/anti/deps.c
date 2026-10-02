@@ -759,6 +759,8 @@ static bool resolve_from_repo(struct resolver *r, const struct requirement *req,
             out->repo = one.repo;
             out->modules = one.modules;
             out->module_count = one.module_count;
+            /* The rest of one moved into out, and its name is a copy. */
+            text_free(&one.name);
             memset(&one, 0, sizeof one);
         }
         package_free(&one);
