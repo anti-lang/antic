@@ -30,6 +30,10 @@ set(ANTIC_CORE_SOURCES
     src/antic/diagnostic.c
     src/antic/docpage.c
     src/antic/driver.c
+    src/antic/driver_index.c
+    src/antic/driver_library.c
+    src/antic/driver_link.c
+    src/antic/driver_search.c
     src/antic/emit.c
     src/antic/expand.c
     src/antic/header.c

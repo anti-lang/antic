@@ -1,9 +1,9 @@
-# The shared headers of the library file, the parser, the checker and
-# lowering group their declarations under a comment that names a file,
-# as /* sema_call.c */. Every function declared under such a comment is
-# defined in that file, and the comment at the top of the header names
-# every file of its family. Run with cmake -P and ROOT, the root of the
-# repository.
+# The shared headers of the library file, the driver, the parser, the
+# checker and lowering group their declarations under a comment that
+# names a file, as /* sema_call.c */. Every function declared under such
+# a comment is defined in that file, and the comment at the top of the
+# header names every file of its family. Run with cmake -P and ROOT, the
+# root of the repository.
 
 set(src "${ROOT}/src/antic")
 set(failures "")
@@ -66,6 +66,7 @@ function(check_header header family)
 endfunction()
 
 check_header("antl_io.h" "antl")
+check_header("driver_parts.h" "driver")
 check_header("parser_parser.h" "parser")
 check_header("sema_checker.h" "sema")
 check_header("lower_lowerer.h" "lower")
