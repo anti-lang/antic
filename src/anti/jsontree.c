@@ -79,10 +79,17 @@ static bool list_add(struct list *l, const char *key,
                      const struct json_value *item)
 {
     if (l->count == l->room) {
-        size_t room = l->room == 0 ? 8 : l->room * 2;
-        const struct json_value **items =
-            realloc((void *)l->items, room * sizeof *items);
+        size_t room;
+        const struct json_value **items;
         const char **keys;
+        /* A room whose double does not fit a size_t in bytes counts as
+           memory that ran out, which the caller reports. */
+        if (l->room > SIZE_MAX / 2 / sizeof *l->items ||
+            l->room > SIZE_MAX / 2 / sizeof *l->keys) {
+            return false;
+        }
+        room = l->room == 0 ? 8 : l->room * 2;
+        items = realloc((void *)l->items, room * sizeof *items);
         if (items == NULL) {
             return false;
         }
