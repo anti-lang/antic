@@ -1,0 +1,14 @@
+//! A doc comment inside `{ }` of an interpolated text is dropped with a
+//! warning, as one inside any other expression is, and the expression around it
+//! reads as written.
+
+import anti.text;
+
+fn main() -> int
+{
+	let x = 3;
+	let s = f"{x /// after the value
+}";
+	let t = f"{/** before the value */ x}";
+	return (s.len + t.len) as int;
+}

@@ -34,6 +34,7 @@ struct parser {
     int depth;                      /* levels entered by descend */
     int reach;                      /* deepest level of the chain's tree */
     struct list *clauses;           /* every `allow` and `unchecked` */
+    struct list *dropped;           /* the doc comments no item took */
     enum fn_block block;            /* the test block being read */
     /* DESIGN: `>>` closes two lists of type arguments. The inner list
        takes the first `>` and sets half, and the outer list takes the
@@ -277,6 +278,48 @@ static bool is_doc(enum token_kind kind)
 static size_t marker_length(const char *s, size_t length)
 {
     return length >= 4 && s[2] == '#' && s[3] == '!' ? 4 : 3;
+}
+
+/* DESIGN: the grammar rules never see a doc comment. Items, fields and
+   the module ask for the comments that precede them, so a comment in
+   any other place is dropped. Copies the tokens of all but the doc
+   comments into kept, with the index in all of each into origin, and
+   returns how many it copied. The last token of all is TOKEN_EOF, which
+   is kept. */
+static size_t keep_tokens(const struct token *all, size_t count,
+                          struct token *kept, size_t *origin)
+{
+    size_t n = 0;
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        if (!is_doc(all[i].kind)) {
+            origin[n] = i;
+            kept[n++] = all[i];
+        }
+    }
+    return n;
+}
+
+/* Record each doc comment of the count tokens of p->all that no item or
+   field took. */
+static void drop_untaken(struct parser *p, size_t count)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        const struct token *t = &p->all[i];
+        struct dropped_doc d;
+        if (!is_doc(t->kind) || p->taken[i]) {
+            continue;
+        }
+        d.pos = pos_of(t);
+        d.marker.text = p->source + t->offset;
+        d.marker.length = marker_length(d.marker.text, t->length);
+        d.module_form = t->kind == TOKEN_MODULE_DOC ||
+                        t->kind == TOKEN_MODULE_NOTE;
+        list_push(p->dropped, &d);
+    }
 }
 
 /* The text of the doc comments of one kind between the previous token and
@@ -1014,27 +1057,25 @@ static bool format_spec(struct token_text spec, struct format_spec *out)
 
 /* The expression of one `{expr}`, parsed from the tokens the lexer made
    for it. The parser reads them as it reads any expression and reports
-   at the positions in the file. */
+   at the positions in the file. A doc comment among them is dropped, as
+   one inside any other expression is. */
 static struct expr *placeholder(struct parser *p,
                                 const struct format_piece *piece)
 {
     struct parser inner = *p;
+    struct token *kept = alloc_zeroed(piece->token_count, sizeof *kept);
     size_t *origin = alloc_zeroed(piece->token_count, sizeof *origin);
+    bool *taken = alloc_zeroed(piece->token_count, sizeof *taken);
+    size_t count = keep_tokens(piece->tokens, piece->token_count, kept,
+                               origin);
     struct expr *e;
-    size_t i;
 
-    /* The tokens of the piece are both lists at once, so each token is
-       its own origin, no doc comment lies between two of them and taken
-       is never read. */
-    for (i = 0; i < piece->token_count; i++) {
-        origin[i] = i;
-    }
-    inner.tokens = piece->tokens;
+    inner.tokens = kept;
     inner.all = piece->tokens;
     inner.origin = origin;
-    inner.taken = NULL;
+    inner.taken = taken;
     inner.pos = 0;
-    inner.last = piece->token_count - 1;
+    inner.last = count - 1;
     inner.panic = false;
     inner.ok = true;
     inner.no_struct_literal = false;
@@ -1042,7 +1083,10 @@ static struct expr *placeholder(struct parser *p,
     if (inner.ok && !check(&inner, TOKEN_EOF)) {
         error_here(&inner, "expected `}` or `:` after the expression");
     }
+    drop_untaken(&inner, piece->token_count);
+    free(kept);
     free(origin);
+    free(taken);
     if (!inner.ok) {
         p->ok = false;
         return NULL;
@@ -4288,8 +4332,9 @@ bool parse(const char *source, const struct token_list *tokens,
            struct module **out)
 {
     struct list clauses = {NULL, 0, 0, sizeof(struct clause)};
+    struct list dropped = {NULL, 0, 0, sizeof(struct dropped_doc)};
     struct parser p = {source, NULL, tokens->items, NULL, NULL, 0, 0, arena,
-                       diags, false, true, false, 0, 0, &clauses,
+                       diags, false, true, false, 0, 0, &clauses, &dropped,
                        BLOCK_NONE, false, 0};
     struct module *m = arena_alloc(arena, sizeof *m);
     struct list imports = {NULL, 0, 0, sizeof(struct import)};
@@ -4297,24 +4342,14 @@ bool parse(const char *source, const struct token_list *tokens,
     struct list provides = {NULL, 0, 0, sizeof(struct provides)};
     struct list frameworks = {NULL, 0, 0, sizeof(struct link_name)};
     struct list linux_libraries = {NULL, 0, 0, sizeof(struct link_name)};
-    struct list dropped = {NULL, 0, 0, sizeof(struct dropped_doc)};
     struct token *kept = alloc_zeroed(tokens->count, sizeof *kept);
     size_t *origin = alloc_zeroed(tokens->count, sizeof *origin);
     bool *taken = alloc_zeroed(tokens->count, sizeof *taken);
-    size_t count = 0;
-    size_t i;
+    size_t count;
     bool saw_tests = false;
     bool saw_fixtures = false;
 
-    /* DESIGN: the grammar rules never see a doc comment. Items, fields and
-       the module ask for the comments that precede them, so a comment in
-       any other place is dropped. */
-    for (i = 0; i < tokens->count; i++) {
-        if (!is_doc(tokens->items[i].kind)) {
-            origin[count] = i;
-            kept[count++] = tokens->items[i];
-        }
-    }
+    count = keep_tokens(tokens->items, tokens->count, kept, origin);
     p.tokens = kept;
     p.last = count - 1;
     p.origin = origin;
@@ -4417,19 +4452,7 @@ bool parse(const char *source, const struct token_list *tokens,
     m->frameworks = list_finish(&p, &frameworks, &m->framework_count);
     m->linux_libraries = list_finish(&p, &linux_libraries,
                                      &m->linux_library_count);
-    for (i = 0; i < tokens->count; i++) {
-        const struct token *t = &tokens->items[i];
-        struct dropped_doc d;
-        if (!is_doc(t->kind) || taken[i]) {
-            continue;
-        }
-        d.pos = pos_of(t);
-        d.marker.text = source + t->offset;
-        d.marker.length = marker_length(d.marker.text, t->length);
-        d.module_form = t->kind == TOKEN_MODULE_DOC ||
-                        t->kind == TOKEN_MODULE_NOTE;
-        list_push(&dropped, &d);
-    }
+    drop_untaken(&p, tokens->count);
     m->dropped = list_finish(&p, &dropped, &m->dropped_count);
     m->clauses = list_finish(&p, &clauses, &m->clause_count);
     free(kept);

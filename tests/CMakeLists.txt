@@ -2042,6 +2042,16 @@ add_test(NAME silent_doc_declared
 set_tests_properties(silent_doc_declared PROPERTIES
     FAIL_REGULAR_EXPRESSION "warning")
 
+# A doc comment inside `{ }` of `f"..."` is dropped with a warning, as one
+# inside any other expression is.
+add_test(NAME warning_format_doc
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        "-DCOMMAND=--doc-warnings,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/format_doc.s,format_doc.anti"
+        "-DNEEDLES=format_doc.anti:10:15: warning: the `///` comment is dropped, because no item or field follows it [doc-dropped];format_doc.anti:12:13: warning: the `/**` comment is dropped, because no item or field follows it [doc-dropped]"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_warnings.cmake")
+
 # A doc comment names the functions of a class of a library without a
 # warning, as it names those of a struct.
 add_test(NAME silent_doc_library_class
