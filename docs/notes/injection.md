@@ -8,7 +8,7 @@ the whole program that carry `inject`. The rules are in "Injection" of
 ## The field
 
 `inject` and `inject final` stand before the name of a field of a class
-body, and `src/antic/parser.c` reads them as contextual words. The `final`
+body, and `src/antic/parser_item.c` reads them as contextual words. The `final`
 form is read first, because its second word is a name as well: the field
 `inject final: *L` is called `final`, and the field `inject: int` is
 called `inject`.

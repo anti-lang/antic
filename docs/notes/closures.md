@@ -18,8 +18,9 @@ choices of `snapshot fn` and `own fn`.
 ## Parser
 
 - `keep` and `concurrent` are contextual words before a parameter, in a
-  parameter list and in the list of a function type. `is_fn_mark` reads one
-  before a name and a colon, before `fn` or `?fn`, and before the other mark.
+  parameter list and in the list of a function type. `parser_is_fn_mark`
+  reads one before a name and a colon, before `fn` or `?fn`, and before the
+  other mark.
 - `fn` in the place of an expression is `EXPR_FN`, which holds an `ITEM_FN`
   of its own. A parameter may leave out its type.
 
@@ -84,9 +85,9 @@ choices of `snapshot fn` and `own fn`.
   form handles it. `types_fn_form` drops the flag, so the conversions
   compare the signature alone.
 - The parser reads `snapshot fn` as an anonymous function with the flag
-  `snapshot`. `fn_param_marks` reads `own` after `keep`, in a parameter
-  list and in the list of a function type. `resolve_fields` gives an `own`
-  field of function type the owned form.
+  `snapshot`. `parser_fn_param_marks` reads `own` after `keep`, in a
+  parameter list and in the list of a function type. `resolve_fields` gives
+  an `own` field of function type the owned form.
 - `check_snapshot` runs after the body of a snapshot. It refuses a capture
   that does not copy fully and the first write of one. A snapshot that
   captures something is `concurrent`.

@@ -1,4 +1,4 @@
-# The shared headers of the checker and of lowering group their
+# The shared headers of the parser, the checker and lowering group their
 # declarations under a comment that names a file, as /* sema_call.c */.
 # Every function declared under such a comment is defined in that file,
 # and the comment at the top of the header names every file of its
@@ -64,6 +64,7 @@ function(check_header header family)
     set(failures "${failures}" PARENT_SCOPE)
 endfunction()
 
+check_header("parser_parser.h" "parser")
 check_header("sema_checker.h" "sema")
 check_header("lower_lowerer.h" "lower")
 

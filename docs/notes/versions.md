@@ -38,7 +38,7 @@ hash per prefix and holds the empty prefix first. It is an array of
 
 ## `compatible`
 
-`compatible_line` of `src/antic/parser.c` reads the contextual word where a
+`compatible_line` of `src/antic/parser_decl.c` reads the contextual word where a
 field of a class body stands. The version is the source span of the
 number the lexer read, with any further `.<integer>` parts after it,
 because `1.1.0` is no number of Anti. The checker refuses the line on a

@@ -60,6 +60,12 @@ set(ANTIC_CORE_SOURCES
     src/antic/notice.c
     src/antic/optimize.c
     src/antic/parser.c
+    src/antic/parser_clause.c
+    src/antic/parser_decl.c
+    src/antic/parser_expr.c
+    src/antic/parser_item.c
+    src/antic/parser_stmt.c
+    src/antic/parser_type.c
     src/antic/pattern.c
     src/antic/platform.c
     src/antic/reach.c
