@@ -682,10 +682,11 @@ static void emit(struct mach_block *b, const struct mach_inst *inst)
 }
 
 /* The scratch register of a spilled virtual register within one
-   instruction. */
+   instruction. An instruction names at most BORROW_LIMIT virtual
+   registers, so place never fills more entries than vreg holds. */
 struct spill_map {
-    uint32_t vreg[MACH_MAX_OPERANDS];
-    uint8_t scratch[MACH_MAX_OPERANDS];
+    uint32_t vreg[BORROW_LIMIT];
+    uint8_t scratch[BORROW_LIMIT];
     size_t count;
     size_t loads[2];        /* per class: integer, float */
     uint8_t borrowed[2][BORROW_LIMIT];  /* per class, after the scratch */
