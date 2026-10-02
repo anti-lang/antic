@@ -1,12 +1,15 @@
 #ifndef ANTIC_ANTL_IO_H
 #define ANTIC_ANTL_IO_H
 
-/* The inside of the library file, which antl.c, antl_tree.c and
-   antl_verify.c share. antl.c writes and reads the header, the type
-   table, the items and the IR. antl_tree.c writes and reads the section
-   of the generics: their declarations and the checked tree of each body.
-   antl_verify.c holds what the reader built to the rules a file must
-   meet. No other file includes this one. */
+/* The inside of the library file, which its files share. antl_io.c
+   holds the primitives of the format. antl.c holds the magic, the
+   helpers the other files share and the top of the reader, antl_header
+   and antl_read. antl_write.c writes the header, the type table, the
+   items and the IR. antl_read.c reads the type table, the constants and
+   the items, and antl_read_ir.c reads the IR. antl_tree.c writes and
+   reads the section of the generics: their declarations and the checked
+   tree of each body. antl_verify.c holds what the reader built to the
+   rules a file must meet. No other file includes this one. */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -53,11 +56,24 @@ struct reader {
     bool *marked_generic;
 };
 
+/* DESIGN: one limit bounds how deep the tables of a library file nest,
+   TYPES_NEST_MAX of types.h, the limit of the checker as well. It covers
+   the structs of the type table and the aggregates and the symbolic
+   values of the IR. The reader recurses no deeper than the limit when it
+   follows an index on demand. A table whose entries point back is read
+   without recursion, and it is refused when it nests deeper. types_nest
+   measures the type table as it measures the types of the source. The
+   checker, the layout and the passes walk the same nesting recursively.
+   See docs/decisions.md. */
+
 /* The type reference that stands for no type in the section of the
    generics. The type table itself never names one. */
 #define ANTL_NO_TYPE UINT32_MAX
 
-/* antl_io.c: the primitives of the format. */
+/* The form of a struct, a class or a variant in the type table. */
+enum { ANTL_FORM_PLAIN, ANTL_FORM_GENERIC, ANTL_FORM_COPY };
+
+/* antl_io.c */
 
 /* Write v in one byte, in four and in eight, little-endian. */
 void antl_put_u8(struct writer *w, uint8_t v);
@@ -99,9 +115,23 @@ void *antl_allocate(struct reader *r, size_t count, size_t size);
 /* Read a string as a name, at most INT_MAX bytes. Its text is memory of
    the pool of the reader, and the pool frees it. */
 struct name antl_get_name(struct reader *r);
+/* Read a string that the reader uses as a C string, such as a module
+   path, and refuse one with a NUL inside. Its text is memory of the pool
+   as for antl_get_name. */
+const char *antl_get_cstr(struct reader *r);
 
-/* antl.c: the types, the values and the libraries, which the section
-   of the generics names as the tables do. */
+/* antl.c */
+
+/* The four bytes a library file starts with. */
+extern const uint8_t antl_magic[4];
+/* Whether the name n is the C string s. */
+bool antl_name_equals(const struct name *n, const char *s);
+/* The interface of module among the libraries the reader was given, or
+   NULL. */
+const struct interface *antl_library(const struct reader *r,
+                                     const struct name *module);
+
+/* antl_write.c */
 
 /* Give t and every type inside it an index in the type table. */
 void antl_visit_type(struct writer *w, const struct type *t);
@@ -121,6 +151,8 @@ void antl_put_symbolic(struct writer *w, const struct symbolic *s);
 void antl_put_param_defaults(struct writer *w, const struct symbol *sym);
 void antl_put_param_owned(struct writer *w, const struct symbol *sym);
 
+/* antl_read.c */
+
 /* The type of the index the file holds next, which lies below limit. */
 struct type *antl_type_ref(struct reader *r, uint32_t limit);
 /* The same below the count of the type table, or NULL for ANTL_NO_TYPE. */
@@ -137,10 +169,17 @@ const struct symbolic *antl_read_symbolic(struct reader *r, uint32_t limit,
    into memory of the pool. */
 void antl_read_param_defaults(struct reader *r, struct symbol *sym);
 void antl_read_param_owned(struct reader *r, struct symbol *sym);
-/* The interface of module among the libraries the reader was given, or
-   NULL. */
-const struct interface *antl_library(const struct reader *r,
-                                     const struct name *module);
+/* Read the type table into the table of the reader, its types made in
+   the types of the reader, and the items into its interface. Both lie in
+   the memory pool of the reader. */
+void antl_read_types(struct reader *r);
+void antl_read_items(struct reader *r);
+
+/* antl_read_ir.c */
+
+/* Read the IR of the file into program, each record moved to the indices
+   of the program. */
+void antl_read_ir(struct reader *r, struct ir_module *program);
 
 /* antl_tree.c */
 

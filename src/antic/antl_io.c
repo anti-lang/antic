@@ -6,10 +6,10 @@
 
 #include "text.h"
 
-/* DESIGN: the primitives of the library file, which antl.c and
-   antl_tree.c both read and write through. Each check of a length or a
-   count stands here once, so the section of the generics keeps every
-   check the tables have. */
+/* DESIGN: the primitives of the library file, which every other file of
+   it reads and writes through. Each check of a length or a count stands
+   here once, so the section of the generics keeps every check the tables
+   have. */
 
 /* Writing */
 
@@ -186,4 +186,16 @@ struct name antl_get_name(struct reader *r)
     n.text = text;
     n.length = length;
     return n;
+}
+
+/* A string that the reader uses as a C string, such as a module path. A
+   NUL inside it would cut it short, so the file is damaged then. */
+const char *antl_get_cstr(struct reader *r)
+{
+    struct name n = antl_get_name(r);
+
+    if (n.length > 0 && memchr(n.text, '\0', n.length) != NULL) {
+        antl_damaged(r);
+    }
+    return n.text;
 }

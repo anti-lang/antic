@@ -13,8 +13,11 @@ set(ANTIC_CORE_SOURCES
     src/antic/antic.c
     src/antic/antl.c
     src/antic/antl_io.c
+    src/antic/antl_read.c
+    src/antic/antl_read_ir.c
     src/antic/antl_tree.c
     src/antic/antl_verify.c
+    src/antic/antl_write.c
     src/antic/applesdk.c
     src/antic/arith.c
     src/antic/arm64.c
