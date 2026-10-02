@@ -24,13 +24,37 @@ if(count LESS 300)
     message(FATAL_ERROR "only ${count} sources were found under ${STD} and ${TESTS}")
 endif()
 
-execute_process(
-    COMMAND "${ANTI}" fmt --check ${sources}
-    RESULT_VARIABLE status
-    OUTPUT_VARIABLE out
-    ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0)
+# Run `anti fmt --check` over one batch of sources and keep what it reports.
+set(report "")
+function(check_batch)
+    execute_process(
+        COMMAND "${ANTI}" fmt --check ${batch}
+        RESULT_VARIABLE status
+        OUTPUT_VARIABLE out
+        ERROR_VARIABLE err
+        ENCODING NONE)
+    if(NOT status EQUAL 0)
+        set(report "${report}${out}${err}" PARENT_SCOPE)
+    endif()
+endfunction()
+
+# The sources go in batches of at most 8000 characters of paths. Windows
+# takes a command line of 32767 characters, and all of them together are
+# longer.
+set(batch "")
+set(length 0)
+foreach(source IN LISTS sources)
+    string(LENGTH "${source}" n)
+    math(EXPR length "${length} + ${n} + 1")
+    if(length GREATER 8000 AND batch)
+        check_batch()
+        set(batch "")
+        math(EXPR length "${n} + 1")
+    endif()
+    list(APPEND batch "${source}")
+endforeach()
+check_batch()
+if(report)
     message(FATAL_ERROR
-        "these sources are not in the canonical form:\n${out}${err}")
+        "these sources are not in the canonical form:\n${report}")
 endif()
