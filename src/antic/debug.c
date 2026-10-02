@@ -438,10 +438,11 @@ static void symbol_records(struct debug *d, struct text *out,
                          "prologue and the epilogue */\n"
                          "    .long 0              /* no type */\n");
         text_appendf(out, "    .secrel32 %s\n    .secidx %s\n", s, s);
-        text_appendf(out, "    .byte 0              /* the flags */\n"
-                          "    .asciz \"%s\"\n"
-                          "    .p2align 2\n"
-                          "%santi_cv_fn%zu_end:\n", text_cstr(&name), l, id);
+        text_append(out, "    .byte 0              /* the flags */\n"
+                         "    .asciz ");
+        quoted(out, text_cstr(&name));
+        text_appendf(out, "\n    .p2align 2\n"
+                          "%santi_cv_fn%zu_end:\n", l, id);
         text_appendf(out, "    .short 2\n"
                           "    .short %u             /* S_END */\n", S_END);
         text_free(&symbol);

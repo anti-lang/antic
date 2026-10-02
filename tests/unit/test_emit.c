@@ -38,12 +38,12 @@ static void assemble(const char *source, enum target target, bool one_module,
     ir_module_init(&ir, &arena, "main");
     if (!lexer_lex(source, strlen(source), &arena, &diags, &tokens) ||
         !parser_parse(source, &tokens, &arena, &diags, &module) ||
-        !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true) ||
-        !lower_module(module, "main", &ir, &diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT)) {
+        !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true)) {
         check_failures++;
-        fprintf(stderr, "test source does not lower: %s\n%s\n",
+        fprintf(stderr, "test source does not check: %s\n%s\n",
                 diags.count > 0 ? diags.items[0].message : "", source);
     } else {
+        lower_module(module, "main", &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
         if (one_module) {
             ir_optimize_module(&ir, "main");
         } else {
@@ -418,6 +418,37 @@ static void debug_paths(void)
     }
 }
 
+/* The name of a function is an assembler string in the debug records of
+   ELF and of CodeView alike, so a quote and a backslash in it are
+   escaped. A library file may name a module with either. */
+static void debug_names(void)
+{
+    static const char escaped[] = ".asciz \"m\\\"a\\\\in.f\"\n";
+    static const enum target targets[] = {TARGET_LINUX_X86_64,
+                                          TARGET_WINDOWS_X86_64};
+    size_t i;
+
+    for (i = 0; i < sizeof targets / sizeof targets[0]; i++) {
+        struct arena arena = {0};
+        struct ir_module m;
+        struct mach_function written = {0};
+        struct mach_function *functions[1];
+        struct debug d;
+        struct text out = {0};
+
+        ir_module_init(&m, &arena, "main");
+        ir_file_add(&m, "main.anti");
+        ir_function_add(&m, "m\"a\\in", "f", IR_VOID, IR_NO_AGG);
+        functions[0] = &written;
+        debug_init(&d, targets[i], &m, "main", true, NULL);
+        debug_sections(&d, &out, functions);
+        CHECK(strstr(text_cstr(&out), escaped) != NULL);
+        text_free(&out);
+        ir_module_free(&m);
+        arena_free(&arena);
+    }
+}
+
 void test_emit(void)
 {
     page_offsets();
@@ -426,6 +457,7 @@ void test_emit(void)
     data_relocation_past_end();
     data_relocation_overlap();
     debug_paths();
+    debug_names();
 
     /* Mach-O names a GOT entry with @GOTPAGE and @GOTPAGEOFF on ARM64 and
        @GOTPCREL on x86_64. */
