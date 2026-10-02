@@ -1249,9 +1249,10 @@ static void class_view(struct text *out, const struct symbol *sym,
     nested_views(out, t, ifaces, iface_count, done);
     text_appendf(out, "typedef struct %s_vtable {\n"
                       "    const void *descriptor;\n"
-                      "    /* The seven functions of anti.lang.Object. They "
-                      "take and give Anti\n       values, so C reads their "
-                      "slots and does not call them. */\n",
+                      "    /* The seven functions and the nine hooks of "
+                      "anti.lang.Object. They\n       take and give Anti "
+                      "values, so C reads their slots and does not call\n"
+                      "       them. */\n",
                  text_cstr(&name));
     for (i = 0; i < count; i++) {
         struct text callee = {0};

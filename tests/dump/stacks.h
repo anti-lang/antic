@@ -29,8 +29,9 @@ void *anti_rt_dup(void *object, const anti_descriptor *type);
 typedef struct Ints Ints;
 typedef struct Ints_vtable {
     const void *descriptor;
-    /* The seven functions of anti.lang.Object. They take and give Anti
-       values, so C reads their slots and does not call them. */
+    /* The seven functions and the nine hooks of anti.lang.Object. They
+       take and give Anti values, so C reads their slots and does not call
+       them. */
     void *type_name;
     void *to_text;
     void *equals;

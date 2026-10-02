@@ -607,10 +607,6 @@ static enum token_kind compound_op(enum token_kind op)
     }
 }
 
-/* Chapter 2 evaluates the place first and the value second. A compound
-   assignment reads the old value before it evaluates the new operand, as
-   x = x + e reads x first. */
-
 /* DESIGN: `*p = try f();` gives the call the address of the place it
    assigns to. The place is read once, before the call, so a target that
    computes an address runs its parts exactly once. Nothing is cleared
@@ -640,6 +636,9 @@ static struct ir_operand call_into_slot(struct lowerer *l,
 
 static void lower_flags_assign(struct lowerer *l, const struct stmt *s);
 
+/* An assignment evaluates the place first and the value second. A
+   compound assignment reads the old value before it evaluates the new
+   operand, as x = x + e reads x first. */
 static void lower_assign(struct lowerer *l, const struct stmt *s)
 {
     const struct expr *target = s->as.assign.target;

@@ -33,8 +33,9 @@ void anti_rt_snapshot_free(void *snapshot);
 typedef struct Button Button;
 typedef struct Button_vtable {
     const void *descriptor;
-    /* The seven functions of anti.lang.Object. They take and give Anti
-       values, so C reads their slots and does not call them. */
+    /* The seven functions and the nine hooks of anti.lang.Object. They
+       take and give Anti values, so C reads their slots and does not call
+       them. */
     void *type_name;
     void *to_text;
     void *equals;

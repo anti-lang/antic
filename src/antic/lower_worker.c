@@ -30,8 +30,6 @@ static size_t next_thunk(const struct lowerer *l, const char *prefix)
     return count;
 }
 
-/* The aggregate that carries the arguments every chunk receives, or
-   IR_NO_AGG when the worker takes the chunk alone. */
 /* The type of parameter i + 1 of the worker that call names, which holds
    argument i of the call. */
 static const struct type *worker_param(const struct expr *call, size_t i)
@@ -39,6 +37,8 @@ static const struct type *worker_param(const struct expr *call, size_t i)
     return call->as.call.callee->symbol->type->params[i + 1];
 }
 
+/* The aggregate that carries the arguments every chunk receives, or
+   IR_NO_AGG when the worker takes the chunk alone. */
 static uint32_t context_aggregate(struct lowerer *l, const struct expr *call,
                                   const char *name)
 {

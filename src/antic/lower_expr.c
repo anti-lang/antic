@@ -577,10 +577,10 @@ static struct ir_operand lower_format(struct lowerer *l, const struct expr *e)
     return lower_address(l, e->as.format.take);
 }
 
-/* The address of the memory that holds the aggregate value of e. A
-   literal gets a slot of its own, and a constant is read-only data. */
 static struct ir_operand coalesce(struct lowerer *l, const struct expr *e);
 
+/* The address of the memory that holds the aggregate value of e. A
+   literal gets a slot of its own, and a constant is read-only data. */
 struct ir_operand lower_address(struct lowerer *l,
                                 const struct expr *e)
 {
@@ -806,8 +806,6 @@ static struct ir_operand short_circuit(struct lowerer *l, const struct expr *e)
     return lower_temp(l, result);
 }
 
-/* p ?? q as a value. The result is p when it is not `none`, and q
-   otherwise, which runs only then. */
 /* DESIGN: `o ?? v` of a `?T` gives the value o holds when its flag is
    set and v otherwise. The value lies at offset 0 of o, so the result
    reads it there. The result has a slot of its own, so a later write to
@@ -861,6 +859,8 @@ static struct ir_operand coalesce_value(struct lowerer *l,
     return result == 0 ? slot : lower_temp(l, result);
 }
 
+/* p ?? q as a value. The result is p when it is not `none`, and q
+   otherwise, which runs only then. */
 static struct ir_operand coalesce(struct lowerer *l, const struct expr *e)
 {
     if (e->as.binary.left->type->kind == TYPE_OPTIONAL) {
