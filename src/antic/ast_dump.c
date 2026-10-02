@@ -89,14 +89,22 @@ static void simple(struct dumper *d, int depth, const char *label,
     end(d, start, type);
 }
 
-/* The spelling of an operator token without its backticks. */
 static void dump_handler(struct dumper *d, int depth,
                          const struct handler *h);
 
+/* The spelling of an operator token without its backticks. */
 static void op_name(struct dumper *d, enum token_kind op)
 {
     const char *quoted = token_kind_name(op);
     text_appendf(d->out, "%.*s", (int)(strlen(quoted) - 2), quoted + 1);
+}
+
+/* The name at index of a table of count names, or "?" for an index the
+   table lacks. A tree read from a library file may hold any value. */
+static const char *name_in(const char *const *names, size_t count,
+                           unsigned index)
+{
+    return index < count && names[index] != NULL ? names[index] : "?";
 }
 
 static void dump_expr(struct dumper *d, int depth, const struct expr *e);
@@ -447,10 +455,16 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
         break;
     case EXPR_ATOMIC: {
         static const char *const names[] = {
-            "load", "store", "swap", "add", "sub", "and", "or",
-            "compare_swap"
+            [ATOMIC_LOAD] = "load", [ATOMIC_STORE] = "store",
+            [ATOMIC_SWAP] = "swap", [ATOMIC_ADD] = "add",
+            [ATOMIC_SUB] = "sub", [ATOMIC_AND] = "and", [ATOMIC_OR] = "or",
+            [ATOMIC_CAS] = "compare_swap"
         };
-        text_appendf(d->out, "atomic %s", names[e->as.atomic.op]);
+        _Static_assert(sizeof names / sizeof *names == ATOMIC_CAS + 1,
+                       "a name for every atomic_op");
+        text_appendf(d->out, "atomic %s",
+                     name_in(names, sizeof names / sizeof *names,
+                             e->as.atomic.op));
         end(d, start, type);
         dump_expr(d, depth + 1, e->as.atomic.place);
         if (e->as.atomic.a != NULL) {
@@ -500,10 +514,15 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
         break;
     case EXPR_SYNC_OP: {
         static const char *const names[] = {
-            "mutex_new", "mutex_destroy", "chan", "send", "recv", "close",
-            "delete"
+            [SYNC_MUTEX_NEW] = "mutex_new",
+            [SYNC_MUTEX_DESTROY] = "mutex_destroy", [SYNC_CHAN_NEW] = "chan",
+            [SYNC_SEND] = "send", [SYNC_RECV] = "recv",
+            [SYNC_CLOSE] = "close", [SYNC_CHAN_DELETE] = "delete"
         };
-        text_append(d->out, names[e->as.sync_op.op]);
+        _Static_assert(sizeof names / sizeof *names == SYNC_CHAN_DELETE + 1,
+                       "a name for every sync_op");
+        text_append(d->out, name_in(names, sizeof names / sizeof *names,
+                                    e->as.sync_op.op));
         end(d, start, type);
         if (e->as.sync_op.element != NULL) {
             dump_type(d, depth + 1, e->as.sync_op.element);
@@ -518,10 +537,18 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
     }
     case EXPR_SIMD: {
         static const char *const names[] = {
-            "splat", "load", "store", "shuffle", "sum", "min", "max", "dot",
-            "select", "any", "all"
+            [SIMD_OP_SPLAT] = "splat", [SIMD_OP_LOAD] = "load",
+            [SIMD_OP_STORE] = "store", [SIMD_OP_SHUFFLE] = "shuffle",
+            [SIMD_OP_SUM] = "sum", [SIMD_OP_MIN] = "min",
+            [SIMD_OP_MAX] = "max", [SIMD_OP_DOT] = "dot",
+            [SIMD_OP_SELECT] = "select", [SIMD_OP_ANY] = "any",
+            [SIMD_OP_ALL] = "all"
         };
-        text_appendf(d->out, "simd %s", names[e->as.simd.op]);
+        _Static_assert(sizeof names / sizeof *names == SIMD_OP_ALL + 1,
+                       "a name for every simd_op");
+        text_appendf(d->out, "simd %s",
+                     name_in(names, sizeof names / sizeof *names,
+                             e->as.simd.op));
         if (e->as.simd.lanes != NULL) {
             for (i = 0; i < e->as.simd.simd->field_count; i++) {
                 text_appendf(d->out, " %u", e->as.simd.lanes[i]);
@@ -838,7 +865,6 @@ static void dump_params(struct dumper *d, int depth, const char *label,
     }
 }
 
-/* The functions and constants declared in the body of a struct or enum. */
 /* The type parameters of a generic, each with its constraints. */
 static void dump_type_params(struct dumper *d, int depth,
                              const struct item *it)
@@ -863,6 +889,7 @@ static void dump_type_params(struct dumper *d, int depth,
     }
 }
 
+/* The functions and constants declared in the body of a struct or enum. */
 static void dump_members(struct dumper *d, const struct item *it)
 {
     size_t i;

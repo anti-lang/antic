@@ -502,6 +502,10 @@ static bool lang_item(const struct type *t, enum type_kind kind,
            memcmp(t->module.text, LANG_MODULE, sizeof LANG_MODULE - 1) == 0;
 }
 
+/* DESIGN: a function that can fail returns a pointer to `anti.lang`'s
+   `Error` or to a class below it. The compiler knows the convention by
+   the module path and the class name, and nothing else of the standard
+   library reaches the checker. */
 bool types_is_lang_error(const struct type *t)
 {
     return lang_item(t, TYPE_CLASS, LANG_ERROR);

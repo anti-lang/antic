@@ -76,15 +76,12 @@ static bool is_local_struct(const struct writer *w, const struct type *t)
              memcmp(t->module.text, module, t->module.length) == 0));
 }
 
-/* The count of functions of the body of t that another module may see.
-   A private function is never one of them, because no other module can
-   name it. A protected one is, because a class below it may. */
+static bool name_equals(const struct name *n, const char *s);
+
 /* DESIGN: a class carries its public and protected functions, and its
    `construct` and `destruct` whatever their level. A class of another
    module that inherits it runs them, and a private function it cannot
    name. */
-static bool name_equals(const struct name *n, const char *s);
-
 /* DESIGN: a generic struct, class or variant carries every function of
    its body, private ones among them. A module that makes a copy of it
    compiles the body of each. A function with type parameters of
@@ -103,6 +100,9 @@ static bool carried_member(const struct type *t, const struct item *m)
                                 name_equals(&m->name, "destruct")));
 }
 
+/* The count of functions of the body of t that another module may see.
+   A private function is never one of them, because no other module can
+   name it. A protected one is, because a class below it may. */
 static size_t public_members(const struct type *t)
 {
     size_t count = 0;
@@ -2525,8 +2525,6 @@ static bool sym_ready(const struct ir_maps *maps, uint32_t sym)
     return true;
 }
 
-/* The aggregate and symbolic tables of the file. They refer to each other
-   by index, so both are read before either is added to the program. */
 /* A bitfield of the IR has an integer type of a fixed width and no more
    bits than it. */
 static bool ir_bitfield_fits(const struct ir_field *f)
@@ -2540,6 +2538,8 @@ static bool ir_bitfield_fits(const struct ir_field *f)
     }
 }
 
+/* The aggregate and symbolic tables of the file. They refer to each other
+   by index, so both are read before either is added to the program. */
 static void read_tables(struct reader *r, struct ir_module *program,
                         struct ir_maps *maps)
 {
@@ -2939,8 +2939,6 @@ static void read_body(struct reader *r, struct ir_module *program,
     }
 }
 
-/* A function signature, mapped to a function of the program. A C function
-   and a declaration share an existing entry of the same name. */
 /* Whether name is that of a copy of a generic, or of a function or a
    datum of one. Only a copy carries `<`. */
 static bool copy_name(const char *name)
@@ -2948,6 +2946,8 @@ static bool copy_name(const char *name)
     return strchr(name, '<') != NULL;
 }
 
+/* A function signature, mapped to a function of the program. A C function
+   and a declaration share an existing entry of the same name. */
 static uint32_t read_signature(struct reader *r, struct ir_module *program,
                                struct ir_maps *maps, bool *has_body,
                                bool *skip)

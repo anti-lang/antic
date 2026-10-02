@@ -915,9 +915,6 @@ static bool names_sub_object(const struct expr *e)
     return f != NULL && f->form == FIELD_IMPL;
 }
 
-/* Rewrite v.f(args) into f(receiver, args). The struct T of v has no
-   field f, and the module declares a function f whose first parameter is
-   T or *T. Returns false after reporting an error. */
 /* Whether a is b, a class below b, or a copy of the generic b or of a
    class below it. A function of b then takes a as `self`. So does a
    generic function whose first parameter is a copy of the generic of a,
@@ -935,6 +932,9 @@ static bool descends_or_copies(const struct type *a, const struct type *b)
     return false;
 }
 
+/* Rewrite v.f(args) into f(receiver, args). The struct T of v has no
+   field f, and the module declares a function f whose first parameter is
+   T or *T. Returns false after reporting an error. */
 static bool method_call(struct checker *c, struct expr *call)
 {
     struct expr *field = call->as.call.callee;
@@ -1121,10 +1121,6 @@ static bool variadic_ok(const struct type *t)
 static struct type *check_type_member(struct checker *c, struct expr *e,
                                       struct type *t);
 
-/* DESIGN: a function that can fail returns a pointer to `anti.lang`'s
-   `Error` or to a class below it. The compiler knows the convention by
-   the module path and the class name, and nothing else of the standard
-   library reaches the checker. */
 /* DESIGN: `p catch fatal` and `p catch e { }` on a `?*T` follow the
    error forms, and the error is `anti.lang.NoneDereference`. The class is
    an ordinary imported one, so the module that writes the form imports
@@ -3057,9 +3053,6 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
     return sema_builtin(c, TYPE_ERROR);
 }
 
-/* The fields of a struct or slice literal against the fields of type s.
-   Every field appears exactly once, and a union literal names one field,
-   which skip_missing allows. */
 /* DESIGN: a class literal names the fields of the whole chain directly,
    in any order, and never writes the base as a nested value. The checker
    flattens the chain into one list, base first, and checks the literal
@@ -3089,6 +3082,9 @@ size_t sema_chain_fields(const struct type *t, struct struct_field *out)
     return count;
 }
 
+/* The fields of a struct or slice literal against the fields of type s.
+   Every field appears exactly once, and a union literal names one field,
+   which skip_missing allows. */
 /* DESIGN: a literal outside the class names its public fields alone. A
    private or protected field then takes its default, so the value is
    still complete. A literal inside the class may name any field. */

@@ -168,7 +168,6 @@ static struct type *float_literal(struct checker *c, struct expr *e,
     return t;
 }
 
-/* Report a value of type got where the context expects another type. */
 /* DESIGN: a pointer to a struct converts to a pointer to any type of its
    `inherits` chain. That is the one implicit conversion of the language.
    The base lies at offset 0, so the address is the same. */
@@ -694,6 +693,8 @@ static int require_fn_form(struct checker *c, struct expr *e,
     return 1;
 }
 
+/* Whether e, a value of type got, stands where the context expects
+   expected. A value that does not is reported. */
 bool sema_require(struct checker *c, struct expr *e, struct type *got,
                   struct type *expected)
 {
@@ -974,9 +975,6 @@ static struct type *check_unary(struct checker *c, struct expr *e,
     }
 }
 
-/* Check both operands of a binary operator so that a literal takes the
-   type of the other operand. outer is the type the context expects of
-   the result, used when both operands are literals. */
 /* Whether e is written `x.carry`, the form a carry into `+` and a borrow
    into `-` take when x is a Flags value. */
 static bool names_carry(const struct expr *e)
@@ -985,6 +983,9 @@ static bool names_carry(const struct expr *e)
            sema_name_is(&e->as.field.name, FLAGS_CARRY);
 }
 
+/* Check both operands of a binary operator so that a literal takes the
+   type of the other operand. outer is the type the context expects of
+   the result, used when both operands are literals. */
 static bool binary_operands(struct checker *c, struct expr *e,
                             struct type *outer, struct type **left,
                             struct type **right)
@@ -1482,9 +1483,6 @@ static bool check_collect(struct checker *c, struct expr *e)
     return true;
 }
 
-/* Rewrite `a op b` into the call the operator names. `!=`, `>`, `<=` and
-   `>=` derive from `eq` and `lt`, so a type declares two functions and
-   gets six operators. */
 /* The receiver of an operator call: the operand itself, or its address
    when the function takes `self`. */
 static struct expr *operator_receiver(struct checker *c, struct expr *a,
@@ -1510,6 +1508,9 @@ static struct expr *operator_receiver(struct checker *c, struct expr *a,
     return address;
 }
 
+/* Rewrite `a op b` into the call the operator names. `!=`, `>`, `<=` and
+   `>=` derive from `eq` and `lt`, so a type declares two functions and
+   gets six operators. */
 static struct type *check_operator(struct checker *c, struct expr *e,
                                    struct type *right, struct symbol *fn)
 {

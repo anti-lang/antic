@@ -3063,8 +3063,6 @@ static bool starts_member(const struct parser *p)
     }
 }
 
-/* One function or constant declared between the braces of a struct, a
-   union or an enum. An abstract function has no body and ends with `;`. */
 /* The constraints after the `:` of a type parameter or the `=` of a
    `constraint`, joined by `+`. Each is a name, qualified by a module or
    not. */
@@ -3146,6 +3144,8 @@ static bool type_params(struct parser *p, struct item *it)
     return ok;
 }
 
+/* One function or constant declared between the braces of a struct, a
+   union or an enum. An abstract function has no body and ends with `;`. */
 static struct item *member_level(struct parser *p, const struct item *owner)
 {
     struct item *m = node(p, sizeof *m);
