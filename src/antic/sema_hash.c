@@ -228,23 +228,6 @@ bool sema_is_hash_call(const struct expr *e)
 
 /* The default `==` */
 
-/* The value of type t that a hidden operand stands for, `*p`. It is
-   checked already and never lowered. */
-static struct expr *stand_in(struct checker *c, struct pos pos,
-                             struct type *t)
-{
-    struct expr *hole = sema_new_node(c, EXPR_NONE, pos);
-    struct expr *at = sema_new_node(c, EXPR_UNARY, pos);
-
-    hole->type = types_pointer(c->types, t);
-    hole->prechecked = true;
-    at->as.unary.op = TOKEN_STAR;
-    at->as.unary.operand = hole;
-    at->type = t;
-    at->prechecked = true;
-    return at;
-}
-
 /* The checked call of the `operator fn eq` of type t that compares two
    values of it inside the operands of a default `==`. Lowering reads
    the function the callee names, and a copy of a generic names its copy
@@ -255,8 +238,8 @@ static struct expr *nested_eq(struct checker *c, struct pos pos,
     struct expr *e = sema_new_node(c, EXPR_BINARY, pos);
 
     e->as.binary.op = TOKEN_EQ;
-    e->as.binary.left = stand_in(c, pos, t);
-    e->as.binary.right = stand_in(c, pos, t);
+    e->as.binary.left = sema_stand_in(c, pos, t);
+    e->as.binary.right = sema_stand_in(c, pos, t);
     if (sema_is_error(sema_check_expr(c, e, NULL)) || e->kind != EXPR_CALL) {
         return NULL;
     }

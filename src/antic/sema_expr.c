@@ -138,13 +138,15 @@ static struct type *integer_literal(struct checker *c, struct expr *e,
     return t;
 }
 
+/* The type of the float literal, negated or not in e. A float has its
+   sign apart from its magnitude, so the sign never decides whether the
+   literal fits. */
 static struct type *float_literal(struct checker *c, struct expr *e,
-                                  struct expr *literal, bool negative,
+                                  struct expr *literal,
                                   struct type *expected)
 {
     struct type *t = sema_builtin(c, TYPE_F64);
 
-    (void)negative;
     if (expected != NULL && !sema_is_error(expected) &&
         expected->kind != TYPE_VOID) {
         if (types_is_float(expected)) {
@@ -893,7 +895,7 @@ static struct type *check_unary(struct checker *c, struct expr *e,
             return integer_literal(c, e, operand, true, expected);
         }
         if (operand->kind == EXPR_FLOAT) {
-            return float_literal(c, e, operand, true, expected);
+            return float_literal(c, e, operand, expected);
         }
         t = sema_check_expr(c, operand, expected);
         if (sema_refuses_half(c, e->pos, t)) {
@@ -1568,10 +1570,8 @@ static struct type *check_operator(struct checker *c, struct expr *e,
     return sig->result;
 }
 
-/* A stand-in for a value of type t that the caller holds, `*p`. It is
-   checked already and never lowered. */
-static struct expr *held_value(struct checker *c, struct type *t,
-                               struct pos pos)
+struct expr *sema_stand_in(struct checker *c, struct pos pos,
+                           struct type *t)
 {
     struct expr *hole = sema_new_node(c, EXPR_NONE, pos);
     struct expr *at = sema_new_node(c, EXPR_UNARY, pos);
@@ -1640,7 +1640,8 @@ static struct expr *class_operator(struct checker *c, struct type *t,
     callee->type = sig;
     callee->as.name = fn->name;
     for (i = 0; i < count; i++) {
-        args[i] = operator_receiver(c, held_value(c, t, pos), sig->params[i]);
+        args[i] = operator_receiver(c, sema_stand_in(c, pos, t),
+                                    sig->params[i]);
     }
     call->as.call.callee = callee;
     call->as.call.args = args;
@@ -2987,7 +2988,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
     case EXPR_INT:
         return integer_literal(c, e, e, false, expected);
     case EXPR_FLOAT:
-        return float_literal(c, e, e, false, expected);
+        return float_literal(c, e, e, expected);
     case EXPR_CHAR:
         return sema_builtin(c, TYPE_CHAR);
     case EXPR_STRING:

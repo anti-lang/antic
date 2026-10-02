@@ -766,7 +766,6 @@ static struct stmt *new_stmt(struct checker *c, enum stmt_kind kind,
 {
     struct stmt *s = arena_alloc(c->arena, sizeof *s);
 
-    memset(s, 0, sizeof *s);
     s->kind = kind;
     s->pos = pos;
     return s;

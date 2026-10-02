@@ -2249,7 +2249,6 @@ static void declare_enum_values(struct checker *c, struct item *it)
     values = types_alloc_array(c->arena, it->param_count + 1, sizeof *values);
     for (j = 0; j < it->param_count; j++) {
         size_t k;
-        memset(&values[j], 0, sizeof values[j]);
         values[j].name = it->params[j].name;
         values[j].pos = it->params[j].pos;
         values[j].doc = it->params[j].doc;
@@ -2466,7 +2465,6 @@ static void declare_fields(struct checker *c, struct item *it)
                                sizeof *fields);
     if (base_fields != 0) {
         static const char super_text[] = "super";
-        memset(&fields[0], 0, sizeof fields[0]);
         fields[0].name.text = super_text;
         fields[0].name.length = sizeof super_text - 1;
         fields[0].pos = it->name_pos;

@@ -319,6 +319,11 @@ bool sema_check_object_from(struct checker *c, struct expr *e,
 bool sema_is_place(const struct expr *e);
 void sema_mark_address_taken(struct checker *c, struct expr *e);
 bool sema_spell(struct text *out, const struct expr *e);
+/* The value of type t that a hidden operand or a value the caller holds
+   stands for, `*p`, in the arena of the checker. It is checked already
+   and never lowered. */
+struct expr *sema_stand_in(struct checker *c, struct pos pos,
+                           struct type *t);
 struct type *sema_usable_pointer(struct checker *c, const struct expr *e,
                                  struct type *t);
 struct type *sema_whole_optional(struct type *t, struct expr *e);
