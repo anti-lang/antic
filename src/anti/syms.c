@@ -20,6 +20,7 @@
 #include "files.h"
 #include "platform.h"
 #include "conf_include.h"
+#include "cursor.h"
 #include "license.h"
 #include "plugin_index.h"
 #include "symbols.h"
@@ -30,11 +31,6 @@
 
 /* The index of a deployment archive. */
 #define INDEX_NAME "index.toml"
-
-/* The variable AddressSanitizer reads its options from, and the option
-   that leaves the frames of a report to Anti's symbolizer. */
-#define SANITIZER_OPTIONS "ASAN_OPTIONS"
-#define NO_SYMBOLIZE "symbolize=0"
 
 /* A list of texts. */
 struct texts {
@@ -824,97 +820,6 @@ done:
     return status;
 }
 
-/* DESIGN: the lines of a map and of a trace come from other machines.
-   sscanf leaves a number that does not fit its object undefined, so a
-   cursor reads them instead. It takes digits alone and refuses a sign
-   and a value above 64 bits. It names each token by its start and its
-   length, so no line is copied into a buffer of fixed size. */
-struct cursor {
-    const char *at;
-    const char *end;
-};
-
-static bool is_blank(char c)
-{
-    return c == ' ' || c == '\t' || c == '\r';
-}
-
-/* Pass over blanks. Returns whether there was one. */
-static bool cursor_blank(struct cursor *c)
-{
-    const char *from = c->at;
-
-    while (c->at < c->end && is_blank(*c->at)) {
-        c->at++;
-    }
-    return c->at > from;
-}
-
-static int digit_of(char c, unsigned base)
-{
-    if (c >= '0' && c <= '9') {
-        return c - '0';
-    }
-    if (base == 16 && c >= 'a' && c <= 'f') {
-        return c - 'a' + 10;
-    }
-    if (base == 16 && c >= 'A' && c <= 'F') {
-        return c - 'A' + 10;
-    }
-    return -1;
-}
-
-/* The digits in base at the cursor as one value. Returns false for no
-   digit and for a value above UINT64_MAX. */
-static bool cursor_number(struct cursor *c, unsigned base, uint64_t *out)
-{
-    uint64_t value = 0;
-    const char *from = c->at;
-    int d;
-
-    while (c->at < c->end && (d = digit_of(*c->at, base)) >= 0) {
-        if (value > (UINT64_MAX - (uint64_t)d) / base) {
-            return false;
-        }
-        value = value * base + (uint64_t)d;
-        c->at++;
-    }
-    *out = value;
-    return c->at > from;
-}
-
-/* A hex number, with or without `0x`. */
-static bool cursor_hex(struct cursor *c, uint64_t *out)
-{
-    if (c->end - c->at > 2 && c->at[0] == '0' &&
-        (c->at[1] == 'x' || c->at[1] == 'X')) {
-        c->at += 2;
-    }
-    return cursor_number(c, 16, out);
-}
-
-static bool cursor_char(struct cursor *c, char want)
-{
-    if (c->at < c->end && *c->at == want) {
-        c->at++;
-        return true;
-    }
-    return false;
-}
-
-/* The bytes up to the next blank or the end. Returns false for none. */
-static bool cursor_token(struct cursor *c, const char **token, size_t *length)
-{
-    const char *from = c->at;
-
-    while (c->at < c->end && !is_blank(*c->at)) {
-        c->at++;
-    }
-    *token = from;
-    *length = (size_t)(c->at - from);
-    return *length > 0;
-}
-
 /* Whether the n bytes at s are a location, `<file>:<line>`. */
 static bool is_location(const char *s, size_t n)
 {
@@ -975,17 +880,17 @@ bool syms_map_lookup(const char *map, uint64_t vaddr, struct text *function,
             (vaddr < end || (end == start && vaddr == start))) {
             const char *stop_at = c.end;
             name = c.at;
-            while (stop_at > name && is_blank(stop_at[-1])) {
+            while (stop_at > name && cursor_is_blank(stop_at[-1])) {
                 stop_at--;
             }
             where = stop_at;
-            while (where > name && !is_blank(where[-1])) {
+            while (where > name && !cursor_is_blank(where[-1])) {
                 where--;
             }
             where_length = (size_t)(stop_at - where);
             if (where > name && is_location(where, where_length)) {
                 stop_at = where;
-                while (stop_at > name && is_blank(stop_at[-1])) {
+                while (stop_at > name && cursor_is_blank(stop_at[-1])) {
                     stop_at--;
                 }
             } else {
@@ -1012,10 +917,8 @@ static bool map_lookup(const struct text *map, uint64_t vaddr,
                            &out->where);
 }
 
-/* The function and the line of vaddr in binary, an ELF or a Mach-O file,
-   or a debug twin of one. Returns false for a file of neither kind. */
-static bool resolve_binary(const struct text *binary, uint64_t vaddr,
-                           struct mapped *out)
+bool syms_resolve_binary(const struct text *binary, uint64_t vaddr,
+                         struct text *function, struct text *where)
 {
     const uint8_t *bytes = (const uint8_t *)binary->data;
     struct anti_found found;
@@ -1028,13 +931,13 @@ static bool resolve_binary(const struct text *binary, uint64_t vaddr,
     memset(&found, 0, sizeof found);
     if (binary->length >= 4 && memcmp(bytes, "\177ELF", 4) == 0) {
         if (anti_rt_elf_function(bytes, binary->length, vaddr, &found)) {
-            append_name(&out->function, found.function,
+            append_name(function, found.function,
                         found.function_length);
         }
         if (anti_rt_elf_line(bytes, binary->length, vaddr, &found) &&
             found.file != NULL) {
-            text_append_bytes(&out->where, found.file, found.file_length);
-            text_appendf(&out->where, ":%lld", (long long)found.line);
+            text_append_bytes(where, found.file, found.file_length);
+            text_appendf(where, ":%lld", (long long)found.line);
         }
         return true;
     }
@@ -1043,7 +946,7 @@ static bool resolve_binary(const struct text *binary, uint64_t vaddr,
     }
     if (anti_rt_macho_table(bytes, binary->length, false, 0, &t)) {
         if (anti_rt_macho_function(&t, vaddr, &found)) {
-            append_name(&out->function, found.function,
+            append_name(function, found.function,
                         found.function_length);
         }
         /* The link of Mach-O leaves the line table in the objects that
@@ -1057,9 +960,9 @@ static bool resolve_binary(const struct text *binary, uint64_t vaddr,
                                               file.length, symbol,
                                               vaddr - start, &found) &&
                     found.file != NULL) {
-                    text_append_bytes(&out->where, found.file,
+                    text_append_bytes(where, found.file,
                                       found.file_length);
-                    text_appendf(&out->where, ":%lld",
+                    text_appendf(where, ":%lld",
                                  (long long)found.line);
                 }
             }
@@ -1094,7 +997,7 @@ static bool resolve_frame(const struct unit *u, uint64_t offset,
     /* A return address follows the call, so the lookup takes the byte
        before it, which is the call and names its line. */
     vaddr = base + offset - 1;
-    if (!resolve_binary(twin, vaddr, out)) {
+    if (!syms_resolve_binary(twin, vaddr, &out->function, &out->where)) {
         return false;
     }
     if ((out->function.length == 0 || out->where.length == 0) && map != NULL &&
@@ -1188,207 +1091,5 @@ done:
     texts_free(&modules);
     text_free(&input);
     units_free(&units);
-    return status;
-}
-
-/* The modules a report names, each read once. A module the read failed
-   for holds no bytes. */
-struct report {
-    struct texts paths;
-    struct texts files;
-};
-
-static uint32_t big_endian(const unsigned char *p)
-{
-    return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 |
-           (uint32_t)p[3];
-}
-
-/* The processor types of Mach-O that a frame of macOS names after the
-   path of its module. */
-struct slice_arch {
-    const char *name;
-    uint32_t cpu;
-    uint32_t sub;
-};
-
-static const struct slice_arch slice_archs[] = {
-    {"arm64", 0x0100000c, 0},
-    {"arm64e", 0x0100000c, 2},
-    {"x86_64", 0x01000007, 3},
-    {"x86_64h", 0x01000007, 8},
-};
-
-/* DESIGN: macOS ships its own libraries and the runtime of
-   AddressSanitizer as universal files, one Mach-O file per processor
-   behind a header of their offsets. The frame names the processor, and
-   the reader takes that file alone. A file of one processor stays as it
-   is. The header and each entry are big-endian words. Returns false for
-   a universal file without the processor. */
-static bool thin_slice(struct text *file, const char *arch, size_t length)
-{
-    const unsigned char *bytes = (const unsigned char *)file->data;
-    const struct slice_arch *want = NULL;
-    uint32_t count;
-    uint32_t i;
-    size_t k;
-
-    if (file->length < 8 || big_endian(bytes) != 0xcafebabe) {
-        return true;
-    }
-    for (k = 0; k < sizeof slice_archs / sizeof slice_archs[0]; k++) {
-        if (strlen(slice_archs[k].name) == length &&
-            memcmp(slice_archs[k].name, arch, length) == 0) {
-            want = &slice_archs[k];
-        }
-    }
-    count = big_endian(bytes + 4);
-    for (i = 0; want != NULL && i < count && 8 + 20 * (size_t)(i + 1) <=
-                                                 file->length;
-         i++) {
-        const unsigned char *entry = bytes + 8 + 20 * (size_t)i;
-        size_t offset = big_endian(entry + 8);
-        size_t size = big_endian(entry + 12);
-        if (big_endian(entry) != want->cpu ||
-            (big_endian(entry + 4) & 0x00ffffff) != want->sub ||
-            offset > file->length || size > file->length - offset) {
-            continue;
-        }
-        memmove(file->data, file->data + offset, size);
-        file->length = size;
-        return true;
-    }
-    return false;
-}
-
-/* The module at the length bytes of path, and in a universal file the
-   one of the arch_length bytes of arch. */
-static const struct text *report_module(struct report *r, const char *path,
-                                        size_t length, const char *arch,
-                                        size_t arch_length)
-{
-    struct text *file;
-    struct text *key;
-    size_t i;
-
-    for (i = 0; i < r->paths.count; i++) {
-        key = &r->paths.items[i];
-        if (key->length == length + 1 + arch_length &&
-            memcmp(key->data, path, length) == 0 &&
-            memcmp(key->data + length + 1, arch, arch_length) == 0) {
-            return &r->files.items[i];
-        }
-    }
-    key = texts_add(&r->paths, path, length);
-    file = texts_add(&r->files, "", 0);
-    if (!files_read(text_cstr(key), file) ||
-        !thin_slice(file, arch, arch_length)) {
-        file->length = 0;
-    }
-    text_append(key, ":");
-    text_append_bytes(key, arch, arch_length);
-    return file;
-}
-
-/* DESIGN: `anti run` and `anti test` run a program of --memory-checks
-   with symbolize=0, so each frame of its report names its module and the
-   offset in it: `#3 0x... (/path/prog:arm64+0x100000a10)` on macOS and
-   `(/path/prog+0xa10)` on Linux. A frame whose module Anti's symbolizer
-   reads gets `in <function> <file>:<line>` in place of the module, the
-   form of the runtime's own symbolizer. Every other line comes out as
-   it went in. The runtime already printed the instruction before the
-   return address, so the offset is looked up as it stands. */
-static void report_line(void *context, const char *line, size_t length)
-{
-    struct report *r = context;
-    size_t shown = length;
-    const char *stop;
-    const char *plus = NULL;
-    const char *colon = NULL;
-    const char *p;
-    struct cursor c;
-    struct mapped m;
-    uint64_t number;
-    uint64_t offset;
-    const struct text *module;
-
-    while (shown > 0 && (line[shown - 1] == '\n' || line[shown - 1] == '\r')) {
-        shown--;
-    }
-    c.at = line;
-    c.end = line + shown;
-    cursor_blank(&c);
-    if (!cursor_char(&c, '#') || !cursor_number(&c, 10, &number) ||
-        !cursor_blank(&c) || !cursor_hex(&c, &number)) {
-        fwrite(line, 1, length, stderr);
-        return;
-    }
-    stop = c.at;
-    cursor_blank(&c);
-    if (!cursor_char(&c, '(') || c.end - c.at < 5 || c.end[-1] != ')') {
-        fwrite(line, 1, length, stderr);
-        return;
-    }
-    for (p = c.at; p + 3 <= c.end - 1; p++) {
-        if (memcmp(p, "+0x", 3) == 0) {
-            plus = p;
-        }
-    }
-    for (p = c.at; plus != NULL && p < plus; p++) {
-        if (*p == ':') {
-            colon = p;
-        } else if (*p == '/') {
-            colon = NULL;
-        }
-    }
-    memset(&m, 0, sizeof m);
-    if (plus != NULL) {
-        struct cursor o;
-        o.at = plus + 1;
-        o.end = c.end - 1;
-        module = report_module(
-            r, c.at, (size_t)((colon != NULL ? colon : plus) - c.at),
-            colon != NULL ? colon + 1 : plus,
-            colon != NULL ? (size_t)(plus - colon - 1) : 0);
-        if (cursor_hex(&o, &offset) && o.at == o.end && module->length > 0 &&
-            resolve_binary(module, offset, &m) && m.function.length > 0) {
-            fwrite(line, 1, (size_t)(stop - line), stderr);
-            fprintf(stderr, " in %s", text_cstr(&m.function));
-            if (m.where.length > 0) {
-                fprintf(stderr, " %s\n", text_cstr(&m.where));
-            } else {
-                fputc(' ', stderr);
-                fwrite(c.at - 1, 1, (size_t)(c.end - c.at + 1), stderr);
-                fputc('\n', stderr);
-            }
-            text_free(&m.function);
-            text_free(&m.where);
-            return;
-        }
-    }
-    text_free(&m.function);
-    text_free(&m.where);
-    fwrite(line, 1, length, stderr);
-}
-
-/* Windows keeps the symbolizing of AddressSanitizer, as the DESIGN of
-   platform_run_symbolized in platform.h says. */
-int syms_run_checked(const char *const argv[])
-{
-    struct report r;
-    struct text value = {0};
-    const char *before = platform_getenv(SANITIZER_OPTIONS);
-    int status;
-
-    memset(&r, 0, sizeof r);
-    if (before != NULL && before[0] != '\0') {
-        text_appendf(&value, "%s:", before);
-    }
-    text_append(&value, NO_SYMBOLIZE);
-    status = platform_run_symbolized(argv, SANITIZER_OPTIONS,
-                                     text_cstr(&value), report_line, &r);
-    texts_free(&r.paths);
-    texts_free(&r.files);
-    text_free(&value);
     return status;
 }

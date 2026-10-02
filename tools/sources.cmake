@@ -107,17 +107,21 @@ set(ANTI_SOURCES
     src/anti/bindapi.c
     src/anti/bindclang.c
     src/anti/bindexpr.c
+    src/anti/bindmodel.c
     src/anti/bindtype.c
     src/anti/bindwrite.c
     src/anti/build.c
     src/anti/check.c
+    src/anti/cursor.c
     src/anti/deps.c
     src/anti/doc.c
     src/anti/files.c
     src/anti/fmt.c
     src/anti/jsontree.c
     src/anti/manifest.c
+    src/anti/memreport.c
     src/anti/platform.c
+    src/anti/project.c
     src/anti/repo.c
     src/anti/sdk.c
     src/anti/symmap.c

@@ -41,11 +41,11 @@ int syms_resolve(const char *trace, const char *const *symbols,
 bool syms_map_lookup(const char *map, uint64_t vaddr, struct text *function,
                      struct text *where);
 
-/* Run the program argv of --memory-checks as `anti run` and `anti test`
-   do and return its exit status. The program runs with the symbolizing
-   of AddressSanitizer off, and each frame of its report comes out with
-   the function, the file and the line that Anti's symbolizer reads from
-   its module. */
-int syms_run_checked(const char *const argv[]);
+/* Append to function the name of the function at vaddr in binary, an
+   ELF or a Mach-O file or a debug twin of one, and to where its
+   `file:line` when the debug information gives one. Returns false for a
+   file of neither kind. */
+bool syms_resolve_binary(const struct text *binary, uint64_t vaddr,
+                         struct text *function, struct text *where);
 
 #endif

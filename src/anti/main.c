@@ -14,6 +14,7 @@
 #include "modpath.h"
 #include "sdk.h"
 #include "platform.h"
+#include "project.h"
 #include "syms.h"
 #include "userdirs.h"
 #include "test.h"
@@ -662,7 +663,7 @@ int main(int argc, char **argv)
         if (argc != 3 || argv[2][0] == '-') {
             return usage(stderr);
         }
-        return build_new(argv[2]);
+        return project_new(argv[2]);
     }
     if (argc >= 2 && (strcmp(argv[1], "build") == 0 ||
                       strcmp(argv[1], "run") == 0)) {

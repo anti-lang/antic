@@ -11,10 +11,39 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "deps.h"
 #include "files.h"
+#include "repo.h"
 #include "text.h"
 #include "toml.h"
+
+/* The directories of the default layout of docs/tooling.md. */
+#define DEFAULT_SRC "src"
+#define DEFAULT_TEST "test"
+
+/* What reading the manifest at path gave. */
+enum opened { OPENED, OPENED_MISSING, OPENED_NO_TOML };
+
+/* Read the manifest at path into *doc, which the caller frees with
+   anti_rt_toml_free when the result is OPENED. A file that is no TOML is
+   reported here, and a missing one is the caller's to report. */
+static enum opened open_manifest(const char *path, struct anti_toml **doc)
+{
+    struct text bytes = {0};
+
+    *doc = NULL;
+    if (!files_read(path, &bytes)) {
+        text_free(&bytes);
+        return OPENED_MISSING;
+    }
+    *doc = anti_rt_toml_read((const unsigned char *)bytes.data,
+                             (int64_t)bytes.length);
+    text_free(&bytes);
+    if (*doc == NULL) {
+        fprintf(stderr, "anti: %s is no TOML that anti reads\n", path);
+        return OPENED_NO_TOML;
+    }
+    return OPENED;
+}
 
 /* The interface of a key of one table: `inject.test.` when tests is
    true and `inject.` otherwise. NULL when the key belongs to another
@@ -56,27 +85,15 @@ static void add_entry(struct manifest_inject *table, const char *interface,
     table->entries[table->count++] = text_cstr(&entry);
 }
 
-bool manifest_inject_read(const char *path, bool tests,
-                          struct manifest_inject *out)
+/* The `[inject]` table of doc, with `[inject.test]` over it when tests is
+   true. */
+static void inject_of(const struct anti_toml *doc, bool tests,
+                      struct manifest_inject *out)
 {
-    struct text bytes = {0};
-    struct anti_toml *doc;
-    int64_t count;
+    int64_t count = anti_rt_toml_count(doc);
     int64_t i;
 
     memset(out, 0, sizeof *out);
-    if (!files_read(path, &bytes)) {
-        text_free(&bytes);
-        return true;
-    }
-    doc = anti_rt_toml_read((const unsigned char *)bytes.data,
-                            (int64_t)bytes.length);
-    text_free(&bytes);
-    if (doc == NULL) {
-        fprintf(stderr, "anti: %s is no TOML that anti reads\n", path);
-        return false;
-    }
-    count = anti_rt_toml_count(doc);
     out->entries = files_array((size_t)count + 1, sizeof *out->entries);
     /* The plain table first, so an entry of `[inject.test]` replaces the
        one `[inject]` holds for that interface, in whichever order the
@@ -99,8 +116,20 @@ bool manifest_inject_read(const char *path, bool tests,
             add_entry(out, interface, (const char *)value.ptr);
         }
     }
-    anti_rt_toml_free(doc);
-    return true;
+}
+
+bool manifest_inject_read(const char *path, bool tests,
+                          struct manifest_inject *out)
+{
+    struct anti_toml *doc;
+    enum opened opened = open_manifest(path, &doc);
+
+    memset(out, 0, sizeof *out);
+    if (opened == OPENED) {
+        inject_of(doc, tests, out);
+        anti_rt_toml_free(doc);
+    }
+    return opened != OPENED_NO_TOML;
 }
 
 const char *manifest_value(const struct anti_toml *doc, const char *key)
@@ -121,39 +150,34 @@ static const char *value_of(const struct anti_toml *doc, const char *key)
     return value != NULL && value[0] != '\0' ? value : NULL;
 }
 
+static void text_of_key(const struct anti_toml *doc, const char *key,
+                        struct text *out);
+
+/* The source and the test directory of doc, or of the default layout
+   where doc is NULL or names none. */
+static void layout_of(const struct anti_toml *doc, struct text *src,
+                      struct text *test)
+{
+    text_append(src, DEFAULT_SRC);
+    text_append(test, DEFAULT_TEST);
+    if (doc != NULL) {
+        text_of_key(doc, "layout.src", src);
+        text_of_key(doc, "layout.test", test);
+    }
+}
+
 bool manifest_layout_read(const char *path, struct text *src,
                           struct text *test, struct text *package)
 {
-    struct text bytes = {0};
     struct anti_toml *doc;
-    const char *value;
+    enum opened opened = open_manifest(path, &doc);
 
-    text_append(src, "src");
-    text_append(test, "test");
-    if (!files_read(path, &bytes)) {
-        text_free(&bytes);
-        return true;
+    layout_of(doc, src, test);
+    if (opened == OPENED) {
+        text_of_key(doc, "package.name", package);
+        anti_rt_toml_free(doc);
     }
-    doc = anti_rt_toml_read((const unsigned char *)bytes.data,
-                            (int64_t)bytes.length);
-    text_free(&bytes);
-    if (doc == NULL) {
-        fprintf(stderr, "anti: %s is no TOML that anti reads\n", path);
-        return false;
-    }
-    if ((value = value_of(doc, "layout.src")) != NULL) {
-        src->length = 0;
-        text_append(src, value);
-    }
-    if ((value = value_of(doc, "layout.test")) != NULL) {
-        test->length = 0;
-        text_append(test, value);
-    }
-    if ((value = value_of(doc, "package.name")) != NULL) {
-        text_append(package, value);
-    }
-    anti_rt_toml_free(doc);
-    return true;
+    return opened != OPENED_NO_TOML;
 }
 
 void manifest_inject_free(struct manifest_inject *table)
@@ -298,30 +322,23 @@ static bool read_tables(const char *path, const struct anti_toml *doc,
 
 bool manifest_read(const char *path, bool tests, struct manifest *out)
 {
-    struct text bytes = {0};
-    struct anti_toml *doc;
+    struct anti_toml *doc = NULL;
+    enum opened opened;
     size_t i;
+    bool ok = false;
 
     memset(out, 0, sizeof *out);
-    text_append(&out->src, "src");
-    text_append(&out->test, "test");
     text_append(&out->build, "build");
     text_append(&out->dist, "dist");
-    if (!files_read(path, &bytes)) {
-        text_free(&bytes);
+    opened = open_manifest(path, &doc);
+    if (opened == OPENED_MISSING) {
         fprintf(stderr, "anti: %s: no manifest here, so there is no project. "
                         "`anti new <name>` writes one\n", path);
-        manifest_free(out);
-        return false;
     }
-    doc = anti_rt_toml_read((const unsigned char *)bytes.data,
-                            (int64_t)bytes.length);
-    text_free(&bytes);
-    if (doc == NULL) {
-        fprintf(stderr, "anti: %s is no TOML that anti reads\n", path);
-        manifest_free(out);
-        return false;
+    if (opened != OPENED) {
+        goto done;
     }
+    layout_of(doc, &out->src, &out->test);
     text_of_key(doc, "package.name", &out->name);
     text_of_key(doc, "package.version", &out->version);
     text_of_key(doc, "package.antic", &out->antic);
@@ -329,36 +346,30 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
     text_of_key(doc, "package.license_text", &out->license_text);
     array_of_key(doc, "package.attribution", &out->attribution,
                  &out->attribution_count);
-    text_of_key(doc, "layout.src", &out->src);
-    text_of_key(doc, "layout.test", &out->test);
     text_of_key(doc, "layout.build", &out->build);
     text_of_key(doc, "layout.dist", &out->dist);
     array_of_key(doc, "targets.default", &out->default_targets,
                  &out->default_target_count);
     array_of_key(doc, "targets.all", &out->all_targets,
                  &out->all_target_count);
+    inject_of(doc, tests, &out->inject);
     if (!read_tables(path, doc, out)) {
-        anti_rt_toml_free(doc);
-        manifest_free(out);
-        return false;
+        goto done;
     }
-    anti_rt_toml_free(doc);
     if (out->name.length == 0) {
         fprintf(stderr, "anti: %s: [package] names no `name`, the root module "
                         "path of the package\n", path);
-        manifest_free(out);
-        return false;
+        goto done;
     }
     /* The version goes into every class descriptor, where the loader of a
        plugin compares it, and into the index the resolver reads. Both
        read it alike only in the form the resolver takes. */
     if (out->version.length > 0 &&
-        !deps_version_valid(text_cstr(&out->version))) {
+        !repo_version_valid(text_cstr(&out->version))) {
         fprintf(stderr, "anti: %s: [package] version `%s` is no version of "
                         "one to three parts of digits, as `1.2.0`\n",
                 path, text_cstr(&out->version));
-        manifest_free(out);
-        return false;
+        goto done;
     }
     /* Every dependency names one source. A table with both a repository
        and a path says two things about where its modules come from. */
@@ -367,29 +378,29 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
         if (d->path.length > 0 && d->repo.length > 0) {
             fprintf(stderr, "anti: %s: the dependency %s names a repository "
                             "and a path\n", path, text_cstr(&d->name));
-            manifest_free(out);
-            return false;
+            goto done;
         }
         if (d->path.length == 0 && d->version.length == 0) {
             fprintf(stderr, "anti: %s: the dependency %s names no version\n",
                     path, text_cstr(&d->name));
-            manifest_free(out);
-            return false;
+            goto done;
         }
         if (d->repo.length > 0 &&
             manifest_repository_url(out, text_cstr(&d->repo)) == NULL) {
             fprintf(stderr, "anti: %s: the dependency %s names the repository "
                             "%s, which [repositories] does not\n", path,
                     text_cstr(&d->name), text_cstr(&d->repo));
-            manifest_free(out);
-            return false;
+            goto done;
         }
     }
-    if (!manifest_inject_read(path, tests, &out->inject)) {
+    ok = true;
+
+done:
+    anti_rt_toml_free(doc);
+    if (!ok) {
         manifest_free(out);
-        return false;
     }
-    return true;
+    return ok;
 }
 
 const char *manifest_repository_url(const struct manifest *m,

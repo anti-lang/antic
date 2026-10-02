@@ -28,10 +28,4 @@ struct build_request {
 /* Build the project and return the exit status of anti. */
 int build_run(const struct build_request *r);
 
-/* `anti new <name>`: a project of the default layout, with a starter
-   manifest and one module that prints and returns. name is the package
-   name, a module path of at least two segments, and the directory takes
-   its last segment. */
-int build_new(const char *name);
-
 #endif

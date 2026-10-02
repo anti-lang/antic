@@ -58,19 +58,19 @@ static void constraints(void)
    version that is none satisfies nothing, so no arithmetic overflows. */
 static void version_bounds(void)
 {
-    CHECK(deps_version_valid("1.2.4"));
-    CHECK(deps_version_valid("2.0"));
-    CHECK(deps_version_valid("7"));
-    CHECK(deps_version_valid("999999999.0.0"));
-    CHECK(!deps_version_valid("1000000000.0.0"));
-    CHECK(!deps_version_valid("99999999999999999999.0.0"));
-    CHECK(!deps_version_valid(""));
-    CHECK(!deps_version_valid("1..2"));
-    CHECK(!deps_version_valid("1.2."));
-    CHECK(!deps_version_valid(".1.2"));
-    CHECK(!deps_version_valid("1.2.3.4"));
-    CHECK(!deps_version_valid("1.2.0/../../x"));
-    CHECK(!deps_version_valid("1.2.0\"\nx = \"y"));
+    CHECK(repo_version_valid("1.2.4"));
+    CHECK(repo_version_valid("2.0"));
+    CHECK(repo_version_valid("7"));
+    CHECK(repo_version_valid("999999999.0.0"));
+    CHECK(!repo_version_valid("1000000000.0.0"));
+    CHECK(!repo_version_valid("99999999999999999999.0.0"));
+    CHECK(!repo_version_valid(""));
+    CHECK(!repo_version_valid("1..2"));
+    CHECK(!repo_version_valid("1.2."));
+    CHECK(!repo_version_valid(".1.2"));
+    CHECK(!repo_version_valid("1.2.3.4"));
+    CHECK(!repo_version_valid("1.2.0/../../x"));
+    CHECK(!repo_version_valid("1.2.0\"\nx = \"y"));
     CHECK(!deps_satisfies("99999999999999999999", "1.0.0"));
     CHECK(!deps_satisfies(">=1.0.0", "99999999999999999999.0.0"));
     CHECK(!deps_satisfies("1.0.0", "1.2.0/../../x"));

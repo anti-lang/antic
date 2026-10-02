@@ -16,7 +16,6 @@
 #include <time.h>
 
 #include "antic.h"
-#include "deps.h"
 #include "files.h"
 #include "platform.h"
 #include "sha256.h"
@@ -65,6 +64,31 @@ bool repo_digest_valid(const char *digest)
         }
     }
     return digest[64] == '\0';
+}
+
+bool repo_version_valid(const char *version)
+{
+    const char *p = version;
+    int parts = 0;
+
+    for (;;) {
+        size_t digits = 0;
+        while (p[digits] >= '0' && p[digits] <= '9') {
+            digits++;
+        }
+        if (digits == 0 || digits > REPO_VERSION_DIGITS) {
+            return false;
+        }
+        p += digits;
+        parts++;
+        if (*p == '\0') {
+            return true;
+        }
+        if (*p != '.' || parts == 3) {
+            return false;
+        }
+        p++;
+    }
 }
 
 /* The cache of a user, which is per user and not per project. It holds
@@ -364,7 +388,7 @@ bool repo_module(const char *prefix, const char *name, const char *version,
                         "name\n", prefix, name);
         goto done;
     }
-    if (!deps_version_valid(version)) {
+    if (!repo_version_valid(version)) {
         fprintf(stderr, "anti: %s names %s %s, which is no version\n", prefix,
                 name, version);
         goto done;

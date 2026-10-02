@@ -19,6 +19,13 @@
    take this form, and a string that does not stands in no path. */
 bool repo_name_valid(const char *name);
 
+/* Whether version is one to three parts of decimal digits joined by dots,
+   each part at most REPO_VERSION_DIGITS digits long. A version of an
+   index, a lock file, a manifest or a library header that is not stands
+   nowhere in a path or in the comparison. */
+enum { REPO_VERSION_DIGITS = 9 };
+bool repo_version_valid(const char *version);
+
 /* Whether digest is a SHA-256 digest in 64 lowercase hex digits. */
 bool repo_digest_valid(const char *digest);
 

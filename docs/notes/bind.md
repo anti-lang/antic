@@ -7,7 +7,8 @@ and "ABI probe" of `docs/tooling-addendum.md`. The settled points are in
 `bind.c` holds the command, `bindapi.c` reads a description of rlparser,
 `bindclang.c` reads a header through clang, `bindtype.c` parses a C type
 spelling, `bindexpr.c` evaluates a constant and `bindwrite.c` writes the
-module, the shim and the probes. `jsontree.c` builds a tree over the scanner
+module, the shim and the probes. `bindmodel.c` holds the memory of the
+model, the warnings and the libraries each bundled library links. `jsontree.c` builds a tree over the scanner
 of `src/rt/json.c`.
 
 ## One model, two readers

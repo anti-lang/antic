@@ -30,7 +30,7 @@
    other. */
 enum { DEPS_ROUNDS = 64 };
 
-/* The largest part of a version, the one of DEPS_VERSION_DIGITS nines. */
+/* The largest part of a version, the one of REPO_VERSION_DIGITS nines. */
 #define DEPS_VERSION_PART_MAX INT64_C(999999999)
 
 /* One part of a version, and where the next part starts. A part above
@@ -53,31 +53,6 @@ static int64_t version_part(const char **p)
         (*p)++;
     }
     return value;
-}
-
-bool deps_version_valid(const char *version)
-{
-    const char *p = version;
-    int parts = 0;
-
-    for (;;) {
-        size_t digits = 0;
-        while (p[digits] >= '0' && p[digits] <= '9') {
-            digits++;
-        }
-        if (digits == 0 || digits > DEPS_VERSION_DIGITS) {
-            return false;
-        }
-        p += digits;
-        parts++;
-        if (*p == '\0') {
-            return true;
-        }
-        if (*p != '.' || parts == 3) {
-            return false;
-        }
-        p++;
-    }
 }
 
 int deps_version_compare(const char *a, const char *b)
@@ -111,7 +86,7 @@ bool deps_constraint_valid(const char *constraint)
     } else if (constraint[0] == '>' && constraint[1] == '=') {
         constraint += 2;
     }
-    return deps_version_valid(constraint);
+    return repo_version_valid(constraint);
 }
 
 bool deps_satisfies(const char *constraint, const char *version)
@@ -119,7 +94,7 @@ bool deps_satisfies(const char *constraint, const char *version)
     struct text bound = {0};
     bool ok;
 
-    if (!deps_version_valid(version)) {
+    if (!repo_version_valid(version)) {
         return false;
     }
     if (constraint == NULL || constraint[0] == '\0') {
@@ -585,7 +560,7 @@ static bool resolve_from_index(struct resolver *r, const struct requirement *req
         }
         /* S40, S45 and M13: a version reaches the comparison, a path of
            the cache and the lock file. */
-        if (!deps_version_valid(version)) {
+        if (!repo_version_valid(version)) {
             fprintf(stderr, "anti: %s names the version %s of %s, which is "
                             "no version\n", text_cstr(&file), version,
                     text_cstr(&req->name));
@@ -854,7 +829,7 @@ static bool lock_package_valid(const char *path, const char *name,
     if (!repo_name_valid(name)) {
         kind = "package name";
         what = name;
-    } else if (!deps_version_valid(version)) {
+    } else if (!repo_version_valid(version)) {
         kind = "version";
         what = version;
     } else if (repo != NULL && strchr(repo, '"') != NULL) {

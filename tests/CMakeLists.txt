@@ -53,7 +53,9 @@ add_executable(antic_unit_tests
     unit/test_tool_platform.c
     unit/test_interface.c
     ../src/anti/bindexpr.c
+    ../src/anti/bindmodel.c
     ../src/anti/bindtype.c
+    ../src/anti/cursor.c
     ../src/anti/deps.c
     ../src/anti/files.c
     ../src/anti/fmt.c

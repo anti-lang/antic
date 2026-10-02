@@ -610,7 +610,7 @@ libraries named "at run time" are loaded by the library itself and need no link.
 - `libX11` is linked, since `rcore.c` calls it for the clipboard. GLFW loads the rest of
   X11. Since glibc 2.34 `pthread` and `dl` lie in `libc.so.6`, and the two names stay on
   the link line as raylib's Makefile gives them, for an older loader.
-- On macOS `Cocoa` and `IOKit` resolve every symbol. The table of `src/anti/bindtype.c`
+- On macOS `Cocoa` and `IOKit` resolve every symbol. The table of `src/anti/bindmodel.c`
   names `Cocoa`, `CoreVideo`, `IOKit` and `OpenGL` for raylib, and the test links all
   four. It names `AudioToolbox`, `CoreAudio` and `CoreFoundation` for miniaudio, which
   links without them.
@@ -1674,7 +1674,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - `#pragma pack(1)` and `__attribute__((packed))` give `packed`. A pack above one byte is refused. `aligned(N)` on a record gives `align(N)`, and on the first field it raises the record's alignment. On another field it is refused. Reason: the addendum refuses every layout directive other than the two it names, and an aligned first field lays out as an aligned record.
 - The shim renames a `static` function with a macro around the include and wraps it under its name. A C99 `inline` definition gets `extern __typeof__(f) f;`, which makes the header's definition the symbol. A variadic inline function is left out. Reason: the addendum asks for a wrapper of the same name, and neither form copies a body.
 - The macros are the object-like `#define` lines of the header in the output of `clang -E -dD`, evaluated as `docs/notes/bind.md` describes. A define of rlparser of the kind `FLOAT` is a `c_float`, and `COLOR` is a struct literal. Reason: the AST holds no macro, and raylib writes its floats with the suffix f.
-- The frameworks of a binding come from a table in `src/anti/bindtype.c`: raylib takes Cocoa, CoreVideo, IOKit and OpenGL, and miniaudio takes AudioToolbox, CoreAudio and CoreFoundation. Reason: those are the frameworks raylib's GLFW back end and miniaudio's Core Audio back end link on macOS. The build of the libraries shows that raylib links with `Cocoa` and `IOKit` alone and miniaudio with none, as "raylib and miniaudio" under "Libraries and runtime" records.
+- The frameworks of a binding come from a table in `src/anti/bindmodel.c`: raylib takes Cocoa, CoreVideo, IOKit and OpenGL, and miniaudio takes AudioToolbox, CoreAudio and CoreFoundation. Reason: those are the frameworks raylib's GLFW back end and miniaudio's Core Audio back end link on macOS. The build of the libraries shows that raylib links with `Cocoa` and `IOKit` alone and miniaudio with none, as "raylib and miniaudio" under "Libraries and runtime" records.
 - `volatile` leaves a `// volatile in C` line before its field, and a line before a function whose parameter is volatile. Reason: the entry under "Core language" asks for a comment in the binding.
 - A binding and a probe in Anti pass through the formatter of `anti fmt` before they are written. Reason: a binding committed into `src/std/` stands in the canonical form that `fmt_canonical` checks.
 - [provisional] An API description that names one struct twice is refused as a whole, with a message naming the struct.

@@ -15,9 +15,9 @@
 #include "cpu.h"
 #include "driver.h"
 #include "files.h"
+#include "memreport.h"
 #include "modpath.h"
 #include "platform.h"
-#include "syms.h"
 #include "target.h"
 #include "text.h"
 #include "units.h"
@@ -309,7 +309,7 @@ static bool run_unit(const struct test_unit *u, const struct options *base,
     }
     argv[0] = text_cstr(&program);
     argv[1] = NULL;
-    ok = (o.memory_checks ? syms_run_checked(argv) : process_run(argv)) == 0;
+    ok = (o.memory_checks ? memreport_run(argv) : process_run(argv)) == 0;
 done:
     imports_free(&imports);
     arena_free(&framework_arena);
