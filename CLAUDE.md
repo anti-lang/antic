@@ -390,7 +390,8 @@ reports what it finished.
   on `leave`. `trace` is a contextual word before `class` and before `fn` in a
   class body, `--trace` and `--no-trace` decide instead of the mode,
   `--trace <pattern>` reaches a class that did not ask, and `--no-hooks` drops
-  every site. `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger`,
+  every site and is refused for a plugin and a program that loads one.
+  `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger`,
   `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal` and `Composite`, and
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
@@ -480,8 +481,10 @@ reports what it finished.
   Precedence per key is the command line, the file, the build. The pool
   reads `threads` and `anti.log` reads `logger`, so `ANTI_THREADS` and
   `ANTI_LOGGER` are gone, and `backtrace = true` turns the frames of an
-  error on in a release build. A line of `[injections]` is a startup error
-  while no program carries an injectable interface. See "Runtime
+  error on in a release build. `rt.get(key)` gives the effective value of a
+  key. A line of `[injections]` that names no injectable interface of the
+  program is a startup error, and a file of `rt.configure` that holds the
+  table is refused, since injections are fixed at start. See "Runtime
   configuration" in `docs/decisions.md` and `docs/notes/runtime-conf.md`.
 - Injection is built. `inject log: *Logger` and `inject final alloc: *Allocator`
   mark a field of a class that the provider of its interface fills before

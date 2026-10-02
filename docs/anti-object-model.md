@@ -54,7 +54,7 @@ Contents:
 
 ## Enum
 
-- `enum Color { Red, Green, Blue }` declares a named integer type with values from 0. `enum Mode: u8 { A = 1, B = 4 }` names the underlying type and gives explicit values. Without an underlying type it is `c_int`.
+- `enum Color { Red, Green, Blue }` declares a named integer type with values from 0. `enum Mode: u8 { A = 1, B = 4 }` names the underlying type and gives explicit values. Without an underlying type it is `c_int`. A value without `=` is one more than the value before it, and every value must fit the underlying type, so `enum E: u8 { A = 255, B }` is refused.
 - An enum has C layout. It converts with `as` to and from its underlying type, both ways unchecked. It compares with `== != < <= > >=`. A value is written `Kind.Circle`.
 - An enum value is a constant expression.
 - `switch` on an enum without `else` must cover every value. The message names the missing ones.
