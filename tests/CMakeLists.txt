@@ -1678,6 +1678,15 @@ add_test(NAME anti_fmt
         "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/fmt"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/fmt"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_fmt.cmake")
+# A failed write of `anti fmt` leaves the source as it was. The limit on
+# the size of a written file is a POSIX one, and Windows has none.
+if(NOT WIN32)
+    add_test(NAME anti_fmt_write
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-fmt-write"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_fmt_write.cmake")
+endif()
 
 # Every source of the standard library and of the tests stands in the
 # canonical form, so that `anti fmt` over the checkout writes nothing.

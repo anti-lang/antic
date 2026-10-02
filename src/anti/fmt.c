@@ -1921,7 +1921,7 @@ int fmt_run(const char *const *paths, size_t count, bool check)
                 0) {
             changed++;
             printf("%s\n", paths[i]);
-            if (!check && !files_write(paths[i], &formed)) {
+            if (!check && !files_replace(paths[i], &formed)) {
                 status = 1;
             }
         }

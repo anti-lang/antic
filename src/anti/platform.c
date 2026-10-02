@@ -125,6 +125,20 @@ bool platform_rename(const char *from, const char *to)
     return renamed;
 }
 
+bool platform_replace(const char *from, const char *to)
+{
+    wchar_t *wide_from = platform_widen(from);
+    wchar_t *wide_to = platform_widen(to);
+    bool replaced = wide_from != NULL && wide_to != NULL &&
+                    MoveFileExW(wide_from, wide_to,
+                                MOVEFILE_REPLACE_EXISTING |
+                                    MOVEFILE_WRITE_THROUGH) != 0;
+
+    free(wide_from);
+    free(wide_to);
+    return replaced;
+}
+
 FILE *platform_open_file(const char *path)
 {
     wchar_t *wide = platform_widen(path);
@@ -219,6 +233,11 @@ bool platform_remove_entry(const char *path)
 }
 
 bool platform_rename(const char *from, const char *to)
+{
+    return rename(from, to) == 0;
+}
+
+bool platform_replace(const char *from, const char *to)
 {
     return rename(from, to) == 0;
 }

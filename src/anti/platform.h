@@ -52,6 +52,10 @@ bool platform_remove_entry(const char *path);
    as rename of the C library does on each. */
 bool platform_rename(const char *from, const char *to);
 
+/* Give the file from the name to, replacing a file that has it, on every
+   host. Returns false when it cannot. */
+bool platform_replace(const char *from, const char *to);
+
 /* Give the file to the permissions of the file from. Windows keeps no
    permission bits, so there it does nothing. */
 bool platform_copy_permissions(const char *from, const char *to);

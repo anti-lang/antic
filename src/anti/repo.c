@@ -190,7 +190,7 @@ static enum repo_answer fetch(const char *url, const char *destination,
     if (!repo_url_allowed(url)) {
         return REPO_FAILED;
     }
-    text_appendf(&temporary, "%s.new", destination);
+    text_appendf(&temporary, "%s%s", destination, FILES_NEW_SUFFIX);
     if (strncmp(url, "file://", 7) == 0) {
         if (file_url_path(url, &source)) {
             if (!files_exists(text_cstr(&source))) {

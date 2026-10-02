@@ -61,6 +61,14 @@ bool files_read_reported(const char *path, struct text *out);
    where a full disk reports the bytes of the last buffer. */
 bool files_write(const char *path, const struct text *bytes);
 
+/* The suffix of the file a write fills beside the one it replaces. */
+#define FILES_NEW_SUFFIX ".new"
+
+/* Write bytes as the whole file at path, which keeps its old bytes until
+   every new one is written. Returns false, and prints why, when the
+   write or the replacement fails, and path then stays as it was. */
+bool files_replace(const char *path, const struct text *bytes);
+
 /* The last part of path, after the last `/` or `\\`. Both separators
    count on every host, so a path written on Windows splits the same way
    on the machine that reads it. The result points into path. */

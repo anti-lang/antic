@@ -228,6 +228,28 @@ bool files_write(const char *path, const struct text *bytes)
     return true;
 }
 
+/* DESIGN: the bytes go to a file beside path, which takes the
+   permissions of path and then its name. A write that fails partway
+   fills the new file alone, which is removed. */
+bool files_replace(const char *path, const struct text *bytes)
+{
+    struct text temporary = {0};
+    bool ok;
+
+    text_appendf(&temporary, "%s%s", path, FILES_NEW_SUFFIX);
+    ok = files_write(text_cstr(&temporary), bytes);
+    if (ok && (!platform_copy_permissions(path, text_cstr(&temporary)) ||
+               !platform_replace(text_cstr(&temporary), path))) {
+        fprintf(stderr, "anti: cannot replace %s\n", path);
+        ok = false;
+    }
+    if (!ok) {
+        platform_remove(text_cstr(&temporary));
+    }
+    text_free(&temporary);
+    return ok;
+}
+
 bool files_copy_program(const char *from, const char *to)
 {
     return files_copy(from, to) && platform_copy_permissions(from, to);
