@@ -201,7 +201,7 @@ when started by hand.
   antic supplied the out pointer of a `catch` binding over stack storage it never zeroed,
   and the `=` in `Document.read` tore down whatever the frame held. `docs/decisions.md`
   holds it under "Object model", and `program_out_slot` pins it on every host.
-- `table_unset` reads the two labels with `table[._]run:` and `table[._]main:`. Each host
+- `trap_table` reads the two labels with `table[._]run:` and `table[._]main:`. Each host
   spells them its own way: `table.run:` on ELF, `_table.run:` on Mach-O and
   `_A5table_run:` on COFF, which writes the last segment of a dotted name after an `_`.
   The pattern held the dotted form alone, so the match was empty on Windows and the test

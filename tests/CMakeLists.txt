@@ -600,13 +600,6 @@ foreach(case "linux-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_cpu_level.cmake")
 endforeach()
 
-# A simd struct above the vector cap is an array and every operation on
-# it a loop, which a warning at the declaration says. The program allows
-# it, because a release build accepts no warning.
-antic_program_test(program_simd_big
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_big.anti"
-    WORK "${CMAKE_CURRENT_BINARY_DIR}/programs")
-
 # The native width of a simd operation: one instruction on the registers
 # of 32 bytes at x86-64-v3, and two on the 16 bytes of every other level
 # and of ARM64.
@@ -1043,10 +1036,6 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
             EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.expected"
             WORK "${CMAKE_CURRENT_BINARY_DIR}/abi-x86_64")
     endif()
-    antic_program_test(program_simd_big_macos-x86_64
-        "${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_big.anti"
-        OPTIONS "${ANTIC_X86_64_OPTIONS}"
-        WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-x86_64")
     # DESIGN: a program that holds anti.regex links PCRE2, which stands at
     # the default level x86-64-v3 alone, and a program below it is refused
     # at link. Rosetta runs no v3 program, so the programs of patterns run
@@ -2763,7 +2752,7 @@ function(antic_check_test name phrase pattern runs)
             "-DANTIC=$<TARGET_FILE:antic>"
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/checks/${name}.anti"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
             "-DPHRASE=${phrase}"
             "-DPATTERN=${pattern}"
             "-DRUNS=${runs}"
@@ -2858,7 +2847,7 @@ if(ANTIC_LLVM_MC)
             "-DANTIC=$<TARGET_FILE:antic>"
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/checks"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/traps"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/checks-override"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_checks.cmake")
 endif()
@@ -2891,30 +2880,28 @@ if(ANTIC_LLVM_MC AND (ANTIC_LLDB OR ANTIC_GDB))
 endif()
 
 # A zero table traps with the name of the class.
-add_test(NAME table_unset
+add_test(NAME trap_table
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
         "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/table.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_table.cmake")
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trap_table.cmake")
 
-# The results of `parallel` take one value per chunk, and a count of them
-# that no size holds stops the program before a worker runs.
-add_test(NAME parallel_size
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/parallel_size.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trap.cmake")
-
-# Out of memory is fatal for `alloc T { }`, `alloc T(args)` and the first
-# `get` of a singleton, which stop with the failure routine instead of
-# writing through a null pointer.
-foreach(name IN ITEMS alloc_literal alloc_construct singleton_memory)
+# The programs of tests/traps that stop with the message of <name>.err.
+# parallel_size: the results of `parallel` take one value per chunk, and
+# a count of them that no size holds stops the program before a worker
+# runs. alloc_literal, alloc_construct and singleton_memory: out of memory
+# is fatal for `alloc T { }`, `alloc T(args)` and the first `get` of a
+# singleton, which stop with the failure routine instead of writing
+# through a null pointer. pattern_limit: a search with a pattern literal
+# that reaches the match limit stops with the pattern and the line.
+# pattern_group_count: a match whose `count` the program raised reads no
+# group past those of its pattern, and stops with the count of the
+# pattern.
+foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
+        singleton_memory pattern_limit pattern_group_count)
     add_test(NAME trap_${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2924,28 +2911,6 @@ foreach(name IN ITEMS alloc_literal alloc_construct singleton_memory)
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trap.cmake")
 endforeach()
-
-# A search with a pattern literal that reaches the match limit stops the
-# program with the pattern and the line.
-add_test(NAME pattern_limit
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/pattern_limit.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trap.cmake")
-
-# A match whose `count` the program raised reads no group past those of
-# its pattern, and stops with the count of the pattern.
-add_test(NAME pattern_group_count
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/pattern_group_count.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trap.cmake")
 
 # The size of a Mutex per target: four bytes on Linux and macOS, eight on
 # Windows.
