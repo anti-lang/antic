@@ -37,7 +37,7 @@ static void end(struct dumper *d, size_t start, const struct type *type)
             text_append(d->out, " ");
             width++;
         } while (width < TYPE_COLUMN);
-        type_name(d->out, type);
+        types_name(d->out, type);
     }
     text_append(d->out, "\n");
 }
@@ -95,7 +95,7 @@ static void dump_handler(struct dumper *d, int depth,
 /* The spelling of an operator token without its backticks. */
 static void op_name(struct dumper *d, enum token_kind op)
 {
-    const char *quoted = token_kind_name(op);
+    const char *quoted = lexer_token_kind_name(op);
     text_appendf(d->out, "%.*s", (int)(strlen(quoted) - 2), quoted + 1);
 }
 

@@ -129,7 +129,7 @@ void lower_set_optional(struct lowerer *l, const struct type *t,
    aggregates of two words. */
 bool lower_is_aggregate(const struct type *t)
 {
-    return type_has_fields(t) || t->kind == TYPE_ARRAY ||
+    return types_has_fields(t) || t->kind == TYPE_ARRAY ||
            t->kind == TYPE_STR || t->kind == TYPE_SLICE ||
            (t->kind == TYPE_FN && (t->bound || t->context));
 }
@@ -142,9 +142,9 @@ static char *name_of_type(const struct type *t, bool qualified)
     char *copy;
 
     if (qualified) {
-        type_name_qualified(&name, t);
+        types_name_qualified(&name, t);
     } else {
-        type_name(&name, t);
+        types_name(&name, t);
     }
     copy = lower_copy_text(&name);
     text_free(&name);
@@ -174,7 +174,7 @@ uint32_t lower_agg_of(struct lowerer *l, const struct type *t)
                                                  : name_of_type(t, true);
     uint32_t agg = ir_agg_find(l->m, name);
     struct ir_field *fields;
-    size_t count = type_has_fields(t) ? t->field_count : 2;
+    size_t count = types_has_fields(t) ? t->field_count : 2;
     size_t i;
 
     if (agg != IR_NO_AGG) {
@@ -189,13 +189,13 @@ uint32_t lower_agg_of(struct lowerer *l, const struct type *t)
                               ? lower_sym_of(l, t->length_of)
                               : ir_sym_int(l->m, IR_I64, t->length);
         if (t->length_of != NULL) {
-            symbolic_print(&text, t->length_of, false);
+            types_symbolic_print(&text, t->length_of, false);
         } else {
             text_appendf(&text, "%llu", (unsigned long long)t->length);
         }
         agg = ir_array_add(l->m, name, element, length, text_cstr(&text));
         text_free(&text);
-    } else if (type_has_fields(t)) {
+    } else if (types_has_fields(t)) {
         for (i = 0; i < count; i++) {
             char *field = alloc_zeroed(t->fields[i].name.length + 1, 1);
             memcpy(field, t->fields[i].name.text, t->fields[i].name.length);
@@ -204,7 +204,7 @@ uint32_t lower_agg_of(struct lowerer *l, const struct type *t)
             fields[i].type = lower_vtype_of(l, t->fields[i].type);
             fields[i].bits = t->fields[i].bits;
             fields[i].ext = t->fields[i].bits == 0 ? IR_EXT_NONE
-                            : type_is_signed(t->fields[i].type) ? IR_EXT_SIGN
+                            : types_is_signed(t->fields[i].type) ? IR_EXT_SIGN
                                                                 : IR_EXT_ZERO;
         }
         agg = t->simd ? ir_simd_add(l->m, name, fields, count)
@@ -361,7 +361,7 @@ static enum ir_ext param_ext(const struct type *t)
     if (type != IR_I8 && type != IR_I16) {
         return IR_EXT_NONE;
     }
-    return type_is_signed(t) ? IR_EXT_SIGN : IR_EXT_ZERO;
+    return types_is_signed(t) ? IR_EXT_SIGN : IR_EXT_ZERO;
 }
 
 /* A parameter of 8 or 16 bits records whether it is signed, and an
@@ -771,7 +771,7 @@ const struct type *lower_field_owner(const struct type *t,
     const struct type *s;
 
     for (s = t; s != NULL; s = s->kind == TYPE_CLASS ? s->base : NULL) {
-        if (type_find_field(s, name) != NULL) {
+        if (types_find_field(s, name) != NULL) {
             return s;
         }
     }
@@ -796,11 +796,15 @@ const struct name lower_entry_name = {"entry", 5};
 struct ir_operand lower_field_offset(struct lowerer *l, const struct type *s,
                                      const struct name *name)
 {
-    uint32_t index = type_has_fields(s) ? (uint32_t)(type_find_field(s, name) -
-                                                     s->fields)
-                     : lower_name_is(name, "len") || lower_name_is(name,
-                                                                   "entry") ? 1
-                                                                      : 0;
+    uint32_t index;
+
+    if (types_has_fields(s)) {
+        index = (uint32_t)(types_find_field(s, name) - s->fields);
+    } else {
+        index = lower_name_is(name, "len") || lower_name_is(name, "entry")
+                    ? 1
+                    : 0;
+    }
 
     if (index == 0 || s->is_union) {
         return lower_zero();
@@ -1074,7 +1078,7 @@ static bool known_copy(struct lowerer *l, const struct item *it)
         return false;
     }
     t = it->symbol->type;
-    type_symbol_name(&name, t);
+    types_symbol_name(&name, t);
     text_append(&name, ".descriptor");
     g = lower_find_global(l->m, it->home_module, text_cstr(&name));
     text_free(&name);

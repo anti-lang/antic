@@ -22,13 +22,13 @@ static void identifiers(void)
 
 static void builtin_types(void)
 {
-    CHECK(token_is_builtin_type(TOKEN_BOOL_TYPE));
-    CHECK(token_is_builtin_type(TOKEN_INT_TYPE));
-    CHECK(token_is_builtin_type(TOKEN_F16));
-    CHECK(token_is_builtin_type(TOKEN_C_WCHAR));
-    CHECK(!token_is_builtin_type(TOKEN_SIZE_OF));
-    CHECK(!token_is_builtin_type(TOKEN_WORKER));
-    CHECK(!token_is_builtin_type(TOKEN_IDENT));
+    CHECK(lexer_token_is_builtin_type(TOKEN_BOOL_TYPE));
+    CHECK(lexer_token_is_builtin_type(TOKEN_INT_TYPE));
+    CHECK(lexer_token_is_builtin_type(TOKEN_F16));
+    CHECK(lexer_token_is_builtin_type(TOKEN_C_WCHAR));
+    CHECK(!lexer_token_is_builtin_type(TOKEN_SIZE_OF));
+    CHECK(!lexer_token_is_builtin_type(TOKEN_WORKER));
+    CHECK(!lexer_token_is_builtin_type(TOKEN_IDENT));
 }
 
 static const char outline_source[] =

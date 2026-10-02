@@ -93,7 +93,7 @@ line of the declaration, which `debug_open` writes after the symbol.
 
 The path of a source is the one a failed check names. That is the file under
 the first search root that holds it, or the file name alone outside every root.
-It comes from `module_file_of_source`, so the library file, the check and the
+It comes from `modpath_file_of_source`, so the library file, the check and the
 debug information never disagree. The bytes are then the same on every host.
 
 The unit carries no `DW_AT_comp_dir`, so a debugger resolves a relative path

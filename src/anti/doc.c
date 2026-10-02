@@ -183,7 +183,7 @@ static bool resolve_name(const struct doc_page *page, const char *s,
     for (i = 0; i < page->import_count; i++) {
         const char *import = text_cstr(&page->imports[i]);
         if (same(s, head, import) ||
-            same(s, head, module_path_last(import))) {
+            same(s, head, modpath_last(import))) {
             text_appendf(href, "%s%s#%.*s", text_cstr(&page->imports[i]),
                          DOC_HTML_SUFFIX, (int)(n - head - 1), dot + 1);
             return true;

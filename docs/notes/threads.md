@@ -15,7 +15,7 @@ tools can observe.
   `ANTL_VERSION` rose to 11.
 - The checker reads the rule of `docs/decisions.md` off the types. The first
   parameter of the worker is a slice of the element type of the array. That element
-  type, every other parameter and the result pass `type_pointer_free`, which `sema.md`
+  type, every other parameter and the result pass `types_pointer_free`, which `sema.md`
   wrote and nothing used until now. The expression has type `[]R`.
 - antic writes one thunk per `parallel`, named `parallel.N` in the module, as `function-pointers.md`
   names a signature `fn.N`. The thunk has the signature that the pool calls:

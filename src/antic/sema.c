@@ -69,7 +69,7 @@ const char *sema_tn(const struct type *t)
     struct text text = {0};
     char *buffer = buffers[next++ % 4];
 
-    type_name(&text, t);
+    types_name(&text, t);
     text_format(buffer, sizeof buffers[0], "%s", text_cstr(&text));
     text_free(&text);
     return buffer;
@@ -576,7 +576,7 @@ static uint8_t bitfield_width(struct checker *c, struct param *field,
                       "written `_: T : 0`");
         return 0;
     }
-    if (!type_is_integer(t) || type_is_target_sized(t)) {
+    if (!types_is_integer(t) || types_is_target_sized(t)) {
         sema_error_at(c, field->type->pos,
                       "a bitfield has a sized integer type, "
                       "found `%s`", sema_tn(t));
@@ -596,10 +596,10 @@ static uint8_t bitfield_width(struct checker *c, struct param *field,
         return 0;
     }
     if (v.kind == CONST_SYMBOLIC || sema_signed_bits(v.as.integer) < 1 ||
-        v.as.integer > (uint64_t)type_bits(t)) {
+        v.as.integer > (uint64_t)types_bits(t)) {
         sema_error_at(c, e->pos, "a bitfield of `%s` has 1 to %d bits",
                       sema_tn(t),
-                      type_bits(t));
+                      types_bits(t));
         return 0;
     }
     return (uint8_t)v.as.integer;
@@ -623,7 +623,7 @@ static void check_simd_struct(struct checker *c, struct item *it)
     if (sema_is_error(lane)) {
         return;
     }
-    if (type_lane_bytes(lane) == 0) {
+    if (types_lane_bytes(lane) == 0) {
         sema_error_at(c, t->fields[0].pos, "a lane of a `simd struct` is an "
                       "integer of a fixed width, a float, `bool` or `char`, "
                       "not `%s`", sema_tn(lane));
@@ -631,7 +631,7 @@ static void check_simd_struct(struct checker *c, struct item *it)
     }
     for (i = 0; i < t->field_count; i++) {
         if (t->fields[i].bits != 0 ||
-            type_field_is_unit_break(&t->fields[i])) {
+            types_field_is_unit_break(&t->fields[i])) {
             sema_error_at(c, t->fields[i].pos,
                           "a lane of a `simd struct` is no "
                           "bitfield");
@@ -657,7 +657,7 @@ static void check_simd_struct(struct checker *c, struct item *it)
                       "from its size and has no `align(N)`");
         return;
     }
-    bytes = type_simd_bytes(t);
+    bytes = types_simd_bytes(t);
     if (bytes % 8 != 0) {
         sema_error_at(c, it->name_pos,
                       "a `simd struct` is a multiple of 8 bytes, "
@@ -767,7 +767,7 @@ struct type *sema_chan_element(struct checker *c, struct type_expr *t)
 {
     struct type *element = sema_resolve_type(c, t);
 
-    if (!sema_is_error(element) && !type_pointer_free(element)) {
+    if (!sema_is_error(element) && !types_pointer_free(element)) {
         sema_error_at(c, t->pos,
                       "a channel carries values alone, and `%s` holds "
                       "a pointer", sema_tn(element));
@@ -2116,7 +2116,7 @@ static void declare_items(struct checker *c)
                library file requires. A base that is no integer, or the
                enum itself, gave lowering a NULL or a struct to read (S10
                of the audit). The error keeps c_int in its place. */
-            if (!type_is_integer(base)) {
+            if (!types_is_integer(base)) {
                 if (!sema_is_error(base)) {
                     sema_error_at(c, it->base->pos, "the underlying type of an "
                                   "enum is an integer type, found `%s`",
@@ -2227,10 +2227,10 @@ static void resolve_bases(struct checker *c)
    still a value of base. */
 static bool follows_in(const struct type *base, uint64_t before)
 {
-    int bits = type_bits(base);
+    int bits = types_bits(base);
     uint64_t top;
 
-    if (type_is_signed(base)) {
+    if (types_is_signed(base)) {
         top = bits < 64 ? ((uint64_t)1 << (bits - 1)) - 1 : INT64_MAX;
         return sema_signed_bits(before) < (int64_t)top;
     }
@@ -2351,7 +2351,7 @@ static void check_transient_field(struct checker *c,
         return;
     }
     if ((ft->kind != TYPE_POINTER && ft->kind != TYPE_FN) ||
-        !type_is_nullable(ft) || ft->bound) {
+        !types_is_nullable(ft) || ft->bound) {
         sema_error_at(c, f->pos, "`transient` needs a `?*T` or a "
                       "`?fn(...)`, and `%.*s` has type `%s`",
                       (int)f->name.length, f->name.text, sema_tn(ft));
@@ -2425,15 +2425,15 @@ static void resolve_fields(struct checker *c, struct item *it,
             fields[j].type = types_fn_owned(c->types, fields[j].type);
         }
         if (it->params[j].bits != NULL ||
-            type_field_is_unit_break(&fields[j])) {
+            types_field_is_unit_break(&fields[j])) {
             fields[j].bits = bitfield_width(c, &it->params[j],
                                             fields[j].type);
         }
-        if (it->kind == ITEM_UNION && type_field_is_unit_break(&fields[j])) {
+        if (it->kind == ITEM_UNION && types_field_is_unit_break(&fields[j])) {
             sema_error_at(c, fields[j].pos, "a union holds no zero-width "
                           "bitfield");
         }
-        for (k = 0; k < j && !type_field_is_unit_break(&fields[j]); k++) {
+        for (k = 0; k < j && !types_field_is_unit_break(&fields[j]); k++) {
             if (sema_same_name(&fields[k].name, &fields[j].name)) {
                 sema_error_at(c, fields[j].pos, "%s `%.*s` has two fields "
                               "named `%.*s`",
@@ -2582,7 +2582,7 @@ static void declare_function_types(struct checker *c)
         if (it->symbol != NULL && it->kind == ITEM_FN && it->is_operator &&
             it->symbol->type->kind == TYPE_FN &&
             it->symbol->type->param_count > 0 &&
-            type_is_simd(sema_struct_of(it->symbol->type->params[0]))) {
+            types_is_simd(sema_struct_of(it->symbol->type->params[0]))) {
             sema_error_at(c, it->name_pos, "`%s` is a `simd struct`, whose "
                           "operators are built in",
                           sema_tn(sema_struct_of(it->symbol->type->params[0])));

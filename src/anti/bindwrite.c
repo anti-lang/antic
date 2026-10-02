@@ -649,7 +649,7 @@ static bool settable(const struct bind_module *b, const struct bind_type *t,
         for (i = 0; e != NULL && i < e->value_count; i++) {
             if (e->values[i].value != 0) {
                 text_append(&s->c_value, e->values[i].name);
-                text_appendf(&s->anti_value, "%s.%s.", module_path_last(b->module),
+                text_appendf(&s->anti_value, "%s.%s.", modpath_last(b->module),
                              e->name);
                 text_append(&s->anti_value, e->values[i].name);
                 return true;
@@ -731,7 +731,7 @@ void bind_write_probe_c(const struct bind_module *b, struct text *out)
 
 void bind_write_probe_anti(const struct bind_module *b, struct text *out)
 {
-    const char *m = module_path_last(b->module);
+    const char *m = modpath_last(b->module);
     size_t i;
     size_t j;
 

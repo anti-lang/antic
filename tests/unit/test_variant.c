@@ -26,8 +26,9 @@ static void run(struct checked *c, const char *source)
 {
     memset(c, 0, sizeof *c);
     types_init(&c->types, &c->arena);
-    c->ok = lex(source, strlen(source), &c->arena, &c->diags, &c->tokens) &&
-            parse(source, &c->tokens, &c->arena, &c->diags, &c->module);
+    c->ok = lexer_lex(source, strlen(source), &c->arena, &c->diags,
+                      &c->tokens) &&
+            parser_parse(source, &c->tokens, &c->arena, &c->diags, &c->module);
     if (!c->ok) {
         fprintf(stderr, "syntax error in test source: %s\n%s\n",
                 c->diags.count > 0 ? c->diags.items[0].message : "",
@@ -41,7 +42,7 @@ static void run(struct checked *c, const char *source)
 
 static void release(struct checked *c)
 {
-    token_list_free(&c->tokens);
+    lexer_token_list_free(&c->tokens);
     diagnostics_free(&c->diags);
     arena_free(&c->arena);
 }
@@ -92,14 +93,14 @@ static void tree(const char *source, const char *expected)
     struct module *module = NULL;
     struct text out = {0};
 
-    CHECK(lex(source, strlen(source), &arena, &diags, &tokens));
-    CHECK(parse(source, &tokens, &arena, &diags, &module));
+    CHECK(lexer_lex(source, strlen(source), &arena, &diags, &tokens));
+    CHECK(parser_parse(source, &tokens, &arena, &diags, &module));
     if (module != NULL) {
         ast_dump(&out, module);
         CHECK_STR(text_cstr(&out), expected);
     }
     text_free(&out);
-    token_list_free(&tokens);
+    lexer_token_list_free(&tokens);
     diagnostics_free(&diags);
     arena_free(&arena);
 }
@@ -141,9 +142,9 @@ void test_variant(void)
         struct arena arena = {0};
         struct diagnostics diags = {0};
         struct token_list tokens = {0};
-        CHECK(lex("variant", 7, &arena, &diags, &tokens));
+        CHECK(lexer_lex("variant", 7, &arena, &diags, &tokens));
         CHECK(tokens.count == 2 && tokens.items[0].kind == TOKEN_VARIANT);
-        token_list_free(&tokens);
+        lexer_token_list_free(&tokens);
         diagnostics_free(&diags);
         arena_free(&arena);
     }

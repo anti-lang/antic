@@ -20,13 +20,13 @@ struct parsed {
 static void parse_source(struct parsed *p, const char *source)
 {
     memset(p, 0, sizeof *p);
-    CHECK(lex(source, strlen(source), &p->arena, &p->diags, &p->tokens));
-    p->ok = parse(source, &p->tokens, &p->arena, &p->diags, &p->module);
+    CHECK(lexer_lex(source, strlen(source), &p->arena, &p->diags, &p->tokens));
+    p->ok = parser_parse(source, &p->tokens, &p->arena, &p->diags, &p->module);
 }
 
 static void release(struct parsed *p)
 {
-    token_list_free(&p->tokens);
+    lexer_token_list_free(&p->tokens);
     diagnostics_free(&p->diags);
     arena_free(&p->arena);
 }

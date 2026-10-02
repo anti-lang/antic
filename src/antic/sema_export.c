@@ -369,7 +369,7 @@ void sema_check_export(struct checker *c, struct item *it)
            _Alignas on a bitfield. */
         if (it->align != NULL && t->field_count > 0 &&
             (t->fields[0].bits > 0 ||
-             type_field_is_unit_break(&t->fields[0]))) {
+             types_field_is_unit_break(&t->fields[0]))) {
             sema_error_at(c, t->fields[0].pos,
                           "the first field `%.*s` of export "
                           "%s `%.*s` is a bitfield, and the C header aligns "
@@ -399,7 +399,7 @@ void sema_check_export(struct checker *c, struct item *it)
         }
         return;
     case ITEM_CONST:
-        if (!sema_is_error(t) && !type_is_numeric(t) &&
+        if (!sema_is_error(t) && !types_is_numeric(t) &&
             t->kind != TYPE_BOOL && t->kind != TYPE_STR) {
             sema_error_at(c, it->type->pos,
                           "export const `%.*s` has type `%s`, and "

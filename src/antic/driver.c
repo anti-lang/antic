@@ -214,7 +214,7 @@ static bool module_name(const struct options *o, struct text *out,
 {
     char error[200];
 
-    if (!module_path_of_source(o->input, o->roots, o->root_count, out, error,
+    if (!modpath_of_source(o->input, o->roots, o->root_count, out, error,
                                sizeof error)) {
         fprintf(stderr, "antic: %s\n", error);
         return false;
@@ -225,7 +225,7 @@ static bool module_name(const struct options *o, struct text *out,
         return false;
     }
     if (o->library && !o->front_end && !o->internal &&
-        module_path_reserved(text_cstr(out))) {
+        modpath_reserved(text_cstr(out))) {
         fprintf(stderr, "antic: %s: the module path `%s` is reserved for the "
                         "language's own libraries\n",
                 o->input, text_cstr(out));
@@ -234,7 +234,7 @@ static bool module_name(const struct options *o, struct text *out,
     /* The warning stands at the top of the file, where a clause of the
        whole file covers it. */
     if (o->library && !o->front_end && diags != NULL &&
-        module_path_segments(text_cstr(out)) == 1) {
+        modpath_segments(text_cstr(out)) == 1) {
         diagnostics_warn(diags, NAME_SINGLE_SEGMENT_PATH, 1, 1,
                          "the module path `%s` has one segment, which is "
                          "for a program's own files", text_cstr(out));
@@ -910,7 +910,7 @@ static void dump_tokens(const char *source, const struct token_list *tokens)
         char position[32];
 
         snprintf(position, sizeof position, "%d:%d", t->line, t->column);
-        printf("%-5s %-8s %.*s\n", position, token_category(t->kind),
+        printf("%-5s %-8s %.*s\n", position, lexer_token_category(t->kind),
                (int)length, source + t->offset);
     }
 }
@@ -935,7 +935,7 @@ static unsigned lower_options(const struct options *o)
    input under the first search root that holds it. */
 static const char *recorded_file(const struct options *o)
 {
-    return module_file_of_source(o->input, o->roots, o->root_count);
+    return modpath_file_of_source(o->input, o->roots, o->root_count);
 }
 
 /* Lower the module into ir and verify the result. file is the path that
@@ -1757,7 +1757,7 @@ static void library_name(const struct options *o, const char *module,
     size_t n;
 
     if (o->output == NULL) {
-        text_append(out, module_path_last(module));
+        text_append(out, modpath_last(module));
         return;
     }
     base = strrchr(o->output, '/');
@@ -1873,7 +1873,8 @@ static int compile(const struct options *o, struct text *source,
     if (!read_source(o->input, source)) {
         goto done;
     }
-    if (!lex(text_cstr(source), source->length, &arena, &diags, &tokens)) {
+    if (!lexer_lex(text_cstr(source), source->length, &arena, &diags,
+                   &tokens)) {
         report_diagnostics(o, &diags);
         goto done;
     }
@@ -1882,7 +1883,7 @@ static int compile(const struct options *o, struct text *source,
         status = 2;
         goto done;
     }
-    if (!parse(text_cstr(source), &tokens, &arena, &diags, &tree)) {
+    if (!parser_parse(text_cstr(source), &tokens, &arena, &diags, &tree)) {
         report_diagnostics(o, &diags);
         goto done;
     }
@@ -2014,7 +2015,7 @@ done:
     ir_module_free(&program);
     free((void *)libraries);
     free((void *)paths.items);
-    token_list_free(&tokens);
+    lexer_token_list_free(&tokens);
     diagnostics_free(&diags);
     arena_free(&arena);
     return status;
@@ -2106,8 +2107,8 @@ const struct interface *driver_interface(const struct options *o,
        the call in the memory pool and not in this buffer. */
     kept = arena_alloc(arena, source.length + 1);
     memcpy(kept, text_cstr(&source), source.length + 1);
-    if (!lex(kept, source.length, arena, &diags, &tokens) ||
-        !parse(kept, &tokens, arena, &diags, &parsed)) {
+    if (!lexer_lex(kept, source.length, arena, &diags, &tokens) ||
+        !parser_parse(kept, &tokens, arena, &diags, &parsed)) {
         report_diagnostics(o, &diags);
         goto done;
     }
@@ -2143,7 +2144,7 @@ const struct interface *driver_interface(const struct options *o,
 done:
     free((void *)libraries);
     free((void *)paths.items);
-    token_list_free(&tokens);
+    lexer_token_list_free(&tokens);
     diagnostics_free(&diags);
     text_free(&source);
     text_free(&module);

@@ -17,7 +17,7 @@ struct lexed {
 static void lex_n(struct lexed *l, const char *source, size_t length)
 {
     memset(l, 0, sizeof *l);
-    l->ok = lex(source, length, &l->arena, &l->diags, &l->tokens);
+    l->ok = lexer_lex(source, length, &l->arena, &l->diags, &l->tokens);
 }
 
 static void lex_s(struct lexed *l, const char *source)
@@ -27,7 +27,7 @@ static void lex_s(struct lexed *l, const char *source)
 
 static void done(struct lexed *l)
 {
-    token_list_free(&l->tokens);
+    lexer_token_list_free(&l->tokens);
     diagnostics_free(&l->diags);
     arena_free(&l->arena);
 }
@@ -45,8 +45,8 @@ static void kinds(const char *source, const enum token_kind *expected,
         if (l.tokens.items[i].kind != expected[i]) {
             check_failures++;
             fprintf(stderr, "%s: token %zu is %s, expected %s\n", source, i,
-                    token_kind_name(l.tokens.items[i].kind),
-                    token_kind_name(expected[i]));
+                    lexer_token_kind_name(l.tokens.items[i].kind),
+                    lexer_token_kind_name(expected[i]));
         }
     }
     CHECK(l.tokens.count > 0 &&

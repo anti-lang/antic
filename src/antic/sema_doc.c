@@ -203,7 +203,7 @@ static bool doc_name_known(const struct doc_scope *s, const char *name,
             /* A struct, a class or a variant of a library, whose fields
                and whose functions a doc comment names as often as the
                type. */
-            if (!type_has_fields(t)) {
+            if (!types_has_fields(t)) {
                 continue;
             }
             for (k = 0; k < t->field_count; k++) {

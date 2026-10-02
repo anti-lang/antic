@@ -511,7 +511,7 @@ static void refuse_redeclared(struct checker *c, const struct item *it,
                 t->fields[j].form == FIELD_TABLE) {
                 continue;
             }
-            if (type_find_field(base, &t->fields[j].name) != NULL ||
+            if (types_find_field(base, &t->fields[j].name) != NULL ||
                 sema_find_member(base, &t->fields[j].name) != NULL) {
                 sema_error_at(c, t->fields[j].pos, "`%.*s` already has `%.*s`",
                               (int)base->name.length, base->name.text,
@@ -545,12 +545,12 @@ static void refuse_redeclared(struct checker *c, const struct item *it,
                them. A function that takes `self` is another matter, and
                so is a field. */
             shadowed = sema_find_member(base, &m->name);
-            if (!m->has_self && type_find_field(base, &m->name) == NULL &&
+            if (!m->has_self && types_find_field(base, &m->name) == NULL &&
                 shadowed != NULL && shadowed->kind == ITEM_FN &&
                 !shadowed->has_self) {
                 continue;
             }
-            if (type_find_field(base, &m->name) != NULL || shadowed != NULL) {
+            if (types_find_field(base, &m->name) != NULL || shadowed != NULL) {
                 sema_error_at(c, m->name_pos, "`%.*s` already has `%.*s`",
                               (int)base->name.length, base->name.text,
                               (int)m->name.length, m->name.text);
@@ -967,7 +967,7 @@ void sema_check_classes(struct checker *c)
         struct type *t = it->symbol != NULL && it->kind != ITEM_TYPE
                              ? it->symbol->type
                              : NULL;
-        if (type_has_fields(t)) {
+        if (types_has_fields(t)) {
             check_implements(c, it, t);
         }
     }
@@ -976,7 +976,7 @@ void sema_check_classes(struct checker *c)
         struct type *t = it->symbol != NULL && it->kind != ITEM_TYPE
                              ? it->symbol->type
                              : NULL;
-        if (type_has_fields(t)) {
+        if (types_has_fields(t)) {
             refuse_abstract_fields(c, t);
         }
     }
@@ -986,7 +986,7 @@ void sema_check_classes(struct checker *c)
         struct type *t = it->symbol != NULL && it->kind != ITEM_TYPE
                              ? it->symbol->type
                              : NULL;
-        if (!type_has_fields(t)) {
+        if (!types_has_fields(t)) {
             continue;
         }
         check_contracts(c, it, t);

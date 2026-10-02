@@ -62,7 +62,7 @@ void lower_init_name(const struct type *t, bool exported, struct text *out)
                      types_c_name(t).text);
         return;
     }
-    type_symbol_name(out, t);
+    types_symbol_name(out, t);
     text_append(out, ".init");
 }
 
@@ -393,7 +393,7 @@ struct ir_function *lower_interface_thunk(struct lowerer *l,
     struct text name = {0};
     size_t i;
 
-    type_symbol_name(&name, t);
+    types_symbol_name(&name, t);
     text_appendf(&name, ".%.*s.%.*s.thunk", (int)sub->name.length,
                  sub->name.text, (int)fn->name.length, fn->name.text);
     f = lower_find_function(l->m, l->module_name, text_cstr(&name));
@@ -464,7 +464,7 @@ struct ir_function *lower_reach_thunk(struct lowerer *l,
     struct text name = {0};
     size_t i;
 
-    type_symbol_name(&name, sub->home);
+    types_symbol_name(&name, sub->home);
     text_appendf(&name, ".%.*s.%.*s.reach", (int)sub->name.length,
                  sub->name.text, (int)sym->item->name.length,
                  sym->item->name.text);

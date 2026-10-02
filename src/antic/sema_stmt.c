@@ -52,7 +52,7 @@ static bool visit_worker_expr(void *data, const struct expr *e)
                 ? sema_struct_of(e->as.field.base->type)
                 : NULL;
         const struct struct_field *f =
-            owner != NULL ? type_find_field(owner, &e->as.field.name) : NULL;
+            owner != NULL ? types_find_field(owner, &e->as.field.name) : NULL;
         if (f != NULL && f->writable && sema_singleton_type(owner)) {
             sema_error_at(w->c, e->pos,
                           "`%.*s` is `mutable` in singleton `%s` and "
@@ -269,7 +269,7 @@ static struct symbol *checked_against_none(const struct expr *cond,
         return NULL;
     }
     if (value->kind != EXPR_NAME || value->symbol == NULL ||
-        !type_is_nullable(value->symbol->type)) {
+        !types_is_nullable(value->symbol->type)) {
         return NULL;
     }
     return (value->symbol->kind == SYMBOL_LOCAL ||
@@ -532,7 +532,7 @@ static void bind_pattern(struct checker *c, struct stmt *s,
         sym->type = part;
         sym->read_only = true;
         names[i].symbol = sym;
-        if (type_is_lent(part)) {
+        if (types_is_lent(part)) {
             sym->lent_turn = true;
         } else {
             sym->copy_of.text = s->as.for_loop.over_text.bytes;
@@ -625,7 +625,7 @@ static void check_assign(struct checker *c, struct stmt *s)
        narrowed to its value is the same, and `+=` and the other compound
        forms change the value it holds, which stays there. */
     if (target->kind == EXPR_NAME && target->symbol != NULL &&
-        type_is_nullable(target->symbol->type) &&
+        types_is_nullable(target->symbol->type) &&
         (op == TOKEN_ASSIGN || target->symbol->type->kind != TYPE_OPTIONAL)) {
         t = target->symbol->type;
         target->type = t;
@@ -662,8 +662,8 @@ static void check_assign(struct checker *c, struct stmt *s)
     if (target->kind == EXPR_FIELD) {
         const struct type *owner = sema_struct_of(target->as.field.base->type);
         const struct struct_field *f =
-            owner != NULL ? type_find_field(owner,
-                                            &target->as.field.name) : NULL;
+            owner != NULL ? types_find_field(owner,
+                                             &target->as.field.name) : NULL;
         if (f != NULL && !f->writable && sema_singleton_type(owner) &&
             (c->ctx.function == NULL ||
              !sema_name_is(&c->ctx.function->name, "construct"))) {
@@ -711,8 +711,8 @@ static void check_assign(struct checker *c, struct stmt *s)
     }
     if ((op == TOKEN_PLUS_ASSIGN || op == TOKEN_MINUS_ASSIGN ||
          op == TOKEN_STAR_ASSIGN || op == TOKEN_SLASH_ASSIGN)
-            ? !type_is_numeric(t)
-            : !type_is_integer(t)) {
+            ? !types_is_numeric(t)
+            : !types_is_integer(t)) {
         char spelling[OP_TEXT];
         sema_error_at(c, s->pos, "`%s` does not apply to `%s`",
                       sema_op_text(op, spelling), sema_tn(t));
@@ -979,7 +979,7 @@ static void check_step(struct checker *c, struct stmt *s, struct type *element)
     if (sema_is_error(type)) {
         return;
     }
-    if (!type_is_integer(type)) {
+    if (!types_is_integer(type)) {
         sema_error_at(c, step->pos, "a `for` step is an integer, found `%s`",
                       sema_tn(type));
         return;
@@ -1012,7 +1012,7 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
                       "and a `catch` on a pointer guards no failure");
         return sema_builtin(c, TYPE_ERROR);
     }
-    if (!type_is_nullable(value) || types_is_maybe_match(value)) {
+    if (!types_is_nullable(value) || types_is_maybe_match(value)) {
         sema_error_at(c, h->pos, "`catch` here guards a `?*T`, found `%s`",
                       sema_tn(value));
         return sema_builtin(c, TYPE_ERROR);
@@ -1127,7 +1127,7 @@ static bool flags_operation(struct checker *c, const struct expr *value,
                       "which has no flags");
         return false;
     }
-    if (!type_is_integer(t)) {
+    if (!types_is_integer(t)) {
         sema_error_at(c, value->pos,
                       "the flags form takes an integer type, found "
                       "`%s`", sema_tn(t));
@@ -1260,7 +1260,7 @@ static void check_destructuring_let(struct checker *c, struct stmt *s)
         sema_error_at(c, s->as.let.value->pos,
                       "a destructuring takes a tuple, found `%s`", sema_tn(t));
         t = sema_builtin(c, TYPE_ERROR);
-    } else if (type_holds_lent(t)) {
+    } else if (types_holds_lent(t)) {
         sema_refuse_lent_tuple(c, s->as.let.value);
         t = sema_builtin(c, TYPE_ERROR);
     } else {
@@ -1502,7 +1502,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
            block runs when p is `none` and leaves, so below the `let` the
            name holds a pointer on every path. */
         if (s->as.let.otherwise != NULL) {
-            if (!sema_is_error(t) && !type_is_nullable(t)) {
+            if (!sema_is_error(t) && !types_is_nullable(t)) {
                 sema_error_at(c, s->as.let.value->pos,
                               "the `else` of a `let` follows a value of type "
                               "`?*T` or `?T`, found `%s`", sema_tn(t));
@@ -1540,7 +1540,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
         } else if (!sema_is_error(t) && t->kind == TYPE_VOID) {
             sema_require(c, s->as.let.value, t, sema_builtin(c, TYPE_I64));
             t = sema_builtin(c, TYPE_ERROR);
-        } else if (type_holds_lent(t)) {
+        } else if (types_holds_lent(t)) {
             sema_refuse_lent_tuple(c, s->as.let.value);
             t = sema_builtin(c, TYPE_ERROR);
         } else {
@@ -1566,7 +1566,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
             if (s->as.let.atomic) {
                 sym->atomic = true;
                 sym->address_taken = true;
-                if (!sema_is_error(t) && !type_is_integer(t) &&
+                if (!sema_is_error(t) && !types_is_integer(t) &&
                     t->kind != TYPE_BOOL && t->kind != TYPE_CHAR &&
                     t->kind != TYPE_POINTER) {
                     sema_error_at(c, s->as.let.name_pos, "an atomic local "
@@ -1792,7 +1792,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
             struct type *high =
                 sema_check_expr(c, s->as.for_loop.high,
                                 sema_is_error(low) ? NULL : low);
-            if (!sema_is_error(low) && !type_is_integer(low)) {
+            if (!sema_is_error(low) && !types_is_integer(low)) {
                 sema_error_at(c, s->as.for_loop.low->pos,
                               "a `for` range counts over an integer, found "
                               "`%s`",
@@ -1822,7 +1822,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
            pointers alone, and a pattern or the copy of `for x in e` reads
            it. `for x in &e` binds such a value itself. */
         if (s->as.for_loop.hooks.place != NULL &&
-            type_holds_lent(s->as.for_loop.hooks.place->type) &&
+            types_holds_lent(s->as.for_loop.hooks.place->type) &&
             (s->as.for_loop.pattern || !s->as.for_loop.by_pointer)) {
             struct symbol *holder = arena_alloc(c->arena, sizeof *holder);
             holder->kind = SYMBOL_LOCAL;
@@ -1898,7 +1898,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
         size_t k;
         size_t j;
         if (s->as.switch_stmt.if_let && !sema_is_error(over) &&
-            type_is_nullable(over) &&
+            types_is_nullable(over) &&
             s->as.switch_stmt.arms[0].binds.length == 0) {
             sema_if_let_none(c, s, over);
             return;
@@ -1923,7 +1923,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
                 bound->type = over;
                 s->as.switch_stmt.bound = bound;
             }
-        } else if (!sema_is_error(over) && !type_is_integer(over) &&
+        } else if (!sema_is_error(over) && !types_is_integer(over) &&
                    over->kind != TYPE_ENUM && over->kind != TYPE_VARIANT) {
             sema_error_at(c, s->as.switch_stmt.value->pos,
                           "`switch` takes an enum, an integer, a `str` or a "
@@ -2410,7 +2410,7 @@ static void check_construct_sets(struct checker *c, const struct item *it)
         for (i = 0; i < up->field_count; i++) {
             const struct struct_field *f = &up->fields[i];
             if ((f->form != FIELD_PLAIN && f->form != FIELD_USE) ||
-                type_field_is_unit_break(f) || f->value != NULL ||
+                types_field_is_unit_break(f) || f->value != NULL ||
                 f->constant != NULL || sema_field_takes_literal(f)) {
                 continue;
             }

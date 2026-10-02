@@ -17,12 +17,12 @@
    must fit the narrower width, so it has one value on every target. */
 static void wrap(struct const_value *v)
 {
-    int bits = type_is_target_sized(v->type) ? 64 : type_bits(v->type);
+    int bits = types_is_target_sized(v->type) ? 64 : types_bits(v->type);
 
     if (bits < 64) {
         uint64_t mask = ((uint64_t)1 << bits) - 1;
         v->as.integer &= mask;
-        if (type_is_signed(v->type) && (v->as.integer >> (bits - 1)) != 0) {
+        if (types_is_signed(v->type) && (v->as.integer >> (bits - 1)) != 0) {
             v->as.integer |= ~mask;
         }
     }
@@ -33,13 +33,13 @@ static void wrap(struct const_value *v)
 static bool fits_every_target(struct checker *c, const struct expr *e,
                               const struct const_value *v)
 {
-    int bits = type_bits(v->type);
+    int bits = types_bits(v->type);
     bool fits;
 
-    if (v->kind != CONST_INT || !type_is_target_sized(v->type)) {
+    if (v->kind != CONST_INT || !types_is_target_sized(v->type)) {
         return true;
     }
-    fits = type_is_signed(v->type)
+    fits = types_is_signed(v->type)
                ? sema_signed_bits(v->as.integer) >=
                          -((int64_t)1 << (bits - 1)) &&
                      sema_signed_bits(v->as.integer) <
@@ -158,9 +158,9 @@ static bool symbolic_value(struct checker *c, struct const_value *out,
    holds after truncation toward zero. */
 static bool float_fits(double x, const struct type *t)
 {
-    int bits = type_bits(t);
-    double lo = type_is_signed(t) ? -ldexp(1.0, bits - 1) : 0.0;
-    double hi = type_is_signed(t) ? ldexp(1.0, bits - 1) : ldexp(1.0, bits);
+    int bits = types_bits(t);
+    double lo = types_is_signed(t) ? -ldexp(1.0, bits - 1) : 0.0;
+    double hi = types_is_signed(t) ? ldexp(1.0, bits - 1) : ldexp(1.0, bits);
 
     return x > lo - 1.0 && x < hi;
 }
@@ -252,10 +252,10 @@ static void operand_text(struct text *out, const struct expr *e,
         text_append_bytes(out, literal->spelling.bytes,
                           literal->spelling.length);
     } else if (v->kind == CONST_SYMBOLIC) {
-        symbolic_print(out, v->as.symbolic, false);
+        types_symbolic_print(out, v->as.symbolic, false);
     } else if (v->kind == CONST_FLOAT) {
         float_as_literal(out, v->as.floating, v->type->kind == TYPE_F32);
-    } else if (type_is_signed(v->type)) {
+    } else if (types_is_signed(v->type)) {
         text_appendf(out, "%lld", (long long)v->as.integer);
     } else {
         text_appendf(out, "%llu", (unsigned long long)v->as.integer);
@@ -278,18 +278,18 @@ static bool reports_undefined(struct checker *c, const struct expr *e,
     bool found = false;
 
     if (e->kind == EXPR_CAST) {
-        if (a->kind == CONST_FLOAT && type_is_integer(result) &&
+        if (a->kind == CONST_FLOAT && types_is_integer(result) &&
             !float_fits(a->as.floating, result)) {
             operand_text(&x, e->as.cast.operand, a);
             sema_error_at(c, e->pos, "`%s as %s` does not fit `%s`",
                           text_cstr(&x), sema_tn(result), sema_tn(result));
             found = true;
         }
-    } else if (type_is_integer(e->as.binary.left->type) &&
+    } else if (types_is_integer(e->as.binary.left->type) &&
                b->kind != CONST_SYMBOLIC) {
         enum token_kind op = e->as.binary.op;
         const struct type *t = e->as.binary.left->type;
-        int bits = type_bits(t);
+        int bits = types_bits(t);
         uint64_t mask = bits == 64 ? UINT64_MAX : ((uint64_t)1 << bits) - 1;
         bool divides = op == TOKEN_SLASH || op == TOKEN_PERCENT;
         const char *o = sema_op_text(op, spelling);
@@ -301,7 +301,7 @@ static bool reports_undefined(struct checker *c, const struct expr *e,
                           text_cstr(&x), o,
                           text_cstr(&y));
             found = true;
-        } else if (divides && a->kind != CONST_SYMBOLIC && type_is_signed(t) &&
+        } else if (divides && a->kind != CONST_SYMBOLIC && types_is_signed(t) &&
                    (a->as.integer & mask) == (uint64_t)1 << (bits - 1) &&
                    sema_signed_bits(b->as.integer) == -1) {
             sema_error_at(c, e->pos, "`%s %s %s` does not fit `%s`",
@@ -309,7 +309,7 @@ static bool reports_undefined(struct checker *c, const struct expr *e,
                           o, text_cstr(&y), sema_tn(t));
             found = true;
         } else if ((op == TOKEN_SHL || op == TOKEN_SHR) &&
-                   ((type_is_signed(t) &&
+                   ((types_is_signed(t) &&
                      sema_signed_bits(b->as.integer) < 0) ||
                     b->as.integer >= (uint64_t)bits)) {
             sema_error_at(c, e->pos, "`%s %s %s` shifts out of range",
@@ -372,7 +372,7 @@ static uint64_t const_elements(const struct type *t)
         return one != 0 && t->length > UINT64_MAX / one ? UINT64_MAX
                                                        : t->length * one;
     }
-    if (!type_has_fields(t) || t->kind == TYPE_CLASS) {
+    if (!types_has_fields(t) || t->kind == TYPE_CLASS) {
         return 1;
     }
     for (i = 0; i < t->field_count; i++) {
@@ -445,7 +445,7 @@ bool sema_eval_const(struct checker *c, struct expr *e,
         }
         out->type = e->type;
         if (a.kind == CONST_SYMBOLIC) {
-            if (!type_is_integer(e->type)) {
+            if (!types_is_integer(e->type)) {
                 sema_error_at(c, e->pos,
                               "a value computed from `size_of` converts "
                               "only to an integer type in a constant "
@@ -460,22 +460,22 @@ bool sema_eval_const(struct checker *c, struct expr *e,
             out->kind = CONST_FLOAT;
             out->as.floating =
                 anti_rt_f16_widen(anti_rt_f16_narrow((float)a.as.floating));
-        } else if (type_is_float(e->type)) {
+        } else if (types_is_float(e->type)) {
             out->kind = CONST_FLOAT;
             out->as.floating = a.kind == CONST_FLOAT ? a.as.floating
-                               : type_is_signed(a.type)
+                               : types_is_signed(a.type)
                                    ? (double)sema_signed_bits(a.as.integer)
                                    : (double)a.as.integer;
             if (e->type->kind == TYPE_F32) {
                 out->as.floating = (float)out->as.floating;
             }
-        } else if (type_is_integer(e->type)) {
+        } else if (types_is_integer(e->type)) {
             out->kind = CONST_INT;
             if (a.kind == CONST_FLOAT) {
                 if (reports_undefined(c, e, e->type, &a, NULL)) {
                     return false;
                 }
-                out->as.integer = type_is_signed(e->type)
+                out->as.integer = types_is_signed(e->type)
                                       ? (uint64_t)(int64_t)a.as.floating
                                       : (uint64_t)a.as.floating;
             } else if (a.kind == CONST_BOOL) {
@@ -522,8 +522,8 @@ bool sema_eval_const(struct checker *c, struct expr *e,
         enum token_kind op = e->as.binary.op;
         struct type *operand = e->as.binary.left->type;
         bool is_float;
-        bool is_signed = type_is_signed(operand);
-        int bits = type_bits(operand);
+        bool is_signed = types_is_signed(operand);
+        int bits = types_bits(operand);
 
         if (!sema_eval_const(c, e->as.binary.left, &a)) {
             return false;
@@ -553,7 +553,7 @@ bool sema_eval_const(struct checker *c, struct expr *e,
         /* The upper half of a product of c_long has another value at
            each width, and no symbolic value carries the signedness of
            c_wchar. */
-        if (op == TOKEN_MUL_HIGH && type_is_target_sized(operand)) {
+        if (op == TOKEN_MUL_HIGH && types_is_target_sized(operand)) {
             return fail_const(c, e, "`" MUL_HIGH "` of a type whose width "
                               "the target decides");
         }
@@ -632,7 +632,7 @@ bool sema_eval_const(struct checker *c, struct expr *e,
            width, as every constant of it does. */
         case TOKEN_SHL_WRAP:
             out->as.integer =
-                b.as.integer >= (uint64_t)(type_is_target_sized(operand)
+                b.as.integer >= (uint64_t)(types_is_target_sized(operand)
                                                ? 64
                                                : bits)
                     ? 0
@@ -644,7 +644,7 @@ bool sema_eval_const(struct checker *c, struct expr *e,
             out->as.integer = arith_saturate(
                 op == TOKEN_PLUS_SAT ? '+' : op == TOKEN_MINUS_SAT ? '-' : '*',
                 a.as.integer, b.as.integer,
-                type_is_target_sized(operand) ? 64 : bits, is_signed);
+                types_is_target_sized(operand) ? 64 : bits, is_signed);
             break;
         case TOKEN_MUL_HIGH:
             out->as.integer =
@@ -795,11 +795,11 @@ bool sema_eval_const(struct checker *c, struct expr *e,
         if (base->kind == TYPE_CLASS) {
             return fail_const(c, e, "a field of a class");
         }
-        if (type_has_fields(base)) {
+        if (types_has_fields(base)) {
             if (!sema_eval_const(c, e->as.field.base, &a)) {
                 return false;
             }
-            f = type_find_field(base, &e->as.field.name);
+            f = types_find_field(base, &e->as.field.name);
             if (f == NULL || a.kind != CONST_STRUCT ||
                 (size_t)(f - base->fields) >= a.as.aggregate.count) {
                 return fail_const(c, e, "this field");
@@ -887,7 +887,7 @@ bool sema_eval_const(struct checker *c, struct expr *e,
     case EXPR_IN: {
         struct expr *sides[3];
         const struct type *t = e->as.in.value->type;
-        if (!type_is_numeric(t) && t->kind != TYPE_CHAR) {
+        if (!types_is_numeric(t) && t->kind != TYPE_CHAR) {
             return fail_const(c, e, "a call");
         }
         for (i = 0; i < 3; i++) {
@@ -1025,7 +1025,7 @@ static bool class_in(const struct type *t, struct ptr_set *answered)
     if (t->kind == TYPE_ARRAY) {
         return class_in(t->element, answered);
     }
-    if (!type_has_fields(t)) {
+    if (!types_has_fields(t)) {
         return false;
     }
     if (!ptr_set_add(answered, t)) {

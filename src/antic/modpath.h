@@ -18,7 +18,7 @@
    and without the suffix. Outside every root it is the file name alone.
    Returns false and writes a message to error for a segment that is not a
    lowercase identifier or that is a keyword. */
-bool module_path_of_source(const char *source, const char *const *roots,
+bool modpath_of_source(const char *source, const char *const *roots,
                            size_t root_count, struct text *out, char *error,
                            size_t error_size);
 
@@ -27,17 +27,17 @@ bool module_path_of_source(const char *source, const char *const *roots,
    and a failed dev-mode check name, so a library file holds the same
    bytes whichever checkout compiled it. The module path comes from the
    same text. Returns a pointer into source. */
-const char *module_file_of_source(const char *source,
-                                  const char *const *roots,
-                                  size_t root_count);
+const char *modpath_file_of_source(const char *source,
+                                   const char *const *roots,
+                                   size_t root_count);
 
 /* Whether path starts with the segment anti, which the language's own
    libraries use. */
-bool module_path_reserved(const char *path);
+bool modpath_reserved(const char *path);
 
-size_t module_path_segments(const char *path);
+size_t modpath_segments(const char *path);
 
 /* The last segment, the name an import declares. */
-const char *module_path_last(const char *path);
+const char *modpath_last(const char *path);
 
 #endif

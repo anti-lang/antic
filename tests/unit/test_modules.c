@@ -38,7 +38,7 @@ static void close_session(struct session *s)
     size_t i;
 
     for (i = 0; i < s->token_lists; i++) {
-        token_list_free(&s->tokens[i]);
+        lexer_token_list_free(&s->tokens[i]);
     }
     diagnostics_free(&s->diags);
     arena_free(&s->arena);
@@ -62,8 +62,8 @@ static struct module *check_module(struct session *s, const char *name,
     struct token_list *tokens = &s->tokens[s->token_lists++];
     struct module *module = NULL;
 
-    *ok = lex(source, strlen(source), &s->arena, &s->diags, tokens) &&
-          parse(source, tokens, &s->arena, &s->diags, &module) &&
+    *ok = lexer_lex(source, strlen(source), &s->arena, &s->diags, tokens) &&
+          parser_parse(source, tokens, &s->arena, &s->diags, &module) &&
           sema_check(module, name, NULL, s->libraries, s->library_count, &s->types,
                      &s->arena, &s->diags, true);
     return module;
@@ -208,8 +208,8 @@ static void damaged_imports(void)
     }
     open_session(&s);
     tokens = &s.tokens[s.token_lists++];
-    ok = lex(source, strlen(source), &s.arena, &s.diags, tokens) &&
-         parse(source, tokens, &s.arena, &s.diags, &module) &&
+    ok = lexer_lex(source, strlen(source), &s.arena, &s.diags, tokens) &&
+         parser_parse(source, tokens, &s.arena, &s.diags, &module) &&
          sema_check(module, "main", NULL, list, COUNT, &s.types, &s.arena,
                     &s.diags, true);
     CHECK(ok);
@@ -662,7 +662,7 @@ static void path_of(const char *source, const char *const *roots,
     struct text out = {0};
     char error[160] = "";
 
-    if (!module_path_of_source(source, roots, count, &out, error,
+    if (!modpath_of_source(source, roots, count, &out, error,
                                sizeof error)) {
         CHECK_STR(error, expected);
     } else {
@@ -689,11 +689,11 @@ static void module_paths(void)
             "`Com` in src/Com/geo.anti is not a lowercase identifier");
     path_of("src/com/fn/geo.anti", roots, 2,
             "`fn` in src/com/fn/geo.anti is a keyword");
-    CHECK(module_path_reserved("anti"));
-    CHECK(module_path_reserved("anti.text"));
-    CHECK(!module_path_reserved("antique.text"));
-    CHECK(module_path_segments("com.niese.geo") == 3);
-    CHECK_STR(module_path_last("com.niese.geo"), "geo");
+    CHECK(modpath_reserved("anti"));
+    CHECK(modpath_reserved("anti.text"));
+    CHECK(!modpath_reserved("antique.text"));
+    CHECK(modpath_segments("com.niese.geo") == 3);
+    CHECK_STR(modpath_last("com.niese.geo"), "geo");
 }
 
 /* An import names the full module path. The last segment, or the name
@@ -2149,7 +2149,7 @@ static void damaged_constants(void)
         poke_u32((uint8_t *)poked.data + at, i);
         open_session(&t);
         type = field_type_of(&poked, &t, "ZN", "zp");
-        CHECK(type == NULL || type_is_nullable(type));
+        CHECK(type == NULL || types_is_nullable(type));
         close_session(&t);
         text_free(&poked);
     }

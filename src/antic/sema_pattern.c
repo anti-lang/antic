@@ -581,7 +581,7 @@ static bool match_call(struct checker *c, struct expr *e, struct type *t)
     char what[32];
     bool named;
 
-    if (type_is_nullable(t)) {
+    if (types_is_nullable(t)) {
         sema_usable_pointer(c, field->as.field.base, t);
         return false;
     }
@@ -674,7 +674,7 @@ struct type *sema_match_field(struct checker *c, struct expr *e,
     struct expr *arg;
     struct pos pos = e->pos;
 
-    if (type_is_nullable(base->type)) {
+    if (types_is_nullable(base->type)) {
         return sema_builtin(c, TYPE_ERROR);
     }
     if (t->pattern == NULL) {
@@ -726,7 +726,7 @@ static void test_of(struct checker *c, struct expr *e, struct type *t)
     struct pos pos = e->pos;
 
     *value = *e;
-    none->type = type_is_nullable(t) ? t : types_with_none(c->types, t);
+    none->type = types_is_nullable(t) ? t : types_with_none(c->types, t);
     memset(e, 0, sizeof *e);
     e->kind = EXPR_BINARY;
     e->pos = pos;

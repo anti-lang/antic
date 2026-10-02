@@ -42,7 +42,7 @@ bool sema_is_place(const struct expr *e)
             return false;
         }
         return base->kind == TYPE_POINTER ||
-               (type_has_fields(base) && sema_is_place(e->as.field.base));
+               (types_has_fields(base) && sema_is_place(e->as.field.base));
     default:
         return false;
     }
@@ -58,7 +58,7 @@ static bool is_bitfield(const struct expr *e)
         return false;
     }
     s = sema_struct_of(e->as.field.base->type);
-    f = s != NULL ? type_find_field(s, &e->as.field.name) : NULL;
+    f = s != NULL ? types_find_field(s, &e->as.field.name) : NULL;
     return f != NULL && f->bits != 0;
 }
 
@@ -95,9 +95,9 @@ static bool is_untyped(const struct expr *e)
 
 static uint64_t max_of(const struct type *t)
 {
-    int bits = type_bits(t);
+    int bits = types_bits(t);
     uint64_t all = bits == 64 ? UINT64_MAX : (((uint64_t)1 << bits) - 1);
-    return type_is_signed(t) ? all >> 1 : all;
+    return types_is_signed(t) ? all >> 1 : all;
 }
 
 static void set_type(struct expr *e, struct type *t)
@@ -116,7 +116,7 @@ static struct type *integer_literal(struct checker *c, struct expr *e,
 
     if (expected != NULL && !sema_is_error(expected) &&
         expected->kind != TYPE_VOID) {
-        if (type_is_integer(expected)) {
+        if (types_is_integer(expected)) {
             t = expected;
         } else {
             sema_error_at(c, e->pos, "expected `%s`, found an integer literal",
@@ -125,13 +125,13 @@ static struct type *integer_literal(struct checker *c, struct expr *e,
             return literal->type;
         }
     }
-    if (negative ? (!type_is_signed(t) ? magnitude != 0
+    if (negative ? (!types_is_signed(t) ? magnitude != 0
                                        : magnitude > max_of(t) + 1)
                  : magnitude > max_of(t)) {
         sema_error_at(c, e->pos, "`%s%.*s` does not fit `%s`%s", sign,
                       (int)literal->spelling.length, literal->spelling.bytes,
                       sema_tn(t),
-                      type_is_target_sized(t) ? " on every target" : "");
+                      types_is_target_sized(t) ? " on every target" : "");
         t = sema_builtin(c, TYPE_ERROR);
     }
     set_type(literal, t);
@@ -147,7 +147,7 @@ static struct type *float_literal(struct checker *c, struct expr *e,
     (void)negative;
     if (expected != NULL && !sema_is_error(expected) &&
         expected->kind != TYPE_VOID) {
-        if (type_is_float(expected)) {
+        if (types_is_float(expected)) {
             t = expected;
         } else {
             sema_error_at(c, e->pos, "expected `%s`, found a float literal",
@@ -292,7 +292,7 @@ static void error_may_be_none(struct checker *c, const struct expr *e,
 struct type *sema_usable_pointer(struct checker *c, const struct expr *e,
                                  struct type *t)
 {
-    if (!type_is_nullable(t)) {
+    if (!types_is_nullable(t)) {
         return t;
     }
     error_may_be_none(c, e, t);
@@ -319,7 +319,7 @@ static bool widens_to_nullable(const struct type *got,
                                const struct type *expected)
 {
     return (got->kind == TYPE_POINTER || got->kind == TYPE_FN) &&
-           !got->nullable && type_is_nullable(expected) &&
+           !got->nullable && types_is_nullable(expected) &&
            got->kind == expected->kind;
 }
 
@@ -409,7 +409,7 @@ static bool through_lent(const struct expr *e)
         switch (e->kind) {
         case EXPR_FIELD:
             base = e->as.field.base->type;
-            if (base == NULL || type_is_lent(base)) {
+            if (base == NULL || types_is_lent(base)) {
                 return base != NULL;
             }
             if (base->kind == TYPE_POINTER) {
@@ -419,7 +419,7 @@ static bool through_lent(const struct expr *e)
             break;
         case EXPR_INDEX:
             base = e->as.index.base->type;
-            if (base == NULL || type_is_lent(base)) {
+            if (base == NULL || types_is_lent(base)) {
                 return base != NULL;
             }
             if (base->kind != TYPE_ARRAY) {
@@ -429,7 +429,7 @@ static bool through_lent(const struct expr *e)
             break;
         case EXPR_UNARY:
             return e->as.unary.op == TOKEN_STAR &&
-                   type_is_lent(e->as.unary.operand->type);
+                   types_is_lent(e->as.unary.operand->type);
         default:
             return false;
         }
@@ -709,20 +709,20 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
        one is expected, since lending promises the callee less. Past that
        the two forms follow the rules of `*T`. */
     /* The result of `operator fn value` takes the tuple it declares. */
-    if (type_holds_lent(got) && got != expected) {
+    if (types_holds_lent(got) && got != expected) {
         sema_refuse_lent_tuple(c, e);
         return false;
     }
     /* DESIGN: the one exit of a lent pointer or slice is an argument of an
        `extern fn`. C cannot be checked, and whether it keeps what it takes
        is its contract, as for every pointer given to C. */
-    if (type_is_lent(got) && !type_is_lent(expected) &&
+    if (types_is_lent(got) && !types_is_lent(expected) &&
         (expected->kind == TYPE_POINTER || expected->kind == TYPE_SLICE) &&
         c->lent_use != LENT_TO_C) {
         refuse_lent(c, e);
         return false;
     }
-    if (type_is_lent(got) || type_is_lent(expected)) {
+    if (types_is_lent(got) || types_is_lent(expected)) {
         return sema_require(c, e, types_unlent(c->types, got),
                             types_unlent(c->types, expected));
     }
@@ -782,7 +782,7 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
     }
     /* A `?*T` where a `*T` is expected is the nullable rule itself, and
        names the value rather than the two types. */
-    if (type_is_nullable(got) && got->kind == expected->kind &&
+    if (types_is_nullable(got) && got->kind == expected->kind &&
         !expected->nullable) {
         struct type *bare = types_without_none(c->types, got);
         if (bare == expected ||
@@ -824,7 +824,7 @@ static struct symbol *operator_symbol(struct checker *c, struct type *t,
    f16 lane is one, since each operation reads it as an f32. */
 bool sema_simd_numeric(const struct type *lane)
 {
-    return type_is_numeric(lane) || lane->kind == TYPE_F16;
+    return types_is_numeric(lane) || lane->kind == TYPE_F16;
 }
 
 /* Unary `-` and `~` on a simd struct apply lane by lane, with the lanes
@@ -832,15 +832,15 @@ bool sema_simd_numeric(const struct type *lane)
 static struct type *check_simd_unary(struct checker *c, struct expr *e,
                                      struct type *t)
 {
-    struct type *lane = type_simd_lane(t);
+    struct type *lane = types_simd_lane(t);
 
-    if (e->as.unary.op == TOKEN_MINUS && !type_is_signed(lane) &&
-        !type_is_float(lane) && lane->kind != TYPE_F16) {
+    if (e->as.unary.op == TOKEN_MINUS && !types_is_signed(lane) &&
+        !types_is_float(lane) && lane->kind != TYPE_F16) {
         sema_error_at(c, e->pos, "unary `-` needs lanes of signed integers or "
                       "floats, and `%s` has `%s`", sema_tn(t), sema_tn(lane));
         return sema_builtin(c, TYPE_ERROR);
     }
-    if (e->as.unary.op == TOKEN_TILDE && !type_is_integer(lane)) {
+    if (e->as.unary.op == TOKEN_TILDE && !types_is_integer(lane)) {
         sema_error_at(c, e->pos,
                       "unary `~` needs integer lanes, and `%s` has `%s`",
                       sema_tn(t), sema_tn(lane));
@@ -863,7 +863,7 @@ static struct type *check_unary(struct checker *c, struct expr *e,
         if (operand->kind != EXPR_INT && operand->kind != EXPR_FLOAT) {
             t = sema_check_expr(c, operand, NULL);
             operand->type = t;
-            if (!sema_is_error(t) && type_is_simd(t)) {
+            if (!sema_is_error(t) && types_is_simd(t)) {
                 return check_simd_unary(c, e, t);
             }
             /* A parameter has the operator its constraints give. */
@@ -899,7 +899,7 @@ static struct type *check_unary(struct checker *c, struct expr *e,
         if (sema_refuses_half(c, e->pos, t)) {
             return sema_builtin(c, TYPE_ERROR);
         }
-        if (!sema_is_error(t) && !type_is_signed(t) && !type_is_float(t)) {
+        if (!sema_is_error(t) && !types_is_signed(t) && !types_is_float(t)) {
             sema_error_at(c, e->pos,
                           "unary `-` needs a signed integer or a float, "
                           "found `%s`",
@@ -917,7 +917,7 @@ static struct type *check_unary(struct checker *c, struct expr *e,
         return t;
     case TOKEN_TILDE:
         t = sema_check_expr(c, operand, expected);
-        if (!sema_is_error(t) && !type_is_integer(t)) {
+        if (!sema_is_error(t) && !types_is_integer(t)) {
             sema_error_at(c, e->pos, "unary `~` needs an integer, found `%s`",
                           sema_tn(t));
             return sema_builtin(c, TYPE_ERROR);
@@ -1009,7 +1009,7 @@ static bool binary_operands(struct checker *c, struct expr *e,
                 return false;
             }
             /* A value that is no pointer holds `none` only as a `?T`. */
-            if (!type_is_nullable(*value_type) &&
+            if (!types_is_nullable(*value_type) &&
                 (*value_type)->kind != TYPE_POINTER &&
                 (*value_type)->kind != TYPE_FN) {
                 sema_error_at(c, none->pos, "`%s` cannot hold `none`",
@@ -1018,7 +1018,7 @@ static bool binary_operands(struct checker *c, struct expr *e,
             }
             *none_type = sema_check_expr(
                 c, none,
-                type_is_nullable(*value_type)
+                types_is_nullable(*value_type)
                     ? *value_type
                     : types_with_none(c->types, *value_type));
             return !sema_is_error(*left) && !sema_is_error(*right);
@@ -1063,7 +1063,7 @@ static bool binary_operands(struct checker *c, struct expr *e,
 
 const char *sema_op_text(enum token_kind op, char buffer[OP_TEXT])
 {
-    const char *quoted = token_kind_name(op);
+    const char *quoted = lexer_token_kind_name(op);
 
     text_format(buffer, OP_TEXT, "%.*s", (int)(strlen(quoted) - 2),
                 quoted + 1);
@@ -1165,7 +1165,7 @@ static struct symbol *operator_symbol(struct checker *c, struct type *t,
     struct item *m;
     struct symbol *sym;
 
-    if (t == NULL || !type_has_fields(t)) {
+    if (t == NULL || !types_has_fields(t)) {
         return NULL;
     }
     name.text = text;
@@ -1221,7 +1221,7 @@ struct symbol *sema_hook(struct checker *c, struct type *t, const char *text)
     if (t != NULL && t->kind == TYPE_POINTER && !t->nullable) {
         t = t->element;
     }
-    if (t == NULL || !type_has_fields(t) || type_is_simd(t)) {
+    if (t == NULL || !types_has_fields(t) || types_is_simd(t)) {
         return NULL;
     }
     name.text = text;
@@ -1417,7 +1417,7 @@ bool sema_iterate(struct checker *c, struct expr *e, struct type *t,
        place. `for x in &e` binds the pointer, and `for x in e` and
        `to_slice` take a copy of what it points at, so one iterator serves
        both forms of a walk. */
-    if (type_is_lent(*element)) {
+    if (types_is_lent(*element)) {
         struct expr *copy = sema_new_node(c, EXPR_UNARY, e->pos);
         copy->as.unary.op = TOKEN_STAR;
         copy->as.unary.operand = it->current;
@@ -1430,7 +1430,7 @@ bool sema_iterate(struct checker *c, struct expr *e, struct type *t,
        walks in place as well. `for x in &e` binds the tuple as it is, and
        `for x in e` and `to_slice` a copy of every part, which the node
        `*` over the tuple writes and no program can. */
-    if (type_holds_lent(*element)) {
+    if (types_holds_lent(*element)) {
         struct expr *copy = sema_new_node(c, EXPR_UNARY, e->pos);
         copy->as.unary.op = TOKEN_STAR;
         copy->as.unary.operand = it->current;
@@ -1468,7 +1468,7 @@ static bool check_collect(struct checker *c, struct expr *e)
     if (owner->kind == TYPE_POINTER && !owner->nullable) {
         owner = owner->element;
     }
-    if (sema_is_error(t) || !type_has_fields(owner) ||
+    if (sema_is_error(t) || !types_has_fields(owner) ||
         sema_method_symbol(c, owner, &callee->as.field.name) != NULL ||
         !sema_is_iterator(c, t)) {
         return false;
@@ -1715,7 +1715,7 @@ static struct type *check_simd_binary(struct checker *c, struct expr *e,
                       "`%s`", o, sema_tn(left), sema_tn(right));
         return sema_builtin(c, TYPE_ERROR);
     }
-    lane = type_simd_lane(left);
+    lane = types_simd_lane(left);
     switch (op) {
     case TOKEN_PLUS:
     case TOKEN_MINUS:
@@ -1733,7 +1733,7 @@ static struct type *check_simd_binary(struct checker *c, struct expr *e,
     case TOKEN_CARET:
     case TOKEN_SHL:
     case TOKEN_SHR:
-        if (!type_is_integer(lane)) {
+        if (!types_is_integer(lane)) {
             sema_error_at(c, e->pos,
                           "`%s` needs integer lanes, and `%s` has `%s`",
                           o, sema_tn(left), sema_tn(lane));
@@ -1869,7 +1869,7 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
         if (left->kind == TYPE_PARAM || right->kind == TYPE_PARAM) {
             return param_binary(c, e, called, left, right);
         }
-        if (type_is_simd(left) || type_is_simd(right)) {
+        if (types_is_simd(left) || types_is_simd(right)) {
             return check_simd_binary(c, e, left, right);
         }
         if (called != NULL) {
@@ -1890,7 +1890,7 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
            the text and `<` its bytes as unsigned numbers, which is the
            order of the code points for UTF-8. */
         if (op == TOKEN_EQ || op == TOKEN_NE) {
-            if (type_has_fields(left) || left->kind == TYPE_ARRAY ||
+            if (types_has_fields(left) || left->kind == TYPE_ARRAY ||
                 left->kind == TYPE_SLICE) {
                 const struct struct_field *gap;
                 if (sema_equals(c, e, left)) {
@@ -1921,7 +1921,7 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
             sema_error_at(c, e->pos, "`%s` is not defined on `%s`%s", o,
                           sema_tn(left), sema_no_order(left, LANG_HOOK_LT));
             return sema_builtin(c, TYPE_ERROR);
-        } else if (!type_is_numeric(left) && left->kind != TYPE_CHAR &&
+        } else if (!types_is_numeric(left) && left->kind != TYPE_CHAR &&
                    left->kind != TYPE_STR) {
             sema_error_at(c, e->pos,
                           "`%s` needs numeric, `char` or `str` operands, "
@@ -1936,7 +1936,7 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
         if (left->kind == TYPE_PARAM || right->kind == TYPE_PARAM) {
             return param_binary(c, e, called, left, right);
         }
-        if (type_is_simd(left) || type_is_simd(right)) {
+        if (types_is_simd(left) || types_is_simd(right)) {
             return check_simd_binary(c, e, left, right);
         }
         if (called != NULL) {
@@ -1952,7 +1952,7 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
             names_carry(e->as.binary.right) &&
             types_is_flags(sema_struct_of(
                 e->as.binary.right->as.field.base->type))) {
-            if (!type_is_integer(left)) {
+            if (!types_is_integer(left)) {
                 sema_error_at(c, e->pos,
                               "a carry goes into an integer, found `%s`",
                               sema_tn(left));
@@ -1971,20 +1971,20 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
         }
         if (op == TOKEN_PLUS || op == TOKEN_MINUS || op == TOKEN_STAR ||
             op == TOKEN_SLASH) {
-            if (!type_is_numeric(left)) {
+            if (!types_is_numeric(left)) {
                 sema_error_at(c, e->pos,
                               "`%s` needs numeric operands, found `%s`",
                               o, sema_tn(left));
                 return sema_builtin(c, TYPE_ERROR);
             }
-        } else if (!type_is_integer(left)) {
+        } else if (!types_is_integer(left)) {
             sema_error_at(c, e->pos, "`%s` needs integer operands, found `%s`",
                           o,
                           sema_tn(left));
             return sema_builtin(c, TYPE_ERROR);
         }
         if ((op == TOKEN_SLASH || op == TOKEN_PERCENT || op == TOKEN_SHL ||
-             op == TOKEN_SHR) && type_is_integer(left) &&
+             op == TOKEN_SHR) && types_is_integer(left) &&
             sema_undefined_on_constants(c, e, left)) {
             return sema_builtin(c, TYPE_ERROR);
         }
@@ -2010,10 +2010,10 @@ static bool can_convert(const struct type *from, const struct type *to)
     if (to->kind == TYPE_ENUM) {
         to = to->base;
     }
-    if (type_is_numeric(from) && type_is_numeric(to)) {
+    if (types_is_numeric(from) && types_is_numeric(to)) {
         return true;
     }
-    if (from->kind == TYPE_BOOL && type_is_integer(to)) {
+    if (from->kind == TYPE_BOOL && types_is_integer(to)) {
         return true;
     }
     if ((from->kind == TYPE_CHAR && to->kind == TYPE_U32) ||
@@ -2168,7 +2168,7 @@ static bool fields_layout(const struct type *t, uint64_t *size,
            the rules of each target, so it has no one layout (S02 of the
            audit). */
         if (t->fields[i].bits != 0 ||
-            type_field_is_unit_break(&t->fields[i]) ||
+            types_field_is_unit_break(&t->fields[i]) ||
             !layout_in(t->fields[i].type, &n, &a, answered)) {
             return false;
         }
@@ -2239,7 +2239,7 @@ static bool layout_in(const struct type *t, uint64_t *size, uint64_t *align,
         if (t->lock_word) {
             return false;
         }
-        *size = type_lane_bytes(t);
+        *size = types_lane_bytes(t);
         *align = *size;
         return *size != 0;
     }
@@ -2275,7 +2275,7 @@ static bool fixed_layout(const struct type *t, uint64_t *size,
 static struct type *check_simd_cast(struct checker *c, struct expr *e,
                                     struct type *from, struct type *to)
 {
-    struct type *other = type_is_simd(from) ? to : from;
+    struct type *other = types_is_simd(from) ? to : from;
     uint64_t from_size;
     uint64_t to_size;
     uint64_t align;
@@ -2338,7 +2338,7 @@ static struct type *check_cast(struct checker *c, struct expr *e)
          to->kind == TYPE_POINTER && to->element->kind == TYPE_CLASS)) {
         return check_class_cast(c, e, from, to);
     }
-    if (type_is_simd(from) || type_is_simd(to)) {
+    if (types_is_simd(from) || types_is_simd(to)) {
         return check_simd_cast(c, e, from, to);
     }
     if (!can_convert(from, to)) {
@@ -2346,7 +2346,7 @@ static struct type *check_cast(struct checker *c, struct expr *e)
                       sema_tn(to));
         return sema_builtin(c, TYPE_ERROR);
     }
-    if (type_is_float(from) && type_is_integer(to) &&
+    if (types_is_float(from) && types_is_integer(to) &&
         sema_undefined_on_constants(c, e, to)) {
         return sema_builtin(c, TYPE_ERROR);
     }
@@ -2500,8 +2500,8 @@ static struct expr *format_value_call(struct checker *c,
     const char *name;
     bool fits;
 
-    if (type_is_integer(t)) {
-        bool is_signed = type_is_signed(t);
+    if (types_is_integer(t)) {
+        bool is_signed = types_is_signed(t);
         fits = spec->precision < 0 && spec->kind != 'e' && spec->kind != 'f';
         name = is_signed ? TEXT_APPEND_INT : TEXT_APPEND_UINT;
         args[0] = t->kind == TYPE_I64 || t->kind == TYPE_U64
@@ -2517,7 +2517,7 @@ static struct expr *format_value_call(struct checker *c,
         args[3] = format_number(c, pos, width);
         args[4] = format_align(c, pos, spec->align, TEXT_ALIGN_RIGHT);
         args[5] = format_truth(c, pos, spec->zero);
-    } else if (type_is_float(t)) {
+    } else if (types_is_float(t)) {
         fits = spec->kind == 0 || spec->kind == 'e' || spec->kind == 'f';
         name = t->kind == TYPE_F32 ? TEXT_APPEND_F32 : TEXT_APPEND_FLOAT;
         args[0] = value;
@@ -2552,7 +2552,7 @@ static struct expr *format_value_call(struct checker *c,
         return NULL;
     }
     return builder_call(c, pos, name, args,
-                        type_is_integer(t) || type_is_float(t) ? 6 : 3);
+                        types_is_integer(t) || types_is_float(t) ? 6 : 3);
 }
 
 /* Check the value of one `{expr}`, bind it to `<value>` in a scope of
@@ -2802,7 +2802,7 @@ static struct type *check_in(struct checker *c, struct expr *e)
         return sema_builtin(c, TYPE_ERROR);
     }
     lt = operator_symbol(c, types[first], "lt");
-    if (lt == NULL && !type_is_numeric(types[first]) &&
+    if (lt == NULL && !types_is_numeric(types[first]) &&
         types[first]->kind != TYPE_CHAR) {
         sema_error_at(c, e->pos, "`in` needs numeric or `char` operands, found "
                       "`%s`", sema_tn(types[first]));
@@ -2854,11 +2854,11 @@ static struct type *check_coalesce(struct checker *c, struct expr *e,
 
     if (expected != NULL && !sema_is_error(expected) &&
         (expected->kind != TYPE_FN || !expected->bound)) {
-        hint = type_is_nullable(expected) ? expected
+        hint = types_is_nullable(expected) ? expected
                                           : types_with_none(c->types, expected);
     }
     left = sema_check_expr(c, e->as.binary.left, hint);
-    if (!sema_is_error(left) && !type_is_nullable(left)) {
+    if (!sema_is_error(left) && !types_is_nullable(left)) {
         sema_error_at(c, e->pos,
                       "`??` follows a value of type `?*T` or `?T`, found `%s`",
                       sema_tn(left));
@@ -2875,7 +2875,7 @@ static struct type *check_coalesce(struct checker *c, struct expr *e,
     /* A right side that may be `none` gives a result that may be, and
        any other gives the value. */
     got = sema_check_expr(c, right, left);
-    if (!type_is_nullable(got) && got->kind != TYPE_NONE &&
+    if (!types_is_nullable(got) && got->kind != TYPE_NONE &&
         !sema_is_error(got)) {
         struct type *bare = types_without_none(c->types, left);
         struct context quiet;
@@ -2972,7 +2972,7 @@ static struct type *check_optional(struct checker *c, struct expr *e)
     e->as.optional.base = base;
     e->as.optional.bound = bound;
     e->as.optional.access = access;
-    return type_is_nullable(result) ? result
+    return types_is_nullable(result) ? result
                                     : types_with_none(c->types, result);
 }
 
@@ -3118,7 +3118,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         }
         /* A closure may run after the variable has changed, so a
            captured variable keeps its declared type. */
-        if (sym->type != NULL && type_is_nullable(sym->type) &&
+        if (sym->type != NULL && types_is_nullable(sym->type) &&
             sym->frame == c->ctx.function) {
             struct type *proved = sema_narrowed_type(c, sym);
             if (proved != NULL) {
@@ -3136,7 +3136,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
     case EXPR_CAST:
         t = check_cast(c, e);
         return !e->as.cast.test && e->as.cast.operand->type != NULL &&
-                       type_is_lent(e->as.cast.operand->type)
+                       types_is_lent(e->as.cast.operand->type)
                    ? types_lent(c->types, t)
                    : t;
     case EXPR_CALL:
@@ -3586,7 +3586,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
            argument so. */
         if (e->as.object.op == TOKEN_DESTROY && t->kind == TYPE_POINTER &&
             t->element->kind != TYPE_CLASS) {
-            if (type_is_lent(t)) {
+            if (types_is_lent(t)) {
                 sema_error_at(c, e->as.object.operand->pos, "the object is "
                               "lent for the call and stays with its owner, "
                               "so `%s` does not take it", what);
@@ -3602,7 +3602,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         }
         /* A lent object stays with its owner, and `dup` makes one that
            belongs to no one yet. */
-        if (e->as.object.op != TOKEN_DUP && type_is_lent(t)) {
+        if (e->as.object.op != TOKEN_DUP && types_is_lent(t)) {
             sema_error_at(c, e->as.object.operand->pos, "the object is lent "
                           "for the call and stays with its owner, so `%s` "
                           "does not take it", what);

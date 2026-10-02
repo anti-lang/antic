@@ -598,7 +598,7 @@ bool sema_move_local(struct checker *c, struct expr *e,
 static bool moves_at_call(const struct type *t)
 {
     return sema_type_owns(t) || sema_needs_teardown(t) ||
-           sema_holds_param(t) || !type_pointer_free(t) || types_is_chan(t) ||
+           sema_holds_param(t) || !types_pointer_free(t) || types_is_chan(t) ||
            types_is_mutex(t);
 }
 

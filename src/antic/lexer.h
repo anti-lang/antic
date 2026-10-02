@@ -34,7 +34,7 @@ enum token_kind {
     TOKEN_TRUE, TOKEN_FALSE, TOKEN_NONE,
     TOKEN_ALLOC, TOKEN_FREE, TOKEN_SIZE_OF,
     /* The words of the built-in types, from bool to c_wchar, which
-       token_is_builtin_type reads as one range. */
+       lexer_token_is_builtin_type reads as one range. */
     TOKEN_BOOL_TYPE, TOKEN_BYTE_TYPE, TOKEN_CHAR_TYPE, TOKEN_F16, TOKEN_F32,
     TOKEN_F64,
     TOKEN_FLOAT_TYPE, TOKEN_I8, TOKEN_I16, TOKEN_I32, TOKEN_I64,
@@ -177,26 +177,26 @@ struct token_list {
 /* Split source into tokens, ending with TOKEN_EOF. Report every error to
    diags and keep going, so that one run reports all of them. Returns true
    when no error occurred. The array of out is allocated with realloc,
-   and token_list_free releases it. The texts of the tokens lie in the
+   and lexer_token_list_free releases it. The texts of the tokens lie in the
    memory pool the call names, which frees them. */
-bool lex(const char *source, size_t length, struct arena *arena,
-         struct diagnostics *diags, struct token_list *out);
+bool lexer_lex(const char *source, size_t length, struct arena *arena,
+               struct diagnostics *diags, struct token_list *out);
 
 /* Release the array of list and leave it empty. */
-void token_list_free(struct token_list *list);
+void lexer_token_list_free(struct token_list *list);
 
 /* Whether the n bytes at s spell a keyword or a reserved word. */
 bool lexer_is_keyword(const char *s, size_t n);
 
 /* Whether the kind is the word of a built-in type, such as `int` or
    `c_wchar`. */
-bool token_is_builtin_type(enum token_kind kind);
+bool lexer_token_is_builtin_type(enum token_kind kind);
 
 /* The kind as the grammar spells it, such as `fn` or identifier. */
-const char *token_kind_name(enum token_kind kind);
+const char *lexer_token_kind_name(enum token_kind kind);
 
 /* The group of a kind in a token dump: keyword, ident, int_lit,
    float_lit, char_lit, string_lit, doc or symbol. */
-const char *token_category(enum token_kind kind);
+const char *lexer_token_category(enum token_kind kind);
 
 #endif

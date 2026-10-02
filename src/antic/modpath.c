@@ -34,8 +34,8 @@ static const char *under(const char *source, const char *root)
     return source + n + 1;
 }
 
-const char *module_file_of_source(const char *source,
-                                  const char *const *roots, size_t root_count)
+const char *modpath_file_of_source(const char *source,
+                                   const char *const *roots, size_t root_count)
 {
     const char *rest = NULL;
     const char *slash;
@@ -51,7 +51,7 @@ const char *module_file_of_source(const char *source,
     return slash != NULL ? slash + 1 : source;
 }
 
-bool module_path_of_source(const char *source, const char *const *roots,
+bool modpath_of_source(const char *source, const char *const *roots,
                            size_t root_count, struct text *out, char *error,
                            size_t error_size)
 {
@@ -90,12 +90,12 @@ bool module_path_of_source(const char *source, const char *const *roots,
     return true;
 }
 
-bool module_path_reserved(const char *path)
+bool modpath_reserved(const char *path)
 {
     return strncmp(path, "anti", 4) == 0 && (path[4] == '\0' || path[4] == '.');
 }
 
-size_t module_path_segments(const char *path)
+size_t modpath_segments(const char *path)
 {
     size_t n = 1;
 
@@ -105,7 +105,7 @@ size_t module_path_segments(const char *path)
     return n;
 }
 
-const char *module_path_last(const char *path)
+const char *modpath_last(const char *path)
 {
     const char *dot = strrchr(path, '.');
     return dot != NULL ? dot + 1 : path;

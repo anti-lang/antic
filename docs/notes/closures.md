@@ -11,7 +11,7 @@ choices of `snapshot fn` and `own fn`.
   words, the code and a context, which a parameter that does not keep its
   argument takes. `concurrent` marks that form at a `concurrent` parameter.
   `types_fn_form` gives the same signature in another form.
-- `type_name` writes `keep` before a plain parameter of a function type and
+- `types_name` writes `keep` before a plain parameter of a function type and
   `concurrent` before a marked one, which is how a program writes the list.
   The top level writes no mark.
 

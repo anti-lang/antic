@@ -255,7 +255,7 @@ static void bind_pattern(struct lowerer *l, const struct stmt *s,
         struct symbol *name = s->as.for_loop.names[i].symbol;
         struct ir_operand part = lower_offset_address(
             l, at, lower_field_offset(l, tuple, &tuple->fields[i].name));
-        if (type_is_lent(tuple->params[i]) && !type_is_lent(name->type)) {
+        if (types_is_lent(tuple->params[i]) && !types_is_lent(name->type)) {
             part = lower_temp(l, ir_load(l->f, l->b, IR_PTR, part));
         }
         if (s->as.for_loop.element->type->kind == TYPE_POINTER) {
@@ -288,7 +288,7 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
     /* `for x in &e` binds the lent pointer, and `for x in e` the copy. A
        value with lent parts is bound as it is, and the copy read from it. */
     const struct expr *current =
-        s->as.for_loop.by_pointer || type_holds_lent(sym->type) ? it->place
+        s->as.for_loop.by_pointer || types_holds_lent(sym->type) ? it->place
                                                                 : it->current;
     struct ir_block *test = lower_new_block(l);
     struct ir_block *body = lower_new_block(l);
@@ -339,7 +339,7 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
        collection, as the copy of a slice element does. A value with lent
        parts gives the loop the parts it receives by value. The teardown
        of the value leaves its pointers alone. */
-    if ((it->place == NULL || type_holds_lent(sym->type)) &&
+    if ((it->place == NULL || types_holds_lent(sym->type)) &&
         sema_needs_teardown(sym->type)) {
         push_exit_action(l, NULL, sym, false);
     }
@@ -413,7 +413,7 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
        the type of the range, so k fits the unsigned type of its width. */
     int64_t stride = s->as.for_loop.step_value;
     bool unsigned_range =
-        over == NULL && !type_is_signed(s->as.for_loop.low->type);
+        over == NULL && !types_is_signed(s->as.for_loop.low->type);
     bool down = stride < 0 && !unsigned_range;
     uint64_t k = down ? 0 - (uint64_t)stride : (uint64_t)stride;
 
@@ -989,7 +989,7 @@ static bool is_flags_let(const struct stmt *s)
 {
     return s->kind == STMT_LET && s->as.let.name_count == 2 &&
            s->as.let.value->type != NULL &&
-           type_is_integer(s->as.let.value->type);
+           types_is_integer(s->as.let.value->type);
 }
 
 /* Write the flags of want into the Flags value at address. */

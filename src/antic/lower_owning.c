@@ -684,7 +684,7 @@ static void prepare(struct lowerer *l, const struct type *t,
     for (i = 0; lit != NULL && i < lit->as.struct_lit.field_count; i++) {
         const struct field_init *init = &lit->as.struct_lit.fields[i];
         const struct type *at = lower_field_owner(t, &init->name);
-        const struct struct_field *field = type_find_field(at, &init->name);
+        const struct struct_field *field = types_find_field(at, &init->name);
         if (field->bits != 0) {
             struct ir_operand v = lower_expr(l, init->value);
             ir_bitstore(l->f, l->b, lower_ir_type_of(field->type), v, dest,

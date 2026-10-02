@@ -444,7 +444,7 @@ static bool angle_type_at(struct angles *a, size_t *at)
 {
     enum token_kind k = angle_kind(a, *at);
 
-    if (token_is_builtin_type(k)) {
+    if (lexer_token_is_builtin_type(k)) {
         (*at)++;
         return true;
     }
@@ -1845,7 +1845,7 @@ bool fmt_source(const char *source, size_t length, struct text *out)
     size_t i;
 
     if (!antic_tokens(source, length, &arena, &tokens)) {
-        token_list_free(&tokens);
+        lexer_token_list_free(&tokens);
         arena_free(&arena);
         return false;
     }
@@ -1887,7 +1887,7 @@ bool fmt_source(const char *source, size_t length, struct text *out)
     flush(&e);
     emitter_free(&e);
     free(pieces.items);
-    token_list_free(&tokens);
+    lexer_token_list_free(&tokens);
     arena_free(&arena);
     return true;
 }

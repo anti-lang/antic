@@ -87,7 +87,7 @@ bool unit_read(const char *source, const char *const *roots,
     if (!files_read_reported(source, &bytes)) {
         goto done;
     }
-    if (!module_path_of_source(source, roots, root_count, &out->path, message,
+    if (!modpath_of_source(source, roots, root_count, &out->path, message,
                                sizeof message)) {
         fprintf(stderr, "anti: %s\n", message);
         goto done;

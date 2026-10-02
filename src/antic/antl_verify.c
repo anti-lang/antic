@@ -407,7 +407,7 @@ static void check_for(struct verify *v, const struct stmt *s)
         }
         sym = element != NULL ? element : s->as.for_loop.names[0].symbol;
         need(v, sym->type != NULL &&
-                    (s->as.for_loop.by_pointer || type_holds_lent(sym->type)
+                    (s->as.for_loop.by_pointer || types_holds_lent(sym->type)
                          ? hooks->place
                          : hooks->current) != NULL);
     }
@@ -989,11 +989,11 @@ bool antl_verify_simd_type(const struct type *t)
     for (i = 0; i < t->field_count; i++) {
         const struct struct_field *f = &t->fields[i];
         if (f->type != lane || f->bits != 0 || f->form != FIELD_PLAIN ||
-            type_field_is_unit_break(f)) {
+            types_field_is_unit_break(f)) {
             return false;
         }
     }
-    return simd_shape(type_lane_bytes(lane), t->field_count,
+    return simd_shape(types_lane_bytes(lane), t->field_count,
                       lane->kind == TYPE_BOOL);
 }
 

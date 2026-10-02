@@ -92,7 +92,7 @@ static const struct struct_field *bitfield_of(const struct expr *e,
         return NULL;
     }
     s = lower_field_owner(s, &e->as.field.name);
-    f = type_find_field(s, &e->as.field.name);
+    f = types_find_field(s, &e->as.field.name);
     *owner = s;
     return f != NULL && f->bits != 0 ? f : NULL;
 }
@@ -235,10 +235,10 @@ static void const_tree(struct lowerer *l, const struct const_value *v,
         agg->items[1].scalar = IR_I64;
         agg->items[1].integer = v->as.text.length;
         *out = *agg;
-    } else if (type_has_fields(t)) {
+    } else if (types_has_fields(t)) {
         agg = ir_const_agg(l->m, lower_vtype_of(l, t), t->field_count);
         for (i = 0; i < t->field_count; i++) {
-            if (type_field_is_unit_break(&t->fields[i])) {
+            if (types_field_is_unit_break(&t->fields[i])) {
                 continue;
             }
             const_tree(l, &v->as.aggregate.items[i], t->fields[i].type,
@@ -309,10 +309,10 @@ void lower_store_constant(struct lowerer *l, const struct type *t,
         }
         return;
     }
-    if (sema_holds_class(t) && type_has_fields(t)) {
+    if (sema_holds_class(t) && types_has_fields(t)) {
         for (i = 0; i < t->field_count; i++) {
             const struct struct_field *f = &t->fields[i];
-            if (type_field_is_unit_break(f)) {
+            if (types_field_is_unit_break(f)) {
                 continue;
             }
             if (f->bits != 0) {

@@ -33,7 +33,7 @@ bool antic_tokens(const char *source, size_t length, struct arena *arena,
                   struct token_list *out)
 {
     struct diagnostics diags = {0};
-    bool ok = lex(source, length, arena, &diags, out);
+    bool ok = lexer_lex(source, length, arena, &diags, out);
 
     diagnostics_free(&diags);
     return ok;
@@ -47,7 +47,7 @@ bool antic_is_identifier(const char *name)
                 tokens.count >= 1 && tokens.items[0].kind == TOKEN_IDENT &&
                 (tokens.count == 1 || tokens.items[1].kind == TOKEN_EOF);
 
-    token_list_free(&tokens);
+    lexer_token_list_free(&tokens);
     arena_free(&arena);
     return word;
 }
@@ -156,8 +156,8 @@ bool antic_outline(const char *path, const char *source, size_t length,
     bool ok = false;
 
     memset(out, 0, sizeof *out);
-    if (!lex(source, length, arena, &diags, &tokens) ||
-        !parse(source, &tokens, arena, &diags, &tree)) {
+    if (!lexer_lex(source, length, arena, &diags, &tokens) ||
+        !parser_parse(source, &tokens, arena, &diags, &tree)) {
         for (i = 0; report && i < diags.count; i++) {
             fprintf(stderr, "%s:%d:%d: error: %s\n", path,
                     diags.items[i].line, diags.items[i].column,
@@ -187,7 +187,7 @@ bool antic_outline(const char *path, const char *source, size_t length,
     ok = true;
 done:
     free(comments.items);
-    token_list_free(&tokens);
+    lexer_token_list_free(&tokens);
     diagnostics_free(&diags);
     return ok;
 }

@@ -195,7 +195,7 @@ static bool compile_imports(const struct test_unit *u,
    run that stopped names the test that stopped it. */
 static void write_runner(const struct test_unit *u, struct text *out)
 {
-    const char *last = module_path_last(text_cstr(&u->unit.path));
+    const char *last = modpath_last(text_cstr(&u->unit.path));
     size_t i;
 
     text_append(out, "//! The runner `anti test` wrote for one module.\n");

@@ -277,8 +277,4 @@ void sema_doc_warnings(const struct module *module, const char *module_name,
 void sema_interface(const struct module *module, const char *module_name,
                     struct arena *arena, struct interface *out);
 
-/* The syntax tree as ast_dump prints it, with the type of every
-   expression, parameter, variable and function on the right. */
-void ast_dump_typed(struct text *out, const struct module *module);
-
 #endif

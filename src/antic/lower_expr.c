@@ -183,7 +183,8 @@ static void build_variant(struct lowerer *l, const struct expr *e,
     fields = lower_case_address(l, v, dest);
     for (i = 0; i < e->as.struct_lit.field_count; i++) {
         const struct field_init *init = &e->as.struct_lit.fields[i];
-        const struct struct_field *field = type_find_field(payload, &init->name);
+        const struct struct_field *field =
+            types_find_field(payload, &init->name);
         lower_store_value(
             l, field->type, init->value,
             lower_offset_address(l, fields,
@@ -263,7 +264,7 @@ void lower_copy_parts(struct lowerer *l, const struct type *lent,
             l, src, lower_field_offset(l, lent, &lent->fields[i].name));
         struct ir_operand to = lower_offset_address(
             l, dest, lower_field_offset(l, copy, &copy->fields[i].name));
-        if (type_is_lent(lent->params[i])) {
+        if (types_is_lent(lent->params[i])) {
             from = lower_temp(l, ir_load(l->f, l->b, IR_PTR, from));
         }
         if (lower_is_aggregate(part)) {
@@ -605,15 +606,15 @@ struct ir_operand lower_address(struct lowerer *l,
     }
     /* An operation on simd structs gives its value in a slot of its
        own. */
-    if (e->kind == EXPR_BINARY && type_is_simd(e->as.binary.left->type)) {
+    if (e->kind == EXPR_BINARY && types_is_simd(e->as.binary.left->type)) {
         return lower_simd_binary(l, e);
     }
-    if (e->kind == EXPR_UNARY && type_is_simd(e->type) &&
+    if (e->kind == EXPR_UNARY && types_is_simd(e->type) &&
         (e->as.unary.op == TOKEN_MINUS || e->as.unary.op == TOKEN_TILDE)) {
         return lower_simd_unary(l, e);
     }
-    if (e->kind == EXPR_CAST && (type_is_simd(e->type) ||
-                                 type_is_simd(e->as.cast.operand->type))) {
+    if (e->kind == EXPR_CAST && (types_is_simd(e->type) ||
+                                 types_is_simd(e->as.cast.operand->type))) {
         return lower_simd_cast(l, e);
     }
     if (e->kind == EXPR_BINARY && e->as.binary.op == TOKEN_QUESTION_QUESTION &&
@@ -747,8 +748,8 @@ static struct ir_operand lower_unary(struct lowerer *l, const struct expr *e)
 
 enum ir_op lower_binary_op(enum token_kind op, const struct type *t)
 {
-    bool is_float = type_is_float(t);
-    bool is_signed = type_is_signed(t);
+    bool is_float = types_is_float(t);
+    bool is_signed = types_is_signed(t);
 
     switch (op) {
     case TOKEN_PLUS: return is_float ? IR_FADD : IR_ADD;
@@ -997,7 +998,7 @@ static enum ir_op flag_op(enum token_kind op, bool unary, const struct type *t)
     case TOKEN_MINUS: return IR_SUB_FL;
     case TOKEN_STAR: return IR_MUL_FL;
     case TOKEN_SHL: return IR_SHL_FL;
-    default: return type_is_signed(t) ? IR_SHR_S_FL : IR_SHR_U_FL;
+    default: return types_is_signed(t) ? IR_SHR_S_FL : IR_SHR_U_FL;
     }
 }
 
@@ -1068,8 +1069,8 @@ static struct ir_operand lower_carry(struct lowerer *l, const struct expr *e)
     char operation[64];
 
     result = lower_flag_operation(
-        l, e, type_is_signed(t) ? 1u << IR_FLAG_OVERFLOW : 0u, flags);
-    if (!type_is_signed(t)) {
+        l, e, types_is_signed(t) ? 1u << IR_FLAG_OVERFLOW : 0u, flags);
+    if (!types_is_signed(t)) {
         return result;
     }
     /* The operation stands before its one read. */
@@ -1267,7 +1268,7 @@ static struct ir_operand class_test(struct lowerer *l, struct ir_operand p,
        test reads it only once the pointer proves to be there. This is
        the one place the nullable rules add an instruction, and it sits
        in a test that already branches. */
-    if (type_is_nullable(from)) {
+    if (types_is_nullable(from)) {
         struct ir_block *held = lower_new_block(l);
         ir_branch(l->f, l->b,
                   lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, p,
@@ -1360,7 +1361,7 @@ static struct ir_operand widen_to_i64(struct lowerer *l, const struct expr *e)
         return v;
     }
     return lower_temp(l, ir_unary(l->f, l->b,
-                                  type_is_signed(e->type) ? IR_SEXT : IR_ZEXT,
+                                  types_is_signed(e->type) ? IR_SEXT : IR_ZEXT,
                                   IR_I64, v));
 }
 
@@ -1388,7 +1389,7 @@ static const struct type *integer_form(const struct type *t)
    enum each have a range or a set of values of their own. */
 static bool converts_as_integer(const struct type *t)
 {
-    return type_is_integer(t) || t->kind == TYPE_CHAR ||
+    return types_is_integer(t) || t->kind == TYPE_CHAR ||
            t->kind == TYPE_ENUM;
 }
 
@@ -1398,9 +1399,9 @@ static bool converts_as_integer(const struct type *t)
 static uint64_t enum_value(const struct type *t, size_t i)
 {
     uint64_t n = t->fields[i].number;
-    int width = type_bits(t->base);
+    int width = types_bits(t->base);
 
-    if (type_is_signed(t->base) && width > 0 && width < 64 &&
+    if (types_is_signed(t->base) && width > 0 && width < 64 &&
         ((n >> (width - 1)) & 1) != 0) {
         n |= ~(uint64_t)0 << width;
     }
@@ -1477,9 +1478,9 @@ static void narrow_check(struct lowerer *l, const struct expr *e,
     enum ir_type source = lower_ir_type_of(from);
     enum ir_type target = lower_ir_type_of(to);
     enum check_kind kind =
-        type_is_signed(source_form) ? CHECK_VALUE : CHECK_VALUE_U;
+        types_is_signed(source_form) ? CHECK_VALUE : CHECK_VALUE_U;
     bool sign_changes =
-        type_is_signed(source_form) != type_is_signed(integer_form(to));
+        types_is_signed(source_form) != types_is_signed(integer_form(to));
     struct text operation = {0};
     struct ir_operand ok;
     struct ir_operand round;
@@ -1489,7 +1490,7 @@ static void narrow_check(struct lowerer *l, const struct expr *e,
     }
     text_append(&operation, to->kind == TYPE_ENUM ? "value not declared by "
                                                   : "value out of range for ");
-    type_name(&operation, to);
+    types_name(&operation, to);
     if (to->kind == TYPE_CHAR || to->kind == TYPE_ENUM) {
         struct ir_operand wide = lower_widen_operand(l, v, source_form);
         if (to->kind == TYPE_CHAR) {
@@ -1500,7 +1501,7 @@ static void narrow_check(struct lowerer *l, const struct expr *e,
         goto done;
     }
     if (sign_changes &&
-        (type_is_signed(source_form) || lower_narrows(source, target))) {
+        (types_is_signed(source_form) || lower_narrows(source, target))) {
         ok = lower_temp(l, ir_binary(l->f, l->b, IR_SGE, IR_I8, v,
                                      ir_int_op(source, 0)));
         lower_check_branch(l, ok, false,
@@ -1512,7 +1513,7 @@ static void narrow_check(struct lowerer *l, const struct expr *e,
         round = lower_temp(l, ir_unary(l->f, l->b, IR_TRUNC, target, v));
         round = lower_temp(
             l, ir_unary(l->f, l->b,
-                        type_is_signed(integer_form(to)) ? IR_SEXT : IR_ZEXT,
+                        types_is_signed(integer_form(to)) ? IR_SEXT : IR_ZEXT,
                         source, round));
         ok = lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, round, v));
         lower_check_branch(l, ok, false,
@@ -1573,21 +1574,21 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
     if (converts_as_integer(from) && converts_as_integer(to)) {
         narrow_check(l, e, from, to, v);
     }
-    if (type_is_float(from) && type_is_float(to)) {
+    if (types_is_float(from) && types_is_float(to)) {
         if (source == target) {
             return v;
         }
         op = target == IR_F64 ? IR_FEXT : IR_FTRUNC;
-    } else if (type_is_float(from)) {
-        op = type_is_signed(to) ? IR_FTOSI : IR_FTOUI;
-    } else if (type_is_float(to)) {
-        op = type_is_signed(from) ? IR_SITOF : IR_UITOF;
+    } else if (types_is_float(from)) {
+        op = types_is_signed(to) ? IR_FTOSI : IR_FTOUI;
+    } else if (types_is_float(to)) {
+        op = types_is_signed(from) ? IR_SITOF : IR_UITOF;
     } else if (source == target) {
         return v;
     } else if (lower_narrows(source, target)) {
         op = IR_TRUNC;
     } else {
-        op = type_is_signed(from) ? IR_SEXT : IR_ZEXT;
+        op = types_is_signed(from) ? IR_SEXT : IR_ZEXT;
     }
     return lower_temp(l, ir_unary(l->f, l->b, op, target, v));
 }
@@ -1599,7 +1600,7 @@ static uint32_t shift_wrap_sym(struct lowerer *l, const struct symbolic *s,
                                uint32_t value, uint32_t count)
 {
     enum ir_type type = lower_ir_type_of(s->type);
-    uint32_t wide = ir_sym_op(l->m, type_is_signed(s->b->type) ? IR_SEXT
+    uint32_t wide = ir_sym_op(l->m, types_is_signed(s->b->type) ? IR_SEXT
                                                                 : IR_ZEXT,
                               IR_I64, count, IR_NO_AGG);
     uint32_t size = ir_sym_size_of(l->m, lower_vtype_of(l, s->type));
@@ -1658,7 +1659,7 @@ uint32_t lower_sym_of(struct lowerer *l, const struct symbolic *s)
         }
         return ir_sym_op(l->m,
                          lower_narrows(source, type)        ? IR_TRUNC
-                         : type_is_signed(s->a->type) ? IR_SEXT
+                         : types_is_signed(s->a->type) ? IR_SEXT
                                                       : IR_ZEXT,
                          type, a, IR_NO_AGG);
     case SYMBOLIC_PARAM:

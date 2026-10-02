@@ -16,7 +16,7 @@ static struct name name_of(const char *s)
 static void named(const struct type *t, const char *expected)
 {
     struct text out = {0};
-    type_name(&out, t);
+    types_name(&out, t);
     CHECK_STR(text_cstr(&out), expected);
     text_free(&out);
 }
@@ -48,9 +48,9 @@ void test_types(void)
           types_pointer_nullable(&types, i64));
     CHECK(types_pointer_nullable(&types, i64) != types_pointer(&types, i64));
     CHECK(types_pointer_nullable(&types, i64)->element == i64);
-    CHECK(type_is_nullable(types_pointer_nullable(&types, i64)));
-    CHECK(!type_is_nullable(types_pointer(&types, i64)));
-    CHECK(!type_is_nullable(i64));
+    CHECK(types_is_nullable(types_pointer_nullable(&types, i64)));
+    CHECK(!types_is_nullable(types_pointer(&types, i64)));
+    CHECK(!types_is_nullable(i64));
     CHECK(types_slice(&types, u8) == types_slice(&types, u8));
     CHECK(types_array(&types, f32, 4) == types_array(&types, f32, 4));
     CHECK(types_array(&types, f32, 4) != types_array(&types, f32, 5));
@@ -88,7 +88,7 @@ void test_types(void)
         elements[0] = str;
         elements[1] = i64;
         CHECK(pair != types_tuple(&types, elements, 2));
-        CHECK(type_has_fields(pair) && pair->field_count == 2);
+        CHECK(types_has_fields(pair) && pair->field_count == 2);
         CHECK(pair->fields[0].type == i64 && pair->fields[1].type == str);
         CHECK(pair->fields[0].name.length == 2 &&
               memcmp(pair->fields[0].name.text, "_0", 2) == 0);
@@ -98,8 +98,8 @@ void test_types(void)
         elements[0] = types_pointer(&types, i64);
         elements[1] = pair;
         named(types_tuple(&types, elements, 2), "(*int, (int, str))");
-        CHECK(type_pointer_free(pair));
-        CHECK(!type_pointer_free(types_tuple(&types, elements, 2)));
+        CHECK(types_pointer_free(pair));
+        CHECK(!types_pointer_free(types_tuple(&types, elements, 2)));
     }
 
     /* struct Pixel { tag: u8, value: i32, flag: u8 } from chapter 2 */
@@ -158,19 +158,19 @@ void test_types(void)
     CHECK(node->fields[0].type == types_pointer(&types, node));
     CHECK(types_nest(node, NULL) == NEST_FITS);
 
-    CHECK(type_pointer_free(i64));
-    CHECK(type_pointer_free(str));
-    CHECK(type_pointer_free(pixel));
-    CHECK(type_pointer_free(types_array(&types, pixel, 2)));
-    CHECK(!type_pointer_free(types_pointer(&types, i64)));
-    CHECK(!type_pointer_free(types_slice(&types, i64)));
-    CHECK(!type_pointer_free(types_fn(&types, NULL, 0, i64)));
+    CHECK(types_pointer_free(i64));
+    CHECK(types_pointer_free(str));
+    CHECK(types_pointer_free(pixel));
+    CHECK(types_pointer_free(types_array(&types, pixel, 2)));
+    CHECK(!types_pointer_free(types_pointer(&types, i64)));
+    CHECK(!types_pointer_free(types_slice(&types, i64)));
+    CHECK(!types_pointer_free(types_fn(&types, NULL, 0, i64)));
 
-    CHECK(type_is_integer(u8) && !type_is_signed(u8));
-    CHECK(type_is_integer(i64) && type_is_signed(i64));
-    CHECK(type_is_float(f32) && !type_is_integer(f32));
-    CHECK(!type_is_numeric(boolean) && !type_is_numeric(character));
-    CHECK(type_bits(types_builtin(&types, TYPE_U16)) == 16);
+    CHECK(types_is_integer(u8) && !types_is_signed(u8));
+    CHECK(types_is_integer(i64) && types_is_signed(i64));
+    CHECK(types_is_float(f32) && !types_is_integer(f32));
+    CHECK(!types_is_numeric(boolean) && !types_is_numeric(character));
+    CHECK(types_bits(types_builtin(&types, TYPE_U16)) == 16);
 
     arena_free(&arena);
 }

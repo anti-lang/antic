@@ -32,8 +32,8 @@ static void run(const char *source, enum target target, struct text *out)
 
     types_init(&types, &arena);
     ir_module_init(&ir, &arena, "main");
-    if (!lex(source, strlen(source), &arena, &diags, &tokens) ||
-        !parse(source, &tokens, &arena, &diags, &module) ||
+    if (!lexer_lex(source, strlen(source), &arena, &diags, &tokens) ||
+        !parser_parse(source, &tokens, &arena, &diags, &module) ||
         !sema_check(module, "main", NULL, NULL, 0, &types, &arena, &diags, true) ||
         !lower_module(module, "main", &ir, &diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT)) {
         check_failures++;
@@ -68,7 +68,7 @@ static void run(const char *source, enum target target, struct text *out)
         free(functions);
     }
     ir_module_free(&ir);
-    token_list_free(&tokens);
+    lexer_token_list_free(&tokens);
     diagnostics_free(&diags);
     arena_free(&arena);
 }

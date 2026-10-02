@@ -43,8 +43,8 @@ static void run(struct lowered *l, const char *source)
     memset(l, 0, sizeof *l);
     types_init(&l->types, &l->arena);
     ir_module_init(&l->ir, &l->arena, "main");
-    if (!lex(source, strlen(source), &l->arena, &l->diags, &l->tokens) ||
-        !parse(source, &l->tokens, &l->arena, &l->diags, &l->module) ||
+    if (!lexer_lex(source, strlen(source), &l->arena, &l->diags, &l->tokens) ||
+        !parser_parse(source, &l->tokens, &l->arena, &l->diags, &l->module) ||
         !sema_check(l->module, "main", NULL, NULL, 0, &l->types, &l->arena,
                     &l->diags, true)) {
         fprintf(stderr, "test source does not check: %d:%d: %s\n%s\n",
@@ -59,7 +59,7 @@ static void run(struct lowered *l, const char *source)
 static void release(struct lowered *l)
 {
     ir_module_free(&l->ir);
-    token_list_free(&l->tokens);
+    lexer_token_list_free(&l->tokens);
     diagnostics_free(&l->diags);
     arena_free(&l->arena);
 }

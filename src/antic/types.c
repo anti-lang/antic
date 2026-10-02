@@ -144,7 +144,7 @@ struct type *types_unlent(struct types *types, struct type *t)
     return lent_form(types, t, false);
 }
 
-bool type_holds_lent(const struct type *t)
+bool types_holds_lent(const struct type *t)
 {
     size_t i;
 
@@ -152,7 +152,7 @@ bool type_holds_lent(const struct type *t)
         return false;
     }
     for (i = 0; i < t->param_count; i++) {
-        if (type_is_lent(t->params[i])) {
+        if (types_is_lent(t->params[i])) {
             return true;
         }
     }
@@ -164,12 +164,12 @@ struct type *types_copy_of_parts(struct types *types, struct type *t)
     struct type **parts;
     size_t i;
 
-    if (!type_holds_lent(t)) {
+    if (!types_holds_lent(t)) {
         return t;
     }
     parts = types_alloc_array(types->arena, t->param_count, sizeof *parts);
     for (i = 0; i < t->param_count; i++) {
-        parts[i] = type_is_lent(t->params[i]) ? t->params[i]->element
+        parts[i] = types_is_lent(t->params[i]) ? t->params[i]->element
                                               : t->params[i];
     }
     return types_tuple(types, parts, t->param_count);
@@ -180,7 +180,7 @@ struct type *types_unlent_parts(struct types *types, struct type *t)
     struct type **parts;
     size_t i;
 
-    if (!type_holds_lent(t)) {
+    if (!types_holds_lent(t)) {
         return t;
     }
     parts = types_alloc_array(types->arena, t->param_count, sizeof *parts);
@@ -190,7 +190,7 @@ struct type *types_unlent_parts(struct types *types, struct type *t)
     return types_tuple(types, parts, t->param_count);
 }
 
-bool type_is_lent(const struct type *t)
+bool types_is_lent(const struct type *t)
 {
     return t != NULL && (t->kind == TYPE_POINTER || t->kind == TYPE_SLICE) &&
            t->lent;
@@ -206,7 +206,7 @@ struct type *types_pointer_nullable(struct types *types, struct type *element)
     return types_pointer_of(types, element, true);
 }
 
-bool type_is_nullable(const struct type *t)
+bool types_is_nullable(const struct type *t)
 {
     return t != NULL &&
            (t->kind == TYPE_POINTER || t->kind == TYPE_FN ||
@@ -218,7 +218,7 @@ struct type *types_without_none(struct types *types, struct type *t)
 {
     struct type key;
 
-    if (!type_is_nullable(t)) {
+    if (!types_is_nullable(t)) {
         return t;
     }
     if (t->kind == TYPE_OPTIONAL) {
@@ -358,18 +358,18 @@ static void print_operand(struct text *out, const struct symbolic *s,
     bool group = s->kind == SYMBOLIC_BINARY || s->kind == SYMBOLIC_CAST;
 
     text_append(out, group ? "(" : "");
-    symbolic_print(out, s, qualified);
+    types_symbolic_print(out, s, qualified);
     text_append(out, group ? ")" : "");
 }
 
-void symbolic_print(struct text *out, const struct symbolic *s,
-                    bool qualified)
+void types_symbolic_print(struct text *out, const struct symbolic *s,
+                          bool qualified)
 {
     switch (s->kind) {
     case SYMBOLIC_INT:
         if (s->type->kind == TYPE_BOOL) {
             text_append(out, s->value != 0 ? "true" : "false");
-        } else if (type_is_signed(s->type)) {
+        } else if (types_is_signed(s->type)) {
             text_appendf(out, "%lld", (long long)s->value);
         } else {
             text_appendf(out, "%llu", (unsigned long long)s->value);
@@ -1165,7 +1165,7 @@ static bool union_in(const struct type *t, struct ptr_set *answered)
         return true;
     }
     for (i = 0; i < t->field_count; i++) {
-        if (!type_field_is_unit_break(&t->fields[i]) &&
+        if (!types_field_is_unit_break(&t->fields[i]) &&
             union_in(t->fields[i].type, answered)) {
             return true;
         }
@@ -1319,7 +1319,7 @@ struct type *types_mask(struct types *types, struct type *s)
     size_t length;
     size_t i;
 
-    if (s->mask != NULL || type_is_mask(s)) {
+    if (s->mask != NULL || types_is_mask(s)) {
         return s->mask != NULL ? s->mask : s;
     }
     /* DESIGN: the mask carries the module of its simd struct and a name
@@ -1353,23 +1353,23 @@ struct type *types_mask(struct types *types, struct type *s)
     return m;
 }
 
-bool type_is_simd(const struct type *t)
+bool types_is_simd(const struct type *t)
 {
     return t != NULL && t->kind == TYPE_STRUCT && t->simd &&
            t->field_count > 0;
 }
 
-bool type_is_mask(const struct type *t)
+bool types_is_mask(const struct type *t)
 {
-    return type_is_simd(t) && t->fields[0].type->kind == TYPE_BOOL;
+    return types_is_simd(t) && t->fields[0].type->kind == TYPE_BOOL;
 }
 
-struct type *type_simd_lane(const struct type *t)
+struct type *types_simd_lane(const struct type *t)
 {
     return t->fields[0].type;
 }
 
-uint64_t type_lane_bytes(const struct type *t)
+uint64_t types_lane_bytes(const struct type *t)
 {
     switch (t->kind) {
     case TYPE_BOOL:
@@ -1389,9 +1389,9 @@ uint64_t type_lane_bytes(const struct type *t)
     }
 }
 
-uint64_t type_simd_bytes(const struct type *t)
+uint64_t types_simd_bytes(const struct type *t)
 {
-    return type_lane_bytes(type_simd_lane(t)) * t->field_count;
+    return types_lane_bytes(types_simd_lane(t)) * t->field_count;
 }
 
 static struct name name_of(const char *text)
@@ -1650,7 +1650,7 @@ static uint32_t nest_value(struct nest_walk *w, struct type *t,
         return element == NEST_CLOSED ? NEST_CLOSED
                                       : nest_max(length, element) + 1;
     }
-    return type_has_fields(t) ? nest_fields(w, t, depth) : 0;
+    return types_has_fields(t) ? nest_fields(w, t, depth) : 0;
 }
 
 enum nest_result types_nest(struct type *s, struct type *error)
@@ -1669,12 +1669,12 @@ enum nest_result types_nest(struct type *s, struct type *error)
     return w.cycle ? NEST_CYCLE : w.deep ? NEST_DEEP : NEST_FITS;
 }
 
-void type_name(struct text *out, const struct type *t)
+void types_name(struct text *out, const struct type *t)
 {
     print_type(out, t, false);
 }
 
-void type_name_qualified(struct text *out, const struct type *t)
+void types_name_qualified(struct text *out, const struct type *t)
 {
     print_type(out, t, true);
 }
@@ -1718,7 +1718,7 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
     case TYPE_ARRAY:
         if (t->length_of != NULL) {
             text_append(out, "[");
-            symbolic_print(out, t->length_of, qualified);
+            types_symbolic_print(out, t->length_of, qualified);
             text_append(out, "]");
         } else {
             text_appendf(out, "[%llu]", (unsigned long long)t->length);
@@ -1779,7 +1779,7 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
     case TYPE_VARIANT:
         if (qualified) {
             text_appendf(out, "%.*s.", (int)t->module.length, t->module.text);
-            type_symbol_name(out, t);
+            types_symbol_name(out, t);
             return;
         }
         text_appendf(out, "%.*s", (int)t->name.length, t->name.text);
@@ -1793,30 +1793,30 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
     }
 }
 
-void type_copy_name(struct text *out, const struct type *g,
-                    struct type *const *args,
-                    const struct symbolic *const *values, bool qualified)
+void types_copy_name(struct text *out, const struct type *g,
+                     struct type *const *args,
+                     const struct symbolic *const *values, bool qualified)
 {
     const struct type *outer = g->nested_in;
     size_t start = 0;
 
     if (outer != NULL && g->name.length > outer->name.length + 1) {
         start = outer->type_param_count;
-        type_copy_name(out, outer, args, values, qualified);
+        types_copy_name(out, outer, args, values, qualified);
         text_appendf(out, "%.*s", (int)(g->name.length - outer->name.length),
                      g->name.text + outer->name.length);
     } else {
         text_appendf(out, "%.*s", (int)g->name.length, g->name.text);
     }
     if (start < g->type_param_count) {
-        type_copy_args(out, args + start, values + start,
-                       g->type_param_count - start, qualified);
+        types_copy_args(out, args + start, values + start,
+                        g->type_param_count - start, qualified);
     }
 }
 
-void type_copy_args(struct text *out, struct type *const *args,
-                    const struct symbolic *const *values, size_t count,
-                    bool qualified)
+void types_copy_args(struct text *out, struct type *const *args,
+                     const struct symbolic *const *values, size_t count,
+                     bool qualified)
 {
     size_t i;
 
@@ -1824,7 +1824,7 @@ void type_copy_args(struct text *out, struct type *const *args,
     for (i = 0; i < count; i++) {
         text_append(out, i > 0 ? ", " : "");
         if (values[i] != NULL) {
-            symbolic_print(out, values[i], qualified);
+            types_symbolic_print(out, values[i], qualified);
         } else {
             print_type(out, args[i], qualified);
         }
@@ -1832,22 +1832,22 @@ void type_copy_args(struct text *out, struct type *const *args,
     text_append(out, ">");
 }
 
-void type_symbol_name(struct text *out, const struct type *t)
+void types_symbol_name(struct text *out, const struct type *t)
 {
     if (t->generic == NULL) {
         text_appendf(out, "%.*s", (int)t->name.length, t->name.text);
         return;
     }
-    type_copy_name(out, t->generic, t->args,
-                   (const struct symbolic *const *)t->values, true);
+    types_copy_name(out, t->generic, t->args,
+                    (const struct symbolic *const *)t->values, true);
 }
 
-bool type_is_integer(const struct type *t)
+bool types_is_integer(const struct type *t)
 {
     return t->kind >= TYPE_I8 && t->kind <= TYPE_CWCHAR;
 }
 
-bool type_has_fields(const struct type *t)
+bool types_has_fields(const struct type *t)
 {
     return t != NULL && (t->kind == TYPE_STRUCT || t->kind == TYPE_CLASS ||
                          t->kind == TYPE_TUPLE || t->kind == TYPE_VARIANT ||
@@ -1867,47 +1867,47 @@ const struct type *types_hash_call_type(const struct expr *call)
     return first->kind == TYPE_POINTER ? first->element : first;
 }
 
-bool type_field_is_unit_break(const struct struct_field *f)
+bool types_field_is_unit_break(const struct struct_field *f)
 {
     return f->name.length == 1 && f->name.text[0] == '_';
 }
 
-const struct struct_field *type_find_field(const struct type *s,
-                                           const struct name *name)
+const struct struct_field *types_find_field(const struct type *s,
+                                            const struct name *name)
 {
     size_t i;
 
     for (i = 0; i < s->field_count; i++) {
         if (same_text(&s->fields[i].name, name) &&
-            !type_field_is_unit_break(&s->fields[i])) {
+            !types_field_is_unit_break(&s->fields[i])) {
             return &s->fields[i];
         }
     }
     return NULL;
 }
 
-bool type_is_target_sized(const struct type *t)
+bool types_is_target_sized(const struct type *t)
 {
     return t->kind == TYPE_CLONG || t->kind == TYPE_CULONG ||
            t->kind == TYPE_CWCHAR;
 }
 
-bool type_is_signed(const struct type *t)
+bool types_is_signed(const struct type *t)
 {
     return t->kind >= TYPE_I8 && t->kind <= TYPE_CLONG;
 }
 
-bool type_is_float(const struct type *t)
+bool types_is_float(const struct type *t)
 {
     return t->kind == TYPE_F32 || t->kind == TYPE_F64;
 }
 
-bool type_is_numeric(const struct type *t)
+bool types_is_numeric(const struct type *t)
 {
-    return type_is_integer(t) || type_is_float(t);
+    return types_is_integer(t) || types_is_float(t);
 }
 
-int type_bits(const struct type *t)
+int types_bits(const struct type *t)
 {
     switch (t->kind) {
     case TYPE_I8:
@@ -1977,7 +1977,7 @@ static bool pointer_free(const struct type *t, struct ptr_set *answered)
     }
 }
 
-bool type_pointer_free(const struct type *t)
+bool types_pointer_free(const struct type *t)
 {
     struct ptr_set answered;
     bool free_of;

@@ -208,7 +208,7 @@ static bool expect(struct parser *p, enum token_kind kind)
     if (accept(p, kind)) {
         return true;
     }
-    error_here(p, "expected %s", token_kind_name(kind));
+    error_here(p, "expected %s", lexer_token_kind_name(kind));
     return false;
 }
 
@@ -610,7 +610,7 @@ static bool scan_type_level(const struct parser *p, struct angle_scan *s)
 {
     enum token_kind k = peek_at(p, s->at)->kind;
 
-    if (token_is_builtin_type(k)) {
+    if (lexer_token_is_builtin_type(k)) {
         s->at++;
         return true;
     }
@@ -783,7 +783,7 @@ static struct type_expr *type_level(struct parser *p)
         }
         return ty;
     }
-    if (token_is_builtin_type(t->kind)) {
+    if (lexer_token_is_builtin_type(t->kind)) {
         next(p);
         ty->kind = TYPEX_BUILTIN;
         ty->builtin = t->kind;
@@ -3124,7 +3124,7 @@ static bool type_params(struct parser *p, struct item *it)
         if (accept(p, TOKEN_COLON)) {
             if (accept(p, TOKEN_INT_TYPE)) {
                 tp.constant = true;
-            } else if (token_is_builtin_type(peek(p)->kind)) {
+            } else if (lexer_token_is_builtin_type(peek(p)->kind)) {
                 error_here(p, "a constant parameter is written `N: int`");
                 free(list.data);
                 p->angles--;
@@ -4328,9 +4328,9 @@ static bool link_line(struct parser *p, struct list *out, const char *kind)
     return true;
 }
 
-bool parse(const char *source, const struct token_list *tokens,
-           struct arena *arena, struct diagnostics *diags,
-           struct module **out)
+bool parser_parse(const char *source, const struct token_list *tokens,
+                  struct arena *arena, struct diagnostics *diags,
+                  struct module **out)
 {
     struct list clauses = {NULL, 0, 0, sizeof(struct clause)};
     struct list dropped = {NULL, 0, 0, sizeof(struct dropped_doc)};

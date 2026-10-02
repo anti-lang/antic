@@ -218,7 +218,7 @@ static void element_c_name(struct text *out, const struct type *t)
         c_type_name(out, t);
         return;
     default:
-        type_name(out, t);
+        types_name(out, t);
         return;
     }
 }
@@ -241,7 +241,7 @@ static void tuple_c_name(struct text *out, const struct type *t)
 static const char *owned_note(const struct symbol *sym, size_t i)
 {
     if (sym != NULL && sym->type != NULL && sym->type->kind == TYPE_FN &&
-        i < sym->type->param_count && type_is_lent(sym->type->params[i])) {
+        i < sym->type->param_count && types_is_lent(sym->type->params[i])) {
         return "/* lent */ ";
     }
     return sym != NULL && sym->owned != NULL && i < sym->owned_count &&
@@ -507,7 +507,7 @@ static void tuple_view(struct text *out, const struct type *t,
         emit_uses(out, t->fields[i].type, ifaces, count, done);
     }
     tuple_c_name(&tag, t);
-    type_name(&written, t);
+    types_name(&written, t);
     owning_note(out, t);
     text_appendf(out, "/* The %s %s. */\nstruct %s {\n",
                  t->kind == TYPE_OPTIONAL ? "optional value" : "tuple",
@@ -652,7 +652,7 @@ static void variant_view(struct text *out, const struct symbol *sym,
    f16 crosses as its sixteen bits. */
 static void vector_typedef(struct text *out, const struct type *t)
 {
-    const struct type *lane = type_simd_lane(t);
+    const struct type *lane = types_simd_lane(t);
     const char *neon;
     const char *sse = "__m128i";
 
@@ -706,7 +706,7 @@ static void enum_view(struct text *out, const struct type *t,
                       const struct doc_text *doc)
 {
     struct text name = {0};
-    bool is_signed = type_is_signed(t->base);
+    bool is_signed = types_is_signed(t->base);
     size_t i;
 
     if (t->field_count == 0) {
@@ -740,19 +740,20 @@ static void struct_fields(struct text *out, const struct type *t)
         doc_comment(out, &t->fields[i].doc, "    ");
         text_append(out, "    ");
         if (i == 0 && t->simd) {
-            uint64_t bytes = type_simd_bytes(t);
+            uint64_t bytes = types_simd_bytes(t);
             text_appendf(out, "ANTI_ALIGNAS(%" PRIu64 ") ",
                          bytes < 16 ? bytes : 16);
         } else if (i == 0 && t->align != 0) {
             text_appendf(out, "ANTI_ALIGNAS(%" PRIu64 ") ", t->align);
         }
         declaration(&field, t->fields[i].type,
-                    type_field_is_unit_break(&t->fields[i])
+                    types_field_is_unit_break(&t->fields[i])
                         ? ""
                         : text_cstr(&buffer),
                     t);
         text_append(out, text_cstr(&field));
-        if (t->fields[i].bits != 0 || type_field_is_unit_break(&t->fields[i])) {
+        if (t->fields[i].bits != 0 ||
+            types_field_is_unit_break(&t->fields[i])) {
             text_appendf(out, " : %u", (unsigned)t->fields[i].bits);
         }
         text_append(out, ";\n");
@@ -964,7 +965,7 @@ static void aggregate(struct text *out, const struct symbol *sym,
         emit_uses(out, t->fields[i].type, ifaces, count, done);
     }
     doc_comment(out, &sym->doc, "");
-    if (t->simd && type_simd_bytes(t) == 16) {
+    if (t->simd && types_simd_bytes(t) == 16) {
         vector_typedef(out, t);
         return;
     }
@@ -1474,7 +1475,7 @@ static void constant(struct text *out, const struct symbol *sym)
     default:
         text_appendf(out, "#define %.*s ((%s)", (int)sym->name.length,
                      sym->name.text, scalar_name(t));
-        integer_literal(out, v->as.integer, type_is_signed(t));
+        integer_literal(out, v->as.integer, types_is_signed(t));
         text_append(out, ")\n");
         return;
     }
@@ -1610,8 +1611,8 @@ void header_write(struct text *out, const char *name,
         for (j = 0; j < ifaces[i]->item_count; j++) {
             const struct symbol *sym = ifaces[i]->items[j];
             if (sym->exported && sym->kind == SYMBOL_STRUCT &&
-                type_is_simd(sym->type) &&
-                type_simd_bytes(sym->type) == 16) {
+                types_is_simd(sym->type) &&
+                types_simd_bytes(sym->type) == 16) {
                 text_append(out,
                     "#if defined(__aarch64__) || defined(_M_ARM64)\n"
                     "#include <arm_neon.h>\n"

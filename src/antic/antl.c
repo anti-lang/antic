@@ -70,7 +70,7 @@ static bool is_local_struct(const struct writer *w, const struct type *t)
     }
     /* A copy of a generic is written in full wherever it stands, so the
        reader can make it when no module read before has. */
-    return type_has_fields(t) &&
+    return types_has_fields(t) &&
            (t->generic != NULL ||
             (t->module.length == strlen(module) &&
              memcmp(t->module.text, module, t->module.length) == 0));
@@ -694,7 +694,7 @@ static void put_defaults(struct writer *w, const struct type *t)
 {
     size_t i;
 
-    if (!type_has_fields(t) || !is_local_struct(w, t)) {
+    if (!types_has_fields(t) || !is_local_struct(w, t)) {
         return;
     }
     for (i = 0; i < t->field_count; i++) {
@@ -1201,9 +1201,9 @@ static bool takes_self(const struct type *fn, const struct type *class)
    width, it has no more bits than the integer, and it is not `_`. */
 static bool bitfield_fits(const struct struct_field *f)
 {
-    return !type_field_is_unit_break(f) && type_is_integer(f->type) &&
-           !type_is_target_sized(f->type) &&
-           f->bits <= (unsigned)type_bits(f->type);
+    return !types_field_is_unit_break(f) && types_is_integer(f->type) &&
+           !types_is_target_sized(f->type) &&
+           f->bits <= (unsigned)types_bits(f->type);
 }
 
 /* The type of the index the file holds next, below limit. ANTL_NO_TYPE
@@ -1358,7 +1358,8 @@ const struct symbolic *antl_read_symbolic(struct reader *r, uint32_t limit,
         }
         break;
     }
-    if (r->failed || !(type_is_integer(key.type) || key.type->kind == TYPE_BOOL)) {
+    if (r->failed ||
+        !(types_is_integer(key.type) || key.type->kind == TYPE_BOOL)) {
         antl_damaged(r);
         return NULL;
     }
@@ -1469,7 +1470,7 @@ static void check_nesting(struct reader *r, uint32_t count)
     uint32_t i;
 
     for (i = 0; i < count && !r->failed; i++) {
-        if (type_has_fields(r->table[i]) &&
+        if (types_has_fields(r->table[i]) &&
             types_nest(r->table[i], NULL) != NEST_FITS) {
             antl_damaged(r);
         }
@@ -1988,7 +1989,7 @@ static void read_types(struct reader *r)
             n = antl_get_count(r, 8);
             values = antl_allocate(r, n, sizeof *values);
             /* The values of an enum are integers. */
-            t = base != NULL && type_is_integer(base)
+            t = base != NULL && types_is_integer(base)
                     ? types_enum(r->types, module, name, base)
                     : NULL;
             for (j = 0; j < n && !r->failed; j++) {
@@ -2149,12 +2150,12 @@ bool antl_read_value(struct reader *r, struct type *t, struct const_value *v,
     switch (kind) {
     case CONST_INT:
         v->as.integer = antl_get_u64(r);
-        return !r->failed && (type_is_integer(t) || t->kind == TYPE_BOOL ||
+        return !r->failed && (types_is_integer(t) || t->kind == TYPE_BOOL ||
                               t->kind == TYPE_ENUM);
     case CONST_FLOAT: {
         uint64_t bits = antl_get_u64(r);
         memcpy(&v->as.floating, &bits, sizeof bits);
-        return !r->failed && (type_is_float(t) || t->kind == TYPE_F16);
+        return !r->failed && (types_is_float(t) || t->kind == TYPE_F16);
     }
     case CONST_BOOL:
         v->as.boolean = antl_get_u8(r) != 0;
@@ -2182,7 +2183,7 @@ bool antl_read_value(struct reader *r, struct type *t, struct const_value *v,
         n = antl_get_count(r, 1);
         if (r->failed || (kind == CONST_ARRAY
                               ? t->kind != TYPE_ARRAY || n != t->length
-                              : !type_has_fields(t) ||
+                              : !types_has_fields(t) ||
                                     n != t->field_count)) {
             return false;
         }
@@ -2282,7 +2283,7 @@ static void read_items(struct reader *r)
                symbol kind. The name a `type` declares may stand for
                any type. */
             ok = sym->alias ||
-                 ((type_has_fields(sym->type) ||
+                 ((types_has_fields(sym->type) ||
                    sym->type->kind == TYPE_ENUM) &&
                   name_equals(&sym->type->module, iface->module));
             break;

@@ -156,7 +156,7 @@ struct ir_operand lower_part_scalar(struct lowerer *l, const struct type *t,
 
 bool lower_field_skipped(const struct struct_field *f)
 {
-    return type_field_is_unit_break(f) || is_lock(f->type);
+    return types_field_is_unit_break(f) || is_lock(f->type);
 }
 
 enum lower_member lower_member_of(const struct struct_field *f)

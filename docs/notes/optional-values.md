@@ -8,7 +8,7 @@ The choices of the passes for `?T` of any type. "Optional values" in
 
 - `TYPE_OPTIONAL` is the kind of a `?T` of a value. Its `element` is the T,
   and its two fields `value` and `has` are the struct C lays out, so the
-  passes after the checker see a struct. `type_has_fields` holds for it.
+  passes after the checker see a struct. `types_has_fields` holds for it.
 - `types_with_none` gives the `?*T` of a `*T`, the `?fn(...)` of a function
   type and the `?T` of anything else, a type that may be `none` among them.
   `types_without_none` gives the T back.
@@ -22,7 +22,7 @@ The choices of the passes for `?T` of any type. "Optional values" in
   `?T` where a T is expected is the error of a value that may be `none`.
 - A literal where a `?T` is expected is checked against T, which
   `value_expected` of `sema_expr.c` decides.
-- Narrowing needs nothing new, since `type_is_nullable` holds for a `?T`. A
+- Narrowing needs nothing new, since `types_is_nullable` holds for a `?T`. A
   narrowed name has type T. A comparison with `none` and a test read the whole
   variable, which `sema_whole_optional` puts back.
 - `if let` on any type that may be `none` is the rewrite that `if let` on a

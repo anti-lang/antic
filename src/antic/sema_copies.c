@@ -329,7 +329,7 @@ static struct name symbol_name(struct copies *k, const struct type *copy,
     struct name made;
     char *text;
 
-    type_symbol_name(&out, copy);
+    types_symbol_name(&out, copy);
     text_appendf(&out, ".%.*s", (int)name->length, name->text);
     text = arena_alloc(k->c->arena, out.length + 1);
     memcpy(text, text_cstr(&out), out.length + 1);
@@ -470,7 +470,7 @@ static struct name copy_name(struct copies *k, const struct name *generic,
     bool cut;
 
     text_appendf(&out, "%.*s", (int)generic->length, generic->text);
-    type_copy_args(&out, args, values, count, true);
+    types_copy_args(&out, args, values, count, true);
     return sema_copy_name(k->c, &out, &cut);
 }
 
@@ -652,9 +652,9 @@ static struct symbol *own_params_copy(struct clone *cl, const struct expr *e,
         }
         map.from = g;
         map.to = copy;
-        type_symbol_name(&out, copy);
+        types_symbol_name(&out, copy);
     } else {
-        type_symbol_name(&out, g);
+        types_symbol_name(&out, g);
     }
     text_appendf(&out, ".%.*s", (int)own_name.length, own_name.text);
     name = sema_copy_name(k->c, &out, &cut);

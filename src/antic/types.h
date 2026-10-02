@@ -355,10 +355,10 @@ struct type *types_lent(struct types *types, struct type *t);
 /* The pointer or slice t without `lent`, and t itself for any other
    type. */
 struct type *types_unlent(struct types *types, struct type *t);
-bool type_is_lent(const struct type *t);
+bool types_is_lent(const struct type *t);
 /* Whether t is a tuple with a lent pointer among its parts, which the
    `operator fn value` of an iterator alone gives. */
-bool type_holds_lent(const struct type *t);
+bool types_holds_lent(const struct type *t);
 /* The tuple t with the type each lent part points at in its place: the
    copy of the value of an iterator that `for x in e` binds. */
 struct type *types_copy_of_parts(struct types *types, struct type *t);
@@ -368,7 +368,7 @@ struct type *types_unlent_parts(struct types *types, struct type *t);
 struct type *types_pointer_of(struct types *types, struct type *element,
                               bool nullable);
 /* Whether t is `?*T`, `?fn(...)` or `?T` of a value type. */
-bool type_is_nullable(const struct type *t);
+bool types_is_nullable(const struct type *t);
 /* The same type without `none`: `*T` of a `?*T`, `fn()` of a `?fn()`, T
    of a `?T`. */
 struct type *types_without_none(struct types *types, struct type *t);
@@ -388,8 +388,8 @@ const struct symbolic *types_symbolic(struct types *types,
                                       const struct symbolic *key);
 /* Append a symbolic value as a program writes it. With qualified set, a
    struct name carries its module. */
-void symbolic_print(struct text *out, const struct symbolic *s,
-                    bool qualified);
+void types_symbolic_print(struct text *out, const struct symbolic *s,
+                          bool qualified);
 struct type *types_fn(struct types *types, struct type *const *params,
                       size_t param_count, struct type *result);
 /* A function type in the ABI form of `may fail`: params end with the out
@@ -755,18 +755,18 @@ bool types_is_chan(const struct type *t);
    of the fields of s, one for the compilation. */
 struct type *types_mask(struct types *types, struct type *s);
 /* Whether t is a simd struct, a mask among them. */
-bool type_is_simd(const struct type *t);
+bool types_is_simd(const struct type *t);
 /* Whether t is a simd struct of `bool`, which a comparison gives. */
-bool type_is_mask(const struct type *t);
+bool types_is_mask(const struct type *t);
 /* The type of the lanes of the simd struct t. */
-struct type *type_simd_lane(const struct type *t);
+struct type *types_simd_lane(const struct type *t);
 /* The bytes of a lane of type t, or 0 for a type that is no lane.
    DESIGN: a lane has one width on every target, so the size of a simd
    struct is a property of its declaration. c_long, c_ulong and c_wchar,
    whose width the target decides, are no lanes. */
-uint64_t type_lane_bytes(const struct type *t);
+uint64_t types_lane_bytes(const struct type *t);
 /* The bytes of the simd struct t, its lanes without padding. */
-uint64_t type_simd_bytes(const struct type *t);
+uint64_t types_simd_bytes(const struct type *t);
 
 /* A new type parameter named name. Each call returns a distinct type. */
 struct type *types_param(struct types *types, struct name name);
@@ -831,55 +831,55 @@ uint32_t types_depth_above(struct type *const *parts, size_t count);
 
 /* The name of t as a program writes it, with int, float and byte for the
    aliased types. */
-void type_name(struct text *out, const struct type *t);
+void types_name(struct text *out, const struct type *t);
 /* The name of t with the module of every struct in it, as main.Vec2. A
    copy of a generic qualifies its arguments as well. */
-void type_name_qualified(struct text *out, const struct type *t);
+void types_name_qualified(struct text *out, const struct type *t);
 /* DESIGN: the name of a struct, a class or a variant in a symbol of its
    module. It is the name of t, and for a copy of a generic the name of
    the generic with the arguments qualified by their modules,
    `List<geo.Point>`. Two copies whose arguments share a name in two
-   modules then never share a symbol, while `type_name` still gives
+   modules then never share a symbol, while `types_name` still gives
    `List<Point>` as the program writes it. */
-void type_symbol_name(struct text *out, const struct type *t);
+void types_symbol_name(struct text *out, const struct type *t);
 /* The name of the copy of the generic g with the arguments args and
    values, `Pair<int, str>`, with the modules of the arguments when
    qualified is set. A copy of a type nested in a generic class is named
    after the copy of the class, `List<int>.Node`. */
-void type_copy_name(struct text *out, const struct type *g,
-                    struct type *const *args,
-                    const struct symbolic *const *values, bool qualified);
+void types_copy_name(struct text *out, const struct type *g,
+                     struct type *const *args,
+                     const struct symbolic *const *values, bool qualified);
 /* The arguments of a copy as its name spells them, `<int, str>`. */
-void type_copy_args(struct text *out, struct type *const *args,
-                    const struct symbolic *const *values, size_t count,
-                    bool qualified);
+void types_copy_args(struct text *out, struct type *const *args,
+                     const struct symbolic *const *values, size_t count,
+                     bool qualified);
 
-bool type_is_integer(const struct type *t);
+bool types_is_integer(const struct type *t);
 /* Whether f is a zero-width bitfield, written `_: T : 0`, which breaks the
    unit of the bitfields and holds no value. */
-bool type_field_is_unit_break(const struct struct_field *f);
+bool types_field_is_unit_break(const struct struct_field *f);
 /* The field of s named name, or NULL. A unit break is no field a name
    reaches, so `_` finds none. The checker and lowering both find a field
    here. */
-const struct struct_field *type_find_field(const struct type *s,
-                                           const struct name *name);
+const struct struct_field *types_find_field(const struct type *s,
+                                            const struct name *name);
 /* c_long, c_ulong and c_wchar, whose width the target decides. */
-bool type_is_target_sized(const struct type *t);
-bool type_is_signed(const struct type *t);
-bool type_is_float(const struct type *t);
-bool type_is_numeric(const struct type *t);
+bool types_is_target_sized(const struct type *t);
+bool types_is_signed(const struct type *t);
+bool types_is_float(const struct type *t);
+bool types_is_numeric(const struct type *t);
 /* The width in bits. A target-sized type has the narrower of its widths,
    the range a value must fit on every target. */
-int type_bits(const struct type *t);
+int types_bits(const struct type *t);
 
 /* A type with no pointer inside it, the property the threading chapter
    needs. str counts as pointer-free, because its bytes never change. A
    Mutex and a channel count as well, because each is made to be shared
    between threads. */
-bool type_pointer_free(const struct type *t);
+bool types_pointer_free(const struct type *t);
 
 /* Whether t declares fields, which a struct, a union and a class do. */
-bool type_has_fields(const struct type *t);
+bool types_has_fields(const struct type *t);
 
 /* The type whose `operator fn hash` the checked call names, one of the
    calls of a default hash: the first parameter of the function, through

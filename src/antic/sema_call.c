@@ -25,7 +25,7 @@ struct type *sema_struct_of(struct type *t)
     if (t->kind == TYPE_POINTER) {
         t = t->element;
     }
-    return type_has_fields(t) ? t : NULL;
+    return types_has_fields(t) ? t : NULL;
 }
 
 /* DESIGN: a name used on a value or a type reaches the member that
@@ -186,7 +186,7 @@ static const struct struct_field *table_sub_object(const struct type *s,
 bool sema_refuse_abstract_value(struct checker *c, struct pos pos,
                                 const char *what, const struct type *t)
 {
-    if (!type_has_fields(t) || !t->has_abstract) {
+    if (!types_has_fields(t) || !t->has_abstract) {
         return false;
     }
     sema_error_at(c, pos, "`%s` is abstract and has no complete value, and %s "
@@ -234,7 +234,7 @@ static bool provides(struct checker *c, const struct type *t,
     bool ambiguous = false;
     bool found;
 
-    if (!type_has_fields(t)) {
+    if (!types_has_fields(t)) {
         return false;
     }
     if (ptr_set_has(&p->yes[pub_only], t)) {
@@ -243,7 +243,7 @@ static bool provides(struct checker *c, const struct type *t,
     if (ptr_set_has(&p->no[pub_only], t)) {
         return false;
     }
-    f = type_find_field(t, name);
+    f = types_find_field(t, name);
     m = f == NULL ? sema_find_member(t, name) : NULL;
     if (f != NULL) {
         found = !pub_only || t->kind != TYPE_CLASS || f->vis == VIS_PUB ||
@@ -484,7 +484,7 @@ static bool literal_complete(const struct type *t, struct ptr_set *answered)
         for (i = 0; i < up->field_count; i++) {
             const struct struct_field *f = &up->fields[i];
             if (f->form == FIELD_BASE || f->form == FIELD_TABLE ||
-                f->form == FIELD_IMPL || type_field_is_unit_break(f)) {
+                f->form == FIELD_IMPL || types_field_is_unit_break(f)) {
                 continue;
             }
             if (f->value == NULL && f->constant == NULL &&
@@ -702,7 +702,7 @@ static struct type *atomic_place(const struct expr *e)
     if (s == NULL) {
         return NULL;
     }
-    f = type_find_field(s, &e->as.field.name);
+    f = types_find_field(s, &e->as.field.name);
     return f != NULL && f->atomic ? f->type : NULL;
 }
 
@@ -710,7 +710,7 @@ static struct type *atomic_place(const struct expr *e)
    integer, a `bool` or a pointer. */
 static bool swaps_as_word(const struct type *t)
 {
-    return type_is_integer(t) || t->kind == TYPE_BOOL ||
+    return types_is_integer(t) || t->kind == TYPE_BOOL ||
            t->kind == TYPE_POINTER;
 }
 
@@ -742,7 +742,7 @@ static bool unchecked_swap(struct checker *c, struct expr *e,
     }
     s = sema_struct_of(place->as.field.base->type);
     for (; s != NULL && f == NULL; s = s->kind == TYPE_CLASS ? s->base : NULL) {
-        f = type_find_field(s, &place->as.field.name);
+        f = types_find_field(s, &place->as.field.name);
     }
     if (f == NULL || f->form != FIELD_PLAIN) {
         return false;
@@ -911,7 +911,7 @@ static bool names_sub_object(const struct expr *e)
         return false;
     }
     s = sema_struct_of(e->as.field.base->type);
-    f = s != NULL ? type_find_field(s, &e->as.field.name) : NULL;
+    f = s != NULL ? types_find_field(s, &e->as.field.name) : NULL;
     return f != NULL && f->form == FIELD_IMPL;
 }
 
@@ -993,13 +993,13 @@ static bool method_call(struct checker *c, struct expr *call)
     if (sema_has_params(first) && f->item != NULL &&
         f->item->type_param_count > 0 && f->item->owner == NULL) {
         first = first->kind == TYPE_POINTER
-                    ? types_pointer(c->types, type_has_fields(t) ? t : s)
+                    ? types_pointer(c->types, types_has_fields(t) ? t : s)
                     : s;
     }
     /* DESIGN: a call result or a literal may be the receiver. It lives
        to the end of its statement, as a temporary of C++ does, so a
        pointer the function gives out into it stays good there. */
-    if (first->kind == TYPE_POINTER && type_has_fields(t)) {
+    if (first->kind == TYPE_POINTER && types_has_fields(t)) {
         struct expr *address = sema_new_node(c, EXPR_UNARY, receiver->pos);
         bool fresh = receiver->kind == EXPR_CALL ||
                      receiver->kind == EXPR_STRUCT_LIT ||
@@ -1016,7 +1016,7 @@ static bool method_call(struct checker *c, struct expr *call)
         address->as.unary.operand = receiver;
         address->type = first;
         receiver = address;
-    } else if (type_has_fields(first) && t->kind == TYPE_POINTER) {
+    } else if (types_has_fields(first) && t->kind == TYPE_POINTER) {
         struct expr *deref = sema_new_node(c, EXPR_UNARY, receiver->pos);
         deref->as.unary.op = TOKEN_STAR;
         deref->as.unary.operand = receiver;
@@ -1198,12 +1198,12 @@ void sema_resolve_origin(struct checker *c, struct stmt *s)
                                        sizeof LANG_ERROR_FRAMES - 1};
     struct type *error = sema_error_class(c, s->pos);
     const struct struct_field *where =
-        error != NULL ? type_find_field(error, &at) : NULL;
+        error != NULL ? types_find_field(error, &at) : NULL;
 
     if (error == NULL) {
         return;
     }
-    if (where == NULL || type_find_field(error, &frames) == NULL ||
+    if (where == NULL || types_find_field(error, &frames) == NULL ||
         where->type != sema_location_type(c, s->pos)) {
         sema_error_at(c, s->pos, "`fail` writes `" LANG_ERROR_AT "` and `"
                       LANG_ERROR_FRAMES "` of `" LANG_MODULE "." LANG_ERROR
@@ -1218,7 +1218,7 @@ void sema_resolve_origin(struct checker *c, struct stmt *s)
    returns. */
 struct type *sema_caught_error(struct checker *c, struct type *result)
 {
-    return result != NULL && type_is_nullable(result)
+    return result != NULL && types_is_nullable(result)
                ? types_pointer(c->types, result->element)
                : result;
 }
@@ -1304,7 +1304,7 @@ static struct type *check_handled(struct checker *c, struct expr *e,
        result, so it is checked against the type the binding holds. A
        `let n: ?*T = alloc T(args) catch e { yield none; }` names that
        type, and the handler yields `none` against it. */
-    if (expected != NULL && type_is_nullable(expected) &&
+    if (expected != NULL && types_is_nullable(expected) &&
         result->kind == TYPE_POINTER && result->element == expected->element) {
         result = expected;
     }
@@ -1349,7 +1349,7 @@ static struct type *check_handled(struct checker *c, struct expr *e,
                           "be `none`, and this call gives no result");
             return sema_builtin(c, TYPE_ERROR);
         }
-        if (h->none && !type_is_nullable(result) && !sema_is_error(result)) {
+        if (h->none && !types_is_nullable(result) && !sema_is_error(result)) {
             sema_error_at(c, h->pos, "`catch none` needs a result that can "
                           "be `none`, and this call gives `%s`",
                           sema_tn(result));
@@ -1774,7 +1774,7 @@ static struct type *check_simd_module(struct checker *c, struct expr *e)
     if (sema_is_error(mask)) {
         return mask;
     }
-    if (!type_is_mask(mask)) {
+    if (!types_is_mask(mask)) {
         sema_error_at(c, args[0]->pos,
                       "`simd.%.*s` takes a mask, a `simd struct` "
                       "of `bool`, found `%s`", (int)name->length, name->text,
@@ -1793,7 +1793,7 @@ static struct type *check_simd_module(struct checker *c, struct expr *e)
     if (sema_is_error(a)) {
         return a;
     }
-    if (!type_is_simd(a)) {
+    if (!types_is_simd(a)) {
         sema_error_at(c, args[1]->pos,
                       "`simd.select` chooses between values of a "
                       "`simd struct`, found `%s`", sema_tn(a));
@@ -1831,7 +1831,7 @@ static struct type *check_simd_static(struct checker *c, struct expr *e,
     const struct name *name = &e->as.call.callee->as.field.name;
     struct expr **args = e->as.call.args;
     size_t count = e->as.call.arg_count;
-    struct type *lane = type_simd_lane(t);
+    struct type *lane = types_simd_lane(t);
     struct type *i64 = sema_builtin(c, TYPE_I64);
 
     if (sema_name_is(name, SIMD_SPLAT)) {
@@ -1885,7 +1885,7 @@ static struct type *check_simd_value(struct checker *c, struct expr *e,
     struct expr *receiver = e->as.call.callee->as.field.base;
     const struct name *name = &e->as.call.callee->as.field.name;
     size_t count = e->as.call.arg_count;
-    struct type *lane = type_simd_lane(s);
+    struct type *lane = types_simd_lane(s);
     struct type *i64 = sema_builtin(c, TYPE_I64);
     struct expr **args = types_alloc_array(c->arena, count + 1, sizeof *args);
     enum simd_op op;
@@ -2368,7 +2368,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
         if (sema_is_error(owner)) {
             return owner;
         }
-        if (type_is_simd(owner) &&
+        if (types_is_simd(owner) &&
             simd_static_name(&callee->as.field.name)) {
             return check_simd_static(c, e, owner);
         }
@@ -2415,7 +2415,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
                         &callee->as.field.base->as.field.name)) != NULL &&
                sym->kind == SYMBOL_STRUCT) {
         struct type *owner = sym->type;
-        if (type_is_simd(owner) &&
+        if (types_is_simd(owner) &&
             simd_static_name(&callee->as.field.name)) {
             return check_simd_static(c, e, owner);
         }
@@ -2461,8 +2461,8 @@ static struct type *check_call(struct checker *c, struct expr *e,
         if (e->as.call.arg_count == 0 &&
             sema_name_is(&callee->as.field.name, LANG_HOOK_HASH) &&
             (base->kind == TYPE_PARAM || sema_struct_of(base) == NULL ||
-             type_find_field(sema_struct_of(base),
-                             &callee->as.field.name) == NULL)) {
+             types_find_field(sema_struct_of(base),
+                              &callee->as.field.name) == NULL)) {
             struct type *hashed;
             if (sema_hash_call(c, e, base, &hashed)) {
                 return hashed;
@@ -2497,8 +2497,8 @@ static struct type *check_call(struct checker *c, struct expr *e,
             sema_name_is(&callee->as.field.name, MUTEX_DESTROY)) {
             return check_mutex_destroy(c, e, base);
         }
-        if (type_is_simd(s) &&
-            type_find_field(s, &callee->as.field.name) == NULL &&
+        if (types_is_simd(s) &&
+            types_find_field(s, &callee->as.field.name) == NULL &&
             simd_value_name(&callee->as.field.name) &&
             !simd_method_declared(c, s, &callee->as.field.name)) {
             return check_simd_value(c, e, base, s);
@@ -2515,7 +2515,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
         /* DESIGN: a union has no methods, so v.f(args) on a union is
            always a call of the function pointer in field f. */
         if (s != NULL && !s->is_union &&
-            type_find_field(s, &callee->as.field.name) == NULL) {
+            types_find_field(s, &callee->as.field.name) == NULL) {
             if (!method_call(c, e)) {
                 return sema_builtin(c, TYPE_ERROR);
             }
@@ -2666,7 +2666,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
             e->as.call.optional &&
             (e->as.call.handler.kind == HANDLE_BLOCK ||
              e->as.call.handler.kind == HANDLE_FATAL);
-        if (!type_is_nullable(fn->result) && !after_optional) {
+        if (!types_is_nullable(fn->result) && !after_optional) {
             sema_error_at(c, e->as.call.handler.pos,
                           "this call cannot fail, so it has no error to "
                           "handle");
@@ -2799,7 +2799,7 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
     if (t->kind == TYPE_VARIANT) {
         return variant_case_value(c, e, t);
     }
-    if (t->kind == TYPE_ENUM && (f = type_find_field(t, name)) != NULL) {
+    if (t->kind == TYPE_ENUM && (f = types_find_field(t, name)) != NULL) {
         e->as.field.enum_value = (uint32_t)(f - t->fields) + 1;
         return t;
     }
@@ -2922,7 +2922,7 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
     base = sema_usable_pointer(c, e->as.field.base, base);
     if (types_is_flags(base) && e->as.field.base->kind == EXPR_NAME &&
         e->as.field.base->symbol != NULL &&
-        (f = type_find_field(base, name)) != NULL) {
+        (f = types_find_field(base, name)) != NULL) {
         e->as.field.base->symbol->flags_read |=
             (uint8_t)(1u << (f - base->fields));
     }
@@ -2935,10 +2935,10 @@ struct type *sema_check_field(struct checker *c, struct expr *e)
                           "`switch` reads the fields of its cases");
             return sema_builtin(c, TYPE_ERROR);
         }
-        if (types_is_match(s) && type_find_field(s, name) == NULL) {
+        if (types_is_match(s) && types_find_field(s, name) == NULL) {
             return sema_match_field(c, e, s);
         }
-        if ((f = type_find_field(s, name)) == NULL && e->as.field.element) {
+        if ((f = types_find_field(s, name)) == NULL && e->as.field.element) {
             /* `t.0` names the element `_0`, so the message names the
                number the program wrote. */
             if (s->kind != TYPE_TUPLE) {
@@ -3106,7 +3106,7 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
         const struct struct_field *f = NULL;
         for (j = 0; j < field_count; j++) {
             if (sema_same_name(&fields[j].name, &inits[i].name) &&
-                !type_field_is_unit_break(&fields[j])) {
+                !types_field_is_unit_break(&fields[j])) {
                 f = &fields[j];
             }
         }
@@ -3163,7 +3163,7 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
            table pointer that the literal never writes, so a literal that
            leaves it out is complete. A field of the error type has had
            its message already. */
-        if (type_field_is_unit_break(&fields[j]) ||
+        if (types_field_is_unit_break(&fields[j]) ||
             fields[j].form == FIELD_IMPL || fields[j].injected ||
             sema_is_error(fields[j].type)) {
             continue;
@@ -3200,7 +3200,7 @@ static bool worker_type(struct checker *c, struct pos pos, const char *what,
     if (sema_is_error(t)) {
         return false;
     }
-    if (!type_pointer_free(t)) {
+    if (!types_pointer_free(t)) {
         sema_error_at(c, pos,
                       "%s has type `%s`, which holds a pointer. A worker "
                       "takes and returns values alone", what, sema_tn(t));

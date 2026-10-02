@@ -226,20 +226,20 @@ static void fn_signature(struct text *out, const char *lead,
                                              : "");
         }
         /* `lent` stands before the name, as the declaration writes it. */
-        if (type_is_lent(p) && params != NULL &&
+        if (types_is_lent(p) && params != NULL &&
             params[i].length > 0) {
             struct type bare = *p;
             bare.lent = false;
             text_appendf(out, "lent %.*s: ", (int)params[i].length,
                          params[i].text);
-            type_name(out, &bare);
+            types_name(out, &bare);
             continue;
         }
         if (params != NULL && params[i].length > 0) {
             text_appendf(out, "%.*s: ", (int)params[i].length,
                          params[i].text);
         }
-        type_name(out, p);
+        types_name(out, p);
     }
     if (variadic) {
         text_append(out, param_count > 0 || self ? ", ..." : "...");
@@ -247,7 +247,7 @@ static void fn_signature(struct text *out, const char *lead,
     text_append(out, ")");
     if (result != NULL) {
         text_append(out, " -> ");
-        type_name(out, result);
+        types_name(out, result);
     }
     if (t->may_fail) {
         text_append(out, " may fail");
@@ -264,7 +264,7 @@ static void const_value(struct text *out, const struct const_value *v)
     }
     switch (v->kind) {
     case CONST_INT:
-        if (v->type != NULL && !type_is_signed(v->type)) {
+        if (v->type != NULL && !types_is_signed(v->type)) {
             text_appendf(out, " = %" PRIu64, v->as.integer);
         } else {
             text_appendf(out, " = %" PRId64, (int64_t)v->as.integer);
@@ -293,7 +293,7 @@ static void type_signature(struct text *out, const char *lead,
         text_appendf(out, "%senum %.*s", lead, (int)name->length, name->text);
         if (t->base != NULL) {
             text_append(out, ": ");
-            type_name(out, t->base);
+            types_name(out, t->base);
         }
         break;
     case TYPE_VARIANT:
@@ -316,7 +316,7 @@ static void type_signature(struct text *out, const char *lead,
         if (t->base != NULL && !(name_is(&t->base->module, LANG_MODULE) &&
                                  name_is(&t->base->name, LANG_OBJECT))) {
             text_append(out, " inherits ");
-            type_name_qualified(out, t->base);
+            types_name_qualified(out, t->base);
         }
         break;
     default:
@@ -355,7 +355,7 @@ static bool field_signature(struct text *out, const struct struct_field *f,
         text_append(out, "own ");
     }
     text_appendf(out, "%.*s: ", (int)f->name.length, f->name.text);
-    type_name(out, f->type);
+    types_name(out, f->type);
     if (f->bits > 0) {
         text_appendf(out, " : %u", (unsigned)f->bits);
     }
@@ -389,7 +389,7 @@ static void variant_cases(struct doc_entry *item, const struct type *t)
             text_appendf(&one->signature, "%s%.*s: ", j > 0 ? ", " : "",
                          (int)body->fields[j].name.length,
                          body->fields[j].name.text);
-            type_name(&one->signature, body->fields[j].type);
+            types_name(&one->signature, body->fields[j].type);
         }
         text_append(&one->signature, " }");
     }
@@ -521,7 +521,7 @@ static void alias_signature(struct doc_entry *one, const char *lead,
 {
     text_appendf(&one->signature, "%stype %.*s = ", lead, (int)name->length,
                  name->text);
-    type_name(&one->signature, t);
+    types_name(&one->signature, t);
     if (t->generic != NULL) {
         text_append_bytes(&one->copy_of_module, t->generic->module.text,
                           t->generic->module.length);
@@ -576,7 +576,7 @@ static void interface_item(struct doc_page *p, const struct symbol *sym)
     case SYMBOL_CONST:
         text_appendf(&one->signature, "%sconst %.*s: ", lead,
                      (int)sym->name.length, sym->name.text);
-        type_name(&one->signature, sym->type);
+        types_name(&one->signature, sym->type);
         const_value(&one->signature, sym->value);
         break;
     default:
@@ -633,7 +633,7 @@ static void tree_item(struct doc_page *p, const struct item *it, bool notes)
     case ITEM_CONST:
         text_appendf(&one->signature, "%sconst %.*s: ", lead,
                      (int)it->name.length, it->name.text);
-        type_name(&one->signature, sym->type);
+        types_name(&one->signature, sym->type);
         const_value(&one->signature, sym->value);
         break;
     default:

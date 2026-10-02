@@ -14,7 +14,7 @@ file argument it walks both directories for `.anti` files, sorted by path,
 so a run over a tree is the same run on every machine.
 
 Every source is read once before any class runs. That pass gives the module
-path, from `module_path_of_source` over the search roots, and the imports,
+path, from `modpath_of_source` over the search roots, and the imports,
 from the parser. A file the lexer or the parser refuses reports there and no
 class below it sees the file, so no message is printed twice.
 

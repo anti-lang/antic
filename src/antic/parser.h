@@ -12,8 +12,8 @@
    memory pool. Every syntax error goes to diags, one per mistake, and
    parsing continues after it. Returns true when no error occurred. The
    module is stored in *out in either case. */
-bool parse(const char *source, const struct token_list *tokens,
-           struct arena *arena, struct diagnostics *diags,
-           struct module **out);
+bool parser_parse(const char *source, const struct token_list *tokens,
+                  struct arena *arena, struct diagnostics *diags,
+                  struct module **out);
 
 #endif

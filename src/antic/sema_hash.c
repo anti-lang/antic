@@ -151,7 +151,7 @@ static void walk(struct checker *c, struct expr *e, struct type *t,
             return;
         }
         for (i = 0; i < t->field_count; i++) {
-            if (!type_field_is_unit_break(&t->fields[i])) {
+            if (!types_field_is_unit_break(&t->fields[i])) {
                 walk(c, e, t->fields[i].type, walked);
             }
         }
@@ -196,7 +196,8 @@ bool sema_hash_call(struct checker *c, struct expr *e, struct type *t,
     if (has_own_hash(c, t)) {
         return false;
     }
-    if (t->kind == TYPE_POINTER && !t->nullable && type_has_fields(t->element)) {
+    if (t->kind == TYPE_POINTER && !t->nullable &&
+        types_has_fields(t->element)) {
         hashed = t->element;
     }
     e->as.call.hashes = true;
@@ -276,7 +277,7 @@ static void walk_parts(struct checker *c, struct expr *e, struct type *t,
         return;
     }
     for (i = 0; i < t->field_count; i++) {
-        if (!type_field_is_unit_break(&t->fields[i])) {
+        if (!types_field_is_unit_break(&t->fields[i])) {
             walk_eq(c, e, t->fields[i].type, walked);
         }
     }
@@ -358,7 +359,7 @@ const struct struct_field *sema_eq_gap(struct checker *c, struct type *t)
 
     for (i = 0; i < t->field_count; i++) {
         const struct struct_field *f = &t->fields[i];
-        if (type_field_is_unit_break(f) || types_is_mutex(f->type) ||
+        if (types_field_is_unit_break(f) || types_is_mutex(f->type) ||
             types_is_object_lock(f->type)) {
             continue;
         }
@@ -445,7 +446,7 @@ static bool concurrent_in(struct checker *c, struct type *t,
         return false;
     }
     for (i = 0; i < t->field_count; i++) {
-        if (!type_field_is_unit_break(&t->fields[i]) &&
+        if (!types_field_is_unit_break(&t->fields[i]) &&
             concurrent_in(c, t->fields[i].type, answered)) {
             return true;
         }
@@ -508,7 +509,7 @@ static bool default_eq(struct checker *c, struct type *t)
         return sema_class_gap(c, t) == NULL &&
                !sema_concurrent_lacks(c, t, LANG_HOOK_EQ);
     case TYPE_STRUCT:
-        return !t->is_union && !type_is_simd(t) && !types_is_mutex(t) &&
+        return !t->is_union && !types_is_simd(t) && !types_is_mutex(t) &&
                !types_is_match(t) && sema_eq_gap(c, t) == NULL;
     case TYPE_TUPLE:
         return sema_eq_gap(c, t) == NULL;

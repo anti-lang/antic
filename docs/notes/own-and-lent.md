@@ -11,8 +11,8 @@ under "Generics and collections" in `docs/decisions.md` hold the decisions.
   `types_without_none` keeps the mark. The type printer writes `lent *T`.
 - A function type names the lent form among its parameters, so `fn(lent *T)`
   and `fn(*T)` are two types and nothing converts between them.
-- `lent []T` is a `TYPE_SLICE` with `lent` set, and `type_is_lent` holds for
-  both kinds. Every rule of the checker keys on `type_is_lent`, so a lent
+- `lent []T` is a `TYPE_SLICE` with `lent` set, and `types_is_lent` holds for
+  both kinds. Every rule of the checker keys on `types_is_lent`, so a lent
   slice meets the refusals of a lent pointer. Slicing a slice gives its own
   type, so a part of a lent slice is lent.
 - `&` of a place, `ptr` of a slice and a slice of an array give the lent

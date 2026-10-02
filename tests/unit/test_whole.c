@@ -39,7 +39,7 @@ static void close_program(struct program *p)
 
     ir_module_free(&p->ir);
     for (i = 0; i < p->token_lists; i++) {
-        token_list_free(&p->tokens[i]);
+        lexer_token_list_free(&p->tokens[i]);
     }
     diagnostics_free(&p->diags);
     arena_free(&p->arena);
@@ -51,8 +51,8 @@ static struct module *compile(struct program *p, const char *name,
 {
     struct token_list *tokens = &p->tokens[p->token_lists++];
     struct module *module = NULL;
-    bool ok = lex(source, strlen(source), &p->arena, &p->diags, tokens) &&
-              parse(source, tokens, &p->arena, &p->diags, &module) &&
+    bool ok = lexer_lex(source, strlen(source), &p->arena, &p->diags, tokens) &&
+              parser_parse(source, tokens, &p->arena, &p->diags, &module) &&
               sema_check(module, name, NULL, p->libraries, p->library_count,
                          &p->types, &p->arena, &p->diags, true) &&
               lower_module(module, name, out, &p->diags, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);

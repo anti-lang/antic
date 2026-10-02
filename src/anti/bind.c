@@ -45,7 +45,7 @@ int bind_header(const char *library, const char *out_dir,
         !files_make_dirs(out_dir) || !driver_library_header(&o, &header)) {
         goto done;
     }
-    text_appendf(&path, "%s/%s%s", out_dir, module_path_last(module),
+    text_appendf(&path, "%s/%s%s", out_dir, modpath_last(module),
                  HEADER_SUFFIX);
     if (files_write(text_cstr(&path), &header)) {
         status = 0;
@@ -125,7 +125,7 @@ int bind_run(const struct bind_request *q)
         default_module(q->input, &module);
     }
     b.module = text_cstr(&module);
-    b.library = module_path_last(b.module);
+    b.library = modpath_last(b.module);
     b.source = files_base_name(q->input);
     b.defines = q->defines;
     b.define_count = q->define_count;

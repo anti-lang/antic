@@ -608,14 +608,14 @@ void sema_resolve_generics(struct checker *c)
    have it, and a struct or a class gets a default. */
 static bool builtin_meets(const struct type *t, const char *hook)
 {
-    bool integer = type_is_integer(t);
-    bool numeric = type_is_numeric(t);
+    bool integer = types_is_integer(t);
+    bool numeric = types_is_numeric(t);
 
     if (strcmp(hook, LANG_HOOK_HASH) == 0) {
         return true;
     }
     if (strcmp(hook, "eq") == 0) {
-        return !type_has_fields(t) && t->kind != TYPE_ARRAY &&
+        return !types_has_fields(t) && t->kind != TYPE_ARRAY &&
                t->kind != TYPE_SLICE && t->kind != TYPE_F16 &&
                t->kind != TYPE_VOID;
     }
@@ -627,7 +627,7 @@ static bool builtin_meets(const struct type *t, const char *hook)
         return numeric;
     }
     if (strcmp(hook, "neg") == 0) {
-        return type_is_signed(t) || type_is_float(t);
+        return types_is_signed(t) || types_is_float(t);
     }
     if (strcmp(hook, "rem") == 0 || strcmp(hook, "and") == 0 ||
         strcmp(hook, "or") == 0 || strcmp(hook, "xor") == 0 ||
@@ -659,7 +659,7 @@ static bool meets_hook(struct checker *c, struct type *t, const char *hook)
         sema_concurrent_lacks(c, t, hook)) {
         return false;
     }
-    if (type_has_fields(t) && strcmp(hook, LANG_HOOK_HASH) != 0) {
+    if (types_has_fields(t) && strcmp(hook, LANG_HOOK_HASH) != 0) {
         return sema_operator_symbol(c, t, hook) != NULL ||
                (strcmp(hook, LANG_HOOK_EQ) == 0 && sema_default_eq(c, t));
     }
@@ -1125,7 +1125,7 @@ static struct name copy_name(struct checker *c, const struct type *generic,
 {
     struct text out = {0};
 
-    type_copy_name(&out, generic, args, values, false);
+    types_copy_name(&out, generic, args, values, false);
     return sema_copy_name(c, &out, cut);
 }
 
@@ -1242,7 +1242,7 @@ static void check_copy(struct checker *c, struct type *copy)
             break;
         }
     }
-    if (!sema_has_params(copy) && type_has_fields(copy)) {
+    if (!sema_has_params(copy) && types_has_fields(copy)) {
         sema_check_nesting(c, copy, pos);
     }
 }
@@ -1451,7 +1451,7 @@ static bool resolve_arg(struct checker *c, const struct name *name,
         struct symbol *sym = sema_lookup(c, &a->name);
         if (sym != NULL && sym->kind == SYMBOL_CONST &&
             sema_const_symbol(c, sym, a->pos) && sym->value != NULL &&
-            type_is_integer(sym->type)) {
+            types_is_integer(sym->type)) {
             if (sym->value->kind == CONST_SYMBOLIC) {
                 *value = sym->value->as.symbolic;
             } else {

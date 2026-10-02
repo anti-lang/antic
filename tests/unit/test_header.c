@@ -25,8 +25,8 @@ static bool header_text(const char *path, const char *source, bool bundled,
     bool ok = true;
 
     types_init(&types, &arena);
-    if (!lex(source, strlen(source), &arena, &diags, &tokens) ||
-        !parse(source, &tokens, &arena, &diags, &module) ||
+    if (!lexer_lex(source, strlen(source), &arena, &diags, &tokens) ||
+        !parser_parse(source, &tokens, &arena, &diags, &module) ||
         !sema_check(module, path, NULL, NULL, 0, &types, &arena, &diags, true)) {
         check_failures++;
         fprintf(stderr, "header source does not check: %s\n",
@@ -37,7 +37,7 @@ static bool header_text(const char *path, const char *source, bool bundled,
         ifaces[0] = &iface;
         header_write(out, "geo", ifaces, 1, bundled);
     }
-    token_list_free(&tokens);
+    lexer_token_list_free(&tokens);
     diagnostics_free(&diags);
     arena_free(&arena);
     return ok;

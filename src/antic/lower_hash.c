@@ -113,7 +113,7 @@ static struct ir_operand hash_value(struct lowerer *l, struct ir_operand v,
     }
     if (type != IR_I64) {
         v = lower_temp(l, ir_unary(l->f, l->b,
-                                   type_is_signed(form) ? IR_SEXT : IR_ZEXT,
+                                   types_is_signed(form) ? IR_SEXT : IR_ZEXT,
                                    IR_I64, v));
     }
     return mix(l, v);
@@ -402,7 +402,7 @@ struct ir_operand lower_hash(struct lowerer *l, const struct expr *e)
     /* A pointer that cannot be `none` reaches the struct it points at,
        as the call of a method does. */
     if (t->kind == TYPE_POINTER && !t->nullable &&
-        type_has_fields(t->element)) {
+        types_has_fields(t->element)) {
         struct ir_operand at = lower_expr(l, receiver);
         return hash_at(l, e, at, t->element);
     }

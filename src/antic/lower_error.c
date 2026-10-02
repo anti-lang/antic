@@ -247,7 +247,7 @@ static void write_origin(struct lowerer *l, const struct stmt *s,
     static const struct name line_name = {LANG_LOCATION_LINE,
                                           sizeof LANG_LOCATION_LINE - 1};
     const struct type *error = s->as.fail.error;
-    const struct type *location = type_find_field(error, &at_name)->type;
+    const struct type *location = types_find_field(error, &at_name)->type;
     struct ir_block *empty = lower_new_block(l);
     struct ir_block *capture = lower_new_block(l);
     struct ir_block *rest = lower_new_block(l);

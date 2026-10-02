@@ -35,8 +35,8 @@ struct ir_operand lower_widen_operand(struct lowerer *l, struct ir_operand v,
         return v;
     }
     return lower_temp(l, ir_unary(l->f, l->b,
-                                  type_is_signed(t) ? IR_SEXT : IR_ZEXT, IR_I64,
-                                  v));
+                                  types_is_signed(t) ? IR_SEXT : IR_ZEXT,
+                                  IR_I64, v));
 }
 
 /* DESIGN: the values the failure prints are widened inside the failure
@@ -115,7 +115,7 @@ struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
     struct ir_operand count;
     struct ir_operand width;
 
-    if (!type_is_integer(t)) {
+    if (!types_is_integer(t)) {
         return lower_none();
     }
     switch (op) {
@@ -126,7 +126,7 @@ struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
         struct ir_block *fail;
         struct ir_block *rest;
         struct ir_operand result;
-        if (!type_is_signed(t)) {
+        if (!types_is_signed(t)) {
             return lower_none();
         }
         snprintf(operation, sizeof operation, "overflow in %s",
@@ -148,7 +148,7 @@ struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
         snprintf(operation, sizeof operation, "division by zero in %s",
                  op == TOKEN_SLASH ? "/" : "%");
         lower_check_branch(l, ok, false, lower_check_text(l, line, operation),
-                           type_is_signed(t) ? CHECK_LEFT : CHECK_LEFT_U, left,
+                           types_is_signed(t) ? CHECK_LEFT : CHECK_LEFT_U, left,
                            lower_none(), t);
         return lower_none();
     case TOKEN_SHL:

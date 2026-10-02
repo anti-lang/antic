@@ -101,7 +101,7 @@ before it, as `lower_binary` does.
 
 ## The path in the text
 
-`module_file_of_source` in `src/antic/modpath.c` gives the path of the source under
+`modpath_file_of_source` in `src/antic/modpath.c` gives the path of the source under
 the first search root that holds it, and its file name alone outside every
 root. `lower_checked` records that as the module's file, which an assertion
 and a check name, while a message keeps the path the command line gave. The

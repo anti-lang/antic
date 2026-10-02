@@ -1138,6 +1138,10 @@ struct module {
 /* Append the tree of module to out, one node per line, indented by two
    spaces per level. Chapter 1 shows this output for the function scale. */
 void ast_dump(struct text *out, const struct module *module);
+/* The syntax tree as ast_dump prints it, with the type of every
+   expression, parameter, variable and function on the right, once the
+   checker has run. */
+void ast_dump_typed(struct text *out, const struct module *module);
 
 /* A visit of the walk in ast_walk.c. Each function returns whether the
    walk goes on into the children of the node, and either may be NULL,

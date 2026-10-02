@@ -98,7 +98,7 @@ bool antic_library_header(const uint8_t *data, size_t size,
 /* Split source into the tokens of the language, ending with TOKEN_EOF,
    as antic reads them. `anti fmt` works on the token list, which is the
    one definition of the words and symbols of Anti. Returns false when the
-   source does not lex. token_list_free releases the array of out, and
+   source does not lex. lexer_token_list_free releases the array of out, and
    the texts of the tokens lie in the memory pool. */
 bool antic_tokens(const char *source, size_t length, struct arena *arena,
                   struct token_list *out);

@@ -24,8 +24,9 @@ static void run(struct checked *c, const char *source)
 {
     memset(c, 0, sizeof *c);
     types_init(&c->types, &c->arena);
-    c->ok = lex(source, strlen(source), &c->arena, &c->diags, &c->tokens) &&
-            parse(source, &c->tokens, &c->arena, &c->diags, &c->module);
+    c->ok = lexer_lex(source, strlen(source), &c->arena, &c->diags,
+                      &c->tokens) &&
+            parser_parse(source, &c->tokens, &c->arena, &c->diags, &c->module);
     if (!c->ok) {
         fprintf(stderr, "syntax error in test source: %s\n",
                 c->diags.items[0].message);
@@ -38,7 +39,7 @@ static void run(struct checked *c, const char *source)
 
 static void release(struct checked *c)
 {
-    token_list_free(&c->tokens);
+    lexer_token_list_free(&c->tokens);
     diagnostics_free(&c->diags);
     arena_free(&c->arena);
 }

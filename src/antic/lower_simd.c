@@ -16,7 +16,7 @@
 /* Whether the operations on the simd struct t are loops over its lanes. */
 static bool simd_loops(const struct type *t)
 {
-    return type_simd_bytes(t) > CPU_VECTOR_BYTE_CAP;
+    return types_simd_bytes(t) > CPU_VECTOR_BYTE_CAP;
 }
 
 /* A new slot for a value of type t, in the entry block. */
@@ -127,7 +127,8 @@ static struct ir_operand lane_at(struct lowerer *l, const struct lanes *c,
                                              lower_temp(l, c->index),
                                              ir_int_op(IR_I64, k)));
     offset = lower_temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64, index,
-                                     lower_size_operand(l, type_simd_lane(t))));
+                                     lower_size_operand(l,
+                                                        types_simd_lane(t))));
     return lower_temp(l, ir_ptradd(l->f, l->b, base, offset));
 }
 
@@ -171,8 +172,8 @@ struct ir_operand lower_simd_binary(struct lowerer *l,
 {
     enum token_kind op = e->as.binary.op;
     const struct type *t = e->as.binary.left->type;
-    const struct type *lane = type_simd_lane(t);
-    bool checked = type_is_integer(lane) &&
+    const struct type *lane = types_simd_lane(t);
+    bool checked = types_is_integer(lane) &&
                    (op == TOKEN_SLASH || op == TOKEN_SHL || op == TOKEN_SHR);
     struct ir_operand x = lower_address(l, e->as.binary.left);
     struct ir_operand y = lower_address(l, e->as.binary.right);
@@ -214,7 +215,7 @@ struct ir_operand lower_simd_unary(struct lowerer *l,
                                    const struct expr *e)
 {
     const struct type *t = e->type;
-    const struct type *lane = type_simd_lane(t);
+    const struct type *lane = types_simd_lane(t);
     enum ir_op op = e->as.unary.op == TOKEN_TILDE ? IR_NOT
                     : lane_math(lane) == IR_F32 || lane_math(lane) == IR_F64
                         ? IR_FNEG
@@ -263,7 +264,7 @@ static struct ir_operand simd_elements(struct lowerer *l, const struct expr *e,
                                        struct ir_operand slice,
                                        struct ir_operand index, size_t count)
 {
-    const struct type *lane = type_simd_lane(e->as.simd.simd);
+    const struct type *lane = types_simd_lane(e->as.simd.simd);
     const struct ir_global *text =
         lower_check_text(l, e->pos.line, "index out of bounds");
     struct ir_operand length = lower_slice_length(l, slice, slice_expr->type);
@@ -298,9 +299,9 @@ static enum ir_op fold_op(enum simd_op op, const struct type *lane)
 
     switch (op) {
     case SIMD_OP_MIN:
-        return is_float ? IR_FLT : type_is_signed(lane) ? IR_SLT : IR_ULT;
+        return is_float ? IR_FLT : types_is_signed(lane) ? IR_SLT : IR_ULT;
     case SIMD_OP_MAX:
-        return is_float ? IR_FGT : type_is_signed(lane) ? IR_SGT : IR_UGT;
+        return is_float ? IR_FGT : types_is_signed(lane) ? IR_SGT : IR_UGT;
     default:
         return is_float ? IR_FADD : IR_ADD;
     }
@@ -319,7 +320,7 @@ static struct ir_operand fold_lanes(struct lowerer *l, enum simd_op op,
                                     const struct type *t, struct ir_operand x,
                                     struct ir_operand y)
 {
-    const struct type *lane = type_simd_lane(t);
+    const struct type *lane = types_simd_lane(t);
     enum ir_type math = lane_math(lane);
     enum ir_op fold = fold_op(op, lane);
     struct text name = {0};
@@ -417,7 +418,7 @@ static struct ir_operand fold_lanes(struct lowerer *l, enum simd_op op,
 struct ir_operand lower_simd(struct lowerer *l, const struct expr *e)
 {
     const struct type *t = e->as.simd.simd;
-    const struct type *lane = type_simd_lane(t);
+    const struct type *lane = types_simd_lane(t);
     struct expr *const *args = e->as.simd.args;
     enum ir_type bits = lower_ir_type_of(lane);
     bool loops = simd_loops(t);

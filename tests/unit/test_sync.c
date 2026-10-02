@@ -26,8 +26,9 @@ static void run(struct checked *c, const char *source)
 {
     memset(c, 0, sizeof *c);
     types_init(&c->types, &c->arena);
-    c->ok = lex(source, strlen(source), &c->arena, &c->diags, &c->tokens) &&
-            parse(source, &c->tokens, &c->arena, &c->diags, &c->module);
+    c->ok = lexer_lex(source, strlen(source), &c->arena, &c->diags,
+                      &c->tokens) &&
+            parser_parse(source, &c->tokens, &c->arena, &c->diags, &c->module);
     if (!c->ok) {
         fprintf(stderr, "syntax error in test source: %s\n%s\n",
                 c->diags.count > 0 ? c->diags.items[0].message : "",
@@ -41,7 +42,7 @@ static void run(struct checked *c, const char *source)
 
 static void release(struct checked *c)
 {
-    token_list_free(&c->tokens);
+    lexer_token_list_free(&c->tokens);
     diagnostics_free(&c->diags);
     arena_free(&c->arena);
 }
@@ -93,8 +94,8 @@ static void syntax_error(const char *source, int line, int column,
     struct token_list tokens = {0};
     struct module *module = NULL;
 
-    CHECK(lex(source, strlen(source), &arena, &diags, &tokens));
-    CHECK(!parse(source, &tokens, &arena, &diags, &module));
+    CHECK(lexer_lex(source, strlen(source), &arena, &diags, &tokens));
+    CHECK(!parser_parse(source, &tokens, &arena, &diags, &module));
     if (diags.count == 0 || diags.items[0].line != line ||
         diags.items[0].column != column ||
         strcmp(diags.items[0].message, message) != 0) {
@@ -105,7 +106,7 @@ static void syntax_error(const char *source, int line, int column,
                 diags.count > 0 ? diags.items[0].message : "nothing",
                 source);
     }
-    token_list_free(&tokens);
+    lexer_token_list_free(&tokens);
     diagnostics_free(&diags);
     arena_free(&arena);
 }
@@ -118,14 +119,14 @@ static void tree(const char *source, const char *expected)
     struct module *module = NULL;
     struct text out = {0};
 
-    CHECK(lex(source, strlen(source), &arena, &diags, &tokens));
-    CHECK(parse(source, &tokens, &arena, &diags, &module));
+    CHECK(lexer_lex(source, strlen(source), &arena, &diags, &tokens));
+    CHECK(parser_parse(source, &tokens, &arena, &diags, &module));
     if (module != NULL) {
         ast_dump(&out, module);
         CHECK_STR(text_cstr(&out), expected);
     }
     text_free(&out);
-    token_list_free(&tokens);
+    lexer_token_list_free(&tokens);
     diagnostics_free(&diags);
     arena_free(&arena);
 }
@@ -143,7 +144,7 @@ static void let_type(const char *source, const char *expected)
         const struct stmt *s = f->body->stmts[0];
         CHECK(s->kind == STMT_LET && s->as.let.symbol != NULL);
         if (s->kind == STMT_LET && s->as.let.symbol != NULL) {
-            type_name(&out, s->as.let.symbol->type);
+            types_name(&out, s->as.let.symbol->type);
             CHECK_STR(text_cstr(&out), expected);
         }
     }
@@ -168,12 +169,12 @@ void test_sync(void)
         const char *source = "sync chan send recv select thread close Mutex";
         size_t i;
 
-        CHECK(lex(source, strlen(source), &arena, &diags, &tokens));
+        CHECK(lexer_lex(source, strlen(source), &arena, &diags, &tokens));
         CHECK(tokens.count == sizeof k / sizeof k[0]);
         for (i = 0; i < tokens.count && i < sizeof k / sizeof k[0]; i++) {
             CHECK(tokens.items[i].kind == k[i]);
         }
-        token_list_free(&tokens);
+        lexer_token_list_free(&tokens);
         diagnostics_free(&diags);
         arena_free(&arena);
     }

@@ -603,7 +603,7 @@ static bool build_c_library(struct build *b, enum target t, enum cpu_level cpu,
                             const struct strings *libraries)
 {
     struct options o;
-    const char *base = module_path_last(text_cstr(&b->m.name));
+    const char *base = modpath_last(text_cstr(&b->m.name));
     bool ok;
 
     base_options(b, &o, t, cpu);
@@ -750,10 +750,10 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
     }
     if (b->r->lib != BUILD_PROGRAM) {
         library_name(t, b->r->lib == BUILD_LIB_SHARED,
-                     module_path_last(text_cstr(&b->m.name)), &deliverable);
+                     modpath_last(text_cstr(&b->m.name)), &deliverable);
     } else {
         text_appendf(&deliverable, "%s%s",
-                     module_path_last(text_cstr(&b->m.name)),
+                     modpath_last(text_cstr(&b->m.name)),
                      target_info(t)->executable_suffix);
     }
     text_appendf(&b->name, "%s/%s", text_cstr(&b->build_dir),
@@ -1036,7 +1036,7 @@ static int build_project(const struct build_request *r, int depth)
             text_appendf(&program, "%s/%s/%s/%s/%s%s", r->root,
                          text_cstr(&b.m.dist), target_name(host),
                          r->release ? "release" : "dev",
-                         module_path_last(text_cstr(&b.m.name)),
+                         modpath_last(text_cstr(&b.m.name)),
                          target_info(host)->executable_suffix);
             if (!files_exists(text_cstr(&program))) {
                 fprintf(stderr, "anti: %s was not built, so there is nothing "
@@ -1079,10 +1079,10 @@ int build_new(const char *name)
     struct text path = {0};
     struct text file = {0};
     struct text directory = {0};
-    const char *last = module_path_last(name);
+    const char *last = modpath_last(name);
     int status = 1;
 
-    if (module_path_segments(name) < 2) {
+    if (modpath_segments(name) < 2) {
         fprintf(stderr, "anti: `%s` is one segment, and a package name is a "
                         "module path of at least two, as com.example.%s\n",
                 name, name);

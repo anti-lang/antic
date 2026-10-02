@@ -661,7 +661,7 @@ bool lexer_is_keyword(const char *s, size_t n)
     return word_kind(s, n) != TOKEN_IDENT || is_null(s, n);
 }
 
-bool token_is_builtin_type(enum token_kind kind)
+bool lexer_token_is_builtin_type(enum token_kind kind)
 {
     return kind >= TOKEN_BOOL_TYPE && kind <= TOKEN_C_WCHAR;
 }
@@ -1295,7 +1295,7 @@ static void placeholder(struct lexer *lx, size_t end, bool raw,
         piece->tokens = copy;
         piece->token_count = tokens.count;
     }
-    token_list_free(&tokens);
+    lexer_token_list_free(&tokens);
     lx->pos = inner.pos;
     lx->line = inner.line;
     lx->column = inner.column;
@@ -1487,8 +1487,8 @@ static void lex_token(struct lexer *lx)
     }
 }
 
-bool lex(const char *source, size_t length, struct arena *arena,
-         struct diagnostics *diags, struct token_list *out)
+bool lexer_lex(const char *source, size_t length, struct arena *arena,
+               struct diagnostics *diags, struct token_list *out)
 {
     struct lexer lx = {source, length, 0, 1, 1, arena, diags, out, true, 0, 0};
 
@@ -1517,7 +1517,7 @@ bool lex(const char *source, size_t length, struct arena *arena,
     }
 }
 
-void token_list_free(struct token_list *list)
+void lexer_token_list_free(struct token_list *list)
 {
     free(list->items);
     list->items = NULL;
@@ -1525,7 +1525,7 @@ void token_list_free(struct token_list *list)
     list->capacity = 0;
 }
 
-const char *token_kind_name(enum token_kind kind)
+const char *lexer_token_kind_name(enum token_kind kind)
 {
     /* DESIGN: the spelling of a symbol in backticks, written on its first
        use and read after. antic runs on one thread and starts none, so no
@@ -1564,7 +1564,7 @@ const char *token_kind_name(enum token_kind kind)
     return names[kind];
 }
 
-const char *token_category(enum token_kind kind)
+const char *lexer_token_category(enum token_kind kind)
 {
     switch (kind) {
     case TOKEN_IDENT: return "ident";
