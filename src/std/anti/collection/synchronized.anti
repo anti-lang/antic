@@ -412,11 +412,9 @@ pub synchronized class SyncList<T>
 	/// `List` hashes alike. The hash of a list calls it with the list locked.
 	fn hash_items(self, element_hash: fn(lent *T) -> u64) -> u64
 	{
-		let h = self.items.count.hash();
-		for p in &self.items {
-			h = (h, element_hash(&p.0)).hash();
-		}
-		return h;
+		return collection.hash_in_order_by<(T, int)>(&self.items, fn(p) {
+			return element_hash(&p.0);
+		});
 	}
 }
 

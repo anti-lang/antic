@@ -511,11 +511,23 @@ pub fn equal<T: eq>(a: *Collection<T>, b: *Collection<T>) -> bool
 /// hash>(a: List<T>) -> u64` beside its `==`.
 pub fn hash_in_order<T: hash>(c: *Collection<T>) -> u64
 {
+	return hash_in_order_by<T>(c, fn(p) {
+		return (*p).hash();
+	});
+}
+
+/// The hash of the elements of `c` in the order of its places, with
+/// `element_hash` giving the hash of each, as `hash_in_order` combines them. A
+/// collection that keeps more than its elements in each slot hashes the
+/// element alone through it, so it hashes as a sequence of its elements.
+pub fn hash_in_order_by<T>(c: *Collection<T>,
+	element_hash: fn(lent *T) -> u64) -> u64
+{
 	let h = c.count.hash();
 	let at = c.first_place();
 	while at >= 0 do {
 		c.lend_place(at, fn(p) {
-			h = (h, (*p).hash()).hash();
+			h = (h, element_hash(p)).hash();
 		});
 		at = c.next_place(at);
 	}
