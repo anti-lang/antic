@@ -24,7 +24,7 @@
 #include "cpu_level.h"
 #include "platform.h"
 #include "rt.h"
-#include "signal.h"
+#include "signals.h"
 #include "std.h"
 #include "utf.h"
 

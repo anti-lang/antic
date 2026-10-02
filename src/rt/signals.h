@@ -1,5 +1,5 @@
-#ifndef ANTI_RT_SIGNAL_H
-#define ANTI_RT_SIGNAL_H
+#ifndef ANTI_RT_SIGNALS_H
+#define ANTI_RT_SIGNALS_H
 
 #include <stdint.h>
 

@@ -11,7 +11,7 @@
 
 #include "../binary_stdio.h"
 #include "../../src/rt/atomic.h"
-#include "../../src/rt/signal.h"
+#include "../../src/rt/signals.h"
 #include "check.h"
 
 #if !defined(_WIN32)

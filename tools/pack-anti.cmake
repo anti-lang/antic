@@ -125,8 +125,7 @@ endfunction()
 # which the CMake build reads as well.
 # DESIGN: the sources of the compiler take its include directories alone.
 # Those of anti take anti's as well. The CMake build compiles antic_core
-# and anti the same way. src/rt holds a signal.h, which hides the one of
-# the C library from a source of the compiler that finds it.
+# and anti the same way.
 include("${tools_dir}/sources.cmake")
 include("${tools_dir}/warnings.cmake")
 

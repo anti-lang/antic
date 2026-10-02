@@ -350,10 +350,8 @@ set(ANTIC_RUNTIME_OBJDUMP
 set(ANTIC_RUNTIME_READOBJ
     "${ANTIC_RUNTIME_DIR}/bin/llvm-readobj${CMAKE_EXECUTABLE_SUFFIX}")
 
-# The signal table of the runtime, in a program of its own. src/rt/signal.h
-# shares its name with the header of C, so the include path of the unit
-# tests would hide the one of C from src/rt/signal.c. The test starts
-# threads, and so does the reader of the platform layer.
+# The signal table of the runtime, in a program of its own. The test
+# starts threads, and so does the reader of the platform layer.
 find_package(Threads REQUIRED)
 antic_rt_sources(signal_sources signal atomic utf platform_posix
     platform_windows)
@@ -656,6 +654,11 @@ add_test(NAME workflows_dispatch_only
 add_test(NAME warning_set
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_warning_set.cmake")
+
+# No header of ours hides a header of the C library on an include path.
+add_test(NAME header_names
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_header_names.cmake")
 
 # Rule 25: every symbol a runtime library of the archive defines starts
 # with anti_rt_, on every target and level.

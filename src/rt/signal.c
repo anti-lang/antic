@@ -6,7 +6,7 @@
 
 #include "atomic.h"
 #include "platform.h"
-#include "signal.h"
+#include "signals.h"
 
 /* The signals a program may wait for. The numbers are the C ones, which
    every platform the compiler targets spells the same way. */
