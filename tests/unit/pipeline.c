@@ -1,3 +1,4 @@
+#include "../binary_stdio.h"
 #include "pipeline.h"
 
 #include <stdio.h>
