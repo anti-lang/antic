@@ -3,15 +3,19 @@
 # cpu_levels_pin compares `antic --print-cpu-levels` with this file.
 #
 # level <name> <architecture> <id> <clang -march= value> <llvm-mc -mattr= value>
+#       <"target-cpu" of LLVM> <"target-features" of LLVM>
 # default <target> <level name>
 #
-# A - in the attributes column means the assembler needs none.
-level v1 x86_64 1 x86-64 -
-level v2 x86_64 2 x86-64-v2 -
-level v3 x86_64 3 x86-64-v3 -
-level armv8.0 arm64 16 armv8-a -
-level armv8.2 arm64 18 armv8.2-a +lse,+fullfp16,+dotprod
-level armv8.5 arm64 21 armv8.5-a +lse,+fullfp16,+dotprod
+# A - in the attributes column means the assembler needs none. The last two
+# columns are the function attributes the LLVM back end writes. The feature
+# strings are what the pinned clang writes for the level, and the test
+# llvm_datalayout_pin compares them with it.
+level v1 x86_64 1 x86-64 - x86-64 +cmov,+cx8,+fxsr,+mmx,+sse,+sse2,+x87
+level v2 x86_64 2 x86-64-v2 - x86-64-v2 +cmov,+crc32,+cx16,+cx8,+fxsr,+mmx,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87
+level v3 x86_64 3 x86-64-v3 - x86-64-v3 +avx,+avx2,+bmi,+bmi2,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fxsr,+lzcnt,+mmx,+movbe,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave
+level armv8.0 arm64 16 armv8-a - generic +fp-armv8,+neon,+v8a,-fmv
+level armv8.2 arm64 18 armv8.2-a +lse,+fullfp16,+dotprod generic +crc,+dotprod,+fp-armv8,+fullfp16,+lse,+neon,+ras,+rdm,+v8.1a,+v8.2a,+v8a,-fmv
+level armv8.5 arm64 21 armv8.5-a +lse,+fullfp16,+dotprod generic +bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fullfp16,+jsconv,+lse,+neon,+pauth,+predres,+ras,+rcpc,+rdm,+sb,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8a,-fmv
 default linux-x86_64 v3
 default linux-arm64 armv8.0
 default macos-x86_64 v3

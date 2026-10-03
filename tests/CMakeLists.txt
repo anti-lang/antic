@@ -30,6 +30,7 @@ add_executable(antic_unit_tests
     unit/pipeline.c
     unit/test_target.c
     unit/test_cpu.c
+    unit/test_llvm_target.c
     unit/test_text.c
     unit/test_lexer.c
     unit/test_parser.c
@@ -481,6 +482,15 @@ add_test(NAME cpu_levels_pin
         "-DANTIC=$<TARGET_FILE:antic>"
         "-DLEVELS=${PROJECT_SOURCE_DIR}/tools/cpu-levels"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_cpu_pin.cmake")
+
+# The data layout of every target and the CPU attributes of every level that
+# the LLVM back end writes are the ones the pinned clang writes.
+add_test(NAME llvm_datalayout_pin
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DCLANG=${ANTIC_CLANG_DIR}/bin/clang"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_datalayout_pin"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_datalayout_pin.cmake")
 
 # The archive holds a runtime per level, so that a program built with --cpu
 # below its target's default links a runtime of that level.

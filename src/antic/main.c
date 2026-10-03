@@ -7,6 +7,7 @@
 #include "cpu.h"
 #include "driver.h"
 #include "linker.h"
+#include "llvm_target.h"
 #include "platform.h"
 #include "userdirs.h"
 #include "target.h"
@@ -83,6 +84,9 @@ static int usage(FILE *out)
           "  --print-targets      print the six targets and their facts\n"
           "  --print-cpu-levels   print the processor levels and the\n"
           "                       default level of each target\n"
+          "  --print-llvm-targets print the triple, the relocation model\n"
+          "                       and the data layout of each target and\n"
+          "                       the clang -march= value of each level\n"
           "  --version            print the version\n",
           out);
     return out == stderr ? 2 : 0;
@@ -114,15 +118,45 @@ static int print_cpu_levels(void)
     for (i = 0; i < CPU_LEVEL_COUNT; i++) {
         enum cpu_level level = (enum cpu_level)i;
         const char *attributes = cpu_attributes(level);
-        printf("level %s %s %d %s %s\n", cpu_name(level),
+        printf("level %s %s %d %s %s %s %s\n", cpu_name(level),
                cpu_arch(level) == ARCH_ARM64 ? "arm64" : "x86_64",
                (int)cpu_id(level), cpu_clang_arch(level),
-               attributes[0] == '\0' ? "-" : attributes);
+               attributes[0] == '\0' ? "-" : attributes,
+               llvm_target_cpu(level), llvm_target_features(level));
     }
     for (i = 0; i < TARGET_COUNT; i++) {
         printf("default %s %s\n", target_name((enum target)i),
                cpu_name(cpu_default((enum target)i)));
     }
+    return 0;
+}
+
+/* What the LLVM back end writes per target, and the clang -march= value of
+   each level with its two function attributes. The test
+   llvm_datalayout_pin compares every line with the pinned clang. */
+static int print_llvm_targets(void)
+{
+    struct text out = {0};
+    int i;
+
+    for (i = 0; i < TARGET_COUNT; i++) {
+        enum target t = (enum target)i;
+        text_appendf(&out, "target %s %s ", target_name(t),
+                     target_info(t)->arch == ARCH_ARM64 ? "arm64" : "x86_64");
+        llvm_triple(&out, t);
+        text_appendf(&out, " %s %s\n", llvm_relocation_model(t),
+                     llvm_data_layout(t));
+    }
+    for (i = 0; i < CPU_LEVEL_COUNT; i++) {
+        enum cpu_level level = (enum cpu_level)i;
+        text_appendf(&out, "level %s %s ", cpu_name(level),
+                     cpu_arch(level) == ARCH_ARM64 ? "arm64" : "x86_64");
+        llvm_clang_arch(&out, level);
+        text_appendf(&out, " %s %s\n", llvm_target_cpu(level),
+                     llvm_target_features(level));
+    }
+    fputs(text_cstr(&out), stdout);
+    text_free(&out);
     return 0;
 }
 
@@ -197,6 +231,8 @@ static int run(int argc, char **argv, const struct lists *l)
             return print_targets();
         } else if (strcmp(arg, "--print-cpu-levels") == 0) {
             return print_cpu_levels();
+        } else if (strcmp(arg, "--print-llvm-targets") == 0) {
+            return print_llvm_targets();
         } else if (strcmp(arg, "--dump-tokens") == 0) {
             options.dump_tokens = true;
             continue;
