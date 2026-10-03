@@ -9,6 +9,7 @@
 # The compiler, which the unit tests, antic and anti link. The files of
 # src/rt/ in it are the code that the runtime and the host share.
 set(ANTIC_CORE_SOURCES
+    src/antic/abi.c
     src/antic/alloc.c
     src/antic/antic.c
     src/antic/antl.c
