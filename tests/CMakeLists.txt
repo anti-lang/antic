@@ -1386,6 +1386,13 @@ add_test(NAME deps_dir
             "-DSYSROOT=${ANTIC_SYSROOT_DIR}" "-DRAYLIB=${ANTIC_RAYLIB_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_deps_dir.cmake")
 
+# A configure leaves the names of lld alone while the suite runs them.
+add_test(NAME llvm_names
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DLLVM=${ANTIC_LLVM_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-names"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_names.cmake")
+
 # A Linux program of a release names no glibc symbol above the pinned
 # 2.35, which tools/pack-anti.cmake reads before it writes a package
 add_test(NAME linux_libc

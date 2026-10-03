@@ -22,12 +22,16 @@ include("${CMAKE_CURRENT_LIST_DIR}/fetch-release.cmake")
 fetch_release("${CMAKE_CURRENT_LIST_DIR}/llvm-pin" "${DEST}")
 
 # lld answers to its four names through argv[0]. The archive carries one
-# copy, because Windows has no symbolic link without a privilege.
+# copy, because Windows has no symbolic link without a privilege. A name
+# that holds lld already is not written: every configure runs this script,
+# and deps_dir configures a copy against the same directory while the
+# suite runs ld.lld from it.
 if(CMAKE_HOST_WIN32)
     set(exe ".exe")
 endif()
 foreach(name ld.lld ld64.lld lld-link)
-    file(COPY_FILE "${DEST}/bin/lld${exe}" "${DEST}/bin/${name}${exe}")
+    file(COPY_FILE "${DEST}/bin/lld${exe}" "${DEST}/bin/${name}${exe}"
+         ONLY_IF_DIFFERENT)
 endforeach()
 
 execute_process(COMMAND "${CMAKE_COMMAND}" "-DLLVM_BIN=${DEST}/bin"
