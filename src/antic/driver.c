@@ -650,6 +650,7 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     struct layouts layouts;
     struct llvm_emit_options emit;
     struct text out = {0};
+    struct debug_spans spans = {0};
     char error[512];
     bool ok;
     int status = 1;
@@ -677,6 +678,9 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     emit.module = module;
     emit.one_module = o->dev || driver_is_plugin(o);
     emit.exports = extras->hosts_plugins;
+    emit.debug = o->debug;
+    emit.optimized = !o->dev;
+    emit.spans = &spans;
     /* The host has run the runtime's start already, so a plugin brings
        no constructor of its own. */
     if (o->lib == LIB_SHARED && !driver_is_plugin(o)) {
@@ -684,16 +688,12 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     }
     ok = ok && llvm_emit_module(&out, &emit, program, &layouts, error,
                                 sizeof error);
-    /* DESIGN: a COFF program that hosts plugins exports the names that
-       emit_names lists from the machine code, and the step flags writes
-       them from the IR. */
+    /* A COFF program that hosts plugins exports every name it defines
+       through its .def file. Its functions are not internal, so opt keeps
+       each of them. */
     if (ok && !o->dump_llvm && extras->hosts_plugins &&
         target_info(o->target)->format == FORMAT_COFF) {
-        text_format(error, sizeof error,
-                    "the LLVM back end does not build a program for %s that "
-                    "loads libraries before the step flags",
-                    target_name(o->target));
-        ok = false;
+        llvm_emit_names(&extras->host_names, o->target, program);
     }
     if (ok && o->dump_llvm) {
         fputs(text_cstr(&out), stdout);
@@ -707,7 +707,7 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
             !o->assembly_only && o->lib != LIB_STATIC) {
             struct text notice = {0};
             char id[65];
-            ok = build_id(o, &out, NULL, id, error, sizeof error);
+            ok = build_id(o, &out, &spans, id, error, sizeof error);
             if (ok) {
                 identified_notice(&notice, &extras->notice, id);
                 llvm_emit_licenses(&out, o->target, notice.data,
@@ -732,6 +732,7 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     }
     layout_free(&layouts);
     text_free(&out);
+    debug_spans_free(&spans);
     return status;
 }
 

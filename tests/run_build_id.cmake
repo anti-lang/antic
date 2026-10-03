@@ -5,6 +5,7 @@
 #   RUNTIME   the runtime directory
 #   SOURCE    the .anti file linked twice
 #   OTHER     another .anti file
+#   OPTIONS   optional options of antic for every build, separated by |
 #   WORK      a directory for the executables
 #
 # The id is the line "build <64 digits>" after the begin marker. The two
@@ -15,11 +16,13 @@
 # "build " that it reads the notice with, and its object reaches every
 # program through --anti.inspect.
 
+string(REPLACE "|" ";" options "${OPTIONS}")
+
 function(build_id out dir source)
     file(MAKE_DIRECTORY "${WORK}/${dir}")
     execute_process(
         COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
-                ${ARGN} -o "${WORK}/${dir}/program" "${source}"
+                ${options} ${ARGN} -o "${WORK}/${dir}/program" "${source}"
         RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "antic failed for ${source}\n${err}")
@@ -63,7 +66,8 @@ endif()
 file(MAKE_DIRECTORY "${WORK}/unreadable.o")
 execute_process(
     COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
-            -o "${WORK}/unreadable" "${SOURCE}" "${WORK}/unreadable.o"
+            ${options} -o "${WORK}/unreadable" "${SOURCE}"
+            "${WORK}/unreadable.o"
     RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(status EQUAL 0)
     message(FATAL_ERROR "antic linked an object it cannot read")

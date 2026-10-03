@@ -8,6 +8,7 @@
 
 #include "abi.h"
 #include "alloc.h"
+#include "llvm_debug.h"
 #include "llvm_target.h"
 #include "rt_abi.h"
 
@@ -62,6 +63,14 @@ struct emitter {
        temporary, which the branchov right after it reads. */
     uint32_t overflow;
     uint32_t overflow_result;
+    struct llvm_debug debug;        /* the metadata of -g */
+    /* The places of a COFF plugin that hold an __imp_ entry, as the
+       entries of anti_rt_imports, and the __imp_ entries they name, one
+       per line. */
+    struct text places;
+    size_t place_count;
+    struct text imports;
+    bool *keeps_frame;              /* per function, see frames_kept */
 };
 
 /* The LLVM type of a scalar after layout_resolve, or NULL for an
@@ -240,6 +249,23 @@ static void float_constant(struct text *out, enum ir_type type, double value)
     text_appendf(out, "0x%016" PRIX64, bits);
 }
 
+/* The constant of an integer operand of a float type. Its value is the
+   bits of the float, which the native back ends load into the register
+   as they stand. The optimizer leaves such a zero in a copy. */
+static void float_bits(struct text *out, enum ir_type type, uint64_t value)
+{
+    if (type == IR_F32) {
+        uint32_t narrow = (uint32_t)value;
+        float f;
+        memcpy(&f, &narrow, sizeof f);
+        float_constant(out, type, (double)f);
+    } else {
+        double d;
+        memcpy(&d, &value, sizeof d);
+        float_constant(out, type, d);
+    }
+}
+
 static void global_symbol(struct text *out, enum target t,
                           const struct ir_global *g);
 static void branch_weights(struct emitter *e, uint32_t then_block,
@@ -263,7 +289,11 @@ static void operand(struct emitter *e, const struct ir_operand *o,
         text_appendf(value, "%%v%" PRIu32, e->value++);
         return;
     case IR_INT:
-        int_constant(value, type, o->as.integer);
+        if (type == IR_F32 || type == IR_F64) {
+            float_bits(value, type, o->as.integer);
+        } else {
+            int_constant(value, type, o->as.integer);
+        }
         return;
     case IR_FLOAT:
         float_constant(value, type, o->as.floating);
@@ -2395,6 +2425,114 @@ static void linkage(struct emitter *e, const struct ir_function *f)
     }
 }
 
+/* The function of the runtime that walks the stack from the frame of its
+   caller, which anti.lang.StackTrace.capture declares and calls. */
+#define TRACE_WALK "anti_rt_trace_walk"
+
+/* The function that the call inst calls, or IR_NO_INDEX. The IR calls
+   a static function of a class through a temporary that `addr` of the
+   function fills, which callees maps to the function. */
+static uint32_t callee_of(const struct ir_inst *inst, const uint32_t *callees)
+{
+    if (inst->a.kind == IR_FUNC) {
+        return inst->a.as.index;
+    }
+    return inst->a.kind == IR_TEMP ? callees[inst->a.as.temp] : IR_NO_INDEX;
+}
+
+/* Whether the call inst passes another skip than the constant 0 to a
+   function that keeps its frame. The skip is the first argument of
+   anti_rt_trace_walk, of StackTrace.capture and of debug.backtrace. */
+static bool skips_own_frame(const struct ir_module *m, const bool *kept,
+                            const struct ir_inst *inst, const uint32_t *callees)
+{
+    uint32_t callee;
+
+    if (inst->op != IR_CALL) {
+        return false;
+    }
+    callee = callee_of(inst, callees);
+    if (callee == IR_NO_INDEX || !kept[callee]) {
+        return false;
+    }
+    if (m->functions[callee]->is_extern) {
+        return true;
+    }
+    return inst->arg_count > 0 && (inst->args[0].kind != IR_INT ||
+                                   inst->args[0].as.integer != 0);
+}
+
+/* Fill callees with the function each temporary of f holds the address
+   of, from an `addr` or a copy of the function, or IR_NO_INDEX. */
+static void callees_of(const struct ir_function *f, uint32_t *callees)
+{
+    size_t b;
+    size_t k;
+
+    for (k = 0; k < f->temp_count; k++) {
+        callees[k] = IR_NO_INDEX;
+    }
+    for (b = 0; b < f->block_count; b++) {
+        const struct ir_block *block = f->blocks[b];
+        for (k = 0; k < block->count; k++) {
+            const struct ir_inst *inst = &block->insts[k];
+            if ((inst->op == IR_ADDR || inst->op == IR_COPY) &&
+                inst->a.kind == IR_FUNC &&
+                inst->result != IR_NO_RESULT) {
+                callees[inst->result] = inst->a.as.index;
+            }
+        }
+    }
+}
+
+/* DESIGN: StackTrace.capture skips its own frame by count, `skip + 1`,
+   and debug.backtrace and a caller of capture(1) count their own the same
+   way. Inlined into its caller, or left by a tail call, such a function
+   would skip the frame of its caller as well, and the trace would not
+   begin where the specification says. So a function keeps its frame,
+   `noinline` and without tail calls, when it calls anti_rt_trace_walk,
+   or when it passes another skip than 0 to a function that keeps its
+   frame. A call without arguments passes no skip. A function that captures with skip 0
+   may be inlined, and its frames are then the ones of its caller, with
+   the lines of the callee under -g, as "Debug information" of
+   docs/work-order-llvm-back-end.md says. The rule runs to a fixed point
+   over the functions of the text. */
+static void frames_kept(const struct ir_module *m, bool *kept)
+{
+    bool changed = true;
+    size_t i;
+
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        kept[i] = f->is_extern && f->module == NULL &&
+                  strcmp(f->name, TRACE_WALK) == 0;
+    }
+    while (changed) {
+        changed = false;
+        for (i = 0; i < m->function_count; i++) {
+            const struct ir_function *f = m->functions[i];
+            uint32_t *callees;
+            size_t b;
+            if (kept[i] || f->is_extern) {
+                continue;
+            }
+            callees = alloc_zeroed(f->temp_count + 1, sizeof *callees);
+            callees_of(f, callees);
+            for (b = 0; !kept[i] && b < f->block_count; b++) {
+                const struct ir_block *block = f->blocks[b];
+                size_t k;
+                for (k = 0; !kept[i] && k < block->count; k++) {
+                    if (skips_own_frame(m, kept, &block->insts[k], callees)) {
+                        kept[i] = true;
+                        changed = true;
+                    }
+                }
+            }
+            free(callees);
+        }
+    }
+}
+
 /* Whether f is the main of the module that is compiled, which the
    runtime calls through its entry. */
 static bool is_main(const struct emitter *e, const struct ir_function *f)
@@ -2408,6 +2546,7 @@ static void definition(struct emitter *e, const struct ir_function *f)
     struct text *out = e->out;
     struct text body = {0};
     struct text allocas = {0};
+    struct debug_spans spans = {0};
     size_t b;
     size_t i;
     uint32_t t;
@@ -2420,11 +2559,15 @@ static void definition(struct emitter *e, const struct ir_function *f)
     if (!signature(e, f, true, is_main(e, f) ? &e->entry : NULL)) {
         return;
     }
-    text_append(out, " #0");
+    text_append(out, e->keeps_frame[f->index]
+                         ? " noinline \"disable-tail-calls\"=\"true\" #0"
+                         : " #0");
     if (link_once(e, f) &&
         target_info(e->o->target)->format == FORMAT_COFF) {
         text_append(out, " comdat");
     }
+    llvm_debug_open(&e->debug, out, f,
+                    !f->exported && !e->o->one_module && !e->o->exports);
     text_append(out, " {\nb0:\n");
     for (t = 0; t < f->temp_count && !e->failed; t++) {
         const char *name = value_type(e, f->temps[t]);
@@ -2446,24 +2589,29 @@ static void definition(struct emitter *e, const struct ir_function *f)
             text_appendf(&body, "\nb%zu:\n", b);
         }
         for (i = 0; i < block->count && !e->failed; i++) {
+            size_t from = body.length;
             instruction(e, &block->insts[i]);
+            llvm_debug_at(&e->debug, &body, from, block->insts[i].line,
+                          &spans);
         }
     }
     e->out = out;
     e->allocas = NULL;
     text_append_bytes(out, allocas.data, allocas.length);
+    llvm_debug_place(&e->debug, &spans, out->length);
     text_append_bytes(out, body.data, body.length);
     text_append(out, "}\n\n");
     text_free(&body);
     text_free(&allocas);
+    debug_spans_free(&spans);
     free(e->signature.params);
     e->signature.params = NULL;
 }
 
 /* The symbol of a global after sigil, without the _ of Mach-O, which llc
    writes. */
-static void global_sigil(struct text *out, char sigil, enum target t,
-                         const struct ir_global *g)
+static void global_name(struct text *out, enum target t,
+                        const struct ir_global *g)
 {
     struct text symbol = {0};
     const char *name;
@@ -2477,8 +2625,18 @@ static void global_sigil(struct text *out, char sigil, enum target t,
     if (target_info(t)->format == FORMAT_MACHO && name[0] == '_') {
         name++;
     }
-    llvm_name(out, sigil, name);
+    text_append(out, name);
     text_free(&symbol);
+}
+
+static void global_sigil(struct text *out, char sigil, enum target t,
+                         const struct ir_global *g)
+{
+    struct text name = {0};
+
+    global_name(&name, t, g);
+    llvm_name(out, sigil, text_cstr(&name));
+    text_free(&name);
 }
 
 static void global_symbol(struct text *out, enum target t,
@@ -2552,6 +2710,94 @@ static bool global_once(const struct emitter *e, const struct ir_global *g)
    section of each format, or in the one the loader writes once where it
    holds an address. The linkage follows the one of a function. A global
    the runtime defines is a declaration of its bytes. */
+/* Whether the text is a COFF plugin, which reaches the names of its
+   host through the __imp_ entries of the import library of the host. */
+static bool imports(const struct emitter *e)
+{
+    return e->m->plugin &&
+           target_info(e->o->target)->format == FORMAT_COFF;
+}
+
+/* Whether relocation r of a global names a function or a datum of the
+   host of a COFF plugin. */
+static bool imported(const struct emitter *e, const struct ir_reloc *r)
+{
+    return imports(e) && (r->fn ? e->m->functions[r->global]->is_extern
+                                : e->m->globals[r->global]->is_extern);
+}
+
+/* DESIGN: a COFF plugin holds the address of the __imp_ entry of a name
+   of its host where its data holds an address of the host, as emit.c
+   writes it. The loader replaces it with the address the entry holds,
+   at each place anti_rt_imports lists. Append the entry of r, which
+   global g holds at its offset, to values, and record the place. */
+static void import_place(struct emitter *e, struct text *values,
+                         const struct ir_global *g, const struct ir_reloc *r)
+{
+    struct text entry = {0};
+    struct text line = {0};
+
+    text_append(&entry, "__imp_");
+    if (r->fn) {
+        function_symbol(&entry, e->o->target, e->m->functions[r->global]);
+    } else {
+        global_name(&entry, e->o->target, e->m->globals[r->global]);
+    }
+    llvm_name(values, '@', text_cstr(&entry));
+    text_appendf(&line, "\n%s\n", text_cstr(&entry));
+    if (strstr(text_cstr(&e->imports), text_cstr(&line)) == NULL) {
+        text_appendf(&e->imports, "%s%s\n", e->imports.length == 0 ? "\n" : "",
+                     text_cstr(&entry));
+    }
+    text_append(&e->places, e->place_count++ > 0 ? ", ptr " : "ptr ");
+    if (r->offset == 0) {
+        global_symbol(&e->places, e->o->target, g);
+    } else {
+        text_append(&e->places, "getelementptr (i8, ptr ");
+        global_symbol(&e->places, e->o->target, g);
+        text_appendf(&e->places, ", i64 %" PRIu64 ")", r->offset);
+    }
+    text_free(&entry);
+    text_free(&line);
+}
+
+/* The declaration of every __imp_ entry the data of a COFF plugin names,
+   and the table anti_rt_imports of the places that hold one. The table
+   stands in every COFF plugin, since its .def file exports it, and in
+   writable data, since the loader marks it done. */
+static void import_table(struct emitter *e)
+{
+    const char *p = text_cstr(&e->imports);
+
+    if (!imports(e)) {
+        return;
+    }
+    while (*p != '\0') {
+        const char *end;
+        struct text entry = {0};
+        if (*p == '\n') {
+            p++;
+            continue;
+        }
+        end = strchr(p, '\n');
+        text_append_bytes(&entry, p, (size_t)(end - p));
+        llvm_name(e->out, '@', text_cstr(&entry));
+        text_append(e->out, " = external global ptr\n");
+        text_free(&entry);
+        p = end;
+    }
+    if (e->place_count == 0) {
+        text_append(e->out, "@anti_rt_imports = dso_local global <{ i64, "
+                            "i64 }> <{ i64 0, i64 0 }>, align 8\n");
+        return;
+    }
+    text_appendf(e->out, "@anti_rt_imports = dso_local global <{ i64, i64, "
+                         "[%zu x ptr] }> <{ i64 %zu, i64 0, [%zu x ptr] "
+                         "[%s] }>, align 8\n",
+                 e->place_count, e->place_count, e->place_count,
+                 text_cstr(&e->places));
+}
+
 static void global(struct emitter *e, const struct ir_global *g, bool twin)
 {
     enum target t = e->o->target;
@@ -2562,6 +2808,7 @@ static void global(struct emitter *e, const struct ir_global *g, bool twin)
     struct ir_reloc *relocs;
     uint64_t from = 0;
     bool zero = true;
+    bool writable = false;
     size_t i;
 
     if (g->is_extern && twin) {
@@ -2569,9 +2816,10 @@ static void global(struct emitter *e, const struct ir_global *g, bool twin)
     }
     global_symbol(e->out, t, g);
     if (g->is_extern) {
-        text_appendf(e->out, " = external global [%" PRIu64 " x i8], align %"
-                             PRIu64 "\n",
-                     g->size, g->align > 0 ? g->align : 1);
+        text_appendf(e->out, " = external %sglobal [%" PRIu64 " x i8], "
+                             "align %" PRIu64 "\n",
+                     imports(e) ? "dllimport " : "", g->size,
+                     g->align > 0 ? g->align : 1);
         return;
     }
     text_append(e->out, " = ");
@@ -2598,7 +2846,10 @@ static void global(struct emitter *e, const struct ir_global *g, bool twin)
         }
         text_appendf(&types, "%sptr", types.length > 0 ? ", " : "");
         text_appendf(&values, "%sptr ", values.length > 0 ? ", " : "");
-        if (relocs[i].fn) {
+        if (imported(e, &relocs[i])) {
+            import_place(e, &values, g, &relocs[i]);
+            writable = true;
+        } else if (relocs[i].fn) {
             function_name(&values, t, e->m->functions[relocs[i].global]);
         } else {
             global_symbol(&values, t, e->m->globals[relocs[i].global]);
@@ -2611,7 +2862,8 @@ static void global(struct emitter *e, const struct ir_global *g, bool twin)
     for (i = 0; i < g->size; i++) {
         zero = zero && g->bytes[i] == 0;
     }
-    text_appendf(e->out, "%s <{ %s }> ", g->mutable ? "global" : "constant",
+    text_appendf(e->out, "%s <{ %s }> ",
+                 g->mutable || writable ? "global" : "constant",
                  text_cstr(&types));
     if (zero && g->reloc_count == 0) {
         text_append(e->out, "zeroinitializer");
@@ -2660,7 +2912,7 @@ static void entry(struct emitter *e, const struct ir_module *m)
 static void declaration(struct emitter *e, const struct ir_function *f)
 {
     e->f = f;
-    text_append(e->out, "declare ");
+    text_append(e->out, imports(e) ? "declare dllimport " : "declare ");
     if (signature(e, f, false, NULL)) {
         text_append(e->out, " #1\n");
     }
@@ -2702,6 +2954,7 @@ static void metadata(struct emitter *e, uint32_t flag_count)
     for (i = 0; i < flag_count; i++) {
         text_appendf(e->out, "%s!%" PRIu32, i > 0 ? ", " : "", i);
     }
+    llvm_debug_flags(&e->debug, e->out);
     text_appendf(e->out, "}\n!llvm.ident = !{!%" PRIu32 "}\n", flag_count);
     text_appendf(e->out, "!%" PRIu32 " = !{i32 1, !\"wchar_size\", i32 %"
                          PRIu64 "}\n",
@@ -2727,6 +2980,7 @@ static void metadata(struct emitter *e, uint32_t flag_count)
                              "i32 2000, i32 1}\n",
                      e->cold_id + COLD_ELSE);
     }
+    llvm_debug_finish(&e->debug, e->out);
 }
 
 /* The number of module flags of the target: the size of wchar_t, the
@@ -2841,6 +3095,25 @@ void llvm_emit_package(struct text *out, enum target t, const char *bytes,
                  sections[target_info(t)->format]);
 }
 
+void llvm_emit_names(struct text *out, enum target t,
+                     const struct ir_module *m)
+{
+    size_t i;
+
+    for (i = 0; i < m->function_count; i++) {
+        if (!m->functions[i]->is_extern) {
+            function_symbol(out, t, m->functions[i]);
+            text_append(out, "\n");
+        }
+    }
+    for (i = 0; i < m->global_count; i++) {
+        if (!m->globals[i]->is_extern) {
+            global_name(out, t, m->globals[i]);
+            text_append(out, " DATA\n");
+        }
+    }
+}
+
 void llvm_emit_licenses(struct text *out, enum target t, const char *bytes,
                         size_t length)
 {
@@ -2874,7 +3147,6 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
                       char *error, size_t error_size)
 {
     struct emitter e;
-    struct text body = {0};
     struct text declarations = {0};
     struct text data = {0};
     uint32_t flags = flag_count(o->target);
@@ -2889,15 +3161,12 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
     e.error_size = error_size;
     e.cold_id = flags + 1;
     e.m = m;
-    /* DESIGN: a plugin of COFF reaches the names of its host through the
-       __imp_ entries of the import library, which the step flags adds. */
-    if (m->plugin && target_info(o->target)->format == FORMAT_COFF) {
-        text_format(error, error_size,
-                    "the LLVM back end does not translate a plugin for %s "
-                    "before the step flags",
-                    target_name(o->target));
-        return false;
-    }
+    /* The ids of the debug metadata follow every other id, so the text
+       without them names the ids of a build without -g. */
+    llvm_debug_init(&e.debug, o->target, m, o->module, o->debug,
+                    o->optimized, e.cold_id + COLD_COUNT, o->spans);
+    e.keeps_frame = alloc_zeroed(m->function_count + 1, sizeof *e.keeps_frame);
+    frames_kept(m, e.keeps_frame);
     head(out, o->target, o->module);
     for (i = 0; i < m->global_count; i++) {
         const struct ir_global *g = m->globals[i];
@@ -2923,9 +3192,11 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
     if (comdats) {
         text_append(out, "\n");
     }
+    /* The definitions go straight into out, where the spans of the
+       debug information they carry stand. */
     for (i = 0; i < m->function_count && !e.failed; i++) {
         const struct ir_function *f = m->functions[i];
-        e.out = f->is_extern ? &declarations : &body;
+        e.out = f->is_extern ? &declarations : out;
         if (f->is_extern) {
             declaration(&e, f);
         } else {
@@ -2946,9 +3217,9 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
         text_free(&symbols[i]);
     }
     free(symbols);
+    import_table(&e);
     constructors(&e, m);
     if (!e.failed) {
-        text_append_bytes(out, body.data, body.length);
         e.out = out;
         entry(&e, m);
         if (data.length > 0) {
@@ -2963,10 +3234,13 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
         attributes(&e);
         metadata(&e, flags);
     }
-    text_free(&body);
     text_free(&data);
     text_free(&declarations);
     text_free(&e.intrinsics);
     text_free(&e.entry);
+    text_free(&e.places);
+    text_free(&e.imports);
+    free(e.keeps_frame);
+    llvm_debug_free(&e.debug);
     return !e.failed;
 }

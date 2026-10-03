@@ -627,15 +627,35 @@ if(llvm_targets)
                 "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
 endif()
 
-# A program for a COFF target that loads libraries waits for the step
-# flags under the LLVM back end. inject_default injects an interface, so
-# it is such a program.
-add_expect_test(llvm_coff_host STATUS 1
-    PATTERN "^antic: the LLVM back end does not build a program for windows-x86_64 that loads libraries before the step flags"
-    COMMAND $<TARGET_FILE:antic> --backend llvm --target windows-x86_64 -S
-            --runtime "${ANTIC_RUNTIME_DIR}"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_coff_host.s"
-            "${CMAKE_CURRENT_SOURCE_DIR}/programs/inject_default.anti")
+# The test llvm_inline_lines: a release build with -g inlines a small
+# callee, and the line table names the line of the callee in the code of
+# its caller.
+if(llvm_targets)
+    add_test(NAME llvm_inline_lines
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/llvm_inline_lines.anti"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-inline-lines"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_inline_lines.cmake")
+endif()
+
+# A COFF host of plugins and its plugin under the LLVM back end export
+# what the native back end exports, and the plugin lists as many places
+# of an __imp_ entry. The VM run runs both.
+foreach(target windows-x86_64 windows-arm64)
+    add_test(NAME llvm_coff_plugin_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-coff-plugin/${target}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_coff_plugin.cmake")
+endforeach()
 
 # --backend takes the names of the two back ends alone.
 add_expect_test(llvm_backend_name STATUS 2
@@ -3587,6 +3607,26 @@ if(NOT WIN32)
             "-DOTHER=${CMAKE_CURRENT_SOURCE_DIR}/programs/args.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/build-id"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_build_id.cmake")
+endif()
+
+# The test llvm_build_id of docs/work-order-llvm-back-end.md: under the
+# LLVM back end a -g build and a plain build of one program give one build
+# id, since the digest leaves out every span of the text that -g added.
+# The program has several functions, so -g adds a subprogram and lines to
+# each. COFF writes subprograms in the plain build too.
+if(NOT WIN32)
+    foreach(target ${ANTIC_HOST_TARGET} windows-x86_64)
+        add_test(NAME llvm_build_id_${target}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DANTIC=$<TARGET_FILE:antic>"
+                "-DLLVM_MC=${ANTIC_LLVM_MC}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/trace/stack_trace.anti"
+                "-DOTHER=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+                "-DOPTIONS=--backend|llvm|--target|${target}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-build-id/${target}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_build_id.cmake")
+    endforeach()
 endif()
 
 # A program that imports a standard library module carries the package of

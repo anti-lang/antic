@@ -13,6 +13,7 @@
 #include "../binary_stdio.h"
 #include "check.h"
 #include "arena.h"
+#include "debug.h"
 #include "ir.h"
 #include "layout.h"
 #include "llvm_emit.h"
@@ -23,6 +24,8 @@ struct fixture {
     struct text out;
     char error[200];
     const char *constructor;        /* the option of the same name */
+    bool debug;                     /* -g */
+    struct debug_spans spans;       /* what -g added, after a run */
 };
 
 static void begin(struct fixture *x)
@@ -33,6 +36,7 @@ static void begin(struct fixture *x)
 
 static void end(struct fixture *x)
 {
+    debug_spans_free(&x->spans);
     text_free(&x->out);
     ir_module_free(&x->m);
     arena_free(&x->arena);
@@ -54,6 +58,9 @@ static bool run_with(struct fixture *x, enum target t, bool one_module,
     o.one_module = one_module;
     o.exports = exports;
     o.constructor = x->constructor;
+    o.debug = x->debug;
+    o.spans = &x->spans;
+    debug_spans_free(&x->spans);
     ok = layout_init(&l, t, &x->m, x->error, sizeof x->error) &&
          layout_data(&l, &x->m);
     for (i = 0; ok && i < x->m.function_count; i++) {
@@ -148,6 +155,297 @@ static void constants(void)
     CHECK(holds(&x, "  ret float 0xBFD0000000000000\n"));
     CHECK(holds(&x, "  ret ptr null\n"));
     CHECK(holds(&x, "  ret i32 -2147483648\n"));
+    end(&x);
+}
+
+/* The text of x without the spans that -g added. */
+static void without_spans(const struct fixture *x, struct text *out)
+{
+    size_t at = 0;
+    size_t i;
+
+    for (i = 0; i < x->spans.count; i++) {
+        text_append_bytes(out, x->out.data + at,
+                          x->spans.items[i].start - at);
+        at = x->spans.items[i].end;
+    }
+    text_append_bytes(out, x->out.data + at, x->out.length - at);
+}
+
+/* main.g at line 2 of app.anti returns at line 3, and main.f at line 5
+   calls it at line 6, copies a value of no statement and returns at
+   line 7. */
+static void debug_program(struct fixture *x)
+{
+    struct ir_function *f;
+    struct ir_function *g;
+    struct ir_block *b;
+    uint32_t file = ir_file_add(&x->m, "app.anti");
+    uint32_t t;
+
+    g = ir_function_add(&x->m, "main", "g", IR_VOID, IR_NO_AGG);
+    g->file = file;
+    g->decl_line = 2;
+    b = ir_block_add(g);
+    g->at_line = 3;
+    ir_ret(g, b, IR_VOID, ir_int_op(IR_VOID, 0));
+    f = ir_function_add(&x->m, "main", "f", IR_I64, IR_NO_AGG);
+    f->file = file;
+    f->decl_line = 5;
+    b = ir_block_add(f);
+    f->at_line = 6;
+    ir_call(f, b, IR_VOID, ir_func_op(g), NULL, 0);
+    f->at_line = 0;
+    t = ir_unary(f, b, IR_COPY, IR_I64, ir_int_op(IR_I64, 9));
+    f->at_line = 7;
+    ir_ret(f, b, IR_I64, ir_temp_op(f, t));
+}
+
+/* -g writes a compile unit, a file, a subprogram per function and a
+   location on every instruction with a line, as "Debug information" of
+   docs/work-order-llvm-back-end.md gives them. A call of no line takes
+   the location of line 0, which the verifier asks for in a function with
+   a subprogram. */
+static void debug_lines(void)
+{
+    struct fixture x;
+
+    begin(&x);
+    debug_program(&x);
+    x.debug = true;
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "define internal void @main.g() #0 !dbg !"));
+    CHECK(holds(&x, "define internal i64 @main.f() #0 !dbg !"));
+    CHECK(holds(&x, "  call void () @main.g(), !dbg !"));
+    CHECK(holds(&x, "  store i64 9, ptr %t0, align 8\n"));
+    CHECK(holds(&x, "  ret i64 %v0, !dbg !"));
+    CHECK(holds(&x, "!llvm.dbg.cu = !{!"));
+    CHECK(holds(&x, " = distinct !DICompileUnit(language: DW_LANG_C11, "
+                    "file: !"));
+    CHECK(holds(&x, "producer: \"antic "));
+    CHECK(holds(&x, "emissionKind: LineTablesOnly"));
+    CHECK(holds(&x, " = !DIFile(filename: \"app.anti\", directory: \"\")"));
+    CHECK(holds(&x, " = distinct !DISubprogram(name: \"main.f\", scope: !"));
+    CHECK(holds(&x, "line: 5, type: !"));
+    CHECK(holds(&x, "scopeLine: 5, spFlags: DISPFlagLocalToUnit | "
+                    "DISPFlagDefinition, unit: !"));
+    CHECK(holds(&x, "isOptimized: false"));
+    CHECK(holds(&x, " = !DISubroutineType(types: !"));
+    CHECK(holds(&x, " = !{null}\n"));
+    CHECK(holds(&x, " = !DILocation(line: 6, column: 0, scope: !"));
+    CHECK(holds(&x, " = !DILocation(line: 7, column: 0, scope: !"));
+    CHECK(holds(&x, " = !DILocation(line: 3, column: 0, scope: !"));
+    CHECK(holds(&x, " = !{i32 2, !\"Debug Info Version\", i32 3}\n"));
+    CHECK(lacks(&x, "CodeView"));
+    end(&x);
+}
+
+/* The build id digests the text without what -g added. That text is the
+   one of a build without -g, on each format. COFF writes a subprogram
+   per function in every build, which names the function in the PDB, and
+   lines with -g alone. */
+static void debug_spans_of(enum target t)
+{
+    struct fixture plain;
+    struct fixture lines;
+    struct text a = {0};
+    struct text b = {0};
+
+    begin(&plain);
+    debug_program(&plain);
+    CHECK(run(&plain, t));
+    begin(&lines);
+    debug_program(&lines);
+    lines.debug = true;
+    CHECK(run(&lines, t));
+    without_spans(&plain, &a);
+    without_spans(&lines, &b);
+    CHECK(strcmp(text_cstr(&a), text_cstr(&b)) == 0);
+    CHECK(lines.spans.count > 0);
+    CHECK(strstr(text_cstr(&b), "!dbg") == NULL);
+    CHECK(strstr(text_cstr(&b), "!DI") == NULL);
+    if (target_info(t)->format == FORMAT_COFF) {
+        CHECK(holds(&plain, "!{i32 2, !\"CodeView\", i32 1}\n"));
+        CHECK(holds(&plain, "!DISubprogram(name: \"main.f\""));
+        CHECK(lacks(&plain, "!DILocation(line: 6,"));
+        CHECK(holds(&lines, "!DILocation(line: 6,"));
+    } else {
+        CHECK(plain.spans.count == 0);
+        CHECK(lacks(&plain, "!DI"));
+        CHECK(strcmp(text_cstr(&a), text_cstr(&plain.out)) == 0);
+    }
+    text_free(&a);
+    text_free(&b);
+    end(&plain);
+    end(&lines);
+}
+
+static void debug_spans(void)
+{
+    debug_spans_of(TARGET_LINUX_X86_64);
+    debug_spans_of(TARGET_MACOS_ARM64);
+    debug_spans_of(TARGET_WINDOWS_X86_64);
+    debug_spans_of(TARGET_WINDOWS_ARM64);
+}
+
+/* A COFF plugin reaches each name of its host through the __imp_ entry
+   of the import library: a declaration is dllimport, and an address in
+   its data holds the __imp_ entry, which anti_rt_imports lists for the
+   loader. A global that holds one stays writable, so opt reads no
+   address out of it. */
+static void coff_plugin(void)
+{
+    static const uint8_t zeros[24] = {0};
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_function *h;
+    struct ir_global *g;
+    struct ir_global *table;
+    struct ir_block *b;
+
+    begin(&x);
+    x.m.plugin = true;
+    h = ir_declare_add(&x.m, "host", "h", IR_VOID, IR_NO_AGG);
+    g = ir_global_add(&x.m, "host", "data", zeros, 8, 8);
+    g->is_extern = true;
+    f = ir_function_add(&x.m, "main", "f", IR_VOID, IR_NO_AGG);
+    b = ir_block_add(f);
+    ir_call(f, b, IR_VOID, ir_func_op(h), NULL, 0);
+    ir_ret(f, b, IR_VOID, ir_int_op(IR_VOID, 0));
+    table = ir_global_add(&x.m, "main", "table", zeros, 24, 8);
+    ir_global_reloc_fn(&x.m, table, 0, h->index);
+    ir_global_reloc(&x.m, table, 8, g->index);
+    ir_global_reloc_fn(&x.m, table, 16, f->index);
+    CHECK(run_with(&x, TARGET_WINDOWS_X86_64, true, false));
+    CHECK(holds(&x, "declare dllimport void @_A4host_h() #1\n"));
+    CHECK(holds(&x, "@_A4host_data = external dllimport global [8 x i8], "
+                    "align 8\n"));
+    CHECK(holds(&x, "@_A4main_table = global <{ ptr, ptr, ptr }> "
+                    "<{ ptr @__imp__A4host_h, ptr @__imp__A4host_data, "
+                    "ptr @_A4main_f }>, align 8\n"));
+    CHECK(holds(&x, "@__imp__A4host_h = external global ptr\n"));
+    CHECK(holds(&x, "@__imp__A4host_data = external global ptr\n"));
+    CHECK(holds(&x, "@anti_rt_imports = dso_local global <{ i64, i64, "
+                    "[2 x ptr] }> <{ i64 2, i64 0, [2 x ptr] [ptr "
+                    "@_A4main_table, ptr getelementptr (i8, ptr "
+                    "@_A4main_table, i64 8)] }>, align 8\n"));
+    /* Another format reaches the host through the GOT of the linker. */
+    CHECK(run_with(&x, TARGET_LINUX_X86_64, true, false));
+    CHECK(lacks(&x, "dllimport"));
+    CHECK(lacks(&x, "__imp_"));
+    CHECK(lacks(&x, "anti_rt_imports"));
+    end(&x);
+
+    begin(&x);
+    x.m.plugin = true;
+    returns(&x, "f", IR_VOID, ir_int_op(IR_VOID, 0));
+    CHECK(run_with(&x, TARGET_WINDOWS_ARM64, true, false));
+    CHECK(holds(&x, "@anti_rt_imports = dso_local global <{ i64, i64 }> "
+                    "<{ i64 0, i64 0 }>, align 8\n"));
+    end(&x);
+}
+
+/* The names a COFF host of plugins exports through its .def file: the
+   symbol of each function it defines, and of each datum with DATA. */
+static void coff_names(void)
+{
+    static const uint8_t zeros[8] = {0};
+    struct fixture x;
+    struct ir_global *g;
+    struct text names = {0};
+
+    begin(&x);
+    returns(&x, "f", IR_VOID, ir_int_op(IR_VOID, 0));
+    ir_declare_add(&x.m, "other", "h", IR_VOID, IR_NO_AGG);
+    ir_global_add(&x.m, "main", "count", zeros, 8, 8);
+    g = ir_global_add(&x.m, "other", "root", NULL, 0, 1);
+    g->is_extern = true;
+    llvm_emit_names(&names, TARGET_WINDOWS_X86_64, &x.m);
+    CHECK(strcmp(text_cstr(&names), "_A4main_f\n_A4main_count DATA\n") == 0);
+    text_free(&names);
+    end(&x);
+}
+
+/* A function that walks the stack from its own frame keeps that frame,
+   neither inlined nor left by a tail call: the one that calls
+   anti_rt_trace_walk, as StackTrace.capture does, and one that passes
+   another skip than 0 to such a function, as debug.backtrace and a
+   caller of capture(1) do. A caller of capture(0) may be inlined, and
+   its frame is then the one of its caller, and so may a function that
+   calls one of them without a skip. */
+static void frames_kept(void)
+{
+    struct fixture x;
+    struct ir_function *walk;
+    struct ir_function *cap;
+    struct ir_function *f;
+    struct ir_block *b;
+    struct ir_operand args[1];
+    uint32_t callee;
+    uint32_t p;
+    uint32_t t;
+
+    begin(&x);
+    walk = ir_extern_add(&x.m, "anti_rt_trace_walk", IR_I64, false);
+    ir_param_add(walk, IR_I64, IR_NO_AGG);
+    cap = ir_function_add(&x.m, "main", "cap", IR_I64, IR_NO_AGG);
+    p = ir_param_add(cap, IR_I64, IR_NO_AGG);
+    b = ir_block_add(cap);
+    args[0] = ir_temp_op(cap, p);
+    t = ir_call(cap, b, IR_I64, ir_func_op(walk), args, 1);
+    ir_ret(cap, b, IR_I64, ir_temp_op(cap, t));
+    f = ir_function_add(&x.m, "main", "bt", IR_I64, IR_NO_AGG);
+    p = ir_param_add(f, IR_I64, IR_NO_AGG);
+    b = ir_block_add(f);
+    t = ir_binary(f, b, IR_ADD, IR_I64, ir_temp_op(f, p),
+                  ir_int_op(IR_I64, 1));
+    args[0] = ir_temp_op(f, t);
+    /* The IR calls a static function of a class through a temporary
+       that holds its address. */
+    callee = ir_unary(f, b, IR_ADDR, IR_PTR, ir_func_op(cap));
+    t = ir_call(f, b, IR_I64, ir_temp_op(f, callee), args, 1);
+    ir_ret(f, b, IR_I64, ir_temp_op(f, t));
+    f = ir_function_add(&x.m, "main", "above", IR_I64, IR_NO_AGG);
+    b = ir_block_add(f);
+    args[0] = ir_int_op(IR_I64, 1);
+    t = ir_call(f, b, IR_I64, ir_func_op(x.m.functions[2]), args, 1);
+    ir_ret(f, b, IR_I64, ir_temp_op(f, t));
+    f = ir_function_add(&x.m, "main", "plain", IR_I64, IR_NO_AGG);
+    b = ir_block_add(f);
+    args[0] = ir_int_op(IR_I64, 0);
+    t = ir_call(f, b, IR_I64, ir_func_op(cap), args, 1);
+    ir_ret(f, b, IR_I64, ir_temp_op(f, t));
+    f = ir_function_add(&x.m, "main", "outer", IR_I64, IR_NO_AGG);
+    b = ir_block_add(f);
+    t = ir_call(f, b, IR_I64, ir_func_op(x.m.functions[3]), NULL, 0);
+    ir_ret(f, b, IR_I64, ir_temp_op(f, t));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "define internal i64 @main.cap(i64 %p0) noinline "
+                    "\"disable-tail-calls\"=\"true\" #0"));
+    CHECK(holds(&x, "define internal i64 @main.bt(i64 %p0) noinline "
+                    "\"disable-tail-calls\"=\"true\" #0"));
+    CHECK(holds(&x, "define internal i64 @main.above() noinline "
+                    "\"disable-tail-calls\"=\"true\" #0"));
+    CHECK(holds(&x, "define internal i64 @main.plain() #0"));
+    CHECK(holds(&x, "define internal i64 @main.outer() #0"));
+    end(&x);
+}
+
+/* An integer constant of a float type is the bits of the float, as the
+   native back ends load it into the register: the zero that the
+   optimizer leaves in a copy of f64, and the bits of 1.5 and of -0.25. */
+static void float_bits(void)
+{
+    struct fixture x;
+
+    begin(&x);
+    returns(&x, "a", IR_F64, ir_int_op(IR_F64, 0));
+    returns(&x, "b", IR_F64, ir_int_op(IR_F64, 0x3FF8000000000000u));
+    returns(&x, "c", IR_F32, ir_int_op(IR_F32, 0xBE800000u));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "  ret double 0x0000000000000000\n"));
+    CHECK(holds(&x, "  ret double 0x3FF8000000000000\n"));
+    CHECK(holds(&x, "  ret float 0xBFD0000000000000\n"));
     end(&x);
 }
 
@@ -250,7 +548,8 @@ static void attributes(void)
                     "\"frame-pointer\"=\"none\" "
                     "\"stack-probe-size\"=\"4096\" "
                     "\"target-cpu\"=\"generic\" \"target-features\"=\""));
-    CHECK(holds(&x, "!llvm.module.flags = !{!0, !1}\n"
+    /* COFF writes the debug flags in every build, see llvm_debug.h. */
+    CHECK(holds(&x, "!llvm.module.flags = !{!0, !1, !5, !6}\n"
                     "!llvm.ident = !{!2}\n"
                     "!0 = !{i32 1, !\"wchar_size\", i32 2}\n"
                     "!1 = !{i32 7, !\"uwtable\", i32 2}\n"));
@@ -296,9 +595,9 @@ static void linkage(void)
 
     CHECK(run_with(&x, TARGET_WINDOWS_X86_64, true, false));
     CHECK(holds(&x, "$_A4main_List$3cint$3e.push = comdat any\n"));
-    CHECK(holds(&x, "define void @_A4main_f() #0 {\n"));
+    CHECK(holds(&x, "define void @_A4main_f() #0 !dbg !"));
     CHECK(holds(&x, "define weak_odr void @_A4main_List$3cint$3e.push() "
-                    "#0 comdat {\n"));
+                    "#0 comdat !dbg !"));
     end(&x);
 }
 
@@ -1066,7 +1365,8 @@ static void memory_classes(void)
                     "  call void (ptr, ptr) @main.g(ptr sret([24 x i8]) "
                     "align 8 %a0, ptr %a1)\n"));
     CHECK(run(&x, TARGET_WINDOWS_X86_64));
-    CHECK(holds(&x, "(ptr sret([24 x i8]) align 8 %sret, ptr %p0) #0 {\n"));
+    CHECK(holds(&x, "(ptr sret([24 x i8]) align 8 %sret, ptr %p0) #0 "
+                    "!dbg !"));
     end(&x);
 }
 
@@ -1116,7 +1416,7 @@ static void word_classes(void)
                     "  ret [2 x float] %v1\n"));
     CHECK(run(&x, TARGET_WINDOWS_X86_64));
     CHECK(holds(&x, "define internal i64 @_A4main_g(ptr %p0, i64 %p1.0) "
-                    "#0 {\n"));
+                    "#0 !dbg !"));
     end(&x);
 }
 
@@ -1571,6 +1871,7 @@ void test_llvm_emit(void)
 {
     module_text();
     constants();
+    float_bits();
     temporaries();
     cold_branches();
     attributes();
@@ -1601,4 +1902,9 @@ void test_llvm_emit(void)
     saturating();
     flag_rows();
     vector_moves();
+    debug_lines();
+    debug_spans();
+    coff_plugin();
+    coff_names();
+    frames_kept();
 }

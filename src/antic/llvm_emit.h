@@ -5,6 +5,7 @@
 #include <stddef.h>
 
 #include "cpu.h"
+#include "debug.h"
 #include "ir.h"
 #include "layout.h"
 #include "target.h"
@@ -29,6 +30,12 @@ struct llvm_emit_options {
        loads, or NULL. llvm.global_ctors names it beside the function of
        each module that compiles its patterns. */
     const char *constructor;
+    /* -g, and release mode, which the compile unit records. */
+    bool debug;
+    bool optimized;
+    /* The spans of the text that the debug information added, which the
+       build id leaves out, or NULL. */
+    struct debug_spans *spans;
 };
 
 /* Append the LLVM IR text of m, laid out for the target by l, to out.
@@ -44,6 +51,13 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
    constant in the section of the format, which no symbol names. */
 void llvm_emit_package(struct text *out, enum target t, const char *bytes,
                        size_t length);
+
+/* Append the names a COFF host of plugins exports through its .def file,
+   one per line: the symbol of each function m defines, and of each
+   datum with DATA after it, as emit_names of the native back end lists
+   them. */
+void llvm_emit_names(struct text *out, enum target t,
+                     const struct ir_module *m);
 
 /* Append to the text of a program or a shared library the notice
    anti_licenses: the bytes and a NUL, in the read-only section. */

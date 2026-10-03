@@ -1,0 +1,18 @@
+//! A callee small enough for LLVM to inline into its caller. The test
+//! llvm_inline_lines reads the line table of a release build with `-g` and
+//! finds the line of the product in the code of `main`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Three times n and one. The line of the product is the line the table names.
+fn thrice(n: int) -> int
+{
+	return n * 3 + 1;
+}
+
+fn main() -> int
+{
+	let n = printf("x\n".ptr) as int;
+	printf("%d\n".ptr, thrice(n) as c_int);
+	return 0;
+}
