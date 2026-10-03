@@ -48,10 +48,13 @@ set(ANTIC_LLVM_MC "${ANTIC_LLVM_DIR}/bin/llvm-mc${antic_exe}" CACHE FILEPATH
     "llvm-mc of the pinned release" FORCE)
 set(ANTIC_LLVM_AR "${ANTIC_LLVM_DIR}/bin/llvm-ar${antic_exe}" CACHE FILEPATH
     "llvm-ar of the pinned release" FORCE)
-# opt of the pinned release, whose verifier the tests of the LLVM back end
-# run over the text antic writes.
+# opt and llc of the pinned release. The tests of the LLVM back end run the
+# verifier of opt over the text antic writes, and both programs on it until
+# antic runs them itself.
 set(ANTIC_OPT "${ANTIC_LLVM_DIR}/bin/opt${antic_exe}" CACHE FILEPATH
     "opt of the pinned release" FORCE)
+set(ANTIC_LLC "${ANTIC_LLVM_DIR}/bin/llc${antic_exe}" CACHE FILEPATH
+    "llc of the pinned release" FORCE)
 
 if(NOT ANTIC_SYSTEM_COMPILER)
     if(CMAKE_GENERATOR MATCHES "^Visual Studio")

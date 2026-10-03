@@ -1,0 +1,67 @@
+//! The defined results of release mode under the LLVM back end, on every
+//! target. A division and a remainder by zero give 0, the least value divided
+//! by minus one gives itself with a remainder of 0, a shift takes its count
+//! modulo the width, and a float out of the range of the integer type
+//! saturates, with 0 for NaN. Each operand comes from the counter of a loop
+//! that runs once, so antic's optimizer folds none of them. The native back end
+//! keeps the raw instruction in release mode, which traps on x86_64, so this
+//! program runs under the LLVM back end alone. It returns the number of results
+//! that differ from the defined ones, and exits with 0.
+
+fn main() -> int
+{
+	let wrong = 0;
+	for i in 0..1 {
+		let zero: int = i;
+		let minus: int = i - 1;
+		let least: int = i - 9223372036854775807 - 1;
+		let n: int = i + 1000;
+		if n / zero != 0 { wrong += 1; }
+		if n % zero != 0 { wrong += 1; }
+		if least / zero != 0 { wrong += 1; }
+		if least / minus != least { wrong += 1; }
+		if least % minus != 0 { wrong += 1; }
+		if n / minus != -1000 { wrong += 1; }
+		if n % minus != 0 { wrong += 1; }
+
+		let u: u64 = (i as u64) + 1000;
+		let uzero: u64 = i as u64;
+		if u / uzero != 0 { wrong += 1; }
+		if u % uzero != 0 { wrong += 1; }
+
+		let zero32: i32 = i as i32;
+		let minus32: i32 = (i as i32) - 1;
+		let least32: i32 = (i as i32) - 2147483647 - 1;
+		if least32 / minus32 != least32 { wrong += 1; }
+		if least32 % minus32 != 0 { wrong += 1; }
+		if least32 / zero32 != 0 { wrong += 1; }
+		if least32 % zero32 != 0 { wrong += 1; }
+
+		let zero8: u8 = i as u8;
+		if (i as u8 + 200) / zero8 != 0 { wrong += 1; }
+
+		let width: int = i + 64;
+		if n << width != 1000 { wrong += 1; }
+		if n << (width + 1) != 2000 { wrong += 1; }
+		if least >> (width + 63) != -1 { wrong += 1; }
+		if u >> (uzero + 65) != 500 { wrong += 1; }
+		let width32: i32 = (i as i32) + 32;
+		if (zero32 + 3) << width32 != 3 { wrong += 1; }
+		let width8: u8 = (i as u8) + 9;
+		if (zero8 + 3) << width8 != 6 { wrong += 1; }
+
+		let big: f64 = (i as f64) + 1.0e30;
+		let nan: f64 = (i as f64) * 0.0 / 0.0;
+		if big as int != 9223372036854775807 { wrong += 1; }
+		if -big as int != least { wrong += 1; }
+		if nan as int != 0 { wrong += 1; }
+		if big as u64 != 18446744073709551615 { wrong += 1; }
+		if -big as u64 != 0 { wrong += 1; }
+		if big as i32 != 2147483647 { wrong += 1; }
+		if -big as i32 != least32 { wrong += 1; }
+		if (big as f32) as int != 9223372036854775807 { wrong += 1; }
+		if (i as f64 + 300.0) as u8 != 255 { wrong += 1; }
+		if (i as f64 - 300.0) as i8 != -128 { wrong += 1; }
+	}
+	return wrong;
+}

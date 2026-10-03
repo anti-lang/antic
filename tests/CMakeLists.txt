@@ -504,7 +504,9 @@ add_test(NAME llvm_datalayout_pin
 # The text of the LLVM back end passes the verifier of opt for every program
 # of tests/dump and tests/programs the translator accepts, in release and dev
 # mode, one test per target. control_flow holds control flow alone, which
-# the translator takes from the step emit-core on.
+# the translator takes from the step emit-core on. The four programs after
+# it hold the tables of the runtime and the entry, which it takes from the
+# step emit-arith on.
 # DESIGN: one test per target, since each runs antic twice per program. As
 # one test the twelve runs per program took over nine minutes under ASan,
 # whose start alone costs a fifth of a second.
@@ -517,9 +519,67 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/dump,${CMAKE_CURRENT_SOURCE_DIR}/programs"
             "-DTARGETS=${target}"
-            "-DACCEPT=control_flow"
+            "-DACCEPT=control_flow,return42,return_pieces,deep_nesting,long_float"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_verify/${target}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_verify.cmake")
+endforeach()
+
+# A program of tests/programs built through the LLVM back end by hand, with
+# opt and llc of the pinned release, and run on a target the host runs.
+# MODE is release or dev, and OPTIONS the options of antic beside them.
+# The test is llvm_program_<name>_<target>_<mode>. The step emit-run moves
+# the steps of run_llvm_program.cmake into antic.
+function(antic_llvm_program_test name target mode)
+    cmake_parse_arguments(PARSE_ARGV 3 arg "" "" "OPTIONS")
+    antic_cpu_level(level "${target}")
+    set(options ${arg_OPTIONS})
+    if(target STREQUAL "macos-x86_64")
+        set(level v1)
+        list(APPEND options --cpu v1)
+    endif()
+    list(JOIN options "," options)
+    add_test(NAME llvm_program_${name}_${target}_${mode}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DOPT=${ANTIC_OPT}"
+            "-DLLC=${ANTIC_LLC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+            "-DTARGET_NAME=${target}"
+            "-DLEVEL=${level}"
+            "-DMODE=${mode}"
+            "-DOPTIONS=${options}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_programs"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_program.cmake")
+endfunction()
+
+# The scalar programs of tests/programs under the LLVM back end, in release
+# and dev mode, for macos-arm64 and for macos-x86_64 under Rosetta, which
+# take --cpu v1 as every macos-x86_64 program of a macos-arm64 host does.
+# Each prints what it prints under the native back end. A program's dev
+# build carries checks that call the runtime, which waits for the step
+# emit-memory, so scalar_ops and llvm_division build in dev mode with
+# --no-checks. The defined result stands behind each check. asserts calls
+# the runtime from its assertions in dev mode, and runs in release mode
+# alone. llvm_division is the test llvm_division of
+# docs/work-order-llvm-back-end.md.
+set(llvm_targets "")
+if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
+    set(llvm_targets macos-arm64 macos-x86_64)
+elseif(ANTIC_HOST_TARGET STREQUAL "macos-x86_64")
+    set(llvm_targets macos-x86_64)
+endif()
+foreach(target IN LISTS llvm_targets)
+    foreach(name IN ITEMS return42 return_pieces deep_nesting long_float
+            asserts scalar_ops llvm_division)
+        antic_llvm_program_test(${name} ${target} release)
+    endforeach()
+    foreach(name IN ITEMS return42 return_pieces deep_nesting long_float)
+        antic_llvm_program_test(${name} ${target} dev)
+    endforeach()
+    foreach(name IN ITEMS scalar_ops llvm_division)
+        antic_llvm_program_test(${name} ${target} dev OPTIONS --no-checks)
+    endforeach()
 endforeach()
 
 # --backend llvm writes no object before the step emit-run adds opt and
@@ -852,6 +912,11 @@ endif()
 
 file(GLOB program_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/programs/*.anti")
+# DESIGN: a program named llvm_* checks a result that the LLVM back end
+# defines and the native back end leaves to the target, such as a division
+# by zero in release mode. It runs under the LLVM back end alone, through
+# antic_llvm_program_test.
+list(FILTER program_sources EXCLUDE REGEX "/llvm_[a-z_]+\\.anti$")
 foreach(source IN LISTS program_sources)
     get_filename_component(name "${source}" NAME_WE)
     antic_program_test(program_${name}
