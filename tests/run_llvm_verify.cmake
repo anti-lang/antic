@@ -8,31 +8,24 @@
 #   RUNTIME  the runtime directory, which holds the standard library
 #   SOURCES  the directories of the programs, separated by commas
 #   TARGETS  the targets, separated by |
-#   ACCEPT   the names of programs the translator must accept in every
-#            mode and for every target, separated by commas
 #   WORK     a scratch directory
 #
-# The translator refuses an operation it does not translate yet, with a
-# message that names the operation and the step of
-# docs/work-order-llvm-back-end.md that adds it. WORK/refused.txt records
-# each refusal with its message and WORK/accepted.txt each accepted text,
-# one line per program, mode and target. A file that the front end refuses
-# as well, under --dump-opt, is no program, such as an input of the parser
-# dumps, and WORK/skipped.txt records it.
+# The translator takes every operation of the IR from the step emit-wide
+# on, so it must accept every program in every mode and for every target.
+# WORK/accepted.txt records each accepted text, one line per program, mode
+# and target. A file that the front end refuses as well, under --dump-opt,
+# is no program, such as an input of the parser dumps, and
+# WORK/skipped.txt records it.
 
 string(REPLACE "," ";" directories "${SOURCES}")
 string(REPLACE "|" ";" targets "${TARGETS}")
-string(REPLACE "," ";" accept "${ACCEPT}")
-set(refusal "antic: the LLVM back end does not translate ")
 
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 set(accepted "")
-set(refused "")
 set(skipped "")
 set(failures "")
 set(accepted_count 0)
-set(refused_count 0)
 
 set(sources "")
 foreach(directory IN LISTS directories)
@@ -76,23 +69,12 @@ foreach(source IN LISTS sources)
                 endif()
                 continue()
             endif()
-            string(FIND "${err}" "${refusal}" at)
-            if(NOT status EQUAL 0 AND at EQUAL 0)
-                string(REGEX REPLACE "\n.*" "" first "${err}")
-                string(APPEND refused "${case}: ${first}\n")
-                math(EXPR refused_count "${refused_count} + 1")
-                if(name IN_LIST accept)
-                    string(APPEND failures
-                           "${case}: the translator refuses it\n${err}\n")
-                endif()
-                continue()
-            endif()
             execute_process(
                 COMMAND "${ANTIC}" ${options} --dump-opt "${source}"
                 RESULT_VARIABLE front
                 OUTPUT_QUIET
                 ERROR_QUIET)
-            if(front EQUAL 0 OR name IN_LIST accept)
+            if(front EQUAL 0)
                 string(APPEND failures
                        "${case}: antic failed with ${status}\n${err}\n")
             else()
@@ -103,10 +85,9 @@ foreach(source IN LISTS sources)
 endforeach()
 
 file(WRITE "${WORK}/accepted.txt" "${accepted}")
-file(WRITE "${WORK}/refused.txt" "${refused}")
 file(WRITE "${WORK}/skipped.txt" "${skipped}")
-message(STATUS "${accepted_count} texts verified, ${refused_count} refused; "
-               "the lists stand in ${WORK}")
+message(STATUS "${accepted_count} texts verified; the lists stand in "
+               "${WORK}")
 if(NOT failures STREQUAL "")
     message(FATAL_ERROR "${failures}")
 endif()

@@ -502,12 +502,9 @@ add_test(NAME llvm_datalayout_pin
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_datalayout_pin.cmake")
 
 # The text of the LLVM back end passes the verifier of opt for every program
-# of tests/dump and tests/programs the translator accepts, in release and dev
-# mode, one test per target. control_flow holds control flow alone, which
-# the translator takes from the step emit-core on. The four programs after
-# it hold the tables of the runtime and the entry, which it takes from the
-# step emit-arith on. The six after those take memory, calls, bitfields
-# and globals that hold addresses, from the step emit-memory on.
+# of tests/dump and tests/programs, in release and dev mode, one test per
+# target. From the step emit-wide on the translator takes every operation
+# of the IR, so a program it refuses fails the test.
 # DESIGN: one test per target, since each runs antic twice per program. As
 # one test the twelve runs per program took over nine minutes under ASan,
 # whose start alone costs a fifth of a second.
@@ -520,7 +517,6 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/dump,${CMAKE_CURRENT_SOURCE_DIR}/programs"
             "-DTARGETS=${target}"
-            "-DACCEPT=control_flow,return42,return_pieces,deep_nesting,long_float,array_local,classes,class_bitfields,object_model,deserialize,floatcalls"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_verify/${target}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_verify.cmake")
 endforeach()
@@ -578,7 +574,9 @@ endfunction()
 # --no-checks. The defined result stands behind each check. asserts calls
 # the runtime from its assertions in dev mode, and runs in release mode
 # alone. llvm_division is the test llvm_division of
-# docs/work-order-llvm-back-end.md.
+# docs/work-order-llvm-back-end.md. The six programs of the wide
+# operations run in both modes from the step emit-wide on, and llvm_flags,
+# the test llvm_flags, runs in release mode as the work order gives it.
 set(llvm_targets "")
 if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
     set(llvm_targets macos-arm64 macos-x86_64)
@@ -596,6 +594,12 @@ foreach(target IN LISTS llvm_targets)
     foreach(name IN ITEMS scalar_ops llvm_division)
         antic_llvm_program_test(${name} ${target} dev OPTIONS --no-checks)
     endforeach()
+    foreach(name IN ITEMS flags saturating mul_high carry_chain wrapping
+            simd)
+        antic_llvm_program_test(${name} ${target} release)
+        antic_llvm_program_test(${name} ${target} dev)
+    endforeach()
+    antic_llvm_program_test(llvm_flags ${target} release)
 endforeach()
 
 # --backend llvm writes no object before the step emit-run adds opt and
