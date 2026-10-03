@@ -2683,6 +2683,36 @@ antic_modules_test(generics_modules
     STD lang mem text
     WORK "${CMAKE_CURRENT_BINARY_DIR}/generics")
 
+# The test mixed_backends of docs/work-order-llvm-back-end.md: the dev
+# objects of the library modules come from one back end and the program
+# from the other, and they link and run. Both follow the C convention and
+# the same layout until the step switch, which removes the test. The
+# classes of chain cross the objects through their tables, and the
+# generics of mid make link-once copies that both back ends define. The
+# release form of each runs as well, with the program from the other back
+# end.
+foreach(pair native,llvm llvm,native)
+    string(REPLACE "," ";" backends "${pair}")
+    list(GET backends 0 libraries)
+    list(GET backends 1 program)
+    antic_modules_test(mixed_backends_chain_${libraries}
+        ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/chain"
+        LIBRARIES animal dog
+        PROGRAM chain
+        STD lang
+        OPTIONS --backend ${program}
+        LIB_OPTIONS --backend ${libraries}
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/mixed-chain-${libraries}")
+    antic_modules_test(mixed_backends_generics_${libraries}
+        ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generics"
+        LIBRARIES gen mid
+        PROGRAM client
+        STD lang mem text
+        OPTIONS --backend ${program}
+        LIB_OPTIONS --backend ${libraries}
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/mixed-generics-${libraries}")
+endforeach()
+
 # Direct imports. A program and a library name the items of another
 # library without its module name, and reach the module by its name as
 # well. A generic among them has its copy made in the program.
