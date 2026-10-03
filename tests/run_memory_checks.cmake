@@ -77,6 +77,28 @@ foreach(target linux-x86_64 macos-arm64 windows-x86_64)
         message(FATAL_ERROR "${target} carries no options hook or no "
                             "marking of the kept blocks")
     endif()
+    # A report walks the Anti frames by their frame pointers. antic
+    # writes no CFI on ELF, so the unwinder stops at the first one. The
+    # options stand as `.byte` lines after their label, which this reads
+    # back into text up to the terminating zero.
+    if(NOT target MATCHES "^windows")
+        string(REGEX MATCH "memory_check_options:\n((    \\.byte [^\n]*\n)+)"
+               lines "${assembly}")
+        string(REGEX MATCHALL "0x[0-9a-f][0-9a-f]" bytes "${CMAKE_MATCH_1}")
+        set(options "")
+        foreach(byte IN LISTS bytes)
+            math(EXPR code "${byte}")
+            if(code EQUAL 0)
+                break()
+            endif()
+            string(ASCII ${code} letter)
+            string(APPEND options "${letter}")
+        endforeach()
+        if(NOT options MATCHES "(^|:)fast_unwind_on_fatal=1(:|$)")
+            message(FATAL_ERROR "${target} does not ask for the fast "
+                                "unwinder of a report: `${options}`")
+        endif()
+    endif()
 endforeach()
 
 execute_process(COMMAND "${ANTIC}" --memory-checks --target windows-arm64

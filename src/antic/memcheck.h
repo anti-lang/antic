@@ -24,9 +24,12 @@
    options a program of --memory-checks gives it. macOS reports the leaks
    only when asked, and ends a program after a report with SIGABRT,
    which writes a crash report. The program exits with status 1
-   instead, as on Linux. */
+   instead, as on Linux. A report walks the stack by the frame pointers,
+   since antic writes no CFI on ELF and the unwinder of a fatal report
+   would stop at the first Anti frame. */
 #define MEMCHECK_OPTIONS_HOOK "__asan_default_options"
-#define MEMCHECK_OPTIONS "detect_leaks=1:abort_on_error=0"
+#define MEMCHECK_OPTIONS \
+    "detect_leaks=1:abort_on_error=0:fast_unwind_on_fatal=1"
 /* The function of src/rt/rt.h that marks a block of the runtime as kept
    until exit, and the call of the leak checker that it makes in a
    program of --memory-checks. */
