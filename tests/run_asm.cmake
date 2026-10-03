@@ -19,9 +19,11 @@ get_filename_component(name "${SOURCE}" NAME_WE)
 set(assembly "${WORK}/${name}.${TARGET}.s")
 file(MAKE_DIRECTORY "${WORK}")
 string(REPLACE "|" ";" options "${OPTIONS}")
+# --backend native: the expected output is the one of the native back end,
+# whichever back end ANTIC_BACKEND names. The step switch rewrites it.
 execute_process(
-    COMMAND "${ANTIC}" -S --target "${TARGET}" ${options} -o "${assembly}"
-            "${SOURCE}"
+    COMMAND "${ANTIC}" --backend native -S --target "${TARGET}" ${options}
+            -o "${assembly}" "${SOURCE}"
     RESULT_VARIABLE status
     OUTPUT_VARIABLE out
     ERROR_VARIABLE err

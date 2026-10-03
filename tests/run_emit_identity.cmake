@@ -22,8 +22,12 @@ foreach(source IN LISTS sources)
     get_filename_component(name "${source}" NAME_WE)
     foreach(target IN LISTS targets)
         set(out "${WORK}/${name}.${target}.s")
-        execute_process(COMMAND "${ANTIC}" --target ${target} --runtime "${RUNTIME}"
-                                -S -o "${out}" "${source}"
+        # --backend native: the expected output is the one of the native
+        # back end, whichever back end ANTIC_BACKEND names. The step
+        # switch rewrites it.
+        execute_process(COMMAND "${ANTIC}" --backend native --target ${target}
+                                --runtime "${RUNTIME}" -S -o "${out}"
+                                "${source}"
                         RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
         if(NOT status EQUAL 0)
             message(FATAL_ERROR "antic -S failed for ${name} on ${target}\n${err}")

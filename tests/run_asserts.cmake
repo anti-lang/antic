@@ -28,13 +28,14 @@ program_expect("forced" COMMAND "${WORK}/forced" ABORTS
                ERR_MATCH "^asserts\\.anti:[0-9]+: assertion failed: n > 0\n$")
 
 # Dev mode keeps them without a flag, and --no-asserts drops them.
-execute_process(COMMAND "${ANTIC}" --dev -S -o "${WORK}/dev.s" "${SOURCE}"
+execute_process(COMMAND "${ANTIC}" --dev --runtime "${RUNTIME}" -S
+                        -o "${WORK}/dev.s" "${SOURCE}"
                 RESULT_VARIABLE status)
 file(READ "${WORK}/dev.s" dev)
 if(NOT status EQUAL 0 OR NOT dev MATCHES "assert_failed")
     message(FATAL_ERROR "dev mode dropped the assertion")
 endif()
-execute_process(COMMAND "${ANTIC}" --dev --no-asserts -S
+execute_process(COMMAND "${ANTIC}" --dev --no-asserts --runtime "${RUNTIME}" -S
                         -o "${WORK}/off.s" "${SOURCE}" RESULT_VARIABLE status)
 file(READ "${WORK}/off.s" off)
 if(NOT status EQUAL 0 OR off MATCHES "assert_failed")

@@ -188,6 +188,7 @@ foreach(module IN LISTS ANTIC_DEV_MODULES)
     string(REPLACE "/" "_" name "${module}")
     add_test(NAME dev_object_${name}
         COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
+                --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
                 -I "${ANTIC_RUNTIME_DIR}/std"
                 -o "${CMAKE_CURRENT_BINARY_DIR}/anti_${name}_dev"
                 "${ANTIC_RUNTIME_DIR}/std/anti/${module}.antl")
@@ -327,7 +328,9 @@ function(antic_dump_test stage subject expected)
     set(version "")
     if(stage STREQUAL "asm")
         set(file "${ANTIC_DUMPS}/${name}.s")
-        list(PREPEND arguments -S -o "${file}")
+        # The golden is the assembly of the native back end, whichever
+        # back end ANTIC_BACKEND names.
+        list(PREPEND arguments --backend native -S -o "${file}")
         set(output "-DOUTPUT=${file}")
     elseif(stage MATCHES "^(tokens|ast|types|ir|opt|select|alloc|llvm)$")
         list(PREPEND arguments --dump-${stage})
@@ -1764,6 +1767,8 @@ if(NOT WIN32)
     add_test(NAME antic_stack
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
+            "-DOPT=${ANTIC_OPT}"
+            "-DLLC=${ANTIC_LLC}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/antic-stack"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_antic_stack.cmake")
 endif()
@@ -2141,19 +2146,25 @@ add_test(NAME warning_names
 # Doc warnings come only with --doc-warnings, which anti check passes.
 add_expect_test(warning_note STATUS 0
     PATTERN "note.anti:2:8: warning: the pub item `warm` has a `//#` note and no `///` comment"
-    COMMAND "$<TARGET_FILE:antic>" --doc-warnings -S -o "${CMAKE_CURRENT_BINARY_DIR}/note.s"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings -S
+            --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/note.s"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/note.anti")
 add_test(NAME silent_note
-    COMMAND antic -S -o "${CMAKE_CURRENT_BINARY_DIR}/note_silent.s"
+    COMMAND antic -S --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/note_silent.s"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/note.anti")
 set_tests_properties(silent_note PROPERTIES FAIL_REGULAR_EXPRESSION "warning")
 
 add_expect_test(warning_dropped STATUS 0
     PATTERN "dropped.anti:3:2: warning: the `/\\*\\*` comment is dropped, because no item or field follows it"
-    COMMAND "$<TARGET_FILE:antic>" --doc-warnings -S -o "${CMAKE_CURRENT_BINARY_DIR}/dropped.s"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings -S
+            --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/dropped.s"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/dropped.anti")
 add_test(NAME silent_dropped
-    COMMAND antic -S -o "${CMAKE_CURRENT_BINARY_DIR}/dropped_silent.s"
+    COMMAND antic -S --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/dropped_silent.s"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/dropped.anti")
 set_tests_properties(silent_dropped PROPERTIES FAIL_REGULAR_EXPRESSION "warning")
 
@@ -2161,6 +2172,7 @@ set_tests_properties(silent_dropped PROPERTIES FAIL_REGULAR_EXPRESSION "warning"
 # without a warning.
 add_test(NAME silent_doc_declared
     COMMAND antic --doc-warnings -S
+            --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
             -o "${CMAKE_CURRENT_BINARY_DIR}/doc_declared.s"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/doc_declared.anti")
 set_tests_properties(silent_doc_declared PROPERTIES
@@ -3145,6 +3157,8 @@ endforeach()
 add_test(NAME mutex_size
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
+        "-DOPT=${ANTIC_OPT}"
+        "-DLLC=${ANTIC_LLC}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/mutex_size.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/mutex_size"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_mutex_size.cmake")

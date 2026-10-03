@@ -15,8 +15,10 @@
 get_filename_component(name "${SOURCE}" NAME_WE)
 set(assembly "${WORK}/${name}.${TARGET}.${LEVEL}.s")
 file(MAKE_DIRECTORY "${WORK}")
+# --backend native: the expected output is the one of the native back end,
+# whichever back end ANTIC_BACKEND names. The step switch rewrites it.
 execute_process(
-    COMMAND "${ANTIC}" -S --target "${TARGET}" --cpu "${LEVEL}"
+    COMMAND "${ANTIC}" --backend native -S --target "${TARGET}" --cpu "${LEVEL}"
             -o "${assembly}" "${SOURCE}"
     RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
     ENCODING NONE)

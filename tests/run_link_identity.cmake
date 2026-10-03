@@ -21,9 +21,11 @@ file(MAKE_DIRECTORY "${WORK}")
 # The name of the output stands in the ad-hoc signature, so it is fixed.
 set(exe "${WORK}/identity")
 file(REMOVE "${exe}")
+# --backend native: the expected output is the one of the native back end,
+# whichever back end ANTIC_BACKEND names. The step switch rewrites it.
 execute_process(
-    COMMAND "${ANTIC}" --target macos-arm64 --llvm-mc "${LLVM_MC}"
-            --runtime "${RUNTIME}" -o "${exe}" "${SOURCE}"
+    COMMAND "${ANTIC}" --backend native --target macos-arm64
+            --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -o "${exe}" "${SOURCE}"
     RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed for macos-arm64\n${err}")

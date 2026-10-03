@@ -1,5 +1,7 @@
 # The size of a Mutex on each target. Run with cmake -P and these values:
 #   ANTIC    the antic executable
+#   OPT      the opt of the pinned release
+#   LLC      the llc of the pinned release
 #   SOURCE   tests/dump/mutex_size.anti
 #   WORK     a directory for the listings
 #
@@ -15,13 +17,14 @@ foreach(case linux-x86_64=4000 linux-arm64=4000 macos-arm64=4000
     list(GET parts 1 wanted)
     set(listing "${WORK}/mutex_size.${target}.s")
     execute_process(COMMAND "${ANTIC}" -S --target "${target}" -o "${listing}"
-                            "${SOURCE}"
+                            --opt "${OPT}" --llc "${LLC}" "${SOURCE}"
                     RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
     if(NOT status EQUAL 0 OR NOT err STREQUAL "")
         message(FATAL_ERROR "antic -S failed for ${target}\n${err}")
     endif()
     file(READ "${listing}" text)
-    if(NOT text MATCHES "[#$]${wanted}[,\n]")
+    # llc writes a comment after the constant, `// =0xfa0`.
+    if(NOT text MATCHES "[#$]${wanted}[,\n ]")
         message(FATAL_ERROR "the listing of ${target} does not return "
                             "${wanted}:\n${text}")
     endif()

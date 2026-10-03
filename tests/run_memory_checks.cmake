@@ -79,8 +79,9 @@ foreach(target linux-x86_64 macos-arm64 windows-x86_64)
     endif()
     # A report walks the Anti frames by their frame pointers. antic
     # writes no CFI on ELF, so the unwinder stops at the first one. The
-    # options stand as `.byte` lines after their label, which this reads
-    # back into text up to the terminating zero.
+    # native back end writes the options as `.byte` lines after their
+    # label, which this reads back into text up to the terminating zero.
+    # llc writes one `.asciz` line.
     if(NOT target MATCHES "^windows")
         string(REGEX MATCH "memory_check_options:\n((    \\.byte [^\n]*\n)+)"
                lines "${assembly}")
@@ -94,6 +95,10 @@ foreach(target linux-x86_64 macos-arm64 windows-x86_64)
             string(ASCII ${code} letter)
             string(APPEND options "${letter}")
         endforeach()
+        if(options STREQUAL "" AND assembly MATCHES
+           "memory_check_options:[^\n]*\n[ \t]*\\.asciz[ \t]+\"([^\"]*)\"")
+            set(options "${CMAKE_MATCH_1}")
+        endif()
         if(NOT options MATCHES "(^|:)fast_unwind_on_fatal=1(:|$)")
             message(FATAL_ERROR "${target} does not ask for the fast "
                                 "unwinder of a report: `${options}`")

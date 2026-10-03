@@ -179,7 +179,7 @@ static bool assemble_package(const struct options *o, const struct text *bytes,
 
     text_appendf(&obj_path, "%s%s", text_cstr(path),
                  target_info(o->target)->object_suffix);
-    if (o->backend == BACKEND_LLVM) {
+    if (driver_uses_llvm(o)) {
         llvm_emit_package(&source, o->target, bytes->data, bytes->length);
         ok = driver_compile_llvm(o, &source, text_cstr(path),
                                  text_cstr(&obj_path));

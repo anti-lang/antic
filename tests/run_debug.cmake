@@ -57,7 +57,8 @@ if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic -c failed\n${err}")
 endif()
 
-# Build the program twice, with the source positions and without them.
+# Build the program twice, with the source positions and without them,
+# and write the assembly of each with -S.
 function(build name)
     execute_process(COMMAND "${ANTIC}" ${ARGN} --llvm-mc "${LLVM_MC}"
                             --runtime "${RUNTIME}" -I "${root}"
@@ -71,21 +72,37 @@ endfunction()
 
 build(app -g)
 build(plain)
+build(app.s -g -S)
+build(plain.s -S)
 
 # A .file directive per source and a .loc before the first instruction of
-# every statement.
+# every statement. Each back end numbers the files its own way, so the
+# number of each file comes from its directive. The native back end
+# writes `.file 1 "step.anti"`, and llc `.file 1 "" "step.anti"` or the
+# same with a tab.
 file(READ "${WORK}/app.s" assembly)
-foreach(wanted "\.file 1 \"com/example/step\.anti\"" "\.file 2 \"app\.anti\""
-        "\.loc 1 3 0" "\.loc 1 4 0" "\.loc 2 5 0" "\.loc 2 10 0"
-        "\.loc 2 11 0")
-    if(NOT assembly MATCHES "${wanted}")
-        message(FATAL_ERROR "the assembly of -g holds no `${wanted}`")
+foreach(source "com/example/step" "app")
+    if(NOT assembly MATCHES
+       "\\.file[ \t]+([0-9]+)[ \t]+(\"\"[ \t]+)?\"${source}\\.anti\"")
+        message(FATAL_ERROR "the assembly of -g names no ${source}.anti")
+    endif()
+    string(REPLACE "/" "_" key "${source}")
+    set(file_${key} "${CMAKE_MATCH_1}")
+endforeach()
+foreach(wanted "${file_com_example_step} 3" "${file_com_example_step} 4"
+        "${file_app} 5" "${file_app} 10" "${file_app} 11")
+    string(REPLACE " " "[ \t]+" position "${wanted}")
+    set(pattern "\\.loc[ \t]+${position}[ \t]+0")
+    if(NOT assembly MATCHES "${pattern}")
+        message(FATAL_ERROR "the assembly of -g holds no `.loc ${wanted} 0`")
     endif()
 endforeach()
 
-# Without -g the assembly carries no position at all.
+# Without -g the assembly carries no position at all. llc names the
+# source of an ELF object with a `.file` of no number, which is no
+# position.
 file(READ "${WORK}/plain.s" bare)
-if(bare MATCHES "\.loc |\.file |\.cv_")
+if(bare MATCHES "\\.loc[ \t]|\\.file[ \t]+[0-9]|\\.cv_")
     message(FATAL_ERROR "a build without -g wrote a source position")
 endif()
 

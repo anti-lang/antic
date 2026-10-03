@@ -151,6 +151,21 @@ target_compile_definitions(antic PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")
 target_compile_definitions(antic_core PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")
+# DESIGN: ANTIC_BACKEND names the back end of a build without --backend,
+# native or llvm, so the whole suite runs under either from the step flags
+# of docs/work-order-llvm-back-end.md to the step switch, which removes
+# the option with --backend. The default stays native until then.
+set(ANTIC_BACKEND native CACHE STRING
+    "The back end of antic without --backend: native or llvm")
+set_property(CACHE ANTIC_BACKEND PROPERTY STRINGS native llvm)
+if(ANTIC_BACKEND STREQUAL "llvm")
+    target_compile_definitions(antic_core PRIVATE ANTIC_DEFAULT_LLVM=1)
+elseif(ANTIC_BACKEND STREQUAL "native")
+    target_compile_definitions(antic_core PRIVATE ANTIC_DEFAULT_LLVM=0)
+else()
+    message(FATAL_ERROR
+        "ANTIC_BACKEND is native or llvm, not ${ANTIC_BACKEND}")
+endif()
 # anti prints the same version as antic, which step 10 of a release
 # reads from a fresh install. tools/pack-anti.cmake defines it for both.
 target_compile_definitions(anti PRIVATE

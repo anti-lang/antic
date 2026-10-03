@@ -87,6 +87,9 @@ struct types;
 bool driver_read_bytes(const char *path, struct text *out);
 bool driver_write_file(const char *path, const struct text *content);
 bool driver_is_plugin(const struct options *o);
+/* Whether the LLVM back end compiles: --backend llvm, or no --backend in
+   a build of antic configured with ANTIC_BACKEND=llvm. */
+bool driver_uses_llvm(const struct options *o);
 bool driver_file_exists(const char *path);
 bool driver_assemble(const struct options *o, const char *assembly,
                      const char *object);

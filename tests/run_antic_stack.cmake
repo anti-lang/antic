@@ -5,6 +5,8 @@
 # and before the thread it ended by SIGSEGV here. Run with cmake -P and
 # these values:
 #   ANTIC  the antic executable
+#   OPT    the opt of the pinned release
+#   LLC    the llc of the pinned release
 #   WORK   a directory this run writes into
 #
 # The limit is `ulimit -s` of a POSIX shell, so Windows has no run of
@@ -25,8 +27,9 @@ file(WRITE "${WORK}/deep.anti"
     "fn main() -> int\n{\n\tlet x = 1;\n\treturn ${expr} - x - ${depth};\n}\n")
 
 execute_process(
-    COMMAND sh -c "ulimit -s 256 && exec \"$0\" -S \"$1\" -o \"$2\""
-            "${ANTIC}" "${WORK}/deep.anti" "${WORK}/deep.s"
+    COMMAND sh -c
+            "ulimit -s 256 && exec \"$0\" -S \"$1\" -o \"$2\" --opt \"$3\" --llc \"$4\""
+            "${ANTIC}" "${WORK}/deep.anti" "${WORK}/deep.s" "${OPT}" "${LLC}"
     RESULT_VARIABLE status
     OUTPUT_VARIABLE out
     ERROR_VARIABLE err

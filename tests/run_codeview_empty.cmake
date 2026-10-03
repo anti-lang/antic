@@ -10,8 +10,10 @@
 #   WORK    a directory for the assembly
 
 file(MAKE_DIRECTORY "${WORK}")
-execute_process(COMMAND "${ANTIC}" --dev --target "${TARGET}" -S -I "${STD}"
-                        -o "${WORK}/empty.${TARGET}.s" "${SOURCE}"
+# --backend native: the expected output is the one of the native back end,
+# whichever back end ANTIC_BACKEND names. The step switch rewrites it.
+execute_process(COMMAND "${ANTIC}" --backend native --dev --target "${TARGET}"
+                        -S -I "${STD}" -o "${WORK}/empty.${TARGET}.s" "${SOURCE}"
                 RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed with ${status}\n${err}")

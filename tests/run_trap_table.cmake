@@ -34,8 +34,10 @@ foreach(case inline copy_inline)
     traps(dev ${case} Part)
 endforeach()
 
-execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}" -S
-                        -o "${WORK}/release.s" "${SOURCE}"
+# --backend native: the labels below are the ones of the native back end,
+# whichever back end ANTIC_BACKEND names. The step switch rewrites it.
+execute_process(COMMAND "${ANTIC}" --backend native --runtime "${RUNTIME}"
+                        -S -o "${WORK}/release.s" "${SOURCE}"
                 RESULT_VARIABLE status)
 # The function run holds the dispatch, `is` and `as`. The teardown and
 # the copy of Holder, which follow it, check in every mode.

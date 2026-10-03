@@ -138,8 +138,9 @@ struct options {
     /* DESIGN: --backend native|llvm selects the back end from the step
        emit-core to the step vm of docs/work-order-llvm-back-end.md, so the
        suite runs both and compares. The step switch removes it, and the
-       LLVM back end is then the only one. */
-    enum { BACKEND_NATIVE, BACKEND_LLVM } backend;
+       LLVM back end is then the only one. Without the option the build
+       of antic decides, see driver_uses_llvm. */
+    enum { BACKEND_DEFAULT, BACKEND_NATIVE, BACKEND_LLVM } backend;
     /* --keep-llvm: the LLVM back end keeps <output>.ll and <output>.bc,
        which it deletes otherwise. */
     bool keep_llvm;

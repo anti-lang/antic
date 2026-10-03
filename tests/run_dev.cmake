@@ -14,8 +14,9 @@
 file(MAKE_DIRECTORY "${WORK}")
 foreach(module scale twice)
     execute_process(
-        COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" -I "${MODULES}"
-                -I "${LIBS}" -o "${WORK}/${module}"
+        COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+                --keep-llvm -I "${MODULES}" -I "${LIBS}"
+                -o "${WORK}/${module}"
                 "${MODULES}/com/example/${module}.anti"
         RESULT_VARIABLE status
         ERROR_VARIABLE err
@@ -41,8 +42,8 @@ endif()
 
 foreach(module scale twice)
     execute_process(
-        COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" -I "${LIBS}"
-                -o "${WORK}/${module}_antl"
+        COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+                --keep-llvm -I "${LIBS}" -o "${WORK}/${module}_antl"
                 "${LIBS}/com/example/${module}.antl"
         RESULT_VARIABLE status
         ERROR_VARIABLE err
@@ -50,10 +51,17 @@ foreach(module scale twice)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "antic --dev ${module}.antl failed\n${err}")
     endif()
-    file(READ "${WORK}/${module}.s" from_source)
-    file(READ "${WORK}/${module}_antl.s" from_library)
+    # The native back end leaves the assembly beside the object, and the
+    # LLVM back end the text of --keep-llvm.
+    set(text .s)
+    if(EXISTS "${WORK}/${module}.ll")
+        set(text .ll)
+    endif()
+    file(READ "${WORK}/${module}${text}" from_source)
+    file(READ "${WORK}/${module}_antl${text}" from_library)
     if(NOT from_source STREQUAL from_library)
-        message(FATAL_ERROR "${module}_antl.s differs from ${module}.s")
+        message(FATAL_ERROR
+            "${module}_antl${text} differs from ${module}${text}")
     endif()
 endforeach()
 execute_process(

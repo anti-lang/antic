@@ -219,6 +219,23 @@ bool driver_is_plugin(const struct options *o)
     return o->lib == LIB_SHARED && o->no_runtime;
 }
 
+/* DESIGN: the CMake option ANTIC_BACKEND sets the back end of a build
+   without --backend, so one configuration runs the whole suite under the
+   LLVM back end and another under the native one. It goes with
+   --backend in the step switch. A build of antic outside CMake, as the
+   packer's, takes the native back end. --dump-select and --dump-alloc
+   print the native back end and take it. */
+#ifndef ANTIC_DEFAULT_LLVM
+#define ANTIC_DEFAULT_LLVM 0
+#endif
+bool driver_uses_llvm(const struct options *o)
+{
+    if (o->backend == BACKEND_DEFAULT) {
+        return ANTIC_DEFAULT_LLVM && !o->dump_select && !o->dump_alloc;
+    }
+    return o->backend == BACKEND_LLVM;
+}
+
 /* Whether the command ends with a link, rather than a dump, a library
    file or an assembly file. */
 static bool links(const struct options *o)
@@ -809,7 +826,7 @@ static int back_end(const struct options *o, struct module *tree,
     }
     /* --dump-llvm prints the text of the LLVM back end, whichever back end
        --backend names. */
-    if (o->backend == BACKEND_LLVM || o->dump_llvm) {
+    if (driver_uses_llvm(o) || o->dump_llvm) {
         return llvm_back_end(o, program, module, assembly, extras);
     }
     functions = alloc_zeroed(program->function_count + 1, sizeof *functions);
@@ -1734,7 +1751,7 @@ int driver_run(const struct options *o)
         }
         goto done;
     }
-    if (o->assembly_only && o->backend == BACKEND_LLVM) {
+    if (o->assembly_only && driver_uses_llvm(o)) {
         text_append(&asm_path, text_cstr(&base));
         if (o->output == NULL) {
             text_append(&asm_path, ASSEMBLY_SUFFIX);
@@ -1758,7 +1775,7 @@ int driver_run(const struct options *o)
        and its text only under --keep-llvm. */
     text_appendf(&obj_path, "%s%s", text_cstr(&base),
                  target_info(o->target)->object_suffix);
-    if (o->backend == BACKEND_LLVM) {
+    if (driver_uses_llvm(o)) {
         if (!driver_compile_llvm(o, &assembly, text_cstr(&base),
                                  text_cstr(&obj_path))) {
             goto done;

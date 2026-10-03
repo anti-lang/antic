@@ -20,13 +20,15 @@ set(bounds "${SOURCES}/bounds_array.anti")
 antic_program("${WORK}/forced" "${bounds}" --checks)
 program_expect("forced" COMMAND "${WORK}/forced" ABORTS
                ERR_MATCH "index out of bounds: index 5, length 4")
-execute_process(COMMAND "${ANTIC}" --dev --no-checks -S -o "${WORK}/off.s"
+execute_process(COMMAND "${ANTIC}" --dev --no-checks --runtime "${RUNTIME}"
+                        -S -o "${WORK}/off.s"
                         "${bounds}" RESULT_VARIABLE status)
 file(READ "${WORK}/off.s" off)
 if(NOT status EQUAL 0 OR off MATCHES "check_failed")
     message(FATAL_ERROR "--no-checks kept the checks of a dev build")
 endif()
-execute_process(COMMAND "${ANTIC}" --dev -S -o "${WORK}/on.s" "${bounds}"
+execute_process(COMMAND "${ANTIC}" --dev --runtime "${RUNTIME}" -S
+                        -o "${WORK}/on.s" "${bounds}"
                 RESULT_VARIABLE status)
 file(READ "${WORK}/on.s" on)
 if(NOT status EQUAL 0 OR NOT on MATCHES "check_failed")

@@ -22,7 +22,10 @@ file(MAKE_DIRECTORY "${WORK}")
 get_filename_component(base "${SOURCE}" NAME_WE)
 set(assembly "${WORK}/${base}.${TARGET}.s")
 set(object "${WORK}/${base}.${TARGET}.obj")
-run("${ANTIC}" -S --target "${TARGET}" -o "${assembly}" "${SOURCE}")
+# --backend native: the expected output is the one of the native back end,
+# whichever back end ANTIC_BACKEND names. The step switch rewrites it.
+run("${ANTIC}" --backend native -S --target "${TARGET}" -o "${assembly}"
+    "${SOURCE}")
 run("${LLVM_MC}" "-triple=${TRIPLE}" -filetype=obj -o "${object}" "${assembly}")
 run("${LLVM_READOBJ}" --unwind "${object}")
 string(REGEX REPLACE "^\nFile: [^\n]*\n" "" decoded "${run_out}")
