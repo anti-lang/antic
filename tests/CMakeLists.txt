@@ -506,7 +506,8 @@ add_test(NAME llvm_datalayout_pin
 # mode, one test per target. control_flow holds control flow alone, which
 # the translator takes from the step emit-core on. The four programs after
 # it hold the tables of the runtime and the entry, which it takes from the
-# step emit-arith on.
+# step emit-arith on. The six after those take memory, calls, bitfields
+# and globals that hold addresses, from the step emit-memory on.
 # DESIGN: one test per target, since each runs antic twice per program. As
 # one test the twelve runs per program took over nine minutes under ASan,
 # whose start alone costs a fifth of a second.
@@ -519,7 +520,7 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/dump,${CMAKE_CURRENT_SOURCE_DIR}/programs"
             "-DTARGETS=${target}"
-            "-DACCEPT=control_flow,return42,return_pieces,deep_nesting,long_float"
+            "-DACCEPT=control_flow,return42,return_pieces,deep_nesting,long_float,array_local,classes,class_bitfields,object_model,deserialize,floatcalls"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_verify/${target}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_verify.cmake")
 endforeach()
@@ -527,10 +528,24 @@ endforeach()
 # A program of tests/programs built through the LLVM back end by hand, with
 # opt and llc of the pinned release, and run on a target the host runs.
 # MODE is release or dev, and OPTIONS the options of antic beside them.
-# The test is llvm_program_<name>_<target>_<mode>. The step emit-run moves
-# the steps of run_llvm_program.cmake into antic.
+# SOURCE names a program elsewhere than tests/programs, OBJECTS the objects
+# of C it links and EXPECTED its expected output. The test is
+# llvm_program_<name>_<target>_<mode>. The step emit-run moves the steps
+# of run_llvm_program.cmake into antic.
 function(antic_llvm_program_test name target mode)
-    cmake_parse_arguments(PARSE_ARGV 3 arg "" "" "OPTIONS")
+    cmake_parse_arguments(PARSE_ARGV 3 arg "" "SOURCE;OBJECTS;EXPECTED"
+                          "OPTIONS")
+    set(source "${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti")
+    if(arg_SOURCE)
+        set(source "${arg_SOURCE}")
+    endif()
+    set(extra "")
+    if(arg_OBJECTS)
+        list(APPEND extra "-DOBJECTS=${arg_OBJECTS}")
+    endif()
+    if(arg_EXPECTED)
+        list(APPEND extra "-DEXPECTED=${arg_EXPECTED}")
+    endif()
     antic_cpu_level(level "${target}")
     set(options ${arg_OPTIONS})
     if(target STREQUAL "macos-x86_64")
@@ -544,11 +559,12 @@ function(antic_llvm_program_test name target mode)
             "-DOPT=${ANTIC_OPT}"
             "-DLLC=${ANTIC_LLC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+            "-DSOURCE=${source}"
             "-DTARGET_NAME=${target}"
             "-DLEVEL=${level}"
             "-DMODE=${mode}"
             "-DOPTIONS=${options}"
+            ${extra}
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_programs"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_program.cmake")
 endfunction()
@@ -1943,6 +1959,36 @@ else()
     set_tests_properties(program_abi_raymath PROPERTIES
         FAIL_REGULAR_EXPRESSION "raylib not found")
 endif()
+
+# The programs of tests/abi under the LLVM back end, in release mode as the
+# program_abi_* tests run, for macos-arm64 and for macos-x86_64 under
+# Rosetta. Each links the objects of C of its native test and prints what
+# that test prints, so they check abi_classify of src/antic/abi.c against
+# clang. abi_simd holds the simd operations its structs need.
+foreach(target IN LISTS llvm_targets)
+    set(suffix "")
+    set(wchar_expected "${abi_wchar_expected}")
+    if(NOT target STREQUAL ANTIC_HOST_TARGET)
+        set(suffix _x86_64)
+        set(wchar_expected "${abi_wchar_x86_64_expected}")
+    endif()
+    foreach(case structs simd wchar raymath)
+        if(NOT TARGET abi_${case}${suffix})
+            continue()
+        endif()
+        set(expected "")
+        if(case STREQUAL "wchar")
+            set(expected EXPECTED "${wchar_expected}")
+        elseif(case STREQUAL "raymath")
+            set(expected EXPECTED
+                "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.expected")
+        endif()
+        antic_llvm_program_test(abi_${case} ${target} release
+            SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_${case}.anti"
+            OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_${case}${suffix}>,,>"
+            ${expected})
+    endforeach()
+endforeach()
 
 # Diagnostics. A refusal of a program exits with 1, and its messages
 # equal the .err file beside it.
@@ -3544,6 +3590,34 @@ if(ANTIC_LLVM_AR)
                 "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
                 "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib"
+                "-DCASE=${case}"
+                "-DCC=${ANTIC_TEST_CC}"
+                "-DCXX=${ANTIC_TEST_CXX}"
+                "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+                "-DTARGET=${ANTIC_HOST_TARGET}"
+                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_clib.cmake")
+    endforeach()
+endif()
+# The same libraries with the object of each built through the LLVM back
+# end by hand, on the macOS hosts, as run_clib.cmake gives under BACKEND.
+# Each case checks what its native test checks.
+if(ANTIC_LLVM_AR AND llvm_targets)
+    foreach(case static shared exports two loader header bundle classes
+            failing tuples flags variants nested simd names handlers ledger
+            generics optional)
+        add_test(NAME clib_llvm_${case}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DANTIC=$<TARGET_FILE:antic>"
+                "-DLLVM_MC=${ANTIC_LLVM_MC}"
+                "-DLLVM_AR=${ANTIC_LLVM_AR}"
+                "-DOPT=${ANTIC_OPT}"
+                "-DLLC=${ANTIC_LLC}"
+                -DBACKEND=llvm
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
+                "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib-llvm"
                 "-DCASE=${case}"
                 "-DCC=${ANTIC_TEST_CC}"
                 "-DCXX=${ANTIC_TEST_CXX}"

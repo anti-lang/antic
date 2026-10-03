@@ -18,6 +18,18 @@
 #   LLVM_OBJDUMP  llvm-objdump, which lists the symbols of the runtime
 #   CROSS     ON for a Windows target of another host. The case builds and
 #             links the programs and runs none, and only bundle has one.
+#   BACKEND   llvm to build the object of each library through the LLVM
+#             back end by hand, with OPT and LLC of the pinned release
+#
+# DESIGN: until the step emit-run of docs/work-order-llvm-back-end.md,
+# antic writes no object through the LLVM back end. The route by hand
+# prints the text of the library with --dump-llvm, runs opt and llc on
+# it, and then runs the same antic command with --llvm-mc naming a script.
+# The script hands back that object for the module and assembles the copy
+# of the package header as llvm-mc does. Header, archive, link and
+# exports then come from antic as they do for the native back end. A
+# shared library takes an empty anti_licenses, since the notice stays
+# out of the dump, as run_llvm_program.cmake does for a program.
 
 # The file names of a library and a program on this host, and what the
 # library driver prints as the compiler of C.
@@ -91,6 +103,50 @@ function(run)
     set(run_out "${out}" PARENT_SCOPE)
 endfunction()
 
+# Write the object of library name, built as kind with the options of
+# ARGN, through the LLVM back end into dir, and the script that stands in
+# for llvm-mc. Set llvm_assembler to the script.
+function(llvm_object name kind dir)
+    set(base "${dir}/${name}.llvm")
+    execute_process(
+        COMMAND "${ANTIC}" --lib ${kind} ${ARGN} ${TARGET_OPTION}
+                --runtime "${RUNTIME}" -I "${SOURCES}" --dump-llvm
+                "${SOURCES}/com/example/${name}.anti"
+        RESULT_VARIABLE status OUTPUT_FILE "${base}.ll" ERROR_VARIABLE err
+        ENCODING NONE)
+    if(NOT status EQUAL 0 OR NOT err STREQUAL "")
+        message(FATAL_ERROR "antic --dump-llvm gave ${status} for ${name}\n${err}")
+    endif()
+    if(kind STREQUAL "shared")
+        file(APPEND "${base}.ll"
+             "@anti_licenses = constant [1 x i8] zeroinitializer, align 1\n")
+    endif()
+    run("${OPT}" "-passes=default<O2>" -o "${base}.bc" "${base}.ll")
+    run("${LLC}" -O2 -filetype=obj -relocation-model=pic -o "${base}.o"
+        "${base}.bc")
+    file(WRITE "${dir}/${name}.assembler.in"
+"#!/bin/sh
+# llvm-mc for antic: the copy of the package header is assembled, and the
+# object of the module is the one the LLVM back end wrote.
+out=
+previous=
+last=
+for argument in \"\$@\"; do
+    if [ \"\$previous\" = -o ]; then out=\"\$argument\"; fi
+    previous=\"\$argument\"
+    last=\"\$argument\"
+done
+case \"\$last\" in
+*.package.s) exec \"${LLVM_MC}\" \"\$@\" ;;
+esac
+exec cp \"${base}.o\" \"\$out\"
+")
+    file(COPY_FILE "${dir}/${name}.assembler.in" "${dir}/${name}.assembler")
+    file(CHMOD "${dir}/${name}.assembler"
+         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
+    set(llvm_assembler "${dir}/${name}.assembler" PARENT_SCOPE)
+endfunction()
+
 # Build library name as kind, static or shared, into dir. Set
 # library_file to the file and library_link to what a program links: the
 # library itself, or the import library of a DLL.
@@ -105,7 +161,12 @@ function(library name kind dir)
     if(kind STREQUAL "shared" AND CMAKE_HOST_WIN32)
         set(link "${dir}/${name}.lib")
     endif()
-    run("${ANTIC}" --lib ${kind} ${ARGN} ${TARGET_OPTION} --llvm-mc "${LLVM_MC}"
+    set(assembler "${LLVM_MC}")
+    if(BACKEND STREQUAL "llvm")
+        llvm_object(${name} ${kind} "${dir}" ${ARGN})
+        set(assembler "${llvm_assembler}")
+    endif()
+    run("${ANTIC}" --lib ${kind} ${ARGN} ${TARGET_OPTION} --llvm-mc "${assembler}"
         --llvm-ar "${LLVM_AR}" --runtime "${RUNTIME}" -I "${SOURCES}"
         -o "${file}" "${SOURCES}/com/example/${name}.anti")
     set(run_out "${run_out}" PARENT_SCOPE)

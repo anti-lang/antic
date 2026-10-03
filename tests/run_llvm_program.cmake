@@ -19,6 +19,8 @@
 #   OPTIONS   optional options of antic, separated by commas
 #   EXPECTED  optional expected file, instead of NAME.expected beside the
 #             source
+#   OBJECTS   optional objects of C that the program links, separated by
+#             commas
 #
 # DESIGN: the runtime reads anti_licenses, the notice that antic appends
 # after the build id. The build id digests the runtime library, so the
@@ -91,9 +93,10 @@ run_tool(llc "${LLC}" -filetype=obj -relocation-model=pic
 
 set(sysroot "${RUNTIME}/sysroot/${TARGET_NAME}")
 file(STRINGS "${sysroot}/sdk-version" sdk_version LIMIT_COUNT 1)
+string(REPLACE "," ";" objects "${OBJECTS}")
 run_tool(ld64.lld "${RUNTIME}/bin/ld64.lld" -S -arch ${arch}
          -platform_version macos "${macos_version}" "${sdk_version}" -syslibroot "${sysroot}"
-         -o "${base}" "${base}.o" "${base}.licenses.o"
+         -o "${base}" "${base}.o" "${base}.licenses.o" ${objects}
          "${RUNTIME}/lib/${TARGET_NAME}/${LEVEL}/libanti_rt.a" -lSystem)
 
 set(program_args "")
