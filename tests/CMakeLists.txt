@@ -31,6 +31,7 @@ add_executable(antic_unit_tests
     unit/test_target.c
     unit/test_cpu.c
     unit/test_llvm_target.c
+    unit/test_abi.c
     unit/test_text.c
     unit/test_lexer.c
     unit/test_parser.c
