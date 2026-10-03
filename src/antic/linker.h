@@ -135,12 +135,15 @@ void link_runtime_library(struct text *out, const char *runtime, enum target t,
    gives it. macOS links the dynamic library and finds it at run time
    through an rpath to that directory. Linux links the static archives
    into a program of the glibc mode, whose symbols the list of .syms
-   exports. Windows links the import library and the thunk, and the DLL
-   stands beside the program. CMakeLists.txt copies the same names. */
+   exports, and libunwind.a gives the runtime _Unwind_Backtrace and
+   _Unwind_GetIP, which glibc does not. Windows links the import library
+   and the thunk, and the DLL stands beside the program. CMakeLists.txt
+   copies the same names. */
 #define MEMCHECK_MACOS_DYLIB "libclang_rt.asan_osx_dynamic.dylib"
 #define MEMCHECK_LINUX_ARCHIVE "libclang_rt.asan.a"
 #define MEMCHECK_LINUX_STATIC "libclang_rt.asan_static.a"
 #define MEMCHECK_LINUX_SYMS "libclang_rt.asan.a.syms"
+#define MEMCHECK_LINUX_UNWIND "libunwind.a"
 #define MEMCHECK_WINDOWS_LIB "clang_rt.asan_dynamic.lib"
 #define MEMCHECK_WINDOWS_THUNK "clang_rt.asan_dynamic_runtime_thunk.lib"
 #define MEMCHECK_WINDOWS_DLL "clang_rt.asan_dynamic.dll"

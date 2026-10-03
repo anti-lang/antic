@@ -612,7 +612,8 @@ static void dynamic_modes(void)
    of the runtime archive. macOS links the dynamic library and names its
    directory as an rpath. The glibc mode of Linux takes the two archives
    whole before the objects and exports the names of the .syms list. It
-   adds the libraries of glibc the runtime calls. Windows links the import
+   adds libunwind.a, whose _Unwind_Backtrace the runtime calls, and the
+   libraries of glibc the runtime calls. Windows links the import
    library and the whole thunk, and keeps the handler of exceptions. */
 static void memory_checks_links(void)
 {
@@ -638,8 +639,9 @@ static void memory_checks_links(void)
           "--dynamic-list=/rt/lib/linux-x86_64-glibc/libclang_rt.asan.a.syms "
           "prog.o shapes.o /rt/lib/linux-x86_64-glibc/v3/libanti_rt.a "
           "-L/rt/sysroot/t/usr/lib/x86_64-linux-gnu "
-          "-L/rt/sysroot/t/lib/x86_64-linux-gnu -lpthread -lrt -ldl -lresolv "
-          "-lm -lc /rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
+          "-L/rt/sysroot/t/lib/x86_64-linux-gnu "
+          "/rt/lib/linux-x86_64-glibc/libunwind.a -lpthread -lrt -ldl "
+          "-lresolv -lm -lc /rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crtn.o");
     in = lld_windows_inputs;
     in.memory_checks = true;

@@ -276,11 +276,17 @@ static void linux_memcheck(struct link_command *c, enum target t,
     add(c, text_cstr(list));
 }
 
-/* The libraries of glibc that the runtime of AddressSanitizer calls. */
-static void linux_memcheck_libraries(struct link_command *c,
+/* The unwinder and the libraries of glibc that the runtime of
+   AddressSanitizer calls. */
+static void linux_memcheck_libraries(struct link_command *c, enum target t,
                                      const struct link_inputs *in)
 {
+    struct text *unwind;
+
     if (in->memory_checks) {
+        unwind = next(c);
+        link_memcheck_file(unwind, in->runtime, t, true, MEMCHECK_LINUX_UNWIND);
+        add(c, text_cstr(unwind));
         add(c, "-lpthread");
         add(c, "-lrt");
         add(c, "-ldl");
@@ -334,7 +340,7 @@ static void glibc_libraries(struct link_command *c, enum target t,
     add(c, text_cstr(shared));
     linux_libraries(c, in);
     if (executable) {
-        linux_memcheck_libraries(c, in);
+        linux_memcheck_libraries(c, t, in);
     }
     add(c, "-lm");
     add(c, "-lc");
@@ -542,7 +548,7 @@ static void linux_ld(struct link_command *c, enum target t,
     add(c, text_cstr(library));
     add(c, text_cstr(search));
     linux_libraries(c, in);
-    linux_memcheck_libraries(c, in);
+    linux_memcheck_libraries(c, t, in);
     add(c, "-lc");
     add(c, text_cstr(crtn));
 }

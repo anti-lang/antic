@@ -391,19 +391,20 @@ endif()
 # DESIGN: --memory-checks links the runtime of AddressSanitizer of the
 # pinned clang, which the runtime archive carries in lib/<target>/ beside
 # the native libraries. macOS takes the dynamic library. The glibc mode of
-# Linux takes the static archives and the list of the names they export.
-# windows-x86_64 takes the DLL, its import library and the thunk. compiler-rt
-# builds none for windows-arm64, and musl has no AddressSanitizer. The
-# MEMCHECK_ names of src/antic/linker.h spell the same files.
+# Linux takes the static archives, the list of the names they export and
+# libunwind.a, which the runtime unwinds the stack with. windows-x86_64
+# takes the DLL, its import library and the thunk. compiler-rt builds none
+# for windows-arm64, and musl has no AddressSanitizer. The MEMCHECK_ names
+# of src/antic/linker.h spell the same files.
 if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     execute_process(COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
         OUTPUT_VARIABLE clang_resource OUTPUT_STRIP_TRAILING_WHITESPACE)
     set(asan_macos-arm64 darwin libclang_rt.asan_osx_dynamic.dylib)
     set(asan_macos-x86_64 darwin libclang_rt.asan_osx_dynamic.dylib)
     set(asan_linux-x86_64-glibc x86_64-unknown-linux-gnu libclang_rt.asan.a
-        libclang_rt.asan_static.a libclang_rt.asan.a.syms)
+        libclang_rt.asan_static.a libclang_rt.asan.a.syms libunwind.a)
     set(asan_linux-arm64-glibc aarch64-unknown-linux-gnu libclang_rt.asan.a
-        libclang_rt.asan_static.a libclang_rt.asan.a.syms)
+        libclang_rt.asan_static.a libclang_rt.asan.a.syms libunwind.a)
     set(asan_windows-x86_64 x86_64-pc-windows-msvc clang_rt.asan_dynamic.lib
         clang_rt.asan_dynamic.dll clang_rt.asan_dynamic_runtime_thunk.lib)
     foreach(target macos-arm64 macos-x86_64 linux-x86_64-glibc
