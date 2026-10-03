@@ -23,7 +23,9 @@
    signatures of scalars. The step emit-arith adds the scalar operations
    and the entry of the runtime. The step emit-memory adds the operations
    on memory, the calls, the globals, the sections and the constructors.
-   Every other operation is refused with the step that adds it. */
+   The step emit-wide adds overflow, flags, saturation, the upper half of
+   a product and the simd operations, so every operation of the IR has
+   its form. */
 
 /* The classification of the parameters and the result of a function. */
 struct classified {
@@ -52,63 +54,15 @@ struct emitter {
     uint32_t slots;                 /* the next %a<n> of the function */
     struct classified signature;    /* of the function */
     /* The four i1 values of the last flag operation, in the order of
-       enum ir_flag, and its result temporary. */
-    uint32_t flags[4];
+       enum ir_flag, each a value or a constant, and its result
+       temporary. */
+    char flags[4][24];
     uint32_t flag_result;
+    /* The i1 of the last addov, subov or mulov, and its result
+       temporary, which the branchov right after it reads. */
+    uint32_t overflow;
+    uint32_t overflow_result;
 };
-
-static void refuse(struct emitter *e, const char *what, const char *step)
-{
-    struct text name = {0};
-
-    if (e->failed) {
-        return;
-    }
-    e->failed = true;
-    ir_name_append(&name, e->f->module, e->f->name);
-    text_format(e->error, e->error_size,
-                "the LLVM back end does not translate %s before the step "
-                "%s, in %s",
-                what, step, text_cstr(&name));
-    text_free(&name);
-}
-
-/* The step of the work order that translates op, or NULL for the
-   operations of the steps up to this one. */
-static const char *step_of(enum ir_op op)
-{
-    switch (op) {
-    case IR_COPY:
-    case IR_JUMP:
-    case IR_BRANCH:
-    case IR_RET:
-    case IR_ADD: case IR_SUB: case IR_MUL: case IR_SDIV: case IR_UDIV:
-    case IR_SREM: case IR_UREM: case IR_AND: case IR_OR: case IR_XOR:
-    case IR_SHL: case IR_SHR_S: case IR_SHR_U:
-    case IR_FADD: case IR_FSUB: case IR_FMUL: case IR_FDIV:
-    case IR_NEG: case IR_NOT: case IR_FNEG:
-    case IR_EQ: case IR_NE: case IR_SLT: case IR_SLE: case IR_SGT:
-    case IR_SGE: case IR_ULT: case IR_ULE: case IR_UGT: case IR_UGE:
-    case IR_FEQ: case IR_FNE: case IR_FLT: case IR_FLE: case IR_FGT:
-    case IR_FGE:
-    case IR_TRUNC: case IR_SEXT: case IR_ZEXT: case IR_SITOF:
-    case IR_UITOF: case IR_FTOSI: case IR_FTOUI: case IR_FEXT:
-    case IR_FTRUNC: case IR_HEXT: case IR_HTRUNC:
-    case IR_SLOT: case IR_LOAD: case IR_STORE: case IR_PTRADD:
-    case IR_MEMCOPY: case IR_ADDR: case IR_BITLOAD: case IR_BITSTORE:
-    case IR_CALL: case IR_VSPLAT: case IR_VBINARY: case IR_VSELECT:
-    case IR_VREDUCE: case IR_ADD_FL: case IR_SUB_FL: case IR_FLAG:
-        return NULL;
-    case IR_ADD_OV: case IR_SUB_OV: case IR_MUL_OV: case IR_BRANCH_OV:
-    case IR_MULH_S: case IR_MULH_U:
-    case IR_ADD_SAT_S: case IR_ADD_SAT_U: case IR_SUB_SAT_S:
-    case IR_SUB_SAT_U: case IR_MUL_SAT_S: case IR_MUL_SAT_U:
-    case IR_MUL_FL: case IR_SHL_FL: case IR_SHR_S_FL: case IR_SHR_U_FL:
-    case IR_NEG_FL: case IR_VUNARY: case IR_VSHUFFLE:
-        return "emit-wide";
-    }
-    return "emit-wide";
-}
 
 /* The LLVM type of a scalar after layout_resolve, or NULL for an
    aggregate and the types the layouts replace. */
@@ -288,6 +242,8 @@ static void float_constant(struct text *out, enum ir_type type, double value)
 
 static void global_symbol(struct text *out, enum target t,
                           const struct ir_global *g);
+static void branch_weights(struct emitter *e, uint32_t then_block,
+                           uint32_t else_block);
 
 /* Append to value the LLVM operand of o as a value of type, after the
    load that reads a temporary. A global or a function is its symbol. */
@@ -472,7 +428,11 @@ static void intrinsic(struct emitter *e, const char *result, const char *name,
 
 /* An operation of two operands of one type: the plain instructions, the
    shifts with the count modulo the width, the guarded divisions and the
-   comparisons, which widen their i1 to the i8 of a bool. */
+   comparisons, which widen their i1 to the i8 of a bool.
+   DESIGN: a comparison widens its i1 to the type of the instruction. The
+   trampolines of whole_tables.c write ne with the type i64, which the
+   native back end takes as a word of 0 or 1, and the branch after it
+   reads the low byte of that word. */
 static void binary(struct emitter *e, const struct ir_inst *inst)
 {
     enum ir_type type = comparison(inst->op) != NULL
@@ -522,8 +482,8 @@ static void binary(struct emitter *e, const struct ir_inst *inst)
                          comparison(inst->op), name, text_cstr(&a),
                          text_cstr(&b));
             text_appendf(e->out, "  %%v%" PRIu32 " = zext i1 %%v%" PRIu32
-                                 " to i8\n",
-                         fresh(e), bit);
+                                 " to %s\n",
+                         fresh(e), bit, value_type(e, inst->type));
         } else {
             text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %s, %s\n",
                          fresh(e), plain_binary(inst->op), name,
@@ -897,9 +857,8 @@ static void vector_of(struct emitter *e, const struct ir_inst *inst,
    tests/abi passes to C need them. A comparison stores its mask as i8
    lanes at alignment 1, since the instruction names the aggregate of
    its operands and not the one of the mask. A shift takes each count
-   modulo the width of a lane, as a scalar shift does. A division needs
-   the guards of each lane and waits for the step emit-wide with the
-   other simd operations. */
+   modulo the width of a lane, as a scalar shift does. The verifier of
+   the IR gives vbinary no integer division. */
 static void vsplat(struct emitter *e, const struct ir_inst *inst)
 {
     const char *lane = value_type(e, inst->type);
@@ -948,9 +907,7 @@ static void vbinary(struct emitter *e, const struct ir_inst *inst)
 
     if (plain_binary(op) == NULL && comparison(op) == NULL && op != IR_SHL &&
         op != IR_SHR_S && op != IR_SHR_U) {
-        char what[48];
-        text_format(what, sizeof what, "`vbinary` of `%s`", ir_op_name(op));
-        refuse(e, what, "emit-wide");
+        unexpected(e, "this lane operation of vbinary");
         return;
     }
     operand(e, &inst->a, IR_PTR, &dst);
@@ -1053,47 +1010,66 @@ static uint32_t field_of(struct emitter *e, const char *type, uint32_t v,
     return n;
 }
 
-/* DESIGN: addfl and subfl give the plain result, and the four flags as
-   i1 values that the flag reads after it widen. The overflow comes from
-   the signed intrinsic, the carry or the borrow from the unsigned one,
-   and zero and sign from comparisons of the result. A carry in runs both
-   intrinsics again on the result and the carry. The two carries cannot
-   both be set. The sum overflows when exactly one of the two signed
-   steps overflowed, so the two overflows combine with xor, which gives
-   the flag of adc and sbb. The other flag operations come with the step
-   emit-wide. */
-static void flag_operation(struct emitter *e, const struct ir_inst *inst)
+/* Keep the value %v<v> as the flag of the last flag operation. */
+static void keep_flag(struct emitter *e, enum ir_flag flag, uint32_t v)
 {
-    bool add = inst->op == IR_ADD_FL;
-    const char *type = value_type(e, inst->type);
-    struct text a = {0};
-    struct text b = {0};
+    text_format(e->flags[flag], sizeof e->flags[flag], "%%v%" PRIu32, v);
+}
+
+/* Keep zero and sign of the result r of type, and r as the result of the
+   flag operation inst. */
+static void finish_flags(struct emitter *e, const struct ir_inst *inst,
+                         const char *type, uint32_t r)
+{
+    char value[24];
+    uint32_t zero = fresh(e);
+    uint32_t sign = fresh(e);
+
+    text_appendf(e->out, "  %%v%" PRIu32 " = icmp eq %s %%v%" PRIu32 ", 0\n",
+                 zero, type, r);
+    text_appendf(e->out, "  %%v%" PRIu32 " = icmp slt %s %%v%" PRIu32 ", 0\n",
+                 sign, type, r);
+    keep_flag(e, IR_FLAG_ZERO, zero);
+    keep_flag(e, IR_FLAG_NEGATIVE, sign);
+    e->flag_result = inst->result;
+    text_format(value, sizeof value, "%%v%" PRIu32, r);
+    store_result(e, inst, value);
+}
+
+/* DESIGN: addfl, subfl and mulfl give the plain result, and the four
+   flags as i1 values that the flag reads after it widen. The overflow
+   comes from the signed intrinsic, the carry, the borrow or the product
+   too wide from the unsigned one, and zero and sign from comparisons of
+   the result. A carry in runs both intrinsics again on the result and
+   the carry. The two carries cannot both be set. The sum overflows when
+   exactly one of the two signed steps overflowed, so the two overflows
+   combine with xor, which gives the flag of adc and sbb. */
+static void arithmetic_flags(struct emitter *e, const struct ir_inst *inst,
+                             const char *type, const char *a, const char *b)
+{
+    const char *kind = inst->op == IR_ADD_FL   ? "add"
+                       : inst->op == IR_SUB_FL ? "sub"
+                                               : "mul";
+    char signed_kind[8];
+    char unsigned_kind[8];
     struct text c = {0};
-    char sum[24];
     uint32_t s;
     uint32_t u;
     uint32_t r;
     uint32_t overflow;
     uint32_t carry;
 
-    if (type == NULL) {
-        return;
-    }
-    operand(e, &inst->a, inst->type, &a);
-    operand(e, &inst->b, inst->type, &b);
     if (inst->c.kind != IR_NONE) {
         operand(e, &inst->c, IR_I8, &c);
     }
     if (e->failed) {
-        text_free(&a);
-        text_free(&b);
         text_free(&c);
         return;
     }
-    s = with_overflow(e, add ? "sadd" : "ssub", type, text_cstr(&a),
-                      text_cstr(&b));
-    u = with_overflow(e, add ? "uadd" : "usub", type, text_cstr(&a),
-                      text_cstr(&b));
+    text_format(signed_kind, sizeof signed_kind, "s%s", kind);
+    text_format(unsigned_kind, sizeof unsigned_kind, "u%s", kind);
+    s = with_overflow(e, signed_kind, type, a, b);
+    u = with_overflow(e, unsigned_kind, type, a, b);
     r = field_of(e, type, s, 0);
     overflow = field_of(e, type, s, 1);
     carry = field_of(e, type, u, 1);
@@ -1109,8 +1085,8 @@ static void flag_operation(struct emitter *e, const struct ir_inst *inst)
                      wide, set, type);
         text_format(partial, sizeof partial, "%%v%" PRIu32, r);
         text_format(in, sizeof in, "%%v%" PRIu32, wide);
-        s = with_overflow(e, add ? "sadd" : "ssub", type, partial, in);
-        u = with_overflow(e, add ? "uadd" : "usub", type, partial, in);
+        s = with_overflow(e, signed_kind, type, partial, in);
+        u = with_overflow(e, unsigned_kind, type, partial, in);
         r = field_of(e, type, s, 0);
         s = field_of(e, type, s, 1);
         u = field_of(e, type, u, 1);
@@ -1123,20 +1099,139 @@ static void flag_operation(struct emitter *e, const struct ir_inst *inst)
                      e->value, carry, u);
         carry = fresh(e);
     }
-    e->flags[IR_FLAG_OVERFLOW] = overflow;
-    e->flags[IR_FLAG_CARRY] = carry;
-    e->flags[IR_FLAG_ZERO] = fresh(e);
-    text_appendf(e->out, "  %%v%" PRIu32 " = icmp eq %s %%v%" PRIu32 ", 0\n",
-                 e->flags[IR_FLAG_ZERO], type, r);
-    e->flags[IR_FLAG_NEGATIVE] = fresh(e);
-    text_appendf(e->out, "  %%v%" PRIu32 " = icmp slt %s %%v%" PRIu32 ", 0\n",
-                 e->flags[IR_FLAG_NEGATIVE], type, r);
-    e->flag_result = inst->result;
-    text_format(sum, sizeof sum, "%%v%" PRIu32, r);
-    store_result(e, inst, sum);
+    keep_flag(e, IR_FLAG_OVERFLOW, overflow);
+    keep_flag(e, IR_FLAG_CARRY, carry);
+    finish_flags(e, inst, type, r);
+    text_free(&c);
+}
+
+/* DESIGN: a shift with flags takes its count modulo the width, as the
+   plain shift does. The carry is the last bit moved out: none for a
+   count of 0, else the top bit of the operand shifted left by the count
+   less one, or the bottom bit of it shifted right. The count less one
+   is taken modulo the width too, so no shift of the text is poison and
+   the and with the test of the count decides. A left shift overflows
+   when the arithmetic shift back does not give the operand, and a right
+   shift never overflows, as expand.c gives both. */
+static void shift_flags(struct emitter *e, const struct ir_inst *inst,
+                        const char *type, const char *a, const char *b)
+{
+    bool left = inst->op == IR_SHL_FL;
+    unsigned mask = width_of(inst->type) - 1;
+    uint32_t count = fresh(e);
+    uint32_t r = fresh(e);
+    uint32_t moved;
+    uint32_t less;
+    uint32_t wrapped;
+    uint32_t shifted;
+    uint32_t bit;
+    uint32_t carry;
+
+    text_appendf(e->out, "  %%v%" PRIu32 " = and %s %s, %u\n", count, type, b,
+                 mask);
+    text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %s, %%v%" PRIu32 "\n", r,
+                 left                        ? "shl"
+                 : inst->op == IR_SHR_S_FL   ? "ashr"
+                                             : "lshr",
+                 type, a, count);
+    if (left) {
+        uint32_t back = fresh(e);
+        uint32_t overflow = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = ashr %s %%v%" PRIu32
+                             ", %%v%" PRIu32 "\n",
+                     back, type, r, count);
+        text_appendf(e->out, "  %%v%" PRIu32 " = icmp ne %s %%v%" PRIu32
+                             ", %s\n",
+                     overflow, type, back, a);
+        keep_flag(e, IR_FLAG_OVERFLOW, overflow);
+    } else {
+        text_format(e->flags[IR_FLAG_OVERFLOW],
+                    sizeof e->flags[IR_FLAG_OVERFLOW], "false");
+    }
+    moved = fresh(e);
+    less = fresh(e);
+    wrapped = fresh(e);
+    shifted = fresh(e);
+    bit = fresh(e);
+    carry = fresh(e);
+    text_appendf(e->out, "  %%v%" PRIu32 " = icmp ne %s %%v%" PRIu32 ", 0\n",
+                 moved, type, count);
+    text_appendf(e->out, "  %%v%" PRIu32 " = sub %s %%v%" PRIu32 ", 1\n",
+                 less, type, count);
+    text_appendf(e->out, "  %%v%" PRIu32 " = and %s %%v%" PRIu32 ", %u\n",
+                 wrapped, type, less, mask);
+    text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %s, %%v%" PRIu32 "\n",
+                 shifted, left ? "shl" : "lshr", type, a, wrapped);
+    if (left) {
+        text_appendf(e->out, "  %%v%" PRIu32 " = icmp slt %s %%v%" PRIu32
+                             ", 0\n",
+                     bit, type, shifted);
+    } else {
+        text_appendf(e->out, "  %%v%" PRIu32 " = trunc %s %%v%" PRIu32
+                             " to i1\n",
+                     bit, type, shifted);
+    }
+    text_appendf(e->out, "  %%v%" PRIu32 " = and i1 %%v%" PRIu32 ", %%v%"
+                         PRIu32 "\n",
+                 carry, moved, bit);
+    keep_flag(e, IR_FLAG_CARRY, carry);
+    finish_flags(e, inst, type, r);
+}
+
+/* negfl is sub 0, x. It overflows at the least value and carries, as a
+   borrow from 0, for every value but 0. */
+static void negation_flags(struct emitter *e, const struct ir_inst *inst,
+                           const char *type, const char *a)
+{
+    uint32_t r = fresh(e);
+    uint32_t overflow = fresh(e);
+    uint32_t carry = fresh(e);
+
+    text_appendf(e->out, "  %%v%" PRIu32 " = sub %s 0, %s\n", r, type, a);
+    text_appendf(e->out, "  %%v%" PRIu32 " = icmp eq %s %s, ", overflow, type,
+                 a);
+    int_constant(e->out, inst->type,
+                 (uint64_t)1 << (width_of(inst->type) - 1));
+    text_append(e->out, "\n");
+    text_appendf(e->out, "  %%v%" PRIu32 " = icmp ne %s %s, 0\n", carry, type,
+                 a);
+    keep_flag(e, IR_FLAG_OVERFLOW, overflow);
+    keep_flag(e, IR_FLAG_CARRY, carry);
+    finish_flags(e, inst, type, r);
+}
+
+/* A flag operation of the rows of "Instruction mapping", which leaves
+   its four flags for the reads after it. */
+static void flag_operation(struct emitter *e, const struct ir_inst *inst)
+{
+    const char *type = value_type(e, inst->type);
+    struct text a = {0};
+    struct text b = {0};
+
+    if (type == NULL) {
+        return;
+    }
+    operand(e, &inst->a, inst->type, &a);
+    if (inst->op != IR_NEG_FL) {
+        operand(e, &inst->b, inst->type, &b);
+    }
+    if (!e->failed) {
+        switch (inst->op) {
+        case IR_SHL_FL:
+        case IR_SHR_S_FL:
+        case IR_SHR_U_FL:
+            shift_flags(e, inst, type, text_cstr(&a), text_cstr(&b));
+            break;
+        case IR_NEG_FL:
+            negation_flags(e, inst, type, text_cstr(&a));
+            break;
+        default:
+            arithmetic_flags(e, inst, type, text_cstr(&a), text_cstr(&b));
+            break;
+        }
+    }
     text_free(&a);
     text_free(&b);
-    text_free(&c);
 }
 
 /* A flag of the flag operation right before it, which the verifier of
@@ -1150,10 +1245,289 @@ static void flag_read(struct emitter *e, const struct ir_inst *inst)
         unexpected(e, "a flag apart from its flag operation");
         return;
     }
-    text_appendf(e->out, "  %%v%" PRIu32 " = zext i1 %%v%" PRIu32 " to i8\n",
-                 e->value, e->flags[inst->field]);
+    text_appendf(e->out, "  %%v%" PRIu32 " = zext i1 %s to i8\n", e->value,
+                 e->flags[inst->field]);
     text_format(value, sizeof value, "%%v%" PRIu32, e->value++);
     store_result(e, inst, value);
+}
+
+/* addov, subov and mulov: the signed with.overflow intrinsic. The result
+   goes to its temporary, and the i1 stays for the branchov right after
+   it, in the same block. */
+static void overflow_operation(struct emitter *e, const struct ir_inst *inst)
+{
+    const char *type = value_type(e, inst->type);
+    struct text a = {0};
+    struct text b = {0};
+    char value[24];
+    uint32_t pair;
+    uint32_t r;
+
+    if (type == NULL) {
+        return;
+    }
+    operand(e, &inst->a, inst->type, &a);
+    operand(e, &inst->b, inst->type, &b);
+    if (!e->failed) {
+        pair = with_overflow(e,
+                             inst->op == IR_ADD_OV   ? "sadd"
+                             : inst->op == IR_SUB_OV ? "ssub"
+                                                     : "smul",
+                             type, text_cstr(&a), text_cstr(&b));
+        r = field_of(e, type, pair, 0);
+        e->overflow = field_of(e, type, pair, 1);
+        e->overflow_result = inst->result;
+        text_format(value, sizeof value, "%%v%" PRIu32, r);
+        store_result(e, inst, value);
+    }
+    text_free(&a);
+    text_free(&b);
+}
+
+/* br on the i1 of the overflow operation right before it. */
+static void branch_overflow(struct emitter *e, const struct ir_inst *inst)
+{
+    if (inst->a.kind != IR_TEMP || inst->a.as.temp != e->overflow_result) {
+        unexpected(e, "a branchov apart from its overflow operation");
+        return;
+    }
+    text_appendf(e->out, "  br i1 %%v%" PRIu32 ", label %%b%" PRIu32
+                         ", label %%b%" PRIu32,
+                 e->overflow, inst->b.as.index, inst->c.as.index);
+    branch_weights(e, inst->b.as.index, inst->c.as.index);
+    text_append(e->out, "\n");
+}
+
+/* Widen the operands of inst to twice the width, sext when is_signed,
+   and multiply them there. Returns the product and writes its type to
+   wide. */
+static uint32_t wide_product(struct emitter *e, const struct ir_inst *inst,
+                             bool is_signed, char *wide, size_t size)
+{
+    const char *type = value_type(e, inst->type);
+    struct text a = {0};
+    struct text b = {0};
+    uint32_t x;
+    uint32_t y;
+    uint32_t p = 0;
+
+    text_format(wide, size, "i%u", 2 * width_of(inst->type));
+    operand(e, &inst->a, inst->type, &a);
+    operand(e, &inst->b, inst->type, &b);
+    if (!e->failed && type != NULL) {
+        x = fresh(e);
+        y = fresh(e);
+        p = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %s to %s\n", x,
+                     is_signed ? "sext" : "zext", type, text_cstr(&a), wide);
+        text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %s to %s\n", y,
+                     is_signed ? "sext" : "zext", type, text_cstr(&b), wide);
+        text_appendf(e->out, "  %%v%" PRIu32 " = mul %s %%v%" PRIu32 ", %%v%"
+                             PRIu32 "\n",
+                     p, wide, x, y);
+    }
+    text_free(&a);
+    text_free(&b);
+    return p;
+}
+
+/* Truncate the value v of type wide to the type of inst and store it as
+   the result. */
+static void narrow_result(struct emitter *e, const struct ir_inst *inst,
+                          const char *wide, uint32_t v)
+{
+    char value[24];
+    uint32_t r = fresh(e);
+
+    text_appendf(e->out, "  %%v%" PRIu32 " = trunc %s %%v%" PRIu32 " to %s\n",
+                 r, wide, v, value_type(e, inst->type));
+    text_format(value, sizeof value, "%%v%" PRIu32, r);
+    store_result(e, inst, value);
+}
+
+/* DESIGN: smulh and umulh multiply in twice the width and shift the
+   upper half down. At 64 bits that is i128 arithmetic, which llc selects
+   as the multiply that gives the upper half. */
+static void high_product(struct emitter *e, const struct ir_inst *inst)
+{
+    char wide[8];
+    uint32_t p = wide_product(e, inst, inst->op == IR_MULH_S, wide,
+                              sizeof wide);
+    uint32_t h;
+
+    if (e->failed) {
+        return;
+    }
+    h = fresh(e);
+    text_appendf(e->out, "  %%v%" PRIu32 " = lshr %s %%v%" PRIu32 ", %u\n", h,
+                 wide, p, width_of(inst->type));
+    narrow_result(e, inst, wide, h);
+}
+
+/* Call the intrinsic llvm.<kind>.<wide> on the value v and the constant
+   bound, declared once, and return the value of the call. */
+static uint32_t clamp(struct emitter *e, const char *kind, const char *wide,
+                      uint32_t v, const char *bound)
+{
+    char name[32];
+    char parameters[24];
+    uint32_t n = fresh(e);
+
+    text_format(name, sizeof name, "llvm.%s.%s", kind, wide);
+    text_format(parameters, sizeof parameters, "%s, %s", wide, wide);
+    intrinsic(e, wide, name, parameters);
+    text_appendf(e->out, "  %%v%" PRIu32 " = call %s @%s(%s %%v%" PRIu32
+                         ", %s %s)\n",
+                 n, wide, name, wide, v, wide, bound);
+    return n;
+}
+
+/* DESIGN: a saturating sum or difference is the intrinsic of its row. A
+   saturating product multiplies in twice the width, where it cannot
+   wrap, clamps to the bounds of the type with smax and smin, or umin,
+   and truncates. */
+static void saturating(struct emitter *e, const struct ir_inst *inst)
+{
+    unsigned width = width_of(inst->type);
+    char wide[8];
+    char bound[24];
+    uint32_t p;
+
+    if (inst->op == IR_MUL_SAT_S || inst->op == IR_MUL_SAT_U) {
+        p = wide_product(e, inst, inst->op == IR_MUL_SAT_S, wide,
+                         sizeof wide);
+        if (e->failed) {
+            return;
+        }
+        if (inst->op == IR_MUL_SAT_S) {
+            text_format(bound, sizeof bound, "%" PRId64,
+                        width == 64 ? INT64_MIN
+                                    : -((int64_t)1 << (width - 1)));
+            p = clamp(e, "smax", wide, p, bound);
+            text_format(bound, sizeof bound, "%" PRIu64,
+                        ((uint64_t)1 << (width - 1)) - 1);
+            p = clamp(e, "smin", wide, p, bound);
+        } else {
+            text_format(bound, sizeof bound, "%" PRIu64,
+                        width == 64 ? UINT64_MAX
+                                    : ((uint64_t)1 << width) - 1);
+            p = clamp(e, "umin", wide, p, bound);
+        }
+        narrow_result(e, inst, wide, p);
+        return;
+    }
+    {
+        const char *type = value_type(e, inst->type);
+        const char *kind = inst->op == IR_ADD_SAT_S   ? "sadd"
+                           : inst->op == IR_ADD_SAT_U ? "uadd"
+                           : inst->op == IR_SUB_SAT_S ? "ssub"
+                                                      : "usub";
+        struct text a = {0};
+        struct text b = {0};
+        char name[32];
+        char parameters[24];
+        char value[24];
+
+        operand(e, &inst->a, inst->type, &a);
+        operand(e, &inst->b, inst->type, &b);
+        if (!e->failed && type != NULL) {
+            text_format(name, sizeof name, "llvm.%s.sat.%s", kind, type);
+            text_format(parameters, sizeof parameters, "%s, %s", type, type);
+            intrinsic(e, type, name, parameters);
+            text_appendf(e->out, "  %%v%" PRIu32 " = call %s @%s(%s %s, %s "
+                                 "%s)\n",
+                         e->value, type, name, type, text_cstr(&a), type,
+                         text_cstr(&b));
+            text_format(value, sizeof value, "%%v%" PRIu32, e->value++);
+            store_result(e, inst, value);
+        }
+        text_free(&a);
+        text_free(&b);
+    }
+}
+
+/* vunary: fneg of float lanes, sub from zeroinitializer for neg and xor
+   with all ones for not. */
+static void vunary(struct emitter *e, const struct ir_inst *inst)
+{
+    enum ir_op op = (enum ir_op)inst->field;
+    const char *lane = value_type(e, inst->type);
+    uint64_t align = layout_align(e->l, inst->of);
+    size_t lanes = e->m->aggs[inst->of.agg]->field_count;
+    struct text dst = {0};
+    struct text x = {0};
+    char vector[48];
+    uint32_t v;
+    uint32_t r;
+    size_t k;
+
+    operand(e, &inst->a, IR_PTR, &dst);
+    operand(e, &inst->b, IR_PTR, &x);
+    if (!e->failed && lane != NULL) {
+        vector_of(e, inst, lane, vector, sizeof vector);
+        v = fresh(e);
+        r = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = load %s, ptr %s, align %"
+                             PRIu64 "\n",
+                     v, vector, text_cstr(&x), align);
+        if (op == IR_FNEG) {
+            text_appendf(e->out, "  %%v%" PRIu32 " = fneg %s %%v%" PRIu32 "\n",
+                         r, vector, v);
+        } else if (op == IR_NEG) {
+            text_appendf(e->out, "  %%v%" PRIu32 " = sub %s zeroinitializer, "
+                                 "%%v%" PRIu32 "\n",
+                         r, vector, v);
+        } else {
+            text_appendf(e->out, "  %%v%" PRIu32 " = xor %s %%v%" PRIu32 ", <",
+                         r, vector, v);
+            for (k = 0; k < lanes; k++) {
+                text_appendf(e->out, "%s%s -1", k > 0 ? ", " : "", lane);
+            }
+            text_append(e->out, ">\n");
+        }
+        text_appendf(e->out, "  store %s %%v%" PRIu32 ", ptr %s, align %"
+                             PRIu64 "\n",
+                     vector, r, text_cstr(&dst), align);
+    }
+    text_free(&dst);
+    text_free(&x);
+}
+
+/* vshuffle: shufflevector with the constant lane indices of the IR. */
+static void vshuffle(struct emitter *e, const struct ir_inst *inst)
+{
+    const char *lane = value_type(e, inst->type);
+    uint64_t align = layout_align(e->l, inst->of);
+    struct text dst = {0};
+    struct text x = {0};
+    char vector[48];
+    uint32_t v;
+    uint32_t r;
+    size_t k;
+
+    operand(e, &inst->a, IR_PTR, &dst);
+    operand(e, &inst->b, IR_PTR, &x);
+    if (!e->failed && lane != NULL) {
+        vector_of(e, inst, lane, vector, sizeof vector);
+        v = fresh(e);
+        r = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = load %s, ptr %s, align %"
+                             PRIu64 "\n",
+                     v, vector, text_cstr(&x), align);
+        text_appendf(e->out, "  %%v%" PRIu32 " = shufflevector %s %%v%" PRIu32
+                             ", %s poison, <%zu x i32> <",
+                     r, vector, v, vector, inst->arg_count);
+        for (k = 0; k < inst->arg_count; k++) {
+            text_appendf(e->out, "%si32 %" PRIu64, k > 0 ? ", " : "",
+                         inst->args[k].as.integer);
+        }
+        text_append(e->out, ">\n");
+        text_appendf(e->out, "  store %s %%v%" PRIu32 ", ptr %s, align %"
+                             PRIu64 "\n",
+                     vector, r, text_cstr(&dst), align);
+    }
+    text_free(&dst);
+    text_free(&x);
 }
 
 /* The lanes of c where the mask b holds, and of args[0] where it does
@@ -1210,9 +1584,72 @@ static void vselect(struct emitter *e, const struct ir_inst *inst)
     text_free(&y);
 }
 
-/* DESIGN: vreduce folds the lanes with the reduction intrinsic of its
-   operation. A sum of floats starts from -0.0 without reassoc, so it
-   adds the lanes in their order. */
+/* The lanes [from, from + count) of the vector v of lanes of type lane
+   as a vector of count lanes. */
+static uint32_t lanes_of(struct emitter *e, const char *lane, size_t lanes,
+                         uint32_t v, size_t from, size_t count)
+{
+    uint32_t n = fresh(e);
+    size_t k;
+
+    text_appendf(e->out, "  %%v%" PRIu32 " = shufflevector <%zu x %s> %%v%"
+                         PRIu32 ", <%zu x %s> poison, <%zu x i32> <",
+                 n, lanes, lane, v, lanes, lane, count);
+    for (k = 0; k < count; k++) {
+        text_appendf(e->out, "%si32 %zu", k > 0 ? ", " : "", from + k);
+    }
+    text_append(e->out, ">\n");
+    return n;
+}
+
+/* DESIGN: a fold of float lanes takes the order of the entry on v.sum()
+   in docs/decisions.md: the upper half of the lanes onto the lower half
+   until one is left, as expand.c folds them. A float sum depends on the
+   order, and the least and the greatest keep the upper lane where it is
+   less or greater by the comparison of the IR, which decides a NaN and
+   the two zeros. So the text halves the vector with shufflevector, where
+   "Instruction mapping" names llvm.vector.reduce.fadd, fmin and fmax,
+   whose order or whose NaN and zeros differ. The decision is above the
+   work order. A fold of integer lanes takes its intrinsic, since the
+   wrapping sum, the least, the greatest and the bits of a mask come out
+   the same in every order. Returns the value of the lane left. */
+static uint32_t halve(struct emitter *e, enum ir_op op, const char *lane,
+                      size_t lanes, uint32_t v)
+{
+    size_t width = lanes;
+    size_t half;
+    uint32_t r;
+
+    for (half = lanes / 2; half >= 1; half /= 2) {
+        uint32_t lo = lanes_of(e, lane, width, v, 0, half);
+        uint32_t hi = lanes_of(e, lane, width, v, half, half);
+        if (op == IR_FADD) {
+            v = fresh(e);
+            text_appendf(e->out, "  %%v%" PRIu32 " = fadd <%zu x %s> %%v%"
+                                 PRIu32 ", %%v%" PRIu32 "\n",
+                         v, half, lane, lo, hi);
+        } else {
+            uint32_t c = fresh(e);
+            v = fresh(e);
+            text_appendf(e->out, "  %%v%" PRIu32 " = %s <%zu x %s> %%v%" PRIu32
+                                 ", %%v%" PRIu32 "\n",
+                         c, comparison(op), half, lane, hi, lo);
+            text_appendf(e->out, "  %%v%" PRIu32 " = select <%zu x i1> %%v%"
+                                 PRIu32 ", <%zu x %s> %%v%" PRIu32
+                                 ", <%zu x %s> %%v%" PRIu32 "\n",
+                         v, half, c, half, lane, hi, half, lane, lo);
+        }
+        width = half;
+    }
+    r = fresh(e);
+    text_appendf(e->out, "  %%v%" PRIu32 " = extractelement <%zu x %s> %%v%"
+                         PRIu32 ", i64 0\n",
+                 r, width, lane, v);
+    return r;
+}
+
+/* vreduce: the intrinsic of its operation on integer lanes, and the
+   halving fold on float lanes. */
 static void vreduce(struct emitter *e, const struct ir_inst *inst)
 {
     enum ir_op op = (enum ir_op)inst->field;
@@ -1222,27 +1659,25 @@ static void vreduce(struct emitter *e, const struct ir_inst *inst)
     struct text x = {0};
     char vector[48];
     char name[64];
-    char parameters[64];
     uint32_t v;
     char value[24];
 
     switch (op) {
     case IR_ADD: fold = "add"; break;
-    case IR_FADD: fold = "fadd"; break;
     case IR_SLT: fold = "smin"; break;
     case IR_ULT: fold = "umin"; break;
-    case IR_FLT: fold = "fmin"; break;
     case IR_SGT: fold = "smax"; break;
     case IR_UGT: fold = "umax"; break;
-    case IR_FGT: fold = "fmax"; break;
     case IR_OR: fold = "or"; break;
     case IR_AND: fold = "and"; break;
-    default: {
-        char what[48];
-        text_format(what, sizeof what, "`vreduce` of `%s`", ir_op_name(op));
-        refuse(e, what, "emit-wide");
+    case IR_FADD:
+    case IR_FLT:
+    case IR_FGT:
+        fold = NULL;
+        break;
+    default:
+        unexpected(e, "this fold of vreduce");
         return;
-    }
     }
     operand(e, &inst->a, IR_PTR, &x);
     if (e->failed || lane == NULL) {
@@ -1250,25 +1685,22 @@ static void vreduce(struct emitter *e, const struct ir_inst *inst)
         return;
     }
     vector_of(e, inst, lane, vector, sizeof vector);
-    text_format(name, sizeof name, "llvm.vector.reduce.%s.v%zu%s", fold, lanes,
-                type_suffix(e, inst->type));
-    if (op == IR_FADD) {
-        text_format(parameters, sizeof parameters, "%s, %s", lane, vector);
-    } else {
-        text_format(parameters, sizeof parameters, "%s", vector);
-    }
-    intrinsic(e, lane, name, parameters);
     v = fresh(e);
     text_appendf(e->out, "  %%v%" PRIu32 " = load %s, ptr %s, align %" PRIu64
                          "\n",
                  v, vector, text_cstr(&x), layout_align(e->l, inst->of));
-    text_appendf(e->out, "  %%v%" PRIu32 " = call %s @%s(", e->value, lane,
-                 name);
-    if (op == IR_FADD) {
-        text_appendf(e->out, "%s -0.000000e+00, ", lane);
+    if (fold == NULL) {
+        v = halve(e, op, lane, lanes, v);
+    } else {
+        text_format(name, sizeof name, "llvm.vector.reduce.%s.v%zu%s", fold,
+                    lanes, type_suffix(e, inst->type));
+        intrinsic(e, lane, name, vector);
+        text_appendf(e->out, "  %%v%" PRIu32 " = call %s @%s(%s %%v%" PRIu32
+                             ")\n",
+                     e->value, lane, name, vector, v);
+        v = fresh(e);
     }
-    text_appendf(e->out, "%s %%v%" PRIu32 ")\n", vector, v);
-    text_format(value, sizeof value, "%%v%" PRIu32, e->value++);
+    text_format(value, sizeof value, "%%v%" PRIu32, v);
     store_result(e, inst, value);
     text_free(&x);
 }
@@ -1784,14 +2216,7 @@ static void branch_weights(struct emitter *e, uint32_t then_block,
 static void instruction(struct emitter *e, const struct ir_inst *inst)
 {
     struct text value = {0};
-    const char *step = step_of(inst->op);
 
-    if (step != NULL) {
-        char what[40];
-        text_format(what, sizeof what, "`%s`", ir_op_name(inst->op));
-        refuse(e, what, step);
-        return;
-    }
     switch (inst->op) {
     case IR_COPY:
         operand(e, &inst->a, inst->type, &value);
@@ -1830,9 +2255,28 @@ static void instruction(struct emitter *e, const struct ir_inst *inst)
     case IR_VREDUCE:
         vreduce(e, inst);
         break;
-    case IR_ADD_FL:
-    case IR_SUB_FL:
+    case IR_VUNARY:
+        vunary(e, inst);
+        break;
+    case IR_VSHUFFLE:
+        vshuffle(e, inst);
+        break;
+    case IR_ADD_FL: case IR_SUB_FL: case IR_MUL_FL: case IR_SHL_FL:
+    case IR_SHR_S_FL: case IR_SHR_U_FL: case IR_NEG_FL:
         flag_operation(e, inst);
+        break;
+    case IR_ADD_OV: case IR_SUB_OV: case IR_MUL_OV:
+        overflow_operation(e, inst);
+        break;
+    case IR_BRANCH_OV:
+        branch_overflow(e, inst);
+        break;
+    case IR_MULH_S: case IR_MULH_U:
+        high_product(e, inst);
+        break;
+    case IR_ADD_SAT_S: case IR_ADD_SAT_U: case IR_SUB_SAT_S:
+    case IR_SUB_SAT_U: case IR_MUL_SAT_S: case IR_MUL_SAT_U:
+        saturating(e, inst);
         break;
     case IR_FLAG:
         flag_read(e, inst);

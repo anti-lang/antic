@@ -1,10 +1,11 @@
-/* llvm_emit_module of the steps emit-core, emit-arith and emit-memory: the
+/* llvm_emit_module of the steps emit-core to emit-wide: the
    temporaries, the blocks, copy, jump, branch and ret, the scalar
    operations with the guards of release mode, the operations on memory,
    the signatures and the calls, the linkage, the attributes of a
    function, the entry of the runtime, the globals, the sections and the
-   constructors, the module flags, and the refusal of every other
-   operation. The expected texts follow the sections "Types and layout",
+   constructors, the module flags, and the wide operations: overflow,
+   flags, saturation, the upper half of a product and the simd
+   operations. The expected texts follow the sections "Types and layout",
    "Calling convention", "Attributes and metadata", "Instruction mapping",
    "Defined results in release mode" and "Globals, sections and
    constructors" of docs/work-order-llvm-back-end.md. */
@@ -324,41 +325,6 @@ static void declarations(void)
     CHECK(run(&x, TARGET_WINDOWS_X86_64));
     CHECK(holds(&x, "declare i64 @_A5other_g(float) #1\n"));
     end(&x);
-}
-
-/* Every operation the step emit-core does not translate is refused, with
-   the name of the operation, the step that adds it and the function. */
-static void refusals(void)
-{
-    static const struct {
-        enum ir_op op;
-        const char *message;
-    } cases[] = {
-        {IR_MULH_S, "the LLVM back end does not translate `smulh` before "
-                    "the step emit-wide, in main.f"},
-        {IR_ADD_SAT_U, "the LLVM back end does not translate `uaddsat` "
-                       "before the step emit-wide, in main.f"},
-        {IR_ADD_OV, "the LLVM back end does not translate `addov` before "
-                    "the step emit-wide, in main.f"},
-    };
-    struct fixture x;
-    struct ir_function *f;
-    struct ir_block *b;
-    uint32_t t;
-    size_t i;
-
-    for (i = 0; i < sizeof cases / sizeof cases[0]; i++) {
-        begin(&x);
-        f = ir_function_add(&x.m, "main", "f", IR_I64, IR_NO_AGG);
-        b = ir_block_add(f);
-        t = ir_binary(f, b, cases[i].op,
-                      IR_I64,
-                      ir_int_op(IR_I64, 1), ir_int_op(IR_I64, 2));
-        ir_ret(f, b, IR_I64, ir_temp_op(f, t));
-        CHECK(!run(&x, TARGET_MACOS_ARM64));
-        CHECK_STR(x.error, cases[i].message);
-        end(&x);
-    }
 }
 
 /* A function main.f(a: from, b: from) -> to whose body is op a, b, or op
@@ -1293,8 +1259,11 @@ static void flag_operations(void)
 }
 
 /* vselect takes the lane of its first operand where the mask holds,
-   with the i8 mask cut to i1. vreduce sums from -0.0 in lane order, and
-   a less-than keeps the least lane. */
+   with the i8 mask cut to i1. vreduce of float lanes folds the upper half
+   of the lanes onto the lower half until one is left, as the entry on
+   v.sum() of docs/decisions.md gives the order, and the least keeps the
+   upper lane where it is less by fcmp olt. A fold of integer lanes is
+   its intrinsic, whose order gives the same result. */
 static void vector_folds(void)
 {
     struct fixture x;
@@ -1330,13 +1299,271 @@ static void vector_folds(void)
                     "<4 x float> %v7\n"
                     "  store <4 x float> %v8, ptr %v0, align 16\n"));
     CHECK(holds(&x, "  %v10 = load <4 x float>, ptr %v9, align 16\n"
-                    "  %v11 = call float @llvm.vector.reduce.fadd.v4f32("
-                    "float -0.000000e+00, <4 x float> %v10)\n"
-                    "  store float %v11, ptr %t2, align 4\n"));
-    CHECK(holds(&x, "  %v14 = call i32 @llvm.vector.reduce.smin.v4i32("
-                    "<4 x i32> %v13)\n"));
-    CHECK(holds(&x, "  %v17 = call i8 @llvm.vector.reduce.or.v4i8("
-                    "<4 x i8> %v16)\n"));
+                    "  %v11 = shufflevector <4 x float> %v10, <4 x float> "
+                    "poison, <2 x i32> <i32 0, i32 1>\n"
+                    "  %v12 = shufflevector <4 x float> %v10, <4 x float> "
+                    "poison, <2 x i32> <i32 2, i32 3>\n"
+                    "  %v13 = fadd <2 x float> %v11, %v12\n"
+                    "  %v14 = shufflevector <2 x float> %v13, <2 x float> "
+                    "poison, <1 x i32> <i32 0>\n"
+                    "  %v15 = shufflevector <2 x float> %v13, <2 x float> "
+                    "poison, <1 x i32> <i32 1>\n"
+                    "  %v16 = fadd <1 x float> %v14, %v15\n"
+                    "  %v17 = extractelement <1 x float> %v16, i64 0\n"
+                    "  store float %v17, ptr %t2, align 4\n"));
+    CHECK(holds(&x, "  %v20 = call i32 @llvm.vector.reduce.smin.v4i32("
+                    "<4 x i32> %v19)\n"));
+    CHECK(holds(&x, "  %v23 = call i8 @llvm.vector.reduce.or.v4i8("
+                    "<4 x i8> %v22)\n"));
+    CHECK(lacks(&x, "vector.reduce.fadd"));
+    end(&x);
+
+    begin(&x);
+    f4 = simd4(&x, "main.F4", IR_F32);
+    f = ir_function_add(&x.m, "main", "f", IR_F32, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b = ir_block_add(f);
+    s = ir_vreduce(f, b, IR_FLT, IR_F32, ir_temp_op(f, p), f4);
+    ir_ret(f, b, IR_F32, ir_temp_op(f, s));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "  %v4 = fcmp olt <2 x float> %v3, %v2\n"
+                    "  %v5 = select <2 x i1> %v4, <2 x float> %v3, "
+                    "<2 x float> %v2\n"));
+    end(&x);
+}
+
+/* addov, subov and mulov call the signed intrinsic with.overflow, store
+   the result and keep its i1, which the branchov right after it takes. */
+static void overflow_branches(void)
+{
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_block *b;
+    struct ir_block *wide;
+    struct ir_block *fits;
+    uint32_t p;
+    uint32_t q;
+    uint32_t r;
+
+    begin(&x);
+    f = ir_function_add(&x.m, "main", "f", IR_I64, IR_NO_AGG);
+    p = ir_param_add(f, IR_I64, IR_NO_AGG);
+    q = ir_param_add(f, IR_I64, IR_NO_AGG);
+    b = ir_block_add(f);
+    wide = ir_block_add(f);
+    fits = ir_block_add(f);
+    r = ir_binary(f, b, IR_ADD_OV, IR_I64, ir_temp_op(f, p),
+                  ir_temp_op(f, q));
+    ir_branch_ov(f, b, ir_temp_op(f, r), wide, fits);
+    ir_ret(f, wide, IR_I64, ir_int_op(IR_I64, 0));
+    ir_ret(f, fits, IR_I64, ir_temp_op(f, r));
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(holds(&x, "  %v2 = call { i64, i1 } @llvm.sadd.with.overflow.i64("
+                    "i64 %v0, i64 %v1)\n"
+                    "  %v3 = extractvalue { i64, i1 } %v2, 0\n"
+                    "  %v4 = extractvalue { i64, i1 } %v2, 1\n"
+                    "  store i64 %v3, ptr %t2, align 8\n"
+                    "  br i1 %v4, label %b1, label %b2\n"));
+    end(&x);
+    CHECK(translates(IR_SUB_OV, IR_I32, IR_I32, false,
+                     "  %v2 = call { i32, i1 } @llvm.ssub.with.overflow.i32("
+                     "i32 %v0, i32 %v1)\n"));
+    CHECK(translates(IR_MUL_OV, IR_I8, IR_I8, false,
+                     "  %v2 = call { i8, i1 } @llvm.smul.with.overflow.i8("
+                     "i8 %v0, i8 %v1)\n"));
+}
+
+/* The upper half of a product multiplies in twice the width, i128 at 64
+   bits, and shifts it down. */
+static void high_products(void)
+{
+    CHECK(translates(IR_MULH_S, IR_I64, IR_I64, false,
+                     "  %v2 = sext i64 %v0 to i128\n"
+                     "  %v3 = sext i64 %v1 to i128\n"
+                     "  %v4 = mul i128 %v2, %v3\n"
+                     "  %v5 = lshr i128 %v4, 64\n"
+                     "  %v6 = trunc i128 %v5 to i64\n"
+                     "  store i64 %v6, ptr %t2, align 8\n"));
+    CHECK(translates(IR_MULH_U, IR_I32, IR_I32, false,
+                     "  %v2 = zext i32 %v0 to i64\n"
+                     "  %v3 = zext i32 %v1 to i64\n"
+                     "  %v4 = mul i64 %v2, %v3\n"
+                     "  %v5 = lshr i64 %v4, 32\n"
+                     "  %v6 = trunc i64 %v5 to i32\n"));
+}
+
+/* A saturating sum or difference is its intrinsic. A saturating product
+   multiplies in twice the width and clamps to the bounds of the type. */
+static void saturating(void)
+{
+    CHECK(translates(IR_ADD_SAT_S, IR_I32, IR_I32, false,
+                     "  %v2 = call i32 @llvm.sadd.sat.i32(i32 %v0, i32 %v1)\n"
+                     "  store i32 %v2, ptr %t2, align 4\n"));
+    CHECK(translates(IR_ADD_SAT_U, IR_I8, IR_I8, false,
+                     "  %v2 = call i8 @llvm.uadd.sat.i8(i8 %v0, i8 %v1)\n"));
+    CHECK(translates(IR_SUB_SAT_S, IR_I16, IR_I16, false,
+                     "  %v2 = call i16 @llvm.ssub.sat.i16(i16 %v0, i16 %v1)\n"));
+    CHECK(translates(IR_SUB_SAT_U, IR_I64, IR_I64, false,
+                     "  %v2 = call i64 @llvm.usub.sat.i64(i64 %v0, i64 %v1)\n"));
+    CHECK(translates(IR_SUB_SAT_U, IR_I64, IR_I64, false,
+                     "declare i64 @llvm.usub.sat.i64(i64, i64)\n"));
+    CHECK(translates(IR_MUL_SAT_S, IR_I64, IR_I64, false,
+                     "  %v2 = sext i64 %v0 to i128\n"
+                     "  %v3 = sext i64 %v1 to i128\n"
+                     "  %v4 = mul i128 %v2, %v3\n"
+                     "  %v5 = call i128 @llvm.smax.i128(i128 %v4, "
+                     "i128 -9223372036854775808)\n"
+                     "  %v6 = call i128 @llvm.smin.i128(i128 %v5, "
+                     "i128 9223372036854775807)\n"
+                     "  %v7 = trunc i128 %v6 to i64\n"
+                     "  store i64 %v7, ptr %t2, align 8\n"));
+    CHECK(translates(IR_MUL_SAT_U, IR_I8, IR_I8, false,
+                     "  %v2 = zext i8 %v0 to i16\n"
+                     "  %v3 = zext i8 %v1 to i16\n"
+                     "  %v4 = mul i16 %v2, %v3\n"
+                     "  %v5 = call i16 @llvm.umin.i16(i16 %v4, i16 255)\n"
+                     "  %v6 = trunc i16 %v5 to i8\n"));
+}
+
+/* A function main.f(a: type, b: type) -> i8 whose body is the flag
+   operation op of a and b, or of a alone for negfl, and the reads of
+   its four flags, which it returns or'ed. Whether its text holds
+   body. */
+static bool flags_of(enum ir_op op, enum ir_type type, const char *body)
+{
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_block *b;
+    struct ir_operand none;
+    uint32_t p;
+    uint32_t q;
+    uint32_t r;
+    uint32_t all = 0;
+    uint32_t k;
+    bool ok;
+
+    memset(&none, 0, sizeof none);
+    begin(&x);
+    f = ir_function_add(&x.m, "main", "f", IR_I8, IR_NO_AGG);
+    p = ir_param_add(f, type, IR_NO_AGG);
+    q = ir_param_add(f, type, IR_NO_AGG);
+    b = ir_block_add(f);
+    r = ir_flag_op(f, b, op, type, ir_temp_op(f, p),
+                   op == IR_NEG_FL ? none : ir_temp_op(f, q), none);
+    for (k = IR_FLAG_OVERFLOW; k <= IR_FLAG_NEGATIVE; k++) {
+        uint32_t read = ir_flag(f, b, (enum ir_flag)k, ir_temp_op(f, r));
+        all = k == IR_FLAG_OVERFLOW
+                  ? read
+                  : ir_binary(f, b, IR_OR, IR_I8, ir_temp_op(f, all),
+                              ir_temp_op(f, read));
+    }
+    ir_ret(f, b, IR_I8, ir_temp_op(f, all));
+    ok = run(&x, TARGET_LINUX_X86_64) && holds(&x, body);
+    end(&x);
+    return ok;
+}
+
+/* mulfl takes its overflow and its carry from the signed and unsigned
+   with.overflow. A shift takes the count modulo the width, and its carry
+   is the last bit moved out: none for a count of 0, else the bit the
+   shift by the count less one puts at the top or the bottom. The left
+   shift overflows when the arithmetic shift back does not give the
+   operand, and a right shift never does. negfl overflows at the least
+   value and carries for every other value but 0. */
+static void flag_rows(void)
+{
+    CHECK(flags_of(IR_MUL_FL, IR_I32,
+                   "  %v2 = call { i32, i1 } @llvm.smul.with.overflow.i32("
+                   "i32 %v0, i32 %v1)\n"
+                   "  %v3 = call { i32, i1 } @llvm.umul.with.overflow.i32("
+                   "i32 %v0, i32 %v1)\n"
+                   "  %v4 = extractvalue { i32, i1 } %v2, 0\n"
+                   "  %v5 = extractvalue { i32, i1 } %v2, 1\n"
+                   "  %v6 = extractvalue { i32, i1 } %v3, 1\n"
+                   "  %v7 = icmp eq i32 %v4, 0\n"
+                   "  %v8 = icmp slt i32 %v4, 0\n"
+                   "  store i32 %v4, ptr %t2, align 4\n"
+                   "  %v9 = zext i1 %v5 to i8\n"));
+    CHECK(flags_of(IR_SHL_FL, IR_I8,
+                   "  %v2 = and i8 %v1, 7\n"
+                   "  %v3 = shl i8 %v0, %v2\n"
+                   "  %v4 = ashr i8 %v3, %v2\n"
+                   "  %v5 = icmp ne i8 %v4, %v0\n"
+                   "  %v6 = icmp ne i8 %v2, 0\n"
+                   "  %v7 = sub i8 %v2, 1\n"
+                   "  %v8 = and i8 %v7, 7\n"
+                   "  %v9 = shl i8 %v0, %v8\n"
+                   "  %v10 = icmp slt i8 %v9, 0\n"
+                   "  %v11 = and i1 %v6, %v10\n"
+                   "  %v12 = icmp eq i8 %v3, 0\n"
+                   "  %v13 = icmp slt i8 %v3, 0\n"
+                   "  store i8 %v3, ptr %t2, align 1\n"
+                   "  %v14 = zext i1 %v5 to i8\n"));
+    CHECK(flags_of(IR_SHR_U_FL, IR_I64,
+                   "  %v2 = and i64 %v1, 63\n"
+                   "  %v3 = lshr i64 %v0, %v2\n"
+                   "  %v4 = icmp ne i64 %v2, 0\n"
+                   "  %v5 = sub i64 %v2, 1\n"
+                   "  %v6 = and i64 %v5, 63\n"
+                   "  %v7 = lshr i64 %v0, %v6\n"
+                   "  %v8 = trunc i64 %v7 to i1\n"
+                   "  %v9 = and i1 %v4, %v8\n"
+                   "  %v10 = icmp eq i64 %v3, 0\n"
+                   "  %v11 = icmp slt i64 %v3, 0\n"
+                   "  store i64 %v3, ptr %t2, align 8\n"
+                   "  %v12 = zext i1 false to i8\n"));
+    CHECK(flags_of(IR_SHR_S_FL, IR_I16,
+                   "  %v3 = ashr i16 %v0, %v2\n"));
+    CHECK(flags_of(IR_NEG_FL, IR_I32,
+                   "  %v1 = sub i32 0, %v0\n"
+                   "  %v2 = icmp eq i32 %v0, -2147483648\n"
+                   "  %v3 = icmp ne i32 %v0, 0\n"
+                   "  %v4 = icmp eq i32 %v1, 0\n"
+                   "  %v5 = icmp slt i32 %v1, 0\n"
+                   "  store i32 %v1, ptr %t2, align 4\n"
+                   "  %v6 = zext i1 %v2 to i8\n"));
+}
+
+/* vunary negates or inverts whole vectors, and vshuffle takes the lanes
+   the IR names, as the constant mask of shufflevector. */
+static void vector_moves(void)
+{
+    static const uint32_t reversed[] = {3, 2, 1, 0};
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_block *b;
+    uint32_t f4;
+    uint32_t i4;
+    uint32_t p;
+    uint32_t q;
+
+    begin(&x);
+    f4 = simd4(&x, "main.F4", IR_F32);
+    i4 = simd4(&x, "main.I4", IR_I32);
+    f = ir_function_add(&x.m, "main", "f", IR_VOID, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    q = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b = ir_block_add(f);
+    ir_vunary(f, b, IR_FNEG, IR_F32, ir_temp_op(f, p), ir_temp_op(f, q), f4);
+    ir_vunary(f, b, IR_NEG, IR_I32, ir_temp_op(f, p), ir_temp_op(f, q), i4);
+    ir_vunary(f, b, IR_NOT, IR_I32, ir_temp_op(f, p), ir_temp_op(f, q), i4);
+    ir_vshuffle(f, b, IR_F32, ir_temp_op(f, p), ir_temp_op(f, q), reversed,
+                4, f4);
+    ir_ret(f, b, IR_VOID, ir_int_op(IR_VOID, 0));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "  %v0 = load ptr, ptr %t0, align 8\n"
+                    "  %v1 = load ptr, ptr %t1, align 8\n"
+                    "  %v2 = load <4 x float>, ptr %v1, align 16\n"
+                    "  %v3 = fneg <4 x float> %v2\n"
+                    "  store <4 x float> %v3, ptr %v0, align 16\n"));
+    CHECK(holds(&x, "  %v7 = sub <4 x i32> zeroinitializer, %v6\n"
+                    "  store <4 x i32> %v7, ptr %v4, align 16\n"));
+    CHECK(holds(&x, "  %v11 = xor <4 x i32> %v10, <i32 -1, i32 -1, i32 -1, "
+                    "i32 -1>\n"));
+    CHECK(holds(&x, "  %v14 = load <4 x float>, ptr %v13, align 16\n"
+                    "  %v15 = shufflevector <4 x float> %v14, <4 x float> "
+                    "poison, <4 x i32> <i32 3, i32 2, i32 1, i32 0>\n"
+                    "  store <4 x float> %v15, ptr %v12, align 16\n"));
     end(&x);
 }
 
@@ -1369,5 +1596,9 @@ void test_llvm_emit(void)
     vectors();
     flag_operations();
     vector_folds();
-    refusals();
+    overflow_branches();
+    high_products();
+    saturating();
+    flag_rows();
+    vector_moves();
 }
