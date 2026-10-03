@@ -45,6 +45,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/layout.c
     src/antic/lexer.c
     src/antic/linker.c
+    src/antic/llvm_emit.c
     src/antic/llvm_target.c
     src/antic/lower.c
     src/antic/lower_check.c

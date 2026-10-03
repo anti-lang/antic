@@ -8,6 +8,7 @@ void test_target(void);
 void test_cpu(void);
 void test_llvm_target(void);
 void test_abi(void);
+void test_llvm_emit(void);
 void test_f16(void);
 void test_text(void);
 void test_diagnostic_cut(void);
@@ -74,6 +75,7 @@ static const struct group groups[] = {
     {"cpu", test_cpu},
     {"llvm_target", test_llvm_target},
     {"abi", test_abi},
+    {"llvm_emit", test_llvm_emit},
     {"f16", test_f16},
     {"text", test_text},
     {"text", test_diagnostic_cut},
