@@ -898,6 +898,448 @@ static void sections(void)
     text_free(&out);
 }
 
+/* A struct of count fields of the given types. */
+static uint32_t record(struct fixture *x, const char *name,
+                       const enum ir_type *types, size_t count)
+{
+    struct ir_field fields[8];
+    size_t i;
+
+    memset(fields, 0, sizeof fields);
+    for (i = 0; i < count; i++) {
+        fields[i].name = "f";
+        fields[i].type = ir_scalar(types[i]);
+    }
+    return ir_struct_add(&x->m, IR_AGG_STRUCT, name, fields, count, false, 0);
+}
+
+/* A call names the function type, so a variadic callee and an indirect
+   one read the same. An i8 or i16 argument extends as the parameter
+   records. A call through a table calls the pointer it loaded. A call
+   whose result nothing reads still returns the type of its signature. */
+static void calls(void)
+{
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_function *g;
+    struct ir_function *printf_fn;
+    struct ir_function *sig;
+    struct ir_block *b;
+    struct ir_global *fmt;
+    struct ir_operand args[2];
+    uint32_t p;
+    uint32_t t;
+
+    begin(&x);
+    fmt = ir_global_add(&x.m, "main", "fmt", (const uint8_t *)"%g\n", 4, 1);
+    g = ir_function_add(&x.m, "main", "g", IR_I64, IR_NO_AGG);
+    ir_param_add(g, IR_I32, IR_NO_AGG);
+    ir_param_add(g, IR_I8, IR_NO_AGG);
+    g->params[1].ext = IR_EXT_ZERO;
+    ir_ret(g, ir_block_add(g), IR_I64, ir_int_op(IR_I64, 0));
+    printf_fn = ir_extern_add(&x.m, "printf", IR_I32, true);
+    ir_param_add(printf_fn, IR_PTR, IR_NO_AGG);
+    sig = ir_declare_add(&x.m, "main", "fn.0", IR_I32, IR_NO_AGG);
+    ir_param_add(sig, IR_I64, IR_NO_AGG);
+    f = ir_function_add(&x.m, "main", "f", IR_I64, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b = ir_block_add(f);
+    args[0] = ir_int_op(IR_I32, 1);
+    args[1] = ir_int_op(IR_I8, 2);
+    t = ir_call(f, b, IR_I64, ir_func_op(g), args, 2);
+    args[0] = ir_global_op(fmt);
+    args[1] = ir_float_op(IR_F64, 1.5);
+    ir_call(f, b, IR_I32, ir_func_op(printf_fn), args, 2);
+    args[0] = ir_int_op(IR_I64, 5);
+    ir_call_indirect(f, b, IR_I32, ir_temp_op(f, p), sig, args, 1);
+    b->insts[b->count - 1].c = ir_global_op(fmt);
+    b->insts[b->count - 1].field = 3;
+    ir_call_indirect(f, b, IR_VOID, ir_temp_op(f, p), sig, args, 1);
+    ir_ret(f, b, IR_I64, ir_temp_op(f, t));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "  %v0 = call i64 (i32, i8) @main.g(i32 1, i8 zeroext 2)\n"
+                    "  store i64 %v0, ptr %t1, align 8\n"
+                    "  %v1 = call i32 (ptr, ...) @printf(ptr @main.fmt, "
+                    "double 0x3FF8000000000000)\n"
+                    "  store i32 %v1, ptr %t2, align 4\n"
+                    "  %v2 = load ptr, ptr %t0, align 8\n"
+                    "  %v3 = call i32 (i64) %v2(i64 5)\n"
+                    "  store i32 %v3, ptr %t3, align 4\n"
+                    "  %v4 = load ptr, ptr %t0, align 8\n"
+                    "  %v5 = call i32 (i64) %v4(i64 5)\n"
+                    "  %v6 = load i64, ptr %t1, align 8\n"));
+    end(&x);
+}
+
+/* The struct {i64, f64} passes in two words and returns in two words
+   under System V. The callee builds the struct in a slot from the words,
+   and the caller copies the struct into a slot of the words' size to
+   load them. */
+static void coerced(void)
+{
+    static const enum ir_type pair[] = {IR_I64, IR_F64};
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_function *g;
+    struct ir_block *b;
+    struct ir_operand arg;
+    uint32_t agg;
+    uint32_t p;
+    uint32_t t;
+
+    begin(&x);
+    agg = record(&x, "main.Pair", pair, 2);
+    g = ir_function_add(&x.m, "main", "g", IR_AGG, agg);
+    p = ir_param_add(g, IR_AGG, agg);
+    ir_ret(g, ir_block_add(g), IR_AGG, ir_temp_op(g, p));
+    f = ir_function_add(&x.m, "main", "f", IR_VOID, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b = ir_block_add(f);
+    arg = ir_temp_op(f, p);
+    t = ir_call(f, b, IR_AGG, ir_func_op(g), &arg, 1);
+    ir_store(f, b, IR_I64, ir_int_op(IR_I64, 0), ir_temp_op(f, t));
+    ir_ret(f, b, IR_VOID, ir_int_op(IR_VOID, 0));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "define internal { i64, double } @main.g(i64 %p0.0, "
+                    "double %p0.1) #0 {\n"
+                    "b0:\n"
+                    "  %t0 = alloca ptr, align 8\n"
+                    "  %a0 = alloca [16 x i8], align 8\n"
+                    "  %a1 = alloca [16 x i8], align 8\n"
+                    "  store i64 %p0.0, ptr %a0, align 8\n"
+                    "  %v0 = getelementptr i8, ptr %a0, i64 8\n"
+                    "  store double %p0.1, ptr %v0, align 8\n"
+                    "  store ptr %a0, ptr %t0, align 8\n"
+                    "  %v1 = load ptr, ptr %t0, align 8\n"
+                    "  call void @llvm.memcpy.p0.p0.i64(ptr %a1, ptr %v1, "
+                    "i64 16, i1 false)\n"
+                    "  %v2 = load i64, ptr %a1, align 8\n"
+                    "  %v3 = getelementptr i8, ptr %a1, i64 8\n"
+                    "  %v4 = load double, ptr %v3, align 8\n"
+                    "  %v5 = insertvalue { i64, double } poison, i64 %v2, 0\n"
+                    "  %v6 = insertvalue { i64, double } %v5, double %v4, 1\n"
+                    "  ret { i64, double } %v6\n"
+                    "}\n"));
+    CHECK(holds(&x, "  %a0 = alloca [16 x i8], align 8\n"
+                    "  %a1 = alloca [16 x i8], align 8\n"
+                    "  store ptr %p0, ptr %t0, align 8\n"
+                    "  %v0 = load ptr, ptr %t0, align 8\n"
+                    "  call void @llvm.memcpy.p0.p0.i64(ptr %a0, ptr %v0, "
+                    "i64 16, i1 false)\n"
+                    "  %v1 = load i64, ptr %a0, align 8\n"
+                    "  %v2 = getelementptr i8, ptr %a0, i64 8\n"
+                    "  %v3 = load double, ptr %v2, align 8\n"
+                    "  %v4 = call { i64, double } (i64, double) "
+                    "@main.g(i64 %v1, double %v3)\n"
+                    "  %v5 = extractvalue { i64, double } %v4, 0\n"
+                    "  store i64 %v5, ptr %a1, align 8\n"
+                    "  %v6 = extractvalue { i64, double } %v4, 1\n"
+                    "  %v7 = getelementptr i8, ptr %a1, i64 8\n"
+                    "  store double %v6, ptr %v7, align 8\n"
+                    "  store ptr %a1, ptr %t1, align 8\n"));
+    end(&x);
+}
+
+/* main.g(a: Big) -> Big and a call of it, for a struct of three i64. */
+static void big_call(struct fixture *x)
+{
+    static const enum ir_type big[] = {IR_I64, IR_I64, IR_I64};
+    struct ir_function *f;
+    struct ir_function *g;
+    struct ir_block *b;
+    struct ir_operand arg;
+    uint32_t agg;
+    uint32_t p;
+
+    agg = record(x, "main.Big", big, 3);
+    g = ir_function_add(&x->m, "main", "g", IR_AGG, agg);
+    p = ir_param_add(g, IR_AGG, agg);
+    ir_ret(g, ir_block_add(g), IR_AGG, ir_temp_op(g, p));
+    f = ir_function_add(&x->m, "main", "f", IR_VOID, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b = ir_block_add(f);
+    arg = ir_temp_op(f, p);
+    ir_call(f, b, IR_AGG, ir_func_op(g), &arg, 1);
+    ir_ret(f, b, IR_VOID, ir_int_op(IR_VOID, 0));
+}
+
+/* A struct above 16 bytes: byval and sret under System V, a pointer to a
+   copy the caller makes and sret under AAPCS64 and Microsoft x64. */
+static void memory_classes(void)
+{
+    struct fixture x;
+
+    begin(&x);
+    big_call(&x);
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "define internal void @main.g(ptr sret([24 x i8]) "
+                    "align 8 %sret, ptr byval([24 x i8]) align 8 %p0) #0 {\n"
+                    "b0:\n"
+                    "  %t0 = alloca ptr, align 8\n"
+                    "  store ptr %p0, ptr %t0, align 8\n"
+                    "  %v0 = load ptr, ptr %t0, align 8\n"
+                    "  call void @llvm.memcpy.p0.p0.i64(ptr %sret, ptr %v0, "
+                    "i64 24, i1 false)\n"
+                    "  ret void\n"
+                    "}\n"));
+    CHECK(holds(&x, "  %a0 = alloca [24 x i8], align 8\n"
+                    "  store ptr %p0, ptr %t0, align 8\n"
+                    "  %v0 = load ptr, ptr %t0, align 8\n"
+                    "  call void (ptr, ptr) @main.g(ptr sret([24 x i8]) "
+                    "align 8 %a0, ptr byval([24 x i8]) align 8 %v0)\n"
+                    "  store ptr %a0, ptr %t1, align 8\n"));
+    CHECK(run(&x, TARGET_LINUX_ARM64));
+    CHECK(holds(&x, "define internal void @main.g(ptr sret([24 x i8]) "
+                    "align 8 %sret, ptr %p0) #0 {\n"));
+    CHECK(holds(&x, "  %a0 = alloca [24 x i8], align 8\n"
+                    "  %a1 = alloca [24 x i8], align 8\n"
+                    "  store ptr %p0, ptr %t0, align 8\n"
+                    "  %v0 = load ptr, ptr %t0, align 8\n"
+                    "  call void @llvm.memcpy.p0.p0.i64(ptr %a1, ptr %v0, "
+                    "i64 24, i1 false)\n"
+                    "  call void (ptr, ptr) @main.g(ptr sret([24 x i8]) "
+                    "align 8 %a0, ptr %a1)\n"));
+    CHECK(run(&x, TARGET_WINDOWS_X86_64));
+    CHECK(holds(&x, "(ptr sret([24 x i8]) align 8 %sret, ptr %p0) #0 {\n"));
+    end(&x);
+}
+
+/* A float aggregate of AAPCS64 is an array of its members, a simd struct
+   of 16 bytes is its vector in a slot of its alignment, and an aggregate
+   of 8 bytes under Microsoft x64 is an integer of its size. */
+static void word_classes(void)
+{
+    static const enum ir_type two_floats[] = {IR_F32, IR_F32};
+    struct ir_field lanes[4];
+    struct fixture x;
+    struct ir_function *g;
+    uint32_t agg;
+    uint32_t vec;
+    uint32_t p;
+    size_t i;
+
+    begin(&x);
+    agg = record(&x, "main.V2", two_floats, 2);
+    memset(lanes, 0, sizeof lanes);
+    for (i = 0; i < 4; i++) {
+        lanes[i].name = "l";
+        lanes[i].type = ir_scalar(IR_F32);
+    }
+    vec = ir_simd_add(&x.m, "main.F4", lanes, 4);
+    g = ir_function_add(&x.m, "main", "g", IR_AGG, agg);
+    p = ir_param_add(g, IR_AGG, vec);
+    ir_param_add(g, IR_AGG, agg);
+    ir_ret(g, ir_block_add(g), IR_AGG, ir_temp_op(g, p));
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(holds(&x, "define internal [2 x float] @main.g(<4 x float> %p0, "
+                    "[2 x float] %p1.0) #0 {\n"
+                    "b0:\n"
+                    "  %t0 = alloca ptr, align 8\n"
+                    "  %t1 = alloca ptr, align 8\n"
+                    "  %a0 = alloca [16 x i8], align 16\n"
+                    "  %a1 = alloca [8 x i8], align 8\n"
+                    "  %a2 = alloca [8 x i8], align 8\n"
+                    "  store <4 x float> %p0, ptr %a0, align 16\n"
+                    "  store ptr %a0, ptr %t0, align 8\n"
+                    "  store [2 x float] %p1.0, ptr %a1, align 8\n"
+                    "  store ptr %a1, ptr %t1, align 8\n"
+                    "  %v0 = load ptr, ptr %t0, align 8\n"
+                    "  call void @llvm.memcpy.p0.p0.i64(ptr %a2, ptr %v0, "
+                    "i64 8, i1 false)\n"
+                    "  %v1 = load [2 x float], ptr %a2, align 8\n"
+                    "  ret [2 x float] %v1\n"));
+    CHECK(run(&x, TARGET_WINDOWS_X86_64));
+    CHECK(holds(&x, "define internal i64 @_A4main_g(ptr %p0, i64 %p1.0) "
+                    "#0 {\n"));
+    end(&x);
+}
+
+/* A simd struct of 4 lanes of type. */
+static uint32_t simd4(struct fixture *x, const char *name, enum ir_type type)
+{
+    struct ir_field lanes[4];
+    size_t i;
+
+    memset(lanes, 0, sizeof lanes);
+    for (i = 0; i < 4; i++) {
+        lanes[i].name = "l";
+        lanes[i].type = ir_scalar(type);
+    }
+    return ir_simd_add(&x->m, name, lanes, 4);
+}
+
+/* vsplat and vbinary, which the simd structs that cross to C need: the
+   value in every lane, and the lane operation on whole vectors loaded at
+   the alignment of the struct. A comparison stores its mask as i8 lanes,
+   and a shift masks its counts to the width of a lane. */
+static void vectors(void)
+{
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_block *b;
+    uint32_t f4;
+    uint32_t i4;
+    uint32_t p;
+    uint32_t q;
+    uint32_t r;
+
+    begin(&x);
+    f4 = simd4(&x, "main.F4", IR_F32);
+    i4 = simd4(&x, "main.I4", IR_I32);
+    f = ir_function_add(&x.m, "main", "f", IR_VOID, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    q = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    r = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b = ir_block_add(f);
+    ir_vsplat(f, b, IR_F32, ir_temp_op(f, p), ir_float_op(IR_F32, 2.0), f4);
+    ir_vbinary(f, b, IR_FADD, IR_F32, ir_temp_op(f, p), ir_temp_op(f, q),
+               ir_temp_op(f, r), f4);
+    ir_vbinary(f, b, IR_FLT, IR_F32, ir_temp_op(f, p), ir_temp_op(f, q),
+               ir_temp_op(f, r), f4);
+    ir_vbinary(f, b, IR_SHL, IR_I32, ir_temp_op(f, p), ir_temp_op(f, q),
+               ir_temp_op(f, r), i4);
+    ir_ret(f, b, IR_VOID, ir_int_op(IR_VOID, 0));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "  %v0 = load ptr, ptr %t0, align 8\n"
+                    "  %v1 = insertelement <4 x float> poison, float "
+                    "0x4000000000000000, i64 0\n"
+                    "  %v2 = shufflevector <4 x float> %v1, <4 x float> "
+                    "poison, <4 x i32> zeroinitializer\n"
+                    "  store <4 x float> %v2, ptr %v0, align 16\n"
+                    "  %v3 = load ptr, ptr %t0, align 8\n"
+                    "  %v4 = load ptr, ptr %t1, align 8\n"
+                    "  %v5 = load ptr, ptr %t2, align 8\n"
+                    "  %v6 = load <4 x float>, ptr %v4, align 16\n"
+                    "  %v7 = load <4 x float>, ptr %v5, align 16\n"
+                    "  %v8 = fadd <4 x float> %v6, %v7\n"
+                    "  store <4 x float> %v8, ptr %v3, align 16\n"));
+    CHECK(holds(&x, "  %v14 = fcmp olt <4 x float> %v12, %v13\n"
+                    "  %v15 = zext <4 x i1> %v14 to <4 x i8>\n"
+                    "  store <4 x i8> %v15, ptr %v9, align 1\n"));
+    CHECK(holds(&x, "  %v21 = and <4 x i32> %v20, <i32 31, i32 31, i32 31, "
+                    "i32 31>\n"
+                    "  %v22 = shl <4 x i32> %v19, %v21\n"
+                    "  store <4 x i32> %v22, ptr %v16, align 16\n"));
+    end(&x);
+}
+
+/* addfl and subfl give the plain result and keep four i1: the overflow
+   of the signed intrinsic, the carry or borrow of the unsigned one, and
+   zero and sign by comparison. A carry in runs both intrinsics again on
+   the result. The two carries cannot both be set, and the overflow of
+   the whole sum is set when exactly one of the two signed steps
+   overflowed, as the flag of adc. flag widens the i1 it reads. */
+static void flag_operations(void)
+{
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_block *b;
+    uint32_t p;
+    uint32_t q;
+    uint32_t c;
+    uint32_t r;
+
+    begin(&x);
+    f = ir_function_add(&x.m, "main", "f", IR_I8, IR_NO_AGG);
+    p = ir_param_add(f, IR_I64, IR_NO_AGG);
+    q = ir_param_add(f, IR_I64, IR_NO_AGG);
+    c = ir_param_add(f, IR_I8, IR_NO_AGG);
+    b = ir_block_add(f);
+    r = ir_flag_op(f, b, IR_ADD_FL, IR_I64, ir_temp_op(f, p),
+                   ir_temp_op(f, q), ir_temp_op(f, c));
+    ir_flag(f, b, IR_FLAG_OVERFLOW, ir_temp_op(f, r));
+    ir_flag(f, b, IR_FLAG_CARRY, ir_temp_op(f, r));
+    ir_flag(f, b, IR_FLAG_ZERO, ir_temp_op(f, r));
+    r = ir_flag_op(f, b, IR_SUB_FL, IR_I64, ir_temp_op(f, p),
+                   ir_temp_op(f, q), ir_temp_op(f, c));
+    r = ir_flag(f, b, IR_FLAG_NEGATIVE, ir_temp_op(f, r));
+    ir_ret(f, b, IR_I8, ir_temp_op(f, r));
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(holds(&x, "  %v0 = load i64, ptr %t0, align 8\n"
+                    "  %v1 = load i64, ptr %t1, align 8\n"
+                    "  %v2 = load i8, ptr %t2, align 1\n"
+                    "  %v3 = call { i64, i1 } @llvm.sadd.with.overflow.i64("
+                    "i64 %v0, i64 %v1)\n"
+                    "  %v4 = call { i64, i1 } @llvm.uadd.with.overflow.i64("
+                    "i64 %v0, i64 %v1)\n"
+                    "  %v5 = extractvalue { i64, i1 } %v3, 0\n"
+                    "  %v6 = extractvalue { i64, i1 } %v3, 1\n"
+                    "  %v7 = extractvalue { i64, i1 } %v4, 1\n"
+                    "  %v8 = icmp ne i8 %v2, 0\n"
+                    "  %v9 = zext i1 %v8 to i64\n"
+                    "  %v10 = call { i64, i1 } @llvm.sadd.with.overflow.i64("
+                    "i64 %v5, i64 %v9)\n"
+                    "  %v11 = call { i64, i1 } @llvm.uadd.with.overflow.i64("
+                    "i64 %v5, i64 %v9)\n"
+                    "  %v12 = extractvalue { i64, i1 } %v10, 0\n"
+                    "  %v13 = extractvalue { i64, i1 } %v10, 1\n"
+                    "  %v14 = extractvalue { i64, i1 } %v11, 1\n"
+                    "  %v15 = xor i1 %v6, %v13\n"
+                    "  %v16 = or i1 %v7, %v14\n"
+                    "  %v17 = icmp eq i64 %v12, 0\n"
+                    "  %v18 = icmp slt i64 %v12, 0\n"
+                    "  store i64 %v12, ptr %t3, align 8\n"
+                    "  %v19 = zext i1 %v15 to i8\n"
+                    "  store i8 %v19, ptr %t4, align 1\n"
+                    "  %v20 = zext i1 %v16 to i8\n"
+                    "  store i8 %v20, ptr %t5, align 1\n"
+                    "  %v21 = zext i1 %v17 to i8\n"
+                    "  store i8 %v21, ptr %t6, align 1\n"));
+    CHECK(holds(&x, "@llvm.ssub.with.overflow.i64(i64 %v"));
+    CHECK(holds(&x, "@llvm.usub.with.overflow.i64(i64 %v"));
+    CHECK(holds(&x, "declare { i64, i1 } @llvm.sadd.with.overflow.i64(i64, "
+                    "i64)\n"));
+    end(&x);
+}
+
+/* vselect takes the lane of its first operand where the mask holds,
+   with the i8 mask cut to i1. vreduce sums from -0.0 in lane order, and
+   a less-than keeps the least lane. */
+static void vector_folds(void)
+{
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_block *b;
+    uint32_t f4;
+    uint32_t i4;
+    uint32_t m4;
+    uint32_t p;
+    uint32_t q;
+    uint32_t s;
+
+    begin(&x);
+    f4 = simd4(&x, "main.F4", IR_F32);
+    i4 = simd4(&x, "main.I4", IR_I32);
+    m4 = simd4(&x, "main.M4", IR_I8);
+    f = ir_function_add(&x.m, "main", "f", IR_I32, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    q = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b = ir_block_add(f);
+    ir_vselect(f, b, IR_F32, ir_temp_op(f, p), ir_temp_op(f, q),
+               ir_temp_op(f, p), ir_temp_op(f, q), f4);
+    ir_vreduce(f, b, IR_FADD, IR_F32, ir_temp_op(f, p), f4);
+    s = ir_vreduce(f, b, IR_SLT, IR_I32, ir_temp_op(f, p), i4);
+    ir_vreduce(f, b, IR_OR, IR_I8, ir_temp_op(f, q), m4);
+    ir_ret(f, b, IR_I32, ir_temp_op(f, s));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "  %v4 = load <4 x i8>, ptr %v1, align 1\n"
+                    "  %v5 = trunc <4 x i8> %v4 to <4 x i1>\n"
+                    "  %v6 = load <4 x float>, ptr %v2, align 16\n"
+                    "  %v7 = load <4 x float>, ptr %v3, align 16\n"
+                    "  %v8 = select <4 x i1> %v5, <4 x float> %v6, "
+                    "<4 x float> %v7\n"
+                    "  store <4 x float> %v8, ptr %v0, align 16\n"));
+    CHECK(holds(&x, "  %v10 = load <4 x float>, ptr %v9, align 16\n"
+                    "  %v11 = call float @llvm.vector.reduce.fadd.v4f32("
+                    "float -0.000000e+00, <4 x float> %v10)\n"
+                    "  store float %v11, ptr %t2, align 4\n"));
+    CHECK(holds(&x, "  %v14 = call i32 @llvm.vector.reduce.smin.v4i32("
+                    "<4 x i32> %v13)\n"));
+    CHECK(holds(&x, "  %v17 = call i8 @llvm.vector.reduce.or.v4i8("
+                    "<4 x i8> %v16)\n"));
+    end(&x);
+}
+
 void test_llvm_emit(void)
 {
     module_text();
@@ -920,5 +1362,12 @@ void test_llvm_emit(void)
     addresses();
     constructors();
     sections();
+    calls();
+    coerced();
+    memory_classes();
+    word_classes();
+    vectors();
+    flag_operations();
+    vector_folds();
     refusals();
 }

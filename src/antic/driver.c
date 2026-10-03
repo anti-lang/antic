@@ -657,6 +657,11 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     emit.module = module;
     emit.one_module = o->dev || driver_is_plugin(o);
     emit.exports = extras->hosts_plugins;
+    /* The host has run the runtime's start already, so a plugin brings
+       no constructor of its own. */
+    if (o->lib == LIB_SHARED && !driver_is_plugin(o)) {
+        emit.constructor = rt_name(RT_FN_INIT);
+    }
     ok = ok && llvm_emit_module(&out, &emit, program, &layouts, error,
                                 sizeof error);
     if (ok && o->dump_llvm) {

@@ -25,6 +25,12 @@
    on memory, the calls, the globals, the sections and the constructors.
    Every other operation is refused with the step that adds it. */
 
+/* The classification of the parameters and the result of a function. */
+struct classified {
+    struct abi_param *params;       /* one per parameter */
+    struct abi_param result;
+};
+
 /* The metadata of a branch into a cold block, one id for each side. */
 enum { COLD_THEN, COLD_ELSE, COLD_COUNT };
 
@@ -44,6 +50,11 @@ struct emitter {
     const struct ir_module *m;
     struct text *allocas;           /* the allocas of the entry block */
     uint32_t slots;                 /* the next %a<n> of the function */
+    struct classified signature;    /* of the function */
+    /* The four i1 values of the last flag operation, in the order of
+       enum ir_flag, and its result temporary. */
+    uint32_t flags[4];
+    uint32_t flag_result;
 };
 
 static void refuse(struct emitter *e, const char *what, const char *step)
@@ -85,20 +96,18 @@ static const char *step_of(enum ir_op op)
     case IR_FTRUNC: case IR_HEXT: case IR_HTRUNC:
     case IR_SLOT: case IR_LOAD: case IR_STORE: case IR_PTRADD:
     case IR_MEMCOPY: case IR_ADDR: case IR_BITLOAD: case IR_BITSTORE:
+    case IR_CALL: case IR_VSPLAT: case IR_VBINARY: case IR_VSELECT:
+    case IR_VREDUCE: case IR_ADD_FL: case IR_SUB_FL: case IR_FLAG:
         return NULL;
     case IR_ADD_OV: case IR_SUB_OV: case IR_MUL_OV: case IR_BRANCH_OV:
     case IR_MULH_S: case IR_MULH_U:
     case IR_ADD_SAT_S: case IR_ADD_SAT_U: case IR_SUB_SAT_S:
     case IR_SUB_SAT_U: case IR_MUL_SAT_S: case IR_MUL_SAT_U:
-    case IR_ADD_FL: case IR_SUB_FL: case IR_MUL_FL: case IR_SHL_FL:
-    case IR_SHR_S_FL: case IR_SHR_U_FL: case IR_NEG_FL: case IR_FLAG:
-    case IR_VBINARY: case IR_VUNARY: case IR_VSPLAT: case IR_VSELECT:
-    case IR_VSHUFFLE: case IR_VREDUCE:
+    case IR_MUL_FL: case IR_SHL_FL: case IR_SHR_S_FL: case IR_SHR_U_FL:
+    case IR_NEG_FL: case IR_VUNARY: case IR_VSHUFFLE:
         return "emit-wide";
-    case IR_CALL:
-        return "emit-memory";
     }
-    return "emit-memory";
+    return "emit-wide";
 }
 
 /* The LLVM type of a scalar after layout_resolve, or NULL for an
@@ -872,6 +881,890 @@ static void bits(struct emitter *e, const struct ir_inst *inst)
     text_free(&word);
 }
 
+/* The vector type <N x T> of the simd struct of inst, one element per
+   lane of the IR's lane type. */
+static void vector_of(struct emitter *e, const struct ir_inst *inst,
+                      const char *element, char *out, size_t size)
+{
+    text_format(out, size, "<%zu x %s>",
+                e->m->aggs[inst->of.agg]->field_count, element);
+}
+
+/* DESIGN: a simd operation loads whole vectors at the alignment of the
+   simd struct, works on <N x T> and stores the result, as "Instruction
+   mapping" in docs/work-order-llvm-back-end.md gives it. vsplat and
+   vbinary come with the step emit-memory, since the simd structs that
+   tests/abi passes to C need them. A comparison stores its mask as i8
+   lanes at alignment 1, since the instruction names the aggregate of
+   its operands and not the one of the mask. A shift takes each count
+   modulo the width of a lane, as a scalar shift does. A division needs
+   the guards of each lane and waits for the step emit-wide with the
+   other simd operations. */
+static void vsplat(struct emitter *e, const struct ir_inst *inst)
+{
+    const char *lane = value_type(e, inst->type);
+    uint64_t align = layout_align(e->l, inst->of);
+    struct text dst = {0};
+    struct text value = {0};
+    char vector[48];
+    uint32_t one;
+    uint32_t all;
+
+    operand(e, &inst->a, IR_PTR, &dst);
+    operand(e, &inst->b, inst->type, &value);
+    if (!e->failed && lane != NULL) {
+        vector_of(e, inst, lane, vector, sizeof vector);
+        one = fresh(e);
+        all = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = insertelement %s poison, %s "
+                             "%s, i64 0\n",
+                     one, vector, lane, text_cstr(&value));
+        text_appendf(e->out, "  %%v%" PRIu32 " = shufflevector %s %%v%" PRIu32
+                             ", %s poison, <%zu x i32> zeroinitializer\n",
+                     all, vector, one, vector,
+                     e->m->aggs[inst->of.agg]->field_count);
+        text_appendf(e->out, "  store %s %%v%" PRIu32 ", ptr %s, align %"
+                             PRIu64 "\n",
+                     vector, all, text_cstr(&dst), align);
+    }
+    text_free(&dst);
+    text_free(&value);
+}
+
+static void vbinary(struct emitter *e, const struct ir_inst *inst)
+{
+    enum ir_op op = (enum ir_op)inst->field;
+    const char *lane = value_type(e, inst->type);
+    uint64_t align = layout_align(e->l, inst->of);
+    size_t lanes = e->m->aggs[inst->of.agg]->field_count;
+    struct text dst = {0};
+    struct text x = {0};
+    struct text y = {0};
+    char vector[48];
+    uint32_t a;
+    uint32_t b;
+    uint32_t r;
+    size_t k;
+
+    if (plain_binary(op) == NULL && comparison(op) == NULL && op != IR_SHL &&
+        op != IR_SHR_S && op != IR_SHR_U) {
+        char what[48];
+        text_format(what, sizeof what, "`vbinary` of `%s`", ir_op_name(op));
+        refuse(e, what, "emit-wide");
+        return;
+    }
+    operand(e, &inst->a, IR_PTR, &dst);
+    operand(e, &inst->b, IR_PTR, &x);
+    operand(e, &inst->c, IR_PTR, &y);
+    if (e->failed || lane == NULL) {
+        text_free(&dst);
+        text_free(&x);
+        text_free(&y);
+        return;
+    }
+    vector_of(e, inst, lane, vector, sizeof vector);
+    a = fresh(e);
+    b = fresh(e);
+    text_appendf(e->out, "  %%v%" PRIu32 " = load %s, ptr %s, align %" PRIu64
+                         "\n",
+                 a, vector, text_cstr(&x), align);
+    text_appendf(e->out, "  %%v%" PRIu32 " = load %s, ptr %s, align %" PRIu64
+                         "\n",
+                 b, vector, text_cstr(&y), align);
+    if (comparison(op) != NULL) {
+        uint32_t bits = fresh(e);
+        r = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %%v%" PRIu32 ", %%v%"
+                             PRIu32 "\n",
+                     bits, comparison(op), vector, a, b);
+        text_appendf(e->out, "  %%v%" PRIu32 " = zext <%zu x i1> %%v%" PRIu32
+                             " to <%zu x i8>\n",
+                     r, lanes, bits, lanes);
+        text_appendf(e->out, "  store <%zu x i8> %%v%" PRIu32 ", ptr %s, "
+                             "align 1\n",
+                     lanes, r, text_cstr(&dst));
+    } else {
+        if (plain_binary(op) == NULL) {
+            uint32_t count = fresh(e);
+            text_appendf(e->out, "  %%v%" PRIu32 " = and %s %%v%" PRIu32 ", <",
+                         count, vector, b);
+            for (k = 0; k < lanes; k++) {
+                text_appendf(e->out, "%s%s %u", k > 0 ? ", " : "", lane,
+                             width_of(inst->type) - 1);
+            }
+            text_append(e->out, ">\n");
+            b = count;
+        }
+        r = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %%v%" PRIu32 ", %%v%"
+                             PRIu32 "\n",
+                     r,
+                     plain_binary(op) != NULL ? plain_binary(op)
+                     : op == IR_SHL           ? "shl"
+                     : op == IR_SHR_S         ? "ashr"
+                                              : "lshr",
+                     vector, a, b);
+        text_appendf(e->out, "  store %s %%v%" PRIu32 ", ptr %s, align %"
+                             PRIu64 "\n",
+                     vector, r, text_cstr(&dst), align);
+    }
+    text_free(&dst);
+    text_free(&x);
+    text_free(&y);
+}
+
+/* The name of type in the name of an intrinsic: i8 to i64, f32 or f64. */
+static const char *type_suffix(struct emitter *e, enum ir_type type)
+{
+    if (type == IR_F32 || type == IR_F64) {
+        return float_suffix(type);
+    }
+    return value_type(e, type);
+}
+
+/* Call the intrinsic llvm.<kind>.with.overflow.<T> on x and y, declared
+   once, and return the value of the call. */
+static uint32_t with_overflow(struct emitter *e, const char *kind,
+                              const char *type, const char *x, const char *y)
+{
+    char name[64];
+    char result[32];
+    char parameters[32];
+    uint32_t n = fresh(e);
+
+    text_format(name, sizeof name, "llvm.%s.with.overflow.%s", kind, type);
+    text_format(result, sizeof result, "{ %s, i1 }", type);
+    text_format(parameters, sizeof parameters, "%s, %s", type, type);
+    intrinsic(e, result, name, parameters);
+    text_appendf(e->out, "  %%v%" PRIu32 " = call %s @%s(%s %s, %s %s)\n", n,
+                 result, name, type, x, type, y);
+    return n;
+}
+
+/* The field k of the value v of type { type, i1 }. */
+static uint32_t field_of(struct emitter *e, const char *type, uint32_t v,
+                         unsigned k)
+{
+    uint32_t n = fresh(e);
+
+    text_appendf(e->out, "  %%v%" PRIu32 " = extractvalue { %s, i1 } %%v%"
+                         PRIu32 ", %u\n",
+                 n, type, v, k);
+    return n;
+}
+
+/* DESIGN: addfl and subfl give the plain result, and the four flags as
+   i1 values that the flag reads after it widen. The overflow comes from
+   the signed intrinsic, the carry or the borrow from the unsigned one,
+   and zero and sign from comparisons of the result. A carry in runs both
+   intrinsics again on the result and the carry. The two carries cannot
+   both be set. The sum overflows when exactly one of the two signed
+   steps overflowed, so the two overflows combine with xor, which gives
+   the flag of adc and sbb. The other flag operations come with the step
+   emit-wide. */
+static void flag_operation(struct emitter *e, const struct ir_inst *inst)
+{
+    bool add = inst->op == IR_ADD_FL;
+    const char *type = value_type(e, inst->type);
+    struct text a = {0};
+    struct text b = {0};
+    struct text c = {0};
+    char sum[24];
+    uint32_t s;
+    uint32_t u;
+    uint32_t r;
+    uint32_t overflow;
+    uint32_t carry;
+
+    if (type == NULL) {
+        return;
+    }
+    operand(e, &inst->a, inst->type, &a);
+    operand(e, &inst->b, inst->type, &b);
+    if (inst->c.kind != IR_NONE) {
+        operand(e, &inst->c, IR_I8, &c);
+    }
+    if (e->failed) {
+        text_free(&a);
+        text_free(&b);
+        text_free(&c);
+        return;
+    }
+    s = with_overflow(e, add ? "sadd" : "ssub", type, text_cstr(&a),
+                      text_cstr(&b));
+    u = with_overflow(e, add ? "uadd" : "usub", type, text_cstr(&a),
+                      text_cstr(&b));
+    r = field_of(e, type, s, 0);
+    overflow = field_of(e, type, s, 1);
+    carry = field_of(e, type, u, 1);
+    if (inst->c.kind != IR_NONE) {
+        uint32_t set = fresh(e);
+        uint32_t wide = fresh(e);
+        char partial[24];
+        char in[24];
+        text_appendf(e->out, "  %%v%" PRIu32 " = icmp ne i8 %s, 0\n", set,
+                     text_cstr(&c));
+        text_appendf(e->out, "  %%v%" PRIu32 " = zext i1 %%v%" PRIu32
+                             " to %s\n",
+                     wide, set, type);
+        text_format(partial, sizeof partial, "%%v%" PRIu32, r);
+        text_format(in, sizeof in, "%%v%" PRIu32, wide);
+        s = with_overflow(e, add ? "sadd" : "ssub", type, partial, in);
+        u = with_overflow(e, add ? "uadd" : "usub", type, partial, in);
+        r = field_of(e, type, s, 0);
+        s = field_of(e, type, s, 1);
+        u = field_of(e, type, u, 1);
+        text_appendf(e->out, "  %%v%" PRIu32 " = xor i1 %%v%" PRIu32 ", %%v%"
+                             PRIu32 "\n",
+                     e->value, overflow, s);
+        overflow = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = or i1 %%v%" PRIu32 ", %%v%"
+                             PRIu32 "\n",
+                     e->value, carry, u);
+        carry = fresh(e);
+    }
+    e->flags[IR_FLAG_OVERFLOW] = overflow;
+    e->flags[IR_FLAG_CARRY] = carry;
+    e->flags[IR_FLAG_ZERO] = fresh(e);
+    text_appendf(e->out, "  %%v%" PRIu32 " = icmp eq %s %%v%" PRIu32 ", 0\n",
+                 e->flags[IR_FLAG_ZERO], type, r);
+    e->flags[IR_FLAG_NEGATIVE] = fresh(e);
+    text_appendf(e->out, "  %%v%" PRIu32 " = icmp slt %s %%v%" PRIu32 ", 0\n",
+                 e->flags[IR_FLAG_NEGATIVE], type, r);
+    e->flag_result = inst->result;
+    text_format(sum, sizeof sum, "%%v%" PRIu32, r);
+    store_result(e, inst, sum);
+    text_free(&a);
+    text_free(&b);
+    text_free(&c);
+}
+
+/* A flag of the flag operation right before it, which the verifier of
+   the IR keeps there, from the four i1 values that operation left. */
+static void flag_read(struct emitter *e, const struct ir_inst *inst)
+{
+    char value[24];
+
+    if (inst->a.kind != IR_TEMP || inst->a.as.temp != e->flag_result ||
+        inst->field > IR_FLAG_NEGATIVE) {
+        unexpected(e, "a flag apart from its flag operation");
+        return;
+    }
+    text_appendf(e->out, "  %%v%" PRIu32 " = zext i1 %%v%" PRIu32 " to i8\n",
+                 e->value, e->flags[inst->field]);
+    text_format(value, sizeof value, "%%v%" PRIu32, e->value++);
+    store_result(e, inst, value);
+}
+
+/* The lanes of c where the mask b holds, and of args[0] where it does
+   not, into a. The mask is a simd struct of i8 lanes, whose lowest bit
+   the select reads. */
+static void vselect(struct emitter *e, const struct ir_inst *inst)
+{
+    const char *lane = value_type(e, inst->type);
+    uint64_t align = layout_align(e->l, inst->of);
+    size_t lanes = e->m->aggs[inst->of.agg]->field_count;
+    struct text dst = {0};
+    struct text mask = {0};
+    struct text x = {0};
+    struct text y = {0};
+    char vector[48];
+
+    operand(e, &inst->a, IR_PTR, &dst);
+    operand(e, &inst->b, IR_PTR, &mask);
+    operand(e, &inst->c, IR_PTR, &x);
+    if (inst->arg_count == 1) {
+        operand(e, &inst->args[0], IR_PTR, &y);
+    } else {
+        unexpected(e, "a vselect without its second operand");
+    }
+    if (!e->failed && lane != NULL) {
+        uint32_t bytes = fresh(e);
+        uint32_t bits = fresh(e);
+        uint32_t a = fresh(e);
+        uint32_t b = fresh(e);
+        uint32_t r = fresh(e);
+        vector_of(e, inst, lane, vector, sizeof vector);
+        text_appendf(e->out, "  %%v%" PRIu32 " = load <%zu x i8>, ptr %s, "
+                             "align 1\n",
+                     bytes, lanes, text_cstr(&mask));
+        text_appendf(e->out, "  %%v%" PRIu32 " = trunc <%zu x i8> %%v%" PRIu32
+                             " to <%zu x i1>\n",
+                     bits, lanes, bytes, lanes);
+        text_appendf(e->out, "  %%v%" PRIu32 " = load %s, ptr %s, align %"
+                             PRIu64 "\n",
+                     a, vector, text_cstr(&x), align);
+        text_appendf(e->out, "  %%v%" PRIu32 " = load %s, ptr %s, align %"
+                             PRIu64 "\n",
+                     b, vector, text_cstr(&y), align);
+        text_appendf(e->out, "  %%v%" PRIu32 " = select <%zu x i1> %%v%" PRIu32
+                             ", %s %%v%" PRIu32 ", %s %%v%" PRIu32 "\n",
+                     r, lanes, bits, vector, a, vector, b);
+        text_appendf(e->out, "  store %s %%v%" PRIu32 ", ptr %s, align %"
+                             PRIu64 "\n",
+                     vector, r, text_cstr(&dst), align);
+    }
+    text_free(&dst);
+    text_free(&mask);
+    text_free(&x);
+    text_free(&y);
+}
+
+/* DESIGN: vreduce folds the lanes with the reduction intrinsic of its
+   operation. A sum of floats starts from -0.0 without reassoc, so it
+   adds the lanes in their order. */
+static void vreduce(struct emitter *e, const struct ir_inst *inst)
+{
+    enum ir_op op = (enum ir_op)inst->field;
+    const char *lane = value_type(e, inst->type);
+    size_t lanes = e->m->aggs[inst->of.agg]->field_count;
+    const char *fold;
+    struct text x = {0};
+    char vector[48];
+    char name[64];
+    char parameters[64];
+    uint32_t v;
+    char value[24];
+
+    switch (op) {
+    case IR_ADD: fold = "add"; break;
+    case IR_FADD: fold = "fadd"; break;
+    case IR_SLT: fold = "smin"; break;
+    case IR_ULT: fold = "umin"; break;
+    case IR_FLT: fold = "fmin"; break;
+    case IR_SGT: fold = "smax"; break;
+    case IR_UGT: fold = "umax"; break;
+    case IR_FGT: fold = "fmax"; break;
+    case IR_OR: fold = "or"; break;
+    case IR_AND: fold = "and"; break;
+    default: {
+        char what[48];
+        text_format(what, sizeof what, "`vreduce` of `%s`", ir_op_name(op));
+        refuse(e, what, "emit-wide");
+        return;
+    }
+    }
+    operand(e, &inst->a, IR_PTR, &x);
+    if (e->failed || lane == NULL) {
+        text_free(&x);
+        return;
+    }
+    vector_of(e, inst, lane, vector, sizeof vector);
+    text_format(name, sizeof name, "llvm.vector.reduce.%s.v%zu%s", fold, lanes,
+                type_suffix(e, inst->type));
+    if (op == IR_FADD) {
+        text_format(parameters, sizeof parameters, "%s, %s", lane, vector);
+    } else {
+        text_format(parameters, sizeof parameters, "%s", vector);
+    }
+    intrinsic(e, lane, name, parameters);
+    v = fresh(e);
+    text_appendf(e->out, "  %%v%" PRIu32 " = load %s, ptr %s, align %" PRIu64
+                         "\n",
+                 v, vector, text_cstr(&x), layout_align(e->l, inst->of));
+    text_appendf(e->out, "  %%v%" PRIu32 " = call %s @%s(", e->value, lane,
+                 name);
+    if (op == IR_FADD) {
+        text_appendf(e->out, "%s -0.000000e+00, ", lane);
+    }
+    text_appendf(e->out, "%s %%v%" PRIu32 ")\n", vector, v);
+    text_format(value, sizeof value, "%%v%" PRIu32, e->value++);
+    store_result(e, inst, value);
+    text_free(&x);
+}
+
+static void classify(struct emitter *e, const struct ir_function *f,
+                     struct classified *c)
+{
+    c->params = alloc_zeroed(f->param_count + 1, sizeof *c->params);
+    abi_classify(e->o->target, e->l, f, c->params, &c->result);
+}
+
+/* The LLVM type of the result r: void for one through the sret pointer,
+   and a literal struct for two words. */
+static void result_type(struct text *out, const struct abi_param *r)
+{
+    if (r->kind == ABI_SRET) {
+        text_append(out, "void");
+    } else if (r->kind == ABI_COERCE && r->word_count == 2) {
+        text_appendf(out, "{ %s, %s }", r->types[0], r->types[1]);
+    } else {
+        text_append(out, r->types[0]);
+    }
+}
+
+static uint64_t round_to_word(uint64_t size)
+{
+    return (size + 7) / 8 * 8;
+}
+
+static uint64_t word_align(uint64_t align)
+{
+    return align < 8 ? 8 : align;
+}
+
+/* The name %a<n> of a new alloca of size bytes aligned to align in the
+   entry block, for a copy that a call or a signature needs. */
+static uint32_t entry_slot(struct emitter *e, uint64_t size, uint64_t align)
+{
+    text_appendf(e->allocas, "  %%a%" PRIu32 " = alloca [%" PRIu64
+                             " x i8], align %" PRIu64 "\n",
+                 e->slots, size, align);
+    return e->slots++;
+}
+
+/* DESIGN: a coerced aggregate lives in a slot of its words' size, a
+   multiple of 8 bytes aligned to 8 or more, so a word that reaches past
+   the end of the aggregate stays inside the slot. Word k of System V
+   stands at 8 k bytes, and every other convention has one word. Returns
+   the slot. */
+static uint32_t word_slot(struct emitter *e, const struct abi_param *p)
+{
+    return entry_slot(e, round_to_word(p->size), word_align(p->align));
+}
+
+/* Append to address the address of word k of slot a. */
+static void word_address(struct emitter *e, uint32_t a, size_t k,
+                         struct text *address)
+{
+    if (k == 0) {
+        text_appendf(address, "%%a%" PRIu32, a);
+        return;
+    }
+    text_appendf(e->out, "  %%v%" PRIu32 " = getelementptr i8, ptr %%a%"
+                         PRIu32 ", i64 %zu\n",
+                 e->value, a, 8 * k);
+    text_appendf(address, "%%v%" PRIu32, e->value++);
+}
+
+/* Load the words of p from slot a, appending each value to values with
+   its type, and its type alone to types. */
+static void load_words(struct emitter *e, const struct abi_param *p,
+                       uint32_t a, uint32_t *words)
+{
+    size_t k;
+
+    for (k = 0; k < p->word_count; k++) {
+        struct text address = {0};
+        word_address(e, a, k, &address);
+        words[k] = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = load %s, ptr %s, align 8\n",
+                     words[k], p->types[k], text_cstr(&address));
+        text_free(&address);
+    }
+}
+
+/* Append a separator to list unless it is empty. */
+static void separate(struct text *list)
+{
+    if (list->length > 0) {
+        text_append(list, ", ");
+    }
+}
+
+/* The attribute of an i8 or i16 parameter, which extends as the
+   signature records. */
+static const char *extension(enum ir_type type, enum ir_ext ext)
+{
+    if (type != IR_I8 && type != IR_I16) {
+        return "";
+    }
+    return ext == IR_EXT_SIGN   ? " signext"
+           : ext == IR_EXT_ZERO ? " zeroext"
+                                : "";
+}
+
+/* Append to head the parameters of f as c classifies them, with their
+   attributes and, when names is set, the names %sret, %p<i> and
+   %p<i>.<k>. Append their types alone to types. */
+static void parameters(const struct ir_function *f, const struct classified *c,
+                       bool names, struct text *head, struct text *types)
+{
+    size_t i;
+    size_t k;
+
+    if (c->result.kind == ABI_SRET) {
+        text_appendf(head, "ptr sret([%" PRIu64 " x i8]) align %" PRIu64 "%s",
+                     c->result.size, c->result.align, names ? " %sret" : "");
+        text_append(types, "ptr");
+    }
+    for (i = 0; i < f->param_count; i++) {
+        const struct abi_param *p = &c->params[i];
+        for (k = 0; k < p->word_count; k++) {
+            separate(head);
+            separate(types);
+            text_append(types, p->types[k]);
+            if (p->kind == ABI_BYVAL) {
+                text_appendf(head, "ptr byval([%" PRIu64 " x i8]) align %"
+                                   PRIu64,
+                             p->size, p->align);
+            } else {
+                text_appendf(head, "%s%s", p->types[k],
+                             p->kind == ABI_DIRECT
+                                 ? extension(f->params[i].type,
+                                             f->params[i].ext)
+                                 : "");
+            }
+            if (names && p->kind == ABI_COERCE) {
+                text_appendf(head, " %%p%zu.%zu", i, k);
+            } else if (names) {
+                text_appendf(head, " %%p%zu", i);
+            }
+        }
+    }
+    if (f->variadic) {
+        separate(head);
+        separate(types);
+        text_append(head, "...");
+        text_append(types, "...");
+    }
+}
+
+/* DESIGN: a parameter arrives as abi_classify passes it, and its
+   temporary holds what the IR expects: the scalar, or the address of the
+   aggregate. A coerced aggregate is rebuilt from its words in a slot, and
+   a vector is stored in a slot. A byval or indirect one is already in
+   memory that the callee may write, a copy the caller or LLVM made. */
+static void prologue(struct emitter *e, const struct ir_function *f,
+                     const struct classified *c)
+{
+    size_t i;
+    size_t k;
+
+    for (i = 0; i < f->param_count && !e->failed; i++) {
+        const struct abi_param *p = &c->params[i];
+        uint32_t temp = f->params[i].temp;
+        uint32_t a = 0;
+        switch (p->kind) {
+        case ABI_DIRECT:
+            text_appendf(e->out, "  store %s %%p%zu, ptr %%t%" PRIu32
+                                 ", align %" PRIu64 "\n",
+                         value_type(e, f->params[i].type), i, temp,
+                         align_of(e, f->params[i].type));
+            continue;
+        case ABI_BYVAL:
+        case ABI_INDIRECT:
+        case ABI_SRET:
+            text_appendf(e->out, "  store ptr %%p%zu, ptr %%t%" PRIu32
+                                 ", align 8\n",
+                         i, temp);
+            continue;
+        case ABI_VECTOR:
+            a = entry_slot(e, p->size, p->align);
+            text_appendf(e->out, "  store %s %%p%zu, ptr %%a%" PRIu32
+                                 ", align %" PRIu64 "\n",
+                         p->types[0], i, a, p->align);
+            break;
+        case ABI_COERCE:
+            a = word_slot(e, p);
+            for (k = 0; k < p->word_count; k++) {
+                struct text address = {0};
+                word_address(e, a, k, &address);
+                text_appendf(e->out, "  store %s %%p%zu.%zu, ptr %s, "
+                                     "align 8\n",
+                             p->types[k], i, k, text_cstr(&address));
+                text_free(&address);
+            }
+            break;
+        }
+        text_appendf(e->out, "  store ptr %%a%" PRIu32 ", ptr %%t%" PRIu32
+                             ", align 8\n",
+                     a, temp);
+    }
+}
+
+/* Return the aggregate at the address in operand a as c classifies the
+   result: a copy through the sret pointer, the vector, or the words
+   loaded from a slot of their size. */
+static void return_aggregate(struct emitter *e, const struct ir_operand *a)
+{
+    const struct abi_param *r = &e->signature.result;
+    struct text pointer = {0};
+    uint32_t words[2];
+    uint32_t slot;
+
+    operand(e, a, IR_PTR, &pointer);
+    if (e->failed) {
+        text_free(&pointer);
+        return;
+    }
+    if (r->kind == ABI_SRET) {
+        copy_bytes(e, "%sret", text_cstr(&pointer), r->size);
+        text_append(e->out, "  ret void\n");
+    } else if (r->kind == ABI_VECTOR) {
+        text_appendf(e->out, "  %%v%" PRIu32 " = load %s, ptr %s, align %"
+                             PRIu64 "\n",
+                     e->value, r->types[0], text_cstr(&pointer), r->align);
+        text_appendf(e->out, "  ret %s %%v%" PRIu32 "\n", r->types[0],
+                     e->value++);
+    } else {
+        char name[24];
+        slot = word_slot(e, r);
+        text_format(name, sizeof name, "%%a%" PRIu32, slot);
+        copy_bytes(e, name, text_cstr(&pointer), r->size);
+        load_words(e, r, slot, words);
+        if (r->word_count == 1) {
+            text_appendf(e->out, "  ret %s %%v%" PRIu32 "\n", r->types[0],
+                         words[0]);
+        } else {
+            uint32_t first = fresh(e);
+            uint32_t both = fresh(e);
+            text_appendf(e->out, "  %%v%" PRIu32 " = insertvalue { %s, %s } "
+                                 "poison, %s %%v%" PRIu32 ", 0\n",
+                         first, r->types[0], r->types[1], r->types[0],
+                         words[0]);
+            text_appendf(e->out, "  %%v%" PRIu32 " = insertvalue { %s, %s } "
+                                 "%%v%" PRIu32 ", %s %%v%" PRIu32 ", 1\n",
+                         both, r->types[0], r->types[1], first, r->types[1],
+                         words[1]);
+            text_appendf(e->out, "  ret { %s, %s } %%v%" PRIu32 "\n",
+                         r->types[0], r->types[1], both);
+        }
+    }
+    text_free(&pointer);
+}
+
+/* Append to args the argument o for parameter p, after the instructions
+   that make it, and its type to types. An aggregate argument is the
+   address of the value. */
+static void argument(struct emitter *e, const struct abi_param *p,
+                     const struct ir_param *param, const struct ir_operand *o,
+                     struct text *args, struct text *types)
+{
+    struct text value = {0};
+    uint32_t words[2];
+    uint32_t slot;
+    size_t k;
+
+    if (p->kind == ABI_DIRECT) {
+        operand(e, o, param->type, &value);
+        separate(args);
+        separate(types);
+        text_appendf(args, "%s%s %s", p->types[0],
+                     extension(param->type, param->ext), text_cstr(&value));
+        text_append(types, p->types[0]);
+        text_free(&value);
+        return;
+    }
+    operand(e, o, IR_PTR, &value);
+    if (e->failed) {
+        text_free(&value);
+        return;
+    }
+    switch (p->kind) {
+    case ABI_BYVAL:
+        separate(args);
+        text_appendf(args, "ptr byval([%" PRIu64 " x i8]) align %" PRIu64
+                           " %s",
+                     p->size, p->align, text_cstr(&value));
+        break;
+    case ABI_INDIRECT: {
+        char name[24];
+        slot = entry_slot(e, p->size, p->align);
+        text_format(name, sizeof name, "%%a%" PRIu32, slot);
+        copy_bytes(e, name, text_cstr(&value), p->size);
+        separate(args);
+        text_appendf(args, "ptr %s", name);
+        break;
+    }
+    case ABI_VECTOR:
+        text_appendf(e->out, "  %%v%" PRIu32 " = load %s, ptr %s, align %"
+                             PRIu64 "\n",
+                     e->value, p->types[0], text_cstr(&value), p->align);
+        separate(args);
+        text_appendf(args, "%s %%v%" PRIu32, p->types[0], e->value++);
+        break;
+    default: {
+        char name[24];
+        slot = word_slot(e, p);
+        text_format(name, sizeof name, "%%a%" PRIu32, slot);
+        copy_bytes(e, name, text_cstr(&value), p->size);
+        load_words(e, p, slot, words);
+        for (k = 0; k < p->word_count; k++) {
+            separate(args);
+            text_appendf(args, "%s %%v%" PRIu32, p->types[k], words[k]);
+        }
+        break;
+    }
+    }
+    for (k = 0; k < p->word_count; k++) {
+        separate(types);
+        text_append(types, p->types[k]);
+    }
+    text_free(&value);
+}
+
+/* Keep the aggregate result of a call, the value call of c, in a slot
+   whose address the result temporary of inst holds: the words of a
+   coerced result or the vector. */
+static void keep_result(struct emitter *e, const struct ir_inst *inst,
+                        const struct abi_param *r, uint32_t call)
+{
+    uint32_t slot;
+    size_t k;
+
+    if (r->kind == ABI_VECTOR) {
+        slot = entry_slot(e, r->size, r->align);
+        text_appendf(e->out, "  store %s %%v%" PRIu32 ", ptr %%a%" PRIu32
+                             ", align %" PRIu64 "\n",
+                     r->types[0], call, slot, r->align);
+    } else {
+        slot = word_slot(e, r);
+        for (k = 0; k < r->word_count; k++) {
+            struct text address = {0};
+            uint32_t word = call;
+            if (r->word_count == 2) {
+                word = fresh(e);
+                text_appendf(e->out, "  %%v%" PRIu32 " = extractvalue "
+                                     "{ %s, %s } %%v%" PRIu32 ", %zu\n",
+                             word, r->types[0], r->types[1], call, k);
+            }
+            word_address(e, slot, k, &address);
+            text_appendf(e->out, "  store %s %%v%" PRIu32 ", ptr %s, "
+                                 "align 8\n",
+                         r->types[k], word, text_cstr(&address));
+            text_free(&address);
+        }
+    }
+    text_appendf(e->out, "  store ptr %%a%" PRIu32 ", ptr %%t%" PRIu32
+                         ", align 8\n",
+                 slot, inst->result);
+}
+
+/* DESIGN: the result of a call takes the type of the instruction, which
+   may differ from the one the callee declares, as a pointer that a
+   function of the runtime returns as an i64. The native back end reads
+   the register either way. Returns the value of type to, which is v when
+   the two LLVM types agree. */
+static uint32_t reinterpret(struct emitter *e, uint32_t v, enum ir_type from,
+                            enum ir_type to)
+{
+    const char *a = value_type(e, from);
+    const char *b = value_type(e, to);
+    bool float_a = from == IR_F32 || from == IR_F64;
+    bool float_b = to == IR_F32 || to == IR_F64;
+    const char *op;
+    uint32_t n;
+
+    if (a == NULL || b == NULL || strcmp(a, b) == 0) {
+        return v;
+    }
+    if (from == IR_PTR) {
+        op = "ptrtoint";
+    } else if (to == IR_PTR) {
+        op = "inttoptr";
+    } else if (float_a || float_b ||
+               layout_size(e->l, ir_scalar(from)) ==
+                   layout_size(e->l, ir_scalar(to))) {
+        op = "bitcast";
+    } else if (layout_size(e->l, ir_scalar(from)) >
+               layout_size(e->l, ir_scalar(to))) {
+        op = "trunc";
+    } else {
+        op = "zext";
+    }
+    n = fresh(e);
+    text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %%v%" PRIu32 " to %s\n", n,
+                 op, a, v, b);
+    return n;
+}
+
+/* DESIGN: a call names its function type, which abi_classify gives for
+   the callee, or for the signature of an indirect call. An argument past
+   the parameters of the callee, the variadic part of a C function or the
+   context a named function never reads, passes in its own type. A call
+   through a table is a call of the pointer the IR loaded from it, whose
+   descriptor and slot the instruction carries for the passes before. An
+   aggregate result lives in a slot of the call, whose address the result
+   temporary holds, as on the native back end. */
+static void call(struct emitter *e, const struct ir_inst *inst)
+{
+    const struct ir_function *callee =
+        e->m->functions[inst->b.kind == IR_FUNC ? inst->b.as.index
+                                                : inst->a.as.index];
+    struct classified c;
+    struct text target = {0};
+    struct text args = {0};
+    struct text types = {0};
+    struct text result = {0};
+    uint32_t sret = 0;
+    uint32_t value;
+    size_t i;
+
+    classify(e, callee, &c);
+    result_type(&result, &c.result);
+    if (inst->a.kind == IR_FUNC) {
+        function_name(&target, e->o->target,
+                      e->m->functions[inst->a.as.index]);
+    } else {
+        operand(e, &inst->a, IR_PTR, &target);
+    }
+    if (c.result.kind == ABI_SRET) {
+        sret = word_slot(e, &c.result);
+        text_appendf(&args, "ptr sret([%" PRIu64 " x i8]) align %" PRIu64
+                            " %%a%" PRIu32,
+                     c.result.size, c.result.align, sret);
+        text_append(&types, "ptr");
+    }
+    for (i = 0; i < inst->arg_count && !e->failed; i++) {
+        struct ir_param extra;
+        struct text unnamed = {0};
+        if (i < callee->param_count) {
+            argument(e, &c.params[i], &callee->params[i], &inst->args[i],
+                     &args, &types);
+            continue;
+        }
+        memset(&extra, 0, sizeof extra);
+        extra.type = inst->args[i].type;
+        if (value_type(e, extra.type) != NULL) {
+            struct abi_param p;
+            memset(&p, 0, sizeof p);
+            p.kind = ABI_DIRECT;
+            p.word_count = 1;
+            text_format(p.types[0], sizeof p.types[0], "%s",
+                        value_type(e, extra.type));
+            /* The variadic part of a C function stays out of its type. */
+            argument(e, &p, &extra, &inst->args[i], &args,
+                     callee->variadic ? &unnamed : &types);
+        }
+        text_free(&unnamed);
+    }
+    if (callee->variadic) {
+        separate(&types);
+        text_append(&types, "...");
+    }
+    if (!e->failed) {
+        bool named = strcmp(text_cstr(&result), "void") != 0;
+        value = e->value;
+        text_append(e->out, "  ");
+        if (named) {
+            text_appendf(e->out, "%%v%" PRIu32 " = ", e->value++);
+        }
+        text_appendf(e->out, "call %s (%s) %s(%s)\n", text_cstr(&result),
+                     text_cstr(&types), text_cstr(&target),
+                     text_cstr(&args));
+        if (inst->result == IR_NO_RESULT) {
+            /* Nothing reads the result. */
+        } else if (c.result.kind == ABI_SRET) {
+            text_appendf(e->out, "  store ptr %%a%" PRIu32 ", ptr %%t%" PRIu32
+                                 ", align 8\n",
+                         sret, inst->result);
+        } else if (callee->result == IR_AGG) {
+            keep_result(e, inst, &c.result, value);
+        } else {
+            char name[24];
+            value = reinterpret(e, value, callee->result, inst->type);
+            text_format(name, sizeof name, "%%v%" PRIu32, value);
+            store_result(e, inst, name);
+        }
+    }
+    free(c.params);
+    text_free(&target);
+    text_free(&args);
+    text_free(&types);
+    text_free(&result);
+}
+
 /* The metadata of a branch whose one side is the failure arm of an
    assertion or a check, which marks that side cold. */
 static void branch_weights(struct emitter *e, uint32_t then_block,
@@ -922,14 +1815,40 @@ static void instruction(struct emitter *e, const struct ir_inst *inst)
         branch_weights(e, inst->b.as.index, inst->c.as.index);
         text_append(e->out, "\n");
         break;
+    case IR_CALL:
+        call(e, inst);
+        break;
+    case IR_VSPLAT:
+        vsplat(e, inst);
+        break;
+    case IR_VBINARY:
+        vbinary(e, inst);
+        break;
+    case IR_VSELECT:
+        vselect(e, inst);
+        break;
+    case IR_VREDUCE:
+        vreduce(e, inst);
+        break;
+    case IR_ADD_FL:
+    case IR_SUB_FL:
+        flag_operation(e, inst);
+        break;
+    case IR_FLAG:
+        flag_read(e, inst);
+        break;
     case IR_RET:
+        if (e->f->result == IR_AGG) {
+            return_aggregate(e, &inst->a);
+            break;
+        }
         if (inst->type == IR_VOID) {
             text_append(e->out, "  ret void\n");
             break;
         }
         operand(e, &inst->a, inst->type, &value);
         if (!e->failed) {
-            text_appendf(e->out, "  ret %s %s\n", scalar_type(inst->type),
+            text_appendf(e->out, "  ret %s %s\n", value_type(e, inst->type),
                          text_cstr(&value));
         }
         break;
@@ -973,55 +1892,31 @@ static void instruction(struct emitter *e, const struct ir_inst *inst)
     text_free(&value);
 }
 
-/* The parameters of f in parentheses, with the names %p<i> when names is
-   set, as abi_classify gives them. The function type goes to type unless
-   it is NULL. Returns false after a refusal. */
+/* The result type, the name and the parameters of f in parentheses, as
+   abi_classify gives them, with the names of the parameters when names
+   is set. The function type goes to type unless it is NULL. Returns
+   false after a failure. */
 static bool signature(struct emitter *e, const struct ir_function *f,
                       bool names, struct text *type)
 {
-    struct abi_param *params =
-        alloc_zeroed(f->param_count + 1, sizeof *params);
-    struct abi_param result;
+    struct classified c;
     struct text head = {0};
     struct text types = {0};
-    size_t i;
+    struct text result = {0};
 
-    abi_classify(e->o->target, e->l, f, params, &result);
-    if (result.kind != ABI_DIRECT) {
-        refuse(e, "an aggregate parameter or result", "emit-memory");
-    }
-    for (i = 0; i < f->param_count && !e->failed; i++) {
-        const struct ir_param *p = &f->params[i];
-        if (params[i].kind != ABI_DIRECT) {
-            refuse(e, "an aggregate parameter or result", "emit-memory");
-            break;
-        }
-        text_appendf(&head, "%s%s", i > 0 ? ", " : "", params[i].types[0]);
-        text_appendf(&types, "%s%s", i > 0 ? ", " : "", params[i].types[0]);
-        if (p->type == IR_I8 || p->type == IR_I16) {
-            text_append(&head, p->ext == IR_EXT_SIGN   ? " signext"
-                               : p->ext == IR_EXT_ZERO ? " zeroext"
-                                                       : "");
-        }
-        if (names) {
-            text_appendf(&head, " %%p%zu", i);
-        }
-    }
-    if (f->variadic) {
-        text_append(&head, f->param_count > 0 ? ", ..." : "...");
-        text_append(&types, f->param_count > 0 ? ", ..." : "...");
-    }
-    if (!e->failed) {
-        text_appendf(e->out, "%s ", result.types[0]);
-        function_name(e->out, e->o->target, f);
-        text_appendf(e->out, "(%s)", text_cstr(&head));
-        if (type != NULL) {
-            text_appendf(type, "%s (%s)", result.types[0], text_cstr(&types));
-        }
+    classify(e, f, &c);
+    result_type(&result, &c.result);
+    parameters(f, &c, names, &head, &types);
+    text_appendf(e->out, "%s ", text_cstr(&result));
+    function_name(e->out, e->o->target, f);
+    text_appendf(e->out, "(%s)", text_cstr(&head));
+    if (type != NULL) {
+        text_appendf(type, "%s (%s)", text_cstr(&result), text_cstr(&types));
     }
     text_free(&head);
     text_free(&types);
-    free(params);
+    text_free(&result);
+    free(c.params);
     return !e->failed;
 }
 
@@ -1099,13 +1994,8 @@ static void definition(struct emitter *e, const struct ir_function *f)
        temporaries, and the body after all of them, in the entry block. */
     e->out = &body;
     e->allocas = &allocas;
-    for (i = 0; i < f->param_count && !e->failed; i++) {
-        enum ir_type type = f->params[i].type;
-        text_appendf(&body, "  store %s %%p%zu, ptr %%t%" PRIu32
-                            ", align %" PRIu64 "\n",
-                     value_type(e, type), i, f->params[i].temp,
-                     align_of(e, type));
-    }
+    classify(e, f, &e->signature);
+    prologue(e, f, &e->signature);
     for (b = 0; b < f->block_count && !e->failed; b++) {
         const struct ir_block *block = f->blocks[b];
         if (b > 0) {
@@ -1122,6 +2012,8 @@ static void definition(struct emitter *e, const struct ir_function *f)
     text_append(out, "}\n\n");
     text_free(&body);
     text_free(&allocas);
+    free(e->signature.params);
+    e->signature.params = NULL;
 }
 
 /* The symbol of a global after sigil, without the _ of Mach-O, which llc
@@ -1216,7 +2108,7 @@ static bool global_once(const struct emitter *e, const struct ir_global *g)
    section of each format, or in the one the loader writes once where it
    holds an address. The linkage follows the one of a function. A global
    the runtime defines is a declaration of its bytes. */
-static void global(struct emitter *e, const struct ir_global *g)
+static void global(struct emitter *e, const struct ir_global *g, bool twin)
 {
     enum target t = e->o->target;
     bool coff = target_info(t)->format == FORMAT_COFF;
@@ -1228,6 +2120,9 @@ static void global(struct emitter *e, const struct ir_global *g)
     bool zero = true;
     size_t i;
 
+    if (g->is_extern && twin) {
+        return;
+    }
     global_symbol(e->out, t, g);
     if (g->is_extern) {
         text_appendf(e->out, " = external global [%" PRIu64 " x i8], align %"
@@ -1399,6 +2294,24 @@ static uint32_t flag_count(enum target t)
            (target_info(t)->os == OS_WINDOWS);
 }
 
+/* DESIGN: two globals of the IR may name one symbol, as every module
+   names the descriptor of the root that the runtime defines. A
+   declaration is written once, and not at all for a symbol the text
+   defines. Whether the declaration of global i is such a twin. */
+static bool declared_elsewhere(const struct ir_module *m,
+                               const struct text *symbols, size_t i)
+{
+    size_t j;
+
+    for (j = 0; j < m->global_count; j++) {
+        if (j != i && (j < i || !m->globals[j]->is_extern) &&
+            strcmp(text_cstr(&symbols[i]), text_cstr(&symbols[j])) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* DESIGN: the functions that run before main are the one of each module
    that compiles its patterns and, in a shared library, the constructor of
    the runtime. llvm.global_ctors names them, at the priority of a C
@@ -1521,6 +2434,7 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
     struct text declarations = {0};
     struct text data = {0};
     uint32_t flags = flag_count(o->target);
+    struct text *symbols;
     bool comdats = false;
     size_t i;
 
@@ -1575,9 +2489,19 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
         }
     }
     e.out = &data;
-    for (i = 0; i < m->global_count && !e.failed; i++) {
-        global(&e, m->globals[i]);
+    symbols = alloc_zeroed(m->global_count + 1, sizeof *symbols);
+    for (i = 0; i < m->global_count; i++) {
+        global_symbol(&symbols[i], o->target, m->globals[i]);
     }
+    for (i = 0; i < m->global_count && !e.failed; i++) {
+        global(&e, m->globals[i],
+               m->globals[i]->is_extern &&
+                   declared_elsewhere(m, symbols, i));
+    }
+    for (i = 0; i < m->global_count; i++) {
+        text_free(&symbols[i]);
+    }
+    free(symbols);
     constructors(&e, m);
     if (!e.failed) {
         text_append_bytes(out, body.data, body.length);
