@@ -135,8 +135,10 @@ static bool sysv_words(const struct layout *agg, struct abi_param *out,
    eightbyte finds one, and on the stack whole otherwise, while later
    arguments still take the registers left. LLVM would split a pair of
    words between the last register and the stack, so the classification
-   counts the registers and makes such an aggregate byval. An sret
-   pointer takes the first integer register. */
+   counts the registers and makes such an aggregate byval. It checks the
+   registers of the classes the aggregate needs alone, since the count of
+   the other class runs past its registers once scalars of that class
+   went to the stack. An sret pointer takes the first integer register. */
 static void sysv(struct layouts *l, const struct ir_function *f,
                  struct abi_param *params, struct abi_param *result)
 {
@@ -170,8 +172,8 @@ static void sysv(struct layouts *l, const struct ir_function *f,
             vector(l, agg, &params[i]);
             floats++;
         } else if (sysv_words(agg, &params[i], &need_int, &need_fp) &&
-                   ints + need_int <= SYSV_INT_ARGS &&
-                   floats + need_fp <= SYSV_FP_ARGS) {
+                   (need_int == 0 || ints + need_int <= SYSV_INT_ARGS) &&
+                   (need_fp == 0 || floats + need_fp <= SYSV_FP_ARGS)) {
             ints += need_int;
             floats += need_fp;
         } else {

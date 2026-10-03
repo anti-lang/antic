@@ -289,6 +289,28 @@ static void sysv_registers(void)
     run(&x, TARGET_LINUX_X86_64);
     EXPECT(&x.params[5], ABI_BYVAL, 1, "ptr", "", 8, 4);
     end(&x);
+
+    /* An aggregate of one class needs registers of that class alone. Nine
+       floats leave no vector register, and an aggregate of integers
+       still takes an integer register, as one of floats does after seven
+       integers. */
+    begin(&x, IR_VOID, IR_NO_AGG);
+    for (i = 0; i < 9; i++) {
+        param(&x, IR_F64, IR_EXT_NONE);
+    }
+    param_agg(&x, same(&x, "main.I2", IR_I32, 2));
+    run(&x, TARGET_LINUX_X86_64);
+    EXPECT(&x.params[9], ABI_COERCE, 1, "i64", "", 8, 4);
+    end(&x);
+
+    begin(&x, IR_VOID, IR_NO_AGG);
+    for (i = 0; i < 7; i++) {
+        param(&x, IR_I64, IR_EXT_NONE);
+    }
+    param_agg(&x, same(&x, "main.D2", IR_F64, 2));
+    run(&x, TARGET_LINUX_X86_64);
+    EXPECT(&x.params[7], ABI_COERCE, 2, "double", "double", 16, 8);
+    end(&x);
 }
 
 /* A simd struct of 16 bytes is __m128 to C: one vector register on System
