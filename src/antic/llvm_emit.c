@@ -9,6 +9,7 @@
 #include "abi.h"
 #include "alloc.h"
 #include "llvm_target.h"
+#include "rt_abi.h"
 
 /* DESIGN: the IR is not in SSA form, so every temporary gets an alloca in
    the entry block. A definition stores into it and each use loads from
@@ -19,10 +20,11 @@
    docs/work-order-llvm-back-end.md gives the form of each operation.
 
    The step emit-core translates copy, jump, branch and ret, and the
-   signatures of scalars. Every other operation is refused with the step
-   that adds it. The text holds no global data before the step
-   emit-memory, which writes the globals and every instruction that names
-   one. */
+   signatures of scalars. The step emit-arith adds the scalar operations,
+   the entry of the runtime and the globals that hold no address. Every
+   other operation is refused with the step that adds it. A global that
+   holds an address and every instruction that names a global wait for the
+   step emit-memory. */
 
 /* The metadata of a branch into a cold block, one id for each side. */
 enum { COLD_THEN, COLD_ELSE, COLD_COUNT };
@@ -38,6 +40,8 @@ struct emitter {
     uint32_t value;                 /* the next %v<n> of the function */
     uint32_t cold_id;               /* the metadata id of COLD_THEN */
     bool cold_used[COLD_COUNT];
+    struct text intrinsics;         /* the declarations of the intrinsics */
+    struct text entry;              /* the type of main, for its alias */
 };
 
 static void refuse(struct emitter *e, const char *what, const char *step)
@@ -57,7 +61,7 @@ static void refuse(struct emitter *e, const char *what, const char *step)
 }
 
 /* The step of the work order that translates op, or NULL for the
-   operations of this step. */
+   operations of the steps emit-core and emit-arith. */
 static const char *step_of(enum ir_op op)
 {
     switch (op) {
@@ -65,7 +69,6 @@ static const char *step_of(enum ir_op op)
     case IR_JUMP:
     case IR_BRANCH:
     case IR_RET:
-        return NULL;
     case IR_ADD: case IR_SUB: case IR_MUL: case IR_SDIV: case IR_UDIV:
     case IR_SREM: case IR_UREM: case IR_AND: case IR_OR: case IR_XOR:
     case IR_SHL: case IR_SHR_S: case IR_SHR_U:
@@ -78,7 +81,7 @@ static const char *step_of(enum ir_op op)
     case IR_TRUNC: case IR_SEXT: case IR_ZEXT: case IR_SITOF:
     case IR_UITOF: case IR_FTOSI: case IR_FTOUI: case IR_FEXT:
     case IR_FTRUNC: case IR_HEXT: case IR_HTRUNC:
-        return "emit-arith";
+        return NULL;
     case IR_ADD_OV: case IR_SUB_OV: case IR_MUL_OV: case IR_BRANCH_OV:
     case IR_MULH_S: case IR_MULH_U:
     case IR_ADD_SAT_S: case IR_ADD_SAT_U: case IR_SUB_SAT_S:
@@ -293,6 +296,313 @@ static void store_result(struct emitter *e, const struct ir_inst *inst,
                  align_of(e, inst->type));
 }
 
+/* The type of operand o: the type of its temporary, or the type a
+   constant carries. */
+static enum ir_type operand_type(const struct emitter *e,
+                                 const struct ir_operand *o)
+{
+    return o->kind == IR_TEMP ? e->f->temps[o->as.temp] : o->type;
+}
+
+/* The next value of the function, %v<n>, which the caller defines. */
+static uint32_t fresh(struct emitter *e)
+{
+    return e->value++;
+}
+
+static unsigned width_of(enum ir_type type)
+{
+    return type == IR_I8 ? 8 : type == IR_I16 ? 16 : type == IR_I32 ? 32 : 64;
+}
+
+/* The LLVM instruction of an operation that maps to one instruction on
+   the same type, or NULL. */
+static const char *plain_binary(enum ir_op op)
+{
+    switch (op) {
+    case IR_ADD: return "add";
+    case IR_SUB: return "sub";
+    case IR_MUL: return "mul";
+    case IR_AND: return "and";
+    case IR_OR: return "or";
+    case IR_XOR: return "xor";
+    case IR_FADD: return "fadd";
+    case IR_FSUB: return "fsub";
+    case IR_FMUL: return "fmul";
+    case IR_FDIV: return "fdiv";
+    default: return NULL;
+    }
+}
+
+/* The instruction and the predicate of a comparison. */
+static const char *comparison(enum ir_op op)
+{
+    switch (op) {
+    case IR_EQ: return "icmp eq";
+    case IR_NE: return "icmp ne";
+    case IR_SLT: return "icmp slt";
+    case IR_SLE: return "icmp sle";
+    case IR_SGT: return "icmp sgt";
+    case IR_SGE: return "icmp sge";
+    case IR_ULT: return "icmp ult";
+    case IR_ULE: return "icmp ule";
+    case IR_UGT: return "icmp ugt";
+    case IR_UGE: return "icmp uge";
+    case IR_FEQ: return "fcmp oeq";
+    case IR_FNE: return "fcmp une";
+    case IR_FLT: return "fcmp olt";
+    case IR_FLE: return "fcmp ole";
+    case IR_FGT: return "fcmp ogt";
+    case IR_FGE: return "fcmp oge";
+    default: return NULL;
+    }
+}
+
+/* DESIGN: a division by zero gives 0, and the least value divided by
+   minus one gives the least value, with a remainder of 0, on every
+   target. The section "Defined results in release mode" of
+   docs/work-order-llvm-back-end.md decides it. The divisor the
+   instruction sees is 1 where the divisor is 0 or minus one, so no sdiv
+   or srem of the text is undefined, and selects put in the defined
+   result. A division by minus one is the negation, which wraps at the
+   least value. A remainder by 1 is 0, which is the result of both cases.
+   opt folds each select whose condition it can decide. */
+static void division(struct emitter *e, enum ir_op op, const char *type,
+                     const char *a, const char *b)
+{
+    bool is_signed = op == IR_SDIV || op == IR_SREM;
+    bool quotient = op == IR_SDIV || op == IR_UDIV;
+    uint32_t zero = fresh(e);
+    uint32_t guard = zero;
+    uint32_t minus = 0;
+    uint32_t safe;
+    uint32_t raw;
+
+    text_appendf(e->out, "  %%v%" PRIu32 " = icmp eq %s %s, 0\n", zero, type,
+                 b);
+    if (is_signed) {
+        minus = fresh(e);
+        guard = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = icmp eq %s %s, -1\n", minus,
+                     type, b);
+        text_appendf(e->out, "  %%v%" PRIu32 " = or i1 %%v%" PRIu32 ", %%v%"
+                             PRIu32 "\n",
+                     guard, zero, minus);
+    }
+    safe = fresh(e);
+    text_appendf(e->out, "  %%v%" PRIu32 " = select i1 %%v%" PRIu32 ", %s 1, "
+                         "%s %s\n",
+                 safe, guard, type, type, b);
+    raw = fresh(e);
+    text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %s, %%v%" PRIu32 "\n", raw,
+                 op == IR_SDIV   ? "sdiv"
+                 : op == IR_UDIV ? "udiv"
+                 : op == IR_SREM ? "srem"
+                                 : "urem",
+                 type, a, safe);
+    if (!quotient) {
+        return;
+    }
+    if (is_signed) {
+        uint32_t negated = fresh(e);
+        uint32_t chosen = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = sub %s 0, %s\n", negated,
+                     type, a);
+        text_appendf(e->out, "  %%v%" PRIu32 " = select i1 %%v%" PRIu32
+                             ", %s %%v%" PRIu32 ", %s %%v%" PRIu32 "\n",
+                     chosen, minus, type, negated, type, raw);
+        raw = chosen;
+    }
+    text_appendf(e->out, "  %%v%" PRIu32 " = select i1 %%v%" PRIu32 ", %s 0, "
+                         "%s %%v%" PRIu32 "\n",
+                 fresh(e), zero, type, type, raw);
+}
+
+/* Declare the intrinsic name of type result (parameters) once. */
+static void intrinsic(struct emitter *e, const char *result, const char *name,
+                      const char *parameters)
+{
+    char line[160];
+
+    text_format(line, sizeof line, "declare %s @%s(%s)\n", result, name,
+                parameters);
+    if (strstr(text_cstr(&e->intrinsics), line) == NULL) {
+        text_append(&e->intrinsics, line);
+    }
+}
+
+/* An operation of two operands of one type: the plain instructions, the
+   shifts with the count modulo the width, the guarded divisions and the
+   comparisons, which widen their i1 to the i8 of a bool. */
+static void binary(struct emitter *e, const struct ir_inst *inst)
+{
+    enum ir_type type = comparison(inst->op) != NULL
+                            ? operand_type(e, &inst->a)
+                            : inst->type;
+    const char *name = value_type(e, type);
+    struct text a = {0};
+    struct text b = {0};
+    char value[24];
+
+    if (name == NULL) {
+        return;
+    }
+    operand(e, &inst->a, type, &a);
+    operand(e, &inst->b, type, &b);
+    if (e->failed) {
+        text_free(&a);
+        text_free(&b);
+        return;
+    }
+    switch (inst->op) {
+    case IR_SHL:
+    case IR_SHR_S:
+    case IR_SHR_U: {
+        uint32_t count = fresh(e);
+        uint32_t shifted = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = and %s %s, %u\n", count, name,
+                     text_cstr(&b), width_of(type) - 1);
+        text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %s, %%v%" PRIu32 "\n",
+                     shifted,
+                     inst->op == IR_SHL     ? "shl"
+                     : inst->op == IR_SHR_S ? "ashr"
+                                            : "lshr",
+                     name, text_cstr(&a), count);
+        break;
+    }
+    case IR_SDIV:
+    case IR_UDIV:
+    case IR_SREM:
+    case IR_UREM:
+        division(e, inst->op, name, text_cstr(&a), text_cstr(&b));
+        break;
+    default:
+        if (comparison(inst->op) != NULL) {
+            uint32_t bit = fresh(e);
+            text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %s, %s\n", bit,
+                         comparison(inst->op), name, text_cstr(&a),
+                         text_cstr(&b));
+            text_appendf(e->out, "  %%v%" PRIu32 " = zext i1 %%v%" PRIu32
+                                 " to i8\n",
+                         fresh(e), bit);
+        } else {
+            text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %s, %s\n",
+                         fresh(e), plain_binary(inst->op), name,
+                         text_cstr(&a), text_cstr(&b));
+        }
+        break;
+    }
+    text_format(value, sizeof value, "%%v%" PRIu32, e->value - 1);
+    store_result(e, inst, value);
+    text_free(&a);
+    text_free(&b);
+}
+
+/* The name of a float type in the name of an intrinsic. */
+static const char *float_suffix(enum ir_type type)
+{
+    return type == IR_F32 ? "f32" : "f64";
+}
+
+/* DESIGN: a float out of the range of the integer type saturates, and NaN
+   gives 0, on every target. llvm.fptosi.sat and llvm.fptoui.sat define
+   exactly that, where fptosi and fptoui give poison. An f16 is its bits
+   in an i16, so hext and htrunc pass through half, and llc calls the
+   conversions of compiler-rt where the processor level has no
+   instruction for them. */
+static void conversion(struct emitter *e, const struct ir_inst *inst)
+{
+    enum ir_type from = operand_type(e, &inst->a);
+    const char *source = value_type(e, from);
+    const char *target = value_type(e, inst->type);
+    struct text a = {0};
+    char value[24];
+
+    if (source == NULL || target == NULL) {
+        return;
+    }
+    operand(e, &inst->a, from, &a);
+    if (e->failed) {
+        text_free(&a);
+        return;
+    }
+    switch (inst->op) {
+    case IR_FTOSI:
+    case IR_FTOUI: {
+        char name[48];
+        text_format(name, sizeof name, "llvm.fpto%s.sat.i%u.%s",
+                    inst->op == IR_FTOSI ? "si" : "ui", width_of(inst->type),
+                    float_suffix(from));
+        intrinsic(e, target, name, source);
+        text_appendf(e->out, "  %%v%" PRIu32 " = call %s @%s(%s %s)\n",
+                     fresh(e), target, name, source, text_cstr(&a));
+        break;
+    }
+    case IR_HEXT: {
+        uint32_t half = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = bitcast %s %s to half\n",
+                     half, source, text_cstr(&a));
+        text_appendf(e->out, "  %%v%" PRIu32 " = fpext half %%v%" PRIu32
+                             " to %s\n",
+                     fresh(e), half, target);
+        break;
+    }
+    case IR_HTRUNC: {
+        uint32_t half = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = fptrunc %s %s to half\n",
+                     half, source, text_cstr(&a));
+        text_appendf(e->out, "  %%v%" PRIu32 " = bitcast half %%v%" PRIu32
+                             " to %s\n",
+                     fresh(e), half, target);
+        break;
+    }
+    default:
+        text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %s to %s\n", fresh(e),
+                     inst->op == IR_TRUNC   ? "trunc"
+                     : inst->op == IR_SEXT  ? "sext"
+                     : inst->op == IR_ZEXT  ? "zext"
+                     : inst->op == IR_SITOF ? "sitofp"
+                     : inst->op == IR_UITOF ? "uitofp"
+                     : inst->op == IR_FEXT  ? "fpext"
+                                            : "fptrunc",
+                     source, text_cstr(&a), target);
+        break;
+    }
+    text_format(value, sizeof value, "%%v%" PRIu32, e->value - 1);
+    store_result(e, inst, value);
+    text_free(&a);
+}
+
+/* neg, not and fneg: sub from 0, xor with all ones and fneg. */
+static void unary(struct emitter *e, const struct ir_inst *inst)
+{
+    const char *name = value_type(e, inst->type);
+    struct text a = {0};
+    char value[24];
+
+    if (name == NULL) {
+        return;
+    }
+    operand(e, &inst->a, inst->type, &a);
+    if (e->failed) {
+        text_free(&a);
+        return;
+    }
+    if (inst->op == IR_NEG) {
+        text_appendf(e->out, "  %%v%" PRIu32 " = sub %s 0, %s\n", fresh(e),
+                     name, text_cstr(&a));
+    } else if (inst->op == IR_NOT) {
+        text_appendf(e->out, "  %%v%" PRIu32 " = xor %s %s, -1\n", fresh(e),
+                     name, text_cstr(&a));
+    } else {
+        text_appendf(e->out, "  %%v%" PRIu32 " = fneg %s %s\n", fresh(e),
+                     name, text_cstr(&a));
+    }
+    text_format(value, sizeof value, "%%v%" PRIu32, e->value - 1);
+    store_result(e, inst, value);
+    text_free(&a);
+}
+
 /* The metadata of a branch whose one side is the failure arm of an
    assertion or a check, which marks that side cold. */
 static void branch_weights(struct emitter *e, uint32_t then_block,
@@ -354,21 +664,34 @@ static void instruction(struct emitter *e, const struct ir_inst *inst)
                          text_cstr(&value));
         }
         break;
+    case IR_NEG:
+    case IR_NOT:
+    case IR_FNEG:
+        unary(e, inst);
+        break;
+    case IR_TRUNC: case IR_SEXT: case IR_ZEXT: case IR_SITOF: case IR_UITOF:
+    case IR_FTOSI: case IR_FTOUI: case IR_FEXT: case IR_FTRUNC:
+    case IR_HEXT: case IR_HTRUNC:
+        conversion(e, inst);
+        break;
     default:
+        binary(e, inst);
         break;
     }
     text_free(&value);
 }
 
 /* The parameters of f in parentheses, with the names %p<i> when names is
-   set, as abi_classify gives them. Returns false after a refusal. */
+   set, as abi_classify gives them. The function type goes to type unless
+   it is NULL. Returns false after a refusal. */
 static bool signature(struct emitter *e, const struct ir_function *f,
-                      bool names)
+                      bool names, struct text *type)
 {
     struct abi_param *params =
         alloc_zeroed(f->param_count + 1, sizeof *params);
     struct abi_param result;
     struct text head = {0};
+    struct text types = {0};
     size_t i;
 
     abi_classify(e->o->target, e->l, f, params, &result);
@@ -382,6 +705,7 @@ static bool signature(struct emitter *e, const struct ir_function *f,
             break;
         }
         text_appendf(&head, "%s%s", i > 0 ? ", " : "", params[i].types[0]);
+        text_appendf(&types, "%s%s", i > 0 ? ", " : "", params[i].types[0]);
         if (p->type == IR_I8 || p->type == IR_I16) {
             text_append(&head, p->ext == IR_EXT_SIGN   ? " signext"
                                : p->ext == IR_EXT_ZERO ? " zeroext"
@@ -393,13 +717,18 @@ static bool signature(struct emitter *e, const struct ir_function *f,
     }
     if (f->variadic) {
         text_append(&head, f->param_count > 0 ? ", ..." : "...");
+        text_append(&types, f->param_count > 0 ? ", ..." : "...");
     }
     if (!e->failed) {
         text_appendf(e->out, "%s ", result.types[0]);
         function_name(e->out, e->o->target, f);
         text_appendf(e->out, "(%s)", text_cstr(&head));
+        if (type != NULL) {
+            text_appendf(type, "%s (%s)", result.types[0], text_cstr(&types));
+        }
     }
     text_free(&head);
+    text_free(&types);
     free(params);
     return !e->failed;
 }
@@ -435,6 +764,14 @@ static void linkage(struct emitter *e, const struct ir_function *f)
     }
 }
 
+/* Whether f is the main of the module that is compiled, which the
+   runtime calls through its entry. */
+static bool is_main(const struct emitter *e, const struct ir_function *f)
+{
+    return !f->is_extern && f->module != NULL &&
+           strcmp(f->module, e->o->module) == 0 && strcmp(f->name, "main") == 0;
+}
+
 static void definition(struct emitter *e, const struct ir_function *f)
 {
     size_t b;
@@ -445,7 +782,7 @@ static void definition(struct emitter *e, const struct ir_function *f)
     e->value = 0;
     text_append(e->out, "define ");
     linkage(e, f);
-    if (!signature(e, f, true)) {
+    if (!signature(e, f, true, is_main(e, f) ? &e->entry : NULL)) {
         return;
     }
     text_append(e->out, " #0");
@@ -481,11 +818,124 @@ static void definition(struct emitter *e, const struct ir_function *f)
     text_append(e->out, "}\n\n");
 }
 
+/* The symbol of a global, without the _ of Mach-O, which llc writes. */
+static void global_symbol(struct text *out, enum target t,
+                          const struct ir_global *g)
+{
+    struct text symbol = {0};
+    const char *name;
+
+    if (g->exported) {
+        target_c_symbol(&symbol, t, g->name);
+    } else {
+        target_mangle(&symbol, t, g->module, g->name);
+    }
+    name = text_cstr(&symbol);
+    if (target_info(t)->format == FORMAT_MACHO && name[0] == '_') {
+        name++;
+    }
+    llvm_name(out, '@', name);
+    text_free(&symbol);
+}
+
+/* DESIGN: a global is a packed struct of its bytes, so its size and its
+   offsets are the ones layout_data computed, whatever the data layout
+   string says. The section "Globals, sections and constructors" of
+   docs/work-order-llvm-back-end.md gives the form. A global the program
+   writes is a global, every other one a constant, which llc puts in the
+   read-only section of each format. The linkage follows the one of a
+   function. A global that holds an address waits for the step
+   emit-memory, which writes it as members of ptr. A global the runtime
+   defines is declared by the step that names it. */
+static void global(struct emitter *e, const struct ir_global *g)
+{
+    struct text name = {0};
+    bool zero = true;
+    uint64_t k;
+
+    if (g->is_extern) {
+        return;
+    }
+    if (g->reloc_count > 0) {
+        if (!e->failed) {
+            e->failed = true;
+            ir_name_append(&name, g->module, g->name);
+            text_format(e->error, e->error_size,
+                        "the LLVM back end does not translate a global that "
+                        "holds an address before the step emit-memory, in "
+                        "%s",
+                        text_cstr(&name));
+            text_free(&name);
+        }
+        return;
+    }
+    global_symbol(e->out, e->o->target, g);
+    text_append(e->out, " = ");
+    if (g->exported) {
+        text_append(e->out, "dso_local ");
+    } else if (!e->o->one_module && !e->o->exports) {
+        text_append(e->out, "internal ");
+    } else if (e->o->one_module && !e->o->exports &&
+               target_info(e->o->target)->format != FORMAT_COFF) {
+        text_append(e->out, "hidden ");
+    }
+    for (k = 0; k < g->size; k++) {
+        zero = zero && g->bytes[k] == 0;
+    }
+    text_appendf(e->out, "%s <{ [%" PRIu64 " x i8] }> ",
+                 g->mutable ? "global" : "constant", g->size);
+    if (zero) {
+        text_append(e->out, "zeroinitializer");
+    } else {
+        text_appendf(e->out, "<{ [%" PRIu64 " x i8] c\"", g->size);
+        for (k = 0; k < g->size; k++) {
+            unsigned char ch = g->bytes[k];
+            if (ch < 0x20 || ch >= 0x7f || ch == '"' || ch == '\\') {
+                text_appendf(e->out, "\\%02X", ch);
+            } else {
+                text_appendf(e->out, "%c", ch);
+            }
+        }
+        text_append(e->out, "\" }>");
+    }
+    text_appendf(e->out, ", align %" PRIu64 "\n", g->align > 0 ? g->align : 1);
+}
+
+/* DESIGN: the runtime calls main through its entry, the name RUNTIME_ENTRY
+   of RUNTIME_MODULE, as the .set of emit.c does for the native back end.
+   An alias gives main the second name, which stays global while main
+   itself may be internal. */
+static void entry(struct emitter *e, const struct ir_module *m)
+{
+    struct text symbol = {0};
+    const char *name;
+    size_t i;
+
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        if (!is_main(e, f)) {
+            continue;
+        }
+        target_mangle(&symbol, e->o->target, RUNTIME_MODULE, RUNTIME_ENTRY);
+        name = text_cstr(&symbol);
+        if (target_info(e->o->target)->format == FORMAT_MACHO &&
+            name[0] == '_') {
+            name++;
+        }
+        llvm_name(e->out, '@', name);
+        text_appendf(e->out, " = alias %s, ptr ", text_cstr(&e->entry));
+        function_name(e->out, e->o->target, f);
+        text_append(e->out, "\n\n");
+        text_free(&symbol);
+        return;
+    }
+}
+
 static void declaration(struct emitter *e, const struct ir_function *f)
 {
     e->f = f;
     text_append(e->out, "declare ");
-    if (signature(e, f, false)) {
+    if (signature(e, f, false, NULL)) {
         text_append(e->out, " #1\n");
     }
 }
@@ -569,6 +1019,7 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
     struct emitter e;
     struct text body = {0};
     struct text declarations = {0};
+    struct text data = {0};
     uint32_t flags = flag_count(o->target);
     bool comdats = false;
     size_t i;
@@ -609,17 +1060,30 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
             definition(&e, f);
         }
     }
+    e.out = &data;
+    for (i = 0; i < m->global_count && !e.failed; i++) {
+        global(&e, m->globals[i]);
+    }
     if (!e.failed) {
         text_append_bytes(out, body.data, body.length);
-        if (declarations.length > 0) {
-            text_append_bytes(out, declarations.data, declarations.length);
+        e.out = out;
+        entry(&e, m);
+        if (data.length > 0) {
+            text_append_bytes(out, data.data, data.length);
             text_append(out, "\n");
         }
-        e.out = out;
+        if (declarations.length > 0 || e.intrinsics.length > 0) {
+            text_append_bytes(out, declarations.data, declarations.length);
+            text_append_bytes(out, e.intrinsics.data, e.intrinsics.length);
+            text_append(out, "\n");
+        }
         attributes(&e);
         metadata(&e, flags);
     }
     text_free(&body);
+    text_free(&data);
     text_free(&declarations);
+    text_free(&e.intrinsics);
+    text_free(&e.entry);
     return !e.failed;
 }

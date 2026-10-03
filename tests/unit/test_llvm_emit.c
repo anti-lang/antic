@@ -1,9 +1,11 @@
-/* llvm_emit_module of the step emit-core: the temporaries, the blocks,
-   copy, jump, branch and ret, the signatures, the linkage, the attributes
-   of a function, the module flags, and the refusal of every other
-   operation. The expected texts follow the sections "Types and layout",
-   "Attributes and metadata" and "Instruction mapping" of
-   docs/work-order-llvm-back-end.md. */
+/* llvm_emit_module of the steps emit-core and emit-arith: the
+   temporaries, the blocks, copy, jump, branch and ret, the scalar
+   operations with the guards of release mode, the signatures, the
+   linkage, the attributes of a function, the entry of the runtime, the
+   globals without an address, the module flags, and the refusal of every
+   other operation. The expected texts follow the sections "Types and
+   layout", "Attributes and metadata", "Instruction mapping" and "Defined
+   results in release mode" of docs/work-order-llvm-back-end.md. */
 
 #include "../binary_stdio.h"
 #include "check.h"
@@ -328,10 +330,10 @@ static void refusals(void)
         enum ir_op op;
         const char *message;
     } cases[] = {
-        {IR_ADD, "the LLVM back end does not translate `add` before the "
-                 "step emit-arith, in main.f"},
-        {IR_FEQ, "the LLVM back end does not translate `feq` before the "
-                 "step emit-arith, in main.f"},
+        {IR_MULH_S, "the LLVM back end does not translate `smulh` before "
+                    "the step emit-wide, in main.f"},
+        {IR_ADD_SAT_U, "the LLVM back end does not translate `uaddsat` "
+                       "before the step emit-wide, in main.f"},
         {IR_ADD_OV, "the LLVM back end does not translate `addov` before "
                     "the step emit-wide, in main.f"},
     };
@@ -346,7 +348,7 @@ static void refusals(void)
         f = ir_function_add(&x.m, "main", "f", IR_I64, IR_NO_AGG);
         b = ir_block_add(f);
         t = ir_binary(f, b, cases[i].op,
-                      cases[i].op == IR_FEQ ? IR_I8 : IR_I64,
+                      IR_I64,
                       ir_int_op(IR_I64, 1), ir_int_op(IR_I64, 2));
         ir_ret(f, b, IR_I64, ir_temp_op(f, t));
         CHECK(!run(&x, TARGET_MACOS_ARM64));
@@ -377,6 +379,295 @@ static void refusals(void)
     end(&x);
 }
 
+/* A function main.f(a: from, b: from) -> to whose body is op a, b, or op
+   a alone when unary is set. The loads of the two parameters are %v0 and
+   %v1, and the operation starts at %v2, or at %v1 when it is unary. */
+static void operation(struct fixture *x, enum ir_op op, enum ir_type from,
+                      enum ir_type to, bool unary)
+{
+    struct ir_function *f = ir_function_add(&x->m, "main", "f", to,
+                                            IR_NO_AGG);
+    struct ir_block *b;
+    uint32_t p = ir_param_add(f, from, IR_NO_AGG);
+    uint32_t q = unary ? 0 : ir_param_add(f, from, IR_NO_AGG);
+    uint32_t t;
+
+    b = ir_block_add(f);
+    t = unary ? ir_unary(f, b, op, to, ir_temp_op(f, p))
+              : ir_binary(f, b, op, to, ir_temp_op(f, p), ir_temp_op(f, q));
+    ir_ret(f, b, to, ir_temp_op(f, t));
+}
+
+/* Whether the text of op on from to to holds body. */
+static bool translates(enum ir_op op, enum ir_type from, enum ir_type to,
+                       bool unary, const char *body)
+{
+    struct fixture x;
+    bool ok;
+
+    begin(&x);
+    operation(&x, op, from, to, unary);
+    ok = run(&x, TARGET_LINUX_X86_64) && holds(&x, body);
+    end(&x);
+    return ok;
+}
+
+/* The arithmetic that wraps carries no nsw and no nuw, and the float
+   arithmetic no fast-math flag. */
+static void arithmetic(void)
+{
+    CHECK(translates(IR_ADD, IR_I64, IR_I64, false,
+                     "  %v2 = add i64 %v0, %v1\n"
+                     "  store i64 %v2, ptr %t2, align 8\n"));
+    CHECK(translates(IR_SUB, IR_I32, IR_I32, false,
+                     "  %v2 = sub i32 %v0, %v1\n"));
+    CHECK(translates(IR_MUL, IR_I16, IR_I16, false,
+                     "  %v2 = mul i16 %v0, %v1\n"));
+    CHECK(translates(IR_AND, IR_I8, IR_I8, false,
+                     "  %v2 = and i8 %v0, %v1\n"));
+    CHECK(translates(IR_OR, IR_I64, IR_I64, false,
+                     "  %v2 = or i64 %v0, %v1\n"));
+    CHECK(translates(IR_XOR, IR_I32, IR_I32, false,
+                     "  %v2 = xor i32 %v0, %v1\n"));
+    CHECK(translates(IR_FADD, IR_F64, IR_F64, false,
+                     "  %v2 = fadd double %v0, %v1\n"));
+    CHECK(translates(IR_FSUB, IR_F32, IR_F32, false,
+                     "  %v2 = fsub float %v0, %v1\n"));
+    CHECK(translates(IR_FMUL, IR_F64, IR_F64, false,
+                     "  %v2 = fmul double %v0, %v1\n"));
+    CHECK(translates(IR_FDIV, IR_F32, IR_F32, false,
+                     "  %v2 = fdiv float %v0, %v1\n"));
+    CHECK(translates(IR_NEG, IR_I32, IR_I32, true,
+                     "  %v1 = sub i32 0, %v0\n"
+                     "  store i32 %v1, ptr %t1, align 4\n"));
+    CHECK(translates(IR_NOT, IR_I64, IR_I64, true,
+                     "  %v1 = xor i64 %v0, -1\n"));
+    CHECK(translates(IR_FNEG, IR_F64, IR_F64, true,
+                     "  %v1 = fneg double %v0\n"));
+}
+
+/* A shift takes its count modulo the width. */
+static void shifts(void)
+{
+    CHECK(translates(IR_SHL, IR_I32, IR_I32, false,
+                     "  %v2 = and i32 %v1, 31\n"
+                     "  %v3 = shl i32 %v0, %v2\n"
+                     "  store i32 %v3, ptr %t2, align 4\n"));
+    CHECK(translates(IR_SHR_S, IR_I64, IR_I64, false,
+                     "  %v2 = and i64 %v1, 63\n"
+                     "  %v3 = ashr i64 %v0, %v2\n"));
+    CHECK(translates(IR_SHR_U, IR_I8, IR_I8, false,
+                     "  %v2 = and i8 %v1, 7\n"
+                     "  %v3 = lshr i8 %v0, %v2\n"));
+    CHECK(translates(IR_SHL, IR_I16, IR_I16, false,
+                     "  %v2 = and i16 %v1, 15\n"));
+}
+
+/* A division by zero gives 0, and the least value divided by minus one
+   gives itself, with a remainder of 0. The divisor the instruction sees is
+   never 0 and never minus one, so no instruction is undefined. */
+static void division(void)
+{
+    CHECK(translates(IR_SDIV, IR_I64, IR_I64, false,
+                     "  %v2 = icmp eq i64 %v1, 0\n"
+                     "  %v3 = icmp eq i64 %v1, -1\n"
+                     "  %v4 = or i1 %v2, %v3\n"
+                     "  %v5 = select i1 %v4, i64 1, i64 %v1\n"
+                     "  %v6 = sdiv i64 %v0, %v5\n"
+                     "  %v7 = sub i64 0, %v0\n"
+                     "  %v8 = select i1 %v3, i64 %v7, i64 %v6\n"
+                     "  %v9 = select i1 %v2, i64 0, i64 %v8\n"
+                     "  store i64 %v9, ptr %t2, align 8\n"));
+    CHECK(translates(IR_SREM, IR_I32, IR_I32, false,
+                     "  %v2 = icmp eq i32 %v1, 0\n"
+                     "  %v3 = icmp eq i32 %v1, -1\n"
+                     "  %v4 = or i1 %v2, %v3\n"
+                     "  %v5 = select i1 %v4, i32 1, i32 %v1\n"
+                     "  %v6 = srem i32 %v0, %v5\n"
+                     "  store i32 %v6, ptr %t2, align 4\n"));
+    CHECK(translates(IR_UDIV, IR_I64, IR_I64, false,
+                     "  %v2 = icmp eq i64 %v1, 0\n"
+                     "  %v3 = select i1 %v2, i64 1, i64 %v1\n"
+                     "  %v4 = udiv i64 %v0, %v3\n"
+                     "  %v5 = select i1 %v2, i64 0, i64 %v4\n"
+                     "  store i64 %v5, ptr %t2, align 8\n"));
+    CHECK(translates(IR_UREM, IR_I16, IR_I16, false,
+                     "  %v2 = icmp eq i16 %v1, 0\n"
+                     "  %v3 = select i1 %v2, i16 1, i16 %v1\n"
+                     "  %v4 = urem i16 %v0, %v3\n"
+                     "  store i16 %v4, ptr %t2, align 2\n"));
+}
+
+/* A comparison gives an i1, which widens to the i8 of a bool. */
+static void comparisons(void)
+{
+    static const struct {
+        enum ir_op op;
+        enum ir_type type;
+        const char *body;
+    } cases[] = {
+        {IR_EQ, IR_I64, "  %v2 = icmp eq i64 %v0, %v1\n"},
+        {IR_NE, IR_I8, "  %v2 = icmp ne i8 %v0, %v1\n"},
+        {IR_SLT, IR_I32, "  %v2 = icmp slt i32 %v0, %v1\n"},
+        {IR_SLE, IR_I16, "  %v2 = icmp sle i16 %v0, %v1\n"},
+        {IR_SGT, IR_I64, "  %v2 = icmp sgt i64 %v0, %v1\n"},
+        {IR_SGE, IR_I64, "  %v2 = icmp sge i64 %v0, %v1\n"},
+        {IR_ULT, IR_I64, "  %v2 = icmp ult i64 %v0, %v1\n"},
+        {IR_ULE, IR_I32, "  %v2 = icmp ule i32 %v0, %v1\n"},
+        {IR_UGT, IR_I8, "  %v2 = icmp ugt i8 %v0, %v1\n"},
+        {IR_UGE, IR_I16, "  %v2 = icmp uge i16 %v0, %v1\n"},
+        {IR_EQ, IR_PTR, "  %v2 = icmp eq ptr %v0, %v1\n"},
+        {IR_FEQ, IR_F64, "  %v2 = fcmp oeq double %v0, %v1\n"},
+        {IR_FNE, IR_F64, "  %v2 = fcmp une double %v0, %v1\n"},
+        {IR_FLT, IR_F32, "  %v2 = fcmp olt float %v0, %v1\n"},
+        {IR_FLE, IR_F32, "  %v2 = fcmp ole float %v0, %v1\n"},
+        {IR_FGT, IR_F64, "  %v2 = fcmp ogt double %v0, %v1\n"},
+        {IR_FGE, IR_F64, "  %v2 = fcmp oge double %v0, %v1\n"},
+    };
+    char body[200];
+    size_t i;
+
+    for (i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+        text_format(body, sizeof body,
+                    "%s  %%v3 = zext i1 %%v2 to i8\n"
+                    "  store i8 %%v3, ptr %%t2, align 1\n",
+                    cases[i].body);
+        CHECK(translates(cases[i].op, cases[i].type, IR_I8, false, body));
+    }
+}
+
+/* The conversions, with the saturating intrinsics for a float to an
+   integer and half for an f16. */
+static void conversions(void)
+{
+    struct fixture x;
+
+    CHECK(translates(IR_TRUNC, IR_I64, IR_I8, true,
+                     "  %v1 = trunc i64 %v0 to i8\n"
+                     "  store i8 %v1, ptr %t1, align 1\n"));
+    CHECK(translates(IR_SEXT, IR_I8, IR_I64, true,
+                     "  %v1 = sext i8 %v0 to i64\n"));
+    CHECK(translates(IR_ZEXT, IR_I16, IR_I32, true,
+                     "  %v1 = zext i16 %v0 to i32\n"));
+    CHECK(translates(IR_SITOF, IR_I32, IR_F64, true,
+                     "  %v1 = sitofp i32 %v0 to double\n"));
+    CHECK(translates(IR_UITOF, IR_I64, IR_F32, true,
+                     "  %v1 = uitofp i64 %v0 to float\n"));
+    CHECK(translates(IR_FEXT, IR_F32, IR_F64, true,
+                     "  %v1 = fpext float %v0 to double\n"));
+    CHECK(translates(IR_FTRUNC, IR_F64, IR_F32, true,
+                     "  %v1 = fptrunc double %v0 to float\n"));
+    CHECK(translates(IR_HEXT, IR_I16, IR_F32, true,
+                     "  %v1 = bitcast i16 %v0 to half\n"
+                     "  %v2 = fpext half %v1 to float\n"
+                     "  store float %v2, ptr %t1, align 4\n"));
+    CHECK(translates(IR_HTRUNC, IR_F32, IR_I16, true,
+                     "  %v1 = fptrunc float %v0 to half\n"
+                     "  %v2 = bitcast half %v1 to i16\n"
+                     "  store i16 %v2, ptr %t1, align 2\n"));
+
+    /* Each intrinsic is declared once, after the definitions. */
+    begin(&x);
+    operation(&x, IR_FTOSI, IR_F64, IR_I32, true);
+    operation(&x, IR_FTOSI, IR_F64, IR_I32, true);
+    x.m.functions[1]->name = "g";
+    operation(&x, IR_FTOUI, IR_F32, IR_I64, true);
+    x.m.functions[2]->name = "h";
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(holds(&x, "  %v1 = call i32 @llvm.fptosi.sat.i32.f64(double %v0)\n"
+                    "  store i32 %v1, ptr %t1, align 4\n"));
+    CHECK(holds(&x, "  %v1 = call i64 @llvm.fptoui.sat.i64.f32(float %v0)\n"));
+    CHECK(holds(&x, "}\n\n"
+                    "declare i32 @llvm.fptosi.sat.i32.f64(double)\n"
+                    "declare i64 @llvm.fptoui.sat.i64.f32(float)\n\n"
+                    "attributes #0"));
+    end(&x);
+}
+
+/* A constant operand stands in the guard as it stands in the operation. */
+static void constant_operands(void)
+{
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_block *b;
+    uint32_t t;
+
+    begin(&x);
+    f = ir_function_add(&x.m, "main", "f", IR_I64, IR_NO_AGG);
+    b = ir_block_add(f);
+    t = ir_binary(f, b, IR_UDIV, IR_I64, ir_int_op(IR_I64, 7),
+                  ir_int_op(IR_I64, 0));
+    ir_ret(f, b, IR_I64, ir_temp_op(f, t));
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(holds(&x, "  %v0 = icmp eq i64 0, 0\n"
+                    "  %v1 = select i1 %v0, i64 1, i64 0\n"
+                    "  %v2 = udiv i64 7, %v1\n"));
+    end(&x);
+}
+
+/* The runtime calls main through its entry, an alias of the main of the
+   module that links. */
+static void entry(void)
+{
+    struct fixture x;
+
+    begin(&x);
+    returns(&x, "main", IR_I64, ir_int_op(IR_I64, 3));
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(holds(&x, "define internal i64 @main.main() #0 {\n"));
+    CHECK(holds(&x, "}\n\n@anti.rt.main = alias i64 (), ptr @main.main\n"));
+    CHECK(run_with(&x, TARGET_WINDOWS_X86_64, true, false));
+    CHECK(holds(&x, "@_A4anti2rt_main = alias i64 (), ptr @_A4main_main\n"));
+    end(&x);
+
+    /* A module without main has no entry. */
+    begin(&x);
+    returns(&x, "f", IR_I64, ir_int_op(IR_I64, 3));
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(lacks(&x, "alias"));
+    end(&x);
+}
+
+/* A global is a packed struct of its bytes, constant unless the program
+   writes it, with the linkage of a function. A global of zeros is
+   zeroinitializer. */
+static void globals(void)
+{
+    static const uint8_t bytes[3] = {1, 0x22, 0xff};
+    static const uint8_t zeros[24] = {0};
+    struct fixture x;
+    struct ir_global *g;
+
+    begin(&x);
+    returns(&x, "f", IR_VOID, ir_int_op(IR_VOID, 0));
+    ir_global_add(&x.m, "main", "bytes", bytes, sizeof bytes, 1);
+    g = ir_global_add(&x.m, "main", "count", zeros, 8, 8);
+    g->mutable = true;
+    g = ir_global_add(&x.m, NULL, "anti_rt_slots", zeros, sizeof zeros, 8);
+    g->exported = true;
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(holds(&x, "@main.bytes = internal constant <{ [3 x i8] }> "
+                    "<{ [3 x i8] c\"\\01\\22\\FF\" }>, align 1\n"
+                    "@main.count = internal global <{ [8 x i8] }> "
+                    "zeroinitializer, align 8\n"
+                    "@anti_rt_slots = dso_local constant <{ [24 x i8] }> "
+                    "zeroinitializer, align 8\n\n"));
+    CHECK(run_with(&x, TARGET_LINUX_X86_64, true, false));
+    CHECK(holds(&x, "@main.bytes = hidden constant <{ [3 x i8] }> "));
+    end(&x);
+
+    /* A global that holds an address waits for the step emit-memory. */
+    begin(&x);
+    returns(&x, "f", IR_VOID, ir_int_op(IR_VOID, 0));
+    g = ir_global_add(&x.m, "main", "table", zeros, 8, 8);
+    ir_global_reloc_fn(&x.m, g, 0, 0);
+    CHECK(!run(&x, TARGET_MACOS_ARM64));
+    CHECK_STR(x.error, "the LLVM back end does not translate a global that "
+                       "holds an address before the step emit-memory, in "
+                       "main.table");
+    end(&x);
+}
+
 void test_llvm_emit(void)
 {
     module_text();
@@ -386,5 +677,13 @@ void test_llvm_emit(void)
     attributes();
     linkage();
     declarations();
+    arithmetic();
+    shifts();
+    division();
+    comparisons();
+    conversions();
+    constant_operands();
+    entry();
+    globals();
     refusals();
 }
