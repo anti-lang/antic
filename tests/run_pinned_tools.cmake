@@ -12,7 +12,8 @@
 # of it with a tool of the host in each place. Then the linker's own mark
 # in each program: `Linker: LLD` in the .comment of an ELF file, the tool
 # lld in the build version of a Mach-O file, and no Rich header, which
-# link.exe writes and lld-link does not, in a PE file.
+# link.exe writes and lld-link does not, in a PE file. Last the seven LLVM
+# tools of the pinned directory, each of the version of tools/llvm-version.
 
 include("${CHECK}")
 
@@ -49,6 +50,17 @@ expect_refused(CMAKE_LINKER "/usr/bin/ld")
 expect_refused(ANTIC_LLVM_AR "/usr/bin/llvm-ar")
 expect_refused(CMAKE_EXE_LINKER_FLAGS "")
 expect_refused(CMAKE_SHARED_LINKER_FLAGS "-fuse-ld=bfd")
+
+get_filename_component(tools "${CHECK}" DIRECTORY)
+file(READ "${tools}/llvm-version" version)
+string(STRIP "${version}" version)
+antic_llvm_tool_problems(problems "${LLVM_DIR}" "${version}" "${OS}")
+if(problems)
+    list(JOIN problems "\n" text)
+    message(FATAL_ERROR "the pinned LLVM tools are not complete:\n${text}")
+endif()
+list(LENGTH ANTIC_LLVM_TOOLS count)
+message(STATUS "${count} LLVM tools of ${version}: ${ANTIC_LLVM_TOOLS}")
 
 string(REPLACE "," ";" programs "${PROGRAMS}")
 foreach(program IN LISTS programs)

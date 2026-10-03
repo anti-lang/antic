@@ -40,6 +40,41 @@ function(antic_pinned_linker out llvm os)
     endif()
 endfunction()
 
+# The seven LLVM tools of the pinned release, which tools/get-llvm.cmake
+# installs and tools/check-llvm.cmake copies into the runtime archive. lld
+# runs under its names ld.lld, ld64.lld and lld-link.
+set(ANTIC_LLVM_TOOLS llvm-mc lld llvm-ar llvm-objdump llvm-readobj opt llc)
+
+# The list of problems of the seven LLVM tools in llvm/bin on a host of
+# the operating system os. It is empty when each is there and reports the
+# LLVM version. lld answers as ld.lld, because the generic name prints no
+# version.
+function(antic_llvm_tool_problems out llvm version os)
+    set(problems "")
+    set(exe "")
+    if(os STREQUAL "windows")
+        set(exe ".exe")
+    endif()
+    foreach(tool IN LISTS ANTIC_LLVM_TOOLS)
+        set(path "${llvm}/bin/${tool}${exe}")
+        if(NOT EXISTS "${path}")
+            list(APPEND problems "${path} is missing")
+            continue()
+        endif()
+        if(tool STREQUAL "lld")
+            set(path "${llvm}/bin/ld.lld${exe}")
+        endif()
+        execute_process(COMMAND "${path}" --version
+                        OUTPUT_VARIABLE text ERROR_VARIABLE err)
+        string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" found "${text}${err}")
+        if(NOT found STREQUAL version)
+            list(APPEND problems
+                 "${path} has version '${found}', the pin is ${version}")
+        endif()
+    endforeach()
+    set(${out} "${problems}" PARENT_SCOPE)
+endfunction()
+
 # Whether path lies under dir.
 function(antic_path_under out path dir)
     string(FIND "${path}" "${dir}/" at)

@@ -99,13 +99,33 @@ move a signature onto the host that serves the binaries.
 
 ### The LLVM tools
 
-The five LLVM tools are not served from the download area. The repository
-`anti-lang/llvm-tools` builds them from the pinned LLVM source and publishes one archive
-per host as an asset of a GitHub release, tagged `<version>-anti.<build>` as in
-`23.1.1-anti.1`. Beside the archives stand `SHA256SUMS` and its signature
+The seven LLVM tools are not served from the download area: llvm-mc, lld, llvm-ar,
+llvm-objdump, llvm-readobj, opt and llc. The repository `anti-lang/llvm-tools` builds them
+from the pinned LLVM source and publishes one archive per host as an asset of a GitHub
+release, tagged `<version>-anti.<build>` as in `23.1.1-anti.5`. Beside the archives stand `SHA256SUMS` and its signature
 `SHA256SUMS.sig`. The recipe, the hosts and the checks of each build are in that
 repository. Each release holds the tools and clang of each of the six hosts. antic takes
-the tools of its host, and a build of antic takes clang as well.
+the tools of its host, and a build of antic takes clang as well. The clang archive also
+carries `libunwind.a` for the two glibc targets, which the build copies into
+`lib/<target>/` of the runtime archive. The runtime of AddressSanitizer calls its
+`_Unwind_Backtrace` and `_Unwind_GetIP` in a Linux program of `--memory-checks`.
+
+`23.1.1-anti.4` added opt and llc, for the LLVM back end. Each tools archive about
+doubled, 177,317,004 bytes over the six hosts:
+
+| Host | Tools archive, anti.3 | Tools archive, anti.4 | Growth |
+|---|---|---|---|
+| linux-x86_64 | 26,271,712 | 58,190,076 | 31,918,364 |
+| linux-arm64 | 23,635,156 | 51,820,800 | 28,185,644 |
+| macos-arm64 | 25,034,028 | 54,392,536 | 29,358,508 |
+| macos-x86_64 | 28,161,820 | 61,934,492 | 33,772,672 |
+| windows-x86_64 | 25,795,084 | 54,878,132 | 29,083,048 |
+| windows-arm64 | 22,577,824 | 47,576,592 | 24,998,768 |
+
+`23.1.1-anti.5` added `libunwind.a`, 137,622 bytes for x86_64 and 145,794 for ARM64,
+which grew each clang archive by 57,788 to 74,916 bytes. Its tools archives differ from
+those of anti.4 in `VERSION` alone. The sizes are in bytes, as shipped, from the reports
+of `anti-lang/llvm-tools` of 2026-10-02 and 2026-10-03.
 
 `tools/llvm-pin` names the tag, the address of the release, the name of an asset and
 the digest of the archive of each of the six hosts. `tools/clang-pin` names the archives

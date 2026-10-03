@@ -25,7 +25,7 @@
 # SHA256SUMS. The stubs of Apple's SDK in sdk/ of a macOS sysroot and the
 # Microsoft CRT stay out, because neither licence allows redistribution. A
 # user brings the first from a Mac with anti sdk import, and the installer
-# adds the second. It adds the five LLVM tools from the release that
+# adds the second. It adds the seven LLVM tools from the release that
 # tools/llvm-pin names. The package carries no key: the installer holds
 # the key that checks them.
 cmake_minimum_required(VERSION 3.20)
