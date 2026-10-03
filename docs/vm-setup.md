@@ -86,6 +86,9 @@ At `41a8372` on 2026-09-27 it passes 983 of 983 with two skipped, and ASan and U
 982 of 982 each. `deps_dir` passes the four directories above on to the copy it
 configures. The sysroots have to be installed again
 after `026ed4f`, which moved X11 and OpenGL into the glibc sysroot.
+At `a4cadfcf` on 2026-10-03 it passes 1261 of 1266 with two skipped, and ASan and UBSan
+1260 of 1265 each. The three that fail in each are `anti_memory_checks`, `memory_checks`
+and `memory_checks_list`, whose link waits for `libunwind` of `23.1.1-anti.5`.
 
 | Untested item | Tests that run it |
 |---|---|
@@ -161,6 +164,8 @@ At `41a8372` on 2026-09-27 it passes 955 of 955 with five skipped. The checks of
 first time, since the tests named the tool without `.exe` before `446c9ba`. The sysroots have to be installed again after `74708ad`. Before it, the
 command above rewrote the junctions of the Windows sysroots into links that name
 nothing.
+At `a4cadfcf` on 2026-10-03 it passes 1247 of 1256 with nine skipped. Its suite ran with
+`ctest -j4`, in a call of its own after the configure and the build of `test.cmd`.
 Extract a tree from the Mac with `tar -xmf`. Ninja otherwise keeps objects that are newer
 than the files the tar restores.
 
