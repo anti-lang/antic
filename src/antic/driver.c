@@ -20,6 +20,7 @@
 #include "linker.h"
 #include "layout.h"
 #include "llvm_emit.h"
+#include "llvm_run.h"
 #include "lower.h"
 #include "memcheck.h"
 #include "header.h"
@@ -620,12 +621,14 @@ static void identified_notice(struct text *out, const struct text *notice,
 /* The LLVM back end, which docs/work-order-llvm-back-end.md builds step
    by step. It folds the symbolic values of the target and puts in the
    checks of --memory-checks as select_module does, then translates the
-   module into LLVM IR text. --dump-llvm prints the text. The step
-   emit-run adds opt and llc, which write the object, so until then a
-   build that wants one is refused. Returns 2 after the dump and 1 after
-   an error, as back_end does. */
+   module into LLVM IR text. --dump-llvm prints the text. Otherwise the
+   text goes to assembly, with the notice after the build id as back_end
+   writes it, and driver_run hands it to opt and llc. Returns 0 with the
+   text, 2 after the dump, 3 for a dev object of a module without main
+   and 1 after an error, as back_end does. */
 static int llvm_back_end(const struct options *o, struct ir_module *program,
-                         const char *module, const struct extras *extras)
+                         const char *module, struct text *assembly,
+                         struct extras *extras)
 {
     struct layouts layouts;
     struct llvm_emit_options emit;
@@ -664,14 +667,48 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     }
     ok = ok && llvm_emit_module(&out, &emit, program, &layouts, error,
                                 sizeof error);
+    /* DESIGN: a COFF program that hosts plugins exports the names that
+       emit_names lists from the machine code, and the step flags writes
+       them from the IR. */
+    if (ok && !o->dump_llvm && extras->hosts_plugins &&
+        target_info(o->target)->format == FORMAT_COFF) {
+        text_format(error, sizeof error,
+                    "the LLVM back end does not build a program for %s that "
+                    "loads libraries before the step flags",
+                    target_name(o->target));
+        ok = false;
+    }
     if (ok && o->dump_llvm) {
         fputs(text_cstr(&out), stdout);
         status = 2;
     } else if (ok) {
-        text_format(error, sizeof error,
-                    "the LLVM back end writes no object before the step "
-                    "emit-run, and --dump-llvm prints its text");
-        ok = false;
+        status = o->dev && !has_main(program, module) ? 3 : 0;
+        /* As in back_end, the build id digests the text without the
+           notice, which holds it. The notice stays out of --dump-llvm,
+           so its goldens do not follow the runtime library. */
+        if (extras->notice.length > 0 && status != 3 &&
+            !o->assembly_only && o->lib != LIB_STATIC) {
+            struct text notice = {0};
+            char id[65];
+            ok = build_id(o, &out, NULL, id, error, sizeof error);
+            if (ok) {
+                identified_notice(&notice, &extras->notice, id);
+                llvm_emit_licenses(&out, o->target, notice.data,
+                                   notice.length);
+                text_free(&notice);
+            }
+        }
+        for (i = 0; ok && i < program->function_count; i++) {
+            const struct ir_function *f = program->functions[i];
+            if (f->exported && !f->is_extern) {
+                text_appendf(&extras->exports, "%s\n", f->name);
+            }
+        }
+        if (ok) {
+            text_append_bytes(assembly, out.data, out.length);
+        } else {
+            status = 1;
+        }
     }
     if (!ok) {
         fprintf(stderr, "antic: %s\n", error);
@@ -773,7 +810,7 @@ static int back_end(const struct options *o, struct module *tree,
     /* --dump-llvm prints the text of the LLVM back end, whichever back end
        --backend names. */
     if (o->backend == BACKEND_LLVM || o->dump_llvm) {
-        return llvm_back_end(o, program, module, extras);
+        return llvm_back_end(o, program, module, assembly, extras);
     }
     functions = alloc_zeroed(program->function_count + 1, sizeof *functions);
     ok = select_module(o->target, o->cpu, program, functions, error,
@@ -1567,6 +1604,47 @@ bool driver_assemble(const struct options *o, const char *assembly,
     return true;
 }
 
+/* Remove the file at path when there is one. */
+static void remove_file(const char *path)
+{
+    if (driver_file_exists(path)) {
+        platform_remove(path);
+    }
+}
+
+bool driver_compile_llvm(const struct options *o, const struct text *text,
+                         const char *base, const char *output)
+{
+    struct text text_path = {0};
+    struct text bitcode_path = {0};
+    struct text found_opt = {0};
+    struct text found_llc = {0};
+    struct llvm_run r;
+    bool ok;
+
+    text_appendf(&text_path, "%s%s", base, LLVM_TEXT_SUFFIX);
+    text_appendf(&bitcode_path, "%s%s", base, LLVM_BITCODE_SUFFIX);
+    r.opt = o->opt != NULL ? o->opt : archive_tool(o, "opt", &found_opt);
+    r.llc = o->llc != NULL ? o->llc : archive_tool(o, "llc", &found_llc);
+    r.target = o->target;
+    r.optimize = !o->dev;
+    r.assembly = o->assembly_only;
+    ok = driver_write_file(text_cstr(&text_path), text) &&
+         llvm_run(&r, text_cstr(&text_path), text_cstr(&bitcode_path),
+                  output);
+    /* DESIGN: --dump-llvm and --keep-llvm are the two ways to read the
+       text, so a build without either leaves no intermediate file. */
+    if (!o->keep_llvm) {
+        remove_file(text_cstr(&text_path));
+        remove_file(text_cstr(&bitcode_path));
+    }
+    text_free(&text_path);
+    text_free(&bitcode_path);
+    text_free(&found_opt);
+    text_free(&found_llc);
+    return ok;
+}
+
 int driver_run(const struct options *o)
 {
     struct text source = {0};
@@ -1656,6 +1734,17 @@ int driver_run(const struct options *o)
         }
         goto done;
     }
+    if (o->assembly_only && o->backend == BACKEND_LLVM) {
+        text_append(&asm_path, text_cstr(&base));
+        if (o->output == NULL) {
+            text_append(&asm_path, ASSEMBLY_SUFFIX);
+        }
+        status = driver_compile_llvm(o, &assembly, text_cstr(&base),
+                                     text_cstr(&asm_path))
+                     ? 0
+                     : 1;
+        goto done;
+    }
     if (o->assembly_only) {
         if (o->output == NULL) {
             text_append(&base, ASSEMBLY_SUFFIX);
@@ -1665,15 +1754,22 @@ int driver_run(const struct options *o)
     }
 
     /* DESIGN: the assembly and object files stay beside the executable,
-       so that a reader can open them. */
-    text_appendf(&asm_path, "%s%s", text_cstr(&base), ASSEMBLY_SUFFIX);
+       so that a reader can open them. The LLVM back end keeps the object,
+       and its text only under --keep-llvm. */
     text_appendf(&obj_path, "%s%s", text_cstr(&base),
                  target_info(o->target)->object_suffix);
-    if (!driver_write_file(text_cstr(&asm_path), &assembly)) {
-        goto done;
-    }
-    if (!driver_assemble(o, text_cstr(&asm_path), text_cstr(&obj_path))) {
-        goto done;
+    if (o->backend == BACKEND_LLVM) {
+        if (!driver_compile_llvm(o, &assembly, text_cstr(&base),
+                                 text_cstr(&obj_path))) {
+            goto done;
+        }
+    } else {
+        text_appendf(&asm_path, "%s%s", text_cstr(&base), ASSEMBLY_SUFFIX);
+        if (!driver_write_file(text_cstr(&asm_path), &assembly) ||
+            !driver_assemble(o, text_cstr(&asm_path),
+                             text_cstr(&obj_path))) {
+            goto done;
+        }
     }
     if (object_only) {
         status = 0;

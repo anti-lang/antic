@@ -21,6 +21,9 @@ struct options {
     const char *input;          /* The .anti source file. */
     const char *output;         /* NULL: input without .anti. */
     const char *llvm_mc;        /* NULL: llvm-mc from PATH. */
+    /* NULL: opt and llc of the runtime archive's bin/, or from PATH. */
+    const char *opt;
+    const char *llc;
     const char *runtime;        /* Holds lib/<target>/. */
     const char *const *libraries;     /* The .antl files. */
     size_t library_count;
@@ -137,6 +140,9 @@ struct options {
        suite runs both and compares. The step switch removes it, and the
        LLVM back end is then the only one. */
     enum { BACKEND_NATIVE, BACKEND_LLVM } backend;
+    /* --keep-llvm: the LLVM back end keeps <output>.ll and <output>.bc,
+       which it deletes otherwise. */
+    bool keep_llvm;
     enum target target;
     /* DESIGN: the processor level is a code-generation setting, not a
        target. --cpu sets it and the target's default stands otherwise. */

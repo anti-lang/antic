@@ -521,13 +521,12 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_verify.cmake")
 endforeach()
 
-# A program of tests/programs built through the LLVM back end by hand, with
-# opt and llc of the pinned release, and run on a target the host runs.
-# MODE is release or dev, and OPTIONS the options of antic beside them.
-# SOURCE names a program elsewhere than tests/programs, OBJECTS the objects
-# of C it links and EXPECTED its expected output. The test is
-# llvm_program_<name>_<target>_<mode>. The step emit-run moves the steps
-# of run_llvm_program.cmake into antic.
+# A program of tests/programs built with antic --backend llvm, which runs
+# opt and llc of the runtime archive and links, and run on a target the
+# host runs. MODE is release or dev, and OPTIONS the options of antic
+# beside them. SOURCE names a program elsewhere than tests/programs,
+# OBJECTS the objects of C it links and EXPECTED its expected output. The
+# test is llvm_program_<name>_<target>_<mode>.
 function(antic_llvm_program_test name target mode)
     cmake_parse_arguments(PARSE_ARGV 3 arg "" "SOURCE;OBJECTS;EXPECTED"
                           "OPTIONS")
@@ -542,22 +541,17 @@ function(antic_llvm_program_test name target mode)
     if(arg_EXPECTED)
         list(APPEND extra "-DEXPECTED=${arg_EXPECTED}")
     endif()
-    antic_cpu_level(level "${target}")
     set(options ${arg_OPTIONS})
     if(target STREQUAL "macos-x86_64")
-        set(level v1)
         list(APPEND options --cpu v1)
     endif()
     list(JOIN options "," options)
     add_test(NAME llvm_program_${name}_${target}_${mode}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DOPT=${ANTIC_OPT}"
-            "-DLLC=${ANTIC_LLC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${source}"
             "-DTARGET_NAME=${target}"
-            "-DLEVEL=${level}"
             "-DMODE=${mode}"
             "-DOPTIONS=${options}"
             ${extra}
@@ -602,13 +596,45 @@ foreach(target IN LISTS llvm_targets)
     antic_llvm_program_test(llvm_flags ${target} release)
 endforeach()
 
-# --backend llvm writes no object before the step emit-run adds opt and
-# llc, and --backend takes the names of the two back ends alone.
-add_expect_test(llvm_backend_no_object STATUS 1
-    PATTERN "^antic: the LLVM back end writes no object before the step emit-run, and --dump-llvm prints its text"
-    COMMAND $<TARGET_FILE:antic> --backend llvm --runtime "${ANTIC_RUNTIME_DIR}"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_backend_no_object"
-            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+# The tool run of the LLVM back end: --keep-llvm, the bitcode of release
+# mode alone and -S. A failed opt or llc prints its own message and then
+# the line of antic. --opt and --llc name the tool, here one that refuses
+# the options antic passes: llc for opt, and llvm-mc for llc, since opt
+# takes the options of llc. The tests run on the hosts of llvm_targets,
+# and the step vm adds the others.
+if(llvm_targets)
+    add_test(NAME llvm_run
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_run"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_run.cmake")
+    add_expect_test(llvm_opt_failed STATUS 1
+        PATTERN "llc: error: -passes is for .mir file only.*antic: opt failed"
+        COMMAND $<TARGET_FILE:antic> --backend llvm
+                --runtime "${ANTIC_RUNTIME_DIR}" --opt "${ANTIC_LLC}"
+                -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_opt_failed"
+                "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+    add_expect_test(llvm_llc_failed STATUS 1
+        PATTERN "llvm-mc: Unknown command line argument .*antic: llc failed"
+        COMMAND $<TARGET_FILE:antic> --backend llvm --dev
+                --runtime "${ANTIC_RUNTIME_DIR}" --llc "${ANTIC_LLVM_MC}"
+                -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_llc_failed"
+                "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+endif()
+
+# A program for a COFF target that loads libraries waits for the step
+# flags under the LLVM back end. inject_default injects an interface, so
+# it is such a program.
+add_expect_test(llvm_coff_host STATUS 1
+    PATTERN "^antic: the LLVM back end does not build a program for windows-x86_64 that loads libraries before the step flags"
+    COMMAND $<TARGET_FILE:antic> --backend llvm --target windows-x86_64 -S
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_coff_host.s"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/inject_default.anti")
+
+# --backend takes the names of the two back ends alone.
 add_expect_test(llvm_backend_name STATUS 2
     PATTERN "^antic: --backend takes native or llvm, not wasm"
     COMMAND $<TARGET_FILE:antic> --backend wasm
@@ -3603,9 +3629,9 @@ if(ANTIC_LLVM_AR)
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_clib.cmake")
     endforeach()
 endif()
-# The same libraries with the object of each built through the LLVM back
-# end by hand, on the macOS hosts, as run_clib.cmake gives under BACKEND.
-# Each case checks what its native test checks.
+# The same libraries built with antic --backend llvm, on the macOS hosts,
+# as run_clib.cmake gives under BACKEND. Each case checks what its native
+# test checks.
 if(ANTIC_LLVM_AR AND llvm_targets)
     foreach(case static shared exports two loader header bundle classes
             failing tuples flags variants nested simd names handlers ledger
@@ -3615,8 +3641,6 @@ if(ANTIC_LLVM_AR AND llvm_targets)
                 "-DANTIC=$<TARGET_FILE:antic>"
                 "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DLLVM_AR=${ANTIC_LLVM_AR}"
-                "-DOPT=${ANTIC_OPT}"
-                "-DLLC=${ANTIC_LLC}"
                 -DBACKEND=llvm
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"

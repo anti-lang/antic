@@ -85,6 +85,9 @@ static int usage(FILE *out)
           "  --dump-llvm          print the LLVM IR text of the LLVM back\n"
           "                       end and stop\n"
           "  --backend native|llvm  the back end, native by default\n"
+          "  --opt <path>         the opt executable of the LLVM back end\n"
+          "  --llc <path>         the llc executable of the LLVM back end\n"
+          "  --keep-llvm          keep <output>.ll and <output>.bc\n"
           "  --print-host-target  print the target antic runs on\n"
           "  --print-targets      print the six targets and their facts\n"
           "  --print-cpu-levels   print the processor levels and the\n"
@@ -278,6 +281,9 @@ static int run(int argc, char **argv, const struct lists *l)
                 return 2;
             }
             continue;
+        } else if (strcmp(arg, "--keep-llvm") == 0) {
+            options.keep_llvm = true;
+            continue;
         } else if (strcmp(arg, "-c") == 0) {
             options.library = true;
             continue;
@@ -458,6 +464,10 @@ static int run(int argc, char **argv, const struct lists *l)
             slot = &cpu;
         } else if (strcmp(arg, "--llvm-mc") == 0) {
             slot = &options.llvm_mc;
+        } else if (strcmp(arg, "--opt") == 0) {
+            slot = &options.opt;
+        } else if (strcmp(arg, "--llc") == 0) {
+            slot = &options.llc;
         } else if (strcmp(arg, "--runtime") == 0) {
             slot = &options.runtime;
         } else if (arg[0] == '-') {

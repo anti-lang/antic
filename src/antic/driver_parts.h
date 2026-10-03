@@ -90,6 +90,13 @@ bool driver_is_plugin(const struct options *o);
 bool driver_file_exists(const char *path);
 bool driver_assemble(const struct options *o, const char *assembly,
                      const char *object);
+/* Write text, the LLVM IR of the LLVM back end, to <base>.ll, and run opt
+   and llc of llvm_run.c on it into output: the object, or the assembly
+   under -S. The tools come from --opt and --llc, or from the runtime
+   archive as llvm-mc does. <base>.ll and <base>.bc are deleted afterwards
+   unless --keep-llvm. */
+bool driver_compile_llvm(const struct options *o, const struct text *text,
+                         const char *base, const char *output);
 
 /* driver_link.c */
 
