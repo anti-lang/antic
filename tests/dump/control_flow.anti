@@ -1,0 +1,21 @@
+// Control flow alone: copies, jumps, branches on a bool and returns, the
+// input of the first test of the LLVM back end.
+
+pub fn choose(a: bool, x: int, y: int) -> int
+{
+	let r = x;
+	if a {
+		r = y;
+	}
+	return r;
+}
+
+pub fn spin(a: bool, b: bool) -> bool
+{
+	while a do {
+		if b {
+			return a;
+		}
+	}
+	return b;
+}

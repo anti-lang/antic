@@ -131,6 +131,12 @@ struct options {
     bool dump_opt;              /* --dump-opt. */
     bool dump_select;           /* --dump-select. */
     bool dump_alloc;            /* --dump-alloc. */
+    bool dump_llvm;             /* --dump-llvm, through the LLVM back end. */
+    /* DESIGN: --backend native|llvm selects the back end from the step
+       emit-core to the step vm of docs/work-order-llvm-back-end.md, so the
+       suite runs both and compares. The step switch removes it, and the
+       LLVM back end is then the only one. */
+    enum { BACKEND_NATIVE, BACKEND_LLVM } backend;
     enum target target;
     /* DESIGN: the processor level is a code-generation setting, not a
        target. --cpu sets it and the target's default stands otherwise. */

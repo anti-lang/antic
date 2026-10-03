@@ -5,6 +5,8 @@
 #   EXPECTED  the file with the expected output
 #   OUTPUT    optional file that the command writes, compared instead of
 #             the standard output, which must then be empty
+#   VERSION   optional version of antic, which the output names as
+#             `antic <version>` and the expected file as `antic VERSION`
 #
 # The lines of the types the runtime declares, which start with
 # "type anti.rt.", are left out of the output before the comparison. Their
@@ -27,6 +29,9 @@ if(DEFINED OUTPUT)
         message(FATAL_ERROR "antic printed output\n${out}")
     endif()
     file(READ "${OUTPUT}" out)
+endif()
+if(DEFINED VERSION)
+    string(REPLACE "antic ${VERSION}" "antic VERSION" out "${out}")
 endif()
 string(REGEX REPLACE "\ntype anti\\.rt\\.[^\n]*" "" out "\n${out}")
 string(SUBSTRING "${out}" 1 -1 out)

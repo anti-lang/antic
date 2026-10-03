@@ -18,6 +18,8 @@
 #include "ir.h"
 #include "lexer.h"
 #include "linker.h"
+#include "layout.h"
+#include "llvm_emit.h"
 #include "lower.h"
 #include "memcheck.h"
 #include "header.h"
@@ -222,7 +224,7 @@ static bool links(const struct options *o)
 {
     return !o->assembly_only && !o->dump_tokens && !o->dump_ast &&
            !o->dump_types && !o->dump_ir && !o->dump_opt && !o->dump_select &&
-           !o->dump_alloc && !o->library && !o->front_end &&
+           !o->dump_alloc && !o->dump_llvm && !o->library && !o->front_end &&
            o->lib == LIB_NONE;
 }
 
@@ -615,6 +617,65 @@ static void identified_notice(struct text *out, const struct text *notice,
     text_append_bytes(out, notice->data + begin, notice->length - begin);
 }
 
+/* The LLVM back end, which docs/work-order-llvm-back-end.md builds step
+   by step. It folds the symbolic values of the target and puts in the
+   checks of --memory-checks as select_module does, then translates the
+   module into LLVM IR text. --dump-llvm prints the text. The step
+   emit-run adds opt and llc, which write the object, so until then a
+   build that wants one is refused. Returns 2 after the dump and 1 after
+   an error, as back_end does. */
+static int llvm_back_end(const struct options *o, struct ir_module *program,
+                         const char *module, const struct extras *extras)
+{
+    struct layouts layouts;
+    struct llvm_emit_options emit;
+    struct text out = {0};
+    char error[512];
+    bool ok;
+    int status = 1;
+    size_t i;
+
+    /* DESIGN: as in select_module, the optimizer runs again on each
+       function that had a symbolic value, so a size folded here reaches
+       the simplifications a number would have reached before. */
+    ok = layout_init(&layouts, o->target, program, error, sizeof error) &&
+         layout_data(&layouts, program);
+    for (i = 0; ok && i < program->function_count; i++) {
+        struct ir_function *f = program->functions[i];
+        bool resolved = false;
+        ok = layout_resolve(&layouts, f, &resolved);
+        if (ok && resolved && !f->is_extern) {
+            optimize_function(f);
+        }
+        if (ok && program->memory_checks && !f->is_extern) {
+            memcheck_function(program, f, &layouts);
+        }
+    }
+    memset(&emit, 0, sizeof emit);
+    emit.target = o->target;
+    emit.cpu = o->cpu;
+    emit.module = module;
+    emit.one_module = o->dev || driver_is_plugin(o);
+    emit.exports = extras->hosts_plugins;
+    ok = ok && llvm_emit_module(&out, &emit, program, &layouts, error,
+                                sizeof error);
+    if (ok && o->dump_llvm) {
+        fputs(text_cstr(&out), stdout);
+        status = 2;
+    } else if (ok) {
+        text_format(error, sizeof error,
+                    "the LLVM back end writes no object before the step "
+                    "emit-run, and --dump-llvm prints its text");
+        ok = false;
+    }
+    if (!ok) {
+        fprintf(stderr, "antic: %s\n", error);
+    }
+    layout_free(&layouts);
+    text_free(&out);
+    return status;
+}
+
 /* Lower the program, run the optimizer passes and run the back end for
    the target: instruction selection, register allocation and emission.
    The dumps print the machine code instead, before allocation for
@@ -628,7 +689,7 @@ static int back_end(const struct options *o, struct module *tree,
     struct text out = {0};
     struct debug_spans spans = {0};
     char error[200];
-    bool dump = o->dump_select || o->dump_alloc;
+    bool dump = o->dump_select || o->dump_alloc || o->dump_llvm;
     bool ok;
     int status = 1;
     size_t i;
@@ -703,6 +764,11 @@ static int back_end(const struct options *o, struct module *tree,
         memcheck_declare(program, module,
                          o->lib == LIB_NONE && has_main(program, module),
                          o->target);
+    }
+    /* --dump-llvm prints the text of the LLVM back end, whichever back end
+       --backend names. */
+    if (o->backend == BACKEND_LLVM || o->dump_llvm) {
+        return llvm_back_end(o, program, module, extras);
     }
     functions = alloc_zeroed(program->function_count + 1, sizeof *functions);
     ok = select_module(o->target, o->cpu, program, functions, error,

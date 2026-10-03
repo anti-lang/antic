@@ -64,8 +64,10 @@ static int usage(FILE *out)
           "  --dependency <n,c,u> a dependency with name, constraint, URL,\n"
           "  --license <spdx>     the licence identifier,\n"
           "  --license-text <f>   the file of the licence text\n"
-          "  --attribution <line> and one attribution line\n"
-          "  --target <name>      compile for <name>, for example macos-arm64\n"
+          "  --attribution <line> and one attribution line\n",
+          out);
+    /* C99 promises string literals of 4095 bytes, so the text is two. */
+    fputs("  --target <name>      compile for <name>, for example macos-arm64\n"
           "  --cpu <level>        the processor level: v1, v2 or v3 on\n"
           "                       x86_64, armv8.0, armv8.2 or armv8.5 on\n"
           "                       ARM64. The target's default stands\n"
@@ -80,6 +82,9 @@ static int usage(FILE *out)
           "  --dump-select        print the selected machine code and stop\n"
           "  --dump-alloc         print the machine code after register\n"
           "                       allocation and stop\n"
+          "  --dump-llvm          print the LLVM IR text of the LLVM back\n"
+          "                       end and stop\n"
+          "  --backend native|llvm  the back end, native by default\n"
           "  --print-host-target  print the target antic runs on\n"
           "  --print-targets      print the six targets and their facts\n"
           "  --print-cpu-levels   print the processor levels and the\n"
@@ -253,6 +258,25 @@ static int run(int argc, char **argv, const struct lists *l)
             continue;
         } else if (strcmp(arg, "--dump-opt") == 0) {
             options.dump_opt = true;
+            continue;
+        } else if (strcmp(arg, "--dump-llvm") == 0) {
+            options.dump_llvm = true;
+            continue;
+        } else if (strcmp(arg, "--backend") == 0) {
+            const char *name = value_of(argc, argv, &i);
+            if (name == NULL) {
+                return 2;
+            }
+            if (strcmp(name, "native") == 0) {
+                options.backend = BACKEND_NATIVE;
+            } else if (strcmp(name, "llvm") == 0) {
+                options.backend = BACKEND_LLVM;
+            } else {
+                fprintf(stderr,
+                        "antic: --backend takes native or llvm, not %s\n",
+                        name);
+                return 2;
+            }
             continue;
         } else if (strcmp(arg, "-c") == 0) {
             options.library = true;

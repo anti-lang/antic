@@ -310,8 +310,8 @@ endfunction()
 # dump_<stage>_<subject>, with _<target> after it for a dump of one target.
 #   antic_dump_test(<stage> <subject> <expected> [TARGET <target>]
 #                   [ARGS <argument>...])
-# tokens, ast, types, ir, opt, select and alloc give --dump-<stage>, and
-# asm gives -S into a file of its own, which the test compares. ARGS are
+# tokens, ast, types, ir, opt, select, alloc and llvm give --dump-<stage>,
+# and asm gives -S into a file of its own, which the test compares. ARGS are
 # the other arguments of antic, the source among them.
 set(ANTIC_DUMPS "${CMAKE_CURRENT_BINARY_DIR}/dumps")
 file(MAKE_DIRECTORY "${ANTIC_DUMPS}")
@@ -324,12 +324,18 @@ function(antic_dump_test stage subject expected)
         set(arguments --target ${arg_TARGET})
     endif()
     set(output "")
+    set(version "")
     if(stage STREQUAL "asm")
         set(file "${ANTIC_DUMPS}/${name}.s")
         list(PREPEND arguments -S -o "${file}")
         set(output "-DOUTPUT=${file}")
-    elseif(stage MATCHES "^(tokens|ast|types|ir|opt|select|alloc)$")
+    elseif(stage MATCHES "^(tokens|ast|types|ir|opt|select|alloc|llvm)$")
         list(PREPEND arguments --dump-${stage})
+        # The LLVM text names the version of antic, which the expected
+        # file writes as VERSION.
+        if(stage STREQUAL "llvm")
+            set(version "-DVERSION=${PROJECT_VERSION}")
+        endif()
     else()
         message(FATAL_ERROR "antic dumps no stage ${stage}")
     endif()
@@ -340,6 +346,7 @@ function(antic_dump_test stage subject expected)
             "-DANTIC=$<TARGET_FILE:antic>"
             "-DCOMMAND=${command}"
             ${output}
+            ${version}
             "-DEXPECTED=${expected}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
 endfunction()
@@ -493,6 +500,39 @@ add_test(NAME llvm_datalayout_pin
         "-DCLANG=${ANTIC_CLANG_DIR}/bin/clang"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_datalayout_pin"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_datalayout_pin.cmake")
+
+# The text of the LLVM back end passes the verifier of opt for every program
+# of tests/dump and tests/programs the translator accepts, in release and dev
+# mode, one test per target. control_flow holds control flow alone, which
+# the translator takes from the step emit-core on.
+# DESIGN: one test per target, since each runs antic twice per program. As
+# one test the twelve runs per program took over nine minutes under ASan,
+# whose start alone costs a fifth of a second.
+foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
+        windows-x86_64 windows-arm64)
+    add_test(NAME llvm_verify_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DOPT=${ANTIC_OPT}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/dump,${CMAKE_CURRENT_SOURCE_DIR}/programs"
+            "-DTARGETS=${target}"
+            "-DACCEPT=control_flow"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_verify/${target}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_verify.cmake")
+endforeach()
+
+# --backend llvm writes no object before the step emit-run adds opt and
+# llc, and --backend takes the names of the two back ends alone.
+add_expect_test(llvm_backend_no_object STATUS 1
+    PATTERN "^antic: the LLVM back end writes no object before the step emit-run, and --dump-llvm prints its text"
+    COMMAND $<TARGET_FILE:antic> --backend llvm --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_backend_no_object"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+add_expect_test(llvm_backend_name STATUS 2
+    PATTERN "^antic: --backend takes native or llvm, not wasm"
+    COMMAND $<TARGET_FILE:antic> --backend wasm
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
 
 # The archive holds a runtime per level, so that a program built with --cpu
 # below its target's default links a runtime of that level.
@@ -3516,6 +3556,19 @@ add_test(NAME print_targets
         "-DCOMMAND=--print-targets"
         "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/targets.txt"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
+
+# The LLVM text of a program of control flow alone: one target of each
+# object format, a release build and two objects of one module.
+antic_dump_test(llvm control_flow
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/control_flow.macos-arm64.ll"
+    TARGET macos-arm64
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/control_flow.anti")
+foreach(target linux-x86_64 windows-x86_64)
+    antic_dump_test(llvm control_flow
+        "${CMAKE_CURRENT_SOURCE_DIR}/dump/control_flow.${target}.ll"
+        TARGET ${target}
+        ARGS --dev "${CMAKE_CURRENT_SOURCE_DIR}/dump/control_flow.anti")
+endforeach()
 
 # main.opt is the optimized IR listing that chapter 1 prints.
 antic_dump_test(opt main

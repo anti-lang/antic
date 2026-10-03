@@ -1,0 +1,115 @@
+# The LLVM text of every program is valid LLVM IR. The test translates each
+# .anti file of the source directories with --dump-llvm, for every target
+# and in release and dev mode, and runs the verifier of opt over each text
+# the translator accepts. A text the verifier refuses fails the test with
+# the verifier's message. Run with cmake -P and these values:
+#   ANTIC    the antic executable
+#   OPT      opt of the pinned release
+#   RUNTIME  the runtime directory, which holds the standard library
+#   SOURCES  the directories of the programs, separated by commas
+#   TARGETS  the targets, separated by |
+#   ACCEPT   the names of programs the translator must accept in every
+#            mode and for every target, separated by commas
+#   WORK     a scratch directory
+#
+# The translator refuses an operation it does not translate yet, with a
+# message that names the operation and the step of
+# docs/work-order-llvm-back-end.md that adds it. WORK/refused.txt records
+# each refusal with its message and WORK/accepted.txt each accepted text,
+# one line per program, mode and target. A file that the front end refuses
+# as well, under --dump-opt, is no program, such as an input of the parser
+# dumps, and WORK/skipped.txt records it.
+
+string(REPLACE "," ";" directories "${SOURCES}")
+string(REPLACE "|" ";" targets "${TARGETS}")
+string(REPLACE "," ";" accept "${ACCEPT}")
+set(refusal "antic: the LLVM back end does not translate ")
+
+file(REMOVE_RECURSE "${WORK}")
+file(MAKE_DIRECTORY "${WORK}")
+set(accepted "")
+set(refused "")
+set(skipped "")
+set(failures "")
+set(accepted_count 0)
+set(refused_count 0)
+
+set(sources "")
+foreach(directory IN LISTS directories)
+    file(GLOB found "${directory}/*.anti")
+    list(SORT found)
+    list(APPEND sources ${found})
+endforeach()
+
+foreach(source IN LISTS sources)
+    get_filename_component(name "${source}" NAME_WE)
+    foreach(target IN LISTS targets)
+        foreach(mode release dev)
+            set(options --runtime "${RUNTIME}" --target "${target}")
+            if(mode STREQUAL "dev")
+                list(APPEND options --dev)
+            endif()
+            set(case "${name} ${mode} ${target}")
+            execute_process(
+                COMMAND "${ANTIC}" ${options} --dump-llvm "${source}"
+                RESULT_VARIABLE status
+                OUTPUT_VARIABLE text
+                ERROR_VARIABLE err
+                ENCODING NONE)
+            if(status EQUAL 0 AND err STREQUAL "" AND NOT text STREQUAL "")
+                set(file "${WORK}/${name}.${mode}.${target}.ll")
+                file(WRITE "${file}" "${text}")
+                execute_process(
+                    COMMAND "${OPT}" -passes=verify -disable-output "${file}"
+                    RESULT_VARIABLE verified
+                    OUTPUT_FILE "${file}.out"
+                    ERROR_FILE "${file}.out")
+                file(READ "${file}.out" out)
+                file(REMOVE "${file}.out")
+                if(NOT verified EQUAL 0 OR NOT out STREQUAL "")
+                    string(APPEND failures
+                           "${case}: the verifier refuses ${file}\n${out}\n")
+                else()
+                    string(APPEND accepted "${case}\n")
+                    math(EXPR accepted_count "${accepted_count} + 1")
+                    file(REMOVE "${file}")
+                endif()
+                continue()
+            endif()
+            string(FIND "${err}" "${refusal}" at)
+            if(NOT status EQUAL 0 AND at EQUAL 0)
+                string(REGEX REPLACE "\n.*" "" first "${err}")
+                string(APPEND refused "${case}: ${first}\n")
+                math(EXPR refused_count "${refused_count} + 1")
+                if(name IN_LIST accept)
+                    string(APPEND failures
+                           "${case}: the translator refuses it\n${err}\n")
+                endif()
+                continue()
+            endif()
+            execute_process(
+                COMMAND "${ANTIC}" ${options} --dump-opt "${source}"
+                RESULT_VARIABLE front
+                OUTPUT_QUIET
+                ERROR_QUIET)
+            if(front EQUAL 0 OR name IN_LIST accept)
+                string(APPEND failures
+                       "${case}: antic failed with ${status}\n${err}\n")
+            else()
+                string(APPEND skipped "${case}\n")
+            endif()
+        endforeach()
+    endforeach()
+endforeach()
+
+file(WRITE "${WORK}/accepted.txt" "${accepted}")
+file(WRITE "${WORK}/refused.txt" "${refused}")
+file(WRITE "${WORK}/skipped.txt" "${skipped}")
+message(STATUS "${accepted_count} texts verified, ${refused_count} refused; "
+               "the lists stand in ${WORK}")
+if(NOT failures STREQUAL "")
+    message(FATAL_ERROR "${failures}")
+endif()
+if(accepted_count EQUAL 0)
+    message(FATAL_ERROR "the translator accepts no program")
+endif()
