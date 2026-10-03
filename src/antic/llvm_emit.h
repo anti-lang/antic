@@ -25,6 +25,10 @@ struct llvm_emit_options {
     bool one_module;
     /* The program loads plugins, which resolve its symbols against it. */
     bool exports;
+    /* The function of the runtime that a shared library runs when it
+       loads, or NULL. llvm.global_ctors names it beside the function of
+       each module that compiles its patterns. */
+    const char *constructor;
 };
 
 /* Append the LLVM IR text of m, laid out for the target by l, to out.
@@ -34,5 +38,16 @@ struct llvm_emit_options {
 bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
                       const struct ir_module *m, struct layouts *l,
                       char *error, size_t error_size);
+
+/* Append the text of the object that holds the copy of the package
+   header of a static library for target t: the bytes in a private
+   constant in the section of the format, which no symbol names. */
+void llvm_emit_package(struct text *out, enum target t, const char *bytes,
+                       size_t length);
+
+/* Append to the text of a program or a shared library the notice
+   anti_licenses: the bytes and a NUL, in the read-only section. */
+void llvm_emit_licenses(struct text *out, enum target t, const char *bytes,
+                        size_t length);
 
 #endif

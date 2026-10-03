@@ -20,11 +20,10 @@
    docs/work-order-llvm-back-end.md gives the form of each operation.
 
    The step emit-core translates copy, jump, branch and ret, and the
-   signatures of scalars. The step emit-arith adds the scalar operations,
-   the entry of the runtime and the globals that hold no address. Every
-   other operation is refused with the step that adds it. A global that
-   holds an address and every instruction that names a global wait for the
-   step emit-memory. */
+   signatures of scalars. The step emit-arith adds the scalar operations
+   and the entry of the runtime. The step emit-memory adds the operations
+   on memory, the calls, the globals, the sections and the constructors.
+   Every other operation is refused with the step that adds it. */
 
 /* The metadata of a branch into a cold block, one id for each side. */
 enum { COLD_THEN, COLD_ELSE, COLD_COUNT };
@@ -42,6 +41,9 @@ struct emitter {
     bool cold_used[COLD_COUNT];
     struct text intrinsics;         /* the declarations of the intrinsics */
     struct text entry;              /* the type of main, for its alias */
+    const struct ir_module *m;
+    struct text *allocas;           /* the allocas of the entry block */
+    uint32_t slots;                 /* the next %a<n> of the function */
 };
 
 static void refuse(struct emitter *e, const char *what, const char *step)
@@ -61,7 +63,7 @@ static void refuse(struct emitter *e, const char *what, const char *step)
 }
 
 /* The step of the work order that translates op, or NULL for the
-   operations of the steps emit-core and emit-arith. */
+   operations of the steps up to this one. */
 static const char *step_of(enum ir_op op)
 {
     switch (op) {
@@ -81,6 +83,8 @@ static const char *step_of(enum ir_op op)
     case IR_TRUNC: case IR_SEXT: case IR_ZEXT: case IR_SITOF:
     case IR_UITOF: case IR_FTOSI: case IR_FTOUI: case IR_FEXT:
     case IR_FTRUNC: case IR_HEXT: case IR_HTRUNC:
+    case IR_SLOT: case IR_LOAD: case IR_STORE: case IR_PTRADD:
+    case IR_MEMCOPY: case IR_ADDR: case IR_BITLOAD: case IR_BITSTORE:
         return NULL;
     case IR_ADD_OV: case IR_SUB_OV: case IR_MUL_OV: case IR_BRANCH_OV:
     case IR_MULH_S: case IR_MULH_U:
@@ -91,8 +95,6 @@ static const char *step_of(enum ir_op op)
     case IR_VBINARY: case IR_VUNARY: case IR_VSPLAT: case IR_VSELECT:
     case IR_VSHUFFLE: case IR_VREDUCE:
         return "emit-wide";
-    case IR_SLOT: case IR_LOAD: case IR_STORE: case IR_PTRADD:
-    case IR_MEMCOPY: case IR_ADDR: case IR_BITLOAD: case IR_BITSTORE:
     case IR_CALL:
         return "emit-memory";
     }
@@ -121,14 +123,37 @@ static const char *scalar_type(enum ir_type type)
     return NULL;
 }
 
-/* The LLVM type of a value of type, or NULL after a refusal. */
+/* Fail with a message that names what the IR holds and the function,
+   for a form that no step of the work order translates, since the
+   lowering never writes it. */
+static void unexpected(struct emitter *e, const char *what)
+{
+    struct text name = {0};
+
+    if (e->failed) {
+        return;
+    }
+    e->failed = true;
+    ir_name_append(&name, e->f->module, e->f->name);
+    text_format(e->error, e->error_size,
+                "the LLVM back end cannot translate %s, in %s", what,
+                text_cstr(&name));
+    text_free(&name);
+}
+
+/* The LLVM type of a value of type, or NULL after a failure. c_long,
+   c_wchar and the word of a Mutex take the integer of their width on the
+   target, where layout_resolve has left one. */
 static const char *value_type(struct emitter *e, enum ir_type type)
 {
     const char *name = scalar_type(type);
 
+    if (name == NULL && type != IR_AGG) {
+        uint64_t bytes = layout_size(e->l, ir_scalar(type));
+        name = bytes == 2 ? "i16" : bytes == 4 ? "i32" : "i64";
+    }
     if (name == NULL) {
-        refuse(e, type == IR_AGG ? "an aggregate value" : "this type",
-               "emit-memory");
+        unexpected(e, "an aggregate value");
     }
     return name;
 }
@@ -252,8 +277,11 @@ static void float_constant(struct text *out, enum ir_type type, double value)
     text_appendf(out, "0x%016" PRIX64, bits);
 }
 
+static void global_symbol(struct text *out, enum target t,
+                          const struct ir_global *g);
+
 /* Append to value the LLVM operand of o as a value of type, after the
-   load that reads a temporary. */
+   load that reads a temporary. A global or a function is its symbol. */
 static void operand(struct emitter *e, const struct ir_operand *o,
                     enum ir_type type, struct text *value)
 {
@@ -276,15 +304,17 @@ static void operand(struct emitter *e, const struct ir_operand *o,
         float_constant(value, type, o->as.floating);
         return;
     case IR_GLOBAL:
+        global_symbol(value, e->o->target, e->m->globals[o->as.index]);
+        return;
     case IR_FUNC:
-        refuse(e, "the address of a global or a function", "emit-memory");
+        function_name(value, e->o->target, e->m->functions[o->as.index]);
         return;
     case IR_NONE:
     case IR_BLOCK:
     case IR_SYM:
         break;
     }
-    refuse(e, "this operand", "emit-memory");
+    unexpected(e, "this operand");
 }
 
 static void store_result(struct emitter *e, const struct ir_inst *inst,
@@ -292,7 +322,7 @@ static void store_result(struct emitter *e, const struct ir_inst *inst,
 {
     text_appendf(e->out, "  store %s %s, ptr %%t%" PRIu32 ", align %" PRIu64
                          "\n",
-                 scalar_type(inst->type), value, inst->result,
+                 value_type(e, inst->type), value, inst->result,
                  align_of(e, inst->type));
 }
 
@@ -603,6 +633,245 @@ static void unary(struct emitter *e, const struct ir_inst *inst)
     text_free(&a);
 }
 
+/* Copy size bytes from src to dst, two values of ptr. */
+static void copy_bytes(struct emitter *e, const char *dst, const char *src,
+                       uint64_t size)
+{
+    intrinsic(e, "void", "llvm.memcpy.p0.p0.i64", "ptr, ptr, i64, i1");
+    text_appendf(e->out, "  call void @llvm.memcpy.p0.p0.i64(ptr %s, ptr %s, "
+                         "i64 %" PRIu64 ", i1 false)\n",
+                 dst, src, size);
+}
+
+/* DESIGN: a slot is an alloca in the entry block, wherever the IR puts
+   it, so a slot in a loop is one place in the frame, as the native back
+   end makes it. Its temporary holds the address. */
+static void slot(struct emitter *e, const struct ir_inst *inst)
+{
+    char value[24];
+
+    text_appendf(e->allocas, "  %%s%" PRIu32 " = alloca [%" PRIu64
+                             " x i8], align %" PRIu64 "\n",
+                 inst->result, layout_size(e->l, inst->of),
+                 layout_align(e->l, inst->of));
+    text_format(value, sizeof value, "%%s%" PRIu32, inst->result);
+    store_result(e, inst, value);
+}
+
+/* DESIGN: a load and a store take the natural alignment of their type.
+   The IR marks no access as unaligned, and the section "Instruction
+   mapping" of docs/work-order-llvm-back-end.md gives 1 only to an access
+   the IR marks. */
+static void load_store(struct emitter *e, const struct ir_inst *inst)
+{
+    const char *name = value_type(e, inst->type);
+    struct text value = {0};
+    struct text pointer = {0};
+
+    if (name == NULL) {
+        return;
+    }
+    if (inst->op == IR_STORE) {
+        operand(e, &inst->a, inst->type, &value);
+        operand(e, &inst->b, IR_PTR, &pointer);
+        if (!e->failed) {
+            text_appendf(e->out, "  store %s %s, ptr %s, align %" PRIu64 "\n",
+                         name, text_cstr(&value), text_cstr(&pointer),
+                         align_of(e, inst->type));
+        }
+    } else {
+        operand(e, &inst->a, IR_PTR, &pointer);
+        if (!e->failed) {
+            text_appendf(e->out, "  %%v%" PRIu32 " = load %s, ptr %s, align %"
+                                 PRIu64 "\n",
+                         e->value, name, text_cstr(&pointer),
+                         align_of(e, inst->type));
+            text_appendf(&value, "%%v%" PRIu32, e->value++);
+            store_result(e, inst, text_cstr(&value));
+        }
+    }
+    text_free(&value);
+    text_free(&pointer);
+}
+
+/* An offset of bytes, which a getelementptr of i8 adds without inbounds,
+   so an address outside its object is no poison. An offset narrower than
+   64 bits extends with its sign. */
+static void ptradd(struct emitter *e, const struct ir_inst *inst)
+{
+    enum ir_type type = operand_type(e, &inst->b);
+    struct text pointer = {0};
+    struct text offset = {0};
+    char value[24];
+
+    operand(e, &inst->a, IR_PTR, &pointer);
+    operand(e, &inst->b, type, &offset);
+    if (!e->failed && type != IR_I64) {
+        uint32_t wide = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = sext %s %s to i64\n", wide,
+                     value_type(e, type), text_cstr(&offset));
+        text_free(&offset);
+        text_appendf(&offset, "%%v%" PRIu32, wide);
+    }
+    if (!e->failed) {
+        text_appendf(e->out, "  %%v%" PRIu32 " = getelementptr i8, ptr %s, "
+                             "i64 %s\n",
+                     e->value, text_cstr(&pointer), text_cstr(&offset));
+        text_format(value, sizeof value, "%%v%" PRIu32, e->value++);
+        store_result(e, inst, value);
+    }
+    text_free(&pointer);
+    text_free(&offset);
+}
+
+static void memcopy(struct emitter *e, const struct ir_inst *inst)
+{
+    struct text dst = {0};
+    struct text src = {0};
+
+    operand(e, &inst->a, IR_PTR, &dst);
+    operand(e, &inst->b, IR_PTR, &src);
+    if (!e->failed) {
+        copy_bytes(e, text_cstr(&dst), text_cstr(&src),
+                   layout_size(e->l, inst->of));
+    }
+    text_free(&dst);
+    text_free(&src);
+}
+
+static uint64_t field_mask(uint64_t width)
+{
+    return width >= 64 ? UINT64_MAX : ((uint64_t)1 << width) - 1;
+}
+
+/* Convert the value v of type from to type to, with the extension ext
+   where to is wider. Returns the value to use, in out. */
+static void convert_int(struct emitter *e, struct text *v, enum ir_type from,
+                        enum ir_type to, enum ir_ext ext)
+{
+    unsigned a = width_of(from);
+    unsigned b = width_of(to);
+    uint32_t n;
+
+    if (a == b) {
+        return;
+    }
+    n = fresh(e);
+    text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %s to %s\n", n,
+                 a > b                 ? "trunc"
+                 : ext == IR_EXT_SIGN ? "sext"
+                                      : "zext",
+                 value_type(e, from), text_cstr(v), value_type(e, to));
+    text_free(v);
+    text_appendf(v, "%%v%" PRIu32, n);
+}
+
+/* Write v = op type v, k and make v the result. */
+static void unit_op(struct emitter *e, struct text *v, const char *op,
+                    enum ir_type type, uint64_t k)
+{
+    uint32_t n = fresh(e);
+
+    text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %s, ", n, op,
+                 value_type(e, type), text_cstr(v));
+    int_constant(e->out, type, k);
+    text_append(e->out, "\n");
+    text_free(v);
+    text_appendf(v, "%%v%" PRIu32, n);
+}
+
+/* DESIGN: a bitfield load reads the integer that holds the field, the
+   unit of layout_bits. An unsigned field shifts down and masks, and a
+   signed one shifts to the top and back with an arithmetic shift, then
+   either widens to its type. A store reads the unit, clears the field,
+   puts the new bits in and writes the unit back. This is the sequence of
+   expand.c for the native back end. A unit may start at any byte, so it
+   takes the alignment its offset leaves in the aggregate. */
+static void bits(struct emitter *e, const struct ir_inst *inst)
+{
+    const struct ir_field *field =
+        &e->m->aggs[inst->of.agg]->fields[inst->field];
+    const struct layout *agg = layout_agg(e->l, inst->of.agg);
+    const struct layout_bits *where = &agg->bits[inst->field];
+    enum ir_type unit = where->unit_type;
+    const char *unit_name = value_type(e, unit);
+    unsigned unit_bits = width_of(unit);
+    uint64_t width = field->bits;
+    uint64_t align = agg->align;
+    struct text value = {0};
+    struct text pointer = {0};
+    struct text word = {0};
+
+    if (where->unit_offset != 0 &&
+        (where->unit_offset & (0 - where->unit_offset)) < align) {
+        align = where->unit_offset & (0 - where->unit_offset);
+    }
+    if (unit_bits / 8 < align) {
+        align = unit_bits / 8;
+    }
+    if (inst->op == IR_BITSTORE) {
+        operand(e, &inst->a, inst->type, &value);
+    }
+    operand(e, inst->op == IR_BITLOAD ? &inst->a : &inst->b, IR_PTR,
+            &pointer);
+    if (e->failed || unit_name == NULL) {
+        text_free(&value);
+        text_free(&pointer);
+        return;
+    }
+    if (where->unit_offset != 0) {
+        uint32_t n = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = getelementptr i8, ptr %s, "
+                             "i64 %" PRIu64 "\n",
+                     n, text_cstr(&pointer), where->unit_offset);
+        text_free(&pointer);
+        text_appendf(&pointer, "%%v%" PRIu32, n);
+    }
+    text_appendf(e->out, "  %%v%" PRIu32 " = load %s, ptr %s, align %" PRIu64
+                         "\n",
+                 e->value, unit_name, text_cstr(&pointer), align);
+    text_appendf(&word, "%%v%" PRIu32, e->value++);
+    if (inst->op == IR_BITLOAD && field->ext == IR_EXT_SIGN) {
+        unsigned up = unit_bits - where->shift - (unsigned)width;
+        if (up != 0) {
+            unit_op(e, &word, "shl", unit, up);
+        }
+        if (width < unit_bits) {
+            unit_op(e, &word, "ashr", unit, unit_bits - width);
+        }
+        convert_int(e, &word, unit, inst->type, IR_EXT_SIGN);
+        store_result(e, inst, text_cstr(&word));
+    } else if (inst->op == IR_BITLOAD) {
+        if (where->shift != 0) {
+            unit_op(e, &word, "lshr", unit, where->shift);
+        }
+        if (width < unit_bits) {
+            unit_op(e, &word, "and", unit, field_mask(width));
+        }
+        convert_int(e, &word, unit, inst->type, IR_EXT_ZERO);
+        store_result(e, inst, text_cstr(&word));
+    } else {
+        uint32_t n;
+        convert_int(e, &value, inst->type, unit, IR_EXT_ZERO);
+        if (width < unit_bits) {
+            unit_op(e, &value, "and", unit, field_mask(width));
+        }
+        if (where->shift != 0) {
+            unit_op(e, &value, "shl", unit, where->shift);
+        }
+        unit_op(e, &word, "and", unit, ~(field_mask(width) << where->shift));
+        n = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = or %s %s, %s\n", n,
+                     unit_name, text_cstr(&word), text_cstr(&value));
+        text_appendf(e->out, "  store %s %%v%" PRIu32 ", ptr %s, align %"
+                             PRIu64 "\n",
+                     unit_name, n, text_cstr(&pointer), align);
+    }
+    text_free(&value);
+    text_free(&pointer);
+    text_free(&word);
+}
+
 /* The metadata of a branch whose one side is the failure arm of an
    assertion or a check, which marks that side cold. */
 static void branch_weights(struct emitter *e, uint32_t then_block,
@@ -673,6 +942,29 @@ static void instruction(struct emitter *e, const struct ir_inst *inst)
     case IR_FTOSI: case IR_FTOUI: case IR_FEXT: case IR_FTRUNC:
     case IR_HEXT: case IR_HTRUNC:
         conversion(e, inst);
+        break;
+    case IR_SLOT:
+        slot(e, inst);
+        break;
+    case IR_LOAD:
+    case IR_STORE:
+        load_store(e, inst);
+        break;
+    case IR_PTRADD:
+        ptradd(e, inst);
+        break;
+    case IR_MEMCOPY:
+        memcopy(e, inst);
+        break;
+    case IR_ADDR:
+        operand(e, &inst->a, IR_PTR, &value);
+        if (!e->failed) {
+            store_result(e, inst, text_cstr(&value));
+        }
+        break;
+    case IR_BITLOAD:
+    case IR_BITSTORE:
+        bits(e, inst);
         break;
     default:
         binary(e, inst);
@@ -774,53 +1066,68 @@ static bool is_main(const struct emitter *e, const struct ir_function *f)
 
 static void definition(struct emitter *e, const struct ir_function *f)
 {
+    struct text *out = e->out;
+    struct text body = {0};
+    struct text allocas = {0};
     size_t b;
     size_t i;
     uint32_t t;
 
     e->f = f;
     e->value = 0;
-    text_append(e->out, "define ");
+    e->slots = 0;
+    text_append(out, "define ");
     linkage(e, f);
     if (!signature(e, f, true, is_main(e, f) ? &e->entry : NULL)) {
         return;
     }
-    text_append(e->out, " #0");
+    text_append(out, " #0");
     if (link_once(e, f) &&
         target_info(e->o->target)->format == FORMAT_COFF) {
-        text_append(e->out, " comdat");
+        text_append(out, " comdat");
     }
-    text_append(e->out, " {\n");
+    text_append(out, " {\nb0:\n");
+    for (t = 0; t < f->temp_count && !e->failed; t++) {
+        const char *name = value_type(e, f->temps[t]);
+        if (name != NULL) {
+            text_appendf(out, "  %%t%" PRIu32 " = alloca %s, align %" PRIu64
+                              "\n",
+                         t, name, align_of(e, f->temps[t]));
+        }
+    }
+    /* The allocas of the slots and the copies come after the ones of the
+       temporaries, and the body after all of them, in the entry block. */
+    e->out = &body;
+    e->allocas = &allocas;
+    for (i = 0; i < f->param_count && !e->failed; i++) {
+        enum ir_type type = f->params[i].type;
+        text_appendf(&body, "  store %s %%p%zu, ptr %%t%" PRIu32
+                            ", align %" PRIu64 "\n",
+                     value_type(e, type), i, f->params[i].temp,
+                     align_of(e, type));
+    }
     for (b = 0; b < f->block_count && !e->failed; b++) {
         const struct ir_block *block = f->blocks[b];
-        text_appendf(e->out, "%sb%zu:\n", b > 0 ? "\n" : "", b);
-        if (b == 0) {
-            for (t = 0; t < f->temp_count && !e->failed; t++) {
-                const char *name = value_type(e, f->temps[t]);
-                if (name != NULL) {
-                    text_appendf(e->out, "  %%t%" PRIu32 " = alloca %s, align "
-                                         "%" PRIu64 "\n",
-                                 t, name, align_of(e, f->temps[t]));
-                }
-            }
-            for (i = 0; i < f->param_count && !e->failed; i++) {
-                enum ir_type type = f->params[i].type;
-                text_appendf(e->out, "  store %s %%p%zu, ptr %%t%" PRIu32
-                                     ", align %" PRIu64 "\n",
-                             scalar_type(type), i, f->params[i].temp,
-                             align_of(e, type));
-            }
+        if (b > 0) {
+            text_appendf(&body, "\nb%zu:\n", b);
         }
         for (i = 0; i < block->count && !e->failed; i++) {
             instruction(e, &block->insts[i]);
         }
     }
-    text_append(e->out, "}\n\n");
+    e->out = out;
+    e->allocas = NULL;
+    text_append_bytes(out, allocas.data, allocas.length);
+    text_append_bytes(out, body.data, body.length);
+    text_append(out, "}\n\n");
+    text_free(&body);
+    text_free(&allocas);
 }
 
-/* The symbol of a global, without the _ of Mach-O, which llc writes. */
-static void global_symbol(struct text *out, enum target t,
-                          const struct ir_global *g)
+/* The symbol of a global after sigil, without the _ of Mach-O, which llc
+   writes. */
+static void global_sigil(struct text *out, char sigil, enum target t,
+                         const struct ir_global *g)
 {
     struct text symbol = {0};
     const char *name;
@@ -834,71 +1141,151 @@ static void global_symbol(struct text *out, enum target t,
     if (target_info(t)->format == FORMAT_MACHO && name[0] == '_') {
         name++;
     }
-    llvm_name(out, '@', name);
+    llvm_name(out, sigil, name);
     text_free(&symbol);
 }
 
-/* DESIGN: a global is a packed struct of its bytes, so its size and its
-   offsets are the ones layout_data computed, whatever the data layout
-   string says. The section "Globals, sections and constructors" of
-   docs/work-order-llvm-back-end.md gives the form. A global the program
-   writes is a global, every other one a constant, which llc puts in the
-   read-only section of each format. The linkage follows the one of a
-   function. A global that holds an address waits for the step
-   emit-memory, which writes it as members of ptr. A global the runtime
-   defines is declared by the step that names it. */
-static void global(struct emitter *e, const struct ir_global *g)
+static void global_symbol(struct text *out, enum target t,
+                          const struct ir_global *g)
 {
-    struct text name = {0};
+    global_sigil(out, '@', t, g);
+}
+
+/* Append c"..." of length bytes, with \XX escapes. */
+static void byte_string(struct text *out, const uint8_t *bytes,
+                        uint64_t length)
+{
+    uint64_t k;
+
+    text_append(out, "c\"");
+    for (k = 0; k < length; k++) {
+        unsigned char ch = bytes[k];
+        if (ch < 0x20 || ch >= 0x7f || ch == '"' || ch == '\\') {
+            text_appendf(out, "\\%02X", ch);
+        } else {
+            text_appendf(out, "%c", ch);
+        }
+    }
+    text_append(out, "\"");
+}
+
+/* Append the member of the bytes from up to to of g to the types and the
+   values of its struct, zeroinitializer for a run of zeros. */
+static void byte_member(struct text *types, struct text *values,
+                        const struct ir_global *g, uint64_t from, uint64_t to)
+{
     bool zero = true;
     uint64_t k;
 
-    if (g->is_extern) {
-        return;
-    }
-    if (g->reloc_count > 0) {
-        if (!e->failed) {
-            e->failed = true;
-            ir_name_append(&name, g->module, g->name);
-            text_format(e->error, e->error_size,
-                        "the LLVM back end does not translate a global that "
-                        "holds an address before the step emit-memory, in "
-                        "%s",
-                        text_cstr(&name));
-            text_free(&name);
-        }
-        return;
-    }
-    global_symbol(e->out, e->o->target, g);
-    text_append(e->out, " = ");
-    if (g->exported) {
-        text_append(e->out, "dso_local ");
-    } else if (!e->o->one_module && !e->o->exports) {
-        text_append(e->out, "internal ");
-    } else if (e->o->one_module && !e->o->exports &&
-               target_info(e->o->target)->format != FORMAT_COFF) {
-        text_append(e->out, "hidden ");
-    }
-    for (k = 0; k < g->size; k++) {
+    for (k = from; k < to; k++) {
         zero = zero && g->bytes[k] == 0;
     }
-    text_appendf(e->out, "%s <{ [%" PRIu64 " x i8] }> ",
-                 g->mutable ? "global" : "constant", g->size);
+    text_appendf(types, "%s[%" PRIu64 " x i8]", types->length > 0 ? ", " : "",
+                 to - from);
+    text_appendf(values, "%s[%" PRIu64 " x i8] ",
+                 values->length > 0 ? ", " : "", to - from);
     if (zero) {
+        text_append(values, "zeroinitializer");
+    } else {
+        byte_string(values, g->bytes + from, to - from);
+    }
+}
+
+static int reloc_order(const void *a, const void *b)
+{
+    const struct ir_reloc *x = a;
+    const struct ir_reloc *y = b;
+
+    return x->offset < y->offset ? -1 : x->offset > y->offset;
+}
+
+/* Whether g is the datum of a copy of a generic in an object of one
+   module, which every module that uses it defines. */
+static bool global_once(const struct emitter *e, const struct ir_global *g)
+{
+    return e->o->one_module && ir_is_copy_name(g->name);
+}
+
+/* DESIGN: a global is a packed struct, so its size and its offsets are
+   the ones layout_data computed, whatever the data layout string says.
+   The section "Globals, sections and constructors" of
+   docs/work-order-llvm-back-end.md gives the form. The bytes between two
+   addresses are one member of [N x i8], and each address a member of ptr
+   that names the global or the function. A global the program writes is
+   a global, every other one a constant, which llc puts in the read-only
+   section of each format, or in the one the loader writes once where it
+   holds an address. The linkage follows the one of a function. A global
+   the runtime defines is a declaration of its bytes. */
+static void global(struct emitter *e, const struct ir_global *g)
+{
+    enum target t = e->o->target;
+    bool coff = target_info(t)->format == FORMAT_COFF;
+    uint64_t word = layout_size(e->l, ir_scalar(IR_PTR));
+    struct text types = {0};
+    struct text values = {0};
+    struct ir_reloc *relocs;
+    uint64_t from = 0;
+    bool zero = true;
+    size_t i;
+
+    global_symbol(e->out, t, g);
+    if (g->is_extern) {
+        text_appendf(e->out, " = external global [%" PRIu64 " x i8], align %"
+                             PRIu64 "\n",
+                     g->size, g->align > 0 ? g->align : 1);
+        return;
+    }
+    text_append(e->out, " = ");
+    if (!g->exported && !e->o->one_module && !e->o->exports) {
+        text_append(e->out, "internal ");
+    } else {
+        if (global_once(e, g)) {
+            text_append(e->out, "weak_odr ");
+        }
+        if (g->exported) {
+            text_append(e->out, "dso_local ");
+        } else if (e->o->one_module && !e->o->exports && !coff) {
+            text_append(e->out, "hidden ");
+        }
+    }
+    relocs = alloc_zeroed(g->reloc_count + 1, sizeof *relocs);
+    if (g->reloc_count > 0) {
+        memcpy(relocs, g->relocs, g->reloc_count * sizeof *relocs);
+        qsort(relocs, g->reloc_count, sizeof *relocs, reloc_order);
+    }
+    for (i = 0; i < g->reloc_count; i++) {
+        if (relocs[i].offset > from) {
+            byte_member(&types, &values, g, from, relocs[i].offset);
+        }
+        text_appendf(&types, "%sptr", types.length > 0 ? ", " : "");
+        text_appendf(&values, "%sptr ", values.length > 0 ? ", " : "");
+        if (relocs[i].fn) {
+            function_name(&values, t, e->m->functions[relocs[i].global]);
+        } else {
+            global_symbol(&values, t, e->m->globals[relocs[i].global]);
+        }
+        from = relocs[i].offset + word;
+    }
+    if (from < g->size || g->reloc_count == 0) {
+        byte_member(&types, &values, g, from, g->size);
+    }
+    for (i = 0; i < g->size; i++) {
+        zero = zero && g->bytes[i] == 0;
+    }
+    text_appendf(e->out, "%s <{ %s }> ", g->mutable ? "global" : "constant",
+                 text_cstr(&types));
+    if (zero && g->reloc_count == 0) {
         text_append(e->out, "zeroinitializer");
     } else {
-        text_appendf(e->out, "<{ [%" PRIu64 " x i8] c\"", g->size);
-        for (k = 0; k < g->size; k++) {
-            unsigned char ch = g->bytes[k];
-            if (ch < 0x20 || ch >= 0x7f || ch == '"' || ch == '\\') {
-                text_appendf(e->out, "\\%02X", ch);
-            } else {
-                text_appendf(e->out, "%c", ch);
-            }
-        }
-        text_append(e->out, "\" }>");
+        text_appendf(e->out, "<{ %s }>", text_cstr(&values));
+    }
+    if (global_once(e, g) && coff) {
+        text_append(e->out, ", comdat");
     }
     text_appendf(e->out, ", align %" PRIu64 "\n", g->align > 0 ? g->align : 1);
+    free(relocs);
+    text_free(&types);
+    text_free(&values);
 }
 
 /* DESIGN: the runtime calls main through its entry, the name RUNTIME_ENTRY
@@ -1012,6 +1399,119 @@ static uint32_t flag_count(enum target t)
            (target_info(t)->os == OS_WINDOWS);
 }
 
+/* DESIGN: the functions that run before main are the one of each module
+   that compiles its patterns and, in a shared library, the constructor of
+   the runtime. llvm.global_ctors names them, at the priority of a C
+   constructor, and llc writes the section of each format: .init_array,
+   __mod_init_func or .CRT$XCU, the sections of emit.c. */
+static void constructors(struct emitter *e, const struct ir_module *m)
+{
+    struct text entries = {0};
+    size_t count = 0;
+    bool declared = false;
+    size_t i;
+
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        if (ir_is_patterns_start(f)) {
+            text_appendf(&entries, "%s{ i32, ptr, ptr } { i32 65535, ptr ",
+                         count++ > 0 ? ", " : "");
+            function_name(&entries, e->o->target, f);
+            text_append(&entries, ", ptr null }");
+        }
+        declared = declared ||
+                   (e->o->constructor != NULL && f->is_extern &&
+                    f->module == NULL &&
+                    strcmp(f->name, e->o->constructor) == 0);
+    }
+    if (e->o->constructor != NULL) {
+        struct text symbol = {0};
+        const char *name;
+        target_c_symbol(&symbol, e->o->target, e->o->constructor);
+        name = text_cstr(&symbol);
+        if (target_info(e->o->target)->format == FORMAT_MACHO &&
+            name[0] == '_') {
+            name++;
+        }
+        text_appendf(&entries, "%s{ i32, ptr, ptr } { i32 65535, ptr ",
+                     count++ > 0 ? ", " : "");
+        llvm_name(&entries, '@', name);
+        text_append(&entries, ", ptr null }");
+        if (!declared) {
+            text_append(&e->intrinsics, "declare void ");
+            llvm_name(&e->intrinsics, '@', name);
+            text_append(&e->intrinsics, "() #1\n");
+        }
+        text_free(&symbol);
+    }
+    if (count > 0) {
+        text_appendf(e->out, "@llvm.global_ctors = appending global [%zu x "
+                             "{ i32, ptr, ptr }] [%s]\n",
+                     count, text_cstr(&entries));
+    }
+    text_free(&entries);
+}
+
+/* The name of the source, the data layout and the triple of t. */
+static void head(struct text *out, enum target t, const char *source)
+{
+    text_appendf(out, "source_filename = \"%s\"\n", source);
+    text_appendf(out, "target datalayout = \"%s\"\n", llvm_data_layout(t));
+    text_append(out, "target triple = \"");
+    llvm_triple(out, t);
+    text_append(out, "\"\n\n");
+}
+
+/* DESIGN: the package header and the notice keep the sections emit.c
+   gives them. No symbol names the copy of the package header, so
+   llvm.used keeps the private constant through every pass. */
+void llvm_emit_package(struct text *out, enum target t, const char *bytes,
+                       size_t length)
+{
+    static const char *const sections[] = {
+        [FORMAT_ELF] = ".anti_package",
+        [FORMAT_MACHO] = "__DATA,__anti_package",
+        [FORMAT_COFF] = ".anti_package",
+    };
+
+    head(out, t, "package");
+    text_appendf(out, "@anti.package = private constant [%zu x i8] ",
+                 length);
+    byte_string(out, (const uint8_t *)bytes, length);
+    text_appendf(out, ", section \"%s\"\n"
+                      "@llvm.used = appending global [1 x ptr] "
+                      "[ptr @anti.package], section \"llvm.metadata\"\n",
+                 sections[target_info(t)->format]);
+}
+
+void llvm_emit_licenses(struct text *out, enum target t, const char *bytes,
+                        size_t length)
+{
+    static const char *const sections[] = {
+        [FORMAT_ELF] = ".rodata",
+        [FORMAT_MACHO] = "__TEXT,__const",
+        [FORMAT_COFF] = ".rdata",
+    };
+    struct text symbol = {0};
+    struct text text = {0};
+    const char *name;
+
+    target_c_symbol(&symbol, t, "anti_licenses");
+    name = text_cstr(&symbol);
+    if (target_info(t)->format == FORMAT_MACHO && name[0] == '_') {
+        name++;
+    }
+    text_append_bytes(&text, bytes, length);
+    llvm_name(out, '@', name);
+    text_appendf(out, " = dso_local constant [%zu x i8] ", length + 1);
+    /* The texts end in a NUL, which text_cstr gives after the bytes. */
+    byte_string(out, (const uint8_t *)text_cstr(&text), length + 1);
+    text_appendf(out, ", section \"%s\", align 1\n",
+                 sections[target_info(t)->format]);
+    text_free(&symbol);
+    text_free(&text);
+}
+
 bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
                       const struct ir_module *m, struct layouts *l,
                       char *error, size_t error_size)
@@ -1030,12 +1530,26 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
     e.error = error;
     e.error_size = error_size;
     e.cold_id = flags + 1;
-    text_appendf(out, "source_filename = \"%s\"\n", o->module);
-    text_appendf(out, "target datalayout = \"%s\"\n",
-                 llvm_data_layout(o->target));
-    text_append(out, "target triple = \"");
-    llvm_triple(out, o->target);
-    text_append(out, "\"\n\n");
+    e.m = m;
+    /* DESIGN: a plugin of COFF reaches the names of its host through the
+       __imp_ entries of the import library, which the step flags adds. */
+    if (m->plugin && target_info(o->target)->format == FORMAT_COFF) {
+        text_format(error, error_size,
+                    "the LLVM back end does not translate a plugin for %s "
+                    "before the step flags",
+                    target_name(o->target));
+        return false;
+    }
+    head(out, o->target, o->module);
+    for (i = 0; i < m->global_count; i++) {
+        const struct ir_global *g = m->globals[i];
+        if (!g->is_extern && global_once(&e, g) &&
+            target_info(o->target)->format == FORMAT_COFF) {
+            global_sigil(out, '$', o->target, g);
+            text_append(out, " = comdat any\n");
+            comdats = true;
+        }
+    }
     for (i = 0; i < m->function_count; i++) {
         const struct ir_function *f = m->functions[i];
         if (!f->is_extern && link_once(&e, f) &&
@@ -1064,6 +1578,7 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
     for (i = 0; i < m->global_count && !e.failed; i++) {
         global(&e, m->globals[i]);
     }
+    constructors(&e, m);
     if (!e.failed) {
         text_append_bytes(out, body.data, body.length);
         e.out = out;

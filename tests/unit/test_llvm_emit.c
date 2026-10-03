@@ -1,11 +1,13 @@
-/* llvm_emit_module of the steps emit-core and emit-arith: the
+/* llvm_emit_module of the steps emit-core, emit-arith and emit-memory: the
    temporaries, the blocks, copy, jump, branch and ret, the scalar
-   operations with the guards of release mode, the signatures, the
-   linkage, the attributes of a function, the entry of the runtime, the
-   globals without an address, the module flags, and the refusal of every
-   other operation. The expected texts follow the sections "Types and
-   layout", "Attributes and metadata", "Instruction mapping" and "Defined
-   results in release mode" of docs/work-order-llvm-back-end.md. */
+   operations with the guards of release mode, the operations on memory,
+   the signatures and the calls, the linkage, the attributes of a
+   function, the entry of the runtime, the globals, the sections and the
+   constructors, the module flags, and the refusal of every other
+   operation. The expected texts follow the sections "Types and layout",
+   "Calling convention", "Attributes and metadata", "Instruction mapping",
+   "Defined results in release mode" and "Globals, sections and
+   constructors" of docs/work-order-llvm-back-end.md. */
 
 #include "../binary_stdio.h"
 #include "check.h"
@@ -19,6 +21,7 @@ struct fixture {
     struct ir_module m;
     struct text out;
     char error[200];
+    const char *constructor;        /* the option of the same name */
 };
 
 static void begin(struct fixture *x)
@@ -49,6 +52,7 @@ static bool run_with(struct fixture *x, enum target t, bool one_module,
     o.module = "main";
     o.one_module = one_module;
     o.exports = exports;
+    o.constructor = x->constructor;
     ok = layout_init(&l, t, &x->m, x->error, sizeof x->error) &&
          layout_data(&l, &x->m);
     for (i = 0; ok && i < x->m.function_count; i++) {
@@ -355,28 +359,6 @@ static void refusals(void)
         CHECK_STR(x.error, cases[i].message);
         end(&x);
     }
-
-    /* A slot and a call wait for the step emit-memory. */
-    begin(&x);
-    f = ir_function_add(&x.m, "main", "f", IR_VOID, IR_NO_AGG);
-    b = ir_block_add(f);
-    ir_slot(f, b, ir_scalar(IR_I64));
-    ir_ret(f, b, IR_VOID, ir_int_op(IR_VOID, 0));
-    CHECK(!run(&x, TARGET_MACOS_ARM64));
-    CHECK_STR(x.error, "the LLVM back end does not translate `slot` before "
-                       "the step emit-memory, in main.f");
-    end(&x);
-
-    /* So does a parameter of an aggregate. */
-    begin(&x);
-    f = ir_function_add(&x.m, "main", "f", IR_VOID, IR_NO_AGG);
-    ir_param_add(f, IR_AGG, ir_array_of(&x.m, "i64", ir_scalar(IR_I64), 2));
-    ir_ret(f, ir_block_add(f), IR_VOID, ir_int_op(IR_VOID, 0));
-    CHECK(!run(&x, TARGET_MACOS_ARM64));
-    CHECK_STR(x.error, "the LLVM back end does not translate an aggregate "
-                       "parameter or result before the step emit-memory, "
-                       "in main.f");
-    end(&x);
 }
 
 /* A function main.f(a: from, b: from) -> to whose body is op a, b, or op
@@ -655,17 +637,265 @@ static void globals(void)
     CHECK(run_with(&x, TARGET_LINUX_X86_64, true, false));
     CHECK(holds(&x, "@main.bytes = hidden constant <{ [3 x i8] }> "));
     end(&x);
+}
 
-    /* A global that holds an address waits for the step emit-memory. */
+/* A slot is an alloca of its bytes in the entry block, wherever the IR
+   puts it, and its temporary holds the address. A load and a store take
+   the natural alignment of their type, an offset is a getelementptr of
+   bytes, a copy calls llvm.memcpy with the folded size, and the address
+   of a global is its symbol. */
+static void memory(void)
+{
+    static const uint8_t zeros[8] = {0};
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_block *b[2];
+    struct ir_global *g;
+    struct ir_vtype pair;
+    uint32_t p;
+    uint32_t s;
+    uint32_t q;
+    uint32_t t;
+    uint32_t a;
+
+    begin(&x);
+    g = ir_global_add(&x.m, "main", "word", zeros, 8, 8);
+    pair = ir_aggregate(ir_array_of(&x.m, "i64", ir_scalar(IR_I64), 2));
+    f = ir_function_add(&x.m, "main", "f", IR_I32, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b[0] = ir_block_add(f);
+    b[1] = ir_block_add(f);
+    ir_jump(f, b[0], b[1]);
+    s = ir_slot(f, b[1], pair);
+    ir_memcopy(f, b[1], ir_temp_op(f, s), ir_temp_op(f, p), pair);
+    q = ir_ptradd(f, b[1], ir_temp_op(f, s), ir_int_op(IR_I64, 4));
+    ir_store(f, b[1], IR_I32, ir_int_op(IR_I32, 7), ir_temp_op(f, q));
+    t = ir_load(f, b[1], IR_I32, ir_temp_op(f, q));
+    a = ir_addr(f, b[1], ir_global_op(g));
+    ir_store(f, b[1], IR_I64, ir_int_op(IR_I64, 1), ir_temp_op(f, a));
+    ir_ret(f, b[1], IR_I32, ir_temp_op(f, t));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "define internal i32 @main.f(ptr %p0) #0 {\n"
+                    "b0:\n"
+                    "  %t0 = alloca ptr, align 8\n"
+                    "  %t1 = alloca ptr, align 8\n"
+                    "  %t2 = alloca ptr, align 8\n"
+                    "  %t3 = alloca i32, align 4\n"
+                    "  %t4 = alloca ptr, align 8\n"
+                    "  %s1 = alloca [16 x i8], align 8\n"
+                    "  store ptr %p0, ptr %t0, align 8\n"
+                    "  br label %b1\n"
+                    "\n"
+                    "b1:\n"
+                    "  store ptr %s1, ptr %t1, align 8\n"
+                    "  %v0 = load ptr, ptr %t1, align 8\n"
+                    "  %v1 = load ptr, ptr %t0, align 8\n"
+                    "  call void @llvm.memcpy.p0.p0.i64(ptr %v0, ptr %v1, "
+                    "i64 16, i1 false)\n"
+                    "  %v2 = load ptr, ptr %t1, align 8\n"
+                    "  %v3 = getelementptr i8, ptr %v2, i64 4\n"
+                    "  store ptr %v3, ptr %t2, align 8\n"
+                    "  %v4 = load ptr, ptr %t2, align 8\n"
+                    "  store i32 7, ptr %v4, align 4\n"
+                    "  %v5 = load ptr, ptr %t2, align 8\n"
+                    "  %v6 = load i32, ptr %v5, align 4\n"
+                    "  store i32 %v6, ptr %t3, align 4\n"
+                    "  store ptr @main.word, ptr %t4, align 8\n"
+                    "  %v7 = load ptr, ptr %t4, align 8\n"
+                    "  store i64 1, ptr %v7, align 8\n"
+                    "  %v8 = load i32, ptr %t3, align 4\n"
+                    "  ret i32 %v8\n"
+                    "}\n"));
+    CHECK(holds(&x, "declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, "
+                    "i1)\n"));
+    end(&x);
+
+    /* The address of a function is its symbol, and an offset of another
+       width than 64 bits is extended with its sign first. */
+    begin(&x);
+    f = ir_function_add(&x.m, "main", "f", IR_PTR, IR_NO_AGG);
+    p = ir_param_add(f, IR_I32, IR_NO_AGG);
+    b[0] = ir_block_add(f);
+    a = ir_addr(f, b[0], ir_func_op(f));
+    q = ir_ptradd(f, b[0], ir_temp_op(f, a), ir_temp_op(f, p));
+    ir_ret(f, b[0], IR_PTR, ir_temp_op(f, q));
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(holds(&x, "  store ptr @main.f, ptr %t1, align 8\n"
+                    "  %v0 = load ptr, ptr %t1, align 8\n"
+                    "  %v1 = load i32, ptr %t0, align 4\n"
+                    "  %v2 = sext i32 %v1 to i64\n"
+                    "  %v3 = getelementptr i8, ptr %v0, i64 %v2\n"));
+    end(&x);
+}
+
+/* The struct of bitfields a: u32 : 3, b: i32 : 5 and c: u32 : 10, whose
+   integers are the i8 at byte 0 for a and b and the i16 at byte 1 for c. */
+static uint32_t bit_record(struct fixture *x)
+{
+    struct ir_field fields[3];
+
+    memset(fields, 0, sizeof fields);
+    fields[0].name = "a";
+    fields[0].type = ir_scalar(IR_I32);
+    fields[0].bits = 3;
+    fields[0].ext = IR_EXT_ZERO;
+    fields[1].name = "b";
+    fields[1].type = ir_scalar(IR_I32);
+    fields[1].bits = 5;
+    fields[1].ext = IR_EXT_SIGN;
+    fields[2].name = "c";
+    fields[2].type = ir_scalar(IR_I32);
+    fields[2].bits = 10;
+    fields[2].ext = IR_EXT_ZERO;
+    return ir_struct_add(&x->m, IR_AGG_STRUCT, "main.Bits", fields, 3, false,
+                         0);
+}
+
+/* A bitfield load reads its integer, shifts the field down and masks it,
+   or shifts it to the top and back with its sign, then widens it. A store
+   clears the field in the integer and puts the new bits in. An integer
+   off its alignment takes the alignment its offset allows. */
+static void bitfields(void)
+{
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_block *b;
+    uint32_t agg;
+    uint32_t p;
+    uint32_t t;
+    uint32_t u;
+
+    begin(&x);
+    agg = bit_record(&x);
+    f = ir_function_add(&x.m, "main", "f", IR_I32, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b = ir_block_add(f);
+    t = ir_bitload(f, b, IR_I32, ir_temp_op(f, p), agg, 1);
+    u = ir_bitload(f, b, IR_I32, ir_temp_op(f, p), agg, 2);
+    ir_bitstore(f, b, IR_I32, ir_temp_op(f, u), ir_temp_op(f, p), agg, 0);
+    ir_ret(f, b, IR_I32, ir_temp_op(f, t));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "  %v0 = load ptr, ptr %t0, align 8\n"
+                    "  %v1 = load i8, ptr %v0, align 1\n"
+                    "  %v2 = ashr i8 %v1, 3\n"
+                    "  %v3 = sext i8 %v2 to i32\n"
+                    "  store i32 %v3, ptr %t1, align 4\n"
+                    "  %v4 = load ptr, ptr %t0, align 8\n"
+                    "  %v5 = getelementptr i8, ptr %v4, i64 1\n"
+                    "  %v6 = load i16, ptr %v5, align 1\n"
+                    "  %v7 = and i16 %v6, 1023\n"
+                    "  %v8 = zext i16 %v7 to i32\n"
+                    "  store i32 %v8, ptr %t2, align 4\n"
+                    "  %v9 = load i32, ptr %t2, align 4\n"
+                    "  %v10 = load ptr, ptr %t0, align 8\n"
+                    "  %v11 = load i8, ptr %v10, align 1\n"
+                    "  %v12 = trunc i32 %v9 to i8\n"
+                    "  %v13 = and i8 %v12, 7\n"
+                    "  %v14 = and i8 %v11, -8\n"
+                    "  %v15 = or i8 %v14, %v13\n"
+                    "  store i8 %v15, ptr %v10, align 1\n"));
+    end(&x);
+}
+
+/* A global that holds addresses is a packed struct of its bytes and of a
+   ptr for each address, a function or another global. A run of zeros is
+   zeroinitializer. A global that another object defines is declared
+   with the size the IR gives it. */
+static void addresses(void)
+{
+    static const uint8_t bytes[24] = {1};
+    static const uint8_t zeros[16] = {0};
+    struct fixture x;
+    struct ir_global *g;
+    struct ir_global *h;
+
     begin(&x);
     returns(&x, "f", IR_VOID, ir_int_op(IR_VOID, 0));
-    g = ir_global_add(&x.m, "main", "table", zeros, 8, 8);
-    ir_global_reloc_fn(&x.m, g, 0, 0);
-    CHECK(!run(&x, TARGET_MACOS_ARM64));
-    CHECK_STR(x.error, "the LLVM back end does not translate a global that "
-                       "holds an address before the step emit-memory, in "
-                       "main.table");
+    g = ir_global_add(&x.m, "main", "bytes", bytes, 3, 1);
+    h = ir_global_add(&x.m, "other", "root", NULL, 0, 1);
+    h->is_extern = true;
+    h = ir_global_add(&x.m, "main", "table", bytes, 24, 8);
+    ir_global_reloc_fn(&x.m, h, 8, 0);
+    ir_global_reloc(&x.m, h, 16, g->index);
+    h = ir_global_add(&x.m, "main", "slot", zeros, 16, 8);
+    ir_global_reloc(&x.m, h, 8, 1);
+    h->mutable = true;
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(holds(&x, "@main.table = internal constant "
+                    "<{ [8 x i8], ptr, ptr }> <{ [8 x i8] "
+                    "c\"\\01\\00\\00\\00\\00\\00\\00\\00\", ptr @main.f, "
+                    "ptr @main.bytes }>, align 8\n"));
+    CHECK(holds(&x, "@main.slot = internal global <{ [8 x i8], ptr }> "
+                    "<{ [8 x i8] zeroinitializer, ptr @other.root }>, "
+                    "align 8\n"));
+    CHECK(holds(&x, "@other.root = external global [0 x i8], align 1\n"));
     end(&x);
+}
+
+/* The function of a module that compiles its patterns, and the
+   constructor of a shared library, run before main from
+   llvm.global_ctors. */
+static void constructors(void)
+{
+    struct fixture x;
+
+    begin(&x);
+    returns(&x, IR_PATTERNS_START, IR_VOID, ir_int_op(IR_VOID, 0));
+    x.constructor = "anti_rt_init";
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "@llvm.global_ctors = appending global "
+                    "[2 x { i32, ptr, ptr }] "
+                    "[{ i32, ptr, ptr } { i32 65535, "
+                    "ptr @main.patterns.start, ptr null }, "
+                    "{ i32, ptr, ptr } { i32 65535, ptr @anti_rt_init, "
+                    "ptr null }]\n"));
+    CHECK(holds(&x, "declare void @anti_rt_init() #1\n"));
+    x.constructor = NULL;
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "@llvm.global_ctors = appending global "
+                    "[1 x { i32, ptr, ptr }] "
+                    "[{ i32, ptr, ptr } { i32 65535, "
+                    "ptr @main.patterns.start, ptr null }]\n"));
+    end(&x);
+
+    /* A module without either has no list. */
+    begin(&x);
+    returns(&x, "f", IR_VOID, ir_int_op(IR_VOID, 0));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(lacks(&x, "llvm.global_ctors"));
+    end(&x);
+}
+
+/* The copy of the package header is an object of one private constant in
+   the section of emit.c, which llvm.used keeps. The notice is the global
+   anti_licenses in the read-only section, ended by a NUL. */
+static void sections(void)
+{
+    struct text out = {0};
+
+    llvm_emit_package(&out, TARGET_LINUX_X86_64, "a\"b", 3);
+    CHECK(strstr(text_cstr(&out), "target triple = \"x86_64-unknown-linux-"
+                                  "gnu\"\n") != NULL);
+    CHECK(strstr(text_cstr(&out),
+                 "@anti.package = private constant [3 x i8] c\"a\\22b\", "
+                 "section \".anti_package\"\n"
+                 "@llvm.used = appending global [1 x ptr] "
+                 "[ptr @anti.package], section \"llvm.metadata\"\n") != NULL);
+    text_free(&out);
+    llvm_emit_package(&out, TARGET_MACOS_ARM64, "x", 1);
+    CHECK(strstr(text_cstr(&out), "section \"__DATA,__anti_package\"") !=
+          NULL);
+    text_free(&out);
+    llvm_emit_licenses(&out, TARGET_MACOS_ARM64, "ab", 2);
+    CHECK_STR(text_cstr(&out),
+              "@anti_licenses = dso_local constant [3 x i8] c\"ab\\00\", "
+              "section \"__TEXT,__const\", align 1\n");
+    text_free(&out);
+    llvm_emit_licenses(&out, TARGET_WINDOWS_X86_64, "", 0);
+    CHECK_STR(text_cstr(&out),
+              "@anti_licenses = dso_local constant [1 x i8] c\"\\00\", "
+              "section \".rdata\", align 1\n");
+    text_free(&out);
 }
 
 void test_llvm_emit(void)
@@ -685,5 +915,10 @@ void test_llvm_emit(void)
     constant_operands();
     entry();
     globals();
+    memory();
+    bitfields();
+    addresses();
+    constructors();
+    sections();
     refusals();
 }
