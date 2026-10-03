@@ -23,6 +23,13 @@
 #include "alloc.h"
 #include "target.h"
 
+/* The work and its context, handed to the thread of
+   platform_run_on_stack. */
+struct stack_call {
+    void (*work)(void *context);
+    void *context;
+};
+
 /* DESIGN: the host is fixed when the tools are compiled, from the
    compiler's predefined macros. The antic_host_target test compares the
    result with the name CMake computes. */
@@ -494,11 +501,48 @@ int process_capture(const char *const argv[], struct text *out)
     return status;
 }
 
+static DWORD WINAPI stack_start(LPVOID context)
+{
+    struct stack_call *call = context;
+
+    call->work(call->context);
+    return 0;
+}
+
+bool platform_run_on_stack(void (*work)(void *context), void *context)
+{
+    struct stack_call call;
+    HANDLE thread;
+
+    call.work = work;
+    call.context = context;
+    /* The size reserves the stack, and Windows commits its pages as the
+       thread reaches them. */
+    thread = CreateThread(NULL, PLATFORM_WORK_STACK, stack_start, &call,
+                          STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
+    if (thread == NULL) {
+        fprintf(stderr, "antic: cannot start the thread of the work: "
+                        "error %lu\n",
+                (unsigned long)GetLastError());
+        return false;
+    }
+    if (WaitForSingleObject(thread, INFINITE) != WAIT_OBJECT_0) {
+        fprintf(stderr, "antic: cannot wait for the thread of the work: "
+                        "error %lu\n",
+                (unsigned long)GetLastError());
+        CloseHandle(thread);
+        return false;
+    }
+    CloseHandle(thread);
+    return true;
+}
+
 #else
 
 #include <dirent.h>
 #include <errno.h>
 #include <limits.h>
+#include <pthread.h>
 #include <spawn.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -845,6 +889,45 @@ int process_run_lines(const char *const argv[], const char *name,
     close(fds[0]);
     text_free(&pending);
     return wait_for(pid, argv[0]);
+}
+
+static void *stack_start(void *context)
+{
+    struct stack_call *call = context;
+
+    call->work(call->context);
+    return NULL;
+}
+
+bool platform_run_on_stack(void (*work)(void *context), void *context)
+{
+    struct stack_call call;
+    pthread_attr_t attributes;
+    pthread_t thread;
+    int error;
+
+    call.work = work;
+    call.context = context;
+    error = pthread_attr_init(&attributes);
+    if (error == 0) {
+        error = pthread_attr_setstacksize(&attributes, PLATFORM_WORK_STACK);
+        if (error == 0) {
+            error = pthread_create(&thread, &attributes, stack_start, &call);
+        }
+        pthread_attr_destroy(&attributes);
+    }
+    if (error != 0) {
+        fprintf(stderr, "antic: cannot start the thread of the work: %s\n",
+                strerror(error));
+        return false;
+    }
+    error = pthread_join(thread, NULL);
+    if (error != 0) {
+        fprintf(stderr, "antic: cannot wait for the thread of the work: %s\n",
+                strerror(error));
+        return false;
+    }
+    return true;
 }
 
 #endif

@@ -206,6 +206,36 @@ static void list_directory(void)
     CHECK(!directory_exists("tool_platform_none"));
 }
 
+/* One frame of 64 KB per level. 512 levels take 32 MB, past the 8 MB of
+   the main thread of Linux and macOS and the 1 MB of Windows. Every level
+   adds the last byte of its frame, so the sum counts the levels. */
+static unsigned descend(unsigned depth)
+{
+    volatile unsigned char frame[64 * 1024];
+
+    frame[0] = 0;
+    frame[sizeof frame - 1] = 1;
+    if (depth == 0) {
+        return frame[0];
+    }
+    return descend(depth - 1) + frame[sizeof frame - 1];
+}
+
+static void deep_work(void *context)
+{
+    *(unsigned *)context = descend(511);
+}
+
+/* platform_run_on_stack runs its work on a stack of
+   PLATFORM_WORK_STACK, which takes the 32 MB of descend. */
+static void deep_stack(void)
+{
+    unsigned levels = 0;
+
+    CHECK(platform_run_on_stack(deep_work, &levels));
+    CHECK(levels == 511);
+}
+
 void test_tool_platform(void)
 {
     static const char path[] = "tool_platform.bin";
@@ -235,4 +265,5 @@ void test_tool_platform(void)
 
     path_rules_of_host();
     list_directory();
+    deep_stack();
 }

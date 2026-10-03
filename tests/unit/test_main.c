@@ -1,3 +1,4 @@
+#include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include "check.h"
 
@@ -124,24 +125,46 @@ static const struct group groups[] = {
     {"interface", test_interface},
 };
 
+/* The name of the file whose groups run, or NULL for every group, and
+   whether one group has that name. */
+struct selection {
+    const char *name;
+    int found;
+};
+
+/* Run the groups selected. Each runs on the thread of
+   platform_run_on_stack, as the passes of antic do, so a deep case meets
+   the stack it meets in antic and not the 8 MB of the main thread. */
+static void run_groups(void *context)
+{
+    struct selection *selection = context;
+    size_t i;
+
+    for (i = 0; i < sizeof groups / sizeof groups[0]; i++) {
+        if (selection->name == NULL ||
+            strcmp(selection->name, groups[i].name) == 0) {
+            groups[i].run();
+            selection->found = 1;
+        }
+    }
+}
+
 /* Run the groups of the file the one argument names, or every group
    without one. */
 int main(int argc, char **argv)
 {
-    size_t i;
-    int found = 0;
+    struct selection selection;
 
     if (argc > 2) {
         fprintf(stderr, "usage: antic_unit_tests [<file>]\n");
         return 2;
     }
-    for (i = 0; i < sizeof groups / sizeof groups[0]; i++) {
-        if (argc == 1 || strcmp(argv[1], groups[i].name) == 0) {
-            groups[i].run();
-            found = 1;
-        }
+    selection.name = argc == 2 ? argv[1] : NULL;
+    selection.found = 0;
+    if (!platform_run_on_stack(run_groups, &selection)) {
+        return 1;
     }
-    if (!found) {
+    if (!selection.found) {
         fprintf(stderr, "no unit test file is named %s\n", argv[1]);
         return 2;
     }

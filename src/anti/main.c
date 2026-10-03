@@ -673,9 +673,8 @@ done:
     return status;
 }
 
-int main(int argc, char **argv)
+static int command(int argc, char **argv)
 {
-    argv = platform_arguments(argv);
     if (argc == 2 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {
         return usage(stdout);
     }
@@ -718,4 +717,30 @@ int main(int argc, char **argv)
         return sdk_command(argc, argv);
     }
     return usage(stderr);
+}
+
+/* The arguments of main and the status of command, handed to the thread
+   of platform_run_on_stack. anti runs the compiler in its own process, so
+   its work takes the stack antic's does. */
+struct work {
+    int argc;
+    char **argv;
+    int status;
+};
+
+static void command_work(void *context)
+{
+    struct work *w = context;
+
+    w->status = command(w->argc, w->argv);
+}
+
+int main(int argc, char **argv)
+{
+    struct work work;
+
+    work.argc = argc;
+    work.argv = platform_arguments(argv);
+    work.status = 1;
+    return platform_run_on_stack(command_work, &work) ? work.status : 1;
 }

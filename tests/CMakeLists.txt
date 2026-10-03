@@ -1588,6 +1588,16 @@ if(NOT WIN32)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_fmt_write.cmake")
 endif()
 
+# antic runs its passes on a stack of its own size, whatever stack the
+# main thread has. The limit of the main thread is a POSIX one too.
+if(NOT WIN32)
+    add_test(NAME antic_stack
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/antic-stack"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_antic_stack.cmake")
+endif()
+
 # Every source of the standard library and of the tests stands in the
 # canonical form, so that `anti fmt` over the checkout writes nothing.
 add_test(NAME fmt_canonical

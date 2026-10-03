@@ -463,9 +463,26 @@ static int run(int argc, char **argv, const struct lists *l)
     return status;
 }
 
+/* The arguments of main and the status of run, handed to the thread of
+   platform_run_on_stack. */
+struct work {
+    int argc;
+    char **argv;
+    const struct lists *lists;
+    int status;
+};
+
+static void run_work(void *context)
+{
+    struct work *w = context;
+
+    w->status = run(w->argc, w->argv, w->lists);
+}
+
 int main(int argc, char **argv)
 {
     struct lists lists;
+    struct work work;
     int status;
 
     argv = platform_arguments(argv);
@@ -481,7 +498,11 @@ int main(int argc, char **argv)
     lists.trace_patterns =
         alloc_zeroed((size_t)argc, sizeof *lists.trace_patterns);
     lists.inject = alloc_zeroed((size_t)argc, sizeof *lists.inject);
-    status = run(argc, argv, &lists);
+    work.argc = argc;
+    work.argv = argv;
+    work.lists = &lists;
+    work.status = 1;
+    status = platform_run_on_stack(run_work, &work) ? work.status : 1;
     free(lists.libraries);
     free(lists.objects);
     free(lists.roots);

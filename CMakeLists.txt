@@ -124,6 +124,10 @@ add_library(antic_core STATIC ${ANTIC_CORE_SOURCES})
 target_include_directories(antic_core PUBLIC ${ANTIC_CORE_INCLUDE_DIRS})
 target_include_directories(antic_core SYSTEM PRIVATE "${ANTIC_PCRE2_INCLUDE}")
 target_link_libraries(antic_core PUBLIC antic_pcre2)
+# antic and anti run their work on a thread of their own, through
+# platform_run_on_stack of src/antic/platform.c.
+find_package(Threads REQUIRED)
+target_link_libraries(antic_core PUBLIC Threads::Threads)
 
 add_executable(antic ${ANTIC_MAIN_SOURCES})
 target_link_libraries(antic PRIVATE antic_core)

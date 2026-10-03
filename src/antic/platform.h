@@ -90,6 +90,18 @@ int process_run_in(const char *directory, const char *const argv[]);
    out. */
 int process_capture(const char *const argv[], struct text *out);
 
+/* DESIGN: antic and anti run their work on a thread with a stack of 64 MB
+   on every host, so the compiler owns its stack. The main thread has 8 MB
+   on Linux and 1 MB on Windows, and a tree as deep as the library format
+   allows, ANTL_TREE_DEPTH_MAX, needs 8 to 10 MB in a debug build under
+   the sanitizers. See "Compiler behaviour" in docs/decisions.md. */
+#define PLATFORM_WORK_STACK ((size_t)64 << 20)
+
+/* Run work(context) on a new thread with a stack of PLATFORM_WORK_STACK
+   bytes, and wait for it to end. Returns false, with a message on
+   standard error, when the thread cannot start or be waited for. */
+bool platform_run_on_stack(void (*work)(void *context), void *context);
+
 #if defined(_WIN32)
 /* The UTF-16 of text, or NULL when text is no valid UTF-8. The caller
    frees the result with free. The layer of anti converts with it. */
