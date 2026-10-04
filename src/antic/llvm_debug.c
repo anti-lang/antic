@@ -73,6 +73,12 @@ static uint32_t unit_file_id(const struct llvm_debug *d)
     return d->files + (uint32_t)d->m->file_count;
 }
 
+/* DESIGN: the compile unit is FullDebug, though it describes lines alone.
+   Under LineTablesOnly llc writes no DWARF subprogram for a function that
+   inlines nothing, so gdb on Linux named a frame by its symbol,
+   app.twice$3cint$3e, where "Debug information" of
+   docs/work-order-llvm-back-end.md keeps one subprogram per function. The
+   nodes stay the same: no variable, type or parameter is described. */
 void llvm_debug_init(struct llvm_debug *d, enum target t,
                      const struct ir_module *m, const char *module,
                      bool lines, bool optimized, uint32_t first,
@@ -103,7 +109,7 @@ void llvm_debug_init(struct llvm_debug *d, enum target t,
                             "language: DW_LANG_C11, file: !%" PRIu32
                             ", producer: \"antic %s\", isOptimized: %s, "
                             "runtimeVersion: 0, emissionKind: "
-                            "LineTablesOnly)\n",
+                            "FullDebug)\n",
                  d->unit, unit_file_id(d), ANTIC_VERSION,
                  optimized ? "true" : "false");
     /* The id after the files names the file of a unit of no source

@@ -223,7 +223,9 @@ static void debug_lines(void)
     CHECK(holds(&x, " = distinct !DICompileUnit(language: DW_LANG_C11, "
                     "file: !"));
     CHECK(holds(&x, "producer: \"antic "));
-    CHECK(holds(&x, "emissionKind: LineTablesOnly"));
+    /* FullDebug keeps the subprogram of every function in the DWARF of
+       ELF, where gdb reads the name of a frame. */
+    CHECK(holds(&x, "emissionKind: FullDebug"));
     CHECK(holds(&x, " = !DIFile(filename: \"app.anti\", directory: \"\")"));
     CHECK(holds(&x, " = distinct !DISubprogram(name: \"main.f\", scope: !"));
     CHECK(holds(&x, "line: 5, type: !"));
