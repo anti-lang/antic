@@ -25,7 +25,8 @@ Chapter 3 installs Anti with one command. That package is this archive with anti
 | Part | Holds | Why it travels with antic |
 |---|---|---|
 | `bin/antic` | The compiler | The program the user runs |
-| `bin/llvm-mc` | The assembler | antic writes assembly text and stops, so something must encode it |
+| `bin/opt`, `bin/llc` | The optimizer and the code generator of LLVM | antic writes LLVM IR text and stops, so something must optimise it and write the object |
+| `bin/llvm-mc` | The assembler | antic accepts `--llvm-mc` and runs nothing with it, until a separate decision takes it out |
 | `bin/lld` and its three names | The linker | One program links ELF, Mach-O and COFF, under `ld.lld`, `ld64.lld` and `lld-link` |
 | `bin/llvm-ar` | The archiver | Static libraries for C, which `antic --lib static` writes |
 | `bin/llvm-objdump`, `bin/llvm-readobj` | Readers of object files | The tests of chapters 16 and 21 check what the emitter produced |
@@ -34,7 +35,7 @@ Chapter 3 installs Anti with one command. That package is this archive with anti
 | `sysroot/linux-x86_64`, `sysroot/linux-arm64` | musl and the compiler-rt builtins | Ours to pass on, so a Linux program links with nothing else installed |
 | `licenses/` | One file per component | The obligations that travel with a shipped program |
 
-antic reads that directory without being told. Without `--runtime` it takes the directory above its own executable, so `~/.anti/bin/antic` finds `~/.anti/lib` beside it. It looks for llvm-mc, llvm-ar and the lld programs in `bin/` of that archive before the search path. The tools that compile a program are then the pinned ones rather than whatever the machine carries.
+antic reads that directory without being told. Without `--runtime` it takes the directory above its own executable, so `~/.anti/bin/antic` finds `~/.anti/lib` beside it. It looks for opt, llc, llvm-ar and the lld programs in `bin/` of that archive before the search path. The tools that compile a program are then the pinned ones rather than whatever the machine carries.
 
 The two sysroots that cannot travel are the subject of the next section.
 

@@ -1368,7 +1368,7 @@ Built: `here`, in an expression and as the default of a parameter, and `SourceLo
 
 ## Checks and debugging
 
-In dev mode every array, slice and `str` index is bounds-checked, signed arithmetic traps on overflow, a narrowing `as` checks its range, a conversion to `char` or to an enum checks the value, division and shifts are checked, `assert` and `show` are active, `-g` writes line information. In release none of it is emitted. `--checks`, `--asserts`, `--trace` and `-g` override.
+In dev mode every array, slice and `str` index is bounds-checked, signed arithmetic traps on overflow, a narrowing `as` checks its range, a conversion to `char` or to an enum checks the value, division and shifts are checked, `assert` and `show` are active, `-g` writes line information. In release none of it is emitted, and every target gives the result of ARM64: a division or a remainder by zero gives 0, the least value divided by minus one gives itself, a shift takes its count modulo the width, and a float out of the range of its integer type saturates, with 0 for NaN. `--checks`, `--asserts`, `--trace` and `-g` override.
 
 ```anti
 trace class Renderer { }

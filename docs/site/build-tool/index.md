@@ -670,7 +670,7 @@ The runtime archive holds a `licenses/` directory with one file per component, w
 
 ### Obligations of a shipped program
 
-Code emitted by antic is the user's code translated, and the licence of antic never reaches its output. The LLVM Exceptions cover the object files of llvm-mc. When compiling embeds portions of LLVM into an object form, those portions may be redistributed without sections 4(a), 4(b) and 4(d) of the Apache License[^6]. Static linking copies components of the runtime archive into an executable, and each brings its licence.
+Code emitted by antic is the user's code translated, and the licence of antic never reaches its output. The LLVM Exceptions cover the object files of llc. When compiling embeds portions of LLVM into an object form, those portions may be redistributed without sections 4(a), 4(b) and 4(d) of the Apache License[^6]. Static linking copies components of the runtime archive into an executable, and each brings its licence.
 
 | Component | Licence | Obligation for a binary |
 |---|---|---|

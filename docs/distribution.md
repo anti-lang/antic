@@ -110,6 +110,10 @@ carries `libunwind.a` for the two glibc targets, which the build copies into
 `lib/<target>/` of the runtime archive. The runtime of AddressSanitizer calls its
 `_Unwind_Backtrace` and `_Unwind_GetIP` in a Linux program of `--memory-checks`.
 
+antic writes LLVM IR text, and opt and llc turn it into the object that lld links. Since
+the step `switch` of `docs/work-order-llvm-back-end.md` they are the one back end, and no
+build runs llvm-mc. llvm-mc leaves the set when a separate decision says so.
+
 `23.1.1-anti.4` added opt and llc, for the LLVM back end. Each tools archive about
 doubled, 177,317,004 bytes over the six hosts:
 
@@ -424,7 +428,7 @@ by the CMake build. `anti license` reads it. Nothing is typed twice.
 ## Obligations of a shipped program
 
 Code emitted by `antic` is the user's code translated. The LLVM licence exception says
-the same for llvm-mc output. The user's obligations toward Anti are whatever the Anti
+the same for the objects llc writes. The user's obligations toward Anti are whatever the Anti
 licence states about output, and it states none.
 
 Static linking is where obligations enter. What the runtime archive links into an
