@@ -3,8 +3,9 @@
 Anti is a compiled, statically typed language. It has C layout, classes with
 interfaces as inline sub-objects, errors as return values and structured
 parallelism. `antic` is its compiler, written in C11 from scratch with no lexer
-or parser generator. It emits GAS-style assembly text for six targets: Linux,
-macOS and Windows, each on x86_64 and ARM64.
+or parser generator. It writes LLVM IR text, and opt and llc of the pinned LLVM
+release turn it into objects. There are six targets: Linux, macOS and Windows,
+each on x86_64 and ARM64.
 
 This repository holds the language. It has the compiler, the runtime, the
 standard library, the build tool, the runtime archive and the documents that
