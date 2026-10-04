@@ -75,10 +75,9 @@ not re-open a settled decision without asking Eddie.
   defect on its first run here, a `bool` field read as 64 that the ordinary
   build passed over.
 - Each of the three suites finishes in under 9 minutes with `ctest -j14`,
-  the number of cores of the development Mac. Measured on 2026-09-30 at
-  `f6c5bc2`: `host` 120 s, and 185 s on the first run after a build, `asan`
-  300 s and `ubsan` 199 s. `emit_identity` alone takes 299 s under ASan and
-  sets its time. A suite past 9 minutes gets faster tests, never fewer: see
+  the number of cores of the development Mac. Measured on 2026-10-04 in the
+  step `switch` of the LLVM back end: `host` 206 s, `asan` 402 s and `ubsan`
+  277 s. `emit_identity` alone takes 400 s under ASan and sets its time. A suite past 9 minutes gets faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
 - Every comment and every `.md` file follows the docs-style rules. The checker
   reads `.md` files alone. Run `python3 tools/docs-style/check_docs.py <files>`
@@ -357,9 +356,10 @@ reports what it finished.
 
 - The compiler lexes, parses and type-checks Anti across modules. Its IR holds
   no sizes: the back end lays out types per target (`src/antic/layout.c`) and folds
-  symbolic values. Both back ends cover all integer and float operations.
-  The emitter writes assembly for all six targets, llvm-mc assembles it, and lld
-  links every target against the sysroots of the runtime archive.
+  symbolic values. The back end translates the IR into LLVM IR text, and opt
+  and llc of the pinned release write the object for all six targets. lld
+  links every target against the sysroots of the runtime archive. See
+  `docs/notes/llvm.md`.
 - The object model is implemented: classes, interfaces as inline sub-objects
   with thunks, four visibility levels, `construct` and `destruct`, operators,
   singletons, the error forms and reflection over descriptors. A class names
@@ -396,8 +396,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1467 ctest tests pass on the development Mac and none is skipped. The ASan
-  and the UBSan builds run 1466 each, without the `no_paths` test, which needs a
+- 1539 ctest tests pass on the development Mac and none is skipped. The ASan
+  and the UBSan builds run 1538 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
@@ -533,7 +533,7 @@ reports what it finished.
 - `antic -g` writes the line of every statement and an entry per function,
   and the link then keeps the debug sections. lldb and gdb stop by file and
   line and print a backtrace of Anti function names. A copy of a generic is
-  `app.List<int>.push` there, although its symbol escapes the brackets. Variables are the next step. See `docs/notes/debug.md`.
+  `app.List<int>.push` there, although its symbol escapes the brackets. Variables are the next step. See `docs/notes/llvm.md`.
 - Error origins and stack traces are built. The first `fail` of an error
   writes `at` and, when backtraces are on, `frames`. `e.text()` names the
   position, the causes and the trace. `StackTrace` has `capture`, `frames`,
