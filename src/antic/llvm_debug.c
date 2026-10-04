@@ -154,7 +154,9 @@ void llvm_debug_open(struct llvm_debug *d, struct text *out,
     size_t start = out->length;
     uint32_t file = f->file != IR_NO_INDEX ? d->files + f->file
                                            : unit_file_id(d);
-    uint32_t line = f->file != IR_NO_INDEX ? f->decl_line : 0;
+    /* Without -g the subprogram of COFF names no line, which CodeView
+       would write as the line record of the function. */
+    uint32_t line = d->lines && f->file != IR_NO_INDEX ? f->decl_line : 0;
 
     d->f = f;
     d->located = false;

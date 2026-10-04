@@ -20,8 +20,8 @@
    every build, with -g and without it. CodeView then writes the symbol
    record of each function, which names a static function in the PDB, as
    the records of debug.c do for the native back end. Without -g no
-   instruction carries a line, and a function takes the location of line
-   0 where it needs one.
+   instruction carries a line, the subprogram names line 0, and a
+   function takes the location of line 0 where it needs one.
 
    DESIGN: the build id digests the text without what the debug
    information added. Each addition is recorded as a span of the text:

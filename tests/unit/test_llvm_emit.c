@@ -271,6 +271,14 @@ static void debug_spans_of(enum target t)
         CHECK(holds(&plain, "!DISubprogram(name: \"main.f\""));
         CHECK(lacks(&plain, "!DILocation(line: 6,"));
         CHECK(holds(&lines, "!DILocation(line: 6,"));
+        /* Without -g the subprogram names no line either, which
+           CodeView would turn into a line record of the function. */
+        CHECK(holds(&plain, "line: 0, type: !"));
+        CHECK(holds(&plain, "scopeLine: 0, spFlags: "));
+        CHECK(lacks(&plain, "line: 5,"));
+        CHECK(lacks(&plain, "line: 2,"));
+        CHECK(holds(&lines, "line: 5, type: !"));
+        CHECK(holds(&lines, "scopeLine: 5, spFlags: "));
     } else {
         CHECK(plain.spans.count == 0);
         CHECK(lacks(&plain, "!DI"));
