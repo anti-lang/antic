@@ -35,8 +35,12 @@ foreach(source IN LISTS sources)
                                 "${target}\n${err}")
         endif()
         string(REPLACE "antic ${VERSION}" "antic VERSION" text "${text}")
+        # DESIGN: the digest is the one of the text as antic means it. On
+        # Windows the standard output of antic ends each line with CRLF,
+        # the variable loses the CR, and file(WRITE) would write it back,
+        # so the digest reads the variable. The file is there to read.
+        string(SHA256 digest "${text}")
         file(WRITE "${out}" "${text}")
-        file(SHA256 "${out}" digest)
         string(APPEND lines "${digest}  ${name}.${target}.ll\n")
     endforeach()
 endforeach()
