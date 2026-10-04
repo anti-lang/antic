@@ -99,3 +99,7 @@ $ git rev-parse HEAD origin/main
    keep these frames, and by which rule? Candidates: `noinline` on every function
    of a build with backtraces on, a `noinline` marker in Anti, or a test option
    that turns inlining off.
+
+## Decision
+
+Eddie decided on 2026-10-04: the tests take the LLVM result in release mode. The back end keeps no frame for a function that release mode inlines. A trace, a symbol list, a PDB or a report of AddressSanitizer names the caller, with the line of the callee under `-g`. A test that needs each function as a frame of its own builds in dev mode, where nothing is inlined. The entry stands in `docs/decisions.md` after the seven provisional entries of this step. The redo of this step changes the expectations of the 18 tests, or moves a test to dev mode. It is done when the suite passes under `-DANTIC_BACKEND=llvm`.
