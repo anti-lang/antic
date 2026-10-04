@@ -523,9 +523,13 @@ Function attributes on every definition:
 
 - `"target-cpu"` and `"target-features"` from the CPU level, see "Targets,
   CPU levels and object formats".
-- `"frame-pointer"="non-leaf"` on macOS arm64, `"none"` elsewhere.
-  Reason: Apple's ABI keeps the frame pointer, and backtraces of crash
-  reports read it. Linux and Windows do not require it.
+- `"frame-pointer"="non-leaf"` on every target but Windows, `"none"` on
+  Windows. Reason: `anti_rt_trace_walk` follows the frame records, as
+  `docs/notes/traces.md` says, and the ASan report of `--memory-checks`
+  walks them with `fast_unwind_on_fatal=1`. Apple's ABI keeps the frame
+  pointer as well. Windows walks the stack with `RtlVirtualUnwind` over the
+  unwind data, so it needs no record. Eddie decided it on 2026-10-04, after
+  the step `vm` found the Linux traces empty with `"none"`.
 - `nounwind` on every Anti function. Anti has no exceptions and its
   failure channel is a return value. The runtime functions are C and get
   it too.
@@ -632,10 +636,11 @@ An external call before every memory access stops LLVM from moving or
 removing any load or store. So a `--memory-checks` build runs at roughly
 dev-mode speed whatever the mode. That is acceptable for a checking build.
 
-`MEMCHECK_OPTIONS` carries `fast_unwind_on_fatal=1` since `7bc666f1`, so
-the ASan report walks Anti frames by their frame pointers. Under the LLVM
-back end every function also gets `.eh_frame`, and the slow unwinder in
-`libunwind` reads it. Both unwinders then see the whole stack.
+`MEMCHECK_OPTIONS` carries `fast_unwind_on_fatal=1` since `7bc666f1`, so the
+ASan report walks Anti frames by their frame pointers. The LLVM back end
+keeps those frame records with `"frame-pointer"="non-leaf"`, see "Attributes
+and metadata". The report then sees the whole stack, as under the native
+back end.
 
 The alternative is the `asan` pass of `opt` with `sanitize_address` on
 every function. It inlines the shadow checks and adds red zones around
