@@ -49,19 +49,12 @@ signed operation and record whether it left the range of its type. The
 terminator `IR_BRANCH_OV` reads that. The two are adjacent, which the verifier
 checks, so the back end emits the arithmetic once and branches on what it left.
 `binary_checks` therefore returns the operation's result, which becomes the
-value of the expression. The selector keeps the operation in `s->overflow` for
-the branch that follows it.
+value of the expression.
 
-The sequences are in `emit_overflow` of `src/antic/arm64.c` and `src/antic/x86_64.c`, and
-`overflow_cond` gives the condition each one leaves. ARM64 uses the V flag of
-`adds` and `subs`. It has no arithmetic narrower than 32 bits, so a narrow type
-operates one width up and compares the result with its own sign extension. It
-has no flag-setting multiply either. A 64-bit `*` takes its result from `mul`
-and compares `smulh` against the sign of that result. A 32-bit `*` takes the
-low half of `smull` and compares it against its own sign extension. x86_64 sets
-the overflow flag for all three, so `two_operand` and `emit_mul` serve
-unchanged. Its `imul` has no two-operand form below 32 bits, which takes the
-route through the wider registers.
+The LLVM text writes each of the three as the signed `with.overflow`
+intrinsic of its width, `llvm.sadd.with.overflow.i64` and the others, and the
+`IR_BRANCH_OV` after it branches on the `i1` of the pair. llc chooses the
+sequence of each target from the intrinsic.
 
 Dropping the checks turns every overflow operation back into its plain
 arithmetic, so a build without them emits what it emitted before the checks

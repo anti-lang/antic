@@ -24,8 +24,8 @@ modules of a version of an index are an array of them.
 Everything the compiler writes lands under `build/<target>/<mode>/`, and the
 tool copies the deliverable into `dist/<target>/<mode>/`. The split of
 `docs/tooling.md` then holds: `build/` is disposable and `dist/` is what a user
-runs or links against. antic writes the assembly and the object beside the
-output it is given, so a link straight into `dist/` would put them there.
+runs or links against. antic writes the object beside the output it is given,
+so a link straight into `dist/` would put it there.
 
 The library file of each module stands under `build/<target>/<mode>/lib/`, as
 the module path spells it, and the object under `obj/`. A library project, one
@@ -99,8 +99,8 @@ whole symbol table for this.
 The binary, the debug link and the map all carry one build id, which is what
 ties a frame of a trace to this archive. The digest of an id leaves out what
 `-g` added, so a `-g` link carries the id of the plain link beside it.
-"Build ids" in `docs/decisions.md` holds the rule and `src/antic/debug.c` records the
-ranges. Both links place every function at the same address, so the one map
+"Build ids" in `docs/decisions.md` holds the rule and `src/antic/llvm_debug.c`
+records the ranges. Both links place every function at the same address, so the one map
 answers for either of them.
 
 A Windows program carries no symbol table, because lld-link writes the symbols

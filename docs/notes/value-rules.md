@@ -11,14 +11,17 @@ Each file below pins what antic writes. A change that alters that output
 writes the file again from this Mac, then reads the diff. Only what the change
 should alter may move.
 
-- `tests/emit-identity/programs.sha256` holds the assembly of every program of
-  `tests/programs/` on the six targets. A new program adds six entries. A
-  change to lowering may change existing ones. Write it with:
+- `tests/emit-identity/programs.sha256` holds the digests of the LLVM text that
+  `--dump-llvm` prints for every program of `tests/programs/` on the six
+  targets, with the version of antic read as `VERSION`. A new program adds six
+  entries. A change to lowering or to the translation may change existing
+  ones. Write it with:
 
   ```bash
   cmake -DANTIC=build/host/antic -DRUNTIME=build/host/runtime \
     -DPROGRAMS=$PWD/tests/programs \
     -DMANIFEST=$PWD/tests/emit-identity/programs.sha256 \
+    -DVERSION=$(cat tools/version) \
     -DWORK=$PWD/build/host/tests/emit-identity -DWRITE=yes \
     -P tests/run_emit_identity.cmake
   ```

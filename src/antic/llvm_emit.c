@@ -2444,10 +2444,10 @@ static bool link_once(const struct emitter *e, const struct ir_function *f)
 
 /* DESIGN: the linkage of a function. A whole program keeps every
    function internal, unless it is an export fn or the program hosts
-   plugins. An object of one module makes every function
-   global and hidden for the other objects, and a copy of a generic weak,
-   in a COMDAT on COFF, which has no hidden symbols. An export fn is
-   dso_local with default visibility. */
+   plugins. An object of one module makes every function global and
+   hidden for the other objects, and a copy of a generic weak, in a COMDAT
+   on COFF, which has no hidden symbols. An export fn is dso_local with
+   default visibility. */
 static void linkage(struct emitter *e, const struct ir_function *f)
 {
     bool coff = target_info(e->o->target)->format == FORMAT_COFF;
