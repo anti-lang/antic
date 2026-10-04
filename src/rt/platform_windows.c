@@ -682,6 +682,11 @@ typedef BOOL(WINAPI *sym_from_addr)(HANDLE, DWORD64, PDWORD64, PSYMBOL_INFO);
 typedef BOOL(WINAPI *sym_line)(HANDLE, DWORD64, PDWORD, PIMAGEHLP_LINE64);
 typedef BOOL(WINAPI *sym_search_path)(HANDLE, PWSTR, DWORD);
 typedef BOOL(WINAPI *sym_set_search_path)(HANDLE, PCWSTR);
+typedef DWORD(WINAPI *sym_inline_count)(HANDLE, DWORD64);
+typedef BOOL(WINAPI *sym_inline_trace)(HANDLE, DWORD64, DWORD, DWORD64,
+                                       DWORD64, LPDWORD, LPDWORD);
+typedef BOOL(WINAPI *sym_inline_line)(HANDLE, DWORD64, ULONG, DWORD64,
+                                      PDWORD, PIMAGEHLP_LINE64);
 
 /* DbgHelp serves one thread at a time, so ANTI_RT_LOCK_DEBUG covers
    every call and the state below. */
@@ -690,6 +695,9 @@ static sym_from_addr help_from_addr;
 static sym_line help_line;
 static sym_search_path help_get_path;
 static sym_set_search_path help_set_path;
+static sym_inline_count help_inline_count;
+static sym_inline_trace help_inline_trace;
+static sym_inline_line help_inline_line;
 
 /* The modules whose directory the search path of DbgHelp holds. The
    record in an executable names its PDB by file name alone. DbgHelp looks
@@ -728,6 +736,38 @@ static void open_help(void)
         help, "SymGetSearchPathW");
     help_set_path = (sym_set_search_path)(void (*)(void))GetProcAddress(
         help, "SymSetSearchPathW");
+    help_inline_count = (sym_inline_count)(void (*)(void))GetProcAddress(
+        help, "SymAddrIncludeInlineTrace");
+    help_inline_trace = (sym_inline_trace)(void (*)(void))GetProcAddress(
+        help, "SymQueryInlineTrace");
+    help_inline_line = (sym_inline_line)(void (*)(void))GetProcAddress(
+        help, "SymGetLineFromInlineContext");
+}
+
+/* DESIGN: the line of an address inside inlined code is the line of the
+   innermost inlined callee, as the line table of DWARF gives it on Linux
+   and macOS and as the entry on inlined frames in docs/decisions.md asks.
+   CodeView keeps the lines of an inlined callee in the inline sites of
+   its caller, and SymGetLineFromAddr64 reads the lines of the caller
+   alone. The inline context of the address names the innermost callee,
+   and SymGetLineFromInlineContext reads its line. An address of no
+   inlined code, or a DbgHelp without the three functions, takes
+   SymGetLineFromAddr64. */
+static bool inline_line(DWORD64 address, IMAGEHLP_LINE64 *line)
+{
+    DWORD context = 0;
+    DWORD index = 0;
+    DWORD displacement = 0;
+
+    if (help_inline_count == NULL || help_inline_trace == NULL ||
+        help_inline_line == NULL ||
+        help_inline_count(GetCurrentProcess(), address) == 0 ||
+        !help_inline_trace(GetCurrentProcess(), address, 0, address, address,
+                           &context, &index)) {
+        return false;
+    }
+    return help_inline_line(GetCurrentProcess(), address, context, 0,
+                            &displacement, line) != FALSE;
 }
 
 /* Put the directory of the module at base on the search path, before
@@ -816,8 +856,10 @@ void anti_rt_debug_lookup(uint64_t address, uint64_t base,
     }
     memset(&line, 0, sizeof line);
     line.SizeOfStruct = sizeof line;
-    if (help_line != NULL &&
-        help_line(GetCurrentProcess(), (DWORD64)address, &column, &line) &&
+    if ((inline_line((DWORD64)address, &line) ||
+         (help_line != NULL &&
+          help_line(GetCurrentProcess(), (DWORD64)address, &column,
+                    &line))) &&
         line.FileName != NULL && strlen(line.FileName) < sizeof out->file) {
         memcpy(out->file, line.FileName, strlen(line.FileName) + 1);
         out->line = (int64_t)line.LineNumber;
