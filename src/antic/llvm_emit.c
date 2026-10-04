@@ -2922,20 +2922,21 @@ static void declaration(struct emitter *e, const struct ir_function *f)
    and fails through a return value. A declaration is a function of
    another module or a function of C, which unwinds through no Anti frame
    either. Windows walks a stack through the unwind tables of each frame,
-   and its frames of a page or more call the stack probe. Apple's arm64
-   keeps the frame pointer, which the backtraces of crash reports read. */
+   and its frames of a page or more call the stack probe. Every other
+   target keeps the frame record of a function that calls another, since
+   anti_rt_trace_walk and the report of --memory-checks follow the chain of
+   records. Eddie decided it on 2026-10-04, see "Attributes and metadata"
+   in docs/work-order-llvm-back-end.md. */
 static void attributes(struct emitter *e)
 {
     const struct target_info *info = target_info(e->o->target);
     bool windows = info->os == OS_WINDOWS;
-    bool apple_arm64 =
-        info->os == OS_MACOS && info->arch == ARCH_ARM64;
 
     text_appendf(e->out, "attributes #0 = { nounwind%s \"frame-pointer\"="
                          "\"%s\"%s \"target-cpu\"=\"%s\" "
                          "\"target-features\"=\"%s\" }\n",
                  windows ? " uwtable(sync)" : "",
-                 apple_arm64 ? "non-leaf" : "none",
+                 windows ? "none" : "non-leaf",
                  windows ? " \"stack-probe-size\"=\"4096\"" : "",
                  llvm_target_cpu(e->o->cpu),
                  llvm_target_features(e->o->cpu));

@@ -529,8 +529,9 @@ static void cold_branches(void)
     end(&x);
 }
 
-/* The function attributes of each kind of target: the frame pointer of
-   Apple's arm64, and the unwind tables and the stack probe of Windows. */
+/* The function attributes of each kind of target: the frame record of
+   every target but Windows, and the unwind tables and the stack probe of
+   Windows. */
 static void attributes(void)
 {
     struct fixture x;
@@ -541,8 +542,14 @@ static void attributes(void)
     CHECK(holds(&x, "attributes #0 = { nounwind \"frame-pointer\"=\"non-leaf\" "
                     "\"target-cpu\"=\"generic\" \"target-features\"=\""));
     CHECK(run(&x, TARGET_MACOS_X86_64));
-    CHECK(holds(&x, "attributes #0 = { nounwind \"frame-pointer\"=\"none\" "
+    CHECK(holds(&x, "attributes #0 = { nounwind \"frame-pointer\"=\"non-leaf\" "
                     "\"target-cpu\"=\"x86-64-v3\" \"target-features\"=\""));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "attributes #0 = { nounwind \"frame-pointer\"=\"non-leaf\" "
+                    "\"target-cpu\"=\"x86-64-v3\" \"target-features\"=\""));
+    CHECK(run(&x, TARGET_LINUX_ARM64));
+    CHECK(holds(&x, "attributes #0 = { nounwind \"frame-pointer\"=\"non-leaf\" "
+                    "\"target-cpu\"=\"generic\" \"target-features\"=\""));
     CHECK(run(&x, TARGET_WINDOWS_ARM64));
     CHECK(holds(&x, "attributes #0 = { nounwind uwtable(sync) "
                     "\"frame-pointer\"=\"none\" "
