@@ -3,6 +3,7 @@
    of 20000 passes, and a counter collects the areas through two direct
    calls. */
 
+#include "../binary_stdio.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

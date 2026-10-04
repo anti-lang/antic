@@ -2,6 +2,7 @@
    of a million integers is summed 1000 times, each pass with its own
    factor. The sums wrap, as they do in Anti, through uint64_t. */
 
+#include "../binary_stdio.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -7,6 +7,7 @@
    with a seed, and growth before the live and the removed entries reach
    half the slots. */
 
+#include "../binary_stdio.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

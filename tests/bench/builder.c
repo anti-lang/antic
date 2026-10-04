@@ -5,6 +5,7 @@
    append_int of anti.text writes it: the digits gathered from the end of
    an array, then appended one byte at a time. */
 
+#include "../binary_stdio.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

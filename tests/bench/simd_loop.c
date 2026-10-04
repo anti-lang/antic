@@ -5,6 +5,7 @@
    as the Anti program has none. The lanes add in the order of `sum`: the
    upper half onto the lower half. */
 
+#include "../binary_stdio.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
