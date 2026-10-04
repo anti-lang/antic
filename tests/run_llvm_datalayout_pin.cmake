@@ -17,6 +17,13 @@
 # armv8.0 would turn on features the level lacks. -mno-fmv makes clang
 # write the same feature string for all three ARM64 triples, so one row per
 # level holds for every target.
+#
+# DESIGN: a Linux triple takes --gcc-toolchain of a directory that does not
+# exist. clang otherwise reads the GCC of the host, finds a libgcc with
+# outline atomics on anti-linux and adds +outline-atomics at armv8.0, where
+# the Mac, which has no GCC, adds nothing. antic compiles against no GCC,
+# so the row without one is the row to compare. The other triples read no
+# GCC and warn about the unused option, so they go without it.
 
 execute_process(COMMAND "${ANTIC}" --print-llvm-targets
     RESULT_VARIABLE status OUTPUT_VARIABLE printed ERROR_VARIABLE err
@@ -82,6 +89,9 @@ foreach(target_line IN LISTS targets)
             set(flags "-mcpu=${cpu}" -mno-fmv "-march=${march}")
         else()
             set(flags "-march=${march}")
+        endif()
+        if(triple MATCHES "-linux-")
+            list(APPEND flags "--gcc-toolchain=${WORK}/no-gcc")
         endif()
         execute_process(
             COMMAND "${CLANG}" -target "${triple}" ${flags} -S -emit-llvm
