@@ -89,6 +89,8 @@ after `026ed4f`, which moved X11 and OpenGL into the glibc sysroot.
 At `a4cadfcf` on 2026-10-03 it passes 1261 of 1266 with two skipped, and ASan and UBSan
 1260 of 1265 each. The three that fail in each are `anti_memory_checks`, `memory_checks`
 and `memory_checks_list`, whose link waits for `libunwind` of `23.1.1-anti.5`.
+At `fd2bc8b6` on 2026-10-04 it passes 1291 of 1293 with two skipped, and ASan and UBSan
+1290 of 1292 each, under both `-DANTIC_BACKEND=llvm` and `-DANTIC_BACKEND=native`.
 
 | Untested item | Tests that run it |
 |---|---|
@@ -168,6 +170,8 @@ At `a4cadfcf` on 2026-10-03 it passes 1247 of 1256 with nine skipped. Its suite 
 `ctest -j4`, in a call of its own after the configure and the build of `test.cmd`.
 Extract a tree from the Mac with `tar -xmf`. Ninja otherwise keeps objects that are newer
 than the files the tar restores.
+At `fd2bc8b6` on 2026-10-04 it passes 1272 of 1281 with nine skipped, under both
+`-DANTIC_BACKEND=llvm` and `-DANTIC_BACKEND=native`, in three parts of `ctest -j4 -I`.
 
 ### SSH from the Mac
 
