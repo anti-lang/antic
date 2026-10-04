@@ -1,0 +1,44 @@
+//! A scalar loop over a slice. One buffer of a million integers is summed 1000
+//! times, each pass with its own factor. `scalar_loop.c` is the same program in
+//! C.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Fill `s` with the numbers of a xorshift generator.
+fn fill(s: []int)
+{
+	let x: u64 = 88172645463325252;
+	for i in 0..s.len {
+		x = x ^ (x <<% 13);
+		x = x ^ (x >> 7);
+		x = x ^ (x <<% 17);
+		s[i] = (x >> 40) as int;
+	}
+}
+
+/// The sum of `s[i] * k + s[i] / 8` over the slice, wrapping.
+fn pass(s: []int, k: int) -> int
+{
+	let total = 0;
+	for i in 0..s.len {
+		total = total +% (s[i] *% k +% (s[i] >> 3));
+	}
+	return total;
+}
+
+fn main() -> int
+{
+	let n = 1048576;
+	let p = alloc(int, n) else {
+		return 1;
+	};
+	let s = []int { ptr: p, len: n };
+	fill(s);
+	let total = 0;
+	for r in 0..1000 {
+		total = total +% pass(s, r);
+	}
+	printf("%lld\n".ptr, total);
+	free(p);
+	return 0;
+}

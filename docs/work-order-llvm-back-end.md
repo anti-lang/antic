@@ -1138,7 +1138,8 @@ small programs, each with a C version compiled by the pinned clang at
 
 Record the run time of the Anti program and of the C program. Record the
 compile time of each Anti program in release and dev mode. Measure on macos-
-arm64 and linux-x86_64. Export the commit before `switch` with `git archive`
+arm64 and on linux-arm64 of anti-linux, the Linux machine of
+`docs/vm-setup.md`. Export the commit before `switch` with `git archive`
 into a directory outside the repository and build it there. Record the same
 programs under the old back end and remove the directory afterwards. No
 worktree, no branch and no checkout in the repository. The report holds the

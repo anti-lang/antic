@@ -1,0 +1,38 @@
+//! A map workload. On each of 20 rounds a `HashMap<int, int>` takes 100000
+//! keys, answers 400000 lookups of which three quarters miss, loses every other
+//! key and answers 100000 lookups again. `map_work.c` is the same program in C,
+//! with a table laid out and grown as `SlotTable<E>` of `anti.collection.map`
+//! does it.
+
+import anti.collection.map.{HashMap};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The key of entry `i` on round `r`, spread over the integers.
+fn key(i: int, r: int) -> int
+{
+	return (i *% 2654435761) +% r;
+}
+
+fn main() -> int
+{
+	let total = 0;
+	for r in 0..20 {
+		let m = HashMap<int, int>.new();
+		for i in 0..100000 {
+			m.set(key(i, r), i);
+		}
+		for i in 0..400000 {
+			total = total +% (m.get(key(i, r)) ?? 1);
+		}
+		for i in 0..100000 by 2 {
+			m.remove(key(i, r));
+		}
+		for i in 0..100000 {
+			total = total +% (m.get(key(i, r)) ?? 3);
+		}
+		total = total +% m.count;
+	}
+	printf("%lld\n".ptr, total);
+	return 0;
+}

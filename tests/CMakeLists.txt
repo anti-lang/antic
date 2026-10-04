@@ -4147,3 +4147,35 @@ add_expect_test(error_types STATUS 1
     COMMAND "$<TARGET_FILE:antic>" -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/types.s"
             types.anti)
 
+
+# The benchmarks of tests/bench: five Anti programs, each with a C twin
+# that the pinned clang compiles at -O2. They take seconds and their times
+# vary with the machine, so they stand outside the suite and outside the
+# default build. `cmake --build build/host --target bench` builds the C
+# twins, then run_bench.cmake compiles and runs every program and prints
+# the table into build/host/tests/bench.md as well.
+set(bench_programs scalar_loop objects builder simd_loop map_work)
+set(bench_executables "")
+foreach(name IN LISTS bench_programs)
+    add_executable(bench_${name} EXCLUDE_FROM_ALL bench/${name}.c)
+    if(MSVC)
+        target_compile_options(bench_${name} PRIVATE /O2)
+    else()
+        target_compile_options(bench_${name} PRIVATE -O2)
+    endif()
+    list(APPEND bench_executables bench_${name})
+endforeach()
+add_custom_target(bench
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DOPT=${ANTIC_OPT}"
+        "-DLLC=${ANTIC_LLC}"
+        "-DBENCH=${CMAKE_CURRENT_SOURCE_DIR}/bench"
+        "-DC_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/bench"
+        "-DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/bench.md"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_bench.cmake"
+    DEPENDS antic anti_std ${bench_executables}
+    USES_TERMINAL
+    VERBATIM)

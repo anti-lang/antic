@@ -1,0 +1,88 @@
+//! A method-heavy object loop. 4096 shapes of two classes take two calls
+//! through the table on each of 20000 passes, and a counter collects the areas
+//! through two direct calls. `objects.c` is the same program in C, with a table
+//! of function pointers per class.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+	abstract fn grow(self, by: int);
+}
+
+class Square inherits Shape
+{
+	pub side: int = 0,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+
+	concrete fn grow(self, by: int)
+	{
+		self.side = (self.side + by) & 1023;
+	}
+}
+
+class Rect inherits Shape
+{
+	pub w: int = 0,
+	pub h: int = 0,
+
+	concrete fn area(self) -> int
+	{
+		return self.w * self.h;
+	}
+
+	concrete fn grow(self, by: int)
+	{
+		self.w = (self.w + by) & 1023;
+		self.h = (self.h + 2 * by) & 511;
+	}
+}
+
+class Counter
+{
+	pub n: int = 0,
+
+	pub fn add(self, v: int)
+	{
+		self.n = self.n +% v;
+	}
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	let n = 4096;
+	let shapes = alloc(*Shape, n) else {
+		return 1;
+	};
+	for i in 0..n {
+		if i % 3 == 0 {
+			shapes[i] = alloc Square { side: i & 255 };
+		} else {
+			shapes[i] = alloc Rect { w: i & 127, h: i & 63 };
+		}
+	}
+	let c = Counter { n: 0 };
+	for r in 0..20000 {
+		for i in 0..n {
+			let s = shapes[i];
+			s.grow(r & 7);
+			c.add(s.area());
+		}
+	}
+	printf("%lld\n".ptr, c.get());
+	for i in 0..n {
+		delete(shapes[i]);
+	}
+	free(shapes);
+	return 0;
+}

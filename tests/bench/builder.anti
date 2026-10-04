@@ -1,0 +1,25 @@
+//! A string builder. One `text.Builder` collects 50000 entries of a word, a
+//! number and a comma, and is cleared and filled again 200 times. `builder.c`
+//! is the same program in C, with a buffer that grows as the runtime's does and
+//! the digits written as `append_int` writes them.
+
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let b = text.Builder.new();
+	let total = 0;
+	for r in 0..200 {
+		b.clear();
+		for i in 0..50000 {
+			b.append("item ");
+			b.append_int(i * 7 - r * 1000);
+			b.append_byte(0x2C);
+		}
+		total = total +% b.len();
+	}
+	printf("%lld\n".ptr, total);
+	return 0;
+}

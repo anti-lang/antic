@@ -1,0 +1,46 @@
+//! A simd loop. The dot product of two buffers of 4096 `f32` runs 200000 times
+//! in vectors of four lanes, and one element changes between the passes. Every
+//! product and sum is a multiple of 1/128 below 2^24/128, so each is exact in
+//! any order. `simd_loop.c` is the same program in C, with a vector type of
+//! clang.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+simd struct F32x4 { a: f32, b: f32, c: f32, d: f32 }
+
+fn dot(a: []f32, b: []f32) -> f32
+{
+	let acc = F32x4.splat(0.0);
+	for i in 0..a.len by 4 {
+		let p = F32x4.load(a, i) * F32x4.load(b, i);
+		acc = acc + p;
+	}
+	return acc.sum();
+}
+
+fn main() -> int
+{
+	let n = 4096;
+	let pa = alloc(f32, n) else {
+		return 1;
+	};
+	let pb = alloc(f32, n) else {
+		return 1;
+	};
+	let a = []f32 { ptr: pa, len: n };
+	let b = []f32 { ptr: pb, len: n };
+	for i in 0..n {
+		a[i] = ((i % 17) as f32) * 0.0625;
+		b[i] = ((i % 13) as f32) * 0.125;
+	}
+	let total: float = 0.0;
+	for r in 0..200000 {
+		total = total + (dot(a, b) as float);
+		let at = r & 4095;
+		a[at] = a[at] + 0.5;
+	}
+	printf("%.1f\n".ptr, total);
+	free(pa);
+	free(pb);
+	return 0;
+}
