@@ -820,7 +820,12 @@ static void search_module(uint64_t base)
     help_set_path(GetCurrentProcess(), path);
 }
 
-/* A name or a file that does not fit its room is left empty. */
+/* A name or a file that does not fit its room is left empty, and so is
+   the file of line 0. CodeView, like DWARF, writes line 0 for code of no
+   source line. The LLVM back end writes such an entry for every function
+   of a build without -g, since LLVM names a function in the PDB only when
+   it has a location, see the entry on -g of the LLVM back end in
+   docs/decisions.md. */
 void anti_rt_debug_lookup(uint64_t address, uint64_t base,
                           struct anti_rt_debug_answer *out)
 {
@@ -860,7 +865,8 @@ void anti_rt_debug_lookup(uint64_t address, uint64_t base,
          (help_line != NULL &&
           help_line(GetCurrentProcess(), (DWORD64)address, &column,
                     &line))) &&
-        line.FileName != NULL && strlen(line.FileName) < sizeof out->file) {
+        line.LineNumber != 0 && line.FileName != NULL &&
+        strlen(line.FileName) < sizeof out->file) {
         memcpy(out->file, line.FileName, strlen(line.FileName) + 1);
         out->line = (int64_t)line.LineNumber;
     }

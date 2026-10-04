@@ -185,19 +185,87 @@ else()
     endif()
 endif()
 
+# The little-endian word of four bytes at byte offset at of hex, a string
+# of two hex digits per byte.
+function(word out hex at)
+    math(EXPR start "${at} * 2")
+    set(value "")
+    foreach(i 6 4 2 0)
+        math(EXPR from "${start} + ${i}")
+        string(SUBSTRING "${hex}" ${from} 2 byte)
+        string(APPEND value "${byte}")
+    endforeach()
+    math(EXPR value "0x${value}" OUTPUT_FORMAT DECIMAL)
+    set(${out} "${value}" PARENT_SCOPE)
+endfunction()
+
+# The number of entries of a line other than 0 in the subsections of lines
+# of the CodeView that `llvm-readobj --codeview --codeview-subsection-bytes`
+# printed. A subsection is a header of 12 bytes and blocks of one file
+# each: the file, the count of entries and the size of the block, then an
+# offset and a word per entry whose low 24 bits are the line. The column
+# of characters after the bytes goes first, and so do the brackets of the
+# dump, which would hold lines of it together as one element of a list.
+function(codeview_lines out dump)
+    string(REGEX REPLACE "  \\|[^\n]*" "" dump "${dump}")
+    string(REGEX REPLACE "[][;]" "" dump "${dump}")
+    string(REPLACE "\n" ";" dump_lines "${dump}")
+    set(count 0)
+    set(in_lines FALSE)
+    set(hex "")
+    foreach(line IN LISTS dump_lines ITEMS "SubSectionType: end")
+        if(line MATCHES "SubSectionType: ")
+            string(LENGTH "${hex}" length)
+            math(EXPR size "${length} / 2")
+            set(at 12)
+            while(in_lines AND at LESS size)
+                math(EXPR entries_at "${at} + 4")
+                word(entries "${hex}" ${entries_at})
+                math(EXPR block_at "${at} + 8")
+                word(block "${hex}" ${block_at})
+                set(i 0)
+                while(i LESS entries)
+                    math(EXPR line_at "${at} + 12 + ${i} * 8 + 4")
+                    word(value "${hex}" ${line_at})
+                    math(EXPR value "${value} & 0xffffff")
+                    if(NOT value EQUAL 0)
+                        math(EXPR count "${count} + 1")
+                    endif()
+                    math(EXPR i "${i} + 1")
+                endwhile()
+                if(block LESS 12)
+                    message(FATAL_ERROR "a block of lines of ${block} bytes")
+                endif()
+                math(EXPR at "${at} + ${block}")
+            endwhile()
+            set(hex "")
+            set(in_lines FALSE)
+            if(line MATCHES "Lines \\(0xF2\\)")
+                set(in_lines TRUE)
+            endif()
+        elseif(in_lines AND line MATCHES "^ *[0-9A-F]+: ([0-9A-F ]+)$")
+            string(REPLACE " " "" bytes "${CMAKE_MATCH_1}")
+            string(APPEND hex "${bytes}")
+        endif()
+    endforeach()
+    set(${out} ${count} PARENT_SCOPE)
+endfunction()
+
 # `anti build` passes -g in dev mode and never in release, so the
 # assembly of a dev build carries the line of every statement: `.loc` of
 # DWARF, or `.cv_loc` of CodeView on Windows. The LLVM back end keeps the
 # object and no assembly, so there the object of a dev build holds a line
-# table: a section `debug_line` of DWARF, or a subsection of lines in the
-# CodeView of `.debug$S` on Windows, which holds the functions without -g
-# as well.
+# table: a section `debug_line` of DWARF, or entries of lines other than 0
+# in the CodeView of `.debug$S` on Windows. A COFF object holds a
+# subsection of lines for every function without -g as well, whose
+# entries name line 0, since LLVM writes the record that names a function
+# in the PDB only for a function with a location. The entry on -g of the
+# LLVM back end in docs/decisions.md says so.
 if(BACKEND STREQUAL "llvm")
     set(readobj_option --sections)
     set(line_table "debug_line")
     if(HOST MATCHES "^windows-")
-        set(readobj_option --codeview)
-        set(line_table "Lines \\(0xF2\\)")
+        set(readobj_option --codeview --codeview-subsection-bytes)
     endif()
     foreach(mode dev release)
         execute_process(COMMAND "${READOBJ}" ${readobj_option}
@@ -210,11 +278,23 @@ if(BACKEND STREQUAL "llvm")
         endif()
         set(${mode}_object "${out}")
     endforeach()
-    if(NOT dev_object MATCHES "${line_table}")
-        message(FATAL_ERROR "the dev build passed no -g")
-    endif()
-    if(release_object MATCHES "${line_table}")
-        message(FATAL_ERROR "the release build passed -g")
+    if(HOST MATCHES "^windows-")
+        codeview_lines(dev_lines "${dev_object}")
+        codeview_lines(release_lines "${release_object}")
+        if(dev_lines EQUAL 0)
+            message(FATAL_ERROR "the dev build passed no -g")
+        endif()
+        if(NOT release_lines EQUAL 0)
+            message(FATAL_ERROR "the release build passed -g: "
+                                "${release_lines} entries name a line")
+        endif()
+    else()
+        if(NOT dev_object MATCHES "${line_table}")
+            message(FATAL_ERROR "the dev build passed no -g")
+        endif()
+        if(release_object MATCHES "${line_table}")
+            message(FATAL_ERROR "the release build passed -g")
+        endif()
     endif()
 else()
     set(line_directive ".loc ")
