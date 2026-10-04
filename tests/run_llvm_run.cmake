@@ -13,7 +13,7 @@ file(MAKE_DIRECTORY "${WORK}")
 
 # Run antic with ARGN, which must succeed and print nothing.
 function(antic)
-    execute_process(COMMAND "${ANTIC}" --backend llvm --runtime "${RUNTIME}"
+    execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}"
                             ${ARGN}
                     RESULT_VARIABLE status OUTPUT_VARIABLE out
                     ERROR_VARIABLE err ENCODING NONE)

@@ -1,4 +1,0 @@
-main.f:
-b0:
-    mov x0, #8
-    ret

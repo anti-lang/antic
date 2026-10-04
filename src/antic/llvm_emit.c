@@ -177,10 +177,10 @@ static void llvm_name(struct text *out, char sigil, const char *name)
     text_append(out, "\"");
 }
 
-/* DESIGN: a function takes the symbol the native back end gives it, so
-   objects of the two back ends link together until the step switch. llc
-   applies the mangling of the triple, so the text drops the leading _ of
-   Mach-O, which llc writes again. */
+/* DESIGN: a function takes the symbol of target_c_symbol or
+   target_mangle, which the runtime, the C headers and the symbolizer
+   read. llc applies the mangling of the triple, so the text drops the
+   leading _ of Mach-O, which llc writes again. */
 static void function_symbol(struct text *out, enum target t,
                             const struct ir_function *f)
 {
@@ -250,8 +250,8 @@ static void float_constant(struct text *out, enum ir_type type, double value)
 }
 
 /* The constant of an integer operand of a float type. Its value is the
-   bits of the float, which the native back ends load into the register
-   as they stand. The optimizer leaves such a zero in a copy. */
+   bits of the float as they stand. The optimizer leaves such a zero in a
+   copy. */
 static void float_bits(struct text *out, enum ir_type type, uint64_t value)
 {
     if (type == IR_F32) {
@@ -460,9 +460,8 @@ static void intrinsic(struct emitter *e, const char *result, const char *name,
    shifts with the count modulo the width, the guarded divisions and the
    comparisons, which widen their i1 to the i8 of a bool.
    DESIGN: a comparison widens its i1 to the type of the instruction. The
-   trampolines of whole_tables.c write ne with the type i64, which the
-   native back end takes as a word of 0 or 1, and the branch after it
-   reads the low byte of that word. */
+   trampolines of whole_tables.c write ne with the type i64, a word of 0
+   or 1, and the branch after it reads the low byte of that word. */
 static void binary(struct emitter *e, const struct ir_inst *inst)
 {
     enum ir_type type = comparison(inst->op) != NULL
@@ -643,8 +642,8 @@ static void copy_bytes(struct emitter *e, const char *dst, const char *src,
 }
 
 /* DESIGN: a slot is an alloca in the entry block, wherever the IR puts
-   it, so a slot in a loop is one place in the frame, as the native back
-   end makes it. Its temporary holds the address. */
+   it, so a slot in a loop is one place in the frame. Its temporary holds
+   the address. */
 static void slot(struct emitter *e, const struct ir_inst *inst)
 {
     char value[24];
@@ -783,9 +782,8 @@ static void unit_op(struct emitter *e, struct text *v, const char *op,
    unit of layout_bits. An unsigned field shifts down and masks, and a
    signed one shifts to the top and back with an arithmetic shift, then
    either widens to its type. A store reads the unit, clears the field,
-   puts the new bits in and writes the unit back. This is the sequence of
-   expand.c for the native back end. A unit may start at any byte, so it
-   takes the alignment its offset leaves in the aggregate. */
+   puts the new bits in and writes the unit back. A unit may start at any
+   byte, so it takes the alignment its offset leaves in the aggregate. */
 static void bits(struct emitter *e, const struct ir_inst *inst)
 {
     const struct ir_field *field =
@@ -1142,7 +1140,7 @@ static void arithmetic_flags(struct emitter *e, const struct ir_inst *inst,
    is taken modulo the width too, so no shift of the text is poison and
    the and with the test of the count decides. A left shift overflows
    when the arithmetic shift back does not give the operand, and a right
-   shift never overflows, as expand.c gives both. */
+   shift never overflows. */
 static void shift_flags(struct emitter *e, const struct ir_inst *inst,
                         const char *type, const char *a, const char *b)
 {
@@ -1634,10 +1632,10 @@ static uint32_t lanes_of(struct emitter *e, const char *lane, size_t lanes,
 
 /* DESIGN: a fold of float lanes takes the order of the entry on v.sum()
    in docs/decisions.md: the upper half of the lanes onto the lower half
-   until one is left, as expand.c folds them. A float sum depends on the
-   order, and the least and the greatest keep the upper lane where it is
-   less or greater by the comparison of the IR, which decides a NaN and
-   the two zeros. So the text halves the vector with shufflevector, where
+   until one is left. A float sum depends on the order, and the least and
+   the greatest keep the upper lane where it is less or greater by the
+   comparison of the IR, which decides a NaN and the two zeros. So the
+   text halves the vector with shufflevector, where
    "Instruction mapping" names llvm.vector.reduce.fadd, fmin and fmax,
    whose order or whose NaN and zeros differ. The decision is above the
    work order. A fold of integer lanes takes its intrinsic, since the
@@ -2095,8 +2093,7 @@ static void keep_result(struct emitter *e, const struct ir_inst *inst,
 
 /* DESIGN: the result of a call takes the type of the instruction, which
    may differ from the one the callee declares, as a pointer that a
-   function of the runtime returns as an i64. The native back end reads
-   the register either way. Returns the value of type to, which is v when
+   function of the runtime returns as an i64. Returns the value of type to, which is v when
    the two LLVM types agree. */
 static uint32_t reinterpret(struct emitter *e, uint32_t v, enum ir_type from,
                             enum ir_type to)
@@ -2138,7 +2135,7 @@ static uint32_t reinterpret(struct emitter *e, uint32_t v, enum ir_type from,
    through a table is a call of the pointer the IR loaded from it, whose
    descriptor and slot the instruction carries for the passes before. An
    aggregate result lives in a slot of the call, whose address the result
-   temporary holds, as on the native back end. */
+   temporary holds. */
 static void call(struct emitter *e, const struct ir_inst *inst)
 {
     const struct ir_function *callee =
@@ -2401,9 +2398,9 @@ static bool link_once(const struct emitter *e, const struct ir_function *f)
     return e->o->one_module && ir_is_copy_name(f->name);
 }
 
-/* DESIGN: the linkage follows the symbols emit.c writes. A whole program
-   keeps every function internal, unless it is an export fn or the
-   program hosts plugins. An object of one module makes every function
+/* DESIGN: the linkage of a function. A whole program keeps every
+   function internal, unless it is an export fn or the program hosts
+   plugins. An object of one module makes every function
    global and hidden for the other objects, and a copy of a generic weak,
    in a COMDAT on COFF, which has no hidden symbols. An export fn is
    dso_local with default visibility. */
@@ -2727,10 +2724,10 @@ static bool imported(const struct emitter *e, const struct ir_reloc *r)
 }
 
 /* DESIGN: a COFF plugin holds the address of the __imp_ entry of a name
-   of its host where its data holds an address of the host, as emit.c
-   writes it. The loader replaces it with the address the entry holds,
-   at each place anti_rt_imports lists. Append the entry of r, which
-   global g holds at its offset, to values, and record the place. */
+   of its host where its data holds an address of the host. The loader
+   replaces it with the address the entry holds, at each place
+   anti_rt_imports lists. Append the entry of r, which global g holds at
+   its offset, to values, and record the place. */
 static void import_place(struct emitter *e, struct text *values,
                          const struct ir_global *g, const struct ir_reloc *r)
 {
@@ -2880,8 +2877,7 @@ static void global(struct emitter *e, const struct ir_global *g, bool twin)
 }
 
 /* DESIGN: the runtime calls main through its entry, the name RUNTIME_ENTRY
-   of RUNTIME_MODULE, as the .set of emit.c does for the native back end.
-   An alias gives main the second name, which stays global while main
+   of RUNTIME_MODULE. An alias gives main the second name, which stays global while main
    itself may be internal. */
 static void entry(struct emitter *e, const struct ir_module *m)
 {
@@ -3015,7 +3011,7 @@ static bool declared_elsewhere(const struct ir_module *m,
    that compiles its patterns and, in a shared library, the constructor of
    the runtime. llvm.global_ctors names them, at the priority of a C
    constructor, and llc writes the section of each format: .init_array,
-   __mod_init_func or .CRT$XCU, the sections of emit.c. */
+   __mod_init_func or .CRT$XCU. */
 static void constructors(struct emitter *e, const struct ir_module *m)
 {
     struct text entries = {0};
@@ -3074,8 +3070,8 @@ static void head(struct text *out, enum target t, const char *source)
     text_append(out, "\"\n\n");
 }
 
-/* DESIGN: the package header and the notice keep the sections emit.c
-   gives them. No symbol names the copy of the package header, so
+/* DESIGN: the package header and the notice keep a section of their own
+   per object format. No symbol names the copy of the package header, so
    llvm.used keeps the private constant through every pass. */
 void llvm_emit_package(struct text *out, enum target t, const char *bytes,
                        size_t length)

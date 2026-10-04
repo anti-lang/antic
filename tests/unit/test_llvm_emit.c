@@ -13,9 +13,9 @@
 #include "../binary_stdio.h"
 #include "check.h"
 #include "arena.h"
-#include "debug.h"
 #include "ir.h"
 #include "layout.h"
+#include "llvm_debug.h"
 #include "llvm_emit.h"
 
 struct fixture {
@@ -441,9 +441,9 @@ static void frames_kept(void)
     end(&x);
 }
 
-/* An integer constant of a float type is the bits of the float, as the
-   native back ends load it into the register: the zero that the
-   optimizer leaves in a copy of f64, and the bits of 1.5 and of -0.25. */
+/* An integer constant of a float type is the bits of the float: the zero
+   that the optimizer leaves in a copy of f64, and the bits of 1.5 and of
+   -0.25. */
 static void float_bits(void)
 {
     struct fixture x;
@@ -1149,7 +1149,7 @@ static void constructors(void)
 }
 
 /* The copy of the package header is an object of one private constant in
-   the section of emit.c, which llvm.used keeps. The notice is the global
+   a section of its own, which llvm.used keeps. The notice is the global
    anti_licenses in the read-only section, ended by a NUL. */
 static void sections(void)
 {

@@ -34,15 +34,8 @@ void test_lower(void);
 void test_modules(void);
 void test_header(void);
 void test_optimize(void);
-void test_select(void);
-void test_regalloc(void);
-void test_x86_64(void);
-void test_arm64(void);
-void test_emit(void);
 void test_link(void);
 void test_userdirs(void);
-void test_float(void);
-void test_struct(void);
 void test_utf(void);
 void test_whole(void);
 void test_sha256(void);
@@ -101,15 +94,8 @@ static const struct group groups[] = {
     {"modules", test_modules},
     {"header", test_header},
     {"optimize", test_optimize},
-    {"select", test_select},
-    {"regalloc", test_regalloc},
-    {"x86_64", test_x86_64},
-    {"arm64", test_arm64},
-    {"emit", test_emit},
     {"link", test_link},
     {"userdirs", test_userdirs},
-    {"float", test_float},
-    {"struct", test_struct},
     {"utf", test_utf},
     {"whole", test_whole},
     {"sha256", test_sha256},

@@ -47,15 +47,8 @@ add_executable(antic_unit_tests
     unit/test_modules.c
     unit/test_header.c
     unit/test_optimize.c
-    unit/test_select.c
-    unit/test_regalloc.c
-    unit/test_x86_64.c
-    unit/test_arm64.c
-    unit/test_emit.c
     unit/test_link.c
     unit/test_userdirs.c
-    unit/test_float.c
-    unit/test_struct.c
     unit/test_utf.c
     unit/test_whole.c
     unit/test_sha256.c
@@ -311,11 +304,8 @@ endfunction()
 # dump_<stage>_<subject>, with _<target> after it for a dump of one target.
 #   antic_dump_test(<stage> <subject> <expected> [TARGET <target>]
 #                   [ARGS <argument>...])
-# tokens, ast, types, ir, opt, select, alloc and llvm give --dump-<stage>,
-# and asm gives -S into a file of its own, which the test compares. ARGS are
-# the other arguments of antic, the source among them.
-set(ANTIC_DUMPS "${CMAKE_CURRENT_BINARY_DIR}/dumps")
-file(MAKE_DIRECTORY "${ANTIC_DUMPS}")
+# tokens, ast, types, ir, opt and llvm give --dump-<stage>. ARGS are the
+# other arguments of antic, the source among them.
 function(antic_dump_test stage subject expected)
     cmake_parse_arguments(PARSE_ARGV 3 arg "" "TARGET" "ARGS")
     set(name dump_${stage}_${subject})
@@ -324,15 +314,8 @@ function(antic_dump_test stage subject expected)
         string(APPEND name _${arg_TARGET})
         set(arguments --target ${arg_TARGET})
     endif()
-    set(output "")
     set(version "")
-    if(stage STREQUAL "asm")
-        set(file "${ANTIC_DUMPS}/${name}.s")
-        # The golden is the assembly of the native back end, whichever
-        # back end ANTIC_BACKEND names.
-        list(PREPEND arguments --backend native -S -o "${file}")
-        set(output "-DOUTPUT=${file}")
-    elseif(stage MATCHES "^(tokens|ast|types|ir|opt|select|alloc|llvm)$")
+    if(stage MATCHES "^(tokens|ast|types|ir|opt|llvm)$")
         list(PREPEND arguments --dump-${stage})
         # The LLVM text names the version of antic, which the expected
         # file writes as VERSION.
@@ -348,7 +331,6 @@ function(antic_dump_test stage subject expected)
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
             "-DCOMMAND=${command}"
-            ${output}
             ${version}
             "-DEXPECTED=${expected}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
@@ -524,9 +506,8 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_verify.cmake")
 endforeach()
 
-# A program of tests/programs built with antic --backend llvm, which runs
-# opt and llc of the runtime archive and links, and run on a target the
-# host runs. MODE is release or dev, and OPTIONS the options of antic
+# A program of tests/programs built with antic, which runs opt and llc of
+# the runtime archive and links, and run on a target the host runs. MODE is release or dev, and OPTIONS the options of antic
 # beside them. SOURCE names a program elsewhere than tests/programs,
 # OBJECTS the objects of C it links and EXPECTED its expected output. The
 # test is llvm_program_<name>_<target>_<mode>.
@@ -562,13 +543,11 @@ function(antic_llvm_program_test name target mode)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_program.cmake")
 endfunction()
 
-# The scalar programs of tests/programs under the LLVM back end, in release
-# and dev mode, for macos-arm64 and for macos-x86_64 under Rosetta, which
-# take --cpu v1 as every macos-x86_64 program of a macos-arm64 host does.
-# Each prints what it prints under the native back end. A program's dev
-# build carries checks that call the runtime, which waits for the step
-# emit-memory, so scalar_ops and llvm_division build in dev mode with
-# --no-checks. The defined result stands behind each check. asserts calls
+# The scalar programs of tests/programs, in release and dev mode, for
+# macos-arm64 and for macos-x86_64 under Rosetta, which take --cpu v1 as
+# every macos-x86_64 program of a macos-arm64 host does. scalar_ops and
+# llvm_division build in dev mode with --no-checks, so the defined result
+# stands behind each check. asserts calls
 # the runtime from its assertions in dev mode, and runs in release mode
 # alone. llvm_division is the test llvm_division of
 # docs/work-order-llvm-back-end.md. The six programs of the wide
@@ -615,13 +594,13 @@ if(llvm_targets)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_run.cmake")
     add_expect_test(llvm_opt_failed STATUS 1
         PATTERN "llc: error: -passes is for .mir file only.*antic: opt failed"
-        COMMAND $<TARGET_FILE:antic> --backend llvm
+        COMMAND $<TARGET_FILE:antic>
                 --runtime "${ANTIC_RUNTIME_DIR}" --opt "${ANTIC_LLC}"
                 -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_opt_failed"
                 "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
     add_expect_test(llvm_llc_failed STATUS 1
         PATTERN "llvm-mc: Unknown command line argument .*antic: llc failed"
-        COMMAND $<TARGET_FILE:antic> --backend llvm --dev
+        COMMAND $<TARGET_FILE:antic> --dev
                 --runtime "${ANTIC_RUNTIME_DIR}" --llc "${ANTIC_LLVM_MC}"
                 -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_llc_failed"
                 "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
@@ -642,9 +621,8 @@ if(llvm_targets)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_inline_lines.cmake")
 endif()
 
-# A COFF host of plugins and its plugin under the LLVM back end export
-# what the native back end exports, and the plugin lists as many places
-# of an __imp_ entry. The VM run runs both.
+# A COFF host of plugins exports every name its plugin imports, and the
+# plugin lists as many places as its table counts. The VM run runs both.
 foreach(target windows-x86_64 windows-arm64)
     add_test(NAME llvm_coff_plugin_${target}
         COMMAND "${CMAKE_COMMAND}"
@@ -656,12 +634,6 @@ foreach(target windows-x86_64 windows-arm64)
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-coff-plugin/${target}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_coff_plugin.cmake")
 endforeach()
-
-# --backend takes the names of the two back ends alone.
-add_expect_test(llvm_backend_name STATUS 2
-    PATTERN "^antic: --backend takes native or llvm, not wasm"
-    COMMAND $<TARGET_FILE:antic> --backend wasm
-            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
 
 # The archive holds a runtime per level, so that a program built with --cpu
 # below its target's default links a runtime of that level.
@@ -675,11 +647,10 @@ set_tests_properties(cpu_archive_levels PROPERTIES
     SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # One test per x86_64 level: v3 writes the VEX forms of AVX and the two
-# levels below it write the SSE forms. v2 adds no instruction that antic
-# writes today, so it differs from v1 in the assembler and the runtime
-# alone.
-set(cpu_sse "    addsd|    addss|    mulss|    ucomisd|    cvtss2sd|    movsd")
-set(cpu_avx "    vaddsd|    vaddss|    vmulss|    vucomisd|    vcvtss2sd|    vmovaps")
+# levels below it write the SSE forms. v2 adds no instruction that llc
+# writes for the program, so it differs from v1 in the runtime alone.
+set(cpu_sse "\taddsd\t|\taddss\t|\tmulss\t|\tucomisd\t|\tcvtss2sd\t|\tmovsd\t")
+set(cpu_avx "\tvaddsd\t|\tvaddss\t|\tvmulss\t|\tvucomisd\t|\tvcvtss2sd\t|\tvmovsd\t")
 foreach(case "v1,${cpu_sse},${cpu_avx}" "v2,${cpu_sse},${cpu_avx}"
         "v3,${cpu_avx},${cpu_sse}")
     string(REPLACE "," ";" parts "${case}")
@@ -689,6 +660,7 @@ foreach(case "v1,${cpu_sse},${cpu_avx}" "v2,${cpu_sse},${cpu_avx}"
     add_test(NAME cpu_level_${level}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DTARGET=linux-x86_64"
             "-DLEVEL=${level}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/floats.anti"
@@ -751,10 +723,11 @@ foreach(target linux-arm64 macos-arm64 windows-arm64)
 endforeach()
 
 # The two conversions of f16. ARM64 and x86-64-v3 have one instruction
-# for each, and v1 and v2, which lack F16C, call the runtime.
-set(f16_call "anti_rt_f16_to_f32|anti_rt_f32_to_f16")
-set(f16_f16c "    vcvtph2ps|    vcvtps2ph")
-set(f16_fcvt "    fcvt s|    fcvt h")
+# for each, and v1 and v2, which lack F16C, call the functions of
+# compiler-rt.
+set(f16_call "__extendhfsf2|__truncsfhf2")
+set(f16_f16c "\tvcvtph2ps\t|\tvcvtps2ph\t")
+set(f16_fcvt "\tfcvt\ts|\tfcvt\th")
 foreach(case "linux-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph"
         "linux-x86_64,v2,${f16_call},cvtph2ps|cvtps2ph"
         "linux-x86_64,v3,${f16_f16c},${f16_call}"
@@ -770,6 +743,7 @@ foreach(case "linux-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph"
     add_test(NAME f16_${target}_${level}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DTARGET=${target}"
             "-DLEVEL=${level}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/half.anti"
@@ -782,11 +756,11 @@ endforeach()
 # The native width of a simd operation: one instruction on the registers
 # of 32 bytes at x86-64-v3, and two on the 16 bytes of every other level
 # and of ARM64.
-foreach(case "linux-x86_64,v3,    vaddps %ymm,1"
-        "linux-x86_64,v1,    addps %xmm,2"
-        "linux-x86_64,v2,    addps %xmm,2"
-        "macos-arm64,armv8.5,    fadd v,2"
-        "linux-arm64,armv8.0,    fadd v,2")
+foreach(case "linux-x86_64,v3,vaddps[^\n]*%ymm,1"
+        "linux-x86_64,v1,addps[^\n]*%xmm,2"
+        "linux-x86_64,v2,addps[^\n]*%xmm,2"
+        "macos-arm64,armv8.5,fadd.4s\tv,2"
+        "linux-arm64,armv8.0,fadd\tv[0-9]+.4s,2")
     string(REPLACE "," ";" parts "${case}")
     list(GET parts 0 target)
     list(GET parts 1 level)
@@ -795,6 +769,7 @@ foreach(case "linux-x86_64,v3,    vaddps %ymm,1"
     add_test(NAME simd_width_${target}_${level}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DTARGET=${target}"
             "-DLEVEL=${level}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_wide.anti"
@@ -943,6 +918,7 @@ foreach(target windows-x86_64 windows-arm64)
     add_test(NAME codeview_empty_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSTD=${ANTIC_RUNTIME_DIR}/std"
             "-DSOURCE=${ANTIC_RUNTIME_DIR}/std/anti/collection/tree.antl"
             "-DTARGET=${target}"
@@ -981,10 +957,10 @@ endif()
 
 file(GLOB program_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/programs/*.anti")
-# DESIGN: a program named llvm_* checks a result that the LLVM back end
-# defines and the native back end leaves to the target, such as a division
-# by zero in release mode. It runs under the LLVM back end alone, through
-# antic_llvm_program_test.
+# DESIGN: a program named llvm_* checks a result of release mode that
+# "Defined results in release mode" of docs/work-order-llvm-back-end.md
+# defines, such as a division by zero. It runs through
+# antic_llvm_program_test, in the modes and with the options it needs.
 list(FILTER program_sources EXCLUDE REGEX "/llvm_[a-z_]+\\.anti$")
 foreach(source IN LISTS program_sources)
     get_filename_component(name "${source}" NAME_WE)
@@ -1309,19 +1285,13 @@ set_tests_properties(program_by_unsigned PROPERTIES TIMEOUT 60)
 file(GLOB std_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/std/*.anti")
 # A program whose output follows the Win32 errors of Windows brings
-# NAME.win32.expected for the Windows targets. A program whose output
-# names the functions of its frames brings NAME.llvm.expected for the
-# LLVM back end, whose release mode inlines small functions, as the entry
-# on inlined frames in docs/decisions.md says.
+# NAME.win32.expected for the Windows targets.
 foreach(source IN LISTS std_sources)
     get_filename_component(name "${source}" NAME_WE)
     set(expected "")
     set(win32_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.win32.expected")
-    set(llvm_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.llvm.expected")
     if(ANTIC_HOST_TARGET MATCHES "^windows-" AND EXISTS "${win32_expected}")
         set(expected EXPECTED "${win32_expected}")
-    elseif(ANTIC_BACKEND STREQUAL "llvm" AND EXISTS "${llvm_expected}")
-        set(expected EXPECTED "${llvm_expected}")
     endif()
     antic_program_test(std_${name}
         "${source}"
@@ -1629,7 +1599,6 @@ add_test(NAME anti_memory_checks
         "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_tests.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-memory-checks"
         "-DHOST=${ANTIC_HOST_TARGET}"
-        "-DBACKEND=${ANTIC_BACKEND}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_memory_checks.cmake")
 set_tests_properties(anti_memory_checks PROPERTIES TIMEOUT 300
     SKIP_REGULAR_EXPRESSION "SKIP: ")
@@ -1659,7 +1628,6 @@ add_test(NAME anti_build
         "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build"
         "-DOBJECT=${anti_object}"
-        "-DBACKEND=${ANTIC_BACKEND}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build.cmake")
 
 # The package name of the manifest reaches every compile of `anti check`,
@@ -1697,7 +1665,6 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
             "${anti_symbols_plugin}"
             "-DHOST=${ANTIC_HOST_TARGET}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-symbols"
-            "-DBACKEND=${ANTIC_BACKEND}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_symbols.cmake")
 endif()
 
@@ -2384,14 +2351,11 @@ foreach(target windows-x86_64 windows-arm64)
 endforeach()
 
 # The PDB of a Windows program names every function of it, in a release
-# build and in one with -g, and holds no path of the build. Release mode of
-# the LLVM back end inlines inner, outer and put, which then have no
-# record of their own, as the entry on inlined frames in docs/decisions.md
-# says. skipped keeps its frame for the skip it passes.
-set(pdb_names "stack_trace.inner;stack_trace.outer;stack_trace.skipped;stack_trace.put;stack_trace.main")
-if(ANTIC_BACKEND STREQUAL "llvm")
-    set(pdb_names "stack_trace.skipped;stack_trace.main")
-endif()
+# build and in one with -g, and holds no path of the build. Release mode
+# inlines inner, outer and put, which then have no record of their own, as
+# the entry on inlined frames in docs/decisions.md says. skipped keeps its
+# frame for the skip it passes.
+set(pdb_names "stack_trace.skipped;stack_trace.main")
 foreach(target windows-x86_64 windows-arm64)
     add_test(NAME pdb_names_${target}
         COMMAND "${CMAKE_COMMAND}"
@@ -2408,13 +2372,14 @@ foreach(target windows-x86_64 windows-arm64)
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
 
-# antic writes the same assembly for every test program on every host.
+# antic writes the same LLVM text for every test program on every host.
 add_test(NAME emit_identity
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DPROGRAMS=${CMAKE_CURRENT_SOURCE_DIR}/programs"
         "-DMANIFEST=${CMAKE_CURRENT_SOURCE_DIR}/emit-identity/programs.sha256"
+        "-DVERSION=${PROJECT_VERSION}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/emit-identity"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_emit_identity.cmake")
 
@@ -2698,36 +2663,6 @@ antic_modules_test(generics_modules
     PROGRAM client
     STD lang mem text
     WORK "${CMAKE_CURRENT_BINARY_DIR}/generics")
-
-# The test mixed_backends of docs/work-order-llvm-back-end.md: the dev
-# objects of the library modules come from one back end and the program
-# from the other, and they link and run. Both follow the C convention and
-# the same layout until the step switch, which removes the test. The
-# classes of chain cross the objects through their tables, and the
-# generics of mid make link-once copies that both back ends define. The
-# release form of each runs as well, with the program from the other back
-# end.
-foreach(pair native,llvm llvm,native)
-    string(REPLACE "," ";" backends "${pair}")
-    list(GET backends 0 libraries)
-    list(GET backends 1 program)
-    antic_modules_test(mixed_backends_chain_${libraries}
-        ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/chain"
-        LIBRARIES animal dog
-        PROGRAM chain
-        STD lang
-        OPTIONS --backend ${program}
-        LIB_OPTIONS --backend ${libraries}
-        WORK "${CMAKE_CURRENT_BINARY_DIR}/mixed-chain-${libraries}")
-    antic_modules_test(mixed_backends_generics_${libraries}
-        ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generics"
-        LIBRARIES gen mid
-        PROGRAM client
-        STD lang mem text
-        OPTIONS --backend ${program}
-        LIB_OPTIONS --backend ${libraries}
-        WORK "${CMAKE_CURRENT_BINARY_DIR}/mixed-generics-${libraries}")
-endforeach()
 
 # Direct imports. A program and a library name the items of another
 # library without its module name, and reach the module by its name as
@@ -3254,7 +3189,6 @@ add_test(NAME memory_checks
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         "-DHOST=${ANTIC_HOST_TARGET}"
-        "-DBACKEND=${ANTIC_BACKEND}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_memory_checks.cmake")
 set_tests_properties(memory_checks PROPERTIES TIMEOUT 120
     SKIP_REGULAR_EXPRESSION "SKIP: ")
@@ -3268,7 +3202,6 @@ add_test(NAME memory_checks_list
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_list.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         "-DHOST=${ANTIC_HOST_TARGET}"
-        "-DBACKEND=${ANTIC_BACKEND}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_memory_checks_list.cmake")
 set_tests_properties(memory_checks_list PROPERTIES TIMEOUT 120
     SKIP_REGULAR_EXPRESSION "SKIP: ")
@@ -3305,18 +3238,18 @@ endif()
 # patterns. Each case is a name, the source in tests/trace, the options of
 # antic and the arguments of the program. The pattern files of the output
 # and of the error output follow, then the exit status. A dev build links
-# the dev object of anti.lang. Release mode of the LLVM back end inlines
-# small functions, as the entry on inlined frames in docs/decisions.md
-# says, so a release case takes NAME.llvm.pattern for NAME.pattern under
-# it where the trace names other frames.
+# the dev object of anti.lang. Release mode inlines small functions, as
+# the entry on inlined frames in docs/decisions.md says, so a release case
+# takes NAME.release.pattern where its trace names other frames than the
+# one of dev mode.
 set(TRACE "${CMAKE_CURRENT_SOURCE_DIR}/trace")
 foreach(case
-        "stack|stack_trace|||stack_trace.pattern||0"
+        "stack|stack_trace|||stack_trace.release.pattern||0"
         "stack_g|stack_trace|-g||stack_trace.g.pattern||0"
         "stack_dev|stack_trace|--dev||stack_trace.pattern||0"
         "forged|forged|||forged.pattern||0"
-        "copies|copies|||copies.pattern||0"
-        "copies_g|copies|-g||copies.pattern||0"
+        "copies|copies|||copies.release.pattern||0"
+        "copies_g|copies|-g||copies.release.pattern||0"
         "copies_dev|copies|--dev||copies.pattern||0"
         "origin|origin|||origin.pattern||0"
         "origin_dev|origin|--dev||origin.trace.pattern||0"
@@ -3343,12 +3276,6 @@ foreach(case
     set(std "")
     if(options MATCHES "--dev")
         set(std lang)
-    endif()
-    string(REGEX REPLACE "\\.pattern$" ".llvm.pattern" llvm_expected
-           "${expected}")
-    if(ANTIC_BACKEND STREQUAL "llvm" AND NOT options MATCHES "--dev" AND
-       EXISTS "${TRACE}/${llvm_expected}")
-        set(expected "${llvm_expected}")
     endif()
     antic_dev_inputs(std_objects std_fixtures ${std})
     list(JOIN std_objects "," std_objects)
@@ -3647,7 +3574,6 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64)
             "-DSOURCE=${TRACE}/symbols.anti"
             "-DTARGET=${target}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-${target}"
-            "-DBACKEND=${ANTIC_BACKEND}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_symbols.cmake")
     set_tests_properties(trace_symbols_${target} PROPERTIES
         SKIP_REGULAR_EXPRESSION "SKIP: ")
@@ -3682,7 +3608,7 @@ if(NOT WIN32)
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/trace/stack_trace.anti"
                 "-DOTHER=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
-                "-DOPTIONS=--backend|llvm|--target|${target}"
+                "-DOPTIONS=--target|${target}"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-build-id/${target}"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_build_id.cmake")
     endforeach()
@@ -3742,32 +3668,6 @@ if(ANTIC_LLVM_AR)
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_clib.cmake")
     endforeach()
 endif()
-# The same libraries built with antic --backend llvm, on the macOS hosts,
-# as run_clib.cmake gives under BACKEND. Each case checks what its native
-# test checks.
-if(ANTIC_LLVM_AR AND llvm_targets)
-    foreach(case static shared exports two loader header bundle classes
-            failing tuples flags variants nested simd names handlers ledger
-            generics optional)
-        add_test(NAME clib_llvm_${case}
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
-                "-DLLVM_AR=${ANTIC_LLVM_AR}"
-                -DBACKEND=llvm
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
-                "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib-llvm"
-                "-DCASE=${case}"
-                "-DCC=${ANTIC_TEST_CC}"
-                "-DCXX=${ANTIC_TEST_CXX}"
-                "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
-                "-DTARGET=${ANTIC_HOST_TARGET}"
-                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_clib.cmake")
-    endforeach()
-endif()
 # Two bundled libraries of each Windows target on every host. The pinned
 # clang compiles the C program for the target and lld-link links it, and
 # nothing runs.
@@ -3818,6 +3718,7 @@ if(ANTIC_LLVM_MC)
         add_test(NAME unwind_${target}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DLLVM_READOBJ=${ANTIC_RUNTIME_READOBJ}"
                 "-DTARGET=${target}"
@@ -3855,83 +3756,42 @@ antic_dump_test(opt main
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.opt"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
 
-# The selected machine code of main.anti that chapter 12 prints.
-antic_dump_test(select main
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.arm64.sel"
-    TARGET macos-arm64
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
-antic_dump_test(select main
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.x86_64.sel"
-    TARGET linux-x86_64
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
-
-# The allocated machine code of main.anti that chapter 13 prints.
-antic_dump_test(alloc main
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.arm64.alloc"
-    TARGET macos-arm64
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
-antic_dump_test(alloc main
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.x86_64.alloc"
-    TARGET linux-x86_64
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
-
-antic_dump_test(alloc twice
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/twice.arm64.alloc"
-    TARGET macos-arm64
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/twice.anti")
-antic_dump_test(alloc cell
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/cell.arm64.alloc"
-    TARGET macos-arm64
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/cell.anti")
-
-# Spilling: more values live across a call than callee-saved registers.
-antic_dump_test(alloc spill12
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/spill12.arm64.alloc"
-    TARGET macos-arm64
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/spill12.anti")
-antic_dump_test(alloc spill7
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/spill7.x86_64.alloc"
-    TARGET linux-x86_64
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/spill7.anti")
-
-# The back ends of chapters 14 and 15: addressing modes and calls.
-foreach(case "sum,linux-x86_64,sum.x86_64" "args,linux-x86_64,args.linux-x86_64"
-        "args,windows-x86_64,args.windows-x86_64" "x86,linux-x86_64,x86.x86_64"
-        "sum,macos-arm64,sum.arm64" "args,macos-arm64,args.macos-arm64"
-        "args,linux-arm64,args.linux-arm64" "x86,linux-arm64,x86.arm64"
-        "arm64,macos-arm64,arm64.macos-arm64" "arm64,linux-arm64,arm64.linux-arm64"
-        "floatcalls,linux-x86_64,floatcalls.linux-x86_64"
-        "floatcalls,windows-x86_64,floatcalls.windows-x86_64"
-        "floatcalls,macos-arm64,floatcalls.macos-arm64"
-        "floatcalls,windows-arm64,floatcalls.windows-arm64"
-        "floatcalls,linux-arm64,floatcalls.linux-arm64"
-        "floats,linux-x86_64,floats.linux-x86_64"
-        "floats,macos-arm64,floats.macos-arm64"
-        "structs,linux-x86_64,structs.linux-x86_64"
-        "structs,windows-x86_64,structs.windows-x86_64"
-        "fnptr,linux-x86_64,fnptr.linux-x86_64"
-        "fnptr,linux-arm64,fnptr.linux-arm64")
+# The LLVM text of the programs of the chapters on selection, register
+# allocation, the back ends and emission, one golden per program and
+# target, the programs and targets whose machine code had a golden.
+foreach(case "main,macos-arm64" "main,macos-x86_64" "main,linux-x86_64"
+        "main,linux-arm64" "main,windows-x86_64" "main,windows-arm64"
+        "twice,macos-arm64" "cell,macos-arm64" "spill12,macos-arm64"
+        "spill7,linux-x86_64" "sum,linux-x86_64" "sum,macos-arm64"
+        "args,linux-x86_64" "args,windows-x86_64" "args,macos-arm64"
+        "args,linux-arm64" "x86,linux-x86_64" "x86,linux-arm64"
+        "arm64,macos-arm64" "arm64,linux-arm64"
+        "floatcalls,linux-x86_64" "floatcalls,windows-x86_64"
+        "floatcalls,macos-arm64" "floatcalls,windows-arm64"
+        "floatcalls,linux-arm64" "floats,linux-x86_64" "floats,macos-arm64"
+        "structs,linux-x86_64" "structs,windows-x86_64" "structs,macos-arm64"
+        "structs,linux-arm64" "structs,windows-arm64"
+        "fnptr,linux-x86_64" "fnptr,linux-arm64" "fnptr,macos-arm64"
+        "loop,linux-arm64" "loop,macos-x86_64"
+        "spillweight,linux-x86_64" "measure,linux-arm64"
+        "strings,linux-x86_64" "strings,macos-arm64" "strings,windows-x86_64")
     string(REPLACE "," ";" parts "${case}")
     list(GET parts 0 source)
     list(GET parts 1 target)
-    list(GET parts 2 expected)
-    antic_dump_test(alloc ${source}
-        "${CMAKE_CURRENT_SOURCE_DIR}/dump/${expected}.alloc"
+    antic_dump_test(llvm ${source}
+        "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.${target}.ll"
         TARGET ${target}
         ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.anti")
 endforeach()
-
-# The three ARM64 conventions pass these structs alike. The Windows frame
-# adds its unwind directives, so it has a file of its own.
-foreach(target macos-arm64 linux-arm64 windows-arm64)
-    set(expected structs.arm64.alloc)
-    if(target STREQUAL "windows-arm64")
-        set(expected structs.windows-arm64.alloc)
-    endif()
-    antic_dump_test(alloc structs
-        "${CMAKE_CURRENT_SOURCE_DIR}/dump/${expected}"
+foreach(case "sizes,linux-x86_64" "bitfields,linux-x86_64"
+        "bitfields,windows-x86_64" "letters,macos-arm64" "letters,linux-x86_64")
+    string(REPLACE "," ";" parts "${case}")
+    list(GET parts 0 source)
+    list(GET parts 1 target)
+    antic_dump_test(llvm ${source}
+        "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.${target}.ll"
         TARGET ${target}
-        ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/structs.anti")
+        ARGS "${CMAKE_CURRENT_SOURCE_DIR}/programs/${source}.anti")
 endforeach()
 
 # The refusals of the programs of tests/errors, error_<name>. A message
@@ -4094,9 +3954,9 @@ foreach(case "types|symbolic||symbolic.types|${DUMP}/symbolic.anti"
         "types|constraints||constraints.types|${DUMP}/constraints.anti"
         "ir|header_main||header/main.ir|${DUMP}/header/main.anti"
         "ir|size_of_main||size_of/main.ir|${DUMP}/size_of/main.anti"
-        "select|size_of_main|linux-arm64|size_of/main.linux-arm64.sel|${DUMP}/size_of/main.anti"
-        "select|c_long_main|linux-x86_64|c_long/main.linux-x86_64.sel|${DUMP}/c_long/main.anti"
-        "select|c_long_main|windows-x86_64|c_long/main.windows-x86_64.sel|${DUMP}/c_long/main.anti"
+        "llvm|size_of_main|linux-arm64|size_of/main.linux-arm64.ll|${DUMP}/size_of/main.anti"
+        "llvm|c_long_main|linux-x86_64|c_long/main.linux-x86_64.ll|${DUMP}/c_long/main.anti"
+        "llvm|c_long_main|windows-x86_64|c_long/main.windows-x86_64.ll|${DUMP}/c_long/main.anti"
         "ir|devirt||devirt.ir|${DUMP}/devirt.anti"
         "ir|devirt_dev||devirt.dev.ir|--dev,${DUMP}/devirt.anti"
         "opt|devirt||devirt.opt|${DUMP}/devirt.anti"
@@ -4108,19 +3968,14 @@ foreach(case "types|symbolic||symbolic.types|${DUMP}/symbolic.anti"
         "opt|forward||forward.opt|${DUMP}/forward.anti"
         "ir|probe||probe.ir|${CMAKE_CURRENT_SOURCE_DIR}/abi/probe.anti"
         "ir|sizes||sizes.ir|${CMAKE_CURRENT_SOURCE_DIR}/programs/sizes.anti"
-        "alloc|spillweight|linux-x86_64|spillweight.linux-x86_64.alloc|${DUMP}/spillweight.anti"
-        "alloc|sizes|linux-x86_64|sizes.linux-x86_64.alloc|${CMAKE_CURRENT_SOURCE_DIR}/programs/sizes.anti"
         "ir|bitfields||bitfields.ir|${CMAKE_CURRENT_SOURCE_DIR}/programs/bitfields.anti"
-        "alloc|bitfields|linux-x86_64|bitfields.linux-x86_64.alloc|${CMAKE_CURRENT_SOURCE_DIR}/programs/bitfields.anti"
-        "alloc|bitfields|windows-x86_64|bitfields.windows-x86_64.alloc|${CMAKE_CURRENT_SOURCE_DIR}/programs/bitfields.anti"
         "opt|measure||measure.opt|${DUMP}/measure.anti"
-        "alloc|measure|linux-arm64|measure.linux-arm64.alloc|${DUMP}/measure.anti"
-        "asm|scale_dev|macos-arm64|scale.dev.macos-arm64.s|--dev,-I,${MODULES},${MODULES}/com/example/scale.anti"
-        "asm|scale_dev|windows-x86_64|scale.dev.windows-x86_64.s|--dev,-I,${MODULES},${MODULES}/com/example/scale.anti"
-        "asm|main_dev|linux-x86_64|main.dev.linux-x86_64.s|--dev,-I,${LIBS},${MODULES}/main.anti"
-        "asm|doubling|linux-x86_64|doubling.linux-x86_64.s|--lib,shared,-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti"
-        "asm|doubling|macos-arm64|doubling.macos-arm64.s|--lib,shared,-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti"
-        "asm|doubling|windows-arm64|doubling.windows-arm64.s|--lib,shared,-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti")
+        "llvm|scale_dev|macos-arm64|scale.dev.macos-arm64.ll|--dev,-I,${MODULES},${MODULES}/com/example/scale.anti"
+        "llvm|scale_dev|windows-x86_64|scale.dev.windows-x86_64.ll|--dev,-I,${MODULES},${MODULES}/com/example/scale.anti"
+        "llvm|main_dev|linux-x86_64|main.dev.linux-x86_64.ll|--dev,-I,${LIBS},${MODULES}/main.anti"
+        "llvm|doubling|linux-x86_64|doubling.linux-x86_64.ll|--lib,shared,--runtime,${ANTIC_RUNTIME_DIR},-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti"
+        "llvm|doubling|macos-arm64|doubling.macos-arm64.ll|--lib,shared,--runtime,${ANTIC_RUNTIME_DIR},-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti"
+        "llvm|doubling|windows-arm64|doubling.windows-arm64.ll|--lib,shared,--runtime,${ANTIC_RUNTIME_DIR},-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 stage)
     list(GET parts 1 subject)
@@ -4135,7 +3990,7 @@ foreach(case "types|symbolic||symbolic.types|${DUMP}/symbolic.anti"
     antic_dump_test(${stage} ${subject} "${DUMP}/${expected}"
         ${target_argument} ARGS ${arguments})
 endforeach()
-set_tests_properties(dump_asm_main_dev_linux-x86_64 PROPERTIES
+set_tests_properties(dump_llvm_main_dev_linux-x86_64 PROPERTIES
     FIXTURES_REQUIRED twice_antl)
 
 # Calls through function pointers in the IR of chapter 20.
@@ -4158,26 +4013,6 @@ antic_dump_test(opt arm64
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/arm64.opt"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/arm64.anti")
 
-# The assembly files of chapters 16, 19 and 20 for each object format.
-foreach(case "main,macos-arm64" "main,macos-x86_64" "main,linux-x86_64"
-        "main,linux-arm64" "main,windows-x86_64" "main,windows-arm64"
-        "letters,macos-arm64" "letters,linux-x86_64"
-        "strings,linux-x86_64" "strings,macos-arm64" "strings,windows-x86_64"
-        "fnptr,macos-arm64")
-    string(REPLACE "," ";" parts "${case}")
-    list(GET parts 0 source)
-    list(GET parts 1 target)
-    if(source STREQUAL "letters")
-        set(path "${CMAKE_CURRENT_SOURCE_DIR}/programs/${source}.anti")
-    else()
-        set(path "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.anti")
-    endif()
-    antic_dump_test(asm ${source}
-        "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.${target}.s"
-        TARGET ${target}
-        ARGS "${path}")
-endforeach()
-
 # Every instruction that antic writes assembles with llvm-mc.
 foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
         "windows-x86_64,x86_64-pc-windows-msvc"
@@ -4192,6 +4027,7 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
         add_test(NAME asm_${source}_${target}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DTARGET=${target}"
                 "-DTRIPLE=${triple}"
@@ -4207,6 +4043,7 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
         add_test(NAME asm_${name}_${target}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DTARGET=${target}"
                 "-DTRIPLE=${triple}"
@@ -4219,6 +4056,7 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
     add_test(NAME asm_debug_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DTARGET=${target}"
             "-DTRIPLE=${triple}"
@@ -4229,15 +4067,16 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
     # A copy of a generic in dev mode is link-once: a weak definition on
     # ELF and Mach-O and a COMDAT section on COFF.
     if(target MATCHES "^linux")
-        set(once ".weak copies_merge.pick$3c$2acopies_merge.Person$3e")
+        set(once "\t.weak\tcopies_merge.pick$3c$2acopies_merge.Person$3e")
     elseif(target MATCHES "^macos")
-        set(once ".weak_definition _copies_merge.pick$3c$2acopies_merge.Person$3e")
+        set(once "\t.weak_definition\t_copies_merge.pick$3c$2acopies_merge.Person$3e")
     else()
         set(once ".text,\"xr\",discard,_A12copies_merge_pick$3c$2acopies_merge.Person$3e")
     endif()
     add_test(NAME asm_copies_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DTARGET=${target}"
             "-DTRIPLE=${triple}"
@@ -4248,15 +4087,17 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_asm.cmake")
     # The debug information names a copy as a person reads it, the DWARF
     # entry on ELF and Mach-O and the CodeView record on COFF, and the
-    # symbol keeps the escaped name.
+    # symbol keeps the escaped name. Release mode inlines the copy, so the
+    # build is a dev build.
     add_test(NAME asm_debug_copies_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DTARGET=${target}"
             "-DTRIPLE=${triple}"
-            "-DOPTIONS=-g"
-            "-DHOLDS=.asciz \"copies_merge.pick<int>\"|pick$3cint$3e:"
+            "-DOPTIONS=--dev|-g"
+            "-DHOLDS=.asciz\t\"copies_merge.pick<int>\"|pick$3cint$3e:"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/copies_merge.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm-debug-copies"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_asm.cmake")
@@ -4264,6 +4105,7 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
     add_test(NAME asm_clib_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DTARGET=${target}"
             "-DTRIPLE=${triple}"
@@ -4276,6 +4118,7 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
         add_test(NAME asm_half_v1_${target}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DTARGET=${target}"
                 "-DTRIPLE=${triple}"
@@ -4285,15 +4128,6 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_asm.cmake")
     endif()
 endforeach()
-
-antic_dump_test(select loop
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/loop.arm64.sel"
-    TARGET linux-arm64
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/loop.anti")
-antic_dump_test(select loop
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/loop.x86_64.sel"
-    TARGET macos-x86_64
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/loop.anti")
 
 # The optimizer examples of chapter 10. Each NAME.anti in tests/opt has its
 # IR before optimization in NAME.ir and after optimization in NAME.opt.

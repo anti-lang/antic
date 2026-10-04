@@ -11,6 +11,12 @@ bool llvm_debug_wanted(enum target t, bool lines)
     return lines || target_info(t)->format == FORMAT_COFF;
 }
 
+void debug_spans_free(struct debug_spans *s)
+{
+    free(s->items);
+    memset(s, 0, sizeof *s);
+}
+
 void llvm_debug_mark(struct debug_spans *s, size_t start, size_t end)
 {
     if (s == NULL || end <= start) {
@@ -43,7 +49,7 @@ static void quoted(struct text *out, const char *s)
 }
 
 /* The file of the module that the text compiles, which names the
-   compile unit, as unit_file of debug.c gives it. */
+   compile unit. */
 static const char *unit_file(const struct llvm_debug *d)
 {
     size_t i;
@@ -136,8 +142,7 @@ void llvm_debug_free(struct llvm_debug *d)
 }
 
 /* The name a reader gives f: its module path, a dot and its name, or the
-   C name of an export fn and of a function of the runtime, as debug.c
-   writes it. */
+   C name of an export fn and of a function of the runtime. */
 static void reader_name(struct text *out, const struct ir_function *f)
 {
     if (f->module == NULL || f->exported) {
@@ -281,9 +286,8 @@ void llvm_debug_flags(struct llvm_debug *d, struct text *out)
     llvm_debug_mark(d->spans, start, out->length);
 }
 
-/* DESIGN: llc writes DWARF on ELF and Mach-O and CodeView on COFF, as
-   llvm-mc did from the directives of debug.c. The flag "CodeView" asks
-   for the second. */
+/* DESIGN: llc writes DWARF on ELF and Mach-O and CodeView on COFF. The
+   flag "CodeView" asks for the second. */
 void llvm_debug_finish(struct llvm_debug *d, struct text *out)
 {
     size_t start = out->length;

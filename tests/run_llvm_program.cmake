@@ -1,6 +1,5 @@
-# Build one test program through the LLVM back end and compare its result
-# with the expected file beside the source, as run_program.cmake does for
-# the native back end. antic runs opt and llc of the runtime archive and
+# Build one test program and compare its result with the expected file
+# beside the source, for a target the host runs. antic runs opt and llc of the runtime archive and
 # links the object, as "Integration route" of
 # docs/work-order-llvm-back-end.md gives it, and no step runs by hand. The
 # text and the bitcode beside the output are gone afterwards, since no
@@ -37,7 +36,7 @@ if(MODE STREQUAL "dev")
     set(mode_options --dev)
 endif()
 execute_process(
-    COMMAND "${ANTIC}" --backend llvm --runtime "${RUNTIME}"
+    COMMAND "${ANTIC}" --runtime "${RUNTIME}"
             --target "${TARGET_NAME}" ${mode_options} ${options}
             -o "${base}" "${SOURCE}" ${objects}
     RESULT_VARIABLE status
@@ -45,7 +44,7 @@ execute_process(
     ERROR_VARIABLE err
     ENCODING NONE)
 if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
-    message(FATAL_ERROR "antic --backend llvm gave ${status} for ${base}\n${out}${err}")
+    message(FATAL_ERROR "antic gave ${status} for ${base}\n${out}${err}")
 endif()
 foreach(intermediate "${base}.ll" "${base}.bc")
     if(EXISTS "${intermediate}")

@@ -1,4 +1,0 @@
-main.f:
-b0:
-    movl $292552704, %eax
-    ret

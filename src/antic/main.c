@@ -72,21 +72,17 @@ static int usage(FILE *out)
           "                       x86_64, armv8.0, armv8.2 or armv8.5 on\n"
           "                       ARM64. The target's default stands\n"
           "                       otherwise\n"
-          "  --llvm-mc <path>     the llvm-mc executable\n"
+          "  --llvm-mc <path>     accepted for the tools that pass it, and\n"
+          "                       unused: llc writes every object\n"
           "  --runtime <dir>      the directory holding lib/<target>/\n"
           "  --dump-tokens        print the tokens of <file.anti> and stop\n"
           "  --dump-ast           print the syntax tree and stop\n"
           "  --dump-types         print the checked tree and stop\n"
           "  --dump-ir            print the IR after lowering and stop\n"
           "  --dump-opt           print the IR after optimization and stop\n"
-          "  --dump-select        print the selected machine code and stop\n"
-          "  --dump-alloc         print the machine code after register\n"
-          "                       allocation and stop\n"
-          "  --dump-llvm          print the LLVM IR text of the LLVM back\n"
-          "                       end and stop\n"
-          "  --backend native|llvm  the back end, native by default\n"
-          "  --opt <path>         the opt executable of the LLVM back end\n"
-          "  --llc <path>         the llc executable of the LLVM back end\n"
+          "  --dump-llvm          print the LLVM IR text and stop\n"
+          "  --opt <path>         the opt executable\n"
+          "  --llc <path>         the llc executable\n"
           "  --keep-llvm          keep <output>.ll and <output>.bc\n"
           "  --print-host-target  print the target antic runs on\n"
           "  --print-targets      print the six targets and their facts\n"
@@ -253,33 +249,11 @@ static int run(int argc, char **argv, const struct lists *l)
         } else if (strcmp(arg, "--dump-ir") == 0) {
             options.dump_ir = true;
             continue;
-        } else if (strcmp(arg, "--dump-alloc") == 0) {
-            options.dump_alloc = true;
-            continue;
-        } else if (strcmp(arg, "--dump-select") == 0) {
-            options.dump_select = true;
-            continue;
         } else if (strcmp(arg, "--dump-opt") == 0) {
             options.dump_opt = true;
             continue;
         } else if (strcmp(arg, "--dump-llvm") == 0) {
             options.dump_llvm = true;
-            continue;
-        } else if (strcmp(arg, "--backend") == 0) {
-            const char *name = value_of(argc, argv, &i);
-            if (name == NULL) {
-                return 2;
-            }
-            if (strcmp(name, "native") == 0) {
-                options.backend = BACKEND_NATIVE;
-            } else if (strcmp(name, "llvm") == 0) {
-                options.backend = BACKEND_LLVM;
-            } else {
-                fprintf(stderr,
-                        "antic: --backend takes native or llvm, not %s\n",
-                        name);
-                return 2;
-            }
             continue;
         } else if (strcmp(arg, "--keep-llvm") == 0) {
             options.keep_llvm = true;

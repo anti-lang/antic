@@ -21,13 +21,11 @@ set(ANTIC_CORE_SOURCES
     src/antic/antl_write.c
     src/antic/applesdk.c
     src/antic/arith.c
-    src/antic/arm64.c
     src/antic/coff.c
     src/antic/arena.c
     src/antic/ast_dump.c
     src/antic/ast_walk.c
     src/antic/cpu.c
-    src/antic/debug.c
     src/antic/diagnostic.c
     src/antic/docpage.c
     src/antic/driver.c
@@ -35,8 +33,6 @@ set(ANTIC_CORE_SOURCES
     src/antic/driver_library.c
     src/antic/driver_link.c
     src/antic/driver_search.c
-    src/antic/emit.c
-    src/antic/expand.c
     src/antic/header.c
     src/antic/ir.c
     src/antic/ir_fold.c
@@ -66,7 +62,6 @@ set(ANTIC_CORE_SOURCES
     src/antic/lower_stmt.c
     src/antic/lower_sync.c
     src/antic/lower_worker.c
-    src/antic/mach.c
     src/antic/memcheck.c
     src/antic/modpath.c
     src/antic/notice.c
@@ -81,9 +76,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/pattern.c
     src/antic/platform.c
     src/antic/reach.c
-    src/antic/regalloc.c
     src/antic/rt_abi.c
-    src/antic/select.c
     src/antic/sha256.c
     src/antic/userdirs.c
     src/antic/ptrset.c
@@ -111,7 +104,6 @@ set(ANTIC_CORE_SOURCES
     src/antic/warnings.c
     src/antic/whole.c
     src/antic/whole_tables.c
-    src/antic/x86_64.c
     src/rt/digest.c
     src/rt/regex.c
     src/rt/toml.c

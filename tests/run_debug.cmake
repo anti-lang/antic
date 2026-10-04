@@ -87,11 +87,9 @@ dev_build(app "${root}/app.anti" -g "${WORK}/step${OBJECT}")
 dev_build(plain "${root}/app.anti" "${WORK}/step_plain${OBJECT}")
 
 # A .file directive per source and a .loc before the first instruction of
-# every statement. Each back end numbers the files its own way, so the
-# number of each file comes from its directive. The native back end
-# writes `.file 1 "com/example/step.anti"`, and llc `.file 1 ""
-# "com/example/step.anti"`, the same with a tab, or the directory apart,
-# `.file 1 "com/example" "step.anti"`.
+# every statement. The number of each file comes from its directive. llc
+# writes `.file 1 "" "com/example/step.anti"`, the same with a tab, or
+# the directory apart, `.file 1 "com/example" "step.anti"`.
 foreach(source "com/example/step" "app")
     get_filename_component(base "${source}" NAME)
     get_filename_component(directory "${source}" DIRECTORY)

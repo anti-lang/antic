@@ -5,16 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "alloc.h"
 #include "antic.h"
 #include "check.h"
 #include "lower.h"
 #include "optimize.h"
 #include "parser.h"
-#include "regalloc.h"
-#include "select.h"
 #include "sema.h"
-#include "target_desc.h"
 
 /* The first message of d, or an empty text when a stage failed without
    one. */
@@ -205,66 +201,4 @@ void ir_print_own(struct text *out, const struct ir_module *m)
         line += length;
     }
     text_free(&all);
-}
-
-void machine_build(struct machine *m, struct ir_module *ir, enum target t,
-                   enum cpu_level level, bool allocate)
-{
-    size_t i;
-
-    memset(m, 0, sizeof *m);
-    m->count = ir->function_count;
-    m->functions = alloc_zeroed(alloc_sum(m->count, 1), sizeof *m->functions);
-    m->ok = select_module(t, level, ir, m->functions, m->error,
-                          sizeof m->error);
-    for (i = 0; allocate && m->ok && i < m->count; i++) {
-        if (m->functions[i] != NULL) {
-            m->ok = regalloc_function(t, m->functions[i], m->error,
-                                      sizeof m->error);
-        }
-    }
-}
-
-void machine_release(struct machine *m)
-{
-    size_t i;
-
-    for (i = 0; i < m->count; i++) {
-        if (m->functions[i] != NULL) {
-            mach_function_free(m->functions[i]);
-            free(m->functions[i]);
-        }
-    }
-    free(m->functions);
-}
-
-void machine_text(struct ir_module *ir, enum target t, enum cpu_level level,
-                  bool allocate, struct text *out)
-{
-    struct machine m;
-    size_t i;
-
-    machine_build(&m, ir, t, level, allocate);
-    for (i = 0; m.ok && i < m.count; i++) {
-        if (m.functions[i] != NULL) {
-            mach_print(out, target_desc(t), level, ir, m.functions[i]);
-        }
-    }
-    if (!m.ok) {
-        text_append(out, m.error);
-    }
-    machine_release(&m);
-}
-
-void machine_of(const char *source, enum target t, enum cpu_level level,
-                bool allocate, struct text *out)
-{
-    struct lowered l;
-
-    lowered_run(&l, source);
-    if (l.ok) {
-        optimize_program(&l.ir, "main");
-        machine_text(&l.ir, t, level, allocate, out);
-    }
-    lowered_release(&l);
 }

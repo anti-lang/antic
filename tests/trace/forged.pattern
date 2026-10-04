@@ -1,7 +1,7 @@
-captured forged\.inner
-captured forged\.outer
 captured forged\.main
+captured main
+captured .*
 forged base 1
-read back forged\.inner
-read back forged\.outer
 read back forged\.main
+read back main
+read back .*

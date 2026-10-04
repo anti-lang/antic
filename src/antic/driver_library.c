@@ -11,7 +11,6 @@
 
 #include "alloc.h"
 #include "coff.h"
-#include "emit.h"
 #include "llvm_emit.h"
 #include "platform.h"
 
@@ -167,32 +166,23 @@ static bool bundle(const struct options *o, const struct extras *extras,
     return ok;
 }
 
-/* Assemble the object of the package header copy at <path>.o, and make
-   path that object. The LLVM back end compiles it with llc instead. */
+/* Compile the object of the package header copy at <path>.o with llc,
+   and make path that object. */
 static bool assemble_package(const struct options *o, const struct text *bytes,
                              struct text *path)
 {
     struct text source = {0};
-    struct text asm_path = {0};
     struct text obj_path = {0};
     bool ok;
 
     text_appendf(&obj_path, "%s%s", text_cstr(path),
                  target_info(o->target)->object_suffix);
-    if (driver_uses_llvm(o)) {
-        llvm_emit_package(&source, o->target, bytes->data, bytes->length);
-        ok = driver_compile_llvm(o, &source, text_cstr(path),
-                                 text_cstr(&obj_path));
-    } else {
-        emit_package(&source, o->target, bytes->data, bytes->length);
-        text_appendf(&asm_path, "%s%s", text_cstr(path), ASSEMBLY_SUFFIX);
-        ok = driver_write_file(text_cstr(&asm_path), &source) &&
-             driver_assemble(o, text_cstr(&asm_path), text_cstr(&obj_path));
-    }
+    llvm_emit_package(&source, o->target, bytes->data, bytes->length);
+    ok = driver_compile_llvm(o, &source, text_cstr(path),
+                             text_cstr(&obj_path));
     text_free(path);
     text_append(path, text_cstr(&obj_path));
     text_free(&source);
-    text_free(&asm_path);
     text_free(&obj_path);
     return ok;
 }

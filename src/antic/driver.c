@@ -14,7 +14,6 @@
 #include "alloc.h"
 #include "antl.h"
 #include "diagnostic.h"
-#include "emit.h"
 #include "ir.h"
 #include "lexer.h"
 #include "linker.h"
@@ -29,9 +28,7 @@
 #include "notice.h"
 #include "optimize.h"
 #include "whole.h"
-#include "regalloc.h"
 #include "rt_abi.h"
-#include "select.h"
 #include "sha256.h"
 #include "parser.h"
 #include "sema.h"
@@ -219,31 +216,13 @@ bool driver_is_plugin(const struct options *o)
     return o->lib == LIB_SHARED && o->no_runtime;
 }
 
-/* DESIGN: the CMake option ANTIC_BACKEND sets the back end of a build
-   without --backend, so one configuration runs the whole suite under the
-   LLVM back end and another under the native one. It goes with
-   --backend in the step switch. A build of antic outside CMake, as the
-   packer's, takes the native back end. --dump-select and --dump-alloc
-   print the native back end and take it. */
-#ifndef ANTIC_DEFAULT_LLVM
-#define ANTIC_DEFAULT_LLVM 0
-#endif
-bool driver_uses_llvm(const struct options *o)
-{
-    if (o->backend == BACKEND_DEFAULT) {
-        return ANTIC_DEFAULT_LLVM && !o->dump_select && !o->dump_alloc;
-    }
-    return o->backend == BACKEND_LLVM;
-}
-
 /* Whether the command ends with a link, rather than a dump, a library
    file or an assembly file. */
 static bool links(const struct options *o)
 {
     return !o->assembly_only && !o->dump_tokens && !o->dump_ast &&
-           !o->dump_types && !o->dump_ir && !o->dump_opt && !o->dump_select &&
-           !o->dump_alloc && !o->dump_llvm && !o->library && !o->front_end &&
-           o->lib == LIB_NONE;
+           !o->dump_types && !o->dump_ir && !o->dump_opt && !o->dump_llvm &&
+           !o->library && !o->front_end && o->lib == LIB_NONE;
 }
 
 /* DESIGN: lld links for every target from any host, with the sysroot of
@@ -571,7 +550,7 @@ static bool digest_file(struct anti_sha256 *s, const char *path)
 }
 
 /* DESIGN: the build id is the SHA-256 of the code that a link takes from
-   antic. That is the assembly of the module that links, every object the
+   antic. That is the LLVM text of the module that links, every object the
    command line adds and the runtime library. The notice is left out,
    because it holds the id. The paths are left out as well, so two links
    of one program in two places carry one id. What `-g` added is left out
@@ -635,14 +614,13 @@ static void identified_notice(struct text *out, const struct text *notice,
     text_append_bytes(out, notice->data + begin, notice->length - begin);
 }
 
-/* The LLVM back end, which docs/work-order-llvm-back-end.md builds step
-   by step. It folds the symbolic values of the target and puts in the
-   checks of --memory-checks as select_module does, then translates the
-   module into LLVM IR text. --dump-llvm prints the text. Otherwise the
-   text goes to assembly, with the notice after the build id as back_end
-   writes it, and driver_run hands it to opt and llc. Returns 0 with the
-   text, 2 after the dump, 3 for a dev object of a module without main
-   and 1 after an error, as back_end does. */
+/* The back end of docs/work-order-llvm-back-end.md. It folds the symbolic
+   values of the target and puts in the checks of --memory-checks, then
+   translates the module into LLVM IR text. --dump-llvm prints the text.
+   Otherwise the text goes to assembly with the notice after the build id,
+   and driver_run hands it to opt and llc. Returns 0 with the text, 2
+   after the dump, 3 for a dev object of a module without main and 1
+   after an error. */
 static int llvm_back_end(const struct options *o, struct ir_module *program,
                          const char *module, struct text *assembly,
                          struct extras *extras)
@@ -656,9 +634,9 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     int status = 1;
     size_t i;
 
-    /* DESIGN: as in select_module, the optimizer runs again on each
-       function that had a symbolic value, so a size folded here reaches
-       the simplifications a number would have reached before. */
+    /* DESIGN: the optimizer runs again on each function that had a
+       symbolic value, so a size folded here reaches the simplifications a
+       number would have reached before. */
     ok = layout_init(&layouts, o->target, program, error, sizeof error) &&
          layout_data(&layouts, program);
     for (i = 0; ok && i < program->function_count; i++) {
@@ -700,9 +678,9 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
         status = 2;
     } else if (ok) {
         status = o->dev && !has_main(program, module) ? 3 : 0;
-        /* As in back_end, the build id digests the text without the
-           notice, which holds it. The notice stays out of --dump-llvm,
-           so its goldens do not follow the runtime library. */
+        /* The build id digests the text without the notice, which holds
+           it. The notice stays out of --dump-llvm, so its goldens do not
+           follow the runtime library. */
         if (extras->notice.length > 0 && status != 3 &&
             !o->assembly_only && o->lib != LIB_STATIC) {
             struct text notice = {0};
@@ -736,22 +714,13 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     return status;
 }
 
-/* Lower the program, run the optimizer passes and run the back end for
-   the target: instruction selection, register allocation and emission.
-   The dumps print the machine code instead, before allocation for
-   --dump-select. Returns 0 with the assembly, 2 after a dump and 1 after
-   an error. */
+/* Lower the program, run the optimizer passes and run llvm_back_end for
+   the target. Returns 0 with the text, 2 after a dump, 3 for a dev object
+   of a module without main and 1 after an error. */
 static int back_end(const struct options *o, struct module *tree,
                     const char *module, struct ir_module *program,
                     struct text *assembly, struct extras *extras)
 {
-    struct mach_function **functions;
-    struct text out = {0};
-    struct debug_spans spans = {0};
-    char error[200];
-    bool dump = o->dump_select || o->dump_alloc || o->dump_llvm;
-    bool ok;
-    int status = 1;
     size_t i;
 
     if (tree != NULL &&
@@ -813,7 +782,7 @@ static int back_end(const struct options *o, struct module *tree,
     } else {
         optimize_program(program, module);
     }
-    if (!dump && !o->assembly_only && !o->dev && o->lib == LIB_NONE &&
+    if (!o->dump_llvm && !o->assembly_only && !o->dev && o->lib == LIB_NONE &&
         !has_main(program, module)) {
         fprintf(stderr, "antic: %s: the program has no function `main`\n",
                 o->input);
@@ -825,84 +794,7 @@ static int back_end(const struct options *o, struct module *tree,
                          o->lib == LIB_NONE && has_main(program, module),
                          o->target);
     }
-    /* --dump-llvm prints the text of the LLVM back end, whichever back end
-       --backend names. */
-    if (driver_uses_llvm(o) || o->dump_llvm) {
-        return llvm_back_end(o, program, module, assembly, extras);
-    }
-    functions = alloc_zeroed(program->function_count + 1, sizeof *functions);
-    ok = select_module(o->target, o->cpu, program, functions, error,
-                       sizeof error);
-    for (i = 0; ok && !(o->dump_select && !o->dump_alloc) &&
-                i < program->function_count;
-         i++) {
-        if (functions[i] != NULL) {
-            ok = regalloc_function(o->target, functions[i], error,
-                                   sizeof error);
-        }
-    }
-    if (ok && dump) {
-        for (i = 0; i < program->function_count; i++) {
-            if (functions[i] != NULL) {
-                mach_print(&out, target_desc(o->target), o->cpu, program,
-                           functions[i]);
-            }
-        }
-        fputs(text_cstr(&out), stdout);
-        status = 2;
-    } else if (ok) {
-        if (o->dev || driver_is_plugin(o)) {
-            emit_module(assembly, o->target, o->cpu, program, functions,
-                        module, extras->hosts_plugins, o->debug, &spans);
-        } else {
-            emit_program(assembly, o->target, o->cpu, program, functions,
-                         module, extras->hosts_plugins, o->debug, &spans);
-        }
-        if (ok && o->dev && !has_main(program, module)) {
-            status = 3;
-        }
-        /* The host has run the runtime's start already, so a plugin
-           brings no constructor of its own. */
-        if (ok && o->lib == LIB_SHARED && !driver_is_plugin(o)) {
-            emit_constructor(assembly, o->target, rt_name(RT_FN_INIT));
-        }
-        if (ok && extras->notice.length > 0 && status != 3 &&
-            !o->assembly_only && o->lib != LIB_STATIC) {
-            struct text notice = {0};
-            char id[65];
-            ok = build_id(o, assembly, &spans, id, error, sizeof error);
-            if (ok) {
-                identified_notice(&notice, &extras->notice, id);
-                emit_licenses(assembly, o->target, notice.data,
-                              notice.length);
-                text_free(&notice);
-            }
-        }
-        if (ok && extras->hosts_plugins &&
-            target_info(o->target)->format == FORMAT_COFF) {
-            emit_names(&extras->host_names, o->target, program, functions);
-        }
-        for (i = 0; ok && i < program->function_count; i++) {
-            const struct ir_function *f = program->functions[i];
-            if (f->exported && !f->is_extern) {
-                text_appendf(&extras->exports, "%s\n", f->name);
-            }
-        }
-        status = !ok ? 1 : status == 3 ? 3 : 0;
-    }
-    if (!ok) {
-        fprintf(stderr, "antic: %s\n", error);
-    }
-    for (i = 0; i < program->function_count; i++) {
-        if (functions[i] != NULL) {
-            mach_function_free(functions[i]);
-            free(functions[i]);
-        }
-    }
-    free(functions);
-    text_free(&out);
-    debug_spans_free(&spans);
-    return status;
+    return llvm_back_end(o, program, module, assembly, extras);
 }
 
 /* The package header from the options. A field without an option stays
@@ -1565,7 +1457,7 @@ done:
 }
 
 /* The tool of the runtime archive, or its bare name for the search path.
-   DESIGN: an installed antic finds llvm-mc and llvm-ar beside itself in
+   DESIGN: an installed antic finds opt, llc and llvm-ar beside itself in
    bin/, the rule that already holds for the lld programs. The text holds
    the path, so it lives until the caller frees it. */
 static const char *archive_tool(const struct options *o, const char *name,
@@ -1586,40 +1478,6 @@ static const char *archive_tool(const struct options *o, const char *name,
         return text_cstr(path);
     }
     return name;
-}
-
-/* Run llvm-mc on the assembly file for the target. */
-bool driver_assemble(const struct options *o, const char *assembly,
-                     const char *object)
-{
-    struct text triple = {0};
-    struct text attributes = {0};
-    struct text found = {0};
-    const char *argv[] = {NULL, NULL, "-filetype=obj", "-o", object, assembly,
-                          NULL, NULL};
-    int run;
-
-    argv[0] = o->llvm_mc != NULL ? o->llvm_mc
-                                 : archive_tool(o, "llvm-mc", &found);
-    text_appendf(&triple, "-triple=%s", target_info(o->target)->triple);
-    argv[1] = text_cstr(&triple);
-    /* The assembler of the level, so that it takes the instructions the
-       level adds. The x86_64 assembler needs no attributes. */
-    if (cpu_attributes(o->cpu)[0] != '\0') {
-        text_appendf(&attributes, "-mattr=%s", cpu_attributes(o->cpu));
-        argv[6] = argv[5];
-        argv[5] = text_cstr(&attributes);
-        argv[7] = NULL;
-    }
-    run = process_run(argv);
-    text_free(&attributes);
-    text_free(&triple);
-    text_free(&found);
-    if (run != 0) {
-        fprintf(stderr, "antic: llvm-mc failed\n");
-        return false;
-    }
-    return true;
 }
 
 /* Remove the file at path when there is one. */
@@ -1752,7 +1610,7 @@ int driver_run(const struct options *o)
         }
         goto done;
     }
-    if (o->assembly_only && driver_uses_llvm(o)) {
+    if (o->assembly_only) {
         text_append(&asm_path, text_cstr(&base));
         if (o->output == NULL) {
             text_append(&asm_path, ASSEMBLY_SUFFIX);
@@ -1763,31 +1621,14 @@ int driver_run(const struct options *o)
                      : 1;
         goto done;
     }
-    if (o->assembly_only) {
-        if (o->output == NULL) {
-            text_append(&base, ASSEMBLY_SUFFIX);
-        }
-        status = driver_write_file(text_cstr(&base), &assembly) ? 0 : 1;
-        goto done;
-    }
 
-    /* DESIGN: the assembly and object files stay beside the executable,
-       so that a reader can open them. The LLVM back end keeps the object,
-       and its text only under --keep-llvm. */
+    /* DESIGN: the object stays beside the executable, so that a reader
+       can open it. The text stays only under --keep-llvm. */
     text_appendf(&obj_path, "%s%s", text_cstr(&base),
                  target_info(o->target)->object_suffix);
-    if (driver_uses_llvm(o)) {
-        if (!driver_compile_llvm(o, &assembly, text_cstr(&base),
-                                 text_cstr(&obj_path))) {
-            goto done;
-        }
-    } else {
-        text_appendf(&asm_path, "%s%s", text_cstr(&base), ASSEMBLY_SUFFIX);
-        if (!driver_write_file(text_cstr(&asm_path), &assembly) ||
-            !driver_assemble(o, text_cstr(&asm_path),
+    if (!driver_compile_llvm(o, &assembly, text_cstr(&base),
                              text_cstr(&obj_path))) {
-            goto done;
-        }
+        goto done;
     }
     if (object_only) {
         status = 0;

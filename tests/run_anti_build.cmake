@@ -12,7 +12,6 @@
 #   READOBJ  llvm-readobj of the runtime archive
 #   WORK     a directory this run writes into
 #   OBJECT   the suffix of an object of the host, .o or .obj
-#   BACKEND  the back end of antic without --backend, native or llvm
 #
 # It covers the dev mode of docs/tooling-addendum.md with its cache,
 # release mode, the `-g` rule of docs/tooling.md, --target, --cpu, the
@@ -21,7 +20,7 @@
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 set(project "${WORK}/app")
-# A Windows host writes app.exe and its assembly app.exe.s, and its
+# A Windows host writes app.exe and its object app.exe.obj, and its
 # symbols lie in a PDB, so the map of its archive names no function.
 set(exe "")
 if(HOST MATCHES "^windows-")
@@ -166,15 +165,10 @@ if(HOST MATCHES "^windows-")
                             "${release}\n${out}${err}")
     endif()
 else()
-    # Release mode of the LLVM back end inlines word into main, which then
-    # has no symbol of its own, as the entry on inlined frames in
-    # docs/decisions.md says.
-    set(names com.example.app.main com.example.greet.word)
-    set(lines "greet.anti:[0-9]+")
-    if(BACKEND STREQUAL "llvm")
-        set(names com.example.app.main)
-        set(lines "app.anti:[0-9]+")
-    endif()
+    # Release mode inlines word into main, which then has no symbol of
+    # its own, as the entry on inlined frames in docs/decisions.md says.
+    set(names com.example.app.main)
+    set(lines "app.anti:[0-9]+")
     foreach(name IN LISTS names)
         if(NOT map MATCHES "${name}")
             message(FATAL_ERROR "the map names no ${name}")
@@ -251,64 +245,44 @@ function(codeview_lines out dump)
     set(${out} ${count} PARENT_SCOPE)
 endfunction()
 
-# `anti build` passes -g in dev mode and never in release, so the
-# assembly of a dev build carries the line of every statement: `.loc` of
-# DWARF, or `.cv_loc` of CodeView on Windows. The LLVM back end keeps the
-# object and no assembly, so there the object of a dev build holds a line
-# table: a section `debug_line` of DWARF, or entries of lines other than 0
-# in the CodeView of `.debug$S` on Windows. A COFF object holds a
-# subsection of lines for every function without -g as well, whose
-# entries name line 0, since LLVM writes the record that names a function
-# in the PDB only for a function with a location. The entry on -g of the
-# LLVM back end in docs/decisions.md says so.
-if(BACKEND STREQUAL "llvm")
-    set(readobj_option --sections)
-    set(line_table "debug_line")
-    if(HOST MATCHES "^windows-")
-        set(readobj_option --codeview --codeview-subsection-bytes)
+# `anti build` passes -g in dev mode and never in release, so the object
+# of a dev build holds a line table: a section `debug_line` of DWARF, or
+# entries of lines other than 0 in the CodeView of `.debug$S` on Windows.
+# A COFF object holds a subsection of lines for every function without -g
+# as well, whose entries name line 0, since LLVM writes the record that
+# names a function in the PDB only for a function with a location. The
+# entry on -g of the LLVM back end in docs/decisions.md says so.
+set(readobj_option --sections)
+set(line_table "debug_line")
+if(HOST MATCHES "^windows-")
+    set(readobj_option --codeview --codeview-subsection-bytes)
+endif()
+foreach(mode dev release)
+    execute_process(COMMAND "${READOBJ}" ${readobj_option}
+                            "${project}/build/${HOST}/${mode}/app${exe}${OBJECT}"
+                    RESULT_VARIABLE status OUTPUT_VARIABLE out
+                    ERROR_VARIABLE err ENCODING NONE)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "llvm-readobj failed on the ${mode} object\n"
+                            "${err}")
     endif()
-    foreach(mode dev release)
-        execute_process(COMMAND "${READOBJ}" ${readobj_option}
-                                "${project}/build/${HOST}/${mode}/app${exe}${OBJECT}"
-                        RESULT_VARIABLE status OUTPUT_VARIABLE out
-                        ERROR_VARIABLE err ENCODING NONE)
-        if(NOT status EQUAL 0)
-            message(FATAL_ERROR "llvm-readobj failed on the ${mode} object\n"
-                                "${err}")
-        endif()
-        set(${mode}_object "${out}")
-    endforeach()
-    if(HOST MATCHES "^windows-")
-        codeview_lines(dev_lines "${dev_object}")
-        codeview_lines(release_lines "${release_object}")
-        if(dev_lines EQUAL 0)
-            message(FATAL_ERROR "the dev build passed no -g")
-        endif()
-        if(NOT release_lines EQUAL 0)
-            message(FATAL_ERROR "the release build passed -g: "
-                                "${release_lines} entries name a line")
-        endif()
-    else()
-        if(NOT dev_object MATCHES "${line_table}")
-            message(FATAL_ERROR "the dev build passed no -g")
-        endif()
-        if(release_object MATCHES "${line_table}")
-            message(FATAL_ERROR "the release build passed -g")
-        endif()
-    endif()
-else()
-    set(line_directive ".loc ")
-    if(HOST MATCHES "^windows-")
-        set(line_directive ".cv_loc ")
-    endif()
-    file(READ "${project}/build/${HOST}/dev/app${exe}.s" dev_assembly)
-    file(READ "${project}/build/${HOST}/release/app${exe}.s" release_assembly)
-    string(FIND "${dev_assembly}" "${line_directive}" at)
-    if(at LESS 0)
+    set(${mode}_object "${out}")
+endforeach()
+if(HOST MATCHES "^windows-")
+    codeview_lines(dev_lines "${dev_object}")
+    codeview_lines(release_lines "${release_object}")
+    if(dev_lines EQUAL 0)
         message(FATAL_ERROR "the dev build passed no -g")
     endif()
-    string(FIND "${release_assembly}" "${line_directive}" at)
-    if(NOT at LESS 0)
+    if(NOT release_lines EQUAL 0)
+        message(FATAL_ERROR "the release build passed -g: "
+                            "${release_lines} entries name a line")
+    endif()
+else()
+    if(NOT dev_object MATCHES "${line_table}")
+        message(FATAL_ERROR "the dev build passed no -g")
+    endif()
+    if(release_object MATCHES "${line_table}")
         message(FATAL_ERROR "the release build passed -g")
     endif()
 endif()

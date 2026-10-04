@@ -2,6 +2,7 @@
 # it holds the instructions of that level and none of a higher one. Run
 # with cmake -P and these values:
 #   ANTIC     the antic executable
+#   RUNTIME   the runtime archive, whose bin/ holds opt and llc
 #   TARGET    the antic target name
 #   LEVEL     the --cpu value
 #   SOURCE    the .anti file
@@ -9,16 +10,17 @@
 #   USES      patterns the assembly must hold, separated by |
 #   AVOIDS    patterns it must not hold, separated by |
 #
-# A pattern carries the four spaces of an instruction line, so that
-# "    addsd" does not match "    vaddsd".
+# A pattern of an instruction carries the tabs around its mnemonic, so
+# that "<tab>addsd<tab>" does not match "<tab>vaddsd<tab>". The build is a
+# dev build, which keeps every function of a source without main, where
+# release mode drops them all.
 
 get_filename_component(name "${SOURCE}" NAME_WE)
 set(assembly "${WORK}/${name}.${TARGET}.${LEVEL}.s")
 file(MAKE_DIRECTORY "${WORK}")
-# --backend native: the expected output is the one of the native back end,
-# whichever back end ANTIC_BACKEND names. The step switch rewrites it.
 execute_process(
-    COMMAND "${ANTIC}" --backend native -S --target "${TARGET}" --cpu "${LEVEL}"
+    COMMAND "${ANTIC}" --runtime "${RUNTIME}" --dev -S --target "${TARGET}"
+            --cpu "${LEVEL}"
             -o "${assembly}" "${SOURCE}"
     RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
     ENCODING NONE)

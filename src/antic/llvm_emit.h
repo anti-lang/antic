@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 #include "cpu.h"
-#include "debug.h"
+#include "llvm_debug.h"
 #include "ir.h"
 #include "layout.h"
 #include "target.h"
@@ -22,7 +22,7 @@ struct llvm_emit_options {
     const char *module;     /* the module that the object compiles */
     /* The object holds one module, a dev object or a plugin, and not the
        whole program. Its definitions are then global for the other
-       objects, as emit_module of the native back end writes them. */
+       objects. */
     bool one_module;
     /* The program loads plugins, which resolve its symbols against it. */
     bool exports;
@@ -54,8 +54,7 @@ void llvm_emit_package(struct text *out, enum target t, const char *bytes,
 
 /* Append the names a COFF host of plugins exports through its .def file,
    one per line: the symbol of each function m defines, and of each
-   datum with DATA after it, as emit_names of the native back end lists
-   them. */
+   datum with DATA after it. */
 void llvm_emit_names(struct text *out, enum target t,
                      const struct ir_module *m);
 

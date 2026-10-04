@@ -1,15 +1,19 @@
-# antic writes the same assembly for every program of tests/programs and
-# every target on every host. MANIFEST holds the digests that a run on the
-# Mac wrote. A run on Linux or Windows compares its own with them. It finds
-# an antic built by another compiler that emits another program, as antic
-# built by clang for Windows did while a call passed two arguments that
-# emit code.
+# antic writes the same LLVM text for every program of tests/programs and
+# every target on every host. MANIFEST holds the digests of the text that
+# --dump-llvm prints, which a run on the Mac wrote. A run on Linux or
+# Windows compares its own with them. It finds an antic built by another
+# compiler that emits another program, as antic built by clang for Windows
+# did while a call passed two arguments that emit code. opt and llc are
+# deterministic for the pinned release and one input, so the text decides
+# the object.
 #
 #   cmake -DANTIC=<antic> -DRUNTIME=<dir> -DPROGRAMS=<dir> -DMANIFEST=<file>
-#         -DWORK=<dir> [-DWRITE=yes] -P tests/run_emit_identity.cmake
+#         -DVERSION=<version> -DWORK=<dir> [-DWRITE=yes]
+#         -P tests/run_emit_identity.cmake
 #
-# WRITE=yes writes the manifest, on the Mac, after a change to antic that
-# changes its output.
+# The text names the version of antic, which the digest reads as VERSION,
+# so a new version leaves the manifest as it is. WRITE=yes writes the
+# manifest, on the Mac, after a change to antic that changes its output.
 
 set(targets linux-x86_64 linux-arm64 macos-arm64 macos-x86_64 windows-x86_64
             windows-arm64)
@@ -21,19 +25,19 @@ set(lines "")
 foreach(source IN LISTS sources)
     get_filename_component(name "${source}" NAME_WE)
     foreach(target IN LISTS targets)
-        set(out "${WORK}/${name}.${target}.s")
-        # --backend native: the expected output is the one of the native
-        # back end, whichever back end ANTIC_BACKEND names. The step
-        # switch rewrites it.
-        execute_process(COMMAND "${ANTIC}" --backend native --target ${target}
-                                --runtime "${RUNTIME}" -S -o "${out}"
-                                "${source}"
-                        RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+        set(out "${WORK}/${name}.${target}.ll")
+        execute_process(COMMAND "${ANTIC}" --target ${target}
+                                --runtime "${RUNTIME}" --dump-llvm "${source}"
+                        RESULT_VARIABLE status OUTPUT_VARIABLE text
+                        ERROR_VARIABLE err ENCODING NONE)
         if(NOT status EQUAL 0)
-            message(FATAL_ERROR "antic -S failed for ${name} on ${target}\n${err}")
+            message(FATAL_ERROR "antic --dump-llvm failed for ${name} on "
+                                "${target}\n${err}")
         endif()
+        string(REPLACE "antic ${VERSION}" "antic VERSION" text "${text}")
+        file(WRITE "${out}" "${text}")
         file(SHA256 "${out}" digest)
-        string(APPEND lines "${digest}  ${name}.${target}.s\n")
+        string(APPEND lines "${digest}  ${name}.${target}.ll\n")
     endforeach()
 endforeach()
 
@@ -58,7 +62,7 @@ if(NOT lines STREQUAL expected)
     endforeach()
     list(LENGTH differ count)
     list(JOIN differ ", " differ)
-    message(FATAL_ERROR "antic wrote other assembly than the Mac for ${count} "
+    message(FATAL_ERROR "antic wrote other LLVM text than the Mac for ${count} "
                         "files: ${differ}. A change to antic that alters its "
                         "output writes the manifest on the Mac with -DWRITE=yes "
                         "and the same values.")

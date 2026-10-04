@@ -1,12 +1,10 @@
-//! The defined results of release mode under the LLVM back end, on every
-//! target. A division and a remainder by zero give 0, the least value divided
-//! by minus one gives itself with a remainder of 0, a shift takes its count
-//! modulo the width, and a float out of the range of the integer type
-//! saturates, with 0 for NaN. Each operand comes from the counter of a loop
-//! that runs once, so antic's optimizer folds none of them. The native back end
-//! keeps the raw instruction in release mode, which traps on x86_64, so this
-//! program runs under the LLVM back end alone. It returns the number of results
-//! that differ from the defined ones, and exits with 0.
+//! The defined results of release mode, on every target. A division and a
+//! remainder by zero give 0, the least value divided by minus one gives itself
+//! with a remainder of 0, a shift takes its count modulo the width, and a float
+//! out of the range of the integer type saturates, with 0 for NaN. Each operand
+//! comes from the counter of a loop that runs once, so antic's optimizer folds
+//! none of them. It returns the number of results that differ from the defined
+//! ones, and exits with 0.
 
 fn main() -> int
 {

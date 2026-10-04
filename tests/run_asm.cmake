@@ -1,7 +1,8 @@
-# Write the assembly file of a program with antic -S and assemble it with
-# llvm-mc, to show that the emitted file is valid for the target. Run with
-# cmake -P and these values:
+# Write the assembly file of a program with antic -S, which llc writes,
+# and assemble it with llvm-mc, to show that the file is valid for the
+# target. Run with cmake -P and these values:
 #   ANTIC     the antic executable
+#   RUNTIME   the runtime archive, whose bin/ holds opt and llc
 #   LLVM_MC   the llvm-mc executable
 #   TARGET    the antic target name
 #   TRIPLE    the llvm-mc triple of the target
@@ -19,10 +20,8 @@ get_filename_component(name "${SOURCE}" NAME_WE)
 set(assembly "${WORK}/${name}.${TARGET}.s")
 file(MAKE_DIRECTORY "${WORK}")
 string(REPLACE "|" ";" options "${OPTIONS}")
-# --backend native: the expected output is the one of the native back end,
-# whichever back end ANTIC_BACKEND names. The step switch rewrites it.
 execute_process(
-    COMMAND "${ANTIC}" --backend native -S --target "${TARGET}" ${options}
+    COMMAND "${ANTIC}" --runtime "${RUNTIME}" -S --target "${TARGET}" ${options}
             -o "${assembly}" "${SOURCE}"
     RESULT_VARIABLE status
     OUTPUT_VARIABLE out

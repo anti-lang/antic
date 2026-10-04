@@ -34,21 +34,25 @@ foreach(case inline copy_inline)
     traps(dev ${case} Part)
 endforeach()
 
-# --backend native: the labels below are the ones of the native back end,
-# whichever back end ANTIC_BACKEND names. The step switch rewrites it.
-execute_process(COMMAND "${ANTIC}" --backend native --runtime "${RUNTIME}"
+execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}"
                         -S -o "${WORK}/release.s" "${SOURCE}"
                 RESULT_VARIABLE status)
-# The function run holds the dispatch, `is` and `as`. The teardown and
-# the copy of Holder, which follow it, check in every mode.
+# The function run holds the dispatch, `is` and `as`, and release mode
+# inlines it into main. The teardown and the copy of Holder, which are
+# functions of their own, check in every mode. The body of main runs from
+# its label to the comment llc writes after every function.
 #
-# Each host spells the two labels its own way: `table.run:` on ELF,
-# `_table.run:` on Mach-O and `_A5table_run:` on COFF, which writes the
+# Each host spells the label its own way: `table.main:` on ELF,
+# `_table.main:` on Mach-O and `_A5table_main:` on COFF, which writes the
 # last segment of a dotted name after an `_`. The character class takes
 # the dot and the underscore, so one pattern reads every host.
 file(READ "${WORK}/release.s" release)
-string(REGEX MATCH "table[._]run:.*table[._]main:" run "${release}")
-if(NOT status EQUAL 0 OR run STREQUAL "" OR
-   run MATCHES "anti_rt_table_unset")
+string(REGEX MATCH "table[._]main:.*" main "${release}")
+string(FIND "${main}" "-- End function" end)
+if(NOT end EQUAL -1)
+    string(SUBSTRING "${main}" 0 ${end} main)
+endif()
+if(NOT status EQUAL 0 OR main STREQUAL "" OR end EQUAL -1 OR
+   main MATCHES "anti_rt_table_unset")
     message(FATAL_ERROR "release mode checks a table in a dispatch")
 endif()

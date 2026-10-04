@@ -18,8 +18,6 @@
 #   LLVM_OBJDUMP  llvm-objdump, which lists the symbols of the runtime
 #   CROSS     ON for a Windows target of another host. The case builds and
 #             links the programs and runs none, and only bundle has one.
-#   BACKEND   llvm to build each library with antic --backend llvm, which
-#             runs opt and llc of the runtime archive
 
 # The file names of a library and a program on this host, and what the
 # library driver prints as the compiler of C.
@@ -107,11 +105,7 @@ function(library name kind dir)
     if(kind STREQUAL "shared" AND CMAKE_HOST_WIN32)
         set(link "${dir}/${name}.lib")
     endif()
-    set(backend "")
-    if(BACKEND STREQUAL "llvm")
-        set(backend --backend llvm)
-    endif()
-    run("${ANTIC}" --lib ${kind} ${ARGN} ${TARGET_OPTION} ${backend} --llvm-mc "${LLVM_MC}"
+    run("${ANTIC}" --lib ${kind} ${ARGN} ${TARGET_OPTION} --llvm-mc "${LLVM_MC}"
         --llvm-ar "${LLVM_AR}" --runtime "${RUNTIME}" -I "${SOURCES}"
         -o "${file}" "${SOURCES}/com/example/${name}.anti")
     set(run_out "${run_out}" PARENT_SCOPE)

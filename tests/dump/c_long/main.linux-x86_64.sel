@@ -1,4 +1,0 @@
-main.f:
-b0:
-    movabsq $4587520000, %rax
-    ret

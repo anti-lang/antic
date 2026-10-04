@@ -1,7 +1,0 @@
-captured forged\.main
-captured main
-captured .*
-forged base 1
-read back forged\.main
-read back main
-read back .*

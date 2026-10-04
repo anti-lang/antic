@@ -1,7 +1,6 @@
 /* The compiler stages the unit tests run a source through: the front end
-   alone, the front end and lowering, or the whole way to the machine code
-   of every function. One copy, so a change of a stage reaches every test
-   that runs it. */
+   alone, or the front end and lowering. One copy, so a change of a stage
+   reaches every test that runs it. */
 #ifndef ANTIC_TEST_PIPELINE_H
 #define ANTIC_TEST_PIPELINE_H
 
@@ -14,7 +13,6 @@
 #include "diagnostic.h"
 #include "ir.h"
 #include "lexer.h"
-#include "mach.h"
 #include "target.h"
 #include "text.h"
 #include "types.h"
@@ -97,30 +95,5 @@ void lowered_release(struct lowered *l);
    other expected text leaves them out, so a change of the descriptor
    rewrites one text. */
 void ir_print_own(struct text *out, const struct ir_module *m);
-
-/* The machine functions of a module, after instruction selection at a
-   level and, when allocate is set, register allocation. functions holds
-   one entry per function of the module, NULL for one without a body, and
-   error the reason when ok is false. machine_release frees m. */
-struct machine {
-    struct mach_function **functions;
-    size_t count;
-    char error[200];
-    bool ok;
-};
-
-void machine_build(struct machine *m, struct ir_module *ir, enum target t,
-                   enum cpu_level level, bool allocate);
-void machine_release(struct machine *m);
-
-/* Append the machine code of every function of ir to out, or the error
-   of the stage that refused it. */
-void machine_text(struct ir_module *ir, enum target t, enum cpu_level level,
-                  bool allocate, struct text *out);
-
-/* Run source through the front end, lowering and optimize_program, and
-   append its machine code to out as machine_text does. */
-void machine_of(const char *source, enum target t, enum cpu_level level,
-                bool allocate, struct text *out);
 
 #endif

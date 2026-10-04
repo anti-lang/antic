@@ -66,8 +66,8 @@ void llvm_triple(struct text *out, enum target t)
     const struct target_info *info = target_info(t);
 
     text_append(out, info->triple);
-    /* The version is the one emit.c writes in .build_version and the
-       linker passes as the platform version. */
+    /* The version is the one the linker passes as the platform
+       version. */
     if (info->os == OS_MACOS) {
         text_appendf(out, "%d.%d", MACOS_MIN_MAJOR, MACOS_MIN_MINOR);
     }

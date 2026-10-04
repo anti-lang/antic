@@ -5,7 +5,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "debug.h"
 #include "ir.h"
 #include "target.h"
 #include "text.h"
@@ -18,10 +17,9 @@
 
    DESIGN: COFF writes the compile unit and a subprogram per function in
    every build, with -g and without it. CodeView then writes the symbol
-   record of each function, which names a static function in the PDB, as
-   the records of debug.c do for the native back end. Without -g no
-   instruction carries a line, the subprogram names line 0, and a
-   function takes the location of line 0 where it needs one.
+   record of each function, which names a static function in the PDB.
+   Without -g no instruction carries a line, the subprogram names line 0,
+   and a function takes the location of line 0 where it needs one.
 
    DESIGN: the build id digests the text without what the debug
    information added. Each addition is recorded as a span of the text:
@@ -29,6 +27,25 @@
    debug flags in the list of the module flags and the metadata nodes at
    the end. A `-g` build and a plain build of one program then share one
    build id, on COFF as well. */
+
+/* One range of the text that the debug information added, as offsets
+   into it. */
+struct debug_span {
+    size_t start;
+    size_t end;
+};
+
+/* DESIGN: the build id is the digest of what a program executes, so the
+   ranges below are left out of it. A `-g` link and a plain link of one
+   program then carry one id. That id is what ties a trace of the plain
+   binary to the symbols archive of the other. */
+struct debug_spans {
+    struct debug_span *items;
+    size_t count;
+    size_t capacity;
+};
+
+void debug_spans_free(struct debug_spans *s);
 
 struct llvm_debug {
     enum target target;

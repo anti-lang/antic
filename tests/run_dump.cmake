@@ -3,8 +3,6 @@
 #   ANTIC     the antic executable
 #   COMMAND   the arguments of antic, separated by commas
 #   EXPECTED  the file with the expected output
-#   OUTPUT    optional file that the command writes, compared instead of
-#             the standard output, which must then be empty
 #   VERSION   optional version of antic, which the output names as
 #             `antic <version>` and the expected file as `antic VERSION`
 #
@@ -24,12 +22,6 @@ if(NOT status EQUAL 0 OR NOT err STREQUAL "")
     message(FATAL_ERROR "antic ${COMMAND} failed with ${status}\n${err}")
 endif()
 file(READ "${EXPECTED}" expected)
-if(DEFINED OUTPUT)
-    if(NOT out STREQUAL "")
-        message(FATAL_ERROR "antic printed output\n${out}")
-    endif()
-    file(READ "${OUTPUT}" out)
-endif()
 if(DEFINED VERSION)
     string(REPLACE "antic ${VERSION}" "antic VERSION" out "${out}")
 endif()

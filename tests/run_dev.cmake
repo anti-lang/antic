@@ -51,12 +51,8 @@ foreach(module scale twice)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "antic --dev ${module}.antl failed\n${err}")
     endif()
-    # The native back end leaves the assembly beside the object, and the
-    # LLVM back end the text of --keep-llvm.
-    set(text .s)
-    if(EXISTS "${WORK}/${module}.ll")
-        set(text .ll)
-    endif()
+    # The text of --keep-llvm stands beside the object.
+    set(text .ll)
     file(READ "${WORK}/${module}${text}" from_source)
     file(READ "${WORK}/${module}_antl${text}" from_library)
     if(NOT from_source STREQUAL from_library)

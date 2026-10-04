@@ -4,16 +4,15 @@
 # the dev programs that link the object then print a warning. Run with
 # cmake -P and these values:
 #   ANTIC   the antic executable
+#   RUNTIME the runtime archive, whose bin/ holds llc
 #   STD     the directory of the library files of the standard library
 #   SOURCE  the library file of the module
 #   TARGET  a Windows target
 #   WORK    a directory for the assembly
 
 file(MAKE_DIRECTORY "${WORK}")
-# --backend native: the expected output is the one of the native back end,
-# whichever back end ANTIC_BACKEND names. The step switch rewrites it.
-execute_process(COMMAND "${ANTIC}" --backend native --dev --target "${TARGET}"
-                        -S -I "${STD}" -o "${WORK}/empty.${TARGET}.s" "${SOURCE}"
+execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}" --dev
+                        --target "${TARGET}" -S -I "${STD}" -o "${WORK}/empty.${TARGET}.s" "${SOURCE}"
                 RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed with ${status}\n${err}")

@@ -11,9 +11,8 @@
 
 /* The classification of every parameter and result for the C convention
    of a target, in the terms of an LLVM signature. The section "Calling
-   convention" of docs/work-order-llvm-back-end.md gives the rules, which
-   locate and locate_result of the native back end hold in terms of
-   registers. LLVM places what the classification leaves to it: the
+   convention" of docs/work-order-llvm-back-end.md gives the rules. LLVM
+   places what the classification leaves to it: the
    registers, the stack slots and the variadic rules of the triple. */
 
 enum abi_kind {

@@ -20,7 +20,9 @@ struct diagnostic_counts {
 struct options {
     const char *input;          /* The .anti source file. */
     const char *output;         /* NULL: input without .anti. */
-    const char *llvm_mc;        /* NULL: llvm-mc from PATH. */
+    /* --llvm-mc, which antic accepts for the tools that pass it and no
+       longer runs: llc writes every object. */
+    const char *llvm_mc;
     /* NULL: opt and llc of the runtime archive's bin/, or from PATH. */
     const char *opt;
     const char *llc;
@@ -132,15 +134,7 @@ struct options {
     bool dump_types;            /* --dump-types. */
     bool dump_ir;               /* --dump-ir. */
     bool dump_opt;              /* --dump-opt. */
-    bool dump_select;           /* --dump-select. */
-    bool dump_alloc;            /* --dump-alloc. */
-    bool dump_llvm;             /* --dump-llvm, through the LLVM back end. */
-    /* DESIGN: --backend native|llvm selects the back end from the step
-       emit-core to the step vm of docs/work-order-llvm-back-end.md, so the
-       suite runs both and compares. The step switch removes it, and the
-       LLVM back end is then the only one. Without the option the build
-       of antic decides, see driver_uses_llvm. */
-    enum { BACKEND_DEFAULT, BACKEND_NATIVE, BACKEND_LLVM } backend;
+    bool dump_llvm;             /* --dump-llvm. */
     /* --keep-llvm: the LLVM back end keeps <output>.ll and <output>.bc,
        which it deletes otherwise. */
     bool keep_llvm;

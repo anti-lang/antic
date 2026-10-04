@@ -1,6 +1,7 @@
 # Decode the Windows unwind data of a program and compare it byte for byte
 # with an expected file. Run with cmake -P and these values:
 #   ANTIC         the antic executable
+#   RUNTIME       the runtime archive, whose bin/ holds opt and llc
 #   LLVM_MC       the llvm-mc executable
 #   LLVM_READOBJ  the llvm-readobj executable
 #   TARGET        windows-x86_64 or windows-arm64
@@ -22,10 +23,8 @@ file(MAKE_DIRECTORY "${WORK}")
 get_filename_component(base "${SOURCE}" NAME_WE)
 set(assembly "${WORK}/${base}.${TARGET}.s")
 set(object "${WORK}/${base}.${TARGET}.obj")
-# --backend native: the expected output is the one of the native back end,
-# whichever back end ANTIC_BACKEND names. The step switch rewrites it.
-run("${ANTIC}" --backend native -S --target "${TARGET}" -o "${assembly}"
-    "${SOURCE}")
+run("${ANTIC}" --runtime "${RUNTIME}" -S --target "${TARGET}"
+    -o "${assembly}" "${SOURCE}")
 run("${LLVM_MC}" "-triple=${TRIPLE}" -filetype=obj -o "${object}" "${assembly}")
 run("${LLVM_READOBJ}" --unwind "${object}")
 string(REGEX REPLACE "^\nFile: [^\n]*\n" "" decoded "${run_out}")

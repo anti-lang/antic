@@ -6,7 +6,6 @@
 #   SOURCE    tests/traps/memory_checks.anti
 #   WORK      a directory for the files
 #   HOST      the host target
-#   BACKEND   the back end of antic without --backend, native or llvm
 #
 # A build without the option carries no check, and a build with it
 # carries the checks, for the host or, on a windows-arm64 host, for
@@ -78,25 +77,12 @@ foreach(target linux-x86_64 macos-arm64 windows-x86_64)
         message(FATAL_ERROR "${target} carries no options hook or no "
                             "marking of the kept blocks")
     endif()
-    # A report walks the Anti frames by their frame pointers. antic
-    # writes no CFI on ELF, so the unwinder stops at the first one. The
-    # native back end writes the options as `.byte` lines after their
-    # label, which this reads back into text up to the terminating zero.
-    # llc writes one `.asciz` line.
+    # A report walks the Anti frames by their frame pointers, so the
+    # options ask for the fast unwinder. llc writes them as one `.asciz`
+    # line after their label.
     if(NOT target MATCHES "^windows")
-        string(REGEX MATCH "memory_check_options:\n((    \\.byte [^\n]*\n)+)"
-               lines "${assembly}")
-        string(REGEX MATCHALL "0x[0-9a-f][0-9a-f]" bytes "${CMAKE_MATCH_1}")
         set(options "")
-        foreach(byte IN LISTS bytes)
-            math(EXPR code "${byte}")
-            if(code EQUAL 0)
-                break()
-            endif()
-            string(ASCII ${code} letter)
-            string(APPEND options "${letter}")
-        endforeach()
-        if(options STREQUAL "" AND assembly MATCHES
+        if(assembly MATCHES
            "memory_check_options:[^\n]*\n[ \t]*\\.asciz[ \t]+\"([^\"]*)\"")
             set(options "${CMAKE_MATCH_1}")
         endif()
@@ -135,14 +121,11 @@ endif()
 # The names of the frames come from the symbolizer of the runtime, which
 # has one on macOS alone. `anti run` puts the report through Anti's
 # symbolizer on the other hosts, which run_anti_memory_checks.cmake checks.
-# Release mode of the LLVM back end inlines each case into main, so the
-# frame names main, under the name anti.rt.main that shares its address.
-# See the entry on inlined frames in docs/decisions.md.
+# Release mode inlines each case into main, so the frame names main,
+# under the name anti.rt.main that shares its address. See the entry on
+# inlined frames in docs/decisions.md.
 foreach(case read_after_free free_twice write_past_end kept)
-    set(in_${case} "in memory_checks\\.${case}")
-    if(BACKEND STREQUAL "llvm")
-        set(in_${case} "in anti\\.rt\\.main")
-    endif()
+    set(in_${case} "in anti\\.rt\\.main")
 endforeach()
 function(reports case)
     program_expect("memory checks ${case}" COMMAND "${program}" ${case}
