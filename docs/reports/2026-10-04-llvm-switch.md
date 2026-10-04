@@ -59,3 +59,7 @@ $ git rev-parse HEAD origin/main
 ```
 
 No suite ran in this session, so it has no pass counts.
+
+## Decision
+
+Eddie decided on 2026-10-04 for option 1. `src/antic/coff.c`, `coff.h` and `tests/unit/test_coff.c` stay. "What stays and what goes" of the work order now lists what goes and what stays, file by file, with the unit tests, the goldens and `--llvm-mc`. The entry stands in `docs/decisions.md` after the entry on frame records. The redo of this step follows the work order as it stands now.

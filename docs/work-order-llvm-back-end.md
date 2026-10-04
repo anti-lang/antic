@@ -96,22 +96,39 @@ New:
 
 Deleted in the step `switch`. Eddie decided on 2026-10-02 on one back end. The
 native back end goes once the LLVM back end passes the suite on every
-target. One implementation per IR operation, 12,000 lines less, one
+target. One implementation per IR operation, about 9,800 lines less, one
 semantics in dev and release mode. The alternative was to keep it as
 `--backend native` for dev mode. That would have doubled the work of every
 IR change and the test matrix. The files:
 
 - `src/antic/select.c`, `expand.c`, `regalloc.c`, `x86_64.c`, `arm64.c`,
-  `emit.c`, `debug.c`, `mach.c`, `coff.c` and their headers. These are the
-  native back end, 12,000 lines together. From the step `emit-core` to the step `vm` the option
-  `--backend native|llvm` selects one of the two, so the suite can run
-  both and compare. The step `switch` removes the option and the files.
-- `tests/unit/test_x86_64.c`, `test_arm64.c`, `test_emit.c` and the other
-  unit tests of those files.
-- The goldens `tests/dump/*.alloc` and `*.s`, with `--dump-select` and
-  `--dump-alloc`. `--dump-llvm` and `*.ll` goldens replace them.
-- The functions `anti_rt_f16_to_f32` and `anti_rt_f32_to_f16` of the
-  runtime, which only the native back end called.
+  `emit.c`, `debug.c` and `mach.c` with their headers and `target_desc.h`.
+  These are the native back end, about 9,800 lines together. From the step
+  `emit-core` to the step `vm` the option `--backend native|llvm` selects
+  one of the two, so the suite can run both and compare. The step `switch`
+  removes the option and the files. `struct debug_spans` and
+  `debug_spans_free` move from `debug.h` to `llvm_debug.h`, since the build
+  id and `llvm_debug.c` read them.
+- `src/antic/coff.c`, `coff.h` and `tests/unit/test_coff.c` stay. They write
+  no code. `coff_join` serves `--bundle-runtime` on the Windows targets and
+  `coff_archive_exports` the `.def` file of a Windows plugin host, under
+  either back end. Eddie decided it on 2026-10-04.
+- The unit tests of native machine code: `tests/unit/test_select.c`,
+  `test_regalloc.c`, `test_emit.c`, `test_x86_64.c`, `test_arm64.c`,
+  `test_float.c` and `test_struct.c`. `tests/unit/pipeline.c` loses
+  `machine_build`, `machine_release`, `machine_text` and `machine_of` with
+  its includes of `select.h`, `regalloc.h` and `target_desc.h`, and keeps
+  the rest. `test_f16.c` and `test_float_read.c` stay.
+- The goldens `tests/dump/*.alloc`, `*.sel` and `*.s`, with `--dump-select`
+  and `--dump-alloc`. `--dump-llvm` and `*.ll` goldens replace them.
+  `unwind_<target>` runs `-S` of the LLVM back end and re-pins its `.unwind`
+  goldens, old and new values in the report.
+- `--llvm-mc` stays accepted. The `anti` tool, 40 test scripts and
+  `docs/site/build-tool` pass it. Whether llvm-mc leaves the shipped set is
+  the separate decision that "Documentation changes" names.
+- The functions `anti_rt_f16_to_f32` and `anti_rt_f32_to_f16` of the runtime
+  stay, with their rows in `RT_FUNCTIONS`. `tests/unit/test_f16.c` and
+  `test_float_read.c` test them, and `src/rt/f16.c` is 14 lines.
 
 ## Pipeline
 
@@ -885,11 +902,12 @@ Existing tests and what happens to each:
 | `tests/abi`, `program_abi_simd`, `clib_*` | run under `--backend llvm`. They check the ABI port of `abi.c` |
 | `tests/checks`, `bounds_*`, `overflow_*` | run under `--backend llvm` in dev mode. They check that the guards and checks survive `opt` |
 | `tests/opt/*.opt`, `--dump-opt` goldens | unchanged. The Anti optimizer runs before the translation |
-| `tests/dump/*.alloc`, `*.s`, `--dump-select`, `--dump-alloc` | deleted in the step `switch` |
+| `tests/dump/*.alloc`, `*.sel`, `*.s`, `--dump-select`, `--dump-alloc` | deleted in the step `switch` |
 | `tests/dump/*.ll`, `--dump-llvm` | new goldens, one per program and target that has an `.alloc` or `.s` golden today |
 | `emit_identity` | digests of the `.ll` text, re-pinned once |
 | `link_identity_<target>` | re-pinned once |
-| `test_x86_64.c`, `test_arm64.c` unit tests | deleted in the step `switch` |
+| `unwind_<target>` | re-pinned once, on the `-S` output of llc |
+| the unit tests of native machine code, see "What stays and what goes" | deleted in the step `switch` |
 | `cpu_levels_pin` | two new columns |
 | `pinned_tools` | checks `opt` and `llc` too |
 | `run_anti_memory_checks.cmake` | runs under `--backend llvm` too |
@@ -933,7 +951,7 @@ In the step that switches the default:
 - Line 19: antic writes LLVM IR, llc writes the object. `-S` writes the
   assembly llc produces. llvm-mc leaves the shipped set when nothing calls
   it any more, which is a separate decision after the step `switch`.
-- Line 21: seven tools.
+- Line 21 names the seven tools since the step `pins`.
 - Line 72: the guarantee about loads and stores through unseen pointers
   is replaced. The reason
   `volatile` is not needed stands on its own. There are no device
@@ -942,17 +960,19 @@ In the step that switches the default:
 - The entry behind `docs/anti-language-additions.md` line 148: release
   mode gives the ARM64 result on every target. The four cases are listed
   under "Defined results in release mode".
-- Line 296: packages carry `opt` and `llc`.
-- Line 348: the runtime archive holds them.
+- The entries that list the tools `tools/get-llvm.cmake` installs and the
+  runtime archive carries: `opt` and `llc`, where the step `pins` left one
+  without.
 - A new entry: the integration route and why libLLVM and LTO were not
   chosen.
 - `docs/anti-language-additions.md` line 148 and
   `docs/anti-syntax-overview.md` where it describes release mode.
 - `docs/notes/llvm.md`: the notes of the back end, in the form of the
   other notes files.
-- `docs/notes/selection.md`, `regalloc.md`, `emitter.md`, and the parts
-  of `floats.md`, `flags.md` and `simd.md` that describe selection: deleted
-  or cut to what still holds. Git keeps the history.
+- `docs/notes/selection.md`, `regalloc.md`, `emitter.md`, `x86_64.md`,
+  `arm64.md` and `debug.md`, and the parts of `floats.md`, `flags.md`,
+  `simd.md` and `targets.md` that describe selection or emission: deleted or
+  cut to what still holds. Git keeps the history.
 - `docs/distribution.md` and `docs/site/runtime-archive`: the two tools.
 
 ## Questions an implementer asks
@@ -996,7 +1016,7 @@ In the step that switches the default:
 | Does `--linker platform` still work? | Yes. The objects are standard. |
 | Does the `.antl` format change? | No. `ANTL_VERSION` stays. |
 | Do library files stay byte-identical across hosts? | Yes. Nothing before the translation changes. |
-| Which tests get re-pinned? | `emit_identity` and `link_identity_<target>`, once, in the step `switch`, with old and new values in the report. |
+| Which tests get re-pinned? | `emit_identity`, `link_identity_<target>` and `unwind_<target>`, once, in the step `switch`, with old and new values in the report. |
 | How do I check the text is valid? | `opt -passes=verify` on it. The test `llvm_verify` does this for every dump program. |
 | How do I debug a miscompile? | `--keep-llvm`, then `opt -O2 -print-after-all` on the kept text, or bisect with `-opt-bisect-limit=N`. |
 | What if llc rejects an attribute or intrinsic? | The pinned release is 23.1.1. Check the LangRef of that release. Every intrinsic in this document exists in it. |
@@ -1094,15 +1114,16 @@ windows-arm64. Fix what fails. Done when the VM run passes under both back
 ends.
 
 `switch`, the switch and the deletion. LLVM is the only back end. Remove
-`--backend`, `--llvm-mc`, `--dump-select` and `--dump-alloc`. Delete the
-files listed under "What stays and what goes" and their unit tests. Delete
-the `.alloc` and `.s` goldens, `mixed_backends`, and the two `f16`
-functions of the runtime. Re-pin `emit_identity` and
-`link_identity_<target>`. The report holds the old and the new values.
-Make every documentation change of "Documentation changes" and write
-`docs/notes/llvm.md`. Done when the suite and the VM run pass. Also done
-only when `grep` finds no reference to a deleted file or option in
-`src/`, `tests/`, `tools/` and `docs/`.
+`--backend`, `--dump-select` and `--dump-alloc`. `--llvm-mc` stays. Delete
+the files listed under "What stays and what goes" and their unit tests.
+Delete the `.alloc`, `.sel` and `.s` goldens and `mixed_backends`. Re-pin
+`emit_identity`, `link_identity_<target>` and `unwind_<target>`. The report
+holds the old and the new values. Make every documentation change of
+"Documentation changes" and write `docs/notes/llvm.md`. Done when the suite
+and the VM run pass. Also done only when `grep` finds no reference to a
+deleted file or option in `src/`, `tests/`, `tools/`, `docs/notes/` and
+`docs/site/`. The history in `docs/reports/`, `docs/audit/`,
+`docs/decisions.md` and this work order stays as written.
 
 `measure`, the numbers. A benchmark directory `tests/bench` holds five
 small programs, each with a C version compiled by the pinned clang at
@@ -1115,10 +1136,12 @@ small programs, each with a C version compiled by the pinned clang at
 - a map workload
 
 Record the run time of the Anti program and of the C program. Record the
-compile time of each Anti program in release and dev mode. Measure on
-macos-arm64 and linux-x86_64. Build the same programs once from the commit
-before `switch` and record those numbers too. The report holds the table.
-No pass or fail, numbers only.
+compile time of each Anti program in release and dev mode. Measure on macos-
+arm64 and linux-x86_64. Export the commit before `switch` with `git archive`
+into a directory outside the repository and build it there. Record the same
+programs under the old back end and remove the directory afterwards. No
+worktree, no branch and no checkout in the repository. The report holds the
+table. No pass or fail, numbers only.
 
 ## Later options, out of scope
 
