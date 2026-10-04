@@ -723,18 +723,19 @@ foreach(target linux-arm64 macos-arm64 windows-arm64)
 endforeach()
 
 # The two conversions of f16. ARM64 and x86-64-v3 have one instruction
-# for each, and v1 and v2, which lack F16C, call the functions of
-# compiler-rt.
-set(f16_call "__extendhfsf2|__truncsfhf2")
+# for each, and v1 and v2, which lack F16C, call the runtime. No call
+# reaches the conversions of compiler-rt.
+set(f16_call "anti_rt_f16_to_f32|anti_rt_f32_to_f16")
 set(f16_f16c "\tvcvtph2ps\t|\tvcvtps2ph\t")
 set(f16_fcvt "\tfcvt\ts|\tfcvt\th")
-foreach(case "linux-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph"
-        "linux-x86_64,v2,${f16_call},cvtph2ps|cvtps2ph"
-        "linux-x86_64,v3,${f16_f16c},${f16_call}"
-        "windows-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph"
-        "windows-x86_64,v3,${f16_f16c},${f16_call}"
-        "linux-arm64,armv8.0,${f16_fcvt},${f16_call}"
-        "macos-arm64,armv8.5,${f16_fcvt},${f16_call}")
+set(f16_rt "__extendhfsf2|__truncsfhf2")
+foreach(case "linux-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph|${f16_rt}"
+        "linux-x86_64,v2,${f16_call},cvtph2ps|cvtps2ph|${f16_rt}"
+        "linux-x86_64,v3,${f16_f16c},${f16_call}|${f16_rt}"
+        "windows-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph|${f16_rt}"
+        "windows-x86_64,v3,${f16_f16c},${f16_call}|${f16_rt}"
+        "linux-arm64,armv8.0,${f16_fcvt},${f16_call}|${f16_rt}"
+        "macos-arm64,armv8.5,${f16_fcvt},${f16_call}|${f16_rt}")
     string(REPLACE "," ";" parts "${case}")
     list(GET parts 0 target)
     list(GET parts 1 level)

@@ -217,7 +217,8 @@ executables from the relocations alone.
 antic finds both programs as it finds llvm-mc: `archive_tool` in
 `src/antic/driver.c` looks in `<runtime>/bin/` and falls back to the
 search path. `--opt <path>` and `--llc <path>` override, as `--llvm-mc`
-does. `--llvm-mc` goes with the native back end in the step `switch`.
+did. `--llvm-mc` stays accepted after the step `switch`, as "What stays and
+what goes" says.
 
 The intermediate files `<output>.ll` and `<output>.bc` are deleted after
 the link unless `--keep-llvm` is given. `--dump-llvm` and `--keep-llvm`
@@ -378,8 +379,8 @@ does not.
 | `SITOF UITOF` | `sitofp uitofp` |
 | `FTOSI FTOUI` | `llvm.fptosi.sat.T.F` and `llvm.fptoui.sat.T.F`, see "Defined results in release mode" |
 | `FEXT FTRUNC` | `fpext fptrunc` |
-| `HEXT` | `bitcast i16 to half`, `fpext half to float` |
-| `HTRUNC` | `fptrunc float to half`, `bitcast half to i16` |
+| `HEXT` | `bitcast i16 to half`, `fpext half to float`. At `v1` and `v2` a call of `anti_rt_f16_to_f32` |
+| `HTRUNC` | `fptrunc float to half`, `bitcast half to i16`. At `v1` and `v2` a call of `anti_rt_f32_to_f16` |
 | `SLOT` | `alloca [N x i8], align A` in the entry block, with N and A from `layout_size` and `layout_align` of `of` |
 | `LOAD STORE` | `load T, ptr %p, align A` and `store T %v, ptr %p, align A`, with A the natural alignment of T or 1 when the IR marks the access unaligned |
 | `PTRADD` | `getelementptr i8, ptr %p, i64 %n` |
@@ -695,13 +696,13 @@ are checked once against the output of
 `clang -march=<value> -S -emit-llvm` of the pinned clang in the step `targets`,
 and the check joins `llvm_datalayout_pin`.
 
-An `f16` conversion is `fpext half to float` on every level. llc selects
-`vcvtph2ps` at `v3` and calls `__extendhfsf2` of compiler-rt below it. The
-runtime archive holds `libclang_rt.builtins.a` for every target already,
-so the symbol resolves. The calls of `anti_rt_f16_to_f32` and
-`anti_rt_f32_to_f16` that the native back end makes at `v1` and `v2` are
-not emitted by the LLVM back end. The step `switch` removes the two functions
-from the runtime.
+An `f16` conversion is `fpext half to float` at `v3` and on ARM64, where
+llc selects `vcvtph2ps` or `fcvt`. At `v1` and `v2` the text calls
+`anti_rt_f16_to_f32` and `anti_rt_f32_to_f16` of the runtime, as the entry
+on `f16` in `docs/decisions.md` says, and no call reaches `__extendhfsf2`
+of compiler-rt. The two functions stay in the runtime. They are the
+functions antic folds constants with, so a folded conversion and one at
+run time agree.
 
 Object formats: `llc -filetype=obj` writes ELF, Mach-O and COFF from the
 triple. The suffixes `.o` and `.obj` of `target_info` stay. COFF objects
@@ -1001,7 +1002,7 @@ In the step that switches the default:
 | Float conversion out of range? | `llvm.fptosi.sat` and `llvm.fptoui.sat`. |
 | How do flags operations translate? | The result as the plain operation, each flag from a `with.overflow` intrinsic or a compare. Keep the four `i1` values per flag operation for the `FLAG` reads. |
 | What does `MULH_S` at 64 bits become? | `i128` multiplication and a shift. llc selects the high-half multiply. |
-| How is `f16` handled? | `i16` bits, `bitcast` to `half` at `hext` and `htrunc`. compiler-rt supplies the conversion below `v3`. |
+| How is `f16` handled? | `i16` bits, `bitcast` to `half` at `hext` and `htrunc`. Below `v3` the runtime's `anti_rt_f16_to_f32` and `anti_rt_f32_to_f16` convert, as the entry on `f16` in `docs/decisions.md` says. |
 | How are simd values typed? | `<N x T>` for a simd struct at or below the cap, loaded and stored around each operation. Masks are `<N x i8>`. |
 | Where do `__asan_loadN` calls come from? | `memcheck_declare`, which runs before the translation. Translate them as calls. |
 | How does `-g` work? | `!DILocation` per instruction with a line, `!DISubprogram` per function, `!DIFile` per source, one `!DICompileUnit`. Lines only. |

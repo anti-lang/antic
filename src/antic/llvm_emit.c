@@ -456,6 +456,23 @@ static void intrinsic(struct emitter *e, const char *result, const char *name,
     }
 }
 
+static bool imports(const struct emitter *e);
+
+/* Declare the function f of the runtime once, with the result and the
+   parameters of the text. A COFF plugin takes it from its host. */
+static void runtime_function(struct emitter *e, const char *result,
+                             enum rt_function f, const char *parameters)
+{
+    char line[160];
+
+    text_format(line, sizeof line, "declare %s%s @%s(%s)\n",
+                imports(e) ? "dllimport " : "", result, rt_name(f),
+                parameters);
+    if (strstr(text_cstr(&e->intrinsics), line) == NULL) {
+        text_append(&e->intrinsics, line);
+    }
+}
+
 /* An operation of two operands of one type: the plain instructions, the
    shifts with the count modulo the width, the guarded divisions and the
    comparisons, which widen their i1 to the i8 of a bool.
@@ -532,12 +549,20 @@ static const char *float_suffix(enum ir_type type)
     return type == IR_F32 ? "f32" : "f64";
 }
 
+/* DESIGN: an f16 is its bits in an i16, so hext and htrunc pass through
+   half where the level has an instruction for them: ARM64 and x86-64-v3.
+   x86-64-v1 and v2 call anti_rt_f16_to_f32 and anti_rt_f32_to_f16 of the
+   runtime, as the entry on f16 in docs/decisions.md says. They are the
+   functions antic folds constants with, so a folded conversion and one at
+   run time agree. */
+static bool f16_calls(const struct emitter *e)
+{
+    return cpu_arch(e->o->cpu) == ARCH_X86_64 && !cpu_has(e->o->cpu, CPU_F16C);
+}
+
 /* DESIGN: a float out of the range of the integer type saturates, and NaN
    gives 0, on every target. llvm.fptosi.sat and llvm.fptoui.sat define
-   exactly that, where fptosi and fptoui give poison. An f16 is its bits
-   in an i16, so hext and htrunc pass through half, and llc calls the
-   conversions of compiler-rt where the processor level has no
-   instruction for them. */
+   exactly that, where fptosi and fptoui give poison. */
 static void conversion(struct emitter *e, const struct ir_inst *inst)
 {
     enum ir_type from = operand_type(e, &inst->a);
@@ -568,6 +593,15 @@ static void conversion(struct emitter *e, const struct ir_inst *inst)
     }
     case IR_HEXT: {
         uint32_t half = fresh(e);
+        if (f16_calls(e)) {
+            runtime_function(e, "float", RT_FN_F16_TO_F32, "i32");
+            text_appendf(e->out, "  %%v%" PRIu32 " = zext %s %s to i32\n",
+                         half, source, text_cstr(&a));
+            text_appendf(e->out, "  %%v%" PRIu32 " = call float @%s(i32 "
+                                 "%%v%" PRIu32 ")\n",
+                         fresh(e), rt_name(RT_FN_F16_TO_F32), half);
+            break;
+        }
         text_appendf(e->out, "  %%v%" PRIu32 " = bitcast %s %s to half\n",
                      half, source, text_cstr(&a));
         text_appendf(e->out, "  %%v%" PRIu32 " = fpext half %%v%" PRIu32
@@ -577,6 +611,16 @@ static void conversion(struct emitter *e, const struct ir_inst *inst)
     }
     case IR_HTRUNC: {
         uint32_t half = fresh(e);
+        if (f16_calls(e)) {
+            runtime_function(e, "i32", RT_FN_F32_TO_F16, "float");
+            text_appendf(e->out, "  %%v%" PRIu32 " = call i32 @%s(%s %s)\n",
+                         half, rt_name(RT_FN_F32_TO_F16), source,
+                         text_cstr(&a));
+            text_appendf(e->out, "  %%v%" PRIu32 " = trunc i32 %%v%" PRIu32
+                                 " to %s\n",
+                         fresh(e), half, target);
+            break;
+        }
         text_appendf(e->out, "  %%v%" PRIu32 " = fptrunc %s %s to half\n",
                      half, source, text_cstr(&a));
         text_appendf(e->out, "  %%v%" PRIu32 " = bitcast half %%v%" PRIu32
