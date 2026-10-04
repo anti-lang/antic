@@ -11,6 +11,7 @@
 #            loads none
 #   HOST     the target name of this host
 #   WORK     a directory this run writes into
+#   BACKEND  the back end of antic without --backend, native or llvm
 #
 # The deployment is the program, its symbols archive and a runtime
 # configuration that includes another file. On a host that loads
@@ -158,15 +159,24 @@ if(DEFINED plugin_id)
 endif()
 symbols(status text resolve "${WORK}/trace.stdout" ${archives})
 set(frame "0x[0-9a-f]+ 0\\+0x[0-9a-f]+")
-foreach(name inner outer main "through<float, str>")
-    if(NOT text MATCHES "\n${frame} com\\.example\\.tracer\\.${name} tracer\\.anti:[0-9]+\n")
-        message(FATAL_ERROR "the resolved trace names no ${name}\n${text}")
+# Release mode of the LLVM back end inlines inner, the copy and outer into
+# main, as the entry on inlined frames in docs/decisions.md says. The one
+# frame of the program is main, at the line of the capture in inner, and
+# the map holds no copy to name.
+set(frames "inner tracer\\.anti:[0-9]+" "outer tracer\\.anti:[0-9]+"
+    "main tracer\\.anti:[0-9]+" "through<float, str> tracer\\.anti:[0-9]+")
+if(BACKEND STREQUAL "llvm")
+    set(frames "main tracer\\.anti:11")
+endif()
+foreach(wanted IN LISTS frames)
+    if(NOT text MATCHES "\n${frame} com\\.example\\.tracer\\.${wanted}\n")
+        message(FATAL_ERROR "the resolved trace names no ${wanted}\n${text}")
     endif()
 endforeach()
 # The map names the copy as the program writes it, with its location last,
 # where the symbol escapes the name.
 file(READ "${WORK}/all/${program_id}/tracer.map" map)
-if(NOT map MATCHES "\n[0-9a-f]+-[0-9a-f]+ com\\.example\\.tracer\\.through<float, str> [^\n]*tracer\\.anti:[0-9]+\n")
+if(NOT BACKEND STREQUAL "llvm" AND NOT map MATCHES "\n[0-9a-f]+-[0-9a-f]+ com\\.example\\.tracer\\.through<float, str> [^\n]*tracer\\.anti:[0-9]+\n")
     message(FATAL_ERROR "the map names the copy wrongly\n${map}")
 endif()
 string(REGEX MATCHALL "\n[^\n]*" raw_lines "\n${trace}")

@@ -7,6 +7,7 @@
 #   TESTS     tests/traps/memory_checks_tests.anti
 #   WORK      a directory this run writes into
 #   HOST      the host target
+#   BACKEND   the back end of antic without --backend, native or llvm
 #
 # The project holds SOURCE as its module, with the case the program takes
 # written in place of its argument, since `anti run` passes none. `anti
@@ -81,13 +82,20 @@ if(NOT status EQUAL 0)
     message(FATAL_ERROR "anti build ended with ${status}:\n${err}")
 endif()
 
+# Release mode of the LLVM back end inlines read_after_free into main, so
+# its frames name main at the lines of read_after_free, as the entry on
+# inlined frames in docs/decisions.md says.
 foreach(mode "" --release)
+    set(function read_after_free)
+    if(mode STREQUAL "--release" AND BACKEND STREQUAL "llvm")
+        set(function main)
+    endif()
     reports("${mode}" use_after_free
         "ERROR: AddressSanitizer: heap-use-after-free"
         "READ of size 8"
-        "#0 0x[0-9a-f]+ in memcheck\\.demo\\.read_after_free ${source}:29\n"
-        "freed by thread T0 here:\n[^\n]*\n *${at}read_after_free ${source}:28\n"
-        "previously allocated by thread T0 here:\n[^\n]*\n *${at}read_after_free ${source}:26\n")
+        "#0 0x[0-9a-f]+ in memcheck\\.demo\\.${function} ${source}:29\n"
+        "freed by thread T0 here:\n[^\n]*\n *${at}${function} ${source}:28\n"
+        "previously allocated by thread T0 here:\n[^\n]*\n *${at}${function} ${source}:26\n")
 endforeach()
 reports("" double_free
     "ERROR: AddressSanitizer: attempting double-free"

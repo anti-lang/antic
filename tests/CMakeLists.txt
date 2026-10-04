@@ -1309,13 +1309,19 @@ set_tests_properties(program_by_unsigned PROPERTIES TIMEOUT 60)
 file(GLOB std_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/std/*.anti")
 # A program whose output follows the Win32 errors of Windows brings
-# NAME.win32.expected for the Windows targets.
+# NAME.win32.expected for the Windows targets. A program whose output
+# names the functions of its frames brings NAME.llvm.expected for the
+# LLVM back end, whose release mode inlines small functions, as the entry
+# on inlined frames in docs/decisions.md says.
 foreach(source IN LISTS std_sources)
     get_filename_component(name "${source}" NAME_WE)
     set(expected "")
     set(win32_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.win32.expected")
+    set(llvm_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.llvm.expected")
     if(ANTIC_HOST_TARGET MATCHES "^windows-" AND EXISTS "${win32_expected}")
         set(expected EXPECTED "${win32_expected}")
+    elseif(ANTIC_BACKEND STREQUAL "llvm" AND EXISTS "${llvm_expected}")
+        set(expected EXPECTED "${llvm_expected}")
     endif()
     antic_program_test(std_${name}
         "${source}"
@@ -1623,6 +1629,7 @@ add_test(NAME anti_memory_checks
         "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_tests.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-memory-checks"
         "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DBACKEND=${ANTIC_BACKEND}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_memory_checks.cmake")
 set_tests_properties(anti_memory_checks PROPERTIES TIMEOUT 300
     SKIP_REGULAR_EXPRESSION "SKIP: ")
@@ -1652,6 +1659,7 @@ add_test(NAME anti_build
         "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build"
         "-DOBJECT=${anti_object}"
+        "-DBACKEND=${ANTIC_BACKEND}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build.cmake")
 
 # The package name of the manifest reaches every compile of `anti check`,
@@ -1689,6 +1697,7 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
             "${anti_symbols_plugin}"
             "-DHOST=${ANTIC_HOST_TARGET}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-symbols"
+            "-DBACKEND=${ANTIC_BACKEND}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_symbols.cmake")
 endif()
 
@@ -2375,7 +2384,14 @@ foreach(target windows-x86_64 windows-arm64)
 endforeach()
 
 # The PDB of a Windows program names every function of it, in a release
-# build and in one with -g, and holds no path of the build.
+# build and in one with -g, and holds no path of the build. Release mode of
+# the LLVM back end inlines inner, outer and put, which then have no
+# record of their own, as the entry on inlined frames in docs/decisions.md
+# says. skipped keeps its frame for the skip it passes.
+set(pdb_names "stack_trace.inner;stack_trace.outer;stack_trace.skipped;stack_trace.put;stack_trace.main")
+if(ANTIC_BACKEND STREQUAL "llvm")
+    set(pdb_names "stack_trace.skipped;stack_trace.main")
+endif()
 foreach(target windows-x86_64 windows-arm64)
     add_test(NAME pdb_names_${target}
         COMMAND "${CMAKE_COMMAND}"
@@ -2383,7 +2399,7 @@ foreach(target windows-x86_64 windows-arm64)
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/trace/stack_trace.anti"
-            "-DNAMES=stack_trace.inner;stack_trace.outer;stack_trace.skipped;stack_trace.put;stack_trace.main"
+            "-DNAMES=${pdb_names}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/pdb-names"
             "-DTARGET=${target}"
             "-DROOT=${CMAKE_SOURCE_DIR}"
@@ -3166,6 +3182,7 @@ if(ANTIC_LLVM_MC AND (ANTIC_LLDB OR ANTIC_GDB))
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/debug"
             "-DDEBUGGER=${debugger}"
             "-DKIND=${debugger_kind}"
+            "-DOBJECT=${anti_object}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_debug.cmake")
 endif()
 
@@ -3237,6 +3254,7 @@ add_test(NAME memory_checks
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DBACKEND=${ANTIC_BACKEND}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_memory_checks.cmake")
 set_tests_properties(memory_checks PROPERTIES TIMEOUT 120
     SKIP_REGULAR_EXPRESSION "SKIP: ")
@@ -3250,6 +3268,7 @@ add_test(NAME memory_checks_list
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_list.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DBACKEND=${ANTIC_BACKEND}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_memory_checks_list.cmake")
 set_tests_properties(memory_checks_list PROPERTIES TIMEOUT 120
     SKIP_REGULAR_EXPRESSION "SKIP: ")
@@ -3286,7 +3305,10 @@ endif()
 # patterns. Each case is a name, the source in tests/trace, the options of
 # antic and the arguments of the program. The pattern files of the output
 # and of the error output follow, then the exit status. A dev build links
-# the dev object of anti.lang.
+# the dev object of anti.lang. Release mode of the LLVM back end inlines
+# small functions, as the entry on inlined frames in docs/decisions.md
+# says, so a release case takes NAME.llvm.pattern for NAME.pattern under
+# it where the trace names other frames.
 set(TRACE "${CMAKE_CURRENT_SOURCE_DIR}/trace")
 foreach(case
         "stack|stack_trace|||stack_trace.pattern||0"
@@ -3321,6 +3343,12 @@ foreach(case
     set(std "")
     if(options MATCHES "--dev")
         set(std lang)
+    endif()
+    string(REGEX REPLACE "\\.pattern$" ".llvm.pattern" llvm_expected
+           "${expected}")
+    if(ANTIC_BACKEND STREQUAL "llvm" AND NOT options MATCHES "--dev" AND
+       EXISTS "${TRACE}/${llvm_expected}")
+        set(expected "${llvm_expected}")
     endif()
     antic_dev_inputs(std_objects std_fixtures ${std})
     list(JOIN std_objects "," std_objects)
@@ -3619,6 +3647,7 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64)
             "-DSOURCE=${TRACE}/symbols.anti"
             "-DTARGET=${target}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-${target}"
+            "-DBACKEND=${ANTIC_BACKEND}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_symbols.cmake")
     set_tests_properties(trace_symbols_${target} PROPERTIES
         SKIP_REGULAR_EXPRESSION "SKIP: ")

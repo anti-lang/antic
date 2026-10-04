@@ -6,6 +6,7 @@
 #   SOURCE    tests/traps/memory_checks.anti
 #   WORK      a directory for the files
 #   HOST      the host target
+#   BACKEND   the back end of antic without --backend, native or llvm
 #
 # A build without the option carries no check, and a build with it
 # carries the checks, for the host or, on a windows-arm64 host, for
@@ -134,12 +135,22 @@ endif()
 # The names of the frames come from the symbolizer of the runtime, which
 # has one on macOS alone. `anti run` puts the report through Anti's
 # symbolizer on the other hosts, which run_anti_memory_checks.cmake checks.
+# Release mode of the LLVM back end inlines each case into main, so the
+# frame names main, under the name anti.rt.main that shares its address.
+# See the entry on inlined frames in docs/decisions.md.
+foreach(case read_after_free free_twice write_past_end kept)
+    set(in_${case} "in memory_checks\\.${case}")
+    if(BACKEND STREQUAL "llvm")
+        set(in_${case} "in anti\\.rt\\.main")
+    endif()
+endforeach()
 function(reports case)
     program_expect("memory checks ${case}" COMMAND "${program}" ${case}
                    STATUS 1 ANY_ERR)
     set(err "${program_stderr}")
     foreach(pattern IN LISTS ARGN)
-        if(NOT HOST MATCHES "^macos" AND pattern MATCHES "memory_checks")
+        if(NOT HOST MATCHES "^macos" AND
+           pattern MATCHES "in (memory_checks|anti\\\\.rt)")
             continue()
         endif()
         if(NOT err MATCHES "${pattern}")
@@ -152,19 +163,19 @@ endfunction()
 reports(use_after_free
     "ERROR: AddressSanitizer: heap-use-after-free"
     "READ of size 8"
-    "#0 0x[0-9a-f]+ in memory_checks\\.read_after_free")
+    "#0 0x[0-9a-f]+ ${in_read_after_free}")
 reports(double_free
     "ERROR: AddressSanitizer: attempting double-free"
-    "in memory_checks\\.free_twice")
+    "${in_free_twice}")
 reports(overflow
     "ERROR: AddressSanitizer: heap-buffer-overflow"
     "WRITE of size 8"
-    "#0 0x[0-9a-f]+ in memory_checks\\.write_past_end")
+    "#0 0x[0-9a-f]+ ${in_write_past_end}")
 if(NOT HOST MATCHES "^windows")
     reports(leak
         "ERROR: LeakSanitizer: detected memory leaks"
         "Direct leak of 8 byte\\(s\\) in 1 object\\(s\\) allocated from:"
-        "allocated from:\n[^\n]*malloc[^\n]*\n[^\n]*in memory_checks\\.kept"
+        "allocated from:\n[^\n]*malloc[^\n]*\n[^\n]*${in_kept}"
         "SUMMARY: AddressSanitizer: 8 byte\\(s\\) leaked in 1 allocation\\(s\\)")
 endif()
 

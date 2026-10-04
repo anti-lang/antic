@@ -6,6 +6,7 @@
 #   SOURCE    tests/traps/memory_checks_list.anti
 #   WORK      a directory for the files
 #   HOST      the host target
+#   BACKEND   the back end of antic without --backend, native or llvm
 #
 # The program reads through a pointer the walk lent after the push freed
 # the room it points into. The report names a read after free and ends
@@ -35,9 +36,16 @@ set(err "${program_stderr}")
 set(patterns
     "ERROR: AddressSanitizer: heap-use-after-free"
     "READ of size 8")
+# Release mode of the LLVM back end inlines kept_across_push into main, so
+# the frame names main, under the name anti.rt.main that shares its
+# address. See the entry on inlined frames in docs/decisions.md.
+set(reader "memory_checks_list\\.kept_across_push")
+if(BACKEND STREQUAL "llvm")
+    set(reader "anti\\.rt\\.main")
+endif()
 if(HOST MATCHES "^macos")
     list(APPEND patterns
-        "#0 0x[0-9a-f]+ in memory_checks_list\\.kept_across_push"
+        "#0 0x[0-9a-f]+ in ${reader}"
         "freed by thread T0 here:\n( +#[^\n]*\n)* +#[^\n]* in anti\\.collection\\.list\\.List[^ \n]*\\.push")
 endif()
 foreach(pattern IN LISTS patterns)

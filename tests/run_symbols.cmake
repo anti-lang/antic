@@ -8,6 +8,7 @@
 #   SOURCE    tests/trace/symbols.anti
 #   TARGET    the target
 #   WORK      a directory for the files
+#   BACKEND   the back end of antic without --backend, native or llvm
 #
 # An ELF binary carries its symbols and its line table, so the probe
 # reads the executable. A Mach-O link leaves the line table in the
@@ -41,7 +42,26 @@ function(probe form file symbol offset wanted)
     endif()
 endfunction()
 
-if("${TARGET}" MATCHES "^linux-")
+# Release mode of the LLVM back end inlines inner into main, which leaves
+# no symbol of inner, as the entry on inlined frames in docs/decisions.md
+# says. The release build gives main, and a dev build gives inner, at the
+# line of its declaration.
+if(BACKEND STREQUAL "llvm")
+    execute_process(
+        COMMAND "${ANTIC}" --dev -g --target ${TARGET} --llvm-mc "${LLVM_MC}"
+                --runtime "${RUNTIME}" -o "${exe}_dev" "${SOURCE}"
+        RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "antic --dev -g failed for ${TARGET}\n${err}")
+    endif()
+    if("${TARGET}" MATCHES "^linux-")
+        probe(elf "${exe}" symbols.main 0 "symbols.main symbols.anti:12")
+        probe(elf "${exe}_dev" symbols.inner 0 "symbols.inner symbols.anti:6")
+    else()
+        probe(macho "${exe}.o" _symbols.main 0 "symbols.anti:12")
+        probe(macho "${exe}_dev.o" _symbols.inner 0 "symbols.anti:6")
+    endif()
+elseif("${TARGET}" MATCHES "^linux-")
     probe(elf "${exe}" symbols.inner 0 "symbols.inner symbols.anti:8")
     probe(elf "${exe}" symbols.main 0 "symbols.main symbols.anti:12")
     # A dev build of linux-arm64 puts the mapping symbol `$x` of the object

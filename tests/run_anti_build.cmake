@@ -12,6 +12,7 @@
 #   READOBJ  llvm-readobj of the runtime archive
 #   WORK     a directory this run writes into
 #   OBJECT   the suffix of an object of the host, .o or .obj
+#   BACKEND  the back end of antic without --backend, native or llvm
 #
 # It covers the dev mode of docs/tooling-addendum.md with its cache,
 # release mode, the `-g` rule of docs/tooling.md, --target, --cpu, the
@@ -165,32 +166,71 @@ if(HOST MATCHES "^windows-")
                             "${release}\n${out}${err}")
     endif()
 else()
-    foreach(name com.example.app.main com.example.greet.word)
+    # Release mode of the LLVM back end inlines word into main, which then
+    # has no symbol of its own, as the entry on inlined frames in
+    # docs/decisions.md says.
+    set(names com.example.app.main com.example.greet.word)
+    set(lines "greet.anti:[0-9]+")
+    if(BACKEND STREQUAL "llvm")
+        set(names com.example.app.main)
+        set(lines "app.anti:[0-9]+")
+    endif()
+    foreach(name IN LISTS names)
         if(NOT map MATCHES "${name}")
             message(FATAL_ERROR "the map names no ${name}")
         endif()
     endforeach()
-    if(NOT map MATCHES "greet.anti:[0-9]+")
+    if(NOT map MATCHES "${lines}")
         message(FATAL_ERROR "the map carries no file and line:\n${map}")
     endif()
 endif()
 
 # `anti build` passes -g in dev mode and never in release, so the
 # assembly of a dev build carries the line of every statement: `.loc` of
-# DWARF, or `.cv_loc` of CodeView on Windows.
-set(line_directive ".loc ")
-if(HOST MATCHES "^windows-")
-    set(line_directive ".cv_loc ")
-endif()
-file(READ "${project}/build/${HOST}/dev/app${exe}.s" dev_assembly)
-file(READ "${project}/build/${HOST}/release/app${exe}.s" release_assembly)
-string(FIND "${dev_assembly}" "${line_directive}" at)
-if(at LESS 0)
-    message(FATAL_ERROR "the dev build passed no -g")
-endif()
-string(FIND "${release_assembly}" "${line_directive}" at)
-if(NOT at LESS 0)
-    message(FATAL_ERROR "the release build passed -g")
+# DWARF, or `.cv_loc` of CodeView on Windows. The LLVM back end keeps the
+# object and no assembly, so there the object of a dev build holds a line
+# table: a section `debug_line` of DWARF, or a subsection of lines in the
+# CodeView of `.debug$S` on Windows, which holds the functions without -g
+# as well.
+if(BACKEND STREQUAL "llvm")
+    set(readobj_option --sections)
+    set(line_table "debug_line")
+    if(HOST MATCHES "^windows-")
+        set(readobj_option --codeview)
+        set(line_table "Lines \\(0xF2\\)")
+    endif()
+    foreach(mode dev release)
+        execute_process(COMMAND "${READOBJ}" ${readobj_option}
+                                "${project}/build/${HOST}/${mode}/app${exe}${OBJECT}"
+                        RESULT_VARIABLE status OUTPUT_VARIABLE out
+                        ERROR_VARIABLE err ENCODING NONE)
+        if(NOT status EQUAL 0)
+            message(FATAL_ERROR "llvm-readobj failed on the ${mode} object\n"
+                                "${err}")
+        endif()
+        set(${mode}_object "${out}")
+    endforeach()
+    if(NOT dev_object MATCHES "${line_table}")
+        message(FATAL_ERROR "the dev build passed no -g")
+    endif()
+    if(release_object MATCHES "${line_table}")
+        message(FATAL_ERROR "the release build passed -g")
+    endif()
+else()
+    set(line_directive ".loc ")
+    if(HOST MATCHES "^windows-")
+        set(line_directive ".cv_loc ")
+    endif()
+    file(READ "${project}/build/${HOST}/dev/app${exe}.s" dev_assembly)
+    file(READ "${project}/build/${HOST}/release/app${exe}.s" release_assembly)
+    string(FIND "${dev_assembly}" "${line_directive}" at)
+    if(at LESS 0)
+        message(FATAL_ERROR "the dev build passed no -g")
+    endif()
+    string(FIND "${release_assembly}" "${line_directive}" at)
+    if(NOT at LESS 0)
+        message(FATAL_ERROR "the release build passed -g")
+    endif()
 endif()
 
 # --target builds for another target, and --cpu takes a level of this

@@ -7,9 +7,13 @@
 #   WORK      a directory for the sources and the binaries
 #   DEBUGGER  lldb or gdb, the debugger of the host
 #   KIND      lldb or gdb, which one it is
+#   OBJECT    the suffix of an object file, .o or .obj
 #
 # The programs are written here rather than kept as fixtures, because the
-# test names the line of every breakpoint.
+# test names the line of every breakpoint. Both build in dev mode, which
+# inlines nothing, so every function is a frame of its own. Release mode
+# of the LLVM back end inlines step and folds the program to its result,
+# as the entry on inlined frames in docs/decisions.md says.
 
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
@@ -57,54 +61,69 @@ if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic -c failed\n${err}")
 endif()
 
-# Build the program twice, with the source positions and without them,
-# and write the assembly of each with -S.
-function(build name)
-    execute_process(COMMAND "${ANTIC}" ${ARGN} --llvm-mc "${LLVM_MC}"
+# Run antic in dev mode in the root, with the library file of the module
+# on the search path.
+function(dev_build name source)
+    execute_process(COMMAND "${ANTIC}" --dev ${ARGN} --llvm-mc "${LLVM_MC}"
                             --runtime "${RUNTIME}" -I "${root}"
                             -I "${WORK}/lib" -o "${WORK}/${name}"
-                            "${root}/app.anti"
+                            "${source}"
                     RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "antic failed for ${name}\n${err}")
     endif()
 endfunction()
 
-build(app -g)
-build(plain)
-build(app.s -g -S)
-build(plain.s -S)
+# The object and the assembly of each module, with the source positions
+# and without them, and the program linked from the objects of each kind.
+foreach(module "com/example/step" "app")
+    get_filename_component(base "${module}" NAME)
+    dev_build(${base}.s "${root}/${module}.anti" -g -S)
+    dev_build(${base}_plain.s "${root}/${module}.anti" -S)
+endforeach()
+dev_build(step "${root}/com/example/step.anti" -g)
+dev_build(step_plain "${root}/com/example/step.anti")
+dev_build(app "${root}/app.anti" -g "${WORK}/step${OBJECT}")
+dev_build(plain "${root}/app.anti" "${WORK}/step_plain${OBJECT}")
 
 # A .file directive per source and a .loc before the first instruction of
 # every statement. Each back end numbers the files its own way, so the
 # number of each file comes from its directive. The native back end
-# writes `.file 1 "step.anti"`, and llc `.file 1 "" "step.anti"` or the
-# same with a tab.
-file(READ "${WORK}/app.s" assembly)
+# writes `.file 1 "com/example/step.anti"`, and llc `.file 1 ""
+# "com/example/step.anti"`, the same with a tab, or the directory apart,
+# `.file 1 "com/example" "step.anti"`.
 foreach(source "com/example/step" "app")
+    get_filename_component(base "${source}" NAME)
+    get_filename_component(directory "${source}" DIRECTORY)
+    file(READ "${WORK}/${base}.s" assembly)
     if(NOT assembly MATCHES
-       "\\.file[ \t]+([0-9]+)[ \t]+(\"\"[ \t]+)?\"${source}\\.anti\"")
+       "\\.file[ \t]+([0-9]+)[ \t]+((\"\"[ \t]+)?\"${source}|\"${directory}\"[ \t]+\"${base})\\.anti\"")
         message(FATAL_ERROR "the assembly of -g names no ${source}.anti")
     endif()
-    string(REPLACE "/" "_" key "${source}")
-    set(file_${key} "${CMAKE_MATCH_1}")
+    set(file_${base} "${CMAKE_MATCH_1}")
+    set(assembly_${base} "${assembly}")
 endforeach()
-foreach(wanted "${file_com_example_step} 3" "${file_com_example_step} 4"
-        "${file_app} 5" "${file_app} 10" "${file_app} 11")
-    string(REPLACE " " "[ \t]+" position "${wanted}")
-    set(pattern "\\.loc[ \t]+${position}[ \t]+0")
-    if(NOT assembly MATCHES "${pattern}")
-        message(FATAL_ERROR "the assembly of -g holds no `.loc ${wanted} 0`")
+foreach(wanted "step ${file_step} 3" "step ${file_step} 4"
+        "app ${file_app} 5" "app ${file_app} 10" "app ${file_app} 11")
+    string(REPLACE " " ";" parts "${wanted}")
+    list(POP_FRONT parts base)
+    list(JOIN parts " " position)
+    string(REPLACE " " "[ \t]+" pattern "${position}")
+    if(NOT assembly_${base} MATCHES "\\.loc[ \t]+${pattern}[ \t]+0")
+        message(FATAL_ERROR "the assembly of -g holds no `.loc ${position} 0`")
     endif()
 endforeach()
 
 # Without -g the assembly carries no position at all. llc names the
 # source of an ELF object with a `.file` of no number, which is no
 # position.
-file(READ "${WORK}/plain.s" bare)
-if(bare MATCHES "\\.loc[ \t]|\\.file[ \t]+[0-9]|\\.cv_")
-    message(FATAL_ERROR "a build without -g wrote a source position")
-endif()
+foreach(base step app)
+    file(READ "${WORK}/${base}_plain.s" bare)
+    if(bare MATCHES "\\.loc[ \t]|\\.file[ \t]+[0-9]|\\.cv_")
+        message(FATAL_ERROR "a build of ${base} without -g wrote a source "
+                            "position")
+    endif()
+endforeach()
 
 # The program runs the same either way, and returns 0 from 3 + 1 times 2,
 # doubled, less 16.
