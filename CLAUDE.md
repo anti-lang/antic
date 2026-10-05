@@ -404,8 +404,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1540 ctest tests pass on the development Mac and none is skipped. The ASan
-  and the UBSan builds run 1539 each, without the `no_paths` test, which needs a
+- 1545 ctest tests pass on the development Mac and none is skipped. The ASan
+  and the UBSan builds run 1544 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
@@ -622,6 +622,10 @@ reports what it finished.
   A read gives an `f32`, a write takes `as f16`, and no operator takes one.
   ARM64 and x86-64-v3 convert in one instruction, and `v1` and `v2` call the
   runtime. See "`f16`" in `docs/decisions.md`.
+- `-> never` is built. A call of such a function ends its path, the IR ends
+  its block with `IR_UNREACHABLE`, and the LLVM text writes `noreturn cold`.
+  `Error.fatal` is `final` and returns `never`. See "Facts that end a path"
+  in `docs/work-order-llvm-optimization.md`.
 - `*T` never holds `none` and `?*T` may, and a function value follows the same
   rule with `?fn(...)`. Narrowing is per block and follows `&&` and `||`.
   `let m = p else { }` and `p catch` bind the checked value, and every pointer
