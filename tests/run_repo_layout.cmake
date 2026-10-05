@@ -14,9 +14,9 @@
 set(top_directories build docs LICENSES src tests tools)
 set(top_files CLAUDE.md README.md CHANGELOG.md LICENSE CMakeLists.txt
     CMakePresets.json .gitignore)
-# The files that tools require in the root, and the release link r. A
-# tracked .claude/settings.json is one, when there is one.
-set(tool_entries .github .gitattributes .editorconfig .claude/settings.json r)
+# The files that tools require in the root, the release link r and the
+# build link c. A tracked .claude/settings.json is one, when there is one.
+set(tool_entries .github .gitattributes .editorconfig .claude/settings.json r c)
 set(src_directories antic anti rt std native)
 set(tests_directories abi anti-build anti-symbols anti-test bench bind check
     clib conf doc dump emit-identity errors fmt framework inject link-identity

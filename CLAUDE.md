@@ -151,12 +151,20 @@ The target stands under "Binary distribution" in `docs/decisions.md`.
 ## Building
 
 ```bash
-cmake --preset host && cmake --build build/host -j8 && ctest --test-dir build/host -j8
+./c            # Debug build in build/host
+./c release    # Release build in build/release
+./c test       # the Debug build, then its suite
 ```
 
-`CMakePresets.json` carries three configurations, each in `build/<preset>`:
-`host`, and the sanitizer configurations `asan` and `ubsan`. All three run the
-full suite.
+`./c` is a link to `tools/compile.sh`. It configures a tree on its first
+build and takes `asan`, `ubsan`, `test` and `fresh` as well. The long form is
+`cmake --preset host && cmake --build build/host -j8 && ctest --test-dir
+build/host -j8`.
+
+`CMakePresets.json` carries four configurations, each in `build/<preset>`:
+`host`, the Debug build, `release`, and the sanitizer configurations `asan`
+and `ubsan`. The suite runs in every tree. The three builds a step of a
+driver proves are `host`, `asan` and `ubsan`.
 
 The pinned downloads lie in `build/deps/`, one copy for all three trees. The
 pinned clang in `build/deps/clang` compiles everything, and the configure step
@@ -192,9 +200,9 @@ for a reader's build and never for a release.
 - The top level holds exactly `build/`, `docs/`, `LICENSES/`, `src/`, `tests/`
   and `tools/`, plus the root files `CLAUDE.md`, `README.md`, `CHANGELOG.md`,
   `LICENSE`, `CMakeLists.txt`, `CMakePresets.json` and `.gitignore`.
-- Files that tools require in the root, and the release link r: `.github/`,
-  `.gitattributes`, `.editorconfig`, a tracked `.claude/settings.json` if
-  there is one, and `r`.
+- Files that tools require in the root, the release link `r` and the build
+  link `c`: `.github/`, `.gitattributes`, `.editorconfig`, a tracked
+  `.claude/settings.json` if there is one, `r` and `c`.
 - `src/` holds exactly `antic/`, `anti/`, `rt/`, `std/` and `native/`.
 - `docs/` holds exactly the directories `audit/`, `notes/`, `reports/` and
   `site/`. `docs/audit/` holds the reports of the code audit and their
