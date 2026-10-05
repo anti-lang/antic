@@ -452,8 +452,11 @@ D5, `inbounds` on the address of a field, under C2, as
 describes.
 
 D6, TBAA, under C2. The step `tbaa-rules` writes the aliasing rules of
-`as` into `docs/anti-language-additions.md`. Eddie accepts them before
-the step `tbaa` writes any `!tbaa` metadata.
+`as` into `docs/anti-language-additions.md`. Eddie decided on 2026-10-05
+that the rules need no review before the step `tbaa` writes `!tbaa`
+metadata from them. They follow the gap procedure of `CLAUDE.md`: a
+`[provisional]` entry of `docs/decisions.md` names them, and his review
+of the provisional entries covers them.
 
 D7, the runtime and profiles. The step `runtime-lto` builds the runtime
 as bitcode and links it with the program through the LTO of lld. It
@@ -530,10 +533,10 @@ each flag and each range.
 
 `tbaa-rules`, the aliasing rules of `as`, written into
 `docs/anti-language-additions.md`. The report lists each rule with the
-programs of `tests/programs` that rely on it. The driver stops after this
-step until Eddie accepts the rules.
+programs of `tests/programs` that rely on it. The step `tbaa` follows it
+with no review of the rules in between, as D6 says.
 
-`tbaa`, the `!tbaa` metadata from the accepted rules, under C2. Done when
+`tbaa`, the `!tbaa` metadata from the rules, under C2. Done when
 the program tests of C2 pass and `tests/bench` is measured.
 
 `runtime-lto`, the runtime as bitcode, under C3. The runtime archive
