@@ -43,11 +43,6 @@ uint64_t anti_rt_hash_seed(void)
     return (uint64_t)anti_rt_atomic_load(&seed, (int64_t)sizeof seed);
 }
 
-uint64_t anti_rt_hash_seeded(uint64_t hash, uint64_t with)
-{
-    return anti_rt_hash_mix(hash ^ anti_rt_hash_mix(with));
-}
-
 void anti_rt_hash_seed_set(uint64_t value)
 {
     anti_rt_atomic_store(&seed, (int64_t)sizeof seed, (int64_t)value);

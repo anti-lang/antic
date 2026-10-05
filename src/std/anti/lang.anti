@@ -25,7 +25,6 @@ extern fn anti_rt_trace_text(frames: ?*RawFrame, count: int) -> ?*byte;
 extern fn anti_rt_trace_symbolize(frame: ?*RawFrame, out: ?*Frame);
 extern fn anti_rt_trace_install(handler: ?*TraceHandler);
 extern fn anti_rt_hash_seed() -> u64;
-extern fn anti_rt_hash_seeded(hash: u64, with: u64) -> u64;
 
 /// The most frames a trace keeps, the innermost ones.
 const TRACE_DEPTH: int = 64;
@@ -393,7 +392,10 @@ pub fn hash_seed() -> u64
 /// seed they land elsewhere, and so does every other key.
 pub fn seeded(hash: u64, with: u64) -> u64
 {
-	return anti_rt_hash_seeded(hash, with);
+	// The hash of a `u64` is the finalizer of MurmurHash3 with the constants of
+	// src/rt/hash.h, which antic writes inline. It stands here and not in the
+	// runtime, so the inliner of `opt` sees it.
+	return (hash ^ with.hash()).hash();
 }
 
 /// The one handler that every hook of every object calls.

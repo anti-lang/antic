@@ -27,7 +27,6 @@ extern int anti_rt_option_backtrace;
    system, and set fixes it for the key `hash_seed`. */
 uint64_t anti_rt_hash_bytes(const unsigned char *bytes, int64_t count);
 uint64_t anti_rt_hash_seed(void);
-uint64_t anti_rt_hash_seeded(uint64_t hash, uint64_t with);
 void anti_rt_hash_seed_set(uint64_t value);
 void anti_rt_hash_seed_start(void);
 

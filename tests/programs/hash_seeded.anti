@@ -1,0 +1,24 @@
+//! `lang.seeded(hash, with)` is `mix(hash ^ mix(with))`, where `mix` is the
+//! finalizer of MurmurHash3 that `x.hash()` of a `u64` gives. The hashing
+//! collections keep their buckets by it, so the values are pinned on every
+//! target. The seed 0 and a key of 0 are among them.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(hash: u64, with: u64)
+{
+	printf("%016llx %016llx %016llx\n".ptr, hash, with, lang.seeded(hash, with));
+}
+
+fn main() -> int
+{
+	show(0, 0);
+	show(1, 0);
+	show(0, 1);
+	show(42, 7);
+	show(0xffffffffffffffff, 0x123456789abcdef0);
+	show((5).hash(), 0xcbf29ce484222325);
+	return 0;
+}
