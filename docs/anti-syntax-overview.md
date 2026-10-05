@@ -934,7 +934,9 @@ let k = n ?? &default_node;
 
 `alloc T { }` returns `*T`, `alloc(T, n)` returns `?*T` as raw memory. Every pointer in an `extern fn` is `?*T`. No pointer arithmetic beyond indexing. A function value follows the same rule: `fn(...)` never holds `none` and `?fn(...)` may.
 
-Built.
+`p as *U` between two pointer types is a view, the same address read as another type. Bytes reach any memory, every pointer is one type and an integer meets its other sign. A struct holds its parts, an array its elements and a simd struct its lanes. Two structs of which neither holds the other keep apart. A view used where it stands reaches any memory, and a view passed on is a pointer of its own type. "Aliasing of views" in `docs/anti-language-additions.md` holds the rules.
+
+Built. Not built yet: a release build that orders loads and stores by the aliasing rules of views, which wait for Eddie's review.
 
 ## Optional values
 

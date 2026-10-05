@@ -18,6 +18,7 @@ Contents:
 - [Flags](#flags)
 - [CPU levels](#cpu-levels)
 - [Simd structs](#simd-structs)
+- [Aliasing of views](#aliasing-of-views)
 - [Tests and fixtures](#tests-and-fixtures)
 - [Sum types](#sum-types)
 - [Locking and channels](#locking-and-channels)
@@ -221,6 +222,27 @@ if f.overflow {
 - The back end maps every operation to the target's native width. One instruction where the width exists, two or more where it does not. The same result everywhere. A `f32x8` is one instruction on x86_64 at v3 and two on ARM64. A `f32x64` is sixteen on ARM64. The lane count is the programmer's, the instruction count is the machine's.
 - `f16` lanes are storage only, as `f16` is: every operation converts to `f32` lanes and back.
 - Above the cap it is an array and a loop, with a message that says which. Variable-length vectors, scatter and gather, and vectorisation of scalar loops are not part of it.
+
+## Aliasing of views
+
+`as` between two pointer types gives a view: the same address, read as another type. These rules say which accesses may refer to the same memory once a view exists. A release build assumes that two accesses the rules keep apart never refer to the same memory. It moves and removes loads and stores by that. A program that breaks a rule is wrong. From the first access that breaks it, a release build may give any result. Neither the checker nor a dev build reports such an access.
+
+The step `tbaa-rules` of `docs/work-order-llvm-optimization.md` wrote the rules on 2026-10-05, for choice D6. Eddie reviews them before the step `tbaa` writes any of them into the LLVM text.
+
+- An access reads or writes memory as a type. A field is accessed as its type, inside the struct, the class, the tuple or the union that holds it. An element is accessed as the element type of its array, slice or pointer, and `*p` as the type `p` points at. A copy of a struct, a class value, a tuple, a variant, a `?T` or an array is an access as that type.
+- Memory holds a type. A local, a global, a field and an element hold the type they are declared with, for as long as they live. Memory from `alloc`, from an `Allocator` or from a function of C holds no type until an access gives it one. There a store gives the bytes it writes the type it stores, and a later store of another type gives them that type. A copy of bytes there gives them the type of the bytes it copies. Memory given back to its allocator and taken again holds no type until the next store.
+- Same type. Two accesses of the same type may refer to the same memory. A type and its alias are one type: `int` and `i64`, `byte` and `u8`, `c_int` and `i32`.
+- Integers. An access of an integer type may refer to the same memory as one of the same width and the other sign. An enum counts as its base type, and `char` as `u32`.
+- Bytes. An access as `u8` or `i8` may refer to any memory. A view as `*byte` or `[]byte` reads and writes the bytes of any value, wherever the view goes.
+- Pointers. Every pointer is one type for these rules. An access of a `*T`, a `?*T`, a function value, a `str` or the `ptr` of a slice may refer to memory that holds a pointer of any other type. `as` converts between any two pointer types, and a collection keeps memory as `*T` that its allocator gave out as `*byte`.
+- Structs and classes. An access of a struct, a class, a tuple, a variant or a `?T` may refer to the memory of each part it holds. That holds at any depth, at the offset of the part. The parts are the fields and the elements of an array field. A class also holds its base at offset 0 and the sub-object of each interface it implements. A view of a value as the type of one of its parts, at the address of that part, reads that part. Fields reached through two structs refer to different memory when neither struct holds the other. That holds even where both fields are an `int`.
+- Arrays and slices. An array is its elements. An access of an element may refer to the same memory as any access of the element type, through an array, a slice, a pointer or a struct that holds the array. A view between `*[N]T`, `*T` and the `ptr` of a `[]T` reaches the same elements.
+- Simd structs. A simd struct is its lanes. An access of a simd struct, whole or one lane, is an access of its lane type. It may refer to the same memory as an element of an array of that type. It may also refer to a field of that type in a plain struct. A view between a `*Vec4` and a `*[4]f32` or a `*Vector4` therefore reaches the same lanes. `as` of a simd struct value to an array or a plain struct of the same bytes copies the bytes, and so does `as` back. It is no view, and it reads its operand as the operand's type.
+- Unions and variants. A read of a field through its union reads the bytes as that field, whichever field wrote them. An access whose path names the union, `u.f` or `p.f` for a pointer `p` to the union, at any depth below the field, may refer to the memory of every field of that union. An access through a pointer to one field, `&u.f`, is an access of the field's type, and that field must be the one the last store wrote. A variant holds the union of its cases and follows the same rule.
+- A view where it stands. An access through a view may refer to any memory where the view reaches it along one path. The path runs through `&`, a field, an element, a part of a slice, a tuple and a local that a `let` or a `=` gave the view. The access reads and writes the bytes, and the memory keeps its type. These are the paths along which a view gives no `inbounds` address, as the entry on `inbounds` in `docs/decisions.md` gives them.
+- A view passed on. A view may reach an access in another way: as an argument, as a result, or stored in a field, an element or a global. There it is a pointer of its own type. The access is one of that type, and the memory must hold a type that the rules above let it refer to.
+- Class pointers. `as` between two class pointers of one chain, or to an interface the class implements, is no view. It gives the same object, or its sub-object of that interface, and its accesses follow the rule of structs and classes.
+- Functions of C. A function of C follows the rules of C, and its accesses may refer to any memory its pointers reach. The runtime, `memcpy`, `memset` and every function that `anti bind` declares are such functions.
 
 ## Tests and fixtures
 
