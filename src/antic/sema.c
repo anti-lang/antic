@@ -849,6 +849,14 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
             (declared = types_declared(c->types, &t->name, false)) != NULL) {
             return declared;
         }
+        /* DESIGN: `never` is a result alone, written after `->`, and
+           the type has no values. Elsewhere the word names a type of
+           the program, and without one the message says why. */
+        if (sym == NULL && sema_name_is(&t->name, "never")) {
+            sema_error_at(c, t->pos, "`never` is the result of a function "
+                          "that does not return, and no value has it");
+            return sema_builtin(c, TYPE_ERROR);
+        }
         if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
             sema_error_at(c, t->pos, "unknown type `%.*s`", (int)t->name.length,
                           t->name.text);
@@ -949,6 +957,9 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
                                   t->result != NULL);
         } else {
             fn = types_fn(c->types, params, t->param_count, result);
+        }
+        if (t->never) {
+            fn = types_fn_never(c->types, fn);
         }
         return t->nullable ? types_with_none(c->types, fn) : fn;
     }
@@ -1353,6 +1364,16 @@ static struct type *function_type_of(struct checker *c, struct item *it)
                       "`construct` returns nothing, and one "
                       "that can fail is written `may fail`");
         return sema_builtin(c, TYPE_ERROR);
+    }
+    if (it->never && it->may_fail) {
+        sema_error_at(c, it->may_fail_pos,
+                      "a function that returns `never` cannot fail");
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (it->never) {
+        return types_fn_never(c->types,
+                              types_fn(c->types, params,
+                                       it->param_count + extra, result));
     }
     if (it->may_fail) {
         struct type *error;

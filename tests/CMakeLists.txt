@@ -3154,6 +3154,18 @@ foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trap.cmake")
 endforeach()
+# fatal_none: `catch fatal` on a `none` pointer runs the function of
+# `error.on_fatal`, prints the error and exits with 1, in release mode,
+# where the guard calls `Error.fatal` directly and ends with unreachable.
+add_test(NAME trap_fatal_none
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/fatal_none.anti"
+        "-DSTATUS=1"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trap.cmake")
 
 # The size of a Mutex per target: four bytes on Linux and macOS, eight on
 # Windows.
@@ -3933,7 +3945,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "shared_handles|--front-end,--runtime,${ANTIC_RUNTIME_DIR},shared_handles.anti"
         "generic_copies|-S,-o,${LISTINGS}/generic_copies.s,generic_copies.anti"
         "copies_deep|-S,-o,${LISTINGS}/copies_deep.s,copies_deep.anti"
-        "copies_many|-S,-o,${LISTINGS}/copies_many.s,copies_many.anti")
+        "copies_many|-S,-o,${LISTINGS}/copies_many.s,copies_many.anti"
+        "never_result|--front-end,never_result.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)
@@ -3976,7 +3989,8 @@ foreach(case "types|symbolic||symbolic.types|${DUMP}/symbolic.anti"
         "llvm|main_dev|linux-x86_64|main.dev.linux-x86_64.ll|--dev,-I,${LIBS},${MODULES}/main.anti"
         "llvm|doubling|linux-x86_64|doubling.linux-x86_64.ll|--lib,shared,--runtime,${ANTIC_RUNTIME_DIR},-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti"
         "llvm|doubling|macos-arm64|doubling.macos-arm64.ll|--lib,shared,--runtime,${ANTIC_RUNTIME_DIR},-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti"
-        "llvm|doubling|windows-arm64|doubling.windows-arm64.ll|--lib,shared,--runtime,${ANTIC_RUNTIME_DIR},-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti")
+        "llvm|doubling|windows-arm64|doubling.windows-arm64.ll|--lib,shared,--runtime,${ANTIC_RUNTIME_DIR},-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti"
+        "llvm|fatal_guard|macos-arm64|fatal_guard.dev.macos-arm64.ll|--dev,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/fatal_guard.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 stage)
     list(GET parts 1 subject)

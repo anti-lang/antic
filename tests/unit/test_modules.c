@@ -317,7 +317,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 75, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 76, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -992,7 +992,7 @@ static void keeps_literals(void)
     ir_print(&ir, &program);
     CHECK_STR(text_cstr(&ir),
               "type str = struct { ptr: ptr, len: i64 }\n"
-              "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+              "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
               "global words.0 size 3 align 1 bytes 68 69 00\n"
               "global main.0 size 3 align 1 bytes 68 69 00\n"
               "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
@@ -1022,7 +1022,7 @@ static void keeps_literals(void)
               "b1:\n"
               "    %9 = addr @main.1\n"
               "    call void @anti_rt_check_failed(%9, 21, 1, %2, %7)\n"
-              "    jump b2\n"
+              "    unreachable\n"
               "b2:\n"
               "    ret i64 %8\n"
               "}\n");
@@ -1480,9 +1480,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 76;
+    copy[4] = 77;
     refuses_file(copy, sizeof copy,
-                 "has format version 76, and antic reads version 75");
+                 "has format version 77, and antic reads version 76");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -1502,10 +1502,11 @@ static void damaged_files(void)
     memcpy(copy, scale_antl, sizeof copy);
     copy[sizeof copy - MUL_OPERAND] = 9;
     refuses_file(copy, sizeof copy, NULL);
-    /* The flags of the function type: a bit that names nothing, and an
-       out pointer without `may fail`. */
+    /* The flags of the function type: `-> never` with `may fail`, which
+       a function that never returns cannot be, and an out pointer without
+       `may fail`. */
     memcpy(copy, scale_antl, sizeof copy);
-    copy[FN_FLAGS] = 128;
+    copy[FN_FLAGS] = 128 | 4;
     refuses_file(copy, sizeof copy, "is damaged at byte 86");
     /* `own fn` without the form of two words and `concurrent`, which it
        always stands with. */
@@ -1531,7 +1532,7 @@ static void damaged_files(void)
     /* A block whose failure kind names nothing. The kind opens the block,
        after the temporaries and the count of blocks. */
     memcpy(copy, scale_antl, sizeof copy);
-    copy[sizeof copy - TAIL + 10] = IR_FAIL_CHECK + 1;
+    copy[sizeof copy - TAIL + 10] = IR_FAIL_GUARD + 1;
     refuses_file(copy, sizeof copy, NULL);
     /* A module path with a NUL inside, which a C string would cut to
        `sc`. The path starts at byte 46. */

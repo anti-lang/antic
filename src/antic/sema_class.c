@@ -226,6 +226,13 @@ static bool same_signature(struct checker *c, const struct item *m,
                       wanted);
         return false;
     }
+    if (mine->never != theirs->never) {
+        sema_error_at(c, m->name_pos,
+                      mine->never ? "`%s` returns `never`, and `%s` returns"
+                                  : "`%s` returns, and `%s` returns `never`",
+                      fn, at);
+        return false;
+    }
     if (mine->may_fail != theirs->may_fail) {
         sema_error_at(c, m->may_fail ? m->may_fail_pos : m->name_pos,
                       mine->may_fail ? "`%s` may fail, and `%s` cannot"

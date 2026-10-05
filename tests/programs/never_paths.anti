@@ -1,0 +1,42 @@
+//! A call of a function that returns `never` ends its path, as `return` does.
+//! `half` returns a value on one path and calls `stop` on the other. `read`
+//! narrows its pointer after a block that calls `stop`. The last call of `half`
+//! ends the program with the status 3, and what `stop` printed comes first.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_rt_exit(status: c_int) -> never;
+
+struct Cell
+{
+	v: int,
+}
+
+fn stop(code: int) -> never
+{
+	printf("stop %d\n".ptr, code as c_int);
+	anti_rt_exit(code as c_int);
+}
+
+fn half(n: int) -> int
+{
+	if n % 2 == 0 {
+		return n / 2;
+	}
+	stop(3);
+}
+
+fn read(p: ?*Cell) -> int
+{
+	if p == none {
+		stop(4);
+	}
+	return p.v;
+}
+
+fn main() -> int
+{
+	let c = Cell { v: 5 };
+	printf("%d %d\n".ptr, half(8) as c_int, read(&c) as c_int);
+	half(7);
+	return 0;
+}

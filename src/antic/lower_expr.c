@@ -1235,7 +1235,6 @@ void lower_check_table(struct lowerer *l, struct ir_operand table,
                                                                       &text))));
     args[1] = ir_int_op(IR_I64, t->name.length);
     lower_rt_call(l, RT_FN_TABLE_UNSET, args);
-    ir_jump(l->f, l->b, join);
     l->b = join;
 }
 
@@ -1344,7 +1343,9 @@ static struct ir_operand checked_cast(struct lowerer *l, struct ir_operand p,
         args[1] = ir_int_op(IR_I64, to->name.length);
         lower_rt_call(l, RT_FN_CAST_FAILED, args);
     }
-    ir_jump(l->f, l->b, join);
+    if (l->b != NULL) {
+        ir_jump(l->f, l->b, join);
+    }
     l->b = join;
     return lower_temp(l, result);
 }
@@ -1862,6 +1863,7 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     uint32_t result;
     uint32_t slot;
     enum ir_type declared;
+    bool ends = fn != NULL && fn->never;
     size_t given;
     size_t i;
 
@@ -1911,8 +1913,11 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
         declared = lower_ir_type_of(e->type);
     }
     if (to.direct) {
-        result = ir_call(l->f, l->b, declared,
-                         ir_func_op(lower_callee_function(l, sym)), args,
+        struct ir_function *target = lower_callee_function(l, sym);
+        /* A C function that a library declared to never return is one
+           function with the declaration here, so its calls end too. */
+        ends = ends || target->never_returns;
+        result = ir_call(l->f, l->b, declared, ir_func_op(target), args,
                          given);
     } else {
         result = ir_call_indirect(l->f, l->b, declared, to.target,
@@ -1931,6 +1936,13 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
         }
     }
     free(args);
+    /* A function that never returns ends its block with the call. What
+       comes after it lands in a block that nothing reaches, which the
+       optimizer removes. */
+    if (ends) {
+        ir_unreachable(l->f, l->b);
+        l->b = lower_new_block(l);
+    }
     if (to.bound.kind == IR_NONE && to.context.kind == IR_NONE) {
         lower_drop_arguments(l, callee->symbol, fn,
                              (const struct expr *const *)e->as.call.args,

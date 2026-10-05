@@ -64,12 +64,11 @@ static void check_call(struct lowerer *l, struct ir_block *fail,
     args[3] = a;
     args[4] = b.kind == IR_NONE ? ir_int_op(IR_I64, 0) : b;
     lower_rt_call(l, RT_FN_CHECK_FAILED, args);
-    ir_jump(l->f, l->b, rest);
     l->b = rest;
 }
 
-/* DESIGN: a dev-mode check is a branch to a block that calls the runtime
-   and falls through to the rest, as an assertion is. The failure block
+/* DESIGN: a dev-mode check is a branch to a block that calls the runtime,
+   which ends the program, as an assertion is. The failure block
    carries its own kind, so the build that compiles the program drops the
    checks and the assertions under separate options. cond decides the
    failure when bad is set, and decides the rest otherwise. */

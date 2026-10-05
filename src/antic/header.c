@@ -1547,7 +1547,8 @@ static void prototype(struct text *out, const struct symbol *sym)
     }
     text_append(&inner, t->param_count == 0 ? "void)" : ")");
     declaration(&decl, t->result, text_cstr(&inner), NULL);
-    text_appendf(out, "%s;\n", text_cstr(&decl));
+    text_appendf(out, "%s%s;\n", t->never ? "_Noreturn " : "",
+                 text_cstr(&decl));
     text_free(&inner);
     text_free(&decl);
 }

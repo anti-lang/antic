@@ -69,7 +69,7 @@ static struct type *find_or_add_params(struct types *types,
             t->length != key->length || t->length_of != key->length_of ||
             t->result != key->result || t->bound != key->bound ||
             t->nullable != key->nullable || t->lent != key->lent ||
-            t->may_fail != key->may_fail ||
+            t->may_fail != key->may_fail || t->never != key->never ||
             t->has_out != key->has_out || t->context != key->context ||
             t->concurrent != key->concurrent || t->owned != key->owned ||
             t->param_count != key->param_count) {
@@ -470,6 +470,19 @@ struct type *types_fn_owned(struct types *types, struct type *fn)
     return find_or_add(types, &key);
 }
 
+struct type *types_fn_never(struct types *types, struct type *fn)
+{
+    struct type key;
+
+    if (fn == NULL || fn->kind != TYPE_FN) {
+        return fn;
+    }
+    key = *fn;
+    key.never = true;
+    key.next = NULL;
+    return find_or_add(types, &key);
+}
+
 struct type *types_bound_of(struct types *types, const struct type *fn)
 {
     struct type key = {0};
@@ -481,6 +494,7 @@ struct type *types_bound_of(struct types *types, const struct type *fn)
     key.bound = true;
     key.may_fail = fn->may_fail;
     key.has_out = fn->has_out;
+    key.never = fn->never;
     return find_or_add(types, &key);
 }
 
@@ -1752,6 +1766,9 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
             print_type(out, p, qualified);
         }
         text_append(out, ")");
+        if (t->never) {
+            text_append(out, " -> never");
+        }
         if (t->has_out || (!t->may_fail && result->kind != TYPE_VOID)) {
             text_append(out, " -> ");
             print_type(out, result, qualified);

@@ -20,7 +20,7 @@ b1:
   %v4 = load ptr, ptr %t2, align 8
   %v5 = load i64, ptr %t0, align 8
   call void (ptr, i64, i32, i64, i64) @anti_rt_check_failed(ptr %v4, i64 39, i32 1, i64 %v5, i64 6)
-  br label %b2
+  unreachable
 
 b2:
   %v6 = load i64, ptr %t1, align 8
@@ -29,7 +29,7 @@ b2:
 
 @com.example.scale.0 = hidden constant <{ [40 x i8] }> <{ [40 x i8] c"com/example/scale.anti:4: overflow in *\00" }>, align 1
 
-declare void @anti_rt_check_failed(ptr, i64, i32, i64, i64) #1
+declare void @anti_rt_check_failed(ptr, i64, i32, i64, i64) noreturn cold #1
 declare { i64, i1 } @llvm.smul.with.overflow.i64(i64, i64)
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="generic" "target-features"="+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fullfp16,+jsconv,+lse,+neon,+pauth,+predres,+ras,+rcpc,+rdm,+sb,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8a,-fmv" }

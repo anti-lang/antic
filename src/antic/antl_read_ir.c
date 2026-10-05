@@ -593,7 +593,7 @@ static void read_body(struct reader *r, struct ir_module *program,
         uint32_t count;
         uint8_t fail_kind;
         fail_kind = antl_get_u8(r);
-        if (fail_kind > IR_FAIL_CHECK) {
+        if (fail_kind > IR_FAIL_GUARD) {
             antl_damaged(r);
         }
         f->blocks[i]->fail = (enum ir_fail)fail_kind;
@@ -608,7 +608,7 @@ static void read_body(struct reader *r, struct ir_module *program,
             inst.result = antl_get_u32(r);
             inst.op = (enum ir_op)op;
             inst.type = (enum ir_type)type;
-            if (op > IR_RET || !valid_type(type) ||
+            if (op > IR_UNREACHABLE || !valid_type(type) ||
                 (inst.result != IR_NO_RESULT && inst.result >= f->temp_count)) {
                 antl_damaged(r);
                 break;
@@ -671,7 +671,7 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
     if (r->failed) {
         return 0;
     }
-    if (!valid_type(result) || flags > 15 ||
+    if (!valid_type(result) || flags > 31 ||
         ((flags & 1) == 0 && module[0] == '\0') ||
         (module[0] != '\0' && (flags & 2) != 0) ||
         (module[0] == '\0' && (flags & 4) != 0)) {
@@ -712,6 +712,13 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
         antl_damaged(r);
         return 0;
     }
+    /* DESIGN: a C function that two modules declare is one function of
+       the program, and it never returns only where both say so. A call
+       of a module that does not say so goes on after it, which the
+       verifier refuses for a function that never returns. */
+    if (f != NULL) {
+        f->never_returns = f->never_returns && (flags & 16) != 0;
+    }
     if (f == NULL) {
         if ((flags & 1) == 0) {
             f = ir_function_add(program, module, name, (enum ir_type)result,
@@ -729,6 +736,7 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
             f = ir_declare_add(program, module, name, (enum ir_type)result,
                                result_agg);
         }
+        f->never_returns = (flags & 16) != 0;
         f->exported = (flags & 4) != 0;
         f->worker = (flags & 8) != 0;
         f->file = file == IR_NO_INDEX ? IR_NO_INDEX : maps->files[file];

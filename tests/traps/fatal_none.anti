@@ -1,0 +1,31 @@
+//! `catch fatal` on a `none` pointer runs the function that `error.on_fatal`
+//! registered, prints the error and ends the program with 1. Lowering calls
+//! `Error.fatal` directly there, and the path of the guard ends with the call.
+
+import anti.error;
+
+extern fn anti_rt_write(stream: c_int, bytes: ?*byte, count: c_size_t);
+
+struct Cell
+{
+	v: int,
+}
+
+fn last_words()
+{
+	anti_rt_write(2, "on_fatal ran\n".ptr, 13);
+}
+
+fn pick(p: ?*Cell) -> int
+{
+	let c = p catch fatal;
+	return c.v;
+}
+
+fn main() -> int
+{
+	error.on_fatal(last_words);
+	let cell = Cell { v: 1 };
+	let sum = pick(&cell);
+	return sum + pick(none);
+}

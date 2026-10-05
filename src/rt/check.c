@@ -5,8 +5,9 @@
    kind names the values that follow it, because the labels belong to the
    check and not to the site. A build without the checks removes every
    call of this routine and the strings with it. */
-void anti_rt_check_failed(const unsigned char *text, int64_t length,
-                          int32_t kind, int64_t a, int64_t b)
+_Noreturn void anti_rt_check_failed(const unsigned char *text,
+                                    int64_t length, int32_t kind, int64_t a,
+                                    int64_t b)
 {
     int n = (int)length;
     const char *at = (const char *)text;
@@ -36,9 +37,10 @@ void anti_rt_check_failed(const unsigned char *text, int64_t length,
 /* DESIGN: a collection records the place of each change with `here`, and
    the loop that finds the counts apart passes the last one on. A place of
    line 0 was never written, and the message then names the loop alone. */
-void anti_rt_walk_changed(const unsigned char *text, int64_t length,
-                          const unsigned char *file, int64_t file_length,
-                          int64_t line)
+_Noreturn void anti_rt_walk_changed(const unsigned char *text,
+                                    int64_t length,
+                                    const unsigned char *file,
+                                    int64_t file_length, int64_t line)
 {
     if (line == 0) {
         anti_rt_fail_abort("%.*s", (int)length, (const char *)text);

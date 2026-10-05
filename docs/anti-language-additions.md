@@ -9,6 +9,7 @@ Contents:
 - [Timing](#timing)
 - [Nullable pointers](#nullable-pointers)
 - [Failing functions](#failing-functions)
+- [Functions that never return](#functions-that-never-return)
 - [Tuples](#tuples)
 - [Error origin and stack traces](#error-origin-and-stack-traces)
 - [Source locations](#source-locations)
@@ -112,6 +113,29 @@ fn divide(a: int, b: int) -> (int, int) may fail
 
 let (q, r) = divide(7, 2) catch fatal;
 let (q, r) = divide(7, 0) catch e { yield (0, 0); };
+```
+
+## Functions that never return
+
+A function whose result is `never` ends the program on every path. Settled on 2026-10-05 with the optimization facts of `docs/work-order-llvm-optimization.md`.
+
+- `fn stop(code: int) -> never` declares one, and so does `extern fn exit(status: c_int) -> never` for a function of C such as `exit` and `abort`.
+- The checker refuses a body of such a function whose end is reachable, and a `return` in it. A function that returns `never` cannot be `may fail`, since a failure returns to the caller.
+- A call of a function that returns `never` ends its path as `return` does. A function with a result may end with one, and `if p == none { stop(1); }` narrows `p` for the rest of the block.
+- The type has no values, so no variable, field or parameter has it. `never` is a contextual word after `->`.
+- `fn(A) -> never` is a function type of its own and converts to no other function type.
+- `Error.fatal` of `anti.lang` is `final fn fatal(self) -> never`, so `catch fatal` calls it directly. The generated header writes `_Noreturn` before an exported function that returns `never`.
+
+```anti
+extern fn exit(status: c_int) -> never;
+
+fn half(n: int) -> int
+{
+	if n % 2 == 0 {
+		return n / 2;
+	}
+	exit(3);
+}
 ```
 
 ## Tuples
@@ -1325,7 +1349,7 @@ list.push(c.share());
 ## Keywords
 
 - Keywords added: `variant`, `tests`, `fixtures`, `provides`, `undo`, `unreachable`, `undefined`, `show`, `embed`, `fail`, `here`, `fallthrough`. `sync`, `chan`, `send`, `recv`, `select` were reserved.
-- Contextual words added: `trace` before `class` or `fn`, `inject` and `inject final` before a field, `compatible` in an abstract class body, `in` after a value and before a range, `may fail` after a signature, `simd` before `struct`. Round four adds `snapshot` before an anonymous `fn`, `keep`, `keep own` and `concurrent` before a parameter of function type, `synchronized` and `concurrent` before `class`, `guarded by` and `unchecked` after a field's type, `unchecked` in a class header, `allow` for silencing a warning, and `none` after `catch`.
+- Contextual words added: `trace` before `class` or `fn`, `inject` and `inject final` before a field, `compatible` in an abstract class body, `in` after a value and before a range, `may fail` after a signature, `never` after `->`, `simd` before `struct`. Round four adds `snapshot` before an anonymous `fn`, `keep`, `keep own` and `concurrent` before a parameter of function type, `synchronized` and `concurrent` before `class`, `guarded by` and `unchecked` after a field's type, `unchecked` in a class header, `allow` for silencing a warning, and `none` after `catch`.
 - Round five adds the keywords `constraint` and `type`, and the contextual word `lent` before a pointer or slice parameter.
 - String prefixes added: `rf`, `x` and `re`.
 - Labels added: an identifier and `:` before `for`, `while` or a block.

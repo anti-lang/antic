@@ -58,11 +58,17 @@ void parser_fn_param_marks(struct parser *p, bool *keep, bool *concurrent,
 }
 
 /* `-> R` after the parameters of the function it, where R may be written
-   `lent *T` or `lent ?*T`. It reports false after an error. `lent` is a
-   contextual word, and no type name is followed by `*` or `?`. */
+   `lent *T` or `lent ?*T`, or `-> never`. It reports false after an
+   error. `lent` is a contextual word, and no type name is followed by `*`
+   or `?`. */
 bool parser_result_type(struct parser *p, struct item *it)
 {
     if (!parser_accept(p, TOKEN_ARROW)) {
+        return true;
+    }
+    if (parser_never_result(p)) {
+        it->never = true;
+        parser_next(p);
         return true;
     }
     if (parser_is_word(p, parser_peek(p), "lent") &&
@@ -153,6 +159,18 @@ struct param *parser_params(struct parser *p, bool allow_variadic,
         return NULL;
     }
     return parser_list_finish(p, &list, count);
+}
+
+/* DESIGN: `never` after `->` is a contextual word, so it stays a name
+   everywhere else. A type named `never` is still written after the arrow
+   with its module, `m.never`, or with its type arguments. Whether the
+   next token is that word. */
+bool parser_never_result(struct parser *p)
+{
+    enum token_kind after = parser_peek_at(p, 1)->kind;
+
+    return parser_is_word(p, parser_peek(p), "never") && after != TOKEN_DOT &&
+           after != TOKEN_LT;
 }
 
 /* DESIGN: `may fail` is two contextual words after a signature, not a

@@ -90,7 +90,7 @@ static bool is_pure(enum ir_op op)
            op != IR_CALL && op != IR_VBINARY && op != IR_VUNARY &&
            op != IR_VSPLAT && op != IR_VSELECT && op != IR_VSHUFFLE &&
            op != IR_JUMP && op != IR_BRANCH && op != IR_BRANCH_OV &&
-           op != IR_RET;
+           op != IR_RET && op != IR_UNREACHABLE;
 }
 
 static struct ir_operand *operand(struct ir_inst *inst, size_t i)

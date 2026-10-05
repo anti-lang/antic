@@ -1079,3 +1079,8 @@ void ir_ret(struct ir_function *f, struct ir_block *b, enum ir_type type,
 {
     append(f, b, IR_RET, type, IR_NO_RESULT)->a = value;
 }
+
+void ir_unreachable(struct ir_function *f, struct ir_block *b)
+{
+    append(f, b, IR_UNREACHABLE, IR_VOID, IR_NO_RESULT);
+}

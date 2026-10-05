@@ -454,6 +454,7 @@ struct ir_function *lower_callee_function(struct lowerer *l,
             f = ir_extern_add(l->m, text_cstr(&symbol),
                               lower_ir_type_of(t->result), false);
             f->result_agg = lower_result_agg(l, t->result);
+            f->never_returns = t->never;
             for (i = 0; i < t->param_count; i++) {
                 lower_add_param(l, f, t->params[i]);
             }
@@ -477,6 +478,7 @@ struct ir_function *lower_callee_function(struct lowerer *l,
                                lower_result_agg(l, t->result));
             f->exported = sym->exported;
         }
+        f->never_returns = t->never;
         for (i = 0; i < t->param_count; i++) {
             lower_add_param(l, f, t->params[i]);
         }
@@ -624,29 +626,6 @@ const struct ir_function *lower_context_signature(struct lowerer *l,
         lower_add_param(l, f, t->params[i]);
     }
     ir_param_add(f, IR_PTR, IR_NO_AGG);
-    return f;
-}
-
-static bool fits_fatal(struct lowerer *l, const struct ir_function *g,
-                       const struct type *t)
-{
-    (void)l; /* find_signature fixes the signature */
-    (void)t; /* find_signature fixes the signature */
-    return g->param_count == 1 && g->params[0].type == IR_PTR &&
-           g->result == IR_VOID;
-}
-
-/* The signature of `fatal`, which takes the error and returns nothing.
-   `catch fatal` calls it through the table of the error's class. */
-const struct ir_function *lower_fatal_signature(struct lowerer *l)
-{
-    size_t count;
-    struct ir_function *f = find_signature(l, fits_fatal, NULL, &count);
-
-    if (f == NULL) {
-        f = declare_signature(l, count, IR_VOID, IR_NO_AGG);
-        ir_param_add(f, IR_PTR, IR_NO_AGG);
-    }
     return f;
 }
 
@@ -947,6 +926,7 @@ static void declare_function(struct lowerer *l, const struct item *it)
         f->result_agg = lower_result_agg(l, t->result);
         f->exported = it->exported;
         f->worker = it->worker;
+        f->never_returns = t->never;
         for (i = 0; i < t->param_count; i++) {
             lower_add_param(l, f, t->params[i]);
         }
@@ -966,6 +946,7 @@ struct ir_function *lower_rt_declare(struct lowerer *l, enum rt_function f)
 
     if (fn == NULL) {
         fn = ir_extern_add(l->m, s->name, s->types[0], false);
+        fn->never_returns = s->never_returns;
         for (i = 0; i < s->param_count; i++) {
             ir_param_add(fn, s->types[1 + i], IR_NO_AGG);
         }
@@ -1003,13 +984,20 @@ struct ir_operand lower_rt_call_as(struct lowerer *l, enum rt_function f,
     uint32_t call = ir_call(l->f, l->b, result, ir_func_op(fn), args,
                             s->param_count);
 
+    /* A function that never returns ends the block, and nothing follows
+       it there. */
+    if (s->never_returns) {
+        ir_unreachable(l->f, l->b);
+        l->b = NULL;
+    }
     return result == IR_VOID ? lower_none() : lower_temp(l, call);
 }
 
 /* The memory of one object of `alloc T { }`, `alloc T(args)` or a
    singleton, size bytes of malloc. Out of memory is fatal for them, so a
-   NULL from malloc ends the program through anti_rt_out_of_memory, and
-   the code after it writes through the result. */
+   NULL from malloc ends the program through anti_rt_out_of_memory, which
+   never returns, and the code after the branch writes through the
+   result. */
 struct ir_operand lower_new_memory(struct lowerer *l, struct ir_operand size)
 {
     struct ir_function *malloc_fn =
@@ -1025,7 +1013,6 @@ struct ir_operand lower_new_memory(struct lowerer *l, struct ir_operand size)
     ir_branch(l->f, l->b, none, lost, rest);
     l->b = lost;
     lower_rt_call(l, RT_FN_OUT_OF_MEMORY, &size);
-    ir_jump(l->f, l->b, rest);
     l->b = rest;
     return made;
 }

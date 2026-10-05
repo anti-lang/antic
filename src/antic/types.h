@@ -196,6 +196,12 @@ struct type {
        `fn(A, *R) may fail` and `fn(A) -> R may fail` are two types. */
     bool may_fail;                  /* TYPE_FN: written `may fail` */
     bool has_out;                   /* TYPE_FN, may_fail: the out pointer */
+    /* DESIGN: `-> never` is the result of a function that ends the
+       program on every path. The type has no values, so the result is
+       TYPE_VOID and the flag says that a call does not come back. It
+       belongs to the key, so `fn(int) -> never` and `fn(int)` are two
+       types. */
+    bool never;                     /* TYPE_FN: written `-> never` */
     size_t param_count;
     struct type *result;            /* TYPE_FN, TYPE_VOID without a result */
     struct name module;             /* TYPE_STRUCT */
@@ -410,6 +416,8 @@ struct type *types_fn_form(struct types *types, struct type *fn, bool context,
 /* The same function type as `own fn(...)`, the form of two words that
    owns its snapshot. */
 struct type *types_fn_owned(struct types *types, struct type *fn);
+/* The same function type with the result `never`. */
+struct type *types_fn_never(struct types *types, struct type *fn);
 
 /* DESIGN: a bound function is a value of two words, the object and the
    entry of the table. Its type is the function type without `self`. It

@@ -260,7 +260,6 @@ struct ir_function *lower_callee_function(struct lowerer *l,
                                           const struct symbol *sym);
 const struct ir_function *lower_signature(struct lowerer *l,
                                           const struct type *t);
-const struct ir_function *lower_fatal_signature(struct lowerer *l);
 const struct ir_function *lower_provider_signature(struct lowerer *l);
 bool lower_is_context(const struct type *t);
 /* Whether t is an aggregate that may be `none`, which its first word

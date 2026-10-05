@@ -56,7 +56,7 @@ static bool is_flag_operation(enum ir_op op)
 static bool is_terminator(enum ir_op op)
 {
     return op == IR_JUMP || op == IR_BRANCH || op == IR_BRANCH_OV ||
-           op == IR_RET;
+           op == IR_RET || op == IR_UNREACHABLE;
 }
 
 /* The type an operand carries, after checking that it refers to
@@ -442,6 +442,8 @@ static void check_inst(struct verifier *v, const struct ir_inst *inst)
             same_type(v, inst, &inst->a, inst->type);
         }
         break;
+    case IR_UNREACHABLE:
+        break;
     default:
         operand_ok(v, inst, &inst->a);
         break;
@@ -627,6 +629,18 @@ bool ir_verify(const struct ir_module *m, struct text *errors)
                         b->insts[at - 1].result != b->insts[k].a.as.temp) {
                         fail(&v, "flag does not follow its operation");
                     }
+                }
+                /* A function that never returns ends the program, so
+                   its call ends the block that holds it. */
+                if (b->insts[k].op == IR_CALL &&
+                    b->insts[k].a.kind == IR_FUNC &&
+                    b->insts[k].a.as.index < m->function_count &&
+                    m->functions[b->insts[k].a.as.index]->never_returns &&
+                    (k + 1 == b->count ||
+                     b->insts[k + 1].op != IR_UNREACHABLE)) {
+                    fail(&v, "%s never returns, and the block goes on after "
+                             "its call",
+                         m->functions[b->insts[k].a.as.index]->name);
                 }
                 if (is_terminator(b->insts[k].op) && k + 1 < b->count) {
                     fail(&v, "%s is not the last instruction",

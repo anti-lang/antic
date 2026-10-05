@@ -363,7 +363,7 @@ Built: `for` over a collection through `iter`, `next` and `value`, and `to_slice
 
 ## Functions
 
-`fn name(params) -> R { }`. `return;` in a function without a result. Default parameter values and named arguments. Function values and bound functions.
+`fn name(params) -> R { }`. `return;` in a function without a result. `-> never` for a function that ends the program on every path. Default parameter values and named arguments. Function values and bound functions.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -394,7 +394,19 @@ let h = fs.open("x", mode: fs.Mode.Write) catch fatal;
 
 Positional arguments first, named ones after in any order. No overloading by signature.
 
-Built: default values, a constant expression or `here`, over a module boundary as well. Not built yet: named arguments.
+`-> never` refuses a reachable end and a `return` in the body, and no value has the type. Its call ends the path of the caller as `return` does.
+
+```anti
+extern fn exit(status: c_int) -> never;
+
+fn half(n: int) -> int
+{
+	if n % 2 == 0 { return n / 2; }
+	exit(3);
+}
+```
+
+Built: default values, a constant expression or `here`, over a module boundary as well, and `-> never`. Not built yet: named arguments.
 
 ## Anonymous functions and closures
 
@@ -1639,7 +1651,7 @@ Round five, generics and collections, follows round four, as "Timing" in `docs/a
 
 Keywords: `fn extern let const struct union enum variant class import pub internal protected export if else switch while do for break continue return defer undo try catch yield fail assert show unreachable undefined embed here fallthrough as is dup delete destroy alloc free size_of self super abstract concrete static singleton inherits implements use worker parallel dispatch join join_all sync chan send recv select atomic true false none tests fixtures provides constraint type`.
 
-Contextual words: `packed align by in final own transient operator mutable trace inject compatible simd`, `fatal` and `none` after `catch`, and `may fail` after a signature. Round four adds `snapshot keep concurrent synchronized unchecked allow` and `guarded by`, and round five adds `lent`. `alloc` and `free` name a function of a class after `fn` and a member after `.`.
+Contextual words: `packed align by in final own transient operator mutable trace inject compatible simd`, `fatal` and `none` after `catch`, `may fail` after a signature and `never` after `->`. Round four adds `snapshot keep concurrent synchronized unchecked allow` and `guarded by`, and round five adds `lent`. `alloc` and `free` name a function of a class after `fn` and a member after `.`.
 
 String prefixes: `r b br f rf x re`.
 

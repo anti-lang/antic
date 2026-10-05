@@ -22,7 +22,7 @@ type probe.Breaks = struct { a: i8, _: i32 : 0, b: i8 : 3 zeroext, _: i64 : 0, c
 type [5]anti.rt.Field = array 5 of anti.rt.Field
 type probe.BreaksBox = struct { c: i8, t: probe.Breaks }
 extern fn printf(ptr, ...) -> i32
-extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
+extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never
 extern fn malloc(i64) -> ptr
 extern fn free(ptr)
 global probe.Wide.descriptor anti.rt.Descriptor { @probe.1, i64 4, ptr 0, size_of probe.Wide, i64 0, ptr 0, i64 4, @probe.Wide.fields, ptr 0, i64 0, i64 0, ptr 0, @probe.package.version, i64 5, ptr 0, i64 0, ptr 0 }
@@ -143,7 +143,7 @@ b3:
 b4:
     %7 = addr @probe.59
     call void @anti_rt_check_failed(%7, 29, 1, %2, 1)
-    jump b5
+    unreachable
 b5:
     %2 = copy i64 %6
     jump b1
@@ -189,7 +189,7 @@ b3:
 b4:
     %21 = addr @probe.62
     call void @anti_rt_check_failed(%21, 29, 1, %9, 1)
-    jump b5
+    unreachable
 b5:
     %9 = copy i64 %20
     jump b1
@@ -210,7 +210,7 @@ b0:
 b1:
     %11 = addr @probe.65
     call void @anti_rt_check_failed(%11, 42, 2, %1, 0)
-    jump b2
+    unreachable
 b2:
     %12 = trunc i32 %1
     %13 = subov i64 %2, %1
@@ -218,7 +218,7 @@ b2:
 b3:
     %14 = addr @probe.66
     call void @anti_rt_check_failed(%14, 29, 1, %2, %1)
-    jump b4
+    unreachable
 b4:
     %15 = trunc i32 %13
     %16 = sext i64 %15
@@ -227,7 +227,7 @@ b4:
 b5:
     %18 = addr @probe.67
     call void @anti_rt_check_failed(%18, 42, 2, %13, 0)
-    jump b6
+    unreachable
 b6:
     %19 = trunc i32 %13
     %20 = call i32 @printf(%6, %7, %12, %19)

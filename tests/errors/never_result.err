@@ -1,0 +1,4 @@
+never_result.anti:18:21: error: a function that returns `never` cannot fail
+never_result.anti:6:4: error: `ends` returns `never` and can reach its end
+never_result.anti:15:2: error: `leaves` returns `never` and holds no `return`
+never_result.anti:25:9: error: `never` is the result of a function that does not return, and no value has it

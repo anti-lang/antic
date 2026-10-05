@@ -1,4 +1,4 @@
-extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
+extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never
 global loops.0 size 28 align 1 bytes 6c 6f 6f 70 73 2e 61 6e 74 69 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 global anti_rt_slots anti.rt.SlotTable { i64 0, ptr 0, i64 0 }
 global anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
@@ -17,7 +17,7 @@ b3:
 b4:
     %4 = addr @loops.0
     call void @anti_rt_check_failed(%4, 27, 1, %1, 1)
-    jump b5
+    unreachable
 b5:
     %1 = copy i64 %2
     %5 = eq i8 %2, 5

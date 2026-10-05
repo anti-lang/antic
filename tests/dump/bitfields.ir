@@ -1,6 +1,6 @@
 type bitfields.Flags = struct { visible: i32 : 1 zeroext, layer: i32 : 4 zeroext, level: i8 : 3 signext, pad: i16 : 9 zeroext }
 type [4]anti.rt.Field = array 4 of anti.rt.Field
-extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
+extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never
 global bitfields.Flags.descriptor anti.rt.Descriptor { @bitfields.1, i64 5, ptr 0, size_of bitfields.Flags, i64 0, ptr 0, i64 4, @bitfields.Flags.fields, ptr 0, i64 0, i64 0, ptr 0, @bitfields.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global bitfields.1 size 6 align 1 bytes 46 6c 61 67 73 00
 global bitfields.2 size 8 align 1 bytes 76 69 73 69 62 6c 65 00
@@ -30,7 +30,7 @@ b1:
     %6 = sext i64 1
     %7 = addr @bitfields.8
     call void @anti_rt_check_failed(%7, 32, 1, %5, %6)
-    jump b2
+    unreachable
 b2:
     bitstore i8 %4, %0, bitfields.Flags.level
     %8 = bitload i32 %0, bitfields.Flags.visible
@@ -42,14 +42,14 @@ b2:
 b3:
     %13 = addr @bitfields.9
     call void @anti_rt_check_failed(%13, 32, 1, %11, 10)
-    jump b4
+    unreachable
 b4:
     %14 = addov i64 %9, %12
     branchov %14, b5, b6
 b5:
     %15 = addr @bitfields.10
     call void @anti_rt_check_failed(%15, 32, 1, %9, %12)
-    jump b6
+    unreachable
 b6:
     %16 = bitload i8 %0, bitfields.Flags.level
     %17 = sext i64 %16
@@ -58,14 +58,14 @@ b6:
 b7:
     %19 = addr @bitfields.9
     call void @anti_rt_check_failed(%19, 32, 1, %17, 100)
-    jump b8
+    unreachable
 b8:
     %20 = addov i64 %14, %18
     branchov %20, b9, b10
 b9:
     %21 = addr @bitfields.10
     call void @anti_rt_check_failed(%21, 32, 1, %14, %18)
-    jump b10
+    unreachable
 b10:
     %22 = bitload i16 %0, bitfields.Flags.pad
     %23 = zext i64 %22
@@ -74,7 +74,7 @@ b10:
 b11:
     %25 = addr @bitfields.10
     call void @anti_rt_check_failed(%25, 32, 1, %20, %23)
-    jump b12
+    unreachable
 b12:
     ret i64 %24
 }

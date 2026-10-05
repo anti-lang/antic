@@ -1,3 +1,4 @@
+#include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include "check.h"
 #include "pipeline.h"
@@ -575,14 +576,78 @@ static void flag_reads(void)
 struct rt_row {
     enum rt_function id;
     const char *name;
+    bool never_returns;
     int declared;
     size_t param_count;
     int agrees[1 + RT_PARAMS_MAX];
 };
 
-#define RT_TEST_ROW(id, name, ...)                                         \
-    {id, #name, RT_DECLARED(name, __VA_ARGS__), RT_COUNT(__VA_ARGS__),     \
-     {RT_EACH(RT_AGREES, __VA_ARGS__)}},
+#define RT_TEST_ROW(id, name, ends, ...)                                   \
+    {id, #name, RT_NEVER_RETURNS(ends), RT_DECLARED(name, __VA_ARGS__),    \
+     RT_COUNT(__VA_ARGS__), {RT_EACH(RT_AGREES, __VA_ARGS__)}},
+
+/* Append the text of the header name of src/rt/ to the text at context,
+   and pass over every other file. */
+static void append_header(void *context, const char *name)
+{
+    struct text *out = context;
+    struct text path = {0};
+    char buffer[4096];
+    size_t length = strlen(name);
+    FILE *f;
+    size_t n;
+
+    if (length < 2 || strcmp(name + length - 2, ".h") != 0) {
+        return;
+    }
+    text_appendf(&path, "%s/src/rt/%s", ANTIC_SOURCE_DIR, name);
+    f = platform_open(text_cstr(&path), false);
+    CHECK(f != NULL);
+    while (f != NULL && (n = fread(buffer, 1, sizeof buffer, f)) > 0) {
+        text_append_bytes(out, buffer, n);
+    }
+    if (f != NULL) {
+        fclose(f);
+    }
+    text_append(out, "\n");
+    text_free(&path);
+}
+
+/* Whether the prototype of name in the headers starts with _Noreturn. A
+   prototype is a line that opens in its first column with a type and
+   holds `name(`. Every prototype of name must agree, and one must
+   exist, else *found stays false. */
+static bool declared_noreturn(const char *headers, const char *name,
+                              bool *found)
+{
+    size_t length = strlen(name);
+    const char *at = headers;
+    bool noreturn = false;
+
+    *found = false;
+    while ((at = strstr(at, name)) != NULL) {
+        const char *line = at;
+        bool starts;
+        while (line > headers && line[-1] != '\n') {
+            line--;
+        }
+        starts = at > line && (at[-1] == ' ' || at[-1] == '*') &&
+                 at[length] == '(' && *line != ' ' && *line != '/' &&
+                 *line != '*' && *line != '#' && *line != '\t';
+        if (starts) {
+            bool here = strncmp(line, "_Noreturn ", 10) == 0;
+            if (*found && here != noreturn) {
+                check_failures++;
+                fprintf(stderr, "%s is declared twice, once _Noreturn\n",
+                        name);
+            }
+            noreturn = here;
+            *found = true;
+        }
+        at += length;
+    }
+    return noreturn;
+}
 
 /* DESIGN: lowering declares every runtime function it calls from the
    IR column of RT_FUNCTIONS in src/antic/rt_abi.h. This test reads the C
@@ -593,15 +658,36 @@ struct rt_row {
 static void runtime_functions(void)
 {
     static const struct rt_row rows[] = {RT_FUNCTIONS(RT_TEST_ROW)};
+    struct text headers = {0};
     size_t i;
     size_t k;
 
+    CHECK(platform_list_directory(ANTIC_SOURCE_DIR "/src/rt", append_header,
+                                  &headers));
     CHECK(sizeof rows / sizeof rows[0] == (size_t)RT_FUNCTION_COUNT);
     for (i = 0; i < sizeof rows / sizeof rows[0]; i++) {
         const struct rt_signature *s = rt_signature(rows[i].id);
+        bool found;
+        bool noreturn =
+            declared_noreturn(text_cstr(&headers), rows[i].name, &found);
         CHECK((size_t)rows[i].id == i);
         CHECK_STR(s->name, rows[i].name);
         CHECK(s->param_count == rows[i].param_count);
+        CHECK(s->never_returns == rows[i].never_returns);
+        /* The column that says a function never returns agrees with
+           _Noreturn on its prototype, so a function that the runtime
+           lets return is never declared noreturn in the LLVM text. */
+        if (!found) {
+            check_failures++;
+            fprintf(stderr, "%s has no prototype in a header of src/rt/\n",
+                    rows[i].name);
+        } else if (noreturn != rows[i].never_returns) {
+            check_failures++;
+            fprintf(stderr, "%s: the row says it %s, and its prototype %s "
+                    "_Noreturn\n", rows[i].name,
+                    rows[i].never_returns ? "never returns" : "returns",
+                    noreturn ? "is" : "is not");
+        }
         if (!rows[i].declared) {
             check_failures++;
             fprintf(stderr, "%s is declared otherwise in src/rt/\n",
@@ -616,6 +702,7 @@ static void runtime_functions(void)
             }
         }
     }
+    text_free(&headers);
 }
 
 /* The layout of a C struct: the offset and the size of each member that
@@ -801,7 +888,7 @@ void test_lower(void)
            "}\n",
            "type main.Flags = struct { visible: i32 : 1 zeroext, level: i8 : 3 signext }\n"
            "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.Flags.descriptor anti.rt.Descriptor { @main.1, i64 5, ptr 0, size_of main.Flags, i64 0, ptr 0, i64 2, @main.Flags.fields, ptr 0, i64 0, i64 0, ptr 0, @main.package.version, i64 5, ptr 0, i64 0, ptr 0 }\n"
            "global main.1 size 6 align 1 bytes 46 6c 61 67 73 00\n"
            "global main.2 size 8 align 1 bytes 76 69 73 69 62 6c 65 00\n"
@@ -819,7 +906,7 @@ void test_lower(void)
            "    %4 = sext i64 2\n"
            "    %5 = addr @main.6\n"
            "    call void @anti_rt_check_failed(%5, 21, 1, %3, %4)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    bitstore i8 %2, %0, main.Flags.level\n"
            "    %6 = bitload i8 %0, main.Flags.level\n"
@@ -836,7 +923,7 @@ void test_lower(void)
            "type main.P = packed struct { a: i8, b: i32 }\n"
            "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
            "type [1]anti.rt.Field = array 1 of anti.rt.Field\n"
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.P.descriptor anti.rt.Descriptor { @main.1, i64 1, ptr 0, size_of main.P, i64 0, ptr 0, i64 2, @main.P.fields, ptr 0, i64 0, i64 0, ptr 0, @main.package.version, i64 5, ptr 0, i64 0, ptr 0 }\n"
            "global main.1 size 2 align 1 bytes 50 00\n"
            "global main.2 size 2 align 1 bytes 61 00\n"
@@ -859,7 +946,7 @@ void test_lower(void)
            "    %8 = sext i64 %5\n"
            "    %9 = addr @main.9\n"
            "    call void @anti_rt_check_failed(%9, 21, 1, %7, %8)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    ret i32 %6\n"
            "}\n");
@@ -886,7 +973,7 @@ void test_lower(void)
            "    return x as i64 + w as i64 + (x as i32) as i64;\n"
            "}\n",
            "extern fn labs(clong) -> clong\n"
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "global main.2 size 35 align 1 bytes 6d 61 69 6e 3a 34 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00\n"
@@ -901,7 +988,7 @@ void test_lower(void)
            "    %6 = sext i64 1\n"
            "    %7 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%7, 21, 1, %5, %6)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    %8 = copy clong %4\n"
            "    %9 = sext i64 %8\n"
@@ -911,7 +998,7 @@ void test_lower(void)
            "b3:\n"
            "    %12 = addr @main.1\n"
            "    call void @anti_rt_check_failed(%12, 21, 1, %9, %10)\n"
-           "    jump b4\n"
+           "    unreachable\n"
            "b4:\n"
            "    %13 = trunc i32 %8\n"
            "    %14 = sext clong %13\n"
@@ -921,7 +1008,7 @@ void test_lower(void)
            "    %16 = sext i64 %8\n"
            "    %17 = addr @main.2\n"
            "    call void @anti_rt_check_failed(%17, 34, 2, %16, 0)\n"
-           "    jump b6\n"
+           "    unreachable\n"
            "b6:\n"
            "    %18 = trunc i32 %8\n"
            "    %19 = sext i64 %18\n"
@@ -930,7 +1017,7 @@ void test_lower(void)
            "b7:\n"
            "    %21 = addr @main.1\n"
            "    call void @anti_rt_check_failed(%21, 21, 1, %11, %19)\n"
-           "    jump b8\n"
+           "    unreachable\n"
            "b8:\n"
            "    ret i64 %20\n"
            "}\n");
@@ -944,7 +1031,7 @@ void test_lower(void)
            "type main.H = struct { tag: i8, n: i32 }\n"
            "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
            "type [size_of(main.H) - 4]byte = array sub i64(size_of main.H, 4) of i8\n"
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.H.descriptor anti.rt.Descriptor { @main.1, i64 1, ptr 0, size_of main.H, i64 0, ptr 0, i64 2, @main.H.fields, ptr 0, i64 0, i64 0, ptr 0, @main.package.version, i64 5, ptr 0, i64 0, ptr 0 }\n"
            "global main.1 size 2 align 1 bytes 48 00\n"
            "global main.2 size 4 align 1 bytes 74 61 67 00\n"
@@ -973,7 +1060,7 @@ void test_lower(void)
            "b4:\n"
            "    %7 = addr @main.6\n"
            "    call void @anti_rt_check_failed(%7, 27, 0, 1, sub i64(size_of main.H, 4))\n"
-           "    jump b5\n"
+           "    unreachable\n"
            "b5:\n"
            "    %8 = mul i64 1, size_of i8\n"
            "    %9 = ptradd %0, %8\n"
@@ -984,7 +1071,7 @@ void test_lower(void)
            "b6:\n"
            "    %13 = addr @main.7\n"
            "    call void @anti_rt_check_failed(%13, 21, 1, sub i64(size_of main.H, 4), %11)\n"
-           "    jump b7\n"
+           "    unreachable\n"
            "b7:\n"
            "    ret i64 %12\n"
            "}\n");
@@ -995,7 +1082,7 @@ void test_lower(void)
            "fn main() -> int {\n"
            "    return scale(7);\n"
            "}\n",
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 32 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00\n"
            "fn main.scale(%0: i64) -> i64 {\n"
@@ -1005,7 +1092,7 @@ void test_lower(void)
            "b1:\n"
            "    %2 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%2, 21, 1, 2, 4)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    %3 = copy i64 %1\n"
            "    %4 = mulov i64 %0, %3\n"
@@ -1013,7 +1100,7 @@ void test_lower(void)
            "b3:\n"
            "    %5 = addr @main.1\n"
            "    call void @anti_rt_check_failed(%5, 21, 1, %0, %3)\n"
-           "    jump b4\n"
+           "    unreachable\n"
            "b4:\n"
            "    ret i64 %4\n"
            "}\n"
@@ -1030,7 +1117,7 @@ void test_lower(void)
            "    *p = *p + 1;\n"
            "    return x;\n"
            "}\n",
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.f() -> i64 {\n"
            "b0:\n"
@@ -1043,7 +1130,7 @@ void test_lower(void)
            "b1:\n"
            "    %4 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%4, 21, 1, %2, 1)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    store i64 %3, %1\n"
            "    %5 = load i64 %0\n"
@@ -1062,7 +1149,7 @@ void test_lower(void)
            "        return 0;\n"
            "    }\n"
            "}\n",
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.g(%0: i64) -> i64 {\n"
            "b0:\n"
@@ -1080,7 +1167,7 @@ void test_lower(void)
            "b4:\n"
            "    %4 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%4, 21, 1, %1, 1)\n"
-           "    jump b5\n"
+           "    unreachable\n"
            "b5:\n"
            "    %1 = copy i64 %3\n"
            "    jump b1\n"
@@ -1094,7 +1181,7 @@ void test_lower(void)
     lowers("fn h(a: u32, b: u32) -> bool {\n"
            "    return a / b > 1 && a != b;\n"
            "}\n",
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 30 align 1 bytes 6d 61 69 6e 3a 32 3a 20 64 69 76 69 73 69 6f 6e 20 62 79 20 7a 65 72 6f 20 69 6e 20 2f 00\n"
            "fn main.h(%0: i32, %1: i32) -> i8 {\n"
            "b0:\n"
@@ -1104,7 +1191,7 @@ void test_lower(void)
            "    %3 = zext i64 %0\n"
            "    %4 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%4, 29, 5, %3, 0)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    %5 = udiv i32 %0, %1\n"
            "    %6 = ugt i8 %5, 1\n"
@@ -1126,7 +1213,7 @@ void test_lower(void)
            "    return 0;\n"
            "}\n",
            "extern fn putchar(i32) -> i32\n"
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 35 align 1 bytes 6d 61 69 6e 3a 34 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00\n"
            "fn main.main() -> i64 {\n"
            "b0:\n"
@@ -1137,7 +1224,7 @@ void test_lower(void)
            "    %2 = zext i64 %0\n"
            "    %3 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%3, 34, 3, %2, 0)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    %4 = call i32 @putchar(%0)\n"
            "    ret i64 0\n"
@@ -1156,7 +1243,7 @@ void test_lower(void)
            "}\n",
            "extern fn malloc(i64) -> ptr\n"
            "extern fn free(ptr)\n"
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 35 align 1 bytes 6d 61 69 6e 3a 36 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 31 36 00\n"
            "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 36 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.k() -> i16 {\n"
@@ -1184,7 +1271,7 @@ void test_lower(void)
            "b3:\n"
            "    %13 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%13, 34, 2, size_of i16, 0)\n"
-           "    jump b4\n"
+           "    unreachable\n"
            "b4:\n"
            "    %14 = trunc i16 size_of i16\n"
            "    %15 = addov i16 %9, %14\n"
@@ -1194,7 +1281,7 @@ void test_lower(void)
            "    %17 = sext i64 %14\n"
            "    %18 = addr @main.1\n"
            "    call void @anti_rt_check_failed(%18, 21, 1, %16, %17)\n"
-           "    jump b6\n"
+           "    unreachable\n"
            "b6:\n"
            "    ret i16 %15\n"
            "}\n");
@@ -1255,7 +1342,7 @@ void test_lower(void)
            "    } while i < n\n"
            "    return i;\n"
            "}\n",
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.count(%0: i64) -> i64 {\n"
            "b0:\n"
@@ -1272,7 +1359,7 @@ void test_lower(void)
            "b4:\n"
            "    %3 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%3, 21, 1, %1, 1)\n"
-           "    jump b5\n"
+           "    unreachable\n"
            "b5:\n"
            "    %1 = copy i64 %2\n"
            "    %4 = eq i8 %1, 5\n"
@@ -1322,7 +1409,7 @@ void test_lower(void)
            "    *p -= BIAS;\n"
            "    return x as i16 + (x as u8 as i16);\n"
            "}\n",
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00\n"
            "global main.1 size 36 align 1 bytes 6d 61 69 6e 3a 35 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 62 79 74 65 00\n"
            "global main.2 size 22 align 1 bytes 6d 61 69 6e 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
@@ -1339,7 +1426,7 @@ void test_lower(void)
            "    %6 = sext i64 -128\n"
            "    %7 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%7, 21, 1, %5, %6)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    store i8 %4, %2\n"
            "    %8 = load i8 %1\n"
@@ -1351,7 +1438,7 @@ void test_lower(void)
            "    %12 = sext i64 %10\n"
            "    %13 = addr @main.1\n"
            "    call void @anti_rt_check_failed(%13, 35, 2, %12, 0)\n"
-           "    jump b4\n"
+           "    unreachable\n"
            "b4:\n"
            "    %14 = zext i16 %10\n"
            "    %15 = addov i16 %9, %14\n"
@@ -1361,7 +1448,7 @@ void test_lower(void)
            "    %17 = sext i64 %14\n"
            "    %18 = addr @main.2\n"
            "    call void @anti_rt_check_failed(%18, 21, 1, %16, %17)\n"
-           "    jump b6\n"
+           "    unreachable\n"
            "b6:\n"
            "    ret i16 %15\n"
            "}\n");
@@ -1391,7 +1478,7 @@ void test_lower(void)
            "}\n",
            "type str = struct { ptr: ptr, len: i64 }\n"
            "type []byte = struct { ptr: ptr, len: i64 }\n"
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 3 align 1 bytes 68 69 00\n"
            "global main.1 size 3 align 1 bytes 68 00 00\n"
            "global main.2 size 22 align 1 bytes 6d 61 69 6e 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
@@ -1421,7 +1508,7 @@ void test_lower(void)
            "b1:\n"
            "    %14 = addr @main.2\n"
            "    call void @anti_rt_check_failed(%14, 21, 1, %10, %12)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    %15 = ptradd %2, offset_of str.len\n"
            "    %16 = load i64 %15\n"
@@ -1430,7 +1517,7 @@ void test_lower(void)
            "b3:\n"
            "    %18 = addr @main.2\n"
            "    call void @anti_rt_check_failed(%18, 21, 1, %13, %16)\n"
-           "    jump b4\n"
+           "    unreachable\n"
            "b4:\n"
            "    ret i64 %17\n"
            "}\n");
@@ -1444,7 +1531,7 @@ void test_lower(void)
            "type str = struct { ptr: ptr, len: i64 }\n"
            "type []i32 = struct { ptr: ptr, len: i64 }\n"
            "type []byte = struct { ptr: ptr, len: i64 }\n"
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 28 align 1 bytes 6d 61 69 6e 3a 33 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
            "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "global main.2 size 35 align 1 bytes 6d 61 69 6e 3a 33 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00\n"
@@ -1468,7 +1555,7 @@ void test_lower(void)
            "b1:\n"
            "    %15 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%15, 27, 0, %2, %12)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    %16 = mul i64 %2, size_of i32\n"
            "    %17 = ptradd %13, %16\n"
@@ -1481,7 +1568,7 @@ void test_lower(void)
            "b3:\n"
            "    %23 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%23, 27, 0, %2, %20)\n"
-           "    jump b4\n"
+           "    unreachable\n"
            "b4:\n"
            "    %24 = mul i64 %2, size_of i8\n"
            "    %25 = ptradd %21, %24\n"
@@ -1494,7 +1581,7 @@ void test_lower(void)
            "    %30 = sext i64 %27\n"
            "    %31 = addr @main.1\n"
            "    call void @anti_rt_check_failed(%31, 21, 1, %29, %30)\n"
-           "    jump b6\n"
+           "    unreachable\n"
            "b6:\n"
            "    %32 = ptradd %3, offset_of []byte.len\n"
            "    %33 = load i64 %32\n"
@@ -1505,7 +1592,7 @@ void test_lower(void)
            "b7:\n"
            "    %37 = addr @main.2\n"
            "    call void @anti_rt_check_failed(%37, 34, 2, %33, 0)\n"
-           "    jump b8\n"
+           "    unreachable\n"
            "b8:\n"
            "    %38 = trunc i32 %33\n"
            "    %39 = addov i32 %28, %38\n"
@@ -1515,7 +1602,7 @@ void test_lower(void)
            "    %41 = sext i64 %38\n"
            "    %42 = addr @main.1\n"
            "    call void @anti_rt_check_failed(%42, 21, 1, %40, %41)\n"
-           "    jump b10\n"
+           "    unreachable\n"
            "b10:\n"
            "    ret i32 %39\n"
            "}\n");
@@ -1585,7 +1672,7 @@ void test_lower(void)
            "}\n",
            "type main.P = struct { x: i64, y: i32 }\n"
            "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.P.descriptor anti.rt.Descriptor { @main.1, i64 1, ptr 0, size_of main.P, i64 0, ptr 0, i64 2, @main.P.fields, ptr 0, i64 0, i64 0, ptr 0, @main.package.version, i64 5, ptr 0, i64 0, ptr 0 }\n"
            "global main.1 size 2 align 1 bytes 50 00\n"
            "global main.2 size 2 align 1 bytes 78 00\n"
@@ -1603,7 +1690,7 @@ void test_lower(void)
            "b1:\n"
            "    %6 = addr @main.6\n"
            "    call void @anti_rt_check_failed(%6, 21, 1, %1, %4)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    ret i64 %5\n"
            "}\n"
@@ -1654,7 +1741,7 @@ void test_lower(void)
            "    return b[0] + b[2];\n"
            "}\n",
            "type [3]i32 = array 3 of i32\n"
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 28 align 1 bytes 6d 61 69 6e 3a 32 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
            "global main.1 size 28 align 1 bytes 6d 61 69 6e 3a 33 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
            "global main.2 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
@@ -1666,7 +1753,7 @@ void test_lower(void)
            "b1:\n"
            "    %3 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%3, 27, 0, 2, 3)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    %4 = mul i64 2, size_of i32\n"
            "    %5 = ptradd %0, %4\n"
@@ -1679,7 +1766,7 @@ void test_lower(void)
            "b3:\n"
            "    %10 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%10, 27, 0, 1, 3)\n"
-           "    jump b4\n"
+           "    unreachable\n"
            "b4:\n"
            "    %11 = mul i64 1, size_of i32\n"
            "    %12 = ptradd %0, %11\n"
@@ -1693,7 +1780,7 @@ void test_lower(void)
            "b5:\n"
            "    %17 = addr @main.1\n"
            "    call void @anti_rt_check_failed(%17, 27, 0, 0, 3)\n"
-           "    jump b6\n"
+           "    unreachable\n"
            "b6:\n"
            "    %18 = mul i64 0, size_of i32\n"
            "    %19 = ptradd %1, %18\n"
@@ -1703,7 +1790,7 @@ void test_lower(void)
            "b7:\n"
            "    %22 = addr @main.1\n"
            "    call void @anti_rt_check_failed(%22, 27, 0, 2, 3)\n"
-           "    jump b8\n"
+           "    unreachable\n"
            "b8:\n"
            "    %23 = mul i64 2, size_of i32\n"
            "    %24 = ptradd %1, %23\n"
@@ -1715,7 +1802,7 @@ void test_lower(void)
            "    %28 = sext i64 %25\n"
            "    %29 = addr @main.2\n"
            "    call void @anti_rt_check_failed(%29, 21, 1, %27, %28)\n"
-           "    jump b10\n"
+           "    unreachable\n"
            "b10:\n"
            "    ret i32 %26\n"
            "}\n");
@@ -1729,7 +1816,7 @@ void test_lower(void)
            "type [2]float = array 2 of f64\n"
            "type [5]int = array 5 of i64\n"
            "extern fn make() -> agg [2]float\n"
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.count(%0: agg [5]int) -> i64 {\n"
            "b0:\n"
@@ -1739,7 +1826,7 @@ void test_lower(void)
            "b1:\n"
            "    %3 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%3, 21, 1, 5, 2)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    ret i64 %2\n"
            "}\n");
@@ -1837,7 +1924,7 @@ void test_lower(void)
            "    let g = twice;\n"
            "    return apply(g, 3) + g(1);\n"
            "}\n",
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "extern fn main.fn.0(i64) -> i64\n"
            "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 32 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00\n"
            "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 39 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
@@ -1848,7 +1935,7 @@ void test_lower(void)
            "b1:\n"
            "    %2 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%2, 21, 1, %0, 2)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    ret i64 %1\n"
            "}\n"
@@ -1868,7 +1955,7 @@ void test_lower(void)
            "b1:\n"
            "    %5 = addr @main.1\n"
            "    call void @anti_rt_check_failed(%5, 21, 1, %2, %3)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    ret i64 %4\n"
            "}\n");
@@ -1890,7 +1977,7 @@ void test_lower(void)
            "}\n",
            "type fn(...) = struct { code: ptr, context: ptr }\n"
            "type main.0.context = struct { k: ptr }\n"
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "extern fn main.fn.0(i64, ptr) -> i64\n"
            "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 32 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00\n"
            "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 39 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
@@ -1901,7 +1988,7 @@ void test_lower(void)
            "b1:\n"
            "    %2 = addr @main.0\n"
            "    call void @anti_rt_check_failed(%2, 21, 1, %0, 2)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    ret i64 %1\n"
            "}\n"
@@ -1946,7 +2033,7 @@ void test_lower(void)
            "b1:\n"
            "    %17 = addr @main.1\n"
            "    call void @anti_rt_check_failed(%17, 21, 1, %7, %15)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    ret i64 %16\n"
            "}\n"
@@ -1959,7 +2046,7 @@ void test_lower(void)
            "b1:\n"
            "    %5 = addr @main.1\n"
            "    call void @anti_rt_check_failed(%5, 21, 1, %0, %3)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    ret i64 %4\n"
            "}\n");
@@ -1977,7 +2064,7 @@ void test_lower(void)
            "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
            "extern fn abs(i32) -> i32\n"
            "extern fn main.fn.0(i32) -> i32\n"
-           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "extern fn main.fn.1(i8 signext) -> i8\n"
            "global main.Ops.descriptor anti.rt.Descriptor { @main.1, i64 3, ptr 0, size_of main.Ops, i64 0, ptr 0, i64 2, @main.Ops.fields, ptr 0, i64 0, i64 0, ptr 0, @main.package.version, i64 5, ptr 0, i64 0, ptr 0 }\n"
            "global main.1 size 4 align 1 bytes 4f 70 73 00\n"
@@ -1999,7 +2086,7 @@ void test_lower(void)
            "    %9 = sext i64 %6\n"
            "    %10 = addr @main.6\n"
            "    call void @anti_rt_check_failed(%10, 21, 1, %8, %9)\n"
-           "    jump b2\n"
+           "    unreachable\n"
            "b2:\n"
            "    %11 = ptradd %0, offset_of main.Ops.narrow\n"
            "    %12 = load ptr %11\n"
@@ -2012,7 +2099,7 @@ void test_lower(void)
            "    %17 = sext i64 %14\n"
            "    %18 = addr @main.6\n"
            "    call void @anti_rt_check_failed(%18, 21, 1, %16, %17)\n"
-           "    jump b4\n"
+           "    unreachable\n"
            "b4:\n"
            "    ret i32 %15\n"
            "}\n");

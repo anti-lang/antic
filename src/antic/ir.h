@@ -179,7 +179,9 @@ enum ir_op {
                        range of its type, else c. a is the result of an
                        IR_ADD_OV, IR_SUB_OV or IR_MUL_OV, which is the
                        instruction right before this one. */
-    IR_RET          /* Return a, or nothing. */
+    IR_RET,         /* Return a, or nothing. */
+    IR_UNREACHABLE  /* Nothing reaches here: the end of a block after a
+                       call of a function that never returns. */
 };
 
 /* The flags IR_FLAG reads, in the order of the fields of Flags. */
@@ -235,11 +237,16 @@ struct ir_inst {
 /* DESIGN: the failure arm of an assertion and the failure arm of a
    dev-mode check carry which one they are. The build that compiles the
    program drops each under its own switch. A library file holds both,
-   and the build that links decides. */
+   and the build that links decides. The arm of a none guard, the path of
+   `p catch fatal` and `p catch e { }` where p is `none`, carries its
+   kind as well. No switch drops it, since the program wrote it, and the
+   back end gives it the weights of a cold block as it gives the other
+   two. */
 enum ir_fail {
     IR_FAIL_NONE,
     IR_FAIL_ASSERT,     /* the failure arm of an assertion */
-    IR_FAIL_CHECK       /* the failure arm of a dev-mode check */
+    IR_FAIL_CHECK,      /* the failure arm of a dev-mode check */
+    IR_FAIL_GUARD       /* the arm of a none guard, never dropped */
 };
 
 struct ir_block {
@@ -288,6 +295,9 @@ struct ir_function {
     bool variadic;
     bool exported;                  /* an export fn, with a C symbol */
     bool worker;                    /* a worker fn */
+    /* The function ends the program on every path. Each call of it ends
+       its block with IR_UNREACHABLE. */
+    bool never_returns;
     struct ir_block **blocks;
     size_t block_count;
     size_t block_capacity;
@@ -691,6 +701,7 @@ void ir_branch(struct ir_function *f, struct ir_block *b,
                const struct ir_block *else_block);
 void ir_ret(struct ir_function *f, struct ir_block *b, enum ir_type type,
             struct ir_operand value);
+void ir_unreachable(struct ir_function *f, struct ir_block *b);
 
 /* The names of types and operations in the text form. */
 const char *ir_type_name(enum ir_type type);

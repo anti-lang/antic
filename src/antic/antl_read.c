@@ -546,8 +546,10 @@ static struct type *read_fn(struct reader *r, uint32_t at)
     }
     /* The out pointer belongs to the `may fail` form alone, and it
        is the last parameter. `concurrent` marks the form of two
-       words alone, which a bound function never has. */
-    if (flags > 127 || ((flags & 32) != 0 && (flags & 16) == 0) ||
+       words alone, which a bound function never has. A function that
+       returns `never` cannot fail. */
+    if (((flags & 128) != 0 && (flags & 4) != 0) ||
+        ((flags & 32) != 0 && (flags & 16) == 0) ||
         ((flags & 64) != 0 && (flags & 48) != 48) ||
         ((flags & 16) != 0 && (flags & 2) != 0) ||
         ((flags & 8) != 0 &&
@@ -559,6 +561,9 @@ static struct type *read_fn(struct reader *r, uint32_t at)
     }
     t = types_fn_flagged(r->types, params, n, t, (flags & 2) != 0,
                          (flags & 4) != 0, (flags & 8) != 0);
+    if ((flags & 128) != 0) {
+        t = types_fn_never(r->types, t);
+    }
     if ((flags & 64) != 0) {
         t = types_fn_owned(r->types, t);
     } else if ((flags & 16) != 0) {

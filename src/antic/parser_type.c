@@ -398,9 +398,13 @@ static struct type_expr *type_level(struct parser *p)
         if (!parser_expect(p, TOKEN_RPAREN)) {
             return NULL;
         }
-        if (parser_accept(p, TOKEN_ARROW) &&
-            (ty->result = parser_type(p)) == NULL) {
-            return NULL;
+        if (parser_accept(p, TOKEN_ARROW)) {
+            if (parser_never_result(p)) {
+                ty->never = true;
+                parser_next(p);
+            } else if ((ty->result = parser_type(p)) == NULL) {
+                return NULL;
+            }
         }
         /* DESIGN: `may fail` after a function type belongs to that type,
            the innermost one when a result is a function type in turn. A

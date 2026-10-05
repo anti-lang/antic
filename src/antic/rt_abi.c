@@ -7,8 +7,9 @@
 /* The IR type of one (IR type, C type) pair of a row. */
 #define RT_IR(ir, c) IR_##ir
 
-#define RT_SIGNATURE_ROW(id, name, ...)                                    \
-    {#name, RT_COUNT(__VA_ARGS__), {RT_EACH(RT_IR, __VA_ARGS__)}},
+#define RT_SIGNATURE_ROW(id, name, ends, ...)                              \
+    {#name, RT_NEVER_RETURNS(ends), RT_COUNT(__VA_ARGS__),                 \
+     {RT_EACH(RT_IR, __VA_ARGS__)}},
 
 static const struct rt_signature signatures[RT_FUNCTION_COUNT] = {
     RT_FUNCTIONS(RT_SIGNATURE_ROW)

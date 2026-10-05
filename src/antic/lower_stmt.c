@@ -228,7 +228,6 @@ static void walk_check(struct lowerer *l, const struct stmt *s)
     args[3] = lower_expr(l, it->change_file_length);
     args[4] = lower_expr(l, it->change_line);
     lower_rt_call(l, RT_FN_WALK_CHANGED, args);
-    ir_jump(l->f, l->b, rest);
     l->b = rest;
 }
 
@@ -760,6 +759,16 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
     lower_hook_changed(l, &p, target);
 }
 
+/* Whether e is a call of a function that returns `never`. */
+static bool lower_calls_never(const struct expr *e)
+{
+    const struct type *t = e->kind == EXPR_CALL && e->as.call.callee != NULL
+                               ? e->as.call.callee->type
+                               : NULL;
+
+    return t != NULL && t->kind == TYPE_FN && t->never;
+}
+
 /* DESIGN: a call whose result the statement drops gives a value that no
    local holds, so the statement tears it down where it ends, as a `let`
    of it would be torn down at the end of its block. value is what the
@@ -1118,8 +1127,8 @@ static void lower_let(struct lowerer *l, const struct stmt *s)
     }
 }
 
-/* DESIGN: an assertion is a branch to a block that calls the runtime and
-   falls through to the rest. The failure block carries a flag. The build
+/* DESIGN: an assertion is a branch to a block that calls the runtime,
+   which ends the program. The failure block carries a flag. The build
    that compiles the program cuts the branch, and the ordinary passes
    remove the block, the call and the text. */
 static void assert_branch(struct lowerer *l, struct ir_operand cond,
@@ -1135,7 +1144,6 @@ static void assert_branch(struct lowerer *l, struct ir_operand cond,
     args[0] = lower_temp(l, ir_addr(l->f, l->b, ir_global_op(text)));
     args[1] = ir_int_op(IR_I64, text->size - 1);
     lower_rt_call(l, RT_FN_ASSERT_FAILED, args);
-    ir_jump(l->f, l->b, rest);
     l->b = rest;
 }
 
@@ -1442,6 +1450,12 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
             return;
         }
         drop_result(l, s->as.expr, lower_expr(l, s->as.expr));
+        /* The call of a function that never returns ended its block, and
+           no statement after it runs. */
+        if (lower_calls_never(s->as.expr) && l->b != NULL) {
+            ir_unreachable(l->f, l->b);
+            l->b = NULL;
+        }
         return;
     case STMT_ASSIGN:
         lower_assign(l, s);

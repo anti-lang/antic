@@ -183,6 +183,9 @@ static void dump_type(struct dumper *d, int depth, const struct type_expr *t)
             }
             dump_type(d, depth + 1, t->params[i]);
         }
+        if (t->never) {
+            simple(d, depth + 1, "never", NULL);
+        }
         if (t->result != NULL) {
             simple(d, depth + 1, "result", NULL);
             dump_type(d, depth + 2, t->result);
@@ -937,6 +940,9 @@ static void dump_members(struct dumper *d, const struct item *it)
             simple(d, 2, "result", NULL);
             dump_type(d, 3, m->result);
         }
+        if (m->never) {
+            simple(d, 2, "never", NULL);
+        }
         if (m->may_fail) {
             simple(d, 2, "may_fail", NULL);
         }
@@ -1036,6 +1042,9 @@ static void dump_module(struct dumper *d, const struct module *module)
             if (it->result != NULL) {
                 simple(d, 1, "result", NULL);
                 dump_type(d, 2, it->result);
+            }
+            if (it->never) {
+                simple(d, 1, "never", NULL);
             }
             if (it->may_fail) {
                 simple(d, 1, "may_fail", NULL);

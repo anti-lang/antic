@@ -20,7 +20,7 @@ b1:
   %v4 = load ptr, ptr %t2, align 8
   %v5 = load i64, ptr %t0, align 8
   call void (ptr, i64, i32, i64, i64) @anti_rt_check_failed(ptr %v4, i64 39, i32 1, i64 %v5, i64 6), !dbg !13
-  br label %b2
+  unreachable
 
 b2:
   %v6 = load i64, ptr %t1, align 8
@@ -29,7 +29,7 @@ b2:
 
 @_A3com7example5scale_0 = constant <{ [40 x i8] }> <{ [40 x i8] c"com/example/scale.anti:4: overflow in *\00" }>, align 1
 
-declare void @anti_rt_check_failed(ptr, i64, i32, i64, i64) #1
+declare void @anti_rt_check_failed(ptr, i64, i32, i64, i64) noreturn cold #1
 declare { i64, i1 } @llvm.smul.with.overflow.i64(i64, i64)
 
 attributes #0 = { nounwind uwtable(sync) "frame-pointer"="none" "stack-probe-size"="4096" "target-cpu"="x86-64-v3" "target-features"="+avx,+avx2,+bmi,+bmi2,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fxsr,+lzcnt,+mmx,+movbe,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave" }

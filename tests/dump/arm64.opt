@@ -1,5 +1,5 @@
 extern fn widen(i8 zeroext, i8 signext, i16 zeroext) -> i32
-extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
+extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never
 global arm64.0 size 28 align 1 bytes 61 72 6d 36 34 2e 61 6e 74 69 3a 36 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 global arm64.1 size 28 align 1 bytes 61 72 6d 36 34 2e 61 6e 74 69 3a 38 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00
 global arm64.2 size 29 align 1 bytes 61 72 6d 36 34 2e 61 6e 74 69 3a 32 36 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
@@ -15,7 +15,7 @@ b0:
 b1:
     %5 = addr @arm64.0
     call void @anti_rt_check_failed(%5, 27, 1, %3, 12288)
-    jump b2
+    unreachable
 b2:
     %6 = copy i64 %4
     %7 = slt i8 %4, 28672
@@ -28,7 +28,7 @@ b4:
 b5:
     %9 = addr @arm64.1
     call void @anti_rt_check_failed(%9, 27, 1, %6, 8192)
-    jump b6
+    unreachable
 b6:
     ret i64 %8
 }
@@ -51,7 +51,7 @@ b0:
 b1:
     %13 = addr @arm64.2
     call void @anti_rt_check_failed(%13, 28, 1, %2, %11)
-    jump b2
+    unreachable
 b2:
     %14 = zext i64 %10
     %15 = addov i64 %12, %14
@@ -59,7 +59,7 @@ b2:
 b3:
     %16 = addr @arm64.2
     call void @anti_rt_check_failed(%16, 28, 1, %12, %14)
-    jump b4
+    unreachable
 b4:
     ret i64 %15
 }

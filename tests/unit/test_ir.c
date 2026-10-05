@@ -297,6 +297,36 @@ static void verifier(void)
     arena_free(&arena);
 }
 
+/* A call of a function that never returns ends its block with
+   unreachable, and nothing follows unreachable in a block. */
+static void never_returns(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *stop;
+    struct ir_function *f;
+    struct ir_block *b0, *b1, *b2;
+
+    ir_module_init(&m, &arena, "main");
+    stop = ir_extern_add(&m, "stop", IR_VOID, false);
+    stop->never_returns = true;
+    f = ir_function_add(&m, "main", "f", IR_VOID, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    b1 = ir_block_add(f);
+    b2 = ir_block_add(f);
+    ir_call(f, b0, IR_VOID, ir_func_op(stop), NULL, 0);
+    ir_jump(f, b0, b1);
+    ir_call(f, b1, IR_VOID, ir_func_op(stop), NULL, 0);
+    ir_unreachable(f, b1);
+    ir_unreachable(f, b2);
+    ir_ret(f, b2, IR_VOID, ir_int_op(IR_I64, 0));
+    verified(&m, "main.f b0: stop never returns, and the block goes on "
+                 "after its call\n"
+                 "main.f b2: unreachable is not the last instruction\n");
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 /* A call through a pointer passes the arguments of its signature. */
 static void indirect_arguments(void)
 {
@@ -498,5 +528,6 @@ void test_ir(void)
     positions();
     symbolic();
     verifier();
+    never_returns();
     no_module();
 }

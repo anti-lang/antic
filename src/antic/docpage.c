@@ -257,6 +257,9 @@ static void fn_signature(struct text *out, const struct fn_shown *f)
         text_append(out, f->param_count > 0 || f->self ? ", ..." : "...");
     }
     text_append(out, ")");
+    if (f->type->never) {
+        text_append(out, " -> never");
+    }
     if (result != NULL) {
         text_append(out, " -> ");
         types_name(out, result);

@@ -159,12 +159,25 @@ bool sema_filled_somewhere(const struct checker *c, const struct type *t)
 
 static bool block_returns(const struct block *b);
 
+/* Whether s is a call of a function that returns `never`, which ends its
+   path as `return` does. */
+static bool calls_never(const struct stmt *s)
+{
+    const struct expr *e = s->kind == STMT_EXPR ? s->as.expr : NULL;
+    const struct type *t = e != NULL && e->kind == EXPR_CALL &&
+                                   e->as.call.callee != NULL
+                               ? e->as.call.callee->type
+                               : NULL;
+
+    return t != NULL && t->kind == TYPE_FN && t->never;
+}
+
 /* The missing-return rule of chapter 2 decides from the form alone. */
 static bool stmt_returns(const struct stmt *s)
 {
     size_t i;
 
-    if (s->kind == STMT_RETURN || s->kind == STMT_FAIL) {
+    if (s->kind == STMT_RETURN || s->kind == STMT_FAIL || calls_never(s)) {
         return true;
     }
     /* A `sync` block returns when its last statement does. */
@@ -211,6 +224,8 @@ static bool stmt_leaves(const struct stmt *s)
     case STMT_CONTINUE:
     case STMT_YIELD:
         return true;
+    case STMT_EXPR:
+        return calls_never(s);
     case STMT_BLOCK:
         return block_leaves(s->as.block);
     case STMT_SYNC:
@@ -1033,6 +1048,17 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
     c->yields = outer_yield;
     sema_leave_scope(c, &scope);
     return types_without_none(c->types, value);
+}
+
+/* The name of the function it in a message, into text: `f` in
+   backquotes, or the anonymous function. */
+static void name_function(char *text, size_t size, const struct item *it)
+{
+    if (it->enclosing != NULL || it->name.length == 0) {
+        text_format(text, size, "the anonymous function");
+        return;
+    }
+    text_format(text, size, "`%.*s`", (int)it->name.length, it->name.text);
 }
 
 /* DESIGN: a `may fail` function writes what it computes through its out
@@ -2073,6 +2099,13 @@ static void check_stmt(struct checker *c, struct stmt *s)
         }
         return;
     case STMT_RETURN:
+        if (c->ctx.function->symbol->type->never) {
+            char named[128];
+            name_function(named, sizeof named, c->ctx.function);
+            sema_error_at(c, s->pos, "%s returns `never` and holds no "
+                          "`return`", named);
+            return;
+        }
         if (s->as.return_value == NULL) {
             if (result->kind != TYPE_VOID) {
                 sema_error_at(c, s->pos, "`return` needs a value of type `%s`",
@@ -2287,7 +2320,8 @@ static bool sets_stmt(struct checker *c, const struct required *r,
             sets_handler(c, r, &handled_call(s->as.expr)->as.call.handler,
                          set);
         }
-        return true;
+        /* A call of a function that returns `never` ends the path. */
+        return !calls_never(s);
     case STMT_LET:
         if (s->as.let.value != NULL && handled_call(s->as.let.value) != NULL) {
             sets_handler(c, r, &handled_call(s->as.let.value)->as.call.handler,
@@ -2483,6 +2517,12 @@ void sema_check_function(struct checker *c, struct item *it)
     sema_check_block(c, it->body);
     check_construct_sets(c, it);
     sema_leave_scope(c, &params);
+    if (it->symbol->type->never && !block_returns(it->body)) {
+        char named[128];
+        name_function(named, sizeof named, it);
+        sema_error_at(c, it->name_pos, "%s returns `never` and can reach its "
+                      "end", named);
+    }
     if (declared_result(c)->kind != TYPE_VOID && !block_returns(it->body)) {
         if (it->enclosing != NULL) {
             sema_error_at(c, it->name_pos, "the anonymous function can reach "
@@ -2753,6 +2793,18 @@ static struct type *anonymous_type(struct checker *c, struct item *it,
     if (target != NULL && target->may_fail && !it->may_fail) {
         it->may_fail = true;
     }
+    if (target != NULL && target->never && it->result == NULL) {
+        it->never = true;
+    }
+    if (it->never && it->may_fail) {
+        sema_error_at(c, it->pos,
+                      "a function that returns `never` cannot fail");
+        return NULL;
+    }
+    if (it->never) {
+        return types_fn_never(c->types, types_fn(c->types, params,
+                                                 it->param_count, result));
+    }
     if (it->may_fail) {
         struct type *error = sema_error_class(c, it->pos);
         bool out = result->kind != TYPE_VOID;
@@ -2888,6 +2940,10 @@ struct type *sema_check_anonymous(struct checker *c, struct expr *e,
     }
     sema_check_block(c, it->body);
     sema_leave_scope(c, &params);
+    if (fn->never && !block_returns(it->body)) {
+        sema_error_at(c, it->pos, "the anonymous function returns `never` "
+                      "and can reach its end");
+    }
     if (declared_result(c)->kind != TYPE_VOID && !block_returns(it->body)) {
         sema_error_at(c, it->pos, "the anonymous function can reach its end "
                       "without `return`");

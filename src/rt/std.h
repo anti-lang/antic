@@ -17,7 +17,7 @@ struct anti_text {
 void anti_rt_write(int32_t stream, const unsigned char *bytes, size_t count);
 
 /* Flush both streams and end the process with status. */
-void anti_rt_exit(int32_t status);
+_Noreturn void anti_rt_exit(int32_t status);
 
 /* DESIGN: the failure routine of the runtime, in src/rt/assert.c. Every
    failure the runtime reports goes through it, so each has one form. It
@@ -34,7 +34,8 @@ void anti_rt_note(const char *format, ...);
 
 /* Print the text of a failed assertion to standard error and abort. The
    compiler built the text, so this adds only a newline. */
-void anti_rt_assert_failed(const unsigned char *text, int64_t length);
+_Noreturn void anti_rt_assert_failed(const unsigned char *text,
+                                     int64_t length);
 
 /* Name the test that is running, which a failed assertion reports before
    its position. The runner of `anti test` is the one caller. */
@@ -55,23 +56,27 @@ enum anti_check {
 
 /* Print the text of a failed check, the values the kind names, and
    abort. */
-void anti_rt_check_failed(const unsigned char *text, int64_t length,
-                          int32_t kind, int64_t a, int64_t b);
+_Noreturn void anti_rt_check_failed(const unsigned char *text,
+                                    int64_t length, int32_t kind, int64_t a,
+                                    int64_t b);
 
 /* Print the text of a walk whose collection changed, which names the
    loop and the collection. Then print the file and the line of the last
    change when the collection recorded one, and abort. */
-void anti_rt_walk_changed(const unsigned char *text, int64_t length,
-                          const unsigned char *file, int64_t file_length,
-                          int64_t line);
+_Noreturn void anti_rt_walk_changed(const unsigned char *text,
+                                    int64_t length,
+                                    const unsigned char *file,
+                                    int64_t file_length, int64_t line);
 
 /* Print the name of the class a checked cast wanted and abort. The name
    is not a C string, so its length comes with it. */
-void anti_rt_cast_failed(const unsigned char *name, int64_t length);
+_Noreturn void anti_rt_cast_failed(const unsigned char *name,
+                                   int64_t length);
 
 /* Print the name of the class an object with a zero table was taken for
    and abort. */
-void anti_rt_table_unset(const unsigned char *name, int64_t length);
+_Noreturn void anti_rt_table_unset(const unsigned char *name,
+                                   int64_t length);
 
 /* The str of a NUL-terminated C string, without the NUL. */
 struct anti_text anti_rt_text_from_c(const unsigned char *bytes);

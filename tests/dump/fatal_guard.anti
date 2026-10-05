@@ -1,0 +1,24 @@
+// The guard of `catch fatal` on a `none` pointer, and a function that never
+// returns. The guard calls `Error.fatal` directly and ends with
+// `unreachable`, and the declaration of each function that never returns
+// carries `noreturn cold`.
+
+import anti.lang;
+
+extern fn anti_rt_exit(status: c_int) -> never;
+
+struct Cell
+{
+	v: int,
+}
+
+pub fn pick(p: ?*Cell) -> int
+{
+	let c = p catch fatal;
+	return c.v;
+}
+
+pub fn stop(code: int) -> never
+{
+	anti_rt_exit(code as c_int);
+}

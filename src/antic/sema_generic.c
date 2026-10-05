@@ -1039,6 +1039,9 @@ static struct type *subst(struct checker *c, struct type *t,
         }
         fn = types_fn_flagged(c->types, params, t->param_count, result,
                               t->bound, t->may_fail, t->has_out);
+        if (t->never) {
+            fn = types_fn_never(c->types, fn);
+        }
         if (t->owned) {
             fn = types_fn_owned(c->types, fn);
         } else if (t->context) {

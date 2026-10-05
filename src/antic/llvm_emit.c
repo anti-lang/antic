@@ -2269,7 +2269,8 @@ static void call(struct emitter *e, const struct ir_inst *inst)
 }
 
 /* The metadata of a branch whose one side is the failure arm of an
-   assertion or a check, which marks that side cold. */
+   assertion or a check, or the arm of a none guard, which marks that side
+   cold. */
 static void branch_weights(struct emitter *e, uint32_t then_block,
                            uint32_t else_block)
 {
@@ -2297,6 +2298,9 @@ static void instruction(struct emitter *e, const struct ir_inst *inst)
         break;
     case IR_JUMP:
         text_appendf(e->out, "  br label %%b%" PRIu32 "\n", inst->a.as.index);
+        break;
+    case IR_UNREACHABLE:
+        text_append(e->out, "  unreachable\n");
         break;
     case IR_BRANCH:
         operand(e, &inst->a, IR_I8, &value);
@@ -2600,6 +2604,7 @@ static void definition(struct emitter *e, const struct ir_function *f)
     if (!signature(e, f, true, is_main(e, f) ? &e->entry : NULL)) {
         return;
     }
+    text_append(out, f->never_returns ? " noreturn cold" : "");
     text_append(out, e->keeps_frame[f->index]
                          ? " noinline \"disable-tail-calls\"=\"true\" #0"
                          : " #0");
@@ -2954,7 +2959,8 @@ static void declaration(struct emitter *e, const struct ir_function *f)
     e->f = f;
     text_append(e->out, imports(e) ? "declare dllimport " : "declare ");
     if (signature(e, f, false, NULL)) {
-        text_append(e->out, " #1\n");
+        text_append(e->out, f->never_returns ? " noreturn cold #1\n"
+                                             : " #1\n");
     }
 }
 

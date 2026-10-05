@@ -59,7 +59,8 @@ void anti_rt_test_running(const unsigned char *name, int64_t length)
    lives in the read-only data of the module. This routine prints that
    one string and ends the program. A release build removes every call
    of it and the strings with them. */
-void anti_rt_assert_failed(const unsigned char *text, int64_t length)
+_Noreturn void anti_rt_assert_failed(const unsigned char *text,
+                                     int64_t length)
 {
     if (running_name != NULL) {
         anti_rt_fail_abort("FAIL %.*s\n%.*s", (int)running_length,

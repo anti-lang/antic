@@ -747,6 +747,7 @@ static void io_typex_body(struct io *io, struct type_expr *x)
     }
     io_typex(io, &x->result);
     io_bool(io, &x->may_fail);
+    io_bool(io, &x->never);
     io_bool(io, &x->keep);
     io_bool(io, &x->concurrent);
     io_bool(io, &x->owned);
@@ -829,6 +830,7 @@ static void io_item_body(struct io *io, struct item *it)
     io_pos(io, &it->result_lent_pos);
     io_bool(io, &it->may_fail);
     io_pos(io, &it->may_fail_pos);
+    io_bool(io, &it->never);
     io_bool(io, &it->worker);
     io_block(io, &it->body);
     io_sym(io, &it->symbol);
@@ -1356,7 +1358,8 @@ static void put_extern(struct writer *w, struct io *io,
                                  (unsigned)it->is_operator << 3 |
                                  (unsigned)it->has_self << 4 |
                                  (unsigned)it->may_fail << 5 |
-                                 (unsigned)it->is_abstract << 6));
+                                 (unsigned)it->is_abstract << 6 |
+                                 (unsigned)it->never << 7));
         antl_put_u8(w, (uint8_t)it->vis);
     }
     antl_put_u8(w, sym->kind == SYMBOL_CONST && sym->value != NULL);
@@ -1446,6 +1449,7 @@ static struct symbol *read_extern(struct reader *r)
         it->has_self = (flags >> 4 & 1) != 0;
         it->may_fail = (flags >> 5 & 1) != 0;
         it->is_abstract = (flags >> 6 & 1) != 0;
+        it->never = (flags >> 7 & 1) != 0;
         it->vis = (enum visibility)antl_get_u8(r);
         it->pub = it->vis == VIS_PUB;
         if ((flags & 3) > FN_CONCRETE || it->vis > VIS_PUB) {
@@ -1527,7 +1531,8 @@ static void put_declaration(struct writer *w, const struct item *it)
     if (it->kind == ITEM_FN) {
         antl_put_u8(w, (uint8_t)((unsigned)it->may_fail |
                                  (unsigned)it->worker << 1 |
-                                 (unsigned)it->is_operator << 2));
+                                 (unsigned)it->is_operator << 2 |
+                                 (unsigned)it->never << 3));
         antl_put_count(w, it->param_count);
         for (i = 0; i < it->param_count; i++) {
             antl_put_bytes(w, it->params[i].name.text,
@@ -1640,6 +1645,7 @@ static struct item *read_declaration(struct reader *r)
         it->may_fail = (marks & 1) != 0;
         it->worker = (marks >> 1 & 1) != 0;
         it->is_operator = (marks >> 2 & 1) != 0;
+        it->never = (marks >> 3 & 1) != 0;
         sym->may_fail = it->may_fail;
         sym->worker = it->worker;
         sym->is_operator = it->is_operator;
@@ -1649,7 +1655,7 @@ static struct item *read_declaration(struct reader *r)
             it->params[i].name = antl_get_name(r);
         }
         it->param_count = n;
-        if (type->kind != TYPE_FN || marks > 7) {
+        if (type->kind != TYPE_FN || marks > 15) {
             antl_damaged(r);
             return NULL;
         }
@@ -1741,6 +1747,7 @@ static void io_root(struct io *io, struct item *fn)
     io_sym(io, &fn->self);
     io_typex(io, &fn->result);
     io_bool(io, &fn->result_lent);
+    io_bool(io, &fn->never);
     io_block(io, &fn->body);
     io_bool(io, &fn->trace);
     io_pos(io, &fn->may_fail_pos);

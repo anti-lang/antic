@@ -1,0 +1,32 @@
+//! The result `never`. A function that returns it reaches no end and holds no
+//! `return`, cannot fail, and no variable has the type.
+
+extern fn anti_rt_exit(status: c_int) -> never;
+
+fn ends(code: int) -> never
+{
+	if code != 0 {
+		anti_rt_exit(code as c_int);
+	}
+}
+
+fn leaves() -> never
+{
+	return;
+}
+
+fn fails() -> never may fail
+{
+	fail "gone";
+}
+
+fn holds() -> int
+{
+	let x: never = 1;
+	return 0;
+}
+
+fn main() -> int
+{
+	return holds();
+}

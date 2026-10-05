@@ -10,7 +10,7 @@ void anti_rt_write(int32_t stream, const unsigned char *bytes, size_t count)
     fwrite(bytes, 1, count, stream == 1 ? stdout : stderr);
 }
 
-void anti_rt_exit(int32_t status)
+_Noreturn void anti_rt_exit(int32_t status)
 {
     fflush(stdout);
     fflush(stderr);

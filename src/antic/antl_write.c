@@ -420,7 +420,7 @@ static void put_type(struct writer *w, const struct type *t)
        `?`, bit 1 bound, bit 2 `may fail` and bit 3 the out pointer of
        that form. Bit 4 is the form of two words of a parameter that does
        not keep its argument, and bit 5 marks it `concurrent`. Bit 6 is
-       `own fn`, which stands with both. Each makes
+       `own fn`, which stands with both. Bit 7 is `-> never`. Each makes
        another type, and a module that imports this one reads the type
        the signature names. */
     case TYPE_FN:
@@ -435,7 +435,8 @@ static void put_type(struct writer *w, const struct type *t)
                                  (unsigned)t->has_out << 3 |
                                  (unsigned)t->context << 4 |
                                  (unsigned)t->concurrent << 5 |
-                                 (unsigned)t->owned << 6));
+                                 (unsigned)t->owned << 6 |
+                                 (unsigned)t->never << 7));
         break;
     case TYPE_TUPLE:
         antl_put_count(w, t->param_count);
@@ -843,7 +844,8 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         const struct ir_function *f = ir->functions[i];
         antl_put_u8(w, (uint8_t)((f->is_extern ? 1 : 0) |
                                  (f->variadic ? 2 : 0) |
-                                 (f->exported ? 4 : 0) | (f->worker ? 8 : 0)));
+                                 (f->exported ? 4 : 0) | (f->worker ? 8 : 0) |
+                                 (f->never_returns ? 16 : 0)));
         put_str(w, f->module);
         put_str(w, f->name);
         antl_put_u8(w, (uint8_t)f->result);

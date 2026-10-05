@@ -6,7 +6,7 @@ type [2]anti.rt.Field = array 2 of anti.rt.Field
 type [3]anti.rt.Field = array 3 of anti.rt.Field
 extern fn take(agg structs.Pair, agg structs.Big, agg structs.Rgb, agg structs.V2) -> agg structs.Pair
 extern fn make(i64) -> agg structs.Big
-extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
+extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never
 global structs.20 size 31 align 1 bytes 73 74 72 75 63 74 73 2e 61 6e 74 69 3a 33 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 global anti_rt_slots anti.rt.SlotTable { i64 0, ptr 0, i64 0 }
 global anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
@@ -27,7 +27,7 @@ b0:
 b1:
     %13 = addr @structs.20
     call void @anti_rt_check_failed(%13, 30, 1, %9, %11)
-    jump b2
+    unreachable
 b2:
     store i64 %12, %5
     ret ptr %5

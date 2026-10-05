@@ -7,7 +7,7 @@ type copies_merge.Order = struct { total: i64 }
 type [1]*copies_merge.Person = array 1 of ptr
 type [1]*copies_merge.Order = array 1 of ptr
 type [1]int = array 1 of i64
-extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
+extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never
 global copies_merge.9 size 36 align 1 bytes 63 6f 70 69 65 73 5f 6d 65 72 67 65 2e 61 6e 74 69 3a 32 37 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 global copies_merge.10 size 42 align 1 bytes 63 6f 70 69 65 73 5f 6d 65 72 67 65 2e 61 6e 74 69 3a 31 37 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00
 global anti_rt_slots anti.rt.SlotTable { i64 0, ptr 0, i64 0 }
@@ -44,7 +44,7 @@ b0:
 b1:
     %17 = addr @copies_merge.9
     call void @anti_rt_check_failed(%17, 35, 1, %11, %15)
-    jump b2
+    unreachable
 b2:
     %18 = ptradd %4, 0
     store ptr %18, %7
@@ -56,7 +56,7 @@ b2:
 b3:
     %22 = addr @copies_merge.9
     call void @anti_rt_check_failed(%22, 35, 1, %16, %20)
-    jump b4
+    unreachable
 b4:
     ret i64 %21
 }
@@ -70,7 +70,7 @@ b0:
 b1:
     %6 = addr @copies_merge.10
     call void @anti_rt_check_failed(%6, 41, 0, %1, %3)
-    jump b2
+    unreachable
 b2:
     %7 = mul i64 %1, size_of ptr
     %8 = ptradd %4, %7
@@ -87,7 +87,7 @@ b0:
 b1:
     %6 = addr @copies_merge.10
     call void @anti_rt_check_failed(%6, 41, 0, %1, %3)
-    jump b2
+    unreachable
 b2:
     %7 = mul i64 %1, size_of i64
     %8 = ptradd %4, %7

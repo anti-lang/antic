@@ -65,6 +65,7 @@ struct type_expr {
     size_t arg_count;
     struct type_expr *result;       /* TYPEX_FN, NULL without a result */
     bool may_fail;                  /* TYPEX_FN: `fn(T) -> R may fail` */
+    bool never;                     /* TYPEX_FN: `fn(T) -> never` */
     /* The marks of a parameter of a function type. `keep fn(E)` holds
        the one C function pointer. `concurrent fn(E)` may be called from
        more than one thread at once. */
@@ -907,6 +908,9 @@ struct item {
        R *out)`, with `out` absent without a result. */
     bool may_fail;
     struct pos may_fail_pos;
+    /* `-> never`: the function ends the program on every path. result
+       is then NULL. */
+    bool never;
     struct block *body;             /* ITEM_FN */
     struct type_expr *type;         /* ITEM_CONST, ITEM_TYPE */
     /* The type parameters between `<` and `>` after the name of a

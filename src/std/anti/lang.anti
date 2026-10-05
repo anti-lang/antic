@@ -17,7 +17,7 @@
 //! deleted when the handler exits, unless the handler returns it.
 
 extern fn anti_rt_write(stream: c_int, bytes: ?*byte, count: c_size_t);
-extern fn anti_rt_exit(status: c_int);
+extern fn anti_rt_exit(status: c_int) -> never;
 extern fn anti_rt_text_from_c(bytes: ?*byte) -> str;
 extern fn anti_rt_trace_walk(into: ?*u64, room: int, skip: int) -> int;
 extern fn anti_rt_trace_frame(address: u64, out: ?*RawFrame);
@@ -300,8 +300,9 @@ pub class Error
 
 	/// Print this error and end the program with its code, or with 1.
 	///
-	/// The function that `error.on_fatal` registered runs first.
-	pub fn fatal(self)
+	/// The function that `error.on_fatal` registered runs first. No class
+	/// replaces it, so `catch fatal` calls it directly, and it never returns.
+	pub final fn fatal(self) -> never
 	{
 		let last = Fatal.get().hook.load();
 		if last != none {

@@ -70,24 +70,21 @@ void lower_handler(struct lowerer *l, const struct handler *h,
     free(scope.items);
 }
 
-/* `catch fatal`: call `fatal` of the class of the error err through its
-   table, which the class of type error_type holds, then go on at join. */
+/* `catch fatal`: call `fatal` of anti.lang.Error on the error err, whose
+   type error_type is a pointer to its class. The function is `final`, so
+   the call is direct, and it never returns, so the block ends there. */
 static void call_fatal(struct lowerer *l, struct ir_operand err,
-                       const struct type *error_type, struct ir_block *join)
+                       const struct type *error_type)
 {
     static const struct name fatal_name = {"fatal", 5};
-    size_t index = lower_table_index(error_type->element, &fatal_name, 1);
-    struct ir_operand table = lower_load_table(l, err, error_type);
-    struct ir_operand entry =
-        lower_temp(l, ir_load(l->f, l->b, IR_PTR,
-                              lower_offset_address(
-                                  l, table, lower_entry_offset(l, index))));
+    const struct item *fatal =
+        lower_find_member_fn(error_type->element, &fatal_name);
     struct ir_operand self = err;
 
-    ir_call_indirect(l->f, l->b, IR_VOID, entry, lower_fatal_signature(l),
-                     &self,
-                     1);
-    ir_jump(l->f, l->b, join);
+    ir_call(l->f, l->b, IR_VOID,
+            ir_func_op(lower_callee_function(l, fatal->symbol)), &self, 1);
+    ir_unreachable(l->f, l->b);
+    l->b = NULL;
 }
 
 /* DESIGN: a call that can fail gives a pointer. A pointer of `none` is
@@ -140,7 +137,7 @@ void lower_handle_error(struct lowerer *l, const struct expr *call,
         }
         break;
     case HANDLE_FATAL:
-        call_fatal(l, err, call->as.call.callee->type->result, join);
+        call_fatal(l, err, call->as.call.callee->type->result);
         break;
     case HANDLE_BLOCK:
         error = ir_unary(l->f, l->b, IR_COPY, IR_PTR, err);
@@ -206,12 +203,15 @@ void lower_guard_missing(struct lowerer *l, const struct stmt *s,
     struct handling scope;
     uint32_t error;
 
+    /* The `none` path is the arm of a none guard, which the back end
+       weighs as cold. */
+    l->b->fail = IR_FAIL_GUARD;
     err = lower_temp(
         l, ir_call(l->f, l->b, IR_PTR,
                    ir_func_op(lower_callee_function(l, s->as.let.guard_make)),
                    NULL, 0));
     if (h->kind == HANDLE_FATAL) {
-        call_fatal(l, err, error_type, join);
+        call_fatal(l, err, error_type);
         l->b = join;
         return;
     }

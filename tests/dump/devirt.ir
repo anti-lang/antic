@@ -28,7 +28,7 @@ extern fn anti_lang_Object_changed(ptr, ptr)
 extern fn anti_rt_hook(ptr, i64)
 extern fn anti_rt_descriptor(ptr) -> ptr
 extern fn devirt.fn.0(ptr) -> i64
-extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64)
+extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never
 global devirt.Only.table [18]ptr { @devirt.Only.descriptor, @anti_lang_Object_type_name, @anti_lang_Object_to_text, @devirt.Only.equals, @devirt.Only.hash, @anti_lang_Object_serialize, @devirt.Only.destroy, @devirt.Only.copy, @anti_lang_Object_created, @anti_lang_Object_destroyed, @anti_lang_Object_copied, @anti_lang_Object_dispatched, @anti_lang_Object_joined, @anti_lang_Object_enter, @anti_lang_Object_leave, @anti_lang_Object_failed, @anti_lang_Object_changed, @devirt.Only.value }
 global devirt.Only.descriptor anti.rt.Descriptor { @devirt.2, i64 4, @anti_lang_Object_descriptor, size_of devirt.Only, i64 1, @devirt.Only.ancestors, i64 1, @devirt.Only.fields, ptr 0, i64 0, i64 17, @devirt.Only.functions, @devirt.package.version, i64 5, ptr 0, i64 0, ptr 0 }
 global devirt.2 size 5 align 1 bytes 4f 6e 6c 79 00
@@ -126,7 +126,7 @@ b0:
 b1:
     %9 = addr @devirt.57
     call void @anti_rt_check_failed(%9, 29, 1, %2, %7)
-    jump b2
+    unreachable
 b2:
     %10 = call i64 @devirt.Base.same(%1)
     %11 = addov i64 %8, %10
@@ -134,7 +134,7 @@ b2:
 b3:
     %12 = addr @devirt.57
     call void @anti_rt_check_failed(%12, 29, 1, %8, %10)
-    jump b4
+    unreachable
 b4:
     ret i64 %11
 }

@@ -228,9 +228,10 @@ The IR gains three facts.
   true for a function that ends the program on every path.
 - A column in `RT_FUNCTIONS` of `src/antic/rt_abi.h` with the same fact.
   It is true for `anti_rt_assert_failed`, `anti_rt_check_failed`,
-  `anti_rt_cast_failed` and `anti_rt_out_of_memory`. The step reads every
-  row against `src/rt/` and marks each function that calls `exit`,
-  `abort` or a `_Noreturn` function on every path.
+  `anti_rt_cast_failed`, `anti_rt_out_of_memory`, `anti_rt_table_unset`
+  and `anti_rt_walk_changed`. The step reads every row against `src/rt/`
+  and marks each function that calls `exit`, `abort` or a `_Noreturn`
+  function on every path.
 - A terminator `IR_UNREACHABLE` after the last enum value of the IR
   instructions. Lowering ends a block with it after a call of a function
   that never returns.
@@ -238,7 +239,12 @@ The IR gains three facts.
 The emitter writes `noreturn cold` on the declaration of such a function.
 It writes `unreachable` for `IR_UNREACHABLE`. `ir_verify.c` refuses an
 instruction after `IR_UNREACHABLE` and a block that falls through a call
-of a never-returning function.
+of a never-returning function. The failure arm of an assertion and of a
+dev-mode check therefore ends with its call of the runtime. The step
+changes the DESIGN comments above `assert_branch` in
+`src/antic/lower_stmt.c` and `lower_check_branch` in
+`src/antic/lower_check.c`, which said that the arm falls through to the
+rest.
 
 The C side matches the IR. `anti_rt_exit` in `src/rt/io.c` and
 `src/rt/std.h` becomes `_Noreturn`. The unit test `runtime_functions` of

@@ -53,7 +53,7 @@ const char *ir_op_name(enum ir_op op)
         [IR_VSHUFFLE] = "vshuffle", [IR_VREDUCE] = "vreduce",
         [IR_CALL] = "call", [IR_JUMP] = "jump", [IR_BRANCH] = "branch",
         [IR_BRANCH_OV] = "branchov",
-        [IR_RET] = "ret",
+        [IR_RET] = "ret", [IR_UNREACHABLE] = "unreachable",
     };
     return names[op];
 }
@@ -236,7 +236,9 @@ static void signature(struct text *out, const struct ir_module *m,
         text_append(out, f->param_count > 0 ? ", ..." : "...");
     }
     text_append(out, ")");
-    if (f->result == IR_AGG) {
+    if (f->never_returns) {
+        text_append(out, " -> never");
+    } else if (f->result == IR_AGG) {
         text_appendf(out, " -> agg %s", m->aggs[f->result_agg]->name);
     } else if (f->result != IR_VOID) {
         text_appendf(out, " -> %s", ir_type_name(f->result));
@@ -351,6 +353,8 @@ static void instruction(struct text *out, const struct ir_module *m,
         }
         text_append(out, ", ");
         ir_vtype_print(out, m, inst->of);
+        break;
+    case IR_UNREACHABLE:
         break;
     case IR_RET:
         if (inst->type != IR_VOID) {
