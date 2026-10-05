@@ -218,11 +218,12 @@ set(ANTIC_TEST_LTO "" CACHE STRING
 if(NOT ANTIC_TEST_LTO MATCHES "^(|full|thin)$")
     message(FATAL_ERROR "ANTIC_TEST_LTO is full, thin or empty, not ${ANTIC_TEST_LTO}")
 endif()
-# Set out to the options after it, with --lto of ANTIC_TEST_LTO added.
+# Set out to the options after it, with --lto of ANTIC_TEST_LTO added. An
+# option may stand in a word of options joined by commas.
 function(antic_test_lto out)
     set(options ${ARGN})
     if(ANTIC_TEST_LTO AND NOT options MATCHES
-       "(^|;)(--dev|-S|-c|--lib|--linker|--lto)(;|$)")
+       "(^|[;,])(--dev|-S|-c|--lib|--linker|--lto)([;,]|$)")
         list(APPEND options --lto ${ANTIC_TEST_LTO})
     endif()
     set(${out} ${options} PARENT_SCOPE)
@@ -1333,13 +1334,21 @@ set_tests_properties(program_by_unsigned PROPERTIES TIMEOUT 60)
 file(GLOB std_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/std/*.anti")
 # A program whose output follows the Win32 errors of Windows brings
-# NAME.win32.expected for the Windows targets.
+# NAME.win32.expected for the Windows targets. One whose output follows
+# the inlining of release mode brings NAME.lto.expected for the suite
+# behind ANTIC_TEST_LTO, where the LTO of lld inlines across the runtime
+# and the program as well. A trace then names the caller, as the entry on
+# the inlining of release mode in docs/decisions.md says.
 foreach(source IN LISTS std_sources)
     get_filename_component(name "${source}" NAME_WE)
     set(expected "")
     set(win32_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.win32.expected")
+    set(lto_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.lto.expected")
     if(ANTIC_HOST_TARGET MATCHES "^windows-" AND EXISTS "${win32_expected}")
         set(expected EXPECTED "${win32_expected}")
+    endif()
+    if(ANTIC_TEST_LTO AND EXISTS "${lto_expected}")
+        set(expected EXPECTED "${lto_expected}")
     endif()
     antic_program_test(std_${name}
         "${source}"
