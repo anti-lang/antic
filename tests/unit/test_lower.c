@@ -582,7 +582,7 @@ struct rt_row {
     int agrees[1 + RT_PARAMS_MAX];
 };
 
-#define RT_TEST_ROW(id, name, ends, ...)                                   \
+#define RT_TEST_ROW(id, name, ends, effects, ...)                          \
     {id, #name, RT_NEVER_RETURNS(ends), RT_DECLARED(name, __VA_ARGS__),    \
      RT_COUNT(__VA_ARGS__), {RT_EACH(RT_AGREES, __VA_ARGS__)}},
 
@@ -703,6 +703,86 @@ static void runtime_functions(void)
         }
     }
     text_free(&headers);
+}
+
+/* DESIGN: the memory effects of every runtime function, written from its
+   C body in src/rt/ and not from RT_FUNCTIONS. A row of the table that
+   says less than the body does lets LLVM move a load or a store across
+   the call, and no test of speed shows it. A function that reads a global,
+   reads through a pointer it loaded, takes a lock, does an atomic
+   operation or calls a handler is IR_EFFECTS_ANY. So is every function
+   that never returns, since each writes its report through the C library
+   before it ends the program. */
+struct rt_effects_row {
+    const char *name;
+    enum ir_effects effects;
+    unsigned guarantees;
+};
+
+#define RT_SETTLED (IR_WILLRETURN | IR_NOSYNC | IR_NOFREE)
+
+static const struct rt_effects_row rt_effects_rows[] = {
+    /* memcmp over the two runs the arguments point to. */
+    {"anti_rt_compare_bytes", IR_EFFECTS_READS_ARGS, RT_SETTLED},
+    /* malloc and memcpy from the argument. malloc is not nosync, and it
+       sets errno when it fails. */
+    {"anti_rt_copy_buffer", IR_EFFECTS_WRITES_ARGS,
+     IR_WILLRETURN | IR_NOFREE},
+    /* Arithmetic on the argument. */
+    {"anti_rt_f16_to_f32", IR_EFFECTS_NONE, RT_SETTLED},
+    {"anti_rt_f32_to_f16", IR_EFFECTS_NONE, RT_SETTLED},
+    /* realloc of the argument, which frees it, and the end of the program
+       when it fails. */
+    {"anti_rt_grow", IR_EFFECTS_WRITES_ARGS, 0},
+    /* memcpy from the argument into words of its own. */
+    {"anti_rt_hash_bytes", IR_EFFECTS_READS_ARGS, RT_SETTLED},
+    /* memcmp over the two runs the arguments point to. */
+    {"anti_rt_same_bytes", IR_EFFECTS_READS_ARGS, RT_SETTLED},
+    /* memcpy from one argument into another. */
+    {"anti_rt_snapshot_text", IR_EFFECTS_WRITES_ARGS, RT_SETTLED},
+};
+
+/* The row of the table for name, or NULL for a function of the class
+   IR_EFFECTS_ANY. */
+static const struct rt_effects_row *rt_effects_of(const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < sizeof rt_effects_rows / sizeof rt_effects_rows[0]; i++) {
+        if (strcmp(rt_effects_rows[i].name, name) == 0) {
+            return &rt_effects_rows[i];
+        }
+    }
+    return NULL;
+}
+
+/* The column of memory effects of every row of RT_FUNCTIONS agrees with
+   the table above. A function of the class IR_EFFECTS_ANY carries no
+   guarantee, since LLVM reads none without a class. */
+static void runtime_effects(void)
+{
+    size_t found = 0;
+    size_t i;
+
+    for (i = 0; i < (size_t)RT_FUNCTION_COUNT; i++) {
+        const struct rt_signature *s = rt_signature((enum rt_function)i);
+        const struct rt_effects_row *row = rt_effects_of(s->name);
+        enum ir_effects effects =
+            row != NULL ? row->effects : IR_EFFECTS_ANY;
+        unsigned guarantees = row != NULL ? row->guarantees : 0;
+
+        found += row != NULL;
+        if (s->effects != effects || s->guarantees != guarantees) {
+            check_failures++;
+            fprintf(stderr, "%s: the row has the effects %d and the "
+                    "guarantees %u, its body %d and %u\n", s->name,
+                    (int)s->effects, s->guarantees, (int)effects,
+                    guarantees);
+        }
+        CHECK(!s->never_returns || s->effects == IR_EFFECTS_ANY);
+    }
+    /* Every function of the table is a row of RT_FUNCTIONS. */
+    CHECK(found == sizeof rt_effects_rows / sizeof rt_effects_rows[0]);
 }
 
 /* The layout of a C struct: the offset and the size of each member that
@@ -2109,6 +2189,7 @@ void test_lower(void)
     records_check_kinds();
     allocates_zeroed_classes();
     runtime_functions();
+    runtime_effects();
     runtime_records();
     match_layout();
 }

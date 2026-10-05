@@ -1,0 +1,11 @@
+exit 0
+round 0: same 0, before 1, after 0, hash kept 1
+round 1: same 1, before 0, after 0, hash kept 0
+round 2: same 0, before 0, after 1, hash kept 0
+half 0.5000
+half 1.5000
+half 4.5000
+copies 1 9 9
+snapshot abcf 1
+buffer xbcf
+grown 3: 10 20 30

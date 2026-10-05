@@ -1,0 +1,51 @@
+//! A call of each runtime function whose declaration carries memory effects:
+//! `==`, `<` and `hash` on a `str`, the conversions of an `f16` below
+//! x86-64-v3, `to_slice` and the copy of a `str` into a snapshot. Only the
+//! `dup` of a class copies an owned buffer, and its tables would fill the text,
+//! so `anti_rt_copy_buffer` is left to the unit test of the classes.
+
+struct Count
+{
+	at: int,
+}
+
+operator fn next(c: *Count) -> bool
+{
+	c.at = c.at + 1;
+	return c.at <= 3;
+}
+
+operator fn value(c: *Count) -> int
+{
+	return c.at;
+}
+
+fn texts(a: str, b: str) -> u64
+{
+	if a == b || a < b {
+		return 1;
+	}
+	return a.hash();
+}
+
+fn halves(x: f32) -> f32
+{
+	let h: f16 = x as f16;
+	return h;
+}
+
+fn collect() -> []int
+{
+	return Count { at: 0 }.to_slice();
+}
+
+fn hold(keep own f: fn(int))
+{
+}
+
+fn snapshot(word: str)
+{
+	hold(snapshot fn(n) {
+		let w = word;
+	});
+}

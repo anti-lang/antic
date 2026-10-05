@@ -1,0 +1,153 @@
+//! The runtime functions whose declarations carry memory effects, each called
+//! again after a write to the memory it reads. A `str` and a slice here share
+//! the bytes of one buffer, and the program changes a byte of it between two
+//! calls with the same arguments. A declaration that said less than the C body
+//! does would let LLVM reuse the first answer or move the write past the call,
+//! and the second line of each pair would repeat the first.
+
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Holds an owned buffer, which `dup` copies.
+class Holder
+{
+	pub own s: []int,
+}
+
+/// Holds an owned function value, whose snapshot copies the bytes of a `str`.
+class Button
+{
+	pub own handler: fn(int) = ignore,
+
+	pub fn on_click(self, keep own f: fn(int))
+	{
+		self.handler = f;
+	}
+
+	pub fn click(self, n: int)
+	{
+		self.handler(n);
+	}
+}
+
+/// Counts up from `at` to 3, so `to_slice` grows its buffer.
+class Count
+{
+	at: int = 0,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at <= 3;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.at * 10;
+	}
+}
+
+fn ignore(n: int)
+{
+}
+
+fn yes(b: bool) -> c_int
+{
+	return b as c_int;
+}
+
+/// The text of `raw`, a view that shares its bytes.
+fn view(raw: *byte, n: int) -> str
+{
+	return text.from_bytes([]byte { ptr: raw, len: n });
+}
+
+fn compare(raw: *byte) -> int
+{
+	let a = view(raw, 4);
+	let first = a.hash();
+	for round in 0..3 {
+		printf("round %d: same %d, before %d, after %d, hash kept %d\n".ptr,
+			round as c_int, yes(a == "abcd"), yes(a < "abcd"),
+			yes("abcd" < a), yes(a.hash() == first));
+		raw[3] = raw[3] + 1;
+	}
+	return 0;
+}
+
+fn halves()
+{
+	let x: f32 = 0.5;
+	for round in 0..3 {
+		let h: f16 = x as f16;
+		printf("half %.4f\n".ptr, h as f64);
+		x = x * 3.0;
+	}
+}
+
+fn copies() -> int
+{
+	let raw = alloc(int, 2) else { return 1; };
+	raw[0] = 1;
+	raw[1] = 2;
+	let h = alloc Holder { s: []int { ptr: raw, len: 2 } };
+	let before = dup(h);
+	h.s[0] = 9;
+	let after = dup(h);
+	printf("copies %d %d %d\n".ptr, before.s[0] as c_int, after.s[0] as c_int,
+		h.s[0] as c_int);
+	delete(before);
+	delete(after);
+	delete(h);
+	return 0;
+}
+
+fn snapshot_of(raw: *byte) -> int
+{
+	let word = view(raw, 4);
+	let b = alloc Button { };
+	b.on_click(snapshot fn(n) {
+		printf("snapshot %.*s %d\n".ptr, word.len as c_int, word.ptr,
+			n as c_int);
+	});
+	raw[0] = 120;
+	b.click(1);
+	printf("buffer %.*s\n".ptr, word.len as c_int, word.ptr);
+	delete(b);
+	return 0;
+}
+
+fn grown()
+{
+	let all = Count { }.to_slice();
+	printf("grown %d:".ptr, all.len as c_int);
+	for x in all {
+		printf(" %d".ptr, x as c_int);
+	}
+	printf("\n".ptr);
+	free(all.ptr);
+}
+
+fn main() -> int
+{
+	let raw = alloc(byte, 5) else { return 1; };
+	raw[0] = 97;
+	raw[1] = 98;
+	raw[2] = 99;
+	raw[3] = 99;
+	raw[4] = 0;
+	if compare(raw) != 0 {
+		return 1;
+	}
+	halves();
+	if copies() != 0 {
+		return 1;
+	}
+	if snapshot_of(raw) != 0 {
+		return 1;
+	}
+	grown();
+	free(raw);
+	return 0;
+}

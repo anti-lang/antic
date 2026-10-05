@@ -649,6 +649,21 @@ static void read_body(struct reader *r, struct ir_module *program,
     }
 }
 
+/* DESIGN: a C function that two modules declare has the memory effects
+   and the guarantees both give it, else the class IR_EFFECTS_ANY and no
+   guarantee. A module that declares a runtime function with an extern fn
+   of its own says nothing of its memory, and the LLVM text then writes
+   nothing either. */
+static void merge_effects(struct ir_function *f, uint8_t effects)
+{
+    if ((unsigned)f->effects != (effects & 3u)) {
+        f->effects = IR_EFFECTS_ANY;
+        f->guarantees = 0;
+        return;
+    }
+    f->guarantees = (uint8_t)(f->guarantees & effects >> 2);
+}
+
 /* A function signature, mapped to a function of the program. A C function
    and a declaration share an existing entry of the same name. */
 static uint32_t read_signature(struct reader *r, struct ir_module *program,
@@ -656,6 +671,7 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
                                bool *skip)
 {
     uint8_t flags = antl_get_u8(r);
+    uint8_t effects = antl_get_u8(r);
     const char *module = antl_get_cstr(r);
     const char *name = antl_get_cstr(r);
     uint8_t result = antl_get_u8(r);
@@ -671,7 +687,7 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
     if (r->failed) {
         return 0;
     }
-    if (!valid_type(result) || flags > 31 ||
+    if (!valid_type(result) || flags > 31 || effects >> 2 > IR_GUARANTEES ||
         ((flags & 1) == 0 && module[0] == '\0') ||
         (module[0] != '\0' && (flags & 2) != 0) ||
         (module[0] == '\0' && (flags & 4) != 0)) {
@@ -718,6 +734,7 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
        verifier refuses for a function that never returns. */
     if (f != NULL) {
         f->never_returns = f->never_returns && (flags & 16) != 0;
+        merge_effects(f, effects);
     }
     if (f == NULL) {
         if ((flags & 1) == 0) {
@@ -737,6 +754,8 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
                                result_agg);
         }
         f->never_returns = (flags & 16) != 0;
+        f->effects = (enum ir_effects)(effects & 3);
+        f->guarantees = (uint8_t)(effects >> 2);
         f->exported = (flags & 4) != 0;
         f->worker = (flags & 8) != 0;
         f->file = file == IR_NO_INDEX ? IR_NO_INDEX : maps->files[file];

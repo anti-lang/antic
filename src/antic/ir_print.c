@@ -213,6 +213,21 @@ static void param_type(struct text *out, const struct ir_module *m,
     }
 }
 
+/* The memory effects of a C function and its guarantees, after its
+   result. A function of the class IR_EFFECTS_ANY shows none. */
+static void effects(struct text *out, const struct ir_function *f)
+{
+    static const char *const classes[] = {"", "none", "reads", "writes"};
+
+    if (f->effects == IR_EFFECTS_ANY) {
+        return;
+    }
+    text_appendf(out, " effects %s%s%s%s", classes[f->effects],
+                 (f->guarantees & IR_WILLRETURN) != 0 ? " willreturn" : "",
+                 (f->guarantees & IR_NOSYNC) != 0 ? " nosync" : "",
+                 (f->guarantees & IR_NOFREE) != 0 ? " nofree" : "");
+}
+
 static void signature(struct text *out, const struct ir_module *m,
                       const struct ir_function *f)
 {
@@ -243,6 +258,7 @@ static void signature(struct text *out, const struct ir_module *m,
     } else if (f->result != IR_VOID) {
         text_appendf(out, " -> %s", ir_type_name(f->result));
     }
+    effects(out, f);
 }
 
 static void instruction(struct text *out, const struct ir_module *m,

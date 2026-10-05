@@ -77,161 +77,188 @@
 #define RT_EACH_9(m, r, a, b, c, d, e, f, g, h, i)                         \
     m r, m a, m b, m c, m d, m e, m f, m g, m h, m i
 
+/* The memory effects of a row: a class of enum ir_effects and the
+   guarantees of the function. Each is read from the C body in src/rt/,
+   and the unit test runtime_effects holds the same reading. */
+#define RT_ANY (IR_EFFECTS_ANY, 0)
+/* Arithmetic on its arguments alone. */
+#define RT_PURE (IR_EFFECTS_NONE, IR_GUARANTEES)
+/* Reads the memory its arguments point to and nothing else. */
+#define RT_READS (IR_EFFECTS_READS_ARGS, IR_GUARANTEES)
+/* Copies between the memory its arguments point to. */
+#define RT_WRITES (IR_EFFECTS_WRITES_ARGS, IR_GUARANTEES)
+/* Copies the memory of an argument into memory of malloc, which is not
+   nosync. */
+#define RT_ALLOCATES (IR_EFFECTS_WRITES_ARGS, IR_WILLRETURN | IR_NOFREE)
+/* Grows a buffer with realloc, which frees the old one, and ends the
+   program when it fails. */
+#define RT_REALLOCATES (IR_EFFECTS_WRITES_ARGS, 0)
+
+#define RT_EFFECTS_CLASS(effects) RT_EFFECTS_CLASS_ effects
+#define RT_EFFECTS_CLASS_(c, g) c
+#define RT_EFFECTS_GUARANTEES(effects) RT_EFFECTS_GUARANTEES_ effects
+#define RT_EFFECTS_GUARANTEES_(c, g) g
+
 /* The runtime functions that generated code calls, in the order of
-   their names. A row is X(id, name, ends, result, parameters...). ends is
-   NEVER for a function that ends the program on every path, which its
-   prototype in src/rt/ declares _Noreturn, and RETURNS for every other
-   one. */
+   their names. A row is X(id, name, ends, effects, result,
+   parameters...). ends is NEVER for a function that ends the program on
+   every path, which its prototype in src/rt/ declares _Noreturn, and
+   RETURNS for every other one. effects is one of the sets above. */
 #define RT_FUNCTIONS(X)                                                    \
-    X(RT_FN_ASSERT_FAILED, anti_rt_assert_failed, NEVER, (VOID, void),     \
-      (PTR, const unsigned char *), (I64, int64_t))                        \
-    X(RT_FN_ATOMIC_ADD, anti_rt_atomic_add, RETURNS, (I64, int64_t),       \
-      (PTR, void *), (I64, int64_t), (I64, int64_t))                       \
-    X(RT_FN_ATOMIC_AND, anti_rt_atomic_and, RETURNS, (I64, int64_t),       \
-      (PTR, void *), (I64, int64_t), (I64, int64_t))                       \
+    X(RT_FN_ASSERT_FAILED, anti_rt_assert_failed, NEVER, RT_ANY,           \
+      (VOID, void), (PTR, const unsigned char *), (I64, int64_t))          \
+    X(RT_FN_ATOMIC_ADD, anti_rt_atomic_add, RETURNS, RT_ANY,               \
+      (I64, int64_t), (PTR, void *), (I64, int64_t), (I64, int64_t))       \
+    X(RT_FN_ATOMIC_AND, anti_rt_atomic_and, RETURNS, RT_ANY,               \
+      (I64, int64_t), (PTR, void *), (I64, int64_t), (I64, int64_t))       \
     X(RT_FN_ATOMIC_COMPARE_SWAP, anti_rt_atomic_compare_swap, RETURNS,     \
-      (I8, int8_t), (PTR, void *), (I64, int64_t), (I64, int64_t),         \
+      RT_ANY, (I8, int8_t), (PTR, void *), (I64, int64_t), (I64, int64_t), \
       (I64, int64_t))                                                      \
-    X(RT_FN_ATOMIC_LOAD, anti_rt_atomic_load, RETURNS, (I64, int64_t),     \
-      (PTR, const void *), (I64, int64_t))                                 \
-    X(RT_FN_ATOMIC_OR, anti_rt_atomic_or, RETURNS, (I64, int64_t),         \
+    X(RT_FN_ATOMIC_LOAD, anti_rt_atomic_load, RETURNS, RT_ANY,             \
+      (I64, int64_t), (PTR, const void *), (I64, int64_t))                 \
+    X(RT_FN_ATOMIC_OR, anti_rt_atomic_or, RETURNS, RT_ANY, (I64, int64_t), \
       (PTR, void *), (I64, int64_t), (I64, int64_t))                       \
-    X(RT_FN_ATOMIC_STORE, anti_rt_atomic_store, RETURNS, (VOID, void),     \
-      (PTR, void *), (I64, int64_t), (I64, int64_t))                       \
-    X(RT_FN_ATOMIC_SUB, anti_rt_atomic_sub, RETURNS, (I64, int64_t),       \
-      (PTR, void *), (I64, int64_t), (I64, int64_t))                       \
-    X(RT_FN_ATOMIC_SWAP, anti_rt_atomic_swap, RETURNS, (I64, int64_t),     \
-      (PTR, void *), (I64, int64_t), (I64, int64_t))                       \
-    X(RT_FN_BACKTRACE_ON, anti_rt_backtrace_on, RETURNS, (I8, bool))       \
-    X(RT_FN_CAST_FAILED, anti_rt_cast_failed, NEVER, (VOID, void),         \
+    X(RT_FN_ATOMIC_STORE, anti_rt_atomic_store, RETURNS, RT_ANY,           \
+      (VOID, void), (PTR, void *), (I64, int64_t), (I64, int64_t))         \
+    X(RT_FN_ATOMIC_SUB, anti_rt_atomic_sub, RETURNS, RT_ANY,               \
+      (I64, int64_t), (PTR, void *), (I64, int64_t), (I64, int64_t))       \
+    X(RT_FN_ATOMIC_SWAP, anti_rt_atomic_swap, RETURNS, RT_ANY,             \
+      (I64, int64_t), (PTR, void *), (I64, int64_t), (I64, int64_t))       \
+    X(RT_FN_BACKTRACE_ON, anti_rt_backtrace_on, RETURNS, RT_ANY,           \
+      (I8, bool))                                                          \
+    X(RT_FN_CAST_FAILED, anti_rt_cast_failed, NEVER, RT_ANY, (VOID, void), \
       (PTR, const unsigned char *), (I64, int64_t))                        \
-    X(RT_FN_CHAN_CLOSE, anti_rt_chan_close, RETURNS, (VOID, void),         \
+    X(RT_FN_CHAN_CLOSE, anti_rt_chan_close, RETURNS, RT_ANY, (VOID, void), \
       (PTR, void *))                                                       \
-    X(RT_FN_CHAN_DELETE, anti_rt_chan_delete, RETURNS, (VOID, void),       \
-      (PTR, void *))                                                       \
-    X(RT_FN_CHAN_NEW, anti_rt_chan_new, RETURNS, (PTR, void *),            \
+    X(RT_FN_CHAN_DELETE, anti_rt_chan_delete, RETURNS, RT_ANY,             \
+      (VOID, void), (PTR, void *))                                         \
+    X(RT_FN_CHAN_NEW, anti_rt_chan_new, RETURNS, RT_ANY, (PTR, void *),    \
       (I64, int64_t), (I64, int64_t))                                      \
-    X(RT_FN_CHAN_RECV, anti_rt_chan_recv, RETURNS, (PTR, void *),          \
+    X(RT_FN_CHAN_RECV, anti_rt_chan_recv, RETURNS, RT_ANY, (PTR, void *),  \
       (PTR, void *), (PTR, void *))                                        \
-    X(RT_FN_CHAN_SEND, anti_rt_chan_send, RETURNS, (VOID, void),           \
+    X(RT_FN_CHAN_SEND, anti_rt_chan_send, RETURNS, RT_ANY, (VOID, void),   \
       (PTR, void *), (PTR, const void *))                                  \
-    X(RT_FN_CHECK_FAILED, anti_rt_check_failed, NEVER, (VOID, void),       \
-      (PTR, const unsigned char *), (I64, int64_t), (I32, int32_t),        \
-      (I64, int64_t), (I64, int64_t))                                      \
-    X(RT_FN_COMPARE_BYTES, anti_rt_compare_bytes, RETURNS, (I64, int64_t), \
-      (PTR, const unsigned char *), (I64, int64_t),                        \
+    X(RT_FN_CHECK_FAILED, anti_rt_check_failed, NEVER, RT_ANY,             \
+      (VOID, void), (PTR, const unsigned char *), (I64, int64_t),          \
+      (I32, int32_t), (I64, int64_t), (I64, int64_t))                      \
+    X(RT_FN_COMPARE_BYTES, anti_rt_compare_bytes, RETURNS, RT_READS,       \
+      (I64, int64_t), (PTR, const unsigned char *), (I64, int64_t),        \
       (PTR, const unsigned char *), (I64, int64_t))                        \
-    X(RT_FN_COPY_BUFFER, anti_rt_copy_buffer, RETURNS, (PTR, void *),      \
-      (PTR, const void *), (I64, int64_t))                                 \
-    X(RT_FN_DELETE, anti_rt_delete, RETURNS, (VOID, void), (PTR, void *),  \
-      (PTR, const struct anti_descriptor *))                               \
-    X(RT_FN_DELETE_FROM, anti_rt_delete_from, RETURNS, (VOID, void),       \
-      (PTR, void *), (PTR, const struct anti_descriptor *),                \
-      (PTR, struct anti_object *))                                         \
-    X(RT_FN_DESCRIPTOR, anti_rt_descriptor, RETURNS,                       \
-      (PTR, const struct anti_descriptor *), (PTR, const void *))          \
-    X(RT_FN_DESTROY, anti_rt_destroy, RETURNS, (VOID, void),               \
+    X(RT_FN_COPY_BUFFER, anti_rt_copy_buffer, RETURNS, RT_ALLOCATES,       \
+      (PTR, void *), (PTR, const void *), (I64, int64_t))                  \
+    X(RT_FN_DELETE, anti_rt_delete, RETURNS, RT_ANY, (VOID, void),         \
       (PTR, void *), (PTR, const struct anti_descriptor *))                \
-    X(RT_FN_DESTROY_FROM, anti_rt_destroy_from, RETURNS, (VOID, void),     \
-      (PTR, void *), (PTR, const struct anti_descriptor *),                \
+    X(RT_FN_DELETE_FROM, anti_rt_delete_from, RETURNS, RT_ANY,             \
+      (VOID, void), (PTR, void *), (PTR, const struct anti_descriptor *),  \
       (PTR, struct anti_object *))                                         \
-    X(RT_FN_DISPATCH, anti_rt_dispatch, RETURNS, (PTR, void *),            \
+    X(RT_FN_DESCRIPTOR, anti_rt_descriptor, RETURNS, RT_ANY,               \
+      (PTR, const struct anti_descriptor *), (PTR, const void *))          \
+    X(RT_FN_DESTROY, anti_rt_destroy, RETURNS, RT_ANY, (VOID, void),       \
+      (PTR, void *), (PTR, const struct anti_descriptor *))                \
+    X(RT_FN_DESTROY_FROM, anti_rt_destroy_from, RETURNS, RT_ANY,           \
+      (VOID, void), (PTR, void *), (PTR, const struct anti_descriptor *),  \
+      (PTR, struct anti_object *))                                         \
+    X(RT_FN_DISPATCH, anti_rt_dispatch, RETURNS, RT_ANY, (PTR, void *),    \
       (PTR, void *), (I64, int64_t), (PTR, anti_rt_dispatch_body *),       \
       (PTR, void *))                                                       \
-    X(RT_FN_DUP, anti_rt_dup, RETURNS, (PTR, void *), (PTR, void *),       \
-      (PTR, const struct anti_descriptor *))                               \
-    X(RT_FN_F16_TO_F32, anti_rt_f16_to_f32, RETURNS, (F32, float),         \
-      (I32, uint32_t))                                                     \
-    X(RT_FN_F32_TO_F16, anti_rt_f32_to_f16, RETURNS, (I32, uint32_t),      \
-      (F32, float))                                                        \
-    X(RT_FN_GIVE, anti_rt_give, RETURNS, (VOID, void),                     \
+    X(RT_FN_DUP, anti_rt_dup, RETURNS, RT_ANY, (PTR, void *),              \
+      (PTR, void *), (PTR, const struct anti_descriptor *))                \
+    X(RT_FN_F16_TO_F32, anti_rt_f16_to_f32, RETURNS, RT_PURE,              \
+      (F32, float), (I32, uint32_t))                                       \
+    X(RT_FN_F32_TO_F16, anti_rt_f32_to_f16, RETURNS, RT_PURE,              \
+      (I32, uint32_t), (F32, float))                                       \
+    X(RT_FN_GIVE, anti_rt_give, RETURNS, RT_ANY, (VOID, void),             \
       (PTR, struct anti_object *), (PTR, void *))                          \
-    X(RT_FN_GROW, anti_rt_grow, RETURNS, (PTR, void *), (PTR, void *),     \
-      (I64, int64_t))                                                      \
-    X(RT_FN_HASH_BYTES, anti_rt_hash_bytes, RETURNS, (I64, uint64_t),      \
-      (PTR, const unsigned char *), (I64, int64_t))                        \
-    X(RT_FN_HOOK, anti_rt_hook, RETURNS, (VOID, void),                     \
+    X(RT_FN_GROW, anti_rt_grow, RETURNS, RT_REALLOCATES, (PTR, void *),    \
+      (PTR, void *), (I64, int64_t))                                       \
+    X(RT_FN_HASH_BYTES, anti_rt_hash_bytes, RETURNS, RT_READS,             \
+      (I64, uint64_t), (PTR, const unsigned char *), (I64, int64_t))       \
+    X(RT_FN_HOOK, anti_rt_hook, RETURNS, RT_ANY, (VOID, void),             \
       (PTR, struct anti_object *), (I64, int64_t))                         \
-    X(RT_FN_HOOK_CALL, anti_rt_hook_call, RETURNS, (VOID, void),           \
+    X(RT_FN_HOOK_CALL, anti_rt_hook_call, RETURNS, RT_ANY, (VOID, void),   \
       (PTR, struct anti_object *), (I64, int64_t),                         \
       (PTR, const unsigned char *), (I64, int64_t))                        \
-    X(RT_FN_HOOK_CHANGED, anti_rt_hook_changed, RETURNS, (VOID, void),     \
-      (PTR, struct anti_object *), (PTR, const struct anti_field *))       \
-    X(RT_FN_HOOK_COPIED, anti_rt_hook_copied, RETURNS, (VOID, void),       \
-      (PTR, struct anti_object *), (PTR, struct anti_object *))            \
-    X(RT_FN_HOOK_FAILED, anti_rt_hook_failed, RETURNS, (VOID, void),       \
-      (PTR, struct anti_object *), (PTR, const unsigned char *),           \
-      (I64, int64_t), (PTR, struct anti_object *))                         \
-    X(RT_FN_INIT, anti_rt_init, RETURNS, (VOID, void))                     \
-    X(RT_FN_JOIN, anti_rt_join, RETURNS, (VOID, void), (PTR, void *),      \
-      (I64, int64_t), (PTR, void *))                                       \
-    X(RT_FN_JOIN_ALL, anti_rt_join_all, RETURNS, (VOID, void),             \
-      (PTR, void *const *), (I64, int64_t))                                \
-    X(RT_FN_JOIN_ALL_HOOKED, anti_rt_join_all_hooked, RETURNS,             \
-      (VOID, void), (PTR, void *const *), (I64, int64_t))                  \
-    X(RT_FN_JOIN_HOOKED, anti_rt_join_hooked, RETURNS, (VOID, void),       \
+    X(RT_FN_HOOK_CHANGED, anti_rt_hook_changed, RETURNS, RT_ANY,           \
+      (VOID, void), (PTR, struct anti_object *),                           \
+      (PTR, const struct anti_field *))                                    \
+    X(RT_FN_HOOK_COPIED, anti_rt_hook_copied, RETURNS, RT_ANY,             \
+      (VOID, void), (PTR, struct anti_object *),                           \
+      (PTR, struct anti_object *))                                         \
+    X(RT_FN_HOOK_FAILED, anti_rt_hook_failed, RETURNS, RT_ANY,             \
+      (VOID, void), (PTR, struct anti_object *),                           \
+      (PTR, const unsigned char *), (I64, int64_t),                        \
+      (PTR, struct anti_object *))                                         \
+    X(RT_FN_INIT, anti_rt_init, RETURNS, RT_ANY, (VOID, void))             \
+    X(RT_FN_JOIN, anti_rt_join, RETURNS, RT_ANY, (VOID, void),             \
       (PTR, void *), (I64, int64_t), (PTR, void *))                        \
-    X(RT_FN_MUTEX_DESTROY, anti_rt_mutex_destroy, RETURNS, (VOID, void),   \
-      (PTR, void *))                                                       \
-    X(RT_FN_MUTEX_LOCK, anti_rt_mutex_lock, RETURNS, (VOID, void),         \
-      (PTR, void *))                                                       \
-    X(RT_FN_MUTEX_LOCK_AT, anti_rt_mutex_lock_at, RETURNS, (VOID, void),   \
-      (PTR, void *), (PTR, const char *))                                  \
-    X(RT_FN_MUTEX_UNLOCK, anti_rt_mutex_unlock, RETURNS, (VOID, void),     \
-      (PTR, void *))                                                       \
-    X(RT_FN_MUTEX_UNLOCK_AT, anti_rt_mutex_unlock_at, RETURNS,             \
+    X(RT_FN_JOIN_ALL, anti_rt_join_all, RETURNS, RT_ANY, (VOID, void),     \
+      (PTR, void *const *), (I64, int64_t))                                \
+    X(RT_FN_JOIN_ALL_HOOKED, anti_rt_join_all_hooked, RETURNS, RT_ANY,     \
+      (VOID, void), (PTR, void *const *), (I64, int64_t))                  \
+    X(RT_FN_JOIN_HOOKED, anti_rt_join_hooked, RETURNS, RT_ANY,             \
+      (VOID, void), (PTR, void *), (I64, int64_t), (PTR, void *))          \
+    X(RT_FN_MUTEX_DESTROY, anti_rt_mutex_destroy, RETURNS, RT_ANY,         \
       (VOID, void), (PTR, void *))                                         \
-    X(RT_FN_OBJECT_LOCK, anti_rt_object_lock, RETURNS, (VOID, void),       \
+    X(RT_FN_MUTEX_LOCK, anti_rt_mutex_lock, RETURNS, RT_ANY, (VOID, void), \
       (PTR, void *))                                                       \
-    X(RT_FN_OBJECT_LOCK_AT, anti_rt_object_lock_at, RETURNS, (VOID, void), \
-      (PTR, void *), (PTR, const char *))                                  \
-    X(RT_FN_OBJECT_LOCK_PAIR, anti_rt_object_lock_pair, RETURNS,           \
+    X(RT_FN_MUTEX_LOCK_AT, anti_rt_mutex_lock_at, RETURNS, RT_ANY,         \
+      (VOID, void), (PTR, void *), (PTR, const char *))                    \
+    X(RT_FN_MUTEX_UNLOCK, anti_rt_mutex_unlock, RETURNS, RT_ANY,           \
+      (VOID, void), (PTR, void *))                                         \
+    X(RT_FN_MUTEX_UNLOCK_AT, anti_rt_mutex_unlock_at, RETURNS, RT_ANY,     \
+      (VOID, void), (PTR, void *))                                         \
+    X(RT_FN_OBJECT_LOCK, anti_rt_object_lock, RETURNS, RT_ANY,             \
+      (VOID, void), (PTR, void *))                                         \
+    X(RT_FN_OBJECT_LOCK_AT, anti_rt_object_lock_at, RETURNS, RT_ANY,       \
+      (VOID, void), (PTR, void *), (PTR, const char *))                    \
+    X(RT_FN_OBJECT_LOCK_PAIR, anti_rt_object_lock_pair, RETURNS, RT_ANY,   \
       (VOID, void), (PTR, void *), (PTR, void *))                          \
     X(RT_FN_OBJECT_LOCK_PAIR_AT, anti_rt_object_lock_pair_at, RETURNS,     \
-      (VOID, void), (PTR, void *), (PTR, void *), (PTR, const char *))     \
-    X(RT_FN_OBJECT_OF, anti_rt_object_of, RETURNS, (PTR, void *),          \
+      RT_ANY, (VOID, void), (PTR, void *), (PTR, void *),                  \
+      (PTR, const char *))                                                 \
+    X(RT_FN_OBJECT_OF, anti_rt_object_of, RETURNS, RT_ANY, (PTR, void *),  \
       (PTR, void *))                                                       \
-    X(RT_FN_OBJECT_UNLOCK, anti_rt_object_unlock, RETURNS, (VOID, void),   \
-      (PTR, void *))                                                       \
-    X(RT_FN_OBJECT_UNLOCK_AT, anti_rt_object_unlock_at, RETURNS,           \
+    X(RT_FN_OBJECT_UNLOCK, anti_rt_object_unlock, RETURNS, RT_ANY,         \
+      (VOID, void), (PTR, void *))                                         \
+    X(RT_FN_OBJECT_UNLOCK_AT, anti_rt_object_unlock_at, RETURNS, RT_ANY,   \
       (VOID, void), (PTR, void *))                                         \
     X(RT_FN_OBJECT_UNLOCK_PAIR, anti_rt_object_unlock_pair, RETURNS,       \
-      (VOID, void), (PTR, void *), (PTR, void *))                          \
+      RT_ANY, (VOID, void), (PTR, void *), (PTR, void *))                  \
     X(RT_FN_OBJECT_UNLOCK_PAIR_AT, anti_rt_object_unlock_pair_at, RETURNS, \
-      (VOID, void), (PTR, void *), (PTR, void *))                          \
-    X(RT_FN_OUT_OF_MEMORY, anti_rt_out_of_memory, NEVER, (VOID, void),     \
-      (I64, int64_t))                                                      \
-    X(RT_FN_PARALLEL, anti_rt_parallel, RETURNS, (VOID, void),             \
+      RT_ANY, (VOID, void), (PTR, void *), (PTR, void *))                  \
+    X(RT_FN_OUT_OF_MEMORY, anti_rt_out_of_memory, NEVER, RT_ANY,           \
+      (VOID, void), (I64, int64_t))                                        \
+    X(RT_FN_PARALLEL, anti_rt_parallel, RETURNS, RT_ANY, (VOID, void),     \
       (PTR, const void *), (I64, int64_t), (I64, int64_t), (I64, int64_t), \
       (I64, int64_t), (PTR, anti_rt_parallel_body *), (PTR, void *),       \
       (PTR, void **), (PTR, int64_t *))                                    \
-    X(RT_FN_PATTERN_HASH, anti_rt_pattern_hash, RETURNS, (I64, uint64_t),  \
-      (PTR, const void *))                                                 \
-    X(RT_FN_PATTERN_SAME, anti_rt_pattern_same, RETURNS, (I8, int8_t),     \
-      (PTR, const void *), (PTR, const void *))                            \
-    X(RT_FN_REGEX_LITERAL, anti_rt_regex_literal, RETURNS, (PTR, void *),  \
-      (PTR, const unsigned char *), (I64, int64_t))                        \
-    X(RT_FN_REGEX_LITERAL_BYTES, anti_rt_regex_literal_bytes, RETURNS,     \
+    X(RT_FN_PATTERN_HASH, anti_rt_pattern_hash, RETURNS, RT_ANY,           \
+      (I64, uint64_t), (PTR, const void *))                                \
+    X(RT_FN_PATTERN_SAME, anti_rt_pattern_same, RETURNS, RT_ANY,           \
+      (I8, int8_t), (PTR, const void *), (PTR, const void *))              \
+    X(RT_FN_REGEX_LITERAL, anti_rt_regex_literal, RETURNS, RT_ANY,         \
       (PTR, void *), (PTR, const unsigned char *), (I64, int64_t))         \
-    X(RT_FN_SAME_BYTES, anti_rt_same_bytes, RETURNS, (I32, int),           \
+    X(RT_FN_REGEX_LITERAL_BYTES, anti_rt_regex_literal_bytes, RETURNS,     \
+      RT_ANY, (PTR, void *), (PTR, const unsigned char *), (I64, int64_t)) \
+    X(RT_FN_SAME_BYTES, anti_rt_same_bytes, RETURNS, RT_READS, (I32, int), \
       (PTR, const unsigned char *), (I64, int64_t),                        \
       (PTR, const unsigned char *), (I64, int64_t))                        \
-    X(RT_FN_SELECT, anti_rt_select, RETURNS, (I64, int64_t),               \
+    X(RT_FN_SELECT, anti_rt_select, RETURNS, RT_ANY, (I64, int64_t),       \
       (PTR, void *const *), (PTR, void *const *), (I64, int64_t),          \
       (PTR, void **))                                                      \
-    X(RT_FN_SNAPSHOT_DUP, anti_rt_snapshot_dup, RETURNS, (PTR, void *),    \
-      (PTR, const void *))                                                 \
-    X(RT_FN_SNAPSHOT_FREE, anti_rt_snapshot_free, RETURNS, (VOID, void),   \
-      (PTR, void *))                                                       \
-    X(RT_FN_SNAPSHOT_NEW, anti_rt_snapshot_new, RETURNS, (PTR, void *),    \
-      (I64, int64_t))                                                      \
-    X(RT_FN_SNAPSHOT_TEXT, anti_rt_snapshot_text, RETURNS, (VOID, void),   \
-      (PTR, void *), (I64, int64_t), (PTR, const unsigned char *),         \
-      (I64, int64_t))                                                      \
-    X(RT_FN_TABLE_UNSET, anti_rt_table_unset, NEVER, (VOID, void),         \
+    X(RT_FN_SNAPSHOT_DUP, anti_rt_snapshot_dup, RETURNS, RT_ANY,           \
+      (PTR, void *), (PTR, const void *))                                  \
+    X(RT_FN_SNAPSHOT_FREE, anti_rt_snapshot_free, RETURNS, RT_ANY,         \
+      (VOID, void), (PTR, void *))                                         \
+    X(RT_FN_SNAPSHOT_NEW, anti_rt_snapshot_new, RETURNS, RT_ANY,           \
+      (PTR, void *), (I64, int64_t))                                       \
+    X(RT_FN_SNAPSHOT_TEXT, anti_rt_snapshot_text, RETURNS, RT_WRITES,      \
+      (VOID, void), (PTR, void *), (I64, int64_t),                         \
       (PTR, const unsigned char *), (I64, int64_t))                        \
-    X(RT_FN_WALK_CHANGED, anti_rt_walk_changed, NEVER, (VOID, void),       \
-      (PTR, const unsigned char *), (I64, int64_t),                        \
+    X(RT_FN_TABLE_UNSET, anti_rt_table_unset, NEVER, RT_ANY, (VOID, void), \
+      (PTR, const unsigned char *), (I64, int64_t))                        \
+    X(RT_FN_WALK_CHANGED, anti_rt_walk_changed, NEVER, RT_ANY,             \
+      (VOID, void), (PTR, const unsigned char *), (I64, int64_t),          \
       (PTR, const unsigned char *), (I64, int64_t), (I64, int64_t))
 
 /* Whether the ends column of a row says the function never returns. */
@@ -248,6 +275,8 @@ enum rt_function { RT_FUNCTIONS(RT_FUNCTION_ENUM) RT_FUNCTION_COUNT };
 struct rt_signature {
     const char *name;
     bool never_returns;
+    enum ir_effects effects;
+    uint8_t guarantees;
     size_t param_count;
     enum ir_type types[1 + RT_PARAMS_MAX];
 };

@@ -947,6 +947,8 @@ struct ir_function *lower_rt_declare(struct lowerer *l, enum rt_function f)
     if (fn == NULL) {
         fn = ir_extern_add(l->m, s->name, s->types[0], false);
         fn->never_returns = s->never_returns;
+        fn->effects = s->effects;
+        fn->guarantees = s->guarantees;
         for (i = 0; i < s->param_count; i++) {
             ir_param_add(fn, s->types[1 + i], IR_NO_AGG);
         }

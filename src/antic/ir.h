@@ -267,6 +267,33 @@ struct ir_param {
     uint32_t temp;
 };
 
+/* DESIGN: the memory a C function reads and writes, in the classes of
+   "Memory effects of runtime functions" in
+   docs/work-order-llvm-optimization.md. The LLVM text writes each class
+   as the attribute in its comment on the declaration of the function.
+   IR_EFFECTS_ANY writes none and is the class of every function the IR
+   knows nothing of, since a class that says less than the C body does
+   lets LLVM move a load or a store across the call. A function that
+   allocates calls malloc or realloc of the C library, which set errno
+   when they fail, so its class writes errno as well. */
+enum ir_effects {
+    IR_EFFECTS_ANY,         /* no attribute */
+    IR_EFFECTS_NONE,        /* memory(none) */
+    IR_EFFECTS_READS_ARGS,  /* memory(argmem: read) */
+    /* memory(argmem: readwrite, inaccessiblemem: readwrite,
+       errnomem: write): it writes through its arguments and allocates */
+    IR_EFFECTS_WRITES_ARGS,
+};
+
+/* The guarantees of a C function of a class other than IR_EFFECTS_ANY,
+   which the LLVM text writes as the attributes of the same names. */
+enum {
+    IR_WILLRETURN = 1,      /* no path of its body ends the program or waits */
+    IR_NOSYNC = 2,          /* no lock, no atomic operation, no handler */
+    IR_NOFREE = 4,          /* it frees no memory */
+    IR_GUARANTEES = 7,      /* every guarantee */
+};
+
 /* DESIGN: a source position is one line and one file per function. The
    file is an index into the module's table, so a function names its
    source in four bytes and the IR holds each path once. at_line is the
@@ -298,6 +325,10 @@ struct ir_function {
     /* The function ends the program on every path. Each call of it ends
        its block with IR_UNREACHABLE. */
     bool never_returns;
+    /* The memory a C function reads and writes, and its guarantees, a
+       set of IR_WILLRETURN, IR_NOSYNC and IR_NOFREE. */
+    enum ir_effects effects;
+    uint8_t guarantees;
     struct ir_block **blocks;
     size_t block_count;
     size_t block_capacity;

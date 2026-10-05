@@ -287,11 +287,15 @@ LLVM spells them:
 |---|---|---|
 | none | `memory(none)` | `anti_rt_hash_seeded` |
 | reads its arguments | `memory(argmem: read)` | `anti_rt_same_bytes`, `anti_rt_compare_bytes`, `anti_rt_hash_bytes` |
-| writes its arguments and allocates | `memory(argmem: readwrite, inaccessiblemem: readwrite)` | `anti_rt_builder_append`, which grows its buffer |
+| writes its arguments and allocates | `memory(argmem: readwrite, inaccessiblemem: readwrite, errnomem: write)` | `anti_rt_builder_append`, which grows its buffer |
 | any | no attribute | `anti_rt_hook`, which runs the handler of `Trace` |
 
 A function of the first three classes also gets `willreturn` when no
 path of its body exits, and `nosync` and `nofree` where its body allows.
+
+The third class writes errno as well. A function that allocates calls
+malloc or realloc, which set errno when they fail, and the pinned LLVM
+gives both `errnomem: write`.
 
 The step classifies every row by reading its C body in `src/rt/`. A
 function that reads a global, takes a lock or calls a handler is `any`.

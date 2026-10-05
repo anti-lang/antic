@@ -458,19 +458,49 @@ static void intrinsic(struct emitter *e, const char *result, const char *name,
 
 static bool imports(const struct emitter *e);
 
+/* Append the memory effects of a C function and its guarantees to out,
+   each attribute after a space. A function of the class IR_EFFECTS_ANY
+   gets none, since LLVM reads no guarantee without a class. */
+static void effects(struct text *out, enum ir_effects kind,
+                    uint8_t guarantees)
+{
+    switch (kind) {
+    case IR_EFFECTS_ANY:
+        return;
+    case IR_EFFECTS_NONE:
+        text_append(out, " memory(none)");
+        break;
+    case IR_EFFECTS_READS_ARGS:
+        text_append(out, " memory(argmem: read)");
+        break;
+    case IR_EFFECTS_WRITES_ARGS:
+        text_append(out, " memory(argmem: readwrite, inaccessiblemem: "
+                         "readwrite, errnomem: write)");
+        break;
+    }
+    text_append(out, (guarantees & IR_WILLRETURN) != 0 ? " willreturn" : "");
+    text_append(out, (guarantees & IR_NOSYNC) != 0 ? " nosync" : "");
+    text_append(out, (guarantees & IR_NOFREE) != 0 ? " nofree" : "");
+}
+
 /* Declare the function f of the runtime once, with the result and the
-   parameters of the text. A COFF plugin takes it from its host. */
+   parameters of the text and the memory effects of its row. A COFF
+   plugin takes it from its host. */
 static void runtime_function(struct emitter *e, const char *result,
                              enum rt_function f, const char *parameters)
 {
-    char line[160];
+    const struct rt_signature *s = rt_signature(f);
+    struct text line = {0};
 
-    text_format(line, sizeof line, "declare %s%s @%s(%s)\n",
-                imports(e) ? "dllimport " : "", result, rt_name(f),
-                parameters);
-    if (strstr(text_cstr(&e->intrinsics), line) == NULL) {
-        text_append(&e->intrinsics, line);
+    text_appendf(&line, "declare %s%s @%s(%s)",
+                 imports(e) ? "dllimport " : "", result, s->name,
+                 parameters);
+    effects(&line, s->effects, s->guarantees);
+    text_append(&line, "\n");
+    if (strstr(text_cstr(&e->intrinsics), text_cstr(&line)) == NULL) {
+        text_append(&e->intrinsics, text_cstr(&line));
     }
+    text_free(&line);
 }
 
 /* An operation of two operands of one type: the plain instructions, the
@@ -2959,6 +2989,7 @@ static void declaration(struct emitter *e, const struct ir_function *f)
     e->f = f;
     text_append(e->out, imports(e) ? "declare dllimport " : "declare ");
     if (signature(e, f, false, NULL)) {
+        effects(e->out, f->effects, f->guarantees);
         text_append(e->out, f->never_returns ? " noreturn cold #1\n"
                                              : " #1\n");
     }

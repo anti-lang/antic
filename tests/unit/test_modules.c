@@ -317,7 +317,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 76, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 77, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -348,7 +348,7 @@ static const uint8_t scale_antl[] = {
     0, 0, 0, 0,                                     /* aggregates */
     0, 0, 0, 0,                                     /* globals */
     1, 0, 0, 0,                                     /* functions */
-    0, 5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',
+    0, 0, 5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',      /* flags, effects */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* scale.scale */
     4, 255, 255, 255, 255,                          /* -> i64 */
     0, 0, 0, 0, 2, 0, 0, 0,                         /* file 0, line 2 */
@@ -954,6 +954,87 @@ static void keeps_extensions(void)
     close_session(&a);
 }
 
+/* The C function name of program, or NULL. */
+static const struct ir_function *c_function(const struct ir_module *program,
+                                            const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < program->function_count; i++) {
+        const struct ir_function *f = program->functions[i];
+        if (f->module == NULL && strcmp(f->name, name) == 0) {
+            return f;
+        }
+    }
+    return NULL;
+}
+
+/* A library keeps the memory effects of a runtime function it calls. A
+   second library that declares the same function without them leaves the
+   program with the weaker of the two, as for a function that never
+   returns. */
+static void keeps_effects(void)
+{
+    struct session a;
+    struct session b;
+    struct session c;
+    struct text same = {0};
+    struct text mine = {0};
+    struct text ir = {0};
+    struct ir_module program;
+    const struct ir_function *f;
+    char error[160] = "";
+
+    open_session(&a);
+    build_library(&a, "same",
+                  "pub fn eq(a: str, b: str) -> bool {\n"
+                  "    return a == b;\n"
+                  "}\n",
+                  &same);
+    open_session(&b);
+    build_library(&b, "mine",
+                  "extern fn anti_rt_same_bytes(a: ?*byte, an: int, "
+                  "b: ?*byte, bn: int) -> c_int;\n"
+                  "pub fn eq(a: str, b: str) -> bool {\n"
+                  "    return anti_rt_same_bytes(a.ptr, a.len, b.ptr, "
+                  "b.len) != 0;\n"
+                  "}\n",
+                  &mine);
+    open_session(&c);
+    ir_module_init(&program, &c.arena, "main");
+    CHECK(antl_read((const uint8_t *)same.data, same.length, NULL, 0,
+                    &c.types, &c.arena, &program, error,
+                    sizeof error) != NULL);
+    CHECK_STR(error, "");
+    f = c_function(&program, "anti_rt_same_bytes");
+    CHECK(f != NULL);
+    if (f != NULL) {
+        CHECK(f->effects == IR_EFFECTS_READS_ARGS);
+        CHECK(f->guarantees == (IR_WILLRETURN | IR_NOSYNC | IR_NOFREE));
+    }
+    ir_print(&ir, &program);
+    CHECK(strstr(text_cstr(&ir),
+                 "extern fn anti_rt_same_bytes(ptr, i64, ptr, i64) -> i32 "
+                 "effects reads willreturn nosync nofree\n") != NULL);
+    CHECK(antl_read((const uint8_t *)mine.data, mine.length, NULL, 0,
+                    &c.types, &c.arena, &program, error,
+                    sizeof error) != NULL);
+    CHECK_STR(error, "");
+    f = c_function(&program, "anti_rt_same_bytes");
+    CHECK(f != NULL);
+    if (f != NULL) {
+        CHECK(f->effects == IR_EFFECTS_ANY);
+        CHECK(f->guarantees == 0);
+    }
+    text_free(&same);
+    text_free(&mine);
+    text_free(&ir);
+    ir_module_free(&program);
+    close_session(&c);
+    close_session(&b);
+    close_session(&a);
+}
+
 /* A library keeps the globals of its literals, and a module that imports
    it numbers its own literals from 0. */
 static void keeps_literals(void)
@@ -1460,6 +1541,8 @@ static void refuses_file(const uint8_t *data, size_t size,
     close_session(&s);
 }
 
+static bool reads_file(const struct text *bytes);
+
 static void damaged_files(void)
 {
     /* Where the fields a poke below reaches sit, counted back from the
@@ -1472,17 +1555,21 @@ static void damaged_files(void)
         MUL_OPERAND = 4 + 2 * 53 - 12,
         PARAM_EXT = TAIL + 4 + 1,
         RESULT_AGG = TAIL + 6 + 4 + 8 + 4,
+        /* The memory effects of the function, before its module and its
+           name, each a count and five bytes, and its result type. */
+        FN_EFFECTS = RESULT_AGG + 1 + 2 * 9 + 1,
         /* The flags, the last byte of type 1, which starts at byte 72
            after the header and the one byte of type 0. */
         FN_FLAGS = 85
     };
     uint8_t copy[sizeof scale_antl];
+    struct text good = {0};
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 77;
+    copy[4] = 78;
     refuses_file(copy, sizeof copy,
-                 "has format version 77, and antic reads version 76");
+                 "has format version 78, and antic reads version 77");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -1493,6 +1580,16 @@ static void damaged_files(void)
     /* The result type agg needs an aggregate of the type table. */
     memcpy(copy, scale_antl, sizeof copy);
     copy[sizeof copy - RESULT_AGG] = IR_AGG;
+    refuses_file(copy, sizeof copy, NULL);
+    /* The memory effects take two bits of a class and three of the
+       guarantees, and no more. */
+    memcpy(copy, scale_antl, sizeof copy);
+    copy[sizeof copy - FN_EFFECTS] = IR_EFFECTS_READS_ARGS |
+                                     IR_GUARANTEES << 2;
+    text_append_bytes(&good, (const char *)copy, sizeof copy);
+    CHECK(reads_file(&good));
+    text_free(&good);
+    copy[sizeof copy - FN_EFFECTS] = 8 << 2;
     refuses_file(copy, sizeof copy, NULL);
     /* Only a parameter of 8 or 16 bits extends. */
     memcpy(copy, scale_antl, sizeof copy);
@@ -3060,6 +3157,7 @@ void test_modules(void)
     dotted_imports();
     unique_exports();
     keeps_extensions();
+    keeps_effects();
     keeps_literals();
     keeps_constants();
     keeps_halves();
