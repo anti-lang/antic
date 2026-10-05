@@ -1587,12 +1587,13 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
             v = lower_expr(l, s->as.return_value);
             /* The value is computed before the deferred statements run,
                so a `defer` cannot change what the function returns. A
-               function without one keeps the value where it is. */
-            if (lower_has_defers(l) &&
-                !lower_is_aggregate(s->as.return_value->type)) {
-                v = lower_temp(
-                    l, ir_unary(l->f, l->b, IR_COPY,
-                                lower_ir_type_of(s->as.return_value->type), v));
+               function without one keeps the value where it is. The
+               value has the type the function returns, which differs
+               from that of the expression where `return` wraps it into a
+               `?T`. */
+            if (lower_has_defers(l) && l->f->result != IR_AGG) {
+                v = lower_temp(l, ir_unary(l->f, l->b, IR_COPY, l->f->result,
+                                           v));
             }
             /* DESIGN: `return local` hands the value to the caller, so
                the local is not destroyed on the way out. Its `own`

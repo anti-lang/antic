@@ -1,0 +1,31 @@
+//! A `return` that wraps its value into the `?T` the function returns, in a
+//! block with a `defer`. The value is kept before the deferred statement runs,
+//! in the type the function returns.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn wrapped(n: int) -> ?int
+{
+	defer printf("left\n".ptr);
+	return n;
+}
+
+fn none_wrapped(n: int) -> ?int
+{
+	defer printf("left none\n".ptr);
+	if n < 0 {
+		return none;
+	}
+	return n + 1;
+}
+
+fn main() -> int
+{
+	let v = wrapped(41) ?? 0;
+	printf("%lld\n".ptr, v + 1);
+	let w = none_wrapped(-1) ?? 7;
+	printf("%lld\n".ptr, w);
+	let x = none_wrapped(1) ?? 7;
+	printf("%lld\n".ptr, x);
+	return 0;
+}
