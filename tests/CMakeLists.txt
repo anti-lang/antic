@@ -4165,6 +4165,15 @@ foreach(name IN LISTS bench_programs)
     endif()
     list(APPEND bench_executables bench_${name})
 endforeach()
+# The twin of map_work that reads its seed at run time, which run C of
+# tests/bench/ablate/run.py times beside the twin.
+add_executable(bench_map_work_rtseed EXCLUDE_FROM_ALL bench/map_work_rtseed.c)
+if(MSVC)
+    target_compile_options(bench_map_work_rtseed PRIVATE /O2)
+else()
+    target_compile_options(bench_map_work_rtseed PRIVATE -O2)
+endif()
+list(APPEND bench_executables bench_map_work_rtseed)
 # mixed_work of tests/bench/ablate, the program of condition C1 in
 # docs/work-order-llvm-optimization.md, has no C twin. run.py holds every
 # build to the line of its baseline, and this test holds the baseline to
