@@ -5,8 +5,10 @@
 #include <string.h>
 
 #include "alloc.h"
+#include "modpath.h"
 #include "reach.h"
 #include "rt_abi.h"
+#include "types.h"
 #include "whole_parts.h"
 
 /* DESIGN: a module that names a class of another module refers to its
@@ -740,6 +742,86 @@ bool whole_at_or_below(const struct whole *w, uint32_t record, uint32_t above)
     return false;
 }
 
+/* Whether a value of the aggregate agg holds a class value, where
+   classes marks the aggregate of every class. An aggregate holds its
+   parts by value, so the walk ends. */
+static bool agg_holds_class(const struct ir_module *m, const bool *classes,
+                            uint32_t agg)
+{
+    const struct ir_aggtype *t = m->aggs[agg];
+    size_t i;
+
+    if (classes[agg]) {
+        return true;
+    }
+    for (i = 0; i < t->field_count; i++) {
+        if (t->fields[i].type.type == IR_AGG &&
+            t->fields[i].type.agg < m->agg_count &&
+            agg_holds_class(m, classes, t->fields[i].type.agg)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* The class record of anti.mem.Allocator, or IR_NO_INDEX. */
+static uint32_t allocator_class(const struct ir_module *m)
+{
+    size_t i;
+
+    for (i = 0; i < m->class_count; i++) {
+        if (same_text(m->classes[i]->module, MEM_MODULE) &&
+            same_text(m->classes[i]->name, MEM_ALLOCATOR)) {
+            return (uint32_t)i;
+        }
+    }
+    return IR_NO_INDEX;
+}
+
+/* DESIGN: the table facts of "Tables and dispatch" in
+   docs/work-order-llvm-optimization.md say that every load and store of a
+   table pointer through one pointer reads or writes one table. That holds
+   where the table pointer of an object is written once, when the object
+   is made, and no pointer that reached an object reaches an object of
+   another class later. A whole program in release mode holds every class
+   and every write, and it holds unless:
+   - a function writes tables, see writes_tables of struct ir_function;
+   - a union holds a class value, a variant's union of its cases among
+     them, since its memory holds objects of several classes in turn;
+   - a class outside the standard library inherits anti.mem.Allocator, which
+     may hand out memory that held an object of another class again.
+   A dev object, a plugin, a library for C and a program that may load a
+   plugin share their objects with code the pass does not see. */
+static bool tables_written_once(const struct whole *w)
+{
+    const struct ir_module *m = w->m;
+    uint32_t allocator = allocator_class(m);
+    bool *classes;
+    bool once = true;
+    size_t i;
+
+    for (i = 0; i < m->function_count && once; i++) {
+        once = !m->functions[i]->writes_tables;
+    }
+    classes = alloc_zeroed(m->agg_count + 1, sizeof *classes);
+    for (i = 0; i < m->class_count; i++) {
+        if (m->classes[i]->agg < m->agg_count) {
+            classes[m->classes[i]->agg] = true;
+        }
+    }
+    for (i = 0; i < m->agg_count && once; i++) {
+        once = !(m->aggs[i]->kind == IR_AGG_UNION &&
+                 agg_holds_class(m, classes, (uint32_t)i));
+    }
+    free(classes);
+    for (i = 0; i < m->class_count && once && allocator != IR_NO_INDEX; i++) {
+        once = (m->classes[i]->module != NULL &&
+                modpath_reserved(m->classes[i]->module)) ||
+               !whole_at_or_below(w, (uint32_t)i, allocator);
+    }
+    return once;
+}
+
 /* DESIGN: a program that injects an interface or loads a library is a
    host. Its symbols are what a plugin resolves against, so the link
    exports them and the emitter writes every name global. `--closed`
@@ -828,6 +910,8 @@ bool whole_program(struct ir_module *program,
         if (!options->plugin &&
             (options->closed || !whole_hosts_plugins(program))) {
             devirtualise(w, program);
+            program->table_facts = !options->library &&
+                                   tables_written_once(w);
         }
         merge_copies(program);
     }

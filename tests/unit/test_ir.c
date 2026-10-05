@@ -327,6 +327,47 @@ static void never_returns(void)
     arena_free(&arena);
 }
 
+/* A load or a store of a table pointer and a load of an entry reach a
+   pointer, and nothing stores an entry. */
+static void table_accesses(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *f;
+    struct ir_block *b0;
+    uint32_t p;
+    uint32_t table;
+    int pass;
+
+    for (pass = 0; pass < 2; pass++) {
+        ir_module_init(&m, &arena, "main");
+        f = ir_function_add(&m, "main", "f", IR_VOID, IR_NO_AGG);
+        p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+        b0 = ir_block_add(f);
+        table = ir_load_access(f, b0, ir_temp_op(f, p), IR_ACCESS_TABLE);
+        ir_load_access(f, b0, ir_temp_op(f, table), IR_ACCESS_ENTRY);
+        ir_store_access(f, b0, ir_temp_op(f, table), ir_temp_op(f, p),
+                        IR_ACCESS_TABLE);
+        if (pass == 1) {
+            ir_load(f, b0, IR_I64, ir_temp_op(f, p));
+            b0->insts[b0->count - 1].field = IR_ACCESS_TABLE;
+            ir_store_access(f, b0, ir_temp_op(f, table), ir_temp_op(f, p),
+                            IR_ACCESS_ENTRY);
+            ir_store(f, b0, IR_PTR, ir_temp_op(f, table), ir_temp_op(f, p));
+            b0->insts[b0->count - 1].field = 3;
+        }
+        ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+        verified(&m, pass == 0
+                         ? ""
+                         : "main.f b0: a load of a table pointer gives ptr, "
+                           "not i64\n"
+                           "main.f b0: a store of an entry of a table\n"
+                           "main.f b0: an access of the kind 3\n");
+        ir_module_free(&m);
+    }
+    arena_free(&arena);
+}
+
 /* A call through a pointer passes the arguments of its signature. */
 static void indirect_arguments(void)
 {
@@ -529,5 +570,6 @@ void test_ir(void)
     symbolic();
     verifier();
     never_returns();
+    table_accesses();
     no_module();
 }

@@ -134,6 +134,54 @@ static void allocates_zeroed_classes(void)
     CHECK(!body_holds(source, "main.points", "@anti_rt_out_of_memory("));
 }
 
+/* The table facts of "Tables and dispatch" in
+   docs/work-order-llvm-optimization.md. The store of a table pointer when
+   an object is made and each load of it for dispatch or `is` are marked
+   !table, and each load of an entry of a table !entry. A function that may
+   give an object another table than the one it holds writes tables: `=`
+   through a pointer to a class that is not final, and a view by `as` of
+   memory as class values or of class values as other memory. A struct
+   holds its class values at their own class, and a conversion between two
+   classes keeps the object. A union that holds a class value is the
+   concern of the pass over the whole program. */
+static void marks_table_accesses(void)
+{
+    static const char source[] =
+        "class Shape { pub n: int = 1,"
+        " pub fn area(self) -> int { return self.n; } }\n"
+        "class Circle inherits Shape {"
+        " concrete fn area(self) -> int { return 2; } }\n"
+        "final class Dot { pub n: int = 0 }\n"
+        "struct Holder { s: Shape }\n"
+        "fn make() -> *Shape { return alloc Circle { }; }\n"
+        "fn call(s: *Shape) -> int { return s.area(); }\n"
+        "fn test(s: *Shape) -> bool { return s is *Circle; }\n"
+        "fn reset(p: *Shape) { *p = Shape { }; }\n"
+        "fn reset_at(p: *Shape) { p[0] = Shape { }; }\n"
+        "fn reset_final(p: *Dot) { *p = Dot { }; }\n"
+        "fn hold(h: *Holder) { *h = Holder { s: Shape { } }; }\n"
+        "fn view(b: *byte) -> *Shape { return b as *Shape; }\n"
+        "fn bytes(s: *Shape) -> *byte { return s as *byte; }\n"
+        "fn up(c: *Circle) -> *Shape { return c as *Shape; }\n"
+        "fn down(s: *Shape) -> *Circle { return s as *Circle; }\n";
+
+    CHECK(body_holds(source, "main.make", ", %0 !table\n"));
+    CHECK(body_holds(source, "main.call", " !table\n"));
+    CHECK(body_holds(source, "main.call", " !entry\n"));
+    CHECK(body_holds(source, "main.test", " !table\n"));
+    CHECK(body_holds(source, "main.test", " !entry\n"));
+    CHECK(!body_holds(source, "main.make", "writes tables"));
+    CHECK(!body_holds(source, "main.call", "writes tables"));
+    CHECK(body_holds(source, "main.reset", ") writes tables {"));
+    CHECK(body_holds(source, "main.reset_at", ") writes tables {"));
+    CHECK(body_holds(source, "main.view", " writes tables {"));
+    CHECK(body_holds(source, "main.bytes", " writes tables {"));
+    CHECK(!body_holds(source, "main.reset_final", "writes tables"));
+    CHECK(!body_holds(source, "main.hold", "writes tables"));
+    CHECK(!body_holds(source, "main.up", "writes tables"));
+    CHECK(!body_holds(source, "main.down", "writes tables"));
+}
+
 /* A class record names the tables of a class, its base, its interfaces
    and the `mutable` fields of a singleton. A `worker fn` keeps its mark.
    A call through a table names the class and the slot. */
@@ -2188,6 +2236,7 @@ void test_lower(void)
     records_hook_entries();
     records_check_kinds();
     allocates_zeroed_classes();
+    marks_table_accesses();
     runtime_functions();
     runtime_effects();
     runtime_records();

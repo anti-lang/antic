@@ -172,6 +172,129 @@ static const char shapes[] =
     "    }\n"
     "}\n";
 
+/* The table facts of the program of main and of a library, after the
+   passes run with release, plugin and library set as given. */
+static bool table_facts(const char *library, const char *main_source,
+                        bool release, bool plugin, bool for_c)
+{
+    struct program p;
+    struct text errors = {0};
+    struct whole_options options;
+    bool facts;
+
+    open_program(&p);
+    if (library != NULL) {
+        load_library(&p, "anti.mem", library);
+    }
+    compile(&p, "main", main_source, &p.ir);
+    memset(&options, 0, sizeof options);
+    options.entry = "main";
+    options.release = release;
+    options.dev = !release;
+    options.plugin = plugin;
+    options.library = for_c;
+    /* A plugin without a `provides` line is refused, and the facts are
+       read all the same. */
+    CHECK(whole_program(&p.ir, &options, &errors) || plugin);
+    facts = p.ir.table_facts;
+    text_free(&errors);
+    close_program(&p);
+    return facts;
+}
+
+/* DESIGN: the LLVM text of a whole program in release mode carries the
+   table facts unless a function may give an object another table than the
+   one it holds, a library file among them, a union holds a class value,
+   or a class outside the standard library hands out memory as an
+   allocator. A dev build, a plugin and a library for C are no whole
+   program. */
+static void decides_table_facts(void)
+{
+    static const char plain[] =
+        "pub class Shape\n"
+        "{\n"
+        "    pub fn area(self) -> int\n"
+        "    {\n"
+        "        return 1;\n"
+        "    }\n"
+        "}\n"
+        "pub class Circle inherits Shape\n"
+        "{\n"
+        "    concrete fn area(self) -> int\n"
+        "    {\n"
+        "        return 2;\n"
+        "    }\n"
+        "}\n"
+        "fn main() -> int\n"
+        "{\n"
+        "    let s: *Shape = alloc Circle { };\n"
+        "    return s.area();\n"
+        "}\n";
+    static const char rewrites[] =
+        "pub class Shape\n"
+        "{\n"
+        "    pub n: int = 1,\n"
+        "}\n"
+        "pub fn reset(p: *Shape)\n"
+        "{\n"
+        "    *p = Shape { };\n"
+        "}\n";
+    static const char allocator[] =
+        "pub abstract class Allocator\n"
+        "{\n"
+        "    abstract fn alloc(self, size: int, align: int) -> ?*byte;\n"
+        "}\n";
+    static const char reuses[] =
+        "import anti.mem;\n"
+        "class Reuse inherits mem.Allocator\n"
+        "{\n"
+        "    held: ?*byte = none,\n"
+        "    concrete fn alloc(self, size: int, align: int) -> ?*byte\n"
+        "    {\n"
+        "        return self.held;\n"
+        "    }\n"
+        "}\n"
+        "fn main() -> int\n"
+        "{\n"
+        "    let r = alloc Reuse { };\n"
+        "    return 0;\n"
+        "}\n";
+
+    CHECK(table_facts(NULL, plain, true, false, false));
+    CHECK(!table_facts(NULL, plain, false, false, false));
+    CHECK(!table_facts(NULL, plain, true, true, false));
+    CHECK(!table_facts(NULL, plain, true, false, true));
+    CHECK(!table_facts(rewrites, "import anti.mem;\n"
+                                 "fn main() -> int\n"
+                                 "{\n"
+                                 "    return 0;\n"
+                                 "}\n",
+                       true, false, false));
+    CHECK(table_facts(allocator, "import anti.mem;\n"
+                                 "fn main() -> int\n"
+                                 "{\n"
+                                 "    return 0;\n"
+                                 "}\n",
+                      true, false, false));
+    CHECK(!table_facts(allocator, reuses, true, false, false));
+    CHECK(!table_facts(NULL,
+                       "class Shape\n"
+                       "{\n"
+                       "    pub n: int = 1,\n"
+                       "}\n"
+                       "union Either\n"
+                       "{\n"
+                       "    s: Shape,\n"
+                       "    k: int,\n"
+                       "}\n"
+                       "fn main() -> int\n"
+                       "{\n"
+                       "    let e = Either { k: 1 };\n"
+                       "    return e.k;\n"
+                       "}\n",
+                       true, false, false));
+}
+
 /* A call through the table of a class reaches the entry at its slot in
    the table of every concrete class at or below it. A call through an
    interface reaches the tables of its sub-objects, and a call through
@@ -295,15 +418,15 @@ static void devirtualises(void)
     passes(true,
            "fn main.calls(%0: ptr, %1: ptr, %2: ptr) -> i64 {\n"
            "b0:\n"
-           "    %3 = load ptr %0\n"
+           "    %3 = load ptr %0 !table\n"
            "    %4 = mul i64 17, size_of ptr\n"
            "    %5 = ptradd %3, %4\n"
-           "    %6 = load ptr %5\n"
+           "    %6 = load ptr %5 !entry\n"
            "    %7 = call i64 %6 via @main.fn.0(%0) table @main.Shape.descriptor 17\n"
-           "    %8 = load ptr %0\n"
+           "    %8 = load ptr %0 !table\n"
            "    %9 = mul i64 18, size_of ptr\n"
            "    %10 = ptradd %8, %9\n"
-           "    %11 = load ptr %10\n"
+           "    %11 = load ptr %10 !entry\n"
            "    %12 = call i64 @main.Shape.name(%0)\n"
            "    %13 = addov i64 %7, %12\n"
            "    branchov %13, b1, b2\n"
@@ -312,10 +435,10 @@ static void devirtualises(void)
            "    call void @anti_rt_check_failed(%14, 22, 1, %7, %12)\n"
            "    unreachable\n"
            "b2:\n"
-           "    %15 = load ptr %1\n"
+           "    %15 = load ptr %1 !table\n"
            "    %16 = mul i64 17, size_of ptr\n"
            "    %17 = ptradd %15, %16\n"
-           "    %18 = load ptr %17\n"
+           "    %18 = load ptr %17 !entry\n"
            "    %19 = call i64 %18 via @main.fn.0(%1) table @main.Named.descriptor 17\n"
            "    %20 = addov i64 %13, %19\n"
            "    branchov %20, b3, b4\n"
@@ -324,10 +447,10 @@ static void devirtualises(void)
            "    call void @anti_rt_check_failed(%21, 22, 1, %13, %19)\n"
            "    unreachable\n"
            "b4:\n"
-           "    %22 = load ptr %2\n"
+           "    %22 = load ptr %2 !table\n"
            "    %23 = mul i64 17, size_of ptr\n"
            "    %24 = ptradd %22, %23\n"
-           "    %25 = load ptr %24\n"
+           "    %25 = load ptr %24 !entry\n"
            "    %26 = call i64 @main.Tile.area(%2)\n"
            "    %27 = addov i64 %20, %26\n"
            "    branchov %27, b5, b6\n"
@@ -341,15 +464,15 @@ static void devirtualises(void)
     passes(false,
            "fn main.calls(%0: ptr, %1: ptr, %2: ptr) -> i64 {\n"
            "b0:\n"
-           "    %3 = load ptr %0\n"
+           "    %3 = load ptr %0 !table\n"
            "    %4 = mul i64 17, size_of ptr\n"
            "    %5 = ptradd %3, %4\n"
-           "    %6 = load ptr %5\n"
+           "    %6 = load ptr %5 !entry\n"
            "    %7 = call i64 %6 via @main.fn.0(%0) table @main.Shape.descriptor 17\n"
-           "    %8 = load ptr %0\n"
+           "    %8 = load ptr %0 !table\n"
            "    %9 = mul i64 18, size_of ptr\n"
            "    %10 = ptradd %8, %9\n"
-           "    %11 = load ptr %10\n"
+           "    %11 = load ptr %10 !entry\n"
            "    %12 = call i64 %11 via @main.fn.0(%0) table @main.Shape.descriptor 18\n"
            "    %13 = addov i64 %7, %12\n"
            "    branchov %13, b1, b2\n"
@@ -358,10 +481,10 @@ static void devirtualises(void)
            "    call void @anti_rt_check_failed(%14, 22, 1, %7, %12)\n"
            "    unreachable\n"
            "b2:\n"
-           "    %15 = load ptr %1\n"
+           "    %15 = load ptr %1 !table\n"
            "    %16 = mul i64 17, size_of ptr\n"
            "    %17 = ptradd %15, %16\n"
-           "    %18 = load ptr %17\n"
+           "    %18 = load ptr %17 !entry\n"
            "    %19 = call i64 %18 via @main.fn.0(%1) table @main.Named.descriptor 17\n"
            "    %20 = addov i64 %13, %19\n"
            "    branchov %20, b3, b4\n"
@@ -370,10 +493,10 @@ static void devirtualises(void)
            "    call void @anti_rt_check_failed(%21, 22, 1, %13, %19)\n"
            "    unreachable\n"
            "b4:\n"
-           "    %22 = load ptr %2\n"
+           "    %22 = load ptr %2 !table\n"
            "    %23 = mul i64 17, size_of ptr\n"
            "    %24 = ptradd %22, %23\n"
-           "    %25 = load ptr %24\n"
+           "    %25 = load ptr %24 !entry\n"
            "    %26 = call i64 %25 via @main.fn.0(%2) table @main.Tile.descriptor 17\n"
            "    %27 = addov i64 %20, %26\n"
            "    branchov %27, b5, b6\n"
@@ -986,6 +1109,7 @@ void test_whole(void)
     finds_entries();
     joins_modules();
     devirtualises();
+    decides_table_facts();
     writes_registry();
     checks_singletons();
     records_slots();

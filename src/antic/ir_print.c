@@ -259,6 +259,7 @@ static void signature(struct text *out, const struct ir_module *m,
         text_appendf(out, " -> %s", ir_type_name(f->result));
     }
     effects(out, f);
+    text_append(out, f->writes_tables ? " writes tables" : "");
 }
 
 static void instruction(struct text *out, const struct ir_module *m,
@@ -404,6 +405,12 @@ static void instruction(struct text *out, const struct ir_module *m,
             operand(out, m, &inst->b);
         }
         break;
+    }
+    /* What a load or a store reaches, after its operands. */
+    if ((inst->op == IR_LOAD || inst->op == IR_STORE) &&
+        inst->field != IR_ACCESS_PLAIN) {
+        text_append(out, inst->field == IR_ACCESS_TABLE ? " !table"
+                                                         : " !entry");
     }
     text_append(out, "\n");
 }

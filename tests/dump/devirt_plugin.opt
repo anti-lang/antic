@@ -76,10 +76,10 @@ b0:
 }
 fn devirt_plugin.talk(%0: ptr) -> i64 {
 b0:
-    %1 = load ptr %0
+    %1 = load ptr %0 !table
     %2 = mul i64 size_of ptr, 17
     %3 = ptradd %1, %2
-    %4 = load ptr %3
+    %4 = load ptr %3 !entry
     %5 = call i64 %4 via @devirt_plugin.fn.0(%0) table @devirt_plugin.Speaker.descriptor 17
     ret i64 %5
 }
@@ -119,7 +119,7 @@ b0:
 fn devirt_plugin.Dog.init(%0: ptr) {
 b0:
     %1 = addr @devirt_plugin.Dog.table
-    store ptr %1, %0
+    store ptr %1, %0 !table
     call void @anti_rt_hook(%0, 0)
     ret
 }

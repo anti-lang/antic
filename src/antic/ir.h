@@ -142,8 +142,8 @@ enum ir_op {
     IR_HEXT, IR_HTRUNC,
     /* Memory. */
     IR_SLOT,        /* Result ptr: a stack slot for a value of type of. */
-    IR_LOAD,        /* Result: load type from a. */
-    IR_STORE,       /* Store a of type into b. */
+    IR_LOAD,        /* Result: load type from a. field is an ir_access. */
+    IR_STORE,       /* Store a of type into b. field is an ir_access. */
     IR_PTRADD,      /* Result ptr: a plus b bytes. */
     IR_MEMCOPY,     /* Copy a value of type of from b to a. */
     IR_ADDR,        /* Result ptr: address of a. */
@@ -182,6 +182,21 @@ enum ir_op {
     IR_RET,         /* Return a, or nothing. */
     IR_UNREACHABLE  /* Nothing reaches here: the end of a block after a
                        call of a function that never returns. */
+};
+
+/* DESIGN: what a load or a store reaches, for the table facts of "Tables
+   and dispatch" in docs/work-order-llvm-optimization.md. The table pointer
+   of an object is stored when the object is made and loaded for a call
+   through its table and for `is`. An entry is a slot of a table, which no
+   program writes. The LLVM text of a program whose module sets table_facts
+   writes !invariant.group on the first two and !invariant.load on the
+   third. Every other access is IR_ACCESS_PLAIN, the load of a table that
+   `=` and the teardown test for zero among them, since an unfilled place
+   holds the table zero until `=` fills it. */
+enum ir_access {
+    IR_ACCESS_PLAIN,
+    IR_ACCESS_TABLE,    /* the table pointer of an object */
+    IR_ACCESS_ENTRY     /* an entry of a table, a load */
 };
 
 /* The flags IR_FLAG reads, in the order of the fields of Flags. */
@@ -329,6 +344,12 @@ struct ir_function {
        set of IR_WILLRETURN, IR_NOSYNC and IR_NOFREE. */
     enum ir_effects effects;
     uint8_t guarantees;
+    /* The function may give an object another table than the one it
+       holds: `=` through a pointer to a class that is not final, which may
+       point at an object of a class below it, or a view by `as` outside
+       the standard library of memory as class values or of class values
+       as other memory. */
+    bool writes_tables;
     struct ir_block **blocks;
     size_t block_count;
     size_t block_capacity;
@@ -501,6 +522,10 @@ struct ir_module {
     bool memory_checks;
     uint32_t memcheck_load;
     uint32_t memcheck_store;
+    /* The table pointer of every object is written once, when the object
+       is made, so the LLVM text writes the facts of enum ir_access. The
+       pass over the whole program sets it, see whole_program. */
+    bool table_facts;
 };
 
 void ir_module_init(struct ir_module *m, struct arena *arena,
@@ -679,6 +704,12 @@ uint32_t ir_load(struct ir_function *f, struct ir_block *b, enum ir_type type,
                  struct ir_operand pointer);
 void ir_store(struct ir_function *f, struct ir_block *b, enum ir_type type,
               struct ir_operand value, struct ir_operand pointer);
+/* A load or a store of a pointer that reaches what access names. */
+uint32_t ir_load_access(struct ir_function *f, struct ir_block *b,
+                        struct ir_operand pointer, enum ir_access access);
+void ir_store_access(struct ir_function *f, struct ir_block *b,
+                     struct ir_operand value, struct ir_operand pointer,
+                     enum ir_access access);
 uint32_t ir_ptradd(struct ir_function *f, struct ir_block *b,
                    struct ir_operand pointer, struct ir_operand offset);
 void ir_memcopy(struct ir_function *f, struct ir_block *b,

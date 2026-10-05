@@ -485,9 +485,10 @@ struct ir_function *lower_reach_thunk(struct lowerer *l,
     }
     table = lower_load_table(l, args[0], sub->type);
     target = lower_temp(
-        l, ir_load(l->f, l->b, IR_PTR,
-                   lower_offset_address(l, table,
-                                        lower_entry_offset(l, index))));
+        l, ir_load_access(l->f, l->b,
+                          lower_offset_address(l, table,
+                                               lower_entry_offset(l, index)),
+                          IR_ACCESS_ENTRY));
     value = ir_call_indirect(l->f, l->b, lower_ir_type_of(sig->result), target,
                              lower_signature(l, sig), args, f->param_count);
     call = &l->b->insts[l->b->count - 1];
@@ -569,7 +570,7 @@ void lower_store_interface_tables(struct lowerer *l, const struct type *t,
 
             at = lower_offset_address(l, dest,
                                       lower_field_offset(l, up, &field->name));
-            ir_store(l->f, l->b, IR_PTR, table, at);
+            ir_store_access(l->f, l->b, table, at, IR_ACCESS_TABLE);
         }
     }
 }

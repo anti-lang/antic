@@ -621,6 +621,19 @@ if(llvm_targets)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_inline_lines.cmake")
 endif()
 
+# The test of the step tables of docs/work-order-llvm-optimization.md: a
+# release build calls the function of an object of a known class
+# directly after opt, across the call of the `created` hook.
+add_test(NAME direct_calls
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DOPT=${ANTIC_OPT}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/table_hook.anti"
+        "-DFUNCTION=table_hook.main"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/direct-calls"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_direct_calls.cmake")
+
 # A COFF host of plugins exports every name its plugin imports, and the
 # plugin lists as many places as its table counts. The VM run runs both.
 foreach(target windows-x86_64 windows-arm64)
@@ -3991,7 +4004,8 @@ foreach(case "types|symbolic||symbolic.types|${DUMP}/symbolic.anti"
         "llvm|doubling|macos-arm64|doubling.macos-arm64.ll|--lib,shared,--runtime,${ANTIC_RUNTIME_DIR},-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti"
         "llvm|doubling|windows-arm64|doubling.windows-arm64.ll|--lib,shared,--runtime,${ANTIC_RUNTIME_DIR},-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti"
         "llvm|fatal_guard|macos-arm64|fatal_guard.dev.macos-arm64.ll|--dev,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/fatal_guard.anti"
-        "llvm|effects|linux-x86_64|effects.dev.linux-x86_64.ll|--dev,--cpu,v2,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/effects.anti")
+        "llvm|effects|linux-x86_64|effects.dev.linux-x86_64.ll|--dev,--cpu,v2,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/effects.anti"
+        "llvm|tables|macos-arm64|tables.macos-arm64.ll|--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/tables.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 stage)
     list(GET parts 1 subject)

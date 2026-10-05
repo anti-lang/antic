@@ -41,6 +41,23 @@ static void fail(struct verifier *v, const char *format, ...)
     v->ok = false;
 }
 
+/* A table pointer and an entry of a table are pointers, and no program
+   writes a table. */
+static void access(struct verifier *v, const struct ir_inst *inst)
+{
+    if (inst->field > IR_ACCESS_ENTRY) {
+        fail(v, "an access of the kind %" PRIu32, inst->field);
+    } else if (inst->op == IR_STORE && inst->field == IR_ACCESS_ENTRY) {
+        fail(v, "a store of an entry of a table");
+    } else if (inst->field != IR_ACCESS_PLAIN && inst->type != IR_PTR) {
+        fail(v, "a %s of %s gives ptr, not %s",
+             inst->op == IR_LOAD ? "load" : "store",
+             inst->field == IR_ACCESS_TABLE ? "a table pointer"
+                                            : "an entry of a table",
+             ir_type_name(inst->type));
+    }
+}
+
 static bool is_overflow(enum ir_op op)
 {
     return op == IR_ADD_OV || op == IR_SUB_OV || op == IR_MUL_OV;
@@ -344,10 +361,12 @@ static void check_inst(struct verifier *v, const struct ir_inst *inst)
         break;
     case IR_LOAD:
         same_type(v, inst, &inst->a, IR_PTR);
+        access(v, inst);
         break;
     case IR_STORE:
         same_type(v, inst, &inst->a, inst->type);
         same_type(v, inst, &inst->b, IR_PTR);
+        access(v, inst);
         break;
     case IR_PTRADD:
         same_type(v, inst, &inst->a, IR_PTR);

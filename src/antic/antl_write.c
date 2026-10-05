@@ -845,7 +845,8 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         antl_put_u8(w, (uint8_t)((f->is_extern ? 1 : 0) |
                                  (f->variadic ? 2 : 0) |
                                  (f->exported ? 4 : 0) | (f->worker ? 8 : 0) |
-                                 (f->never_returns ? 16 : 0)));
+                                 (f->never_returns ? 16 : 0) |
+                                 (f->writes_tables ? 32 : 0)));
         antl_put_u8(w, (uint8_t)((unsigned)f->effects |
                                  (unsigned)f->guarantees << 2));
         put_str(w, f->module);

@@ -687,7 +687,7 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
     if (r->failed) {
         return 0;
     }
-    if (!valid_type(result) || flags > 31 || effects >> 2 > IR_GUARANTEES ||
+    if (!valid_type(result) || flags > 63 || effects >> 2 > IR_GUARANTEES ||
         ((flags & 1) == 0 && module[0] == '\0') ||
         (module[0] != '\0' && (flags & 2) != 0) ||
         (module[0] == '\0' && (flags & 4) != 0)) {
@@ -735,6 +735,7 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
     if (f != NULL) {
         f->never_returns = f->never_returns && (flags & 16) != 0;
         merge_effects(f, effects);
+        f->writes_tables = f->writes_tables || (flags & 32) != 0;
     }
     if (f == NULL) {
         if ((flags & 1) == 0) {
@@ -754,6 +755,7 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
                                result_agg);
         }
         f->never_returns = (flags & 16) != 0;
+        f->writes_tables = (flags & 32) != 0;
         f->effects = (enum ir_effects)(effects & 3);
         f->guarantees = (uint8_t)(effects >> 2);
         f->exported = (flags & 4) != 0;

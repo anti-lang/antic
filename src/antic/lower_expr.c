@@ -6,6 +6,7 @@
 #include "text.h"
 #include "types.h"
 #include "lower_lowerer.h"
+#include "modpath.h"
 
 /* Whether e is a T that the checker made the `?T` holding it. In a copy
    of a generic that `?T` may be a `?*U`, which holds the `*U` as it is. */
@@ -384,9 +385,11 @@ static void build_value_into(struct lowerer *l, const struct expr *e,
             if (index > 0 && !lower_bound_is_direct(e, s)) {
                 struct ir_operand table = lower_load_table(l, object, s);
                 entry = lower_temp(
-                    l, ir_load(l->f, l->b, IR_PTR,
-                               lower_offset_address(
-                                   l, table, lower_entry_offset(l, index))));
+                    l, ir_load_access(l->f, l->b,
+                                      lower_offset_address(
+                                          l, table,
+                                          lower_entry_offset(l, index)),
+                                      IR_ACCESS_ENTRY));
             } else {
                 entry = lower_temp(
                     l, ir_addr(l->f, l->b,
@@ -1201,7 +1204,8 @@ static struct ir_operand descriptor_field(struct lowerer *l,
 struct ir_operand lower_load_table(struct lowerer *l, struct ir_operand p,
                                    const struct type *t)
 {
-    struct ir_operand table = lower_temp(l, ir_load(l->f, l->b, IR_PTR, p));
+    struct ir_operand table =
+        lower_temp(l, ir_load_access(l->f, l->b, p, IR_ACCESS_TABLE));
 
     if (t != NULL && t->kind == TYPE_POINTER) {
         t = t->element;
@@ -1275,7 +1279,8 @@ static struct ir_operand class_test(struct lowerer *l, struct ir_operand p,
         l->b = held;
     }
     table = lower_load_table(l, p, from);
-    descriptor = lower_temp(l, ir_load(l->f, l->b, IR_PTR, table));
+    descriptor =
+        lower_temp(l, ir_load_access(l->f, l->b, table, IR_ACCESS_ENTRY));
     object_depth =
         descriptor_field(l, descriptor, RT_DESCRIPTOR_DEPTH, IR_I64);
     ir_branch(l->f, l->b,
@@ -1527,6 +1532,35 @@ done:
 
 /* The conversions of chapter 2. Two types with one IR type, such as u32
    and char, convert without an instruction. */
+/* What the pointer or the slice t reaches, or NULL for another type. */
+static const struct type *viewed(const struct type *t)
+{
+    return t->kind == TYPE_POINTER || t->kind == TYPE_SLICE ? t->element
+                                                             : NULL;
+}
+
+/* DESIGN: a view by `as` of memory as class values, or of class values as
+   other memory, may write a table pointer that no literal wrote, or reuse
+   memory that held an object of another class. The function is marked,
+   and a program that holds it writes no table facts. A conversion
+   between two classes keeps the object it points at. The standard
+   library writes through such a view only memory that holds one type for
+   its whole life: the room of a collection, two elements of one slice and
+   a block of an allocator. */
+static bool cast_writes_tables(const struct lowerer *l, const struct type *from,
+                               const struct type *to)
+{
+    const struct type *a = viewed(from);
+    const struct type *b = viewed(to);
+
+    if (a == NULL || b == NULL || a == b ||
+        (a->kind == TYPE_CLASS && b->kind == TYPE_CLASS)) {
+        return false;
+    }
+    return (sema_holds_class(a) || sema_holds_class(b)) &&
+           !(l->f->module != NULL && modpath_reserved(l->f->module));
+}
+
 static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
 {
     const struct type *from = e->as.cast.operand->type;
@@ -1535,6 +1569,10 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
     enum ir_type target = lower_ir_type_of(to);
     struct ir_operand v = lower_expr(l, e->as.cast.operand);
     enum ir_op op;
+
+    if (cast_writes_tables(l, from, to)) {
+        l->f->writes_tables = true;
+    }
 
     /* An f16 converts to and from an f32 alone, and to itself. */
     if (from->kind == TYPE_F16 || to->kind == TYPE_F16) {
@@ -1836,9 +1874,10 @@ static uint32_t table_target(struct lowerer *l, const struct expr *e,
     }
     table = lower_load_table(l, object, e->as.call.dispatch);
     to->target = lower_temp(
-        l, ir_load(l->f, l->b, IR_PTR,
-                   lower_offset_address(
-                       l, table, lower_entry_offset(l, index))));
+        l, ir_load_access(l->f, l->b,
+                          lower_offset_address(l, table,
+                                               lower_entry_offset(l, index)),
+                          IR_ACCESS_ENTRY));
     to->direct = false;
     return ir_index(index);
 }

@@ -675,10 +675,11 @@ static void prepare(struct lowerer *l, const struct type *t,
     /* The table pointer is the first word of every object, and the base
        of a class sits at offset 0, so it goes at dest. */
     if (t->kind == TYPE_CLASS) {
-        ir_store(l->f, l->b, IR_PTR,
-                 lower_temp(l, ir_addr(l->f, l->b,
-                                       ir_global_op(lower_class_table(l, t)))),
-                 dest);
+        ir_store_access(l->f, l->b,
+                        lower_temp(l, ir_addr(l->f, l->b,
+                                              ir_global_op(
+                                                  lower_class_table(l, t)))),
+                        dest, IR_ACCESS_TABLE);
         lower_store_interface_tables(l, t, dest);
     }
     for (i = 0; lit != NULL && i < lit->as.struct_lit.field_count; i++) {

@@ -1,0 +1,35 @@
+// The table facts of a whole program in release mode. The store of the table
+// pointer when an object is made and each load of it for a call through the
+// table carry `!invariant.group`, and each load of an entry of a table
+// carries `!invariant.load`.
+
+class Shape
+{
+	pub n: int = 1,
+
+	pub fn area(self) -> int
+	{
+		return self.n;
+	}
+}
+
+class Circle inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return self.n * 10;
+	}
+}
+
+fn measure(s: *Shape) -> int
+{
+	return s.area();
+}
+
+pub fn main() -> int
+{
+	let s: *Shape = alloc Circle { };
+	let n = s.area() + measure(s);
+	delete(s);
+	return n;
+}

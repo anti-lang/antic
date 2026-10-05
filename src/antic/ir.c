@@ -880,6 +880,23 @@ void ir_store(struct ir_function *f, struct ir_block *b, enum ir_type type,
     inst->b = pointer;
 }
 
+uint32_t ir_load_access(struct ir_function *f, struct ir_block *b,
+                        struct ir_operand pointer, enum ir_access access)
+{
+    uint32_t result = ir_load(f, b, IR_PTR, pointer);
+
+    b->insts[b->count - 1].field = (uint32_t)access;
+    return result;
+}
+
+void ir_store_access(struct ir_function *f, struct ir_block *b,
+                     struct ir_operand value, struct ir_operand pointer,
+                     enum ir_access access)
+{
+    ir_store(f, b, IR_PTR, value, pointer);
+    b->insts[b->count - 1].field = (uint32_t)access;
+}
+
 uint32_t ir_ptradd(struct ir_function *f, struct ir_block *b,
                    struct ir_operand pointer, struct ir_operand offset)
 {

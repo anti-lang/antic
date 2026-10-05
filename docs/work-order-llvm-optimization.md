@@ -309,10 +309,10 @@ moves that computation into Anti, so the inliner sees it. Run B measured
 
 ## Tables and dispatch
 
-The table pointer of an object is written once, when the object is made.
-In a whole program every table global is an `internal constant` in the
-text already. Two
-facts follow from that:
+The table pointer of an object is written when the object is made. In
+most programs nothing writes it again. In a whole program every table
+global is an `internal constant` in the text already. Two facts follow
+from that:
 
 - Each store of the table pointer at construction and each load of it for
   dispatch carries `!invariant.group !N`. LLVM then forwards the stored
@@ -325,9 +325,22 @@ run D. The same holds for any call through the table of an object whose
 class LLVM sees.
 
 The step lists every store of a table pointer in lowering and in
-`src/rt/`. A store other than the one at construction needs
-`llvm.launder.invariant.group` on the pointer after it. The report names
-each store found.
+`src/rt/`. The report names each store found.
+
+`=` between values copies bytes, table pointers included, as "Ownership
+and copies" of `docs/anti-object-model.md` says. `*p = Shape { }` through
+a `*Shape` that points at a `Circle` gives the object the table of
+`Shape`, and `tests/programs/table_rewrite.anti` pins that. So the table
+pointer of an object is not written once in every program.
+`llvm.launder.invariant.group` after such a store would give a new
+pointer to the code that uses its result alone. Every other pointer to
+the object, and a caller across a call, would keep forwarding the old
+table. The facts therefore stand only in a program whose every table
+pointer is written once. The pass over the whole program decides that,
+as "Compiler behaviour" in `docs/decisions.md` records. The step
+corrected this paragraph, which first asked for
+`llvm.launder.invariant.group` after every store other than the one at
+construction.
 
 ## Parameters and results
 

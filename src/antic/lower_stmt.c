@@ -689,6 +689,23 @@ static void lower_flags_assign(struct lowerer *l, const struct stmt *s);
 /* An assignment evaluates the place first and the value second. A
    compound assignment reads the old value before it evaluates the new
    operand, as x = x + e reads x first. */
+/* DESIGN: `=` between values copies bytes, table pointers included. A
+   place reached through a pointer to a class that is not final may hold
+   an object of a class below it, which `=` then gives the table of the
+   class of the place. The function is marked, and a program that holds
+   it writes no table facts. Every other place of a class value holds an
+   object of its own class, whose table `=` writes again. */
+static bool assign_writes_tables(const struct expr *target)
+{
+    const struct type *t = target->type;
+    bool through_pointer =
+        target->kind == EXPR_UNARY ||
+        (target->kind == EXPR_INDEX &&
+         target->as.index.base->type->kind == TYPE_POINTER);
+
+    return through_pointer && t->kind == TYPE_CLASS && !t->is_final;
+}
+
 static void lower_assign(struct lowerer *l, const struct stmt *s)
 {
     const struct expr *target = s->as.assign.target;
@@ -701,6 +718,9 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
     if (target->kind == EXPR_TUPLE) {
         lower_flags_assign(l, s);
         return;
+    }
+    if (assign_writes_tables(target)) {
+        l->f->writes_tables = true;
     }
     if (!lower_place(l, target, &p)) {
         return;

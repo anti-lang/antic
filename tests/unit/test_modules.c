@@ -317,7 +317,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 77, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 78, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -1567,9 +1567,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 78;
+    copy[4] = 79;
     refuses_file(copy, sizeof copy,
-                 "has format version 78, and antic reads version 77");
+                 "has format version 79, and antic reads version 78");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -1590,6 +1590,15 @@ static void damaged_files(void)
     CHECK(reads_file(&good));
     text_free(&good);
     copy[sizeof copy - FN_EFFECTS] = 8 << 2;
+    refuses_file(copy, sizeof copy, NULL);
+    /* The flags of a function, right before its effects, take six bits,
+       the last of them the mark that it writes tables. */
+    memcpy(copy, scale_antl, sizeof copy);
+    copy[sizeof copy - FN_EFFECTS - 1] |= 32;
+    text_append_bytes(&good, (const char *)copy, sizeof copy);
+    CHECK(reads_file(&good));
+    text_free(&good);
+    copy[sizeof copy - FN_EFFECTS - 1] |= 64;
     refuses_file(copy, sizeof copy, NULL);
     /* Only a parameter of 8 or 16 bits extends. */
     memcpy(copy, scale_antl, sizeof copy);

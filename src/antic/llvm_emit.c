@@ -48,6 +48,11 @@ struct emitter {
     uint32_t value;                 /* the next %v<n> of the function */
     uint32_t cold_id;               /* the metadata id of COLD_THEN */
     bool cold_used[COLD_COUNT];
+    /* The id of the empty node that !invariant.group and !invariant.load
+       name, after the ids of the cold branches. It is there where the
+       module carries the table facts and an access names one. */
+    uint32_t facts_id;
+    bool facts;
     struct text intrinsics;         /* the declarations of the intrinsics */
     struct text entry;              /* the type of main, for its alias */
     const struct ir_module *m;
@@ -730,6 +735,47 @@ static void slot(struct emitter *e, const struct ir_inst *inst)
     store_result(e, inst, value);
 }
 
+/* DESIGN: the table facts of "Tables and dispatch" in
+   docs/work-order-llvm-optimization.md. A load or a store of a table
+   pointer carries !invariant.group, so opt forwards the table an object
+   was made with to every call through it, across any call between. A
+   load of an entry carries !invariant.load, since no program writes a
+   table. Both stand only in a module whose pass over the whole program
+   found every table pointer written once, see whole_program. */
+static void access_fact(struct emitter *e, const struct ir_inst *inst)
+{
+    if (!e->facts || inst->field == IR_ACCESS_PLAIN) {
+        return;
+    }
+    text_appendf(e->out, ", %s !%" PRIu32,
+                 inst->field == IR_ACCESS_TABLE ? "!invariant.group"
+                                                : "!invariant.load",
+                 e->facts_id);
+}
+
+/* Whether a load or a store of a function of m reaches a table pointer or
+   an entry of a table. */
+static bool names_table(const struct ir_module *m)
+{
+    size_t i;
+    size_t j;
+    size_t k;
+
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        for (j = 0; j < f->block_count; j++) {
+            const struct ir_block *b = f->blocks[j];
+            for (k = 0; k < b->count; k++) {
+                if ((b->insts[k].op == IR_LOAD || b->insts[k].op == IR_STORE) &&
+                    b->insts[k].field != IR_ACCESS_PLAIN) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 /* DESIGN: a load and a store take the natural alignment of their type.
    The IR marks no access as unaligned, and the section "Instruction
    mapping" of docs/work-order-llvm-back-end.md gives 1 only to an access
@@ -747,17 +793,21 @@ static void load_store(struct emitter *e, const struct ir_inst *inst)
         operand(e, &inst->a, inst->type, &value);
         operand(e, &inst->b, IR_PTR, &pointer);
         if (!e->failed) {
-            text_appendf(e->out, "  store %s %s, ptr %s, align %" PRIu64 "\n",
+            text_appendf(e->out, "  store %s %s, ptr %s, align %" PRIu64,
                          name, text_cstr(&value), text_cstr(&pointer),
                          align_of(e, inst->type));
+            access_fact(e, inst);
+            text_append(e->out, "\n");
         }
     } else {
         operand(e, &inst->a, IR_PTR, &pointer);
         if (!e->failed) {
             text_appendf(e->out, "  %%v%" PRIu32 " = load %s, ptr %s, align %"
-                                 PRIu64 "\n",
+                                 PRIu64,
                          e->value, name, text_cstr(&pointer),
                          align_of(e, inst->type));
+            access_fact(e, inst);
+            text_append(e->out, "\n");
             text_appendf(&value, "%%v%" PRIu32, e->value++);
             store_result(e, inst, text_cstr(&value));
         }
@@ -3058,6 +3108,9 @@ static void metadata(struct emitter *e, uint32_t flag_count)
                              "i32 2000, i32 1}\n",
                      e->cold_id + COLD_ELSE);
     }
+    if (e->facts) {
+        text_appendf(e->out, "!%" PRIu32 " = !{}\n", e->facts_id);
+    }
     llvm_debug_finish(&e->debug, e->out);
 }
 
@@ -3238,11 +3291,14 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
     e.error = error;
     e.error_size = error_size;
     e.cold_id = flags + 1;
+    e.facts_id = e.cold_id + COLD_COUNT;
+    e.facts = m->table_facts && names_table(m);
     e.m = m;
     /* The ids of the debug metadata follow every other id, so the text
        without them names the ids of a build without -g. */
     llvm_debug_init(&e.debug, o->target, m, o->module, o->debug,
-                    o->optimized, e.cold_id + COLD_COUNT, o->spans);
+                    o->optimized, e.facts_id + (e.facts ? 1 : 0),
+                    o->spans);
     e.keeps_frame = alloc_zeroed(m->function_count + 1, sizeof *e.keeps_frame);
     frames_kept(m, e.keeps_frame);
     head(out, o->target, o->module);

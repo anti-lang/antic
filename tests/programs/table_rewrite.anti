@@ -1,0 +1,75 @@
+//! `=` between values copies bytes, table pointers included, so `*p = Shape {
+//! }` through a `*Shape` that points at a `Circle` gives the object the table
+//! of `Shape`. A call through the table after it reaches `Shape.area`, through
+//! `p` and through every other pointer to the object, and so does a call after
+//! a hook that does the same. A release build of a program that writes a table
+//! this way therefore writes no table facts.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Shape
+{
+	pub n: int = 2,
+
+	pub fn area(self) -> int
+	{
+		return self.n;
+	}
+}
+
+class Circle inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return self.n * 10;
+	}
+}
+
+/// A class whose `created` hook gives a new object of a class below it the
+/// table of `Mark`, inside the runtime's call of the hook.
+class Mark
+{
+	pub n: int = 2,
+
+	pub fn area(self) -> int
+	{
+		return self.n;
+	}
+
+	concrete fn created(self)
+	{
+		if self.n == 2 {
+			*self = Mark { n: 7 };
+		}
+	}
+}
+
+class Tick inherits Mark
+{
+	concrete fn area(self) -> int
+	{
+		return self.n * 10;
+	}
+}
+
+fn reset(p: *Shape)
+{
+	*p = Shape { n: 3 };
+}
+
+pub fn main() -> int
+{
+	let c = alloc Circle { };
+	let p: *Shape = c;
+	let q: *Shape = c;
+	printf("%d %d\n".ptr, p.area() as c_int, q.area() as c_int);
+	reset(p);
+	printf("%d %d\n".ptr, p.area() as c_int, q.area() as c_int);
+	*q = Shape { n: 4 };
+	printf("%d %d\n".ptr, p.area() as c_int, (p is *Circle) as c_int);
+	delete(c);
+	let t: *Mark = alloc Tick { };
+	printf("%d\n".ptr, t.area() as c_int);
+	delete(t);
+	return 0;
+}
