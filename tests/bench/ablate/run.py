@@ -9,9 +9,11 @@
 #   tests/bench/ablate/run.py map_work 'opt-inline --no-hooks'
 #   tests/bench/ablate/run.py map_work --table D
 #   tests/bench/ablate/run.py mixed_work -- --no-hooks
+#   tests/bench/ablate/run.py map_work -- --lto=full --lto=thin
 #
 # A build is a list of words. A word that starts with `-` is an option of
-# antic, any other word names a wrapper of this directory, and `+` joins
+# antic, and `--name=value` passes `--name` and `value`, for an option
+# that takes a value. Any other word names a wrapper of this directory, and `+` joins
 # two wrappers as a space does. The wrappers run in the order given, each
 # passing the text it edited to the next, and the last one to the pinned
 # opt of the runtime directory. A build of one antic option alone stands
@@ -57,7 +59,13 @@ class Build:
     def __init__(self, spec, index):
         self.options = []
         self.wrappers = []
+        written = []
         for word in spec.split():
+            if word.startswith("-"):
+                written.append(word)
+            if word.startswith("--") and "=" in word:
+                self.options += word.split("=", 1)
+                continue
             if word.startswith("-"):
                 self.options.append(word)
                 continue
@@ -66,7 +74,7 @@ class Build:
                 if not os.path.isfile(path):
                     sys.exit("run.py: no wrapper %s in %s" % (name, HERE))
                 self.wrappers.append(path)
-        words = [os.path.basename(w) for w in self.wrappers] + self.options
+        words = [os.path.basename(w) for w in self.wrappers] + written
         self.label = " and ".join("`%s`" % w for w in words) or "baseline"
         self.index = index
         self.compiles = []
