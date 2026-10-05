@@ -7,6 +7,7 @@
 #include "check.h"
 
 #include "cpu.h"
+#include "llvm_run.h"
 #include "llvm_target.h"
 #include "text.h"
 
@@ -88,6 +89,22 @@ void test_llvm_target(void)
     CHECK_STR(llvm_target_cpu(CPU_ARMV8_0), "generic");
     CHECK_STR(llvm_target_cpu(CPU_ARMV8_2), "generic");
     CHECK_STR(llvm_target_cpu(CPU_ARMV8_5), "generic");
+
+    /* D4 of docs/work-order-llvm-optimization.md: the five targets whose
+       machines are unknown keep the scheduling model of target-cpu. The
+       value of macos-arm64 is a measurement, which no test pins. */
+    CHECK(llvm_tune_cpu(TARGET_LINUX_X86_64) == NULL);
+    CHECK(llvm_tune_cpu(TARGET_LINUX_ARM64) == NULL);
+    CHECK(llvm_tune_cpu(TARGET_MACOS_X86_64) == NULL);
+    CHECK(llvm_tune_cpu(TARGET_WINDOWS_X86_64) == NULL);
+    CHECK(llvm_tune_cpu(TARGET_WINDOWS_ARM64) == NULL);
+
+    /* opt of release mode takes a pipeline and an inline threshold. The
+       values are measurements, which no test pins. */
+    CHECK(strncmp(llvm_opt_options[0], "-passes=", 8) == 0);
+    CHECK(llvm_opt_options[0][8] != '\0');
+    CHECK(strncmp(llvm_opt_options[1], "-inline-threshold=", 18) == 0);
+    CHECK(llvm_opt_options[1][18] >= '1' && llvm_opt_options[1][18] <= '9');
 
     /* The -march= value clang takes for the feature string of a level: the
        one the runtime is built at, with the extensions the level adds. */

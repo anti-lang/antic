@@ -93,6 +93,24 @@ const char *llvm_target_features(enum cpu_level level)
     return levels[level].features;
 }
 
+/* DESIGN: macos-arm64 tunes for apple-m1 and keeps the instructions of its
+   level, choice D4 of docs/work-order-llvm-optimization.md under C1. Every
+   Mac of the target has Apple silicon. The machines of the other five
+   targets are unknown, so they keep the model of target-cpu and write no
+   attribute. tests/bench/ablate/run.py measured it on 2026-10-05 under
+   default<O3>, 15 runs each, the medians against generic:
+
+       scalar_loop 0.98, objects 1.00, builder 0.99, simd_loop 0.97,
+       map_work 1.00, mixed_work 1.00
+
+   simd_loop lies beyond 2 percent and no object grows, so apple-m1
+   wins. A later measurement may choose another, and no
+   test pins the value. */
+const char *llvm_tune_cpu(enum target t)
+{
+    return t == TARGET_MACOS_ARM64 ? "apple-m1" : NULL;
+}
+
 void llvm_clang_arch(struct text *out, enum cpu_level level)
 {
     text_append(out, cpu_clang_arch(level));

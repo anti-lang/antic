@@ -88,12 +88,47 @@ static bool run_lto(const struct llvm_run *r, const char *text_path,
     return true;
 }
 
+/* DESIGN: release mode runs default<O3> at an inline threshold of 225,
+   choices D8 and D3 of docs/work-order-llvm-optimization.md under C1.
+   tests/bench/ablate/run.py measured them on macos-arm64 on 2026-10-05,
+   15 runs each. Medians against default<O2>, the pipelines first:
+
+       program      O2        O3        O2,licm,unswitch,irce
+       scalar_loop  299.9 ms  1.00      1.00
+       objects      141.1 ms  1.01      1.01
+       builder      264.9 ms  0.94      1.00
+       simd_loop    130.3 ms  1.00      1.00
+       map_work     182.5 ms  0.82      0.96
+       mixed_work   193.3 ms  0.89      0.99
+
+   The thresholds under default<O3>, against default<O3> alone, which
+   inlines at 250. Every threshold lies within 2 percent of every other on
+   every program, so the release compile and the object decide:
+
+       program      225   500   1000  2000
+       scalar_loop  1.00  1.00  1.00  1.00
+       objects      1.00  1.00  1.01  1.00
+       builder      1.00  1.00  1.00  1.00
+       simd_loop    1.00  1.00  1.00  1.00
+       map_work     1.00  1.01  1.01  1.02
+       mixed_work   1.01  1.03  1.02  1.01
+       mixed_work   2388 ms, 695,312 B at 225, against 2546 ms,
+                    713,528 B at 250 and 3920 ms, 933,600 B at 2000
+
+   default<O2> followed by loop-mssa(licm,simple-loop-unswitch) and irce
+   lost to default<O3>. opt -verify-each accepted the three pipelines on
+   the text of every program. A later measurement may choose another, and
+   no test pins either value. docs/reports/2026-10-05-llvm-opt-config.md
+   holds the tables. */
+const char *const llvm_opt_options[LLVM_OPT_OPTION_COUNT] = {
+    "-passes=default<O3>", "-inline-threshold=225"};
+
 bool llvm_run(const struct llvm_run *r, const char *text_path,
               const char *bitcode_path, const char *output)
 {
     struct text model = {0};
-    const char *opt[] = {r->opt, "-passes=default<O2>", "-o", bitcode_path,
-                         text_path, NULL};
+    const char *opt[] = {r->opt, llvm_opt_options[0], llvm_opt_options[1],
+                         "-o", bitcode_path, text_path, NULL};
     const char *options[3];
     int run;
 

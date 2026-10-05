@@ -19,14 +19,20 @@ struct llvm_run {
     const char *opt;            /* the opt program */
     const char *llc;            /* the llc program */
     enum target target;         /* gives the relocation model of llc */
-    /* Release mode: opt runs default<O2> into the bitcode, and llc reads
-       the bitcode at -O2. Dev mode: llc reads the text at -O1 alone. */
+    /* Release mode: opt runs llvm_opt_options into the bitcode, and llc
+       reads the bitcode at -O2. Dev mode: llc reads the text at -O1
+       alone. */
     bool optimize;
     bool assembly;              /* -S: llc writes assembly, not an object */
     /* --lto in release mode: opt writes the bitcode of the mode as the
        output, which lld links, and llc does not run. */
     enum lto lto;
 };
+
+/* The options of opt in release mode without --lto, before the output
+   and the text: the pass pipeline and the inline threshold. */
+#define LLVM_OPT_OPTION_COUNT 2
+extern const char *const llvm_opt_options[LLVM_OPT_OPTION_COUNT];
 
 /* Run the tools of r on the text at text_path and write the object, or
    the assembly, to output. bitcode_path receives the output of opt in

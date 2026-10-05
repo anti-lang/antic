@@ -3495,15 +3495,20 @@ static void attributes(struct emitter *e)
 {
     const struct target_info *info = target_info(e->o->target);
     bool windows = info->os == OS_WINDOWS;
+    const char *tune = llvm_tune_cpu(e->o->target);
 
     text_appendf(e->out, "attributes #0 = { nounwind%s \"frame-pointer\"="
                          "\"%s\"%s \"target-cpu\"=\"%s\" "
-                         "\"target-features\"=\"%s\" }\n",
+                         "\"target-features\"=\"%s\"",
                  windows ? " uwtable(sync)" : "",
                  windows ? "none" : "non-leaf",
                  windows ? " \"stack-probe-size\"=\"4096\"" : "",
                  llvm_target_cpu(e->o->cpu),
                  llvm_target_features(e->o->cpu));
+    if (tune != NULL) {
+        text_appendf(e->out, " \"tune-cpu\"=\"%s\"", tune);
+    }
+    text_append(e->out, " }\n");
     text_append(e->out, "attributes #1 = { nounwind }\n\n");
 }
 

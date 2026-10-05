@@ -125,8 +125,10 @@ design the back end was built from.
 
 ## The tool run
 
-- Release mode runs `opt -passes=default<O2>` into `<output>.bc` and llc at
-  `-O2` on the bitcode. Dev mode runs llc at `-O1` on the text without opt,
+- Release mode runs `opt -passes=default<O3> -inline-threshold=225` into
+  `<output>.bc` and llc at `-O2` on the bitcode. `llvm_opt_options` of
+  `src/antic/llvm_run.c` holds the two options, which the step `config` of
+  `docs/work-order-llvm-optimization.md` measured. Dev mode runs llc at `-O1` on the text without opt,
   so it inlines nothing and every function stays a frame of its own.
 - llc writes the object with `-filetype=obj`, or the assembly under `-S` with
   `-filetype=asm`. The relocation model is `pic` on Linux and macOS and

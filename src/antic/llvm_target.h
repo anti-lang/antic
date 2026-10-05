@@ -25,6 +25,10 @@ const char *llvm_relocation_model(enum target t);
 const char *llvm_target_cpu(enum cpu_level level);
 const char *llvm_target_features(enum cpu_level level);
 
+/* The "tune-cpu" function attribute of a target, or NULL where the
+   scheduling model stays the one of "target-cpu". */
+const char *llvm_tune_cpu(enum target t);
+
 /* Append the -march= value clang takes for the feature string of a level:
    the value of cpu_clang_arch with the extensions the level adds. The test
    llvm_datalayout_pin passes it to the pinned clang. */

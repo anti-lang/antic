@@ -17,6 +17,7 @@
 #include "layout.h"
 #include "llvm_debug.h"
 #include "llvm_emit.h"
+#include "llvm_target.h"
 
 struct fixture {
     struct arena arena;
@@ -574,6 +575,33 @@ static void attributes(void)
                     "!0 = !{i32 1, !\"wchar_size\", i32 2}\n"
                     "!1 = !{i32 7, !\"uwtable\", i32 2}\n"));
     end(&x);
+}
+
+/* "tune-cpu" follows "target-features" where llvm_tune_cpu names a CPU,
+   and a target without one writes none, so the scheduling model is the
+   one of "target-cpu". */
+static void tune_cpu(void)
+{
+    struct fixture x;
+    int i;
+
+    for (i = 0; i < TARGET_COUNT; i++) {
+        enum target t = (enum target)i;
+        const char *tune = llvm_tune_cpu(t);
+        struct text want = {0};
+
+        begin(&x);
+        returns(&x, "f", IR_VOID, ir_int_op(IR_VOID, 0));
+        CHECK(run(&x, t));
+        if (tune == NULL) {
+            CHECK(lacks(&x, "tune-cpu"));
+        } else {
+            text_appendf(&want, "\" \"tune-cpu\"=\"%s\" }\n", tune);
+            CHECK(holds(&x, text_cstr(&want)));
+        }
+        text_free(&want);
+        end(&x);
+    }
 }
 
 /* The linkage of a definition follows the object: internal in a whole
@@ -2086,6 +2114,7 @@ void test_llvm_emit(void)
     temporaries();
     cold_branches();
     attributes();
+    tune_cpu();
     linkage();
     declarations();
     arithmetic();

@@ -74,7 +74,7 @@ declare noundef i32 @printf(ptr noundef, ...) #1
 declare noundef double @mix(i64 noundef, double noundef, i64 noundef, float noundef) #1
 declare noundef float @nine(double noundef, double noundef, double noundef, double noundef, double noundef, double noundef, double noundef, double noundef, float noundef, float noundef) #1
 
-attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="generic" "target-features"="+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fullfp16,+jsconv,+lse,+neon,+pauth,+predres,+ras,+rcpc,+rdm,+sb,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8a,-fmv" }
+attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="generic" "target-features"="+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fullfp16,+jsconv,+lse,+neon,+pauth,+predres,+ras,+rcpc,+rdm,+sb,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8a,-fmv" "tune-cpu"="apple-m1" }
 attributes #1 = { nounwind }
 
 !llvm.module.flags = !{!0, !1}
