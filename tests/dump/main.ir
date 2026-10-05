@@ -3,7 +3,7 @@ global main.0 size 27 align 1 bytes 6d 61 69 6e 2e 61 6e 74 69 3a 33 3a 20 6f 76
 global main.1 size 27 align 1 bytes 6d 61 69 6e 2e 61 6e 74 69 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00
 fn main.scale(%0: i64) -> i64 {
 b0:
-    %1 = addov i64 2, 4
+    %1 = addov nsw i64 2, 4
     branchov %1, b1, b2
 b1:
     %2 = addr @main.0
@@ -11,7 +11,7 @@ b1:
     unreachable
 b2:
     %3 = copy i64 %1
-    %4 = mulov i64 %0, %3
+    %4 = mulov nsw i64 %0, %3
     branchov %4, b3, b4
 b3:
     %5 = addr @main.1

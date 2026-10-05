@@ -51,6 +51,7 @@ const char *ir_op_name(enum ir_op op)
         [IR_VBINARY] = "vbinary", [IR_VUNARY] = "vunary",
         [IR_VSPLAT] = "vsplat", [IR_VSELECT] = "vselect",
         [IR_VSHUFFLE] = "vshuffle", [IR_VREDUCE] = "vreduce",
+        [IR_LIFE_START] = "lifestart", [IR_LIFE_END] = "lifeend",
         [IR_CALL] = "call", [IR_JUMP] = "jump", [IR_BRANCH] = "branch",
         [IR_BRANCH_OV] = "branchov",
         [IR_RET] = "ret", [IR_UNREACHABLE] = "unreachable",
@@ -269,6 +270,12 @@ static void signature(struct text *out, const struct ir_module *m,
         text_append(out, f->result_ext == IR_EXT_SIGN ? " signext"
                                                       : " zeroext");
     }
+    if (f->result_range) {
+        text_append(out, " range ");
+        integer(out, f->result, f->result_low);
+        text_append(out, ", ");
+        integer(out, f->result, f->result_high);
+    }
     text_append(out, f->allocates ? " allocates" : "");
     effects(out, f);
     text_append(out, f->writes_tables ? " writes tables" : "");
@@ -284,6 +291,13 @@ static void instruction(struct text *out, const struct ir_module *m,
         text_appendf(out, "%%%" PRIu32 " = ", inst->result);
     }
     text_append(out, ir_op_name(inst->op));
+    /* The wrap facts in the order the LLVM text writes them. */
+    if (inst->op == IR_ADD || inst->op == IR_SUB || inst->op == IR_MUL ||
+        inst->op == IR_ADD_OV || inst->op == IR_SUB_OV ||
+        inst->op == IR_MUL_OV) {
+        text_append(out, (inst->field & IR_NUW) != 0 ? " nuw" : "");
+        text_append(out, (inst->field & IR_NSW) != 0 ? " nsw" : "");
+    }
     switch (inst->op) {
     case IR_SLOT:
         text_append(out, " ");
@@ -292,6 +306,9 @@ static void instruction(struct text *out, const struct ir_module *m,
     case IR_PTRADD:
     case IR_BRANCH:
     case IR_BRANCH_OV:
+        if (inst->op == IR_PTRADD && inst->field == IR_INBOUNDS) {
+            text_append(out, " inbounds");
+        }
         text_append(out, " ");
         operand(out, m, &inst->a);
         text_append(out, ", ");
@@ -309,8 +326,20 @@ static void instruction(struct text *out, const struct ir_module *m,
         text_append(out, ", ");
         ir_vtype_print(out, m, inst->of);
         break;
+    case IR_LOAD:
+        text_appendf(out, " %s ", ir_type_name(inst->type));
+        operand(out, m, &inst->a);
+        if (inst->b.kind == IR_INT) {
+            text_append(out, " range ");
+            operand(out, m, &inst->b);
+            text_append(out, ", ");
+            operand(out, m, &inst->c);
+        }
+        break;
     case IR_ADDR:
     case IR_JUMP:
+    case IR_LIFE_START:
+    case IR_LIFE_END:
         text_append(out, " ");
         operand(out, m, &inst->a);
         break;

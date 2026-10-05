@@ -73,6 +73,7 @@ static void make_copy(struct ir_inst *inst, struct ir_operand value)
     inst->a = value;
     inst->b = none();
     inst->c = none();
+    inst->field = 0;
 }
 
 static void delete_inst(struct ir_block *b, size_t i)
@@ -500,6 +501,7 @@ static bool simplify(struct ir_inst *inst)
         if ((k = power_of_two(&inst->b)) > 0) {
             inst->op = IR_SHL;
             inst->b = ir_int_op(t, (uint64_t)k);
+            inst->field = 0;
             return true;
         }
         return false;
@@ -1027,6 +1029,8 @@ static bool forward_stores(struct ir_function *f)
             case IR_VSPLAT:
             case IR_VSELECT:
             case IR_VSHUFFLE:
+            case IR_LIFE_START:
+            case IR_LIFE_END:
                 memset(&held, 0, sizeof held);
                 break;
             default:
@@ -1085,7 +1089,8 @@ static bool escapes_in(const struct ir_inst *inst, uint32_t temp)
 {
     size_t i;
 
-    if (inst->op == IR_LOAD) {
+    if (inst->op == IR_LOAD || inst->op == IR_LIFE_START ||
+        inst->op == IR_LIFE_END) {
         return false;
     }
     if (inst->op == IR_STORE) {
@@ -1271,7 +1276,8 @@ static void rewrite_slot_uses(struct ir_function *f, uint32_t base,
     }
 }
 
-/* Delete every ptradd of the slot base. */
+/* Delete every ptradd of the slot base, and the start and the end of its
+   lifetime. */
 static void drop_slot_addresses(struct ir_function *f, uint32_t base)
 {
     size_t j;
@@ -1281,7 +1287,9 @@ static void drop_slot_addresses(struct ir_function *f, uint32_t base)
         struct ir_block *block = f->blocks[j];
         for (k = block->count; k > 0; k--) {
             const struct ir_inst *at = &block->insts[k - 1];
-            if (at->op == IR_PTRADD && is_temp(&at->a, base)) {
+            if ((at->op == IR_PTRADD || at->op == IR_LIFE_START ||
+                 at->op == IR_LIFE_END) &&
+                is_temp(&at->a, base)) {
                 delete_inst(block, k - 1);
             }
         }
@@ -1536,7 +1544,8 @@ static enum ir_op without_overflow(enum ir_op op)
 /* Replace every branch into a failure block of that kind with a jump to
    the block that follows it. Dropping the checks also turns every
    overflow operation back into its arithmetic, so a build without them
-   emits what it emitted before they existed. */
+   emits what it emitted before they existed. The arithmetic wraps there,
+   so it keeps no wrap fact. */
 void optimize_drop_failures(struct ir_module *program, enum ir_fail kind)
 {
     size_t i;
@@ -1554,6 +1563,7 @@ void optimize_drop_failures(struct ir_module *program, enum ir_fail kind)
                     if (inst->op == IR_ADD_OV || inst->op == IR_SUB_OV ||
                         inst->op == IR_MUL_OV) {
                         inst->op = without_overflow(inst->op);
+                        inst->field = 0;
                     }
                 }
             }

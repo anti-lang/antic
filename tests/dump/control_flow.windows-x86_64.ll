@@ -27,7 +27,7 @@ b2:
   ret i64 %v4
 }
 
-define noundef zeroext i8 @_A12control_flow_spin(i8 zeroext noundef %p0, i8 zeroext noundef %p1) #0 !dbg !14 {
+define noundef zeroext range(i8 0, 2) i8 @_A12control_flow_spin(i8 zeroext noundef %p0, i8 zeroext noundef %p1) #0 !dbg !14 {
 b0:
   %t0 = alloca i8, align 1
   %t1 = alloca i8, align 1

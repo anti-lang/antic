@@ -1,0 +1,107 @@
+//! One function for each fact of "Arithmetic, addresses and ranges" that the
+//! LLVM text writes. A dev build checks `+`, and the value the check passes is
+//! `nsw`. The step of a range is `nuw nsw` from a low bound of 0, `nsw` alone
+//! from another and `nuw` alone on an unsigned type. The field of a `*T` is a
+//! `getelementptr inbounds`, and the field of a view by `as` is not. A bool and
+//! an enum load with `!range` and return with `range()`, as the tag of a
+//! variant loads, and a call of such a function carries the range. A local
+//! struct whose address a call takes lives between two lifetime markers in the
+//! body of a loop.
+
+enum Kind
+{
+	Circle,
+	Square,
+	Line,
+}
+
+variant Shape
+{
+	Round { r: int },
+	Empty,
+}
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+struct Holder
+{
+	kind: Kind,
+	on: bool,
+}
+
+fn checked(a: int, b: int) -> int
+{
+	return a + b;
+}
+
+fn up(n: int) -> int
+{
+	let t = 0;
+	for i in 0..n {
+		t +%= i;
+	}
+	return t;
+}
+
+fn down(a: int, b: int) -> int
+{
+	let t = 0;
+	for i in a..b by -2 {
+		t +%= i;
+	}
+	return t;
+}
+
+fn bytes(lo: u8, hi: u8) -> u8
+{
+	let t: u8 = 0;
+	for i in lo..hi {
+		t +%= i;
+	}
+	return t;
+}
+
+fn field(p: *Point) -> int
+{
+	return p.y;
+}
+
+fn viewed(p: *Point) -> int
+{
+	let q = p as *Point;
+	return q.y;
+}
+
+fn kind(h: *Holder) -> Kind
+{
+	return h.kind;
+}
+
+fn on(h: *Holder) -> bool
+{
+	return h.on;
+}
+
+fn round(s: Shape) -> bool
+{
+	return s is Shape.Round;
+}
+
+fn is_line(h: *Holder) -> bool
+{
+	return kind(h) == Kind.Line;
+}
+
+fn scoped(n: int) -> int
+{
+	let s = 0;
+	for i in 0..n {
+		let p = Point { x: i, y: 2 };
+		s +%= field(&p);
+	}
+	return s;
+}

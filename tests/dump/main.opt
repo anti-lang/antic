@@ -5,7 +5,7 @@ global anti_rt_slots anti.rt.SlotTable { i64 0, ptr 0, i64 0 }
 global anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn main.scale(%0: i64) -> i64 {
 b0:
-    %1 = addov i64 2, 4
+    %1 = addov nsw i64 2, 4
     branchov %1, b1, b2
 b1:
     %2 = addr @main.0
@@ -13,7 +13,7 @@ b1:
     unreachable
 b2:
     %3 = copy i64 %1
-    %4 = mulov i64 %0, %1
+    %4 = mulov nsw i64 %0, %1
     branchov %4, b3, b4
 b3:
     %5 = addr @main.1

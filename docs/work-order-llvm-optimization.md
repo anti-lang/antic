@@ -367,7 +367,9 @@ Anti wraps on overflow in release mode, so a plain `add` carries no
 - In a checked build, the operation on the path where `IR_BRANCH_OV`
   found no overflow. That path carries `nsw`.
 - The step of a `for i in a..b` loop, where `i < b` holds before the
-  step. It carries `nsw`, and `nuw` when `a` is at least 0.
+  step. On a signed range it carries `nsw`, and `nuw` when `a` is at
+  least 0. On an unsigned range it carries `nuw` alone, since its values
+  may pass the top of the signed type.
 
 `opt` already derives `nuw nsw` on the counters of `map_work`. The step
 measures whether the explicit flags change any program of `tests/bench`.

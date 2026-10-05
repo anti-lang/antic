@@ -1,0 +1,36 @@
+//! The plain operators wrap in release mode, so they carry no wrap fact. A test
+//! that a fact of no overflow would fold, `x + 1 > x`, is false at the top of
+//! the type, and so are the two like it for `-` and `*`. Each operand comes
+//! from the counter of a loop that runs once, so antic's optimizer folds none
+//! of them. It returns the number of results that differ from the defined ones,
+//! and exits with 0.
+
+fn grows(x: int) -> bool
+{
+	return x + 1 > x;
+}
+
+fn shrinks(x: int) -> bool
+{
+	return x - 1 < x;
+}
+
+fn doubles(x: int) -> bool
+{
+	return x * 2 / 2 == x;
+}
+
+fn main() -> int
+{
+	let wrong = 0;
+	for i in 0..1 {
+		let top: int = i + 9223372036854775807;
+		let least: int = i - 9223372036854775807 - 1;
+		if grows(top) { wrong += 1; }
+		if shrinks(least) { wrong += 1; }
+		if doubles(top) { wrong += 1; }
+		if top + 1 != least { wrong += 1; }
+		if !grows(top - 1) { wrong += 1; }
+	}
+	return wrong;
+}

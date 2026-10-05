@@ -13,21 +13,21 @@ global main.8 size 28 align 1 bytes 6d 61 69 6e 2e 61 6e 74 69 3a 31 30 3a 20 6f
 fn main.f() -> i64 {
 b0:
     %0 = copy i64 size_of main.H
-    %1 = mulov i64 %0, 1
+    %1 = mulov nsw i64 %0, 1
     branchov %1, b1, b2
 b1:
     %2 = addr @main.6
     call void @anti_rt_check_failed(%2, 27, 1, %0, 1)
     unreachable
 b2:
-    %3 = addov i64 %1, 4
+    %3 = addov nsw i64 %1, 4
     branchov %3, b3, b4
 b3:
     %4 = addr @main.7
     call void @anti_rt_check_failed(%4, 27, 1, %1, 4)
     unreachable
 b4:
-    %5 = subov i64 %3, 4
+    %5 = subov nsw i64 %3, 4
     branchov %5, b5, b6
 b5:
     %6 = addr @main.8

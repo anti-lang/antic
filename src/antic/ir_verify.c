@@ -180,6 +180,14 @@ static void facts_ok(struct verifier *v)
     if (f->allocates && !f->is_extern) {
         fail(v, "a function with a body allocates");
     }
+    if (f->result_range &&
+        (f->result < IR_I8 || f->result > IR_I64)) {
+        fail(v, "the result is %s and has a range", ir_type_name(f->result));
+    } else if (f->result_range &&
+               ir_int_op(f->result, f->result_low).as.integer ==
+                   ir_int_op(f->result, f->result_high).as.integer) {
+        fail(v, "the result has an empty range");
+    }
     for (i = 0; i < f->param_count; i++) {
         const struct ir_param *p = &f->params[i];
         if (p->deref_size != IR_NO_INDEX && !p->nonnull) {
@@ -641,9 +649,61 @@ static bool check_class(const struct ir_module *m, const struct ir_class *c,
     return ok;
 }
 
+/* The facts of "Arithmetic, addresses and ranges" stand where each
+   belongs: the wrap facts on integer arithmetic, and nuw nowhere on an
+   overflow operation, inbounds on an address, a range of the type of its
+   load that is not empty, and a lifetime of a slot. slots marks the
+   temporaries an IR_SLOT defines. */
+static void arith_facts_ok(struct verifier *v, const struct ir_inst *inst,
+                           const bool *slots)
+{
+    switch (inst->op) {
+    case IR_ADD: case IR_SUB: case IR_MUL:
+        if (inst->field > IR_WRAP_FACTS) {
+            fail(v, "%s has the wrap facts %" PRIu32, ir_op_name(inst->op),
+                 inst->field);
+        }
+        break;
+    case IR_ADD_OV: case IR_SUB_OV: case IR_MUL_OV:
+        if ((inst->field & ~(uint32_t)IR_NSW) != 0) {
+            fail(v, "%s has a wrap fact other than nsw",
+                 ir_op_name(inst->op));
+        }
+        break;
+    case IR_PTRADD:
+        if (inst->field > IR_INBOUNDS) {
+            fail(v, "ptradd has a fact other than inbounds");
+        }
+        break;
+    case IR_LOAD:
+        if (inst->b.kind == IR_NONE && inst->c.kind == IR_NONE) {
+            break;
+        }
+        if (inst->b.kind != IR_INT || inst->c.kind != IR_INT ||
+            inst->b.type != inst->type || inst->c.type != inst->type ||
+            inst->type < IR_I8 || inst->type > IR_I64) {
+            fail(v, "load of %s has a range of another type",
+                 ir_type_name(inst->type));
+        } else if (inst->b.as.integer == inst->c.as.integer) {
+            fail(v, "load has an empty range");
+        }
+        break;
+    case IR_LIFE_START:
+    case IR_LIFE_END:
+        if (inst->a.kind != IR_TEMP || inst->a.as.temp >= v->f->temp_count ||
+            !slots[inst->a.as.temp]) {
+            fail(v, "%s names no slot", ir_op_name(inst->op));
+        }
+        break;
+    default:
+        break;
+    }
+}
+
 bool ir_verify(const struct ir_module *m, struct text *errors)
 {
     struct verifier v = {m, NULL, NULL, errors, true};
+    bool *slots;
     size_t i;
     size_t j;
     size_t k;
@@ -660,12 +720,23 @@ bool ir_verify(const struct ir_module *m, struct text *errors)
             continue;
         }
         params_ok(&v);
+        slots = alloc_zeroed((size_t)v.f->temp_count + 1, sizeof *slots);
+        for (j = 0; j < v.f->block_count; j++) {
+            const struct ir_block *b = v.f->blocks[j];
+            for (k = 0; k < b->count; k++) {
+                if (b->insts[k].op == IR_SLOT &&
+                    b->insts[k].result < v.f->temp_count) {
+                    slots[b->insts[k].result] = true;
+                }
+            }
+        }
         for (j = 0; j < v.f->block_count; j++) {
             const struct ir_block *b = v.f->blocks[j];
             v.b = b;
             for (k = 0; k < b->count; k++) {
                 if (indices_ok(&v, &b->insts[k])) {
                     check_inst(&v, &b->insts[k]);
+                    arith_facts_ok(&v, &b->insts[k], slots);
                 }
                 /* A branch on overflow reads the flags of the
                    instruction right before it, so nothing may come
@@ -709,6 +780,7 @@ bool ir_verify(const struct ir_module *m, struct text *errors)
                 fail(&v, "the block does not end with a terminator");
             }
         }
+        free(slots);
         /* The analysis follows block operands, which must be valid. */
         if (v.ok) {
             check_definitions(&v);

@@ -81,6 +81,10 @@ struct exit_action {
        after the locals of the body are gone. An exit that gives an error
        runs `failed` before it. */
     bool leave;
+    /* The end of the lifetime of the slot of a `let`, the temporary that
+       IR_SLOT gave in slot. */
+    bool life_end;
+    uint32_t slot;
 };
 
 struct defers {
@@ -141,6 +145,9 @@ struct lowerer {
     struct ir_block *b;         /* NULL after a terminator */
     struct loop *loop;
     struct defers *defers;
+    /* The exit actions run for an exit of the function, which ends the
+       lifetime of every slot itself. */
+    bool leaving;
     uint32_t loop_depth;        /* the loops the next block sits inside */
     struct handling *handling;  /* the handler being lowered */
     struct try_scope *try_scope;
@@ -194,6 +201,7 @@ struct place {
     uint32_t temp;
     struct ir_operand address;      /* of a bitfield: of its aggregate */
     enum ir_type type;
+    const struct type *of;          /* the type of the value */
     bool bitfield;
     uint32_t agg;                   /* bitfield */
     uint32_t field;                 /* bitfield */
@@ -292,6 +300,8 @@ struct ir_operand lower_constant(struct lowerer *l,
 struct ir_operand lower_offset_address(struct lowerer *l,
                                        struct ir_operand address,
                                        struct ir_operand offset);
+struct ir_operand lower_field_at(struct lowerer *l, struct ir_operand address,
+                                 struct ir_operand offset);
 struct ir_operand lower_zero(void);
 const struct type *lower_field_owner(const struct type *t,
                                      const struct name *name);
@@ -326,6 +336,20 @@ struct ir_operand lower_object_call(struct lowerer *l, enum rt_function f,
                                     const struct type *t);
 size_t lower_globals_of_module(struct lowerer *l);
 
+/* DESIGN: the values a load of type t may read, from low up to high and
+   without it, for the !range of a load and range() of a result in
+   "Arithmetic, addresses and ranges" of
+   docs/work-order-llvm-optimization.md. A bool holds 0 or 1, since no
+   operation makes another byte of one and `as` refuses to make one from
+   an integer. An enum holds one of its values, which a dev build checks
+   where `as` makes one, and 0, the value of memory that `alloc` zeroed
+   before the program wrote the field. A range that covers its whole type
+   and an enum whose integer follows the target give no range. */
+bool lower_range_of(const struct type *t, uint64_t *low, uint64_t *high);
+/* A load of a value of type t from address, with its range. */
+struct ir_operand lower_load_value(struct lowerer *l, const struct type *t,
+                                   struct ir_operand address);
+
 /* lower_place.c */
 
 struct ir_operand lower_field_address(struct lowerer *l,
@@ -348,6 +372,7 @@ const struct const_value *lower_location_value(struct lowerer *l,
                                                struct pos pos,
                                                const struct type *t);
 struct ir_operand lower_read_place(struct lowerer *l, const struct place *p);
+
 
 /* lower_check.c */
 

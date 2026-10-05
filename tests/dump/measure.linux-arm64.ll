@@ -11,7 +11,7 @@ b0:
   store [2 x i64] %p0.0, ptr %a0, align 8
   store ptr %a0, ptr %t0, align 8
   %v0 = load ptr, ptr %t0, align 8
-  %v1 = getelementptr i8, ptr %v0, i64 8
+  %v1 = getelementptr inbounds i8, ptr %v0, i64 8
   store ptr %v1, ptr %t1, align 8
   %v2 = load ptr, ptr %t1, align 8
   %v3 = load i64, ptr %v2, align 8
@@ -35,7 +35,7 @@ b0:
   %v1 = load float, ptr %v0, align 4
   store float %v1, ptr %t1, align 4
   %v2 = load ptr, ptr %t0, align 8
-  %v3 = getelementptr i8, ptr %v2, i64 4
+  %v3 = getelementptr inbounds i8, ptr %v2, i64 4
   store ptr %v3, ptr %t2, align 8
   %v4 = load ptr, ptr %t2, align 8
   %v5 = load float, ptr %v4, align 4

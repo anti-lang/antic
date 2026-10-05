@@ -49,6 +49,7 @@ b0:
   %t10 = alloca i64, align 8
   %s0 = alloca [16 x i8], align 8
   store ptr %s0, ptr %t0, align 8
+  call void @llvm.lifetime.start.p0(ptr %s0)
   store ptr @fnptr.twice, ptr %t1, align 8
   %v0 = load ptr, ptr %t1, align 8
   %v1 = load ptr, ptr %t0, align 8
@@ -93,6 +94,7 @@ b0:
 
 declare noundef i32 @abs(i32 noundef) #1
 declare noundef i32 @fnptr.fn.0(i32 noundef) #1
+declare void @llvm.lifetime.start.p0(ptr)
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="generic" "target-features"="+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fullfp16,+jsconv,+lse,+neon,+pauth,+predres,+ras,+rcpc,+rdm,+sb,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8a,-fmv" }
 attributes #1 = { nounwind }

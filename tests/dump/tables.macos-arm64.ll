@@ -10,7 +10,7 @@ b0:
   %t3 = alloca i64, align 8
   store ptr %p0, ptr %t0, align 8
   %v0 = load ptr, ptr %t0, align 8
-  %v1 = getelementptr i8, ptr %v0, i64 8
+  %v1 = getelementptr inbounds i8, ptr %v0, i64 8
   store ptr %v1, ptr %t1, align 8
   %v2 = load ptr, ptr %t1, align 8
   %v3 = load i64, ptr %v2, align 8

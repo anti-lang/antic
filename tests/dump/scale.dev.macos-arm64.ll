@@ -10,7 +10,7 @@ b0:
   store i64 %p0, ptr %t0, align 8
   %v0 = load i64, ptr %t0, align 8
   %v1 = call { i64, i1 } @llvm.smul.with.overflow.i64(i64 %v0, i64 6)
-  %v2 = extractvalue { i64, i1 } %v1, 0
+  %v2 = mul nsw i64 %v0, 6
   %v3 = extractvalue { i64, i1 } %v1, 1
   store i64 %v2, ptr %t1, align 8
   br i1 %v3, label %b1, label %b2, !prof !3

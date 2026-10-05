@@ -6,42 +6,42 @@ global anti_rt_slots anti.rt.SlotTable { i64 0, ptr 0, i64 0 }
 global anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn identities.mix(%0: i64) -> i64 {
 b0:
-    %1 = addov i64 %0, 0
+    %1 = addov nsw i64 %0, 0
     branchov %1, b1, b2
 b1:
     %2 = addr @identities.0
     call void @anti_rt_check_failed(%2, 32, 1, %0, 0)
     unreachable
 b2:
-    %3 = mulov i64 %1, 8
+    %3 = mulov nsw i64 %1, 8
     branchov %3, b3, b4
 b3:
     %4 = addr @identities.1
     call void @anti_rt_check_failed(%4, 32, 1, %1, 8)
     unreachable
 b4:
-    %5 = mulov i64 2, %0
+    %5 = mulov nsw i64 2, %0
     branchov %5, b5, b6
 b5:
     %6 = addr @identities.1
     call void @anti_rt_check_failed(%6, 32, 1, 2, %0)
     unreachable
 b6:
-    %7 = addov i64 %3, %5
+    %7 = addov nsw i64 %3, %5
     branchov %7, b7, b8
 b7:
     %8 = addr @identities.0
     call void @anti_rt_check_failed(%8, 32, 1, %3, %5)
     unreachable
 b8:
-    %9 = mulov i64 %0, 1
+    %9 = mulov nsw i64 %0, 1
     branchov %9, b9, b10
 b9:
     %10 = addr @identities.1
     call void @anti_rt_check_failed(%10, 32, 1, %0, 1)
     unreachable
 b10:
-    %11 = subov i64 %7, %9
+    %11 = subov nsw i64 %7, %9
     branchov %11, b11, b12
 b11:
     %12 = addr @identities.2

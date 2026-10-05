@@ -97,6 +97,9 @@ struct symbol {
     /* A local whose `let` took a pointer or a slice into the fields of
        the object of a thread-safe class. */
     bool into_fields;
+    /* A local that a `let` or a `=` gave an address that a view by `as`
+       made, or that was made from one, see sema_value_view. */
+    bool holds_view;
     /* The error a `catch` binds: the loops its handler stands in, the
        function it moved into, and whether a `defer` or an `undo` of the
        handler names it. */
@@ -220,6 +223,17 @@ bool sema_field_takes_literal(const struct struct_field *f);
 /* Whether a value of type t holds a class, itself or in a field or an
    element. */
 bool sema_holds_class(const struct type *t);
+/* DESIGN: whether the address e gives, or the address of the place e
+   names, comes from a view by `as` or from an address made from an
+   integer. Such an address may point at no object of its type, so the
+   address of a field reached through it is no `inbounds` address, as
+   "Arithmetic, addresses and ranges" in
+   docs/work-order-llvm-optimization.md says. An `as` that gives a pointer
+   or a slice is a view, a local that ever held one carries holds_view,
+   and `&`, a field, an element, a part of a slice and a tuple pass the
+   view on. A field read through a view gives memory and no view. */
+bool sema_value_view(const struct expr *e);
+bool sema_place_view(const struct expr *e);
 /* Whether fn has a body: here, in the runtime, or in the module whose
    library file declared it. */
 bool sema_has_body(const struct item *fn);

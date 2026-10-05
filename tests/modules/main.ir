@@ -4,7 +4,7 @@ global com.example.twice.0 size 40 align 1 bytes 63 6f 6d 2f 65 78 61 6d 70 6c 6
 global main.0 size 35 align 1 bytes 6d 61 69 6e 2e 61 6e 74 69 3a 35 3a 20 64 69 76 69 73 69 6f 6e 20 62 79 20 7a 65 72 6f 20 69 6e 20 2f 00
 fn com.example.scale.scale(%0: i64) -> i64 {
 b0:
-    %1 = mulov i64 %0, 6
+    %1 = mulov nsw i64 %0, 6
     branchov %1, b1, b2
 b1:
     %2 = addr @com.example.scale.0
@@ -17,7 +17,7 @@ fn com.example.twice.twice(%0: i64) -> i64 {
 b0:
     %1 = call i64 @com.example.scale.scale(%0)
     %2 = call i64 @com.example.scale.scale(%0)
-    %3 = addov i64 %1, %2
+    %3 = addov nsw i64 %1, %2
     branchov %3, b1, b2
 b1:
     %4 = addr @com.example.twice.0

@@ -131,10 +131,9 @@ static const struct name union_name = {VARIANT_UNION,
 struct ir_operand lower_load_tag(struct lowerer *l, const struct type *v,
                                  struct ir_operand address)
 {
-    return lower_temp(
-        l, ir_load(l->f, l->b, lower_ir_type_of(v->base),
-                   lower_offset_address(l, address,
-                                        lower_field_offset(l, v, &tag_name))));
+    return lower_load_value(
+        l, v->base,
+        lower_offset_address(l, address, lower_field_offset(l, v, &tag_name)));
 }
 
 /* The address of the fields of case index of the variant v at address.
@@ -742,7 +741,7 @@ static struct ir_operand lower_unary(struct lowerer *l, const struct expr *e)
         return lower_temp(l, ir_unary(l->f, l->b, IR_NOT, type, v));
     case TOKEN_STAR:
         v = lower_expr(l, operand);
-        return lower_temp(l, ir_load(l->f, l->b, type, v));
+        return lower_load_value(l, e->type, v);
     default: /* TOKEN_AMP: semantic analysis marked the operand */
         return lower_place(l, operand, &p) ? p.address : lower_none();
     }

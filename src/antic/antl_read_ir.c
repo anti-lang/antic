@@ -677,6 +677,8 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
     uint8_t result = antl_get_u8(r);
     uint32_t result_agg = read_agg_ref(r, program, maps, result);
     uint8_t result_ext = antl_get_u8(r);
+    uint64_t low = (flags & 128) != 0 ? antl_get_u64(r) : 0;
+    uint64_t high = (flags & 128) != 0 ? antl_get_u64(r) : 0;
     uint32_t file = antl_get_u32(r);
     uint32_t decl_line = antl_get_u32(r);
     uint32_t param_count = antl_get_count(r, 11);
@@ -688,7 +690,13 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
     if (r->failed) {
         return 0;
     }
-    if (!valid_type(result) || flags > 127 || effects >> 2 > IR_GUARANTEES ||
+    if (!valid_type(result) || effects >> 2 > IR_GUARANTEES ||
+        ((flags & 128) != 0 &&
+         (result < IR_I8 || result > IR_I64 ||
+          ir_int_op((enum ir_type)result, low).as.integer !=
+              low ||
+          ir_int_op((enum ir_type)result, high).as.integer != high ||
+          low == high)) ||
         result_ext > IR_EXT_ZERO ||
         (result_ext != IR_EXT_NONE && result != IR_I8 && result != IR_I16) ||
         ((flags & 64) != 0 && (module[0] != '\0' || result != IR_PTR)) ||
@@ -742,6 +750,10 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
         if (f->result_ext != (enum ir_ext)result_ext) {
             f->result_ext = IR_EXT_NONE;
         }
+        if (!f->result_range || (flags & 128) == 0 || f->result_low != low ||
+            f->result_high != high) {
+            f->result_range = false;
+        }
         merge_effects(f, effects);
         f->writes_tables = f->writes_tables || (flags & 32) != 0;
     }
@@ -766,6 +778,9 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
         f->writes_tables = (flags & 32) != 0;
         f->allocates = (flags & 64) != 0;
         f->result_ext = (enum ir_ext)result_ext;
+        f->result_range = (flags & 128) != 0;
+        f->result_low = low;
+        f->result_high = high;
         f->effects = (enum ir_effects)(effects & 3);
         f->guarantees = (uint8_t)(effects >> 2);
         f->exported = (flags & 4) != 0;

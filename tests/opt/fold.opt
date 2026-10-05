@@ -6,7 +6,7 @@ global anti_rt_slots anti.rt.SlotTable { i64 0, ptr 0, i64 0 }
 global anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn fold.quotient() -> i64 {
 b0:
-    %0 = addov i64 -4, -1
+    %0 = addov nsw i64 -4, -1
     branchov %0, b1, b2
 b1:
     %1 = addr @fold.2
@@ -27,7 +27,7 @@ b1:
 b2:
     ret i32 -4
 }
-fn fold.compared() -> i8 zeroext {
+fn fold.compared() -> i8 zeroext range 0, 2 {
 b0:
     ret i8 0
 }

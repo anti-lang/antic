@@ -2,19 +2,24 @@
 #include <string.h>
 
 #include "alloc.h"
+#include "arith.h"
 #include "sema.h"
 #include "text.h"
 #include "types.h"
 #include "lower_lowerer.h"
 
-/* Whether any block the function is inside has a statement to run. */
+/* Whether any block the function is inside has a statement to run. The
+   end of the lifetime of a slot runs no statement and changes no value. */
 bool lower_has_defers(const struct lowerer *l)
 {
     const struct defers *scope;
+    size_t i;
 
     for (scope = l->defers; scope != NULL; scope = scope->outer) {
-        if (scope->count > 0) {
-            return true;
+        for (i = 0; i < scope->count; i++) {
+            if (!scope->items[i].life_end) {
+                return true;
+            }
         }
     }
     return false;
@@ -50,6 +55,8 @@ static void push_exit_action(struct lowerer *l, const struct stmt *stmt,
     action->second = 0;
     action->unlock_fn = RT_FUNCTION_COUNT;
     action->leave = false;
+    action->life_end = false;
+    action->slot = 0;
 }
 
 /* Record the `leave` hook of the function around the scope. */
@@ -84,6 +91,8 @@ void lower_push_error_action(struct lowerer *l, const struct symbol *sym,
     action->second = 0;
     action->unlock_fn = RT_FUNCTION_COUNT;
     action->leave = false;
+    action->life_end = false;
+    action->slot = 0;
 }
 
 /* Record the unlock of the lock whose address is in mutex, which a
@@ -108,6 +117,8 @@ void lower_push_unlock_action(struct lowerer *l, uint32_t mutex,
     action->second = 0;
     action->unlock_fn = unlock_fn;
     action->leave = false;
+    action->life_end = false;
+    action->slot = 0;
 }
 
 void lower_jump_to_join(struct lowerer *l, struct ir_block **join)
@@ -393,6 +404,7 @@ struct for_walk {
     bool unsigned_range;
     bool down;
     uint64_t k;                 /* the magnitude of the step */
+    unsigned wrap;              /* the wrap facts of the step of a range */
 };
 
 /* Read the bound of the sequence over once, before the loop, and enter
@@ -452,6 +464,25 @@ static void range_start(struct lowerer *l, const struct stmt *s,
     w->counter_type = lower_ir_type_of(s->as.for_loop.low->type);
     type = w->counter_type;
     read = lower_expr(l, s->as.for_loop.low);
+    /* DESIGN: the step moves the counter only where the distance to the
+       bound that ends the walk exceeds k, so the moved counter lies
+       strictly inside the range and the step never wraps in the type of
+       the range. A signed range carries nsw. The counter of a signed range
+       is at least the low bound, so a constant low bound of 0 or more
+       keeps it at 0 or more, and the step carries nuw as well. An
+       unsigned range carries nuw alone, since its values may pass the
+       top of the signed type. "Arithmetic, addresses and ranges" in
+       docs/work-order-llvm-optimization.md asks for these facts. */
+    if (w->unsigned_range) {
+        w->wrap = IR_NUW;
+    } else {
+        w->wrap = IR_NSW;
+        if (read.kind == IR_INT && type >= IR_I8 && type <= IR_I64 &&
+            arith_signed(read.as.integer,
+                         8 << (type - IR_I8)) >= 0) {
+            w->wrap |= IR_NUW;
+        }
+    }
     w->low = lower_temp(l, ir_unary(l->f, l->b, IR_COPY, type, read));
     read = lower_expr(l, s->as.for_loop.high);
     w->high = lower_temp(l, ir_unary(l->f, l->b, IR_COPY, type, read));
@@ -545,9 +576,11 @@ static void range_step(struct lowerer *l, const struct for_walk *w)
               w->exit, advance);
     l->b = advance;
     ir_assign(l->f, l->b, w->counter,
-              lower_temp(l, ir_binary(l->f, l->b, w->down ? IR_SUB : IR_ADD,
-                                      type, lower_temp(l, w->counter),
-                                      ir_int_op(type, w->k))));
+              lower_temp(l, ir_binary_wrap(l->f, l->b,
+                                           w->down ? IR_SUB : IR_ADD, type,
+                                           lower_temp(l, w->counter),
+                                           ir_int_op(type, w->k),
+                                           w->wrap)));
     ir_jump(l->f, l->b, w->body);
 }
 
@@ -1135,11 +1168,62 @@ static void lower_flags_assign(struct lowerer *l, const struct stmt *s)
                 values);
 }
 
+/* Whether the temporary of sym is a slot of the entry block, which
+   lower_reserve_slots gave it. */
+static bool in_slot(const struct lowerer *l, const struct symbol *sym)
+{
+    const struct ir_block *entry = l->f->blocks[0];
+    size_t i;
+
+    if (sym == NULL ||
+        !(sym->address_taken || lower_is_aggregate(sym->type))) {
+        return false;
+    }
+    for (i = 0; i < entry->count && entry->insts[i].op == IR_SLOT; i++) {
+        if (entry->insts[i].result == sym->ir) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* DESIGN: the slot of a local lives from its `let` to the end of its
+   block, which "Memory model" in docs/decisions.md gives as the
+   lexical block scoping of C. The `let` starts the lifetime of the slot,
+   and an exit action ends it on every exit of the block, after the
+   teardown of the local, which the `let` registers later and so runs
+   first. llc then lays two slots that never live at the same time over
+   one place of the frame. A closure never outlives what it captures,
+   and a pointer to a local after its block is a dangling pointer, as in
+   C. A slot that lowering made for anything other than a `let` keeps
+   the whole function. */
+static void start_lifetime(struct lowerer *l, const struct symbol *sym)
+{
+    struct exit_action *action;
+
+    if (!in_slot(l, sym)) {
+        return;
+    }
+    ir_lifetime(l->f, l->b, IR_LIFE_START, lower_temp(l, sym->ir));
+    push_exit_action(l, NULL, NULL, false);
+    action = &l->defers->items[l->defers->count - 1];
+    action->life_end = true;
+    action->slot = sym->ir;
+}
+
 static void lower_let(struct lowerer *l, const struct stmt *s)
 {
+    size_t i;
+
     if (is_flags_let(s)) {
         lower_flags_let(l, s);
         return;
+    }
+    start_lifetime(l, s->as.let.symbol);
+    for (i = 0; i < s->as.let.name_count; i++) {
+        if (!s->as.let.names[i].assigns) {
+            start_lifetime(l, s->as.let.names[i].symbol);
+        }
     }
     lower_let_value(l, s);
     if (s->as.let.name_count > 0 && l->b != NULL) {
@@ -1647,7 +1731,16 @@ void lower_run_defers(struct lowerer *l, const struct defers *scope,
         if (action->undo) {
             continue;
         }
-        if (action->leave) {
+        /* DESIGN: an exit of the function writes no end of a lifetime.
+           The return reads the value of an aggregate where it stands,
+           in the slot of the local `return v` names, after these actions
+           run, and the return itself ends every slot. */
+        if (action->life_end) {
+            if (!l->leaving) {
+                ir_lifetime(l->f, l->b, IR_LIFE_END,
+                            lower_temp(l, action->slot));
+            }
+        } else if (action->leave) {
             if (failing) {
                 lower_hook_failed(l, l->failing_error);
             }
@@ -1683,9 +1776,11 @@ void lower_run_defers_to(struct lowerer *l, const struct defers *stop,
     if (stop == NULL) {
         lower_end_temps(l, 0, false);
     }
+    l->leaving = stop == NULL;
     for (scope = l->defers; scope != stop; scope = scope->outer) {
         lower_run_defers(l, scope, failing);
     }
+    l->leaving = false;
 }
 
 /* Anti has no labels, so a statement after return, break or continue is

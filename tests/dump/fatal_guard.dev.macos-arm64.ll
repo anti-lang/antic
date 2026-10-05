@@ -13,6 +13,7 @@ b0:
   %s1 = alloca [8 x i8], align 8
   store ptr %p0, ptr %t0, align 8
   store ptr %s1, ptr %t1, align 8
+  call void @llvm.lifetime.start.p0(ptr %s1)
   %v0 = load ptr, ptr %t0, align 8
   %v1 = load ptr, ptr %t1, align 8
   store ptr %v0, ptr %v1, align 8
@@ -94,6 +95,7 @@ declare void @anti_rt_exit(i32 noundef) noreturn cold #1
 declare void @anti.lang.Error.fatal(ptr noundef nonnull dereferenceable(120)) noreturn cold #1
 declare noundef ptr @anti.lang.NoneDereference.new() #1
 declare void @anti_rt_check_failed(ptr noundef, i64 noundef, i32 noundef, i64 noundef, i64 noundef) noreturn cold #1
+declare void @llvm.lifetime.start.p0(ptr)
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="generic" "target-features"="+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fullfp16,+jsconv,+lse,+neon,+pauth,+predres,+ras,+rcpc,+rdm,+sb,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8a,-fmv" }
 attributes #1 = { nounwind }

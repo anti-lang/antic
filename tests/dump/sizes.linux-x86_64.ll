@@ -18,6 +18,7 @@ b0:
   %t11 = alloca i32, align 4
   %s0 = alloca [16 x i8], align 1
   store ptr %s0, ptr %t0, align 8
+  call void @llvm.lifetime.start.p0(ptr %s0)
   store i64 0, ptr %t1, align 8
   br label %b1
 
@@ -92,6 +93,7 @@ b6:
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
 
 declare noundef i32 @printf(ptr noundef, ...) #1
+declare void @llvm.lifetime.start.p0(ptr)
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="x86-64-v3" "target-features"="+avx,+avx2,+bmi,+bmi2,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fxsr,+lzcnt,+mmx,+movbe,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave" }
 attributes #1 = { nounwind }

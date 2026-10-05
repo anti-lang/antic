@@ -12,6 +12,7 @@ b0:
   store i64 %p0, ptr %t0, align 8
   store i64 %p1, ptr %t1, align 8
   store ptr %s2, ptr %t2, align 8
+  call void @llvm.lifetime.start.p0(ptr %s2)
   %v0 = load i64, ptr %t0, align 8
   %v1 = load ptr, ptr %t2, align 8
   store i64 %v0, ptr %v1, align 8
@@ -28,6 +29,8 @@ b0:
 
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
+
+declare void @llvm.lifetime.start.p0(ptr)
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="generic" "target-features"="+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fullfp16,+jsconv,+lse,+neon,+pauth,+predres,+ras,+rcpc,+rdm,+sb,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8a,-fmv" }
 attributes #1 = { nounwind }

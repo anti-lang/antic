@@ -26,7 +26,7 @@ b0:
   %v2 = load ptr, ptr %v1, align 8
   store ptr %v2, ptr %t3, align 8
   %v3 = load ptr, ptr %t0, align 8
-  %v4 = getelementptr i8, ptr %v3, i64 8
+  %v4 = getelementptr inbounds i8, ptr %v3, i64 8
   store ptr %v4, ptr %t4, align 8
   %v5 = load ptr, ptr %t4, align 8
   %v6 = load i64, ptr %v5, align 8
@@ -77,6 +77,7 @@ b0:
   %a1 = alloca [16 x i8], align 8
   store ptr %s0, ptr %t0, align 8
   store ptr %s1, ptr %t1, align 8
+  call void @llvm.lifetime.start.p0(ptr %s0)
   store ptr @strings.0, ptr %t2, align 8
   %v0 = load ptr, ptr %t2, align 8
   %v1 = load ptr, ptr %t1, align 8
@@ -130,6 +131,7 @@ b0:
 
 declare noundef i32 @puts(ptr noundef) #1
 declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
+declare void @llvm.lifetime.start.p0(ptr)
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="x86-64-v3" "target-features"="+avx,+avx2,+bmi,+bmi2,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fxsr,+lzcnt,+mmx,+movbe,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave" }
 attributes #1 = { nounwind }

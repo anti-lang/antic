@@ -96,13 +96,13 @@ class devirt.Speaker abstract descriptor @devirt.Speaker.descriptor base @anti_l
 class devirt.Dog descriptor @devirt.Dog.descriptor base @devirt.Speaker.descriptor table @devirt.Dog.table init @devirt.Dog.init
 fn devirt.Only.value(%0: ptr nonnull deref(size_of devirt.Only)) -> i64 {
 b0:
-    %1 = ptradd %0, offset_of devirt.Only.n
+    %1 = ptradd inbounds %0, offset_of devirt.Only.n
     %2 = load i64 %1
     ret i64 %2
 }
 fn devirt.Base.value(%0: ptr nonnull deref(size_of devirt.Base)) -> i64 {
 b0:
-    %1 = ptradd %0, offset_of devirt.Base.n
+    %1 = ptradd inbounds %0, offset_of devirt.Base.n
     %2 = load i64 %1
     ret i64 %2
 }
@@ -122,7 +122,7 @@ b0:
     %5 = ptradd %3, %4
     %6 = load ptr %5 !entry
     %7 = call i64 %6 via @devirt.fn.0(%1) table @devirt.Base.descriptor 17
-    %8 = addov i64 %2, %7
+    %8 = addov nsw i64 %2, %7
     branchov %8, b1, b2
 b1:
     %9 = addr @devirt.57
@@ -130,7 +130,7 @@ b1:
     unreachable
 b2:
     %10 = call i64 @devirt.Base.same(%1)
-    %11 = addov i64 %8, %10
+    %11 = addov nsw i64 %8, %10
     branchov %11, b3, b4
 b3:
     %12 = addr @devirt.57

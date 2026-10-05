@@ -1,0 +1,189 @@
+//! The facts of "Arithmetic, addresses and ranges" at the edge of what the
+//! language guarantees. Through a view by `as`, a field may lie past the end of
+//! the object, and its address stays an address beside the field access of the
+//! real object. The step of a range runs up to the last value of the type and
+//! down to the least, from bounds of either sign and across the sign of an
+//! unsigned byte. An enum reads 0 where `alloc` zeroed it, though 0 is no value
+//! of it, and the full range of a byte. A local whose address a call takes
+//! lives in each turn of a loop, beside one of the next block, and a local
+//! struct returns from its block. The test runs in release mode and, with
+//! `--checks`, with the checks of a dev build in an optimised program, where
+//! the checked `+` at the end of its range passes.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+struct Wide
+{
+	a: int,
+	b: int,
+	c: int,
+	d: int,
+}
+
+enum Odd: u8
+{
+	Three = 3,
+	Seven = 7,
+}
+
+enum Full: u8
+{
+	Low = 0,
+	High = 255,
+}
+
+struct Box
+{
+	odd: Odd,
+	full: Full,
+	flag: bool,
+}
+
+fn say(text: str, yes: bool)
+{
+	if yes {
+		printf("%s yes\n".ptr, text.ptr);
+	} else {
+		printf("%s no\n".ptr, text.ptr);
+	}
+}
+
+fn views()
+{
+	let ps: [2]Pair = [Pair { a: 1, b: 2 }, Pair { a: 3, b: 4 }];
+	let w = &ps[1] as *Wide;
+	let past = &w.d;
+	let near = &w.b;
+	let real = &ps[1].b;
+	printf("view %lld %lld\n".ptr, w.a, w.b);
+	say("view b is the field", near == real);
+	say("view d is the field", past == real);
+	let bytes = &ps[0] as *byte;
+	printf("back %lld %lld\n".ptr, (bytes as *Pair).b, ps[0].b);
+}
+
+fn ranges()
+{
+	let lo: i8 = 120;
+	let hi: i8 = 127;
+	let t = 0;
+	for i in lo..hi {
+		t +%= i as int;
+	}
+	printf("i8 %lld\n".ptr, t);
+	let top = 9223372036854775807;
+	let n = 0;
+	for i in 0..top by 4611686018427387904 {
+		n +%= 1;
+	}
+	printf("big %lld\n".ptr, n);
+	let u_lo: u8 = 100;
+	let u_hi: u8 = 255;
+	let u = 0;
+	for i in u_lo..u_hi by 50 {
+		u +%= i as int;
+	}
+	printf("u8 %lld\n".ptr, u);
+	let across = 0;
+	for i in -3..3 {
+		across +%= i;
+	}
+	printf("across %lld\n".ptr, across);
+	for i in -5..5 by -3 {
+		printf("down %lld\n".ptr, i);
+	}
+	for i in 0..10 by -3 {
+		printf("to zero %lld\n".ptr, i);
+	}
+	let least = -9223372036854775807 - 1;
+	let last = 0;
+	for i in least..least +% 3 {
+		last = i;
+	}
+	printf("least %lld\n".ptr, last);
+}
+
+fn grows(x: int) -> bool
+{
+	return x + 1 > x;
+}
+
+fn odd_name(o: Odd) -> int
+{
+	let v = 0;
+	switch o {
+		Odd.Three => v = 3,
+		Odd.Seven => v = 7,
+	}
+	return v;
+}
+
+fn enums()
+{
+	let boxes = alloc(Box, 2) else {
+		return;
+	};
+	printf("zero %lld %lld\n".ptr, boxes[0].odd as int, boxes[0].full as int);
+	say("zero flag", boxes[0].flag);
+	boxes[1].odd = Odd.Seven;
+	boxes[1].full = Full.High;
+	boxes[1].flag = true;
+	printf("set %lld %lld %lld\n".ptr, odd_name(boxes[1].odd),
+		boxes[1].full as int, boxes[1].odd as int);
+	say("set flag", boxes[1].flag);
+	free(boxes);
+}
+
+fn sum(p: *Pair) -> int
+{
+	return p.a + p.b;
+}
+
+fn make(n: int) -> Pair
+{
+	let first = Pair { a: n, b: n + 1 };
+	if n > 0 {
+		return first;
+	}
+	let second = Pair { a: 0 - n, b: 1 };
+	return second;
+}
+
+fn lifetimes()
+{
+	let s = 0;
+	for i in 0..4 {
+		let p = Pair { a: i, b: 10 };
+		if i == 2 {
+			continue;
+		}
+		s +%= sum(&p);
+	}
+	{
+		let q = Pair { a: 100, b: 200 };
+		s +%= sum(&q);
+	}
+	{
+		let r = Pair { a: 1000, b: 2000 };
+		s +%= sum(&r);
+	}
+	let m = make(5);
+	let k = make(-5);
+	printf("lifetimes %lld %lld %lld %lld %lld\n".ptr, s, m.a, m.b, k.a, k.b);
+}
+
+fn main() -> int
+{
+	views();
+	ranges();
+	say("grows below the top", grows(9223372036854775806));
+	enums();
+	lifetimes();
+	return 0;
+}

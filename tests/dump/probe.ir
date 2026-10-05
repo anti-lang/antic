@@ -136,7 +136,7 @@ b2:
     %4 = mul i64 %2, size_of i8
     %5 = ptradd %0, %4
     store i8 0, %5
-    %6 = addov i64 %2, 1
+    %6 = addov nsw i64 %2, 1
     branchov %6, b4, b5
 b3:
     ret
@@ -176,7 +176,7 @@ b2:
     %17 = load i8 %16
     %18 = zext i32 %17
     %19 = call i32 @printf(%14, %18)
-    %20 = addov i64 %9, 1
+    %20 = addov nsw i64 %9, 1
     branchov %20, b4, b5
 b3:
     %23 = addr @probe.63
@@ -213,7 +213,7 @@ b1:
     unreachable
 b2:
     %12 = trunc i32 %1
-    %13 = subov i64 %2, %1
+    %13 = subov nsw i64 %2, %1
     branchov %13, b3, b4
 b3:
     %14 = addr @probe.66
@@ -294,7 +294,7 @@ b2:
     store i64 6, %9
     call void @probe.dump(%7, %5, size_of probe.Wide)
     call void @probe.clear(%5, size_of probe.Wide)
-    %10 = ptradd %5, offset_of probe.Wide.b
+    %10 = ptradd inbounds %5, offset_of probe.Wide.b
     store clong 1, %10
     %12 = addr @probe.69
     store ptr %12, %11
@@ -302,7 +302,7 @@ b2:
     store i64 6, %13
     call void @probe.dump(%11, %5, size_of probe.Wide)
     call void @probe.clear(%5, size_of probe.Wide)
-    %14 = ptradd %5, offset_of probe.Wide.c
+    %14 = ptradd inbounds %5, offset_of probe.Wide.c
     store cwchar 1, %14
     %16 = addr @probe.70
     store ptr %16, %15
@@ -310,7 +310,7 @@ b2:
     store i64 6, %17
     call void @probe.dump(%15, %5, size_of probe.Wide)
     call void @probe.clear(%5, size_of probe.Wide)
-    %18 = ptradd %5, offset_of probe.Wide.d
+    %18 = ptradd inbounds %5, offset_of probe.Wide.d
     store i16 1, %18
     %20 = addr @probe.71
     store ptr %20, %19
@@ -465,7 +465,7 @@ b10:
     store i64 7, %88
     call void @probe.dump(%86, %84, size_of probe.Tight)
     call void @probe.clear(%84, size_of probe.Tight)
-    %89 = ptradd %84, offset_of probe.Tight.b
+    %89 = ptradd inbounds %84, offset_of probe.Tight.b
     store i32 1, %89
     %91 = addr @probe.86
     store ptr %91, %90
@@ -473,7 +473,7 @@ b10:
     store i64 7, %92
     call void @probe.dump(%90, %84, size_of probe.Tight)
     call void @probe.clear(%84, size_of probe.Tight)
-    %93 = ptradd %84, offset_of probe.Tight.c
+    %93 = ptradd inbounds %84, offset_of probe.Tight.c
     store i16 1, %93
     %95 = addr @probe.87
     store ptr %95, %94
@@ -530,7 +530,7 @@ b14:
     store i64 9, %119
     call void @probe.dump(%117, %115, size_of probe.Aligned)
     call void @probe.clear(%115, size_of probe.Aligned)
-    %120 = ptradd %115, offset_of probe.Aligned.b
+    %120 = ptradd inbounds %115, offset_of probe.Aligned.b
     store i32 1, %120
     %122 = addr @probe.91
     store ptr %122, %121

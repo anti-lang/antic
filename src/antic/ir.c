@@ -906,6 +906,43 @@ uint32_t ir_ptradd(struct ir_function *f, struct ir_block *b,
     return ir_binary(f, b, IR_PTRADD, IR_PTR, pointer, offset);
 }
 
+uint32_t ir_binary_wrap(struct ir_function *f, struct ir_block *b,
+                        enum ir_op op, enum ir_type type, struct ir_operand x,
+                        struct ir_operand y, unsigned wrap)
+{
+    uint32_t result = ir_binary(f, b, op, type, x, y);
+
+    b->insts[b->count - 1].field = wrap;
+    return result;
+}
+
+uint32_t ir_ptradd_inbounds(struct ir_function *f, struct ir_block *b,
+                            struct ir_operand pointer,
+                            struct ir_operand offset)
+{
+    uint32_t result = ir_ptradd(f, b, pointer, offset);
+
+    b->insts[b->count - 1].field = IR_INBOUNDS;
+    return result;
+}
+
+uint32_t ir_load_range(struct ir_function *f, struct ir_block *b,
+                       enum ir_type type, struct ir_operand pointer,
+                       uint64_t low, uint64_t high)
+{
+    uint32_t result = ir_load(f, b, type, pointer);
+
+    b->insts[b->count - 1].b = ir_int_op(type, low);
+    b->insts[b->count - 1].c = ir_int_op(type, high);
+    return result;
+}
+
+void ir_lifetime(struct ir_function *f, struct ir_block *b, enum ir_op op,
+                 struct ir_operand slot)
+{
+    append(f, b, op, IR_VOID, IR_NO_RESULT)->a = slot;
+}
+
 void ir_memcopy(struct ir_function *f, struct ir_block *b,
                 struct ir_operand dst, struct ir_operand src,
                 struct ir_vtype of)

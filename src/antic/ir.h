@@ -167,6 +167,15 @@ enum ir_op {
                        IR_FADD sums, a less-than keeps the least, a
                        greater-than the greatest, and IR_OR and IR_AND
                        fold a mask. */
+    /* DESIGN: the lifetime of the slot a names, the result of an IR_SLOT,
+       as "Arithmetic, addresses and ranges" in
+       docs/work-order-llvm-optimization.md gives it. Lowering writes the
+       start where a `let` binds the slot and the end on every exit of its
+       block. The slot holds no value outside the two, so the back end may
+       give its memory to another slot that never lives at the same
+       time. */
+    IR_LIFE_START,
+    IR_LIFE_END,
     /* Calls. */
     IR_CALL,        /* Result: call a with args, as signature b if set.
                        A call through a table names in c the descriptor
@@ -197,6 +206,34 @@ enum ir_access {
     IR_ACCESS_PLAIN,
     IR_ACCESS_TABLE,    /* the table pointer of an object */
     IR_ACCESS_ENTRY     /* an entry of a table, a load */
+};
+
+/* DESIGN: the facts of "Arithmetic, addresses and ranges" in
+   docs/work-order-llvm-optimization.md, which the LLVM text writes and
+   LLVM cannot check. Each stands only where the rules of the language
+   guarantee it, under condition C2 of that document.
+
+   The field of an IR_ADD, IR_SUB or IR_MUL holds the wrap facts: IR_NSW
+   when the signed result never leaves the range of its type, IR_NUW when
+   the unsigned one never does. Anti wraps in release mode, so an
+   operation carries a fact only where the language rules out the wrap:
+   the step of a range loop. The field of an IR_ADD_OV, IR_SUB_OV or
+   IR_MUL_OV holds IR_NSW when no path through the overflow block reads
+   its result, so the value the other path reads never wrapped. Dropping
+   the checks clears it with the overflow.
+
+   The field of an IR_PTRADD holds IR_INBOUNDS when the address stays
+   inside the object its operand points at: the address of a field of an
+   object that a non-optional reference reaches.
+
+   An IR_LOAD whose b and c are integers of its type reads a value in the
+   range from b up to c, without c, and the range may wrap as in LLVM. A
+   load of a bool reads 0 or 1, and a load of an enum one of its values. */
+enum {
+    IR_NSW = 1,
+    IR_NUW = 2,
+    IR_WRAP_FACTS = 3,
+    IR_INBOUNDS = 1
 };
 
 /* The flags IR_FLAG reads, in the order of the fields of Flags. */
@@ -349,6 +386,11 @@ struct ir_function {
     /* A C function that returns fresh memory, or none, and keeps no other
        pointer to it. */
     bool allocates;
+    /* The result lies from result_low up to result_high, without it, as
+       the range of a load: a bool or an enum of an Anti function. */
+    bool result_range;
+    uint64_t result_low;
+    uint64_t result_high;
     bool is_extern;                 /* no body: C or another module */
     bool variadic;
     bool exported;                  /* an export fn, with a C symbol */
@@ -728,6 +770,21 @@ void ir_store_access(struct ir_function *f, struct ir_block *b,
                      enum ir_access access);
 uint32_t ir_ptradd(struct ir_function *f, struct ir_block *b,
                    struct ir_operand pointer, struct ir_operand offset);
+/* The facts of "Arithmetic, addresses and ranges": an operation with the
+   wrap facts wrap, an address inside the object pointer points at, a load
+   of a value from low up to high, and the start or the end of the
+   lifetime of a slot. */
+uint32_t ir_binary_wrap(struct ir_function *f, struct ir_block *b,
+                        enum ir_op op, enum ir_type type, struct ir_operand x,
+                        struct ir_operand y, unsigned wrap);
+uint32_t ir_ptradd_inbounds(struct ir_function *f, struct ir_block *b,
+                            struct ir_operand pointer,
+                            struct ir_operand offset);
+uint32_t ir_load_range(struct ir_function *f, struct ir_block *b,
+                       enum ir_type type, struct ir_operand pointer,
+                       uint64_t low, uint64_t high);
+void ir_lifetime(struct ir_function *f, struct ir_block *b, enum ir_op op,
+                 struct ir_operand slot);
 void ir_memcopy(struct ir_function *f, struct ir_block *b,
                 struct ir_operand dst, struct ir_operand src,
                 struct ir_vtype of);

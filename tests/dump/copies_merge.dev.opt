@@ -25,10 +25,15 @@ b0:
     %5 = slot []*copies_merge.Person
     %6 = slot []*copies_merge.Order
     %7 = slot []int
+    lifestart %0
     store i64 30, %0
+    lifestart %1
     store i64 12, %1
+    lifestart %2
     store ptr %0, %2
+    lifestart %3
     store ptr %1, %3
+    lifestart %4
     store i64 5, %4
     %8 = ptradd %2, 0
     store ptr %8, %5
@@ -42,7 +47,7 @@ b0:
     store i64 1, %13
     %14 = call ptr @copies_merge.pick<*copies_merge.Order>(%6, 0)
     %15 = load i64 %14
-    %16 = addov i64 %11, %15
+    %16 = addov nsw i64 %11, %15
     branchov %16, b1, b2
 b1:
     %17 = addr @copies_merge.9
@@ -54,7 +59,7 @@ b2:
     %19 = ptradd %7, offset_of []int.len
     store i64 1, %19
     %20 = call i64 @copies_merge.pick<int>(%7, 0)
-    %21 = addov i64 %16, %20
+    %21 = addov nsw i64 %16, %20
     branchov %21, b3, b4
 b3:
     %22 = addr @copies_merge.9

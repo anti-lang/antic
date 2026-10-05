@@ -427,6 +427,103 @@ static void param_facts(void)
     arena_free(&arena);
 }
 
+/* The facts of "Arithmetic, addresses and ranges": the wrap facts of an
+   operation, inbounds on an address, the range of a load and of a result
+   and the lifetime of a slot. The second pass puts each where it does not
+   belong. */
+static void arith_facts(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *f;
+    struct ir_function *g;
+    struct ir_block *b0;
+    struct ir_block *b1;
+    struct ir_block *b2;
+    uint32_t p;
+    uint32_t n;
+    uint32_t slot;
+    uint32_t step;
+    uint32_t sum;
+    uint32_t at;
+    uint32_t flag;
+    int pass;
+
+    for (pass = 0; pass < 2; pass++) {
+        ir_module_init(&m, &arena, "main");
+        f = ir_function_add(&m, "main", "f", IR_I8, IR_NO_AGG);
+        f->result_range = true;
+        f->result_low = 0;
+        f->result_high = 2;
+        p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+        n = ir_param_add(f, IR_I64, IR_NO_AGG);
+        b0 = ir_block_add(f);
+        b1 = ir_block_add(f);
+        b2 = ir_block_add(f);
+        slot = ir_slot(f, b0, ir_scalar(IR_I64));
+        ir_lifetime(f, b0, IR_LIFE_START, ir_temp_op(f, slot));
+        step = ir_binary_wrap(f, b0, IR_ADD, IR_I64, ir_temp_op(f, n),
+                              ir_int_op(IR_I64, 1), IR_NSW | IR_NUW);
+        sum = ir_binary_wrap(f, b0, IR_ADD_OV, IR_I64, ir_temp_op(f, n),
+                             ir_temp_op(f, step), IR_NSW);
+        ir_branch_ov(f, b0, ir_temp_op(f, sum), b1, b2);
+        ir_unreachable(f, b1);
+        at = ir_ptradd_inbounds(f, b2, ir_temp_op(f, p),
+                                ir_int_op(IR_I64, 8));
+        flag = ir_load_range(f, b2, IR_I8, ir_temp_op(f, at), 0, 2);
+        ir_lifetime(f, b2, IR_LIFE_END, ir_temp_op(f, slot));
+        ir_ret(f, b2, IR_I8, ir_temp_op(f, flag));
+        if (pass == 0) {
+            printed(&m, "fn main.f(%0: ptr, %1: i64) -> i8 range 0, 2 {\n"
+                        "b0:\n"
+                        "    %2 = slot i64\n"
+                        "    lifestart %2\n"
+                        "    %3 = add nuw nsw i64 %1, 1\n"
+                        "    %4 = addov nsw i64 %1, %3\n"
+                        "    branchov %4, b1, b2\n"
+                        "b1:\n"
+                        "    unreachable\n"
+                        "b2:\n"
+                        "    %5 = ptradd inbounds %0, 8\n"
+                        "    %6 = load i8 %5 range 0, 2\n"
+                        "    lifeend %2\n"
+                        "    ret i8 %6\n"
+                        "}\n");
+            verified(&m, "");
+        } else {
+            struct ir_block *gb;
+            uint32_t q;
+            g = ir_function_add(&m, "main", "g", IR_PTR, IR_NO_AGG);
+            g->result_range = true;
+            q = ir_param_add(g, IR_PTR, IR_NO_AGG);
+            gb = ir_block_add(g);
+            ir_load_range(g, gb, IR_I8, ir_temp_op(g, q), 0, 2);
+            gb->insts[0].b = ir_int_op(IR_I16, 0);
+            ir_ret(g, gb, IR_PTR, ir_temp_op(g, q));
+            f->result_high = 0;
+            b0->insts[2].field = 4;
+            b0->insts[3].field = IR_NUW;
+            b2->insts[0].field = 2;
+            b2->insts[1].b = ir_int_op(IR_I8, 3);
+            b2->insts[1].c = ir_int_op(IR_I8, 3);
+            b2->insts[2].a = ir_temp_op(f, n);
+            verified(&m, "main.f: the result has an empty range\n"
+                         "main.f b0: add has the wrap facts 4\n"
+                         "main.f b0: addov has a wrap fact other than "
+                         "nsw\n"
+                         "main.f b2: ptradd has a fact other than "
+                         "inbounds\n"
+                         "main.f b2: load has an empty range\n"
+                         "main.f b2: lifeend names no slot\n"
+                         "main.g: the result is ptr and has a range\n"
+                         "main.g b0: load of i8 has a range of another "
+                         "type\n");
+        }
+        ir_module_free(&m);
+    }
+    arena_free(&arena);
+}
+
 /* A call through a pointer passes the arguments of its signature. */
 static void indirect_arguments(void)
 {
@@ -631,5 +728,6 @@ void test_ir(void)
     never_returns();
     table_accesses();
     param_facts();
+    arith_facts();
     no_module();
 }

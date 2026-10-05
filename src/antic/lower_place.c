@@ -12,6 +12,18 @@
 #include "types.h"
 #include "lower_lowerer.h"
 
+/* The address of the field e names, at its offset after address. It is
+   inbounds unless the object comes through a view, see sema_place_view. */
+static struct ir_operand field_address(struct lowerer *l, const struct expr *e,
+                                       const struct type *s,
+                                       struct ir_operand address)
+{
+    struct ir_operand offset = lower_field_offset(l, s, &e->as.field.name);
+
+    return sema_place_view(e) ? lower_offset_address(l, address, offset)
+                              : lower_field_at(l, address, offset);
+}
+
 /* v.f is f's offset after the address of v. A pointer base p.f uses the
    pointer. */
 struct ir_operand lower_field_address(struct lowerer *l,
@@ -26,8 +38,7 @@ struct ir_operand lower_field_address(struct lowerer *l,
     if (!pointer) {
         lower_keep_temp(l, base, address);
     }
-    return lower_offset_address(l, address,
-                                lower_field_offset(l, s, &e->as.field.name));
+    return field_address(l, e, s, address);
 }
 
 /* The address of element 0: an array starts at its own address, a str or
@@ -133,6 +144,7 @@ bool lower_place(struct lowerer *l, const struct expr *e,
     p->object = lower_none();
     p->owner = NULL;
     p->type = lower_ir_type_of(e->type);
+    p->of = e->type;
     switch (e->kind) {
     /* A name narrowed from a `?T` reads the value at offset 0 of the
        variable, which lives where its declared type puts it. */
@@ -185,8 +197,7 @@ bool lower_place(struct lowerer *l, const struct expr *e,
             }
             p->object = address;
             p->owner = s;
-            p->address = lower_offset_address(
-                l, address, lower_field_offset(l, s, &e->as.field.name));
+            p->address = field_address(l, e, s, address);
         }
         return true;
     default:
@@ -415,5 +426,5 @@ struct ir_operand lower_read_place(struct lowerer *l, const struct place *p)
         return lower_temp(l, ir_bitload(l->f, l->b, p->type, p->address, p->agg,
                                         p->field));
     }
-    return lower_temp(l, ir_load(l->f, l->b, p->type, p->address));
+    return lower_load_value(l, p->of, p->address);
 }

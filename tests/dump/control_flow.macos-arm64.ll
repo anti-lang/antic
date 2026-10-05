@@ -27,7 +27,7 @@ b2:
   ret i64 %v4
 }
 
-define internal noundef zeroext i8 @control_flow.spin(i8 zeroext noundef %p0, i8 zeroext noundef %p1) #0 {
+define internal noundef zeroext range(i8 0, 2) i8 @control_flow.spin(i8 zeroext noundef %p0, i8 zeroext noundef %p1) #0 {
 b0:
   %t0 = alloca i8, align 1
   %t1 = alloca i8, align 1

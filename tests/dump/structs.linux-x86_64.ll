@@ -39,6 +39,7 @@ b0:
   store ptr %a2, ptr %t3, align 8
   store ptr %s4, ptr %t4, align 8
   store ptr %s5, ptr %t5, align 8
+  call void @llvm.lifetime.start.p0(ptr %s4)
   %v1 = load ptr, ptr %t0, align 8
   %v2 = load i64, ptr %v1, align 8
   store i64 %v2, ptr %t6, align 8
@@ -48,6 +49,7 @@ b0:
   %v4 = load ptr, ptr %t4, align 8
   %v5 = load ptr, ptr %t7, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr %v4, ptr %v5, i64 24, i1 false)
+  call void @llvm.lifetime.start.p0(ptr %s5)
   %v6 = load ptr, ptr %t0, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr %a4, ptr %v6, i64 16, i1 false)
   %v7 = load i64, ptr %a4, align 8
@@ -74,7 +76,7 @@ b0:
   %v22 = load i64, ptr %v21, align 8
   store i64 %v22, ptr %t9, align 8
   %v23 = load ptr, ptr %t1, align 8
-  %v24 = getelementptr i8, ptr %v23, i64 16
+  %v24 = getelementptr inbounds i8, ptr %v23, i64 16
   store ptr %v24, ptr %t10, align 8
   %v25 = load ptr, ptr %t10, align 8
   %v26 = load i64, ptr %v25, align 8
@@ -101,6 +103,7 @@ b0:
 
 declare { i64, double } @take(i64, double, ptr byval([24 x i8]) align 8, i64, <2 x float>) #1
 declare void @make(ptr sret([24 x i8]) align 8, i64 noundef) #1
+declare void @llvm.lifetime.start.p0(ptr)
 declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="x86-64-v3" "target-features"="+avx,+avx2,+bmi,+bmi2,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fxsr,+lzcnt,+mmx,+movbe,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave" }

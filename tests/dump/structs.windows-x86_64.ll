@@ -33,6 +33,7 @@ b0:
   store ptr %a0, ptr %t3, align 8
   store ptr %s4, ptr %t4, align 8, !dbg !13
   store ptr %s5, ptr %t5, align 8
+  call void @llvm.lifetime.start.p0(ptr %s4), !dbg !13
   %v0 = load ptr, ptr %t0, align 8
   %v1 = load i64, ptr %v0, align 8
   store i64 %v1, ptr %t6, align 8
@@ -42,6 +43,7 @@ b0:
   %v3 = load ptr, ptr %t4, align 8
   %v4 = load ptr, ptr %t7, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr %v3, ptr %v4, i64 24, i1 false), !dbg !13
+  call void @llvm.lifetime.start.p0(ptr %s5), !dbg !13
   %v5 = load ptr, ptr %t0, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr %a3, ptr %v5, i64 16, i1 false), !dbg !13
   %v6 = load ptr, ptr %t4, align 8
@@ -60,7 +62,7 @@ b0:
   %v13 = load i64, ptr %v12, align 8
   store i64 %v13, ptr %t9, align 8
   %v14 = load ptr, ptr %t1, align 8
-  %v15 = getelementptr i8, ptr %v14, i64 16
+  %v15 = getelementptr inbounds i8, ptr %v14, i64 16
   store ptr %v15, ptr %t10, align 8
   %v16 = load ptr, ptr %t10, align 8
   %v17 = load i64, ptr %v16, align 8
@@ -82,6 +84,7 @@ b0:
 
 declare void @take(ptr sret([16 x i8]) align 8, ptr, ptr, ptr, i64) #1
 declare void @make(ptr sret([24 x i8]) align 8, i64 noundef) #1
+declare void @llvm.lifetime.start.p0(ptr)
 declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
 
 attributes #0 = { nounwind uwtable(sync) "frame-pointer"="none" "stack-probe-size"="4096" "target-cpu"="x86-64-v3" "target-features"="+avx,+avx2,+bmi,+bmi2,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fxsr,+lzcnt,+mmx,+movbe,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave" }

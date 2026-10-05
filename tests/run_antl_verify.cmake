@@ -13,7 +13,7 @@ file(MAKE_DIRECTORY "${WORK}")
 set(scale "${LIBS}/com/example/scale.antl")
 file(READ "${scale}" hex HEX)
 # ret i64 on line 4, with no result.
-string(FIND "${hex}" "550404000000ffffffff" at)
+string(FIND "${hex}" "570404000000ffffffff" at)
 if(at LESS 0)
     message(FATAL_ERROR "no ret i64 in ${scale}")
 endif()

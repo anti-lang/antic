@@ -405,6 +405,12 @@ void lower_add_params(struct lowerer *l, struct ir_function *f,
     size_t i;
 
     f->result_ext = param_ext(t->result);
+    /* A function of C may return any bits, so only the result of an Anti
+       function carries the range of its type. */
+    f->result_range = f->module != NULL && t->result != NULL &&
+                      f->result == lower_ir_type_of(t->result) &&
+                      lower_range_of(t->result, &f->result_low,
+                                     &f->result_high);
     for (i = 0; i < t->param_count; i++) {
         lower_add_param(l, f, t->params[i]);
         if (sym != NULL && sym->owned != NULL && i < sym->owned_count &&
@@ -782,6 +788,71 @@ struct ir_operand lower_offset_address(struct lowerer *l,
         return address;
     }
     return lower_temp(l, ir_ptradd(l->f, l->b, address, offset));
+}
+
+bool lower_range_of(const struct type *t, uint64_t *low, uint64_t *high)
+{
+    enum ir_type type = lower_ir_type_of(t);
+    uint64_t mask;
+    uint64_t least = 0;
+    uint64_t most = 0;
+    unsigned bits;
+    bool is_signed;
+    size_t i;
+
+    if (t->kind == TYPE_BOOL) {
+        *low = 0;
+        *high = 2;
+        return true;
+    }
+    if (t->kind != TYPE_ENUM || type < IR_I8 || type > IR_I64) {
+        return false;
+    }
+    bits = 8u << (type - IR_I8);
+    mask = bits == 64 ? UINT64_MAX : ((uint64_t)1 << bits) - 1;
+    is_signed = types_is_signed(t->base);
+    for (i = 0; i < t->field_count; i++) {
+        uint64_t v = t->fields[i].number & mask;
+        bool below = is_signed ? arith_signed(v, (int)bits) <
+                                     arith_signed(least, (int)bits)
+                               : v < least;
+        bool above = is_signed ? arith_signed(v, (int)bits) >
+                                     arith_signed(most, (int)bits)
+                               : v > most;
+        least = below ? v : least;
+        most = above ? v : most;
+    }
+    if (((most + 1) & mask) == least) {
+        return false;
+    }
+    *low = least;
+    *high = (most + 1) & mask;
+    return true;
+}
+
+struct ir_operand lower_load_value(struct lowerer *l, const struct type *t,
+                                   struct ir_operand address)
+{
+    uint64_t low;
+    uint64_t high;
+    enum ir_type type = lower_ir_type_of(t);
+
+    if (lower_range_of(t, &low, &high)) {
+        return lower_temp(l, ir_load_range(l->f, l->b, type, address, low,
+                                           high));
+    }
+    return lower_temp(l, ir_load(l->f, l->b, type, address));
+}
+
+/* The address of a field at offset after address, which a reference
+   reaches, so the address stays inside the object. */
+struct ir_operand lower_field_at(struct lowerer *l, struct ir_operand address,
+                                 struct ir_operand offset)
+{
+    if (offset.kind == IR_INT && offset.as.integer == 0) {
+        return address;
+    }
+    return lower_temp(l, ir_ptradd_inbounds(l->f, l->b, address, offset));
 }
 
 struct ir_operand lower_zero(void)

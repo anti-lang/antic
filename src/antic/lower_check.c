@@ -131,8 +131,11 @@ struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
         snprintf(operation, sizeof operation, "overflow in %s",
                  op == TOKEN_PLUS ? "+" : op == TOKEN_MINUS ? "-" : "*");
         text = lower_check_text(l, line, operation);
-        result = lower_temp(l, ir_binary(l->f, l->b, overflow_op(op),
-                                         lower_ir_type_of(t), left, right));
+        /* The failure block prints left and right alone, so the path
+           that reads the result is the one without overflow. */
+        result = lower_temp(l, ir_binary_wrap(l->f, l->b, overflow_op(op),
+                                              lower_ir_type_of(t), left,
+                                              right, IR_NSW));
         fail = lower_new_block(l);
         rest = lower_new_block(l);
         fail->fail = IR_FAIL_CHECK;

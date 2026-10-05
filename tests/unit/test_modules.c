@@ -319,7 +319,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 79, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 80, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -366,7 +366,7 @@ static const uint8_t scale_antl[] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 255, 255, 255, 255, 0, 0, 0, 0,              /* no type, field 0 */
     0, 0, 0, 0,                                     /* no arguments */
-    85, 4, 3, 0, 0, 0, 255, 255, 255, 255,          /* line 3: ret i64 */
+    87, 4, 3, 0, 0, 0, 255, 255, 255, 255,          /* line 3: ret i64 */
     1, 4, 1, 0, 0, 0, 0, 0, 0, 0,                   /* %1 */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -575,12 +575,12 @@ static void keeps_symbolic_sizes(void)
     ir_print(&ir, &program);
     CHECK_STR(text_cstr(&ir),
               "type sized.H = struct { tag: i8, n: i32 }\n"
-              "type [size_of(sized.H) * 2]byte = array "
-              "mul i64(size_of sized.H, 2) of i8\n"
+              "type [size_of(sized.H) * 2]byte = array mul i64(size_of sized.H, 2) of i8\n"
               "type sized.B = struct { data: [size_of(sized.H) * 2]byte }\n"
               "fn main.main() -> i64 {\n"
               "b0:\n"
               "    %0 = slot sized.B\n"
+              "    lifestart %0\n"
               "    %1 = copy i64 0\n"
               "    jump b1\n"
               "b1:\n"
@@ -1093,15 +1093,15 @@ static void keeps_literals(void)
               "b0:\n"
               "    %3 = slot str\n"
               "    %0 = call agg @words.hi()\n"
-              "    %1 = ptradd %0, offset_of str.len\n"
+              "    %1 = ptradd inbounds %0, offset_of str.len\n"
               "    %2 = load i64 %1\n"
               "    %4 = addr @main.0\n"
               "    store ptr %4, %3\n"
               "    %5 = ptradd %3, offset_of str.len\n"
               "    store i64 2, %5\n"
-              "    %6 = ptradd %3, offset_of str.len\n"
+              "    %6 = ptradd inbounds %3, offset_of str.len\n"
               "    %7 = load i64 %6\n"
-              "    %8 = addov i64 %2, %7\n"
+              "    %8 = addov nsw i64 %2, %7\n"
               "    branchov %8, b1, b2\n"
               "b1:\n"
               "    %9 = addr @main.1\n"
@@ -1573,9 +1573,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 80;
+    copy[4] = 81;
     refuses_file(copy, sizeof copy,
-                 "has format version 80, and antic reads version 79");
+                 "has format version 81, and antic reads version 80");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -1597,9 +1597,11 @@ static void damaged_files(void)
     text_free(&good);
     copy[sizeof copy - FN_EFFECTS] = 8 << 2;
     refuses_file(copy, sizeof copy, NULL);
-    /* The flags of a function, right before its effects, take seven
+    /* The flags of a function, right before its effects, take eight
        bits. The sixth marks that it writes tables, and the seventh that
-       it allocates, which a C function alone does. */
+       it allocates, which a C function alone does. The eighth marks the
+       range of the result, whose two words follow its extension, and the
+       file holds none. */
     memcpy(copy, scale_antl, sizeof copy);
     copy[sizeof copy - FN_EFFECTS - 1] |= 32;
     text_append_bytes(&good, (const char *)copy, sizeof copy);

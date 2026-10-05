@@ -847,7 +847,8 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
                                  (f->exported ? 4 : 0) | (f->worker ? 8 : 0) |
                                  (f->never_returns ? 16 : 0) |
                                  (f->writes_tables ? 32 : 0) |
-                                 (f->allocates ? 64 : 0)));
+                                 (f->allocates ? 64 : 0) |
+                                 (f->result_range ? 128 : 0)));
         antl_put_u8(w, (uint8_t)((unsigned)f->effects |
                                  (unsigned)f->guarantees << 2));
         put_str(w, f->module);
@@ -855,6 +856,10 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         antl_put_u8(w, (uint8_t)f->result);
         antl_put_u32(w, f->result_agg);
         antl_put_u8(w, (uint8_t)f->result_ext);
+        if (f->result_range) {
+            antl_put_u64(w, f->result_low);
+            antl_put_u64(w, f->result_high);
+        }
         antl_put_u32(w, f->file);
         antl_put_u32(w, f->decl_line);
         antl_put_count(w, f->param_count);

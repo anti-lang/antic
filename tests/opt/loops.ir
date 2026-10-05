@@ -5,7 +5,7 @@ b0:
     %1 = copy i64 0
     jump b1
 b1:
-    %2 = addov i64 %1, 1
+    %2 = addov nsw i64 %1, 1
     branchov %2, b4, b5
 b2:
     %6 = slt i8 %1, %0

@@ -775,6 +775,7 @@ static void io_sym_body(struct io *io, struct symbol *s)
     io_bool(io, &s->caught);
     io_bool(io, &s->atomic);
     io_bool(io, &s->into_fields);
+    io_bool(io, &s->holds_view);
     io_int(io, &s->caught_loops);
     io_csym(io, &s->moved_into);
     io_bool(io, &s->deferred);

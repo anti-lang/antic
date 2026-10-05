@@ -1384,6 +1384,79 @@ static void param_attributes(void)
     end(&x);
 }
 
+/* The facts of "Arithmetic, addresses and ranges": the wrap facts of an
+   operation and of the value an overflow check passes, inbounds on an
+   address, the range of a load, of a result and of a call, and the
+   lifetime of a slot. */
+static void arith_text(void)
+{
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_function *g;
+    struct ir_function *other;
+    struct ir_block *b0;
+    struct ir_block *b1;
+    struct ir_block *b2;
+    uint32_t p;
+    uint32_t n;
+    uint32_t slot;
+    uint32_t step;
+    uint32_t sum;
+    uint32_t at;
+    uint32_t flag;
+    struct ir_operand args[2];
+
+    begin(&x);
+    f = ir_function_add(&x.m, "main", "f", IR_I8, IR_NO_AGG);
+    f->result_range = true;
+    f->result_low = 0;
+    f->result_high = 2;
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    n = ir_param_add(f, IR_I64, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    b1 = ir_block_add(f);
+    b2 = ir_block_add(f);
+    slot = ir_slot(f, b0, ir_scalar(IR_I64));
+    ir_lifetime(f, b0, IR_LIFE_START, ir_temp_op(f, slot));
+    step = ir_binary_wrap(f, b0, IR_ADD, IR_I64, ir_temp_op(f, n),
+                          ir_int_op(IR_I64, 1), IR_NSW | IR_NUW);
+    sum = ir_binary_wrap(f, b0, IR_SUB_OV, IR_I64, ir_temp_op(f, n),
+                         ir_temp_op(f, step), IR_NSW);
+    ir_branch_ov(f, b0, ir_temp_op(f, sum), b1, b2);
+    ir_unreachable(f, b1);
+    at = ir_ptradd_inbounds(f, b2, ir_temp_op(f, p), ir_int_op(IR_I64, 8));
+    flag = ir_load_range(f, b2, IR_I8, ir_temp_op(f, at), 0, 2);
+    ir_lifetime(f, b2, IR_LIFE_END, ir_temp_op(f, slot));
+    ir_ret(f, b2, IR_I8, ir_temp_op(f, flag));
+    other = ir_declare_add(&x.m, "other", "kind", IR_I32, IR_NO_AGG);
+    other->result_range = true;
+    other->result_low = (uint64_t)-3;
+    other->result_high = 6;
+    g = ir_function_add(&x.m, "main", "g", IR_I8, IR_NO_AGG);
+    p = ir_param_add(g, IR_PTR, IR_NO_AGG);
+    b0 = ir_block_add(g);
+    args[0] = ir_temp_op(g, p);
+    args[1] = ir_int_op(IR_I64, 1);
+    flag = ir_call(g, b0, IR_I8, ir_func_op(f), args, 2);
+    ir_call(g, b0, IR_I32, ir_func_op(other), NULL, 0);
+    ir_ret(g, b0, IR_I8, ir_temp_op(g, flag));
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(holds(&x, "define internal noundef range(i8 0, 2) i8 @main.f("));
+    CHECK(holds(&x, "  call void @llvm.lifetime.start.p0(ptr %s2)\n"));
+    CHECK(holds(&x, " = add nuw nsw i64 %"));
+    CHECK(holds(&x, " = call { i64, i1 } @llvm.ssub.with.overflow.i64("));
+    CHECK(holds(&x, " = sub nsw i64 %"));
+    CHECK(holds(&x, " = getelementptr inbounds i8, ptr %"));
+    CHECK(holds(&x, ", align 1, !range !5\n"));
+    CHECK(holds(&x, "  call void @llvm.lifetime.end.p0(ptr %s2)\n"));
+    CHECK(holds(&x, " = call range(i8 0, 2) i8 (ptr, i64) @main.f("));
+    CHECK(holds(&x, " = call range(i32 -3, 6) i32 () @other.kind("));
+    CHECK(holds(&x, "declare noundef range(i32 -3, 6) i32 @other.kind()"));
+    CHECK(holds(&x, "declare void @llvm.lifetime.start.p0(ptr)\n"));
+    CHECK(holds(&x, "!5 = !{i8 0, i8 2}\n"));
+    end(&x);
+}
+
 /* main.g(a: Big) -> Big and a call of it, for a struct of three i64. */
 static void big_call(struct fixture *x)
 {
@@ -1972,6 +2045,7 @@ void test_llvm_emit(void)
     calls();
     coerced();
     param_attributes();
+    arith_text();
     memory_classes();
     word_classes();
     vectors();

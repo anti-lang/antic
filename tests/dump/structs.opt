@@ -14,15 +14,17 @@ fn structs.call(%0: agg structs.Pair, %1: agg structs.Big, %2: agg structs.Rgb, 
 b0:
     %4 = slot structs.Big
     %5 = slot structs.Pair
+    lifestart %4
     %6 = load i64 %0
     %7 = call agg @make(%6)
     memcopy %4, %7, structs.Big
+    lifestart %5
     %8 = call agg @take(%0, %4, %2, %3)
     memcopy %5, %8, structs.Pair
     %9 = load i64 %5
-    %10 = ptradd %1, offset_of structs.Big.c
+    %10 = ptradd inbounds %1, offset_of structs.Big.c
     %11 = load i64 %10
-    %12 = addov i64 %9, %11
+    %12 = addov nsw i64 %9, %11
     branchov %12, b1, b2
 b1:
     %13 = addr @structs.20

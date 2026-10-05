@@ -15,6 +15,7 @@ global bitfields.10 size 33 align 1 bytes 62 69 74 66 69 65 6c 64 73 2e 61 6e 74
 fn bitfields.main() -> i64 {
 b0:
     %0 = slot bitfields.Flags
+    lifestart %0
     bitstore i32 1, %0, bitfields.Flags.visible
     bitstore i32 9, %0, bitfields.Flags.layer
     bitstore i8 -3, %0, bitfields.Flags.level
@@ -23,7 +24,7 @@ b0:
     %2 = add i32 %1, 3
     bitstore i32 %2, %0, bitfields.Flags.layer
     %3 = bitload i8 %0, bitfields.Flags.level
-    %4 = subov i8 %3, 1
+    %4 = subov nsw i8 %3, 1
     branchov %4, b1, b2
 b1:
     %5 = sext i64 %3
@@ -37,14 +38,14 @@ b2:
     %9 = zext i64 %8
     %10 = bitload i32 %0, bitfields.Flags.layer
     %11 = zext i64 %10
-    %12 = mulov i64 %11, 10
+    %12 = mulov nsw i64 %11, 10
     branchov %12, b3, b4
 b3:
     %13 = addr @bitfields.9
     call void @anti_rt_check_failed(%13, 32, 1, %11, 10)
     unreachable
 b4:
-    %14 = addov i64 %9, %12
+    %14 = addov nsw i64 %9, %12
     branchov %14, b5, b6
 b5:
     %15 = addr @bitfields.10
@@ -53,14 +54,14 @@ b5:
 b6:
     %16 = bitload i8 %0, bitfields.Flags.level
     %17 = sext i64 %16
-    %18 = mulov i64 %17, 100
+    %18 = mulov nsw i64 %17, 100
     branchov %18, b7, b8
 b7:
     %19 = addr @bitfields.9
     call void @anti_rt_check_failed(%19, 32, 1, %17, 100)
     unreachable
 b8:
-    %20 = addov i64 %14, %18
+    %20 = addov nsw i64 %14, %18
     branchov %20, b9, b10
 b9:
     %21 = addr @bitfields.10
@@ -69,7 +70,7 @@ b9:
 b10:
     %22 = bitload i16 %0, bitfields.Flags.pad
     %23 = zext i64 %22
-    %24 = addov i64 %20, %23
+    %24 = addov nsw i64 %20, %23
     branchov %24, b11, b12
 b11:
     %25 = addr @bitfields.10

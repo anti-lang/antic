@@ -2,7 +2,7 @@ source_filename = "effects"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
-define hidden noundef zeroext i8 @effects.next(ptr noundef nonnull dereferenceable(8) %p0) #0 {
+define hidden noundef zeroext range(i8 0, 2) i8 @effects.next(ptr noundef nonnull dereferenceable(8) %p0) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca i64, align 8
@@ -15,7 +15,7 @@ b0:
   store i64 %v1, ptr %t1, align 8
   %v2 = load i64, ptr %t1, align 8
   %v3 = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %v2, i64 1)
-  %v4 = extractvalue { i64, i1 } %v3, 0
+  %v4 = add nsw i64 %v2, 1
   %v5 = extractvalue { i64, i1 } %v3, 1
   store i64 %v4, ptr %t2, align 8
   br i1 %v5, label %b1, label %b2, !prof !3
@@ -218,7 +218,7 @@ b0:
 
 b1:
   %v1 = load ptr, ptr %t1, align 8
-  %v2 = call i8 (ptr) @effects.next(ptr %v1)
+  %v2 = call range(i8 0, 2) i8 (ptr) @effects.next(ptr %v1)
   store i8 %v2, ptr %t5, align 1
   %v3 = load i8, ptr %t5, align 1
   %v4 = trunc i8 %v3 to i1
@@ -407,9 +407,11 @@ b0:
   %v15 = load i64, ptr %t8, align 8
   %v16 = load ptr, ptr %t9, align 8
   store i64 %v15, ptr %v16, align 8
+  call void @llvm.lifetime.start.p0(ptr %s2)
   %v17 = load ptr, ptr %t2, align 8
   %v18 = load ptr, ptr %t4, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr %v17, ptr %v18, i64 16, i1 false)
+  call void @llvm.lifetime.end.p0(ptr %s2)
   ret void
 }
 
@@ -432,6 +434,8 @@ declare { i64, i1 } @llvm.sadd.with.overflow.i64(i64, i64)
 declare i32 @anti_rt_f32_to_f16(float) memory(none) willreturn nosync nofree
 declare float @anti_rt_f16_to_f32(i32) memory(none) willreturn nosync nofree
 declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
+declare void @llvm.lifetime.start.p0(ptr)
+declare void @llvm.lifetime.end.p0(ptr)
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="x86-64-v2" "target-features"="+cmov,+crc32,+cx16,+cx8,+fxsr,+mmx,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87" }
 attributes #1 = { nounwind }

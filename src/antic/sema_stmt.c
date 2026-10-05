@@ -1917,6 +1917,70 @@ static void check_for(struct checker *c, struct stmt *s)
     sema_leave_scope(c, &for_scope);
 }
 
+bool sema_value_view(const struct expr *e)
+{
+    size_t i;
+
+    if (e == NULL) {
+        return false;
+    }
+    switch (e->kind) {
+    case EXPR_CAST:
+        return e->type != NULL &&
+               (e->type->kind == TYPE_POINTER || e->type->kind == TYPE_SLICE ||
+                e->type->kind == TYPE_OPTIONAL);
+    case EXPR_NAME:
+        return e->symbol != NULL && e->symbol->holds_view;
+    case EXPR_UNARY:
+        return e->as.unary.op == TOKEN_AMP &&
+               sema_place_view(e->as.unary.operand);
+    case EXPR_SLICE:
+        return sema_value_view(e->as.slice.base) ||
+               sema_place_view(e->as.slice.base);
+    case EXPR_TUPLE:
+        for (i = 0; i < e->as.tuple.count; i++) {
+            if (sema_value_view(e->as.tuple.elements[i])) {
+                return true;
+            }
+        }
+        return false;
+    default:
+        return false;
+    }
+}
+
+bool sema_place_view(const struct expr *e)
+{
+    const struct expr *base;
+
+    if (e == NULL) {
+        return false;
+    }
+    switch (e->kind) {
+    case EXPR_FIELD:
+    case EXPR_INDEX:
+        /* A pointer or a slice base gives the address, and a value base
+           is a place of its own. */
+        base = e->kind == EXPR_FIELD ? e->as.field.base : e->as.index.base;
+        return sema_value_view(base) || sema_place_view(base);
+    case EXPR_UNARY:
+        return e->as.unary.op == TOKEN_STAR &&
+               sema_value_view(e->as.unary.operand);
+    case EXPR_CAST:
+        return true;
+    default:
+        return false;
+    }
+}
+
+/* A local that takes a view keeps the mark for every place it reaches. */
+static void mark_view(struct symbol *sym, const struct expr *value)
+{
+    if (sym != NULL && sema_value_view(value)) {
+        sym->holds_view = true;
+    }
+}
+
 static void check_stmt(struct checker *c, struct stmt *s)
 {
     struct type *t;
@@ -1927,6 +1991,10 @@ static void check_stmt(struct checker *c, struct stmt *s)
     switch (s->kind) {
     case STMT_LET:
         check_let(c, s);
+        mark_view(s->as.let.symbol, s->as.let.value);
+        for (i = 0; i < s->as.let.name_count; i++) {
+            mark_view(s->as.let.names[i].symbol, s->as.let.value);
+        }
         return;
     case STMT_CONST:
         sym = sema_declare(c, SYMBOL_CONST, &s->as.let.name, s->as.let.name_pos,
@@ -1943,6 +2011,9 @@ static void check_stmt(struct checker *c, struct stmt *s)
     case STMT_ASSIGN:
         sema_refuse_escaping_error(c, s->as.assign.value);
         check_assign(c, s);
+        if (s->as.assign.target->kind == EXPR_NAME) {
+            mark_view(s->as.assign.target->symbol, s->as.assign.value);
+        }
         return;
     case STMT_IF: {
         struct symbol *leaves[PROVED_MAX];

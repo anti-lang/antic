@@ -27,13 +27,13 @@ b0:
 
 b1:
   %v5 = load ptr, ptr %t0, align 8
-  %v6 = getelementptr i8, ptr %v5, i64 8
+  %v6 = getelementptr inbounds i8, ptr %v5, i64 8
   store ptr %v6, ptr %t3, align 8
   %v7 = load ptr, ptr %t3, align 8
   %v8 = load i64, ptr %v7, align 8
   store i64 %v8, ptr %t4, align 8
   %v9 = load ptr, ptr %t1, align 8
-  %v10 = getelementptr i8, ptr %v9, i64 8
+  %v10 = getelementptr inbounds i8, ptr %v9, i64 8
   store ptr %v10, ptr %t5, align 8
   %v11 = load ptr, ptr %t5, align 8
   %v12 = load i64, ptr %v11, align 8
@@ -41,14 +41,14 @@ b1:
   %v13 = load i64, ptr %t4, align 8
   %v14 = load i64, ptr %t6, align 8
   %v15 = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %v13, i64 %v14)
-  %v16 = extractvalue { i64, i1 } %v15, 0
+  %v16 = add nsw i64 %v13, %v14
   %v17 = extractvalue { i64, i1 } %v15, 1
   store i64 %v16, ptr %t7, align 8
   br i1 %v17, label %b3, label %b4, !prof !3
 
 b2:
   %v18 = load ptr, ptr %t0, align 8
-  %v19 = getelementptr i8, ptr %v18, i64 8
+  %v19 = getelementptr inbounds i8, ptr %v18, i64 8
   store ptr %v19, ptr %t8, align 8
   %v20 = load ptr, ptr %t8, align 8
   %v21 = load i64, ptr %v20, align 8
@@ -76,7 +76,7 @@ b0:
   %t2 = alloca i64, align 8
   store ptr %p0, ptr %t0, align 8
   %v0 = load ptr, ptr %t0, align 8
-  %v1 = getelementptr i8, ptr %v0, i64 8
+  %v1 = getelementptr inbounds i8, ptr %v0, i64 8
   store ptr %v1, ptr %t1, align 8
   %v2 = load ptr, ptr %t1, align 8
   %v3 = load i64, ptr %v2, align 8

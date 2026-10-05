@@ -34,6 +34,13 @@ struct classified {
     struct abi_param result;
 };
 
+/* The range of a load, as the operands of its IR_LOAD give it. */
+struct load_range {
+    enum ir_type type;
+    uint64_t low;
+    uint64_t high;
+};
+
 /* The metadata of a branch into a cold block, one id for each side. */
 enum { COLD_THEN, COLD_ELSE, COLD_COUNT };
 
@@ -76,6 +83,11 @@ struct emitter {
     size_t place_count;
     struct text imports;
     bool *keeps_frame;              /* per function, see frames_kept */
+    /* The ranges the loads of the module read, each once, with the
+       metadata id of the first. */
+    struct load_range *ranges;
+    size_t range_count;
+    uint32_t range_id;
 };
 
 /* The LLVM type of a scalar after layout_resolve, or NULL for an
@@ -566,8 +578,10 @@ static void binary(struct emitter *e, const struct ir_inst *inst)
                                  " to %s\n",
                          fresh(e), bit, value_type(e, inst->type));
         } else {
-            text_appendf(e->out, "  %%v%" PRIu32 " = %s %s %s, %s\n",
-                         fresh(e), plain_binary(inst->op), name,
+            text_appendf(e->out, "  %%v%" PRIu32 " = %s%s%s %s %s, %s\n",
+                         fresh(e), plain_binary(inst->op),
+                         (inst->field & IR_NUW) != 0 ? " nuw" : "",
+                         (inst->field & IR_NSW) != 0 ? " nsw" : "", name,
                          text_cstr(&a), text_cstr(&b));
         }
         break;
@@ -753,6 +767,66 @@ static void access_fact(struct emitter *e, const struct ir_inst *inst)
                  e->facts_id);
 }
 
+/* The index of the range of inst among the ranges of the module, or
+   range_count for a load without one. */
+static size_t range_index(const struct load_range *ranges, size_t count,
+                          const struct ir_inst *inst)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        if (ranges[i].type == inst->type &&
+            ranges[i].low == inst->b.as.integer &&
+            ranges[i].high == inst->c.as.integer) {
+            return i;
+        }
+    }
+    return count;
+}
+
+/* DESIGN: the range of a load as !range, in the metadata node of that
+   range, which every load of the same range names. See lower_range_of. */
+static void range_fact(struct emitter *e, const struct ir_inst *inst)
+{
+    if (inst->b.kind != IR_INT) {
+        return;
+    }
+    text_appendf(e->out, ", !range !%" PRIu32,
+                 e->range_id + (uint32_t)range_index(e->ranges,
+                                                     e->range_count, inst));
+}
+
+/* Collect the ranges of the loads of m, each once, in the order of their
+   first load. */
+static void collect_ranges(struct emitter *e, const struct ir_module *m)
+{
+    size_t i;
+    size_t j;
+    size_t k;
+    size_t capacity = 0;
+
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        for (j = 0; j < f->block_count; j++) {
+            const struct ir_block *b = f->blocks[j];
+            for (k = 0; k < b->count; k++) {
+                const struct ir_inst *inst = &b->insts[k];
+                if (inst->op != IR_LOAD || inst->b.kind != IR_INT ||
+                    range_index(e->ranges, e->range_count, inst) <
+                        e->range_count) {
+                    continue;
+                }
+                e->ranges = alloc_grow(e->ranges, &capacity, e->range_count,
+                                       sizeof *e->ranges);
+                e->ranges[e->range_count].type = inst->type;
+                e->ranges[e->range_count].low = inst->b.as.integer;
+                e->ranges[e->range_count].high = inst->c.as.integer;
+                e->range_count++;
+            }
+        }
+    }
+}
+
 /* Whether a load or a store of a function of m reaches a table pointer or
    an entry of a table. */
 static bool names_table(const struct ir_module *m)
@@ -807,6 +881,7 @@ static void load_store(struct emitter *e, const struct ir_inst *inst)
                          e->value, name, text_cstr(&pointer),
                          align_of(e, inst->type));
             access_fact(e, inst);
+            range_fact(e, inst);
             text_append(e->out, "\n");
             text_appendf(&value, "%%v%" PRIu32, e->value++);
             store_result(e, inst, text_cstr(&value));
@@ -816,9 +891,15 @@ static void load_store(struct emitter *e, const struct ir_inst *inst)
     text_free(&pointer);
 }
 
-/* An offset of bytes, which a getelementptr of i8 adds without inbounds,
-   so an address outside its object is no poison. An offset narrower than
-   64 bits extends with its sign. */
+/* DESIGN: an offset of bytes, which a getelementptr of i8 adds without
+   inbounds, so an address outside its object is no poison. An offset
+   narrower than 64 bits extends with its sign. The one exception, which
+   "Arithmetic, addresses and ranges" in
+   docs/work-order-llvm-optimization.md gives, is the address of a field
+   of an object that a non-optional reference reaches, which lowering
+   marks IR_INBOUNDS. The checker guarantees that such an object exists
+   and holds the field. A view through `as` and an address made from an
+   integer never carry the mark, see sema_value_view. */
 static void ptradd(struct emitter *e, const struct ir_inst *inst)
 {
     enum ir_type type = operand_type(e, &inst->b);
@@ -836,9 +917,11 @@ static void ptradd(struct emitter *e, const struct ir_inst *inst)
         text_appendf(&offset, "%%v%" PRIu32, wide);
     }
     if (!e->failed) {
-        text_appendf(e->out, "  %%v%" PRIu32 " = getelementptr i8, ptr %s, "
+        text_appendf(e->out, "  %%v%" PRIu32 " = getelementptr %si8, ptr %s, "
                              "i64 %s\n",
-                     e->value, text_cstr(&pointer), text_cstr(&offset));
+                     e->value,
+                     inst->field == IR_INBOUNDS ? "inbounds " : "",
+                     text_cstr(&pointer), text_cstr(&offset));
         text_format(value, sizeof value, "%%v%" PRIu32, e->value++);
         store_result(e, inst, value);
     }
@@ -1426,7 +1509,21 @@ static void overflow_operation(struct emitter *e, const struct ir_inst *inst)
                              : inst->op == IR_SUB_OV ? "ssub"
                                                      : "smul",
                              type, text_cstr(&a), text_cstr(&b));
-        r = field_of(e, type, pair, 0);
+        /* DESIGN: the path where the check found no overflow reads the
+           result, and the overflow block reads the operands alone, so
+           the result of an operation that lowering marks IR_NSW is the
+           plain operation with nsw. A wrap makes it poison on the
+           overflow path alone, which never reads it. */
+        if ((inst->field & IR_NSW) != 0) {
+            r = fresh(e);
+            text_appendf(e->out, "  %%v%" PRIu32 " = %s nsw %s %s, %s\n", r,
+                         inst->op == IR_ADD_OV   ? "add"
+                         : inst->op == IR_SUB_OV ? "sub"
+                                                 : "mul",
+                         type, text_cstr(&a), text_cstr(&b));
+        } else {
+            r = field_of(e, type, pair, 0);
+        }
         e->overflow = field_of(e, type, pair, 1);
         e->overflow_result = inst->result;
         text_format(value, sizeof value, "%%v%" PRIu32, r);
@@ -2278,6 +2375,28 @@ static uint32_t reinterpret(struct emitter *e, uint32_t v, enum ir_type from,
     return n;
 }
 
+/* range(T low, high) and a space where the result r of f carries a range
+   and passes as its own type. */
+static void result_range(struct emitter *e, struct text *out,
+                         const struct ir_function *f,
+                         const struct abi_param *r)
+{
+    const char *type;
+
+    if (!f->result_range || r->kind != ABI_DIRECT || r->word_count != 1) {
+        return;
+    }
+    type = value_type(e, f->result);
+    if (type == NULL || strcmp(r->types[0], type) != 0) {
+        return;
+    }
+    text_appendf(out, "range(%s ", type);
+    int_constant(out, f->result, f->result_low);
+    text_append(out, ", ");
+    int_constant(out, f->result, f->result_high);
+    text_append(out, ") ");
+}
+
 /* DESIGN: a call names its function type, which abi_classify gives for
    the callee, or for the signature of an indirect call. An argument past
    the parameters of the callee, the variadic part of a C function or the
@@ -2296,6 +2415,7 @@ static void call(struct emitter *e, const struct ir_inst *inst)
     struct text args = {0};
     struct text types = {0};
     struct text result = {0};
+    struct text facts = {0};
     uint32_t sret = 0;
     uint32_t value;
     size_t i;
@@ -2349,9 +2469,12 @@ static void call(struct emitter *e, const struct ir_inst *inst)
         if (named) {
             text_appendf(e->out, "%%v%" PRIu32 " = ", e->value++);
         }
-        text_appendf(e->out, "call %s (%s) %s(%s)\n", text_cstr(&result),
-                     text_cstr(&types), text_cstr(&target),
-                     text_cstr(&args));
+        if (inst->a.kind == IR_FUNC) {
+            result_range(e, &facts, callee, &c.result);
+        }
+        text_appendf(e->out, "call %s%s (%s) %s(%s)\n", text_cstr(&facts),
+                     text_cstr(&result), text_cstr(&types),
+                     text_cstr(&target), text_cstr(&args));
         if (inst->result == IR_NO_RESULT) {
             /* Nothing reads the result. */
         } else if (c.result.kind == ABI_SRET) {
@@ -2372,6 +2495,7 @@ static void call(struct emitter *e, const struct ir_inst *inst)
     text_free(&args);
     text_free(&types);
     text_free(&result);
+    text_free(&facts);
 }
 
 /* The metadata of a branch whose one side is the failure arm of an
@@ -2408,6 +2532,18 @@ static void instruction(struct emitter *e, const struct ir_inst *inst)
     case IR_UNREACHABLE:
         text_append(e->out, "  unreachable\n");
         break;
+    /* DESIGN: the slot of the lifetime is the alloca the IR_SLOT of its
+       temporary wrote, which the verifier checks, since the intrinsics
+       take an alloca and no other pointer. */
+    case IR_LIFE_START:
+    case IR_LIFE_END: {
+        const char *name = inst->op == IR_LIFE_START ? "llvm.lifetime.start.p0"
+                                                     : "llvm.lifetime.end.p0";
+        intrinsic(e, "void", name, "ptr");
+        text_appendf(e->out, "  call void @%s(ptr %%s%" PRIu32 ")\n", name,
+                     inst->a.as.temp);
+        break;
+    }
     case IR_BRANCH:
         operand(e, &inst->a, IR_I8, &value);
         if (e->failed) {
@@ -2552,6 +2688,7 @@ static void result_facts(struct emitter *e, const struct ir_function *f,
                             : f->result_ext == IR_EXT_ZERO ? "zeroext "
                                                            : "");
     }
+    result_range(e, e->out, f, r);
 }
 
 /* The result type, the name and the parameters of f in parentheses, as
@@ -3175,6 +3312,15 @@ static void metadata(struct emitter *e, uint32_t flag_count)
     if (e->facts) {
         text_appendf(e->out, "!%" PRIu32 " = !{}\n", e->facts_id);
     }
+    for (i = 0; i < e->range_count; i++) {
+        const char *type = value_type(e, e->ranges[i].type);
+        text_appendf(e->out, "!%" PRIu32 " = !{%s ", e->range_id + (uint32_t)i,
+                     type);
+        int_constant(e->out, e->ranges[i].type, e->ranges[i].low);
+        text_appendf(e->out, ", %s ", type);
+        int_constant(e->out, e->ranges[i].type, e->ranges[i].high);
+        text_append(e->out, "}\n");
+    }
     llvm_debug_finish(&e->debug, e->out);
 }
 
@@ -3358,10 +3504,12 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
     e.facts_id = e.cold_id + COLD_COUNT;
     e.facts = m->table_facts && names_table(m);
     e.m = m;
+    e.range_id = e.facts_id + (e.facts ? 1 : 0);
+    collect_ranges(&e, m);
     /* The ids of the debug metadata follow every other id, so the text
        without them names the ids of a build without -g. */
     llvm_debug_init(&e.debug, o->target, m, o->module, o->debug,
-                    o->optimized, e.facts_id + (e.facts ? 1 : 0),
+                    o->optimized, e.range_id + (uint32_t)e.range_count,
                     o->spans);
     e.keeps_frame = alloc_zeroed(m->function_count + 1, sizeof *e.keeps_frame);
     frames_kept(m, e.keeps_frame);
@@ -3439,6 +3587,7 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
     text_free(&e.places);
     text_free(&e.imports);
     free(e.keeps_frame);
+    free(e.ranges);
     llvm_debug_free(&e.debug);
     return !e.failed;
 }

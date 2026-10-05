@@ -23,7 +23,7 @@ b3:
     unreachable
 b4:
     %5 = srem i64 -9, 2
-    %6 = addov i64 %2, %5
+    %6 = addov nsw i64 %2, %5
     branchov %6, b5, b6
 b5:
     %7 = addr @fold.2
@@ -55,7 +55,7 @@ b4:
     %8 = trunc i32 %3
     ret i32 %8
 }
-fn fold.compared() -> i8 zeroext {
+fn fold.compared() -> i8 zeroext range 0, 2 {
 b0:
     %0 = slt i8 3, 4
     %1 = copy i8 %0

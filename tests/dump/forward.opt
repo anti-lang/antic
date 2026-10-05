@@ -7,9 +7,9 @@ global anti_rt_slots anti.rt.SlotTable { i64 0, ptr 0, i64 0 }
 global anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn forward.twice(%0: ptr nonnull deref(size_of forward.Point)) -> i64 {
 b0:
-    %1 = ptradd %0, offset_of forward.Point.y
+    %1 = ptradd inbounds %0, offset_of forward.Point.y
     %2 = load i64 %1
-    %3 = addov i64 %2, %2
+    %3 = addov nsw i64 %2, %2
     branchov %3, b1, b2
 b1:
     %4 = addr @forward.6
@@ -21,7 +21,7 @@ b2:
 fn forward.round_trip(%0: ptr nonnull deref(size_of forward.Point), %1: i64) -> i64 {
 b0:
     store i64 %1, %0
-    %2 = addov i64 %1, %1
+    %2 = addov nsw i64 %1, %1
     branchov %2, b1, b2
 b1:
     %3 = addr @forward.7

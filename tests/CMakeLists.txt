@@ -561,13 +561,13 @@ elseif(ANTIC_HOST_TARGET STREQUAL "macos-x86_64")
 endif()
 foreach(target IN LISTS llvm_targets)
     foreach(name IN ITEMS return42 return_pieces deep_nesting long_float
-            asserts scalar_ops llvm_division)
+            asserts scalar_ops llvm_division llvm_wrap)
         antic_llvm_program_test(${name} ${target} release)
     endforeach()
     foreach(name IN ITEMS return42 return_pieces deep_nesting long_float)
         antic_llvm_program_test(${name} ${target} dev)
     endforeach()
-    foreach(name IN ITEMS scalar_ops llvm_division)
+    foreach(name IN ITEMS scalar_ops llvm_division llvm_wrap)
         antic_llvm_program_test(${name} ${target} dev OPTIONS --no-checks)
     endforeach()
     foreach(name IN ITEMS flags saturating mul_high carry_chain wrapping
@@ -1001,6 +1001,12 @@ foreach(name IN ITEMS qualified_bodies qualified_chain qualified_single)
         OPTIONS "--dev"
         WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-dev")
 endforeach()
+# The facts of arithmetic with the checks of a dev build in a release
+# build, where the checked operations carry nsw.
+antic_program_test(program_arith_facts_checks
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/arith_facts.anti"
+    OPTIONS "--checks"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-checks")
 # The wrapping and saturating operators, mul_high and the flags form in
 # dev mode, whose checks trap on the plain operators and on none of these.
 foreach(name IN ITEMS wrapping saturating compound_wrapping mul_high flags
@@ -4006,7 +4012,8 @@ foreach(case "types|symbolic||symbolic.types|${DUMP}/symbolic.anti"
         "llvm|fatal_guard|macos-arm64|fatal_guard.dev.macos-arm64.ll|--dev,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/fatal_guard.anti"
         "llvm|effects|linux-x86_64|effects.dev.linux-x86_64.ll|--dev,--cpu,v2,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/effects.anti"
         "llvm|tables|macos-arm64|tables.macos-arm64.ll|--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/tables.anti"
-        "llvm|params|macos-arm64|params.dev.macos-arm64.ll|--dev,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/params.anti")
+        "llvm|params|macos-arm64|params.dev.macos-arm64.ll|--dev,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/params.anti"
+        "llvm|arith|macos-arm64|arith.dev.macos-arm64.ll|--dev,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/arith.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 stage)
     list(GET parts 1 subject)
