@@ -445,6 +445,9 @@ uint32_t ir_param_add(struct ir_function *f, enum ir_type type, uint32_t agg)
     p->type = type;
     p->ext = IR_EXT_NONE;
     p->agg = agg;
+    p->nonnull = false;
+    p->own = false;
+    p->deref_size = IR_NO_INDEX;
     p->temp = f->is_extern ? IR_NO_RESULT
                            : ir_temp(f, type == IR_AGG ? IR_PTR : type);
     return p->temp;

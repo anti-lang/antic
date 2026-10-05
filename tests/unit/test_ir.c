@@ -368,6 +368,65 @@ static void table_accesses(void)
     arena_free(&arena);
 }
 
+/* The facts of "Parameters and results" in
+   docs/work-order-llvm-optimization.md. nonnull, a dereferenceable size and
+   own stand on a pointer parameter alone, and a size needs nonnull. An
+   extension stands on a result of 8 or 16 bits, and allocates on the
+   pointer result of a C function. */
+static void param_facts(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *grab;
+    struct ir_function *f;
+    struct ir_block *b0;
+    struct text out = {0};
+    int pass;
+
+    for (pass = 0; pass < 2; pass++) {
+        ir_module_init(&m, &arena, "main");
+        grab = ir_extern_add(&m, "grab", IR_PTR, false);
+        grab->allocates = true;
+        f = ir_function_add(&m, "main", "f", IR_I8, IR_NO_AGG);
+        f->result_ext = IR_EXT_SIGN;
+        ir_param_add(f, IR_PTR, IR_NO_AGG);
+        f->params[0].nonnull = true;
+        f->params[0].deref_size = ir_sym_size_of(&m, ir_scalar(IR_I64));
+        f->params[0].own = true;
+        ir_param_add(f, IR_I64, IR_NO_AGG);
+        b0 = ir_block_add(f);
+        ir_ret(f, b0, IR_I8, ir_int_op(IR_I8, 0));
+        if (pass == 0) {
+            ir_print(&out, &m);
+            CHECK(strstr(text_cstr(&out),
+                         "extern fn grab() -> ptr allocates\n") != NULL);
+            CHECK(strstr(text_cstr(&out),
+                         "fn main.f(%0: ptr nonnull deref(size_of i64) own, "
+                         "%1: i64) -> i8 signext {") != NULL);
+            text_free(&out);
+            verified(&m, "");
+        } else {
+            grab->result_ext = IR_EXT_ZERO;
+            f->allocates = true;
+            f->params[0].nonnull = false;
+            f->params[1].own = true;
+            f->params[1].nonnull = true;
+            f->params[1].deref_size = (uint32_t)m.sym_count;
+            verified(&m, "grab: the result is ptr and has an extension\n"
+                         "main.f: the result is i8 and allocates\n"
+                         "main.f: a function with a body allocates\n"
+                         "main.f: parameter 0 is dereferenceable and may be "
+                         "none\n"
+                         "main.f: parameter 1 is i64 and has a fact of a "
+                         "pointer\n"
+                         "main.f: parameter 1 is dereferenceable by a "
+                         "symbolic value that does not exist\n");
+        }
+        ir_module_free(&m);
+    }
+    arena_free(&arena);
+}
+
 /* A call through a pointer passes the arguments of its signature. */
 static void indirect_arguments(void)
 {
@@ -571,5 +630,6 @@ void test_ir(void)
     verifier();
     never_returns();
     table_accesses();
+    param_facts();
     no_module();
 }

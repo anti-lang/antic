@@ -3730,7 +3730,7 @@ add_test(NAME ir_tuple_out
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
         "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/tuples.anti"
-        "-DLINE=export fn com.example.tuples.tuples_divide(%0: i64, %1: i64, %2: ptr) -> ptr {"
+        "-DLINE=export fn com.example.tuples.tuples_divide(%0: i64, %1: i64, %2: ptr nonnull deref(size_of (int, int))) -> ptr {"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_ir_line.cmake")
 
 # The Windows unwind data of chapter 16, decoded by llvm-readobj from the
@@ -4005,7 +4005,8 @@ foreach(case "types|symbolic||symbolic.types|${DUMP}/symbolic.anti"
         "llvm|doubling|windows-arm64|doubling.windows-arm64.ll|--lib,shared,--runtime,${ANTIC_RUNTIME_DIR},-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/doubling.anti"
         "llvm|fatal_guard|macos-arm64|fatal_guard.dev.macos-arm64.ll|--dev,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/fatal_guard.anti"
         "llvm|effects|linux-x86_64|effects.dev.linux-x86_64.ll|--dev,--cpu,v2,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/effects.anti"
-        "llvm|tables|macos-arm64|tables.macos-arm64.ll|--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/tables.anti")
+        "llvm|tables|macos-arm64|tables.macos-arm64.ll|--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/tables.anti"
+        "llvm|params|macos-arm64|params.dev.macos-arm64.ll|--dev,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/params.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 stage)
     list(GET parts 1 subject)

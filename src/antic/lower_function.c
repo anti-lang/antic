@@ -422,9 +422,7 @@ static struct ir_function *lower_anonymous_function(struct lowerer *l,
                         lower_ir_type_of(t->result),
                         lower_result_agg(l, t->result));
     text_free(&name);
-    for (i = 0; i < t->param_count; i++) {
-        lower_add_param(l, f, t->params[i]);
-    }
+    lower_add_params(l, f, t, it->symbol);
     if (it->capture_count > 0) {
         ir_param_add(f, IR_PTR, IR_NO_AGG);
     }

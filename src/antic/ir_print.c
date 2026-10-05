@@ -211,6 +211,13 @@ static void param_type(struct text *out, const struct ir_module *m,
     if (p->ext != IR_EXT_NONE) {
         text_append(out, p->ext == IR_EXT_SIGN ? " signext" : " zeroext");
     }
+    text_append(out, p->nonnull ? " nonnull" : "");
+    if (p->deref_size != IR_NO_INDEX && p->deref_size < m->sym_count) {
+        text_append(out, " deref(");
+        ir_sym_print(out, m, p->deref_size);
+        text_append(out, ")");
+    }
+    text_append(out, p->own ? " own" : "");
 }
 
 /* The memory effects of a C function and its guarantees, after its
@@ -258,6 +265,11 @@ static void signature(struct text *out, const struct ir_module *m,
     } else if (f->result != IR_VOID) {
         text_appendf(out, " -> %s", ir_type_name(f->result));
     }
+    if (f->result_ext != IR_EXT_NONE) {
+        text_append(out, f->result_ext == IR_EXT_SIGN ? " signext"
+                                                      : " zeroext");
+    }
+    text_append(out, f->allocates ? " allocates" : "");
     effects(out, f);
     text_append(out, f->writes_tables ? " writes tables" : "");
 }

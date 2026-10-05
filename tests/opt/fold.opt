@@ -27,7 +27,7 @@ b1:
 b2:
     ret i32 -4
 }
-fn fold.compared() -> i8 {
+fn fold.compared() -> i8 zeroext {
 b0:
     ret i8 0
 }

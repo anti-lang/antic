@@ -182,6 +182,54 @@ static void marks_table_accesses(void)
     CHECK(!body_holds(source, "main.down", "writes tables"));
 }
 
+/* The facts of "Parameters and results" in
+   docs/work-order-llvm-optimization.md. A `*T` parameter is nonnull and
+   dereferenceable for the size of T, `self` among them, and a `?*T` is
+   neither. An `own` pointer is own. A result of 8 or 16 bits extends by
+   its signedness. The thunk of an interface takes the address of the
+   sub-object, which the size of the class does not measure. allocates
+   marks the three runtime functions that give fresh memory. */
+static void fills_param_facts(void)
+{
+    static const char source[] =
+        "struct Point { x: int, y: int }\n"
+        "class Node { pub n: int = 0,"
+        " pub fn get(self) -> int { return self.n; } }\n"
+        "abstract class Named { abstract fn label(self) -> int; }\n"
+        "class Tag { pub id: int = 3, implements named: Named,"
+        " concrete fn Named::label(self) -> int { return self.id; } }\n"
+        "fn take(p: *Point, q: ?*Point, own n: *Node, b: i8, c: bool)"
+        " -> i8 { return b; }\n"
+        "fn wide(x: u16) -> u16 { return x; }\n"
+        "fn plain(x: int) -> int { return x; }\n"
+        "fn copy(n: *Node) -> *Node { return dup(n); }\n"
+        "extern fn anti_rt_mem_alloc(size: int, align: int) -> ?*byte;\n"
+        "fn raw() -> ?*byte { return anti_rt_mem_alloc(8, 8); }\n";
+    struct lowered l;
+    const struct ir_function *f;
+
+    CHECK(body_holds(source, "main.take",
+                     "(%0: ptr nonnull deref(size_of main.Point), %1: ptr, "
+                     "%2: ptr nonnull deref(size_of main.Node) own, "
+                     "%3: i8 signext, %4: i8 zeroext) -> i8 signext {"));
+    CHECK(body_holds(source, "main.wide",
+                     "(%0: i16 zeroext) -> i16 zeroext {"));
+    CHECK(body_holds(source, "main.plain", "(%0: i64) -> i64 {"));
+    CHECK(body_holds(source, "main.Node.get",
+                     "(%0: ptr nonnull deref(size_of main.Node)) -> i64 {"));
+    CHECK(body_holds(source, "main.Tag.named.label.thunk",
+                     "(%0: ptr nonnull) -> i64 {"));
+    lowered_run(&l, source);
+    CHECK(l.ok);
+    f = function_named(&l.ir, "anti_rt_dup");
+    CHECK(f != NULL && f->allocates);
+    f = function_named(&l.ir, "anti_rt_mem_alloc");
+    CHECK(f != NULL && f->allocates);
+    f = function_named(&l.ir, "malloc");
+    CHECK(f == NULL || !f->allocates);
+    lowered_release(&l);
+}
+
 /* A class record names the tables of a class, its base, its interfaces
    and the `mutable` fields of a singleton. A `worker fn` keeps its mark.
    A call through a table names the class and the slot. */
@@ -1023,7 +1071,8 @@ void test_lower(void)
            "global main.3 size 6 align 1 bytes 6c 65 76 65 6c 00\n"
            "global main.Flags.fields [2]anti.rt.Field { anti.rt.Field { @main.2, i64 7, offset_of main.Flags.visible, i64 0, i64 0, ptr 0 }, anti.rt.Field { @main.3, i64 5, offset_of main.Flags.level, i64 0, i64 0, ptr 0 } }\n"
            "global main.package.version size 6 align 1 bytes 30 2e 30 2e 30 00\nglobal main.6 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00\n"
-           "fn main.f(%0: ptr) -> i8 {\n"
+           "fn main.f(%0: ptr nonnull deref(size_of main.Flags)) "
+           "-> i8 signext {\n"
            "b0:\n"
            "    bitstore i32 1, %0, main.Flags.visible\n"
            "    %1 = bitload i8 %0, main.Flags.level\n"
@@ -1047,8 +1096,8 @@ void test_lower(void)
            "fn f(p: *P, a: A) -> i32 {\n"
            "    return p.b + a.a as i32;\n"
            "}\n",
-           "type main.A = struct align(16) { a: i8 }\n"
            "type main.P = packed struct { a: i8, b: i32 }\n"
+           "type main.A = struct align(16) { a: i8 }\n"
            "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
            "type [1]anti.rt.Field = array 1 of anti.rt.Field\n"
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
@@ -1061,7 +1110,8 @@ void test_lower(void)
            "global main.7 size 2 align 1 bytes 41 00\n"
            "global main.A.fields [1]anti.rt.Field { anti.rt.Field { @main.2, i64 1, offset_of main.A.a, i64 8, i64 0, ptr 0 } }\n"
            "global main.9 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-           "fn main.f(%0: ptr, %1: agg main.A) -> i32 {\n"
+           "fn main.f(%0: ptr nonnull deref(size_of main.P), "
+           "%1: agg main.A) -> i32 {\n"
            "b0:\n"
            "    %2 = ptradd %0, offset_of main.P.b\n"
            "    %3 = load i32 %2\n"
@@ -1311,7 +1361,7 @@ void test_lower(void)
            "}\n",
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 30 align 1 bytes 6d 61 69 6e 3a 32 3a 20 64 69 76 69 73 69 6f 6e 20 62 79 20 7a 65 72 6f 20 69 6e 20 2f 00\n"
-           "fn main.h(%0: i32, %1: i32) -> i8 {\n"
+           "fn main.h(%0: i32, %1: i32) -> i8 zeroext {\n"
            "b0:\n"
            "    %2 = ne i8 %1, 0\n"
            "    branch %2, b2, b1\n"
@@ -1374,7 +1424,7 @@ void test_lower(void)
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 35 align 1 bytes 6d 61 69 6e 3a 36 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 31 36 00\n"
            "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 36 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-           "fn main.k() -> i16 {\n"
+           "fn main.k() -> i16 signext {\n"
            "b0:\n"
            "    %0 = mul i64 4, size_of i16\n"
            "    %1 = call ptr @malloc(%0)\n"
@@ -1431,7 +1481,7 @@ void test_lower(void)
            "    *p = x as f16;\n"
            "    return *p;\n"
            "}\n",
-           "fn main.h(%0: ptr, %1: f32) -> f32 {\n"
+           "fn main.h(%0: ptr nonnull deref(size_of i16), %1: f32) -> f32 {\n"
            "b0:\n"
            "    %2 = htrunc i16 %1\n"
            "    store i16 %2, %0\n"
@@ -1541,7 +1591,7 @@ void test_lower(void)
            "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00\n"
            "global main.1 size 36 align 1 bytes 6d 61 69 6e 3a 35 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 62 79 74 65 00\n"
            "global main.2 size 22 align 1 bytes 6d 61 69 6e 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-           "fn main.bump(%0: i8 signext) -> i16 {\n"
+           "fn main.bump(%0: i8 signext) -> i16 signext {\n"
            "b0:\n"
            "    %1 = slot i8\n"
            "    store i8 %0, %1\n"
@@ -1746,7 +1796,7 @@ void test_lower(void)
            "type [3]int = array 3 of i64\n"
            "type []byte = struct { ptr: ptr, len: i64 }\n"
            "type []int = struct { ptr: ptr, len: i64 }\n"
-           "fn main.h(%0: ptr, %1: i64) -> ptr {\n"
+           "fn main.h(%0: ptr nonnull deref(size_of i8), %1: i64) -> ptr {\n"
            "b0:\n"
            "    %2 = slot [3]int\n"
            "    %3 = slot []byte\n"
@@ -1822,7 +1872,7 @@ void test_lower(void)
            "b2:\n"
            "    ret i64 %5\n"
            "}\n"
-           "fn main.u(%0: ptr) {\n"
+           "fn main.u(%0: ptr nonnull deref(size_of main.P)) {\n"
            "b0:\n"
            "    %1 = ptradd %0, offset_of main.P.y\n"
            "    store i32 3, %1\n"
@@ -1971,8 +2021,8 @@ void test_lower(void)
            "    *out = PAIR;\n"
            "}\n",
            "type main.Gap = struct { a: i8, b: i32 }\n"
-           "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
            "type main.Pair = struct { one: main.Gap, two: main.Gap }\n"
+           "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
            "global main.Gap.descriptor anti.rt.Descriptor { @main.1, i64 3, "
            "ptr 0, size_of main.Gap, i64 0, ptr 0, i64 2, @main.Gap.fields, "
            "ptr 0, i64 0, i64 0, ptr 0, @main.package.version, i64 5, ptr 0, i64 0, ptr 0 }\n"
@@ -1994,7 +2044,7 @@ void test_lower(void)
            "main.Pair.two, i64 21, i64 0, @main.Gap.descriptor } }\n"
            "global main.11 main.Pair { main.Gap { i8 1, i32 2 }, main.Gap { i8 "
            "3, i32 4 } }\n"
-           "fn main.f(%0: ptr) {\n"
+           "fn main.f(%0: ptr nonnull deref(size_of main.Pair)) {\n"
            "b0:\n"
            "    %1 = addr @main.11\n"
            "    memcopy %0, %1, main.Pair\n"
@@ -2200,7 +2250,8 @@ void test_lower(void)
            "global main.3 size 7 align 1 bytes 6e 61 72 72 6f 77 00\n"
            "global main.Ops.fields [2]anti.rt.Field { anti.rt.Field { @main.2, i64 5, offset_of main.Ops.unary, i64 18, i64 0, ptr 0 }, anti.rt.Field { @main.3, i64 6, offset_of main.Ops.narrow, i64 18, i64 0, ptr 0 } }\n"
            "global main.package.version size 6 align 1 bytes 30 2e 30 2e 30 00\nglobal main.6 size 22 align 1 bytes 6d 61 69 6e 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-           "fn main.call(%0: ptr, %1: i32) -> i32 {\n"
+           "fn main.call(%0: ptr nonnull deref(size_of main.Ops), "
+           "%1: i32) -> i32 {\n"
            "b0:\n"
            "    %2 = addr @abs\n"
            "    %3 = copy ptr %2\n"
@@ -2237,6 +2288,7 @@ void test_lower(void)
     records_check_kinds();
     allocates_zeroed_classes();
     marks_table_accesses();
+    fills_param_facts();
     runtime_functions();
     runtime_effects();
     runtime_records();

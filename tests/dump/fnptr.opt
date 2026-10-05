@@ -20,7 +20,7 @@ b1:
 b2:
     ret i32 %1
 }
-fn fnptr.run(%0: ptr, %1: i32) -> i32 {
+fn fnptr.run(%0: ptr nonnull deref(size_of fnptr.Op), %1: i32) -> i32 {
 b0:
     %2 = load ptr %0
     %3 = call i32 %2 via @fnptr.fn.0(%1)

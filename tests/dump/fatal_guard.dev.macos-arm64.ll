@@ -2,7 +2,7 @@ source_filename = "fatal_guard"
 target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32"
 target triple = "arm64-apple-macos11.0"
 
-define hidden i64 @fatal_guard.pick(ptr %p0) #0 {
+define hidden noundef i64 @fatal_guard.pick(ptr noundef %p0) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -42,7 +42,7 @@ b2:
   ret i64 %v13
 }
 
-define hidden void @fatal_guard.stop(i64 %p0) noreturn cold #0 {
+define hidden void @fatal_guard.stop(i64 noundef %p0) noreturn cold #0 {
 b0:
   %t0 = alloca i64, align 8
   %t1 = alloca i32, align 4
@@ -90,10 +90,10 @@ b2:
 @fatal_guard.package.version = hidden constant <{ [6 x i8] }> <{ [6 x i8] c"0.0.0\00" }>, align 1
 @fatal_guard.5 = hidden constant <{ [48 x i8] }> <{ [48 x i8] c"fatal_guard.anti:23: value out of range for i32\00" }>, align 1
 
-declare void @anti_rt_exit(i32) noreturn cold #1
-declare void @anti.lang.Error.fatal(ptr) noreturn cold #1
-declare ptr @anti.lang.NoneDereference.new() #1
-declare void @anti_rt_check_failed(ptr, i64, i32, i64, i64) noreturn cold #1
+declare void @anti_rt_exit(i32 noundef) noreturn cold #1
+declare void @anti.lang.Error.fatal(ptr noundef nonnull dereferenceable(120)) noreturn cold #1
+declare noundef ptr @anti.lang.NoneDereference.new() #1
+declare void @anti_rt_check_failed(ptr noundef, i64 noundef, i32 noundef, i64 noundef, i64 noundef) noreturn cold #1
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="generic" "target-features"="+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fullfp16,+jsconv,+lse,+neon,+pauth,+predres,+ras,+rcpc,+rdm,+sb,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8a,-fmv" }
 attributes #1 = { nounwind }

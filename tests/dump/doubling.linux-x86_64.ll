@@ -2,7 +2,7 @@ source_filename = "com.example.doubling"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
-define dso_local i64 @twice(i64 %p0) #0 {
+define dso_local noundef i64 @twice(i64 noundef %p0) #0 {
 b0:
   %t0 = alloca i64, align 8
   %t1 = alloca i64, align 8

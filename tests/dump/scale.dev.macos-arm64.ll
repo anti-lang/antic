@@ -2,7 +2,7 @@ source_filename = "com.example.scale"
 target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32"
 target triple = "arm64-apple-macos11.0"
 
-define hidden i64 @com.example.scale.scale(i64 %p0) #0 {
+define hidden noundef i64 @com.example.scale.scale(i64 noundef %p0) #0 {
 b0:
   %t0 = alloca i64, align 8
   %t1 = alloca i64, align 8
@@ -29,7 +29,7 @@ b2:
 
 @com.example.scale.0 = hidden constant <{ [40 x i8] }> <{ [40 x i8] c"com/example/scale.anti:4: overflow in *\00" }>, align 1
 
-declare void @anti_rt_check_failed(ptr, i64, i32, i64, i64) noreturn cold #1
+declare void @anti_rt_check_failed(ptr noundef, i64 noundef, i32 noundef, i64 noundef, i64 noundef) noreturn cold #1
 declare { i64, i1 } @llvm.smul.with.overflow.i64(i64, i64)
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="generic" "target-features"="+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fullfp16,+jsconv,+lse,+neon,+pauth,+predres,+ras,+rcpc,+rdm,+sb,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8a,-fmv" }

@@ -275,11 +275,21 @@ struct ir_block {
 
 /* A parameter. An aggregate parameter's temporary holds a pointer to the
    value, and the back end copies it in as its ABI requires. */
+/* DESIGN: the facts of a pointer parameter, which lowering reads from its
+   Anti type and the LLVM text writes as attributes, as "Parameters and
+   results" in docs/work-order-llvm-optimization.md gives them. A `*T`
+   never holds `none`, so it is nonnull and dereferenceable for the size
+   of T, a symbolic value the back end folds. An `own` pointer is the one
+   holder of what it points at. A parameter that is no pointer holds
+   none of them. */
 struct ir_param {
     enum ir_type type;
     enum ir_ext ext;
     uint32_t agg;                   /* IR_AGG: the aggregate, else IR_NO_AGG */
     uint32_t temp;
+    bool nonnull;                   /* a `*T`: never `none` */
+    bool own;                       /* an `own` pointer parameter */
+    uint32_t deref_size;            /* size_of T, or IR_NO_INDEX */
 };
 
 /* DESIGN: the memory a C function reads and writes, in the classes of
@@ -333,6 +343,12 @@ struct ir_function {
     size_t param_capacity;
     enum ir_type result;
     uint32_t result_agg;            /* IR_AGG: the aggregate, else IR_NO_AGG */
+    /* How a result of 8 or 16 bits extends to 32 bits, from the
+       signedness of its Anti type. */
+    enum ir_ext result_ext;
+    /* A C function that returns fresh memory, or none, and keeps no other
+       pointer to it. */
+    bool allocates;
     bool is_extern;                 /* no body: C or another module */
     bool variadic;
     bool exported;                  /* an export fn, with a C symbol */

@@ -1,34 +1,35 @@
-type [18]ptr = array 18 of ptr
 type anti.lang.Object = struct { table: ptr }
 type devirt.Only = struct { super: anti.lang.Object, n: i64 }
+type devirt.Base = struct { super: anti.lang.Object, n: i64 }
+type devirt.Derived = struct { super: devirt.Base }
+type devirt.Speaker = struct { super: anti.lang.Object }
+type devirt.Dog = struct { super: devirt.Speaker }
+type [18]ptr = array 18 of ptr
 type [2]ptr = array 2 of ptr
 type [1]anti.rt.Field = array 1 of anti.rt.Field
 type [17]anti.rt.Function = array 17 of anti.rt.Function
 type str = struct { ptr: ptr, len: i64 }
+type anti.lang.FieldDescriptor = struct { name: str, offset: i64, type_id: i64, owned: i64, descriptor: ptr }
 type [19]ptr = array 19 of ptr
-type devirt.Base = struct { super: anti.lang.Object, n: i64 }
 type [18]anti.rt.Function = array 18 of anti.rt.Function
-type devirt.Derived = struct { super: devirt.Base }
 type [3]ptr = array 3 of ptr
-type devirt.Speaker = struct { super: anti.lang.Object }
 type [18]i64 = array 18 of i64
-type devirt.Dog = struct { super: devirt.Speaker }
-extern fn anti_lang_Object_type_name(ptr) -> agg str
-extern fn anti_lang_Object_to_text(ptr) -> agg str
-extern fn anti_lang_Object_serialize(ptr, ptr)
-extern fn anti_lang_Object_created(ptr)
-extern fn anti_lang_Object_destroyed(ptr)
-extern fn anti_lang_Object_copied(ptr, ptr)
-extern fn anti_lang_Object_dispatched(ptr)
-extern fn anti_lang_Object_joined(ptr)
-extern fn anti_lang_Object_enter(ptr, agg str)
-extern fn anti_lang_Object_leave(ptr, agg str)
-extern fn anti_lang_Object_failed(ptr, agg str, ptr)
-extern fn anti_lang_Object_changed(ptr, ptr)
+extern fn anti_lang_Object_type_name(ptr nonnull deref(size_of anti.lang.Object)) -> agg str
+extern fn anti_lang_Object_to_text(ptr nonnull deref(size_of anti.lang.Object)) -> agg str
+extern fn anti_lang_Object_serialize(ptr nonnull deref(size_of anti.lang.Object), ptr nonnull deref(size_of anti.lang.Object))
+extern fn anti_lang_Object_created(ptr nonnull deref(size_of anti.lang.Object))
+extern fn anti_lang_Object_destroyed(ptr nonnull deref(size_of anti.lang.Object))
+extern fn anti_lang_Object_copied(ptr nonnull deref(size_of anti.lang.Object), ptr nonnull deref(size_of anti.lang.Object))
+extern fn anti_lang_Object_dispatched(ptr nonnull deref(size_of anti.lang.Object))
+extern fn anti_lang_Object_joined(ptr nonnull deref(size_of anti.lang.Object))
+extern fn anti_lang_Object_enter(ptr nonnull deref(size_of anti.lang.Object), agg str)
+extern fn anti_lang_Object_leave(ptr nonnull deref(size_of anti.lang.Object), agg str)
+extern fn anti_lang_Object_failed(ptr nonnull deref(size_of anti.lang.Object), agg str, ptr nonnull deref(size_of anti.lang.Object))
+extern fn anti_lang_Object_changed(ptr nonnull deref(size_of anti.lang.Object), ptr nonnull deref(size_of anti.lang.FieldDescriptor))
 extern fn anti_rt_hook(ptr, i64)
 extern fn anti_rt_descriptor(ptr) -> ptr
 extern fn anti_rt_table_unset(ptr, i64) -> never
-extern fn devirt.fn.0(ptr) -> i64
+extern fn devirt.fn.0(ptr nonnull deref(size_of devirt.Base)) -> i64
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never
 global devirt.Only.table [18]ptr { @devirt.Only.descriptor, @anti_lang_Object_type_name, @anti_lang_Object_to_text, @devirt.Only.equals, @devirt.Only.hash, @anti_lang_Object_serialize, @devirt.Only.destroy, @devirt.Only.copy, @anti_lang_Object_created, @anti_lang_Object_destroyed, @anti_lang_Object_copied, @anti_lang_Object_dispatched, @anti_lang_Object_joined, @anti_lang_Object_enter, @anti_lang_Object_leave, @anti_lang_Object_failed, @anti_lang_Object_changed, @devirt.Only.value }
 global devirt.Only.descriptor anti.rt.Descriptor { @devirt.2, i64 4, @anti_lang_Object_descriptor, size_of devirt.Only, i64 1, @devirt.Only.ancestors, i64 1, @devirt.Only.fields, ptr 0, i64 0, i64 17, @devirt.Only.functions, @devirt.package.version, i64 5, ptr 0, i64 0, ptr 0 }
@@ -94,27 +95,27 @@ class devirt.Base descriptor @devirt.Base.descriptor base @anti_lang_Object_desc
 class devirt.Derived descriptor @devirt.Derived.descriptor base @devirt.Base.descriptor table @devirt.Derived.table init @devirt.Derived.init
 class devirt.Speaker abstract descriptor @devirt.Speaker.descriptor base @anti_lang_Object_descriptor
 class devirt.Dog descriptor @devirt.Dog.descriptor base @devirt.Speaker.descriptor table @devirt.Dog.table init @devirt.Dog.init
-fn devirt.Only.value(%0: ptr) -> i64 {
+fn devirt.Only.value(%0: ptr nonnull deref(size_of devirt.Only)) -> i64 {
 b0:
     %1 = ptradd %0, offset_of devirt.Only.n
     %2 = load i64 %1
     ret i64 %2
 }
-fn devirt.Base.value(%0: ptr) -> i64 {
+fn devirt.Base.value(%0: ptr nonnull deref(size_of devirt.Base)) -> i64 {
 b0:
     %1 = ptradd %0, offset_of devirt.Base.n
     %2 = load i64 %1
     ret i64 %2
 }
-fn devirt.Base.same(%0: ptr) -> i64 {
+fn devirt.Base.same(%0: ptr nonnull deref(size_of devirt.Base)) -> i64 {
 b0:
     ret i64 7
 }
-fn devirt.Derived.value(%0: ptr) -> i64 {
+fn devirt.Derived.value(%0: ptr nonnull deref(size_of devirt.Derived)) -> i64 {
 b0:
     ret i64 100
 }
-fn devirt.total(%0: ptr, %1: ptr) -> i64 {
+fn devirt.total(%0: ptr nonnull deref(size_of devirt.Only), %1: ptr nonnull deref(size_of devirt.Base)) -> i64 {
 b0:
     %2 = call i64 @devirt.Only.value(%0)
     %3 = load ptr %1 !table
@@ -146,11 +147,11 @@ b5:
 b6:
     ret i64 %13
 }
-fn devirt.Dog.speak(%0: ptr) -> i64 {
+fn devirt.Dog.speak(%0: ptr nonnull deref(size_of devirt.Dog)) -> i64 {
 b0:
     ret i64 3
 }
-fn devirt.talk(%0: ptr) -> i64 {
+fn devirt.talk(%0: ptr nonnull deref(size_of devirt.Speaker)) -> i64 {
 b0:
     %1 = load ptr %0 !table
     %2 = eq i8 %1, 0

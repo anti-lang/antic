@@ -215,7 +215,7 @@ static void debug_lines(void)
     x.debug = true;
     CHECK(run(&x, TARGET_LINUX_X86_64));
     CHECK(holds(&x, "define internal void @main.g() #0 !dbg !"));
-    CHECK(holds(&x, "define internal i64 @main.f() #0 !dbg !"));
+    CHECK(holds(&x, "define internal noundef i64 @main.f() #0 !dbg !"));
     CHECK(holds(&x, "  call void () @main.g(), !dbg !"));
     CHECK(holds(&x, "  store i64 9, ptr %t0, align 8\n"));
     CHECK(holds(&x, "  ret i64 %v0, !dbg !"));
@@ -430,14 +430,16 @@ static void frames_kept(void)
     t = ir_call(f, b, IR_I64, ir_func_op(x.m.functions[3]), NULL, 0);
     ir_ret(f, b, IR_I64, ir_temp_op(f, t));
     CHECK(run(&x, TARGET_LINUX_X86_64));
-    CHECK(holds(&x, "define internal i64 @main.cap(i64 %p0) noinline "
+    CHECK(holds(&x, "define internal noundef i64 @main.cap(i64 noundef %p0) "
+                    "noinline "
                     "\"disable-tail-calls\"=\"true\" #0"));
-    CHECK(holds(&x, "define internal i64 @main.bt(i64 %p0) noinline "
+    CHECK(holds(&x, "define internal noundef i64 @main.bt(i64 noundef %p0) "
+                    "noinline "
                     "\"disable-tail-calls\"=\"true\" #0"));
-    CHECK(holds(&x, "define internal i64 @main.above() noinline "
+    CHECK(holds(&x, "define internal noundef i64 @main.above() noinline "
                     "\"disable-tail-calls\"=\"true\" #0"));
-    CHECK(holds(&x, "define internal i64 @main.plain() #0"));
-    CHECK(holds(&x, "define internal i64 @main.outer() #0"));
+    CHECK(holds(&x, "define internal noundef i64 @main.plain() #0"));
+    CHECK(holds(&x, "define internal noundef i64 @main.outer() #0"));
     end(&x);
 }
 
@@ -481,8 +483,9 @@ static void temporaries(void)
     ir_assign(f, b, t, ir_float_op(IR_F64, 2.0));
     ir_ret(f, b, IR_I16, ir_temp_op(f, p));
     CHECK(run(&x, TARGET_LINUX_ARM64));
-    CHECK(holds(&x, "define internal i16 @main.f(i16 signext %p0, "
-                    "double %p1) #0 {\n"
+    CHECK(holds(&x, "define internal noundef i16 @main.f("
+                    "i16 signext noundef %p0, "
+                    "double noundef %p1) #0 {\n"
                     "b0:\n"
                     "  %t0 = alloca i16, align 2\n"
                     "  %t1 = alloca double, align 8\n"
@@ -635,11 +638,11 @@ static void declarations(void)
     f = ir_declare_add(&x.m, "other", "g", IR_I64, IR_NO_AGG);
     ir_param_add(f, IR_F32, IR_NO_AGG);
     CHECK(run(&x, TARGET_MACOS_ARM64));
-    CHECK(holds(&x, "declare i32 @printf(ptr, ...) #1\n"));
-    CHECK(holds(&x, "declare void @anti_rt_byte(i8 zeroext) #1\n"));
-    CHECK(holds(&x, "declare i64 @other.g(float) #1\n"));
+    CHECK(holds(&x, "declare noundef i32 @printf(ptr noundef, ...) #1\n"));
+    CHECK(holds(&x, "declare void @anti_rt_byte(i8 zeroext noundef) #1\n"));
+    CHECK(holds(&x, "declare noundef i64 @other.g(float noundef) #1\n"));
     CHECK(run(&x, TARGET_WINDOWS_X86_64));
-    CHECK(holds(&x, "declare i64 @_A5other_g(float) #1\n"));
+    CHECK(holds(&x, "declare noundef i64 @_A5other_g(float noundef) #1\n"));
     end(&x);
 }
 
@@ -878,7 +881,7 @@ static void entry(void)
     begin(&x);
     returns(&x, "main", IR_I64, ir_int_op(IR_I64, 3));
     CHECK(run(&x, TARGET_MACOS_ARM64));
-    CHECK(holds(&x, "define internal i64 @main.main() #0 {\n"));
+    CHECK(holds(&x, "define internal noundef i64 @main.main() #0 {\n"));
     CHECK(holds(&x, "}\n\n@anti.rt.main = alias i64 (), ptr @main.main\n"));
     CHECK(run_with(&x, TARGET_WINDOWS_X86_64, true, false));
     CHECK(holds(&x, "@_A4anti2rt_main = alias i64 (), ptr @_A4main_main\n"));
@@ -957,7 +960,8 @@ static void memory(void)
     ir_store(f, b[1], IR_I64, ir_int_op(IR_I64, 1), ir_temp_op(f, a));
     ir_ret(f, b[1], IR_I32, ir_temp_op(f, t));
     CHECK(run(&x, TARGET_LINUX_X86_64));
-    CHECK(holds(&x, "define internal i32 @main.f(ptr %p0) #0 {\n"
+    CHECK(holds(&x, "define internal noundef i32 @main.f(ptr noundef %p0) "
+                    "#0 {\n"
                     "b0:\n"
                     "  %t0 = alloca ptr, align 8\n"
                     "  %t1 = alloca ptr, align 8\n"
@@ -1319,6 +1323,64 @@ static void coerced(void)
                     "  %v7 = getelementptr i8, ptr %a1, i64 8\n"
                     "  store double %v6, ptr %v7, align 8\n"
                     "  store ptr %a1, ptr %t1, align 8\n"));
+    end(&x);
+}
+
+/* The facts of "Parameters and results" in
+   docs/work-order-llvm-optimization.md as attributes. noundef stands on a
+   scalar parameter and result and never on a coerced aggregate, whose
+   padding is undefined. A `*T` is nonnull dereferenceable(N), an own
+   pointer noalias, and the result of a function that allocates noalias.
+   A result of 8 or 16 bits extends on every definition, and on a
+   declaration of C where its convention extends it: System V x86_64 and
+   Apple arm64. */
+static void param_attributes(void)
+{
+    static const enum ir_type gap[] = {IR_I8, IR_I64};
+    struct fixture x;
+    struct ir_function *f;
+    uint32_t agg;
+
+    begin(&x);
+    agg = record(&x, "main.Gap", gap, 2);
+    f = ir_function_add(&x.m, "main", "f", IR_I8, IR_NO_AGG);
+    f->result_ext = IR_EXT_SIGN;
+    ir_param_add(f, IR_PTR, IR_NO_AGG);
+    f->params[0].nonnull = true;
+    f->params[0].deref_size = ir_sym_size_of(&x.m, ir_aggregate(agg));
+    ir_param_add(f, IR_PTR, IR_NO_AGG);
+    f->params[1].nonnull = true;
+    f->params[1].own = true;
+    ir_param_add(f, IR_AGG, agg);
+    ir_param_add(f, IR_I64, IR_NO_AGG);
+    ir_ret(f, ir_block_add(f), IR_I8, ir_int_op(IR_I8, 0));
+    f = ir_extern_add(&x.m, "anti_rt_copy_buffer", IR_PTR, false);
+    f->allocates = true;
+    ir_param_add(f, IR_PTR, IR_NO_AGG);
+    ir_param_add(f, IR_I64, IR_NO_AGG);
+    f = ir_extern_add(&x.m, "flag", IR_I8, false);
+    f->result_ext = IR_EXT_ZERO;
+    f = ir_declare_add(&x.m, "other", "small", IR_I16, IR_NO_AGG);
+    f->result_ext = IR_EXT_SIGN;
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(holds(&x, "define internal noundef signext i8 @main.f("
+                    "ptr noundef nonnull dereferenceable(16) %p0, "
+                    "ptr noalias noundef nonnull %p1, [2 x i64] %p2.0, "
+                    "i64 noundef %p3) #0 {\n"));
+    CHECK(holds(&x, "declare noalias noundef ptr @anti_rt_copy_buffer("
+                    "ptr noundef, i64 noundef) #1\n"));
+    CHECK(holds(&x, "declare noundef zeroext i8 @flag() #1\n"));
+    CHECK(holds(&x, "declare noundef signext i16 @other.small() #1\n"));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "declare noundef zeroext i8 @flag() #1\n"));
+    CHECK(run(&x, TARGET_LINUX_ARM64));
+    CHECK(holds(&x, "define internal noundef signext i8 @main.f("));
+    CHECK(holds(&x, "declare noundef i8 @flag() #1\n"));
+    CHECK(holds(&x, "declare noundef signext i16 @other.small() #1\n"));
+    CHECK(run(&x, TARGET_WINDOWS_X86_64));
+    CHECK(holds(&x, "declare noundef i8 @flag() #1\n"));
+    CHECK(run(&x, TARGET_WINDOWS_ARM64));
+    CHECK(holds(&x, "declare noundef i8 @flag() #1\n"));
     end(&x);
 }
 
@@ -1909,6 +1971,7 @@ void test_llvm_emit(void)
     sections();
     calls();
     coerced();
+    param_attributes();
     memory_classes();
     word_classes();
     vectors();

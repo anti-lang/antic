@@ -2,7 +2,7 @@ source_filename = "control_flow"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc"
 
-define i64 @_A12control_flow_choose(i8 zeroext %p0, i64 %p1, i64 %p2) #0 !dbg !12 {
+define noundef i64 @_A12control_flow_choose(i8 zeroext noundef %p0, i64 noundef %p1, i64 noundef %p2) #0 !dbg !12 {
 b0:
   %t0 = alloca i8, align 1
   %t1 = alloca i64, align 8
@@ -27,7 +27,7 @@ b2:
   ret i64 %v4
 }
 
-define i8 @_A12control_flow_spin(i8 zeroext %p0, i8 zeroext %p1) #0 !dbg !14 {
+define noundef zeroext i8 @_A12control_flow_spin(i8 zeroext noundef %p0, i8 zeroext noundef %p1) #0 !dbg !14 {
 b0:
   %t0 = alloca i8, align 1
   %t1 = alloca i8, align 1

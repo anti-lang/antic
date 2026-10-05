@@ -2,7 +2,7 @@ source_filename = "effects"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
-define hidden i8 @effects.next(ptr %p0) #0 {
+define hidden noundef zeroext i8 @effects.next(ptr noundef nonnull dereferenceable(8) %p0) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca i64, align 8
@@ -39,7 +39,7 @@ b2:
   ret i8 %v13
 }
 
-define hidden i64 @effects.value(ptr %p0) #0 {
+define hidden noundef i64 @effects.value(ptr noundef nonnull dereferenceable(8) %p0) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca i64, align 8
@@ -51,7 +51,7 @@ b0:
   ret i64 %v2
 }
 
-define hidden i64 @effects.texts(i64 %p0.0, i64 %p0.1, i64 %p1.0, i64 %p1.1) #0 {
+define hidden noundef i64 @effects.texts(i64 %p0.0, i64 %p0.1, i64 %p1.0, i64 %p1.1) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -171,7 +171,7 @@ b3:
   br i1 %v55, label %b1, label %b2
 }
 
-define hidden float @effects.halves(float %p0) #0 {
+define hidden noundef float @effects.halves(float noundef %p0) #0 {
 b0:
   %t0 = alloca float, align 4
   %t1 = alloca i16, align 2
@@ -292,7 +292,7 @@ b5:
   ret { i64, i64 } %v45
 }
 
-define hidden void @effects.hold(ptr %p0, ptr %p1) #0 {
+define hidden void @effects.hold(ptr noundef %p0, ptr noundef %p1) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -364,7 +364,7 @@ b0:
   ret void
 }
 
-define hidden void @effects.snapshot.0(i64 %p0, ptr %p1) #0 {
+define hidden void @effects.snapshot.0(i64 noundef %p0, ptr noundef %p1) #0 {
 b0:
   %t0 = alloca i64, align 8
   %t1 = alloca ptr, align 8
@@ -420,14 +420,14 @@ b0:
 @effects.package.version = hidden constant <{ [6 x i8] }> <{ [6 x i8] c"0.0.0\00" }>, align 1
 @effects.5 = hidden constant <{ [31 x i8] }> <{ [31 x i8] c"effects.anti:14: overflow in +\00" }>, align 1
 
-declare void @anti_rt_check_failed(ptr, i64, i32, i64, i64) noreturn cold #1
-declare i32 @anti_rt_same_bytes(ptr, i64, ptr, i64) memory(argmem: read) willreturn nosync nofree #1
-declare i64 @anti_rt_compare_bytes(ptr, i64, ptr, i64) memory(argmem: read) willreturn nosync nofree #1
-declare i64 @anti_rt_hash_bytes(ptr, i64) memory(argmem: read) willreturn nosync nofree #1
-declare ptr @anti_rt_grow(ptr, i64) memory(argmem: readwrite, inaccessiblemem: readwrite, errnomem: write) #1
-declare void @anti_rt_snapshot_free(ptr) #1
-declare ptr @anti_rt_snapshot_new(i64) #1
-declare void @anti_rt_snapshot_text(ptr, i64, ptr, i64) memory(argmem: readwrite, inaccessiblemem: readwrite, errnomem: write) willreturn nosync nofree #1
+declare void @anti_rt_check_failed(ptr noundef, i64 noundef, i32 noundef, i64 noundef, i64 noundef) noreturn cold #1
+declare noundef i32 @anti_rt_same_bytes(ptr noundef, i64 noundef, ptr noundef, i64 noundef) memory(argmem: read) willreturn nosync nofree #1
+declare noundef i64 @anti_rt_compare_bytes(ptr noundef, i64 noundef, ptr noundef, i64 noundef) memory(argmem: read) willreturn nosync nofree #1
+declare noundef i64 @anti_rt_hash_bytes(ptr noundef, i64 noundef) memory(argmem: read) willreturn nosync nofree #1
+declare noundef ptr @anti_rt_grow(ptr noundef, i64 noundef) memory(argmem: readwrite, inaccessiblemem: readwrite, errnomem: write) #1
+declare void @anti_rt_snapshot_free(ptr noundef) #1
+declare noundef ptr @anti_rt_snapshot_new(i64 noundef) #1
+declare void @anti_rt_snapshot_text(ptr noundef, i64 noundef, ptr noundef, i64 noundef) memory(argmem: readwrite, inaccessiblemem: readwrite, errnomem: write) willreturn nosync nofree #1
 declare { i64, i1 } @llvm.sadd.with.overflow.i64(i64, i64)
 declare i32 @anti_rt_f32_to_f16(float) memory(none) willreturn nosync nofree
 declare float @anti_rt_f16_to_f32(i32) memory(none) willreturn nosync nofree

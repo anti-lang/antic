@@ -2,7 +2,7 @@ source_filename = "floatcalls"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
 target triple = "aarch64-unknown-linux-gnu"
 
-define internal double @floatcalls.calls(ptr %p0, double %p1) #0 {
+define internal noundef double @floatcalls.calls(ptr noundef nonnull dereferenceable(1) %p0, double noundef %p1) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca double, align 8
@@ -41,7 +41,7 @@ b0:
   ret double %v19
 }
 
-define internal float @floatcalls.last(double %p0, double %p1, double %p2, double %p3, double %p4, double %p5, double %p6, double %p7, float %p8, float %p9) #0 {
+define internal noundef float @floatcalls.last(double noundef %p0, double noundef %p1, double noundef %p2, double noundef %p3, double noundef %p4, double noundef %p5, double noundef %p6, double noundef %p7, float noundef %p8, float noundef %p9) #0 {
 b0:
   %t0 = alloca double, align 8
   %t1 = alloca double, align 8
@@ -70,9 +70,9 @@ b0:
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
 
-declare i32 @printf(ptr, ...) #1
-declare double @mix(i64, double, i64, float) #1
-declare float @nine(double, double, double, double, double, double, double, double, float, float) #1
+declare noundef i32 @printf(ptr noundef, ...) #1
+declare noundef double @mix(i64 noundef, double noundef, i64 noundef, float noundef) #1
+declare noundef float @nine(double noundef, double noundef, double noundef, double noundef, double noundef, double noundef, double noundef, double noundef, float noundef, float noundef) #1
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="generic" "target-features"="+fp-armv8,+neon,+v8a,-fmv" }
 attributes #1 = { nounwind }

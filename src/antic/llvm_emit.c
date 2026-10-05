@@ -1958,11 +1958,36 @@ static const char *extension(enum ir_type type, enum ir_ext ext)
                                 : "";
 }
 
+/* DESIGN: the facts of a parameter as attributes, as "Parameters and
+   results" in docs/work-order-llvm-optimization.md gives them. A scalar
+   is noundef, an own pointer noalias, and a `*T` nonnull and
+   dereferenceable for the size of T where that size is not zero. A
+   coerced aggregate, a vector and a parameter in memory take none of
+   them: the words of an aggregate may hold its padding, whose bytes are
+   undefined, and clang leaves them out as well. */
+static void param_facts(struct emitter *e, const struct ir_param *param,
+                        const struct abi_param *p, struct text *head)
+{
+    uint64_t size = 0;
+
+    if (p->kind != ABI_DIRECT) {
+        return;
+    }
+    text_append(head, param->own ? " noalias" : "");
+    text_append(head, " noundef");
+    text_append(head, param->nonnull ? " nonnull" : "");
+    if (param->deref_size != IR_NO_INDEX &&
+        layout_fold(e->l, param->deref_size, &size) && size > 0) {
+        text_appendf(head, " dereferenceable(%" PRIu64 ")", size);
+    }
+}
+
 /* Append to head the parameters of f as c classifies them, with their
    attributes and, when names is set, the names %sret, %p<i> and
    %p<i>.<k>. Append their types alone to types. */
-static void parameters(const struct ir_function *f, const struct classified *c,
-                       bool names, struct text *head, struct text *types)
+static void parameters(struct emitter *e, const struct ir_function *f,
+                       const struct classified *c, bool names,
+                       struct text *head, struct text *types)
 {
     size_t i;
     size_t k;
@@ -1988,6 +2013,7 @@ static void parameters(const struct ir_function *f, const struct classified *c,
                                  ? extension(f->params[i].type,
                                              f->params[i].ext)
                                  : "");
+                param_facts(e, &f->params[i], p, head);
             }
             if (names && p->kind == ABI_COERCE) {
                 text_appendf(head, " %%p%zu.%zu", i, k);
@@ -2491,6 +2517,43 @@ static void instruction(struct emitter *e, const struct ir_inst *inst)
     text_free(&value);
 }
 
+/* DESIGN: a result of 8 or 16 bits extends where its callee extends it.
+   antic extends it in every function it defines, so a definition and a
+   declaration of another module write the extension the signature
+   records. A function of C extends it where its convention says so,
+   System V x86_64 and Apple arm64, where clang writes it too. AAPCS64 of
+   Linux and both Windows conventions leave the upper bits to the caller,
+   so a declaration of C there writes none, and the caller extends what it
+   reads. */
+static bool result_extends(const struct emitter *e,
+                           const struct ir_function *f)
+{
+    enum convention convention = target_info(e->o->target)->convention;
+
+    return !f->is_extern || f->module != NULL ||
+           convention == CONVENTION_SYSV ||
+           convention == CONVENTION_APPLE_ARM64;
+}
+
+/* The attributes of the result r of f, each followed by a space: noalias
+   on the result of a function that allocates, noundef on a scalar and
+   the extension of a result of 8 or 16 bits. */
+static void result_facts(struct emitter *e, const struct ir_function *f,
+                         const struct abi_param *r)
+{
+    if (r->kind != ABI_DIRECT || f->result == IR_VOID) {
+        return;
+    }
+    text_append(e->out, f->allocates ? "noalias " : "");
+    text_append(e->out, "noundef ");
+    if (result_extends(e, f) &&
+        (f->result == IR_I8 || f->result == IR_I16)) {
+        text_append(e->out, f->result_ext == IR_EXT_SIGN   ? "signext "
+                            : f->result_ext == IR_EXT_ZERO ? "zeroext "
+                                                           : "");
+    }
+}
+
 /* The result type, the name and the parameters of f in parentheses, as
    abi_classify gives them, with the names of the parameters when names
    is set. The function type goes to type unless it is NULL. Returns
@@ -2505,7 +2568,8 @@ static bool signature(struct emitter *e, const struct ir_function *f,
 
     classify(e, f, &c);
     result_type(&result, &c.result);
-    parameters(f, &c, names, &head, &types);
+    parameters(e, f, &c, names, &head, &types);
+    result_facts(e, f, &c.result);
     text_appendf(e->out, "%s ", text_cstr(&result));
     function_name(e->out, e->o->target, f);
     text_appendf(e->out, "(%s)", text_cstr(&head));

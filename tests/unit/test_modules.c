@@ -245,8 +245,10 @@ static void lowers_imports(void)
     }
     ir_print(&out, &ir);
     CHECK_STR(text_cstr(&out),
+              "type geometry.Rect = struct { w: i64, h: i64 }\n"
               "extern fn geometry.make() -> ptr\n"
-              "extern fn geometry.release(ptr)\n"
+              "extern fn geometry.release(ptr nonnull "
+              "deref(size_of geometry.Rect))\n"
               "extern fn putchar(i32) -> i32\n"
               "extern fn geometry.area(i64, i64) -> i64\n"
               "fn main.main() -> i64 {\n"
@@ -317,7 +319,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 78, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 79, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -350,9 +352,10 @@ static const uint8_t scale_antl[] = {
     1, 0, 0, 0,                                     /* functions */
     0, 0, 5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',      /* flags, effects */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* scale.scale */
-    4, 255, 255, 255, 255,                          /* -> i64 */
+    4, 255, 255, 255, 255, 0,                       /* -> i64 */
     0, 0, 0, 0, 2, 0, 0, 0,                         /* file 0, line 2 */
     1, 0, 0, 0, 4, 0, 255, 255, 255, 255,           /* one i64 parameter */
+    0, 255, 255, 255, 255,                          /* with no facts */
     2, 0, 0, 0, 4, 4,                               /* temporaries */
     1, 0, 0, 0,                                     /* blocks */
     0,                                              /* not an assert arm */
@@ -1548,13 +1551,16 @@ static void damaged_files(void)
     /* Where the fields a poke below reaches sit, counted back from the
        end of the file. First the classes, two instructions of 53 bytes
        each and the 15 bytes that open the body. Then the one parameter of
-       the signature, its count, the source of the function and its
-       result. */
+       the signature with its facts, its count, the source of the function
+       and its result with its extension. */
     enum {
         TAIL = 4 + 2 * 53 + 15,
         MUL_OPERAND = 4 + 2 * 53 - 12,
-        PARAM_EXT = TAIL + 4 + 1,
-        RESULT_AGG = TAIL + 6 + 4 + 8 + 4,
+        PARAM_FACTS = TAIL + 4 + 1,
+        PARAM_DEREF = TAIL + 4,
+        PARAM_EXT = PARAM_FACTS + 4 + 1,
+        RESULT_EXT = TAIL + 11 + 4 + 8 + 1,
+        RESULT_AGG = RESULT_EXT + 4,
         /* The memory effects of the function, before its module and its
            name, each a count and five bytes, and its result type. */
         FN_EFFECTS = RESULT_AGG + 1 + 2 * 9 + 1,
@@ -1567,9 +1573,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 79;
+    copy[4] = 80;
     refuses_file(copy, sizeof copy,
-                 "has format version 79, and antic reads version 78");
+                 "has format version 80, and antic reads version 79");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -1591,8 +1597,9 @@ static void damaged_files(void)
     text_free(&good);
     copy[sizeof copy - FN_EFFECTS] = 8 << 2;
     refuses_file(copy, sizeof copy, NULL);
-    /* The flags of a function, right before its effects, take six bits,
-       the last of them the mark that it writes tables. */
+    /* The flags of a function, right before its effects, take seven
+       bits. The sixth marks that it writes tables, and the seventh that
+       it allocates, which a C function alone does. */
     memcpy(copy, scale_antl, sizeof copy);
     copy[sizeof copy - FN_EFFECTS - 1] |= 32;
     text_append_bytes(&good, (const char *)copy, sizeof copy);
@@ -1600,9 +1607,22 @@ static void damaged_files(void)
     text_free(&good);
     copy[sizeof copy - FN_EFFECTS - 1] |= 64;
     refuses_file(copy, sizeof copy, NULL);
-    /* Only a parameter of 8 or 16 bits extends. */
+    copy[sizeof copy - FN_EFFECTS - 1] = 128;
+    refuses_file(copy, sizeof copy, NULL);
+    /* Only a parameter or a result of 8 or 16 bits extends. */
     memcpy(copy, scale_antl, sizeof copy);
     copy[sizeof copy - PARAM_EXT] = IR_EXT_SIGN;
+    refuses_file(copy, sizeof copy, NULL);
+    memcpy(copy, scale_antl, sizeof copy);
+    copy[sizeof copy - RESULT_EXT] = IR_EXT_SIGN;
+    refuses_file(copy, sizeof copy, NULL);
+    /* The facts of a pointer stand on a pointer alone, and a
+       dereferenceable size needs nonnull. */
+    memcpy(copy, scale_antl, sizeof copy);
+    copy[sizeof copy - PARAM_FACTS] = 1;
+    refuses_file(copy, sizeof copy, NULL);
+    memcpy(copy, scale_antl, sizeof copy);
+    memset(copy + sizeof copy - PARAM_DEREF, 0, 4);
     refuses_file(copy, sizeof copy, NULL);
     /* The temporary of the mul instruction points past the temporaries. */
     memcpy(copy, scale_antl, sizeof copy);

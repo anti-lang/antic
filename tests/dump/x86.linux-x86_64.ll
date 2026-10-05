@@ -2,7 +2,7 @@ source_filename = "x86"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
-define internal i64 @x86.div(i64 %p0, i64 %p1) #0 {
+define internal noundef i64 @x86.div(i64 noundef %p0, i64 noundef %p1) #0 {
 b0:
   %t0 = alloca i64, align 8
   %t1 = alloca i64, align 8
@@ -38,7 +38,7 @@ b0:
   ret i64 %v20
 }
 
-define internal i32 @x86.ushift(i32 %p0, i32 %p1) #0 {
+define internal noundef i32 @x86.ushift(i32 noundef %p0, i32 noundef %p1) #0 {
 b0:
   %t0 = alloca i32, align 4
   %t1 = alloca i32, align 4
@@ -67,7 +67,7 @@ b0:
   ret i32 %v13
 }
 
-define internal i64 @x86.bytes(i8 zeroext %p0, i8 signext %p1) #0 {
+define internal noundef i64 @x86.bytes(i8 zeroext noundef %p0, i8 signext noundef %p1) #0 {
 b0:
   %t0 = alloca i8, align 1
   %t1 = alloca i8, align 1
@@ -98,7 +98,7 @@ b0:
   ret i64 %v11
 }
 
-define internal i16 @x86.narrow(i16 signext %p0, i16 signext %p1) #0 {
+define internal noundef signext i16 @x86.narrow(i16 signext noundef %p0, i16 signext noundef %p1) #0 {
 b0:
   %t0 = alloca i16, align 2
   %t1 = alloca i16, align 2
@@ -164,7 +164,7 @@ b2:
   ret i16 %v36
 }
 
-define internal i64 @x86.shifts(i64 %p0, i64 %p1) #0 {
+define internal noundef i64 @x86.shifts(i64 noundef %p0, i64 noundef %p1) #0 {
 b0:
   %t0 = alloca i64, align 8
   %t1 = alloca i64, align 8

@@ -2,7 +2,7 @@ source_filename = "cell"
 target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32"
 target triple = "arm64-apple-macos11.0"
 
-define internal i64 @cell.cell(i64 %p0, i64 %p1) #0 {
+define internal noundef i64 @cell.cell(i64 noundef %p0, i64 noundef %p1) #0 {
 b0:
   %t0 = alloca i64, align 8
   %t1 = alloca i64, align 8

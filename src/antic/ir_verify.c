@@ -160,6 +160,44 @@ static bool params_ok(struct verifier *v)
     return ok;
 }
 
+/* The facts of the signature, which the LLVM text writes as attributes:
+   an extension on a result of 8 or 16 bits, allocates on the pointer
+   result of a C function, and the facts of a pointer on a pointer
+   parameter, where a dereferenceable size needs nonnull. */
+static void facts_ok(struct verifier *v)
+{
+    const struct ir_function *f = v->f;
+    size_t i;
+
+    if (f->result_ext != IR_EXT_NONE && f->result != IR_I8 &&
+        f->result != IR_I16) {
+        fail(v, "the result is %s and has an extension",
+             ir_type_name(f->result));
+    }
+    if (f->allocates && f->result != IR_PTR) {
+        fail(v, "the result is %s and allocates", ir_type_name(f->result));
+    }
+    if (f->allocates && !f->is_extern) {
+        fail(v, "a function with a body allocates");
+    }
+    for (i = 0; i < f->param_count; i++) {
+        const struct ir_param *p = &f->params[i];
+        if (p->deref_size != IR_NO_INDEX && !p->nonnull) {
+            fail(v, "parameter %zu is dereferenceable and may be none", i);
+        }
+        if (p->type != IR_PTR &&
+            (p->nonnull || p->own || p->deref_size != IR_NO_INDEX)) {
+            fail(v, "parameter %zu is %s and has a fact of a pointer", i,
+                 ir_type_name(p->type));
+        }
+        if (p->deref_size != IR_NO_INDEX && p->deref_size >= v->m->sym_count) {
+            fail(v, "parameter %zu is dereferenceable by a symbolic value "
+                    "that does not exist",
+                 i);
+        }
+    }
+}
+
 /* A jump or a branch goes to a block, which the optimizer and the
    analysis of the definitions index with. */
 static void target_ok(struct verifier *v, const struct ir_inst *inst,
@@ -617,6 +655,7 @@ bool ir_verify(const struct ir_module *m, struct text *errors)
     for (i = 0; i < m->function_count; i++) {
         v.f = m->functions[i];
         v.b = NULL;
+        facts_ok(&v);
         if (v.f->is_extern) {
             continue;
         }

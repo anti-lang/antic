@@ -2,7 +2,7 @@ source_filename = "control_flow"
 target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32"
 target triple = "arm64-apple-macos11.0"
 
-define internal i64 @control_flow.choose(i8 zeroext %p0, i64 %p1, i64 %p2) #0 {
+define internal noundef i64 @control_flow.choose(i8 zeroext noundef %p0, i64 noundef %p1, i64 noundef %p2) #0 {
 b0:
   %t0 = alloca i8, align 1
   %t1 = alloca i64, align 8
@@ -27,7 +27,7 @@ b2:
   ret i64 %v4
 }
 
-define internal i8 @control_flow.spin(i8 zeroext %p0, i8 zeroext %p1) #0 {
+define internal noundef zeroext i8 @control_flow.spin(i8 zeroext noundef %p0, i8 zeroext noundef %p1) #0 {
 b0:
   %t0 = alloca i8, align 1
   %t1 = alloca i8, align 1

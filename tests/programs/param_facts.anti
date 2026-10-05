@@ -1,0 +1,127 @@
+//! The facts of parameters and results in a release build, each at the edge of
+//! what the language guarantees. A `*T` is dereferenceable for the size of T
+//! and no more: `corner` gets the last element of a block of four and reads it
+//! only when asked. An `own` pointer is the one holder of what it points at
+//! until the function stores it: `adopt` stores the node in a holder and then
+//! writes it through both. The result of `dup` is new memory, which the program
+//! writes beside the original. A result of 8 or 16 bits keeps its value at each
+//! end of its range, through a call that recursion keeps a call.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+class Node
+{
+	pub v: int = 0,
+}
+
+class Holder
+{
+	pub own node: ?*Node = none,
+}
+
+fn corner(p: *Point, read: bool) -> int
+{
+	if read {
+		return p.x + p.y;
+	}
+	return 1;
+}
+
+fn adopt(h: *Holder, own n: *Node) -> int
+{
+	h.node = n;
+	n.v = 1;
+	let m = h.node else {
+		return -1;
+	};
+	m.v = m.v + 10;
+	return n.v;
+}
+
+fn keep_i8(n: int, v: i8) -> i8
+{
+	if n == 0 {
+		return v;
+	}
+	let r = keep_i8(n - 1, v);
+	return r;
+}
+
+fn keep_u8(n: int, v: u8) -> u8
+{
+	if n == 0 {
+		return v;
+	}
+	let r = keep_u8(n - 1, v);
+	return r;
+}
+
+fn keep_i16(n: int, v: i16) -> i16
+{
+	if n == 0 {
+		return v;
+	}
+	let r = keep_i16(n - 1, v);
+	return r;
+}
+
+fn keep_u16(n: int, v: u16) -> u16
+{
+	if n == 0 {
+		return v;
+	}
+	let r = keep_u16(n - 1, v);
+	return r;
+}
+
+fn keep_bool(n: int, v: bool) -> bool
+{
+	if n == 0 {
+		return v;
+	}
+	let r = keep_bool(n - 1, v);
+	return r;
+}
+
+fn main() -> int
+{
+	let points = alloc(Point, 4) else {
+		return 1;
+	};
+	for i in 0..4 {
+		points[i] = Point { x: i, y: i * 2 };
+	}
+	let total = 0;
+	for i in 0..1000 {
+		total = total + corner(&points[3], i % 100 == 0);
+	}
+	printf("corner %lld\n".ptr, total);
+	free(points);
+
+	let h = alloc Holder { };
+	printf("adopt %lld\n".ptr, adopt(h, alloc Node { v: 5 }));
+	delete(h);
+
+	let a = alloc Node { v: 5 };
+	let b = dup(a);
+	b.v = 7;
+	a.v = a.v + 1;
+	printf("dup %lld %lld\n".ptr, a.v, b.v);
+	delete(a);
+	delete(b);
+
+	printf("i8 %lld %lld\n".ptr, keep_i8(3, -128) as int, keep_i8(3, 127) as int);
+	printf("u8 %lld\n".ptr, keep_u8(3, 255) as int);
+	printf("i16 %lld %lld\n".ptr, keep_i16(3, -32768) as int,
+		keep_i16(3, 32767) as int);
+	printf("u16 %lld\n".ptr, keep_u16(3, 65535) as int);
+	printf("bool %d %d\n".ptr, keep_bool(3, true) as c_int,
+		keep_bool(3, false) as c_int);
+	return 0;
+}

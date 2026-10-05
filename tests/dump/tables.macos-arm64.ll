@@ -2,7 +2,7 @@ source_filename = "tables"
 target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32"
 target triple = "arm64-apple-macos11.0"
 
-define internal i64 @tables.Circle.area(ptr %p0) #0 {
+define internal noundef i64 @tables.Circle.area(ptr noundef nonnull dereferenceable(16) %p0) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -22,7 +22,7 @@ b0:
   ret i64 %v6
 }
 
-define internal i64 @tables.measure(ptr %p0) #0 {
+define internal noundef i64 @tables.measure(ptr noundef nonnull dereferenceable(16) %p0) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -47,7 +47,7 @@ b0:
   ret i64 %v9
 }
 
-define internal i64 @tables.main() #0 {
+define internal noundef i64 @tables.main() #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca i8, align 1
@@ -114,7 +114,7 @@ b2:
   ret i64 %v28
 }
 
-define internal i8 @tables.Circle.equals(ptr %p0, ptr %p1) #0 {
+define internal noundef i8 @tables.Circle.equals(ptr noundef %p0, ptr noundef %p1) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -197,7 +197,7 @@ b5:
   br i1 %v35, label %b2, label %b1
 }
 
-define internal i64 @tables.Circle.hash(ptr %p0) #0 {
+define internal noundef i64 @tables.Circle.hash(ptr noundef %p0) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -293,7 +293,7 @@ b0:
   ret i64 %v50
 }
 
-define internal void @tables.Circle.destroy(ptr %p0, ptr %p1) #0 {
+define internal void @tables.Circle.destroy(ptr noundef %p0, ptr noundef %p1) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -304,7 +304,7 @@ b0:
   ret void
 }
 
-define internal void @tables.Circle.copy(ptr %p0, ptr %p1) #0 {
+define internal void @tables.Circle.copy(ptr noundef %p0, ptr noundef %p1) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -359,24 +359,24 @@ b0:
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
 
-declare [2 x i64] @anti_lang_Object_type_name(ptr) #1
-declare [2 x i64] @anti_lang_Object_to_text(ptr) #1
-declare void @anti_lang_Object_serialize(ptr, ptr) #1
-declare void @anti_lang_Object_created(ptr) #1
-declare void @anti_lang_Object_destroyed(ptr) #1
-declare void @anti_lang_Object_copied(ptr, ptr) #1
-declare void @anti_lang_Object_dispatched(ptr) #1
-declare void @anti_lang_Object_joined(ptr) #1
-declare void @anti_lang_Object_enter(ptr, [2 x i64]) #1
-declare void @anti_lang_Object_leave(ptr, [2 x i64]) #1
-declare void @anti_lang_Object_failed(ptr, [2 x i64], ptr) #1
-declare void @anti_lang_Object_changed(ptr, ptr) #1
-declare void @anti_rt_hook(ptr, i64) #1
-declare ptr @anti_rt_descriptor(ptr) #1
-declare i64 @tables.fn.0(ptr) #1
-declare ptr @malloc(i64) #1
-declare void @anti_rt_out_of_memory(i64) noreturn cold #1
-declare void @anti_rt_delete(ptr, ptr) #1
+declare [2 x i64] @anti_lang_Object_type_name(ptr noundef nonnull dereferenceable(8)) #1
+declare [2 x i64] @anti_lang_Object_to_text(ptr noundef nonnull dereferenceable(8)) #1
+declare void @anti_lang_Object_serialize(ptr noundef nonnull dereferenceable(8), ptr noundef nonnull dereferenceable(8)) #1
+declare void @anti_lang_Object_created(ptr noundef nonnull dereferenceable(8)) #1
+declare void @anti_lang_Object_destroyed(ptr noundef nonnull dereferenceable(8)) #1
+declare void @anti_lang_Object_copied(ptr noundef nonnull dereferenceable(8), ptr noundef nonnull dereferenceable(8)) #1
+declare void @anti_lang_Object_dispatched(ptr noundef nonnull dereferenceable(8)) #1
+declare void @anti_lang_Object_joined(ptr noundef nonnull dereferenceable(8)) #1
+declare void @anti_lang_Object_enter(ptr noundef nonnull dereferenceable(8), [2 x i64]) #1
+declare void @anti_lang_Object_leave(ptr noundef nonnull dereferenceable(8), [2 x i64]) #1
+declare void @anti_lang_Object_failed(ptr noundef nonnull dereferenceable(8), [2 x i64], ptr noundef nonnull dereferenceable(8)) #1
+declare void @anti_lang_Object_changed(ptr noundef nonnull dereferenceable(8), ptr noundef nonnull dereferenceable(48)) #1
+declare void @anti_rt_hook(ptr noundef, i64 noundef) #1
+declare noundef ptr @anti_rt_descriptor(ptr noundef) #1
+declare noundef i64 @tables.fn.0(ptr noundef nonnull dereferenceable(16)) #1
+declare noundef ptr @malloc(i64 noundef) #1
+declare void @anti_rt_out_of_memory(i64 noundef) noreturn cold #1
+declare void @anti_rt_delete(ptr noundef, ptr noundef) #1
 declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="generic" "target-features"="+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fullfp16,+jsconv,+lse,+neon,+pauth,+predres,+ras,+rcpc,+rdm,+sb,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8a,-fmv" }

@@ -676,9 +676,10 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
     const char *name = antl_get_cstr(r);
     uint8_t result = antl_get_u8(r);
     uint32_t result_agg = read_agg_ref(r, program, maps, result);
+    uint8_t result_ext = antl_get_u8(r);
     uint32_t file = antl_get_u32(r);
     uint32_t decl_line = antl_get_u32(r);
-    uint32_t param_count = antl_get_count(r, 6);
+    uint32_t param_count = antl_get_count(r, 11);
     struct ir_function *f = NULL;
     size_t i;
 
@@ -687,7 +688,10 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
     if (r->failed) {
         return 0;
     }
-    if (!valid_type(result) || flags > 63 || effects >> 2 > IR_GUARANTEES ||
+    if (!valid_type(result) || flags > 127 || effects >> 2 > IR_GUARANTEES ||
+        result_ext > IR_EXT_ZERO ||
+        (result_ext != IR_EXT_NONE && result != IR_I8 && result != IR_I16) ||
+        ((flags & 64) != 0 && (module[0] != '\0' || result != IR_PTR)) ||
         ((flags & 1) == 0 && module[0] == '\0') ||
         (module[0] != '\0' && (flags & 2) != 0) ||
         (module[0] == '\0' && (flags & 4) != 0)) {
@@ -734,6 +738,10 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
        verifier refuses for a function that never returns. */
     if (f != NULL) {
         f->never_returns = f->never_returns && (flags & 16) != 0;
+        f->allocates = f->allocates && (flags & 64) != 0;
+        if (f->result_ext != (enum ir_ext)result_ext) {
+            f->result_ext = IR_EXT_NONE;
+        }
         merge_effects(f, effects);
         f->writes_tables = f->writes_tables || (flags & 32) != 0;
     }
@@ -756,6 +764,8 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
         }
         f->never_returns = (flags & 16) != 0;
         f->writes_tables = (flags & 32) != 0;
+        f->allocates = (flags & 64) != 0;
+        f->result_ext = (enum ir_ext)result_ext;
         f->effects = (enum ir_effects)(effects & 3);
         f->guarantees = (uint8_t)(effects >> 2);
         f->exported = (flags & 4) != 0;
@@ -766,13 +776,24 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
             uint8_t type = antl_get_u8(r);
             uint8_t ext = antl_get_u8(r);
             uint32_t agg = read_agg_ref(r, program, maps, type);
+            uint8_t facts = antl_get_u8(r);
+            uint32_t deref = antl_get_u32(r);
             bool narrow = type == IR_I8 || type == IR_I16;
             if (!valid_type(type) || type == IR_VOID || ext > IR_EXT_ZERO ||
-                (ext != IR_EXT_NONE) != narrow) {
+                (ext != IR_EXT_NONE) != narrow || facts > 3 ||
+                (facts != 0 && type != IR_PTR) ||
+                (deref != IR_NO_INDEX && (facts & 1) == 0)) {
                 antl_damaged(r);
             } else {
+                struct ir_param *p;
                 ir_param_add(f, (enum ir_type)type, agg);
-                f->params[f->param_count - 1].ext = (enum ir_ext)ext;
+                p = &f->params[f->param_count - 1];
+                p->ext = (enum ir_ext)ext;
+                p->nonnull = (facts & 1) != 0;
+                p->own = (facts & 2) != 0;
+                if (deref != IR_NO_INDEX) {
+                    p->deref_size = map_sym(r, program, maps, deref);
+                }
             }
         }
     } else {
@@ -780,6 +801,8 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
             uint8_t type = antl_get_u8(r);
             antl_get_u8(r);
             read_agg_ref(r, program, maps, type);
+            antl_get_u8(r);
+            antl_get_u32(r);
         }
     }
     return f->index;

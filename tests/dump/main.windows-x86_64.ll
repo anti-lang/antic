@@ -2,7 +2,7 @@ source_filename = "main"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc"
 
-define internal i64 @_A4main_scale(i64 %p0) #0 !dbg !12 {
+define internal noundef i64 @_A4main_scale(i64 noundef %p0) #0 !dbg !12 {
 b0:
   %t0 = alloca i64, align 8
   %t1 = alloca i64, align 8
@@ -14,7 +14,7 @@ b0:
   ret i64 %v2
 }
 
-define internal i64 @_A4main_main() #0 !dbg !14 {
+define internal noundef i64 @_A4main_main() #0 !dbg !14 {
 b0:
   %t0 = alloca i64, align 8
   %v0 = call i64 (i64) @_A4main_scale(i64 7), !dbg !15

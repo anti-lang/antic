@@ -9,7 +9,7 @@ global forward.Point.fields [2]anti.rt.Field { anti.rt.Field { @forward.2, i64 1
 global forward.package.version size 6 align 1 bytes 30 2e 30 2e 30 00
 global forward.6 size 31 align 1 bytes 66 6f 72 77 61 72 64 2e 61 6e 74 69 3a 31 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
 global forward.7 size 31 align 1 bytes 66 6f 72 77 61 72 64 2e 61 6e 74 69 3a 31 39 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
-fn forward.twice(%0: ptr) -> i64 {
+fn forward.twice(%0: ptr nonnull deref(size_of forward.Point)) -> i64 {
 b0:
     %1 = ptradd %0, offset_of forward.Point.y
     %2 = load i64 %1
@@ -24,7 +24,7 @@ b1:
 b2:
     ret i64 %5
 }
-fn forward.round_trip(%0: ptr, %1: i64) -> i64 {
+fn forward.round_trip(%0: ptr nonnull deref(size_of forward.Point), %1: i64) -> i64 {
 b0:
     store i64 %1, %0
     %2 = load i64 %0

@@ -125,7 +125,7 @@ global probe.96 size 9 align 1 bytes 42 72 65 61 6b 73 2e 62 00
 global probe.97 size 9 align 1 bytes 42 72 65 61 6b 73 2e 63 00
 global probe.98 probe.Breaks { i8 1, -, i8 2, -, i8 3 }
 global probe.99 size 29 align 1 bytes 42 72 65 61 6b 73 2e 63 6f 6e 73 74 20 61 20 25 64 20 62 20 25 64 20 63 20 25 64 0a 00
-fn probe.clear(%0: ptr, %1: i64) {
+fn probe.clear(%0: ptr nonnull deref(size_of i8), %1: i64) {
 b0:
     %2 = copy i64 0
     jump b1
@@ -148,7 +148,7 @@ b5:
     %2 = copy i64 %6
     jump b1
 }
-fn probe.dump(%0: agg str, %1: ptr, %2: i64) {
+fn probe.dump(%0: agg str, %1: ptr nonnull deref(size_of i8), %2: i64) {
 b0:
     %3 = slot str
     %11 = slot str

@@ -2,7 +2,7 @@ source_filename = "floats"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
-define internal double @floats.keep(ptr %p0, double %p1, float %p2) #0 {
+define internal noundef double @floats.keep(ptr noundef nonnull dereferenceable(4) %p0, double noundef %p1, float noundef %p2) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca double, align 8
@@ -68,7 +68,7 @@ b3:
   br i1 %v28, label %b1, label %b2
 }
 
-define internal i64 @floats.convert(i8 signext %p0, i64 %p1, double %p2, float %p3) #0 {
+define internal noundef i64 @floats.convert(i8 signext noundef %p0, i64 noundef %p1, double noundef %p2, float noundef %p3) #0 {
 b0:
   %t0 = alloca i8, align 1
   %t1 = alloca i64, align 8

@@ -2,7 +2,7 @@ source_filename = "strings"
 target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32"
 target triple = "arm64-apple-macos11.0"
 
-define internal [2 x i64] @strings.tail([2 x i64] %p0.0, i64 %p1) #0 {
+define internal [2 x i64] @strings.tail([2 x i64] %p0.0, i64 noundef %p1) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca i64, align 8
@@ -52,7 +52,7 @@ b0:
   ret [2 x i64] %v19
 }
 
-define internal i64 @strings.main() #0 {
+define internal noundef i64 @strings.main() #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -116,7 +116,7 @@ b0:
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
 
-declare i32 @puts(ptr) #1
+declare noundef i32 @puts(ptr noundef) #1
 declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="generic" "target-features"="+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fullfp16,+jsconv,+lse,+neon,+pauth,+predres,+ras,+rcpc,+rdm,+sb,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8a,-fmv" }

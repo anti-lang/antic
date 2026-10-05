@@ -2,7 +2,7 @@ source_filename = "main"
 target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32"
 target triple = "arm64-apple-macos11.0"
 
-define internal i64 @main.scale(i64 %p0) #0 {
+define internal noundef i64 @main.scale(i64 noundef %p0) #0 {
 b0:
   %t0 = alloca i64, align 8
   %t1 = alloca i64, align 8
@@ -14,7 +14,7 @@ b0:
   ret i64 %v2
 }
 
-define internal i64 @main.main() #0 {
+define internal noundef i64 @main.main() #0 {
 b0:
   %t0 = alloca i64, align 8
   %v0 = call i64 (i64) @main.scale(i64 7)

@@ -2,7 +2,7 @@ source_filename = "sizes"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
-define internal i64 @sizes.main() #0 {
+define internal noundef i64 @sizes.main() #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca i64, align 8
@@ -91,7 +91,7 @@ b6:
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
 
-declare i32 @printf(ptr, ...) #1
+declare noundef i32 @printf(ptr noundef, ...) #1
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="x86-64-v3" "target-features"="+avx,+avx2,+bmi,+bmi2,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fxsr,+lzcnt,+mmx,+movbe,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave" }
 attributes #1 = { nounwind }

@@ -305,9 +305,7 @@ void lower_class_construct(struct lowerer *l, const struct item *it)
                         lower_ir_type_of(sig->result), IR_NO_AGG);
     text_free(&name);
     f->exported = true;
-    for (i = 0; i < sig->param_count; i++) {
-        lower_add_param(l, f, sig->params[i]);
-    }
+    lower_add_params(l, f, sig, m->symbol);
     l->f = f;
     l->b = ir_block_add(f);
     self = lower_temp(l, f->params[0].temp);
@@ -399,9 +397,10 @@ struct ir_function *lower_interface_thunk(struct lowerer *l,
                         lower_result_agg(l, sig->result));
     text_free(&name);
     f->result_agg = lower_result_agg(l, sig->result);
-    for (i = 0; i < sig->param_count; i++) {
-        lower_add_param(l, f, sig->params[i]);
-    }
+    lower_add_params(l, f, sig, fn->symbol);
+    /* The thunk takes the address of the sub-object, which the size of
+       the class does not measure. */
+    f->params[0].deref_size = IR_NO_INDEX;
     entry = ir_block_add(f);
     l->f = f;
     l->b = entry;
@@ -471,9 +470,10 @@ struct ir_function *lower_reach_thunk(struct lowerer *l,
                         lower_result_agg(l, sig->result));
     text_free(&name);
     f->result_agg = lower_result_agg(l, sig->result);
-    for (i = 0; i < sig->param_count; i++) {
-        lower_add_param(l, f, sig->params[i]);
-    }
+    lower_add_params(l, f, sig, sym);
+    /* As for a thunk, the first parameter is the address of a part of
+       the object. */
+    f->params[0].deref_size = IR_NO_INDEX;
     l->f = f;
     l->b = ir_block_add(f);
     args = alloc_zeroed(f->param_count + 1, sizeof *args);

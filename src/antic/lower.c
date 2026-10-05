@@ -365,7 +365,9 @@ static enum ir_ext param_ext(const struct type *t)
 }
 
 /* A parameter of 8 or 16 bits records whether it is signed, and an
-   aggregate its layout.
+   aggregate its layout. A `*T` records that it is never `none` and the
+   size of T, which "Nullable pointers" of docs/anti-language-additions.md
+   guarantees.
    DESIGN: a parameter that does not keep its argument is two parameters
    of the IR, the code and then the context. C passes a callback and its
    `void *` so. Every convention then passes two pointers, where a struct
@@ -374,6 +376,7 @@ void lower_add_param(struct lowerer *l, struct ir_function *f,
                      const struct type *t)
 {
     enum ir_type type = lower_ir_type_of(t);
+    struct ir_param *p;
 
     if (lower_is_context(t)) {
         ir_param_add(f, IR_PTR, IR_NO_AGG);
@@ -381,7 +384,57 @@ void lower_add_param(struct lowerer *l, struct ir_function *f,
         return;
     }
     ir_param_add(f, type, lower_result_agg(l, t));
-    f->params[f->param_count - 1].ext = param_ext(t);
+    p = &f->params[f->param_count - 1];
+    p->ext = param_ext(t);
+    if (t->kind == TYPE_POINTER && !t->nullable) {
+        struct ir_vtype pointee = lower_vtype_of(l, t->element);
+        p->nonnull = true;
+        if (pointee.type != IR_VOID) {
+            p->deref_size = ir_sym_size_of(l->m, pointee);
+        }
+    }
+}
+
+/* The parameters of the function type t, the result extension of its
+   result, and the mark of each `own` pointer parameter of sym. The flags
+   of sym count `self` and each parameter once, and a parameter with its
+   context is two of the IR. */
+void lower_add_params(struct lowerer *l, struct ir_function *f,
+                      const struct type *t, const struct symbol *sym)
+{
+    size_t i;
+
+    f->result_ext = param_ext(t->result);
+    for (i = 0; i < t->param_count; i++) {
+        lower_add_param(l, f, t->params[i]);
+        if (sym != NULL && sym->owned != NULL && i < sym->owned_count &&
+            sym->owned[i] && t->params[i]->kind == TYPE_POINTER) {
+            f->params[f->param_count - 1].own = true;
+        }
+    }
+}
+
+/* DESIGN: the C functions that give fresh memory, or none, and keep no
+   other pointer to it, which "Parameters and results" in
+   docs/work-order-llvm-optimization.md names. The LLVM text marks their
+   result noalias. anti_rt_dup fills the new object through the copy entry
+   of its class, which fills the fields of the object alone, and the
+   `copied` hook runs after the call. */
+static const char *const allocating_functions[] = {
+    "anti_rt_copy_buffer", "anti_rt_dup", "anti_rt_mem_alloc"};
+
+/* Mark the C function f allocates when it is one of them. */
+void lower_mark_allocates(struct ir_function *f)
+{
+    size_t i;
+
+    for (i = 0; i < sizeof allocating_functions / sizeof *allocating_functions;
+         i++) {
+        if (strcmp(f->name, allocating_functions[i]) == 0 &&
+            f->result == IR_PTR) {
+            f->allocates = true;
+        }
+    }
 }
 
 /* Append to args the operands that pass value to a parameter of type
@@ -441,7 +494,6 @@ struct ir_function *lower_callee_function(struct lowerer *l,
     const char *module;
     char *name;
     struct ir_function *f;
-    size_t i;
 
     /* DESIGN: a function of the root has no source. Its body is a symbol
        of the runtime under the prefix RUNTIME_ROOT, declared with the
@@ -455,9 +507,7 @@ struct ir_function *lower_callee_function(struct lowerer *l,
                               lower_ir_type_of(t->result), false);
             f->result_agg = lower_result_agg(l, t->result);
             f->never_returns = t->never;
-            for (i = 0; i < t->param_count; i++) {
-                lower_add_param(l, f, t->params[i]);
-            }
+            lower_add_params(l, f, t, sym);
         }
         text_free(&symbol);
         return f;
@@ -473,15 +523,14 @@ struct ir_function *lower_callee_function(struct lowerer *l,
             f = ir_extern_add(l->m, name, lower_ir_type_of(t->result),
                               sym->variadic);
             f->result_agg = lower_result_agg(l, t->result);
+            lower_mark_allocates(f);
         } else {
             f = ir_declare_add(l->m, module, name, lower_ir_type_of(t->result),
                                lower_result_agg(l, t->result));
             f->exported = sym->exported;
         }
         f->never_returns = t->never;
-        for (i = 0; i < t->param_count; i++) {
-            lower_add_param(l, f, t->params[i]);
-        }
+        lower_add_params(l, f, t, sym);
     }
     free(name);
     return f;
@@ -901,7 +950,6 @@ static void declare_function(struct lowerer *l, const struct item *it)
     const char *module =
         it->home_module != NULL ? it->home_module : l->module_name;
     struct ir_function *f;
-    size_t i;
 
     f = it->kind == ITEM_EXTERN_FN ? lower_find_function(l->m, NULL,
                                                          name) : NULL;
@@ -927,9 +975,10 @@ static void declare_function(struct lowerer *l, const struct item *it)
         f->exported = it->exported;
         f->worker = it->worker;
         f->never_returns = t->never;
-        for (i = 0; i < t->param_count; i++) {
-            lower_add_param(l, f, t->params[i]);
+        if (f->is_extern) {
+            lower_mark_allocates(f);
         }
+        lower_add_params(l, f, t, it->symbol);
     }
     free(name);
     it->symbol->ir = f->index;
@@ -947,6 +996,7 @@ struct ir_function *lower_rt_declare(struct lowerer *l, enum rt_function f)
     if (fn == NULL) {
         fn = ir_extern_add(l->m, s->name, s->types[0], false);
         fn->never_returns = s->never_returns;
+        lower_mark_allocates(fn);
         fn->effects = s->effects;
         fn->guarantees = s->guarantees;
         for (i = 0; i < s->param_count; i++) {

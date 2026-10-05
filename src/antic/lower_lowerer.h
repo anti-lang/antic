@@ -253,6 +253,9 @@ char *lower_copy_text(const struct text *t);
 uint32_t lower_result_agg(struct lowerer *l, const struct type *t);
 void lower_add_param(struct lowerer *l, struct ir_function *f,
                      const struct type *t);
+void lower_add_params(struct lowerer *l, struct ir_function *f,
+                      const struct type *t, const struct symbol *sym);
+void lower_mark_allocates(struct ir_function *f);
 struct ir_function *lower_c_function(struct lowerer *l, const char *name,
                                      enum ir_type result, enum ir_type param);
 struct ir_function *lower_calloc_function(struct lowerer *l);

@@ -1,0 +1,47 @@
+//! One function for each fact of a parameter and a result that the LLVM text
+//! writes. A `*T` is `nonnull dereferenceable(N)`, and a `?*T` takes none of
+//! the facts of a pointer. An `own` pointer is `noalias`, and so is the result
+//! of `anti_rt_mem_alloc`. A result of 8 or 16 bits is `signext` or `zeroext`,
+//! and every scalar is `noundef`. A struct with padding, passed in words, takes
+//! no `noundef`.
+
+extern fn anti_rt_mem_alloc(size: int, align: int) -> ?*byte;
+
+struct Gap
+{
+	a: u8,
+	b: int,
+}
+
+fn read(p: *Gap, q: ?*Gap) -> int
+{
+	if q != none {
+		return p.b + q.b;
+	}
+	return p.b;
+}
+
+fn take(own p: *Gap) -> int
+{
+	return p.b;
+}
+
+fn small(x: i8) -> i8
+{
+	return x;
+}
+
+fn wide(x: u16) -> u16
+{
+	return x;
+}
+
+fn first(g: Gap) -> u8
+{
+	return g.a;
+}
+
+fn raw() -> ?*byte
+{
+	return anti_rt_mem_alloc(16, 8);
+}

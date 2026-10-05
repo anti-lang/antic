@@ -2,7 +2,7 @@ source_filename = "sum"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
-define internal i64 @sum.sum(ptr %p0, i64 %p1) #0 {
+define internal noundef i64 @sum.sum(ptr noundef nonnull dereferenceable(4) %p0, i64 noundef %p1) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca i64, align 8
@@ -58,7 +58,7 @@ b3:
   ret i64 %v21
 }
 
-define internal void @sum.fill(ptr %p0, i64 %p1) #0 {
+define internal void @sum.fill(ptr noundef nonnull dereferenceable(2) %p0, i64 noundef %p1) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca i64, align 8

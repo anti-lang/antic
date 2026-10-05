@@ -2,7 +2,7 @@ source_filename = "fnptr"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
-define internal i32 @fnptr.twice(i32 %p0) #0 {
+define internal noundef i32 @fnptr.twice(i32 noundef %p0) #0 {
 b0:
   %t0 = alloca i32, align 4
   %t1 = alloca i32, align 4
@@ -15,7 +15,7 @@ b0:
   ret i32 %v3
 }
 
-define internal i32 @fnptr.run(ptr %p0, i32 %p1) #0 {
+define internal noundef i32 @fnptr.run(ptr noundef nonnull dereferenceable(8) %p0, i32 noundef %p1) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca i32, align 4
@@ -34,7 +34,7 @@ b0:
   ret i32 %v5
 }
 
-define internal i64 @fnptr.main() #0 {
+define internal noundef i64 @fnptr.main() #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -91,8 +91,8 @@ b0:
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
 
-declare i32 @abs(i32) #1
-declare i32 @fnptr.fn.0(i32) #1
+declare noundef i32 @abs(i32 noundef) #1
+declare noundef i32 @fnptr.fn.0(i32 noundef) #1
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="x86-64-v3" "target-features"="+avx,+avx2,+bmi,+bmi2,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fxsr,+lzcnt,+mmx,+movbe,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave" }
 attributes #1 = { nounwind }

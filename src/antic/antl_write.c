@@ -846,13 +846,15 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
                                  (f->variadic ? 2 : 0) |
                                  (f->exported ? 4 : 0) | (f->worker ? 8 : 0) |
                                  (f->never_returns ? 16 : 0) |
-                                 (f->writes_tables ? 32 : 0)));
+                                 (f->writes_tables ? 32 : 0) |
+                                 (f->allocates ? 64 : 0)));
         antl_put_u8(w, (uint8_t)((unsigned)f->effects |
                                  (unsigned)f->guarantees << 2));
         put_str(w, f->module);
         put_str(w, f->name);
         antl_put_u8(w, (uint8_t)f->result);
         antl_put_u32(w, f->result_agg);
+        antl_put_u8(w, (uint8_t)f->result_ext);
         antl_put_u32(w, f->file);
         antl_put_u32(w, f->decl_line);
         antl_put_count(w, f->param_count);
@@ -860,6 +862,9 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
             antl_put_u8(w, (uint8_t)f->params[j].type);
             antl_put_u8(w, (uint8_t)f->params[j].ext);
             antl_put_u32(w, f->params[j].agg);
+            antl_put_u8(w, (uint8_t)((f->params[j].nonnull ? 1 : 0) |
+                                     (f->params[j].own ? 2 : 0)));
+            antl_put_u32(w, f->params[j].deref_size);
         }
     }
     for (i = 0; i < ir->function_count; i++) {

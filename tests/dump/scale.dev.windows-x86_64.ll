@@ -2,7 +2,7 @@ source_filename = "com.example.scale"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc"
 
-define i64 @_A3com7example5scale_scale(i64 %p0) #0 !dbg !12 {
+define noundef i64 @_A3com7example5scale_scale(i64 noundef %p0) #0 !dbg !12 {
 b0:
   %t0 = alloca i64, align 8
   %t1 = alloca i64, align 8
@@ -29,7 +29,7 @@ b2:
 
 @_A3com7example5scale_0 = constant <{ [40 x i8] }> <{ [40 x i8] c"com/example/scale.anti:4: overflow in *\00" }>, align 1
 
-declare void @anti_rt_check_failed(ptr, i64, i32, i64, i64) noreturn cold #1
+declare void @anti_rt_check_failed(ptr noundef, i64 noundef, i32 noundef, i64 noundef, i64 noundef) noreturn cold #1
 declare { i64, i1 } @llvm.smul.with.overflow.i64(i64, i64)
 
 attributes #0 = { nounwind uwtable(sync) "frame-pointer"="none" "stack-probe-size"="4096" "target-cpu"="x86-64-v3" "target-features"="+avx,+avx2,+bmi,+bmi2,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fxsr,+lzcnt,+mmx,+movbe,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave" }

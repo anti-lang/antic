@@ -2,7 +2,7 @@ source_filename = "measure"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
 target triple = "aarch64-unknown-linux-gnu"
 
-define internal i64 @measure.length_of([2 x i64] %p0.0) #0 {
+define internal noundef i64 @measure.length_of([2 x i64] %p0.0) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -20,7 +20,7 @@ b0:
   ret i64 %v4
 }
 
-define internal i64 @measure.sum([2 x float] %p0.0) #0 {
+define internal noundef i64 @measure.sum([2 x float] %p0.0) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca float, align 4
@@ -51,7 +51,7 @@ b0:
   ret i64 %v11
 }
 
-define internal i64 @measure.main() #0 {
+define internal noundef i64 @measure.main() #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -113,8 +113,8 @@ b0:
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
 
-declare i64 @measure.fn.0([2 x i64]) #1
-declare i64 @measure.fn.1([2 x float]) #1
+declare noundef i64 @measure.fn.0([2 x i64]) #1
+declare noundef i64 @measure.fn.1([2 x float]) #1
 declare i64 @llvm.fptosi.sat.i64.f32(float)
 declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
 

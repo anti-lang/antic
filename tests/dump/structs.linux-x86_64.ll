@@ -100,7 +100,7 @@ b0:
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
 
 declare { i64, double } @take(i64, double, ptr byval([24 x i8]) align 8, i64, <2 x float>) #1
-declare void @make(ptr sret([24 x i8]) align 8, i64) #1
+declare void @make(ptr sret([24 x i8]) align 8, i64 noundef) #1
 declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="x86-64-v3" "target-features"="+avx,+avx2,+bmi,+bmi2,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fxsr,+lzcnt,+mmx,+movbe,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave" }

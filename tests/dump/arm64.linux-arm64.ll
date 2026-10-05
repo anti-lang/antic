@@ -2,7 +2,7 @@ source_filename = "arm64"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
 target triple = "aarch64-unknown-linux-gnu"
 
-define internal i64 @arm64.imms(i64 %p0) #0 {
+define internal noundef i64 @arm64.imms(i64 noundef %p0) #0 {
 b0:
   %t0 = alloca i64, align 8
   %t1 = alloca i64, align 8
@@ -44,7 +44,7 @@ b2:
   ret i64 %v16
 }
 
-define internal i8 @arm64.bump(i8 zeroext %p0) #0 {
+define internal noundef zeroext i8 @arm64.bump(i8 zeroext noundef %p0) #0 {
 b0:
   %t0 = alloca i8, align 1
   %t1 = alloca i8, align 1
@@ -56,7 +56,7 @@ b0:
   ret i8 %v2
 }
 
-define internal i32 @arm64.pass(i8 zeroext %p0, i8 signext %p1) #0 {
+define internal noundef i32 @arm64.pass(i8 zeroext noundef %p0, i8 signext noundef %p1) #0 {
 b0:
   %t0 = alloca i8, align 1
   %t1 = alloca i8, align 1
@@ -75,7 +75,7 @@ b0:
   ret i32 %v5
 }
 
-define internal i64 @arm64.last(i8 zeroext %p0, i16 signext %p1, i64 %p2, i64 %p3, i64 %p4, i64 %p5, i64 %p6, i64 %p7, i8 signext %p8, i32 %p9, i8 zeroext %p10) #0 {
+define internal noundef i64 @arm64.last(i8 zeroext noundef %p0, i16 signext noundef %p1, i64 noundef %p2, i64 noundef %p3, i64 noundef %p4, i64 noundef %p5, i64 noundef %p6, i64 noundef %p7, i8 signext noundef %p8, i32 noundef %p9, i8 zeroext noundef %p10) #0 {
 b0:
   %t0 = alloca i8, align 1
   %t1 = alloca i16, align 2
@@ -124,7 +124,7 @@ b0:
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
 
-declare i32 @widen(i8 zeroext, i8 signext, i16 zeroext) #1
+declare noundef i32 @widen(i8 zeroext noundef, i8 signext noundef, i16 zeroext noundef) #1
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="generic" "target-features"="+fp-armv8,+neon,+v8a,-fmv" }
 attributes #1 = { nounwind }

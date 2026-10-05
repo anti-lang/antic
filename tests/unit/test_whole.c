@@ -416,7 +416,9 @@ static void passes(bool release, const char *expected)
 static void devirtualises(void)
 {
     passes(true,
-           "fn main.calls(%0: ptr, %1: ptr, %2: ptr) -> i64 {\n"
+           "fn main.calls(%0: ptr nonnull deref(size_of main.Shape), "
+           "%1: ptr nonnull deref(size_of main.Named), "
+           "%2: ptr nonnull deref(size_of main.Tile)) -> i64 {\n"
            "b0:\n"
            "    %3 = load ptr %0 !table\n"
            "    %4 = mul i64 17, size_of ptr\n"
@@ -462,7 +464,9 @@ static void devirtualises(void)
            "    ret i64 %27\n"
            "}\n");
     passes(false,
-           "fn main.calls(%0: ptr, %1: ptr, %2: ptr) -> i64 {\n"
+           "fn main.calls(%0: ptr nonnull deref(size_of main.Shape), "
+           "%1: ptr nonnull deref(size_of main.Named), "
+           "%2: ptr nonnull deref(size_of main.Tile)) -> i64 {\n"
            "b0:\n"
            "    %3 = load ptr %0 !table\n"
            "    %4 = mul i64 17, size_of ptr\n"
