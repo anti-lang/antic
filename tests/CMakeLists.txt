@@ -4165,6 +4165,14 @@ foreach(name IN LISTS bench_programs)
     endif()
     list(APPEND bench_executables bench_${name})
 endforeach()
+# mixed_work of tests/bench/ablate, the program of condition C1 in
+# docs/work-order-llvm-optimization.md, has no C twin. run.py holds every
+# build to the line of its baseline, and this test holds the baseline to
+# the right line in release mode, so a fact that changes it fails the
+# suite and not only a measurement.
+antic_program_test(program_mixed_work
+    "${CMAKE_CURRENT_SOURCE_DIR}/bench/ablate/mixed_work.anti"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/bench_ablate")
 add_custom_target(bench
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"

@@ -1,0 +1,515 @@
+//! A mixed workload, the program of condition C1 in
+//! `docs/work-order-llvm-optimization.md`. It does work in eleven modules of
+//! the standard library, so its object shows the growth of code that the five
+//! small programs of `tests/bench` cannot show. On each of 6 rounds it sorts
+//! and filters lists, counts in hash maps and sets, queries sorted maps and
+//! sets, slides a window over a deque and a ring, finds the shortest paths of a
+//! grid with a priority queue, keeps particles in a pool and a tree, sieves
+//! primes in a bit set, writes and reads JSON and TOML, and matches a pattern.
+//! It prints one sum of everything it computed. It has no C twin.
+
+import anti.collection.deque.{Deque};
+import anti.collection.grid.{Grid};
+import anti.collection.list.{List};
+import anti.collection.map.{HashMap, Map};
+import anti.collection.pool.{Handle, Pool};
+import anti.collection.queue.{PriorityQueue};
+import anti.collection.ring.{Ring};
+import anti.collection.set.{BitSet, HashSet, Set};
+import anti.collection.sorted.{SortedMap, SortedSet};
+import anti.collection.tree.{Tree};
+import anti.json;
+import anti.random;
+import anti.regex;
+import anti.text;
+import anti.toml;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// An item of a list, sorted by its weight and then its id.
+struct Item
+{
+	id: int,
+	weight: int,
+}
+
+/// A point of the plane, a key of the sorted map.
+struct Spot
+{
+	x: int,
+	y: int,
+}
+
+operator fn lt(a: Spot, b: Spot) -> bool
+{
+	return a.x < b.x || a.x == b.x && a.y < b.y;
+}
+
+operator fn eq(a: Spot, b: Spot) -> bool
+{
+	return a.x == b.x && a.y == b.y;
+}
+
+/// A particle of the pool, which moves and loses energy.
+struct Particle
+{
+	x: int,
+	y: int,
+	dx: int,
+	dy: int,
+	energy: int,
+}
+
+/// A number below `limit` from `r`.
+fn draw(r: *random.Random, limit: int) -> int
+{
+	return r.below(limit as u64) as int;
+}
+
+/// The number `s` writes, or 0 when it writes none.
+fn number(s: str) -> int
+{
+	let n = text.parse_int(s) catch e {
+		yield 0;
+	};
+	return n;
+}
+
+/// Sorts, filters, reverses and sums lists of numbers, items and words.
+fn lists(r: *random.Random) -> int
+{
+	let total = 0;
+	let numbers = List<int>.new();
+	for i in 0..60000 {
+		numbers.push(draw(r, 1000000));
+	}
+	numbers.sort();
+	for i in 0..numbers.count by 97 {
+		total = total +% numbers[i];
+	}
+	numbers.filter(fn(x) {
+		return x % 3 == 0;
+	});
+	numbers.reverse();
+	total = total +% numbers.count +% (numbers.first() ?? 0);
+
+	let items = List<Item>.new();
+	for i in 0..20000 {
+		items.push(Item { id: i, weight: draw(r, 5000) });
+	}
+	items.sort_with(fn(a, b) {
+		return a.weight < b.weight || a.weight == b.weight && a.id < b.id;
+	});
+	for i in 0..items.count by 101 {
+		total = total +% items[i].id;
+	}
+	let heavy = items.find_all(fn(it) {
+		return it.weight > 4900;
+	});
+	total = total +% heavy.count;
+
+	let words = List<str>.new();
+	let names = ["ant", "bee", "cat", "dog", "eel", "fox", "gnu", "hen"];
+	for i in 0..8000 {
+		words.push(names[draw(r, 8)]);
+	}
+	words.sort();
+	total = total +% words[words.count / 2].len +% words.count;
+	return total;
+}
+
+/// Counts in a hash map, a map of insertion order and the three sets.
+fn hashing(r: *random.Random) -> int
+{
+	let total = 0;
+	let counts = HashMap<int, int>.new();
+	let ordered = Map<int, int>.new();
+	let seen = HashSet<int>.new();
+	let kept = Set<int>.new();
+	for i in 0..60000 {
+		let k = draw(r, 20000);
+		let n = counts.get(k) ?? 0;
+		counts.set(k, n + 1);
+		if seen.add(k) {
+			ordered.set(k, i);
+		}
+		if k % 7 == 0 {
+			kept.add(k);
+		}
+	}
+	for k in 0..20000 by 3 {
+		total = total +% (counts.get(k) ?? 0) +% (ordered.get(k) ?? 1);
+		if kept.contains(k) {
+			total = total +% 5;
+		}
+	}
+	for k in 0..20000 by 2 {
+		counts.remove(k);
+		seen.remove(k);
+	}
+	let evens = HashSet<int>.new();
+	for k in 0..20000 by 2 {
+		evens.add(k);
+	}
+	let both = seen.intersect(evens);
+	let either = seen.union(evens);
+	total = total +% counts.count +% seen.count +% both.count +% either.count;
+
+	let words = HashMap<str, int>.new();
+	let names = ["red", "green", "blue", "cyan", "magenta", "yellow"];
+	for i in 0..30000 {
+		let w = names[draw(r, 6)];
+		words.set(w, (words.get(w) ?? 0) + i);
+	}
+	for w in words.keys() {
+		total = total +% w.len;
+	}
+	for v in words.values() {
+		total = total +% v;
+	}
+	return total;
+}
+
+/// Inserts into, walks and queries sorted maps and sorted sets.
+fn ordered(r: *random.Random) -> int
+{
+	let total = 0;
+	let m = SortedMap<int, int>.new();
+	for i in 0..30000 {
+		m.set(draw(r, 1000000), i);
+	}
+	for e in m.range(250000, 260000) {
+		let (k, v) = e;
+		total = total +% k +% v;
+	}
+	for i in 0..2000 {
+		let probe = draw(r, 1000000);
+		if let below = m.floor(probe) {
+			total = total +% below.0;
+		}
+		if let above = m.ceiling(probe) {
+			total = total +% above.1;
+		}
+	}
+	for i in 0..5000 {
+		if let first = m.pop_first() {
+			total = total +% first.0;
+		}
+	}
+
+	let spots = SortedMap<Spot, int>.new();
+	for i in 0..10000 {
+		let x = draw(r, 100);
+		let y = draw(r, 100);
+		spots.set(Spot { x: x, y: y }, i);
+	}
+	for k in spots.keys() {
+		total = total +% k.x *% 100 +% k.y;
+	}
+
+	let a = SortedSet<int>.new();
+	let b = SortedSet<int>.new();
+	for i in 0..20000 {
+		a.add(draw(r, 50000));
+		b.add(draw(r, 50000));
+	}
+	let both = a.intersect(b);
+	let either = a.union(b);
+	let only = a.minus(b);
+	total = total +% both.count +% either.count +% only.count;
+	for x in either.range(1000, 2000) {
+		total = total +% x;
+	}
+	return total;
+}
+
+/// Slides a window over a deque and keeps the last values in a ring.
+fn queues(r: *random.Random) -> int
+{
+	let total = 0;
+	let window = Deque<int>.new();
+	let values = List<int>.new();
+	for i in 0..100000 {
+		values.push(draw(r, 1000000));
+	}
+	// The maximum of every window of 64 values, from a deque of positions
+	// whose values fall.
+	for i in 0..values.count {
+		while window.count > 0 do {
+			let back = window.back() ?? 0;
+			if values[back] > values[i] {
+				break;
+			}
+			window.pop_back();
+		}
+		window.push_back(i);
+		let front = window.front() ?? 0;
+		if front <= i - 64 {
+			window.pop_front();
+		}
+		if i >= 63 {
+			total = total +% values[window.front() ?? 0];
+		}
+	}
+
+	let recent = Ring<int, 64>.new();
+	for i in 0..values.count {
+		if recent.is_full() {
+			total = total +% (recent.pop() ?? 0);
+		}
+		recent.push(values[i] % 1000);
+	}
+
+	let heap = PriorityQueue<int>.new();
+	for i in 0..30000 {
+		heap.push(draw(r, 1000000));
+	}
+	let last = -1;
+	while heap.count > 0 do {
+		let x = heap.pop() ?? 0;
+		if x < last {
+			total = total +% 1000000007;
+		}
+		last = x;
+		total = total +% (x & 15);
+	}
+	return total;
+}
+
+/// The cost of the cheapest path from the corner of a grid of weights to every
+/// cell, by Dijkstra's algorithm with a priority queue.
+fn paths(r: *random.Random) -> int
+{
+	let side = 96;
+	let weights = Grid<int>.new(side, side, 0);
+	for y in 0..side {
+		for x in 0..side {
+			weights[x, y] = 1 + draw(r, 9);
+		}
+	}
+	let best = Grid<int>.new(side, side, 1 << 40);
+	let open = PriorityQueue<int>.new();
+	best[0, 0] = 0;
+	open.push(0);
+	// A queue entry is the cost times 65536 plus the cell.
+	while open.count > 0 do {
+		let entry = open.pop() ?? 0;
+		let cost = entry >> 16;
+		let cell = entry & 65535;
+		let x = cell % side;
+		let y = cell / side;
+		if cost > best[x, y] {
+			continue;
+		}
+		let steps = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+		for i in 0..4 {
+			let nx = x + steps[i].0;
+			let ny = y + steps[i].1;
+			if nx < 0 || ny < 0 || nx >= side || ny >= side {
+				continue;
+			}
+			let through = cost + weights[nx, ny];
+			if through < best[nx, ny] {
+				best[nx, ny] = through;
+				open.push((through << 16) + ny * side + nx);
+			}
+		}
+	}
+	let total = 0;
+	for cost in best {
+		total = total +% cost;
+	}
+	return total;
+}
+
+/// Moves particles of a pool, files them in a tree by their quadrant, and
+/// sieves the primes below 200000 in a bit set.
+fn objects(r: *random.Random) -> int
+{
+	let total = 0;
+	let pool = Pool<Particle>.new();
+	let handles = List<Handle<Particle>>.new();
+	for i in 0..4000 {
+		let x = draw(r, 1000);
+		let y = draw(r, 1000);
+		let dx = draw(r, 7) - 3;
+		let dy = draw(r, 7) - 3;
+		let energy = 50 + draw(r, 50);
+		let h = pool.add(Particle { x: x, y: y, dx: dx, dy: dy, energy: energy });
+		handles.push(h);
+	}
+	for step in 0..40 {
+		for i in 0..handles.count {
+			pool.modify(handles[i], fn(p) {
+				p.x = p.x + p.dx;
+				p.y = p.y + p.dy;
+				p.energy = p.energy - 1;
+			});
+		}
+		if step % 10 == 9 {
+			for i in 0..handles.count by 5 {
+				if let p = pool.get(handles[i]) {
+					if p.energy < 60 {
+						pool.remove(handles[i]);
+					}
+				}
+			}
+		}
+	}
+	for i in 0..handles.count {
+		if let p = pool.get(handles[i]) {
+			total = total +% p.x +% p.y +% p.energy;
+		}
+	}
+	total = total +% pool.count;
+
+	let tree = Tree<int>.new();
+	let root = tree.add_root(0);
+	let quadrants = List<Handle<int>>.new();
+	for q in 0..4 {
+		let child = tree.add_child(root, q) catch fatal;
+		quadrants.push(child);
+	}
+	for i in 0..handles.count {
+		if let p = pool.get(handles[i]) {
+			let q = 0;
+			if p.x >= 500 {
+				q += 1;
+			}
+			if p.y >= 500 {
+				q += 2;
+			}
+			tree.add_child(quadrants[q], p.energy);
+		}
+	}
+	let walk = tree.depth_first(root);
+	for h in walk {
+		total = total +% (tree.get(h) ?? 0);
+	}
+	total = total +% tree.children(quadrants[3]).count;
+
+	let limit = 200000;
+	let composite = BitSet.new(limit);
+	for n in 2..limit {
+		if composite.contains(n) {
+			continue;
+		}
+		total = total +% n;
+		let m = n * n;
+		while m < limit do {
+			composite.add(m);
+			m += n;
+		}
+	}
+	return total;
+}
+
+/// Writes numbers as JSON, reads members back and parses them again.
+fn texts(r: *random.Random) -> int
+{
+	let total = 0;
+	let b = text.Builder.new();
+	for i in 0..2000 {
+		b.clear();
+		b.append("{\"id\":");
+		json.write_int(i, &b);
+		b.append(",\"name\":");
+		json.write_text("item", &b);
+		b.append(",\"value\":");
+		json.write_int(draw(r, 1000000) - 500000, &b);
+		b.append(",\"flag\":");
+		json.write_bool(i % 3 == 0, &b);
+		b.append("}");
+		let found = "";
+		if json.member(b.text(), "value", &found) {
+			total = total +% number(found);
+		}
+		if json.member(b.text(), "id", &found) {
+			total = total +% number(found);
+		}
+	}
+	let line = text.Builder.new();
+	for i in 0..3000 {
+		line.clear();
+		line.append_int(draw(r, 1000000), 16);
+		line.append_text("x", 4);
+		line.append_float(draw(r, 1000) as f64 / 8.0, 3);
+		total = total +% line.len();
+	}
+	return total;
+}
+
+/// Writes a TOML document and reads values back by their paths.
+fn config(r: *random.Random) -> int
+{
+	let total = 0;
+	let b = text.Builder.new();
+	b.append("name = \"mixed\"\nquiet = false\n");
+	for t in 0..40 {
+		b.append("\n[[stage]]\nindex = ");
+		b.append_int(t);
+		b.append("\nweight = ");
+		b.append_int(draw(r, 1000));
+		b.append("\nlabel = \"stage\"\n");
+	}
+	let doc = toml.Document.read(b.text()) catch fatal;
+	let path = text.Builder.new();
+	for round in 0..20 {
+		for t in 0..40 {
+			path.clear();
+			path.append("stage.");
+			path.append_int(t);
+			path.append(".weight");
+			total = total +% doc.int_of(path.text(), 0);
+		}
+		total = total +% doc.len();
+		if !doc.bool_of("quiet", true) {
+			total = total +% 1;
+		}
+	}
+	return total;
+}
+
+/// Matches a pattern over a text of words and numbers.
+fn patterns(r: *random.Random) -> int
+{
+	let total = 0;
+	let b = text.Builder.new();
+	for i in 0..4000 {
+		b.append("word");
+		b.append_int(draw(r, 100000));
+		b.append(" ");
+		if i % 5 == 0 {
+			b.append("key=");
+			b.append_int(i);
+			b.append(" ");
+		}
+	}
+	let source = b.text();
+	for m in source.find_all(re"key=(\d+)") {
+		total = total +% number(m.1);
+	}
+	for m in source.find_all(re"[a-z]+(\d{5})") {
+		total = total +% m.1.len;
+	}
+	return total;
+}
+
+fn main() -> int
+{
+	let r = random.Random.new(20261005);
+	let total = 0;
+	for round in 0..6 {
+		total = total +% lists(&r);
+		total = total +% hashing(&r);
+		total = total +% ordered(&r);
+		total = total +% queues(&r);
+		total = total +% paths(&r);
+		total = total +% objects(&r);
+		total = total +% texts(&r);
+		total = total +% config(&r);
+		total = total +% patterns(&r);
+	}
+	printf("%lld\n".ptr, total);
+	return 0;
+}

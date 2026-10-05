@@ -404,8 +404,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1539 ctest tests pass on the development Mac and none is skipped. The ASan
-  and the UBSan builds run 1538 each, without the `no_paths` test, which needs a
+- 1540 ctest tests pass on the development Mac and none is skipped. The ASan
+  and the UBSan builds run 1539 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
