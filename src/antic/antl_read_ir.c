@@ -622,10 +622,21 @@ static void read_body(struct reader *r, struct ir_module *program,
             }
             inst.of = read_vtype(r, false);
             inst.field = antl_get_u32(r);
+            if ((op == IR_LOAD || op == IR_STORE) && inst.of.type == IR_AGG) {
+                inst.member = antl_get_u32(r);
+            }
             if (!r->failed && inst.of.type == IR_AGG) {
                 inst.of.agg = map_agg(r, program, maps, inst.of.agg);
             }
-            if (!r->failed &&
+            /* A load or a store has the type of "Aliasing of views" or
+               none, and a field of it names a field of a struct. */
+            if (!r->failed && (op == IR_LOAD || op == IR_STORE) &&
+                inst.of.type == IR_AGG &&
+                (program->aggs[inst.of.agg]->kind != IR_AGG_STRUCT ||
+                 inst.member >= program->aggs[inst.of.agg]->field_count)) {
+                antl_damaged(r);
+            }
+            if (!r->failed && op != IR_LOAD && op != IR_STORE &&
                 ((op == IR_SLOT || op == IR_MEMCOPY || op == IR_BITLOAD ||
                   op == IR_BITSTORE ||
                   (op >= IR_VBINARY && op <= IR_VREDUCE)) ==

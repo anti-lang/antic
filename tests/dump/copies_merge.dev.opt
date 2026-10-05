@@ -40,13 +40,13 @@ b0:
     %9 = ptradd %5, offset_of []*copies_merge.Person.len
     store i64 1, %9
     %10 = call ptr @copies_merge.pick<*copies_merge.Person>(%5, 0)
-    %11 = load i64 %10
+    %11 = load i64 %10 !type copies_merge.Person.age
     %12 = ptradd %3, 0
     store ptr %12, %6
     %13 = ptradd %6, offset_of []*copies_merge.Order.len
     store i64 1, %13
     %14 = call ptr @copies_merge.pick<*copies_merge.Order>(%6, 0)
-    %15 = load i64 %14
+    %15 = load i64 %14 !type copies_merge.Order.total
     %16 = addov nsw i64 %11, %15
     branchov %16, b1, b2
 b1:
@@ -82,7 +82,7 @@ b1:
 b2:
     %7 = mul i64 %1, size_of ptr
     %8 = ptradd %4, %7
-    %9 = load ptr %8
+    %9 = load ptr %8 !type ptr
     ret ptr %9
 }
 fn copies_merge.pick<*copies_merge.Order>(%0: agg []*copies_merge.Order, %1: i64) -> ptr {
@@ -99,7 +99,7 @@ b1:
 b2:
     %7 = mul i64 %1, size_of ptr
     %8 = ptradd %4, %7
-    %9 = load ptr %8
+    %9 = load ptr %8 !type ptr
     ret ptr %9
 }
 fn copies_merge.pick<int>(%0: agg []int, %1: i64) -> i64 {
@@ -116,6 +116,6 @@ b1:
 b2:
     %7 = mul i64 %1, size_of i64
     %8 = ptradd %4, %7
-    %9 = load i64 %8
+    %9 = load i64 %8 !type i64
     ret i64 %9
 }

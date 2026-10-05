@@ -29,7 +29,7 @@ b0:
   %v4 = getelementptr inbounds i8, ptr %v3, i64 8
   store ptr %v4, ptr %t4, align 8
   %v5 = load ptr, ptr %t4, align 8
-  %v6 = load i64, ptr %v5, align 8
+  %v6 = load i64, ptr %v5, align 8, !tbaa !15
   store i64 %v6, ptr %t5, align 8
   %v7 = load ptr, ptr %t3, align 8
   %v8 = load i64, ptr %t1, align 8
@@ -141,3 +141,17 @@ attributes #1 = { nounwind }
 !0 = !{i32 1, !"wchar_size", i32 4}
 !1 = !{i32 8, !"PIC Level", i32 2}
 !2 = !{!"antic VERSION"}
+!5 = !{!"anti"}
+!6 = !{!"byte", !5, i64 0}
+!7 = !{!"i16", !6, i64 0}
+!8 = !{!"i32", !6, i64 0}
+!9 = !{!"i64", !6, i64 0}
+!10 = !{!"f32", !6, i64 0}
+!11 = !{!"f64", !6, i64 0}
+!12 = !{!"ptr", !6, i64 0}
+!13 = !{!7, !7, i64 0}
+!14 = !{!8, !8, i64 0}
+!15 = !{!9, !9, i64 0}
+!16 = !{!10, !10, i64 0}
+!17 = !{!11, !11, i64 0}
+!18 = !{!12, !12, i64 0}

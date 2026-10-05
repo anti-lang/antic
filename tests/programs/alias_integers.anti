@@ -1,0 +1,79 @@
+//! The rule "Integers" of "Aliasing of views": an integer meets one of the same
+//! width and the other sign, an enum meets its base type and `char` meets
+//! `u32`. Each pair writes through both types and reads the first. The test
+//! runs in release mode, where the loads and stores carry !tbaa.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn getenv(name: ?*byte) -> ?*byte;
+
+enum Level: u16
+{
+	Low = 1,
+	High = 2,
+}
+
+/// p, or other where ANTI_ALIAS_OTHER is set, which no test sets, so the
+/// optimiser cannot tell the result from p.
+fn either(p: *byte, other: *byte) -> *byte
+{
+	if getenv("ANTI_ALIAS_OTHER".ptr) != none {
+		return other;
+	}
+	return p;
+}
+
+fn signs16(p: *i16, q: *u16) -> i16
+{
+	*p = -1;
+	*q = 7;
+	return *p;
+}
+
+fn signs32(p: *i32, q: *u32) -> i32
+{
+	*p = -1;
+	*q = 8;
+	return *p;
+}
+
+fn signs64(p: *int, q: *u64) -> int
+{
+	*p = -1;
+	*q = 9;
+	return *p;
+}
+
+fn level(p: *Level, q: *u16) -> u16
+{
+	*p = Level.Low;
+	*q = 2;
+	return *p as u16;
+}
+
+fn letter(p: *char, q: *u32) -> u32
+{
+	*p = 'a';
+	*q = 98;
+	return *p as u32;
+}
+
+fn main() -> int
+{
+	let words = alloc(u64, 2) else {
+		return 1;
+	};
+	let raw = words as *byte;
+	let spare = &words[1] as *byte;
+	printf("i16 u16 %d\n".ptr,
+		signs16(raw as *i16, either(raw, spare) as *u16) as c_int);
+	printf("i32 u32 %d\n".ptr,
+		signs32(raw as *i32, either(raw, spare) as *u32));
+	printf("int u64 %lld\n".ptr,
+		signs64(raw as *int, either(raw, spare) as *u64));
+	printf("enum u16 %d\n".ptr,
+		level(raw as *Level, either(raw, spare) as *u16) as c_int);
+	printf("char u32 %u\n".ptr,
+		letter(raw as *char, either(raw, spare) as *u32));
+	free(words);
+	return 0;
+}

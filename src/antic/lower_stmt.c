@@ -815,6 +815,9 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
         ir_bitstore(l->f, l->b, p.type, v, p.address, p.agg, p.field);
     } else {
         ir_store(l->f, l->b, p.type, v, p.address);
+        if (p.typed.type != IR_VOID) {
+            ir_type_access(l->b, p.typed, p.member);
+        }
     }
     lower_hook_changed(l, &p, target);
 }

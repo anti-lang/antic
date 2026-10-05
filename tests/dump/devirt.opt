@@ -97,13 +97,13 @@ global anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn devirt.Only.value(%0: ptr nonnull deref(size_of devirt.Only)) -> i64 {
 b0:
     %1 = ptradd inbounds %0, offset_of devirt.Only.n
-    %2 = load i64 %1
+    %2 = load i64 %1 !type devirt.Only.n
     ret i64 %2
 }
 fn devirt.Base.value(%0: ptr nonnull deref(size_of devirt.Base)) -> i64 {
 b0:
     %1 = ptradd inbounds %0, offset_of devirt.Base.n
-    %2 = load i64 %1
+    %2 = load i64 %1 !type devirt.Base.n
     ret i64 %2
 }
 fn devirt.Base.same(%0: ptr nonnull deref(size_of devirt.Base)) -> i64 {

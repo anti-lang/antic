@@ -740,8 +740,7 @@ static struct ir_operand lower_unary(struct lowerer *l, const struct expr *e)
         v = lower_expr(l, operand);
         return lower_temp(l, ir_unary(l->f, l->b, IR_NOT, type, v));
     case TOKEN_STAR:
-        v = lower_expr(l, operand);
-        return lower_load_value(l, e->type, v);
+        return lower_place(l, e, &p) ? lower_read_place(l, &p) : lower_none();
     default: /* TOKEN_AMP: semantic analysis marked the operand */
         return lower_place(l, operand, &p) ? p.address : lower_none();
     }

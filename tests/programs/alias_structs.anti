@@ -1,0 +1,99 @@
+//! The rule "Structs and classes" of "Aliasing of views": a struct holds its
+//! parts at any depth, a class holds its base at offset 0, and a view of a
+//! value as the type of one of its parts, at the address of that part, reads
+//! that part. A field of a nested struct meets the field of the outer one that
+//! holds it, the first field meets a view of the whole as its type, a field of
+//! a base meets the same field through the derived class, and a copy of the
+//! whole reads a part written last. The test runs in release mode, where the
+//! loads and stores carry !tbaa.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn getenv(name: ?*byte) -> ?*byte;
+
+struct Inner
+{
+	x: int,
+	y: float,
+}
+
+struct Outer
+{
+	k: int,
+	inner: Inner,
+}
+
+class Base
+{
+	pub n: int = 0,
+}
+
+class Derived inherits Base
+{
+	pub m: int = 0,
+}
+
+/// p, or other where ANTI_ALIAS_OTHER is set, which no test sets, so the
+/// optimiser cannot tell the result from p.
+fn either(p: *byte, other: *byte) -> *byte
+{
+	if getenv("ANTI_ALIAS_OTHER".ptr) != none {
+		return other;
+	}
+	return p;
+}
+
+fn nested(o: *Outer, i: *Inner) -> int
+{
+	o.inner.x = 1;
+	i.x = 2;
+	return o.inner.x;
+}
+
+fn first(o: *Outer, p: *int) -> int
+{
+	o.k = 3;
+	*p = 4;
+	return o.k;
+}
+
+fn part(o: *Outer, p: *float) -> float
+{
+	o.inner.y = 0.25;
+	*p = 0.5;
+	return o.inner.y;
+}
+
+fn base(d: *Derived, b: *Base) -> int
+{
+	d.n = 5;
+	b.n = 6;
+	return d.n;
+}
+
+fn whole(o: *Outer, i: *Inner) -> int
+{
+	o.inner.x = 7;
+	i.x = 8;
+	let copy = *o;
+	return copy.inner.x;
+}
+
+fn main() -> int
+{
+	let o = alloc Outer { k: 0, inner: Inner { x: 0, y: 0.0 } };
+	let spare = alloc Outer { k: 0, inner: Inner { x: 0, y: 0.0 } };
+	let i = either(&o.inner as *byte, &spare.inner as *byte) as *Inner;
+	printf("nested %lld\n".ptr, nested(o, i));
+	printf("first %lld\n".ptr,
+		first(o, either(o as *byte, spare as *byte) as *int));
+	let y = either(&o.inner.y as *byte, &spare.inner.y as *byte);
+	printf("part %g\n".ptr, part(o, y as *float));
+	let d = alloc Derived { };
+	let other = alloc Derived { };
+	printf("base %lld\n".ptr,
+		base(d, either(d as *byte, other as *byte) as *Base));
+	printf("whole %lld\n".ptr, whole(o, i));
+	delete(d);
+	delete(other);
+	return 0;
+}

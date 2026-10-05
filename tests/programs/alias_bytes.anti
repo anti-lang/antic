@@ -1,0 +1,77 @@
+//! The rule "Bytes" of "Aliasing of views": an access as `u8` or `i8` may refer
+//! to any memory, and a view as `*byte` or `[]byte` reads and writes the bytes
+//! of any value wherever it goes. A byte written into an int, a float and a
+//! field of a struct reaches the next read of each, as does a byte field of a
+//! struct that a view lays over an int. The test runs in release mode, where
+//! the loads and stores carry !tbaa.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn getenv(name: ?*byte) -> ?*byte;
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+struct Head
+{
+	low: u8,
+	high: i8,
+}
+
+/// p, or other where ANTI_ALIAS_OTHER is set, which no test sets, so the
+/// optimiser cannot tell the result from p.
+fn either(p: *byte, other: *byte) -> *byte
+{
+	if getenv("ANTI_ALIAS_OTHER".ptr) != none {
+		return other;
+	}
+	return p;
+}
+
+fn into_int(p: *int, b: *byte) -> int
+{
+	*p = 0x0102;
+	*b = 9;
+	return *p;
+}
+
+fn into_float(p: *float, s: []byte) -> float
+{
+	*p = 1.0;
+	s[7] = 0x40;
+	return *p;
+}
+
+fn into_field(ps: *Pair, b: *i8) -> int
+{
+	ps.b = 0x0300;
+	*b = 4;
+	return ps.b;
+}
+
+fn head(p: *int, h: *Head) -> int
+{
+	*p = 0;
+	h.low = 5;
+	h.high = -1;
+	return *p;
+}
+
+fn main() -> int
+{
+	let ps = alloc Pair { a: 0, b: 0 };
+	let spare = alloc Pair { a: 0, b: 0 };
+	let a = &ps.a as *byte;
+	printf("int %lld\n".ptr, into_int(&ps.a, either(a, spare as *byte)));
+	let f: float = 0.0;
+	let fb = either(&f as *byte, spare as *byte);
+	printf("float %g\n".ptr, into_float(&f, (*(fb as *[8]byte))[0..8]));
+	let b = &ps.b as *byte;
+	printf("field %lld\n".ptr,
+		into_field(ps, either(b, spare as *byte) as *i8));
+	printf("head %lld\n".ptr,
+		head(&ps.a, either(a, spare as *byte) as *Head));
+	return 0;
+}

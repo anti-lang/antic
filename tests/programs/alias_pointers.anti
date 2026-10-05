@@ -1,0 +1,106 @@
+//! The rule "Pointers" of "Aliasing of views": every pointer is one type. A
+//! store of a `*int` reaches a read as `?*byte`, as `*float` and as the `ptr`
+//! of a `str` or a slice, and a function value meets a `?fn` and a `?*byte`.
+//! The test runs in release mode, where the loads and stores carry !tbaa.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn getenv(name: ?*byte) -> ?*byte;
+
+struct Slot
+{
+	p: *int,
+	f: fn() -> int,
+}
+
+struct Named
+{
+	name: str,
+	items: []int,
+}
+
+/// p, or other where ANTI_ALIAS_OTHER is set, which no test sets, so the
+/// optimiser cannot tell the result from p.
+fn either(p: *byte, other: *byte) -> *byte
+{
+	if getenv("ANTI_ALIAS_OTHER".ptr) != none {
+		return other;
+	}
+	return p;
+}
+
+fn seven() -> int
+{
+	return 7;
+}
+
+fn eight() -> int
+{
+	return 8;
+}
+
+fn optional(s: *Slot, q: *?*byte, to: *int) -> bool
+{
+	s.p = to;
+	*q = none;
+	return s.p as ?*byte == none;
+}
+
+fn other_type(s: *Slot, q: **float, to: *float) -> bool
+{
+	s.p = s.p;
+	*q = to;
+	return s.p as *byte == to as *byte;
+}
+
+fn text(s: *str, q: *?*byte, to: ?*byte) -> bool
+{
+	*q = to;
+	return (*s).ptr == to;
+}
+
+fn slice(s: *[]int, q: **int, to: *int) -> int
+{
+	*q = to;
+	return (*s)[0];
+}
+
+fn function(s: *Slot, q: *?fn() -> int) -> int
+{
+	s.f = seven;
+	*q = eight;
+	let g = s.f;
+	return g();
+}
+
+fn function_bytes(s: *Slot, q: *?*byte) -> bool
+{
+	*q = none;
+	s.f = seven;
+	return *q != none;
+}
+
+fn main() -> int
+{
+	let a = 1;
+	let b = 2;
+	let x: float = 0.5;
+	let s = alloc Slot { p: &a, f: seven };
+	let spare = alloc Slot { p: &a, f: seven };
+	let p = either(&s.p as *byte, &spare.p as *byte);
+	let f = either(&s.f as *byte, &spare.f as *byte);
+	printf("optional %d\n".ptr, optional(s, p as *?*byte, &b) as c_int);
+	printf("other type %d\n".ptr,
+		other_type(s, p as **float, &x) as c_int);
+	let ints: [2]int = [3, 4];
+	let n = alloc Named { name: "abc", items: ints[0..2] };
+	let other = alloc Named { name: "abc", items: ints[0..2] };
+	let w = either(&n.name as *byte, &other.name as *byte);
+	let t = "xyz";
+	printf("str %d\n".ptr, text(&n.name, w as *?*byte, t.ptr) as c_int);
+	let o = either(&n.items as *byte, &other.items as *byte);
+	printf("slice %lld\n".ptr, slice(&n.items, o as **int, &ints[1]));
+	printf("function %lld\n".ptr, function(s, f as *?fn() -> int));
+	printf("function bytes %d\n".ptr,
+		function_bytes(s, f as *?*byte) as c_int);
+	return 0;
+}

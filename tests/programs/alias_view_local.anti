@@ -1,0 +1,81 @@
+//! The rule "A view where it stands" of "Aliasing of views": an access through
+//! a view reaches any memory along one path, through `&`, a field, an element,
+//! a part of a slice, a tuple and a local that `let` or `=` gave the view. It
+//! reads and writes the bytes, and the memory keeps its type. A float is
+//! written as `u32`, a field of a struct through a view as another struct, and
+//! an int through a tuple and a part of a slice of a view, each read back as
+//! the type the memory holds. The test runs in release mode, where the loads
+//! and stores carry !tbaa.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn getenv(name: ?*byte) -> ?*byte;
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+struct Two
+{
+	x: f32,
+	ps: [2]Pair,
+}
+
+struct Wide
+{
+	a: int,
+	b: int,
+	c: int,
+	d: int,
+}
+
+/// p, or other where ANTI_ALIAS_OTHER is set, which no test sets, so the
+/// optimiser cannot tell the result from p.
+fn either(p: *byte, other: *byte) -> *byte
+{
+	if getenv("ANTI_ALIAS_OTHER".ptr) != none {
+		return other;
+	}
+	return p;
+}
+
+fn as_bits(x: *f32, spare: *byte) -> float
+{
+	*x = 1.0;
+	let bits = either(x as *byte, spare) as *u32;
+	*bits = 0x40490fdb;
+	return *x as float;
+}
+
+fn as_other(ps: *[2]Pair, spare: *byte) -> int
+{
+	(*ps)[0].b = 1;
+	(*ps)[1].a = 2;
+	let w = either(&(*ps)[0] as *byte, spare) as *Wide;
+	w.b = 3;
+	w.c = 4;
+	return (*ps)[0].b * 10 + (*ps)[1].a;
+}
+
+fn through_parts(ps: *[2]Pair, spare: *byte) -> int
+{
+	(*ps)[1].b = 5;
+	let t = (either(ps as *byte, spare) as *[4]int, 0);
+	let s = (*t.0)[2..4];
+	s[1] = 6;
+	let later = either(ps as *byte, spare) as *int;
+	later = &later[1];
+	*later = 7;
+	return (*ps)[1].b * 10 + (*ps)[0].b;
+}
+
+fn main() -> int
+{
+	let two = alloc Two { x: 0.0, ps: [Pair { a: 0, b: 0 }, Pair { a: 0, b: 0 }] };
+	let spare = alloc Two { x: 0.0, ps: [Pair { a: 0, b: 0 }, Pair { a: 0, b: 0 }] };
+	printf("bits %.7f\n".ptr, as_bits(&two.x, spare as *byte));
+	printf("other %lld\n".ptr, as_other(&two.ps, spare as *byte));
+	printf("parts %lld\n".ptr, through_parts(&two.ps, spare as *byte));
+	return 0;
+}

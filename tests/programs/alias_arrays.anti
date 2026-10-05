@@ -1,0 +1,57 @@
+//! The rule "Arrays and slices" of "Aliasing of views": an array is its
+//! elements. An element of an array field meets a pointer of the element type,
+//! a slice meets the array it covers, and a view between `*[N]T` and `*T`
+//! reaches the same elements. The test runs in release mode, where the loads
+//! and stores carry !tbaa.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn getenv(name: ?*byte) -> ?*byte;
+
+struct Holder
+{
+	count: int,
+	values: [4]int,
+}
+
+/// p, or other where ANTI_ALIAS_OTHER is set, which no test sets, so the
+/// optimiser cannot tell the result from p.
+fn either(p: *byte, other: *byte) -> *byte
+{
+	if getenv("ANTI_ALIAS_OTHER".ptr) != none {
+		return other;
+	}
+	return p;
+}
+
+fn field(h: *Holder, p: *int) -> int
+{
+	h.values[2] = 1;
+	*p = 2;
+	return h.values[2];
+}
+
+fn sliced(a: *[4]int, s: []int) -> int
+{
+	(*a)[1] = 3;
+	s[1] = 4;
+	return (*a)[1];
+}
+
+fn viewed(a: *[4]int, p: *int) -> int
+{
+	(*a)[0] = 5;
+	*p = 6;
+	return (*a)[0];
+}
+
+fn main() -> int
+{
+	let h = alloc Holder { count: 4, values: [0, 0, 0, 0] };
+	let spare = alloc Holder { count: 4, values: [0, 0, 0, 0] };
+	let p = either(&h.values[2] as *byte, &spare.values[2] as *byte);
+	printf("field %lld\n".ptr, field(h, p as *int));
+	let a = either(&h.values as *byte, &spare.values as *byte) as *[4]int;
+	printf("slice %lld\n".ptr, sliced(&h.values, (*a)[0..4]));
+	printf("view %lld\n".ptr, viewed(&h.values, a as *int));
+	return 0;
+}

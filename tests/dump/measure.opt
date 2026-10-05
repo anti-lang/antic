@@ -11,14 +11,14 @@ global anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn measure.length_of(%0: agg str) -> i64 {
 b0:
     %1 = ptradd inbounds %0, offset_of str.len
-    %2 = load i64 %1
+    %2 = load i64 %1 !type i64
     ret i64 %2
 }
 fn measure.sum(%0: agg measure.V2) -> i64 {
 b0:
-    %1 = load f32 %0
+    %1 = load f32 %0 !type measure.V2.x
     %2 = ptradd inbounds %0, offset_of measure.V2.y
-    %3 = load f32 %2
+    %3 = load f32 %2 !type measure.V2.y
     %4 = fadd f32 %1, %3
     %5 = ftosi i64 %4
     ret i64 %5

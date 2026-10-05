@@ -74,6 +74,8 @@ static void make_copy(struct ir_inst *inst, struct ir_operand value)
     inst->b = none();
     inst->c = none();
     inst->field = 0;
+    inst->of = ir_scalar(IR_VOID);
+    inst->member = 0;
 }
 
 static void delete_inst(struct ir_block *b, size_t i)

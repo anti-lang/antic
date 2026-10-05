@@ -1,0 +1,106 @@
+//! The rule "Unions and variants" of "Aliasing of views": a field read through
+//! its union reads the bytes as that field, whichever field wrote them. An
+//! access whose path names the union may refer to every field of it at any
+//! depth below the field, and a store through a pointer to one field is read
+//! through the union. A variant holds the union of its cases. The test runs in
+//! release mode, where the loads and stores carry !tbaa.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn getenv(name: ?*byte) -> ?*byte;
+
+union Word
+{
+	i: int,
+	f: float,
+}
+
+struct Left
+{
+	a: int,
+	b: int,
+}
+
+struct Right
+{
+	c: int,
+	d: int,
+}
+
+union Deep
+{
+	left: Left,
+	right: Right,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Square { side: int },
+}
+
+/// p, or other where ANTI_ALIAS_OTHER is set, which no test sets, so the
+/// optimiser cannot tell the result from p.
+fn either(p: *byte, other: *byte) -> *byte
+{
+	if getenv("ANTI_ALIAS_OTHER".ptr) != none {
+		return other;
+	}
+	return p;
+}
+
+fn pun(w: *Word, v: *Word) -> int
+{
+	w.i = 1;
+	v.f = 2.0;
+	return w.i;
+}
+
+fn deep(u: *Deep, v: *Deep) -> int
+{
+	u.left.b = 3;
+	v.right.d = 4;
+	return u.left.b;
+}
+
+fn field(w: *Word, p: *int) -> int
+{
+	w.f = 1.5;
+	*p = 5;
+	return w.i;
+}
+
+fn size(s: Shape) -> int
+{
+	let n = 0;
+	switch s {
+		Circle c => n = c.r,
+		Square q => n = q.side * 10,
+	}
+	return n;
+}
+
+fn shapes(s: *Shape, t: *Shape) -> int
+{
+	*s = Shape.Circle { r: 6 };
+	*t = Shape.Square { side: 7 };
+	return size(*s);
+}
+
+fn main() -> int
+{
+	let w = alloc Word { i: 0 };
+	let spare = alloc Word { i: 0 };
+	let v = either(w as *byte, spare as *byte) as *Word;
+	printf("pun %lld\n".ptr, pun(w, v));
+	let u = alloc Deep { left: Left { a: 0, b: 0 } };
+	let other = alloc Deep { left: Left { a: 0, b: 0 } };
+	printf("deep %lld\n".ptr,
+		deep(u, either(u as *byte, other as *byte) as *Deep));
+	printf("field %lld\n".ptr,
+		field(w, either(&w.i as *byte, &spare.i as *byte) as *int));
+	let s = alloc Shape.Circle { r: 0 };
+	let t = alloc Shape.Circle { r: 0 };
+	printf("variant %lld\n".ptr,
+		shapes(s, either(s as *byte, t as *byte) as *Shape));
+	return 0;
+}

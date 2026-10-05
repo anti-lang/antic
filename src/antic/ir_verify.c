@@ -225,6 +225,57 @@ static void vtype_ok(struct verifier *v, const struct ir_inst *inst)
     }
 }
 
+/* The type of "Aliasing of views" that a load or a store reads memory as:
+   none, its own scalar type, or a field of that type of a plain struct.
+   Bytes reach any memory, and a lock word belongs to the system, so
+   neither takes one. A table pointer and an entry are accesses that
+   lowering makes for itself. */
+static void access_type(struct verifier *v, const struct ir_inst *inst)
+{
+    const char *name = ir_op_name(inst->op);
+    const struct ir_aggtype *agg;
+    const struct ir_field *field;
+
+    if (inst->of.type == IR_VOID) {
+        return;
+    }
+    if (inst->type == IR_I8) {
+        fail(v, "%s of i8 has a type, and bytes reach any memory", name);
+    } else if (inst->type == IR_LOCK || inst->type == IR_AGG ||
+               inst->type == IR_VOID) {
+        fail(v, "%s of %s has a type", name, ir_type_name(inst->type));
+    } else if (inst->field != IR_ACCESS_PLAIN) {
+        fail(v, "%s of %s has a type", name,
+             inst->field == IR_ACCESS_TABLE ? "a table pointer"
+                                            : "an entry of a table");
+    } else if (inst->of.type != IR_AGG) {
+        if (inst->of.type != inst->type) {
+            fail(v, "%s of %s has the type %s", name, ir_type_name(inst->type),
+                 ir_type_name(inst->of.type));
+        }
+    } else if (inst->of.agg >= v->m->agg_count) {
+        fail(v, "%s has the type of an aggregate that does not exist", name);
+    } else {
+        agg = v->m->aggs[inst->of.agg];
+        field = inst->member < agg->field_count ? &agg->fields[inst->member]
+                                                : NULL;
+        if (agg->kind != IR_AGG_STRUCT || agg->simd) {
+            fail(v, "%s has the type of a field of %s, which is no struct",
+                 name, agg->name);
+        } else if (field == NULL) {
+            fail(v, "%s has the type of field %" PRIu32 " of %s, which has %zu",
+                 name, inst->member, agg->name, agg->field_count);
+        } else if (field->bits != 0) {
+            fail(v, "%s has the type of the bitfield %s.%s", name, agg->name,
+                 field->name);
+        } else if (field->type.type != inst->type) {
+            fail(v, "%s of %s has the type of %s.%s, which is %s", name,
+                 ir_type_name(inst->type), agg->name, field->name,
+                 ir_type_name(field->type.type));
+        }
+    }
+}
+
 static enum ir_type type_of(const struct verifier *v, const struct ir_operand *o)
 {
     return o->kind == IR_TEMP ? v->f->temps[o->as.temp] : o->type;
@@ -408,11 +459,13 @@ static void check_inst(struct verifier *v, const struct ir_inst *inst)
     case IR_LOAD:
         same_type(v, inst, &inst->a, IR_PTR);
         access(v, inst);
+        access_type(v, inst);
         break;
     case IR_STORE:
         same_type(v, inst, &inst->a, inst->type);
         same_type(v, inst, &inst->b, IR_PTR);
         access(v, inst);
+        access_type(v, inst);
         break;
     case IR_PTRADD:
         same_type(v, inst, &inst->a, IR_PTR);

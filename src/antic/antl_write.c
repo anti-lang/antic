@@ -765,6 +765,12 @@ static void put_inst(struct writer *w, const struct ir_inst *inst)
     put_operand(w, &inst->c);
     put_vtype(w, inst->of);
     antl_put_u32(w, inst->field);
+    /* The field of the type of an access stands only where that type is
+       an aggregate. */
+    if ((inst->op == IR_LOAD || inst->op == IR_STORE) &&
+        inst->of.type == IR_AGG) {
+        antl_put_u32(w, inst->member);
+    }
     antl_put_count(w, inst->arg_count);
     for (i = 0; i < inst->arg_count; i++) {
         put_operand(w, &inst->args[i]);

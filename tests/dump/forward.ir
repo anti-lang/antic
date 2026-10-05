@@ -12,9 +12,9 @@ global forward.7 size 31 align 1 bytes 66 6f 72 77 61 72 64 2e 61 6e 74 69 3a 31
 fn forward.twice(%0: ptr nonnull deref(size_of forward.Point)) -> i64 {
 b0:
     %1 = ptradd inbounds %0, offset_of forward.Point.y
-    %2 = load i64 %1
+    %2 = load i64 %1 !type forward.Point.y
     %3 = ptradd inbounds %0, offset_of forward.Point.y
-    %4 = load i64 %3
+    %4 = load i64 %3 !type forward.Point.y
     %5 = addov nsw i64 %2, %4
     branchov %5, b1, b2
 b1:
@@ -26,9 +26,9 @@ b2:
 }
 fn forward.round_trip(%0: ptr nonnull deref(size_of forward.Point), %1: i64) -> i64 {
 b0:
-    store i64 %1, %0
-    %2 = load i64 %0
-    %3 = load i64 %0
+    store i64 %1, %0 !type forward.Point.x
+    %2 = load i64 %0 !type forward.Point.x
+    %3 = load i64 %0 !type forward.Point.x
     %4 = addov nsw i64 %2, %3
     branchov %4, b1, b2
 b1:

@@ -1,0 +1,4 @@
+exit 0
+int i64 2
+c_int i32 4
+field 6

@@ -216,7 +216,7 @@ b0:
   %v1 = getelementptr inbounds i8, ptr %v0, i64 8
   store ptr %v1, ptr %t1, align 8
   %v2 = load ptr, ptr %t1, align 8
-  %v3 = load i64, ptr %v2, align 8
+  %v3 = load i64, ptr %v2, align 8, !tbaa !23
   store i64 %v3, ptr %t2, align 8
   %v4 = load i64, ptr %t2, align 8
   ret i64 %v4
@@ -244,7 +244,7 @@ b0:
   %t1 = alloca i32, align 4
   store ptr %p0, ptr %t0, align 8
   %v0 = load ptr, ptr %t0, align 8
-  %v1 = load i32, ptr %v0, align 4, !range !5
+  %v1 = load i32, ptr %v0, align 4, !range !5, !tbaa !24
   store i32 %v1, ptr %t1, align 4
   %v2 = load i32, ptr %t1, align 4
   ret i32 %v2
@@ -396,3 +396,21 @@ attributes #1 = { nounwind }
 !3 = !{!"branch_weights", i32 1, i32 2000}
 !5 = !{i32 0, i32 3}
 !6 = !{i8 0, i8 2}
+!7 = !{!"anti"}
+!8 = !{!"byte", !7, i64 0}
+!9 = !{!"i16", !8, i64 0}
+!10 = !{!"i32", !8, i64 0}
+!11 = !{!"i64", !8, i64 0}
+!12 = !{!"f32", !8, i64 0}
+!13 = !{!"f64", !8, i64 0}
+!14 = !{!"ptr", !8, i64 0}
+!15 = !{!9, !9, i64 0}
+!16 = !{!10, !10, i64 0}
+!17 = !{!11, !11, i64 0}
+!18 = !{!12, !12, i64 0}
+!19 = !{!13, !13, i64 0}
+!20 = !{!14, !14, i64 0}
+!21 = !{!"arith.Point", !11, i64 0, !11, i64 8}
+!22 = !{!"arith.Holder", !10, i64 0}
+!23 = !{!21, !11, i64 8}
+!24 = !{!22, !10, i64 0}

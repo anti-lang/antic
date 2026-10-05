@@ -280,8 +280,10 @@ struct ir_inst {
     struct ir_operand a;
     struct ir_operand b;
     struct ir_operand c;
-    struct ir_vtype of;             /* IR_SLOT, IR_MEMCOPY, the bitfield ops */
+    struct ir_vtype of;             /* IR_SLOT, IR_MEMCOPY, the bitfield ops,
+                                       the type of an access */
     uint32_t field;                 /* IR_BITLOAD, IR_BITSTORE, IR_FLAG */
+    uint32_t member;                /* the field of the type of an access */
     struct ir_operand *args;        /* IR_CALL */
     size_t arg_count;
 };
@@ -780,6 +782,21 @@ uint32_t ir_binary_wrap(struct ir_function *f, struct ir_block *b,
 uint32_t ir_ptradd_inbounds(struct ir_function *f, struct ir_block *b,
                             struct ir_operand pointer,
                             struct ir_operand offset);
+/* DESIGN: the type an access reads memory as, by the rules of "Aliasing
+   of views" in docs/anti-language-additions.md, which the LLVM text writes
+   as !tbaa. LLVM cannot check it, so it stands only where the rules
+   guarantee it, under condition C2 of
+   docs/work-order-llvm-optimization.md. The of of an IR_LOAD or an
+   IR_STORE is void for an access the rules give no type of its own: an
+   access through a view, of bytes, along a path through a union, of a
+   table, and every access that lowering makes for itself. It is the
+   scalar type of the access for an element, a `*p` and a variable whose
+   memory a pointer may reach. It is the aggregate of a struct, a class or
+   a tuple, with member the index of the field, for a field of one. An i8
+   is bytes, which reach any memory, and carries no type.
+   ir_type_access gives the last instruction of b, a load or a store, of
+   and member. */
+void ir_type_access(struct ir_block *b, struct ir_vtype of, uint32_t member);
 uint32_t ir_load_range(struct ir_function *f, struct ir_block *b,
                        enum ir_type type, struct ir_operand pointer,
                        uint64_t low, uint64_t high);

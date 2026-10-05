@@ -56,7 +56,7 @@ b6:
     store ptr %20, %19
     %21 = ptradd %19, offset_of str.len
     store i64 15, %21
-    %22 = load ptr %19
+    %22 = load ptr %19 !type ptr
     %23 = call i32 @printf(%22, size_of sizes.Header, %6, size_of sizes.Buffer)
     %24 = subov nsw i64 size_of sizes.Header, 16
     branchov %24, b13, b14

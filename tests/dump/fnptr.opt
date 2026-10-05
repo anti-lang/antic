@@ -22,7 +22,7 @@ b2:
 }
 fn fnptr.run(%0: ptr nonnull deref(size_of fnptr.Op), %1: i32) -> i32 {
 b0:
-    %2 = load ptr %0
+    %2 = load ptr %0 !type fnptr.Op.apply
     %3 = call i32 %2 via @fnptr.fn.0(%1)
     ret i32 %3
 }

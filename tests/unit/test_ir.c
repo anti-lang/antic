@@ -524,6 +524,100 @@ static void arith_facts(void)
     arena_free(&arena);
 }
 
+/* The types of accesses of "Aliasing of views": a field of a struct names
+   the struct and the field, and an element or a `*p` its scalar type. The
+   second pass types accesses the rules give no type: bytes, a field of a
+   union, a bitfield, a field of another type, a table pointer. */
+static void type_accesses(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *f;
+    struct ir_block *b0;
+    struct ir_field fields[3];
+    uint32_t pair;
+    uint32_t word;
+    uint32_t p;
+    uint32_t at;
+    uint32_t v;
+    int pass;
+
+    for (pass = 0; pass < 2; pass++) {
+        ir_module_init(&m, &arena, "main");
+        memset(fields, 0, sizeof fields);
+        fields[0].name = "a";
+        fields[0].type = ir_scalar(IR_I64);
+        fields[1].name = "b";
+        fields[1].type = ir_scalar(IR_F64);
+        fields[2].name = "c";
+        fields[2].type = ir_scalar(IR_I32);
+        fields[2].bits = 3;
+        pair = ir_struct_add(&m, IR_AGG_STRUCT, "main.Pair", fields, 3, false,
+                             0);
+        word = ir_struct_add(&m, IR_AGG_UNION, "main.Word", fields, 2, false,
+                             0);
+        f = ir_function_add(&m, "main", "f", IR_VOID, IR_NO_AGG);
+        p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+        b0 = ir_block_add(f);
+        at = ir_ptradd_inbounds(f, b0, ir_temp_op(f, p),
+                                ir_sym_operand(&m, ir_sym_offset_of(&m, pair,
+                                                                    1)));
+        v = ir_load(f, b0, IR_F64, ir_temp_op(f, at));
+        ir_type_access(b0, ir_aggregate(pair), 1);
+        ir_store(f, b0, IR_F64, ir_temp_op(f, v), ir_temp_op(f, at));
+        ir_type_access(b0, ir_aggregate(pair), 1);
+        ir_store(f, b0, IR_I64, ir_int_op(IR_I64, 7), ir_temp_op(f, p));
+        ir_type_access(b0, ir_scalar(IR_I64), 0);
+        ir_load(f, b0, IR_I8, ir_temp_op(f, p));
+        if (pass == 1) {
+            ir_type_access(b0, ir_scalar(IR_I8), 0);
+            ir_load(f, b0, IR_I64, ir_temp_op(f, p));
+            ir_type_access(b0, ir_aggregate(word), 0);
+            ir_load(f, b0, IR_I32, ir_temp_op(f, p));
+            ir_type_access(b0, ir_aggregate(pair), 2);
+            ir_load(f, b0, IR_I64, ir_temp_op(f, p));
+            ir_type_access(b0, ir_aggregate(pair), 1);
+            ir_load(f, b0, IR_I64, ir_temp_op(f, p));
+            ir_type_access(b0, ir_aggregate(pair), 3);
+            ir_load(f, b0, IR_I64, ir_temp_op(f, p));
+            ir_type_access(b0, ir_scalar(IR_F64), 0);
+            ir_load_access(f, b0, ir_temp_op(f, p), IR_ACCESS_TABLE);
+            ir_type_access(b0, ir_scalar(IR_PTR), 0);
+        }
+        ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+        if (pass == 0) {
+            printed(&m, "type main.Pair = struct { a: i64, b: f64, "
+                        "c: i32 : 3 zeroext }\n"
+                        "type main.Word = union { a: i64, b: f64 }\n"
+                        "fn main.f(%0: ptr) {\n"
+                        "b0:\n"
+                        "    %1 = ptradd inbounds %0, offset_of main.Pair.b\n"
+                        "    %2 = load f64 %1 !type main.Pair.b\n"
+                        "    store f64 %2, %1 !type main.Pair.b\n"
+                        "    store i64 7, %0 !type i64\n"
+                        "    %3 = load i8 %0\n"
+                        "    ret\n"
+                        "}\n");
+            verified(&m, "");
+        } else {
+            verified(&m, "main.f b0: load of i8 has a type, and bytes reach "
+                         "any memory\n"
+                         "main.f b0: load has the type of a field of "
+                         "main.Word, which is no struct\n"
+                         "main.f b0: load has the type of the bitfield "
+                         "main.Pair.c\n"
+                         "main.f b0: load of i64 has the type of "
+                         "main.Pair.b, which is f64\n"
+                         "main.f b0: load has the type of field 3 of "
+                         "main.Pair, which has 3\n"
+                         "main.f b0: load of i64 has the type f64\n"
+                         "main.f b0: load of a table pointer has a type\n");
+        }
+        ir_module_free(&m);
+    }
+    arena_free(&arena);
+}
+
 /* A call through a pointer passes the arguments of its signature. */
 static void indirect_arguments(void)
 {
@@ -729,5 +823,6 @@ void test_ir(void)
     table_accesses();
     param_facts();
     arith_facts();
+    type_accesses();
     no_module();
 }

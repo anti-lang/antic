@@ -1,0 +1,94 @@
+//! The rule "A view passed on" of "Aliasing of views": a view that leaves as an
+//! argument, a result or a field is a pointer of its own type, and the memory
+//! holds a type the rules let it refer to. An `i32` changed through a `*u32`
+//! argument, the first field of a struct through a `*int` kept in a field,
+//! memory from `alloc` kept as `*Pair` in a field, and a part of a struct given
+//! back as a result each read back as the type the memory holds. The test runs
+//! in release mode, where the loads and stores carry !tbaa.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn getenv(name: ?*byte) -> ?*byte;
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+struct Num
+{
+	n: i32,
+}
+
+struct Keeper
+{
+	p: *int,
+	room: *Pair,
+}
+
+/// p, or other where ANTI_ALIAS_OTHER is set, which no test sets, so the
+/// optimiser cannot tell the result from p.
+fn either(p: *byte, other: *byte) -> *byte
+{
+	if getenv("ANTI_ALIAS_OTHER".ptr) != none {
+		return other;
+	}
+	return p;
+}
+
+fn bump(p: *u32)
+{
+	*p = *p + 1;
+}
+
+fn signed(n: *i32) -> i32
+{
+	*n = 41;
+	bump(either(n as *byte, n as *byte) as *u32);
+	return *n;
+}
+
+fn kept(k: *Keeper, ps: *Pair) -> int
+{
+	ps.a = 1;
+	*k.p = 2;
+	return ps.a;
+}
+
+fn room(k: *Keeper, p: *int) -> int
+{
+	k.room[1].b = 3;
+	*p = 4;
+	return k.room[1].b;
+}
+
+fn second(ps: *Pair) -> *int
+{
+	return either(&ps.b as *byte, &ps.a as *byte) as *int;
+}
+
+fn result(ps: *Pair) -> int
+{
+	ps.b = 5;
+	*second(ps) = 6;
+	return ps.b;
+}
+
+fn main() -> int
+{
+	let num = alloc Num { n: 0 };
+	printf("argument %d\n".ptr, signed(&num.n));
+	let ps = alloc Pair { a: 0, b: 0 };
+	let spare = alloc Pair { a: 0, b: 0 };
+	let raw = alloc(byte, 2 * size_of(Pair)) else {
+		return 1;
+	};
+	let k = alloc Keeper { p: ps as *int, room: raw as *Pair };
+	k.p = either(ps as *byte, spare as *byte) as *int;
+	printf("field %lld\n".ptr, kept(k, ps));
+	let b = either(&k.room[1].b as *byte, &spare.b as *byte);
+	printf("room %lld\n".ptr, room(k, b as *int));
+	printf("result %lld\n".ptr, result(ps));
+	free(raw);
+	return 0;
+}

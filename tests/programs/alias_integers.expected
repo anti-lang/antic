@@ -1,0 +1,6 @@
+exit 0
+i16 u16 7
+i32 u32 8
+int u64 9
+enum u16 2
+char u32 98

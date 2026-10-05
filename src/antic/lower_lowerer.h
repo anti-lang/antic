@@ -209,6 +209,10 @@ struct place {
        it and its type. The `changed` hook takes both. */
     struct ir_operand object;
     const struct type *owner;
+    /* The type of "Aliasing of views" that a load or a store of the place
+       reads memory as, and the field of it, see ir_type_access. */
+    struct ir_vtype typed;
+    uint32_t member;
 };
 
 /* The kinds of enum anti_check in src/rt/std.h, in its order. The unit test

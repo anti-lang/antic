@@ -84,6 +84,10 @@ void llvm_debug_init(struct llvm_debug *d, enum target t,
 
 void llvm_debug_free(struct llvm_debug *d);
 
+/* Append s as a metadata string in quotes. A quote, a backslash and a
+   byte outside printable ASCII take the escape \XX. */
+void llvm_metadata_string(struct text *out, const char *s);
+
 /* Append ` !dbg !N` to the definition of f, which out ends with, and
    write the subprogram of f. local says that f has internal linkage. */
 void llvm_debug_open(struct llvm_debug *d, struct text *out,

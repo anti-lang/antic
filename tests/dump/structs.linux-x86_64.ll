@@ -41,7 +41,7 @@ b0:
   store ptr %s5, ptr %t5, align 8
   call void @llvm.lifetime.start.p0(ptr %s4)
   %v1 = load ptr, ptr %t0, align 8
-  %v2 = load i64, ptr %v1, align 8
+  %v2 = load i64, ptr %v1, align 8, !tbaa !21
   store i64 %v2, ptr %t6, align 8
   %v3 = load i64, ptr %t6, align 8
   call void (ptr, i64) @make(ptr sret([24 x i8]) align 8 %a3, i64 %v3)
@@ -73,13 +73,13 @@ b0:
   %v20 = load ptr, ptr %t8, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr %v19, ptr %v20, i64 16, i1 false)
   %v21 = load ptr, ptr %t5, align 8
-  %v22 = load i64, ptr %v21, align 8
+  %v22 = load i64, ptr %v21, align 8, !tbaa !21
   store i64 %v22, ptr %t9, align 8
   %v23 = load ptr, ptr %t1, align 8
   %v24 = getelementptr inbounds i8, ptr %v23, i64 16
   store ptr %v24, ptr %t10, align 8
   %v25 = load ptr, ptr %t10, align 8
-  %v26 = load i64, ptr %v25, align 8
+  %v26 = load i64, ptr %v25, align 8, !tbaa !22
   store i64 %v26, ptr %t11, align 8
   %v27 = load i64, ptr %t9, align 8
   %v28 = load i64, ptr %t11, align 8
@@ -87,7 +87,7 @@ b0:
   store i64 %v29, ptr %t12, align 8
   %v30 = load i64, ptr %t12, align 8
   %v31 = load ptr, ptr %t5, align 8
-  store i64 %v30, ptr %v31, align 8
+  store i64 %v30, ptr %v31, align 8, !tbaa !21
   %v32 = load ptr, ptr %t5, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr %a8, ptr %v32, i64 16, i1 false)
   %v33 = load i64, ptr %a8, align 8
@@ -114,3 +114,21 @@ attributes #1 = { nounwind }
 !0 = !{i32 1, !"wchar_size", i32 4}
 !1 = !{i32 8, !"PIC Level", i32 2}
 !2 = !{!"antic VERSION"}
+!5 = !{!"anti"}
+!6 = !{!"byte", !5, i64 0}
+!7 = !{!"i16", !6, i64 0}
+!8 = !{!"i32", !6, i64 0}
+!9 = !{!"i64", !6, i64 0}
+!10 = !{!"f32", !6, i64 0}
+!11 = !{!"f64", !6, i64 0}
+!12 = !{!"ptr", !6, i64 0}
+!13 = !{!7, !7, i64 0}
+!14 = !{!8, !8, i64 0}
+!15 = !{!9, !9, i64 0}
+!16 = !{!10, !10, i64 0}
+!17 = !{!11, !11, i64 0}
+!18 = !{!12, !12, i64 0}
+!19 = !{!"structs.Pair", !9, i64 0, !11, i64 8}
+!20 = !{!"structs.Big", !9, i64 0, !9, i64 8, !9, i64 16}
+!21 = !{!19, !9, i64 0}
+!22 = !{!20, !9, i64 16}

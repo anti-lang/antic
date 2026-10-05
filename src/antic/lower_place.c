@@ -132,8 +132,100 @@ struct ir_global *lower_static_global(struct lowerer *l,
     return g;
 }
 
-bool lower_place(struct lowerer *l, const struct expr *e,
-                 struct place *p)
+/* Whether an access of an IR scalar type may carry a type of "Aliasing
+   of views". Bytes reach any memory, and a lock word belongs to the
+   system. */
+static bool typed_scalar(enum ir_type type)
+{
+    return type == IR_I16 || type == IR_I32 || type == IR_I64 ||
+           type == IR_F32 || type == IR_F64 || type == IR_PTR ||
+           type == IR_CLONG || type == IR_CWCHAR;
+}
+
+/* Whether the path of the place e names a union or a variant, as u.f or
+   p.f for a pointer p to one, at any depth below the field. The path
+   ends at a pointer, so q.x for q = &u.f names no union. */
+static bool names_union(const struct expr *e)
+{
+    const struct expr *base;
+    const struct type *t;
+    bool pointer;
+
+    for (;;) {
+        if (e->kind == EXPR_FIELD) {
+            base = e->as.field.base;
+        } else if (e->kind == EXPR_INDEX) {
+            base = e->as.index.base;
+        } else {
+            return false;
+        }
+        t = base->type;
+        pointer = t->kind == TYPE_POINTER;
+        t = pointer ? t->element : t;
+        if (t->kind == TYPE_VARIANT || (t->kind == TYPE_STRUCT && t->is_union)) {
+            return true;
+        }
+        if (pointer || (e->kind == EXPR_INDEX && t->kind != TYPE_ARRAY)) {
+            return false;
+        }
+        e = base;
+    }
+}
+
+/* DESIGN: the type of "Aliasing of views" in
+   docs/anti-language-additions.md that an access of the place e reads
+   memory as, see ir_type_access. A place in a temporary, a bitfield, a
+   place of bytes or of an aggregate, a place a view reaches and a path
+   through a union take none. A field of a plain struct, a class or a
+   tuple names the type that declares it, which `super` makes the base for
+   a field of a base. Fields reached through two types of which neither
+   holds the other then refer to different memory, while a pointer to the
+   field, an element or a `*p` of its type keeps the scalar type alone and
+   may refer to any of them. A lane of a simd struct is its scalar type. A
+   field read as another type than it holds, the value of a narrowed
+   `?T`, keeps the scalar type of the read. */
+static void type_place(struct lowerer *l, const struct expr *e,
+                       struct place *p)
+{
+    const struct expr *base;
+    const struct type *s;
+    const struct struct_field *field;
+    const struct ir_aggtype *agg;
+    uint32_t index;
+
+    if (p->in_temp || p->bitfield || !typed_scalar(p->type) ||
+        sema_place_view(e) || names_union(e)) {
+        return;
+    }
+    p->typed = ir_scalar(p->type);
+    if (e->kind != EXPR_FIELD ||
+        (e->symbol != NULL && e->symbol->kind == SYMBOL_GLOBAL)) {
+        return;
+    }
+    base = e->as.field.base;
+    s = base->type->kind == TYPE_POINTER ? base->type->element : base->type;
+    if ((s->kind != TYPE_STRUCT && s->kind != TYPE_CLASS &&
+         s->kind != TYPE_TUPLE) ||
+        s->is_union || s->simd) {
+        return;
+    }
+    field = types_find_field(s, &e->as.field.name);
+    if (field == NULL) {
+        return;
+    }
+    index = lower_agg_of(l, s);
+    agg = l->m->aggs[index];
+    if ((size_t)(field - s->fields) >= agg->field_count ||
+        agg->fields[field - s->fields].bits != 0 ||
+        agg->fields[field - s->fields].type.type != p->type) {
+        return;
+    }
+    p->typed = ir_aggregate(index);
+    p->member = (uint32_t)(field - s->fields);
+}
+
+static bool place_address(struct lowerer *l, const struct expr *e,
+                          struct place *p)
 {
     const struct symbol *sym = e->symbol;
     const struct struct_field *bits;
@@ -143,6 +235,8 @@ bool lower_place(struct lowerer *l, const struct expr *e,
     p->in_temp = false;
     p->object = lower_none();
     p->owner = NULL;
+    p->typed = ir_scalar(IR_VOID);
+    p->member = 0;
     p->type = lower_ir_type_of(e->type);
     p->of = e->type;
     switch (e->kind) {
@@ -207,6 +301,17 @@ bool lower_place(struct lowerer *l, const struct expr *e,
         p->address = lower_address(l, e);
         return true;
     }
+}
+
+bool lower_place(struct lowerer *l, const struct expr *e,
+                 struct place *p)
+{
+    bool found = place_address(l, e, p);
+
+    if (found) {
+        type_place(l, e, p);
+    }
+    return found;
 }
 
 /* The scalar constant v as a leaf of a constant tree. */
@@ -419,6 +524,8 @@ const struct const_value *lower_location_value(struct lowerer *l,
 
 struct ir_operand lower_read_place(struct lowerer *l, const struct place *p)
 {
+    struct ir_operand value;
+
     if (p->in_temp) {
         return lower_temp(l, p->temp);
     }
@@ -426,5 +533,9 @@ struct ir_operand lower_read_place(struct lowerer *l, const struct place *p)
         return lower_temp(l, ir_bitload(l->f, l->b, p->type, p->address, p->agg,
                                         p->field));
     }
-    return lower_load_value(l, p->of, p->address);
+    value = lower_load_value(l, p->of, p->address);
+    if (p->typed.type != IR_VOID) {
+        ir_type_access(l->b, p->typed, p->member);
+    }
+    return value;
 }

@@ -1,0 +1,59 @@
+//! The rule "Same type" of "Aliasing of views": two accesses of the same type
+//! may refer to the same memory, and a type and its alias are one type. `int`
+//! meets `i64`, `c_int` meets `i32`, and a field meets a pointer of its type.
+//! The test runs in release mode, where the loads and stores carry !tbaa.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn getenv(name: ?*byte) -> ?*byte;
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+/// p, or other where ANTI_ALIAS_OTHER is set, which no test sets, so the
+/// optimiser cannot tell the result from p.
+fn either(p: *byte, other: *byte) -> *byte
+{
+	if getenv("ANTI_ALIAS_OTHER".ptr) != none {
+		return other;
+	}
+	return p;
+}
+
+fn wide(p: *int, q: *i64) -> int
+{
+	*p = 1;
+	*q = 2;
+	return *p;
+}
+
+fn narrow(p: *c_int, q: *i32) -> c_int
+{
+	*p = 3;
+	*q = 4;
+	return *p;
+}
+
+fn field(ps: *Pair, q: *int) -> int
+{
+	ps.b = 5;
+	*q = 6;
+	return ps.b;
+}
+
+fn main() -> int
+{
+	let ps = alloc Pair { a: 0, b: 0 };
+	let spare = alloc Pair { a: 0, b: 0 };
+	let w = either(&ps.a as *byte, &spare.a as *byte);
+	printf("int i64 %lld\n".ptr, wide(&ps.a, w as *i64));
+	let n: c_int = 0;
+	let other: c_int = 0;
+	let m = either(&n as *byte, &other as *byte);
+	printf("c_int i32 %d\n".ptr, narrow(&n, m as *i32));
+	let q = either(&ps.b as *byte, &spare.b as *byte);
+	printf("field %lld\n".ptr, field(ps, q as *int));
+	return 0;
+}

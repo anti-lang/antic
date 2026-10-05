@@ -14,7 +14,7 @@ b0:
   %v1 = getelementptr inbounds i8, ptr %v0, i64 8
   store ptr %v1, ptr %t1, align 8
   %v2 = load ptr, ptr %t1, align 8
-  %v3 = load i64, ptr %v2, align 8
+  %v3 = load i64, ptr %v2, align 8, !tbaa !15
   store i64 %v3, ptr %t2, align 8
   %v4 = load i64, ptr %t2, align 8
   ret i64 %v4
@@ -32,13 +32,13 @@ b0:
   store [2 x float] %p0.0, ptr %a0, align 8
   store ptr %a0, ptr %t0, align 8
   %v0 = load ptr, ptr %t0, align 8
-  %v1 = load float, ptr %v0, align 4
+  %v1 = load float, ptr %v0, align 4, !tbaa !20
   store float %v1, ptr %t1, align 4
   %v2 = load ptr, ptr %t0, align 8
   %v3 = getelementptr inbounds i8, ptr %v2, i64 4
   store ptr %v3, ptr %t2, align 8
   %v4 = load ptr, ptr %t2, align 8
-  %v5 = load float, ptr %v4, align 4
+  %v5 = load float, ptr %v4, align 4, !tbaa !21
   store float %v5, ptr %t3, align 4
   %v6 = load float, ptr %t1, align 4
   %v7 = load float, ptr %t3, align 4
@@ -126,3 +126,20 @@ attributes #1 = { nounwind }
 !0 = !{i32 1, !"wchar_size", i32 4}
 !1 = !{i32 8, !"PIC Level", i32 2}
 !2 = !{!"antic VERSION"}
+!5 = !{!"anti"}
+!6 = !{!"byte", !5, i64 0}
+!7 = !{!"i16", !6, i64 0}
+!8 = !{!"i32", !6, i64 0}
+!9 = !{!"i64", !6, i64 0}
+!10 = !{!"f32", !6, i64 0}
+!11 = !{!"f64", !6, i64 0}
+!12 = !{!"ptr", !6, i64 0}
+!13 = !{!7, !7, i64 0}
+!14 = !{!8, !8, i64 0}
+!15 = !{!9, !9, i64 0}
+!16 = !{!10, !10, i64 0}
+!17 = !{!11, !11, i64 0}
+!18 = !{!12, !12, i64 0}
+!19 = !{!"measure.V2", !10, i64 0, !10, i64 4}
+!20 = !{!19, !10, i64 0}
+!21 = !{!19, !10, i64 4}

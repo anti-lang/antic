@@ -11,7 +11,7 @@ b0:
   %t4 = alloca i8, align 1
   store ptr %p0, ptr %t0, align 8
   %v0 = load ptr, ptr %t0, align 8
-  %v1 = load i64, ptr %v0, align 8
+  %v1 = load i64, ptr %v0, align 8, !tbaa !20
   store i64 %v1, ptr %t1, align 8
   %v2 = load i64, ptr %t1, align 8
   %v3 = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %v2, i64 1)
@@ -30,7 +30,7 @@ b1:
 b2:
   %v8 = load i64, ptr %t2, align 8
   %v9 = load ptr, ptr %t0, align 8
-  store i64 %v8, ptr %v9, align 8
+  store i64 %v8, ptr %v9, align 8, !tbaa !20
   %v10 = load i64, ptr %t2, align 8
   %v11 = icmp sle i64 %v10, 3
   %v12 = zext i1 %v11 to i8
@@ -45,7 +45,7 @@ b0:
   %t1 = alloca i64, align 8
   store ptr %p0, ptr %t0, align 8
   %v0 = load ptr, ptr %t0, align 8
-  %v1 = load i64, ptr %v0, align 8
+  %v1 = load i64, ptr %v0, align 8, !tbaa !20
   store i64 %v1, ptr %t1, align 8
   %v2 = load i64, ptr %t1, align 8
   ret i64 %v2
@@ -446,3 +446,19 @@ attributes #1 = { nounwind }
 !1 = !{i32 8, !"PIC Level", i32 2}
 !2 = !{!"antic VERSION"}
 !3 = !{!"branch_weights", i32 1, i32 2000}
+!5 = !{!"anti"}
+!6 = !{!"byte", !5, i64 0}
+!7 = !{!"i16", !6, i64 0}
+!8 = !{!"i32", !6, i64 0}
+!9 = !{!"i64", !6, i64 0}
+!10 = !{!"f32", !6, i64 0}
+!11 = !{!"f64", !6, i64 0}
+!12 = !{!"ptr", !6, i64 0}
+!13 = !{!7, !7, i64 0}
+!14 = !{!8, !8, i64 0}
+!15 = !{!9, !9, i64 0}
+!16 = !{!10, !10, i64 0}
+!17 = !{!11, !11, i64 0}
+!18 = !{!12, !12, i64 0}
+!19 = !{!"effects.Count", !9, i64 0}
+!20 = !{!19, !9, i64 0}

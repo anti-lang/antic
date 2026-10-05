@@ -315,6 +315,49 @@ static void fills_arith_facts(void)
     CHECK(body_count(source, "main.scoped", "lifeend") == 1);
 }
 
+/* The types of accesses of "Aliasing of views". A field of a struct or a
+   class names the struct that declares it, a field of a base the base,
+   and an element, a `*p` and a lane of a simd struct the scalar type. An
+   access through a view, of bytes or along a path through a union has no
+   type. */
+static void fills_access_types(void)
+{
+    static const char source[] =
+        "struct Point { x: int, y: float, on: bool }\n"
+        "union Word { i: int, f: float }\n"
+        "union Deep { p: Point, n: int }\n"
+        "simd struct V4 { x: f32, y: f32, z: f32, w: f32 }\n"
+        "class Box { pub n: int = 0 }\n"
+        "class Big inherits Box { pub m: int = 0 }\n"
+        "fn get(p: *Point) -> float { return p.y; }\n"
+        "fn set(p: *Point) { p.x = 3; }\n"
+        "fn bump(p: *Point) { p.x += 1; }\n"
+        "fn elem(a: []int, i: int) -> int { return a[i]; }\n"
+        "fn deref(p: *f32) -> f32 { return *p; }\n"
+        "fn view(p: *Point) -> int {"
+        " let q = p as *int; return *q + (p as *Point).x; }\n"
+        "fn bytes(p: *u8, q: *Point) -> bool {"
+        " return *p == 0 && q.on; }\n"
+        "fn word(w: *Word) -> float { return w.f; }\n"
+        "fn deep(d: *Deep) -> int { return d.p.x; }\n"
+        "fn lane(v: *V4) -> f32 { return v.y; }\n"
+        "fn boxed(b: *Big) -> int { return b.n + b.m; }\n";
+
+    CHECK(body_holds(source, "main.get", "!type main.Point.y"));
+    CHECK(body_holds(source, "main.set", "store i64 3, %0 !type main.Point.x"));
+    CHECK(body_count(source, "main.bump", "!type main.Point.x") == 2);
+    CHECK(body_holds(source, "main.elem", "!type i64"));
+    CHECK(body_holds(source, "main.deref", "load f32 %0 !type f32"));
+    CHECK(body_count(source, "main.view", "!type") == 0);
+    CHECK(body_count(source, "main.bytes", "!type") == 0);
+    CHECK(body_count(source, "main.word", "!type") == 0);
+    CHECK(body_count(source, "main.deep", "!type") == 0);
+    CHECK(body_holds(source, "main.lane", "!type f32"));
+    CHECK(body_count(source, "main.lane", "!type main.") == 0);
+    CHECK(body_holds(source, "main.boxed", "!type main.Box.n"));
+    CHECK(body_holds(source, "main.boxed", "!type main.Big.m"));
+}
+
 /* A class record names the tables of a class, its base, its interfaces
    and the `mutable` fields of a singleton. A `worker fn` keeps its mark.
    A call through a table names the class and the slot. */
@@ -1199,7 +1242,7 @@ void test_lower(void)
            "fn main.f(%0: ptr nonnull deref(size_of main.P), %1: agg main.A) -> i32 {\n"
            "b0:\n"
            "    %2 = ptradd inbounds %0, offset_of main.P.b\n"
-           "    %3 = load i32 %2\n"
+           "    %3 = load i32 %2 !type main.P.b\n"
            "    %4 = load i8 %1\n"
            "    %5 = zext i32 %4\n"
            "    %6 = addov nsw i32 %3, %5\n"
@@ -1391,7 +1434,7 @@ void test_lower(void)
            "    lifestart %0\n"
            "    store i64 5, %0\n"
            "    %1 = copy ptr %0\n"
-           "    %2 = load i64 %1\n"
+           "    %2 = load i64 %1 !type i64\n"
            "    %3 = addov nsw i64 %2, 1\n"
            "    branchov %3, b1, b2\n"
            "b1:\n"
@@ -1399,8 +1442,8 @@ void test_lower(void)
            "    call void @anti_rt_check_failed(%4, 21, 1, %2, 1)\n"
            "    unreachable\n"
            "b2:\n"
-           "    store i64 %3, %1\n"
-           "    %5 = load i64 %0\n"
+           "    store i64 %3, %1 !type i64\n"
+           "    %5 = load i64 %0 !type i64\n"
            "    ret i64 %5\n"
            "}\n");
 
@@ -1525,10 +1568,10 @@ void test_lower(void)
            "b2:\n"
            "    %4 = mul i64 2, size_of i16\n"
            "    %5 = ptradd %2, %4\n"
-           "    store i16 7, %5\n"
+           "    store i16 7, %5 !type i16\n"
            "    %6 = mul i64 2, size_of i16\n"
            "    %7 = ptradd %2, %6\n"
-           "    %8 = load i16 %7\n"
+           "    %8 = load i16 %7 !type i16\n"
            "    %9 = copy i16 %8\n"
            "    call void @free(%2)\n"
            "    %10 = trunc i16 size_of i16\n"
@@ -1573,8 +1616,8 @@ void test_lower(void)
            "fn main.h(%0: ptr nonnull deref(size_of i16), %1: f32) -> f32 {\n"
            "b0:\n"
            "    %2 = htrunc i16 %1\n"
-           "    store i16 %2, %0\n"
-           "    %3 = load i16 %0\n"
+           "    store i16 %2, %0 !type i16\n"
+           "    %3 = load i16 %0 !type i16\n"
            "    %4 = hext f32 %3\n"
            "    ret f32 %4\n"
            "}\n");
@@ -1770,9 +1813,9 @@ void test_lower(void)
            "    %8 = ptradd %2, offset_of str.len\n"
            "    store i64 2, %8\n"
            "    %9 = ptradd inbounds %0, offset_of str.len\n"
-           "    %10 = load i64 %9\n"
+           "    %10 = load i64 %9 !type i64\n"
            "    %11 = ptradd inbounds %1, offset_of []byte.len\n"
-           "    %12 = load i64 %11\n"
+           "    %12 = load i64 %11 !type i64\n"
            "    %13 = addov nsw i64 %10, %12\n"
            "    branchov %13, b1, b2\n"
            "b1:\n"
@@ -1781,7 +1824,7 @@ void test_lower(void)
            "    unreachable\n"
            "b2:\n"
            "    %15 = ptradd inbounds %2, offset_of str.len\n"
-           "    %16 = load i64 %15\n"
+           "    %16 = load i64 %15 !type i64\n"
            "    %17 = addov nsw i64 %13, %16\n"
            "    branchov %17, b3, b4\n"
            "b3:\n"
@@ -1830,7 +1873,7 @@ void test_lower(void)
            "b2:\n"
            "    %16 = mul i64 %2, size_of i32\n"
            "    %17 = ptradd %13, %16\n"
-           "    %18 = load i32 %17\n"
+           "    %18 = load i32 %17 !type i32\n"
            "    %19 = ptradd %0, offset_of str.len\n"
            "    %20 = load i64 %19\n"
            "    %21 = load ptr %0\n"
@@ -1855,7 +1898,7 @@ void test_lower(void)
            "    unreachable\n"
            "b6:\n"
            "    %32 = ptradd inbounds %3, offset_of []byte.len\n"
-           "    %33 = load i64 %32\n"
+           "    %33 = load i64 %32 !type i64\n"
            "    %34 = trunc i32 %33\n"
            "    %35 = sext i64 %34\n"
            "    %36 = eq i8 %35, %33\n"
@@ -1913,7 +1956,7 @@ void test_lower(void)
            "    %12 = sub i64 3, 0\n"
            "    %13 = ptradd %4, offset_of []int.len\n"
            "    store i64 %12, %13\n"
-           "    %14 = load ptr %3\n"
+           "    %14 = load ptr %3 !type ptr\n"
            "    ret ptr %14\n"
            "}\n");
 
@@ -1933,7 +1976,7 @@ void test_lower(void)
            "    %1 = addr @main.1\n"
            "    memcopy %0, %1, str\n"
            "    %2 = ptradd inbounds %0, offset_of str.len\n"
-           "    %3 = load i64 %2\n"
+           "    %3 = load i64 %2 !type i64\n"
            "    ret i64 %3\n"
            "}\n");
     /* An aggregate parameter is a pointer to the value, and a field is a
@@ -1957,9 +2000,9 @@ void test_lower(void)
            "global main.6 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.t(%0: agg main.P) -> i64 {\n"
            "b0:\n"
-           "    %1 = load i64 %0\n"
+           "    %1 = load i64 %0 !type main.P.x\n"
            "    %2 = ptradd inbounds %0, offset_of main.P.y\n"
-           "    %3 = load i32 %2\n"
+           "    %3 = load i32 %2 !type main.P.y\n"
            "    %4 = sext i64 %3\n"
            "    %5 = addov nsw i64 %1, %4\n"
            "    branchov %5, b1, b2\n"
@@ -1973,7 +2016,7 @@ void test_lower(void)
            "fn main.u(%0: ptr nonnull deref(size_of main.P)) {\n"
            "b0:\n"
            "    %1 = ptradd inbounds %0, offset_of main.P.y\n"
-           "    store i32 3, %1\n"
+           "    store i32 3, %1 !type main.P.y\n"
            "    ret\n"
            "}\n");
 
@@ -2005,8 +2048,8 @@ void test_lower(void)
            "    lifestart %2\n"
            "    memcopy %2, %1, main.V\n"
            "    %4 = ptradd inbounds %2, offset_of main.V.y\n"
-           "    %5 = load f64 %1\n"
-           "    store f64 %5, %4\n"
+           "    %5 = load f64 %1 !type main.V.x\n"
+           "    store f64 %5, %4 !type main.V.y\n"
            "    ret ptr %2\n"
            "}\n");
 
@@ -2033,7 +2076,7 @@ void test_lower(void)
            "b2:\n"
            "    %4 = mul i64 2, size_of i32\n"
            "    %5 = ptradd %0, %4\n"
-           "    %6 = load i32 %5\n"
+           "    %6 = load i32 %5 !type i32\n"
            "    store i32 %6, %1\n"
            "    %7 = mul i64 1, size_of i32\n"
            "    %8 = ptradd %1, %7\n"
@@ -2046,7 +2089,7 @@ void test_lower(void)
            "b4:\n"
            "    %11 = mul i64 1, size_of i32\n"
            "    %12 = ptradd %0, %11\n"
-           "    %13 = load i32 %12\n"
+           "    %13 = load i32 %12 !type i32\n"
            "    store i32 %13, %8\n"
            "    %14 = mul i64 2, size_of i32\n"
            "    %15 = ptradd %1, %14\n"
@@ -2060,7 +2103,7 @@ void test_lower(void)
            "b6:\n"
            "    %18 = mul i64 0, size_of i32\n"
            "    %19 = ptradd %1, %18\n"
-           "    %20 = load i32 %19\n"
+           "    %20 = load i32 %19 !type i32\n"
            "    %21 = ult i8 2, 3\n"
            "    branch %21, b8, b7\n"
            "b7:\n"
@@ -2070,7 +2113,7 @@ void test_lower(void)
            "b8:\n"
            "    %23 = mul i64 2, size_of i32\n"
            "    %24 = ptradd %1, %23\n"
-           "    %25 = load i32 %24\n"
+           "    %25 = load i32 %24 !type i32\n"
            "    %26 = addov nsw i32 %20, %25\n"
            "    branchov %26, b9, b10\n"
            "b9:\n"
@@ -2181,7 +2224,7 @@ void test_lower(void)
            "    %4 = call agg @add(%1, %2)\n"
            "    memcopy %0, %4, main.V\n"
            "    %5 = ptradd inbounds %0, offset_of main.V.y\n"
-           "    %6 = load f64 %5\n"
+           "    %6 = load f64 %5 !type main.V.y\n"
            "    ret f64 %6\n"
            "}\n");
 
@@ -2315,7 +2358,7 @@ void test_lower(void)
            "fn main.main.0(%0: i64, %1: ptr) -> i64 {\n"
            "b0:\n"
            "    %2 = load ptr %1\n"
-           "    %3 = load i64 %2\n"
+           "    %3 = load i64 %2 !type i64\n"
            "    %4 = addov nsw i64 %0, %3\n"
            "    branchov %4, b1, b2\n"
            "b1:\n"
@@ -2352,7 +2395,7 @@ void test_lower(void)
            "b0:\n"
            "    %2 = addr @abs\n"
            "    %3 = copy ptr %2\n"
-           "    %4 = load ptr %0\n"
+           "    %4 = load ptr %0 !type main.Ops.unary\n"
            "    %5 = call i32 %4 via @main.fn.0(%1)\n"
            "    %6 = call i32 %3 via @main.fn.0(%1)\n"
            "    %7 = addov nsw i32 %5, %6\n"
@@ -2365,7 +2408,7 @@ void test_lower(void)
            "    unreachable\n"
            "b2:\n"
            "    %11 = ptradd inbounds %0, offset_of main.Ops.narrow\n"
-           "    %12 = load ptr %11\n"
+           "    %12 = load ptr %11 !type main.Ops.narrow\n"
            "    %13 = call i8 %12 via @main.fn.1(1)\n"
            "    %14 = sext i32 %13\n"
            "    %15 = addov nsw i32 %7, %14\n"
@@ -2387,6 +2430,7 @@ void test_lower(void)
     marks_table_accesses();
     fills_param_facts();
     fills_arith_facts();
+    fills_access_types();
     runtime_functions();
     runtime_effects();
     runtime_records();

@@ -1,0 +1,5 @@
+exit 0
+argument 42
+field 2
+room 4
+result 6

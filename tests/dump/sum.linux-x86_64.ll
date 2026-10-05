@@ -39,7 +39,7 @@ b2:
   %v11 = getelementptr i8, ptr %v9, i64 %v10
   store ptr %v11, ptr %t6, align 8
   %v12 = load ptr, ptr %t6, align 8
-  %v13 = load i32, ptr %v12, align 4
+  %v13 = load i32, ptr %v12, align 4, !tbaa !14
   store i32 %v13, ptr %t7, align 4
   %v14 = load i32, ptr %t7, align 4
   %v15 = sext i32 %v14 to i64
@@ -91,7 +91,7 @@ b2:
   %v11 = getelementptr i8, ptr %v9, i64 %v10
   store ptr %v11, ptr %t5, align 8
   %v12 = load ptr, ptr %t5, align 8
-  store i16 7, ptr %v12, align 2
+  store i16 7, ptr %v12, align 2, !tbaa !13
   %v13 = load i64, ptr %t2, align 8
   %v14 = add i64 %v13, 1
   store i64 %v14, ptr %t2, align 8
@@ -112,3 +112,17 @@ attributes #1 = { nounwind }
 !0 = !{i32 1, !"wchar_size", i32 4}
 !1 = !{i32 8, !"PIC Level", i32 2}
 !2 = !{!"antic VERSION"}
+!5 = !{!"anti"}
+!6 = !{!"byte", !5, i64 0}
+!7 = !{!"i16", !6, i64 0}
+!8 = !{!"i32", !6, i64 0}
+!9 = !{!"i64", !6, i64 0}
+!10 = !{!"f32", !6, i64 0}
+!11 = !{!"f64", !6, i64 0}
+!12 = !{!"ptr", !6, i64 0}
+!13 = !{!7, !7, i64 0}
+!14 = !{!8, !8, i64 0}
+!15 = !{!9, !9, i64 0}
+!16 = !{!10, !10, i64 0}
+!17 = !{!11, !11, i64 0}
+!18 = !{!12, !12, i64 0}

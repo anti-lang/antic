@@ -1,0 +1,7 @@
+exit 0
+optional 1
+other type 1
+str 1
+slice 4
+function 8
+function bytes 1

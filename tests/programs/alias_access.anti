@@ -1,0 +1,48 @@
+//! The rule "An access" of "Aliasing of views": a field is accessed as its
+//! type, and a copy of a struct is an access of the struct. A store through a
+//! pointer to a field reaches a copy of the struct made after it, and a copy
+//! into the struct reaches a read through the pointer. The test runs in release
+//! mode, where the loads and stores carry !tbaa.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn getenv(name: ?*byte) -> ?*byte;
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+/// p, or other where ANTI_ALIAS_OTHER is set, which no test sets, so the
+/// optimiser cannot tell the result from p.
+fn either(p: *byte, other: *byte) -> *byte
+{
+	if getenv("ANTI_ALIAS_OTHER".ptr) != none {
+		return other;
+	}
+	return p;
+}
+
+fn copy_after(ps: *Pair, pb: *int) -> int
+{
+	*pb = 5;
+	let c = *ps;
+	return c.b;
+}
+
+fn copy_into(ps: *Pair, pb: *int) -> int
+{
+	*pb = 1;
+	*ps = Pair { a: 7, b: 8 };
+	return *pb;
+}
+
+fn main() -> int
+{
+	let ps = alloc Pair { a: 1, b: 2 };
+	let spare = alloc Pair { a: 0, b: 0 };
+	let pb = either(&ps.b as *byte, &spare.b as *byte) as *int;
+	printf("copy after %lld\n".ptr, copy_after(ps, pb));
+	printf("copy into %lld\n".ptr, copy_into(ps, pb));
+	return 0;
+}

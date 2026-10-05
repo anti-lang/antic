@@ -1,0 +1,64 @@
+//! The rule "Simd structs" of "Aliasing of views": a simd struct is its lanes.
+//! A lane meets an element of an array of its type and a field of that type in
+//! a plain struct, through views between `*Vec4`, `*[4]f32` and `*Vector4`. A
+//! whole value reads a lane written last, and `as` of a value to an array
+//! copies the bytes. The test runs in release mode, where the loads and stores
+//! carry !tbaa.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn getenv(name: ?*byte) -> ?*byte;
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+struct Vector4 { x: f32, y: f32, z: f32, w: f32 }
+
+/// p, or other where ANTI_ALIAS_OTHER is set, which no test sets, so the
+/// optimiser cannot tell the result from p.
+fn either(p: *byte, other: *byte) -> *byte
+{
+	if getenv("ANTI_ALIAS_OTHER".ptr) != none {
+		return other;
+	}
+	return p;
+}
+
+fn array(v: *Vec4, a: *[4]f32) -> float
+{
+	v.y = 1.0;
+	(*a)[1] = 2.0;
+	return v.y as float;
+}
+
+fn plain(v: *Vec4, s: *Vector4) -> float
+{
+	v.z = 1.0;
+	s.z = 3.0;
+	return v.z as float;
+}
+
+fn whole(v: *Vec4, a: *[4]f32) -> float
+{
+	(*a)[3] = 4.0;
+	let w = *v + *v;
+	return w.w as float;
+}
+
+fn copied(v: *Vec4, s: *Vector4) -> float
+{
+	s.x = 5.0;
+	let a = *v as [4]f32;
+	s.x = 6.0;
+	return a[0] as float;
+}
+
+fn main() -> int
+{
+	let v = alloc Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 };
+	let spare = alloc Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 };
+	let p = either(v as *byte, spare as *byte);
+	printf("array %g\n".ptr, array(v, p as *[4]f32));
+	printf("plain %g\n".ptr, plain(v, p as *Vector4));
+	printf("whole %g\n".ptr, whole(v, p as *[4]f32));
+	printf("copied %g\n".ptr, copied(v, p as *Vector4));
+	return 0;
+}

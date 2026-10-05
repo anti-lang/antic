@@ -447,11 +447,23 @@ static void instruction(struct text *out, const struct ir_module *m,
         }
         break;
     }
-    /* What a load or a store reaches, after its operands. */
+    /* What a load or a store reaches, after its operands, and the type it
+       reads the memory as. */
     if ((inst->op == IR_LOAD || inst->op == IR_STORE) &&
         inst->field != IR_ACCESS_PLAIN) {
         text_append(out, inst->field == IR_ACCESS_TABLE ? " !table"
                                                          : " !entry");
+    }
+    if ((inst->op == IR_LOAD || inst->op == IR_STORE) &&
+        inst->of.type != IR_VOID) {
+        text_append(out, " !type ");
+        if (inst->of.type == IR_AGG && inst->of.agg < m->agg_count &&
+            inst->member < m->aggs[inst->of.agg]->field_count) {
+            text_appendf(out, "%s.%s", m->aggs[inst->of.agg]->name,
+                         m->aggs[inst->of.agg]->fields[inst->member].name);
+        } else {
+            ir_vtype_print(out, m, inst->of);
+        }
     }
     text_append(out, "\n");
 }

@@ -34,10 +34,10 @@ b1:
 
 b2:
   %v9 = load ptr, ptr %t1, align 8
-  %v10 = load ptr, ptr %v9, align 8
+  %v10 = load ptr, ptr %v9, align 8, !tbaa !18
   store ptr %v10, ptr %t4, align 8
   %v11 = load ptr, ptr %t4, align 8
-  %v12 = load i64, ptr %v11, align 8
+  %v12 = load i64, ptr %v11, align 8, !tbaa !20
   store i64 %v12, ptr %t5, align 8
   %v13 = load i64, ptr %t5, align 8
   ret i64 %v13
@@ -107,3 +107,19 @@ attributes #1 = { nounwind }
 !2 = !{!"antic VERSION"}
 !3 = !{!"branch_weights", i32 1, i32 2000}
 !4 = !{!"branch_weights", i32 2000, i32 1}
+!5 = !{!"anti"}
+!6 = !{!"byte", !5, i64 0}
+!7 = !{!"i16", !6, i64 0}
+!8 = !{!"i32", !6, i64 0}
+!9 = !{!"i64", !6, i64 0}
+!10 = !{!"f32", !6, i64 0}
+!11 = !{!"f64", !6, i64 0}
+!12 = !{!"ptr", !6, i64 0}
+!13 = !{!7, !7, i64 0}
+!14 = !{!8, !8, i64 0}
+!15 = !{!9, !9, i64 0}
+!16 = !{!10, !10, i64 0}
+!17 = !{!11, !11, i64 0}
+!18 = !{!12, !12, i64 0}
+!19 = !{!"fatal_guard.Cell", !9, i64 0}
+!20 = !{!19, !9, i64 0}

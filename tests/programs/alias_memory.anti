@@ -1,0 +1,72 @@
+//! The rule "Memory holds a type" of "Aliasing of views": memory from `alloc`
+//! holds no type until a store gives it one, and a later store of another type
+//! gives it that type. The bytes of a block take an int, then a float, then an
+//! int again, each read as the type stored last, and a copy of bytes by
+//! `memcpy` gives the bytes it writes the type of the bytes it copies. A block
+//! given back and taken again holds what its next store writes. The test runs
+//! in release mode, where the loads and stores carry !tbaa.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn getenv(name: ?*byte) -> ?*byte;
+extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
+
+/// p, or other where ANTI_ALIAS_OTHER is set, which no test sets, so the
+/// optimiser cannot tell the result from p.
+fn either(p: *byte, other: *byte) -> *byte
+{
+	if getenv("ANTI_ALIAS_OTHER".ptr) != none {
+		return other;
+	}
+	return p;
+}
+
+fn to_float(pi: *int, pf: *float) -> float
+{
+	*pi = 5;
+	*pf = 2.5;
+	return *pf;
+}
+
+fn to_int(pi: *int, pf: *float) -> int
+{
+	*pf = 2.5;
+	*pi = 9;
+	return *pi;
+}
+
+fn copied(from: *float, to: *float, raw_from: *byte, raw_to: *byte) -> float
+{
+	*from = 0.75;
+	memcpy(raw_to as ?*byte, raw_from as ?*byte, 8);
+	return *to;
+}
+
+fn main() -> int
+{
+	let raw = alloc(byte, 16) else {
+		return 1;
+	};
+	let spare = alloc(byte, 16) else {
+		return 1;
+	};
+	let other = alloc(byte, 16) else {
+		return 1;
+	};
+	let pi = either(raw, spare) as *int;
+	let pf = either(raw, spare) as *float;
+	printf("float %g\n".ptr, to_float(pi, pf));
+	printf("int %lld\n".ptr, to_int(pi, pf));
+	printf("copied %g\n".ptr,
+		copied(pf, either(other, spare) as *float, raw, other));
+	free(raw);
+	let again = alloc(byte, 16) else {
+		return 1;
+	};
+	let pa = either(again, spare) as *int;
+	let pg = either(again, spare) as *float;
+	printf("again %lld\n".ptr, to_int(pa, pg));
+	free(again);
+	free(spare);
+	free(other);
+	return 0;
+}

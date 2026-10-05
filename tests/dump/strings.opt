@@ -12,7 +12,7 @@ b0:
     %2 = slot []byte
     %3 = load ptr %0
     %4 = ptradd inbounds %0, offset_of str.len
-    %5 = load i64 %4
+    %5 = load i64 %4 !type i64
     %6 = mul i64 %1, size_of i8
     %7 = ptradd %3, %6
     store ptr %7, %2

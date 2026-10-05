@@ -8,7 +8,7 @@ global anti_rt_injectable anti.rt.Injectables { i64 0, ptr 0 }
 fn forward.twice(%0: ptr nonnull deref(size_of forward.Point)) -> i64 {
 b0:
     %1 = ptradd inbounds %0, offset_of forward.Point.y
-    %2 = load i64 %1
+    %2 = load i64 %1 !type forward.Point.y
     %3 = addov nsw i64 %2, %2
     branchov %3, b1, b2
 b1:
@@ -20,7 +20,7 @@ b2:
 }
 fn forward.round_trip(%0: ptr nonnull deref(size_of forward.Point), %1: i64) -> i64 {
 b0:
-    store i64 %1, %0
+    store i64 %1, %0 !type forward.Point.x
     %2 = addov nsw i64 %1, %1
     branchov %2, b1, b2
 b1:

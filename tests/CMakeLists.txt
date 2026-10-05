@@ -4013,7 +4013,8 @@ foreach(case "types|symbolic||symbolic.types|${DUMP}/symbolic.anti"
         "llvm|effects|linux-x86_64|effects.dev.linux-x86_64.ll|--dev,--cpu,v2,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/effects.anti"
         "llvm|tables|macos-arm64|tables.macos-arm64.ll|--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/tables.anti"
         "llvm|params|macos-arm64|params.dev.macos-arm64.ll|--dev,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/params.anti"
-        "llvm|arith|macos-arm64|arith.dev.macos-arm64.ll|--dev,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/arith.anti")
+        "llvm|arith|macos-arm64|arith.dev.macos-arm64.ll|--dev,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/arith.anti"
+        "llvm|tbaa|macos-arm64|tbaa.dev.macos-arm64.ll|--dev,--runtime,${ANTIC_RUNTIME_DIR},${DUMP}/tbaa.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 stage)
     list(GET parts 1 subject)

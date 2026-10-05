@@ -1457,6 +1457,65 @@ static void arith_text(void)
     end(&x);
 }
 
+/* The types of "Aliasing of views" as !tbaa: a root, bytes below it, one
+   node per scalar type below bytes and a tag of each, a node per struct
+   that an access names with its scalar fields at their offsets, and a tag
+   per field. An access without a type carries none, and a struct leaves
+   out its bytes. */
+static void tbaa_text(void)
+{
+    static const enum ir_type pair[] = {IR_I64, IR_F64, IR_I8, IR_CLONG};
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_block *b0;
+    uint32_t agg;
+    uint32_t p;
+    uint32_t at;
+    uint32_t v;
+
+    begin(&x);
+    agg = record(&x, "main.Pair", pair, 4);
+    f = ir_function_add(&x.m, "main", "f", IR_VOID, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    at = ir_ptradd_inbounds(f, b0, ir_temp_op(f, p), ir_int_op(IR_I64, 8));
+    v = ir_load(f, b0, IR_F64, ir_temp_op(f, at));
+    ir_type_access(b0, ir_aggregate(agg), 1);
+    ir_store(f, b0, IR_I64, ir_int_op(IR_I64, 1), ir_temp_op(f, p));
+    ir_type_access(b0, ir_aggregate(agg), 0);
+    ir_store(f, b0, IR_F64, ir_temp_op(f, v), ir_temp_op(f, p));
+    ir_type_access(b0, ir_scalar(IR_F64), 0);
+    ir_load(f, b0, IR_I64, ir_temp_op(f, p));
+    ir_load(f, b0, IR_PTR, ir_temp_op(f, p));
+    ir_type_access(b0, ir_scalar(IR_PTR), 0);
+    ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(holds(&x, " = load double, ptr %v2, align 8, !tbaa !20\n"));
+    CHECK(holds(&x, "  store i64 1, ptr %v4, align 8, !tbaa !21\n"));
+    CHECK(holds(&x, "  store double %v5, ptr %v6, align 8, !tbaa !17\n"));
+    CHECK(holds(&x, " = load i64, ptr %v7, align 8\n"));
+    CHECK(holds(&x, " = load ptr, ptr %v9, align 8, !tbaa !18\n"));
+    CHECK(holds(&x, "!5 = !{!\"anti\"}\n"
+                    "!6 = !{!\"byte\", !5, i64 0}\n"
+                    "!7 = !{!\"i16\", !6, i64 0}\n"
+                    "!8 = !{!\"i32\", !6, i64 0}\n"
+                    "!9 = !{!\"i64\", !6, i64 0}\n"
+                    "!10 = !{!\"f32\", !6, i64 0}\n"
+                    "!11 = !{!\"f64\", !6, i64 0}\n"
+                    "!12 = !{!\"ptr\", !6, i64 0}\n"
+                    "!13 = !{!7, !7, i64 0}\n"
+                    "!14 = !{!8, !8, i64 0}\n"
+                    "!15 = !{!9, !9, i64 0}\n"
+                    "!16 = !{!10, !10, i64 0}\n"
+                    "!17 = !{!11, !11, i64 0}\n"
+                    "!18 = !{!12, !12, i64 0}\n"
+                    "!19 = !{!\"main.Pair\", !9, i64 0, !11, i64 8, "
+                    "!9, i64 24}\n"
+                    "!20 = !{!19, !11, i64 8}\n"
+                    "!21 = !{!19, !9, i64 0}\n"));
+    end(&x);
+}
+
 /* main.g(a: Big) -> Big and a call of it, for a struct of three i64. */
 static void big_call(struct fixture *x)
 {
@@ -2046,6 +2105,7 @@ void test_llvm_emit(void)
     coerced();
     param_attributes();
     arith_text();
+    tbaa_text();
     memory_classes();
     word_classes();
     vectors();

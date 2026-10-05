@@ -1,0 +1,75 @@
+//! One function for each kind of type that "Aliasing of views" gives an access
+//! in the LLVM text. A field of a struct and of a class names the type that
+//! declares it, a field of a base the base, and an element, a `*p` and a lane
+//! of a simd struct their scalar type. An access through a view, of bytes and
+//! along a path through a union carries no `!tbaa`.
+
+struct Point
+{
+	x: int,
+	y: float,
+	on: bool,
+}
+
+union Word
+{
+	i: int,
+	f: float,
+}
+
+simd struct V4 { x: f32, y: f32, z: f32, w: f32 }
+
+class Box
+{
+	pub n: int = 0,
+}
+
+class Big inherits Box
+{
+	pub m: i32 = 0,
+}
+
+fn field(p: *Point) -> float
+{
+	p.x = 1;
+	return p.y;
+}
+
+fn element(a: []u16, i: int) -> u16
+{
+	return a[i];
+}
+
+fn pointer(p: *?*byte) -> ?*byte
+{
+	return *p;
+}
+
+fn lane(v: *V4) -> f32
+{
+	return v.z;
+}
+
+fn base(b: *Big) -> int
+{
+	b.m = 2;
+	return b.n;
+}
+
+fn view(p: *Point) -> int
+{
+	let q = p as *int;
+	return *q;
+}
+
+fn bytes(p: *Point, b: *byte) -> bool
+{
+	*b = 0;
+	return p.on;
+}
+
+fn word(w: *Word) -> float
+{
+	w.i = 3;
+	return w.f;
+}

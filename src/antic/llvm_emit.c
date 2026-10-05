@@ -41,6 +41,25 @@ struct load_range {
     uint64_t high;
 };
 
+/* A field of a struct that an access names as its type. */
+struct tbaa_field {
+    uint32_t agg;
+    uint32_t member;
+    uint32_t node;                  /* the index of agg in tbaa_aggs */
+};
+
+/* The scalar types of the !tbaa tree, in the order of their ids. */
+enum {
+    TBAA_I16,
+    TBAA_I32,
+    TBAA_I64,
+    TBAA_F32,
+    TBAA_F64,
+    TBAA_PTR,
+    TBAA_SCALARS,
+    TBAA_NONE = TBAA_SCALARS
+};
+
 /* The metadata of a branch into a cold block, one id for each side. */
 enum { COLD_THEN, COLD_ELSE, COLD_COUNT };
 
@@ -88,6 +107,15 @@ struct emitter {
     struct load_range *ranges;
     size_t range_count;
     uint32_t range_id;
+    /* The types of "Aliasing of views" the accesses of the module name:
+       whether any does, the id of the root, and each struct and each field
+       of one in the order of its first access. */
+    bool tbaa;
+    uint32_t tbaa_id;
+    uint32_t *tbaa_aggs;
+    size_t tbaa_agg_count;
+    struct tbaa_field *tbaa_fields;
+    size_t tbaa_field_count;
 };
 
 /* The LLVM type of a scalar after layout_resolve, or NULL for an
@@ -827,6 +855,212 @@ static void collect_ranges(struct emitter *e, const struct ir_module *m)
     }
 }
 
+/* DESIGN: the types of "Aliasing of views" in
+   docs/anti-language-additions.md as !tbaa, in the scalar form of LLVM
+   with struct paths, see ir_type_access. A root holds bytes, which every
+   other type sits below, as an access of bytes may refer to any memory.
+   Below bytes stands one node per scalar type, which merges the signs of
+   an integer, an enum with its base, char with u32 and every pointer into
+   one. A struct node lists the scalar fields of a struct at their offsets
+   on the target, and an access of a field names the struct, the field's
+   type and the offset. Two fields of two structs then never alias, a
+   field and an access of its scalar type alone may, and bytes, a bool, a
+   lock word and an aggregate field stay out of the struct node. f16 is
+   storage of 16 bits and shares the node of i16, which keeps it beside
+   u16, the one type a view of it reads. */
+static unsigned tbaa_scalar(const struct emitter *e, enum ir_type type)
+{
+    switch (type) {
+    case IR_I16: return TBAA_I16;
+    case IR_I32: return TBAA_I32;
+    case IR_I64: return TBAA_I64;
+    case IR_F32: return TBAA_F32;
+    case IR_F64: return TBAA_F64;
+    case IR_PTR: return TBAA_PTR;
+    case IR_CLONG:
+    case IR_CWCHAR:
+        switch (layout_size(e->l, ir_scalar(type))) {
+        case 2: return TBAA_I16;
+        case 4: return TBAA_I32;
+        default: return TBAA_I64;
+        }
+    default:
+        return TBAA_NONE;
+    }
+}
+
+/* The field of the type of a typed access inst among the fields of the
+   module, or tbaa_field_count. */
+static size_t tbaa_field_index(const struct emitter *e,
+                               const struct ir_inst *inst)
+{
+    size_t i;
+
+    for (i = 0; i < e->tbaa_field_count; i++) {
+        if (e->tbaa_fields[i].agg == inst->of.agg &&
+            e->tbaa_fields[i].member == inst->member) {
+            return i;
+        }
+    }
+    return e->tbaa_field_count;
+}
+
+/* Whether the field that the typed access inst names stands in the node
+   of its struct with the scalar type of the access. */
+static bool tbaa_field_of(const struct emitter *e, const struct ir_inst *inst)
+{
+    const struct ir_aggtype *agg;
+
+    if (inst->of.type != IR_AGG || inst->of.agg >= e->m->agg_count) {
+        return false;
+    }
+    agg = e->m->aggs[inst->of.agg];
+    return agg->kind == IR_AGG_STRUCT && !agg->simd &&
+           inst->member < agg->field_count &&
+           agg->fields[inst->member].bits == 0 &&
+           agg->fields[inst->member].type.type != IR_AGG &&
+           tbaa_scalar(e, agg->fields[inst->member].type.type) ==
+               tbaa_scalar(e, inst->type);
+}
+
+/* Collect the structs and the fields that the typed accesses of m name,
+   each once, in the order of their first access. */
+static void collect_tbaa(struct emitter *e, const struct ir_module *m)
+{
+    size_t agg_capacity = 0;
+    size_t field_capacity = 0;
+    size_t i;
+    size_t j;
+    size_t k;
+    size_t a;
+
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        for (j = 0; j < f->block_count; j++) {
+            const struct ir_block *b = f->blocks[j];
+            for (k = 0; k < b->count; k++) {
+                const struct ir_inst *inst = &b->insts[k];
+                if ((inst->op != IR_LOAD && inst->op != IR_STORE) ||
+                    inst->of.type == IR_VOID ||
+                    tbaa_scalar(e, inst->type) == TBAA_NONE) {
+                    continue;
+                }
+                e->tbaa = true;
+                if (!tbaa_field_of(e, inst) ||
+                    tbaa_field_index(e, inst) < e->tbaa_field_count) {
+                    continue;
+                }
+                for (a = 0; a < e->tbaa_agg_count; a++) {
+                    if (e->tbaa_aggs[a] == inst->of.agg) {
+                        break;
+                    }
+                }
+                if (a == e->tbaa_agg_count) {
+                    e->tbaa_aggs = alloc_grow(e->tbaa_aggs, &agg_capacity,
+                                              e->tbaa_agg_count,
+                                              sizeof *e->tbaa_aggs);
+                    e->tbaa_aggs[e->tbaa_agg_count++] = inst->of.agg;
+                }
+                e->tbaa_fields = alloc_grow(e->tbaa_fields, &field_capacity,
+                                            e->tbaa_field_count,
+                                            sizeof *e->tbaa_fields);
+                e->tbaa_fields[e->tbaa_field_count].agg = inst->of.agg;
+                e->tbaa_fields[e->tbaa_field_count].member = inst->member;
+                e->tbaa_fields[e->tbaa_field_count].node = (uint32_t)a;
+                e->tbaa_field_count++;
+            }
+        }
+    }
+}
+
+/* The number of ids the !tbaa tree of the module takes: the root, bytes,
+   the scalar types and their tags, then the structs and their fields. */
+static uint32_t tbaa_count(const struct emitter *e)
+{
+    if (!e->tbaa) {
+        return 0;
+    }
+    return 2 + 2 * TBAA_SCALARS + (uint32_t)e->tbaa_agg_count +
+           (uint32_t)e->tbaa_field_count;
+}
+
+/* The !tbaa of a typed access: the tag of its field, or of its scalar
+   type. */
+static void tbaa_fact(struct emitter *e, const struct ir_inst *inst)
+{
+    unsigned scalar;
+    uint32_t id;
+
+    if (!e->tbaa || inst->of.type == IR_VOID) {
+        return;
+    }
+    scalar = tbaa_scalar(e, inst->type);
+    if (scalar == TBAA_NONE) {
+        return;
+    }
+    id = e->tbaa_id + 2 + TBAA_SCALARS + scalar;
+    if (tbaa_field_of(e, inst)) {
+        id = e->tbaa_id + 2 + 2 * TBAA_SCALARS +
+             (uint32_t)e->tbaa_agg_count +
+             (uint32_t)tbaa_field_index(e, inst);
+    }
+    text_appendf(e->out, ", !tbaa !%" PRIu32, id);
+}
+
+/* The !tbaa tree of the module, in the ids that tbaa_count gives. */
+static void tbaa_nodes(struct emitter *e)
+{
+    static const char *const names[TBAA_SCALARS] = {"i16", "i32", "i64",
+                                                    "f32", "f64", "ptr"};
+    uint32_t first = e->tbaa_id + 2;
+    uint32_t structs = first + 2 * TBAA_SCALARS;
+    uint32_t i;
+    size_t j;
+    size_t k;
+
+    if (!e->tbaa) {
+        return;
+    }
+    text_appendf(e->out, "!%" PRIu32 " = !{!\"anti\"}\n", e->tbaa_id);
+    text_appendf(e->out, "!%" PRIu32 " = !{!\"byte\", !%" PRIu32 ", i64 0}\n",
+                 e->tbaa_id + 1, e->tbaa_id);
+    for (i = 0; i < TBAA_SCALARS; i++) {
+        text_appendf(e->out, "!%" PRIu32 " = !{!\"%s\", !%" PRIu32
+                             ", i64 0}\n",
+                     first + i, names[i], e->tbaa_id + 1);
+    }
+    for (i = 0; i < TBAA_SCALARS; i++) {
+        text_appendf(e->out, "!%" PRIu32 " = !{!%" PRIu32 ", !%" PRIu32
+                             ", i64 0}\n",
+                     first + TBAA_SCALARS + i, first + i, first + i);
+    }
+    for (j = 0; j < e->tbaa_agg_count; j++) {
+        const struct ir_aggtype *agg = e->m->aggs[e->tbaa_aggs[j]];
+        const struct layout *layout = layout_agg(e->l, e->tbaa_aggs[j]);
+        text_appendf(e->out, "!%" PRIu32 " = !{!", structs + (uint32_t)j);
+        llvm_metadata_string(e->out, agg->name);
+        for (k = 0; k < agg->field_count; k++) {
+            unsigned scalar = tbaa_scalar(e, agg->fields[k].type.type);
+            if (agg->fields[k].bits != 0 || scalar == TBAA_NONE) {
+                continue;
+            }
+            text_appendf(e->out, ", !%" PRIu32 ", i64 %" PRIu64,
+                         first + scalar, layout->offsets[k]);
+        }
+        text_append(e->out, "}\n");
+    }
+    for (j = 0; j < e->tbaa_field_count; j++) {
+        const struct tbaa_field *field = &e->tbaa_fields[j];
+        const struct ir_aggtype *agg = e->m->aggs[field->agg];
+        text_appendf(e->out, "!%" PRIu32 " = !{!%" PRIu32 ", !%" PRIu32
+                             ", i64 %" PRIu64 "}\n",
+                     structs + (uint32_t)e->tbaa_agg_count + (uint32_t)j,
+                     structs + field->node,
+                     first + tbaa_scalar(e, agg->fields[field->member].type.type),
+                     layout_agg(e->l, field->agg)->offsets[field->member]);
+    }
+}
+
 /* Whether a load or a store of a function of m reaches a table pointer or
    an entry of a table. */
 static bool names_table(const struct ir_module *m)
@@ -871,6 +1105,7 @@ static void load_store(struct emitter *e, const struct ir_inst *inst)
                          name, text_cstr(&value), text_cstr(&pointer),
                          align_of(e, inst->type));
             access_fact(e, inst);
+            tbaa_fact(e, inst);
             text_append(e->out, "\n");
         }
     } else {
@@ -882,6 +1117,7 @@ static void load_store(struct emitter *e, const struct ir_inst *inst)
                          align_of(e, inst->type));
             access_fact(e, inst);
             range_fact(e, inst);
+            tbaa_fact(e, inst);
             text_append(e->out, "\n");
             text_appendf(&value, "%%v%" PRIu32, e->value++);
             store_result(e, inst, text_cstr(&value));
@@ -3321,6 +3557,7 @@ static void metadata(struct emitter *e, uint32_t flag_count)
         int_constant(e->out, e->ranges[i].type, e->ranges[i].high);
         text_append(e->out, "}\n");
     }
+    tbaa_nodes(e);
     llvm_debug_finish(&e->debug, e->out);
 }
 
@@ -3506,11 +3743,12 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
     e.m = m;
     e.range_id = e.facts_id + (e.facts ? 1 : 0);
     collect_ranges(&e, m);
+    e.tbaa_id = e.range_id + (uint32_t)e.range_count;
+    collect_tbaa(&e, m);
     /* The ids of the debug metadata follow every other id, so the text
        without them names the ids of a build without -g. */
     llvm_debug_init(&e.debug, o->target, m, o->module, o->debug,
-                    o->optimized, e.range_id + (uint32_t)e.range_count,
-                    o->spans);
+                    o->optimized, e.tbaa_id + tbaa_count(&e), o->spans);
     e.keeps_frame = alloc_zeroed(m->function_count + 1, sizeof *e.keeps_frame);
     frames_kept(m, e.keeps_frame);
     head(out, o->target, o->module);
@@ -3588,6 +3826,8 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
     text_free(&e.imports);
     free(e.keeps_frame);
     free(e.ranges);
+    free(e.tbaa_aggs);
+    free(e.tbaa_fields);
     llvm_debug_free(&e.debug);
     return !e.failed;
 }

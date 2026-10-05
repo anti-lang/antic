@@ -926,6 +926,12 @@ uint32_t ir_ptradd_inbounds(struct ir_function *f, struct ir_block *b,
     return result;
 }
 
+void ir_type_access(struct ir_block *b, struct ir_vtype of, uint32_t member)
+{
+    b->insts[b->count - 1].of = of;
+    b->insts[b->count - 1].member = member;
+}
+
 uint32_t ir_load_range(struct ir_function *f, struct ir_block *b,
                        enum ir_type type, struct ir_operand pointer,
                        uint64_t low, uint64_t high)

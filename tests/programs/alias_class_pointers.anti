@@ -1,0 +1,75 @@
+//! The rule "Class pointers" of "Aliasing of views": `as` between two classes
+//! of one chain, or to an interface the class implements, gives the same object
+//! or its sub-object, and its accesses follow the rule of structs and classes.
+//! A field of a base meets the same field through the derived class, after an
+//! `as` each way and after a call through an interface. The test runs in
+//! release mode, where the loads and stores carry !tbaa.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn getenv(name: ?*byte) -> ?*byte;
+
+abstract class Counter
+{
+	abstract fn add(self, n: int);
+}
+
+class Animal
+{
+	pub legs: int = 0,
+}
+
+class Dog inherits Animal
+{
+	implements counter: Counter,
+	pub tail: int = 0,
+
+	concrete fn Counter::add(self, n: int)
+	{
+		self.legs = self.legs + n;
+	}
+}
+
+/// p, or other where ANTI_ALIAS_OTHER is set, which no test sets, so the
+/// optimiser cannot tell the result from p.
+fn either(p: *byte, other: *byte) -> *byte
+{
+	if getenv("ANTI_ALIAS_OTHER".ptr) != none {
+		return other;
+	}
+	return p;
+}
+
+fn up(d: *Dog, a: *Animal) -> int
+{
+	d.legs = 1;
+	a.legs = 2;
+	return d.legs;
+}
+
+fn down(a: *Animal, d: *Dog) -> int
+{
+	a.legs = 3;
+	d.legs = 4;
+	d.tail = 9;
+	return a.legs;
+}
+
+fn counted(d: *Dog, c: *Counter) -> int
+{
+	d.legs = 5;
+	c.add(2);
+	return d.legs;
+}
+
+fn main() -> int
+{
+	let d = alloc Dog { };
+	let other = alloc Dog { };
+	let a = either(d as *byte, other as *byte) as *Dog;
+	printf("up %lld\n".ptr, up(d, a as *Animal));
+	printf("down %lld\n".ptr, down(d as *Animal, a));
+	printf("interface %lld\n".ptr, counted(d, a as *Counter));
+	delete(d);
+	delete(other);
+	return 0;
+}

@@ -157,8 +157,8 @@ b0:
     store ptr %4, %3
     %5 = ptradd %3, offset_of str.len
     store i64 2, %5
-    %6 = load ptr %3
-    %7 = load ptr %0
+    %6 = load ptr %3 !type ptr
+    %7 = load ptr %0 !type ptr
     %8 = call i32 @printf(%6, %7)
     %9 = copy i64 0
     jump b1
@@ -170,7 +170,7 @@ b2:
     store ptr %12, %11
     %13 = ptradd %11, offset_of str.len
     store i64 5, %13
-    %14 = load ptr %11
+    %14 = load ptr %11 !type ptr
     %15 = mul i64 %9, size_of i8
     %16 = ptradd %1, %15
     %17 = load i8 %16
@@ -183,7 +183,7 @@ b3:
     store ptr %23, %22
     %24 = ptradd %22, offset_of str.len
     store i64 1, %24
-    %25 = load ptr %22
+    %25 = load ptr %22 !type ptr
     %26 = call i32 @printf(%25)
     ret
 b4:
@@ -201,8 +201,8 @@ b0:
     store ptr %4, %3
     %5 = ptradd %3, offset_of str.len
     store i64 20, %5
-    %6 = load ptr %3
-    %7 = load ptr %0
+    %6 = load ptr %3 !type ptr
+    %7 = load ptr %0 !type ptr
     %8 = trunc i32 %1
     %9 = sext i64 %8
     %10 = eq i8 %9, %1
@@ -295,7 +295,7 @@ b2:
     call void @probe.dump(%7, %5, size_of probe.Wide)
     call void @probe.clear(%5, size_of probe.Wide)
     %10 = ptradd inbounds %5, offset_of probe.Wide.b
-    store clong 1, %10
+    store clong 1, %10 !type probe.Wide.b
     %12 = addr @probe.69
     store ptr %12, %11
     %13 = ptradd %11, offset_of str.len
@@ -303,7 +303,7 @@ b2:
     call void @probe.dump(%11, %5, size_of probe.Wide)
     call void @probe.clear(%5, size_of probe.Wide)
     %14 = ptradd inbounds %5, offset_of probe.Wide.c
-    store cwchar 1, %14
+    store cwchar 1, %14 !type probe.Wide.c
     %16 = addr @probe.70
     store ptr %16, %15
     %17 = ptradd %15, offset_of str.len
@@ -311,7 +311,7 @@ b2:
     call void @probe.dump(%15, %5, size_of probe.Wide)
     call void @probe.clear(%5, size_of probe.Wide)
     %18 = ptradd inbounds %5, offset_of probe.Wide.d
-    store i16 1, %18
+    store i16 1, %18 !type probe.Wide.d
     %20 = addr @probe.71
     store ptr %20, %19
     %21 = ptradd %19, offset_of str.len
@@ -466,7 +466,7 @@ b10:
     call void @probe.dump(%86, %84, size_of probe.Tight)
     call void @probe.clear(%84, size_of probe.Tight)
     %89 = ptradd inbounds %84, offset_of probe.Tight.b
-    store i32 1, %89
+    store i32 1, %89 !type probe.Tight.b
     %91 = addr @probe.86
     store ptr %91, %90
     %92 = ptradd %90, offset_of str.len
@@ -474,7 +474,7 @@ b10:
     call void @probe.dump(%90, %84, size_of probe.Tight)
     call void @probe.clear(%84, size_of probe.Tight)
     %93 = ptradd inbounds %84, offset_of probe.Tight.c
-    store i16 1, %93
+    store i16 1, %93 !type probe.Tight.c
     %95 = addr @probe.87
     store ptr %95, %94
     %96 = ptradd %94, offset_of str.len
@@ -531,7 +531,7 @@ b14:
     call void @probe.dump(%117, %115, size_of probe.Aligned)
     call void @probe.clear(%115, size_of probe.Aligned)
     %120 = ptradd inbounds %115, offset_of probe.Aligned.b
-    store i32 1, %120
+    store i32 1, %120 !type probe.Aligned.b
     %122 = addr @probe.91
     store ptr %122, %121
     %123 = ptradd %121, offset_of str.len
@@ -606,7 +606,7 @@ b18:
     store ptr %155, %154
     %156 = ptradd %154, offset_of str.len
     store i64 28, %156
-    %157 = load ptr %154
+    %157 = load ptr %154 !type ptr
     %158 = load i8 %142
     %159 = zext i32 %158
     %160 = bitload i8 %142, probe.Breaks.b

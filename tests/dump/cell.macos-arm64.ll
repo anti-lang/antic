@@ -22,7 +22,7 @@ b0:
   store i64 %v4, ptr %t3, align 8
   %v5 = load i64, ptr %t3, align 8
   %v6 = load ptr, ptr %t2, align 8
-  store i64 %v5, ptr %v6, align 8
+  store i64 %v5, ptr %v6, align 8, !tbaa !15
   %v7 = load i64, ptr %t3, align 8
   ret i64 %v7
 }
@@ -40,3 +40,17 @@ attributes #1 = { nounwind }
 !0 = !{i32 1, !"wchar_size", i32 4}
 !1 = !{i32 8, !"PIC Level", i32 2}
 !2 = !{!"antic VERSION"}
+!5 = !{!"anti"}
+!6 = !{!"byte", !5, i64 0}
+!7 = !{!"i16", !6, i64 0}
+!8 = !{!"i32", !6, i64 0}
+!9 = !{!"i64", !6, i64 0}
+!10 = !{!"f32", !6, i64 0}
+!11 = !{!"f64", !6, i64 0}
+!12 = !{!"ptr", !6, i64 0}
+!13 = !{!7, !7, i64 0}
+!14 = !{!8, !8, i64 0}
+!15 = !{!9, !9, i64 0}
+!16 = !{!10, !10, i64 0}
+!17 = !{!11, !11, i64 0}
+!18 = !{!12, !12, i64 0}

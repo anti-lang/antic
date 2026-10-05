@@ -319,7 +319,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 80, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 81, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -972,6 +972,48 @@ static const struct ir_function *c_function(const struct ir_module *program,
     return NULL;
 }
 
+/* A library keeps the type of "Aliasing of views" of every access, a
+   field of a struct with its field and an element with its scalar type,
+   and writes it again byte for byte. */
+static void keeps_access_types(void)
+{
+    struct session a;
+    struct session b;
+    struct text first = {0};
+    struct text second = {0};
+    struct text ir = {0};
+    struct ir_module program;
+    struct interface *read;
+    char error[160] = "";
+
+    open_session(&a);
+    build_library(&a, "geo",
+                  "pub struct P { x: int, y: float }\n"
+                  "pub fn y(p: *P) -> float { return p.y; }\n"
+                  "pub fn at(a: []int, i: int) -> int { return a[i]; }\n",
+                  &first);
+    open_session(&b);
+    ir_module_init(&program, &b.arena, "geo");
+    read = antl_read((const uint8_t *)first.data, first.length, NULL, 0,
+                     &b.types, &b.arena, &program, error, sizeof error);
+    CHECK_STR(error, "");
+    CHECK(read != NULL);
+    if (read != NULL) {
+        antl_write(&second, read, &program, false);
+        CHECK(first.length == second.length &&
+              memcmp(first.data, second.data, first.length) == 0);
+        ir_print_own(&ir, &program);
+        CHECK(strstr(text_cstr(&ir), "load f64 %1 !type geo.P.y\n") != NULL);
+        CHECK(strstr(text_cstr(&ir), "!type i64\n") != NULL);
+    }
+    text_free(&first);
+    text_free(&second);
+    text_free(&ir);
+    ir_module_free(&program);
+    close_session(&b);
+    close_session(&a);
+}
+
 /* A library keeps the memory effects of a runtime function it calls. A
    second library that declares the same function without them leaves the
    program with the weaker of the two, as for a function that never
@@ -1094,13 +1136,13 @@ static void keeps_literals(void)
               "    %3 = slot str\n"
               "    %0 = call agg @words.hi()\n"
               "    %1 = ptradd inbounds %0, offset_of str.len\n"
-              "    %2 = load i64 %1\n"
+              "    %2 = load i64 %1 !type i64\n"
               "    %4 = addr @main.0\n"
               "    store ptr %4, %3\n"
               "    %5 = ptradd %3, offset_of str.len\n"
               "    store i64 2, %5\n"
               "    %6 = ptradd inbounds %3, offset_of str.len\n"
-              "    %7 = load i64 %6\n"
+              "    %7 = load i64 %6 !type i64\n"
               "    %8 = addov nsw i64 %2, %7\n"
               "    branchov %8, b1, b2\n"
               "b1:\n"
@@ -1573,9 +1615,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 81;
+    copy[4] = 82;
     refuses_file(copy, sizeof copy,
-                 "has format version 81, and antic reads version 80");
+                 "has format version 82, and antic reads version 81");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -3189,6 +3231,7 @@ void test_modules(void)
     unique_exports();
     keeps_extensions();
     keeps_effects();
+    keeps_access_types();
     keeps_literals();
     keeps_constants();
     keeps_halves();

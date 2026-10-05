@@ -13,7 +13,7 @@ b0:
   %v1 = getelementptr inbounds i8, ptr %v0, i64 8
   store ptr %v1, ptr %t1, align 8
   %v2 = load ptr, ptr %t1, align 8
-  %v3 = load i64, ptr %v2, align 8
+  %v3 = load i64, ptr %v2, align 8, !tbaa !21
   store i64 %v3, ptr %t2, align 8
   %v4 = load i64, ptr %t2, align 8
   %v5 = mul i64 %v4, 10
@@ -388,3 +388,19 @@ attributes #1 = { nounwind }
 !1 = !{i32 8, !"PIC Level", i32 2}
 !2 = !{!"antic VERSION"}
 !5 = !{}
+!6 = !{!"anti"}
+!7 = !{!"byte", !6, i64 0}
+!8 = !{!"i16", !7, i64 0}
+!9 = !{!"i32", !7, i64 0}
+!10 = !{!"i64", !7, i64 0}
+!11 = !{!"f32", !7, i64 0}
+!12 = !{!"f64", !7, i64 0}
+!13 = !{!"ptr", !7, i64 0}
+!14 = !{!8, !8, i64 0}
+!15 = !{!9, !9, i64 0}
+!16 = !{!10, !10, i64 0}
+!17 = !{!11, !11, i64 0}
+!18 = !{!12, !12, i64 0}
+!19 = !{!13, !13, i64 0}
+!20 = !{!"tables.Shape", !10, i64 8}
+!21 = !{!20, !10, i64 8}
