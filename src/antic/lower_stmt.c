@@ -472,14 +472,21 @@ static void range_start(struct lowerer *l, const struct stmt *s,
        keeps it at 0 or more, and the step carries nuw as well. An
        unsigned range carries nuw alone, since its values may pass the
        top of the signed type. "Arithmetic, addresses and ranges" in
-       docs/work-order-llvm-optimization.md asks for these facts. */
+       docs/work-order-llvm-optimization.md asks for these facts.
+
+       A step of half the range of the type, `by -128` on an i8, is the
+       least value as a constant of the type. The operation of the IR
+       moves by its bits, while nsw reads the constant with its sign, so
+       `sub nsw` by it adds 128 and leaves the range. That step carries no
+       nsw. A type whose width follows the target counts as 32 bits, the
+       narrowest it takes. */
     if (w->unsigned_range) {
         w->wrap = IR_NUW;
     } else {
-        w->wrap = IR_NSW;
+        int bits = type >= IR_I8 && type <= IR_I64 ? 8 << (type - IR_I8) : 32;
+        w->wrap = w->k < (uint64_t)1 << (bits - 1) ? IR_NSW : 0;
         if (read.kind == IR_INT && type >= IR_I8 && type <= IR_I64 &&
-            arith_signed(read.as.integer,
-                         8 << (type - IR_I8)) >= 0) {
+            arith_signed(read.as.integer, bits) >= 0) {
             w->wrap |= IR_NUW;
         }
     }

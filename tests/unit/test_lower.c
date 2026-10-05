@@ -260,9 +260,10 @@ static size_t body_count(const char *source, const char *name,
 
 /* The facts of "Arithmetic, addresses and ranges". nsw on a checked
    operation, the wrap facts of the step of a range by its sign and its
-   low bound, inbounds on a field that a reference reaches and on no field
-   of a view, the range of a bool, an enum and a tag, read or returned,
-   and the lifetime of an aggregate local. */
+   low bound, no nsw on a step of half the range of the type, inbounds on
+   a field that a reference reaches and on no field of a view, the range
+   of a bool, an enum and a tag, read or returned, and the lifetime of an
+   aggregate local. */
 static void fills_arith_facts(void)
 {
     static const char source[] =
@@ -287,6 +288,8 @@ static void fills_arith_facts(void)
         "fn bytes(n: u8) -> u8 {"
         " let t: u8 = 0; let one: u8 = 1;"
         " for i in one..n { t +%= i; } return t; }\n"
+        "fn half(lo: i8, hi: i8) -> int {"
+        " let t = 0; for i in lo..hi by -128 { t +%= i as int; } return t; }\n"
         "fn scoped(n: int) -> int { let s = 0;"
         " for i in 0..n { let p = Point { x: i, y: 2 }; s +%= p.x; }"
         " return s; }\n";
@@ -297,6 +300,8 @@ static void fills_arith_facts(void)
     CHECK(body_count(source, "main.down", " nuw") == 0);
     CHECK(body_holds(source, "main.bytes", "add nuw i8"));
     CHECK(body_count(source, "main.bytes", " nsw") == 0);
+    CHECK(body_holds(source, "main.half", "sub i8 "));
+    CHECK(body_count(source, "main.half", " nsw") == 0);
     CHECK(body_holds(source, "main.get", "ptradd inbounds %0, "));
     CHECK(body_count(source, "main.view", "ptradd inbounds") == 0);
     CHECK(body_holds(source, "main.kind", ") -> i32 range 0, 3 {"));

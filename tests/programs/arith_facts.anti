@@ -2,13 +2,13 @@
 //! language guarantees. Through a view by `as`, a field may lie past the end of
 //! the object, and its address stays an address beside the field access of the
 //! real object. The step of a range runs up to the last value of the type and
-//! down to the least, from bounds of either sign and across the sign of an
-//! unsigned byte. An enum reads 0 where `alloc` zeroed it, though 0 is no value
-//! of it, and the full range of a byte. A local whose address a call takes
-//! lives in each turn of a loop, beside one of the next block, and a local
-//! struct returns from its block. The test runs in release mode and, with
-//! `--checks`, with the checks of a dev build in an optimised program, where
-//! the checked `+` at the end of its range passes.
+//! down to the least, by half the range of the type as well, from bounds of
+//! either sign and across the sign of an unsigned byte. An enum reads 0 where
+//! `alloc` zeroed it, though 0 is no value of it, and the full range of a byte.
+//! A local whose address a call takes lives in each turn of a loop, beside one
+//! of the next block, and a local struct returns from its block. The test runs
+//! in release mode and, with `--checks`, with the checks of a dev build in an
+//! optimised program, where the checked `+` at the end of its range passes.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -101,7 +101,15 @@ fn ranges()
 	for i in 0..10 by -3 {
 		printf("to zero %lld\n".ptr, i);
 	}
+	let lo_half: i8 = -128;
+	let hi_half: i8 = 127;
+	for i in lo_half..hi_half by -128 {
+		printf("half i8 %lld\n".ptr, i as int);
+	}
 	let least = -9223372036854775807 - 1;
+	for i in least..top by -9223372036854775808 {
+		printf("half int %lld\n".ptr, i);
+	}
 	let last = 0;
 	for i in least..least +% 3 {
 		last = i;

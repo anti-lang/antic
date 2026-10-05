@@ -15,6 +15,10 @@ to zero 9
 to zero 6
 to zero 3
 to zero 0
+half i8 0
+half i8 -128
+half int 0
+half int -9223372036854775808
 least -9223372036854775806
 grows below the top yes
 zero 0 0
