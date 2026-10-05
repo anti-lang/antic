@@ -108,6 +108,12 @@ endforeach()
 if(entries MATCHES "(^|\n)anti/sysroot/macos-[^/\n]+/sdk/")
     message(FATAL_ERROR "${archive} carries stubs of Apple's SDK")
 endif()
+# DESIGN: the runtime as bitcode that --lto links stays out of the package
+# until Eddie says yes to shipping it, condition C3 of
+# docs/work-order-llvm-optimization.md. His yes takes this check away.
+if(entries MATCHES "(^|\n)anti/lib/[^\n]*/bitcode/")
+    message(FATAL_ERROR "${archive} carries the runtime as bitcode")
+endif()
 
 # The anti of the package runs the commands that read JSON, TOML and the
 # symbols of a binary, whose readers stand in src/rt. On a Linux host the

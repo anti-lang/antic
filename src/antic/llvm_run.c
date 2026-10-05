@@ -68,6 +68,26 @@ done:
    function attributes in the text, so the command lines carry neither,
    and the text alone decides the code. See "Integration route" in
    docs/work-order-llvm-back-end.md. */
+/* DESIGN: under --lto opt runs the pipeline before the link that clang
+   runs for -flto=full or -flto=thin at -O2, and ThinLTO writes the
+   summary of the module beside the bitcode. The LTO of lld runs the rest
+   over the program and the runtime together. */
+static bool run_lto(const struct llvm_run *r, const char *text_path,
+                    const char *output)
+{
+    const char *full[] = {r->opt, "-passes=lto-pre-link<O2>", "-o", output,
+                          text_path, NULL};
+    const char *thin[] = {r->opt, "--thinlto-bc",
+                          "-passes=thinlto-pre-link<O2>", "-o", output,
+                          text_path, NULL};
+
+    if (process_run(r->lto == LTO_THIN ? thin : full) != 0) {
+        fprintf(stderr, "antic: opt failed\n");
+        return false;
+    }
+    return true;
+}
+
 bool llvm_run(const struct llvm_run *r, const char *text_path,
               const char *bitcode_path, const char *output)
 {
@@ -77,6 +97,9 @@ bool llvm_run(const struct llvm_run *r, const char *text_path,
     const char *options[3];
     int run;
 
+    if (r->lto != LTO_NONE) {
+        return run_lto(r, text_path, output);
+    }
     if (r->optimize && process_run(opt) != 0) {
         fprintf(stderr, "antic: opt failed\n");
         return false;

@@ -42,6 +42,8 @@ static int usage(FILE *out)
           "  --llvm-ar <path>     the llvm-ar executable\n"
           "  --linker lld|platform  link with lld of the runtime archive, the\n"
           "                       default, or with the platform linker\n"
+          "  --lto full|thin      link the program and the runtime as\n"
+          "                       bitcode through the LTO of lld\n"
           "  --framework <name>   link a macOS program against a framework\n"
           "                       of Apple's SDK\n"
           "  --linux-lib <name>   link a Linux program against a library\n"
@@ -361,6 +363,18 @@ static int run(int argc, char **argv, const struct lists *l)
                 options.linker = LINKER_PLATFORM;
             } else {
                 fprintf(stderr, "antic: --linker takes lld or platform\n");
+                return 2;
+            }
+            continue;
+        } else if (strcmp(arg, "--lto") == 0) {
+            const char *value = value_of(argc, argv, &i);
+            if (value == NULL) {
+                return 2;
+            }
+            if (!link_lto_from_name(value, &options.lto)) {
+                fprintf(stderr, "antic: --lto takes %s or %s, not %s\n",
+                        link_lto_name(LTO_FULL), link_lto_name(LTO_THIN),
+                        value);
                 return 2;
             }
             continue;

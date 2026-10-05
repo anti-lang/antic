@@ -246,6 +246,37 @@ static bool can_link(const struct options *o)
     return true;
 }
 
+/* DESIGN: --lto links a program in release mode. Dev mode writes an
+   object per module, and the other refusals write no program or link
+   with a linker of the host. A runtime archive without the runtime as
+   bitcode of the mode, such as the package before Eddie's yes under C3
+   of docs/work-order-llvm-optimization.md, is refused before anything
+   compiles. */
+static bool lto_usable(const struct options *o)
+{
+    struct text library = {0};
+    bool ok = true;
+
+    if (o->dev || o->assembly_only || o->library || o->lib != LIB_NONE ||
+        o->linker != LINKER_LLD) {
+        fputs("antic: --lto links a program in release mode, without --dev, "
+              "-S, -c, --lib or --linker platform\n",
+              stderr);
+        return false;
+    }
+    if (o->runtime == NULL) {
+        return true;
+    }
+    link_runtime_bitcode(&library, o->runtime, o->target, o->cpu, o->lto);
+    if (!driver_file_exists(text_cstr(&library))) {
+        fprintf(stderr, "antic: --lto %s needs %s, the runtime as bitcode\n",
+                link_lto_name(o->lto), text_cstr(&library));
+        ok = false;
+    }
+    text_free(&library);
+    return ok;
+}
+
 bool driver_file_exists(const char *path)
 {
     FILE *f = platform_open(path, false);
@@ -1505,6 +1536,7 @@ bool driver_compile_llvm(const struct options *o, const struct text *text,
     r.target = o->target;
     r.optimize = !o->dev;
     r.assembly = o->assembly_only;
+    r.lto = o->lto;
     ok = driver_write_file(text_cstr(&text_path), text) &&
          llvm_run(&r, text_cstr(&text_path), text_cstr(&bitcode_path),
                   output);
@@ -1546,6 +1578,9 @@ int driver_run(const struct options *o)
     if (o->memory_checks && !memcheck_available(o->target)) {
         fprintf(stderr, "antic: `--memory-checks` is not available for %s\n",
                 target_name(o->target));
+        return 2;
+    }
+    if (o->lto != LTO_NONE && !lto_usable(o)) {
         return 2;
     }
     /* DESIGN: `unload` refuses while an object of the library is alive,

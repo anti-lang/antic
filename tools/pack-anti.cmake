@@ -310,8 +310,12 @@ foreach(host IN LISTS HOSTS)
         build_program("${host}" "${tree}/bin/anti${suffix}" anti)
     endif()
 
+    # DESIGN: the runtime as bitcode of --lto, bitcode/ beside the runtime
+    # of each level, stays out until Eddie's yes under condition C3 of
+    # docs/work-order-llvm-optimization.md. CMakeLists.txt names it.
     foreach(target IN LISTS TARGETS)
-        file(COPY "${RUNTIME}/lib/${target}" DESTINATION "${tree}/lib")
+        file(COPY "${RUNTIME}/lib/${target}" DESTINATION "${tree}/lib"
+             PATTERN "bitcode" EXCLUDE)
     endforeach()
     file(COPY "${RUNTIME}/std" DESTINATION "${tree}")
     file(COPY "${RUNTIME}/licenses/" DESTINATION "${tree}/licenses")

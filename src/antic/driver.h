@@ -119,6 +119,7 @@ struct options {
                                      sysroot. */
     size_t linux_library_count;
     enum linker linker;         /* --linker lld|platform, lld by default. */
+    enum lto lto;               /* --lto full|thin, none by default. */
     const char *package_name;   /* --package-name, of the header. */
     const char *package_version;
     const char *const *dependencies;  /* --dependency <name>,<constraint>,<url> */

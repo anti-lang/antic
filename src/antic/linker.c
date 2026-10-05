@@ -71,24 +71,56 @@ void link_memcheck_file(struct text *out, const char *runtime, enum target t,
     text_appendf(out, "/%s", name);
 }
 
-/* The runtime library of t at level cpu, of the glibc mode with glibc. */
+/* The words of --lto by mode, LTO_NONE having none. */
+static const char *const lto_names[] = {NULL, "full", "thin"};
+
+const char *link_lto_name(enum lto mode)
+{
+    return lto_names[mode];
+}
+
+bool link_lto_from_name(const char *name, enum lto *mode)
+{
+    size_t i;
+
+    for (i = 1; i < sizeof lto_names / sizeof lto_names[0]; i++) {
+        if (strcmp(name, lto_names[i]) == 0) {
+            *mode = (enum lto)i;
+            return true;
+        }
+    }
+    return false;
+}
+
+/* The runtime library of t at level cpu, of the glibc mode with glibc,
+   and the runtime as bitcode of mode lto unless it is LTO_NONE. */
 static void runtime_library(struct text *out, const char *runtime,
-                            enum target t, enum cpu_level cpu, bool glibc)
+                            enum target t, enum cpu_level cpu, bool glibc,
+                            enum lto lto)
 {
     /* DESIGN: MSVC names a static library name.lib, and the other
        toolchains libname.a. The level names the directory, because the
        archive holds one runtime per level of the target. */
     text_appendf(out, "%s/%s/", runtime, RUNTIME_LIB_DIR);
     link_target_dir(out, t, glibc);
-    text_appendf(out, "/%s/%s", cpu_name(cpu),
-                 target_info(t)->format == FORMAT_COFF ? "anti_rt.lib"
-                                                       : "libanti_rt.a");
+    text_appendf(out, "/%s/", cpu_name(cpu));
+    if (lto != LTO_NONE) {
+        text_appendf(out, "%s/%s/", RUNTIME_BITCODE_DIR, link_lto_name(lto));
+    }
+    text_append(out, target_info(t)->format == FORMAT_COFF ? "anti_rt.lib"
+                                                           : "libanti_rt.a");
 }
 
 void link_runtime_library(struct text *out, const char *runtime, enum target t,
                           enum cpu_level cpu)
 {
-    runtime_library(out, runtime, t, cpu, false);
+    runtime_library(out, runtime, t, cpu, false, LTO_NONE);
+}
+
+void link_runtime_bitcode(struct text *out, const char *runtime, enum target t,
+                          enum cpu_level cpu, enum lto mode)
+{
+    runtime_library(out, runtime, t, cpu, false, mode);
 }
 
 const char *const *link_crt_dirs(enum target t)
@@ -227,15 +259,33 @@ static void macos_memcheck(struct link_command *c, enum target t,
     add(c, in->rpath);
 }
 
+/* DESIGN: the LTO of lld runs at the level of opt in release mode, -O2,
+   whatever default lld has. */
+static void lto_level(struct link_command *c, enum target t,
+                      const struct link_inputs *in)
+{
+    if (in->lto != LTO_NONE) {
+        add(c, target_info(t)->os == OS_WINDOWS ? "/opt:lldlto=2"
+                                                : "--lto-O2");
+    }
+}
+
 static void macos(struct link_command *c, enum target t,
                   const struct link_inputs *in)
 {
     struct text *library = next(c);
 
-    link_runtime_library(library, in->runtime, t, in->cpu);
+    runtime_library(library, in->runtime, t, in->cpu, false, in->lto);
     macos_start(c, t, in, false);
     add(c, "-o");
     add(c, in->executable);
+    lto_level(c, t, in);
+    if (in->lto != LTO_NONE && in->debug) {
+        struct text *objects = next(c);
+        text_appendf(objects, "%s%s", in->executable, LINK_LTO_OBJECTS_SUFFIX);
+        add(c, "-object_path_lto");
+        add(c, text_cstr(objects));
+    }
     /* DESIGN: a plugin is bound against the host at load, so the host
        keeps every name its own objects define in its export table. */
     if (in->exports) {
@@ -366,7 +416,7 @@ static void linux_glibc(struct link_command *c, enum target t,
     struct text *crtn = next(c);
     size_t i;
 
-    runtime_library(library, in->runtime, t, in->cpu, true);
+    runtime_library(library, in->runtime, t, in->cpu, true, in->lto);
     text_appendf(sysroot, "--sysroot=%s", in->sysroot);
     text_appendf(interpreter, "--dynamic-linker=%s", glibc_interpreter(t));
     text_appendf(crtn, "%s/%s/%s/crtn.o", in->sysroot, SYSROOT_LIB, triple);
@@ -380,6 +430,7 @@ static void linux_glibc(struct link_command *c, enum target t,
     if (!in->debug) {
         add(c, "--strip-debug");
     }
+    lto_level(c, t, in);
     add(c, "-o");
     add(c, in->executable);
     for (i = 0; i < 2; i++) {
@@ -411,7 +462,7 @@ static void linux_lld(struct link_command *c, enum target t,
     struct text *library = next(c);
     size_t i;
 
-    link_runtime_library(library, in->runtime, t, in->cpu);
+    runtime_library(library, in->runtime, t, in->cpu, false, in->lto);
     add(c, linker);
     add(c, "-static");
     add(c, "-pie");
@@ -419,6 +470,7 @@ static void linux_lld(struct link_command *c, enum target t,
     if (!in->debug) {
         add(c, "--strip-debug");
     }
+    lto_level(c, t, in);
     add(c, "-o");
     add(c, in->executable);
     for (i = 0; i < 2; i++) {
@@ -587,13 +639,14 @@ static void windows(struct link_command *c, enum target t,
     const char *linker = program(c, in, t);
     struct text *library = next(c);
 
-    link_runtime_library(library, in->runtime, t, in->cpu);
+    runtime_library(library, in->runtime, t, in->cpu, false, in->lto);
     add(c, linker);
     add(c, "/NOLOGO");
     windows_debug(c, in);
     add(c, "/SUBSYSTEM:CONSOLE");
     add(c, target_info(t)->arch == ARCH_ARM64 ? "/MACHINE:ARM64"
                                               : "/MACHINE:X64");
+    lto_level(c, t, in);
     windows_output(c, in);
     /* DESIGN: a program that can host a plugin exports the names of the
        .def file. The link writes the import library its plugins link
@@ -815,7 +868,7 @@ void link_shared_command(struct link_command *c, enum target t,
     start(c);
     library = next(c);
     if (!s->plugin) {
-        runtime_library(library, in->runtime, t, in->cpu, glibc);
+        runtime_library(library, in->runtime, t, in->cpu, glibc, LTO_NONE);
     }
     switch (target_info(t)->os) {
     case OS_MACOS: macos_shared(c, t, in, s, library); break;

@@ -207,6 +207,27 @@ function(antic_dev_inputs objects fixtures)
     set(${fixtures} ${found_fixtures} PARENT_SCOPE)
 endfunction()
 
+# DESIGN: ANTIC_TEST_LTO runs the suite behind --lto, as the step
+# runtime-lto of docs/work-order-llvm-optimization.md asks. Empty by
+# default, so the suite builds as a user does. Set to full or thin, it
+# gives each program test of antic_program_test, antic_modules_test and
+# antic_llvm_program_test that builds in release mode --lto in that mode.
+# A test whose options hold one that --lto refuses keeps them alone.
+set(ANTIC_TEST_LTO "" CACHE STRING
+    "full or thin: build the program tests of release mode with --lto")
+if(NOT ANTIC_TEST_LTO MATCHES "^(|full|thin)$")
+    message(FATAL_ERROR "ANTIC_TEST_LTO is full, thin or empty, not ${ANTIC_TEST_LTO}")
+endif()
+# Set out to the options after it, with --lto of ANTIC_TEST_LTO added.
+function(antic_test_lto out)
+    set(options ${ARGN})
+    if(ANTIC_TEST_LTO AND NOT options MATCHES
+       "(^|;)(--dev|-S|-c|--lib|--linker|--lto)(;|$)")
+        list(APPEND options --lto ${ANTIC_TEST_LTO})
+    endif()
+    set(${out} ${options} PARENT_SCOPE)
+endfunction()
+
 # A program test of run_program.cmake, which builds source with antic,
 # llvm-mc and the runtime archive of this tree, runs it and compares the
 # result with the expected file beside it.
@@ -223,7 +244,8 @@ function(antic_program_test name source)
         message(FATAL_ERROR "antic_program_test(${name}) names no WORK")
     endif()
     antic_dev_inputs(dev_objects dev_fixtures ${arg_DEV})
-    list(JOIN arg_OPTIONS "," options)
+    antic_test_lto(options ${arg_OPTIONS})
+    list(JOIN options "," options)
     set(objects ${dev_objects} ${arg_OBJECTS})
     list(JOIN objects "," objects)
     set(optional "")
@@ -266,13 +288,16 @@ function(antic_modules_test name)
     antic_dev_inputs(std_objects std_fixtures ${arg_STD})
     list(JOIN std_objects "," std_objects)
     list(JOIN arg_LIBRARIES "," libraries)
-    list(JOIN arg_OPTIONS "," options)
     list(JOIN arg_LIB_OPTIONS "," lib_options)
     foreach(mode release dev)
         set(objects "")
+        set(options ${arg_OPTIONS})
         if(mode STREQUAL "dev")
             set(objects "${std_objects}")
+        else()
+            antic_test_lto(options ${options})
         endif()
+        list(JOIN options "," options)
         add_test(NAME ${name}_${mode}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
@@ -528,6 +553,9 @@ function(antic_llvm_program_test name target mode)
     set(options ${arg_OPTIONS})
     if(target STREQUAL "macos-x86_64")
         list(APPEND options --cpu v1)
+    endif()
+    if(mode STREQUAL "release")
+        antic_test_lto(options ${options})
     endif()
     list(JOIN options "," options)
     add_test(NAME llvm_program_${name}_${target}_${mode}
@@ -2317,7 +2345,61 @@ foreach(case "linux-x86_64|elf64-x86-64" "linux-arm64|elf64-littleaarch64"
         set_tests_properties(cross_link_${target}${suffix} PROPERTIES
             SKIP_REGULAR_EXPRESSION "SKIP: ")
     endforeach()
+    # The step runtime-lto of docs/work-order-llvm-optimization.md: lld
+    # links the bitcode of the program with the runtime as bitcode of
+    # each mode for every target.
+    foreach(mode full thin)
+        add_test(NAME cross_link_lto_${mode}_${target}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DANTIC=$<TARGET_FILE:antic>"
+                "-DLLVM_MC=${ANTIC_LLVM_MC}"
+                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/cross-lto-${mode}"
+                "-DTARGET=${target}"
+                "-DFORMAT=${format}"
+                "-DOPTIONS=--lto,${mode}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_cross_link.cmake")
+        set_tests_properties(cross_link_lto_${mode}_${target} PROPERTIES
+            SKIP_REGULAR_EXPRESSION "SKIP: ")
+    endforeach()
 endforeach()
+
+# --lto takes one of its two modes, and links a program in release mode
+# alone. A runtime archive without the runtime as bitcode of the mode is
+# refused before anything compiles.
+add_expect_test(lto_mode STATUS 2
+    PATTERN "^antic: --lto takes full or thin, not fast"
+    COMMAND $<TARGET_FILE:antic> --runtime "${ANTIC_RUNTIME_DIR}"
+            --lto fast -o "${CMAKE_CURRENT_BINARY_DIR}/lto_mode"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+foreach(case "dev|--dev" "assembly|-S" "lib|--lib|static"
+        "platform|--linker|platform")
+    string(REPLACE "|" ";" parts "${case}")
+    list(POP_FRONT parts what)
+    add_expect_test(lto_refused_${what} STATUS 2
+        PATTERN "^antic: --lto links a program in release mode, without --dev, -S, -c, --lib or --linker platform"
+        COMMAND $<TARGET_FILE:antic> --runtime "${ANTIC_RUNTIME_DIR}"
+                --lto full ${parts}
+                -o "${CMAKE_CURRENT_BINARY_DIR}/lto_refused_${what}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+endforeach()
+# The .def file of a Windows program that hosts plugins lists the COFF
+# symbols of its object, which --lto makes bitcode.
+if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
+    add_expect_test(lto_refused_windows_host STATUS 1
+        PATTERN "^antic: --lto links no Windows program that hosts plugins"
+        COMMAND $<TARGET_FILE:antic> --runtime "${ANTIC_RUNTIME_DIR}"
+                --target windows-x86_64 --lto full
+                -o "${CMAKE_CURRENT_BINARY_DIR}/lto_refused_windows_host.exe"
+                "${CMAKE_CURRENT_SOURCE_DIR}/programs/inject_default.anti")
+endif()
+add_expect_test(lto_no_bitcode STATUS 2
+    PATTERN "^antic: --lto thin needs .*/lib/${ANTIC_HOST_TARGET}/[^/]+/bitcode/thin/[^/]+, the runtime as bitcode"
+    COMMAND $<TARGET_FILE:antic> --runtime "${CMAKE_CURRENT_BINARY_DIR}"
+            --lto thin -o "${CMAKE_CURRENT_BINARY_DIR}/lto_no_bitcode"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
 
 # A release links its macOS binaries against the pinned Apple SDK, and an
 # SDK that changed under that name is refused.
@@ -4220,6 +4302,15 @@ list(APPEND bench_executables bench_map_work_rtseed)
 antic_program_test(program_mixed_work
     "${CMAKE_CURRENT_SOURCE_DIR}/bench/ablate/mixed_work.anti"
     WORK "${CMAKE_CURRENT_BINARY_DIR}/bench_ablate")
+# The same program through the LTO of lld in each mode of --lto, the step
+# runtime-lto of the work order. It imports six modules of the standard
+# library, so the runtime and the program meet in many places.
+foreach(mode full thin)
+    antic_program_test(program_mixed_work_lto_${mode}
+        "${CMAKE_CURRENT_SOURCE_DIR}/bench/ablate/mixed_work.anti"
+        OPTIONS --lto ${mode}
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/bench_ablate_lto_${mode}")
+endforeach()
 add_custom_target(bench
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"

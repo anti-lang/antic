@@ -58,6 +58,19 @@
    --linker platform selects the linker of the host's own toolchain. */
 enum linker { LINKER_LLD, LINKER_PLATFORM };
 
+/* DESIGN: --lto full|thin links the bitcode of a program in release mode
+   with the runtime as bitcode through the LTO of lld, choice D7 of
+   docs/work-order-llvm-optimization.md. The default build links objects,
+   and the runtime as bitcode stays out of the package, until Eddie's yes
+   under condition C3. The runtime archive keeps the bitcode of a target
+   and level in <runtime>/RUNTIME_LIB_DIR/<target>/<level>/
+   RUNTIME_BITCODE_DIR/<mode>/, named by the word of the option, since
+   ThinLTO imports nothing from the bitcode of full LTO and ld64.lld
+   cannot choose the mode of one kind of bitcode for both. CMakeLists.txt
+   and tools/pack-anti.cmake spell the same names. */
+#define RUNTIME_BITCODE_DIR "bitcode"
+enum lto { LTO_NONE, LTO_FULL, LTO_THIN };
+
 /* Append the path of the PDB of a Windows link whose output is
    executable: the output with its suffix replaced by `.pdb`, beside it.
    The link and the symbols archive of anti build both name it so. */

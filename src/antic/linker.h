@@ -51,7 +51,23 @@ struct link_inputs {
     /* macOS with --memory-checks: the absolute directory of that
        runtime, where the program finds it at run time. */
     const char *rpath;
+    /* --lto: object is bitcode, and the link takes the runtime as
+       bitcode of the mode. */
+    enum lto lto;
 };
+
+/* DESIGN: a macOS link of --lto with -g keeps the objects that the LTO of
+   ld64.lld writes in the directory <executable>LINK_LTO_OBJECTS_SUFFIX.
+   Mach-O leaves the debug information in the objects, and the program
+   names them by path. */
+#define LINK_LTO_OBJECTS_SUFFIX ".lto"
+
+/* The word of --lto that names mode, which names its directory of the
+   runtime as bitcode as well. */
+const char *link_lto_name(enum lto mode);
+
+/* Set *mode to the mode that name names, and answer whether one does. */
+bool link_lto_from_name(const char *name, enum lto *mode);
 
 /* The suffixes of the object files and archives that antic passes to the
    linker. */
@@ -123,6 +139,11 @@ bool link_is_input(const char *path);
    runtime. */
 void link_runtime_library(struct text *out, const char *runtime, enum target t,
                           enum cpu_level cpu);
+
+/* Append the path of the runtime as bitcode of mode for target t at level
+   cpu below runtime. */
+void link_runtime_bitcode(struct text *out, const char *runtime, enum target t,
+                          enum cpu_level cpu, enum lto mode);
 
 /* The native library of `anti.regex`, PCRE2 as src/native/ names it, and
    the runtime library of its glue, which src/native/pcre2.cmake builds

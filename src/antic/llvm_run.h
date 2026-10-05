@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 
+#include "antic.h"
 #include "target.h"
 
 /* The run of opt and llc of the pinned release on the text that
@@ -22,6 +23,9 @@ struct llvm_run {
        the bitcode at -O2. Dev mode: llc reads the text at -O1 alone. */
     bool optimize;
     bool assembly;              /* -S: llc writes assembly, not an object */
+    /* --lto in release mode: opt writes the bitcode of the mode as the
+       output, which lld links, and llc does not run. */
+    enum lto lto;
 };
 
 /* Run the tools of r on the text at text_path and write the object, or

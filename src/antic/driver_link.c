@@ -219,6 +219,7 @@ bool driver_link_inputs_of(const struct options *o, const struct extras *extras,
                 (o->linux_library_count > 0 || extras->hosts_plugins ||
                  o->memory_checks);
     in->memory_checks = o->memory_checks;
+    in->lto = o->lto;
     if (o->memory_checks && os == OS_MACOS) {
         struct text dir = {0};
         text_appendf(&dir, "%s/%s/", o->runtime, RUNTIME_LIB_DIR);
@@ -469,6 +470,14 @@ bool driver_link_program(const struct options *o, const char *object,
     ok = driver_link_inputs_of(o, extras, object, executable, &in, &facts);
     in.extra = extra;
     in.extra_count = extra_count;
+    /* DESIGN: the .def file of a Windows host lists the names of the COFF
+       symbols of its object, and under --lto the object is bitcode. */
+    if (ok && in.exports && os == OS_WINDOWS && o->lto != LTO_NONE) {
+        fputs("antic: --lto links no Windows program that hosts plugins, "
+              "since the names it exports come from a COFF object\n",
+              stderr);
+        ok = false;
+    }
     if (ok && in.exports && os == OS_WINDOWS) {
         ok = host_exports(o, object, executable, &extras->host_names, &def,
                           &implib);

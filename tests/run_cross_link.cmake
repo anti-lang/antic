@@ -9,6 +9,7 @@
 #   WORK          a directory for the executable
 #   TARGET        the target name
 #   FORMAT        the file format that llvm-objdump prints
+#   OPTIONS       optional options of antic, separated by commas
 
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")
     message("SKIP: the runtime archive has no sysroot for ${TARGET}")
@@ -26,9 +27,10 @@ endif()
 file(MAKE_DIRECTORY "${WORK}")
 get_filename_component(program "${SOURCE}" NAME_WE)
 set(exe "${WORK}/${program}-${TARGET}")
+string(REPLACE "," ";" options "${OPTIONS}")
 execute_process(
     COMMAND "${ANTIC}" --target "${TARGET}" --llvm-mc "${LLVM_MC}"
-            --runtime "${RUNTIME}" -o "${exe}" "${SOURCE}"
+            --runtime "${RUNTIME}" ${options} -o "${exe}" "${SOURCE}"
     RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed for ${TARGET}\n${err}")

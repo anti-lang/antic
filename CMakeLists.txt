@@ -270,6 +270,15 @@ if(APPLE)
     endif()
 endif()
 
+# DESIGN: the runtime as bitcode that --lto links, one archive per mode in
+# lib/<target>/<level>/bitcode/<mode>/, as RUNTIME_BITCODE_DIR and
+# link_lto_name of src/antic/ name them. The mode is the word of -flto=
+# as well. tools/pack-anti.cmake leaves the directory out of the package
+# until Eddie's yes under condition C3 of
+# docs/work-order-llvm-optimization.md.
+set(ANTIC_RUNTIME_BITCODE_DIR bitcode)
+set(ANTIC_LTO_MODES full thin)
+
 # DESIGN: clang compiles the runtime for every other target that has a
 # sysroot, so that antic links a program for each of them from this host.
 # Linux takes the headers of musl, macOS the headers of the Zig release
@@ -327,8 +336,44 @@ function(anti_cross_runtime_at target triple level root)
         COMMAND "${ANTIC_LLVM_AR}" rcs "${library}" ${objects}
         DEPENDS ${objects}
         VERBATIM)
+    # The same sources as bitcode, once per mode of --lto, with the flags
+    # of the objects above. The stub stays an object. DESIGN: clang runs
+    # in the source tree on the path below it, because bitcode records
+    # the path of its source as given and -ffile-prefix-map leaves that
+    # name alone. The test no_paths reads every library of the archive.
+    set(bitcode_libraries "")
+    get_filename_component(library_name "${library}" NAME)
+    foreach(mode IN LISTS ANTIC_LTO_MODES)
+        set(mode_objects "")
+        set(mode_work "${work}/${ANTIC_RUNTIME_BITCODE_DIR}-${mode}")
+        set(mode_library
+            "${out}/${ANTIC_RUNTIME_BITCODE_DIR}/${mode}/${library_name}")
+        foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
+            set(object "${mode_work}/${source}.o")
+            add_custom_command(OUTPUT "${object}"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${mode_work}"
+                COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
+                    -flto=${mode} ${ANTIC_C_WARNINGS}
+                    "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
+                    "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
+                    -MMD -MF "${object}.d"
+                    -c "src/rt/${source}.c" -o "${object}"
+                WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+                DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
+                DEPFILE "${object}.d"
+                VERBATIM)
+            list(APPEND mode_objects "${object}")
+        endforeach()
+        get_filename_component(mode_out "${mode_library}" DIRECTORY)
+        add_custom_command(OUTPUT "${mode_library}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${mode_out}"
+            COMMAND "${ANTIC_LLVM_AR}" rcs "${mode_library}" ${mode_objects}
+            DEPENDS ${mode_objects}
+            VERBATIM)
+        list(APPEND bitcode_libraries "${mode_library}")
+    endforeach()
     add_custom_target(anti_rt_${target}_${level} ALL
-        DEPENDS "${library}" "${stub}")
+        DEPENDS "${library}" "${stub}" ${bitcode_libraries})
 endfunction()
 
 function(anti_cross_runtime target triple)
