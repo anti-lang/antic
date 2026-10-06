@@ -1,7 +1,8 @@
 # Toolchain work for later
 
-The toolchain is frozen at `23.1.1-anti.5` of `anti-lang/llvm-tools`, which added opt,
-llc and `libunwind.a` to `23.1.1-anti.3` for the LLVM back end. Each line below is
+The toolchain is frozen at `23.1.1-anti.6` of `anti-lang/llvm-tools`. `23.1.1-anti.5`
+added opt, llc and `libunwind.a` to `23.1.1-anti.3` for the LLVM back end, and anti.6
+added llvm-profdata and the profile runtime for profile-guided optimisation. Each line below is
 toolchain work that came up after the freeze of `23.1.1-anti.3`. It waits until a need
 makes it a release.
 

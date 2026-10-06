@@ -1,10 +1,11 @@
-# Install the seven LLVM tools llvm-mc, lld, llvm-ar, llvm-objdump,
-# llvm-readobj, opt and llc for this host into <dir>/bin. llvm-mc
-# assembles, lld links under the names ld.lld, ld64.lld and lld-link, and
-# llvm-ar writes static libraries. llvm-objdump reads the format and
-# architecture of an output, and llvm-readobj decodes the Windows unwind
-# data for the tests. opt optimizes LLVM IR and llc compiles it to an
-# object, for the LLVM back end.
+# Install the eight LLVM tools llvm-mc, lld, llvm-ar, llvm-objdump,
+# llvm-readobj, opt, llc and llvm-profdata for this host into <dir>/bin.
+# llvm-mc assembles, lld links under the names ld.lld, ld64.lld and
+# lld-link, and llvm-ar writes static libraries. llvm-objdump reads the
+# format and architecture of an output, and llvm-readobj decodes the
+# Windows unwind data for the tests. opt optimizes LLVM IR and llc compiles
+# it to an object, for the LLVM back end. llvm-profdata merges the raw
+# profiles of a --profile-generate run into the file --profile-use reads.
 #
 #   cmake [-DDEST=<dir>] [-DARCHIVE=<file>] -P tools/get-llvm.cmake
 #

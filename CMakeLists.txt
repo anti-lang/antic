@@ -462,6 +462,31 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
             endif()
         endforeach()
     endforeach()
+    # DESIGN: --profile-generate links the profile runtime of the pinned
+    # clang, which the runtime archive carries in lib/<target>/ beside the
+    # runtime of AddressSanitizer. It is one file per target, for every
+    # level of the target: compiler-rt builds it for the triple alone. Each
+    # Linux target takes the build of its own C library, musl or glibc,
+    # and both macOS targets the one universal file. The PROFILE_RUNTIME_
+    # names of src/antic/linker.h spell the same files.
+    set(profile_macos-arm64 darwin libclang_rt.profile_osx.a)
+    set(profile_macos-x86_64 darwin libclang_rt.profile_osx.a)
+    set(profile_linux-x86_64 x86_64-unknown-linux-musl libclang_rt.profile.a)
+    set(profile_linux-arm64 aarch64-unknown-linux-musl libclang_rt.profile.a)
+    set(profile_linux-x86_64-glibc x86_64-unknown-linux-gnu
+        libclang_rt.profile.a)
+    set(profile_linux-arm64-glibc aarch64-unknown-linux-gnu
+        libclang_rt.profile.a)
+    set(profile_windows-x86_64 x86_64-pc-windows-msvc clang_rt.profile.lib)
+    set(profile_windows-arm64 aarch64-pc-windows-msvc clang_rt.profile.lib)
+    foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)
+        set(profile ${profile_${target}})
+        list(POP_FRONT profile dir)
+        if(EXISTS "${clang_resource}/lib/${dir}/${profile}")
+            file(COPY "${clang_resource}/lib/${dir}/${profile}"
+                DESTINATION "${ANTIC_RUNTIME_DIR}/lib/${target}")
+        endif()
+    endforeach()
 endif()
 
 # The standard library in src/std/, written as library files into std/ of the

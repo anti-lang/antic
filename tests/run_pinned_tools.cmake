@@ -12,7 +12,7 @@
 # of it with a tool of the host in each place. Then the linker's own mark
 # in each program: `Linker: LLD` in the .comment of an ELF file, the tool
 # lld in the build version of a Mach-O file, and no Rich header, which
-# link.exe writes and lld-link does not, in a PE file. Last the seven LLVM
+# link.exe writes and lld-link does not, in a PE file. Last the eight LLVM
 # tools of the pinned directory, each of the version of tools/llvm-version.
 
 include("${CHECK}")

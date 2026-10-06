@@ -40,12 +40,13 @@ function(antic_pinned_linker out llvm os)
     endif()
 endfunction()
 
-# The seven LLVM tools of the pinned release, which tools/get-llvm.cmake
+# The eight LLVM tools of the pinned release, which tools/get-llvm.cmake
 # installs and tools/check-llvm.cmake copies into the runtime archive. lld
 # runs under its names ld.lld, ld64.lld and lld-link.
-set(ANTIC_LLVM_TOOLS llvm-mc lld llvm-ar llvm-objdump llvm-readobj opt llc)
+set(ANTIC_LLVM_TOOLS llvm-mc lld llvm-ar llvm-objdump llvm-readobj opt llc
+    llvm-profdata)
 
-# The list of problems of the seven LLVM tools in llvm/bin on a host of
+# The list of problems of the eight LLVM tools in llvm/bin on a host of
 # the operating system os. It is empty when each is there and reports the
 # LLVM version. lld answers as ld.lld, because the generic name prints no
 # version.

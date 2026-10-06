@@ -202,8 +202,9 @@ when started by hand.
 - One suite per build tree at a time. Two `ctest` runs in one tree fail each other's
   tests. A command started with `&` in a tool call keeps running after the call returns.
 
-- The toolchain is frozen at `23.1.1-anti.5`, which added opt, llc and `libunwind.a`
-  to `23.1.1-anti.3` for the LLVM back end. A toolchain change goes to
+- The toolchain is frozen at `23.1.1-anti.6`. `23.1.1-anti.5` added opt, llc and
+  `libunwind.a` to `23.1.1-anti.3` for the LLVM back end, and anti.6 added
+  llvm-profdata and the profile runtime for profile-guided optimisation. A toolchain change goes to
   `docs/toolchain-later.md` as one line.
 - Both VMs ran the suite after the libc check. Linux passed 408 of 408, and both
   sanitizer suites 407 of 407 with `cmake --preset asan` and `ubsan` and no other option.

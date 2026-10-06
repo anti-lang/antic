@@ -99,16 +99,18 @@ move a signature onto the host that serves the binaries.
 
 ### The LLVM tools
 
-The seven LLVM tools are not served from the download area: llvm-mc, lld, llvm-ar,
-llvm-objdump, llvm-readobj, opt and llc. The repository `anti-lang/llvm-tools` builds them
+The eight LLVM tools are not served from the download area: llvm-mc, lld, llvm-ar,
+llvm-objdump, llvm-readobj, opt, llc and llvm-profdata. The repository `anti-lang/llvm-tools` builds them
 from the pinned LLVM source and publishes one archive per host as an asset of a GitHub
-release, tagged `<version>-anti.<build>` as in `23.1.1-anti.5`. Beside the archives stand `SHA256SUMS` and its signature
+release, tagged `<version>-anti.<build>` as in `23.1.1-anti.6`. Beside the archives stand `SHA256SUMS` and its signature
 `SHA256SUMS.sig`. The recipe, the hosts and the checks of each build are in that
 repository. Each release holds the tools and clang of each of the six hosts. antic takes
 the tools of its host, and a build of antic takes clang as well. The clang archive also
 carries `libunwind.a` for the two glibc targets, which the build copies into
 `lib/<target>/` of the runtime archive. The runtime of AddressSanitizer calls its
-`_Unwind_Backtrace` and `_Unwind_GetIP` in a Linux program of `--memory-checks`.
+`_Unwind_Backtrace` and `_Unwind_GetIP` in a Linux program of `--memory-checks`. It
+carries the profile runtime of compiler-rt for every target as well, which the build
+copies into `lib/<target>/` and a program of `--profile-generate` links.
 
 antic writes LLVM IR text, and opt and llc turn it into the object that lld links. Since
 the step `switch` of `docs/work-order-llvm-back-end.md` they are the one back end, and no
@@ -130,6 +132,21 @@ doubled, 177,317,004 bytes over the six hosts:
 which grew each clang archive by 57,788 to 74,916 bytes. Its tools archives differ from
 those of anti.4 in `VERSION` alone. The sizes are in bytes, as shipped, from the reports
 of `anti-lang/llvm-tools` of 2026-10-02 and 2026-10-03.
+
+`23.1.1-anti.6` added `llvm-profdata` to each tools archive and the profile runtime of
+compiler-rt to each clang archive, for `--profile-generate` and `--profile-use`. The
+runtime of one target weighs 151,522 to 228,104 bytes. Every other file is that of
+anti.5. The sizes are in bytes, as shipped, from the report of `anti-lang/llvm-tools`
+of 2026-10-05:
+
+| Host | Tools, anti.5 | Tools, anti.6 | Growth | Clang, anti.5 | Clang, anti.6 | Growth |
+|---|---|---|---|---|---|---|
+| linux-x86_64 | 58,207,088 | 59,504,208 | 1,297,120 | 31,964,636 | 32,123,632 | 158,996 |
+| linux-arm64 | 51,819,892 | 53,010,396 | 1,190,504 | 28,936,004 | 29,099,632 | 163,628 |
+| macos-arm64 | 54,411,340 | 56,111,556 | 1,700,216 | 30,882,556 | 31,063,076 | 180,520 |
+| macos-x86_64 | 61,933,048 | 63,882,332 | 1,949,284 | 34,196,960 | 34,367,592 | 170,632 |
+| windows-x86_64 | 54,855,680 | 56,460,784 | 1,605,104 | 30,522,700 | 30,704,892 | 182,192 |
+| windows-arm64 | 47,578,316 | 48,903,092 | 1,324,776 | 27,164,136 | 27,337,428 | 173,292 |
 
 `tools/llvm-pin` names the tag, the address of the release, the name of an asset and
 the digest of the archive of each of the six hosts. `tools/clang-pin` names the archives
