@@ -1,0 +1,60 @@
+//! `text.Builder` keeps a NUL after its bytes, fills its room to the last byte
+//! before the NUL and grows past it, whether a byte, a text or the digits of a
+//! number take the room.
+import anti.io;
+import anti.text;
+
+/// Whether the byte after the text of `b` is the NUL.
+fn nul_follows(b: *text.Builder) -> bool
+{
+	let t = b.text();
+	if let p = t.ptr {
+		return p[t.len] == 0;
+	}
+	return false;
+}
+
+fn main() -> int
+{
+	/* One byte at a time through the first room and two growths. */
+	let bytes = text.Builder.new();
+	for i in 0..100 {
+		bytes.append_byte(0x61 + ((i % 26) as byte));
+		if bytes.len() != i + 1 || !nul_follows(&bytes) {
+			return 1;
+		}
+	}
+	io.println(bytes.text());
+
+	/* Texts of 1 to 12 bytes, whose ends meet the room at every offset. */
+	let texts = text.Builder.new();
+	let piece = "abcdefghijkl";
+	for n in 1..13 {
+		texts.append(text.slice(piece, 0, n));
+		if !nul_follows(&texts) {
+			return 2;
+		}
+	}
+	io.println(texts.text());
+
+	/* An empty text changes nothing. */
+	let empty = text.Builder.new();
+	empty.append("");
+	empty.append_byte(0x7C);
+	empty.append("");
+	if empty.len() != 1 || !nul_follows(&empty) {
+		return 3;
+	}
+	io.println(empty.text());
+
+	/* Numbers whose digits cross the room, with and without a sign. */
+	let numbers = text.Builder.new();
+	for i in 0..40 {
+		numbers.append_int(i * 1013 - 20000);
+		if !nul_follows(&numbers) {
+			return 4;
+		}
+	}
+	io.println(numbers.text());
+	return 0;
+}

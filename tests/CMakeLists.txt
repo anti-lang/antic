@@ -3328,6 +3328,22 @@ add_test(NAME memory_checks_list
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_memory_checks_list.cmake")
 set_tests_properties(memory_checks_list PROPERTIES TIMEOUT 120
     SKIP_REGULAR_EXPRESSION "SKIP: ")
+# text.Builder appends in place while its room holds the bytes and the NUL.
+# Under --memory-checks a fresh block holds no zeros, so a missing NUL or a
+# write past the room fails here where a plain run passes by chance.
+if(NOT ANTIC_HOST_TARGET STREQUAL "windows-arm64")
+    add_test(NAME std_builder_room_memory_checks
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/builder_room.anti"
+            "-DOPTIONS=--memory-checks"
+            "-DOBJECTS="
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-memory-checks"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    set_tests_properties(std_builder_room_memory_checks PROPERTIES TIMEOUT 120)
+endif()
 
 # The ABI probe compares the layouts of C and antic on the host.
 if(NOT WIN32)

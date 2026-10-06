@@ -111,7 +111,13 @@ static int reserve(struct anti_builder *b, int64_t count)
    `serialize` of the root class writes an object into one, and the
    runtime holds that body. The class is a face over these functions, so
    one buffer serves both sides. A mismatch of the layout breaks the
-   builder test at once. */
+   builder test at once.
+
+   DESIGN: the class also appends in place while the room holds the bytes
+   and their NUL, without a call, which LLVM cannot inline into this C.
+   It keeps the rule of this function: one byte past the length for the
+   NUL, and growth here alone. Eddie decided it on 2026-10-06, and
+   `put` of src/std/anti/text.anti holds the measurement. */
 void anti_rt_builder_append(struct anti_builder *b,
                             const unsigned char *bytes, int64_t len)
 {
