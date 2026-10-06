@@ -54,6 +54,9 @@ struct link_inputs {
     /* --lto: object is bitcode, and the link takes the runtime as
        bitcode of the mode. */
     enum lto lto;
+    /* --profile-generate: link the profile runtime that the runtime
+       archive holds beside the native libraries. */
+    bool profile_generate;
 };
 
 /* DESIGN: a macOS link of --lto with -g keeps the objects that the LTO of
@@ -168,6 +171,23 @@ void link_runtime_bitcode(struct text *out, const char *runtime, enum target t,
 #define MEMCHECK_WINDOWS_LIB "clang_rt.asan_dynamic.lib"
 #define MEMCHECK_WINDOWS_THUNK "clang_rt.asan_dynamic_runtime_thunk.lib"
 #define MEMCHECK_WINDOWS_DLL "clang_rt.asan_dynamic.dll"
+
+/* DESIGN: the runtime archive carries the profile runtime of compiler-rt
+   of the pinned clang in lib/<target>/, under the names compiler-rt gives
+   it, one file per target for every level. The text of an instrumented
+   program on Mach-O and COFF refers to PROFILE_RUNTIME_HOOK itself, which
+   draws in the code that writes the profile at exit. On ELF it does not,
+   so the link names the hook as undefined, as clang's driver does.
+   CMakeLists.txt copies the same names. */
+#define PROFILE_RUNTIME_ELF "libclang_rt.profile.a"
+#define PROFILE_RUNTIME_MACOS "libclang_rt.profile_osx.a"
+#define PROFILE_RUNTIME_WINDOWS "clang_rt.profile.lib"
+#define PROFILE_RUNTIME_HOOK "__llvm_profile_runtime"
+
+/* Append the path of the profile runtime of target t below runtime. With
+   glibc it lies in the directory of the glibc mode. */
+void link_profile_runtime(struct text *out, const char *runtime,
+                          enum target t, bool glibc);
 
 /* Append the path of the file name of the runtime of AddressSanitizer
    for target t below runtime. With glibc it lies in the directory of

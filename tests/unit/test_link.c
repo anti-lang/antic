@@ -16,39 +16,39 @@ static const char *const extra_windows[] = {"shapes.obj"};
 static const struct link_inputs unix_inputs = {
     "prog.o", "prog", "/rt", "/sdk", "15.4", "/usr/lib/x86_64-linux-gnu",
     NULL, 0, LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false,
-    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE
+    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false
 };
 
 static const struct link_inputs windows_inputs = {
     "prog.obj", "prog.exe", "C:/rt", NULL, NULL, NULL, NULL, 0,
     LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false,
-    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE
+    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false
 };
 
 static const struct link_inputs extra_inputs = {
     "prog.o", "prog", "/rt", "/sdk", "15.4", "/usr/lib/aarch64-linux-gnu",
     extra_unix, 2, LINKER_PLATFORM, CPU_ARMV8_5, NULL, NULL, NULL, 0, false,
     false,
-    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE
+    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false
 };
 
 static const struct link_inputs extra_windows_inputs = {
     "prog.obj", "prog.exe", "C:/rt", NULL, NULL, NULL, extra_windows, 1,
     LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false,
-    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE
+    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false
 };
 
 /* lld of the runtime archive with the sysroot of the target. */
 static const struct link_inputs lld_inputs = {
     "prog.o", "prog", "/rt", NULL, "26.5", NULL, extra_unix, 1, LINKER_LLD,
     CPU_V3, "/rt/sysroot/t", "/rt/bin", NULL, 0, false, false,
-    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE
+    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false
 };
 
 static const struct link_inputs lld_windows_inputs = {
     "prog.obj", "prog.exe", "/rt", NULL, NULL, NULL, NULL, 0, LINKER_LLD,
     CPU_V3, "/rt/sysroot/t", "/rt/bin", NULL, 0, false, false,
-    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE
+    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false
 };
 
 /* Build the command line of target t and compare it, joined by spaces.
@@ -720,6 +720,57 @@ static void lto_links(void)
     CHECK(!link_lto_from_name("", &mode));
 }
 
+/* --profile-generate links the profile runtime of compiler-rt from
+   lib/<target>/ of the runtime archive, after the runtime of Anti. Linux
+   names __llvm_profile_runtime as undefined, since the instrumented text
+   of an ELF target holds no reference to it, and the glibc mode takes the
+   build of its own C library. Windows keeps the static C runtime that
+   the objects of the profile runtime name out of the link. */
+static void profile_links(void)
+{
+    struct link_inputs in = lld_inputs;
+    struct link_inputs win = lld_windows_inputs;
+
+    in.profile_generate = true;
+    links(TARGET_MACOS_ARM64, &in,
+          "/rt/bin/ld64.lld -S -arch arm64 -platform_version macos 11.0 26.5 "
+          "-syslibroot /rt/sysroot/t -o prog prog.o shapes.o "
+          "/rt/lib/macos-arm64/armv8.5/libanti_rt.a "
+          "/rt/lib/macos-arm64/libclang_rt.profile_osx.a -lSystem");
+    links(TARGET_LINUX_ARM64, &in,
+          "/rt/bin/ld.lld -static -pie --no-dynamic-linker --strip-debug "
+          "-u __llvm_profile_runtime -o prog "
+          "/rt/sysroot/t/usr/lib/rcrt1.o /rt/sysroot/t/usr/lib/crti.o prog.o "
+          "shapes.o /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
+          "/rt/lib/linux-arm64/libclang_rt.profile.a "
+          "/rt/sysroot/t/usr/lib/libc.a "
+          "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
+          "/rt/sysroot/t/usr/lib/crtn.o");
+    in.glibc = true;
+    links(TARGET_LINUX_X86_64, &in,
+          "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -pie "
+          "--dynamic-linker=/lib64/ld-linux-x86-64.so.2 --strip-debug "
+          "-u __llvm_profile_runtime -o prog "
+          "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
+          "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crti.o prog.o shapes.o "
+          "/rt/lib/linux-x86_64-glibc/v3/libanti_rt.a "
+          "/rt/lib/linux-x86_64-glibc/libclang_rt.profile.a "
+          "-L/rt/sysroot/t/usr/lib/x86_64-linux-gnu "
+          "-L/rt/sysroot/t/lib/x86_64-linux-gnu -lm -lc "
+          "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
+          "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crtn.o");
+    win.profile_generate = true;
+    links(TARGET_WINDOWS_ARM64, &win,
+          "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
+          "/ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:ARM64 "
+          "/OUT:prog.exe /PDB:prog.pdb /LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
+          "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
+          "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/aarch64 prog.obj "
+          "/rt/lib/windows-arm64/armv8.2/anti_rt.lib "
+          "/rt/lib/windows-arm64/clang_rt.profile.lib /NODEFAULTLIB:libcmt.lib "
+          "msvcrt.lib libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
+}
+
 /* A shared library takes the facts of a program of its module: the
    libraries of `link linux` in the glibc mode, and the runtime of
    AddressSanitizer under --memory-checks. A Linux library of the glibc
@@ -881,6 +932,7 @@ void test_link(void)
     dynamic_modes();
     memory_checks_links();
     lto_links();
+    profile_links();
     shared_modes();
     sysroot_names();
     strips_debug();

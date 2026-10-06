@@ -277,6 +277,78 @@ static bool lto_usable(const struct options *o)
     return ok;
 }
 
+/* The first bytes of an indexed profile, which llvm-profdata merge
+   writes, and of a raw profile of 64 bits, which a run writes. Both are
+   little-endian on every target of Anti. */
+static const unsigned char indexed_profile[] = {0xff, 'l', 'p', 'r',
+                                                'o',  'f', 'i', 0x81};
+static const unsigned char raw_profile[] = {0x81, 'r', 'f', 'o',
+                                            'r',  'p', 'l', 0xff};
+
+/* Whether the file at path is an indexed profile. A message names the
+   problem otherwise, and for a raw profile the command that merges it. */
+static bool indexed_profile_file(const char *path)
+{
+    unsigned char head[sizeof indexed_profile] = {0};
+    FILE *f = platform_open(path, false);
+    size_t got;
+
+    if (f == NULL) {
+        fprintf(stderr, "antic: cannot read %s\n", path);
+        return false;
+    }
+    got = fread(head, 1, sizeof head, f);
+    fclose(f);
+    if (got == sizeof head &&
+        memcmp(head, indexed_profile, sizeof head) == 0) {
+        return true;
+    }
+    if (got == sizeof head && memcmp(head, raw_profile, sizeof head) == 0) {
+        fprintf(stderr, "antic: %s is a raw profile. llvm-profdata merge "
+                        "-o <file> %s writes the profile that "
+                        "--profile-use reads\n",
+                path, path);
+        return false;
+    }
+    fprintf(stderr, "antic: %s is no profile of llvm-profdata merge\n", path);
+    return false;
+}
+
+/* DESIGN: --profile-generate and --profile-use act on the run of opt in
+   release mode, choice D7 of docs/work-order-llvm-optimization.md, and
+   neither is a default, condition C3. Dev mode runs no opt, and --lto
+   runs the pipeline before the link, which takes no profile here. The
+   instrumented program links the profile runtime, so --profile-generate
+   builds a program that lld links. A profile is the indexed file of
+   llvm-profdata merge, since opt reads no raw profile. */
+static bool profile_usable(const struct options *o)
+{
+    const char *option =
+        o->profile_generate ? "--profile-generate" : "--profile-use";
+
+    if (o->dev || o->lto != LTO_NONE) {
+        fprintf(stderr, "antic: %s builds in release mode, without --dev or "
+                        "--lto\n",
+                option);
+        return false;
+    }
+    if (o->profile_generate && o->profile_use != NULL) {
+        fputs("antic: --profile-generate and --profile-use exclude each "
+              "other\n",
+              stderr);
+        return false;
+    }
+    if (o->profile_generate &&
+        (o->assembly_only || o->library || o->lib != LIB_NONE ||
+         o->linker != LINKER_LLD)) {
+        fputs("antic: --profile-generate links a program, without -S, -c, "
+              "--lib or --linker platform\n",
+              stderr);
+        return false;
+    }
+    return o->profile_use == NULL || indexed_profile_file(o->profile_use);
+}
+
 bool driver_file_exists(const char *path)
 {
     FILE *f = platform_open(path, false);
@@ -1537,6 +1609,8 @@ bool driver_compile_llvm(const struct options *o, const struct text *text,
     r.optimize = !o->dev;
     r.assembly = o->assembly_only;
     r.lto = o->lto;
+    r.profile_generate = o->profile_generate;
+    r.profile_use = o->profile_use;
     ok = driver_write_file(text_cstr(&text_path), text) &&
          llvm_run(&r, text_cstr(&text_path), text_cstr(&bitcode_path),
                   output);
@@ -1581,6 +1655,10 @@ int driver_run(const struct options *o)
         return 2;
     }
     if (o->lto != LTO_NONE && !lto_usable(o)) {
+        return 2;
+    }
+    if ((o->profile_generate || o->profile_use != NULL) &&
+        !profile_usable(o)) {
         return 2;
     }
     /* DESIGN: `unload` refuses while an object of the library is alive,

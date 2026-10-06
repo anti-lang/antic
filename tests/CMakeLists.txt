@@ -4320,6 +4320,18 @@ foreach(mode full thin)
         OPTIONS --lto ${mode}
         WORK "${CMAKE_CURRENT_BINARY_DIR}/bench_ablate_lto_${mode}")
 endforeach()
+# The same program built with --profile-generate, run, merged by
+# llvm-profdata and built again with --profile-use, the step pgo of the
+# work order. Each build passes the test of the program.
+add_test(NAME profile_guided
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/bench/ablate/mixed_work.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/profile_guided"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_profile.cmake")
+set_tests_properties(profile_guided PROPERTIES TIMEOUT 300)
 add_custom_target(bench
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"

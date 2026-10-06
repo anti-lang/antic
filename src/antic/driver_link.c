@@ -220,6 +220,7 @@ bool driver_link_inputs_of(const struct options *o, const struct extras *extras,
                  o->memory_checks);
     in->memory_checks = o->memory_checks;
     in->lto = o->lto;
+    in->profile_generate = o->profile_generate;
     if (o->memory_checks && os == OS_MACOS) {
         struct text dir = {0};
         text_appendf(&dir, "%s/%s/", o->runtime, RUNTIME_LIB_DIR);

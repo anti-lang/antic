@@ -57,6 +57,12 @@ inlining show up as a difference between the two.
 same name to `antic`, in either mode. It is off by default. "Memory checks" in
 `docs/anti-language-additions.md` gives what it finds.
 
+`--profile-generate` and `--profile-use <file>` on `anti build` and `anti run` pass the
+options of the same name to `antic`, for a program in release mode alone. The first
+builds a program that writes a raw profile of each run. `llvm-profdata merge` of the
+package turns the raw profiles into the file the second reads. Both are off by default,
+as condition C3 of `docs/work-order-llvm-optimization.md` requires.
+
 ## Check command
 
 `anti check` runs everything that writes no artifact. It exits non-zero on the first

@@ -44,6 +44,10 @@ static int usage(FILE *out)
           "                       default, or with the platform linker\n"
           "  --lto full|thin      link the program and the runtime as\n"
           "                       bitcode through the LTO of lld\n"
+          "  --profile-generate   instrument the program, which writes a\n"
+          "                       raw profile of its run when it exits\n"
+          "  --profile-use <file> optimize with the profile that\n"
+          "                       llvm-profdata merge wrote\n"
           "  --framework <name>   link a macOS program against a framework\n"
           "                       of Apple's SDK\n"
           "  --linux-lib <name>   link a Linux program against a library\n"
@@ -298,6 +302,11 @@ static int run(int argc, char **argv, const struct lists *l)
             continue;
         } else if (strcmp(arg, "--llvm-ar") == 0) {
             slot = &options.llvm_ar;
+        } else if (strcmp(arg, "--profile-generate") == 0) {
+            options.profile_generate = true;
+            continue;
+        } else if (strcmp(arg, "--profile-use") == 0) {
+            slot = &options.profile_use;
         } else if (strcmp(arg, "-g") == 0) {
             options.debug = true;
             continue;

@@ -29,9 +29,11 @@ static int usage(FILE *out)
           "                  [--strip-docs] [--cpu <level>] [--memory-checks]\n"
           "                  [--lib static|shared] [--bundle-runtime]\n"
           "                  [--soname] [--runtime <dir>] [--llvm-mc <path>]\n"
-          "                  [--llvm-ar <path>]\n"
+          "                  [--llvm-ar <path>] [--profile-generate]\n"
+          "                  [--profile-use <file>]\n"
           "       anti run [--release] [--cpu <level>] [--offline]\n"
-          "                [--memory-checks]\n"
+          "                [--memory-checks] [--profile-generate]\n"
+          "                [--profile-use <file>]\n"
           "                [--runtime <dir>] [--llvm-mc <path>]\n"
           "       anti sdk export [--sdk <MacOSX.sdk>] [-o <dir>]\n"
           "       anti sdk import <bundle> [--sysroot <dir>]\n"
@@ -251,6 +253,10 @@ static int build_command(int argc, char **argv)
             request.strip_docs = true;
         } else if (strcmp(argv[i], "--memory-checks") == 0) {
             request.memory_checks = true;
+        } else if (strcmp(argv[i], "--profile-generate") == 0) {
+            request.profile_generate = true;
+        } else if (strcmp(argv[i], "--profile-use") == 0 && i + 1 < argc) {
+            request.profile_use = argv[++i];
         } else if (strcmp(argv[i], "--bundle-runtime") == 0) {
             request.bundle_runtime = true;
         } else if (strcmp(argv[i], "--soname") == 0) {
@@ -277,6 +283,15 @@ static int build_command(int argc, char **argv)
         } else {
             return usage(stderr);
         }
+    }
+    /* DESIGN: antic takes a profile in the one call of release mode, and
+       a library for C or the objects of dev mode would leave it out. */
+    if ((request.profile_generate || request.profile_use != NULL) &&
+        (!request.release || request.lib != BUILD_PROGRAM)) {
+        fputs("anti: --profile-generate and --profile-use build a program "
+              "with --release, without --lib\n",
+              stderr);
+        return 2;
     }
     if (request.runtime == NULL && default_runtime(&home)) {
         request.runtime = text_cstr(&home);

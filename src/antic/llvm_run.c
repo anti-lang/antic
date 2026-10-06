@@ -123,20 +123,59 @@ static bool run_lto(const struct llvm_run *r, const char *text_path,
 const char *const llvm_opt_options[LLVM_OPT_OPTION_COUNT] = {
     "-passes=default<O3>", "-inline-threshold=225"};
 
+/* DESIGN: --profile-generate and --profile-use run the pipeline of
+   release mode with the instrumentation of a profile or with its use, as
+   clang does for -fprofile-generate and -fprofile-use. Both place it at
+   the same point of the pipeline, so the profile of an instrumented
+   build fits the build that uses it. The instrumented program writes
+   LLVM_PROFILE_DEFAULT in its working directory, the name clang gives,
+   and LLVM_PROFILE_FILE names another file. %m stands for the signature of
+   the program, so the runs of one program merge into one file and those
+   of two programs stay apart. */
+#define LLVM_PROFILE_DEFAULT "default_%m.profraw"
+
+static bool run_opt(const struct llvm_run *r, const char *text_path,
+                    const char *bitcode_path)
+{
+    struct text profile = {0};
+    const char *opt[9];
+    size_t n = 0;
+    bool ok;
+
+    opt[n++] = r->opt;
+    opt[n++] = llvm_opt_options[0];
+    opt[n++] = llvm_opt_options[1];
+    if (r->profile_generate) {
+        opt[n++] = "-pgo-kind=pgo-instr-gen-pipeline";
+        opt[n++] = "-profile-file=" LLVM_PROFILE_DEFAULT;
+    } else if (r->profile_use != NULL) {
+        text_appendf(&profile, "-profile-file=%s", r->profile_use);
+        opt[n++] = "-pgo-kind=pgo-instr-use-pipeline";
+        opt[n++] = text_cstr(&profile);
+    }
+    opt[n++] = "-o";
+    opt[n++] = bitcode_path;
+    opt[n++] = text_path;
+    opt[n] = NULL;
+    ok = process_run(opt) == 0;
+    text_free(&profile);
+    if (!ok) {
+        fprintf(stderr, "antic: opt failed\n");
+    }
+    return ok;
+}
+
 bool llvm_run(const struct llvm_run *r, const char *text_path,
               const char *bitcode_path, const char *output)
 {
     struct text model = {0};
-    const char *opt[] = {r->opt, llvm_opt_options[0], llvm_opt_options[1],
-                         "-o", bitcode_path, text_path, NULL};
     const char *options[3];
     int run;
 
     if (r->lto != LTO_NONE) {
         return run_lto(r, text_path, output);
     }
-    if (r->optimize && process_run(opt) != 0) {
-        fprintf(stderr, "antic: opt failed\n");
+    if (r->optimize && !run_opt(r, text_path, bitcode_path)) {
         return false;
     }
     text_appendf(&model, "-relocation-model=%s",

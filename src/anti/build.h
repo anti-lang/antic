@@ -16,6 +16,10 @@ struct build_request {
     bool offline;
     bool strip_docs;
     bool memory_checks;         /* --memory-checks, passed to antic */
+    /* --profile-generate and --profile-use <file>, passed to the antic
+       call of a release program. */
+    bool profile_generate;
+    const char *profile_use;
     /* --lib static and --lib shared build a library for C rather than a
        program. Without one a project with `main` gives an executable and
        a project without it gives the library files of its modules. */

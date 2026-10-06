@@ -120,6 +120,12 @@ struct options {
     size_t linux_library_count;
     enum linker linker;         /* --linker lld|platform, lld by default. */
     enum lto lto;               /* --lto full|thin, none by default. */
+    /* --profile-generate: release mode instruments the program, which
+       writes a raw profile of its run when it exits. */
+    bool profile_generate;
+    /* --profile-use <file>: release mode optimizes with the profile that
+       llvm-profdata merge wrote. */
+    const char *profile_use;
     const char *package_name;   /* --package-name, of the header. */
     const char *package_version;
     const char *const *dependencies;  /* --dependency <name>,<constraint>,<url> */

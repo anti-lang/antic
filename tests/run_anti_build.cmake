@@ -338,3 +338,36 @@ execute_process(
 if(status EQUAL 0 OR NOT err MATCHES "one segment")
     message(FATAL_ERROR "anti new took a name of one segment: ${out}${err}")
 endif()
+
+# --profile-generate and --profile-use reach the release build of a
+# program and nothing else. The instrumented program writes its raw
+# profile where LLVM_PROFILE_FILE names it, llvm-profdata merges it, and
+# the build that uses it warns about no function.
+set(LLVM_BIN "${RUNTIME}/bin")
+foreach(refused "--profile-generate" "--release;--profile-generate;--lib;static"
+        "--profile-use;${WORK}/app.profdata")
+    run_anti(status text build ${refused} --runtime "${RUNTIME}"
+             --llvm-mc "${LLVM_MC}")
+    if(NOT status EQUAL 2 OR NOT text MATCHES
+       "--profile-generate and --profile-use build a program with --release")
+        message(FATAL_ERROR "anti build ${refused} gave ${status}: ${text}")
+    endif()
+endforeach()
+build("the instrumented build" build --release --profile-generate)
+set(ENV{LLVM_PROFILE_FILE} "${WORK}/app.profraw")
+program_expect("the instrumented program" COMMAND "${release}" STATUS 9
+               OUT "one\n")
+unset(ENV{LLVM_PROFILE_FILE})
+execute_process(COMMAND "${LLVM_BIN}/llvm-profdata${exe}" merge
+                        -o "${WORK}/app.profdata" "${WORK}/app.profraw"
+                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "llvm-profdata merge gave ${status}\n${err}")
+endif()
+run_anti(status text build --release --profile-use "${WORK}/app.profdata"
+         --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+if(NOT status EQUAL 0 OR text MATCHES "warning")
+    message(FATAL_ERROR "the build with the profile gave ${status}: ${text}")
+endif()
+program_expect("the program of the profile" COMMAND "${release}" STATUS 9
+               OUT "one\n")

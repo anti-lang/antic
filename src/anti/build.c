@@ -483,6 +483,8 @@ static bool build_release(struct build *b, enum target t, enum cpu_level cpu,
     o.output = text_cstr(&b->name);
     o.libraries = libraries->items;
     o.library_count = libraries->count;
+    o.profile_generate = b->r->profile_generate;
+    o.profile_use = b->r->profile_use;
     return driver_run(&o) == 0;
 }
 
@@ -539,6 +541,8 @@ static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
     o.libraries = libraries->items;
     o.library_count = libraries->count;
     o.debug = true;
+    o.profile_generate = b->r->profile_generate;
+    o.profile_use = b->r->profile_use;
     if (driver_run(&o) != 0) {
         goto done;
     }

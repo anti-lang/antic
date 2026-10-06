@@ -71,6 +71,20 @@ void link_memcheck_file(struct text *out, const char *runtime, enum target t,
     text_appendf(out, "/%s", name);
 }
 
+void link_profile_runtime(struct text *out, const char *runtime,
+                          enum target t, bool glibc)
+{
+    static const char *const names[] = {
+        [OS_LINUX] = PROFILE_RUNTIME_ELF,
+        [OS_MACOS] = PROFILE_RUNTIME_MACOS,
+        [OS_WINDOWS] = PROFILE_RUNTIME_WINDOWS,
+    };
+
+    text_appendf(out, "%s/%s/", runtime, RUNTIME_LIB_DIR);
+    link_target_dir(out, t, glibc);
+    text_appendf(out, "/%s", names[target_info(t)->os]);
+}
+
 /* The words of --lto by mode, LTO_NONE having none. */
 static const char *const lto_names[] = {NULL, "full", "thin"};
 
@@ -158,6 +172,7 @@ const char *link_lld_flavour(enum target t)
 #define SYSROOT_MUSL_LIBC "libc.a"
 #define SYSROOT_WINDOWS_CRT "crt/lib"
 #define WINDOWS_MSVCRT "msvcrt.lib"
+#define WINDOWS_STATIC_CRT "libcmt.lib"
 
 /* The directory of the processor in the library directories of a Windows
    sysroot. */
@@ -259,6 +274,32 @@ static void macos_memcheck(struct link_command *c, enum target t,
     add(c, in->rpath);
 }
 
+/* The profile runtime of --profile-generate, which follows the runtime
+   of Anti. */
+static void profile_runtime(struct link_command *c, enum target t,
+                            const struct link_inputs *in, bool glibc)
+{
+    struct text *file;
+
+    if (!in->profile_generate) {
+        return;
+    }
+    file = next(c);
+    link_profile_runtime(file, in->runtime, t, glibc);
+    add(c, text_cstr(file));
+}
+
+/* An ELF link of --profile-generate names the hook of the profile
+   runtime as undefined, which draws in the code that writes the
+   profile. */
+static void profile_hook(struct link_command *c, const struct link_inputs *in)
+{
+    if (in->profile_generate) {
+        add(c, "-u");
+        add(c, PROFILE_RUNTIME_HOOK);
+    }
+}
+
 /* DESIGN: the LTO of lld runs at the level of opt in release mode, -O2,
    whatever default lld has. */
 static void lto_level(struct link_command *c, enum target t,
@@ -293,6 +334,7 @@ static void macos(struct link_command *c, enum target t,
     }
     add_inputs(c, in);
     add(c, text_cstr(library));
+    profile_runtime(c, t, in, false);
     macos_memcheck(c, t, in);
     add(c, "-lSystem");
     macos_frameworks(c, in);
@@ -431,6 +473,7 @@ static void linux_glibc(struct link_command *c, enum target t,
         add(c, "--strip-debug");
     }
     lto_level(c, t, in);
+    profile_hook(c, in);
     add(c, "-o");
     add(c, in->executable);
     for (i = 0; i < 2; i++) {
@@ -442,6 +485,7 @@ static void linux_glibc(struct link_command *c, enum target t,
     linux_memcheck(c, t, in);
     add_inputs(c, in);
     add(c, text_cstr(library));
+    profile_runtime(c, t, in, true);
     glibc_libraries(c, t, in, true);
     add(c, text_cstr(crtn));
 }
@@ -471,6 +515,7 @@ static void linux_lld(struct link_command *c, enum target t,
         add(c, "--strip-debug");
     }
     lto_level(c, t, in);
+    profile_hook(c, in);
     add(c, "-o");
     add(c, in->executable);
     for (i = 0; i < 2; i++) {
@@ -480,6 +525,7 @@ static void linux_lld(struct link_command *c, enum target t,
     }
     add_inputs(c, in);
     add(c, text_cstr(library));
+    profile_runtime(c, t, in, false);
     for (i = 0; i < 3; i++) {
         struct text *file = next(c);
         text_appendf(file, "%s/%s/%s", in->sysroot, SYSROOT_LIB, after[i]);
@@ -664,6 +710,14 @@ static void windows(struct link_command *c, enum target t,
     windows_memcheck(c, t, in);
     add_inputs(c, in);
     add(c, text_cstr(library));
+    /* DESIGN: compiler-rt builds the profile runtime of Windows against
+       the static C runtime, and its objects name libcmt.lib. The program
+       takes the C runtime of the machine, as above, so the static one
+       stays out and the image holds one C library. */
+    if (in->profile_generate) {
+        profile_runtime(c, t, in, false);
+        add(c, "/NODEFAULTLIB:" WINDOWS_STATIC_CRT);
+    }
     add(c, WINDOWS_MSVCRT);
     add(c, "libvcruntime.lib");
     add(c, "ucrt.lib");

@@ -27,6 +27,10 @@ struct llvm_run {
     /* --lto in release mode: opt writes the bitcode of the mode as the
        output, which lld links, and llc does not run. */
     enum lto lto;
+    /* Release mode: opt instruments the program, or optimizes it with the
+       indexed profile at profile_use. */
+    bool profile_generate;
+    const char *profile_use;
 };
 
 /* The options of opt in release mode without --lto, before the output
