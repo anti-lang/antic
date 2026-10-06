@@ -283,6 +283,25 @@ set(ANTIC_LTO_MODES full thin)
 # sysroot, so that antic links a program for each of them from this host.
 # Linux takes the headers of musl, macOS the headers of the Zig release
 # that the sysroot holds and Windows the headers that xwin installs.
+# DESIGN: the runtime and the glue of the runtime archive put every
+# function and every datum of an ELF or COFF object into a section of its
+# own, so that the link of a program drops the ones it never reaches, as
+# --gc-sections and /OPT:REF in src/antic/linker.c do. Eddie decided on
+# 2026-10-06 that an executable carries no code it never uses. clang
+# splits a Mach-O object per symbol already, and -dead_strip alone gave
+# 32.1 percent off hello world, 17.8 off builder, 18.3 off objects, 10.2
+# off map_work and 4.3 off mixed_work on macos-arm64 that day. Under --lto
+# lld splits the code it generates itself, so the bitcode takes neither
+# flag. See the entry on dropped code under "Scope and toolchain" in
+# docs/decisions.md.
+function(antic_runtime_sections out target)
+    if(target MATCHES "^macos-")
+        set(${out} "" PARENT_SCOPE)
+    else()
+        set(${out} -ffunction-sections -fdata-sections PARENT_SCOPE)
+    endif()
+endfunction()
+
 # DESIGN: one runtime library per target and level, so that a second root
 # can hold the same target at a lower level. The archive that ships holds
 # the default level of each target, which anti_cross_runtime builds.
@@ -292,6 +311,7 @@ function(anti_cross_runtime_at target triple level root)
     # The level of the library, so that its atomics are one instruction
     # wherever the level has them.
     antic_cpu_march(march "${level}")
+    antic_runtime_sections(sections "${target}")
     set(out "${root}/lib/${target}/${level}")
     if(target MATCHES "^windows")
         set(library "${out}/anti_rt.lib")
@@ -305,7 +325,7 @@ function(anti_cross_runtime_at target triple level root)
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
             COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-                ${ANTIC_C_WARNINGS}
+                ${ANTIC_C_WARNINGS} ${sections}
                 "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
                 "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
                 -MMD -MF "${object}.d"
@@ -323,7 +343,7 @@ function(anti_cross_runtime_at target triple level root)
     add_custom_command(OUTPUT "${stub}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${out}"
         COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-            ${ANTIC_C_WARNINGS}
+            ${ANTIC_C_WARNINGS} ${sections}
             "${march}" "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
             -MMD -MF "${stub}.d"
             -c "${PROJECT_SOURCE_DIR}/src/rt/license_stub.c" -o "${stub}"

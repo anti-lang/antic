@@ -132,7 +132,9 @@ design the back end was built from.
   so it inlines nothing and every function stays a frame of its own.
 - llc writes the object with `-filetype=obj`, or the assembly under `-S` with
   `-filetype=asm`. The relocation model is `pic` on Linux and macOS and
-  `static` on Windows.
+  `static` on Windows. On Linux and Windows llc also runs with
+  `-function-sections -data-sections`, so the link drops each function and
+  datum that nothing reaches. Mach-O splits per symbol without them.
 - llc runs in the directory of its output and writes it by its file name,
   with its input and its own path absolute. llc records the name of its
   output in the CodeView of a COFF object. lld-link carries that name into

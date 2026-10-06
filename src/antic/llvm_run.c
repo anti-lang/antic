@@ -21,6 +21,10 @@ static const char *file_name(const char *path)
     return name;
 }
 
+/* The most options of llc before its input: the level, the file type,
+   the relocation model and the two that split sections. */
+#define LLC_OPTIONS 5
+
 /* DESIGN: llc runs in the directory of its output and writes the output
    by its file name alone. llc records the name of its output as the
    object name of the CodeView of a COFF object, S_OBJNAME, and lld-link
@@ -28,16 +32,30 @@ static const char *file_name(const char *path)
    build. The input and llc itself then go by absolute paths. It is the
    rule that nothing shipped holds a build path, which windows_debug in
    linker.c gives the link. */
-static int run_llc(const char *llc, const char *const options[3],
+static int run_llc(const char *llc, const char *const options[LLC_OPTIONS],
                    const char *input, const char *output)
 {
     const char *name = file_name(output);
     struct text directory = {0};
     struct text program = {0};
     struct text absolute = {0};
-    const char *argv[] = {llc, options[0], options[1], options[2], input,
-                          "-o", output, NULL};
+    const char *argv[LLC_OPTIONS + 5];
+    size_t n = 0;
+    size_t i;
+    size_t at_input;
+    size_t at_output;
     int run = -1;
+
+    argv[n++] = llc;
+    for (i = 0; i < LLC_OPTIONS && options[i] != NULL; i++) {
+        argv[n++] = options[i];
+    }
+    at_input = n;
+    argv[n++] = input;
+    argv[n++] = "-o";
+    at_output = n;
+    argv[n++] = output;
+    argv[n] = NULL;
 
     if (name == output) {
         return process_run(argv);
@@ -52,8 +70,8 @@ static int run_llc(const char *llc, const char *const options[3],
     if (!absolute_path(input, &absolute)) {
         goto done;
     }
-    argv[4] = text_cstr(&absolute);
-    argv[6] = name;
+    argv[at_input] = text_cstr(&absolute);
+    argv[at_output] = name;
     run = process_run_in(text_cstr(&directory), argv);
 done:
     text_free(&absolute);
@@ -169,7 +187,8 @@ bool llvm_run(const struct llvm_run *r, const char *text_path,
               const char *bitcode_path, const char *output)
 {
     struct text model = {0};
-    const char *options[3];
+    const char *options[LLC_OPTIONS] = {NULL};
+    size_t n = 0;
     int run;
 
     if (r->lto != LTO_NONE) {
@@ -180,9 +199,22 @@ bool llvm_run(const struct llvm_run *r, const char *text_path,
     }
     text_appendf(&model, "-relocation-model=%s",
                  llvm_relocation_model(r->target));
-    options[0] = r->optimize ? "-O2" : "-O1";
-    options[1] = r->assembly ? "-filetype=asm" : "-filetype=obj";
-    options[2] = text_cstr(&model);
+    options[n++] = r->optimize ? "-O2" : "-O1";
+    options[n++] = r->assembly ? "-filetype=asm" : "-filetype=obj";
+    options[n++] = text_cstr(&model);
+    /* DESIGN: an ELF or COFF object puts every function and every datum
+       into a section of its own, in release and dev mode, so that the
+       link drops the ones the program never reaches. Eddie decided on
+       2026-10-06 that an executable carries no code it never uses. llc
+       splits a Mach-O object per symbol already, and -dead_strip alone
+       gave 32.1 percent off hello world and 4.3 off mixed_work on
+       macos-arm64 that day. See the entry on dropped code under "Scope
+       and toolchain" in docs/decisions.md, and drop_unused in
+       linker.c. */
+    if (target_info(r->target)->format != FORMAT_MACHO) {
+        options[n++] = "-function-sections";
+        options[n++] = "-data-sections";
+    }
     run = run_llc(r->llc, options, r->optimize ? bitcode_path : text_path,
                   output);
     text_free(&model);

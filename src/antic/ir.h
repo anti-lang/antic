@@ -396,6 +396,9 @@ struct ir_function {
     bool is_extern;                 /* no body: C or another module */
     bool variadic;
     bool exported;                  /* an export fn, with a C symbol */
+    /* Code outside the program reaches the function by its name alone,
+       so the link keeps it although nothing refers to it. */
+    bool by_name;
     bool worker;                    /* a worker fn */
     /* The function ends the program on every path. Each call of it ends
        its block with IR_UNREACHABLE. */

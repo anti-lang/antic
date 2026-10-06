@@ -2375,6 +2375,27 @@ foreach(case "linux-x86_64|elf64-x86-64" "linux-arm64|elf64-littleaarch64"
     endforeach()
 endforeach()
 
+# Every link drops the code a program never calls. A hello-world program
+# calls anti_rt_write of src/rt/io.c and never anti_rt_exit of the same
+# file, so the second must be gone from the executable of every target.
+foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
+        windows-x86_64 windows-arm64)
+    add_test(NAME dead_code_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/link-identity/hello.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/dead-code"
+            "-DTARGET=${target}"
+            "-DKEPT=anti_rt_write"
+            "-DDROPPED=anti_rt_exit"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dead_code.cmake")
+    set_tests_properties(dead_code_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
 # --lto takes one of its two modes, and links a program in release mode
 # alone. A runtime archive without the runtime as bitcode of the mode is
 # refused before anything compiles.

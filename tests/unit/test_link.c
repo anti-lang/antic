@@ -393,29 +393,31 @@ static void libraries(void)
     in.executable = "libgeo.dylib";
     shared(TARGET_MACOS_ARM64, &in, &none,
            "ld -dylib -S -arch arm64 -platform_version macos 11.0 15.4 "
-           "-syslibroot /sdk -o libgeo.dylib geo.o "
+           "-syslibroot /sdk -o libgeo.dylib -dead_strip geo.o "
            "/rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem");
     shared(TARGET_MACOS_X86_64, &in, &versioned,
            "ld -dylib -S -arch x86_64 -platform_version macos 11.0 15.4 "
-           "-syslibroot /sdk -o libgeo.dylib -install_name @rpath/libgeo.dylib "
-           "-compatibility_version 1.0.0 -current_version 1.2.4 geo.o "
-           "/rt/lib/macos-x86_64/v3/libanti_rt.a -lSystem");
+           "-syslibroot /sdk -o libgeo.dylib -dead_strip -install_name "
+           "@rpath/libgeo.dylib -compatibility_version 1.0.0 -current_version "
+           "1.2.4 geo.o /rt/lib/macos-x86_64/v3/libanti_rt.a -lSystem");
     in.executable = "libgeo.so.1";
     shared(TARGET_LINUX_X86_64, &in, &versioned,
-           "ld -shared --exclude-libs ALL --strip-debug -o libgeo.so.1 -soname libgeo.so.1 geo.o "
-           "/rt/lib/linux-x86_64/v3/libanti_rt.a -L/usr/lib/x86_64-linux-gnu -lc");
+           "ld -shared --exclude-libs ALL --strip-debug --gc-sections -o "
+           "libgeo.so.1 -soname libgeo.so.1 geo.o "
+           "/rt/lib/linux-x86_64/v3/libanti_rt.a -L/usr/lib/x86_64-linux-gnu "
+           "-lc");
     in.executable = "libgeo.so";
     shared(TARGET_LINUX_ARM64, &in, &none,
-           "ld -shared --exclude-libs ALL --strip-debug -o libgeo.so geo.o "
-           "/rt/lib/linux-arm64/armv8.0/libanti_rt.a "
+           "ld -shared --exclude-libs ALL --strip-debug --gc-sections -o "
+           "libgeo.so geo.o /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
            "-L/usr/lib/x86_64-linux-gnu -lc");
     win.object = "geo.obj";
     win.executable = "geo.dll";
     shared(TARGET_WINDOWS_ARM64, &win, &def,
-           "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /DLL /MACHINE:ARM64 /OUT:geo.dll "
-           "/PDB:geo.pdb /DEF:geo.def "
-           "geo.obj C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
-           "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
+           "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /OPT:REF "
+           "/OPT:NOICF /DLL /MACHINE:ARM64 /OUT:geo.dll /PDB:geo.pdb "
+           "/DEF:geo.def geo.obj C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib "
+           "msvcrt.lib libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
 
     link_relocatable_command(&c, TARGET_MACOS_ARM64, &in, "joined.o",
                              joined_inputs, 3);
@@ -436,25 +438,26 @@ static void libraries(void)
     in.extra_count = 0;
     in.executable = "libgeo.dylib";
     shared(TARGET_MACOS_ARM64, &in, &none,
-           "/rt/bin/ld64.lld -dylib -S -arch arm64 -platform_version macos 11.0 "
-           "26.5 -syslibroot /rt/sysroot/t -o libgeo.dylib geo.o "
-           "/rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem");
+           "/rt/bin/ld64.lld -dylib -S -arch arm64 -platform_version macos "
+           "11.0 26.5 -syslibroot /rt/sysroot/t -o libgeo.dylib -dead_strip "
+           "geo.o /rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem");
     in.executable = "libgeo.so.1";
     shared(TARGET_LINUX_X86_64, &in, &versioned,
-           "/rt/bin/ld.lld -shared --exclude-libs ALL --strip-debug -o libgeo.so.1 -soname "
-           "libgeo.so.1 geo.o "
+           "/rt/bin/ld.lld -shared --exclude-libs ALL --strip-debug "
+           "--gc-sections -o libgeo.so.1 -soname libgeo.so.1 geo.o "
            "/rt/lib/linux-x86_64/v3/libanti_rt.a");
     win = lld_windows_inputs;
     win.object = "geo.obj";
     win.executable = "geo.dll";
     shared(TARGET_WINDOWS_ARM64, &win, &def,
-           "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. /ignore:4099 /DLL /MACHINE:ARM64 "
-           "/OUT:geo.dll /PDB:geo.pdb "
-           "/DEF:geo.def /LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
+           "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% "
+           "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:NOICF /DLL "
+           "/MACHINE:ARM64 /OUT:geo.dll /PDB:geo.pdb /DEF:geo.def "
+           "/LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
            "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
            "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/aarch64 geo.obj "
-           "/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib libvcruntime.lib "
-           "ucrt.lib legacy_stdio_definitions.lib");
+           "/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
+           "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
     link_relocatable_command(&c, TARGET_MACOS_ARM64, &in, "joined.o",
                              joined_inputs, 3);
     joined(&c, "ld -r -keep_private_externs -arch arm64 -o joined.o geo.o "
@@ -502,25 +505,25 @@ static void frameworks(void)
     in.sdk_version = "26.5";
     links(TARGET_MACOS_ARM64, &in,
           "/rt/bin/ld64.lld -S -arch arm64 -platform_version macos 11.0 26.5 "
-          "-syslibroot /rt/sysroot/t/sdk -o prog prog.o shapes.o "
-          "/rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem -framework CoreFoundation "
-          "-framework Cocoa");
+          "-syslibroot /rt/sysroot/t/sdk -o prog -dead_strip prog.o shapes.o "
+          "/rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem -framework "
+          "CoreFoundation -framework Cocoa");
     in.linker = LINKER_PLATFORM;
     in.lld_dir = NULL;
     in.sdk_path = "/sdk";
     links(TARGET_MACOS_X86_64, &in,
-          "ld -S -arch x86_64 -platform_version macos 11.0 26.5 "
-          "-syslibroot /sdk -o prog prog.o shapes.o "
-          "/rt/lib/macos-x86_64/v3/libanti_rt.a -lSystem -framework CoreFoundation "
-          "-framework Cocoa");
+          "ld -S -arch x86_64 -platform_version macos 11.0 26.5 -syslibroot "
+          "/sdk -o prog -dead_strip prog.o shapes.o "
+          "/rt/lib/macos-x86_64/v3/libanti_rt.a -lSystem -framework "
+          "CoreFoundation -framework Cocoa");
     in = lld_inputs;
     in.frameworks = names;
     in.framework_count = 2;
     links(TARGET_LINUX_ARM64, &in,
           "/rt/bin/ld.lld -static -pie --no-dynamic-linker --strip-debug "
-          "-o prog "
-          "/rt/sysroot/t/usr/lib/rcrt1.o /rt/sysroot/t/usr/lib/crti.o prog.o "
-          "shapes.o /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
+          "--gc-sections -o prog /rt/sysroot/t/usr/lib/rcrt1.o "
+          "/rt/sysroot/t/usr/lib/crti.o prog.o shapes.o "
+          "/rt/lib/linux-arm64/armv8.0/libanti_rt.a "
           "/rt/sysroot/t/usr/lib/libc.a "
           "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
           "/rt/sysroot/t/usr/lib/crtn.o");
@@ -542,7 +545,8 @@ static void dynamic_modes(void)
     in.glibc = true;
     links(TARGET_LINUX_ARM64, &in,
           "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -pie "
-          "--dynamic-linker=/lib/ld-linux-aarch64.so.1 --strip-debug -o prog "
+          "--dynamic-linker=/lib/ld-linux-aarch64.so.1 --strip-debug "
+          "--gc-sections -o prog "
           "/rt/sysroot/t/usr/lib/aarch64-linux-gnu/Scrt1.o "
           "/rt/sysroot/t/usr/lib/aarch64-linux-gnu/crti.o prog.o shapes.o "
           "/rt/lib/linux-arm64-glibc/armv8.0/libanti_rt.a "
@@ -556,7 +560,8 @@ static void dynamic_modes(void)
     links(TARGET_LINUX_X86_64, &in,
           "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -pie "
           "--dynamic-linker=/lib64/ld-linux-x86-64.so.2 --export-dynamic "
-          "-o prog /rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
+          "--gc-sections -o prog "
+          "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crti.o prog.o shapes.o "
           "/rt/lib/linux-x86_64-glibc/v3/libanti_rt.a "
           "-L/rt/sysroot/t/usr/lib/x86_64-linux-gnu "
@@ -567,9 +572,11 @@ static void dynamic_modes(void)
     in.linux_libraries = names;
     in.linux_library_count = 1;
     links(TARGET_LINUX_ARM64, &in,
-          "ld -pie --strip-debug --dynamic-linker=/lib/ld-linux-aarch64.so.1 -o prog "
-          "/usr/lib/aarch64-linux-gnu/Scrt1.o /usr/lib/aarch64-linux-gnu/crti.o "
-          "prog.o shapes.o libm.a /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
+          "ld -pie --strip-debug --gc-sections "
+          "--dynamic-linker=/lib/ld-linux-aarch64.so.1 -o prog "
+          "/usr/lib/aarch64-linux-gnu/Scrt1.o "
+          "/usr/lib/aarch64-linux-gnu/crti.o prog.o shapes.o libm.a "
+          "/rt/lib/linux-arm64/armv8.0/libanti_rt.a "
           "-L/usr/lib/aarch64-linux-gnu -l X11 -lc "
           "/usr/lib/aarch64-linux-gnu/crtn.o");
     in = lld_windows_inputs;
@@ -578,8 +585,8 @@ static void dynamic_modes(void)
     in.import_library = "prog.lib";
     links(TARGET_WINDOWS_ARM64, &in,
           "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
-          "/ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:ARM64 /OUT:prog.exe "
-          "/PDB:prog.pdb /DEF:prog.def /IMPLIB:prog.lib "
+          "/ignore:4099 /OPT:REF /OPT:NOICF /SUBSYSTEM:CONSOLE /MACHINE:ARM64 "
+          "/OUT:prog.exe /PDB:prog.pdb /DEF:prog.def /IMPLIB:prog.lib "
           "/LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/aarch64 prog.obj "
@@ -597,8 +604,8 @@ static void dynamic_modes(void)
         in.extra_count = 1;
         link_shared_command(&c, TARGET_WINDOWS_ARM64, &in, &plugin);
         joined(&c, "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% "
-                   "/pdbsourcepath:. /ignore:4099 /DLL /NOENTRY "
-                   "/MACHINE:ARM64 /OUT:fancy.dll /PDB:fancy.pdb "
+                   "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:NOICF /DLL "
+                   "/NOENTRY /MACHINE:ARM64 /OUT:fancy.dll /PDB:fancy.pdb "
                    "/DEF:fancy.def /LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
                    "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
                    "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/aarch64 fancy.obj "
@@ -623,15 +630,16 @@ static void memory_checks_links(void)
     in.rpath = "/abs/rt/lib/macos-arm64";
     links(TARGET_MACOS_ARM64, &in,
           "/rt/bin/ld64.lld -S -arch arm64 -platform_version macos 11.0 26.5 "
-          "-syslibroot /rt/sysroot/t -o prog prog.o shapes.o "
+          "-syslibroot /rt/sysroot/t -o prog -dead_strip prog.o shapes.o "
           "/rt/lib/macos-arm64/armv8.5/libanti_rt.a "
-          "/rt/lib/macos-arm64/libclang_rt.asan_osx_dynamic.dylib "
-          "-rpath /abs/rt/lib/macos-arm64 -lSystem");
+          "/rt/lib/macos-arm64/libclang_rt.asan_osx_dynamic.dylib -rpath "
+          "/abs/rt/lib/macos-arm64 -lSystem");
     in.glibc = true;
     links(TARGET_LINUX_X86_64, &in,
           "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -pie "
           "--dynamic-linker=/lib64/ld-linux-x86-64.so.2 --strip-debug "
-          "-o prog /rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
+          "--gc-sections -o prog "
+          "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crti.o --whole-archive "
           "/rt/lib/linux-x86_64-glibc/libclang_rt.asan_static.a "
           "--no-whole-archive --whole-archive "
@@ -640,22 +648,21 @@ static void memory_checks_links(void)
           "prog.o shapes.o /rt/lib/linux-x86_64-glibc/v3/libanti_rt.a "
           "-L/rt/sysroot/t/usr/lib/x86_64-linux-gnu "
           "-L/rt/sysroot/t/lib/x86_64-linux-gnu "
-          "/rt/lib/linux-x86_64-glibc/libunwind.a -lpthread -lrt -ldl "
-          "-lresolv -lm -lc /rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
+          "/rt/lib/linux-x86_64-glibc/libunwind.a -lpthread -lrt -ldl -lresolv "
+          "-lm -lc /rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crtn.o");
     in = lld_windows_inputs;
     in.memory_checks = true;
     links(TARGET_WINDOWS_X86_64, &in,
           "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
-          "/ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:X64 /OUT:prog.exe "
-          "/PDB:prog.pdb /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
+          "/ignore:4099 /OPT:REF /OPT:NOICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
+          "/OUT:prog.exe /PDB:prog.pdb /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/x86_64 "
           "/rt/lib/windows-x86_64/clang_rt.asan_dynamic.lib "
           "/INCLUDE:__asan_seh_interceptor "
-          "/WHOLEARCHIVE:/rt/lib/windows-x86_64/"
-          "clang_rt.asan_dynamic_runtime_thunk.lib prog.obj "
-          "/rt/lib/windows-x86_64/v3/anti_rt.lib msvcrt.lib "
+          "/WHOLEARCHIVE:/rt/lib/windows-x86_64/clang_rt.asan_dynamic_runtime_thunk.lib "
+          "prog.obj /rt/lib/windows-x86_64/v3/anti_rt.lib msvcrt.lib "
           "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
 }
 
@@ -672,21 +679,22 @@ static void lto_links(void)
     in.lto = LTO_FULL;
     links(TARGET_MACOS_ARM64, &in,
           "/rt/bin/ld64.lld -S -arch arm64 -platform_version macos 11.0 26.5 "
-          "-syslibroot /rt/sysroot/t -o prog --lto-O2 prog.o shapes.o "
-          "/rt/lib/macos-arm64/armv8.5/bitcode/full/libanti_rt.a -lSystem");
+          "-syslibroot /rt/sysroot/t -o prog -dead_strip --lto-O2 prog.o "
+          "shapes.o /rt/lib/macos-arm64/armv8.5/bitcode/full/libanti_rt.a "
+          "-lSystem");
     in.lto = LTO_THIN;
     in.debug = true;
     links(TARGET_MACOS_ARM64, &in,
           "/rt/bin/ld64.lld -arch arm64 -platform_version macos 11.0 26.5 "
-          "-syslibroot /rt/sysroot/t -o prog --lto-O2 -object_path_lto "
-          "prog.lto prog.o shapes.o "
+          "-syslibroot /rt/sysroot/t -o prog -dead_strip --lto-O2 "
+          "-object_path_lto prog.lto prog.o shapes.o "
           "/rt/lib/macos-arm64/armv8.5/bitcode/thin/libanti_rt.a -lSystem");
     in.debug = false;
     links(TARGET_LINUX_ARM64, &in,
           "/rt/bin/ld.lld -static -pie --no-dynamic-linker --strip-debug "
-          "--lto-O2 -o prog "
-          "/rt/sysroot/t/usr/lib/rcrt1.o /rt/sysroot/t/usr/lib/crti.o prog.o "
-          "shapes.o /rt/lib/linux-arm64/armv8.0/bitcode/thin/libanti_rt.a "
+          "--gc-sections --lto-O2 -o prog /rt/sysroot/t/usr/lib/rcrt1.o "
+          "/rt/sysroot/t/usr/lib/crti.o prog.o shapes.o "
+          "/rt/lib/linux-arm64/armv8.0/bitcode/thin/libanti_rt.a "
           "/rt/sysroot/t/usr/lib/libc.a "
           "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
           "/rt/sysroot/t/usr/lib/crtn.o");
@@ -695,7 +703,8 @@ static void lto_links(void)
     links(TARGET_LINUX_X86_64, &in,
           "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -pie "
           "--dynamic-linker=/lib64/ld-linux-x86-64.so.2 --strip-debug "
-          "--lto-O2 -o prog /rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
+          "--gc-sections --lto-O2 -o prog "
+          "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crti.o prog.o shapes.o "
           "/rt/lib/linux-x86_64-glibc/v3/bitcode/full/libanti_rt.a "
           "-L/rt/sysroot/t/usr/lib/x86_64-linux-gnu "
@@ -705,8 +714,9 @@ static void lto_links(void)
     win.lto = LTO_THIN;
     links(TARGET_WINDOWS_X86_64, &win,
           "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
-          "/ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:X64 /opt:lldlto=2 "
-          "/OUT:prog.exe /PDB:prog.pdb /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
+          "/ignore:4099 /OPT:REF /OPT:NOICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
+          "/opt:lldlto=2 /OUT:prog.exe /PDB:prog.pdb "
+          "/LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/x86_64 prog.obj "
           "/rt/lib/windows-x86_64/v3/bitcode/thin/anti_rt.lib msvcrt.lib "
@@ -734,12 +744,12 @@ static void profile_links(void)
     in.profile_generate = true;
     links(TARGET_MACOS_ARM64, &in,
           "/rt/bin/ld64.lld -S -arch arm64 -platform_version macos 11.0 26.5 "
-          "-syslibroot /rt/sysroot/t -o prog prog.o shapes.o "
+          "-syslibroot /rt/sysroot/t -o prog -dead_strip prog.o shapes.o "
           "/rt/lib/macos-arm64/armv8.5/libanti_rt.a "
           "/rt/lib/macos-arm64/libclang_rt.profile_osx.a -lSystem");
     links(TARGET_LINUX_ARM64, &in,
           "/rt/bin/ld.lld -static -pie --no-dynamic-linker --strip-debug "
-          "-u __llvm_profile_runtime -o prog "
+          "--gc-sections -u __llvm_profile_runtime -o prog "
           "/rt/sysroot/t/usr/lib/rcrt1.o /rt/sysroot/t/usr/lib/crti.o prog.o "
           "shapes.o /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
           "/rt/lib/linux-arm64/libclang_rt.profile.a "
@@ -750,7 +760,7 @@ static void profile_links(void)
     links(TARGET_LINUX_X86_64, &in,
           "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -pie "
           "--dynamic-linker=/lib64/ld-linux-x86-64.so.2 --strip-debug "
-          "-u __llvm_profile_runtime -o prog "
+          "--gc-sections -u __llvm_profile_runtime -o prog "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crti.o prog.o shapes.o "
           "/rt/lib/linux-x86_64-glibc/v3/libanti_rt.a "
@@ -762,7 +772,7 @@ static void profile_links(void)
     win.profile_generate = true;
     links(TARGET_WINDOWS_ARM64, &win,
           "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
-          "/ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:ARM64 "
+          "/ignore:4099 /OPT:REF /OPT:NOICF /SUBSYSTEM:CONSOLE /MACHINE:ARM64 "
           "/OUT:prog.exe /PDB:prog.pdb /LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/aarch64 prog.obj "
@@ -792,7 +802,7 @@ static void shared_modes(void)
     in.glibc = true;
     shared(TARGET_LINUX_ARM64, &in, &none,
            "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -shared --exclude-libs ALL "
-           "--strip-debug -o libgeo.so geo.o shapes.o "
+           "--strip-debug --gc-sections -o libgeo.so geo.o shapes.o "
            "/rt/lib/linux-arm64-glibc/armv8.0/libanti_rt.a "
            "-L/rt/sysroot/t/usr/lib/aarch64-linux-gnu "
            "-L/rt/sysroot/t/lib/aarch64-linux-gnu -l X11 -l GL -lm -lc "
@@ -803,7 +813,7 @@ static void shared_modes(void)
     in.linux_library_count = 1;
     shared(TARGET_LINUX_X86_64, &in, &plugin,
            "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -shared --strip-debug "
-           "-o libfancy.so fancy.o "
+           "--gc-sections -o libfancy.so fancy.o "
            "-L/rt/sysroot/t/usr/lib/x86_64-linux-gnu "
            "-L/rt/sysroot/t/lib/x86_64-linux-gnu -l X11 -lm -lc "
            "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a");
@@ -821,8 +831,8 @@ static void shared_modes(void)
     in.linux_libraries = names;
     in.linux_library_count = 1;
     shared(TARGET_LINUX_ARM64, &in, &none,
-           "ld -shared --exclude-libs ALL --strip-debug -o libgeo.so geo.o "
-           "/rt/lib/linux-arm64/armv8.0/libanti_rt.a "
+           "ld -shared --exclude-libs ALL --strip-debug --gc-sections -o "
+           "libgeo.so geo.o /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
            "-L/usr/lib/aarch64-linux-gnu -l X11 -lc");
 
     in = lld_inputs;
@@ -833,25 +843,25 @@ static void shared_modes(void)
     in.rpath = "/abs/rt/lib/macos-arm64";
     shared(TARGET_MACOS_ARM64, &in, &none,
            "/rt/bin/ld64.lld -dylib -S -arch arm64 -platform_version macos "
-           "11.0 26.5 -syslibroot /rt/sysroot/t -o libgeo.dylib geo.o "
-           "/rt/lib/macos-arm64/armv8.5/libanti_rt.a "
-           "/rt/lib/macos-arm64/libclang_rt.asan_osx_dynamic.dylib "
-           "-rpath /abs/rt/lib/macos-arm64 -lSystem");
+           "11.0 26.5 -syslibroot /rt/sysroot/t -o libgeo.dylib -dead_strip "
+           "geo.o /rt/lib/macos-arm64/armv8.5/libanti_rt.a "
+           "/rt/lib/macos-arm64/libclang_rt.asan_osx_dynamic.dylib -rpath "
+           "/abs/rt/lib/macos-arm64 -lSystem");
     in = lld_windows_inputs;
     in.object = "geo.obj";
     in.executable = "geo.dll";
     in.memory_checks = true;
     shared(TARGET_WINDOWS_X86_64, &in, &def,
            "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% "
-           "/pdbsourcepath:. /ignore:4099 /DLL /MACHINE:X64 /OUT:geo.dll "
-           "/PDB:geo.pdb /DEF:geo.def /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
+           "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:NOICF /DLL "
+           "/MACHINE:X64 /OUT:geo.dll /PDB:geo.pdb /DEF:geo.def "
+           "/LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
            "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
            "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/x86_64 "
            "/rt/lib/windows-x86_64/clang_rt.asan_dynamic.lib "
            "/INCLUDE:__asan_seh_interceptor "
-           "/WHOLEARCHIVE:/rt/lib/windows-x86_64/"
-           "clang_rt.asan_dynamic_runtime_thunk.lib geo.obj "
-           "/rt/lib/windows-x86_64/v3/anti_rt.lib msvcrt.lib "
+           "/WHOLEARCHIVE:/rt/lib/windows-x86_64/clang_rt.asan_dynamic_runtime_thunk.lib "
+           "geo.obj /rt/lib/windows-x86_64/v3/anti_rt.lib msvcrt.lib "
            "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
 }
 
@@ -943,30 +953,35 @@ void test_link(void)
     runtime_licence(ANTIC_SOURCE_DIR "/src/rt/LICENSE");
     runtime_licence(ANTIC_SOURCE_DIR "/src/std/LICENSE");
     links(TARGET_MACOS_ARM64, &unix_inputs,
-          "ld -S -arch arm64 -platform_version macos 11.0 15.4 -syslibroot /sdk "
-          "-o prog prog.o /rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem");
+          "ld -S -arch arm64 -platform_version macos 11.0 15.4 -syslibroot "
+          "/sdk -o prog -dead_strip prog.o "
+          "/rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem");
     links(TARGET_MACOS_X86_64, &unix_inputs,
-          "ld -S -arch x86_64 -platform_version macos 11.0 15.4 -syslibroot /sdk "
-          "-o prog prog.o /rt/lib/macos-x86_64/v3/libanti_rt.a -lSystem");
+          "ld -S -arch x86_64 -platform_version macos 11.0 15.4 -syslibroot "
+          "/sdk -o prog -dead_strip prog.o "
+          "/rt/lib/macos-x86_64/v3/libanti_rt.a -lSystem");
     links(TARGET_LINUX_X86_64, &unix_inputs,
-          "ld -pie --strip-debug --dynamic-linker=/lib64/ld-linux-x86-64.so.2 -o prog "
+          "ld -pie --strip-debug --gc-sections "
+          "--dynamic-linker=/lib64/ld-linux-x86-64.so.2 -o prog "
           "/usr/lib/x86_64-linux-gnu/Scrt1.o /usr/lib/x86_64-linux-gnu/crti.o "
           "prog.o /rt/lib/linux-x86_64/v3/libanti_rt.a "
           "-L/usr/lib/x86_64-linux-gnu -lc /usr/lib/x86_64-linux-gnu/crtn.o");
     links(TARGET_LINUX_ARM64, &unix_inputs,
-          "ld -pie --strip-debug --dynamic-linker=/lib/ld-linux-aarch64.so.1 -o prog "
+          "ld -pie --strip-debug --gc-sections "
+          "--dynamic-linker=/lib/ld-linux-aarch64.so.1 -o prog "
           "/usr/lib/x86_64-linux-gnu/Scrt1.o /usr/lib/x86_64-linux-gnu/crti.o "
           "prog.o /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
           "-L/usr/lib/x86_64-linux-gnu -lc /usr/lib/x86_64-linux-gnu/crtn.o");
     links(TARGET_WINDOWS_X86_64, &windows_inputs,
-          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:X64 /OUT:prog.exe "
-          "/PDB:prog.pdb prog.obj C:/rt/lib/windows-x86_64/v3/anti_rt.lib msvcrt.lib "
-          "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
+          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /OPT:REF "
+          "/OPT:NOICF /SUBSYSTEM:CONSOLE /MACHINE:X64 /OUT:prog.exe "
+          "/PDB:prog.pdb prog.obj C:/rt/lib/windows-x86_64/v3/anti_rt.lib "
+          "msvcrt.lib libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
     links(TARGET_WINDOWS_ARM64, &windows_inputs,
-          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:ARM64 "
-          "/OUT:prog.exe /PDB:prog.pdb "
-          "prog.obj C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
-          "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
+          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /OPT:REF "
+          "/OPT:NOICF /SUBSYSTEM:CONSOLE /MACHINE:ARM64 /OUT:prog.exe "
+          "/PDB:prog.pdb prog.obj C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib "
+          "msvcrt.lib libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
 
     /* ld64.lld links with the .tbd stubs of the sysroot, and ld.lld with
        musl as a static position-independent executable, without the debug
@@ -974,19 +989,19 @@ void test_link(void)
        sysroot, or of the LIB variable without one. */
     links(TARGET_MACOS_X86_64, &lld_inputs,
           "/rt/bin/ld64.lld -S -arch x86_64 -platform_version macos 11.0 26.5 "
-          "-syslibroot /rt/sysroot/t -o prog prog.o shapes.o "
+          "-syslibroot /rt/sysroot/t -o prog -dead_strip prog.o shapes.o "
           "/rt/lib/macos-x86_64/v3/libanti_rt.a -lSystem");
     links(TARGET_LINUX_ARM64, &lld_inputs,
           "/rt/bin/ld.lld -static -pie --no-dynamic-linker --strip-debug "
-          "-o prog "
-          "/rt/sysroot/t/usr/lib/rcrt1.o /rt/sysroot/t/usr/lib/crti.o prog.o "
-          "shapes.o /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
+          "--gc-sections -o prog /rt/sysroot/t/usr/lib/rcrt1.o "
+          "/rt/sysroot/t/usr/lib/crti.o prog.o shapes.o "
+          "/rt/lib/linux-arm64/armv8.0/libanti_rt.a "
           "/rt/sysroot/t/usr/lib/libc.a "
           "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
           "/rt/sysroot/t/usr/lib/crtn.o");
     links(TARGET_WINDOWS_X86_64, &lld_windows_inputs,
-          "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. /ignore:4099 /SUBSYSTEM:CONSOLE "
-          "/MACHINE:X64 "
+          "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
+          "/ignore:4099 /OPT:REF /OPT:NOICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
           "/OUT:prog.exe /PDB:prog.pdb /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/x86_64 prog.obj "
@@ -997,26 +1012,31 @@ void test_link(void)
         no_sysroot.sysroot = NULL;
         no_sysroot.lld_dir = NULL;
         links(TARGET_WINDOWS_ARM64, &no_sysroot,
-              "lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. /ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:ARM64 "
-              "/OUT:prog.exe /PDB:prog.pdb prog.obj "
-              "/rt/lib/windows-arm64/armv8.2/anti_rt.lib "
-              "msvcrt.lib libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
+              "lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
+              "/ignore:4099 /OPT:REF /OPT:NOICF /SUBSYSTEM:CONSOLE "
+              "/MACHINE:ARM64 /OUT:prog.exe /PDB:prog.pdb prog.obj "
+              "/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
+              "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
     }
 
     /* Object files and archives from the command line follow the object
        of the program, before the runtime library. */
     links(TARGET_MACOS_ARM64, &extra_inputs,
-          "ld -S -arch arm64 -platform_version macos 11.0 15.4 -syslibroot /sdk "
-          "-o prog prog.o shapes.o libm.a /rt/lib/macos-arm64/armv8.5/libanti_rt.a "
-          "-lSystem");
+          "ld -S -arch arm64 -platform_version macos 11.0 15.4 -syslibroot "
+          "/sdk -o prog -dead_strip prog.o shapes.o libm.a "
+          "/rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem");
     links(TARGET_LINUX_ARM64, &extra_inputs,
-          "ld -pie --strip-debug --dynamic-linker=/lib/ld-linux-aarch64.so.1 -o prog "
-          "/usr/lib/aarch64-linux-gnu/Scrt1.o /usr/lib/aarch64-linux-gnu/crti.o "
-          "prog.o shapes.o libm.a /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
+          "ld -pie --strip-debug --gc-sections "
+          "--dynamic-linker=/lib/ld-linux-aarch64.so.1 -o prog "
+          "/usr/lib/aarch64-linux-gnu/Scrt1.o "
+          "/usr/lib/aarch64-linux-gnu/crti.o prog.o shapes.o libm.a "
+          "/rt/lib/linux-arm64/armv8.0/libanti_rt.a "
           "-L/usr/lib/aarch64-linux-gnu -lc /usr/lib/aarch64-linux-gnu/crtn.o");
     links(TARGET_WINDOWS_ARM64, &extra_windows_inputs,
-          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /SUBSYSTEM:CONSOLE /MACHINE:ARM64 /OUT:prog.exe "
-          "/PDB:prog.pdb prog.obj shapes.obj C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
+          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /OPT:REF "
+          "/OPT:NOICF /SUBSYSTEM:CONSOLE /MACHINE:ARM64 /OUT:prog.exe "
+          "/PDB:prog.pdb prog.obj shapes.obj "
+          "C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
           "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
 
     /* The directories that may hold the start files of glibc, in order. */

@@ -62,12 +62,13 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     antic_native_library(glue_name "${target}" anti_rt_regex)
     set(glue "${ANTIC_RUNTIME_DIR}/lib/${target}/${glue_name}")
     set(glue_objects "")
+    antic_runtime_sections(sections "${target}")
     foreach(source regex patterns)
         set(object "${work}/rt_${source}.o")
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
             COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-                ${ANTIC_C_WARNINGS} ${flags}
+                ${ANTIC_C_WARNINGS} ${flags} ${sections}
                 "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=."
                 -isystem "${ANTIC_PCRE2_INCLUDE}" -MMD -MF "${object}.d"
                 -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"

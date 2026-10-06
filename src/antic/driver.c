@@ -735,6 +735,7 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     char error[512];
     bool ok;
     int status = 1;
+    bool with_notice;
     size_t i;
 
     /* DESIGN: the optimizer runs again on each function that had a
@@ -767,6 +768,12 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     if (o->lib == LIB_SHARED && !driver_is_plugin(o)) {
         emit.constructor = rt_name(RT_FN_INIT);
     }
+    /* The notice stays out of --dump-llvm, so its goldens do not follow
+       the runtime library, and out of every object that does not link. */
+    with_notice = extras->notice.length > 0 && !o->dump_llvm &&
+             !(o->dev && !has_main(program, module)) && !o->assembly_only &&
+             o->lib != LIB_STATIC;
+    emit.notice = with_notice;
     ok = ok && llvm_emit_module(&out, &emit, program, &layouts, error,
                                 sizeof error);
     /* A COFF program that hosts plugins exports every name it defines
@@ -782,10 +789,8 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     } else if (ok) {
         status = o->dev && !has_main(program, module) ? 3 : 0;
         /* The build id digests the text without the notice, which holds
-           it. The notice stays out of --dump-llvm, so its goldens do not
-           follow the runtime library. */
-        if (extras->notice.length > 0 && status != 3 &&
-            !o->assembly_only && o->lib != LIB_STATIC) {
+           it. */
+        if (with_notice) {
             struct text notice = {0};
             char id[65];
             ok = build_id(o, &out, &spans, id, error, sizeof error);

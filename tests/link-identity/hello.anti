@@ -1,0 +1,7 @@
+import anti.io;
+
+fn main() -> int
+{
+	io.println("hello");
+	return 0;
+}

@@ -18,7 +18,8 @@
 struct llvm_run {
     const char *opt;            /* the opt program */
     const char *llc;            /* the llc program */
-    enum target target;         /* gives the relocation model of llc */
+    /* gives the relocation model of llc and whether it splits sections */
+    enum target target;
     /* Release mode: opt runs llvm_opt_options into the bitcode, and llc
        reads the bitcode at -O2. Dev mode: llc reads the text at -O1
        alone. */

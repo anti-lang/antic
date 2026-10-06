@@ -3593,6 +3593,60 @@ static bool declared_elsewhere(const struct ir_module *m,
     return false;
 }
 
+/* The name of the notice anti_licenses in the text, without the leading
+   _ of Mach-O, which llc writes again. */
+static void notice_symbol(struct text *out, enum target t)
+{
+    struct text symbol = {0};
+    const char *name;
+
+    target_c_symbol(&symbol, t, "anti_licenses");
+    name = text_cstr(&symbol);
+    if (target_info(t)->format == FORMAT_MACHO && name[0] == '_') {
+        name++;
+    }
+    text_append(out, name);
+    text_free(&symbol);
+}
+
+/* DESIGN: the link drops what nothing refers to, so what is reached by
+   name alone stands in llvm.used, which makes it a root in every format:
+   SHF_GNU_RETAIN on ELF, no_dead_strip on Mach-O and /INCLUDE on COFF.
+   Those are the notice anti_licenses, whose licence texts every binary
+   ships and in which the trace of src/rt/trace.c and `anti symbols` find
+   the build id by the symbol, and the functions marked by_name, such as
+   the options hook that the runtime of AddressSanitizer looks up. A
+   module holds one llvm.used, so this one names both. See the entry on
+   dropped code under "Scope and toolchain" in docs/decisions.md. */
+static void roots(struct emitter *e, const struct ir_module *m)
+{
+    struct text entries = {0};
+    size_t count = 0;
+    size_t i;
+
+    if (e->o->notice) {
+        struct text symbol = {0};
+        notice_symbol(&symbol, e->o->target);
+        text_append(&entries, "ptr ");
+        llvm_name(&entries, '@', text_cstr(&symbol));
+        text_free(&symbol);
+        count++;
+    }
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        if (f->by_name && !f->is_extern) {
+            text_append(&entries, count++ > 0 ? ", ptr " : "ptr ");
+            function_name(&entries, e->o->target, f);
+        }
+    }
+    if (count > 0) {
+        text_appendf(e->out, "@llvm.used = appending global [%zu x ptr] "
+                             "[%s], section \"llvm.metadata\"\n",
+                     count, text_cstr(&entries));
+    }
+    text_free(&entries);
+}
+
 /* DESIGN: the functions that run before main are the one of each module
    that compiles its patterns and, in a shared library, the constructor of
    the runtime. llvm.global_ctors names them, at the priority of a C
@@ -3707,15 +3761,10 @@ void llvm_emit_licenses(struct text *out, enum target t, const char *bytes,
     };
     struct text symbol = {0};
     struct text text = {0};
-    const char *name;
 
-    target_c_symbol(&symbol, t, "anti_licenses");
-    name = text_cstr(&symbol);
-    if (target_info(t)->format == FORMAT_MACHO && name[0] == '_') {
-        name++;
-    }
+    notice_symbol(&symbol, t);
     text_append_bytes(&text, bytes, length);
-    llvm_name(out, '@', name);
+    llvm_name(out, '@', text_cstr(&symbol));
     text_appendf(out, " = dso_local constant [%zu x i8] ", length + 1);
     /* The texts end in a NUL, which text_cstr gives after the bytes. */
     byte_string(out, (const uint8_t *)text_cstr(&text), length + 1);
@@ -3808,6 +3857,7 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
     free(symbols);
     import_table(&e);
     constructors(&e, m);
+    roots(&e, m);
     if (!e.failed) {
         e.out = out;
         entry(&e, m);

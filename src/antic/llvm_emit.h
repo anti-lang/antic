@@ -36,6 +36,9 @@ struct llvm_emit_options {
     /* The spans of the text that the debug information added, which the
        build id leaves out, or NULL. */
     struct debug_spans *spans;
+    /* The text will end with the notice of llvm_emit_licenses, which
+       llvm.used of the module names. */
+    bool notice;
 };
 
 /* Append the LLVM IR text of m, laid out for the target by l, to out.
@@ -59,7 +62,8 @@ void llvm_emit_names(struct text *out, enum target t,
                      const struct ir_module *m);
 
 /* Append to the text of a program or a shared library the notice
-   anti_licenses: the bytes and a NUL, in the read-only section. */
+   anti_licenses: the bytes and a NUL, in the read-only section. The
+   module before it was emitted with notice set. */
 void llvm_emit_licenses(struct text *out, enum target t, const char *bytes,
                         size_t length);
 

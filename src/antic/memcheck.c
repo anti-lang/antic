@@ -71,6 +71,7 @@ void memcheck_declare(struct ir_module *m, const char *module, bool links,
                                                 MEMCHECK_OPTIONS_HOOK, IR_PTR,
                                                 IR_NO_AGG);
         f->exported = true;
+        f->by_name = true;
         struct ir_block *b = ir_block_add(f);
         ir_ret(f, b, IR_PTR, ir_temp_op(f, ir_addr(f, b, ir_global_op(g))));
     }
