@@ -117,14 +117,17 @@ execute_process(COMMAND "${LLVM_BIN}/opt${exe}" -S -passes=verify
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "opt cannot read ${used}.bc\n${err}")
 endif()
+# COFF spells main of the module `_A<length><module>_main`, as
+# target_mangle of src/antic/target.c does, and ELF and Mach-O spell it
+# `<module>.main`.
 file(READ "${WORK}/used.opt.ll" optimized)
 if(NOT optimized MATCHES
-   "define [^\n]*@${name}\\.main\\(\\)[^\n]*!prof !([0-9]+)")
+   "define [^\n]*@(_A[0-9]+)?${name}[._]main\\(\\)[^\n]*!prof !([0-9]+)")
     message(FATAL_ERROR "main carries no count of the profile in "
                         "${WORK}/used.opt.ll")
 endif()
 if(NOT optimized MATCHES
-   "\n!${CMAKE_MATCH_1} = !{!\"function_entry_count\", i64 1}")
+   "\n!${CMAKE_MATCH_2} = !{!\"function_entry_count\", i64 1}")
     message(FATAL_ERROR "the profile does not count one call of main in "
                         "${WORK}/used.opt.ll")
 endif()
