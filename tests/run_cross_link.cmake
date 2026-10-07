@@ -1,6 +1,6 @@
 # Link tests/programs/return42.anti for TARGET on this host with lld and
 # check the object file format of the executable with llvm-objdump. The
-# format names the architecture. Run with cmake -P and these values:
+# format names the architecture, and the link prints nothing. Run with cmake -P and these values:
 #   ANTIC         the antic executable
 #   LLVM_MC       the llvm-mc executable
 #   LLVM_OBJDUMP  the llvm-objdump executable
@@ -31,9 +31,16 @@ string(REPLACE "," ";" options "${OPTIONS}")
 execute_process(
     COMMAND "${ANTIC}" --target "${TARGET}" --llvm-mc "${LLVM_MC}"
             --runtime "${RUNTIME}" ${options} -o "${exe}" "${SOURCE}"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+    ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed for ${TARGET}\n${err}")
+endif()
+# A link that succeeds prints nothing. A warning of the linker is a
+# defect of the inputs, as the triples of a program and a runtime that
+# differ were under --lto.
+if(NOT "${out}${err}" STREQUAL "")
+    message(FATAL_ERROR "antic printed output for ${TARGET}\n${out}${err}")
 endif()
 execute_process(COMMAND "${LLVM_OBJDUMP}" -h "${exe}"
     RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)

@@ -361,6 +361,14 @@ function(anti_cross_runtime_at target triple level root)
     # in the source tree on the path below it, because bitcode records
     # the path of its source as given and -ffile-prefix-map leaves that
     # name alone. The test no_paths reads every library of the archive.
+    # [provisional] DESIGN: the bitcode of a musl target carries the triple
+    # antic writes for the target, <arch>-unknown-linux-gnu, and its
+    # objects keep -linux-musl. The LTO of lld compiles every module for
+    # the triple of the first, the program's, and warned on each module
+    # of the runtime whose triple differed. See the entry on the runtime
+    # as bitcode under "Compiler behaviour" in docs/decisions.md.
+    string(REPLACE "-linux-musl" "-unknown-linux-gnu" bitcode_triple
+        "${triple}")
     set(bitcode_libraries "")
     get_filename_component(library_name "${library}" NAME)
     foreach(mode IN LISTS ANTIC_LTO_MODES)
@@ -372,8 +380,8 @@ function(anti_cross_runtime_at target triple level root)
             set(object "${mode_work}/${source}.o")
             add_custom_command(OUTPUT "${object}"
                 COMMAND "${CMAKE_COMMAND}" -E make_directory "${mode_work}"
-                COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-                    -flto=${mode} ${ANTIC_C_WARNINGS}
+                COMMAND "${CMAKE_C_COMPILER}" --target=${bitcode_triple}
+                    -std=c11 -O2 -flto=${mode} ${ANTIC_C_WARNINGS}
                     "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
                     "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
                     -MMD -MF "${object}.d"
