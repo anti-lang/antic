@@ -5,6 +5,7 @@
 #include "pipeline.h"
 #include "antl.h"
 #include "modpath.h"
+#include "../../src/antic/platform.h"
 #include "arena.h"
 #include "ast.h"
 #include "diagnostic.h"
@@ -671,6 +672,16 @@ static void module_paths(void)
             "`Com` in src/Com/geo.anti is not a lowercase identifier");
     path_of("src/com/fn/geo.anti", roots, 2,
             "`fn` in src/com/fn/geo.anti is a keyword");
+    /* A Windows host separates the parts of a path with `\` as well, as
+       its programs and a script that joins a path there write it. */
+    if (platform_separator() == '\\') {
+        static const char *const windows_roots[] = {"C:\\work\\src"};
+        path_of("C:\\work\\bench\\objects.anti", NULL, 0, "objects");
+        path_of("C:\\work\\src\\com\\niese\\geo.anti", windows_roots, 1,
+                "com.niese.geo");
+        path_of("C:\\work\\src/com\\niese/geo.anti", windows_roots, 1,
+                "com.niese.geo");
+    }
     CHECK(modpath_reserved("anti"));
     CHECK(modpath_reserved("anti.text"));
     CHECK(!modpath_reserved("antique.text"));

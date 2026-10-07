@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "lexer.h"
+#include "platform.h"
 
 static bool is_lower_identifier(const char *s, size_t n)
 {
@@ -20,15 +21,35 @@ static bool is_lower_identifier(const char *s, size_t n)
     return true;
 }
 
+/* Whether c separates the parts of a path on the host: `/` on every
+   host, and `\` as well on Windows, as platform_last_separator says. */
+static bool separates(char c)
+{
+    return c == '/' || c == platform_separator();
+}
+
+/* The first separator of the n bytes at s, or NULL when they hold none. */
+static const char *first_separator(const char *s, size_t n)
+{
+    size_t i;
+
+    for (i = 0; i < n; i++) {
+        if (separates(s[i])) {
+            return s + i;
+        }
+    }
+    return NULL;
+}
+
 /* The part of source under root, or NULL when root does not hold it. */
 static const char *under(const char *source, const char *root)
 {
     size_t n = strlen(root);
 
-    while (n > 0 && root[n - 1] == '/') {
+    while (n > 0 && separates(root[n - 1])) {
         n--;
     }
-    if (n == 0 || strncmp(source, root, n) != 0 || source[n] != '/') {
+    if (n == 0 || strncmp(source, root, n) != 0 || !separates(source[n])) {
         return NULL;
     }
     return source + n + 1;
@@ -47,7 +68,7 @@ const char *modpath_file_of_source(const char *source,
     if (rest != NULL) {
         return rest;
     }
-    slash = strrchr(source, '/');
+    slash = platform_last_separator(source);
     return slash != NULL ? slash + 1 : source;
 }
 
@@ -66,11 +87,11 @@ bool modpath_of_source(const char *source, const char *const *roots,
         rest = under(source, roots[i]);
     }
     if (rest == NULL) {
-        const char *slash = strrchr(source, '/');
+        const char *slash = platform_last_separator(source);
         rest = slash != NULL ? slash + 1 : source;
     }
     while (rest < end) {
-        const char *slash = memchr(rest, '/', (size_t)(end - rest));
+        const char *slash = first_separator(rest, (size_t)(end - rest));
         size_t n = slash != NULL ? (size_t)(slash - rest)
                                  : (size_t)(end - rest);
         if (!is_lower_identifier(rest, n)) {
