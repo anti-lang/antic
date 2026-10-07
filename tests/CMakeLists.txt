@@ -652,16 +652,24 @@ endif()
 
 # The test of the step tables of docs/work-order-llvm-optimization.md: a
 # release build calls the function of an object of a known class
-# directly after opt, across the call of the `created` hook.
-add_test(NAME direct_calls
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DOPT=${ANTIC_OPT}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/table_hook.anti"
-        "-DFUNCTION=table_hook.main"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/direct-calls"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_direct_calls.cmake")
+# directly after opt, across the call of the `created` hook. Every host
+# builds for every target, so each spelling of the name is read on every
+# host. The Windows VM found the COFF one missing.
+foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
+        windows-x86_64 windows-arm64)
+    add_test(NAME direct_calls_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DOPT=${ANTIC_OPT}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/table_hook.anti"
+            "-DFUNCTION=table_hook.main"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/direct-calls/${target}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_direct_calls.cmake")
+    set_tests_properties(direct_calls_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
 
 # A COFF host of plugins exports every name its plugin imports, and the
 # plugin lists as many places as its table counts. The VM run runs both.
