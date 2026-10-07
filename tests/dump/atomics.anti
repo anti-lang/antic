@@ -1,0 +1,62 @@
+//! Every atomic operation on a field of each width, a `bool` and a pointer, for
+//! the tests of the instructions that each target and level writes.
+
+class Cells
+{
+	pub atomic b: i8,
+	pub atomic h: i16,
+	pub atomic w: i32,
+	pub atomic d: int,
+	pub atomic flag: bool,
+	pub atomic p: ?*int,
+}
+
+pub fn bytes(c: *Cells) -> int
+{
+	c.b.store(1);
+	let total = c.b.load() as int + c.b.swap(2) as int;
+	let added = c.b.add(3) as int + c.b.sub(4) as int;
+	let masked = c.b.and(5) as int + c.b.or(6) as int;
+	return total + added + masked + c.b.compare_swap(7, 8) as int;
+}
+
+pub fn halves(c: *Cells) -> int
+{
+	c.h.store(1);
+	let total = c.h.load() as int + c.h.swap(2) as int;
+	let added = c.h.add(3) as int + c.h.sub(4) as int;
+	let masked = c.h.and(5) as int + c.h.or(6) as int;
+	return total + added + masked + c.h.compare_swap(7, 8) as int;
+}
+
+pub fn words(c: *Cells) -> int
+{
+	c.w.store(1);
+	let total = c.w.load() as int + c.w.swap(2) as int;
+	let added = c.w.add(3) as int + c.w.sub(4) as int;
+	let masked = c.w.and(5) as int + c.w.or(6) as int;
+	return total + added + masked + c.w.compare_swap(7, 8) as int;
+}
+
+pub fn doubles(c: *Cells) -> int
+{
+	c.d.store(1);
+	let total = c.d.load() + c.d.swap(2);
+	let added = c.d.add(3) + c.d.sub(4);
+	let masked = c.d.and(5) + c.d.or(6);
+	return total + added + masked + c.d.compare_swap(7, 8) as int;
+}
+
+pub fn flags(c: *Cells) -> bool
+{
+	c.flag.store(true);
+	let was = c.flag.swap(false);
+	return was && c.flag.compare_swap(false, c.flag.load());
+}
+
+pub fn pointers(c: *Cells, q: *int) -> bool
+{
+	c.p.store(q);
+	let old = c.p.swap(none);
+	return old == c.p.load() || c.p.compare_swap(none, q);
+}

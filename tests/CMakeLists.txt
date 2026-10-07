@@ -763,6 +763,53 @@ add_test(NAME runtime_hosts
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_runtime_hosts.cmake")
 set_tests_properties(runtime_hosts PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
 
+# The atomic operations of a program are LLVM atomic instructions on every
+# target, and each target and level writes the instructions its runtime
+# holds: one instruction with LSE, a load-store exclusive loop on armv8.0,
+# and the lock prefix on x86_64. No call of the runtime remains.
+add_test(NAME llvm_atomics
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/atomics.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-atomics"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_atomics.cmake")
+set(atomic_lse "\tcasal\t|\tldaddal\t|\tswpal\t|\tcasalb\t|\tcasalh\t")
+set(atomic_exclusive "\tldaxr\t|\tstlxr\t|\tldaxrb\t|\tstlxrh\t")
+set(atomic_x86 "\tlock\t\t|xadd|cmpxchg|\txchg")
+set(atomic_calls "anti_rt_atomic|__aarch64_")
+foreach(case "linux-arm64,armv8.0,${atomic_exclusive},${atomic_lse}"
+        "linux-arm64,armv8.2,${atomic_lse},${atomic_exclusive}"
+        "linux-arm64,armv8.5,${atomic_lse},${atomic_exclusive}"
+        "windows-arm64,armv8.2,${atomic_lse},${atomic_exclusive}"
+        "macos-arm64,armv8.5,${atomic_lse},${atomic_exclusive}"
+        "linux-x86_64,v1,${atomic_x86},"
+        "linux-x86_64,v3,${atomic_x86},"
+        "macos-x86_64,v3,${atomic_x86},"
+        "windows-x86_64,v3,${atomic_x86},")
+    string(REPLACE "," ";" parts "${case}")
+    list(GET parts 0 target)
+    list(GET parts 1 level)
+    list(GET parts 2 uses)
+    list(GET parts 3 avoids)
+    if(avoids STREQUAL "")
+        set(avoids "${atomic_calls}")
+    else()
+        set(avoids "${avoids}|${atomic_calls}")
+    endif()
+    add_test(NAME atomics_${target}_${level}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DTARGET=${target}"
+            "-DLEVEL=${level}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/atomics.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/atomics-level"
+            "-DUSES=${uses}"
+            "-DAVOIDS=${avoids}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_cpu_level.cmake")
+endforeach()
+
 # An atomic load of the runtime is sequentially consistent on every ARM64
 # target and level, as src/rt/atomic.c promises. Windows compiled it through
 # `volatile` once, which is a plain load there.

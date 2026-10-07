@@ -1,0 +1,91 @@
+//! Every atomic operation at every width: a byte, a 16-bit, a 32-bit and a
+//! 64-bit integer, an unsigned byte, a `bool` and a pointer. A value below zero
+//! comes back with its sign, and an unsigned byte above 127 without one.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Cells
+{
+	pub atomic b: i8,
+	pub atomic h: i16,
+	pub atomic w: i32,
+	pub atomic d: int,
+	pub atomic u: u8,
+	pub atomic flag: bool,
+	pub atomic p: ?*int,
+}
+
+/// Prints the result of an operation and the value it left.
+fn show(what: ?*byte, got: int, left: int)
+{
+	printf("%s %lld %lld\n".ptr, what, got, left);
+}
+
+fn main() -> int
+{
+	let c = Cells { b: 0, h: 0, w: 0, d: 0, u: 0, flag: false, p: none };
+	let one = 1;
+	let two = 2;
+
+	c.b.store(-5);
+	let got1 = c.b.add(3);
+	show("i8 add".ptr, got1 as int, c.b.load() as int);
+	let got2 = c.b.sub(100);
+	show("i8 sub".ptr, got2 as int, c.b.load() as int);
+	let got3 = c.b.swap(-128);
+	show("i8 swap".ptr, got3 as int, c.b.load() as int);
+	let got4 = c.b.or(1);
+	show("i8 or".ptr, got4 as int, c.b.load() as int);
+	let got5 = c.b.and(-2);
+	show("i8 and".ptr, got5 as int, c.b.load() as int);
+
+	c.h.store(-300);
+	let got6 = c.h.add(-32000);
+	show("i16 add".ptr, got6 as int, c.h.load() as int);
+	let got7 = c.h.swap(7);
+	show("i16 swap".ptr, got7 as int, c.h.load() as int);
+	let ok8 = c.h.compare_swap(7, -9);
+	show("i16 cas".ptr, ok8 as int, c.h.load() as int);
+	let ok9 = c.h.compare_swap(7, 11);
+	show("i16 cas".ptr, ok9 as int, c.h.load() as int);
+
+	c.w.store(2147483647);
+	let got10 = c.w.add(1);
+	show("i32 add".ptr, got10 as int, c.w.load() as int);
+	let got11 = c.w.sub(-5);
+	show("i32 sub".ptr, got11 as int, c.w.load() as int);
+	let ok12 = c.w.compare_swap(-2147483643, 12);
+	show("i32 cas".ptr, ok12 as int, c.w.load() as int);
+
+	c.d.store(-1);
+	let got13 = c.d.and(255);
+	show("i64 and".ptr, got13, c.d.load());
+	let got14 = c.d.or(-4294967296);
+	show("i64 or".ptr, got14, c.d.load());
+	let got15 = c.d.swap(9007199254740993);
+	show("i64 swap".ptr, got15, c.d.load());
+	let ok16 = c.d.compare_swap(9007199254740993, -7);
+	show("i64 cas".ptr, ok16 as int, c.d.load());
+
+	c.u.store(250);
+	let got17 = c.u.add(10);
+	show("u8 add".ptr, got17 as int, c.u.load() as int);
+	let got18 = c.u.sub(5);
+	show("u8 sub".ptr, got18 as int, c.u.load() as int);
+
+	c.flag.store(true);
+	let was19 = c.flag.swap(false);
+	show("bool swap".ptr, was19 as int, c.flag.load() as int);
+	let ok20 = c.flag.compare_swap(false, true);
+	show("bool cas".ptr, ok20 as int, c.flag.load() as int);
+
+	c.p.store(&one);
+	let old = c.p.swap(&two);
+	let now = c.p.load();
+	show("ptr swap".ptr, (old == &one) as int, (now == &two) as int);
+	let ok21 = c.p.compare_swap(&one, &one);
+	show("ptr cas".ptr, ok21 as int, (c.p.load() == &two) as int);
+	let ok22 = c.p.compare_swap(&two, none);
+	show("ptr cas".ptr, ok22 as int, (c.p.load() == none) as int);
+	return 0;
+}

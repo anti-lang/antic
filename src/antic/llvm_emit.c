@@ -2633,6 +2633,159 @@ static void result_range(struct emitter *e, struct text *out,
     text_append(out, ") ");
 }
 
+/* The kind of LLVM instruction that writes an atomic operation of the
+   runtime. */
+enum atomic_form { ATOMIC_LOAD_FORM, ATOMIC_STORE_FORM, ATOMIC_RMW_FORM,
+                   ATOMIC_CAS_FORM };
+
+/* The atomic operations of the runtime and the instruction of each, with
+   the operation of an atomicrmw. */
+static const struct {
+    enum rt_function function;
+    enum atomic_form form;
+    const char *rmw;
+} atomic_calls[] = {
+    {RT_FN_ATOMIC_LOAD, ATOMIC_LOAD_FORM, NULL},
+    {RT_FN_ATOMIC_STORE, ATOMIC_STORE_FORM, NULL},
+    {RT_FN_ATOMIC_SWAP, ATOMIC_RMW_FORM, "xchg"},
+    {RT_FN_ATOMIC_ADD, ATOMIC_RMW_FORM, "add"},
+    {RT_FN_ATOMIC_SUB, ATOMIC_RMW_FORM, "sub"},
+    {RT_FN_ATOMIC_AND, ATOMIC_RMW_FORM, "and"},
+    {RT_FN_ATOMIC_OR, ATOMIC_RMW_FORM, "or"},
+    {RT_FN_ATOMIC_COMPARE_SWAP, ATOMIC_CAS_FORM, NULL},
+};
+
+/* The value of operand o of an atomic call as an integer of bits bits:
+   the i64 the runtime takes, truncated. */
+static void atomic_value(struct emitter *e, const struct ir_operand *o,
+                         unsigned bits, struct text *out)
+{
+    struct text wide = {0};
+    uint32_t narrow;
+
+    operand(e, o, IR_I64, &wide);
+    if (bits == 64 || e->failed) {
+        text_append(out, text_cstr(&wide));
+    } else {
+        narrow = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = trunc i64 %s to i%u\n",
+                     narrow, text_cstr(&wide), bits);
+        text_appendf(out, "%%v%" PRIu32, narrow);
+    }
+    text_free(&wide);
+}
+
+/* DESIGN: an atomic operation is a call of the runtime in the IR, which
+   keeps the IR and the library file as they were, and the text writes it
+   as the LLVM instruction that the runtime's body holds: load atomic,
+   store atomic, atomicrmw or cmpxchg, sequentially consistent as every
+   operation of src/rt/atomic.c, at the natural alignment of its width.
+   The level of the function then decides the instructions, as it decided
+   those of the runtime of the level: `ldaddal` and `casal` with LSE, a
+   load-store-exclusive loop on armv8.0, whose features name no outline
+   atomics, and `lock xadd` and `lock cmpxchg` on x86_64. A result is the
+   value sign-extended to an i64, as the runtime gives it, and a compare
+   and swap gives the success flag as a byte. A width that is no constant
+   of 1, 2, 4 or 8 bytes stays a call, which no lowering writes. Returns
+   whether it wrote the call. */
+static bool atomic_call(struct emitter *e, const struct ir_inst *inst,
+                        const struct ir_function *callee)
+{
+    struct text address = {0};
+    struct text value = {0};
+    struct text desired = {0};
+    const char *rmw = NULL;
+    enum atomic_form form = ATOMIC_LOAD_FORM;
+    bool found = false;
+    unsigned bits;
+    uint64_t width;
+    uint32_t result = 0;
+    size_t i;
+
+    if (!callee->is_extern || callee->module != NULL ||
+        inst->arg_count < 2 || inst->args[1].kind != IR_INT) {
+        return false;
+    }
+    for (i = 0; i < sizeof atomic_calls / sizeof atomic_calls[0]; i++) {
+        if (strcmp(callee->name, rt_name(atomic_calls[i].function)) == 0) {
+            form = atomic_calls[i].form;
+            rmw = atomic_calls[i].rmw;
+            found = true;
+        }
+    }
+    width = inst->args[1].as.integer;
+    if (!found || (width != 1 && width != 2 && width != 4 && width != 8)) {
+        return false;
+    }
+    bits = (unsigned)width * 8;
+    operand(e, &inst->args[0], IR_PTR, &address);
+    if (form != ATOMIC_LOAD_FORM) {
+        atomic_value(e, &inst->args[2], bits, &value);
+    }
+    if (form == ATOMIC_CAS_FORM) {
+        atomic_value(e, &inst->args[3], bits, &desired);
+    }
+    if (e->failed) {
+        goto done;
+    }
+    switch (form) {
+    case ATOMIC_LOAD_FORM:
+        result = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = load atomic i%u, ptr %s "
+                             "seq_cst, align %" PRIu64 "\n",
+                     result, bits, text_cstr(&address), width);
+        break;
+    case ATOMIC_STORE_FORM:
+        text_appendf(e->out, "  store atomic i%u %s, ptr %s seq_cst, "
+                             "align %" PRIu64 "\n",
+                     bits, text_cstr(&value), text_cstr(&address), width);
+        break;
+    case ATOMIC_RMW_FORM:
+        result = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = atomicrmw %s ptr %s, i%u %s "
+                             "seq_cst, align %" PRIu64 "\n",
+                     result, rmw, text_cstr(&address), bits,
+                     text_cstr(&value), width);
+        break;
+    case ATOMIC_CAS_FORM: {
+        uint32_t pair = fresh(e);
+        uint32_t flag = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = cmpxchg ptr %s, i%u %s, "
+                             "i%u %s seq_cst seq_cst, align %" PRIu64 "\n",
+                     pair, text_cstr(&address), bits, text_cstr(&value), bits,
+                     text_cstr(&desired), width);
+        text_appendf(e->out, "  %%v%" PRIu32 " = extractvalue { i%u, i1 } "
+                             "%%v%" PRIu32 ", 1\n",
+                     flag, bits, pair);
+        result = fresh(e);
+        text_appendf(e->out, "  %%v%" PRIu32 " = zext i1 %%v%" PRIu32
+                             " to i8\n",
+                     result, flag);
+        break;
+    }
+    }
+    if (inst->result != IR_NO_RESULT && form != ATOMIC_STORE_FORM) {
+        char name[24];
+        if (form != ATOMIC_CAS_FORM) {
+            if (bits < 64) {
+                uint32_t wide = fresh(e);
+                text_appendf(e->out, "  %%v%" PRIu32 " = sext i%u %%v%" PRIu32
+                                     " to i64\n",
+                             wide, bits, result);
+                result = wide;
+            }
+            result = reinterpret(e, result, IR_I64, inst->type);
+        }
+        text_format(name, sizeof name, "%%v%" PRIu32, result);
+        store_result(e, inst, name);
+    }
+done:
+    text_free(&address);
+    text_free(&value);
+    text_free(&desired);
+    return true;
+}
+
 /* DESIGN: a call names its function type, which abi_classify gives for
    the callee, or for the signature of an indirect call. An argument past
    the parameters of the callee, the variadic part of a C function or the
@@ -2656,6 +2809,9 @@ static void call(struct emitter *e, const struct ir_inst *inst)
     uint32_t value;
     size_t i;
 
+    if (atomic_call(e, inst, callee)) {
+        return;
+    }
     classify(e, callee, &c);
     result_type(&result, &c.result);
     if (inst->a.kind == IR_FUNC) {
