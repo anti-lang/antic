@@ -3428,9 +3428,11 @@ endif()
 # The debug information of -g, read by the debugger of the host: lldb on
 # macOS and gdb on Linux. A breakpoint by file and line in an imported
 # module and a backtrace of Anti function names.
+# A Windows link writes CodeView, which neither reads, so a Windows host
+# runs no test of them even where a gdb stands on its path.
 find_program(ANTIC_LLDB NAMES lldb DOC "the debugger of macOS")
 find_program(ANTIC_GDB NAMES gdb DOC "the debugger of Linux")
-if(ANTIC_LLVM_MC AND (ANTIC_LLDB OR ANTIC_GDB))
+if(ANTIC_LLVM_MC AND (ANTIC_LLDB OR ANTIC_GDB) AND NOT WIN32)
     if(APPLE AND ANTIC_LLDB)
         set(debugger "${ANTIC_LLDB}")
         set(debugger_kind lldb)
