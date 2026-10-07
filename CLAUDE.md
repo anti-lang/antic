@@ -263,7 +263,9 @@ directories of `tests/` and `docs/`. Adding to any list is Eddie's decision.
     `docs/decisions.md` records. Their headers and `lib/cacert.pem` are not yet
     part of the runtime archive. `anti.regex` binds PCRE2, and no module binds
     the other four.
-17. Inline atomic instruction sequences, which are runtime calls today.
+17. Done. The LLVM text writes every atomic operation as an LLVM atomic
+    instruction, and the runtime keeps its functions for C.
+    `docs/reports/2026-10-07-inline-atomics.md` reports it.
 18. Done. The one manifest of a release, and the installers that read its
     signature. `docs/reports/2026-09-20-one-manifest.md` reports both.
 19. Done. Every Windows link passes `/DEBUG` with `/PDBALTPATH:%_PDB%`, the
@@ -366,7 +368,10 @@ reports what it finished.
   no sizes: the back end lays out types per target (`src/antic/layout.c`) and folds
   symbolic values. The back end translates the IR into LLVM IR text, and opt
   and llc of the pinned release write the object for all six targets. lld
-  links every target against the sysroots of the runtime archive. See
+  links every target against the sysroots of the runtime archive. A release
+  build links the program and the runtime as bitcode through full LTO, and
+  `--lto none` links objects. An atomic operation is an LLVM atomic
+  instruction. Both work orders of LLVM are complete. See
   `docs/notes/llvm.md`.
 - The object model is implemented: classes, interfaces as inline sub-objects
   with thunks, four visibility levels, `construct` and `destruct`, operators,
@@ -404,8 +409,8 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1598 ctest tests pass on the development Mac and none is skipped. The ASan
-  and the UBSan builds run 1597 each, without the `no_paths` test, which needs a
+- 1663 ctest tests pass on the development Mac and none is skipped. The ASan
+  and the UBSan builds run 1662 each, without the `no_paths` test, which needs a
   build that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
@@ -720,8 +725,11 @@ reports what it finished.
   `CHANGELOG.md`. `./r --dry-run` runs the first five steps and prints a plan
   for the rest. See `docs/work-order-release-script.md`, and its decisions
   under "The release script" in `docs/decisions.md`.
-- `.github/workflows/test.yml` runs a five-runner matrix on `workflow_dispatch`
-  only. It has never run.
+- `.github/workflows/test.yml` runs a six-runner matrix on `workflow_dispatch`
+  only. Its run of 2026-10-08 passed linux-arm64 and failed four tests on
+  linux-x86_64 and windows-x86_64, which later commits fixed. The macOS jobs
+  wait for an image with the pinned SDK. See
+  `docs/reports/2026-10-08-x86_64-hardware.md`.
 - The `anti` tool holds `new`, `build`, `run`, `sdk export`, `sdk import`,
   `test`, `check`, `fmt`, `doc`, `bind` and `symbols`, and nothing else of
   `docs/tooling.md`.
@@ -748,8 +756,8 @@ reports what it finished.
   writes one object per module, cached by the digest of its input, the compiler
   version, the target and the level, with `-g` on. `--release` compiles the
   whole program in one call and writes `<program>-symbols.zip` beside it.
-  `--target`, `--cpu`, `--offline`, `--strip-docs` and `--lib static|shared`
-  are built, and a project without `main` is a library project. `anti run`
+  `--target`, `--cpu`, `--offline`, `--strip-docs`, `--lto` and
+  `--lib static|shared` are built, and a project without `main` is a library project. `anti run`
   builds for the host and runs it, and `anti new` writes a starter project. See
   "The build command" in `docs/decisions.md` and `docs/notes/build.md`.
 - `anti check` is built, with its four classes in the order of

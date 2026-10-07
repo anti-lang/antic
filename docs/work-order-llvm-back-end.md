@@ -1,5 +1,11 @@
 # LLVM back end for antic
 
+Complete on 2026-10-08. The steps up to `switch` are reported in
+`docs/reports/2026-10-03-llvm-*.md` and `docs/reports/2026-10-04-llvm-*.md`,
+the toolchain of anti.7 in `docs/reports/2026-10-07-pin-anti7.md`, and the
+close of every open item in `docs/reports/2026-10-08-llvm-closed.md`.
+`docs/notes/llvm.md` describes the back end as it stands.
+
 Design and work order for compiling Anti programs through the LLVM optimizer
 and code generator. The reader is the session that implements it. Every
 question that came up while writing this has an answer below. Every

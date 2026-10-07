@@ -56,7 +56,9 @@ design the back end was built from.
   of another object is `external global [N x i8]` with the size and the
   alignment of its IR global.
 - The runtime enters the program through `anti.rt.main`, an alias of the
-  program's `main`. The function of each module that compiles its pattern
+  program's `main`. That `main` is `noinline` and stands in
+  `llvm.compiler.used`, so under LTO it keeps its frame and its own name in a
+  trace, a map and a PDB. The function of each module that compiles its pattern
   literals and, in a shared library, the constructor of the runtime stand in
   `llvm.global_ctors`. The copy of the package header and the notice are
   constants in sections of their own, which `llvm.used` keeps.
@@ -75,6 +77,61 @@ design the back end was built from.
 - The CPU and its features stand in the function attributes
   `"target-cpu"` and `"target-features"` of each level. The text alone then
   decides the code, and the command lines of opt and llc carry neither.
+  macos-arm64 adds `"tune-cpu"="apple-m1"`.
+- An atomic operation is a call of `anti_rt_atomic_*` in the IR, and
+  `atomic_call` writes it as `load atomic`, `store atomic`, `atomicrmw` or
+  `cmpxchg` of its width, `seq_cst` as the runtime's bodies are. The level
+  then picks the instructions: LSE from `armv8.2`, a load-store exclusive
+  loop at `armv8.0`, the lock prefix on x86_64.
+
+## Facts for the optimizer
+
+`docs/work-order-llvm-optimization.md` gave LLVM every fact the language
+guarantees, one step each. The entries of `docs/decisions.md` hold the
+rules, and the tests named there pin each fact.
+
+- `noreturn cold` on a function of type `never` and on the failure routines,
+  and `unreachable` after a call of one, so the fatal path costs a hot loop
+  nothing. A branch into a failure arm carries cold weights.
+- The memory effects of each function of the runtime, the column of
+  `src/antic/rt_abi.h`, as `memory(...)` with `nofree`, `nosync` and
+  `willreturn` where they hold.
+- The table facts: `!invariant.group` on the store and the loads of a table
+  pointer, and `!invariant.load` on a slot. A call through the table of a
+  known object then becomes a direct call or inlines.
+- The parameter facts: `noundef`, `nonnull` and `dereferenceable(N)` of a
+  `*T`, `noalias` of an `own` pointer and of an allocation, `signext` and
+  `zeroext` of a narrow integer, and `range()` on a result of a `bool` or an
+  enum.
+- The facts of arithmetic and addresses: `nsw` and `nuw` where the value
+  rules make them hold, `getelementptr inbounds` on a field, `!range` on a
+  load of a `bool`, an enum or a tag, and `llvm.lifetime` around the slot of
+  a `let`.
+- `!tbaa` from the aliasing rules of views by `as` in
+  `docs/anti-language-additions.md`.
+
+## The link
+
+- A release build that links a program with lld links through full LTO by
+  default. opt runs `lto-pre-link<O3>` with the threshold 225 and writes
+  bitcode as the object, and lld links it with the runtime as bitcode of
+  `lib/<target>/<level>/bitcode/full/` at `--lto-O3` and the same threshold,
+  `/opt:lldlto=3` on Windows. `--lto thin` takes `bitcode/thin/`, and
+  `--lto none` the link of objects below. Dev mode, `-S`, `-c`, `--lib`,
+  `--linker platform`, a profile, `--memory-checks` and a Windows program
+  that hosts plugins keep the objects.
+- The runtime as bitcode of a Linux target carries no unwind tables. The link
+  with `-g` that a symbols archive holds then lays the program out as the
+  release link does. The runtime of ARM64 Linux takes no outline atomics on
+  any host.
+- Every link drops what nothing reaches: `-dead_strip`, `--gc-sections` or
+  `/OPT:REF`. What only a name reaches stands in `llvm.used`.
+- lld-link of windows-x86_64 folds identical code in the safe form,
+  `/OPT:SAFEICF` with the address-significance table of llc. Every other link
+  folds nothing.
+- `--profile-generate` instruments the run of opt and links the profile
+  runtime of compiler-rt, and `--profile-use <file>` runs opt with the
+  merged profile. Both take the link of objects.
 
 ## Defined results and wide operations
 
@@ -125,8 +182,9 @@ design the back end was built from.
 
 ## The tool run
 
-- Release mode runs `opt -passes=default<O3> -inline-threshold=225` into
-  `<output>.bc` and llc at `-O2` on the bitcode. `llvm_opt_options` of
+- The link of objects in release mode, `--lto none`, runs
+  `opt -passes=default<O3> -inline-threshold=225` into `<output>.bc` and llc
+  at `-O2` on the bitcode. `llvm_opt_options` of
   `src/antic/llvm_run.c` holds the two options, which the step `config` of
   `docs/work-order-llvm-optimization.md` measured. Dev mode runs llc at `-O1` on the text without opt,
   so it inlines nothing and every function stays a frame of its own.

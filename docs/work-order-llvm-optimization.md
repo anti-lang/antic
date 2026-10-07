@@ -1,5 +1,12 @@
 # Optimization facts in the LLVM text
 
+Complete on 2026-10-08. The steps are reported in
+`docs/reports/2026-10-05-llvm-opt-*.md` and
+`docs/reports/2026-10-06-llvm-opt-pgo.md`. Eddie's yes under C3 made the
+runtime as bitcode the default, `docs/reports/2026-10-07-runtime-bitcode.md`,
+and `docs/reports/2026-10-07-speed-gaps.md` and
+`docs/reports/2026-10-08-llvm-closed.md` close the open items.
+
 Design and work order for giving LLVM every fact it can optimize with. The
 reader is the session that implements a step. Eddie decided on 2026-10-05
 that antic uses every optimization LLVM offers. The checklist is
