@@ -4,6 +4,8 @@
 #
 #   cmake -DROOT=<repository> -P tests/run_package_api.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 file(READ "${ROOT}/tools/package-api" api)
 string(STRIP "${api}" api)
 if(NOT api MATCHES "^[0-9]+$")

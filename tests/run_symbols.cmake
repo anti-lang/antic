@@ -16,6 +16,8 @@
 # the line of its declaration when it has a prologue. A leaf has none, so
 # its first address lies on its first statement.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(GLOB runtime_library "${RUNTIME}/lib/${TARGET}/*/libanti_rt.a")
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}" OR runtime_library STREQUAL "")
     message("SKIP: the runtime archive has no sysroot or runtime for ${TARGET}")

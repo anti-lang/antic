@@ -17,6 +17,8 @@
 #   OBJECTS   optional objects of C that the program links, separated by
 #             commas
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 get_filename_component(name "${SOURCE}" NAME_WE)

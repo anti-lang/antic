@@ -13,6 +13,8 @@
 # this test. Its main thread has 1 MB, which the unit test deep_stack of
 # test_tool_platform.c passes on the same helper.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 

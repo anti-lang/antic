@@ -9,6 +9,8 @@
 #   HOST     the target name of this host
 #   WORK     a directory this run writes into
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 set(project "${WORK}/internal")

@@ -9,6 +9,8 @@
 # runtime archive for every module of the real tree, and reads that
 # CMakeLists.txt names no file of the tree.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${ROOT}/tools/std-modules.cmake")
 
 set(tree "${WORK}/${ANTI_STD_COLLECTION_DIR}")

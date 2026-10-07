@@ -6,6 +6,8 @@
 #
 #   cmake -DROOT=<repository> -DWORK=<dir> -P tests/run_publish_manifest.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 find_program(OPENSSL openssl)
 if(NOT OPENSSL)
     message("SKIP: openssl is missing")

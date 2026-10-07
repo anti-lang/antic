@@ -15,6 +15,9 @@
 
 # The file:// URL of a directory: file:///tmp/repo, and file:///C:/repo
 # for a Windows path, whose drive follows the third slash.
+
+cmake_minimum_required(VERSION 3.21)
+
 function(file_url path out)
     if(path MATCHES "^/")
         set(${out} "file://${path}" PARENT_SCOPE)

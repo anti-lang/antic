@@ -11,6 +11,8 @@
 #   WORK      a directory for the objects and the executable
 #   OBJECT    the suffix antic gives an object of the host, .o or .obj
 
+cmake_minimum_required(VERSION 3.21)
+
 file(MAKE_DIRECTORY "${WORK}")
 foreach(module scale twice)
     execute_process(

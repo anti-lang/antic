@@ -5,6 +5,8 @@
 #   ANTIC   the antic executable
 #   LEVELS  tools/cpu-levels
 
+cmake_minimum_required(VERSION 3.21)
+
 execute_process(COMMAND "${ANTIC}" --print-cpu-levels
     RESULT_VARIABLE status OUTPUT_VARIABLE printed ERROR_VARIABLE err
     ENCODING NONE)

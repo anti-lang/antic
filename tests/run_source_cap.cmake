@@ -7,6 +7,8 @@
 # The largest size is LEX_SOURCE_MAX of src/antic/lexer.h. Spaces make a
 # module with no items, which the front end takes.
 
+cmake_minimum_required(VERSION 3.21)
+
 set(limit 67108864)
 file(MAKE_DIRECTORY "${WORK}")
 string(REPEAT " " 1048576 mebibyte)

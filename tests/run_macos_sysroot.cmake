@@ -10,6 +10,9 @@
 
 # The pin names a release of Zig on ziglang.org and the APSL of a release
 # of the SPDX licence list.
+
+cmake_minimum_required(VERSION 3.21)
+
 file(STRINGS "${ROOT}/tools/zig-stubs-pin" pins REGEX "^[A-Z]")
 foreach(line IN LISTS pins)
     string(REGEX REPLACE "^([^=]+)=(.*)$" "\\1;\\2" pair "${line}")

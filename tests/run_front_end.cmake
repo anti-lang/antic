@@ -7,6 +7,8 @@
 #   BAD       a program the checker refuses
 #   WORK      a directory the run may write into
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 execute_process(

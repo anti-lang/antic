@@ -6,6 +6,8 @@
 #
 # A row of the note opens with the name in backticks, `| `name` |`.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(READ "${TABLE}" table)
 # The match leaves out the `]` before the `=`, since a bracket in a list
 # element keeps CMake from splitting the list there.

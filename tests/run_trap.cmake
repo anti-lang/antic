@@ -10,6 +10,8 @@
 #   STATUS    optional exit status of a program that ends without aborting
 #   WORK      a directory for the files
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 get_filename_component(name "${SOURCE}" NAME_WE)

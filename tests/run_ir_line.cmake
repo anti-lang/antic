@@ -4,6 +4,8 @@
 #   COMMAND  the arguments after --dump-ir, separated by commas
 #   LINE     the line the IR must hold
 
+cmake_minimum_required(VERSION 3.21)
+
 string(REPLACE "," ";" arguments "${COMMAND}")
 execute_process(
     COMMAND "${ANTIC}" --dump-ir ${arguments}

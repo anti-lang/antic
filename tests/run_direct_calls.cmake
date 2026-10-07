@@ -15,6 +15,8 @@
 #   TARGET    the target the program is built for
 #   WORK      a directory for the files
 
+cmake_minimum_required(VERSION 3.21)
+
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")
     message("SKIP: the runtime archive has no sysroot for ${TARGET}")
     return()

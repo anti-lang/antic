@@ -7,6 +7,8 @@
 #
 #   cmake -DROOT=<repository> -P tests/run_release_site.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 file(READ "${ROOT}/tools/release.sh" script)
 
 # The directory of the signature is made over ssh, and it keeps the group

@@ -4,6 +4,8 @@
 # may hold a match. Run with cmake -P and ROOT, the root of the
 # repository.
 
+cmake_minimum_required(VERSION 3.21)
+
 set(names
     # The markers of the licence notice.
     "ANTI_LICENSES_|src/rt/license.h"

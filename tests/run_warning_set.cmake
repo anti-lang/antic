@@ -6,6 +6,8 @@
 # are in docs/c-guidelines.md. Run with cmake -P and ROOT, the root of the
 # repository.
 
+cmake_minimum_required(VERSION 3.21)
+
 set(allowed "tools/warnings.cmake" "src/native/warnings.cmake"
     "tests/run_warning_set.cmake")
 

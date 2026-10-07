@@ -8,6 +8,8 @@
 # whether the runner must accept it. `cmake -E echo` prints its text and
 # exits 0. `cmake -E cat` of a missing file prints a message and exits 1.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(MAKE_DIRECTORY "${WORK}")
 file(WRITE "${WORK}/refused.txt" "error: refused\n")
 set(missing "${WORK}/missing.anti")

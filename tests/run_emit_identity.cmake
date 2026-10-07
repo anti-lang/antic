@@ -15,6 +15,8 @@
 # so a new version leaves the manifest as it is. WRITE=yes writes the
 # manifest, on the Mac, after a change to antic that changes its output.
 
+cmake_minimum_required(VERSION 3.21)
+
 set(targets linux-x86_64 linux-arm64 macos-arm64 macos-x86_64 windows-x86_64
             windows-arm64)
 file(REMOVE_RECURSE "${WORK}")

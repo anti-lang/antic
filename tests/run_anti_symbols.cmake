@@ -17,6 +17,8 @@
 # plugins it also holds a plugin in a `plugins` directory, named once
 # more by `[injections]`, with an archive of its own.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 set(project "${WORK}/tracer")

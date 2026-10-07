@@ -5,6 +5,9 @@
 #   cmake -DROOT=<repository> -DCACHE=<CMakeCache.txt> -P tests/run_pinned_compiler.cmake
 
 # Set <out> to the value of <key> in the cache.
+
+cmake_minimum_required(VERSION 3.21)
+
 function(cached key out)
     file(STRINGS "${CACHE}" line REGEX "^${key}:[A-Z]+=")
     string(REGEX REPLACE "^${key}:[A-Z]+=" "" value "${line}")

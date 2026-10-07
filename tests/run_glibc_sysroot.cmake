@@ -12,6 +12,9 @@
 #         -P tests/run_glibc_sysroot.cmake
 
 # The pins name the release pocket of jammy, whose files never change.
+
+cmake_minimum_required(VERSION 3.21)
+
 file(STRINGS "${ROOT}/tools/sysroot-pins" pins REGEX "^GLIBC_")
 foreach(line IN LISTS pins)
     string(REGEX REPLACE "^([^=]+)=(.*)$" "\\1;\\2" pair "${line}")

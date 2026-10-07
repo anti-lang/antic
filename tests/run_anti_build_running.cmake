@@ -14,6 +14,8 @@
 # The script runs itself once more with REBUILD set, as the second command
 # of a pipeline, so that it builds while the program runs.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 set(project "${WORK}/running")

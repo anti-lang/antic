@@ -11,6 +11,8 @@
 #   EXPECTED  the file of the digest
 #   WORK      a directory for the executable
 
+cmake_minimum_required(VERSION 3.21)
+
 file(GLOB runtime_library "${RUNTIME}/lib/macos-arm64/*/libanti_rt.a")
 if(NOT EXISTS "${RUNTIME}/sysroot/macos-arm64/usr/lib/libSystem.tbd" OR
    runtime_library STREQUAL "")

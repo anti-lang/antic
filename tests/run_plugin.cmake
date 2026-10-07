@@ -13,6 +13,8 @@
 #   EXPECTED  the output of the host
 #   PROVIDED  the output of a program whose provider is the library
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 # Run antic, which must succeed and print nothing.

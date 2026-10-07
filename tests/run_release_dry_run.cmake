@@ -16,6 +16,8 @@
 # HOST_LINK holds the options of a link of a program of this host and SDK
 # the Apple SDK of the build, which is empty on another system.
 
+cmake_minimum_required(VERSION 3.21)
+
 if(NOT APPLE)
     message("SKIP: a release is made on the development Mac")
     return()

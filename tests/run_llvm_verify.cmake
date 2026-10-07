@@ -17,6 +17,8 @@
 # is no program, such as an input of the parser dumps, and
 # WORK/skipped.txt records it.
 
+cmake_minimum_required(VERSION 3.21)
+
 string(REPLACE "," ";" directories "${SOURCES}")
 string(REPLACE "|" ";" targets "${TARGETS}")
 

@@ -11,6 +11,8 @@
 # layout is the subject of runtime_types in tests/unit/test_lower.c alone,
 # so a change of the descriptor rewrites one expected text.
 
+cmake_minimum_required(VERSION 3.21)
+
 string(REPLACE "," ";" arguments "${COMMAND}")
 execute_process(
     COMMAND "${ANTIC}" ${arguments}

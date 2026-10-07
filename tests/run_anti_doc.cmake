@@ -12,6 +12,8 @@
 # public interface. It also covers the four doc markers, the Markdown
 # subset in both forms and the refusal of a library file under --dev.
 
+cmake_minimum_required(VERSION 3.21)
+
 set(SRC "${FIXTURE}/src")
 set(SHAPES "${SRC}/com/example/shapes.anti")
 set(APP "${SRC}/com/example/app.anti")

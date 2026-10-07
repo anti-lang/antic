@@ -13,6 +13,8 @@
 # then shows that the first failing class ends the run, and it reads the
 # whole standard library.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 

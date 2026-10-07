@@ -20,6 +20,8 @@
 #   LIB_OPTIONS  optional options of antic for the library modules
 #   OBJECT     the suffix antic gives an object of the host, .o or .obj
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 string(REPLACE "," ";" libraries "${LIBRARIES}")

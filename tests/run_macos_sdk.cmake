@@ -5,6 +5,8 @@
 #   cmake -DROOT=<repository> -DCLANG=<clang> -DLLVM_BIN=<dir> -DWORK=<dir>
 #         -P tests/run_macos_sdk.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 if(NOT APPLE)
     message("SKIP: the Apple SDK is pinned on the Mac that packs a release")
     return()

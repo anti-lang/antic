@@ -11,6 +11,8 @@
 #   HOST     the target name of this host, a macOS target
 #   WORK     a directory this run writes into
 
+cmake_minimum_required(VERSION 3.21)
+
 set(project "${WORK}/clock")
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")

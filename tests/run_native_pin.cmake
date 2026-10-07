@@ -17,6 +17,8 @@
 # regular expression lets `.` match any byte, so a text one dot short of
 # the version was refused as a copy of it.
 
+cmake_minimum_required(VERSION 3.21)
+
 string(TOUPPER "${NAME}" key)
 set(pin "${ROOT}/tools/${NAME}-pin")
 set(script "${ROOT}/${SCRIPT}")

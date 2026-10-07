@@ -6,6 +6,8 @@
 # The C library of macOS writes a line of its own about the refused
 # memory first, so the message is matched where it stands.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 file(REMOVE_RECURSE "${WORK}")

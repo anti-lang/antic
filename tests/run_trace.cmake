@@ -20,6 +20,8 @@
 # pattern that starts with "+ " matches one line or more, and one that
 # starts with "* " matches any number of lines.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 if(NOT DEFINED STATUS)

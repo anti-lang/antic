@@ -17,6 +17,8 @@
 # crash gives execute_process a text such as "Segmentation fault", which
 # equals no number.
 
+cmake_minimum_required(VERSION 3.21)
+
 if(NOT STATUS MATCHES "^[0-9]+$")
     message(FATAL_ERROR "STATUS is `${STATUS}`, and it must be a number")
 endif()

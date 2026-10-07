@@ -10,6 +10,8 @@
 #   WORK          a directory for the assembly and the object
 #   EXPECTED      the decoded unwind data without the line that names the file
 
+cmake_minimum_required(VERSION 3.21)
+
 function(run)
     execute_process(COMMAND ${ARGN} RESULT_VARIABLE status
         OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)

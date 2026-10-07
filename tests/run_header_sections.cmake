@@ -5,6 +5,8 @@
 # and the comment at the top of the header names every file of its
 # family. Run with cmake -P and ROOT, the root of the repository.
 
+cmake_minimum_required(VERSION 3.21)
+
 set(src "${ROOT}/src/antic")
 set(failures "")
 

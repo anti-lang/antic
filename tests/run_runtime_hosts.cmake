@@ -10,6 +10,8 @@
 #   OBJDUMP   the llvm-objdump executable
 #   WORK      a directory for the members
 
+cmake_minimum_required(VERSION 3.21)
+
 set(opt "${RUNTIME}/bin/opt${CMAKE_EXECUTABLE_SUFFIX}")
 file(GLOB libraries "${RUNTIME}/lib/linux-arm64*/*/libanti_rt.a")
 file(GLOB archives "${RUNTIME}/lib/linux-arm64*/*/bitcode/*/libanti_rt.a")

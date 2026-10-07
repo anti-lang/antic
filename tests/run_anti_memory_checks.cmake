@@ -18,6 +18,8 @@
 # run reads the kind of each error alone. windows-arm64 has no runtime of
 # AddressSanitizer, so the test reports itself skipped there.
 
+cmake_minimum_required(VERSION 3.21)
+
 if(HOST STREQUAL "windows-arm64")
     message("SKIP: windows-arm64 has no runtime of AddressSanitizer")
     return()

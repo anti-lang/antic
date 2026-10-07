@@ -16,6 +16,8 @@
 # "build " that it reads the notice with, and its object reaches every
 # program through --anti.inspect.
 
+cmake_minimum_required(VERSION 3.21)
+
 string(REPLACE "|" ";" options "${OPTIONS}")
 
 function(build_id out dir source)

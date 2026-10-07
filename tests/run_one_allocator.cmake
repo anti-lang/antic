@@ -7,6 +7,8 @@
 # ROOT, the root of the repository, and UNIT_SOURCES, the sources of the
 # programs of tests/ that link antic_core joined with |.
 
+cmake_minimum_required(VERSION 3.21)
+
 set(src "${ROOT}/src/antic")
 set(owner "alloc.c")
 set(owners "alloc.c" "alloc.h")

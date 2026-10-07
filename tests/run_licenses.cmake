@@ -8,6 +8,8 @@
 #   WANTED    optional list of patterns for the marker and package lines
 #   EXPECTED  optional file with the whole notice that the program holds
 
+cmake_minimum_required(VERSION 3.21)
+
 file(MAKE_DIRECTORY "${WORK}")
 execute_process(
     COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"

@@ -12,6 +12,8 @@
 #   RUNTIME   the runtime archive
 #   WORK      a directory this run writes into
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 

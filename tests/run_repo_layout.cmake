@@ -11,6 +11,8 @@
 # tree that is no git work tree is read from the disk instead, without
 # build/.
 
+cmake_minimum_required(VERSION 3.21)
+
 set(top_directories build docs LICENSES src tests tools)
 set(top_files CLAUDE.md README.md CHANGELOG.md LICENSE CMakeLists.txt
     CMakePresets.json .gitignore)

@@ -9,6 +9,8 @@
 #   USES      mnemonics the library must hold, separated by |
 #   AVOIDS    mnemonics it must not hold, separated by |
 
+cmake_minimum_required(VERSION 3.21)
+
 if(NOT EXISTS "${LIBRARY}" OR NOT EXISTS "${OBJDUMP}")
     message("SKIP: no runtime library or llvm-objdump for ${TARGET}")
     return()

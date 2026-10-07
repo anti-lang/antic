@@ -910,6 +910,11 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
 endif()
 
 # CI runs only by hand: every workflow triggers on workflow_dispatch alone.
+# Every script of `cmake -P` names the minimum version of CMake, so CMake 3
+# sets the policies CMake 4 takes for granted.
+add_test(NAME script_policies
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_script_policies.cmake")
 add_test(NAME workflows_dispatch_only
     COMMAND "${CMAKE_COMMAND}"
         "-DWORKFLOWS=${PROJECT_SOURCE_DIR}/.github/workflows"

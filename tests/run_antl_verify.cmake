@@ -8,6 +8,8 @@
 #   LIBS      the directory of the library files
 #   WORK      a scratch directory
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 set(scale "${LIBS}/com/example/scale.antl")

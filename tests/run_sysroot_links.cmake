@@ -8,6 +8,8 @@
 #
 #   cmake -DROOT=<repository> -DWORK=<dir> -P tests/run_sysroot_links.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 set(stage "${WORK}/stage")
 file(WRITE "${stage}/apk/usr/include/stdio.h" "usr/include/stdio.h\n")

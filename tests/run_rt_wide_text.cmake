@@ -6,6 +6,8 @@
 # of `SystemError.from_win32` in it. Run with cmake -P and ROOT, the root
 # of the repository.
 
+cmake_minimum_required(VERSION 3.21)
+
 set(src "${ROOT}/src/rt")
 file(GLOB sources RELATIVE "${src}" "${src}/*.c" "${src}/*.h")
 set(failures "")

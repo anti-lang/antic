@@ -15,6 +15,8 @@
 #         -DSOURCE=<file.anti> -DNAMES=<symbol;...> -DWORK=<dir>
 #         -DTARGET=<target> -DROOT=<checkout> -P tests/run_pdb_names.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")
     message("SKIP: the runtime archive has no sysroot for ${TARGET}")
     return()

@@ -11,6 +11,8 @@
 # configurations are cut off, so a signing key or a hooks path of the user
 # does not change the result.
 
+cmake_minimum_required(VERSION 3.21)
+
 if(NOT GIT)
     find_program(GIT git)
 endif()

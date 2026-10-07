@@ -7,6 +7,8 @@
 #   SOURCE    tests/dump/atomics.anti
 #   WORK      a directory for the text
 
+cmake_minimum_required(VERSION 3.21)
+
 file(MAKE_DIRECTORY "${WORK}")
 set(wanted
     "load atomic i8, ptr [^\n]* seq_cst, align 1"

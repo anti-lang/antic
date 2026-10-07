@@ -10,6 +10,8 @@
 #   TARGET  a Windows target
 #   WORK    a directory for the assembly
 
+cmake_minimum_required(VERSION 3.21)
+
 file(MAKE_DIRECTORY "${WORK}")
 execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}" --dev
                         --target "${TARGET}" -S -I "${STD}" -o "${WORK}/empty.${TARGET}.s" "${SOURCE}"

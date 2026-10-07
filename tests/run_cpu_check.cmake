@@ -10,6 +10,8 @@
 #   WORK      a directory for the executable
 #   NEEDS     the text the message must name
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 file(GLOB runtime_library "${RUNTIME}/lib/${TARGET}/*/libanti_rt.a")

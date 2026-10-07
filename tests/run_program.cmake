@@ -19,6 +19,8 @@
 # Every byte after that line is the expected standard output. An optional
 # NAME.args file beside the source holds one command-line argument per line.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 if(NOT EXISTS "${LLVM_MC}")

@@ -6,6 +6,8 @@
 # from another header of its own. Run with cmake -P and ROOT, the root of
 # the repository.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(GLOB_RECURSE c_files RELATIVE "${ROOT}"
     "${ROOT}/src/*.c" "${ROOT}/src/*.h" "${ROOT}/tests/*.c" "${ROOT}/tests/*.h"
     "${ROOT}/tests/*.cpp")

@@ -6,6 +6,8 @@
 #         -DRUNTIME=<runtime directory> -DC_PROGRAM=<raw_bytes_c>
 #         -DWORK=<dir> -P tests/run_raw_output.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${ROOT}/tests/program_output.cmake")
 file(MAKE_DIRECTORY "${WORK}")
 

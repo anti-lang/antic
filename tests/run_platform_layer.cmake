@@ -8,6 +8,8 @@
 # rest of src/rt takes a name of enum anti_rt_lock. Run with cmake -P and
 # ROOT, the root of the repository.
 
+cmake_minimum_required(VERSION 3.21)
+
 set(layer "platform.c" "platform.h" "platform_posix.c" "platform_windows.c")
 set(system_locks "pthread_mutex_t|pthread_cond_t|pthread_once|SRWLOCK|CONDITION_VARIABLE|CRITICAL_SECTION|INIT_ONCE|os_unfair_lock")
 set(failures "")

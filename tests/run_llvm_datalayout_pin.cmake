@@ -25,6 +25,8 @@
 # so the row without one is the row to compare. The other triples read no
 # GCC and warn about the unused option, so they go without it.
 
+cmake_minimum_required(VERSION 3.21)
+
 execute_process(COMMAND "${ANTIC}" --print-llvm-targets
     RESULT_VARIABLE status OUTPUT_VARIABLE printed ERROR_VARIABLE err
     ENCODING NONE)

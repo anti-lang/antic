@@ -12,6 +12,8 @@
 # between two files of spaces, joined by `cmake -E cat`. Spaces alone make
 # a module with no items, which the front end takes.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 

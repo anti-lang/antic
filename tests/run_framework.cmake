@@ -12,6 +12,8 @@
 #   TARGET        macos-arm64 or macos-x86_64
 #   OPTIONS       optional options of antic, separated by commas
 
+cmake_minimum_required(VERSION 3.21)
+
 file(GLOB runtime_library "${RUNTIME}/lib/${TARGET}/*/libanti_rt.a")
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}" OR runtime_library STREQUAL "")
     message("SKIP: the runtime archive has no sysroot or runtime for ${TARGET}")

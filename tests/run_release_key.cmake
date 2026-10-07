@@ -5,6 +5,8 @@
 #
 #   cmake -DROOT=<repository> -P tests/run_release_key.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 set(key "${ROOT}/tools/keys/release.pem")
 if(NOT EXISTS "${key}")
     message(FATAL_ERROR "tools/keys/release.pem, the key that checks SHA256SUMS.sig, "

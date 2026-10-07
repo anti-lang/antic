@@ -15,6 +15,8 @@
 # llvm-readobj, which the runtime archive carries, lists those names, and
 # the test removes each from the text before it looks for the path.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(GLOB_RECURSE shipped "${RUNTIME}/lib/*.a" "${RUNTIME}/lib/*.lib"
      "${RUNTIME}/lib/*.o" "${RUNTIME}/lib/*.obj")
 if(shipped STREQUAL "")

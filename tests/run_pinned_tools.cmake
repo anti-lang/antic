@@ -15,6 +15,8 @@
 # link.exe writes and lld-link does not, in a PE file. Last the eight LLVM
 # tools of the pinned directory, each of the version of tools/llvm-version.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CHECK}")
 
 set(names CMAKE_C_COMPILER CMAKE_AR CMAKE_RANLIB CMAKE_LINKER ANTIC_LLVM_AR

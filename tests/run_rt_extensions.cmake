@@ -6,6 +6,8 @@
 # are those of the extensions of clang, gcc and MSVC the runtime has
 # used. Run with cmake -P and ROOT, the root of the repository.
 
+cmake_minimum_required(VERSION 3.21)
+
 set(holders "platform.h" "platform_posix.c" "platform_windows.c" "atomic.c")
 set(extensions "__attribute__|__asm__|__asm[ (]|__atomic_|__sync_|__builtin_|__declspec|__int128|__typeof__|__extension__|_Interlocked|__iso_volatile|__cpuid|_xgetbv|__dmb|^[ ]*#[ ]*pragma")
 set(failures "")

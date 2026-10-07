@@ -13,6 +13,8 @@
 # end of the script refuses them. The run is read for the files it wrote,
 # not for its status.
 
+cmake_minimum_required(VERSION 3.21)
+
 if(CMAKE_HOST_WIN32)
     set(exe ".exe")
 endif()

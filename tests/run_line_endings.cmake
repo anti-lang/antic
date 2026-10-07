@@ -5,6 +5,8 @@
 #
 #   cmake -DROOT=<repository> -P tests/run_line_endings.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 file(READ "${ROOT}/.gitattributes" rules)
 foreach(rule "* text=auto eol=lf")
     string(FIND "${rules}" "${rule}" found)

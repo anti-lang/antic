@@ -9,6 +9,8 @@
 #         -DSOURCE=<file.anti> -DWORK=<dir> -DTARGET=<target>
 #         -P tests/run_pdb_guid.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")
     message("SKIP: the runtime archive has no sysroot for ${TARGET}")
     return()

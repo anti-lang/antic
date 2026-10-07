@@ -26,6 +26,8 @@
 # cache, so a dev compile time covers the program's own module and the
 # link.
 
+cmake_minimum_required(VERSION 3.21)
+
 set(programs scalar_loop objects builder simd_loop map_work)
 set(dev_modules lang mem text collection collection/map)
 

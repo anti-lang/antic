@@ -4,6 +4,8 @@
 #
 #   cmake -DROOT=<repository> -P tests/run_installer_options.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 set(scripts install.sh install.ps1 uninstall.sh uninstall.ps1)
 # The processor of the package, which defaults to the processor of this
 # machine. Each spelling stands in every script.

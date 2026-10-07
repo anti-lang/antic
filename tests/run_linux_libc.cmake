@@ -19,6 +19,8 @@
 # of its own machine. No program of this tree needs one, so the listing is
 # written here.
 
+cmake_minimum_required(VERSION 3.21)
+
 if(NOT EXISTS "${SYSROOT}/linux-arm64/usr/lib/libc.a")
     message("SKIP: no Linux sysroot in ${SYSROOT}")
     return()

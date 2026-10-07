@@ -7,6 +7,8 @@
 # calls driver_interface, whose result is a structure of the checker.
 # Run with cmake -P and ROOT, the root of the repository.
 
+cmake_minimum_required(VERSION 3.21)
+
 set(antic "${ROOT}/src/antic")
 set(anti "${ROOT}/src/anti")
 set(helpers

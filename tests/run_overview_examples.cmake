@@ -28,6 +28,8 @@
 #       checker off the `!` of the comment.
 # A context that no `anti` block follows fails the run.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 file(READ "${OVERVIEW}" content)

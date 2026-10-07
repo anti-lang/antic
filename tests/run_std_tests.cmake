@@ -12,6 +12,8 @@
 # run links an object of each. Both runs report the same tests, and the
 # release run has the assertions off.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 

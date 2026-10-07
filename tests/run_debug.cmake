@@ -15,6 +15,8 @@
 # of the LLVM back end inlines step and folds the program to its result,
 # as the entry on inlined frames in docs/decisions.md says.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 set(root "${WORK}/root")

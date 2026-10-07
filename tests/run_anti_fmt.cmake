@@ -9,6 +9,8 @@
 # output changes nothing, and `--check`, which writes nothing and lists
 # the files that differ.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 configure_file("${FIXTURE}/loose.anti" "${WORK}/loose.anti" COPYONLY)

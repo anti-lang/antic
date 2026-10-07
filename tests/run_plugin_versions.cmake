@@ -15,6 +15,8 @@
 # A Windows library links against the import library of its host, so
 # each host there takes a library of its own.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 # Run antic, which must succeed and print nothing.

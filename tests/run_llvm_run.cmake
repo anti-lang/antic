@@ -8,6 +8,8 @@
 #   SOURCE    a program that exits with 42
 #   WORK      a directory for the output
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 

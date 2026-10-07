@@ -7,6 +7,8 @@
 #   OUTPUT    the .antl file to write
 #   EXPECTED  the hex listing
 
+cmake_minimum_required(VERSION 3.21)
+
 string(REPLACE "|" ";" options "${OPTIONS}")
 execute_process(
     COMMAND "${ANTIC}" -c -I "${ROOT}" ${options} -o "${OUTPUT}" "${SOURCE}"

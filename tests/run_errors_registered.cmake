@@ -6,6 +6,8 @@
 # A registration names a program as `<name>.anti`, as `<name>.err` or as
 # the case `"<name>|` of a list, in tests/CMakeLists.txt or in a runner.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(GLOB programs RELATIVE "${TESTS}/errors" "${TESTS}/errors/*.anti")
 file(GLOB expected RELATIVE "${TESTS}/errors" "${TESTS}/errors/*.err")
 file(GLOB runners "${TESTS}/run_*.cmake")

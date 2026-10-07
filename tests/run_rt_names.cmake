@@ -17,6 +17,8 @@
 #   10.0.26100 defines _Avx2WmemEnabledWeakValue as selectany on x86_64,
 #   the same way, and the Build Tools of the Windows VM bring it.
 
+cmake_minimum_required(VERSION 3.21)
+
 if(NOT EXISTS "${OBJDUMP}")
     message("SKIP: no llvm-objdump in the runtime archive")
     return()

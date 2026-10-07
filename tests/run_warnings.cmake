@@ -6,6 +6,8 @@
 #   NEEDLES    the messages the run must print, separated by semicolons
 #   ABSENT     messages the run must not print, separated by semicolons
 
+cmake_minimum_required(VERSION 3.21)
+
 string(REPLACE "," ";" arguments "${COMMAND}")
 execute_process(
     COMMAND "${ANTIC}" ${arguments}

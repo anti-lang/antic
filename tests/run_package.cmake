@@ -16,6 +16,9 @@
 # Xcode is installed. Xcode brought macOS SDK 27.0 on 2026-09-20, whose
 # libSystem.tbd names the target arm64e.x1-macos, and the pinned ld64.lld
 # read it as malformed and left every symbol of libSystem undefined.
+
+cmake_minimum_required(VERSION 3.21)
+
 file(READ "${ROOT}/tools/pack-anti.cmake" packer_text)
 if(packer_text MATCHES "xcrun[^\n]*--show-sdk-path" AND
    NOT packer_text MATCHES "xcrun --sdk")

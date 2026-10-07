@@ -7,6 +7,8 @@
 #   cmake -DANTIC=<antic> -DSOURCE=<file.anti> -DWORK=<dir>
 #         -P tests/run_runtime_from_data_dir.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 if(WIN32)
     set(data "${WORK}/home/anti")

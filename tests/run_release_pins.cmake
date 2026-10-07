@@ -6,6 +6,8 @@
 #
 #   cmake -DROOT=<repository> -P tests/run_release_pins.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 set(hosts linux-x86_64 linux-arm64 macos-arm64 macos-x86_64 windows-x86_64
           windows-arm64)
 file(READ "${ROOT}/tools/llvm-version" version)

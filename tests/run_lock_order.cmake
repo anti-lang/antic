@@ -9,6 +9,8 @@
 # with the four sites, and runs to its end. The release build records
 # nothing and prints nothing.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 file(MAKE_DIRECTORY "${WORK}")

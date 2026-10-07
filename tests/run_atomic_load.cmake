@@ -6,6 +6,8 @@
 #   LIBRARY   the static library of the target
 #   TARGET    the antic target name, for the message
 
+cmake_minimum_required(VERSION 3.21)
+
 if(NOT EXISTS "${LIBRARY}" OR NOT EXISTS "${OBJDUMP}")
     message("SKIP: no runtime library or llvm-objdump for ${TARGET}")
     return()

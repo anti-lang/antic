@@ -22,6 +22,9 @@
 # anti bind takes the pinned clang of build/deps beside its tree, and
 # otherwise the first clang on PATH. A tree configured with a pinned clang
 # elsewhere, as on the test machines, puts that one first on PATH.
+
+cmake_minimum_required(VERSION 3.21)
+
 if(CLANG_DIR)
     file(TO_NATIVE_PATH "${CLANG_DIR}/bin" clang_bin)
     if(HOST MATCHES "^windows-")

@@ -14,6 +14,8 @@
 # kept every requirement it had read, so c =2.0.0 and c =1.0.0 refused
 # the project.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 function(file_url path out)

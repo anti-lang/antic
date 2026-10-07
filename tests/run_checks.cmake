@@ -10,6 +10,8 @@
 # Release mode drops the checks and dev mode keeps them, and --checks and
 # --no-checks override either mode.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 file(MAKE_DIRECTORY "${WORK}")

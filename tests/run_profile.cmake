@@ -18,6 +18,8 @@
 # differs from its profile. Its bitcode carries the counts of the run,
 # and the program prints the expected output again.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 if(CMAKE_HOST_WIN32)

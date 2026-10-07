@@ -11,6 +11,8 @@
 #   FORMAT        the file format that llvm-objdump prints
 #   OPTIONS       optional options of antic, separated by commas
 
+cmake_minimum_required(VERSION 3.21)
+
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")
     message("SKIP: the runtime archive has no sysroot for ${TARGET}")
     return()

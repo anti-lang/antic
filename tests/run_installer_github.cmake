@@ -10,6 +10,9 @@
 
 # The lines of tools/release-base and tools/site-base, which both
 # installers carry.
+
+cmake_minimum_required(VERSION 3.21)
+
 file(READ "${ROOT}/tools/release-base" pins)
 foreach(key repository download api)
     if(NOT pins MATCHES "(^|\n)${key}=([^\n]+)")

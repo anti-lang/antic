@@ -8,6 +8,8 @@
 #   cmake -DROOT=<repository> -DNAME=cmake
 #         "-DREADERS=tools/install.sh;tools/install.ps1" -P tests/run_pin.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 set(hosts macos-arm64 macos-x86_64 linux-x86_64 linux-arm64 windows-x86_64
           windows-arm64)
 set(pin "${ROOT}/tools/${NAME}-pin")

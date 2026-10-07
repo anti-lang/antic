@@ -7,6 +7,8 @@
 #   ROOT      the search root that holds the sources
 #   WORK      a directory for the outputs
 
+cmake_minimum_required(VERSION 3.21)
+
 file(MAKE_DIRECTORY "${WORK}")
 execute_process(
     COMMAND "${ANTIC}" -c -I "${ROOT}" --package-name com.example

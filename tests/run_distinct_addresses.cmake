@@ -14,6 +14,8 @@
 #   TARGET        the target name
 #   ROOT          the repository
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${ROOT}/tests/program_output.cmake")
 
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")

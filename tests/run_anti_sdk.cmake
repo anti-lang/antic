@@ -6,6 +6,8 @@
 #
 #   cmake -DANTI=<anti> -DWORK=<dir> -P tests/run_anti_sdk.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 
 # A stand-in SDK: stubs in usr/lib and in a framework whose top-level stub

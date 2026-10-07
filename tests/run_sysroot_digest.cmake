@@ -7,6 +7,9 @@
 
 # A Windows host takes its Windows sysroots from the Build Tools and hashes
 # no tree of xwin.
+
+cmake_minimum_required(VERSION 3.21)
+
 if(CMAKE_HOST_WIN32)
     message("SKIP: a Windows host takes the Build Tools rather than xwin")
     return()

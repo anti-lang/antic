@@ -9,6 +9,8 @@
 #   cmake -DRUNTIME=<runtime archive> -DLLVM_AR=<llvm-ar> -DWORK=<dir>
 #         -P tests/run_float_digits.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 file(GLOB_RECURSE archives "${RUNTIME}/lib/libanti_rt.a"
      "${RUNTIME}/lib/anti_rt.lib")
 if(archives STREQUAL "")

@@ -15,6 +15,8 @@
 # dev build, which keeps every function of a source without main, where
 # release mode drops them all.
 
+cmake_minimum_required(VERSION 3.21)
+
 get_filename_component(name "${SOURCE}" NAME_WE)
 set(assembly "${WORK}/${name}.${TARGET}.${LEVEL}.s")
 file(MAKE_DIRECTORY "${WORK}")

@@ -8,6 +8,8 @@
 # left out, because the canonical form of a source the lexer refuses is
 # unknown and the layout of the others is what they check.
 
+cmake_minimum_required(VERSION 3.21)
+
 set(SKIP
     "${TESTS}/check/format/src/com/example/loose.anti"
     "${TESTS}/errors/format_literal.anti"

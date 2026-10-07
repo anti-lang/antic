@@ -21,6 +21,8 @@
 # leak check on and no report. On macOS each report names the function
 # of the program that made the error.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(MAKE_DIRECTORY "${WORK}")
 
 set(checked "${HOST}")

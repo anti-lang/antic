@@ -11,6 +11,9 @@
 # the refusal of a manifest without one and the staging area of a release
 # that ./r installs from before step 6 signs. The Windows VM of step 5
 # runs the refusal for real.
+
+cmake_minimum_required(VERSION 3.21)
+
 foreach(installer install.sh install.ps1)
     file(READ "${ROOT}/tools/${installer}" text)
     foreach(name SHA256SUMS.sig ANTI_STAGING "no SHA256SUMS.sig")

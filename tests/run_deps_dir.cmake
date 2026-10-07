@@ -13,6 +13,8 @@
 #         -DCLANG=<dir> -DLLVM=<dir> -DSYSROOT=<dir> -DRAYLIB=<dir>
 #         -DGENERATOR=<generator> -P tests/run_deps_dir.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 set(source "${WORK}/source")
 file(MAKE_DIRECTORY "${source}")

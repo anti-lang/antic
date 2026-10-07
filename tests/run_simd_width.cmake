@@ -10,6 +10,8 @@
 #             starts its line
 #   COUNT     how often it must stand in the assembly
 
+cmake_minimum_required(VERSION 3.21)
+
 get_filename_component(name "${SOURCE}" NAME_WE)
 set(assembly "${WORK}/${name}.${TARGET}.${LEVEL}.s")
 file(MAKE_DIRECTORY "${WORK}")

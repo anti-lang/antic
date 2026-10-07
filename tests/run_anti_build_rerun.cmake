@@ -13,6 +13,8 @@
 #   WORK     a directory this run writes into
 #   TURNS    how many times to run and build
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 set(project "${WORK}/app")

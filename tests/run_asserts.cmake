@@ -9,6 +9,8 @@
 # assertion. A dev build, and any build with --asserts, prints the text
 # and aborts. --no-asserts drops them in dev mode too.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 file(MAKE_DIRECTORY "${WORK}")

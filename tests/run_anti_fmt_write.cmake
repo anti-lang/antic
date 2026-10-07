@@ -10,6 +10,8 @@
 # The limit is `ulimit -f` of a POSIX shell, so Windows has no run of
 # this test.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 set(source "${WORK}/wide.anti")

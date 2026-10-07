@@ -17,6 +17,8 @@
 # release mode, the `-g` rule of docs/tooling.md, --target, --cpu, the
 # lock file, `anti run` and the project `anti new` writes.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 set(project "${WORK}/app")

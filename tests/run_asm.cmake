@@ -11,6 +11,8 @@
 #   WORK      a directory for the assembly and object files
 #   HOLDS     optional lines the assembly must hold, separated by |
 
+cmake_minimum_required(VERSION 3.21)
+
 if(NOT EXISTS "${LLVM_MC}")
     message(FATAL_ERROR
         "llvm-mc not found at '${LLVM_MC}'. Configure with -DANTIC_LLVM_MC=<path>.")

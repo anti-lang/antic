@@ -14,6 +14,8 @@
 # It then compiles the same module without --tests and shows that no name
 # of either block reaches the assembly or the library file.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 

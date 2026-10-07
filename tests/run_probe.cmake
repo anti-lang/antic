@@ -9,6 +9,8 @@
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/../tools/warnings.cmake")
 

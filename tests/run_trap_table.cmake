@@ -11,6 +11,8 @@
 # inline. A dispatch, `is` and `as` check in dev mode, and release mode
 # keeps the raw load.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 function(traps build case class)

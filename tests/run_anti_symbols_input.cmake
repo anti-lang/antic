@@ -8,6 +8,8 @@
 # line `0-<21 digits>` would otherwise claim every address. A frame
 # offset of 21 digits would otherwise land on the last function.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}/archive")
 

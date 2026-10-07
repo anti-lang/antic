@@ -9,6 +9,8 @@
 # the form on purpose, each as `<path under ROOT>:<function>`, separated
 # by commas.
 
+cmake_minimum_required(VERSION 3.21)
+
 string(REPLACE "," ";" skipped "${SKIP}")
 file(GLOB_RECURSE sources "${ROOT}/*.anti")
 if(NOT sources)

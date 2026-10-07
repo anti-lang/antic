@@ -6,6 +6,8 @@
 #   LEVELS    tools/cpu-levels
 #   TARGETS   the target names, separated by |
 
+cmake_minimum_required(VERSION 3.21)
+
 file(STRINGS "${LEVELS}" lines REGEX "^level ")
 foreach(line IN LISTS lines)
     string(REPLACE " " ";" fields "${line}")

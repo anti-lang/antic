@@ -9,6 +9,8 @@
 # one constant: 4000 on Linux and macOS, where the word is a futex word
 # or an os_unfair_lock, and 8000 on Windows, where it is an SRWLOCK.
 
+cmake_minimum_required(VERSION 3.21)
+
 file(MAKE_DIRECTORY "${WORK}")
 foreach(case linux-x86_64=4000 linux-arm64=4000 macos-arm64=4000
         macos-x86_64=4000 windows-x86_64=8000 windows-arm64=8000)

@@ -6,6 +6,8 @@
 #   cmake -DPIN=<run_native_pin.cmake> -DWORK=<dir>
 #         -P tests/run_native_pin_self.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 set(version "10.48")
 set(digest "ebcc25aadf2a51fa1fefa9b8bc9e7a79b3dae86870a0f1152a22e42befd46888")
 set(root "${WORK}/root")

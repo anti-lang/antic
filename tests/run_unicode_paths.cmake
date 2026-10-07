@@ -17,6 +17,8 @@
 #         -DSOURCE=<return42.anti> -DWORK=<dir>
 #         -P tests/run_unicode_paths.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 set(name "pü中")

@@ -5,6 +5,8 @@
 #   LLVM_BIN  the directory of the installed tools
 #   DEST      optional directory of the runtime archive's tools
 
+cmake_minimum_required(VERSION 3.21)
+
 file(READ "${CMAKE_CURRENT_LIST_DIR}/llvm-version" pin)
 string(STRIP "${pin}" pin)
 if(CMAKE_HOST_WIN32)

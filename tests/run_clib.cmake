@@ -21,6 +21,9 @@
 
 # The file names of a library and a program on this host, and what the
 # library driver prints as the compiler of C.
+
+cmake_minimum_required(VERSION 3.21)
+
 set(PREFIX lib)
 set(STATIC_SUFFIX ".a")
 set(HOST_SHARED_SUFFIX ".so")

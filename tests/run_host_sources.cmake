@@ -10,6 +10,8 @@
 #         -DPCRE2_INCLUDE=<dir> -DVERSION=<version>
 #         -P tests/run_host_sources.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${ROOT}/tools/sources.cmake")
 include("${ROOT}/tools/warnings.cmake")
 include("${ROOT}/tools/host-compile.cmake")
