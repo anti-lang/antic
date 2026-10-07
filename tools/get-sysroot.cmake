@@ -396,15 +396,21 @@ function(build_tools out)
     set("${out}" "${found}" PARENT_SCOPE)
 endfunction()
 
-# The newest directory under root, by version order.
+# The newest directory under root whose name is a version, by version
+# order. Windows Kits/10/Include holds `wdf` of the Driver Kit beside the
+# versions of the SDK, and a name of letters sorts above every number.
 function(newest root out)
     file(GLOB found "${root}/*")
     set(directories "")
     foreach(path IN LISTS found)
-        if(IS_DIRECTORY "${path}")
+        get_filename_component(name "${path}" NAME)
+        if(IS_DIRECTORY "${path}" AND name MATCHES "^[0-9]+(\\.[0-9]+)*$")
             list(APPEND directories "${path}")
         endif()
     endforeach()
+    if(directories STREQUAL "")
+        message(FATAL_ERROR "${root} holds no directory of a version")
+    endif()
     list(SORT directories COMPARE NATURAL ORDER DESCENDING)
     list(GET directories 0 first)
     set("${out}" "${first}" PARENT_SCOPE)

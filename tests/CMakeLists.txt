@@ -2040,6 +2040,14 @@ add_test(NAME macos_sysroot
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/macos_sysroot"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_macos_sysroot.cmake")
+# The sysroot of a Windows target over the Build Tools takes the newest
+# SDK, and not `wdf` of the Driver Kit beside it.
+add_test(NAME sysroot_build_tools
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/sysroot_build_tools"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_sysroot_build_tools.cmake")
+set_tests_properties(sysroot_build_tools PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
 add_test(NAME glibc_sysroot
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/glibc_sysroot"
