@@ -73,14 +73,15 @@ void test_llvm_target(void)
     triple(TARGET_WINDOWS_X86_64, "x86_64-pc-windows-msvc");
     triple(TARGET_WINDOWS_ARM64, "aarch64-pc-windows-msvc");
 
-    /* pic on Linux and macOS. lld-link makes a Windows executable
-       position-independent from the relocations alone. */
+    /* pic on every target, as clang compiles. An x86_64 object of the
+       static model holds the address of a datum in 32 bits, and a Windows
+       image lies above 4 GiB. */
     CHECK_STR(llvm_relocation_model(TARGET_LINUX_X86_64), "pic");
     CHECK_STR(llvm_relocation_model(TARGET_LINUX_ARM64), "pic");
     CHECK_STR(llvm_relocation_model(TARGET_MACOS_X86_64), "pic");
     CHECK_STR(llvm_relocation_model(TARGET_MACOS_ARM64), "pic");
-    CHECK_STR(llvm_relocation_model(TARGET_WINDOWS_X86_64), "static");
-    CHECK_STR(llvm_relocation_model(TARGET_WINDOWS_ARM64), "static");
+    CHECK_STR(llvm_relocation_model(TARGET_WINDOWS_X86_64), "pic");
+    CHECK_STR(llvm_relocation_model(TARGET_WINDOWS_ARM64), "pic");
 
     /* The target-cpu column of the work order. */
     CHECK_STR(llvm_target_cpu(CPU_V1), "x86-64");

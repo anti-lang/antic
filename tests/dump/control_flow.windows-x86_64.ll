@@ -2,7 +2,7 @@ source_filename = "control_flow"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc"
 
-define noundef i64 @_A12control_flow_choose(i8 zeroext noundef %p0, i64 noundef %p1, i64 noundef %p2) #0 !dbg !12 {
+define noundef i64 @_A12control_flow_choose(i8 zeroext noundef %p0, i64 noundef %p1, i64 noundef %p2) #0 !dbg !13 {
 b0:
   %t0 = alloca i8, align 1
   %t1 = alloca i64, align 8
@@ -11,7 +11,7 @@ b0:
   store i8 %p0, ptr %t0, align 1
   store i64 %p1, ptr %t1, align 8
   store i64 %p2, ptr %t2, align 8
-  %v0 = load i64, ptr %t1, align 8, !dbg !13
+  %v0 = load i64, ptr %t1, align 8, !dbg !14
   store i64 %v0, ptr %t3, align 8
   %v1 = load i8, ptr %t0, align 1
   %v2 = trunc i8 %v1 to i1
@@ -27,13 +27,13 @@ b2:
   ret i64 %v4
 }
 
-define noundef zeroext range(i8 0, 2) i8 @_A12control_flow_spin(i8 zeroext noundef %p0, i8 zeroext noundef %p1) #0 !dbg !14 {
+define noundef zeroext range(i8 0, 2) i8 @_A12control_flow_spin(i8 zeroext noundef %p0, i8 zeroext noundef %p1) #0 !dbg !15 {
 b0:
   %t0 = alloca i8, align 1
   %t1 = alloca i8, align 1
   store i8 %p0, ptr %t0, align 1
   store i8 %p1, ptr %t1, align 1
-  br label %b1, !dbg !15
+  br label %b1, !dbg !16
 
 b1:
   %v0 = load i8, ptr %t0, align 1
@@ -57,19 +57,20 @@ b4:
 attributes #0 = { nounwind uwtable(sync) "frame-pointer"="none" "stack-probe-size"="4096" "target-cpu"="x86-64-v3" "target-features"="+avx,+avx2,+bmi,+bmi2,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fxsr,+lzcnt,+mmx,+movbe,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave" }
 attributes #1 = { nounwind }
 
-!llvm.module.flags = !{!0, !1, !5, !6}
-!llvm.ident = !{!2}
+!llvm.module.flags = !{!0, !1, !2, !6, !7}
+!llvm.ident = !{!3}
 !0 = !{i32 1, !"wchar_size", i32 2}
-!1 = !{i32 7, !"uwtable", i32 2}
-!2 = !{!"antic VERSION"}
-!llvm.dbg.cu = !{!7}
-!5 = !{i32 2, !"Debug Info Version", i32 3}
-!6 = !{i32 2, !"CodeView", i32 1}
-!7 = distinct !DICompileUnit(language: DW_LANG_C11, file: !8, producer: "antic VERSION", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!8 = !DIFile(filename: "control_flow.anti", directory: "")
-!10 = !DISubroutineType(types: !11)
-!11 = !{null}
-!12 = distinct !DISubprogram(name: "control_flow.choose", scope: !8, file: !8, line: 0, type: !10, scopeLine: 0, spFlags: DISPFlagDefinition, unit: !7)
-!13 = !DILocation(line: 0, column: 0, scope: !12)
-!14 = distinct !DISubprogram(name: "control_flow.spin", scope: !8, file: !8, line: 0, type: !10, scopeLine: 0, spFlags: DISPFlagDefinition, unit: !7)
-!15 = !DILocation(line: 0, column: 0, scope: !14)
+!1 = !{i32 8, !"PIC Level", i32 2}
+!2 = !{i32 7, !"uwtable", i32 2}
+!3 = !{!"antic VERSION"}
+!llvm.dbg.cu = !{!8}
+!6 = !{i32 2, !"Debug Info Version", i32 3}
+!7 = !{i32 2, !"CodeView", i32 1}
+!8 = distinct !DICompileUnit(language: DW_LANG_C11, file: !9, producer: "antic VERSION", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!9 = !DIFile(filename: "control_flow.anti", directory: "")
+!11 = !DISubroutineType(types: !12)
+!12 = !{null}
+!13 = distinct !DISubprogram(name: "control_flow.choose", scope: !9, file: !9, line: 0, type: !11, scopeLine: 0, spFlags: DISPFlagDefinition, unit: !8)
+!14 = !DILocation(line: 0, column: 0, scope: !13)
+!15 = distinct !DISubprogram(name: "control_flow.spin", scope: !9, file: !9, line: 0, type: !11, scopeLine: 0, spFlags: DISPFlagDefinition, unit: !8)
+!16 = !DILocation(line: 0, column: 0, scope: !15)

@@ -2,7 +2,7 @@ source_filename = "strings"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc"
 
-define internal void @_A7strings_tail(ptr sret([16 x i8]) align 8 %sret, ptr %p0, i64 noundef %p1) #0 !dbg !26 {
+define internal void @_A7strings_tail(ptr sret([16 x i8]) align 8 %sret, ptr %p0, i64 noundef %p1) #0 !dbg !27 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca i64, align 8
@@ -16,7 +16,7 @@ b0:
   %s2 = alloca [16 x i8], align 8
   store ptr %p0, ptr %t0, align 8
   store i64 %p1, ptr %t1, align 8
-  store ptr %s2, ptr %t2, align 8, !dbg !27
+  store ptr %s2, ptr %t2, align 8, !dbg !28
   %v0 = load ptr, ptr %t0, align 8
   %v1 = load ptr, ptr %v0, align 8
   store ptr %v1, ptr %t3, align 8
@@ -24,7 +24,7 @@ b0:
   %v3 = getelementptr inbounds i8, ptr %v2, i64 8
   store ptr %v3, ptr %t4, align 8
   %v4 = load ptr, ptr %t4, align 8
-  %v5 = load i64, ptr %v4, align 8, !tbaa !15
+  %v5 = load i64, ptr %v4, align 8, !tbaa !16
   store i64 %v5, ptr %t5, align 8
   %v6 = load ptr, ptr %t3, align 8
   %v7 = load i64, ptr %t1, align 8
@@ -44,11 +44,11 @@ b0:
   %v17 = load ptr, ptr %t8, align 8
   store i64 %v16, ptr %v17, align 8
   %v18 = load ptr, ptr %t2, align 8
-  call void @llvm.memcpy.p0.p0.i64(ptr %sret, ptr %v18, i64 16, i1 false), !dbg !27
+  call void @llvm.memcpy.p0.p0.i64(ptr %sret, ptr %v18, i64 16, i1 false), !dbg !28
   ret void
 }
 
-define internal noundef i64 @_A7strings_main() #0 !dbg !28 {
+define internal noundef i64 @_A7strings_main() #0 !dbg !29 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -65,9 +65,9 @@ b0:
   %s1 = alloca [16 x i8], align 8
   %a0 = alloca [16 x i8], align 8
   %a1 = alloca [16 x i8], align 8
-  store ptr %s0, ptr %t0, align 8, !dbg !29
+  store ptr %s0, ptr %t0, align 8, !dbg !30
   store ptr %s1, ptr %t1, align 8
-  call void @llvm.lifetime.start.p0(ptr %s0), !dbg !29
+  call void @llvm.lifetime.start.p0(ptr %s0), !dbg !30
   store ptr @_A7strings_0, ptr %t2, align 8
   %v0 = load ptr, ptr %t2, align 8
   %v1 = load ptr, ptr %t1, align 8
@@ -78,15 +78,15 @@ b0:
   %v4 = load ptr, ptr %t3, align 8
   store i64 5, ptr %v4, align 8
   %v5 = load ptr, ptr %t1, align 8
-  call void @llvm.memcpy.p0.p0.i64(ptr %a1, ptr %v5, i64 16, i1 false), !dbg !29
-  call void (ptr, ptr, i64) @_A7strings_tail(ptr sret([16 x i8]) align 8 %a0, ptr %a1, i64 1), !dbg !29
+  call void @llvm.memcpy.p0.p0.i64(ptr %a1, ptr %v5, i64 16, i1 false), !dbg !30
+  call void (ptr, ptr, i64) @_A7strings_tail(ptr sret([16 x i8]) align 8 %a0, ptr %a1, i64 1), !dbg !30
   store ptr %a0, ptr %t4, align 8
   %v6 = load ptr, ptr %t0, align 8
   %v7 = load ptr, ptr %t4, align 8
-  call void @llvm.memcpy.p0.p0.i64(ptr %v6, ptr %v7, i64 16, i1 false), !dbg !29
+  call void @llvm.memcpy.p0.p0.i64(ptr %v6, ptr %v7, i64 16, i1 false), !dbg !30
   store ptr @_A7strings_1, ptr %t5, align 8
   %v8 = load ptr, ptr %t5, align 8
-  %v9 = call i32 (ptr) @puts(ptr %v8), !dbg !29
+  %v9 = call i32 (ptr) @puts(ptr %v8), !dbg !30
   store i32 %v9, ptr %t6, align 4
   %v10 = load ptr, ptr %t0, align 8
   %v11 = load ptr, ptr %v10, align 8
@@ -118,33 +118,34 @@ declare void @llvm.lifetime.start.p0(ptr)
 attributes #0 = { nounwind uwtable(sync) "frame-pointer"="none" "stack-probe-size"="4096" "target-cpu"="x86-64-v3" "target-features"="+avx,+avx2,+bmi,+bmi2,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fxsr,+lzcnt,+mmx,+movbe,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave" }
 attributes #1 = { nounwind }
 
-!llvm.module.flags = !{!0, !1, !19, !20}
-!llvm.ident = !{!2}
+!llvm.module.flags = !{!0, !1, !2, !20, !21}
+!llvm.ident = !{!3}
 !0 = !{i32 1, !"wchar_size", i32 2}
-!1 = !{i32 7, !"uwtable", i32 2}
-!2 = !{!"antic VERSION"}
-!5 = !{!"anti"}
-!6 = !{!"byte", !5, i64 0}
-!7 = !{!"i16", !6, i64 0}
-!8 = !{!"i32", !6, i64 0}
-!9 = !{!"i64", !6, i64 0}
-!10 = !{!"f32", !6, i64 0}
-!11 = !{!"f64", !6, i64 0}
-!12 = !{!"ptr", !6, i64 0}
-!13 = !{!7, !7, i64 0}
+!1 = !{i32 8, !"PIC Level", i32 2}
+!2 = !{i32 7, !"uwtable", i32 2}
+!3 = !{!"antic VERSION"}
+!6 = !{!"anti"}
+!7 = !{!"byte", !6, i64 0}
+!8 = !{!"i16", !7, i64 0}
+!9 = !{!"i32", !7, i64 0}
+!10 = !{!"i64", !7, i64 0}
+!11 = !{!"f32", !7, i64 0}
+!12 = !{!"f64", !7, i64 0}
+!13 = !{!"ptr", !7, i64 0}
 !14 = !{!8, !8, i64 0}
 !15 = !{!9, !9, i64 0}
 !16 = !{!10, !10, i64 0}
 !17 = !{!11, !11, i64 0}
 !18 = !{!12, !12, i64 0}
-!llvm.dbg.cu = !{!21}
-!19 = !{i32 2, !"Debug Info Version", i32 3}
-!20 = !{i32 2, !"CodeView", i32 1}
-!21 = distinct !DICompileUnit(language: DW_LANG_C11, file: !22, producer: "antic VERSION", isOptimized: true, runtimeVersion: 0, emissionKind: FullDebug)
-!22 = !DIFile(filename: "strings.anti", directory: "")
-!24 = !DISubroutineType(types: !25)
-!25 = !{null}
-!26 = distinct !DISubprogram(name: "strings.tail", scope: !22, file: !22, line: 0, type: !24, scopeLine: 0, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition | DISPFlagOptimized, unit: !21)
-!27 = !DILocation(line: 0, column: 0, scope: !26)
-!28 = distinct !DISubprogram(name: "strings.main", scope: !22, file: !22, line: 0, type: !24, scopeLine: 0, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition | DISPFlagOptimized, unit: !21)
-!29 = !DILocation(line: 0, column: 0, scope: !28)
+!19 = !{!13, !13, i64 0}
+!llvm.dbg.cu = !{!22}
+!20 = !{i32 2, !"Debug Info Version", i32 3}
+!21 = !{i32 2, !"CodeView", i32 1}
+!22 = distinct !DICompileUnit(language: DW_LANG_C11, file: !23, producer: "antic VERSION", isOptimized: true, runtimeVersion: 0, emissionKind: FullDebug)
+!23 = !DIFile(filename: "strings.anti", directory: "")
+!25 = !DISubroutineType(types: !26)
+!26 = !{null}
+!27 = distinct !DISubprogram(name: "strings.tail", scope: !23, file: !23, line: 0, type: !25, scopeLine: 0, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition | DISPFlagOptimized, unit: !22)
+!28 = !DILocation(line: 0, column: 0, scope: !27)
+!29 = distinct !DISubprogram(name: "strings.main", scope: !23, file: !23, line: 0, type: !25, scopeLine: 0, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition | DISPFlagOptimized, unit: !22)
+!30 = !DILocation(line: 0, column: 0, scope: !29)

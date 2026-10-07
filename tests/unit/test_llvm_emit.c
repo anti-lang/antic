@@ -570,10 +570,11 @@ static void attributes(void)
                     "\"stack-probe-size\"=\"4096\" "
                     "\"target-cpu\"=\"generic\" \"target-features\"=\""));
     /* COFF writes the debug flags in every build, see llvm_debug.h. */
-    CHECK(holds(&x, "!llvm.module.flags = !{!0, !1, !5, !6}\n"
-                    "!llvm.ident = !{!2}\n"
+    CHECK(holds(&x, "!llvm.module.flags = !{!0, !1, !2, !6, !7}\n"
+                    "!llvm.ident = !{!3}\n"
                     "!0 = !{i32 1, !\"wchar_size\", i32 2}\n"
-                    "!1 = !{i32 7, !\"uwtable\", i32 2}\n"));
+                    "!1 = !{i32 8, !\"PIC Level\", i32 2}\n"
+                    "!2 = !{i32 7, !\"uwtable\", i32 2}\n"));
     end(&x);
 }
 

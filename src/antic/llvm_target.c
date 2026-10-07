@@ -78,9 +78,23 @@ const char *llvm_data_layout(enum target t)
     return layouts[t];
 }
 
+/* DESIGN: the relocation model of every target is the one the pinned clang
+   passes as -mrelocation-model, pic on all six, and llvm_datalayout_pin
+   compares them on every run. The static model of x86_64 writes the
+   address of a datum as 32 absolute bits. lld-link puts a 64-bit image at
+   0x140000000 and keeps the low half of such an address without a word,
+   so every windows-x86_64 program that wrote a string ended with
+   0xC0000005 in the C library. One row per target, in the order of enum
+   target. */
+static const char *const models[TARGET_COUNT] = {
+    [TARGET_LINUX_X86_64] = "pic",   [TARGET_LINUX_ARM64] = "pic",
+    [TARGET_MACOS_X86_64] = "pic",   [TARGET_MACOS_ARM64] = "pic",
+    [TARGET_WINDOWS_X86_64] = "pic", [TARGET_WINDOWS_ARM64] = "pic",
+};
+
 const char *llvm_relocation_model(enum target t)
 {
-    return target_info(t)->os == OS_WINDOWS ? "static" : "pic";
+    return models[t];
 }
 
 const char *llvm_target_cpu(enum cpu_level level)

@@ -16,8 +16,8 @@ void llvm_triple(struct text *out, enum target t);
 /* The `target datalayout` string the pinned clang writes for the triple. */
 const char *llvm_data_layout(enum target t);
 
-/* The -relocation-model= value of llc: pic on Linux and macOS, static on
-   Windows. */
+/* The -relocation-model= value of llc, the one the pinned clang uses for
+   the triple: pic on every target. */
 const char *llvm_relocation_model(enum target t);
 
 /* The "target-cpu" and "target-features" function attributes of a level.

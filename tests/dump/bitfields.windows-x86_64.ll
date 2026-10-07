@@ -2,7 +2,7 @@ source_filename = "bitfields"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc"
 
-define internal noundef i64 @_A9bitfields_main() #0 !dbg !12 {
+define internal noundef i64 @_A9bitfields_main() #0 !dbg !13 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca i32, align 4
@@ -23,8 +23,8 @@ b0:
   %t16 = alloca i64, align 8
   %t17 = alloca i64, align 8
   %s0 = alloca [8 x i8], align 4
-  store ptr %s0, ptr %t0, align 8, !dbg !13
-  call void @llvm.lifetime.start.p0(ptr %s0), !dbg !13
+  store ptr %s0, ptr %t0, align 8, !dbg !14
+  call void @llvm.lifetime.start.p0(ptr %s0), !dbg !14
   %v0 = load ptr, ptr %t0, align 8
   %v1 = load i8, ptr %v0, align 1
   %v2 = trunc i32 1 to i8
@@ -155,17 +155,18 @@ declare void @llvm.lifetime.start.p0(ptr)
 attributes #0 = { nounwind uwtable(sync) "frame-pointer"="none" "stack-probe-size"="4096" "target-cpu"="x86-64-v3" "target-features"="+avx,+avx2,+bmi,+bmi2,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fxsr,+lzcnt,+mmx,+movbe,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave" }
 attributes #1 = { nounwind }
 
-!llvm.module.flags = !{!0, !1, !5, !6}
-!llvm.ident = !{!2}
+!llvm.module.flags = !{!0, !1, !2, !6, !7}
+!llvm.ident = !{!3}
 !0 = !{i32 1, !"wchar_size", i32 2}
-!1 = !{i32 7, !"uwtable", i32 2}
-!2 = !{!"antic VERSION"}
-!llvm.dbg.cu = !{!7}
-!5 = !{i32 2, !"Debug Info Version", i32 3}
-!6 = !{i32 2, !"CodeView", i32 1}
-!7 = distinct !DICompileUnit(language: DW_LANG_C11, file: !8, producer: "antic VERSION", isOptimized: true, runtimeVersion: 0, emissionKind: FullDebug)
-!8 = !DIFile(filename: "bitfields.anti", directory: "")
-!10 = !DISubroutineType(types: !11)
-!11 = !{null}
-!12 = distinct !DISubprogram(name: "bitfields.main", scope: !8, file: !8, line: 0, type: !10, scopeLine: 0, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition | DISPFlagOptimized, unit: !7)
-!13 = !DILocation(line: 0, column: 0, scope: !12)
+!1 = !{i32 8, !"PIC Level", i32 2}
+!2 = !{i32 7, !"uwtable", i32 2}
+!3 = !{!"antic VERSION"}
+!llvm.dbg.cu = !{!8}
+!6 = !{i32 2, !"Debug Info Version", i32 3}
+!7 = !{i32 2, !"CodeView", i32 1}
+!8 = distinct !DICompileUnit(language: DW_LANG_C11, file: !9, producer: "antic VERSION", isOptimized: true, runtimeVersion: 0, emissionKind: FullDebug)
+!9 = !DIFile(filename: "bitfields.anti", directory: "")
+!11 = !DISubroutineType(types: !12)
+!12 = !{null}
+!13 = distinct !DISubprogram(name: "bitfields.main", scope: !9, file: !9, line: 0, type: !11, scopeLine: 0, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition | DISPFlagOptimized, unit: !8)
+!14 = !DILocation(line: 0, column: 0, scope: !13)

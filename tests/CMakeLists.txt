@@ -2404,6 +2404,21 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
 
+# A windows-x86_64 program holds no 32-bit absolute address, and runs on a
+# Windows host.
+add_test(NAME windows_addresses
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/link-identity/hello.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/windows-addresses"
+        "-DROOT=${CMAKE_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_windows_addresses.cmake")
+set_tests_properties(windows_addresses PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
 # --lto takes one of its two modes, and links a program in release mode
 # alone. A runtime archive without the runtime as bitcode of the mode is
 # refused before anything compiles.

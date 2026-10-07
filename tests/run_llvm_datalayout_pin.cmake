@@ -1,5 +1,5 @@
-# The data layout string of every target and the two CPU attributes of every
-# level are the ones the pinned clang writes. src/antic/llvm_target.c holds
+# The data layout string and the relocation model of every target and the
+# two CPU attributes of every level are the ones the pinned clang writes. src/antic/llvm_target.c holds
 # them, `antic --print-llvm-targets` prints them, and this test runs the
 # pinned clang once per target and per level of the target's architecture
 # and compares. A mismatch after a toolchain upgrade fails here instead of
@@ -74,7 +74,24 @@ foreach(target_line IN LISTS targets)
     list(GET fields 1 target)
     list(GET fields 2 target_arch)
     list(GET fields 3 triple)
+    list(GET fields 4 model)
     list(GET fields 5 layout)
+    # The relocation model clang passes to its code generator.
+    execute_process(
+        COMMAND "${CLANG}" -target "${triple}" "-###" -c -x c "${empty}"
+                -o "${WORK}/empty.o"
+        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+        ENCODING NONE)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "clang -### failed for ${target}\n${err}")
+    endif()
+    string(REGEX MATCH "\"-mrelocation-model\" \"([^\"]*)\"" found
+           "${out}${err}")
+    set(clang_model "${CMAKE_MATCH_1}")
+    if(NOT clang_model STREQUAL model)
+        message(FATAL_ERROR "the relocation model of ${target} differs from "
+                            "clang\nantic: ${model}\nclang: ${clang_model}")
+    endif()
     foreach(level_line IN LISTS levels)
         string(REPLACE " " ";" fields "${level_line}")
         list(GET fields 1 level)

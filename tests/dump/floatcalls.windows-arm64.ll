@@ -2,7 +2,7 @@ source_filename = "floatcalls"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-p:64:64-i32:32-i64:64-i128:128-n32:64-S128-Fn32"
 target triple = "aarch64-pc-windows-msvc"
 
-define internal noundef double @_A10floatcalls_calls(ptr noundef nonnull dereferenceable(1) %p0, double noundef %p1) #0 !dbg !12 {
+define internal noundef double @_A10floatcalls_calls(ptr noundef nonnull dereferenceable(1) %p0, double noundef %p1) #0 !dbg !13 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca double, align 8
@@ -13,12 +13,12 @@ b0:
   %t6 = alloca double, align 8
   store ptr %p0, ptr %t0, align 8
   store double %p1, ptr %t1, align 8
-  %v0 = load ptr, ptr %t0, align 8, !dbg !13
+  %v0 = load ptr, ptr %t0, align 8, !dbg !14
   %v1 = load double, ptr %t1, align 8
-  %v2 = call i32 (ptr, ...) @printf(ptr %v0, double %v1, i64 3), !dbg !13
+  %v2 = call i32 (ptr, ...) @printf(ptr %v0, double %v1, i64 3), !dbg !14
   store i32 %v2, ptr %t2, align 4
   %v3 = load double, ptr %t1, align 8
-  %v4 = call double (i64, double, i64, float) @mix(i64 1, double %v3, i64 2, float 0x3FE0000000000000), !dbg !13
+  %v4 = call double (i64, double, i64, float) @mix(i64 1, double %v3, i64 2, float 0x3FE0000000000000), !dbg !14
   store double %v4, ptr %t3, align 8
   %v5 = load double, ptr %t1, align 8
   %v6 = load double, ptr %t1, align 8
@@ -28,7 +28,7 @@ b0:
   %v10 = load double, ptr %t1, align 8
   %v11 = load double, ptr %t1, align 8
   %v12 = load double, ptr %t1, align 8
-  %v13 = call float (double, double, double, double, double, double, double, double, float, float) @nine(double %v5, double %v6, double %v7, double %v8, double %v9, double %v10, double %v11, double %v12, float 0x3FF0000000000000, float 0x4000000000000000), !dbg !13
+  %v13 = call float (double, double, double, double, double, double, double, double, float, float) @nine(double %v5, double %v6, double %v7, double %v8, double %v9, double %v10, double %v11, double %v12, float 0x3FF0000000000000, float 0x4000000000000000), !dbg !14
   store float %v13, ptr %t4, align 4
   %v14 = load float, ptr %t4, align 4
   %v15 = fpext float %v14 to double
@@ -41,7 +41,7 @@ b0:
   ret double %v19
 }
 
-define internal noundef float @_A10floatcalls_last(double noundef %p0, double noundef %p1, double noundef %p2, double noundef %p3, double noundef %p4, double noundef %p5, double noundef %p6, double noundef %p7, float noundef %p8, float noundef %p9) #0 !dbg !14 {
+define internal noundef float @_A10floatcalls_last(double noundef %p0, double noundef %p1, double noundef %p2, double noundef %p3, double noundef %p4, double noundef %p5, double noundef %p6, double noundef %p7, float noundef %p8, float noundef %p9) #0 !dbg !15 {
 b0:
   %t0 = alloca double, align 8
   %t1 = alloca double, align 8
@@ -63,7 +63,7 @@ b0:
   store double %p7, ptr %t7, align 8
   store float %p8, ptr %t8, align 4
   store float %p9, ptr %t9, align 4
-  %v0 = load float, ptr %t9, align 4, !dbg !15
+  %v0 = load float, ptr %t9, align 4, !dbg !16
   ret float %v0
 }
 
@@ -77,19 +77,20 @@ declare noundef float @nine(double noundef, double noundef, double noundef, doub
 attributes #0 = { nounwind uwtable(sync) "frame-pointer"="none" "stack-probe-size"="4096" "target-cpu"="generic" "target-features"="+crc,+dotprod,+fp-armv8,+fullfp16,+lse,+neon,+ras,+rdm,+v8.1a,+v8.2a,+v8a,-fmv" }
 attributes #1 = { nounwind }
 
-!llvm.module.flags = !{!0, !1, !5, !6}
-!llvm.ident = !{!2}
+!llvm.module.flags = !{!0, !1, !2, !6, !7}
+!llvm.ident = !{!3}
 !0 = !{i32 1, !"wchar_size", i32 2}
-!1 = !{i32 7, !"uwtable", i32 2}
-!2 = !{!"antic VERSION"}
-!llvm.dbg.cu = !{!7}
-!5 = !{i32 2, !"Debug Info Version", i32 3}
-!6 = !{i32 2, !"CodeView", i32 1}
-!7 = distinct !DICompileUnit(language: DW_LANG_C11, file: !8, producer: "antic VERSION", isOptimized: true, runtimeVersion: 0, emissionKind: FullDebug)
-!8 = !DIFile(filename: "floatcalls.anti", directory: "")
-!10 = !DISubroutineType(types: !11)
-!11 = !{null}
-!12 = distinct !DISubprogram(name: "floatcalls.calls", scope: !8, file: !8, line: 0, type: !10, scopeLine: 0, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition | DISPFlagOptimized, unit: !7)
-!13 = !DILocation(line: 0, column: 0, scope: !12)
-!14 = distinct !DISubprogram(name: "floatcalls.last", scope: !8, file: !8, line: 0, type: !10, scopeLine: 0, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition | DISPFlagOptimized, unit: !7)
-!15 = !DILocation(line: 0, column: 0, scope: !14)
+!1 = !{i32 8, !"PIC Level", i32 2}
+!2 = !{i32 7, !"uwtable", i32 2}
+!3 = !{!"antic VERSION"}
+!llvm.dbg.cu = !{!8}
+!6 = !{i32 2, !"Debug Info Version", i32 3}
+!7 = !{i32 2, !"CodeView", i32 1}
+!8 = distinct !DICompileUnit(language: DW_LANG_C11, file: !9, producer: "antic VERSION", isOptimized: true, runtimeVersion: 0, emissionKind: FullDebug)
+!9 = !DIFile(filename: "floatcalls.anti", directory: "")
+!11 = !DISubroutineType(types: !12)
+!12 = !{null}
+!13 = distinct !DISubprogram(name: "floatcalls.calls", scope: !9, file: !9, line: 0, type: !11, scopeLine: 0, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition | DISPFlagOptimized, unit: !8)
+!14 = !DILocation(line: 0, column: 0, scope: !13)
+!15 = distinct !DISubprogram(name: "floatcalls.last", scope: !9, file: !9, line: 0, type: !11, scopeLine: 0, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition | DISPFlagOptimized, unit: !8)
+!16 = !DILocation(line: 0, column: 0, scope: !15)
