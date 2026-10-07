@@ -107,14 +107,15 @@ if(NOT status EQUAL 0)
 endif()
 
 # The program built with the profile, its counts in the bitcode, and its
-# output.
+# output. --keep-llvm writes the bitcode beside the output under the name
+# of the output, so Windows names it used.exe.bc.
 set(used "${WORK}/used${exe}")
 built("${used}" --profile-use "${profile}" --keep-llvm)
 execute_process(COMMAND "${LLVM_BIN}/opt${exe}" -S -passes=verify
-                        -o "${WORK}/used.opt.ll" "${WORK}/used.bc"
+                        -o "${WORK}/used.opt.ll" "${used}.bc"
                 RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
-    message(FATAL_ERROR "opt cannot read ${WORK}/used.bc\n${err}")
+    message(FATAL_ERROR "opt cannot read ${used}.bc\n${err}")
 endif()
 file(READ "${WORK}/used.opt.ll" optimized)
 if(NOT optimized MATCHES
