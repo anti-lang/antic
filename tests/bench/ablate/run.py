@@ -38,7 +38,9 @@ BENCH = os.path.dirname(HERE)
 ROOT = os.path.dirname(os.path.dirname(BENCH))
 WINDOWS = sys.platform == "win32"
 EXE = ".exe" if WINDOWS else ""
-OBJECT = ".obj" if WINDOWS else ".o"
+# antic writes the object beside the program, under the name of the
+# program and the suffix of an object: prog.exe.obj on Windows.
+OBJECT = EXE + (".obj" if WINDOWS else ".o")
 
 # The builds of run A to run D of the work order, after the baseline, and
 # the C programs each run times beside the twin.
@@ -87,7 +89,7 @@ class Build:
             command += ["--opt", self.wrappers[0]]
             env["ANTI_ABLATE_RUNTIME"] = args.runtime
             env["ANTI_ABLATE_NEXT"] = os.pathsep.join(self.wrappers[1:])
-        command += ["--runtime", args.runtime, "-o", output, source]
+        command += ["--runtime", args.runtime, "-o", output + EXE, source]
         start = time.perf_counter_ns()
         run = subprocess.run(command, env=env, capture_output=True)
         took = time.perf_counter_ns() - start
