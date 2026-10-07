@@ -216,5 +216,11 @@ struct text;
    a message when the file cannot be read. */
 bool driver_library_header(const struct options *options, struct text *out);
 
+/* The name of the file that a program of --memory-checks for target t
+   loads from its own directory, and that the link writes beside it: the
+   DLL of AddressSanitizer on Windows. NULL on every other target, whose
+   program finds its runtime by itself. */
+const char *driver_memcheck_companion(enum target t);
+
 
 #endif

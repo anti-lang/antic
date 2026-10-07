@@ -1742,6 +1742,17 @@ add_test(NAME anti_memory_checks
 set_tests_properties(anti_memory_checks PROPERTIES TIMEOUT 300
     SKIP_REGULAR_EXPRESSION "SKIP: ")
 
+# A Windows program of `anti build --memory-checks` has the DLL of
+# AddressSanitizer beside it in dist/.
+add_test(NAME anti_memory_dll
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-memory-dll"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_memory_dll.cmake")
+set_tests_properties(anti_memory_dll PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+
 # `anti build`, `anti run` and `anti new` over a two-module project: the
 # dev cache, release mode, the -g rule, --target, --cpu and the lock file.
 if(ANTIC_HOST_CPU STREQUAL "arm64")

@@ -787,6 +787,19 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
         ok = copy_into(text_cstr(&b->name), text_cstr(&b->dist_dir),
                        text_cstr(&deliverable));
     }
+    /* DESIGN: a Windows program of --memory-checks loads the DLL of
+       AddressSanitizer from its own directory. The link wrote it beside
+       the program in the build directory, and dist/ takes it as well, so
+       `anti run` starts a program that finds it. */
+    if (ok && b->r->memory_checks && b->r->lib == BUILD_PROGRAM &&
+        driver_memcheck_companion(t) != NULL) {
+        struct text companion = {0};
+        text_appendf(&companion, "%s/%s", text_cstr(&b->build_dir),
+                     driver_memcheck_companion(t));
+        ok = copy_into(text_cstr(&companion), text_cstr(&b->dist_dir),
+                       driver_memcheck_companion(t));
+        text_free(&companion);
+    }
     if (ok && b->r->release && b->r->lib == BUILD_PROGRAM) {
         ok = build_symbols(b, t, cpu, main_at, &libraries,
                            text_cstr(&deliverable));

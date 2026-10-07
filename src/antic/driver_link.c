@@ -420,6 +420,11 @@ bool driver_native_inputs(const struct options *o, const struct extras *extras,
     return true;
 }
 
+const char *driver_memcheck_companion(enum target t)
+{
+    return target_info(t)->os == OS_WINDOWS ? MEMCHECK_WINDOWS_DLL : NULL;
+}
+
 /* DESIGN: a Windows program of --memory-checks loads the DLL of
    AddressSanitizer. The link copies it from the runtime archive to the
    directory of the program, where the loader looks first. */
