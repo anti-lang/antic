@@ -136,6 +136,12 @@ when started by hand.
   `C:/Program Files`.
 - Windows holds a program for a moment after it ran, and a write fails with `EACCES`.
   `platform_open` of the tools retries a write for up to two seconds.
+- Smart App Control, in evaluation mode on anti-windows, maps a new program for 0.2 to
+  1.6 s after it ran, through `AppIDSvc`, `CryptSvc` and the `applockerfltr` driver. A
+  write in place then fails with `ERROR_USER_MAPPED_FILE`, which the C runtime gives as
+  `EINVAL`, and `MoveFileExW` cannot replace the file. `files_copy_program` writes beside
+  it and replaces it with `platform_replace_program`. `RmGetList` of the Restart Manager
+  names the holders of a file.
 - clang ignores `--ld-path` for an MSVC target. `-fuse-ld=lld` with `-B<dir>` finds
   `lld-link` in that directory.
 - The `arm_neon.h` of the MSVC CRT makes `float32x4_t` a union, which clang passes in

@@ -25,6 +25,8 @@
 #include <stdint.h>
 #include <windows.h>
 
+#include "text.h"
+
 static bool not_found(DWORD error)
 {
     return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
@@ -125,6 +127,50 @@ bool platform_rename(const char *from, const char *to)
     return renamed;
 }
 
+/* Give the file from the name to with the semantics of a POSIX rename.
+   Returns ERROR_SUCCESS, or the error of Windows. */
+static DWORD rename_posix(const wchar_t *from, const wchar_t *to)
+{
+    DWORD room = GetFullPathNameW(to, 0, NULL, NULL);
+    DWORD length;
+    DWORD size;
+    FILE_RENAME_INFO *info;
+    HANDLE file;
+    DWORD error = ERROR_SUCCESS;
+
+    if (room == 0) {
+        return GetLastError();
+    }
+    /* FILE_RENAME_INFO holds the first character of the name. */
+    size = (DWORD)sizeof *info + room * (DWORD)sizeof(wchar_t);
+    info = calloc(1, size);
+    if (info == NULL) {
+        return ERROR_NOT_ENOUGH_MEMORY;
+    }
+    length = GetFullPathNameW(to, room, info->FileName, NULL);
+    if (length == 0 || length >= room) {
+        free(info);
+        return length == 0 ? GetLastError() : ERROR_INVALID_NAME;
+    }
+    info->Flags = FILE_RENAME_FLAG_REPLACE_IF_EXISTS |
+                  FILE_RENAME_FLAG_POSIX_SEMANTICS;
+    info->FileNameLength = length * (DWORD)sizeof(wchar_t);
+    /* A link is renamed itself, as MoveFileExW does. */
+    file = CreateFileW(from, DELETE | SYNCHRONIZE,
+                       FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                       NULL, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, NULL);
+    if (file == INVALID_HANDLE_VALUE) {
+        error = GetLastError();
+    } else {
+        if (!SetFileInformationByHandle(file, FileRenameInfoEx, info, size)) {
+            error = GetLastError();
+        }
+        CloseHandle(file);
+    }
+    free(info);
+    return error;
+}
+
 bool platform_replace(const char *from, const char *to)
 {
     wchar_t *wide_from = platform_widen(from);
@@ -136,6 +182,78 @@ bool platform_replace(const char *from, const char *to)
 
     free(wide_from);
     free(wide_to);
+    return replaced;
+}
+
+bool platform_program_replaced(void)
+{
+    return true;
+}
+
+/* Move the file at to aside, to the name aside, give from the name to and
+   delete the old file. The old file takes its name back when from cannot
+   have it. */
+static bool replace_aside(const wchar_t *from, const wchar_t *to,
+                          const wchar_t *aside)
+{
+    if (rename_posix(to, aside) != ERROR_SUCCESS) {
+        return false;
+    }
+    if (rename_posix(from, to) != ERROR_SUCCESS) {
+        rename_posix(aside, to);
+        return false;
+    }
+    /* The delete takes the name at once while a holder keeps the file
+       mapped as data. One mapped as an image refuses it, and the next
+       replace of the same program removes the file. */
+    DeleteFileW(aside);
+    return true;
+}
+
+/* DESIGN: Smart App Control holds a new program for up to 1.6 s after it
+   ran, which the DESIGN of files_copy_program measures. It maps the file
+   as data at times and as an image at others. MoveFileExW refused to
+   replace a file mapped as data with ERROR_ACCESS_DENIED. A rename with
+   FILE_RENAME_FLAG_POSIX_SEMANTICS replaces a file mapped as data at
+   once: the name goes to the new file, and the holder keeps the old one
+   until it lets go. A file mapped as an image refuses that rename as
+   well, and still lets itself be renamed, so the replace moves it aside
+   to the name with PLATFORM_OLD_SUFFIX and gives from its name. The old
+   file is deleted at once when Windows allows it and by the next replace
+   otherwise, which first removes what an earlier one left. That name in
+   dist/ belongs to anti, so the remove takes no file of the user. NTFS
+   takes the flag from Windows 10 1709. A file system without it, or an
+   older Windows, refuses the call with ERROR_INVALID_PARAMETER,
+   ERROR_NOT_SUPPORTED or ERROR_INVALID_FUNCTION, and the replace is then
+   platform_replace. A holder that shares no deletion still makes the
+   replace fail, and to stays as it was. */
+bool platform_replace_program(const char *from, const char *to)
+{
+    struct text name = {0};
+    wchar_t *wide_from = platform_widen(from);
+    wchar_t *wide_to = platform_widen(to);
+    wchar_t *aside;
+    bool replaced = false;
+    DWORD error;
+
+    text_appendf(&name, "%s%s", to, PLATFORM_OLD_SUFFIX);
+    aside = platform_widen(text_cstr(&name));
+    text_free(&name);
+    if (wide_from != NULL && wide_to != NULL && aside != NULL) {
+        DeleteFileW(aside);
+        error = rename_posix(wide_from, wide_to);
+        if (error == ERROR_INVALID_PARAMETER || error == ERROR_NOT_SUPPORTED ||
+            error == ERROR_INVALID_FUNCTION) {
+            replaced = platform_replace(from, to);
+        } else if (error == ERROR_ACCESS_DENIED) {
+            replaced = replace_aside(wide_from, wide_to, aside);
+        } else {
+            replaced = error == ERROR_SUCCESS;
+        }
+    }
+    free(wide_from);
+    free(wide_to);
+    free(aside);
     return replaced;
 }
 
@@ -238,6 +356,16 @@ bool platform_rename(const char *from, const char *to)
 }
 
 bool platform_replace(const char *from, const char *to)
+{
+    return rename(from, to) == 0;
+}
+
+bool platform_program_replaced(void)
+{
+    return false;
+}
+
+bool platform_replace_program(const char *from, const char *to)
 {
     return rename(from, to) == 0;
 }

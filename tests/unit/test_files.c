@@ -270,6 +270,144 @@ static void regular_files(void)
     text_free(&back);
 }
 
+#if defined(_WIN32)
+/* Map the file at wide as a reader that closed its handle and kept the
+   section, which Windows' Application Identity service does with a
+   program that just ran, as data or with image set as an image. Returns
+   the view, and the section in section. */
+static const void *map_file(const wchar_t *wide, bool image, HANDLE *section)
+{
+    DWORD protect = image ? PAGE_READONLY | SEC_IMAGE : PAGE_READONLY;
+    HANDLE file = CreateFileW(wide, GENERIC_READ,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE |
+                                  FILE_SHARE_DELETE,
+                              NULL, OPEN_EXISTING, 0, NULL);
+    const void *view = NULL;
+
+    *section = NULL;
+    if (file == INVALID_HANDLE_VALUE) {
+        return NULL;
+    }
+    *section = CreateFileMappingW(file, NULL, protect, 0, 0, NULL);
+    if (*section != NULL) {
+        view = MapViewOfFile(*section, FILE_MAP_READ, 0, 0, 0);
+    }
+    CloseHandle(file);
+    return view;
+}
+
+/* A program in dist/ that just ran is mapped by the Application Identity
+   service of Windows for up to 1.6 s. Windows refuses to truncate such a
+   file with ERROR_USER_MAPPED_FILE, and `anti build` could not copy the
+   program again. The copy replaces the mapped file at once, and the
+   reader keeps the old bytes until it lets go. */
+static void copy_over_mapped(void)
+{
+    struct text old = {0};
+    struct text fresh = {0};
+    struct text back = {0};
+    HANDLE section;
+    const void *view;
+
+    files_remove_tree(TREE);
+    CHECK(platform_make_dir(TREE));
+    text_append(&old, "old program");
+    text_append(&fresh, "new program");
+    CHECK(files_write(TREE "/app.exe", &old));
+    CHECK(files_write(TREE "/build.exe", &fresh));
+    view = map_file(L"" TREE L"\\app.exe", false, &section);
+    CHECK(view != NULL);
+    CHECK(files_copy_program(TREE "/build.exe", TREE "/app.exe"));
+    CHECK(files_read(TREE "/app.exe", &back));
+    CHECK_STR(text_cstr(&back), "new program");
+    CHECK(view != NULL && memcmp(view, "old program", 11) == 0);
+    CHECK(!files_exists(TREE "/app.exe" FILES_NEW_SUFFIX));
+    if (view != NULL) {
+        UnmapViewOfFile(view);
+    }
+    if (section != NULL) {
+        CloseHandle(section);
+    }
+    CHECK(files_remove_tree(TREE));
+    text_free(&old);
+    text_free(&fresh);
+    text_free(&back);
+}
+
+/* The Application Identity service also holds a program as an image for
+   a moment, and Windows then refuses to rename another file over it with
+   ERROR_ACCESS_DENIED. It still lets the program be renamed, so the copy
+   moves it aside first. The old program stays under its name with
+   PLATFORM_OLD_SUFFIX while it is mapped, and the next copy removes it.
+   The program here is the unit test itself, since an image section
+   needs a real executable. */
+static void copy_over_image(void)
+{
+    wchar_t self[MAX_PATH];
+    struct text fresh = {0};
+    struct text back = {0};
+    HANDLE section;
+    const void *view;
+    DWORD length = GetModuleFileNameW(NULL, self, MAX_PATH);
+
+    CHECK(length > 0 && length < MAX_PATH);
+    files_remove_tree(TREE);
+    CHECK(platform_make_dir(TREE));
+    CHECK(CopyFileW(self, L"" TREE L"\\app.exe", FALSE));
+    text_append(&fresh, "new program");
+    CHECK(files_write(TREE "/build.exe", &fresh));
+    view = map_file(L"" TREE L"\\app.exe", true, &section);
+    CHECK(view != NULL);
+    CHECK(files_copy_program(TREE "/build.exe", TREE "/app.exe"));
+    CHECK(files_read(TREE "/app.exe", &back));
+    CHECK_STR(text_cstr(&back), "new program");
+    CHECK(!files_exists(TREE "/app.exe" FILES_NEW_SUFFIX));
+    if (view != NULL) {
+        UnmapViewOfFile(view);
+    }
+    if (section != NULL) {
+        CloseHandle(section);
+    }
+    CHECK(files_copy_program(TREE "/build.exe", TREE "/app.exe"));
+    CHECK(!files_exists(TREE "/app.exe" PLATFORM_OLD_SUFFIX));
+    CHECK(files_remove_tree(TREE));
+    text_free(&fresh);
+    text_free(&back);
+}
+
+/* A program that a reader holds without sharing it for deletion cannot
+   be replaced. The copy then fails, the old program stays whole and no
+   file of the copy is left beside it. */
+static void copy_over_held(void)
+{
+    struct text old = {0};
+    struct text fresh = {0};
+    struct text back = {0};
+    HANDLE held;
+
+    files_remove_tree(TREE);
+    CHECK(platform_make_dir(TREE));
+    text_append(&old, "old program");
+    text_append(&fresh, "new program");
+    CHECK(files_write(TREE "/app.exe", &old));
+    CHECK(files_write(TREE "/build.exe", &fresh));
+    held = CreateFileW(L"" TREE L"\\app.exe", GENERIC_READ, FILE_SHARE_READ,
+                       NULL, OPEN_EXISTING, 0, NULL);
+    CHECK(held != INVALID_HANDLE_VALUE);
+    CHECK(!files_copy_program(TREE "/build.exe", TREE "/app.exe"));
+    if (held != INVALID_HANDLE_VALUE) {
+        CloseHandle(held);
+    }
+    CHECK(files_read(TREE "/app.exe", &back));
+    CHECK_STR(text_cstr(&back), "old program");
+    CHECK(!files_exists(TREE "/app.exe" FILES_NEW_SUFFIX));
+    CHECK(files_remove_tree(TREE));
+    text_free(&old);
+    text_free(&fresh);
+    text_free(&back);
+}
+#endif
+
 /* files_grow keeps the elements, zeroes the new room and doubles it. */
 static void grow_array(void)
 {
@@ -320,7 +458,11 @@ void test_files(void)
     utf8_names();
     anti_layer();
     regular_files();
-#if !defined(_WIN32)
+#if defined(_WIN32)
+    copy_over_mapped();
+    copy_over_image();
+    copy_over_held();
+#else
     walk_unreadable();
     walk_links();
 #endif

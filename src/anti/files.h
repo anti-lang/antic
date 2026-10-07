@@ -39,7 +39,9 @@ bool files_copy(const char *from, const char *to);
 /* Copy the file and give the copy the execute bits of the original. A
    program that `anti build` copies into `dist/` is run from there, and
    files_copy writes a plain file. Windows decides by the suffix, so the
-   call is a copy there. */
+   call is a copy there. On Windows the copy replaces to whole or leaves
+   it as it was, and may leave the old program for a moment under its
+   name with PLATFORM_OLD_SUFFIX. */
 bool files_copy_program(const char *from, const char *to);
 
 /* Append the bytes of the file at path to out. Returns false when the

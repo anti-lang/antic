@@ -1804,6 +1804,22 @@ add_test(NAME anti_build_inputs
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-inputs"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build_inputs.cmake")
 
+# A program run from dist/ and built again at once, fifteen times. Windows
+# maps a program that just ran for a moment, and the copy into dist/
+# failed there. A turn takes about two seconds on the Windows VM.
+if(ANTIC_HOST_TARGET MATCHES "^windows-")
+    add_test(NAME anti_build_rerun
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-rerun"
+            "-DTURNS=15"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build_rerun.cmake")
+endif()
+
 # The rules of the canonical form on one file, the format stability of
 # docs/tooling.md and `--check`, which writes nothing.
 add_test(NAME anti_fmt

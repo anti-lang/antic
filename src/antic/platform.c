@@ -123,7 +123,9 @@ static bool append_narrow(struct text *out, const wchar_t *wide)
    dist/ at every build, right after a user ran it, and failed three builds
    in ten on the Windows VM. A write waits for the file up to two seconds,
    in steps of 50 ms, as the file copies of CMake retry. A read never
-   waits, and a file that stays locked still fails. */
+   waits, and a file that stays locked still fails. A program that Smart
+   App Control holds mapped fails with EINVAL instead, which this wait
+   does not cover. files_copy_program of anti replaces such a file. */
 #define OPEN_WRITE_TRIES 40
 #define OPEN_WRITE_STEP_MS 50
 

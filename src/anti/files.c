@@ -250,9 +250,34 @@ bool files_replace(const char *path, const struct text *bytes)
     return ok;
 }
 
+/* DESIGN: Smart App Control of Windows 11 checks a new program when it
+   first runs. Its AppLocker filter and the Application Identity service
+   then keep a section of the file mapped for 0.2 to 1.6 s after the
+   program ended, measured on the Windows VM. Windows refuses to truncate
+   a mapped file with ERROR_USER_MAPPED_FILE, which the C runtime reports
+   as EINVAL, so a copy in place failed in `anti build` right after a run,
+   and the wait of platform_open, which waits on EACCES alone, never ran.
+   Where platform_program_replaced says so, the copy goes to a file beside
+   to, and platform_replace_program puts it in place under the mapping
+   without a wait. A copy that fails leaves the old program whole and
+   removes its own file. The Mac and Linux write in place. */
 bool files_copy_program(const char *from, const char *to)
 {
-    return files_copy(from, to) && platform_copy_permissions(from, to);
+    struct text temporary = {0};
+    bool ok;
+
+    if (!platform_program_replaced()) {
+        return files_copy(from, to) && platform_copy_permissions(from, to);
+    }
+    text_appendf(&temporary, "%s%s", to, FILES_NEW_SUFFIX);
+    ok = files_copy(from, text_cstr(&temporary)) &&
+         platform_copy_permissions(from, text_cstr(&temporary)) &&
+         platform_replace_program(text_cstr(&temporary), to);
+    if (!ok) {
+        platform_remove(text_cstr(&temporary));
+    }
+    text_free(&temporary);
+    return ok;
 }
 
 bool files_ends_with(const char *s, const char *suffix)
