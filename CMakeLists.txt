@@ -446,6 +446,18 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
         if(target MATCHES "^linux-arm64")
             set(no_outline -mno-outline-atomics)
         endif()
+        # [provisional] DESIGN: a runtime of Linux keeps the frame record of
+        # every function that calls another, as every Anti function does on
+        # Linux, since anti_rt_trace_walk follows the records through the
+        # frames of the runtime. clang omits the frame pointer at -O2 on
+        # x86_64 Linux, and on a GitHub runner of x86_64 the trace stopped
+        # at the C main of the runtime. ARM64 keeps the records already, and
+        # macOS keeps them on both processors. The test runtime_frames reads
+        # main of every runtime of Linux and macOS.
+        if(target MATCHES "^linux-")
+            list(APPEND no_outline -fno-omit-frame-pointer
+                 -momit-leaf-frame-pointer)
+        endif()
         if(target STREQUAL "linux-x86_64" OR target STREQUAL "linux-arm64")
             string(REPLACE "linux-arm64" "aarch64" arch "${target}")
             string(REPLACE "linux-x86_64" "x86_64" arch "${arch}")

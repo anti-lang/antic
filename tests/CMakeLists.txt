@@ -751,6 +751,16 @@ foreach(case "linux-arm64,armv8.0,${cpu_exclusive},${cpu_lse}"
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
 
+# The runtime keeps the frame record of every function that calls another
+# on Linux and macOS, so a trace walks through its frames.
+add_test(NAME runtime_frames
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/runtime-frames.txt"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_runtime_frames.cmake")
+set_tests_properties(runtime_frames PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+
 # The runtime of linux-arm64 is the same on every host: neither its
 # objects nor its bitcode take the outline atomics that the GCC of a Linux
 # host brought.
