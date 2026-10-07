@@ -1,0 +1,28 @@
+//! The program that `anti_build_running` keeps running while `anti build`
+//! replaces it in dist/. It writes the file `started` in its working directory,
+//! waits up to a minute for the file `stop` and returns 7.
+
+import anti.fs;
+import anti.time;
+
+/// Whether the file at `path` exists.
+fn present(path: str) -> bool
+{
+	let f = fs.open(path) catch e {
+		return false;
+	};
+	fs.close(f) catch fatal;
+	return true;
+}
+
+fn main() -> int
+{
+	let started = fs.open("started", fs.Mode.Write) catch fatal;
+	fs.close(started) catch fatal;
+	let turns = 0;
+	while !present("stop") && turns < 600 do {
+		time.sleep(time.milliseconds(100));
+		turns += 1;
+	}
+	return 7;
+}

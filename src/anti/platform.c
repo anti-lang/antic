@@ -185,11 +185,6 @@ bool platform_replace(const char *from, const char *to)
     return replaced;
 }
 
-bool platform_program_replaced(void)
-{
-    return true;
-}
-
 /* Move the file at to aside, to the name aside, give from the name to and
    delete the old file. The old file takes its name back when from cannot
    have it. */
@@ -358,11 +353,6 @@ bool platform_rename(const char *from, const char *to)
 bool platform_replace(const char *from, const char *to)
 {
     return rename(from, to) == 0;
-}
-
-bool platform_program_replaced(void)
-{
-    return false;
 }
 
 bool platform_replace_program(const char *from, const char *to)

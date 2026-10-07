@@ -56,15 +56,11 @@ bool platform_rename(const char *from, const char *to);
    host. Returns false when it cannot. */
 bool platform_replace(const char *from, const char *to);
 
-/* True where files_copy_program writes a program beside its place and
-   then replaces it with platform_replace_program, false where it writes
-   the program in place. The DESIGN of files_copy_program gives the
-   reason. */
-bool platform_program_replaced(void);
-
-/* platform_replace for a program that anti writes into dist/. On Windows
-   it also replaces a program that another process holds mapped, and the
-   holder keeps the old file until it lets go. A program mapped as an
+/* platform_replace for a program that anti writes into dist/, which a
+   process may be running. A process that runs the old program keeps it
+   until it ends. On Windows it also replaces a program that another
+   process holds mapped, and the holder keeps the old file until it lets
+   go. A program mapped as an
    image is first moved aside, to its name with PLATFORM_OLD_SUFFIX, and
    then deleted. One that cannot be deleted yet stays there until the
    next call for the same name removes it. Returns false when it cannot,

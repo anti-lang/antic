@@ -257,18 +257,20 @@ bool files_replace(const char *path, const struct text *bytes)
    a mapped file with ERROR_USER_MAPPED_FILE, which the C runtime reports
    as EINVAL, so a copy in place failed in `anti build` right after a run,
    and the wait of platform_open, which waits on EACCES alone, never ran.
-   Where platform_program_replaced says so, the copy goes to a file beside
-   to, and platform_replace_program puts it in place under the mapping
-   without a wait. A copy that fails leaves the old program whole and
-   removes its own file. The Mac and Linux write in place. */
+   The copy goes to a file beside to, and platform_replace_program puts
+   it in place under the mapping without a wait.
+
+   DESIGN: the Mac and Linux take the same path, which Eddie decided on
+   2026-10-07. Linux refuses to open a program that runs for writing,
+   with ETXTBSY, and the rename replaces it: the running process keeps
+   the old file until it ends. On every host a copy that fails partway
+   leaves the old program whole and removes its own file, where a write
+   in place left a broken program in dist/. */
 bool files_copy_program(const char *from, const char *to)
 {
     struct text temporary = {0};
     bool ok;
 
-    if (!platform_program_replaced()) {
-        return files_copy(from, to) && platform_copy_permissions(from, to);
-    }
     text_appendf(&temporary, "%s%s", to, FILES_NEW_SUFFIX);
     ok = files_copy(from, text_cstr(&temporary)) &&
          platform_copy_permissions(from, text_cstr(&temporary)) &&

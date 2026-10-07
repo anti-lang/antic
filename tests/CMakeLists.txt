@@ -1820,6 +1820,19 @@ if(ANTIC_HOST_TARGET MATCHES "^windows-")
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build_rerun.cmake")
 endif()
 
+# A program that runs from dist/ while `anti build` builds it again. The
+# build replaces it, the running program ends as it began, and the new
+# program runs. Linux refuses a write into a running program.
+add_test(NAME anti_build_running
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-running"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build_running.cmake")
+
 # The rules of the canonical form on one file, the format stability of
 # docs/tooling.md and `--check`, which writes nothing.
 add_test(NAME anti_fmt
