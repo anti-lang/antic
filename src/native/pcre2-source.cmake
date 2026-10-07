@@ -58,7 +58,8 @@ else()
     set_property(TARGET antic_pcre2 PROPERTY COMPILE_OPTIONS
         ${ANTIC_PCRE2_WARNINGS}
         "-ffile-prefix-map=${ANTIC_PCRE2_SOURCE}=."
-        "-ffile-prefix-map=${CMAKE_BINARY_DIR}=.")
+        "-ffile-prefix-map=${CMAKE_BINARY_DIR}=."
+        "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=.")
 endif()
 string(REPLACE "-D" "" antic_pcre2_definitions "${ANTIC_PCRE2_DEFINES}")
 target_compile_definitions(antic_pcre2 PRIVATE ${antic_pcre2_definitions})
