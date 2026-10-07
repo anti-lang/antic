@@ -751,6 +751,18 @@ foreach(case "linux-arm64,armv8.0,${cpu_exclusive},${cpu_lse}"
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
 
+# The runtime of linux-arm64 is the same on every host: neither its
+# objects nor its bitcode take the outline atomics that the GCC of a Linux
+# host brought.
+add_test(NAME runtime_hosts
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_AR=${ANTIC_LLVM_AR}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/runtime-hosts"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_runtime_hosts.cmake")
+set_tests_properties(runtime_hosts PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+
 # An atomic load of the runtime is sequentially consistent on every ARM64
 # target and level, as src/rt/atomic.c promises. Windows compiled it through
 # `volatile` once, which is a plain load there.

@@ -434,10 +434,23 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
         if(NOT EXISTS "${sysroot}")
             continue()
         endif()
+        # [provisional] DESIGN: a runtime of ARM64 Linux names no outline
+        # atomics. For a triple that names glibc, the bitcode of every
+        # Linux target among them, the clang driver of a Linux host that
+        # finds a GCC of the host adds +outline-atomics, where a Mac adds
+        # nothing. The runtime then differed by host, against the rule that
+        # one target's runtime is the same bytes whichever host built it,
+        # and its atomics at armv8.0 were calls of __aarch64_*. The test
+        # runtime_hosts reads every library and member.
+        set(no_outline "")
+        if(target MATCHES "^linux-arm64")
+            set(no_outline -mno-outline-atomics)
+        endif()
         if(target STREQUAL "linux-x86_64" OR target STREQUAL "linux-arm64")
             string(REPLACE "linux-arm64" "aarch64" arch "${target}")
             string(REPLACE "linux-x86_64" "x86_64" arch "${arch}")
             anti_cross_runtime(${target} ${arch}-linux-musl -fPIC -nostdinc
+                ${no_outline}
                 -isystem "${sysroot}/usr/include"
                 -isystem "${clang_resource}/include")
         elseif(target MATCHES "^linux-(x86_64|arm64)-glibc$")
@@ -447,6 +460,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
             string(REPLACE "linux-arm64-glibc" "aarch64" arch "${target}")
             string(REPLACE "linux-x86_64-glibc" "x86_64" arch "${arch}")
             anti_cross_runtime(${target} ${arch}-linux-gnu -fPIC -nostdinc
+                ${no_outline}
                 -isystem "${sysroot}/usr/include/${arch}-linux-gnu"
                 -isystem "${sysroot}/usr/include"
                 -isystem "${clang_resource}/include")
