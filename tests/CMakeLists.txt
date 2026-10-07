@@ -1733,6 +1733,24 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_symbols.cmake")
 endif()
 
+# The link of the symbols archive lays an ELF program out as the release
+# link does. Under LTO the debug CFI of an Anti function moved into
+# .eh_frame when the runtime brought unwind tables, and every address
+# after it shifted.
+foreach(target linux-x86_64 linux-arm64)
+    add_test(NAME symbols_layout_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-symbols"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-layout-${target}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_symbols_layout.cmake")
+    set_tests_properties(symbols_layout_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
 # `anti symbols resolve` refuses a line of a map or a trace whose number
 # does not fit 64 bits. The archive is written here, so every host runs it.
 add_test(NAME anti_symbols_input

@@ -369,6 +369,19 @@ function(anti_cross_runtime_at target triple level root)
     # as bitcode under "Compiler behaviour" in docs/decisions.md.
     string(REPLACE "-linux-musl" "-unknown-linux-gnu" bitcode_triple
         "${triple}")
+    # [provisional] DESIGN: the bitcode of a Linux target carries no
+    # unwind tables, so its functions are nounwind without uwtable, as
+    # "Attributes and metadata" of docs/work-order-llvm-back-end.md gives
+    # every Anti function there. Under LTO the program and the runtime
+    # are one module, and one function with unwind tables moved the debug
+    # CFI of every Anti function into .eh_frame in the link with -g. The
+    # link of a symbols archive then laid the program out otherwise than
+    # the release link, which symbols_layout_<target> checks. The objects
+    # keep the tables, and the C library brings its own.
+    set(bitcode_unwind "")
+    if(triple MATCHES "-linux-")
+        set(bitcode_unwind -fno-asynchronous-unwind-tables -fno-unwind-tables)
+    endif()
     set(bitcode_libraries "")
     get_filename_component(library_name "${library}" NAME)
     foreach(mode IN LISTS ANTIC_LTO_MODES)
@@ -381,7 +394,8 @@ function(anti_cross_runtime_at target triple level root)
             add_custom_command(OUTPUT "${object}"
                 COMMAND "${CMAKE_COMMAND}" -E make_directory "${mode_work}"
                 COMMAND "${CMAKE_C_COMPILER}" --target=${bitcode_triple}
-                    -std=c11 -O2 -flto=${mode} ${ANTIC_C_WARNINGS}
+                    -std=c11 -O2 -flto=${mode} ${bitcode_unwind}
+                    ${ANTIC_C_WARNINGS}
                     "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
                     "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
                     -MMD -MF "${object}.d"
