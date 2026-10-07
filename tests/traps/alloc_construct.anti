@@ -1,8 +1,12 @@
 //! `alloc T(args) catch e { }` of a class no heap holds stops the program with
 //! the failure routine before `construct` runs. Before the fix the object was
-//! written through the null `malloc` gave.
+//! written through the null `malloc` gave. The object reaches `printf`, since a
+//! release build may drop an allocation that nothing outside `main` reaches,
+//! and with it the failure.
 
 import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Huge
 {
@@ -23,5 +27,6 @@ fn main() -> int
 	let h = alloc Huge(3) catch e {
 		return 1;
 	};
+	printf("%p\n".ptr, h);
 	return h.n as int;
 }
