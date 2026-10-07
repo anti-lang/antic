@@ -310,12 +310,14 @@ foreach(host IN LISTS HOSTS)
         build_program("${host}" "${tree}/bin/anti${suffix}" anti)
     endif()
 
-    # DESIGN: the runtime as bitcode of --lto, bitcode/ beside the runtime
-    # of each level, stays out until Eddie's yes under condition C3 of
-    # docs/work-order-llvm-optimization.md. CMakeLists.txt names it.
+    # DESIGN: a release build links the runtime as bitcode through full
+    # LTO by default, which Eddie decided on 2026-10-07, so bitcode/full/
+    # beside the runtime of each level goes in. The bitcode of ThinLTO,
+    # bitcode/thin/, stays out, since no build takes it without being
+    # asked. CMakeLists.txt names both directories.
     foreach(target IN LISTS TARGETS)
         file(COPY "${RUNTIME}/lib/${target}" DESTINATION "${tree}/lib"
-             PATTERN "bitcode" EXCLUDE)
+             REGEX "/bitcode/thin$" EXCLUDE)
     endforeach()
     file(COPY "${RUNTIME}/std" DESTINATION "${tree}")
     file(COPY "${RUNTIME}/licenses/" DESTINATION "${tree}/licenses")

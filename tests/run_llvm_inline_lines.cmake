@@ -26,7 +26,8 @@ endforeach()
 get_filename_component(file "${SOURCE}" NAME)
 
 # The host's program, and a Linux program, whose executable holds its
-# line table. A Mach-O executable leaves the table in the object.
+# line table. A Mach-O executable leaves the table in the object, which
+# the LTO of a release build writes into the directory <program>.lto.
 set(targets ${HOST} linux-x86_64)
 list(REMOVE_DUPLICATES targets)
 foreach(target IN LISTS targets)
@@ -40,7 +41,7 @@ foreach(target IN LISTS targets)
     endif()
     set(table "${program}")
     if(target MATCHES "^macos-")
-        set(table "${program}.o")
+        file(GLOB table "${program}.lto/*.o")
     endif()
     execute_process(COMMAND "${OBJDUMP}" -t "${table}"
                     OUTPUT_VARIABLE symbols ENCODING NONE)

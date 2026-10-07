@@ -371,3 +371,22 @@ if(NOT status EQUAL 0 OR text MATCHES "warning")
 endif()
 program_expect("the program of the profile" COMMAND "${release}" STATUS 9
                OUT "one\n")
+
+# A release build links through full LTO, so its object is bitcode, and
+# --lto none links the program and the runtime as objects. Bitcode starts
+# with `BC` 0xC0DE, or on Darwin with the magic of its wrapper.
+set(release_object "${project}/build/${HOST}/release/app${exe}.o")
+if(HOST MATCHES "^windows-")
+    set(release_object "${project}/build/${HOST}/release/app${exe}.obj")
+endif()
+foreach(mode full none)
+    build("the release build of --lto ${mode}" build --release --lto ${mode})
+    program_expect("the program of --lto ${mode}" COMMAND "${release}"
+                   STATUS 9 OUT "one\n")
+    file(READ "${release_object}" magic LIMIT 4 HEX)
+    if(mode STREQUAL "full" AND NOT magic MATCHES "^(4243c0de|dec0170b)$")
+        message(FATAL_ERROR "the object of --lto full starts with ${magic}")
+    elseif(mode STREQUAL "none" AND magic MATCHES "^(4243c0de|dec0170b)$")
+        message(FATAL_ERROR "the object of --lto none is bitcode")
+    endif()
+endforeach()

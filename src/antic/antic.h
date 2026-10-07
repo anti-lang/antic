@@ -60,9 +60,10 @@ enum linker { LINKER_LLD, LINKER_PLATFORM };
 
 /* DESIGN: --lto full|thin links the bitcode of a program in release mode
    with the runtime as bitcode through the LTO of lld, choice D7 of
-   docs/work-order-llvm-optimization.md. The default build links objects,
-   and the runtime as bitcode stays out of the package, until Eddie's yes
-   under condition C3. The runtime archive keeps the bitcode of a target
+   docs/work-order-llvm-optimization.md. Eddie decided on 2026-10-07 that
+   a release build links through full LTO by default, since it gives the
+   finer control over what code goes into a program, and --lto none links
+   the program and the runtime as objects. The runtime archive keeps the bitcode of a target
    and level in <runtime>/RUNTIME_LIB_DIR/<target>/<level>/
    RUNTIME_BITCODE_DIR/<mode>/, named by the word of the option, since
    ThinLTO imports nothing from the bitcode of full LTO and ld64.lld
@@ -70,6 +71,14 @@ enum linker { LINKER_LLD, LINKER_PLATFORM };
    and tools/pack-anti.cmake spell the same names. */
 #define RUNTIME_BITCODE_DIR "bitcode"
 enum lto { LTO_NONE, LTO_FULL, LTO_THIN };
+
+/* The word of --lto that names mode, which names its directory of the
+   runtime as bitcode as well. anti reads the option with the same
+   words. */
+const char *link_lto_name(enum lto mode);
+
+/* Set *mode to the mode that name names, and answer whether one does. */
+bool link_lto_from_name(const char *name, enum lto *mode);
 
 /* Append the path of the PDB of a Windows link whose output is
    executable: the output with its suffix replaced by `.pdb`, beside it.

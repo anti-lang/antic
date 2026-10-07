@@ -679,20 +679,21 @@ static void lto_links(void)
     in.lto = LTO_FULL;
     links(TARGET_MACOS_ARM64, &in,
           "/rt/bin/ld64.lld -S -arch arm64 -platform_version macos 11.0 26.5 "
-          "-syslibroot /rt/sysroot/t -o prog -dead_strip --lto-O2 prog.o "
-          "shapes.o /rt/lib/macos-arm64/armv8.5/bitcode/full/libanti_rt.a "
+          "-syslibroot /rt/sysroot/t -o prog -dead_strip --lto-O3 -mllvm "
+          "-inline-threshold=225 prog.o shapes.o /rt/lib/macos-arm64/armv8.5/bitcode/full/libanti_rt.a "
           "-lSystem");
     in.lto = LTO_THIN;
     in.debug = true;
     links(TARGET_MACOS_ARM64, &in,
           "/rt/bin/ld64.lld -arch arm64 -platform_version macos 11.0 26.5 "
-          "-syslibroot /rt/sysroot/t -o prog -dead_strip --lto-O2 "
-          "-object_path_lto prog.lto prog.o shapes.o "
+          "-syslibroot /rt/sysroot/t -o prog -dead_strip --lto-O3 -mllvm "
+          "-inline-threshold=225 -object_path_lto prog.lto prog.o shapes.o "
           "/rt/lib/macos-arm64/armv8.5/bitcode/thin/libanti_rt.a -lSystem");
     in.debug = false;
     links(TARGET_LINUX_ARM64, &in,
           "/rt/bin/ld.lld -static -pie --no-dynamic-linker --strip-debug "
-          "--gc-sections --lto-O2 -o prog /rt/sysroot/t/usr/lib/rcrt1.o "
+          "--gc-sections --lto-O3 -mllvm -inline-threshold=225 -o prog "
+          "/rt/sysroot/t/usr/lib/rcrt1.o "
           "/rt/sysroot/t/usr/lib/crti.o prog.o shapes.o "
           "/rt/lib/linux-arm64/armv8.0/bitcode/thin/libanti_rt.a "
           "/rt/sysroot/t/usr/lib/libc.a "
@@ -703,7 +704,7 @@ static void lto_links(void)
     links(TARGET_LINUX_X86_64, &in,
           "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -pie "
           "--dynamic-linker=/lib64/ld-linux-x86-64.so.2 --strip-debug "
-          "--gc-sections --lto-O2 -o prog "
+          "--gc-sections --lto-O3 -mllvm -inline-threshold=225 -o prog "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crti.o prog.o shapes.o "
           "/rt/lib/linux-x86_64-glibc/v3/bitcode/full/libanti_rt.a "
@@ -715,7 +716,8 @@ static void lto_links(void)
     links(TARGET_WINDOWS_X86_64, &win,
           "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
           "/ignore:4099 /OPT:REF /OPT:SAFEICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
-          "/opt:lldlto=2 /OUT:prog.exe /PDB:prog.pdb "
+          "/opt:lldlto=3 /mllvm:-inline-threshold=225 /OUT:prog.exe "
+          "/PDB:prog.pdb "
           "/LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/x86_64 prog.obj "

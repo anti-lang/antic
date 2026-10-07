@@ -119,7 +119,11 @@ struct options {
                                      sysroot. */
     size_t linux_library_count;
     enum linker linker;         /* --linker lld|platform, lld by default. */
-    enum lto lto;               /* --lto full|thin, none by default. */
+    /* --lto full|thin|none. driver_run gives a release build that links
+       a program full when the option is not given, and lto_given tells
+       the two apart. */
+    enum lto lto;
+    bool lto_given;
     /* --profile-generate: release mode instruments the program, which
        writes a raw profile of its run when it exits. */
     bool profile_generate;

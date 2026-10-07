@@ -910,8 +910,11 @@ static void entry(void)
     begin(&x);
     returns(&x, "main", IR_I64, ir_int_op(IR_I64, 3));
     CHECK(run(&x, TARGET_MACOS_ARM64));
-    CHECK(holds(&x, "define internal noundef i64 @main.main() #0 {\n"));
+    CHECK(holds(&x,
+                "define internal noundef i64 @main.main() noinline #0 {\n"));
     CHECK(holds(&x, "}\n\n@anti.rt.main = alias i64 (), ptr @main.main\n"));
+    CHECK(holds(&x, "@llvm.compiler.used = appending global [1 x ptr] "
+                    "[ptr @main.main], section \"llvm.metadata\"\n"));
     CHECK(run_with(&x, TARGET_WINDOWS_X86_64, true, false));
     CHECK(holds(&x, "@_A4anti2rt_main = alias i64 (), ptr @_A4main_main\n"));
     end(&x);

@@ -4,7 +4,8 @@
 # table pointer of the object to the call through its table, across the
 # call of the `created` hook, and opt then calls the function directly or
 # inlines it. The test reads the bitcode that opt wrote, as text, and
-# refuses a call through a pointer in the function FUNCTION. Run with
+# refuses a call through a pointer in the function FUNCTION. The build
+# takes --lto none, whose opt runs the whole pipeline before llc. Run with
 # cmake -P and these values:
 #   ANTIC     the antic executable
 #   RUNTIME   the runtime directory, whose bin/ holds opt and llc
@@ -29,7 +30,7 @@ file(MAKE_DIRECTORY "${WORK}")
 get_filename_component(name "${SOURCE}" NAME_WE)
 set(program "${WORK}/${name}")
 execute_process(COMMAND "${ANTIC}" --target "${TARGET}" --runtime "${RUNTIME}"
-                        --keep-llvm -o "${program}" "${SOURCE}"
+                        --lto none --keep-llvm -o "${program}" "${SOURCE}"
                 RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed\n${err}")

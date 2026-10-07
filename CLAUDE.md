@@ -117,8 +117,8 @@ The target stands under "Binary distribution" in `docs/decisions.md`.
   package. No C compiler ships, and no user needs one.
 - Six packages, one per platform, each complete on its own. Each holds antic and
   anti, the pinned LLVM tools and the standard library. It also holds the runtime of
-  all six targets with the native libraries and their headers, the sysroots of every
-  target and the licence texts. Nothing is downloaded at install time or later. One package builds for all
+  all six targets with its bitcode of full LTO, and the native libraries and their
+  headers. The sysroots of every target and the licence texts complete it. Nothing is downloaded at install time or later. One package builds for all
   six targets with no network. Apple's frameworks are the one thing a package lacks.
 - antic and anti use only what is in the package. The two exceptions are
   `antic --linker platform` and `anti bind --clang`, which a user asks for by name

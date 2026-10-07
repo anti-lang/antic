@@ -6,7 +6,9 @@
 # KEPT and DROPPED stand in one object file of the runtime, src/rt/io.c.
 # The program calls KEPT, so the linker takes the object, and DROPPED must
 # still be gone. The test then shows the strip within an object, which a
-# link that only chooses objects does not give.
+# link that only chooses objects does not give. It links the runtime as
+# objects with --lto none, since the LTO of a default release build
+# inlines KEPT into the program and leaves no name to read.
 #
 # ELF and Mach-O executables keep their symbol table, which llvm-objdump
 # lists. A Windows executable holds none, and its PDB names every external
@@ -45,7 +47,7 @@ endif()
 file(REMOVE "${exe}")
 execute_process(
     COMMAND "${ANTIC}" --target "${TARGET}" --llvm-mc "${LLVM_MC}"
-            --runtime "${RUNTIME}" -o "${exe}" "${SOURCE}"
+            --runtime "${RUNTIME}" --lto none -o "${exe}" "${SOURCE}"
     RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic failed for ${TARGET}\n${err}")

@@ -108,11 +108,26 @@ endforeach()
 if(entries MATCHES "(^|\n)anti/sysroot/macos-[^/\n]+/sdk/")
     message(FATAL_ERROR "${archive} carries stubs of Apple's SDK")
 endif()
-# DESIGN: the runtime as bitcode that --lto links stays out of the package
-# until Eddie says yes to shipping it, condition C3 of
-# docs/work-order-llvm-optimization.md. His yes takes this check away.
-if(entries MATCHES "(^|\n)anti/lib/[^\n]*/bitcode/")
-    message(FATAL_ERROR "${archive} carries the runtime as bitcode")
+# DESIGN: a release build links the runtime as bitcode through full LTO
+# by default, which Eddie decided on 2026-10-07, so every runtime of the
+# package has its bitcode of full LTO beside it. The bitcode of ThinLTO
+# stays out, and `--lto thin` then names the archive it lacks.
+string(REGEX MATCHALL "anti/lib/[^/\n]+/[^/\n]+/(lib)?anti_rt\\.(a|lib)\n"
+       runtimes "${entries}")
+if(runtimes STREQUAL "")
+    message(FATAL_ERROR "${archive} carries no runtime")
+endif()
+foreach(runtime IN LISTS runtimes)
+    string(STRIP "${runtime}" runtime)
+    get_filename_component(level "${runtime}" DIRECTORY)
+    get_filename_component(library "${runtime}" NAME)
+    string(REPLACE "." "\\." pattern "${level}/bitcode/full/${library}")
+    if(NOT entries MATCHES "(^|\n)${pattern}\n")
+        message(FATAL_ERROR "${archive} lacks ${level}/bitcode/full/${library}")
+    endif()
+endforeach()
+if(entries MATCHES "(^|\n)anti/lib/[^\n]*/bitcode/thin/")
+    message(FATAL_ERROR "${archive} carries the bitcode of ThinLTO")
 endif()
 
 # The anti of the package runs the commands that read JSON, TOML and the

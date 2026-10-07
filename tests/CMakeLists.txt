@@ -2466,11 +2466,22 @@ add_test(NAME windows_addresses
 set_tests_properties(windows_addresses PROPERTIES
     SKIP_REGULAR_EXPRESSION "SKIP: ")
 
+# A release build links the runtime as bitcode through full LTO unless it
+# is told otherwise or cannot.
+add_test(NAME lto_default
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+        "-DHOSTING=${CMAKE_CURRENT_SOURCE_DIR}/programs/inject_default.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/lto-default"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_lto_default.cmake")
+
 # --lto takes one of its two modes, and links a program in release mode
 # alone. A runtime archive without the runtime as bitcode of the mode is
 # refused before anything compiles.
 add_expect_test(lto_mode STATUS 2
-    PATTERN "^antic: --lto takes full or thin, not fast"
+    PATTERN "^antic: --lto takes full, thin or none, not fast"
     COMMAND $<TARGET_FILE:antic> --runtime "${ANTIC_RUNTIME_DIR}"
             --lto fast -o "${CMAKE_CURRENT_BINARY_DIR}/lto_mode"
             "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
@@ -2495,6 +2506,14 @@ if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
                 -o "${CMAKE_CURRENT_BINARY_DIR}/lto_refused_windows_host.exe"
                 "${CMAKE_CURRENT_SOURCE_DIR}/programs/inject_default.anti")
 endif()
+# `anti build` and `anti run` pass --lto to the one antic call of release
+# mode, so the option needs --release and a program.
+add_expect_test(anti_lto_word STATUS 2
+    PATTERN "^anti: --lto takes full, thin or none, not fast"
+    COMMAND $<TARGET_FILE:anti> build --release --lto fast)
+add_expect_test(anti_lto_dev STATUS 2
+    PATTERN "^anti: --lto builds a program with --release, without --lib"
+    COMMAND $<TARGET_FILE:anti> run --lto none)
 add_expect_test(lto_no_bitcode STATUS 2
     PATTERN "^antic: --lto thin needs .*/lib/${ANTIC_HOST_TARGET}/[^/]+/bitcode/thin/[^/]+, the runtime as bitcode"
     COMMAND $<TARGET_FILE:antic> --runtime "${CMAKE_CURRENT_BINARY_DIR}"

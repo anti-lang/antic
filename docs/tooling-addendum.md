@@ -63,6 +63,12 @@ builds a program that writes a raw profile of each run. `llvm-profdata merge` of
 package turns the raw profiles into the file the second reads. Both are off by default,
 as condition C3 of `docs/work-order-llvm-optimization.md` requires.
 
+A release build links the program and the runtime as bitcode through full LTO.
+`--lto full|thin|none` on `anti build` and `anti run` passes the option of the same name
+to `antic`, with `--release` alone. `--lto none` links the program and the runtime as
+objects, and `--lto thin` needs a runtime archive that holds the bitcode of ThinLTO,
+which no package carries.
+
 ## Check command
 
 `anti check` runs everything that writes no artifact. It exits non-zero on the first

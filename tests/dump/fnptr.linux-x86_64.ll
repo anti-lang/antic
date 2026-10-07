@@ -34,7 +34,7 @@ b0:
   ret i32 %v5
 }
 
-define internal noundef i64 @fnptr.main() #0 {
+define internal noundef i64 @fnptr.main() noinline #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -91,6 +91,7 @@ b0:
 
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
+@llvm.compiler.used = appending global [1 x ptr] [ptr @fnptr.main], section "llvm.metadata"
 
 declare noundef i32 @abs(i32 noundef) #1
 declare noundef i32 @fnptr.fn.0(i32 noundef) #1

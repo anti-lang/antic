@@ -14,7 +14,7 @@ b0:
   ret i64 %v2
 }
 
-define internal noundef i64 @_A4main_main() #0 !dbg !15 {
+define internal noundef i64 @_A4main_main() noinline #0 !dbg !15 {
 b0:
   %t0 = alloca i64, align 8
   %v0 = call i64 (i64) @_A4main_scale(i64 7), !dbg !16
@@ -27,6 +27,7 @@ b0:
 
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
+@llvm.compiler.used = appending global [1 x ptr] [ptr @_A4main_main], section "llvm.metadata"
 
 attributes #0 = { nounwind uwtable(sync) "frame-pointer"="none" "stack-probe-size"="4096" "target-cpu"="x86-64-v3" "target-features"="+avx,+avx2,+bmi,+bmi2,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fxsr,+lzcnt,+mmx,+movbe,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave" }
 attributes #1 = { nounwind }

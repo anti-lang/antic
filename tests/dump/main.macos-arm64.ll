@@ -14,7 +14,7 @@ b0:
   ret i64 %v2
 }
 
-define internal noundef i64 @main.main() #0 {
+define internal noundef i64 @main.main() noinline #0 {
 b0:
   %t0 = alloca i64, align 8
   %v0 = call i64 (i64) @main.scale(i64 7)
@@ -27,6 +27,7 @@ b0:
 
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
+@llvm.compiler.used = appending global [1 x ptr] [ptr @main.main], section "llvm.metadata"
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="generic" "target-features"="+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fullfp16,+jsconv,+lse,+neon,+pauth,+predres,+ras,+rcpc,+rdm,+sb,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8a,-fmv" "tune-cpu"="apple-m1" }
 attributes #1 = { nounwind }

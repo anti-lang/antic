@@ -11,7 +11,8 @@
 #
 # An ELF binary carries its symbols and its line table, so the probe
 # reads the executable. A Mach-O link leaves the line table in the
-# object, which the probe reads. The first address of a function lies on
+# object, which the probe reads: the one the LTO of a release build
+# writes into the directory <exe>.lto, and the one beside a dev build. The first address of a function lies on
 # the line of its declaration when it has a prologue. A leaf has none, so
 # its first address lies on its first statement.
 
@@ -56,6 +57,7 @@ if("${TARGET}" MATCHES "^linux-")
     probe(elf "${exe}" symbols.main 0 "symbols.main symbols.anti:12")
     probe(elf "${exe}_dev" symbols.inner 0 "symbols.inner symbols.anti:6")
 else()
-    probe(macho "${exe}.o" _symbols.main 0 "symbols.anti:12")
+    file(GLOB lto_object "${exe}.lto/*.o")
+    probe(macho "${lto_object}" _symbols.main 0 "symbols.anti:12")
     probe(macho "${exe}_dev.o" _symbols.inner 0 "symbols.anti:6")
 endif()

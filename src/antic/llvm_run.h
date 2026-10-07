@@ -34,6 +34,10 @@ struct llvm_run {
     const char *profile_use;
 };
 
+/* The inline threshold of release mode, which opt takes with and without
+   --lto and the LTO of lld takes as well. */
+#define LLVM_INLINE_THRESHOLD "-inline-threshold=225"
+
 /* The options of opt in release mode without --lto, before the output
    and the text: the pass pipeline and the inline threshold. */
 #define LLVM_OPT_OPTION_COUNT 2

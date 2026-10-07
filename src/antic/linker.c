@@ -1,4 +1,5 @@
 #include "linker.h"
+#include "llvm_run.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,8 +87,8 @@ void link_profile_runtime(struct text *out, const char *runtime,
     text_appendf(out, "/%s", names[target_info(t)->os]);
 }
 
-/* The words of --lto by mode, LTO_NONE having none. */
-static const char *const lto_names[] = {NULL, "full", "thin"};
+/* The words of --lto by mode. */
+static const char *const lto_names[] = {"none", "full", "thin"};
 
 const char *link_lto_name(enum lto mode)
 {
@@ -98,7 +99,7 @@ bool link_lto_from_name(const char *name, enum lto *mode)
 {
     size_t i;
 
-    for (i = 1; i < sizeof lto_names / sizeof lto_names[0]; i++) {
+    for (i = 0; i < sizeof lto_names / sizeof lto_names[0]; i++) {
         if (strcmp(name, lto_names[i]) == 0) {
             *mode = (enum lto)i;
             return true;
@@ -355,14 +356,19 @@ static void drop_unused(struct link_command *c, enum target t,
     }
 }
 
-/* DESIGN: the LTO of lld runs at the level of opt in release mode, -O2,
-   whatever default lld has. */
+/* DESIGN: the LTO of lld runs at the level and the inline threshold of
+   opt in release mode, O3 and 225, whatever default lld has. run_lto of
+   llvm_run.c gives the measurement. */
 static void lto_level(struct link_command *c, enum target t,
                       const struct link_inputs *in)
 {
-    if (in->lto != LTO_NONE) {
-        add(c, target_info(t)->os == OS_WINDOWS ? "/opt:lldlto=2"
-                                                : "--lto-O2");
+    if (in->lto != LTO_NONE && target_info(t)->os == OS_WINDOWS) {
+        add(c, "/opt:lldlto=3");
+        add(c, "/mllvm:" LLVM_INLINE_THRESHOLD);
+    } else if (in->lto != LTO_NONE) {
+        add(c, "--lto-O3");
+        add(c, "-mllvm");
+        add(c, LLVM_INLINE_THRESHOLD);
     }
 }
 

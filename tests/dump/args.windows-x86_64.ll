@@ -29,7 +29,7 @@ b0:
   ret i64 %v3
 }
 
-define internal noundef i64 @_A4args_main() #0 !dbg !15 {
+define internal noundef i64 @_A4args_main() noinline #0 !dbg !15 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca i8, align 1
@@ -86,6 +86,7 @@ b2:
 
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
+@llvm.compiler.used = appending global [1 x ptr] [ptr @_A4args_main], section "llvm.metadata"
 
 declare noundef i32 @printf(ptr noundef, ...) #1
 declare noundef ptr @malloc(i64 noundef) #1

@@ -42,8 +42,9 @@ static int usage(FILE *out)
           "  --llvm-ar <path>     the llvm-ar executable\n"
           "  --linker lld|platform  link with lld of the runtime archive, the\n"
           "                       default, or with the platform linker\n"
-          "  --lto full|thin      link the program and the runtime as\n"
-          "                       bitcode through the LTO of lld\n"
+          "  --lto full|thin|none link the program and the runtime as\n"
+          "                       bitcode through the LTO of lld, full by\n"
+          "                       default in release mode, or as objects\n"
           "  --profile-generate   instrument the program, which writes a\n"
           "                       raw profile of its run when it exits\n"
           "  --profile-use <file> optimize with the profile that\n"
@@ -381,11 +382,12 @@ static int run(int argc, char **argv, const struct lists *l)
                 return 2;
             }
             if (!link_lto_from_name(value, &options.lto)) {
-                fprintf(stderr, "antic: --lto takes %s or %s, not %s\n",
+                fprintf(stderr, "antic: --lto takes %s, %s or %s, not %s\n",
                         link_lto_name(LTO_FULL), link_lto_name(LTO_THIN),
-                        value);
+                        link_lto_name(LTO_NONE), value);
                 return 2;
             }
+            options.lto_given = true;
             continue;
         } else if (strcmp(arg, "--doc-warnings") == 0) {
             options.doc_warnings = true;

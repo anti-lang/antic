@@ -47,7 +47,7 @@ b0:
   ret i64 %v9
 }
 
-define internal noundef i64 @tables.main() #0 {
+define internal noundef i64 @tables.main() noinline #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca i8, align 1
@@ -358,6 +358,7 @@ b0:
 @tables.Circle.functions = internal constant <{ ptr, [24 x i8], ptr, ptr, [24 x i8], ptr, ptr, [24 x i8], ptr, ptr, [24 x i8], ptr, ptr, [24 x i8], ptr, ptr, [24 x i8], ptr, ptr, [24 x i8], ptr, ptr, [24 x i8], ptr, ptr, [24 x i8], ptr, ptr, [24 x i8], ptr, ptr, [24 x i8], ptr, ptr, [24 x i8], ptr, ptr, [24 x i8], ptr, ptr, [24 x i8], ptr, ptr, [24 x i8], ptr, ptr, [24 x i8], ptr, ptr, [24 x i8], ptr }> <{ ptr @tables.7, [24 x i8] c"\09\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00", ptr @tables.6, ptr @tables.8, [24 x i8] c"\07\00\00\00\00\00\00\00\02\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00", ptr @tables.6, ptr @tables.10, [24 x i8] c"\06\00\00\00\00\00\00\00\03\00\00\00\00\00\00\00\02\00\00\00\00\00\00\00", ptr @tables.9, ptr @tables.12, [24 x i8] c"\04\00\00\00\00\00\00\00\04\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00", ptr @tables.11, ptr @tables.14, [24 x i8] c"\09\00\00\00\00\00\00\00\05\00\00\00\00\00\00\00\02\00\00\00\00\00\00\00", ptr @tables.13, ptr @tables.16, [24 x i8] c"\08\00\00\00\00\00\00\00\06\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00", ptr @tables.15, ptr @tables.17, [24 x i8] c"\04\00\00\00\00\00\00\00\07\00\00\00\00\00\00\00\02\00\00\00\00\00\00\00", ptr @tables.13, ptr @tables.18, [24 x i8] c"\07\00\00\00\00\00\00\00\08\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00", ptr @tables.15, ptr @tables.19, [24 x i8] c"\09\00\00\00\00\00\00\00\09\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00", ptr @tables.15, ptr @tables.20, [24 x i8] c"\06\00\00\00\00\00\00\00\0A\00\00\00\00\00\00\00\02\00\00\00\00\00\00\00", ptr @tables.13, ptr @tables.21, [24 x i8] c"\0A\00\00\00\00\00\00\00\0B\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00", ptr @tables.15, ptr @tables.22, [24 x i8] c"\06\00\00\00\00\00\00\00\0C\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00", ptr @tables.15, ptr @tables.24, [24 x i8] c"\05\00\00\00\00\00\00\00\0D\00\00\00\00\00\00\00\02\00\00\00\00\00\00\00", ptr @tables.23, ptr @tables.25, [24 x i8] c"\05\00\00\00\00\00\00\00\0E\00\00\00\00\00\00\00\02\00\00\00\00\00\00\00", ptr @tables.23, ptr @tables.27, [24 x i8] c"\06\00\00\00\00\00\00\00\0F\00\00\00\00\00\00\00\03\00\00\00\00\00\00\00", ptr @tables.26, ptr @tables.28, [24 x i8] c"\07\00\00\00\00\00\00\00\10\00\00\00\00\00\00\00\02\00\00\00\00\00\00\00", ptr @tables.13, ptr @tables.30, [24 x i8] c"\04\00\00\00\00\00\00\00\11\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00", ptr @tables.29 }>, align 8
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
+@llvm.compiler.used = appending global [1 x ptr] [ptr @tables.main], section "llvm.metadata"
 
 declare [2 x i64] @anti_lang_Object_type_name(ptr noundef nonnull dereferenceable(8)) #1
 declare [2 x i64] @anti_lang_Object_to_text(ptr noundef nonnull dereferenceable(8)) #1

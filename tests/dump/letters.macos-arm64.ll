@@ -2,7 +2,7 @@ source_filename = "letters"
 target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32"
 target triple = "arm64-apple-macos11.0"
 
-define internal noundef i64 @letters.main() #0 {
+define internal noundef i64 @letters.main() noinline #0 {
 b0:
   %t0 = alloca i64, align 8
   %t1 = alloca i8, align 1
@@ -45,6 +45,7 @@ b3:
 
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
+@llvm.compiler.used = appending global [1 x ptr] [ptr @letters.main], section "llvm.metadata"
 
 declare noundef i32 @putchar(i32 noundef) #1
 

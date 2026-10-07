@@ -180,6 +180,13 @@ tree, and one less level is one less path to get wrong.
 | `raylib`, `pcre2`, `mbedtls`, `miniaudio` | The static library per target, with headers | The CMake build in `src/native/` |
 | `musl` | The Linux sysroot per processor | `tools/get-sysroot.cmake` |
 
+The runtime archive of a package holds, beside the runtime of each target and level in
+`lib/<target>/<level>/`, its bitcode of full LTO in `bitcode/full/`. A release build
+links the program and that bitcode through the LTO of lld by default, which Eddie decided
+on 2026-10-07. The bitcode of ThinLTO, `bitcode/thin/`, stays in the build tree, so
+`--lto thin` from a package names the archive it lacks. The bitcode of full LTO adds 11.5
+MB to a package before compression and 0.82 MB after xz.
+
 A Linux program of a release links the pinned sysroot and never the libc of the machine
 that packed it: musl for the static form, glibc 2.35 and the kernel headers of Ubuntu
 22.04 for the dynamic one. The shipped antic then runs on any Linux from Ubuntu 22.04 on.

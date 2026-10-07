@@ -52,7 +52,7 @@ b0:
   ret [2 x i64] %v19
 }
 
-define internal noundef i64 @strings.main() #0 {
+define internal noundef i64 @strings.main() noinline #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8
@@ -116,6 +116,7 @@ b0:
 @strings.1 = internal constant <{ [3 x i8] }> <{ [3 x i8] c"hi\00" }>, align 1
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
+@llvm.compiler.used = appending global [1 x ptr] [ptr @strings.main], section "llvm.metadata"
 
 declare noundef i32 @puts(ptr noundef) #1
 declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)

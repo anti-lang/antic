@@ -88,17 +88,25 @@ done:
    and the text alone decides the code. See "Integration route" in
    docs/work-order-llvm-back-end.md. */
 /* DESIGN: under --lto opt runs the pipeline before the link that clang
-   runs for -flto=full or -flto=thin at -O2, and ThinLTO writes the
-   summary of the module beside the bitcode. The LTO of lld runs the rest
-   over the program and the runtime together. */
+   runs for -flto=full or -flto=thin, and ThinLTO writes the summary of
+   the module beside the bitcode. The LTO of lld runs the rest over the
+   program and the runtime together, which link_command sets to the same
+   level and threshold. Both take O3 and the threshold of
+   llvm_opt_options, which release mode chose under C1. At O2 the LTO
+   that a release build takes by default ran builder in 1.28 and map_work
+   in 1.20 of the time of the object link on macos-arm64 on 2026-10-07,
+   and at O3 with 225 every program of tests/bench and mixed_work lay
+   within 1 percent of it or below, objects at 0.73. */
 static bool run_lto(const struct llvm_run *r, const char *text_path,
                     const char *output)
 {
-    const char *full[] = {r->opt, "-passes=lto-pre-link<O2>", "-o", output,
-                          text_path, NULL};
+    const char *full[] = {r->opt, "-passes=lto-pre-link<O3>",
+                          LLVM_INLINE_THRESHOLD, "-o", output, text_path,
+                          NULL};
     const char *thin[] = {r->opt, "--thinlto-bc",
-                          "-passes=thinlto-pre-link<O2>", "-o", output,
-                          text_path, NULL};
+                          "-passes=thinlto-pre-link<O3>",
+                          LLVM_INLINE_THRESHOLD, "-o", output, text_path,
+                          NULL};
 
     if (process_run(r->lto == LTO_THIN ? thin : full) != 0) {
         fprintf(stderr, "antic: opt failed\n");
@@ -140,7 +148,7 @@ static bool run_lto(const struct llvm_run *r, const char *text_path,
    no test pins either value. docs/reports/2026-10-05-llvm-opt-config.md
    holds the tables. */
 const char *const llvm_opt_options[LLVM_OPT_OPTION_COUNT] = {
-    "-passes=default<O3>", "-inline-threshold=225"};
+    "-passes=default<O3>", LLVM_INLINE_THRESHOLD};
 
 /* DESIGN: --profile-generate and --profile-use run the pipeline of
    release mode with the instrumentation of a profile or with its use, as

@@ -65,12 +65,6 @@ struct link_inputs {
    names them by path. */
 #define LINK_LTO_OBJECTS_SUFFIX ".lto"
 
-/* The word of --lto that names mode, which names its directory of the
-   runtime as bitcode as well. */
-const char *link_lto_name(enum lto mode);
-
-/* Set *mode to the mode that name names, and answer whether one does. */
-bool link_lto_from_name(const char *name, enum lto *mode);
 
 /* The suffixes of the object files and archives that antic passes to the
    linker. */

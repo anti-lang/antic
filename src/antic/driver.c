@@ -246,12 +246,34 @@ static bool can_link(const struct options *o)
     return true;
 }
 
+/* DESIGN: Eddie decided on 2026-10-07 that a release build links the
+   program and the runtime as bitcode through full LTO, since bitcode
+   gives the finer control over what code goes into a program. The mode
+   holds where --lto is not given and the build links a program with
+   lld. Dev mode writes an object per module, -S, -c and --lib need real
+   objects, and the platform linker has no LTO of the pinned release, so
+   each of those keeps LTO_NONE. So does a build with a profile, since
+   the profile acts on the run of opt that --lto moves before the link,
+   a build of --memory-checks, whose options hook the AddressSanitizer
+   runtime of macOS does not find under LTO, and a Windows program that
+   hosts plugins, which driver_run learns after the front end. Each of
+   them but the first refuses --lto full or thin when it is given, and
+   --memory-checks refuses them on macOS. */
+static enum lto lto_mode(const struct options *o)
+{
+    if (o->lto_given || o->dev || o->front_end || o->assembly_only ||
+        o->library || o->lib != LIB_NONE || o->linker != LINKER_LLD ||
+        o->profile_generate || o->profile_use != NULL || o->memory_checks) {
+        return o->lto;
+    }
+    return LTO_FULL;
+}
+
 /* DESIGN: --lto links a program in release mode. Dev mode writes an
    object per module, and the other refusals write no program or link
    with a linker of the host. A runtime archive without the runtime as
-   bitcode of the mode, such as the package before Eddie's yes under C3
-   of docs/work-order-llvm-optimization.md, is refused before anything
-   compiles. */
+   bitcode of the mode is refused before anything compiles, and where
+   the mode is the default the message names --lto none. */
 static bool lto_usable(const struct options *o)
 {
     struct text library = {0};
@@ -264,13 +286,29 @@ static bool lto_usable(const struct options *o)
               stderr);
         return false;
     }
+    /* DESIGN: the AddressSanitizer runtime of macOS is a dylib that
+       takes its options from the hook of the program, which overrides a
+       weak definition of the dylib. ld64.lld marks no definition that
+       its LTO wrote as such an override, so the dylib kept its own
+       options and a report ended the program with SIGABRT. */
+    if (o->memory_checks && target_info(o->target)->os == OS_MACOS) {
+        fputs("antic: --lto links no macOS program of --memory-checks\n",
+              stderr);
+        return false;
+    }
     if (o->runtime == NULL) {
         return true;
     }
     link_runtime_bitcode(&library, o->runtime, o->target, o->cpu, o->lto);
-    if (!driver_file_exists(text_cstr(&library))) {
+    if (!driver_file_exists(text_cstr(&library)) && o->lto_given) {
         fprintf(stderr, "antic: --lto %s needs %s, the runtime as bitcode\n",
                 link_lto_name(o->lto), text_cstr(&library));
+        ok = false;
+    } else if (!driver_file_exists(text_cstr(&library))) {
+        fprintf(stderr, "antic: a release build links the runtime as "
+                        "bitcode, %s, which is missing. --lto none links "
+                        "the runtime as objects\n",
+                text_cstr(&library));
         ok = false;
     }
     text_free(&library);
@@ -1632,8 +1670,10 @@ bool driver_compile_llvm(const struct options *o, const struct text *text,
     return ok;
 }
 
-int driver_run(const struct options *o)
+int driver_run(const struct options *given)
 {
+    struct options resolved = *given;
+    const struct options *o = &resolved;
     struct text source = {0};
     struct text module = {0};
     struct text assembly = {0};
@@ -1659,6 +1699,7 @@ int driver_run(const struct options *o)
                 target_name(o->target));
         return 2;
     }
+    resolved.lto = lto_mode(given);
     if (o->lto != LTO_NONE && !lto_usable(o)) {
         return 2;
     }
@@ -1718,6 +1759,12 @@ int driver_run(const struct options *o)
         break;
     default:
         goto done;
+    }
+    /* The .def file of a Windows host lists the COFF symbols of its
+       object, which LTO would make bitcode. See lto_mode. */
+    if (!o->lto_given && extras.hosts_plugins &&
+        target_info(o->target)->os == OS_WINDOWS) {
+        resolved.lto = LTO_NONE;
     }
     if (o->dev && !object_only && !o->assembly_only &&
         (o->runtime == NULL || !can_link(o))) {

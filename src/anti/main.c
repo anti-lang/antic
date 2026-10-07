@@ -30,10 +30,10 @@ static int usage(FILE *out)
           "                  [--lib static|shared] [--bundle-runtime]\n"
           "                  [--soname] [--runtime <dir>] [--llvm-mc <path>]\n"
           "                  [--llvm-ar <path>] [--profile-generate]\n"
-          "                  [--profile-use <file>]\n"
+          "                  [--profile-use <file>] [--lto full|thin|none]\n"
           "       anti run [--release] [--cpu <level>] [--offline]\n"
           "                [--memory-checks] [--profile-generate]\n"
-          "                [--profile-use <file>]\n"
+          "                [--profile-use <file>] [--lto full|thin|none]\n"
           "                [--runtime <dir>] [--llvm-mc <path>]\n"
           "       anti sdk export [--sdk <MacOSX.sdk>] [-o <dir>]\n"
           "       anti sdk import <bundle> [--sysroot <dir>]\n"
@@ -238,6 +238,7 @@ static int build_command(int argc, char **argv)
 {
     struct build_request request;
     struct text home = {0};
+    enum lto lto;
     int status;
     int i;
 
@@ -257,6 +258,8 @@ static int build_command(int argc, char **argv)
             request.profile_generate = true;
         } else if (strcmp(argv[i], "--profile-use") == 0 && i + 1 < argc) {
             request.profile_use = argv[++i];
+        } else if (strcmp(argv[i], "--lto") == 0 && i + 1 < argc) {
+            request.lto = argv[++i];
         } else if (strcmp(argv[i], "--bundle-runtime") == 0) {
             request.bundle_runtime = true;
         } else if (strcmp(argv[i], "--soname") == 0) {
@@ -290,6 +293,19 @@ static int build_command(int argc, char **argv)
         (!request.release || request.lib != BUILD_PROGRAM)) {
         fputs("anti: --profile-generate and --profile-use build a program "
               "with --release, without --lib\n",
+              stderr);
+        return 2;
+    }
+    /* DESIGN: --lto acts on the one antic call of release mode, as a
+       profile does. antic refuses full and thin with a profile. */
+    if (request.lto != NULL && !link_lto_from_name(request.lto, &lto)) {
+        fprintf(stderr, "anti: --lto takes full, thin or none, not %s\n",
+                request.lto);
+        return 2;
+    }
+    if (request.lto != NULL &&
+        (!request.release || request.lib != BUILD_PROGRAM)) {
+        fputs("anti: --lto builds a program with --release, without --lib\n",
               stderr);
         return 2;
     }

@@ -3122,9 +3122,11 @@ static void definition(struct emitter *e, const struct ir_function *f)
         return;
     }
     text_append(out, f->never_returns ? " noreturn cold" : "");
+    /* main is noinline for the reason main_kept gives. */
     text_append(out, e->keeps_frame[f->index]
                          ? " noinline \"disable-tail-calls\"=\"true\" #0"
-                         : " #0");
+                     : is_main(e, f) ? " noinline #0"
+                                     : " #0");
     if (link_once(e, f) &&
         target_info(e->o->target)->format == FORMAT_COFF) {
         text_append(out, " comdat");
@@ -3609,6 +3611,32 @@ static void notice_symbol(struct text *out, enum target t)
     text_free(&symbol);
 }
 
+/* DESIGN: main keeps its own frame and its own name in the program, as
+   the object link gave it, so a trace, the map of a symbols archive and
+   a PDB name the main of the program. Under LTO, which a release build
+   links through by default, two things took both away. lld inlined main
+   into the C main of the runtime, and the optimizer gives an internal
+   function that only an alias names the name of the alias, which is the
+   entry of the runtime here. main is noinline, and llvm.compiler.used
+   keeps the optimizer from the rename while it leaves the link free to
+   drop what it would. The object link never inlined main, since the
+   runtime calls it from an object of its own. */
+static void main_kept(struct emitter *e, const struct ir_module *m)
+{
+    size_t i;
+
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        if (is_main(e, f)) {
+            text_append(e->out, "@llvm.compiler.used = appending global "
+                                "[1 x ptr] [ptr ");
+            function_name(e->out, e->o->target, f);
+            text_append(e->out, "], section \"llvm.metadata\"\n");
+            return;
+        }
+    }
+}
+
 /* DESIGN: the link drops what nothing refers to, so what is reached by
    name alone stands in llvm.used, which makes it a root in every format:
    SHF_GNU_RETAIN on ELF, no_dead_strip on Mach-O and /INCLUDE on COFF.
@@ -3645,6 +3673,7 @@ static void roots(struct emitter *e, const struct ir_module *m)
                      count, text_cstr(&entries));
     }
     text_free(&entries);
+    main_kept(e, m);
 }
 
 /* DESIGN: the functions that run before main are the one of each module

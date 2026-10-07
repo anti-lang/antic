@@ -20,6 +20,9 @@ struct build_request {
        call of a release program. */
     bool profile_generate;
     const char *profile_use;
+    /* --lto full|thin|none, the word passed to the antic call of a
+       release program, or NULL for the default of antic. */
+    const char *lto;
     /* --lib static and --lib shared build a library for C rather than a
        program. Without one a project with `main` gives an executable and
        a project without it gives the library files of its modules. */

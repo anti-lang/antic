@@ -40,8 +40,10 @@ function(expect_run path)
     endif()
 endfunction()
 
-# A release build keeps the text and the bitcode of opt.
-antic(--keep-llvm -o "${WORK}/release" "${SOURCE}")
+# A release build keeps the text and the bitcode of opt. Under the LTO of
+# a default release build the object is that bitcode, so the build links
+# the runtime as objects.
+antic(--lto none --keep-llvm -o "${WORK}/release" "${SOURCE}")
 expect_run("${WORK}/release")
 file(STRINGS "${WORK}/release.ll" triple REGEX "^target triple = ")
 if(triple STREQUAL "")

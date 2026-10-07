@@ -471,6 +471,15 @@ done:
     return ok;
 }
 
+/* The --lto of the request, whose word the command line checked, on the
+   options of a release program. */
+static void release_lto(const struct build *b, struct options *o)
+{
+    if (b->r->lto != NULL) {
+        o->lto_given = link_lto_from_name(b->r->lto, &o->lto);
+    }
+}
+
 /* Release mode: one call with every module, so the optimizer sees the
    whole program. */
 static bool build_release(struct build *b, enum target t, enum cpu_level cpu,
@@ -485,6 +494,7 @@ static bool build_release(struct build *b, enum target t, enum cpu_level cpu,
     o.library_count = libraries->count;
     o.profile_generate = b->r->profile_generate;
     o.profile_use = b->r->profile_use;
+    release_lto(b, &o);
     return driver_run(&o) == 0;
 }
 
@@ -543,6 +553,7 @@ static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
     o.debug = true;
     o.profile_generate = b->r->profile_generate;
     o.profile_use = b->r->profile_use;
+    release_lto(b, &o);
     if (driver_run(&o) != 0) {
         goto done;
     }
