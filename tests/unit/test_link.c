@@ -655,7 +655,7 @@ static void memory_checks_links(void)
     in.memory_checks = true;
     links(TARGET_WINDOWS_X86_64, &in,
           "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
-          "/ignore:4099 /OPT:REF /OPT:NOICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
+          "/ignore:4099 /OPT:REF /OPT:SAFEICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
           "/OUT:prog.exe /PDB:prog.pdb /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/x86_64 "
@@ -714,7 +714,7 @@ static void lto_links(void)
     win.lto = LTO_THIN;
     links(TARGET_WINDOWS_X86_64, &win,
           "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
-          "/ignore:4099 /OPT:REF /OPT:NOICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
+          "/ignore:4099 /OPT:REF /OPT:SAFEICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
           "/opt:lldlto=2 /OUT:prog.exe /PDB:prog.pdb "
           "/LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
@@ -853,7 +853,7 @@ static void shared_modes(void)
     in.memory_checks = true;
     shared(TARGET_WINDOWS_X86_64, &in, &def,
            "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% "
-           "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:NOICF /DLL "
+           "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:SAFEICF /DLL "
            "/MACHINE:X64 /OUT:geo.dll /PDB:geo.pdb /DEF:geo.def "
            "/LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
            "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
@@ -1001,7 +1001,7 @@ void test_link(void)
           "/rt/sysroot/t/usr/lib/crtn.o");
     links(TARGET_WINDOWS_X86_64, &lld_windows_inputs,
           "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
-          "/ignore:4099 /OPT:REF /OPT:NOICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
+          "/ignore:4099 /OPT:REF /OPT:SAFEICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
           "/OUT:prog.exe /PDB:prog.pdb /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/x86_64 prog.obj "

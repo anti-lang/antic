@@ -1,0 +1,47 @@
+//! Two functions with the same body and two classes with the same body keep
+//! addresses of their own, which the program compares at run time. A link that
+//! folds identical code must leave every address a program compares distinct.
+//! The hash of a function value is the hash of its address, and the seed of the
+//! hash comes from the runtime, so opt cannot decide the comparison while it
+//! compiles. It prints `0 0 0 0` and `14`.
+
+import anti.reflect;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn one(n: int) -> int
+{
+	return n * 3 + 1;
+}
+
+fn two(n: int) -> int
+{
+	return n * 3 + 1;
+}
+
+class First
+{
+	pub n: int = 4,
+}
+
+class Second
+{
+	pub n: int = 4,
+}
+
+fn main() -> int
+{
+	let f: fn(int) -> int = one;
+	let g: fn(int) -> int = two;
+	let a = First { };
+	let b = Second { };
+	let p: *Object = &a;
+	let q: *Object = &b;
+	let d = reflect.describe(&a as *byte);
+	let e = reflect.describe(&b as *byte);
+	printf("%d %d %d %d\n".ptr, (f.hash() == g.hash()) as c_int,
+		(d.hash() == e.hash()) as c_int, (p is *Second) as c_int,
+		(q is *First) as c_int);
+	printf("%d\n".ptr, (f(2) + g(2)) as c_int);
+	return 0;
+}

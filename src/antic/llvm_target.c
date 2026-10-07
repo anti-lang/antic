@@ -97,6 +97,14 @@ const char *llvm_relocation_model(enum target t)
     return models[t];
 }
 
+/* DESIGN: windows-x86_64 alone folds identical code, in the safe form,
+   because only there it took 1 percent or more off a program on
+   2026-10-07. See drop_unused in linker.c. */
+bool llvm_safe_folding(enum target t)
+{
+    return t == TARGET_WINDOWS_X86_64;
+}
+
 const char *llvm_target_cpu(enum cpu_level level)
 {
     return levels[level].target_cpu;

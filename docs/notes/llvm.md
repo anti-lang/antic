@@ -134,7 +134,9 @@ design the back end was built from.
   `-filetype=asm`. The relocation model is `pic` on every target, the one
   the pinned clang passes. On Linux and Windows llc also runs with
   `-function-sections -data-sections`, so the link drops each function and
-  datum that nothing reaches. Mach-O splits per symbol without them.
+  datum that nothing reaches. Mach-O splits per symbol without them. On
+  windows-x86_64 llc adds `-addrsig`, the table that the safe folding of
+  lld-link reads.
 - llc runs in the directory of its output and writes it by its file name,
   with its input and its own path absolute. llc records the name of its
   output in the CodeView of a COFF object. lld-link carries that name into

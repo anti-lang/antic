@@ -6,6 +6,7 @@
 
 #include "alloc.h"
 #include "ir.h"
+#include "llvm_target.h"
 
 static bool ends_with(const char *s, const char *suffix)
 {
@@ -324,18 +325,32 @@ static void profile_hook(struct link_command *c, const struct link_inputs *in)
 
    Both Windows linkers turn /OPT:REF off under the /DEBUG every link
    passes, so it is named, and named alone it turns on the folding of
-   identical code as well. /OPT:NOICF keeps that off: folding merges
-   functions and constants whose addresses a program may compare, which
-   is a decision of its own. See the entry on dropped code under "Scope
-   and toolchain" in docs/decisions.md. */
-static void drop_unused(struct link_command *c, enum target t)
+   all identical code as well. That gives two functions or two constants
+   one address, which a program may compare, so /OPT:NOICF keeps it off.
+
+   DESIGN: lld-link of windows-x86_64 folds in the safe form instead,
+   /OPT:SAFEICF: only the code and data that the address-significance
+   table of every object leaves out, so each address a program compares
+   stays distinct. llc writes the table with -addrsig, see llvm_run.c.
+   Relinked on 2026-10-07, it took 1.07 to 1.72 percent off the five
+   programs of the dead-code measurement for windows-x86_64, hello world
+   from 66,560 to 65,536 bytes and tests/bench/ablate/mixed_work.anti
+   from 985,088 to 968,192, each with its old output. Every other target
+   gained less than 1 percent, the most 0.82 for mixed_work on
+   windows-arm64, and keeps its links. link.exe has no safe form. See
+   the entry on folding under "Scope and toolchain" in
+   docs/decisions.md, and distinct_addresses_<target>. */
+static void drop_unused(struct link_command *c, enum target t,
+                        const struct link_inputs *in)
 {
     switch (target_info(t)->os) {
     case OS_MACOS: add(c, "-dead_strip"); break;
     case OS_LINUX: add(c, "--gc-sections"); break;
     case OS_WINDOWS:
         add(c, "/OPT:REF");
-        add(c, "/OPT:NOICF");
+        add(c, llvm_safe_folding(t) && in->linker == LINKER_LLD
+                   ? "/OPT:SAFEICF"
+                   : "/OPT:NOICF");
         break;
     }
 }
@@ -360,7 +375,7 @@ static void macos(struct link_command *c, enum target t,
     macos_start(c, t, in, false);
     add(c, "-o");
     add(c, in->executable);
-    drop_unused(c, t);
+    drop_unused(c, t, in);
     lto_level(c, t, in);
     if (in->lto != LTO_NONE && in->debug) {
         struct text *objects = next(c);
@@ -513,7 +528,7 @@ static void linux_glibc(struct link_command *c, enum target t,
     if (!in->debug) {
         add(c, "--strip-debug");
     }
-    drop_unused(c, t);
+    drop_unused(c, t, in);
     lto_level(c, t, in);
     profile_hook(c, in);
     add(c, "-o");
@@ -556,7 +571,7 @@ static void linux_lld(struct link_command *c, enum target t,
     if (!in->debug) {
         add(c, "--strip-debug");
     }
-    drop_unused(c, t);
+    drop_unused(c, t, in);
     lto_level(c, t, in);
     profile_hook(c, in);
     add(c, "-o");
@@ -679,7 +694,7 @@ static void linux_ld(struct link_command *c, enum target t,
     if (!in->debug) {
         add(c, "--strip-debug");
     }
-    drop_unused(c, t);
+    drop_unused(c, t, in);
     add(c, text_cstr(interpreter));
     add(c, "-o");
     add(c, in->executable);
@@ -733,7 +748,7 @@ static void windows(struct link_command *c, enum target t,
     add(c, linker);
     add(c, "/NOLOGO");
     windows_debug(c, in);
-    drop_unused(c, t);
+    drop_unused(c, t, in);
     add(c, "/SUBSYSTEM:CONSOLE");
     add(c, target_info(t)->arch == ARCH_ARM64 ? "/MACHINE:ARM64"
                                               : "/MACHINE:X64");
@@ -835,7 +850,7 @@ static void macos_shared(struct link_command *c, enum target t,
     macos_start(c, t, in, true);
     add(c, "-o");
     add(c, in->executable);
-    drop_unused(c, t);
+    drop_unused(c, t, in);
     if (s->major != NULL) {
         add(c, "-install_name");
         add(c, text_cstr(install));
@@ -891,7 +906,7 @@ static void linux_shared(struct link_command *c, enum target t,
     if (!in->debug) {
         add(c, "--strip-debug");
     }
-    drop_unused(c, t);
+    drop_unused(c, t, in);
     add(c, "-o");
     add(c, in->executable);
     if (s->major != NULL) {
@@ -930,7 +945,7 @@ static void windows_shared(struct link_command *c, enum target t,
     add(c, linker);
     add(c, "/NOLOGO");
     windows_debug(c, in);
-    drop_unused(c, t);
+    drop_unused(c, t, in);
     add(c, "/DLL");
     /* DESIGN: a plugin links no C runtime startup, so it has no entry
        point. The host's runtime has started before the load, and

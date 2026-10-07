@@ -22,8 +22,9 @@ static const char *file_name(const char *path)
 }
 
 /* The most options of llc before its input: the level, the file type,
-   the relocation model and the two that split sections. */
-#define LLC_OPTIONS 5
+   the relocation model, the two that split sections and the table of
+   significant addresses. */
+#define LLC_OPTIONS 6
 
 /* DESIGN: llc runs in the directory of its output and writes the output
    by its file name alone. llc records the name of its output as the
@@ -214,6 +215,12 @@ bool llvm_run(const struct llvm_run *r, const char *text_path,
     if (target_info(r->target)->format != FORMAT_MACHO) {
         options[n++] = "-function-sections";
         options[n++] = "-data-sections";
+    }
+    /* The table names every symbol whose address the program uses, so
+       the safe folding of lld leaves those apart. See drop_unused in
+       linker.c. */
+    if (llvm_safe_folding(r->target)) {
+        options[n++] = "-addrsig";
     }
     run = run_llc(r->llc, options, r->optimize ? bitcode_path : text_path,
                   output);

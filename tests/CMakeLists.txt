@@ -2404,6 +2404,24 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
 
+# Two functions and two descriptors whose contents could be folded keep
+# addresses of their own in a release program of every target.
+foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
+        windows-x86_64 windows-arm64)
+    add_test(NAME distinct_addresses_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/link-identity/distinct.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/distinct-addresses"
+            "-DTARGET=${target}"
+            "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_distinct_addresses.cmake")
+    set_tests_properties(distinct_addresses_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
 # A windows-x86_64 program holds no 32-bit absolute address, and runs on a
 # Windows host.
 add_test(NAME windows_addresses
