@@ -44,10 +44,10 @@ foreach(archive IN LISTS archives)
     file(GLOB members "${dir}/*.o")
     foreach(member IN LISTS members)
         execute_process(COMMAND "${opt}" -S -o "${member}.ll" "${member}"
-                        RESULT_VARIABLE status ERROR_VARIABLE err
-                        ENCODING NONE)
+                        RESULT_VARIABLE status ERROR_FILE "${member}.err")
         if(NOT status EQUAL 0)
-            message(FATAL_ERROR "opt failed on ${member} of ${archive}\n${err}")
+            message(FATAL_ERROR "opt failed on ${member} of ${archive}, "
+                                "see ${member}.err")
         endif()
         file(STRINGS "${member}.ll" outline REGEX "\\+outline-atomics")
         if(outline)
