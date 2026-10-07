@@ -39,8 +39,9 @@ jobs:
         with:
           arch: ${{ matrix.msvc }}
 
-      - name: Install raylib for the ABI tests
-        if: runner.os != 'Windows'
+      # The configure step builds raylib for every target, on every host.
+      - name: Install raylib
+        shell: bash
         run: cmake -DDEST=build/deps/raylib -P tools/get-raylib.cmake
 
       # The configure step downloads the pinned clang and the LLVM tools
@@ -53,8 +54,28 @@ jobs:
         run: >
           cmake -S . -B build/host -G Ninja -DCMAKE_BUILD_TYPE=Debug
 
+      # The sysroots of the six targets and of the glibc mode, which every
+      # program test links against. The script takes the pinned clang and
+      # LLVM tools that the configure step installed, and the configure step
+      # runs again to copy the sysroots into the runtime archive.
+      # ACCEPT_LICENSE=yes accepts the terms of the Microsoft CRT and the
+      # Windows SDK that xwin downloads, as docs/vm-setup.md does for the
+      # test machines.
+      - name: Install the sysroots
+        shell: bash
+        run: >
+          cmake -DDEST=build/deps/sysroot -DLLVM_BIN=build/deps/llvm/bin
+          -DCLANG_DIR=build/deps/clang -DACCEPT_LICENSE=yes
+          "-DTARGETS=linux-x86_64;linux-arm64;linux-x86_64-glibc;linux-arm64-glibc;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64"
+          -P tools/get-sysroot.cmake
+
+      - name: Configure with the sysroots
+        shell: bash
+        run: cmake -S . -B build/host
+
       - name: Build
         run: cmake --build build/host
 
+      # Four tests at a time, the processors of a hosted runner.
       - name: Test
-        run: ctest --test-dir build/host --output-on-failure
+        run: ctest --test-dir build/host --output-on-failure -j4
