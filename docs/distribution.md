@@ -102,7 +102,7 @@ move a signature onto the host that serves the binaries.
 The eight LLVM tools are not served from the download area: llvm-mc, lld, llvm-ar,
 llvm-objdump, llvm-readobj, opt, llc and llvm-profdata. The repository `anti-lang/llvm-tools` builds them
 from the pinned LLVM source and publishes one archive per host as an asset of a GitHub
-release, tagged `<version>-anti.<build>` as in `23.1.1-anti.6`. Beside the archives stand `SHA256SUMS` and its signature
+release, tagged `<version>-anti.<build>` as in `23.1.1-anti.7`. Beside the archives stand `SHA256SUMS` and its signature
 `SHA256SUMS.sig`. The recipe, the hosts and the checks of each build are in that
 repository. Each release holds the tools and clang of each of the six hosts. antic takes
 the tools of its host, and a build of antic takes clang as well. The clang archive also
@@ -147,6 +147,12 @@ of 2026-10-05:
 | macos-x86_64 | 61,933,048 | 63,882,332 | 1,949,284 | 34,196,960 | 34,367,592 | 170,632 |
 | windows-x86_64 | 54,855,680 | 56,460,784 | 1,605,104 | 30,522,700 | 30,704,892 | 182,192 |
 | windows-arm64 | 47,578,316 | 48,903,092 | 1,324,776 | 27,164,136 | 27,337,428 | 173,292 |
+
+`23.1.1-anti.7` gives every static musl tool of both Linux hosts a thread stack of 8 MiB
+in its `PT_GNU_STACK` header, where musl gave each thread its small default. The ThinLTO
+link of `mixed_work` crashed `ld.lld` of anti.6 on linux-arm64 in a worker thread. Each
+of those binaries differs from its anti.6 copy in that one field. Besides `VERSION`,
+every other file of every archive is that of anti.6.
 
 `tools/llvm-pin` names the tag, the address of the release, the name of an asset and
 the digest of the archive of each of the six hosts. `tools/clang-pin` names the archives
