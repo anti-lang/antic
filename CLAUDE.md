@@ -732,7 +732,8 @@ reports what it finished.
   anti-linux runs linux-arm64 and linux-x86_64 under `qemu-x86_64`, and
   anti-windows runs windows-arm64 and windows-x86_64 under the x64 emulation
   of Windows. A test of `--memory-checks` for an x86_64 target skips under
-  qemu and the emulation of Windows. The last run on real x86_64 hardware is
+  qemu and the emulation of Windows, and runs under Rosetta for every program
+  that links at `v1`. The last run on real x86_64 hardware is
   that of 2026-10-08, in `docs/reports/2026-10-08-x86_64-hardware.md`. See
   "Scope and toolchain" in `docs/decisions.md`.
 - The `anti` tool holds `new`, `build`, `run`, `sdk export`, `sdk import`,

@@ -6,6 +6,8 @@
 #   SOURCE    tests/traps/memory_checks_list.anti
 #   WORK      a directory for the files
 #   HOST      the host target
+#   OPTIONS   optional options of antic, separated by commas, which the
+#             Mac passes for macos-x86_64 under Rosetta
 #
 # The program reads through a pointer the walk lent after the push freed
 # the room it points into. The report names a read after free and ends
@@ -24,8 +26,10 @@ file(MAKE_DIRECTORY "${WORK}")
 
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
+string(REPLACE "," ";" options "${OPTIONS}")
 set(program "${WORK}/memory_checks_list")
-execute_process(COMMAND "${ANTIC}" --memory-checks --llvm-mc "${LLVM_MC}"
+execute_process(COMMAND "${ANTIC}" --memory-checks ${options}
+                        --llvm-mc "${LLVM_MC}"
                         --runtime "${RUNTIME}" -o "${program}" "${SOURCE}"
                 RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)

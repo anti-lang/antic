@@ -104,8 +104,11 @@ asked. The last run on real x86_64 hardware was the workflow run of 2026-10-08.
   Windows it prints `interception_win: unhandled instruction` for three functions of
   the system and then `CHECK failed: asan_malloc_win.cpp:235`. Rosetta runs it, and
   `memory_checks_list.anti` built for macos-x86_64 at `--cpu v1` reports its read
-  after free there. The tests of `--memory-checks` for linux-x86_64 and windows-x86_64
-  link their programs and report themselves skipped. They passed on real x86_64
+  after free there. The Mac runs `memory_checks_list_macos-x86_64` and
+  `std_builder_room_memory_checks_macos-x86_64` at `v1`, and no `memory_checks` of that
+  target, whose pattern literal needs `anti.regex` at x86-64-v3. The tests of
+  `--memory-checks` for linux-x86_64 and windows-x86_64 link their programs and report
+  themselves skipped. They passed on real x86_64
   hardware on 2026-10-08, in the last workflow run.
 
 - LeakSanitizer runs on the Mac only through the presets.

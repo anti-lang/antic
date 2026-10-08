@@ -1437,6 +1437,30 @@ if(ANTIC_EMULATED_TARGET)
     endforeach()
     set_tests_properties(program_by_unsigned_${emulated} PROPERTIES
         TIMEOUT 60)
+    # DESIGN: the runtime of AddressSanitizer for x86_64 runs under
+    # Rosetta, so the Mac runs the programs of --memory-checks for
+    # macos-x86_64 that link at v1. traps/memory_checks.anti stays out,
+    # since its clean case compiles a pattern literal and anti.regex is
+    # built for x86-64-v3 alone. qemu-x86_64 and the x64 emulation of
+    # Windows stop that runtime, as the block after memory_checks says.
+    if(emulated STREQUAL "macos-x86_64")
+        add_test(NAME memory_checks_list_${emulated}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DANTIC=$<TARGET_FILE:antic>"
+                "-DLLVM_MC=${ANTIC_LLVM_MC}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_list.anti"
+                "-DOPTIONS=${ANTIC_X86_64_OPTIONS}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/memory-checks-x86_64"
+                "-DHOST=${ANTIC_HOST_TARGET}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_memory_checks_list.cmake")
+        antic_program_test(std_builder_room_memory_checks_${emulated}
+            "${CMAKE_CURRENT_SOURCE_DIR}/std/builder_room.anti"
+            OPTIONS "${ANTIC_X86_64_OPTIONS},--memory-checks"
+            WORK "${CMAKE_CURRENT_BINARY_DIR}/memory-checks-x86_64")
+        set_tests_properties(memory_checks_list_${emulated}
+            std_builder_room_memory_checks_${emulated} PROPERTIES TIMEOUT 120)
+    endif()
 endif()
 
 # The environment variable that tests/programs/args.anti looks for.
@@ -3660,7 +3684,8 @@ if(NOT ANTIC_HOST_TARGET STREQUAL "windows-arm64")
 endif()
 # DESIGN: the runtime of AddressSanitizer for x86_64 stops under
 # qemu-x86_64, in its allocator, and under the x64 emulation of Windows,
-# where it cannot intercept the heap functions. Rosetta runs it. On
+# where it cannot intercept the heap functions. Rosetta runs it, and the
+# block of the emulated target registers the programs of macos-x86_64. On
 # linux-arm64 and windows-arm64 the three programs of --memory-checks are
 # therefore linked for the emulated target and not run, and each test
 # reports itself skipped with the reason. The runtimes of x86_64 last ran
