@@ -96,6 +96,8 @@ At `5e44c8e8` on 2026-10-08 it passes 1595 of 1595 with six skipped, and ASan an
 three of the six skips are the tests of `--memory-checks` for linux-x86_64.
 At `60322802` on 2026-10-08 it passes 1601 of 1601 with six skipped, mimalloc in every
 program of musl. Its sanitizer suites did not run.
+At `3c047bd4` on 2026-10-08 it passes 1619 of 1619 with six skipped, with safe folding on
+every target and a profile in the LTO link. Its sanitizer suites did not run.
 
 | Untested item | Tests that run it |
 |---|---|
@@ -184,6 +186,9 @@ At `5e44c8e8` on 2026-10-08 it passes 1583 of 1583 with twelve skipped, in 951 s
 emulation, and three of the twelve skips are the tests of `--memory-checks` for that target.
 At `60322802` on 2026-10-08 it passes 1589 of 1589 with twelve skipped, in four parts of
 `ctest -j4 -I`.
+At `1400572b` on 2026-10-08 it passes 1607 of 1607 with twelve skipped, in five parts of
+`ctest -j4 -I`. The tests `profile_lto_<mode>_<target>` run an instrumented program of
+both Windows targets there.
 
 ### SSH from the Mac
 
