@@ -9,7 +9,7 @@ Eddie installs UTM, both images and the Windows licence. Each VM gets the tools 
 ### Image and machine
 
 - Image: `ubuntu-26.04.1-live-server-arm64.iso` of Ubuntu 26.04.1 LTS from https://cdimage.ubuntu.com/releases/26.04/release/. anti-linux was installed from the image of 26.04 and runs 26.04.1, with CMake 4.2.3 and `qemu-user` 10.2.1 from its packages.
-- UTM: a new machine with Virtualize, Linux and the ISO. Give it 4 cores, 8 GB of memory and 64 GB of disk.
+- UTM: a new machine with Virtualize, Linux and the ISO. Give it 6 cores, 16 GB of memory and 256 GB of disk.
 - In the installer, select "Install OpenSSH server".
 
 ### Packages and tools
@@ -120,7 +120,7 @@ in 153 s. Its sanitizer suites did not run.
 ### Image and machine
 
 - Image: the Windows 11 ARM64 ISO from https://www.microsoft.com/en-us/software-download/windows11arm64, with Eddie's licence. Parallels Desktop works as well as UTM.
-- UTM: a new machine with Virtualize, Windows and the ISO. Give it 4 cores, 8 GB of memory and 128 GB of disk.
+- UTM: a new machine with Virtualize, Windows and the ISO. Give it 4 cores, 16 GB of memory and 128 GB of disk.
 
 ### Packages and tools
 
