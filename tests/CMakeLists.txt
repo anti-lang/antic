@@ -2609,20 +2609,47 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
 endforeach()
 
 # Two functions and two descriptors whose contents could be folded keep
-# addresses of their own in a release program of every target.
+# addresses of their own in a release program of every target, in the
+# default LTO link and in the object link of --lto none.
+set(distinct_source "${CMAKE_CURRENT_SOURCE_DIR}/link-identity/distinct.anti")
 foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
         windows-x86_64 windows-arm64)
-    add_test(NAME distinct_addresses_${target}
+    foreach(lto full none)
+        if(lto STREQUAL "full")
+            set(name distinct_addresses_${target})
+        else()
+            set(name distinct_addresses_lto_${lto}_${target})
+        endif()
+        add_test(NAME ${name}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DANTIC=$<TARGET_FILE:antic>"
+                "-DLLVM_MC=${ANTIC_LLVM_MC}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DSOURCE=${distinct_source}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/distinct-addresses/${lto}"
+                "-DTARGET=${target}"
+                "-DLTO=${lto}"
+                "-DROOT=${CMAKE_SOURCE_DIR}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_distinct_addresses.cmake")
+        set_tests_properties(${name} PROPERTIES
+            SKIP_REGULAR_EXPRESSION "SKIP: ")
+    endforeach()
+endforeach()
+
+# Every object of a program and of its runtime carries the
+# address-significance table that the safe folding of lld reads.
+foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
+        windows-x86_64 windows-arm64)
+    add_test(NAME address_tables_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/link-identity/distinct.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/distinct-addresses"
+            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DSOURCE=${distinct_source}"
             "-DTARGET=${target}"
-            "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_distinct_addresses.cmake")
-    set_tests_properties(distinct_addresses_${target} PROPERTIES
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/address-tables/${target}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_address_tables.cmake")
+    set_tests_properties(address_tables_${target} PROPERTIES
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
 

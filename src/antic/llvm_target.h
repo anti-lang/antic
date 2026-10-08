@@ -20,10 +20,6 @@ const char *llvm_data_layout(enum target t);
    the triple: pic on every target. */
 const char *llvm_relocation_model(enum target t);
 
-/* Whether llc writes the address-significance table of the objects of
-   target t, so that lld folds identical code in the safe form. */
-bool llvm_safe_folding(enum target t);
-
 /* The "target-cpu" and "target-features" function attributes of a level.
    The feature string is the one the pinned clang writes for the level. */
 const char *llvm_target_cpu(enum cpu_level level);

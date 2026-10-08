@@ -224,12 +224,10 @@ bool llvm_run(const struct llvm_run *r, const char *text_path,
         options[n++] = "-function-sections";
         options[n++] = "-data-sections";
     }
-    /* The table names every symbol whose address the program uses, so
-       the safe folding of lld leaves those apart. See drop_unused in
-       linker.c. */
-    if (llvm_safe_folding(r->target)) {
-        options[n++] = "-addrsig";
-    }
+    /* The address-significance table names every symbol whose address
+       the program uses, so the safe folding of lld leaves those apart.
+       Every target writes it. See drop_unused in linker.c. */
+    options[n++] = "-addrsig";
     /* DESIGN: every function of an ARM64 object starts on a 16-byte
        boundary, and the object runtime of each ARM64 target is compiled
        with -falign-functions=16 to match, see CMakeLists.txt. Eddie

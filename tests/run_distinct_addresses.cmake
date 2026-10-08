@@ -1,7 +1,7 @@
-# Link tests/link-identity/distinct.anti for TARGET in release mode and run
-# it where this host can: its own target, macos-x86_64 under Rosetta at v1
-# on macos-arm64, and windows-x86_64 under the x64 emulation on
-# windows-arm64. The program compares the addresses of two functions and of
+# Link tests/link-identity/distinct.anti for TARGET in release mode with
+# --lto LTO and run it where this host can: its own target, macos-x86_64
+# under Rosetta at v1 on macos-arm64, and windows-x86_64 under the x64
+# emulation on windows-arm64. The program compares the addresses of two functions and of
 # two descriptors whose contents could be folded, and prints `0 0 0 0`
 # while each pair stays apart. A link that folds identical code shares an
 # address there, and the test fails. See the entry on folding under "Scope
@@ -12,6 +12,7 @@
 #   SOURCE        the .anti file
 #   WORK          a directory for the executable
 #   TARGET        the target name
+#   LTO           full, the default link, or none, the object link
 #   ROOT          the repository
 
 cmake_minimum_required(VERSION 3.21)
@@ -50,7 +51,8 @@ if("${TARGET}" MATCHES "^windows-")
 endif()
 file(REMOVE "${exe}")
 execute_process(
-    COMMAND "${ANTIC}" --target "${TARGET}" ${options} --llvm-mc "${LLVM_MC}"
+    COMMAND "${ANTIC}" --target "${TARGET}" ${options} --lto "${LTO}"
+            --llvm-mc "${LLVM_MC}"
             --runtime "${RUNTIME}" -o "${exe}" "${SOURCE}"
     RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0 OR NOT err STREQUAL "")

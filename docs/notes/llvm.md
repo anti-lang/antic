@@ -126,9 +126,9 @@ rules, and the tests named there pin each fact.
   any host.
 - Every link drops what nothing reaches: `-dead_strip`, `--gc-sections` or
   `/OPT:REF`. What only a name reaches stands in `llvm.used`.
-- lld-link of windows-x86_64 folds identical code in the safe form,
-  `/OPT:SAFEICF` with the address-significance table of llc. Every other link
-  folds nothing.
+- Every link of lld folds identical code in the safe form, `--icf=safe` or
+  `/OPT:SAFEICF`, with the address-significance table of llc, of the runtime
+  and of the LTO of lld. `link.exe` keeps `/OPT:NOICF`.
 - `--profile-generate` instruments the run of opt and links the profile
   runtime of compiler-rt, and `--profile-use <file>` runs opt with the
   merged profile. Both take the link of objects.
@@ -192,9 +192,9 @@ rules, and the tests named there pin each fact.
   `-filetype=asm`. The relocation model is `pic` on every target, the one
   the pinned clang passes. On Linux and Windows llc also runs with
   `-function-sections -data-sections`, so the link drops each function and
-  datum that nothing reaches. Mach-O splits per symbol without them. On
-  windows-x86_64 llc adds `-addrsig`, the table that the safe folding of
-  lld-link reads. On the three ARM64 targets llc adds `-align-all-functions=4`,
+  datum that nothing reaches. Mach-O splits per symbol without them. llc
+  adds `-addrsig` on every target, the table that the safe folding of lld
+  reads. On the three ARM64 targets llc adds `-align-all-functions=4`,
   so every function of the object link starts on a 16-byte boundary, as every
   function of the object runtime does.
 - llc runs in the directory of its output and writes it by its file name,

@@ -294,9 +294,15 @@ set(ANTIC_LTO_MODES full thin)
 # lld splits the code it generates itself, so the bitcode takes neither
 # flag. See the entry on dropped code under "Scope and toolchain" in
 # docs/decisions.md.
+# DESIGN: the same objects carry the address-significance table, which the
+# safe folding of lld reads, so that it folds only what no program compares
+# by address. clang writes it for ELF and COFF by default and for Mach-O
+# with -faddrsig alone. Eddie decided on 2026-10-08 that every target folds
+# in the safe form, see drop_unused in src/antic/linker.c. The LTO of lld
+# writes the table for the bitcode itself.
 function(antic_runtime_sections out target)
     if(target MATCHES "^macos-")
-        set(${out} "" PARENT_SCOPE)
+        set(${out} -faddrsig PARENT_SCOPE)
     else()
         set(${out} -ffunction-sections -fdata-sections PARENT_SCOPE)
     endif()

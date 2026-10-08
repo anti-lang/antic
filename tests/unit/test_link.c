@@ -440,18 +440,19 @@ static void libraries(void)
     shared(TARGET_MACOS_ARM64, &in, &none,
            "/rt/bin/ld64.lld -dylib -S -arch arm64 -platform_version macos "
            "11.0 26.5 -syslibroot /rt/sysroot/t -o libgeo.dylib -dead_strip "
-           "geo.o /rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem");
+           "--icf=safe geo.o /rt/lib/macos-arm64/armv8.5/libanti_rt.a "
+           "-lSystem");
     in.executable = "libgeo.so.1";
     shared(TARGET_LINUX_X86_64, &in, &versioned,
            "/rt/bin/ld.lld -shared --exclude-libs ALL --strip-debug "
-           "--gc-sections -o libgeo.so.1 -soname libgeo.so.1 geo.o "
+           "--gc-sections --icf=safe -o libgeo.so.1 -soname libgeo.so.1 geo.o "
            "/rt/lib/linux-x86_64/v3/libanti_rt.a");
     win = lld_windows_inputs;
     win.object = "geo.obj";
     win.executable = "geo.dll";
     shared(TARGET_WINDOWS_ARM64, &win, &def,
            "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% "
-           "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:NOICF /DLL "
+           "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:SAFEICF /DLL "
            "/MACHINE:ARM64 /OUT:geo.dll /PDB:geo.pdb /DEF:geo.def "
            "/LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
            "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
@@ -505,9 +506,9 @@ static void frameworks(void)
     in.sdk_version = "26.5";
     links(TARGET_MACOS_ARM64, &in,
           "/rt/bin/ld64.lld -S -arch arm64 -platform_version macos 11.0 26.5 "
-          "-syslibroot /rt/sysroot/t/sdk -o prog -dead_strip prog.o shapes.o "
-          "/rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem -framework "
-          "CoreFoundation -framework Cocoa");
+          "-syslibroot /rt/sysroot/t/sdk -o prog -dead_strip --icf=safe "
+          "prog.o shapes.o /rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem "
+          "-framework CoreFoundation -framework Cocoa");
     in.linker = LINKER_PLATFORM;
     in.lld_dir = NULL;
     in.sdk_path = "/sdk";
@@ -521,7 +522,7 @@ static void frameworks(void)
     in.framework_count = 2;
     links(TARGET_LINUX_ARM64, &in,
           "/rt/bin/ld.lld -static -pie --no-dynamic-linker --strip-debug "
-          "--gc-sections -o prog /rt/sysroot/t/usr/lib/rcrt1.o "
+          "--gc-sections --icf=safe -o prog /rt/sysroot/t/usr/lib/rcrt1.o "
           "/rt/sysroot/t/usr/lib/crti.o prog.o shapes.o "
           "/rt/lib/linux-arm64/armv8.0/libanti_rt.a "
           "/rt/lib/linux-arm64/armv8.0/libmimalloc.a "
@@ -543,8 +544,8 @@ static void musl_allocator(void)
     in.extra_count = 0;
     in.cpu = CPU_V1;
     link_command(&c, TARGET_LINUX_X86_64, &in);
-    joined(&c, "/rt/bin/ld.lld -static -pie --no-dynamic-linker "
-               "--strip-debug --gc-sections -o prog "
+    joined(&c, "/rt/bin/ld.lld -static -pie --no-dynamic-linker --strip-debug "
+               "--gc-sections --icf=safe -o prog "
                "/rt/sysroot/t/usr/lib/rcrt1.o /rt/sysroot/t/usr/lib/crti.o "
                "prog.o /rt/lib/linux-x86_64/v1/libanti_rt.a "
                "/rt/lib/linux-x86_64/v1/libmimalloc.a "
@@ -571,7 +572,7 @@ static void dynamic_modes(void)
     links(TARGET_LINUX_ARM64, &in,
           "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -pie "
           "--dynamic-linker=/lib/ld-linux-aarch64.so.1 --strip-debug "
-          "--gc-sections -o prog "
+          "--gc-sections --icf=safe -o prog "
           "/rt/sysroot/t/usr/lib/aarch64-linux-gnu/Scrt1.o "
           "/rt/sysroot/t/usr/lib/aarch64-linux-gnu/crti.o prog.o shapes.o "
           "/rt/lib/linux-arm64-glibc/armv8.0/libanti_rt.a "
@@ -585,7 +586,7 @@ static void dynamic_modes(void)
     links(TARGET_LINUX_X86_64, &in,
           "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -pie "
           "--dynamic-linker=/lib64/ld-linux-x86-64.so.2 --export-dynamic "
-          "--gc-sections -o prog "
+          "--gc-sections --icf=safe -o prog "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crti.o prog.o shapes.o "
           "/rt/lib/linux-x86_64-glibc/v3/libanti_rt.a "
@@ -609,9 +610,10 @@ static void dynamic_modes(void)
     in.def_file = "prog.def";
     in.import_library = "prog.lib";
     links(TARGET_WINDOWS_ARM64, &in,
-          "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
-          "/ignore:4099 /OPT:REF /OPT:NOICF /SUBSYSTEM:CONSOLE /MACHINE:ARM64 "
-          "/OUT:prog.exe /PDB:prog.pdb /DEF:prog.def /IMPLIB:prog.lib "
+          "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% "
+          "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:SAFEICF "
+          "/SUBSYSTEM:CONSOLE /MACHINE:ARM64 /OUT:prog.exe /PDB:prog.pdb "
+          "/DEF:prog.def /IMPLIB:prog.lib "
           "/LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/aarch64 prog.obj "
@@ -629,7 +631,7 @@ static void dynamic_modes(void)
         in.extra_count = 1;
         link_shared_command(&c, TARGET_WINDOWS_ARM64, &in, &plugin);
         joined(&c, "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% "
-                   "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:NOICF /DLL "
+                   "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:SAFEICF /DLL "
                    "/NOENTRY /MACHINE:ARM64 /OUT:fancy.dll /PDB:fancy.pdb "
                    "/DEF:fancy.def /LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
                    "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
@@ -655,15 +657,15 @@ static void memory_checks_links(void)
     in.rpath = "/abs/rt/lib/macos-arm64";
     links(TARGET_MACOS_ARM64, &in,
           "/rt/bin/ld64.lld -S -arch arm64 -platform_version macos 11.0 26.5 "
-          "-syslibroot /rt/sysroot/t -o prog -dead_strip prog.o shapes.o "
-          "/rt/lib/macos-arm64/armv8.5/libanti_rt.a "
+          "-syslibroot /rt/sysroot/t -o prog -dead_strip --icf=safe prog.o "
+          "shapes.o /rt/lib/macos-arm64/armv8.5/libanti_rt.a "
           "/rt/lib/macos-arm64/libclang_rt.asan_osx_dynamic.dylib -rpath "
           "/abs/rt/lib/macos-arm64 -lSystem");
     in.glibc = true;
     links(TARGET_LINUX_X86_64, &in,
           "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -pie "
           "--dynamic-linker=/lib64/ld-linux-x86-64.so.2 --strip-debug "
-          "--gc-sections -o prog "
+          "--gc-sections --icf=safe -o prog "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crti.o --whole-archive "
           "/rt/lib/linux-x86_64-glibc/libclang_rt.asan_static.a "
@@ -673,8 +675,8 @@ static void memory_checks_links(void)
           "prog.o shapes.o /rt/lib/linux-x86_64-glibc/v3/libanti_rt.a "
           "-L/rt/sysroot/t/usr/lib/x86_64-linux-gnu "
           "-L/rt/sysroot/t/lib/x86_64-linux-gnu "
-          "/rt/lib/linux-x86_64-glibc/libunwind.a -lpthread -lrt -ldl -lresolv "
-          "-lm -lc /rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
+          "/rt/lib/linux-x86_64-glibc/libunwind.a -lpthread -lrt -ldl "
+          "-lresolv -lm -lc /rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crtn.o");
     in = lld_windows_inputs;
     in.memory_checks = true;
@@ -704,22 +706,23 @@ static void lto_links(void)
     in.lto = LTO_FULL;
     links(TARGET_MACOS_ARM64, &in,
           "/rt/bin/ld64.lld -S -arch arm64 -platform_version macos 11.0 26.5 "
-          "-syslibroot /rt/sysroot/t -o prog -dead_strip --lto-O3 -mllvm "
-          "-inline-threshold=225 prog.o shapes.o /rt/lib/macos-arm64/armv8.5/bitcode/full/libanti_rt.a "
-          "-lSystem");
+          "-syslibroot /rt/sysroot/t -o prog -dead_strip --icf=safe --lto-O3 "
+          "-mllvm -inline-threshold=225 prog.o shapes.o "
+          "/rt/lib/macos-arm64/armv8.5/bitcode/full/libanti_rt.a -lSystem");
     in.lto = LTO_THIN;
     in.debug = true;
     links(TARGET_MACOS_ARM64, &in,
           "/rt/bin/ld64.lld -arch arm64 -platform_version macos 11.0 26.5 "
-          "-syslibroot /rt/sysroot/t -o prog -dead_strip --lto-O3 -mllvm "
-          "-inline-threshold=225 -object_path_lto prog.lto prog.o shapes.o "
-          "/rt/lib/macos-arm64/armv8.5/bitcode/thin/libanti_rt.a -lSystem");
+          "-syslibroot /rt/sysroot/t -o prog -dead_strip --icf=safe --lto-O3 "
+          "-mllvm -inline-threshold=225 -object_path_lto prog.lto prog.o "
+          "shapes.o /rt/lib/macos-arm64/armv8.5/bitcode/thin/libanti_rt.a "
+          "-lSystem");
     in.debug = false;
     links(TARGET_LINUX_ARM64, &in,
           "/rt/bin/ld.lld -static -pie --no-dynamic-linker --strip-debug "
-          "--gc-sections --lto-O3 -mllvm -inline-threshold=225 -o prog "
-          "/rt/sysroot/t/usr/lib/rcrt1.o "
-          "/rt/sysroot/t/usr/lib/crti.o prog.o shapes.o "
+          "--gc-sections --icf=safe --lto-O3 -mllvm -inline-threshold=225 -o "
+          "prog /rt/sysroot/t/usr/lib/rcrt1.o /rt/sysroot/t/usr/lib/crti.o "
+          "prog.o shapes.o "
           "/rt/lib/linux-arm64/armv8.0/bitcode/thin/libanti_rt.a "
           "/rt/lib/linux-arm64/armv8.0/libmimalloc.a "
           "/rt/sysroot/t/usr/lib/libc.a "
@@ -730,8 +733,8 @@ static void lto_links(void)
     links(TARGET_LINUX_X86_64, &in,
           "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -pie "
           "--dynamic-linker=/lib64/ld-linux-x86-64.so.2 --strip-debug "
-          "--gc-sections --lto-O3 -mllvm -inline-threshold=225 -o prog "
-          "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
+          "--gc-sections --icf=safe --lto-O3 -mllvm -inline-threshold=225 -o "
+          "prog /rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crti.o prog.o shapes.o "
           "/rt/lib/linux-x86_64-glibc/v3/bitcode/full/libanti_rt.a "
           "-L/rt/sysroot/t/usr/lib/x86_64-linux-gnu "
@@ -772,12 +775,12 @@ static void profile_links(void)
     in.profile_generate = true;
     links(TARGET_MACOS_ARM64, &in,
           "/rt/bin/ld64.lld -S -arch arm64 -platform_version macos 11.0 26.5 "
-          "-syslibroot /rt/sysroot/t -o prog -dead_strip prog.o shapes.o "
-          "/rt/lib/macos-arm64/armv8.5/libanti_rt.a "
+          "-syslibroot /rt/sysroot/t -o prog -dead_strip --icf=safe prog.o "
+          "shapes.o /rt/lib/macos-arm64/armv8.5/libanti_rt.a "
           "/rt/lib/macos-arm64/libclang_rt.profile_osx.a -lSystem");
     links(TARGET_LINUX_ARM64, &in,
           "/rt/bin/ld.lld -static -pie --no-dynamic-linker --strip-debug "
-          "--gc-sections -u __llvm_profile_runtime -o prog "
+          "--gc-sections --icf=safe -u __llvm_profile_runtime -o prog "
           "/rt/sysroot/t/usr/lib/rcrt1.o /rt/sysroot/t/usr/lib/crti.o prog.o "
           "shapes.o /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
           "/rt/lib/linux-arm64/libclang_rt.profile.a "
@@ -789,7 +792,7 @@ static void profile_links(void)
     links(TARGET_LINUX_X86_64, &in,
           "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -pie "
           "--dynamic-linker=/lib64/ld-linux-x86-64.so.2 --strip-debug "
-          "--gc-sections -u __llvm_profile_runtime -o prog "
+          "--gc-sections --icf=safe -u __llvm_profile_runtime -o prog "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/Scrt1.o "
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crti.o prog.o shapes.o "
           "/rt/lib/linux-x86_64-glibc/v3/libanti_rt.a "
@@ -800,14 +803,16 @@ static void profile_links(void)
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crtn.o");
     win.profile_generate = true;
     links(TARGET_WINDOWS_ARM64, &win,
-          "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
-          "/ignore:4099 /OPT:REF /OPT:NOICF /SUBSYSTEM:CONSOLE /MACHINE:ARM64 "
-          "/OUT:prog.exe /PDB:prog.pdb /LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
+          "/rt/bin/lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% "
+          "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:SAFEICF "
+          "/SUBSYSTEM:CONSOLE /MACHINE:ARM64 /OUT:prog.exe /PDB:prog.pdb "
+          "/LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/aarch64 prog.obj "
           "/rt/lib/windows-arm64/armv8.2/anti_rt.lib "
-          "/rt/lib/windows-arm64/clang_rt.profile.lib /NODEFAULTLIB:libcmt.lib "
-          "msvcrt.lib libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
+          "/rt/lib/windows-arm64/clang_rt.profile.lib "
+          "/NODEFAULTLIB:libcmt.lib msvcrt.lib libvcruntime.lib ucrt.lib "
+          "legacy_stdio_definitions.lib");
 }
 
 /* A shared library takes the facts of a program of its module: the
@@ -831,8 +836,8 @@ static void shared_modes(void)
     in.glibc = true;
     shared(TARGET_LINUX_ARM64, &in, &none,
            "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -shared --exclude-libs ALL "
-           "--strip-debug --gc-sections -o libgeo.so geo.o shapes.o "
-           "/rt/lib/linux-arm64-glibc/armv8.0/libanti_rt.a "
+           "--strip-debug --gc-sections --icf=safe -o libgeo.so geo.o "
+           "shapes.o /rt/lib/linux-arm64-glibc/armv8.0/libanti_rt.a "
            "-L/rt/sysroot/t/usr/lib/aarch64-linux-gnu "
            "-L/rt/sysroot/t/lib/aarch64-linux-gnu -l X11 -l GL -lm -lc "
            "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a");
@@ -842,7 +847,7 @@ static void shared_modes(void)
     in.linux_library_count = 1;
     shared(TARGET_LINUX_X86_64, &in, &plugin,
            "/rt/bin/ld.lld --sysroot=/rt/sysroot/t -shared --strip-debug "
-           "--gc-sections -o libfancy.so fancy.o "
+           "--gc-sections --icf=safe -o libfancy.so fancy.o "
            "-L/rt/sysroot/t/usr/lib/x86_64-linux-gnu "
            "-L/rt/sysroot/t/lib/x86_64-linux-gnu -l X11 -lm -lc "
            "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a");
@@ -873,7 +878,7 @@ static void shared_modes(void)
     shared(TARGET_MACOS_ARM64, &in, &none,
            "/rt/bin/ld64.lld -dylib -S -arch arm64 -platform_version macos "
            "11.0 26.5 -syslibroot /rt/sysroot/t -o libgeo.dylib -dead_strip "
-           "geo.o /rt/lib/macos-arm64/armv8.5/libanti_rt.a "
+           "--icf=safe geo.o /rt/lib/macos-arm64/armv8.5/libanti_rt.a "
            "/rt/lib/macos-arm64/libclang_rt.asan_osx_dynamic.dylib -rpath "
            "/abs/rt/lib/macos-arm64 -lSystem");
     in = lld_windows_inputs;
@@ -1019,11 +1024,11 @@ void test_link(void)
        sysroot, or of the LIB variable without one. */
     links(TARGET_MACOS_X86_64, &lld_inputs,
           "/rt/bin/ld64.lld -S -arch x86_64 -platform_version macos 11.0 26.5 "
-          "-syslibroot /rt/sysroot/t -o prog -dead_strip prog.o shapes.o "
-          "/rt/lib/macos-x86_64/v3/libanti_rt.a -lSystem");
+          "-syslibroot /rt/sysroot/t -o prog -dead_strip --icf=safe prog.o "
+          "shapes.o /rt/lib/macos-x86_64/v3/libanti_rt.a -lSystem");
     links(TARGET_LINUX_ARM64, &lld_inputs,
           "/rt/bin/ld.lld -static -pie --no-dynamic-linker --strip-debug "
-          "--gc-sections -o prog /rt/sysroot/t/usr/lib/rcrt1.o "
+          "--gc-sections --icf=safe -o prog /rt/sysroot/t/usr/lib/rcrt1.o "
           "/rt/sysroot/t/usr/lib/crti.o prog.o shapes.o "
           "/rt/lib/linux-arm64/armv8.0/libanti_rt.a "
           "/rt/lib/linux-arm64/armv8.0/libmimalloc.a "
@@ -1044,7 +1049,7 @@ void test_link(void)
         no_sysroot.lld_dir = NULL;
         links(TARGET_WINDOWS_ARM64, &no_sysroot,
               "lld-link /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
-              "/ignore:4099 /OPT:REF /OPT:NOICF /SUBSYSTEM:CONSOLE "
+              "/ignore:4099 /OPT:REF /OPT:SAFEICF /SUBSYSTEM:CONSOLE "
               "/MACHINE:ARM64 /OUT:prog.exe /PDB:prog.pdb prog.obj "
               "/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
               "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");

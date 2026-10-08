@@ -7,7 +7,6 @@
 
 #include "alloc.h"
 #include "ir.h"
-#include "llvm_target.h"
 
 static bool ends_with(const char *s, const char *suffix)
 {
@@ -327,31 +326,43 @@ static void profile_hook(struct link_command *c, const struct link_inputs *in)
    Both Windows linkers turn /OPT:REF off under the /DEBUG every link
    passes, so it is named, and named alone it turns on the folding of
    all identical code as well. That gives two functions or two constants
-   one address, which a program may compare, so /OPT:NOICF keeps it off.
+   one address, which a program may compare.
 
-   DESIGN: lld-link of windows-x86_64 folds in the safe form instead,
-   /OPT:SAFEICF: only the code and data that the address-significance
-   table of every object leaves out, so each address a program compares
-   stays distinct. llc writes the table with -addrsig, see llvm_run.c.
-   Relinked on 2026-10-07, it took 1.07 to 1.72 percent off the five
-   programs of the dead-code measurement for windows-x86_64, hello world
-   from 66,560 to 65,536 bytes and tests/bench/ablate/mixed_work.anti
-   from 985,088 to 968,192, each with its old output. Every other target
-   gained less than 1 percent, the most 0.82 for mixed_work on
-   windows-arm64, and keeps its links. link.exe has no safe form. See
-   the entry on folding under "Scope and toolchain" in
-   docs/decisions.md, and distinct_addresses_<target>. */
+   DESIGN: every link of lld folds identical code in the safe form,
+   --icf=safe for ld.lld and ld64.lld and /OPT:SAFEICF for lld-link.
+   It folds only the code and data that the address-significance table
+   of every object leaves out, so each address a program compares stays
+   distinct. llc writes the table with -addrsig, see llvm_run.c, the
+   object runtime of macOS takes -faddrsig, see CMakeLists.txt, and the
+   LTO of lld writes it for the code it generates. An object without a
+   table folds nothing. Eddie decided on 2026-10-08 that every target
+   folds, since the safe form costs no speed and he wants no code in a
+   program that it does not need. link.exe has no safe form and keeps
+   /OPT:NOICF, and GNU ld and Apple's ld fold nothing. The measurement
+   stands in the entry on folding under "Scope and toolchain" in
+   docs/decisions.md. distinct_addresses_<target> checks the
+   guarantee. */
 static void drop_unused(struct link_command *c, enum target t,
                         const struct link_inputs *in)
 {
+    bool lld = in->linker == LINKER_LLD;
+
     switch (target_info(t)->os) {
-    case OS_MACOS: add(c, "-dead_strip"); break;
-    case OS_LINUX: add(c, "--gc-sections"); break;
+    case OS_MACOS:
+        add(c, "-dead_strip");
+        if (lld) {
+            add(c, "--icf=safe");
+        }
+        break;
+    case OS_LINUX:
+        add(c, "--gc-sections");
+        if (lld) {
+            add(c, "--icf=safe");
+        }
+        break;
     case OS_WINDOWS:
         add(c, "/OPT:REF");
-        add(c, llvm_safe_folding(t) && in->linker == LINKER_LLD
-                   ? "/OPT:SAFEICF"
-                   : "/OPT:NOICF");
+        add(c, lld ? "/OPT:SAFEICF" : "/OPT:NOICF");
         break;
     }
 }
