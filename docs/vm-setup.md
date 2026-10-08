@@ -8,7 +8,7 @@ Eddie installs UTM, both images and the Windows licence. Each VM gets the tools 
 
 ### Image and machine
 
-- Image: `ubuntu-24.04.5-live-server-arm64.iso` from https://cdimage.ubuntu.com/releases/24.04/release/.
+- Image: `ubuntu-26.04.1-live-server-arm64.iso` of Ubuntu 26.04.1 LTS from https://cdimage.ubuntu.com/releases/26.04/release/. anti-linux was installed from the image of 26.04 and runs 26.04.1, with CMake 4.2.3 and `qemu-user` 10.2.1 from its packages.
 - UTM: a new machine with Virtualize, Linux and the ISO. Give it 4 cores, 8 GB of memory and 64 GB of disk.
 - In the installer, select "Install OpenSSH server".
 
@@ -98,6 +98,8 @@ At `60322802` on 2026-10-08 it passes 1601 of 1601 with six skipped, mimalloc in
 program of musl. Its sanitizer suites did not run.
 At `3c047bd4` on 2026-10-08 it passes 1619 of 1619 with six skipped, with safe folding on
 every target and a profile in the LTO link. Its sanitizer suites did not run.
+At `95096d2b` on 2026-10-08, on Ubuntu 26.04.1, it passes 1619 of 1619 with six skipped,
+in 153 s. Its sanitizer suites did not run.
 
 | Untested item | Tests that run it |
 |---|---|
@@ -189,6 +191,8 @@ At `60322802` on 2026-10-08 it passes 1589 of 1589 with twelve skipped, in four 
 At `1400572b` on 2026-10-08 it passes 1607 of 1607 with twelve skipped, in five parts of
 `ctest -j4 -I`. The tests `profile_lto_<mode>_<target>` run an instrumented program of
 both Windows targets there.
+At `95096d2b` on 2026-10-08 it passes 1607 of 1607 with twelve skipped, in 825 s with
+`ctest -j4` after the build.
 
 ### SSH from the Mac
 
