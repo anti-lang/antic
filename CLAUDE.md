@@ -411,9 +411,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1663 ctest tests pass on the development Mac and none is skipped. The ASan
-  and the UBSan builds run 1662 each, without the `no_paths` test, which needs a
-  build that no sanitizer wrote paths into. `overview_examples` compiles every
+- 1689 ctest tests pass on the development Mac, and one of them,
+  `sysroot_build_tools`, skips there, since the sysroot it lays out over the
+  Build Tools needs a Windows host. The ASan and the UBSan builds run 1688
+  each with the same skip, without the `no_paths` test, which needs a build
+  that no sanitizer wrote paths into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built, and so are
