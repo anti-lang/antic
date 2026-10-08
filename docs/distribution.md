@@ -236,7 +236,8 @@ that the packer wrote, which it then signs in place with the release key. It tag
 the commit and uploads the assets to a GitHub release. It uploads thirteen files and no signature. It
 publishes the text of anti-lang.com and installs the result from outside. Anti uses no
 CI, so no runner checks a release. `./r --dry-run` performs the
-first five steps and prints what the rest would do.
+first five steps and prints what the rest would do. On a version that is a tag already
+it warns where a real run refuses.
 
 The site takes the two installers, the downloads page, the signature of the manifest
 and the public key. That page names the version and the six packages, with the digest

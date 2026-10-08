@@ -6,7 +6,8 @@
 #   ./r --resume
 #   ./r --skip-vms
 #
-# A dry run performs steps 1 to 5 and prints a plan for the rest.
+# A dry run performs steps 1 to 5 and prints a plan for the rest. On a
+# version that is a tag already it warns where a real run refuses.
 # --resume starts at the first step whose output is missing.
 # --skip-vms leaves the two VMs out and marks a pre-release.
 #
@@ -56,6 +57,8 @@ site_key_path=${key_url#"$site_base/"}
 
 dry_run=no
 skip_vms=no
+# The warning of a dry run on a version that is a tag already.
+tag_warning=""
 for argument in "$@"; do
     case $argument in
     --dry-run) dry_run=yes ;;
@@ -185,19 +188,30 @@ preflight() {
     # and its rerun has to go on at the step that failed. The stamp of
     # step 7 in the state of this commit is what tells that tag from a
     # published version. A tag without it is a version that is out.
+    #
+    # DESIGN: a dry run on a published version warns and goes on, so the
+    # dry run checks the script at any time and not only before a
+    # release. A real run refuses it here, before anything is built.
     own_tag=no
     if [ -f "$state/07-release" ] &&
         [ "$(cat "$state/head" 2> /dev/null)" = "$(git -C "$root" rev-parse HEAD)" ]; then
         own_tag=yes
     fi
     if [ "$own_tag" = no ]; then
+        published=""
         if git -C "$root" rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
-            die "$tag is a tag of this checkout already, and a published version is never rebuilt"
+            published="$tag is a tag of this checkout already"
+        elif [ -n "$(git -C "$root" ls-remote --tags origin "refs/tags/$tag")" ]; then
+            published="origin holds the tag $tag already"
         fi
-        if [ -n "$(git -C "$root" ls-remote --tags origin "refs/tags/$tag")" ]; then
-            die "origin holds the tag $tag already, and a published version is never rebuilt"
+        if [ -z "$published" ]; then
+            say "$version is no tag here and none on origin"
+        elif [ "$dry_run" = no ]; then
+            die "$published, and a published version is never rebuilt"
+        else
+            tag_warning="$published, and a real run refuses a published version"
+            say "warning: $tag_warning"
         fi
-        say "$version is no tag here and none on origin"
     else
         say "$tag is the tag that step 7 of this run made, and the run goes on"
     fi
@@ -1099,6 +1113,7 @@ verify
 report
 if [ "$dry_run" = yes ]; then
     printf 'r: the dry run of %s is done, and its files stand in %s\n' "$version" "$dist"
+    [ -z "$tag_warning" ] || printf 'r: warning: %s\n' "$tag_warning"
 else
     printf 'r: Anti %s is released\n' "$version"
 fi

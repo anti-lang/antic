@@ -725,7 +725,8 @@ reports what it finished.
 - `./r` makes a release, in ten steps from a pushed `main` to the published
   download. The version stands in `tools/version` and its entry in
   `CHANGELOG.md`. `./r --dry-run` runs the first five steps and prints a plan
-  for the rest. See `docs/work-order-release-script.md`, and its decisions
+  for the rest, and on a version that is a tag already it warns where a real
+  run refuses. See `docs/work-order-release-script.md`, and its decisions
   under "The release script" in `docs/decisions.md`.
 - Anti uses no CI. The Mac runs macos-arm64 and macos-x86_64 under Rosetta,
   anti-linux runs linux-arm64 and linux-x86_64 under `qemu-x86_64`, and

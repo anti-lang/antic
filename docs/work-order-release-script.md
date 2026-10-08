@@ -8,7 +8,7 @@ You do not stop to ask. Where a step is unclear, take the smallest option that k
 
 ## Inputs
 
-- `tools/version` holds the version, `0.1.0` and the like, and is the only place it is written. `./r` refuses when the version is already a tag.
+- `tools/version` holds the version, `0.1.0` and the like, and is the only place it is written. `./r` refuses when the version is already a tag, and `./r --dry-run` warns and goes on.
 - `CHANGELOG.md` holds an entry for the version, above the previous one, in the docs style. `./r` refuses when the entry is missing.
 - `main` is checked out, without uncommitted changes, and pushed. `./r` refuses otherwise.
 - The runtime archive's downloads are in place: the LLVM tools and clang at the pins, the six sysroots, raylib, from `build/`. `./r` runs the download steps when they are missing.
@@ -31,14 +31,14 @@ You do not stop to ask. Where a step is unclear, take the smallest option that k
 
 ## Options
 
-- `./r --dry-run` performs steps 1 to 5 and prints what 6 to 10 would do, uploading nothing.
+- `./r --dry-run` performs steps 1 to 5 and prints what 6 to 10 would do, uploading nothing. On a version that is a tag already it warns rather than refuses, so it runs at any time.
 - `./r --resume` starts at the first step whose output is missing. A rerun after a failure does that by default.
 - `./r --skip-vms` for a machine without the VMs. It marks the release as a pre-release, since step 5 did not run.
 
 ## Rules
 
 - Every artefact carries the version and the build id, and `anti license --from` on every shipped binary prints both.
-- A published version is never rebuilt. A second run of `./r` with the same version refuses at step 1.
+- A published version is never rebuilt. A second run of `./r` with the same version refuses at step 1. A dry run warns there instead.
 - `./r` never touches the working tree except to write `build/dist/` and the report.
 - The script has a test, `release_dry_run`. It runs `./r --dry-run` on a temporary copy of the tree with the version bumped and checks each step's output exists.
 

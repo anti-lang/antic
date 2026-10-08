@@ -322,6 +322,11 @@ file(WRITE "${WORK}/dry-run.log" "${out}${err}")
 if(NOT failed EQUAL 0)
     message(FATAL_ERROR "./r --dry-run failed:\n${out}${err}")
 endif()
+# A version that is no tag gives no warning.
+if("${out}${err}" MATCHES "warning:")
+    message(FATAL_ERROR "./r --dry-run warns on a version that is no tag\n"
+                        "${out}${err}")
+endif()
 
 # A dry run writes under build/dist/dry-run, so that nothing it leaves
 # behind stands in for a step of a release.
@@ -526,17 +531,51 @@ if(OPENSSL)
     endif()
 endif()
 
-# A version that is a tag is published, and a second run refuses it.
+# DESIGN: a version that is a tag is published, and a real run refuses
+# it in step 1. A dry run warns, runs every other check and prints the
+# plan, so it checks the script at any time and not only before a
+# release. Both hold for a tag of the checkout and for a tag of origin
+# alone.
+function(tagged_runs where)
+    set(ENV{PATH} "${WORK}/bin:${saved_path}")
+    execute_process(COMMAND "${copy}/r" --dry-run WORKING_DIRECTORY "${copy}"
+                    RESULT_VARIABLE failed OUTPUT_VARIABLE out
+                    ERROR_VARIABLE err ENCODING NONE)
+    set(ENV{PATH} "${saved_path}")
+    if(NOT failed EQUAL 0)
+        message(FATAL_ERROR "./r --dry-run refused a version that is a tag "
+                            "${where}\n${out}${err}")
+    endif()
+    if(NOT "${out}${err}" MATCHES "warning: [^\n]*v${version}")
+        message(FATAL_ERROR "./r --dry-run gave no warning on the tag "
+                            "${where}\n${out}${err}")
+    endif()
+    foreach(line "would sign" "would tag v${version}" "would install"
+            "the dry run of ${version} is done")
+        if(NOT out MATCHES "${line}")
+            message(FATAL_ERROR "./r --dry-run on the tag ${where} printed no "
+                                "`${line}`\n${out}${err}")
+        endif()
+    endforeach()
+    set(ENV{PATH} "${WORK}/bin:${saved_path}")
+    execute_process(COMMAND "${copy}/r" WORKING_DIRECTORY "${copy}"
+                    RESULT_VARIABLE refused OUTPUT_VARIABLE out
+                    ERROR_VARIABLE err ENCODING NONE)
+    set(ENV{PATH} "${saved_path}")
+    if(refused EQUAL 0 OR NOT "${out}${err}" MATCHES "v${version}"
+       OR "${out}${err}" MATCHES "step 2")
+        message(FATAL_ERROR "./r did not refuse a version that is a tag "
+                            "${where} in step 1\n${out}${err}")
+    endif()
+endfunction()
 run("the tag failed" "${GIT}" -C "${copy}" tag "v${version}")
-set(ENV{PATH} "${WORK}/bin:${saved_path}")
-execute_process(COMMAND "${copy}/r" --dry-run WORKING_DIRECTORY "${copy}"
-                RESULT_VARIABLE refused OUTPUT_VARIABLE out
-                ERROR_VARIABLE err ENCODING NONE)
-set(ENV{PATH} "${saved_path}")
-if(refused EQUAL 0 OR NOT "${out}${err}" MATCHES "v${version}")
-    message(FATAL_ERROR "./r packed a version that is already a tag\n${out}${err}")
-endif()
+tagged_runs("of the checkout")
+run("the push of the tag failed" "${GIT}" -C "${copy}" push --quiet origin
+    "v${version}")
 run("the tag did not go" "${GIT}" -C "${copy}" tag -d "v${version}")
+tagged_runs("of origin")
+run("the tag did not leave origin" "${GIT}" -C "${copy}" push --quiet origin
+    ":refs/tags/v${version}")
 
 # A release that stopped after step 7 holds a tag of its own, and its
 # rerun goes on rather than refusing it. The stamp of step 7 in the state
