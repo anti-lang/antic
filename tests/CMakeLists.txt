@@ -3664,8 +3664,9 @@ foreach(target linux-x86_64 linux-arm64)
             "-DANTIC=$<TARGET_FILE:antic>"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/c_allocator.anti"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/c_allocator.anti"
             "-DTARGET=${target}"
+            "-DHOST=${ANTIC_HOST_TARGET}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/musl-allocator/${target}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_musl_allocator.cmake")
     set_tests_properties(musl_allocator_${target} PROPERTIES TIMEOUT 120

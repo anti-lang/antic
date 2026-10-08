@@ -6,8 +6,10 @@
 #   ANTIC         the antic executable
 #   RUNTIME       the runtime directory
 #   LLVM_OBJDUMP  the llvm-objdump executable
-#   SOURCE        a program that calls the five functions
+#   SOURCE        a program that calls the five functions, with its
+#                 .expected file beside it
 #   TARGET        linux-x86_64 or linux-arm64
+#   HOST          the target antic runs on, where each program also runs
 #   WORK          a directory for the files
 #
 # The symbol table of a Linux program stays after --strip-debug. mimalloc
@@ -54,6 +56,9 @@ function(address out table symbol)
     set(${out} "${CMAKE_MATCH_1}" PARENT_SCOPE)
 endfunction()
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+string(REGEX REPLACE "\\.anti$" ".expected" expected_file "${SOURCE}")
+
 # The source files of musl's allocator, as its file symbols name them.
 set(musl_files lite_malloc.c aligned_alloc.c calloc.c realloc.c)
 
@@ -84,6 +89,10 @@ foreach(build "release" "lto_none,--lto,none" "lto_thin,--lto,thin"
             message(FATAL_ERROR "${name}: the program links ${file} of musl")
         endif()
     endforeach()
+    if(HOST STREQUAL TARGET)
+        program_expect("${name}" COMMAND "${WORK}/${name}"
+                       EXPECTED "${expected_file}")
+    endif()
 endforeach()
 
 # --memory-checks links against glibc, where AddressSanitizer defines

@@ -1,8 +1,9 @@
-//! The five functions of the C allocator, called by a program. A program of
-//! musl takes them from mimalloc of the runtime archive, and every other
-//! program from its C library. musl_allocator_<target> reads which one a Linux
-//! program links. Each block goes to strcpy and printf, so release mode cannot
-//! drop the call that made it, and each is freed.
+//! The five functions of the C allocator, called by a program of Linux. A
+//! program of musl takes them from mimalloc of the runtime archive, and
+//! musl_allocator_<target> reads which one it links. Each block goes to strcpy
+//! and printf, so release mode cannot drop the call that made it, and each is
+//! freed. The Universal C Runtime of Windows has no aligned_alloc, so the
+//! program is no test of every target.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 extern fn strcpy(to: ?*byte, from: ?*byte) -> ?*byte;
