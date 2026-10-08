@@ -39,10 +39,11 @@ antic_native_license(mimalloc "${ANTIC_MIMALLOC_SOURCE}/LICENSE")
 # DESIGN: src/static.c, the one object that mimalloc's own build writes as
 # mimalloc.o for a static override, with the definitions and flags that
 # its CMakeLists.txt gives that object in a Release build for clang on
-# Linux with MI_LIBC_MUSL on and every other option at its default. One
-# object holds every function of the C allocator, so the link takes all
-# of them or none. The flags that are no warnings stand here, and the
-# warnings in ANTIC_MIMALLOC_WARNINGS of src/native/warnings.cmake.
+# Linux with MI_LIBC_MUSL on and every other option at its default but
+# the three below. One object holds every function of the C allocator,
+# so the link takes all of them or none. The flags that are no warnings
+# stand here, and the warnings in ANTIC_MIMALLOC_WARNINGS of
+# src/native/warnings.cmake.
 #
 # [provisional] DESIGN: one option differs from its default. MI_ALLOW_THP
 # is OFF, so MI_DEFAULT_ALLOW_THP is 0 where the default FULL gives 2, and
@@ -60,9 +61,16 @@ antic_native_license(mimalloc "${ANTIC_MIMALLOC_SOURCE}/LICENSE")
 # and a third-party allocator changes nothing through the environment.
 # Eddie decided it on 2026-10-08. The test mimalloc_environment_<target>
 # runs a program with two of the variables.
+#
+# DESIGN: MI_STATS is 0 where mimalloc's Release build gives 1, so the
+# allocator keeps no detailed statistics. Under MI_NO_GETENV no program
+# can print them, and code that can never run is still code to audit.
+# Eddie decided it on 2026-10-08. Statistics come back only together with
+# a defined way to read them, such as part of --memory-checks. The test
+# musl_allocator_<target> refuses a program that holds their labels.
 set(ANTIC_MIMALLOC_DEFINES -DMI_MALLOC_OVERRIDE -DMI_LIBC_MUSL=1
     -DMI_DEFAULT_ALLOW_THP=0 -DMI_NO_GETENV=1 -DNDEBUG=1 -DMI_GUARDED=0
-    -DMI_STATS=1 -DMI_PROFILE=1)
+    -DMI_STATS=0 -DMI_PROFILE=1)
 set(ANTIC_MIMALLOC_FLAGS -std=gnu11 -O3 -fvisibility=hidden -mno-outline
     -ftls-model=local-dynamic -fno-builtin-malloc)
 

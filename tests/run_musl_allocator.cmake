@@ -18,6 +18,12 @@
 # aligned_alloc is a function of its own there. Its file symbol tells it
 # apart from musl's: the musl of the sysroot names each source file of its
 # allocator, and mimalloc is the one file static.c.
+#
+# mimalloc builds with MI_STATS=0, so a program keeps none of its
+# detailed statistics. Eddie decided it on 2026-10-08: under
+# MI_NO_GETENV no program can print them. The labels "binned" and
+# "malloc req~" are strings that mi_stats_print writes for those
+# statistics alone, so a program that links them still carries the code.
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -82,6 +88,12 @@ foreach(build "release" "lto_none,--lto,none" "lto_thin,--lto,thin"
     address(aligned "${table}" aligned_alloc)
     if(aligned STREQUAL "")
         message(FATAL_ERROR "${name}: the program defines no aligned_alloc")
+    endif()
+    file(STRINGS "${WORK}/${name}" labels
+         REGEX "^(binned|malloc req~)$" ENCODING UTF-8)
+    if(labels)
+        message(FATAL_ERROR "${name}: the program holds the detailed "
+                            "statistics of mimalloc: ${labels}")
     endif()
     foreach(file IN LISTS musl_files)
         string(FIND "${table}" " ${file}\n" at)
