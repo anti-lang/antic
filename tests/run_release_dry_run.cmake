@@ -390,7 +390,7 @@ foreach(name packages/SHA256SUMS.sig state/06-digests state/07-release)
 endforeach()
 foreach(line "would sign" "would tag v${version}" "would create the release"
         "would upload 13 files" "would upload no SHA256SUMS.sig"
-        "the runner matrix, left out" "would rsync tools/install.sh"
+        "would rsync tools/install.sh"
         "would rsync the downloads page" "would rsync SHA256SUMS.sig"
         "tools/keys/release.pem" "would install")
     if(NOT out MATCHES "${line}")
@@ -399,10 +399,17 @@ foreach(line "would sign" "would tag v${version}" "would create the release"
     endif()
 endforeach()
 
-# DESIGN: the runner matrix is no step of a release. --matrix runs it, and
-# a run without the flag names no workflow at all.
-if(out MATCHES "would run the workflow")
-    message(FATAL_ERROR "step 8 runs the runner matrix without --matrix\n${out}")
+# Anti runs no CI, so a release names no runner matrix and no workflow.
+if(out MATCHES "matrix|workflow")
+    message(FATAL_ERROR "the release still names a runner matrix or a "
+                        "workflow\n${out}")
+endif()
+execute_process(COMMAND "${copy}/r" --matrix WORKING_DIRECTORY "${copy}"
+                RESULT_VARIABLE refused OUTPUT_VARIABLE matrix_out
+                ERROR_VARIABLE matrix_err ENCODING NONE)
+if(NOT refused EQUAL 2 OR "${matrix_err}" MATCHES "matrix")
+    message(FATAL_ERROR "./r --matrix ended with ${refused} and printed "
+                        "`${matrix_out}${matrix_err}`")
 endif()
 
 # DESIGN: the assets of the release are the twelve files and the manifest.
