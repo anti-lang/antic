@@ -193,6 +193,8 @@ At `1400572b` on 2026-10-08 it passes 1607 of 1607 with twelve skipped, in five 
 both Windows targets there.
 At `95096d2b` on 2026-10-08 it passes 1607 of 1607 with twelve skipped, in 825 s with
 `ctest -j4` after the build.
+At `27cee303` on 2026-10-08 it passes 1610 of 1610 with fourteen skipped, in 797 s with
+`ctest -j4` after the build.
 
 ### SSH from the Mac
 
