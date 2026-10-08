@@ -15,7 +15,7 @@ file(GLOB build_files RELATIVE "${ROOT}"
     "${ROOT}/CMakeLists.txt" "${ROOT}/CMakePresets.json" "${ROOT}/r"
     "${ROOT}/tools/*.cmake" "${ROOT}/tools/*.sh" "${ROOT}/tools/*.ps1"
     "${ROOT}/src/native/*.cmake" "${ROOT}/tests/*.cmake"
-    "${ROOT}/tests/CMakeLists.txt" "${ROOT}/.github/workflows/*.yml")
+    "${ROOT}/tests/CMakeLists.txt")
 file(GLOB_RECURSE c_files RELATIVE "${ROOT}"
     "${ROOT}/src/*.c" "${ROOT}/src/*.h" "${ROOT}/tests/*.c" "${ROOT}/tests/*.h"
     "${ROOT}/tests/*.cpp")

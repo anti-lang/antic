@@ -88,8 +88,9 @@ not re-open a settled decision without asking Eddie.
   for comments without the checker. The tool output under `docs/audit/data/`
   stays as the tools wrote it. The copy under `tools/` is pinned on purpose, so
   the rules do not change when the skill it came from syncs.
-- No workflow runs. Every workflow stays `workflow_dispatch` only, which the
-  test `workflows_dispatch_only` checks. Hosted build minutes are limited.
+- No CI. Anti runs no GitHub workflow, and the test `no_workflows` refuses
+  any file under `.github/workflows/`. Every suite runs on the development
+  Mac and on the two VMs of `docs/vm-setup.md`.
 - One commit per logical change. Push to `origin/main` directly, no pull
   requests, after every completed step.
 - The gap procedure. Where a specification is silent, take the smallest option
@@ -201,7 +202,7 @@ for a reader's build and never for a release.
   and `tools/`, plus the root files `CLAUDE.md`, `README.md`, `CHANGELOG.md`,
   `LICENSE`, `CMakeLists.txt`, `CMakePresets.json` and `.gitignore`.
 - Files that tools require in the root, the release link `r` and the build
-  link `c`: `.github/`, `.gitattributes`, `.editorconfig`, a tracked
+  link `c`: `.gitattributes`, `.editorconfig`, a tracked
   `.claude/settings.json` if there is one, `r` and `c`.
 - `src/` holds exactly `antic/`, `anti/`, `rt/`, `std/` and `native/`.
 - `docs/` holds exactly the directories `audit/`, `notes/`, `reports/` and

@@ -19,7 +19,7 @@ file(REMOVE_RECURSE "${WORK}")
 set(source "${WORK}/source")
 file(MAKE_DIRECTORY "${source}")
 foreach(entry CMakeLists.txt CMakePresets.json LICENSE README.md CHANGELOG.md
-              .github docs LICENSES src tests tools)
+              docs LICENSES src tests tools)
     file(COPY "${ROOT}/${entry}" DESTINATION "${source}")
 endforeach()
 

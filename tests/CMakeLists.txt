@@ -919,16 +919,15 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endif()
 
-# CI runs only by hand: every workflow triggers on workflow_dispatch alone.
 # Every script of `cmake -P` names the minimum version of CMake, so CMake 3
 # sets the policies CMake 4 takes for granted.
 add_test(NAME script_policies
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_script_policies.cmake")
-add_test(NAME workflows_dispatch_only
-    COMMAND "${CMAKE_COMMAND}"
-        "-DWORKFLOWS=${PROJECT_SOURCE_DIR}/.github/workflows"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_workflows.cmake")
+# Anti runs no CI, so no file stands under .github/workflows/.
+add_test(NAME no_workflows
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_no_workflows.cmake")
 
 # The warning flags of the build stand in tools/warnings.cmake and
 # src/native/warnings.cmake alone, as docs/c-guidelines.md requires.
