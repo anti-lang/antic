@@ -252,18 +252,17 @@ static bool can_link(const struct options *o)
    holds where --lto is not given and the build links a program with
    lld. Dev mode writes an object per module, -S, -c and --lib need real
    objects, and the platform linker has no LTO of the pinned release, so
-   each of those keeps LTO_NONE. So does a build with a profile, since
-   the profile acts on the run of opt that --lto moves before the link,
-   a build of --memory-checks, whose options hook the AddressSanitizer
-   runtime of macOS does not find under LTO, and a Windows program that
-   hosts plugins, which driver_run learns after the front end. Each of
-   them but the first refuses --lto full or thin when it is given, and
-   --memory-checks refuses them on macOS. */
+   each of those keeps LTO_NONE. So does a build of --memory-checks,
+   whose options hook the AddressSanitizer runtime of macOS does not find
+   under LTO, and a Windows program that hosts plugins, which driver_run
+   learns after the front end. Each of them refuses --lto full or thin
+   when it is given, and --memory-checks refuses them on macOS. A build
+   with a profile takes the default as well, see profile_usable. */
 static enum lto lto_mode(const struct options *o)
 {
     if (o->lto_given || o->dev || o->front_end || o->assembly_only ||
         o->library || o->lib != LIB_NONE || o->linker != LINKER_LLD ||
-        o->profile_generate || o->profile_use != NULL || o->memory_checks) {
+        o->memory_checks) {
         return o->lto;
     }
     return LTO_FULL;
@@ -354,19 +353,22 @@ static bool indexed_profile_file(const char *path)
 
 /* DESIGN: --profile-generate and --profile-use act on the run of opt in
    release mode, choice D7 of docs/work-order-llvm-optimization.md, and
-   neither is a default, condition C3. Dev mode runs no opt, and --lto
-   runs the pipeline before the link, which takes no profile here. The
-   instrumented program links the profile runtime, so --profile-generate
-   builds a program that lld links. A profile is the indexed file of
-   llvm-profdata merge, since opt reads no raw profile. */
+   neither is a default, condition C3. Dev mode runs no opt. Eddie decided
+   on 2026-10-08 that a build with a profile links through the LTO of a
+   release build as well, full by default, so a program gets both the
+   profile and the smaller link. The profile acts on the pipeline opt runs
+   before the link, under --lto full and thin as without them, and --lto
+   none keeps the link of objects. The instrumented program links the
+   profile runtime, so --profile-generate builds a program that lld
+   links. A profile is the indexed file of llvm-profdata merge, since opt
+   reads no raw profile. */
 static bool profile_usable(const struct options *o)
 {
     const char *option =
         o->profile_generate ? "--profile-generate" : "--profile-use";
 
-    if (o->dev || o->lto != LTO_NONE) {
-        fprintf(stderr, "antic: %s builds in release mode, without --dev or "
-                        "--lto\n",
+    if (o->dev) {
+        fprintf(stderr, "antic: %s builds in release mode, without --dev\n",
                 option);
         return false;
     }

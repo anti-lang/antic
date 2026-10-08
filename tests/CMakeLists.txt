@@ -4710,16 +4710,49 @@ foreach(mode full thin)
 endforeach()
 # The same program built with --profile-generate, run, merged by
 # llvm-profdata and built again with --profile-use, the step pgo of the
-# work order. Each build passes the test of the program.
+# work order. Each build takes the default LTO of a release build and
+# passes the test of the program.
 add_test(NAME profile_guided
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/bench/ablate/mixed_work.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/profile_guided"
-        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DREFUSALS=ON"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_profile.cmake")
 set_tests_properties(profile_guided PROPERTIES TIMEOUT 300)
+# A program with a profile of its own run in each link of a release
+# build, for the host and for the target it emulates.
+set(profile_targets "${ANTIC_HOST_TARGET}")
+if(ANTIC_EMULATED_TARGET)
+    list(APPEND profile_targets "${ANTIC_EMULATED_TARGET}")
+endif()
+foreach(target IN LISTS profile_targets)
+    set(options "")
+    set(emulator "")
+    if(target STREQUAL ANTIC_EMULATED_TARGET)
+        set(options "${ANTIC_X86_64_OPTIONS}")
+        set(emulator "${ANTIC_EMULATOR}")
+    endif()
+    foreach(lto full thin none)
+        set(mode "${lto}")
+        if(lto STREQUAL "full")
+            set(mode "")
+        endif()
+        add_test(NAME profile_lto_${lto}_${target}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DANTIC=$<TARGET_FILE:antic>"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/loops.anti"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/profile-lto/${lto}-${target}"
+                "-DOPTIONS=${options}"
+                "-DEMULATOR=${emulator}"
+                "-DLTO=${mode}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_profile.cmake")
+        set_tests_properties(profile_lto_${lto}_${target} PROPERTIES
+            TIMEOUT 300)
+    endforeach()
+endforeach()
 add_custom_target(bench
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"

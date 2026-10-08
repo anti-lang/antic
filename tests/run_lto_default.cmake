@@ -1,7 +1,8 @@
 # A release build links the program and the runtime as bitcode through
 # full LTO by default, and `--lto none` links both as objects, the link of
-# before. A build that LTO cannot serve without being asked keeps the
-# objects: one with a profile, and a Windows program that hosts plugins.
+# before. A build with a profile takes the default as well. A Windows
+# program that hosts plugins, which LTO cannot serve without being asked,
+# keeps the objects.
 # Run with cmake -P and these values:
 #   ANTIC     the antic executable
 #   RUNTIME   the runtime directory
@@ -75,7 +76,11 @@ expect_bitcode("${WORK}/none${exe}${object}" NOT)
 expect_run("${WORK}/none${exe}")
 
 antic(--profile-generate -o "${WORK}/profile${exe}" "${SOURCE}")
-expect_bitcode("${WORK}/profile${exe}${object}" NOT)
+expect_bitcode("${WORK}/profile${exe}${object}")
+
+antic(--profile-generate --lto none -o "${WORK}/profile-none${exe}"
+      "${SOURCE}")
+expect_bitcode("${WORK}/profile-none${exe}${object}" NOT)
 
 # The .def file of a Windows host lists the COFF symbols of its object.
 if(EXISTS "${RUNTIME}/sysroot/windows-x86_64")

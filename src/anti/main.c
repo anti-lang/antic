@@ -297,7 +297,7 @@ static int build_command(int argc, char **argv)
         return 2;
     }
     /* DESIGN: --lto acts on the one antic call of release mode, as a
-       profile does. antic refuses full and thin with a profile. */
+       profile does, and antic takes both together. */
     if (request.lto != NULL && !link_lto_from_name(request.lto, &lto)) {
         fprintf(stderr, "anti: --lto takes full, thin or none, not %s\n",
                 request.lto);

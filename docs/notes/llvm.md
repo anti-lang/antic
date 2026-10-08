@@ -118,8 +118,8 @@ rules, and the tests named there pin each fact.
   `lib/<target>/<level>/bitcode/full/` at `--lto-O3` and the same threshold,
   `/opt:lldlto=3` on Windows. `--lto thin` takes `bitcode/thin/`, and
   `--lto none` the link of objects below. Dev mode, `-S`, `-c`, `--lib`,
-  `--linker platform`, a profile, `--memory-checks` and a Windows program
-  that hosts plugins keep the objects.
+  `--linker platform`, `--memory-checks` and a Windows program that hosts
+  plugins keep the objects.
 - The runtime as bitcode of a Linux target carries no unwind tables. The link
   with `-g` that a symbols archive holds then lays the program out as the
   release link does. The runtime of ARM64 Linux takes no outline atomics on
@@ -131,7 +131,9 @@ rules, and the tests named there pin each fact.
   and of the LTO of lld. `link.exe` keeps `/OPT:NOICF`.
 - `--profile-generate` instruments the run of opt and links the profile
   runtime of compiler-rt, and `--profile-use <file>` runs opt with the
-  merged profile. Both take the link of objects.
+  merged profile. Both take the link of a release build, the LTO of lld by
+  default, and opt applies the profile before the link. The LTO of lld
+  takes none.
 
 ## Defined results and wide operations
 

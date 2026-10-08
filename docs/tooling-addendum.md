@@ -61,7 +61,8 @@ same name to `antic`, in either mode. It is off by default. "Memory checks" in
 options of the same name to `antic`, for a program in release mode alone. The first
 builds a program that writes a raw profile of each run. `llvm-profdata merge` of the
 package turns the raw profiles into the file the second reads. Both are off by default,
-as condition C3 of `docs/work-order-llvm-optimization.md` requires.
+as condition C3 of `docs/work-order-llvm-optimization.md` requires. A build with either
+takes the LTO of a release build, as one without a profile does.
 
 A release build links the program and the runtime as bitcode through full LTO.
 `--lto full|thin|none` on `anti build` and `anti run` passes the option of the same name

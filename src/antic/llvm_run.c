@@ -97,22 +97,65 @@ done:
    in 1.20 of the time of the object link on macos-arm64 on 2026-10-07,
    and at O3 with 225 every program of tests/bench and mixed_work lay
    within 1 percent of it or below, objects at 0.73. */
+/* DESIGN: --profile-generate and --profile-use run the pipeline of
+   release mode with the instrumentation of a profile or with its use, as
+   clang does for -fprofile-generate and -fprofile-use. Both place it at
+   the same point of the pipeline, so the profile of an instrumented
+   build fits the build that uses it. The instrumented program writes
+   LLVM_PROFILE_DEFAULT in its working directory, the name clang gives,
+   and LLVM_PROFILE_FILE names another file. %m stands for the signature of
+   the program, so the runs of one program merge into one file and those
+   of two programs stay apart. */
+#define LLVM_PROFILE_DEFAULT "default_%m.profraw"
+
+/* Append the options of the profile of r to the n options of opt. profile
+   holds the text of the option of --profile-use, which the caller frees.
+   DESIGN: under --lto the profile acts on the pipeline before the link,
+   as clang gives -fprofile-generate and -fprofile-use with -flto, and the
+   bitcode carries its counts and its summary into the LTO of lld. That
+   LTO takes no profile of the instrumentation of IR: ld.lld, ld64.lld and
+   lld-link of the pinned release read a context-sensitive profile and a
+   sample profile alone. */
+static void profile_options(const struct llvm_run *r, struct text *profile,
+                            const char **opt, size_t *n)
+{
+    if (r->profile_generate) {
+        opt[(*n)++] = "-pgo-kind=pgo-instr-gen-pipeline";
+        opt[(*n)++] = "-profile-file=" LLVM_PROFILE_DEFAULT;
+    } else if (r->profile_use != NULL) {
+        text_appendf(profile, "-profile-file=%s", r->profile_use);
+        opt[(*n)++] = "-pgo-kind=pgo-instr-use-pipeline";
+        opt[(*n)++] = text_cstr(profile);
+    }
+}
+
 static bool run_lto(const struct llvm_run *r, const char *text_path,
                     const char *output)
 {
-    const char *full[] = {r->opt, "-passes=lto-pre-link<O3>",
-                          LLVM_INLINE_THRESHOLD, "-o", output, text_path,
-                          NULL};
-    const char *thin[] = {r->opt, "--thinlto-bc",
-                          "-passes=thinlto-pre-link<O3>",
-                          LLVM_INLINE_THRESHOLD, "-o", output, text_path,
-                          NULL};
+    struct text profile = {0};
+    const char *opt[10];
+    size_t n = 0;
+    bool ok;
 
-    if (process_run(r->lto == LTO_THIN ? thin : full) != 0) {
-        fprintf(stderr, "antic: opt failed\n");
-        return false;
+    opt[n++] = r->opt;
+    if (r->lto == LTO_THIN) {
+        opt[n++] = "--thinlto-bc";
+        opt[n++] = "-passes=thinlto-pre-link<O3>";
+    } else {
+        opt[n++] = "-passes=lto-pre-link<O3>";
     }
-    return true;
+    opt[n++] = LLVM_INLINE_THRESHOLD;
+    profile_options(r, &profile, opt, &n);
+    opt[n++] = "-o";
+    opt[n++] = output;
+    opt[n++] = text_path;
+    opt[n] = NULL;
+    ok = process_run(opt) == 0;
+    text_free(&profile);
+    if (!ok) {
+        fprintf(stderr, "antic: opt failed\n");
+    }
+    return ok;
 }
 
 /* DESIGN: release mode runs default<O3> at an inline threshold of 225,
@@ -150,17 +193,6 @@ static bool run_lto(const struct llvm_run *r, const char *text_path,
 const char *const llvm_opt_options[LLVM_OPT_OPTION_COUNT] = {
     "-passes=default<O3>", LLVM_INLINE_THRESHOLD};
 
-/* DESIGN: --profile-generate and --profile-use run the pipeline of
-   release mode with the instrumentation of a profile or with its use, as
-   clang does for -fprofile-generate and -fprofile-use. Both place it at
-   the same point of the pipeline, so the profile of an instrumented
-   build fits the build that uses it. The instrumented program writes
-   LLVM_PROFILE_DEFAULT in its working directory, the name clang gives,
-   and LLVM_PROFILE_FILE names another file. %m stands for the signature of
-   the program, so the runs of one program merge into one file and those
-   of two programs stay apart. */
-#define LLVM_PROFILE_DEFAULT "default_%m.profraw"
-
 static bool run_opt(const struct llvm_run *r, const char *text_path,
                     const char *bitcode_path)
 {
@@ -172,14 +204,7 @@ static bool run_opt(const struct llvm_run *r, const char *text_path,
     opt[n++] = r->opt;
     opt[n++] = llvm_opt_options[0];
     opt[n++] = llvm_opt_options[1];
-    if (r->profile_generate) {
-        opt[n++] = "-pgo-kind=pgo-instr-gen-pipeline";
-        opt[n++] = "-profile-file=" LLVM_PROFILE_DEFAULT;
-    } else if (r->profile_use != NULL) {
-        text_appendf(&profile, "-profile-file=%s", r->profile_use);
-        opt[n++] = "-pgo-kind=pgo-instr-use-pipeline";
-        opt[n++] = text_cstr(&profile);
-    }
+    profile_options(r, &profile, opt, &n);
     opt[n++] = "-o";
     opt[n++] = bitcode_path;
     opt[n++] = text_path;
