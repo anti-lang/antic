@@ -179,6 +179,7 @@ tree, and one less level is one less path to get wrong.
 | `anti` | The runtime archive with antic per target | The release build of chapter 23 |
 | `raylib`, `pcre2`, `mbedtls`, `miniaudio` | The static library per target, with headers | The CMake build in `src/native/` |
 | `musl` | The Linux sysroot per processor | `tools/get-sysroot.cmake` |
+| `mimalloc` | The static library per Linux target and processor level, the C allocator of every program of musl | The CMake build in `src/native/` |
 
 The runtime archive of a package holds, beside the runtime of each target and level in
 `lib/<target>/<level>/`, its bitcode of full LTO in `bitcode/full/`. A release build
@@ -471,6 +472,7 @@ executable carries its licence with it:
 | miniaudio | MIT-0 | None |
 | Mbed TLS | Apache 2.0 | Ship the licence and notice with the binary |
 | PCRE2 | BSD 3-clause | Reproduce the copyright notice with the binary |
+| mimalloc, in every program of musl | MIT | Include the copyright and permission notice with the binary |
 | CA bundle | MPL 2.0 | None. The file is loaded from the archive, not shipped |
 
 A program that imports `anti.raylib` and `anti.miniaudio` owes nobody anything. A

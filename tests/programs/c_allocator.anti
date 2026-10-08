@@ -1,0 +1,29 @@
+//! The five functions of the C allocator, called by a program. A program of
+//! musl takes them from mimalloc of the runtime archive, and every other
+//! program from its C library. musl_allocator_<target> reads which one a Linux
+//! program links. Each block goes to strcpy and printf, so release mode cannot
+//! drop the call that made it, and each is freed.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn strcpy(to: ?*byte, from: ?*byte) -> ?*byte;
+extern fn malloc(size: u64) -> ?*byte;
+extern fn calloc(count: u64, size: u64) -> ?*byte;
+extern fn realloc(p: ?*byte, size: u64) -> ?*byte;
+extern fn aligned_alloc(align: u64, size: u64) -> ?*byte;
+
+fn main() -> int
+{
+	let a = malloc(64) else { return 1; };
+	strcpy(a, "malloc and realloc".ptr);
+	let b = calloc(8, 8) else { return 2; };
+	let c = realloc(a, 4096) else { return 3; };
+	let d = aligned_alloc(64, 256) else { return 4; };
+	strcpy(d, "aligned_alloc".ptr);
+	printf("%s\n".ptr, c);
+	printf("calloc [%s]\n".ptr, b);
+	printf("%s\n".ptr, d);
+	free(c);
+	free(b);
+	free(d);
+	return 0;
+}

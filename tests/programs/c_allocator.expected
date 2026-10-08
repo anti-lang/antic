@@ -1,0 +1,4 @@
+exit 0
+malloc and realloc
+calloc []
+aligned_alloc

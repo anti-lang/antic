@@ -6,7 +6,8 @@
 # Libraries are added in the order of docs/decisions.md: PCRE2, then Mbed
 # TLS, miniaudio and raylib, with SQLite between PCRE2 and Mbed TLS as
 # docs/anti-language-additions.md places it. media.cmake holds what the
-# last two share.
+# last two share. mimalloc, the C allocator of the musl targets, comes
+# last.
 #
 # DESIGN: this is a subdirectory of the build of antic and no project of
 # its own, so one configure builds every target that has a sysroot, as the
@@ -95,6 +96,7 @@ include(mbedtls.cmake)
 include(media.cmake)
 include(miniaudio.cmake)
 include(raylib.cmake)
+include(mimalloc.cmake)
 
 # LICENSES/ of the repository holds the licence text of every library
 # above, the same bytes the build copies from its pinned release.

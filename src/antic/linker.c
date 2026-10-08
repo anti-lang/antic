@@ -567,6 +567,7 @@ static void linux_lld(struct link_command *c, enum target t,
                                         "crtn.o"};
     const char *linker = program(c, in, t);
     struct text *library = next(c);
+    struct text *allocator = next(c);
     size_t i;
 
     runtime_library(library, in->runtime, t, in->cpu, false, in->lto);
@@ -590,6 +591,11 @@ static void linux_lld(struct link_command *c, enum target t,
     add_inputs(c, in);
     add(c, text_cstr(library));
     profile_runtime(c, t, in, false);
+    /* The allocator comes before libc.a, so malloc and the functions
+       beside it resolve to it for the program, the runtime and musl. */
+    text_appendf(allocator, "%s/%s/%s/%s/%s", in->runtime, RUNTIME_LIB_DIR,
+                 target_name(t), cpu_name(in->cpu), MUSL_ALLOCATOR);
+    add(c, text_cstr(allocator));
     for (i = 0; i < 3; i++) {
         struct text *file = next(c);
         text_appendf(file, "%s/%s/%s", in->sysroot, SYSROOT_LIB, after[i]);

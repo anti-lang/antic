@@ -35,3 +35,8 @@ set(ANTIC_RAYLIB_WARNINGS -Wall -Wno-missing-braces -Werror=pointer-arith
 # macOS it defines GL_SILENCE_DEPRECATION, since Apple deprecates OpenGL.
 set(ANTIC_RAYLIB_WARNINGS_windows -D_CRT_SECURE_NO_WARNINGS)
 set(ANTIC_RAYLIB_WARNINGS_macos -DGL_SILENCE_DEPRECATION)
+
+# mimalloc 3.5.3. The warnings its CMakeLists.txt adds for clang, which is
+# also its C++ compiler here.
+set(ANTIC_MIMALLOC_WARNINGS -Wall -Wextra -Wpedantic -Wno-deprecated
+    -Wno-unknown-pragmas -Wstrict-prototypes -Wno-static-in-inline)

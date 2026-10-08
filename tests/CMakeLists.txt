@@ -3656,6 +3656,22 @@ if(ANTIC_EMULATED_TARGET MATCHES "^(linux|windows)-x86_64$")
     endforeach()
 endif()
 
+# A program of musl links mimalloc of the runtime archive as its C
+# allocator in every mode, and a program of --memory-checks does not.
+foreach(target linux-x86_64 linux-arm64)
+    add_test(NAME musl_allocator_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/c_allocator.anti"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/musl-allocator/${target}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_musl_allocator.cmake")
+    set_tests_properties(musl_allocator_${target} PROPERTIES TIMEOUT 120
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
 # The ABI probe compares the layouts of C and antic on the host.
 if(NOT WIN32)
     add_test(NAME abi_probe

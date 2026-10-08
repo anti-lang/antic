@@ -178,6 +178,18 @@ void link_runtime_bitcode(struct text *out, const char *runtime, enum target t,
 #define PROFILE_RUNTIME_WINDOWS "clang_rt.profile.lib"
 #define PROFILE_RUNTIME_HOOK "__llvm_profile_runtime"
 
+/* DESIGN: a program of musl links mimalloc of the runtime archive, which
+   replaces the allocator of musl. Eddie decided on 2026-10-08 to measure
+   it and adopt it if it won, under the rule of "Decisions" in
+   docs/work-order-llvm-optimization.md. The library stands beside the
+   runtime of each level, lib/<target>/<level>/, since every program of
+   the mode links it as it links the runtime. src/native/mimalloc.cmake
+   writes the same name. The glibc mode keeps the allocator of glibc, and
+   --memory-checks, which links in that mode, the one of
+   AddressSanitizer. See the entry on the allocator of musl under
+   "Libraries and runtime" in docs/decisions.md. */
+#define MUSL_ALLOCATOR "libmimalloc.a"
+
 /* Append the path of the profile runtime of target t below runtime. With
    glibc it lies in the directory of the glibc mode. */
 void link_profile_runtime(struct text *out, const char *runtime,

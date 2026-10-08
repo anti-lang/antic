@@ -524,9 +524,34 @@ static void frameworks(void)
           "--gc-sections -o prog /rt/sysroot/t/usr/lib/rcrt1.o "
           "/rt/sysroot/t/usr/lib/crti.o prog.o shapes.o "
           "/rt/lib/linux-arm64/armv8.0/libanti_rt.a "
+          "/rt/lib/linux-arm64/armv8.0/libmimalloc.a "
           "/rt/sysroot/t/usr/lib/libc.a "
           "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
           "/rt/sysroot/t/usr/lib/crtn.o");
+}
+
+/* A program of musl takes the allocator of the runtime archive at the
+   level of its runtime, before libc.a, so that malloc and free of the
+   program, the runtime and musl resolve to it. A program of the glibc
+   mode keeps the allocator of glibc. */
+static void musl_allocator(void)
+{
+    struct link_inputs in = lld_inputs;
+    struct link_command c;
+
+    in.extra = NULL;
+    in.extra_count = 0;
+    in.cpu = CPU_V1;
+    link_command(&c, TARGET_LINUX_X86_64, &in);
+    joined(&c, "/rt/bin/ld.lld -static -pie --no-dynamic-linker "
+               "--strip-debug --gc-sections -o prog "
+               "/rt/sysroot/t/usr/lib/rcrt1.o /rt/sysroot/t/usr/lib/crti.o "
+               "prog.o /rt/lib/linux-x86_64/v1/libanti_rt.a "
+               "/rt/lib/linux-x86_64/v1/libmimalloc.a "
+               "/rt/sysroot/t/usr/lib/libc.a "
+               "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
+               "/rt/sysroot/t/usr/lib/crtn.o");
+    link_command_free(&c);
 }
 
 /* A Linux program that names a library with `link linux`, or that can
@@ -696,6 +721,7 @@ static void lto_links(void)
           "/rt/sysroot/t/usr/lib/rcrt1.o "
           "/rt/sysroot/t/usr/lib/crti.o prog.o shapes.o "
           "/rt/lib/linux-arm64/armv8.0/bitcode/thin/libanti_rt.a "
+          "/rt/lib/linux-arm64/armv8.0/libmimalloc.a "
           "/rt/sysroot/t/usr/lib/libc.a "
           "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
           "/rt/sysroot/t/usr/lib/crtn.o");
@@ -755,6 +781,7 @@ static void profile_links(void)
           "/rt/sysroot/t/usr/lib/rcrt1.o /rt/sysroot/t/usr/lib/crti.o prog.o "
           "shapes.o /rt/lib/linux-arm64/armv8.0/libanti_rt.a "
           "/rt/lib/linux-arm64/libclang_rt.profile.a "
+          "/rt/lib/linux-arm64/armv8.0/libmimalloc.a "
           "/rt/sysroot/t/usr/lib/libc.a "
           "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
           "/rt/sysroot/t/usr/lib/crtn.o");
@@ -941,6 +968,7 @@ void test_link(void)
     sdk_names();
     libraries();
     frameworks();
+    musl_allocator();
     dynamic_modes();
     memory_checks_links();
     lto_links();
@@ -998,6 +1026,7 @@ void test_link(void)
           "--gc-sections -o prog /rt/sysroot/t/usr/lib/rcrt1.o "
           "/rt/sysroot/t/usr/lib/crti.o prog.o shapes.o "
           "/rt/lib/linux-arm64/armv8.0/libanti_rt.a "
+          "/rt/lib/linux-arm64/armv8.0/libmimalloc.a "
           "/rt/sysroot/t/usr/lib/libc.a "
           "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
           "/rt/sysroot/t/usr/lib/crtn.o");
