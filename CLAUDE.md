@@ -342,6 +342,10 @@ the same list.
 36. The test of a release with the network off. On each VM, a fresh install from
     the package builds and runs a raylib program and a plugin host for its own
     target. It also cross-builds a program for every other target.
+37. The other four forms of `anti license` of `docs/distribution.md`: the
+    plain form, `--project`, `--project --notice` and `--from-archive`.
+    Today `--from` is the one form, and `anti build` writes `NOTICE.txt`
+    from the notice of the binary rather than from `anti.lock`.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures

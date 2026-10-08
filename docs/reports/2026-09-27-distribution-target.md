@@ -35,7 +35,7 @@ tools, which the last section names.
 ## The gap
 
 What the packages and the installers do today that differs from the target,
-in the order they are best built. Items 27 to 36 of "First sessions" in
+in the order they are best built. Items 27 to 37 of "First sessions" in
 `CLAUDE.md` hold the same list.
 
 1. The LLVM tools into the package. The installers download them today.
@@ -60,6 +60,8 @@ in the order they are best built. Items 27 to 36 of "First sessions" in
 9. `--bundle-runtime` on Mach-O without Apple's `ld -r`, which needs a design:
    ld64.lld 23.1.1 has no relocatable output.
 10. The test of a release with the network off on each VM.
+11. The other four forms of `anti license`: the plain form, `--project`,
+    `--project --notice` and `--from-archive`. Added on 2026-10-08.
 
 ## Question for Eddie
 
