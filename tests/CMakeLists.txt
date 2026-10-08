@@ -3672,6 +3672,23 @@ foreach(target linux-x86_64 linux-arm64)
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
 
+# Under --lto none every function of an ARM64 program and of its runtime
+# starts on a 16-byte boundary.
+foreach(target macos-arm64 linux-arm64 windows-arm64)
+    add_test(NAME function_alignment_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/devirtualise.anti"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/function-alignment/${target}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_function_alignment.cmake")
+    set_tests_properties(function_alignment_${target} PROPERTIES
+        TIMEOUT 120 SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
 # The ABI probe compares the layouts of C and antic on the host.
 if(NOT WIN32)
     add_test(NAME abi_probe

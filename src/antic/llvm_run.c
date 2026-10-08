@@ -22,9 +22,9 @@ static const char *file_name(const char *path)
 }
 
 /* The most options of llc before its input: the level, the file type,
-   the relocation model, the two that split sections and the table of
-   significant addresses. */
-#define LLC_OPTIONS 6
+   the relocation model, the two that split sections, the table of
+   significant addresses and the alignment of functions. */
+#define LLC_OPTIONS 7
 
 /* DESIGN: llc runs in the directory of its output and writes the output
    by its file name alone. llc records the name of its output as the
@@ -229,6 +229,28 @@ bool llvm_run(const struct llvm_run *r, const char *text_path,
        linker.c. */
     if (llvm_safe_folding(r->target)) {
         options[n++] = "-addrsig";
+    }
+    /* DESIGN: every function of an ARM64 object starts on a 16-byte
+       boundary, and the object runtime of each ARM64 target is compiled
+       with -falign-functions=16 to match, see CMakeLists.txt. Eddie
+       decided it on 2026-10-08 for the object link, which --lto none and
+       dev mode take, and every other link of objects. The LTO link of a
+       release build keeps the alignment LLVM chooses. llc aligns a small
+       function at 4 bytes, so in the object link the four functions of
+       the shapes of tests/bench/objects.anti stood in 0x54 bytes and the
+       calls through the table alternated between them. Measured with
+       tests/bench/ablate/run.py on 2026-10-08, 15 runs each, objects
+       under --lto none ran 105.7 ms against 138.4 on macos-arm64. Every
+       other program of tests/bench and mixed_work stayed within 1
+       percent on macos-arm64 and on anti-linux, which ran objects in
+       104 ms either way. mixed_work grew by 1.6 percent on macos-arm64
+       and 0.4 on linux-arm64. In the LTO link the alignment changed no
+       program by more than 2 percent on 2026-10-07 and grew mixed_work
+       by 1.6 percent, so that link stays as it is.
+       docs/reports/2026-10-08-allocator-and-alignment.md holds the
+       tables. */
+    if (target_info(r->target)->arch == ARCH_ARM64) {
+        options[n++] = "-align-all-functions=4";
     }
     run = run_llc(r->llc, options, r->optimize ? bitcode_path : text_path,
                   output);

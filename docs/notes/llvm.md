@@ -194,7 +194,9 @@ rules, and the tests named there pin each fact.
   `-function-sections -data-sections`, so the link drops each function and
   datum that nothing reaches. Mach-O splits per symbol without them. On
   windows-x86_64 llc adds `-addrsig`, the table that the safe folding of
-  lld-link reads.
+  lld-link reads. On the three ARM64 targets llc adds `-align-all-functions=4`,
+  so every function of the object link starts on a 16-byte boundary, as every
+  function of the object runtime does.
 - llc runs in the directory of its output and writes it by its file name,
   with its input and its own path absolute. llc records the name of its
   output in the CodeView of a COFF object. lld-link carries that name into

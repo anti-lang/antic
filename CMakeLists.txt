@@ -312,6 +312,16 @@ function(anti_cross_runtime_at target triple level root)
     # wherever the level has them.
     antic_cpu_march(march "${level}")
     antic_runtime_sections(sections "${target}")
+    # DESIGN: the objects of an ARM64 runtime align every function at 16
+    # bytes, as llc does for every ARM64 object antic writes, so the
+    # object link of --lto none and dev mode places the functions of the
+    # program and of the runtime alike. The bitcode below keeps the
+    # alignment LLVM chooses, since the LTO link stays as it is.
+    # run_llc of src/antic/llvm_run.c holds the measurement.
+    set(align "")
+    if(target MATCHES "arm64")
+        set(align -falign-functions=16)
+    endif()
     set(out "${root}/lib/${target}/${level}")
     if(target MATCHES "^windows")
         set(library "${out}/anti_rt.lib")
@@ -325,7 +335,7 @@ function(anti_cross_runtime_at target triple level root)
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
             COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-                ${ANTIC_C_WARNINGS} ${sections}
+                ${ANTIC_C_WARNINGS} ${sections} ${align}
                 "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
                 "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
                 -MMD -MF "${object}.d"
@@ -343,7 +353,7 @@ function(anti_cross_runtime_at target triple level root)
     add_custom_command(OUTPUT "${stub}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${out}"
         COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-            ${ANTIC_C_WARNINGS} ${sections}
+            ${ANTIC_C_WARNINGS} ${sections} ${align}
             "${march}" "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
             -MMD -MF "${stub}.d"
             -c "${PROJECT_SOURCE_DIR}/src/rt/license_stub.c" -o "${stub}"
