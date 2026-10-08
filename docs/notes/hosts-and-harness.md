@@ -34,11 +34,11 @@ file does.
 
 | Host | Suite | Sanitizers | Only there |
 |---|---|---|---|
-| Mac | 1160 | ASan, UBSan, 1159 each | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export`, lldb |
-| Linux VM | 983 | ASan, UBSan, 982 each | glibc sysroot, linux-arm64 programs, gdb |
-| Windows VM | 955 | none | windows-arm64 programs, the Win32 expected files |
+| Mac | 1663 | ASan, UBSan, 1662 each | macos-x86_64 under Rosetta, `emit_identity` with `WRITE=yes`, `anti sdk export`, lldb |
+| Linux VM | 1595 | ASan, UBSan, 1594 each | glibc sysroot, linux-arm64 programs, linux-x86_64 under `qemu-x86_64`, gdb |
+| Windows VM | 1583 | none | windows-arm64 programs, windows-x86_64 under the x64 emulation, the Win32 expected files |
 
-The counts are of 2026-09-27. A host runs fewer tests than the Mac because a test that
+The counts are of 2026-10-08. A host runs fewer tests than the Mac because a test that
 needs something it lacks is not registered or skips. Linux skips `release_dry_run` and
 `macos_sdk`. Windows also skips `sysroot_digest`, `installer_github` and
 `manifest_signature`.
@@ -59,8 +59,12 @@ Mac's `build/sysroot` before, and `cmake --preset asan` on the Linux VM, whose d
 live in `~/.local/share/anti-vm`, then built a runtime with no sysroot and failed to link
 102 programs.
 
-No machine here runs linux-x86_64 or windows-x86_64 programs. Only the CI runners do,
-when started by hand.
+Anti uses no CI, and no machine here has an x86_64 processor. Each arm64 host runs the
+x86_64 programs of its own system under emulation, as "x86_64 under emulation" in
+`docs/vm-setup.md` says. `ANTIC_EMULATED_TARGET` of `tests/CMakeLists.txt` names the
+target, and the program tests of that target run through `EMULATOR`, which is
+`qemu-x86_64` on Linux and empty on macOS and Windows, which emulate without being
+asked. The last run on real x86_64 hardware was the workflow run of 2026-10-08.
 
 ## Quirks
 
@@ -93,6 +97,16 @@ when started by hand.
   before the segment open.
 
 ## Sanitizers
+
+- The runtime of AddressSanitizer for x86_64 stops under emulation. Under `qemu-x86_64`
+  every program of `--memory-checks` ends at once with `CHECK failed:
+  sanitizer_allocator_primary32.h:293`, before `main`. Under the x64 emulation of
+  Windows it prints `interception_win: unhandled instruction` for three functions of
+  the system and then `CHECK failed: asan_malloc_win.cpp:235`. Rosetta runs it, and
+  `memory_checks_list.anti` built for macos-x86_64 at `--cpu v1` reports its read
+  after free there. The tests of `--memory-checks` for linux-x86_64 and windows-x86_64
+  link their programs and report themselves skipped. They passed on real x86_64
+  hardware on 2026-10-08, in the last workflow run.
 
 - LeakSanitizer runs on the Mac only through the presets.
   `cmake --build --preset asan` and `ctest --preset asan` set

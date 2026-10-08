@@ -232,9 +232,9 @@ and the two sanitizer suites in an export of the commit, packs the six hosts,
 writes the symbols archives beside them and checks the packages on both VMs. The
 packages and the archives stand in `build/dist/packages` under the one `SHA256SUMS`
 that the packer wrote, which it then signs in place with the release key. It tags
-the commit and uploads the assets to a GitHub release. It uploads thirteen files and no signature. It runs the
-runner matrix once, publishes the text of anti-lang.com and installs the result from
-outside. `./r --dry-run` performs the
+the commit and uploads the assets to a GitHub release. It uploads thirteen files and no signature. It
+publishes the text of anti-lang.com and installs the result from outside. Anti uses no
+CI, so no runner checks a release. `./r --dry-run` performs the
 first five steps and prints what the rest would do.
 
 The site takes the two installers, the downloads page, the signature of the manifest
@@ -243,7 +243,7 @@ and the release URL of each. It carries the fingerprint of the public key. Step 
 rsyncs the four files and reads the signature and the key back. Nothing binary reaches
 the site.
 
-`docs/work-order-release-script.md` holds the eleven steps, and
+`docs/work-order-release-script.md` holds the steps, and
 `docs/decisions.md` holds the decisions under "The release script".
 
 ### After publishing a package

@@ -721,16 +721,18 @@ reports what it finished.
   `%LOCALAPPDATA%\Programs\anti\bin` and `%LOCALAPPDATA%\anti`. Nothing outside
   the user's profile is written. The packer links macOS against the Apple SDK
   that `tools/macos-sdk-pin` names, never a bare `xcrun`.
-- `./r` makes a release, in eleven steps from a pushed `main` to the published
+- `./r` makes a release, in ten steps from a pushed `main` to the published
   download. The version stands in `tools/version` and its entry in
   `CHANGELOG.md`. `./r --dry-run` runs the first five steps and prints a plan
   for the rest. See `docs/work-order-release-script.md`, and its decisions
   under "The release script" in `docs/decisions.md`.
-- `.github/workflows/test.yml` runs a six-runner matrix on `workflow_dispatch`
-  only. Its run of 2026-10-08 passed linux-arm64 and failed four tests on
-  linux-x86_64 and windows-x86_64, which later commits fixed. The macOS jobs
-  wait for an image with the pinned SDK. See
-  `docs/reports/2026-10-08-x86_64-hardware.md`.
+- Anti uses no CI. The Mac runs macos-arm64 and macos-x86_64 under Rosetta,
+  anti-linux runs linux-arm64 and linux-x86_64 under `qemu-x86_64`, and
+  anti-windows runs windows-arm64 and windows-x86_64 under the x64 emulation
+  of Windows. A test of `--memory-checks` for an x86_64 target skips under
+  qemu and the emulation of Windows. The last run on real x86_64 hardware is
+  that of 2026-10-08, in `docs/reports/2026-10-08-x86_64-hardware.md`. See
+  "Scope and toolchain" in `docs/decisions.md`.
 - The `anti` tool holds `new`, `build`, `run`, `sdk export`, `sdk import`,
   `test`, `check`, `fmt`, `doc`, `bind` and `symbols`, and nothing else of
   `docs/tooling.md`.

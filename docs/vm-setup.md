@@ -1,6 +1,6 @@
 # VM setup
 
-Two virtual machines on the development Mac run the test suite on Linux ARM64 and on Windows ARM64. They cover the untested items of `docs/decisions.md` that need no x86_64 processor. The targets linux-x86_64 and windows-x86_64 stay for the GitHub Actions runners on a release day. The Mac runs macos-x86_64 programs itself, through Rosetta.
+Two virtual machines on the development Mac run the test suite on Linux ARM64 and on Windows ARM64. Anti uses no CI, so the Mac and these two machines test every target. Each VM builds programs for arm64 and x86_64 and runs both. anti-linux runs the linux-x86_64 programs under `qemu-x86_64`. anti-windows runs the windows-x86_64 programs under the x64 emulation of Windows. The Mac runs macos-x86_64 programs itself, through Rosetta.
 
 Eddie installs UTM, both images and the Windows licence. Each VM gets the tools below once. The test run then exports the committed tree of the Mac with `git archive`, as a reader's checkout holds it, and builds it in a fresh directory.
 
@@ -8,7 +8,7 @@ Eddie installs UTM, both images and the Windows licence. Each VM gets the tools 
 
 ### Image and machine
 
-- Image: `ubuntu-24.04.5-live-server-arm64.iso` from https://cdimage.ubuntu.com/releases/24.04/release/. The runner `ubuntu-24.04-arm` of the workflow runs the same Ubuntu release, 24.04.
+- Image: `ubuntu-24.04.5-live-server-arm64.iso` from https://cdimage.ubuntu.com/releases/24.04/release/.
 - UTM: a new machine with Virtualize, Linux and the ISO. Give it 4 cores, 8 GB of memory and 64 GB of disk.
 - In the installer, select "Install OpenSSH server".
 
@@ -18,7 +18,7 @@ Run these commands in the VM once. The tools go to `~/.local/share/anti-vm`, in 
 
 ```sh
 sudo apt update
-sudo apt install -y build-essential cmake git curl xz-utils
+sudo apt install -y build-essential cmake git curl xz-utils qemu-user
 git -C /tmp clone --depth 1 git@github.com:anti-lang/antic.git antic
 cmake -DDEST=$HOME/.local/share/anti-vm/clang -P /tmp/antic/tools/get-clang.cmake
 cmake -DDEST=$HOME/.local/share/anti-vm/toolchain -P /tmp/antic/tools/get-llvm.cmake
@@ -29,7 +29,7 @@ cmake -DDEST=$HOME/.local/share/anti-vm/sysroot -DLLVM_BIN=$HOME/.local/share/an
 cmake -DDEST=$HOME/.local/share/anti-vm/raylib -P /tmp/antic/tools/get-raylib.cmake
 ```
 
-The clone only supplies the scripts. If the repository is private, copy `tools/` with `scp -r tools anti-linux:/tmp/antic/` instead. The macOS sysroots hold Zig's stubs, which link every macOS program that names no framework. `-DACCEPT_LICENSE=yes` accepts the terms of the Microsoft CRT and Windows SDK that xwin downloads.
+`qemu-user` holds `qemu-x86_64`, which the configure step finds on the path and the tests of linux-x86_64 run their programs with. Without it the suite runs no linux-x86_64 program. The clone only supplies the scripts. If the repository is private, copy `tools/` with `scp -r tools anti-linux:/tmp/antic/` instead. The macOS sysroots hold Zig's stubs, which link every macOS program that names no framework. `-DACCEPT_LICENSE=yes` accepts the terms of the Microsoft CRT and Windows SDK that xwin downloads.
 
 A program that names a framework also needs the stubs of Apple's SDK. On the Mac, `build/host/anti sdk export` writes `apple-sdk-<version>.tar.xz`. Copy it to the VM and install it with `anti sdk import <bundle> --sysroot $HOME/.local/share/anti-vm/sysroot`. A copy of the SDK itself works too, as `-DAPPLE_SDK=<MacOSX.sdk>` of `get-sysroot.cmake`.
 
@@ -91,10 +91,15 @@ At `a4cadfcf` on 2026-10-03 it passes 1261 of 1266 with two skipped, and ASan an
 and `memory_checks_list`, whose link waits for `libunwind` of `23.1.1-anti.5`.
 At `fd2bc8b6` on 2026-10-04 it passes 1291 of 1293 with two skipped, and ASan and UBSan
 1290 of 1292 each, under both `-DANTIC_BACKEND=llvm` and `-DANTIC_BACKEND=native`.
+At `5e44c8e8` on 2026-10-08 it passes 1595 of 1595 with six skipped, and ASan and UBSan
+1594 of 1594 each. 222 of the tests run linux-x86_64 programs under `qemu-x86_64`, and
+three of the six skips are the tests of `--memory-checks` for linux-x86_64.
 
 | Untested item | Tests that run it |
 |---|---|
 | linux-arm64 programs, which the Mac only links | `program_*`, `std_*`, `dev_modules` |
+| linux-x86_64 programs under `qemu-x86_64` | `program_*_linux-x86_64`, `program_abi_*_linux-x86_64`, whose C files the pinned clang compiles against the musl headers of the sysroot |
+| `--memory-checks` for linux-x86_64 | `memory_checks_linux-x86_64`, `memory_checks_list_linux-x86_64`, `std_builder_room_memory_checks_linux-x86_64`. Each links its program and reports itself skipped, since the runtime of AddressSanitizer stops under qemu |
 | Static PIE programs against musl | `program_*`, linked with ld.lld against `~/.local/share/anti-vm/sysroot/linux-arm64` |
 | Dynamic PIE programs against glibc 2.35, with libX11 and libGL | `linux_modes`, `plugin_host`, `plugin_versions` |
 | C objects built against glibc in a musl program | `program_abi_structs`, `program_abi_raymath`, `program_abi_wchar`, whose C files the pinned clang compiles |
@@ -172,6 +177,9 @@ Extract a tree from the Mac with `tar -xmf`. Ninja otherwise keeps objects that 
 than the files the tar restores.
 At `fd2bc8b6` on 2026-10-04 it passes 1272 of 1281 with nine skipped, under both
 `-DANTIC_BACKEND=llvm` and `-DANTIC_BACKEND=native`, in three parts of `ctest -j4 -I`.
+At `5e44c8e8` on 2026-10-08 it passes 1583 of 1583 with twelve skipped, in 951 s with
+`ctest -j4` after the build. 222 of the tests run windows-x86_64 programs under the x64
+emulation, and three of the twelve skips are the tests of `--memory-checks` for that target.
 
 ### SSH from the Mac
 
@@ -195,6 +203,8 @@ ssh anti-windows %USERPROFILE%\test.cmd
 | Untested item | Tests that run it |
 |---|---|
 | windows-arm64 programs, which the Mac only links | `program_*`, `std_*`, linked with lld-link against `LIB` |
+| windows-x86_64 programs under the x64 emulation | `program_*_windows-x86_64`, `program_abi_*_windows-x86_64`, `windows_addresses`, `distinct_addresses_windows-x86_64` |
+| `--memory-checks` for windows-x86_64 | `memory_checks_windows-x86_64`, `memory_checks_list_windows-x86_64`, `std_builder_room_memory_checks_windows-x86_64`. Each links its program and reports itself skipped, since the runtime of AddressSanitizer cannot intercept the heap functions under the emulation |
 | The Windows branch of `src/rt/start.c`, compiled with MSVC | every `program_*` test, through `anti_rt.lib` |
 | `c_wchar` at 16 bits and `c_long` at 32 bits against MSVC | `program_abi_wchar`, `program_abi_structs` |
 | Exception unwinding through an Anti frame | The runtime test that closes the unwind data of chapter 16: an exception raised in C unwinds through an Anti frame to a handler in C. `llvm-readobj` proves that the tables parse, not that Windows walks them. The test does not exist yet. |
@@ -226,16 +236,21 @@ installer's refusal of a manifest without a signature, and then installs with
 `ANTI_BASE` is therefore the override of a release before it is published, on a VM and
 nowhere else. A machine that installs the way a user does sets none of the three.
 
-## Runners
+## x86_64 under emulation
 
-The workflow `.github/workflows/test.yml` covers linux-x86_64 and windows-x86_64 when Eddie starts it on a release day. They are the Linux programs of that target and the Windows x64 unwind data at run time. The Mac already runs the macos-x86_64 programs, float conversions included.
+No machine here has an x86_64 processor. The suite of each arm64 host runs the x86_64 programs of its own system under emulation. The Mac and the two VMs therefore run the programs of all six targets:
 
-No machine here has an x86_64 processor, so neither x86_64 package runs on hardware of its
-own. Both run under emulation instead, and both passed on 2026-09-16. The Linux ARM64
+| Host | Emulated target | Emulation | Level |
+|---|---|---|---|
+| Mac | macos-x86_64 | Rosetta | `--cpu v1`, since Rosetta has no AVX2 |
+| anti-linux | linux-x86_64 | `qemu-x86_64`, which the tests call | default, x86-64-v3 |
+| anti-windows | windows-x86_64 | the x64 emulation of Windows 11 | default, x86-64-v3 |
+
+Emulation proves that the programs antic writes for x86_64 are correct and that the binaries of the packages run. It does not prove the timing of a real x86_64 processor. The runtime of AddressSanitizer for x86_64 stops under qemu, in its allocator. Under the emulation of Windows it cannot intercept the heap functions. Rosetta runs it. The last run on real x86_64 hardware was the workflow run of 2026-10-08, in `docs/reports/2026-10-08-x86_64-hardware.md`. The runtimes of AddressSanitizer for x86_64 Linux and Windows passed there.
+
+Both x86_64 packages run under emulation as well, and both passed on 2026-09-16. The Linux ARM64
 machine compiled and ran a linux-x86_64 program with `qemu-x86_64`. Windows 11 on ARM
 emulates x64, and the installer takes that package with `ANTI_ARCH` or `--intel` into
 `%USERPROFILE%\.anti-x86_64`. Its `antic.exe` reports `windows-x86_64`, compiles a program
 through the emulated llvm-mc and lld-link, and `llvm-objdump -h` calls the result
-`coff-x86-64`. Emulation proves that the binaries of the package run and that the programs
-they compile are correct. It does not prove the timing or the behaviour of a real x86_64
-processor, which the runners cover on a release day.
+`coff-x86-64`.

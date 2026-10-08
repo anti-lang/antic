@@ -49,6 +49,6 @@ Every item has the tests the specification implies, and every message is pinned 
 ## Rules, unchanged
 
 - Warnings are errors. All tests pass on the host before every commit. The docs-style checker reports zero findings on every touched file.
-- No workflow runs. Every workflow stays `workflow_dispatch` only.
+- No CI. Anti runs no GitHub workflow, as "Scope and toolchain" in `docs/decisions.md` has said since 2026-10-08.
 - One commit per logical change. Push after every completed step.
 - If a step fails after a reasonable number of attempts, isolate it and note it in the report. Move on, and return at the end.
