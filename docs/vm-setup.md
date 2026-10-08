@@ -94,6 +94,8 @@ At `fd2bc8b6` on 2026-10-04 it passes 1291 of 1293 with two skipped, and ASan an
 At `5e44c8e8` on 2026-10-08 it passes 1595 of 1595 with six skipped, and ASan and UBSan
 1594 of 1594 each. 222 of the tests run linux-x86_64 programs under `qemu-x86_64`, and
 three of the six skips are the tests of `--memory-checks` for linux-x86_64.
+At `60322802` on 2026-10-08 it passes 1601 of 1601 with six skipped, mimalloc in every
+program of musl. Its sanitizer suites did not run.
 
 | Untested item | Tests that run it |
 |---|---|
@@ -180,6 +182,8 @@ At `fd2bc8b6` on 2026-10-04 it passes 1272 of 1281 with nine skipped, under both
 At `5e44c8e8` on 2026-10-08 it passes 1583 of 1583 with twelve skipped, in 951 s with
 `ctest -j4` after the build. 222 of the tests run windows-x86_64 programs under the x64
 emulation, and three of the twelve skips are the tests of `--memory-checks` for that target.
+At `60322802` on 2026-10-08 it passes 1589 of 1589 with twelve skipped, in four parts of
+`ctest -j4 -I`.
 
 ### SSH from the Mac
 
