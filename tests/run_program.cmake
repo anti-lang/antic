@@ -14,6 +14,10 @@
 #             does when one of them is absent
 #   WARNING   optional text that antic prints, for a program whose subject
 #             is a warning. Without it antic prints nothing
+#   EMULATOR  optional program that runs the executable, for a target the
+#             host runs under emulation alone
+#   SKIP_RUN  optional reason the program is linked and not run. The test
+#             then reports itself skipped with it
 #
 # The expected file starts with the line "exit N", the process exit code.
 # Every byte after that line is the expected standard output. An optional
@@ -60,6 +64,11 @@ elseif(NOT out STREQUAL "" OR NOT err STREQUAL "")
     message(FATAL_ERROR "antic printed output\n${out}${err}")
 endif()
 
+if(DEFINED SKIP_RUN AND NOT SKIP_RUN STREQUAL "")
+    message("SKIP: ${SKIP_RUN}")
+    return()
+endif()
+
 set(program_args "")
 if(EXISTS "${dir}/${name}.args")
     file(STRINGS "${dir}/${name}.args" program_args ENCODING UTF-8)
@@ -74,5 +83,5 @@ if(DEFINED UNSET AND NOT UNSET STREQUAL "")
 endif()
 # The standard error of a test program is its own business: a program
 # that reports an error writes it there.
-program_expect("${name}" COMMAND ${runner} "${exe}" ${program_args}
+program_expect("${name}" COMMAND ${runner} ${EMULATOR} "${exe}" ${program_args}
                EXPECTED "${expected_file}" ANY_ERR)

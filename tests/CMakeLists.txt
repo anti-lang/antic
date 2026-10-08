@@ -234,12 +234,13 @@ endfunction()
 # result with the expected file beside it.
 #   antic_program_test(<name> <source> WORK <dir> [EXPECTED <file>]
 #                      [OPTIONS <option>...] [DEV <module>...]
-#                      [OBJECTS <object>...] [UNSET <variable>...])
-# OPTIONS, OBJECTS and UNSET reach the script as run_program.cmake names
-# them. DEV names the modules whose dev objects the link takes, which
-# antic_dev_inputs resolves.
+#                      [OBJECTS <object>...] [UNSET <variable>...]
+#                      [EMULATOR <program>] [SKIP_RUN <reason>])
+# OPTIONS, OBJECTS, UNSET, EMULATOR and SKIP_RUN reach the script as
+# run_program.cmake names them. DEV names the modules whose dev objects the
+# link takes, which antic_dev_inputs resolves.
 function(antic_program_test name source)
-    cmake_parse_arguments(PARSE_ARGV 2 arg "" "WORK;EXPECTED"
+    cmake_parse_arguments(PARSE_ARGV 2 arg "" "WORK;EXPECTED;EMULATOR;SKIP_RUN"
                           "OPTIONS;DEV;OBJECTS;UNSET")
     if(NOT arg_WORK)
         message(FATAL_ERROR "antic_program_test(${name}) names no WORK")
@@ -256,6 +257,12 @@ function(antic_program_test name source)
     if(arg_UNSET)
         list(JOIN arg_UNSET "," unset)
         list(APPEND optional "-DUNSET=${unset}")
+    endif()
+    if(arg_EMULATOR)
+        list(APPEND optional "-DEMULATOR=${arg_EMULATOR}")
+    endif()
+    if(arg_SKIP_RUN)
+        list(APPEND optional "-DSKIP_RUN=${arg_SKIP_RUN}")
     endif()
     add_test(NAME ${name}
         COMMAND "${CMAKE_COMMAND}"
@@ -1305,72 +1312,130 @@ int abi_wchar_type;" ANTIC_WCHAR_${type}${suffix})
     message(FATAL_ERROR "wchar_t of ${CMAKE_C_COMPILER} is none of i32, u32 and u16")
 endfunction()
 
-# The same C files compiled for macos-x86_64, which the ABI programs of
-# that target link. The host runs them, so antic meets clang on the System
-# V rules of x86_64 as well.
+# DESIGN: every arm64 host runs the x86_64 programs of its own system under
+# emulation, so the Mac and the two VMs of docs/vm-setup.md run the
+# programs of all six targets between them. Anti runs no CI and no machine
+# here has an x86_64 processor. macos-arm64 runs macos-x86_64 under
+# Rosetta, linux-arm64 runs linux-x86_64 under qemu-x86_64 and
+# windows-arm64 runs windows-x86_64 under the x64 emulation of Windows.
+# Rosetta has no AVX2, so the programs of macos-x86_64 take --cpu v1 and
+# link the v1 runtime of the archive, as any --cpu v1 build does. qemu and
+# Windows emulate x86-64-v3, and their programs take the default level. A
+# linux-arm64 host without qemu-x86_64 runs no linux-x86_64 program. Each
+# include directory is one joined argument, since CMake drops a repeated
+# -isystem from the options of a target.
+set(ANTIC_EMULATED_TARGET "")
+set(ANTIC_EMULATOR "")
+set(emulated_c_flags "")
+if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
+    set(ANTIC_EMULATED_TARGET macos-x86_64)
+    set(ANTIC_X86_64_OPTIONS "--target,macos-x86_64,--cpu,v1")
+    set(emulated_c_flags -arch x86_64 -mmacosx-version-min=11.0)
+elseif(ANTIC_HOST_TARGET STREQUAL "linux-arm64")
+    find_program(ANTIC_QEMU_X86_64 qemu-x86_64)
+    if(ANTIC_QEMU_X86_64)
+        set(ANTIC_EMULATED_TARGET linux-x86_64)
+        set(ANTIC_EMULATOR "${ANTIC_QEMU_X86_64}")
+    else()
+        message(STATUS "No qemu-x86_64: the suite runs no linux-x86_64 program")
+    endif()
+    set(ANTIC_X86_64_OPTIONS "--target,linux-x86_64")
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+        execute_process(COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
+            OUTPUT_VARIABLE resource OUTPUT_STRIP_TRAILING_WHITESPACE)
+        set(emulated_c_flags --target=x86_64-linux-musl -fPIC -nostdinc
+            "-isystem${resource}/include"
+            "-isystem${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64/usr/include")
+    endif()
+elseif(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
+    set(ANTIC_EMULATED_TARGET windows-x86_64)
+    set(ANTIC_X86_64_OPTIONS "--target,windows-x86_64")
+    # -idirafter searches the sysroot after clang's own headers, as
+    # run_clib.cmake does for the same reason.
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+        set(win "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
+        set(emulated_c_flags --target=x86_64-pc-windows-msvc
+            -fms-runtime-lib=dll
+            "-idirafter${win}/crt/include" "-idirafter${win}/sdk/include/ucrt"
+            "-idirafter${win}/sdk/include/um"
+            "-idirafter${win}/sdk/include/shared")
+    endif()
+endif()
+
+# The same C files compiled for the emulated target, which its ABI
+# programs link. The host runs them, so antic meets clang on the rules of
+# x86_64 as well.
 function(abi_x86_64_object name source)
     add_library(${name} OBJECT "${source}")
-    target_compile_options(${name} PRIVATE -arch x86_64
-        -mmacosx-version-min=11.0 -fno-sanitize=all ${ANTIC_REFERENCE_C_FLAGS})
+    target_compile_options(${name} PRIVATE ${emulated_c_flags}
+        -fno-sanitize=all ${ANTIC_REFERENCE_C_FLAGS})
 endfunction()
 
-# A macos-arm64 host runs a macos-x86_64 program as well, so every program
-# runs for that target too. The other four targets need their own machine.
-# Rosetta has no AVX2, so those programs take --cpu v1 and link the v1
-# runtime of the archive, as any --cpu v1 build does.
-set(ANTIC_X86_64_OPTIONS "--target,macos-x86_64,--cpu,v1")
-if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
-    abi_x86_64_object(abi_structs_x86_64 abi/structs.c)
-    abi_x86_64_object(abi_wchar_x86_64 abi/wchar.c)
-    abi_x86_64_object(abi_simd_x86_64 abi/simd.c)
-    abi_wchar_expected(abi_wchar_x86_64_expected _X86_64 -arch x86_64)
-    set(abi_structs_x86_64_options "")
-    set(abi_simd_x86_64_options "")
-    set(abi_wchar_x86_64_options EXPECTED "${abi_wchar_x86_64_expected}")
-    foreach(case structs wchar simd)
-        antic_program_test(program_abi_${case}_macos-x86_64
-            "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_${case}.anti"
-            OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_${case}_x86_64>,,>"
-            OPTIONS "${ANTIC_X86_64_OPTIONS}"
-            ${abi_${case}_x86_64_options}
-            WORK "${CMAKE_CURRENT_BINARY_DIR}/abi-x86_64")
-    endforeach()
-    if(EXISTS "${ANTIC_RAYLIB_DIR}/src/raymath.h")
-        abi_x86_64_object(abi_raymath_x86_64 abi/raymath.c)
-        target_include_directories(abi_raymath_x86_64 PRIVATE
-            "${ANTIC_RAYLIB_DIR}/src")
-        antic_program_test(program_abi_raymath_macos-x86_64
-            "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.anti"
-            OPTIONS "${ANTIC_X86_64_OPTIONS}"
-            OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_raymath_x86_64>,,>"
-            EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.expected"
-            WORK "${CMAKE_CURRENT_BINARY_DIR}/abi-x86_64")
+if(ANTIC_EMULATED_TARGET)
+    set(emulated "${ANTIC_EMULATED_TARGET}")
+    set(emulator "")
+    if(ANTIC_EMULATOR)
+        set(emulator EMULATOR "${ANTIC_EMULATOR}")
+    endif()
+    if(emulated_c_flags)
+        abi_x86_64_object(abi_structs_x86_64 abi/structs.c)
+        abi_x86_64_object(abi_wchar_x86_64 abi/wchar.c)
+        abi_x86_64_object(abi_simd_x86_64 abi/simd.c)
+        abi_wchar_expected(abi_wchar_x86_64_expected _X86_64
+            ${emulated_c_flags})
+        set(abi_structs_x86_64_options "")
+        set(abi_simd_x86_64_options "")
+        set(abi_wchar_x86_64_options EXPECTED "${abi_wchar_x86_64_expected}")
+        foreach(case structs wchar simd)
+            antic_program_test(program_abi_${case}_${emulated}
+                "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_${case}.anti"
+                OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_${case}_x86_64>,,>"
+                OPTIONS "${ANTIC_X86_64_OPTIONS}"
+                ${abi_${case}_x86_64_options}
+                ${emulator}
+                WORK "${CMAKE_CURRENT_BINARY_DIR}/abi-x86_64")
+        endforeach()
+        if(EXISTS "${ANTIC_RAYLIB_DIR}/src/raymath.h")
+            abi_x86_64_object(abi_raymath_x86_64 abi/raymath.c)
+            target_include_directories(abi_raymath_x86_64 PRIVATE
+                "${ANTIC_RAYLIB_DIR}/src")
+            antic_program_test(program_abi_raymath_${emulated}
+                "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.anti"
+                OPTIONS "${ANTIC_X86_64_OPTIONS}"
+                OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_raymath_x86_64>,,>"
+                EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.expected"
+                ${emulator}
+                WORK "${CMAKE_CURRENT_BINARY_DIR}/abi-x86_64")
+        endif()
     endif()
     # DESIGN: a program that holds anti.regex links PCRE2, which stands at
     # the default level x86-64-v3 alone, and a program below it is refused
-    # at link. Rosetta runs no v3 program, so the programs of patterns run
-    # on the host target alone. errors/pattern_level.anti holds the
-    # refusal.
-    set(rosetta_sources ${program_sources})
-    list(FILTER rosetta_sources EXCLUDE REGEX "/(pattern_[a-z]+|regex_compile|eq_handles)\\.anti$")
-    foreach(source IN LISTS rosetta_sources)
+    # at link. Rosetta runs no v3 program, so on macos-arm64 the programs
+    # of patterns run on the host target alone. errors/pattern_level.anti
+    # holds the refusal.
+    set(emulated_sources ${program_sources})
+    if(emulated STREQUAL "macos-x86_64")
+        list(FILTER emulated_sources EXCLUDE REGEX "/(pattern_[a-z]+|regex_compile|eq_handles)\\.anti$")
+    endif()
+    foreach(source IN LISTS emulated_sources)
         get_filename_component(name "${source}" NAME_WE)
-        antic_program_test(program_${name}_macos-x86_64
+        antic_program_test(program_${name}_${emulated}
             "${source}"
             OPTIONS "${ANTIC_X86_64_OPTIONS}"
+            ${emulator}
             WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-x86_64")
     endforeach()
-    set_tests_properties(program_args_macos-x86_64 PROPERTIES
+    set_tests_properties(program_args_${emulated} PROPERTIES
         ENVIRONMENT "ANTI_TEST_GREETING=héllo")
-    set_tests_properties(program_nullable_macos-x86_64 PROPERTIES
+    set_tests_properties(program_nullable_${emulated} PROPERTIES
         ENVIRONMENT "ANTI_TEST_NULLABLE=set from C")
     foreach(name IN ITEMS sync_exits sync_workers channels select_two
             channel_workers parallel_join synchronized concurrent sync_pairs
         lock_free_queue)
-        set_tests_properties(program_${name}_macos-x86_64 PROPERTIES
+        set_tests_properties(program_${name}_${emulated} PROPERTIES
             TIMEOUT 120)
     endforeach()
-    set_tests_properties(program_by_unsigned_macos-x86_64 PROPERTIES
+    set_tests_properties(program_by_unsigned_${emulated} PROPERTIES
         TIMEOUT 60)
 endif()
 
@@ -1388,9 +1453,9 @@ set_tests_properties(program_nullable PROPERTIES
 # gave it one. Other systems ignore the variable.
 set_tests_properties(program_alloc_owning PROPERTIES
     ENVIRONMENT "MallocScribble=1")
-if(TEST program_alloc_owning_macos-x86_64)
-    set_tests_properties(program_alloc_owning_macos-x86_64 PROPERTIES
-        ENVIRONMENT "MallocScribble=1")
+if(ANTIC_EMULATED_TARGET)
+    set_tests_properties(program_alloc_owning_${ANTIC_EMULATED_TARGET}
+        PROPERTIES ENVIRONMENT "MallocScribble=1")
 endif()
 
 # The workers of tests/programs/channel_workers.anti wait on each other, so
@@ -3565,6 +3630,30 @@ if(NOT ANTIC_HOST_TARGET STREQUAL "windows-arm64")
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-memory-checks"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
     set_tests_properties(std_builder_room_memory_checks PROPERTIES TIMEOUT 120)
+endif()
+# DESIGN: the runtime of AddressSanitizer for x86_64 stops under
+# qemu-x86_64, in its allocator, and under the x64 emulation of Windows,
+# where it cannot intercept the heap functions. Rosetta runs it. On
+# linux-arm64 and windows-arm64 the three programs of --memory-checks are
+# therefore linked for the emulated target and not run, and each test
+# reports itself skipped with the reason. The runtimes of x86_64 last ran
+# on real x86_64 hardware on 2026-10-08, as
+# docs/reports/2026-10-08-llvm-closed.md reports.
+if(ANTIC_EMULATED_TARGET MATCHES "^(linux|windows)-x86_64$")
+    foreach(case "memory_checks,traps/memory_checks.anti"
+            "memory_checks_list,traps/memory_checks_list.anti"
+            "std_builder_room_memory_checks,std/builder_room.anti")
+        string(REPLACE "," ";" parts "${case}")
+        list(GET parts 0 name)
+        list(GET parts 1 source)
+        antic_program_test(${name}_${ANTIC_EMULATED_TARGET}
+            "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
+            OPTIONS "${ANTIC_X86_64_OPTIONS},--memory-checks"
+            SKIP_RUN "the AddressSanitizer runtime of x86_64 stops under emulation"
+            WORK "${CMAKE_CURRENT_BINARY_DIR}/memory-checks-x86_64")
+        set_tests_properties(${name}_${ANTIC_EMULATED_TARGET} PROPERTIES
+            TIMEOUT 120 SKIP_REGULAR_EXPRESSION "SKIP: ")
+    endforeach()
 endif()
 
 # The ABI probe compares the layouts of C and antic on the host.
