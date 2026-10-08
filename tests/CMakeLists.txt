@@ -3747,6 +3747,28 @@ foreach(target linux-x86_64 linux-arm64)
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
 
+# A program of musl reads no MIMALLOC_* variable: run with two of them,
+# it prints what it prints without them. A Linux host runs the program of
+# its own target, and linux-arm64 the one of linux-x86_64 under qemu.
+foreach(target linux-x86_64 linux-arm64)
+    set(emulator "")
+    if(target STREQUAL ANTIC_EMULATED_TARGET)
+        set(emulator "${ANTIC_EMULATOR}")
+    endif()
+    add_test(NAME mimalloc_environment_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/c_allocator.anti"
+            "-DTARGET=${target}"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DEMULATOR=${emulator}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/mimalloc-environment/${target}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_mimalloc_environment.cmake")
+    set_tests_properties(mimalloc_environment_${target} PROPERTIES
+        TIMEOUT 120 SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
 # Under --lto none every function of an ARM64 program and of its runtime
 # starts on a 16-byte boundary.
 foreach(target macos-arm64 linux-arm64 windows-arm64)

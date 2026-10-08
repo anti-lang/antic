@@ -50,13 +50,19 @@ antic_native_license(mimalloc "${ANTIC_MIMALLOC_SOURCE}/LICENSE")
 # tests/bench/builder.anti ran 115 ms on anti-linux against 50 ms with
 # musl's allocator, and with OFF it ran 50 ms. map_work ran 150 ms with
 # FULL, 157 with OFF and 185 with musl's allocator, mixed_work 178, 177
-# and 200, and the other three programs were alike in all three. A run
-# may still ask for them with MIMALLOC_ALLOW_THP. The rule of "Decisions"
-# in docs/work-order-llvm-optimization.md picks OFF, the faster program on
-# every one, measured 2026-10-08.
+# and 200, and the other three programs were alike in all three. The rule
+# of "Decisions" in docs/work-order-llvm-optimization.md picks OFF, the
+# faster program on every one, measured 2026-10-08.
+#
+# DESIGN: MI_NO_GETENV makes _mi_getenv of src/libc.c find no variable, so
+# mimalloc reads no MIMALLOC_* option of the environment. An Anti program
+# is configured through the runtime configuration of anti.runtime alone,
+# and a third-party allocator changes nothing through the environment.
+# Eddie decided it on 2026-10-08. The test mimalloc_environment_<target>
+# runs a program with two of the variables.
 set(ANTIC_MIMALLOC_DEFINES -DMI_MALLOC_OVERRIDE -DMI_LIBC_MUSL=1
-    -DMI_DEFAULT_ALLOW_THP=0 -DNDEBUG=1 -DMI_GUARDED=0 -DMI_STATS=1
-    -DMI_PROFILE=1)
+    -DMI_DEFAULT_ALLOW_THP=0 -DMI_NO_GETENV=1 -DNDEBUG=1 -DMI_GUARDED=0
+    -DMI_STATS=1 -DMI_PROFILE=1)
 set(ANTIC_MIMALLOC_FLAGS -std=gnu11 -O3 -fvisibility=hidden -mno-outline
     -ftls-model=local-dynamic -fno-builtin-malloc)
 
