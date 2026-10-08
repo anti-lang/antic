@@ -55,3 +55,7 @@ and UBSan 1691 of 1691 in 321 s, with `-j14` and no warnings from our code. A fi
 ASan run took 554 s while anti-linux ran its suite on the same Mac, and the run alone
 took 465 s. anti-linux passed 1622 of 1622 in 251 s, `musl_allocator_<target>` and
 `mimalloc_environment_<target>` among them.
+
+## Decisions
+
+Eddie decided on 2026-10-08. The size stands, since 1.5 KB on a program of 250 KB is not worth a study of the inliner. `MI_PROFILE` goes the way of `MI_STATS`, with `-DMI_PROFILE=0` in `ANTIC_MIMALLOC_DEFINES` and a check of `musl_allocator_<target>` that no symbol of `src/sample-profile.c` stays in a program of musl. Both stand in `docs/decisions.md` after the entry on `MI_STATS`. The change itself is a step of a driver.
