@@ -142,19 +142,19 @@ static void sort_map(struct map *m)
     }
 }
 
-bool symmap_notice(const struct text *bytes, struct text *id,
-                   struct text *version)
+static const char notice_head[] = ANTI_NOTICE_BEGIN ANTI_NOTICE_BUILD;
+
+/* The begin marker of the notice in bytes, where the line of a build id
+   follows it, or NULL when the bytes hold none. */
+static const char *find_notice(const struct text *bytes)
 {
-    static const char head[] = ANTI_NOTICE_BEGIN ANTI_NOTICE_BUILD;
-    size_t marker = sizeof head - 1;
+    size_t marker = sizeof notice_head - 1;
     size_t i;
 
     for (i = 0; i + marker + ANTI_BUILD_ID_LENGTH < bytes->length; i++) {
         const char *at = bytes->data + i;
-        const char *end = bytes->data + bytes->length;
-        const char *line;
         size_t j;
-        if (memcmp(at, head, marker) != 0) {
+        if (memcmp(at, notice_head, marker) != 0) {
             continue;
         }
         for (j = 0; j < ANTI_BUILD_ID_LENGTH; j++) {
@@ -163,9 +163,45 @@ bool symmap_notice(const struct text *bytes, struct text *id,
                 break;
             }
         }
-        if (j < ANTI_BUILD_ID_LENGTH || at[marker + ANTI_BUILD_ID_LENGTH] != '\n') {
-            continue;
+        if (j == ANTI_BUILD_ID_LENGTH &&
+            at[marker + ANTI_BUILD_ID_LENGTH] == '\n') {
+            return at;
         }
+    }
+    return NULL;
+}
+
+bool symmap_license(const struct text *bytes, struct text *out)
+{
+    static const char end_marker[] = ANTI_NOTICE_END;
+    const char *at = find_notice(bytes);
+    const char *from;
+    const char *end;
+    const char *to;
+
+    if (at == NULL) {
+        return false;
+    }
+    from = at + sizeof notice_head - 1 + ANTI_BUILD_ID_LENGTH + 1;
+    end = bytes->data + bytes->length;
+    for (to = from; to + sizeof end_marker - 1 <= end; to++) {
+        if (memcmp(to, end_marker, sizeof end_marker - 1) == 0) {
+            text_append_bytes(out, from, (size_t)(to - from));
+            return true;
+        }
+    }
+    return false;
+}
+
+bool symmap_notice(const struct text *bytes, struct text *id,
+                   struct text *version)
+{
+    size_t marker = sizeof notice_head - 1;
+    const char *at = find_notice(bytes);
+    const char *end = bytes->data + bytes->length;
+    const char *line;
+
+    if (at != NULL) {
         text_append_bytes(id, at + marker, ANTI_BUILD_ID_LENGTH);
         line = at + marker + ANTI_BUILD_ID_LENGTH + 1;
         while (line < end && end - line > 8 &&
@@ -196,6 +232,22 @@ bool symmap_notice(const struct text *bytes, struct text *id,
         return true;
     }
     return false;
+}
+
+bool symmap_license_of(const char *binary, struct text *out)
+{
+    struct text bytes = {0};
+    bool found;
+
+    if (!files_read_reported(binary, &bytes)) {
+        return false;
+    }
+    found = symmap_license(&bytes, out);
+    text_free(&bytes);
+    if (!found) {
+        fprintf(stderr, "anti: %s carries no licence notice\n", binary);
+    }
+    return found;
 }
 
 bool symmap_build_id(const char *program, struct text *out)

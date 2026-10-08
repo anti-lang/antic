@@ -360,6 +360,28 @@ static bool copy_into(const char *from, const char *to, const char *name)
     return ok;
 }
 
+/* The file beside a binary in dist/ that holds the text of its notice. */
+#define NOTICE_FILE "NOTICE.txt"
+
+/* [provisional] DESIGN: NOTICE.txt beside a program or a shared library
+   holds the licence text of its notice, the text `anti license --from`
+   prints. The notice names the packages the link put into the binary,
+   which are the packages of the project. A static library for C carries
+   no notice and gets no file. */
+static bool write_notice(const struct build *b)
+{
+    struct text notice = {0};
+    struct text path = {0};
+    bool ok;
+
+    text_appendf(&path, "%s/%s", text_cstr(&b->dist_dir), NOTICE_FILE);
+    ok = symmap_license_of(text_cstr(&b->name), &notice) &&
+         files_write(text_cstr(&path), &notice);
+    text_free(&notice);
+    text_free(&path);
+    return ok;
+}
+
 /* The module of the project that holds `main`, or the count of the
    modules when none does, which is a library project. */
 static size_t linking_module(const struct build *b)
@@ -786,6 +808,9 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
     if (ok) {
         ok = copy_into(text_cstr(&b->name), text_cstr(&b->dist_dir),
                        text_cstr(&deliverable));
+    }
+    if (ok && b->r->lib != BUILD_LIB_STATIC) {
+        ok = write_notice(b);
     }
     /* DESIGN: a Windows program of --memory-checks loads the DLL of
        AddressSanitizer from its own directory. The link wrote it beside

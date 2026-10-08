@@ -185,6 +185,21 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
     return true;
 }
 
+/* DESIGN: the runtime of AddressSanitizer is built against glibc, so a
+   Linux link of --memory-checks takes the glibc mode. */
+static bool links_glibc(const struct options *o, const struct extras *extras)
+{
+    return target_info(o->target)->os == OS_LINUX &&
+           (o->linux_library_count > 0 || extras->hosts_plugins ||
+            o->memory_checks);
+}
+
+bool driver_links_musl(const struct options *o, const struct extras *extras)
+{
+    return o->lib == LIB_NONE && o->linker == LINKER_LLD &&
+           target_info(o->target)->os == OS_LINUX && !links_glibc(o, extras);
+}
+
 /* DESIGN: every link of a module takes its inputs from
    driver_link_inputs_of: a program, a library for C, a plugin and the
    join of a bundled runtime alike. The frameworks, the libraries of
@@ -213,11 +228,7 @@ bool driver_link_inputs_of(const struct options *o, const struct extras *extras,
     in->linux_libraries = o->linux_libraries;
     in->linux_library_count = o->linux_library_count;
     in->exports = extras->hosts_plugins;
-    /* DESIGN: the runtime of AddressSanitizer is built against glibc,
-       so a Linux link of --memory-checks takes the glibc mode. */
-    in->glibc = os == OS_LINUX &&
-                (o->linux_library_count > 0 || extras->hosts_plugins ||
-                 o->memory_checks);
+    in->glibc = links_glibc(o, extras);
     in->memory_checks = o->memory_checks;
     in->lto = o->lto;
     in->profile_generate = o->profile_generate;

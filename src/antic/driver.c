@@ -862,6 +862,90 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     return status;
 }
 
+/* The package of a component of the runtime archive, with the text of
+   <runtime>/RUNTIME_LICENSES_DIR/<file>. The text stays empty when the
+   options name no runtime. */
+static void archive_package(const struct options *o, const char *name,
+                            const char *version, const char *license,
+                            const char *file, struct arena *arena,
+                            struct package *out)
+{
+    struct text path = {0};
+    struct text text = {0};
+
+    memset(out, 0, sizeof *out);
+    out->name = name;
+    out->version = version;
+    out->license = license;
+    out->license_text = "";
+    text_appendf(&path, "%s/%s/%s", o->runtime != NULL ? o->runtime : ".",
+                 RUNTIME_LICENSES_DIR, file);
+    if (o->runtime != NULL && read_text(text_cstr(&path), &text)) {
+        char *copy = arena_alloc(arena, text.length + 1);
+        memcpy(copy, text_cstr(&text), text.length);
+        out->license_text = copy;
+    }
+    text_free(&path);
+    text_free(&text);
+}
+
+/* The licence notice of a linked binary: the runtime, musl and mimalloc
+   in a program of musl, every package of the loaded libraries once, and
+   the package of the compiled module.
+
+   DESIGN: musl and mimalloc are MIT, whose notice travels with the
+   binary, and every program of musl links both. Eddie decided on
+   2026-10-08 that its notice names them, each with the version of its
+   pin and the text of the runtime archive. A program of the glibc mode
+   and of any other target links neither and names neither. */
+static void build_notice(const struct options *o,
+                         const struct extras *extras, struct arena *arena,
+                         struct text *out)
+{
+    const struct interface *own = extras->own;
+    size_t count = extras->library_count;
+    const struct package **list = alloc_zeroed(count + 4, sizeof *list);
+    struct package runtime;
+    struct package musl;
+    struct package mimalloc;
+    size_t n = 0;
+    size_t i;
+    size_t j;
+
+    archive_package(o, RUNTIME_MODULE, ANTIC_VERSION, "0BSD",
+                    RUNTIME_LICENSE_FILE, arena, &runtime);
+    list[n++] = &runtime;
+    if (driver_links_musl(o, extras)) {
+        archive_package(o, MUSL_PACKAGE, ANTIC_MUSL_VERSION, "MIT",
+                        MUSL_PACKAGE ".txt", arena, &musl);
+        archive_package(o, MIMALLOC_PACKAGE, ANTIC_MIMALLOC_VERSION, "MIT",
+                        MIMALLOC_PACKAGE ".txt", arena, &mimalloc);
+        list[n++] = &musl;
+        list[n++] = &mimalloc;
+    }
+    /* DESIGN: the package of the compiled module is always the last
+       `package` line, even where a library of the same package came
+       first. `anti symbols` reads the version of a binary there. */
+    for (i = 0; i < count; i++) {
+        const struct interface *library = extras->libraries[i];
+        if (own->package.name != NULL &&
+            strcmp(own->package.name, library->package.name) == 0) {
+            continue;
+        }
+        for (j = 0; j < n; j++) {
+            if (strcmp(list[j]->name, library->package.name) == 0) {
+                break;
+            }
+        }
+        if (j == n) {
+            list[n++] = &library->package;
+        }
+    }
+    list[n++] = &own->package;
+    notice_text(out, list, n);
+    free((void *)list);
+}
+
 /* Lower the program, run the optimizer passes and run llvm_back_end for
    the target. Returns 0 with the text, 2 after a dump, 3 for a dev object
    of a module without main and 1 after an error. */
@@ -903,6 +987,9 @@ static int back_end(const struct options *o, struct module *tree,
                 "build it without `--no-hooks`, or with `--closed`\n",
                 o->input);
         return 1;
+    }
+    if (extras->own != NULL) {
+        build_notice(o, extras, program->arena, &extras->notice);
     }
     extras->regex = holds_module(program, REGEX_MODULE);
     for (i = 0; driver_is_plugin(o) && i < program->class_count; i++) {
@@ -1105,58 +1192,6 @@ static bool own_interface(const struct options *o, struct module *tree,
     return true;
 }
 
-/* The licence notice of a linked binary: the runtime, every package of
-   the loaded libraries once, and the package of the compiled module. */
-static bool build_notice(const struct options *o, const struct interface *own,
-                         const struct interface *const *libraries,
-                         size_t count, struct arena *arena, struct text *out)
-{
-    const struct package **list = alloc_zeroed(count + 3, sizeof *list);
-    struct package runtime;
-    struct text path = {0};
-    struct text text = {0};
-    size_t n = 0;
-    size_t i;
-    size_t j;
-
-    memset(&runtime, 0, sizeof runtime);
-    runtime.name = RUNTIME_MODULE;
-    runtime.version = ANTIC_VERSION;
-    runtime.license = "0BSD";
-    runtime.license_text = "";
-    text_appendf(&path, "%s/licenses/anti_rt.txt",
-                 o->runtime != NULL ? o->runtime : ".");
-    if (o->runtime != NULL && read_text(text_cstr(&path), &text)) {
-        char *copy = arena_alloc(arena, text.length + 1);
-        memcpy(copy, text_cstr(&text), text.length);
-        runtime.license_text = copy;
-    }
-    list[n++] = &runtime;
-    /* DESIGN: the package of the compiled module is always the last
-       `package` line, even where a library of the same package came
-       first. `anti symbols` reads the version of a binary there. */
-    for (i = 0; i < count; i++) {
-        if (own->package.name != NULL &&
-            strcmp(own->package.name, libraries[i]->package.name) == 0) {
-            continue;
-        }
-        for (j = 0; j < n; j++) {
-            if (strcmp(list[j]->name, libraries[i]->package.name) == 0) {
-                break;
-            }
-        }
-        if (j == n) {
-            list[n++] = &libraries[i]->package;
-        }
-    }
-    list[n++] = &own->package;
-    notice_text(out, list, n);
-    free((void *)list);
-    text_free(&path);
-    text_free(&text);
-    return true;
-}
-
 static int compile(const struct options *o, struct text *source,
                    struct text *module, struct text *assembly,
                    struct text *base, struct extras *extras)
@@ -1168,6 +1203,7 @@ static int compile(const struct options *o, struct text *source,
     struct types types;
     struct ir_module program;
     const struct interface **libraries = NULL;
+    struct interface own;
     struct paths paths = {0};
     int status = 1;
 
@@ -1267,15 +1303,15 @@ static int compile(const struct options *o, struct text *source,
         goto done;
     }
     if (o->lib != LIB_NONE || links(o)) {
-        struct interface own;
         const struct interface **all =
             alloc_zeroed(paths.count + 2, sizeof *all);
-        if (!own_interface(o, tree, text_cstr(module), &arena, &own) ||
-            !build_notice(o, &own, libraries, paths.count, &arena,
-                          &extras->notice)) {
+        if (!own_interface(o, tree, text_cstr(module), &arena, &own)) {
             free((void *)all);
             goto done;
         }
+        extras->own = &own;
+        extras->libraries = libraries;
+        extras->library_count = paths.count;
         if (o->lib != LIB_NONE) {
             memcpy((void *)all, (void *)libraries,
                    paths.count * sizeof *all);
@@ -1293,6 +1329,9 @@ static int compile(const struct options *o, struct text *source,
         free((void *)all);
     }
     status = back_end(o, tree, text_cstr(module), &program, assembly, extras);
+    /* Both lie in this frame and in the list freed below. */
+    extras->own = NULL;
+    extras->libraries = NULL;
     if (status != 0 && status != 3) {
         goto done;
     }

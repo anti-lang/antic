@@ -43,6 +43,18 @@
 #define RUNTIME_BIN_DIR "bin"
 /* The library files of the standard library, a search root of antic. */
 #define RUNTIME_STD_DIR "std"
+/* The licence texts of the runtime archive, one file per component in
+   <runtime>/RUNTIME_LICENSES_DIR/. CMakeLists.txt writes the text of the
+   runtime as RUNTIME_LICENSE_FILE, tools/get-sysroot.cmake the text of
+   musl as <MUSL_PACKAGE>.txt and src/native/mimalloc.cmake the text of
+   mimalloc as <MIMALLOC_PACKAGE>.txt. The test license_notice reads the
+   two of a program of musl. */
+#define RUNTIME_LICENSES_DIR "licenses"
+#define RUNTIME_LICENSE_FILE "anti_rt.txt"
+/* The packages of the C library of musl and of its allocator in the
+   notice of a program of musl. */
+#define MUSL_PACKAGE "musl"
+#define MIMALLOC_PACKAGE "mimalloc"
 /* The object beside the runtime library that a bundled archive carries
    instead of the licence text of src/rt/license.c. */
 #define RUNTIME_LICENSE_STUB "anti_rt_license_stub"

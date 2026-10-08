@@ -23,8 +23,9 @@ function(antic_host_triple host out)
 endfunction()
 
 # The options of a compile for host into out: the target, the version
-# antic reports, the release of the pinned clang anti names, and the
-# headers of the family. root is the repository, sysroot the directory of
+# antic reports, the release of the pinned clang anti names, the versions
+# of musl and mimalloc that antic writes into a notice, and the headers
+# of the family. root is the repository, sysroot the directory of
 # tools/get-sysroot.cmake, resource the resource directory of the clang,
 # macos_sdk the pinned Apple SDK, which only a macOS host reads, and
 # version the version of tools/version. Each family reads its headers
@@ -35,11 +36,15 @@ function(antic_host_compile_options out host root sysroot resource macos_sdk
     antic_host_triple("${host}" triple)
     include("${root}/tools/clang-release.cmake")
     antic_clang_release(clang_version clang_tag clang_page)
+    include("${root}/tools/libc-versions.cmake")
+    antic_libc_versions(musl_version mimalloc_version)
     set(options --target=${triple} -std=c11 -O2 "-ffile-prefix-map=${root}=."
                 "-DANTIC_VERSION=\"${version}\""
                 "-DANTI_CLANG_VERSION=\"${clang_version}\""
                 "-DANTI_CLANG_TAG=\"${clang_tag}\""
-                "-DANTI_CLANG_PAGE=\"${clang_page}\"")
+                "-DANTI_CLANG_PAGE=\"${clang_page}\""
+                "-DANTIC_MUSL_VERSION=\"${musl_version}\""
+                "-DANTIC_MIMALLOC_VERSION=\"${mimalloc_version}\"")
     if(host MATCHES "^macos-")
         list(APPEND options -isysroot "${macos_sdk}")
     elseif(host MATCHES "^linux-")

@@ -31,12 +31,8 @@ if(NOT antic_mimalloc_fetched EQUAL 0)
     message(FATAL_ERROR "src/native/get-mimalloc.cmake failed, so the build "
                         "has no mimalloc source")
 endif()
-file(STRINGS "${PROJECT_SOURCE_DIR}/tools/mimalloc-pin"
-     antic_mimalloc_version REGEX "^MIMALLOC_VERSION=")
-string(REGEX REPLACE "^MIMALLOC_VERSION=" "" antic_mimalloc_version
-       "${antic_mimalloc_version}")
 set(ANTIC_MIMALLOC_SOURCE
-    "${ANTIC_MIMALLOC_DIR}/mimalloc-${antic_mimalloc_version}")
+    "${ANTIC_MIMALLOC_DIR}/mimalloc-${ANTIC_MIMALLOC_VERSION}")
 set(ANTIC_MIMALLOC_WORK "${CMAKE_BINARY_DIR}/native/mimalloc")
 antic_native_license(mimalloc "${ANTIC_MIMALLOC_SOURCE}/LICENSE")
 

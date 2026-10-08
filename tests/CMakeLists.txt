@@ -1504,7 +1504,9 @@ set_tests_properties(program_by_unsigned PROPERTIES TIMEOUT 60)
 file(GLOB std_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/std/*.anti")
 # A program whose output follows the Win32 errors of Windows brings
-# NAME.win32.expected for the Windows targets. One whose output follows
+# NAME.win32.expected for the Windows targets, and one whose output names
+# the C libraries of musl brings NAME.musl.expected for the Linux hosts,
+# whose programs link musl. One whose output follows
 # the inlining of release mode brings NAME.lto.expected for the suite
 # behind ANTIC_TEST_LTO, where the LTO of lld inlines across the runtime
 # and the program as well. A trace then names the caller, as the entry on
@@ -1514,8 +1516,12 @@ foreach(source IN LISTS std_sources)
     set(expected "")
     set(win32_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.win32.expected")
     set(lto_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.lto.expected")
+    set(musl_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.musl.expected")
     if(ANTIC_HOST_TARGET MATCHES "^windows-" AND EXISTS "${win32_expected}")
         set(expected EXPECTED "${win32_expected}")
+    endif()
+    if(ANTIC_HOST_TARGET MATCHES "^linux-" AND EXISTS "${musl_expected}")
+        set(expected EXPECTED "${musl_expected}")
     endif()
     if(ANTIC_TEST_LTO AND EXISTS "${lto_expected}")
         set(expected EXPECTED "${lto_expected}")
@@ -1960,6 +1966,22 @@ add_test(NAME linux_modes
         "-DHOST=${ANTIC_HOST_TARGET}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/linux-modes"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_linux_modes.cmake")
+
+# A program of musl names musl and mimalloc in its notice, and a program
+# of glibc or of macOS names neither. `anti license --from` prints the
+# notice and NOTICE.txt of `anti build` holds the same.
+add_test(NAME license_notice
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DMUSL_VERSION=${ANTIC_MUSL_VERSION}"
+        "-DMIMALLOC_VERSION=${ANTIC_MIMALLOC_VERSION}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/license-notice"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_license_notice.cmake")
+set_tests_properties(license_notice PROPERTIES TIMEOUT 120
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # The two shapes of a dependency, the repository layout over `file://`
 # and the two libraries for C.
@@ -3765,6 +3787,9 @@ if(NOT WIN32)
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/licenses"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DMUSL_VERSION=${ANTIC_MUSL_VERSION}"
+            "-DMIMALLOC_VERSION=${ANTIC_MIMALLOC_VERSION}"
             "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/licenses.notice"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_licenses.cmake")
 endif()
@@ -4161,6 +4186,9 @@ if(NOT WIN32)
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/io.anti"
             "-DWANTED=ANTI_LICENSES_BEGIN|build [0-9a-f]+|package anti.rt [0-9.]+ 0BSD|package anti [0-9.]+ 0BSD|package com.example.hello 2.0.0 MIT"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/licenses-std"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DMUSL_VERSION=${ANTIC_MUSL_VERSION}"
+            "-DMIMALLOC_VERSION=${ANTIC_MIMALLOC_VERSION}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_licenses.cmake")
 endif()
 

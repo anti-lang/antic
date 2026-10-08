@@ -158,6 +158,14 @@ target_compile_definitions(anti PRIVATE
 target_compile_definitions(anti_core PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")
 
+# The versions of musl and mimalloc that the notice of a program of musl
+# names, from tools/libc-versions.cmake.
+include(tools/libc-versions.cmake)
+antic_libc_versions(ANTIC_MUSL_VERSION ANTIC_MIMALLOC_VERSION)
+target_compile_definitions(antic_core PRIVATE
+    ANTIC_MUSL_VERSION="${ANTIC_MUSL_VERSION}"
+    ANTIC_MIMALLOC_VERSION="${ANTIC_MIMALLOC_VERSION}")
+
 # The pinned clang that anti bind --clang names, from
 # tools/clang-release.cmake.
 include(tools/clang-release.cmake)

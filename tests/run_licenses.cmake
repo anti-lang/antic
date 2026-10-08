@@ -7,6 +7,12 @@
 #   WORK      a directory for the executable
 #   WANTED    optional list of patterns for the marker and package lines
 #   EXPECTED  optional file with the whole notice that the program holds
+#   HOST      the target antic runs on, which the program is built for
+#   MUSL_VERSION, MIMALLOC_VERSION
+#             the versions of the two C libraries that a program of a
+#             Linux host links, since it links musl. Its notice names both
+#             after the runtime, which WANTED and EXPECTED leave out, and
+#             their texts follow the texts of EXPECTED.
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -24,6 +30,15 @@ set(wanted "ANTI_LICENSES_BEGIN;build [0-9a-f]+;package anti.rt [0-9.]+ 0BSD;pac
 if(DEFINED WANTED)
     string(REPLACE "|" ";" wanted "${WANTED}")
 endif()
+set(musl FALSE)
+if(HOST MATCHES "^linux-")
+    set(musl TRUE)
+    string(REPLACE "." "\\." musl_version "${MUSL_VERSION}")
+    string(REPLACE "." "\\." mimalloc_version "${MIMALLOC_VERSION}")
+    string(REPLACE "package anti.rt [0-9.]+ 0BSD"
+           "package anti.rt [0-9.]+ 0BSD;package musl ${musl_version} MIT;package mimalloc ${mimalloc_version} MIT"
+           wanted "${wanted}")
+endif()
 string(JOIN ";" got ${lines})
 if(NOT got MATCHES "^${wanted}")
     message(FATAL_ERROR "the notice in the program is\n${got}")
@@ -38,7 +53,18 @@ if(DEFINED EXPECTED)
     file(READ "${WORK}/licensed" program HEX)
     string(REGEX REPLACE "0a6275696c6420((3[0-9]|6[1-6])+)0a" "0a" program
            "${program}")
-    file(READ "${EXPECTED}" notice HEX)
+    file(READ "${EXPECTED}" notice)
+    if(musl)
+        file(READ "${RUNTIME}/licenses/musl.txt" musl_text)
+        file(READ "${RUNTIME}/licenses/mimalloc.txt" mimalloc_text)
+        string(REGEX REPLACE "(\npackage anti\\.rt [^\n]*\n)"
+               "\\1package musl ${MUSL_VERSION} MIT\npackage mimalloc ${MIMALLOC_VERSION} MIT\n"
+               notice "${notice}")
+        string(REPLACE "ANTI_LICENSES_END\n"
+               "text for musl\n${musl_text}text for mimalloc\n${mimalloc_text}ANTI_LICENSES_END\n"
+               notice "${notice}")
+    endif()
+    string(HEX "${notice}" notice)
     string(FIND "${program}" "${notice}" at)
     if(at EQUAL -1)
         message(FATAL_ERROR "the program does not hold the notice of ${EXPECTED}")

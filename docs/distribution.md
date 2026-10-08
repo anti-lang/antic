@@ -451,7 +451,7 @@ The author may delete those lines. Nothing in the language depends on them.
 | `anti license` | The licence of `antic` and `anti`, then every runtime archive component with name, version, identifier and full text |
 | `anti license --project` | The packages the current project links, from `anti.lock` and the imported bundled modules, with identifiers, attributions and texts |
 | `anti license --project --notice` | Writes the same content as `dist/<os>-<cpu>/<mode>/NOTICE.txt` |
-| `anti license --from <executable>` | Reads `anti_licenses` out of the binary by its marker and prints it |
+| `anti license --from <executable>` | Reads `anti_licenses` out of the binary by its marker and prints it without the markers and the build id |
 | `anti license --from-archive lib<name>.a` | Reads the licence fields from the copy of the `.antl` package header in a static archive, so a C project can produce its notice |
 
 The runtime archive holds a `licenses/` directory with one file per component, written
@@ -473,12 +473,15 @@ executable carries its licence with it:
 | miniaudio | MIT-0 | None |
 | Mbed TLS | Apache 2.0 | Ship the licence and notice with the binary |
 | PCRE2 | BSD 3-clause | Reproduce the copyright notice with the binary |
+| musl, in every program of musl | MIT | Include the copyright and permission notice with the binary |
 | mimalloc, in every program of musl | MIT | Include the copyright and permission notice with the binary |
 | CA bundle | MPL 2.0 | None. The file is loaded from the archive, not shipped |
 
 A program that imports `anti.raylib` and `anti.miniaudio` owes nobody anything. A
 program that imports `anti.net` or `anti.regex` owes an attribution, and `anti_licenses`
-plus `NOTICE.txt` supply it. This section is a statement of how the licences read, not legal advice.
+plus `NOTICE.txt` supply it. Every program of musl carries the notices of musl and
+mimalloc in `anti_licenses` and `NOTICE.txt`, and a program of the glibc mode or of any
+other target carries neither. This section is a statement of how the licences read, not legal advice.
 
 ## Licence choices for Anti itself
 

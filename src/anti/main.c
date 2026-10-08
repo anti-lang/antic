@@ -15,6 +15,7 @@
 #include "sdk.h"
 #include "platform.h"
 #include "project.h"
+#include "symmap.h"
 #include "syms.h"
 #include "userdirs.h"
 #include "test.h"
@@ -57,7 +58,8 @@ static int usage(FILE *out)
           "                              [--out <symbols.zip>]\n"
           "       anti symbols check --conf <config.toml>\n"
           "                          [--symbols <symbols.zip>]...\n"
-          "       anti symbols resolve <trace.txt> --symbols <symbols.zip>...\n",
+          "       anti symbols resolve <trace.txt> --symbols <symbols.zip>...\n"
+          "       anti license --from <binary>\n",
           out);
     fputs("\n"
           "new writes a project of the default layout: anti.toml, src/ with\n"
@@ -146,9 +148,32 @@ static int usage(FILE *out)
           "module whether its symbols are present, stale or missing, and\n"
           "exits with 1 unless every one is present. symbols resolve prints a\n"
           "raw trace with the function and the line of every frame whose\n"
-          "build id an archive holds, and leaves every other frame raw.\n",
+          "build id an archive holds, and leaves every other frame raw.\n"
+          "\n"
+          "license --from prints the licence notice that a program or a\n"
+          "shared library of Anti carries: one line per package with its\n"
+          "version and licence, then each licence text once. build writes\n"
+          "the same text as NOTICE.txt beside such a binary in dist/.\n",
           out);
     return out == stdout ? 0 : 2;
+}
+
+/* `anti license --from <binary>`, the one form of the command that is
+   built. */
+static int license_command(int argc, char **argv)
+{
+    struct text notice = {0};
+    int status = 1;
+
+    if (argc != 4 || strcmp(argv[2], "--from") != 0) {
+        return usage(stderr);
+    }
+    if (symmap_license_of(argv[3], &notice)) {
+        fputs(text_cstr(&notice), stdout);
+        status = 0;
+    }
+    text_free(&notice);
+    return status;
 }
 
 /* `anti symbols` and its three commands. */
@@ -746,6 +771,9 @@ static int command(int argc, char **argv)
     }
     if (argc >= 3 && strcmp(argv[1], "sdk") == 0) {
         return sdk_command(argc, argv);
+    }
+    if (argc >= 2 && strcmp(argv[1], "license") == 0) {
+        return license_command(argc, argv);
     }
     return usage(stderr);
 }

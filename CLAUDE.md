@@ -739,8 +739,9 @@ reports what it finished.
   that of 2026-10-08, in `docs/reports/2026-10-08-x86_64-hardware.md`. See
   "Scope and toolchain" in `docs/decisions.md`.
 - The `anti` tool holds `new`, `build`, `run`, `sdk export`, `sdk import`,
-  `test`, `check`, `fmt`, `doc`, `bind` and `symbols`, and nothing else of
-  `docs/tooling.md`.
+  `test`, `check`, `fmt`, `doc`, `bind`, `symbols` and `license --from`, and
+  nothing else of `docs/tooling.md`. `anti build` writes `NOTICE.txt` beside
+  a program, and the notice of a program of musl names musl and mimalloc.
 - `anti symbols inventory`, `check` and `resolve` are built. They read the
   runtime configuration, find the program beside it and the libraries of
   `plugins` and `[injections]`, and match every binary to an archive by its

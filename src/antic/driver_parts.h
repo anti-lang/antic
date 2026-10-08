@@ -21,6 +21,8 @@
 #include "linker.h"
 #include "text.h"
 
+struct interface;
+
 #define ASSEMBLY_SUFFIX ".s"
 #define DEF_SUFFIX ".def"
 
@@ -44,6 +46,13 @@ struct extras {
     struct text host_names;
     /* The program holds `anti.regex`, so the link adds PCRE2. */
     bool regex;
+    /* The packages of the licence notice: the interface of the compiled
+       module and the library files it loaded. own is NULL where nothing
+       links. The back end writes the notice once the program's link mode
+       is known, since a program of musl names more packages. */
+    const struct interface *own;
+    const struct interface *const *libraries;
+    size_t library_count;
 };
 
 /* A list of paths that grows as it is filled. */
@@ -99,6 +108,9 @@ bool driver_compile_llvm(const struct options *o, const struct text *text,
 /* driver_link.c */
 
 void driver_link_facts_free(struct link_facts *f);
+/* Whether the program links the C library of musl, and with it mimalloc:
+   a program for Linux that lld links outside the glibc mode. */
+bool driver_links_musl(const struct options *o, const struct extras *extras);
 bool driver_link_inputs_of(const struct options *o, const struct extras *extras,
                            const char *object, const char *executable,
                            struct link_inputs *in, struct link_facts *f);

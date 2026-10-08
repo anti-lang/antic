@@ -18,10 +18,19 @@
    the line after the begin marker of src/rt/license.h, and a line of the
    same form elsewhere in the bytes is passed over. The version is the
    one of the last `package` line, which names the package of the
-   compiled module. Returns false when the bytes hold no notice. This is
-   the one reader of the notice in anti. */
+   compiled module. Returns false when the bytes hold no notice. This and
+   symmap_license are the readers of the notice in anti. */
 bool symmap_notice(const struct text *bytes, struct text *id,
                    struct text *version);
+
+/* Append the licence text of the notice in bytes to out: the lines
+   between the build id and the end marker, as anti.license gives them in
+   the program. Returns false when the bytes hold no notice. */
+bool symmap_license(const struct text *bytes, struct text *out);
+
+/* The licence text of the binary at the path, through symmap_license.
+   Reports and returns false when the binary carries no notice. */
+bool symmap_license_of(const char *binary, struct text *out);
 
 /* The build id of the program at the path, through symmap_notice.
    Returns false when the program carries none. */
