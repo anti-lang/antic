@@ -117,7 +117,8 @@ The target stands under "Binary distribution" in `docs/decisions.md`.
   every host. Using Anti takes the pinned LLVM tools that travel inside every
   package. No C compiler ships, and no user needs one.
 - Six packages, one per platform, each complete on its own. Each holds antic and
-  anti, the pinned LLVM tools and the standard library. It also holds the runtime of
+  anti with the pinned LLVM tools beside them in `bin/`, and the standard library.
+  It also holds the runtime of
   all six targets with its bitcode of full LTO, and the native libraries and their
   headers. mimalloc, the C allocator of every program of musl, stands beside the
   runtime of each Linux level. The sysroots of every target and the licence texts complete it. Nothing is downloaded at install time or later. One package builds for all
@@ -168,7 +169,9 @@ build/host -j8`.
 and `ubsan`. The suite runs in every tree. The three builds a step of a
 driver proves are `host`, `asan` and `ubsan`.
 
-The pinned downloads lie in `build/deps/`, one copy for all three trees. The
+The pinned downloads lie in `build/deps/`, one copy for all three trees. A
+release adds the LLVM tools of the other five hosts in
+`build/deps/llvm-tools/<host>` for the packer. The
 pinned clang in `build/deps/clang` compiles everything, and the configure step
 installs it and the pinned LLVM tools in `build/deps/llvm/bin` with
 `tools/get-clang.cmake` and `tools/get-llvm.cmake`. The build also needs the
@@ -306,9 +309,12 @@ The gap to "Binary distribution" in `docs/decisions.md`, one item per difference
 the order they are best built. `docs/reports/2026-09-27-distribution-target.md` holds
 the same list.
 
-27. The LLVM tools into the package. The packer copies llvm-mc, ld.lld, ld64.lld,
-    lld-link and llvm-ar of the platform into `bin/`, and the installers stop
-    downloading them from `anti-lang/llvm-tools`.
+27. Done. The LLVM tools of the host travel in `bin/` of every package beside
+    antic and anti, with `llvm-version`, and the installers download none.
+    The packer takes the tools of another host from
+    `build/deps/llvm-tools/<host>`, which `tools/get-llvm.cmake -DHOST=<host>`
+    lays out and step 1 of `./r` fills.
+    `docs/reports/2026-10-09-dist-tools.md` reports it.
 28. antic and anti take their tools from the package alone. Today antic falls back
     on an lld of the search path, and a Windows link without a sysroot reads `LIB`
     of an MSVC environment. Two messages of antic name `tools/get-sysroot.cmake`,

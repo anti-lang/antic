@@ -74,6 +74,20 @@ foreach(script get-llvm.cmake get-clang.cmake fetch-release.cmake install.sh
     endif()
 endforeach()
 
+# DESIGN: the LLVM tools travel in bin/ of every package, which Eddie
+# decided on 2026-10-08 in docs/work-order-distribution.md, so no
+# installer reads the pin or the version to download them. A package
+# carries neither file in tools/, and the test package_keys checks that.
+foreach(script install.sh install.ps1)
+    file(READ "${ROOT}/tools/${script}" text)
+    foreach(name llvm-pin llvm-version llvm-sums)
+        if(text MATCHES "${name}")
+            message(FATAL_ERROR "tools/${script} names ${name}, and the LLVM "
+                                "tools travel in bin/ of the package")
+        endif()
+    endforeach()
+endforeach()
+
 # tools/get-llvm.cmake and tools/get-clang.cmake install into the
 # directories that tools/pinned-compiler.cmake reads by default, and each
 # spells its directory once, under ANTIC_DEPS_DIR of tools/deps-dir.cmake.

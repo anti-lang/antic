@@ -139,6 +139,7 @@ source=\"\"
 script=\"\"
 preset=\"\"
 previous=\"\"
+host=\"\"
 for word in \"\$@\"; do
     case \$word in
     -S) previous=source ;;
@@ -147,6 +148,7 @@ for word in \"\$@\"; do
     --preset) previous=preset ;;
     --build) previous=build ;;
     -DDEST=*) dest=\${word#-DDEST=} ;;
+    -DHOST=*) host=\${word#-DHOST=} ;;
     -DSYMBOLS=*) symbols=\${word#-DSYMBOLS=} ;;
     -DHOSTS=*) hosts=\$(echo \"\${word#-DHOSTS=}\" | tr ';' ' ') ;;
     *)
@@ -165,7 +167,7 @@ cache() {
     mkdir -p \"\$1\"
     cat > \"\$1/CMakeCache.txt\" <<EOF
 ANTIC_CLANG_DIR:PATH=${ROOT}/build/deps/clang
-ANTIC_LLVM_DIR:PATH=${LLVM_BIN}/..
+ANTIC_LLVM_DIR:PATH=${WORK}/deps/llvm
 ANTIC_RAYLIB_DIR:PATH=${ROOT}/build/deps/raylib
 ANTIC_SYSROOT_DIR:PATH=${ROOT}/build/deps/sysroot
 ANTIC_SYSTEM_COMPILER:BOOL=OFF
@@ -225,6 +227,18 @@ if [ -n \"\$script\" ]; then
         done
         printf '%s' \"\$sums\" > \"\$dest/SHA256SUMS\"
         rmdir \"\$dest/work\" 2>/dev/null || true
+        exit 0
+        ;;
+    get-llvm.cmake)
+        # The tools of another host, laid out as bin/ of the runtime
+        # archive: the eleven names and llvm-version.
+        [ -n \"\$dest\" ] && [ -n \"\$host\" ] || exit 1
+        mkdir -p \"\$dest/bin\"
+        for tool in llvm-mc llvm-ar llvm-objdump llvm-readobj lld ld.lld \\
+                ld64.lld lld-link opt llc llvm-profdata; do
+            echo \"stand-in \$tool of \$host\" > \"\$dest/bin/\$tool\"
+        done
+        echo '${llvm_version}' > \"\$dest/bin/llvm-version\"
         exit 0
         ;;
     *) exit 0 ;;
@@ -307,6 +321,18 @@ run("the commit failed" "${GIT}" -C "${copy}" commit --quiet
     -m "Release ${version}")
 run("the push failed" "${GIT}" -C "${copy}" push --quiet origin main)
 
+# DESIGN: the cache of the stand-in names a deps directory of this test,
+# with the real LLVM tools of this machine behind a link, so that what the
+# script fetches for the other hosts lands here and never in build/deps of
+# the checkout.
+get_filename_component(llvm_dir "${LLVM_BIN}" DIRECTORY)
+file(MAKE_DIRECTORY "${WORK}/deps")
+file(CREATE_LINK "${llvm_dir}" "${WORK}/deps/llvm" SYMBOLIC)
+file(READ "${ROOT}/tools/llvm-version" llvm_version)
+string(STRIP "${llvm_version}" llvm_version)
+cmake_host_system_information(RESULT machine_cpu QUERY OS_PLATFORM)
+set(machine "macos-${machine_cpu}")
+
 set(saved_path "$ENV{PATH}")
 # Step 9 rsyncs the text of the site to the webroot that ANTI_SITE names,
 # and the preflight refuses a run without it. The stand-in for ssh
@@ -326,6 +352,29 @@ endif()
 if("${out}${err}" MATCHES "warning:")
     message(FATAL_ERROR "./r --dry-run warns on a version that is no tag\n"
                         "${out}${err}")
+endif()
+
+# Step 1 fetches the LLVM tools of every host but this machine into
+# llvm-tools/<host> beside the llvm/ of the downloads, through
+# tools/get-llvm.cmake, and step 3 hands that directory to the packer.
+# The stand-in of the script writes the layout, so what this reads is the
+# wiring: one call per host, into the directory the cache names.
+foreach(host IN LISTS hosts)
+    if(host STREQUAL machine)
+        continue()
+    endif()
+    if(NOT out MATCHES "the LLVM tools of ${host} ")
+        message(FATAL_ERROR "the dry run fetched no LLVM tools of ${host}\n"
+                            "${out}${err}")
+    endif()
+    if(NOT EXISTS "${WORK}/deps/llvm-tools/${host}/bin/llvm-version")
+        message(FATAL_ERROR "the dry run laid out no llvm-tools/${host}/bin\n"
+                            "${out}${err}")
+    endif()
+endforeach()
+if(EXISTS "${WORK}/deps/llvm-tools/${machine}")
+    message(FATAL_ERROR "the dry run fetched the LLVM tools of this machine, "
+                        "which the runtime archive holds")
 endif()
 
 # A dry run writes under build/dist/dry-run, so that nothing it leaves

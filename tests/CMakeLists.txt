@@ -2204,6 +2204,12 @@ if(EXISTS "${ANTIC_SYSROOT_DIR}/linux-x86_64" AND
                 "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/package"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package.cmake")
+    # PERF DECISION: the package carries the LLVM tools, and xz compresses
+    # its 530 MB of them in about three minutes. ctest runs the tests of
+    # a fresh tree in the order of their declaration, which put this one
+    # last and alone at the end of the suite. The cost puts it first, so
+    # the rest of the suite runs beside it.
+    set_tests_properties(package_keys PROPERTIES COST 300)
 endif()
 add_test(NAME raylib_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}" -DNAME=raylib

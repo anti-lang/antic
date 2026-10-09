@@ -69,8 +69,9 @@ and ARM64. Each is complete on its own, and nothing is downloaded at install tim
 later. A package holds:
 
 - antic and anti, native binaries of the package's platform;
-- the pinned LLVM tools of that platform: llvm-mc, lld for ELF, Mach-O and COFF,
-  llvm-ar, opt and llc;
+- the pinned LLVM tools of that platform in `bin/` beside antic and anti, with
+  `llvm-version`. They are llvm-mc, lld for ELF, Mach-O and COFF under its four
+  names, llvm-ar, llvm-objdump, llvm-readobj, llvm-profdata, opt and llc;
 - the standard library;
 - the runtime of all six targets at every processor level, with the static native
   libraries PCRE2, raylib, miniaudio, Mbed TLS and SQLite, and their headers;

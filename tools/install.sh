@@ -68,10 +68,10 @@ site=${ANTI_SITE_BASE:-https://anti-lang.com}
 base=${ANTI_BASE:-}
 
 # DESIGN: the installer carries the public key that checks SHA256SUMS.sig
-# of the package and of the LLVM tools. Neither download carries a key of
-# its own. anti-lang.com serves the installer, and GitHub serves both
-# downloads. A key that travelled with them could be replaced with them.
-# anti-lang.com serves the same key as tools/keys/release.pem.
+# of the package. The download carries no key of its own. anti-lang.com
+# serves the installer, and GitHub serves the package. A key that
+# travelled with it could be replaced with it. anti-lang.com serves the
+# same key as tools/keys/release.pem.
 release_key='-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEao0Di9RL8gvG6oA9x7gIDJ7/zLn6
 /J5i5dgtCf82Hvpro/4umWhaPA8APgrIJKLD4XDvTqhLijckvFxj0f3Bhg==
@@ -137,8 +137,7 @@ sha256() {
 # package serves the manifest beside it. The signature comes from the
 # other host for that reason. openssl checks it against the key the
 # installer carries, never against one fetched beside it. A missing
-# openssl therefore stops the install here. It only warns for the LLVM
-# tools, whose digest tools/llvm-pin of the package carries as well.
+# openssl therefore stops the install here.
 check_manifest() {
     if curl -fsSL -o "$work/SHA256SUMS.sig" "$signature" 2>/dev/null; then
         command -v openssl >/dev/null 2>&1 ||
@@ -287,59 +286,10 @@ if [ "$api" -lt "$PACKAGE_API" ]; then
 this installer needs $PACKAGE_API. Install a newer version of Anti."
 fi
 
-# DESIGN: the LLVM tools come from the release that tools/llvm-pin of the
-# package names. The pinned digest decides, and openssl checks the signature
-# of SHA256SUMS against the key of this installer. macOS and Linux carry
-# openssl. A package without the pin carries the tools itself.
-llvm_pin=$home/tools/llvm-pin
-if [ -f "$llvm_pin" ]; then
-    row() {
-        sed -n "s/^$1=//p" "$llvm_pin"
-    }
-    llvm_version=$(tr -d ' \n' < "$home/tools/llvm-version")
-    tag=$(row tag | sed "s/@VERSION@/$llvm_version/g")
-    release=$(row release | sed "s/@TAG@/$tag/g")
-    tools=$(row file | sed "s/@TAG@/$tag/g; s/@HOST@/$host/g")
-    digest=$(row "$host-digest")
-    if [ -z "$digest" ]; then
-        fail "tools/llvm-pin names no LLVM tools for $host"
-    fi
-    say "downloading $tools"
-    curl -fsSL -o "$work/$tools" "$release/$tools"
-    curl -fsSL -o "$work/llvm-sums" "$release/SHA256SUMS"
-    curl -fsSL -o "$work/llvm-sums.sig" "$release/SHA256SUMS.sig"
-    got=$(sha256 "$work/$tools")
-    if [ "$got" != "$digest" ]; then
-        fail "$tools: SHA-256 $got, expected $digest"
-    fi
-    listed=$(grep "  $tools\$" "$work/llvm-sums" | cut -d ' ' -f 1)
-    if [ "$listed" != "$digest" ]; then
-        fail "SHA256SUMS of $tag lists '$listed' for $tools, and the pin $digest"
-    fi
-    if command -v openssl >/dev/null 2>&1; then
-        printf '%s\n' "$release_key" > "$work/release.pem"
-        openssl dgst -sha256 -binary -out "$work/llvm-sums.sha256" \
-            "$work/llvm-sums"
-        if ! openssl pkeyutl -verify -pubin -inkey "$work/release.pem" \
-            -in "$work/llvm-sums.sha256" -sigfile "$work/llvm-sums.sig" \
-            >/dev/null 2>&1; then
-            fail "SHA256SUMS of $tag carries no signature of the key of Anti"
-        fi
-    else
-        say "warning: openssl is missing, so this installer checked the digest of $tools and not the signature"
-    fi
-    tar -xJf "$work/$tools" -C "$home" bin licenses
-fi
-
-# lld answers to its four names through argv[0], and the archive carries
-# one copy of it.
-if [ -e "$home/bin/lld" ]; then
-    for name in ld.lld ld64.lld lld-link; do
-        if [ ! -e "$home/bin/$name" ]; then
-            cp "$home/bin/lld" "$home/bin/$name"
-        fi
-    done
-fi
+# DESIGN: the LLVM tools travel in bin/ of the package beside antic and
+# anti, so nothing is downloaded for them. antic finds them there by the
+# rule of src/antic/userdirs.c, beside the lib/ of the archive.
+say "the package carries the LLVM tools of $host in $home/bin"
 
 # CMake installs the sysroot of this host. The package holds the script
 # and the pins, and the pinned CMake stands in when the host has none.

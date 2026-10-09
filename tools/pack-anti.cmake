@@ -2,32 +2,35 @@
 #
 #   cmake -DDEST=<dir> -DCLANG=<clang> -DLLVM_BIN=<dir> -DSYSROOT=<dir>
 #         -DRUNTIME=<dir> -DHOSTS=<host>[;<host>] [-DSYMBOLS=<dir>]
-#         -P tools/pack-anti.cmake
+#         [-DTOOLS=<dir>] -P tools/pack-anti.cmake
 #
 # CLANG is the pinned clang of build/clang, LLVM_BIN its tools, SYSROOT
 # the directory of tools/get-sysroot.cmake and RUNTIME the runtime that the
 # CMake build wrote. SYMBOLS is where the PDB of a Windows program goes,
 # which is outside the package and is needed when a Windows host is
-# compiled here. For each host it compiles antic and anti for that host
-# and lays the package out around them. ANTIC and ANTI name the programs
-# already built for the one host of HOSTS, which the package takes
-# instead, and then CLANG and LLVM_BIN are not needed:
+# compiled here. TOOLS holds the LLVM tools of every host of HOSTS that is
+# not this machine, as <dir>/<host>/bin, which tools/get-llvm.cmake
+# -DHOST=<host> lays out. For each host it compiles antic and anti for
+# that host and lays the package out around them. ANTIC and ANTI name the
+# programs already built for the one host of HOSTS, which the package
+# takes instead, and then CLANG and LLVM_BIN are not needed:
 #
-#   bin/        antic and anti
+#   bin/        antic, anti and the LLVM tools of the host with llvm-version,
+#               copied as bin/ of the runtime archive holds them
 #   lib/<t>/<l>/ the runtime library of all six targets, per processor level
 #   std/        the standard library
 #   sysroot/    the two Linux sysroots and the two macOS sysroots of Zig's
 #               stubs, which are ours to redistribute
 #   tools/      the scripts that install the sysroot of the host
 #   licenses/   one file per component
+#   VERSION     the version of tools/version
 #
 # The result is anti-<version>-<host>.tar.xz in DEST, with its digest in
 # SHA256SUMS. The stubs of Apple's SDK in sdk/ of a macOS sysroot and the
 # Microsoft CRT stay out, because neither licence allows redistribution. A
 # user brings the first from a Mac with anti sdk import, and the installer
-# adds the second. It adds the eight LLVM tools from the release that
-# tools/llvm-pin names. The package carries no key: the installer holds
-# the key that checks them.
+# adds the second. The package carries no key: the installer holds the key
+# that checks the manifest of the release.
 cmake_minimum_required(VERSION 3.20)
 
 set(needed DEST SYSROOT RUNTIME HOSTS)
@@ -69,6 +72,44 @@ set(tools_dir "${CMAKE_CURRENT_LIST_DIR}")
 get_filename_component(root "${tools_dir}/.." ABSOLUTE)
 file(STRINGS "${tools_dir}/version" version LIMIT_COUNT 1)
 string(STRIP "${version}" version)
+# DESIGN: the LLVM tools of a package are those of its host, in bin/
+# beside antic and anti, which Eddie decided on 2026-10-08 in
+# docs/work-order-distribution.md. bin/ of the runtime archive holds the
+# tools of this machine, and the tools of every other host stand in
+# TOOLS/<host>/bin, which tools/get-llvm.cmake -DHOST=<host> lays out the
+# same way. A host without its directory is refused here, before anything
+# is compiled, since a package with the tools of another host fails on
+# every machine it installs on. llvm-version of each directory has to
+# name the pin, so a directory of an earlier release is refused as well.
+include("${tools_dir}/fetch-release.cmake")
+antic_machine_host(machine)
+file(READ "${tools_dir}/llvm-version" llvm_version)
+string(STRIP "${llvm_version}" llvm_version)
+foreach(host IN LISTS HOSTS)
+    if(host STREQUAL machine)
+        set(dir "${RUNTIME}/bin")
+    elseif(DEFINED TOOLS AND IS_DIRECTORY "${TOOLS}/${host}/bin")
+        set(dir "${TOOLS}/${host}/bin")
+    else()
+        message(FATAL_ERROR "${host}: the LLVM tools of ${host} are not in "
+                            "TOOLS/${host}/bin. cmake -DHOST=${host} "
+                            "-DDEST=<dir>/${host} -P tools/get-llvm.cmake "
+                            "lays them out, and -DTOOLS=<dir> names the "
+                            "directory.")
+    endif()
+    if(NOT EXISTS "${dir}/llvm-version")
+        message(FATAL_ERROR "${host}: ${dir} holds no llvm-version, so it is "
+                            "no bin/ of the LLVM tools")
+    endif()
+    file(READ "${dir}/llvm-version" found)
+    string(STRIP "${found}" found)
+    if(NOT found STREQUAL llvm_version)
+        message(FATAL_ERROR "${host}: ${dir} holds LLVM ${found}, and "
+                            "tools/llvm-version names ${llvm_version}")
+    endif()
+    set("tools_of_${host}" "${dir}")
+endforeach()
+
 if(DEFINED ANTIC)
     list(LENGTH HOSTS count)
     if(NOT count EQUAL 1 OR NOT DEFINED ANTI)
@@ -309,6 +350,11 @@ foreach(host IN LISTS HOSTS)
         build_program("${host}" "${tree}/bin/antic${suffix}" antic)
         build_program("${host}" "${tree}/bin/anti${suffix}" anti)
     endif()
+    # The LLVM tools of the host, as the runtime archive holds them. antic
+    # finds them beside itself, by the rule of runtime_archive in
+    # src/antic/userdirs.c: bin/ of the archive above its own bin/.
+    file(COPY "${tools_of_${host}}/" DESTINATION "${tree}/bin")
+    file(WRITE "${tree}/VERSION" "${version}\n")
 
     # DESIGN: a release build links the runtime as bitcode through full
     # LTO by default, which Eddie decided on 2026-10-07, so bitcode/full/
@@ -330,10 +376,12 @@ foreach(host IN LISTS HOSTS)
              DESTINATION "${tree}/sysroot/${target}")
     endforeach()
     file(COPY "${SYSROOT}/licenses/" DESTINATION "${tree}/licenses")
-    # The installer reads llvm-pin, and checks the LLVM release with the key
-    # it holds itself.
+    # The installer reads package-api and drives get-sysroot.cmake with
+    # the pins, until the step installers of docs/work-order-distribution.md
+    # takes tools/ out of the package. No pin of the LLVM tools is here,
+    # since bin/ carries the tools themselves.
     foreach(name get-sysroot.cmake sysroot-pins zig-stubs-pin cmake-pin
-            cmake-version llvm-version llvm-pin package-api)
+            cmake-version package-api)
         file(COPY "${root}/tools/${name}" DESTINATION "${tree}/tools")
     endforeach()
     file(COPY "${root}/LICENSE" DESTINATION "${tree}")

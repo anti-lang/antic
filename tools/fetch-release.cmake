@@ -2,9 +2,11 @@
 # check it and unpack it. tools/get-llvm.cmake and tools/get-clang.cmake
 # include this file and call fetch_release().
 #
-#   fetch_release(<pin> <dest>)
+#   fetch_release(<pin> <dest> [<host>])
 #
-# <pin> is tools/llvm-pin or tools/clang-pin. The archive is checked against
+# <pin> is tools/llvm-pin or tools/clang-pin. <host> names another host
+# than this machine, for the packer, which puts the tools of every host
+# into its package. The archive is checked against
 # the digest of the pin, against its line of SHA256SUMS of the release, and
 # SHA256SUMS.sig against tools/keys/release.pem of the checkout, which the person
 # who cloned it trusts. The archive unpacks into <dest>, and <dest>/.installed
@@ -16,12 +18,11 @@ cmake_minimum_required(VERSION 3.21)
 
 set(fetch_release_root "${CMAKE_CURRENT_LIST_DIR}/..")
 
-function(fetch_release pin dest)
-    get_filename_component(root "${fetch_release_root}" ABSOLUTE)
-    file(READ "${root}/tools/llvm-version" version)
-    string(STRIP "${version}" version)
-    # The host is named as the six targets of antic are, so one spelling
-    # serves the pins, the archive of the runtime and the option --target.
+# Set <out> to the name of this machine among the six hosts of antic. The
+# host is named as the six targets of antic are, so one spelling serves
+# the pins, the archive of the runtime and the option --target. The packer
+# reads it to tell the host of the runtime archive from the others.
+function(antic_machine_host out)
     cmake_host_system_information(RESULT os QUERY OS_NAME)
     cmake_host_system_information(RESULT platform QUERY OS_PLATFORM)
     string(TOLOWER "${os}" os)
@@ -31,7 +32,20 @@ function(fetch_release pin dest)
     elseif(platform MATCHES "^(x86_64|amd64|x64)$")
         set(platform x86_64)
     endif()
-    set(host "${os}-${platform}")
+    set(${out} "${os}-${platform}" PARENT_SCOPE)
+endfunction()
+
+function(fetch_release pin dest)
+    get_filename_component(root "${fetch_release_root}" ABSOLUTE)
+    # file(ARCHIVE_EXTRACT) unpacks nothing into a relative destination.
+    get_filename_component(dest "${dest}" ABSOLUTE)
+    file(READ "${root}/tools/llvm-version" version)
+    string(STRIP "${version}" version)
+    if(ARGC GREATER 2)
+        set(host "${ARGV2}")
+    else()
+        antic_machine_host(host)
+    endif()
     set(fetched_host "${host}" PARENT_SCOPE)
     set(fetched_version "${version}" PARENT_SCOPE)
 

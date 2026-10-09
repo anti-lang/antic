@@ -8,6 +8,7 @@
 # profiles of a --profile-generate run into the file --profile-use reads.
 #
 #   cmake [-DDEST=<dir>] [-DARCHIVE=<file>] -P tools/get-llvm.cmake
+#   cmake -DHOST=<host> -DDEST=<dir> -P tools/get-llvm.cmake
 #
 # The tools come from the release that tools/llvm-pin names, whose recipe
 # builds them from the LLVM source of tools/llvm-version.
@@ -15,27 +16,50 @@
 # it against the pin, SHA256SUMS and its signature. DEST defaults to
 # build/deps/llvm of the repository, and the configure step of CMakeLists.txt
 # runs this script. ARCHIVE names an archive already downloaded.
+#
+# HOST names another host, whose tools go into <dir> for the packer: the
+# runtime archive holds the tools of this machine alone, and a package
+# carries the tools of its own host. The archive is checked the same way,
+# and <dir>/bin is laid out as bin/ of the runtime archive, with the four
+# names of lld and llvm-version. Nothing of it runs here.
 cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/deps-dir.cmake")
+if(DEFINED HOST AND NOT DEFINED DEST)
+    message(FATAL_ERROR "HOST names the tools of ${HOST}, and DEST says where "
+                        "they go")
+endif()
 if(NOT DEFINED DEST)
     set(DEST "${ANTIC_DEPS_DIR}/llvm")
 endif()
 include("${CMAKE_CURRENT_LIST_DIR}/fetch-release.cmake")
-fetch_release("${CMAKE_CURRENT_LIST_DIR}/llvm-pin" "${DEST}")
+if(DEFINED HOST)
+    fetch_release("${CMAKE_CURRENT_LIST_DIR}/llvm-pin" "${DEST}" "${HOST}")
+else()
+    fetch_release("${CMAKE_CURRENT_LIST_DIR}/llvm-pin" "${DEST}")
+endif()
 
 # lld answers to its four names through argv[0]. The archive carries one
 # copy, because Windows has no symbolic link without a privilege. A name
 # that holds lld already is not written: every configure runs this script,
 # and deps_dir configures a copy against the same directory while the
 # suite runs ld.lld from it.
-if(CMAKE_HOST_WIN32)
+if(fetched_host MATCHES "^windows-")
     set(exe ".exe")
 endif()
 foreach(name ld.lld ld64.lld lld-link)
     file(COPY_FILE "${DEST}/bin/lld${exe}" "${DEST}/bin/${name}${exe}"
          ONLY_IF_DIFFERENT)
 endforeach()
+
+# The tools of another host cannot run here, and the digest of the pin
+# has checked them. tools/check-llvm.cmake writes llvm-version beside the
+# tools of this machine, and the same line stands here for the packer.
+if(DEFINED HOST)
+    file(WRITE "${DEST}/bin/llvm-version" "${fetched_version}\n")
+    message(STATUS "the LLVM tools of ${HOST} in ${DEST}/bin")
+    return()
+endif()
 
 execute_process(COMMAND "${CMAKE_COMMAND}" "-DLLVM_BIN=${DEST}/bin"
                         -P "${CMAKE_CURRENT_LIST_DIR}/check-llvm.cmake"

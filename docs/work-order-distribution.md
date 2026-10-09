@@ -100,8 +100,10 @@ Each of these settles a point the gap list left open. Eddie decided them on
 
 1. **The tools travel in `bin/`**, beside antic and anti, not in a
    directory of their own. antic finds them beside itself, as it finds them
-   in `build/host/runtime/bin` today. `llvm-version` travels with them, so
-   `antic --version` prints the pin from the package.
+   in `build/host/runtime/bin` today. `llvm-version` travels with them, so a
+   package names the pin of its tools. `antic --version` prints the one line
+   `antic <version>` as before, which the test `antic_version` and steps 3 and
+   10 of `./r` read.
 2. **The record of copyleft sources is `licenses/sources.txt`**, one line
    per component of the package whose licence asks for source. A line
    holds the component, the version, and the URL of the exact upstream
@@ -187,8 +189,11 @@ since `d6b8d473`.
 
 `tools`. The LLVM tools into the package. `tools/pack-anti.cmake` copies
 `bin/` of the runtime archive into `bin/` of the package, beside antic and
-anti, and `VERSION` into the root. antic and anti find the tools beside
-themselves. A test unpacks a package built from the tree and runs `antic
+anti, and `VERSION` into the root. The runtime archive holds the tools of
+the machine alone, so for every other host the packer takes
+`build/deps/llvm-tools/<host>/bin`, which `tools/get-llvm.cmake
+-DHOST=<host>` lays out the same way and step 1 of `./r` fills. antic and
+anti find the tools beside themselves. A test unpacks a package built from the tree and runs `antic
 --version`, `anti --version` and a hello program for the host with the
 package alone on the path and `PATH` otherwise empty of LLVM tools. The
 installers stop installing the LLVM tools, and `tools/llvm-pin` and

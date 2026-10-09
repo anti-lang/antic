@@ -1,10 +1,11 @@
 # Pack the package of this host from the antic and the anti of the build,
 # and check that the archive carries no key and nothing of tools/keys/.
-# The installer holds the key that checks the LLVM tools, and the package
-# holds the pin that names them. Both macOS sysroots of Zig's stubs go in,
-# and the stubs of Apple's SDK in sdk/ stay out. A package of a build with
-# the compiler of the machine is refused. Every licence of the runtime tree
-# goes in.
+# The LLVM tools of the host travel in bin/ beside antic and anti, with
+# llvm-version, and tools/ holds no pin of them. The package alone then
+# prints its version and builds a program, with nothing else on the PATH.
+# Both macOS sysroots of Zig's stubs go in, and the stubs of Apple's SDK
+# in sdk/ stay out. A package of a build with the compiler of the machine
+# is refused. Every licence of the runtime tree goes in.
 #
 #   cmake -DROOT=<repository> -DANTIC=<antic> -DANTI=<anti> -DHOST=<host>
 #         -DSYSROOT=<dir> -DRUNTIME=<dir> -DCLANG=<clang> -DLLVM_BIN=<dir>
@@ -88,15 +89,31 @@ set(suffix "")
 if(HOST MATCHES "^windows-")
     set(suffix ".exe")
 endif()
-foreach(entry anti/tools/llvm-pin anti/tools/llvm-version
-              anti/tools/zig-stubs-pin anti/bin/antic${suffix}
-              anti/bin/anti${suffix}
-              anti/sysroot/macos-arm64/usr/lib/libSystem.tbd
-              anti/sysroot/macos-x86_64/usr/lib/libSystem.tbd
-              anti/sysroot/macos-arm64/sdk-version
-              anti/licenses/zig.txt anti/licenses/apsl.txt)
+# DESIGN: the LLVM tools travel in bin/ of the package beside antic and
+# anti, copied from bin/ of the runtime archive with llvm-version, which
+# Eddie decided on 2026-10-08 in docs/work-order-distribution.md. The
+# installer downloads none, so tools/ carries no pin of them. VERSION in
+# the root names the version of the package.
+set(tools llvm-mc llvm-ar llvm-objdump llvm-readobj lld ld.lld ld64.lld
+          lld-link opt llc llvm-profdata)
+set(expected anti/tools/zig-stubs-pin anti/bin/antic${suffix}
+             anti/bin/anti${suffix} anti/bin/llvm-version anti/VERSION
+             anti/sysroot/macos-arm64/usr/lib/libSystem.tbd
+             anti/sysroot/macos-x86_64/usr/lib/libSystem.tbd
+             anti/sysroot/macos-arm64/sdk-version
+             anti/licenses/zig.txt anti/licenses/apsl.txt)
+foreach(tool IN LISTS tools)
+    list(APPEND expected "anti/bin/${tool}${suffix}")
+endforeach()
+foreach(entry IN LISTS expected)
     if(NOT entries MATCHES "(^|\n)${entry}\n")
         message(FATAL_ERROR "${archive} lacks ${entry}")
+    endif()
+endforeach()
+foreach(entry anti/tools/llvm-pin anti/tools/llvm-version)
+    if(entries MATCHES "(^|\n)${entry}\n")
+        message(FATAL_ERROR "${archive} carries ${entry}, and no installer "
+                            "reads it since the tools travel in bin/")
     endif()
 endforeach()
 # Every licence of the runtime tree goes in, those of the native libraries
@@ -160,19 +177,70 @@ run_packed("anti bind" bind "${ROOT}/tests/bind/raylib_api.json"
 if(NOT EXISTS "${WORK}/run/bound/raylib.anti")
     message(FATAL_ERROR "the packed anti bind wrote no raylib.anti")
 endif()
+
+# DESIGN: the package alone builds a program. The PATH holds bin/ of the
+# package and nothing else, so no tool of LLVM or of Anti comes from
+# anywhere else, and no --runtime names the archive: antic and anti find
+# it above their own bin/, and opt, llc and lld in that bin/, by the one
+# rule of runtime_archive in src/antic/userdirs.c. A Windows link takes
+# its libraries from LIB until the step mingw of
+# docs/work-order-distribution.md puts a Windows sysroot into the package.
+set(bin "${WORK}/unpacked/anti/bin")
+function(run_alone what dir)
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env "PATH=${bin}"
+                "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
+                ${ARGN}
+        WORKING_DIRECTORY "${dir}" RESULT_VARIABLE status
+        OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "the package alone: ${what} failed with "
+                            "${status}\n${out}${err}")
+    endif()
+    set(alone_out "${out}" PARENT_SCOPE)
+endfunction()
+file(STRINGS "${ROOT}/tools/version" version LIMIT_COUNT 1)
+string(STRIP "${version}" version)
+string(REPLACE "." "\\." version_pattern "${version}")
+foreach(program antic anti)
+    run_alone("${program} --version" "${WORK}/run" "${bin}/${program}${suffix}"
+              --version)
+    if(NOT alone_out MATCHES "^${program} ${version_pattern}\r?\n$")
+        message(FATAL_ERROR "the packed ${program} prints '${alone_out}', not "
+                            "${program} ${version}")
+    endif()
+endforeach()
+file(READ "${WORK}/unpacked/anti/VERSION" packed_version)
+string(STRIP "${packed_version}" packed_version)
+if(NOT packed_version STREQUAL version)
+    message(FATAL_ERROR "VERSION of the package holds '${packed_version}', and "
+                        "tools/version ${version}")
+endif()
+file(READ "${WORK}/unpacked/anti/bin/llvm-version" packed_llvm)
+file(READ "${ROOT}/tools/llvm-version" llvm_version)
+if(NOT packed_llvm STREQUAL llvm_version)
+    message(FATAL_ERROR "bin/llvm-version of the package holds "
+                        "'${packed_llvm}', and tools/llvm-version "
+                        "'${llvm_version}'")
+endif()
+file(WRITE "${WORK}/run/hello.anti"
+     "import anti.io;\n\nfn main() -> int\n{\n    io.print(\"hello\");\n"
+     "    return 0;\n}\n")
+run_alone("antic hello.anti" "${WORK}/run" "${bin}/antic${suffix}" hello.anti
+          -o "${WORK}/run/hello${suffix}")
+run_alone("hello" "${WORK}/run" "${WORK}/run/hello${suffix}")
+if(NOT alone_out MATCHES "hello")
+    message(FATAL_ERROR "the hello program of the package prints "
+                        "'${alone_out}'")
+endif()
+
 file(COPY "${ROOT}/tests/anti-build/app" DESTINATION "${WORK}/run")
 set(project "${WORK}/run/app")
-execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E env
-            "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
-            "${WORK}/unpacked/anti/bin/anti${suffix}" build --release
-            --runtime "${RUNTIME}" --llvm-mc "${LLVM_BIN}/llvm-mc${suffix}"
-    WORKING_DIRECTORY "${project}" RESULT_VARIABLE status
-    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
+run_alone("anti build --release" "${project}" "${bin}/anti${suffix}" build
+          --release)
 set(release "${project}/dist/${HOST}/release")
-if(NOT status EQUAL 0 OR NOT EXISTS "${release}/app${suffix}")
-    message(FATAL_ERROR "the packed anti did not build the project of "
-                        "anti.toml: ${status}\n${out}${err}")
+if(NOT EXISTS "${release}/app${suffix}")
+    message(FATAL_ERROR "the packed anti built no program of anti.toml")
 endif()
 # A Windows program keeps its functions in the PDB, which only DbgHelp
 # reads. The inventory runs on the other hosts, as anti_symbols does.
@@ -194,16 +262,50 @@ endif()
 # A host that is not Linux packs linux-arm64 as well. The packer then
 # compiles a Linux anti from the source list of the CMake build, and the
 # link fails when a source is missing.
+# DESIGN: the runtime archive holds the tools of this machine alone. The
+# tools of another host come from TOOLS/<host>/bin, which
+# tools/get-llvm.cmake -DHOST=<host> lays out as bin/ of the runtime
+# archive. A stand-in of that layout keeps the test off the network, and
+# a host without its directory is refused before anything is compiled.
 if(NOT HOST MATCHES "^linux-")
     execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${WORK}/linux"
                             "-DCLANG=${CLANG}" "-DLLVM_BIN=${LLVM_BIN}"
                             "-DHOSTS=linux-arm64" "-DSYSROOT=${WORK}/sysroot"
                             "-DRUNTIME=${RUNTIME}"
                             -P "${ROOT}/tools/pack-anti.cmake"
+                    RESULT_VARIABLE refused ERROR_VARIABLE err ENCODING NONE)
+    if(refused EQUAL 0 OR NOT err MATCHES "get-llvm.cmake")
+        message(FATAL_ERROR "tools/pack-anti.cmake packed linux-arm64 without "
+                            "the tools of linux-arm64: ${err}")
+    endif()
+    set(stand_in "${WORK}/tools/linux-arm64/bin")
+    file(MAKE_DIRECTORY "${stand_in}")
+    foreach(tool IN LISTS tools)
+        file(WRITE "${stand_in}/${tool}" "stand-in ${tool} of linux-arm64\n")
+    endforeach()
+    file(WRITE "${stand_in}/llvm-version" "${llvm_version}")
+    execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${WORK}/linux"
+                            "-DCLANG=${CLANG}" "-DLLVM_BIN=${LLVM_BIN}"
+                            "-DHOSTS=linux-arm64" "-DSYSROOT=${WORK}/sysroot"
+                            "-DRUNTIME=${RUNTIME}" "-DTOOLS=${WORK}/tools"
+                            -P "${ROOT}/tools/pack-anti.cmake"
                     RESULT_VARIABLE packed)
     file(GLOB archive "${WORK}/linux/anti-*-linux-arm64.tar.xz")
     if(NOT packed EQUAL 0 OR NOT archive)
         message(FATAL_ERROR "tools/pack-anti.cmake packed no linux-arm64")
+    endif()
+    file(MAKE_DIRECTORY "${WORK}/linux/unpacked")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E tar xf "${archive}"
+                            anti/bin/ld.lld anti/bin/llvm-version
+                    WORKING_DIRECTORY "${WORK}/linux/unpacked"
+                    RESULT_VARIABLE unpacked)
+    if(NOT unpacked EQUAL 0)
+        message(FATAL_ERROR "${archive} holds no bin/ld.lld of linux-arm64")
+    endif()
+    file(READ "${WORK}/linux/unpacked/anti/bin/ld.lld" packed_lld)
+    if(NOT packed_lld STREQUAL "stand-in ld.lld of linux-arm64\n")
+        message(FATAL_ERROR "${archive} carries another ld.lld than the one of "
+                            "linux-arm64")
     endif()
 endif()
 

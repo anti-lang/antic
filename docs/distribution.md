@@ -99,13 +99,16 @@ move a signature onto the host that serves the binaries.
 
 ### The LLVM tools
 
-The eight LLVM tools are not served from the download area: llvm-mc, lld, llvm-ar,
-llvm-objdump, llvm-readobj, opt, llc and llvm-profdata. The repository `anti-lang/llvm-tools` builds them
+Every package carries the LLVM tools of its host in `bin/` beside antic and anti:
+llvm-mc, lld under its four names, llvm-ar, llvm-objdump, llvm-readobj, opt, llc and
+llvm-profdata, with `llvm-version`. They are not served from the download area on their
+own. The repository `anti-lang/llvm-tools` builds them
 from the pinned LLVM source and publishes one archive per host as an asset of a GitHub
 release, tagged `<version>-anti.<build>` as in `23.1.1-anti.7`. Beside the archives stand `SHA256SUMS` and its signature
 `SHA256SUMS.sig`. The recipe, the hosts and the checks of each build are in that
 repository. Each release holds the tools and clang of each of the six hosts. antic takes
-the tools of its host, and a build of antic takes clang as well. The clang archive also
+the tools of its host from `bin/` of the archive above its own, by the rule of
+`runtime_archive` in `src/antic/userdirs.c`, and a build of antic takes clang as well. The clang archive also
 carries `libunwind.a` for the two glibc targets, which the build copies into
 `lib/<target>/` of the runtime archive. The runtime of AddressSanitizer calls its
 `_Unwind_Backtrace` and `_Unwind_GetIP` in a Linux program of `--memory-checks`. It
@@ -160,7 +163,16 @@ of clang in the same release. `tools/get-llvm.cmake` takes the
 archive of the host into `build/deps/llvm`, and checks the digest of the pin, the line
 of `SHA256SUMS` and the signature. A toolchain bump is a new release there and a new
 pin here. Every package carries the LLVM tools of its platform, as "Binary
-distribution" in `docs/decisions.md` decides, so an installer downloads none.
+distribution" in `docs/decisions.md` decides, so an installer downloads none, and the
+`tools/` of a package holds neither `llvm-pin` nor `llvm-version`. The packer copies
+`bin/` of the runtime archive into the package of the machine's own host. For each
+other host, `tools/get-llvm.cmake -DHOST=<host>` lays the archive of that host out the
+same way under `build/deps/llvm-tools/<host>`, checked against the pin, the manifest
+and the signature as the host's own. Step 1 of `./r` fills those five directories and
+step 3 hands the directory to the packer as `TOOLS`. The macos-arm64 package that the
+test `package_keys` builds from the tree grew from 20,533,160 bytes to 125,271,420
+with the tools on 2026-10-09, since the four names of lld are four copies of 73 MB
+that xz compresses one by one.
 
 The public key that checks `SHA256SUMS.sig` with `openssl pkeyutl -verify` lives in the
 installers, which anti-lang.com serves, and in `tools/keys/release.pem` of the repository,

@@ -303,6 +303,28 @@ preflight() {
     raylib_dir=$(cached ANTIC_RAYLIB_DIR)
     llvm_bin=$llvm_dir/bin
     say "the downloads of $host_tree/ are in place"
+
+    # DESIGN: the runtime archive holds the LLVM tools of this machine,
+    # and a package carries the tools of its own host. The tools of the
+    # other five hosts come from the same release, into llvm-tools/<host>
+    # beside the llvm/ of the downloads, through tools/get-llvm.cmake,
+    # which checks each archive against the pin, the manifest and the
+    # signature. A host whose directory is in place is not fetched again,
+    # and step 3 hands the directory to the packer.
+    tools_dir=$(dirname "$llvm_dir")/llvm-tools
+    machine=macos-$(uname -m)
+    mkdir -p "$dist"
+    for host in $hosts; do
+        [ "$host" != "$machine" ] || continue
+        if [ ! -f "$tools_dir/$host/bin/llvm-version" ]; then
+            cmake -DHOST="$host" -DDEST="$tools_dir/$host" \
+                -P "$root/tools/get-llvm.cmake" > "$dist/tools-$host.log" 2>&1 ||
+                die "the LLVM tools of $host did not download, and $dist/tools-$host.log holds the output"
+            [ -f "$tools_dir/$host/bin/llvm-version" ] ||
+                die "tools/get-llvm.cmake laid out no $tools_dir/$host/bin"
+        fi
+        say "the LLVM tools of $host are in $tools_dir/$host"
+    done
 }
 
 # Step 2. The suite of this machine, in an export of the commit, and
@@ -371,7 +393,7 @@ build_packages() {
     cmake -DDEST="$packages" -DCLANG="$clang_dir/bin/clang" \
         -DLLVM_BIN="$llvm_bin" -DSYSROOT="$sysroot_dir" \
         -DRUNTIME="$export_tree/$host_tree/runtime" -DHOSTS="$list" \
-        -DSYMBOLS="$symbols" \
+        -DSYMBOLS="$symbols" -DTOOLS="$tools_dir" \
         -P "$root/tools/pack-anti.cmake" > "$logs/pack.log" 2>&1 ||
         die "step 3: the packer failed, see $logs/pack.log"
 
