@@ -18,6 +18,7 @@
 #   bin/        antic, anti and the LLVM tools of the host with llvm-version,
 #               copied as bin/ of the runtime archive holds them
 #   lib/<t>/<l>/ the runtime library of all six targets, per processor level
+#   include/    the headers of the native libraries, one directory each
 #   std/        the standard library
 #   lib/<t>-glibc/ the runtime of both Linux targets against glibc
 #   sysroot/    the two Linux sysroots of musl, their two -glibc twins with
@@ -369,6 +370,12 @@ foreach(host IN LISTS HOSTS)
              REGEX "/bitcode/thin$" EXCLUDE)
     endforeach()
     file(COPY "${RUNTIME}/std" DESTINATION "${tree}")
+    # DESIGN: the headers of the native libraries go in as include/ of the
+    # runtime archive holds them, one directory per library, which Eddie
+    # decided on 2026-10-08 in docs/work-order-distribution.md. They serve
+    # anti bind --clang and a C program that links an Anti library and the
+    # native library it uses.
+    file(COPY "${RUNTIME}/include" DESTINATION "${tree}")
     file(COPY "${RUNTIME}/licenses/" DESTINATION "${tree}/licenses")
     foreach(target linux-x86_64 linux-arm64)
         file(COPY "${SYSROOT}/${target}" DESTINATION "${tree}/sysroot")

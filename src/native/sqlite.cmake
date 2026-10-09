@@ -45,6 +45,8 @@ file(CONFIGURE OUTPUT "${ANTIC_SQLITE_WORK}/licence.txt"
      CONTENT "SQLite is in the public domain.\n\n${antic_sqlite_blessing}\n"
      @ONLY NEWLINE_STYLE UNIX)
 antic_native_license(sqlite "${ANTIC_SQLITE_WORK}/licence.txt")
+# The two headers of the amalgamation, which its build installs.
+antic_native_headers(sqlite3 "${ANTIC_SQLITE_SOURCE}" sqlite3.h sqlite3ext.h)
 
 # DESIGN: sqlite3.c of the amalgamation with no compile-time option of our
 # own, the defaults of the release: serialized threading, and extensions
@@ -80,14 +82,16 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         VERBATIM)
 
     # The C half of the test sqlite_link_<target>, compiled as a program of
-    # that target would compile C against the library.
+    # that target would compile C against the library, with the headers of
+    # include/sqlite3/ of the runtime tree.
     set(probe "${work}/sqlite_probe.o")
     add_custom_command(OUTPUT "${probe}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
         COMMAND ${compile} ${ANTIC_C_WARNINGS}
-            -isystem "${ANTIC_SQLITE_SOURCE}"
+            -isystem "${ANTIC_RUNTIME_DIR}/include/sqlite3"
             -c "${antic_sqlite_probe}" -o "${probe}"
-        DEPENDS "${antic_sqlite_probe}" "${ANTIC_SQLITE_SOURCE}/sqlite3.h"
+        DEPENDS "${antic_sqlite_probe}"
+            "${ANTIC_RUNTIME_DIR}/include/sqlite3/sqlite3.h"
         VERBATIM)
     add_custom_target(sqlite_${target} ALL DEPENDS "${library}" "${probe}")
 

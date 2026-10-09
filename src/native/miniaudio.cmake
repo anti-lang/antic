@@ -23,6 +23,7 @@ set(ANTIC_MINIAUDIO_SOURCE
     "${ANTIC_MINIAUDIO_DIR}/miniaudio-${antic_miniaudio_version}")
 set(ANTIC_MINIAUDIO_WORK "${CMAKE_BINARY_DIR}/native/miniaudio")
 antic_native_license(miniaudio "${ANTIC_MINIAUDIO_SOURCE}/LICENSE")
+antic_native_headers(miniaudio "${ANTIC_MINIAUDIO_SOURCE}" miniaudio.h)
 
 # DESIGN: miniaudio.c of the release, with no definition of our own. Every
 # back end stays in, and miniaudio loads the one it uses at run time: ALSA,
@@ -64,7 +65,8 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
         VERBATIM)
 
     # The C half of the test, compiled as a program of that target would
-    # compile C against the library. On Linux it carries its own main.
+    # compile C against the library, with the header of include/miniaudio/
+    # of the runtime tree. On Linux it carries its own main.
     set(probe "${work}/miniaudio_probe.o")
     set(probe_main "")
     if(target MATCHES "^linux-")
@@ -73,10 +75,10 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
     add_custom_command(OUTPUT "${probe}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
         COMMAND ${compile} ${ANTIC_C_WARNINGS} ${probe_main}
-            -isystem "${ANTIC_MINIAUDIO_SOURCE}"
+            -isystem "${ANTIC_RUNTIME_DIR}/include/miniaudio"
             -c "${antic_miniaudio_probe}" -o "${probe}"
         DEPENDS "${antic_miniaudio_probe}"
-            "${ANTIC_MINIAUDIO_SOURCE}/miniaudio.h"
+            "${ANTIC_RUNTIME_DIR}/include/miniaudio/miniaudio.h"
         VERBATIM)
     add_custom_target(miniaudio_${target} ALL DEPENDS "${library}" "${probe}")
 

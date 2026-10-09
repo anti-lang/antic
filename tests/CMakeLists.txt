@@ -2209,6 +2209,7 @@ if(EXISTS "${ANTIC_SYSROOT_DIR}/linux-x86_64" AND
                 "-DSYSROOT=${ANTIC_SYSROOT_DIR}" "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DCLANG=${CMAKE_C_COMPILER}"
                 "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+                "-DRAYLIB=${ANTIC_RAYLIB_DIR}"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/package"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package.cmake")
     # PERF DECISION: the package carries the LLVM tools, and xz compresses

@@ -6,12 +6,13 @@
 # With an empty PATH and no LIB it links a program for every target that
 # names no framework. Both macOS sysroots of Zig's stubs go in, and the
 # stubs of Apple's SDK in sdk/ stay out. A package of a build with the
-# compiler of the machine is refused. Every licence of the runtime tree
-# goes in.
+# compiler of the machine is refused. Every licence and every header of
+# the runtime tree goes in, and anti bind --clang of the package binds
+# include/raylib/raylib.h as the anti of the tree binds the pinned source.
 #
 #   cmake -DROOT=<repository> -DANTIC=<antic> -DANTI=<anti> -DHOST=<host>
 #         -DSYSROOT=<dir> -DRUNTIME=<dir> -DCLANG=<clang> -DLLVM_BIN=<dir>
-#         -DWORK=<dir> -P tests/run_package.cmake
+#         -DRAYLIB=<dir> -DWORK=<dir> -P tests/run_package.cmake
 
 # DESIGN: the packer links macOS against the Apple SDK that
 # tools/macos-sdk-pin names, resolved by version, and never against the
@@ -128,6 +129,16 @@ foreach(cpu x86_64 arm64)
          "anti/lib/linux-${cpu}-glibc/${level}/libanti_rt.a"
          "anti/lib/linux-${cpu}-glibc/libunwind.a")
 endforeach()
+# DESIGN: the headers of the native libraries go into include/<library>/
+# of the runtime archive and the package, which Eddie decided on
+# 2026-10-08 in docs/work-order-distribution.md. Each directory is the one
+# a C compile names with -I, so Mbed TLS keeps mbedtls/ and psa/ below it.
+foreach(header pcre2/pcre2.h sqlite3/sqlite3.h sqlite3/sqlite3ext.h
+        mbedtls/mbedtls/ssl.h mbedtls/mbedtls/mbedtls_config.h
+        mbedtls/psa/crypto.h miniaudio/miniaudio.h raylib/raylib.h
+        raylib/raymath.h raylib/rlgl.h raylib/rcamera.h)
+    list(APPEND expected "anti/include/${header}")
+endforeach()
 foreach(entry IN LISTS expected)
     if(NOT entries MATCHES "(^|\n)${entry}\n")
         message(FATAL_ERROR "${archive} lacks ${entry}")
@@ -146,6 +157,17 @@ foreach(licence IN LISTS licences)
     string(REPLACE "." "\\." pattern "${licence}")
     if(NOT entries MATCHES "(^|\n)anti/licenses/${pattern}\n")
         message(FATAL_ERROR "${archive} lacks anti/licenses/${licence}")
+    endif()
+endforeach()
+# Every header of the runtime tree goes in.
+file(GLOB_RECURSE headers RELATIVE "${RUNTIME}/include" "${RUNTIME}/include/*")
+if(headers STREQUAL "")
+    message(FATAL_ERROR "${RUNTIME}/include holds no header")
+endif()
+foreach(header IN LISTS headers)
+    string(REPLACE "." "\\." pattern "${header}")
+    if(NOT entries MATCHES "(^|\n)anti/include/${pattern}\n")
+        message(FATAL_ERROR "${archive} lacks anti/include/${header}")
     endif()
 endforeach()
 if(entries MATCHES "(^|\n)anti/sysroot/macos-[^/\n]+/sdk/")
@@ -211,7 +233,6 @@ run_packed("anti bind" bind "${ROOT}/tests/bind/raylib_api.json"
 if(NOT EXISTS "${WORK}/run/bound/raylib.anti")
     message(FATAL_ERROR "the packed anti bind wrote no raylib.anti")
 endif()
-
 # DESIGN: the package alone builds a program. The PATH holds bin/ of the
 # package and nothing else, so no tool of LLVM or of Anti comes from
 # anywhere else, and no --runtime names the archive: antic and anti find
@@ -262,8 +283,9 @@ endif()
 # holds no Windows sysroot until the step mingw puts the trees of
 # mingw-w64 into it, so the Windows sysroots of the runtime archive stand
 # in at the place the package will hold them, as links the test removes
-# before the tree. They stand before the first link, since a Windows host
-# links its own hello program against one.
+# before the tree. They stand before the first link and before anti bind
+# --clang, since a Windows host links its own hello program against one
+# and clang reads the headers of the host's sysroot.
 set(links)
 set(targets linux-x86_64 linux-arm64 macos-arm64 macos-x86_64)
 foreach(target windows-x86_64 windows-arm64)
@@ -276,6 +298,64 @@ foreach(target windows-x86_64 windows-arm64)
         message("SKIP the link for ${target}: ${SYSROOT}/${target} is not here")
     endif()
 endforeach()
+# anti bind --clang of the package, with bin/ of the package and the
+# pinned clang alone on the PATH, binds include/raylib/raylib.h of the
+# package. It writes anti.raylib as the anti of the tree writes it from
+# raylib.h of the pinned raylib source, which the test anti_bind_raylib
+# compiles and probes. The PATH is set as run_anti_bind.cmake sets it, for
+# the two runs, and put back after them. Each directory is made native
+# alone, since file(TO_NATIVE_PATH) writes `;` for the `:` of a joined
+# PATH.
+get_filename_component(clang_bin "${CLANG}" DIRECTORY)
+file(TO_NATIVE_PATH "${WORK}/unpacked/anti/bin" bind_path)
+file(TO_NATIVE_PATH "${clang_bin}" clang_bin)
+if(HOST MATCHES "^windows-")
+    string(APPEND bind_path ";${clang_bin}")
+else()
+    string(APPEND bind_path ":${clang_bin}")
+endif()
+set(saved_path "$ENV{PATH}")
+set(ENV{PATH} "${bind_path}")
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E env
+            "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
+            "${WORK}/unpacked/anti/bin/anti${suffix}" bind --clang
+            "${WORK}/unpacked/anti/include/raylib/raylib.h"
+            -o "${WORK}/run/bound-clang"
+    WORKING_DIRECTORY "${WORK}/run" RESULT_VARIABLE packed_status
+    OUTPUT_VARIABLE packed_out ERROR_VARIABLE packed_err ENCODING NONE)
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E env
+            "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
+            "${ANTI}" bind --clang "${RAYLIB}/src/raylib.h"
+            -o "${WORK}/run/bound-tree" --runtime "${RUNTIME}"
+    WORKING_DIRECTORY "${WORK}/run" RESULT_VARIABLE tree_status
+    OUTPUT_VARIABLE tree_out ERROR_VARIABLE tree_err ENCODING NONE)
+set(ENV{PATH} "${saved_path}")
+if(NOT packed_status EQUAL 0)
+    message(FATAL_ERROR "the packed anti bind --clang of include/raylib/raylib.h "
+                        "failed with ${packed_status}\n${packed_out}${packed_err}")
+endif()
+if(NOT tree_status EQUAL 0)
+    message(FATAL_ERROR "anti bind --clang of the pinned raylib.h failed with "
+                        "${tree_status}\n${tree_out}${tree_err}")
+endif()
+file(GLOB written RELATIVE "${WORK}/run/bound-clang" "${WORK}/run/bound-clang/*")
+file(GLOB wanted RELATIVE "${WORK}/run/bound-tree" "${WORK}/run/bound-tree/*")
+if(NOT "raylib.anti" IN_LIST written OR NOT written STREQUAL wanted)
+    message(FATAL_ERROR "the packed anti bind --clang wrote '${written}', and "
+                        "the anti of the tree '${wanted}'")
+endif()
+foreach(file IN LISTS written)
+    file(READ "${WORK}/run/bound-clang/${file}" got)
+    file(READ "${WORK}/run/bound-tree/${file}" want)
+    if(NOT got STREQUAL want)
+        message(FATAL_ERROR "${file} that the packed anti bind --clang wrote "
+                            "from include/raylib/raylib.h differs from anti.raylib "
+                            "of the tree")
+    endif()
+endforeach()
+
 file(WRITE "${WORK}/run/hello.anti"
      "import anti.io;\n\nfn main() -> int\n{\n    io.print(\"hello\");\n"
      "    return 0;\n}\n")

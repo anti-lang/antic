@@ -31,6 +31,7 @@ Chapter 3 installs Anti with one command. That package is this archive with anti
 | `bin/llvm-ar` | The archiver | Static libraries for C, which `antic --lib static` writes |
 | `bin/llvm-objdump`, `bin/llvm-readobj` | Readers of object files | The tests of chapters 16 and 21 check what the emitter produced |
 | `lib/<target>/<level>/` | anti_rt for all six targets, one per processor level | A program of any target and level links the runtime, whichever host compiled it |
+| `include/<library>/` | The headers of PCRE2, SQLite, Mbed TLS, miniaudio and raylib, one directory each | `anti bind --clang` reads them, and a C program that links an Anti library names one with `-I` beside the native library it uses |
 | `std/` | The standard library as `.antl` files | One file serves every target, because the IR holds no sizes |
 | `sysroot/linux-x86_64`, `sysroot/linux-arm64` | musl and the compiler-rt builtins | Ours to pass on, so a Linux program links with nothing else installed |
 | `licenses/` | One file per component, and `sources.txt` | The obligations that travel with a shipped program, and the upstream source of every pinned component |

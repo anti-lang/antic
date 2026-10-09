@@ -7,6 +7,9 @@
 # pcre2-source.cmake, which CMakeLists.txt at the top includes before antic.
 
 antic_native_license(pcre2 "${ANTIC_PCRE2_SOURCE}/LICENCE.md")
+# The header PCRE2 installs, generated from pcre2.h.generic. The POSIX
+# wrapper and its header stay out, as its library does.
+antic_native_headers(pcre2 "${ANTIC_PCRE2_INCLUDE}" pcre2.h)
 
 foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     antic_native_target(triple flags "${target}")
@@ -41,15 +44,16 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         VERBATIM)
 
     # The C half of the test pcre2_link_<target>, compiled as a program of
-    # that target would compile C against the library.
+    # that target would compile C against the library, with the header of
+    # include/pcre2/ of the runtime tree.
     set(probe "${work}/pcre2_probe.o")
     add_custom_command(OUTPUT "${probe}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
         COMMAND ${compile} ${ANTIC_C_WARNINGS}
-            -isystem "${ANTIC_PCRE2_INCLUDE}"
+            -isystem "${ANTIC_RUNTIME_DIR}/include/pcre2"
             -c "${PROJECT_SOURCE_DIR}/tests/abi/pcre2_probe.c" -o "${probe}"
         DEPENDS "${PROJECT_SOURCE_DIR}/tests/abi/pcre2_probe.c"
-            "${ANTIC_PCRE2_INCLUDE}/pcre2.h"
+            "${ANTIC_RUNTIME_DIR}/include/pcre2/pcre2.h"
         VERBATIM)
     # DESIGN: the glue of anti.regex, src/rt/regex.c and src/rt/patterns.c,
     # is a runtime library of its own beside PCRE2 and no part of anti_rt.

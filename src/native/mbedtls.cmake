@@ -30,6 +30,11 @@ set(ANTIC_MBEDTLS_SOURCE "${ANTIC_MBEDTLS_DIR}/mbedtls-${antic_mbedtls_version}"
 set(ANTIC_MBEDTLS_INCLUDE "${ANTIC_MBEDTLS_SOURCE}/include")
 set(ANTIC_MBEDTLS_WORK "${CMAKE_BINARY_DIR}/native/mbedtls")
 antic_native_license(mbedtls "${ANTIC_MBEDTLS_SOURCE}/LICENSE")
+# The headers include/CMakeLists.txt of the release installs, every header
+# of include/mbedtls/ and include/psa/, mbedtls_config.h among them.
+file(GLOB antic_mbedtls_headers RELATIVE "${ANTIC_MBEDTLS_INCLUDE}"
+     "${ANTIC_MBEDTLS_INCLUDE}/mbedtls/*.h" "${ANTIC_MBEDTLS_INCLUDE}/psa/*.h")
+antic_native_headers(mbedtls "${ANTIC_MBEDTLS_INCLUDE}" ${antic_mbedtls_headers})
 
 # The sources of the three libraries, src_crypto, src_x509 and src_tls of
 # library/CMakeLists.txt in the release. The files of 3rdparty/ build only
@@ -94,14 +99,16 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         VERBATIM)
 
     # The C half of the test mbedtls_link_<target>, compiled as a program
-    # of that target would compile C against the library.
+    # of that target would compile C against the library, with the headers
+    # of include/mbedtls/ of the runtime tree.
     set(probe "${work}/mbedtls_probe.o")
     add_custom_command(OUTPUT "${probe}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
         COMMAND ${compile} ${ANTIC_C_WARNINGS}
-            -isystem "${ANTIC_MBEDTLS_INCLUDE}"
+            -isystem "${ANTIC_RUNTIME_DIR}/include/mbedtls"
             -c "${antic_mbedtls_probe}" -o "${probe}"
         DEPENDS "${antic_mbedtls_probe}"
+            "${ANTIC_RUNTIME_DIR}/include/mbedtls/mbedtls/mbedtls_config.h"
         VERBATIM)
     add_custom_target(mbedtls_${target} ALL DEPENDS "${library}" "${probe}")
 

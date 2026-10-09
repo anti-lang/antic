@@ -13,6 +13,10 @@ endif()
 set(ANTIC_RAYLIB_SOURCE "${ANTIC_RAYLIB_DIR}/src")
 set(ANTIC_RAYLIB_WORK "${CMAKE_BINARY_DIR}/native/raylib")
 antic_native_license(raylib "${ANTIC_RAYLIB_DIR}/LICENSE")
+# The four headers of raylib_public_headers in src/CMakeLists.txt of the
+# release.
+antic_native_headers(raylib "${ANTIC_RAYLIB_SOURCE}" raylib.h rcamera.h rlgl.h
+    raymath.h)
 
 # The seven modules of the library. rglfw.c holds GLFW, and raudio.c the
 # audio module over miniaudio.
@@ -113,7 +117,8 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
         VERBATIM)
 
     # The C half of the test, compiled as a program of that target would
-    # compile C against the library. On Linux it carries its own main.
+    # compile C against the library, with the headers of include/raylib/
+    # of the runtime tree. On Linux it carries its own main.
     set(probe "${work}/raylib_probe.o")
     set(probe_main "")
     if(target MATCHES "^linux-")
@@ -122,9 +127,10 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
     add_custom_command(OUTPUT "${probe}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
         COMMAND ${compile} ${ANTIC_C_WARNINGS} ${probe_main}
-            -isystem "${ANTIC_RAYLIB_SOURCE}"
+            -isystem "${ANTIC_RUNTIME_DIR}/include/raylib"
             -c "${antic_raylib_probe}" -o "${probe}"
-        DEPENDS "${antic_raylib_probe}" "${ANTIC_RAYLIB_SOURCE}/raylib.h"
+        DEPENDS "${antic_raylib_probe}"
+            "${ANTIC_RUNTIME_DIR}/include/raylib/raylib.h"
         VERBATIM)
     add_custom_target(raylib_${target} ALL DEPENDS "${library}" "${probe}")
     antic_native_library(miniaudio_name "${target}" miniaudio)
@@ -194,11 +200,12 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
             "-ffile-prefix-map=${CMAKE_BINARY_DIR}=."
             "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=."
             ${ANTIC_C_WARNINGS} ${probe_main}
-            -isystem "${ANTIC_RAYLIB_SOURCE}"
-            -isystem "${ANTIC_MINIAUDIO_SOURCE}"
+            -isystem "${ANTIC_RUNTIME_DIR}/include/raylib"
+            -isystem "${ANTIC_RUNTIME_DIR}/include/miniaudio"
             -c "${antic_media_audio_probe}" -o "${probe}"
-        DEPENDS "${antic_media_audio_probe}" "${ANTIC_RAYLIB_SOURCE}/raylib.h"
-            "${ANTIC_MINIAUDIO_SOURCE}/miniaudio.h"
+        DEPENDS "${antic_media_audio_probe}"
+            "${ANTIC_RUNTIME_DIR}/include/raylib/raylib.h"
+            "${ANTIC_RUNTIME_DIR}/include/miniaudio/miniaudio.h"
         VERBATIM)
     add_custom_target(media_audio_${target} ALL DEPENDS "${probe}")
 

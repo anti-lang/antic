@@ -200,6 +200,12 @@ on 2026-10-07. The bitcode of ThinLTO, `bitcode/thin/`, stays in the build tree,
 `--lto thin` from a package names the archive it lacks. The bitcode of full LTO adds 11.5
 MB to a package before compression and 0.82 MB after xz.
 
+The headers of PCRE2, SQLite, Mbed TLS, miniaudio and raylib stand in
+`include/<library>/` of the runtime archive and of every package, one directory each,
+which is the directory a C compile names with `-I`. They serve `anti bind --clang` from a
+package and a C program that links an Anti library and the native library it uses. The
+build of Mbed TLS carries no CA bundle, so no `lib/cacert.pem` stands beside them yet.
+
 A Linux program of a release links the pinned sysroot and never the libc of the machine
 that packed it: musl for the static form, glibc 2.35 and the kernel headers of Ubuntu
 22.04 for the dynamic one. The shipped antic then runs on any Linux from Ubuntu 22.04 on.

@@ -263,11 +263,12 @@ directories of `tests/` and `docs/`. Adding to any list is Eddie's decision.
 15. Done. `f"..."` and `rf"..."` with their format specifications, as
     calls of `anti.text.Builder`. `docs/reports/2026-09-21-interpolation.md`
     reports it, and `docs/notes/interpolation.md` holds its choices.
-16. The native libraries in `src/native/`. PCRE2, SQLite, Mbed TLS, miniaudio
-    and raylib build for all six targets, as "Libraries and runtime" in
-    `docs/decisions.md` records. Their headers and `lib/cacert.pem` are not yet
-    part of the runtime archive. `anti.regex` binds PCRE2, and no module binds
-    the other four.
+16. Done. The native libraries in `src/native/`. PCRE2, SQLite, Mbed TLS,
+    miniaudio and raylib build for all six targets, as "Libraries and runtime"
+    in `docs/decisions.md` records, and their headers stand in
+    `include/<library>/` of the runtime archive. The build of Mbed TLS carries
+    no `lib/cacert.pem`. `anti.regex` binds PCRE2, and no module binds the
+    other four. `docs/reports/2026-10-09-dist-headers.md` reports the headers.
 17. Done. The LLVM text writes every atomic operation as an LLVM atomic
     instruction, and the runtime keeps its functions for C.
     `docs/reports/2026-10-07-inline-atomics.md` reports it.
@@ -332,8 +333,10 @@ the same list.
     `tools/upstream-sources.cmake` from the pins, and `anti license --from`
     prints the line of a component after its text.
     `docs/reports/2026-10-09-dist-sources.md` reports it.
-31. The headers of the native libraries into the runtime archive, item 16. Today
-    `lib/<target>/` holds their static libraries alone.
+31. Done. The headers of the native libraries stand in `include/<library>/` of
+    the runtime archive and of every package, and `anti bind --clang` of a
+    package binds `include/raylib/raylib.h` as the tree binds the pinned
+    source. `docs/reports/2026-10-09-dist-headers.md` reports it.
 32. The Windows sysroot of mingw-w64: pinned import libraries for both Windows
     targets, generated from the `.def` files of the mingw-w64 project. A program
     links `ucrtbase.dll`. The lld link drops `msvcrt.lib`, `libvcruntime.lib`, `ucrt.lib`

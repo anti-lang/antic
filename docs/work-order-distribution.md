@@ -240,7 +240,10 @@ of the runtime archive and the package, as decision 3 says, and
 is not touched, since `include/` is a directory of the archive and not of
 the tree. A test runs `anti bind --clang` on `include/raylib/raylib.h` of
 an unpacked package with the pinned clang and compares the module it writes
-with `anti.raylib` of the tree. Done when the test passes and item 16 and
+with `anti.raylib` as the `anti` of the tree writes it from `raylib.h` of the
+pinned raylib source, the module that the test `anti_bind_raylib` compiles.
+The tree holds no file of `anti.raylib`, since "Bindings" in
+`docs/decisions.md` has `anti bind` write it. Done when the test passes and item 16 and
 item 31 of "First sessions" in `CLAUDE.md` read "Done".
 
 `mingw`. The Windows sysroot of mingw-w64, as decision 4 says. In order:

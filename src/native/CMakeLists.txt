@@ -83,6 +83,22 @@ function(antic_native_license name source)
     set_property(GLOBAL APPEND PROPERTY ANTIC_NATIVE_LICENSES "${name}")
 endfunction()
 
+# Copy the headers <file>... of the native library <name>, each a path
+# below <base>, to include/<name>/ of the runtime tree under the same path,
+# which the packer copies. A C program and anti bind --clang read them
+# there.
+# DESIGN: the headers of each library are the ones its own build installs,
+# and include/<name>/ is the directory a C compile names with -I, so a
+# header keeps the directory its includes name: mbedtls/ and psa/ of Mbed
+# TLS. Eddie decided include/<library>/ on 2026-10-08 in
+# docs/work-order-distribution.md.
+function(antic_native_headers name base)
+    foreach(file IN LISTS ARGN)
+        configure_file("${base}/${file}"
+            "${ANTIC_RUNTIME_DIR}/include/${name}/${file}" COPYONLY)
+    endforeach()
+endfunction()
+
 set(ANTIC_NATIVE_TARGETS "")
 foreach(target IN LISTS ANTIC_TARGETS)
     if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
