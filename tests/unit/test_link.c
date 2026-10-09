@@ -451,14 +451,12 @@ static void libraries(void)
     win.object = "geo.obj";
     win.executable = "geo.dll";
     shared(TARGET_WINDOWS_ARM64, &win, &def,
-           "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% "
-           "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:SAFEICF /DLL "
+           "/rt/bin/lld-link /NOLOGO /lldmingw /lldignoreenv /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:oldnames.lib /NODEFAULTLIB:uuid.lib /DEBUG /PDBALTPATH:%_PDB% "
+           "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF /DLL "
            "/MACHINE:ARM64 /OUT:geo.dll /PDB:geo.pdb /DEF:geo.def "
-           "/LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
-           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
-           "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/aarch64 geo.obj "
-           "/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
-           "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
+           "/IMPLIB:geo.lib /LIBPATH:/rt/sysroot/t/lib geo.obj "
+           "/rt/lib/windows-arm64/armv8.2/anti_rt.lib clang_rt.builtins.lib "
+          "ucrtbase.lib ntdll.lib kernel32.lib");
     link_relocatable_command(&c, TARGET_MACOS_ARM64, &in, "joined.o",
                              joined_inputs, 3);
     joined(&c, "ld -r -keep_private_externs -arch arm64 -o joined.o geo.o "
@@ -610,15 +608,13 @@ static void dynamic_modes(void)
     in.def_file = "prog.def";
     in.import_library = "prog.lib";
     links(TARGET_WINDOWS_ARM64, &in,
-          "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% "
-          "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:SAFEICF "
+          "/rt/bin/lld-link /NOLOGO /lldmingw /lldignoreenv /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:oldnames.lib /NODEFAULTLIB:uuid.lib /DEBUG /PDBALTPATH:%_PDB% "
+          "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF "
           "/SUBSYSTEM:CONSOLE /MACHINE:ARM64 /OUT:prog.exe /PDB:prog.pdb "
           "/DEF:prog.def /IMPLIB:prog.lib "
-          "/LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
-          "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
-          "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/aarch64 prog.obj "
-          "/rt/lib/windows-arm64/armv8.2/anti_rt.lib msvcrt.lib "
-          "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
+          "/LIBPATH:/rt/sysroot/t/lib prog.obj "
+          "/rt/lib/windows-arm64/armv8.2/anti_rt.lib clang_rt.builtins.lib "
+          "ucrtbase.lib ntdll.lib kernel32.lib");
     /* A plugin links the import library of its host among its inputs,
        no runtime and no start of the C runtime. */
     {
@@ -630,14 +626,12 @@ static void dynamic_modes(void)
         in.extra = host;
         in.extra_count = 1;
         link_shared_command(&c, TARGET_WINDOWS_ARM64, &in, &plugin);
-        joined(&c, "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% "
-                   "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:SAFEICF /DLL "
+        joined(&c, "/rt/bin/lld-link /NOLOGO /lldmingw /lldignoreenv /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:oldnames.lib /NODEFAULTLIB:uuid.lib /DEBUG /PDBALTPATH:%_PDB% "
+                   "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF /DLL "
                    "/NOENTRY /MACHINE:ARM64 /OUT:fancy.dll /PDB:fancy.pdb "
-                   "/DEF:fancy.def /LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
-                   "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
-                   "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/aarch64 fancy.obj "
-                   "host.lib libvcruntime.lib ucrt.lib "
-                   "legacy_stdio_definitions.lib");
+                   "/DEF:fancy.def /LIBPATH:/rt/sysroot/t/lib fancy.obj "
+                   "host.lib clang_rt.builtins.lib ucrtbase.lib ntdll.lib "
+                   "kernel32.lib");
         link_command_free(&c);
     }
 }
@@ -681,16 +675,14 @@ static void memory_checks_links(void)
     in = lld_windows_inputs;
     in.memory_checks = true;
     links(TARGET_WINDOWS_X86_64, &in,
-          "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
-          "/ignore:4099 /OPT:REF /OPT:SAFEICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
-          "/OUT:prog.exe /PDB:prog.pdb /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
-          "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
-          "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/x86_64 "
+          "/rt/bin/lld-link /NOLOGO /lldmingw /lldignoreenv /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:oldnames.lib /NODEFAULTLIB:uuid.lib /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
+          "/OPT:REF /OPT:SAFEICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
+          "/OUT:prog.exe /PDB:prog.pdb /LIBPATH:/rt/sysroot/t/lib "
           "/rt/lib/windows-x86_64/clang_rt.asan_dynamic.lib "
           "/INCLUDE:__asan_seh_interceptor "
           "/WHOLEARCHIVE:/rt/lib/windows-x86_64/clang_rt.asan_dynamic_runtime_thunk.lib "
-          "prog.obj /rt/lib/windows-x86_64/v3/anti_rt.lib msvcrt.lib "
-          "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
+          "prog.obj /rt/lib/windows-x86_64/v3/anti_rt.lib clang_rt.builtins.lib "
+          "ucrtbase.lib ntdll.lib kernel32.lib");
 }
 
 /* --lto links the bitcode of the program with the runtime as bitcode of
@@ -743,15 +735,13 @@ static void lto_links(void)
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crtn.o");
     win.lto = LTO_THIN;
     links(TARGET_WINDOWS_X86_64, &win,
-          "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
-          "/ignore:4099 /OPT:REF /OPT:SAFEICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
+          "/rt/bin/lld-link /NOLOGO /lldmingw /lldignoreenv /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:oldnames.lib /NODEFAULTLIB:uuid.lib /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
+          "/OPT:REF /OPT:SAFEICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
           "/opt:lldlto=3 /mllvm:-inline-threshold=225 /OUT:prog.exe "
           "/PDB:prog.pdb "
-          "/LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
-          "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
-          "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/x86_64 prog.obj "
-          "/rt/lib/windows-x86_64/v3/bitcode/thin/anti_rt.lib msvcrt.lib "
-          "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
+          "/LIBPATH:/rt/sysroot/t/lib prog.obj "
+          "/rt/lib/windows-x86_64/v3/bitcode/thin/anti_rt.lib clang_rt.builtins.lib "
+          "ucrtbase.lib ntdll.lib kernel32.lib");
     /* The word of the option names the directory of its mode. */
     CHECK(link_lto_from_name("full", &mode) && mode == LTO_FULL);
     CHECK_STR(link_lto_name(mode), "full");
@@ -803,16 +793,13 @@ static void profile_links(void)
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crtn.o");
     win.profile_generate = true;
     links(TARGET_WINDOWS_ARM64, &win,
-          "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% "
-          "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:SAFEICF "
+          "/rt/bin/lld-link /NOLOGO /lldmingw /lldignoreenv /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:oldnames.lib /NODEFAULTLIB:uuid.lib /DEBUG /PDBALTPATH:%_PDB% "
+          "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF "
           "/SUBSYSTEM:CONSOLE /MACHINE:ARM64 /OUT:prog.exe /PDB:prog.pdb "
-          "/LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
-          "/LIBPATH:/rt/sysroot/t/sdk/lib/um/aarch64 "
-          "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/aarch64 prog.obj "
+          "/LIBPATH:/rt/sysroot/t/lib prog.obj "
           "/rt/lib/windows-arm64/armv8.2/anti_rt.lib "
           "/rt/lib/windows-arm64/clang_rt.profile.lib "
-          "/NODEFAULTLIB:libcmt.lib msvcrt.lib libvcruntime.lib ucrt.lib "
-          "legacy_stdio_definitions.lib");
+          "clang_rt.builtins.lib ucrtbase.lib ntdll.lib kernel32.lib");
 }
 
 /* A shared library takes the facts of a program of its module: the
@@ -886,17 +873,15 @@ static void shared_modes(void)
     in.executable = "geo.dll";
     in.memory_checks = true;
     shared(TARGET_WINDOWS_X86_64, &in, &def,
-           "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% "
-           "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:SAFEICF /DLL "
+           "/rt/bin/lld-link /NOLOGO /lldmingw /lldignoreenv /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:oldnames.lib /NODEFAULTLIB:uuid.lib /DEBUG /PDBALTPATH:%_PDB% "
+           "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF /DLL "
            "/MACHINE:X64 /OUT:geo.dll /PDB:geo.pdb /DEF:geo.def "
-           "/LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
-           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
-           "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/x86_64 "
+           "/IMPLIB:geo.lib /LIBPATH:/rt/sysroot/t/lib "
            "/rt/lib/windows-x86_64/clang_rt.asan_dynamic.lib "
            "/INCLUDE:__asan_seh_interceptor "
            "/WHOLEARCHIVE:/rt/lib/windows-x86_64/clang_rt.asan_dynamic_runtime_thunk.lib "
-           "geo.obj /rt/lib/windows-x86_64/v3/anti_rt.lib msvcrt.lib "
-           "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
+           "geo.obj /rt/lib/windows-x86_64/v3/anti_rt.lib clang_rt.builtins.lib "
+          "ucrtbase.lib ntdll.lib kernel32.lib");
 }
 
 /* The flavour of lld and the file that shows a sysroot is complete come
@@ -913,10 +898,8 @@ static void sysroot_names(void)
         {TARGET_LINUX_ARM64, true, "ld.lld",
          "usr/lib/libclang_rt.builtins.a"},
         {TARGET_MACOS_ARM64, false, "ld64.lld", SYSROOT_SDK_VERSION},
-        {TARGET_WINDOWS_X86_64, false, "lld-link",
-         "crt/lib/x86_64/msvcrt.lib"},
-        {TARGET_WINDOWS_ARM64, false, "lld-link",
-         "crt/lib/aarch64/msvcrt.lib"},
+        {TARGET_WINDOWS_X86_64, false, "lld-link", "lib/ucrtbase.lib"},
+        {TARGET_WINDOWS_ARM64, false, "lld-link", "lib/ucrtbase.lib"},
     };
     size_t i;
 
@@ -1021,9 +1004,12 @@ void test_link(void)
     /* ld64.lld links with the .tbd stubs of the sysroot, and ld.lld with
        musl as a static position-independent executable, without the debug
        sections that musl carries. lld-link takes the libraries of the
-       sysroot alone: /lldignoreenv keeps the LIB variable out, and the
-       sysroot stands as the Visual Studio and the Windows SDK, so a
-       Windows host adds none of its own. */
+       sysroot alone: /lldmingw looks for no Visual Studio of a Windows
+       host and ties the unwind data of the gnu objects to their
+       functions, /lldignoreenv keeps the LIB variable out, and
+       /NODEFAULTLIB drops the four libraries of Microsoft's C runtime and
+       SDK the objects of compiler-rt name. The libraries of mingw-w64 and
+       the builtins follow the runtime. */
     links(TARGET_MACOS_X86_64, &lld_inputs,
           "/rt/bin/ld64.lld -S -arch x86_64 -platform_version macos 11.0 26.5 "
           "-syslibroot /rt/sysroot/t -o prog -dead_strip --icf=safe prog.o "
@@ -1038,13 +1024,11 @@ void test_link(void)
           "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
           "/rt/sysroot/t/usr/lib/crtn.o");
     links(TARGET_WINDOWS_X86_64, &lld_windows_inputs,
-          "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
-          "/ignore:4099 /OPT:REF /OPT:SAFEICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
-          "/OUT:prog.exe /PDB:prog.pdb /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
-          "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
-          "/LIBPATH:/rt/sysroot/t/sdk/lib/ucrt/x86_64 prog.obj "
-          "/rt/lib/windows-x86_64/v3/anti_rt.lib msvcrt.lib libvcruntime.lib "
-          "ucrt.lib legacy_stdio_definitions.lib");
+          "/rt/bin/lld-link /NOLOGO /lldmingw /lldignoreenv /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:oldnames.lib /NODEFAULTLIB:uuid.lib /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
+          "/OPT:REF /OPT:SAFEICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
+          "/OUT:prog.exe /PDB:prog.pdb /LIBPATH:/rt/sysroot/t/lib prog.obj "
+          "/rt/lib/windows-x86_64/v3/anti_rt.lib clang_rt.builtins.lib "
+          "ucrtbase.lib ntdll.lib kernel32.lib");
     /* Object files and archives from the command line follow the object
        of the program, before the runtime library. */
     links(TARGET_MACOS_ARM64, &extra_inputs,

@@ -67,8 +67,11 @@ the host in it holds the address of the `__imp_` entry instead, and
 with the address its entry holds before `plugin.c` reads the table. A state word keeps a second
 open of the same library from doing it twice. The `.def` file of a
 Windows plugin exports `anti_rt_provides` and `anti_rt_imports`, and the
-link takes `/NOENTRY`, the import library of the host, the vcruntime
-and the UCRT, whose heap the host shares.
+link takes `/NOENTRY`, the import library of the host, the builtins and
+the import libraries of ucrtbase.dll, ntdll.dll and kernel32.dll of the
+sysroot. The plugin shares the heap of ucrtbase.dll with its host, and
+takes the stack probe, `_fltused` and the printf family from the host's
+exports, which name the runtime's static part of the C runtime.
 
 ## The host
 

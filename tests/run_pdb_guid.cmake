@@ -38,9 +38,7 @@ foreach(mode release debug)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "antic failed for ${TARGET} ${mode}\n${out}${err}")
     endif()
-    # The objects of the Microsoft C runtime name PDBs that no machine
-    # here holds. /ignore:4099 drops that warning, and a link of a program
-    # of Anti says nothing else.
+    # A link of a program of Anti says nothing.
     if(NOT "${out}${err}" STREQUAL "")
         message(FATAL_ERROR "the ${mode} link for ${TARGET} printed\n${out}${err}")
     endif()

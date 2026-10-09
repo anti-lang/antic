@@ -14,9 +14,11 @@
 #include <string.h>
 
 /* The entropy of Windows is BCryptGenRandom, which entropy_poll.c calls
-   without naming its library. net_sockets.c names ws2_32 itself. */
+   without naming its library, and net_sockets.c names ws2_32 under the
+   compiler of Microsoft alone, so a program names both. */
 #if defined(_WIN32)
 #pragma comment(lib, "bcrypt.lib")
+#pragma comment(lib, "ws2_32.lib")
 #endif
 
 int32_t mbedtls_probe_version(void);

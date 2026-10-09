@@ -5,11 +5,14 @@
    that includes stdlib.h. */
 #define _CRT_RAND_S
 
+#include <assert.h>
+#include <corecrt_startup.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <io.h>
 #include <limits.h>
 #include <malloc.h>
+#include <math.h>
 #include <share.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -19,7 +22,7 @@
 #include <sys/stat.h>
 #include <wchar.h>
 #include <windows.h>
-#include <DbgHelp.h>
+#include <dbghelp.h>
 
 #include "cpu_level.h"
 #include "platform.h"
@@ -27,10 +30,6 @@
 #include "signals.h"
 #include "std.h"
 #include "utf.h"
-
-#if defined(ANTI_RT_X86_64)
-#include <intrin.h>
-#endif
 
 /* See the DESIGN comment of the same function in platform_posix.c. */
 int64_t anti_rt_is_windows(void)
@@ -1110,20 +1109,26 @@ void anti_rt_memory_kept(const void *p)
 
 #if defined(ANTI_RT_X86_64)
 
+/* DESIGN: the two instructions as inline assembly, the same as in
+   platform_posix.c, since the headers of mingw-w64 declare the intrinsics
+   of Microsoft's compiler otherwise than clang does. xgetbv is written by
+   its bytes, so that the assembler needs no xsave option. */
 void anti_rt_cpuid(uint32_t leaf, uint32_t sub, uint32_t out[4])
 {
-    int regs[4];
-
-    __cpuidex(regs, (int)leaf, (int)sub);
-    out[0] = (uint32_t)regs[0];
-    out[1] = (uint32_t)regs[1];
-    out[2] = (uint32_t)regs[2];
-    out[3] = (uint32_t)regs[3];
+    __asm__ volatile("cpuid"
+                     : "=a"(out[0]), "=b"(out[1]), "=c"(out[2]), "=d"(out[3])
+                     : "a"(leaf), "c"(sub));
 }
 
 uint64_t anti_rt_xcr0(void)
 {
-    return _xgetbv(0);
+    uint32_t low;
+    uint32_t high;
+
+    __asm__ volatile(".byte 0x0f, 0x01, 0xd0"
+                     : "=a"(low), "=d"(high)
+                     : "c"(0));
+    return (uint64_t)high << 32 | low;
 }
 
 #elif defined(ANTI_RT_ARM64)
@@ -1150,6 +1155,413 @@ int32_t anti_rt_arm64_level(void)
         return ANTI_CPU_ARMV8_5;
     }
     return ANTI_CPU_ARMV8_0;
+}
+
+#endif
+
+/* The static part of the C runtime, for the runtime archive alone.
+
+   DESIGN: the archive compiles this file for the gnu triple against the
+   headers of mingw-w64, which define __MINGW32__. The host build of a
+   Windows machine compiles it for its unit tests as well, against the
+   headers of Microsoft and with Microsoft's C runtime, which gives this
+   part itself and holds no dirent.h, so the part stays out there.
+
+   DESIGN: a Windows program links against ucrtbase.dll, the C library of
+   every Windows since 10, through the import library that
+   tools/get-sysroot.cmake writes from the .def file of mingw-w64, and
+   against no library of Microsoft, which Eddie decided on 2026-09-27
+   under "Binary distribution" in docs/decisions.md. The DLL holds the C
+   library alone. What the static libraries of Microsoft gave beside it
+   stands here: the start of a program, whose entry point stands in
+   platform_entry.c, the entry point of a DLL, the tables of the
+   initialisers, the directory of thread-local storage, the stack probe,
+   the check of the stack cookie and the marks the compiler names. atexit
+   and the printf family, which the headers of the UCRT declare and the
+   DLL does not export, stand in platform_stdio.c. The names are the ones
+   the compiler, the linker and the loader look for, so rule 25 of
+   docs/c-guidelines.md stops at them, as the entry on the runtime of a
+   Windows target under "Binary distribution" says. The C of the runtime
+   is compiled for the gnu triple against the headers of mingw-w64, so it
+   compiles as C of mingw-w64 would, and the program is compiled for the
+   msvc triple. */
+
+#if defined(__MINGW32__)
+
+#include <dirent.h>
+
+#define ANTI_RT_SECTION(name) __attribute__((section(name), used))
+
+/* The tables of the initialisers: the C initialisers in .CRT$XI*, each
+   of which gives 0 or an error, and the constructors in .CRT$XC*, where
+   the compiler puts the constructor of a module. The linker sorts the
+   sections of a group by name, so the two marks of each table bound what
+   the objects of the program put between them. */
+ANTI_RT_SECTION(".CRT$XIA") static const _PIFV c_initialisers_start[1] = {0};
+ANTI_RT_SECTION(".CRT$XIZ") static const _PIFV c_initialisers_end[1] = {0};
+ANTI_RT_SECTION(".CRT$XCA") static const _PVFV constructors_start[1] = {0};
+ANTI_RT_SECTION(".CRT$XCZ") static const _PVFV constructors_end[1] = {0};
+
+/* Run the two tables, before main and when a process attaches a DLL. */
+static bool run_initialisers(void)
+{
+    if (_initterm_e((_PIFV *)c_initialisers_start,
+                    (_PIFV *)c_initialisers_end) != 0) {
+        return false;
+    }
+    _initterm((_PVFV *)constructors_start, (_PVFV *)constructors_end);
+    return true;
+}
+
+/* The directory of thread-local storage, which the linker puts into the
+   header of the image and the loader reads for every thread. The raw
+   data is the .tls section between the two marks, the callbacks are the
+   .CRT$XL* group after its first mark, which holds none, and the index
+   is the word the loader writes and the code of every thread-local
+   variable reads. The struct is IMAGE_TLS_DIRECTORY with pointers for
+   its addresses, so that its initialiser is addresses alone. */
+struct tls_directory {
+    const void *raw_data_start;
+    const void *raw_data_end;
+    unsigned long *index;
+    const void *callbacks;
+    uint32_t zero_fill_size;
+    uint32_t characteristics;
+};
+
+ANTI_RT_SECTION(".tls") static char *tls_start = NULL;
+ANTI_RT_SECTION(".tls$ZZZ") static char *tls_end = NULL;
+ANTI_RT_SECTION(".CRT$XLA") static const PIMAGE_TLS_CALLBACK tls_callbacks_start = NULL;
+ANTI_RT_SECTION(".CRT$XLZ") static const PIMAGE_TLS_CALLBACK tls_callbacks_end = NULL;
+/* The loader writes the index of the module once, before any thread
+   reads it. The index, the directory, the mark of floating point and the
+   cookie below are named by the code the back end writes and by the
+   linker, never by the IR, so each is marked used: the LTO of a release
+   build would otherwise drop them before the back end asks for them. */
+__attribute__((used)) unsigned long _tls_index = 0;
+__attribute__((used)) const struct tls_directory _tls_used = {
+    &tls_start, &tls_end, &_tls_index, &tls_callbacks_start + 1, 0, 0
+};
+
+/* The mark of a module that uses floating point, which the code of
+   x86_64 names and the C runtime of Microsoft defined. */
+__attribute__((used)) const int _fltused = 0x9875;
+
+/* The cookie of the stack check of Microsoft's compiler, which the
+   profile runtime of compiler-rt and a C object of a user built with
+   the check carry. It starts as the default value of Microsoft's C
+   runtime and takes a random value at the start of a program or a DLL,
+   as that runtime gives it one, with the top 16 bits clear so that a
+   text that overflows a buffer spells it with difficulty. The check
+   keeps every register, as its callers hold their result across it, so
+   it is assembly, as the stack probe is. The probe touches every page of
+   a frame above a page from the top down, so that the guard page of the
+   stack moves. The code of the msvc triple calls __chkstk with the size
+   in rax on x86_64 and in x15, in units of 16 bytes, on ARM64. The C of
+   the gnu triple calls ___chkstk_ms on x86_64 with the same contract. */
+#define DEFAULT_SECURITY_COOKIE 0x2B992DDFA232u
+__attribute__((used)) uintptr_t __security_cookie = DEFAULT_SECURITY_COOKIE;
+
+/* A random cookie from the C runtime, or the default when it gives none. */
+static void set_security_cookie(void)
+{
+    unsigned int low;
+    unsigned int high;
+    uintptr_t value;
+
+    if (rand_s(&low) != 0 || rand_s(&high) != 0) {
+        return;
+    }
+    value = ((uintptr_t)high << 32 | low) & 0x0000FFFFFFFFFFFFu;
+    if (value != 0 && value != DEFAULT_SECURITY_COOKIE) {
+        __security_cookie = value;
+    }
+}
+
+#if defined(ANTI_RT_X86_64)
+__asm__(".text\n"
+        ".globl __chkstk\n"
+        ".globl ___chkstk_ms\n"
+        ".globl __security_check_cookie\n"
+        ".def __chkstk; .scl 2; .type 32; .endef\n"
+        ".def ___chkstk_ms; .scl 2; .type 32; .endef\n"
+        ".def __security_check_cookie; .scl 2; .type 32; .endef\n"
+        ".p2align 4\n"
+        "__chkstk:\n"
+        "___chkstk_ms:\n"
+        "    pushq %rcx\n"
+        "    pushq %rax\n"
+        "    cmpq $0x1000, %rax\n"
+        "    leaq 24(%rsp), %rcx\n"
+        "    jb 1f\n"
+        "2:\n"
+        "    subq $0x1000, %rcx\n"
+        "    testq %rcx, (%rcx)\n"
+        "    subq $0x1000, %rax\n"
+        "    cmpq $0x1000, %rax\n"
+        "    ja 2b\n"
+        "1:\n"
+        "    subq %rax, %rcx\n"
+        "    testq %rcx, (%rcx)\n"
+        "    popq %rax\n"
+        "    popq %rcx\n"
+        "    retq\n"
+        ".p2align 4\n"
+        "__security_check_cookie:\n"
+        "    cmpq __security_cookie(%rip), %rcx\n"
+        "    jne 3f\n"
+        "    retq\n"
+        "3:\n"
+        "    ud2\n");
+#elif defined(ANTI_RT_ARM64)
+__asm__(".text\n"
+        ".globl __chkstk\n"
+        ".globl __security_check_cookie\n"
+        ".def __chkstk; .scl 2; .type 32; .endef\n"
+        ".def __security_check_cookie; .scl 2; .type 32; .endef\n"
+        ".p2align 4\n"
+        "__chkstk:\n"
+        "    lsl x16, x15, #4\n"
+        "    mov x17, sp\n"
+        "1:\n"
+        "    sub x17, x17, #4096\n"
+        "    subs x16, x16, #4096\n"
+        "    ldr xzr, [x17]\n"
+        "    b.gt 1b\n"
+        "    ret\n"
+        ".p2align 4\n"
+        "__security_check_cookie:\n"
+        "    adrp x16, __security_cookie\n"
+        "    ldr x16, [x16, :lo12:__security_cookie]\n"
+        "    cmp x0, x16\n"
+        "    b.ne 2f\n"
+        "    ret\n"
+        "2:\n"
+        "    brk #0xf003\n");
+#endif
+
+/* The compiler of the gnu triple calls __main at the start of main,
+   where the constructors of a program run under GCC. They have run
+   before main here, so it does nothing. */
+void __main(void);
+void __main(void)
+{
+}
+
+/* See platform.h. The C runtime starts itself when the loader maps its
+   DLL. The program sets its type, which the message of an assertion
+   reads, its arguments and its environment, which the UCRT keeps per
+   module, runs its initialisers and leaves through exit, which runs the
+   atexit functions and flushes the streams. */
+_Noreturn void anti_rt_windows_start(int (*program)(int, char **))
+{
+    set_security_cookie();
+    _set_app_type(_crt_console_app);
+    if (_initialize_narrow_environment() != 0 ||
+        _configure_narrow_argv(_crt_argv_unexpanded_arguments) != 0 ||
+        !run_initialisers()) {
+        abort();
+    }
+    exit(program(*__p___argc(), *__p___argv()));
+}
+
+/* The entry point of a DLL, under the name lld-link looks for in its
+   mingw mode. Its initialisers run when a process attaches it, and
+   nothing happens on the other events. */
+BOOL WINAPI DllMainCRTStartup(HINSTANCE instance, DWORD reason,
+                              LPVOID reserved);
+BOOL WINAPI DllMainCRTStartup(HINSTANCE instance, DWORD reason,
+                              LPVOID reserved)
+{
+    /* The loader passes the module and, on a detach, whether the process
+       ends, which the start has no use for. */
+    (void)instance;
+    (void)reserved;
+    if (reason != DLL_PROCESS_ATTACH) {
+        return TRUE;
+    }
+    set_security_cookie();
+    return run_initialisers();
+}
+
+/* DESIGN: the headers of mingw-w64 declare a few functions that its own
+   library defines and ucrtbase.dll does not export, and the native
+   libraries and the C of the tests reach fourteen of them: assert of
+   raylib and miniaudio ends in _assert, raylib calls hypotf, raylib walks
+   a directory with opendir, readdir and closedir, and the macros of
+   math.h that classify a number, fpclassify, isnan and signbit among
+   them, call the nine functions below where the compiler does not inline
+   the bodies the header offers. They stand here, with the meaning the
+   library of mingw-w64 gives them, so that no library of mingw-w64 is
+   built. A program of C against the headers of the package that reaches
+   another function of that library gets an undefined symbol from the
+   link. */
+
+int __fpclassify(double x)
+{
+    return __builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, FP_SUBNORMAL,
+                                FP_ZERO, x);
+}
+
+int __fpclassifyf(float x)
+{
+    return __builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, FP_SUBNORMAL,
+                                FP_ZERO, x);
+}
+
+int __fpclassifyl(long double x)
+{
+    return __builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, FP_SUBNORMAL,
+                                FP_ZERO, x);
+}
+
+int __isnan(double x)
+{
+    return __builtin_isnan(x);
+}
+
+int __isnanf(float x)
+{
+    return __builtin_isnan(x);
+}
+
+int __isnanl(long double x)
+{
+    return __builtin_isnan(x);
+}
+
+int __signbit(double x)
+{
+    return __builtin_signbit(x) != 0;
+}
+
+int __signbitf(float x)
+{
+    return __builtin_signbit(x) != 0;
+}
+
+int __signbitl(long double x)
+{
+    return __builtin_signbit(x) != 0;
+}
+
+void _assert(const char *message, const char *file, unsigned line)
+{
+    fprintf(stderr, "Assertion failed: %s, file %s, line %u\n", message,
+            file, line);
+    abort();
+}
+
+float hypotf(float x, float y)
+{
+    return (float)hypot((double)x, (double)y);
+}
+
+/* A directory that opendir opened: the entry readdir gives, the handle
+   of the find functions, the count of the entries read, -1 past the end,
+   and the pattern path\* in UTF-16. The DIR of dirent.h is the type of
+   the library of mingw-w64, which no caller looks into, so its pointer
+   stands for this struct. The names go through UTF-16 and back, as every
+   text of the runtime does, where the library of mingw-w64 takes the
+   code page of the system. */
+struct open_directory {
+    struct dirent entry;
+    intptr_t handle;
+    int state;
+    wchar_t *pattern;
+};
+
+DIR *opendir(const char *path)
+{
+    struct open_directory *directory = malloc(sizeof *directory);
+    wchar_t *wide;
+    size_t units;
+    DWORD attributes;
+
+    if (directory == NULL) {
+        errno = ENOMEM;
+        return NULL;
+    }
+    wide = wide_of(path, 2);
+    if (wide == NULL) {
+        free(directory);
+        return NULL;
+    }
+    units = wcslen(wide);
+    attributes = units == 0 ? INVALID_FILE_ATTRIBUTES
+                            : GetFileAttributesW(wide);
+    if (attributes == INVALID_FILE_ATTRIBUTES ||
+        !(attributes & FILE_ATTRIBUTE_DIRECTORY)) {
+        errno = attributes == INVALID_FILE_ATTRIBUTES ? ENOENT : ENOTDIR;
+        free(wide);
+        free(directory);
+        return NULL;
+    }
+    if (wide[units - 1] != L'/' && wide[units - 1] != L'\\' &&
+        wide[units - 1] != L':') {
+        wide[units++] = L'\\';
+    }
+    wide[units] = L'*';
+    wide[units + 1] = L'\0';
+    memset(&directory->entry, 0, sizeof directory->entry);
+    directory->handle = -1;
+    directory->state = 0;
+    directory->pattern = wide;
+    return (DIR *)directory;
+}
+
+struct dirent *readdir(DIR *opened)
+{
+    struct open_directory *directory = (struct open_directory *)opened;
+    struct _wfinddata64_t found;
+    size_t bytes;
+
+    if (directory->state < 0) {
+        return NULL;
+    }
+    if (directory->state == 0) {
+        directory->handle = _wfindfirst64(directory->pattern, &found);
+        if (directory->handle == -1) {
+            directory->state = -1;
+            return NULL;
+        }
+    } else if (_wfindnext64(directory->handle, &found) != 0) {
+        /* The end of the directory is no error of the walk. */
+        if (GetLastError() == ERROR_NO_MORE_FILES) {
+            errno = 0;
+        }
+        _findclose(directory->handle);
+        directory->handle = -1;
+        directory->state = -1;
+        return NULL;
+    }
+    directory->state++;
+    bytes = utf8_of(found.name, wcslen(found.name), directory->entry.d_name,
+                    sizeof directory->entry.d_name);
+    if (bytes == 0 && found.name[0] != L'\0') {
+        /* A name the entry of dirent.h cannot hold ends the walk, since an
+           empty name would stand for a file that is not there. */
+        errno = ENAMETOOLONG;
+        _findclose(directory->handle);
+        directory->handle = -1;
+        directory->state = -1;
+        return NULL;
+    }
+    directory->entry.d_namlen = (unsigned short)bytes;
+    return &directory->entry;
+}
+
+int closedir(DIR *opened)
+{
+    struct open_directory *directory = (struct open_directory *)opened;
+    int status = 0;
+
+    if (directory->handle != -1) {
+        status = _findclose(directory->handle);
+    }
+    free(directory->pattern);
+    free(directory);
+    return status;
 }
 
 #endif

@@ -1357,25 +1357,28 @@ elseif(ANTIC_HOST_TARGET STREQUAL "linux-arm64")
 elseif(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
     set(ANTIC_EMULATED_TARGET windows-x86_64)
     set(ANTIC_X86_64_OPTIONS "--target,windows-x86_64")
-    # -idirafter searches the sysroot after clang's own headers, as
-    # run_clib.cmake does for the same reason.
     if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-        set(win "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
-        set(emulated_c_flags --target=x86_64-pc-windows-msvc
-            -fms-runtime-lib=dll
-            "-idirafter${win}/crt/include" "-idirafter${win}/sdk/include/ucrt"
-            "-idirafter${win}/sdk/include/um"
-            "-idirafter${win}/sdk/include/shared")
+        execute_process(COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
+            OUTPUT_VARIABLE resource OUTPUT_STRIP_TRAILING_WHITESPACE)
+        antic_windows_triple(triple windows-x86_64)
+        antic_windows_compile_options(emulated_c_flags
+            "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64" "${resource}")
+        list(PREPEND emulated_c_flags "--target=${triple}")
     endif()
 endif()
 
 # The same C files compiled for the emulated target, which its ABI
 # programs link. The host runs them, so antic meets clang on the rules of
 # x86_64 as well.
+# DESIGN: the object takes no runtime library of Microsoft. On a Windows
+# host CMake would add the directive of msvcrtd for a Debug build, which
+# names a library the sysroot of mingw-w64 does not hold and which the
+# link of the program against the sysroot then refuses.
 function(abi_x86_64_object name source)
     add_library(${name} OBJECT "${source}")
     target_compile_options(${name} PRIVATE ${emulated_c_flags}
         -fno-sanitize=all ${ANTIC_REFERENCE_C_FLAGS})
+    set_target_properties(${name} PROPERTIES MSVC_RUNTIME_LIBRARY "")
 endfunction()
 
 if(ANTIC_EMULATED_TARGET)
@@ -1695,6 +1698,7 @@ set_tests_properties(std_userdirs PROPERTIES ENVIRONMENT
 # Struct passing checked against C: the functions of tests/abi/structs.c,
 # compiled by the C compiler of the build, take and return structs by value.
 add_library(abi_structs OBJECT abi/structs.c)
+set_target_properties(abi_structs PROPERTIES MSVC_RUNTIME_LIBRARY "")
 target_compile_options(abi_structs PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
 if(APPLE)
     target_compile_options(abi_structs PRIVATE -mmacosx-version-min=11.0)
@@ -1712,6 +1716,7 @@ antic_program_test(program_abi_structs
 # Simd structs against C: the functions of tests/abi/simd.c take and
 # return the vector types of C by value.
 add_library(abi_simd OBJECT abi/simd.c)
+set_target_properties(abi_simd PROPERTIES MSVC_RUNTIME_LIBRARY "")
 target_compile_options(abi_simd PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
 if(APPLE)
     target_compile_options(abi_simd PRIVATE -mmacosx-version-min=11.0)
@@ -1725,6 +1730,7 @@ antic_program_test(program_abi_simd
     WORK "${CMAKE_CURRENT_BINARY_DIR}/abi")
 
 add_library(abi_wchar OBJECT abi/wchar.c)
+set_target_properties(abi_wchar PROPERTIES MSVC_RUNTIME_LIBRARY "")
 target_compile_options(abi_wchar PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
 if(APPLE)
     target_compile_options(abi_wchar PRIVATE -mmacosx-version-min=11.0)
@@ -1754,9 +1760,11 @@ if(antic_sanitized EQUAL -1)
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_no_paths.cmake")
 endif()
 
+# install.sh alone reads the pin of CMake, for the stubs of a macOS
+# package without Zig's. install.ps1 lays out no sysroot any more.
 add_test(NAME cmake_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}" -DNAME=cmake
-            "-DREADERS=tools/install.sh$<SEMICOLON>tools/install.ps1"
+            "-DREADERS=tools/install.sh"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_pin.cmake")
 add_test(NAME release_pins
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
@@ -1772,11 +1780,19 @@ add_test(NAME release_key
 add_test(NAME release_site
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_release_site.cmake")
-add_test(NAME sysroot_digest
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/sysroot_digest"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_sysroot_digest.cmake")
-set_tests_properties(sysroot_digest PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+# The Windows sysroot of mingw-w64: the headers, the import libraries
+# that llvm-dlltool writes from the .def files for the processor of each
+# target, the builtins of the pinned clang and the licence, laid out from
+# a stand-in source release by the pinned clang and the pinned llvm-ar.
+if(NOT ANTIC_SYSTEM_COMPILER)
+    add_test(NAME windows_sysroot
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/windows_sysroot"
+                "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
+                "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+                "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_windows_sysroot.cmake")
+endif()
 
 # A configure with -DANTI_DEPS_DIR reads the pinned downloads of another
 # directory, and a copy of the sources builds against this tree's.
@@ -2178,14 +2194,6 @@ add_test(NAME macos_sysroot
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/macos_sysroot"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_macos_sysroot.cmake")
-# The sysroot of a Windows target over the Build Tools takes the newest
-# SDK, and not `wdf` of the Driver Kit beside it.
-add_test(NAME sysroot_build_tools
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/sysroot_build_tools"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_sysroot_build_tools.cmake")
-set_tests_properties(sysroot_build_tools PROPERTIES
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
 add_test(NAME glibc_sysroot
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/glibc_sysroot"
@@ -2196,11 +2204,13 @@ add_test(NAME sysroot_links
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/sysroot_links"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_sysroot_links.cmake")
 # The package of this host, packed from the antic of this build. It needs
-# the Linux and macOS sysroots that every package carries.
+# the sysroots of every target, which every package carries.
 if(EXISTS "${ANTIC_SYSROOT_DIR}/linux-x86_64" AND
    EXISTS "${ANTIC_SYSROOT_DIR}/linux-arm64" AND
    EXISTS "${ANTIC_SYSROOT_DIR}/macos-arm64" AND
    EXISTS "${ANTIC_SYSROOT_DIR}/macos-x86_64" AND
+   EXISTS "${ANTIC_SYSROOT_DIR}/windows-x86_64" AND
+   EXISTS "${ANTIC_SYSROOT_DIR}/windows-arm64" AND
    EXISTS "${ANTIC_SYSROOT_DIR}/licenses")
     add_test(NAME package_keys
         COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
@@ -2302,6 +2312,7 @@ set_tests_properties(release_dry_run PROPERTIES
 # the version, so the default of ANTIC_RAYLIB_DIR cannot name another one.
 if(EXISTS "${ANTIC_RAYLIB_DIR}/src/raymath.h")
     add_library(abi_raymath OBJECT abi/raymath.c)
+    set_target_properties(abi_raymath PROPERTIES MSVC_RUNTIME_LIBRARY "")
     target_compile_options(abi_raymath PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
     target_include_directories(abi_raymath PRIVATE "${ANTIC_RAYLIB_DIR}/src")
     if(APPLE)
@@ -4239,7 +4250,7 @@ endif()
 
 # Libraries for C, built with antic --lib and used from C programs on the
 # host. Windows compiles the programs with the pinned clang against the
-# xwin sysroot of the runtime archive.
+# mingw-w64 sysroot of the runtime archive and links them with lld-link.
 
 # The text of a float takes no digit from the C library in any runtime of
 # the archive. std/float_text.anti holds the text itself.

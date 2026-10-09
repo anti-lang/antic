@@ -9,8 +9,9 @@
 # Every line gives three fields and reaches its source over HTTPS, and
 # names a component whose licence text stands beside the file. The line
 # of glibc and the one of the kernel headers name the version of
-# tools/sysroot-pins in their URL, musl names its version there as well,
-# and the line of every pinned library carries the version of its pin.
+# tools/sysroot-pins in their URL, musl and mingw-w64 name their version
+# there as well, and the line of every pinned library carries the version
+# of its pin.
 # The lines end in LF on every host, so the file of a package built on
 # Windows is the file of a package built anywhere else, and the line
 # `anti license` prints after a text carries no carriage return.
@@ -99,6 +100,8 @@ read_pin(musl sysroot-pins MUSL_VERSION)
 expect(musl "${musl}" ON)
 read_pin(zig zig-stubs-pin ZIG_TAG)
 expect(zig "${zig}" ON)
+read_pin(mingw sysroot-pins MINGW_VERSION)
+expect(mingw-w64 "${mingw}" ON)
 foreach(name pcre2 sqlite mbedtls miniaudio raylib mimalloc)
     string(TOUPPER "${name}" key)
     read_pin(version "${name}-pin" "${key}_VERSION")

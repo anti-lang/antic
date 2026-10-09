@@ -22,19 +22,19 @@
 #   std/        the standard library
 #   lib/<t>-glibc/ the runtime of both Linux targets against glibc
 #   sysroot/    the two Linux sysroots of musl, their two -glibc twins with
-#               the X11 and OpenGL packages, and the two macOS sysroots of
-#               Zig's stubs, which are ours to redistribute
+#               the X11 and OpenGL packages, the two macOS sysroots of
+#               Zig's stubs and the two Windows sysroots of mingw-w64, all
+#               ours to redistribute
 #   tools/      the scripts that install the sysroot of the host
 #   licenses/   one file per component, and sources.txt, the record of
 #               the upstream source of each
 #   VERSION     the version of tools/version
 #
 # The result is anti-<version>-<host>.tar.xz in DEST, with its digest in
-# SHA256SUMS. The stubs of Apple's SDK in sdk/ of a macOS sysroot and the
-# Microsoft CRT stay out, because neither licence allows redistribution. A
-# user brings the first from a Mac with anti sdk import, and the installer
-# adds the second. The package carries no key: the installer holds the key
-# that checks the manifest of the release.
+# SHA256SUMS. The stubs of Apple's SDK in sdk/ of a macOS sysroot stay
+# out, because their licence allows no redistribution, and a user brings
+# them from a Mac with anti sdk import. The package carries no key: the
+# installer holds the key that checks the manifest of the release.
 cmake_minimum_required(VERSION 3.20)
 
 set(needed DEST SYSROOT RUNTIME HOSTS)
@@ -150,7 +150,7 @@ endfunction()
 
 # Compile and link antic or anti for one host. Each family of targets reads
 # its headers from a different place: the macOS stubs of SYSROOT, the musl
-# sysroot, or the Microsoft headers that xwin wrote. The sources and the
+# sysroot, or the mingw-w64 sysroot. The sources and the
 # include directories of each program are the lists of tools/sources.cmake,
 # which the CMake build reads as well.
 # DESIGN: the sources of the compiler take its include directories alone.
@@ -185,6 +185,20 @@ if(NOT DEFINED ANTIC)
     list(APPEND pcre2_files "${pcre2_work}/pcre2_chartables.c")
 endif()
 
+# The lowest processor level of host, the first that tools/cpu-levels
+# lists for its architecture.
+function(lowest_level out host)
+    string(REGEX REPLACE "^[a-z]+-" "" arch "${host}")
+    file(STRINGS "${tools_dir}/cpu-levels" rows REGEX "^level ")
+    foreach(row IN LISTS rows)
+        if(row MATCHES "^level ([^ ]+) ${arch} ")
+            set("${out}" "${CMAKE_MATCH_1}" PARENT_SCOPE)
+            return()
+        endif()
+    endforeach()
+    message(FATAL_ERROR "tools/cpu-levels lists no level of ${arch}")
+endfunction()
+
 function(build_program host output program)
     antic_host_triple("${host}" triple)
     set(program_sources ${ANTIC_MAIN_SOURCES})
@@ -207,14 +221,6 @@ function(build_program host output program)
     if(host MATCHES "^macos-")
         set(link --ld-path=${LLVM_BIN}/ld64.lld)
     elseif(host MATCHES "^windows-")
-        set(win "${SYSROOT}/${host}")
-        set(arch x86_64)
-        if(host STREQUAL "windows-arm64")
-            set(arch aarch64)
-        endif()
-        set(link -fuse-ld=lld -B "${LLVM_BIN}"
-                 -L "${win}/crt/lib/${arch}" -L "${win}/sdk/lib/ucrt/${arch}"
-                 -L "${win}/sdk/lib/um/${arch}")
         # DESIGN: a Windows program carries no symbol table, so what names
         # a frame of a report from a user is the PDB that lld-link writes
         # with /DEBUG. It stands in SYMBOLS, outside the package, and step
@@ -222,17 +228,17 @@ function(build_program host output program)
         # /PDBALTPATH:%_PDB% keeps the CodeView record of the executable
         # to the file name of the PDB, so the path of this machine does
         # not ship. /pdbsourcepath:. keeps the directory of the link out of
-        # the relative file names of the PDB. /ignore:4099 drops the
-        # warning that the objects of the Microsoft C runtime name PDBs no
-        # machine here holds.
+        # the relative file names of the PDB. /OPT:REF drops what the
+        # program never reaches, as /DEBUG turns it off.
         if(NOT DEFINED SYMBOLS)
             message(FATAL_ERROR "${host}: a Windows program is linked with "
                                 "/DEBUG, and SYMBOLS names the directory its "
                                 "PDB goes in")
         endif()
         file(MAKE_DIRECTORY "${SYMBOLS}/${host}")
-        list(APPEND link -Wl,/DEBUG "-Wl,/PDBALTPATH:%_PDB%"
-             -Wl,/pdbsourcepath:. -Wl,/ignore:4099)
+        antic_windows_link_options(link "${host}" "${SYSROOT}/${host}")
+        list(APPEND link /DEBUG "/PDBALTPATH:%_PDB%" /pdbsourcepath:.
+             /OPT:REF)
     endif()
     # Every program links from objects, which stand outside the tree of the
     # package, work/<host>/anti. The clang driver looks for the start files
@@ -298,9 +304,18 @@ function(build_program host output program)
         endforeach()
         get_filename_component(pdb "${SYMBOLS}/${host}/${program}.pdb" ABSOLUTE)
         file(RELATIVE_PATH pdb "${out_dir}" "${pdb}")
-        execute_process(COMMAND "${CLANG}" --target=${triple} -fms-runtime-lib=dll
-                                ${link} "-Wl,/PDB:${pdb}" -o "${out_name}"
-                                ${relative}
+        # DESIGN: antic and anti are Windows programs of ours, and link
+        # the runtime of Anti at the lowest level of the host for the
+        # static part of the C runtime it holds, the entry point among
+        # it, as every program of a Windows target does. The level is the
+        # lowest, since the two run on every machine of the host.
+        lowest_level(level "${host}")
+        file(RELATIVE_PATH runtime_library "${out_dir}"
+             "${RUNTIME}/lib/${host}/${level}/anti_rt.lib")
+        execute_process(COMMAND "${LLVM_BIN}/lld-link" ${link} "/PDB:${pdb}"
+                                "/OUT:${out_name}" ${relative}
+                                "${runtime_library}"
+                                ${ANTIC_WINDOWS_LIBRARIES}
                         WORKING_DIRECTORY "${out_dir}" RESULT_VARIABLE failed)
     else()
         execute_process(COMMAND "${CLANG}" ${common} ${link} -o "${output}"
@@ -377,7 +392,11 @@ foreach(host IN LISTS HOSTS)
     # native library it uses.
     file(COPY "${RUNTIME}/include" DESTINATION "${tree}")
     file(COPY "${RUNTIME}/licenses/" DESTINATION "${tree}/licenses")
-    foreach(target linux-x86_64 linux-arm64)
+    # DESIGN: the two Windows sysroots of mingw-w64 go in as the runtime
+    # archive holds them, which Eddie decided on 2026-09-27 under "Binary
+    # distribution" in docs/decisions.md, and the step mingw of
+    # docs/work-order-distribution.md built.
+    foreach(target linux-x86_64 linux-arm64 windows-x86_64 windows-arm64)
         file(COPY "${SYSROOT}/${target}" DESTINATION "${tree}/sysroot")
     endforeach()
     # DESIGN: every package holds the two glibc sysroots with their X11 and

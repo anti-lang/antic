@@ -125,10 +125,21 @@ Each of these settles a point the gap list left open. Eddie decided them on
    `mingw-w64-crt` for `ucrtbase.dll`, `kernel32.dll`, `ntdll.dll`,
    `user32.dll`, `dbghelp.dll` and every other DLL the runtime, raylib,
    miniaudio and the tests name. The build writes them for both Windows
-   targets on every host. The compiler helpers, `__chkstk` among them,
-   come from `clang_rt.builtins.lib` of the pinned clang for the target,
-   which goes into `lib/<target>/` as the builtins of the Linux targets do.
-   The SEH entry point `__C_specific_handler` comes from `ntdll.dll`.
+   targets on every host. The compiler helpers come from
+   `clang_rt.builtins.lib` of the pinned clang for the target, which goes
+   into `lib/` of the sysroot as the builtins of the Linux targets do. The
+   stack probe `__chkstk` is not among them: the builtins of the pinned
+   clang hold none, so the runtime defines it, with the entry point, the
+   directory of thread-local storage, `_fltused` and the printf family,
+   which the static libraries of Microsoft gave. The SEH entry point
+   `__C_specific_handler` comes from `kernel32.dll` on x86_64 and from
+   `ucrtbase.dll` on both processors, as the `.def` files of mingw-w64
+   have it. The step `mingw` corrected the two sentences that named the
+   builtins and `ntdll.dll`. The C of the gnu triples compiles with no
+   `-g` option, as before: `-gcodeview` alone adds the records of every
+   function and the build information with the paths of the machine to an
+   object, which the tests `dead_code` and `no_paths` refuse, and the step
+   corrected that word as well.
    The triples stay `x86_64-pc-windows-msvc` and `aarch64-pc-windows-msvc`,
    so CodeView, the PDB and lld-link stay as they are. The runtime, the
    native libraries and the tests compile against the mingw-w64 headers

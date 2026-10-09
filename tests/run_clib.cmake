@@ -49,32 +49,29 @@ if(CROSS)
 endif()
 set(RUNTIME_LIBRARY "${PREFIX}anti_rt${STATIC_SUFFIX}")
 
-# DESIGN: on Windows the pinned clang compiles and links each C program
-# against the xwin sysroot of the runtime archive, as antic links an Anti
-# program, and not against the Build Tools of the machine. The pinned
-# archive ships no C++ library, so a C++17 check compiles the header with
-# -x c++ and -fsyntax-only and links nothing.
+# DESIGN: on Windows the pinned clang compiles each C program against the
+# mingw-w64 sysroot of the runtime archive, with the triple and the flags
+# of tools/windows-compile.cmake, and lld-link links it against the
+# sysroot as antic links an Anti program, never against the Build Tools
+# of the machine. The pinned archive ships no C++ library, so a C++17
+# check compiles the header with -x c++ and -fsyntax-only and links
+# nothing.
+include("${CMAKE_CURRENT_LIST_DIR}/../tools/windows-compile.cmake")
 if("${TARGET}" MATCHES "^windows-")
     set(win "${RUNTIME}/sysroot/${TARGET}")
-    set(arch x86_64)
-    if("${TARGET}" STREQUAL "windows-arm64")
-        set(arch aarch64)
-    endif()
-    if(CROSS)
-        list(APPEND CC "--target=${arch}-pc-windows-msvc")
-    endif()
-    # -idirafter searches the sysroot after clang's own headers, as the
-    # driver does for MSVC. With -isystem, the arm_neon.h of the MSVC CRT
-    # made float32x4_t the union __n128, which clang passes in integer
-    # registers, and the vectors of clib_simd reached Anti in the wrong
-    # registers on windows-arm64.
-    list(APPEND CC -fms-runtime-lib=dll -nostdlibinc
-         -idirafter "${win}/crt/include" -idirafter "${win}/sdk/include/ucrt"
-         -idirafter "${win}/sdk/include/um"
-         -idirafter "${win}/sdk/include/shared")
+    list(GET CC 0 compiler)
+    execute_process(COMMAND "${compiler}" -print-resource-dir
+                    OUTPUT_VARIABLE resource OUTPUT_STRIP_TRAILING_WHITESPACE
+                    ENCODING NONE)
+    antic_windows_triple(triple "${TARGET}")
+    antic_windows_compile_options(windows_options "${win}" "${resource}")
+    list(APPEND CC "--target=${triple}" ${windows_options})
     set(CXX ${CC} -x c++)
-    set(LINK -fuse-ld=lld -B "${RUNTIME}/bin" -L "${win}/crt/lib/${arch}"
-             -L "${win}/sdk/lib/ucrt/${arch}" -L "${win}/sdk/lib/um/${arch}")
+    set(LLD_LINK "${RUNTIME}/bin/lld-link${CMAKE_EXECUTABLE_SUFFIX}")
+    if(CMAKE_HOST_WIN32)
+        set(LLD_LINK "${RUNTIME}/bin/lld-link.exe")
+    endif()
+    antic_windows_link_options(WINDOWS_LINK "${TARGET}" "${win}")
 endif()
 
 # Every C and C++ file of the tests compiles under the warnings of the
@@ -92,6 +89,37 @@ function(run)
         message(FATAL_ERROR "${ARGN} failed with ${status}\n${out}${err}")
     endif()
     set(run_out "${out}" PARENT_SCOPE)
+endfunction()
+
+# Compile the C sources of SOURCES with the options of OPTIONS, and link
+# them with the inputs of INPUTS into output. On Windows the pinned clang
+# compiles each source for the target and lld-link links the objects
+# against the sysroot, with the libraries every Windows program links.
+# A program whose inputs name no runtime of Anti takes the one of the
+# lowest level of the target, for the start of a program it holds.
+function(program output)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "OPTIONS;SOURCES;INPUTS")
+    if("${TARGET}" MATCHES "^windows-")
+        set(objects "")
+        foreach(source IN LISTS arg_SOURCES)
+            get_filename_component(name "${source}" NAME_WE)
+            set(object "${output}-${name}.o")
+            run(${CC} ${arg_OPTIONS} -c "${source}" -o "${object}")
+            list(APPEND objects "${object}")
+        endforeach()
+        set(inputs ${arg_INPUTS})
+        if(NOT "${inputs}" MATCHES "anti_rt\\.lib")
+            file(GLOB runtimes "${RUNTIME}/lib/${TARGET}/*/anti_rt.lib")
+            list(SORT runtimes)
+            list(GET runtimes 0 lowest)
+            list(APPEND inputs "${lowest}")
+        endif()
+        run("${LLD_LINK}" ${WINDOWS_LINK} "/OUT:${output}" ${objects}
+            ${inputs} ${ANTIC_WINDOWS_LIBRARIES})
+    else()
+        run(${CC} ${arg_OPTIONS} ${arg_SOURCES} ${arg_INPUTS} ${LINK}
+            -o "${output}")
+    endif()
 endfunction()
 
 # Build library name as kind, static or shared, into dir. Set
@@ -159,8 +187,8 @@ if(CASE STREQUAL "static")
     endif()
     string(REPLACE "${DRIVER} main.c " "" inputs "${line}")
     separate_arguments(inputs UNIX_COMMAND "${inputs}")
-    run(${CC} -I "${dir}" "${SOURCES}/roundtrip.c" ${inputs} ${LINK}
-        -o "${dir}/roundtrip${EXE}")
+    program("${dir}/roundtrip${EXE}" OPTIONS -I "${dir}"
+            SOURCES "${SOURCES}/roundtrip.c" INPUTS ${inputs})
     expect_output("${dir}/roundtrip${EXE}" "${SOURCES}/roundtrip.expected")
 elseif(CASE STREQUAL "classes")
     # A C program builds an Anti class, calls through its table and ends
@@ -169,8 +197,9 @@ elseif(CASE STREQUAL "classes")
     expect_header("${dir}/canvas.h" canvas.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/canvas.c" "${library_file}"
-        "${runtime_library}" ${LINK} -o "${dir}/canvas${EXE}")
+    program("${dir}/canvas${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/canvas.c"
+            INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/canvas${EXE}" "${SOURCES}/canvas.expected")
     # The copy finds ../binary_stdio.h through the directory of canvas.c.
     configure_file("${SOURCES}/canvas.c" "${dir}/canvas.cpp" COPYONLY)
@@ -189,9 +218,9 @@ elseif(CASE STREQUAL "failing")
     expect_header("${dir}/failing.h" failing.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/failing.c"
-        "${library_file}" "${runtime_library}" ${LINK}
-        -o "${dir}/failing${EXE}")
+    program("${dir}/failing${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/failing.c"
+            INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/failing${EXE}" "${SOURCES}/failing.expected")
 elseif(CASE STREQUAL "generics")
     # The copy of a generic that `export type` names crosses to C as the
@@ -201,9 +230,9 @@ elseif(CASE STREQUAL "generics")
     expect_header("${dir}/stacks.h" stacks.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/stacks.c"
-        "${library_file}" "${runtime_library}" ${LINK}
-        -o "${dir}/stacks${EXE}")
+    program("${dir}/stacks${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/stacks.c"
+            INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/stacks${EXE}" "${SOURCES}/stacks.expected")
     configure_file("${SOURCES}/stacks.c" "${dir}/stacks.cpp" COPYONLY)
     run(${CXX} -std=c++17 -fsyntax-only -I "${dir}" -I "${SOURCES}"
@@ -215,9 +244,9 @@ elseif(CASE STREQUAL "tuples")
     expect_header("${dir}/tuples.h" tuples.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/tuples.c"
-        "${library_file}" "${runtime_library}" ${LINK}
-        -o "${dir}/tuples${EXE}")
+    program("${dir}/tuples${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/tuples.c"
+            INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/tuples${EXE}" "${SOURCES}/tuples.expected")
 elseif(CASE STREQUAL "optional")
     # A `?T` of an exported signature crosses as the struct of the value
@@ -226,9 +255,9 @@ elseif(CASE STREQUAL "optional")
     expect_header("${dir}/optional.h" optional.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/optional.c"
-        "${library_file}" "${runtime_library}" ${LINK}
-        -o "${dir}/optional${EXE}")
+    program("${dir}/optional${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/optional.c"
+            INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/optional${EXE}" "${SOURCES}/optional.expected")
 elseif(CASE STREQUAL "simd")
     # A simd struct of 16 bytes crosses as the vector type of C, which
@@ -238,9 +267,9 @@ elseif(CASE STREQUAL "simd")
     expect_header("${dir}/simdlib.h" simdlib.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/simd.c"
-        "${library_file}" "${runtime_library}" ${LINK}
-        -o "${dir}/simd${EXE}")
+    program("${dir}/simd${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/simd.c"
+            INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/simd${EXE}" "${SOURCES}/simd.expected")
 elseif(CASE STREQUAL "flags")
     # Flags crosses as the struct of four bools the header writes for it,
@@ -249,9 +278,9 @@ elseif(CASE STREQUAL "flags")
     expect_header("${dir}/flags.h" flags.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/flags.c"
-        "${library_file}" "${runtime_library}" ${LINK}
-        -o "${dir}/flags${EXE}")
+    program("${dir}/flags${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/flags.c"
+            INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/flags${EXE}" "${SOURCES}/flags.expected")
 elseif(CASE STREQUAL "ledger")
     # A synchronized class crosses with the bytes of its hidden lock, and
@@ -260,9 +289,9 @@ elseif(CASE STREQUAL "ledger")
     expect_header("${dir}/ledger.h" ledger.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/ledger.c"
-        "${library_file}" "${runtime_library}" ${LINK} -lpthread
-        -o "${dir}/ledger${EXE}")
+    program("${dir}/ledger${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/ledger.c"
+            INPUTS "${library_file}" "${runtime_library}" -lpthread)
     expect_output("${dir}/ledger${EXE}" "${SOURCES}/ledger.expected")
 elseif(CASE STREQUAL "handlers")
     # An `own fn` field crosses as the struct of its code and its
@@ -272,9 +301,9 @@ elseif(CASE STREQUAL "handlers")
     expect_header("${dir}/handlers.h" handlers.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/handlers.c"
-        "${library_file}" "${runtime_library}" ${LINK}
-        -o "${dir}/handlers${EXE}")
+    program("${dir}/handlers${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/handlers.c"
+            INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/handlers${EXE}" "${SOURCES}/handlers.expected")
 elseif(CASE STREQUAL "names")
     # The header gives two fields whose names share a long prefix one C
@@ -283,9 +312,9 @@ elseif(CASE STREQUAL "names")
     library(names static "${dir}")
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/names.c"
-        "${library_file}" "${runtime_library}" ${LINK}
-        -o "${dir}/names${EXE}")
+    program("${dir}/names${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/names.c"
+            INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/names${EXE}" "${SOURCES}/names.expected")
 elseif(CASE STREQUAL "variants")
     # An export variant crosses as the enum of its tags and the struct of
@@ -296,9 +325,9 @@ elseif(CASE STREQUAL "variants")
     expect_header("${dir}/variants.h" variants.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/variants.c"
-        "${library_file}" "${runtime_library}" ${LINK}
-        -o "${dir}/variants${EXE}")
+    program("${dir}/variants${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/variants.c"
+            INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/variants${EXE}" "${SOURCES}/variants.expected")
     run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only
         "${SOURCES}/variants.cpp")
@@ -311,16 +340,16 @@ elseif(CASE STREQUAL "nested")
     expect_header("${dir}/nested.h" nested.h)
     string(STRIP "${run_out}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
-    run(${CC} -std=c11 -I "${dir}" "${SOURCES}/nested.c"
-        "${library_file}" "${runtime_library}" ${LINK}
-        -o "${dir}/nested${EXE}")
+    program("${dir}/nested${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/nested.c"
+            INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/nested${EXE}" "${SOURCES}/nested.expected")
     run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only
         "${SOURCES}/nested.cpp")
 elseif(CASE STREQUAL "shared")
     library(geo shared "${dir}")
-    run(${CC} -I "${dir}" "${SOURCES}/roundtrip.c" "${library_link}" ${LINK}
-        -o "${dir}/roundtrip${EXE}")
+    program("${dir}/roundtrip${EXE}" OPTIONS -I "${dir}"
+            SOURCES "${SOURCES}/roundtrip.c" INPUTS "${library_link}")
     expect_output("${dir}/roundtrip${EXE}" "${SOURCES}/roundtrip.expected")
 elseif(CASE STREQUAL "exports")
     library(geo shared "${dir}")
@@ -357,21 +386,21 @@ elseif(CASE STREQUAL "two")
     if(CMAKE_HOST_WIN32)
         set(two_shared "${dir}/shared/two_shared${EXE}")
     endif()
-    run(${CC} -I "${dir}/shared" "${SOURCES}/twolibs.c" "${geo}"
-        "${library_link}" ${LINK} -o "${two_shared}")
+    program("${two_shared}" OPTIONS -I "${dir}/shared"
+            SOURCES "${SOURCES}/twolibs.c" INPUTS "${geo}" "${library_link}")
     expect_printed("10\n" "${two_shared}")
     library(geo static "${dir}/static")
     set(geo "${library_file}")
     library(other static "${dir}/static")
     # The printed link line names the runtime library of the host.
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${run_out}")
-    run(${CC} -I "${dir}/static" "${SOURCES}/twolibs.c" "${geo}"
-        "${library_file}" ${runtime_library} ${LINK}
-        -o "${dir}/two_static${EXE}")
+    program("${dir}/two_static${EXE}" OPTIONS -I "${dir}/static"
+            SOURCES "${SOURCES}/twolibs.c"
+            INPUTS "${geo}" "${library_file}" ${runtime_library})
     expect_printed("10\n" "${dir}/two_static${EXE}")
 elseif(CASE STREQUAL "loader")
     library(geo shared "${dir}")
-    run(${CC} "${SOURCES}/loader.c" ${LINK} -o "${dir}/loader${EXE}")
+    program("${dir}/loader${EXE}" SOURCES "${SOURCES}/loader.c")
     expect_printed("1\n" "${dir}/loader${EXE}" "${library_file}")
 elseif(CASE STREQUAL "header")
     library(geo static "${dir}")
@@ -401,10 +430,22 @@ elseif(CASE STREQUAL "bundle")
         message(FATAL_ERROR "unexpected link line: ${line}")
     endif()
     library(other static "${dir}" --bundle-runtime)
-    execute_process(
-        COMMAND ${CC} -I "${dir}" "${SOURCES}/twolibs.c" "${geo}"
-                "${library_file}" ${LINK} -o "${dir}/two_bundled${EXE}"
-        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
+    if("${TARGET}" MATCHES "^windows-")
+        run(${CC} -I "${dir}" -c "${SOURCES}/twolibs.c"
+            -o "${dir}/two_bundled.o")
+        execute_process(
+            COMMAND "${LLD_LINK}" ${WINDOWS_LINK}
+                    "/OUT:${dir}/two_bundled${EXE}" "${dir}/two_bundled.o"
+                    "${geo}" "${library_file}" ${ANTIC_WINDOWS_LIBRARIES}
+            RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+            ENCODING NONE)
+    else()
+        execute_process(
+            COMMAND ${CC} -I "${dir}" "${SOURCES}/twolibs.c" "${geo}"
+                    "${library_file}" ${LINK} -o "${dir}/two_bundled${EXE}"
+            RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+            ENCODING NONE)
+    endif()
     if(status EQUAL 0 OR NOT "${out}${err}" MATCHES "duplicate symbol|multiple definition")
         message(FATAL_ERROR "two bundled runtimes linked: ${status}\n${out}${err}")
     endif()
@@ -435,8 +476,8 @@ elseif(CASE STREQUAL "bundle")
     # A library that reads the notice links against the stub of the bundle
     # and reports an empty notice.
     library(notice static "${dir}/notice" --bundle-runtime)
-    run(${CC} -I "${dir}/notice" "${SOURCES}/notice.c" "${library_file}"
-        ${LINK} -o "${dir}/notice/notice${EXE}")
+    program("${dir}/notice/notice${EXE}" OPTIONS -I "${dir}/notice"
+            SOURCES "${SOURCES}/notice.c" INPUTS "${library_file}")
     if(NOT CROSS)
         expect_printed("0\n" "${dir}/notice/notice${EXE}")
     endif()

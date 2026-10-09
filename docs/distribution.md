@@ -225,7 +225,14 @@ another host it takes them from a Mac the user owns, with `anti sdk export` ther
 package carries them. The Windows targets link against the import libraries of the
 mingw-w64 project and `ucrtbase.dll`, never against Microsoft's CRT and SDK, which may
 not be redistributed. Every package carries those import libraries, and the two glibc
-sysroots with their X11 and OpenGL packages. The glibc sysroots went in with the step
+sysroots with their X11 and OpenGL packages. The Windows sysroots went in with the step
+`mingw` of `docs/work-order-distribution.md`: `include/` with the headers of mingw-w64
+and `lib/` with the import libraries that llvm-dlltool wrote from its `.def` files and
+`clang_rt.builtins.lib` of the pinned clang, 18 MB for the two before compression. A
+program of `--memory-checks` for windows-x86_64 runs with `clang_rt.asan_dynamic.dll`
+of the runtime archive beside it, as the pinned clang built it, and that DLL needs
+`VCRUNTIME140.dll` and the API sets of the UCRT, which the Visual C++ Redistributable
+installs on the machine that runs the program. The glibc sysroots went in with the step
 `glibc` of `docs/work-order-distribution.md`, copied as the runtime archive holds them,
 with the runtime of both Linux targets against glibc in `lib/linux-<cpu>-glibc/`. A
 program of `link linux`, a raylib program and a plugin host then link for Linux from any

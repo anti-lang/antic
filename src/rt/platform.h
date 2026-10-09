@@ -19,6 +19,15 @@
 /* 1 in the runtime of a Windows target and 0 elsewhere. anti.os asks it. */
 int64_t anti_rt_is_windows(void);
 
+#if defined(_WIN32)
+/* The start of a Windows program: the C runtime of ucrtbase.dll set up
+   for the program and its initialisers run, then program called with the
+   arguments of the command line and its status given to exit.
+   mainCRTStartup of platform_entry.c, the entry point the linker names,
+   calls it. */
+_Noreturn void anti_rt_windows_start(int (*program)(int, char **));
+#endif
+
 /* The architecture the runtime is compiled for, as a name of the layer.
    clang names it the same on every system, and MSVC by names of its
    own. */

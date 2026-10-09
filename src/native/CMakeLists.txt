@@ -45,18 +45,9 @@ function(antic_native_target out_triple out_flags target)
         set(triple "${arch}-apple-macos11")
         set(flags -isysroot "${sysroot}")
     else()
-        # DESIGN: the headers of clang come before those of the MSVC CRT,
-        # the order clang-cl searches. The CRT holds its own immintrin.h,
-        # whose __m256i is the union of MSVC, and the SIMD constants of
-        # stb_image_resize2.h in raylib are then initialised byte by byte
-        # from 64-bit values, which clang truncates.
-        set(triple "${arch}-pc-windows-msvc")
-        set(flags -fms-runtime-lib=dll
-            -isystem "${antic_native_resource}/include"
-            -isystem "${sysroot}/crt/include"
-            -isystem "${sysroot}/sdk/include/ucrt"
-            -isystem "${sysroot}/sdk/include/um"
-            -isystem "${sysroot}/sdk/include/shared")
+        antic_windows_triple(triple "${target}")
+        antic_windows_compile_options(flags "${sysroot}"
+            "${antic_native_resource}")
     endif()
     antic_cpu_level(level "${target}")
     antic_cpu_march(march "${level}")

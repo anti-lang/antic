@@ -171,40 +171,52 @@ static bool target_options(const char *clang, enum target t,
         ARG(text_cstr(&p_));                                               \
         text_free(&p_);                                                    \
     } while (0)
-    if (strncmp(name, "linux-", 6) == 0) {
-        const char *argv[] = {clang, "-print-resource-dir", NULL};
-        struct text resource = {0};
-        ARG(strcmp(name, "linux-arm64") == 0 ? "--target=aarch64-linux-musl"
-                                               : "--target=x86_64-linux-musl");
-        ARG("-nostdinc");
-        SYS("/usr/include");
-        if (process_capture(argv, &resource) != 0) {
-            fprintf(stderr, "anti: %s -print-resource-dir failed\n", clang);
-            ok = false;
-        } else {
-            while (resource.length > 0 &&
-                   (resource.data[resource.length - 1] == '\n' ||
-                    resource.data[resource.length - 1] == '\r')) {
-                resource.data[--resource.length] = '\0';
-            }
-            text_append(&resource, "/include");
-            ARG("-isystem");
-            ARG(text_cstr(&resource));
-        }
-        text_free(&resource);
-    } else if (strncmp(name, "macos-", 6) == 0) {
+    if (strncmp(name, "macos-", 6) == 0) {
         ARG(strcmp(name, "macos-arm64") == 0 ? "--target=arm64-apple-macos11"
                                                : "--target=x86_64-apple-macos11");
         ARG("-isysroot");
         ARG(text_cstr(&sysroot));
     } else {
-        ARG(strcmp(name, "windows-arm64") == 0
-                ? "--target=aarch64-pc-windows-msvc"
-                : "--target=x86_64-pc-windows-msvc");
-        SYS("/crt/include");
-        SYS("/sdk/include/ucrt");
-        SYS("/sdk/include/um");
-        SYS("/sdk/include/shared");
+        /* The headers of clang stand in its resource directory. The musl
+           headers come before them, and the mingw-w64 headers after them,
+           as the driver of clang orders each pair. */
+        const char *argv[] = {clang, "-print-resource-dir", NULL};
+        struct text resource = {0};
+        bool linux = strncmp(name, "linux-", 6) == 0;
+
+        if (process_capture(argv, &resource) != 0) {
+            fprintf(stderr, "anti: %s -print-resource-dir failed\n", clang);
+            ok = false;
+        }
+        while (resource.length > 0 &&
+               (resource.data[resource.length - 1] == '\n' ||
+                resource.data[resource.length - 1] == '\r')) {
+            resource.data[--resource.length] = '\0';
+        }
+        text_append(&resource, "/include");
+        if (linux) {
+            ARG(strcmp(name, "linux-arm64") == 0
+                    ? "--target=aarch64-linux-musl"
+                    : "--target=x86_64-linux-musl");
+            ARG("-nostdinc");
+            SYS("/usr/include");
+        } else {
+            /* The gnu triple and the flags of tools/windows-compile.cmake,
+               since the headers of mingw-w64 refuse the msvc triple. */
+            ARG(strcmp(name, "windows-arm64") == 0
+                    ? "--target=aarch64-w64-windows-gnu"
+                    : "--target=x86_64-w64-windows-gnu");
+            ARG("-fms-extensions");
+            ARG("-nostdinc");
+        }
+        if (ok) {
+            ARG("-isystem");
+            ARG(text_cstr(&resource));
+        }
+        if (!linux) {
+            SYS("/include");
+        }
+        text_free(&resource);
     }
 #undef SYS
 #undef ARG

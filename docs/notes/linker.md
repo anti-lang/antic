@@ -22,3 +22,45 @@ tools can observe.
   every lld-link command names `crt` and `sdk` of the sysroot as `/vctoolsdir`
   and `/winsdkdir`, which ends the detection, and a library the sysroot lacks
   stays missing. `own_tools` checks both with stand-in archives of links.
+
+## The Windows link against mingw-w64
+
+- A Windows sysroot is `include/`, the headers of mingw-w64 with `_mingw.h` written
+  for the UCRT, and `lib/`, the import libraries that llvm-dlltool wrote from the
+  `.def` files of mingw-w64-crt beside `clang_rt.builtins.lib` of the pinned clang.
+  `lib/ucrtbase.lib` is the file that shows the sysroot is complete. The step `mingw`
+  of `docs/work-order-distribution.md` built it, and the test `windows_sysroot` lays
+  one out from a stand-in release.
+- Every lld-link command runs in the mingw mode of lld-link, `/lldmingw`, which ties
+  the `.pdata$f` and `.xdata$f` sections of the gnu objects to their function f and
+  looks for no Visual Studio of the machine, passes `/lldignoreenv`, drops
+  `msvcrt.lib`, `libcmt.lib`, `oldnames.lib` and `uuid.lib` by name with `/NODEFAULTLIB`, gives
+  `lib/` of the sysroot as its one `/LIBPATH`, and after the runtime names
+  `clang_rt.builtins.lib`, `ucrtbase.lib`, `ntdll.lib` and `kernel32.lib`. Nothing of
+  Microsoft is linked. The four names matter because the runtimes of compiler-rt name
+  them in their directives, and lld-link refuses a default library it cannot find. A
+  directive that names another library, as the probe of raylib names `user32.lib`,
+  reaches lld-link and is found in `lib/`.
+- ucrtbase.dll holds the C library alone. What the static libraries of Microsoft gave
+  beside it, the entry points `mainCRTStartup`, which stands in
+  `src/rt/platform_entry.c` so that only the link of a program pulls it in, and
+  `DllMainCRTStartup`, the printf family with `atexit`, weak in `src/rt/platform_stdio.c`
+  and a member as an object alone, the tables
+  of the initialisers that `.CRT$XCU` constructors land in, the directory of
+  thread-local storage, `_fltused`, `__chkstk`, the cookie of the stack check,
+  `atexit` and the printf family, stands in `src/rt/platform_windows.c`, so every
+  program and every C library of a Windows target links `anti_rt.lib`. A plugin
+  reaches those names through the import library of its host, and the packer links
+  antic and anti of a Windows host with the runtime of the lowest level for them.
+- The C of a Windows target compiles for the gnu triple with `-fms-extensions
+  -fno-auto-import -nostdinc -D__USE_MINGW_ANSI_STDIO=0`, the headers of clang before
+  those of mingw-w64 and no `-g`, from `tools/windows-compile.cmake`, since
+  `_mingw.h` defines `__attribute__` away for a compiler without `__GNUC__`. The text of antic keeps the msvc triple.
+  The gnu objects call `___chkstk_ms` where the msvc text calls `__chkstk`, and the
+  runtime defines both names on x86_64. The bitcode of the runtime is written again
+  under the msvc triple by clang reading its own IR, so the LTO link warns on no
+  module.
+- The runtime also defines `_assert`, `hypotf`, `opendir`, `readdir`, `closedir` and
+  the nine functions behind `fpclassify`, `isnan` and `signbit` of `math.h`, which the
+  headers of mingw-w64 declare, its own library defines, and raylib, miniaudio and the
+  C of the tests reach.

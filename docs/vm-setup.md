@@ -23,13 +23,13 @@ git -C /tmp clone --depth 1 git@github.com:anti-lang/antic.git antic
 cmake -DDEST=$HOME/.local/share/anti-vm/clang -P /tmp/antic/tools/get-clang.cmake
 cmake -DDEST=$HOME/.local/share/anti-vm/toolchain -P /tmp/antic/tools/get-llvm.cmake
 cmake -DDEST=$HOME/.local/share/anti-vm/sysroot -DLLVM_BIN=$HOME/.local/share/anti-vm/toolchain/bin \
-  -DCLANG_DIR=$HOME/.local/share/anti-vm/clang -DACCEPT_LICENSE=yes \
+  -DCLANG_DIR=$HOME/.local/share/anti-vm/clang \
   -DTARGETS="linux-x86_64;linux-arm64;linux-x86_64-glibc;linux-arm64-glibc;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" \
   -P /tmp/antic/tools/get-sysroot.cmake
 cmake -DDEST=$HOME/.local/share/anti-vm/raylib -P /tmp/antic/tools/get-raylib.cmake
 ```
 
-`qemu-user` holds `qemu-x86_64`, which the configure step finds on the path and the tests of linux-x86_64 run their programs with. Without it the suite runs no linux-x86_64 program. The clone only supplies the scripts. If the repository is private, copy `tools/` with `scp -r tools anti-linux:/tmp/antic/` instead. The macOS sysroots hold Zig's stubs, which link every macOS program that names no framework. `-DACCEPT_LICENSE=yes` accepts the terms of the Microsoft CRT and Windows SDK that xwin downloads.
+`qemu-user` holds `qemu-x86_64`, which the configure step finds on the path and the tests of linux-x86_64 run their programs with. Without it the suite runs no linux-x86_64 program. The clone only supplies the scripts. If the repository is private, copy `tools/` with `scp -r tools anti-linux:/tmp/antic/` instead. The macOS sysroots hold Zig's stubs, which link every macOS program that names no framework. The Windows sysroots are the headers and the import libraries of mingw-w64, which the script writes from the pinned source release with the pinned clang and llvm-ar.
 
 A program that names a framework also needs the stubs of Apple's SDK. On the Mac, `build/host/anti sdk export` writes `apple-sdk-<version>.tar.xz`. Copy it to the VM and install it with `anti sdk import <bundle> --sysroot $HOME/.local/share/anti-vm/sysroot`. A copy of the SDK itself works too, as `-DAPPLE_SDK=<MacOSX.sdk>` of `get-sysroot.cmake`.
 
@@ -147,7 +147,7 @@ cmake -DDEST=$env:LOCALAPPDATA\anti-vm\clang -P $env:USERPROFILE\antic-check\too
 cmake -DDEST=$env:LOCALAPPDATA\anti-vm\toolchain -P $env:USERPROFILE\antic-check\tools\get-llvm.cmake
 ```
 
-One command installs the sysroots of all six targets. The Windows ones come from the Build Tools of the VM, and the macOS ones from Zig. A program that names a framework takes Apple's SDK as on the Linux VM.
+One command installs the sysroots of all six targets. The Windows ones come from the pinned source release of mingw-w64, as on every host, and the macOS ones from Zig. A program that names a framework takes Apple's SDK as on the Linux VM.
 
 ```powershell
 cmake -DDEST=$env:LOCALAPPDATA\anti-vm\sysroot -DLLVM_BIN=$env:LOCALAPPDATA\anti-vm\toolchain\bin -DCLANG_DIR=$env:LOCALAPPDATA\anti-vm\clang -DTARGETS="linux-x86_64;linux-arm64;linux-x86_64-glibc;linux-arm64-glibc;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" -P $env:USERPROFILE\antic-check\tools\get-sysroot.cmake
@@ -217,13 +217,13 @@ ssh anti-windows %USERPROFILE%\test.cmd
 
 | Untested item | Tests that run it |
 |---|---|
-| windows-arm64 programs, which the Mac only links | `program_*`, `std_*`, linked with lld-link against the sysroot that `tools/get-sysroot.cmake` laid out over the Build Tools |
+| windows-arm64 programs, which the Mac only links | `program_*`, `std_*`, linked with lld-link against the mingw-w64 sysroot that `tools/get-sysroot.cmake` laid out |
 | windows-x86_64 programs under the x64 emulation | `program_*_windows-x86_64`, `program_abi_*_windows-x86_64`, `windows_addresses`, `distinct_addresses_windows-x86_64` |
 | `--memory-checks` for windows-x86_64 | `memory_checks_windows-x86_64`, `memory_checks_list_windows-x86_64`, `std_builder_room_memory_checks_windows-x86_64`. Each links its program and reports itself skipped, since the runtime of AddressSanitizer cannot intercept the heap functions under the emulation |
-| The Windows branch of `src/rt/start.c`, compiled with MSVC | every `program_*` test, through `anti_rt.lib` |
-| `c_wchar` at 16 bits and `c_long` at 32 bits against MSVC | `program_abi_wchar`, `program_abi_structs` |
+| The Windows branch of `src/rt/platform_windows.c` with the static part of the C runtime, compiled against mingw-w64 | every `program_*` test, through `anti_rt.lib` |
+| `c_wchar` at 16 bits and `c_long` at 32 bits against the Windows ABI | `program_abi_wchar`, `program_abi_structs` |
 | Exception unwinding through an Anti frame | The runtime test that closes the unwind data of chapter 16: an exception raised in C unwinds through an Anti frame to a handler in C. `llvm-readobj` proves that the tables parse, not that Windows walks them. The test does not exist yet. |
-| Shared libraries, `.def` files and `.CRT$XCU` constructors | `clib_shared`, `clib_exports`, `clib_loader`, `clib_two`, compiled with the pinned clang against the xwin sysroot |
+| Shared libraries, `.def` files and `.CRT$XCU` constructors | `clib_shared`, `clib_exports`, `clib_loader`, `clib_two`, compiled with the pinned clang against the mingw-w64 sysroot and linked with lld-link |
 | Whether `link.exe` accepts the COFF symbol form | `program_platform_linker` skips Windows until it supports `link.exe`. |
 | Float aggregates of one member against MSVC | No test compares them yet. The VM can run one. |
 | `tools/install.ps1` | The installer has never run. The VM is the first machine that can parse it. |

@@ -48,9 +48,9 @@ The directory `sysroot/<target>/` of the runtime archive holds what lld links a 
 |---|---|---|---|
 | linux-x86_64, linux-arm64 | musl 1.2.6 and `libclang_rt.builtins.a` | Alpine Linux 3.24 packages `musl-dev` and `compiler-rt` | MIT, Apache 2.0 with LLVM Exceptions |
 | macos-x86_64, macos-arm64 | `.tbd` stubs of libSystem | Command Line Tools for Xcode | Xcode and Apple SDKs Agreement |
-| windows-x86_64, windows-arm64 | Microsoft C runtime 14.44.17.14 and Windows SDK 10.0.26100 | xwin 0.10.0 | Microsoft licence terms |
+| windows-x86_64, windows-arm64 | the headers of mingw-w64 14.0.0, the import libraries of ucrtbase.dll, ntdll.dll, kernel32.dll and seven more DLLs written from its `.def` files, and `clang_rt.builtins.lib` | the source release of mingw-w64, and the pinned clang | the licences of the mingw-w64 runtime, Apache 2.0 with LLVM Exceptions |
 
-The file `tools/sysroot-pins` holds the versions and the SHA-256 digests of the downloaded files. For a Windows sysroot xwin writes a tree of about 5600 files, and the pin is the SHA-256 digest of the sorted digests of those files. The script checks it after each download. The build also compiles the runtime library for every other target that has a sysroot, with clang and the headers of that sysroot.
+The file `tools/sysroot-pins` holds the versions and the SHA-256 digests of the downloaded files. The script checks each one after its download. The build also compiles the runtime library for every other target that has a sysroot, with clang and the headers of that sysroot.
 
 ## Mixing musl with glibc
 
@@ -84,7 +84,8 @@ sysroot.
 
 Each compile names the triple of the target and the headers it reads. Linux takes the
 headers of musl from the sysroot. The macOS compile takes the SDK of the host through
-`-isysroot`, and the Windows one the headers that xwin installed. The flags are those
+`-isysroot`, and the Windows one the headers of mingw-w64, for the gnu triple of the
+processor, as `tools/windows-compile.cmake` gives them. The flags are those
 of the host build, with two of its own. The option `-fvisibility=hidden` keeps the
 runtime symbols out of the dynamic table of a shared library. The option
 `-fno-sanitize=all` keeps the instrumentation of a sanitizer build of antic out of the

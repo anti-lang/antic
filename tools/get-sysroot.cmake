@@ -2,8 +2,7 @@
 # <dir>/<target>/, and the licence of each component into <dir>/licenses/.
 #
 #   cmake -DDEST=<dir> -DLLVM_BIN=<dir> -DTARGETS=<target>[;<target>]
-#         [-DCLANG_DIR=<dir>] [-DACCEPT_LICENSE=yes] [-DAPPLE_SDK=<dir>]
-#         -P tools/get-sysroot.cmake
+#         [-DCLANG_DIR=<dir>] [-DAPPLE_SDK=<dir>] -P tools/get-sysroot.cmake
 #
 # linux-x86_64, linux-arm64: musl from the Alpine package of
 #   tools/sysroot-pins, checked against its digest, and the compiler-rt
@@ -19,10 +18,12 @@
 #   tools/zig-stubs-pin names, on every host. They link every program that
 #   names no framework. APPLE_SDK=<MacOSX.sdk> also copies the .tbd stubs
 #   of that SDK into sdk/ of the sysroot, for a program that names one.
-# windows-x86_64, windows-arm64: the MSVC CRT and the Windows SDK import
-#   libraries, which xwin downloads at the versions of tools/sysroot-pins.
-#   Microsoft licenses them to the user, so the script runs xwin only with
-#   ACCEPT_LICENSE=yes. It installs the pinned xwin when the path has none.
+# windows-x86_64, windows-arm64: the headers of mingw-w64 and the import
+#   libraries that llvm-dlltool writes from its .def files, from the
+#   source release of tools/sysroot-pins, for ucrtbase.dll, kernel32.dll,
+#   ntdll.dll and the DLLs the runtime, raylib, Mbed TLS and the tests
+#   name, and the compiler-rt builtins of the pinned clang, which also
+#   preprocesses the .def files for the processor of each target.
 #
 # Every absolute symbolic link of a sysroot becomes the relative link to the
 # same path inside it.
@@ -31,13 +32,16 @@ cmake_minimum_required(VERSION 3.20)
 if(NOT DEFINED DEST OR NOT DEFINED LLVM_BIN OR NOT DEFINED TARGETS)
     message(FATAL_ERROR "usage: cmake -DDEST=<dir> -DLLVM_BIN=<dir> "
                         "-DTARGETS=<target>[;<target>] "
-                        "[-DACCEPT_LICENSE=yes] -P tools/get-sysroot.cmake")
+                        "-P tools/get-sysroot.cmake")
 endif()
 # A relative DEST or LLVM_BIN names a directory under the one this script
-# runs in. The digest of a Windows tree lists its files relative to an
-# absolute path, and finds none under a relative one.
+# runs in.
 get_filename_component(DEST "${DEST}" ABSOLUTE)
 get_filename_component(LLVM_BIN "${LLVM_BIN}" ABSOLUTE)
+set(HOST_EXE "")
+if(CMAKE_HOST_WIN32)
+    set(HOST_EXE ".exe")
+endif()
 
 set(tools_dir "${CMAKE_CURRENT_LIST_DIR}")
 if(NOT DEFINED CLANG_DIR)
@@ -54,21 +58,6 @@ foreach(line IN LISTS pins)
     set("${key}" "${value}")
 endforeach()
 file(MAKE_DIRECTORY "${DEST}/licenses")
-
-# SPLAT is empty for a run that does everything, script for one that
-# writes the xwin command and stops, and done for one that checks the
-# tree after the caller ran it.
-if(NOT DEFINED SPLAT)
-    set(SPLAT "")
-endif()
-set(SPLAT_SCRIPT "${DEST}/.download/splat.sh")
-if(CMAKE_HOST_WIN32)
-    set(SPLAT_SCRIPT "${DEST}/.download/splat.cmd")
-endif()
-if(SPLAT STREQUAL "script")
-    file(MAKE_DIRECTORY "${DEST}/.download")
-    file(WRITE "${SPLAT_SCRIPT}" "")
-endif()
 
 # Download url to file and stop unless its digest is the expected one.
 function(fetch url file digest)
@@ -88,8 +77,7 @@ function(fetch url file digest)
 endfunction()
 
 # The digest of the regular files under dir: their SHA-256 lines in the
-# order of their paths, hashed once more. xwin adds symbolic links for
-# other spellings on a case-sensitive file system, so links stay out.
+# order of their paths, hashed once more. Links stay out.
 function(tree_digest dir out)
     file(GLOB_RECURSE found LIST_DIRECTORIES false RELATIVE "${dir}"
          "${dir}/*")
@@ -113,10 +101,8 @@ endfunction()
 # a copy of the file instead.
 # Only a path of the package's own system, which starts with `/`, is such
 # a link. Windows reads it back as `\usr\...`, so the destination takes
-# the separator of CMake first. The sysroot of a Windows target over the
-# Build Tools is made of junctions to C:/Program Files, which CMake reads
-# as absolute links, and they stay. Windows follows no link written with
-# `/`, so a Windows host writes the relative link with its own separator.
+# the separator of CMake first. Windows follows no link written with `/`,
+# so a Windows host writes the relative link with its own separator.
 function(relative_links root)
     file(GLOB_RECURSE entries LIST_DIRECTORIES true "${root}/*")
     foreach(entry IN LISTS entries)
@@ -323,249 +309,136 @@ function(macos_sysroot target arch)
     endif()
 endfunction()
 
-# The xwin program of the pin, from the path or from its own release.
-function(xwin_program out)
-    find_program(found xwin)
-    if(found)
-        execute_process(COMMAND "${found}" --version
-                        OUTPUT_VARIABLE text OUTPUT_STRIP_TRAILING_WHITESPACE)
-        string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" version "${text}")
-        if(version STREQUAL XWIN_VERSION)
-            set("${out}" "${found}" PARENT_SCOPE)
-            return()
-        endif()
-    endif()
-    cmake_host_system_information(RESULT os QUERY OS_NAME)
-    cmake_host_system_information(RESULT cpu QUERY OS_PLATFORM)
-    string(TOLOWER "${os}" os)
-    string(TOLOWER "${cpu}" cpu)
-    if(cpu MATCHES "^(arm64|aarch64)$")
-        set(cpu arm64)
-    elseif(cpu MATCHES "^(x86_64|amd64|x64)$")
-        set(cpu x86_64)
-    endif()
-    set(asset "${XWIN_BIN_${os}-${cpu}}")
-    set(digest "${XWIN_BIN_${os}-${cpu}_DIGEST}")
-    if(asset STREQUAL "" AND os STREQUAL "windows")
-        # xwin publishes no build for Windows on ARM64, and Windows runs an
-        # x64 program there under emulation.
-        set(asset "${XWIN_BIN_windows-x86_64}")
-        set(digest "${XWIN_BIN_windows-x86_64_DIGEST}")
-    endif()
-    if(asset STREQUAL "")
-        message(FATAL_ERROR
-                "xwin ${XWIN_VERSION} publishes no build for ${os}-${cpu}. "
-                "Run cargo install xwin --locked --version ${XWIN_VERSION}")
-    endif()
-    set(work "${DEST}/.download/xwin-bin")
+# The source release of mingw-w64 that tools/sysroot-pins names, fetched
+# and unpacked once under .download/. <out> is its directory.
+function(mingw_source out)
+    set(work "${DEST}/.download/mingw")
+    set(name "mingw-w64-v${MINGW_VERSION}")
+    string(REPLACE "@VERSION@" "${MINGW_VERSION}" url "${MINGW_URL}")
     file(MAKE_DIRECTORY "${work}")
-    fetch("${XWIN_BIN_URL}/${asset}" "${work}/${asset}" "${digest}")
-    file(ARCHIVE_EXTRACT INPUT "${work}/${asset}" DESTINATION "${work}")
-    file(GLOB_RECURSE program "${work}/*/xwin" "${work}/*/xwin.exe")
-    if(program STREQUAL "")
-        message(FATAL_ERROR "${asset} holds no xwin program")
+    fetch("${url}" "${work}/${name}.tar.bz2" "${MINGW_DIGEST}")
+    if(NOT EXISTS "${work}/${name}/mingw-w64-headers")
+        file(ARCHIVE_EXTRACT INPUT "${work}/${name}.tar.bz2"
+             DESTINATION "${work}"
+             PATTERNS "${name}/mingw-w64-headers/*"
+                      "${name}/mingw-w64-crt/def-include/*"
+                      "${name}/mingw-w64-crt/lib-common/*"
+                      "${name}/mingw-w64-crt/lib64/*"
+                      "${name}/mingw-w64-crt/libarm64/*"
+                      "${name}/COPYING.MinGW-w64-runtime/*")
     endif()
-    list(GET program 0 program)
-    set("${out}" "${program}" PARENT_SCOPE)
+    set("${out}" "${work}/${name}" PARENT_SCOPE)
 endfunction()
 
-# The CRT and the SDK that the Build Tools of Visual Studio installed on
-# this machine. A junction needs no privilege where a symbolic link does,
-# so the sysroot points at them and downloads nothing. Returns the path of
-# the installation, or an empty string when the machine has none.
-function(build_tools out)
-    set("${out}" "" PARENT_SCOPE)
-    if(NOT CMAKE_HOST_WIN32)
-        return()
-    endif()
-    set(where "$ENV{ProgramFiles\(x86\)}/Microsoft Visual Studio/Installer/vswhere.exe")
-    if(DEFINED VSWHERE)
-        set(where "${VSWHERE}")
-    endif()
-    if(NOT EXISTS "${where}")
-        return()
-    endif()
-    execute_process(COMMAND "${where}" -nologo -latest -products *
-                            -property installationPath
-                    OUTPUT_VARIABLE found OUTPUT_STRIP_TRAILING_WHITESPACE
-                    ERROR_QUIET)
-    string(REGEX REPLACE "\r?\n.*$" "" found "${found}")
-    if(found STREQUAL "" OR NOT IS_DIRECTORY "${found}")
-        return()
-    endif()
-    set("${out}" "${found}" PARENT_SCOPE)
-endfunction()
-
-# The newest directory under root whose name is a version, by version
-# order. Windows Kits/10/Include holds `wdf` of the Driver Kit beside the
-# versions of the SDK, and a name of letters sorts above every number.
-function(newest root out)
-    file(GLOB found "${root}/*")
-    set(directories "")
-    foreach(path IN LISTS found)
-        get_filename_component(name "${path}" NAME)
-        if(IS_DIRECTORY "${path}" AND name MATCHES "^[0-9]+(\\.[0-9]+)*$")
-            list(APPEND directories "${path}")
-        endif()
+# DESIGN: the headers of a Windows sysroot are the ones mingw-w64-headers
+# installs, from crt/, include/ and ddk/include/ of the release, all into
+# include/ of the sysroot: the headers and the few other files a header
+# includes, with the .idl files, the change logs and the makefiles left
+# behind. _mingw.h is written from _mingw.h.in with the two values its
+# configure fills in: the UCRT as the C runtime, which ucrtbase.dll is,
+# and Windows 10 as the version of the API.
+function(windows_headers source root)
+    set(headers "${source}/mingw-w64-headers")
+    foreach(dir crt include ddk/include)
+        file(COPY "${headers}/${dir}/" DESTINATION "${root}/include"
+             FILES_MATCHING PATTERN "*.h" PATTERN "*.c" PATTERN "*.inl"
+             PATTERN "*.dlg" PATTERN "*.h16" PATTERN "*.hxx" PATTERN "*.rh"
+             PATTERN "*.ver")
     endforeach()
-    if(directories STREQUAL "")
-        message(FATAL_ERROR "${root} holds no directory of a version")
-    endif()
-    list(SORT directories COMPARE NATURAL ORDER DESCENDING)
-    list(GET directories 0 first)
-    set("${out}" "${first}" PARENT_SCOPE)
+    file(READ "${headers}/crt/_mingw.h.in" text)
+    string(REPLACE "@DEFAULT_MSVCRT_VERSION@" "0xE00" text "${text}")
+    string(REPLACE "@DEFAULT_WIN32_WINNT@" "0xa00" text "${text}")
+    file(WRITE "${root}/include/_mingw.h" "${text}")
 endfunction()
 
-# Point link at target with a junction, which any account may create.
-function(junction link target)
-    if(NOT IS_DIRECTORY "${target}")
-        message(FATAL_ERROR "${target} is missing, so the sysroot has no "
-                            "${link}")
-    endif()
-    get_filename_component(parent "${link}" DIRECTORY)
-    file(MAKE_DIRECTORY "${parent}")
-    file(TO_NATIVE_PATH "${link}" from)
-    file(TO_NATIVE_PATH "${target}" to)
-    execute_process(COMMAND cmd /c mklink /J "${from}" "${to}"
-                    RESULT_VARIABLE made OUTPUT_QUIET
-                    ERROR_VARIABLE complaint)
-    if(NOT made EQUAL 0)
-        message(FATAL_ERROR "cannot join ${from} to ${to}: ${complaint}")
-    endif()
-endfunction()
+# DESIGN: the import libraries are those of the DLLs a program of ours
+# links: ucrtbase.dll, the C library, kernel32.dll and ntdll.dll, which
+# every program links, and the DLLs the runtime, raylib, Mbed TLS and the
+# tests name: dbghelp for the stack traces of the runtime, user32, gdi32,
+# shell32 and winmm for raylib, bcrypt and ws2_32 for Mbed TLS. Eddie
+# decided the list on 2026-10-08 in decision 4 of
+# docs/work-order-distribution.md.
+set(WINDOWS_DLLS ucrtbase ntdll kernel32 user32 gdi32 shell32 winmm dbghelp
+    bcrypt ws2_32)
 
-# Lay the sysroot of a Windows target over the local Build Tools.
-function(windows_local target arch install)
-    set(root "${DEST}/${target}")
-    set(ms x64)
-    if(arch STREQUAL "aarch64")
-        set(ms arm64)
-    endif()
-    newest("${install}/VC/Tools/MSVC" msvc)
-    set(kits "$ENV{ProgramFiles\(x86\)}/Windows Kits/10")
-    if(DEFINED WINDOWS_KITS)
-        set(kits "${WINDOWS_KITS}")
-    endif()
-    newest("${kits}/Include" headers)
-    get_filename_component(sdk_version "${headers}" NAME)
-
-    file(REMOVE_RECURSE "${root}")
-    junction("${root}/crt/include" "${msvc}/include")
-    junction("${root}/crt/lib/${arch}" "${msvc}/lib/${ms}")
-    foreach(part ucrt um shared)
-        junction("${root}/sdk/include/${part}" "${headers}/${part}")
-    endforeach()
-    foreach(part ucrt um)
-        junction("${root}/sdk/lib/${part}/${arch}"
-                 "${kits}/Lib/${sdk_version}/${part}/${ms}")
-    endforeach()
-    file(WRITE "${DEST}/licenses/windows-sdk.txt"
-"The sysroot of ${target} points at the Microsoft C runtime and Windows SDK
-${sdk_version} that the Build Tools installed on this machine, under
-${install}. Nothing of Microsoft is copied or redistributed.
-")
-    message(STATUS "${target}: over the Build Tools in ${install}")
-endfunction()
-
-# Append the splat of one target to the script that the caller runs. A
-# shell gives xwin the terminal that its progress bar looks for.
-function(write_splat program target arch options)
-    set(quoted "")
-    foreach(argument "${program}" --accept-license --cache-dir
-            "${DEST}/.download/xwin" --arch "${arch}" --crt-version
-            "${XWIN_CRT_VERSION}" --sdk-version "${XWIN_SDK_VERSION}" splat
-            --output "${DEST}/${target}" ${options})
-        if(CMAKE_HOST_WIN32)
-            file(TO_NATIVE_PATH "${argument}" argument)
-        endif()
-        string(APPEND quoted " \"${argument}\"")
-    endforeach()
-    file(APPEND "${SPLAT_SCRIPT}" "echo ${target}\n${quoted}\n")
-endfunction()
-
-function(windows_sysroot target arch digest)
-    build_tools(install)
-    if(NOT install STREQUAL "")
-        windows_local("${target}" "${arch}" "${install}")
-        return()
-    endif()
-    if(NOT ACCEPT_LICENSE STREQUAL "yes")
-        message(FATAL_ERROR
-                "${target}: xwin downloads the Microsoft CRT ${XWIN_CRT_VERSION} "
-                "and the Windows SDK ${XWIN_SDK_VERSION}, which Microsoft "
-                "licenses to you. Pass -DACCEPT_LICENSE=yes to accept their "
-                "terms.")
-    endif()
-    if(CMAKE_HOST_WIN32)
-        # xwin links sdk/lib/<version> to its own directory whatever the
-        # flags say, and Windows grants a symbolic link only to Developer
-        # Mode or to an administrator. One link costs less to try than a
-        # gigabyte to download.
-        set(probe "${DEST}/.probe-directory")
-        file(REMOVE_RECURSE "${probe}" "${probe}-link")
-        file(MAKE_DIRECTORY "${probe}")
-        file(CREATE_LINK "${probe}" "${probe}-link" SYMBOLIC RESULT linked)
-        file(REMOVE_RECURSE "${probe}" "${probe}-link")
-        if(NOT linked STREQUAL "0")
-            message(FATAL_ERROR
-                    "${target}: Windows refuses a symbolic link in ${DEST}, "
-                    "and xwin lays out the SDK with one. Turn on Developer "
-                    "Mode under Settings, System, For developers, or run "
-                    "this command as an administrator. A Developer Command "
-                    "Prompt of Visual Studio needs neither, because "
-                    "lld-link reads the LIB variable it sets.")
-        endif()
-    endif()
-    # The symlinks of xwin only fix the casing of the SDK for a
-    # case-sensitive file system. Windows has none, and it refuses a
-    # symlink to a program without the privilege, so they go.
-    set(splat_options "")
-    if(CMAKE_HOST_WIN32)
-        set(splat_options --disable-symlinks)
-    endif()
-    if(NOT SPLAT STREQUAL "done")
-        xwin_program(program)
-        file(REMOVE_RECURSE "${DEST}/${target}")
-        # DESIGN: the progress bar of xwin asks whether its own standard
-        # output is a console and draws nothing when it is not. Under
-        # cmake it never is, so SPLAT=script writes the command instead
-        # and the caller runs it with a terminal of its own.
-        if(SPLAT STREQUAL "script")
-            write_splat("${program}" "${target}" "${arch}" "${splat_options}")
-            return()
-        endif()
-        message(STATUS "${target}: xwin downloads about 1 GB and unpacks "
-                       "it, which takes minutes without a word")
+# The .def file of <dll> for the processor of <triple>, written to <def>:
+# the .def.in of lib-common/ preprocessed by the pinned clang for the
+# triple, as the makefile of mingw-w64-crt does, with the stdcall
+# decoration of a name stripped, or the plain .def of <lib_dir>, the
+# directory of the processor, or of lib-common/.
+function(windows_def crt dll triple lib_dir def)
+    if(EXISTS "${crt}/lib-common/${dll}.def.in")
         execute_process(
-            COMMAND "${program}" --accept-license
-                    --cache-dir "${DEST}/.download/xwin" --arch "${arch}"
-                    --crt-version "${XWIN_CRT_VERSION}"
-                    --sdk-version "${XWIN_SDK_VERSION}"
-                    splat --output "${DEST}/${target}" ${splat_options}
-            RESULT_VARIABLE ran)
-        if(NOT ran EQUAL 0)
-            message(FATAL_ERROR "${program} failed for ${target}")
+            COMMAND "${CLANG_DIR}/bin/clang${HOST_EXE}" "--target=${triple}"
+                    -x c -E -P -nostdinc -I "${crt}/def-include"
+                    "${crt}/lib-common/${dll}.def.in"
+            RESULT_VARIABLE failed OUTPUT_VARIABLE text ERROR_VARIABLE err)
+        if(failed)
+            message(FATAL_ERROR "clang did not preprocess ${dll}.def.in:\n${err}")
         endif()
+        # A name of the form name@N carries the stdcall decoration of
+        # 32-bit code, which no 64-bit code has.
+        string(REPLACE ";" "\;" text "${text}")
+        string(REPLACE "\n" ";" lines "${text}")
+        set(text "")
+        foreach(line IN LISTS lines)
+            string(REGEX REPLACE "^([^ ]+)@[0-9]+( |$)" "\\1\\2" line "${line}")
+            string(APPEND text "${line}\n")
+        endforeach()
+        file(WRITE "${def}" "${text}")
+    elseif(EXISTS "${crt}/${lib_dir}/${dll}.def")
+        file(COPY_FILE "${crt}/${lib_dir}/${dll}.def" "${def}")
+    elseif(EXISTS "${crt}/lib-common/${dll}.def")
+        file(COPY_FILE "${crt}/lib-common/${dll}.def" "${def}")
+    else()
+        message(FATAL_ERROR "${crt} holds no .def file of ${dll}")
     endif()
-    tree_digest("${DEST}/${target}" actual)
-    if(NOT actual STREQUAL digest)
-        message(FATAL_ERROR "${DEST}/${target}: SHA-256 of the files "
-                            "${actual}, expected ${digest}")
-    endif()
-    file(WRITE "${DEST}/licenses/windows-sdk.txt"
-"The import libraries in sysroot/windows-x86_64 and sysroot/windows-arm64
-come from the Microsoft C runtime ${XWIN_CRT_VERSION} and the Windows SDK
-${XWIN_SDK_VERSION}, fetched with xwin ${XWIN_VERSION}. Microsoft distributes
-them under the licence terms that xwin shows and that the caller accepted
-with ACCEPT_LICENSE.
-")
 endfunction()
 
-set(wrote_script FALSE)
-foreach(target IN LISTS TARGETS)
-    if(target MATCHES "^windows-" AND SPLAT STREQUAL "script")
-        set(wrote_script TRUE)
+# The Windows sysroot of target: include/ with the headers, lib/ with the
+# import libraries of WINDOWS_DLLS for <machine>, the processor as
+# llvm-dlltool names it, and the builtins of the pinned clang for the
+# msvc triple of <arch>, which the text of antic and the C of the gnu
+# <triple> both call.
+function(windows_sysroot target arch triple machine lib_dir)
+    set(root "${DEST}/${target}")
+    set(work "${DEST}/.download/mingw/${target}")
+    mingw_source(source)
+    file(REMOVE_RECURSE "${root}")
+    file(MAKE_DIRECTORY "${root}/lib" "${work}")
+    windows_headers("${source}" "${root}")
+    # DESIGN: llvm-dlltool is llvm-ar under that name, which reads its
+    # own name, so the pinned llvm-ar stands in under a link, or a copy
+    # where the host writes no link.
+    set(dlltool "${DEST}/.download/mingw/llvm-dlltool${HOST_EXE}")
+    file(REMOVE "${dlltool}")
+    file(CREATE_LINK "${LLVM_BIN}/llvm-ar${HOST_EXE}" "${dlltool}"
+         COPY_ON_ERROR SYMBOLIC)
+    set(crt "${source}/mingw-w64-crt")
+    foreach(dll IN LISTS WINDOWS_DLLS)
+        windows_def("${crt}" "${dll}" "${triple}" "${lib_dir}"
+                    "${work}/${dll}.def")
+        execute_process(COMMAND "${dlltool}" -m "${machine}"
+                                -d "${work}/${dll}.def"
+                                -l "${root}/lib/${dll}.lib"
+                        RESULT_VARIABLE failed ERROR_VARIABLE err)
+        if(failed)
+            message(FATAL_ERROR "llvm-dlltool wrote no ${dll}.lib:\n${err}")
+        endif()
+    endforeach()
+    file(GLOB builtins "${CLANG_DIR}/lib/clang/*/lib/${arch}-pc-windows-msvc/clang_rt.builtins.lib")
+    if(NOT builtins)
+        message(FATAL_ERROR "${CLANG_DIR} holds no builtins of ${arch} Windows. "
+                            "Run tools/get-clang.cmake first.")
     endif()
+    file(COPY_FILE "${builtins}" "${root}/lib/clang_rt.builtins.lib")
+    file(COPY_FILE "${source}/COPYING.MinGW-w64-runtime/COPYING.MinGW-w64-runtime.txt"
+         "${DEST}/licenses/mingw-w64.txt")
+    file(COPY_FILE "${CLANG_DIR}/licenses/llvm.txt"
+         "${DEST}/licenses/compiler-rt.txt")
+endfunction()
+
+foreach(target IN LISTS TARGETS)
     if(target STREQUAL "linux-x86_64")
         linux_sysroot("${target}" x86_64 "${MUSL_DEV_X86_64}")
     elseif(target STREQUAL "linux-arm64")
@@ -579,17 +452,14 @@ foreach(target IN LISTS TARGETS)
     elseif(target STREQUAL "macos-x86_64")
         macos_sysroot("${target}" x86_64)
     elseif(target STREQUAL "windows-x86_64")
-        windows_sysroot("${target}" x86_64 "${XWIN_TREE_X86_64}")
+        windows_sysroot("${target}" x86_64 x86_64-w64-windows-gnu
+                        i386:x86-64 lib64)
     elseif(target STREQUAL "windows-arm64")
-        windows_sysroot("${target}" aarch64 "${XWIN_TREE_AARCH64}")
+        windows_sysroot("${target}" aarch64 aarch64-w64-windows-gnu arm64
+                        libarm64)
     else()
         message(FATAL_ERROR "unknown target ${target}")
     endif()
-    if(NOT (target MATCHES "^windows-" AND SPLAT STREQUAL "script"))
-        relative_links("${DEST}/${target}")
-        message(STATUS "${DEST}/${target}")
-    endif()
+    relative_links("${DEST}/${target}")
+    message(STATUS "${DEST}/${target}")
 endforeach()
-if(wrote_script)
-    message(STATUS "splat script: ${SPLAT_SCRIPT}")
-endif()

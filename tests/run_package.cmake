@@ -39,7 +39,8 @@ endforeach()
 file(REMOVE_RECURSE "${WORK}")
 # The sysroots that a package carries, and an SDK of Apple beside the
 # stubs of a macOS sysroot, as APPLE_SDK or anti sdk import leave it.
-foreach(name linux-x86_64 linux-arm64 macos-arm64 macos-x86_64 licenses)
+foreach(name linux-x86_64 linux-arm64 macos-arm64 macos-x86_64
+             windows-x86_64 windows-arm64 licenses)
     file(COPY "${SYSROOT}/${name}" DESTINATION "${WORK}/sysroot")
 endforeach()
 file(WRITE "${WORK}/sysroot/macos-arm64/sdk/sdk-version" "26.5\n")
@@ -105,7 +106,20 @@ set(expected anti/tools/zig-stubs-pin anti/bin/antic${suffix}
              anti/sysroot/macos-x86_64/usr/lib/libSystem.tbd
              anti/sysroot/macos-arm64/sdk-version
              anti/licenses/zig.txt anti/licenses/apsl.txt
-             anti/licenses/sources.txt)
+             anti/licenses/sources.txt anti/licenses/mingw-w64.txt)
+# DESIGN: every package carries the two Windows sysroots of mingw-w64 as
+# the runtime archive holds them: the headers, the import libraries that
+# llvm-dlltool wrote from the .def files and the builtins of the pinned
+# clang, which Eddie decided on 2026-09-27 under "Binary distribution" in
+# docs/decisions.md and the step mingw of docs/work-order-distribution.md
+# built.
+foreach(cpu x86_64 arm64)
+    set(windows "anti/sysroot/windows-${cpu}")
+    list(APPEND expected "${windows}/include/_mingw.h"
+         "${windows}/include/windows.h" "${windows}/lib/ucrtbase.lib"
+         "${windows}/lib/kernel32.lib" "${windows}/lib/ntdll.lib"
+         "${windows}/lib/clang_rt.builtins.lib")
+endforeach()
 foreach(tool IN LISTS tools)
     list(APPEND expected "anti/bin/${tool}${suffix}")
 endforeach()
@@ -279,25 +293,10 @@ endif()
 # DESIGN: the package alone links a program for every target that names
 # no framework, with an empty PATH and no LIB, which Eddie decided on
 # 2026-09-27 under "Binary distribution" in docs/decisions.md and the
-# step own-tools of docs/work-order-distribution.md built. The package
-# holds no Windows sysroot until the step mingw puts the trees of
-# mingw-w64 into it, so the Windows sysroots of the runtime archive stand
-# in at the place the package will hold them, as links the test removes
-# before the tree. They stand before the first link and before anti bind
-# --clang, since a Windows host links its own hello program against one
-# and clang reads the headers of the host's sysroot.
-set(links)
-set(targets linux-x86_64 linux-arm64 macos-arm64 macos-x86_64)
-foreach(target windows-x86_64 windows-arm64)
-    if(EXISTS "${SYSROOT}/${target}")
-        file(CREATE_LINK "${SYSROOT}/${target}"
-             "${WORK}/unpacked/anti/sysroot/${target}" SYMBOLIC)
-        list(APPEND links "${WORK}/unpacked/anti/sysroot/${target}")
-        list(APPEND targets "${target}")
-    else()
-        message("SKIP the link for ${target}: ${SYSROOT}/${target} is not here")
-    endif()
-endforeach()
+# step own-tools of docs/work-order-distribution.md built. The Windows
+# sysroots of mingw-w64 travel in the package since the step mingw.
+set(targets linux-x86_64 linux-arm64 macos-arm64 macos-x86_64
+    windows-x86_64 windows-arm64)
 # anti bind --clang of the package, with bin/ of the package and the
 # pinned clang alone on the PATH, binds include/raylib/raylib.h of the
 # package. It writes anti.raylib as the anti of the tree writes it from
@@ -492,10 +491,6 @@ if(NOT HOST MATCHES "^windows-")
                             "program\n${packed_out}")
     endif()
 endif()
-
-foreach(link IN LISTS links)
-    file(REMOVE "${link}")
-endforeach()
 
 # A host that is not Linux packs linux-arm64 as well. The packer then
 # compiles a Linux anti from the source list of the CMake build, and the

@@ -120,8 +120,16 @@ GLIBC_AARCH64_LIBGLX=libg/libglvnd/libglx0_1.4.0-1_arm64.deb
 GLIBC_AARCH64_LIBGLX_DIGEST=8309cfbd85a511768035c6641c13120c57cb918845e9f31174691c95b24cd003
 GLIBC_AARCH64_LIBGLVND=libg/libglvnd/libglvnd0_1.4.0-1_arm64.deb
 GLIBC_AARCH64_LIBGLVND_DIGEST=47e4a53b0b3bbf007e2e4e7efb481ec4db4d127914b0d355550092549911a99d
-# The Windows sysroots: xwin with the CRT and SDK versions below. The digest
-# covers the regular files of the tree that xwin writes for each target.
+# The Windows sysroots: the headers of mingw-w64 and the import libraries
+# that llvm-dlltool writes from its .def files, from the source release
+# below, with the SHA-256 digest of the archive. @VERSION@ in the URL
+# stands for the version.
+MINGW_VERSION=14.0.0
+MINGW_URL=https://downloads.sourceforge.net/project/mingw-w64/mingw-w64/mingw-w64-release/mingw-w64-v@VERSION@.tar.bz2
+MINGW_DIGEST=6eaf921d9eb987d3820b364ea9775bc19b965ec81490b6fdd716526c28e1995c
+# xwin, which built the Windows sysroots before the step mingw of
+# docs/work-order-distribution.md. The pins below reach no script and leave
+# with the step no-xwin.
 XWIN_VERSION=0.10.0
 # The prebuilt xwin of that version, which the script installs when xwin is
 # not on the path. The project publishes no build for macOS, where cargo

@@ -1,14 +1,15 @@
 # Rule 1 of docs/c-guidelines.md for the runtime: a compiler extension
 # stands only in a file that exists to hold one. That is the platform
-# layer, src/rt/platform.h with platform_posix.c and platform_windows.c,
-# and src/rt/atomic.c, which holds the atomic operations of every
-# compiler. Every other file of src/rt is C11 alone. The spellings below
+# layer, src/rt/platform.h with platform_posix.c, platform_windows.c and
+# platform_stdio.c, and src/rt/atomic.c, which holds the atomic
+# operations of every compiler. Every other file of src/rt is C11 alone. The spellings below
 # are those of the extensions of clang, gcc and MSVC the runtime has
 # used. Run with cmake -P and ROOT, the root of the repository.
 
 cmake_minimum_required(VERSION 3.21)
 
-set(holders "platform.h" "platform_posix.c" "platform_windows.c" "atomic.c")
+set(holders "platform.h" "platform_posix.c" "platform_windows.c"
+    "platform_stdio.c" "atomic.c")
 set(extensions "__attribute__|__asm__|__asm[ (]|__atomic_|__sync_|__builtin_|__declspec|__int128|__typeof__|__extension__|_Interlocked|__iso_volatile|__cpuid|_xgetbv|__dmb|^[ ]*#[ ]*pragma")
 set(failures "")
 

@@ -19,3 +19,9 @@ set(ANTIC_CXX_WARNINGS -Wall -Wextra -Wpedantic -Werror -Wshadow -Wconversion)
 # The same rule for MSVC, which a reader's build with
 # -DANTIC_SYSTEM_COMPILER=ON may use on Windows.
 set(ANTIC_MSVC_WARNINGS /W4 /WX)
+
+# The one warning turned off, at the one step of CMakeLists.txt that reads
+# the bitcode of the runtime of a Windows target, compiled for the gnu
+# triple, and writes it again for the msvc triple: clang warns that the
+# triple of the module is overridden, which is the purpose of the step.
+set(ANTIC_OVERRIDE_MODULE_WARNINGS -Wno-override-module)

@@ -21,7 +21,7 @@ into `build/deps/llvm`. The Linux sysroots take the builtins of the pinned clang
 ```bash
 cmake -P tools/get-clang.cmake
 cmake -P tools/get-llvm.cmake
-cmake -DDEST=build/deps/sysroot -DLLVM_BIN=build/deps/llvm/bin -DACCEPT_LICENSE=yes \
+cmake -DDEST=build/deps/sysroot -DLLVM_BIN=build/deps/llvm/bin \
       -DTARGETS="linux-x86_64;linux-arm64;linux-x86_64-glibc;linux-arm64-glibc;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" \
       -P tools/get-sysroot.cmake
 cmake -DDEST=build/deps/raylib -P tools/get-raylib.cmake
@@ -30,9 +30,10 @@ cmake --build build/host -j8
 ctest --test-dir build/host -j8
 ```
 
-`-DACCEPT_LICENSE=yes` accepts the terms of the Microsoft CRT and Windows SDK, which xwin
-downloads for the two Windows targets. antic links programs for all six targets on every
-host, so the build needs the sysroots of all six. A Linux program that names a library
+The two Windows sysroots are the headers and the import libraries of mingw-w64. The
+script writes them from the pinned source release with the pinned clang and llvm-ar.
+antic links programs for all six targets on every host, so the build needs the sysroots
+of all six. A Linux program that names a library
 with `link linux`, or that can load a plugin, links against glibc, so each Linux target
 also takes the sysroot `linux-<cpu>-glibc`.
 

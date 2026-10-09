@@ -68,6 +68,7 @@ endmacro()
 # calls the functions it does not deprecate, through src/antic/platform.c
 # in the tools and src/rt/platform_windows.c in the runtime.
 include(tools/warnings.cmake)
+include(tools/windows-compile.cmake)
 if(MSVC)
     add_compile_options(${ANTIC_MSVC_WARNINGS} /utf-8)
 else()
@@ -231,11 +232,19 @@ endfunction()
 set(ANTIC_RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
 # DESIGN: one list of runtime sources. The cross build of every target
 # reads it, so a new source reaches every target at once. license_stub.c
-# is not here, because it sits beside the library.
+# is not here, because it sits beside the library. The two of
+# ANTIC_RUNTIME_WINDOWS_OBJECTS, the entry point of a Windows program and
+# the printf family of a Windows target, are members of the Windows
+# runtimes alone, and join the bitcode archives as objects: each compiles
+# to nothing elsewhere, an empty member changed the bytes of a macOS link,
+# which link_identity_macos-arm64 pins, and as bitcode the entry would take
+# main into itself under LTO, and the weak printf family would be strong.
 set(ANTIC_RUNTIME_SOURCES assert atomic backtrace call cast check conf cpu digest
     errno f16 fs hash hooks init io json license loaded lock mem object
-    platform_posix platform_windows plugin reflect registry signal snapshot start
+    platform_entry platform_posix platform_stdio platform_windows plugin
+    reflect registry signal snapshot start
     symbols sync text threads toml trace utf)
+set(ANTIC_RUNTIME_WINDOWS_OBJECTS platform_entry platform_stdio)
 # DESIGN: the runtime library of every target comes from the cross build
 # below, on every host and for the host's own target as well. Eddie
 # decided this. The pinned clang compiles it against the pinned sysroot of
@@ -297,7 +306,8 @@ set(ANTIC_LTO_MODES full thin)
 # DESIGN: clang compiles the runtime for every other target that has a
 # sysroot, so that antic links a program for each of them from this host.
 # Linux takes the headers of musl, macOS the headers of the Zig release
-# that the sysroot holds and Windows the headers that xwin installs.
+# that the sysroot holds and Windows the headers of mingw-w64, with the
+# triple and the flags of tools/windows-compile.cmake.
 # DESIGN: the runtime and the glue of the runtime archive put every
 # function and every datum of an ELF or COFF object into a section of its
 # own, so that the link of a program drops the ones it never reaches, as
@@ -351,7 +361,11 @@ function(anti_cross_runtime_at target triple level root)
     endif()
     # The compiler names the headers each object includes in a dependency
     # file, so a change of any header rebuilds the objects that read it.
-    foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
+    set(sources ${ANTIC_RUNTIME_SOURCES})
+    if(NOT target MATCHES "^windows")
+        list(REMOVE_ITEM sources ${ANTIC_RUNTIME_WINDOWS_OBJECTS})
+    endif()
+    foreach(source IN LISTS sources)
         set(object "${work}/${source}.o")
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
@@ -400,6 +414,26 @@ function(anti_cross_runtime_at target triple level root)
     # as bitcode under "Compiler behaviour" in docs/decisions.md.
     string(REPLACE "-linux-musl" "-unknown-linux-gnu" bitcode_triple
         "${triple}")
+    # [provisional] DESIGN: the bitcode of a Windows target carries the
+    # msvc triple antic writes for the target, and its objects keep the
+    # gnu triple the C compiles for, as the objects of a musl target keep
+    # theirs. The LTO of lld warns on each module whose triple differs
+    # from the program's. The headers of mingw-w64 refuse the msvc
+    # triple, so clang compiles for the gnu one, and then reads its own
+    # bitcode as IR and writes it again for the msvc triple, with the
+    # summary and the module hash of ThinLTO where the mode asks for
+    # them, which opt writes without the hash. clang warns that the
+    # triple of the module is overridden, which is the purpose of the
+    # step, so tools/warnings.cmake turns that one warning off there. The
+    # IR of the two is
+    # one IR: both are COFF of the Win64 convention, and what differs
+    # between them, the stack probe and the stubs of the imports, the
+    # back end writes from the triple. See the entry on the runtime of a
+    # Windows target under "Binary distribution" in docs/decisions.md.
+    set(retriple "")
+    if(target MATCHES "^windows")
+        antic_windows_msvc_triple(retriple "${target}")
+    endif()
     # [provisional] DESIGN: the bitcode of a Linux target carries no
     # unwind tables, so its functions are nounwind without uwtable, as
     # "Attributes and metadata" of docs/work-order-llvm-back-end.md gives
@@ -420,8 +454,35 @@ function(anti_cross_runtime_at target triple level root)
         set(mode_work "${work}/${ANTIC_RUNTIME_BITCODE_DIR}-${mode}")
         set(mode_library
             "${out}/${ANTIC_RUNTIME_BITCODE_DIR}/${mode}/${library_name}")
-        foreach(source IN LISTS ANTIC_RUNTIME_SOURCES)
+        set(retriple_commands "")
+        if(retriple)
+            set(retriple_commands
+                COMMAND "${CMAKE_C_COMPILER}" -x ir "--target=${retriple}"
+                    -O2 -flto=${mode} ${ANTIC_OVERRIDE_MODULE_WARNINGS}
+                    -c "${mode_work}/gnu.o" -o "${mode_work}/msvc.o")
+        endif()
+        foreach(source IN LISTS sources)
+            # [provisional] DESIGN: the members of
+            # ANTIC_RUNTIME_WINDOWS_OBJECTS join the bitcode of the runtime
+            # as the objects, never as bitcode. Under LTO the start would
+            # otherwise take main into itself, where the trace of a program
+            # names main, as the expected outputs of the trace tests pin,
+            # and the weak printf family would be strong to the LTO of lld,
+            # a duplicate of the inline copies of the profile runtime.
+            if(source IN_LIST ANTIC_RUNTIME_WINDOWS_OBJECTS)
+                list(APPEND mode_objects "${work}/${source}.o")
+                continue()
+            endif()
             set(object "${mode_work}/${source}.o")
+            set(compiled "${object}")
+            set(retriple_one "")
+            if(retriple)
+                set(compiled "${mode_work}/${source}.gnu.o")
+                string(REPLACE "${mode_work}/gnu.o" "${compiled}"
+                    retriple_one "${retriple_commands}")
+                string(REPLACE "${mode_work}/msvc.o" "${object}"
+                    retriple_one "${retriple_one}")
+            endif()
             add_custom_command(OUTPUT "${object}"
                 COMMAND "${CMAKE_COMMAND}" -E make_directory "${mode_work}"
                 COMMAND "${CMAKE_C_COMPILER}" --target=${bitcode_triple}
@@ -430,7 +491,8 @@ function(anti_cross_runtime_at target triple level root)
                     "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
                     "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
                     -MMD -MF "${object}.d"
-                    -c "src/rt/${source}.c" -o "${object}"
+                    -c "src/rt/${source}.c" -o "${compiled}"
+                ${retriple_one}
                 WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
                 DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
                 DEPFILE "${object}.d"
@@ -516,18 +578,10 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
             anti_cross_runtime(${target} arm64-apple-macos11
                 -isysroot "${sysroot}")
         elseif(target MATCHES "^windows")
-            string(REPLACE "windows-arm64" "aarch64" arch "${target}")
-            string(REPLACE "windows-x86_64" "x86_64" arch "${arch}")
-            # DESIGN: the link line takes the Universal CRT of the machine
-            # with ucrt.lib, which MSVC spells /MD. The objects of the
-            # runtime declare the same model, so that the C library of the
-            # image is one library rather than two.
-            anti_cross_runtime(${target} ${arch}-pc-windows-msvc
-                -fms-runtime-lib=dll
-                -isystem "${sysroot}/crt/include"
-                -isystem "${sysroot}/sdk/include/ucrt"
-                -isystem "${sysroot}/sdk/include/um"
-                -isystem "${sysroot}/sdk/include/shared")
+            antic_windows_triple(triple "${target}")
+            antic_windows_compile_options(windows_options "${sysroot}"
+                "${clang_resource}")
+            anti_cross_runtime(${target} ${triple} ${windows_options})
         endif()
     endforeach()
 endif()

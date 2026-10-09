@@ -171,20 +171,25 @@ const char *link_lld_flavour(enum target t)
 #define SYSROOT_LIB "usr/lib"
 #define SYSROOT_BUILTINS "libclang_rt.builtins.a"
 #define SYSROOT_MUSL_LIBC "libc.a"
-/* The two trees of a Windows sysroot: the C runtime of the compiler and
-   the Windows SDK, as xwin lays them out. */
-#define SYSROOT_WINDOWS_TOOLS "crt"
-#define SYSROOT_WINDOWS_SDK "sdk"
-#define SYSROOT_WINDOWS_CRT SYSROOT_WINDOWS_TOOLS "/lib"
-#define WINDOWS_MSVCRT "msvcrt.lib"
+/* The library directory of a Windows sysroot, which holds the import
+   libraries that tools/get-sysroot.cmake writes from the .def files of
+   mingw-w64 and the builtins of the pinned clang, and the libraries every
+   lld-link command names from it. tools/windows-compile.cmake spells the
+   same names for the links of the build. */
+#define SYSROOT_WINDOWS_LIB "lib"
+#define WINDOWS_BUILTINS "clang_rt.builtins.lib"
+#define WINDOWS_C_LIBRARY "ucrtbase.lib"
+#define WINDOWS_NT_LIBRARY "ntdll.lib"
+#define WINDOWS_KERNEL_LIBRARY "kernel32.lib"
+/* The libraries of link.exe, the platform linker, which links with the C
+   runtime of Visual Studio as the entry under "Linking" in
+   docs/decisions.md gives the command, and the static one that the
+   profile runtime names and the program leaves out. */
+static const char *const platform_windows_libraries[] = {
+    "msvcrt.lib", "libvcruntime.lib", "ucrt.lib",
+    "legacy_stdio_definitions.lib",
+};
 #define WINDOWS_STATIC_CRT "libcmt.lib"
-
-/* The directory of the processor in the library directories of a Windows
-   sysroot. */
-static const char *windows_arch(enum target t)
-{
-    return target_info(t)->arch == ARCH_ARM64 ? "aarch64" : "x86_64";
-}
 
 void link_sysroot_marker(struct text *out, enum target t, bool glibc)
 {
@@ -197,8 +202,7 @@ void link_sysroot_marker(struct text *out, enum target t, bool glibc)
         text_append(out, SYSROOT_SDK_VERSION);
         break;
     case OS_WINDOWS:
-        text_appendf(out, "%s/%s/%s", SYSROOT_WINDOWS_CRT, windows_arch(t),
-                     WINDOWS_MSVCRT);
+        text_appendf(out, "%s/%s", SYSROOT_WINDOWS_LIB, WINDOWS_C_LIBRARY);
         break;
     }
 }
@@ -631,18 +635,20 @@ static void linux_lld(struct link_command *c, enum target t,
    such flag and says so with warning LNK4044, so it goes to lld-link
    alone.
 
-   The objects of the Microsoft C runtime name PDBs that no machine here
-   holds, and lld-link warns once per object when it cannot read one.
-   /ignore:4099 drops that warning, which says nothing about the program
-   being linked. */
+   The objects of the Microsoft C runtime, which the platform linker
+   takes, name PDBs that no machine here holds, and a linker warns once
+   per object when it cannot read one. /ignore:4099 drops that warning,
+   which says nothing about the program being linked. lld-link links
+   nothing of Microsoft, so it needs no such flag. */
 static void windows_debug(struct link_command *c, const struct link_inputs *in)
 {
     add(c, "/DEBUG");
     add(c, "/PDBALTPATH:%_PDB%");
     if (in->linker == LINKER_LLD) {
         add(c, "/pdbsourcepath:.");
+    } else {
+        add(c, "/ignore:4099");
     }
-    add(c, "/ignore:4099");
 }
 
 /* The PDB takes the name of the output with its suffix replaced, as the
@@ -656,6 +662,20 @@ void link_pdb_path(struct text *out, const char *executable)
                  (int)(dot != NULL ? (size_t)(dot - executable)
                                    : strlen(executable)),
                  executable);
+}
+
+/* The import library of a DLL takes the name of the DLL with its suffix
+   replaced, as lld-link names it by default outside its mingw mode, and
+   stands beside it. */
+static void link_import_library_path(struct text *out, const char *library)
+{
+    const char *slash = strrchr(library, '/');
+    const char *dot = strrchr(slash != NULL ? slash : library, '.');
+
+    text_appendf(out, "%.*s" LINK_COFF_ARCHIVE_SUFFIX,
+                 (int)(dot != NULL ? (size_t)(dot - library)
+                                   : strlen(library)),
+                 library);
 }
 
 /* The output and the PDB of a Windows link. */
@@ -680,52 +700,91 @@ static void windows_output(struct link_command *c, const struct link_inputs *in)
    directories even under /lldignoreenv. The Windows VM showed ucrt.lib
    come from Windows Kits with LIB unset. A library the sysroot lacks
    would then come from the machine without a word, and the program would
-   depend on what the package never held. /vctoolsdir and /winsdkdir name
-   the two trees of the sysroot as that toolchain, which ends the
-   detection, and the directories lld-link derives from them, lib/x64 and
-   Lib/<version>/ucrt/x64, do not exist in a sysroot that names its
-   architectures x86_64 and aarch64. So every lld-link command takes the
-   sysroot alone, and a missing library is missing. Eddie decided the rule
-   on 2026-09-27 under "Binary distribution" in docs/decisions.md. The
-   platform linker, link.exe, keeps its own rules. */
+   depend on what the package never held. /lldmingw ends the detection:
+   in that mode lld-link looks for no Visual Studio and takes the
+   library directories of the command line alone. The mode is the one
+   the objects of the gnu triple need as well, since their unwind data
+   stands in .pdata$f and .xdata$f sections that only the mode ties to
+   the function f, as GNU ld does, and /OPT:REF drops them otherwise.
+   The runtimes of compiler-rt name msvcrt.lib, libcmt.lib, oldnames.lib
+   and uuid.lib in their directives, the C runtime and the SDK of
+   Microsoft, which no sysroot of ours holds, so /NODEFAULTLIB drops
+   those four by name. A
+   directive that names any other library stays, as the one of a C
+   object that names user32.lib does, and lld-link finds it in lib/ of
+   the sysroot or reports it missing. So every lld-link command takes the
+   sysroot alone, and a missing library is missing. Eddie decided the
+   rule on 2026-09-27 under "Binary distribution" in docs/decisions.md.
+   The platform linker, link.exe, keeps its own rules. */
+static const char *const dropped_default_libraries[] = {
+    "msvcrt.lib", "libcmt.lib", "oldnames.lib", "uuid.lib",
+};
+
 static void lld_link_start(struct link_command *c, const char *linker,
                            const struct link_inputs *in)
 {
-    struct text *tools;
-    struct text *sdk;
+    size_t i;
 
     add(c, linker);
     add(c, "/NOLOGO");
     if (in->linker != LINKER_LLD) {
         return;
     }
-    tools = next(c);
-    sdk = next(c);
-    text_appendf(tools, "/vctoolsdir:%s/%s", in->sysroot, SYSROOT_WINDOWS_TOOLS);
-    text_appendf(sdk, "/winsdkdir:%s/%s", in->sysroot, SYSROOT_WINDOWS_SDK);
+    add(c, "/lldmingw");
     add(c, "/lldignoreenv");
-    add(c, text_cstr(tools));
-    add(c, text_cstr(sdk));
+    for (i = 0; i < sizeof dropped_default_libraries /
+                        sizeof dropped_default_libraries[0]; i++) {
+        struct text *dropped = next(c);
+        text_appendf(dropped, "/NODEFAULTLIB:%s", dropped_default_libraries[i]);
+        add(c, text_cstr(dropped));
+    }
 }
 
-/* The library directories of lld-link: the CRT and the SDK that xwin
-   writes into the sysroot. The platform linker takes its own. */
-static void windows_libpaths(struct link_command *c, enum target t,
-                             const struct link_inputs *in)
+/* The library directory of lld-link: lib/ of the sysroot. The platform
+   linker takes its own. */
+static void windows_libpath(struct link_command *c,
+                            const struct link_inputs *in)
 {
-    static const char *const dirs[] = {SYSROOT_WINDOWS_CRT,
-                                       SYSROOT_WINDOWS_SDK "/lib/um",
-                                       SYSROOT_WINDOWS_SDK "/lib/ucrt"};
-    const char *arch = windows_arch(t);
-    size_t i;
+    struct text *dir;
 
     if (in->linker != LINKER_LLD) {
         return;
     }
-    for (i = 0; i < 3; i++) {
-        struct text *dir = next(c);
-        text_appendf(dir, "/LIBPATH:%s/%s/%s", in->sysroot, dirs[i], arch);
-        add(c, text_cstr(dir));
+    dir = next(c);
+    text_appendf(dir, "/LIBPATH:%s/%s", in->sysroot, SYSROOT_WINDOWS_LIB);
+    add(c, text_cstr(dir));
+}
+
+/* DESIGN: the libraries of every Windows link, after its inputs. lld-link
+   takes the builtins of the pinned clang, which hold the helpers the code
+   calls for what the processor has no instruction for, and the import
+   libraries of ucrtbase.dll, the C library of every Windows since 10, of
+   ntdll.dll and of kernel32.dll, as decision 4 of
+   docs/work-order-distribution.md names them, and nothing of Microsoft.
+   The entry point, the stack probe and the printf family, which the
+   static libraries of Microsoft gave, stand in the runtime, in
+   src/rt/platform_windows.c. A plugin takes them from the import library
+   of its host among its inputs. The platform linker takes the C runtime
+   of Visual Studio, with the static one left out of a program of
+   --profile-generate, whose runtime names it. */
+static void windows_libraries(struct link_command *c,
+                              const struct link_inputs *in)
+{
+    size_t i;
+
+    if (in->linker == LINKER_LLD) {
+        add(c, WINDOWS_BUILTINS);
+        add(c, WINDOWS_C_LIBRARY);
+        add(c, WINDOWS_NT_LIBRARY);
+        add(c, WINDOWS_KERNEL_LIBRARY);
+        return;
+    }
+    if (in->profile_generate) {
+        add(c, "/NODEFAULTLIB:" WINDOWS_STATIC_CRT);
+    }
+    for (i = 0; i < sizeof platform_windows_libraries /
+                        sizeof platform_windows_libraries[0]; i++) {
+        add(c, platform_windows_libraries[i]);
     }
 }
 
@@ -793,12 +852,12 @@ static void windows_memcheck(struct link_command *c, enum target t,
     add(c, text_cstr(thunk));
 }
 
-/* DESIGN: link.exe or lld-link with the C runtime of the machine. The
-   Universal CRT is a part of Windows since Windows 10, so ucrt.lib links
-   against what the machine already holds. Only vcruntime, the support
-   code of the compiler, comes in statically, because that one ships with
-   Visual Studio rather than with Windows. The program then needs no
-   redistributable, and it weighs 23,040 bytes instead of 91,136. */
+/* DESIGN: lld-link with ucrtbase.dll, the C library every Windows holds
+   since Windows 10, and the runtime of Anti, which brings the entry point
+   and the rest of what the static libraries of Microsoft gave. The
+   program then links nothing of Microsoft and needs no redistributable.
+   The platform linker links the C runtime of Visual Studio instead, the
+   user's own C world. */
 static void windows(struct link_command *c, enum target t,
                     const struct link_inputs *in)
 {
@@ -826,26 +885,17 @@ static void windows(struct link_command *c, enum target t,
         add(c, text_cstr(def));
         add(c, text_cstr(implib));
     }
-    windows_libpaths(c, t, in);
+    windows_libpath(c, in);
     windows_memcheck(c, t, in);
     add_inputs(c, in);
     add(c, text_cstr(library));
     /* DESIGN: compiler-rt builds the profile runtime of Windows against
-       the static C runtime, and its objects name libcmt.lib. The program
-       takes the C runtime of the machine, as above, so the static one
-       stays out and the image holds one C library. */
-    if (in->profile_generate) {
-        profile_runtime(c, t, in, false);
-        add(c, "/NODEFAULTLIB:" WINDOWS_STATIC_CRT);
-    }
-    add(c, WINDOWS_MSVCRT);
-    add(c, "libvcruntime.lib");
-    add(c, "ucrt.lib");
-    /* DESIGN: printf and its family are inline in the headers of the
-       UCRT, and ucrt.lib exports none of them. A program that calls
-       one through `extern fn` needs the definitions of the older
-       form, which this library holds. */
-    add(c, "legacy_stdio_definitions.lib");
+       the static C runtime, and its objects name libcmt.lib, which the
+       start of the command drops. What the runtime takes of that
+       library, the check of the stack cookie and atexit among it, the
+       runtime of Anti defines. The image holds one C library. */
+    profile_runtime(c, t, in, false);
+    windows_libraries(c, in);
 }
 
 static void add_inputs(struct link_command *c, const struct link_inputs *in)
@@ -1016,18 +1066,35 @@ static void windows_shared(struct link_command *c, enum target t,
                                               : "/MACHINE:X64");
     windows_output(c, in);
     add(c, text_cstr(def));
-    windows_libpaths(c, t, in);
+    /* DESIGN: lld-link writes the import library of a DLL in its mingw
+       mode only when asked, so a library for C asks for it by the name
+       lld-link gives it otherwise, beside the DLL. A plugin has none,
+       since nothing links against a plugin. */
+    if (!s->plugin && in->linker == LINKER_LLD) {
+        struct text *implib = next(c);
+        text_append(implib, "/IMPLIB:");
+        link_import_library_path(implib, in->executable);
+        add(c, text_cstr(implib));
+    }
+    windows_libpath(c, in);
     windows_memcheck(c, t, in);
     /* The inputs of a plugin hold the import library of its host,
        which names every symbol of the runtime and the program. */
     add_inputs(c, in);
     if (!s->plugin) {
         add(c, text_cstr(library));
-        add(c, WINDOWS_MSVCRT);
     }
-    add(c, "libvcruntime.lib");
-    add(c, "ucrt.lib");
-    add(c, "legacy_stdio_definitions.lib");
+    if (s->plugin && in->linker != LINKER_LLD) {
+        /* link.exe: a plugin links no msvcrt.lib, the start of a program,
+           and the rest of the C runtime of Visual Studio. */
+        size_t i;
+        for (i = 1; i < sizeof platform_windows_libraries /
+                            sizeof platform_windows_libraries[0]; i++) {
+            add(c, platform_windows_libraries[i]);
+        }
+        return;
+    }
+    windows_libraries(c, in);
 }
 
 void link_shared_command(struct link_command *c, enum target t,

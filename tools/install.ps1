@@ -6,9 +6,9 @@
 # It downloads the package of this host and SHA256SUMS from the GitHub
 # release of the version, and SHA256SUMS.sig from anti-lang.com. It checks
 # the signature first, then the SHA-256 of the package against the
-# manifest, unpacks it and offers the sysroot of Windows. The C runtime and
-# the Windows SDK belong to Microsoft, so the script asks before xwin
-# fetches them. Unpacking uses tar.exe, which Windows 10 and later carry.
+# manifest and unpacks it. The package carries the sysroot of every
+# target, the Windows ones of mingw-w64 among them. Unpacking uses tar.exe,
+# which Windows 10 and later carry.
 #
 # ANTI_ARCH takes the package of another processor, which Windows on ARM
 # runs under emulation. A copy of the file on disk takes --arm or --intel
@@ -287,50 +287,9 @@ try {
     # by the rule of src/antic/userdirs.c, beside the lib\ of the archive.
     Say "the package carries the LLVM tools of $host_name in $home_dir\bin"
 
-    # CMake installs the sysroot. The package holds the script and the
-    # pins, and the pinned CMake stands in when the host has none.
-    $cmake = (Get-Command cmake -ErrorAction SilentlyContinue).Source
-    if (-not $cmake) {
-        $pins = Get-Content "$home_dir\tools\cmake-pin"
-        $cmake_version = (Get-Content "$home_dir\tools\cmake-version").Trim()
-        $url = (($pins | Where-Object { $_ -match "^$host_name-url=" }) -split "=", 2)[1]
-        $url = $url.Replace("@VERSION@", $cmake_version)
-        $digest = (($pins | Where-Object { $_ -match "^$host_name-digest=" }) -split "=", 2)[1]
-        Say "installing CMake $cmake_version, which the sysroot step needs"
-        Invoke-WebRequest $url -OutFile "$work\cmake.zip"
-        $got = (Get-FileHash "$work\cmake.zip" -Algorithm SHA256).Hash.ToLower()
-        if ($digest -ne $got) { Fail "CMake has SHA-256 $got, expected $digest" }
-        Expand-Archive "$work\cmake.zip" -DestinationPath "$home_dir\tools\cmake"
-        $cmake = (Get-ChildItem "$home_dir\tools\cmake" -Recurse -Filter cmake.exe |
-                  Select-Object -First 1).FullName
-    }
-
-    # The script takes the CRT and the SDK of the Build Tools when this
-    # machine has them, which downloads nothing and needs no privilege. It
-    # stops and asks for the licence when the machine has neither, because
-    # xwin then fetches them from Microsoft.
-    Say "laying out the sysroot of $host_name"
-    $sysroot = @("-DDEST=$home_dir\sysroot", "-DLLVM_BIN=$home_dir\bin",
-                 "-DTARGETS=$host_name")
-    $script = "$home_dir\tools\get-sysroot.cmake"
-    & $cmake $sysroot -P $script
-    if ($LASTEXITCODE -ne 0) {
-        Say "this machine holds no Microsoft CRT, which a Windows program"
-        Say "links against. xwin fetches about 1 GB of it from Microsoft."
-        if (Ask MICROSOFT "Let xwin fetch the CRT and the Windows SDK?") {
-            # The progress bar of xwin draws only on a terminal of its
-            # own, so CMake writes the command and this shell runs it.
-            & $cmake $sysroot "-DACCEPT_LICENSE=yes" "-DSPLAT=script" -P $script
-            $splat = "$home_dir\sysroot\.download\splat.cmd"
-            if ($LASTEXITCODE -eq 0 -and (Test-Path $splat)) {
-                & cmd /c $splat
-                & $cmake $sysroot "-DACCEPT_LICENSE=yes" "-DSPLAT=done" -P $script
-            }
-        } else {
-            Say "a Developer Command Prompt of Visual Studio needs neither,"
-            Say "because lld-link reads the LIB variable it sets."
-        }
-    }
+    # DESIGN: the package carries the sysroot of every target, the Windows
+    # ones of mingw-w64 among them, so nothing is laid out here.
+    Say "the package carries the sysroots of all six targets in $home_dir\sysroot"
 
     # DESIGN: the PATH names one antic, and it is the one this machine runs
     # without emulation. A package of the other processor is therefore

@@ -516,16 +516,19 @@ static bool choose_comdats(struct join *j)
                 continue;
             }
             if (s->leader == DROPPED) {
-                text_appendf(j->error, "a COMDAT of %s has no symbol",
-                             o->in->name);
-                return false;
-            }
-            /* A COMDAT of a static symbol is the object's own, and no
-               linker merges it with another. */
-            if (symbol_at(o, s->leader)[16] != CLASS_EXTERNAL) {
+                /* DESIGN: a COMDAT that its section symbol alone names, as
+                   the .pdata$f and .xdata$f of an object compiled for the
+                   gnu triple are, goes by the name of the section, which
+                   names its function. A linker keys it the same way. */
+                name = s->name;
+                length = s->name_length;
+            } else if (symbol_at(o, s->leader)[16] != CLASS_EXTERNAL) {
+                /* A COMDAT of a static symbol is the object's own, and no
+                   linker merges it with another. */
                 continue;
+            } else {
+                symbol_name(o, s->leader, &name, &length);
             }
-            symbol_name(o, s->leader, &name, &length);
             e = find(&j->comdats, name, length, true);
             if (e->name == NULL) {
                 e->name = name;

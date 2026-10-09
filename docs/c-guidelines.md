@@ -67,13 +67,13 @@ The bar differs by where the code runs.
 19. A source file longer than 3000 lines is reported, with where it could split along the parts of its work. The same judgement applies as for a function.
 20. A function used in one file only is `static`.
 21. A header includes what it uses and nothing more, has an include guard, and no two headers include each other.
-22. `src/rt/` includes no header of `src/antic/`, `src/anti/` or `tools/`. A `#if` on the host system stands only in the files of the platform layer. The platform layer is the files named platform: `src/rt/platform.h` with `src/rt/platform_posix.c` and `src/rt/platform_windows.c` for the runtime, and `src/antic/platform.c` and `src/anti/platform.c` for the tools. The rule concerns the host. Code that chooses by target through run-time values is not affected.
+22. `src/rt/` includes no header of `src/antic/`, `src/anti/` or `tools/`. A `#if` on the host system stands only in the files of the platform layer. The platform layer is the files named platform: `src/rt/platform.h` with `src/rt/platform_posix.c` and `src/rt/platform_windows.c` for the runtime, and `src/antic/platform.c` and `src/anti/platform.c` for the tools. `src/rt/platform_entry.c` holds the entry point of a Windows program in an object of its own, which only the link of a program pulls in, and `src/rt/platform_stdio.c` the printf family of a Windows target, weak and never bitcode, as the comment of each says. The rule concerns the host. Code that chooses by target through run-time values is not affected.
 23. Mutable global state exists only where a comment says why, and code of `src/rt/` that threads can reach guards it.
 
 ### Consistency
 
 24. A pointer to data a function does not change is `const`.
-25. The names of a module share its prefix. Every exported symbol of the runtime starts with `anti_rt_`, with no other prefix. The one exception is a C function that implements an item of an Anti module: it carries that module's mangled name, as `anti_lang_Object_*` does for `anti.lang.Object`.
+25. The names of a module share its prefix. Every exported symbol of the runtime starts with `anti_rt_`, with no other prefix. The one exception is a C function that implements an item of an Anti module: it carries that module's mangled name, as `anti_lang_Object_*` does for `anti.lang.Object`. The static part of the C runtime of a Windows target, which `src/rt/platform_windows.c` defines, carries the names the compiler, the linker and the loader look for, as the entry on it under "Binary distribution" in `docs/decisions.md` records, and the test `rt_names` lists them.
 26. No function is unused, and no block of code is repeated where one helper would serve.
 
 ### Comments

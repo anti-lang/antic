@@ -17,7 +17,12 @@ static void __cdecl binary_stdio(void);
 __declspec(allocate(".CRT$XCU")) static void(__cdecl *binary_stdio_entry)(void) =
     binary_stdio;
 #else
-__attribute__((constructor))
+/* The entry goes into the table of constructors the start of a program
+   runs, as it does for the compiler of Microsoft. A constructor attribute
+   of the gnu triple would land in .ctors, which no start of ours runs. */
+static void binary_stdio(void);
+__attribute__((section(".CRT$XCU"), used)) static void (*binary_stdio_entry)(void) =
+    binary_stdio;
 #endif
 static void binary_stdio(void)
 {

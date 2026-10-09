@@ -83,7 +83,7 @@ endforeach()
 
 # The two Windows checks need the Windows sysroot of the archive.
 set(windows "${RUNTIME}/sysroot/windows-x86_64")
-if(NOT EXISTS "${windows}/crt/lib/x86_64/msvcrt.lib")
+if(NOT EXISTS "${windows}/lib/ucrtbase.lib")
     message("SKIP the Windows checks: ${windows} is not here")
 else()
     # An archive without the Windows sysroot, and LIB naming the real one:
@@ -91,33 +91,33 @@ else()
     set(no_windows "${WORK}/no-windows")
     stand_in("${no_windows}" bin)
     file(MAKE_DIRECTORY "${no_windows}/sysroot")
-    set(lib "${windows}/crt/lib/x86_64;${windows}/sdk/lib/um/x86_64")
-    set(lib "${lib};${windows}/sdk/lib/ucrt/x86_64")
     run_antic("no Windows sysroot" 1
               "antic: linking for windows-x86_64 needs the sysroot [^\n]*windows-x86_64[^\n]* of the package"
-              ENV "LIB=${lib}"
+              ENV "LIB=${windows}/lib"
               COMMAND --runtime "${no_windows}" --target windows-x86_64
                       -o "${WORK}/no-sysroot.exe" "${source}")
     if(EXISTS "${WORK}/no-sysroot.exe")
         message(FATAL_ERROR "antic linked a Windows program from LIB")
     endif()
-    # The sysroot without its ucrt/ directory, and LIB naming the real one:
-    # lld-link reads LIB no more, so ucrt.lib stays missing. On the Windows
-    # VM lld-link once found it in the Windows Kits of the machine instead,
-    # which /vctoolsdir and /winsdkdir stop.
+    # The sysroot without kernel32.lib in its lib/, and LIB naming the
+    # real one: lld-link reads LIB no more, so the library stays missing.
+    # On the Windows VM lld-link once found a library in the Windows Kits
+    # of the machine instead, which hold a kernel32.lib, and /lldmingw
+    # stops that.
     set(partial "${WORK}/partial-windows")
     stand_in("${partial}" bin)
     set(partial_sysroot "${partial}/sysroot/windows-x86_64")
-    file(MAKE_DIRECTORY "${partial_sysroot}/sdk/lib/ucrt/x86_64")
-    file(CREATE_LINK "${windows}/crt" "${partial_sysroot}/crt" SYMBOLIC)
-    file(CREATE_LINK "${windows}/sdk/lib/um" "${partial_sysroot}/sdk/lib/um"
-         SYMBOLIC)
-    run_antic("ucrt.lib from LIB" 1 "ucrt\\.lib"
-              ENV "LIB=${windows}/sdk/lib/ucrt/x86_64"
+    file(MAKE_DIRECTORY "${partial_sysroot}/lib")
+    foreach(library ucrtbase.lib clang_rt.builtins.lib ntdll.lib)
+        file(CREATE_LINK "${windows}/lib/${library}"
+             "${partial_sysroot}/lib/${library}" SYMBOLIC)
+    endforeach()
+    run_antic("kernel32.lib from LIB" 1 "kernel32\\.lib"
+              ENV "LIB=${windows}/lib"
               COMMAND --runtime "${partial}" --target windows-x86_64
                       -o "${WORK}/partial.exe" "${source}")
     if(EXISTS "${WORK}/partial.exe")
-        message(FATAL_ERROR "lld-link took ucrt.lib from LIB")
+        message(FATAL_ERROR "lld-link took kernel32.lib from LIB")
     endif()
 endif()
 
@@ -136,8 +136,8 @@ endforeach()
 
 # The links go first, so nothing of the real archive is removed with them.
 file(GLOB links "${WORK}/*/lib" "${WORK}/*/std" "${WORK}/*/sysroot"
-     "${WORK}/*/bin" "${WORK}/*/licenses" "${WORK}/*/sysroot/*/crt"
-     "${WORK}/*/sysroot/*/sdk/lib/um")
+     "${WORK}/*/bin" "${WORK}/*/licenses"
+     "${WORK}/*/sysroot/*/lib/*.lib")
 foreach(link IN LISTS links)
     if(IS_SYMLINK "${link}")
         file(REMOVE "${link}")

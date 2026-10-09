@@ -337,12 +337,14 @@ the same list.
     the runtime archive and of every package, and `anti bind --clang` of a
     package binds `include/raylib/raylib.h` as the tree binds the pinned
     source. `docs/reports/2026-10-09-dist-headers.md` reports it.
-32. The Windows sysroot of mingw-w64: pinned import libraries for both Windows
-    targets, generated from the `.def` files of the mingw-w64 project. A program
-    links `ucrtbase.dll`. The lld link drops `msvcrt.lib`, `libvcruntime.lib`, `ucrt.lib`
-    and `legacy_stdio_definitions.lib`. The runtime, the native libraries and the
-    tests compile against headers that agree with those libraries. Today they take
-    the headers and libraries of xwin, or of the Build Tools on a Windows host.
+32. Done. The Windows sysroot of mingw-w64: the headers and the import
+    libraries of both Windows targets, written from the `.def` files of the
+    mingw-w64 project, travel in the runtime archive and in every package.
+    A program links `ucrtbase.dll`, `ntdll.dll`, `kernel32.dll` and the
+    builtins, and nothing of Microsoft. The runtime defines the static part
+    of the C runtime, the entry point among it, and the C of every Windows
+    target compiles for the gnu triple against the mingw-w64 headers.
+    `docs/reports/2026-10-09-dist-mingw.md` reports it.
 33. xwin leaves `tools/get-sysroot.cmake`, `tools/sysroot-pins`, the installers and
     `ANTI_MICROSOFT`, once item 32 links every Windows program.
 34. The installers download the package alone and use `| bash`. They drop the LLVM
@@ -429,12 +431,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1692 ctest tests pass on the development Mac, and three of them,
-  `sysroot_build_tools` and the two `mimalloc_environment` tests, skip
-  there. The first needs a Windows host for the sysroot it lays out over
-  the Build Tools, and the other two a Linux host. The ASan and the UBSan
-  builds run 1691 each with the same skips, without the `no_paths` test, which needs a build
-  that no sanitizer wrote paths into. `overview_examples` compiles every
+- 1693 ctest tests pass on the development Mac, and two of them, the
+  `mimalloc_environment` tests, skip there, since they need a Linux host.
+  The ASan and the UBSan builds run 1692 each with the same skips, without
+  the `no_paths` test, which needs a build that no sanitizer wrote paths
+  into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built, and so are

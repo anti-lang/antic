@@ -8,9 +8,10 @@
 # It downloads the package of this host and SHA256SUMS from the GitHub
 # release of the version, and SHA256SUMS.sig from anti-lang.com. It checks
 # the signature first, then the SHA-256 of the package against the
-# manifest, unpacks it and installs the sysroot of the host. The SDK of
-# macOS belongs to Apple and the C runtime of Windows to Microsoft. The
-# script asks before it takes either of them.
+# manifest and unpacks it. The package carries the sysroot of every
+# target, the Windows ones of mingw-w64 among them. The SDK of macOS
+# belongs to Apple, and the script asks before it takes its stubs from
+# the Command Line Tools for a package without Zig's.
 #
 # The option --arm or --intel takes the package of that processor rather
 # than the one of this machine. A machine that emulates the other
@@ -48,7 +49,6 @@
 #              its executables there.
 #   ANTI_REPLACE: replace an install that is there.
 #   ANTI_PATH: add the line to the shell profile.
-#   ANTI_MICROSOFT: let xwin fetch the CRT and the Windows SDK.
 set -eu
 
 # DESIGN: the two halves of a release stand on two hosts, and a forged
@@ -336,26 +336,10 @@ macos-*)
     ;;
 esac
 
-if ask MICROSOFT "Also install the Microsoft CRT and Windows SDK, so that this host builds Windows programs?"; then
-    say "xwin downloads them, and Microsoft licenses them to you"
-    # The progress bar of xwin draws only when its own standard output is
-    # a terminal. CMake writes the command and this shell runs it, so the
-    # bar has the terminal of the user rather than a pipe.
-    "$cmake" -DDEST="$home/sysroot" -DLLVM_BIN="$home/bin" \
-        -DACCEPT_LICENSE=yes -DSPLAT=script \
-        -DTARGETS="windows-x86_64;windows-arm64" \
-        -P "$home/tools/get-sysroot.cmake" >/dev/null
-    sh "$home/sysroot/.download/splat.sh"
-    "$cmake" -DDEST="$home/sysroot" -DLLVM_BIN="$home/bin" \
-        -DACCEPT_LICENSE=yes -DSPLAT=done \
-        -DTARGETS="windows-x86_64;windows-arm64" \
-        -P "$home/tools/get-sysroot.cmake"
-else
-    say "Windows programs need the Microsoft CRT. Add it later with:"
-    echo "    $cmake -DDEST=$home/sysroot -DLLVM_BIN=$home/bin \\"
-    echo "        -DACCEPT_LICENSE=yes -DTARGETS='windows-x86_64;windows-arm64' \\"
-    echo "        -P $home/tools/get-sysroot.cmake"
-fi
+# DESIGN: the package carries the sysroot of every target, the Windows
+# ones of mingw-w64 among them, so this host builds Windows programs with
+# nothing more.
+say "the package carries the sysroots of all six targets in $home/sysroot"
 
 # DESIGN: the PATH names one antic, and it is the one this machine runs
 # without emulation. A package of the other processor is therefore called
