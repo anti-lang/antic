@@ -20,9 +20,9 @@ foreach(key VERSION DIGEST)
     endif()
 endforeach()
 
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/upstream-sources.cmake")
+antic_pin_url(url mbedtls)
 set(name "mbedtls-${MBEDTLS_VERSION}")
-set(url
-    "https://github.com/Mbed-TLS/mbedtls/releases/download/${name}/${name}.tar.bz2")
 set(archive "${DEST}/${name}.tar.bz2")
 file(MAKE_DIRECTORY "${DEST}")
 set(have "")

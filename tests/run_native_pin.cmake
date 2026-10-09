@@ -1,9 +1,11 @@
-# The version and the digest of a third-party library live in
-# tools/<NAME>-pin alone. Its download script reads them from there, so no
-# second copy can drift. Run with cmake -P and these values:
+# The version, the digest and the URL of a third-party library live in
+# tools/<NAME>-pin alone. Its download script reads them from there, and
+# the record of the upstream sources of the runtime archive reads the URL
+# there too, so no second copy can drift. Run with cmake -P and these
+# values:
 #   ROOT    the repository
 #   NAME    the library, as in tools/<NAME>-pin. The keys of the pin are
-#           <NAME>_VERSION and <NAME>_DIGEST in capitals
+#           <NAME>_VERSION, <NAME>_DIGEST and <NAME>_URL in capitals
 #   SCRIPT  the download script, relative to ROOT
 #   FILES   optional files relative to ROOT, separated by commas, that
 #           spell neither the version nor the digest either
@@ -51,6 +53,10 @@ string(LENGTH "${digest}" length)
 if(NOT digest MATCHES "^[0-9a-f]+$" OR NOT length EQUAL 64)
     message(FATAL_ERROR "${key}_DIGEST is `${digest}`, expected 64 hex digits")
 endif()
+read_pin(url URL)
+if(NOT url MATCHES "^https://[^ ]+$")
+    message(FATAL_ERROR "${key}_URL is `${url}`, which is not HTTPS")
+endif()
 if(YEAR)
     read_pin(year YEAR)
     if(NOT year MATCHES "^20[0-9][0-9]$")
@@ -58,7 +64,8 @@ if(YEAR)
     endif()
 endif()
 
-# The source comes over HTTPS and the digest is checked on every download.
+# The source comes over HTTPS, from the URL of the pin or one the script
+# spells, and the digest is checked on every download.
 file(STRINGS "${script}" urls REGEX "://")
 foreach(line IN LISTS urls)
     string(FIND "${line}" "https://" at)

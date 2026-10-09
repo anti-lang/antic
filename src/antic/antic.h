@@ -51,6 +51,12 @@
    two of a program of musl. */
 #define RUNTIME_LICENSES_DIR "licenses"
 #define RUNTIME_LICENSE_FILE "anti_rt.txt"
+/* The record of the upstream source of every pinned component, beside
+   the texts: one line per component with the name of its text, its
+   version and the URL of the exact source package, which
+   tools/upstream-sources.cmake writes from the pins. `anti license`
+   prints the line of a component after its text. */
+#define RUNTIME_SOURCES_FILE "sources.txt"
 /* The packages of the C library of musl and of its allocator in the
    notice of a program of musl. */
 #define MUSL_PACKAGE "musl"

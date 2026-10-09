@@ -365,9 +365,10 @@ static bool copy_into(const char *from, const char *to, const char *name)
 
 /* [provisional] DESIGN: NOTICE.txt beside a program or a shared library
    holds the licence text of its notice, the text `anti license --from`
-   prints. The notice names the packages the link put into the binary,
-   which are the packages of the project. A static library for C carries
-   no notice and gets no file. */
+   prints, with the upstream source of each component of the runtime
+   archive after its text. The notice names the packages the link put
+   into the binary, which are the packages of the project. A static
+   library for C carries no notice and gets no file. */
 static bool write_notice(const struct build *b)
 {
     struct text notice = {0};
@@ -376,6 +377,7 @@ static bool write_notice(const struct build *b)
 
     text_appendf(&path, "%s/%s", text_cstr(&b->dist_dir), NOTICE_FILE);
     ok = symmap_license_of(text_cstr(&b->name), &notice) &&
+         symmap_license_sources(&notice, text_cstr(&b->runtime)) &&
          files_write(text_cstr(&path), &notice);
     text_free(&notice);
     text_free(&path);

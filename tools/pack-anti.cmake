@@ -24,7 +24,8 @@
 #               the X11 and OpenGL packages, and the two macOS sysroots of
 #               Zig's stubs, which are ours to redistribute
 #   tools/      the scripts that install the sysroot of the host
-#   licenses/   one file per component
+#   licenses/   one file per component, and sources.txt, the record of
+#               the upstream source of each
 #   VERSION     the version of tools/version
 #
 # The result is anti-<version>-<host>.tar.xz in DEST, with its digest in

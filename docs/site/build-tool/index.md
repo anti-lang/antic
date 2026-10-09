@@ -663,10 +663,10 @@ The subcommand `anti license` has five forms.
 | `anti license` | The licence of antic and `anti`, then every runtime archive component with name, version, identifier and full text |
 | `anti license --project` | The packages that the project links, from `anti.lock` and the imported bundled modules, with identifiers, attributions and texts |
 | `anti license --project --notice` | The same content, written as `dist/<os>-<cpu>/<mode>/NOTICE.txt` |
-| `anti license --from <executable>` | The notice `anti_licenses`, found in the binary by its markers |
+| `anti license --from <executable>` | The notice `anti_licenses`, found in the binary by its markers, with the upstream source of each component after its text where `licenses/sources.txt` of the runtime archive names one |
 | `anti license --from-archive lib<name>.a` | The licence fields from the package header copy in a static archive, for the notice of a C project |
 
-The runtime archive holds a `licenses/` directory with one file per component, which its CMake build writes and `anti license` reads.
+The runtime archive holds a `licenses/` directory with one file per component, which its CMake build writes and `anti license` reads. Beside them stands `sources.txt`, the record of the upstream source of every pinned component, written from the pins.
 
 ### Obligations of a shipped program
 

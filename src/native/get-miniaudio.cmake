@@ -21,9 +21,9 @@ foreach(key VERSION DIGEST)
     endif()
 endforeach()
 
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/upstream-sources.cmake")
+antic_pin_url(url miniaudio)
 set(name "miniaudio-${MINIAUDIO_VERSION}")
-set(url
-    "https://github.com/mackron/miniaudio/archive/refs/tags/${MINIAUDIO_VERSION}.tar.gz")
 set(archive "${DEST}/${name}.tar.gz")
 file(MAKE_DIRECTORY "${DEST}")
 set(have "")

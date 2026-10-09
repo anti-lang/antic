@@ -121,7 +121,7 @@ The target stands under "Binary distribution" in `docs/decisions.md`.
   It also holds the runtime of
   all six targets with its bitcode of full LTO, and the native libraries and their
   headers. mimalloc, the C allocator of every program of musl, stands beside the
-  runtime of each Linux level. The sysroots of every target and the licence texts complete it. Nothing is downloaded at install time or later. One package builds for all
+  runtime of each Linux level. The sysroots of every target, the licence texts and the record of their upstream sources complete it. Nothing is downloaded at install time or later. One package builds for all
   six targets with no network. Apple's frameworks are the one thing a package lacks.
 - antic and anti use only what is in the package. The two exceptions are
   `antic --linker platform` and `anti bind --clang`, which a user asks for by name
@@ -326,10 +326,12 @@ the same list.
     runtime of both Linux targets, travel in every package. A program of `link
     linux`, raylib or a plugin host then links for Linux from any host.
     `docs/reports/2026-10-09-dist-glibc.md` reports it.
-30. The source record of every copyleft part. `licenses/` names the exact upstream
-    source packages and versions of glibc, the kernel headers and every other
-    copyleft component beside their licence texts. Today it holds the licence texts
-    alone.
+30. Done. `licenses/sources.txt` of the runtime archive and of every package
+    records the name, the version and the URL of the exact upstream source
+    package of every pinned component, written by
+    `tools/upstream-sources.cmake` from the pins, and `anti license --from`
+    prints the line of a component after its text.
+    `docs/reports/2026-10-09-dist-sources.md` reports it.
 31. The headers of the native libraries into the runtime archive, item 16. Today
     `lib/<target>/` holds their static libraries alone.
 32. The Windows sysroot of mingw-w64: pinned import libraries for both Windows

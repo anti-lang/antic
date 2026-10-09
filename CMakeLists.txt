@@ -244,6 +244,13 @@ set(ANTIC_RUNTIME_SOURCES assert atomic backtrace call cast check conf cpu diges
 # of the tree, the headers of glibc and the outline atomics of libgcc,
 # which a musl program does not link.
 configure_file(src/rt/LICENSE "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt" COPYONLY)
+# Beside the licence texts, licenses/sources.txt records the upstream
+# source of every pinned component, from tools/upstream-sources.cmake. The
+# packer copies it with the texts, and `anti license` prints the line of a
+# component after its text. RUNTIME_SOURCES_FILE of src/antic/antic.h
+# names the file, and the test runtime_sources reads it.
+include(tools/upstream-sources.cmake)
+antic_write_sources("${ANTIC_RUNTIME_DIR}/licenses/sources.txt")
 
 # The sysroot of each target that lld links against, which
 # tools/get-sysroot.cmake installs, goes to sysroot/<target> of the runtime

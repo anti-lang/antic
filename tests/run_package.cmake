@@ -103,7 +103,8 @@ set(expected anti/tools/zig-stubs-pin anti/bin/antic${suffix}
              anti/sysroot/macos-arm64/usr/lib/libSystem.tbd
              anti/sysroot/macos-x86_64/usr/lib/libSystem.tbd
              anti/sysroot/macos-arm64/sdk-version
-             anti/licenses/zig.txt anti/licenses/apsl.txt)
+             anti/licenses/zig.txt anti/licenses/apsl.txt
+             anti/licenses/sources.txt)
 foreach(tool IN LISTS tools)
     list(APPEND expected "anti/bin/${tool}${suffix}")
 endforeach()
@@ -193,6 +194,17 @@ execute_process(COMMAND "${CMAKE_COMMAND}" -E tar xf "${archive}"
                 WORKING_DIRECTORY "${WORK}/unpacked" RESULT_VARIABLE unpacked)
 if(NOT unpacked EQUAL 0)
     message(FATAL_ERROR "${archive} does not unpack")
+endif()
+# The record of the upstream sources travels beside the licence texts,
+# with a line for glibc and one for the kernel headers whose URL names the
+# version of tools/sysroot-pins.
+execute_process(COMMAND "${CMAKE_COMMAND}" "-DROOT=${ROOT}"
+                        "-DSOURCES=${WORK}/unpacked/anti/licenses/sources.txt"
+                        -P "${ROOT}/tests/run_sources.cmake"
+                RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+                ENCODING NONE)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "licenses/sources.txt of the package: ${out}${err}")
 endif()
 run_packed("anti bind" bind "${ROOT}/tests/bind/raylib_api.json"
            -o "${WORK}/run/bound")
@@ -291,6 +303,20 @@ foreach(target IN LISTS targets)
         message(FATAL_ERROR "the package alone, with an empty PATH and no LIB, "
                             "links no program for ${target}: antic ended with "
                             "${status}\n${out}${err}")
+    endif()
+endforeach()
+# The notice of a program of musl, printed by the packed anti from the
+# package alone, follows the text of musl and of mimalloc with the line of
+# each in licenses/sources.txt of the package.
+run_alone("anti license --from of a program of musl" "${WORK}/run"
+          "${bin}/anti${suffix}" license --from "${WORK}/run/return42-linux-arm64")
+foreach(name musl mimalloc)
+    file(STRINGS "${WORK}/unpacked/anti/licenses/sources.txt" line
+         REGEX "^${name} ")
+    string(FIND "${alone_out}" "\nsource ${line}\n" at)
+    if(line STREQUAL "" OR at EQUAL -1)
+        message(FATAL_ERROR "the packed anti license --from prints no `source "
+                            "${line}` for ${name}\n${alone_out}")
     endif()
 endforeach()
 

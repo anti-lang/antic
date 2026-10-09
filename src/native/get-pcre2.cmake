@@ -20,9 +20,9 @@ foreach(key VERSION DIGEST)
     endif()
 endforeach()
 
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/upstream-sources.cmake")
+antic_pin_url(url pcre2)
 set(name "pcre2-${PCRE2_VERSION}")
-set(url
-    "https://github.com/PCRE2Project/pcre2/releases/download/${name}/${name}.tar.gz")
 set(archive "${DEST}/${name}.tar.gz")
 file(MAKE_DIRECTORY "${DEST}")
 set(have "")

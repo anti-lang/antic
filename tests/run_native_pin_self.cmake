@@ -16,7 +16,8 @@ set(root "${WORK}/root")
 function(write_root recipe)
     file(REMOVE_RECURSE "${root}")
     file(WRITE "${root}/tools/demo-pin"
-         "DEMO_VERSION=${version}\nDEMO_DIGEST=${digest}\n")
+         "DEMO_VERSION=${version}\nDEMO_DIGEST=${digest}\n"
+         "DEMO_URL=https://example.org/demo-@VERSION@.tar.gz\n")
     file(WRITE "${root}/src/native/get-demo.cmake"
          "file(DOWNLOAD \"https://example.org/demo-\${DEMO_VERSION}.tar.gz\"\n"
          "     \"\${DEST}/demo.tar.gz\"\n"
@@ -76,3 +77,16 @@ string(FIND "${output}" "not HTTPS" at)
 if(status EQUAL 0 OR at EQUAL -1)
     message(FATAL_ERROR "the check passed a download over HTTP\n${output}")
 endif()
+
+# A pin whose URL is plain HTTP, or that has none, is refused.
+foreach(line "DEMO_URL=http://example.org/demo-@VERSION@.tar.gz\n" "")
+    write_root("")
+    file(WRITE "${root}/tools/demo-pin"
+         "DEMO_VERSION=${version}\nDEMO_DIGEST=${digest}\n${line}")
+    check(status output)
+    string(FIND "${output}" "DEMO_URL is" at)
+    if(status EQUAL 0 OR at EQUAL -1)
+        message(FATAL_ERROR "the check passed a pin with `${line}` as its "
+                            "URL\n${output}")
+    endif()
+endforeach()

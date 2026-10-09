@@ -32,6 +32,13 @@ bool symmap_license(const struct text *bytes, struct text *out);
    Reports and returns false when the binary carries no notice. */
 bool symmap_license_of(const char *binary, struct text *out);
 
+/* Follow the text of each component of the notice with its line of
+   RUNTIME_SOURCES_FILE of the runtime archive at runtime, as
+   `source <name> <version> <url>`. A component the record does not name
+   gets no line. Reports and returns false when the record cannot be
+   read. */
+bool symmap_license_sources(struct text *notice, const char *runtime);
+
 /* The build id of the program at the path, through symmap_notice.
    Returns false when the program carries none. */
 bool symmap_build_id(const char *program, struct text *out);

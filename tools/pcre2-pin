@@ -1,5 +1,7 @@
-# The pinned PCRE2 release that src/native/get-pcre2.cmake downloads. The
-# digest is the SHA-256 of pcre2-<version>.tar.gz that the release page of
+# The pinned PCRE2 release that src/native/get-pcre2.cmake downloads from
+# the URL, where @VERSION@ stands for the version. The digest is the
+# SHA-256 of pcre2-<version>.tar.gz that the release page of
 # PCRE2Project/pcre2 publishes.
 PCRE2_VERSION=10.48
+PCRE2_URL=https://github.com/PCRE2Project/pcre2/releases/download/pcre2-@VERSION@/pcre2-@VERSION@.tar.gz
 PCRE2_DIGEST=ebcc25aadf2a51fa1fefa9b8bc9e7a79b3dae86870a0f1152a22e42befd46888

@@ -19,8 +19,8 @@ foreach(key VERSION DIGEST)
     endif()
 endforeach()
 
-set(url
-    "https://github.com/raysan5/raylib/archive/refs/tags/${RAYLIB_VERSION}.tar.gz")
+include("${CMAKE_CURRENT_LIST_DIR}/upstream-sources.cmake")
+antic_pin_url(url raylib)
 set(archive "${DEST}/raylib-${RAYLIB_VERSION}.tar.gz")
 file(MAKE_DIRECTORY "${DEST}")
 file(DOWNLOAD "${url}" "${archive}" STATUS status SHOW_PROGRESS

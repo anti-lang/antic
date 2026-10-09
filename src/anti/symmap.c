@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "antic.h"
 #include "files.h"
 #include "license.h"
 #include "symbols.h"
@@ -248,6 +249,101 @@ bool symmap_license_of(const char *binary, struct text *out)
         fprintf(stderr, "anti: %s carries no licence notice\n", binary);
     }
     return found;
+}
+
+/* The line of the record in sources that names the component of name,
+   without its newline, with its length in length, or NULL. A line of the
+   record is `<name> <version> <url>`, and one that starts with # is a
+   comment. */
+static const char *source_line(const struct text *sources, const char *name,
+                               size_t name_length, size_t *length)
+{
+    const char *at = sources->data;
+    const char *end = at + sources->length;
+
+    while (at < end) {
+        const char *stop = memchr(at, '\n', (size_t)(end - at));
+        size_t line_length = (size_t)((stop != NULL ? stop : end) - at);
+        if (line_length > name_length && at[0] != '#' &&
+            at[name_length] == ' ' && memcmp(at, name, name_length) == 0) {
+            *length = line_length;
+            return at;
+        }
+        at = stop != NULL ? stop + 1 : end;
+    }
+    return NULL;
+}
+
+/* Append to out a `source` line for each of the names, the names of a
+   `text for` line separated by spaces, that the record in sources
+   names. */
+static void append_sources(struct text *out, const struct text *sources,
+                           const char *names, size_t names_length)
+{
+    const char *at = names;
+    const char *end;
+
+    if (names == NULL) {
+        return;
+    }
+    end = names + names_length;
+    while (at < end) {
+        const char *space = memchr(at, ' ', (size_t)(end - at));
+        const char *stop = space != NULL ? space : end;
+        size_t length = 0;
+        const char *line =
+            source_line(sources, at, (size_t)(stop - at), &length);
+        if (line != NULL) {
+            text_append(out, "source ");
+            text_append_bytes(out, line, length);
+            text_append(out, "\n");
+        }
+        if (space == NULL) {
+            break;
+        }
+        at = space + 1;
+    }
+}
+
+bool symmap_license_sources(struct text *notice, const char *runtime)
+{
+    static const char head[] = "text for ";
+    struct text path = {0};
+    struct text sources = {0};
+    struct text out = {0};
+    const char *names = NULL;
+    size_t names_length = 0;
+    bool ok;
+
+    text_appendf(&path, "%s/%s/%s", runtime, RUNTIME_LICENSES_DIR,
+                 RUNTIME_SOURCES_FILE);
+    ok = files_read_reported(text_cstr(&path), &sources);
+    if (ok) {
+        const char *at = notice->data;
+        const char *end = at + notice->length;
+        while (at < end) {
+            const char *stop = memchr(at, '\n', (size_t)(end - at));
+            const char *next = stop != NULL ? stop + 1 : end;
+            size_t line_length = (size_t)((stop != NULL ? stop : end) - at);
+            if (line_length > sizeof head - 1 &&
+                memcmp(at, head, sizeof head - 1) == 0) {
+                append_sources(&out, &sources, names, names_length);
+                names = at + sizeof head - 1;
+                names_length = line_length - (sizeof head - 1);
+            }
+            text_append_bytes(&out, at, (size_t)(next - at));
+            at = next;
+        }
+        append_sources(&out, &sources, names, names_length);
+        notice->length = 0;
+        if (out.length > 0) {
+            text_append_bytes(notice, out.data, out.length);
+        }
+    }
+    text_free(&path);
+    text_free(&sources);
+    text_free(&out);
+    return ok;
 }
 
 bool symmap_build_id(const char *program, struct text *out)

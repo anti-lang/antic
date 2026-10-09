@@ -3,8 +3,11 @@
 # statically against musl on linux-arm64. tests/anti-build/window links
 # dynamically against glibc there, and app on macos-arm64 links neither.
 # `anti license --from` prints the notice of each program, and NOTICE.txt
-# beside it in dist/ holds the same text. Run with cmake -P and these
-# values:
+# beside it in dist/ holds the same text. After the text of musl and of
+# mimalloc stands the line of licenses/sources.txt of the runtime archive
+# that names the upstream source of each, as `source <line>`, and a
+# program that links neither prints no source line. Run with cmake -P and
+# these values:
 #   ANTI              the anti executable
 #   RUNTIME           the runtime archive
 #   LLVM_MC           the assembler
@@ -28,6 +31,12 @@ file(COPY "${FIXTURE}/app" "${FIXTURE}/window" DESTINATION "${WORK}")
 
 foreach(name musl mimalloc)
     file(READ "${RUNTIME}/licenses/${name}.txt" ${name}_text)
+    file(STRINGS "${RUNTIME}/licenses/sources.txt" ${name}_source
+         REGEX "^${name} ")
+    if(NOT ${name}_source MATCHES "^${name} [^ ]+ https://[^ ]+$")
+        message(FATAL_ERROR "licenses/sources.txt of the runtime archive has "
+                            "no line for ${name}: `${${name}_source}`")
+    endif()
 endforeach()
 
 # Build project for target and check its notice. carries is TRUE where
@@ -48,6 +57,7 @@ function(check_notice project target carries)
     endif()
     set(dist "${WORK}/${project}/dist/${target}/dev")
     execute_process(COMMAND "${ANTI}" license --from "${dist}/${project}"
+                            --runtime "${RUNTIME}"
         RESULT_VARIABLE status OUTPUT_VARIABLE notice ERROR_VARIABLE err
         ENCODING NONE)
     if(NOT status EQUAL 0)
@@ -98,12 +108,24 @@ function(check_notice project target carries)
                 message(FATAL_ERROR "the notice of ${what} holds the text of "
                                     "${name} twice\n${notice}")
             endif()
+            string(FIND "${notice}"
+                   "\ntext for ${name}\n${${name}_text}source ${${name}_source}\n"
+                   source_at)
+            if(source_at EQUAL -1)
+                message(FATAL_ERROR "the notice of ${what} does not follow the "
+                                    "text of ${name} with `source "
+                                    "${${name}_source}`\n${notice}")
+            endif()
         elseif(notice MATCHES "(^|\n)package ${name} " OR
                notice MATCHES "\ntext for [^\n]*${name}")
             message(FATAL_ERROR "the notice of ${what} names ${name}, which "
                                 "it does not link\n${notice}")
         endif()
     endforeach()
+    if(NOT carries AND notice MATCHES "(^|\n)source ")
+        message(FATAL_ERROR "the notice of ${what} holds a source line, and "
+                            "no component of it has one\n${notice}")
+    endif()
 endfunction()
 
 check_notice(app linux-arm64 TRUE)

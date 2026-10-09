@@ -501,6 +501,13 @@ add_test(NAME expect_runner
 add_expect_test(runtime_licenses STATUS 0
     PATTERN "^BSD Zero Clause License"
     COMMAND "${CMAKE_COMMAND}" -E cat "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt")
+# Beside the texts, licenses/sources.txt records the upstream source of
+# every pinned component: name, version and the URL of the exact source
+# package, written from the pins.
+add_test(NAME runtime_sources
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DSOURCES=${ANTIC_RUNTIME_DIR}/licenses/sources.txt"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_sources.cmake")
 
 # The processor levels. src/antic/cpu.c holds the table for antic and
 # tools/cpu-levels holds it for the build, so the two are compared.

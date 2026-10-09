@@ -59,7 +59,7 @@ static int usage(FILE *out)
           "       anti symbols check --conf <config.toml>\n"
           "                          [--symbols <symbols.zip>]...\n"
           "       anti symbols resolve <trace.txt> --symbols <symbols.zip>...\n"
-          "       anti license --from <binary>\n",
+          "       anti license --from <binary> [--runtime <dir>]\n",
           out);
     fputs("\n"
           "new writes a project of the default layout: anti.toml, src/ with\n"
@@ -152,27 +152,53 @@ static int usage(FILE *out)
           "\n"
           "license --from prints the licence notice that a program or a\n"
           "shared library of Anti carries: one line per package with its\n"
-          "version and licence, then each licence text once. build writes\n"
-          "the same text as NOTICE.txt beside such a binary in dist/.\n",
+          "version and licence, then each licence text once, followed by\n"
+          "the upstream source of the component where the runtime archive\n"
+          "records one. build writes the same text as NOTICE.txt beside\n"
+          "such a binary in dist/.\n",
           out);
     return out == stdout ? 0 : 2;
 }
 
-/* `anti license --from <binary>`, the one form of the command that is
-   built. */
+/* `anti license --from <binary> [--runtime <dir>]`, the one form of the
+   command that is built. The line of each component in the record of
+   upstream sources follows its text, so the command reads the runtime
+   archive: the one --runtime names, or the one anti finds by the rule of
+   runtime_archive, as every other command does. */
 static int license_command(int argc, char **argv)
 {
     struct text notice = {0};
+    struct text runtime = {0};
+    const char *binary = NULL;
     int status = 1;
+    int i;
 
-    if (argc != 4 || strcmp(argv[2], "--from") != 0) {
+    for (i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--from") == 0 && i + 1 < argc &&
+            binary == NULL) {
+            binary = argv[++i];
+        } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc &&
+                   runtime.length == 0) {
+            text_append(&runtime, argv[++i]);
+        } else {
+            text_free(&runtime);
+            return usage(stderr);
+        }
+    }
+    if (binary == NULL) {
+        text_free(&runtime);
         return usage(stderr);
     }
-    if (symmap_license_of(argv[3], &notice)) {
+    if (runtime.length == 0 && !runtime_archive(&runtime)) {
+        fputs("anti: the system does not say where the runtime archive is, "
+              "so license needs --runtime\n", stderr);
+    } else if (symmap_license_of(binary, &notice) &&
+               symmap_license_sources(&notice, text_cstr(&runtime))) {
         fputs(text_cstr(&notice), stdout);
         status = 0;
     }
     text_free(&notice);
+    text_free(&runtime);
     return status;
 }
 

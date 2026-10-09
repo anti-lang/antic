@@ -22,22 +22,12 @@ foreach(key VERSION YEAR DIGEST)
     endif()
 endforeach()
 
-# X.Y.Z is written as X, then Y and Z in two digits each, then 00, so
-# 3.8.2 would be 3080200.
-if(NOT SQLITE_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)$")
-    message(FATAL_ERROR "SQLITE_VERSION is `${SQLITE_VERSION}`, expected X.Y.Z")
-endif()
-set(number "${CMAKE_MATCH_1}")
-foreach(part "${CMAKE_MATCH_2}" "${CMAKE_MATCH_3}")
-    if(part LESS 10)
-        string(APPEND number "0")
-    endif()
-    string(APPEND number "${part}")
-endforeach()
-string(APPEND number "00")
-
-set(name "sqlite-amalgamation-${number}")
-set(url "https://sqlite.org/${SQLITE_YEAR}/${name}.zip")
+# The URL of the pin names the archive sqlite-amalgamation-<number>.zip,
+# whose number tools/upstream-sources.cmake writes from the version, and
+# the unpacked directory carries the same name.
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/upstream-sources.cmake")
+antic_pin_url(url sqlite)
+get_filename_component(name "${url}" NAME_WE)
 set(archive "${DEST}/${name}.zip")
 file(MAKE_DIRECTORY "${DEST}")
 set(have "")

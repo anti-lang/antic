@@ -467,11 +467,12 @@ The author may delete those lines. Nothing in the language depends on them.
 | `anti license` | The licence of `antic` and `anti`, then every runtime archive component with name, version, identifier and full text |
 | `anti license --project` | The packages the current project links, from `anti.lock` and the imported bundled modules, with identifiers, attributions and texts |
 | `anti license --project --notice` | Writes the same content as `dist/<os>-<cpu>/<mode>/NOTICE.txt` |
-| `anti license --from <executable>` | Reads `anti_licenses` out of the binary by its marker and prints it without the markers and the build id |
+| `anti license --from <executable>` | Reads `anti_licenses` out of the binary by its marker and prints it without the markers and the build id, with the line of `licenses/sources.txt` after the text of each component the record names |
 | `anti license --from-archive lib<name>.a` | Reads the licence fields from the copy of the `.antl` package header in a static archive, so a C project can produce its notice |
 
 The runtime archive holds a `licenses/` directory with one file per component, written
-by the CMake build. `anti license` reads it. Nothing is typed twice.
+by the CMake build. Beside them stands `sources.txt`, the record of the upstream source
+of every pinned component. `anti license` reads both. Nothing is typed twice.
 
 ## Obligations of a shipped program
 
@@ -498,6 +499,16 @@ program that imports `anti.net` or `anti.regex` owes an attribution, and `anti_l
 plus `NOTICE.txt` supply it. Every program of musl carries the notices of musl and
 mimalloc in `anti_licenses` and `NOTICE.txt`, and a program of the glibc mode or of any
 other target carries neither. This section is a statement of how the licences read, not legal advice.
+
+The package itself carries glibc and the kernel headers in its glibc sysroots, whose
+licences ask for the source. `licenses/sources.txt` of the package records, beside the
+licence texts, the upstream source of every pinned component: the name of its licence
+text, its version and the URL of the exact source package. For glibc, the kernel headers
+and the X11 and OpenGL packages that is the `.dsc` of the Ubuntu source package, for
+musl, Zig and each native library the release archive. The CMake build writes the file
+from the pins, so nothing is typed twice. `anti license --from` prints the line of a
+component after its text, as `source <name> <version> <url>`, and `NOTICE.txt` holds the
+same, so a program of musl names the source of musl and mimalloc with their notices.
 
 ## Licence choices for Anti itself
 

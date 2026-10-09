@@ -33,7 +33,7 @@ Chapter 3 installs Anti with one command. That package is this archive with anti
 | `lib/<target>/<level>/` | anti_rt for all six targets, one per processor level | A program of any target and level links the runtime, whichever host compiled it |
 | `std/` | The standard library as `.antl` files | One file serves every target, because the IR holds no sizes |
 | `sysroot/linux-x86_64`, `sysroot/linux-arm64` | musl and the compiler-rt builtins | Ours to pass on, so a Linux program links with nothing else installed |
-| `licenses/` | One file per component | The obligations that travel with a shipped program |
+| `licenses/` | One file per component, and `sources.txt` | The obligations that travel with a shipped program, and the upstream source of every pinned component |
 
 antic reads that directory without being told. Without `--runtime` it takes the directory above its own executable, so `~/.anti/bin/antic` finds `~/.anti/lib` beside it. It takes opt, llc, llvm-ar and the lld programs from `bin/` of that archive and from nowhere else, and refuses a missing one by its path. The tools that compile a program are then the pinned ones whatever the machine carries.
 
@@ -187,7 +187,10 @@ program would lose its own notice. The build writes it as
 
 The directory `licenses/` of the archive holds one file per component. `anti_rt.txt`
 is the 0BSD licence of the runtime. The sysroot step adds the licence of musl, of the
-compiler-rt builtins and of the LLVM tools. A program that ships carries the
+compiler-rt builtins and of the LLVM tools. Beside the texts, `sources.txt` records the
+upstream source of every pinned component: the name of its text, its version and the
+URL of the exact source package, written from the pins at configure. `anti license
+--from` prints the line of a component after its text. A program that ships carries the
 obligations of what it links.
 
 | Component | Licence | Obligation of a shipped binary |

@@ -21,9 +21,9 @@ foreach(key VERSION DIGEST)
     endif()
 endforeach()
 
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/upstream-sources.cmake")
+antic_pin_url(url mimalloc)
 set(name "mimalloc-${MIMALLOC_VERSION}")
-set(url
-    "https://github.com/microsoft/mimalloc/archive/refs/tags/v${MIMALLOC_VERSION}.tar.gz")
 set(archive "${DEST}/${name}.tar.gz")
 file(MAKE_DIRECTORY "${DEST}")
 set(have "")

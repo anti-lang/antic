@@ -1,7 +1,9 @@
 # The pinned mimalloc release that src/native/get-mimalloc.cmake
-# downloads, the archive of the tag v<version> of microsoft/mimalloc.
-# GitHub publishes no digest for a source archive, so the digest below is
-# the one of the archive at its first download, which two downloads of
-# 2026-10-08 gave alike.
+# downloads from the URL, where @VERSION@ stands for the version: the
+# archive of the tag v<version> of microsoft/mimalloc. GitHub publishes no
+# digest for a source archive, so the digest below is the one of the
+# archive at its first download, which two downloads of 2026-10-08 gave
+# alike.
 MIMALLOC_VERSION=3.5.3
+MIMALLOC_URL=https://github.com/microsoft/mimalloc/archive/refs/tags/v@VERSION@.tar.gz
 MIMALLOC_DIGEST=3b4a15153a59905995f7070296ed604bb5ccc00cabb8b93446931aff77224d47
