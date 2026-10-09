@@ -182,10 +182,11 @@ Each of these settles a point the gap list left open. Eddie decided them on
 Each step is one headless session. Each ends with the three suites on the
 Mac, the suite on both VMs where the step says so, a report
 `docs/reports/<date>-dist-<step>.md`, and a push. A step that changes
-`tools/pack-anti.cmake` or an installer also runs `./r --dry-run`, which
-performs steps 1 to 5 of a release on the staged tree, and the report
-holds its output. The dry run accepts a version that is a tag already
-since `d6b8d473`.
+`tools/pack-anti.cmake`, `tools/release.sh` or an installer keeps the test
+`release_dry_run` passing, which runs `./r --dry-run` over stand-ins inside
+the host suite. The real `./r --dry-run` is Eddie's. It needs a pushed
+`main` and runs longer than one call of a session allows, so no step runs
+it. Eddie runs it after the step `release-check`, before `./r`.
 
 `tools`. The LLVM tools into the package. `tools/pack-anti.cmake` copies
 `bin/` of the runtime archive into `bin/` of the package, beside antic and
@@ -200,7 +201,7 @@ installers stop installing the LLVM tools, and `tools/llvm-pin` and
 `llvm-version` leave the package's `tools/`. `docs/distribution.md` under
 "The LLVM tools" and the "Binary distribution" entry on the six packages
 say that the tools travel inside. Done when the test passes on the Mac and
-the dry run passes.
+the suites pass.
 
 `own-tools`. antic and anti use the package alone. `grep` finds every
 place where antic or anti reads `PATH`, `LIB` or another variable of the
@@ -218,7 +219,7 @@ runtime archive, with their X11 and OpenGL development files and the glibc
 runtime. A test links a program of `link linux` and a raylib program for
 both Linux targets from an unpacked package on the Mac. The packages grow
 by about 100 MB each, which the report records per host. Done when the
-test passes and the dry run passes.
+test passes and the suites pass.
 
 `sources`. `licenses/sources.txt`, as decision 2 says. The CMake build
 writes it into the runtime archive beside the licence texts, from
@@ -275,9 +276,9 @@ and xwin, and `tools/` leaves the package in `tools/pack-anti.cmake`.
 commands, and `docs/distribution.md` under "Binary downloads" and "What the
 site serves" says what the installer does now. The test `release_dry_run`
 follows the installers. Step 5 of `./r` and `docs/work-order-release-script.md`
-lose the lines about the LLVM tools and the sysroot. Done when `./r
---dry-run` passes and an install from the staging area on both VMs, with
-the network on, gives `anti --version` and a hello program for the host.
+lose the lines about the LLVM tools and the sysroot. Done when the suites
+pass and an install from the staging area on both VMs, with the network on,
+gives `anti --version` and a hello program for the host.
 
 `bundle-macho`. `--bundle-runtime` on Mach-O as decision 6 says. Apple's
 `ld -r` leaves `src/antic/driver_library.c`, and the marker member and the
@@ -310,16 +311,16 @@ included. Test first, one test per form, with a project that links two
 packages and a static archive built with `--lib static`. Done when the
 tests pass on the Mac and both VMs and item 37 reads "Done".
 
-`release-check`. The last step builds nothing new. It runs `./r --dry-run`
-on the tree, installs the package of each host on its machine with the
-installer from the staging area, and runs the check of step 10 of the
-release script by hand on the Mac and both VMs: `anti --version`, `antic
---version`, a hello program for the host and a link for the other five
-targets, with the network off. It writes the `CHANGELOG.md` entry of 0.2.0
-from the reports since 0.1.0, in the form of the entry of 0.1.0, and sets
-`tools/version` to 0.2.0. It does not tag and does not run `./r` without
-`--dry-run`. Done when the dry run passes with the new version and the
-report holds the three checks. Eddie runs `./r`.
+`release-check`. The last step builds nothing new. It packs the package of
+each host from the tree, installs it on its machine with the installer from
+the staging area, and runs the check of step 10 of the release script by
+hand on the Mac and both VMs: `anti --version`, `antic --version`, a hello
+program for the host and a link for the other five targets, with the network
+off. It writes the `CHANGELOG.md` entry of 0.2.0 from the reports since
+0.1.0, in the form of the entry of 0.1.0, and sets `tools/version` to 0.2.0.
+It does not tag and does not run `./r`. Done when the three checks pass and
+`release_dry_run` passes with the new version. Eddie then runs `./r --dry-
+run` and `./r`.
 
 ## Documentation changes
 
@@ -367,7 +368,7 @@ commit, in the words of the decisions.
 | Does a step add a directory under `src/`, `tests/` or `docs/`? | No. `include/` is a directory of the runtime archive and of the package, not of the tree. |
 | What if a sentence here contradicts the code? | The code, the tests and `docs/decisions.md` win. Correct the sentence in the same commit and say so in the report. |
 | When is BLOCKED right? | For a question no document answers. Not for a contradiction, and not for a choice this document makes. |
-| Who runs `./r`? | Eddie. The step `release-check` stops at the dry run. |
+| Who runs `./r --dry-run` and `./r`? | Eddie, after the step `release-check`. No session runs either: the dry run needs a pushed `main` and runs longer than one call allows. |
 
 ## Later options, out of scope
 
