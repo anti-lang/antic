@@ -15,6 +15,10 @@ tools can observe.
 - Every target links against `sysroot/<target>` of the archive, the Windows
   targets included, and a missing sysroot is refused with the line that it is
   the package's. Every lld-link command carries `/lldignoreenv`, so the library
-  directories of `LIB`, which an MSVC environment sets, reach no link, and a
-  library the sysroot lacks stays missing. `own_tools` checks both with
-  stand-in archives of links.
+  directories of `LIB`, which an MSVC environment sets, reach no link. On a
+  Windows host lld-link also finds the installed Visual Studio and Windows SDK
+  through the setup configuration and the registry, under `/lldignoreenv` too,
+  and the Windows VM read `ucrt.lib` from Windows Kits with `LIB` unset. So
+  every lld-link command names `crt` and `sdk` of the sysroot as `/vctoolsdir`
+  and `/winsdkdir`, which ends the detection, and a library the sysroot lacks
+  stays missing. `own_tools` checks both with stand-in archives of links.

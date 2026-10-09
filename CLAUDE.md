@@ -318,8 +318,9 @@ the same list.
 28. Done. antic and anti take their tools, their libraries and their
     sysroots from the package alone. A tool that `bin/` of the archive
     lacks is refused by its path, a Windows link without its sysroot is
-    refused, every lld-link runs with `/lldignoreenv`, and no message
-    names `tools/get-sysroot.cmake`. `own_tools` and `package_keys` check
+    refused, every lld-link runs with `/lldignoreenv` and the sysroot as
+    its Visual Studio and Windows SDK, and no message names
+    `tools/get-sysroot.cmake`. `own_tools` and `package_keys` check
     it. `docs/reports/2026-10-09-dist-own-tools.md` reports it.
 29. The two glibc sysroots, with their X11 and OpenGL packages and the glibc runtime
     of both Linux targets, into every package. Today no package holds them. A program

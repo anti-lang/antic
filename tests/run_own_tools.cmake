@@ -4,7 +4,8 @@
 # the search path, even when the search path holds it. A Windows link
 # without the sysroot of its target is refused and never reads the
 # library directories of LIB, which an MSVC environment sets, and a
-# Windows link with the sysroot reads LIB no more: a library the sysroot
+# Windows link with the sysroot reads LIB no more, nor the Visual Studio
+# and the Windows SDK a Windows host installed: a library the sysroot
 # lacks stays missing. No message of antic or anti names
 # tools/get-sysroot.cmake, which a user has no use for. Each stand-in
 # archive here is a directory of links into the real one, with a bin/ or
@@ -101,7 +102,9 @@ else()
         message(FATAL_ERROR "antic linked a Windows program from LIB")
     endif()
     # The sysroot without its ucrt/ directory, and LIB naming the real one:
-    # lld-link reads LIB no more, so ucrt.lib stays missing.
+    # lld-link reads LIB no more, so ucrt.lib stays missing. On the Windows
+    # VM lld-link once found it in the Windows Kits of the machine instead,
+    # which /vctoolsdir and /winsdkdir stop.
     set(partial "${WORK}/partial-windows")
     stand_in("${partial}" bin)
     set(partial_sysroot "${partial}/sysroot/windows-x86_64")

@@ -223,17 +223,6 @@ if(NOT packed_llvm STREQUAL llvm_version)
                         "'${packed_llvm}', and tools/llvm-version "
                         "'${llvm_version}'")
 endif()
-file(WRITE "${WORK}/run/hello.anti"
-     "import anti.io;\n\nfn main() -> int\n{\n    io.print(\"hello\");\n"
-     "    return 0;\n}\n")
-run_alone("antic hello.anti" "${WORK}/run" "${bin}/antic${suffix}" hello.anti
-          -o "${WORK}/run/hello${suffix}")
-run_alone("hello" "${WORK}/run" "${WORK}/run/hello${suffix}")
-if(NOT alone_out MATCHES "hello")
-    message(FATAL_ERROR "the hello program of the package prints "
-                        "'${alone_out}'")
-endif()
-
 # DESIGN: the package alone links a program for every target that names
 # no framework, with an empty PATH and no LIB, which Eddie decided on
 # 2026-09-27 under "Binary distribution" in docs/decisions.md and the
@@ -241,7 +230,8 @@ endif()
 # holds no Windows sysroot until the step mingw puts the trees of
 # mingw-w64 into it, so the Windows sysroots of the runtime archive stand
 # in at the place the package will hold them, as links the test removes
-# before the tree.
+# before the tree. They stand before the first link, since a Windows host
+# links its own hello program against one.
 set(links)
 set(targets linux-x86_64 linux-arm64 macos-arm64 macos-x86_64)
 foreach(target windows-x86_64 windows-arm64)
@@ -254,6 +244,17 @@ foreach(target windows-x86_64 windows-arm64)
         message("SKIP the link for ${target}: ${SYSROOT}/${target} is not here")
     endif()
 endforeach()
+file(WRITE "${WORK}/run/hello.anti"
+     "import anti.io;\n\nfn main() -> int\n{\n    io.print(\"hello\");\n"
+     "    return 0;\n}\n")
+run_alone("antic hello.anti" "${WORK}/run" "${bin}/antic${suffix}" hello.anti
+          -o "${WORK}/run/hello${suffix}")
+run_alone("hello" "${WORK}/run" "${WORK}/run/hello${suffix}")
+if(NOT alone_out MATCHES "hello")
+    message(FATAL_ERROR "the hello program of the package prints "
+                        "'${alone_out}'")
+endif()
+
 foreach(target IN LISTS targets)
     set(exe "${WORK}/run/return42-${target}")
     if(target MATCHES "^windows-")
@@ -272,10 +273,6 @@ foreach(target IN LISTS targets)
                             "${status}\n${out}${err}")
     endif()
 endforeach()
-foreach(link IN LISTS links)
-    file(REMOVE "${link}")
-endforeach()
-
 file(COPY "${ROOT}/tests/anti-build/app" DESTINATION "${WORK}/run")
 set(project "${WORK}/run/app")
 run_alone("anti build --release" "${project}" "${bin}/anti${suffix}" build
@@ -300,6 +297,10 @@ if(NOT HOST MATCHES "^windows-")
                             "program\n${packed_out}")
     endif()
 endif()
+
+foreach(link IN LISTS links)
+    file(REMOVE "${link}")
+endforeach()
 
 # A host that is not Linux packs linux-arm64 as well. The packer then
 # compiles a Linux anti from the source list of the CMake build, and the

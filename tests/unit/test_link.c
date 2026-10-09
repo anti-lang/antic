@@ -451,7 +451,7 @@ static void libraries(void)
     win.object = "geo.obj";
     win.executable = "geo.dll";
     shared(TARGET_WINDOWS_ARM64, &win, &def,
-           "/rt/bin/lld-link /NOLOGO /lldignoreenv /DEBUG /PDBALTPATH:%_PDB% "
+           "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% "
            "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:SAFEICF /DLL "
            "/MACHINE:ARM64 /OUT:geo.dll /PDB:geo.pdb /DEF:geo.def "
            "/LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
@@ -610,7 +610,7 @@ static void dynamic_modes(void)
     in.def_file = "prog.def";
     in.import_library = "prog.lib";
     links(TARGET_WINDOWS_ARM64, &in,
-          "/rt/bin/lld-link /NOLOGO /lldignoreenv /DEBUG /PDBALTPATH:%_PDB% "
+          "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% "
           "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:SAFEICF "
           "/SUBSYSTEM:CONSOLE /MACHINE:ARM64 /OUT:prog.exe /PDB:prog.pdb "
           "/DEF:prog.def /IMPLIB:prog.lib "
@@ -630,7 +630,7 @@ static void dynamic_modes(void)
         in.extra = host;
         in.extra_count = 1;
         link_shared_command(&c, TARGET_WINDOWS_ARM64, &in, &plugin);
-        joined(&c, "/rt/bin/lld-link /NOLOGO /lldignoreenv /DEBUG /PDBALTPATH:%_PDB% "
+        joined(&c, "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% "
                    "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:SAFEICF /DLL "
                    "/NOENTRY /MACHINE:ARM64 /OUT:fancy.dll /PDB:fancy.pdb "
                    "/DEF:fancy.def /LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
@@ -681,7 +681,7 @@ static void memory_checks_links(void)
     in = lld_windows_inputs;
     in.memory_checks = true;
     links(TARGET_WINDOWS_X86_64, &in,
-          "/rt/bin/lld-link /NOLOGO /lldignoreenv /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
+          "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
           "/ignore:4099 /OPT:REF /OPT:SAFEICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
           "/OUT:prog.exe /PDB:prog.pdb /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "
@@ -743,7 +743,7 @@ static void lto_links(void)
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crtn.o");
     win.lto = LTO_THIN;
     links(TARGET_WINDOWS_X86_64, &win,
-          "/rt/bin/lld-link /NOLOGO /lldignoreenv /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
+          "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
           "/ignore:4099 /OPT:REF /OPT:SAFEICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
           "/opt:lldlto=3 /mllvm:-inline-threshold=225 /OUT:prog.exe "
           "/PDB:prog.pdb "
@@ -803,7 +803,7 @@ static void profile_links(void)
           "/rt/sysroot/t/usr/lib/x86_64-linux-gnu/crtn.o");
     win.profile_generate = true;
     links(TARGET_WINDOWS_ARM64, &win,
-          "/rt/bin/lld-link /NOLOGO /lldignoreenv /DEBUG /PDBALTPATH:%_PDB% "
+          "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% "
           "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:SAFEICF "
           "/SUBSYSTEM:CONSOLE /MACHINE:ARM64 /OUT:prog.exe /PDB:prog.pdb "
           "/LIBPATH:/rt/sysroot/t/crt/lib/aarch64 "
@@ -886,7 +886,7 @@ static void shared_modes(void)
     in.executable = "geo.dll";
     in.memory_checks = true;
     shared(TARGET_WINDOWS_X86_64, &in, &def,
-           "/rt/bin/lld-link /NOLOGO /lldignoreenv /DEBUG /PDBALTPATH:%_PDB% "
+           "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% "
            "/pdbsourcepath:. /ignore:4099 /OPT:REF /OPT:SAFEICF /DLL "
            "/MACHINE:X64 /OUT:geo.dll /PDB:geo.pdb /DEF:geo.def "
            "/LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
@@ -1021,7 +1021,9 @@ void test_link(void)
     /* ld64.lld links with the .tbd stubs of the sysroot, and ld.lld with
        musl as a static position-independent executable, without the debug
        sections that musl carries. lld-link takes the libraries of the
-       sysroot alone, and /lldignoreenv keeps the LIB variable out. */
+       sysroot alone: /lldignoreenv keeps the LIB variable out, and the
+       sysroot stands as the Visual Studio and the Windows SDK, so a
+       Windows host adds none of its own. */
     links(TARGET_MACOS_X86_64, &lld_inputs,
           "/rt/bin/ld64.lld -S -arch x86_64 -platform_version macos 11.0 26.5 "
           "-syslibroot /rt/sysroot/t -o prog -dead_strip --icf=safe prog.o "
@@ -1036,7 +1038,7 @@ void test_link(void)
           "/rt/sysroot/t/usr/lib/libclang_rt.builtins.a "
           "/rt/sysroot/t/usr/lib/crtn.o");
     links(TARGET_WINDOWS_X86_64, &lld_windows_inputs,
-          "/rt/bin/lld-link /NOLOGO /lldignoreenv /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
+          "/rt/bin/lld-link /NOLOGO /lldignoreenv /vctoolsdir:/rt/sysroot/t/crt /winsdkdir:/rt/sysroot/t/sdk /DEBUG /PDBALTPATH:%_PDB% /pdbsourcepath:. "
           "/ignore:4099 /OPT:REF /OPT:SAFEICF /SUBSYSTEM:CONSOLE /MACHINE:X64 "
           "/OUT:prog.exe /PDB:prog.pdb /LIBPATH:/rt/sysroot/t/crt/lib/x86_64 "
           "/LIBPATH:/rt/sysroot/t/sdk/lib/um/x86_64 "

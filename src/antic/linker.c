@@ -171,7 +171,11 @@ const char *link_lld_flavour(enum target t)
 #define SYSROOT_LIB "usr/lib"
 #define SYSROOT_BUILTINS "libclang_rt.builtins.a"
 #define SYSROOT_MUSL_LIBC "libc.a"
-#define SYSROOT_WINDOWS_CRT "crt/lib"
+/* The two trees of a Windows sysroot: the C runtime of the compiler and
+   the Windows SDK, as xwin lays them out. */
+#define SYSROOT_WINDOWS_TOOLS "crt"
+#define SYSROOT_WINDOWS_SDK "sdk"
+#define SYSROOT_WINDOWS_CRT SYSROOT_WINDOWS_TOOLS "/lib"
 #define WINDOWS_MSVCRT "msvcrt.lib"
 #define WINDOWS_STATIC_CRT "libcmt.lib"
 
@@ -667,22 +671,41 @@ static void windows_output(struct link_command *c, const struct link_inputs *in)
     add(c, text_cstr(pdb));
 }
 
-/* The start of an lld-link command: the program, no banner, and the
-   environment left unread.
+/* The start of an lld-link command: the program, no banner, and nothing
+   of the machine.
    DESIGN: lld-link reads the library directories of LIB, as link.exe
-   does, unless /lldignoreenv is given. A library the sysroot lacks would
-   then come from the MSVC environment of the machine without a word, and
-   the program would depend on what the package never held. Every lld-link
-   command ignores the environment, so a missing library is missing. Eddie
-   decided this on 2026-09-27 under "Binary distribution" in
-   docs/decisions.md. The platform linker, link.exe, keeps its own rules. */
-static void lld_link_start(struct link_command *c, const char *linker)
+   does, unless /lldignoreenv is given. On a Windows host it also finds
+   the Visual Studio and the Windows SDK the machine installed, through
+   the setup configuration and the registry, and adds their library
+   directories even under /lldignoreenv. The Windows VM showed ucrt.lib
+   come from Windows Kits with LIB unset. A library the sysroot lacks
+   would then come from the machine without a word, and the program would
+   depend on what the package never held. /vctoolsdir and /winsdkdir name
+   the two trees of the sysroot as that toolchain, which ends the
+   detection, and the directories lld-link derives from them, lib/x64 and
+   Lib/<version>/ucrt/x64, do not exist in a sysroot that names its
+   architectures x86_64 and aarch64. So every lld-link command takes the
+   sysroot alone, and a missing library is missing. Eddie decided the rule
+   on 2026-09-27 under "Binary distribution" in docs/decisions.md. The
+   platform linker, link.exe, keeps its own rules. */
+static void lld_link_start(struct link_command *c, const char *linker,
+                           const struct link_inputs *in)
 {
+    struct text *tools;
+    struct text *sdk;
+
     add(c, linker);
     add(c, "/NOLOGO");
-    if (strcmp(linker, platform_linkers[OS_WINDOWS]) != 0) {
-        add(c, "/lldignoreenv");
+    if (in->linker != LINKER_LLD) {
+        return;
     }
+    tools = next(c);
+    sdk = next(c);
+    text_appendf(tools, "/vctoolsdir:%s/%s", in->sysroot, SYSROOT_WINDOWS_TOOLS);
+    text_appendf(sdk, "/winsdkdir:%s/%s", in->sysroot, SYSROOT_WINDOWS_SDK);
+    add(c, "/lldignoreenv");
+    add(c, text_cstr(tools));
+    add(c, text_cstr(sdk));
 }
 
 /* The library directories of lld-link: the CRT and the SDK that xwin
@@ -690,8 +713,9 @@ static void lld_link_start(struct link_command *c, const char *linker)
 static void windows_libpaths(struct link_command *c, enum target t,
                              const struct link_inputs *in)
 {
-    static const char *const dirs[] = {SYSROOT_WINDOWS_CRT, "sdk/lib/um",
-                                       "sdk/lib/ucrt"};
+    static const char *const dirs[] = {SYSROOT_WINDOWS_CRT,
+                                       SYSROOT_WINDOWS_SDK "/lib/um",
+                                       SYSROOT_WINDOWS_SDK "/lib/ucrt"};
     const char *arch = windows_arch(t);
     size_t i;
 
@@ -782,7 +806,7 @@ static void windows(struct link_command *c, enum target t,
     struct text *library = next(c);
 
     runtime_library(library, in->runtime, t, in->cpu, false, in->lto);
-    lld_link_start(c, linker);
+    lld_link_start(c, linker, in);
     windows_debug(c, in);
     drop_unused(c, t, in);
     add(c, "/SUBSYSTEM:CONSOLE");
@@ -978,7 +1002,7 @@ static void windows_shared(struct link_command *c, enum target t,
     struct text *def = next(c);
 
     text_appendf(def, "/DEF:%s", s->def_file != NULL ? s->def_file : "");
-    lld_link_start(c, linker);
+    lld_link_start(c, linker, in);
     windows_debug(c, in);
     drop_unused(c, t, in);
     add(c, "/DLL");
