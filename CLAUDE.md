@@ -322,10 +322,10 @@ the same list.
     its Visual Studio and Windows SDK, and no message names
     `tools/get-sysroot.cmake`. `own_tools` and `package_keys` check
     it. `docs/reports/2026-10-09-dist-own-tools.md` reports it.
-29. The two glibc sysroots, with their X11 and OpenGL packages and the glibc runtime
-    of both Linux targets, into every package. Today no package holds them. A program
-    that reaches `link linux`, raylib, miniaudio or a plugin then links only where a
-    user installed them.
+29. Done. The two glibc sysroots, with their X11 and OpenGL packages and the glibc
+    runtime of both Linux targets, travel in every package. A program of `link
+    linux`, raylib or a plugin host then links for Linux from any host.
+    `docs/reports/2026-10-09-dist-glibc.md` reports it.
 30. The source record of every copyleft part. `licenses/` names the exact upstream
     source packages and versions of glibc, the kernel headers and every other
     copyleft component beside their licence texts. Today it holds the licence texts

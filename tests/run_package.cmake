@@ -107,6 +107,26 @@ set(expected anti/tools/zig-stubs-pin anti/bin/antic${suffix}
 foreach(tool IN LISTS tools)
     list(APPEND expected "anti/bin/${tool}${suffix}")
 endforeach()
+# DESIGN: every package carries the two glibc sysroots of the runtime
+# archive as they are, with their X11 and OpenGL development files, and
+# the glibc runtime of both Linux targets, which Eddie decided on
+# 2026-09-27 under "Binary distribution" in docs/decisions.md.
+foreach(cpu x86_64 arm64)
+    set(multiarch x86_64-linux-gnu)
+    set(level v1)
+    if(cpu STREQUAL "arm64")
+        set(multiarch aarch64-linux-gnu)
+        set(level armv8.0)
+    endif()
+    set(glibc "anti/sysroot/linux-${cpu}-glibc")
+    list(APPEND expected "${glibc}/lib/${multiarch}/libc.so.6"
+         "${glibc}/usr/lib/${multiarch}/Scrt1.o"
+         "${glibc}/usr/lib/${multiarch}/libX11.so"
+         "${glibc}/usr/lib/${multiarch}/libGL.so"
+         "${glibc}/usr/include/X11/Xlib.h" "${glibc}/usr/include/GL/gl.h"
+         "anti/lib/linux-${cpu}-glibc/${level}/libanti_rt.a"
+         "anti/lib/linux-${cpu}-glibc/libunwind.a")
+endforeach()
 foreach(entry IN LISTS expected)
     if(NOT entries MATCHES "(^|\n)${entry}\n")
         message(FATAL_ERROR "${archive} lacks ${entry}")
@@ -271,6 +291,75 @@ foreach(target IN LISTS targets)
         message(FATAL_ERROR "the package alone, with an empty PATH and no LIB, "
                             "links no program for ${target}: antic ended with "
                             "${status}\n${out}${err}")
+    endif()
+endforeach()
+
+# DESIGN: the package alone links a Linux program against glibc, from any
+# host, which the step glibc of docs/work-order-distribution.md built. A
+# program of `link linux`, tests/anti-build/window, builds with anti build.
+# A raylib program imports the binding that the packed anti bind writes,
+# compiled into a library file, and links libraylib.a of the package with
+# the Linux libraries the binding names. Both name libX11 and libGL of the
+# glibc sysroot. A Linux host runs the two programs of its own target. No
+# display serves them, so the raylib program asks for a mouse button, which
+# reads the state of rcore and opens no window.
+file(COPY "${ROOT}/tests/anti-build/window" DESTINATION "${WORK}/run")
+set(game_dir "${WORK}/run/game")
+file(MAKE_DIRECTORY "${game_dir}/lib/game")
+run_alone("anti bind --module game.raylib" "${WORK}/run" "${bin}/anti${suffix}"
+          bind "${ROOT}/tests/bind/raylib_api.json" --module game.raylib
+          -o "${game_dir}/src/game")
+run_alone("antic -c of the raylib binding" "${game_dir}" "${bin}/antic${suffix}"
+          -c -I "${game_dir}/src" -o "${game_dir}/lib/game/raylib.antl"
+          "${game_dir}/src/game/raylib.anti")
+file(WRITE "${game_dir}/game.anti"
+     "import anti.io;\nimport game.raylib;\n\nfn main() -> int\n{\n"
+     "    if !raylib.IsMouseButtonPressed(0) {\n"
+     "        io.println(\"no click\");\n    }\n    return 0;\n}\n")
+file(STRINGS "${game_dir}/src/game/raylib.anti" raylib_linux
+     REGEX "^link linux \"[^\"]+\";$")
+set(linux_libs)
+foreach(line IN LISTS raylib_linux)
+    string(REGEX REPLACE "^link linux \"([^\"]+)\";$" "\\1" name "${line}")
+    list(APPEND linux_libs --linux-lib "${name}")
+endforeach()
+if(NOT linux_libs MATCHES "X11" OR NOT linux_libs MATCHES "GL")
+    message(FATAL_ERROR "the binding of raylib names no X11 and GL: "
+                        "${raylib_linux}")
+endif()
+foreach(target linux-x86_64 linux-arm64)
+    run_alone("anti build --target ${target} of a program of link linux"
+              "${WORK}/run/window" "${bin}/anti${suffix}" build
+              --target "${target}")
+    set(window "${WORK}/run/window/dist/${target}/dev/window")
+    set(game "${WORK}/run/game-${target}")
+    run_alone("a raylib program for ${target}" "${game_dir}"
+              "${bin}/antic${suffix}" --target "${target}"
+              -I "${game_dir}/lib" ${linux_libs} -o "${game}"
+              "${game_dir}/game.anti"
+              "${WORK}/unpacked/anti/lib/${target}/libraylib.a")
+    foreach(exe "${window}" "${game}")
+        run_alone("llvm-readobj of ${exe}" "${WORK}/run"
+                  "${bin}/llvm-readobj${suffix}" --needed-libs
+                  --program-headers "${exe}")
+        foreach(needed PT_INTERP libX11\\.so\\.6 libGL\\.so\\.1 libc\\.so\\.6)
+            if(NOT alone_out MATCHES "${needed}")
+                message(FATAL_ERROR "${exe} of the package lacks ${needed}\n"
+                                    "${alone_out}")
+            endif()
+        endforeach()
+    endforeach()
+    if(target STREQUAL HOST)
+        run_alone("the program of link linux" "${WORK}/run" "${window}")
+        if(NOT alone_out STREQUAL "no display\nno context\n")
+            message(FATAL_ERROR "the program of link linux of the package "
+                                "prints '${alone_out}'")
+        endif()
+        run_alone("the raylib program" "${WORK}/run" "${game}")
+        if(NOT alone_out MATCHES "no click\n$")
+            message(FATAL_ERROR "the raylib program of the package prints "
+                                "'${alone_out}'")
+        endif()
     endif()
 endforeach()
 file(COPY "${ROOT}/tests/anti-build/app" DESTINATION "${WORK}/run")

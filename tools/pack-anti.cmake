@@ -19,8 +19,10 @@
 #               copied as bin/ of the runtime archive holds them
 #   lib/<t>/<l>/ the runtime library of all six targets, per processor level
 #   std/        the standard library
-#   sysroot/    the two Linux sysroots and the two macOS sysroots of Zig's
-#               stubs, which are ours to redistribute
+#   lib/<t>-glibc/ the runtime of both Linux targets against glibc
+#   sysroot/    the two Linux sysroots of musl, their two -glibc twins with
+#               the X11 and OpenGL packages, and the two macOS sysroots of
+#               Zig's stubs, which are ours to redistribute
 #   tools/      the scripts that install the sysroot of the host
 #   licenses/   one file per component
 #   VERSION     the version of tools/version
@@ -369,6 +371,18 @@ foreach(host IN LISTS HOSTS)
     file(COPY "${RUNTIME}/licenses/" DESTINATION "${tree}/licenses")
     foreach(target linux-x86_64 linux-arm64)
         file(COPY "${SYSROOT}/${target}" DESTINATION "${tree}/sysroot")
+    endforeach()
+    # DESIGN: every package holds the two glibc sysroots with their X11 and
+    # OpenGL development files, and the glibc runtime of both Linux
+    # targets, so a program of `link linux`, raylib, miniaudio or a plugin
+    # host links for Linux from any host. Eddie decided this on 2026-09-27
+    # under "Binary distribution" in docs/decisions.md. Both come from the
+    # runtime archive, copied as it holds them, as the step glibc of
+    # docs/work-order-distribution.md says.
+    foreach(target linux-x86_64-glibc linux-arm64-glibc)
+        file(COPY "${RUNTIME}/sysroot/${target}" DESTINATION "${tree}/sysroot")
+        file(COPY "${RUNTIME}/lib/${target}" DESTINATION "${tree}/lib"
+             REGEX "/bitcode/thin$" EXCLUDE)
     endforeach()
     # The stubs and headers of Zig go in, and never the SDK of Apple in sdk/.
     foreach(target macos-arm64 macos-x86_64)

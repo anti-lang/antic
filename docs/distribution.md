@@ -219,7 +219,11 @@ another host it takes them from a Mac the user owns, with `anti sdk export` ther
 package carries them. The Windows targets link against the import libraries of the
 mingw-w64 project and `ucrtbase.dll`, never against Microsoft's CRT and SDK, which may
 not be redistributed. Every package carries those import libraries, and the two glibc
-sysroots with their X11 and OpenGL packages.
+sysroots with their X11 and OpenGL packages. The glibc sysroots went in with the step
+`glibc` of `docs/work-order-distribution.md`, copied as the runtime archive holds them,
+with the runtime of both Linux targets against glibc in `lib/linux-<cpu>-glibc/`. A
+program of `link linux`, a raylib program and a plugin host then link for Linux from any
+host. The two add about 120 MB to a package before compression and 17 MB after xz.
 
 ### Publishing
 
