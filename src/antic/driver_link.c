@@ -53,6 +53,39 @@ static bool find_crt_dir(enum target t, struct text *out)
     return false;
 }
 
+/* The tool of the runtime archive, bin/<name> with the suffix of the
+   host, or NULL with a message when the archive lacks it. The text holds
+   the path, so it lives until the caller frees it.
+   DESIGN: antic takes opt, llc, llvm-ar and the lld programs from bin/
+   of the archive, which is bin/ of the package beside antic itself, and
+   from nowhere else. A tool the archive lacks is refused by its path and
+   never taken from the search path, so the tools that build a program are
+   the pinned ones whatever the machine carries. Eddie decided this on
+   2026-09-27 under "Binary distribution" in docs/decisions.md. */
+const char *driver_archive_tool(const struct options *o, const char *name,
+                                struct text *path)
+{
+    enum target host;
+    const char *suffix =
+        target_host(&host) ? target_info(host)->executable_suffix : "";
+
+    if (o->runtime == NULL) {
+        fprintf(stderr, "antic: no runtime archive holds %s. The package "
+                        "holds it in bin/ beside antic.\n",
+                name);
+        return NULL;
+    }
+    text_appendf(path, "%s/%s/%s%s", o->runtime, RUNTIME_BIN_DIR, name,
+                 suffix);
+    if (!driver_file_exists(text_cstr(path))) {
+        fprintf(stderr, "antic: %s is missing. The package holds it in bin/ "
+                        "beside antic.\n",
+                text_cstr(path));
+        return NULL;
+    }
+    return text_cstr(path);
+}
+
 void driver_link_facts_free(struct link_facts *f)
 {
     text_free(&f->sdk_path);
@@ -64,9 +97,10 @@ void driver_link_facts_free(struct link_facts *f)
 }
 
 /* DESIGN: a program that names a framework links against Apple's SDK,
-   which Anti never fetches. sdk/ of the sysroot holds its stubs, from
-   tools/get-sysroot.cmake with APPLE_SDK or from anti sdk import. A Mac
-   without them takes the SDK of its Command Line Tools. */
+   which Anti never fetches and no package holds. sdk/ of the sysroot
+   holds its stubs where anti sdk import put them, or the build with
+   APPLE_SDK. A Mac without them takes the SDK of its Command Line Tools,
+   as "Binary distribution" in docs/decisions.md says. */
 /* Set f->sdk_path and f->sdk_version to Apple's SDK, which a program that
    names a framework links against, or explain where it comes from. */
 static bool apple_sdk(const struct options *o, struct link_facts *f)
@@ -103,10 +137,10 @@ static bool apple_sdk(const struct options *o, struct link_facts *f)
     for (i = 0; i < o->framework_count; i++) {
         fprintf(stderr, "%s %s", i > 0 ? "," : "", o->frameworks[i]);
     }
-    fprintf(stderr, " link for %s against Apple's SDK, which %s lacks. A Mac "
-                    "keeps the SDK in " APPLE_CLT_SDKS ". Pass a copy of it "
-                    "as APPLE_SDK to tools/get-sysroot.cmake, or run anti sdk "
-                    "export on that Mac and anti sdk import here.\n",
+    fprintf(stderr, " link for %s against Apple's SDK, which no package holds "
+                    "and %s lacks. A Mac keeps the SDK in " APPLE_CLT_SDKS
+                    ". Run anti sdk export on a Mac and anti sdk import "
+                    "here.\n",
             target_name(o->target), text_cstr(&f->sdk_path));
     return false;
 }
@@ -121,7 +155,6 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
     enum target t = o->target;
     enum target_os os = target_info(t)->os;
     struct text marker = {0};
-    enum target host;
     bool present;
 
     in->linker = o->linker;
@@ -143,16 +176,15 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
         }
         return true;
     }
-    text_appendf(&f->lld_dir, "%s/%s", o->runtime, RUNTIME_BIN_DIR);
-    /* The flavour of lld is a program of the host, which ends in .exe on
-       Windows. The command line may leave the suffix out. */
-    text_appendf(&marker, "%s/%s%s", text_cstr(&f->lld_dir),
-                 link_lld_flavour(t),
-                 target_host(&host) ? target_info(host)->executable_suffix : "");
-    in->lld_dir = driver_file_exists(text_cstr(&marker))
-                      ? text_cstr(&f->lld_dir)
-                      : NULL;
+    /* The flavour of lld stands in bin/ of the archive, and a link without
+       it is refused there rather than after the compile. */
+    if (driver_archive_tool(o, link_lld_flavour(t), &marker) == NULL) {
+        text_free(&marker);
+        return false;
+    }
     text_free(&marker);
+    text_appendf(&f->lld_dir, "%s/%s", o->runtime, RUNTIME_BIN_DIR);
+    in->lld_dir = text_cstr(&f->lld_dir);
     text_appendf(&f->sysroot, "%s/%s/", o->runtime, RUNTIME_SYSROOT_DIR);
     link_target_dir(&f->sysroot, t, in->glibc);
     text_appendf(&marker, "%s/", text_cstr(&f->sysroot));
@@ -161,15 +193,19 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
               (os != OS_MACOS ||
                driver_read_bytes(text_cstr(&marker), &f->sdk_version));
     text_free(&marker);
-    /* DESIGN: without a Windows sysroot lld-link reads the library
-       directories of LIB, which an MSVC environment sets. */
-    if (!present && os != OS_WINDOWS) {
-        fprintf(stderr, "antic: linking for %s with lld needs the sysroot "
-                        "%s, which tools/get-sysroot.cmake installs\n",
+    /* DESIGN: every target links against the sysroot of the archive, the
+       Windows targets included. A Windows link without one once read the
+       library directories of LIB, which an MSVC environment sets, and is
+       refused now: the package holds what a link needs, and a library of
+       the machine never stands in. Eddie decided this on 2026-09-27 under
+       "Binary distribution" in docs/decisions.md. */
+    if (!present) {
+        fprintf(stderr, "antic: linking for %s needs the sysroot %s of the "
+                        "package\n",
                 target_name(t), text_cstr(&f->sysroot));
         return false;
     }
-    in->sysroot = present ? text_cstr(&f->sysroot) : NULL;
+    in->sysroot = text_cstr(&f->sysroot);
     if (os == OS_MACOS && in->framework_count > 0) {
         if (!apple_sdk(o, f)) {
             return false;

@@ -203,9 +203,10 @@ rules, and the tests named there pin each fact.
   with its input and its own path absolute. llc records the name of its
   output in the CodeView of a COFF object. lld-link carries that name into
   the PDB, which must hold no path of the build.
-- `archive_tool` finds opt and llc in `bin/` of the runtime archive, then on
-  the search path. `--opt` and `--llc` name others. A failed tool prints its
-  own message, then `antic: opt failed` or `antic: llc failed`.
+- `driver_archive_tool` finds opt and llc in `bin/` of the runtime archive
+  and nowhere else, and refuses a missing one by its path before it runs.
+  `--opt` and `--llc` name others. A failed tool prints its own message,
+  then `antic: opt failed` or `antic: llc failed`.
 - `<output>.ll` and `<output>.bc` are deleted as soon as llc ends, unless
   `--keep-llvm` keeps them. `--llvm-mc` is accepted and runs nothing.
 

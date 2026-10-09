@@ -23,7 +23,7 @@ struct link_inputs {
     enum linker linker;
     enum cpu_level cpu;         /* the level of the runtime to link */
     const char *sysroot;        /* lld: <runtime>/sysroot/<target> */
-    const char *lld_dir;        /* lld: its directory, or NULL for PATH */
+    const char *lld_dir;        /* lld: bin/ of the runtime archive */
     const char *const *frameworks; /* macOS: -framework */
     size_t framework_count;
     /* DESIGN: -g keeps the debug sections. Without it every link strips

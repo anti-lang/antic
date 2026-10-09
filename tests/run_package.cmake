@@ -3,9 +3,11 @@
 # The LLVM tools of the host travel in bin/ beside antic and anti, with
 # llvm-version, and tools/ holds no pin of them. The package alone then
 # prints its version and builds a program, with nothing else on the PATH.
-# Both macOS sysroots of Zig's stubs go in, and the stubs of Apple's SDK
-# in sdk/ stay out. A package of a build with the compiler of the machine
-# is refused. Every licence of the runtime tree goes in.
+# With an empty PATH and no LIB it links a program for every target that
+# names no framework. Both macOS sysroots of Zig's stubs go in, and the
+# stubs of Apple's SDK in sdk/ stay out. A package of a build with the
+# compiler of the machine is refused. Every licence of the runtime tree
+# goes in.
 #
 #   cmake -DROOT=<repository> -DANTIC=<antic> -DANTI=<anti> -DHOST=<host>
 #         -DSYSROOT=<dir> -DRUNTIME=<dir> -DCLANG=<clang> -DLLVM_BIN=<dir>
@@ -182,9 +184,7 @@ endif()
 # package and nothing else, so no tool of LLVM or of Anti comes from
 # anywhere else, and no --runtime names the archive: antic and anti find
 # it above their own bin/, and opt, llc and lld in that bin/, by the one
-# rule of runtime_archive in src/antic/userdirs.c. A Windows link takes
-# its libraries from LIB until the step mingw of
-# docs/work-order-distribution.md puts a Windows sysroot into the package.
+# rule of runtime_archive in src/antic/userdirs.c.
 set(bin "${WORK}/unpacked/anti/bin")
 function(run_alone what dir)
     execute_process(
@@ -233,6 +233,48 @@ if(NOT alone_out MATCHES "hello")
     message(FATAL_ERROR "the hello program of the package prints "
                         "'${alone_out}'")
 endif()
+
+# DESIGN: the package alone links a program for every target that names
+# no framework, with an empty PATH and no LIB, which Eddie decided on
+# 2026-09-27 under "Binary distribution" in docs/decisions.md and the
+# step own-tools of docs/work-order-distribution.md built. The package
+# holds no Windows sysroot until the step mingw puts the trees of
+# mingw-w64 into it, so the Windows sysroots of the runtime archive stand
+# in at the place the package will hold them, as links the test removes
+# before the tree.
+set(links)
+set(targets linux-x86_64 linux-arm64 macos-arm64 macos-x86_64)
+foreach(target windows-x86_64 windows-arm64)
+    if(EXISTS "${SYSROOT}/${target}")
+        file(CREATE_LINK "${SYSROOT}/${target}"
+             "${WORK}/unpacked/anti/sysroot/${target}" SYMBOLIC)
+        list(APPEND links "${WORK}/unpacked/anti/sysroot/${target}")
+        list(APPEND targets "${target}")
+    else()
+        message("SKIP the link for ${target}: ${SYSROOT}/${target} is not here")
+    endif()
+endforeach()
+foreach(target IN LISTS targets)
+    set(exe "${WORK}/run/return42-${target}")
+    if(target MATCHES "^windows-")
+        string(APPEND exe ".exe")
+    endif()
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env "PATH=" --unset=LIB
+                "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
+                "${bin}/antic${suffix}" --target "${target}" -o "${exe}"
+                "${ROOT}/tests/programs/return42.anti"
+        WORKING_DIRECTORY "${WORK}/run" RESULT_VARIABLE status
+        OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
+    if(NOT status EQUAL 0 OR NOT EXISTS "${exe}")
+        message(FATAL_ERROR "the package alone, with an empty PATH and no LIB, "
+                            "links no program for ${target}: antic ended with "
+                            "${status}\n${out}${err}")
+    endif()
+endforeach()
+foreach(link IN LISTS links)
+    file(REMOVE "${link}")
+endforeach()
 
 file(COPY "${ROOT}/tests/anti-build/app" DESTINATION "${WORK}/run")
 set(project "${WORK}/run/app")

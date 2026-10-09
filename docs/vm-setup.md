@@ -153,7 +153,7 @@ One command installs the sysroots of all six targets. The Windows ones come from
 cmake -DDEST=$env:LOCALAPPDATA\anti-vm\sysroot -DLLVM_BIN=$env:LOCALAPPDATA\anti-vm\toolchain\bin -DCLANG_DIR=$env:LOCALAPPDATA\anti-vm\clang -DTARGETS="linux-x86_64;linux-arm64;linux-x86_64-glibc;linux-arm64-glibc;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" -P $env:USERPROFILE\antic-check\tools\get-sysroot.cmake
 ```
 
-Create `%USERPROFILE%\test.cmd` with these lines. `vcvarsall.bat arm64` sets the MSVC environment, including the variable `LIB` that lld-link reads, and puts the Ninja of Visual Studio on the path. The pinned clang needs Ninja, because the Visual Studio generator takes the compiler of its own toolset.
+Create `%USERPROFILE%\test.cmd` with these lines. `vcvarsall.bat arm64` sets the MSVC environment and puts the Ninja of Visual Studio on the path. antic runs lld-link with `/lldignoreenv`, so the variable `LIB` it sets reaches no link. The pinned clang needs Ninja, because the Visual Studio generator takes the compiler of its own toolset.
 
 ```bat
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" arm64
@@ -217,7 +217,7 @@ ssh anti-windows %USERPROFILE%\test.cmd
 
 | Untested item | Tests that run it |
 |---|---|
-| windows-arm64 programs, which the Mac only links | `program_*`, `std_*`, linked with lld-link against `LIB` |
+| windows-arm64 programs, which the Mac only links | `program_*`, `std_*`, linked with lld-link against the sysroot that `tools/get-sysroot.cmake` laid out over the Build Tools |
 | windows-x86_64 programs under the x64 emulation | `program_*_windows-x86_64`, `program_abi_*_windows-x86_64`, `windows_addresses`, `distinct_addresses_windows-x86_64` |
 | `--memory-checks` for windows-x86_64 | `memory_checks_windows-x86_64`, `memory_checks_list_windows-x86_64`, `std_builder_room_memory_checks_windows-x86_64`. Each links its program and reports itself skipped, since the runtime of AddressSanitizer cannot intercept the heap functions under the emulation |
 | The Windows branch of `src/rt/start.c`, compiled with MSVC | every `program_*` test, through `anti_rt.lib` |

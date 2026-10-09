@@ -199,8 +199,8 @@ void link_sysroot_marker(struct text *out, enum target t, bool glibc)
     }
 }
 
-/* The program of the linker of target t: the flavour of lld in its
-   directory, or the platform linker. */
+/* The program of the linker of target t: the flavour of lld in bin/ of
+   the runtime archive, or the platform linker. */
 static const char *program(struct link_command *c, const struct link_inputs *in,
                            enum target t)
 {
@@ -209,9 +209,6 @@ static const char *program(struct link_command *c, const struct link_inputs *in,
 
     if (in->linker == LINKER_PLATFORM) {
         return platform_linkers[os];
-    }
-    if (in->lld_dir == NULL) {
-        return lld_flavours[os];
     }
     path = next(c);
     text_appendf(path, "%s/%s", in->lld_dir, lld_flavours[os]);
@@ -670,9 +667,26 @@ static void windows_output(struct link_command *c, const struct link_inputs *in)
     add(c, text_cstr(pdb));
 }
 
+/* The start of an lld-link command: the program, no banner, and the
+   environment left unread.
+   DESIGN: lld-link reads the library directories of LIB, as link.exe
+   does, unless /lldignoreenv is given. A library the sysroot lacks would
+   then come from the MSVC environment of the machine without a word, and
+   the program would depend on what the package never held. Every lld-link
+   command ignores the environment, so a missing library is missing. Eddie
+   decided this on 2026-09-27 under "Binary distribution" in
+   docs/decisions.md. The platform linker, link.exe, keeps its own rules. */
+static void lld_link_start(struct link_command *c, const char *linker)
+{
+    add(c, linker);
+    add(c, "/NOLOGO");
+    if (strcmp(linker, platform_linkers[OS_WINDOWS]) != 0) {
+        add(c, "/lldignoreenv");
+    }
+}
+
 /* The library directories of lld-link: the CRT and the SDK that xwin
-   writes into the sysroot. Without a sysroot lld-link reads LIB, as
-   link.exe does. */
+   writes into the sysroot. The platform linker takes its own. */
 static void windows_libpaths(struct link_command *c, enum target t,
                              const struct link_inputs *in)
 {
@@ -681,7 +695,7 @@ static void windows_libpaths(struct link_command *c, enum target t,
     const char *arch = windows_arch(t);
     size_t i;
 
-    if (in->linker != LINKER_LLD || in->sysroot == NULL) {
+    if (in->linker != LINKER_LLD) {
         return;
     }
     for (i = 0; i < 3; i++) {
@@ -768,8 +782,7 @@ static void windows(struct link_command *c, enum target t,
     struct text *library = next(c);
 
     runtime_library(library, in->runtime, t, in->cpu, false, in->lto);
-    add(c, linker);
-    add(c, "/NOLOGO");
+    lld_link_start(c, linker);
     windows_debug(c, in);
     drop_unused(c, t, in);
     add(c, "/SUBSYSTEM:CONSOLE");
@@ -965,8 +978,7 @@ static void windows_shared(struct link_command *c, enum target t,
     struct text *def = next(c);
 
     text_appendf(def, "/DEF:%s", s->def_file != NULL ? s->def_file : "");
-    add(c, linker);
-    add(c, "/NOLOGO");
+    lld_link_start(c, linker);
     windows_debug(c, in);
     drop_unused(c, t, in);
     add(c, "/DLL");

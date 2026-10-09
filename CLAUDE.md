@@ -315,10 +315,12 @@ the same list.
     `build/deps/llvm-tools/<host>`, which `tools/get-llvm.cmake -DHOST=<host>`
     lays out and step 1 of `./r` fills.
     `docs/reports/2026-10-09-dist-tools.md` reports it.
-28. antic and anti take their tools from the package alone. Today antic falls back
-    on an lld of the search path, and a Windows link without a sysroot reads `LIB`
-    of an MSVC environment. Two messages of antic name `tools/get-sysroot.cmake`,
-    which a user has no use for.
+28. Done. antic and anti take their tools, their libraries and their
+    sysroots from the package alone. A tool that `bin/` of the archive
+    lacks is refused by its path, a Windows link without its sysroot is
+    refused, every lld-link runs with `/lldignoreenv`, and no message
+    names `tools/get-sysroot.cmake`. `own_tools` and `package_keys` check
+    it. `docs/reports/2026-10-09-dist-own-tools.md` reports it.
 29. The two glibc sysroots, with their X11 and OpenGL packages and the glibc runtime
     of both Linux targets, into every package. Today no package holds them. A program
     that reaches `link linux`, raylib, miniaudio or a plugin then links only where a

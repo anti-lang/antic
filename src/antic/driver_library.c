@@ -74,20 +74,26 @@ static bool bundle(const struct options *o, const struct extras *extras,
                    const char *object, const char *base, struct arena *arena,
                    struct paths *members)
 {
-    const char *llvm_ar = o->llvm_ar != NULL ? o->llvm_ar : "llvm-ar";
     bool coff = target_info(o->target)->format == FORMAT_COFF;
     struct text library = {0};
     struct text listing = {0};
     struct text dir = {0};
     struct text output = {0};
     struct text joined = {0};
+    struct text found_ar = {0};
     struct paths objects = {0};
+    const char *llvm_ar;
     const char *p;
     bool ok;
 
     if (!o->bundle_runtime) {
         driver_add_path(members, object);
         return true;
+    }
+    llvm_ar = o->llvm_ar != NULL ? o->llvm_ar
+                                 : driver_archive_tool(o, "llvm-ar", &found_ar);
+    if (llvm_ar == NULL) {
+        return false;
     }
     link_runtime_library(&library, o->runtime, o->target, o->cpu);
     text_appendf(&dir, "%s.rt", base);
@@ -163,6 +169,7 @@ static bool bundle(const struct options *o, const struct extras *extras,
     text_free(&dir);
     text_free(&output);
     text_free(&joined);
+    text_free(&found_ar);
     return ok;
 }
 
@@ -226,18 +233,22 @@ bool driver_build_c_library(const struct options *o, const char *object,
     if (ok && o->lib == LIB_STATIC) {
         struct arena arena = {0};
         struct text package = {0};
+        struct text found_ar = {0};
         struct paths members = {0};
         struct link_command c;
+        const char *llvm_ar;
         text_appendf(&package, "%s%s%s", text_cstr(&dir), name, PACKAGE_SUFFIX);
-        ok = assemble_package(o, &extras->package, &package) &&
+        llvm_ar = o->llvm_ar != NULL
+                      ? o->llvm_ar
+                      : driver_archive_tool(o, "llvm-ar", &found_ar);
+        ok = llvm_ar != NULL &&
+             assemble_package(o, &extras->package, &package) &&
              bundle(o, extras, object, base, &arena, &members);
         if (ok) {
             driver_add_path(&members, text_cstr(&package));
             platform_remove(text_cstr(&path));
-            link_archive_command(&c, o->target,
-                                 o->llvm_ar != NULL ? o->llvm_ar : "llvm-ar",
-                                 text_cstr(&path), members.items,
-                                 members.count);
+            link_archive_command(&c, o->target, llvm_ar, text_cstr(&path),
+                                 members.items, members.count);
             ok = run_command(&c, "llvm-ar");
             link_command_free(&c);
         }
@@ -251,6 +262,7 @@ bool driver_build_c_library(const struct options *o, const char *object,
         free((void *)members.items);
         arena_free(&arena);
         text_free(&package);
+        text_free(&found_ar);
     } else if (ok) {
         struct link_inputs in;
         struct link_command c;

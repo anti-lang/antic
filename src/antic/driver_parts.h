@@ -100,13 +100,18 @@ bool driver_file_exists(const char *path);
 /* Write text, the LLVM IR of the back end, to <base>.ll, and run opt and
    llc of llvm_run.c on it into output: the object, or the assembly under
    -S. The tools come from --opt and --llc, or from bin/ of the runtime
-   archive. <base>.ll and <base>.bc are deleted afterwards unless
-   --keep-llvm. */
+   archive, and nowhere else. <base>.ll and <base>.bc are deleted
+   afterwards unless --keep-llvm. */
 bool driver_compile_llvm(const struct options *o, const struct text *text,
                          const char *base, const char *output);
 
 /* driver_link.c */
 
+/* The tool name of bin/ of the runtime archive, with the suffix of the
+   host, or NULL with a message when the archive lacks it. path holds the
+   text. */
+const char *driver_archive_tool(const struct options *o, const char *name,
+                                struct text *path);
 void driver_link_facts_free(struct link_facts *f);
 /* Whether the program links the C library of musl, and with it mimalloc:
    a program for Linux that lld links outside the glibc mode. */

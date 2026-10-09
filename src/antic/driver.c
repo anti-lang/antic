@@ -1643,30 +1643,6 @@ done:
     return status;
 }
 
-/* The tool of the runtime archive, or its bare name for the search path.
-   DESIGN: an installed antic finds opt, llc and llvm-ar beside itself in
-   bin/, the rule that already holds for the lld programs. The text holds
-   the path, so it lives until the caller frees it. */
-static const char *archive_tool(const struct options *o, const char *name,
-                                struct text *path)
-{
-    enum target host;
-
-    if (o->runtime == NULL) {
-        return name;
-    }
-
-    if (!target_host(&host)) {
-        return name;
-    }
-    text_appendf(path, "%s/%s/%s%s", o->runtime, RUNTIME_BIN_DIR, name,
-                 target_info(host)->executable_suffix);
-    if (driver_file_exists(text_cstr(path))) {
-        return text_cstr(path);
-    }
-    return name;
-}
-
 /* Remove the file at path when there is one. */
 static void remove_file(const char *path)
 {
@@ -1687,15 +1663,18 @@ bool driver_compile_llvm(const struct options *o, const struct text *text,
 
     text_appendf(&text_path, "%s%s", base, LLVM_TEXT_SUFFIX);
     text_appendf(&bitcode_path, "%s%s", base, LLVM_BITCODE_SUFFIX);
-    r.opt = o->opt != NULL ? o->opt : archive_tool(o, "opt", &found_opt);
-    r.llc = o->llc != NULL ? o->llc : archive_tool(o, "llc", &found_llc);
+    r.opt = o->opt != NULL ? o->opt
+                           : driver_archive_tool(o, "opt", &found_opt);
+    r.llc = o->llc != NULL ? o->llc
+                           : driver_archive_tool(o, "llc", &found_llc);
     r.target = o->target;
     r.optimize = !o->dev;
     r.assembly = o->assembly_only;
     r.lto = o->lto;
     r.profile_generate = o->profile_generate;
     r.profile_use = o->profile_use;
-    ok = driver_write_file(text_cstr(&text_path), text) &&
+    ok = r.opt != NULL && r.llc != NULL &&
+         driver_write_file(text_cstr(&text_path), text) &&
          llvm_run(&r, text_cstr(&text_path), text_cstr(&bitcode_path),
                   output);
     /* DESIGN: --dump-llvm and --keep-llvm are the two ways to read the

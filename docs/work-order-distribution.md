@@ -211,7 +211,10 @@ platform` and `anti bind --clang`, which the "Binary distribution" entry on
 host tools keeps. A message that named `get-sysroot.cmake` names the
 package and `anti sdk import` instead. A test runs antic with an empty
 `PATH` and no `LIB` and links a program for every target that needs no
-framework. Done when the test passes on the Mac and both VMs.
+framework. The package holds no Windows sysroot until the step `mingw`, so
+the test stands in the Windows sysroots of the runtime archive at the place
+the package will hold them. Done when the test passes on the Mac and both
+VMs.
 
 `glibc`. The two glibc sysroots into every package. `tools/pack-anti.cmake`
 copies `sysroot/linux-x86_64-glibc` and `sysroot/linux-arm64-glibc` of the

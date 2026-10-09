@@ -35,7 +35,7 @@ Chapter 3 installs Anti with one command. That package is this archive with anti
 | `sysroot/linux-x86_64`, `sysroot/linux-arm64` | musl and the compiler-rt builtins | Ours to pass on, so a Linux program links with nothing else installed |
 | `licenses/` | One file per component | The obligations that travel with a shipped program |
 
-antic reads that directory without being told. Without `--runtime` it takes the directory above its own executable, so `~/.anti/bin/antic` finds `~/.anti/lib` beside it. It looks for opt, llc, llvm-ar and the lld programs in `bin/` of that archive before the search path. The tools that compile a program are then the pinned ones rather than whatever the machine carries.
+antic reads that directory without being told. Without `--runtime` it takes the directory above its own executable, so `~/.anti/bin/antic` finds `~/.anti/lib` beside it. It takes opt, llc, llvm-ar and the lld programs from `bin/` of that archive and from nowhere else, and refuses a missing one by its path. The tools that compile a program are then the pinned ones whatever the machine carries.
 
 The two sysroots that cannot travel are the subject of the next section.
 

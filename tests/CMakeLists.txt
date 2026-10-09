@@ -2226,6 +2226,15 @@ add_test(NAME native_pin_self
 add_test(NAME package_api
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package_api.cmake")
+# antic takes its tools, its libraries and its sysroots from the runtime
+# archive alone, and refuses what the archive lacks by its path rather
+# than taking it from the search path or from LIB.
+add_test(NAME own_tools
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DANTIC=$<TARGET_FILE:antic>" "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DOPT=${ANTIC_OPT}" "-DLLC=${ANTIC_LLC}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/own_tools"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_own_tools.cmake")
 add_test(NAME line_endings
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_line_endings.cmake")
