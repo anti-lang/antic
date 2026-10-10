@@ -381,6 +381,11 @@ the same list.
     --notice` and `--from-archive`. `anti build` writes `NOTICE.txt` from
     `anti.lock` and the imported bundled modules, as `--project --notice`
     writes it. `docs/reports/2026-10-10-dist-license-forms.md` reports it.
+38. Done. The release check of 0.2.0. The package of each host, packed
+    from the tree, installed on its machine from the staging area, and
+    the check of step 10 of `./r` run by hand with the network off on the
+    Mac and both VMs. `tools/version` holds 0.2.0 and `CHANGELOG.md` its
+    entry. `docs/reports/2026-10-10-dist-release-check.md` reports it.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
