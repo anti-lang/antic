@@ -33,6 +33,10 @@ struct extras {
     struct text name;
     struct text header;
     struct text package;
+    /* The symbol anti_rt_bundle_<package> that the library object of a
+       bundled Mach-O library refers to and its marker member defines.
+       Empty in every other build. */
+    struct text marker;
     struct text notice;
     struct text exports;
     /* The program can host a plugin, so the link exports its symbols.
@@ -143,6 +147,10 @@ bool driver_load_libraries(const struct paths *paths, const char *module,
 
 /* driver_library.c */
 
+/* Append the symbol of the marker of the bundled library of package:
+   RUNTIME_BUNDLE_MARKER, an underscore and the name, with an underscore
+   for each byte that is no letter and no digit. */
+void driver_bundle_marker(struct text *out, const char *package);
 bool driver_build_c_library(const struct options *o, const char *object,
                             const char *base, const struct extras *extras);
 

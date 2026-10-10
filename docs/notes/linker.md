@@ -64,3 +64,35 @@ tools can observe.
   the nine functions behind `fpclassify`, `isnan` and `signbit` of `math.h`, which the
   headers of mingw-w64 declare, its own library defines, and raylib, miniaudio and the
   C of the tests reach.
+
+## The Mach-O form of `--bundle-runtime`
+
+- A bundled runtime of a macOS target is the archive `lib<name>.a` itself. `bundle`
+  of `src/antic/driver_library.c` takes the members of `libanti_rt.a` out with
+  llvm-ar, as it does for ELF and COFF, and hands each to the archive instead of to
+  a join: the library object, `anti_rt_license_stub.o`, every runtime member except
+  `start.o` and `license.o`, the marker `<name>.bundle.o` and `<name>.package.o`.
+  No linker runs, so the build needs llvm-ar, opt and llc alone and no sysroot.
+  `own_tools` builds one with a search path that holds no `ld`.
+- The marker is an object antic compiles from two lines of LLVM text,
+  `llvm_emit_bundle_marker`. It defines `anti_rt_bundle` and
+  `anti_rt_bundle_<package>`, both hidden like every symbol of the runtime. Neither
+  is then an export of a program or a dylib that links the bundle. A hidden symbol
+  of Mach-O is still one definition per link.
+- The library object refers to `anti_rt_bundle_<package>` through the private
+  constant `@anti.bundle`, which `llvm.used` keeps, since no code reads the marker.
+  The reference is what loads the marker member: ld64 takes a member of an archive
+  only for a symbol the link lacks. A marker with the fixed name alone would load
+  once, from the first bundle, and a second bundle would link without a word.
+- ld64.lld reports `duplicate symbol: _anti_rt_bundle` with the two marker members,
+  `libgeo.a(geo.bundle.o)` and `libother.a(other.bundle.o)`. It reports
+  `anti_rt_registry` and the other tables of the pass over the whole program too,
+  which each library object of a bundle defines. No function of the runtime is a
+  duplicate, since the link takes each runtime member from the first archive. The
+  case `twice` of `tests/run_clib.cmake` reads the report of the marker.
+- A C program links the runtime members it reaches and not the whole runtime. The
+  program of `tests/clib/roundtrip.c` for macos-arm64 is 58,048 bytes against the
+  archive. Against the one object of Apple's `ld -r` it was 174,416 bytes.
+- Two members of one name are possible, a library `text` beside `text.o` of the
+  runtime. llvm-ar keeps both when one command names both, and ld64 finds a member
+  by its place in the archive and not by its name.

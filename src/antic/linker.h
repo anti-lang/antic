@@ -119,7 +119,7 @@ void link_archive_command(struct link_command *c, enum target t,
                           const char *const *members, size_t count);
 
 /* Build the command line that joins objects into one relocatable object
-   for a bundled runtime, with the linker of in. */
+   for a bundled runtime of an ELF target, with the linker of in. */
 void link_relocatable_command(struct link_command *c, enum target t,
                               const struct link_inputs *in, const char *output,
                               const char *const *objects, size_t count);

@@ -361,7 +361,7 @@ static void shared(enum target t, const struct link_inputs *in,
 
 /* Libraries for C. llvm-ar writes an archive in the format of the object
    files, and the platform linker a shared library. The objects of a
-   bundled runtime join into one relocatable object. */
+   bundled runtime of ELF join into one relocatable object. */
 static void libraries(void)
 {
     static const char *const members[] = {"geo.o", "geo.package.o"};
@@ -419,20 +419,15 @@ static void libraries(void)
            "/DEF:geo.def geo.obj C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib "
            "msvcrt.lib libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
 
-    link_relocatable_command(&c, TARGET_MACOS_ARM64, &in, "joined.o",
-                             joined_inputs, 3);
-    joined(&c, "ld -r -keep_private_externs -arch arm64 -o joined.o geo.o "
-               "init.c.o utf.c.o");
-    link_command_free(&c);
     link_relocatable_command(&c, TARGET_LINUX_X86_64, &in, "joined.o",
                              joined_inputs, 3);
     joined(&c, "ld -r -o joined.o geo.o init.c.o utf.c.o");
     link_command_free(&c);
 
     /* lld links the libraries too. ld64.lld writes no relocatable object,
-       so a bundled runtime on macOS still joins with ld -r. A shared
-       library on Linux links no C library, whose symbols the process
-       provides. */
+       so a bundled runtime on macOS is an archive and joins nothing. A
+       shared library on Linux links no C library, whose symbols the
+       process provides. */
     in = lld_inputs;
     in.object = "geo.o";
     in.extra_count = 0;
@@ -457,11 +452,6 @@ static void libraries(void)
            "/IMPLIB:geo.lib /LIBPATH:/rt/sysroot/t/lib geo.obj "
            "/rt/lib/windows-arm64/armv8.2/anti_rt.lib clang_rt.builtins.lib "
           "ucrtbase.lib ntdll.lib kernel32.lib");
-    link_relocatable_command(&c, TARGET_MACOS_ARM64, &in, "joined.o",
-                             joined_inputs, 3);
-    joined(&c, "ld -r -keep_private_externs -arch arm64 -o joined.o geo.o "
-               "init.c.o utf.c.o");
-    link_command_free(&c);
     link_relocatable_command(&c, TARGET_LINUX_ARM64, &in, "joined.o",
                              joined_inputs, 3);
     joined(&c, "/rt/bin/ld.lld -r -o joined.o geo.o init.c.o utf.c.o");

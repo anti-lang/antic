@@ -154,9 +154,11 @@ created by the first `parallel`. Nothing runs before the C program calls an expo
 function.
 
 `--bundle-runtime` joins the runtime objects and the library object into one object of
-the static archive for the single-file case, on every target. The printed link line then
-omits `libanti_rt.a`. The header carries a comment that only one bundled Anti archive may
-be linked into a program.
+the static archive for the single-file case, on Linux and Windows. On macOS the archive
+holds the library object, the runtime objects and one marker object instead, since
+ld64.lld writes no relocatable object. The printed link line then omits `libanti_rt.a` on
+every target. The header carries a comment that only one bundled Anti archive may be
+linked into a program.
 
 The bundled native libraries behind `anti.raylib`, `anti.miniaudio`, `anti.net` and
 `anti.regex` are never in the archive. The printed link line names them, as the driver
@@ -216,7 +218,7 @@ exported interface of the previous version in the index to enforce it.
 | Exports only | The shared library's export table equals the set of `export` names plus `anti_licenses` |
 | Two libraries | Two Anti shared libraries load into one C process. Two static archives with `libanti_rt.a` link into one program |
 | Constructor | An exported function using `parallel` works as the first call after `dlopen` |
-| Bundle conflict | Two `--bundle-runtime` archives in one program fail to link with a duplicate symbol error naming the runtime |
+| Bundle conflict | Two `--bundle-runtime` archives in one program fail to link with a duplicate symbol error naming the runtime, or on macOS the marker `anti_rt_bundle` |
 
 ## Chapter changes
 

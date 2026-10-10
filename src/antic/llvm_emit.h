@@ -39,6 +39,9 @@ struct llvm_emit_options {
     /* The text will end with the notice of llvm_emit_licenses, which
        llvm.used of the module names. */
     bool notice;
+    /* The symbol of the marker member that the object of a bundled
+       Mach-O library refers to, or NULL. */
+    const char *bundle;
 };
 
 /* Append the LLVM IR text of m, laid out for the target by l, to out.
@@ -54,6 +57,12 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
    constant in the section of the format, which no symbol names. */
 void llvm_emit_package(struct text *out, enum target t, const char *bytes,
                        size_t length);
+
+/* Append the text of the marker member of a bundled Mach-O library for
+   target t: the definitions of RUNTIME_BUNDLE_MARKER, which every bundle
+   defines, and of symbol, which the object of this library refers to. */
+void llvm_emit_bundle_marker(struct text *out, enum target t,
+                             const char *symbol);
 
 /* Append the names a COFF host of plugins exports through its .def file,
    one per line: the symbol of each function m defines, and of each

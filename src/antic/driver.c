@@ -41,6 +41,7 @@ static void extras_free(struct extras *e)
     text_free(&e->name);
     text_free(&e->header);
     text_free(&e->package);
+    text_free(&e->marker);
     text_free(&e->notice);
     text_free(&e->exports);
     text_free(&e->provides);
@@ -814,6 +815,8 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
              !(o->dev && !has_main(program, module)) && !o->assembly_only &&
              o->lib != LIB_STATIC;
     emit.notice = with_notice;
+    emit.bundle = extras->marker.length > 0 ? text_cstr(&extras->marker)
+                                            : NULL;
     ok = ok && llvm_emit_module(&out, &emit, program, &layouts, error,
                                 sizeof error);
     /* A COFF program that hosts plugins exports every name it defines
@@ -1317,6 +1320,10 @@ static int compile(const struct options *o, struct text *source,
                    paths.count * sizeof *all);
             all[paths.count] = &own;
             library_name(o, text_cstr(module), &extras->name);
+            if (o->bundle_runtime && o->lib == LIB_STATIC &&
+                target_info(o->target)->format == FORMAT_MACHO) {
+                driver_bundle_marker(&extras->marker, own.package.name);
+            }
             header_write(&extras->header, text_cstr(&extras->name), all,
                          paths.count + 1, o->bundle_runtime);
             if (!antl_write_header(&extras->package, &own)) {
@@ -1757,7 +1764,7 @@ int driver_run(const struct options *given)
         (o->runtime == NULL ||
          ((o->lib == LIB_SHARED ||
            (o->bundle_runtime &&
-            target_info(o->target)->format != FORMAT_COFF)) &&
+            target_info(o->target)->format == FORMAT_ELF)) &&
           !can_link(o)))) {
         if (o->runtime == NULL) {
             fprintf(stderr, "antic: --lib needs --runtime <dir>, the directory "

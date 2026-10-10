@@ -81,6 +81,20 @@ foreach(name no-opt no-lld no-lld-link.exe no-ar.a)
     endif()
 endforeach()
 
+# A bundled runtime of a macOS target is an archive that llvm-ar of the
+# package writes. The search path holds no ld, and antic asks for none:
+# Apple's ld -r once joined the objects, on a Mac alone. The status and
+# the library are the check. The antic of the ASan build writes a line
+# of its own here, since this search path holds no symbolizer either.
+run_antic("a bundled macOS library" 0 ".*"
+          COMMAND --runtime "${RUNTIME}" --target macos-arm64 --lib static
+                  --bundle-runtime -I "${ROOT}/tests/clib"
+                  -o "${WORK}/libbundled.a"
+                  "${ROOT}/tests/clib/com/example/doubling.anti")
+if(NOT EXISTS "${WORK}/libbundled.a")
+    message(FATAL_ERROR "antic wrote no bundled library for macos-arm64")
+endif()
+
 # The two Windows checks need the Windows sysroot of the archive.
 set(windows "${RUNTIME}/sysroot/windows-x86_64")
 if(NOT EXISTS "${windows}/lib/ucrtbase.lib")

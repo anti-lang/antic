@@ -8,16 +8,20 @@
 #   SOURCES   tests/clib
 #   DUMP      tests/dump, with the headers that chapter 25 prints
 #   WORK      a directory for the output
-#   CASE      static, shared, exports, two, loader, header, bundle, simd,
-#             classes, failing, tuples, flags, ledger, variants, nested,
-#             names, handlers, generics or optional
+#   CASE      static, shared, exports, two, loader, header, bundle, twice,
+#             simd, classes, failing, tuples, flags, ledger, variants,
+#             nested, names, handlers, generics or optional
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 #   CXX       the same compiler for C++, which checks the headers
 #   TARGET    the target of this host, or with CROSS the Windows target
 #   LLVM_OBJDUMP  llvm-objdump, which lists the symbols of the runtime
-#   CROSS     ON for a Windows target of another host. The case builds and
-#             links the programs and runs none, and only bundle has one.
+#   CROSS     ON for a target of another host. The case builds and links
+#             the programs and runs none, and only bundle and twice have
+#             one.
+#   SYSROOT   ON for a macOS target whose C programs compile and link
+#             against the sysroot of the runtime archive, on every host
+#   OPTIONS   further options of antic, with | between them
 
 # The file names of a library and a program on this host, and what the
 # library driver prints as the compiler of C.
@@ -40,13 +44,15 @@ if("${TARGET}" MATCHES "^windows-")
 elseif(APPLE)
     set(HOST_SHARED_SUFFIX ".dylib")
 endif()
-if(CROSS)
+if(CROSS OR SYSROOT)
     if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")
         message("SKIP: the runtime archive has no sysroot for ${TARGET}")
         return()
     endif()
     set(TARGET_OPTION --target "${TARGET}")
 endif()
+string(REPLACE "|" ";" options "${OPTIONS}")
+list(APPEND TARGET_OPTION ${options})
 set(RUNTIME_LIBRARY "${PREFIX}anti_rt${STATIC_SUFFIX}")
 
 # DESIGN: on Windows the pinned clang compiles each C program against the
@@ -74,6 +80,29 @@ if("${TARGET}" MATCHES "^windows-")
     antic_windows_link_options(WINDOWS_LINK "${TARGET}" "${win}")
 endif()
 
+# DESIGN: with SYSROOT the pinned clang compiles each C program of a macOS
+# target against the sysroot of the runtime archive, and ld64.lld of the
+# archive links it against the stubs of that sysroot, as antic links an
+# Anti program. Every host then builds the programs of both macOS targets,
+# and no driver of C stands between the test and what ld64.lld reports.
+# The triple and the versions are the ones of the cross build of the
+# runtime and of macos_start in src/antic/linker.c.
+set(MACOS_LINK "")
+if(SYSROOT AND "${TARGET}" MATCHES "^macos-(.+)$")
+    set(arch "${CMAKE_MATCH_1}")
+    set(macos "${RUNTIME}/sysroot/${TARGET}")
+    file(STRINGS "${macos}/sdk-version" sdk_version LIMIT_COUNT 1)
+    list(GET CC 0 compiler)
+    set(CC "${compiler}" "--target=${arch}-apple-macos11" -isysroot "${macos}")
+    set(CXX ${CC} -x c++)
+    set(LD64 "${RUNTIME}/bin/ld64.lld")
+    if(CMAKE_HOST_WIN32)
+        set(LD64 "${RUNTIME}/bin/ld64.lld.exe")
+    endif()
+    set(MACOS_LINK -arch "${arch}" -platform_version macos 11.0
+        "${sdk_version}" -syslibroot "${macos}" -lSystem)
+endif()
+
 # Every C and C++ file of the tests compiles under the warnings of the
 # repository, and a warning is an error.
 include("${CMAKE_CURRENT_LIST_DIR}/../tools/warnings.cmake")
@@ -95,18 +124,21 @@ endfunction()
 # them with the inputs of INPUTS into output. On Windows the pinned clang
 # compiles each source for the target and lld-link links the objects
 # against the sysroot, with the libraries every Windows program links.
+# With SYSROOT the same holds for a macOS target and ld64.lld.
 # A program whose inputs name no runtime of Anti takes the one of the
 # lowest level of the target, for the start of a program it holds.
 function(program output)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "OPTIONS;SOURCES;INPUTS")
-    if("${TARGET}" MATCHES "^windows-")
-        set(objects "")
+    set(objects "")
+    if("${TARGET}" MATCHES "^windows-" OR MACOS_LINK)
         foreach(source IN LISTS arg_SOURCES)
             get_filename_component(name "${source}" NAME_WE)
             set(object "${output}-${name}.o")
             run(${CC} ${arg_OPTIONS} -c "${source}" -o "${object}")
             list(APPEND objects "${object}")
         endforeach()
+    endif()
+    if("${TARGET}" MATCHES "^windows-")
         set(inputs ${arg_INPUTS})
         if(NOT "${inputs}" MATCHES "anti_rt\\.lib")
             file(GLOB runtimes "${RUNTIME}/lib/${TARGET}/*/anti_rt.lib")
@@ -116,6 +148,8 @@ function(program output)
         endif()
         run("${LLD_LINK}" ${WINDOWS_LINK} "/OUT:${output}" ${objects}
             ${inputs} ${ANTIC_WINDOWS_LIBRARIES})
+    elseif(MACOS_LINK)
+        run("${LD64}" ${MACOS_LINK} ${objects} ${arg_INPUTS} -o "${output}")
     else()
         run(${CC} ${arg_OPTIONS} ${arg_SOURCES} ${arg_INPUTS} ${LINK}
             -o "${output}")
@@ -429,49 +463,61 @@ elseif(CASE STREQUAL "bundle")
     if(NOT line STREQUAL "${DRIVER} main.c ${geo}${system}")
         message(FATAL_ERROR "unexpected link line: ${line}")
     endif()
-    library(other static "${dir}" --bundle-runtime)
-    if("${TARGET}" MATCHES "^windows-")
-        run(${CC} -I "${dir}" -c "${SOURCES}/twolibs.c"
-            -o "${dir}/two_bundled.o")
-        execute_process(
-            COMMAND "${LLD_LINK}" ${WINDOWS_LINK}
-                    "/OUT:${dir}/two_bundled${EXE}" "${dir}/two_bundled.o"
-                    "${geo}" "${library_file}" ${ANTIC_WINDOWS_LIBRARIES}
-            RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-            ENCODING NONE)
-    else()
-        execute_process(
-            COMMAND ${CC} -I "${dir}" "${SOURCES}/twolibs.c" "${geo}"
-                    "${library_file}" ${LINK} -o "${dir}/two_bundled${EXE}"
-            RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-            ENCODING NONE)
+    # A C program links the bundled library and nothing else of Anti,
+    # and runs on the runtime inside it.
+    program("${dir}/roundtrip${EXE}" OPTIONS -I "${dir}"
+            SOURCES "${SOURCES}/roundtrip.c" INPUTS "${geo}")
+    if(NOT CROSS)
+        expect_output("${dir}/roundtrip${EXE}" "${SOURCES}/roundtrip.expected")
     endif()
-    if(status EQUAL 0 OR NOT "${out}${err}" MATCHES "duplicate symbol|multiple definition")
-        message(FATAL_ERROR "two bundled runtimes linked: ${status}\n${out}${err}")
-    endif()
-    # One of the duplicates is a symbol that the runtime library defines,
-    # and not only one that antic writes into the library object. Every
-    # linker spells a duplicate its own way, and llvm-objdump lists a
-    # definition of COFF, ELF and Mach-O each its own way. ld64.lld names
-    # a Mach-O symbol without the underscore that llvm-objdump prints.
-    file(GLOB runtime_libraries "${RUNTIME}/lib/${TARGET}/*/${RUNTIME_LIBRARY}")
-    list(GET runtime_libraries 0 runtime_library)
-    set(linked "${out}${err}")
-    run("${LLVM_OBJDUMP}" --syms "${runtime_library}")
-    set(defined "${run_out}")
-    set(spelled "(duplicate symbol:? '?|multiple definition of `)")
-    string(REGEX MATCHALL "${spelled}[^' \n]+" reported "${linked}")
-    set(runtime_duplicate "")
-    foreach(item IN LISTS reported)
-        string(REGEX REPLACE "^${spelled}" "" name "${item}")
-        string(REGEX REPLACE "([][+.*()^$?|\\])" "\\\\\\1" pattern "${name}")
-        if(defined MATCHES "(\\(sec +[1-9][0-9]*\\)\\(fl 0x[0-9a-f]+\\)\\(ty +[0-9a-f]+\\)\\(scl +2\\) \\(nx [0-9]+\\) 0x[0-9a-f]+ |\n[0-9a-f]+ g [^\n]*[ \t])_?${pattern}\r?\n")
-            set(runtime_duplicate "${name}")
-            break()
+    # Two bundled libraries of ELF or COFF in one program. A Mach-O bundle
+    # is an archive, whose duplicate is the marker that the case twice
+    # reads.
+    if(NOT "${TARGET}" MATCHES "^macos-")
+        library(other static "${dir}" --bundle-runtime)
+        if("${TARGET}" MATCHES "^windows-")
+            run(${CC} -I "${dir}" -c "${SOURCES}/twolibs.c"
+                -o "${dir}/two_bundled.o")
+            execute_process(
+                COMMAND "${LLD_LINK}" ${WINDOWS_LINK}
+                        "/OUT:${dir}/two_bundled${EXE}" "${dir}/two_bundled.o"
+                        "${geo}" "${library_file}" ${ANTIC_WINDOWS_LIBRARIES}
+                RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+                ENCODING NONE)
+        else()
+            execute_process(
+                COMMAND ${CC} -I "${dir}" "${SOURCES}/twolibs.c" "${geo}"
+                        "${library_file}" ${LINK} -o "${dir}/two_bundled${EXE}"
+                RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+                ENCODING NONE)
         endif()
-    endforeach()
-    if(runtime_duplicate STREQUAL "")
-        message(FATAL_ERROR "no duplicate is a symbol of the runtime\n${linked}")
+        if(status EQUAL 0 OR NOT "${out}${err}" MATCHES "duplicate symbol|multiple definition")
+            message(FATAL_ERROR "two bundled runtimes linked: ${status}\n${out}${err}")
+        endif()
+        # One of the duplicates is a symbol that the runtime library defines,
+        # and not only one that antic writes into the library object. Every
+        # linker spells a duplicate its own way, and llvm-objdump lists a
+        # definition of COFF, ELF and Mach-O each its own way. ld64.lld names
+        # a Mach-O symbol without the underscore that llvm-objdump prints.
+        file(GLOB runtime_libraries "${RUNTIME}/lib/${TARGET}/*/${RUNTIME_LIBRARY}")
+        list(GET runtime_libraries 0 runtime_library)
+        set(linked "${out}${err}")
+        run("${LLVM_OBJDUMP}" --syms "${runtime_library}")
+        set(defined "${run_out}")
+        set(spelled "(duplicate symbol:? '?|multiple definition of `)")
+        string(REGEX MATCHALL "${spelled}[^' \n]+" reported "${linked}")
+        set(runtime_duplicate "")
+        foreach(item IN LISTS reported)
+            string(REGEX REPLACE "^${spelled}" "" name "${item}")
+            string(REGEX REPLACE "([][+.*()^$?|\\])" "\\\\\\1" pattern "${name}")
+            if(defined MATCHES "(\\(sec +[1-9][0-9]*\\)\\(fl 0x[0-9a-f]+\\)\\(ty +[0-9a-f]+\\)\\(scl +2\\) \\(nx [0-9]+\\) 0x[0-9a-f]+ |\n[0-9a-f]+ g [^\n]*[ \t])_?${pattern}\r?\n")
+                set(runtime_duplicate "${name}")
+                break()
+            endif()
+        endforeach()
+        if(runtime_duplicate STREQUAL "")
+            message(FATAL_ERROR "no duplicate is a symbol of the runtime\n${linked}")
+        endif()
     endif()
     # A library that reads the notice links against the stub of the bundle
     # and reports an empty notice.
@@ -480,6 +526,58 @@ elseif(CASE STREQUAL "bundle")
             SOURCES "${SOURCES}/notice.c" INPUTS "${library_file}")
     if(NOT CROSS)
         expect_printed("0\n" "${dir}/notice/notice${EXE}")
+    endif()
+elseif(CASE STREQUAL "twice")
+    # Two bundled libraries of a macOS target in one C program. A Mach-O
+    # bundle is an archive: the library object, the members of the runtime
+    # library without the one of src/rt/start.c, and a marker member. The
+    # library object refers to anti_rt_bundle_<package> of its own marker
+    # member, so the link loads the marker of each bundle, and each
+    # defines anti_rt_bundle, which ld64.lld reports as a duplicate.
+    if(NOT MACOS_LINK)
+        message(FATAL_ERROR "the case twice takes a macOS target and SYSROOT")
+    endif()
+    library(geo static "${dir}" --bundle-runtime)
+    set(geo "${library_file}")
+    library(other static "${dir}" --bundle-runtime)
+    run("${LLVM_AR}" t "${geo}")
+    string(REPLACE "\r" "" listed "\n${run_out}")
+    foreach(member geo.o geo.bundle.o geo.package.o anti_rt_license_stub.o
+            init.o text.o)
+        if(NOT listed MATCHES "\n${member}\n")
+            message(FATAL_ERROR "${geo} holds no ${member}:${listed}")
+        endif()
+    endforeach()
+    foreach(member start.o license.o geo.bundled.o)
+        if(listed MATCHES "\n${member}\n")
+            message(FATAL_ERROR "${geo} holds ${member}:${listed}")
+        endif()
+    endforeach()
+    # The marker member defines both names, and the library object leaves
+    # the one of its package undefined.
+    run("${LLVM_OBJDUMP}" --syms "${geo}")
+    string(REPLACE "\r" "" symbols "${run_out}")
+    foreach(defined _anti_rt_bundle _anti_rt_bundle_com_example_geo)
+        if(NOT symbols MATCHES "\n[0-9a-f]+ g [^\n]*[ \t]${defined}\n")
+            message(FATAL_ERROR "${geo} defines no ${defined}\n${symbols}")
+        endif()
+    endforeach()
+    if(NOT symbols MATCHES "\\*UND\\* _anti_rt_bundle_com_example_geo\n")
+        message(FATAL_ERROR "the library object of ${geo} names no marker\n"
+                            "${symbols}")
+    endif()
+    run(${CC} -I "${dir}" -c "${SOURCES}/twolibs.c" -o "${dir}/twolibs.o")
+    execute_process(
+        COMMAND "${LD64}" ${MACOS_LINK} "${dir}/twolibs.o" "${geo}"
+                "${library_file}" -o "${dir}/two_bundled"
+        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+        ENCODING NONE)
+    string(REPLACE "\r" "" linked "${out}${err}")
+    if(status EQUAL 0 OR EXISTS "${dir}/two_bundled")
+        message(FATAL_ERROR "two bundled runtimes linked: ${status}\n${linked}")
+    endif()
+    if(NOT linked MATCHES "duplicate symbol: _?anti_rt_bundle\n>>> defined in [^\n]*libgeo\\.a\\(geo\\.bundle\\.o\\)\n>>> defined in [^\n]*libother\\.a\\(other\\.bundle\\.o\\)\n")
+        message(FATAL_ERROR "ld64.lld reports no duplicate marker\n${linked}")
     endif()
 else()
     message(FATAL_ERROR "unknown CASE ${CASE}")

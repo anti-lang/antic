@@ -1,7 +1,7 @@
 /* A library for C and a plugin: the llvm-ar and join commands, the COFF
-   objects joined into one, the bundled runtime, the object of the package
-   header copy, and the header, the archive or the shared library each
-   build writes. */
+   objects joined into one, the bundled runtime with the marker member of
+   Mach-O, the object of the package header copy, and the header, the
+   archive or the shared library each build writes. */
 
 #include "driver_parts.h"
 
@@ -15,6 +15,7 @@
 #include "platform.h"
 
 #define PACKAGE_SUFFIX ".package"
+#define MARKER_SUFFIX ".bundle"
 #define EXPORTED_SUFFIX ".exported"
 
 /* DESIGN: a bundled runtime holds every member of the runtime library
@@ -67,14 +68,86 @@ static bool join_coff(const struct paths *objects, const char *output)
     return ok;
 }
 
+void driver_bundle_marker(struct text *out, const char *package)
+{
+    const char *p;
+
+    text_appendf(out, "%s_", RUNTIME_BUNDLE_MARKER);
+    for (p = package; *p != '\0'; p++) {
+        bool plain = (*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+                     (*p >= '0' && *p <= '9');
+        text_appendf(out, "%c", plain ? *p : '_');
+    }
+}
+
+/* Compile text, the LLVM IR of an object that antic writes beside the
+   library object, at <path>.o with opt and llc, and make path that
+   object. */
+static bool compile_member(const struct options *o, const struct text *text,
+                           struct text *path)
+{
+    struct text obj_path = {0};
+    bool ok;
+
+    text_appendf(&obj_path, "%s%s", text_cstr(path),
+                 target_info(o->target)->object_suffix);
+    ok = driver_compile_llvm(o, text, text_cstr(path), text_cstr(&obj_path));
+    text_free(path);
+    text_append(path, text_cstr(&obj_path));
+    text_free(&obj_path);
+    return ok;
+}
+
+/* Compile the marker member of a bundled Mach-O library at
+   <base>.bundle.o and add it to members. */
+static bool add_marker(const struct options *o, const struct extras *extras,
+                       const char *base, struct arena *arena,
+                       struct paths *members)
+{
+    struct text source = {0};
+    struct text path = {0};
+    bool ok;
+
+    text_appendf(&path, "%s%s", base, MARKER_SUFFIX);
+    llvm_emit_bundle_marker(&source, o->target, text_cstr(&extras->marker));
+    ok = compile_member(o, &source, &path);
+    if (ok) {
+        char *copy = arena_alloc(arena, path.length + 1);
+        memcpy(copy, text_cstr(&path), path.length + 1);
+        driver_add_path(members, copy);
+    }
+    text_free(&source);
+    text_free(&path);
+    return ok;
+}
+
+/* DESIGN: a bundled runtime of ELF and of COFF is one relocatable object
+   of the library object and the members of the runtime, so two bundles
+   in one program define every symbol of the runtime twice and the link
+   reports a duplicate. ld.lld -r writes the object of ELF and coff_join
+   the one of COFF. Mach-O has neither: ld64.lld 23.1.1 writes no
+   relocatable object, a build runs no linker of the host, so not Apple's
+   ld -r, and a joiner of Mach-O of our own is out of proportion to the
+   feature. A bundled runtime of Mach-O is an archive instead: the
+   library object, the members of the runtime, and one marker member.
+   A link loads a member of an archive only for a symbol it lacks, so
+   the runtime members of a second bundle would stay out without a word.
+   The marker brings the duplicate back. It defines
+   anti_rt_bundle_<package>, which the library object of that package
+   refers to, so the link loads the marker of every bundle it takes a
+   library object from. It also defines anti_rt_bundle, the same name in
+   every bundle, so two markers in one program are a duplicate symbol.
+   See the entry on --bundle-runtime in docs/decisions.md. */
+
 /* The members of a static library besides the package header. They are
    the compiled object, or with a bundled runtime one relocatable object
-   of it and the runtime's members. The paths are in the memory pool. */
+   of it and the runtime's members, or for Mach-O the object, those
+   members and the marker. The paths are in the memory pool. */
 static bool bundle(const struct options *o, const struct extras *extras,
                    const char *object, const char *base, struct arena *arena,
                    struct paths *members)
 {
-    bool coff = target_info(o->target)->format == FORMAT_COFF;
+    enum object_format format = target_info(o->target)->format;
     struct text library = {0};
     struct text listing = {0};
     struct text dir = {0};
@@ -137,11 +210,17 @@ static bool bundle(const struct options *o, const struct extras *extras,
         p += n;
         p += strspn(p, "\r\n");
     }
-    if (ok) {
+    if (ok && format == FORMAT_MACHO) {
+        size_t i;
+        for (i = 0; i < objects.count; i++) {
+            driver_add_path(members, objects.items[i]);
+        }
+        ok = add_marker(o, extras, base, arena, members);
+    } else if (ok) {
         char *copy;
         text_appendf(&joined, "%s.bundled%s", base,
                      target_info(o->target)->object_suffix);
-        if (coff) {
+        if (format == FORMAT_COFF) {
             ok = join_coff(&objects, text_cstr(&joined));
         } else {
             struct link_command c;
@@ -179,18 +258,11 @@ static bool assemble_package(const struct options *o, const struct text *bytes,
                              struct text *path)
 {
     struct text source = {0};
-    struct text obj_path = {0};
     bool ok;
 
-    text_appendf(&obj_path, "%s%s", text_cstr(path),
-                 target_info(o->target)->object_suffix);
     llvm_emit_package(&source, o->target, bytes->data, bytes->length);
-    ok = driver_compile_llvm(o, &source, text_cstr(path),
-                             text_cstr(&obj_path));
-    text_free(path);
-    text_append(path, text_cstr(&obj_path));
+    ok = compile_member(o, &source, path);
     text_free(&source);
-    text_free(&obj_path);
     return ok;
 }
 

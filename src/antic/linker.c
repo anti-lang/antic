@@ -1141,10 +1141,10 @@ void link_archive_command(struct link_command *c, enum target t,
     }
 }
 
-/* DESIGN: ld64 turns hidden symbols into local ones in a relocatable
-   object unless -keep_private_externs is given. The runtime symbols stay
-   global, so two bundled runtimes in one program are a duplicate. ld64.lld
-   writes no relocatable object, so Mach-O always joins with ld64. */
+/* DESIGN: ELF alone joins with a linker. ld64.lld writes no relocatable
+   object and no linker of COFF does, and a build runs no linker of the
+   host. A bundled runtime of Mach-O is an archive with a marker member,
+   and COFF joins with coff_join. See bundle in driver_library.c. */
 void link_relocatable_command(struct link_command *c, enum target t,
                               const struct link_inputs *in, const char *output,
                               const char *const *objects, size_t count)
@@ -1152,14 +1152,8 @@ void link_relocatable_command(struct link_command *c, enum target t,
     size_t i;
 
     start(c);
-    add(c, target_info(t)->os == OS_MACOS ? "ld"
-                                          : program(c, in, t));
+    add(c, program(c, in, t));
     add(c, "-r");
-    if (target_info(t)->os == OS_MACOS) {
-        add(c, "-keep_private_externs");
-        add(c, "-arch");
-        add(c, target_info(t)->arch == ARCH_ARM64 ? "arm64" : "x86_64");
-    }
     add(c, "-o");
     add(c, output);
     for (i = 0; i < count; i++) {

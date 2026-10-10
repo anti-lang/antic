@@ -64,6 +64,10 @@
 /* The object beside the runtime library that a bundled archive carries
    instead of the licence text of src/rt/license.c. */
 #define RUNTIME_LICENSE_STUB "anti_rt_license_stub"
+/* The symbol that the marker member of every bundled Mach-O library
+   defines, and with _<package> after it the one that the library object
+   of that package refers to. See bundle in driver_library.c. */
+#define RUNTIME_BUNDLE_MARKER "anti_rt_bundle"
 /* DESIGN: the Linux link mode against glibc takes the sysroot and the
    runtime of the target name with this suffix, linux-arm64-glibc beside
    linux-arm64. tools/get-sysroot.cmake and CMakeLists.txt spell the same

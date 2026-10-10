@@ -13,9 +13,9 @@ struct coff_input {
     size_t size;
 };
 
-/* Join the objects into one COFF object in out, as `ld -r` joins them on
-   ELF and Mach-O. A reference of one object to a symbol that another
-   defines takes that symbol. Returns false and appends the reason to
+/* Join the objects into one COFF object in out, as `ld.lld -r` joins them
+   on ELF. A reference of one object to a symbol that another defines
+   takes that symbol. Returns false and appends the reason to
    error when the joined object would link to another program than the
    objects do. */
 bool coff_join(const struct coff_input *inputs, size_t count,

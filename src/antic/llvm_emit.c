@@ -8,6 +8,7 @@
 
 #include "abi.h"
 #include "alloc.h"
+#include "antic.h"
 #include "llvm_debug.h"
 #include "llvm_target.h"
 #include "rt_abi.h"
@@ -3801,17 +3802,32 @@ static void main_kept(struct emitter *e, const struct ir_module *m)
    the build id by the symbol, and the functions marked by_name, such as
    the options hook that the runtime of AddressSanitizer looks up. A
    module holds one llvm.used, so this one names both. See the entry on
-   dropped code under "Scope and toolchain" in docs/decisions.md. */
+   dropped code under "Scope and toolchain" in docs/decisions.md.
+
+   DESIGN: the object of a bundled Mach-O library refers to the marker
+   of its package, so a link that takes the object from the archive
+   takes the marker member with it. Nothing of the library reads the
+   marker, so a private constant holds its address and llvm.used keeps
+   the constant. See bundle in driver_library.c. */
 static void roots(struct emitter *e, const struct ir_module *m)
 {
     struct text entries = {0};
     size_t count = 0;
     size_t i;
 
+    if (e->o->bundle != NULL) {
+        llvm_name(e->out, '@', e->o->bundle);
+        text_append(e->out, " = external hidden global i8\n"
+                            "@anti.bundle = private constant ptr ");
+        llvm_name(e->out, '@', e->o->bundle);
+        text_append(e->out, "\n");
+        text_append(&entries, "ptr @anti.bundle");
+        count++;
+    }
     if (e->o->notice) {
         struct text symbol = {0};
         notice_symbol(&symbol, e->o->target);
-        text_append(&entries, "ptr ");
+        text_append(&entries, count > 0 ? ", ptr " : "ptr ");
         llvm_name(&entries, '@', text_cstr(&symbol));
         text_free(&symbol);
         count++;
@@ -3915,6 +3931,19 @@ void llvm_emit_package(struct text *out, enum target t, const char *bytes,
                       "@llvm.used = appending global [1 x ptr] "
                       "[ptr @anti.package], section \"llvm.metadata\"\n",
                  sections[target_info(t)->format]);
+}
+
+/* DESIGN: both symbols are hidden, as every symbol of the runtime is,
+   so neither is an export of a program or a shared library that links
+   the bundle. A hidden symbol is still one definition per link, and two
+   of a name are a duplicate. */
+void llvm_emit_bundle_marker(struct text *out, enum target t,
+                             const char *symbol)
+{
+    head(out, t, "bundle");
+    text_appendf(out, "@%s = hidden constant i8 0\n", RUNTIME_BUNDLE_MARKER);
+    llvm_name(out, '@', symbol);
+    text_append(out, " = hidden constant i8 0\n");
 }
 
 void llvm_emit_names(struct text *out, enum target t,

@@ -364,8 +364,11 @@ the same list.
     of the package, which carries no `tools/`. The downloads page shows the
     manual install with the same checks as commands.
     `docs/reports/2026-10-10-dist-installers.md` reports it.
-35. `--bundle-runtime` on Mach-O without Apple's `ld -r`. ld64.lld 23.1.1 has no
-    relocatable output, so the join needs a design of its own.
+35. Done. `--bundle-runtime` on Mach-O writes an archive of the library
+    object, the runtime members and a marker member, and Apple's `ld -r`
+    left the code. Two bundled libraries in one program are the duplicate
+    symbol `anti_rt_bundle`. `docs/reports/2026-10-10-dist-bundle-macho.md`
+    reports it.
 36. The test of a release with the network off. On each VM, a fresh install from
     the package builds and runs a raylib program and a plugin host for its own
     target. It also cross-builds a program for every other target.
@@ -442,9 +445,9 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1694 ctest tests pass on the development Mac, and two of them, the
+- 1697 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  The ASan and the UBSan builds run 1693 each with the same skips, without
+  The ASan and the UBSan builds run 1696 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.

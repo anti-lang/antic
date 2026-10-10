@@ -4324,6 +4324,51 @@ if(ANTIC_LLVM_AR AND CMAKE_C_COMPILER_ID MATCHES "Clang")
     endforeach()
 endif()
 
+# A bundled library of each macOS target on every host. The pinned clang
+# compiles the C programs against the sysroot of the runtime archive and
+# ld64.lld links them, as antic links an Anti program. A Mac runs them,
+# the ones of macos-x86_64 under Rosetta at v1, and every other host
+# links them alone. clib_bundle_twice_<target> links two bundled libraries
+# into one program and expects the duplicate symbol of their markers.
+if(ANTIC_LLVM_AR AND CMAKE_C_COMPILER_ID MATCHES "Clang")
+    foreach(target macos-arm64 macos-x86_64)
+        set(cross ON)
+        set(options "")
+        if(target STREQUAL ANTIC_HOST_TARGET)
+            set(cross OFF)
+        elseif(target STREQUAL ANTIC_EMULATED_TARGET)
+            set(cross OFF)
+            set(options "--cpu|v1")
+        endif()
+        foreach(case bundle twice)
+            set(name clib_bundle_${target})
+            if(case STREQUAL "twice")
+                set(name clib_bundle_twice_${target})
+            endif()
+            add_test(NAME ${name}
+                COMMAND "${CMAKE_COMMAND}"
+                    "-DANTIC=$<TARGET_FILE:antic>"
+                    "-DLLVM_MC=${ANTIC_LLVM_MC}"
+                    "-DLLVM_AR=${ANTIC_LLVM_AR}"
+                    "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                    "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
+                    "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
+                    "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib-${target}"
+                    "-DCASE=${case}"
+                    "-DCC=${CMAKE_C_COMPILER}"
+                    "-DCXX=${CMAKE_C_COMPILER}"
+                    "-DTARGET=${target}"
+                    "-DOPTIONS=${options}"
+                    "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+                    -DSYSROOT=ON
+                    -DCROSS=${cross}
+                    -P "${CMAKE_CURRENT_SOURCE_DIR}/run_clib.cmake")
+            set_tests_properties(${name} PROPERTIES
+                SKIP_REGULAR_EXPRESSION "SKIP: ")
+        endforeach()
+    endforeach()
+endif()
+
 # A function that may fail and returns a tuple takes one out pointer, the
 # last parameter, and not one per element. The header of clib_tuples
 # pins the same signature on the C side.
