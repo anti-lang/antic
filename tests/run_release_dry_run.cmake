@@ -873,7 +873,8 @@ if(refused EQUAL 0 OR NOT "${out}${err}" MATCHES "CHANGELOG.md")
 endif()
 
 # tools/check-cpu.cmake reads the levels of a package and refuses one that
-# lacks a level of tools/cpu-levels.
+# lacks a level of tools/cpu-levels, in lib/<target>/ and, for a Linux
+# target, in lib/<target>-glibc/ as well.
 set(tree "${WORK}/package")
 foreach(target IN LISTS hosts)
     set(levels v1 v2 v3)
@@ -886,6 +887,9 @@ foreach(target IN LISTS hosts)
     endif()
     foreach(level IN LISTS levels)
         file(WRITE "${tree}/anti/lib/${target}/${level}/${library}" "")
+        if(target MATCHES "^linux-")
+            file(WRITE "${tree}/anti/lib/${target}-glibc/${level}/${library}" "")
+        endif()
     endforeach()
 endforeach()
 execute_process(COMMAND "${CMAKE_COMMAND}" "-DTREE=${tree}"

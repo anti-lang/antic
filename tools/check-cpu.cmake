@@ -14,6 +14,12 @@
 #
 # ARCHIVE reads the entries of the tarball and unpacks nothing. TREE reads
 # an unpacked package, whose top directory is anti.
+#
+# DESIGN: the runtime of the glibc link mode of a Linux target stands in
+# lib/<target>-glibc/ at the levels of that target, and every package
+# carries it since the step glibc of docs/work-order-distribution.md. The
+# check reads that directory as it reads the target's own, so a package
+# without one glibc level is refused like one without a musl level.
 cmake_minimum_required(VERSION 3.20)
 
 if(NOT DEFINED LEVELS OR (NOT DEFINED ARCHIVE AND NOT DEFINED TREE))
@@ -39,6 +45,14 @@ endforeach()
 if(targets STREQUAL "")
     message(FATAL_ERROR "check-cpu: ${LEVELS} names no target")
 endif()
+# The directories under lib/: each target, and the glibc twin of a Linux one.
+set(runtime_dirs "")
+foreach(target IN LISTS targets)
+    list(APPEND runtime_dirs "${target}")
+    if(target MATCHES "^linux-")
+        list(APPEND runtime_dirs "${target}-glibc")
+    endif()
+endforeach()
 
 if(DEFINED ARCHIVE)
     if(NOT EXISTS "${ARCHIVE}")
@@ -64,8 +78,8 @@ endif()
 
 set(missing "")
 set(checked 0)
-foreach(target IN LISTS targets)
-    if(target MATCHES "arm64$")
+foreach(target IN LISTS runtime_dirs)
+    if(target MATCHES "arm64(-glibc)?$")
         set(wanted "${levels_arm64}")
     else()
         set(wanted "${levels_x86_64}")
@@ -92,12 +106,12 @@ foreach(entry IN LISTS carried)
     string(REGEX REPLACE "^anti/lib/([^/]+)/([^/]+)/.*$" "\\1;\\2" pair "${entry}")
     list(GET pair 0 target)
     list(GET pair 1 level)
-    if(target MATCHES "arm64$")
+    if(target MATCHES "arm64(-glibc)?$")
         set(wanted "${levels_arm64}")
     else()
         set(wanted "${levels_x86_64}")
     endif()
-    if(NOT target IN_LIST targets OR NOT level IN_LIST wanted)
+    if(NOT target IN_LIST runtime_dirs OR NOT level IN_LIST wanted)
         list(APPEND extra "anti/lib/${target}/${level}")
     endif()
 endforeach()
@@ -112,4 +126,4 @@ if(NOT extra STREQUAL "")
     message(FATAL_ERROR "check-cpu: ${what} carries a runtime that "
                         "${LEVELS} does not name, in\n  ${printed}")
 endif()
-message(STATUS "${what}: ${checked} runtimes, one per level of each target")
+message(STATUS "${what}: ${checked} runtimes, one per level of each target and glibc mode")
