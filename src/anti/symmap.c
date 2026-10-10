@@ -274,6 +274,26 @@ static const char *source_line(const struct text *sources, const char *name,
     return NULL;
 }
 
+bool symmap_source_version(const struct text *sources, const char *name,
+                           struct text *out)
+{
+    size_t name_length = strlen(name);
+    size_t length = 0;
+    const char *line = source_line(sources, name, name_length, &length);
+    const char *version;
+    const char *stop;
+
+    if (line == NULL) {
+        return false;
+    }
+    version = line + name_length + 1;
+    stop = memchr(version, ' ', length - name_length - 1);
+    text_append_bytes(out, version,
+                      stop != NULL ? (size_t)(stop - version)
+                                   : length - name_length - 1);
+    return true;
+}
+
 /* Append to out a `source` line for each of the names, the names of a
    `text for` line separated by spaces, that the record in sources
    names. */

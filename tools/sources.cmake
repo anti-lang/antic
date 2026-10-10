@@ -133,6 +133,7 @@ set(ANTI_CORE_SOURCES
     src/anti/files.c
     src/anti/fmt.c
     src/anti/jsontree.c
+    src/anti/licensing.c
     src/anti/manifest.c
     src/anti/memreport.c
     src/anti/platform.c

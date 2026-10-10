@@ -500,6 +500,30 @@ The runtime archive holds a `licenses/` directory with one file per component, w
 by the CMake build. Beside them stands `sources.txt`, the record of the upstream source
 of every pinned component. `anti license` reads both. Nothing is typed twice.
 
+All five forms are built. Each prints the lines of a notice. A package has the line
+`package <name> <version> <identifier>` and its `attribution` lines. Each distinct text
+follows once, after the line `text for <names>` with the packages it covers. The line
+`source <name> <version> <url>` of `sources.txt` follows the text of a component that
+the record names.
+
+The plain form reads the package it runs from: `LICENSE` in its root for `antic` and
+`anti`, then `licenses/` with `sources.txt`. The version of a component is the one of the
+record, and `-` where the record names none. The identifier is the SPDX expression that
+the text of the component names. A text that holds the notices of more than one
+licence, as the copyright file of a package of Ubuntu does, has `LicenseRef-<name>`.
+
+`--project` builds the project as `anti build` does and takes its options. The notice
+names the runtime, then musl and mimalloc where the program links them, every package of
+`anti.lock`, the package of every bundled module the project imports, and the package of
+the project last. Without `--notice` it prints the notice of one target, the one of
+`--target` or the host. With `--notice` it writes `NOTICE.txt` for every target of the
+build, beside whatever the build wrote. `anti build` writes the same file beside a
+program and a shared library, from the project and not from the notice of the binary.
+
+`--from-archive` reads the member `<name>.package.o` of the archive, which holds the copy
+of the package header. It prints the package of the library with its identifier, its
+attributions and its text.
+
 ## Obligations of a shipped program
 
 Code emitted by `antic` is the user's code translated. The LLVM licence exception says
@@ -535,6 +559,8 @@ musl, Zig and each native library the release archive. The CMake build writes th
 from the pins, so nothing is typed twice. `anti license --from` prints the line of a
 component after its text, as `source <name> <version> <url>`, and `NOTICE.txt` holds the
 same, so a program of musl names the source of musl and mimalloc with their notices.
+The plain form of `anti license` prints every line of the record, each after the text of
+its component.
 
 ## Licence choices for Anti itself
 

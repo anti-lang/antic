@@ -376,10 +376,11 @@ the same list.
     comes back for the suite. `docs/vm-setup.md` holds the commands that turn
     the network of each VM off and on.
     `docs/reports/2026-10-10-dist-offline.md` reports it.
-37. The other four forms of `anti license` of `docs/distribution.md`: the
-    plain form, `--project`, `--project --notice` and `--from-archive`.
-    Today `--from` is the one form, and `anti build` writes `NOTICE.txt`
-    from the notice of the binary rather than from `anti.lock`.
+37. Done. The other four forms of `anti license` of `docs/distribution.md`:
+    the plain form over `licenses/` of the package, `--project`, `--project
+    --notice` and `--from-archive`. `anti build` writes `NOTICE.txt` from
+    `anti.lock` and the imported bundled modules, as `--project --notice`
+    writes it. `docs/reports/2026-10-10-dist-license-forms.md` reports it.
 
 Then `docs/anti-language-additions.md` in the order its "Timing" section gives:
 nullable pointers, the dev-mode checks, the lines of `-g`, tests and fixtures
@@ -449,9 +450,9 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1697 ctest tests pass on the development Mac, and two of them, the
+- 1701 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  The ASan and the UBSan builds run 1696 each with the same skips, without
+  The ASan and the UBSan builds run 1700 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
@@ -777,9 +778,12 @@ reports what it finished.
   that of 2026-10-08, in `docs/reports/2026-10-08-x86_64-hardware.md`. See
   "Scope and toolchain" in `docs/decisions.md`.
 - The `anti` tool holds `new`, `build`, `run`, `sdk export`, `sdk import`,
-  `test`, `check`, `fmt`, `doc`, `bind`, `symbols` and `license --from`, and
-  nothing else of `docs/tooling.md`. `anti build` writes `NOTICE.txt` beside
-  a program, and the notice of a program of musl names musl and mimalloc.
+  `test`, `check`, `fmt`, `doc`, `bind`, `symbols` and `license`, and
+  nothing else of `docs/tooling.md`. `anti license` has its five forms, and
+  `--project` builds the project to print its notice. `anti build` writes
+  `NOTICE.txt` beside a program from `anti.lock` and the bundled modules the
+  project imports, and the notice of a program of musl names musl and
+  mimalloc.
 - `anti symbols inventory`, `check` and `resolve` are built. They read the
   runtime configuration, find the program beside it and the libraries of
   `plugins` and `[injections]`, and match every binary to an archive by its

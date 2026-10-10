@@ -39,6 +39,12 @@ bool symmap_license_of(const char *binary, struct text *out);
    read. */
 bool symmap_license_sources(struct text *notice, const char *runtime);
 
+/* Append to out the version that the record of upstream sources in
+   sources gives the component of name, the second word of its line.
+   Returns false when the record names no such component. */
+bool symmap_source_version(const struct text *sources, const char *name,
+                           struct text *out);
+
 /* The build id of the program at the path, through symmap_notice.
    Returns false when the program carries none. */
 bool symmap_build_id(const char *program, struct text *out);

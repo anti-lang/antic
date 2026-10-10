@@ -865,31 +865,53 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     return status;
 }
 
-/* The package of a component of the runtime archive, with the text of
-   <runtime>/RUNTIME_LICENSES_DIR/<file>. The text stays empty when the
-   options name no runtime. */
-static void archive_package(const struct options *o, const char *name,
-                            const char *version, const char *license,
-                            const char *file, struct arena *arena,
-                            struct package *out)
+/* The package of a component of the runtime archive under the name it
+   has in a notice, with the identifier of notice_component_license and
+   the text of <runtime>/RUNTIME_LICENSES_DIR/<component>.txt. The text
+   stays empty when runtime is NULL. */
+static void archive_package(const char *runtime, const char *name,
+                            const char *component, const char *version,
+                            struct arena *arena, struct package *out)
 {
     struct text path = {0};
     struct text text = {0};
+    struct text license = {0};
+    char *copy;
 
     memset(out, 0, sizeof *out);
     out->name = name;
     out->version = version;
-    out->license = license;
+    notice_component_license(component, &license);
+    copy = arena_alloc(arena, license.length + 1);
+    memcpy(copy, text_cstr(&license), license.length + 1);
+    out->license = copy;
     out->license_text = "";
-    text_appendf(&path, "%s/%s/%s", o->runtime != NULL ? o->runtime : ".",
-                 RUNTIME_LICENSES_DIR, file);
-    if (o->runtime != NULL && read_text(text_cstr(&path), &text)) {
-        char *copy = arena_alloc(arena, text.length + 1);
+    text_appendf(&path, "%s/%s/%s%s", runtime != NULL ? runtime : ".",
+                 RUNTIME_LICENSES_DIR, component, RUNTIME_LICENSE_SUFFIX);
+    if (runtime != NULL && read_text(text_cstr(&path), &text)) {
+        copy = arena_alloc(arena, text.length + 1);
         memcpy(copy, text_cstr(&text), text.length);
         out->license_text = copy;
     }
     text_free(&path);
     text_free(&text);
+    text_free(&license);
+}
+
+size_t driver_runtime_packages(const char *runtime, bool musl,
+                               struct arena *arena, struct package *out)
+{
+    size_t n = 0;
+
+    archive_package(runtime, RUNTIME_MODULE, RUNTIME_LICENSE_NAME,
+                    ANTIC_VERSION, arena, &out[n++]);
+    if (musl) {
+        archive_package(runtime, MUSL_PACKAGE, MUSL_PACKAGE,
+                        ANTIC_MUSL_VERSION, arena, &out[n++]);
+        archive_package(runtime, MIMALLOC_PACKAGE, MIMALLOC_PACKAGE,
+                        ANTIC_MIMALLOC_VERSION, arena, &out[n++]);
+    }
+    return n;
 }
 
 /* The licence notice of a linked binary: the runtime, musl and mimalloc
@@ -907,24 +929,20 @@ static void build_notice(const struct options *o,
 {
     const struct interface *own = extras->own;
     size_t count = extras->library_count;
-    const struct package **list = alloc_zeroed(count + 4, sizeof *list);
-    struct package runtime;
-    struct package musl;
-    struct package mimalloc;
+    const struct package **list =
+        alloc_zeroed(count + DRIVER_RUNTIME_PACKAGES + 1, sizeof *list);
+    struct package archive[DRIVER_RUNTIME_PACKAGES];
+    bool musl = driver_links_musl(o, extras);
+    size_t archived = driver_runtime_packages(o->runtime, musl, arena, archive);
     size_t n = 0;
     size_t i;
     size_t j;
 
-    archive_package(o, RUNTIME_MODULE, ANTIC_VERSION, "0BSD",
-                    RUNTIME_LICENSE_FILE, arena, &runtime);
-    list[n++] = &runtime;
-    if (driver_links_musl(o, extras)) {
-        archive_package(o, MUSL_PACKAGE, ANTIC_MUSL_VERSION, "MIT",
-                        MUSL_PACKAGE ".txt", arena, &musl);
-        archive_package(o, MIMALLOC_PACKAGE, ANTIC_MIMALLOC_VERSION, "MIT",
-                        MIMALLOC_PACKAGE ".txt", arena, &mimalloc);
-        list[n++] = &musl;
-        list[n++] = &mimalloc;
+    if (o->links_musl != NULL) {
+        *o->links_musl = musl;
+    }
+    for (i = 0; i < archived; i++) {
+        list[n++] = &archive[i];
     }
     /* DESIGN: the package of the compiled module is always the last
        `package` line, even where a library of the same package came

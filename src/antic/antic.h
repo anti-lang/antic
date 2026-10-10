@@ -45,12 +45,19 @@
 #define RUNTIME_STD_DIR "std"
 /* The licence texts of the runtime archive, one file per component in
    <runtime>/RUNTIME_LICENSES_DIR/. CMakeLists.txt writes the text of the
-   runtime as RUNTIME_LICENSE_FILE, tools/get-sysroot.cmake the text of
+   runtime under RUNTIME_LICENSE_NAME, tools/get-sysroot.cmake the text of
    musl as <MUSL_PACKAGE>.txt and src/native/mimalloc.cmake the text of
    mimalloc as <MIMALLOC_PACKAGE>.txt. The test license_notice reads the
    two of a program of musl. */
 #define RUNTIME_LICENSES_DIR "licenses"
-#define RUNTIME_LICENSE_FILE "anti_rt.txt"
+/* The text of a component is <name>RUNTIME_LICENSE_SUFFIX, and the name
+   of the runtime's is RUNTIME_LICENSE_NAME. */
+#define RUNTIME_LICENSE_SUFFIX ".txt"
+#define RUNTIME_LICENSE_NAME "anti_rt"
+/* The licence of antic and anti in the root of a package, which the
+   CMake build writes into the root of the runtime archive as well. `anti
+   license` prints it before the components. */
+#define RUNTIME_OWN_LICENSE "LICENSE"
 /* The record of the upstream source of every pinned component, beside
    the texts: one line per component with the name of its text, its
    version and the URL of the exact source package, which
@@ -64,6 +71,10 @@
 /* The object beside the runtime library that a bundled archive carries
    instead of the licence text of src/rt/license.c. */
 #define RUNTIME_LICENSE_STUB "anti_rt_license_stub"
+/* The member of a static library for C that holds the copy of the
+   package header is <name>LIBRARY_PACKAGE_SUFFIX and the object suffix of
+   the target. `anti license --from-archive` finds the copy by it. */
+#define LIBRARY_PACKAGE_SUFFIX ".package"
 /* The symbol that the marker member of every bundled Mach-O library
    defines, and with _<package> after it the one that the library object
    of that package refers to. See bundle in driver_library.c. */
@@ -138,6 +149,22 @@ bool antic_library_header(const uint8_t *data, size_t size,
                           struct arena *arena, struct package *package,
                           const char **module, char *error,
                           size_t error_size);
+
+/* Append the lines of the licence notice of the packages to out, as
+   notice_text of notice.h writes them, without the two markers of a
+   binary. Every form of `anti license` prints these lines. */
+void antic_notice_lines(struct text *out,
+                        const struct package *const *packages, size_t count);
+
+/* Append the SPDX identifier of the component of licenses/ of the runtime
+   archive whose text is <component>.txt, through
+   notice_component_license. */
+void antic_component_license(const char *component, struct text *out);
+
+/* Whether data starts as a library file does, with its magic. `anti
+   license --from-archive` looks for the copy of a package header in a
+   member of a static library by it. */
+bool antic_library_starts(const uint8_t *data, size_t size);
 
 /* Split source into the tokens of the language, ending with TOKEN_EOF,
    as antic reads them. `anti fmt` works on the token list, which is the

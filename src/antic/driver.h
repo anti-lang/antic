@@ -130,6 +130,13 @@ struct options {
     /* --profile-use <file>: release mode optimizes with the profile that
        llvm-profdata merge wrote. */
     const char *profile_use;
+    /* DESIGN: whether a program links the C library of musl, and mimalloc
+       with it, is a fact of the whole program: a class with an `inject`
+       field or a call of plugin.load makes it a plugin host, which links
+       against glibc. The call that links the program writes the answer
+       here, so `anti` names in NOTICE.txt what the link took and decides
+       nothing a second time. NULL: nobody asks. */
+    bool *links_musl;
     const char *package_name;   /* --package-name, of the header. */
     const char *package_version;
     const char *const *dependencies;  /* --dependency <name>,<constraint>,<url> */
@@ -158,6 +165,20 @@ struct options {
 /* Compile options->input and return the process exit status for antic. */
 int driver_run(const struct options *options);
 struct arena;
+struct package;
+
+/* The most packages that driver_runtime_packages gives. */
+enum { DRIVER_RUNTIME_PACKAGES = 3 };
+
+/* The packages that the runtime archive puts into a binary, in the order
+   of its notice: the runtime, and after it musl and mimalloc where musl
+   says that the link takes the C library of musl. Each carries the
+   identifier of notice_component_license and the text of licenses/ of
+   the archive at runtime, in the memory pool, and an empty text where
+   runtime is NULL. Returns the count. The notice of antic and the one
+   `anti` writes from a project both start with these. */
+size_t driver_runtime_packages(const char *runtime, bool musl,
+                               struct arena *arena, struct package *out);
 
 /* The library files that options->libraries needs: those files, every
    module each of them imports, and every module below those. The paths

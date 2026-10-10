@@ -2006,6 +2006,37 @@ add_test(NAME license_notice
 set_tests_properties(license_notice PROPERTIES TIMEOUT 120
     SKIP_REGULAR_EXPRESSION "SKIP: ")
 
+# The four forms of `anti license` beside --from, one test each: the
+# plain form over licenses/ of the runtime archive, --project over a
+# project that links two packages, --project --notice and the NOTICE.txt
+# of `anti build`, and --from-archive over a static archive of `--lib
+# static`.
+foreach(form plain project notice archive)
+    set(name "license_${form}")
+    if(form STREQUAL "notice")
+        set(name license_project_notice)
+    elseif(form STREQUAL "archive")
+        set(name license_from_archive)
+    endif()
+    add_test(NAME ${name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DFORM=${form}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DLLVM_AR=${ANTIC_LLVM_AR}"
+            "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DVERSION=${PROJECT_VERSION}"
+            "-DMUSL_VERSION=${ANTIC_MUSL_VERSION}"
+            "-DMIMALLOC_VERSION=${ANTIC_MIMALLOC_VERSION}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/license-form-${form}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_license_forms.cmake")
+    set_tests_properties(${name} PROPERTIES TIMEOUT 180
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
 # The two shapes of a dependency, the repository layout over `file://`
 # and the two libraries for C.
 add_test(NAME anti_build_deps

@@ -9,8 +9,10 @@
 
 #include "alloc.h"
 #include "antl.h"
+#include "antl_io.h"
 #include "ast.h"
 #include "diagnostic.h"
+#include "notice.h"
 #include "parser.h"
 
 bool antic_library_header(const uint8_t *data, size_t size,
@@ -27,6 +29,29 @@ bool antic_library_header(const uint8_t *data, size_t size,
     *package = iface.package;
     *module = iface.module;
     return true;
+}
+
+void antic_notice_lines(struct text *out,
+                        const struct package *const *packages, size_t count)
+{
+    struct text marked = {0};
+    size_t begin = sizeof ANTI_NOTICE_BEGIN - 1;
+    size_t end = sizeof ANTI_NOTICE_END - 1;
+
+    notice_text(&marked, packages, count);
+    text_append_bytes(out, marked.data + begin, marked.length - begin - end);
+    text_free(&marked);
+}
+
+void antic_component_license(const char *component, struct text *out)
+{
+    notice_component_license(component, out);
+}
+
+bool antic_library_starts(const uint8_t *data, size_t size)
+{
+    return size >= sizeof antl_magic &&
+           memcmp(data, antl_magic, sizeof antl_magic) == 0;
 }
 
 bool antic_tokens(const char *source, size_t length, struct arena *arena,

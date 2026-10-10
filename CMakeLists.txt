@@ -253,6 +253,9 @@ set(ANTIC_RUNTIME_WINDOWS_OBJECTS platform_entry platform_stdio)
 # of the tree, the headers of glibc and the outline atomics of libgcc,
 # which a musl program does not link.
 configure_file(src/rt/LICENSE "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt" COPYONLY)
+# The licence of antic and anti stands in the root of the archive, as in
+# the root of a package, where `anti license` reads it.
+configure_file(LICENSE "${ANTIC_RUNTIME_DIR}/LICENSE" COPYONLY)
 # Beside the licence texts, licenses/sources.txt records the upstream
 # source of every pinned component, from tools/upstream-sources.cmake. The
 # packer copies it with the texts, and `anti license` prints the line of a

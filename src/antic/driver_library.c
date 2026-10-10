@@ -14,7 +14,6 @@
 #include "llvm_emit.h"
 #include "platform.h"
 
-#define PACKAGE_SUFFIX ".package"
 #define MARKER_SUFFIX ".bundle"
 #define EXPORTED_SUFFIX ".exported"
 
@@ -309,7 +308,8 @@ bool driver_build_c_library(const struct options *o, const char *object,
         struct paths members = {0};
         struct link_command c;
         const char *llvm_ar;
-        text_appendf(&package, "%s%s%s", text_cstr(&dir), name, PACKAGE_SUFFIX);
+        text_appendf(&package, "%s%s%s", text_cstr(&dir), name,
+                     LIBRARY_PACKAGE_SUFFIX);
         llvm_ar = o->llvm_ar != NULL
                       ? o->llvm_ar
                       : driver_archive_tool(o, "llvm-ar", &found_ar);

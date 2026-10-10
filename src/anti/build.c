@@ -19,6 +19,7 @@
 #include "deps.h"
 #include "driver.h"
 #include "files.h"
+#include "licensing.h"
 #include "manifest.h"
 #include "memreport.h"
 #include "modpath.h"
@@ -94,6 +95,10 @@ struct build {
        program reaches, in framework_arena. */
     struct arena framework_arena;
     struct unit_links links;
+    /* Whether the link of the program of this target took the C library
+       of musl, which the driver writes through links_musl of its
+       options. */
+    bool links_musl;
 };
 
 /* What decides one output of the cache beside its input. The addendum
@@ -367,24 +372,101 @@ static bool copy_into(const char *from, const char *to, const char *name)
 /* The file beside a binary in dist/ that holds the text of its notice. */
 #define NOTICE_FILE "NOTICE.txt"
 
-/* [provisional] DESIGN: NOTICE.txt beside a program or a shared library
-   holds the licence text of its notice, the text `anti license --from`
-   prints, with the upstream source of each component of the runtime
-   archive after its text. The notice names the packages the link put
-   into the binary, which are the packages of the project. A static
-   library for C carries no notice and gets no file. */
-static bool write_notice(const struct build *b)
+/* The package of the project itself, as the header of its library files
+   carries it: the fields of the manifest and the text of its licence
+   file. text holds the bytes of that file. */
+static bool own_package(const struct build *b, struct text *text,
+                        struct package *out)
 {
+    memset(out, 0, sizeof *out);
+    out->name = text_cstr(&b->m.name);
+    out->version = b->m.version.length > 0 ? text_cstr(&b->m.version)
+                                           : PACKAGE_VERSION_DEFAULT;
+    out->license = text_cstr(&b->m.license);
+    out->attribution = b->attribution.items;
+    out->attribution_count = b->attribution.count;
+    if (b->license.length > 0 &&
+        !files_read_reported(text_cstr(&b->license), text)) {
+        return false;
+    }
+    out->license_text = text_cstr(text);
+    return true;
+}
+
+/* [provisional] DESIGN: the notice of a project comes from the project
+   and not from the binary. It names the runtime, musl and mimalloc where
+   the link of the program took them, every package of anti.lock, the
+   package of every bundled module the project imports and the package of
+   the project, in the lines of the notice of a binary, with the upstream
+   source of each component of the runtime archive after its text. The
+   bundled modules are the library files that the modules of the project
+   and of the lock reach and that belong to neither, which
+   driver_libraries finds under std/ of the runtime archive. A package of
+   the lock that no module imports is named all the same, since the lock
+   is what the project declares. `anti build` writes the notice as
+   NOTICE.txt beside a program or a shared library, `anti license
+   --project --notice` beside whatever it built, and `anti license
+   --project` prints it. files[i] is the library file of unit i. */
+static bool deliver_notice(struct build *b, enum target t, enum cpu_level cpu,
+                           const struct text *files, bool beside)
+{
+    struct arena arena = {0};
+    struct licensing_project project = {0};
+    struct options search;
+    struct strings seed = {0};
+    struct strings libraries = {0};
+    struct package own;
+    struct text own_text = {0};
     struct text notice = {0};
     struct text path = {0};
+    const char **closure = NULL;    /* the memory pool holds the list */
+    size_t count = 0;
+    size_t i;
+    size_t j;
     bool ok;
 
-    text_appendf(&path, "%s/%s", text_cstr(&b->dist_dir), NOTICE_FILE);
-    ok = symmap_license_of(text_cstr(&b->name), &notice) &&
-         symmap_license_sources(&notice, text_cstr(&b->runtime)) &&
-         files_write(text_cstr(&path), &notice);
+    if (!beside && b->r->notice == BUILD_NOTICE_BUILD) {
+        return true;
+    }
+    for (i = 0; i < b->unit_count; i++) {
+        strings_add(&seed, text_cstr(&files[i]));
+    }
+    graph_libraries(b, &seed);
+    base_options(b, &search, t, cpu);
+    search.libraries = seed.items;
+    search.library_count = seed.count;
+    ok = driver_libraries(&search, &arena, &closure, &count) &&
+         own_package(b, &own_text, &own);
+    graph_libraries(b, &libraries);
+    for (i = 0; ok && i < count; i++) {
+        for (j = 0; j < seed.count; j++) {
+            if (strcmp(closure[i], seed.items[j]) == 0) {
+                break;
+            }
+        }
+        if (j == seed.count) {
+            strings_add(&libraries, closure[i]);
+        }
+    }
+    project.runtime = text_cstr(&b->runtime);
+    project.musl = b->links_musl;
+    project.libraries = libraries.items;
+    project.library_count = libraries.count;
+    project.own = &own;
+    ok = ok && licensing_project(&project, &notice);
+    if (ok && (beside || b->r->notice == BUILD_NOTICE_WRITE)) {
+        text_appendf(&path, "%s/%s", text_cstr(&b->dist_dir), NOTICE_FILE);
+        ok = files_write(text_cstr(&path), &notice);
+    }
+    if (ok && b->r->notice == BUILD_NOTICE_PRINT && b->depth == 0) {
+        fputs(text_cstr(&notice), stdout);
+    }
+    strings_free(&seed);
+    strings_free(&libraries);
+    text_free(&own_text);
     text_free(&notice);
     text_free(&path);
+    arena_free(&arena);
     return ok;
 }
 
@@ -488,6 +570,7 @@ static bool build_dev(struct build *b, enum target t, enum cpu_level cpu,
     o.library_count = libraries->count;
     o.objects = objects.items;
     o.object_count = objects.count;
+    o.links_musl = &b->links_musl;
     ok = driver_run(&o) == 0;
 done:
     for (i = 0; paths != NULL && i < count; i++) {
@@ -525,6 +608,7 @@ static bool build_release(struct build *b, enum target t, enum cpu_level cpu,
     o.profile_generate = b->r->profile_generate;
     o.profile_use = b->r->profile_use;
     release_lto(b, &o);
+    o.links_musl = &b->links_musl;
     return driver_run(&o) == 0;
 }
 
@@ -750,6 +834,7 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
     b->lib_dir.length = 0;
     b->obj_dir.length = 0;
     b->name.length = 0;
+    b->links_musl = false;
     text_appendf(&b->build_dir, "%s/%s/%s/%s", b->r->root,
                  text_cstr(&b->m.build), target_name(t), mode);
     text_appendf(&b->dist_dir, "%s/%s/%s/%s", b->r->root,
@@ -779,7 +864,8 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
     }
     main_at = linking_module(b);
     if (b->r->lib == BUILD_PROGRAM && main_at == b->unit_count) {
-        ok = write_library_files(b, files);
+        ok = write_library_files(b, files) &&
+             deliver_notice(b, t, cpu, files, false);
         goto done;
     }
     /* The link reads the module that carries `main` as its input, so its
@@ -819,8 +905,8 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
         ok = copy_into(text_cstr(&b->name), text_cstr(&b->dist_dir),
                        text_cstr(&deliverable));
     }
-    if (ok && b->r->lib != BUILD_LIB_STATIC) {
-        ok = write_notice(b);
+    if (ok) {
+        ok = deliver_notice(b, t, cpu, files, b->r->lib != BUILD_LIB_STATIC);
     }
     /* DESIGN: a Windows program of --memory-checks loads the DLL of
        AddressSanitizer from its own directory. The link wrote it beside
@@ -892,6 +978,7 @@ static bool path_dependency(void *context, const char *directory,
     sub.target = NULL;
     sub.lib = BUILD_PROGRAM;
     sub.run = false;
+    sub.notice = BUILD_NOTICE_BUILD;
     if (build_project(&sub, c->depth + 1) == 0) {
         text_appendf(out, "%s/%s/%s/%s", directory, text_cstr(&m.dist),
                      target_name(host), c->r->release ? "release" : "dev");

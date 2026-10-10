@@ -30,6 +30,13 @@ struct build_request {
     bool bundle_runtime;
     bool soname;
     bool run;                   /* `anti run`, which runs what it built */
+    /* DESIGN: `anti license --project` is a build that also prints the
+       notice of the project, and with `--notice` one that writes
+       NOTICE.txt beside whatever it built. A build alone writes the file
+       beside a program and a shared library. The build is what knows
+       whether the program links musl, so no second command decides
+       it. */
+    enum { BUILD_NOTICE_BUILD, BUILD_NOTICE_WRITE, BUILD_NOTICE_PRINT } notice;
 };
 
 /* Build the project and return the exit status of anti. */

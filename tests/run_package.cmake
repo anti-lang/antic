@@ -11,7 +11,9 @@
 # the runtime tree goes in, and anti bind --clang of the package binds
 # include/raylib/raylib.h as the anti of the tree binds the pinned source.
 # tools/check-offline.cmake, the check that step 5 of a release runs on
-# each VM with the network off, passes on the package.
+# each VM with the network off, passes on the package. `anti license` of
+# the package prints its LICENSE, every text of its licenses/ and every
+# line of its sources.txt.
 #
 #   cmake -DROOT=<repository> -DANTIC=<antic> -DANTI=<anti> -DHOST=<host>
 #         -DSYSROOT=<dir> -DRUNTIME=<dir> -DCLANG=<clang> -DLLVM_BIN=<dir>
@@ -402,6 +404,46 @@ foreach(name musl mimalloc)
     if(line STREQUAL "" OR at EQUAL -1)
         message(FATAL_ERROR "the packed anti license --from prints no `source "
                             "${line}` for ${name}\n${alone_out}")
+    endif()
+endforeach()
+# The plain form of the packed anti reads licenses/ of the package
+# alone, sources.txt included: the licence of antic and anti from LICENSE
+# of the package, then every component with its text, and every line of
+# the record after the text of its component.
+run_alone("anti license" "${WORK}/run" "${bin}/anti${suffix}" license)
+if(NOT alone_out MATCHES "^package antic ${version_pattern} MIT\npackage anti ${version_pattern} MIT\npackage anti\\.rt ${version_pattern} 0BSD\n")
+    message(FATAL_ERROR "the packed anti license does not start with antic, "
+                        "anti and the runtime\n${alone_out}")
+endif()
+file(READ "${WORK}/unpacked/anti/LICENSE" packed_license)
+string(FIND "${alone_out}" "\ntext for antic anti\n${packed_license}" at)
+if(at EQUAL -1)
+    message(FATAL_ERROR "the packed anti license prints no LICENSE of the "
+                        "package\n${alone_out}")
+endif()
+file(GLOB packed_texts RELATIVE "${WORK}/unpacked/anti/licenses"
+     "${WORK}/unpacked/anti/licenses/*.txt")
+list(REMOVE_ITEM packed_texts sources.txt)
+foreach(file IN LISTS packed_texts)
+    string(REGEX REPLACE "\\.txt$" "" name "${file}")
+    if(name STREQUAL "anti_rt")
+        set(name "anti.rt")
+    endif()
+    file(READ "${WORK}/unpacked/anti/licenses/${file}" text)
+    string(FIND "${alone_out}" "\npackage ${name} " line_at)
+    string(FIND "${alone_out}" "${text}" text_at)
+    if(line_at EQUAL -1 OR text_at EQUAL -1)
+        message(FATAL_ERROR "the packed anti license lacks the component "
+                            "${name} or its text\n${alone_out}")
+    endif()
+endforeach()
+file(STRINGS "${WORK}/unpacked/anti/licenses/sources.txt" packed_sources
+     REGEX "^[^#]")
+foreach(line IN LISTS packed_sources)
+    string(FIND "${alone_out}" "\nsource ${line}\n" at)
+    if(at EQUAL -1)
+        message(FATAL_ERROR "the packed anti license prints no `source "
+                            "${line}`\n${alone_out}")
     endif()
 endforeach()
 

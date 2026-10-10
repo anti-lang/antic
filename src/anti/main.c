@@ -10,6 +10,7 @@
 #include "doc.h"
 #include "files.h"
 #include "fmt.h"
+#include "licensing.h"
 #include "manifest.h"
 #include "modpath.h"
 #include "sdk.h"
@@ -17,6 +18,7 @@
 #include "project.h"
 #include "symmap.h"
 #include "syms.h"
+#include "target.h"
 #include "userdirs.h"
 #include "test.h"
 #include "text.h"
@@ -59,7 +61,10 @@ static int usage(FILE *out)
           "       anti symbols check --conf <config.toml>\n"
           "                          [--symbols <symbols.zip>]...\n"
           "       anti symbols resolve <trace.txt> --symbols <symbols.zip>...\n"
-          "       anti license --from <binary> [--runtime <dir>]\n",
+          "       anti license [--runtime <dir>]\n"
+          "       anti license --project [--notice] [<options of build>]\n"
+          "       anti license --from <binary> [--runtime <dir>]\n"
+          "       anti license --from-archive <library>\n",
           out);
     fputs("\n"
           "new writes a project of the default layout: anti.toml, src/ with\n"
@@ -150,56 +155,20 @@ static int usage(FILE *out)
           "raw trace with the function and the line of every frame whose\n"
           "build id an archive holds, and leaves every other frame raw.\n"
           "\n"
-          "license --from prints the licence notice that a program or a\n"
-          "shared library of Anti carries: one line per package with its\n"
-          "version and licence, then each licence text once, followed by\n"
-          "the upstream source of the component where the runtime archive\n"
-          "records one. build writes the same text as NOTICE.txt beside\n"
-          "such a binary in dist/.\n",
+          "license prints a notice: one line per package with its version\n"
+          "and licence, then each licence text once, followed by the\n"
+          "upstream source of the component where the runtime archive\n"
+          "records one. Alone it prints the licence of antic and anti and\n"
+          "every component of the runtime archive. --project builds the\n"
+          "project and prints the packages it links, from anti.lock and\n"
+          "the bundled modules it imports, for --target or the host, and\n"
+          "with --notice it writes them as NOTICE.txt in dist/, the file\n"
+          "build writes beside a program and a shared library. --from\n"
+          "prints the notice that a program or a shared library of Anti\n"
+          "carries, and --from-archive the licence fields of the package\n"
+          "header in a static library of --lib static.\n",
           out);
     return out == stdout ? 0 : 2;
-}
-
-/* `anti license --from <binary> [--runtime <dir>]`, the one form of the
-   command that is built. The line of each component in the record of
-   upstream sources follows its text, so the command reads the runtime
-   archive: the one --runtime names, or the one anti finds by the rule of
-   runtime_archive, as every other command does. */
-static int license_command(int argc, char **argv)
-{
-    struct text notice = {0};
-    struct text runtime = {0};
-    const char *binary = NULL;
-    int status = 1;
-    int i;
-
-    for (i = 2; i < argc; i++) {
-        if (strcmp(argv[i], "--from") == 0 && i + 1 < argc &&
-            binary == NULL) {
-            binary = argv[++i];
-        } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc &&
-                   runtime.length == 0) {
-            text_append(&runtime, argv[++i]);
-        } else {
-            text_free(&runtime);
-            return usage(stderr);
-        }
-    }
-    if (binary == NULL) {
-        text_free(&runtime);
-        return usage(stderr);
-    }
-    if (runtime.length == 0 && !runtime_archive(&runtime)) {
-        fputs("anti: the system does not say where the runtime archive is, "
-              "so license needs --runtime\n", stderr);
-    } else if (symmap_license_of(binary, &notice) &&
-               symmap_license_sources(&notice, text_cstr(&runtime))) {
-        fputs(text_cstr(&notice), stdout);
-        status = 0;
-    }
-    text_free(&notice);
-    text_free(&runtime);
-    return status;
 }
 
 /* `anti symbols` and its three commands. */
@@ -284,19 +253,18 @@ static const char **sources_of(const struct files_list *found)
     return sources;
 }
 
-/* `anti build` and `anti run`. */
-static int build_command(int argc, char **argv)
+/* Read the options of `anti build` from argv[from] on into request, for
+   the three commands that build a project: build, run and license
+   --project. Returns 0, or the exit status of a command line that is
+   refused. */
+static int build_options(int argc, char **argv, int from,
+                         struct build_request *out)
 {
-    struct build_request request;
-    struct text home = {0};
+    struct build_request request = *out;
     enum lto lto;
-    int status;
     int i;
 
-    memset(&request, 0, sizeof request);
-    request.root = ".";
-    request.run = strcmp(argv[1], "run") == 0;
-    for (i = 2; i < argc; i++) {
+    for (i = from; i < argc; i++) {
         if (strcmp(argv[i], "--release") == 0) {
             request.release = true;
         } else if (strcmp(argv[i], "--offline") == 0) {
@@ -360,11 +328,154 @@ static int build_command(int argc, char **argv)
               stderr);
         return 2;
     }
-    if (request.runtime == NULL && default_runtime(&home)) {
-        request.runtime = text_cstr(&home);
+    *out = request;
+    return 0;
+}
+
+/* Run the build of request with the runtime archive anti finds where
+   the request names none. */
+static int build_with_runtime(struct build_request *request)
+{
+    struct text home = {0};
+    int status;
+
+    if (request->runtime == NULL && default_runtime(&home)) {
+        request->runtime = text_cstr(&home);
     }
-    status = build_run(&request);
+    status = build_run(request);
     text_free(&home);
+    return status;
+}
+
+/* `anti build` and `anti run`. */
+static int build_command(int argc, char **argv)
+{
+    struct build_request request;
+    int status;
+
+    memset(&request, 0, sizeof request);
+    request.root = ".";
+    request.run = strcmp(argv[1], "run") == 0;
+    status = build_options(argc, argv, 2, &request);
+    return status != 0 ? status : build_with_runtime(&request);
+}
+
+/* `anti license --project [--notice]` with the options of `anti build`
+   in rest: the build of the project, which prints its notice or writes
+   it as NOTICE.txt.
+
+   [provisional] DESIGN: one notice is one text, so the form that prints
+   takes one target, the one of --target or the host, and never the lists
+   of `[targets]`. The build of a static library prints the line that
+   links it, which would stand before the notice, so that form writes the
+   file. */
+static int license_project(int count, char **rest, bool notice)
+{
+    struct build_request request;
+    enum target host;
+    int status;
+
+    memset(&request, 0, sizeof request);
+    request.root = ".";
+    request.notice = notice ? BUILD_NOTICE_WRITE : BUILD_NOTICE_PRINT;
+    status = build_options(count, rest, 0, &request);
+    if (status != 0) {
+        return status;
+    }
+    if (!notice) {
+        if (request.target != NULL && strcmp(request.target, "all") == 0) {
+            fputs("anti: license --project prints the notice of one target, "
+                  "so it takes --target <os>-<cpu> and not all\n", stderr);
+            return 2;
+        }
+        if (request.lib == BUILD_LIB_STATIC) {
+            fputs("anti: the build of a static library prints the line that "
+                  "links it, so license --project --lib static takes "
+                  "--notice\n", stderr);
+            return 2;
+        }
+        if (request.target == NULL) {
+            if (!target_host(&host)) {
+                fputs("anti: this host is no target of Anti, so license "
+                      "--project needs --target\n", stderr);
+                return 1;
+            }
+            request.target = target_name(host);
+        }
+    }
+    return build_with_runtime(&request);
+}
+
+/* `anti license` in its five forms: over the runtime archive, over the
+   project of the current directory with --project, over a binary with
+   --from and over a static library with --from-archive. The line of each
+   component in the record of upstream sources follows its text, so the
+   forms that print a component read the runtime archive: the one
+   --runtime names, or the one anti finds by the rule of runtime_archive,
+   as every other command does. */
+static int license_command(int argc, char **argv)
+{
+    struct text notice = {0};
+    struct text runtime = {0};
+    char **rest = files_array((size_t)argc + 1, sizeof *rest);
+    const char *binary = NULL;
+    const char *archive = NULL;
+    bool project = false;
+    bool written = false;
+    bool bad = false;
+    int count = 0;
+    int status = 1;
+    int i;
+
+    for (i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--project") == 0) {
+            project = true;
+        } else if (strcmp(argv[i], "--notice") == 0) {
+            written = true;
+        } else {
+            rest[count++] = argv[i];
+        }
+    }
+    if (project) {
+        status = license_project(count, rest, written);
+        free(rest);
+        return status;
+    }
+    for (i = 0; i < count && !bad; i++) {
+        if (strcmp(rest[i], "--from") == 0 && i + 1 < count &&
+            binary == NULL) {
+            binary = rest[++i];
+        } else if (strcmp(rest[i], "--from-archive") == 0 && i + 1 < count &&
+                   archive == NULL) {
+            archive = rest[++i];
+        } else if (strcmp(rest[i], "--runtime") == 0 && i + 1 < count &&
+                   runtime.length == 0) {
+            text_append(&runtime, rest[++i]);
+        } else {
+            bad = true;
+        }
+    }
+    free(rest);
+    if (bad || written || (binary != NULL && archive != NULL) ||
+        (archive != NULL && runtime.length > 0)) {
+        text_free(&runtime);
+        return usage(stderr);
+    }
+    if (archive != NULL) {
+        return licensing_from_archive(archive);
+    }
+    if (runtime.length == 0 && !runtime_archive(&runtime)) {
+        fputs("anti: the system does not say where the runtime archive is, "
+              "so license needs --runtime\n", stderr);
+    } else if (binary == NULL) {
+        status = licensing_plain(text_cstr(&runtime));
+    } else if (symmap_license_of(binary, &notice) &&
+               symmap_license_sources(&notice, text_cstr(&runtime))) {
+        fputs(text_cstr(&notice), stdout);
+        status = 0;
+    }
+    text_free(&notice);
+    text_free(&runtime);
     return status;
 }
 

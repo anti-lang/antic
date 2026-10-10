@@ -17,4 +17,8 @@
 void notice_text(struct text *out, const struct package *const *packages,
                  size_t count);
 
+/* Append the SPDX identifier of the component of licenses/ of the runtime
+   archive whose text is <component>.txt. */
+void notice_component_license(const char *component, struct text *out);
+
 #endif
