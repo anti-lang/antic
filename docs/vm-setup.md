@@ -100,6 +100,8 @@ At `3c047bd4` on 2026-10-08 it passes 1619 of 1619 with six skipped, with safe f
 every target and a profile in the LTO link. Its sanitizer suites did not run.
 At `95096d2b` on 2026-10-08, on Ubuntu 26.04.1, it passes 1619 of 1619 with six skipped,
 in 153 s. Its sanitizer suites did not run.
+At `9c720c2c` on 2026-10-10 it passes 1627 of 1627 with five skipped, in 276 s, as the
+last phase of step 5 of a release. Its sanitizer suites did not run.
 
 | Untested item | Tests that run it |
 |---|---|
@@ -197,6 +199,9 @@ At `27cee303` on 2026-10-08 it passes 1610 of 1610 with fourteen skipped, in 797
 `ctest -j4` after the build.
 At `3f111e33` on 2026-10-10 it passes 1611 of 1611 with thirteen skipped, in five parts
 of `ctest -j4 -I`, against the Windows sysroots of mingw-w64 and no Build Tools.
+At `9c720c2c` on 2026-10-10 it passes 1615 of 1615 with fourteen skipped, in eight parts
+of `ctest -j4 -I` that took 1138 s together, after the install and the check with the
+network off of step 5 of a release.
 
 ### SSH from the Mac
 
