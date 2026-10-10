@@ -127,21 +127,3 @@ GLIBC_AARCH64_LIBGLVND_DIGEST=47e4a53b0b3bbf007e2e4e7efb481ec4db4d127914b0d35555
 MINGW_VERSION=14.0.0
 MINGW_URL=https://downloads.sourceforge.net/project/mingw-w64/mingw-w64/mingw-w64-release/mingw-w64-v@VERSION@.tar.bz2
 MINGW_DIGEST=6eaf921d9eb987d3820b364ea9775bc19b965ec81490b6fdd716526c28e1995c
-# xwin, which built the Windows sysroots before the step mingw of
-# docs/work-order-distribution.md. The pins below reach no script and leave
-# with the step no-xwin.
-XWIN_VERSION=0.10.0
-# The prebuilt xwin of that version, which the script installs when xwin is
-# not on the path. The project publishes no build for macOS, where cargo
-# install xwin --locked --version 0.10.0 supplies it.
-XWIN_BIN_linux-x86_64=xwin-0.10.0-x86_64-unknown-linux-musl.tar.gz
-XWIN_BIN_linux-x86_64_DIGEST=d870eb4b2f390878af6da1ccd3cf321d22fcb72720984853b4be732ae597fc88
-XWIN_BIN_linux-arm64=xwin-0.10.0-aarch64-unknown-linux-musl.tar.gz
-XWIN_BIN_linux-arm64_DIGEST=6d56d28537a86f37aa3d041318898f25ee3100c6b6ec332ad873c28faf37be23
-XWIN_BIN_windows-x86_64=xwin-0.10.0-x86_64-pc-windows-msvc.tar.gz
-XWIN_BIN_windows-x86_64_DIGEST=96e83665ef5c1406aabd0be603a8d08e67e604f36fda630b6807ee948a614e26
-XWIN_BIN_URL=https://github.com/Jake-Shadle/xwin/releases/download/0.10.0
-XWIN_CRT_VERSION=14.44.17.14
-XWIN_SDK_VERSION=10.0.26100
-XWIN_TREE_X86_64=8574fd515e077867db8b43de9ecdb3f2b344bdecd6f360a8c2be2ebf6b4f608e
-XWIN_TREE_AARCH64=4c1b8ae7edd23ed5f0389465c84f39176d862e7b9a232b7787f8d36c27bcabbc

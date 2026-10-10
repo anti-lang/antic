@@ -128,7 +128,7 @@ function(install_run name staging out_variable log_variable)
                 "ANTI_BASE=file://${WORK}/base"
                 "ANTI_HOME=${home}"
                 "ANTI_STAGING=${staging}"
-                ANTI_REPLACE=yes ANTI_PATH=no ANTI_MICROSOFT=no
+                ANTI_REPLACE=yes ANTI_PATH=no
                 sh "${WORK}/install.sh"
         RESULT_VARIABLE failed OUTPUT_VARIABLE out ERROR_VARIABLE err
         ENCODING NONE)

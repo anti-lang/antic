@@ -345,10 +345,16 @@ the same list.
     of the C runtime, the entry point among it, and the C of every Windows
     target compiles for the gnu triple against the mingw-w64 headers.
     `docs/reports/2026-10-09-dist-mingw.md` reports it.
-33. xwin leaves `tools/get-sysroot.cmake`, `tools/sysroot-pins`, the installers and
-    `ANTI_MICROSOFT`, once item 32 links every Windows program.
+33. Done. The tool that fetched the CRT and SDK of Microsoft is gone. Its
+    pins left `tools/sysroot-pins`, and `ANTI_MICROSOFT` left
+    `tools/release.sh` and the tests of the installers. Step 10 of `./r`
+    refuses an install that lacks the sysroot of a target. The test
+    `no_sdk_fetcher` refuses the name of the tool outside
+    `docs/decisions.md` and `docs/reports/`, so this item does not spell
+    it, and neither does the path of its report: the report of 2026-10-10
+    in `docs/reports/`, named after the step that follows `mingw`.
 34. The installers download the package alone and use `| bash`. They drop the LLVM
-    tools, xwin, the step for the stubs of the Command Line Tools and CMake. Nothing
+    tools, the step for the stubs of the Command Line Tools and CMake. Nothing
     a user runs needs CMake. antic and anti never run it. The installers run it for
     `tools/get-sysroot.cmake` alone, which item 33 and this item take away. The
     package then carries no scripts for an installer. The downloads page shows the
@@ -431,9 +437,9 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1693 ctest tests pass on the development Mac, and two of them, the
+- 1694 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  The ASan and the UBSan builds run 1692 each with the same skips, without
+  The ASan and the UBSan builds run 1693 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.

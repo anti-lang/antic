@@ -179,7 +179,7 @@ function(install_run name out_variable log_variable)
                 "ANTI_GITHUB_API=file://${WORK}/github/latest.json"
                 "ANTI_SITE_BASE=file://${WORK}/site"
                 "ANTI_HOME=${home}"
-                ANTI_REPLACE=yes ANTI_PATH=no ANTI_MICROSOFT=no
+                ANTI_REPLACE=yes ANTI_PATH=no
                 ${ARGN}
                 sh "${WORK}/install.sh"
         RESULT_VARIABLE failed OUTPUT_VARIABLE out ERROR_VARIABLE err

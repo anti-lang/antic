@@ -942,6 +942,12 @@ add_test(NAME script_policies
 add_test(NAME no_workflows
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_no_workflows.cmake")
+# The tool that fetched the CRT and SDK of Microsoft is named nowhere but in
+# the history of docs/decisions.md and docs/reports/, and no file of the
+# code names the variable of the installers that went with it.
+add_test(NAME no_sdk_fetcher
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_no_sdk_fetcher.cmake")
 
 # The warning flags of the build stand in tools/warnings.cmake and
 # src/native/warnings.cmake alone, as docs/c-guidelines.md requires.

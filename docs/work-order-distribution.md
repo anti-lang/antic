@@ -24,8 +24,9 @@ Checked against the tree at `feab21fb` on 2026-10-08.
   `lib/<target>/` with the runtimes per level and the native libraries,
   `std/`, `licenses/` with one text per component, and `sysroot/` with
   eight sysroots: musl and glibc for both Linux targets, Zig's stubs for
-  both macOS targets, and the trees of xwin for both Windows targets. The
-  Windows trees are 630 MB and 857 MB, since xwin fetches the whole SDK.
+  both macOS targets, and for both Windows targets the trees of the SDK
+  fetcher, a tool that downloads the CRT and SDK of Microsoft. The Windows
+  trees are 630 MB and 857 MB, since it fetches the whole SDK.
 - `tools/pack-anti.cmake` lays the package out as `bin/` with antic and
   anti alone, `lib/`, `std/`, `licenses/`, `sysroot/` with the two musl
   sysroots and `usr/` of the two macOS ones, and `tools/` with
@@ -36,15 +37,16 @@ Checked against the tree at `feab21fb` on 2026-10-08.
   `SHA256SUMS` from the GitHub release and `SHA256SUMS.sig` from
   anti-lang.com, check them with openssl, unpack, and then install the
   LLVM tools from `anti-lang/llvm-tools` and the sysroot of the host with
-  CMake and `tools/get-sysroot.cmake`. `ANTI_MICROSOFT` lets xwin fetch
-  the Microsoft CRT and SDK. `install.sh` is 452 lines, `install.ps1` 413.
+  CMake and `tools/get-sysroot.cmake`. `ANTI_MICROSOFT` lets the SDK
+  fetcher download the Microsoft CRT and SDK. `install.sh` is 452 lines,
+  `install.ps1` 413.
 - `tools/get-sysroot.cmake` installs the sysroots from `tools/sysroot-pins`.
   musl comes from Alpine, glibc 2.35 with the kernel headers and the X11 and
   OpenGL packages from Ubuntu 22.04, and the macOS stubs from Zig. The
-  Windows trees come through xwin under `ACCEPT_LICENSE=yes`.
+  Windows trees come through the SDK fetcher under `ACCEPT_LICENSE=yes`.
 - `src/antic/linker.c` links a Windows program against `msvcrt.lib`,
   `ucrt.lib`, `libvcruntime.lib` and `legacy_stdio_definitions.lib` of the
-  xwin tree, and a program of `--profile-generate` against `libcmt.lib`,
+  fetched tree, and a program of `--profile-generate` against `libcmt.lib`,
   since compiler-rt builds its profile runtime of Windows against the
   static C runtime. `/NOENTRY` is given where the entry is antic's own,
   from `src/rt/start.c`.
@@ -186,7 +188,7 @@ Each of these settles a point the gap list left open. Eddie decided them on
    on from a script.
 9. **The order of the steps is the order below.** The LLVM tools first,
    since every later test of a package needs them. mingw-w64 before the
-   installers, since the installers lose xwin with it.
+   installers, since the installers lose the SDK fetcher with it.
 
 ## Steps
 
@@ -277,18 +279,22 @@ holds for the two runtimes of compiler-rt. The report records the size of
 the two Windows sysroots before and after, which of the two triples of
 decision 4 held for the C of the runtime, and the DLLs a program of
 `--memory-checks` needs. Done when the suite passes on all three machines
-with the new sysroot and the xwin trees are no longer read anywhere.
+with the new sysroot and the fetched trees are no longer read anywhere.
 
-`no-xwin`. xwin leaves `tools/get-sysroot.cmake`, `tools/sysroot-pins`,
+`no-sdk-fetcher`, which `drive-dist.sh` runs under the name of the tool.
+The SDK fetcher leaves `tools/get-sysroot.cmake`, `tools/sysroot-pins`,
 `tools/install.sh`, `tools/install.ps1`, `ANTI_MICROSOFT`, `CMakeLists.txt`
-and every document. `grep -ri xwin` over `src/`, `tests/`, `tools/`,
-`docs/notes/`, `docs/site/`, `docs/*.md` and `CLAUDE.md` finds nothing but
-history in `docs/reports/` and `docs/decisions.md`. Done when the three
-suites pass and the grep finds nothing.
+and every document, this one included. A search for the name of the tool
+with `grep -ri` over `src/`, `tests/`, `tools/`, `docs/notes/`,
+`docs/site/`, `docs/*.md` and `CLAUDE.md` finds nothing. `docs/reports/`
+and `docs/decisions.md` keep the name, since they are history. The test
+`no_sdk_fetcher` holds the search. Done when the three suites pass and the
+search finds nothing.
 
 `installers`. The installers download the package alone, as decision 7
 says. `install.sh` and `install.ps1` lose the LLVM tools, the sysroot, CMake
-and xwin, and `tools/` leaves the package in `tools/pack-anti.cmake`.
+and the SDK fetcher, and `tools/` leaves the package in
+`tools/pack-anti.cmake`.
 `tools/downloads.html.in` shows the manual install with the same checks as
 commands, and `docs/distribution.md` under "Binary downloads" and "What the
 site serves" says what the installer does now. The test `release_dry_run`

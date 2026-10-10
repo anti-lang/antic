@@ -546,7 +546,7 @@ data=\${XDG_DATA_HOME:-\$HOME/.local/share}/anti
 bin=\${XDG_BIN_HOME:-\$HOME/.local/bin}
 rm -rf "\$data" "\$bin/antic" "\$bin/anti"
 if ANTI_VERSION=$version ANTI_BASE=file://\$HOME/anti-release \\
-    ANTI_REPLACE=yes ANTI_PATH=yes ANTI_MICROSOFT=no \\
+    ANTI_REPLACE=yes ANTI_PATH=yes \\
     sh "\$HOME/anti-release/install.sh" > release-unsigned.log 2>&1; then
     echo "the installer took a manifest without a signature"
     exit 1
@@ -559,7 +559,7 @@ grep -q 'SHA256SUMS.sig' release-unsigned.log || {
 echo "the installer refuses a manifest without a signature"
 rm -rf "\$data"
 ANTI_VERSION=$version ANTI_BASE=file://\$HOME/anti-release ANTI_STAGING=yes \\
-    ANTI_REPLACE=yes ANTI_PATH=yes ANTI_MICROSOFT=no \\
+    ANTI_REPLACE=yes ANTI_PATH=yes \\
     sh "\$HOME/anti-release/install.sh" > release-install.log 2>&1
 [ -f "\$data/.anti-install" ] || { echo "the installer wrote no marker"; exit 1; }
 "\$bin/antic" --version
@@ -611,7 +611,6 @@ set ANTI_VERSION=$version
 set ANTI_BASE=%USERPROFILE%\anti-release
 set ANTI_REPLACE=yes
 set ANTI_PATH=yes
-set ANTI_MICROSOFT=no
 rem DESIGN: the install the VM checks is the one a user gets, in the
 rem directories of Windows and not a tree under ANTI_HOME. DATA holds the
 rem archive and BIN the two executables that go on the PATH.
@@ -1046,7 +1045,7 @@ verify() {
     curl -fsSL "$site_root/install.sh" > "$dist/verify/install.sh" ||
         die "step 10: the installer did not download from $site_root"
     ANTI_VERSION=$version ANTI_HOME=$home ANTI_REPLACE=yes ANTI_PATH=no \
-        ANTI_MICROSOFT=no sh "$dist/verify/install.sh" \
+        sh "$dist/verify/install.sh" \
         > "$logs/verify.log" 2>&1 ||
         die "step 10: the install failed, see $logs/verify.log"
     printed=$("$home/bin/anti" --version)
@@ -1068,15 +1067,12 @@ HELLO
     (cd "$dist/verify" && "$home/bin/antic" hello.anti -o hello) ||
         die "step 10: the program did not compile for $host_target"
     [ "$("$dist/verify/hello")" = hello ] || die "step 10: the program printed nothing"
-    # A fresh install links for the four targets whose sysroot it
-    # carries. The C runtime of Windows is Microsoft's, and the
-    # installer takes it only from a user who accepts their licence.
+    # A fresh install links for the other five targets, since the package
+    # carries the sysroot of every one.
     for target in $hosts; do
         [ "$target" != "$host_target" ] || continue
-        if [ ! -d "$home/sysroot/$target" ]; then
-            say "$target waits for the C runtime of Microsoft, which this install left out"
-            continue
-        fi
+        [ -d "$home/sysroot/$target" ] ||
+            die "step 10: the install carries no sysroot of $target"
         (cd "$dist/verify" && "$home/bin/antic" --target "$target" hello.anti \
             -o "hello-$target") || die "step 10: nothing linked for $target"
         say "links for $target"
