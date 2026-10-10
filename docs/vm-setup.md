@@ -195,6 +195,8 @@ At `95096d2b` on 2026-10-08 it passes 1607 of 1607 with twelve skipped, in 825 s
 `ctest -j4` after the build.
 At `27cee303` on 2026-10-08 it passes 1610 of 1610 with fourteen skipped, in 797 s with
 `ctest -j4` after the build.
+At `3f111e33` on 2026-10-10 it passes 1611 of 1611 with thirteen skipped, in five parts
+of `ctest -j4 -I`, against the Windows sysroots of mingw-w64 and no Build Tools.
 
 ### SSH from the Mac
 
