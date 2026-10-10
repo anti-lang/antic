@@ -69,7 +69,7 @@ global anti.rt.provides.built.0 size 6 align 1 bytes 30 2e 30 2e 30 00
 global anti.rt.registry.0 size 14 align 1 bytes 64 65 76 69 72 74 5f 70 6c 75 67 69 6e 00
 global anti.rt.registry.classes [1]anti.rt.Class { anti.rt.Class { @devirt_plugin.Dog.descriptor, @devirt_plugin.Dog.init, @anti.rt.registry.0, i64 13, i64 0 } }
 global anti.rt.provides.entries [1]anti.rt.Provides { anti.rt.Provides { @anti.rt.provides.0, i64 21, @devirt_plugin.Speaker.descriptor, @devirt_plugin.Dog.descriptor, @devirt_plugin.Dog.init, i64 0, i64 0, @anti.rt.provides.chain.0, i64 18, i64 0, size_of devirt_plugin.Speaker, @anti.rt.provides.built.0, i64 5 } }
-global anti.rt.provides.version size 6 align 1 bytes 30 2e 31 2e 30 00
+global anti.rt.provides.version size 6 align 1 bytes 30 2e 32 2e 30 00
 global anti_rt_provides anti.rt.Provided { i64 1, @anti.rt.provides.entries, @anti.rt.provides.version, i64 5, i64 1, @anti.rt.registry.classes }
 fn devirt_plugin.Dog.speak(%0: ptr nonnull deref(size_of devirt_plugin.Dog)) -> i64 {
 b0:

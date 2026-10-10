@@ -11,9 +11,11 @@
 #         -DVERSION=<version> -DWORK=<dir> [-DWRITE=yes]
 #         -P tests/run_emit_identity.cmake
 #
-# The text names the version of antic, which the digest reads as VERSION,
-# so a new version leaves the manifest as it is. WRITE=yes writes the
-# manifest, on the Mac, after a change to antic that changes its output.
+# The text names the version of antic in its ident line, which the digest
+# reads as VERSION. It names the version of the standard library in the
+# constant anti.lang.package.version too, which the digest keeps, so a new
+# version writes the manifest again. WRITE=yes writes the manifest, on the
+# Mac, after a change to antic that changes its output.
 
 cmake_minimum_required(VERSION 3.21)
 

@@ -626,7 +626,7 @@ The bytes between the markers in `dist/macos-arm64/release/hello` read as below.
 
 ```text
 ANTI_LICENSES_BEGIN
-package anti.rt 0.1.0 0BSD
+package anti.rt 0.2.0 0BSD
 package com.example 1.2.4 MIT
 attribution Copyright 2026 Example
 package com.example.hello 2.0.0 MIT

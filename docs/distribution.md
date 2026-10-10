@@ -39,7 +39,7 @@ https://github.com/anti-lang/antic/releases/download/v<version>/SHA256SUMS
   no file of the repository before they hold a package. The test `installer_github`
   pins their copies against that file.
 - `<file>` names the component, the version and the target, as in
-  `anti-0.1.0-macos-arm64.tar.xz`. The target names are the six of `--target`.
+  `anti-0.2.0-macos-arm64.tar.xz`. The target names are the six of `--target`.
 - A release holds the six packages and the six symbols archives. `SHA256SUMS` names
   all twelve, and `shasum -c` reads it. It is the manifest the release script signed.
   `SHA256SUMS.sig` stands on anti-lang.com, never here. Both installers read the

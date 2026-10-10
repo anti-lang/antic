@@ -753,7 +753,7 @@ reports what it finished.
 - Of the small things, `switch` on a `str` is built, a chain of calls of
   `anti.text.equal`, with `x in lo..hi`, `p ?? q`, `p?.x` and `p?.f(args)`.
   See "Small things" in `docs/decisions.md`.
-- Anti 0.1.0 installs with one command. The six packages, the six symbols archives and
+- Anti 0.2.0 installs with one command. The six packages, the six symbols archives and
   `SHA256SUMS` are assets of the GitHub release of the tag, which `tools/release-base`
   names. anti-lang.com serves text alone: the two installers, the downloads page,
   `SHA256SUMS.sig` of every version and the public key, which is the single trust

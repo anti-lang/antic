@@ -60,7 +60,7 @@ own. Every `get-*.cmake` script takes the same `-DANTI_DEPS_DIR`.
 
 ## Installing
 
-Anti 0.1.0 installs with one command on every host. The installers and the
+Anti 0.2.0 installs with one command on every host. The installers and the
 packages are served from anti-lang.com, and `docs/distribution.md` describes the
 package of each host and the checks it passes.
 

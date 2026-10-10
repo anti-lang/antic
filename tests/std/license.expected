@@ -1,6 +1,6 @@
 exit 0
-package anti.rt 0.1.0 0BSD
-package anti 0.1.0 0BSD
+package anti.rt 0.2.0 0BSD
+package anti 0.2.0 0BSD
 package license 0.0.0 
 text for anti.rt anti
 BSD Zero Clause License
