@@ -445,6 +445,25 @@ foreach(pair IN LISTS vm_scripts)
     endif()
 endforeach()
 
+# DESIGN: the script of a VM writes its logs beside the files of the run,
+# in anti-release of the user, and none into the tree it extracted. The
+# tree of a VM has no history, so the test repo_layout reads its directory
+# there, and a log at its top level is an entry outside the layout. The
+# real step 5 of 2026-10-10 failed on that test, which is how the rule
+# got here. A log is named by a variable of the script, never bare.
+foreach(script vm-linux.sh vm-windows.cmd)
+    file(READ "${copy}/build/dist/dry-run/work/${script}" script_text)
+    if(script_text MATCHES "[> ]([A-Za-z][A-Za-z0-9_-]*\\.log)")
+        message(FATAL_ERROR "${script} of step 5 names the log "
+                            "${CMAKE_MATCH_1} without a directory, so it "
+                            "lands in the tree of the VM, where repo_layout "
+                            "refuses it")
+    endif()
+    if(NOT script_text MATCHES "anti-release[^\n]*\n")
+        message(FATAL_ERROR "${script} of step 5 names no anti-release")
+    endif()
+endforeach()
+
 # Run step 5 of the copy again with <variable> set to <value> for the
 # stand-in of ssh, and answer with the status, the output and the calls.
 function(vm_run variable value status_variable out_variable calls_variable)

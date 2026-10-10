@@ -597,26 +597,30 @@ A=\${XDG_DATA_HOME:-\$HOME/.local/share}/anti-vm
 # which is the pair antic has to find its runtime through.
 data=\${XDG_DATA_HOME:-\$HOME/.local/share}/anti
 bin=\${XDG_BIN_HOME:-\$HOME/.local/bin}
+# DESIGN: the logs stand beside the files of the run and never in the
+# tree. That tree has no history, so its test repo_layout reads the
+# directory, and a log at its top level is an entry outside the layout.
+logs=\$HOME/anti-release
 case \$1 in
 install)
     tar -xmf "\$HOME/anti-release/tree.tar"
     rm -rf "\$data" "\$bin/antic" "\$bin/anti"
     if ANTI_VERSION=$version ANTI_BASE=file://\$HOME/anti-release \\
         ANTI_REPLACE=yes ANTI_PATH=yes \\
-        sh "\$HOME/anti-release/install.sh" > release-unsigned.log 2>&1; then
+        sh "\$HOME/anti-release/install.sh" > "\$logs/release-unsigned.log" 2>&1; then
         echo "the installer took a manifest without a signature"
         exit 1
     fi
-    grep -q 'SHA256SUMS.sig' release-unsigned.log || {
+    grep -q 'SHA256SUMS.sig' "\$logs/release-unsigned.log" || {
         echo "the installer stopped for another reason than the signature"
-        cat release-unsigned.log
+        cat "\$logs/release-unsigned.log"
         exit 1
     }
     echo "the installer refuses a manifest without a signature"
     rm -rf "\$data"
     ANTI_VERSION=$version ANTI_BASE=file://\$HOME/anti-release ANTI_STAGING=yes \\
         ANTI_REPLACE=yes ANTI_PATH=yes \\
-        sh "\$HOME/anti-release/install.sh" > release-install.log 2>&1
+        sh "\$HOME/anti-release/install.sh" > "\$logs/release-install.log" 2>&1
     [ -f "\$data/.anti-install" ] || { echo "the installer wrote no marker"; exit 1; }
     "\$bin/antic" --version
     "\$bin/anti" --version
@@ -644,7 +648,7 @@ offline)
     # from taking a directory that no installer of Anti wrote.
     mkdir -p "\$HOME/anti-release/not-an-install"
     if ANTI_HOME=\$HOME/anti-release/not-an-install ANTI_REMOVE=yes \\
-        sh "\$HOME/anti-release/uninstall.sh" > release-marker.log 2>&1; then
+        sh "\$HOME/anti-release/uninstall.sh" > "\$logs/release-marker.log" 2>&1; then
         echo "the uninstaller removed a directory with no marker"
         exit 1
     fi
@@ -652,7 +656,7 @@ offline)
         { echo "the uninstaller removed a directory with no marker"; exit 1; }
     echo "the uninstaller refuses a directory without the marker"
     ANTI_REMOVE=yes sh "\$HOME/anti-release/uninstall.sh" \\
-        > release-uninstall.log 2>&1
+        > "\$logs/release-uninstall.log" 2>&1
     [ ! -d "\$data" ] || { echo "the uninstaller left \$data"; exit 1; }
     [ ! -f "\$bin/antic" ] || { echo "the uninstaller left \$bin/antic"; exit 1; }
     echo "the install of linux-arm64 is checked and removed"
@@ -660,10 +664,10 @@ offline)
 suite)
     opts="-DANTIC_CLANG_DIR=\$A/clang -DANTIC_LLVM_DIR=\$A/toolchain"
     opts="\$opts -DANTIC_SYSROOT_DIR=\$A/sysroot -DANTIC_RAYLIB_DIR=\$A/raylib/raylib-6.0"
-    cmake -S . -B $host_tree \$opts > release-configure.log 2>&1
-    cmake --build $host_tree -j"\$(nproc)" > release-build.log 2>&1
-    ctest --test-dir $host_tree -j"\$(nproc)" > release-ctest.log 2>&1
-    grep 'tests passed' release-ctest.log
+    cmake -S . -B $host_tree \$opts > "\$logs/release-configure.log" 2>&1
+    cmake --build $host_tree -j"\$(nproc)" > "\$logs/release-build.log" 2>&1
+    ctest --test-dir $host_tree -j"\$(nproc)" > "\$logs/release-ctest.log" 2>&1
+    grep 'tests passed' "\$logs/release-ctest.log"
     ;;
 *)
     echo "run.sh takes install, offline or suite"
@@ -688,6 +692,10 @@ rem directories of Windows and not a tree under ANTI_HOME. DATA holds the
 rem archive and BIN the two executables that go on the PATH.
 set DATA=%LOCALAPPDATA%\anti
 set BIN=%LOCALAPPDATA%\Programs\anti\bin
+rem DESIGN: the logs stand beside the files of the run and never in the
+rem tree. That tree has no history, so its test repo_layout reads the
+rem directory, and a log at its top level is an entry outside the layout.
+set LOGS=%USERPROFILE%\anti-release
 if "%1"=="install" goto install
 if "%1"=="offline" goto offline
 if "%1"=="suite" goto suite
@@ -702,15 +710,15 @@ set ANTI_REPLACE=yes
 set ANTI_PATH=yes
 if exist "%DATA%" rmdir /s /q "%DATA%"
 if exist "%BIN%" rmdir /s /q "%BIN%"
-powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\install.ps1 > release-unsigned.log 2>&1
+powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\install.ps1 > "%LOGS%\release-unsigned.log" 2>&1
 if not errorlevel 1 (echo the installer took a manifest without a signature & exit /b 1)
-findstr /C:"SHA256SUMS.sig" release-unsigned.log > nul
-if errorlevel 1 (echo the installer stopped for another reason than the signature & type release-unsigned.log & exit /b 1)
+findstr /C:"SHA256SUMS.sig" "%LOGS%\release-unsigned.log" > nul
+if errorlevel 1 (echo the installer stopped for another reason than the signature & type "%LOGS%\release-unsigned.log" & exit /b 1)
 echo the installer refuses a manifest without a signature
 if exist "%DATA%" rmdir /s /q "%DATA%"
 set ANTI_STAGING=yes
-powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\install.ps1 > release-install.log 2>&1
-if errorlevel 1 (echo the install failed & type release-install.log & exit /b 1)
+powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\install.ps1 > "%LOGS%\release-install.log" 2>&1
+if errorlevel 1 (echo the install failed & type "%LOGS%\release-install.log" & exit /b 1)
 if not exist "%DATA%\.anti-install" (echo the installer wrote no marker & exit /b 1)
 "%BIN%\antic.exe" --version
 "%BIN%\anti.exe" --version
@@ -739,11 +747,11 @@ rem from taking a directory that no installer of Anti wrote.
 if not exist "%USERPROFILE%\anti-release\not-an-install" mkdir "%USERPROFILE%\anti-release\not-an-install"
 set ANTI_REMOVE=yes
 set ANTI_HOME=%USERPROFILE%\anti-release\not-an-install
-powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\uninstall.ps1 > release-marker.log 2>&1
+powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\uninstall.ps1 > "%LOGS%\release-marker.log" 2>&1
 if not exist "%USERPROFILE%\anti-release\not-an-install" (echo the uninstaller removed a directory with no marker & exit /b 1)
 echo the uninstaller refuses a directory without the marker
 set ANTI_HOME=
-powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\uninstall.ps1 > release-uninstall.log 2>&1
+powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\uninstall.ps1 > "%LOGS%\release-uninstall.log" 2>&1
 if exist "%DATA%" (echo the uninstaller left %DATA% & exit /b 1)
 if exist "%BIN%\antic.exe" (echo the uninstaller left %BIN%\antic.exe & exit /b 1)
 echo the install of windows-arm64 is checked and removed
@@ -751,13 +759,13 @@ exit /b 0
 
 :suite
 call "%VC%" arm64 > nul
-if exist build\host (cmake -S . -B build\host > release-configure.log 2>&1) else (cmake -S . -B build\host -G Ninja > release-configure.log 2>&1)
+if exist build\host (cmake -S . -B build\host > "%LOGS%\release-configure.log" 2>&1) else (cmake -S . -B build\host -G Ninja > "%LOGS%\release-configure.log" 2>&1)
 if errorlevel 1 (echo the configure failed & exit /b 1)
-cmake --build build\host > release-build.log 2>&1
+cmake --build build\host > "%LOGS%\release-build.log" 2>&1
 if errorlevel 1 (echo the build failed & exit /b 1)
-ctest --test-dir build\host -j4 > release-ctest.log 2>&1
-if errorlevel 1 (echo the suite failed & findstr /R /C:"^	 *[0-9]* - " release-ctest.log & exit /b 1)
-findstr /C:"tests passed" release-ctest.log
+ctest --test-dir build\host -j4 > "%LOGS%\release-ctest.log" 2>&1
+if errorlevel 1 (echo the suite failed & findstr /R /C:"^	 *[0-9]* - " "%LOGS%\release-ctest.log" & exit /b 1)
+findstr /C:"tests passed" "%LOGS%\release-ctest.log"
 exit /b 0
 WINDOWS
     # CRLF, which cmd reads and a Unix line ending breaks.

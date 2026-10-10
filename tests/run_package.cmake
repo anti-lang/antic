@@ -547,6 +547,8 @@ endif()
 # A directory that holds no antic is no install, and the check names it.
 run_offline(status offline_out "-DBIN=${WORK}/run"
             "-DARCHIVE=${WORK}/unpacked/anti")
+# CMake wraps the text of an error at a width, wherever the path ends.
+string(REGEX REPLACE "[ \n]+" " " offline_out "${offline_out}")
 if(status EQUAL 0 OR NOT offline_out MATCHES "holds no antic")
     message(FATAL_ERROR "tools/check-offline.cmake took a directory without "
                         "antic as an install\n${offline_out}")
