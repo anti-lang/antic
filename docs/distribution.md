@@ -270,7 +270,9 @@ digests back over ssh. `CHECK_ONLY` runs the checks and sends nothing, which is 
 `./r` in the root of the repository makes a release. It reads the version from
 `tools/version` and its entry from `CHANGELOG.md`. It runs the suite of the Mac
 and the two sanitizer suites in an export of the commit, packs the six hosts,
-writes the symbols archives beside them and checks the packages on both VMs. The
+writes the symbols archives beside them and checks the packages on both VMs. Each VM
+installs the package of its host, builds with that install while its network is off
+and then runs the suite. The
 packages and the archives stand in `build/dist/packages` under the one `SHA256SUMS`
 that the packer wrote, which it then signs in place with the release key. It tags
 the commit and uploads the assets to a GitHub release. It uploads thirteen files and no signature. It

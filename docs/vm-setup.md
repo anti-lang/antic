@@ -229,6 +229,7 @@ ssh anti-windows %USERPROFILE%\test.cmd
 | Whether `link.exe` accepts the COFF symbol form | `program_platform_linker` skips Windows until it supports `link.exe`. |
 | Float aggregates of one member against MSVC | No test compares them yet. The VM can run one. |
 | `tools/install.ps1` | Step 5 of a release and the step `installers` of `docs/work-order-distribution.md` run it from a staging area, with `ANTI_STAGING=yes`. |
+| An install that builds with the network off | Step 5 of a release runs `tools/check-offline.cmake` on the install, and `package_keys` on the package it packs. |
 | The published package of this host | `anti-<version>-windows-<cpu>.tar.xz`, once the suite passes here. |
 | Pointer equality of DLL functions | Waits for the DLL-based libraries of chapter 23. |
 | A plugin bound through the import library of its host | `plugin_host`, `plugin_versions` |
@@ -250,8 +251,62 @@ because step 9 publishes nothing before the release exists. The run first reads 
 installer's refusal of a manifest without a signature, and then installs with
 `ANTI_STAGING=yes`, because step 6 signs the manifest after these checks.
 
+The step then turns the network of the VM off, with the commands of "The network of a
+VM, off and on" below. `tools/check-offline.cmake` builds and runs a raylib program and
+a plugin host for the target of the VM. It links a hello program for each of the other
+five targets, and the uninstaller then removes the install. The network comes back, and the suite
+runs on a VM that holds no install.
+
 `ANTI_BASE` is therefore the override of a release before it is published, on a VM and
 nowhere else. A machine that installs the way a user does sets none of the three.
+
+## The network of a VM, off and on
+
+Step 5 of a release checks an install while the network of the VM is off, as "Binary distribution" in `docs/decisions.md` asks. Each command below runs on the Mac and reaches the VM over ssh. Off is one rule of the firewall of the VM. It refuses every packet that leaves for another address than the one of the Mac. That address is the first word of `SSH_CONNECTION` on the VM. The session that gives the command therefore stays up, and so does every later one. No route and no interface changes, so a lease of DHCP that renews puts nothing back. `tools/release.sh` holds the same six commands, and the test `release_dry_run` compares the two.
+
+A release that stops inside step 5 turns the network on again as it ends. If a VM stays off the network all the same, the second command of its section puts it back.
+
+### anti-linux
+
+Off adds a table of nftables whose one chain rejects every packet that leaves the VM. The loopback interface and the address of the Mac are the two exceptions. `sudo` asks the user of the VM for no password. A restart of the VM forgets the table.
+
+```sh
+ssh anti-linux 'sudo nft "add table inet anti_offline; add chain inet anti_offline out { type filter hook output priority 0; }; add rule inet anti_offline out oifname lo accept; add rule inet anti_offline out ip daddr ${SSH_CONNECTION%% *} accept; add rule inet anti_offline out reject"'
+```
+
+On removes the table, and succeeds when there is none.
+
+```sh
+ssh anti-linux 'sudo nft destroy table inet anti_offline'
+```
+
+The probe succeeds when the VM reaches the network. With the network off it ends with the status 28 of curl, since no name resolves.
+
+```sh
+ssh anti-linux 'curl -fsS --max-time 10 -o /dev/null https://github.com'
+```
+
+### anti-windows
+
+Off adds one rule to the firewall of Windows. It blocks the two ranges of IPv4 below and above the address of the Mac, and all of IPv6. A rule that blocks wins over every rule that allows, those of Windows' own services among them. The user of the VM is an administrator, and its ssh session runs with those rights, which `netsh` needs. The rule survives a restart of the VM.
+
+```sh
+ssh anti-windows 'powershell -Command "$m = [version]$env:SSH_CONNECTION.Split()[0]; $n = \"$($m.Major).$($m.Minor).$($m.Build)\"; netsh advfirewall firewall add rule name=anti-offline dir=out action=block \"remoteip=0.0.0.0-$n.$($m.Revision - 1),$n.$($m.Revision + 1)-255.255.255.255,::/1,8000::/1\""'
+```
+
+On removes the rule and empties the cache of the DNS client. Names resolve again about 8 seconds later, so step 5 waits for the probe.
+
+```sh
+ssh anti-windows 'netsh advfirewall firewall delete rule name=anti-offline && ipconfig /flushdns'
+```
+
+The probe is `curl.exe` of Windows.
+
+```sh
+ssh anti-windows 'curl.exe -fsS --max-time 10 -o NUL https://github.com'
+```
+
+Both VMs took the commands on 2026-10-10. With the network off no name resolved on either, the gateway `192.168.60.2` did not answer, and the ssh session stayed up.
 
 ## x86_64 under emulation
 

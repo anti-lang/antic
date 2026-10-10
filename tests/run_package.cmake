@@ -10,6 +10,8 @@
 # compiler of the machine is refused. Every licence and every header of
 # the runtime tree goes in, and anti bind --clang of the package binds
 # include/raylib/raylib.h as the anti of the tree binds the pinned source.
+# tools/check-offline.cmake, the check that step 5 of a release runs on
+# each VM with the network off, passes on the package.
 #
 #   cmake -DROOT=<repository> -DANTIC=<antic> -DANTI=<anti> -DHOST=<host>
 #         -DSYSROOT=<dir> -DRUNTIME=<dir> -DCLANG=<clang> -DLLVM_BIN=<dir>
@@ -494,6 +496,60 @@ if(NOT HOST MATCHES "^windows-")
         message(FATAL_ERROR "the packed anti found no symbols of the "
                             "program\n${packed_out}")
     endif()
+endif()
+
+# DESIGN: the test of a release is what a fresh install builds with the
+# network off, which Eddie decided on 2026-09-27 under "Binary
+# distribution" in docs/decisions.md and decision 8 of
+# docs/work-order-distribution.md places in step 5 of ./r. That step runs
+# tools/check-offline.cmake on each VM, and this runs the same script on
+# the package of this host: a raylib program and a plugin host build and
+# run for the host, and a hello program links for each of the other five
+# targets. The script names every tool by its path and gives each a PATH
+# of bin/ of the package alone.
+function(run_offline status_variable out_variable)
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env
+                "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
+                "${CMAKE_COMMAND}" ${ARGN} "-DROOT=${ROOT}" "-DHOST=${HOST}"
+                "-DWORK=${WORK}/offline"
+                -P "${ROOT}/tools/check-offline.cmake"
+        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+        ENCODING NONE)
+    set("${status_variable}" "${status}" PARENT_SCOPE)
+    set("${out_variable}" "${out}${err}" PARENT_SCOPE)
+endfunction()
+run_offline(status offline_out "-DBIN=${bin}" "-DARCHIVE=${WORK}/unpacked/anti")
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "tools/check-offline.cmake failed on the package of "
+                        "${HOST} with ${status}\n${offline_out}")
+endif()
+set(offline_lines "a raylib program of ${HOST} builds and runs"
+    "a plugin host of ${HOST} loads its plugin"
+    "the install builds for ${HOST} and links for the other five targets")
+foreach(target IN LISTS targets)
+    if(NOT target STREQUAL HOST)
+        list(APPEND offline_lines "a hello program links for ${target}: ")
+    endif()
+endforeach()
+foreach(line IN LISTS offline_lines)
+    string(FIND "${offline_out}" "${line}" at)
+    if(at EQUAL -1)
+        message(FATAL_ERROR "tools/check-offline.cmake prints no `${line}` for "
+                            "the package of ${HOST}\n${offline_out}")
+    endif()
+endforeach()
+string(FIND "${offline_out}" "a hello program links for ${HOST}: " at)
+if(NOT at EQUAL -1)
+    message(FATAL_ERROR "tools/check-offline.cmake cross-builds for ${HOST}, "
+                        "which is the host\n${offline_out}")
+endif()
+# A directory that holds no antic is no install, and the check names it.
+run_offline(status offline_out "-DBIN=${WORK}/run"
+            "-DARCHIVE=${WORK}/unpacked/anti")
+if(status EQUAL 0 OR NOT offline_out MATCHES "holds no antic")
+    message(FATAL_ERROR "tools/check-offline.cmake took a directory without "
+                        "antic as an install\n${offline_out}")
 endif()
 
 # A host that is not Linux packs linux-arm64 as well. The packer then

@@ -18,6 +18,30 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+# DESIGN: the commands that take a VM off the network, put it back and ask
+# whether it reaches the network stand in tools/release.sh, one variable
+# each, and docs/vm-setup.md shows the same six as commands of the Mac.
+# The page is what Eddie runs by hand when a release stopped with a VM off
+# the network, so it shows the commands of the script and no others. This
+# runs on every host, before the skips of the dry run.
+file(READ "${ROOT}/tools/release.sh" release_text)
+file(READ "${ROOT}/docs/vm-setup.md" vm_setup)
+foreach(system linux windows)
+    foreach(kind off on probe)
+        if(NOT release_text MATCHES "\n${system}_network_${kind}='([^\n]*)'\n")
+            message(FATAL_ERROR "tools/release.sh holds no "
+                                "${system}_network_${kind}='...' on one line")
+        endif()
+        set(shown "ssh anti-${system} '${CMAKE_MATCH_1}'")
+        string(FIND "${vm_setup}" "${shown}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "docs/vm-setup.md does not show the command of "
+                                "${system}_network_${kind} of tools/release.sh:\n"
+                                "${shown}")
+        endif()
+    endforeach()
+endforeach()
+
 if(NOT APPLE)
     message("SKIP: a release is made on the development Mac")
     return()
@@ -277,12 +301,50 @@ exit 0
 
 # The stand-ins for the two VMs. Every command answers with the lines the
 # script reads: the refusal of the unsigned manifest that the installer
-# there prints, the version of a program it installed and the count of a
-# suite.
+# there prints, the version of a program it installed, the last line of
+# the check with the network off and the count of a suite.
+#
+# DESIGN: the stand-in keeps the state of the network of each machine in a
+# file, which the command that turns it off writes and the one that turns
+# it on removes, and the probe answers by it. Every call goes into ssh.log
+# with the machine and that state, so the test reads which phase ran with
+# the network off. SSH_FAILS names a command that fails, and
+# SSH_OFF_IGNORED makes the command that turns the network off do nothing.
 file(WRITE "${WORK}/bin/ssh" "#!/bin/sh
+machine=\"\"
+while [ \$# -gt 0 ]; do
+    case \$1 in
+    -n) shift ;;
+    -o) shift; shift ;;
+    *) machine=\$1; shift; break ;;
+    esac
+done
+command=\"\$*\"
+state='${WORK}'/offline-\$machine
+case \$command in
+*'add table inet anti_offline'* | *'add rule name=anti-offline'*)
+    [ -n \"\${SSH_OFF_IGNORED:-}\" ] || : > \"\$state\" ;;
+*'destroy table inet anti_offline'* | *'delete rule name=anti-offline'*)
+    rm -f \"\$state\" ;;
+esac
+network=on
+[ ! -f \"\$state\" ] || network=off
+printf '%s\\n' \"\$machine \$network \$command\" >> '${WORK}/ssh.log'
+case \$command in
+*github.com*)
+    [ \$network = on ]
+    exit
+    ;;
+esac
+if [ -n \"\${SSH_FAILS:-}\" ]; then
+    case \$command in
+    *\"\$SSH_FAILS\"*) echo 'the stand-in fails this call'; exit 1 ;;
+    esac
+fi
 echo 'the installer refuses a manifest without a signature'
 echo 'antic ${version}'
 echo 'anti ${version}'
+echo 'the install builds for this host and links for the other five targets'
 echo '100% tests passed, 0 tests failed out of 409'
 exit 0
 ")
@@ -352,6 +414,89 @@ endif()
 if("${out}${err}" MATCHES "warning:")
     message(FATAL_ERROR "./r --dry-run warns on a version that is no tag\n"
                         "${out}${err}")
+endif()
+
+# DESIGN: step 5 installs the package on each VM, turns the network of
+# the VM off, runs the check of the install, turns the network on and runs
+# the suite, which Eddie decided on 2026-10-08 in decision 8 of
+# docs/work-order-distribution.md. The probe says off before the check
+# and on before the suite, so a command that changed nothing stops the
+# step. ssh.log of the stand-in holds the calls in their order with the
+# state of the network at each.
+set(vm_scripts "anti-linux=run\\.sh" "anti-windows=run\\.cmd")
+foreach(pair IN LISTS vm_scripts)
+    string(REPLACE "=" ";" parts "${pair}")
+    list(GET parts 0 vm)
+    list(GET parts 1 script)
+    file(READ "${WORK}/ssh.log" calls)
+    if(NOT calls MATCHES "${vm} on [^\n]*${script} install\n.*${vm} off [^\n]*github\\.com\n.*${vm} off [^\n]*${script} offline\n.*${vm} on [^\n]*github\\.com\n.*${vm} on [^\n]*${script} suite\n")
+        message(FATAL_ERROR "step 5 on ${vm} is not the install, the check with "
+                            "the network off and the suite with it on, in "
+                            "that order:\n${calls}")
+    endif()
+    foreach(line "${vm}: the network is off" "${vm}: the network is on again"
+            "${vm}: the install builds with the network off")
+        if(NOT out MATCHES "${line}")
+            message(FATAL_ERROR "the dry run does not say `${line}`\n${out}${err}")
+        endif()
+    endforeach()
+    if(EXISTS "${WORK}/offline-${vm}")
+        message(FATAL_ERROR "step 5 left ${vm} off the network")
+    endif()
+endforeach()
+
+# Run step 5 of the copy again with <variable> set to <value> for the
+# stand-in of ssh, and answer with the status, the output and the calls.
+function(vm_run variable value status_variable out_variable calls_variable)
+    file(REMOVE "${copy}/build/dist/dry-run/state/05-vms" "${WORK}/ssh.log")
+    set(ENV{${variable}} "${value}")
+    set(ENV{PATH} "${WORK}/bin:${saved_path}")
+    execute_process(COMMAND "${copy}/r" --dry-run WORKING_DIRECTORY "${copy}"
+                    RESULT_VARIABLE failed OUTPUT_VARIABLE out
+                    ERROR_VARIABLE err ENCODING NONE)
+    set(ENV{PATH} "${saved_path}")
+    unset(ENV{${variable}})
+    file(READ "${WORK}/ssh.log" calls)
+    set("${status_variable}" "${failed}" PARENT_SCOPE)
+    set("${out_variable}" "${out}${err}" PARENT_SCOPE)
+    set("${calls_variable}" "${calls}" PARENT_SCOPE)
+endfunction()
+
+# A check that fails with the network off stops the step, and the network
+# of that VM comes back all the same. The suite does not run, and the step
+# leaves no stamp.
+vm_run(SSH_FAILS "run.sh offline" refused log calls)
+if(refused EQUAL 0 OR NOT log MATCHES "step 5: anti-linux failed")
+    message(FATAL_ERROR "./r went on after the check with the network off "
+                        "failed on anti-linux\n${log}")
+endif()
+if(NOT calls MATCHES "anti-linux off [^\n]*run\\.sh offline\n.*anti-linux on [^\n]*destroy table inet anti_offline"
+   OR EXISTS "${WORK}/offline-anti-linux")
+    message(FATAL_ERROR "a failed check left anti-linux off the network:\n"
+                        "${calls}")
+endif()
+if(calls MATCHES "run\\.sh suite" OR
+   EXISTS "${copy}/build/dist/dry-run/state/05-vms")
+    message(FATAL_ERROR "step 5 ran the suite or left its stamp after a failed "
+                        "check:\n${calls}")
+endif()
+
+# A command that turns the network off and changes nothing is found by the
+# probe, and the check does not run on a VM that reaches the network.
+vm_run(SSH_OFF_IGNORED yes refused log calls)
+if(refused EQUAL 0 OR NOT log MATCHES "step 5: anti-linux still reaches the network")
+    message(FATAL_ERROR "./r ran the check on a VM whose network is on\n${log}")
+endif()
+if(calls MATCHES "run\\.sh offline")
+    message(FATAL_ERROR "the check ran with the network of anti-linux on:\n"
+                        "${calls}")
+endif()
+
+# A rerun after either failure runs the step again, and it passes.
+vm_run(SSH_NOTHING "" failed log calls)
+if(NOT failed EQUAL 0 OR
+   NOT EXISTS "${copy}/build/dist/dry-run/state/05-vms")
+    message(FATAL_ERROR "./r did not run step 5 again after it failed\n${log}")
 endif()
 
 # Step 1 fetches the LLVM tools of every host but this machine into

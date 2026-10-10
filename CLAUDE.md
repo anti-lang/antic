@@ -369,9 +369,13 @@ the same list.
     left the code. Two bundled libraries in one program are the duplicate
     symbol `anti_rt_bundle`. `docs/reports/2026-10-10-dist-bundle-macho.md`
     reports it.
-36. The test of a release with the network off. On each VM, a fresh install from
-    the package builds and runs a raylib program and a plugin host for its own
-    target. It also cross-builds a program for every other target.
+36. Done. Step 5 of `./r` installs the package on each VM from the staging
+    area and turns the network of the VM off. `tools/check-offline.cmake`
+    then builds and runs a raylib program and a plugin host for the target of
+    the VM and links a hello program for each of the other five. The network
+    comes back for the suite. `docs/vm-setup.md` holds the commands that turn
+    the network of each VM off and on.
+    `docs/reports/2026-10-10-dist-offline.md` reports it.
 37. The other four forms of `anti license` of `docs/distribution.md`: the
     plain form, `--project`, `--project --notice` and `--from-archive`.
     Today `--from` is the one form, and `anti build` writes `NOTICE.txt`

@@ -519,72 +519,157 @@ build_symbols() {
     finished 04 symbols
 }
 
+# DESIGN: the test of a release is what a fresh install builds with the
+# network off, which Eddie decided on 2026-09-27 under "Binary
+# distribution" in docs/decisions.md and decision 8 of
+# docs/work-order-distribution.md places in this step. These are the
+# commands that take a VM off the network, put it back and ask whether it
+# reaches the network. Each runs on the VM over ssh from this Mac, and
+# docs/vm-setup.md shows the same six, which the test release_dry_run
+# holds.
+#
+# DESIGN: off is one rule of the firewall of the VM, which refuses every
+# packet that leaves for another address than the one of this Mac, the
+# first word of SSH_CONNECTION there. The session that gives the command
+# therefore stays up, and so does every later one. On removes the rule. No
+# route and no interface changes, so nothing a lease of DHCP renews puts
+# the network back in the middle of the check. Linux takes a table of
+# nftables under sudo, which a restart of the VM forgets. Windows takes a
+# rule of its firewall that blocks the two ranges around the address of
+# the Mac and all of IPv6, and its DNS client answers again a few seconds
+# after the rule went, which is why the step waits for the probe.
+# shellcheck disable=SC2016
+linux_network_off='sudo nft "add table inet anti_offline; add chain inet anti_offline out { type filter hook output priority 0; }; add rule inet anti_offline out oifname lo accept; add rule inet anti_offline out ip daddr ${SSH_CONNECTION%% *} accept; add rule inet anti_offline out reject"'
+linux_network_on='sudo nft destroy table inet anti_offline'
+linux_network_probe='curl -fsS --max-time 10 -o /dev/null https://github.com'
+# shellcheck disable=SC2016
+windows_network_off='powershell -Command "$m = [version]$env:SSH_CONNECTION.Split()[0]; $n = \"$($m.Major).$($m.Minor).$($m.Build)\"; netsh advfirewall firewall add rule name=anti-offline dir=out action=block \"remoteip=0.0.0.0-$n.$($m.Revision - 1),$n.$($m.Revision + 1)-255.255.255.255,::/1,8000::/1\""'
+windows_network_on='netsh advfirewall firewall delete rule name=anti-offline && ipconfig /flushdns'
+windows_network_probe='curl.exe -fsS --max-time 10 -o NUL https://github.com'
+
+# Run the command of a VM that turns its network off or on, or the probe
+# that succeeds when the VM reaches the network.
+network() {
+    case $1:$2 in
+    anti-linux:off) remote=$linux_network_off ;;
+    anti-linux:on) remote=$linux_network_on ;;
+    anti-linux:probe) remote=$linux_network_probe ;;
+    anti-windows:off) remote=$windows_network_off ;;
+    anti-windows:on) remote=$windows_network_on ;;
+    anti-windows:probe) remote=$windows_network_probe ;;
+    *) die "step 5: no command of $1 for the network is called $2" ;;
+    esac
+    ssh -n -o BatchMode=yes "$1" "$remote"
+}
+
+# DESIGN: a VM that this run took off the network gets it back on every
+# exit, the refusal of a later check and an interrupt alike. A VM left
+# off the network fails the next thing anyone does on it, long after the
+# release that left it so.
+offline_machine=""
+restore_network() {
+    [ -n "$offline_machine" ] || return 0
+    network "$offline_machine" on > /dev/null 2>&1 ||
+        printf 'r: the network of %s is still off, and docs/vm-setup.md holds the command that turns it on\n' \
+            "$offline_machine" >&2
+    offline_machine=""
+}
+trap restore_network EXIT
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+
 # Write the shell script that a Linux VM runs, and print its path. It
-# extracts the tree, runs the suite, installs the package of that host
-# from a directory of the machine, checks the install and removes it.
+# takes the phase of the step as its argument. install extracts the tree
+# and installs the package of that host from a directory of the machine.
+# offline runs the check of the install and removes it, both with the
+# network off. suite builds the tree and runs its tests.
 write_linux_script() {
     cat > "$work/vm-linux.sh" <<LINUX
 set -eu
 cd "\$HOME/antic-check"
-tar -xmf "\$HOME/anti-release/tree.tar"
 # The tools of the VM stand in the data directory of its user, under a
 # name of their own. A reset of that user is then those directories and
 # never the machine. docs/vm-setup.md installs them there.
 A=\${XDG_DATA_HOME:-\$HOME/.local/share}/anti-vm
-opts="-DANTIC_CLANG_DIR=\$A/clang -DANTIC_LLVM_DIR=\$A/toolchain"
-opts="\$opts -DANTIC_SYSROOT_DIR=\$A/sysroot -DANTIC_RAYLIB_DIR=\$A/raylib/raylib-6.0"
-cmake -S . -B $host_tree \$opts > release-configure.log 2>&1
-cmake --build $host_tree -j"\$(nproc)" > release-build.log 2>&1
-ctest --test-dir $host_tree -j"\$(nproc)" > release-ctest.log 2>&1
-grep 'tests passed' release-ctest.log
-
 # DESIGN: the install the VM checks is the one a user gets, in the
 # directories of the platform, and not a tree under ANTI_HOME. The
 # executables land on the PATH and the archive in the data directory,
 # which is the pair antic has to find its runtime through.
 data=\${XDG_DATA_HOME:-\$HOME/.local/share}/anti
 bin=\${XDG_BIN_HOME:-\$HOME/.local/bin}
-rm -rf "\$data" "\$bin/antic" "\$bin/anti"
-if ANTI_VERSION=$version ANTI_BASE=file://\$HOME/anti-release \\
-    ANTI_REPLACE=yes ANTI_PATH=yes \\
-    sh "\$HOME/anti-release/install.sh" > release-unsigned.log 2>&1; then
-    echo "the installer took a manifest without a signature"
-    exit 1
-fi
-grep -q 'SHA256SUMS.sig' release-unsigned.log || {
-    echo "the installer stopped for another reason than the signature"
-    cat release-unsigned.log
-    exit 1
-}
-echo "the installer refuses a manifest without a signature"
-rm -rf "\$data"
-ANTI_VERSION=$version ANTI_BASE=file://\$HOME/anti-release ANTI_STAGING=yes \\
-    ANTI_REPLACE=yes ANTI_PATH=yes \\
-    sh "\$HOME/anti-release/install.sh" > release-install.log 2>&1
-[ -f "\$data/.anti-install" ] || { echo "the installer wrote no marker"; exit 1; }
-"\$bin/antic" --version
-"\$bin/anti" --version
-cd "\$HOME/anti-release"
-printf 'import anti.io;\n\nfn main() -> int\n{\n    io.print("hello");\n    return 0;\n}\n' > hello.anti
-# No --runtime: antic on the PATH finds the archive of the data directory.
-"\$bin/antic" hello.anti -o hello
-./hello
-# A tree with no marker is refused, which is what keeps an uninstaller
-# from taking a directory that no installer of Anti wrote.
-mkdir -p "\$HOME/anti-release/not-an-install"
-if ANTI_HOME=\$HOME/anti-release/not-an-install ANTI_REMOVE=yes \\
-    sh "\$HOME/anti-release/uninstall.sh" > release-marker.log 2>&1; then
-    echo "the uninstaller removed a directory with no marker"
-    exit 1
-fi
-[ -d "\$HOME/anti-release/not-an-install" ] ||
-    { echo "the uninstaller removed a directory with no marker"; exit 1; }
-echo "the uninstaller refuses a directory without the marker"
-ANTI_REMOVE=yes sh "\$HOME/anti-release/uninstall.sh" \\
-    > release-uninstall.log 2>&1
-[ ! -d "\$data" ] || { echo "the uninstaller left \$data"; exit 1; }
-[ ! -f "\$bin/antic" ] || { echo "the uninstaller left \$bin/antic"; exit 1; }
-echo "the install of linux-arm64 is checked and removed"
+case \$1 in
+install)
+    tar -xmf "\$HOME/anti-release/tree.tar"
+    rm -rf "\$data" "\$bin/antic" "\$bin/anti"
+    if ANTI_VERSION=$version ANTI_BASE=file://\$HOME/anti-release \\
+        ANTI_REPLACE=yes ANTI_PATH=yes \\
+        sh "\$HOME/anti-release/install.sh" > release-unsigned.log 2>&1; then
+        echo "the installer took a manifest without a signature"
+        exit 1
+    fi
+    grep -q 'SHA256SUMS.sig' release-unsigned.log || {
+        echo "the installer stopped for another reason than the signature"
+        cat release-unsigned.log
+        exit 1
+    }
+    echo "the installer refuses a manifest without a signature"
+    rm -rf "\$data"
+    ANTI_VERSION=$version ANTI_BASE=file://\$HOME/anti-release ANTI_STAGING=yes \\
+        ANTI_REPLACE=yes ANTI_PATH=yes \\
+        sh "\$HOME/anti-release/install.sh" > release-install.log 2>&1
+    [ -f "\$data/.anti-install" ] || { echo "the installer wrote no marker"; exit 1; }
+    "\$bin/antic" --version
+    "\$bin/anti" --version
+    cd "\$HOME/anti-release"
+    printf 'import anti.io;\n\nfn main() -> int\n{\n    io.print("hello");\n    return 0;\n}\n' > hello.anti
+    # No --runtime: antic on the PATH finds the archive of the data directory.
+    "\$bin/antic" hello.anti -o hello
+    ./hello
+    echo
+    echo "the package of linux-arm64 is installed"
+    ;;
+offline)
+    # DESIGN: the check names no archive and no tool. antic and anti of
+    # the bin directory find the archive of the data directory, and the
+    # script gives each a PATH of that bin directory alone.
+    cmake -DBIN="\$bin" -DARCHIVE="\$data" -DROOT="\$HOME/antic-check" \\
+        -DHOST=linux-arm64 -DWORK="\$HOME/anti-release/offline" \\
+        -P tools/check-offline.cmake
+    # DESIGN: the install goes before the network comes back, so the
+    # suite runs on a machine that holds no install, as it did before
+    # this step checked one. The antic of a build tree finds no archive
+    # above its directory and would take the one of the data directory.
+    #
+    # A tree with no marker is refused, which is what keeps an uninstaller
+    # from taking a directory that no installer of Anti wrote.
+    mkdir -p "\$HOME/anti-release/not-an-install"
+    if ANTI_HOME=\$HOME/anti-release/not-an-install ANTI_REMOVE=yes \\
+        sh "\$HOME/anti-release/uninstall.sh" > release-marker.log 2>&1; then
+        echo "the uninstaller removed a directory with no marker"
+        exit 1
+    fi
+    [ -d "\$HOME/anti-release/not-an-install" ] ||
+        { echo "the uninstaller removed a directory with no marker"; exit 1; }
+    echo "the uninstaller refuses a directory without the marker"
+    ANTI_REMOVE=yes sh "\$HOME/anti-release/uninstall.sh" \\
+        > release-uninstall.log 2>&1
+    [ ! -d "\$data" ] || { echo "the uninstaller left \$data"; exit 1; }
+    [ ! -f "\$bin/antic" ] || { echo "the uninstaller left \$bin/antic"; exit 1; }
+    echo "the install of linux-arm64 is checked and removed"
+    ;;
+suite)
+    opts="-DANTIC_CLANG_DIR=\$A/clang -DANTIC_LLVM_DIR=\$A/toolchain"
+    opts="\$opts -DANTIC_SYSROOT_DIR=\$A/sysroot -DANTIC_RAYLIB_DIR=\$A/raylib/raylib-6.0"
+    cmake -S . -B $host_tree \$opts > release-configure.log 2>&1
+    cmake --build $host_tree -j"\$(nproc)" > release-build.log 2>&1
+    ctest --test-dir $host_tree -j"\$(nproc)" > release-ctest.log 2>&1
+    grep 'tests passed' release-ctest.log
+    ;;
+*)
+    echo "run.sh takes install, offline or suite"
+    exit 2
+    ;;
+esac
 LINUX
     printf '%s\n' "$work/vm-linux.sh"
 }
@@ -598,24 +683,23 @@ write_windows_script() {
 setlocal
 set VC=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat
 cd /d %USERPROFILE%\antic-check
-tar -xmf %USERPROFILE%\anti-release\tree.tar
-call "%VC%" arm64 > nul
-if exist build\host (cmake -S . -B build\host > release-configure.log 2>&1) else (cmake -S . -B build\host -G Ninja > release-configure.log 2>&1)
-if errorlevel 1 (echo the configure failed & exit /b 1)
-cmake --build build\host > release-build.log 2>&1
-if errorlevel 1 (echo the build failed & exit /b 1)
-ctest --test-dir build\host -j4 > release-ctest.log 2>&1
-if errorlevel 1 (echo the suite failed & findstr /R /C:"^	 *[0-9]* - " release-ctest.log & exit /b 1)
-findstr /C:"tests passed" release-ctest.log
-set ANTI_VERSION=$version
-set ANTI_BASE=%USERPROFILE%\anti-release
-set ANTI_REPLACE=yes
-set ANTI_PATH=yes
 rem DESIGN: the install the VM checks is the one a user gets, in the
 rem directories of Windows and not a tree under ANTI_HOME. DATA holds the
 rem archive and BIN the two executables that go on the PATH.
 set DATA=%LOCALAPPDATA%\anti
 set BIN=%LOCALAPPDATA%\Programs\anti\bin
+if "%1"=="install" goto install
+if "%1"=="offline" goto offline
+if "%1"=="suite" goto suite
+echo run.cmd takes install, offline or suite
+exit /b 2
+
+:install
+tar -xmf %USERPROFILE%\anti-release\tree.tar
+set ANTI_VERSION=$version
+set ANTI_BASE=%USERPROFILE%\anti-release
+set ANTI_REPLACE=yes
+set ANTI_PATH=yes
 if exist "%DATA%" rmdir /s /q "%DATA%"
 if exist "%BIN%" rmdir /s /q "%BIN%"
 powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\install.ps1 > release-unsigned.log 2>&1
@@ -636,6 +720,20 @@ rem No --runtime: antic of the bin directory finds the archive of DATA.
 "%BIN%\antic.exe" hello.anti -o hello.exe
 if errorlevel 1 (echo antic did not find the runtime archive & exit /b 1)
 hello.exe
+if errorlevel 1 (echo the hello program of the install failed & exit /b 1)
+echo the package of windows-arm64 is installed
+exit /b 0
+
+:offline
+rem DESIGN: the check names no archive and no tool. antic and anti of BIN
+rem find the archive of DATA, and the script gives each a PATH of BIN alone.
+cmake -DBIN="%BIN%" -DARCHIVE="%DATA%" -DROOT=%USERPROFILE%\antic-check -DHOST=windows-arm64 -DWORK=%USERPROFILE%\anti-release\offline -P tools\check-offline.cmake
+if errorlevel 1 (echo the check of the install failed & exit /b 1)
+rem DESIGN: the install goes before the network comes back, so the suite
+rem runs on a machine that holds no install, as it did before this step
+rem checked one. The antic of a build tree finds no archive above its
+rem directory and would take the one of DATA.
+rem
 rem A tree with no marker is refused, which is what keeps an uninstaller
 rem from taking a directory that no installer of Anti wrote.
 if not exist "%USERPROFILE%\anti-release\not-an-install" mkdir "%USERPROFILE%\anti-release\not-an-install"
@@ -649,6 +747,18 @@ powershell -ExecutionPolicy Bypass -File %USERPROFILE%\anti-release\uninstall.ps
 if exist "%DATA%" (echo the uninstaller left %DATA% & exit /b 1)
 if exist "%BIN%\antic.exe" (echo the uninstaller left %BIN%\antic.exe & exit /b 1)
 echo the install of windows-arm64 is checked and removed
+exit /b 0
+
+:suite
+call "%VC%" arm64 > nul
+if exist build\host (cmake -S . -B build\host > release-configure.log 2>&1) else (cmake -S . -B build\host -G Ninja > release-configure.log 2>&1)
+if errorlevel 1 (echo the configure failed & exit /b 1)
+cmake --build build\host > release-build.log 2>&1
+if errorlevel 1 (echo the build failed & exit /b 1)
+ctest --test-dir build\host -j4 > release-ctest.log 2>&1
+if errorlevel 1 (echo the suite failed & findstr /R /C:"^	 *[0-9]* - " release-ctest.log & exit /b 1)
+findstr /C:"tests passed" release-ctest.log
+exit /b 0
 WINDOWS
     # CRLF, which cmd reads and a Unix line ending breaks.
     awk '{ printf "%s\r\n", $0 }' "$work/vm-windows.cmd" > "$work/vm-windows.crlf"
@@ -686,10 +796,107 @@ send_to_vm() {
         "$root/tools/uninstall.sh" "$root/tools/uninstall.ps1" \
         "$machine:anti-release/" ||
         die "step 5: the installers did not reach $machine"
+    if [ "$machine" = anti-windows ]; then
+        scp -q -o BatchMode=yes "$(write_windows_script)" \
+            "$machine:anti-release/run.cmd" ||
+            die "step 5: the script did not reach $machine"
+    else
+        scp -q -o BatchMode=yes "$(write_linux_script)" \
+            "$machine:anti-release/run.sh" ||
+            die "step 5: the script did not reach $machine"
+    fi
 }
 
-# Step 5. Both VMs run the suite of the commit and install the package
-# of their host from the files of this run, before anything is published.
+# Run one phase of the script of a VM, and add what it prints to the log
+# of that machine. The Windows machine answers to cmd, which runs the
+# command file by its path: under a `cmd /c` of its own the phase arrives
+# with the closing quote of the command line.
+vm_phase() {
+    if [ "$1" = anti-windows ]; then
+        ssh -n -o BatchMode=yes "$1" \
+            "%USERPROFILE%\\anti-release\\run.cmd $2" >> "$3" 2>&1
+    else
+        ssh -n -o BatchMode=yes "$1" \
+            "sh \$HOME/anti-release/run.sh $2" >> "$3" 2>&1
+    fi
+}
+
+# The log of a VM, which every phase of the step adds to.
+vm_log() {
+    printf '%s\n' "$logs/${1#anti-}.log"
+}
+
+# Install the package of host on a VM, from the files of this run and with
+# the network on. The installer's own check is the version each of the two
+# programs prints.
+vm_install() {
+    machine=$1
+    log=$(vm_log "$machine")
+    : > "$log"
+    send_to_vm "$machine" "$2"
+    vm_phase "$machine" install "$log" ||
+        die "step 5: $machine failed, see $log"
+    grep -q "antic $version" "$log" ||
+        die "step 5: the install on $machine printed no antic $version"
+    grep -q "refuses a manifest without a signature" "$log" ||
+        die "step 5: the installer of $machine checked no signature"
+    say "$machine: the package installs and compiles a program"
+}
+
+# Turn the network of a VM off, run the check of its install and turn the
+# network on again.
+#
+# DESIGN: the probe is read on both sides of the check. A command that
+# turned nothing off would let the check pass on a VM that downloads what
+# its package lacks, and the probe after the command that turns the
+# network on says that the VM is as the step found it. ssh ends with 255
+# when the VM does not answer, which is no answer of the probe. A check
+# that failed is reported after the network is back.
+vm_offline() {
+    machine=$1
+    log=$(vm_log "$machine")
+    offline_machine=$machine
+    network "$machine" off >> "$log" 2>&1 ||
+        die "step 5: the network of $machine did not turn off, see $log"
+    answer=0
+    network "$machine" probe >> "$log" 2>&1 || answer=$?
+    [ "$answer" != 255 ] ||
+        die "step 5: $machine does not answer with its network off, see $log"
+    [ "$answer" != 0 ] ||
+        die "step 5: $machine still reaches the network after the command that turns it off"
+    say "$machine: the network is off"
+    checked=yes
+    vm_phase "$machine" offline "$log" || checked=no
+    network "$machine" on >> "$log" 2>&1 ||
+        die "step 5: the network of $machine did not turn on, see $log"
+    tries=0
+    until network "$machine" probe >> "$log" 2>&1; do
+        tries=$((tries + 1))
+        [ "$tries" -lt 12 ] ||
+            die "step 5: $machine does not reach the network again, see $log"
+        sleep 5
+    done
+    offline_machine=""
+    say "$machine: the network is on again"
+    [ "$checked" = yes ] ||
+        die "step 5: $machine failed with the network off, see $log"
+    grep -q "links for the other five targets" "$log" ||
+        die "step 5: the check on $machine built no program for the other targets"
+    say "$machine: the install builds with the network off, and uninstalls"
+}
+
+# Build the tree on a VM and run its suite, with the network on.
+vm_suite() {
+    machine=$1
+    log=$(vm_log "$machine")
+    vm_phase "$machine" suite "$log" ||
+        die "step 5: $machine failed, see $log"
+    say "$machine: $(grep 'tests passed' "$log" || echo 'the suite printed no count')"
+}
+
+# Step 5. Both VMs install the package of their host from the files of
+# this run, build with it while their network is off and run the suite of
+# the commit, before anything is published.
 vm_checks() {
     if [ "$skip_vms" = yes ]; then
         printf 'r: step 5, the VMs, skipped by --skip-vms\n'
@@ -699,34 +906,11 @@ vm_checks() {
     mkdir -p "$work" "$logs"
     (cd "$root" && git ls-files -z | xargs -0 tar cf "$work/tree.tar") ||
         die "step 5: the tree did not pack"
-
-    send_to_vm anti-linux linux-arm64
-    linux_script=$(write_linux_script)
-    scp -q -o BatchMode=yes "$linux_script" anti-linux:anti-release/run.sh ||
-        die "step 5: the script did not reach anti-linux"
-    ssh -n -o BatchMode=yes anti-linux 'sh $HOME/anti-release/run.sh' \
-        > "$logs/linux.log" 2>&1 ||
-        die "step 5: anti-linux failed, see $logs/linux.log"
-    say "anti-linux: $(grep 'tests passed' "$logs/linux.log" || echo 'the suite printed no count')"
-    grep -q "antic $version" "$logs/linux.log" ||
-        die "step 5: the install on anti-linux printed no antic $version"
-    grep -q "refuses a manifest without a signature" "$logs/linux.log" ||
-        die "step 5: the installer of anti-linux checked no signature"
-    say "anti-linux: the package installs, compiles a program and uninstalls"
-
-    send_to_vm anti-windows windows-arm64
-    windows_script=$(write_windows_script)
-    scp -q -o BatchMode=yes "$windows_script" 'anti-windows:anti-release/run.cmd' ||
-        die "step 5: the script did not reach anti-windows"
-    ssh -n -o BatchMode=yes anti-windows 'cmd /c %USERPROFILE%\anti-release\run.cmd' \
-        > "$logs/windows.log" 2>&1 ||
-        die "step 5: anti-windows failed, see $logs/windows.log"
-    say "anti-windows: $(grep 'tests passed' "$logs/windows.log" || echo 'the suite printed no count')"
-    grep -q "antic $version" "$logs/windows.log" ||
-        die "step 5: the install on anti-windows printed no antic $version"
-    grep -q "refuses a manifest without a signature" "$logs/windows.log" ||
-        die "step 5: the installer of anti-windows checked no signature"
-    say "anti-windows: the package installs and uninstalls"
+    for pair in anti-linux:linux-arm64 anti-windows:windows-arm64; do
+        vm_install "${pair%%:*}" "${pair#*:}"
+        vm_offline "${pair%%:*}"
+        vm_suite "${pair%%:*}"
+    done
     finished 05 vms
 }
 
