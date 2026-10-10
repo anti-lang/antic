@@ -1,0 +1,9 @@
+[package]
+name = "com.example.notices"
+version = "0.3.0"
+license = "MIT"
+license_text = "LICENSE"
+
+[dependencies]
+"com.example.shapes" = { path = "../shapes" }
+"com.example.tones" = { path = "../tones" }

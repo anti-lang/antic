@@ -204,7 +204,11 @@ static void base_options(struct build *b, struct options *o,
 }
 
 /* The package header that every library file of this project carries.
-   The name and the version stand in the options of every call. */
+   The name and the version stand in the options of every call. Every
+   call that links takes it as well: the notice of a program and of a
+   shared library names the package of the project with its licence, its
+   text and its attributions, and a static library carries a copy of the
+   header. A link without it wrote the name and the version alone. */
 static void header_options(const struct build *b, struct options *o)
 {
     if (b->m.license.length > 0) {
@@ -476,6 +480,7 @@ static bool build_dev(struct build *b, enum target t, enum cpu_level cpu,
        one module of a dev build that every build compiles again. The
        link it carries is the relink that every build runs. */
     base_options(b, &o, t, cpu);
+    header_options(b, &o);
     o.input = b->units[main_at].source;
     o.output = text_cstr(&b->name);
     o.dev = true;
@@ -512,6 +517,7 @@ static bool build_release(struct build *b, enum target t, enum cpu_level cpu,
     struct options o;
 
     base_options(b, &o, t, cpu);
+    header_options(b, &o);
     o.input = b->units[main_at].source;
     o.output = text_cstr(&b->name);
     o.libraries = libraries->items;
@@ -570,6 +576,7 @@ static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
     text_appendf(&archive, "%s/%s%s", text_cstr(&b->dist_dir),
                  text_cstr(&stem), SYMS_ARCHIVE_SUFFIX);
     base_options(b, &o, t, cpu);
+    header_options(b, &o);
     o.input = b->units[main_at].source;
     o.output = text_cstr(&debug_path);
     o.libraries = libraries->items;
@@ -651,6 +658,7 @@ static bool build_c_library(struct build *b, enum target t, enum cpu_level cpu,
     bool ok;
 
     base_options(b, &o, t, cpu);
+    header_options(b, &o);
     o.input = b->units[root_module(b)].source;
     o.output = text_cstr(&b->name);
     o.libraries = libraries->items;

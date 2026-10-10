@@ -6,8 +6,11 @@
 # beside it in dist/ holds the same text. After the text of musl and of
 # mimalloc stands the line of licenses/sources.txt of the runtime archive
 # that names the upstream source of each, as `source <line>`, and a
-# program that links neither prints no source line. Run with cmake -P and
-# these values:
+# program that links neither prints no source line. The notice names the
+# package of the project with the licence, the attributions and the text
+# of its manifest, and a static library carries them in the copy of its
+# package header: tests/anti-build/notices and shapes have all three.
+# Run with cmake -P and these values:
 #   ANTI              the anti executable
 #   RUNTIME           the runtime archive
 #   LLVM_MC           the assembler
@@ -131,3 +134,40 @@ endfunction()
 check_notice(app linux-arm64 TRUE)
 check_notice(window linux-arm64 FALSE)
 check_notice(app macos-arm64 FALSE)
+
+# The link of a program carries the licence fields of the manifest, as the
+# library files of the project do.
+file(COPY "${FIXTURE}/notices" "${FIXTURE}/shapes" "${FIXTURE}/tones"
+     DESTINATION "${WORK}")
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E env
+            "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
+            "${ANTI}" build --target macos-arm64
+            --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+    WORKING_DIRECTORY "${WORK}/notices"
+    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+    ENCODING NONE)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "anti build of notices failed with ${status}\n"
+                        "${out}${err}")
+endif()
+execute_process(COMMAND "${ANTI}" license --from
+                        "${WORK}/notices/dist/macos-arm64/dev/notices"
+                        --runtime "${RUNTIME}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE notice ERROR_VARIABLE err
+    ENCODING NONE)
+file(READ "${FIXTURE}/notices/LICENSE" own_text)
+string(FIND "${notice}"
+       "\npackage com.example.notices 0.3.0 MIT\ntext for " line_at)
+string(FIND "${notice}" "\ntext for com.example.notices\n${own_text}" text_at)
+if(NOT status EQUAL 0 OR line_at EQUAL -1 OR text_at EQUAL -1)
+    message(FATAL_ERROR "the notice of notices lacks the licence or the text "
+                        "of its own package: ${status}\n${notice}${err}")
+endif()
+string(FIND "${notice}"
+       "\npackage com.example.shapes 2.0.1 BSD-3-Clause\nattribution Copyright 2026 The Shapes Authors\n"
+       at)
+if(at EQUAL -1)
+    message(FATAL_ERROR "the notice of notices lacks the licence or the "
+                        "attribution of a package it links\n${notice}")
+endif()

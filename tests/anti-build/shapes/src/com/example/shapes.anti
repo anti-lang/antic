@@ -1,0 +1,7 @@
+//! A package with a licence, an attribution line and one function.
+
+/// The area of a rectangle of `w` by `h`.
+pub fn area(w: int, h: int) -> int
+{
+	return w * h;
+}

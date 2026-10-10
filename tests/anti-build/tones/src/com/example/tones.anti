@@ -1,0 +1,7 @@
+//! A second package with a licence and two attribution lines.
+
+/// The note an octave above `n`.
+pub fn octave(n: int) -> int
+{
+	return n + 12;
+}

@@ -1,0 +1,6 @@
+[package]
+name = "com.example.tones"
+version = "1.4.0"
+license = "MIT"
+license_text = "LICENSE"
+attribution = ["Copyright 2026 The Tones Authors", "Contains tables from Example Corp, CC0-1.0"]

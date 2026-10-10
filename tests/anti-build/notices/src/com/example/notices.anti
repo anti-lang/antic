@@ -1,0 +1,11 @@
+//! A program that links two packages, each with a licence of its own.
+
+import anti.io;
+import com.example.shapes;
+import com.example.tones;
+
+fn main() -> int
+{
+	io.println("notices");
+	return shapes.area(2, 3) + tones.octave(1);
+}
