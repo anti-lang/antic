@@ -335,22 +335,42 @@ static bool is_package_member(const struct ar_member *m)
                                     LIBRARY_PACKAGE_SUFFIX, suffix) == 0;
 }
 
+/* The most places of one member where a package header is read. */
+enum { PACKAGE_TRIES = 8 };
+
 /* The package header that the bytes of a member hold: the object keeps
    the copy as one run of bytes in a section of its own, so it starts
-   where the bytes of a library file start. */
+   where the bytes of a library file start.
+
+   DESIGN: an archive is input that anti did not write. A member that
+   repeats the first bytes of a library file would have every one of its
+   offsets read as a header, each into the same memory pool. A read that
+   fails therefore goes into a pool of its own, which is freed, and a
+   member is given up after PACKAGE_TRIES places. The object antic writes
+   holds those bytes once, at the start of the copy. */
 static bool member_package(const struct ar_member *m, struct arena *arena,
                            struct package *out)
 {
     const uint8_t *data = (const uint8_t *)m->data;
     char message[256];
     const char *module;
+    size_t tries = 0;
     size_t i;
 
-    for (i = 0; i < m->size; i++) {
-        if (antic_library_starts(data + i, m->size - i) &&
-            antic_library_header(data + i, m->size - i, arena, out, &module,
-                                 message, sizeof message)) {
-            return true;
+    for (i = 0; i < m->size && tries < PACKAGE_TRIES; i++) {
+        struct arena scratch = {0};
+        struct package probe;
+        bool found;
+        if (!antic_library_starts(data + i, m->size - i)) {
+            continue;
+        }
+        tries++;
+        found = antic_library_header(data + i, m->size - i, &scratch, &probe,
+                                     &module, message, sizeof message);
+        arena_free(&scratch);
+        if (found) {
+            return antic_library_header(data + i, m->size - i, arena, out,
+                                        &module, message, sizeof message);
         }
     }
     return false;

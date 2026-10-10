@@ -448,8 +448,9 @@ if(FORM STREQUAL "archive")
     # A malformed archive is refused and read no further than its bytes
     # go: a size past the end of the file, a size that is no number, a
     # long name without its table and one past the end of the table, a
-    # name of the BSD form longer than its member, and a member of the
-    # package header that holds the first bytes of a library file alone.
+    # name of the BSD form longer than its member, a member of the package
+    # header that holds the first bytes of a library file alone, and one
+    # that repeats those bytes 4000 times and never holds a header.
     # The header of a member is its name in 16 bytes, 32 bytes of date,
     # owner and mode, the size in 10 and the two bytes that end it.
     function(ar_member out name size data)
@@ -482,7 +483,10 @@ if(FORM STREQUAL "archive")
     set(malformed_6 "${start_alone}")
     set(malformed_7 "${table}${start_named}")
     set(malformed_8 "")
-    foreach(case RANGE 1 8)
+    string(REPEAT "ANTL" 4000 starts)
+    ar_member(many_starts "s.package.o/" 16000 "${starts}")
+    set(malformed_9 "${many_starts}")
+    foreach(case RANGE 1 9)
         file(WRITE "${WORK}/malformed-${case}.a" "!<arch>\n${malformed_${case}}")
         run_anti("${WORK}" status out err license --from-archive
                  "${WORK}/malformed-${case}.a")
