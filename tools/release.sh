@@ -759,7 +759,13 @@ exit /b 0
 
 :suite
 call "%VC%" arm64 > nul
-if exist build\host (cmake -S . -B build\host > "%LOGS%\release-configure.log" 2>&1) else (cmake -S . -B build\host -G Ninja > "%LOGS%\release-configure.log" 2>&1)
+rem The tools of the VM stand in its data directory, as on the Linux VM
+rem and as docs/vm-setup.md installs them. Without these four options a
+rem fresh build\host downloads clang and the LLVM tools and stops at
+rem raylib, which has no fetcher in the configure.
+set A=%LOCALAPPDATA%/anti-vm
+set OPTS=-DANTIC_CLANG_DIR=%A%/clang -DANTIC_LLVM_DIR=%A%/toolchain -DANTIC_SYSROOT_DIR=%A%/sysroot -DANTIC_RAYLIB_DIR=%A%/raylib/raylib-6.0
+if exist build\host (cmake -S . -B build\host %OPTS% > "%LOGS%\release-configure.log" 2>&1) else (cmake -S . -B build\host -G Ninja %OPTS% > "%LOGS%\release-configure.log" 2>&1)
 if errorlevel 1 (echo the configure failed & exit /b 1)
 cmake --build build\host > "%LOGS%\release-build.log" 2>&1
 if errorlevel 1 (echo the build failed & exit /b 1)
