@@ -49,6 +49,14 @@ https://github.com/anti-lang/antic/releases/download/v<version>/SHA256SUMS
   names. `ANTI_VERSION` names another one, and `ANTI_BASE` points an installer at a
   staging area of a release instead, in the layout `<base>/anti/<version>/<file>` that
   the packer writes.
+- Each installer downloads the package of its host and `SHA256SUMS` from the release
+  and `SHA256SUMS.sig` from the site, checks the signature with the key it carries and
+  the digest against the manifest, unpacks the package into the directories of the
+  platform, runs `antic --version` and `anti --version` of the package as the check of
+  the install and puts the two programs on the path. It downloads nothing else and runs
+  nothing else. The package carries the LLVM tools and the sysroot of every target, and
+  no script or pin for an installer, since the step `installers` of
+  `docs/work-order-distribution.md`. The test `installer_alone` holds the rule.
 
 A tag is published once and never again, so a path is written once and never again. A
 pin file in the repository names the file and its digest, so an older Anti keeps
@@ -71,7 +79,10 @@ Step 9 of a release rsyncs four files there over ssh: the two installers, the do
 page, `SHA256SUMS.sig` of the version and `tools/keys/release.pem`. It then reads the
 signature and the key back over HTTPS, and checks that the signature covers the
 manifest of the GitHub release. The page names every asset of the release by URL and
-carries its digest. The signature of a version keeps its own directory, so the
+carries its digest. It shows the manual install as commands for both shells, with the
+checks of the installers: the two `openssl` lines over `SHA256SUMS.sig` and the key,
+`shasum` or `Get-FileHash` over the package, and the two programs run from the unpacked
+package. The signature of a version keeps its own directory, so the
 installer of an older version still finds the signature of that version.
 
 ### Why the two halves stand apart

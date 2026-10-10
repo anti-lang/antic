@@ -6,9 +6,12 @@
 # It downloads the package of this host and SHA256SUMS from the GitHub
 # release of the version, and SHA256SUMS.sig from anti-lang.com. It checks
 # the signature first, then the SHA-256 of the package against the
-# manifest and unpacks it. The package carries the sysroot of every
-# target, the Windows ones of mingw-w64 among them. Unpacking uses tar.exe,
-# which Windows 10 and later carry.
+# manifest, unpacks the package and puts antic and anti on the path. The
+# package carries everything a build takes, the LLVM tools and the
+# sysroot of every target among them, so nothing else is downloaded and
+# nothing of the package is run but its two programs, whose --version is
+# the check of the install. Unpacking uses tar.exe, which Windows 10 and
+# later carry.
 #
 # ANTI_ARCH takes the package of another processor, which Windows on ARM
 # runs under emulation. A copy of the file on disk takes --arm or --intel
@@ -268,28 +271,24 @@ try {
     Set-Content -Path "$home_dir\.anti-install" -Value $version
     Say "installed $version in $home_dir"
 
-    # DESIGN: the site serves this installer, so it is always the
-    # newest. The CMake scripts it drives come from the package, which is
-    # as old as the version installed. The number rises when the options
-    # it passes change, and a package older than that fails here rather
-    # than halfway.
-    $PACKAGE_API = 1
-    $api = 0
-    if (Test-Path "$home_dir\tools\package-api") {
-        $api = [int]((Get-Content "$home_dir\tools\package-api" -Raw).Trim())
+    # DESIGN: the check of an install is the two programs of the package,
+    # run from where they were unpacked. The package carries the LLVM
+    # tools in bin\ and the sysroot of every target in sysroot\, so
+    # nothing is downloaded or laid out here and no script of the package
+    # runs. A package whose programs print another version, or that this
+    # machine cannot run, is no install. Eddie decided this on 2026-10-08,
+    # in decision 7 of docs/work-order-distribution.md.
+    foreach ($program in @("antic", "anti")) {
+        $printed = (& "$home_dir\bin\$program.exe" --version | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0) {
+            Fail "$home_dir\bin\$program.exe --version failed: $printed"
+        }
+        if ($printed -ne "$program $version") {
+            Fail "$home_dir\bin\$program.exe prints '$printed', and the package is $version"
+        }
+        Say $printed
     }
-    if ($api -lt $PACKAGE_API) {
-        Fail "Anti $version speaks version $api of the installer interface, and this installer needs $PACKAGE_API. Install a newer version of Anti."
-    }
-
-    # DESIGN: the LLVM tools travel in bin\ of the package beside antic
-    # and anti, so nothing is downloaded for them. antic finds them there
-    # by the rule of src/antic/userdirs.c, beside the lib\ of the archive.
-    Say "the package carries the LLVM tools of $host_name in $home_dir\bin"
-
-    # DESIGN: the package carries the sysroot of every target, the Windows
-    # ones of mingw-w64 among them, so nothing is laid out here.
-    Say "the package carries the sysroots of all six targets in $home_dir\sysroot"
+    Say "the package carries the LLVM tools and the sysroots of all six targets, so nothing else is downloaded"
 
     # DESIGN: the PATH names one antic, and it is the one this machine runs
     # without emulation. A package of the other processor is therefore

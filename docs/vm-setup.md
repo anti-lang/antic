@@ -228,14 +228,14 @@ ssh anti-windows %USERPROFILE%\test.cmd
 | Shared libraries, `.def` files and `.CRT$XCU` constructors | `clib_shared`, `clib_exports`, `clib_loader`, `clib_two`, compiled with the pinned clang against the mingw-w64 sysroot and linked with lld-link |
 | Whether `link.exe` accepts the COFF symbol form | `program_platform_linker` skips Windows until it supports `link.exe`. |
 | Float aggregates of one member against MSVC | No test compares them yet. The VM can run one. |
-| `tools/install.ps1` | The installer has never run. The VM is the first machine that can parse it. |
+| `tools/install.ps1` | Step 5 of a release and the step `installers` of `docs/work-order-distribution.md` run it from a staging area, with `ANTI_STAGING=yes`. |
 | The published package of this host | `anti-<version>-windows-<cpu>.tar.xz`, once the suite passes here. |
 | Pointer equality of DLL functions | Waits for the DLL-based libraries of chapter 23. |
 | A plugin bound through the import library of its host | `plugin_host`, `plugin_versions` |
 
 ## Installing a package on a VM
 
-A user installs with `curl -fsSL https://anti-lang.com/install.sh | sh`, or with
+A user installs with `curl -fsSL https://anti-lang.com/install.sh | bash`, or with
 `irm https://anti-lang.com/install.ps1 | iex` on Windows. The site serves the installer
 and nothing binary. The package and `SHA256SUMS` come from the GitHub release of the
 newest tag, which the latest-release API names. `SHA256SUMS.sig` comes from the site,

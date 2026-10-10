@@ -65,11 +65,13 @@
   <main class="terminal">
     <h1>Anti @VERSION@</h1>
     <p class="dim">Released @RELEASED@. One command installs the compiler,
-      the runtime archive, the standard library and the tools into your own
-      account. Nothing outside your home directory is written.</p>
+      the runtime archive, the standard library and the LLVM tools into
+      your own account. The package carries the sysroot of every target, so
+      nothing else is downloaded, and nothing outside your home directory
+      is written.</p>
 
     <h2>Install on macOS and Linux</h2>
-    <pre>curl -fsSL https://anti-lang.com/install.sh | sh</pre>
+    <pre>curl -fsSL https://anti-lang.com/install.sh | bash</pre>
 
     <h2>Install on Windows</h2>
     <pre>irm https://anti-lang.com/install.ps1 | iex</pre>
@@ -80,7 +82,10 @@
       <a href="@RELEASE@">GitHub release of @TAG@</a>, and
       <a href="@SIGNATURE@"><code>SHA256SUMS.sig</code></a> from this site.
       It checks the signature against the public key it carries, and then
-      the digest of the package against the manifest.</p>
+      the digest of the package against the manifest. It unpacks the
+      package, runs <code>antic --version</code> and
+      <code>anti --version</code> from it as the check of the install, and
+      puts the two programs on your path. It runs nothing else.</p>
     <p>The two halves stand on two hosts on purpose. Whoever takes GitHub
       changes binaries that the signature no longer covers. Whoever takes
       this site signs nothing, because the private key is on neither host.
@@ -93,6 +98,44 @@
 @ROWS@
       </tbody>
     </table>
+
+    <h2>Manual install on macOS and Linux</h2>
+    <p>The same steps as commands, with the name of your package from the
+      table. The two <code>openssl</code> lines are the signature check of
+      the installers, and <code>shasum</code> reads the manifest. Linux
+      spells the last of those <code>sha256sum --ignore-missing -c
+      SHA256SUMS</code>.</p>
+    <pre>package=anti-@VERSION@-macos-arm64.tar.xz
+curl -fsSLO @DOWNLOAD@/$package
+curl -fsSLO @DOWNLOAD@/SHA256SUMS
+curl -fsSLO @SIGNATURE@
+curl -fsSLO @KEY@
+openssl dgst -sha256 -binary -out SHA256SUMS.sha256 SHA256SUMS
+openssl pkeyutl -verify -pubin -inkey release.pem -in SHA256SUMS.sha256 -sigfile SHA256SUMS.sig
+shasum -a 256 --ignore-missing -c SHA256SUMS
+mkdir -p ~/.local/share ~/.local/bin
+tar -xJf $package -C ~/.local/share
+cp ~/.local/share/anti/bin/antic ~/.local/share/anti/bin/anti ~/.local/bin/
+antic --version
+anti --version</pre>
+
+    <h2>Manual install on Windows</h2>
+    <p>The same in PowerShell. <code>openssl</code> is the one of Git for
+      Windows, and <code>Get-FileHash</code> gives the digest the manifest
+      line has to hold.</p>
+    <pre>$package = "anti-@VERSION@-windows-x86_64.tar.xz"
+irm @DOWNLOAD@/$package -OutFile $package
+irm @DOWNLOAD@/SHA256SUMS -OutFile SHA256SUMS
+irm @SIGNATURE@ -OutFile SHA256SUMS.sig
+irm @KEY@ -OutFile release.pem
+openssl dgst -sha256 -binary -out SHA256SUMS.sha256 SHA256SUMS
+openssl pkeyutl -verify -pubin -inkey release.pem -in SHA256SUMS.sha256 -sigfile SHA256SUMS.sig
+(Get-FileHash $package -Algorithm SHA256).Hash.ToLower() -eq ((Select-String -SimpleMatch $package SHA256SUMS).Line -split " ")[0]
+tar.exe -xJf $package -C $env:LOCALAPPDATA
+New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Programs\anti\bin"
+Copy-Item "$env:LOCALAPPDATA\anti\bin\antic.exe", "$env:LOCALAPPDATA\anti\bin\anti.exe" "$env:LOCALAPPDATA\Programs\anti\bin"
+&amp; "$env:LOCALAPPDATA\Programs\anti\bin\antic.exe" --version
+&amp; "$env:LOCALAPPDATA\Programs\anti\bin\anti.exe" --version</pre>
 
     <h2>The public key</h2>
     <p>The installers carry the public key of the release and check every

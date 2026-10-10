@@ -298,8 +298,10 @@ and the SDK fetcher, and `tools/` leaves the package in
 `tools/downloads.html.in` shows the manual install with the same checks as
 commands, and `docs/distribution.md` under "Binary downloads" and "What the
 site serves" says what the installer does now. The test `release_dry_run`
-follows the installers. Step 5 of `./r` and `docs/work-order-release-script.md`
-lose the lines about the LLVM tools and the sysroot. Done when the suites
+follows the installers. Step 5 of `./r` lost its lines about the LLVM tools
+and the sysroot in the steps `tools` and `mingw`, and step 3 of
+`docs/work-order-release-script.md` names what a package holds without the
+installers and `tools/`. Done when the suites
 pass and an install from the staging area on both VMs, with the network on,
 gives `anti --version` and a hello program for the host.
 

@@ -126,6 +126,10 @@ The target stands under "Binary distribution" in `docs/decisions.md`.
 - antic and anti use only what is in the package. The two exceptions are
   `antic --linker platform` and `anti bind --clang`, which a user asks for by name
   to work with the user's own C world. Building programs never needs either.
+- The installers download the package, `SHA256SUMS` and `SHA256SUMS.sig`, check
+  the signature and the digest, unpack, run `antic --version` and `anti --version`
+  of the package and put the two on the path. They run no CMake and lay out no
+  sysroot, and the package carries no script or pin for them.
 - A change that makes a package depend on something outside it, or on a tool of the
   host, is refused like a warning.
 
@@ -353,12 +357,13 @@ the same list.
     `docs/decisions.md` and `docs/reports/`, so this item does not spell
     it, and neither does the path of its report: the report of 2026-10-10
     in `docs/reports/`, named after the step that follows `mingw`.
-34. The installers download the package alone and use `| bash`. They drop the LLVM
-    tools, the step for the stubs of the Command Line Tools and CMake. Nothing
-    a user runs needs CMake. antic and anti never run it. The installers run it for
-    `tools/get-sysroot.cmake` alone, which item 33 and this item take away. The
-    package then carries no scripts for an installer. The downloads page shows the
+34. Done. The installers download the package alone and use `| bash`. Each
+    checks the signature and the digest, unpacks, runs `antic --version` and
+    `anti --version` of the package as the check of the install and puts the
+    two on the path. Neither runs CMake, lays out a sysroot or reads a file
+    of the package, which carries no `tools/`. The downloads page shows the
     manual install with the same checks as commands.
+    `docs/reports/2026-10-10-dist-installers.md` reports it.
 35. `--bundle-runtime` on Mach-O without Apple's `ld -r`. ld64.lld 23.1.1 has no
     relocatable output, so the join needs a design of its own.
 36. The test of a release with the network off. On each VM, a fresh install from

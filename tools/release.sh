@@ -922,6 +922,8 @@ write_page() {
             -e "s|@RELEASED@|$(date -u '+%Y-%m-%d')|g" \
             -e "s|@RELEASE@|https://github.com/$(repository)/releases/tag/$tag|g" \
             -e "s|@SIGNATURE@|$signature_url|g" \
+            -e "s|@DOWNLOAD@|$release_url|g" \
+            -e "s|@KEY@|$key_url|g" \
             -e "s|@FINGERPRINT@|$(key_fingerprint)|g" > "$1"
 }
 

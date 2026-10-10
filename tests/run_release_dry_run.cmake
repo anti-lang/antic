@@ -186,7 +186,7 @@ if [ -n \"\$script\" ]; then
         for host in \$hosts; do
             tree=\$dest/work/\$host
             rm -rf \"\$tree\"
-            mkdir -p \"\$tree/anti/bin\" \"\$tree/anti/tools\"
+            mkdir -p \"\$tree/anti/bin\"
             suffix=\"\"
             case \$host in windows-*) suffix=.exe ;; esac
             fixture=${WORK}/fixture
@@ -450,6 +450,37 @@ foreach(line "would sign" "would tag v${version}" "would create the release"
     if(NOT out MATCHES "${line}")
         message(FATAL_ERROR "the dry run does not say what it would do: "
                             "`${line}` is missing\n${out}${err}")
+    endif()
+endforeach()
+
+# DESIGN: the downloads page shows the manual install with the checks of
+# the installers as commands, which Eddie decided on 2026-10-08 in
+# decision 7 of docs/work-order-distribution.md: the download of the
+# package and the manifest from the release and of the signature and the
+# key from the site, the signature check of the installers, the digest,
+# the unpacking and the two programs on the path, for both shells. The
+# page of the dry run has every mark filled.
+file(READ "${dist}/downloads-index.html" page)
+foreach(text "anti-${version}-macos-arm64.tar.xz"
+        "downloads/anti/${version}/SHA256SUMS.sig" "keys/release.pem"
+        "openssl dgst -sha256 -binary" "openssl pkeyutl -verify"
+        "shasum -a 256" "sha256sum" "tar -xJf" ".local/share/anti"
+        ".local/bin" "Get-FileHash" "tar.exe -xJf" "Programs\\anti\\bin"
+        "antic --version" "anti --version")
+    string(FIND "${page}" "${text}" found)
+    if(found EQUAL -1)
+        message(FATAL_ERROR "the downloads page shows no `${text}` in its "
+                            "manual install\n${page}")
+    endif()
+endforeach()
+if(page MATCHES "@[A-Z]+@")
+    message(FATAL_ERROR "the downloads page keeps a mark unfilled:\n${page}")
+endif()
+foreach(word cmake sysroot-pin get-sysroot package-api)
+    string(FIND "${page}" "${word}" found)
+    if(NOT found EQUAL -1)
+        message(FATAL_ERROR "the downloads page names `${word}`, and nothing "
+                            "a user runs needs it\n${page}")
     endif()
 endforeach()
 

@@ -25,16 +25,20 @@
 #               the X11 and OpenGL packages, the two macOS sysroots of
 #               Zig's stubs and the two Windows sysroots of mingw-w64, all
 #               ours to redistribute
-#   tools/      the scripts that install the sysroot of the host
 #   licenses/   one file per component, and sources.txt, the record of
 #               the upstream source of each
+#   LICENSE     the licence of Anti
 #   VERSION     the version of tools/version
 #
 # The result is anti-<version>-<host>.tar.xz in DEST, with its digest in
 # SHA256SUMS. The stubs of Apple's SDK in sdk/ of a macOS sysroot stay
 # out, because their licence allows no redistribution, and a user brings
 # them from a Mac with anti sdk import. The package carries no key: the
-# installer holds the key that checks the manifest of the release.
+# installer holds the key that checks the manifest of the release. It
+# carries no tools/ either: the installer downloads it, checks it, unpacks
+# it and runs nothing of it but antic and anti, so no script and no pin
+# travels with it. Eddie decided this on 2026-10-08, in decision 7 of
+# docs/work-order-distribution.md.
 cmake_minimum_required(VERSION 3.20)
 
 set(needed DEST SYSROOT RUNTIME HOSTS)
@@ -352,7 +356,7 @@ foreach(host IN LISTS HOSTS)
     set(work "${DEST}/work/${host}")
     set(tree "${work}/anti")
     file(REMOVE_RECURSE "${work}")
-    file(MAKE_DIRECTORY "${tree}/bin" "${tree}/tools" "${tree}/licenses")
+    file(MAKE_DIRECTORY "${tree}/bin" "${tree}/licenses")
 
     set(suffix "")
     if(host MATCHES "^windows-")
@@ -417,14 +421,6 @@ foreach(host IN LISTS HOSTS)
              DESTINATION "${tree}/sysroot/${target}")
     endforeach()
     file(COPY "${SYSROOT}/licenses/" DESTINATION "${tree}/licenses")
-    # The installer reads package-api and drives get-sysroot.cmake with
-    # the pins, until the step installers of docs/work-order-distribution.md
-    # takes tools/ out of the package. No pin of the LLVM tools is here,
-    # since bin/ carries the tools themselves.
-    foreach(name get-sysroot.cmake sysroot-pins zig-stubs-pin cmake-pin
-            cmake-version package-api)
-        file(COPY "${root}/tools/${name}" DESTINATION "${tree}/tools")
-    endforeach()
     file(COPY "${root}/LICENSE" DESTINATION "${tree}")
 
     set(packed "${DEST}/anti-${version}-${host}.tar.xz")

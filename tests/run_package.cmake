@@ -1,8 +1,9 @@
 # Pack the package of this host from the antic and the anti of the build,
 # and check that the archive carries no key and nothing of tools/keys/.
 # The LLVM tools of the host travel in bin/ beside antic and anti, with
-# llvm-version, and tools/ holds no pin of them. The package alone then
-# prints its version and builds a program, with nothing else on the PATH.
+# llvm-version, and the package holds no tools/ at all, since no installer
+# runs a script of it. The package alone then prints its version and
+# builds a program, with nothing else on the PATH.
 # With an empty PATH and no LIB it links a program for every target that
 # names no framework. Both macOS sysroots of Zig's stubs go in, and the
 # stubs of Apple's SDK in sdk/ stay out. A package of a build with the
@@ -96,11 +97,12 @@ endif()
 # DESIGN: the LLVM tools travel in bin/ of the package beside antic and
 # anti, copied from bin/ of the runtime archive with llvm-version, which
 # Eddie decided on 2026-10-08 in docs/work-order-distribution.md. The
-# installer downloads none, so tools/ carries no pin of them. VERSION in
-# the root names the version of the package.
+# installer downloads none and runs no script of the package, so the
+# package holds no tools/. VERSION in the root names the version of the
+# package.
 set(tools llvm-mc llvm-ar llvm-objdump llvm-readobj lld ld.lld ld64.lld
           lld-link opt llc llvm-profdata)
-set(expected anti/tools/zig-stubs-pin anti/bin/antic${suffix}
+set(expected anti/bin/antic${suffix}
              anti/bin/anti${suffix} anti/bin/llvm-version anti/VERSION
              anti/sysroot/macos-arm64/usr/lib/libSystem.tbd
              anti/sysroot/macos-x86_64/usr/lib/libSystem.tbd
@@ -158,12 +160,14 @@ foreach(entry IN LISTS expected)
         message(FATAL_ERROR "${archive} lacks ${entry}")
     endif()
 endforeach()
-foreach(entry anti/tools/llvm-pin anti/tools/llvm-version)
-    if(entries MATCHES "(^|\n)${entry}\n")
-        message(FATAL_ERROR "${archive} carries ${entry}, and no installer "
-                            "reads it since the tools travel in bin/")
-    endif()
-endforeach()
+# DESIGN: the package holds no tools/, since the installers download the
+# package and run nothing of it, which Eddie decided on 2026-10-08 in
+# decision 7 of docs/work-order-distribution.md. The LLVM tools travel in
+# bin/, and the pins and the scripts of the sysroot stay in the tree.
+if(entries MATCHES "(^|\n)anti/tools/")
+    message(FATAL_ERROR "${archive} carries tools/, and no installer runs a "
+                        "script or reads a pin of the package")
+endif()
 # Every licence of the runtime tree goes in, those of the native libraries
 # among them.
 file(GLOB licences RELATIVE "${RUNTIME}/licenses" "${RUNTIME}/licenses/*.txt")

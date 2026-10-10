@@ -2,16 +2,17 @@
 # Install Anti for the user who runs it, in the directories of the
 # platform.
 #
-#   curl -fsSL https://anti-lang.com/install.sh | sh
-#   curl -fsSL https://anti-lang.com/install.sh | sh -s -- --intel  # docs-style:ignore
+#   curl -fsSL https://anti-lang.com/install.sh | bash
+#   curl -fsSL https://anti-lang.com/install.sh | bash -s -- --intel  # docs-style:ignore
 #
 # It downloads the package of this host and SHA256SUMS from the GitHub
 # release of the version, and SHA256SUMS.sig from anti-lang.com. It checks
 # the signature first, then the SHA-256 of the package against the
-# manifest and unpacks it. The package carries the sysroot of every
-# target, the Windows ones of mingw-w64 among them. The SDK of macOS
-# belongs to Apple, and the script asks before it takes its stubs from
-# the Command Line Tools for a package without Zig's.
+# manifest, unpacks the package and puts antic and anti on the path. The
+# package carries everything a build takes, the LLVM tools and the
+# sysroot of every target among them, so nothing else is downloaded and
+# nothing of the package is run but its two programs, whose --version is
+# the check of the install. The script is POSIX sh, and bash runs it.
 #
 # The option --arm or --intel takes the package of that processor rather
 # than the one of this machine. A machine that emulates the other
@@ -272,74 +273,21 @@ mv "$work/anti" "$home"
 printf '%s\n' "$version" > "$home/.anti-install"
 say "installed $version in $home"
 
-# DESIGN: the site serves this installer, so it is always the newest.
-# The CMake scripts it drives come from the package, which is as old as
-# the version installed. The number rises when the options it passes
-# change, and a package older than that fails here rather than halfway.
-PACKAGE_API=1
-api=0
-if [ -f "$home/tools/package-api" ]; then
-    api=$(tr -d ' \n' < "$home/tools/package-api")
-fi
-if [ "$api" -lt "$PACKAGE_API" ]; then
-    fail "Anti $version speaks version $api of the installer interface, and \
-this installer needs $PACKAGE_API. Install a newer version of Anti."
-fi
-
-# DESIGN: the LLVM tools travel in bin/ of the package beside antic and
-# anti, so nothing is downloaded for them. antic finds them there by the
-# rule of src/antic/userdirs.c, beside the lib/ of the archive.
-say "the package carries the LLVM tools of $host in $home/bin"
-
-# CMake installs the sysroot of this host. The package holds the script
-# and the pins, and the pinned CMake stands in when the host has none.
-cmake=$(command -v cmake || true)
-if [ -z "$cmake" ]; then
-    pin=$(grep "^$host-url=" "$home/tools/cmake-pin" | cut -d = -f 2-)
-    cmake_version=$(tr -d ' \n' < "$home/tools/cmake-version")
-    url=$(echo "$pin" | sed "s/@VERSION@/$cmake_version/g")
-    digest=$(grep "^$host-digest=" "$home/tools/cmake-pin" | cut -d = -f 2-)
-    say "installing CMake $cmake_version, which the sysroot step needs"
-    curl -fsSL -o "$work/cmake.tar.gz" "$url"
-    got=$(sha256 "$work/cmake.tar.gz")
-    if [ "$digest" != "$got" ]; then
-        fail "CMake: SHA-256 $got, expected $digest"
-    fi
-    mkdir -p "$home/tools/cmake"
-    tar -xzf "$work/cmake.tar.gz" -C "$home/tools/cmake" --strip-components=1
-    cmake=$(find "$home/tools/cmake" -name cmake -type f -perm -u+x | head -1)
-fi
-
-# DESIGN: a package that carries Zig's stubs links for macOS with no SDK.
-# A program that names a framework takes the SDK of the Command Line Tools,
-# which antic finds on its own. A package without the stubs, as 0.1.0 is,
-# takes the stubs of the Command Line Tools here.
-case $host in
-macos-*)
-    if [ -f "$home/sysroot/macos-$arch/usr/lib/libSystem.tbd" ]; then
-        say "the package links for macOS with Zig's stubs of libSystem"
-    else
-        if [ ! -d /Library/Developer/CommandLineTools/SDKs ]; then
-            say "the macOS SDK is missing. Apple installs it with xcode-select --install"
-            if ask "Run xcode-select --install now?"; then
-                xcode-select --install || true
-                say "run this installer again when the Command Line Tools are in place"
-                exit 0
-            fi
-            fail "no SDK, so no linking for macOS"
-        fi
-        say "taking the SDK stubs from the Command Line Tools"
-        "$cmake" -DDEST="$home/sysroot" -DLLVM_BIN="$home/bin" \
-            -DTARGETS="macos-arm64;macos-x86_64" \
-            -P "$home/tools/get-sysroot.cmake" >/dev/null
-    fi
-    ;;
-esac
-
-# DESIGN: the package carries the sysroot of every target, the Windows
-# ones of mingw-w64 among them, so this host builds Windows programs with
-# nothing more.
-say "the package carries the sysroots of all six targets in $home/sysroot"
+# DESIGN: the check of an install is the two programs of the package,
+# run from where they were unpacked. The package carries the LLVM tools
+# in bin/ and the sysroot of every target in sysroot/, so nothing is
+# downloaded or laid out here and no script of the package runs. A
+# package whose programs print another version, or that this machine
+# cannot run, is no install. Eddie decided this on 2026-10-08, in
+# decision 7 of docs/work-order-distribution.md.
+for program in antic anti; do
+    printed=$("$home/bin/$program" --version 2>&1) ||
+        fail "$home/bin/$program --version failed: $printed"
+    [ "$printed" = "$program $version" ] ||
+        fail "$home/bin/$program prints '$printed', and the package is $version"
+    say "$printed"
+done
+say "the package carries the LLVM tools and the sysroots of all six targets, so nothing else is downloaded"
 
 # DESIGN: the PATH names one antic, and it is the one this machine runs
 # without emulation. A package of the other processor is therefore called

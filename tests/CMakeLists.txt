@@ -1766,12 +1766,6 @@ if(antic_sanitized EQUAL -1)
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_no_paths.cmake")
 endif()
 
-# install.sh alone reads the pin of CMake, for the stubs of a macOS
-# package without Zig's. install.ps1 lays out no sysroot any more.
-add_test(NAME cmake_pin
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}" -DNAME=cmake
-            "-DREADERS=tools/install.sh"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_pin.cmake")
 add_test(NAME release_pins
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_release_pins.cmake")
@@ -2247,9 +2241,6 @@ add_test(NAME native_pin_self
             "-DPIN=${CMAKE_CURRENT_SOURCE_DIR}/run_native_pin.cmake"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/native-pin-self"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_native_pin_self.cmake")
-add_test(NAME package_api
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package_api.cmake")
 # antic takes its tools, its libraries and its sysroots from the runtime
 # archive alone, and refuses what the archive lacks by its path rather
 # than taking it from the search path or from LIB.
@@ -2279,6 +2270,16 @@ add_test(NAME installer_github
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/installer-github"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_installer_github.cmake")
 set_tests_properties(installer_github PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# The installers download the package alone: no CMake, no sysroot step
+# and no script of the package, and the check of an install is the
+# --version of its two programs.
+add_test(NAME installer_alone
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/installer-alone"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_installer_alone.cmake")
+set_tests_properties(installer_alone PROPERTIES
     SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # The installer trusts no line of SHA256SUMS before it has checked

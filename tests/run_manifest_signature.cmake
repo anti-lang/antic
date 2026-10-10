@@ -74,18 +74,17 @@ function(run message)
     endif()
 endfunction()
 
-# The package the installer unpacks. It carries what install.sh reads and
-# no program: the version of the installer interface, and the stubs of
-# libSystem that tell it this package links for macOS on its own. Without
-# tools/llvm-pin it downloads no toolchain, so the test reaches no server.
+# The package the installer unpacks. It carries the two programs the
+# installer runs as the check of the install, as scripts that print the
+# version, and nothing else: the installer reads no script and no pin of
+# a package, so the test reaches no server.
 set(tree "${WORK}/package")
 file(MAKE_DIRECTORY "${tree}/anti/bin")
-file(WRITE "${tree}/anti/tools/package-api" "1\n")
 file(WRITE "${tree}/anti/bin/antic" "#!/bin/sh\necho \"antic ${version}\"\n")
 file(WRITE "${tree}/anti/bin/anti" "#!/bin/sh\necho \"anti ${version}\"\n")
-foreach(target macos-arm64 macos-x86_64)
-    file(WRITE "${tree}/anti/sysroot/${target}/usr/lib/libSystem.tbd" "stub\n")
-endforeach()
+file(CHMOD "${tree}/anti/bin/antic" "${tree}/anti/bin/anti"
+     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
+                 WORLD_READ WORLD_EXECUTE)
 set(area "${WORK}/base/anti/${version}")
 file(MAKE_DIRECTORY "${area}")
 run("the package did not pack" "${CMAKE_COMMAND}" -E chdir "${tree}"

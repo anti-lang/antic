@@ -33,27 +33,16 @@ foreach(installer install.sh install.ps1)
     endif()
 endforeach()
 
-# DESIGN: the keys live in tools/keys/, and the packer copies a list of
-# named files of tools/ into a package. No name of that list is under
-# tools/keys/ or is a key file. The test package_keys opens a package the
+# DESIGN: the keys live in tools/keys/, and the packer copies no file of
+# tools/ into a package, since the step installers of
+# docs/work-order-distribution.md took tools/ out of the package. No key
+# can then travel with one. The test package_keys opens a package the
 # packer wrote and checks what it carries.
 file(READ "${ROOT}/tools/pack-anti.cmake" packer)
-string(REGEX MATCHALL "foreach\\(name [^)]*\\)[ \n]*file\\(COPY \"\\$\\{root\\}/tools/\\$\\{name\\}\""
-       copies "${packer}")
-if(NOT copies)
-    message(FATAL_ERROR "tools/pack-anti.cmake has no list of the files of "
-                        "tools/ it copies")
+if(packer MATCHES "file\\(COPY[^)]*\\$\\{root\\}/tools/")
+    message(FATAL_ERROR "tools/pack-anti.cmake copies a file of tools/ into "
+                        "the package, which carries no tools/")
 endif()
-foreach(copy IN LISTS copies)
-    string(REGEX REPLACE "^foreach\\(name ([^)]*)\\).*$" "\\1" names "${copy}")
-    string(REGEX REPLACE "[ \n]+" ";" names "${names}")
-    foreach(name IN LISTS names)
-        if(name MATCHES "^keys(/|$)" OR name MATCHES "\\.(pem|gpg|asc)$")
-            message(FATAL_ERROR "tools/pack-anti.cmake copies tools/${name} "
-                                "into the package")
-        endif()
-    endforeach()
-endforeach()
 if(packer MATCHES "tools/keys")
     message(FATAL_ERROR "tools/pack-anti.cmake names tools/keys")
 endif()
