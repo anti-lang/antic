@@ -486,8 +486,12 @@ if(FORM STREQUAL "archive")
     string(REPEAT "ANTL" 4000 starts)
     ar_member(many_starts "s.package.o/" 16000 "${starts}")
     set(malformed_9 "${many_starts}")
+    # file(WRITE) ends a line with CR and LF on Windows, which would
+    # break the eight bytes an archive starts with, so the bytes are
+    # written with line feeds on every host.
     foreach(case RANGE 1 9)
-        file(WRITE "${WORK}/malformed-${case}.a" "!<arch>\n${malformed_${case}}")
+        file(CONFIGURE OUTPUT "${WORK}/malformed-${case}.a"
+             CONTENT "!<arch>\n${malformed_${case}}" @ONLY NEWLINE_STYLE UNIX)
         run_anti("${WORK}" status out err license --from-archive
                  "${WORK}/malformed-${case}.a")
         if(NOT status EQUAL 1 OR NOT out STREQUAL "" OR
