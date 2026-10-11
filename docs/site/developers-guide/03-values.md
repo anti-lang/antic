@@ -1370,6 +1370,7 @@ fn main() -> int
 		say(f"{i}: {v}");
 	}
 	say(f"(i8, i8) {size_of((i8, i8))}, (i8, int) {size_of((i8, int))}, (int, str) {size_of((int, str))}");
+	say(f"(i8, int, i8) {size_of((i8, int, i8))}, (int, i8, i8) {size_of((int, i8, i8))}");
 	return 0;
 }
 ```
@@ -1383,6 +1384,7 @@ equal true
 1: 20
 2: 30
 (i8, i8) 2, (i8, int) 16, (int, str) 24
+(i8, int, i8) 24, (int, i8, i8) 16
 ```
 
 The flags form of the integer section, `let (result, flags) = a + b;`, is this destructuring over a pair `(T, Flags)`.
@@ -1465,7 +1467,7 @@ Where it lives: `src/antic/types.c` makes one type per distinct tuple, and `src/
 | Calls into the runtime | 0 | 0 |
 | Checks | none | none |
 
-The order of the elements decides the padding. `(i8, int, i8)` is 24 bytes and `(int, i8, i8)` is 16.
+The order of the elements decides the padding. The last line of the program above prints 24 bytes for `(i8, int, i8)` and 16 for `(int, i8, i8)`.
 
 ### Pitfalls
 

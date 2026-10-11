@@ -19,7 +19,7 @@ The function `compile` of `src/antic/driver.c` runs the front end, `back_end` an
 | Step | Reads | Writes | Source |
 |---|---|---|---|
 | Lexer | the source bytes | tokens | `lexer_lex` in `src/antic/lexer.c` |
-| Parser | tokens | the syntax tree | `parser_parse` in `src/antic/parser.c` and the five `parser_*.c` files |
+| Parser | tokens | the syntax tree | `parser_parse` in `src/antic/parser.c` and the six `parser_*.c` files |
 | Library loading | the `import` lines | the interface and the IR of each imported module | `driver_find_libraries` and `driver_load_libraries` in `src/antic/driver_search.c` |
 | Checker | the tree and the interfaces | the checked tree, with a type on every expression | `sema_check` in `src/antic/sema.c` and the `sema_*.c` files |
 | Lowering | the checked tree | the IR of antic | `lower_module` in `src/antic/lower.c` and the `lower_*.c` files |
@@ -335,7 +335,7 @@ The whole-program pass uses that view in these steps, which chapter 9 describes.
 
 The link of a release build is a full LTO link. `opt` runs `lto-pre-link<O3>` and writes bitcode as the object. `lld` then links that bitcode with the runtime. The archive holds the runtime as bitcode in `lib/<target>/<level>/bitcode/full/`. LLVM then runs its passes over the program and the runtime as one module, at `--lto-O3`. A call of `anti_rt_write` may then be inlined like a call of a function of the program.
 
-Dev mode, `--lib`, `--linker platform` and `--memory-checks` link objects and take no LTO. So does a Windows program that loads plugins. `--lto none` asks for the link of objects in release mode. That link runs `opt` with `default<O3>` into `<output>.bc` and `llc -O2` on the bitcode. `lto_mode` of `src/antic/driver.c` holds the rule.
+Dev mode, `--lib` and `--linker platform` link objects and refuse `--lto full` and `--lto thin`. A build with `--memory-checks` and a Windows program that loads plugins link objects unless `--lto` is given. A macOS build with `--memory-checks` refuses `--lto`. `--lto none` asks for the link of objects in release mode. That link runs `opt` with `default<O3>` into `<output>.bc` and `llc -O2` on the bitcode. `lto_mode` of `src/antic/driver.c` holds the rule.
 
 Every link drops the functions and data that nothing reaches, with `--gc-sections`, `-dead_strip` or `/OPT:REF`. `llc` writes each function and each datum into a section of its own for that, on ELF and COFF.
 
@@ -345,7 +345,7 @@ The runtime archive is the directory antic reads beside its own executable. A pa
 
 | Path | Contents |
 |---|---|
-| `bin/` | `opt`, `llc`, `ld.lld`, `ld64.lld`, `lld-link`, `llvm-ar`, `llvm-mc`, `llvm-objdump`, `llvm-profdata`, `llvm-readobj` and `llvm-version` |
+| `bin/` | `opt`, `llc`, `lld`, `ld.lld`, `ld64.lld`, `lld-link`, `llvm-ar`, `llvm-mc`, `llvm-objdump`, `llvm-profdata`, `llvm-readobj` and `llvm-version` |
 | `std/` | the standard library, one `.antl` per module |
 | `lib/<target>/<level>/` | `libanti_rt.a`, the runtime as objects, and `bitcode/full/` and `bitcode/thin/` with the runtime as bitcode |
 | `lib/<target>/` | the native libraries PCRE2, SQLite, Mbed TLS, miniaudio and raylib, the glue of `anti.regex` and the profile runtime of compiler-rt |

@@ -197,7 +197,7 @@ A dev build of `com.example.hello` on macos-arm64 writes these files.
 | `dist/macos-arm64/dev/hello` | the program, copied for delivery |
 | `dist/macos-arm64/dev/NOTICE.txt` | the licence notice of what the program links |
 
-The library file and each object under `obj/` have a file with the suffix `.key` beside them. The key is the SHA-256 of the input, the version of antic, the target and the processor level. A build compiles a module again only when its key changes.
+The library file and each object under `obj/` have a file with the suffix `.key` beside them. The key is one line: the SHA-256 of the input, the version of antic, the target, the processor level and whether the build writes debug lines. `strict` follows in a build that refuses warnings and `memory-checks` in a build with `--memory-checks`. A build compiles a module again only when its key changes.
 
 `build/` is disposable, and `dist/` holds what a user runs. Chapter 18 describes the manifest, the lock file and the cache.
 
