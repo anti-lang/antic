@@ -369,14 +369,16 @@ function(antic_dump_test stage subject expected)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dump.cmake")
 endfunction()
 
-# llvm-objdump and llvm-readobj of the runtime archive, with the suffix of
-# an executable of the host, .exe on Windows. Every test names them by
-# these two. Spelled without the suffix, the file was missing on Windows,
-# and each test that reads a library there skipped.
+# llvm-objdump, llvm-readobj and llvm-mc of the runtime archive, with the
+# suffix of an executable of the host, .exe on Windows. Every test names
+# them by these three. Spelled without the suffix, the file was missing on
+# Windows, and each test that reads a library there skipped.
 set(ANTIC_RUNTIME_OBJDUMP
     "${ANTIC_RUNTIME_DIR}/bin/llvm-objdump${CMAKE_EXECUTABLE_SUFFIX}")
 set(ANTIC_RUNTIME_READOBJ
     "${ANTIC_RUNTIME_DIR}/bin/llvm-readobj${CMAKE_EXECUTABLE_SUFFIX}")
+set(ANTIC_RUNTIME_MC
+    "${ANTIC_RUNTIME_DIR}/bin/llvm-mc${CMAKE_EXECUTABLE_SUFFIX}")
 
 # The signal table of the runtime, in a program of its own. The test
 # starts threads, and so does the reader of the platform layer.
@@ -2640,9 +2642,23 @@ add_test(NAME overview_examples
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DOVERVIEW=${PROJECT_SOURCE_DIR}/docs/anti-syntax-overview.md"
+        "-DDOCUMENTS=${PROJECT_SOURCE_DIR}/docs/anti-syntax-overview.md"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/overview"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_overview_examples.cmake")
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_document_examples.cmake")
+
+# Every page of the developer's guide, through the same runner and its
+# marks: every `anti` block compiles, a program prints its `text output`
+# block, a `refused` block fails with the error it names, and an `llvm`
+# or `asm` excerpt stands in what antic writes for the block it names.
+add_test(NAME guide_examples
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DDOCUMENTS=${PROJECT_SOURCE_DIR}/docs/site/developers-guide"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/guide"
+        "-DLLVM_MC=${ANTIC_RUNTIME_MC}"
+        "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_document_examples.cmake")
 
 add_expect_test(warning_one_segment STATUS 0
     PATTERN "geometry.anti:1:1: warning: the module path `geometry` has one segment, which is for a program's own files \\[single-segment-path\\]"
