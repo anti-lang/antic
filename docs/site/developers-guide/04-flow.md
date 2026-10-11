@@ -10,112 +10,1342 @@ tags: [compilers, programming-languages]
 keywords: [control flow, if, while, for loop, switch, break, continue, defer, undo]
 ---
 
+A statement of this chapter becomes basic blocks and branches in the IR of antic, and nothing else. No statement here allocates or takes a lock. Three of them call a function: a `for` over a collection calls its iterator, a `switch` on a `str` calls `anti.text.equal`, and a dev build calls the runtime when a check fails.
+
+An excerpt marked `ir` shows the IR of antic after lowering, which `antic --dump-ir` prints and chapter 2 explains. A block is `b0`, `b1` and on, `branch %c, b1, b2` goes to `b1` when `%c` is true, and `jump` goes unconditionally. Lowering writes the checks of dev mode into the IR in both modes, and a release build drops their blocks afterwards.
+
 ## if and while
 
 ### What you know
 
-`if` and `while` in Java, C and C++, their conditions, and what counts as true in each.
+C and C++ take any scalar as a condition: zero and the null pointer are false, everything else is true. Java takes a `boolean` alone. All three write the condition in parentheses and make the braces optional. All three have the conditional expression `c ? a : b`, and in all three an assignment is an expression that a condition may hold.
 
 ### The feature
 
-`if`, `else`, `while`, `do`, a condition that is a `bool` or a checked pointer, narrowing in a branch, and the refusals.
+`if` takes a condition and a block. `else if` continues the chain and `else` ends it. The braces are part of the statement, and parentheses around the condition are optional.
+
+A condition has type `bool`. No integer and no pointer converts to it, so a test of a number is written `n != 0` and a test of a pointer `p != none`. The one other type that stands as a condition is the match of a pattern, `?Match`, which means that the pattern matched.
+
+`&&` and `||` evaluate the left operand first and the right one only when the left does not decide. `!` negates a `bool`.
+
+`while cond do { }` tests before each turn and runs its block zero or more times. `do { } while cond` runs its block once before the first test. No `;` follows the condition of a `do` loop.
+
+`if` is a statement. Anti has no conditional expression and no `if` that gives a value. An assignment is a statement as well, so a condition cannot hold one.
+
+A name declared in a block ends with the block. The condition of a `while` therefore reads names of the enclosing block alone.
+
+```anti
+//! name: branch
+import anti.io;
+import anti.text;
+
+export fn sign(x: int) -> int
+{
+	if x > 0 {
+		return 1;
+	} else if x < 0 {
+		return -1;
+	} else {
+		return 0;
+	}
+}
+
+export fn odd_part(n: int) -> int
+{
+	while n > 1 && (n & 1) == 0 do {
+		n = n >> 1;
+	}
+	return n;
+}
+
+export fn digits(n: int) -> int
+{
+	let count = 0;
+	do {
+		count += 1;
+		n = n / 10;
+	} while n != 0
+	return count;
+}
+
+export fn length(p: ?*int) -> int
+{
+	if p != none && *p > 0 {
+		return *p;
+	}
+	return 0;
+}
+
+fn say(line: str)
+{
+	io.println(line);
+	free(line.ptr);
+}
+
+fn main() -> int
+{
+	say(f"sign {sign(7)} {sign(-7)} {sign(0)}");
+	say(f"odd_part {odd_part(48)} {odd_part(7)}");
+	say(f"digits {digits(0)} {digits(1234)}");
+	let n = 12;
+	say(f"length {length(&n)} {length(none)}");
+	return 0;
+}
+```
+
+```text output
+sign 1 -1 0
+odd_part 3 7
+digits 1 4
+length 12 0
+```
+
+A condition that compares a local or a parameter with `none` narrows that name. In `length` the parameter `p` has type `?*int`. Right of `p != none &&` and inside the block it has type `*int`, so `*p` compiles. A test `p == none` whose block leaves narrows `p` for the rest of the enclosing block. `&&` narrows what follows it, and `||` narrows nothing inside the block, since either side may have been the true one. An assignment to the name ends the narrowing. A field is never narrowed, because any call may write it. Chapter 7 holds the full rule, with `if let` and `let ... else`, which bind the checked value to a new name.
+
+A function with a result ends every path in a `return`. The checker reads the form of the last statement alone. An `if` whose every branch leaves, with an `else`, counts. A `while true do { }` does not, so a `return` follows it.
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: a condition has type `bool`, found `int`
+let n = 3;
+if n {
+	n = 0;
+}
+```
+
+```anti refused
+//! error: a condition has type `bool`, found `?*int`
+fn length(p: ?*int) -> int
+{
+	if p {
+		return 1;
+	}
+	return 0;
+}
+```
+
+```anti refused
+//! error: expected `{`
+let n = 3;
+if n > 0
+	n = 0;
+```
+
+```anti refused
+//! error: expected `do`
+let n = 3;
+while n > 0 {
+	n -= 1;
+}
+```
+
+```anti refused
+//! error: `p` may be `none`, check it or use `?*T`
+fn length(p: ?*int, always: bool) -> int
+{
+	if p != none || always {
+		return *p;
+	}
+	return 0;
+}
+```
+
+```anti refused
+//! error: `n.next` may be `none`, check it or use `?*T`
+struct Node { next: ?*Node, value: int }
+
+fn second(n: *Node) -> int
+{
+	if n.next != none {
+		return n.next.value;
+	}
+	return 0;
+}
+```
+
+```anti refused
+//! error: `forever` can reach its end without `return`
+fn forever() -> int
+{
+	while true do {
+		return 1;
+	}
+}
+```
 
 ### How antic builds it
 
-The basic blocks and the `br` of an `if` and the loop of a `while` in the LLVM text, with excerpts.
+Lowering turns an `if` into one conditional branch per condition and one block per body. A loop is a block for the test, a block for the body and a jump back. `&&` and `||` are branches too: the right operand stands in a block that the left operand jumps over.
+
+```ir excerpt=branch target=linux-x86_64 mode=dev
+export fn branch.odd_part(%0: i64) -> i64 {
+b0:
+    jump b1
+b1:
+    %1 = sgt i8 %0, 1
+    branch %1, b4, b3
+...
+b3:
+    ret i64 %0
+b4:
+    %2 = and i64 %0, 1
+    %3 = eq i8 %2, 0
+    branch %3, b2, b3
+...
+b6:
+    %7 = sshr i64 %0, 1
+    %0 = copy i64 %7
+    jump b1
+}
+```
+
+`b1` is the test of the `while`. It holds the left operand of `&&`, `n > 1`, and leaves to `b3` when that is false. `b4` holds the right operand and runs only when the left one was true. `b6` is the body, which shifts, assigns `n` and jumps back to the test. `b3` is the exit, which both operands reach. The left-out blocks check the shift count, which chapter 3 describes.
+
+A dev build writes this IR into the LLVM module one instruction at a time and runs no optimizer. Every local and every temporary is a slot of the frame.
+
+```llvm excerpt=branch target=linux-x86_64 mode=dev
+define dso_local noundef i64 @sign(i64 noundef %p0) #0 {
+b0:
+  %t0 = alloca i64, align 8
+  %t1 = alloca i8, align 1
+  %t2 = alloca i8, align 1
+  store i64 %p0, ptr %t0, align 8
+  %v0 = load i64, ptr %t0, align 8
+  %v1 = icmp sgt i64 %v0, 0
+  %v2 = zext i1 %v1 to i8
+  store i8 %v2, ptr %t1, align 1
+  %v3 = load i8, ptr %t1, align 1
+  %v4 = trunc i8 %v3 to i1
+  br i1 %v4, label %b1, label %b2
+```
+
+The three `alloca` lines are the slots of `x` and of the two conditions. `icmp sgt` compares, `zext` widens the result to the `i8` that a `bool` is, and the `store` and `load` pass it through its slot. `trunc` gives the `i1` that `br` takes. A condition in a dev build is therefore one compare, one store, one load and one branch.
+
+A release build runs `opt` over the module, which removes the slots and rewrites the branches.
+
+```llvm excerpt=branch target=linux-x86_64 mode=release
+define dso_local noundef range(i64 -1, 2) i64 @sign(i64 noundef %p0) local_unnamed_addr #3 {
+b0:
+  %common.ret.op = tail call i64 @llvm.scmp.i64.i64(i64 %p0, i64 0)
+  ret i64 %common.ret.op
+}
+```
+
+The whole `if` chain of `sign` is one three-way compare, `llvm.scmp`, which gives -1, 0 or 1. The function holds no branch.
+
+```llvm excerpt=branch target=linux-x86_64 mode=release
+b0:
+  %v1.not = icmp eq ptr %p0, null
+  br i1 %v1.not, label %common.ret, label %b3
+...
+b3:                                               ; preds = %b0
+  %v9 = load i64, ptr %p0, align 8, !tbaa !18
+  %spec.select = tail call i64 @llvm.smax.i64(i64 %v9, i64 0)
+  br label %common.ret
+```
+
+This is `length`. The test of `none` is a compare of the pointer with null, and it stays a branch, because the `load` in `b3` must not run for a null pointer. The second condition and both `return` statements became `smax`, the larger of `*p` and 0.
+
+```asm excerpt=branch target=linux-x86_64 mode=release
+<length>:
+testq %rdi, %rdi
+je 0x15 <length+0x15>
+movq (%rdi), %rax
+movq %rax, %rcx
+sarq $0x3f, %rcx
+andnq %rax, %rcx, %rax
+retq
+xorl %eax, %eax
+retq
+```
+
+`testq` and `je` are the test of `none`. The three instructions after the load compute the larger of the value and 0 without a branch. On arm64 the test of `none` is one `cbz` instruction.
+
+Where it lives: `if_statement` and `statement` of `src/antic/parser_stmt.c` parse the forms. `check_condition`, `checked_against_none` and `stmt_leaves` of `src/antic/sema_stmt.c` check the condition, the narrowing and the missing `return`. `lower_if` and `lower_loop` of `src/antic/lower_stmt.c` write the blocks, and `src/antic/llvm_emit.c` writes each `branch` as a `br`.
 
 ### What it costs
 
-The calls and the allocations of a branch and of a loop, and what a condition with narrowing adds.
+| Cost | Dev | Release |
+|---|---|---|
+| A condition | one compare, one store and one load of an `i8` slot, one conditional branch | one compare and one branch, or a branch-free form that `opt` chooses |
+| `&&` and `||` | one conditional branch per operand | one branch per operand, or one `and` where both sides are safe to evaluate |
+| A turn of a `while` | the condition and one jump back | the condition |
+| Narrowing | nothing: it is a rule of the checker | nothing |
+| Heap allocations | 0 | 0 |
+| Calls into the runtime | 0 | 0 |
+| Locks and atomic operations | 0 | 0 |
+| Checks inserted | none | none |
+
+An `if` or a loop inserts no check of its own. The checks inside `odd_part` and `digits` belong to `>>`, `/` and `+=`, and chapter 3 gives their cost.
 
 ### Pitfalls
 
-Where a condition, an assignment in one, or narrowing behaves other than a Java, C or C++ programmer expects.
+For a Java programmer:
+
+- The loop is written `while cond do { }`. A `while` without `do` is refused.
+- Anti has no `c ? a : b`. An `if` with two assignments takes its place.
+- A test of `none` narrows a local or a parameter. It does not narrow a field, so a field is copied into a local first.
+
+For a C programmer:
+
+- `if n` and `if p` are refused. The condition is a `bool`.
+- `if x = 1` does not parse, since an assignment is a statement.
+- The braces are required, so no `else` attaches to the wrong `if`.
+- `do { } while cond` takes no `;` at its end.
+
+For a C++ programmer:
+
+- No class converts to `bool` in a condition. `explicit operator bool` has no counterpart.
+- `if` holds no declaration of its own, as `if (auto x = f())` does. `if let` binds the value of an optional, and chapter 7 describes it.
+- A name narrowed by `p != none` is a plain `*T` in the block. No `*p` there carries a hidden check.
 
 ## for over ranges and collections
 
 ### What you know
 
-The three-clause `for` of C, the enhanced `for` of Java and the range `for` of C++.
+C has the three-clause `for (init; test; step)`, and Java and C++ keep it. Java adds `for (T x : items)` over an array or an `Iterable`, which calls `iterator()`, `hasNext()` and `next()`. C++ adds `for (auto x : items)`, which calls `begin()` and `end()` and copies each element unless the variable is a reference.
 
 ### The feature
 
-`for i in 0..10`, `by`, a reversed range, `for x in e` over a slice, an array and a collection, `for x in &e`, `for i, x in items`, and the refusals.
+Anti has no three-clause `for`. A `for` walks a range or a sequence, and every other loop is a `while`.
+
+A range is `lo..hi`. It starts at `lo` and stops before `hi`. Both bounds have one integer type, which is the type of the variable. Each bound is evaluated once, before the first turn. A range whose `lo` is not below `hi` runs no turn. `for lo..hi { }` names no variable and counts the turns.
+
+`by k` sets the step, and `k` is a constant expression. `by -k` visits the values that `by k` visits, in reverse order: `0..10 by -3` gives 9, 6, 3 and 0. A range never computes a value past its ends, so a range that ends at the largest value of its type stops as any other does.
+
+`for x in e` walks a slice, an array, a collection or an iterator, and `x` is a copy of each element. `for x in &e` gives `x` as a pointer to each element in its place, for one turn. `for i, x in e` gives the index and the element of a slice or an array. `for (k, v) in m` takes apart the tuple that each element of a collection is, such as the key and the value of a map.
+
+The variable of a `for` is read-only and ends with the loop.
+
+```anti
+//! name: loops
+import anti.io;
+import anti.text;
+import anti.collection.list.{List};
+
+export fn sum_to(n: int) -> int
+{
+	let total = 0;
+	for i in 0..n {
+		total +%= i;
+	}
+	return total;
+}
+
+fn total_of(items: *List<int>) -> int
+{
+	let sum = 0;
+	for x in items {
+		sum +%= x;
+	}
+	return sum;
+}
+
+fn say(line: str)
+{
+	io.println(line);
+	free(line.ptr);
+}
+
+fn main() -> int
+{
+	let b = text.Builder.new();
+	for i in 0..10 by 3 {
+		b.append_int(i);
+		b.append(" ");
+	}
+	for i in 0..10 by -3 {
+		b.append_int(i);
+		b.append(" ");
+	}
+	for 0..2 {
+		b.append("tick ");
+	}
+	say(b.take());
+
+	let squares = [1, 4, 9];
+	for p in &squares {
+		*p += 1;
+	}
+	for i, x in squares {
+		say(f"{i}: {x}");
+	}
+
+	let numbers = List<int>.new();
+	numbers.push(3);
+	numbers.push(4);
+	say(f"sum_to {sum_to(5)}, total_of {total_of(&numbers)}");
+	return 0;
+}
+```
+
+```text output
+0 3 6 9 9 6 3 0 tick tick 
+0: 2
+1: 5
+2: 10
+sum_to 10, total_of 7
+```
+
+A collection is any type with `operator fn iter(self)`, which gives a new iterator on each call. An iterator is any type with `operator fn next(self) -> bool` and `operator fn value(self) -> T`. `for x in c` calls `iter` once, then `next` before each turn and `value` at the head of each turn. `for x in it` walks an iterator in its place. A class of the program takes part by declaring the three hooks, and chapter 9 shows one.
+
+`for x in e` copies each element, and the loop tears the copy down at the end of each turn, on every exit of the body. `for x in &e` copies nothing. Over a collection it binds what the `value` of the iterator returns, a `lent *T` for a list. Chapter 11 describes lent pointers.
+
+A collection must not change its size while a loop walks it. A dev build stops the program when it does, with a message that names the collection, the loop and the place of the change. `remove_all(test)` of a collection removes elements while it walks.
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: `by 0` never advances
+let total = 0;
+for i in 0..10 by 0 {
+	total += i;
+}
+```
+
+```anti refused
+//! error: a variable is not a constant expression
+fn sum(step: int) -> int
+{
+	let total = 0;
+	for i in 0..10 by step {
+		total += i;
+	}
+	return total;
+}
+```
+
+```anti refused
+//! error: `i` is the variable of a `for` and is read-only
+for i in 0..10 {
+	i = 5;
+}
+```
+
+```anti refused
+//! error: `x` is a copy of each element of `items`. Walk with `&items` to change the elements
+let items = [1, 2, 3];
+for x in items {
+	x = 5;
+}
+```
+
+```anti refused
+//! error: a `for` range counts over an integer, found `float`
+let turns = 0;
+for t in 0.0..1.0 {
+	turns += 1;
+}
+```
+
+```anti refused
+//! error: `for` walks a range, a slice, an array, a collection or an iterator, found `int`
+let total = 0;
+for x in 5 {
+	total += x;
+}
+```
+
+```anti refused
+//! error: `for i, x` binds the index and the element of a slice or an array
+let total = 0;
+for i, x in 0..10 {
+	total += i;
+}
+```
+
+```anti refused
+//! error: unknown name `i`
+fn last() -> int
+{
+	for i in 0..3 { }
+	return i;
+}
+```
 
 ### How antic builds it
 
-A range loop as a counter and a compare, a collection loop as calls of `iter`, `next` and `value`, and the `Watch` of dev mode, with excerpts.
+A range loop is a counter, one test before the loop and one test per turn.
+
+```ir excerpt=loops target=linux-x86_64 mode=dev
+export fn loops.sum_to(%0: i64) -> i64 {
+b0:
+    %1 = copy i64 0
+    %2 = copy i64 0
+    %3 = copy i64 %0
+    %4 = copy i64 %2
+    %5 = slt i8 %2, %3
+    branch %5, b1, b3
+b1:
+    %6 = copy i64 %4
+    %7 = add i64 %1, %6
+...
+b2:
+    %8 = sub i64 %3, %4
+    %9 = ule i8 %8, 1
+    branch %9, b3, b4
+...
+b4:
+    %10 = add nuw nsw i64 %4, 1
+```
+
+`b0` copies the two bounds into `%2` and `%3`, so that the body cannot change them, and starts the counter `%4`. `slt` is the test of an empty range, the one compare by the sign of the type. `b1` is the body: `%6` is `i`, a copy of the counter. `b2` is the step. It measures the distance to the end, `hi - counter`, and leaves when the distance is at most the step. Only then does `b4` move the counter. The `add` carries `nuw nsw`, because the moved counter lies inside the range and cannot overflow. `continue` jumps to `b2`.
+
+The step never produces a value past `hi`. A loop written `i < hi; i += k` wraps when `hi` is near the end of the type, and this form does not. The counter needs no overflow check in dev mode for the same reason.
+
+In a release build `opt` knows the trip count of this loop, and here it replaces the loop by its closed form.
+
+```asm excerpt=loops target=linux-x86_64 mode=release
+<sum_to>:
+testq %rdi, %rdi
+jle 0x1f <sum_to+0x1f>
+leaq -0x1(%rdi), %rdx
+leaq -0x2(%rdi), %rax
+mulxq %rax, %rcx, %rax
+shrdq $0x1, %rax, %rcx
+leaq (%rdi,%rcx), %rax
+decq %rax
+retq
+xorl %eax, %eax
+retq
+```
+
+`testq` and `jle` are the test of an empty range. The rest multiplies `n - 1` by `n - 2`, halves the product and adds `n - 1`, which is the sum of 0 to `n - 1`. No instruction of the loop is left.
+
+A loop over a slice or an array reads the pointer and the length once and indexes with a counter. It has no bounds check, since the counter stays below the length it was read from. Each turn copies one element.
+
+A loop over a collection is the three calls.
+
+```ir excerpt=loops target=linux-x86_64 mode=release
+fn loops.total_of(%0: ptr nonnull deref(size_of anti.collection.list.List<int>)) -> i64 {
+b0:
+    %2 = slot anti.collection.IndexedWalk<int>
+...
+    memcopy %2, %7, anti.collection.IndexedWalk<int>
+    jump b1
+b1:
+...
+    %14 = ne i8 %10, %13
+    branch %14, b4, b5
+b2:
+    %31 = call ptr @anti.collection.IndexedWalk<int>.value(%2)
+    %32 = load i64 %31 !type i64
+...
+    call void @anti_rt_walk_changed(%15, 56, %19, %24, %29)
+    unreachable
+b5:
+    %30 = call i8 @anti.collection.IndexedWalk<int>.next(%2)
+    branch %30, b2, b3
+```
+
+`%2` is the iterator, a slot of the frame of 64 bytes. `b0` calls `iter` through the table of the list, since `items` is a pointer, and copies its result into the slot. A dev build also tests the table pointer before that call, which chapter 9 describes. `b1` is the test of each turn. It first compares two counts: the changes of the list now and the changes when the walk began. When they differ, the block `b4` calls `anti_rt_walk_changed`, which prints the message and ends the program. `b5` calls `next`, and `b2` calls `value` and loads the element through the pointer it returns.
+
+The iterator of a list holds a `Watch`, which is a pointer to the `Changes` of the list and the count at the start. Every function that changes the size of the list adds 1 to that count and stores the `here` of its caller. An iterator without a field of type `Watch` gets no such test.
+
+A release build drops `b4` and the compare before it. `next` and `value` are ordinary functions of the module, and `opt` inlines them where its threshold allows.
+
+Where it lives: `check_for`, `check_step` and the read-only rule of `src/antic/sema_stmt.c`, and `sema_iterate` of `src/antic/sema_expr.c` for the hooks. `lower_for`, `range_start` and `range_step` of `src/antic/lower_stmt.c` write a range and a slice loop, and `lower_for_hooks` and `walk_check` a collection loop. `anti_rt_walk_changed` is in `src/rt/check.c`. `Changes` and `Watch` are in `src/std/anti/lang.anti`, and `IndexedWalk` in `src/std/anti/collection.anti`.
 
 ### What it costs
 
-The calls per turn of a range loop and of a collection loop, and the copy a plain `for x` makes. The check of a changed collection in dev mode.
+| Cost | Dev | Release |
+|---|---|---|
+| A range loop, before the first turn | two copies of the bounds, one compare | one compare |
+| A range loop, per turn | one subtract, one compare, one add | at most that, and none where `opt` finds a closed form or vectorizes |
+| A slice or array loop, per turn | one compare, one add, one copy of the element | the same or less |
+| A collection loop, before the first turn | one call of `iter`, one copy of the iterator into the frame | the same, inlined where `opt` chooses |
+| A collection loop, per turn | two loads and one compare of the change counts, one call of `next`, one call of `value`, one copy of the element | `next` and `value`, with no compare of the counts |
+| `for x in &e`, per turn | no copy of the element | no copy |
+| Heap allocations | 0 | 0 |
+| Locks and atomic operations | 0 | 0 |
+| Checks inserted | the change check of a collection loop | none |
+
+The iterator lives in the frame of the function that holds the loop. For a `List<int>` it is 64 bytes.
+
+`--no-checks` drops the change check from a dev build, and `--checks` keeps it in a release build. Without it, a loop over a list that grows in the body reads through a pointer into memory the list has freed.
+
+The copy of `for x in e` has the size of the element. For an `int` it is one load. For a struct of 200 bytes it is 200 bytes per turn, and `for x in &e` avoids it.
 
 ### Pitfalls
 
-Where a range bound, `by`, the copy per turn or a change inside the loop behaves other than a Java, C or C++ programmer expects.
+For a Java programmer:
+
+- `0..10` stops before 10, and `by -1` walks the same ten values down from 9. It does not start at 10.
+- A change of a collection inside its loop stops a dev build, as `ConcurrentModificationException` does. A release build carries no such test.
+- `for x in items` gives a copy of a struct. A change of the copy is refused, and `for x in &items` reaches the element.
+
+For a C programmer:
+
+- The bounds are evaluated once. A body that changes `n` does not change the number of turns of `for i in 0..n`.
+- The variable cannot be assigned, so a turn is skipped with `continue` and never with `i += 1`.
+- A range from 10 down to 0 is `0..10 by -1`. `10..0` runs no turn.
+- The variable does not exist after the loop. A search keeps its result in a variable declared before the loop.
+
+For a C++ programmer:
+
+- `for x in items` copies, as `for (auto x : items)` does. `for x in &items` is `for (auto& x : items)`.
+- An iterator is one object with `next` and `value`. No pair of `begin` and `end` exists, and no iterator is compared with another.
+- An iterator is not invalidated without notice in a dev build. The program stops at the next turn.
 
 ## switch
 
 ### What you know
 
-`switch` in Java, C and C++, fallthrough, and `switch` on a string in Java.
+`switch` in C, C++ and Java jumps to the `case` whose constant equals the value, and execution runs on into the next `case` unless a `break` ends it. C and C++ switch on integers and enums. Java also switches on strings and, in its arrow form, runs one arm without fallthrough.
 
 ### The feature
 
-`switch` on an integer, an enum, a `str` and a variant, `fallthrough`, `else`, the completeness rule, `x in lo..hi`, and the refusals.
+`switch` takes a value of an integer type, an enum, a `str` or a variant. Each arm names one value, then `=>`, then a body. A comma separates the arms. One arm runs, and none falls into the next unless it says so.
+
+The body of an arm is a call, an assignment or a block. Anything else, such as a `return`, stands in a block.
+
+The value of an arm is a constant expression of the type of the `switch`, and an enum value is written with its type, `Kind.Circle`. Each value has one arm. `else` takes every value that no arm names, and a `switch` has at most one.
+
+A `switch` on an enum without `else` names every value of the enum. A `switch` on a variant without `else` names every case. A `switch` on an integer or a `str` without `else` does nothing when no arm matches.
+
+`fallthrough;` as the last statement of a block arm enters the body of the next arm without testing its value.
+
+An arm of a `switch` on a variant names a case. `Circle c =>` binds `c` to a copy of the fields of the case, and `Empty =>` binds nothing. Chapter 8 describes variants.
+
+```anti
+//! name: arms
+import anti.io;
+import anti.text;
+
+enum Kind { Circle, Square, Rect }
+
+variant Shape { Circle { r: int }, Box { w: int, h: int }, Empty }
+
+export fn days(month: int) -> int
+{
+	let n = 31;
+	switch month {
+		2 => n = 28,
+		4 => n = 30,
+		6 => n = 30,
+		9 => n = 30,
+		11 => n = 30,
+	}
+	return n;
+}
+
+fn level(name: str) -> int
+{
+	switch name {
+		"debug" => { return 0; },
+		"info" => { return 1; },
+		"warn" => { return 2; },
+	}
+	return -1;
+}
+
+fn area(s: Shape) -> int
+{
+	let a = 0;
+	switch s {
+		Circle c => a = 3 * c.r * c.r,
+		Box b => a = b.w * b.h,
+		Empty => { },
+	}
+	return a;
+}
+
+fn corners(k: Kind) -> int
+{
+	let n = 0;
+	switch k {
+		Kind.Circle => { },
+		Kind.Square => {
+			fallthrough;
+		},
+		Kind.Rect => n = 4,
+	}
+	return n;
+}
+
+fn say(line: str)
+{
+	io.println(line);
+	free(line.ptr);
+}
+
+fn main() -> int
+{
+	say(f"days {days(2)} {days(4)} {days(12)}");
+	let info = level("info");
+	let trace = level("trace");
+	say(f"level {info} {trace}");
+	say(f"area {area(Shape.Circle { r: 2 })} {area(Shape.Box { w: 2, h: 5 })} {area(Shape.Empty)}");
+	say(f"corners {corners(Kind.Circle)} {corners(Kind.Square)} {corners(Kind.Rect)}");
+	return 0;
+}
+```
+
+```text output
+days 28 30 31
+level 1 -1
+area 12 10 0
+corners 0 4 4
+```
+
+`x in lo..hi` is an expression of type `bool` that is true when `x` lies in the range. It stands in a condition, not as the value of an arm, so a `switch` has no arm for a range of values.
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: `switch` takes an enum, an integer, a `str` or a variant, found `float`
+let x = 1.5;
+switch x {
+	1.5 => x = 0.0,
+}
+```
+
+```anti refused
+//! error: `switch` takes an enum, an integer, a `str` or a variant, found `char`
+let c = 'a';
+let n = 0;
+switch c {
+	'a' => n = 1,
+}
+```
+
+```anti refused
+//! error: a variable is not a constant expression
+let x = 1;
+let y = 1;
+switch x {
+	y => x = 0,
+}
+```
+
+```anti refused
+//! error: this value already has an arm
+let x = 1;
+switch x {
+	1 => x = 0,
+	1 => x = 2,
+}
+```
+
+```anti refused
+//! error: this `switch` on `Kind` has no arm for `Rect`
+enum Kind { Circle, Square, Rect }
+
+fn corners(k: Kind) -> int
+{
+	let n = 0;
+	switch k {
+		Kind.Circle => n = 0,
+		Kind.Square => n = 4,
+	}
+	return n;
+}
+```
+
+```anti refused
+//! error: an arm of a `switch` is a call, an assignment or a block
+let x = 1;
+switch x {
+	1 => x + 1,
+}
+```
+
+```anti refused
+//! error: `fallthrough` in the last arm
+let x = 1;
+switch x {
+	1 => { fallthrough; },
+}
+```
+
+```anti refused
+//! error: `fallthrough` is allowed as the last statement of a `switch` arm only
+let x = 1;
+switch x {
+	1 => {
+		fallthrough;
+		x = 3;
+	},
+	2 => { },
+}
+```
+
+```anti refused
+//! error: a `switch` has one `else`
+let x = 1;
+switch x {
+	else => x = 2,
+	else => x = 3,
+}
+```
+
+`fallthrough` into an arm that binds the fields of a variant case is refused as well, since the fields of that case are not there.
 
 ### How antic builds it
 
-The `switch` instruction of LLVM for an integer, the chain of `anti.text.equal` calls for a `str`, and the tag test of a variant, with excerpts.
+Lowering writes a `switch` as a chain of compares in the order of the arms. antic writes no `switch` instruction of LLVM and builds no jump table itself.
+
+```ir excerpt=arms target=linux-x86_64 mode=dev
+export fn arms.days(%0: i64) -> i64 {
+b0:
+    %1 = copy i64 31
+    %2 = copy i64 %0
+    %3 = eq i8 %2, 2
+    branch %3, b1, b2
+b1:
+    %1 = copy i64 28
+    jump b3
+b2:
+    %4 = eq i8 %2, 4
+    branch %4, b4, b5
+b3:
+    ret i64 %1
+b4:
+    %1 = copy i64 30
+    jump b3
+```
+
+`%2` is a copy of the value, taken once. `b0` compares it with 2, the value of the first arm, and `b1` is that arm's body, which jumps to the join block `b3`. `b2` is the test of the second arm. A value that matches the last arm passes through every compare before it. A dev build runs this chain as written.
+
+In a release build `opt` reads the chain and chooses another form. For `days` it is a table.
+
+```llvm excerpt=arms target=linux-x86_64 mode=release
+@switch.table.days = private unnamed_addr constant [10 x i8] c"\1C\1F\1E\1F\1E\1F\1F\1E\1F\1E", align 8
+...
+b0:
+  %switch.tableidx = add i64 %p0, -2
+  %0 = icmp ult i64 %switch.tableidx, 10
+  br i1 %0, label %switch.lookup, label %b3
+...
+switch.lookup:                                    ; preds = %b0
+  %switch.gep = getelementptr inbounds nuw i8, ptr @switch.table.days, i64 %switch.tableidx
+  %switch.load = load i8, ptr %switch.gep, align 1
+  %switch.ext = zext i8 %switch.load to i64
+```
+
+The table holds one byte per month from 2 to 11: `\1C` is 28, `\1E` is 30 and `\1F` is 31. `b0` subtracts 2 and makes one unsigned compare, which tests both ends of the table. `switch.lookup` loads the byte. The five arms became one compare, one branch and one load, whatever the value.
+
+```asm excerpt=arms target=linux-x86_64 mode=release
+<days>:
+addq $-0x2, %rdi
+movl $0x1f, %eax
+cmpq $0x9, %rdi
+ja 0x1a <days+0x1a>
+leaq (%rip), %rax
+movzbl (%rdi,%rax), %eax
+retq
+```
+
+`movl $0x1f` loads 31, the value when no arm matches. `ja` skips the lookup for a month outside 2 to 11.
+
+A `switch` on a `str` binds the text once and calls `anti.text.equal` for each arm in turn.
+
+```ir excerpt=arms target=linux-x86_64 mode=dev
+fn arms.level(%0: agg str) -> i64 {
+b0:
+    %2 = slot str
+...
+    %1 = copy ptr %0
+    %3 = addr @arms.0
+    store ptr %3, %2
+    %4 = ptradd %2, offset_of str.len
+    store i64 5, %4
+    %5 = call i8 @anti.text.equal(%1, %2)
+    branch %5, b1, b2
+b1:
+    ret i64 0
+b2:
+```
+
+`%2` is a `str` in the frame for the literal `"debug"`: the address of its bytes and the length 5. The call compares it with the text of the `switch`. `equal` compares the lengths first and the bytes only when the lengths agree. The arms are not hashed and not sorted, so a text that matches no arm costs one call per arm.
+
+A `switch` on a variant loads the tag once and compares it with the number of each arm's case.
+
+```ir excerpt=arms target=linux-x86_64 mode=dev
+fn arms.area(%0: agg arms.Shape) -> i64 {
+b0:
+    %1 = slot arms.Shape.Circle
+    %2 = slot arms.Shape.Box
+    %3 = copy i64 0
+    %4 = load i8 %0 range 0, 3
+    %5 = eq i8 %4, 0
+    branch %5, b1, b2
+b1:
+    %6 = ptradd %0, offset_of arms.Shape.u
+    memcopy %1, %6, arms.Shape.Circle
+    %7 = load i64 %1 !type arms.Shape.Circle.r
+```
+
+`%4` is the tag, one byte whose range the IR records as 0 to 2. `b1` is the arm `Circle c`. The `memcopy` copies the fields of the case out of the variant into the slot `%1`, which is `c`. The body reads `c.r` from the copy, so it may assign the variant without changing `c`.
+
+Where it lives: the `TOKEN_SWITCH` case of `statement` and `arm_body` of `src/antic/parser_stmt.c`. `check_switch`, `check_switch_covers` and `refuse_same_value` of `src/antic/sema_stmt.c`. `lower_switch`, `arm_test` and `bind_case_fields` of `src/antic/lower_stmt.c`. `equal` is in `src/std/anti/text.anti`.
 
 ### What it costs
 
-The jump table or the compare chain of a `switch`, the calls of a `str` switch, and its allocations.
+| Cost | Dev | Release |
+|---|---|---|
+| An integer or enum `switch` of n arms | up to n compares and n branches, in the order of the arms | what `opt` chooses: a lookup table, a jump table or a shorter chain |
+| A `str` `switch` of n arms | up to n calls of `anti.text.equal`, and two stores per call | the same calls, inlined where `opt` chooses |
+| A variant `switch` of n arms | one load of the tag, up to n compares | one load, and what `opt` chooses |
+| An arm that binds | one copy of the fields of the case | the copy, where `opt` cannot remove it |
+| `fallthrough` | one jump | none |
+| Heap allocations | 0 | 0 |
+| Calls into the runtime | 0 | 0 |
+| Checks inserted | none | none |
+
+The completeness of a `switch` on an enum or a variant is a rule of the checker. No arm for an impossible value and no trap is added at run time.
+
+The order of the arms is the order of the tests in a dev build. In a release build the order does not decide the code of an integer `switch`.
 
 ### Pitfalls
 
-Where fallthrough, completeness and a `str` case behave other than a Java, C or C++ programmer expects.
+For a Java programmer:
+
+- An arm holds one value. `case 4, 6, 9, 11 ->` is four arms, or one `if` with `||`.
+- A `switch` gives no value. An arm assigns a variable declared before it.
+- A `switch` on a `str` compares arm by arm. It does not hash the text first.
+
+For a C programmer:
+
+- An arm does not fall into the next one. No `break` ends it, and `fallthrough;` asks for the old behaviour.
+- `break` inside an arm leaves the enclosing loop, as the next section shows.
+- A `char` is not an integer here. `switch c as u32` switches on its code.
+- A `switch` on an enum that misses a value is an error, not a warning.
+
+For a C++ programmer:
+
+- A `return` in every arm does not end the function for the checker. A `return` after the `switch` is required.
+- `Circle c =>` copies the fields. Writing `c.r` changes the copy.
+- A new case of a variant, or a new value of an enum, breaks every `switch` without `else` at compile time.
 
 ## break and continue
 
 ### What you know
 
-`break`, `continue` and the labelled jumps of Java, C and C++.
+`break` leaves the innermost loop or `switch` in C, C++ and Java, and `continue` starts the next turn of the innermost loop. Java labels a loop to leave an outer one, and C and C++ use `goto` for that.
 
 ### The feature
 
-`break` and `continue` in every loop and in a `switch`, what each leaves, how each meets `defer`, and the refusals.
+`break;` leaves the innermost loop: a `while`, a `do` or a `for`. `continue;` ends the current turn. In a `while` and a `do` loop it goes to the condition. In a `for` it goes to the step, so the loop advances.
+
+A `switch` is not a target of `break`. Inside an arm, `break` and `continue` act on the loop around the `switch`.
+
+Both run the `defer` statements of every block they leave, innermost first, and tear down the locals of those blocks. The next section describes `defer`.
+
+Anti has no labels and no `goto`. An outer loop is left through a flag that its condition reads, or by a `return` from a function that holds both loops.
+
+```anti
+//! name: jumps
+import anti.io;
+import anti.text;
+
+export fn first_negative(p: *int, n: int) -> int
+{
+	let at = -1;
+	for i in 0..n {
+		if p[i] >= 0 {
+			continue;
+		}
+		at = i;
+		break;
+	}
+	return at;
+}
+
+fn say(line: str)
+{
+	io.println(line);
+	free(line.ptr);
+}
+
+fn main() -> int
+{
+	let items = [4, 0, 7, -2, 9];
+	say(f"first negative at {first_negative(&items[0], 5)}");
+
+	let count = 0;
+	for x in items {
+		switch x {
+			0 => { continue; },
+			7 => { break; },
+			else => count += 1,
+		}
+	}
+	say(f"count {count}");
+
+	let i = 0;
+	while true do {
+		i += 1;
+		defer say(f"left turn {i}");
+		if i == 1 {
+			continue;
+		}
+		if i == 2 {
+			break;
+		}
+	}
+	return 0;
+}
+```
+
+```text output
+first negative at 3
+count 1
+left turn 1
+left turn 2
+```
+
+The second loop counts 4, skips 0 and leaves at 7, so `count` is 1. In the third loop the `defer` runs at the `continue` of the first turn and at the `break` of the second.
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: `break` outside a loop
+let n = 3;
+if n > 0 {
+	break;
+}
+```
+
+```anti refused
+//! error: `break` outside a loop
+let x = 1;
+switch x {
+	1 => { break; },
+}
+```
+
+```anti refused
+//! error: `continue` outside a loop
+let n = 3;
+if n > 0 {
+	continue;
+}
+```
+
+Lowering skips every statement that follows a `break`, a `continue` or a `return` in its block, since nothing can reach it.
 
 ### How antic builds it
 
-The branches the two become in the LLVM text and the `defer` bodies that run on the way out, with an excerpt.
+Each of the two is one jump. Before the jump stand the deferred statements of the blocks it leaves, written out again at that place.
+
+```anti
+//! name: scan
+extern fn note(n: c_int);
+
+export fn scan(p: *int, n: int)
+{
+	for i in 0..n {
+		defer note(2);
+		if p[i] == 0 {
+			continue;
+		}
+		if p[i] < 0 {
+			break;
+		}
+		note(1);
+	}
+}
+```
+
+```ir excerpt=scan target=linux-x86_64 mode=dev
+b2:
+    %15 = sub i64 %3, %4
+    %16 = ule i8 %15, 1
+    branch %16, b3, b8
+b3:
+    ret
+b4:
+    call void @note(2)
+    jump b2
+...
+b6:
+    call void @note(2)
+    jump b3
+b7:
+    call void @note(1)
+    call void @note(2)
+    jump b2
+```
+
+`b2` is the step of the `for` and `b3` the exit of the loop. `b4` is the `continue`: the deferred `note(2)` and a jump to the step. `b6` is the `break`: the deferred call again and a jump to the exit. `b7` is the end of the body, with the third copy of the deferred call. The function holds `note(2)` three times, once per exit of the block.
+
+A release build leaves it to `opt` to merge the copies. In the object of this example the `continue` and the end of the body share one call, and the `break` keeps its own.
+
+Where it lives: the `STMT_BREAK` and `STMT_CONTINUE` cases of `check_stmt` in `src/antic/sema_stmt.c` refuse one outside a loop. The same cases of `lower_stmt_kind` in `src/antic/lower_stmt.c` call `lower_run_defers_to` and write the jump, and `lower_block` skips the statements after it.
 
 ### What it costs
 
-The branch of each, and the deferred code they run.
+| Cost | Dev | Release |
+|---|---|---|
+| `break` | one jump | one jump or none |
+| `continue` | one jump | one jump or none |
+| Deferred statements on the way | each runs once, from a copy of its code at this exit | the same, and `opt` may merge copies |
+| Heap allocations | 0 | 0 |
+| Calls into the runtime | 0 | 0 |
+| Checks inserted | none | none |
+
+The code size grows with the exits. A block with d deferred statements and e exits holds d times e copies in the IR.
 
 ### Pitfalls
 
-Where `break` inside a `switch` in a loop, or a `defer` on the way out, behaves other than a Java, C or C++ programmer expects.
+For a Java programmer:
+
+- No label names a loop. `break outer;` has no counterpart, and a function with a `return` takes its place.
+- `break` in a `switch` arm leaves the loop around it. A Java `break` there leaves the `switch` alone.
+
+For a C programmer:
+
+- A `switch` arm needs no `break`, and one written from habit ends the loop.
+- `continue` in a `for` runs the step, as in C. In a `while` the body advances its own counter before it.
+- No `goto` exists. Cleanup at one label is written with `defer`.
+
+For a C++ programmer:
+
+- A local of a class type is destroyed at `break` and `continue`, as a destructor runs there in C++.
+- The deferred code is copied to each exit. It is not one function called from each.
 
 ## defer and undo
 
 ### What you know
 
-`finally` of Java, the destructor of C++ and the `goto cleanup` of C.
+C frees what a function took at the end, often behind a `goto cleanup` label. C++ ties the release to a destructor, which runs at every exit of the scope. Java writes it in `finally` or opens the resource in `try (...)`. None of the three separates the release that always runs from the one that runs after a failure alone.
 
 ### The feature
 
-`defer` at every exit of a block, `undo` on the fail path alone, their order, what each may name, and the refusals.
+`defer stmt;` records one statement. It runs at every exit of the block that holds the `defer`: at the closing brace, at a `return`, a `break`, a `continue`, and when an error leaves the block. The statements of one block run in the reverse order of their declaration.
+
+`undo stmt;` records one statement that runs only when the block is left by an error: a `fail`, or a `try` that forwards one. On that exit every `undo` of the block runs, last declared first, and after them every `defer` of the block.
+
+Both take effect where they stand. An exit above a `defer` does not run it. A deferred statement reads its variables when it runs, not when it is declared.
+
+The statement is a call, an assignment or a block. A call that may fail carries its handler, `defer fs.close(f) catch fatal;`.
+
+A local of a class type with a `destruct` is torn down at the end of its block. It behaves as a `defer` written after its declaration. Chapter 11 describes that order.
+
+```anti
+//! name: exits
+import anti.io;
+import anti.text;
+
+fn step(name: str, ok: bool) may fail
+{
+	io.println(name);
+	if !ok {
+		fail "stopped";
+	}
+}
+
+fn build(ok: bool) may fail
+{
+	io.println("open a");
+	defer io.println("defer: close a");
+	undo io.println("undo: remove a");
+	io.println("open b");
+	defer io.println("defer: close b");
+	undo io.println("undo: remove b");
+	try step("write", ok);
+	io.println("done");
+}
+
+fn order() -> int
+{
+	let n = 1;
+	defer {
+		let line = f"deferred, n is {n}";
+		io.println(line);
+		free(line.ptr);
+	}
+	{
+		defer io.println("inner block ends");
+		n = 2;
+	}
+	n = 3;
+	return n;
+}
+
+fn main() -> int
+{
+	build(true) catch { };
+	io.println("--");
+	build(false) catch { };
+	io.println("--");
+	let n = order();
+	let line = f"order gave {n}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+open a
+open b
+write
+done
+defer: close b
+defer: close a
+--
+open a
+open b
+write
+undo: remove b
+undo: remove a
+defer: close b
+defer: close a
+--
+inner block ends
+deferred, n is 3
+order gave 3
+```
+
+The first call of `build` succeeds and runs the two `defer` statements. The second fails in `step`. Both `undo` statements run before either `defer`. In `order` the deferred block prints 3, the value of `n` at the `return`, and the `defer` of the inner block runs at that block's brace.
+
+`return v;` with a result that fits a register, such as an `int` or a pointer, computes `v` before the deferred statements run. A deferred statement that assigns the local afterwards does not change the result. A result that is a struct, a tuple or a `str` and names a local is read from that local after the deferred statements ran.
+
+```anti
+//! name: results
+import anti.io;
+import anti.text;
+
+struct Pair { a: int, b: int }
+
+fn scalar() -> int
+{
+	let n = 1;
+	defer n = 99;
+	return n;
+}
+
+fn aggregate() -> Pair
+{
+	let p = Pair { a: 1, b: 2 };
+	defer p.a = 99;
+	return p;
+}
+
+fn main() -> int
+{
+	let p = aggregate();
+	let line = f"scalar {scalar()}, aggregate {p.a}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+scalar 1, aggregate 99
+```
+
+The parser refuses a `defer` directly in a `defer` and an `undo` directly in an `undo`.
+
+```anti refused
+//! error: a `defer` holds one statement, not another `defer`
+let n = 0;
+defer defer n = 1;
+```
+
+```anti refused
+//! error: an `undo` holds one statement, not another `undo`
+let n = 0;
+undo undo n = 1;
+```
+
+```anti refused
+//! error: `step` may fail and its error is not handled
+fn step() may fail
+{
+	fail "stopped";
+}
+
+fn build() -> int
+{
+	defer step();
+	return 0;
+}
+```
+
+A local that a `defer` or an `undo` names cannot move into an `own` parameter, since the deferred statement would read it after the move. Chapter 11 shows that refusal.
 
 ### How antic builds it
 
-Where a deferred body stands in the LLVM text for each exit of its block, and the fail path that runs an `undo`, with excerpts.
+A deferred statement has no run-time record. Lowering keeps a list of exit actions per block while it walks the function. At every exit it writes the statements of that list into the IR again, in reverse order. A failing exit writes the `undo` statements of a block first.
+
+```anti
+//! name: paths
+extern fn close_a();
+extern fn remove_a();
+
+fn step(ok: bool) may fail
+{
+	if !ok {
+		fail "stopped";
+	}
+}
+
+fn build(ok: bool) may fail
+{
+	defer close_a();
+	undo remove_a();
+	try step(ok);
+}
+```
+
+```ir excerpt=paths target=linux-x86_64 mode=dev
+fn paths.build(%0: i8 zeroext) -> ptr {
+b0:
+    %1 = call ptr @paths.step(%0)
+    %2 = eq i8 %1, 0
+    branch %2, b2, b1
+b1:
+    call void @remove_a()
+    call void @close_a()
+    ret ptr %1
+b2:
+    call void @close_a()
+    ret ptr 0
+}
+```
+
+`build` may fail, so it returns a pointer: the error, or 0 for none. Chapter 6 describes that form. `b0` calls `step` and compares the pointer it returns with 0. `b1` is the failing exit of the `try`. It runs the `undo`, then the `defer`, and returns the error. `b2` is the closing brace. It runs the `defer` alone and returns 0.
+
+The `defer` stands twice and the `undo` once. Neither is called through a pointer, neither is recorded in the frame, and no table of the executable describes them. A function without an exit by error holds no code for its `undo` statements at all.
+
+Where it lives: the `TOKEN_DEFER` and `TOKEN_UNDO` cases of `statement` in `src/antic/parser_stmt.c`. `push_exit_action`, `lower_run_defers` and `lower_run_defers_to` of `src/antic/lower_stmt.c` keep the list and write the copies, and `lower_block` runs the list at the closing brace.
 
 ### What it costs
 
-The code of a deferred body per exit, its calls and its allocations.
+| Cost | Dev | Release |
+|---|---|---|
+| Declaring a `defer` or an `undo` | no instruction | no instruction |
+| A `defer` at run time | its statement, once per exit taken | the same |
+| An `undo` at run time | its statement on a failing exit, nothing otherwise | the same |
+| Code size | one copy of a `defer` per exit of its block, one copy of an `undo` per failing exit | the same, and `opt` may merge copies |
+| Bytes in the frame | 0 | 0 |
+| Heap allocations | 0 | 0 |
+| Calls into the runtime | 0 | 0 |
+| Checks inserted | none | none |
+
+The cost is the size of the code. A block with three deferred calls and four `try` expressions holds each call five times: four failing exits and the closing brace. A long deferred statement is better written as one function that the `defer` calls.
 
 ### Pitfalls
 
-Where the order of deferred bodies, a variable they read, or `undo` on success behaves other than a Java, C or C++ programmer expects.
+For a Java programmer:
+
+- A `defer` belongs to its block, not to its function. One inside the block of an `if` or a loop runs when that block ends.
+- A `defer` runs only when control passed it. A `return` above it skips it, where `finally` covers its whole `try`.
+- An error is no exception, and nothing unwinds. A `defer` runs because its code stands at each exit.
+
+For a C programmer:
+
+- The deferred statement reads the variable at the exit. `defer free(p);` frees what `p` holds then, so `p` is not reassigned in between.
+- `undo` replaces the `if (failed)` before a cleanup label. It runs on the error exit alone.
+- A `return`, a `break`, a `continue`, a `fail` or a `try` inside a deferred statement is not refused, and antic 0.2.0 crashes on it. A deferred statement ends at its own end.
+
+For a C++ programmer:
+
+- The order is that of destructors, last declared first, with one difference: every `undo` of a block runs before its `defer` statements.
+- A `defer` is not an object. It cannot be dismissed, as a scope guard can. `undo` is the form that runs on failure alone.
+- A deferred statement that changes a struct local changes the result of a `return` that names it. A scalar result is fixed before the deferred statements run.
