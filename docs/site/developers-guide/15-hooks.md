@@ -3,7 +3,7 @@ title: "Hooks"
 description: "Hooks and tracing, injection, runtime configuration, plugins, and what --no-hooks and --no-trace remove."
 summary: "The nine hooks of `anti.lang.Object` and the tracing built on them, injection and the standard interfaces, the runtime configuration, plugins, and what `--no-hooks` and `--no-trace` remove, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T23:30:00+02:00
+lastmod: 2026-10-11T20:18:56+02:00
 draft: true
 weight: 150
 tags: [compilers, programming-languages]
@@ -444,7 +444,7 @@ made 3, entered 0, left 0, failed 0, changed 0
 leaks: made 2, freed 1, live 1
 ```
 
-The test runs the release build, where marked code is not traced: `entered` is 0. The handler still receives `created` three times, for the `Renderer`, the `Quiet` and the error of `check`, since the five hooks of the last section are in every build.
+The test runs the release build, where marked code is not traced: `entered` is 0. The handler still receives `created` three times, for the `Renderer`, the `Quiet` and the error of `check`. The five hooks of the last section are in every build.
 
 The same file built with other options prints another second line. Each line below is the output of that build.
 
@@ -545,7 +545,7 @@ Where it lives: `traced_function` of `src/antic/lower_function.c`, `lower_traced
 
 Marked code is traced in a dev build and with `--trace`. It is not traced in a release build and with `--no-trace`.
 
-A traced function cannot be inlined across its two calls of the runtime as freely as a plain one, and its object must be in memory at both. `--no-trace` on a dev build gives the plain code back and gives up `enter`, `leave` and `failed` of every class.
+A traced function cannot be inlined across its two calls of the runtime as freely as a plain one. Its object must be in memory at both calls. `--no-trace` on a dev build gives the plain code back and gives up `enter`, `leave` and `failed` of every class.
 
 `--no-hooks` removes these sites as well, with the five of the last section.
 
@@ -1134,6 +1134,7 @@ The functions of a `Library`:
 | `lib.unload()` | closes the library, or fails with `IN_USE` while an object of it is alive |
 
 ```anti
+//! name: host
 import anti.io;
 import anti.log;
 import anti.plugin;
@@ -1142,7 +1143,9 @@ import anti.text;
 fn speak(path: str) may fail
 {
 	let lib = try plugin.load(path);
-	let logger = try lib.instance(log.Logger);
+	let logger = lib.instance(log.Logger) else {
+		fail "the library provides no Logger";
+	};
 	logger.log(log.Level.Info, "first");
 	logger.log(log.Level.Info, "second");
 	let known = lib.supports(log.Logger, "log");
@@ -1288,7 +1291,25 @@ The library reaches the host through the loader of the system. On Linux and Wind
 
 The host is built to be bound against. Its functions and data are global and none is hidden. The link passes `-export_dynamic` on macOS and `--export-dynamic` on Linux, and writes a `.def` file and an import library on Windows.
 
-`plugin.load` opens the library, reads `anti_rt_provides` and runs the checks of the list above. That every interface descriptor lies in the image of the host is the proof that the library was bound against it. `lib.instance(Interface)` is rewritten by the checker into a call that passes the address of the descriptor of the interface. The runtime allocates the size the descriptor of the class gives, calls the function that prepares the object and adds the offset of the interface.
+`plugin.load` opens the library, reads `anti_rt_provides` and runs the checks of the list above. That every interface descriptor lies in the image of the host is the proof that the library was bound against it.
+
+`lib.instance(Interface)` is rewritten by the checker into a call that passes the address of the descriptor of the interface. The lines below are that call in `speak` of the host above, in a dev build.
+
+```ir excerpt=host target=linux-x86_64 mode=dev
+    %6 = addr @anti.log.Logger.descriptor
+...
+    %12 = load ptr %11 !entry
+    %13 = call ptr %12 via @host.fn.0(%5, %6) table @anti.plugin.Library.descriptor 17
+    %14 = copy ptr %13
+    %15 = eq i8 %14, 0
+    branch %15, b5, b6
+```
+
+- `addr @anti.log.Logger.descriptor` stands where the source names the type `log.Logger`. It is the descriptor of the interface in the host, the same address the loader compared at `plugin.load`.
+- The call goes through entry 17 of the table of the `Library`. That entry is `instance_at` of `anti.plugin`, which hands the handle of the library and the descriptor to `anti_rt_plugin_instance`.
+- The compare with 0 is the `else` of the `let`. The result is `none` when the library provides no class for the interface.
+
+The runtime allocates the size the descriptor of the class gives, calls the function that prepares the object and adds the offset of the interface.
 
 The count of live objects is kept in the hooks. `created` and `destroyed` of every object find the image that the table of its class lies in, and add to the count of that library. `unload` reads the count. A build without hooks could not keep it, which is why `--no-hooks` is refused for a host and for a plugin.
 

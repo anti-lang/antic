@@ -3,7 +3,7 @@ title: "Optionals"
 description: "Nullable pointers, ?T and its layout, if let, ?? and the refusals of the checker."
 summary: "`*T` and `?*T`, narrowing, `?T` of any type with its layout, and the forms that read an optional, `if let`, `let ... else`, `??`, `?.` and the guards of `catch`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:13:52+02:00
+lastmod: 2026-10-11T20:18:56+02:00
 draft: true
 weight: 70
 tags: [compilers, programming-languages]
@@ -424,6 +424,8 @@ Five forms read a `?*T` or a `?T`. Each evaluates the optional once.
 `if let` and `let ... else` bind a new name, so they also read a field or the result of a call, which narrowing does not reach.
 
 `?.` reaches a pointer alone. A field or a result of another type is refused, since the result must itself be able to hold `none`. A chain continues with `?.`: `n?.next?.next`.
+
+`try` is no sixth form. antic 0.2.0 accepts `let x = try e;` on an optional and narrows `x` to the value, and the code it writes makes no test. A `none` then reaches the next statement as a value. A function that forwards a missing value writes `let x = e else { fail "missing"; };`.
 
 `e catch` on an optional turns `none` into an error of the class `anti.lang.NoneDereference`. `catch fatal` prints it and ends the program. `catch err { }` binds it, and the handler ends with `yield v` or leaves, as the handler of a failing call does.
 
