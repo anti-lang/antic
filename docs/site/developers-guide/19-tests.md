@@ -354,7 +354,7 @@ anti test -I src src/com/example/purse.anti
 
 The root is compared with the path as written. `-I src` matches `src/com/example/purse.anti` and does not match `./src/com/example/purse.anti`, whose module is then `purse` alone.
 
-The command reads `anti.toml` of the current directory when there is one. It takes the package name from it, and the providers of the `[inject]` table with those of `[inject.test]` laid over them, which chapter 15 describes. It reads no `[layout]`: the files of a run are the ones the command line names.
+The command reads `anti.toml` of the current directory when there is one. It takes the package name from it, and the providers of the `[inject]` table with those of `[inject.test]` laid over them, which chapter 15 describes. The directories of `[layout]` choose no file: the files of a run are the ones the command line names.
 
 ### A run
 
