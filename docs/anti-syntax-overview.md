@@ -2,13 +2,12 @@
 
 Every feature of the language in one place, each with what it does and an example where one helps. The rules are in `docs/decisions.md`, `docs/anti-object-model.md` and `docs/anti-language-additions.md`. This overview follows them and adds nothing. Where a feature is not built yet, its section says so.
 
-The test `overview_examples` runs every `anti` block of this page through the front end of antic, so an example that stops compiling fails the suite. A block that opens with `anti not-built` shows a feature that is not built yet, and the test passes over it. The status line of its section names that feature. A hidden block before an example declares the names the example uses without showing them.
+The test `overview_examples` runs every `anti` block of this page through the front end of antic, so an example that stops compiling fails the suite. A block that declares `main` is built and run as well, and the `text` block after it holds what the program prints. A block that opens with `anti not-built` shows a feature that is not built yet, and the test passes over it. The last sentence of its section names that feature. A hidden block before an example declares the names the example uses without showing them.
 
 Contents:
 
 - [Program structure](#program-structure)
 - [Modules](#modules)
-- [Direct imports](#direct-imports)
 - [Types](#types)
 - [Literals](#literals)
 - [Variables and constants](#variables-and-constants)
@@ -42,6 +41,7 @@ Contents:
 - [Compile-time targets](#compile-time-targets)
 - [Source locations](#source-locations)
 - [Checks and debugging](#checks-and-debugging)
+- [Processor levels](#processor-levels)
 - [Warnings and safety checks](#warnings-and-safety-checks)
 - [Wire formats](#wire-formats)
 - [Script mode](#script-mode)
@@ -49,7 +49,7 @@ Contents:
 - [Bytes](#bytes)
 - [Collections](#collections)
 - [Standard library](#standard-library)
-- [Later](#later)
+- [Tools](#tools)
 - [Reserved words](#reserved-words)
 
 ## Program structure
@@ -64,6 +64,10 @@ fn main() -> int
 	io.println("hello");
 	return 0;
 }
+```
+
+```text
+hello
 ```
 
 `main` has one of three signatures: `fn main() -> int`, `fn main(args: []str) -> int`, `fn main(args: []str, env: []str) -> int`. Comments are `//` to the end of the line and `/* */`, which do not nest. `///` documents the next item and `//!` the module, and `//#` and `//#!` do the same for the developers of a library. Source is UTF-8. Indentation is a tab. An item body opens `{` on its own line, a statement block opens `{` on the statement's line.
@@ -90,26 +94,17 @@ let s = text.equal(a, b);
 out.println("renamed");
 ```
 
-`pub` exports to every module, `internal` to modules under the same package root, none to the file. `import x as y` renames the local name. Paths under `anti.` are the language's. Third parties use a root they own.
+`pub` exports to every module, `internal` to modules under the same package root, none to the file. `internal` marks an item of a module, and `protected` a member of a class. `import x as y` renames the local name. The `import` lines come first in a file, after an `allow` or `unchecked` clause for the whole file. Paths under `anti.` are the language's. Third parties use a root they own.
 
-## Direct imports
-
-`import anti.collection.map.{Map, HashMap};` makes the listed names of a module visible in the file without the module's name, so code writes `Map<str, int>` rather than `map.Map<str, int>`. Each listed name is a public item of that module, and one that clashes with a name already visible in the file is refused, naming both. The module stays reachable by its name, as with a plain `import`. `anti fmt` keeps the list sorted.
+`import anti.collection.map.{Map, HashMap};` makes the listed names of a module visible in the file without the module's name, so code writes `Map<str, int>` rather than `map.Map<str, int>`. Each listed name is a public item of that module, and one that clashes with a name already visible in the file is refused, naming both. The module stays reachable by its name, as with a plain `import`. `anti fmt` keeps the list sorted. `import anti.regex.{Regex};` is refused, since `Regex` is declared in `anti.lang` and is no item of `anti.regex`.
 
 ```anti
 import anti.collection.map.{HashMap, Map};
-import anti.mem.{ArenaAllocator, Shared};
-
-let ages = Map<str, int>.new();
-let seen = map.HashMap<str, bool>.new();
-```
-
-The same over modules that are built:
-
-```anti
 import anti.io.{println};
 import anti.text.{Builder, equal};
 
+let ages = Map<str, int>.new();
+let seen = map.HashMap<str, bool>.new();
 let b = Builder.new();
 b.append("one");
 if equal(b.text(), "one") && text.equal("a", "a") {
@@ -117,11 +112,15 @@ if equal(b.text(), "one") && text.equal("a", "a") {
 }
 ```
 
-Built: direct imports, a generic class named by its listed name and by the name of its module included. `import anti.regex.{Regex};` is refused, since `Regex` is declared in `anti.lang` and is no item of `anti.regex`.
+Two other lines stand at module level. `link framework "CoreAudio";` names a framework of Apple's SDK, and `link linux "X11";` a library of the glibc sysroot, see [C interop](#c-interop).
 
 ## Types
 
-Sized numbers `i8 i16 i32 i64 u8 u16 u32 u64 f32 f64`, with `int` for `i64`, `uint` for `u64`, `float` for `f64`, `byte` for `u8`. `f16` is storage only, read as `f32` and written with `as f16`. `bool`. `char`, a 32-bit Unicode scalar. `str`, immutable UTF-8, pointer plus length, NUL-terminated outside its length. `==` compares the text of two `str` values, `<` compares their bytes, which for UTF-8 is the order of the code points, and a `str` meets `eq`, `Ordered` and `hash`. Fixed arrays `[N]T`. Slices `[]T`, pointer plus length. Pointers `*T` and nullable pointers `?*T`. Optional values `?T` of any type. Function pointers `fn(i32) -> i32` and nullable ones `?fn(i32) -> i32`. Tuples `(int, str)`, anonymous structs with C layout. Structs, enums, variants, classes. The built-in types `Flags`, `Mutex` and `chan T`. The C types `c_int`, `c_long`, `c_wchar` and the rest for bindings. No implicit conversions between numbers.
+Sized numbers `i8 i16 i32 i64 u8 u16 u32 u64 f32 f64`, with `int` for `i64`, `uint` for `u64`, `float` for `f64`, `byte` for `u8`. `f16` is storage only, read as `f32` and written with `as f16`. `bool`. `char`, a 32-bit Unicode scalar. `str`, immutable UTF-8, pointer plus length, NUL-terminated outside its length. `==` compares the text of two `str` values, `<` compares their bytes, which for UTF-8 is the order of the code points, and a `str` meets `eq`, `Ordered` and `hash`. Fixed arrays `[N]T`. Slices `[]T`, pointer plus length. Pointers `*T` and nullable pointers `?*T`. Optional values `?T` of any type, and `??T` is a `?T` whose value is a `?T`. Function pointers `fn(i32) -> i32` and nullable ones `?fn(i32) -> i32`. Tuples `(int, str)`, anonymous structs with C layout. Structs, enums, variants, classes. No implicit conversions between numbers.
+
+A slice and a `str` have `.len`, an `int`, and `.ptr`, a `?*T` or a `?*byte`, both read-only. An array has `.len` alone. `s[i]` on a `str` is a `byte`, and `s[lo..hi]` is a `[]byte`. `a[lo..hi]` on an array or a slice is a `[]T`, and both bounds are required.
+
+The compiler declares `Object`, `Job`, `Flags`, `Mutex`, `chan T`, `Regex`, `ByteRegex`, `Match`, `ByteMatch`, `FieldDescriptor` and the constraint `Number` in `anti.lang`, and the source of `anti.lang` declares the rest of the root. The C types for bindings are `c_char c_uchar c_short c_ushort c_int c_uint c_long c_ulong c_longlong c_ulonglong c_size_t c_float c_double c_wchar`. `c_long`, `c_ulong` and `c_wchar` take the width of the target.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -138,13 +137,17 @@ let p: *Rect = &r;
 let f: fn(int) -> int = double;
 let t: (int, str) = (1, "one");
 let h: f16 = 1.5 as f16;
+let count = s.len;
+let name = "tea";
+let first = name[0];
+let rest = name[1..3];
+let again = []int { ptr: s.ptr, len: s.len };
+let twice: ??int = none;
 ```
-
-Built: `f16`, one conversion instruction on ARM64 and at x86-64-v3 and a call of the runtime at `v1` and `v2`, `==`, `<` and `hash` on `str`, and `?T` of any type, see [Optional values](#optional-values).
 
 ## Literals
 
-Integers in decimal and hex with `_` separators. Floats with digits on both sides of `.`. Strings `"..."` with escapes, `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes, and `#"..."#` with hashes for quotes inside. Interpolation `f"..."` with format specifications, and `rf"..."` for interpolation without escapes. The text of an `f"..."` is memory of the C library, freed with `free(s.ptr)`, and text that should live in an `ArenaAllocator` is built with `anti.text.Builder`, whose `take_in(from)` takes the allocator. Bytes in hex `x"00 AB CC"`. A pattern literal `re"..."`, see [Regular expressions](#regular-expressions). The prefixes are `r`, `b`, `br`, `f`, `rf`, `x` and `re`, one meaning each. `true`, `false`, `none`. Literals take their type from context.
+Integers in decimal and hex with `_` separators, and no `0b` or `0o` prefix. Floats with digits on both sides of `.` and an optional exponent, `1.0e9`, so `1e9` is no literal. Characters `'q'` with the escapes of a string. Strings `"..."` with the escapes `\n \r \t \\ \" \' \0 \xHH \u{H}`, where `\u{}` takes one to six hex digits. In a `str` or a `char` `\xHH` stops at 7F and `\0` is refused, and a byte string takes both. `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes. Hash delimiters `#"..."#` on every form but `x"..."`, for quotes inside. Interpolation `f"..."` with format specifications, and `rf"..."` for interpolation without escapes. The text of an `f"..."` is memory of the C library, freed with `free(s.ptr)`, and text that should live in an `ArenaAllocator` is built with `anti.text.Builder`, whose `take_in(from)` takes the allocator. Bytes in hex `x"00 AB CC"`. A pattern literal `re"..."`, see [Regular expressions](#regular-expressions). The prefixes are `r`, `b`, `br`, `f`, `rf`, `x` and `re`, one meaning each. Arrays `[1, 2, 3]` and the repeat `[v; n]`, which copies `v` into `n` elements. A slice from a pointer `[]T { ptr: p, len: n }`. `true`, `false`, `none`. Literals take their type from context.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -157,24 +160,36 @@ let price = 2.5;
 let a = 1_000_000;
 let b = 0xFF_FF;
 let c = 3.14;
+let big = 1.0e9;
+let q = 'q';
+let nl = '\n';
 let d = r#"a "quoted" string"#;
 let e = b"\x00\x01";
 let g = f"{name:>10} costs {price:8.2f}";
 let h = rf"C:\tools\{name}";
 let i = x"00 AB CC";
+let j = br#"raw "bytes""#;
 let x: i8 = -128;
+let zeros = [0; 16];
+let pair = [1, 2];
 ```
-
-Built: `f"..."`, `rf"..."` and `re"..."`.
 
 ## Variables and constants
 
-`let` declares a mutable local with mandatory initialisation. `const` declares a constant expression. Shadowing in an inner block is allowed. `undefined` opts one local out of initialisation.
+`let` declares a mutable local with mandatory initialisation, and `let x: atomic int = 0;` an atomic local. `const` declares a constant expression at module level, in a block and in a class body, where `Name.NAME` reaches it. Shadowing in an inner block is allowed. `let (a, b) = e;` takes a tuple apart, see [Tuples](#tuples), and `let m = p else { }` binds a checked pointer, see [Pointers](#pointers). `undefined` opts one local out of initialisation.
 
 ```anti
+class Limits
+{
+	const MAX: int = 64;
+}
+
 let x = 5;
 let y: f32 = 1.0;
-const MAX: int = 64;
+const STEP: int = 2;
+let hits: atomic int = 0;
+let (lo, hi) = (1, 2);
+let m = Limits.MAX;
 ```
 
 ```anti not-built
@@ -185,48 +200,75 @@ Not built yet: `undefined`.
 
 ## Operators
 
-C precedence. Arithmetic `+ - * / %`, comparison `== != < <= > >=`, logic `&& || !`, bits `& | ^ ~ << >>`. Conversion `x as T`, checked downcast `p as *T`, nullable downcast `p as? *T`, type test `p is *T`. Wrapping `+% -% *% <<%` and saturating `+| -| *|`. Coalescing `??` and chaining `?.` over `none`. Ranges `lo..hi`, half-open. `x in lo..hi`. Compound assignment `+=` and the rest, `+%=` and `+|=` among them. No `++`, no `?:`.
+C precedence, with the differences below. Arithmetic `+ - * / %`, comparison `== != < <= > >=`, logic `&& || !`, bits `& | ^ ~ << >>`, unary `- ! ~`, address `&p` and dereference `*p`. Conversion `x as T`, checked downcast `p as *T`, nullable downcast `p as? *T`, type test `p is *T`, and `v is Shape.Circle` on a variant, `geo.Shape.Circle` for a variant of another module. Wrapping `+% -% *% <<%` and saturating `+| -| *|`, which bind as the operator they extend. Coalescing `??` and chaining `?.` over `none`. Ranges `lo..hi`, half-open. `x in lo..hi`. Compound assignment `+=` and the rest, `+%=` and `+|=` among them. No `++`, no `?:`.
+
+| Binds | Operators |
+|---|---|
+| loosest | `\|\|` |
+| | `&&` |
+| | `\|` |
+| | `^` |
+| | `&` |
+| | `== !=` |
+| | `< <= > >=` and `in` |
+| | `??`, from the right |
+| | `<< >> <<%` |
+| | `+ - +% -% +\| -\|` |
+| | `* / % *% *\|` |
+| | `as` |
+| tightest | `- ! ~ & *` before an operand |
+
+`as` binds tighter than every binary operator and looser than the unary ones, so `-x as u8` is `(-x) as u8`. `??` groups from the right, `a ?? b ?? c` is `a ?? (b ?? c)`. `in` binds as `<` does, and each bound takes the operators that bind tighter, so `i + 1 in 0..n * 2` needs no parentheses.
 
 <!-- overview: context, docs-style:ignore
 ```anti
 struct Node { value: int, next: ?*Node }
+variant Shape { Circle { r: f32 }, Empty }
 let a = 7;
 let b = 2;
 let c = 'q';
 let fallback = Node { value: 0, next: none };
 let maybe: ?*Node = none;
 let node: ?*Node = &fallback;
+let shape = Shape.Empty;
 ```
 -->
 ```anti
 let q = a / b;
+let neg = -a;
 let w = a +% b;
 let s = a +| b;
 let p = maybe ?? &fallback;
 let v = node?.next?.next;
+let addr = &a;
+let back = *addr;
 if c in 'a'..'z' { }
 let (sum, f) = a + b;
 if f.carry { }
+let round = shape is Shape.Circle;
 ```
 
 `let (result, flags) = e;` binds the wrapped result and a `Flags` struct with `overflow`, `carry`, `zero` and `negative`. A carry in is `a + b + f.carry`. `mul_high(a, b)` gives the upper half of the full product.
 
-Built: `x in lo..hi`, `??` and `?.`, the wrapping and saturating operators with their compound assignments, `mul_high` and `Flags`, with `adc` and `adcs` for a carry in.
-
 ## Statements
 
-`if`, `else if`, `else`. `switch` names one value per arm, and an enum value with its type, `Kind.Circle`. It falls through only where an arm ends in `fallthrough;`. Assignment is a statement. Blocks `{ }` are statements. `defer` and `undo`. `assert`, `show`, `unreachable`. Labels on blocks.
+`if`, `else if`, `else`. `if let x = e { }` binds the value of a `?T`, or the fields of a variant case as `if let Circle c = s { }`, and `else if let` continues a chain. `switch` names one value per arm, and an enum value with its type, `Kind.Circle`. An arm is a call, an assignment or a block, and one `else` takes the rest. It falls through only where an arm ends in `fallthrough;`. Assignment is a statement, and `*p = f() catch e { }` handles the error of the call that fills a place. Blocks `{ }` are statements. `defer` and `undo` each hold one statement, and a `defer` inside a `defer` or an `undo` inside an `undo` is refused. `assert(cond)` and `assert(cond, "message")`, whose message is a string literal. `yield v;` and `yield;` end the handler of a `catch`, see [Errors](#errors).
 
 <!-- overview: context, docs-style:ignore
 ```anti
 import anti.fs;
+import anti.text;
 enum Kind { Circle, Square, Rect }
+variant Shape { Circle { r: f32 }, Empty }
 fn draw_circle() { }
 fn draw_box() { }
 let x = 3;
 let y = 0;
 let n = 1;
 let kind = Kind.Square;
+let shape = Shape.Empty;
+let maybe: ?int = none;
+let slot = &y;
 let path = "out.txt";
 let f = fs.open(path, fs.Mode.Write) catch fatal;
 ```
@@ -238,6 +280,12 @@ if x > 0 {
 	y = -1;
 } else {
 	y = 0;
+}
+
+if let v = maybe {
+	y = v;
+} else if let Circle c = shape {
+	y = 2;
 }
 
 switch kind {
@@ -252,6 +300,8 @@ switch kind {
 defer fs.close(f) catch fatal;
 undo fs.remove(path) catch e { e.print(); };
 assert(n > 0, "n must be positive");
+*slot = text.parse_int("7") catch { yield 0; };
+fs.flush(f) catch { yield; };
 ```
 
 ```anti not-built
@@ -259,9 +309,7 @@ let v = show(compute(x));
 if x < 0 { unreachable; }
 ```
 
-`switch` on an enum without `else` must cover every value. `switch` on a `str` is a comparison chain. `fallthrough;` as an arm's last statement enters the next arm's body without testing its values, and is refused in the last arm and into an arm that binds a variant's fields. `defer` runs at every exit of the block, `undo` only on an error exit. `assert` and `show` vanish in release. `unreachable` traps in dev and is undefined in release.
-
-Built: `fallthrough` and `switch` on `str`. Not built yet: `show`, `unreachable`.
+`switch` on an enum without `else` must cover every value. `switch` on a `str` is a comparison chain. `fallthrough;` as an arm's last statement enters the next arm's body without testing its values, and is refused in the last arm and into an arm that binds a variant's fields. `defer` runs at every exit of the block, `undo` only on an error exit. `assert` and `show` vanish in release, and a call in the condition of an `assert` is the warning `assert-call`. `unreachable` traps in dev and is undefined in release. Not built yet: `show`, `unreachable` and labels on blocks.
 
 ## Loops
 
@@ -359,11 +407,11 @@ for p in &people {
 }
 ```
 
-Built: `for` over a collection through `iter`, `next` and `value`, and `to_slice`. `for x in &c` over a slice, an array and a collection whose `value` gives a `lent` pointer, the read-only loop variable of the copy form with its refusal, `for (k, v) in m` and `for (k, v) in &m`, a `value` that returns `(K, lent *V)`, and the trap of a dev build on a collection that changes its size while a loop walks it, through `anti.lang.Changes` and `anti.lang.Watch`. Not built yet: labels.
+Not built yet: labels.
 
 ## Functions
 
-`fn name(params) -> R { }`. `return;` in a function without a result. `-> never` for a function that ends the program on every path. Default parameter values and named arguments. Function values and bound functions.
+`fn name(params) -> R { }`. `return;` in a function without a result. `-> never` for a function that ends the program on every path. Default parameter values and named arguments. Function values and bound functions. `extern fn` declares a C function, takes `...` for a variadic one, and refuses `may fail` and `export`, see [C interop](#c-interop).
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -406,7 +454,7 @@ fn half(n: int) -> int
 }
 ```
 
-Built: default values, a constant expression or `here`, over a module boundary as well, and `-> never`. Not built yet: named arguments.
+Default values are a constant expression or `here`, over a module boundary as well. Not built yet: named arguments.
 
 ## Anonymous functions and closures
 

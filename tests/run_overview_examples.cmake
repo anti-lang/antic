@@ -1,6 +1,7 @@
 # Every `anti` block of the syntax overview goes through the front end of
-# antic, so an example that stops compiling fails the suite. Run with
-# cmake -P and these values:
+# antic, so an example that stops compiling fails the suite. A block that
+# declares `main` is built and run as well. Run with cmake -P and these
+# values:
 #   ANTIC     the antic executable
 #   RUNTIME   the runtime archive
 #   OVERVIEW  docs/anti-syntax-overview.md
@@ -27,8 +28,15 @@
 #       example uses without showing them. `docs-style:ignore` keeps the
 #       checker off the `!` of the comment.
 # A context that no `anti` block follows fails the run.
+#
+# A block whose items declare `fn main` is a program. The run builds it,
+# runs it and compares what it printed with the `text` block that follows
+# the example, or with nothing when no `text` block follows. The program
+# exits with 0.
 
 cmake_minimum_required(VERSION 3.21)
+
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
@@ -48,7 +56,16 @@ string(REPLACE "\n" ";" lines "${content}")
 set(item_start "^(import|pub|internal|fn|extern|export|struct|packed|union|enum|variant|class|abstract|final|singleton|simd|trace|worker|provides|link|tests|fixtures|constraint|type)( |$)")
 set(checked 0)
 set(skipped 0)
+set(programs 0)
 set(failures "")
+
+# Give `text` back the characters the list form replaced.
+function(restore out text)
+    string(REPLACE "${semicolon}" ";" text "${text}")
+    string(REPLACE "${open_bracket}" "[" text "${text}")
+    string(REPLACE "${close_bracket}" "]" text "${text}")
+    set(${out} "${text}" PARENT_SCOPE)
+endfunction()
 
 # Split `text`, a list of lines, into items and statements, and write the
 # module to `path`.
@@ -90,10 +107,30 @@ function(write_module text path)
         string(APPEND source
             "\nfn overview_example() -> int${fails}\n{\n${statements}\treturn 0${semicolon}\n}\n")
     endif()
-    string(REPLACE "${semicolon}" ";" source "${source}")
-    string(REPLACE "${open_bracket}" "[" source "${source}")
-    string(REPLACE "${close_bracket}" "]" source "${source}")
+    restore(source "${source}")
     file(WRITE "${path}" "${source}")
+endfunction()
+
+# Build the program `module` into `exe` and run it. It prints `wanted` and
+# exits with 0. The program goes through program_expect, which reads what
+# it wrote as bytes.
+function(run_program module exe wanted)
+    execute_process(
+        COMMAND "${ANTIC}" --runtime "${RUNTIME}" -o "${exe}" "${module}"
+        RESULT_VARIABLE status
+        OUTPUT_VARIABLE out
+        ERROR_VARIABLE err
+        ENCODING NONE)
+    if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
+        message(FATAL_ERROR
+            "the program ${module} of the overview does not build:\n${out}${err}")
+    endif()
+    get_filename_component(label "${exe}" NAME)
+    if(wanted STREQUAL "")
+        program_expect("${label}" COMMAND "${exe}")
+    else()
+        program_expect("${label}" COMMAND "${exe}" OUT "${wanted}")
+    endif()
 endfunction()
 
 set(number 0)
@@ -103,8 +140,35 @@ set(context_line 0)
 set(context "")
 set(block "")
 set(block_line 0)
+# The program of the last block, which waits for the `text` block that
+# holds its output, and that output.
+set(pending_module "")
+set(pending_exe "")
+set(wanted "")
 foreach(line IN LISTS lines)
     math(EXPR number "${number} + 1")
+    if(state STREQUAL "output")
+        if(line STREQUAL "```")
+            set(state outside)
+            restore(wanted "${wanted}")
+            run_program("${pending_module}" "${pending_exe}" "${wanted}")
+            set(pending_module "")
+            set(wanted "")
+        else()
+            string(APPEND wanted "${line}\n")
+        endif()
+        continue()
+    endif()
+    if(state STREQUAL "outside" AND NOT pending_module STREQUAL "")
+        if(line STREQUAL "")
+            continue()
+        elseif(line STREQUAL "```text")
+            set(state output)
+            continue()
+        endif()
+        run_program("${pending_module}" "${pending_exe}" "")
+        set(pending_module "")
+    endif()
     if(state STREQUAL "context")
         if(line STREQUAL "-->")
             set(state outside)
@@ -130,6 +194,10 @@ foreach(line IN LISTS lines)
                 if(NOT status EQUAL 0 OR err MATCHES "warning")
                     string(APPEND failures
                         "\nthe block at line ${block_line} of the overview, written as ${module}:\n${err}")
+                elseif("${block}" MATCHES "(^|;)fn main\\(")
+                    math(EXPR programs "${programs} + 1")
+                    set(pending_module "${module}")
+                    set(pending_exe "${WORK}/overview_${block_line}")
                 endif()
             endif()
             set(context_line 0)
@@ -153,6 +221,9 @@ foreach(line IN LISTS lines)
             "the context at line ${context_line} of the overview stands before a block that is not `anti`")
     endif()
 endforeach()
+if(NOT pending_module STREQUAL "")
+    run_program("${pending_module}" "${pending_exe}" "")
+endif()
 if(NOT context_line EQUAL 0)
     message(FATAL_ERROR
         "the context at line ${context_line} of the overview has no block after it")
@@ -163,4 +234,4 @@ endif()
 if(failures)
     message(FATAL_ERROR "an example of the overview does not compile:${failures}")
 endif()
-message(STATUS "${checked} blocks compiled, ${skipped} skipped as not built")
+message(STATUS "${checked} blocks compiled, ${programs} programs run, ${skipped} skipped as not built")
