@@ -3,7 +3,7 @@ title: "Optionals"
 description: "Nullable pointers, ?T and its layout, if let, ?? and the refusals of the checker."
 summary: "`*T` and `?*T`, narrowing, `?T` of any type with its layout, and the forms that read an optional, `if let`, `let ... else`, `??`, `?.` and the guards of `catch`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T08:10:24+02:00
+lastmod: 2026-10-11T20:13:52+02:00
 draft: true
 weight: 70
 tags: [compilers, programming-languages]
@@ -331,7 +331,7 @@ fn or_text(v: ?int) -> int
 
 ### How antic builds it
 
-A `?T` of a value is a struct of two fields with the layout C gives it: `value`, of type `T`, at offset 0, and `has`, one byte that is 1 or 0. The size is rounded up to the alignment of `T`. A `?int` is 8 bytes of value, 1 of flag and 7 of padding, 16 in all. A `?u8` is 2 bytes.
+A `?T` of a value is a struct of two fields with the layout C gives it. The field `value`, of type `T`, stands at offset 0, and `has` after it is one byte that is 1 or 0. The size is rounded up to the alignment of `T`. A `?int` is 8 bytes of value, 1 of flag and 7 of padding, 16 in all. A `?u8` is 2 bytes.
 
 The value stands at offset 0, so the address of a `?T` is the address of its value. A narrowed name reads its value there with no adjustment.
 
@@ -677,7 +677,7 @@ Where it lives: `check_optional` of `src/antic/sema_expr.c` checks `?.`, and `se
 | Heap allocations when the value is there | 0 | 0 |
 | Checks inserted | none | none |
 
-`if let` and `let ... else` copy the value into the new name. For a `?int` that is 8 bytes. For a `?T` of a large struct it is the size of the struct, and a test of the name with narrowing reads the value in place.
+`if let` and `let ... else` copy the value into the new name. For a `?int` that is 8 bytes. For a `?T` of a large struct it is the size of the struct. A test of the name with narrowing reads the value in place.
 
 `e catch err { }` allocates an error object of at least 120 bytes on the `none` path. Where `none` is expected, `??`, `if let` and `let ... else` handle it without an allocation.
 
