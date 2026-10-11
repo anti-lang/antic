@@ -3,7 +3,7 @@ title: "Functions"
 description: "Declaration, parameters, defaults, source locations, the calling convention, inlining, closures, snapshot fn and own fn, function values."
 summary: "Declaration and parameters, default values and source locations, the calling convention, inlining, anonymous functions and closures with their captures, `snapshot fn` and `own fn`, and function values with their layout, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-11T20:24:00+02:00
 draft: true
 weight: 50
 tags: [compilers, programming-languages]
@@ -1090,7 +1090,7 @@ A snapshot may be kept. The places that keep one own it.
 - An `own` field of function type, `own handler: fn(int)`.
 - A parameter marked `keep own`, which the function then stores in such a field.
 
-Such a value is an `own fn`. Its owner frees the snapshot: a class in its teardown, an assignment to the field before it stores the new value. `=` does not copy an `own fn`, and `dup` copies it with its snapshot. A named function fits an `own fn` place as well, with no snapshot.
+Such a value is an `own fn`. Its owner frees the snapshot: a class in its teardown, an assignment to the field before it stores the new value. `=` does not copy an `own fn`, and `dup` of [chapter 11]({{% relref "11-ownership" %}}) copies it with its snapshot. A named function fits an `own fn` place as well, with no snapshot.
 
 A snapshot also goes where a closure goes, to a parameter without `keep`. It then lives in the frame, as a closure does, and costs no allocation.
 
