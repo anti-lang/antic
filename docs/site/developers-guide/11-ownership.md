@@ -351,7 +351,8 @@ Where it lives: `sema_lent_form` of `src/antic/sema.c`. `sema_require` and `thro
 | Teardown of an `own` pointer to a class | one `anti_rt_delete_from`, one indirect call of the teardown, one `free`, one store of `none` | the same |
 | Teardown of an `own` slice of bytes | one `anti_rt_give`, one `free`, one store of `none` | the same |
 | Checks | the test for a zero table in `anti_rt_delete_from` | the same |
-| Atomic operations and locks | 0 | 0 |
+| Atomic operations | two loads in the `anti_rt_hook` of each object torn down, and what a `destruct` of the program does | the same |
+| Locks | 0 | 0 |
 
 `size_of(Sprite)` is 56: the table pointer, 16 bytes of `pixels`, 8 of `shadow`, 8 of `atlas` and 16 of `name`. The same class without the two words `own` has the same 56 bytes.
 
@@ -1264,7 +1265,8 @@ The lowering is the same in dev and in release, and both keep the test for a zer
 | A temporary argument | the same sequence, once, after the call |
 | A statement temporary | one slot of 8 bytes in the frame, one store when made, one load and one test at the end of the statement |
 | `delete(p)` | one `anti_rt_delete`, one indirect call of the teardown, one `free` |
-| Heap allocations, atomic operations, locks | 0 |
+| Atomic operations | two loads in each `anti_rt_hook` |
+| Heap allocations, locks | 0 |
 
 A value that owns nothing has no teardown, and its block emits no code for it. `--no-hooks` drops the call of `anti_rt_hook`, with the hooks of chapter 15.
 
@@ -1908,12 +1910,14 @@ The costs are the same in dev and in release.
 |---|---|
 | Bytes of a handle, `size_of(Shared<Circle>)` | 16: the table pointer and the cell pointer |
 | Bytes of the cell on the heap | 32 for a `Circle` of 16: the table pointer, the count and the value |
-| `Shared<T>.new(value)` | one `malloc` of the cell, plain stores of the count and the value, two `anti_rt_hook`, no atomic operation |
-| `share()` and `dup(h)` | one atomic add, no allocation |
+| `Shared<T>.new(value)` | one `malloc` of the cell, plain stores of the count and the value, two `anti_rt_hook`, no atomic operation on the count |
+| `share()` | one atomic add, one `anti_rt_hook` for the new handle, no allocation |
+| `dup(h)` | one atomic add, one `anti_rt_hook_copied`, no allocation |
 | `count()` | one atomic load |
 | `read(f)` and `modify(f)` | one test for `none`, one indirect call of `f`, no atomic operation, no lock |
-| The teardown of a handle | one atomic subtract |
+| The teardown of a handle | one `anti_rt_hook`, one atomic subtract, one `anti_rt_delete_from` of a field that holds `none` |
 | The teardown of the last handle | one `anti_rt_delete` on top: the teardown of the value and one `free` |
+| Atomic loads inside the hooks | two in each `anti_rt_hook`, one in `anti_rt_hook_copied` |
 | Locks | 0 |
 | Copies of code | one copy of `Shared<T>` and of `Cell<T>` per type argument, as chapter 10 counts |
 

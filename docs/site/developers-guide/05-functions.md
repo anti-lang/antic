@@ -801,7 +801,7 @@ The threshold is a cost in the units of `opt`, not a count of source lines. No o
 For a Java programmer:
 
 - Inlining is fixed when the program is built. No run-time profile changes it. `--profile-generate` and `--profile-use` of chapter 21 give `opt` a profile at build time.
-- A dev build is slower than a release build mostly for this reason: no call is inlined and every local is in memory.
+- A dev build inlines no call and keeps every local in memory, as the excerpt of `hyp2` shows.
 
 For a C programmer:
 

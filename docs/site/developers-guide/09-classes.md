@@ -317,7 +317,7 @@ Where it lives: `lower_class_record` and `table_of` of `src/antic/lower_desc.c` 
 | Locks | 0 | 0 |
 | Checks inserted | the zero table before `is`, `as` and a dispatch | none of those, the check of `as` stays |
 
-The call of `anti_rt_hook` per object made is the one cost a C++ object lacks. `--no-hooks` drops it, with the hooks and the leak tracking of chapter 15.
+The call of `anti_rt_hook` runs once per object made and once per teardown. `--no-hooks` drops it, with the hooks and the leak tracking of chapter 15.
 
 ### Pitfalls
 
