@@ -20,7 +20,7 @@ Every reference of Java may be `null`, and a dereference of one throws `NullPoin
 
 ### The feature
 
-`none` is the pointer that points at nothing. `*T` never holds it. `?*T` may hold it and cannot be dereferenced until a test proves that it does not. `null` is not a word of Anti.
+`none` is the pointer that points at nothing. `*T` never holds it. `?*T` may hold it and cannot be dereferenced until a test proves that it holds a pointer. Anti has no `null`.
 
 A `*T` converts to a `?*T` wherever one is expected. The other direction needs a test.
 
@@ -686,7 +686,7 @@ Where it lives: `check_optional` of `src/antic/sema_expr.c` checks `?.`, and `se
 For a Java programmer:
 
 - `?.` does not reach an `int` field. `p?.count` is refused, and `if let q = p { }` reads `q.count`.
-- `??` evaluates its right side only for `none`, as `orElseGet` does and `orElse` does not.
+- `??` evaluates its right side only for `none`, as `orElseGet` does. `orElse` evaluates its argument always.
 - Narrowing and `if let` differ in what they reach: narrowing tests a name, and `if let` binds any expression.
 
 For a C programmer:
@@ -699,4 +699,4 @@ For a C++ programmer:
 
 - `e ?? d` is `value_or(d)` with a lazy `d`.
 - `if let x = e` copies the value, as `if (auto x = e)` does. Writing `x` does not change `e`.
-- `?.` gives a pointer or `none`. It does not wrap any result in an optional, as `and_then` or `transform` does.
+- `?.` gives a pointer or `none` and reaches pointer members alone. A member of another type is read after `if let`.

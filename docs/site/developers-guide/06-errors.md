@@ -281,15 +281,17 @@ Where it lives: `lower_fail` and `write_origin` of `src/antic/lower_error.c` wri
 | Cost | Dev | Release |
 |---|---|---|
 | A call that does not fail | one more argument, one compare with null, one branch not taken, one store of the result through the out pointer | the same, or nothing when `opt` inlines the callee |
-| `fail` | one heap allocation of the error, one load and one compare of its line, one copy of 64 bytes, one call of `anti_rt_backtrace_on` | the same |
+| `fail` of a new error | one `malloc` of the error and one call of `anti_rt_hook` for its `created` hook, one load and one compare of its line, one copy of 64 bytes, one call of `anti_rt_backtrace_on` | the same |
 | `fail` with backtraces on | one capture of the stack as well, see the later section | off by default |
 | Each frame the error passes | one compare, one branch taken, one return | the same |
-| Handling it | one call of `anti_rt_delete`: the teardown and one `free` | the same |
+| Handling it | one call of `anti_rt_delete`: the teardown with its `destroyed` hook and one `free` | the same |
 | Bytes of an error | 120 on the heap, and what a class of the program adds | the same |
 | Bytes in a frame | 8 for a result of 8 bytes that a failing call writes | the same or none |
 | Locks | 0 | 0 |
-| Atomic operations | 1, the load in `anti_rt_backtrace_on` | 1 |
+| Atomic operations | one load in `anti_rt_backtrace_on`, and one load in each call of `anti_rt_hook` | the same |
 | Checks inserted | none | none |
+
+Every object calls the `created` hook when it is made and the `destroyed` hook when it is torn down, and an error is an object. Chapter 15 describes the hooks and `--no-hooks`, which drops those calls.
 
 The executable holds no unwind tables for errors and no table of handlers. A function that may fail and a function that may not are compiled alike, except for the out pointer and the test.
 
@@ -1062,6 +1064,6 @@ For a C programmer:
 
 For a C++ programmer:
 
-- The checks are not part of a library that a build may swap. They are instructions of the compiled function, and one option of the build removes all of them.
+- The checks are instructions of the compiled function, and one option of the build removes all of them. No checked library stands behind them.
 - An assertion that fails does not unwind. `defer` statements and destructors do not run.
 - `assert` takes no formatted message. The message is one literal, built into the read-only data.

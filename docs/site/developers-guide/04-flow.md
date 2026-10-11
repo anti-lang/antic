@@ -492,7 +492,7 @@ b4:
 
 `b0` copies the two bounds into `%2` and `%3`, so that the body cannot change them, and starts the counter `%4`. `slt` is the test of an empty range, the one compare by the sign of the type. `b1` is the body: `%6` is `i`, a copy of the counter. `b2` is the step. It measures the distance to the end, `hi - counter`, and leaves when the distance is at most the step. Only then does `b4` move the counter. The `add` carries `nuw nsw`, because the moved counter lies inside the range and cannot overflow. `continue` jumps to `b2`.
 
-The step never produces a value past `hi`. A loop written `i < hi; i += k` wraps when `hi` is near the end of the type, and this form does not. The counter needs no overflow check in dev mode for the same reason.
+The step never produces a value past `hi`. A loop written `i < hi; i += k` wraps when `hi` is near the end of the type. The distance test stops before that. The counter needs no overflow check in dev mode for the same reason.
 
 In a release build `opt` knows the trip count of this loop, and here it replaces the loop by its closed form.
 

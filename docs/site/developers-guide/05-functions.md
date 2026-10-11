@@ -471,7 +471,7 @@ Each platform has one C calling convention: System V on x86-64 Linux and macOS, 
 
 ### The feature
 
-Every Anti function uses the C convention of its target, exported or not. Nothing marks a function as following it, and no function departs from it.
+Every Anti function uses the C convention of its target, exported or not, and no marking selects another.
 
 | Value | How it travels |
 |---|---|
@@ -661,7 +661,7 @@ No call takes a lock, an atomic operation or heap memory, and no check is insert
 For a Java programmer:
 
 - A struct argument has a cost by its size. Past 16 bytes it is copied at every call, and a pointer avoids the copy.
-- `self` is an ordinary first argument. A method call through a class pointer that needs no dispatch is a direct call.
+- `self` is an ordinary first argument, a pointer to the object. Chapter 9 describes when a call goes through the table of the class.
 
 For a C programmer:
 
@@ -1073,7 +1073,7 @@ A C++ lambda with `[=]` copies its captures into the lambda object, and `std::fu
 
 A snapshot holds values that copy fully: numbers, `bool`, `char`, structs of those, and `str`. It refuses a class value, a pointer and a slice.
 
-A snapshot may be kept, which a closure may not. The places that keep one own it.
+A snapshot may be kept. The places that keep one own it.
 
 - An `own` field of function type, `own handler: fn(int)`.
 - A parameter marked `keep own`, which the function then stores in such a field.
