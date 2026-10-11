@@ -851,12 +851,12 @@ declare noundef ptr @XOpenDisplay(ptr noundef)
 
 The names reach the linker. On Linux, lld links the program as a position independent executable against the glibc sysroot of the package. It names the dynamic linker, the libraries of the `link linux` lines, libm and libc. It takes the runtime that was built against the headers of glibc 2.35. On macOS, lld receives `-framework Name` and reads the framework from the SDK.
 
-The two link modes of Linux, for a program with `main` that calls `XOpenDisplay` and for one that prints a line, built on macOS for linux-x86_64:
+The table holds the two link modes of Linux, built on macOS for linux-x86_64. The first program has a `main` that calls `XOpenDisplay(none)` and prints `a display` with `io.println` when the result is not `none`. The second prints `a line` and calls nothing else.
 
 | Program | Bytes | Needed libraries | Interpreter |
 |---|---:|---|---|
-| with `--linux-lib X11` | 26,192 | `libX11.so.6`, `libc.so.6`, `libm.so.6` | `/lib64/ld-linux-x86-64.so.2` |
-| without | 227,768 | none | none |
+| with `--linux-lib X11` | 26,184 | `libX11.so.6`, `libc.so.6`, `libm.so.6` | `/lib64/ld-linux-x86-64.so.2` |
+| without | 227,760 | none | none |
 
 The second column is the output of `llvm-readobj --needed-libs` of the pinned tools.
 
@@ -1137,7 +1137,7 @@ The plugin of `tests/plugin`, the class `Fancy` of `net.example.fancy`, built fo
 | Binary | Bytes | Dynamic symbols | Needed libraries |
 |---|---:|---|---|
 | `libfancy.so`, the plugin | 15,152 | 2 defined, 20 left open | none |
-| the host | 284,472 | 835 | `ld-linux-x86-64.so.2`, `libc.so.6`, `libm.so.6` |
+| the host | 284,472 | 751 defined, 83 left open | `ld-linux-x86-64.so.2`, `libc.so.6`, `libm.so.6` |
 | the host with `--closed` | 352,528 | none | none |
 
 The 20 open names of the plugin are `anti_rt_descriptor`, `anti_rt_hook`, the descriptor of `Greeter`, the descriptor of the root class and its 16 functions. The two names it defines are `anti_rt_provides`, the table `plugin.load` reads, and `anti_licenses`.
@@ -1153,7 +1153,7 @@ Where it lives: `whole_hosts_plugins` and the test before `devirtualise` in `src
 | A call from the host into a plugin | one dispatch through the table of the object: two loads and an indirect call |
 | A call from a plugin into the runtime | one call through the procedure linkage table of the plugin |
 | Bytes of the plugin of the example | 15,152, since it holds no runtime |
-| Bytes a host pays to be bound against | its dynamic symbol table, 835 names in the example |
+| Bytes a host pays to be bound against | its dynamic symbol table, 834 names in the example |
 | A Linux host | dynamic against glibc 2.35 or newer, where a closed program is static |
 | Heap allocations of an instance | one, of the size the descriptor of the class gives |
 | Atomic operations and locks | those of `plugin.load` and of the count of live objects, which chapter 15 counts |
