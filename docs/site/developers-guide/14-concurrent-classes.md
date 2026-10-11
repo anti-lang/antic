@@ -3,7 +3,7 @@ title: "Concurrent classes"
 description: "Synchronized and concurrent classes, the hidden lock, guarded fields, sync blocks, the lock order checks of dev mode, and the thread-safe collections."
 summary: "`synchronized class` with its hidden lock, `concurrent class` with its guarded fields, `sync` blocks, the lock order checks of dev mode and the thread-safe collections of `anti.collection`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T21:30:00+02:00
+lastmod: 2026-10-11T20:16:50+02:00
 draft: true
 weight: 140
 tags: [compilers, programming-languages]
@@ -16,7 +16,7 @@ A class is thread-safe when it is declared so, and the checker holds it to the d
 
 ### What you know
 
-Java marks a method `synchronized`, and the method runs under the monitor of its object, which the same thread enters again. Nothing stops a field from being read by a method without the word. C++ puts a `std::mutex` member in the class and a `std::lock_guard` in each member function, and C does the same by hand with a `pthread_mutex_t` in the struct.
+Java marks a method `synchronized`, and the method runs under the monitor of its object, which the same thread enters again. Nothing stops a field from being read by a method without the word. C++ puts a `std::mutex` member in the class and a `std::lock_guard` in each member function. C does the same by hand with a `pthread_mutex_t` in the struct.
 
 ### The feature
 
@@ -230,7 +230,7 @@ fn poke(t: *Tally)
 
 For a synchronized class the checker proves the following, each by the rules above.
 
-- Every read and write of a field stands in a function with `self` of the class or of a class below it, or in `construct` or `destruct`.
+- Every access of a field stands in `construct`, in `destruct` or in a function with `self` of the class or of a class below it.
 - Every such function that code outside the class can call holds the lock of `self` from its first statement to its exit.
 - No such function hands a pointer or a slice into the fields to its caller or to a function value.
 
@@ -1464,7 +1464,7 @@ The elements of a `SyncList<T>` are stored as tuples `(T, int)` of the value and
 
 A `ConcurrentMap` holds a pointer to 16 parts. Each part is a `Mutex`, a `HashMap` of the entries, a `HashMap` of their versions and a clock. An operation hashes the key with the seed of the map, picks the part by the top four bits of the hash and runs inside `sync part.lock`. The table of the part hashes the key again for each of its own operations. The count of the entries is an atomic field, so `count()` takes no lock. An operation over the whole map, such as `find_all` or a walk, takes the 16 locks one after the other and holds one at a time.
 
-An `SpscRing<T, N>` holds a block of `N` elements and two atomic counters: `given`, which the producer writes, and `taken`, which the consumer writes. Each side keeps a plain copy of the counter of the other side and reads the atomic one only when the copy says the ring is full or empty.
+An `SpscRing<T, N>` holds a block of `N` elements and two atomic counters: `given`, which the producer writes, and `taken`, which the consumer writes. Each side keeps a plain copy of the counter of the other side. It reads the atomic one only when the copy says the ring is full or empty.
 
 ```llvm excerpt=shared target=linux-x86_64 mode=release
 define internal noundef zeroext range(i8 0, 2) i8 @"anti.collection.concurrent.SpscRing$3cint$2c$2064$3e.push"(
