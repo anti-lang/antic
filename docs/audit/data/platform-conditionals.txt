@@ -1,0 +1,7 @@
+# Conditionals on the host system outside the platform layer of rule 22:
+# src/rt/platform.h, platform_posix.c, platform_windows.c, platform_entry.c,
+# platform_stdio.c, src/antic/platform.[ch], src/anti/platform.[ch], and
+# src/antic/attributes.h, which holds an extension.
+# grep -nE "#\s*(if|ifdef|ifndef|elif) ... (_WIN32|_WIN64|__APPLE__|__linux__|_MSC_VER|__unix__|__MACH__|__FreeBSD__|__GLIBC__|__MINGW)"
+src/antic/header.c:789:                             "#if defined(_WIN32)\n"
+# The one line, src/antic/header.c:789, is a string literal that antic writes into the C header of a library; no conditional of the sources stands outside the layer.

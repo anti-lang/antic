@@ -1,0 +1,11 @@
+# The shared headers of the checker, lowering, the parser, the driver,
+# the library file and the whole-program pass group their declarations
+# under a comment naming a file, as /* sema_call.c */. Each line is a
+# declaration whose function that file does not define.
+# src/antic/sema_checker.h: 216 declarations under a file comment
+# src/antic/lower_lowerer.h: 191 declarations under a file comment
+# src/antic/parser_parser.h: 61 declarations under a file comment
+# src/antic/driver_parts.h: 21 declarations under a file comment
+# src/antic/antl_io.h: 47 declarations under a file comment
+# src/antic/whole_parts.h: 12 declarations under a file comment
+# 0 declarations under the wrong file, 55 sections

@@ -1,0 +1,145 @@
+# Mentions of the native back end under src/, tests/ and tools/:
+# regalloc, x86_64.c, arm64.c, emit.c, select.c, select.h, --backend,
+# --dump-select, --dump-alloc, "instruction selection" and "selector".
+# Then the bare word select, which is also the select statement of
+# channels and simd.select, counted per file with the lines that are
+# not a select statement, a simd.select, or a word of English.
+## specific words
+src/antic/driver.c:800: emit.cpu = o->cpu;
+src/antic/driver.c:810: emit.constructor = rt_name(RT_FN_INIT);
+src/antic/lower_expr.c:2189: own, and atomic_call of llvm_emit.c writes it as the LLVM atomic
+src/native/raylib.cmake:92: # objc_msgSendClass$<selector>$<class> that the linker writes.
+src/native/raylib.cmake:98: -fno-objc-msgsend-class-selector-stubs)
+src/rt/symbols.c:426: /* DWARF 5 names the size of an address and of a segment selector,
+tests/CMakeLists.txt:35: unit/test_llvm_emit.c
+tests/run_bench.cmake:14: #             --backend,native for an antic that still has that option
+tests/unit/test_symbols.c:210: add_int(out, 0, 1);     /* segment selector size */
+tools/sources.cmake:45: src/antic/llvm_emit.c
+# 10 lines
+## bare select, per file
+src/anti/fmt.c: 1 lines, 0 not a select statement or an English use
+src/anti/sdk.c: 1 lines, 1 not a select statement or an English use
+    src/anti/sdk.c:148: fputs("anti: " APPLE_CLT_SDKS " holds no SDK. Run xcode-select "
+src/antic/antl_tree.c: 1 lines, 1 not a select statement or an English use
+    src/antic/antl_tree.c:1240: io_arms(io, &s->as.select.arms, &s->as.select.count);
+src/antic/antl_verify.c: 3 lines, 3 not a select statement or an English use
+    src/antic/antl_verify.c:485: for (i = 0; i < s->as.select.count; i++) {
+    src/antic/antl_verify.c:486: need(v, s->as.select.arms[i].body != NULL);
+    src/antic/antl_verify.c:856: join(&r, walk_arms(v, s->as.select.arms, s->as.select.count, d));
+src/antic/ast.h: 3 lines, 0 not a select statement or an English use
+src/antic/ast_dump.c: 3 lines, 2 not a select statement or an English use
+    src/antic/ast_dump.c:728: for (i = 0; i < s->as.select.count; i++) {
+    src/antic/ast_dump.c:729: const struct switch_arm *arm = &s->as.select.arms[i];
+src/antic/ast_walk.c: 1 lines, 1 not a select statement or an English use
+    src/antic/ast_walk.c:273: walk_arms(v, s->as.select.arms, s->as.select.count);
+src/antic/coff.c: 1 lines, 1 not a select statement or an English use
+    src/antic/coff.c:40: not select `any`, or an auxiliary record it does not read. */
+src/antic/lexer.c: 2 lines, 1 not a select statement or an English use
+    src/antic/lexer.c:200: locking and channels took `chan`, `recv`, `select`, `send` and
+src/antic/llvm_emit.c: 7 lines, 6 not a select statement or an English use
+    src/antic/llvm_emit.c:440: opt folds each select whose condition it can decide. */
+    src/antic/llvm_emit.c:464: text_appendf(e->out, "  %%v%" PRIu32 " = select i1 %%v%" PRIu32 ", %s 1, "
+    src/antic/llvm_emit.c:482: text_appendf(e->out, "  %%v%" PRIu32 " = select i1 %%v%" PRIu32
+    src/antic/llvm_emit.c:487: text_appendf(e->out, "  %%v%" PRIu32 " = select i1 %%v%" PRIu32 ", %s 0, "
+    src/antic/llvm_emit.c:2060: text_appendf(e->out, "  %%v%" PRIu32 " = select <%zu x i1> %%v%" PRIu32
+    src/antic/llvm_emit.c:2123: text_appendf(e->out, "  %%v%" PRIu32 " = select <%zu x i1> %%v%"
+src/antic/lower_stmt.c: 2 lines, 2 not a select statement or an English use
+    src/antic/lower_stmt.c:1950: for (j = 0; j < s->as.select.count; j++) {
+    src/antic/lower_stmt.c:1951: reserve_stmt(l, entry, s->as.select.arms[j].body);
+src/antic/lower_sync.c: 6 lines, 6 not a select statement or an English use
+    src/antic/lower_sync.c:3: `sync` and `select`, and the operations that make, use and end a
+    src/antic/lower_sync.c:283: /* An array of count pointers, the form in which `select` hands its
+    src/antic/lower_sync.c:290: /* DESIGN: `select` passes the handle of each arm's channel to
+    src/antic/lower_sync.c:298: size_t count = s->as.select.count;
+    src/antic/lower_sync.c:311: const struct switch_arm *arm = &s->as.select.arms[i];
+    src/antic/lower_sync.c:330: const struct switch_arm *arm = &s->as.select.arms[i];
+src/antic/parser_expr.c: 2 lines, 1 not a select statement or an English use
+    src/antic/parser_expr.c:738: statement `select` never follow `.`. */
+src/antic/parser_stmt.c: 6 lines, 4 not a select statement or an English use
+    src/antic/parser_stmt.c:2: of `switch` and `select`, the handlers of `catch` and every other
+    src/antic/parser_stmt.c:610: parser_error_here(p, "a `select` waits on one channel or more");
+    src/antic/parser_stmt.c:618: parser_error_here(p, "a `select` has no `else`");
+    src/antic/parser_stmt.c:641: s->as.select.arms = parser_list_finish(p, &arms, &s->as.select.count);
+src/antic/sema_copies.c: 11 lines, 11 not a select statement or an English use
+    src/antic/sema_copies.c:1370: n->as.select.arms = types_alloc_array(
+    src/antic/sema_copies.c:1371: cl->k->c->arena, s->as.select.count + 1,
+    src/antic/sema_copies.c:1372: sizeof *n->as.select.arms);
+    src/antic/sema_copies.c:1373: memcpy(n->as.select.arms, s->as.select.arms,
+    src/antic/sema_copies.c:1374: s->as.select.count * sizeof *n->as.select.arms);
+    src/antic/sema_copies.c:1376: for (i = 0; i < s->as.select.count; i++) {
+src/antic/sema_simd.c: 9 lines, 5 not a select statement or an English use
+    src/antic/sema_simd.c:320: bool select = sema_name_is(name, SIMD_SELECT);
+    src/antic/sema_simd.c:325: if (count != (select ? 3u : 1u)) {
+    src/antic/sema_simd.c:327: (int)name->length, name->text, select ? 3 : 1,
+    src/antic/sema_simd.c:328: select ? "s" : "", count);
+    src/antic/sema_simd.c:342: if (!select) {
+src/antic/sema_stmt.c: 7 lines, 7 not a select statement or an English use
+    src/antic/sema_stmt.c:1417: /* DESIGN: an arm of `select` names a channel, and the name it binds
+    src/antic/sema_stmt.c:1426: for (i = 0; i < s->as.select.count; i++) {
+    src/antic/sema_stmt.c:1427: struct switch_arm *arm = &s->as.select.arms[i];
+    src/antic/sema_stmt.c:1432: sema_error_at(c, arm->value->pos, "an arm of a `select` names a "
+    src/antic/sema_stmt.c:2458: /* One arm of a `select` runs, and any of them may. */
+    src/antic/sema_stmt.c:2460: for (i = 0; i < s->as.select.count; i++) {
+src/antic/target.c: 1 lines, 0 not a select statement or an English use
+src/antic/types.h: 2 lines, 0 not a select statement or an English use
+src/rt/sync.c: 6 lines, 5 not a select statement or an English use
+    src/rt/sync.c:5: DESIGN: a channel and a select stand on the monitors of the platform
+    src/rt/sync.c:43: /* DESIGN: a `select` that finds no channel ready waits on one condition
+    src/rt/sync.c:45: the selects that wait, so a `send` with no select to wake takes no
+    src/rt/sync.c:46: lock beside its channel's. A select counts itself before it looks at
+    src/rt/sync.c:194: struct channel *ch = channel_of(chans[index], "`select` on a channel "
+src/rt/sync.h: 1 lines, 1 not a select statement or an English use
+    src/rt/sync.h:3: and `select`. src/rt/lock.c holds the locks and src/rt/sync.c the
+src/std/anti/simd.anti: 1 lines, 1 not a select statement or an English use
+    src/std/anti/simd.anti:3: //! `select(mask, a, b)` gives the lane of `a` where the lane of `mask` holds
+tests/CMakeLists.txt: 1 lines, 1 not a select statement or an English use
+    tests/CMakeLists.txt:1193: # block and every arm of a `select`. sync_exits fails with the errors of
+tests/clib/com/example/simdlib.anti: 1 lines, 0 not a select statement or an English use
+tests/dump/main.dev.linux-x86_64.ll: 3 lines, 3 not a select statement or an English use
+    tests/dump/main.dev.linux-x86_64.ll:15: %v5 = select i1 %v4, i64 1, i64 2
+    tests/dump/main.dev.linux-x86_64.ll:18: %v8 = select i1 %v3, i64 %v7, i64 %v6
+    tests/dump/main.dev.linux-x86_64.ll:19: %v9 = select i1 %v2, i64 0, i64 %v8
+tests/dump/x86.linux-arm64.ll: 10 lines, 10 not a select statement or an English use
+    tests/dump/x86.linux-arm64.ll:19: %v5 = select i1 %v4, i64 1, i64 %v1
+    tests/dump/x86.linux-arm64.ll:22: %v8 = select i1 %v3, i64 %v7, i64 %v6
+    tests/dump/x86.linux-arm64.ll:23: %v9 = select i1 %v2, i64 0, i64 %v8
+    tests/dump/x86.linux-arm64.ll:30: %v15 = select i1 %v14, i64 1, i64 %v11
+    tests/dump/x86.linux-arm64.ll:62: %v10 = select i1 %v9, i32 1, i32 %v8
+    tests/dump/x86.linux-arm64.ll:64: %v12 = select i1 %v9, i32 0, i32 %v11
+tests/dump/x86.linux-x86_64.ll: 10 lines, 10 not a select statement or an English use
+    tests/dump/x86.linux-x86_64.ll:19: %v5 = select i1 %v4, i64 1, i64 %v1
+    tests/dump/x86.linux-x86_64.ll:22: %v8 = select i1 %v3, i64 %v7, i64 %v6
+    tests/dump/x86.linux-x86_64.ll:23: %v9 = select i1 %v2, i64 0, i64 %v8
+    tests/dump/x86.linux-x86_64.ll:30: %v15 = select i1 %v14, i64 1, i64 %v11
+    tests/dump/x86.linux-x86_64.ll:62: %v10 = select i1 %v9, i32 1, i32 %v8
+    tests/dump/x86.linux-x86_64.ll:64: %v12 = select i1 %v9, i32 0, i32 %v11
+tests/errors/simd_ops.anti: 2 lines, 0 not a select statement or an English use
+tests/errors/simd_ops.err: 2 lines, 0 not a select statement or an English use
+tests/modules/sync/com/example/queue.anti: 1 lines, 0 not a select statement or an English use
+tests/programs/channel_workers.anti: 1 lines, 0 not a select statement or an English use
+tests/programs/select_two.anti: 2 lines, 1 not a select statement or an English use
+    tests/programs/select_two.anti:1: //! `select` waits on two channels and takes a value from one that holds one. An
+tests/programs/simd.anti: 7 lines, 0 not a select statement or an English use
+tests/programs/simd.expected: 1 lines, 1 not a select statement or an English use
+    tests/programs/simd.expected:12: select 1 2 2 2
+tests/programs/simd_big.anti: 1 lines, 0 not a select statement or an English use
+tests/run_installer_alone.cmake: 5 lines, 4 not a select statement or an English use
+    tests/run_installer_alone.cmake:21: foreach(word cmake get-sysroot package-api xcode-select commandlinetools
+    tests/run_installer_alone.cmake:124: # DESIGN: a cmake and an xcode-select stand first on the PATH. Each
+    tests/run_installer_alone.cmake:128: foreach(tool cmake xcode-select)
+    tests/run_installer_alone.cmake:164: foreach(tool cmake xcode-select)
+tests/unit/test_llvm_emit.c: 10 lines, 10 not a select statement or an English use
+    tests/unit/test_llvm_emit.c:771: "  %v5 = select i1 %v4, i64 1, i64 %v1\n"
+    tests/unit/test_llvm_emit.c:774: "  %v8 = select i1 %v3, i64 %v7, i64 %v6\n"
+    tests/unit/test_llvm_emit.c:775: "  %v9 = select i1 %v2, i64 0, i64 %v8\n"
+    tests/unit/test_llvm_emit.c:781: "  %v5 = select i1 %v4, i32 1, i32 %v1\n"
+    tests/unit/test_llvm_emit.c:786: "  %v3 = select i1 %v2, i64 1, i64 %v1\n"
+    tests/unit/test_llvm_emit.c:788: "  %v5 = select i1 %v2, i64 0, i64 %v4\n"
+tests/unit/test_sync.c: 12 lines, 7 not a select statement or an English use
+    tests/unit/test_sync.c:14: `chan T` with `send`, `recv` and `close`, and `select` over the
+    tests/unit/test_sync.c:78: const char *source = "sync chan send recv select thread close Mutex";
+    tests/unit/test_sync.c:124: /* `select` names a channel in each arm and the name that takes what
+    tests/unit/test_sync.c:159: 1, 43, "a `select` has no `else`");
+    tests/unit/test_sync.c:161: "a `select` waits on one channel or more");
+    tests/unit/test_sync.c:226: /* `select` binds what its arm's channel gives, `none` once that
+# 146 lines hold the word select

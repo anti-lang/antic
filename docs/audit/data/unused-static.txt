@@ -1,0 +1,8 @@
+# Static functions of src/antic, src/anti and src/rt that nothing in
+# their file names apart from their definition and their prototype.
+# Comments, strings and directives are blanked first, so a name inside
+# a macro body is not seen; the compiler's -Wunused-function in
+# warnings.txt is the other witness.
+# file:line name
+# 0 functions
+# -Wunused-function in warnings-unique.txt: 0 lines

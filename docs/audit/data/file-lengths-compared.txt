@@ -1,0 +1,12 @@
+# Files past 3000 lines now or at the second audit, 70e8860.
+# file lines-now lines-then status
+src/antic/llvm_emit.c 4102 absent new
+src/antic/sema_stmt.c 3089 3531 kept
+src/antic/sema.c 2948 3735 gone
+src/antic/sema_call.c 2668 3544 gone
+src/antic/sema_expr.c 2503 3752 gone
+src/antic/lower_expr.c 2329 3199 gone
+src/antic/driver.c 1871 3017 gone
+src/antic/lower.c 1330 3323 gone
+src/antic/parser.c 754 4340 gone
+src/antic/antl.c 180 3788 gone

@@ -1,0 +1,14 @@
+# grep -nE "\b(strcpy|strcat|sprintf|vsprintf|gets|strncpy|v?f?s?scanf|vs?scanf)\s*\(" src/rt/*.[ch] src/antic/*.[ch] src/anti/*.[ch]
+src/rt/platform_stdio.c:90:ANTI_RT_WEAK int vsprintf(char *buffer, const char *format, va_list arguments)
+src/rt/platform_stdio.c:98:ANTI_RT_WEAK int sprintf(char *buffer, const char *format, ...)
+src/rt/platform_stdio.c:104:    count = vsprintf(buffer, format, arguments);
+src/rt/platform_stdio.c:151:ANTI_RT_WEAK int vscanf(const char *format, va_list arguments)
+src/rt/platform_stdio.c:157:ANTI_RT_WEAK int scanf(const char *format, ...)
+src/rt/platform_stdio.c:163:    count = vscanf(format, arguments);
+src/rt/platform_stdio.c:168:ANTI_RT_WEAK int vfscanf(FILE *file, const char *format, va_list arguments)
+src/rt/platform_stdio.c:174:ANTI_RT_WEAK int fscanf(FILE *file, const char *format, ...)
+src/rt/platform_stdio.c:180:    count = vfscanf(file, format, arguments);
+src/rt/platform_stdio.c:185:ANTI_RT_WEAK int vsscanf(const char *text, const char *format, va_list arguments)
+src/rt/platform_stdio.c:191:ANTI_RT_WEAK int sscanf(const char *text, const char *format, ...)
+src/rt/platform_stdio.c:197:    count = vsscanf(text, format, arguments);
+# Every line is in src/rt/platform_stdio.c, which defines the printf and scanf families of a Windows target; lines 104, 163, 180 and 197 are the calls inside those definitions. No other file calls one.

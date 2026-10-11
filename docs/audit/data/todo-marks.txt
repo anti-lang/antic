@@ -1,0 +1,9 @@
+# Every TODO, FIXME, XXX and HACK, as a word, under src/, then under
+# tests/ and tools/, then under docs/ outside docs/audit/.
+## src
+# 0 lines
+## tests tools
+tools/docs-style/check_docs.py:118: CAPS_ALLOW = {"TODO", "FIXME", "HACK", "NOTE", "SAFETY", "WARNING", "XXX", "BUG"}
+# 1 lines
+## docs
+# 0 lines

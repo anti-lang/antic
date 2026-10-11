@@ -1,0 +1,306 @@
+# The first comment of every .c, .h and .anti file under src/.
+# status: top (the first non-blank line), guard (only the include guard
+# stands before it), includes (only the guard and #include lines or a
+# module line stand before it), after-code (other code stands before it,
+# at the line given), none. Then the line and the first 110 characters.
+# file | status | line | text
+src/anti/bind.c | top | 1 | anti bind: bindings of C libraries, and the C header of a library
+src/anti/bind.h | includes | 7 | `anti bind --header <name>.antl`: write `<name>.h` into out_dir from
+src/anti/bindapi.c | top | 1 | The reader of an API description in the format of raylib's rlparser,
+src/anti/bindclang.c | top | 1 | The reader of a C header through clang: the AST that clang dumps as
+src/anti/bindexpr.c | top | 1 | The evaluator of the constant expressions of a binding. It gives the
+src/anti/bindexpr.h | includes | 9 | The value of a constant expression of C. */
+src/anti/bindmodel.c | top | 1 | The memory of a binding and its warnings, the words of Anti a name of
+src/anti/bindmodel.h | includes | 12 | The declarations of a C API that anti bind writes as an Anti module.
+src/anti/bindtype.c | top | 1 | The fixed mappings of the C types and the parser of a C type spelling,
+src/anti/bindwrite.c | top | 1 | The writer of anti bind: the module, the shim and the two probes. */
+src/anti/build.c | top | 1 | `anti build` and `anti run`.
+src/anti/build.h | includes | 6 | What `anti build` and `anti run` were asked for. A field that names
+src/anti/check.c | top | 1 | `anti check`: every check that writes no artifact of a program.
+src/anti/check.h | includes | 7 | One run of `anti check`. sources are the files to check, and none
+src/anti/cursor.c | top | 1 | The cursor over one line of text that comes from another machine. */
+src/anti/cursor.h | includes | 8 | DESIGN: the lines of a map, of a trace and of a report of
+src/anti/deps.c | top | 1 | The dependency graph of a project: the lock file, the index of a
+src/anti/deps.h | includes | 12 | Read the package header and the module path of the library file at
+src/anti/doc.c | top | 1 | `anti doc`: the documentation generator of docs/tooling.md.
+src/anti/doc.h | includes | 7 | What a run writes. HTML is the form of the reference on anti-lang.com
+src/anti/files.c | after-code at 11 | 24 | calloc may answer NULL for no bytes, which is no failure, so the
+src/anti/files.h | includes | 9 | Print that anti ran out of memory and exit with status 70. Every
+src/anti/fmt.c | top | 1 | `anti fmt`, the canonical form of an Anti source.
+src/anti/fmt.h | includes | 9 | Write the canonical form of one Anti source into out. The rules are
+src/anti/jsontree.c | top | 1 | A tree of a JSON document over the scanner of src/rt/json.c. */
+src/anti/jsontree.h | includes | 10 | A tree of a JSON document, built over the scanner of src/rt/json.c. anti
+src/anti/licensing.c | top | 1 | `anti license` over the runtime archive, a project and a static
+src/anti/licensing.h | includes | 10 | `anti license` over the runtime archive, over a project and over a
+src/anti/main.c | includes | 26 | The text stands in more than one literal, since C99 guarantees a
+src/anti/manifest.c | top | 1 | The tables of `anti.toml` that a build passes to antic.
+src/anti/manifest.h | includes | 9 | The manifest of a project, in its root, which is where a build runs. */
+src/anti/memreport.c | top | 1 | The run of a program of --memory-checks whose report names its frames
+src/anti/memreport.h | guard | 4 | Run the program argv of --memory-checks as `anti run` and `anti test`
+src/anti/platform.c | top | 1 | The platform layer of anti, which docs/c-guidelines.md names under rule
+src/anti/platform.h | includes | 8 | The platform layer of antic, which anti calls as well. */
+src/anti/project.c | top | 1 | `anti new`, which writes a project of the default layout. */
+src/anti/project.h | guard | 4 | `anti new <name>`: a project of the default layout, with a starter
+src/anti/repo.c | top | 1 | The repositories a build fetches from and the cache it fetches into.
+src/anti/repo.h | includes | 8 | A repository is a URL prefix serving static files, so a fetch is one
+src/anti/sdk.c | includes | 14 | The macOS sysroots that an import fills. */
+src/anti/sdk.h | guard | 4 | Pack the .tbd stubs and the version of a MacOSX.sdk into
+src/anti/symmap.c | top | 1 | The text map of a symbols archive.
+src/anti/symmap.h | includes | 9 | The map of a symbols archive. It holds one line per function of a
+src/anti/syms.c | top | 1 | `anti symbols inventory`, `check` and `resolve`.
+src/anti/syms.h | includes | 10 | `anti build --release` names the symbols archive beside a binary
+src/anti/test.c | top | 1 | `anti test`: the runner of the `tests` and `fixtures` blocks.
+src/anti/test.h | includes | 7 | One run of `anti test`. sources are the modules to test, and roots
+src/anti/units.c | top | 1 | The modules of a run over the sources of a project, in the order a
+src/anti/units.h | includes | 12 | One module of a run over the sources of a project. `anti check`,
+src/anti/zip.c | top | 1 | The zip writer of the symbols archive.
+src/anti/zip.h | includes | 7 | The symbols archive of a release is a zip file, because every host
+src/antic/abi.c | includes | 6 | The registers that pass arguments under System V, six integer and eight
+src/antic/abi.h | includes | 12 | The classification of every parameter and result for the C convention
+src/antic/alloc.c | none at 7 | 0 | 
+src/antic/alloc.h | includes | 6 | DESIGN: the one owner of the heap memory of antic. Every part of the
+src/antic/antic.c | top | 1 | The side of antic behind antic.h: the walks over a source and a library
+src/antic/antic.h | guard | 4 | DESIGN: what the anti tool may use of antic. anti compiles through
+src/antic/antl.c | top | 1 | The format of the library file and the top of its reader: the magic,
+src/antic/antl.h | includes | 15 | A library file holds the interface of one module and the unoptimised IR
+src/antic/antl_io.c | includes | 9 | DESIGN: the primitives of the library file, which every other file of
+src/antic/antl_io.h | guard | 4 | The inside of the library file, which its files share. antl_io.c
+src/antic/antl_read.c | top | 1 | The reader of the type table, the constants and the items of a library
+src/antic/antl_read_ir.c | top | 1 | The reader of the IR of a library file: the aggregate and symbolic
+src/antic/antl_tree.c | includes | 9 | DESIGN: the section of the generics. A library file stores each
+src/antic/antl_verify.c | includes | 8 | DESIGN: the verifier of library files. The reader takes each record of
+src/antic/antl_write.c | top | 1 | The writer of the library file: the type table with the types every
+src/antic/applesdk.c | includes | 9 | Read the decimal digits at *s into *value and move *s past them. At
+src/antic/applesdk.h | includes | 8 | DESIGN: Anti never fetches Apple's SDK. A Mac keeps it in
+src/antic/arena.c | includes | 8 | DESIGN: hand out memory from large blocks and free all of it at the end
+src/antic/arena.h | includes | 6 | Memory for data that lives until the whole compilation ends, such as
+src/antic/arith.c | includes | 9 | The value of the low n bits of v, extended by is_signed. */
+src/antic/arith.h | includes | 8 | Integer arithmetic of n bits, n being 8, 16, 32 or 64, which the
+src/antic/ast.h | includes | 11 | The syntax tree of one module. Every node lives in the compilation's
+src/antic/ast_dump.c | includes | 8 | Node names follow the rules of the chapter 2 grammar, so a dump reads
+src/antic/ast_walk.c | top | 1 | The one walk of a function body that every analysis of the checked
+src/antic/attributes.h | guard | 4 | DESIGN: rule 1 of docs/c-guidelines.md keeps a compiler extension to a
+src/antic/coff.c | includes | 13 | DESIGN: lld-link and link.exe write no relocatable object, and the
+src/antic/coff.h | includes | 9 | A COFF object to join: the name a message gives it and its bytes. */
+src/antic/cpu.c | includes | 5 | DESIGN: one row per level, in the order of enum cpu_level. clang_arch
+src/antic/cpu.h | includes | 7 | The level ids are the ones the runtime reads, so they have one
+src/antic/diagnostic.c | none at 9 | 0 | 
+src/antic/diagnostic.h | includes | 9 | DESIGN: every warning and every safety check has a stable name, printed
+src/antic/docpage.c | top | 1 | The page of `anti doc`, built from the public interface of a module or
+src/antic/driver.c | top | 1 | The driver of antic: it reads the files of a compilation and runs it,
+src/antic/driver.h | includes | 11 | DESIGN: `anti check` reports one line per class, so it needs the number
+src/antic/driver_index.c | top | 1 | The plugin index, `anti-plugins.toml`, which antic writes beside a
+src/antic/driver_library.c | top | 1 | A library for C and a plugin: the llvm-ar and join commands, the COFF
+src/antic/driver_link.c | top | 1 | The link of a program: the facts of the target, Apple's SDK and the
+src/antic/driver_parts.h | guard | 4 | The inside of the driver, which its files share. driver.c reads and
+src/antic/driver_search.c | top | 1 | The library files of a compilation: the files of the command line, the
+src/antic/header.c | includes | 11 | The C name of a scalar type. DESIGN: a sized type maps to its <stdint.h>
+src/antic/header.h | includes | 11 | The C header of a library for C: the export structs, unions, constants
+src/antic/ir.c | includes | 10 | Growable arrays of the module are plain heap arrays, released by
+src/antic/ir.h | includes | 13 | The intermediate representation of antic: typed three-address code in
+src/antic/ir_fold.c | after-code at 5 | 20 | The checks of the operations that have no value for some operands. */
+src/antic/ir_fold.h | includes | 8 | What folding an operation gives. */
+src/antic/ir_print.c | after-code at 8 | 76 | Append the text form of a type in memory. */
+src/antic/ir_verify.c | includes | 12 | Check what every later stage relies on. Each block ends with exactly
+src/antic/layout.c | after-code at 14 | 27 | text_vformat marks a message cut to fit with three dots. */
+src/antic/layout.h | includes | 11 | The back end lays out the aggregates of the IR for one target and folds
+src/antic/lexer.c | includes | 13 | The spelling of every keyword and symbol, indexed by kind. Keyword
+src/antic/lexer.h | after-code at 11 | 15 | Names and literals */
+src/antic/linker.c | after-code at 11 | 27 | The object of the program, then the extra inputs. */
+src/antic/linker.h | includes | 12 | The files of a link and the facts about the host that the command line
+src/antic/llvm_debug.c | after-code at 9 | 35 | Append s as a metadata string in quotes. A quote, a backslash and a
+src/antic/llvm_debug.h | includes | 12 | The debug information of `-g` in the LLVM text, as the section "Debug
+src/antic/llvm_emit.c | includes | 16 | DESIGN: the IR is not in SSA form, so every temporary gets an alloca in
+src/antic/llvm_emit.h | includes | 14 | The translation of the IR into LLVM IR text, the back end of
+src/antic/llvm_run.c | includes | 9 | The file name of path, after its last separator. Windows takes `\` as
+src/antic/llvm_run.h | includes | 9 | The run of opt and llc of the pinned release on the text that
+src/antic/llvm_target.c | includes | 3 | DESIGN: every data layout string is the `target datalayout` line the
+src/antic/llvm_target.h | includes | 8 | What the LLVM back end writes for a target and a processor level. The
+src/antic/lower.c | after-code at 15 | 26 | bool is i8 and char is i32. Signedness moves into the operations. An
+src/antic/lower.h | after-code at 10 | 13 | DESIGN: `--no-hooks` drops every hook site the compiler writes,
+src/antic/lower_check.c | top | 1 | The checks of a dev build in lowering. The text a failed check prints,
+src/antic/lower_class.c | top | 1 | The functions lowering writes for a class. The init of a class with
+src/antic/lower_desc.c | after-code at 10 | 16 | The primary table of t, in the order sema_table_of gives, which the
+src/antic/lower_eq.c | top | 1 | The default `==` of a struct, a class value, a tuple, a variant and a
+src/antic/lower_error.c | top | 1 | The error channel in lowering. A call whose error a handler takes, the
+src/antic/lower_expr.c | includes | 11 | Whether e is a T that the checker made the `?T` holding it. In a copy
+src/antic/lower_function.c | top | 1 | Function bodies in lowering. A function of the module, its parameters,
+src/antic/lower_hash.c | top | 1 | The default hash of a value, which `x.hash()` gives on a type without
+src/antic/lower_hook.c | top | 1 | The sites of the hooks in lowering. Which classes are traced, the calls
+src/antic/lower_lowerer.h | guard | 4 | The state of lowering and the functions its files share. Each file
+src/antic/lower_owning.c | top | 1 | The owning values of lowering. One teardown, one copy and one clear of
+src/antic/lower_pattern.c | top | 1 | Pattern literals in lowering. A `re"..."` literal is a global that the
+src/antic/lower_place.c | top | 1 | Places and addresses in lowering. The address of a field, an element,
+src/antic/lower_simd.c | includes | 9 | DESIGN: an operation on a simd struct below the vector cap is one simd
+src/antic/lower_stmt.c | includes | 11 | Whether any block the function is inside has a statement to run. The
+src/antic/lower_sync.c | top | 1 | Locks and channels in lowering. The lock word of a Mutex and the
+src/antic/lower_worker.c | top | 1 | `parallel` and `dispatch` in lowering. The context a worker reads, the
+src/antic/main.c | after-code at 15 | 76 | C99 promises string literals of 4095 bytes, so the text is two. */
+src/antic/memcheck.c | after-code at 9 | 14 | Whether the runtime of AddressSanitizer for t checks for leaks. The
+src/antic/memcheck.h | includes | 10 | DESIGN: --memory-checks puts a check of AddressSanitizer before every
+src/antic/modpath.c | after-code at 8 | 24 | Whether c separates the parts of a path on the host: `/` on every
+src/antic/modpath.h | includes | 9 | A module path names a module: lowercase identifiers joined by dots, as
+src/antic/notice.c | after-code at 5 | 10 | Whether a package before index i has the name of package i. */
+src/antic/notice.h | includes | 6 | The begin and end markers of the licence notice, by which a tool finds
+src/antic/optimize.c | includes | 13 | DESIGN: the passes rely on three properties and nothing else.
+src/antic/optimize.h | after-code at 6 | 8 | Optimize the functions of module alone, for an object of its own in dev
+src/antic/parser.c | top | 1 | The parser of a module and the helpers its files share: the stream of
+src/antic/parser.h | includes | 11 | Build the syntax tree of one module from its tokens. Nodes go into the
+src/antic/parser_clause.c | top | 1 | The clauses `allow(name, "reason")` and `unchecked(name, "reason")`
+src/antic/parser_decl.c | top | 1 | The parts of a declaration: the marks, the parameters and the result
+src/antic/parser_expr.c | top | 1 | Expressions: the primary forms with `f"..."` and anonymous functions,
+src/antic/parser_item.c | top | 1 | The items of a module: a class with its body, a variant with its
+src/antic/parser_parser.h | guard | 4 | The state of the parser and the functions its files share. parser.c
+src/antic/parser_stmt.c | top | 1 | Statements and blocks: `let` and `const`, `if` and `if let`, the arms
+src/antic/parser_type.c | top | 1 | Types, and the scan that tells a list of type arguments after `<` from
+src/antic/pattern.c | after-code at 9 | 77 | DESIGN: the check `exponential-pattern` reads the pattern into a tree
+src/antic/pattern.h | includes | 8 | The checks of a pattern literal: the compile with PCRE2 and the safety
+src/antic/platform.c | top | 1 | The platform layer of antic and anti, which docs/c-guidelines.md names
+src/antic/platform.h | includes | 10 | The platform layer of antic and anti, which docs/c-guidelines.md names
+src/antic/ptrset.c | includes | 9 | DESIGN: the set, the map and the index are one table with values of
+src/antic/ptrset.h | includes | 8 | A set of pointers, open addressed and at most half full. A zeroed
+src/antic/reach.c | includes | 9 | The walk over what the entries reach. The work list holds functions,
+src/antic/reach.h | includes | 8 | What the entries of a program reach: one flag per function and one
+src/antic/rt_abi.c | includes | 7 | The IR type of one (IR type, C type) pair of a row. */
+src/antic/rt_abi.h | guard | 4 | The contract between the code antic writes and the runtime of src/rt/:
+src/antic/sema.c | includes | 12 | DESIGN: one pass over the syntax tree per module, after every
+src/antic/sema.h | after-code at 15 | 40 | The value of a constant, computed at compile time. */
+src/antic/sema_call.c | top | 1 | The checks of calls and members: fields, functions of a class,
+src/antic/sema_chain.c | includes | 8 | DESIGN: a declaration that names another resolves that one first, and
+src/antic/sema_checker.h | guard | 4 | The state of the checker and the functions its files share. sema.c
+src/antic/sema_class.c | top | 1 | The class model: the tables a class fills and the bodies that fill
+src/antic/sema_const.c | top | 1 | The evaluation of constant expressions, and the order in which the
+src/antic/sema_copies.c | includes | 8 | DESIGN: the compiled copies of generics. A generic is checked once,
+src/antic/sema_doc.c | top | 1 | The doc warnings of `anti check`: each doc comment against the markup
+src/antic/sema_export.c | top | 1 | The checks of what crosses to C and the interface of a checked
+src/antic/sema_expr.c | top | 1 | The checks of expressions: places, literals, the unary operators,
+src/antic/sema_generic.c | includes | 7 | DESIGN: the checker's part of generics. A generic declares its type
+src/antic/sema_hash.c | top | 1 | The checker's part of hashing: `x.hash()` on every type. A class and a
+src/antic/sema_operator.c | top | 1 | The checks of the binary operators, `in` and `??` among them, of the
+src/antic/sema_pattern.c | top | 1 | The methods of `str` and `[]byte` that take a pattern and the match
+src/antic/sema_safety.c | top | 1 | The checks of the thread-safe classes: a synchronized class, whose
+src/antic/sema_simd.c | top | 1 | The checks of simd structs: the operators lane by lane, `as` between
+src/antic/sema_stmt.c | top | 1 | The checks of statements and function bodies: narrowing, assignment,
+src/antic/sema_thread.c | top | 1 | The checks of the calls that threads share data through: the atomic
+src/antic/sema_value.c | top | 1 | The value rules of the checker: what a value owns, when a value moves
+src/antic/sha256.c | none at 7 | 0 | 
+src/antic/sha256.h | includes | 6 | The hash is the one of the runtime, which antic and anti compile in. */
+src/antic/target.c | includes | 5 | These names are also the directory names of the runtime archive,
+src/antic/target.h | includes | 10 | The minimum macOS version of both macOS targets. */
+src/antic/text.c | includes | 10 | Grow to hold extra more bytes plus the terminating NUL. The compiler
+src/antic/text.h | includes | 9 | A growable byte buffer that stays NUL-terminated. A zero-initialised
+src/antic/types.c | after-code at 11 | 32 | How many levels t stands above a name, 0 for NULL. */
+src/antic/types.h | includes | 12 | The checked types of a compilation. Every type exists once, so two
+src/antic/userdirs.c | includes | 10 | DESIGN: an XDG variable counts only when it holds an absolute path.
+src/antic/userdirs.h | includes | 8 | DESIGN: an install of Anti is local to the user and follows the
+src/antic/warnings.c | after-code at 10 | 15 | The names, in the order of enum diag_name. docs/notes/warnings.md
+src/antic/warnings.h | after-code at 9 | 11 | A warning, which `allow` silences, or a safety check, which
+src/antic/whole.c | includes | 14 | DESIGN: a module that names a class of another module refers to its
+src/antic/whole.h | includes | 11 | The passes over the IR of the whole program. They run after the last
+src/antic/whole_parts.h | guard | 4 | The inside of the pass over the whole program, which its two files
+src/antic/whole_tables.c | top | 1 | The tables of the whole program that the runtime reads: the registry
+src/rt/assert.c | includes | 6 | The one form of every line the runtime writes to standard error. */
+src/rt/atomic.c | includes | 4 | DESIGN: every operation is sequentially consistent, which is the one
+src/rt/atomic.h | top | 1 | The atomic operations of the language. Every one is sequentially
+src/rt/backtrace.c | top | 1 | Whether `fail` captures the frames of the error it gives.
+src/rt/call.c | top | 1 | reflect.call, which reads the trampolines of a program. */
+src/rt/cast.c | includes | 3 | DESIGN: `p as *T` on a class pointer traps when the object is of no
+src/rt/check.c | includes | 3 | DESIGN: the compiler builds the text that names the file, the line and
+src/rt/conf.c | top | 1 | The runtime configuration.
+src/rt/conf.h | top | 1 | The runtime configuration: the keys of [runtime], the layer each value
+src/rt/conf_include.h | top | 1 | The bound and the message of the includes of a runtime configuration,
+src/rt/cpu.c | top | 1 | The processor check that runs once at start. antic writes the level a
+src/rt/cpu_level.h | top | 1 | The processor levels, shared by antic and the runtime.
+src/rt/digest.c | top | 1 | The SHA-256 of FIPS 180-4, for the runtime, antic and anti. */
+src/rt/digest.h | top | 1 | The SHA-256 of FIPS 180-4, fed in pieces.
+src/rt/errno.c | includes | 5 | DESIGN: errno is a macro that expands to a thread-local lvalue, so an
+src/rt/f16.c | includes | 3 | DESIGN: x86-64-v1 and v2 have no F16C. A program built for them
+src/rt/f16.h | top | 1 | The conversions between f16 and f32, shared by antic and the runtime.
+src/rt/fs.c | top | 1 | The C side of anti.fs: opening a file, its size, the listing of a
+src/rt/grow.h | top | 1 | The growth of a block of the C library, which the runtime and antic
+src/rt/hash.c | top | 1 | The hash of text and bytes, and the seed of the hashing collections.
+src/rt/hash.h | top | 1 | The hash of a value, shared by antic and the runtime.
+src/rt/hooks.c | includes | 9 | DESIGN: the one handler lives in an atomic word of the runtime and not
+src/rt/hooks.h | top | 1 | The nine hooks of anti.lang.Object and the one anti.lang.TraceHandler
+src/rt/init.c | includes | 4 | 1 once anti_rt_init ran. main, or the constructor of a shared
+src/rt/io.c | includes | 5 | DESIGN: anti.io writes through the C streams, so its output and the
+src/rt/json.c | top | 1 | The JSON scanner that Object.deserialize and anti bind share.
+src/rt/json.h | includes | 8 | A scanner of JSON text, at the level of tokens and positions. It knows
+src/rt/license.c | includes | 5 | The notice that antic links into every executable and shared library. */
+src/rt/license.h | top | 1 | The licence notice of every Anti binary, shared by antic, the runtime
+src/rt/license_stub.c | includes | 3 | The licence text in a static library for C. A bundled runtime carries
+src/rt/loaded.c | top | 1 | The libraries a program holds open, and the count of the objects of
+src/rt/lock.c | top | 1 | The lock of a Mutex, the hidden lock of a synchronized object and the
+src/rt/mem.c | top | 1 | The C side of anti.mem: memory from the C library at an alignment the
+src/rt/object.c | includes | 13 | DESIGN: the default bodies of anti.lang.Object walk the field list of the
+src/rt/object.h | top | 1 | The root class of the object model and the data behind reflection. The
+src/rt/patterns.c | top | 1 | The patterns of a program: the literals it compiles before main, and
+src/rt/platform.h | top | 1 | The platform layer of the runtime: what the rest of src/rt asks of the
+src/rt/platform_entry.c | top | 1 | The entry point of a Windows program. See platform.h.
+src/rt/platform_posix.c | top | 1 | The platform layer on macOS and Linux. See platform.h. */
+src/rt/platform_stdio.c | top | 1 | The printf and scanf families and atexit of a Windows target, which
+src/rt/platform_windows.c | top | 1 | The platform layer on Windows. See platform.h. */
+src/rt/plugin.c | top | 1 | Loading a shared library that provides interfaces.
+src/rt/plugin.h | top | 1 | Loading a shared library that `provides` interfaces: the table the
+src/rt/plugin_index.h | top | 1 | The name of the index of plugins, shared by antic, the runtime and
+src/rt/reflect.c | top | 1 | What anti.reflect reads. A descriptor is read-only data of the program,
+src/rt/reflect.h | includes | 9 | The kinds of anti.reflect.ValueKind, in its order. */
+src/rt/regex.c | includes | 7 | The 8-bit library, linked statically, as src/native/ builds it. */
+src/rt/regex.h | top | 1 | The compile of a pattern with PCRE2, which antic and the runtime share.
+src/rt/registry.c | top | 1 | reflect.new and Object.deserialize, which read the registry of the
+src/rt/registry.h | top | 1 | The registry of the classes of a program, which the link step writes,
+src/rt/rt.h | includes | 6 | The state of the runtime. An executable initialises it in main. A shared
+src/rt/signal.c | top | 1 | Operating system signals for anti.os. The platform layer routes a
+src/rt/signals.h | includes | 6 | The two signals a console sends, under the numbers C gives them. A
+src/rt/snapshot.c | top | 1 | The snapshots of `snapshot fn` that live on the heap, which an `own fn`
+src/rt/start.c | top | 1 | The C entry point of every Anti program. It converts the command-line
+src/rt/std.h | top | 1 | The C functions behind the modules anti.io, anti.text, anti.license,
+src/rt/symbols.c | includes | 5 | The form is `_A`, each segment of the module path as its length in
+src/rt/symbols.h | top | 1 | The readers of the symbol table and the line table that
+src/rt/sync.c | top | 1 | The channels of `chan T`. antic lowers each operation to one call here
+src/rt/sync.h | top | 1 | The calls of locking and channels that generated code makes: the
+src/rt/text.c | after-code at 11 | 29 | DESIGN: `s.to_bytes()` and `data.to_text()` copy, since a `[]byte` can
+src/rt/threads.c | top | 1 | The worker pool behind `parallel`. antic lowers the construct to one
+src/rt/threads.h | top | 1 | The calls of `parallel`, `dispatch` and `join` that generated code
+src/rt/toml.c | top | 1 | The TOML subset that anti.toml reads and the logger configures itself
+src/rt/toml.h | includes | 8 | A read of the TOML subset that anti.toml, the logger and the runtime
+src/rt/trace.c | top | 1 | The capture, the modules and the symbols of a stack trace.
+src/rt/trace.h | top | 1 | The runtime of anti.lang.StackTrace and of the frames that `fail`
+src/rt/utf.c | after-code at 3 | 27 | The length of the well-formed sequence that starts with byte b, and the
+src/rt/utf.h | top | 1 | Text conversions of the runtime entry, and the UTF-8 encoder and
+src/std/anti/args.anti | top | 1 | ! Command-line options declared once and read by name.
+src/std/anti/collection.anti | top | 1 | ! The interfaces of walking and the parts every collection shares.
+src/std/anti/collection/concurrent.anti | top | 1 | ! The collections that threads share without one lock around the whole.
+src/std/anti/collection/deque.anti | top | 1 | ! `Deque<T>`, a ring buffer that grows.
+src/std/anti/collection/grid.anti | top | 1 | ! `Grid<T>`, a two-dimensional array.
+src/std/anti/collection/list.anti | top | 1 | ! `List<T>`, a sequence in one contiguous buffer.
+src/std/anti/collection/map.anti | top | 1 | ! Maps from keys to values that find a key by its hash.
+src/std/anti/collection/pool.anti | top | 1 | ! Elements at fixed addresses, reached by handles.
+src/std/anti/collection/queue.anti | top | 1 | ! Ordered retrieval.
+src/std/anti/collection/ring.anti | top | 1 | ! `Ring<T, N>`, a ring buffer of fixed capacity for real-time code.
+src/std/anti/collection/set.anti | top | 1 | ! Sets that find an element by its hash, and a set of small numbers.
+src/std/anti/collection/sorted.anti | top | 1 | ! Sorted collections, which walk their elements in the order of their keys.
+src/std/anti/collection/synchronized.anti | top | 1 | ! The collections that threads share behind one lock each.
+src/std/anti/collection/tree.anti | top | 1 | ! A hierarchy of elements on handles.
+src/std/anti/config.anti | top | 1 | ! The settings of the program, as keys with text values.
+src/std/anti/debug.anti | top | 1 | ! Helpers for debugging a program at run time.
+src/std/anti/error.anti | top | 1 | ! The conveniences of the error convention.
+src/std/anti/fs.anti | top | 1 | ! Files and directories.
+src/std/anti/io.anti | top | 1 | ! Console output and the exit code of a program.
+src/std/anti/json.anti | top | 1 | ! The JSON that `serialize` writes and `deserialize` reads.
+src/std/anti/lang.anti | top | 1 | ! The root of the standard library, which imports nothing.
+src/std/anti/license.anti | top | 1 | ! The licence notice of the program.
+src/std/anti/log.anti | top | 1 | ! Logging through a level, a sink and a format.
+src/std/anti/mem.anti | top | 1 | ! Allocators, which a library or a class takes to make its memory.
+src/std/anti/os.anti | top | 1 | ! The operating system around the program.
+src/std/anti/plugin.anti | top | 1 | ! Shared libraries a program loads while it runs.
+src/std/anti/random.anti | top | 1 | ! A seedable source of pseudorandom numbers.
+src/std/anti/reflect.anti | top | 1 | ! What a program can read of its own classes at run time.
+src/std/anti/regex.anti | top | 1 | ! The failures of a pattern, and the compile of a pattern at run time.
+src/std/anti/runtime.anti | top | 1 | ! The runtime of the program, as far as a program reaches it.
+src/std/anti/simd.anti | top | 1 | ! The functions of masks, which take a simd struct of any type.
+src/std/anti/text.anti | top | 1 | ! Operations on `str` values.
+src/std/anti/time.anti | top | 1 | ! Clocks and durations.
+src/std/anti/toml.anti | top | 1 | ! Reading a subset of TOML.
+src/std/anti/trace.anti | top | 1 | ! The stock handlers of the nine hooks, and the `trace` key that names one.
+# after-code 22, guard 12, includes 107, none 3, top 155, 299 files
