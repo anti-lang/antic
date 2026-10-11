@@ -3,7 +3,7 @@ title: "Errors"
 description: "may fail, fail, try and handlers, how an error travels back, error origins and stack traces and their cost, never, assert and the dev checks."
 summary: "`may fail`, `fail`, `try` and the handlers, how an error travels back from `fail` to its handler, error origins and stack traces and their cost, `-> never`, `assert` and the checks of dev mode, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T08:10:24+02:00
+lastmod: 2026-10-11T20:13:40+02:00
 draft: true
 weight: 60
 tags: [compilers, programming-languages]
@@ -22,7 +22,7 @@ Java and C++ throw an exception, which leaves the function and every caller unti
 
 `may fail` after the result marks a function that can fail. Such a function leaves on one of two channels. `return v;` leaves with its result. `fail e;` leaves with an error, a `*Error`, and gives no result.
 
-`fail "text";` is `fail lang.Error.new(0, "text");`. `Error` is a class of `anti.lang`, and a file names it `lang.Error`. It holds a `code`, a `message`, the error that caused it and the position of its first `fail`. `Error.new(code, message)` makes one, and `Error.wrap(code, message, cause)` makes one that takes over the error below it. A program declares a class of its own that inherits `lang.Error` and adds fields, and a handler tests for it with `is`.
+`fail "text";` is `fail lang.Error.new(0, "text");`. `Error` is a class of `anti.lang`, and a file names it `lang.Error`. It holds a `code`, a `message`, the error that caused it and the position of its first `fail`. `Error.new(code, message)` makes one, and `Error.wrap(code, message, cause)` makes one that takes over the error below it. A program declares a class of its own that inherits `lang.Error` and adds fields, and a handler tests for it with `is`. Chapter 9 describes classes, inheritance and `is`.
 
 A call of a function that may fail is handled where it stands. The next section holds the forms: `try` forwards the error, and `catch` handles it. A call with neither is refused.
 
@@ -218,7 +218,7 @@ b5:
     ret ptr %8
 ```
 
-`half` has two parameters: `n` and the out pointer `%1`. `Error.new` allocates the error and returns its address. The next four lines load the line of its origin, `at.line`, and compare it with 0. An error that no `fail` has seen yet has line 0, and `b3` then writes the origin: it copies the constant location of this `fail` into the error. `b3` also asks the runtime whether backtraces are on, and `b4` captures one when they are. A later section describes both. `b5` is the failing exit, `ret ptr %8`: the function returns the address of the error and writes nothing through `%1`.
+`half` has two parameters: `n` and the out pointer `%1`. `Error.new` allocates the error and returns its address. The next four lines load the line of its origin, `at.line`, and compare it with 0. An error that no `fail` has seen yet has line 0. `b3` then writes the origin by copying the constant location of this `fail` into the error. `b3` also asks the runtime whether backtraces are on, and `b4` captures one when they are. A later section describes both. `b5` is the failing exit, `ret ptr %8`: the function returns the address of the error and writes nothing through `%1`.
 
 The successful exit of `half` stores the result through `%1` and returns null, `store i64 %N, %1` and `ret ptr 0`.
 
@@ -340,7 +340,7 @@ A call of a function that may fail takes one of these forms.
 
 A handler follows a `let`, an assignment or a call statement. It does not follow a call inside a larger expression. Where the call gives a result, the handler supplies one with `yield v;`, or leaves the block with `return`, `break`, `continue` or `fail`. A handler of a call without a result ends with `yield;` or at its brace.
 
-The error a handler binds is deleted at every exit of the handler. Two things take it away first: `fail e;`, which hands it to the caller, and passing it to an `own` parameter, as `Error.wrap` does with its cause. The name of the error ends with the handler.
+The error a handler binds is deleted at every exit of the handler. `fail e;` takes it away first by handing it to the caller. So does passing it to an `own` parameter, as `Error.wrap` does with its cause. The name of the error ends with the handler.
 
 A `try` block runs its statements until one fails. The rest of the block is skipped, its `defer` statements run, and the handler runs. A call inside the block needs no mark of its own.
 
@@ -564,7 +564,7 @@ xorl %eax, %eax
 addq $0x18, %rsp
 ```
 
-This is `twice`. `leaq -0x28(%rbp), %rsi` is the out pointer, the address of the slot of `h`. After the call `rax` holds the error or null. `testq` and `jne` are the `try`: both jump to the one exit of the function at `0x44`, the `addq`, with the error still in `rax`. The path without an error loads `h` from its slot, calls again, stores the final result through the out pointer of `twice` in `rbx` and clears `rax` to return null.
+This is `twice`. `leaq -0x28(%rbp), %rsi` is the out pointer, the address of the slot of `h`. After the call `rax` holds the error or null. `testq` and `jne` are the `try`: both jump to the one exit of the function at `0x44`, the `addq`, with the error still in `rax`. The path without an error loads `h` from its slot and calls again. It stores the final result through the out pointer of `twice` in `rbx` and clears `rax` to return null.
 
 ```asm excerpt=thr target=linux-x86_64 mode=release
 callq *%rcx
@@ -580,7 +580,7 @@ callq 0x41 <guarded+0x41>
 movq -0x10(%rbp), %rax
 ```
 
-This is `guarded`. `je` skips the handler when no error came back. The handler keeps the error in `rbx`, calls `note`, stores -1 into the slot of `v` and calls `anti_rt_delete` with the error and the address of the descriptor of `Error`. The linker fills in the targets of the two direct calls. The last line, which both paths reach, loads `v`.
+This is `guarded`. `je` skips the handler when no error came back. The handler keeps the error in `rbx`, calls `note` and stores -1 into the slot of `v`. It then calls `anti_rt_delete` with the error and the address of the descriptor of `Error`. The linker fills in the targets of the two direct calls. The last line, which both paths reach, loads `v`.
 
 On arm64 the test is one instruction, `cbnz` or `cbz` on `x0`.
 
@@ -629,15 +629,15 @@ A Java exception captures its stack trace when it is constructed, in every build
 
 ### The feature
 
-Every error carries its origin. The first `fail` that gives an error writes the position of that `fail` into the field `at`, a `SourceLocation` with the file, the line, the column, the function and the module. A later `fail` of the same error, such as `fail e;` in a handler, leaves the origin as it is.
+Every error carries its origin. The first `fail` that gives an error writes the position of that `fail` into the field `at`. The field is a `SourceLocation` with the file, the line, the column, the function and the module. A later `fail` of the same error, such as `fail e;` in a handler, leaves the origin as it is.
 
 `e.text()` gives the error as text: `file:line:column: error N: message`, or the message alone after the position when the code is 0. Each cause follows on a line of its own after `caused by:`. `e.print()` writes that text to the standard error.
 
-An error may also carry a stack trace, the return addresses of the calls that led to the `fail`. The trace is captured at the first `fail`, together with the origin, when backtraces are on. They are on in a dev build and off in a release build. A release program turns them on with the option `--anti.backtrace` on its command line or with `backtrace = true` in its runtime configuration, without being built again.
+An error may also carry a stack trace, the return addresses of the calls that led to the `fail`. The trace is captured at the first `fail`, together with the origin, when backtraces are on. They are on in a dev build and off in a release build. A release program turns them on with the option `--anti.backtrace` on its command line or with `backtrace = true` in its runtime configuration, without being built again. Chapter 15 describes the runtime configuration.
 
 A trace holds raw frames: an address, and the module it lies in with its build id and its base address. `e.text()` appends them after the causes in that raw form, which `anti symbols resolve` of chapter 18 turns into names and lines from the symbols archive of a release.
 
-`lang.StackTrace.capture()` takes a trace anywhere, in any build. Its `frames` are the raw frames, `text()` gives the raw form, and `symbolize()` reads the name of the function of each frame from the symbol table of the program, and the file and the line in a build with `-g`.
+`lang.StackTrace.capture()` takes a trace anywhere, in any build. Its `frames` are the raw frames, and `text()` gives the raw form. `symbolize()` reads the name of the function of each frame from the symbol table of the program. In a build with `-g` it reads the file and the line as well.
 
 ```anti
 //! name: origin
@@ -702,14 +702,14 @@ A `module` line gives a number, the build id, the base address and the path. A f
 
 ### How antic builds it
 
-The origin is written by the code after each `fail`, which the first section shows: a load of `at.line`, a compare with 0 and, for a new error, a copy of a constant `SourceLocation` of 64 bytes. That constant is the same kind of record as a `here` of chapter 5. An error that already has a line skips the copy and the rest.
+The code after each `fail` writes the origin, as the first section shows. It is a load of `at.line`, a compare with 0 and, for a new error, a copy of a constant `SourceLocation` of 64 bytes. That constant is the same kind of record as a `here` of chapter 5. An error that already has a line skips the copy and the rest.
 
 Whether a trace follows is decided at run time by `anti_rt_backtrace_on`. It reads the option `backtrace` with one atomic load. When the option is unset it reads the constant `anti_rt_backtrace_default`. The whole-program pass writes it into every program that can fail: 1 in a dev build, 0 in a release build. A library is therefore compiled once and serves both.
 
 The capture is `StackTrace.capture`, a function of `anti.lang`.
 
 - It reserves 64 addresses, 512 bytes, in its frame.
-- It calls `anti_rt_trace_walk`, which fills them with return addresses. On Linux and macOS the walk follows the chain of frame records from its own frame. antic keeps a frame record in every function that calls another, in both modes, so the walk needs no unwind tables. On Windows it unwinds through the unwind data of each function.
+- It calls `anti_rt_trace_walk`, which fills them with return addresses. On Linux and macOS the walk follows the chain of frame records from its own frame. Every function that calls another keeps a frame record, in both modes, so the walk needs no unwind tables. On Windows it unwinds through the unwind data of each function.
 - It allocates the `StackTrace`, 40 bytes, and an array of one `RawFrame` of 48 bytes per frame.
 - It calls `anti_rt_trace_frame` once per frame, which finds the module of the address, its base and its build id.
 
@@ -873,7 +873,7 @@ define hidden void @nev.stop(i64 %p0.0, i64 %p0.1) noreturn cold #0 {
 declare void @exit(i32 noundef) noreturn cold #1
 ```
 
-The LLVM module marks the function and the declaration `noreturn cold`. `noreturn` lets `opt` drop everything after the call. `cold` tells it that the path is rare: the block is moved out of the hot code, and the branch that leads to it is predicted not taken.
+The LLVM module marks the function and the declaration `noreturn cold`. `noreturn` lets `opt` drop everything after the call. `cold` tells it that the path is rare. The block is moved out of the hot code, and the branch that leads to it is predicted not taken.
 
 The runtime functions behind the checks, `anti_rt_check_failed` and `anti_rt_assert_failed`, carry the same two attributes.
 
