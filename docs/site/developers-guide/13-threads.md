@@ -414,6 +414,7 @@ For a C++ programmer:
 
 - The checker follows the parameters of a worker and stops at the object. A pointer in a field of the object passes, and two objects that share one target race.
 - A job that is never joined leaks its block and its result. Nothing detaches.
+- On a machine of one processor the pool has no thread, and a job runs when it is joined. A program that waits for a `send` of a job before it joins the job waits for ever there.
 - A worker cannot fail and cannot return an error. It writes its outcome into the object.
 
 ## parallel
