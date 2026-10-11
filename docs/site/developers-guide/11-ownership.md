@@ -3,7 +3,7 @@ title: "Ownership"
 description: "own, lent, dup, moves, teardown, temporaries, the rules at a call, Shared<T> and its counts, and what the checker refuses and why."
 summary: "`own` and `lent`, `dup` and moves, teardown and temporaries, the rules at a call, `Shared<T>` of `anti.mem` with its atomic count, and what the checker refuses and why, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T08:10:24+02:00
+lastmod: 2026-10-11T20:15:56+02:00
 draft: true
 weight: 110
 tags: [compilers, programming-languages]
@@ -390,8 +390,8 @@ A value **owns something** when its teardown has work to do. That holds for a cl
 A value that owns nothing is copied by `=` and `let`, byte for byte. A value that owns something has three operations.
 
 - `=` and `let` refuse to copy an existing one: a local, a field, an element or `*p`. The bytes would give its memory two owners.
-- A fresh value moves. A literal, a call result and the result of `dup` have no other owner, so `let`, `=`, `return` and an argument take them without a copy of what they own.
-- `dup` copies. `dup(x)` of a value gives a value, and `dup(p)` of a pointer to a class gives a new object on the heap and a pointer to it. Each `own` field of the copy gets memory of its own, and a class value held inline copies itself the same way. Other pointer fields copy the address. `dup` of a value that owns nothing gives its bytes.
+- A fresh value moves. A literal, a call result and the result of `dup` have no other owner. A `let`, an `=`, a `return` and an argument therefore take them without a copy of what they own.
+- `dup` copies. `dup(x)` of a value gives a value. For a pointer to a class, `dup(p)` gives a new object on the heap and a pointer to it. Each `own` field of the copy gets memory of its own, and a class value held inline copies itself the same way. Other pointer fields copy the address. `dup` of a value that owns nothing gives its bytes.
 
 A local moves in four places. It moves as an argument of an `own` parameter and as a part of a tuple, struct, class or variant literal. It moves by `return` and by `destroy(&x)`. After a move the name is dead. The checker refuses every mention that follows the move in the text, an assignment to the name included.
 
@@ -403,7 +403,7 @@ The order of the text is the order of execution except in three cases, and the c
 
 A move on one path of an `if` is accepted. The local is then dead after the `if` on both paths. The code tears it down at the end of its block only when it did not move.
 
-What moves at an `own` parameter follows the type. A value that owns something moves, and so does a value that holds a pointer, such as a `*T`, a slice or a struct with a pointer field. An `int`, a `str` and a struct of numbers are copied, and the caller keeps its local. A value that stays where it is, a field or an element, does not move, and the checker asks for `dup`.
+What moves at an `own` parameter follows the type. A value that owns something moves. So does a value that holds a pointer, such as a `*T`, a slice or a struct with a pointer field. An `int`, a `str` and a struct of numbers are copied, and the caller keeps its local. A value that stays where it is, a field or an element, does not move, and the checker asks for `dup`.
 
 `*dup(p)` and `*alloc T { }` are refused. The dereference would drop the only pointer to a new object, and nothing could free it.
 
@@ -1310,7 +1310,7 @@ The word before a parameter says who owns the argument after the call. No word m
 | `own b: Box` | the value itself, by a move | the function, at every exit | everything a local allows: bind it, store it, return it, pass it on |
 | `own p: *Box` | the address, and the caller's name is dead | no one by itself | everything, and `delete(p)` is the function's to write |
 
-A parameter without `own` **belongs to the caller**. Where its value owns something, the function gets the bytes, and the ownership stays with the caller. The checker refuses every way that would give the value a second owner: `let`, `=`, a tuple, struct, class or variant literal, an `own` argument and `return`. The message names the two fixes, `own` on the parameter and `dup(b)`. In generic code the same holds for a parameter whose type is a type parameter, since the `T` of a copy may own something.
+A parameter without `own` **belongs to the caller**. Where its value owns something, the function gets the bytes, and the ownership stays with the caller. The checker refuses every way that would give the value a second owner. Those are `let`, `=`, a tuple, struct, class or variant literal, an `own` argument and `return`. The message names the two fixes, `own` on the parameter and `dup(b)`. In generic code the same holds for a parameter whose type is a type parameter, since the `T` of a copy may own something.
 
 A write to a field of such a parameter changes the bytes the function received. The caller's value keeps its field. What the value owns is shared for the length of the call, so a write through an `own` pointer of the parameter reaches the caller's memory.
 
