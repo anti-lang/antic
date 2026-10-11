@@ -12,6 +12,9 @@
 #   LLC       optional llc executable
 #   OPTIONS   optional options of antic, separated by commas, such as
 #             --backend,native for an antic that still has that option
+#   RELEASE_OPTIONS  optional options of antic for the release build
+#             alone, separated by commas, such as --profile-use,<file>,
+#             which dev mode refuses
 #   RUNS      optional number of runs of each executable, 5 by default
 #   BUILDS    optional number of builds of each program, 3 by default
 #   OUTPUT    optional file that receives the table as well
@@ -38,6 +41,7 @@ if(NOT DEFINED BUILDS)
     set(BUILDS 3)
 endif()
 string(REPLACE "," ";" options "${OPTIONS}")
+string(REPLACE "," ";" release_options "${RELEASE_OPTIONS}")
 set(tools "")
 if(DEFINED OPT AND NOT OPT STREQUAL "")
     list(APPEND tools --opt "${OPT}")
@@ -99,8 +103,8 @@ foreach(name IN LISTS programs)
     set(release_times "")
     set(dev_times "")
     foreach(build RANGE 1 ${BUILDS})
-        timed(took "${ANTIC}" ${options} ${tools} --runtime "${RUNTIME}"
-            -o "${WORK}/release/${name}" "${source}")
+        timed(took "${ANTIC}" ${options} ${release_options} ${tools}
+            --runtime "${RUNTIME}" -o "${WORK}/release/${name}" "${source}")
         list(APPEND release_times ${took})
         timed(took "${ANTIC}" --dev ${options} ${tools} --runtime "${RUNTIME}"
             -I "${RUNTIME}/std" -o "${WORK}/dev/${name}" "${source}"
