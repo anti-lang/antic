@@ -3,7 +3,7 @@ title: "Memory"
 description: "Pointers, slices and views, the aliasing of views, the bounds checks, anti.mem, the allocator, alloc and free, and --memory-checks."
 summary: "Pointers, slices and views with their aliasing, the bounds checks of dev mode, `anti.mem` and the allocator, `alloc` and `free`, and `--memory-checks`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T08:10:24+02:00
+lastmod: 2026-10-11T20:16:12+02:00
 draft: true
 weight: 120
 tags: [compilers, programming-languages]
@@ -836,12 +836,12 @@ C has one allocator, `malloc` and `free`, and a program that wants another passe
 | `alloc(size, align) -> ?*byte` | `size` bytes at an address that is a multiple of `align`, a power of two. A negative `size`, an `align` that is no power of two and memory that has run out give `none`. A `size` of zero gives an address that `free` takes |
 | `free(p)` | gives back memory that `alloc` of the same allocator gave. `none` does nothing |
 
-The standard library ships two allocators, and a program writes its own by inheriting `Allocator`.
+`anti.mem` holds two allocators, and a program writes its own by inheriting `Allocator`.
 
 - `LibcAllocator` is the allocator over the C library. It is a singleton, `mem.LibcAllocator.get()`, and the default provider of the interface, `mem.Allocator.default()`.
 - `ArenaAllocator.new(from, block)` hands out memory from blocks that it takes from the allocator `from`. Each block holds `block` bytes, or one larger request alone. A request at an alignment above 16 takes a block of its own. `free` of one allocation gives nothing back. `free_all()` gives back every block at once, and `destruct` gives back what is left.
 
-Memory goes back to the allocator that gave it. Memory of `LibcAllocator` goes back through its `free` and never through `free` of the language, since Windows gives aligned memory back with a function of its own.
+Memory goes back to the allocator that gave it. Memory of `LibcAllocator` goes back through its `free` and never through `free` of the language. Windows gives aligned memory back with a function of its own.
 
 The memory an allocator gives is raw bytes, a `?*byte`. The program views it as the type it stores there, `raw as *Point`. The memory is not zeroed. An assignment of a class value into it reads the table of the value it replaces. Memory that will hold a class value is therefore zeroed first.
 
@@ -1060,7 +1060,7 @@ fn end(c: chan int)
 
 ### How antic builds it
 
-An allocator is an object, and `from.alloc(size, align)` is a dispatch through its table. `alloc` and `free` are the first two functions of `Allocator`, so they take the entries 17 and 18, after the descriptor, the seven functions of the root and the nine hooks.
+An allocator is an object, and `from.alloc(size, align)` is a dispatch through its table. The functions `alloc` and `free` are the first two of `Allocator`. They take the entries 17 and 18, after the descriptor, the seven functions of the root and the nine hooks.
 
 ```ir excerpt=pools target=linux-x86_64 mode=dev
     %3 = load ptr %0 !table
