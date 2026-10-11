@@ -324,8 +324,10 @@ The program of `dist/` carries no symbol data. `hello-symbols.zip` holds `hello.
 
 | Program | Bytes |
 |---|---:|
-| `dist/macos-arm64/dev/hello` | 119,760 |
+| `dist/macos-arm64/dev/hello` | 119,776 |
 | `dist/macos-arm64/release/hello` | 90,208 |
+
+The symbol table of a dev program for macOS names each of its objects by the absolute path of the file. The size of the dev program therefore changes with the directory of the project: the same build under a directory name 43 characters longer is 120,016 bytes. The release program holds no such path.
 
 ### Targets and libraries
 
