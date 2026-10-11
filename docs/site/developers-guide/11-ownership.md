@@ -3,7 +3,7 @@ title: "Ownership"
 description: "own, lent, dup, moves, teardown, temporaries, the rules at a call, Shared<T> and its counts, and what the checker refuses and why."
 summary: "`own` and `lent`, `dup` and moves, teardown and temporaries, the rules at a call, `Shared<T>` of `anti.mem` with its atomic count, and what the checker refuses and why, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:15:56+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 110
 tags: [compilers, programming-languages]
@@ -329,7 +329,7 @@ b0:
 ```
 
 - `%p0` is the object. `%p1` is the allocator that the memory goes back to, and null stands for the C library.
-- `anti_rt_hook(%p0, 1)` is the `destroyed` hook of chapter 15.
+- `anti_rt_hook(%p0, 1)` is the `destroyed` hook of [chapter 15]({{% relref "15-hooks" %}}).
 - The `atomicrmw sub` is the body of `destruct`, which the release build inlined. The `destruct` of every class of the chain runs before any field goes, so a body still reads what the object owns.
 - The fields go last to first. `shadow` stands at offset 24. `anti_rt_delete_from` tears down the object behind it through that object's own table and frees it. A pointer that holds `none` does nothing there.
 - `pixels` stands at offset 8, and the load reads the address of its buffer. `anti_rt_give` frees the buffer: with a null allocator it calls `free`.
@@ -841,7 +841,7 @@ b0:
 - The two `getelementptr` lines give the address of `data` at offset 8 in the source and in the copy.
 - `anti_rt_copy_buffer(%v7, 8)` allocates 8 bytes with `malloc` and copies the `int` into them.
 - The `store` puts the new address into the copy, which now owns a cell of its own.
-- `anti_rt_hook_copied`, in the lines before, is the `copied` hook of chapter 15.
+- `anti_rt_hook_copied`, in the lines before, is the `copied` hook of [chapter 15]({{% relref "15-hooks" %}}).
 
 `dup(p)` of a pointer is one call, `anti_rt_dup(p, descriptor)`. The runtime reads the size of the object from its descriptor, allocates it and calls the copy function through the table. A pointer to a base class therefore copies the whole derived object.
 
@@ -1268,7 +1268,7 @@ The lowering is the same in dev and in release, and both keep the test for a zer
 | Atomic operations | two loads in each `anti_rt_hook` |
 | Heap allocations, locks | 0 |
 
-A value that owns nothing has no teardown, and its block emits no code for it. `--no-hooks` drops the call of `anti_rt_hook`, with the hooks of chapter 15.
+A value that owns nothing has no teardown, and its block emits no code for it. `--no-hooks` drops the call of `anti_rt_hook`, with the hooks of [chapter 15]({{% relref "15-hooks" %}}).
 
 `early` has two exits and two locals, and its body holds three calls of `teardown.Res.destroy`. A function with many exits and many owning locals grows by that product.
 
@@ -1289,7 +1289,7 @@ For a C++ programmer:
 
 - An argument temporary dies right after its call, before the rest of the full expression runs. A pointer that the call returned into what the temporary owns dangles in the same statement.
 - A value read through a field or used as the object of a call lives to the end of the statement, as in C++.
-- A constructor that fails runs no `destruct`, as chapter 9 shows.
+- A constructor that fails runs no `destruct`, as [chapter 9]({{% relref "09-classes" %}}) shows.
 - `delete` of a pointer to a struct is refused. `destroy(p)` and `free(p)` are the two steps.
 
 ## The rules at a call
@@ -1325,7 +1325,7 @@ An `own` parameter takes the argument over.
 
 The object of a call, `self`, is a pointer to the object. A function of a class reads and changes the object in place and takes no ownership of it.
 
-`keep` belongs to parameters of function type. A function may store such a parameter only when it is marked `keep`, and `keep own` takes a `snapshot fn` with its memory. Chapter 5 holds both.
+`keep` belongs to parameters of function type. A function may store such a parameter only when it is marked `keep`, and `keep own` takes a `snapshot fn` with its memory. [Chapter 5]({{% relref "05-functions" %}}) holds both.
 
 ```anti
 //! name: calls
@@ -1659,7 +1659,7 @@ A handle is a class value that owns something. Every rule of the chapter holds f
 
 No pointer to the object leaves a handle. `read` and `modify` lend it for one call, so the pointer cannot be stored. The two functions differ in name alone, and both lend a pointer that may change the object.
 
-The count is atomic. The handles of one object may be made, used and torn down on more than one thread at once. The object itself is not locked: `T` must be a thread-safe type of chapter 14 for more than one thread to change it.
+The count is atomic. The handles of one object may be made, used and torn down on more than one thread at once. The object itself is not locked: `T` must be a thread-safe type of [chapter 14]({{% relref "14-concurrent-classes" %}}) for more than one thread to change it.
 
 Two objects that each hold a handle of the other are never freed. Each keeps the count of the other at 1 or above. The fix is a plain pointer for one of the two links.
 
@@ -1898,9 +1898,9 @@ stlxr w10, x9, [x8]
 cbnz w10, 0x14 <anti.mem.Shared$3cshared.Circle$3e.destruct+0x14>
 ```
 
-`ldaxr` loads the count and marks the address, `stlxr` stores the new count if no other thread wrote in between, and `cbnz` tries again otherwise. Chapter 20 holds the levels at which arm64 has the one instruction.
+`ldaxr` loads the count and marks the address, `stlxr` stores the new count if no other thread wrote in between, and `cbnz` tries again otherwise. [Chapter 20]({{% relref "20-targets" %}}) holds the levels at which arm64 has the one instruction.
 
-Where it lives: `Shared` and `Cell` of `src/std/anti/mem.anti`. The atomic operations of a field are in chapter 13.
+Where it lives: `Shared` and `Cell` of `src/std/anti/mem.anti`. The atomic operations of a field are in [chapter 13]({{% relref "13-threads" %}}).
 
 ### What it costs
 
@@ -1919,7 +1919,7 @@ The costs are the same in dev and in release.
 | The teardown of the last handle | one `anti_rt_delete` on top: the teardown of the value and one `free` |
 | Atomic loads inside the hooks | two in each `anti_rt_hook`, one in `anti_rt_hook_copied` |
 | Locks | 0 |
-| Copies of code | one copy of `Shared<T>` and of `Cell<T>` per type argument, as chapter 10 counts |
+| Copies of code | one copy of `Shared<T>` and of `Cell<T>` per type argument, as [chapter 10]({{% relref "10-generics" %}}) counts |
 
 A plain pointer and an `own` field cost none of this. A program pays for the count where it writes `Shared`, and nowhere else.
 

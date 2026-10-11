@@ -3,7 +3,7 @@ title: "Classes"
 description: "Classes and the object in memory, construct and destruct, fields and methods, dispatch through interfaces, static fields, singletons, operators and reflection."
 summary: "Classes and the object in memory, `construct` and `destruct`, fields and methods, interfaces as inline sub-objects with thunks and the dispatch through them, static fields and singletons, operators, and reflection over the descriptors, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:15:17+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 90
 tags: [compilers, programming-languages]
@@ -248,7 +248,7 @@ b2:
 - The three `type` lines are the whole layout: the table pointer, then the fields of each class down the chain.
 - `alloc Circle { r: r }` is a call of `malloc` with the size of the class. A null result ends the program in `anti_rt_out_of_memory`, which is why `alloc` gives a `*Circle` and no `?*Circle`.
 - `store ptr %3, %1 !table` writes the address of the table of `Circle` into the first 8 bytes. That store is what makes the memory an object.
-- The stores that follow write the named field and then every default of the chain. The last instruction of the function, not shown, is `call void @anti_rt_hook(%1, 0)`, the `created` hook of chapter 15.
+- The stores that follow write the named field and then every default of the chain. The last instruction of the function, not shown, is `call void @anti_rt_hook(%1, 0)`, the `created` hook of [chapter 15]({{% relref "15-hooks" %}}).
 
 The table is one read-only global per class. Its entries are pointers.
 
@@ -266,7 +266,7 @@ The last line is cut from the global `@anti_Circle_vtable`, which holds 19 point
 
 - Entry 0 points at the descriptor of the class, which the section on reflection describes.
 - Entries 1 to 7 are the seven functions of `Object`. `equals`, `hash`, `destroy` and `copy` are functions the compiler writes for each class. `type_name`, `to_text` and `serialize` are the root's, in the runtime.
-- Entries 8 to 16 are the nine hooks of chapter 15, and the first is `created`.
+- Entries 8 to 16 are the nine hooks of [chapter 15]({{% relref "15-hooks" %}}), and the first is `created`.
 - Entries 17 and 18, at the end of the line, are `Circle_area` and `Shape_move`, the `pub` functions of the chain in the order of their declaration.
 
 `%s0` is the local `c`, 40 bytes in the frame of `main`. A class value is its bytes, with no header before them and no allocation, and the literal stores the same table pointer into it. A class that is not exported names its table `objects.Dot.table`. An exported one has the name its C header declares.
@@ -317,7 +317,7 @@ Where it lives: `lower_class_record` and `table_of` of `src/antic/lower_desc.c` 
 | Locks | 0 | 0 |
 | Checks inserted | the zero table before `is`, `as` and a dispatch | none of those, the check of `as` stays |
 
-The call of `anti_rt_hook` runs once per object made and once per teardown. `--no-hooks` drops it, with the hooks and the leak tracking of chapter 15.
+The call of `anti_rt_hook` runs once per object made and once per teardown. `--no-hooks` drops it, with the hooks and the leak tracking of [chapter 15]({{% relref "15-hooks" %}}).
 
 ### Pitfalls
 
@@ -361,7 +361,7 @@ A constructor of C++ runs the constructors of the bases and members first. A des
 
 1. the `destroyed` hook,
 2. `destruct` of the class, then of each base up the chain,
-3. the `own` fields of chapter 11 and the inline class fields, each with its own teardown,
+3. the `own` fields of [chapter 11]({{% relref "11-ownership" %}}) and the inline class fields, each with its own teardown,
 4. the memory of the object.
 
 `destroy(&v)` does the first three for a value. A local of a class whose chain declares `destruct` or owns something is torn down at the end of its block, on every exit. `destruct` does not run on an object whose `construct` failed.
@@ -490,7 +490,7 @@ construct Base
 failed: a name is not empty
 ```
 
-The third run constructs `Base`, fails in `Named` and runs no `destruct` at all, neither that of `Named` nor that of `Base`. Whatever a `construct` acquired before its `fail` is released by an `undo` of chapter 4.
+The third run constructs `Base`, fails in `Named` and runs no `destruct` at all, neither that of `Named` nor that of `Base`. Whatever a `construct` acquired before its `fail` is released by an `undo` of [chapter 4]({{% relref "04-flow" %}}).
 
 The checker refuses each of the following.
 
@@ -692,7 +692,7 @@ A function of a class body takes `self`, a `*Class`, as its first parameter. A f
 - `self.super.f(args)` calls the body of the base, directly.
 - `let f = c.scaled;` is a bound function, two words, the object and the entry. `f()` calls it.
 
-A field takes a default, `pub r: f32 = 1.0`, a constant expression that every literal applies when it omits the field. A field may be a bitfield. `own`, `atomic` and `transient` are markers of chapters 11 and 13.
+A field takes a default, `pub r: f32 = 1.0`, a constant expression that every literal applies when it omits the field. A field may be a bitfield. `own`, `atomic` and `transient` are markers of chapters [11]({{% relref "11-ownership" %}}) and [13]({{% relref "13-threads" %}}).
 
 `v.f(args)` looks in the class, then up its chain, then in its `use` fields, then in the module. `use part: T,` is a field whose `pub` members are reachable on the class, so `car.start()` is `car.engine.start()`. The class does not convert to `*T`.
 
@@ -1345,7 +1345,7 @@ An atomic field has no `=` and no `+=`, and it is not read by its name alone. It
 | `add(v)`, `sub(v)`, `and(v)`, `or(v)`, `swap(v)` | the value the field held before |
 | `compare_swap(expected, new)` | `true` when the field held `expected` and now holds `new` |
 
-`atomic` also marks an instance field and a local, which chapter 13 covers.
+`atomic` also marks an instance field and a local, which [chapter 13]({{% relref "13-threads" %}}) covers.
 
 `singleton class Config { }` declares a class with one instance. `Config.get()` gives a pointer to it and creates it at the first call, from the defaults and from `construct` when the class declares one without arguments.
 
@@ -1603,7 +1603,7 @@ Only the type of the left operand is looked up. `a + b` is `a.add(b)`, and the f
 
 For a class the function stands in the class body, with `self` as the left operand. For a struct it is a free function of the module that declares the struct, with the struct as its first parameter. Two such functions may share a name when their first parameters differ in type.
 
-The same word declares the language hooks `iter`, `next`, `value`, `index`, `set_index` and `hash`, which chapter 16 covers.
+The same word declares the language hooks `iter`, `next`, `value`, `index`, `set_index` and `hash`, which [chapter 16]({{% relref "16-collections" %}}) covers.
 
 A class or a struct without `operator fn eq` has a default `==` that compares the fields in order. A class without `concrete fn hash` has a default hash over the same fields. Neither has a default `<`, so a type that a constraint asks to be ordered declares `lt`. `==` on two class pointers stays the identity of the objects and calls nothing.
 
@@ -1895,7 +1895,7 @@ Every class has a descriptor: its name, its base, its size, its fields and its `
 
 A `Value` holds a kind and one of an `int`, a `uint`, an `f64`, a `bool`, a `char`, a `str` or a pointer. `of_int`, `of_float` and their siblings build one, and `v.data.f` reads the float of one.
 
-`set` and `call` follow the error convention of chapter 6. They fail with the code `BAD_INDEX`, `NOT_CARRIED` for a type no `Value` carries, `WRONG_KIND` or `WRONG_COUNT`.
+`set` and `call` follow the error convention of [chapter 6]({{% relref "06-errors" %}}). They fail with the code `BAD_INDEX`, `NOT_CARRIED` for a type no `Value` carries, `WRONG_KIND` or `WRONG_COUNT`.
 
 The functions of the root work over the same descriptor. `obj.serialize(&builder)` writes an object as JSON with its class in the member `type`, and `Object.deserialize(text, from)` builds the object back, with its memory from the allocator `from`. A field that the text cannot carry, such as a bitfield or a union, is written as `null` and keeps its default on the way back.
 
@@ -2036,7 +2036,7 @@ type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i6
 type anti.rt.Function = struct { name: ptr, name_length: i64, slot: i64, param_count: i64, signature: ptr }
 ```
 
-- A descriptor has 17 words, 136 bytes. `depth` and `ancestors` serve `is` and `as`. `offset` is the distance from an interface part to its object. `version` and `versions` serve the plugin loader of chapter 15.
+- A descriptor has 17 words, 136 bytes. `depth` and `ancestors` serve `is` and `as`. `offset` is the distance from an interface part to its object. `version` and `versions` serve the plugin loader of [chapter 15]({{% relref "15-hooks" %}}).
 - A field record has 6 words, 48 bytes: the name, the offset, a type id and the `own` mark. For an inline struct or class it also holds the descriptor of that type.
 - A function record has 5 words, 40 bytes: the name, the slot in the table, the count of parameters and the text of the signature.
 

@@ -3,7 +3,7 @@ title: "Flow"
 description: "if and while, for over ranges and collections, switch on values and what each compiles to, break and continue, defer and undo."
 summary: "`if` and `while`, `for` over a range and over a collection, `switch` on an integer, a `str` and a variant with what each compiles to, `break` and `continue`, `defer` and `undo`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:19:28+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 40
 tags: [compilers, programming-languages]
@@ -12,7 +12,7 @@ keywords: [control flow, if, while, for loop, switch, break, continue, defer, un
 
 A statement of this chapter becomes basic blocks and branches in the IR of antic, and nothing else. No statement here allocates or takes a lock. A `for` over a collection calls its iterator, and a `switch` on a `str` calls `anti.text.equal`. A dev build calls the runtime when a check fails.
 
-An excerpt marked `ir` shows the IR of antic after lowering, which `antic --dump-ir` prints and chapter 2 explains. A block is `b0`, `b1` and on, `branch %c, b1, b2` goes to `b1` when `%c` is true, and `jump` goes unconditionally. Lowering writes the checks of dev mode into the IR in both modes, and a release build drops their blocks afterwards.
+An excerpt marked `ir` shows the IR of antic after lowering, which `antic --dump-ir` prints and [chapter 2]({{% relref "02-how-antic-works" %}}) explains. A block is `b0`, `b1` and on, `branch %c, b1, b2` goes to `b1` when `%c` is true, and `jump` goes unconditionally. Lowering writes the checks of dev mode into the IR in both modes, and a release build drops their blocks afterwards.
 
 ## if and while
 
@@ -100,7 +100,7 @@ digits 1 4
 length 12 0
 ```
 
-A condition that compares a local or a parameter with `none` narrows that name. In `length` the parameter `p` has type `?*int`. Right of `p != none &&` and inside the block it has type `*int`, so `*p` compiles. A test `p == none` whose block leaves narrows `p` for the rest of the enclosing block. `&&` narrows what follows it, and `||` narrows nothing inside the block, since either side may have been the true one. An assignment to the name ends the narrowing. A field is never narrowed, because any call may write it. Chapter 7 holds the full rule, with `if let` and `let ... else`, which bind the checked value to a new name.
+A condition that compares a local or a parameter with `none` narrows that name. In `length` the parameter `p` has type `?*int`. Right of `p != none &&` and inside the block it has type `*int`, so `*p` compiles. A test `p == none` whose block leaves narrows `p` for the rest of the enclosing block. `&&` narrows what follows it, and `||` narrows nothing inside the block, since either side may have been the true one. An assignment to the name ends the narrowing. A field is never narrowed, because any call may write it. [Chapter 7]({{% relref "07-optionals" %}}) holds the full rule, with `if let` and `let ... else`, which bind the checked value to a new name.
 
 A function with a result ends every path in a `return`. The checker reads the form of the last statement alone. An `if` whose every branch leaves, with an `else`, counts. A `while true do { }` does not, so a `return` follows it.
 
@@ -200,7 +200,7 @@ b6:
 }
 ```
 
-`b1` is the test of the `while`. It holds the left operand of `&&`, `n > 1`, and leaves to `b3` when that is false. `b4` holds the right operand and runs only when the left one was true. `b6` is the body, which shifts, assigns `n` and jumps back to the test. `b3` is the exit, which both operands reach. The left-out blocks check the shift count, which chapter 3 describes.
+`b1` is the test of the `while`. It holds the left operand of `&&`, `n > 1`, and leaves to `b3` when that is false. `b4` holds the right operand and runs only when the left one was true. `b6` is the body, which shifts, assigns `n` and jumps back to the test. `b3` is the exit, which both operands reach. The left-out blocks check the shift count, which [chapter 3]({{% relref "03-values" %}}) describes.
 
 A dev build writes this IR into the LLVM module one instruction at a time and runs no optimizer. Every local and every temporary is a slot of the frame.
 
@@ -277,7 +277,7 @@ Where it lives: `if_statement` and `statement` of `src/antic/parser_stmt.c` pars
 | Locks and atomic operations | 0 | 0 |
 | Checks inserted | none | none |
 
-An `if` or a loop inserts no check of its own. The checks inside `odd_part` and `digits` belong to `>>`, `/` and `+=`, and chapter 3 gives their cost.
+An `if` or a loop inserts no check of its own. The checks inside `odd_part` and `digits` belong to `>>`, `/` and `+=`, and [chapter 3]({{% relref "03-values" %}}) gives their cost.
 
 ### Pitfalls
 
@@ -297,7 +297,7 @@ For a C programmer:
 For a C++ programmer:
 
 - No class converts to `bool` in a condition. `explicit operator bool` has no counterpart.
-- `if` holds no declaration of its own, as `if (auto x = f())` does. `if let` binds the value of an optional, and chapter 7 describes it.
+- `if` holds no declaration of its own, as `if (auto x = f())` does. `if let` binds the value of an optional, and [chapter 7]({{% relref "07-optionals" %}}) describes it.
 - A name narrowed by `p != none` is a plain `*T` in the block. No `*p` there carries a hidden check.
 
 ## for over ranges and collections
@@ -391,9 +391,9 @@ sum_to 10, total_of 7
 iterator 64 bytes
 ```
 
-A collection is any type with `operator fn iter(self)`, which gives a new iterator on each call. An iterator is any type with `operator fn next(self) -> bool` and `operator fn value(self) -> T`. `for x in c` calls `iter` once, then `next` before each turn and `value` at the head of each turn. `for x in it` walks an iterator in its place. A class of the program takes part by declaring the three hooks, and chapter 9 shows one.
+A collection is any type with `operator fn iter(self)`, which gives a new iterator on each call. An iterator is any type with `operator fn next(self) -> bool` and `operator fn value(self) -> T`. `for x in c` calls `iter` once, then `next` before each turn and `value` at the head of each turn. `for x in it` walks an iterator in its place. A class of the program takes part by declaring the three hooks, and [chapter 9]({{% relref "09-classes" %}}) shows one.
 
-`for x in e` copies each element, and the loop tears the copy down at the end of each turn, on every exit of the body. `for x in &e` copies nothing. Over a collection it binds what the `value` of the iterator returns, a `lent *T` for a list. Chapter 11 describes lent pointers.
+`for x in e` copies each element, and the loop tears the copy down at the end of each turn, on every exit of the body. `for x in &e` copies nothing. Over a collection it binds what the `value` of the iterator returns, a `lent *T` for a list. [Chapter 11]({{% relref "11-ownership" %}}) describes lent pointers.
 
 A collection must not change its size while a loop walks it. A dev build stops the program when it does, with a message that names the collection, the loop and the place of the change. `remove_all(test)` of a collection removes elements while it walks.
 
@@ -542,9 +542,9 @@ b5:
     branch %30, b2, b3
 ```
 
-`%2` is the iterator, a slot of the frame of 64 bytes. `b0` calls `iter` through the table of the list, since `items` is a pointer, and copies its result into the slot. A dev build also tests the table pointer before that call, which chapter 9 describes. `b1` is the test of each turn. It loads the pointer to the `Changes` of the list and compares two counts. One is the count of changes now, and the other the count when the walk began. When they differ, the block `b4` calls `anti_rt_walk_changed`, which prints the message and ends the program. `b5` calls `next`, and `b2` calls `value` and loads the element through the pointer it returns.
+`%2` is the iterator, a slot of the frame of 64 bytes. `b0` calls `iter` through the table of the list, since `items` is a pointer, and copies its result into the slot. A dev build also tests the table pointer before that call, which [chapter 9]({{% relref "09-classes" %}}) describes. `b1` is the test of each turn. It loads the pointer to the `Changes` of the list and compares two counts. One is the count of changes now, and the other the count when the walk began. When they differ, the block `b4` calls `anti_rt_walk_changed`, which prints the message and ends the program. `b5` calls `next`, and `b2` calls `value` and loads the element through the pointer it returns.
 
-The iterator of a list holds a `Watch`, which is a pointer to the `Changes` of the list and the count at the start. "Walking a collection" of chapter 16 describes both, and what every change of a collection stores. An iterator without a field of type `Watch` gets no such test.
+The iterator of a list holds a `Watch`, which is a pointer to the `Changes` of the list and the count at the start. "Walking a collection" of [chapter 16]({{% relref "16-collections" %}}) describes both, and what every change of a collection stores. An iterator without a field of type `Watch` gets no such test.
 
 A release build drops `b4` and the compare before it. `next` and `value` are ordinary functions of the module, and `opt` inlines them where its threshold allows.
 
@@ -609,7 +609,7 @@ A `switch` on an enum without `else` names every value of the enum. A `switch` o
 
 `fallthrough;` as the last statement of a block arm enters the body of the next arm without testing its value.
 
-An arm of a `switch` on a variant names a case. `Circle c =>` binds `c` to a copy of the fields of the case, and `Empty =>` binds nothing. Chapter 8 describes variants.
+An arm of a `switch` on a variant names a case. `Circle c =>` binds `c` to a copy of the fields of the case, and `Empty =>` binds nothing. [Chapter 8]({{% relref "08-structs-enums" %}}) describes variants.
 
 ```anti
 //! name: arms
@@ -863,7 +863,7 @@ b2:
 
 `%2` is a `str` in the frame for the literal `"debug"`: the address of its bytes and the length 5. The call compares it with the text of the `switch`. `equal` compares the lengths first and the bytes only when the lengths agree. The arms are not hashed and not sorted, so a text that matches no arm costs one call per arm.
 
-A `switch` on a variant loads the tag once and compares it with the number of each arm's case. An arm that binds copies the fields of its case into a slot of the frame first. "Pattern matching" of chapter 8 shows that code.
+A `switch` on a variant loads the tag once and compares it with the number of each arm's case. An arm that binds copies the fields of its case into a slot of the frame first. "Pattern matching" of [chapter 8]({{% relref "08-structs-enums" %}}) shows that code.
 
 Where it lives: the `TOKEN_SWITCH` case of `statement` and `arm_body` of `src/antic/parser_stmt.c`. `check_switch`, `check_switch_covers` and `refuse_same_value` of `src/antic/sema_stmt.c`. `lower_switch`, `arm_test` and `bind_case_fields` of `src/antic/lower_stmt.c`. `equal` is in `src/std/anti/text.anti`.
 
@@ -1014,7 +1014,7 @@ Lowering skips every statement that follows a `break`, a `continue` or a `return
 
 ### How antic builds it
 
-Each of the two is one jump. Before the jump stand the deferred statements of the blocks it leaves, written out again at that place. The example calls `note`, an `extern fn`. That is a function of C which the module declares and does not define, so no pass removes a call of it. Chapter 17 describes the form.
+Each of the two is one jump. Before the jump stand the deferred statements of the blocks it leaves, written out again at that place. The example calls `note`, an `extern fn`. That is a function of C which the module declares and does not define, so no pass removes a call of it. [Chapter 17]({{% relref "17-c-interop" %}}) describes the form.
 
 ```anti
 //! name: scan
@@ -1122,13 +1122,13 @@ C frees what a function took at the end, often behind a `goto cleanup` label. C+
 
 `undo stmt;` records one statement that runs only when the block is left by an error: a `fail`, or a `try` that forwards one. On that exit every `undo` of the block runs, last declared first, and after them every `defer` of the block.
 
-Chapter 6 describes errors. This section needs three of its forms. A function marked `may fail` can end with an error, which `fail` raises. `try` before a call passes the error of that call on to the caller. `catch { }` after a call takes the error and goes on.
+[Chapter 6]({{% relref "06-errors" %}}) describes errors. This section needs three of its forms. A function marked `may fail` can end with an error, which `fail` raises. `try` before a call passes the error of that call on to the caller. `catch { }` after a call takes the error and goes on.
 
 Both take effect where they stand. An exit above a `defer` does not run it. A deferred statement reads its variables when it runs, not when it is declared.
 
 The statement is a call, an assignment or a block. A call that may fail carries its handler, `defer fs.close(f) catch fatal;`.
 
-A local of a class type with a `destruct` is torn down at the end of its block. It behaves as a `defer` written after its declaration. Chapter 11 describes that order.
+A local of a class type with a `destruct` is torn down at the end of its block. It behaves as a `defer` written after its declaration. [Chapter 11]({{% relref "11-ownership" %}}) describes that order.
 
 ```anti
 //! name: exits
@@ -1273,7 +1273,7 @@ fn build() -> int
 }
 ```
 
-A local that a `defer` or an `undo` names cannot move into an `own` parameter, since the deferred statement would read it after the move. Chapter 11 shows that refusal.
+A local that a `defer` or an `undo` names cannot move into an `own` parameter, since the deferred statement would read it after the move. [Chapter 11]({{% relref "11-ownership" %}}) shows that refusal.
 
 ### How antic builds it
 
@@ -1315,7 +1315,7 @@ b2:
 }
 ```
 
-`build` may fail, so it returns a pointer: the error, or 0 for none. Chapter 6 describes that form. `b0` calls `step` and compares the pointer it returns with 0. `b1` is the failing exit of the `try`. It runs the `undo`, then the `defer`, and returns the error. `b2` is the closing brace. It runs the `defer` alone and returns 0.
+`build` may fail, so it returns a pointer: the error, or 0 for none. [Chapter 6]({{% relref "06-errors" %}}) describes that form. `b0` calls `step` and compares the pointer it returns with 0. `b1` is the failing exit of the `try`. It runs the `undo`, then the `defer`, and returns the error. `b2` is the closing brace. It runs the `defer` alone and returns 0.
 
 The `defer` stands twice and the `undo` once. Neither is called through a pointer, neither is recorded in the frame, and no table of the executable describes them. A function without an exit by error holds no code for its `undo` statements at all.
 

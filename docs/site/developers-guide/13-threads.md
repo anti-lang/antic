@@ -3,7 +3,7 @@ title: "Threads"
 description: "Threads, dispatch and join, parallel, channels and select, atomics, locks, and what the checker refuses."
 summary: "`worker fn`, `dispatch` and `join`, `parallel`, channels and `select`, atomics and locks, and what the checker refuses of each, with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:16:28+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 130
 tags: [compilers, programming-languages]
@@ -41,8 +41,8 @@ Every other argument and the result hold no pointer. The checker reads that off 
 - A class value holds none when its fields hold none. The table pointer and the `own` fields do not count.
 - A pointer, a slice and a function value hold one, and are refused.
 - A `chan T` passes by value, since a copy names the same channel.
-- A pointer to a thread-safe object passes: a `*Mutex` and a pointer to a `synchronized class` or a `concurrent class` of chapter 14.
-- A parameter of function type takes a named function. It takes a closure only when it is marked `concurrent`, which chapter 5 describes.
+- A pointer to a thread-safe object passes: a `*Mutex` and a pointer to a `synchronized class` or a `concurrent class` of [chapter 14]({{% relref "14-concurrent-classes" %}}).
+- A parameter of function type takes a named function. It takes a closure only when it is marked `concurrent`, which [chapter 5]({{% relref "05-functions" %}}) describes.
 
 A job has no type a program can write. A `let` infers it from a `dispatch`, and an array literal of jobs has it as its element. `job.handle` reads its one field, a `?*byte`. A job therefore never stands in a field, a parameter or a result.
 
@@ -54,7 +54,7 @@ The checker walks every function a worker reaches. It refuses a `delete` of an o
 
 A worker cannot fail. `may fail` gives the result `?*Error`, which is a pointer.
 
-The pool has one thread fewer than the machine has processors, since the thread that joins runs work as well. The key `threads` of the runtime configuration sets the count, as `--anti.threads=4` on the command line of the program. Chapter 15 describes the configuration.
+The pool has one thread fewer than the machine has processors, since the thread that joins runs work as well. The key `threads` of the runtime configuration sets the count, as `--anti.threads=4` on the command line of the program. [Chapter 15]({{% relref "15-hooks" %}}) describes the configuration.
 
 ```anti
 //! name: workers
@@ -340,7 +340,7 @@ b0:
 
 - `%s3` is the context of the `dispatch`, a slot of the frame of `start` that holds the arguments after the object. Here it holds `seed`.
 - `anti_rt_dispatch` takes the object, the 8 bytes of the result, a thunk and the context. It returns the job, one pointer.
-- `anti_rt_hook` with 3 is the hook `dispatched` of the object, which chapter 15 describes.
+- `anti_rt_hook` with 3 is the hook `dispatched` of the object, which [chapter 15]({{% relref "15-hooks" %}}) describes.
 - `anti_rt_join_hooked` takes the job, the size of the result and the slot `%s9` that receives it. It calls the hook `joined` of the object after the wait.
 - The `load` reads the result out of the slot.
 
@@ -394,7 +394,7 @@ The costs are the same in dev and in release.
 
 The walk of the objects in flight is linear in their number.
 
-`--no-hooks` drops the call of `anti_rt_hook` after a `dispatch` and makes a `join` a call of `anti_rt_join`. A program built that way gives up the hooks `dispatched` and `joined`, and with them the `ThreadMonitor` of chapter 15.
+`--no-hooks` drops the call of `anti_rt_hook` after a `dispatch` and makes a `join` a call of `anti_rt_join`. A program built that way gives up the hooks `dispatched` and `joined`, and with them the `ThreadMonitor` of [chapter 15]({{% relref "15-hooks" %}}).
 
 ### Pitfalls
 
@@ -1095,7 +1095,7 @@ Java has `AtomicInteger` and `AtomicReference` as objects with methods. C++ has 
 
 An atomic holds an integer of 8, 16, 32 or 64 bits, a `bool`, a `char` or a pointer. A struct takes no atomic field, and neither a parameter nor a result is atomic.
 
-Every static field is atomic. The parser refuses one without the word, since a static field is a global that every thread reaches. Chapter 9 describes static fields.
+Every static field is atomic. The parser refuses one without the word, since a static field is a global that every thread reaches. [Chapter 9]({{% relref "09-classes" %}}) describes static fields.
 
 Eight operations exist, written as calls on the variable.
 
@@ -1114,7 +1114,7 @@ Every operation is sequentially consistent. No form names a weaker order.
 
 A plain read, an assignment and `&x` of an atomic are refused. `add` and `sub` wrap in both modes and have no overflow check.
 
-`compare_swap` also takes a plain field of one word in a concurrent class when `unchecked(unguarded-field, "reason")` marks it. Chapter 14 describes that form.
+`compare_swap` also takes a plain field of one word in a concurrent class when `unchecked(unguarded-field, "reason")` marks it. [Chapter 14]({{% relref "14-concurrent-classes" %}}) describes that form.
 
 ```anti
 //! name: counters
@@ -1396,7 +1396,7 @@ ret
 - `ldaddal` adds `x9` to the value at `[x8]` and leaves the value before in `x0`.
 - `casalb` compares the byte with `w8` and writes `w10` on a match. `w8` then holds what it found, and `cmp` with `cset` makes the flag.
 
-Chapter 20 describes the levels and `--cpu`, which chooses one.
+[Chapter 20]({{% relref "20-targets" %}}) describes the levels and `--cpu`, which chooses one.
 
 The runtime keeps `anti_rt_atomic_load` and its siblings as C functions for its own code. No program calls them for an atomic of 1, 2, 4 or 8 bytes.
 
@@ -1461,11 +1461,11 @@ A `Mutex` cannot be copied. `let k = m;`, a `Mutex` argument by value and an ass
 
 A `Mutex` is not taken twice by one thread. A `sync` inside a `sync` on the same place in one function is refused. The checker calls two operands the same place when they name the same variable or the same path of fields, with `&` and `*` taken off. It does not follow a pointer that was copied into another local.
 
-`sync a, b { }` holds two locks, and takes two synchronized objects of chapter 14. Two `Mutex` values are refused there.
+`sync a, b { }` holds two locks, and takes two synchronized objects of [chapter 14]({{% relref "14-concurrent-classes" %}}). Two `Mutex` values are refused there.
 
 Memory that holds zero bytes is an unlocked `Mutex`, so a field of an object from `alloc T { }` with no value is ready to use.
 
-The checker does not tie a field to its `Mutex` in a plain class. The `guarded by` of a concurrent class in chapter 14 is that check.
+The checker does not tie a field to its `Mutex` in a plain class. The `guarded by` of a concurrent class in [chapter 14]({{% relref "14-concurrent-classes" %}}) is that check.
 
 ```anti
 //! name: locks
@@ -1735,7 +1735,7 @@ define hidden void @locks.count(ptr noundef nonnull dereferenceable(16) %p0, ptr
   call void (ptr) @anti_rt_mutex_unlock_at(ptr %v23)
 ```
 
-The runtime records there the order in which each thread takes its locks. Chapter 14 describes that record and its report.
+The runtime records there the order in which each thread takes its locks. [Chapter 14]({{% relref "14-concurrent-classes" %}}) describes that record and its report.
 
 The lock itself is in the platform layer. On Linux a free lock is taken by one compare-and-swap of the word from 0 to 1 and given back by one exchange to 0. The word is 2 while a thread waits, and only then does either side call `futex`. On macOS the two calls are `os_unfair_lock_lock` and `os_unfair_lock_unlock`, and on Windows `AcquireSRWLockExclusive` and `ReleaseSRWLockExclusive`.
 
@@ -1767,7 +1767,7 @@ The record of the order belongs to dev mode. No flag of antic turns it on in a r
 For a Java programmer:
 
 - A `Mutex` is not taken again by the thread that holds it. A function that calls another function with a `sync` on the same `Mutex` waits for itself.
-- No lock belongs to every object. A plain class has one only as a field, and the hidden lock of chapter 14 is the other form.
+- No lock belongs to every object. A plain class has one only as a field, and the hidden lock of [chapter 14]({{% relref "14-concurrent-classes" %}}) is the other form.
 
 For a C programmer:
 

@@ -3,7 +3,7 @@ title: "C interop"
 description: "extern fn, the C types, the ABI of a call, anti bind, link, libraries for C with --lib and --bundle-runtime, and plugins across the boundary."
 summary: "`extern fn` and the C types, the ABI of a call, `anti bind`, `link`, libraries for C with `--lib` and `--bundle-runtime`, and plugins across the boundary, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:19:43+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 170
 tags: [compilers, programming-languages]
@@ -43,11 +43,11 @@ The C types name the types of C on the target. Eleven of the fourteen are other 
 
 The rules of a declaration and of a call:
 
-- Every pointer of an `extern fn` is written `?*T`, in a parameter and in the result. C gives no promise that a pointer is not null. A result is tested before it is read, as chapter 7 describes.
+- Every pointer of an `extern fn` is written `?*T`, in a parameter and in the result. C gives no promise that a pointer is not null. A result is tested before it is read, as [chapter 7]({{% relref "07-optionals" %}}) describes.
 - `?*byte` stands for `void *` and for `char *`.
 - A call converts nothing. An `int` does not pass where a `c_int` stands, and `n as c_int` is the conversion.
 - A variadic argument has type `i32`, `u32`, `int`, `u64`, `float` or a pointer.
-- A struct passes by value as the C struct of the same layout, which chapter 8 describes.
+- A struct passes by value as the C struct of the same layout, which [chapter 8]({{% relref "08-structs-enums" %}}) describes.
 - A parameter of function type takes a named function. A closure that captures a variable is refused, since C receives one pointer and no context.
 - A text literal ends in a zero byte, so `"hello".ptr` is a C string. `text.from_c(p)` of `anti.text` gives the `str` of a C string.
 - `may fail` and `export` are refused on an `extern fn`.
@@ -449,7 +449,7 @@ export fn px(p: P) -> int
 
 ### How antic builds it
 
-An `export fn` is the same function as any other, under another name and with another linkage. The convention of chapter 5 is the C convention, so a C caller and an Anti caller put the arguments in the same places.
+An `export fn` is the same function as any other, under another name and with another linkage. The convention of [chapter 5]({{% relref "05-functions" %}}) is the C convention, so a C caller and an Anti caller put the arguments in the same places.
 
 ```llvm excerpt=geometry target=linux-x86_64 mode=release
 define dso_local noundef i32 @dot(i64 %p0.0, i64 %p1.0)
@@ -533,7 +533,7 @@ Where it lives: `src/antic/sema_export.c` and `src/antic/sema.c` hold the signat
 | `size_of(Vec2)`, `size_of(Box)` | 8, 24, the sizes C computes | the same |
 | Heap allocations | none | none |
 | Calls into the runtime | none for the call itself | the same |
-| A `may fail` function that fails | one error object on the heap, as chapter 6 counts | the same |
+| A `may fail` function that fails | one error object on the heap, as [chapter 6]({{% relref "06-errors" %}}) counts | the same |
 | Checks of dev mode inside the function | the overflow checks of `a.x * b.x + a.y * b.y`, three in `dot` | none |
 | Atomic operations and locks | none | none |
 | Copies of code | one function per `export fn`. A release build may inline it into Anti callers and keeps the symbol |
@@ -926,7 +926,7 @@ A C program calls an exported function without a call that starts anything. A sh
 
 Memory crosses as between two C libraries. A library takes its memory from the `malloc` of the process it runs in: `libgeometry.so` imports `malloc` and `free` as open names. C may therefore `free` what an exported function returned. The comment of each function says who frees what.
 
-An exported class crosses with its layout, its tables and the helpers `anti_<Class>_init` and `anti_<Class>_construct`, which chapter 9 describes.
+An exported class crosses with its layout, its tables and the helpers `anti_<Class>_init` and `anti_<Class>_construct`, which [chapter 9]({{% relref "09-classes" %}}) describes.
 
 The session below builds the module `geometry` of "The ABI of a call" in the three forms for linux-x86_64.
 
@@ -1028,7 +1028,7 @@ Where it lives: `src/antic/header.c` writes the header, `src/antic/driver_librar
 | The bundled archive | 362,292 bytes, with the runtime of the level `v3` inside |
 | The shared library | 85,352 bytes, with the runtime inside |
 | Start of the runtime | once per process for a static library, once per shared library for a shared one |
-| Threads | none until the first `parallel` or `dispatch` of the library, which starts the pool, as chapter 13 describes |
+| Threads | none until the first `parallel` or `dispatch` of the library, which starts the pool, as [chapter 13]({{% relref "13-threads" %}}) describes |
 | Checks | by the mode of the build, as for a program. A library of dev mode carries the checks into the C program |
 
 The sizes are those of release builds for linux-x86_64.
@@ -1061,7 +1061,7 @@ A plugin in C is a shared object opened with `dlopen`, and a table of function p
 
 ### The feature
 
-A plugin is the third kind of shared library antic writes. It is for an Anti program and not for C. Chapter 15 holds how a module provides an interface with `provides Interface as Class;`, how a host loads the library with `plugin.load` and what the load checks. This section holds what crosses the boundary between the two binaries.
+A plugin is the third kind of shared library antic writes. It is for an Anti program and not for C. [Chapter 15]({{% relref "15-hooks" %}}) holds how a module provides an interface with `provides Interface as Class;`, how a host loads the library with `plugin.load` and what the load checks. This section holds what crosses the boundary between the two binaries.
 
 | Shared output | Built with | Holds a runtime | Visible symbols | Loaded by |
 |---|---|---|---|---|
@@ -1156,7 +1156,7 @@ Where it lives: `whole_hosts_plugins` and the test before `devirtualise` in `src
 | Bytes a host pays to be bound against | its dynamic symbol table, 834 names in the example |
 | A Linux host | dynamic against glibc 2.35 or newer, where a closed program is static |
 | Heap allocations of an instance | one, of the size the descriptor of the class gives |
-| Atomic operations and locks | those of `plugin.load` and of the count of live objects, which chapter 15 counts |
+| Atomic operations and locks | those of `plugin.load` and of the count of live objects, which [chapter 15]({{% relref "15-hooks" %}}) counts |
 | Checks at load | the runtime version, the hash chain of each interface and the slots the host calls, once per load |
 | Devirtualisation | none. A release build of a host or of a plugin skips the pass, so every call through a table stays a dispatch |
 

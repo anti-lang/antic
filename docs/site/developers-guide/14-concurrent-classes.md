@@ -3,7 +3,7 @@ title: "Concurrent classes"
 description: "Synchronized and concurrent classes, the hidden lock, guarded fields, sync blocks, the lock order checks of dev mode, and the thread-safe collections."
 summary: "`synchronized class` with its hidden lock, `concurrent class` with its guarded fields, `sync` blocks, the lock order checks of dev mode and the thread-safe collections of `anti.collection`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:16:50+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 140
 tags: [compilers, programming-languages]
@@ -31,7 +31,7 @@ The rules of a synchronized class:
 - A function that is not private gives out no pointer and no slice into the fields. It may not return one, and it may not pass one to a function value.
 - A synchronized class inherits the root, an abstract class without fields, or another synchronized class. A class that inherits a synchronized class is written `synchronized class` as well.
 - An object cannot be copied or assigned as a whole, since it holds a lock.
-- A worker takes a pointer to an object of the class, the exception of chapter 13.
+- A worker takes a pointer to an object of the class, the exception of [chapter 13]({{% relref "13-threads" %}}).
 
 The default `==` of two objects runs under the locks of both, and the default hash under the lock of its object. The section on `sync` blocks describes the order of two locks.
 
@@ -247,7 +247,7 @@ The hidden lock is the last field of the first synchronized class of a chain. It
 
 | Part | Bytes | Holds |
 |---|---|---|
-| The word | 4 on Linux and macOS, 8 on Windows, padded to 8 | the `Mutex` of chapter 13 |
+| The word | 4 on Linux and macOS, 8 on Windows, padded to 8 | the `Mutex` of [chapter 13]({{% relref "13-threads" %}}) |
 | The owner | 8 | a value of the thread that holds the lock, or 0 |
 | The depth | 8 | how many times that thread took it |
 
@@ -334,7 +334,7 @@ define hidden noundef zeroext range(i8 0, 2) i8 @tally.Tally.take(ptr noundef no
   call void (ptr, ptr) @anti_rt_object_lock_at(ptr %v2, ptr %v3)
 ```
 
-The excerpts show the module before the link. The link of a release program runs LTO over the program and the runtime, as chapter 2 describes, and may inline the two calls.
+The excerpts show the module before the link. The link of a release program runs LTO over the program and the runtime, as [chapter 2]({{% relref "02-how-antic-works" %}}) describes, and may inline the two calls.
 
 Where it lives: `sema_safety_declare`, `sema_hidden_lock` and `sema_check_reach` of `src/antic/sema_safety.c`, `lower_object_lock_call` and `lower_hold_lock` of `src/antic/lower_sync.c`, and `anti_rt_object_lock` and `anti_rt_object_unlock` of `src/rt/lock.c`.
 
@@ -389,7 +389,7 @@ Java mixes `synchronized` blocks on chosen locks, `volatile` fields, the classes
 | Kind | Written | Rule |
 |---|---|---|
 | Guarded | `units: int = 0 guarded by lock,` | every read and write stands inside a `sync` on the `Mutex` field `lock` of the same object |
-| Atomic | `atomic reads: int = 0,` | every access is an atomic operation of chapter 13 |
+| Atomic | `atomic reads: int = 0,` | every access is an atomic operation of [chapter 13]({{% relref "13-threads" %}}) |
 | Fixed | `limit: int,` | `construct` and `destruct` write it, and nothing else does |
 
 `guarded by` follows the type of a field or its default. It names a `Mutex` field of the same class. In a type nested in the class, `guarded by Outer.lock` names a `Mutex` field of the class around it.
@@ -784,7 +784,7 @@ Where it lives: `check_guards_of`, `sema_check_reach`, `sema_note_field_write` a
 
 ### What it costs
 
-The costs are the same in dev and in release, apart from the record of the order of chapter 13.
+The costs are the same in dev and in release, apart from the record of the order of [chapter 13]({{% relref "13-threads" %}}).
 
 | Cost | Count |
 |---|---|
@@ -829,7 +829,7 @@ Java writes `synchronized (obj) { }` on any object, and the block gives the moni
 
 | Form | Holds |
 |---|---|
-| `sync m { }` | a `Mutex`, or a pointer to one, as chapter 13 describes |
+| `sync m { }` | a `Mutex`, or a pointer to one, as [chapter 13]({{% relref "13-threads" %}}) describes |
 | `sync obj { }` | the hidden lock of a synchronized object, or of a pointer to one |
 | `sync a, b { }` | the hidden locks of two synchronized objects |
 
@@ -1283,7 +1283,7 @@ Two modules of the standard library hold six collections for more than one threa
 | `ConcurrentMap<K, V>` | `anti.collection.concurrent` | `concurrent class` | 16 parts by the hash of the key, each with a `Mutex` |
 | `SpscRing<T, N>` | `anti.collection.concurrent` | `concurrent class` | no lock, two atomic counters |
 
-Each is made with `new`, takes an optional `Allocator` there, and is torn down as the plain collections of chapter 16 are. A worker takes a pointer to one.
+Each is made with `new`, takes an optional `Allocator` there, and is torn down as the plain collections of [chapter 16]({{% relref "16-collections" %}}) are. A worker takes a pointer to one.
 
 They have the operations of the plain collections less two groups. No operation takes a position, since a position can go stale between two calls. No operation lends the whole buffer, since a slice of it would be reached without the lock.
 
@@ -1456,7 +1456,7 @@ b0:
   store i64 %v8, ptr %v4, align 8
 ```
 
-- The symbol is the copy of the generic for `int`. `$3c` and `$3e` are the escaped brackets of `SyncList<int>`, as chapter 10 describes.
+- The symbol is the copy of the generic for `int`. `$3c` and `$3e` are the escaped brackets of `SyncList<int>`, as [chapter 10]({{% relref "10-generics" %}}) describes.
 - The hidden lock is at offset 160 of the 184 bytes, the last 24.
 - The add and the store raise the clock of the list at offset 152, which gives the new element its version.
 
@@ -1511,9 +1511,9 @@ The costs are the same in dev and in release, apart from the record of the order
 | An operation over a whole `ConcurrentMap` | 16 locks, one after the other |
 | `push` and `pop` of an `SpscRing` with room and with elements | one atomic load and one atomic store, no lock and no call |
 | `for x in c` | one lock, and one copy of every element into a snapshot on the heap |
-| Copies of code | one copy of the class per set of type arguments, as chapter 10 counts |
+| Copies of code | one copy of the class per set of type arguments, as [chapter 10]({{% relref "10-generics" %}}) counts |
 
-Chapter 16 holds the cost of each operation of the plain collections inside.
+[Chapter 16]({{% relref "16-collections" %}}) holds the cost of each operation of the plain collections inside.
 
 ### Pitfalls
 

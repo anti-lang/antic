@@ -3,7 +3,7 @@ title: "Optionals"
 description: "Nullable pointers, ?T and its layout, if let, ?? and the refusals of the checker."
 summary: "`*T` and `?*T`, narrowing, `?T` of any type with its layout, and the forms that read an optional, `if let`, `let ... else`, `??`, `?.` and the guards of `catch`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:18:56+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 70
 tags: [compilers, programming-languages]
@@ -244,7 +244,7 @@ A `?T` follows every rule of a `?*T`. It compares with `none`, a test narrows a 
 
 Two `?T` values compare with `==` when `T` has `==`. They are equal when both are `none`, or when both hold values that are equal.
 
-`none` means that nothing is there, which is an ordinary answer. A lookup that finds no entry gives `none`. A failure that the caller should hear about is an error of chapter 6. The standard library follows that line: `map.get(key)` gives a `?V`, and `text.parse_int(s)` may fail.
+`none` means that nothing is there, which is an ordinary answer. A lookup that finds no entry gives `none`. A failure that the caller should hear about is an error of [chapter 6]({{% relref "06-errors" %}}). The standard library follows that line: `map.get(key)` gives a `?V`, and `text.parse_int(s)` may fail.
 
 A `?T` whose `T` is a pointer or a function type is that pointer, with `none` as 0. `??T` is an optional of an optional, with two flags.
 
@@ -363,7 +363,7 @@ The value comes back in `rax` and the flag in `rdx`. The function has no branch:
 
 A C header writes a `?T` as `struct anti_opt_<T>` with the fields `value` and `has`, `struct anti_opt_int` for a `?int`.
 
-A `?T` of a class value that owns something is torn down only when its flag is set. Chapter 11 describes teardown.
+A `?T` of a class value that owns something is torn down only when its flag is set. [Chapter 11]({{% relref "11-ownership" %}}) describes teardown.
 
 Where it lives: `TYPE_OPTIONAL` and `types_with_none` of `src/antic/types.c` make the type, and `src/antic/layout.c` lays it out as a struct. `lower_optional_flag` and `lower_set_optional` of `src/antic/lower.c` read and write the flag. `src/antic/header.c` writes the C struct.
 

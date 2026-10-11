@@ -3,7 +3,7 @@ title: "Tests"
 description: "tests and fixtures blocks, anti test, expected output and memory checks in tests."
 summary: "The `tests` and `fixtures` blocks of a module with how antic builds them and what they cost, `anti test`, how a test states the expected output, and `--memory-checks` in tests."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:20:14+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 190
 tags: [compilers, programming-languages]
@@ -354,7 +354,7 @@ anti test -I src src/com/example/purse.anti
 
 The root is compared with the path as written. `-I src` matches `src/com/example/purse.anti` and does not match `./src/com/example/purse.anti`, whose module is then `purse` alone.
 
-The command reads `anti.toml` of the current directory when there is one. It takes the package name from it, and the providers of the `[inject]` table with those of `[inject.test]` laid over them, which chapter 15 describes. The directories of `[layout]` choose no file: the files of a run are the ones the command line names.
+The command reads `anti.toml` of the current directory when there is one. It takes the package name from it, and the providers of the `[inject]` table with those of `[inject.test]` laid over them, which [chapter 15]({{% relref "15-hooks" %}}) describes. The directories of `[layout]` choose no file: the files of a run are the ones the command line names.
 
 ### A run
 
@@ -492,7 +492,7 @@ com/example/shelf.anti:5: index out of bounds: index 3, length 3
 antic: build/tests/com_example_shelf.runner ended by signal 6
 ```
 
-With `half(3)` in the first test, the error reaches `fatal`. The run prints the origin and the text of the error, `com/example/shelf.anti:11:3: odd`. A dev run adds the raw frames of the stack trace, which `anti symbols resolve` of chapter 18 reads. The runner exits with a status other than 0, and the module counts as failed.
+With `half(3)` in the first test, the error reaches `fatal`. The run prints the origin and the text of the error, `com/example/shelf.anti:11:3: odd`. A dev run adds the raw frames of the stack trace, which `anti symbols resolve` of [chapter 18]({{% relref "18-the-tool" %}}) reads. The runner exits with a status other than 0, and the module counts as failed.
 
 | End of a test | Standard error of a dev run | Later tests of the module |
 |---|---|---|
@@ -577,7 +577,7 @@ The pages of this guide use a third form. A block that declares `main` is built 
 
 ## Memory checks in tests
 
-`anti test --memory-checks` compiles every module of the run with the option of chapter 12 and with the lines of `-g`. Each runner then reports a use after free, a double free, an access outside a heap block and, at its exit, the blocks it lost. The module `src/com/example/squares.anti` loses one block.
+`anti test --memory-checks` compiles every module of the run with the option of [chapter 12]({{% relref "12-memory" %}}) and with the lines of `-g`. Each runner then reports a use after free, a double free, an access outside a heap block and, at its exit, the blocks it lost. The module `src/com/example/squares.anti` loses one block.
 
 ```anti
 import anti.lang;
@@ -643,6 +643,6 @@ The facts of a checked run follow.
 - The leak check runs once per runner, so it reports the leaks of all tests of a module together.
 - `--release --memory-checks` checks the optimized code. The optimizer inlines a small test into the runner, and frame 2 above then reads `anti.test.com_example_squares.main squares.anti:16`.
 - A dev run keeps its bounds checks and its assertions beside the memory checks.
-- The limits of the option hold: windows-arm64 refuses it, and the Windows runtime reports no leaks. The five programs of the measured table of chapter 12 ran 8 to 53 times slower with the option.
+- The limits of the option hold: windows-arm64 refuses it, and the Windows runtime reports no leaks. The five programs of the measured table of [chapter 12]({{% relref "12-memory" %}}) ran 8 to 53 times slower with the option.
 
 Where it lives: `base_options` of `src/anti/test.c` sets the option and `-g` for every compile, and `run_unit` runs the program through `memreport_run` of `src/anti/memreport.c`. The instrumentation is in `src/antic/memcheck.c`.

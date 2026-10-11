@@ -3,7 +3,7 @@ title: "Targets"
 description: "The six targets, --target and --cpu, the processor levels, cross-building, script mode, -g and debugging, the build id and what a release build does with LLVM."
 summary: "The six targets, `--target` and `--cpu` with the processor levels, cross-building from any host, script mode, `-g` and debugging, the build id, and what a release build does with LLVM."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:20:44+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 200
 tags: [compilers, programming-languages]
@@ -37,7 +37,7 @@ The name of a target is also the name of its directories in the runtime archive,
 | windows-x86_64 | `ucrtbase.dll`, through the import libraries of mingw-w64 | `lld-link` | `v3` |
 | windows-arm64 | `ucrtbase.dll`, through the import libraries of mingw-w64 | `lld-link` | `armv8.2` |
 
-A Linux program that reaches a `link linux` line, or that loads a plugin, links dynamically against glibc 2.35 instead. Chapter 17 describes that mode. `int` is 64 bits on all six targets. `c_long` is 32 bits on the two Windows targets and 64 bits on the other four.
+A Linux program that reaches a `link linux` line, or that loads a plugin, links dynamically against glibc 2.35 instead. [Chapter 17]({{% relref "17-c-interop" %}}) describes that mode. `int` is 64 bits on all six targets. `c_long` is 32 bits on the two Windows targets and 64 bits on the other four.
 
 The program of this chapter has one function per difference between the levels.
 
@@ -249,7 +249,7 @@ anti build --release --target all
 | `windows-x86_64/release/levels.exe` | 60416 |
 | `windows-arm64/release/levels.exe` | 55296 |
 
-A Linux program is larger because it holds musl and mimalloc. Each directory also holds `NOTICE.txt` and `levels-symbols.zip`, the symbols archive of chapter 18.
+A Linux program is larger because it holds musl and mimalloc. Each directory also holds `NOTICE.txt` and `levels-symbols.zip`, the symbols archive of [chapter 18]({{% relref "18-the-tool" %}}).
 
 | Target | Sysroot of the package |
 |---|---|
@@ -281,7 +281,7 @@ antic -o hello hello.anti
 
 ## -g and debugging
 
-`antic -g` writes the source position of every statement and one entry per function, and the link keeps the debug sections. `anti build` passes `-g` in dev mode and never in release mode. A release build of `anti build` writes the symbols archive instead, which chapter 18 describes.
+`antic -g` writes the source position of every statement and one entry per function, and the link keeps the debug sections. `anti build` passes `-g` in dev mode and never in release mode. A release build of `anti build` writes the symbols archive instead, which [chapter 18]({{% relref "18-the-tool" %}}) describes.
 
 The debug information holds lines and function names. It holds no variable, no parameter and no type.
 
@@ -356,13 +356,13 @@ The id stands in the notice of the program, as the line `build <id>` after the b
 
 A change of the source or of the runtime library gives another id, and so does a compiler that writes another LLVM text. The test `program_build_id` of the suite links one program twice, with `-g` and without it, and compares the ids.
 
-The id ties a trace to the symbols of its build. A raw stack trace prints one `module` line per loaded binary with its id. `anti symbols` matches each id to a symbols archive, as chapter 18 shows. `-g` does not change the id, so a trace of a stripped release program resolves against the archive of the same build.
+The id ties a trace to the symbols of its build. A raw stack trace prints one `module` line per loaded binary with its id. `anti symbols` matches each id to a symbols archive, as [chapter 18]({{% relref "18-the-tool" %}}) shows. `-g` does not change the id, so a trace of a stripped release program resolves against the archive of the same build.
 
 Where it lives: `build_id` and `identified_notice` of `src/antic/driver.c`, with the spans of the debug information from `src/antic/llvm_debug.c`. The runtime reads the id of a loaded module in `src/rt/platform_posix.c` and `src/rt/platform_windows.c`.
 
 ## LLVM in a release build
 
-The code of such a build passes through `opt` and then through either `llc` or the LTO of `lld`, all three of the pinned tools. Chapter 2 describes the passes of antic that come before them.
+The code of such a build passes through `opt` and then through either `llc` or the LTO of `lld`, all three of the pinned tools. [Chapter 2]({{% relref "02-how-antic-works" %}}) describes the passes of antic that come before them.
 
 | Build | `opt` | Code generation | Link |
 |---|---|---|---|
@@ -390,6 +390,6 @@ llc and the linker add these steps in both modes.
 | Folding of identical code | `--icf=safe`, `/OPT:SAFEICF`, with the table `-addrsig` writes | two functions with the same code share one copy, unless the program takes the address of either |
 | Alignment of functions on ARM64, in a link of objects | `-align-all-functions=4` | every function starts on a 16-byte boundary |
 
-`--profile-generate` and `--profile-use` add the instrumentation of a profile to the `opt` step. Chapter 21 describes them with the other measurements.
+`--profile-generate` and `--profile-use` add the instrumentation of a profile to the `opt` step. [Chapter 21]({{% relref "21-performance" %}}) describes them with the other measurements.
 
 Where it lives: `llvm_run`, `run_opt` and `run_lto` of `src/antic/llvm_run.c` start `opt` and `llc`, and `lto_mode` of `src/antic/driver.c` chooses the kind of link. `drop_unused` and `lto_level` of `src/antic/linker.c` write the options of the link.

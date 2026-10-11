@@ -3,7 +3,7 @@ title: "Memory"
 description: "Pointers, slices and views, the aliasing of views, the bounds checks, anti.mem, the allocator, alloc and free, and --memory-checks."
 summary: "Pointers, slices and views with their aliasing, the bounds checks of dev mode, `anti.mem` and the allocator, `alloc` and `free`, and `--memory-checks`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:16:12+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 120
 tags: [compilers, programming-languages]
@@ -20,7 +20,7 @@ A C pointer is an address with arithmetic: `p + 1`, `p - q` and a cast to and fr
 
 ### The feature
 
-`*T` is a pointer to a `T`, and `?*T` is one that may hold `none`, as chapter 7 gives. The forms that make and use a pointer follow.
+`*T` is a pointer to a `T`, and `?*T` is one that may hold `none`, as [chapter 7]({{% relref "07-optionals" %}}) gives. The forms that make and use a pointer follow.
 
 | Form | What it gives |
 |---|---|
@@ -32,7 +32,7 @@ A C pointer is an address with arithmetic: `p + 1`, `p - q` and a cast to and fr
 | `alloc(T, n)` | room for `n` values of `T` on the heap, as a `?*T` |
 | `free(p)` | gives the memory of `alloc` back |
 | `p as *U` | the same address as a pointer of another type, a view of the next section |
-| `p == q` | whether two pointers of one type point at the same place. Two class pointers compare their objects, as chapter 9 gives |
+| `p == q` | whether two pointers of one type point at the same place. Two class pointers compare their objects, as [chapter 9]({{% relref "09-classes" %}}) gives |
 
 `alloc T { }` never gives `none`: the program ends with a message when no memory is left. `alloc(T, n)` gives `none` then, so its result is tested or bound with `catch`.
 
@@ -40,9 +40,9 @@ The memory of `alloc(T, n)` is not written. Its elements hold what the allocator
 
 A pointer has no arithmetic. `p + 1` and `q - p` are refused, a pointer does not convert to an integer or back, and `<` does not compare two pointers. `&p[i]` is the one form that moves a pointer.
 
-`free` takes memory that `alloc` gave. It runs no teardown. An object of a class that owns something ends with `delete(p)`, which chapter 11 holds.
+`free` takes memory that `alloc` gave. It runs no teardown. An object of a class that owns something ends with `delete(p)`, which [chapter 11]({{% relref "11-ownership" %}}) holds.
 
-The checker does not follow the life of what a pointer points at. A pointer to a local may be returned, and a pointer may be read after `free`. Both compile, and both are errors of the program. `lent` of chapter 11 is the checked form for a pointer that must not outlive a call.
+The checker does not follow the life of what a pointer points at. A pointer to a local may be returned, and a pointer may be read after `free`. Both compile, and both are errors of the program. `lent` of [chapter 11]({{% relref "11-ownership" %}}) is the checked form for a pointer that must not outlive a call.
 
 ```anti
 //! name: ptrs
@@ -295,7 +295,7 @@ For a C programmer:
 
 For a C++ programmer:
 
-- `alloc T { }` runs no `construct`, and `free(p)` runs no `destruct`. `alloc T(args)` and `delete(p)` of chapter 9 run them.
+- `alloc T { }` runs no `construct`, and `free(p)` runs no `destruct`. `alloc T(args)` and `delete(p)` of [chapter 9]({{% relref "09-classes" %}}) run them.
 - `free(p)` of an object that owns something leaks what it owns. `delete(p)` is the form with the teardown.
 - A `*T` is not a reference: it can be assigned again, and it is copied as an address.
 
@@ -345,7 +345,7 @@ Rules say which two accesses may refer to the same memory once a view exists. A 
 - A view passed on, as an argument, a result or a stored pointer, is a pointer of its own type. Its accesses follow the rules above.
 - Memory of `alloc` and of an allocator holds no type until a store gives it one.
 
-`as` between two class pointers of one chain, or to an interface, is no view. It is the checked conversion of chapter 9.
+`as` between two class pointers of one chain, or to an interface, is no view. It is the checked conversion of [chapter 9]({{% relref "09-classes" %}}).
 
 ```anti
 //! name: slices
@@ -637,7 +637,7 @@ For a C programmer:
 For a C++ programmer:
 
 - The aliasing rules are those of the language and not of C++. A signed and an unsigned integer of one width meet, every pointer type meets every other, and a view where it stands reaches any memory.
-- A slice is a `std::span`. It has no capacity and cannot grow. `List<T>` of chapter 16 is the growing form.
+- A slice is a `std::span`. It has no capacity and cannot grow. `List<T>` of [chapter 16]({{% relref "16-collections" %}}) is the growing form.
 - A dev build does not find a broken aliasing rule. The wrong result shows in a release build alone.
 
 ## Bounds checks
@@ -817,7 +817,7 @@ For a C programmer:
 For a C++ programmer:
 
 - `s[i]` is `at()` in a dev build and `operator[]` in a release build, by the mode and not by the spelling.
-- No iterator is checked, since a walk makes no check. A collection that changes under a walk is found by the change check of chapter 4.
+- No iterator is checked, since a walk makes no check. A collection that changes under a walk is found by the change check of [chapter 4]({{% relref "04-flow" %}}).
 
 ## anti.mem and the allocator
 
@@ -853,8 +853,8 @@ The parts of the language and the library that allocate take an allocator in a f
 | `destroy(p, from)` | the same without the object itself |
 | `Object.deserialize(input, from)` | takes the object, its strings and the objects it owns from `from` |
 | `builder.take_in(from)` | gives the text of an `anti.text.Builder` in memory of `from` |
-| a collection, when it is made | takes an optional allocator, as chapter 16 gives |
-| `inject alloc: *Allocator` | a field that the provider of the interface fills, as chapter 15 gives |
+| a collection, when it is made | takes an optional allocator, as [chapter 16]({{% relref "16-collections" %}}) gives |
+| `inject alloc: *Allocator` | a field that the provider of the interface fills, as [chapter 15]({{% relref "15-hooks" %}}) gives |
 
 A module that writes `delete(p, from)` or `destroy(p, from)` imports `anti.mem`.
 
@@ -1078,7 +1078,7 @@ b2:
 ```
 
 - `%0` is the allocator, and `%3` its table pointer.
-- The test for a zero table is the check of a dispatch in dev mode, which chapter 9 holds. A release build drops it.
+- The test for a zero table is the check of a dispatch in dev mode, which [chapter 9]({{% relref "09-classes" %}}) holds. A release build drops it.
 - `17` times the size of a pointer is the offset of the entry, and `%8` is the function it holds.
 - The call passes the allocator, the size of a `Point` as a symbol and the alignment 8.
 
@@ -1131,7 +1131,7 @@ The path that fits therefore runs one remainder and eight compares. The function
     call void @anti_rt_delete_from(%29, %47, %0)
 ```
 
-The runtime runs the teardown of the object with `from` as its second argument. The teardown hands each `own` field to `anti_rt_give(from, p)`, as the excerpt of `Sprite.destroy` in chapter 11 shows. `anti_rt_give` calls entry 18 of the table of `from`, its `free`. A null `from` stands for the C library and calls `free`.
+The runtime runs the teardown of the object with `from` as its second argument. The teardown hands each `own` field to `anti_rt_give(from, p)`, as the excerpt of `Sprite.destroy` in [chapter 11]({{% relref "11-ownership" %}}) shows. `anti_rt_give` calls entry 18 of the table of `from`, its `free`. A null `from` stands for the C library and calls `free`.
 
 Where it lives: `Allocator`, `LibcAllocator` and `ArenaAllocator` of `src/std/anti/mem.anti`. `anti_rt_mem_alloc` and `anti_rt_mem_free` of `src/rt/mem.c`. `anti_rt_give` and `anti_rt_delete_from` of `src/rt/object.c`, and `ANTI_ENTRY_ALLOC` and `ANTI_ENTRY_FREE` of `src/rt/object.h`.
 

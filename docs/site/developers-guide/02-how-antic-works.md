@@ -3,7 +3,7 @@ title: "How antic works"
 description: "The passes of antic from source to executable, its IR and the LLVM module, dev and release builds, LTO, the runtime archive and how to read the excerpts."
 summary: "The passes from source to executable, the IR of antic and the LLVM module, dev and release builds, whole-program compilation and the LTO of the runtime, the runtime archive and the allocator, what an executable holds beside the program, and how to read and make the excerpts of this guide."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:09:42+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 20
 tags: [compilers, programming-languages]
@@ -32,7 +32,7 @@ The function `compile` of `src/antic/driver.c` runs the front end, `back_end` an
 | `llc` | the text or the bitcode | the object, or the assembly under `-S` | `llvm_run` in `src/antic/llvm_run.c` |
 | Link | the object and the runtime archive | the executable | `driver_link_program` in `src/antic/driver_link.c` and `src/antic/linker.c` |
 
-A build with `--memory-checks` adds one step after the layout, `memcheck_function` of `src/antic/memcheck.c`. Chapter 12 describes it.
+A build with `--memory-checks` adds one step after the layout, `memcheck_function` of `src/antic/memcheck.c`. [Chapter 12]({{% relref "12-memory" %}}) describes it.
 
 The parser keeps the `tests` and `fixtures` blocks of a file under `--tests` alone. Every other build drops both right after parsing, in `drop_test_blocks` of `src/antic/driver.c`.
 
@@ -316,7 +316,7 @@ The mode is release for `antic` unless `--dev` is given, and dev for `anti build
 
 The checks of dev mode start with the overflow check of `+`, `-` and `*` and the bounds check of an index. A division, a shift and a narrowing conversion have one each, and later chapters name the rest. `--no-checks` drops them from a dev build and `--no-asserts` the assertions. The build that compiles the program decides. A library file carries every check, and a release build of the program drops the ones in its libraries too.
 
-A release build defines what a dropped check guarded. A signed `+`, `-` or `*` wraps, a division by zero gives 0, and a shift takes its count modulo the width. Chapter 3 shows each.
+A release build defines what a dropped check guarded. A signed `+`, `-` or `*` wraps, a division by zero gives 0, and a shift takes its count modulo the width. [Chapter 3]({{% relref "03-values" %}}) shows each.
 
 `back_end` of `src/antic/driver.c` holds the rule for the checks and the assertions, and `lower_options` the rule for tracing.
 
@@ -324,7 +324,7 @@ A release build defines what a dropped check guarded. A signed `+`, `-` or `*` w
 
 A release build of antic compiles the whole program in one run. The program holds the IR of the module on the command line. It also holds the IR of every library file that module imports, directly or through another import. The whole-program pass and the optimizer of antic therefore see every function and every class.
 
-The whole-program pass uses that view in these steps, which chapter 9 describes.
+The whole-program pass uses that view in these steps, which [chapter 9]({{% relref "09-classes" %}}) describes.
 
 - A call through a class table becomes a direct call where one function alone can be its target.
 - The class registry that `anti.reflect` reads is written.
@@ -360,7 +360,7 @@ antic looks for the archive in two places, in this order: the directory above it
 
 A Linux program links statically against the C library musl, and its allocator is mimalloc. The archive `lib/<target>/<level>/libmimalloc.a` stands before `libc.a` on the link line. `malloc`, `free`, `calloc`, `realloc` and `aligned_alloc` of the program, the runtime and musl therefore resolve to mimalloc. `link_command` of `src/antic/linker.c` writes that line. A program that names a library with `link linux` links dynamically against glibc 2.35 and keeps the allocator of glibc.
 
-A macOS program uses the allocator of `libSystem`, and a Windows program the one of `ucrtbase.dll`. The `alloc` and `free` of the language call `malloc` and `free` on every target. Chapter 12 describes `anti.mem`.
+A macOS program uses the allocator of `libSystem`, and a Windows program the one of `ucrtbase.dll`. The `alloc` and `free` of the language call `malloc` and `free` on every target. [Chapter 12]({{% relref "12-memory" %}}) describes `anti.mem`.
 
 ## Contents of an executable
 

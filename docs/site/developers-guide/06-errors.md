@@ -3,7 +3,7 @@ title: "Errors"
 description: "may fail, fail, try and handlers, how an error travels back, error origins and stack traces and their cost, never, assert and the dev checks."
 summary: "`may fail`, `fail`, `try` and the handlers, how an error travels back from `fail` to its handler, error origins and stack traces and their cost, `-> never`, `assert` and the checks of dev mode, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:15:17+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 60
 tags: [compilers, programming-languages]
@@ -22,7 +22,7 @@ Java and C++ throw an exception, which leaves the function and every caller unti
 
 `may fail` after the result marks a function that can fail. Such a function leaves on one of two channels. `return v;` leaves with its result. `fail e;` leaves with an error, a `*Error`, and gives no result.
 
-`fail "text";` is `fail lang.Error.new(0, "text");`. `Error` is a class of `anti.lang`, and a file names it `lang.Error`. It holds a `code`, a `message`, the error that caused it and the position of its first `fail`. `Error.new(code, message)` makes one, and `Error.wrap(code, message, cause)` makes one that takes over the error below it. A program declares a class of its own that inherits `lang.Error` and adds fields, and a handler tests for it with `is`. Chapter 9 describes classes, inheritance and `is`.
+`fail "text";` is `fail lang.Error.new(0, "text");`. `Error` is a class of `anti.lang`, and a file names it `lang.Error`. It holds a `code`, a `message`, the error that caused it and the position of its first `fail`. `Error.new(code, message)` makes one, and `Error.wrap(code, message, cause)` makes one that takes over the error below it. A program declares a class of its own that inherits `lang.Error` and adds fields, and a handler tests for it with `is`. [Chapter 9]({{% relref "09-classes" %}}) describes classes, inheritance and `is`.
 
 A call of a function that may fail is handled where it stands. The next section holds the forms: `try` forwards the error, and `catch` handles it. A call with neither is refused.
 
@@ -291,11 +291,11 @@ Where it lives: `lower_fail` and `write_origin` of `src/antic/lower_error.c` wri
 | Atomic operations | one load in `anti_rt_backtrace_on`, and two loads in each call of `anti_rt_hook` for `created` or `destroyed`: the installed trace handler and the count of loaded libraries | the same |
 | Checks inserted | none | none |
 
-Every object calls the `created` hook when it is made and the `destroyed` hook when it is torn down, and an error is an object. Chapter 15 describes the hooks and `--no-hooks`, which drops those calls.
+Every object calls the `created` hook when it is made and the `destroyed` hook when it is torn down, and an error is an object. [Chapter 15]({{% relref "15-hooks" %}}) describes the hooks and `--no-hooks`, which drops those calls.
 
 The executable holds no unwind tables for errors and no table of handlers. A function that may fail and a function that may not are compiled alike, except for the out pointer and the test.
 
-An error that does occur costs one heap allocation, where a call that succeeds costs one compare. A function that fails as a matter of routine is better written with a `?T` result of chapter 7, which allocates nothing. A parser that tries one form after another is such a function.
+An error that does occur costs one heap allocation, where a call that succeeds costs one compare. A function that fails as a matter of routine is better written with a `?T` result of [chapter 7]({{% relref "07-optionals" %}}), which allocates nothing. A parser that tries one form after another is such a function.
 
 ### Pitfalls
 
@@ -309,12 +309,12 @@ For a C programmer:
 
 - The test cannot be forgotten: a failing call without a handler does not compile.
 - The value arrives through the out pointer only when the result is null. After an error the slot is not written.
-- From C the function is called as `Error *f(args, R *out)`. Chapter 17 shows the header and the C side of an error.
+- From C the function is called as `Error *f(args, R *out)`. [Chapter 17]({{% relref "17-c-interop" %}}) shows the header and the C side of an error.
 
 For a C++ programmer:
 
 - `may fail` is part of the type of the function, as `noexcept` is, with the meaning reversed.
-- No destructor runs during unwinding, since nothing unwinds. Each frame runs its `defer` and `undo` statements at the failing exit, as chapter 4 shows.
+- No destructor runs during unwinding, since nothing unwinds. Each frame runs its `defer` and `undo` statements at the failing exit, as [chapter 4]({{% relref "04-flow" %}}) shows.
 - An error is always an object on the heap, never a value thrown by copy.
 
 ## try and handlers
@@ -599,7 +599,7 @@ Where it lives: `sema_call.c` of `src/antic/` checks the forms and the `yield`, 
 | Heap allocations | 0 | 0 |
 | Checks inserted | none | none |
 
-A function with four `try` expressions and three `defer` statements holds each deferred statement five times, as chapter 4 counts.
+A function with four `try` expressions and three `defer` statements holds each deferred statement five times, as [chapter 4]({{% relref "04-flow" %}}) counts.
 
 ### Pitfalls
 
@@ -633,9 +633,9 @@ Every error carries its origin. The first `fail` that gives an error writes the 
 
 `e.text()` gives the error as text: `file:line:column: error N: message`, or the message alone after the position when the code is 0. Each cause follows on a line of its own after `caused by:`. `e.print()` writes that text to the standard error.
 
-An error may also carry a stack trace, the return addresses of the calls that led to the `fail`. The trace is captured at the first `fail`, together with the origin, when backtraces are on. They are on in a dev build and off in a release build. A release program turns them on with the option `--anti.backtrace` on its command line or with `backtrace = true` in its runtime configuration, without being built again. Chapter 15 describes the runtime configuration.
+An error may also carry a stack trace, the return addresses of the calls that led to the `fail`. The trace is captured at the first `fail`, together with the origin, when backtraces are on. They are on in a dev build and off in a release build. A release program turns them on with the option `--anti.backtrace` on its command line or with `backtrace = true` in its runtime configuration, without being built again. [Chapter 15]({{% relref "15-hooks" %}}) describes the runtime configuration.
 
-A trace holds raw frames: an address, and the module it lies in with its build id and its base address. `e.text()` appends them after the causes in that raw form, which `anti symbols resolve` of chapter 18 turns into names and lines from the symbols archive of a release.
+A trace holds raw frames: an address, and the module it lies in with its build id and its base address. `e.text()` appends them after the causes in that raw form. `anti symbols resolve` of [chapter 18]({{% relref "18-the-tool" %}}) turns it into names and lines from the symbols archive of a release.
 
 `lang.StackTrace.capture()` takes a trace anywhere, in any build. Its `frames` are the raw frames, and `text()` gives the raw form. `symbolize()` reads the name of the function of each frame from the symbol table of the program. In a build with `-g` it reads the file and the line as well.
 
@@ -702,7 +702,7 @@ A `module` line gives a number, the build id, the base address and the path. A f
 
 ### How antic builds it
 
-The code after each `fail` writes the origin, as the first section shows. It is a load of `at.line`, a compare with 0 and, for a new error, a copy of a constant `SourceLocation` of 64 bytes. That constant is the same kind of record as a `here` of chapter 5. An error that already has a line skips the copy and the rest.
+The code after each `fail` writes the origin, as the first section shows. It is a load of `at.line`, a compare with 0 and, for a new error, a copy of a constant `SourceLocation` of 64 bytes. That constant is the same kind of record as a `here` of [chapter 5]({{% relref "05-functions" %}}). An error that already has a line skips the copy and the rest.
 
 Whether a trace follows is decided at run time by `anti_rt_backtrace_on`. It reads the option `backtrace` with one atomic load. When the option is unset it reads the constant `anti_rt_backtrace_default`. The whole-program pass writes it into every program that can fail: 1 in a dev build, 0 in a release build. A library is therefore compiled once and serves both.
 
@@ -721,7 +721,7 @@ declare noundef ptr @anti.lang.StackTrace.capture(i64 noundef) #1
 declare noundef i8 @anti_rt_backtrace_on() #1
 ```
 
-The module of a function that fails declares the two functions it calls. A function that walks the stack and skips frames by count stays out of line, as chapter 5 says. The first frame of the trace is therefore the function with the `fail`.
+The module of a function that fails declares the two functions it calls. A function that walks the stack and skips frames by count stays out of line, as [chapter 5]({{% relref "05-functions" %}}) says. The first frame of the trace is therefore the function with the `fail`.
 
 In a release build `opt` inlines small functions, and an inlined function has no frame. A trace of a release build lists the functions that still have one.
 
@@ -766,7 +766,7 @@ For a C++ programmer:
 
 - `fail e;` in a handler keeps the first origin and the first trace. The path of the rethrow is not recorded.
 - A wrapped error has an origin and a trace of its own, and `text()` prints the trace of the outermost error alone.
-- Inlining removes frames from the trace of a release build. A build with `-g` records the inlined calls for a debugger, and chapter 20 describes it.
+- Inlining removes frames from the trace of a release build. A build with `-g` records the inlined calls for a debugger, and [chapter 20]({{% relref "20-targets" %}}) describes it.
 
 ## never
 
@@ -931,7 +931,7 @@ A dev build also inserts checks around operations that can go wrong. Each prints
 | Shift | a shift count is not below the width of the type | 3 |
 | Changed collection | a collection changed its size while a `for` walks it | 4 |
 
-Later chapters add checks of their own, such as the test of a number converted to an enum. "Checks of a release build" of chapter 21 lists every check of the guide with what a release build does with it.
+Later chapters add checks of their own, such as the test of a number converted to an enum. "Checks of a release build" of [chapter 21]({{% relref "21-performance" %}}) lists every check of the guide with what a release build does with it.
 
 Four options of antic override the mode. `--checks` keeps the checks in a release build, and `--no-checks` drops them from a dev build. `--asserts` and `--no-asserts` do the same for assertions. The build of the program decides for every module in it, the standard library included.
 
@@ -1046,7 +1046,7 @@ Where it lives: `assert_branch` and the `STMT_ASSERT` case of `src/antic/lower_s
 
 Each failure block is `cold`, so the compare and a branch that is not taken are all that the passing path runs.
 
-Turning the checks off gives up the stop. Without the bounds check an index past the end reads or writes other memory. Without the overflow check a signed overflow wraps. Chapter 3 states what each arithmetic operation does without its check, and chapter 12 what an index does.
+Turning the checks off gives up the stop. Without the bounds check an index past the end reads or writes other memory. Without the overflow check a signed overflow wraps. [Chapter 3]({{% relref "03-values" %}}) states what each arithmetic operation does without its check, and [chapter 12]({{% relref "12-memory" %}}) what an index does.
 
 A release build is tested with its checks on by passing `--checks --asserts`. That build runs the optimized code and still stops at the first violation.
 

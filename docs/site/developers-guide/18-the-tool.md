@@ -3,7 +3,7 @@ title: "The tool"
 description: "anti.toml, dependencies and the lock file, anti build and its cache, anti check, anti fmt, anti doc, anti license and anti symbols."
 summary: "The manifest `anti.toml`, dependencies and `anti.lock`, `anti build` and its cache, `anti check`, `anti fmt`, `anti doc`, `anti license` and `anti symbols`."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:19:56+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 180
 tags: [compilers, programming-languages]
@@ -12,7 +12,7 @@ keywords: [build tool, manifest, lock file, dependency resolution, build cache, 
 
 `anti` is the tool of a project. It reads the manifest `anti.toml`, resolves and fetches the dependencies, and compiles through the driver of antic, which is linked into it. Every command of this chapter was run on macos-arm64 with Anti 0.2.0, and the page shows its output as the tool printed it. A path of the machine is shortened to `/home/ann`.
 
-Chapter 1 holds `anti new`, a first `anti build` and `anti run`. Chapter 17 holds `anti bind`, and chapter 19 `anti test`.
+[Chapter 1]({{% relref "01-getting-started" %}}) holds `anti new`, a first `anti build` and `anti run`. [Chapter 17]({{% relref "17-c-interop" %}}) holds `anti bind`, and [chapter 19]({{% relref "19-tests" %}}) `anti test`.
 
 ## anti.toml
 
@@ -39,7 +39,7 @@ The tool reads these tables.
 | | `all` | the targets of `anti build --target all`. All six by default |
 | `[repositories]` | an alias | the URL prefix of a repository |
 | `[dependencies]` | a package name, quoted | an inline table with `version`, `repo` or `path` |
-| `[inject]`, `[inject.test]` | the path of an interface | its provider, as chapter 15 describes |
+| `[inject]`, `[inject.test]` | the path of an interface | its provider, as [chapter 15]({{% relref "15-hooks" %}}) describes |
 
 A source file is one module. Its module path is its path under `src/` with dots for the slashes, so `src/com/example/hello.anti` is `com.example.hello`. The module with `fn main` is the program, and a project without one is a library project.
 
@@ -207,7 +207,7 @@ A build resolves in four steps.
 3. It fetches every library file that is not in the cache and compares its digest with the index.
 4. It hands the sources of the project and every library file of the graph to the compiler.
 
-Fetched files go to the cache of the user, which chapter 1 places: `~/.cache/anti` on macOS and Linux unless `XDG_CACHE_HOME` names another, and `%LOCALAPPDATA%\anti\cache` on Windows. After the build above it holds three files.
+Fetched files go to the cache of the user, which [chapter 1]({{% relref "01-getting-started" %}}) places: `~/.cache/anti` on macOS and Linux unless `XDG_CACHE_HOME` names another, and `%LOCALAPPDATA%\anti\cache` on Windows. After the build above it holds three files.
 
 ```text
 index/<sha256 of the prefix>/com.example.units/index.toml
@@ -240,14 +240,14 @@ Where it lives: `src/anti/deps.c` resolves the graph and writes the lock file, a
 |---|---|
 | `--release` | release mode. Dev mode is the default of the tool |
 | `--target <t>`, `--target all` | build for that target, or for the list `all` of the manifest |
-| `--cpu <level>` | the processor level, which chapter 20 lists |
+| `--cpu <level>` | the processor level, which [chapter 20]({{% relref "20-targets" %}}) lists |
 | `--offline` | contact no repository |
-| `--lib static`, `--lib shared` | write a library for C with its header, as chapter 17 describes |
+| `--lib static`, `--lib shared` | write a library for C with its header, as [chapter 17]({{% relref "17-c-interop" %}}) describes |
 | `--bundle-runtime`, `--soname` | the two options of a library for C |
-| `--memory-checks` | build with the memory checks of chapter 12 |
+| `--memory-checks` | build with the memory checks of [chapter 12]({{% relref "12-memory" %}}) |
 | `--strip-docs` | leave the doc text out of the library files |
 | `--lto full`, `thin`, `none` | the link time optimization of a release build |
-| `--profile-generate`, `--profile-use <file>` | the two steps of a build with a profile, which chapter 21 describes |
+| `--profile-generate`, `--profile-use <file>` | the two steps of a build with a profile, which [chapter 21]({{% relref "21-performance" %}}) describes |
 | `--runtime <dir>` | the package to build with |
 
 ### A dev build
@@ -304,7 +304,7 @@ The objects of `anti.io`, `anti.lang`, `anti.mem`, `anti.text` and `com.example.
 
 ### A release build
 
-`anti build --release` compiles the whole program in one call of the compiler, as chapter 2 describes, and caches no object.
+`anti build --release` compiles the whole program in one call of the compiler, as [chapter 2]({{% relref "02-how-antic-works" %}}) describes, and caches no object.
 
 ```text
 build/macos-arm64/release/lib/com/example/hello.antl
@@ -585,7 +585,7 @@ anti license --from-archive libgeometry.a
 package geometry 0.0.0 
 ```
 
-The archive is the library of chapter 17, built by antic without a package version, so its header names `0.0.0` and no licence.
+The archive is the library of [chapter 17]({{% relref "17-c-interop" %}}), built by antic without a package version, so its header names `0.0.0` and no licence.
 
 Where it lives: `src/anti/licensing.c`, and `src/antic/notice.c` for the notice a build writes into a program.
 
@@ -599,7 +599,7 @@ A release program carries no symbol data, and a trace it prints is a list of add
 | `anti symbols check --conf <config.toml> [--symbols <symbols.zip>]...` | reports per binary whether its symbols are present, stale or missing |
 | `anti symbols resolve <trace.txt> --symbols <symbols.zip>...` | prints a raw trace with the function and the line of each frame |
 
-The commands start from the runtime configuration of chapter 15. They find the program in the directory of the configuration, and the libraries that its `plugins` key and its `[injections]` table name. Every binary is known by its build id, the 64 hex digits its notice carries. An archive belongs to a binary when the two ids are equal.
+The commands start from the runtime configuration of [chapter 15]({{% relref "15-hooks" %}}). They find the program in the directory of the configuration, and the libraries that its `plugins` key and its `[injections]` table name. Every binary is known by its build id, the 64 hex digits its notice carries. An archive belongs to a binary when the two ids are equal.
 
 The deployment of the example is one directory with three files: the program `tracer` of `tests/anti-symbols`, its archive `tracer-symbols.zip` and the configuration `tracer.toml`.
 

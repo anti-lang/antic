@@ -3,7 +3,7 @@ title: "Hooks"
 description: "Hooks and tracing, injection, runtime configuration, plugins, and what --no-hooks and --no-trace remove."
 summary: "The nine hooks of `anti.lang.Object` and the tracing built on them, injection and the standard interfaces, the runtime configuration, plugins, and what `--no-hooks` and `--no-trace` remove, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:18:56+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 150
 tags: [compilers, programming-languages]
@@ -269,7 +269,7 @@ The costs are the same in dev and in release.
 
 `--no-hooks` gives up the five hooks of every class of the program, every `TraceHandler`, the stock handlers of `anti.trace` and the loading of plugins.
 
-The excerpts show the module before the link. The LTO of a release link may inline `anti_rt_hook` into a site, as chapter 2 describes.
+The excerpts show the module before the link. The LTO of a release link may inline `anti_rt_hook` into a site, as [chapter 2]({{% relref "02-how-antic-works" %}}) describes.
 
 ### Pitfalls
 
@@ -454,7 +454,7 @@ The same file built with other options prints another second line. Each line bel
 | `antic --trace --trace writes` | `made 3, entered 4, left 4, failed 1, changed 2` |
 | `anti run`, a dev build | `made 4, entered 4, left 4, failed 1, changed 0` |
 
-The four calls are two of `draw`, one of `marked` and one of `check`. `scale` is private and `plain` is unmarked, so neither is traced. The two writes are `self.frames += n`. The dev build makes one object more, the stack trace of the error, which chapter 6 describes.
+The four calls are two of `draw`, one of `marked` and one of `check`. `scale` is private and `plain` is unmarked, so neither is traced. The two writes are `self.frames += n`. The dev build makes one object more, the stack trace of the error, which [chapter 6]({{% relref "06-errors" %}}) describes.
 
 The checker refuses each of the following.
 
@@ -836,7 +836,7 @@ An `inject` field is filled where the defaults of the class are written: in a li
 
 The call is indirect although the slot is filled at the link. The slot is a writable global, so the runtime may store another provider before `main`.
 
-The field is an ordinary pointer after that. `self.out.greeting()` is the call through an interface of chapter 9, with no further load of the slot.
+The field is an ordinary pointer after that. `self.out.greeting()` is the call through an interface of [chapter 9]({{% relref "09-classes" %}}), with no further load of the slot.
 
 `get` of a singleton makes its object at the first call, with a `compare_swap`, and gives the same object after it.
 
@@ -892,11 +892,11 @@ The runtime of a program has six keys, and three layers give a key its value.
 
 | Key | Value | Read by |
 |---|---|---|
-| `backtrace` | `true` or `false` | the capture of the frames of an error, chapter 6 |
-| `hash_seed` | a number | the hashing collections, chapter 16 |
+| `backtrace` | `true` or `false` | the capture of the frames of an error, [chapter 6]({{% relref "06-errors" %}}) |
+| `hash_seed` | a number | the hashing collections, [chapter 16]({{% relref "16-collections" %}}) |
 | `logger` | a path | `anti.log`, the file of its sinks |
 | `plugins` | directories, separated by `:` | the discovery of plugins |
-| `threads` | a count from 1 | the worker pool, chapter 13 |
+| `threads` | a count from 1 | the worker pool, [chapter 13]({{% relref "13-threads" %}}) |
 | `trace` | names of handlers | `trace.start()` of `anti.trace` |
 
 The layers, the strongest first:

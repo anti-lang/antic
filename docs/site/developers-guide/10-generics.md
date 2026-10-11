@@ -3,7 +3,7 @@ title: "Generics"
 description: "Generic functions and classes, constraints, one copy per use, what can be generic and the size of the code."
 summary: "Generic functions and classes with their type parameters, constraints checked where the generic is written and at each use, one compiled copy per use, what can be generic, and the size of the code, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:15:36+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 100
 tags: [compilers, programming-languages]
@@ -39,7 +39,7 @@ In an expression, `<` after a name opens type arguments when a list of types clo
 
 Two uses with the same arguments are one type, in every module. A generic that nothing uses compiles to nothing.
 
-A value of a type parameter moves. A parameter that the function keeps, returns or passes on is marked `own`, and `dup(x)` copies one. Chapter 11 gives the rule and its reason.
+A value of a type parameter moves. A parameter that the function keeps, returns or passes on is marked `own`, and `dup(x)` copies one. [Chapter 11]({{% relref "11-ownership" %}}) gives the rule and its reason.
 
 ```anti
 //! name: gen
@@ -538,7 +538,7 @@ b0:
 
 - In `largest<cons.Money>` the `<` of the body is a direct call of `cons.lt`, the `operator fn` of the struct. No table of operators is passed, and nothing is looked up at run time.
 - In `largest<int>` the same `<` is the instruction `slt`.
-- In `area_of<cons.Square>` the constraint is an interface. The copy takes the address of the `shape` part of the `Square` and calls `area` through the table of that part. Chapter 9 shows that code for any interface call. A release build binds the call when one class fills the entry.
+- In `area_of<cons.Square>` the constraint is an interface. The copy takes the address of the `shape` part of the `Square` and calls `area` through the table of that part. [Chapter 9]({{% relref "09-classes" %}}) shows that code for any interface call. A release build binds the call when one class fills the entry.
 
 The three constraint forms therefore cost a direct call, an instruction, or a dispatch, and the form of the type argument decides which.
 
@@ -794,8 +794,8 @@ The generic forms combine with the other features of the language.
 
 - A function of a class takes type parameters of its own, `pub fn top<U>(self, fallback: T, f: fn(T) -> U) -> U`. It is called directly and has no entry in the table, so it cannot be `abstract` and cannot be replaced.
 - A type nested in a generic class sees the parameters of the class. Each copy of the class has a copy of the nested type.
-- A generic class may be `synchronized` or `concurrent`, and the rules of chapter 14 hold in every copy.
-- A generic `worker fn` is checked against the rules of workers of chapter 13 in every copy, with the concrete types.
+- A generic class may be `synchronized` or `concurrent`, and the rules of [chapter 14]({{% relref "14-concurrent-classes" %}}) hold in every copy.
+- A generic `worker fn` is checked against the rules of workers of [chapter 13]({{% relref "13-threads" %}}) in every copy, with the concrete types.
 - A generic function may be `may fail`.
 - A generic type declares operators and language hooks, so `for x in list` works for every copy of a list with `operator fn iter`.
 - A function type is a type argument, as in `List<fn(int) -> int>`.
@@ -993,7 +993,7 @@ Where it lives: `sema_compile_copies` of `src/antic/sema_copies.c` makes the cop
 | A nested type of a generic class | one copy per copy of the class | the same |
 | A generic synchronized class | the hidden lock in each object of each copy | the same |
 | A generic worker | one copy per type argument, started as any worker | the same |
-| A generic `may fail` function | the out pointer and the error result of chapter 6 | the same |
+| A generic `may fail` function | the out pointer and the error result of [chapter 6]({{% relref "06-errors" %}}) | the same |
 | Table entries | none for a function with type parameters of its own | none |
 
 ### Pitfalls

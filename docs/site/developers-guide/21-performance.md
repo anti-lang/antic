@@ -3,7 +3,7 @@ title: "Performance"
 description: "One table of the cost of every feature of the guide, measuring with tests/bench, --profile-generate and --profile-use, tracing, and the checks a release keeps."
 summary: "One table with the cost of every feature of the guide and a link to its section, measuring with `tests/bench`, `--profile-generate` and `--profile-use`, tracing, and which checks a release build keeps and what turning them off gives up."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T19:50:00+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 210
 tags: [compilers, programming-languages]
@@ -150,7 +150,7 @@ The release compile is the whole build of a program: the passes of antic, `opt`,
 
 ### Options of a build
 
-`run_bench.cmake` takes options of antic in `OPTIONS`, for both builds of a program. `RELEASE_OPTIONS` holds options for the release build alone. Each column below is one run of the runner with one set of options. The table therefore shows what an option costs or saves on the five programs.
+`run_bench.cmake` passes what `OPTIONS` holds to antic, for the release and the dev compile of a program. The variable `RELEASE_OPTIONS` holds options for the release build alone. Each column below is one run of the runner with one set of options. The table therefore shows what an option costs or saves on the five programs.
 
 | Program | Plain | `--lto none` | `--checks --asserts` | `--no-hooks` | `--trace objects` | `--profile-use` |
 |---|---:|---:|---:|---:|---:|---:|
@@ -218,7 +218,7 @@ Where it lives: `profile_options` of `src/antic/llvm_run.c` passes the options t
 
 ## Tracing
 
-A traced function calls the runtime twice, once on entry and once on exit. A class marked `trace` is traced in a dev build and with `--trace`, and `--trace <pattern>` traces a class that did not ask. Chapter 15 counts what stands inside each call.
+A traced function calls the runtime twice, once on entry and once on exit. A class marked `trace` is traced in a dev build and with `--trace`, and `--trace <pattern>` traces a class that did not ask. [Chapter 15]({{% relref "15-hooks" %}}) counts what stands inside each call.
 
 The column `--trace objects` of the table of options traces every class of the module `objects`, in the release build, with no handler installed. On each of 20,000 passes, each of 4,096 shapes takes `grow`, `area` and one `add` of the counter. That is 245.76 million traced calls. The program ran in 483.3 ms against 104.0 ms. The other four programs hold no class of that module and stayed within the noise.
 
@@ -256,7 +256,7 @@ The column was therefore measured two more times. `map_work` repeats its gain, a
 
 ## Checks of a release build
 
-A release build drops the checks of dev mode and the assertions. `--checks` and `--asserts` keep them in a release build, and `--no-checks` and `--no-asserts` drop them from a dev build. The build that compiles the program decides for every module in it. The standard library and the copies of its generics are among them.
+Outside dev mode a program holds no check of that mode and no assertion. The options `--checks` and `--asserts` keep them in a release build, and `--no-checks` and `--no-asserts` drop them from a dev build. The build that compiles the program decides for every module in it. The standard library and the copies of its generics are among them.
 
 | Check of dev mode | Section | In a release build | Without it |
 |---|---|---|---|

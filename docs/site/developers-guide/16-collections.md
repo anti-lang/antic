@@ -3,7 +3,7 @@ title: "Collections"
 description: "The layout, the growth and the cost of each operation of List, Deque, Ring, Grid, the maps and the sets, the sorted ones, Pool, Tree and PriorityQueue."
 summary: "The collections of `anti.collection` with their layout and their growth, walking, hashing and its seed, order and equality, and one table with the cost of each operation, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:19:28+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 160
 tags: [compilers, programming-languages]
@@ -347,7 +347,7 @@ b0:
   call void @llvm.memcpy.p0.p0.i64(ptr noundef nonnull align 1 dereferenceable(64) %v20.i, ptr noundef nonnull align 8 dereferenceable(64) %p2, i64 64, i1 false)
 ```
 
-- The symbol is the copy of the class for `int`. `$3c` and `$3e` are the escaped brackets, as chapter 10 describes.
+- The symbol is the copy of the class for `int`. `$3c` and `$3e` are the escaped brackets, as [chapter 10]({{% relref "10-generics" %}}) describes.
 - The two loads read `count` at offset 8 and `capacity` at offset 104, and the compare decides whether the block grows.
 - The call of `resize` is the growth. opt inlined `make_room` and `grown` around it.
 - The `store` writes the element into its slot.
@@ -626,7 +626,7 @@ For a Java programmer:
 For a C programmer:
 
 - The index of a grid is `g[x, y]`, column first. The block is stored row by row, so the cell is at `y * width + x`.
-- A ring is for one thread. `SpscRing<T, N>` of chapter 14 is the ring between two threads.
+- A ring is for one thread. `SpscRing<T, N>` of [chapter 14]({{% relref "14-concurrent-classes" %}}) is the ring between two threads.
 
 For a C++ programmer:
 
@@ -642,7 +642,7 @@ For a C++ programmer:
 
 ### The feature
 
-`anti.collection.map` holds two maps. `Map<K, V>` walks its entries in the order their keys were first added, on every run and every machine. `HashMap<K, V>` keeps no order and walks in a new random order on every walk. Both find a key by its hash. The key type needs `==` and `hash`, which every type of chapter 3 and every struct of them has by default.
+`anti.collection.map` holds two maps. `Map<K, V>` walks its entries in the order their keys were first added, on every run and every machine. `HashMap<K, V>` keeps no order and walks in a new random order on every walk. Both find a key by its hash. The key type needs `==` and `hash`, which every type of [chapter 3]({{% relref "03-values" %}}) and every struct of them has by default.
 
 | Operation | Result |
 |---|---|
@@ -1522,7 +1522,7 @@ Where it lives: `src/std/anti/collection/pool.anti`. `Slots<T>` holds `slot_of`,
 | The address of a slot | the highest bit of the index, found with six compares, and one load of the block pointer |
 | `remove` | zeroes the slot and raises the generation. No element moves |
 | A walk | every slot handed out, free ones included, and one more version per element reached |
-| Atomic operations and locks | none. `SyncPool<T>` of chapter 14 is the pool for more than one thread |
+| Atomic operations and locks | none. `SyncPool<T>` of [chapter 14]({{% relref "14-concurrent-classes" %}}) is the pool for more than one thread |
 | Checks | the test of the handle, in every build |
 | Copies of code | one copy of `Pool<T>`, `Slots<T>` and `Collection<T>` per element type |
 
@@ -1742,7 +1742,7 @@ For a C++ programmer:
 
 ### The feature
 
-`for` walks a range, a slice, an array, a collection or an iterator. Chapter 4 holds the loop itself. This section holds what a collection adds.
+`for` walks a range, a slice, an array, a collection or an iterator. [Chapter 4]({{% relref "04-flow" %}}) holds the loop itself. This section holds what a collection adds.
 
 | Form | What the body receives |
 |---|---|
@@ -2039,7 +2039,7 @@ A struct replaces the default with `operator fn hash(a: S) -> u64` at module lev
 
 The hashing collections do not use `x.hash()` as it is. Each mixes it with a seed, a `u64` that the runtime draws from the random source of the system when the program starts. `lang.hash_seed()` gives the seed. A collection reads it once, when it is made.
 
-The option `--anti.hash_seed=<n>` of every program and the key `hash_seed` of the runtime configuration fix the seed. A test that needs the same buckets on every run sets one of them. Chapter 15 holds the runtime configuration.
+The option `--anti.hash_seed=<n>` of every program and the key `hash_seed` of the runtime configuration fix the seed. A test that needs the same buckets on every run sets one of them. [Chapter 15]({{% relref "15-hooks" %}}) holds the runtime configuration.
 
 The seed decides the buckets and never the order a program sees. A `Map` walks in insertion order, and a `HashMap` takes its order from another random number.
 
@@ -2440,7 +2440,7 @@ b0:
   %v8 = call range(i8 0, 2) i8 (i64, i64, i64, i64) @orders.lt(i64 %v1, i64 %v3, i64 %v5, i64 %v7)
 ```
 
-The two structs of 16 bytes pass as four integers, by the calling convention of chapter 5. A release build inlines `lt` into `before`:
+The two structs of 16 bytes pass as four integers, by the calling convention of [chapter 5]({{% relref "05-functions" %}}). A release build inlines `lt` into `before`:
 
 ```llvm excerpt=orders target=linux-x86_64 mode=release
 define dso_local noundef zeroext range(i8 0, 2) i8 @before(ptr

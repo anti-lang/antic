@@ -3,7 +3,7 @@ title: "Functions"
 description: "Declaration, parameters, defaults, source locations, the calling convention, inlining, closures, snapshot fn and own fn, function values."
 summary: "Declaration and parameters, default values and source locations, the calling convention, inlining, anonymous functions and closures with their captures, `snapshot fn` and `own fn`, and function values with their layout, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:12:59+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 50
 tags: [compilers, programming-languages]
@@ -26,7 +26,7 @@ An argument is copied into its parameter. A parameter is a variable of the funct
 
 A name has one function. Anti has no overloading by signature. The functions of a file may stand in any order and may call themselves. A named function stands at module level or in a class body, never inside another function. The form inside a body is the anonymous function of a later section.
 
-A call gives every parameter without a default one argument, by position. The result of a call may be dropped, unless the function may fail, which chapter 6 describes.
+A call gives every parameter without a default one argument, by position. The result of a call may be dropped, unless the function may fail, which [chapter 6]({{% relref "06-errors" %}}) describes.
 
 The word before `fn` sets who may call it.
 
@@ -37,7 +37,7 @@ The word before `fn` sets who may call it.
 | `pub` | every module |
 | `export` | every module, and C: the function stands in the header under its plain name |
 
-Four words mark a parameter. `own` takes the argument over, and the caller no longer has it. `lent` borrows a pointer or a slice for the call and keeps no copy. Chapter 11 describes both. `keep` marks a parameter of function type that the function stores, and `concurrent` one that it passes on to another thread. A later section describes both.
+Four words mark a parameter. `own` takes the argument over, and the caller no longer has it. `lent` borrows a pointer or a slice for the call and keeps no copy. [Chapter 11]({{% relref "11-ownership" %}}) describes both. `keep` marks a parameter of function type that the function stores, and `concurrent` one that it passes on to another thread. A later section describes both.
 
 `main` is `fn main() -> int`, `fn main(args: []str) -> int` or `fn main(args: []str, env: []str) -> int`. Its result is the exit status of the program.
 
@@ -280,7 +280,7 @@ For a C programmer:
 For a C++ programmer:
 
 - Anti has no reference parameters. `*T` is the form, and it cannot be `none`.
-- No overloading and no templates by overload. A generic function of chapter 10 takes the place of an overload set.
+- No overloading and no templates by overload. A generic function of [chapter 10]({{% relref "10-generics" %}}) takes the place of an overload set.
 - `own` on a parameter is a move that the checker enforces: the caller cannot name the argument afterwards.
 
 ## Defaults and source locations
@@ -577,7 +577,7 @@ flip 2 1, dot 11, grow 7, count 5, add 4, half 4, apply 42
 sizes: Point 16, Vec2 16, Box 40, Counter 16, str 16
 ```
 
-`half` may fail, and its handler `catch { yield -1; }` gives -1 in place of the result when it does. Chapter 6 describes handlers, and chapter 9 the class `Counter` with its `self`.
+`half` may fail, and its handler `catch { yield -1; }` gives -1 in place of the result when it does. [Chapter 6]({{% relref "06-errors" %}}) describes handlers, and [chapter 9]({{% relref "09-classes" %}}) the class `Counter` with its `self`.
 
 ### How antic builds it
 
@@ -663,7 +663,7 @@ No call takes a lock, an atomic operation or heap memory, and no check is insert
 For a Java programmer:
 
 - A struct argument has a cost by its size. Past 16 bytes it is copied at every call, and a pointer avoids the copy.
-- `self` is an ordinary first argument, a pointer to the object. Chapter 9 describes when a call goes through the table of the class.
+- `self` is an ordinary first argument, a pointer to the object. [Chapter 9]({{% relref "09-classes" %}}) describes when a call goes through the table of the class.
 
 For a C programmer:
 
@@ -782,7 +782,7 @@ retq
 
 The function is four instructions and has no frame.
 
-Under `-g` a release build records an inlined call in the debug information, so a debugger and a stack trace with line numbers still name `square`. Chapter 20 describes that.
+Under `-g` a release build records an inlined call in the debug information, so a debugger and a stack trace with line numbers still name `square`. [Chapter 20]({{% relref "20-targets" %}}) describes that.
 
 Where it lives: `llvm_opt_options` and `run_opt` of `src/antic/llvm_run.c` hold the pipeline and the threshold, which `LLVM_INLINE_THRESHOLD` of `src/antic/llvm_run.h` names. `src/antic/linker.c` passes the same threshold to the LTO link. `frames_kept` and `main_kept` of `src/antic/llvm_emit.c` mark the functions that stay.
 
@@ -802,7 +802,7 @@ The threshold is a cost in the units of `opt`, not a count of source lines. No o
 
 For a Java programmer:
 
-- Inlining is fixed when the program is built. No run-time profile changes it. `--profile-generate` and `--profile-use` of chapter 21 give `opt` a profile at build time.
+- Inlining is fixed when the program is built. No run-time profile changes it. `--profile-generate` and `--profile-use` of [chapter 21]({{% relref "21-performance" %}}) give `opt` a profile at build time.
 - A dev build inlines no call and keeps every local in memory, as the excerpt of `hyp2` shows.
 
 For a C programmer:
@@ -836,7 +836,7 @@ A closure never outlives what it captures, and the checker enforces that through
 
 The receiver of a function parameter without `keep` may call it and may pass it on to another such parameter. It cannot store it.
 
-A parameter marked `concurrent` hands its function on to `parallel` or `dispatch`. A closure passed there may change a captured variable only when the type of the variable is thread-safe. Chapter 13 describes that rule.
+A parameter marked `concurrent` hands its function on to `parallel` or `dispatch`. A closure passed there may change a captured variable only when the type of the variable is thread-safe. [Chapter 13]({{% relref "13-threads" %}}) describes that rule.
 
 An anonymous function that captures nothing is an ordinary function. It may go wherever a named function goes.
 
@@ -1408,7 +1408,7 @@ jmpq *%r8
 
 The five moves put `a` and `b` into the first two argument registers and the context into the third. `jmpq *%r8` jumps to the code.
 
-The C header of `call_it` writes the pair as a callback and a `void *`. Chapter 17 shows the header.
+The C header of `call_it` writes the pair as a callback and a `void *`. [Chapter 17]({{% relref "17-c-interop" %}}) shows the header.
 
 Where it lives: `types_fn_form` of `src/antic/types.c` holds the forms of a function type. `sema_param_form` of `src/antic/sema.c` chooses one and `require_fn_form` of `src/antic/sema_expr.c` converts between them. `lower_call` of `src/antic/lower_expr.c` writes the call, and `lower_push_argument` of `src/antic/lower.c` splits a pair.
 
@@ -1431,7 +1431,7 @@ An indirect call is not inlined unless `opt` learns the target. A table of funct
 For a Java programmer:
 
 - A function type is no interface. `fn(int) -> int` has no methods and no implementing class.
-- A method of an object as a value, `c.area`, is bound to that object. Chapter 9 describes bound functions.
+- A method of an object as a value, `c.area`, is bound to that object. [Chapter 9]({{% relref "09-classes" %}}) describes bound functions.
 
 For a C programmer:
 

@@ -3,16 +3,16 @@ title: "Values"
 description: "The types and literals of Anti, variables and constants, integers that wrap or saturate, overflow checks, floats and f16, text and bytes, tuples and inference."
 summary: "Types, literals, variables and constants, integers with `+%` and `+|` and the overflow checks of dev mode, floats and `f16`, `str` and `[]byte` with their layout, tuples and type inference, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:11:01+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 30
 tags: [compilers, programming-languages]
 keywords: [types, literals, integer overflow, wrapping arithmetic, saturating arithmetic, f16, strings, tuples, type inference]
 ---
 
-A scalar value of Anti has a size that is the same on all six targets, and no number converts to another type without `as`. Signed arithmetic is checked in a dev build and wraps in a release build. The wrapping and the saturating operators state the intent of a line in both. This chapter covers the scalar types, text and bytes, and tuples. Chapter 8 covers structs, enums and variants, and chapter 12 covers arrays and slices.
+A scalar value of Anti has a size that is the same on all six targets, and no number converts to another type without `as`. Signed arithmetic is checked in a dev build and wraps in a release build. The wrapping and the saturating operators state the intent of a line in both. This chapter covers the scalar types, text and bytes, and tuples. [Chapter 8]({{% relref "08-structs-enums" %}}) covers structs, enums and variants, and [chapter 12]({{% relref "12-memory" %}}) covers arrays and slices.
 
-Some examples mark a function `export fn`. An exported function keeps its plain name and stays in the release module, so a release excerpt can show it. Chapter 17 describes `export fn`.
+Some examples mark a function `export fn`. An exported function keeps its plain name and stays in the release module, so a release excerpt can show it. [Chapter 17]({{% relref "17-c-interop" %}}) describes `export fn`.
 
 ## Types and literals
 
@@ -33,7 +33,7 @@ The scalar types have fixed widths, and four of them have a second name.
 | `bool` | | 8 | `true` and `false` |
 | `char` | | 32 | one Unicode scalar value |
 
-The compound types are `str`, the array `[N]T`, the slice `[]T` and the pointers `*T` and `?*T`. The optional `?T`, the function type `fn(A) -> R` and the tuple `(A, B)` complete them. The C types `c_int`, `c_long` and the others exist for bindings and stand in chapter 17.
+The compound types are `str`, the array `[N]T`, the slice `[]T` and the pointers `*T` and `?*T`. The optional `?T`, the function type `fn(A) -> R` and the tuple `(A, B)` complete them. The C types `c_int`, `c_long` and the others exist for bindings and stand in [chapter 17]({{% relref "17-c-interop" %}}).
 
 A literal has no suffix. It takes its type from where it stands, and an integer literal without such a context is an `int`, a float literal a `float`.
 
@@ -682,7 +682,7 @@ let y = x++;
 
 ### How antic builds it
 
-Lowering writes a checked `+` as the IR operation `addov` followed by `branchov`, as chapter 2 shows for `*`. The LLVM text writes the pair as the signed `with.overflow` intrinsic of the width and a branch on its bit. This is `checked` in dev mode.
+Lowering writes a checked `+` as the IR operation `addov` followed by `branchov`, as [chapter 2]({{% relref "02-how-antic-works" %}}) shows for `*`. The LLVM text writes the pair as the signed `with.overflow` intrinsic of the width and a branch on its bit. This is `checked` in dev mode.
 
 ```llvm excerpt=ints target=linux-x86_64 mode=dev
 define dso_local noundef i64 @checked(i64 noundef %p0, i64 noundef %p1) #0 {
@@ -1062,7 +1062,7 @@ A `String` of Java is an immutable object of UTF-16 code units that the collecto
 
 A `char` is one Unicode scalar value in 32 bits. A character literal is a `char`, and `s[i]` is a `byte`, so neither converts to the other without `as`.
 
-`[]byte` is a slice of bytes with no encoding. Chapter 12 covers slices.
+`[]byte` is a slice of bytes with no encoding. [Chapter 12]({{% relref "12-memory" %}}) covers slices.
 
 The string literals have seven prefixes.
 
@@ -1172,7 +1172,7 @@ raw.len 3, raw[0] 255, hex[1] 171
 n = 42, size_of(str) = 16, size_of(char) = 4
 ```
 
-`é` is two bytes in UTF-8, 195 and 169, so `"héllo"` has a length of 6 and 5 characters. `"Z" < "a"` holds because the comparison is by bytes and 90 is below 97. `text.parse_int` may fail, and `catch fatal` after the call prints the error and ends the program when it does. Chapter 6 covers failing functions and their handlers.
+`é` is two bytes in UTF-8, 195 and 169, so `"héllo"` has a length of 6 and 5 characters. `"Z" < "a"` holds because the comparison is by bytes and 90 is below 97. `text.parse_int` may fail, and `catch fatal` after the call prints the error and ends the program when it does. [Chapter 6]({{% relref "06-errors" %}}) covers failing functions and their handlers.
 
 The checker refuses each of the following.
 
@@ -1448,7 +1448,7 @@ retq
 
 The first element comes back in `rax` and the second in `rdx`. The function has no frame, no memory access and no branch.
 
-A tuple above 16 bytes, such as `(int, str)`, is returned through a pointer that the caller passes. A function marked `may fail` returns its error in the register and writes its tuple through one out pointer, which chapter 6 describes.
+A tuple above 16 bytes, such as `(int, str)`, is returned through a pointer that the caller passes. A function marked `may fail` returns its error in the register and writes its tuple through one out pointer, which [chapter 6]({{% relref "06-errors" %}}) describes.
 
 In dev mode a tuple local is a slot of the frame, and `t.0` is a load at the offset of the element.
 
@@ -1518,7 +1518,7 @@ let c = half(3.0);
 let d: [3]i16 = [1, 2, 3];
 ```
 
-A call of a generic function takes its type arguments from its arguments, from left to right. Chapter 10 covers generics.
+A call of a generic function takes its type arguments from its arguments, from left to right. [Chapter 10]({{% relref "10-generics" %}}) covers generics.
 
 ```anti
 fn is_less<T: Ordered>(a: T, b: T) -> bool { return a < b; }

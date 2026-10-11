@@ -3,7 +3,7 @@ title: "Structs and enums"
 description: "Structs and their layout, packed and align, unions and bitfields, simd structs, enums, variants with their tag and payload, and pattern matching."
 summary: "Structs with C layout, `packed` and `align`, unions and bitfields, simd structs, enums, variants as a tag and a union of their cases, and the `switch` that takes a variant apart, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:14:36+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 80
 tags: [compilers, programming-languages]
@@ -24,16 +24,16 @@ A struct declares fields and nothing else. Each field is a name and a type, the 
 
 - Every field is readable and writable wherever the struct is visible. A struct has no `pub`, no `protected` and no private field.
 - A field has no default. A literal names every field, in any order.
-- A struct holds no function, no constant and no `inherits`. Behaviour belongs to a class of chapter 9.
+- A struct holds no function, no constant and no `inherits`. Behaviour belongs to a class of [chapter 9]({{% relref "09-classes" %}}).
 - Structs are nominal. Two declarations with the same fields are two types, and neither converts to the other.
 - A struct holds another struct inline. A struct that holds itself is refused, and a pointer to itself is an ordinary field, as `next: ?*Node` is.
 - A struct of another module is named with its module, `geo.Rect { x: 0.0, y: 0.0, w: 1.0, h: 1.0 }`.
 
-A struct is a value. `let copy = r;` copies every byte, an argument of struct type is a copy, and a result is a copy. A function that changes the struct of its caller takes a `*Rect`. A struct that owns something, such as one with a collection inside, follows the value rules of chapter 11 and is not copied by `=`.
+A struct is a value. `let copy = r;` copies every byte, an argument of struct type is a copy, and a result is a copy. A function that changes the struct of its caller takes a `*Rect`. A struct that owns something, such as one with a collection inside, follows the value rules of [chapter 11]({{% relref "11-ownership" %}}) and is not copied by `=`.
 
 The method-call form works on a struct. `r.area()` is `area(&r)`, and `r.widen(2.0)` is `widen(r, 2.0)`, when `area` and `widen` are free functions of the module that declares `Rect`. The first parameter decides between the address and the copy. The struct does not know the functions exist.
 
-`==` and `!=` compare two structs field by field, each field by its kind. A number compares by its value, a `str` by its bytes, a pointer by its address and an inline struct by these rules again. `x.hash()` gives a `u64` over the same fields in the same order, so two structs that are equal hash alike. A struct has no default `<`. An `operator fn` at module level replaces a default or adds an operator, as the section on operators of chapter 9 shows.
+`==` and `!=` compare two structs field by field, each field by its kind. A number compares by its value, a `str` by its bytes, a pointer by its address and an inline struct by these rules again. `x.hash()` gives a `u64` over the same fields in the same order, so two structs that are equal hash alike. A struct has no default `<`. An `operator fn` at module level replaces a default or adds an operator, as the section on operators of [chapter 9]({{% relref "09-classes" %}}) shows.
 
 `size_of(T)` is the size of a type in bytes on the target, padding included.
 
@@ -254,13 +254,13 @@ vmovups %ymm0, (%rdi)
 
 The default hash is written in place as well. `key` runs the finalizer of MurmurHash3 over each field and again over the running value, four multiplications per field. It reads no seed and calls nothing.
 
-A value of struct type passes as the C convention of the target passes that struct, which chapter 5 covers. On linux-x86_64 a `Rect` travels in two `xmm` registers and comes back in two.
+A value of struct type passes as the C convention of the target passes that struct, which [chapter 5]({{% relref "05-functions" %}}) covers. On linux-x86_64 a `Rect` travels in two `xmm` registers and comes back in two.
 
 ```llvm excerpt=rects target=linux-x86_64 mode=dev
 define hidden { <2 x float>, <2 x float> } @rects.widen(<2 x float> %p0.0, <2 x float> %p0.1, float noundef %p1) #0 {
 ```
 
-Lowering writes a descriptor for every struct of a module. It holds the name, the size and a record per field with the name, the offset and a type id. The descriptor is 136 bytes and a field record 48. A struct never points at its descriptor. Reflection and the default `serialize` of a class with a struct field reach it, and chapter 9 describes both. The release module of `rects` holds none of the five, because nothing refers to them.
+Lowering writes a descriptor for every struct of a module. It holds the name, the size and a record per field with the name, the offset and a type id. The descriptor is 136 bytes and a field record 48. A struct never points at its descriptor. Reflection and the default `serialize` of a class with a struct field reach it, and [chapter 9]({{% relref "09-classes" %}}) describes both. The release module of `rects` holds none of the five, because nothing refers to them.
 
 Where it lives: `compute` of `src/antic/layout.c` lays out every aggregate, and `layout_resolve` replaces `size_of` and `offset_of`. `lower_field_at`, `lower_field_offset` and `lower_literal_address` of `src/antic/lower.c`. `lower_equals` of `src/antic/lower_eq.c` and `lower_hash` of `src/antic/lower_hash.c` write the defaults. `lower_struct_descriptor` of `src/antic/lower_desc.c`.
 
@@ -1251,7 +1251,7 @@ C writes a sum type by hand: a struct with a tag and a union, and a `switch` on 
 - A variant has one case or more, and a variant that holds itself is refused.
 - A declaration takes `packed` and `align(N)`. `packed` reaches the fields of the cases as well.
 - Another module names a case as `geo.Shape.Circle { r: 2.0 }` and tests it as `v is geo.Shape.Circle`.
-- A variant with a case that owns something follows the value rules of chapter 11. It is torn down by its tag, and `=` of an existing one is refused.
+- A variant with a case that owns something follows the value rules of [chapter 11]({{% relref "11-ownership" %}}). It is torn down by its tag, and `=` of an existing one is refused.
 
 ```anti
 //! name: shapes
@@ -1509,7 +1509,7 @@ C takes a tagged union apart with a `switch` on the tag and reads the member the
 
 `switch`, `if let` and `is` take a variant value. A pointer `p` to a variant is written `*p`, which reads through the pointer and copies only the case an arm binds.
 
-An arm that binds a case with an owning field gets a copy of what the field owns. The arm tears the copy down at its end. Chapter 11 covers that copy.
+An arm that binds a case with an owning field gets a copy of what the field owns. The arm tears the copy down at its end. [Chapter 11]({{% relref "11-ownership" %}}) covers that copy.
 
 ```anti
 //! name: match

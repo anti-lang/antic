@@ -3,7 +3,7 @@ title: "Getting started"
 description: "Installing the package of Anti, the first program, anti build and anti run, dev and release builds and where the files go."
 summary: "The package per platform and its one-command install, antic and anti, a first program, `anti build` and `anti run`, the dev and the release mode and the directories an install and a build write."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:12:15+02:00
+lastmod: 2026-10-11T20:23:44+02:00
 draft: true
 weight: 10
 tags: [compilers, programming-languages]
@@ -29,7 +29,7 @@ Each package is complete on its own. It builds programs for all six targets with
 | `licenses/` | the licence text of each component and `sources.txt`, the record of its upstream source |
 | `LICENSE`, `VERSION` | the licence of Anti and its version |
 
-A library file, `<module>.antl`, is the compiled form of one module: its public interface and its code in the IR of antic. A processor level is the instruction set a build assumes, such as `x86-64-v3`. Chapter 20 lists the levels.
+A library file, `<module>.antl`, is the compiled form of one module: its public interface and its code in the IR of antic. A processor level is the instruction set a build assumes, such as `x86-64-v3`. [Chapter 20]({{% relref "20-targets" %}}) lists the levels.
 
 The frameworks of Apple are the one thing a package lacks, since their licence allows no redistribution. A program that names one with `link framework` needs the stubs that `anti sdk export` packs on a Mac and `anti sdk import` unpacks on any host.
 
@@ -105,7 +105,7 @@ antic [options] <file.anti> [<library.antl>...] [<object.o> <archive.a>...]
 | `-o <file>` | the output. Without it the output is the input without `.anti` |
 | `--dev` | dev mode. Release mode is the default of `antic` |
 | `--target <name>` | compile and link for that target. The host is the default |
-| `--cpu <level>` | the processor level. Chapter 20 lists the levels |
+| `--cpu <level>` | the processor level. [Chapter 20]({{% relref "20-targets" %}}) lists the levels |
 | `-S` | stop after writing the assembly text |
 | `-c` | write the library file `<file>.antl` of the module and stop |
 | `-I <dir>` | a search root: module `a.b` is `a/b.anti` or `a/b.antl` under it |
@@ -129,7 +129,7 @@ antic [options] <file.anti> [<library.antl>...] [<object.o> <archive.a>...]
 | `anti symbols` | collect and read the symbols archives of a deployed program |
 | `anti sdk export`, `anti sdk import` | pack and unpack the stubs of Apple's SDK |
 
-Chapter 18 describes each command. `anti --help` prints the options of all of them.
+[Chapter 18]({{% relref "18-the-tool" %}}) describes each command. `anti --help` prints the options of all of them.
 
 ## Hello
 
@@ -172,7 +172,7 @@ antic hello.anti
 ./hello
 ```
 
-The first command writes two files beside the source: the executable `hello` and the object `hello.o`. The build is a release build, so the program and the runtime are linked with link-time optimization, LTO for short. Chapter 2 describes that link. The second command prints `hello`.
+The first command writes two files beside the source: the executable `hello` and the object `hello.o`. The build is a release build, so the program and the runtime are linked with link-time optimization, LTO for short. [Chapter 2]({{% relref "02-how-antic-works" %}}) describes that link. The second command prints `hello`.
 
 `antic --target linux-x86_64 -o hello-linux hello.anti` writes the same program for Linux on any host. The package holds the runtime and the sysroot of every target, so a cross-build needs no other install.
 
@@ -214,7 +214,7 @@ A dev build of `com.example.hello` on macos-arm64 writes these files.
 
 The library file and each object under `obj/` have a file with the suffix `.key` beside them. The key is one line. It holds the SHA-256 of the input, the version of antic, the target and the processor level. It also says whether the build writes debug lines. The word `strict` follows in a build that refuses warnings and `memory-checks` in a build with `--memory-checks`. A build compiles a module again only when its key changes.
 
-`build/` is disposable, and `dist/` holds what a user runs. Chapter 18 describes the manifest, the lock file and the cache.
+`build/` is disposable, and `dist/` holds what a user runs. [Chapter 18]({{% relref "18-the-tool" %}}) describes the manifest, the lock file and the cache.
 
 `anti build --release` writes `build/macos-arm64/release/` and `dist/macos-arm64/release/` in the same way. Its `dist/` also holds `hello-symbols.zip`, the symbols archive of the program. A release program carries no symbol data, and the archive holds what turns the addresses of a stack trace into names and lines. The option `--target <name>` builds for another target and `--target all` for all six.
 
@@ -263,7 +263,7 @@ A dev build of the same file stops at the multiplication. It prints `grow.anti:6
 overflow in *\00"
 ```
 
-The release module holds no such text and no call of `anti_rt_check_failed`. `--checks` keeps the checks in a release build, and `--no-checks` drops them from a dev build. Chapter 2 shows the code of both modes for one function, and chapter 3 lists every check.
+The release module holds no such text and no call of `anti_rt_check_failed`. `--checks` keeps the checks in a release build, and `--no-checks` drops them from a dev build. [Chapter 2]({{% relref "02-how-antic-works" %}}) shows the code of both modes for one function, and [chapter 3]({{% relref "03-values" %}}) lists every check.
 
 ## File locations
 
