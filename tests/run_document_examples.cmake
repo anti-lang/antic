@@ -17,7 +17,9 @@
 # A block is a mix of items and statements. A line that starts with a
 # word that opens an item, such as `fn`, `class` or `import`, begins an
 # item, which runs until its braces close on a line that ends in `}` or
-# `;`. Every other line is a statement. The items stand at module level
+# `;`. A `const` that starts a line is an item, so that the functions of
+# the block reach it, and one inside a body stays where it is. Every
+# other line is a statement. The items stand at module level
 # and the statements go into the body of one function. That function may
 # fail when a statement forwards with `try` or writes `fail`.
 # `import anti.lang;` stands first unless the block writes it.
@@ -156,7 +158,7 @@ if(documents STREQUAL "")
     message(FATAL_ERROR "no document to read in `${DOCUMENTS}`")
 endif()
 
-set(item_start "^(import|pub|internal|fn|extern|export|struct|packed|union|enum|variant|class|abstract|final|singleton|simd|trace|worker|provides|link|tests|fixtures|constraint|type)( |$)")
+set(item_start "^(import|pub|internal|const|fn|extern|export|struct|packed|union|enum|variant|class|abstract|final|singleton|simd|trace|worker|provides|link|tests|fixtures|constraint|type)( |$)")
 set(checked 0)
 set(skipped 0)
 set(programs 0)
