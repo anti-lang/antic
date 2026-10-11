@@ -12,13 +12,13 @@ keywords: [developer guide, Anti language, compiler, performance, Java, C, C++]
 
 The guide is for a working programmer from Java, C or C++. The reader knows pointers, the stack and the heap, a vtable and a little assembly. Each chapter teaches a feature in depth: what it does, how antic builds it and what it costs. The rules the checker applies and the cases it refuses stand with it. Every `anti` block of a page compiles, every program prints what its output block shows, and every excerpt stands in the code antic writes. The test `guide_examples` of the suite checks each page, so the guide fails the suite when the compiler changes under it.
 
-## The parts of a section
+## Section layout
 
 Every feature section has five parts, in this order.
 
 - What you know: how Java, C and C++ handle the subject, as far as it bears on the difference.
 - The feature: every form, every rule the checker applies, the edge cases and the refusals, with examples that run and examples the checker refuses.
-- How antic builds it: what the front end turns the feature into, the layout in memory and the runtime functions it calls by name. What dev mode adds and what a release build removes, with an excerpt of the LLVM IR or the machine code. The source files to read on.
+- How antic builds it: what the front end turns the feature into, the layout in memory and the runtime functions it calls by name. What dev mode adds and what a release build removes, with an excerpt of the LLVM IR or the machine code. The source files that hold it.
 - What it costs: the bytes per value, the heap allocations, the calls into the runtime, the atomic operations and the locks. The checks inserted in each mode with the option that turns each off, and the copies of code a use makes. A time comes only from `tests/bench`.
 - Pitfalls: where the feature behaves other than a programmer of each of the three languages expects.
 

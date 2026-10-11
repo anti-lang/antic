@@ -10,7 +10,7 @@ tags: [compilers, programming-languages]
 keywords: [error handling, may fail, try, catch, stack trace, never, assert, checks]
 ---
 
-## may fail and fail
+## Failing functions
 
 ### What you know
 
@@ -26,7 +26,7 @@ The `?*Error` result and the out pointer in the LLVM text, and how an error trav
 
 ### What it costs
 
-One pointer compare per call of a failing function, the heap allocation of an error, and nothing more on the success path.
+The compare per call of a failing function, the heap allocation of an error, and what the path without an error pays.
 
 ### Pitfalls
 
@@ -48,7 +48,7 @@ The branch after a call and the delete at every exit of a handler in the LLVM te
 
 ### What it costs
 
-The branch per `try`, the delete per handler, and no table and no unwinder.
+The branch per `try` and the delete per handler.
 
 ### Pitfalls
 
@@ -92,7 +92,7 @@ Where a trace is captured, and what it costs when backtraces are on, other than 
 
 ### What it costs
 
-Nothing beyond the call, and the code opt removes after it.
+The instructions of a call of a `never` function, and the code opt removes after it.
 
 ### Pitfalls
 
@@ -110,12 +110,12 @@ Where a `never` function in a condition or a `switch` behaves other than a C or 
 
 ### How antic builds it
 
-The compare and the call of `anti_rt_check_failed` of a check in the LLVM text of dev mode, and its absence in release mode, with excerpts.
+The compare and the call of `anti_rt_check_failed` of a check in the LLVM text of each mode, with excerpts.
 
 ### What it costs
 
-The branch per check in dev mode, nothing in release mode, and what turning each off gives up.
+The branch per check, the mode that inserts it, and what turning each off gives up.
 
 ### Pitfalls
 
-Where an assertion with a side effect, or a check off in release mode, behaves other than a Java, C or C++ programmer expects.
+Where an assertion with a side effect, or a check that is turned off, behaves other than a Java, C or C++ programmer expects.

@@ -22,11 +22,11 @@ keywords: [nullable pointers, optional values, null safety, narrowing, if let]
 
 ### How antic builds it
 
-One pointer for both types in the LLVM text and the test of `none` as a compare against null, with excerpts.
+The LLVM type of `*T` and of `?*T` and the test of `none`, with excerpts.
 
 ### What it costs
 
-Eight bytes for `*T` and `?*T` alike by `size_of`, and the compare per test.
+The bytes of `*T` and of `?*T` by `size_of`, and the compare per test.
 
 ### Pitfalls
 
@@ -48,7 +48,7 @@ A `?T` as the value and one flag byte with C layout, and `struct anti_opt_<T>` i
 
 ### What it costs
 
-The bytes of a `?T` by `size_of`, its padding, and no allocation.
+The bytes of a `?T` by `size_of`, its padding, and its allocations.
 
 ### Pitfalls
 
@@ -70,7 +70,7 @@ The flag test and the branch of each form in the LLVM text, with excerpts.
 
 ### What it costs
 
-One compare per form, and no call.
+The compares and the calls of each form.
 
 ### Pitfalls
 

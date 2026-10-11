@@ -22,11 +22,11 @@ The garbage collector of Java, `unique_ptr` and references of C++, and the conve
 
 ### How antic builds it
 
-What ownership changes in the LLVM text, which is nothing at a call and a free at the end of an owner, with excerpts.
+What ownership changes in the LLVM text at a call and at the end of an owner, with excerpts.
 
 ### What it costs
 
-No run-time cost of `own` and `lent`, and the free an owner runs.
+The run-time cost of `own` and of `lent`, and the free an owner runs.
 
 ### Pitfalls
 
@@ -44,7 +44,7 @@ A local that moves into an `own` parameter, `dup(x)` and `dup(p)`, and the copy 
 
 ### How antic builds it
 
-A move as a plain copy of the bits with no teardown at the source, with excerpts. A `dup` as the copy of the owned parts.
+A move and a `dup` in the LLVM text, with excerpts.
 
 ### What it costs
 
@@ -52,7 +52,7 @@ The bytes a move copies, and the allocations of a `dup`.
 
 ### Pitfalls
 
-Where `=` is refused, a move is a copy and `dup` is deep, other than a Java, C or C++ programmer expects.
+Where `=`, a move and `dup` behave other than a Java, C or C++ programmer expects.
 
 ## Teardown and temporaries
 
@@ -92,13 +92,13 @@ What each parameter kind costs in the LLVM text at the call and in the function,
 
 ### What it costs
 
-The copy of a plain parameter, the move of an `own` one, and nothing for a `lent` one.
+The cost of a plain parameter, of an `own` one and of a `lent` one.
 
 ### Pitfalls
 
 Where a plain parameter may not be stored, and `own` takes the local, other than a Java, C or C++ programmer expects.
 
-## Shared<T>
+## Shared objects
 
 ### What you know
 

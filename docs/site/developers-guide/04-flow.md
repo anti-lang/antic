@@ -26,7 +26,7 @@ The basic blocks and the `br` of an `if` and the loop of a `while` in the LLVM t
 
 ### What it costs
 
-No call and no allocation for a branch or a loop, and what a condition with narrowing adds.
+The calls and the allocations of a branch and of a loop, and what a condition with narrowing adds.
 
 ### Pitfalls
 
@@ -48,7 +48,7 @@ A range loop as a counter and a compare, a collection loop as calls of `iter`, `
 
 ### What it costs
 
-No call for a range, the hook calls per turn of a collection loop and the copy a plain `for x` makes. The check of a changed collection in dev mode.
+The calls per turn of a range loop and of a collection loop, and the copy a plain `for x` makes. The check of a changed collection in dev mode.
 
 ### Pitfalls
 
@@ -70,7 +70,7 @@ The `switch` instruction of LLVM for an integer, the chain of `anti.text.equal` 
 
 ### What it costs
 
-The jump table or the compare chain llc chooses, the calls of a `str` switch, and no allocation.
+The jump table or the compare chain of a `switch`, the calls of a `str` switch, and its allocations.
 
 ### Pitfalls
 
@@ -92,7 +92,7 @@ The branches the two become in the LLVM text and the `defer` bodies that run on 
 
 ### What it costs
 
-One branch each, and the deferred code they run.
+The branch of each, and the deferred code they run.
 
 ### Pitfalls
 
@@ -110,11 +110,11 @@ Where `break` inside a `switch` in a loop, or a `defer` on the way out, behaves 
 
 ### How antic builds it
 
-The copies of a deferred body at each exit in the LLVM text and the fail path that runs an `undo`, with excerpts.
+Where a deferred body stands in the LLVM text for each exit of its block, and the fail path that runs an `undo`, with excerpts.
 
 ### What it costs
 
-The code of a body copied per exit, no call and no allocation.
+The code of a deferred body per exit, its calls and its allocations.
 
 ### Pitfalls
 

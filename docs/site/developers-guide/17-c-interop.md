@@ -26,11 +26,11 @@ The declaration in the LLVM text and the conversion of each type at the call, wi
 
 ### What it costs
 
-Nothing beyond the call, and the conversion of a `str` to a C string.
+The cost of a call of an `extern fn`, and the conversion of a `str` to a C string.
 
 ### Pitfalls
 
-Where a pointer from C is nullable, and a `str` has no terminator, other than a Java, C or C++ programmer expects.
+Where a pointer from C is nullable, and a `str` carries its length, other than a Java, C or C++ programmer expects.
 
 ## The ABI of a call
 
@@ -48,7 +48,7 @@ The header `anti bind --header` writes and the signature in the LLVM text, with 
 
 ### What it costs
 
-Nothing beyond a C call, and the out pointer of a failing function.
+The cost of a call across the boundary, and the out pointer of a failing function.
 
 ### Pitfalls
 
@@ -70,11 +70,11 @@ The JSON of `-Xclang -ast-dump=json` read by the scanner of `src/rt/json.c`, and
 
 ### What it costs
 
-Nothing at run time, and the shim the inline functions cost.
+The run-time code of a binding, and the shim of the inline functions.
 
 ### Pitfalls
 
-Where a macro, an inline function or a variadic function needs a shim, other than a C programmer expects.
+Where a macro, an inline function and a variadic function of a header behave other than a C programmer expects.
 
 ## link
 
@@ -92,7 +92,7 @@ What lld receives for each form, and the dynamic link against glibc 2.35, with a
 
 ### What it costs
 
-The dynamic dependency a program takes on, and nothing per call.
+The dynamic dependency a program takes on, and the cost per call.
 
 ### Pitfalls
 
@@ -114,7 +114,7 @@ The archive with the library object, the runtime members and the marker member, 
 
 ### What it costs
 
-The bytes a bundled runtime adds to a library, and nothing per call.
+The bytes a bundled runtime adds to a library, and the cost per call.
 
 ### Pitfalls
 

@@ -26,7 +26,7 @@ A worker as a function the pool calls, and `dispatch` and `join` as runtime func
 
 ### What it costs
 
-The runtime calls of a dispatch and of a join, the heap allocation of a job, and the threads of the pool.
+The runtime calls of a dispatch and of a join, the allocations of a job, and the threads of the pool.
 
 ### Pitfalls
 
@@ -58,7 +58,7 @@ Where a change of a captured variable is refused, other than a Java, C or C++ pr
 
 ### What you know
 
-`BlockingQueue` of Java, the condition variables of C and C++, and the `select` none of the three has.
+`BlockingQueue` of Java, the condition variables of C and C++, and waiting on more than one queue in each.
 
 ### The feature
 
@@ -70,7 +70,7 @@ The channel of `src/rt/sync.c` and the futex or the lock it waits on, with excer
 
 ### What it costs
 
-The bytes of a channel, the heap allocation of its buffer, the lock per operation, and the blocking of `send` and `recv`.
+The bytes of a channel, its allocations, the locks per operation, and the blocking of `send` and `recv`.
 
 ### Pitfalls
 

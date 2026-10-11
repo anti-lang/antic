@@ -14,7 +14,7 @@ keywords: [synchronized class, concurrent class, hidden lock, guarded fields, sy
 
 ### What you know
 
-The `synchronized` methods of Java, a class with a mutex member in C++, and nothing of the kind in C.
+The `synchronized` methods of Java, a class with a mutex member in C++, and a struct with a mutex in C.
 
 ### The feature
 
@@ -22,11 +22,11 @@ The `synchronized` methods of Java, a class with a mutex member in C++, and noth
 
 ### How antic builds it
 
-The lock word in the object, and the lock and unlock at the entry and at every exit of a function, with excerpts.
+The hidden lock in the object, and the lock and unlock at the entry and at every exit of a function, with excerpts.
 
 ### What it costs
 
-The one word of the lock by `size_of`, the runtime calls per function, and the default `==` and hash under the lock.
+The bytes of the hidden lock by `size_of`, the runtime calls per function, and the default `==` and hash under the lock.
 
 ### Pitfalls
 
@@ -52,7 +52,7 @@ The bytes of a guarded field, the lock per access, and the atomic operation per 
 
 ### Pitfalls
 
-Where a fixed field is read-only, and a public function gives out no pointer, other than a Java or C++ programmer expects.
+Where a fixed field, and a pointer into the fields, behave other than a Java or C++ programmer expects.
 
 ## sync blocks
 
@@ -84,7 +84,7 @@ The deadlock detection of a Java thread dump, and the absence of a check in C an
 
 ### The feature
 
-The report of dev mode on two locks taken in opposite orders, what it prints, and what release mode drops.
+The report of dev mode on two locks taken in opposite orders, what it prints, and the check in release mode.
 
 ### How antic builds it
 
@@ -92,7 +92,7 @@ The runtime functions that record the order of locks in dev mode, with an excerp
 
 ### What it costs
 
-The calls per lock in dev mode, and nothing in release mode.
+The calls per lock in dev mode, and what release mode keeps of them.
 
 ### Pitfalls
 
@@ -118,4 +118,4 @@ The lock per operation of a synchronized collection, the atomic operations of a 
 
 ### Pitfalls
 
-Where a walk of a synchronized collection holds its lock, other than a Java programmer expects.
+Where a walk of a synchronized collection and its lock behave other than a Java programmer expects.

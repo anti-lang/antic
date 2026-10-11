@@ -36,7 +36,7 @@ Where layout, copying and equality behave other than a Java, C or C++ programmer
 
 ### What you know
 
-`#pragma pack` and `__attribute__((aligned))` of C and C++, and nothing of the kind in Java.
+`#pragma pack` and `__attribute__((aligned))` of C and C++, and the layout Java leaves to its virtual machine.
 
 ### The feature
 
@@ -66,11 +66,11 @@ Where a packed field, its address or its atomic use behaves other than a C or C+
 
 ### How antic builds it
 
-A union as its largest member and a bitfield as masks and shifts in the LLVM text, with excerpts.
+A union and the unit of a bitfield in the LLVM text, and the code of a bitfield access, with excerpts.
 
 ### What it costs
 
-The bytes of a union and of a bitfield unit by `size_of`, and the shifts per access.
+The bytes of a union and of a bitfield unit by `size_of`, and the instructions per access.
 
 ### Pitfalls
 
@@ -110,11 +110,11 @@ Where the width, the processor level and the passing of a vector behave other th
 
 ### How antic builds it
 
-An enum as an integer of its underlying type in the LLVM text, with an excerpt.
+An enum in the LLVM text, with an excerpt.
 
 ### What it costs
 
-The bytes of an enum by `size_of`, and no call.
+The bytes of an enum by `size_of`, and the calls of its use.
 
 ### Pitfalls
 
@@ -136,7 +136,7 @@ A variant as a struct of a tag and a union of its cases with C layout, and the e
 
 ### What it costs
 
-The bytes of a variant by `size_of`, the tag and the largest case, and no allocation.
+The bytes of a variant by `size_of`, the tag and the largest case, and its allocations.
 
 ### Pitfalls
 
@@ -158,7 +158,7 @@ The tag test and the copies of the fields in the LLVM text, with an excerpt.
 
 ### What it costs
 
-One compare per case and the copy of the fields, and no allocation.
+The compares per case, the copy of the fields, and the allocations.
 
 ### Pitfalls
 

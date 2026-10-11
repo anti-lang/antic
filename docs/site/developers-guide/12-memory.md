@@ -26,11 +26,11 @@ A pointer as `ptr` in the LLVM text, and `alloc` and `free` as calls of the allo
 
 ### What it costs
 
-Eight bytes per pointer by `size_of`, the runtime calls of `alloc` and `free`, and the check of a dereference in dev mode.
+The bytes of a pointer by `size_of`, the runtime calls of `alloc` and `free`, and the checks of a dereference in each mode.
 
 ### Pitfalls
 
-Where there is no arithmetic, and `free` of a class pointer is refused, other than a C or C++ programmer expects.
+Where pointer arithmetic and `free` of a class pointer behave other than a C or C++ programmer expects.
 
 ## Slices and views
 
@@ -48,7 +48,7 @@ A slice as a pointer and a length, an array in place, and a view as the same poi
 
 ### What it costs
 
-Sixteen bytes per slice by `size_of`, no allocation for a view, and the copy of an array.
+The bytes of a slice by `size_of`, the allocations of a view, and the copy of an array.
 
 ### Pitfalls
 
@@ -62,19 +62,19 @@ The `ArrayIndexOutOfBoundsException` of Java, the undefined behaviour of C and C
 
 ### The feature
 
-The check of every index in dev mode, what a failed check prints, `--no-checks`, and what release mode keeps.
+The check of an index, the mode that inserts it, what a failed check prints, `--checks` and `--no-checks`.
 
 ### How antic builds it
 
-The compare and the call of `anti_rt_check_failed` of an index in the LLVM text of dev mode, with excerpts in both modes.
+The compare and the call of `anti_rt_check_failed` of an index in the LLVM text, with excerpts in both modes.
 
 ### What it costs
 
-The compare per index in dev mode, nothing in release mode, and what turning it off gives up.
+The compare per index, the mode that inserts it, and what turning it off gives up.
 
 ### Pitfalls
 
-Where a release build checks no index, other than a Java programmer expects.
+Where the index check of each mode behaves other than a Java, C or C++ programmer expects.
 
 ## anti.mem and the allocator
 
@@ -114,7 +114,7 @@ The checks of AddressSanitizer at every load and store, the runtime from the run
 
 ### What it costs
 
-The time and the memory of a checked program, from `tests/bench`, and nothing without the option.
+The time and the memory of a checked program, from `tests/bench`, and the cost without the option.
 
 ### Pitfalls
 

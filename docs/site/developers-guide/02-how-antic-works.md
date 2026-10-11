@@ -1,6 +1,6 @@
 ---
 title: "How antic works"
-description: "The passes of antic from source to executable, its IR and the LLVM module, dev and release builds, LTO, the runtime archive and how to read the excerpts of this guide."
+description: "The passes of antic from source to executable, its IR and the LLVM module, dev and release builds, LTO, the runtime archive and how to read the excerpts."
 summary: "The passes from source to executable, the IR of antic and the LLVM module, dev and release builds, whole-program compilation and the LTO of the runtime, the runtime archive and the allocator, what an executable holds beside the program, and how to read and make the excerpts of this guide."
 date: 2026-10-11T08:10:24+02:00
 lastmod: 2026-10-11T08:10:24+02:00
@@ -12,7 +12,7 @@ keywords: [compiler passes, intermediate representation, LLVM, link-time optimiz
 
 ## Passes from source to executable
 
-The seven passes in order: the lexer, the parser, the checker, the lowering, the whole-program pass, the LLVM back end and the link. What each reads and what each writes.
+The passes in order, from the lexer to the link, with what each reads and what each writes.
 
 ## The IR of antic
 
@@ -34,9 +34,9 @@ The pass over the IR of every module and release devirtualisation. The link of t
 
 What `lib/<target>/<level>/` holds, the runtime a program links, and musl with mimalloc on Linux.
 
-## What an executable holds
+## Contents of an executable
 
-The code of the program, the runtime, the licence notice, the build id and the tables of the classes, with the bytes of each.
+The parts a link adds to the code of the program, with the bytes of each.
 
 ## Reading the excerpts
 
@@ -71,7 +71,7 @@ A block marked `refused` does not compile, and its `//! error:` line names the f
 let x: int = "a";
 ```
 
-An `llvm` excerpt holds lines of the LLVM text antic writes for the named block. Here it is the dev build of `twice` for linux-x86_64 with its overflow check. A line of `...` stands for lines left out.
+An `llvm` excerpt holds lines of the module llc receives for the named block. In dev mode that module is the LLVM text antic writes. Here it is `twice` for linux-x86_64 with its overflow check. A line of `...` stands for lines left out.
 
 ```llvm excerpt=hello target=linux-x86_64 mode=dev
 define hidden noundef i64 @hello.twice(i64 noundef %p0) #0 {
@@ -88,7 +88,18 @@ define hidden noundef i64 @hello.twice(i64 noundef %p0) #0 {
 }
 ```
 
-An `asm` excerpt holds lines of the disassembly of the object, here the release build of `main` for linux-x86_64, where `twice(21) - 42` is the constant 0.
+In release mode the module llc receives is the one opt wrote. Here opt has put `twice` into `main` and folded `twice(21) - 42`, so `main` returns the constant 0 and the module holds no `twice`.
+
+```llvm excerpt=hello target=linux-x86_64 mode=release
+define internal noundef i64 @hello.main() #0 {
+b0:
+  tail call void @anti_rt_write(i32 1, ptr nonnull @hello.1, i64 5)
+  tail call void @anti_rt_write(i32 1, ptr nonnull @anti.io.1, i64 1)
+  ret i64 0
+}
+```
+
+An `asm` excerpt holds lines of `llvm-objdump -d` of the object. Here it is the end of `main` in the release build for linux-x86_64.
 
 ```asm excerpt=hello target=linux-x86_64 mode=release
 <hello.main>:

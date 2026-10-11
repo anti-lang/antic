@@ -26,7 +26,7 @@ A function in the LLVM text with its linkage per mode and the attributes of each
 
 ### What it costs
 
-What passing each kind of parameter costs, and no allocation for a call.
+The copies and the allocations of passing each kind of parameter.
 
 ### Pitfalls
 
@@ -44,11 +44,11 @@ A default value of a parameter, `here` and `SourceLocation`, how a call fills ea
 
 ### How antic builds it
 
-A default filled in at the call in the LLVM text and a `SourceLocation` as a constant of the data section, with excerpts.
+How a call fills a default and a `SourceLocation` in the LLVM text, with excerpts.
 
 ### What it costs
 
-Nothing at run time beyond the argument itself, and the bytes of a `SourceLocation` by `size_of`.
+What a default and `here` cost at run time, and the bytes of a `SourceLocation` by `size_of`.
 
 ### Pitfalls
 
@@ -84,15 +84,15 @@ Where a struct, a slice or an error travels other than a Java, C or C++ programm
 
 ### The feature
 
-Anti has no word for inlining. What opt inlines in a release build, the threshold antic passes to it, and what dev mode leaves as calls.
+What decides inlining in each mode. What opt inlines in a release build, the threshold antic passes to it, and what dev mode leaves as calls.
 
 ### How antic builds it
 
-The LLVM text of a release build before opt and the disassembly after it, for one small function, with excerpts.
+One small function in the module of a dev build and of a release build, and in the disassembly of each, with excerpts.
 
 ### What it costs
 
-The inline threshold antic passes to opt, and what a call costs in dev mode.
+The inline threshold antic passes to opt, and the instructions of a call in dev mode.
 
 ### Pitfalls
 
@@ -114,7 +114,7 @@ The context in the frame, the two words of a function parameter, and the code of
 
 ### What it costs
 
-No heap allocation for a closure, the two words of a parameter of function type, and the one word of a `keep` one.
+The allocations of a closure, the words of a parameter of function type, and the words of a `keep` one.
 
 ### Pitfalls
 
@@ -136,7 +136,7 @@ The heap block of an `own fn` and its two words, and the copy a `snapshot fn` ma
 
 ### What it costs
 
-One heap allocation per `own fn`, its bytes by `size_of`, and the runtime calls that free it.
+The heap allocations of an `own fn`, its bytes by `size_of`, and the runtime calls that free it.
 
 ### Pitfalls
 

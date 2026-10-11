@@ -36,8 +36,8 @@ The line of every statement and the entry per function `-g` writes, lldb and gdb
 
 ## The build id
 
-The digest of the LLVM text without the notice, where it stands in a program, and how `anti symbols` matches it.
+What the build id is computed from, where it stands in a program, and how `anti symbols` matches it.
 
-## What a release build does with LLVM
+## LLVM in a release build
 
 `default<O3>` with the inline threshold, `lto-pre-link<O3>`, and the LTO of lld over the program and the runtime.

@@ -30,6 +30,6 @@ The two commands on a project, the manifest they read and the files they write.
 
 The two modes of a build, what each checks and what each removes, and the option that chooses.
 
-## Where the files go
+## File locations
 
 The install directories per platform, the cache of the user and the directories a build writes.

@@ -1,6 +1,6 @@
 ---
 title: "Collections"
-description: "List, Deque, Ring, Grid, Map, HashMap, Set, HashSet, BitSet, the sorted ones, Pool, Tree and PriorityQueue with their layout, their growth and the cost of each operation."
+description: "The layout, the growth and the cost of each operation of List, Deque, Ring, Grid, the maps and the sets, the sorted ones, Pool, Tree and PriorityQueue."
 summary: "The collections of `anti.collection` with their layout and their growth, walking, hashing and its seed, order and equality, and one table with the cost of each operation, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
 lastmod: 2026-10-11T08:10:24+02:00
@@ -22,7 +22,7 @@ keywords: [collections, List, Deque, Map, HashMap, Set, SortedMap, Pool, Tree, P
 
 ### How antic builds it
 
-The pointer, the length and the capacity of a `List<T>`, the ring of a `Deque<T>`, and the growth of each, with excerpts.
+The fields of a `List<T>` and of a `Deque<T>`, and the growth of each, with excerpts.
 
 ### What it costs
 
@@ -44,15 +44,15 @@ A circular buffer and a two-dimensional array written by hand in Java, C and C++
 
 ### How antic builds it
 
-The array of `N` elements of a `Ring<T, N>` and the one block of a `Grid<T>`, with excerpts.
+The storage of a `Ring<T, N>` and of a `Grid<T>`, with excerpts.
 
 ### What it costs
 
-The bytes of each by `size_of`, no allocation for a `Ring`, one for a `Grid`, and the cost of each operation.
+The bytes of each by `size_of`, the allocations of each, and the cost of each operation.
 
 ### Pitfalls
 
-Where a full `Ring` drops or refuses, other than a Java or C++ programmer expects.
+Where a full `Ring` behaves other than a Java or C++ programmer expects.
 
 ## Map and HashMap
 
@@ -66,15 +66,15 @@ Where a full `Ring` drops or refuses, other than a Java or C++ programmer expect
 
 ### How antic builds it
 
-The table of each, its probing or its buckets, the growth, and the `hash` hook it calls, with excerpts.
+The storage of each, its growth, and the hooks it calls, with excerpts.
 
 ### What it costs
 
-The bytes of each by `size_of`, the allocation per growth, the hash call per operation, and the cost of each operation.
+The bytes of each by `size_of`, the allocation per growth, the hook calls per operation, and the cost of each operation.
 
 ### Pitfalls
 
-Where a key needs `hash` and `eq`, and a walk follows no insertion order, other than a Java or C++ programmer expects.
+Where the hooks a key needs, and the order of a walk, behave other than a Java or C++ programmer expects.
 
 ## Set, HashSet and BitSet
 
@@ -88,7 +88,7 @@ Where a key needs `hash` and `eq`, and a walk follows no insertion order, other 
 
 ### How antic builds it
 
-The table of a `Set<T>` and the words of a `BitSet`, with excerpts.
+The storage of a `Set<T>`, of a `HashSet<T>` and of a `BitSet`, with excerpts.
 
 ### What it costs
 
@@ -96,7 +96,7 @@ The bytes of each by `size_of`, the allocations, and the cost of each operation.
 
 ### Pitfalls
 
-Where a `BitSet` holds integers alone, other than a Java or C++ programmer expects.
+Where the elements of a `BitSet` behave other than a Java or C++ programmer expects.
 
 ## SortedMap and SortedSet
 
@@ -110,11 +110,11 @@ Where a `BitSet` holds integers alone, other than a Java or C++ programmer expec
 
 ### How antic builds it
 
-The tree of each and the `lt` hook it calls, with excerpts.
+The storage of each and the `lt` hook it calls, with excerpts.
 
 ### What it costs
 
-The bytes of a node, the allocation per insert, and the cost of each operation.
+The bytes each holds per element, the allocations per insert, and the cost of each operation.
 
 ### Pitfalls
 
@@ -132,7 +132,7 @@ An object pool and a generational index written by hand in Java, C and C++.
 
 ### How antic builds it
 
-The slots of a `Pool<T>` and the index and the generation of a `Handle<T>`, with excerpts.
+The slots of a `Pool<T>` and the fields of a `Handle<T>`, with excerpts.
 
 ### What it costs
 
@@ -140,7 +140,7 @@ The bytes of a handle and of a slot by `size_of`, and the cost of each operation
 
 ### Pitfalls
 
-Where a stale handle is refused at run time, other than a C or C++ programmer expects.
+Where a handle of a freed slot behaves other than a C or C++ programmer expects.
 
 ## Tree and PriorityQueue
 
@@ -154,15 +154,15 @@ Where a stale handle is refused at run time, other than a C or C++ programmer ex
 
 ### How antic builds it
 
-The nodes of a `Tree<T>` and the heap of a `PriorityQueue<T>`, with excerpts.
+The storage of a `Tree<T>` and of a `PriorityQueue<T>`, with excerpts.
 
 ### What it costs
 
-The bytes of a node, the allocations, and the cost of each operation.
+The bytes each holds per element, the allocations, and the cost of each operation.
 
 ### Pitfalls
 
-Where the top of a `PriorityQueue` is the least by `lt`, other than a Java or C++ programmer expects.
+Where the order of a `PriorityQueue` behaves other than a Java or C++ programmer expects.
 
 ## Walking a collection
 
@@ -202,7 +202,7 @@ The default hash `lower_hash.c` writes, the constants of `src/rt/hash.h`, and th
 
 ### What it costs
 
-The calls per hash, and what hashing a struct of each field kind costs.
+The calls per hash, and the instructions of hashing a struct per field kind.
 
 ### Pitfalls
 
@@ -232,4 +232,4 @@ Where `<` has no default, and `==` on a channel compares identity, other than a 
 
 ## The cost of each operation
 
-One table with the cost of every operation of every collection of `anti.collection`, measured through `tests/bench`.
+One table of every operation of every collection of `anti.collection`, with its allocations and its calls, and its time measured through `tests/bench`.

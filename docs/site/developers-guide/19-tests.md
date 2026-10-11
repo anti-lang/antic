@@ -14,23 +14,23 @@ keywords: [unit tests, fixtures, test runner, expected output, memory checks]
 
 ### What you know
 
-JUnit of Java, the test frameworks of C and C++, and a test that sees private members.
+JUnit of Java, the test frameworks of C and C++, and where each keeps a test and what it may reach.
 
 ### The feature
 
-`tests { }` and `fixtures { }`, one of each per module, `setup` and `teardown`, `assert`, what each sees, `antic --tests`, and the refusals.
+`tests { }` and `fixtures { }`, at most one of each per module, `setup` and `teardown`, `assert`, what each sees, `antic --tests`, and the refusals.
 
 ### How antic builds it
 
-The functions of a block made public under `--tests` and dropped after parsing otherwise, and the runner `anti test` writes, with an excerpt.
+What `antic --tests` makes of the two blocks, the drop after parsing in every other build, and the runner `anti test` writes, with an excerpt.
 
 ### What it costs
 
-Nothing in a build without `--tests`, and the code of the runner.
+What a build without `--tests` holds of the two blocks, and the code of the runner.
 
 ### Pitfalls
 
-Where a test sees the private items of its module, other than a Java, C or C++ programmer expects.
+Where what a test may reach in its module behaves other than a Java, C or C++ programmer expects.
 
 ## anti test
 

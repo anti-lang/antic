@@ -1,6 +1,6 @@
 ---
 title: "Classes"
-description: "Classes and the object in memory, construct and destruct, fields and methods, dispatch through interfaces, static fields and singletons, operators, reflection and its tables."
+description: "Classes and the object in memory, construct and destruct, fields and methods, dispatch through interfaces, static fields, singletons, operators and reflection."
 summary: "Classes and the object in memory, `construct` and `destruct`, fields and methods, interfaces as inline sub-objects with thunks and the dispatch through them, static fields and singletons, operators, and reflection over the descriptors, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
 lastmod: 2026-10-11T08:10:24+02:00
@@ -22,11 +22,11 @@ A Java object with its header, a C++ object with its vtable pointer, and a C str
 
 ### How antic builds it
 
-The object as a struct whose first word points at the descriptor and the table, and the layout of the fields, with excerpts.
+The object in the LLVM text, how it reaches its descriptor and its table, and the layout of the fields, with excerpts.
 
 ### What it costs
 
-The bytes of an object by `size_of`, the one word of the descriptor pointer, and the heap allocation of `alloc`.
+The bytes of an object by `size_of`, what it holds beside its fields, and the heap allocation of `alloc`.
 
 ### Pitfalls
 
@@ -114,11 +114,11 @@ A static field as a global, the instance of a singleton and the check of the who
 
 ### What it costs
 
-The atomic operation per access of a static field, and no allocation for a singleton.
+The operations per access of a static field, and the allocations of a singleton.
 
 ### Pitfalls
 
-Where a static field is atomic and a singleton is read-only, other than a Java or C++ programmer expects.
+Where a static field and the fields of a singleton behave other than a Java or C++ programmer expects.
 
 ## Operators
 

@@ -14,7 +14,7 @@ keywords: [hooks, tracing, dependency injection, runtime configuration, plugins,
 
 ### What you know
 
-The finalizer and the agents of Java, and nothing of the kind in C and C++.
+The finalizer and the agents of Java, and the instrumentation a C or C++ program adds by hand.
 
 ### The feature
 
@@ -52,7 +52,7 @@ The calls per traced site, what `--no-trace` removes, and the time of a traced l
 
 ### Pitfalls
 
-Where a release build traces nothing unless asked, other than a Java programmer expects.
+Where tracing follows the mode until an option decides, other than a Java programmer expects.
 
 ## Injection
 
@@ -92,7 +92,7 @@ The reader of `src/rt` that parses the TOML at start and the table the pool and 
 
 ### What it costs
 
-The read at start, and nothing per use of a key after it.
+The read at start, and the cost per use of a key after it.
 
 ### Pitfalls
 

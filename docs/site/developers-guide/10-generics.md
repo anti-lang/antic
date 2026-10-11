@@ -26,7 +26,7 @@ The checked tree of a generic in the library file, and the copy with the argumen
 
 ### What it costs
 
-Nothing at run time beyond the code of the copy, and the size of a copy.
+The run-time code of a generic against the same code written by hand, and the size of a copy.
 
 ### Pitfalls
 
@@ -48,7 +48,7 @@ The check of a body against its constraints and of each use where it stands, and
 
 ### What it costs
 
-Nothing at run time, and what a constraint costs the checker.
+The run-time code a constraint adds, and the work of the checker.
 
 ### Pitfalls
 
@@ -62,11 +62,11 @@ The one erased class of Java, one instantiation per argument list of C++, and th
 
 ### The feature
 
-One copy per use with concrete arguments, `max<int>` and `List<int>.push`, link-once copies in dev mode, merged identical copies in release mode, and `export type`.
+One copy per use with concrete arguments, `max<int>` and `List<int>.push`, the copy each dev object carries, merged identical copies in release mode, and `export type`.
 
 ### How antic builds it
 
-The names of the copies in the LLVM text, `linkonce_odr` in dev mode and the merge of release mode, with excerpts.
+The names of the copies in the LLVM text, their linkage in a dev object and the merge of release mode, with excerpts.
 
 ### What it costs
 
@@ -76,7 +76,7 @@ The bytes of code per copy, shown by the symbols of a program with two uses, and
 
 Where the symbol of a copy escapes the brackets, and two uses share code or not, other than a Java or C++ programmer expects.
 
-## What can be generic
+## Generic declaration forms
 
 ### What you know
 

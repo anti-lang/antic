@@ -1,6 +1,6 @@
 ---
 title: "Values"
-description: "The types and literals of Anti, variables and constants, integers that wrap or saturate, the overflow checks, floats and f16, text and bytes, tuples and type inference."
+description: "The types and literals of Anti, variables and constants, integers that wrap or saturate, overflow checks, floats and f16, text and bytes, tuples and inference."
 summary: "Types, literals, variables and constants, integers with `+%` and `+|` and the overflow checks of dev mode, floats and `f16`, `str` and `[]byte` with their layout, tuples and type inference, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
 lastmod: 2026-10-11T08:10:24+02:00
@@ -26,7 +26,7 @@ The LLVM type of each type of Anti per target, with an excerpt of a function tha
 
 ### What it costs
 
-The bytes and the alignment of each type by `size_of` on the six targets, and what a literal costs at run time.
+The bytes and the alignment of each type by `size_of` on the six targets, and the instructions a literal takes at run time.
 
 ### Pitfalls
 
@@ -40,15 +40,15 @@ Declaration and initialisation in Java, C and C++, `final` and `const`, and memo
 
 ### The feature
 
-`let` with its mandatory initialisation, `undefined`, `const` at module level and in a block, shadowing in an inner block, and the refusals.
+`let` with its mandatory initialisation, `const` at module level, in a block and in a class body, shadowing in an inner block, and the refusals.
 
 ### How antic builds it
 
-A local as an `alloca` of the LLVM text and a constant folded before lowering, with an excerpt of each.
+A local and a constant in the LLVM text of each mode, with an excerpt of each.
 
 ### What it costs
 
-What a local costs on the stack in dev mode and in release mode, and that a `const` costs no memory.
+What a local and a `const` cost in memory in dev mode and in release mode.
 
 ### Pitfalls
 
@@ -70,7 +70,7 @@ The `llvm.sadd.with.overflow` family of a checked operation, the plain instructi
 
 ### What it costs
 
-The branch per checked operation in dev mode, nothing in release mode, `--no-checks` that turns the checks off, and what that gives up.
+The branch per checked operation, the mode that inserts it, `--checks` and `--no-checks`, and what turning the checks off gives up.
 
 ### Pitfalls
 
@@ -80,7 +80,7 @@ Where overflow, division, a shift and a conversion behave other than a Java, C o
 
 ### What you know
 
-`float` and `double` of Java, C and C++, their arithmetic, and the half-precision type none of the three has.
+`float` and `double` of Java, C and C++, their arithmetic, and how each stores a half-precision number.
 
 ### The feature
 
@@ -92,7 +92,7 @@ The float instructions of LLVM, the conversion of an `f16` in one instruction on
 
 ### What it costs
 
-The bytes of each float type by `size_of`, the runtime calls of an `f16` conversion at `v1` and `v2`, and no check in either mode.
+The bytes of each float type by `size_of`, the runtime calls of an `f16` conversion at `v1` and `v2`, and the checks of each mode.
 
 ### Pitfalls
 
@@ -110,11 +110,11 @@ Where a float literal, a comparison, an `f16` and the processor level behave oth
 
 ### How antic builds it
 
-A `str` as a pointer and a length, a literal in the read-only data, an `f"..."` as calls on `anti.text.Builder`, with excerpts.
+A `str` as a pointer and a length, where a literal stands in the object, and an `f"..."` as calls on `anti.text.Builder`, with excerpts.
 
 ### What it costs
 
-Sixteen bytes per `str` by `size_of`, the heap allocation of an `f"..."` and who frees it, and the runtime calls of each function of `anti.text`.
+The bytes of a `str` by `size_of`, the heap allocation of an `f"..."` and who frees it, and the runtime calls of each function of `anti.text`.
 
 ### Pitfalls
 
@@ -136,7 +136,7 @@ A tuple as an anonymous struct with C layout, one per distinct tuple in the head
 
 ### What it costs
 
-The bytes of a tuple by `size_of`, its padding, and no call and no allocation to build one or take it apart.
+The bytes of a tuple by `size_of`, its padding, and the calls and the allocations of building one and of taking it apart.
 
 ### Pitfalls
 
@@ -158,7 +158,7 @@ The pass of the checker that fixes every type before lowering, so the IR and the
 
 ### What it costs
 
-Nothing at run time, and what inference costs the checker.
+The run-time code of an inferred type against a written one, and the work of the checker.
 
 ### Pitfalls
 
