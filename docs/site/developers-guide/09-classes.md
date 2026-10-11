@@ -313,7 +313,8 @@ Where it lives: `lower_class_record` and `table_of` of `src/antic/lower_desc.c` 
 | `&d` to a base pointer | nothing | nothing |
 | `p is *T`, `p as? *T` | five loads and two compares, and the test of the table | five loads and two compares |
 | `p as *T` | the same and a branch to `anti_rt_cast_failed` | the same |
-| Atomic operations and locks | 0 | 0 |
+| Atomic operations | two loads in each call of `anti_rt_hook`: the installed trace handler and the count of loaded libraries | the same |
+| Locks | 0 | 0 |
 | Checks inserted | the zero table before `is`, `as` and a dispatch | none of those, the check of `as` stays |
 
 The call of `anti_rt_hook` per object made is the one cost a C++ object lacks. `--no-hooks` drops it, with the hooks and the leak tracking of chapter 15.
@@ -981,7 +982,7 @@ retq
 - `circle_area` calls `area` on a `*Circle`. No class below `Circle` replaces it, so the call is direct, and `opt` inlines `area` and the private `square` into three instructions.
 - `advance` calls `step` on a `*Counter`, an abstract class. `Up` is the only class of the program that fills `step`, so the pass binds the call to `Up.step`, and the increment stands in place.
 
-The pass does not run in dev mode, which compiles one module at a time and relies on `final`. It also leaves the calls alone in a program that loads a plugin or injects a provider. A class the compiler never saw may fill an entry there.
+The pass does not run in dev mode, which compiles one module at a time and relies on `final`. It also leaves the calls alone in a plugin and in a program that loads a plugin or injects a provider. A class the compiler never saw may fill an entry there. `--closed` builds a program that loads no plugin, and the pass runs for it.
 
 Where it lives: `lower_load_table` of `src/antic/lower_expr.c` loads the table and writes the dev check. `devirtualise` of `src/antic/whole.c`. `docs/notes/whole-program.md` holds the choices of the pass.
 
