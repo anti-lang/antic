@@ -269,7 +269,7 @@ A release build drops the checks of dev mode and the assertions. `--checks` and 
 | The bounds of `load` and `store` of a simd struct | [Simd structs]({{% relref "08-structs-enums#simd-structs" %}}) | dropped, as the section states it | the same |
 | The index of `l[i]`, `remove_at(i)` and `g[x, y]` | [List and Deque]({{% relref "16-collections#list-and-deque" %}}) | dropped, kept by `--checks` | the same |
 | A collection changed during a loop over it | [Walking a collection]({{% relref "16-collections#walking-a-collection" %}}) | dropped, kept by `--checks` | the loop reads a block that a growth freed |
-| The zero table before `is`, `as` and a dispatch | [Classes and the object in memory]({{% relref "09-classes#classes-and-the-object-in-memory" %}}) | dropped, and `--checks` does not bring it back. The check of `p as *T` stays | a zero table pointer is not reported before the dispatch reads through it |
+| The zero table before `is`, `as` and a dispatch | [Classes and the object in memory]({{% relref "09-classes#classes-and-the-object-in-memory" %}}) | dropped, and `--checks` does not bring it back. `--no-checks` leaves it in a dev build. The check of `p as *T` stays | a zero table pointer is not reported before the dispatch reads through it |
 | `assert` | [assert and the dev checks]({{% relref "06-errors#assert-and-the-dev-checks" %}}) | dropped with its condition, kept by `--asserts` | the condition is not evaluated |
 | The order of the locks | [Lock order checks]({{% relref "14-concurrent-classes#lock-order-checks" %}}) | not built in, with no option | an inversion that no dev run took is found by no build |
 
