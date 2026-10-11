@@ -1051,7 +1051,7 @@ The default `==` of a synchronized class takes its two locks with the same pair 
 
 A dev build calls `anti_rt_object_lock_pair_at` with the place of the `sync` and records the order it took.
 
-Where it lives: `check_sync` and `check_sync_pair` of `src/antic/sema_stmt.c`, `lower_sync` and `lower_sync_pair` of `src/antic/lower_sync.c`, `lower_class_equals` of `src/antic/lower_class.c`, and `anti_rt_object_lock_pair` of `src/rt/lock.c`.
+Where it lives: `check_sync` and `check_sync_pair` of `src/antic/sema_stmt.c`, `lower_sync` and `lower_sync_pair` of `src/antic/lower_sync.c`, `lower_class_equals` of `src/antic/lower_eq.c`, and `anti_rt_object_lock_pair` of `src/rt/lock.c`.
 
 ### What it costs
 
@@ -1460,9 +1460,9 @@ b0:
 - The hidden lock is at offset 160 of the 184 bytes, the last 24.
 - The add and the store raise the clock of the list at offset 152, which gives the new element its version.
 
-The elements of a `SyncList<T>` are stored as pairs of the value and its version, so each element takes 8 bytes more than in a `List<T>`.
+The elements of a `SyncList<T>` are stored as tuples `(T, int)` of the value and its version. An element of a `SyncList<int>` takes 16 bytes, where one of a `List<int>` takes 8. A smaller `T` also takes the padding before the `int`.
 
-A `ConcurrentMap` holds a pointer to 16 parts. Each part is a `Mutex`, a `HashMap` of the entries, a `HashMap` of their versions and a clock. An operation hashes the key with the seed of the map, picks the part by the top four bits of the hash and runs inside `sync part.lock`. The count of the entries is an atomic field, so `count()` takes no lock. An operation over the whole map, such as `find_all` or a walk, takes the 16 locks one after the other and holds one at a time.
+A `ConcurrentMap` holds a pointer to 16 parts. Each part is a `Mutex`, a `HashMap` of the entries, a `HashMap` of their versions and a clock. An operation hashes the key with the seed of the map, picks the part by the top four bits of the hash and runs inside `sync part.lock`. The table of the part hashes the key again for each of its own operations. The count of the entries is an atomic field, so `count()` takes no lock. An operation over the whole map, such as `find_all` or a walk, takes the 16 locks one after the other and holds one at a time.
 
 An `SpscRing<T, N>` holds a block of `N` elements and two atomic counters: `given`, which the producer writes, and `taken`, which the consumer writes. Each side keeps a plain copy of the counter of the other side and reads the atomic one only when the copy says the ring is full or empty.
 
@@ -1504,8 +1504,9 @@ The costs are the same in dev and in release, apart from the record of the order
 | `size_of(ConcurrentMap<int, int>)` | 40, and one block of 16 parts on the heap |
 | `size_of(SpscRing<int, 64>)` | 56, and one block of 64 elements on the heap |
 | An operation of a synchronized collection | one hidden lock taken and given back, around the operation of the plain collection |
-| A version | 8 bytes per element, and one add per change |
-| `get`, `set`, `add` and `update` of a `ConcurrentMap` | one hash of the key, one `Mutex` of 16, and one atomic add when the count changes |
+| A version | 8 bytes per element and the padding of the pair, and one add per change |
+| `get` of a `ConcurrentMap` | one `Mutex` of 16 and two hashes of the key: one to pick the part and one in the table of the part |
+| `set`, `add` and `update` of a `ConcurrentMap` | one `Mutex` of 16 and one atomic add when the count changes. Four hashes of the key for `set`, and three for an `add` or an `update` that changes the map |
 | `count()` of a `ConcurrentMap` | one atomic load |
 | An operation over a whole `ConcurrentMap` | 16 locks, one after the other |
 | `push` and `pop` of an `SpscRing` with room and with elements | one atomic load and one atomic store, no lock and no call |
