@@ -158,7 +158,7 @@ if(documents STREQUAL "")
     message(FATAL_ERROR "no document to read in `${DOCUMENTS}`")
 endif()
 
-set(item_start "^(import|pub|internal|const|fn|extern|export|struct|packed|union|enum|variant|class|abstract|final|singleton|simd|trace|worker|provides|link|tests|fixtures|constraint|type)( |$)")
+set(item_start "^(import|pub|internal|const|fn|extern|export|struct|packed|union|enum|variant|class|abstract|final|singleton|simd|trace|worker|provides|link|tests|fixtures|constraint|type|operator)( |$)")
 set(checked 0)
 set(skipped 0)
 set(programs 0)
