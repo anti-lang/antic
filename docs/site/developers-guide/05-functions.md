@@ -430,7 +430,7 @@ A `SourceLocation` is 64 bytes: a `str` of 16 bytes for the file, two `int` for 
 
 The texts of the record are literals of the module. Two locations in one function share the bytes of the file, the function and the module name.
 
-Where it lives: `check_defaults` of `src/antic/sema.c` checks a default, with `sema_eval_const` of `src/antic/sema_const.c` for the constant. `default_argument` of `src/antic/sema_call.c` fills a call. The `EXPR_HERE` case of `lower_expr` in `src/antic/lower_expr.c` writes the record. `SourceLocation` is declared in `src/std/anti/lang.anti`.
+Where it lives: `check_defaults` of `src/antic/sema.c` checks a default, with `sema_eval_const` of `src/antic/sema_const.c` for the constant. `default_argument` of `src/antic/sema_call.c` fills a call. The `EXPR_HERE` case of `lower_address` in `src/antic/lower_expr.c` takes the address of the record, which `lower_location_value` of `src/antic/lower_place.c` writes. `SourceLocation` is declared in `src/std/anti/lang.anti`.
 
 ### What it costs
 
@@ -1023,7 +1023,17 @@ The closure loads the address of `hits` from its context once, at its entry. Eve
 
 A named function such as `show` is passed with a context of null. The callee passes that null as one more argument, which `show` does not read. The C conventions of all six targets allow a caller to pass an argument the callee ignores.
 
-A release build often removes all of it. In the release module of this example `opt` inlined `each` and the closure into `count_even`, which leaves no call and no context, and `hits` is a register.
+A release build often removes all of it. The release module of this example holds one function of the program, `clo.main`. `opt` inlined `each`, `count_even`, `fold`, `show` and the three anonymous functions into it, which leaves no indirect call and no context.
+
+```llvm excerpt=clo target=linux-x86_64 mode=release
+define internal noundef i64 @clo.main() #3 {
+...
+  call void @anti.text.Builder.append_int(ptr %s2.i, i64 3, i64 10, i8 zeroext 0, i64 0, i8 zeroext 1, i8 zeroext 0)
+...
+  call void @anti.text.Builder.append_int(ptr %s2.i, i64 4, i64 10, i8 zeroext 0, i64 0, i8 zeroext 1, i8 zeroext 0)
+```
+
+The two calls of `append_int` are `each(s[0..2], show)`. The loop of `each` and the call through the function value are gone, and each call of `show` stands in `main` with its element as a constant, 3 and then 4.
 
 Where it lives: `sema_check_anonymous`, `sema_capture` and `check_closure_lifetime` of `src/antic/sema_stmt.c` check a closure. `lower_closure` and `lower_anonymous_function` of `src/antic/lower_function.c` write the context and the function. `lower_add_param` of `src/antic/lower.c` splits a function parameter into its two words.
 
@@ -1201,7 +1211,7 @@ For an `own fn` the record lives on the heap. Lowering computes the size of the 
 
 `%15` is the length of `name`. `%16` is the size of the record plus that length, and `%17` the new block. `anti_rt_snapshot_text` copies the bytes of `name` to the offset where the record ends. The `store` writes that offset into the field of `name`, in place of a pointer, so the block can be copied byte by byte. `%24` is the field of `scale`, which takes the value 10.
 
-`anti_rt_snapshot_new` is `malloc`, a write of the size and one atomic add to the count of live snapshots, which a leak check reads. `anti_rt_snapshot_free` is one atomic subtract and `free`. `anti_rt_snapshot_dup` reads the size, allocates and copies the block.
+`anti_rt_snapshot_new` is `malloc`, a write of the size and one atomic add to the count of live snapshots, which a leak check reads. `anti_rt_snapshot_free` is one atomic subtract and `free`. `anti_rt_snapshot_dup` reads the size, calls `anti_rt_snapshot_new` for a block of it and copies the block.
 
 An `own fn` is two words: the code and the pointer to the snapshot. In `Panel` the `own` field is 16 bytes and the plain field 8, which with the table pointer gives the 32 bytes the example prints. A named function in an `own fn` place has a null snapshot, and freeing it does nothing.
 
@@ -1218,7 +1228,7 @@ Where it lives: `check_snapshot` of `src/antic/sema_stmt.c` and `require_owned` 
 | Bytes on the heap | 8 for the size, the size of each capture, and the bytes of each `str` | the same |
 | Bytes of an `own fn` value | 16 | 16 |
 | Freeing an `own fn` | one call of `anti_rt_snapshot_free`: one atomic subtract and one `free` | the same |
-| `dup` of an `own fn` | one `malloc` and one copy of the block | the same |
+| `dup` of an `own fn` | one call of `anti_rt_snapshot_dup`: one `malloc`, one atomic add and one copy of the block | the same |
 | Calling it | one indirect call with the snapshot as the last argument | the same |
 | Checks inserted | none | none |
 
