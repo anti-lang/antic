@@ -380,7 +380,7 @@ The counts are the same in dev and in release, apart from the checks of the last
 | Atomic operations and locks | none |
 | Index check of `l[i]` and `remove_at(i)` | dev mode. `--no-checks` drops it and `--checks` keeps it in a release build |
 | Overflow checks of the arithmetic inside | dev mode, under the same two options |
-| Copies of code | one copy of `List<T>`, `Indexed<T>` and `Collection<T>` per element type: 44 functions for `List<int>` in the module of `growth` |
+| Copies of code | one copy of `List<T>`, `Indexed<T>` and `Collection<T>` per element type. The three classes have 64 functions for `List<int>` in the dev module of `growth`, and 44 in its release module after opt |
 
 The checks follow the build that compiles the program, since a copy of a generic is compiled with the module that uses it.
 
@@ -913,7 +913,7 @@ The counts are the same in dev and in release, apart from the checks of dev mode
 | Growth | by doubling, from a capacity of 8. Every entry moves into the new block, a `Map` in its order |
 | `get`, `contains`, `set`, `add`, `remove`, `update` | one hash of the key, one mix with the seed, one probe |
 | The probe | one compare of 8 bytes per slot passed, and one compare of the keys per slot with an equal mark |
-| `set` and `add` of a new key | a copy of the key as `dup` makes it, and a copy of 64 bytes for the place of the call |
+| `set` and `add` of a new key | a second probe for a free slot, a copy of the key as `dup` makes it, and a copy of 64 bytes for the place of the call |
 | `remove` | marks the slot. No entry moves |
 | A walk of a `HashMap` | every slot, live or not. The first walk draws 8 bytes with `anti_rt_entropy` |
 | A walk of a `Map` | every entry written, removed ones included |
