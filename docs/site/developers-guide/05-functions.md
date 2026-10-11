@@ -3,7 +3,7 @@ title: "Functions"
 description: "Declaration, parameters, defaults, source locations, the calling convention, inlining, closures, snapshot fn and own fn, function values."
 summary: "Declaration and parameters, default values and source locations, the calling convention, inlining, anonymous functions and closures with their captures, `snapshot fn` and `own fn`, and function values with their layout, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T08:10:24+02:00
+lastmod: 2026-10-11T20:12:59+02:00
 draft: true
 weight: 50
 tags: [compilers, programming-languages]
@@ -355,7 +355,7 @@ dflt.anti:34:14 in dflt.main of dflt: passed on
 size_of(SourceLocation) 64
 ```
 
-The second line of the trace names the call of `checked` in `main`, although `trace` was called from inside `checked`. The line numbers count the lines of the module that the test of this page builds from the example, which has no blank lines between its items. The third names the place of the `here` that `main` wrote itself.
+The second line of the trace names the call of `checked` in `main`, although `trace` was called from inside `checked`. The line numbers count the lines of the module that the test of this page builds from the example. That module has no blank lines between its items. The third names the place of the `here` that `main` wrote itself.
 
 The checker refuses each of the following.
 
@@ -426,7 +426,7 @@ define hidden void @dflt.trace(i64 %p0.0, i64 %p0.1, ptr byval([64 x i8]) align 
 define hidden noundef i64 @dflt.checked(i64 noundef %p0, ptr byval([64 x i8]) align 8 %p1) #0 {
 ```
 
-A `SourceLocation` is 64 bytes: a `str` of 16 bytes for the file, two `int` for the line and the column, and two `str` for the function and the module. It is larger than 16 bytes, so System V passes it `byval`: the caller copies the 64 bytes of the record onto the stack. On the arm64 targets and on windows-x86_64 the caller makes the copy in its frame and passes a pointer to it.
+A `SourceLocation` is 64 bytes. A `str` of 16 bytes holds the file, two `int` the line and the column, and two more `str` the function and the module. It is larger than 16 bytes, so System V passes it `byval`: the caller copies the 64 bytes of the record onto the stack. On the arm64 targets and on windows-x86_64 the caller makes the copy in its frame and passes a pointer to it.
 
 The texts of the record are literals of the module. Two locations in one function share the bytes of the file, the function and the module name.
 
@@ -577,6 +577,8 @@ flip 2 1, dot 11, grow 7, count 5, add 4, half 4, apply 42
 sizes: Point 16, Vec2 16, Box 40, Counter 16, str 16
 ```
 
+`half` may fail, and its handler `catch { yield -1; }` gives -1 in place of the result when it does. Chapter 6 describes handlers, and chapter 9 the class `Counter` with its `self`.
+
 ### How antic builds it
 
 antic classifies every parameter and every result itself and writes the outcome into the signature of the LLVM function. The signature therefore shows the convention.
@@ -689,7 +691,7 @@ A dev build inlines nothing. Every call in the source is a call in the object, s
 
 A release build compiles the whole program as one LLVM module and runs `opt` over it with the pipeline `default<O3>` and an inline threshold of 225. `opt` weighs each call by the size of the callee and inlines below the threshold. A function that is `internal` and inlined into every caller is removed. The modules of the standard library are part of that module, so a small library function is inlined as one of the program is.
 
-The link of a release program is a full LTO link by default. lld runs the same threshold over the program and the bitcode of the runtime, so a small function of the runtime is inlined too. `--lto none` links objects and leaves every call into the runtime a call.
+The link of a release program is a full LTO link by default. The linker lld applies the same threshold to the program and the bitcode of the runtime. A small function of the runtime is therefore inlined too. `--lto none` links objects and leaves every call into the runtime a call.
 
 Three kinds of function are never inlined.
 
@@ -768,7 +770,7 @@ b0:
 }
 ```
 
-In the release module the body of `square` stands twice in `hyp2`, as the two `mul` lines whose names end in `.i`, the mark of an inlined instruction. The module holds no function `inl.square`.
+In the release module the body of `square` stands twice in `hyp2`, as the two `mul` lines. Their names end in `.i`, the mark of an inlined instruction. The module holds no function `inl.square`.
 
 ```asm excerpt=inl target=linux-x86_64 mode=release
 <hyp2>:
@@ -1033,7 +1035,7 @@ define internal noundef i64 @clo.main() #3 {
   call void @anti.text.Builder.append_int(ptr %s2.i, i64 4, i64 10, i8 zeroext 0, i64 0, i8 zeroext 1, i8 zeroext 0)
 ```
 
-The two calls of `append_int` are `each(s[0..2], show)`. The loop of `each` and the call through the function value are gone, and each call of `show` stands in `main` with its element as a constant, 3 and then 4.
+The two calls of `append_int` are `each(s[0..2], show)`. The loop of `each` and the call through the function value are gone. Each call of `show` stands in `main` with its element as a constant, 3 and then 4.
 
 Where it lives: `sema_check_anonymous`, `sema_capture` and `check_closure_lifetime` of `src/antic/sema_stmt.c` check a closure. `lower_closure` and `lower_anonymous_function` of `src/antic/lower_function.c` write the context and the function. `lower_add_param` of `src/antic/lower.c` splits a function parameter into its two words.
 
@@ -1196,7 +1198,7 @@ fn caller()
 
 A snapshot is a record: its size in bytes first, then one field per captured variable. The function reads its captures from that record, which it receives as its context.
 
-For an `own fn` the record lives on the heap. Lowering computes the size of the record plus the length of every captured `str`, calls `anti_rt_snapshot_new` for the block and copies each `str` behind the record with `anti_rt_snapshot_text`. The snapshot therefore owns the bytes of its texts and does not depend on the `str` it was made from.
+For an `own fn` the record lives on the heap. Lowering computes the size of the record plus the length of every captured `str` and calls `anti_rt_snapshot_new` for the block. It copies each `str` behind the record with `anti_rt_snapshot_text`. The snapshot therefore owns the bytes of its texts and does not depend on the `str` it was made from.
 
 ```ir excerpt=snap target=linux-x86_64 mode=release
     %16 = add i64 size_of main.0.snapshot, %15
@@ -1213,7 +1215,7 @@ For an `own fn` the record lives on the heap. Lowering computes the size of the 
 
 `anti_rt_snapshot_new` is `malloc`, a write of the size and one atomic add to the count of live snapshots, which a leak check reads. `anti_rt_snapshot_free` is one atomic subtract and `free`. `anti_rt_snapshot_dup` reads the size, calls `anti_rt_snapshot_new` for a block of it and copies the block.
 
-An `own fn` is two words: the code and the pointer to the snapshot. In `Panel` the `own` field is 16 bytes and the plain field 8, which with the table pointer gives the 32 bytes the example prints. A named function in an `own fn` place has a null snapshot, and freeing it does nothing.
+An `own fn` is two words, the code and the pointer to the snapshot. In `Panel` the `own` field is 16 bytes and the plain field 8, which with the table pointer gives the 32 bytes the example prints. A named function in an `own fn` place has a null snapshot, and freeing it does nothing.
 
 The snapshot passed to `run` is the same record in a slot of the frame of `main`. Its `str` is copied as two words, and nothing calls the runtime.
 
