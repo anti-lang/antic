@@ -3,7 +3,7 @@ title: "Tests"
 description: "tests and fixtures blocks, anti test, expected output and memory checks in tests."
 summary: "The `tests` and `fixtures` blocks of a module with how antic builds them and what they cost, `anti test`, how a test states the expected output, and `--memory-checks` in tests."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T18:40:00+02:00
+lastmod: 2026-10-11T20:20:14+02:00
 draft: true
 weight: 190
 tags: [compilers, programming-languages]
@@ -278,11 +278,11 @@ fn main() -> int
 }
 ```
 
-The module path of a runner is `anti.test.<module>`, with each dot of the module written as `_`. antic refuses a library of a program under the root `anti.`, so the two never clash. A module with `setup` gets the call `<module>.setup();` before each test and `<module>.teardown();` after it.
+The module path of a runner is `anti.test.<module>`, with each dot of the module written as `_`. The compiler refuses a library of a program under the root `anti.`, so the two never clash. A module with `setup` gets the call `<module>.setup();` before each test and `<module>.teardown();` after it.
 
 `anti_rt_test_running` stores the address and the length of the name in two words of the runtime. `anti_rt_assert_failed` reads them. With a name set it prints `FAIL <name>` and then the text of the assertion to the standard error, and calls `abort`. A test that returns reaches the `printf` that prints `ok <name>`.
 
-The two modes build the runner in two ways.
+The mode decides how the runner is built.
 
 | | Dev run | Run with `--release` |
 |---|---|---|
@@ -383,7 +383,7 @@ The `ok` lines and the totals go to the standard output. The exit status is 0 wh
 | `anti/test/com_example_purse.anti` | the runner |
 | `com_example_purse.runner.o`, `com_example_purse.runner` | the object of the runner and the linked program |
 
-Every module that a module of the run imports is named in the same run, or stands as a library file under a root. The standard library is found in the runtime archive. A run of `tally.anti` alone, which imports `com.example.purse`, stops with "cannot find module `com.example.purse`".
+Every module that a module of the run imports is named in the same run, or is a library file under a root. The standard library is found in the runtime archive. A run of `tally.anti` alone, which imports `com.example.purse`, stops with "cannot find module `com.example.purse`".
 
 ### A failed assertion
 
@@ -450,7 +450,7 @@ anti test: 6 tests in 2 modules, 1 module failed
 
 ### Other ends of a test
 
-A test also ends its module by a trap of a dev check and by an error that reaches `fatal`. The module `src/com/example/shelf.anti` shows both.
+A trap of a dev check and an error that reaches `fatal` end a module as a failed assertion does. The module `src/com/example/shelf.anti` shows both.
 
 ```anti
 import anti.lang;
@@ -503,7 +503,7 @@ With `half(3)` in the first test, the error reaches `fatal`. The run prints the 
 
 ### Runs with --release
 
-`anti test --release` builds each runner as a release program with the assertions and the dev checks off. Both modules above pass.
+`anti test --release` builds each runner as a whole program and drops the assertions and the dev checks. Both modules above pass.
 
 ```sh
 anti test --release -I src src/com/example/change.anti src/com/example/shelf.anti
@@ -571,7 +571,7 @@ constant: 9 6 3 0
 forward: 0 3 6 9
 ```
 
-`tests/run_program.cmake` builds the program in release mode, runs it and compares both. It reads the output as the bytes of a file, so a CR and a NUL count. antic must print nothing during the build: a warning fails the test unless the test names it. An optional `<name>.args` holds one command-line argument per line.
+`tests/run_program.cmake` builds the program in release mode, runs it and compares both. It reads the output as the bytes of a file, so a CR and a NUL count. The compiler must print nothing during the build. A warning fails the test unless the test names it. An optional `<name>.args` holds one command-line argument per line.
 
 The pages of this guide use a third form. A block that declares `main` is built and run, and the `text output` block after it holds its whole output. The test `guide_examples` compares the two through `tests/run_document_examples.cmake`.
 
@@ -639,7 +639,7 @@ The report comes at the exit of the runner, after every test of the module. It c
 
 The facts of a checked run follow.
 
-- A use after free and a double free end the runner at the access, with the frames of the access, of the `free` and of the `alloc`. The later tests of the module do not run.
+- A use after free and a double free end the runner at the access. The report holds the frames of the access, of the `free` and of the `alloc`. The later tests of the module do not run.
 - The leak check runs once per runner, so it reports the leaks of all tests of a module together.
 - `--release --memory-checks` checks the optimized code. The optimizer inlines a small test into the runner, and frame 2 above then reads `anti.test.com_example_squares.main squares.anti:16`.
 - A dev run keeps its bounds checks and its assertions beside the memory checks.
