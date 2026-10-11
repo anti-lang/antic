@@ -159,7 +159,7 @@ Lowering writes that check in every mode, and the same holds for a bounds check,
 
 The parameter of `main` is `agg []str`, an aggregate that travels as a pointer in the IR. A `[]str` is the struct `{ ptr: ptr, len: i64 }`. `args.len` is a `ptradd` to the field and a `load`.
 
-The offset of the field is the symbol `offset_of []str.len` and no number. The IR holds no size, no offset and no alignment. That keeps the IR of a module equal for every target, so one library file serves all six. `src/antic/layout.c` lays every aggregate out for the target and replaces each symbol with its number, right before the LLVM text is written.
+The offset of the field is the symbol `offset_of []str.len` and no number. The IR holds no size, no offset and no alignment. That keeps the IR of a module equal for every target, so one library file serves all six. `src/antic/layout.c` lays every aggregate out for the target. It replaces each symbol with its number right before the LLVM text is written.
 
 `%5 = slot str` reserves memory in the frame for the `str` that `main` passes to `io.println`. The front end builds the `str` there with two stores, the pointer and the length 12.
 
@@ -296,11 +296,11 @@ xorl %eax, %eax
 retq
 ```
 
-`cmpq $0x1, %rsi` compares the length of `args` with 1, and `jne` skips the printing. The frame is built on the printing path alone. Each call takes the descriptor 1 in `edi`, the address of the text in `rsi` and its length in `edx`. `llvm-objdump -d` prints no relocations, so a `callq` shows the address after itself where the linker later writes `anti_rt_write`. `xorl %eax, %eax` is the `return 0`.
+`cmpq $0x1, %rsi` compares the length of `args` with 1, and `jne` skips the printing. The frame is built on the printing path alone. Each call takes the descriptor 1 in `edi`, the address of the text in `rsi` and its length in `edx`. `llvm-objdump -d` prints no relocations. A `callq` therefore shows the address after itself, where the linker later writes `anti_rt_write`. `xorl %eax, %eax` is the `return 0`.
 
 ## Dev and release builds
 
-A build is a dev build or a release build. `antic` builds in release mode unless `--dev` is given. `anti build` builds in dev mode unless `--release` is given.
+`antic` builds in release mode unless `--dev` is given. `anti build` builds in dev mode unless `--release` is given.
 
 | | Dev | Release |
 |---|---|---|
@@ -314,7 +314,7 @@ A build is a dev build or a release build. `antic` builds in release mode unless
 | LTO with the runtime | none | full, and `--lto thin` or `--lto none` choose another |
 | Warnings | printed | refused as errors |
 
-The checks of dev mode are the overflow check of `+`, `-` and `*`, the bounds check of an index, the checks of a division, a shift and a narrowing conversion, and the others each chapter names. `--no-checks` drops them from a dev build and `--no-asserts` the assertions. The build that compiles the program decides, so a library file carries every check and a release build of the program drops the ones in its libraries too.
+The checks of dev mode start with the overflow check of `+`, `-` and `*` and the bounds check of an index. A division, a shift and a narrowing conversion have one each, and later chapters name the rest. `--no-checks` drops them from a dev build and `--no-asserts` the assertions. The build that compiles the program decides, so a library file carries every check and a release build of the program drops the ones in its libraries too.
 
 A release build defines what a dropped check guarded. A signed `+`, `-` or `*` wraps, a division by zero gives 0, and a shift takes its count modulo the width. Chapter 3 shows each.
 
@@ -324,9 +324,16 @@ A release build defines what a dropped check guarded. A signed `+`, `-` or `*` w
 
 A release build of antic compiles the whole program in one run. The program holds the IR of the module on the command line. It also holds the IR of every library file that module imports, directly or through another import. The whole-program pass and the optimizer of antic therefore see every function and every class.
 
-The whole-program pass does four things with that view. It turns a call through a class table into a direct call where one function alone can be its target. It writes the class registry that `anti.reflect` reads. It runs the singleton check, `check_singletons` of `src/antic/whole.c`. It writes the bitmaps of the table slots the program uses. Chapter 9 describes each. In dev mode the pass runs for the module that holds `main`, when that module links.
+The whole-program pass uses that view in these steps, which chapter 9 describes.
 
-The link of a release build is a full LTO link. `opt` runs `lto-pre-link<O3>` and writes bitcode as the object. `lld` then links that bitcode with the runtime, which the archive holds as bitcode in `lib/<target>/<level>/bitcode/full/`. LLVM then runs its passes over the program and the runtime as one module, at `--lto-O3`. A call of `anti_rt_write` may then be inlined like a call of a function of the program.
+- A call through a class table becomes a direct call where one function alone can be its target.
+- The class registry that `anti.reflect` reads is written.
+- The singleton check runs, `check_singletons` of `src/antic/whole.c`.
+- The bitmaps of the table slots the program uses are written.
+
+ In dev mode the pass runs for the module that holds `main`, when that module links.
+
+The link of a release build is a full LTO link. `opt` runs `lto-pre-link<O3>` and writes bitcode as the object. `lld` then links that bitcode with the runtime. The archive holds the runtime as bitcode in `lib/<target>/<level>/bitcode/full/`. LLVM then runs its passes over the program and the runtime as one module, at `--lto-O3`. A call of `anti_rt_write` may then be inlined like a call of a function of the program.
 
 Dev mode, `--lib`, `--linker platform` and `--memory-checks` link objects and take no LTO. So does a Windows program that loads plugins. `--lto none` asks for the link of objects in release mode. That link runs `opt` with `default<O3>` into `<output>.bc` and `llc -O2` on the bitcode. `lto_mode` of `src/antic/driver.c` holds the rule.
 
@@ -349,9 +356,9 @@ The runtime archive is the directory antic reads beside its own executable. A pa
 
 antic looks for the archive in two places, in this order: the directory above its own `bin/`, then the data directory of the user. `--runtime <dir>` names another. `runtime_archive` of `src/antic/userdirs.c` holds the rule.
 
-`libanti_rt.a` is the runtime, written in C under `src/rt/`. It holds the entry point, the failure routines of the checks, the output functions, the thread pool, reflection and the rest of what a program calls as `anti_rt_*`. One runtime exists per target and processor level, so a program built with `--cpu v1` links a runtime compiled for `v1`.
+`libanti_rt.a` is the runtime, written in C under `src/rt/`. It holds the entry point, the failure routines of the checks, the output functions, the thread pool and reflection. A program calls its functions as `anti_rt_*`. One runtime exists per target and processor level, so a program built with `--cpu v1` links a runtime compiled for `v1`.
 
-A Linux program links statically against musl, and its allocator is mimalloc. `lib/<target>/<level>/libmimalloc.a` stands before `libc.a` on the link line, so `malloc`, `free`, `calloc`, `realloc` and `aligned_alloc` of the program, the runtime and musl resolve to mimalloc. `link_command` of `src/antic/linker.c` writes that line. A program that names a library with `link linux` links dynamically against glibc 2.35 and keeps the allocator of glibc.
+A Linux program links statically against musl, and its allocator is mimalloc. `lib/<target>/<level>/libmimalloc.a` stands before `libc.a` on the link line. `malloc`, `free`, `calloc`, `realloc` and `aligned_alloc` of the program, the runtime and musl therefore resolve to mimalloc. `link_command` of `src/antic/linker.c` writes that line. A program that names a library with `link linux` links dynamically against glibc 2.35 and keeps the allocator of glibc.
 
 A macOS program uses the allocator of `libSystem`, and a Windows program the one of `ucrtbase.dll`. The `alloc` and `free` of the language call `malloc` and `free` on every target. Chapter 12 describes `anti.mem`.
 
@@ -512,4 +519,4 @@ The first command writes the dev module as `walk.s.ll`. The second writes the re
 
 The test removes the `//!` lines of a block and writes `import anti.lang;` in front of a block that does not import it. A line number inside an excerpt counts the lines of that module.
 
-Where it lives: `compile`, `back_end`, `llvm_back_end` and `driver_run` in `src/antic/driver.c` for the order of the steps, `src/antic/ir_print.c` for the form of the IR dumps, `src/antic/llvm_emit.c` for the LLVM text, `src/antic/llvm_run.c` for the tools and `src/rt/start.c` for the start of a program.
+Where it lives: `compile`, `back_end`, `llvm_back_end` and `driver_run` of `src/antic/driver.c` hold the order of the steps. `src/antic/ir_print.c` writes the IR dumps and `src/antic/llvm_emit.c` the LLVM text. `src/antic/llvm_run.c` runs the tools, and `src/rt/start.c` starts a program.

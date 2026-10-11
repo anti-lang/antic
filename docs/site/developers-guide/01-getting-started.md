@@ -10,7 +10,7 @@ tags: [compilers, programming-languages]
 keywords: [install, package, antic, anti, hello world, dev build, release build]
 ---
 
-Anti installs as one package per platform, with one command and no other download. The package holds the compiler `antic`, the tool `anti` and everything a build needs for all six targets. This chapter installs it, builds a first program two ways and names every file an install and a build write.
+Anti installs as one package per platform, with one command and no other download. The package holds the compiler `antic`, the tool `anti` and everything a build needs for all six targets. The chapter covers the install and a first program. It names every file an install and a build write.
 
 ## The package
 
@@ -171,7 +171,7 @@ cd hello
 anti run
 ```
 
-`anti new` writes three things: the manifest `anti.toml`, the source `src/com/example/hello.anti` and the empty directory `test/`. The source is the program above with a doc comment of the module on top. The manifest names the package and its version.
+`anti new` writes the manifest `anti.toml`, the source `src/com/example/hello.anti` and the empty directory `test/`. The source is the program above with a doc comment of the module on top. The manifest names the package and its version.
 
 ```toml
 [package]
@@ -271,4 +271,4 @@ A build writes inside the project alone.
 | `dist/<target>/<mode>/` | `anti build` | the program, `NOTICE.txt` and in release mode the symbols archive |
 | `<output>` and `<output>.o` | `antic` | the executable and its object, beside each other |
 
-Where it lives: `tools/install.sh` and `tools/install.ps1` for the installers, `tools/pack-anti.cmake` for the layout of a package, `src/antic/userdirs.c` for the directories, `src/antic/main.c` for the options of antic and `src/anti/build.c` for `anti build`, `anti run` and `anti new`.
+Where it lives: `tools/install.sh` and `tools/install.ps1` are the installers. `tools/pack-anti.cmake` lays a package out. `src/antic/userdirs.c` holds the directories and `src/antic/main.c` the options of antic. `src/anti/build.c` holds `anti build`, `anti run` and `anti new`.

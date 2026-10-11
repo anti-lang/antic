@@ -202,11 +202,11 @@ b0:
 }
 ```
 
-`ret i32 42` returns the literal as an immediate value. `0x3FE0000000000000` is 0.5, which the text writes as the bits of a `double` for both float types. `'q'` is the `i32` 113, its code point. `true` is the `i8` 1. `zeroext` says that the caller may read the byte as a full register, and `range(i8 0, 2)` that it is 0 or 1.
+`ret i32 42` returns the literal as an immediate value. `0x3FE0000000000000` is 0.5, which the text writes as the bits of a `double` for both float types. `'q'` is the `i32` 113, its code point. `true` is the `i8` 1. `zeroext` says that the caller may read the byte as a full register. `range(i8 0, 2)` says that it is 0 or 1.
 
 `llvm_emit.c` writes a narrow integer parameter or result with `signext` or `zeroext`, by the signedness of its type.
 
-Where it lives: `src/antic/lexer.c` reads a literal, `sema_const.c` and `sema_expr.c` of `src/antic/` give it its type and check that it fits, `src/antic/types.c` holds the types, `lower_cast` of `src/antic/lower_expr.c` lowers `as`, and `src/antic/layout.c` gives each type its size.
+Where it lives: `src/antic/lexer.c` reads a literal. `sema_const.c` and `sema_expr.c` of `src/antic/` give it its type and check that it fits. `src/antic/types.c` holds the types and `src/antic/layout.c` their sizes. `lower_cast` of `src/antic/lower_expr.c` lowers `as`.
 
 ### What it costs
 
@@ -286,7 +286,7 @@ For a C programmer:
 
 For a C++ programmer:
 
-- No implicit conversion exists, narrowing or widening. Every one is an `as`.
+- No implicit conversion exists in either direction. A narrowing and a widening one are both written `as`.
 - A float literal for an `f32` needs no `f`, and an integer literal is never a float.
 - `'ab'` is an error. A character literal holds one character.
 
@@ -443,7 +443,7 @@ b0:
 
 A `str` constant is the global of its literal, shared with every equal literal of the module. `GREETING` and a `"tea"` written elsewhere in the module are one global.
 
-Where it lives: `sema_const.c` of `src/antic/` computes a constant expression, `lower_stmt.c` lowers a `let`, and `src/antic/llvm_emit.c` writes the `alloca` of each temporary and slot.
+Where it lives: `sema_const.c` of `src/antic/` computes a constant expression, and `lower_stmt.c` lowers a `let`. `src/antic/llvm_emit.c` writes the `alloca` of each temporary and slot.
 
 ### What it costs
 
@@ -734,7 +734,7 @@ cmovnoq %rdi, %rax
 retq
 ```
 
-The first four instructions compute the clamp value from the sign of the wrapped sum: the greatest `int` when the sum wrapped to a negative number, the least otherwise. `addq` adds again and sets the overflow flag, and `cmovnoq` takes the sum when the flag is clear. arm64 needs four instructions: `adds`, `asr`, `eor` and `csel`.
+The first four instructions compute the clamp value from the sign of the wrapped sum. It is the greatest `int` when the sum wrapped to a negative number and the least otherwise. `addq` adds again and sets the overflow flag, and `cmovnoq` takes the sum when the flag is clear. arm64 needs four instructions: `adds`, `asr`, `eor` and `csel`.
 
 A release build keeps the defined results of a division in the code. The dev check is dropped, and the selects stay.
 
@@ -753,7 +753,7 @@ b0:
 }
 ```
 
-`%v5` is the divisor, replaced by 1 when it is 0 or -1, so `sdiv` never sees a pair that LLVM leaves undefined. `%v8` takes `0 - a` for a divisor of -1, and `%v9` takes 0 for a divisor of 0. On arm64 the function is nine instructions with one `sdiv` and no branch. A divisor that `opt` can prove to be neither 0 nor -1, such as a constant, leaves the `sdiv` alone.
+`%v5` is the divisor, replaced by 1 when it is 0 or -1. `sdiv` therefore never sees a pair that LLVM leaves undefined. `%v8` takes `0 - a` for a divisor of -1, and `%v9` takes 0 for a divisor of 0. On arm64 the function is nine instructions with one `sdiv` and no branch. A divisor that `opt` can prove to be neither 0 nor -1, such as a constant, leaves the `sdiv` alone.
 
 A shift masks its count, `and i64 %count, 63` before `shl`. A narrowing `as` is one `trunc` in release mode. In dev mode the value is also converted back and compared with the original, which is the range check.
 
@@ -772,7 +772,7 @@ retq
 
 `addq (%rsi), %rax` adds the low words and sets the carry flag. The two `movq` lines after it leave the flag alone. `adcq 0x8(%rdi), %rax` adds the high words and that carry in one instruction. arm64 writes the pair as `adds` and `adc`. A flag that a function never reads costs nothing.
 
-Where it lives: `lower_binary_checks` of `src/antic/lower_check.c` writes the checks of an operator and `narrow_check` of `src/antic/lower_expr.c` the one of `as`. `optimize_drop_failures` of `src/antic/optimize.c` drops them, `src/antic/arith.c` computes the wrapping and saturating results of constants, `src/antic/llvm_emit.c` writes the intrinsics, and `anti_rt_check_failed` of `src/rt/check.c` prints the message.
+Where it lives: `lower_binary_checks` of `src/antic/lower_check.c` writes the checks of an operator and `narrow_check` of `src/antic/lower_expr.c` the one of `as`. `optimize_drop_failures` of `src/antic/optimize.c` drops them. `src/antic/arith.c` computes the wrapping and saturating results of constants, and `src/antic/llvm_emit.c` writes the intrinsics. `anti_rt_check_failed` of `src/rt/check.c` prints the message.
 
 ### What it costs
 
@@ -999,7 +999,7 @@ arm64 converts with `fcvt s0, h0` and `fcvt h0, s0` at every level. The x86_64 l
 
 A conversion to an integer is one instruction on arm64, `fcvtzs`, which saturates by itself. On x86_64 `to_int` is seven instructions: `vcvttsd2si` and two compares with conditional moves for the upper bound and the NaN.
 
-Where it lives: `src/antic/llvm_emit.c` writes the float instructions and both forms of the `f16` conversion, `lower_cast` of `src/antic/lower_expr.c` lowers `as`, `src/rt/f16.h` holds the conversion that the checker, the optimizer and the runtime share, and `anti_rt_builder_float` of `src/rt/text.c` writes the digits.
+Where it lives: `src/antic/llvm_emit.c` writes the float instructions and both forms of the `f16` conversion. `lower_cast` of `src/antic/lower_expr.c` lowers `as`. `src/rt/f16.h` holds the conversion that the checker, the optimizer and the runtime share. `anti_rt_builder_float` of `src/rt/text.c` writes the digits.
 
 ### What it costs
 
@@ -1043,7 +1043,7 @@ For a C++ programmer:
 
 ### What you know
 
-A `String` of Java is an immutable object of UTF-16 code units that the collector frees, and its `length()` counts those units. A string of C is a `char *` to bytes that end at a NUL, so its length costs a scan. `std::string` of C++ owns its bytes, knows its size and frees them in its destructor.
+A `String` of Java is an immutable object of UTF-16 code units that the collector frees. Its `length()` counts those units. A string of C is a `char *` to bytes that end at a NUL, so its length costs a scan. `std::string` of C++ owns its bytes, knows its size and frees them in its destructor.
 
 ### The feature
 
@@ -1225,7 +1225,7 @@ A `"` ends an `f"..."` inside an `{expr}` too. A value that needs a quote is bou
 
 ### How antic builds it
 
-A `str` is a struct of 16 bytes: the pointer at offset 0 and the length at offset 8. A `[]T` has the same layout. The three calling conventions pass it in three ways.
+A `str` is a struct of 16 bytes: the pointer at offset 0 and the length at offset 8. A `[]T` has the same layout. The calling conventions of the targets pass it as the table shows.
 
 | Target | A `str` parameter in the LLVM text |
 |---|---|
@@ -1319,7 +1319,7 @@ For a C++ programmer:
 
 - A `str` is a `std::string_view`, not a `std::string`. It owns nothing and no destructor runs for it.
 - The text of an `f"..."` has no owner type. The program frees it once, by hand.
-- No small-string buffer exists. An `f"..."` of one byte takes a heap block of 32 bytes.
+- A `str` has no buffer of its own for a short text. An `f"..."` of one byte takes a heap block of 32 bytes.
 
 ## Tuples
 
@@ -1415,7 +1415,7 @@ let less = t < u;
 
 ### How antic builds it
 
-A tuple is an anonymous struct with the layout C gives a struct of the same members. The elements stand in order, each at the next offset that its alignment allows, and the size is a multiple of the largest alignment. `(i8, int)` is therefore 16 bytes: one byte, seven of padding and eight.
+A tuple is an anonymous struct with the layout C gives a struct of the same members. The elements stand in order, each at the next offset that its alignment allows. The size is a multiple of the largest alignment. `(i8, int)` is therefore 16 bytes: one byte, seven of padding and eight.
 
 Two tuple types with the same element types are one type. A header that antic writes for a C library names it by its elements, `struct anti_tuple_int_int` for `(int, int)`.
 
@@ -1450,7 +1450,7 @@ A tuple above 16 bytes, such as `(int, str)`, is returned through a pointer that
 
 In dev mode a tuple local is a slot of the frame, and `t.0` is a load at the offset of the element.
 
-Where it lives: `src/antic/types.c` makes one type per distinct tuple, `src/antic/layout.c` lays it out, `src/antic/abi.c` classifies it for each convention, `src/antic/sema_stmt.c` checks a destructuring and `tuple_elements` of `src/antic/header.c` writes its C name.
+Where it lives: `src/antic/types.c` makes one type per distinct tuple, and `src/antic/layout.c` lays it out. `src/antic/abi.c` classifies it for each convention. `src/antic/sema_stmt.c` checks a destructuring, and `tuple_elements` of `src/antic/header.c` writes its C name.
 
 ### What it costs
 
@@ -1620,7 +1620,7 @@ Lowering reads the types from the tree, so the IR and the LLVM module carry no t
 
 The first three lines are the body of `inferred` and the last three the body of `written`.
 
-Where it lives: `sema_stmt.c` of `src/antic/` gives a `let` its type, `sema_expr.c` and `sema_const.c` type a literal from its context, `sema_generic.c` infers the type arguments of a call, and `ast_dump_typed` of `src/antic/ast_dump.c` prints the checked tree.
+Where it lives: `sema_stmt.c` of `src/antic/` gives a `let` its type. `sema_expr.c` and `sema_const.c` type a literal from its context, and `sema_generic.c` infers the type arguments of a call. `ast_dump_typed` of `src/antic/ast_dump.c` prints the checked tree.
 
 ### What it costs
 
