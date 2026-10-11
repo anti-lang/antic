@@ -335,9 +335,20 @@ function(excerpt_output out kind id module target mode option dir)
                 "an asm excerpt needs LLVM_MC and LLVM_OBJDUMP")
         endif()
         target_triple(triple "${target}")
+        # DESIGN: llc writes the instructions of the level of the target,
+        # and llvm-mc knows the base level of a triple alone. macos-arm64
+        # builds at armv8.5, so its text holds `ldaddal` and `casal`,
+        # which llvm-mc refuses without the feature. `+all` makes the
+        # assembler of arm64 take every instruction. It chooses none: the
+        # text is what llc wrote. x86_64 has no such feature and needs
+        # none, since its assembler takes every instruction as it is.
+        set(mc_features "")
+        if(triple MATCHES "^(arm64|aarch64)")
+            set(mc_features "-mattr=+all")
+        endif()
         execute_process(
-            COMMAND "${LLVM_MC}" "-triple=${triple}" -filetype=obj
-                    -o "${base}.o" "${base}.s"
+            COMMAND "${LLVM_MC}" "-triple=${triple}" ${mc_features}
+                    -filetype=obj -o "${base}.o" "${base}.s"
             RESULT_VARIABLE status
             OUTPUT_VARIABLE mc_out
             ERROR_VARIABLE mc_err
