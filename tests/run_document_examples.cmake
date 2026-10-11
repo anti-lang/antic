@@ -71,6 +71,12 @@
 #       labels of the assembler such as .LBB0_3 and a number that labels a
 #       line are made equal. The named block stands before its first
 #       excerpt.
+#   ```llvm excerpt=<id> target=<target> mode=<mode> option=<option>
+#   ```asm excerpt=<id> target=<target> mode=<mode> option=<option>
+#       builds the named block with one more option of antic, so that a
+#       document shows what the option changes in the code: `checks` is
+#       --checks, `no-checks` is --no-checks and `memory-checks` is
+#       --memory-checks. A dump takes no option.
 #   ```tokens excerpt=<id> target=<target> mode=<dev|release>
 #   ```ast excerpt=<id> target=<target> mode=<dev|release>
 #   ```types excerpt=<id> target=<target> mode=<dev|release>
@@ -257,10 +263,17 @@ set(dump_kinds "tokens|ast|types|ir|opt")
 # Build the module `module` of the block named `id` for `target` in
 # `mode`, unless this run built it already, and set `out` to the file a
 # `kind` excerpt reads: the module llc receives for llvm, the disassembly
-# for asm and what antic prints for a dump. The files stand in `dir` as
-# <id>.<mode>.<target>.s and beside it.
-function(excerpt_output out kind id module target mode dir)
+# for asm and what antic prints for a dump. `option` is "" or the name of
+# the one option of antic the build takes on top. The files stand in `dir`
+# as <id>.<mode>.<target>.s and beside it, with the option after the
+# target where there is one.
+function(excerpt_output out kind id module target mode option dir)
     set(base "${dir}/${id}.${mode}.${target}")
+    set(extra "")
+    if(NOT option STREQUAL "")
+        set(base "${base}.${option}")
+        set(extra "--${option}")
+    endif()
     set(dev "")
     if(mode STREQUAL "dev")
         set(dev --dev)
@@ -284,15 +297,16 @@ function(excerpt_output out kind id module target mode dir)
     endif()
     if(NOT EXISTS "${base}.s")
         execute_process(
-            COMMAND "${ANTIC}" ${dev} -S --keep-llvm --target "${target}"
-                    --runtime "${RUNTIME}" -o "${base}.s" "${module}"
+            COMMAND "${ANTIC}" ${dev} ${extra} -S --keep-llvm
+                    --target "${target}" --runtime "${RUNTIME}"
+                    -o "${base}.s" "${module}"
             RESULT_VARIABLE status
             OUTPUT_VARIABLE build_out
             ERROR_VARIABLE build_err
             ENCODING NONE)
         if(NOT status EQUAL 0)
             message(FATAL_ERROR
-                "the block `${id}` of ${document} does not build for ${target} in ${mode} mode:\n${build_out}${build_err}")
+                "the block `${id}` of ${document} does not build for ${target} in ${mode} mode ${extra}:\n${build_out}${build_err}")
         endif()
     endif()
     if(kind STREQUAL "llvm" AND mode STREQUAL "dev")
@@ -473,6 +487,7 @@ foreach(document IN LISTS documents)
     set(excerpt_id "")
     set(excerpt_target "")
     set(excerpt_mode "")
+    set(excerpt_option "")
     foreach(line IN LISTS lines)
         math(EXPR number "${number} + 1")
         if(state STREQUAL "output")
@@ -511,7 +526,8 @@ foreach(document IN LISTS documents)
             endif()
             excerpt_output(path "${excerpt_kind}" "${excerpt_id}"
                            "${module_${document_index}_${excerpt_id}}"
-                           "${excerpt_target}" "${excerpt_mode}" "${dir}")
+                           "${excerpt_target}" "${excerpt_mode}"
+                           "${excerpt_option}" "${dir}")
             excerpt_missing(missing "${block}" "${path}")
             if(NOT missing STREQUAL "")
                 message(FATAL_ERROR
@@ -663,17 +679,23 @@ foreach(document IN LISTS documents)
             endif()
             set(state block)
             math(EXPR block_line "${number} + 1")
-        elseif(line MATCHES "^```(llvm|asm|${dump_kinds}) excerpt=([a-z][a-z0-9_]*) target=([a-z0-9_-]+) mode=(dev|release)$")
+        elseif(line MATCHES "^```(llvm|asm|${dump_kinds}) excerpt=([a-z][a-z0-9_]*) target=([a-z0-9_-]+) mode=(dev|release)( option=(checks|no-checks|memory-checks))?$")
             set(excerpt_kind "${CMAKE_MATCH_1}")
             set(excerpt_id "${CMAKE_MATCH_2}")
             set(excerpt_target "${CMAKE_MATCH_3}")
             set(excerpt_mode "${CMAKE_MATCH_4}")
+            set(excerpt_option "${CMAKE_MATCH_6}")
+            if(NOT excerpt_option STREQUAL "" AND
+               excerpt_kind MATCHES "^(${dump_kinds})$")
+                message(FATAL_ERROR
+                    "the ${excerpt_kind} excerpt at line ${number} of ${document} names an option, and a dump takes none")
+            endif()
             set(state excerpt)
             set(block "")
             math(EXPR block_line "${number} + 1")
         elseif(line MATCHES "^```(llvm|asm|${dump_kinds}) ")
             message(FATAL_ERROR
-                "the excerpt at line ${number} of ${document} is not written as `${CMAKE_MATCH_1} excerpt=<id> target=<target> mode=<dev|release>`")
+                "the excerpt at line ${number} of ${document} is not written as `${CMAKE_MATCH_1} excerpt=<id> target=<target> mode=<dev|release>`, with `option=<checks|no-checks|memory-checks>` after it for llvm and asm alone")
         elseif(line MATCHES "^```" AND NOT context_line EQUAL 0)
             message(FATAL_ERROR
                 "the context at line ${context_line} of ${document} stands before a block that is not `anti`")
