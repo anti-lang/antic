@@ -3,7 +3,7 @@ title: "Errors"
 description: "may fail, fail, try and handlers, how an error travels back, error origins and stack traces and their cost, never, assert and the dev checks."
 summary: "`may fail`, `fail`, `try` and the handlers, how an error travels back from `fail` to its handler, error origins and stack traces and their cost, `-> never`, `assert` and the checks of dev mode, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:13:40+02:00
+lastmod: 2026-10-11T20:15:17+02:00
 draft: true
 weight: 60
 tags: [compilers, programming-languages]
@@ -930,6 +930,8 @@ A dev build also inserts checks around operations that can go wrong. Each prints
 | Division | the divisor of `/` or `%` is zero | 3 |
 | Shift | a shift count is not below the width of the type | 3 |
 | Changed collection | a collection changed its size while a `for` walks it | 4 |
+
+Later chapters add checks of their own, such as the test of a number converted to an enum. "Checks of a release build" of chapter 21 lists every check of the guide with what a release build does with it.
 
 Four options of antic override the mode. `--checks` keeps the checks in a release build, and `--no-checks` drops them from a dev build. `--asserts` and `--no-asserts` do the same for assertions. The build of the program decides for every module in it, the standard library included.
 

@@ -3,7 +3,7 @@ title: "Classes"
 description: "Classes and the object in memory, construct and destruct, fields and methods, dispatch through interfaces, static fields, singletons, operators and reflection."
 summary: "Classes and the object in memory, `construct` and `destruct`, fields and methods, interfaces as inline sub-objects with thunks and the dispatch through them, static fields and singletons, operators, and reflection over the descriptors, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T08:10:24+02:00
+lastmod: 2026-10-11T20:15:17+02:00
 draft: true
 weight: 90
 tags: [compilers, programming-languages]
@@ -297,7 +297,7 @@ cmpq %rcx, 0x10(%rax)
 
 `is_box` is `s is *Box` on a `*Shape`. It loads the table, then entry 0, the descriptor. The descriptor holds the depth of the class in its chain at offset `0x20` and an array of its ancestors at `0x28`. `Box` has depth 2, so the test reads ancestor 2 of the object's class and compares it with the descriptor of `Box`. The cost is the same for a chain of any length.
 
-A dev build adds one test before a dispatch, an `is` and an `as`: a table pointer of zero ends the program in `anti_rt_table_unset` with the class name. Memory from `alloc(T, n)` that was never filled has such a pointer.
+A dev build adds one test before a dispatch, an `is` and an `as`. A table pointer of zero ends the program in `anti_rt_table_unset` with the class name. Memory from `alloc(T, n)` that was never filled has such a pointer.
 
 Where it lives: `lower_class_record` and `table_of` of `src/antic/lower_desc.c` write the tables and the descriptors. `lower_init_function` of `src/antic/lower_class.c` writes the stores of a new object. `anti_rt_delete`, `anti_rt_destroy_from` and `checked_object` of `src/rt/object.c`. `anti_rt_hook` of `src/rt/hooks.c`.
 
@@ -342,7 +342,7 @@ For a C++ programmer:
 
 ### What you know
 
-A constructor of C++ runs the constructors of the bases and members first, and a destructor runs in the reverse order, also during the unwinding of an exception. A constructor of Java calls `super(...)` as its first statement, and Java has no destructor: `close` is called by hand or by `try` with resources. C writes `init` and `free` functions and calls them by hand.
+A constructor of C++ runs the constructors of the bases and members first. A destructor runs in the reverse order, also during the unwinding of an exception. A constructor of Java calls `super(...)` as its first statement, and Java has no destructor: `close` is called by hand or by `try` with resources. C writes `init` and `free` functions and calls them by hand.
 
 ### The feature
 
@@ -361,7 +361,7 @@ A constructor of C++ runs the constructors of the bases and members first, and a
 
 1. the `destroyed` hook,
 2. `destruct` of the class, then of each base up the chain,
-3. the `own` fields and the inline class fields, each with its own teardown,
+3. the `own` fields of chapter 11 and the inline class fields, each with its own teardown,
 4. the memory of the object.
 
 `destroy(&v)` does the first three for a value. A local of a class whose chain declares `destruct` or owns something is torn down at the end of its block, on every exit. `destruct` does not run on an object whose `construct` failed.
@@ -1286,7 +1286,7 @@ retq
 
 - `render` is the two instructions of any dispatch, since `Circle` and `Square` both implement `Drawable`.
 - The thunk of a release build has the body of `draw` inlined. It reads `r` at `0x18` from the sub-object, which is offset 32 of the `Circle`, and doubles it. The interface call costs one indirect jump and no second call.
-- `Circle` is the only class that implements `Named`, so the whole-program pass binds `n.rank()` in `rank_of` to its thunk, and `opt` inlines it: one load at offset 8 of the sub-object and one add.
+- `Circle` is the only class that implements `Named`, so the whole-program pass binds `n.rank()` in `rank_of` to its thunk. `opt` then inlines it into one load at offset 8 of the sub-object and one add.
 - `as_named` is one `leaq`.
 
 On arm64 `render` is `ldr x8, [x0]`, `ldr x1, [x8, #0x88]` and `br x1`.
@@ -1306,7 +1306,7 @@ Where it lives: `lower_interface_thunk` of `src/antic/lower_class.c` writes a th
 | Heap allocations, calls into the runtime | 0 | 0 |
 | Checks inserted | the zero table before the dispatch | none |
 
-An interface call costs what a class call costs: two loads and an indirect transfer. The work that tells the classes apart was done when the table was written.
+A call through an interface pointer takes two loads and an indirect transfer, as a call through a class pointer does. The work that tells the classes apart was done when the table was written.
 
 ### Pitfalls
 
@@ -2059,7 +2059,7 @@ b0:
 - `icmp ne i8 %v7, 3` tests that its kind is 3, `Float`.
 - The `call` passes the object and the `f64` to the entry, and the result is stored back as a `Value`.
 
-`reflect.call` itself is `anti_rt_reflect_call` of the runtime. It finds the function record by its index, reads the entry from the table of the object at the record's slot, and searches the table `anti_rt_trampolines` for the record's signature text with `strcmp`. The call therefore dispatches as any call does: an object of a derived class runs its own replacement.
+`reflect.call` itself is `anti_rt_reflect_call` of the runtime. It finds the function record by its index and reads the entry from the table of the object at the record's slot. It then searches the table `anti_rt_trampolines` for the record's signature text with `strcmp`. The call therefore dispatches as any call does: an object of a derived class runs its own replacement.
 
 `reflect.new` reads `anti_rt_registry`, a list of every class of the program with its descriptor and a function that prepares an object. The whole-program pass writes it at link time.
 
