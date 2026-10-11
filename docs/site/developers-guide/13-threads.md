@@ -386,9 +386,9 @@ The costs are the same in dev and in release.
 | `dispatch` | one call of the runtime and one of `anti_rt_hook` |
 | Allocations of a `dispatch` | one `calloc` of 56 bytes for the job, and one `malloc` of the result when the worker returns a value |
 | Locks of a `dispatch` | the lock of the pool, taken once |
-| `join` | one call of the runtime, the lock of the pool, one copy of the result, two calls of `free` |
-| Atomic operations | 0 |
-| Threads | the processors of the machine less one, started once |
+| `join` | one call of the runtime, the lock of the pool, one copy of the result, two calls of `free`, and the hook `joined` |
+| Atomic operations | one atomic load per hook call, of the installed trace handler: one for a `dispatch` and one for a `join`. 0 with `--no-hooks` |
+| Threads | the processors of the machine less one, or the key `threads` less one, started once |
 | Checks | the test for an object in flight, in both modes |
 | Copies of code | one thunk per `dispatch` in the source |
 
@@ -1052,7 +1052,7 @@ The costs are the same in dev and in release.
 | `select` that finds a value | one call and the lock of each channel it tries |
 | `select` that waits | two atomic operations, the lock of all selects and the lock of each channel twice, per wake |
 | `delete` | one call and two calls of `free` |
-| Checks | the capacity at `chan T(n)` and the closed flag at `send`, in both modes |
+| Checks | the capacity at `chan T(n)`, the closed flag at `send` and a null handle at every operation, in both modes |
 
 A `send` that finds the channel full and a `recv` that finds it empty sleep in the system until the other side wakes them.
 
