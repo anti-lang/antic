@@ -3,7 +3,7 @@ title: "Targets"
 description: "The six targets, --target and --cpu, the processor levels, cross-building, script mode, -g and debugging, the build id and what a release build does with LLVM."
 summary: "The six targets, `--target` and `--cpu` with the processor levels, cross-building from any host, script mode, `-g` and debugging, the build id, and what a release build does with LLVM."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T19:10:00+02:00
+lastmod: 2026-10-11T20:20:44+02:00
 draft: true
 weight: 200
 tags: [compilers, programming-languages]
@@ -121,7 +121,7 @@ Where it lives: `cpu_from_name` and `cpu_default` of `src/antic/cpu.c`, `driver_
 
 ## The processor levels
 
-A processor level names a set of instructions. x86_64 has `v1`, `v2` and `v3`, the levels x86-64, x86-64-v2 and x86-64-v3 of the System V ABI. ARM64 has `armv8.0`, `armv8.2` and `armv8.5`.
+A level names a set of instructions. x86_64 has `v1`, `v2` and `v3`, the levels x86-64, x86-64-v2 and x86-64-v3 of the System V ABI. ARM64 has `armv8.0`, `armv8.2` and `armv8.5`.
 
 | Level | Instruction sets beyond the level below | What antic writes with them |
 |---|---|---|
@@ -170,7 +170,7 @@ retq
 
 - A VEX instruction takes three operands, the last one the destination.
 - `vcvtph2ps` is the F16C conversion from half to single precision. `vpinsrw` puts the 16 bits into the register first.
-- `blend` is a multiply and an add at `v3` as well. antic writes no flag that lets LLVM contract the two, so the FMA of the level does not fuse them. The result is the same on every level.
+- `blend` is a multiply and an add at `v3` as well. The LLVM text carries no flag that lets LLVM contract the two, so the FMA of the level does not fuse them. The result is the same on every level.
 
 `tick` is `lock xaddq` on all three levels. `v2` gives the code of `v1` for the three functions.
 
@@ -202,7 +202,7 @@ ldaddal x8, x0, [x9]
 ret
 ```
 
-`ldaddal` adds `x8` to the word at `x9` and leaves the old value in `x0`. macos-arm64 writes the same instruction by default, since its level is `armv8.5`. `blend` is `fsub`, `fmul` and `fadd` on every ARM64 level, and `widen` is a load and one `fcvt`.
+`ldaddal` adds `x8` to the word at `x9` and leaves the old value in `x0`. The target macos-arm64 writes the same instruction by default, since its level is `armv8.5`. `blend` is `fsub`, `fmul` and `fadd` on every ARM64 level, and `widen` is a load and one `fcvt`.
 
 ### The check at start
 
@@ -265,7 +265,7 @@ Where it lives: `src/anti/build.c` loops over the targets, and `src/antic/driver
 
 ## Script mode
 
-Script mode is specified and not built. `docs/anti-language-additions.md` describes a file whose first line is `#!/usr/bin/env anti`, which `anti file.anti` compiles into a cache and runs. At this commit the lexer refuses the first line, and `anti` has no command that takes a source file as its first argument: `anti hello.anti` prints the usage and exits with 2.
+The specification describes a script, and antic 0.2.0 builds none. `docs/anti-language-additions.md` describes a file whose first line is `#!/usr/bin/env anti`, which `anti file.anti` compiles into a cache and runs. The lexer refuses that first line. `anti` has no command that takes a source file as its first argument, and `anti hello.anti` prints the usage and exits with 2.
 
 ```anti refused
 //! error: unexpected character `#`
@@ -332,13 +332,13 @@ Where it lives: `src/antic/llvm_debug.c` writes the nodes, and `link_command` of
 
 ## The build id
 
-The build id of a program or a shared library is a SHA-256, written as 64 lowercase hex digits. antic computes it at the link from three inputs.
+The build id of a program or a shared library is a SHA-256, written as 64 lowercase hex digits. The link computes it from these inputs.
 
 - The LLVM text of the module that links.
 - Every object file the command line adds.
 - The runtime library of the target and the level.
 
-Three things are left out of the digest.
+The digest leaves these out.
 
 - The licence notice, since the notice holds the id.
 - Every path, so that two links of one program in two directories carry one id.
@@ -362,7 +362,7 @@ Where it lives: `build_id` and `identified_notice` of `src/antic/driver.c`, with
 
 ## LLVM in a release build
 
-A release build runs three programs of the pinned LLVM release over the code: `opt`, then either `llc` or the LTO of `lld`. Chapter 2 describes the passes of antic that come before them.
+The code of such a build passes through `opt` and then through either `llc` or the LTO of `lld`, all three of the pinned tools. Chapter 2 describes the passes of antic that come before them.
 
 | Build | `opt` | Code generation | Link |
 |---|---|---|---|
@@ -373,7 +373,7 @@ A release build runs three programs of the pinned LLVM release over the code: `o
 
 Every release pipeline runs with `-inline-threshold=225`, in `opt` and in the LTO of `lld`. `lld-link` takes the level as `/opt:lldlto=3`. Under full LTO the runtime is part of the one module that LLVM compiles. A call of a runtime function is then inlined like a call of a function of the program.
 
-A release build takes no LTO in four cases, and links objects as `--lto none` does: a library of `--lib`, a link with `--linker platform`, a build with `--memory-checks`, and a Windows program that loads plugins.
+A library of `--lib`, a link with `--linker platform`, a build with `--memory-checks` and a Windows program that loads plugins take no LTO. Each links objects as `--lto none` does.
 
 The function attributes carry the level into LLVM. The module of the release build names the processor of `v3`.
 
