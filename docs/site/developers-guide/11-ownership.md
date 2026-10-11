@@ -20,7 +20,7 @@ Java frees an object when no reference reaches it, so no reference owns anything
 
 ### The feature
 
-`own` before a pointer field or a slice field of a class says that the object owns the memory behind the field. Two things follow from the word.
+`own` before a pointer field or a slice field of a class says that the object owns the memory behind the field. The teardown and `dup` follow the word.
 
 - The teardown of the object frees the memory. An `own` pointer to a class is deleted through the table of the object it points at. An object of a derived class therefore runs its own teardown. The elements of an `own` slice are torn down last to first, and then the buffer is freed.
 - `dup` of the object gives the copy memory of its own, with a copy of the contents.
@@ -73,6 +73,9 @@ class Sprite
 fn sprite(atlas: *Texture, n: int) -> *Sprite
 {
 	let raw = alloc(byte, n) catch fatal;
+	for i in 0..n {
+		raw[i] = 0;
+	}
 	Sprite.live.add(1);
 	return alloc Sprite { pixels: []byte { ptr: raw, len: n }, atlas: atlas };
 }
@@ -370,7 +373,7 @@ For a C programmer:
 For a C++ programmer:
 
 - An `own` field is a `unique_ptr` without the wrapper type: the field is 8 bytes, and the class teardown frees it.
-- `lent` is checked. A reference parameter of C++ may be stored by the callee, and a `lent` pointer may not.
+- `lent` is checked. A reference parameter of C++ may be stored by the callee, and the checker refuses the same store of a `lent` pointer.
 - A plain `*T` parameter is not lent. The function may store it, and the caller keeps the object alive.
 
 ## dup and moves
@@ -796,7 +799,7 @@ b2:
 - `b1` calls the teardown of the class with a null allocator.
 - `pass`, which returns its parameter, has neither the test nor the call. Its whole body is `ret ptr %0`.
 
-The end of `main` treats its four locals in two ways.
+The end of `main` calls the teardown of a local outright, or tests the local first.
 
 ```ir excerpt=moves target=linux-x86_64 mode=dev
     call void @moves.Box.destroy(%2, 0)
@@ -887,7 +890,7 @@ For a C++ programmer:
 
 ### What you know
 
-C++ runs the destructors of the locals at the end of their scope, last to first. Those of the temporaries run at the end of the full expression. Java has no destructor. A `finally` block or try-with-resources closes what the collector does not. C frees by hand on every path out of a function, which is where its leaks come from.
+C++ runs the destructors of the locals at the end of their scope, last to first. Those of the temporaries run at the end of the full expression. Java has no destructor. A `finally` block or try-with-resources closes the files and locks that the collector leaves open. C frees by hand on every path out of a function, which is where its leaks come from.
 
 ### The feature
 
@@ -1305,7 +1308,7 @@ The word before a parameter says who owns the argument after the call. No word m
 | `own b: Box` | the value itself, by a move | the function, at every exit | everything a local allows: bind it, store it, return it, pass it on |
 | `own p: *Box` | the address, and the caller's name is dead | no one by itself | everything, and `delete(p)` is the function's to write |
 
-A parameter without `own` **belongs to the caller**. Where its value owns something, the function gets the bytes and not the ownership. The checker refuses every way that would give the value a second owner: `let`, `=`, a tuple, struct, class or variant literal, an `own` argument and `return`. The message names the two fixes, `own` on the parameter and `dup(b)`. In generic code the same holds for a parameter whose type is a type parameter, since the `T` of a copy may own something.
+A parameter without `own` **belongs to the caller**. Where its value owns something, the function gets the bytes, and the ownership stays with the caller. The checker refuses every way that would give the value a second owner: `let`, `=`, a tuple, struct, class or variant literal, an `own` argument and `return`. The message names the two fixes, `own` on the parameter and `dup(b)`. In generic code the same holds for a parameter whose type is a type parameter, since the `T` of a copy may own something.
 
 A write to a field of such a parameter changes the bytes the function received. The caller's value keeps its field. What the value owns is shared for the length of the call, so a write through an `own` pointer of the parameter reaches the caller's memory.
 
@@ -1616,7 +1619,7 @@ No kind of parameter allocates, calls the runtime at the call, or takes a lock. 
 
 For a Java programmer:
 
-- A parameter of a class type is the value, not a reference. A write to its field stays in the function. A parameter of type `*Box` is the reference.
+- A parameter of a class type is the value. A write to its field stays in the function. A parameter of type `*Box` is the reference.
 - After `take(a)` the name `a` is gone. Java has no call that ends the caller's variable.
 
 For a C programmer:
@@ -1628,7 +1631,7 @@ For a C programmer:
 For a C++ programmer:
 
 - The move is at the call site without a word. `take(a)` moves, where C++ writes `take(std::move(a))`.
-- A plain value parameter is not copied with a copy constructor. It is the bytes, and what they own stays with the caller.
+- A plain value parameter is the bytes of the argument. No copy constructor runs, and what the bytes own stays with the caller.
 - `return b;` of a plain parameter is refused, where C++ copies or moves. The parameter needs `own`, or the function returns `dup(b)`.
 
 ## Shared objects
