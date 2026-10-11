@@ -295,7 +295,7 @@ Where it lives: `test_block` and `parser_parse` of `src/antic/parser.c`, `drop_t
 
 ### What it costs
 
-A build without `--tests` pays nothing for the two blocks. The module `purse` was compiled with `-S` for linux-x86_64, once as written and once with both blocks deleted. The two assembly files are equal byte for byte in dev mode and in release mode. So are the two library files that `antic -c` writes, at 18212 bytes each. The test `anti_test` of the suite checks that no name of a block reaches the assembly or the library file.
+A build without `--tests` pays nothing for the two blocks. The module `purse` was compiled with `-S` for linux-x86_64, once as written and once with both blocks deleted. The two assembly files are equal byte for byte in dev mode and in release mode. So are the two library files that `antic -c` writes, at 17,903 bytes each for the block as this page shows it. The test `anti_test` of the suite checks that no name of a block reaches the assembly or the library file.
 
 A test build holds what the excerpt and the runner show.
 
@@ -628,8 +628,8 @@ The standard error holds the report of the leak checker. The addresses differ fr
 ==12093==ERROR: LeakSanitizer: detected memory leaks
 
 Direct leak of 32 byte(s) in 1 object(s) allocated from:
-    #1 0x0001023cc9cc in com.example.squares.squares squares.anti:7
-    #2 0x0001023ccad0 in com.example.squares.last_square_is_nine squares.anti:18
+    #1 0x0001023cc9cc in com.example.squares.squares squares.anti:5
+    #2 0x0001023ccad0 in com.example.squares.last_square_is_nine squares.anti:16
     #3 0x0001023cc8f0 in anti.test.com_example_squares.main com_example_squares.anti:10
 
 SUMMARY: AddressSanitizer: 32 byte(s) leaked in 1 allocation(s).
@@ -641,7 +641,7 @@ The facts of a checked run follow.
 
 - A use after free and a double free end the runner at the access, with the frames of the access, of the `free` and of the `alloc`. The later tests of the module do not run.
 - The leak check runs once per runner, so it reports the leaks of all tests of a module together.
-- `--release --memory-checks` checks the optimized code. The optimizer inlines a small test into the runner, and frame 2 above then reads `anti.test.com_example_squares.main squares.anti:18`.
+- `--release --memory-checks` checks the optimized code. The optimizer inlines a small test into the runner, and frame 2 above then reads `anti.test.com_example_squares.main squares.anti:16`.
 - A dev run keeps its bounds checks and its assertions beside the memory checks.
 - The limits of the option hold: windows-arm64 refuses it, and the Windows runtime reports no leaks. The five programs of the measured table of chapter 12 ran 8 to 53 times slower with the option.
 
