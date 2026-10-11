@@ -288,7 +288,7 @@ Where it lives: `lower_fail` and `write_origin` of `src/antic/lower_error.c` wri
 | Bytes of an error | 120 on the heap, and what a class of the program adds | the same |
 | Bytes in a frame | 8 for a result of 8 bytes that a failing call writes | the same or none |
 | Locks | 0 | 0 |
-| Atomic operations | one load in `anti_rt_backtrace_on`, and one load in each call of `anti_rt_hook` | the same |
+| Atomic operations | one load in `anti_rt_backtrace_on`, and two loads in each call of `anti_rt_hook` for `created` or `destroyed`: the installed trace handler and the count of loaded libraries | the same |
 | Checks inserted | none | none |
 
 Every object calls the `created` hook when it is made and the `destroyed` hook when it is torn down, and an error is an object. Chapter 15 describes the hooks and `--no-hooks`, which drops those calls.
