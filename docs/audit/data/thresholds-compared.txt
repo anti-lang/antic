@@ -1,0 +1,206 @@
+# Functions past a threshold now (lines > 100, nest > 4, params > 6),
+# against the second audit at 70e8860, docs/audit/2026-09-30/data/.
+# status: new (under every threshold then, or absent), kept (past one
+# then too). A function is matched by its name in the same file, then in
+# a file split from it, then anywhere. gone: past a threshold then and
+# under every one now, moved: still past one under another name or not
+# found, listed for a reader to match by hand.
+# file:line name lines nest params | past | status | then: lines nest params at file:line
+src/antic/sema_expr.c:1790 check_expr_inner 641 4 3 | long | kept | 647 4 3 at src/antic/sema_expr.c:3033
+src/antic/parser_stmt.c:374 statement_level 410 5 1 | long+nest | kept | 403 5 1 at src/antic/parser.c:2346
+src/antic/parser_expr.c:278 primary 356 5 1 | long+nest | kept | 368 5 1 at src/antic/parser.c:1093
+src/antic/main.c:205 run 329 4 3 | long | kept | 295 4 3 at src/antic/main.c:145
+src/antic/ast_dump.c:257 dump_expr 315 4 3 | long | kept | 290 4 3 at src/antic/ast_dump.c:238
+src/antic/parser_item.c:264 item_level 298 4 1 | long | kept | 283 4 1 at src/antic/parser.c:3669
+src/antic/lower_stmt.c:1479 lower_stmt_kind 241 3 2 | long | kept | 354 5 2 at src/antic/lower_stmt.c:2121
+src/antic/lower_expr.c:2057 lower_expr_value 237 4 2 | long | kept | 250 4 2 at src/antic/lower_expr.c:2914
+src/antic/sema_stmt.c:1984 check_stmt 235 4 2 | long | kept | 645 7 2 at src/antic/sema_stmt.c:2019
+src/antic/sema_copies.c:976 xe 229 3 2 | long | kept | 229 3 2 at src/antic/sema_copies.c:1043
+src/antic/antl_write.c:386 put_type 206 4 2 | long | kept | 203 4 2 at src/antic/antl.c:460
+src/antic/sema.c:802 resolve_type_inner 206 4 2 | long | kept | 206 4 2 at src/antic/sema.c:738
+src/antic/antl_tree.c:935 io_expr_body 200 2 2 | long | kept | 195 2 2 at src/antic/antl_tree.c:987
+src/antic/driver_library.c:271 driver_build_c_library 199 3 4 | long | new | absent
+src/antic/ir_print.c:284 instruction 186 3 3 | long | kept | 144 3 3 at src/antic/ir_print.c:243
+src/antic/sema_copies.c:1206 xs 185 5 2 | long+nest | kept | 185 5 2 at src/antic/sema_copies.c:1273
+src/antic/sema_operator.c:524 sema_check_binary 185 4 3 | long | kept | 185 4 3 at src/antic/sema_expr.c:1918
+src/antic/parser_type.c:243 type_level 182 3 1 | long | kept | 174 3 1 at src/antic/parser.c:666
+src/antic/ir_verify.c:395 check_inst 175 5 2 | long+nest | kept | 169 5 2 at src/antic/ir_verify.c:273
+src/antic/driver.c:1216 compile 172 3 6 | long | kept | 173 3 6 at src/antic/driver.c:1884
+src/antic/ast_dump.c:639 dump_stmt 167 3 3 | long | kept | 167 3 3 at src/antic/ast_dump.c:595
+src/antic/sema_pattern.c:375 patch_call 166 4 2 | long | kept | 166 4 2 at src/antic/sema_pattern.c:361
+src/antic/parser_item.c:15 class_item 166 3 2 | long | kept | 161 3 2 at src/antic/parser.c:3429
+src/antic/ast_dump.c:955 dump_module 164 3 2 | long | kept | 161 3 2 at src/antic/ast_dump.c:908
+src/antic/antl_write.c:780 put_ir 162 3 2 | long | kept | 147 3 2 at src/antic/antl.c:843
+src/antic/antl_read_ir.c:680 read_signature 156 4 5 | long | kept | 102 3 5 at src/antic/antl.c:3202
+src/antic/sema_export.c:254 sema_check_export 155 4 2 | long | kept | 155 4 2 at src/antic/sema_export.c:259
+src/antic/driver.c:1718 driver_run 154 2 1 | long | kept | 127 2 1 at src/antic/driver.c:2891
+src/rt/registry.c:624 read_value 151 4 6 | long | kept | 149 4 6 at src/rt/registry.c:634
+src/antic/sema_generic.c:1729 sema_generic_call 151 3 6 | long | kept | 151 3 6 at src/antic/sema_generic.c:1512
+src/antic/antl_verify.c:608 walk_at 151 2 4 | long | new | absent
+src/antic/sema_stmt.c:1622 check_let 149 3 2 | long | new | absent
+src/antic/layout.c:224 compute 147 3 2 | long | kept | 147 3 2 at src/antic/layout.c:222
+src/antic/lower.c:1185 lower_module 146 5 7 | long+nest+params | kept | 150 5 8 at src/antic/lower.c:3174
+src/antic/sema_stmt.c:1773 check_for 146 4 2 | long | new | absent
+src/anti/main.c:28 usage 145 0 1 | long | kept | 126 0 1 at src/anti/main.c:24
+src/antic/lower_simd.c:413 lower_simd 144 4 2 | long | kept | 144 4 2 at src/antic/lower_simd.c:417
+src/rt/object.c:529 put_value 140 3 5 | long | kept | 141 3 5 at src/rt/object.c:488
+src/antic/antl_read_ir.c:1056 antl_read_ir 140 3 2 | long | new | absent
+src/antic/llvm_emit.c:2911 instruction 137 2 2 | long | kept | 144 3 3 at src/antic/ir_print.c:243
+src/anti/check.c:414 check_run 136 2 1 | long | kept | 151 2 8 at src/anti/check.c:441
+src/antic/parser.c:620 parser_parse 135 4 5 | long | new | absent
+src/antic/parser_decl.c:309 member_level 135 2 2 | long | kept | 130 2 2 at src/antic/parser.c:3003
+src/antic/lower_expr.c:280 build_value_into 133 3 3 | long | kept | 182 4 3 at src/antic/lower_expr.c:446
+src/antic/lower_desc.c:1129 lower_class_descriptor 132 3 2 | long | kept | 135 3 2 at src/antic/lower_desc.c:1313
+src/antic/pattern.c:684 parse_group 129 4 2 | long | kept | 129 4 2 at src/antic/pattern.c:682
+src/antic/ast_walk.c:61 walk_children 127 2 2 | long | new | absent
+src/anti/fmt.c:1621 emit_token 125 3 4 | long | kept | 151 3 4 at src/anti/fmt.c:1599
+src/antic/sema_expr.c:820 check_unary 125 3 3 | long | kept | 124 3 3 at src/antic/sema_expr.c:970
+src/antic/antl_tree.c:1603 read_declaration 120 3 1 | long | kept | 117 3 1 at src/antic/antl_tree.c:1651
+src/antic/sema_expr.c:698 sema_require 119 2 4 | long | kept | 117 2 4 at src/antic/sema_expr.c:818
+src/anti/build.c:819 build_target 119 2 3 | long | kept | 117 3 3 at src/anti/build.c:692
+src/antic/sema_stmt.c:618 check_assign 118 2 2 | long | kept | 120 2 2 at src/antic/sema_stmt.c:1142
+src/antic/sema.c:1288 function_type_of 117 2 2 | long | kept | 107 2 2 at src/antic/sema.c:1171
+src/antic/types.c:1696 print_type 116 4 3 | long | kept | 113 4 3 at src/antic/types.c:1473
+src/anti/bindclang.c:1491 bind_read_clang 116 4 2 | long | kept | 141 4 2 at src/anti/bindclang.c:1381
+src/antic/lower_stmt.c:1842 reserve_stmt 116 3 3 | long | kept | 116 3 3 at src/antic/lower_stmt.c:2594
+src/antic/driver.c:1397 driver_interface 115 3 5 | long | kept | 133 3 5 at src/antic/driver.c:2066
+src/antic/antl_tree.c:1922 read_tree 115 2 3 | long | new | 77 2 3 at src/antic/antl_tree.c:1973
+src/antic/lower_stmt.c:992 lower_let_value 115 2 2 | long | kept | 120 2 2 at src/antic/lower_stmt.c:1726
+src/antic/sema_const.c:889 sema_eval_const 114 2 3 | long | kept | 520 6 3 at src/antic/sema_const.c:330
+src/antic/sema_stmt.c:1508 check_switch 112 4 2 | long | new | absent
+src/antic/sema_stmt.c:2374 sets_stmt 112 3 4 | long | kept | 111 3 4 at src/antic/sema_stmt.c:2819
+src/antic/sema_generic.c:975 subst 112 3 3 | long | kept | 109 3 3 at src/antic/sema_generic.c:854
+src/antic/llvm_emit.c:3991 llvm_emit_module 112 2 6 | long | new | absent
+src/antic/antl_tree.c:1136 io_stmt_body 112 2 2 | long | kept | 112 2 2 at src/antic/antl_tree.c:1183
+src/antic/sema_doc.c:115 doc_name_known 111 4 3 | long | kept | 113 4 3 at src/antic/sema_export.c:520
+src/antic/lower_expr.c:585 lower_address 111 3 2 | long | kept | 104 3 2 at src/antic/lower_expr.c:985
+src/antic/antl_tree.c:1397 read_extern 110 3 1 | long | kept | 105 3 1 at src/antic/antl_tree.c:1451
+src/antic/sema_export.c:417 sema_interface 109 3 4 | long | kept | 109 3 4 at src/antic/sema_export.c:937
+src/antic/antl_read_ir.c:253 read_tables 109 3 3 | long | kept | 105 3 3 at src/antic/antl.c:2801
+src/anti/bindtype.c:240 specifiers 108 4 1 | long | kept | 108 4 1 at src/anti/bindtype.c:360
+src/antic/driver_library.c:145 bundle 108 3 6 | long | new | 96 3 5 at src/antic/driver.c:2488
+src/antic/lower_expr.c:1883 lower_call 108 2 2 | long | kept | 146 2 2 at src/antic/lower_expr.c:2185
+src/antic/antl_write.c:178 antl_visit_type 105 4 2 | long | new | 4 0 2 at src/antic/antl.c:3646
+src/antic/parser_expr.c:659 postfix_links 104 6 1 | long+nest | new | absent
+src/antic/driver_search.c:248 driver_load_libraries 104 5 6 | long+nest | new | absent
+src/antic/antl_verify.c:763 walk_stmt 104 2 3 | long | new | 80 2 2 at src/antic/sema_stmt.c:190
+src/antic/antl_verify.c:250 check_expr 104 2 2 | long | new | absent
+src/anti/doc.c:740 doc_run 103 2 1 | long | kept | 138 3 10 at src/anti/doc.c:1377
+src/antic/antl_read_ir.c:560 read_body 102 3 4 | long | new | 91 3 4 at src/antic/antl.c:3101
+src/anti/bind.c:110 bind_run 102 2 1 | long | kept | 102 2 1 at src/anti/bind.c:109
+src/antic/sema_class.c:144 same_signature 101 2 4 | long | new | 95 2 4 at src/antic/sema.c:1906
+src/antic/sema_call.c:2569 sema_check_field_inits 100 3 8 | params | kept | 96 3 8 at src/antic/sema_call.c:3220
+src/antic/ir_verify.c:756 ir_verify 88 5 2 | nest | kept | 62 5 2 at src/antic/ir_verify.c:576
+src/rt/regex.c:313 walk_class 84 6 6 | nest | kept | 84 6 6 at src/rt/regex.c:306
+src/anti/repo.c:373 repo_module 80 2 7 | params | kept | 74 2 7 at src/anti/repo.c:324
+src/rt/threads.c:217 anti_rt_parallel 77 2 9 | params | kept | 78 2 9 at src/rt/threads.c:297
+src/antic/coff.c:748 write_sections 76 5 3 | nest | kept | 76 5 3 at src/antic/coff.c:733
+src/antic/sema.c:2885 sema_check 64 2 9 | params | kept | 60 2 9 at src/antic/sema.c:3676
+src/rt/json.c:87 read_string 63 6 2 | nest | new | 5 0 4 at src/rt/registry.c:268
+src/rt/utf.c:143 anti_rt_split_command_line 57 5 2 | nest | kept | 57 5 2 at src/rt/utf.c:143
+src/rt/patterns.c:704 anti_rt_regex_patch 56 3 10 | params | kept | 56 3 10 at src/rt/patterns.c:713
+src/antic/coff.c:827 write_symbols 52 5 4 | nest | kept | 52 5 4 at src/antic/coff.c:812
+src/anti/check.c:72 front_end_class 52 3 8 | params | kept | 52 3 8 at src/anti/check.c:75
+src/antic/llvm_debug.c:88 llvm_debug_init 50 2 8 | params | new | absent
+src/anti/build.c:291 module_object 49 2 7 | params | kept | 45 2 7 at src/anti/build.c:282
+src/antic/sema_doc.c:474 sema_doc_warnings 48 2 7 | params | kept | 48 2 7 at src/antic/sema_export.c:881
+src/antic/llvm_emit.c:929 collect_tbaa 47 5 2 | nest | new | absent
+src/antic/antl.c:136 antl_read 45 2 9 | params | kept | 45 2 9 at src/antic/antl.c:3744
+src/anti/fmt.c:379 angle_list 44 5 3 | nest | kept | 44 5 3 at src/anti/fmt.c:379
+src/antic/optimize.c:1551 optimize_drop_failures 44 5 2 | nest | new | absent
+src/antic/lower_desc.c:435 field_record 44 1 7 | params | kept | 42 1 7 at src/antic/lower_desc.c:601
+src/antic/lower_eq.c:497 compare_member 43 2 7 | params | kept | 50 1 7 at src/antic/lower_eq.c:451
+src/anti/units.c:168 unit_order 40 5 3 | nest | kept | 40 5 3 at src/anti/units.c:148
+src/antic/lower_owning.c:111 each_case 40 2 7 | params | kept | 44 2 7 at src/antic/lower.c:2432
+src/rt/patterns.c:783 anti_rt_bytes_patch 37 2 8 | params | kept | 37 2 8 at src/rt/patterns.c:792
+src/antic/types.c:615 types_interface_member 36 5 3 | nest | kept | 36 5 3 at src/antic/types.c:566
+src/antic/lower_owning.c:56 each_element 36 1 8 | params | kept | 49 1 7 at src/antic/lower.c:2687
+src/antic/llvm_emit.c:3219 frames_kept 35 5 2 | nest | new | absent
+src/antic/driver.c:610 dump_ir 34 2 11 | params | kept | 34 2 12 at src/antic/driver.c:1017
+src/rt/patterns.c:648 anti_rt_regex_replace 34 1 7 | params | kept | 34 1 7 at src/rt/patterns.c:665
+src/antic/driver.c:572 whole_checked 31 1 9 | params | kept | 31 1 9 at src/antic/driver.c:979
+src/anti/test.c:43 base_options 26 1 7 | params | new | 26 1 6 at src/anti/test.c:42
+src/antic/header.c:1194 class_uses 23 2 7 | params | new | absent
+src/antic/lower_check.c:47 check_call 22 2 8 | params | kept | 27 2 8 at src/antic/lower.c:1079
+src/antic/lower_expr.c:1419 scalar_check 21 0 7 | params | kept | 21 0 7 at src/antic/lower_expr.c:1836
+src/antic/lower_expr.c:1445 enum_check 20 1 8 | params | kept | 20 1 8 at src/antic/lower_expr.c:1862
+src/antic/driver.c:550 lower_checked 19 1 9 | params | kept | 22 1 10 at src/antic/driver.c:954
+src/antic/lower_expr.c:1777 lower_drop_arguments 16 2 7 | params | kept | 16 2 7 at src/antic/lower_expr.c:2156
+src/antic/diagnostic.c:13 add 16 0 8 | params | kept | 26 2 8 at src/antic/diagnostic.c:7
+src/antic/ir.c:1055 ir_vshuffle 15 1 8 | params | kept | 15 1 8 at src/antic/ir.c:995
+src/antic/antic.c:18 antic_library_header 15 1 7 | params | new | absent
+src/antic/types.c:427 types_fn_flagged 14 0 7 | params | kept | 14 0 7 at src/antic/types.c:396
+src/rt/patterns.c:862 anti_rt_regex_stop_group 14 0 7 | params | kept | 12 0 7 at src/rt/patterns.c:871
+src/antic/ir.c:1041 ir_vselect 13 0 8 | params | kept | 13 0 8 at src/antic/ir.c:981
+src/antic/ir.c:210 ir_struct_add 13 0 7 | params | kept | 13 0 7 at src/antic/ir.c:266
+src/antic/layout.c:661 write_bits 13 0 7 | params | kept | 13 0 7 at src/antic/layout.c:827
+src/rt/patterns.c:887 anti_rt_regex_stop_template 13 0 7 | params | kept | 13 0 7 at src/rt/patterns.c:894
+src/antic/lower_owning.c:12 work_on 12 1 7 | params | new | absent
+src/antic/lower_check.c:75 lower_check_branch 12 0 8 | params | kept | 12 0 8 at src/antic/lower.c:1112
+src/anti/units.c:18 unit_options 12 0 7 | params | new | absent
+src/antic/ir.c:774 ir_flag_op 12 0 7 | params | kept | 12 0 7 at src/antic/ir.c:774
+src/antic/ir.c:982 ir_bitstore 11 0 7 | params | kept | 11 0 7 at src/antic/ir.c:922
+src/antic/ir.c:1006 ir_vbinary 10 0 8 | params | kept | 10 0 8 at src/antic/ir.c:946
+src/antic/ir.c:1101 ir_call_indirect 10 0 7 | params | kept | 10 0 7 at src/antic/ir.c:1041
+src/antic/lower_eq.c:485 member_at 10 0 7 | params | new | 17 1 5 at src/antic/coff.c:1014
+src/antic/ir.c:909 ir_binary_wrap 9 0 7 | params | new | absent
+src/antic/ir.c:1017 ir_vunary 9 0 7 | params | kept | 9 0 7 at src/antic/ir.c:957
+src/antic/lower_owning.c:94 each_array_element 9 0 7 | params | new | absent
+src/rt/patterns.c:930 anti_rt_regex_stop_group_bytes 9 0 7 | params | new | absent
+src/rt/patterns.c:947 anti_rt_regex_replace_bytes 9 0 7 | params | kept | 9 0 7 at src/rt/patterns.c:944
+# gone or moved
+src/antic/antl.c:1905 read_types 490 6 1 | not found by name
+src/antic/sema_call.c:2459 check_call 381 3 4 | gone | now 98 3 4 at src/antic/sema_call.c:2036
+src/antic/driver.c:2702 build_c_library 188 3 4 | gone | now 30 1 4 at src/anti/build.c:737
+src/antic/sema_call.c:2998 sema_check_field 186 3 2 | gone | now 38 1 2 at src/antic/sema_call.c:2495
+src/antic/lower_stmt.c:673 lower_for 176 2 2 | gone | now 78 2 2 at src/antic/lower_stmt.c:598
+src/antic/whole.c:2310 write_provides 175 4 3 | not found by name
+src/rt/symbols.c:363 unit_line 172 4 4 | gone | now 22 1 4 at src/rt/symbols.c:551
+src/antic/header.c:1072 class_view 170 3 2 | gone | now 45 2 5 at src/antic/header.c:1417
+src/antic/sema_call.c:902 method_call 165 2 2 | gone | now 69 2 2 at src/antic/sema_call.c:863
+src/antic/parser.c:4183 parse 158 4 5 | gone | now 23 1 2 at src/anti/bindapi.c:165
+src/antic/optimize.c:1177 split_slots 156 9 1 | gone | now 30 3 1 at src/antic/optimize.c:1301
+src/antic/driver.c:1172 back_end 152 3 7 | gone | now 82 2 6 at src/antic/driver.c:973
+src/antic/header.c:1362 header_write 152 4 5 | gone | now 26 3 5 at src/antic/header.c:1797
+src/antic/lower.c:1815 lower_function_body 149 2 2 | gone | now 47 2 2 at src/antic/lower_function.c:244
+src/antic/x86_64.c:2618 print 134 3 5 | not found by name
+src/rt/text.c:698 anti_rt_read_float 134 3 5 | gone | now 84 2 5 at src/rt/text.c:750
+src/anti/deps.c:486 resolve_from_index 133 2 5 | gone | now 57 1 5 at src/anti/deps.c:643
+src/antic/antl.c:3498 read_ir 130 3 2 | not found by name
+src/antic/optimize.c:1502 remove_unused_functions 130 5 3 | gone | now 61 2 3 at src/antic/optimize.c:1403
+src/antic/x86_64.c:1299 emit_call 129 3 2 | not found by name
+src/antic/linker.c:573 link_shared_command 118 3 4 | gone | now 22 1 4 at src/antic/linker.c:1100
+src/antic/arm64.c:1779 emit_call 114 3 2 | not found by name
+src/antic/lower.c:2886 copy_field 114 2 5 | gone | now 38 1 5 at src/antic/lower_owning.c:578
+src/antic/driver.c:1650 load_libraries 108 5 6 | not found by name
+src/antic/sema_stmt.c:81 walk_expr 108 3 2 | gone | now 5 0 3 at src/antic/antl_verify.c:526
+src/antic/antl.c:261 visit_type 105 4 2 | not found by name
+src/anti/build.c:976 build_project 103 3 2 | gone | now 77 2 2 at src/anti/build.c:1138
+src/anti/bindclang.c:1071 read_preprocessed 102 5 2 | gone | now 51 4 2 at src/anti/bindclang.c:1186
+src/antic/lower_stmt.c:1464 lower_construct 102 3 3 | gone | now 76 2 3 at src/antic/lower_class.c:582
+src/antic/parser.c:1486 postfix 99 6 1 | gone | now 10 0 1 at src/antic/parser_expr.c:764
+src/antic/whole.c:1461 write_slots 93 5 5 | not found by name
+src/antic/whole.c:1323 check_singletons 81 6 3 | gone | now 54 2 3 at src/antic/whole.c:671
+src/antic/regalloc.c:355 rematerialise_constants 78 5 1 | not found by name
+src/anti/syms.c:1177 syms_resolve 73 5 3 | gone | now 56 3 3 at src/anti/syms.c:1052
+src/anti/test.c:324 test_run 70 2 11 | gone | now 72 2 1 at src/anti/test.c:325
+src/rt/json.c:74 anti_rt_json_string 65 6 4 | gone | now 9 0 4 at src/rt/json.c:151
+src/antic/whole.c:617 reach_program 62 5 3 | not found by name
+src/anti/doc.c:252 fn_signature 56 2 10 | gone | now 55 2 2 at src/antic/docpage.c:216
+src/antic/emit.c:104 emit_function 51 2 8 | not found by name
+src/antic/emit.c:441 emit 50 2 12 | gone | now 8 1 3 at src/anti/zip.c:359
+src/anti/doc.c:1329 write_interfaces 47 2 8 | gone | now 36 2 6 at src/anti/doc.c:703
+src/antic/emit.c:253 emit_global 43 2 7 | not found by name
+src/antic/optimize.c:1717 ir_drop_failures 43 5 2 | not found by name
+src/antic/arm64.c:828 compare_lanes 34 2 7 | not found by name
+src/antic/whole.c:1969 reach_calls 34 5 5 | gone | now 26 3 5 at src/antic/whole_tables.c:1104
+src/rt/registry.c:548 read_level 27 2 9 | gone | now 25 2 5 at src/rt/registry.c:541
+src/antic/regalloc.c:781 reserve_borrow_slots 23 5 1 | not found by name
+src/rt/object.c:420 put_level 23 2 8 | gone | now 21 2 4 at src/rt/object.c:463
+src/antic/emit.c:54 visibility 22 1 7 | not found by name
+src/anti/build.c:111 cache_key 17 1 7 | gone | now 18 1 3 at src/anti/build.c:120
+src/antic/x86_64.c:2249 fold_chunks 16 1 8 | not found by name
+src/antic/arm64.c:1050 fold_chunks 15 1 8 | not found by name
+src/antic/emit.c:492 emit_program 8 0 11 | not found by name
+src/antic/emit.c:501 emit_module 8 0 11 | not found by name
+# counts: new 32, kept 110, gone 33, not found by name 21

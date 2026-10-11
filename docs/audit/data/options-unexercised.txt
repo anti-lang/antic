@@ -1,0 +1,116 @@
+# Every option, a string literal of the form "--name" or "-x" in the file
+# that reads the command line, src/antic/main.c and src/anti/main.c, and
+# the --anti.* options of src/rt, and the number of files under tests/
+# and under tools/ that hold the same text. An option with 0 under tests/
+# is exercised by no test, unless a test builds the text or passes the
+# option through a variable; such cases are to be read by hand.
+# option | tests | tools | defined in
+## antic
+--anti-internal | 2 | 0 | src/antic/main.c
+--asserts | 1 | 0 | src/antic/main.c
+--attribution | 1 | 0 | src/antic/main.c
+--bundle-runtime | 3 | 0 | src/antic/main.c
+--checks | 3 | 0 | src/antic/main.c
+--closed | 2 | 0 | src/antic/main.c
+--cpu | 7 | 1 | src/antic/main.c
+--dependency | 1 | 0 | src/antic/main.c
+--dev | 22 | 0 | src/antic/main.c
+--doc-warnings | 2 | 0 | src/antic/main.c
+--dump-ast | 0 | 0 | src/antic/main.c
+--dump-ir | 2 | 0 | src/antic/main.c
+--dump-llvm | 3 | 0 | src/antic/main.c
+--dump-opt | 1 | 0 | src/antic/main.c
+--dump-tokens | 0 | 0 | src/antic/main.c
+--dump-types | 0 | 0 | src/antic/main.c
+--framework | 2 | 1 | src/antic/main.c
+--front-end | 5 | 0 | src/antic/main.c
+--help | 1 | 1 | src/antic/main.c
+--inject | 2 | 0 | src/antic/main.c
+--keep-llvm | 7 | 0 | src/antic/main.c
+--lib | 14 | 1 | src/antic/main.c
+--license | 2 | 0 | src/antic/main.c
+--license-text | 1 | 0 | src/antic/main.c
+--linker | 1 | 0 | src/antic/main.c
+--linux-lib | 2 | 1 | src/antic/main.c
+--llc | 5 | 0 | src/antic/main.c
+--llvm-ar | 3 | 0 | src/antic/main.c
+--llvm-mc | 46 | 0 | src/antic/main.c
+--lto | 16 | 0 | src/antic/main.c
+--memory-checks | 11 | 0 | src/antic/main.c
+--no-asserts | 2 | 0 | src/antic/main.c
+--no-checks | 3 | 0 | src/antic/main.c
+--no-hooks | 5 | 0 | src/antic/main.c
+--no-reflect | 5 | 0 | src/antic/main.c
+--no-runtime | 6 | 1 | src/antic/main.c
+--no-trace | 1 | 0 | src/antic/main.c
+--opt | 20 | 0 | src/antic/main.c
+--package-name | 3 | 0 | src/antic/main.c
+--package-version | 3 | 0 | src/antic/main.c
+--print-cpu-levels | 1 | 1 | src/antic/main.c
+--print-host-target | 2 | 1 | src/antic/main.c
+--print-llvm-targets | 1 | 0 | src/antic/main.c
+--print-targets | 1 | 0 | src/antic/main.c
+--profile-generate | 5 | 1 | src/antic/main.c
+--profile-use | 3 | 1 | src/antic/main.c
+--runtime | 78 | 1 | src/antic/main.c
+--soname | 0 | 0 | src/antic/main.c
+--strip-docs | 0 | 0 | src/antic/main.c
+--target | 45 | 6 | src/antic/main.c
+--tests | 3 | 0 | src/antic/main.c
+--trace | 5 | 0 | src/antic/main.c
+--version | 6 | 8 | src/antic/main.c
+--warn-undocumented | 3 | 0 | src/antic/main.c
+--warnings-as-errors | 2 | 0 | src/antic/main.c
+-I | 26 | 3 | src/antic/main.c
+-S | 23 | 1 | src/antic/main.c
+-c | 25 | 5 | src/antic/main.c
+-g | 15 | 2 | src/antic/main.c
+-o | 76 | 5 | src/antic/main.c
+# 60 options, 5 with no test: --dump-ast --dump-tokens --dump-types --soname --strip-docs
+## anti
+--bundle-runtime | 3 | 0 | src/anti/main.c
+--check | 5 | 0 | src/anti/main.c
+--clang | 2 | 2 | src/anti/main.c
+--conf | 3 | 0 | src/anti/main.c
+--cpu | 7 | 1 | src/anti/main.c
+--dev | 22 | 0 | src/anti/main.c
+--from | 4 | 0 | src/anti/main.c
+--from-archive | 2 | 0 | src/anti/main.c
+--header | 2 | 0 | src/anti/main.c
+--help | 1 | 1 | src/anti/main.c
+--lib | 14 | 1 | src/anti/main.c
+--llvm-ar | 3 | 0 | src/anti/main.c
+--llvm-mc | 46 | 0 | src/anti/main.c
+--lto | 16 | 0 | src/anti/main.c
+--markdown | 1 | 0 | src/anti/main.c
+--memory-checks | 11 | 0 | src/anti/main.c
+--module | 2 | 1 | src/anti/main.c
+--notice | 2 | 0 | src/anti/main.c
+--offline | 2 | 0 | src/anti/main.c
+--out | 3 | 0 | src/anti/main.c
+--private | 1 | 0 | src/anti/main.c
+--probe | 1 | 0 | src/anti/main.c
+--profile-generate | 5 | 1 | src/anti/main.c
+--profile-use | 3 | 1 | src/anti/main.c
+--project | 2 | 0 | src/anti/main.c
+--release | 14 | 0 | src/anti/main.c
+--runtime | 78 | 1 | src/anti/main.c
+--sdk | 2 | 1 | src/anti/main.c
+--soname | 0 | 0 | src/anti/main.c
+--strip-docs | 0 | 0 | src/anti/main.c
+--symbols | 3 | 0 | src/anti/main.c
+--sysroot | 4 | 1 | src/anti/main.c
+--target | 45 | 6 | src/anti/main.c
+--targets | 1 | 0 | src/anti/main.c
+--version | 6 | 8 | src/anti/main.c
+--warn-undocumented | 3 | 0 | src/anti/main.c
+--work | 8 | 0 | src/anti/main.c
+-D | 1 | 1 | src/anti/main.c
+-I | 26 | 3 | src/anti/main.c
+-h | 4 | 1 | src/anti/main.c
+-o | 76 | 5 | src/anti/main.c
+# 41 options, 2 with no test: --soname --strip-docs
+## runtime (src/rt), the --anti.* options and the words a message names
+--anti. | 3 | 0 | src/rt/conf.c src/rt/start.c
+-inf | 2 | 0 | src/rt/text.c
+# 2 options, 0 with no test: 

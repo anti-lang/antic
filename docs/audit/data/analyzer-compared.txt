@@ -1,0 +1,57 @@
+# analyzer-unique.txt now, against the second audit at 70e8860,
+# docs/audit/2026-09-30/data/. A warning matches one of then with the
+# same file, or a file split from it (sema, lower, parser, driver, antl,
+# whole, llvm), and the same text; line numbers moved and are not compared.
+# status | now | then
+kept | 1 src/anti/jsontree.c:155: warning: 2nd function call argument is an uninitialized value [core.CallAndMessage] | src/anti/jsontree.c:148
+kept | 1 src/antic/antl_tree.c:1575: warning: Dereference of null pointer (loaded from field 'param') [core.NullDereference] | src/antic/antl_tree.c:1623
+new | 1 src/antic/antl_verify.c:339: warning: Access to field 'field_count' results in a dereference of a null pointer (loaded from variable 'simd') [core.NullDereference] |
+new | 1 src/antic/antl_verify.c:467: warning: Access to field 'type' results in a dereference of a null pointer (loaded from field 'value') [core.NullDereference] |
+kept | 1 src/antic/arith.c:117: warning: Left shift overflows the capacity of 'uint64_t' [core.BitwiseShift] | src/antic/arith.c:106
+kept | 1 src/antic/arith.c:18: warning: Left shift overflows the capacity of 'uint64_t' [core.BitwiseShift] | src/antic/arith.c:18
+kept | 1 src/antic/ast_dump.c:54: warning: Access to field 'length' results in a dereference of a null pointer (loaded from variable 'name') [core.NullDereference] | src/antic/ast_dump.c:52
+new | 1 src/antic/docpage.c:626: warning: Access to field 'symbol' results in a dereference of a null pointer (loaded from variable 'it') [core.NullDereference] |
+kept | 1 src/antic/layout.c:313: warning: Division by zero [core.DivideZero] | src/antic/layout.c:311
+kept | 1 src/antic/layout.c:98: warning: Division by zero [core.DivideZero] | src/antic/layout.c:96
+new | 1 src/antic/llvm_emit.c:2456: warning: 7th function call argument is an uninitialized value [core.CallAndMessage] |
+new | 1 src/antic/llvm_emit.c:2460: warning: 8th function call argument is an uninitialized value [core.CallAndMessage] |
+kept | 1 src/antic/lower_desc.c:331: warning: Access to field 'kind' results in a dereference of a null pointer (loaded from variable 'inner') [core.NullDereference] | src/antic/lower_desc.c:497
+kept | 1 src/antic/lower_expr.c:2132: warning: Access to field 'kind' results in a dereference of a null pointer (loaded from field 'type') [core.NullDereference] | src/antic/lower_expr.c:2990
+kept | 1 src/antic/lower_expr.c:630: warning: Access to field 'ir' results in a dereference of a null pointer (loaded from variable 'sym') [core.NullDereference] | src/antic/lower_expr.c:1023
+kept | 1 src/antic/lower_stmt.c:258: warning: Access to field 'type' results in a dereference of a null pointer (loaded from field 'element') [core.NullDereference] | src/antic/lower_stmt.c:536
+kept | 1 src/antic/lower_stmt.c:555: warning: Access to field 'type' results in a dereference of a null pointer (loaded from variable 'sym') [core.NullDereference] | src/antic/lower_stmt.c:821
+kept | 1 src/antic/optimize.c:781: warning: Dereference of null pointer [core.NullDereference] | src/antic/optimize.c:858
+kept | 1 src/antic/optimize.c:83: warning: Attempt to release already released memory [unix.Malloc] | src/antic/optimize.c:78
+kept | 1 src/antic/sema.c:2707: warning: Access to field 'item_exported' results in a dereference of a null pointer (loaded from field 'type') [core.NullDereference] | src/antic/sema.c:2852
+kept | 1 src/antic/sema.c:623: warning: Access to field 'pos' results in a dereference of a null pointer (loaded from variable 'e') [core.NullDereference] | src/antic/sema.c:559
+new | 1 src/antic/sema_call.c:565: warning: Access to field 'generic' results in a dereference of a null pointer (loaded from variable 's') [core.NullDereference] |
+kept | 1 src/antic/sema_call.c:920: warning: Access to field 'kind' results in a dereference of a null pointer (loaded from variable 's') [core.NullDereference] | src/antic/sema_call.c:1041
+kept | 1 src/antic/sema_class.c:370: warning: Access to field 'field_count' results in a dereference of a null pointer (loaded from variable 't') [core.NullDereference] | src/antic/sema.c:2928
+kept | 1 src/antic/sema_class.c:416: warning: Access to field 'field_count' results in a dereference of a null pointer (loaded from variable 't') [core.NullDereference] | src/antic/sema.c:2974
+kept | 1 src/antic/sema_class.c:515: warning: Access to field 'field_count' results in a dereference of a null pointer (loaded from variable 't') [core.NullDereference] | src/antic/sema.c:3073
+kept | 1 src/antic/sema_class.c:835: warning: Access to field 'field_count' results in a dereference of a null pointer (loaded from variable 't') [core.NullDereference] | src/antic/sema.c:3392
+kept | 1 src/antic/sema_pattern.c:302: warning: Access to field 'kind' results in a dereference of a null pointer (loaded from variable 'with') [core.NullDereference] | src/antic/sema_pattern.c:295
+new | 1 src/antic/sema_safety.c:149: warning: Subtraction of a non-null pointer (from variable 'f') and a null pointer (via field 'fields') results in undefined behavior [core.NullPointerArithm] |
+kept | 1 src/antic/sema_simd.c:158: warning: Division by zero [core.DivideZero] | src/antic/sema_expr.c:2312
+kept | 1 src/antic/sema_stmt.c:206: warning: Access to field 'count' results in a dereference of a null pointer (loaded from variable 'b') [core.NullDereference] | src/antic/sema_stmt.c:397
+kept | 3 src/rt/object.c:473: warning: The right operand of '<' is a garbage value [core.UndefinedBinaryOperatorResult] | src/rt/object.c:432
+new | 1 src/rt/platform_windows.c:1014: warning: The left operand of '!=' is a garbage value [core.UndefinedBinaryOperatorResult] |
+kept | 3 src/rt/registry.c:822: warning: Array access (from variable 'seen') results in a null pointer dereference [core.NullDereference] | src/rt/registry.c:830
+gone | | 1 src/anti/doc.c:645: warning: Access to field 'symbol' results in a dereference of a null pointer (loaded from variable 'it') [core.NullDereference]
+gone | | 1 src/antic/antl_tree.c:1543: warning: Access to field 'module' results in a dereference of a null pointer (loaded from variable 'lib') [core.NullDereference]
+gone | | 1 src/antic/antl_tree.c:1548: warning: Access to field 'item_count' results in a dereference of a null pointer (loaded from variable 'lib') [core.NullDereference]
+gone | | 1 src/antic/header.c:619: warning: Value stored to 'neon' during its initialization is never read [deadcode.DeadStores]
+gone | | 1 src/antic/layout.c:604: warning: Left shift overflows the capacity of 'uint64_t' [core.BitwiseShift]
+gone | | 1 src/antic/lower_stmt.c:2342: warning: Dereference of null pointer [core.NullDereference]
+gone | | 1 src/antic/lower_stmt.c:662: warning: Access to field 'address_taken' results in a dereference of a null pointer (loaded from variable 'sym') [core.NullDereference]
+gone | | 1 src/antic/parser.c:260: warning: The right operand of '<' is a garbage value [core.UndefinedBinaryOperatorResult]
+gone | | 1 src/antic/sema.c:110: warning: Access to field 'length' results in a dereference of a null pointer (loaded from variable 'b') [core.NullDereference]
+gone | | 1 src/antic/sema_call.c:272: warning: Access to field 'form' results in a dereference of a null pointer (loaded from variable 'f') [core.NullDereference]
+gone | | 1 src/antic/sema_call.c:965: warning: Access to field 'kind' results in a dereference of a null pointer (loaded from variable 'first') [core.NullDereference]
+gone | | 1 src/antic/sema_pattern.c:337: warning: Access to field 'pos' results in a dereference of a null pointer (loaded from variable 'into') [core.NullDereference]
+gone | | 1 src/antic/types.c:1453: warning: Access to field 'layout' results in a dereference of a null pointer (loaded from variable 't') [core.NullDereference]
+gone | | 1 src/antic/x86_64.c:1113: warning: Access to field 'size' results in a dereference of a null pointer (loaded from variable 'agg') [core.NullDereference]
+gone | | 1 src/antic/x86_64.c:1215: warning: Access to field 'align' results in a dereference of a null pointer (loaded from variable 'agg') [core.NullDereference]
+gone | | 1 src/rt/fs.c:235: warning: Null pointer passed as 1st argument to memory copy function [unix.cstring.NullArg]
+gone | | 1 src/rt/start.c:128: warning: The left operand of '!=' is a garbage value due to array index out of bounds [core.UndefinedBinaryOperatorResult]
+# counts: new 8, kept 26, gone 17

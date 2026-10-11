@@ -1,0 +1,55 @@
+# Duplicated blocks of 10 or more significant lines between two
+# files of src/antic, src/rt, src/anti and src/std. A significant line
+# is a line without comments that holds more than braces or
+# punctuation. exact: the lines agree after whitespace is collapsed.
+# near: they agree once identifiers, numbers and strings are
+# replaced, and the block is not inside an exact one. A near
+# window needs at least 5 lines that call, test or assign, so lists
+# of enum names, fields or cases do not count.
+# kind lines fileA:first-last fileB:first-last
+near 18 src/anti/bindtype.c:296-313 src/antic/main.c:250-275
+near 18 src/anti/bindtype.c:296-313 src/antic/main.c:247-272
+near 17 src/anti/bindtype.c:296-312 src/antic/main.c:253-277
+near 16 src/anti/bindtype.c:298-313 src/antic/main.c:247-269
+near 15 src/anti/bindtype.c:296-310 src/antic/main.c:256-277
+near 14 src/anti/bindtype.c:300-313 src/antic/main.c:247-266
+near 13 src/anti/bindtype.c:296-308 src/antic/main.c:259-277
+near 13 src/antic/antl_read.c:876-888 src/antic/lower_expr.c:2078-2090
+near 13 src/antic/lexer.c:18-32 src/antic/warnings.c:10-26
+near 13 src/antic/sema_const.c:1120-1139 src/antic/sema_value.c:327-346
+exact 13 src/rt/platform_posix.c:827-848 src/rt/platform_windows.c:1107-1131
+near 12 src/anti/bindtype.c:302-313 src/antic/main.c:247-263
+near 12 src/antic/antl.c:17-28 src/antic/antl_tree.c:31-42
+near 12 src/antic/antl.c:18-29 src/antic/antl_tree.c:31-42
+near 12 src/antic/antl.c:19-30 src/antic/antl_tree.c:31-42
+near 12 src/antic/antl.c:20-31 src/antic/antl_tree.c:31-42
+near 12 src/antic/antl_read.c:877-888 src/antic/lower_expr.c:2094-2107
+near 12 src/antic/antl_tree.c:1254-1270 src/antic/llvm_emit.c:2953-2969
+near 12 src/antic/antl_tree.c:1254-1270 src/antic/llvm_emit.c:2956-2972
+exact 12 src/antic/optimize.c:910-922 src/antic/whole.c:396-408
+near 11 src/anti/bindtype.c:296-306 src/antic/main.c:262-277
+near 11 src/anti/build.c:1090-1100 src/anti/manifest.c:446-456
+near 11 src/antic/antl.c:17-27 src/antic/antl_tree.c:32-42
+near 11 src/antic/antl.c:21-31 src/antic/antl_tree.c:31-41
+near 11 src/antic/antl_read.c:876-886 src/antic/lower_expr.c:2080-2090
+near 11 src/antic/antl_read.c:876-886 src/antic/lower_expr.c:2095-2107
+near 11 src/antic/antl_read.c:878-888 src/antic/lower_expr.c:2078-2088
+near 11 src/std/anti/collection/deque.anti:95-121 src/std/anti/collection/list.anti:189-214
+near 10 src/anti/bindtype.c:297-306 src/antic/main.c:390-404
+near 10 src/anti/bindtype.c:299-308 src/antic/main.c:390-404
+near 10 src/anti/bindtype.c:301-310 src/antic/main.c:390-404
+near 10 src/anti/bindtype.c:303-312 src/antic/main.c:390-404
+near 10 src/anti/bindtype.c:304-313 src/antic/main.c:247-260
+near 10 src/anti/build.c:1092-1101 src/anti/manifest.c:447-456
+near 10 src/anti/build.c:1093-1102 src/anti/manifest.c:447-456
+near 10 src/anti/build.c:1094-1103 src/anti/manifest.c:447-456
+near 10 src/antic/antl.c:17-26 src/antic/antl_tree.c:33-42
+near 10 src/antic/antl.c:22-31 src/antic/antl_tree.c:31-40
+near 10 src/antic/antl_read.c:875-884 src/antic/pattern.c:821-830
+near 10 src/antic/antl_read.c:877-886 src/antic/lower_expr.c:641-650
+near 10 src/antic/antl_read.c:879-888 src/antic/lower_expr.c:2094-2103
+near 10 src/antic/antl_read.c:879-888 src/antic/lower_expr.c:641-650
+near 10 src/antic/antl_tree.c:1254-1267 src/antic/llvm_emit.c:2959-2972
+near 10 src/antic/antl_tree.c:1257-1270 src/antic/llvm_emit.c:2953-2966
+near 10 src/antic/ast_walk.c:66-78 src/antic/sema_copies.c:865-877
+# 2 exact blocks, 43 near blocks

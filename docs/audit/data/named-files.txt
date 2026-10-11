@@ -1,0 +1,657 @@
+# Every file name that CLAUDE.md, docs/decisions.md or a file of docs/notes/
+# names, with whether it exists. A path is checked as written. A bare name
+# exists when a tracked file carries it, and its paths are given. Names
+# with a placeholder in angle brackets are not listed. Names under build/
+# and names a build writes are checked against the tree alone, so a
+# missing one may be a product of a build rather than a stale name.
+# status name | documents that name it | paths
+missing --anti.conf | CLAUDE.md,decisions.md,runtime-conf.md | 
+missing -sha256sum.txt | decisions.md | 
+missing -state.md | CLAUDE.md | 
+missing -symbols.zip | CLAUDE.md,build.md,decisions.md | 
+exists CHANGELOG.md | CLAUDE.md,decisions.md | CHANGELOG.md
+exists CLAUDE.md | CLAUDE.md,decisions.md,hosts-and-harness.md,value-rules.md | CLAUDE.md
+exists CMakeLists.txt | CLAUDE.md,decisions.md,hosts-and-harness.md,value-rules.md | CMakeLists.txt src/native/CMakeLists.txt tests/CMakeLists.txt
+exists CMakePresets.json | CLAUDE.md,decisions.md | CMakePresets.json
+missing Class.lock | concurrent-classes.md,decisions.md | 
+missing KERNEL32.dll | decisions.md | 
+missing LICENCE.md | decisions.md | 
+exists LICENSES/mbedtls.txt | decisions.md | LICENSES/mbedtls.txt
+exists LICENSES/mimalloc.txt | decisions.md | LICENSES/mimalloc.txt
+exists LICENSES/miniaudio.txt | decisions.md | LICENSES/miniaudio.txt
+exists LICENSES/pcre2.txt | decisions.md | LICENSES/pcre2.txt
+exists LICENSES/raylib.txt | decisions.md | LICENSES/raylib.txt
+exists LICENSES/sqlite.txt | decisions.md | LICENSES/sqlite.txt
+missing NOTICE.txt | CLAUDE.md,decisions.md | 
+exists README.md | CLAUDE.md,decisions.md | README.md
+missing SDKSettings.json | decisions.md | 
+missing SHA256SUMS.sig | CLAUDE.md,decisions.md | 
+missing Scrt1.o | decisions.md | 
+missing VCRUNTIME140.dll | decisions.md | 
+missing _mingw.h | decisions.md,linker.md | 
+missing anti-plugins.toml | CLAUDE.md,decisions.md,plugins.md | 
+missing anti.json | CLAUDE.md,decisions.md | 
+missing anti.lock | CLAUDE.md,build.md,decisions.md | 
+exists anti.toml | CLAUDE.md,build.md,decisions.md,injection.md | tests/anti-build/app/anti.toml tests/anti-build/clock/anti.toml tests/anti-build/consumer/anti.toml tests/anti-build/internal/anti.toml ...
+missing anti_lang_dev.o | value-rules.md | 
+missing anti_rt.lib | decisions.md,linker.md | 
+missing anti_rt_license_stub.o | linker.md | 
+exists antic.c | decisions.md | src/antic/antic.c
+exists antic.h | decisions.md | src/antic/antic.h
+exists antl.c | decisions.md | src/antic/antl.c
+exists antl.h | decisions.md | src/antic/antl.h
+exists antl_io.c | decisions.md | src/antic/antl_io.c
+exists antl_read.c | decisions.md | src/antic/antl_read.c
+exists antl_read_ir.c | decisions.md | src/antic/antl_read_ir.c
+exists antl_tree.c | decisions.md,generics.md,hashing.md,hosts-and-harness.md,value-rules.md | src/antic/antl_tree.c
+exists antl_verify.c | decisions.md,hosts-and-harness.md | src/antic/antl_verify.c
+exists antl_write.c | decisions.md | src/antic/antl_write.c
+missing api.json | decisions.md | 
+exists app.anti | hosts-and-harness.md | tests/anti-build/app/src/com/example/app.anti tests/anti-build/internal/src/com/example/app.anti tests/check/clean/src/com/example/app.anti tests/doc/src/com/example/app.anti ...
+exists applesdk.h | decisions.md | src/antic/applesdk.h
+exists arena.h | decisions.md | src/antic/arena.h
+missing arm_neon.h | hosts-and-harness.md | 
+missing asan_malloc_win.cpp | hosts-and-harness.md | 
+exists ast.h | collections.md,decisions.md,direct-imports.md | src/antic/ast.h
+exists ast_walk.c | decisions.md | src/antic/ast_walk.c
+exists atomic.c | decisions.md | src/rt/atomic.c
+missing bcrypt.dll | decisions.md | 
+missing bcrypt.lib | decisions.md | 
+exists binary_stdio.h | decisions.md | tests/binary_stdio.h
+exists bind.c | bind.md | src/anti/bind.c
+exists bindapi.c | bind.md | src/anti/bindapi.c
+exists bindclang.c | bind.md | src/anti/bindclang.c
+exists bindexpr.c | bind.md | src/anti/bindexpr.c
+exists bindmodel.c | bind.md | src/anti/bindmodel.c
+exists bindmodel.h | bind.md | src/anti/bindmodel.h
+exists bindtype.c | bind.md | src/anti/bindtype.c
+exists bindwrite.c | bind.md | src/anti/bindwrite.c
+exists build/host/CMakeCache.txt | decisions.md,hosts-and-harness.md | build/host/CMakeCache.txt
+exists build/host/runtime/licenses/anti_rt.txt | setup.md | build/host/runtime/licenses/anti_rt.txt
+exists build/host/tests/modules/com/example/scale.antl | value-rules.md | build/host/tests/modules/com/example/scale.antl
+exists build/host/tests/modules/pick.antl | value-rules.md | build/host/tests/modules/pick.antl
+exists coff.h | decisions.md | src/antic/coff.h
+exists collection_deque.anti | decisions.md | tests/std/collection_deque.anti
+exists collection_grid.anti | decisions.md | tests/std/collection_grid.anti
+exists collection_queue.anti | decisions.md | tests/std/collection_queue.anti
+exists collection_ring.anti | decisions.md | tests/std/collection_ring.anti
+exists collection_tree.anti | decisions.md | tests/std/collection_tree.anti
+exists config.anti | decisions.md | src/std/anti/config.anti
+missing config.h | decisions.md | 
+missing config.toml | decisions.md | 
+exists cpu.h | decisions.md,simd.md | src/antic/cpu.h
+exists cpu_level.h | decisions.md | src/rt/cpu_level.h
+missing crti.o | decisions.md | 
+missing crtn.o | decisions.md | 
+missing dbghelp.dll | decisions.md | 
+missing debug.c | decisions.md | 
+exists diagnostic.h | decisions.md | src/antic/diagnostic.h
+exists docpage.c | decisions.md | src/antic/docpage.c
+exists docs/anti-language-additions.md | CLAUDE.md,closures.md,concurrent-classes.md,decisions.md,dev-checks.md,hooks.md,injection.md,iteration.md,llvm.md,optional-values.md,own-and-lent.md,plugins.md,runtime-conf.md,symbols.md,trace-handlers.md,traces.md,versions.md,warnings.md | docs/anti-language-additions.md
+exists docs/anti-object-model.md | CLAUDE.md,decisions.md | docs/anti-object-model.md
+exists docs/anti-syntax-overview.md | CLAUDE.md,decisions.md | docs/anti-syntax-overview.md
+missing docs/audit/rt.md | decisions.md | 
+missing docs/audit/summary.md | decisions.md | 
+exists docs/c-guidelines.md | CLAUDE.md,decisions.md | docs/c-guidelines.md
+exists docs/decisions.md | CLAUDE.md,aggregates.md,bind.md,build.md,check.md,closures.md,collections.md,concurrent-classes.md,decisions.md,dev-checks.md,direct-imports.md,doc.md,flags.md,floats.md,fmt.md,function-pointers.md,generics.md,hashing.md,hooks.md,hosts-and-harness.md,injection.md,interpolation.md,ir.md,iteration.md,lexer.md,linker.md,llvm.md,locking.md,lowering.md,modules.md,nested-types.md,optimizer.md,optional-values.md,own-and-lent.md,parser.md,patterns.md,plugins.md,runtime-conf.md,sema.md,setup.md,simd.md,strings.md,symbols.md,targets.md,threads.md,trace-handlers.md,traces.md,variants.md,versions.md,warnings.md,whole-program.md | docs/decisions.md
+exists docs/distribution.md | CLAUDE.md,decisions.md | docs/distribution.md
+exists docs/libraries-for-c.md | CLAUDE.md,decisions.md,plugins.md | docs/libraries-for-c.md
+exists docs/notes/bind.md | CLAUDE.md,decisions.md | docs/notes/bind.md
+exists docs/notes/build.md | CLAUDE.md,decisions.md | docs/notes/build.md
+exists docs/notes/check.md | CLAUDE.md,decisions.md | docs/notes/check.md
+exists docs/notes/closures.md | CLAUDE.md,decisions.md | docs/notes/closures.md
+exists docs/notes/collections.md | CLAUDE.md,decisions.md | docs/notes/collections.md
+exists docs/notes/concurrent-classes.md | CLAUDE.md,decisions.md,locking.md | docs/notes/concurrent-classes.md
+exists docs/notes/direct-imports.md | CLAUDE.md,decisions.md | docs/notes/direct-imports.md
+exists docs/notes/doc.md | CLAUDE.md,decisions.md | docs/notes/doc.md
+exists docs/notes/flags.md | CLAUDE.md,decisions.md,llvm.md | docs/notes/flags.md
+exists docs/notes/floats.md | llvm.md | docs/notes/floats.md
+exists docs/notes/fmt.md | check.md,decisions.md | docs/notes/fmt.md
+exists docs/notes/generics.md | CLAUDE.md,decisions.md | docs/notes/generics.md
+exists docs/notes/hashing.md | CLAUDE.md,decisions.md | docs/notes/hashing.md
+exists docs/notes/hooks.md | CLAUDE.md,decisions.md,trace-handlers.md | docs/notes/hooks.md
+exists docs/notes/hosts-and-harness.md | CLAUDE.md,decisions.md | docs/notes/hosts-and-harness.md
+exists docs/notes/injection.md | CLAUDE.md,decisions.md | docs/notes/injection.md
+exists docs/notes/interpolation.md | CLAUDE.md,lexer.md | docs/notes/interpolation.md
+exists docs/notes/iteration.md | CLAUDE.md,decisions.md | docs/notes/iteration.md
+exists docs/notes/llvm.md | CLAUDE.md,generics.md | docs/notes/llvm.md
+exists docs/notes/locking.md | CLAUDE.md,concurrent-classes.md,decisions.md | docs/notes/locking.md
+exists docs/notes/nested-types.md | CLAUDE.md,decisions.md | docs/notes/nested-types.md
+exists docs/notes/patterns.md | CLAUDE.md | docs/notes/patterns.md
+exists docs/notes/plugins.md | CLAUDE.md,decisions.md,versions.md | docs/notes/plugins.md
+missing docs/notes/regalloc.md | decisions.md | 
+exists docs/notes/runtime-conf.md | CLAUDE.md,decisions.md | docs/notes/runtime-conf.md
+exists docs/notes/simd.md | CLAUDE.md,decisions.md,llvm.md | docs/notes/simd.md
+exists docs/notes/symbols.md | CLAUDE.md,decisions.md,generics.md | docs/notes/symbols.md
+exists docs/notes/trace-handlers.md | CLAUDE.md,decisions.md,hooks.md | docs/notes/trace-handlers.md
+exists docs/notes/traces.md | CLAUDE.md | docs/notes/traces.md
+exists docs/notes/value-rules.md | CLAUDE.md,llvm.md | docs/notes/value-rules.md
+exists docs/notes/variants.md | CLAUDE.md,decisions.md | docs/notes/variants.md
+exists docs/notes/versions.md | CLAUDE.md,decisions.md,plugins.md | docs/notes/versions.md
+exists docs/notes/warnings.md | CLAUDE.md,decisions.md | docs/notes/warnings.md
+exists docs/notes/whole-program.md | CLAUDE.md,decisions.md | docs/notes/whole-program.md
+exists docs/reports/2026-09-19-first-sessions-10-to-13.md | CLAUDE.md | docs/reports/2026-09-19-first-sessions-10-to-13.md
+exists docs/reports/2026-09-19-first-sessions-3-to-6.md | CLAUDE.md | docs/reports/2026-09-19-first-sessions-3-to-6.md
+exists docs/reports/2026-09-19-first-sessions-7-to-9.md | CLAUDE.md | docs/reports/2026-09-19-first-sessions-7-to-9.md
+exists docs/reports/2026-09-19-whole-program.md | CLAUDE.md | docs/reports/2026-09-19-whole-program.md
+exists docs/reports/2026-09-20-object-model-completion.md | CLAUDE.md | docs/reports/2026-09-20-object-model-completion.md
+exists docs/reports/2026-09-20-one-manifest.md | CLAUDE.md | docs/reports/2026-09-20-one-manifest.md
+exists docs/reports/2026-09-21-interpolation.md | CLAUDE.md | docs/reports/2026-09-21-interpolation.md
+exists docs/reports/2026-09-21-llvm-tools.md | CLAUDE.md | docs/reports/2026-09-21-llvm-tools.md
+exists docs/reports/2026-09-22-first-sessions-20-to-24.md | CLAUDE.md | docs/reports/2026-09-22-first-sessions-20-to-24.md
+exists docs/reports/2026-09-24-glibc-and-plugins.md | CLAUDE.md | docs/reports/2026-09-24-glibc-and-plugins.md
+exists docs/reports/2026-09-27-distribution-target.md | CLAUDE.md | docs/reports/2026-09-27-distribution-target.md
+exists docs/reports/2026-09-28-add5-concurrent.md | decisions.md | docs/reports/2026-09-28-add5-concurrent.md
+exists docs/reports/2026-10-05-llvm-opt-config.md | decisions.md | docs/reports/2026-10-05-llvm-opt-config.md
+exists docs/reports/2026-10-07-inline-atomics.md | CLAUDE.md | docs/reports/2026-10-07-inline-atomics.md
+exists docs/reports/2026-10-07-runtime-bitcode.md | decisions.md | docs/reports/2026-10-07-runtime-bitcode.md
+exists docs/reports/2026-10-08-llvm-closed.md | decisions.md | docs/reports/2026-10-08-llvm-closed.md
+exists docs/reports/2026-10-08-provisional-review.md | decisions.md | docs/reports/2026-10-08-provisional-review.md
+exists docs/reports/2026-10-08-x86_64-hardware.md | CLAUDE.md | docs/reports/2026-10-08-x86_64-hardware.md
+exists docs/reports/2026-10-09-dist-glibc.md | CLAUDE.md | docs/reports/2026-10-09-dist-glibc.md
+exists docs/reports/2026-10-09-dist-headers.md | CLAUDE.md | docs/reports/2026-10-09-dist-headers.md
+missing docs/reports/2026-10-09-dist-mingw.md | CLAUDE.md | 
+exists docs/reports/2026-10-09-dist-own-tools.md | CLAUDE.md | docs/reports/2026-10-09-dist-own-tools.md
+exists docs/reports/2026-10-09-dist-sources.md | CLAUDE.md | docs/reports/2026-10-09-dist-sources.md
+exists docs/reports/2026-10-09-dist-tools.md | CLAUDE.md | docs/reports/2026-10-09-dist-tools.md
+exists docs/reports/2026-10-10-dist-bundle-macho.md | CLAUDE.md | docs/reports/2026-10-10-dist-bundle-macho.md
+exists docs/reports/2026-10-10-dist-installers.md | CLAUDE.md | docs/reports/2026-10-10-dist-installers.md
+exists docs/reports/2026-10-10-dist-license-forms.md | CLAUDE.md | docs/reports/2026-10-10-dist-license-forms.md
+exists docs/reports/2026-10-10-dist-offline.md | CLAUDE.md | docs/reports/2026-10-10-dist-offline.md
+exists docs/reports/2026-10-10-dist-release-check.md | CLAUDE.md | docs/reports/2026-10-10-dist-release-check.md
+exists docs/site/runtime-archive/index.md | decisions.md | docs/site/runtime-archive/index.md
+exists docs/toolchain-later.md | decisions.md,hosts-and-harness.md | docs/toolchain-later.md
+exists docs/tooling-addendum.md | CLAUDE.md,bind.md,build.md,check.md,decisions.md,doc.md,fmt.md | docs/tooling-addendum.md
+exists docs/tooling.md | CLAUDE.md,build.md,decisions.md,doc.md | docs/tooling.md
+exists docs/vm-setup.md | CLAUDE.md,decisions.md,hosts-and-harness.md | docs/vm-setup.md
+exists docs/work-order-completion.md | CLAUDE.md | docs/work-order-completion.md
+exists docs/work-order-distribution.md | decisions.md,linker.md | docs/work-order-distribution.md
+exists docs/work-order-llvm-back-end.md | decisions.md,llvm.md | docs/work-order-llvm-back-end.md
+exists docs/work-order-llvm-optimization.md | CLAUDE.md,decisions.md,llvm.md | docs/work-order-llvm-optimization.md
+exists docs/work-order-release-script.md | CLAUDE.md,decisions.md | docs/work-order-release-script.md
+missing drive-dist.sh | decisions.md | 
+exists driver.c | decisions.md | src/antic/driver.c
+exists driver_index.c | decisions.md | src/antic/driver_index.c
+exists driver_library.c | decisions.md | src/antic/driver_library.c
+exists driver_link.c | decisions.md | src/antic/driver_link.c
+exists driver_search.c | decisions.md | src/antic/driver_search.c
+missing emit.c | decisions.md | 
+missing entropy_poll.c | decisions.md | 
+missing expand.c | decisions.md | 
+exists f16.h | decisions.md,hashing.md | src/rt/f16.h
+missing file.anti | decisions.md | 
+missing file.antl | decisions.md | 
+exists files.c | decisions.md | src/anti/files.c
+exists fs.c | decisions.md | src/rt/fs.c
+exists function-pointers.md | threads.md | docs/notes/function-pointers.md
+missing gdi32.dll | decisions.md | 
+missing gdi32.lib | decisions.md | 
+exists geo.anti | decisions.md | tests/clib/com/example/geo.anti tests/errors/geo.anti tests/modules/blocks/com/example/geo.anti tests/modules/lines/com/example/geo.anti ...
+exists geometry.anti | decisions.md | tests/check/clean/src/com/example/geometry.anti tests/errors/geometry.anti
+missing geometry.antl | decisions.md | 
+missing glibc.txt | decisions.md | 
+exists hash_default.anti | hashing.md | tests/programs/hash_default.anti
+exists hash_generic.anti | hashing.md | tests/programs/hash_generic.anti
+exists header.c | generics.md | src/antic/header.c tests/clib/header.c
+exists header.h | decisions.md | src/antic/header.h
+missing immintrin.h | decisions.md | 
+missing index.toml | decisions.md | 
+exists init.c | decisions.md | src/rt/init.c
+exists install.sh | decisions.md | tools/install.sh
+exists ir_verify.c | decisions.md | src/antic/ir_verify.c
+exists json.c | decisions.md | src/rt/json.c
+exists jsontree.c | bind.md | src/anti/jsontree.c
+missing kernel32.dll | CLAUDE.md,decisions.md,plugins.md | 
+missing kernel32.lib | decisions.md,linker.md | 
+missing l.map | decisions.md | 
+missing legacy_stdio_definitions.lib | decisions.md | 
+exists lexer.h | decisions.md | src/antic/lexer.h
+missing lib.antl | decisions.md | 
+missing libGL.so | decisions.md | 
+missing libLTO.dylib | decisions.md,linker.md | 
+missing libX11.so | decisions.md | 
+missing libanti_rt.a | decisions.md,linker.md | 
+missing libc.a | decisions.md | 
+missing libc.so | decisions.md | 
+missing libcmt.lib | decisions.md,linker.md | 
+missing libgeo.a | linker.md | 
+missing libgl1.txt | decisions.md | 
+missing libglvnd.txt | decisions.md | 
+missing libicui18n.so | decisions.md | 
+missing libm.so | decisions.md | 
+missing libmbedtls.a | decisions.md | 
+missing libminiaudio.a | decisions.md | 
+missing libother.a | linker.md | 
+missing libpcre2-8.a | CLAUDE.md,decisions.md | 
+missing libraylib.a | decisions.md | 
+missing libsqlite3.a | decisions.md | 
+missing libunwind.a | decisions.md,hosts-and-harness.md | 
+missing libvcruntime.lib | decisions.md | 
+missing libx11-6.txt | decisions.md | 
+missing libx11.txt | decisions.md | 
+missing license.o | linker.md | 
+missing link.exe | decisions.md,llvm.md | 
+exists linker.h | decisions.md | src/antic/linker.h
+missing linux-headers.txt | decisions.md | 
+exists list.anti | decisions.md | src/std/anti/collection/list.anti
+missing llvm-readobj.exe | hosts-and-harness.md | 
+exists log.anti | decisions.md | src/std/anti/log.anti tests/std/log.anti
+exists lower.c | CLAUDE.md,decisions.md,hashing.md,variants.md | src/antic/lower.c
+exists lower_check.c | decisions.md | src/antic/lower_check.c
+exists lower_class.c | decisions.md | src/antic/lower_class.c
+exists lower_desc.c | closures.md,collections.md,decisions.md,generics.md | src/antic/lower_desc.c
+exists lower_eq.c | decisions.md,hashing.md | src/antic/lower_eq.c
+exists lower_error.c | decisions.md | src/antic/lower_error.c
+exists lower_expr.c | decisions.md | src/antic/lower_expr.c
+exists lower_function.c | decisions.md | src/antic/lower_function.c
+exists lower_hash.c | CLAUDE.md,decisions.md,hashing.md | src/antic/lower_hash.c
+exists lower_hook.c | decisions.md | src/antic/lower_hook.c
+exists lower_lowerer.h | decisions.md,hashing.md | src/antic/lower_lowerer.h
+exists lower_owning.c | decisions.md,value-rules.md | src/antic/lower_owning.c
+exists lower_pattern.c | decisions.md | src/antic/lower_pattern.c
+exists lower_place.c | decisions.md | src/antic/lower_place.c
+exists lower_simd.c | decisions.md | src/antic/lower_simd.c
+exists lower_stmt.c | decisions.md | src/antic/lower_stmt.c
+exists lower_sync.c | decisions.md | src/antic/lower_sync.c
+exists lower_worker.c | decisions.md | src/antic/lower_worker.c
+missing mach.c | decisions.md | 
+exists main.anti | decisions.md,lowering.md | tests/dump/c_long/main.anti tests/dump/header/main.anti tests/dump/main.anti tests/dump/size_of/main.anti ...
+exists main.c | decisions.md | src/anti/main.c src/antic/main.c
+exists map_work.anti | decisions.md | tests/bench/map_work.anti
+exists map_work.c | decisions.md | tests/bench/map_work.c
+missing math.h | decisions.md,linker.md | 
+missing mbedtls.lib | decisions.md | 
+exists memory_checks_list.anti | hosts-and-harness.md | tests/traps/memory_checks_list.anti
+missing miniaudio.c | decisions.md | 
+missing miniaudio.h | decisions.md | 
+missing miniaudio.lib | decisions.md | 
+exists modpath.h | decisions.md | src/antic/modpath.h
+exists modules.md | sema.md | docs/notes/modules.md
+missing msvcrt.lib | decisions.md,linker.md | 
+missing net_sockets.c | decisions.md | 
+exists notice.h | decisions.md | src/antic/notice.h
+missing ntdll.dll | CLAUDE.md,decisions.md,plugins.md | 
+missing ntdll.lib | decisions.md,linker.md | 
+exists object.c | decisions.md | src/rt/object.c
+exists objects.anti | decisions.md | tests/bench/objects.anti
+missing oldnames.lib | decisions.md,linker.md | 
+missing opengl32.dll | decisions.md | 
+exists opt_noreturn.py | decisions.md | tests/bench/ablate/opt_noreturn.py
+exists parser.c | decisions.md,direct-imports.md | src/antic/parser.c
+exists parser_clause.c | decisions.md | src/antic/parser_clause.c
+exists parser_decl.c | collections.md,decisions.md | src/antic/parser_decl.c
+exists parser_expr.c | decisions.md | src/antic/parser_expr.c
+exists parser_item.c | decisions.md | src/antic/parser_item.c
+exists parser_stmt.c | decisions.md | src/antic/parser_stmt.c
+exists parser_type.c | decisions.md | src/antic/parser_type.c
+missing part.lock | decisions.md | 
+exists patterns.c | hashing.md | src/rt/patterns.c
+missing pcre2-8.lib | decisions.md | 
+missing pcre2.h | decisions.md | 
+exists pcre2_match.anti | decisions.md | tests/abi/pcre2_match.anti
+missing pick.antl | generics.md,value-rules.md | 
+exists platform.c | decisions.md | src/anti/platform.c src/antic/platform.c
+exists platform.h | decisions.md | src/anti/platform.h src/antic/platform.h src/rt/platform.h
+exists platform_posix.c | decisions.md | src/rt/platform_posix.c
+exists platform_windows.c | decisions.md,hashing.md | src/rt/platform_windows.c
+exists plugin.c | plugins.md | src/rt/plugin.c
+missing process.c | decisions.md | 
+missing prog.ll | decisions.md | 
+missing raudio.c | decisions.md | 
+missing raylib.h | decisions.md | 
+missing raylib.lib | decisions.md | 
+exists raylib_api.json | CLAUDE.md,aggregates.md,bind.md,decisions.md | tests/bind/raylib_api.json
+missing raymath.h | decisions.md | 
+missing rcamera.h | decisions.md | 
+missing rcore.c | decisions.md | 
+missing rcrt1.o | decisions.md | 
+exists regex.c | hashing.md | src/rt/regex.c
+exists release.pem | CLAUDE.md | tools/keys/public/release.pem tools/keys/release.pem
+missing rglfw.c | decisions.md | 
+missing rlgl.h | decisions.md | 
+exists run.py | decisions.md | tests/bench/ablate/run.py
+exists run_clib.cmake | decisions.md | tests/run_clib.cmake
+exists run_lock_order.cmake | concurrent-classes.md | tests/run_lock_order.cmake
+exists run_program.cmake | hosts-and-harness.md | tests/run_program.cmake
+missing sanitizer_allocator_primary32.h | hosts-and-harness.md | 
+exists sdk.c | decisions.md | src/anti/sdk.c
+missing selfpath.c | decisions.md | 
+exists sema.c | decisions.md,direct-imports.md,hashing.md,iteration.md | src/antic/sema.c
+exists sema.h | decisions.md | src/antic/sema.h
+exists sema.md | threads.md | docs/notes/sema.md
+exists sema_call.c | collections.md,decisions.md,direct-imports.md,hashing.md | src/antic/sema_call.c
+exists sema_checker.h | decisions.md,hashing.md | src/antic/sema_checker.h
+exists sema_class.c | decisions.md | src/antic/sema_class.c
+exists sema_const.c | decisions.md | src/antic/sema_const.c
+exists sema_copies.c | collections.md,generics.md,hashing.md | src/antic/sema_copies.c
+exists sema_doc.c | decisions.md | src/antic/sema_doc.c
+exists sema_export.c | decisions.md | src/antic/sema_export.c
+exists sema_expr.c | collections.md,decisions.md,optional-values.md,own-and-lent.md | src/antic/sema_expr.c
+exists sema_generic.c | collections.md,decisions.md,generics.md,hashing.md | src/antic/sema_generic.c
+exists sema_hash.c | decisions.md,hashing.md | src/antic/sema_hash.c
+exists sema_operator.c | decisions.md,generics.md,hashing.md | src/antic/sema_operator.c
+exists sema_pattern.c | decisions.md | src/antic/sema_pattern.c
+exists sema_safety.c | decisions.md | src/antic/sema_safety.c
+exists sema_simd.c | decisions.md | src/antic/sema_simd.c
+exists sema_stmt.c | collections.md,decisions.md | src/antic/sema_stmt.c
+exists sema_thread.c | concurrent-classes.md,decisions.md,generics.md | src/antic/sema_thread.c
+exists sema_value.c | value-rules.md | src/antic/sema_value.c
+exists sha256.c | decisions.md | src/antic/sha256.c
+exists sha256.h | decisions.md | src/antic/sha256.h
+missing shell32.dll | decisions.md | 
+missing shell32.lib | decisions.md | 
+missing sources.txt | decisions.md | 
+missing sqlite3.c | decisions.md | 
+missing sqlite3.h | decisions.md | 
+missing sqlite3.lib | decisions.md | 
+missing sqlite3ext.h | decisions.md | 
+exists src/anti/bindmodel.c | decisions.md | src/anti/bindmodel.c
+exists src/anti/build.c | build.md,decisions.md | src/anti/build.c
+exists src/anti/check.c | check.md,decisions.md | src/anti/check.c
+exists src/anti/deps.c | build.md,decisions.md | src/anti/deps.c
+exists src/anti/doc.c | decisions.md,doc.md,generics.md,hashing.md | src/anti/doc.c
+exists src/anti/files.c | decisions.md | src/anti/files.c
+exists src/anti/fmt.c | decisions.md,direct-imports.md,fmt.md | src/anti/fmt.c
+exists src/anti/manifest.c | build.md,decisions.md,injection.md | src/anti/manifest.c
+exists src/anti/platform.c | decisions.md | src/anti/platform.c
+exists src/anti/repo.c | build.md,decisions.md | src/anti/repo.c
+exists src/anti/symmap.c | build.md,decisions.md | src/anti/symmap.c
+exists src/anti/symmap.h | decisions.md | src/anti/symmap.h
+exists src/anti/syms.c | decisions.md,symbols.md | src/anti/syms.c
+exists src/anti/syms.h | decisions.md | src/anti/syms.h
+exists src/anti/units.c | decisions.md,doc.md | src/anti/units.c
+exists src/anti/zip.c | build.md,decisions.md | src/anti/zip.c
+exists src/antic/abi.c | decisions.md,llvm.md | src/antic/abi.c
+exists src/antic/alloc.c | decisions.md | src/antic/alloc.c
+exists src/antic/antic.h | decisions.md,doc.md | src/antic/antic.h
+exists src/antic/antl.h | decisions.md,value-rules.md | src/antic/antl.h
+exists src/antic/antl_io.h | decisions.md | src/antic/antl_io.h
+exists src/antic/antl_verify.c | decisions.md | src/antic/antl_verify.c
+exists src/antic/arith.c | flags.md | src/antic/arith.c
+missing src/antic/arm64.c | decisions.md | 
+exists src/antic/attributes.h | decisions.md | src/antic/attributes.h
+exists src/antic/coff.c | decisions.md,plugins.md | src/antic/coff.c
+exists src/antic/cpu.c | CLAUDE.md,decisions.md | src/antic/cpu.c
+exists src/antic/cpu.h | decisions.md | src/antic/cpu.h
+missing src/antic/debug.c | decisions.md | 
+exists src/antic/docpage.c | doc.md,generics.md | src/antic/docpage.c
+exists src/antic/driver.c | check.md,decisions.md,dev-checks.md,doc.md,hooks.md,llvm.md | src/antic/driver.c
+exists src/antic/driver.h | decisions.md | src/antic/driver.h
+exists src/antic/driver_library.c | linker.md | src/antic/driver_library.c
+exists src/antic/driver_parts.h | decisions.md | src/antic/driver_parts.h
+exists src/antic/driver_search.c | decisions.md | src/antic/driver_search.c
+exists src/antic/ir.c | decisions.md,llvm.md | src/antic/ir.c
+exists src/antic/layout.c | CLAUDE.md | src/antic/layout.c
+exists src/antic/lexer.c | lexer.md | src/antic/lexer.c
+exists src/antic/lexer.h | decisions.md | src/antic/lexer.h
+exists src/antic/linker.c | decisions.md,linker.md | src/antic/linker.c
+exists src/antic/llvm_debug.c | build.md,llvm.md | src/antic/llvm_debug.c
+exists src/antic/llvm_emit.c | llvm.md,plugins.md | src/antic/llvm_emit.c
+exists src/antic/llvm_run.c | decisions.md,llvm.md | src/antic/llvm_run.c
+exists src/antic/llvm_target.c | decisions.md,llvm.md,targets.md | src/antic/llvm_target.c
+exists src/antic/lower_desc.c | decisions.md,hooks.md,plugins.md,versions.md | src/antic/lower_desc.c
+exists src/antic/lower_expr.c | dev-checks.md | src/antic/lower_expr.c
+exists src/antic/lower_hook.c | hooks.md | src/antic/lower_hook.c
+exists src/antic/lower_lowerer.h | decisions.md,dev-checks.md | src/antic/lower_lowerer.h
+exists src/antic/lower_pattern.c | patterns.md | src/antic/lower_pattern.c
+exists src/antic/main.c | decisions.md | src/antic/main.c
+exists src/antic/modpath.c | dev-checks.md | src/antic/modpath.c
+exists src/antic/notice.c | decisions.md | src/antic/notice.c
+exists src/antic/notice.h | decisions.md | src/antic/notice.h
+exists src/antic/parser.c | plugins.md | src/antic/parser.c
+exists src/antic/parser.h | decisions.md | src/antic/parser.h
+exists src/antic/parser_decl.c | versions.md | src/antic/parser_decl.c
+exists src/antic/parser_item.c | injection.md | src/antic/parser_item.c
+exists src/antic/parser_parser.h | decisions.md | src/antic/parser_parser.h
+exists src/antic/pattern.c | patterns.md | src/antic/pattern.c
+exists src/antic/platform.c | decisions.md | src/antic/platform.c
+exists src/antic/rt_abi.h | collections.md,decisions.md,llvm.md | src/antic/rt_abi.h
+exists src/antic/sema_call.c | decisions.md,plugins.md | src/antic/sema_call.c
+exists src/antic/sema_chain.c | decisions.md | src/antic/sema_chain.c
+exists src/antic/sema_checker.h | decisions.md | src/antic/sema_checker.h
+exists src/antic/sema_export.c | check.md | src/antic/sema_export.c
+exists src/antic/sema_operator.c | decisions.md | src/antic/sema_operator.c
+exists src/antic/sema_pattern.c | patterns.md | src/antic/sema_pattern.c
+exists src/antic/target.c | targets.md | src/antic/target.c
+exists src/antic/target.h | decisions.md | src/antic/target.h
+exists src/antic/text.c | decisions.md | src/antic/text.c
+exists src/antic/types.c | sema.md | src/antic/types.c
+exists src/antic/types.h | decisions.md | src/antic/types.h
+exists src/antic/userdirs.c | decisions.md | src/antic/userdirs.c
+exists src/antic/warnings.c | decisions.md,warnings.md | src/antic/warnings.c
+exists src/antic/whole.c | whole-program.md | src/antic/whole.c
+exists src/antic/whole_parts.h | decisions.md | src/antic/whole_parts.h
+exists src/antic/whole_tables.c | decisions.md,injection.md,plugins.md,versions.md,whole-program.md | src/antic/whole_tables.c
+missing src/antic/x86_64.c | decisions.md | 
+missing src/external/miniaudio.h | decisions.md | 
+missing src/libc.c | decisions.md | 
+missing src/main.anti | decisions.md | 
+exists src/native/CMakeLists.txt | decisions.md | src/native/CMakeLists.txt
+exists src/native/get-mbedtls.cmake | decisions.md | src/native/get-mbedtls.cmake
+missing src/native/get-media-sysroot.cmake | decisions.md | 
+exists src/native/get-mimalloc.cmake | decisions.md | src/native/get-mimalloc.cmake
+exists src/native/get-miniaudio.cmake | decisions.md | src/native/get-miniaudio.cmake
+exists src/native/get-pcre2.cmake | decisions.md | src/native/get-pcre2.cmake
+exists src/native/get-sqlite.cmake | decisions.md | src/native/get-sqlite.cmake
+exists src/native/mbedtls.cmake | decisions.md | src/native/mbedtls.cmake
+exists src/native/media.cmake | decisions.md | src/native/media.cmake
+exists src/native/miniaudio.cmake | decisions.md | src/native/miniaudio.cmake
+exists src/native/pcre2-files.cmake | decisions.md | src/native/pcre2-files.cmake
+exists src/native/pcre2-source.cmake | decisions.md | src/native/pcre2-source.cmake
+exists src/native/pcre2.cmake | decisions.md | src/native/pcre2.cmake
+exists src/native/raylib.cmake | decisions.md | src/native/raylib.cmake
+exists src/native/sqlite.cmake | decisions.md | src/native/sqlite.cmake
+exists src/native/warnings.cmake | CLAUDE.md,decisions.md | src/native/warnings.cmake
+exists src/rt/assert.c | decisions.md | src/rt/assert.c
+exists src/rt/atomic.c | decisions.md | src/rt/atomic.c
+exists src/rt/backtrace.c | traces.md | src/rt/backtrace.c
+exists src/rt/call.c | whole-program.md | src/rt/call.c
+exists src/rt/check.c | decisions.md,dev-checks.md | src/rt/check.c
+exists src/rt/conf.c | decisions.md,injection.md,runtime-conf.md,symbols.md | src/rt/conf.c
+exists src/rt/conf_include.h | decisions.md,symbols.md | src/rt/conf_include.h
+exists src/rt/cpu.c | decisions.md,hosts-and-harness.md | src/rt/cpu.c
+exists src/rt/cpu_level.h | decisions.md | src/rt/cpu_level.h
+exists src/rt/digest.c | decisions.md | src/rt/digest.c
+exists src/rt/f16.h | decisions.md,floats.md | src/rt/f16.h
+exists src/rt/fs.c | decisions.md,runtime-conf.md | src/rt/fs.c
+exists src/rt/hash.c | decisions.md,hashing.md | src/rt/hash.c
+exists src/rt/hash.h | CLAUDE.md,decisions.md,hashing.md | src/rt/hash.h
+exists src/rt/hooks.c | decisions.md,hooks.md | src/rt/hooks.c
+exists src/rt/init.c | decisions.md | src/rt/init.c
+exists src/rt/io.c | decisions.md | src/rt/io.c
+exists src/rt/json.c | CLAUDE.md,bind.md,decisions.md | src/rt/json.c
+exists src/rt/license.c | decisions.md,runtime-conf.md | src/rt/license.c
+exists src/rt/license.h | decisions.md | src/rt/license.h
+exists src/rt/loaded.c | decisions.md,plugins.md | src/rt/loaded.c
+exists src/rt/lock.c | CLAUDE.md,concurrent-classes.md,decisions.md,locking.md | src/rt/lock.c
+exists src/rt/mem.c | CLAUDE.md,decisions.md | src/rt/mem.c
+exists src/rt/object.c | collections.md,decisions.md,hashing.md,versions.md | src/rt/object.c
+exists src/rt/object.h | decisions.md,hooks.md | src/rt/object.h
+exists src/rt/patterns.c | decisions.md,patterns.md | src/rt/patterns.c
+missing src/rt/platform.c | decisions.md | 
+exists src/rt/platform.h | decisions.md,traces.md | src/rt/platform.h
+exists src/rt/platform_entry.c | decisions.md,linker.md | src/rt/platform_entry.c
+exists src/rt/platform_posix.c | decisions.md | src/rt/platform_posix.c
+exists src/rt/platform_stdio.c | decisions.md,linker.md | src/rt/platform_stdio.c
+exists src/rt/platform_windows.c | decisions.md,linker.md,plugins.md | src/rt/platform_windows.c
+exists src/rt/plugin.c | decisions.md,plugins.md,versions.md | src/rt/plugin.c
+exists src/rt/plugin_index.h | decisions.md | src/rt/plugin_index.h
+exists src/rt/regex.c | decisions.md,patterns.md | src/rt/regex.c
+exists src/rt/regex.h | CLAUDE.md,decisions.md | src/rt/regex.h
+exists src/rt/registry.c | whole-program.md | src/rt/registry.c
+exists src/rt/rt.h | decisions.md | src/rt/rt.h
+exists src/rt/signal.c | decisions.md | src/rt/signal.c
+exists src/rt/snapshot.c | closures.md,decisions.md | src/rt/snapshot.c
+exists src/rt/start.c | CLAUDE.md,decisions.md,runtime-conf.md,setup.md,threads.md | src/rt/start.c
+exists src/rt/std.h | dev-checks.md | src/rt/std.h
+exists src/rt/symbols.c | build.md,decisions.md,symbols.md,traces.md | src/rt/symbols.c
+exists src/rt/sync.c | CLAUDE.md,locking.md | src/rt/sync.c
+exists src/rt/sync.h | locking.md | src/rt/sync.h
+exists src/rt/text.c | decisions.md,interpolation.md | src/rt/text.c
+exists src/rt/threads.c | hooks.md,runtime-conf.md | src/rt/threads.c
+missing src/rt/time.c | decisions.md | 
+exists src/rt/toml.c | build.md,decisions.md,plugins.md,runtime-conf.md | src/rt/toml.c
+exists src/rt/trace.c | decisions.md,traces.md | src/rt/trace.c
+exists src/rt/utf.c | decisions.md | src/rt/utf.c
+missing src/sample-profile.c | decisions.md | 
+missing src/static.c | decisions.md | 
+exists src/std/anti/collection/concurrent.anti | decisions.md | src/std/anti/collection/concurrent.anti
+exists src/std/anti/collection/synchronized.anti | decisions.md | src/std/anti/collection/synchronized.anti
+exists src/std/anti/lang.anti | hashing.md,traces.md | src/std/anti/lang.anti
+exists src/std/anti/log.anti | runtime-conf.md | src/std/anti/log.anti
+exists src/std/anti/trace.anti | runtime-conf.md,trace-handlers.md | src/std/anti/trace.anti
+missing start.o | linker.md | 
+missing stb_image_resize2.h | decisions.md | 
+missing stb_vorbis.c | decisions.md | 
+exists std.h | decisions.md | src/rt/std.h
+missing stdbool.h | decisions.md | 
+missing stddef.h | decisions.md | 
+missing stdint.h | decisions.md | 
+exists strings.md | setup.md | docs/notes/strings.md
+exists symbols.c | decisions.md | src/rt/symbols.c
+exists syms.c | decisions.md | src/anti/syms.c
+exists sync.h | decisions.md | src/rt/sync.h
+missing tar.exe | decisions.md | 
+exists target.c | targets.md | src/antic/target.c
+exists target.h | decisions.md | src/antic/target.h
+exists test_lower.c | flags.md | tests/unit/test_lower.c
+exists test_modules.c | generics.md | tests/unit/test_modules.c
+exists test_parser.c | direct-imports.md | tests/unit/test_parser.c
+exists test_sync.c | locking.md | tests/unit/test_sync.c
+exists test_variant.c | variants.md | tests/unit/test_variant.c
+exists tests/CMakeLists.txt | decisions.md,hosts-and-harness.md | tests/CMakeLists.txt
+exists tests/abi/abi_raymath.anti | aggregates.md | tests/abi/abi_raymath.anti
+exists tests/abi/abi_raymath.expected | decisions.md | tests/abi/abi_raymath.expected
+exists tests/abi/mbedtls_link.anti | decisions.md | tests/abi/mbedtls_link.anti
+exists tests/abi/mbedtls_probe.c | decisions.md | tests/abi/mbedtls_probe.c
+exists tests/abi/media_audio_link.anti | decisions.md | tests/abi/media_audio_link.anti
+exists tests/abi/media_audio_probe.c | decisions.md | tests/abi/media_audio_probe.c
+exists tests/abi/miniaudio_link.anti | decisions.md | tests/abi/miniaudio_link.anti
+exists tests/abi/miniaudio_probe.c | decisions.md | tests/abi/miniaudio_probe.c
+exists tests/abi/pcre2_match.anti | decisions.md | tests/abi/pcre2_match.anti
+exists tests/abi/pcre2_probe.c | decisions.md | tests/abi/pcre2_probe.c
+exists tests/abi/probe.anti | bind.md | tests/abi/probe.anti
+exists tests/abi/raylib_link.anti | decisions.md | tests/abi/raylib_link.anti
+exists tests/abi/raylib_probe.c | decisions.md | tests/abi/raylib_probe.c
+exists tests/abi/raymath.c | aggregates.md | tests/abi/raymath.c
+exists tests/abi/sqlite_link.anti | decisions.md | tests/abi/sqlite_link.anti
+exists tests/abi/sqlite_probe.c | decisions.md | tests/abi/sqlite_probe.c
+exists tests/bench/ablate/mixed_work.anti | decisions.md | tests/bench/ablate/mixed_work.anti
+exists tests/bench/ablate/run.py | decisions.md | tests/bench/ablate/run.py
+exists tests/bench/builder.anti | decisions.md | tests/bench/builder.anti
+exists tests/bench/map_work_rtseed.c | decisions.md | tests/bench/map_work_rtseed.c
+exists tests/bench/objects.anti | decisions.md | tests/bench/objects.anti
+exists tests/binary_stdio.h | decisions.md,hosts-and-harness.md | tests/binary_stdio.h
+exists tests/bind/layout.h | decisions.md | tests/bind/layout.h
+exists tests/bind/raylib_api.json | decisions.md | tests/bind/raylib_api.json
+exists tests/clib/roundtrip.c | linker.md | tests/clib/roundtrip.c
+exists tests/dump/constraints.anti | decisions.md | tests/dump/constraints.anti
+exists tests/dump/devirt_plugin.opt | whole-program.md | tests/dump/devirt_plugin.opt
+exists tests/dump/stacks.h | generics.md | tests/dump/stacks.h
+exists tests/dump/unwind.anti | decisions.md,llvm.md | tests/dump/unwind.anti
+exists tests/emit-identity/programs.sha256 | value-rules.md | tests/emit-identity/programs.sha256
+exists tests/errors/constraints.anti | decisions.md | tests/errors/constraints.anti
+exists tests/errors/direct_imports.anti | decisions.md | tests/errors/direct_imports.anti
+exists tests/errors/no_hooks_plugins.anti | hooks.md | tests/errors/no_hooks_plugins.anti
+exists tests/errors/sizeof.err | decisions.md | tests/errors/sizeof.err
+exists tests/errors/sorted.anti | decisions.md | tests/errors/sorted.anti
+exists tests/fmt/loose.anti | collections.md,direct-imports.md | tests/fmt/loose.anti
+exists tests/link-identity/return42.macos-arm64.sha256 | value-rules.md | tests/link-identity/return42.macos-arm64.sha256
+exists tests/modules/generics/pick.antl.hex | value-rules.md | tests/modules/generics/pick.antl.hex
+exists tests/modules/scale.antl.hex | value-rules.md | tests/modules/scale.antl.hex
+exists tests/program_output.cmake | decisions.md | tests/program_output.cmake
+missing tests/programs/NAME.anti | setup.md | 
+exists tests/programs/arith_facts.anti | decisions.md | tests/programs/arith_facts.anti
+exists tests/programs/hash_seeded.anti | decisions.md | tests/programs/hash_seeded.anti
+exists tests/programs/hooks.expected | trace-handlers.md | tests/programs/hooks.expected
+exists tests/programs/letters.anti | decisions.md | tests/programs/letters.anti
+exists tests/programs/llvm_wrap.anti | decisions.md | tests/programs/llvm_wrap.anti
+exists tests/programs/param_facts.anti | decisions.md | tests/programs/param_facts.anti
+exists tests/programs/table_hook.anti | decisions.md | tests/programs/table_hook.anti
+exists tests/programs/table_rewrite.anti | decisions.md | tests/programs/table_rewrite.anti
+exists tests/programs/trace_handlers.anti | trace-handlers.md | tests/programs/trace_handlers.anti
+exists tests/run_antl.cmake | value-rules.md | tests/run_antl.cmake
+exists tests/run_bench.cmake | decisions.md | tests/run_bench.cmake
+exists tests/run_clib.cmake | linker.md | tests/run_clib.cmake
+exists tests/run_debug.cmake | hosts-and-harness.md | tests/run_debug.cmake
+exists tests/run_emit_identity.cmake | value-rules.md | tests/run_emit_identity.cmake
+exists tests/run_expect.cmake | decisions.md | tests/run_expect.cmake
+exists tests/run_glibc_link.cmake | decisions.md | tests/run_glibc_link.cmake
+exists tests/run_native_link.cmake | decisions.md | tests/run_native_link.cmake
+exists tests/run_package.cmake | decisions.md | tests/run_package.cmake
+missing tests/run_pcre2_pin.cmake | decisions.md | 
+exists tests/run_plugin.cmake | hooks.md | tests/run_plugin.cmake
+exists tests/std/collection.anti | decisions.md | tests/std/collection.anti
+exists tests/std/collection_list.anti | decisions.md | tests/std/collection_list.anti
+exists tests/std/collection_parts.anti | decisions.md | tests/std/collection_parts.anti
+exists tests/std/collection_pool.anti | decisions.md | tests/std/collection_pool.anti
+exists tests/std/direct_imports.anti | decisions.md | tests/std/direct_imports.anti
+exists tests/std/interfaces.anti | decisions.md | tests/std/interfaces.anti
+exists tests/std/shared.anti | decisions.md | tests/std/shared.anti
+exists tests/std/sorted_map.anti | decisions.md | tests/std/sorted_map.anti
+exists tests/std/sorted_order.anti | decisions.md | tests/std/sorted_order.anti
+exists tests/std/sorted_set.anti | decisions.md | tests/std/sorted_set.anti
+exists tests/trace/handler_reports.anti | trace-handlers.md | tests/trace/handler_reports.anti
+exists tests/trace/stack_trace.anti | decisions.md | tests/trace/stack_trace.anti
+exists tests/traps/alloc_literal.anti | decisions.md | tests/traps/alloc_literal.anti
+exists tests/unit/path_rules.h | decisions.md | tests/unit/path_rules.h
+exists tests/unit/test_coff.c | decisions.md | tests/unit/test_coff.c
+exists tests/unit/test_lower.c | decisions.md,hooks.md | tests/unit/test_lower.c
+exists tests/unit/test_modules.c | value-rules.md | tests/unit/test_modules.c
+exists tests/unit/test_sema.c | value-rules.md | tests/unit/test_sema.c
+exists text.h | decisions.md | src/antic/text.h
+missing text.o | linker.md | 
+exists threads.h | decisions.md | src/rt/threads.h
+exists toml.c | decisions.md | src/rt/toml.c
+exists tools/check-cpu.cmake | decisions.md | tools/check-cpu.cmake
+exists tools/check-libc.cmake | decisions.md | tools/check-libc.cmake
+exists tools/check-llvm.cmake | decisions.md | tools/check-llvm.cmake
+exists tools/check-offline.cmake | CLAUDE.md,decisions.md | tools/check-offline.cmake
+exists tools/check-pdb.cmake | CLAUDE.md,decisions.md | tools/check-pdb.cmake
+exists tools/clang-release.cmake | decisions.md | tools/clang-release.cmake
+exists tools/compile.sh | CLAUDE.md,decisions.md | tools/compile.sh
+exists tools/deps-dir.cmake | decisions.md | tools/deps-dir.cmake
+exists tools/docs-style/check_docs.py | CLAUDE.md,decisions.md,hosts-and-harness.md | tools/docs-style/check_docs.py
+exists tools/get-clang.cmake | CLAUDE.md,decisions.md | tools/get-clang.cmake
+exists tools/get-llvm.cmake | CLAUDE.md,decisions.md | tools/get-llvm.cmake
+exists tools/get-raylib.cmake | CLAUDE.md,decisions.md | tools/get-raylib.cmake
+exists tools/get-sysroot.cmake | CLAUDE.md,decisions.md | tools/get-sysroot.cmake
+exists tools/git-hooks.cmake | decisions.md | tools/git-hooks.cmake
+exists tools/install.ps1 | decisions.md | tools/install.ps1
+exists tools/install.sh | decisions.md | tools/install.sh
+exists tools/keys/private/release-key.pem | decisions.md | tools/keys/private/release-key.pem
+exists tools/keys/release.pem | decisions.md | tools/keys/release.pem
+exists tools/macos-sdk.cmake | decisions.md | tools/macos-sdk.cmake
+exists tools/pack-anti.cmake | decisions.md | tools/pack-anti.cmake
+exists tools/pinned-compiler.cmake | decisions.md | tools/pinned-compiler.cmake
+exists tools/pinned-tools.cmake | decisions.md | tools/pinned-tools.cmake
+exists tools/publish.cmake | decisions.md | tools/publish.cmake
+exists tools/release.sh | CLAUDE.md,decisions.md | tools/release.sh
+missing tools/scripts/format_anti.py | decisions.md | 
+exists tools/sources.cmake | decisions.md | tools/sources.cmake
+exists tools/std-modules.cmake | decisions.md | tools/std-modules.cmake
+exists tools/upstream-sources.cmake | CLAUDE.md,decisions.md | tools/upstream-sources.cmake
+exists tools/warnings.cmake | CLAUDE.md,decisions.md | tools/warnings.cmake
+exists tools/windows-compile.cmake | decisions.md,linker.md | tools/windows-compile.cmake
+missing tree.tar | hosts-and-harness.md | 
+exists types.c | decisions.md | src/antic/types.c
+exists types.h | collections.md | src/antic/types.h
+missing ucrt.lib | decisions.md,linker.md | 
+missing ucrtbase.dll | CLAUDE.md,decisions.md,linker.md,plugins.md | 
+missing ucrtbase.lib | decisions.md,linker.md | 
+exists units.c | decisions.md | src/anti/units.c
+missing user32.dll | decisions.md | 
+missing user32.lib | decisions.md,linker.md | 
+exists userdirs.c | decisions.md | src/antic/userdirs.c
+exists userdirs.h | decisions.md | src/antic/userdirs.h
+missing uuid.lib | decisions.md,linker.md | 
+exists walk.anti | decisions.md | tests/modules/closures/com/example/walk.anti
+exists whole.c | decisions.md,generics.md | src/antic/whole.c
+exists whole_tables.c | decisions.md,llvm.md | src/antic/whole_tables.c
+missing winmm.dll | decisions.md | 
+missing winmm.lib | decisions.md | 
+missing ws2_32.dll | decisions.md | 
+missing ws2_32.lib | decisions.md | 
+missing x.exe | hosts-and-harness.md | 
+missing x509_crt.c | decisions.md | 
+# 649 names, 148 missing

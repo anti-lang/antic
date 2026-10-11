@@ -1,0 +1,104 @@
+Tool pass of the third audit, run on 2026-10-11 at f3af7693 on macOS arm64.
+Compiler: build/deps/clang/bin/clang, the pinned clang 23.1.1.
+Paths are relative to the checkout. No build file was changed. The scratch
+scripts, the job lists and the objects stand in build/audit/2026-10-11/ and
+are not committed. Every command's output went to a file, never to the
+terminal.
+
+Compile lines: every line is the one the host build runs, read from
+build/host/CMakeFiles/<target>.dir/flags.make for the host targets and from
+the build.make of each runtime target, with -Werror removed and the
+dependency flags -MMD and -MF dropped. The host tree was configured on
+2026-10-10, after the last change of a build file that names a source or a
+flag.
+  host-antic_core  src/antic/*.c except main.c, and src/rt/digest.c,
+                   regex.c, toml.c and utf.c, which antic compiles
+  host-antic       src/antic/main.c
+  host-anti_core   src/anti/*.c except main.c, and src/rt/json.c and
+                   symbols.c
+  host-anti        src/anti/main.c
+  rt-macos-arm64_armv8.5, rt-linux-x86_64_v3, rt-windows-x86_64_v3
+                   every file of anti_rt for three targets, so each
+                   platform branch is read; the Windows target adds
+                   platform_entry.c and platform_stdio.c. The bitcode line
+                   of a file repeats its object line with -flto=full and is
+                   not run again.
+  rt-<target>-glue src/rt/regex.c and patterns.c as src/native/pcre2.cmake
+                   compiles them into anti_rt_regex, the glue of PCRE2.
+                   src/native/ holds no C file of its own.
+252 compile lines in all.
+
+analyzer.txt     <compile line> --analyze -Xanalyzer -analyzer-output=text
+                 <file> -o /dev/null, one "### <build> <file>" header each
+analyzer-unique.txt  every warning of analyzer.txt once, column dropped,
+                 with the number of builds that reported it
+analyzer-compared.txt  analyzer-unique.txt against the second audit's
+                 docs/audit/2026-09-30/data/analyzer-unique.txt: a warning
+                 matches one with the same text in the same file or a file
+                 split from it (sema, lower, parser, driver, antl, whole,
+                 llvm); line numbers moved
+warnings.txt     <compile line> -Wall -Wextra -Wconversion -Wshadow
+                 -Wcast-align -Wformat=2 -Wvla -Wstrict-prototypes
+                 -Wmissing-prototypes -Wnull-dereference
+                 -Wmissing-variable-declarations -Wunused-macros -c <file>
+                 -o build/audit/2026-10-11/obj/<build>/<file>.o
+warnings-unique.txt  every warning of warnings.txt once, with its count
+warnings-compared.txt  the same comparison as analyzer-compared.txt
+banned-calls.txt grep -nE for strcpy, strcat, sprintf, vsprintf, gets,
+                 strncpy and every scanf form over src/rt, src/antic and
+                 src/anti, *.c and *.h
+function-metrics.txt  metrics.py of the first audit, unchanged, over
+                 src/rt, src/antic and src/anti, *.c and *.h: per function
+                 the file:line of its signature, its name, its lines, its
+                 deepest nest of brace blocks without initializer braces,
+                 and its parameter count
+file-lengths.txt lines per file, from the same script
+thresholds.txt   the functions past 100 lines, a nest of 4 or 6 parameters,
+                 longest first
+thresholds-compared.txt  thresholds.txt against the second audit's list,
+                 each marked new or kept, and the functions that left it.
+                 A function is matched by its name in the same file, then
+                 in a file split from it, then anywhere, so a name that
+                 another file reuses may match the wrong function; the
+                 "not found by name" lines are for a reader to match
+file-lengths-compared.txt  the files past 3000 lines now and then
+include-graph.txt  every quoted #include of src/antic, src/anti and src/rt,
+                 resolved as the build resolves it, listed where the header
+                 belongs to another part, then the includes against the
+                 direction: the runtime into antic or anti, the front end
+                 into the IR or the back end, the IR into the back end, and
+                 anti into a header antic.h does not name. The parts of
+                 antic are named in the file's header
+call-graph.txt   for sema*.c, lower*.c, driver*.c and llvm*.c, with
+                 parser*.c, antl*.c and whole*.c as extras, each non-static
+                 function of one file named before "(" in another, per
+                 pair, and a matrix of the call counts
+header-sections.txt  the declarations of the six shared headers of a split
+                 that stand under the comment of a file that does not
+                 define them
+duplication.txt  blocks of 10 or more significant lines that two files of
+                 src/antic, src/rt, src/anti and src/std share, exact or
+                 with names replaced; the header of the file gives the
+                 method
+platform-conditionals.txt  every #if on the host system outside the
+                 platform layer that rule 22 names
+first-comments.txt  the first comment of every .c, .h and .anti file under
+                 src/, with what stands before it
+header-function-comments.txt  every function a header under src/ declares
+                 and whether a comment stands directly before it
+todo-marks.txt   every TODO, FIXME, XXX and HACK under src/, tests/, tools/
+                 and docs/ outside docs/audit/
+design-comments.txt  every DESIGN and PERF DECISION comment under src/ with
+                 three marks, because, a second colon and a reason word,
+                 and the list of those with none
+named-files.txt  every file name CLAUDE.md, docs/decisions.md or a file of
+                 docs/notes/ names, with whether it exists
+unnamed-files.txt  every tracked file under src/ that none of them names
+unused-static.txt  static functions nothing in their file names
+options-unexercised.txt  the options of src/antic/main.c, src/anti/main.c
+                 and the --anti.* options of src/rt, with the number of
+                 files under tests/ and tools/ that hold the same text
+rt-functions-unused.txt  the rows of RT_FUNCTIONS and where antic names
+                 each
+back-end-mentions.txt  the words of the native back end under src/, tests/
+                 and tools/, and the bare word select per file

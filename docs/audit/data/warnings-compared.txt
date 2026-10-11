@@ -1,0 +1,88 @@
+# warnings-unique.txt now, against the second audit at 70e8860,
+# docs/audit/2026-09-30/data/. A warning matches one of then with the
+# same file, or a file split from it (sema, lower, parser, driver, antl,
+# whole, llvm), and the same text; line numbers moved and are not compared.
+# status | now | then
+kept | 1 src/antic/sema.c:321:31: warning: format string is not a string literal [-Wformat-nonliteral] | src/antic/sema.c:296
+kept | 3 src/rt/assert.c:10:34: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 0)' attribute to the declaration of 'write_line' [-Wmissing-format-attribute] | src/rt/assert.c:10
+kept | 3 src/rt/assert.c:20:28: warning: diagnostic behavior may be improved by adding the 'format(printf, 2, 3)' attribute to the declaration of 'anti_rt_fail_exit' [-Wmissing-format-attribute] | src/rt/assert.c:20
+kept | 3 src/rt/assert.c:30:28: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'anti_rt_fail_abort' [-Wmissing-format-attribute] | src/rt/assert.c:30
+kept | 3 src/rt/assert.c:40:28: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'anti_rt_note' [-Wmissing-format-attribute] | src/rt/assert.c:40
+kept | 2 src/rt/conf.c:121:40: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'format_text' [-Wmissing-format-attribute] | src/rt/conf.c:120
+kept | 1 src/rt/conf.c:121:9: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'format_text' [-Wmissing-format-attribute] | src/rt/conf.c:120
+kept | 3 src/rt/object.c:1050:10: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align] | src/rt/object.c:1005
+kept | 3 src/rt/object.c:1050:39: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align] | src/rt/object.c:1005
+kept | 3 src/rt/object.c:1132:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align] | src/rt/object.c:1087
+kept | 3 src/rt/object.c:1133:18: warning: cast from 'char *' to 'struct anti_object *' increases required alignment from 1 to 8 [-Wcast-align] | src/rt/object.c:1088
+new | 2 src/rt/patterns.c:122:9: warning: macro is not used [-Wunused-macros] |
+kept | 3 src/rt/patterns.c:339:9: warning: no previous prototype for function 'anti_rt_regex_begin' [-Wmissing-prototypes] | src/rt/patterns.c:358
+kept | 3 src/rt/patterns.c:391:9: warning: no previous prototype for function 'anti_rt_regex_next' [-Wmissing-prototypes] | src/rt/patterns.c:410
+kept | 3 src/rt/patterns.c:408:20: warning: no previous prototype for function 'anti_rt_regex_current' [-Wmissing-prototypes] | src/rt/patterns.c:427
+kept | 3 src/rt/patterns.c:422:9: warning: no previous prototype for function 'anti_rt_regex_first' [-Wmissing-prototypes] | src/rt/patterns.c:441
+kept | 3 src/rt/patterns.c:442:9: warning: no previous prototype for function 'anti_rt_regex_test' [-Wmissing-prototypes] | src/rt/patterns.c:461
+kept | 3 src/rt/patterns.c:530:9: warning: no previous prototype for function 'anti_rt_regex_group' [-Wmissing-prototypes] | src/rt/patterns.c:541
+kept | 3 src/rt/patterns.c:550:9: warning: no previous prototype for function 'anti_rt_regex_group_named' [-Wmissing-prototypes] | src/rt/patterns.c:561
+kept | 3 src/rt/patterns.c:568:9: warning: no previous prototype for function 'anti_rt_regex_template_fits' [-Wmissing-prototypes] | src/rt/patterns.c:579
+kept | 3 src/rt/patterns.c:648:9: warning: no previous prototype for function 'anti_rt_regex_replace' [-Wmissing-prototypes] | src/rt/patterns.c:665
+kept | 3 src/rt/patterns.c:704:9: warning: no previous prototype for function 'anti_rt_regex_patch' [-Wmissing-prototypes] | src/rt/patterns.c:713
+kept | 3 src/rt/patterns.c:783:9: warning: no previous prototype for function 'anti_rt_bytes_patch' [-Wmissing-prototypes] | src/rt/patterns.c:792
+kept | 3 src/rt/patterns.c:824:6: warning: no previous prototype for function 'anti_rt_regex_append' [-Wmissing-prototypes] | src/rt/patterns.c:833
+kept | 3 src/rt/patterns.c:831:18: warning: no previous prototype for function 'anti_rt_regex_take' [-Wmissing-prototypes] | src/rt/patterns.c:840
+kept | 3 src/rt/patterns.c:846:16: warning: no previous prototype for function 'anti_rt_regex_stop_limit' [-Wmissing-prototypes] | src/rt/patterns.c:855
+kept | 3 src/rt/patterns.c:84:18: warning: no previous prototype for function 'anti_rt_regex_message' [-Wmissing-prototypes] | src/rt/patterns.c:82
+kept | 3 src/rt/patterns.c:862:16: warning: no previous prototype for function 'anti_rt_regex_stop_group' [-Wmissing-prototypes] | src/rt/patterns.c:871
+kept | 3 src/rt/patterns.c:877:16: warning: no previous prototype for function 'anti_rt_regex_stop_name' [-Wmissing-prototypes] | src/rt/patterns.c:884
+kept | 3 src/rt/patterns.c:887:16: warning: no previous prototype for function 'anti_rt_regex_stop_template' [-Wmissing-prototypes] | src/rt/patterns.c:894
+kept | 3 src/rt/patterns.c:905:9: warning: no previous prototype for function 'anti_rt_regex_first_bytes' [-Wmissing-prototypes] | src/rt/patterns.c:912
+kept | 3 src/rt/patterns.c:912:9: warning: no previous prototype for function 'anti_rt_regex_next_bytes' [-Wmissing-prototypes] | src/rt/patterns.c:919
+kept | 3 src/rt/patterns.c:918:20: warning: no previous prototype for function 'anti_rt_regex_current_bytes' [-Wmissing-prototypes] | src/rt/patterns.c:925
+kept | 3 src/rt/patterns.c:924:9: warning: no previous prototype for function 'anti_rt_regex_group_bytes' [-Wmissing-prototypes] | src/rt/patterns.c:931
+new | 3 src/rt/patterns.c:930:16: warning: no previous prototype for function 'anti_rt_regex_stop_group_bytes' [-Wmissing-prototypes] |
+kept | 3 src/rt/patterns.c:940:9: warning: no previous prototype for function 'anti_rt_regex_group_named_bytes' [-Wmissing-prototypes] | src/rt/patterns.c:937
+kept | 3 src/rt/patterns.c:947:9: warning: no previous prototype for function 'anti_rt_regex_replace_bytes' [-Wmissing-prototypes] | src/rt/patterns.c:944
+kept | 3 src/rt/patterns.c:957:18: warning: no previous prototype for function 'anti_rt_regex_take_bytes' [-Wmissing-prototypes] | src/rt/patterns.c:954
+new | 1 src/rt/platform_windows.c:1241:37: warning: no previous extern declaration for non-static variable '_tls_index' [-Wmissing-variable-declarations] |
+new | 1 src/rt/platform_windows.c:1242:50: warning: no previous extern declaration for non-static variable '_tls_used' [-Wmissing-variable-declarations] |
+new | 1 src/rt/platform_windows.c:1248:33: warning: no previous extern declaration for non-static variable '_fltused' [-Wmissing-variable-declarations] |
+new | 1 src/rt/platform_windows.c:1263:33: warning: no previous extern declaration for non-static variable '__security_cookie' [-Wmissing-variable-declarations] |
+new | 1 src/rt/platform_windows.c:641:12: warning: no previous extern declaration for non-static variable 'anti_rt_no_licenses' [-Wmissing-variable-declarations] |
+kept | 1 src/rt/plugin.c:58:15: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'fail' [-Wmissing-format-attribute] | src/rt/plugin.c:57
+kept | 2 src/rt/plugin.c:58:62: warning: diagnostic behavior may be improved by adding the 'format(printf, 1, 2)' attribute to the declaration of 'fail' [-Wmissing-format-attribute] | src/rt/plugin.c:57
+new | 3 src/rt/regex.c:9:9: warning: macro is not used [-Wunused-macros] |
+kept | 3 src/rt/text.c:34:18: warning: no previous prototype for function 'anti_rt_text_copy' [-Wmissing-prototypes] | src/rt/text.c:33
+kept | 3 src/rt/text.c:52:18: warning: no previous prototype for function 'anti_rt_bytes_copy' [-Wmissing-prototypes] | src/rt/text.c:51
+gone | | 1 src/anti/bindclang.c:290:33: warning: diagnostic behavior may be improved by adding the 'format(printf, 2, 3)' attribute to the declaration of 'refuse' [-Wmissing-format-attribute]
+gone | | 1 src/antic/diagnostic.c:31:5: warning: diagnostic behavior may be improved by adding the 'format(printf, 7, 0)' attribute to the declaration of 'add' [-Wmissing-format-attribute]
+gone | | 1 src/antic/sema.c:34:13: warning: diagnostic behavior may be improved by adding the 'format(printf, 3, 0)' attribute to the declaration of 'vformat_to' [-Wmissing-format-attribute]
+gone | | 3 src/rt/errno.c:39:9: warning: no previous prototype for function 'anti_rt_last_error' [-Wmissing-prototypes]
+gone | | 3 src/rt/errno.c:48:22: warning: no previous prototype for function 'anti_rt_last_error_text' [-Wmissing-prototypes]
+gone | | 3 src/rt/lock.c:284:6: warning: no previous prototype for function 'anti_rt_mutex_lock' [-Wmissing-prototypes]
+gone | | 3 src/rt/lock.c:286:6: warning: no previous prototype for function 'anti_rt_mutex_unlock' [-Wmissing-prototypes]
+gone | | 3 src/rt/lock.c:288:6: warning: no previous prototype for function 'anti_rt_mutex_lock_at' [-Wmissing-prototypes]
+gone | | 3 src/rt/lock.c:294:6: warning: no previous prototype for function 'anti_rt_mutex_unlock_at' [-Wmissing-prototypes]
+gone | | 3 src/rt/lock.c:302:6: warning: no previous prototype for function 'anti_rt_mutex_destroy' [-Wmissing-prototypes]
+gone | | 3 src/rt/lock.c:342:6: warning: no previous prototype for function 'anti_rt_object_lock' [-Wmissing-prototypes]
+gone | | 3 src/rt/lock.c:351:6: warning: no previous prototype for function 'anti_rt_object_unlock' [-Wmissing-prototypes]
+gone | | 3 src/rt/lock.c:353:6: warning: no previous prototype for function 'anti_rt_object_lock_at' [-Wmissing-prototypes]
+gone | | 3 src/rt/lock.c:363:6: warning: no previous prototype for function 'anti_rt_object_unlock_at' [-Wmissing-prototypes]
+gone | | 3 src/rt/lock.c:376:6: warning: no previous prototype for function 'anti_rt_object_lock_pair' [-Wmissing-prototypes]
+gone | | 3 src/rt/lock.c:387:6: warning: no previous prototype for function 'anti_rt_object_unlock_pair' [-Wmissing-prototypes]
+gone | | 3 src/rt/lock.c:395:6: warning: no previous prototype for function 'anti_rt_object_lock_pair_at' [-Wmissing-prototypes]
+gone | | 3 src/rt/lock.c:406:6: warning: no previous prototype for function 'anti_rt_object_unlock_pair_at' [-Wmissing-prototypes]
+gone | | 3 src/rt/lock.c:417:5: warning: no previous prototype for function 'anti_rt_address_below' [-Wmissing-prototypes]
+gone | | 3 src/rt/patterns.c:33:7: warning: no previous prototype for function 'anti_rt_regex_literal' [-Wmissing-prototypes]
+gone | | 3 src/rt/patterns.c:53:7: warning: no previous prototype for function 'anti_rt_regex_literal_bytes' [-Wmissing-prototypes]
+gone | | 3 src/rt/sync.c:133:7: warning: no previous prototype for function 'anti_rt_chan_new' [-Wmissing-prototypes]
+gone | | 3 src/rt/sync.c:175:6: warning: no previous prototype for function 'anti_rt_chan_send' [-Wmissing-prototypes]
+gone | | 3 src/rt/sync.c:199:7: warning: no previous prototype for function 'anti_rt_chan_recv' [-Wmissing-prototypes]
+gone | | 3 src/rt/sync.c:218:6: warning: no previous prototype for function 'anti_rt_chan_close' [-Wmissing-prototypes]
+gone | | 3 src/rt/sync.c:231:6: warning: no previous prototype for function 'anti_rt_chan_delete' [-Wmissing-prototypes]
+gone | | 3 src/rt/sync.c:285:9: warning: no previous prototype for function 'anti_rt_select' [-Wmissing-prototypes]
+gone | | 3 src/rt/text.c:58:9: warning: no previous prototype for function 'anti_rt_text_invalid' [-Wmissing-prototypes]
+gone | | 3 src/rt/threads.c:297:6: warning: no previous prototype for function 'anti_rt_parallel' [-Wmissing-prototypes]
+gone | | 3 src/rt/threads.c:381:7: warning: no previous prototype for function 'anti_rt_dispatch' [-Wmissing-prototypes]
+gone | | 3 src/rt/threads.c:425:6: warning: no previous prototype for function 'anti_rt_join' [-Wmissing-prototypes]
+gone | | 3 src/rt/threads.c:471:6: warning: no previous prototype for function 'anti_rt_join_all' [-Wmissing-prototypes]
+gone | | 3 src/rt/threads.c:485:6: warning: no previous prototype for function 'anti_rt_join_hooked' [-Wmissing-prototypes]
+gone | | 3 src/rt/threads.c:496:6: warning: no previous prototype for function 'anti_rt_join_all_hooked' [-Wmissing-prototypes]
+# counts: new 8, kept 40, gone 34
