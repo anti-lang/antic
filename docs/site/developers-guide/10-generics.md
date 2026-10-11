@@ -3,7 +3,7 @@ title: "Generics"
 description: "Generic functions and classes, constraints, one copy per use, what can be generic and the size of the code."
 summary: "Generic functions and classes with their type parameters, constraints checked where the generic is written and at each use, one compiled copy per use, what can be generic, and the size of the code, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T08:10:24+02:00
+lastmod: 2026-10-11T20:15:36+02:00
 draft: true
 weight: 100
 tags: [compilers, programming-languages]
@@ -35,7 +35,7 @@ A use names its arguments, or the compiler infers them.
 - A type always writes them: `Pair<int, str>`, `Maybe<int>.Some { value: 6 }`, `Cell<f64> { value: 2.5 }`.
 - A literal takes them from the type the context expects: `let p: Pair<int, str> = Pair { first: 1, second: "one" };`.
 
-In an expression, `<` after a name opens type arguments when a list of types closed by `>` follows and the next token is `(`, `.` or `{`. So `m < 9 && 2 > 1` stays two comparisons. `>>` closes two lists.
+In an expression, `<` after a name opens type arguments when a list of types closed by `>` follows it. The token after that `>` must be `(`, `.` or `{`. So `m < 9 && 2 > 1` stays two comparisons. `>>` closes two lists.
 
 Two uses with the same arguments are one type, in every module. A generic that nothing uses compiles to nothing.
 
@@ -538,7 +538,7 @@ b0:
 
 - In `largest<cons.Money>` the `<` of the body is a direct call of `cons.lt`, the `operator fn` of the struct. No table of operators is passed, and nothing is looked up at run time.
 - In `largest<int>` the same `<` is the instruction `slt`.
-- In `area_of<cons.Square>` the constraint is an interface. The copy takes the address of the `shape` part of the `Square` and calls `area` through the table of that part, as chapter 9 shows for any interface call. A release build binds the call when one class fills the entry.
+- In `area_of<cons.Square>` the constraint is an interface. The copy takes the address of the `shape` part of the `Square` and calls `area` through the table of that part. Chapter 9 shows that code for any interface call. A release build binds the call when one class fills the entry.
 
 The three constraint forms therefore cost a direct call, an instruction, or a dispatch, and the form of the type argument decides which.
 
@@ -703,7 +703,7 @@ define weak_odr hidden noundef i64 @copies.pick$3cint$3e(i64 %p0.0, i64 %p0.1, i
 define weak_odr hidden noundef zeroext i8 @copies.pick$3cbyte$3e(i64 %p0.0, i64 %p0.1, i64 noundef %p1) #0 {
 ```
 
-Each copy is `weak_odr` in a dev object. Two modules that both use `pick<int>` each compile it, and the linker keeps one definition of the name, as it does for an inline function of C++. `$2a` is the `*` of the pointer type. The dev object of this program holds 22 functions with a type argument in their name: 4 copies of `pick`, 3 of `Slot.get`, and 5 functions the compiler writes for each of the 3 copies of `Slot`.
+Each copy is `weak_odr` in a dev object. Two modules that both use `pick<int>` each compile it. The linker keeps one definition of the name, as it does for an inline function of C++. `$2a` is the `*` of the pointer type. The dev object of this program holds 22 functions with a type argument in their name. They are 4 copies of `pick`, 3 of `Slot.get`, and 5 functions the compiler writes for each of the 3 copies of `Slot`.
 
 A release build runs `merge_copies` in the whole-program pass. It compares every pair of copies, instruction by instruction, and lets the earlier one serve the calls of the later one. It repeats until nothing changes, since a merge can make two callers identical.
 
@@ -747,7 +747,7 @@ retq
 
 The release object holds 9 functions with a type argument in their name, against 22 in the dev object. No copy of `pick` is among them: after the merge, `opt` inlined the three that were left into their callers. The functions of `Slot` stay, because the tables hold their addresses.
 
-`Slot<*Person>.get` and `Slot<int>.get` are the same two machine instructions and stay two functions. antic merges by its own IR, where a pointer and an `i64` are two types. The link of lld runs with `--icf=safe`, or `/OPT:SAFEICF` for a Windows target, which folds identical machine code of functions whose address nothing compares. A link with `--linker platform` folds nothing.
+`Slot<*Person>.get` and `Slot<int>.get` are the same two machine instructions and stay two functions. The merge works on the IR of antic, where a pointer and an `i64` are two types. The link of lld runs with `--icf=safe`, or `/OPT:SAFEICF` for a Windows target, which folds identical machine code of functions whose address nothing compares. A link with `--linker platform` folds nothing.
 
 Where it lives: `linkage` of `src/antic/llvm_emit.c` writes `weak_odr`. `merge_copies` and `same_function` of `src/antic/whole.c` merge. `src/antic/linker.c` passes `--icf=safe` and `/OPT:SAFEICF`. `tests/dump/copies_merge.anti` pins the merge with the goldens `copies_merge.opt` and `copies_merge.dev.opt`.
 
@@ -795,7 +795,7 @@ The generic forms combine with the other features of the language.
 - A function of a class takes type parameters of its own, `pub fn top<U>(self, fallback: T, f: fn(T) -> U) -> U`. It is called directly and has no entry in the table, so it cannot be `abstract` and cannot be replaced.
 - A type nested in a generic class sees the parameters of the class. Each copy of the class has a copy of the nested type.
 - A generic class may be `synchronized` or `concurrent`, and the rules of chapter 14 hold in every copy.
-- A generic `worker fn` is checked against the rules of workers in every copy, with the concrete types.
+- A generic `worker fn` is checked against the rules of workers of chapter 13 in every copy, with the concrete types.
 - A generic function may be `may fail`.
 - A generic type declares operators and language hooks, so `for x in list` works for every copy of a list with `operator fn iter`.
 - A function type is a type argument, as in `List<fn(int) -> int>`.
@@ -1001,7 +1001,7 @@ Where it lives: `sema_compile_copies` of `src/antic/sema_copies.c` makes the cop
 For a Java programmer:
 
 - A function with its own type parameters is never dispatched. A derived class cannot replace it.
-- A class that nests a type and takes type parameters cannot be used from a library file yet. It is used inside the module that declares it.
+- A class that nests a type and takes type parameters cannot be used from a library file. It is used inside the module that declares it.
 
 For a C programmer:
 
