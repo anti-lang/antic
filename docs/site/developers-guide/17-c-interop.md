@@ -3,7 +3,7 @@ title: "C interop"
 description: "extern fn, the C types, the ABI of a call, anti bind, link, libraries for C with --lib and --bundle-runtime, and plugins across the boundary."
 summary: "`extern fn` and the C types, the ABI of a call, `anti bind`, `link`, libraries for C with `--lib` and `--bundle-runtime`, and plugins across the boundary, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:00:00+02:00
+lastmod: 2026-10-11T20:19:43+02:00
 draft: true
 weight: 170
 tags: [compilers, programming-languages]
@@ -192,7 +192,7 @@ A `c_long` converts with `as`, since it is 4 bytes on one target and 8 on anothe
 
 ### How antic builds it
 
-An `extern fn` is a `declare` line of the LLVM module, and a call of it is one `call`. antic writes no stub, no wrapper and no conversion. The three functions below call C and do nothing else.
+An `extern fn` is a `declare` line of the LLVM module, and a call of it is one `call`. The compiler writes no stub, no wrapper and no conversion. The three functions below call C and do nothing else.
 
 ```anti
 //! name: tocee
@@ -709,7 +709,7 @@ The probe checks that the binding and the header agree on the layout. `probe_sha
 
 ### How antic builds it
 
-`anti bind` is part of the `anti` tool and no part of the compiler. It runs clang twice with the same options. `-E -dD` gives the macros and the `#pragma pack` lines, and `-fsyntax-only -Xclang -ast-dump=json` gives the declarations as JSON. The options aim clang at the target and at the headers of its sysroot in the package, so a binding reads the same headers on every host.
+`anti bind` is part of the `anti` tool and no part of the compiler. It runs clang twice with the same options. `-E -dD` gives the macros and the `#pragma pack` lines, and `-fsyntax-only -Xclang -ast-dump=json` gives the declarations as JSON. The options aim clang at the target and at the headers of its sysroot in the package. A binding therefore reads the same headers on every host.
 
 Both input forms fill one model of records, enums, functions and constants. The model holds C types by their spelling and no size. One writer turns it into the module, the shim and the probes. A JSON description and a header of one API therefore give the same binding.
 
