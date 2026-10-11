@@ -3,14 +3,14 @@ title: "Values"
 description: "The types and literals of Anti, variables and constants, integers that wrap or saturate, overflow checks, floats and f16, text and bytes, tuples and inference."
 summary: "Types, literals, variables and constants, integers with `+%` and `+|` and the overflow checks of dev mode, floats and `f16`, `str` and `[]byte` with their layout, tuples and type inference, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T17:00:00+02:00
+lastmod: 2026-10-11T20:11:01+02:00
 draft: true
 weight: 30
 tags: [compilers, programming-languages]
 keywords: [types, literals, integer overflow, wrapping arithmetic, saturating arithmetic, f16, strings, tuples, type inference]
 ---
 
-A scalar value of Anti has a size that is the same on all six targets, and no number converts to another type without `as`. Signed arithmetic is checked in a dev build and wraps in a release build. The wrapping and the saturating operators state the intent of a line in both. This chapter covers the scalar types, text, bytes and tuples. Chapter 8 covers structs, arrays, enums and variants.
+A scalar value of Anti has a size that is the same on all six targets, and no number converts to another type without `as`. Signed arithmetic is checked in a dev build and wraps in a release build. The wrapping and the saturating operators state the intent of a line in both. This chapter covers the scalar types, text and bytes, and tuples. Chapter 8 covers structs, enums and variants, and chapter 12 covers arrays and slices.
 
 Some examples mark a function `export fn`. An exported function keeps its plain name and stays in the release module, so a release excerpt can show it. Chapter 17 describes `export fn`.
 
@@ -33,7 +33,7 @@ The scalar types have fixed widths, and four of them have a second name.
 | `bool` | | 8 | `true` and `false` |
 | `char` | | 32 | one Unicode scalar value |
 
-The compound types are `str`, the array `[N]T`, the slice `[]T`, the pointers `*T` and `?*T`, the optional `?T`, the function type `fn(A) -> R` and the tuple `(A, B)`. The C types `c_int`, `c_long` and the others exist for bindings and stand in chapter 17.
+The compound types are `str`, the array `[N]T`, the slice `[]T` and the pointers `*T` and `?*T`. The optional `?T`, the function type `fn(A) -> R` and the tuple `(A, B)` complete them. The C types `c_int`, `c_long` and the others exist for bindings and stand in chapter 17.
 
 A literal has no suffix. It takes its type from where it stands, and an integer literal without such a context is an `int`, a float literal a `float`.
 
@@ -265,6 +265,8 @@ char      4
 | A narrowing `as` between integers | one `trunc`, and a compare with a branch for the range check | one `trunc` |
 
 `size_of` is folded at compile time and costs nothing at run time. The integer section below shows the range check of a narrowing `as`.
+
+The `f"..."` of `show` formats its values into a text in new memory, which `free(line.ptr)` gives back. Most programs of the guide print that way, and "Text and bytes" below describes the form.
 
 ### Pitfalls
 
@@ -605,9 +607,7 @@ value out of range for i16\00"
 shift count out of range for <<\00"
 ```
 
-### Flags and carry
-
-`let (result, flags) = e;` gives the wrapped result of one integer operation and its flags. `e` is one `+`, `-`, `*`, `<<`, `>>` or unary `-`. `flags` has the built-in struct type `Flags` with four `bool` fields: `overflow`, `carry`, `zero` and `negative`. The form never stops a program, in any build.
+`let (result, flags) = e;` gives the wrapped result of one integer operation and its flags. The form takes a pair apart into two variables, as "Tuples" below describes. `e` is one `+`, `-`, `*`, `<<`, `>>` or unary `-`. `flags` has the built-in struct type `Flags` with four `bool` fields: `overflow`, `carry`, `zero` and `negative`. The form never stops a program, in any build.
 
 `a + b + f.carry` adds the carry of an earlier operation, and `a - b - f.carry` subtracts its borrow.
 
@@ -734,7 +734,7 @@ cmovnoq %rdi, %rax
 retq
 ```
 
-The first four instructions compute the clamp value from the sign of the wrapped sum. It is the greatest `int` when the sum wrapped to a negative number and the least otherwise. `addq` adds again and sets the overflow flag, and `cmovnoq` takes the sum when the flag is clear. arm64 needs four instructions: `adds`, `asr`, `eor` and `csel`.
+The first four instructions compute the clamp value from the sign of the wrapped sum. It is the greatest `int` when the sum wrapped to a negative number and the least otherwise. `addq` adds again and sets the overflow flag, and `cmovnoq` takes the sum when the flag is clear. On arm64 the function is four instructions: `adds`, `asr`, `eor` and `csel`.
 
 A release build keeps the defined results of a division in the code. The dev check is dropped, and the selects stay.
 
@@ -1076,7 +1076,7 @@ The string literals have seven prefixes.
 | `br"..."` | `[]byte` | bytes with every backslash kept |
 | `x"00 AB CC"` | `[]byte` | bytes written as hex pairs |
 
-`re"..."` is a pattern literal and stands with the regular expressions of the standard library. Every form but `x"..."` takes hash delimiters, `#"a "quoted" word"#`, for a text that holds quotes.
+`re"..."` is a pattern literal of type `Regex`. The guide has no chapter on regular expressions, and "Regular expressions" of `docs/anti-syntax-overview.md` lists their forms. Every form but `x"..."` takes hash delimiters, `#"a "quoted" word"#`, for a text that holds quotes.
 
 The escapes are `\n \r \t \\ \" \' \0`, `\xHH` and `\u{H}` with one to six hex digits. In a `str` and a `char`, `\xHH` stops at `\x7F` and `\0` is refused, so a `str` literal is always valid UTF-8 without a NUL inside. A byte string takes both.
 
@@ -1172,7 +1172,7 @@ raw.len 3, raw[0] 255, hex[1] 171
 n = 42, size_of(str) = 16, size_of(char) = 4
 ```
 
-`é` is two bytes in UTF-8, 195 and 169, so `"héllo"` has a length of 6 and 5 characters. `"Z" < "a"` holds because the comparison is by bytes and 90 is below 97.
+`é` is two bytes in UTF-8, 195 and 169, so `"héllo"` has a length of 6 and 5 characters. `"Z" < "a"` holds because the comparison is by bytes and 90 is below 97. `text.parse_int` may fail, and `catch fatal` after the call prints the error and ends the program when it does. Chapter 6 covers failing functions and their handlers.
 
 The checker refuses each of the following.
 
