@@ -274,13 +274,9 @@ function(excerpt_output out kind id module target mode dir)
             endif()
             execute_process(
                 COMMAND "${LLVM_OPT}" -S -o "${base}.opt.ll" "${base}.s.bc"
-                RESULT_VARIABLE status
-                OUTPUT_VARIABLE opt_out
-                ERROR_VARIABLE opt_err
-                ENCODING NONE)
+                RESULT_VARIABLE status)
             if(NOT status EQUAL 0)
-                message(FATAL_ERROR
-                    "opt refuses ${base}.s.bc:\n${opt_out}${opt_err}")
+                message(FATAL_ERROR "opt refuses ${base}.s.bc")
             endif()
         endif()
         set(${out} "${base}.opt.ll" PARENT_SCOPE)
