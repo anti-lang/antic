@@ -3,7 +3,7 @@ title: "Threads"
 description: "Threads, dispatch and join, parallel, channels and select, atomics, locks, and what the checker refuses."
 summary: "`worker fn`, `dispatch` and `join`, `parallel`, channels and `select`, atomics and locks, and what the checker refuses of each, with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T19:30:00+02:00
+lastmod: 2026-10-11T20:16:28+02:00
 draft: true
 weight: 130
 tags: [compilers, programming-languages]
@@ -50,7 +50,7 @@ A `dispatch` is an expression whose value must be bound. A statement that is a `
 
 The pool holds each object from its `dispatch` until its worker returns. That time is the flight of the object. A `dispatch` of an object in flight starts nothing: its job has the handle `none`, and `join` of that job gives a result of zero bytes. Two workers therefore never hold one object.
 
-The checker walks every function a worker reaches and refuses two things in them. A worker may not `delete` an object or a channel, since another worker may hold it. A worker may not read or write a `mutable` field of a singleton.
+The checker walks every function a worker reaches. It refuses a `delete` of an object or a channel there, since another worker may hold it. It refuses a read or a write of a `mutable` field of a singleton as well.
 
 A worker cannot fail. `may fail` gives the result `?*Error`, which is a pointer.
 
