@@ -2656,6 +2656,7 @@ add_test(NAME guide_examples
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DDOCUMENTS=${PROJECT_SOURCE_DIR}/docs/site/developers-guide"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/guide"
+        "-DLLVM_OPT=${ANTIC_OPT}"
         "-DLLVM_MC=${ANTIC_RUNTIME_MC}"
         "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_document_examples.cmake")

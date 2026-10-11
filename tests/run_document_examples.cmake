@@ -9,6 +9,8 @@
 #   DOCUMENTS     the documents: .md files, and directories whose .md
 #                 files are read in the order of their names
 #   WORK          a directory the run may write into
+#   LLVM_OPT      opt of the pinned tools, for an `llvm` excerpt of a
+#                 release build
 #   LLVM_MC       llvm-mc of the pinned tools, for an `asm` excerpt
 #   LLVM_OBJDUMP  llvm-objdump of the pinned tools, for an `asm` excerpt
 #
@@ -42,8 +44,11 @@
 #       opens a block the compiler must refuse. Its line
 #       `//! error: <text>` holds a text of the first error, which the run
 #       looks for in the first line of antic's standard error that says
-#       `error:`. The `//!` lines of a block are marks for the run and
-#       never reach the module.
+#       `error:`. The front end refuses most of them. A block it accepts
+#       goes through a release build, as a program when it declares `main`
+#       and with -S otherwise, so that a refusal of the lowering or of the
+#       whole-program pass counts as well. The `//!` lines of a block are
+#       marks for the run and never reach the module.
 #   ```text output
 #       right after a program holds what it prints. A block whose items
 #       declare `fn main` is a program: the run builds it in release
@@ -54,28 +59,37 @@
 #   ```asm excerpt=<id> target=<target> mode=<dev|release>
 #       holds up to 20 lines of what antic writes for the named block,
 #       built for the target with `-S --keep-llvm`, and with `--dev` in
-#       dev mode. Each line of the excerpt must stand in that output in
-#       the order shown: a line of the excerpt is found in a line of the
-#       output, each line after it in the line after that, and a line of
-#       `...` stands for any number of left-out lines. Before the
-#       comparison, runs of blanks collapse to one space, blank lines to
-#       one, and the numbered names of LLVM such as %12, the labels of the
-#       assembler such as .LBB0_3 and a number that labels a line are made
-#       equal. The named block stands before its first excerpt.
+#       dev mode: for llvm the module llc receives, and for asm
+#       llvm-objdump -d of the object. Each line of the excerpt must stand
+#       in that output in the order shown: a line of the excerpt is found
+#       in a line of the output, each line after it in the line after
+#       that, and a line of `...` stands for any number of left-out lines.
+#       Before the comparison, runs of blanks collapse to one space, blank
+#       lines to one, and the numbered names of LLVM such as %12, the
+#       labels of the assembler such as .LBB0_3 and a number that labels a
+#       line are made equal. The named block stands before its first
+#       excerpt.
 #
-# DESIGN: what --keep-llvm keeps, read from driver_compile_llvm and
-# llvm_run of src/antic. It keeps <output>.ll, the LLVM text antic
-# writes, with <output> the path of -o as given, so `-o hello.s` keeps
-# `hello.s.ll`. The text is the module before opt in both modes. Dev mode
-# runs no opt, and llc reads the text, so the `.ll` is the module llc
-# receives. Release mode runs opt over the text with `default<O3>` and
-# keeps the bitcode as <output>.bc, which is the module llc receives, and
-# no pinned tool writes it as text, though `opt -S` of the pinned opt
-# prints it. A release program under the default `--lto full` runs opt
-# with `lto-pre-link<O3>` into the object itself, writes no `.bc` and
-# runs no llc, since the LTO of lld takes the rest. An `llvm` excerpt
-# therefore reads <output>.ll: the module llc receives in dev mode, and
-# the module opt receives in release mode, where the part of antic ends.
+# DESIGN: what --keep-llvm keeps, read from driver_compile_llvm of
+# src/antic/driver.c and llvm_run of src/antic/llvm_run.c. It keeps
+# <output>.ll, the LLVM text antic writes, with <output> the path of -o as
+# given, so `-o hello.s` keeps `hello.s.ll`. That text is the module
+# before opt in both modes. Dev mode runs no opt and llc reads the text,
+# so the `.ll` is the module llc receives. Release mode runs opt over the
+# text with `default<O3>` and keeps its result as <output>.bc, the module
+# after opt, which llc receives. A release program under the default
+# `--lto full` runs opt with `lto-pre-link<O3>` into the object itself,
+# writes no `.bc` and runs no llc, since the LTO of lld takes the rest.
+# -S links nothing and takes the path of `--lto none` in release mode. An
+# `llvm` excerpt therefore reads <output>.ll in dev mode, and in release
+# mode the text of <output>.bc, which `opt -S` of the pinned tools prints
+# without running a pass. No other pinned tool prints bitcode.
+#
+# DESIGN: a release excerpt shows the module of the block alone, after
+# default<O3> and before any link. A function that opt inlined into every
+# caller is gone from it, and so is one that nothing reaches, since a
+# whole program keeps every function internal. The LTO link of a release
+# program may inline the runtime into what the excerpt shows as a call.
 #
 # DESIGN: an `asm` excerpt reads llvm-objdump -d of an object that
 # llvm-mc assembles from the text llc wrote under -S, with the triple of
@@ -226,8 +240,9 @@ endfunction()
 
 # Build the module `module` of the block named `id` for `target` in
 # `mode`, unless this run built it already, and set `out` to the file a
-# `kind` excerpt reads: the LLVM text for llvm, the disassembly for asm.
-# The files stand in `dir` as <id>.<mode>.<target>.s and beside it.
+# `kind` excerpt reads: the module llc receives for llvm, the disassembly
+# for asm. The files stand in `dir` as <id>.<mode>.<target>.s and beside
+# it.
 function(excerpt_output out kind id module target mode dir)
     set(base "${dir}/${id}.${mode}.${target}")
     if(NOT EXISTS "${base}.s")
@@ -247,8 +262,28 @@ function(excerpt_output out kind id module target mode dir)
                 "the block `${id}` of ${document} does not build for ${target} in ${mode} mode:\n${build_out}${build_err}")
         endif()
     endif()
-    if(kind STREQUAL "llvm")
+    if(kind STREQUAL "llvm" AND mode STREQUAL "dev")
         set(${out} "${base}.s.ll" PARENT_SCOPE)
+        return()
+    endif()
+    if(kind STREQUAL "llvm")
+        if(NOT EXISTS "${base}.opt.ll")
+            if(NOT DEFINED LLVM_OPT)
+                message(FATAL_ERROR
+                    "an llvm excerpt of a release build needs LLVM_OPT")
+            endif()
+            execute_process(
+                COMMAND "${LLVM_OPT}" -S -o "${base}.opt.ll" "${base}.s.bc"
+                RESULT_VARIABLE status
+                OUTPUT_VARIABLE opt_out
+                ERROR_VARIABLE opt_err
+                ENCODING NONE)
+            if(NOT status EQUAL 0)
+                message(FATAL_ERROR
+                    "opt refuses ${base}.s.bc:\n${opt_out}${opt_err}")
+            endif()
+        endif()
+        set(${out} "${base}.opt.ll" PARENT_SCOPE)
         return()
     endif()
     if(NOT EXISTS "${base}.dis")
@@ -533,6 +568,21 @@ foreach(document IN LISTS documents)
                 OUTPUT_VARIABLE out
                 ERROR_VARIABLE err
                 ENCODING NONE)
+            if(refuse AND status EQUAL 0)
+                # The front end accepts the block, so a later pass of a
+                # release build is the one that refuses it.
+                set(later -S -o "${exe}.s")
+                if("${source}" MATCHES "(^|;)fn main\\(")
+                    set(later -o "${exe}")
+                endif()
+                execute_process(
+                    COMMAND "${ANTIC}" --runtime "${RUNTIME}" ${later}
+                            "${module}"
+                    RESULT_VARIABLE status
+                    OUTPUT_VARIABLE out
+                    ERROR_VARIABLE err
+                    ENCODING NONE)
+            endif()
             if(refuse)
                 if(status EQUAL 0)
                     message(FATAL_ERROR
@@ -612,7 +662,7 @@ foreach(document IN LISTS documents)
             "the block at line ${block_line} of ${document} does not close")
     endif()
 endforeach()
-if(checked EQUAL 0)
+if(checked EQUAL 0 AND refusals EQUAL 0)
     message(FATAL_ERROR "no `anti` block in ${DOCUMENTS}")
 endif()
 if(failures)
