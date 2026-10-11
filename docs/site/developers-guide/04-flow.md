@@ -3,7 +3,7 @@ title: "Flow"
 description: "if and while, for over ranges and collections, switch on values and what each compiles to, break and continue, defer and undo."
 summary: "`if` and `while`, `for` over a range and over a collection, `switch` on an integer, a `str` and a variant with what each compiles to, `break` and `continue`, `defer` and `undo`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:14:36+02:00
+lastmod: 2026-10-11T20:19:28+02:00
 draft: true
 weight: 40
 tags: [compilers, programming-languages]
@@ -544,7 +544,7 @@ b5:
 
 `%2` is the iterator, a slot of the frame of 64 bytes. `b0` calls `iter` through the table of the list, since `items` is a pointer, and copies its result into the slot. A dev build also tests the table pointer before that call, which chapter 9 describes. `b1` is the test of each turn. It loads the pointer to the `Changes` of the list and compares two counts. One is the count of changes now, and the other the count when the walk began. When they differ, the block `b4` calls `anti_rt_walk_changed`, which prints the message and ends the program. `b5` calls `next`, and `b2` calls `value` and loads the element through the pointer it returns.
 
-The iterator of a list holds a `Watch`, which is a pointer to the `Changes` of the list and the count at the start. Every function that changes the size of the list adds 1 to that count and stores the `here` of its caller, the source position that chapter 5 describes. An iterator without a field of type `Watch` gets no such test.
+The iterator of a list holds a `Watch`, which is a pointer to the `Changes` of the list and the count at the start. "Walking a collection" of chapter 16 describes both, and what every change of a collection stores. An iterator without a field of type `Watch` gets no such test.
 
 A release build drops `b4` and the compare before it. `next` and `value` are ordinary functions of the module, and `opt` inlines them where its threshold allows.
 

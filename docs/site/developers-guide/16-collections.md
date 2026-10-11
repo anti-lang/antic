@@ -3,7 +3,7 @@ title: "Collections"
 description: "The layout, the growth and the cost of each operation of List, Deque, Ring, Grid, the maps and the sets, the sorted ones, Pool, Tree and PriorityQueue."
 summary: "The collections of `anti.collection` with their layout and their growth, walking, hashing and its seed, order and equality, and one table with the cost of each operation, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T18:00:00+02:00
+lastmod: 2026-10-11T20:19:28+02:00
 draft: true
 weight: 160
 tags: [compilers, programming-languages]
@@ -1371,7 +1371,7 @@ A Java program holds a reference to an object, and the collector keeps the objec
 
 `remove` frees the slot and raises its generation. A handle of the removed element then finds nothing, also after the slot holds another element. Every form above gives `none` or `false` for such a handle.
 
-The version of an element counts its changes since it was added: `set`, `set_if_version`, `modify`, the update forms, and each turn of a `for` that reaches it.
+The version of an element counts its changes since it was added. A change is a `set`, a `set_if_version`, a `modify`, an update form, or a turn of a `for` that reaches the element.
 
 `for x in &p` walks the elements in the order of their slots and lends each.
 
@@ -1470,7 +1470,7 @@ The type of a handle names the element type alone. Nothing in it names the pool.
 
 ### How antic builds it
 
-A pool grows by adding blocks and never copies one. The first block holds 8 slots, or the capacity it was made with, rounded up to a power of two. Each further block holds twice the slots of the one before. Slot `i` lies in the block that the highest set bit of `i + 8` names, so the address of a slot is a few shifts and one load.
+A pool grows by adding blocks and never copies one. The first block holds 8 slots, or the capacity it was made with, rounded up to a power of two. Each further block holds twice the slots of the one before. Slot `i` lies in the block that the highest set bit of `i + 8` names. The address of a slot is therefore a few shifts and one load.
 
 The memory of a block holds its elements and then three words per slot.
 
@@ -1668,7 +1668,7 @@ A walk of a queue lends nothing, since a change in place would break the order o
 
 A `Tree<T>` inherits `Slots<T>`, the storage of a pool, and keeps five more words per slot. They are the parent, the first child, the last child, the next sibling and the previous sibling. Each is the index of a slot, or -1. A slot of a tree is `size_of(T)` and 64 bytes. The object is the 520 bytes of a pool and the index of the last root.
 
-`add_child` claims a slot and links it after the last child of its parent. `remove` unlinks the top of the subtree and then frees the slots from the leaves up, so it uses no stack and no list of its own. `children`, `depth_first` and `breadth_first` follow the links and fill a `Copies<Handle<T>>` from the allocator of the tree.
+`add_child` claims a slot and links it after the last child of its parent. `remove` unlinks the top of the subtree and then frees the slots from the leaves up. It uses no stack and no list of its own. `children`, `depth_first` and `breadth_first` follow the links and fill a `Copies<Handle<T>>` from the allocator of the tree.
 
 A `PriorityQueue<T>` inherits `Indexed<T>` and has the 136 bytes and the growth of a list. Its block holds one spare slot past the capacity, which a swap goes through. The element at `i` is no larger than those at `2i + 1` and `2i + 2`, so the smallest stands at 0.
 
@@ -2233,7 +2233,7 @@ Java compares references with `==` and values with `equals`, and orders with `Co
 
 ### The feature
 
-`==` compares values. It has a default on a struct, a class value, a tuple, a variant, a `?T` and an array, which compares part by part, each part by its own `==`. `!=` is its negation. A struct replaces the default with `operator fn eq(a: S, b: S) -> bool` at module level.
+`==` compares values. It has a default on a struct, a class value, a tuple, a variant, a `?T` and an array. The default compares part by part, each part by its own `==`. `!=` is its negation. A struct replaces the default with `operator fn eq(a: S, b: S) -> bool` at module level.
 
 `<` is built in for the numbers, `char` and `str`. A struct and a class have no default order. `operator fn lt(a: S, b: S) -> bool` at module level gives a type `<`, and `>`, `<=` and `>=` follow from it.
 
