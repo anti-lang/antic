@@ -527,9 +527,9 @@ define hidden noundef i64 @traced.Renderer.draw(ptr noundef nonnull dereferencea
 
 The handler is one word of the runtime, written and read atomically. `Trace.install` is a call of `anti_rt_trace_install`, which stores the pointer. The functions of a handler are entries 17 to 25 of its table, after the sixteen of the root.
 
-The stock handlers allocate nothing inside a hook. Each table they keep is a field of the handler with a size fixed at compile time, and each count is an atomic field.
+The stock handlers allocate nothing inside a hook. Each table they keep is a field of the handler with a size fixed at compile time. The counts of `LeakTracker`, `CallLogger` and `ThreadMonitor` and the totals of `ErrorMonitor` and `ChangeJournal` are atomic fields. The tables of the `Profiler` and of the `ChangeJournal` and the last error of the `ErrorMonitor` are plain fields, and no lock guards them.
 
-Where it lives: `traced_class` and `traced_function` in the lowering of `src/antic`, `lower_hook_call`, `lower_hook_failed` and `lower_hook_changed` of `src/antic/lower_hook.c`, `anti_rt_hook_call` and `anti_rt_trace_install` of `src/rt/hooks.c`, and `src/std/anti/trace.anti`.
+Where it lives: `traced_function` of `src/antic/lower_function.c`, `lower_traced_class`, `lower_hook_call`, `lower_hook_failed` and `lower_hook_changed` of `src/antic/lower_hook.c`, `anti_rt_hook_call` and `anti_rt_trace_install` of `src/rt/hooks.c`, and `src/std/anti/trace.anti`.
 
 ### What it costs
 
@@ -567,7 +567,7 @@ For a C++ programmer:
 
 - `leave` runs after the locals of the function are gone. A handler that reads the object in `leave` reads it after the teardowns of the body.
 - The name a hook receives is a `str` into read-only data and lives as long as the program. The error `failed` receives is deleted when its `catch` ends, so a handler copies what it keeps.
-- A handler runs on every thread that reaches a site. Its counters are atomic fields.
+- A handler runs on every thread that reaches a site, so a handler of the program counts with atomic fields. The tables of the stock `Profiler` are plain fields.
 
 ## Injection
 
@@ -858,7 +858,7 @@ The costs are the same in dev and in release.
 | Inside a provider that is `get` of a singleton | one atomic load, after the first call |
 | A call through the field | the dispatch of an interface, as for any pointer to an abstract class |
 | Allocations | 0 by the injection. The provider decides its own |
-| At the start of the program | 0 for a program without replacements |
+| At the start of the program | one read of the key `plugins` under the lock of the configuration, and one pass over the list of the injectable interfaces. A program without replacements stores nothing |
 
 A class with three `inject` fields runs three providers for every object. A provider that builds a new object each time builds one per field and per object, and nothing frees it for the class.
 
@@ -1296,7 +1296,7 @@ A provider that is a library fills a slot of the last section in another way tha
 
 Discovery reads the `anti-plugins.toml` of each directory of the key `plugins`, in order, and opens no library to learn what is inside. A library built for another runtime version is passed over. One whose bytes do not match the digest of the index is refused. Two libraries that provide one interface are an error that names both.
 
-Where it lives: `whole_write_provides` and `whole_hosts_plugins` of `src/antic/whole_tables.c`, `write_plugin_index` of the driver, `src/rt/plugin.c` for the loader and its checks, `src/rt/loaded.c` for the open libraries and their counts, and `src/std/anti/plugin.anti`.
+Where it lives: `whole_write_provides` of `src/antic/whole_tables.c`, `whole_hosts_plugins` of `src/antic/whole.c`, `driver_write_plugin_index` of `src/antic/driver_index.c`, `src/rt/plugin.c` for the loader and its checks, `src/rt/loaded.c` for the open libraries and their counts, and `src/std/anti/plugin.anti`.
 
 ### What it costs
 
@@ -1311,7 +1311,7 @@ Where it lives: `whole_write_provides` and `whole_hosts_plugins` of `src/antic/w
 | The exports of a host | the names of its functions and data stay in the executable |
 | LTO | a host keeps every exported function, so the link removes less unused code |
 
-The two programs of the example show the exports. On macos-arm64, the host that calls `speak` is 255,296 bytes, and the same source built with `--closed` is 134,896 bytes. The library is 57,856 bytes. The closed program fails at `plugin.load` with the message of the loader, which names the first symbol it could not find.
+The two programs of the example show the exports. The host measured here has a `main` that calls `speak` and prints the message of a failure. On macos-arm64 it is 255,344 bytes, and the same source built with `--closed` is 134,912 bytes. The library is 57,856 bytes. The closed program fails at `plugin.load` with the message of the loader, which names the first symbol it could not find.
 
 ### Pitfalls
 
