@@ -1466,7 +1466,7 @@ fn read(p: *Pool<int>, h: Handle<str>) -> ?int
 }
 ```
 
-The type of a handle names the element and not the pool. A handle of one `Pool<int>` passes the checker at another `Pool<int>`, where it finds another element or nothing.
+The type of a handle names the element type alone. Nothing in it names the pool. A handle of one `Pool<int>` passes the checker at another `Pool<int>`, where it finds another element or nothing.
 
 ### How antic builds it
 
@@ -1575,7 +1575,7 @@ A tree in Java is a node class with a list of children, one object per node. C a
 | `q.pop()` | removes the smallest element and gives it, a `?T` |
 | `q.peek()` | a copy of the smallest element, a `?T` |
 
-`for x in q` walks copies in the order of the array, which is not the order of `pop`. An update form changes elements in place and restores the order after it.
+`for x in q` walks copies in the order of the array. `pop` gives another order, smallest first. An update form changes elements in place and restores the order after it.
 
 ```anti
 //! name: trees

@@ -10,7 +10,7 @@ tags: [compilers, programming-languages]
 keywords: [build tool, manifest, lock file, dependency resolution, build cache, formatter, documentation generator, licence notice, symbols]
 ---
 
-`anti` is the tool of a project. It reads the manifest `anti.toml`, resolves and fetches the dependencies, and compiles through the driver of antic, which is linked into it. Every command of this chapter was run on macos-arm64 with Anti 0.2.0, and its output stands as the tool printed it. A path of the machine is shortened to `/home/ann`.
+`anti` is the tool of a project. It reads the manifest `anti.toml`, resolves and fetches the dependencies, and compiles through the driver of antic, which is linked into it. Every command of this chapter was run on macos-arm64 with Anti 0.2.0, and the page shows its output as the tool printed it. A path of the machine is shortened to `/home/ann`.
 
 Chapter 1 holds `anti new`, a first `anti build` and `anti run`. Chapter 17 holds `anti bind`, and chapter 19 `anti test`.
 
@@ -418,13 +418,13 @@ Where it lives: `src/anti/check.c`. The front end is `antic --front-end --warnin
 
 The canonical form:
 
-- one tab per level of nesting;
-- the brace of an item body on a line of its own;
-- the brace of a statement block on the line of its statement;
-- no parentheses around a whole condition;
-- one statement per line;
-- a doc comment wrapped at 80 columns;
-- the names of a direct import in sorted order.
+- one tab per level of nesting
+- the brace of an item body on a line of its own
+- the brace of a statement block on the line of its statement
+- no parentheses around a whole condition
+- one statement per line
+- a doc comment wrapped at 80 columns
+- the names of a direct import in sorted order
 
 The line breaks of the author stand where no rule moves them. A source before `anti fmt`:
 

@@ -284,7 +284,7 @@ The costs are the same in dev and in release.
 For a Java programmer:
 
 - No exception crosses the boundary and nothing checks the arguments. A wrong pointer is a crash in C.
-- A `str` is no C string. `s.ptr` of a literal ends in a zero byte, and `s.ptr` of a part of a text does not.
+- A `str` is no C string. `s.ptr` of a literal ends in a zero byte. `s.ptr` of a part of a text runs on into the rest of the text.
 
 For a C programmer:
 
@@ -912,7 +912,7 @@ A C library is an archive of objects or a shared object, and a header that decla
 
 Both forms write `<name>.h` beside the library. The header holds every `export` item of the module: the structs and unions, the constants, and a prototype per function. A `///` comment of an exported item becomes a `/** */` comment above it. The header is written again by every build.
 
-The runtime reaches the C program in one of three ways.
+The form of the library decides how the runtime reaches the C program.
 
 | Form | Where the runtime is | What the C program links |
 |---|---|---|
