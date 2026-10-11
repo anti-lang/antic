@@ -445,7 +445,7 @@ retq
 
 Both reads are one `movq`. On arm64 the aligned read is `ldr x0, [x0, #0x10]` and the packed one is `ldur x0, [x0, #0x6]`, the form of the load that takes an offset that is no multiple of 8.
 
-Where it lives: `item_level`, `class_item` and `variant_item` of `src/antic/parser_item.c` read the two words. `compute` of `src/antic/layout.c` applies `t->packed` and `t->align`. `src/antic/header.c` writes `#pragma pack` and `_Alignas` into the C header.
+Where it lives: `item_level`, `class_item` and `variant_item` of `src/antic/parser_item.c` read the two words. `compute` of `src/antic/layout.c` applies `t->packed` and `t->align`. `src/antic/header.c` writes `#pragma pack(push, 1)` and `ANTI_ALIGNAS(N)` into the C header. The header defines that macro as `_Alignas(n)` for C and `alignas(n)` for C++.
 
 ### What it costs
 
