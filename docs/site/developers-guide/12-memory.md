@@ -529,13 +529,15 @@ fn sized(n: int) -> int
 
 ### How antic builds it
 
-A slice is two words wherever it goes. As a parameter it is two integer registers.
+A slice is two words wherever it goes. As a parameter it is two integer registers on linux-x86_64 and macos-x86_64.
 
 ```llvm excerpt=slices target=linux-x86_64 mode=dev
 define hidden void @slices.double_all(i64 %p0.0, i64 %p0.1) #0 {
 ```
 
-`%p0.0` is the address and `%p0.1` the length. An array is its elements in place, in the frame or in the value that holds it, with no header.
+`%p0.0` is the address and `%p0.1` the length. The three arm64 targets pass the two words as one `[2 x i64]`, which is two registers as well. On windows-x86_64 the parameter is one `ptr` to a copy of the two words, which the caller makes in its frame.
+
+An array is its elements in place, in the frame or in the value that holds it, with no header.
 
 A part of a slice is an address computation and a subtraction. In the release build of `inner` both fold into the result.
 
@@ -616,7 +618,7 @@ Where it lives: `ir_type_access` of `src/antic/ir.c` gives each access its type.
 | A load after a store of a type the rules keep apart | one load | none: the optimizer reuses the value it knows |
 | Heap allocations | 0 | 0 |
 
-A slice passes in two registers and an array of more than 16 bytes in memory, as a copy. A function that reads a large array takes a slice or a pointer and copies nothing.
+A slice passes in two registers on five targets and as a pointer to a copy of its two words on windows-x86_64. An array of more than 16 bytes passes in memory, as a copy. A function that reads a large array takes a slice or a pointer and copies nothing.
 
 ### Pitfalls
 
@@ -1091,7 +1093,35 @@ The release code of `ArenaAllocator.alloc` shows the same dispatch, where it ask
 
 136 is 17 times 8. The call is indirect, since three classes of the program implement `Allocator`.
 
-A request that fits the head block of an `ArenaAllocator` makes no call. `alloc` rounds the used count up to the alignment, compares with the limit, adds the size and returns the address. A request that does not fit takes a new head block from `from`. The room left in the old head block is not handed out again.
+A request that fits the head block of an `ArenaAllocator` makes no call in a release build. `alloc` rounds the used count up to the alignment, compares with the limit, adds the size and returns the address. A request that does not fit takes a new head block from `from`. The room left in the old head block is not handed out again.
+
+```llvm excerpt=pools target=linux-x86_64 mode=release
+define internal noundef ptr @anti.mem.ArenaAllocator.alloc(
+b0:
+  %v1.i = icmp sgt i64 %p1, -1
+  %v7.i = icmp sgt i64 %p2, 0
+...
+  %v18.i = icmp samesign ult i64 %0, 2
+...
+  %v10.not = icmp eq ptr %v8, null
+...
+  %v6.i = srem i64 %v17, %p2
+  %v8.i = icmp eq i64 %v6.i, 0
+...
+  %v34.not = icmp sgt i64 %spec.select.i11, %v31
+  %v73 = sub i64 %v31, %spec.select.i11
+  %v76.not = icmp sgt i64 %p1, %v73
+...
+  %v49.not = icmp sgt i64 %p2, %v46
+```
+
+- The first three compares test the arguments. The size is zero or more, the alignment is above zero, and the alignment has at most one bit set. `%0` is the count of its bits.
+- `%v10.not` tests the head block for `none`.
+- `srem` is the remainder of the used count by the alignment, and `%v8.i` tests it for zero.
+- `%v34.not` compares the padding with the room left, and `%v76.not` the size with the room after the padding.
+- `%v49.not` compares the alignment with the alignment of the head block.
+
+The path that fits therefore runs one remainder and eight compares. The functions `valid` and `padding` of `anti.mem` are inlined here, as the `.i` at the end of a name says. A dev build compiles `anti.mem` in dev mode as well. Its `alloc` calls `valid` and `padding` as functions and checks the divisor and each of its additions and subtractions for overflow.
 
 `LibcAllocator.alloc` calls `anti_rt_mem_alloc`, which calls `posix_memalign` on macOS and Linux and `_aligned_malloc` on Windows.
 
@@ -1112,7 +1142,7 @@ Where it lives: `Allocator`, `LibcAllocator` and `ArenaAllocator` of `src/std/an
 | Bytes of a `*Allocator` | 8 | 8 |
 | Bytes of an `ArenaAllocator` | 56 | 56 |
 | `from.alloc` and `from.free` | two loads, one indirect call, one test for a zero table | two loads, one indirect call |
-| `ArenaAllocator.alloc` that fits | one remainder, seven compares, no call | the same |
+| `ArenaAllocator.alloc` that fits | two calls, of `valid` and `padding`, one remainder, eight compares and the overflow checks of dev mode | one remainder, eight compares, no call |
 | `ArenaAllocator.alloc` that does not fit | one `alloc` of `from` | the same |
 | `ArenaAllocator.free` | an empty function | the same |
 | `free_all()` | one `free` of `from` per block | the same |
@@ -1299,6 +1329,8 @@ The rest of the option is in the link and in the module that holds `main`.
 - The same module defines `anti_rt_memory_kept`, which the runtime calls for each block it keeps. It hands the block to `__lsan_ignore_object`.
 - The build writes the lines of `-g`, so a report names files and lines.
 
+A Windows program gets neither of the two definitions, since the AddressSanitizer runtime of Windows has no leak check.
+
 Where it lives: `memcheck_declare` and the pass over each function in `src/antic/memcheck.c`, with the design in `src/antic/memcheck.h`. `lto_mode` of `src/antic/driver.c` and the link in `src/antic/driver_link.c`.
 
 ### What it costs
@@ -1308,7 +1340,7 @@ Where it lives: `memcheck_declare` and the pass over each function in `src/antic
 | A load or a store through a pointer | one instruction | one call of `__asan_loadN` or `__asan_storeN` before it |
 | A load or a store of a local or a global | one instruction | the same |
 | `alloc` and `free` | the C library | those of the AddressSanitizer runtime |
-| The link of a release build | full LTO of the program and the runtime | no LTO |
+| The link of a release build | full LTO of the program and the runtime | no LTO, unless `--lto` asks for it. A macOS target refuses `--lto` with the option |
 | Checks of dev mode | by the mode | by the mode, unchanged |
 
 The check is a call and never an inline test. A loop over a slice therefore makes one call per element.
