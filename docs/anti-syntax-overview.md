@@ -1161,7 +1161,7 @@ let jobs = [dispatch sprite -> render(frame + 1)];
 join_all(jobs[0..1]);
 ```
 
-Worker parameters are pointer-free. The table pointer and `own` fields do not count. `[]Circle` chunks like any array, `[]*Shape` is refused and points at `dispatch`. `ANTI_THREADS` is gone. `--anti.threads` and the configuration file set the pool size.
+Worker parameters are pointer-free. The table pointer and `own` fields do not count. `[]Circle` chunks like any array, `[]*Shape` is refused and points at `dispatch`. `--anti.threads` and the key `threads` of the configuration file set the pool size.
 
 `sync m { }` holds a `Mutex` for its block and unlocks it on every exit. `chan T` is a bounded queue of pointer-free values, and `select` waits on more than one channel, written like `switch` over them.
 
@@ -1192,9 +1192,7 @@ select {
 delete(c);
 ```
 
-A `sync` on the mutex of an enclosing `sync` in the same function is refused. `close` stops what a channel takes, and what it holds is still received. `delete(c)` ends a channel. A worker takes a `chan T` beside its values, and a pointer to a `Mutex`, which cannot be copied.
-
-Built: `parallel`, `dispatch`, `join`, `join_all`, `Mutex`, `sync`, `chan T` with `send`, `recv` and `close`, and `select`. `--anti.threads` and the `threads` key of the configuration file set the pool size, and `ANTI_THREADS` is gone. Not built yet: the warning on a field written inside `sync` and read outside it.
+A `sync` on the mutex of an enclosing `sync` in the same function is refused. `close` stops what a channel takes, and what it holds is still received. `delete(c)` ends a channel. An arm of a `select` is a call, an assignment or a block, as an arm of a `switch` is, and may leave the binding out. A worker takes a `chan T` beside its values, and a pointer to a `Mutex`, which cannot be copied. Not built yet: the warning on a field written inside `sync` and read outside it.
 
 ## Concurrent classes
 
@@ -1234,8 +1232,6 @@ let hits: atomic int = 0;
 
 A `synchronized class` gives each object a hidden lock that every public function runs under, released on every exit, and `sync obj { }` holds it for a block. `sync a, b { }` holds the locks of two synchronized objects, taken in the order of their addresses and once for one object, and the default `==` of a synchronized class runs under it, its default hash under `sync a`. An operator that takes a synchronized class through pointers receives the objects themselves, and one that takes it by value is refused. A `concurrent class` leaves the locking to the programmer, and every field is guarded by a `Mutex`, atomic, or fixed after `construct`. It has no default `==` or hash and declares the ones it needs. `unchecked(unguarded-field, "reason")` after a field's type or in the class header overrules the check, and `compare_swap` takes a field of one word that it marks. A public function of either never gives out a pointer or a slice into the object's fields. A worker may take a pointer to a thread-safe object, and `atomic` marks a local as well. A `Mutex` is one word of the program's memory and cannot be copied. A dev build records the order in which each thread takes locks and reports two orders that conflict. `size_of(Mutex)` is 4 on Linux and macOS and 8 on Windows.
 
-Built: everything above. That covers `synchronized class` with its hidden lock, `sync obj { }`, `sync a, b { }`, the default `==` and hash of a synchronized class under its locks, the refusal of a default `==` or hash of a concurrent class, `concurrent class` with `guarded by`, atomic and fixed fields and the safety check `unguarded-field`, `unchecked` after a field's type and in the class header, the rule on pointers into the fields, atomic locals, the pointer to a thread-safe object in a worker, the one-word `Mutex`, the report of lock orders in a dev build, and `compare_swap` on a field of one word that `unchecked` marks.
-
 ## Hooks and tracing
 
 `anti.lang.Object` declares nine hooks with empty bodies, and every class inherits them. `created`, `destroyed` and `copied` are the lifecycle, `dispatched` and `joined` are the threads, and every build compiles the five. `enter`, `leave` and `failed` need tracing, and `changed` needs `--trace writes`. `anti.lang.TraceHandler` declares the same nine with the object after `self`, and `anti.lang.Trace.install(h)` stores one handler.
@@ -1262,11 +1258,11 @@ trace class Renderer
 }
 ```
 
-Every hook site calls the installed handler and then dispatches the object's own hook. `leave` reverses the two, so the handler and the object's hook nest around the call. A class that replaced a hook does not silence the handler, and the handler does not replace the class's hook.
+Every hook site calls the installed handler and then dispatches the object's own hook. `leave` reverses the two, so the handler and the object's hook nest around the call. A class that replaced a hook does not silence the handler, and the handler does not replace the class's hook. A hook site is one call of the runtime.
 
-`--no-hooks` drops every site, the five always-on ones as well. Instrumentation is a build option and never a change to an object's layout. A program that loads plugins cannot be built with `--no-hooks`, since `unload` counts a library's objects in the hooks. antic refuses the combination with a message that names both. A plugin cannot be built with it either, because its own classes call those hooks.
+`trace` is a contextual word before `class` and before `fn` in a class body. `--trace` and `--no-trace` decide instead of the mode, `--trace <pattern>` reaches a class that did not ask, and `--trace writes` turns `changed` on. `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger`, `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal` and `Composite`. `trace.start` reads the runtime key `trace` and installs the handler it names, and `trace.install` takes the same text from a program.
 
-Built: the nine hooks and their entries in the table of every class, `TraceHandler`, `Trace.install`, the order of the two calls with `leave` reversed, the contextual `trace` before `class` and before `fn` in a class body, `--trace`, `--no-trace`, `--trace <pattern>`, `--trace writes`, `--no-hooks` and its refusal in a program that loads plugins and in a plugin. A hook site is one call of the runtime. `anti.trace` is built with `LeakTracker`, `Profiler`, `CallLogger`, `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal` and `Composite`. `trace.start` reads the runtime key `trace` and installs what it names, and `trace.install` takes the same text from a program. Not built yet: the cost of one load and one compare at a site without a handler.
+`--no-hooks` drops every site, the five always-on ones as well. Instrumentation is a build option and never a change to an object's layout. A program that loads plugins cannot be built with `--no-hooks`, since `unload` counts a library's objects in the hooks. antic refuses the combination with a message that names both. A plugin cannot be built with it either, because its own classes call those hooks. Not built yet: the cost of one load and one compare at a site without a handler.
 
 ## Injection
 
@@ -1290,11 +1286,9 @@ class Renderer
 "anti.log.Logger" = "net.niese.tests.FakeLogger.get"
 ```
 
-Six standard interfaces ship with defaults: `Logger`, `Clock`, `Source`, `FileSystem`, `Allocator`, `Config`. Standard interfaces for services come with a reference implementation: `anti.db` with SQLite, `anti.http`, `anti.serialize`, `anti.crypto`. They wait for the native libraries of the runtime archive.
+`inject name: *Interface` marks a field that the provider of its interface fills before `construct` runs, and `inject final` one that the run-time configuration may not replace. A provider is a module function that gives a pointer of the interface, or the `get` of a singleton that implements it. The name of that singleton alone names its `get`. The `[inject]` and `[inject.test]` tables of the manifest reach `antic` as `--inject Interface=Provider`, and `anti test` passes them. One slot per interface holds the provider, and every site calls through it. The link refuses an interface with no provider, a provider that is no function of the program or is no such interface, and a cycle through the providers.
 
-A provider is a module function that gives a pointer of the interface, or the `get` of a singleton that implements it. The name of that singleton alone names its `get`.
-
-Built: `inject name: *Interface` and `inject final name: *Interface`. The `[inject]` and `[inject.test]` tables of the manifest reach `antic` as `--inject Interface=Provider`, and `anti test` passes them. One slot per interface holds the provider, and every site calls through it. The link refuses an interface with no provider, a provider that is no function of the program or is no such interface, and a cycle through the providers. The six standard interfaces are built, each an abstract class with a default implementation and a default provider, so an `inject` field of one needs no entry in the manifest: `anti.log.Logger` with `SinkLogger`, `anti.time.Clock` with `SystemClock`, `anti.random.Source` with `SharedRandom`, `anti.fs.FileSystem` with `SystemFileSystem`, `anti.mem.Allocator` with `LibcAllocator` and `anti.config.Config` with `FileConfig`. The default provider of an interface is a static function `default` of it, which the manifest overrides. `anti.mem` also holds `ArenaAllocator`, which hands out memory from blocks and gives them all back at once, and `Object.deserialize` and `Builder.take_in(from)` of `anti.text` take an `Allocator`. `f"..."` takes none. The language's `alloc` and `free` stay bound to the C library. The run-time replacement and `--closed` are built with plugins. Every collection of `anti.collection` takes an `Allocator` when it is made, and the C library without one. Not built yet: the interfaces for services.
+Six standard interfaces ship, each an abstract class with a default implementation and a default provider, so an `inject` field of one needs no entry in the manifest: `anti.log.Logger` with `SinkLogger`, `anti.time.Clock` with `SystemClock`, `anti.random.Source` with `SharedRandom`, `anti.fs.FileSystem` with `SystemFileSystem`, `anti.mem.Allocator` with `LibcAllocator` and `anti.config.Config` with `FileConfig`. The default provider of an interface is a static function `default` of it, which the manifest overrides. `anti.mem` also holds `ArenaAllocator`, which hands out memory from blocks and gives them all back at once, and `Object.deserialize` and `Builder.take_in(from)` of `anti.text` take an `Allocator`. `f"..."` takes none. The language's `alloc` and `free` stay bound to the C library. Every collection of `anti.collection` takes an `Allocator` when it is made, and the C library without one. The run-time replacement and `--closed` stand under [Plugins](#plugins). Not built yet: the interfaces for services.
 
 ## Plugins
 
@@ -1331,13 +1325,15 @@ let logger = lib.instance(log.Logger) catch fatal;
 "anti.log.Logger" = "lib/CISOLogger.so"
 ```
 
-Versions are checked at load: interface hash chain, no fields added, every slot the program reaches present. `--anti.conf`, `--anti.inspect` and the other `--anti.` options are the runtime's and are consumed before `main`, and `rt.get(key)` gives the effective value of a key. Injections are fixed at start, so `rt.configure` refuses a table `[injections]` and names `--anti.conf` and `ANTI_CONF` instead.
+`provides Interface as Class;` stands at module level, and `antic --lib shared --no-runtime` writes the library: the object of its own module alone, linked without the runtime and bound against the host that loads it. `plugin.load` gives a `Library`, `lib.instance(Interface)` builds the class it provides, `lib.supports(Interface, "f")` reads its functions, and `lib.unload()` refuses while an object of the library is alive. The load checks the runtime version exactly and that every interface is the host's. The classes of a library join the registry, so `reflect.new` finds one by name. antic writes `anti-plugins.toml` beside a library, with the interfaces, the runtime version and the digest of each library of the directory. `"plugin:path"` and `"discover"` of the manifest take a provider from a library, discovery reads the index and checks the digest, and `[injections]` and `--anti.inject` replace a provider at start. `--closed` builds a program without the exports a plugin binds against. A program loads a library on macOS, Linux and Windows. On Linux a program that can load one links dynamically against glibc. On Windows its link writes an import library, and a plugin links against the import library of the program that loads it.
 
-Built: `provides Interface as Class;` and `antic --lib shared --no-runtime`, which writes a library that links no runtime and is bound against the host that loads it. `plugin.load` gives a `Library`, `lib.instance(Interface)` builds the class it provides, `lib.supports(Interface, "f")` reads its functions, and `lib.unload()` refuses while an object of the library is alive. The load checks the runtime version exactly and that every interface is the host's. The classes of a library join the registry, so `reflect.new` finds one by name. antic writes `anti-plugins.toml` beside a library, with the interfaces, the runtime version and the digest of each library of the directory. `"plugin:path"` and `"discover"` of the manifest take a provider from a library, discovery reads the index and checks the digest, and `[injections]` and `--anti.inject` replace a provider at start. `--closed` builds a program without the exports a plugin binds against. The runtime configuration is built as before: `--anti.conf=<path>`, `ANTI_CONF` and `rt.configure(path)` of `anti.runtime` name the file, the includes run first and in order, every key of `[runtime]` is an option of the same name, `--anti.inspect` prints the effective value of each with the layer it came from, and `--anti.help` lists the options. Precedence per key is the command line, the file, the build. `--anti.inspect` prints the version and the used slots of each injectable interface. The version checks are built: every class descriptor carries the version of the package that declared it, an abstract class carries the chain of its structural hashes and the floor a `compatible <version>;` line names, and a plugin carries the chain, the fields, the size and the version of each interface it was built against. The load compares the two chains at the length of the shorter, refuses a field added between the two versions, refuses a slot the program's calls reach and the library lacks, and fills a slot that `reflect.call` alone may reach with a stub that names the plugin. A program loads a library on macOS, Linux and Windows. On Linux a program that can load one links dynamically against glibc. On Windows its link writes an import library, and a plugin links against the import library of the program that loads it. `rt.configure` refuses a table `[injections]`, in its file and in every file that file includes.
+Versions are checked at load. Every class descriptor carries the version of the package that declared it, `--package-version` and `0.0.0` without one. An abstract class carries the chain of its structural hashes and the floor a `compatible <version>;` line names, and a plugin carries the chain, the fields, the size and the version of each interface it was built against. The load compares the two chains at the length of the shorter, refuses a field added between the two versions, refuses a slot the program's calls reach and the library lacks, and fills a slot that `reflect.call` alone may reach with a stub that names the plugin.
+
+`--anti.conf=<path>`, `ANTI_CONF` and `rt.configure(path)` of `anti.runtime` name the configuration file, which holds `include`, `[runtime]` and `[injections]`. The includes run first and in order, so the including file wins per key. Every key of `[runtime]` is an option of the same name, `--anti.inspect` prints the effective value of each with the layer it came from and the version and the used slots of each injectable interface, and `--anti.help` lists the options. Precedence per key is the command line, the file, the build. The `--anti.` options are the runtime's and are consumed before `main`, and `rt.get(key)` gives the effective value of a key. Injections are fixed at start, so `rt.configure` refuses a table `[injections]`, in its file and in every file that file includes, and names `--anti.conf` and `ANTI_CONF` instead.
 
 ## Tests
 
-A `tests` block per module holds tests, a `fixtures` block holds their helpers. Both see the module's private items and are compiled only by `anti test`.
+A `tests` block per module holds tests, a `fixtures` block holds their helpers, and a module has at most one of each. Both see the module's private items and are compiled only by `anti test`.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -1374,8 +1370,6 @@ tests
 
 `setup` and `teardown` in `fixtures` run before and after every test of the module. `anti test` compiles each module with `--tests`, writes a runner that calls its tests, links it and runs it. The dev run links an object of every module the one under test imports, so a module of the standard library carries a `tests` block too. It prints `ok <module>.<test>` for a test that returned, and a failed assertion prints `FAIL <module>.<test>` and then the file and the line. `anti test --release` runs the same tests with the checks and the assertions off.
 
-Built.
-
 ## C interop
 
 C functions in, Anti functions out, structs shared without marshalling.
@@ -1392,13 +1386,16 @@ extern fn DrawCircleV(center: Vector2, radius: c_float, color: Color);
 
 export fn dot(a: Vec2, b: Vec2) -> c_int { return a.x * b.x + a.y * b.y; }
 export struct Vec2 { x: c_int, y: c_int }
+export union Bits { whole: u32, parts: [4]u8 }
+export const LIMIT: c_int = 8;
 
 link framework "CoreAudio";
+link linux "X11";
 ```
 
-`anti bind raylib_api.json` and `anti bind --clang header.h` generate bindings. `anti build --lib static|shared` builds a library with a header. A class is exported with its layout, tables, `anti_<Class>_init`, `anti_<Class>_construct` for a `construct` with arguments, and the dispatch wrappers. `embed("file")` puts a file's bytes in the binary.
+`extern fn` declares a C function. Every pointer of one is `?*T`, `...` declares a variadic one, and `may fail` and `export` are refused on it. `export` on `fn`, `struct`, `union`, `const` and `type` implies `pub` and puts the item into the C header, a function under its unmangled name. The signature of an `export fn` and the fields of an `export struct` or `export union` use sized integers, `int`, `uint`, `float`, `bool`, the C types, pointers to such types, exported structs and unions, and function pointers of such signatures. `char`, `str`, slices, arrays by value and non-exported structs are refused, and a field may be a fixed array of an allowed type. An `export const` has a numeric type, `bool` or `str`. An `export fn` of a class body is `pub` as well, and `export type` writes a copy of a generic, see [Generics](#generics). `link framework "Name";` links a macOS program against a framework of Apple's SDK, and `link linux "Name";` a Linux program against a library of the glibc sysroot. A Linux program that reaches a `link linux` line links dynamically against glibc 2.35, and every other one statically against musl.
 
-Built: `extern`, `export`, static and shared libraries, the header, `link framework`, `link linux`, `anti bind` in its three forms. A Linux program that reaches a `link linux` line links dynamically against glibc 2.35, and every other one statically against musl. Not built yet: `embed`.
+`anti bind raylib_api.json` and `anti bind --clang header.h` generate bindings. `anti build --lib static|shared` builds a library with a header. A class is exported with its layout, tables, `anti_<Class>_init`, `anti_<Class>_construct` for a `construct` with arguments, and the dispatch wrappers. `embed("file")` puts a file's bytes in the binary. Not built yet: `embed`.
 
 ## Compile-time targets
 
@@ -1415,7 +1412,7 @@ switch target.os {
 }
 ```
 
-Built: `anti check --targets all`, which runs the front end of every source once per target. Not built yet: `target.os`, `target.cpu` and `target.mode`, and the `switch` on one of them.
+`anti check --targets all` runs the front end of every source once per target. Not built yet: `target.os`, `target.cpu` and `target.mode`, and the `switch` on one of them.
 
 ## Source locations
 
@@ -1430,25 +1427,34 @@ let p = here;               // the position of this expression
 
 The value is constant data. `here` in an ordinary expression gives the position of that expression, which is rarely what a message wants.
 
-Built: `here`, in an expression and as the default of a parameter, and `SourceLocation` in `anti.lang`.
-
 ## Checks and debugging
 
-In dev mode every array, slice and `str` index is bounds-checked, signed arithmetic traps on overflow, a narrowing `as` checks its range, a conversion to `char` or to an enum checks the value, division and shifts are checked, `assert` and `show` are active, `-g` writes line information. In release none of it is emitted, and every target gives the result of ARM64: a division or a remainder by zero gives 0, the least value divided by minus one gives itself, a shift takes its count modulo the width, and a float out of the range of its integer type saturates, with 0 for NaN. `--checks`, `--asserts`, `--trace` and `-g` override.
+In dev mode every array, slice and `str` index is bounds-checked, signed arithmetic traps on overflow, a narrowing `as` checks its range, a conversion to `char` or to an enum checks the value, division and shifts are checked, `assert` and `show` are active, `-g` writes line information. In release none of it is emitted, and every target gives the result of ARM64: a division or a remainder by zero gives 0, the least value divided by minus one gives itself, a shift takes its count modulo the width, and a float out of the range of its integer type saturates, with 0 for NaN. `--checks` and `--no-checks`, `--asserts` and `--no-asserts`, `--trace` and `--no-trace` and `-g` override the mode.
 
 ```anti
 trace class Renderer { }
 ```
 
-`trace` marks a class or function whose `pub` functions call the `enter` and `leave` hooks in dev mode. `--trace <pattern>` instruments code that did not ask. `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger` and the rest, and `trace.start` installs the one that the runtime key `trace` names. "Hooks and tracing" above holds the nine hooks and the options that decide them.
+`trace` marks a class or function whose `pub` functions call the `enter` and `leave` hooks in dev mode. `--trace <pattern>` instruments code that did not ask. `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger` and the rest, and `trace.start` installs the one that the runtime key `trace` names. [Hooks and tracing](#hooks-and-tracing) holds the nine hooks and the options that decide them.
 
-A release binary carries no symbol data. `anti build --release` writes a symbols archive beside it, and `anti symbols inventory`, `check` and `resolve` collect the archives of a deployment and turn a raw trace into names and lines. `anti.debug.backtrace` captures one at run time, and `--anti.backtrace` turns the frames of an error on in a release build.
+`-g` writes the line of every statement and an entry per function, and the link keeps the debug sections, so lldb and gdb stop by file and line and print a backtrace of Anti function names. Every executable and shared library carries a build id in `anti_licenses`. A release binary carries no symbol data. `anti build --release` writes a symbols archive beside it, `<program>-symbols.zip`, with the same link with its debug sections kept, the map of the program's functions and, on Windows, the PDB. `anti symbols inventory`, `check` and `resolve` read the runtime configuration and the build id of every binary it reaches, collect the archives of a deployment and turn a raw trace into names and lines. `resolve` names a frame from the debug link and fills what it lacks from the map. `StackTrace` has `capture`, `frames`, `text` and `symbolize`, which names the function of a frame in every build and its file and line in a `-g` build. `anti.debug.backtrace(skip)` captures one at run time, and `--anti.backtrace` turns the frames of an error on in a release build.
 
-The x86_64 baseline for a release build is x86-64-v3. The ARM64 baseline is `armv8.5` on macOS, `armv8.2` on Windows and `armv8.0` on Linux. `--cpu` overrides on every target, and a program refuses to start on a processor below its level. A level is a code-generation setting, not a target. The runtime archive holds one runtime per target and level, so a program below the default links a runtime of its own level. The native libraries are built for the default level alone, and a program below it that imports one is refused at link.
+`--memory-checks`, for `antic`, `anti build`, `anti test` and `anti run`, makes a build find a use after free, a double free and a read or write outside a heap block while the program runs, and report the leaks at exit with where each block was allocated. The back end emits the checks of AddressSanitizer around every load and store, and the build links the runtime of AddressSanitizer from the runtime archive. The option is off by default, since the program runs two to three times slower, and is refused on windows-arm64, which has no such runtime. `anti run` and `anti test` put the report through Anti's own symbolizer, so every frame reads as a name, a file and a line, and the leak report leaves out what the runtime keeps from start to exit on purpose. A pointer into a collection kept across a change of its size is a use after free, and the option finds it.
 
-`--memory-checks`, for `antic`, `anti build`, `anti test` and `anti run`, makes a build find a use after free, a double free and a read or write outside a heap block while the program runs, and report the leaks at exit with where each block was allocated. The back end emits the checks of AddressSanitizer around every load and store, and the build links its runtime from the pinned clang. The option is off by default, since the program runs two to three times slower, and is refused on windows-arm64, which has no such runtime. `anti run` and `anti test` put the report through Anti's own symbolizer, so every frame reads as a name, a file and a line, and the leak report leaves out what the runtime keeps from start to exit on purpose. A pointer into a collection kept across a change of its size is a use after free, and the option finds it.
+Not built yet: the variables of `-g`, the symbols archive of a shared library and of a plugin, the names of a Windows frame in `resolve` and the leak report on windows-x86_64. `anti build` writes the archive for a program alone, `resolve` reads no PDB and leaves a Windows frame raw, and the runtime of AddressSanitizer for windows-x86_64 has no leak check.
 
-Built: the checks, with `--checks` and `--no-checks`, `-g`, which writes the line of every statement and keeps the debug sections of the link, the build id in `anti_licenses` of every executable and shared library, the backtraces, with `StackTrace`, `anti.debug.backtrace` and `--anti.backtrace`, and the CPU levels, with `--cpu`, the start-up check and the runtime archive with one runtime per target and level. `symbolize` names the function of a frame in every build and its file and line in a `-g` build. `trace` and the options that decide it are built, and "Hooks and tracing" above names them. The symbols archive of `anti build --release` is built: `<program>-symbols.zip` beside the program, with the same link with its debug sections kept, the map of the program's functions and, on Windows, the PDB. `anti symbols inventory`, `check` and `resolve` are built. They read the runtime configuration and the build id of every binary it reaches, and `resolve` names a frame from the debug link and fills what it lacks from the map. Not built yet: the variables of `-g`, the symbols archive of a shared library and of a plugin, which `anti build` does not write, and the names of a Windows frame in `resolve`, which reads no PDB and leaves the frame raw. Windows has not run a trace. `--memory-checks` is built for `antic`, `anti build`, `anti run` and `anti test`, with the leak check, the kept blocks of the runtime and the report through Anti's symbolizer. `tests/traps/memory_checks.anti` makes each kind of error, and `tests/traps/memory_checks_list.anti` keeps a pointer into a `List` across a push that grows it. Not built yet: the leak report on windows-x86_64, whose runtime of AddressSanitizer has no leak check. Linux and Windows have not run a program of the option.
+## Processor levels
+
+A level is a code-generation setting, not a target. `--cpu` takes `v1`, `v2` or `v3` on x86_64 and `armv8.0`, `armv8.2` or `armv8.5` on ARM64, and each target has a default.
+
+| Target | Default level |
+|---|---|
+| linux-x86_64, macos-x86_64, windows-x86_64 | `v3`, x86-64-v3 |
+| macos-arm64 | `armv8.5` |
+| windows-arm64 | `armv8.2` |
+| linux-arm64 | `armv8.0` |
+
+x86-64-v3 writes the VEX forms of the scalar float instructions, and an atomic operation is one instruction at `armv8.2` and above. The runtime archive holds one runtime per target and level in `lib/<target>/<level>/`, so a program below the default links a runtime of its own level. Every program checks the processor at start against the level of the runtime it linked, and refuses a machine below it. The native libraries are built for the default level alone, and a program below it that imports one is refused at link. `antic --print-cpu-levels` prints the table.
 
 ## Warnings and safety checks
 
@@ -1471,9 +1477,30 @@ fn sum_all(lines: []str) -> int may fail
 }
 ```
 
-Every warning and every safety check has a stable name at the end of its message, as in `` `e` shadows the outer `e` [shadowed-catch] ``. `allow` and `unchecked` stand before a statement, last in a declaration's header, or at the top of the file ending with `;`, and `unchecked` also after a field's type. Each takes one name and a required reason, and is not part of a signature. One that silences nothing is the warning `unused-allow` or `unused-unchecked`. `antic --warnings-as-errors` gives the release behaviour in a dev build, and `anti check` uses it. The first safety checks are `unguarded-field` and `exponential-pattern`.
+Every warning and every safety check has a stable name at the end of its message, as in `` `e` shadows the outer `e` [shadowed-catch] ``. `allow` and `unchecked` stand before a statement, last in a declaration's header, or at the top of the file ending with `;`, before the imports, and `unchecked` also after a field's type. Each takes one name and a required reason, and is not part of a signature. One that silences nothing is the warning `unused-allow` or `unused-unchecked`. `antic --warnings-as-errors` gives the release behaviour in a dev build, and `anti check` uses it. `docs/notes/warnings.md` gives the fix of each.
 
-Built: the name of every warning, `allow` and `unchecked` at every level, `unused-allow` and `unused-unchecked`, the refusal of a clause that names an error, `--warnings-as-errors`, `anti check` with it, and a release build that refuses a warning. `docs/notes/warnings.md` lists the names with their meaning and their fix. The safety check `unguarded-field` is built with concurrent classes, and `exponential-pattern` with pattern literals.
+| Warning | Meaning |
+|---|---|
+| `shadowed-catch` | The name a `catch` binds hides a variable of an outer scope. |
+| `never-fails` | A `may fail` function holds no `fail` and no `try`. |
+| `assert-call` | The condition of an `assert` calls a function, which a release build does not run. |
+| `unfilled-abstract` | No class of the program fills an abstract class. |
+| `above-vector-cap` | A `simd struct` is above the vector cap, so each operation on it is a loop. |
+| `single-segment-path` | The module path of a library has one segment, which is for a program's own files. |
+| `doc-markup` | A doc comment holds markup outside the doc subset. |
+| `doc-unresolved` | A name in backticks of a doc comment resolves to nothing. |
+| `doc-note-only` | A `pub` item has a `//#` note and no `///` comment. |
+| `undocumented` | A `pub` item has no `///` comment, under `--warn-undocumented`. |
+| `doc-dropped` | A doc comment stands where no item or field follows it. |
+| `unused-allow` | An `allow` silences nothing. |
+| `unused-unchecked` | An `unchecked` overrules nothing. |
+
+The five `doc-` warnings and `undocumented` come with `--doc-warnings`, which `anti check` passes.
+
+| Safety check | Meaning |
+|---|---|
+| `unguarded-field` | A field of a concurrent class is not guarded, atomic or fixed. |
+| `exponential-pattern` | A pattern literal nests repeats over text that overlaps, which can take exponential time. |
 
 ## Wire formats
 
