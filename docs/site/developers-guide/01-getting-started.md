@@ -3,7 +3,7 @@ title: "Getting started"
 description: "Installing the package of Anti, the first program, anti build and anti run, dev and release builds and where the files go."
 summary: "The package per platform and its one-command install, antic and anti, a first program, `anti build` and `anti run`, the dev and the release mode and the directories an install and a build write."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:09:42+02:00
+lastmod: 2026-10-11T20:12:15+02:00
 draft: true
 weight: 10
 tags: [compilers, programming-languages]
@@ -151,6 +151,19 @@ hello
 ```
 
 `import anti.io;` makes the module `anti.io` reachable under its last segment, `io`. `main` returns an `int`, which becomes the exit status of the program. A `//` comment runs to the end of its line.
+
+One source file is one module. An item of a module is private to its file unless it is marked. `pub` makes it visible to every module, and `internal` to the modules of the same package. An `import` has two more forms.
+
+```anti
+import anti.io.{println};
+import anti.text as t;
+
+if t.equal("a", "a") {
+	println("equal");
+}
+```
+
+`import anti.io.{println};` makes the listed public items of a module visible without its name. `import anti.text as t;` gives the module another name in the file. The guide has no chapter on modules, and "Modules" of `docs/anti-syntax-overview.md` holds their rules.
 
 ### Hello with antic alone
 

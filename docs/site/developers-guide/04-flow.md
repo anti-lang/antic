@@ -3,14 +3,14 @@ title: "Flow"
 description: "if and while, for over ranges and collections, switch on values and what each compiles to, break and continue, defer and undo."
 summary: "`if` and `while`, `for` over a range and over a collection, `switch` on an integer, a `str` and a variant with what each compiles to, `break` and `continue`, `defer` and `undo`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T08:10:24+02:00
+lastmod: 2026-10-11T20:12:15+02:00
 draft: true
 weight: 40
 tags: [compilers, programming-languages]
 keywords: [control flow, if, while, for loop, switch, break, continue, defer, undo]
 ---
 
-A statement of this chapter becomes basic blocks and branches in the IR of antic, and nothing else. No statement here allocates or takes a lock. Three of them call a function: a `for` over a collection calls its iterator, a `switch` on a `str` calls `anti.text.equal`, and a dev build calls the runtime when a check fails.
+A statement of this chapter becomes basic blocks and branches in the IR of antic, and nothing else. No statement here allocates or takes a lock. A `for` over a collection calls its iterator, and a `switch` on a `str` calls `anti.text.equal`. A dev build calls the runtime when a check fails.
 
 An excerpt marked `ir` shows the IR of antic after lowering, which `antic --dump-ir` prints and chapter 2 explains. A block is `b0`, `b1` and on, `branch %c, b1, b2` goes to `b1` when `%c` is true, and `jump` goes unconditionally. Lowering writes the checks of dev mode into the IR in both modes, and a release build drops their blocks afterwards.
 
@@ -24,7 +24,7 @@ C and C++ take any scalar as a condition: zero and the null pointer are false, e
 
 `if` takes a condition and a block. `else if` continues the chain and `else` ends it. The braces are part of the statement, and parentheses around the condition are optional.
 
-A condition has type `bool`. No integer and no pointer converts to it, so a test of a number is written `n != 0` and a test of a pointer `p != none`. The one other type that stands as a condition is the match of a pattern, `?Match`, which means that the pattern matched.
+A condition has type `bool`. No integer and no pointer converts to it, so a test of a number is written `n != 0` and a test of a pointer `p != none`. The one other type a condition takes is `?Match`, the match of a pattern, which is true when the pattern matched.
 
 `&&` and `||` evaluate the left operand first and the right one only when the left does not decide. `!` negates a `bool`.
 
@@ -245,7 +245,7 @@ b3:                                               ; preds = %b0
   br label %common.ret
 ```
 
-This is `length`. The test of `none` is a compare of the pointer with null, and it stays a branch, because the `load` in `b3` must not run for a null pointer. The second condition and both `return` statements became `smax`, the larger of `*p` and 0.
+This is `length`. The test of `none` is a compare of the pointer with null. It stays a branch, because the `load` in `b3` must not run for a null pointer. The second condition and both `return` statements became `smax`, the larger of `*p` and 0.
 
 ```asm excerpt=branch target=linux-x86_64 mode=release
 <length>:
@@ -542,9 +542,9 @@ b5:
     branch %30, b2, b3
 ```
 
-`%2` is the iterator, a slot of the frame of 64 bytes. `b0` calls `iter` through the table of the list, since `items` is a pointer, and copies its result into the slot. A dev build also tests the table pointer before that call, which chapter 9 describes. `b1` is the test of each turn. It loads the pointer to the `Changes` of the list and compares two counts: the changes of the list now and the changes when the walk began. When they differ, the block `b4` calls `anti_rt_walk_changed`, which prints the message and ends the program. `b5` calls `next`, and `b2` calls `value` and loads the element through the pointer it returns.
+`%2` is the iterator, a slot of the frame of 64 bytes. `b0` calls `iter` through the table of the list, since `items` is a pointer, and copies its result into the slot. A dev build also tests the table pointer before that call, which chapter 9 describes. `b1` is the test of each turn. It loads the pointer to the `Changes` of the list and compares two counts. One is the count of changes now, and the other the count when the walk began. When they differ, the block `b4` calls `anti_rt_walk_changed`, which prints the message and ends the program. `b5` calls `next`, and `b2` calls `value` and loads the element through the pointer it returns.
 
-The iterator of a list holds a `Watch`, which is a pointer to the `Changes` of the list and the count at the start. Every function that changes the size of the list adds 1 to that count and stores the `here` of its caller. An iterator without a field of type `Watch` gets no such test.
+The iterator of a list holds a `Watch`, which is a pointer to the `Changes` of the list and the count at the start. Every function that changes the size of the list adds 1 to that count and stores the `here` of its caller, the source position that chapter 5 describes. An iterator without a field of type `Watch` gets no such test.
 
 A release build drops `b4` and the compare before it. `next` and `value` are ordinary functions of the module, and `opt` inlines them where its threshold allows.
 
@@ -595,7 +595,7 @@ For a C++ programmer:
 
 ### What you know
 
-`switch` in C, C++ and Java jumps to the `case` whose constant equals the value, and execution runs on into the next `case` unless a `break` ends it. C and C++ switch on integers and enums. Java also switches on strings and, in its arrow form, runs one arm without fallthrough.
+`switch` in C, C++ and Java jumps to the `case` whose constant equals the value. Execution runs on into the next `case` unless a `break` ends it. C and C++ switch on integers and enums. Java also switches on strings and, in its arrow form, runs one arm without fallthrough.
 
 ### The feature
 
@@ -787,7 +787,7 @@ switch x {
 
 ### How antic builds it
 
-Lowering writes a `switch` as a chain of compares in the order of the arms. antic writes no `switch` instruction of LLVM and builds no jump table itself.
+Lowering writes a `switch` as a chain of compares in the order of the arms. The LLVM text that antic writes holds no `switch` instruction and no jump table, in either mode.
 
 ```ir excerpt=arms target=linux-x86_64 mode=dev
 export fn arms.days(%0: i64) -> i64 {
@@ -1031,7 +1031,7 @@ Lowering skips every statement that follows a `break`, a `continue` or a `return
 
 ### How antic builds it
 
-Each of the two is one jump. Before the jump stand the deferred statements of the blocks it leaves, written out again at that place.
+Each of the two is one jump. Before the jump stand the deferred statements of the blocks it leaves, written out again at that place. The example calls `note`, an `extern fn`. That is a function of C which the module declares and does not define, so no pass removes a call of it. Chapter 17 describes the form.
 
 ```anti
 //! name: scan
@@ -1135,9 +1135,11 @@ C frees what a function took at the end, often behind a `goto cleanup` label. C+
 
 ### The feature
 
-`defer stmt;` records one statement. It runs at every exit of the block that holds the `defer`: at the closing brace, at a `return`, a `break`, a `continue`, and when an error leaves the block. The statements of one block run in the reverse order of their declaration.
+`defer stmt;` records one statement. It runs at every exit of the block that holds the `defer`. The exits are the closing brace, a `return`, a `break`, a `continue` and an error that leaves the block. The statements of one block run in the reverse order of their declaration.
 
 `undo stmt;` records one statement that runs only when the block is left by an error: a `fail`, or a `try` that forwards one. On that exit every `undo` of the block runs, last declared first, and after them every `defer` of the block.
+
+Chapter 6 describes errors. This section needs three of its forms. A function marked `may fail` can end with an error, which `fail` raises. `try` before a call passes the error of that call on to the caller. `catch { }` after a call takes the error and goes on.
 
 Both take effect where they stand. An exit above a `defer` does not run it. A deferred statement reads its variables when it runs, not when it is declared.
 
