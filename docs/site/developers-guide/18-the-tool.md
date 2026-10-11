@@ -3,7 +3,7 @@ title: "The tool"
 description: "anti.toml, dependencies and the lock file, anti build and its cache, anti check, anti fmt, anti doc, anti license and anti symbols."
 summary: "The manifest `anti.toml`, dependencies and `anti.lock`, `anti build` and its cache, `anti check`, `anti fmt`, `anti doc`, `anti license` and `anti symbols`."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T22:00:00+02:00
+lastmod: 2026-10-11T20:19:56+02:00
 draft: true
 weight: 180
 tags: [compilers, programming-languages]
@@ -410,7 +410,7 @@ src/com/example/units.anti:34:9: error: the operands of `/` have the types `floa
 anti check: front end: 1 file, 1 target, 0 warnings, 1 failed
 ```
 
-A doc block compiles in one of two contexts. A block of a `///` comment becomes a module of its own that imports the module of the comment, so it reaches the public items alone. A block of a `//#` note is compiled inside a copy of the module, where the private items are in reach. A block without `fn main` is wrapped in a function. The example `let f = units.feet(2.0);` of `feet` is therefore checked against the real function.
+A doc block compiles in one of two contexts. A block of a `///` comment becomes a module of its own that imports the module of the comment, so it reaches the public items alone. A `//#` note is a doc comment for the developers of a library, which the user pages leave out. A block of such a note is compiled inside a copy of the module, where the private items are in reach. A block without `fn main` is wrapped in a function. The example `let f = units.feet(2.0);` of `feet` is therefore checked against the real function.
 
 Where it lives: `src/anti/check.c`. The front end is `antic --front-end --warnings-as-errors`, called through the driver.
 
@@ -463,7 +463,7 @@ The formatter sorted the two names of the import list and left the order of the 
 
 `anti fmt` works on the tokens of a file and not on its syntax tree. It uses the lexer of the compiler, so it formats a file that does not parse. An ordinary comment stays where it stands between two tokens.
 
-A second run changes nothing: `anti fmt` prints no path and `anti fmt --check` exits with 0. The sources of the standard library and of the tests of Anti stand in this form.
+A second run changes nothing. `anti fmt` then prints no path, and `anti fmt --check` exits with 0. The sources of the standard library and of the tests of Anti stand in this form.
 
 Where it lives: `src/anti/fmt.c`.
 
