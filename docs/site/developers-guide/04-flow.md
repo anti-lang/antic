@@ -322,6 +322,7 @@ The variable of a `for` is read-only and ends with the loop.
 //! name: loops
 import anti.io;
 import anti.text;
+import anti.collection;
 import anti.collection.list.{List};
 
 export fn sum_to(n: int) -> int
@@ -376,6 +377,7 @@ fn main() -> int
 	numbers.push(3);
 	numbers.push(4);
 	say(f"sum_to {sum_to(5)}, total_of {total_of(&numbers)}");
+	say(f"iterator {size_of(collection.IndexedWalk<int>)} bytes");
 	return 0;
 }
 ```
@@ -386,6 +388,7 @@ fn main() -> int
 1: 5
 2: 10
 sum_to 10, total_of 7
+iterator 64 bytes
 ```
 
 A collection is any type with `operator fn iter(self)`, which gives a new iterator on each call. An iterator is any type with `operator fn next(self) -> bool` and `operator fn value(self) -> T`. `for x in c` calls `iter` once, then `next` before each turn and `value` at the head of each turn. `for x in it` walks an iterator in its place. A class of the program takes part by declaring the three hooks, and chapter 9 shows one.
@@ -539,7 +542,7 @@ b5:
     branch %30, b2, b3
 ```
 
-`%2` is the iterator, a slot of the frame of 64 bytes. `b0` calls `iter` through the table of the list, since `items` is a pointer, and copies its result into the slot. A dev build also tests the table pointer before that call, which chapter 9 describes. `b1` is the test of each turn. It first compares two counts: the changes of the list now and the changes when the walk began. When they differ, the block `b4` calls `anti_rt_walk_changed`, which prints the message and ends the program. `b5` calls `next`, and `b2` calls `value` and loads the element through the pointer it returns.
+`%2` is the iterator, a slot of the frame of 64 bytes. `b0` calls `iter` through the table of the list, since `items` is a pointer, and copies its result into the slot. A dev build also tests the table pointer before that call, which chapter 9 describes. `b1` is the test of each turn. It loads the pointer to the `Changes` of the list and compares two counts: the changes of the list now and the changes when the walk began. When they differ, the block `b4` calls `anti_rt_walk_changed`, which prints the message and ends the program. `b5` calls `next`, and `b2` calls `value` and loads the element through the pointer it returns.
 
 The iterator of a list holds a `Watch`, which is a pointer to the `Changes` of the list and the count at the start. Every function that changes the size of the list adds 1 to that count and stores the `here` of its caller. An iterator without a field of type `Watch` gets no such test.
 
@@ -555,13 +558,13 @@ Where it lives: `check_for`, `check_step` and the read-only rule of `src/antic/s
 | A range loop, per turn | one subtract, one compare, one add | at most that, and none where `opt` finds a closed form or vectorizes |
 | A slice or array loop, per turn | one compare, one add, one copy of the element | the same or less |
 | A collection loop, before the first turn | one call of `iter`, one copy of the iterator into the frame | the same, inlined where `opt` chooses |
-| A collection loop, per turn | two loads and one compare of the change counts, one call of `next`, one call of `value`, one copy of the element | `next` and `value`, with no compare of the counts |
+| A collection loop, per turn | three loads and one compare of the change counts, one call of `next`, one call of `value`, one copy of the element | `next` and `value`, with no compare of the counts |
 | `for x in &e`, per turn | no copy of the element | no copy |
 | Heap allocations | 0 | 0 |
 | Locks and atomic operations | 0 | 0 |
 | Checks inserted | the change check of a collection loop | none |
 
-The iterator lives in the frame of the function that holds the loop. For a `List<int>` it is 64 bytes.
+The iterator lives in the frame of the function that holds the loop. For a `List<int>` it is the `IndexedWalk<int>` of 64 bytes that the last line of the program prints.
 
 `--no-checks` drops the change check from a dev build, and `--checks` keeps it in a release build. Without it, a loop over a list that grows in the body reads through a pointer into memory the list has freed.
 
@@ -1072,6 +1075,24 @@ b7:
 `b2` is the step of the `for` and `b3` the exit of the loop. `b4` is the `continue`: the deferred `note(2)` and a jump to the step. `b6` is the `break`: the deferred call again and a jump to the exit. `b7` is the end of the body, with the third copy of the deferred call. The function holds `note(2)` three times, once per exit of the block.
 
 A release build leaves it to `opt` to merge the copies. In the object of this example the `continue` and the end of the body share one call, and the `break` keeps its own.
+
+```asm excerpt=scan target=linux-x86_64 mode=release
+<scan>:
+...
+movl $0x2, %edi
+callq 0x2a <scan+0x2a>
+incq %r15
+...
+movl $0x1, %edi
+callq 0x45 <scan+0x45>
+jmp 0x20 <scan+0x20>
+...
+movl $0x2, %edi
+...
+jmp 0x66 <scan+0x66>
+```
+
+The first `movl $0x2, %edi` stands at offset `0x20`, and it and its `callq` are the deferred call of both the `continue` and the end of the body. The `jmp 0x20` after `note(1)` goes back to it. The second `movl $0x2, %edi` is the copy of the `break`. It leaves through the last `jmp`, a tail call of `note`.
 
 Where it lives: the `STMT_BREAK` and `STMT_CONTINUE` cases of `check_stmt` in `src/antic/sema_stmt.c` refuse one outside a loop. The same cases of `lower_stmt_kind` in `src/antic/lower_stmt.c` call `lower_run_defers_to` and write the jump, and `lower_block` skips the statements after it.
 
