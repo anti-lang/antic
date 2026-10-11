@@ -507,8 +507,6 @@ fn wire(p: *Panel)
 
 A closure never outlives what it captures. It is passed to a parameter that does not keep it, or held in a local used the same way, and never stored in a field, a return value, a global or a `keep` parameter. Creating one allocates nothing. A parameter that passes its function on to `parallel` or `dispatch` is marked `concurrent`, and a closure there may change a captured variable only when its type is thread-safe. A worker takes a closure through a `concurrent` parameter alone. `snapshot fn` copies what it uses when it is made, is read-only, and holds numbers, `bool`, `char`, structs of those and `str`. It is accepted at an `own` field, a `keep own` parameter and a `concurrent` parameter, and a plain `keep` parameter refuses it. A parameter that does not keep its argument is two words, the code and a context pointer, and a plain kept function value stays one C function pointer. `own fn` is two words as well, the code and a snapshot on the heap that its owner frees. `=` does not copy it, and `dup` copies it with its snapshot. The header writes the two words of a parameter as a callback and a `void *` context, and an `own fn` field as a struct of the code and the snapshot. An `extern fn` takes C function pointers alone.
 
-Built: everything above. That covers anonymous functions with their types from the target, closures that capture by reference, `keep` and `concurrent` with the checks on both sides, the two words of a parameter that does not keep its argument and the rule of the worker. `snapshot fn` is built as well, with `own` fields and `keep own` parameters. `programs/closures.anti` and `programs/snapshots.anti` run them, and `errors/closures.anti` and `errors/snapshots.anti` hold the refusals.
-
 ## Tuples
 
 An anonymous struct with C layout, for a function with two answers and no name for the pair.
@@ -528,8 +526,6 @@ for i, x in items { }
 ```
 
 Elements are `t.0`, `t.1` and on. Destructuring is `let (a, b) = e;` and `for i, x in items`, and nowhere else: not in a parameter list and not nested. Two tuple types are the same when their element types are the same in order. A tuple of more than three elements, or one that crosses a module boundary, is a struct that has not been named yet.
-
-Built.
 
 ## Errors
 
@@ -573,15 +569,15 @@ try {
 }
 ```
 
-A handler ends with `yield v` or leaves the block. The name after `catch` is any identifier, scoped to the handler, and the error is deleted on every exit of the handler unless `return e` or `fail e` hands it on or a call moved it into an `own` parameter. `Error.wrap` takes its cause so. `fail "text"` is `fail Error.new(0, "text")`. `try` forwards the error and is refused outside a function that may fail. `undo` runs on the `fail` path and not on `return`. `Error` has `code`, `message`, an owned `cause`, the origin `at` that `fail` fills, and the frames of a trace when backtraces are on. It lives in `anti.lang`, the root of the standard library, which imports nothing. `e.text()` gives `error N: message`, or the message alone for code 0, with each cause on a line of its own, and the error keeps those bytes until it is deleted. Libraries subclass it and callers test with `is`. `anti.error` adds `SystemError`, with `from_errno()` and `from_win32()`, and `on_fatal` and `check`.
+A handler ends with `yield v` or leaves the block. The name after `catch` is any identifier, scoped to the handler, and `catch { }` binds none. The error is deleted on every exit of the handler unless `return e` or `fail e` hands it on or a call moved it into an `own` parameter. `Error.wrap` takes its cause so. `fail "text"` is `fail Error.new(0, "text")`. `try` forwards the error and is refused outside a function that may fail. It stands wherever the call stands, after `return` and inside an expression as well. `undo` runs on the `fail` path and not on `return`. `Error` has `code`, `message`, an owned `cause`, the origin `at` that `fail` fills, and the frames of a trace when backtraces are on. It lives in `anti.lang`, the root of the standard library, which imports nothing. `e.text()` gives `error N: message`, or the message alone for code 0, with each cause on a line of its own, and the error keeps those bytes until it is deleted. `e.print()` writes that text to the standard error, and `e.fatal()` prints it and ends the program. Libraries subclass it and callers test with `is`. `anti.error` adds `SystemError`, with `from_errno()` and `from_win32()`, and `on_fatal` and `check`.
 
 The ABI of a `may fail` function is `?*Error f(args, R *out)`, with the result through an out pointer. `fn(A) -> R may fail` is its type as a value, a call through it is handled as a direct call is, and the header writes the ABI form. The compiler supplies that pointer over storage whose table it zeroes. The binding is destroyed at the end of its block like any other local. `may fail` is the one failing form. A C binding returns its error as an ordinary value, and a `may fail` wrapper turns it into a `fail`.
 
-Built: `catch`, `try`, the `try` block and `catch fatal`, `may fail` and `fail`, `may fail` on a `construct` with arguments, and `undo` on the fail path. `Error` and `NoneDereference` live in `anti.lang`. Every test program uses `may fail`, and `errors/construct_forms.anti` checks that a `construct` refuses `-> ?*Error`. A function fails by its `may fail` marking alone, and one that returns `*Error` or `?*Error` without it gives the error as a value. `text.parse_int` may fail, and no other function of `anti.text` or `anti.io` fails. The three user directories of `anti.os` may fail, and so does every function of `anti.fs`: `open`, `read`, `write`, `flush`, `size`, `close`, `list`, `remove` and `rename`. `toml.Document.read`, `log.FileSink.new`, `args.Parser.parse`, `reflect.set`, `reflect.call` and `json.unquote` may fail. `try` stands wherever the call stands, after `return` and inside an expression as well. `fn(A) -> R may fail` is a type, and a call through a value of it takes a handler. A handler moves its error into an `own` parameter, and `Error.wrap` takes its cause so. The first `fail` of an error writes its origin `at` and, when backtraces are on, its frames, and `e.text()` names the position, the causes and the trace. `--anti.backtrace` and `backtrace = true` of the runtime configuration turn the frames on in a release build. The checker warns where the name a `catch` binds shadows a variable in scope, `shadowed-catch`, and where a `may fail` function holds no `fail` and no `try`, `never-fails`. `catch none` counts a failure as `none` where the result can be `none`, and deletes the error as every handler does. `programs/catch_none.anti` runs it and `errors/catch_none.anti` holds the refusals.
+A function fails by its `may fail` marking alone, and one that returns `*Error` or `?*Error` without it gives the error as a value. A `construct` with arguments that can fail is written `may fail`, and one written `-> ?*Error` is refused. The first `fail` of an error writes its origin `at` and, when backtraces are on, its frames, and `e.text()` names the position, the causes and the trace. `--anti.backtrace` and `backtrace = true` of the runtime configuration turn the frames on in a release build. The checker warns where the name a `catch` binds shadows a variable in scope, `shadowed-catch`, and where a `may fail` function holds no `fail` and no `try`, `never-fails`. `catch none` deletes the error as every handler does. The failing functions of the standard library stand in the table of [Standard library](#standard-library).
 
 ## Structs
 
-Fields only, exactly the bytes C declares. Every field is visible. Method-call sugar for free functions in the declaring module.
+Fields only, exactly the bytes C declares. Every field is visible. Method-call sugar for free functions in the declaring module. Structs are nominal: two declarations are two types, and a literal of a struct of another module names it as `geo.Rect { }`.
 
 ```anti
 struct Rect
@@ -592,13 +588,31 @@ struct Rect
 	h: f32,
 }
 
+packed struct Header
+{
+	kind: u8 : 4,
+	flags: u8 : 4,
+	_: u32 : 0,
+	length: u32,
+}
+
+union Word
+{
+	whole: u64,
+	halves: [2]u32,
+}
+
 fn area(r: *Rect) -> f32 { return r.w * r.h; }
 
 let r = Rect { x: 0.0, y: 0.0, w: 8.0, h: 4.0 };
 let a = r.area();       // area(&r)
+let h = Header { kind: 1, flags: 2, length: 3 };
+let w = Word { whole: 1 };
+let bytes = size_of(Rect);
+let at = lang.SourceLocation { file: "a.anti", line: 1, column: 1, function: "main", module: "app" };
 ```
 
-`packed struct` removes padding. `struct Foo align(16)` raises alignment. `union` has C layout. Bitfields `flags: u32 : 4`. `size_of(T)` is the size on the target.
+`packed` before `struct`, `union`, `class` or `variant` removes padding, and `align(N)` after the name of any of the four raises its alignment. `union` has C layout, and a literal of one names exactly one field. Bitfields `flags: u32 : 4`. `_: T : 0` is a zero-width bitfield, a unit break as in C, and a union holds none. A trailing comma is allowed in every comma-separated list. `size_of(T)` is the size on the target.
 
 ## Simd structs
 
@@ -617,13 +631,11 @@ let d = simd.select(m, a, b);
 let s = c.sum();
 ```
 
-Arithmetic, the bitwise operators on integer lanes, comparisons and unary minus apply lane by lane. A comparison yields a mask, a `simd struct` of `bool` with the same lane count. `simd.select`, `simd.any` and `simd.all` are in `anti.simd`. `splat`, `load`, `store`, `shuffle`, `sum`, `min`, `max` and `dot` are built in. `as` between a `simd struct` and the array or plain struct of the same bytes is free. The back end maps each operation to the target's native width, so the lane count is the programmer's and the instruction count is the machine's. Above the vector cap it is an array and a loop.
-
-Built: the declaration and its rules, the element-wise operators, the masks of the comparisons, `simd.select`, `simd.any` and `simd.all` of `anti.simd`, the eight built-ins and `as` to an array or a plain struct of the same bytes. A `simd struct` of 16 bytes is the vector type of C in the header and passes in a vector register. One of another size passes as the struct of its lanes. An `f32x8` is one instruction at x86-64-v3 and two everywhere else, and a `simd struct` above the cap is an array and a loop, which a warning at its declaration names.
+Arithmetic, the bitwise operators on integer lanes, comparisons and unary minus apply lane by lane. A comparison yields a mask, a `simd struct` of `bool` with the same lane count. `simd.select`, `simd.any` and `simd.all` are in `anti.simd`. `splat`, `load`, `store`, `shuffle`, `sum`, `min`, `max` and `dot` are built in. `as` between a `simd struct` and the array or plain struct of the same bytes is free. The back end maps each operation to the target's native width, so the lane count is the programmer's and the instruction count is the machine's. An `f32x8` is one instruction at x86-64-v3 and two everywhere else. A `simd struct` of 16 bytes is the vector type of C in the header and passes in a vector register, and one of another size passes as the struct of its lanes. Above the vector cap it is an array and a loop, which the warning `above-vector-cap` names at its declaration.
 
 ## Enums
 
-A named integer type with C layout. A value without `=` follows the one before it, and every value fits the underlying type.
+A named integer type with C layout, over `c_int` unless the declaration names the type. A value without `=` follows the one before it, and every value fits the underlying type. `as` converts an enum to and from any numeric type, and a dev build checks a conversion to an enum. `==` and `!=` compare two values, and `switch` takes them with their type.
 
 ```anti
 enum Kind { Circle, Square, Empty }
@@ -631,6 +643,8 @@ enum Mode: u8 { Read = 1, Write = 2 }
 
 let k = Kind.Circle;
 let n = k as int;
+let m = 2 as Kind;
+if k != m { }
 ```
 
 ## Variants
@@ -662,7 +676,7 @@ let round = s is Shape.Circle;
 let n = s.tag as int;
 ```
 
-Built: declarations with `packed` and `align(N)`, the literals of the cases, `switch` that names every case or has `else`, `if let`, `is`, `tag`, a variant of another module and the enum of the tags in the C header. `fallthrough` never enters an arm that binds a case's fields. A variant with an owning case is torn down by its tag and follows the value rules of an owning struct, and an arm that binds such a case gets a copy that the arm tears down. `tests/programs/variant_owning.anti` and `tests/std/collection_variants.anti` run it under a leak check, and `tests/errors/variant_owning.anti` holds the refusals.
+A declaration takes `packed` and `align(N)`. A literal of a variant of another module is `geo.Shape.Circle { r: 2.0 }`, and the test of its case `v is geo.Shape.Circle`. A `switch` names every case or has `else`, and `fallthrough` never enters an arm that binds a case's fields. The C header writes the enum of the tags. A variant with an owning case is torn down by its tag and follows the value rules of an owning struct, and an arm that binds such a case gets a copy that the arm tears down.
 
 ## Classes
 
@@ -706,17 +720,17 @@ c.move(1.0, 1.0);
 ```
 
 - `class Name inherits Base` names the base in the header, after the name and after `align(N)` when the class has one. One base, `anti.lang.Object` when absent, and `module.Class` for a base of another module. The base is no member, so `inherits` in the body is refused, and `implements` and `use` stay there as named sub-objects. `self.super` is the base part and `self.super.f()` the base's function, which is refused when that function is abstract.
-- `pub fn` goes into the table and is visible everywhere, `protected fn` to the class and its chain, `fn` to the class only. A function without `self` is static: `Circle.new(...)`. An `operator fn` at module level reaches the private and protected fields and functions of the classes of its own module. An ordinary function of the module and an operator of another module do not.
+- `pub fn` goes into the table and is visible everywhere, `protected fn` to the class and its chain, `fn` to the class only. A function without `self` is static: `Circle.new(...)`. A `const` of the body is reached as `Shape.MAX`. An `operator fn` at module level reaches the private and protected fields and functions of the classes of its own module. An ordinary function of the module and an operator of another module do not.
 - `abstract class` is required when any function has no body. `final class` and `final fn` forbid inheritance and replacement.
 - `concrete fn` replaces an inherited entry, `concrete fn Base::f` documents which, `concrete fn Iface::f` fills one interface's table only.
-- Fields are private unless `pub` or `protected`, and a field may be a bitfield as in a struct. A literal outside the class names `pub` fields only. Defaults fill the rest, then `construct` runs. An inline class field without a default takes `T { }` when every field of `T` has a default or `T` has none, and `construct` runs on it. Otherwise the literal must name it.
+- Fields are private unless `pub` or `protected`, and a field may be a bitfield as in a struct. A literal outside the class names `pub` fields only, and names a class of another module as `shapes.Circle { }`. Defaults fill the rest, then `construct` runs. An inline class field without a default takes `T { }` when every field of `T` has a default or `T` has none, and `construct` runs on it. Otherwise the literal must name it.
 - `alloc T { fields }` and `alloc T(args)` create on the heap and return `*T`. `T { fields }` and `T(args)` are values. A `construct` with arguments that can fail is written `may fail`, leaves with `fail` and succeeds at its end. Every path that succeeds assigns every field without a default, which the compiler checks. `T(args)` carries the error of `construct` to the handler at the call, and a failed `alloc` frees the object.
 - A `construct` below that wants its base initialised calls `self.super.construct(args)` as the first statement of its body, and `try` forwards a failure of the base. One that leaves the call out keeps the defaults of the base's fields.
 - `delete(p)` runs `destruct` up the chain, frees owned fields, frees the object. `destroy(&v)` does the same without the free. `destroy(&v)` of a local moves `v` out, so its block skips its teardown and naming `v` again is refused, and `destroy` of a part of a local is refused. `delete(p, from)` and `destroy(p, from)` give every piece of owned memory back to the `anti.mem.Allocator` `from`, and `delete` the object as well. Memory goes back to the allocator it came from. A value is destroyed at the end of its block, and so is each element of a local array of them, last to first.
 - `dup(p)` is a deep copy through ownership. `=` that copies an existing value with owned fields is refused. A fresh value on the right, a literal, `T(args)` or the result of `dup`, moves, and `=` destroys the value it replaces first.
 - `p is *T`, `p as *T` checked, `p as? *T` gives `none` on a mismatch. `==` on class pointers is object identity.
 
-A class may declare a `struct`, `enum` or `class` inside its body. The nested type is private: only the enclosing class names it, and a public signature that names it is a compile error. Its full name is `PeopleList.Node` in the symbols and the header. A type that users work with directly stays at module level.
+A class may declare a `struct`, `enum` or `class` inside its body. The nested type is private: only the enclosing class names it, and a public signature that names it is a compile error. Its full name is `PeopleList.Node` in the symbols and `PeopleList_Node` in the header, where one that the layout of an `export class` reaches stands before the class with its layout alone. A type that users work with directly stays at module level.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -735,8 +749,6 @@ class PeopleList
 	head: ?*Node = none,
 }
 ```
-
-Built: everything above, nested types included. The C header writes a nested type as `PeopleList_Node`, and one that the layout of an `export class` reaches stands before the class with its layout alone. `tests/errors/final_replace.anti` and `final_modules.anti` hold the refusals of a replaced `final fn` and of a class below a `final class`, in one module and across a library file.
 
 ## Interfaces
 
@@ -778,13 +790,11 @@ let s = &c as *Serializable;
 s.serialize(&b);
 ```
 
-`implements name: Iface,` places the interface's table pointer and fields inside the object at a named field. `&c` converts to `*Serializable` implicitly. A `concrete fn` without a qualifier fills every table with that name that no qualified body of its class fills, and the nearest body wins down the chain. Two qualified bodies of one name fill the tables of two interfaces whose signatures differ, and `c.f()` on the class is ambiguous when two or more interfaces have qualified bodies of `f` and no unqualified body exists. A single qualified body is reached through its interface's table. `use name: T,` is composition: `T`'s public names are reachable on the class and the class does not convert to `*T`.
-
-Built.
+`implements name: Iface,` places the interface's table pointer and fields inside the object at a named field. `&c` converts to `*Serializable` implicitly. A `concrete fn` without a qualifier fills every table with that name that no qualified body of its class fills, and the nearest body wins down the chain. Two qualified bodies of one name fill the tables of two interfaces whose signatures differ, and `c.f()` on the class is ambiguous when two or more interfaces have qualified bodies of `f` and no unqualified body exists. A single qualified body is reached through its interface's table. `use name: T,` is composition: `T`'s public names are reachable on the class and the class does not convert to `*T`. A program with an abstract class that no class fills gets the warning `unfilled-abstract`.
 
 ## Generics
 
-Functions, structs, classes, variants and interfaces take type parameters between `<` and `>`. A constraint after `:` states what the generic needs from a type: a hook of the operator table such as `lt`, `add`, `iter` or `hash`, an interface, or a set named with `constraint`, combined with `+`. The compiler checks the body against the constraints where the generic is written and every use where it is used, so an error lands in the code that made it. A parameter without constraints can be stored, copied, moved, passed on and measured with `size_of`, which is what a container needs. `N: int` takes an integer constant instead of a type, such as the length of a fixed array. `anti.lang` ships `constraint Number = add + sub + mul + div + neg + lt;` and `constraint Ordered = eq + lt;`.
+Functions, structs, classes, variants and interfaces take type parameters between `<` and `>`. A constraint after `:` states what the generic needs from a type: a hook of the operator table such as `lt`, `add`, `iter` or `hash`, an interface, or a set named with `constraint`, combined with `+`. The compiler checks the body against the constraints where the generic is written and every use where it is used, so an error lands in the code that made it. A parameter without constraints can be stored, copied, moved, passed on and measured with `size_of`, which is what a container needs. `N: int` takes an integer constant instead of a type, such as the length of a fixed array, and reads as a value in the body. The compiler declares `constraint Number = add + sub + mul + div + neg + lt;` in `anti.lang`, and the source of `anti.lang` declares `constraint Ordered = eq + lt;`. `hash` is the constraint that `x.hash()` on a value of `T` needs.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -812,6 +822,8 @@ abstract class Source<T> { abstract fn next(self) -> ?T; }
 constraint Key = eq + hash;
 
 let p: Pair<int, str> = Pair { first: 1, second: "one" };
+let q = Pair<int, str> { first: 2, second: "two" };
+let ok = Result<int, str>.Ok { value: 3 };
 let m = max(3, 7);                     // max<int>
 let people = List<Person>.new();
 
@@ -852,7 +864,7 @@ fn find<K: eq + hash, V>(m: *Map<K, V>, k: K) -> ?V
 }
 ```
 
-Type arguments are inferred from the arguments of a call and written out where nothing gives them. In an expression, `<` after a name opens type arguments when a list of types closed by `>` follows and the token after it is `(`, `.` or `{`, so `a < b > c` stays two comparisons. `>>` closes two lists. Every use with concrete arguments gets its own compiled copy, with no boxing, and two uses with the same arguments are one type in every module. The whole-program pass merges copies whose code is identical. A method with type parameters of its own is called directly and never stands in the table, so it cannot be `abstract` or replaced. A library file stores a generic as its checked syntax tree with its parameters open, and each use lowers that tree with its arguments. C sees no open generic: `export type PersonList = List<Person>;` writes a copy into the header as an exported class, and a generic `export fn` is refused.
+Type arguments are inferred from the arguments of a call and written out where nothing gives them. In an expression, `<` after a name opens type arguments when a list of types closed by `>` follows and the token after it is `(`, `.` or `{`, so `a < b > c` stays two comparisons. `>>` closes two lists. Every use with concrete arguments gets its own compiled copy, with no boxing, and two uses with the same arguments are one type in every module. A generic that nothing uses compiles to nothing. A dev build marks a copy link-once, and the whole-program pass of a release build merges copies whose code is identical. A method with type parameters of its own is called directly and never stands in the table, so it cannot be `abstract` or replaced. A library file stores a generic as its checked syntax tree with its parameters open, and each use lowers that tree with its arguments. C sees no open generic: `export type PersonList = List<Person>;` writes a copy into the header as an exported class, and a generic `export fn` is refused.
 
 A type nested in a generic class sees the parameters of the class, and each copy of the class has a copy of it. A generic class may be `synchronized` or `concurrent`, and its rules hold in every copy. A generic `worker fn` is checked against the rules of workers in every copy, with the concrete types. A generic type declares language hooks, so `for x in list` works for every copy of a `List<T>` with `operator fn iter`. A generic function may be `may fail`. Function types, closures and snapshots appear as type arguments, `List<fn(int) -> int>`, under the rules of `keep` and `concurrent`.
 
@@ -887,7 +899,7 @@ worker fn total<T: add>(chunk: []T, zero: T) -> T
 }
 ```
 
-Built: the syntax of generics and its checks. Type parameters in `<>` on functions, structs, classes, variants, interfaces and the functions of a class body, `N: int`, type arguments in every type, the rule of C# in an expression with the refusal of a name that is not generic, and `>>` closing two lists. `constraint` and `type` are built, and `export type` is checked. The checker infers the type arguments of a call from its arguments. A generic that nothing uses compiles to nothing. `tests/dump/generics.anti` and `tests/errors/generics.anti` hold the forms and the refusals. The constraints are built: hooks, interfaces, `+`, named sets and `Number` of `anti.lang`, the check of a body where it is written and of every use where it stands, and what a parameter without constraints allows. A generic interface is a constraint with its type arguments, `C: Iterable<int>`. `tests/dump/constraints.anti`, `tests/errors/constraints.anti` and `tests/errors/walk_interfaces.anti` hold both sides. The compiled copies are built for the generics of the module's own source: one copy per use with concrete arguments, `size_of(T)` per copy, a descriptor per copy of a class, link-once copies in a dev build and the whole-program merge of identical copies in a release build. `tests/programs/generic_copies.anti` runs in both modes. A generic, a `type` and a `constraint` in a library file are built. The file carries the checked tree of every generic, a module that uses one makes its copies from it, and one copy is one type across modules. `export type` writes its copy into the C header as an exported class, and `anti doc` shows the parameters of a generic with their constraints. `tests/modules/generics/` runs a program and two libraries in both modes, and `clib_generics` calls a named copy from C. What can be generic and the other features with generics are built for the generics of the module's own source. `N: int` sizes a type and reads as a value. A function of a class with type parameters of its own compiles a copy per class and argument and stands in no table. A type nested in a generic class has a copy per copy of the class. Synchronized and concurrent generic classes keep their rules in every copy, and `parallel` and `dispatch` check a generic worker in every copy. Hooks in generic types, generic `may fail` functions, function types as type arguments and generic variants are built. `tests/programs/generic_constants.anti`, `generic_methods.anti`, `generic_nested.anti`, `generic_sync.anti`, `generic_hooks.anti`, `generic_may_fail.anti`, `generic_fn_args.anti` and `generic_variants.anti` run in both modes, and `tests/errors/generic_copies.anti` holds the refusals of a copy. Not built yet: the cache of copies in a dev build. A library file carries no function of a class with type parameters of its own and no type nested in a generic class. `Ordered` of `anti.lang` is built, `eq + lt`, named bare or as `lang.Ordered`, and `hash` is a constraint that `x.hash()` on a value of `T` needs.
+Not built yet: the cache of copies in a dev build. A library file carries no function of a class with type parameters of its own and no type nested in a generic class.
 
 ## Ownership
 
@@ -912,7 +924,7 @@ class Buffer
 }
 ```
 
-A class value with `destruct`, an `own` field or an owning part owns something, and so does a collection. A struct or a tuple with a part that owns something follows the value rules of a class value: it is torn down part by part at the end of its block, `=` refuses it, `dup` copies it and it moves into an `own` parameter. A variant with a case that owns something follows the same rules and is torn down by its tag, the fields of the case it holds. One that owns nothing stays plain data. An owning local named in a tuple, struct, class or case literal moves into it, and naming it afterwards is refused. In generic code a local of a type parameter moves on `let` and `=` for every `T`, and `dup(x)` is the copy. `destroy(p)` tears down a value of any type in place, and `dup(x)` of a value of a type parameter copies the value. A parameter that is not `own` belongs to the caller: `let`, `=`, a literal, an `own` argument and `return` refuse one whose value owns something, or whose type is a type parameter. `own` takes it over and `dup(p)` copies it, and `dup(x)` of a class value gives a value. `*dup(p)` and `*alloc T { }` are refused, since nothing could free the new object, and `dup(*p)` copies the value instead. A value that owns nothing and holds no pointer is copied into an `own` parameter and stays with its caller. `own` before a parameter takes ownership of the argument, for a value of any type. Passing a local moves it, and naming the local again is refused. `lent` before a pointer parameter says the pointer is valid only during the call. The function may read and change through it and pass it on to another `lent` parameter, and may not store it, return it, capture it in a closure that outlives the call or pass it to a `keep` or `own` place. `lent` before a slice parameter, `fn(lent []T)`, follows the same rules. A pointer or a slice derived from a lent one, `s.ptr`, `&p.field`, `&s[i]` or a part of a slice, is lent as well, and its one exit is an argument of an `extern fn`, whose contract decides whether C keeps it. `anti.mem.Shared<T>` gives an object more than one owner through an atomic count: `share()` gives another handle and counts it, `=` stays refused, `read(f)` and `modify(f)` lend the object, and the object is destroyed when its last handle is freed. Two shared objects that hold each other are never freed.
+A class value with `destruct`, an `own` field or an owning part owns something, and so does a collection. A struct or a tuple with a part that owns something follows the value rules of a class value: it is torn down part by part at the end of its block, `=` refuses it, `dup` copies it and it moves into an `own` parameter. A variant with a case that owns something follows the same rules and is torn down by its tag, the fields of the case it holds. One that owns nothing stays plain data. An owning local named in a tuple, struct, class or case literal moves into it, and naming it afterwards is refused. In generic code a local of a type parameter moves on `let` and `=` for every `T`, and `dup(x)` is the copy. `destroy(p)` tears down a value of any type in place, and `dup(x)` of a value of a type parameter copies the value. A parameter that is not `own` belongs to the caller: `let`, `=`, a literal, an `own` argument and `return` refuse one whose value owns something, or whose type is a type parameter. `own` takes it over and `dup(p)` copies it, and `dup(x)` of a class value gives a value. `*dup(p)` and `*alloc T { }` are refused, since nothing could free the new object, and `dup(*p)` copies the value instead. A value that owns nothing and holds no pointer is copied into an `own` parameter and stays with its caller. `own` before a parameter takes ownership of the argument, for a value of any type. Passing a local moves it, and naming the local again is refused. The function tears the value down at every exit unless it moves on by a call, `=`, `let` or `return`. `lent` before a pointer parameter says the pointer is valid only during the call. The function may read and change through it and pass it on to another `lent` parameter, and may not store it, return it, capture it in a closure that outlives the call or pass it to a `keep` or `own` place. `lent` before a slice parameter, `fn(lent []T)`, follows the same rules. A pointer or a slice derived from a lent one, `s.ptr`, `&p.field`, `&s[i]` or a part of a slice, is lent as well, and its one exit is an argument of an `extern fn`, whose contract decides whether C keeps it. `anti.mem.Shared<T>` gives an object more than one owner through an atomic count: `share()` gives another handle and counts it, `=` stays refused, `read(f)` and `modify(f)` lend the object, and the object is destroyed when its last handle is freed. Two shared objects that hold each other are never freed.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -956,11 +968,9 @@ shapes.push(c.share());
 c.modify(fn(p) { p.r = 3.0; });
 ```
 
-Built: `own` and `transient` fields, the `own` parameter of any type and `lent`. A local passed to an `own` parameter moves, unless its value owns nothing and holds no pointer, and the caller then tears it down no more and names it no more, and the function tears it down at every exit unless it moves on by a call, `=`, `let` or `return`. A `lent` parameter has the type `lent *T`, which goes to another `lent` parameter, the object of a call and a comparison, and which `=`, `return`, a parameter without `lent`, `own`, a snapshot and `delete` refuse. A `lent` slice parameter has the type `lent []T` under the same rules. A pointer or a slice derived from a lent one is lent, and goes to an `extern fn` as its one exit. `tests/programs/own_params.anti`, `tests/programs/lent_params.anti` and `tests/programs/lent_slices.anti` run them, and `tests/errors/own_params.anti`, `tests/errors/lent_params.anti` and `tests/errors/lent_slices.anti` hold the refusals. `Shared<T>` of `anti.mem` is built: `tests/std/shared.anti` runs it in both modes, and `tests/errors/shared_handles.anti` holds the refusals. The moves of an owning local into a literal are built: `tests/programs/literal_moves.anti` runs them, and `tests/errors/literal_moves.anti` holds the refusals. The moves of a generic local on `let` and `=` are built: `tests/programs/generic_moves.anti` runs them, and `tests/errors/generic_moves.anti` holds the refusals. The refusal of `*` on the result of `dup` or `alloc` is built, and `tests/errors/deref_new.anti` holds both forms. The rule of a parameter that belongs to the caller is built for every way out of the function, with `dup(x)` of a class value and the copy of a value that owns nothing into an `own` parameter: `tests/programs/caller_params.anti` runs both fixes, and `tests/errors/caller_params.anti` holds the refusals.
-
 ## Pointers
 
-`none` is the pointer that points to no value. It is a concept of the language, and zero is today's encoding of it. `*T` is never `none`. `?*T` may be `none` and must be checked before use. The check narrows the type for the block.
+`none` is the pointer that points to no value. It is a concept of the language, and zero is today's encoding of it. `null` is refused with a message that names `none`. `*T` is never `none`. `?*T` may be `none` and must be checked before use. The check narrows the type for the block.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -982,13 +992,11 @@ let k = n ?? &default_node;
 
 `alloc T { }` returns `*T`, `alloc(T, n)` returns `?*T` as raw memory. Every pointer in an `extern fn` is `?*T`. No pointer arithmetic beyond indexing. A function value follows the same rule: `fn(...)` never holds `none` and `?fn(...)` may.
 
-`p as *U` between two pointer types is a view, the same address read as another type. Bytes reach any memory, every pointer is one type and an integer meets its other sign. A struct holds its parts, an array its elements and a simd struct its lanes. Two structs of which neither holds the other keep apart. A view used where it stands reaches any memory, and a view passed on is a pointer of its own type. "Aliasing of views" in `docs/anti-language-additions.md` holds the rules.
-
-Built, with a release build that orders loads and stores by the aliasing rules of views through `!tbaa`.
+`p as *U` between two pointer types is a view, the same address read as another type. Bytes reach any memory, every pointer is one type and an integer meets its other sign. A struct holds its parts, an array its elements and a simd struct its lanes. Two structs of which neither holds the other keep apart. A view used where it stands reaches any memory, and a view passed on is a pointer of its own type. A release build orders loads and stores by these rules. "Aliasing of views" in `docs/anti-language-additions.md` holds them.
 
 ## Optional values
 
-`?T` is a `T` or `none`, for a value of any type, and follows every rule of `?*T`. It compares with `none`, narrows after a test, and works with `if let`, `let ... else` and `??`, and it is used as a `T` only after a test proves it holds one. `none` means that nothing is there, which is normal, and a failure is `may fail`: `map.get(key)` gives `?V`, and `text.parse_int(s)` stays `may fail`. A `?T` of a value type is the value and one flag byte, padded to the type's alignment, and `?*T` stays one pointer. The C header writes `?T` as a struct of the value and a `bool`.
+`?T` is a `T` or `none`, for a value of any type, and follows every rule of `?*T`. It compares with `none`, narrows after a test, and works with `if let`, `let ... else`, `??`, `?.` and the guards of `catch`, and it is used as a `T` only after a test proves it holds one. `none` means that nothing is there, which is normal, and a failure is `may fail`: `map.get(key)` gives `?V`, and `text.parse_int(s)` stays `may fail`. A `?T` of a value type is the value and one flag byte, padded to the type's alignment, and `?*T` and `?fn(...)` stay one pointer. `?Match` is a `?T` of `Match`. The C header writes `?T` as `struct anti_opt_<T>` with `value` and `has`.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -1008,11 +1016,9 @@ if let a = ages.get("Ann") { }
 let first = queue.first() else { return 1; };
 ```
 
-Built: `?T` of any type, a struct of the value and a flag byte, with `none`, the tests and the narrowing, `if let`, `let ... else`, `??`, `?.`, the guards of `catch` and `catch none`. `?*T` and `?fn(...)` stay one pointer, and `?Match` is a `?T` of `Match`. A `?T` crosses to C as `struct anti_opt_<T>` with `value` and `has`. `get` of a list and of a map gives a `?T`, so `ages.get("Ann") ?? 0` reads a value or its default.
-
 ## Reflection
 
-Every class has a descriptor: name, parent, size, fields with name, offset, type and ownership, functions with their table slot. `anti.reflect` reads it. `describe` gives the descriptor of an object, `field_count` and `field` read the field list, and `function_count` and `function` the function list. `get` and `set` read and write a field by its index as a `Value`, `call` calls a function by its index, and `new` builds an object of a class it names, or gives `none`.
+Every class has a descriptor: name, parent, size, fields with name, offset, type and ownership, functions with their table slot. `anti.reflect` reads it. `describe` gives the descriptor of an object, `parent` the descriptor of its base and `name` the class name. `field_count` and `field` read the field list as `Field` values with `name`, `offset`, `type_id`, `element` and `owned`, and `function_count` and `function` the function list as `Function` values with `name`, `slot` and `param_count`. `TypeId` names the kind of a field. `get` and `set` read and write a field by its index as a `Value`, which `nothing`, `of_int`, `of_uint`, `of_float`, `of_bool`, `of_char`, `of_str` and `of_ptr` build. `call` calls a function by its index, and `new` builds an object of a class it names, or gives `none`. `set` and `call` fail with the codes `BAD_INDEX`, `NOT_CARRIED`, `WRONG_KIND` and `WRONG_COUNT`.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -1030,6 +1036,8 @@ let no_args: [1]reflect.Value = [reflect.nothing()];
 -->
 ```anti
 let d = reflect.describe(obj as *byte) else { return 1; };
+io.println(reflect.name(d));
+let base = reflect.parent(d);
 for i in 0..reflect.field_count(d) {
 	io.println(reflect.field(d, i).name);
 	let v = reflect.get(obj as *byte, d, i);
@@ -1039,7 +1047,7 @@ let r = reflect.call(obj, 0, no_args[0..0]) catch fatal;
 let fresh = reflect.new("Circle");
 ```
 
-`anti.lang.Object` gives every class `type_name`, `to_text`, `equals`, `hash` and `serialize` with defaults over the descriptor, and `copy` and `destruct`, whose defaults the compiler writes per class. `copy(self, to: *Object)` fills an object that `dup` has already allocated at its concrete size, and a replacement fills the fields and never allocates. `Object.deserialize(text, from)` reads the text of `serialize` back into an object, which comes with its strings and the objects it owns from the `anti.mem.Allocator` `from`. The caller gives them back through `from` at once. `--no-reflect` drops the field and function lists.
+`anti.lang.Object` gives every class `type_name`, `to_text`, `equals`, `hash` and `serialize` with defaults over the descriptor, and `copy` and `destruct`, whose defaults the compiler writes per class. `copy(self, to: *Object)` fills an object that `dup` has already allocated at its concrete size, and a replacement fills the fields and never allocates. `Object.deserialize(text, from)` reads the text of `serialize` back into an object, which comes with its strings and the objects it owns from the `anti.mem.Allocator` `from`. The caller gives them back through `from` at once. A variant, a tuple and a `?T` of a value have descriptors of their own, so a field of each compares, hashes, serializes and reads back, and an array field is written as a JSON array of its elements, nested once per level. `--no-reflect` drops the field and function lists.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -1056,7 +1064,7 @@ destroy(back, &arena);
 arena.free_all();
 ```
 
-Built: descriptors, `get`, `set`, `call`, `new`, `Value` and `Object.deserialize` with an `Allocator`. A variant, a tuple and a `?T` of a value have descriptors of their own, so a field of each compares, hashes, serializes and reads back. An array field is written as a JSON array of its elements, nested once per level. Not built yet: `type_of(T)`, the descriptor of any type.
+Not built yet: `type_of(T)`, the descriptor of any type.
 
 ## Operators on classes
 
@@ -1080,7 +1088,7 @@ if a == b { }
 
 The names: `add sub mul div rem neg eq lt and or xor shl shr not`. `!=`, `>`, `<=`, `>=` and compound assignments derive. For a struct the operator is a free function in the declaring module. Two such functions may share a name when their first parameters name different types, and the operator picks one by the type of its left operand, so one module gives `Point` and `Rect` each its own `==`. A bare call `eq(a, b)` picks by its first argument in the same way. Ordinary functions keep one function per name.
 
-The same table holds the language hooks: `iter`, `next` and `value` for `for x in e`, `index` and `set_index` for `e[i]` and `e[i] = v`, and `hash` for a key of a hashing collection. `index` and `set_index` take any number of indices, each with its own type, so `g[x, y]` reads and `g[x, y] = v` writes. A name outside the table is an error that lists the valid names, and a hook with the wrong signature is an error that states the right one. An `operator fn` is also an ordinary method, so `a.add(b)` is `a + b`. `f"..."` writes a class through `to_text`. `operator fn hash(self) -> u64` is the hook of a key of a hashing collection, and the built-in types have it. A struct or class gets a default that hashes its fields in order, and two values equal by `eq` have the same `hash`. A struct or class also gets a default `==` that compares its fields in order, and a class value compares through `equals`. Both defaults take each field by its kind: a `str` by its bytes, an `own` slice element by element, a plain slice or a pointer by address, and an inline struct, class or array field by these rules again, so a class and a struct with the same fields compare alike. A class with a union or a `Match` field has no default `==`. A lock is left out of `==` and `hash`, a channel and an `own fn` compare by identity, and a `Regex` by its pattern text. The compiler writes the default `==` and `hash` of each class as code, so both work under `--no-reflect`, which refuses a call of the default `serialize`, of `deserialize` and of `anti.reflect`. A tuple, a variant and a `?T` get the default `==` when every part has one, so a tuple can be the key of a map. Two arrays of one type compare element by element. Neither gets a default `<`, since what order means is the type's own choice, so a type used where `Ordered` is needed declares `operator fn lt`. A class replaces the default with `concrete fn hash(self) -> u64`, as it replaces every function of `Object`.
+The same table holds the language hooks: `iter`, `next` and `value` for `for x in e`, `index` and `set_index` for `e[i]` and `e[i] = v`, and `hash` for a key of a hashing collection. `index` and `set_index` take any number of indices, each with its own type, so `g[x, y]` reads and `g[x, y] = v` writes. A name outside the table is an error that lists the valid names, and a hook with the wrong signature is an error that states the right one. An `operator fn` is also an ordinary method, so `a.add(b)` is `a + b`. `f"..."` writes a class through `to_text`. `operator fn hash(self) -> u64` is the hook of a key of a hashing collection, and the built-in types have it. `x.hash()` gives a `u64` on every type: a scalar through the finalizer of MurmurHash3 with zero of either sign as one value, a `str` by its bytes, a pointer by its address, and a struct, a tuple, a variant, a `?T`, an array and a slice through the default over their parts in order. A struct or class gets a default that hashes its fields in order, and two values equal by `eq` have the same `hash`. A struct or class also gets a default `==` that compares its fields in order, and a class value compares through `equals`. Both defaults take each field by its kind: a `str` by its bytes, an `own` slice element by element, a plain slice or a pointer by address, and an inline struct, class or array field by these rules again, so a class and a struct with the same fields compare alike. A class with a union or a `Match` field has no default `==`. A lock is left out of `==` and `hash`, a channel and an `own fn` compare by identity, and a `Regex` by its pattern text. The compiler writes the default `==` and `hash` of each class as code, so both work under `--no-reflect`, which refuses a call of the default `serialize`, of `deserialize` and of `anti.reflect`. A tuple, a variant and a `?T` get the default `==` when every part has one, so a tuple can be the key of a map. Two arrays of one type compare element by element. Neither gets a default `<`, since what order means is the type's own choice, so a type used where `Ordered` is needed declares `operator fn lt`. A class replaces the default with `concrete fn hash(self) -> u64`, as it replaces every function of `Object`.
 
 ```anti
 class Name
@@ -1093,8 +1101,6 @@ class Name
 	}
 }
 ```
-
-Built: the operators and the hooks `iter`, `next`, `value`, `index`, `set_index` and `hash`, with any number of indices. `x.hash()` gives a `u64` on every type: a scalar through the finalizer of MurmurHash3 with zero of either sign as one value, a `str` by its bytes, a pointer by its address, and a struct, a tuple, a variant, a `?T`, an array and a slice through the default over their parts in order. A part with a hash of its own is hashed by it, and a class takes the `hash` of `Object` over its field list. Operator functions that share a name are built, and `tests/programs/operator_overloads.anti` and `tests/errors/overloads.anti` hold them and their refusals. The default `==` of a struct and of a class value is built, with each field by its kind in the compiler and in the runtime, and so is that of a tuple, a variant and a `?T`. `tests/programs/eq_default.anti`, `eq_kinds.anti`, `eq_parts.anti`, `eq_inline.anti`, `eq_arrays.anti`, `eq_handles.anti` and `tests/errors/equality.anti` hold them and their refusals. `tests/programs/hash_builtin.anti`, `hash_default.anti` and `hash_generic.anti` run in both modes, `tests/modules/hashing/` hashes the types of a library file, and `tests/errors/hashing.anti` holds the refusals.
 
 ## Static fields and singletons
 
@@ -1121,8 +1127,6 @@ Config.get().requests.add(1);
 ```
 
 Atomic operations: `load store add sub and or swap compare_swap`, sequentially consistent. `add`, `sub`, `and`, `or` and `swap` give the value the field held before. In a singleton a plain field is read-only after creation and `atomic` fields are atomic. `mutable` fields may be written anywhere except from a worker, which the compiler checks.
-
-Built.
 
 ## Threads
 
