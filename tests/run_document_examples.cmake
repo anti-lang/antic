@@ -69,6 +69,16 @@
 #       labels of the assembler such as .LBB0_3 and a number that labels a
 #       line are made equal. The named block stands before its first
 #       excerpt.
+#   ```tokens excerpt=<id> target=<target> mode=<dev|release>
+#   ```ast excerpt=<id> target=<target> mode=<dev|release>
+#   ```types excerpt=<id> target=<target> mode=<dev|release>
+#   ```ir excerpt=<id> target=<target> mode=<dev|release>
+#   ```opt excerpt=<id> target=<target> mode=<dev|release>
+#       holds up to 20 lines of what `antic --dump-<kind>` prints for the
+#       named block, with `--dev` in dev mode, compared as the lines of
+#       an `llvm` excerpt are. The number that labels a line is the line
+#       of a token there, so a token of the excerpt matches by its
+#       column, its kind and its text.
 #
 # DESIGN: what --keep-llvm keeps, read from driver_compile_llvm of
 # src/antic/driver.c and llvm_run of src/antic/llvm_run.c. It keeps
@@ -238,18 +248,39 @@ function(target_triple out target)
     set(${out} "${CMAKE_MATCH_2}" PARENT_SCOPE)
 endfunction()
 
+# The kinds of excerpt that read a dump of antic, each the word after
+# `--dump-` of its option.
+set(dump_kinds "tokens|ast|types|ir|opt")
+
 # Build the module `module` of the block named `id` for `target` in
 # `mode`, unless this run built it already, and set `out` to the file a
 # `kind` excerpt reads: the module llc receives for llvm, the disassembly
-# for asm. The files stand in `dir` as <id>.<mode>.<target>.s and beside
-# it.
+# for asm and what antic prints for a dump. The files stand in `dir` as
+# <id>.<mode>.<target>.s and beside it.
 function(excerpt_output out kind id module target mode dir)
     set(base "${dir}/${id}.${mode}.${target}")
-    if(NOT EXISTS "${base}.s")
-        set(dev "")
-        if(mode STREQUAL "dev")
-            set(dev --dev)
+    set(dev "")
+    if(mode STREQUAL "dev")
+        set(dev --dev)
+    endif()
+    if(kind MATCHES "^(${dump_kinds})$")
+        if(NOT EXISTS "${base}.${kind}")
+            execute_process(
+                COMMAND "${ANTIC}" ${dev} "--dump-${kind}" --target "${target}"
+                        --runtime "${RUNTIME}" "${module}"
+                RESULT_VARIABLE status
+                OUTPUT_FILE "${base}.${kind}"
+                ERROR_VARIABLE dump_err
+                ENCODING NONE)
+            if(NOT status EQUAL 0)
+                message(FATAL_ERROR
+                    "antic --dump-${kind} refuses the block `${id}` of ${document} for ${target} in ${mode} mode:\n${dump_err}")
+            endif()
         endif()
+        set(${out} "${base}.${kind}" PARENT_SCOPE)
+        return()
+    endif()
+    if(NOT EXISTS "${base}.s")
         execute_process(
             COMMAND "${ANTIC}" ${dev} -S --keep-llvm --target "${target}"
                     --runtime "${RUNTIME}" -o "${base}.s" "${module}"
@@ -630,7 +661,7 @@ foreach(document IN LISTS documents)
             endif()
             set(state block)
             math(EXPR block_line "${number} + 1")
-        elseif(line MATCHES "^```(llvm|asm) excerpt=([a-z][a-z0-9_]*) target=([a-z0-9_-]+) mode=(dev|release)$")
+        elseif(line MATCHES "^```(llvm|asm|${dump_kinds}) excerpt=([a-z][a-z0-9_]*) target=([a-z0-9_-]+) mode=(dev|release)$")
             set(excerpt_kind "${CMAKE_MATCH_1}")
             set(excerpt_id "${CMAKE_MATCH_2}")
             set(excerpt_target "${CMAKE_MATCH_3}")
@@ -638,9 +669,9 @@ foreach(document IN LISTS documents)
             set(state excerpt)
             set(block "")
             math(EXPR block_line "${number} + 1")
-        elseif(line MATCHES "^```(llvm|asm) ")
+        elseif(line MATCHES "^```(llvm|asm|${dump_kinds}) ")
             message(FATAL_ERROR
-                "the excerpt at line ${number} of ${document} is not written as `llvm excerpt=<id> target=<target> mode=<dev|release>`")
+                "the excerpt at line ${number} of ${document} is not written as `${CMAKE_MATCH_1} excerpt=<id> target=<target> mode=<dev|release>`")
         elseif(line MATCHES "^```" AND NOT context_line EQUAL 0)
             message(FATAL_ERROR
                 "the context at line ${context_line} of ${document} stands before a block that is not `anti`")
