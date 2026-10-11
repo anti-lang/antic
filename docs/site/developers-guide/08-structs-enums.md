@@ -3,7 +3,7 @@ title: "Structs and enums"
 description: "Structs and their layout, packed and align, unions and bitfields, simd structs, enums, variants with their tag and payload, and pattern matching."
 summary: "Structs with C layout, `packed` and `align`, unions and bitfields, simd structs, enums, variants as a tag and a union of their cases, and the `switch` that takes a variant apart, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T08:10:24+02:00
+lastmod: 2026-10-11T20:14:36+02:00
 draft: true
 weight: 80
 tags: [compilers, programming-languages]
@@ -33,7 +33,7 @@ A struct is a value. `let copy = r;` copies every byte, an argument of struct ty
 
 The method-call form works on a struct. `r.area()` is `area(&r)`, and `r.widen(2.0)` is `widen(r, 2.0)`, when `area` and `widen` are free functions of the module that declares `Rect`. The first parameter decides between the address and the copy. The struct does not know the functions exist.
 
-`==` and `!=` compare two structs field by field, each field by its kind: a number by its value, a `str` by its bytes, a pointer by its address, an inline struct by these rules again. `x.hash()` gives a `u64` over the same fields in the same order, so two structs that are equal hash alike. A struct has no default `<`. An `operator fn` at module level replaces a default or adds an operator, as the section on operators of chapter 9 shows.
+`==` and `!=` compare two structs field by field, each field by its kind. A number compares by its value, a `str` by its bytes, a pointer by its address and an inline struct by these rules again. `x.hash()` gives a `u64` over the same fields in the same order, so two structs that are equal hash alike. A struct has no default `<`. An `operator fn` at module level replaces a default or adds an operator, as the section on operators of chapter 9 shows.
 
 `size_of(T)` is the size of a type in bytes on the target, padding included.
 
@@ -111,7 +111,7 @@ area 32 40 4, same true true, hash true, total 3, to 5
 sizes: Rect 16, Mixed 32, Point 16, Line 48, Node 16
 ```
 
-`Mixed` holds 16 bytes of fields in 32 bytes. Three bytes of padding follow `tag`, seven follow `flag` and six follow `last`, so that `count` starts at 4, `total` at 16 and the size is a multiple of 8.
+`Mixed` holds 16 bytes of fields in 32 bytes. Three bytes of padding follow `tag`, seven follow `flag` and six follow `last`. `count` therefore starts at 4 and `total` at 16, and the size is a multiple of 8.
 
 The checker refuses each of the following.
 
@@ -260,7 +260,7 @@ A value of struct type passes as the C convention of the target passes that stru
 define hidden { <2 x float>, <2 x float> } @rects.widen(<2 x float> %p0.0, <2 x float> %p0.1, float noundef %p1) #0 {
 ```
 
-Lowering writes a descriptor for every struct of a module. It holds the name, the size and a record per field with the name, the offset and a type id. The descriptor is 136 bytes and a field record 48. A struct never points at its descriptor. Reflection and the default `serialize` of a class with a struct field reach it. The release module of `rects` holds none of the five, because nothing refers to them.
+Lowering writes a descriptor for every struct of a module. It holds the name, the size and a record per field with the name, the offset and a type id. The descriptor is 136 bytes and a field record 48. A struct never points at its descriptor. Reflection and the default `serialize` of a class with a struct field reach it, and chapter 9 describes both. The release module of `rects` holds none of the five, because nothing refers to them.
 
 Where it lives: `compute` of `src/antic/layout.c` lays out every aggregate, and `layout_resolve` replaces `size_of` and `offset_of`. `lower_field_at`, `lower_field_offset` and `lower_literal_address` of `src/antic/lower.c`. `lower_equals` of `src/antic/lower_eq.c` and `lower_hash` of `src/antic/lower_hash.c` write the defaults. `lower_struct_descriptor` of `src/antic/lower_desc.c`.
 
@@ -443,7 +443,7 @@ movq 0x6(%rdi), %rax
 retq
 ```
 
-Both reads are one `movq`. On arm64 the aligned read is `ldr x0, [x0, #0x10]` and the packed one is `ldur x0, [x0, #0x6]`, the form of the load that takes an offset that is no multiple of 8.
+Both reads are one `movq`. On arm64 the aligned read is `ldr x0, [x0, #0x10]` and the packed one is `ldur x0, [x0, #0x6]`. The second is the form of the load that takes an offset that is no multiple of 8.
 
 Where it lives: `item_level`, `class_item` and `variant_item` of `src/antic/parser_item.c` read the two words. `compute` of `src/antic/layout.c` applies `t->packed` and `t->align`. `src/antic/header.c` writes `#pragma pack(push, 1)` and `ANTI_ALIGNAS(N)` into the C header. The header defines that macro as `_Alignas(n)` for C and `alignas(n)` for C++.
 
@@ -670,7 +670,7 @@ retq
 
 `set_mid` needs no mask of the new value, since the shift by 3 in a byte drops every bit above the fifth. `high_half` reads `w.halves[1]` of the union as one load at offset 4: a union costs nothing beyond the access to the field.
 
-Linux and macOS follow the System V rule for bitfields: a field goes right after the one before it unless it would cross a boundary of its own type. Windows follows the MSVC rule: a field whose type has another size than the unit in use starts a new unit. `Wide` holds a `u8`, a `u16` and a `u8`, and the two rules disagree on it.
+Linux and macOS follow the System V rule for bitfields. A field goes right after the one before it unless it would cross a boundary of its own type. Windows follows the MSVC rule. A field whose type has another size than the unit in use starts a new unit. `Wide` holds a `u8`, a `u16` and a `u8`, and the two rules disagree on it.
 
 ```llvm excerpt=bits target=linux-x86_64 mode=dev
 define dso_local noundef i64 @wide_size() #0 {
@@ -1448,7 +1448,7 @@ movzbl (%rdi), %eax
 retq
 ```
 
-`unit` builds its result in registers: `rax` holds the tag 1 in its low byte and the bits of `1.0` for `w` in its high half, and `xmm0` holds `h`. `round` is one compare of a byte in memory, and `tag_of` one load.
+`unit` builds its result in registers. The register `rax` holds the tag 1 in its low byte and the bits of `1.0` for `w` in its high half, and `xmm0` holds `h`. `round` is one compare of a byte in memory, and `tag_of` one load.
 
 The C header of a library writes `enum Shape_tag` with `Shape_Circle = 0` and the following values, and then the struct with the tag and the union.
 

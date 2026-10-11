@@ -3,7 +3,7 @@ title: "Flow"
 description: "if and while, for over ranges and collections, switch on values and what each compiles to, break and continue, defer and undo."
 summary: "`if` and `while`, `for` over a range and over a collection, `switch` on an integer, a `str` and a variant with what each compiles to, `break` and `continue`, `defer` and `undo`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:12:15+02:00
+lastmod: 2026-10-11T20:14:36+02:00
 draft: true
 weight: 40
 tags: [compilers, programming-languages]
@@ -863,24 +863,7 @@ b2:
 
 `%2` is a `str` in the frame for the literal `"debug"`: the address of its bytes and the length 5. The call compares it with the text of the `switch`. `equal` compares the lengths first and the bytes only when the lengths agree. The arms are not hashed and not sorted, so a text that matches no arm costs one call per arm.
 
-A `switch` on a variant loads the tag once and compares it with the number of each arm's case.
-
-```ir excerpt=arms target=linux-x86_64 mode=dev
-fn arms.area(%0: agg arms.Shape) -> i64 {
-b0:
-    %1 = slot arms.Shape.Circle
-    %2 = slot arms.Shape.Box
-    %3 = copy i64 0
-    %4 = load i8 %0 range 0, 3
-    %5 = eq i8 %4, 0
-    branch %5, b1, b2
-b1:
-    %6 = ptradd %0, offset_of arms.Shape.u
-    memcopy %1, %6, arms.Shape.Circle
-    %7 = load i64 %1 !type arms.Shape.Circle.r
-```
-
-`%4` is the tag, one byte whose range the IR records as 0 to 2. `b1` is the arm `Circle c`. The `memcopy` copies the fields of the case out of the variant into the slot `%1`, which is `c`. The body reads `c.r` from the copy, so it may assign the variant without changing `c`.
+A `switch` on a variant loads the tag once and compares it with the number of each arm's case. An arm that binds copies the fields of its case into a slot of the frame first. "Pattern matching" of chapter 8 shows that code.
 
 Where it lives: the `TOKEN_SWITCH` case of `statement` and `arm_body` of `src/antic/parser_stmt.c`. `check_switch`, `check_switch_covers` and `refuse_same_value` of `src/antic/sema_stmt.c`. `lower_switch`, `arm_test` and `bind_case_fields` of `src/antic/lower_stmt.c`. `equal` is in `src/std/anti/text.anti`.
 
