@@ -260,7 +260,7 @@ popq %rbp
 retq
 ```
 
-`pushq %rbp` and `movq %rsp, %rbp` build the frame record, which every function of a Linux and a macOS target keeps. `subq $0x20, %rsp` makes room for the four slots. The two `movq` lines after it store the parameters `w` and `h`, which arrive in `rdi` and `rsi`. `imulq` multiplies and sets the overflow flag. `jo` jumps to the failure arm at offset `0x24` when the flag is set. The other path loads the product into `rax` and returns. Dev mode runs `llc` at `-O1` with no `opt` before it. The slots of the temporaries stay in memory, and nothing is inlined.
+`pushq %rbp` and `movq %rsp, %rbp` build the frame record. On Linux and macOS every function that calls another keeps one, by the attribute `"frame-pointer"="non-leaf"`. `subq $0x20, %rsp` makes room for the four slots. The two `movq` lines after it store the parameters `w` and `h`, which arrive in `rdi` and `rsi`. `imulq` multiplies and sets the overflow flag. `jo` jumps to the failure arm at offset `0x24` when the flag is set. The other path loads the product into `rax` and returns. Dev mode runs `llc` at `-O1` with no `opt` before it. The slots of the temporaries stay in memory, and nothing is inlined.
 
 The overflow check of a multiplication costs one `jo` on x86_64. On arm64 the same module gives four instructions, since ARM64 has no overflow flag for a multiplication.
 
@@ -464,7 +464,7 @@ b0:
 }
 ```
 
-A function shows in a release excerpt only when `main` reaches it and `opt` has not inlined every call of it. The examples of the later chapters pass a value that `main` reads at run time where a function must survive.
+A function shows in a release excerpt only when `main` reaches it and `opt` has not inlined every call of it. An example of the later chapters marks a function `export fn` where a release excerpt must show it. An exported function is `dso_local` and never `internal`, so `opt` keeps it under its plain name.
 
 ```asm excerpt=hello target=linux-x86_64 mode=release
 <hello.main>:
