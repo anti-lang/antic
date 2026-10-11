@@ -3,7 +3,7 @@ title: "Getting started"
 description: "Installing the package of Anti, the first program, anti build and anti run, dev and release builds and where the files go."
 summary: "The package per platform and its one-command install, antic and anti, a first program, `anti build` and `anti run`, the dev and the release mode and the directories an install and a build write."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T15:30:00+02:00
+lastmod: 2026-10-11T20:09:42+02:00
 draft: true
 weight: 10
 tags: [compilers, programming-languages]
@@ -28,6 +28,8 @@ Each package is complete on its own. It builds programs for all six targets with
 | `sysroot/` | the C library and the system libraries of each target |
 | `licenses/` | the licence text of each component and `sources.txt`, the record of its upstream source |
 | `LICENSE`, `VERSION` | the licence of Anti and its version |
+
+A library file, `<module>.antl`, is the compiled form of one module: its public interface and its code in the IR of antic. A processor level is the instruction set a build assumes, such as `x86-64-v3`. Chapter 20 lists the levels.
 
 The frameworks of Apple are the one thing a package lacks, since their licence allows no redistribution. A program that names one with `link framework` needs the stubs that `anti sdk export` packs on a Mac and `anti sdk import` unpacks on any host.
 
@@ -157,7 +159,7 @@ antic hello.anti
 ./hello
 ```
 
-The first command writes two files beside the source: the executable `hello` and the object `hello.o`. The build is a release build, so the program and the runtime are linked through LTO. The second command prints `hello`.
+The first command writes two files beside the source: the executable `hello` and the object `hello.o`. The build is a release build, so the program and the runtime are linked with link-time optimization, LTO for short. Chapter 2 describes that link. The second command prints `hello`.
 
 `antic --target linux-x86_64 -o hello-linux hello.anti` writes the same program for Linux on any host. The package holds the runtime and the sysroot of every target, so a cross-build needs no other install.
 
@@ -179,7 +181,7 @@ name = "com.example.hello"
 version = "0.1.0"
 ```
 
-A name of one segment is refused: `` anti: `hello` is one segment, and a package name is a module path of at least two, as com.example.hello ``.
+A name of one segment is refused. The message is `` anti: `hello` is one segment, and a package name is a module path of at least two, as com.example.hello ``.
 
 ## anti build and anti run
 
@@ -197,11 +199,11 @@ A dev build of `com.example.hello` on macos-arm64 writes these files.
 | `dist/macos-arm64/dev/hello` | the program, copied for delivery |
 | `dist/macos-arm64/dev/NOTICE.txt` | the licence notice of what the program links |
 
-The library file and each object under `obj/` have a file with the suffix `.key` beside them. The key is one line: the SHA-256 of the input, the version of antic, the target, the processor level and whether the build writes debug lines. `strict` follows in a build that refuses warnings and `memory-checks` in a build with `--memory-checks`. A build compiles a module again only when its key changes.
+The library file and each object under `obj/` have a file with the suffix `.key` beside them. The key is one line. It holds the SHA-256 of the input, the version of antic, the target and the processor level. It also says whether the build writes debug lines. The word `strict` follows in a build that refuses warnings and `memory-checks` in a build with `--memory-checks`. A build compiles a module again only when its key changes.
 
 `build/` is disposable, and `dist/` holds what a user runs. Chapter 18 describes the manifest, the lock file and the cache.
 
-`anti build --release` writes `build/macos-arm64/release/` and `dist/macos-arm64/release/` in the same way. Its `dist/` also holds `hello-symbols.zip`, the symbols archive of the program. `--target <name>` builds for another target and `--target all` for all six.
+`anti build --release` writes `build/macos-arm64/release/` and `dist/macos-arm64/release/` in the same way. Its `dist/` also holds `hello-symbols.zip`, the symbols archive of the program. A release program carries no symbol data, and the archive holds what turns the addresses of a stack trace into names and lines. The option `--target <name>` builds for another target and `--target all` for all six.
 
 ## Dev and release
 
