@@ -1,9 +1,10 @@
 # Toolchain work for later
 
-The toolchain is frozen at `23.1.1-anti.7` of `anti-lang/llvm-tools`. `23.1.1-anti.5`
+The toolchain is frozen at `23.1.1-anti.8` of `anti-lang/llvm-tools`. `23.1.1-anti.5`
 added opt, llc and `libunwind.a` to `23.1.1-anti.3` for the LLVM back end, anti.6
-added llvm-profdata and the profile runtime for profile-guided optimisation, and anti.7
-gave every static musl tool a thread stack of 8 MiB. Each line below is
+added llvm-profdata and the profile runtime for profile-guided optimisation, anti.7
+gave every static musl tool a thread stack of 8 MiB, and anti.8 added llvm-cov for the
+coverage measurement, which no package carries. Each line below is
 toolchain work that came up after the freeze of `23.1.1-anti.3`. It waits until a need
 makes it a release.
 

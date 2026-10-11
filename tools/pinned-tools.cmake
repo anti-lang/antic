@@ -40,13 +40,17 @@ function(antic_pinned_linker out llvm os)
     endif()
 endfunction()
 
-# The eight LLVM tools of the pinned release, which tools/get-llvm.cmake
-# installs and tools/check-llvm.cmake copies into the runtime archive. lld
-# runs under its names ld.lld, ld64.lld and lld-link.
+# The nine LLVM tools of the pinned release, which tools/get-llvm.cmake
+# installs. tools/check-llvm.cmake copies every one but llvm-cov into the
+# runtime archive. lld runs under its names ld.lld, ld64.lld and lld-link.
+#
+# DESIGN: llvm-cov measures what the tests of this tree reach, and no
+# package carries it, which Eddie decided on 2026-10-11 as decision 29 of
+# docs/decisions.md. A build needs it, so it stands in this list.
 set(ANTIC_LLVM_TOOLS llvm-mc lld llvm-ar llvm-objdump llvm-readobj opt llc
-    llvm-profdata)
+    llvm-profdata llvm-cov)
 
-# The list of problems of the eight LLVM tools in llvm/bin on a host of
+# The list of problems of the nine LLVM tools in llvm/bin on a host of
 # the operating system os. It is empty when each is there and reports the
 # LLVM version. lld answers as ld.lld, because the generic name prints no
 # version.

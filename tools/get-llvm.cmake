@@ -1,11 +1,14 @@
-# Install the eight LLVM tools llvm-mc, lld, llvm-ar, llvm-objdump,
-# llvm-readobj, opt, llc and llvm-profdata for this host into <dir>/bin.
+# Install the nine LLVM tools llvm-mc, lld, llvm-ar, llvm-objdump,
+# llvm-readobj, opt, llc, llvm-profdata and llvm-cov for this host into
+# <dir>/bin.
 # llvm-mc assembles, lld links under the names ld.lld, ld64.lld and
 # lld-link, and llvm-ar writes static libraries. llvm-objdump reads the
 # format and architecture of an output, and llvm-readobj decodes the
 # Windows unwind data for the tests. opt optimizes LLVM IR and llc compiles
 # it to an object, for the LLVM back end. llvm-profdata merges the raw
 # profiles of a --profile-generate run into the file --profile-use reads.
+# llvm-cov reads such a profile against a program built for coverage, which
+# measures what the tests of this tree reach.
 #
 #   cmake [-DDEST=<dir>] [-DARCHIVE=<file>] -P tools/get-llvm.cmake
 #   cmake -DHOST=<host> -DDEST=<dir> -P tools/get-llvm.cmake
@@ -21,7 +24,8 @@
 # runtime archive holds the tools of this machine alone, and a package
 # carries the tools of its own host. The archive is checked the same way,
 # and <dir>/bin is laid out as bin/ of the runtime archive, with the four
-# names of lld and llvm-version. Nothing of it runs here.
+# names of lld and llvm-version, and without llvm-cov. Nothing of it runs
+# here.
 cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/deps-dir.cmake")
@@ -55,7 +59,13 @@ endforeach()
 # The tools of another host cannot run here, and the digest of the pin
 # has checked them. tools/check-llvm.cmake writes llvm-version beside the
 # tools of this machine, and the same line stands here for the packer.
+#
+# DESIGN: llvm-cov leaves the directory of another host. No package
+# carries it, which Eddie decided on 2026-10-11 as decision 29 of
+# docs/decisions.md, and tools/pack-anti.cmake copies this bin/ whole into
+# the package of the host. The test no_llvm_cov_packed holds it.
 if(DEFINED HOST)
+    file(REMOVE "${DEST}/bin/llvm-cov${exe}")
     file(WRITE "${DEST}/bin/llvm-version" "${fetched_version}\n")
     message(STATUS "the LLVM tools of ${HOST} in ${DEST}/bin")
     return()

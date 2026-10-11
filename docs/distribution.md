@@ -115,7 +115,7 @@ llvm-mc, lld under its four names, llvm-ar, llvm-objdump, llvm-readobj, opt, llc
 llvm-profdata, with `llvm-version`. They are not served from the download area on their
 own. The repository `anti-lang/llvm-tools` builds them
 from the pinned LLVM source and publishes one archive per host as an asset of a GitHub
-release, tagged `<version>-anti.<build>` as in `23.1.1-anti.7`. Beside the archives stand `SHA256SUMS` and its signature
+release, tagged `<version>-anti.<build>` as in `23.1.1-anti.8`. Beside the archives stand `SHA256SUMS` and its signature
 `SHA256SUMS.sig`. The recipe, the hosts and the checks of each build are in that
 repository. Each release holds the tools and clang of each of the six hosts. antic takes
 the tools of its host from `bin/` of the archive above its own, by the rule of
@@ -167,6 +167,14 @@ in its `PT_GNU_STACK` header, where musl gave each thread its small default. The
 link of `mixed_work` crashed `ld.lld` of anti.6 on linux-arm64 in a worker thread. Each
 of those binaries differs from its anti.6 copy in that one field. Besides `VERSION`,
 every other file of every archive is that of anti.6.
+
+`23.1.1-anti.8` adds `llvm-cov` to each tools archive, which measures what the tests of
+antic reach. The tools archive of macos-arm64 grows from 56,124,100 to 57,388,052 bytes,
+and it differs from that of anti.7 in `VERSION` and `bin/llvm-cov` alone. The build
+installs `llvm-cov` in `build/deps/llvm/bin`, and no package carries it:
+`tools/check-llvm.cmake` copies it into no runtime archive, and `tools/get-llvm.cmake
+-DHOST=<host>` leaves it out of the directory the packer copies. The test
+`no_llvm_cov_packed` holds both.
 
 `tools/llvm-pin` names the tag, the address of the release, the name of an asset and
 the digest of the archive of each of the six hosts. `tools/clang-pin` names the archives

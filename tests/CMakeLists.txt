@@ -1046,7 +1046,8 @@ endif()
 
 # The runtime archive carries llvm-mc, lld and llvm-ar of LLVM
 # tools/llvm-version, which the build copies to runtime/bin from the
-# directory that tools/get-llvm.cmake installs.
+# directory that tools/get-llvm.cmake installs. It carries no llvm-cov,
+# which toolchain_pin refuses there.
 if(ANTIC_LLVM_MC)
     get_filename_component(ANTIC_LLVM_BIN "${ANTIC_LLVM_MC}" DIRECTORY)
     add_custom_target(llvm_tools ALL
@@ -1055,6 +1056,7 @@ if(ANTIC_LLVM_MC)
             -P "${PROJECT_SOURCE_DIR}/tools/check-llvm.cmake")
     add_test(NAME toolchain_pin
         COMMAND "${CMAKE_COMMAND}" "-DLLVM_BIN=${ANTIC_RUNTIME_DIR}/bin"
+            -DRUNTIME_ARCHIVE=ON
             -P "${PROJECT_SOURCE_DIR}/tools/check-llvm.cmake")
 endif()
 
@@ -1812,6 +1814,12 @@ add_test(NAME llvm_names
             "-DLLVM=${ANTIC_LLVM_DIR}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-names"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_names.cmake")
+
+# llvm-cov stays out of every directory the packer copies into a package.
+add_test(NAME no_llvm_cov_packed
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/no-llvm-cov-packed"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_no_llvm_cov_packed.cmake")
 
 # A Linux program of a release names no glibc symbol above the pinned
 # 2.35, which tools/pack-anti.cmake reads before it writes a package

@@ -3,12 +3,12 @@
 # tools/llvm-version alone, and @VERSION@ takes it. An asset is named after
 # the tag and the host, which @TAG@ and @HOST@ take. Each digest is the
 # SHA-256 of the asset of that host.
-tag=@VERSION@-anti.7
+tag=@VERSION@-anti.8
 release=https://github.com/anti-lang/llvm-tools/releases/download/@TAG@
 file=clang-@TAG@-@HOST@.tar.xz
-linux-x86_64-digest=7ae5230595a587045d0bc24226873a57b22de9047d2639fe1d21627384050c69
-linux-arm64-digest=de70eee754a49dde5eb2c13fc8485dabfc7580be28a8b2078403b6ea2ddf4b47
-macos-arm64-digest=404fdb3b48e27c2a75ccc0c55c3f25a50ee4b8f5e2b11314e60556df249a5aa7
-macos-x86_64-digest=ce4ae9cedbac8744404b01d025b260300064673946d1890dbb2e98389fbbdce9
-windows-x86_64-digest=1a8fe9d71490bd4305ffa26ba6ede51ffe0f9f2c21ba39256dddcc8354bee5af
-windows-arm64-digest=3a4a3fbdb4184961b25c0dcc62f63d4d09e34c817bbecd618c1caef3f013ce3b
+linux-x86_64-digest=b9e17ef10df19f25f8983a0be6039672016e46e5cb36eccc64f724bacf131835
+linux-arm64-digest=bcb78474ff60d3e5ad0ba077eb702a8d75999e0b3239c94bcfcd53a2d0ac31f6
+macos-arm64-digest=46a384aa69f6a029f590d0914401718cb926023c975eef864fbdb73eb36b2834
+macos-x86_64-digest=bbee3b922b6df8426e171e7b4d4694341d3ab06deb2e1b3d288a342bf7aafdb8
+windows-x86_64-digest=c67ad97bf756eef8465a4637190d5ba5f171df2b14e638b8368f15b6fda0e3fc
+windows-arm64-digest=566a7d294436d31359dfa4ae6d311996ee5b9c860446f27c00089ce23a8a4f48
