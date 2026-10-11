@@ -252,7 +252,7 @@ vmovups %ymm0, (%rdi)
 
 `total` is one load at offset `0x10`. `same` is the default `==` of `Point`. It compares `x`, leaves with `false` at the first difference, and compares `y`. The compiler writes that code where the `==` stands and calls no function. `put` copies the 32 bytes of a `Mixed` through one `ymm` register, which the default level x86-64-v3 has. On arm64 the copy is one `ldp` and one `stp` of two 16-byte registers, and `total` is `ldr x0, [x0, #0x10]`.
 
-The default hash is written in place as well. `key` mixes each field with the finalizer of MurmurHash3, two multiplications per field, and folds the fields together in order. It reads no seed and calls nothing.
+The default hash is written in place as well. `key` runs the finalizer of MurmurHash3 over each field and again over the running value, four multiplications per field. It reads no seed and calls nothing.
 
 A value of struct type passes as the C convention of the target passes that struct, which chapter 5 covers. On linux-x86_64 a `Rect` travels in two `xmm` registers and comes back in two.
 
@@ -274,7 +274,7 @@ Where it lives: `compute` of `src/antic/layout.c` lays out every aggregate, and 
 | A literal | one store per field | the same, or fewer after folding |
 | A copy | one `memcpy` of the size | moves through registers up to a few words, a call of `memcpy` above |
 | `a == b` | one compare and one branch per field, in place | the same |
-| `a.hash()` | two multiplications per field and three for the whole, in place | the same |
+| `a.hash()` | four multiplications per field, in place | the same, eight `imulq` in `key` for the two fields of `Point` |
 | Heap allocations | 0 | 0 |
 | Calls into the runtime | 0 | 0 |
 | Checks inserted | none for a struct, the checks of the operators on its fields remain | none |
