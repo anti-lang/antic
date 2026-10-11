@@ -77,8 +77,10 @@
 #       document shows what the option changes in the code: `checks` is
 #       --checks, `no-checks` is --no-checks and `memory-checks` is
 #       --memory-checks. `no-hooks` is --no-hooks, `trace` is --trace
-#       without a pattern and `no-trace` is --no-trace. A dump takes no
-#       option.
+#       without a pattern and `no-trace` is --no-trace. `tests` is --tests,
+#       which keeps the `tests` and `fixtures` blocks of the block, `debug`
+#       is -g, and `cpu-<level>` is --cpu <level>, as in `cpu-v1`. A dump
+#       takes no option.
 #   ```tokens excerpt=<id> target=<target> mode=<dev|release>
 #   ```ast excerpt=<id> target=<target> mode=<dev|release>
 #   ```types excerpt=<id> target=<target> mode=<dev|release>
@@ -272,7 +274,13 @@ set(dump_kinds "tokens|ast|types|ir|opt")
 function(excerpt_output out kind id module target mode option dir)
     set(base "${dir}/${id}.${mode}.${target}")
     set(extra "")
-    if(NOT option STREQUAL "")
+    if(option STREQUAL "debug")
+        set(base "${base}.${option}")
+        set(extra -g)
+    elseif(option MATCHES "^cpu-(.+)$")
+        set(base "${base}.${option}")
+        set(extra --cpu "${CMAKE_MATCH_1}")
+    elseif(NOT option STREQUAL "")
         set(base "${base}.${option}")
         set(extra "--${option}")
     endif()
@@ -692,7 +700,7 @@ foreach(document IN LISTS documents)
             endif()
             set(state block)
             math(EXPR block_line "${number} + 1")
-        elseif(line MATCHES "^```(llvm|asm|${dump_kinds}) excerpt=([a-z][a-z0-9_]*) target=([a-z0-9_-]+) mode=(dev|release)( option=(checks|no-checks|memory-checks|no-hooks|trace|no-trace))?$")
+        elseif(line MATCHES "^```(llvm|asm|${dump_kinds}) excerpt=([a-z][a-z0-9_]*) target=([a-z0-9_-]+) mode=(dev|release)( option=(checks|no-checks|memory-checks|no-hooks|trace|no-trace|tests|debug|cpu-[a-z0-9.]+))?$")
             set(excerpt_kind "${CMAKE_MATCH_1}")
             set(excerpt_id "${CMAKE_MATCH_2}")
             set(excerpt_target "${CMAKE_MATCH_3}")
@@ -708,7 +716,7 @@ foreach(document IN LISTS documents)
             math(EXPR block_line "${number} + 1")
         elseif(line MATCHES "^```(llvm|asm|${dump_kinds}) ")
             message(FATAL_ERROR
-                "the excerpt at line ${number} of ${document} is not written as `${CMAKE_MATCH_1} excerpt=<id> target=<target> mode=<dev|release>`, with `option=<checks|no-checks|memory-checks|no-hooks|trace|no-trace>` after it for llvm and asm alone")
+                "the excerpt at line ${number} of ${document} is not written as `${CMAKE_MATCH_1} excerpt=<id> target=<target> mode=<dev|release>`, with `option=<checks|no-checks|memory-checks|no-hooks|trace|no-trace|tests|debug|cpu-<level>>` after it for llvm and asm alone")
         elseif(line MATCHES "^```" AND NOT context_line EQUAL 0)
             message(FATAL_ERROR
                 "the context at line ${context_line} of ${document} stands before a block that is not `anti`")
