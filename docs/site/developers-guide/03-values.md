@@ -10,7 +10,7 @@ tags: [compilers, programming-languages]
 keywords: [types, literals, integer overflow, wrapping arithmetic, saturating arithmetic, f16, strings, tuples, type inference]
 ---
 
-A value of Anti has a fixed size that is the same on all six targets, and no number converts to another type without `as`. Signed arithmetic is checked in a dev build and wraps in a release build. The wrapping and the saturating operators state the intent of a line in both. This chapter covers the scalar types, text, bytes and tuples. Chapter 8 covers structs, arrays, enums and variants.
+A scalar value of Anti has a size that is the same on all six targets, and no number converts to another type without `as`. Signed arithmetic is checked in a dev build and wraps in a release build. The wrapping and the saturating operators state the intent of a line in both. This chapter covers the scalar types, text, bytes and tuples. Chapter 8 covers structs, arrays, enums and variants.
 
 Some examples mark a function `export fn`. An exported function keeps its plain name and stays in the release module, so a release excerpt can show it. Chapter 17 describes `export fn`.
 
@@ -1038,3 +1038,612 @@ For a C++ programmer:
 - An `f16` is no arithmetic type. An expression reads it as `f32`, and only `as f16` writes one.
 - `let h: f16 = 1.5;` is an error, since a literal is never a half. The form is `1.5 as f16`.
 - An x86_64 program built with `--cpu v1` or `--cpu v2` calls the runtime for every `f16` read and write.
+
+## Text and bytes
+
+### What you know
+
+A `String` of Java is an immutable object of UTF-16 code units that the collector frees, and its `length()` counts those units. A string of C is a `char *` to bytes that end at a NUL, so its length costs a scan. `std::string` of C++ owns its bytes, knows its size and frees them in its destructor.
+
+### The feature
+
+`str` is a text: a pointer to UTF-8 bytes and their count. It is immutable and owns nothing. Copying a `str` copies the pointer and the count, never the bytes.
+
+| Expression | Type | Result |
+|---|---|---|
+| `s.len` | `int` | the number of bytes |
+| `s.ptr` | `?*byte` | the address of the first byte |
+| `s[i]` | `byte` | one byte, with a bounds check in dev mode |
+| `s[lo..hi]` | `[]byte` | the bytes from `lo` up to `hi`, sharing the memory |
+| `a == b`, `a != b` | `bool` | whether the bytes are equal |
+| `a < b` and the other three | `bool` | the order of the bytes, which is the order of the code points |
+
+`+` takes no `str`. A text is built with `f"..."` or with `anti.text.Builder`.
+
+A `char` is one Unicode scalar value in 32 bits. A character literal is a `char`, and `s[i]` is a `byte`, so neither converts to the other without `as`.
+
+`[]byte` is a slice of bytes with no encoding. Chapter 12 covers slices.
+
+The string literals have seven prefixes.
+
+| Literal | Type | Contents |
+|---|---|---|
+| `"..."` | `str` | text with escapes |
+| `r"..."` | `str` | text with every backslash kept |
+| `f"..."` | `str` | text with `{expr}` values, built at run time |
+| `rf"..."` | `str` | the same with every backslash kept |
+| `b"..."` | `[]byte` | bytes with escapes |
+| `br"..."` | `[]byte` | bytes with every backslash kept |
+| `x"00 AB CC"` | `[]byte` | bytes written as hex pairs |
+
+`re"..."` is a pattern literal and stands with the regular expressions of the standard library. Every form but `x"..."` takes hash delimiters, `#"a "quoted" word"#`, for a text that holds quotes.
+
+The escapes are `\n \r \t \\ \" \' \0`, `\xHH` and `\u{H}` with one to six hex digits. In a `str` and a `char`, `\xHH` stops at `\x7F` and `\0` is refused, so a `str` literal is always valid UTF-8 without a NUL inside. A byte string takes both.
+
+An `f"..."` writes each `{expr}` into the text. The values it writes are integers, floats, `bool`, `char`, `str` and objects, which it writes through their `to_text`. `{{` and `}}` write a brace. A format specification follows a colon, as `[align][0][width][.precision][kind]`.
+
+| Part | Values | Applies to |
+|---|---|---|
+| align | `<` left, `>` right, `^` centre | every value. A number stands on the right by default and every other value on the left |
+| `0` | fill with zeros after the sign | numbers, with a width |
+| width | one to nine digits, counted in characters | every value |
+| precision | the digits after the point | floats |
+| kind | `x`, `X`, `b`, `o` for integers. `e`, `f` for floats | numbers |
+
+A float without a precision is written with the fewest digits that read back as the same value.
+
+The text of an `f"..."` is new memory from the C library on every evaluation. It belongs to the program, and `free(s.ptr)` gives it back. A module that writes one imports `anti.text`.
+
+`anti.text` holds the functions on a `str`.
+
+| Function | Result |
+|---|---|
+| `text.byte_count(s)`, `text.char_count(s)` | the bytes, and the characters, which costs a pass over the bytes |
+| `text.equal(a, b)` | what `a == b` gives |
+| `text.slice(s, from, to)` | a `str` of that byte range, sharing the memory of `s` |
+| `text.find_byte(s, b)` | the index of the first `b`, or -1 |
+| `text.parse_int(s)` | the `int` the text writes. It may fail |
+| `text.from_c(p)`, `text.from_bytes(b)` | a `str` over a C string or over bytes, sharing their memory |
+| `text.to_bytes(s)` | a copy of the bytes in new memory, freed with `free(result.ptr)` |
+| `text.to_text(b)` | a `str` over a copy of the bytes in new memory, freed with `free(result.ptr)`. It fails when the bytes are no valid UTF-8 |
+
+```anti
+//! name: texts
+import anti.io;
+import anti.text;
+
+fn same(a: str, b: str) -> bool
+{
+	return a == b;
+}
+
+fn third(s: str) -> byte
+{
+	return s[2];
+}
+
+fn label(n: int) -> str
+{
+	return f"n = {n}";
+}
+
+fn say(line: str)
+{
+	io.println(line);
+	free(line.ptr);
+}
+
+fn main(args: []str) -> int
+{
+	let s = "héllo";
+	say(f"len {s.len}, chars {text.char_count(s)}");
+	say(f"s[1] = {s[1]}, third = {third(s)}");
+	let part = s[0..3];
+	let head = text.slice(s, 0, 3);
+	say(f"part.len = {part.len}, head = {head}");
+	let equal = same(s, "héllo");
+	let less = "abc" < "abd";
+	let upper = "Z" < "a";
+	say(f"equal {equal}, less {less}, upper first {upper}");
+	let c = 'é';
+	say(f"char {c} is {c as u32}");
+	let raw = b"\xFF\x00a";
+	let hex = x"00 AB CC";
+	say(f"raw.len {raw.len}, raw[0] {raw[0]}, hex[1] {hex[1]}");
+	let name = "tea";
+	let price = 2.5;
+	say(f"{name:>6}|{name:<6}|{price:8.2f}|{args.len:04}|{255:x}");
+	let n = text.parse_int("42") catch fatal;
+	let made = label(n);
+	say(f"{made}, size_of(str) = {size_of(str)}, size_of(char) = {size_of(char)}");
+	free(made.ptr);
+	return 0;
+}
+```
+
+```text output
+len 6, chars 5
+s[1] = 195, third = 169
+part.len = 3, head = hé
+equal true, less true, upper first true
+char é is 233
+raw.len 3, raw[0] 255, hex[1] 171
+   tea|tea   |    2.50|0001|ff
+n = 42, size_of(str) = 16, size_of(char) = 4
+```
+
+`é` is two bytes in UTF-8, 195 and 169, so `"héllo"` has a length of 6 and 5 characters. `"Z" < "a"` holds because the comparison is by bytes and 90 is below 97.
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: `+` needs numeric operands, found `str`
+let a = "abc";
+let b = a + "def";
+```
+
+```anti refused
+//! error: cannot assign to this expression
+let s = "abc";
+s[0] = 65;
+```
+
+```anti refused
+//! error: expected `char`, found `byte`
+let s = "abc";
+let c: char = s[0];
+```
+
+```anti refused
+//! error: expected `str`, found `[]byte`
+let t: str = b"ab";
+```
+
+```anti refused
+//! error: `\xHH` stops at `\x7F` outside byte strings
+let s = "\xFF";
+```
+
+```anti refused
+//! error: NUL is not allowed here
+let s = "a\0b";
+```
+
+```anti refused
+//! error: a character literal holds one character
+let c = 'ab';
+```
+
+```anti refused
+//! error: unterminated `{` in `f"..."`
+import anti.text;
+let key = "k";
+let line = f"{key == "k"}";
+```
+
+A `"` ends an `f"..."` inside an `{expr}` too. A value that needs a quote is bound to a name first, as `equal` is above, or the literal takes hash delimiters.
+
+### How antic builds it
+
+A `str` is a struct of 16 bytes: the pointer at offset 0 and the length at offset 8. A `[]T` has the same layout. The three calling conventions pass it in three ways.
+
+| Target | A `str` parameter in the LLVM text |
+|---|---|
+| linux-x86_64, macos-x86_64 | two `i64`, in two registers |
+| linux-arm64, macos-arm64, windows-arm64 | one `[2 x i64]`, in two registers |
+| windows-x86_64 | a `ptr` to a copy the caller makes |
+
+A string literal is a constant global of the module that holds the bytes and a NUL after them. The NUL is not counted in the length. Two literals with equal bytes are one global. `llc` puts the global into the read-only data: `.rodata` on ELF, `__TEXT,__const` on Mach-O and `.rdata` on COFF.
+
+This is `label`, the function with the `f"n = {n}"`, in dev mode.
+
+```llvm excerpt=texts target=linux-x86_64 mode=dev
+define hidden { i64, i64 } @texts.label(i64 noundef %p0) #0 {
+...
+  store ptr @anti.text.Builder.new, ptr %t3, align 8
+  %v0 = load ptr, ptr %t3, align 8
+  call void (ptr) %v0(ptr sret([32 x i8]) align 8 %a0)
+...
+  store ptr @texts.1, ptr %t5, align 8
+...
+  store i64 4, ptr %v7, align 8
+...
+  call void (ptr, i64, i64) @anti.text.Builder.append(ptr %v8, i64 %v10, i64 %v12)
+  %v13 = load ptr, ptr %t1, align 8
+  %v14 = load i64, ptr %t0, align 8
+  call void (ptr, i64, i64, i8, i64, i8, i8) @anti.text.Builder.append_int(ptr %v13, i64 %v14, i64 10, i8 zeroext 0, i64 0, i8 zeroext 1, i8 zeroext 0)
+  %v15 = load ptr, ptr %t1, align 8
+  %v16 = call { i64, i64 } (ptr) @anti.text.Builder.take(ptr %v15)
+```
+
+Line by line:
+
+- The result `{ i64, i64 }` is the `str`, returned in two registers.
+- `Builder.new` builds a `Builder` of 32 bytes into `%a0`, a slot of the frame. `sret` marks the pointer the result is written through.
+- `@texts.1` is the global of the text `n = `, and the `store i64 4` is its length. The two stores build the `str` that `append` takes.
+- `append_int` writes `n`. Its other arguments are the radix 10 and the parts of the format specification, all at their defaults here.
+- `take` gives the collected bytes as a `str` and leaves the builder empty.
+
+The checker writes those four calls in place of the literal, so lowering and every later step see ordinary calls of `anti.text`. A float value is `append_float`, a `bool` `append_bool`, a `char` `append_char` and a `str` `append_text`.
+
+The `Builder` holds a pointer to its room, a length and a capacity. `append` copies into the room in place while the bytes and their NUL fit. `anti_rt_builder_append` of `src/rt/text.c` grows the room with `realloc`, to 32 bytes first and then by doubling. `take` hands the room over as it is, so the block of a text is 32 bytes or a power of two times that. A text of no bytes takes a block of one byte.
+
+`a == b` on two `str` is a call of `anti_rt_same_bytes`. It compares the lengths first and calls `memcmp` only when they are equal. `a < b` calls `anti_rt_compare_bytes`.
+
+```llvm excerpt=texts target=linux-x86_64 mode=dev
+  %v18 = call i32 (ptr, i64, ptr, i64) @anti_rt_same_bytes(ptr %v14, i64 %v15, ptr %v16, i64 %v17)
+```
+
+`s[2]` loads the length, compares it with the index in one unsigned comparison and loads the byte. A release build drops the comparison.
+
+Where it lives: `src/antic/lexer.c` reads the literal forms and the pieces of an `f"..."`, and `src/antic/sema_expr.c` writes its `Builder` calls. `src/std/anti/text.anti` holds `Builder` and the functions on a `str`, and `src/rt/text.c` holds `anti_rt_builder_append`, `anti_rt_builder_take`, `anti_rt_same_bytes` and `anti_rt_compare_bytes`.
+
+### What it costs
+
+| Operation | Dev | Release |
+|---|---|---|
+| a `str` value | 16 bytes | 16 bytes |
+| a `char` value | 4 bytes | 4 bytes |
+| a string literal | its bytes and one NUL in the read-only data, once per module | the same |
+| copying or passing a `str` | 16 bytes, no allocation | the same |
+| `s.len` | one load | one load |
+| `s[i]` | a compare, a branch and a load | a load |
+| `a == b` | one call of `anti_rt_same_bytes` | the same call, which the LTO link may inline |
+| `text.char_count(s)` | one pass over the bytes | the same |
+| `f"..."` | one heap block of at least 32 bytes, one call per text and per value | the same block, with `append` inlined |
+| `text.slice`, `text.from_bytes` | no allocation | no allocation |
+| `text.to_bytes` | one heap block of the length | the same |
+
+An `f"..."` whose text and NUL fit in 32 bytes takes one allocation. A longer one calls `realloc` again each time an append passes the room, which then doubles until it holds the bytes. The program frees the block, and a text that is never freed is a leak that `--memory-checks` reports.
+
+No operation on a `str` takes a lock or an atomic operation. The bounds check of `s[i]` follows `--checks` and `--no-checks` as every check of dev mode does. Without it an index past the end reads memory outside the text.
+
+### Pitfalls
+
+For a Java programmer:
+
+- `s.len` counts bytes, not characters. `"héllo".len` is 6.
+- `==` compares the text. No `equals` is needed, and no identity comparison of two texts exists.
+- `+` does not join texts. The form is `f"{a}{b}"`.
+- The text of an `f"..."` is not collected. The program frees it with `free(s.ptr)`.
+- `s[i]` is a byte of the UTF-8 form, not a `char`.
+
+For a C programmer:
+
+- A `str` is 16 bytes and carries its length. `strlen` is never needed, and a `str` may hold no NUL at its end.
+- A literal and the text of an `f"..."` have a NUL after their bytes. A `str` from `text.slice` or `text.from_bytes` shares memory and has none of its own, so its `ptr` is no C string.
+- `'a'` is a `char` of 4 bytes, not an `int` and not a byte.
+- A `str` cannot be written through. `text.to_bytes` gives a copy that can.
+
+For a C++ programmer:
+
+- A `str` is a `std::string_view`, not a `std::string`. It owns nothing and no destructor runs for it.
+- The text of an `f"..."` has no owner type. The program frees it once, by hand.
+- No small-string buffer exists. An `f"..."` of one byte takes a heap block of 32 bytes.
+
+## Tuples
+
+### What you know
+
+Java has no tuple, and a method that returns two values returns an object, such as a record. C returns a struct declared for the purpose, or writes through pointer parameters. C++ has `std::pair` and `std::tuple` with `std::get<0>` and structured bindings.
+
+### The feature
+
+A tuple type is two or more types in parentheses, `(int, str)`. A tuple value is two or more expressions in parentheses, `(1, "one")`. `t.0` and `t.1` name its elements, which can be read and assigned. A tuple is a value: an assignment or a call copies every element.
+
+`let (a, b) = e;` takes a tuple apart into new variables, one per element. `for i, x in items` gives the index and the element of each turn.
+
+Two tuples of one type compare with `==` when every element has `==`. A tuple has no `<`. A tuple may be an element of a tuple, a field, an array element, a constant and the key of a map.
+
+```anti
+//! name: pairs
+import anti.io;
+import anti.text;
+
+export fn min_max(a: int, b: int) -> (int, int)
+{
+	if a < b {
+		return (a, b);
+	}
+	return (b, a);
+}
+
+fn say(line: str)
+{
+	io.println(line);
+	free(line.ptr);
+}
+
+fn main() -> int
+{
+	let t = (1, "one");
+	say(f"t.0 = {t.0}, t.1 = {t.1}");
+	t.0 = 2;
+	let (lo, hi) = min_max(9, 4);
+	say(f"lo {lo}, hi {hi}, t.0 {t.0}");
+	let nested: (int, (bool, str)) = (1, (true, "x"));
+	say(f"nested.1.1 = {nested.1.1}");
+	let same = (lo, hi) == (4, 9);
+	say(f"equal {same}");
+	let items = [10, 20, 30];
+	for i, v in items {
+		say(f"{i}: {v}");
+	}
+	say(f"(i8, i8) {size_of((i8, i8))}, (i8, int) {size_of((i8, int))}, (int, str) {size_of((int, str))}");
+	return 0;
+}
+```
+
+```text output
+t.0 = 1, t.1 = one
+lo 4, hi 9, t.0 2
+nested.1.1 = x
+equal true
+0: 10
+1: 20
+2: 30
+(i8, i8) 2, (i8, int) 16, (int, str) 24
+```
+
+The flags form of the integer section, `let (result, flags) = a + b;`, is this destructuring over a pair `(T, Flags)`.
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: `(int, str)` has 2 elements, and `2` is none of them
+let t = (1, "one");
+let u = t.2;
+```
+
+```anti refused
+//! error: `(int, str)` has 2 elements, and the destructuring names 3
+let t = (1, "one");
+let (a, b, c) = t;
+```
+
+```anti refused
+//! error: a tuple has two or more elements
+let t: (int) = (1);
+```
+
+```anti refused
+//! error: `<` needs numeric, `char` or `str` operands, found `(int, int)`
+let t = (1, 2);
+let u = (1, 3);
+let less = t < u;
+```
+
+### How antic builds it
+
+A tuple is an anonymous struct with the layout C gives a struct of the same members. The elements stand in order, each at the next offset that its alignment allows, and the size is a multiple of the largest alignment. `(i8, int)` is therefore 16 bytes: one byte, seven of padding and eight.
+
+Two tuple types with the same element types are one type. A header that antic writes for a C library names it by its elements, `struct anti_tuple_int_int` for `(int, int)`.
+
+The calling convention treats a tuple as that struct. On the System V targets a tuple of up to 16 bytes travels in two registers.
+
+```llvm excerpt=pairs target=linux-x86_64 mode=release
+define dso_local { i64, i64 } @min_max(i64 noundef %p0, i64 noundef %p1) local_unnamed_addr #3 {
+b0:
+  %p0.p1 = tail call i64 @llvm.smin.i64(i64 %p0, i64 %p1)
+  %p1.p0 = tail call i64 @llvm.smax.i64(i64 %p0, i64 %p1)
+  %v16.pn = insertvalue { i64, i64 } poison, i64 %p0.p1, 0
+  %common.ret.op = insertvalue { i64, i64 } %v16.pn, i64 %p1.p0, 1
+  ret { i64, i64 } %common.ret.op
+}
+```
+
+The result type `{ i64, i64 }` is the pair of registers. `opt` has turned the `if` into `smin` and `smax`, and the two `insertvalue` lines put the smaller value first.
+
+```asm excerpt=pairs target=linux-x86_64 mode=release
+<min_max>:
+movq %rsi, %rdx
+cmpq %rsi, %rdi
+movq %rsi, %rax
+cmovlq %rdi, %rax
+cmovgq %rdi, %rdx
+retq
+```
+
+The first element comes back in `rax` and the second in `rdx`. The function has no frame, no memory access and no branch.
+
+A tuple above 16 bytes, such as `(int, str)`, is returned through a pointer that the caller passes. A function marked `may fail` returns its error in the register and writes its tuple through one out pointer, which chapter 6 describes.
+
+In dev mode a tuple local is a slot of the frame, and `t.0` is a load at the offset of the element.
+
+Where it lives: `src/antic/types.c` makes one type per distinct tuple, `src/antic/layout.c` lays it out, `src/antic/abi.c` classifies it for each convention, `src/antic/sema_stmt.c` checks a destructuring and `tuple_elements` of `src/antic/header.c` writes its C name.
+
+### What it costs
+
+| Cost | Dev | Release |
+|---|---|---|
+| Bytes | the C struct of the elements, padding included | the same |
+| Building one | one store per element | registers, when `opt` keeps it out of memory |
+| `t.0` | one load | one register |
+| `let (a, b) = e;` | one load and one store per element | none beyond the values |
+| Passing and returning | up to 16 bytes in two registers on System V and AAPCS64, larger through a pointer | the same |
+| Heap allocations | 0 | 0 |
+| Calls into the runtime | 0 | 0 |
+| Checks | none | none |
+
+The order of the elements decides the padding. `(i8, int, i8)` is 24 bytes and `(int, i8, i8)` is 16.
+
+### Pitfalls
+
+For a Java programmer:
+
+- A tuple is a value, not an object. It has no identity, cannot be `null`, and an assignment copies it.
+- Returning one allocates nothing.
+
+For a C programmer:
+
+- The layout is that of a C struct, so the order of the elements changes the size.
+- `(x)` is a parenthesised expression, and a tuple has at least two elements.
+- The comma is no operator. `(a, b)` is a pair, never `b` alone.
+
+For a C++ programmer:
+
+- An element is `t.0`, not `std::get<0>(t)`.
+- `let (a, b) = e;` copies the elements. It binds no reference into the tuple.
+- A tuple has no `<`. Sorting by two keys needs a struct with `operator fn lt`.
+
+## Type inference
+
+### What you know
+
+`var` of Java and `auto` of C++ take the type of a local from its initialiser. C++ also deduces template arguments from the arguments of a call. C had no inference before `auto` of C23.
+
+### The feature
+
+Anti infers a type in three places.
+
+A `let` without a type takes the type of its initialiser.
+
+```anti
+let n = 5;
+let ratio = 0.5;
+let name = "tea";
+let pair = (n, name);
+let bytes = [1, 2, 3];
+```
+
+A literal takes its type from where it stands. Five places give one. They are the initialiser of a typed `let`, an argument and a returned value. The other operand of a binary operator and an element of a typed array give one too. Without such a context an integer literal is an `int` and a float literal a `float`.
+
+```anti
+fn half(x: f32) -> f32 { return x / 2.0; }
+let a: u8 = 200;
+let b = a + 55;
+let c = half(3.0);
+let d: [3]i16 = [1, 2, 3];
+```
+
+A call of a generic function takes its type arguments from its arguments, from left to right. Chapter 10 covers generics.
+
+```anti
+fn is_less<T: Ordered>(a: T, b: T) -> bool { return a < b; }
+let small: u8 = 3;
+let x = is_less(3, 4);
+let y = is_less(small, 4);
+let z = is_less<u8>(3, 4);
+```
+
+The first call compares two `int`. The second fixes `T` as `u8` at its first argument, and the literal `4` then becomes a `u8`. The third names the type argument.
+
+Nothing else is inferred. A parameter and a result of a function always name their types. An inferred type never depends on a later use of the variable, and it never changes.
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: `none` needs a type that may be `none` from its context
+let n = none;
+```
+
+```anti refused
+//! error: expected `int`, found a float literal
+let a = [1, 2.0];
+```
+
+```anti refused
+//! error: expected `int`, found `byte`
+fn is_less<T: Ordered>(a: T, b: T) -> bool { return a < b; }
+let small: u8 = 3;
+let n = is_less(4, small);
+```
+
+```anti refused
+//! error: expected `i16`, found `int`
+let xs = [1, 2, 3];
+let n: i16 = xs.len;
+```
+
+In the third block the literal `4` comes first, so `T` is `int` before `small` is seen.
+
+### How antic builds it
+
+The checker fixes the type of every expression and writes it into the tree. `--dump-types` shows the result. This is `inferred` of the program below.
+
+```anti
+//! name: infer
+export fn inferred(n: int) -> int
+{
+	let twice = n * 2;
+	let big = twice > 100;
+	if big {
+		return 100;
+	}
+	return twice;
+}
+
+export fn written(n: int) -> int
+{
+	let twice: int = n * 2;
+	let big: bool = twice > 100;
+	if big {
+		return 100;
+	}
+	return twice;
+}
+
+fn main(args: []str) -> int
+{
+	return inferred(args.len) - written(args.len);
+}
+```
+
+```types excerpt=infer target=linux-x86_64 mode=release
+export function inferred   fn(int) -> int
+...
+    let_stmt twice         int
+      multiplicative *     int
+        ident n            int
+        int_lit 2          int
+    let_stmt big           bool
+      relation >           bool
+        ident twice        int
+        int_lit 100        int
+```
+
+`twice` is an `int` because `n * 2` is one, and the literal `2` is an `int` because `n` is one. `big` is a `bool` because a comparison gives one.
+
+Lowering reads the types from the tree, so the IR and the LLVM module carry no trace of how a type was found. `inferred` and `written` compile to the same code.
+
+```llvm excerpt=infer target=linux-x86_64 mode=release
+  %v2 = shl i64 %p0, 1
+  %common.ret.op = tail call i64 @llvm.smin.i64(i64 %v2, i64 100)
+  ret i64 %common.ret.op
+}
+...
+  %v2 = shl i64 %p0, 1
+  %common.ret.op = tail call i64 @llvm.smin.i64(i64 %v2, i64 100)
+  ret i64 %common.ret.op
+}
+```
+
+The first three lines are the body of `inferred` and the last three the body of `written`.
+
+Where it lives: `sema_stmt.c` of `src/antic/` gives a `let` its type, `sema_expr.c` and `sema_const.c` type a literal from its context, `sema_generic.c` infers the type arguments of a call, and `ast_dump_typed` of `src/antic/ast_dump.c` prints the checked tree.
+
+### What it costs
+
+| Cost | Dev | Release |
+|---|---|---|
+| Bytes, instructions, calls, checks | the same as with the type written | the same as with the type written |
+
+Inference runs in the checker and adds nothing to the program.
+
+### Pitfalls
+
+For a Java programmer:
+
+- `let n = 5;` makes a 64-bit `int`, where `var n = 5;` of Java makes 32 bits.
+- `let x = 1.0;` makes a 64-bit `float`.
+
+For a C programmer:
+
+- A literal has no type of its own. `200 + 100` in a `u8` context is checked against `u8`, and `300` there is an error.
+- An untyped integer literal is always `int`, never a narrower type that would fit it.
+
+For a C++ programmer:
+
+- `let` never infers a reference. It declares a new variable.
+- A function has no inferred result type. Every signature is written in full.
+- The type arguments of a generic call are fixed from the left. Putting the typed argument first lets a literal after it follow.
