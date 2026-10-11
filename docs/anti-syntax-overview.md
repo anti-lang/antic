@@ -1549,7 +1549,7 @@ Not built yet.
 
 ## Regular expressions
 
-A pattern literal `re"..."` is raw and has type `Regex`. The compiler checks it, knows its groups and compiles it once before `main`. `Regex.compile(text)` compiles one at run time and may fail. The engine is PCRE2, linked only when a program uses a pattern.
+A pattern literal `re"..."` is raw and has type `Regex`. The compiler checks it, knows its groups and compiles it once before `main`. `Regex.compile(text)` compiles one at run time and may fail with `BadPattern`. The engine is PCRE2, linked only when a program uses a pattern, and a module that writes a pattern imports `anti.regex`.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -1575,13 +1575,11 @@ let r = Regex.compile(input) catch fatal;
 let n = line.matches(r) catch none;
 ```
 
-`matches`, `find_all`, `replace` and `split` are methods of `str`. `find_all` and `split` are iterators, and `to_slice()` collects either. `limit` takes that many matches from the start, or from the end when negative. A match behaves as a `?*T` does and stands alone as a condition. Its fields are `all`, `group(n)`, `took_part(n)`, `count`, `pre` and `post`, and for a pattern literal a group is a field, `m.1` or `m.year`. A template names groups with `$1` and `${name}`, and a function may give each replacement. A call with a pattern literal never fails. A call with a compiled pattern may fail with `regex.TooExpensive` or `regex.MissingGroup`. Flags are PCRE2's inline flags, `(?i)`, and `\d`, `\w` and `\s` mean their ASCII sets. A pattern that can take exponential time fails the safety check `exponential-pattern`. No match reads or writes anything global.
-
-Built: `catch none`, as a form of every failing call, the pattern literal `re"..."` with its check at compile time and the safety check `exponential-pattern`, the literals compiled once before `main`, `Regex.compile`, the inline flags, the ASCII meaning of `\d`, `\w` and `\s` with `(*UCP)` for the Unicode one, and the classes `Error`, `BadPattern`, `TooExpensive` and `MissingGroup` of `anti.regex`. A module that writes a pattern imports `anti.regex`. The methods `matches`, `find_all`, `replace` and `split` with `limit` in both directions, the match with its fields, `?Match`, the test of a match in `if`, `while`, `&&`, `||` and `!`, `if let` and `let ... else` on one, the groups of a literal as fields, templates checked at compile time, a function as the replacement, and the match limit with the failure by the origin of the pattern are built. `ByteRegex` and the byte forms of the methods are built, see [Bytes](#bytes).
+`matches`, `find_all`, `replace` and `split` are methods of `str`. `find_all` and `split` are iterators, and `to_slice()` collects either. `limit` takes that many matches from the start, or from the end when negative. A match is a `?Match`, behaves as a `?*T` does and stands alone as a condition, in `if`, `while`, `&&`, `||` and `!`, and `if let` and `let ... else` bind one. Its fields are `all`, `group(n)`, `took_part(n)`, `count`, `pre` and `post`, and for a pattern literal a group is a field, `m.1` or `m.year`. A template names groups with `$1` and `${name}`, is checked at compile time for a literal, and a function may give each replacement. A call with a pattern literal never fails and stops at the match limit. A call with a compiled pattern may fail with `regex.TooExpensive` or `regex.MissingGroup`. Flags are PCRE2's inline flags, `(?i)`, and `\d`, `\w` and `\s` mean their ASCII sets, with `(*UCP)` for the Unicode ones. A pattern that can take exponential time fails the safety check `exponential-pattern`. No match reads or writes anything global.
 
 ## Bytes
 
-The same methods work on `[]byte` with a `ByteRegex`, where `.` matches any byte and nothing needs to be valid UTF-8. A pattern literal takes its mode from where it is used. `patch` writes bytes over part of what it finds, in place, and allocates nothing.
+The same methods work on `[]byte` with a `ByteRegex`, where `.` matches any byte and nothing needs to be valid UTF-8. A pattern literal takes its mode from where it is used, and `ByteRegex.compile(text)` compiles one at run time. `patch` writes bytes over part of what it finds, in place, and allocates nothing.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -1602,13 +1600,11 @@ let s = v.to_text() catch fatal;
 data.patch(x"80 10 20 30", x"FF", at: 2);
 ```
 
-`s.to_bytes()` copies a `str` into new bytes, and `data.to_text()` checks for valid UTF-8 and may fail. A match's fields are slices of the searched bytes. `replace` returns new bytes, and `patch` never changes the length, so a `with` that does not fit its span is a compile error or a `LengthMismatch` failure by the origin of its operands. `str` has no `patch`.
-
-Built: `ByteRegex` and `ByteRegex.compile`, the mode of a pattern literal taken from where it is used, the methods `matches`, `find_all`, `replace` and `split` of `[]byte` with the match `ByteMatch`, the class rules of byte patterns, `to_bytes` and `to_text`, and `patch` with a byte sequence or a pattern, `into`, `at`, `limit` and the fit rule. Until named arguments are built, `into`, `at` and `limit` come by position, `data.patch(x"80 10 20 30", x"FF", 0, 2)`. Not built yet: `at: 2` and the other named arguments of `patch`.
+`s.to_bytes()` copies a `str` into new bytes, and `data.to_text()` checks for valid UTF-8 and may fail. Both are calls of `anti.text`. A match of bytes is a `ByteMatch`, and its fields are slices of the searched bytes. `replace` returns new bytes, and `patch` never changes the length, so a `with` that does not fit its span is a compile error or a `LengthMismatch` failure by the origin of its operands. `patch` takes a byte sequence or a pattern, then `into`, `at` and `limit` by position, `data.patch(x"80 10 20 30", x"FF", 0, 2)`, until named arguments are built. `str` has no `patch`. Not built yet: `at: 2` and the other named arguments of `patch`.
 
 ## Collections
 
-The collections of `anti.collection` are generic classes used as values, one module per family: `List<T>`, `Deque<T>`, `Ring<T, N>` and `Grid<T>`, `Map<K, V>` and `HashMap<K, V>`, `Set<T>`, `HashSet<T>` and `BitSet`, `SortedMap<K, V>` and `SortedSet<T>`, `Pool<T>` with `Handle<T>`, `Tree<T>` and `PriorityQueue<T>`. `anti.collection` itself holds `Iterable<T>` and `Iterator<T>`. A collection owns its storage and stores its elements by value. It is freed at the end of its block, moves on return, is refused by `=` and is copied by `dup`. No pointer to an element leaves it except through a `lent` parameter: reading gives a copy, as a `?T` where nothing may be there, and `read` and `modify` lend an element to a function. `union` stays a keyword and names a function after `fn` and a member after `.`, as `alloc` and `free` do, so a set has `union(o)`.
+The collections of `anti.collection` are generic classes used as values, one module per family: `List<T>`, `Deque<T>`, `Ring<T, N>` and `Grid<T>`, `Map<K, V>` and `HashMap<K, V>`, `Set<T>`, `HashSet<T>` and `BitSet`, `SortedMap<K, V>` and `SortedSet<T>`, `Pool<T>` with `Handle<T>`, `Tree<T>` and `PriorityQueue<T>`. `anti.collection` itself holds `Iterable<T>`, `Iterator<T>` and `Collection<T>`, the operations every collection has. A collection owns its storage and stores its elements by value. It is freed at the end of its block, moves on return, is refused by `=` and is copied by `dup`, with room of its own. No pointer to an element leaves it except through a `lent` parameter: reading gives a copy, as a `?T` where nothing may be there, and `read` and `modify` lend an element to a function. `union` stays a keyword and names a function after `fn` and a member after `.`, as `alloc` and `free` do, so a set has `union(o)`.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -1649,14 +1645,14 @@ for (k, v) in &ages {
 }
 ```
 
-Criteria come in three forms: `_all` acts on every match and gives the count, `_first` on the first match in the collection's order, and `_one` on the one match, failing when none or more than one matches. Every collection takes an optional allocator, `from`, and one that grows takes an initial `capacity`, with `reserve(n)` and `shrink()`. Until named arguments are built, `new` takes both by position, `capacity` first, as the example above does. The named form is the one the specification gives:
+Criteria come in three forms: `_all` acts on every match and gives the count, `_first` on the first match in the collection's order, and `_one` on the one match, failing with `NotOne`, which carries the count, when none or more than one matches. `find_all` gives a `Copies<T>`. Every collection takes an optional allocator, `from`, and one that grows takes an initial `capacity`, with `reserve(n)` and `shrink()`. Until named arguments are built, `new` takes both by position, `capacity` first, as the example above does. The named form is the one the specification gives:
 
 ```anti not-built
 let people = List<Person>.new(capacity: 1000);
 let ages = Map<str, int>.new(from: &arena);
 ```
 
-`Map` walks in insertion order, the same on every run. `SortedMap` is a B-tree and walks in key order. `HashMap` walks in an order that differs on every walk, so no program depends on it. A hashing collection mixes its hashes with a seed chosen at start. `Ring<T, N>` allocates nothing after it is made, for real-time code. A `Pool` keeps its elements at fixed addresses and gives handles of a slot and a generation, so a stale handle finds nothing, and a `Tree` holds a hierarchy on the same handles. `PriorityQueue<T>` gives its smallest element first, and `Grid<T>` is indexed by two positions.
+`Map` walks in insertion order, the same on every run. `SortedMap` is a B-tree and walks in key order. `HashMap` walks in an order that differs on every walk, so no program depends on it. A hashing collection mixes its hashes with a seed the runtime chooses at start from the random source of the system. `lang.hash_seed()` gives it, `lang.seeded(h, seed)` mixes it into a hash, and `--anti.hash_seed=<n>` or the key `hash_seed` fixes it for a test. `Ring<T, N>` allocates nothing after it is made, for real-time code. A `Pool` keeps its elements at fixed addresses and gives handles of a slot and a generation, so a stale handle finds nothing, and a `Tree` holds a hierarchy on the same handles. `get_versioned` gives an element with its version, and `set_if_version(h, x, version)` fails with `pool.Changed` when the element changed or is gone. `PriorityQueue<T>` gives its smallest element first, and `Grid<T>` is indexed by two positions. `sort`, `sort_by` and `map` are functions of `anti.collection.list` that a call on a list reaches as its own, and `map` names both its types, `scores.map<int, str>(f)`.
 
 ```anti
 import anti.collection.grid.{Grid};
@@ -1691,7 +1687,9 @@ let g = Grid<int>.new(4, 4, 0);
 g[1, 2] = 7;
 ```
 
-The thread-safe collections of `anti.collection.synchronized` and `anti.collection.concurrent`, each module named after the kind of class it holds, follow [Concurrent classes](#concurrent-classes). `SyncList<T>`, `SyncMap<K, V>`, `SyncSet<T>` and `SyncPool<T>` are `synchronized`. `ConcurrentMap<K, V>` is `concurrent`, split into parts locked apart. `SpscRing<T, N>` passes values from one thread to one other with two atomic counters and no lock. They have no operation by position and no `lend_slice`, and every one has versioned `set`. `==` and the hash of each compare and hash its elements only, never a version, a change count or a lock, and `ConcurrentMap` holds the locks of all its parts in their fixed order meanwhile. A queue between threads is `chan T`.
+A collection has `==` when its elements have `eq`, and a hash of its elements, so equal collections hash alike: a sequence in order, and a map or a set whatever the order of its entries. Its `equals` through `*Object` is its `==`. A copy of a `Pool` or a `Tree` keeps the handles of the original.
+
+The thread-safe collections of `anti.collection.synchronized` and `anti.collection.concurrent`, each module named after the kind of class it holds, follow [Concurrent classes](#concurrent-classes). `SyncList<T>`, `SyncMap<K, V>`, `SyncSet<T>` and `SyncPool<T>` are `synchronized`. `ConcurrentMap<K, V>` is `concurrent`, split into parts locked apart. `SpscRing<T, N>` passes values from one thread to one other with two atomic counters and no lock. They have no operation by position and no `lend_slice`, and every one but the ring has versioned `set`. A thread-safe collection walks, and writes its text, over copies of its elements, and `read`, `modify` and the functions of the criteria forms run under its lock. `==` and the hash of each compare and hash its elements only, never a version, a change count or a lock, and `ConcurrentMap` holds the locks of all its parts in their fixed order meanwhile. A queue between threads is `chan T`.
 
 ```anti
 import anti.collection.concurrent.{ConcurrentMap, SpscRing};
@@ -1706,11 +1704,11 @@ let pushed = samples.push(0.5);
 let s = samples.pop() ?? 0.0;
 ```
 
-Built: every collection of this section. `List<T>`, `Deque<T>`, `Ring<T, N>` and `Grid<T>` stand in `anti.collection.list`, `deque`, `ring` and `grid`, `Map<K, V>` and `HashMap<K, V>` in `anti.collection.map`, `Set<T>`, `HashSet<T>` and `BitSet` in `anti.collection.set`, `SortedMap<K, V>` and `SortedSet<T>` in `anti.collection.sorted`, `Pool<T>` with `Handle<T>` in `anti.collection.pool`, `Tree<T>` in `anti.collection.tree` and `PriorityQueue<T>` in `anti.collection.queue`. `SyncList<T>`, `SyncMap<K, V>`, `SyncSet<T>` and `SyncPool<T>` stand in `anti.collection.synchronized`, and `ConcurrentMap<K, V>` and `SpscRing<T, N>` in `anti.collection.concurrent`. Each has the operations of its family and those every collection has. `Iterable<T>`, `Iterator<T>` and `Collection<T>` stand in `anti.collection`, `find_all` gives a `Copies<T>`, and `_one` fails with `NotOne`, which carries the count. A collection has `==` when its elements have `eq`, and a hash of its elements, so equal collections hash alike: a sequence in order, and a map or a set whatever the order of its entries. Its `equals` through `*Object` is its `==`. `dup` copies every collection with room of its own, and a copy of a `Pool` or a `Tree` keeps the handles of the original. The seed of the hashing collections is built: the runtime chooses it at start from the random source of the system, `lang.hash_seed()` gives it, `lang.seeded(h, seed)` mixes it into a hash, and `--anti.hash_seed=<n>` or the key `hash_seed` fixes it for a test. `tests/std/` runs every collection in both modes, and `tests/traps/` holds the traps of a dev build. A thread-safe collection walks, and writes its text, over copies of its elements, and `read`, `modify` and the functions of the criteria forms run under its lock. `sort`, `sort_by` and `map` are functions of `anti.collection.list` that a call on a list reaches as its own, and `map` names both its types, `scores.map<int, str>(f)`. The versioned set is `set_if_version`, with the version after the value, `staff.set_if_version(h, x, version)`. It fails with `anti.collection.pool.Changed` when the element changed or is gone, and `get_versioned` gives the element with its version. Not built yet: named arguments, which the not-built example above writes, `deserialize` of a collection and the versioned `set` of `SpscRing`, which a `[provisional]` entry of `docs/decisions.md` leaves out, since the ring has no `set`.
+Not built yet: named arguments, which the not-built example above writes, `deserialize` of a collection, and the versioned `set` of `SpscRing`, since the ring has no `set`.
 
 ## Standard library
 
-The modules under `anti.` ship with the compiler, and a program imports them without `-I`. `anti.lang` is the root and imports nothing. It holds `Error`, `NoneDereference`, `SourceLocation`, `StackTrace`, `Trace` and `TraceHandler`, and the compiler declares `Object`, `Job`, `Flags`, `Mutex` and `FieldDescriptor` there.
+The modules under `anti.` ship with the compiler, and a program imports them without `-I`. `anti.lang` is the root and imports nothing.
 
 ```anti
 import anti.io;
@@ -1722,20 +1720,105 @@ io.println(s);
 free(s.ptr);
 ```
 
-Built: `anti.lang`, `anti.io`, `anti.text`, `anti.license`, `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`, `anti.random`, `anti.collection`, `anti.toml`, `anti.config`, `anti.args`, `anti.json`, `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`, `anti.simd`, `anti.trace`, `anti.plugin`, `anti.regex` over PCRE2, the collections under `anti.collection`, `Shared<T>` of `anti.mem` and `Ordered` of `anti.lang`. Not built yet: the other modules over the native libraries of the runtime archive, `anti.net`, `anti.raylib` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses.
+The 23 modules, with their public items and the functions among them that may fail:
 
-## Later
+| Module | Public items | May fail |
+|---|---|---|
+| `anti.lang` | `Error`, `NoneDereference`, `SourceLocation`, `StackTrace`, `RawFrame`, `Frame`, `Changes`, `Watch`, `Trace`, `TraceHandler`, `Ordered`, `hash_seed`, `seeded`, and the names the compiler declares, see [Types](#types) | |
+| `anti.io` | `print`, `println`, `eprint`, `eprintln`, `exit` | |
+| `anti.text` | `equal`, `from_c`, `from_bytes`, `to_bytes`, `to_text`, `byte_count`, `char_count`, `slice`, `find_byte`, `parse_int`, `Align`, `Builder` with `append`, `append_byte`, `append_int`, `append_uint`, `append_float`, `append_f32`, `append_bool`, `append_char`, `append_text`, `text`, `len`, `clear`, `take` and `take_in` | `to_text`, `parse_int` |
+| `anti.license` | `text` | |
+| `anti.error` | `SystemError` with `from_errno` and `from_win32`, `on_fatal`, `check` | |
+| `anti.time` | `Duration` with `nanoseconds`, `microseconds`, `milliseconds`, `seconds`, `as_milliseconds`, `as_seconds`, `add` and `between`, `now`, `wall`, `sleep`, `Clock`, `SystemClock` | |
+| `anti.os` | `INTERRUPT`, `BREAK`, `TERMINATE`, `on_signal`, `signal_pending`, `user_config_dir`, `user_data_dir`, `user_cache_dir` | the three directories |
+| `anti.fs` | `Mode`, `File`, `open` with `Mode.Read` as its default, `read`, `write`, `flush`, `size`, `close`, `list`, `remove`, `rename`, `read_file`, `write_file`, `FileSystem`, `SystemFileSystem` | every function |
+| `anti.reflect` | `TypeId`, `Field`, `Function`, `describe`, `parent`, `name`, `field_count`, `field`, `function_count`, `function`, `get`, `set`, `new`, `call`, `ValueKind`, `Value`, `nothing`, `of_int`, `of_uint`, `of_float`, `of_bool`, `of_char`, `of_str`, `of_ptr`, `BAD_INDEX`, `NOT_CARRIED`, `WRONG_KIND`, `WRONG_COUNT` | `set`, `call` |
+| `anti.random` | `Source`, `Random`, `SharedRandom` | |
+| `anti.collection` | `Iterable<T>`, `Iterator<T>`, `Collection<T>`, `Indexed<T>`, `IndexedWalk<T>`, `Copies<T>`, `NotOne`, `allocator`, `equal`, the hashing helpers `hash_in_order`, `hash_in_order_by`, `hash_in_any_order`, `hash_sum` and `hash_of_sum`, and the writers of the text of a collection | `find_one`, `update_one` and `remove_one` of every collection |
+| `anti.toml` | `Document`, `int_value`, `bool_value` | `Document.read` |
+| `anti.config` | `Config`, `FileConfig`, `current`, `read` | `read` |
+| `anti.args` | `Parser` | `Parser.parse` |
+| `anti.json` | `write`, `write_text`, `write_int`, `write_bool`, `member`, `unquote` | `unquote` |
+| `anti.log` | `Level`, `Format`, `Sink`, `StderrSink`, `FileSink`, `CallbackSink`, `Logger`, `SinkLogger`, `Log`, `logger`, `set`, `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `level_name`, `level_of`, `register` | `FileSink.new` |
+| `anti.debug` | `backtrace` | |
+| `anti.mem` | `Allocator`, `LibcAllocator`, `ArenaAllocator`, `Shared<T>` | |
+| `anti.runtime` | `configure`, `get` | |
+| `anti.simd` | nothing of its own: the compiler knows `select`, `any` and `all` by name | |
+| `anti.trace` | `LeakTracker`, `Profiler`, `CallLogger`, `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal`, `Composite`, `start`, `install`, `PROFILE_SLOTS`, `JOURNAL_SLOTS`, `MESSAGE_BYTES`, `COMPOSITE_SLOTS` | |
+| `anti.plugin` | `Library` with `instance`, `supports`, `live` and `unload`, `load`, `NOT_LOADED`, `IN_USE` | `load`, `instance`, `unload` |
+| `anti.regex` | `Error`, `BadPattern`, `TooExpensive`, `MissingGroup`, `LengthMismatch`, `compile`, `compile_bytes`, `Cursor`, `Matches`, `Pieces`, `ByteMatches`, `BytePieces`, and the functions behind the methods of `str` and `[]byte` | `compile`, `compile_bytes`, and a method with a compiled pattern |
 
-Round five, generics and collections, follows round four, as "Timing" in `docs/anti-language-additions.md` orders it, with generics first. [Generics](#generics), [Optional values](#optional-values), [Direct imports](#direct-imports) and [Collections](#collections) hold it. The syntax of generics, its constraints, the compiled copies, the generics of library files and of C, what can be generic, the other features with generics, the optional values, ownership at a call, lending, the language part of walking a collection, hashing and order, direct imports, the parts every collection shares, the collections, the thread-safe collections, shared ownership and memory checks are built. With generics come `anti.collection.Iterable<T>` and `Iterator<T>`, which a class with the `iter` hook implements. Closures are built, in [Anonymous functions and closures](#anonymous-functions-and-closures).
+The 12 modules under `anti.collection`, each with the `operator fn eq` and `operator fn hash` of its classes:
+
+| Module | Public items |
+|---|---|
+| `anti.collection.list` | `List<T>`, `sort`, `sort_by`, `map` |
+| `anti.collection.deque` | `Deque<T>` |
+| `anti.collection.ring` | `Ring<T, N>` |
+| `anti.collection.grid` | `Grid<T>` |
+| `anti.collection.map` | `Map<K, V>`, `HashMap<K, V>`, `EntryTable<E>`, `SlotTable<E>`, and the walks `MapWalk`, `MapKeys`, `MapValues`, `HashMapWalk`, `HashMapKeys` and `HashMapValues` |
+| `anti.collection.set` | `Set<T>`, `HashSet<T>`, `BitSet`, and the walks `SetWalk`, `HashSetWalk` and `BitWalk` |
+| `anti.collection.sorted` | `SortedMap<K, V>`, `SortedSet<T>`, `BTree<T>`, and the walks `SortedWalk`, `SortedEntries`, `SortedKeys` and `SortedValues` |
+| `anti.collection.pool` | `Pool<T>`, `Handle<T>`, `Slots<T>`, `Changed`, `SlotsWalk<T>` |
+| `anti.collection.tree` | `Tree<T>` |
+| `anti.collection.queue` | `PriorityQueue<T>`, `QueueWalk<T>` |
+| `anti.collection.synchronized` | `SyncList<T>`, `SyncMap<K, V>`, `SyncSet<T>`, `SyncPool<T>`, `sort`, `sort_by`, `map` |
+| `anti.collection.concurrent` | `ConcurrentMap<K, V>`, `SpscRing<T, N>`, `Snapshot<T>` |
+
+Not built yet: the modules over the other native libraries of the runtime archive, `anti.net`, `anti.raylib` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses.
+
+## Tools
+
+The `anti` tool has twelve commands.
+
+| Command | What it does |
+|---|---|
+| `anti new <name>` | Writes a starter project: `anti.toml`, `src/` with one module and `test/`. |
+| `anti build` | Reads `anti.toml`, resolves the dependencies into `anti.lock`, fetches every library file and compiles the project. Dev mode writes one object per module, cached by digest, with `-g` on. `--release` compiles the whole program in one call and writes the symbols archive beside it. `--target`, `--cpu`, `--offline`, `--strip-docs`, `--lto`, `--memory-checks`, `--lib static\|shared`, `--bundle-runtime`, `--soname`, `--profile-generate` and `--profile-use`. It writes `NOTICE.txt` beside a program. |
+| `anti run` | Builds for the host and runs what it wrote, with the options of `build` that apply to the host. |
+| `anti sdk export` | Packs the stubs and the version of Apple's SDK into `apple-sdk-<version>.tar.xz`, on a Mac. |
+| `anti sdk import <bundle>` | Unpacks that bundle into the sysroot of Anti on any host, for a program that names a framework. |
+| `anti test` | Compiles each module with `--tests`, writes the runner, links it and runs it. `--release` and `--memory-checks`. |
+| `anti check` | The front end on every source, the `anti` blocks of the doc comments, the doc warnings and the formatting, in that order. `--targets all` and `--warn-undocumented`. |
+| `anti doc` | One page per module and an index, as HTML or with `--markdown`. `--dev` and `--private` read the syntax tree for the private items and the notes. |
+| `anti fmt` | Writes the canonical form of each file, and `--check` reports a file that differs. |
+| `anti bind` | `anti bind <api.json>` and `anti bind --clang <header>` write a binding module, with `--probe` the ABI probe. `anti bind --header <file.antl>` writes the C header of a library. |
+| `anti symbols` | `inventory`, `check` and `resolve` over the symbols archives of a deployment, see [Checks and debugging](#checks-and-debugging). |
+| `anti license` | Prints the licence texts of the package. `--project` and `--project --notice` print those of a project, `--from <binary>` reads a binary and `--from-archive <library>` a library. |
+
+The options of `antic` that this page names, and the ones that decide how a program is built:
+
+| Option | Meaning |
+|---|---|
+| `-o <file>`, `-c`, `-S` | The output file, a library file, the assembly text. |
+| `-g` | The line of every statement, and the debug sections kept at the link. |
+| `--dev` | Dev mode: the module alone into its object, linked when it defines `main`. Without it a build is a release build. |
+| `--front-end`, `--tests` | The lexer, the parser and the checker alone, and the `tests` and `fixtures` blocks kept. |
+| `--checks`, `--no-checks`, `--asserts`, `--no-asserts` | The run-time checks and the assertions, against the mode. |
+| `--trace`, `--no-trace`, `--trace <pattern>`, `--trace writes`, `--no-hooks` | Tracing and the hook sites, see [Hooks and tracing](#hooks-and-tracing). |
+| `--no-reflect` | Drops the field and function lists of the descriptors. |
+| `--memory-checks` | The checks of AddressSanitizer at every load and store. |
+| `--target <name>`, `--cpu <level>` | The target and the processor level, see [Processor levels](#processor-levels). |
+| `--lto full\|thin\|none` | The link of the program and the runtime as bitcode, full by default in a release build, or as objects. |
+| `--profile-generate`, `--profile-use <file>` | Instrument a program, and build with the profile that `llvm-profdata merge` wrote. |
+| `--lib static\|shared`, `--bundle-runtime`, `--soname`, `--no-runtime`, `--closed` | A library for C with its header, the runtime inside the static one, the major version as the soname of the shared one, a plugin without the runtime, and a program without the exports a plugin binds against. |
+| `--linker lld\|platform` | lld of the package, the default, or the linker of the platform. |
+| `--framework <name>`, `--linux-lib <name>` | What `link framework` and `link linux` pass. |
+| `--inject <I=P>`, `--package-name`, `--package-version` | The provider of an injectable interface, and the package of a library file. |
+| `--warnings-as-errors`, `--doc-warnings`, `--warn-undocumented`, `--strip-docs` | Every warning refused, the doc warnings on, every `pub` item without a `///` comment reported, and the doc text left out of a library file. |
+| `--dump-tokens`, `--dump-ast`, `--dump-types`, `--dump-ir`, `--dump-opt`, `--dump-llvm` | Print one stage of the compiler and stop. |
+| `--print-host-target`, `--print-targets`, `--print-cpu-levels`, `--print-llvm-targets`, `--version` | Print the facts of the targets and the levels, or the version. |
 
 ## Reserved words
 
-Keywords: `fn extern let const struct union enum variant class import pub internal protected export if else switch while do for break continue return defer undo try catch yield fail assert show unreachable undefined embed here fallthrough as is dup delete destroy alloc free size_of self super abstract concrete static singleton inherits implements use worker parallel dispatch join join_all sync chan send recv select atomic true false none tests fixtures provides constraint type`.
+Keywords: `abstract alloc as assert atomic break catch chan class concrete const constraint continue defer delete destroy dispatch do dup else enum export extern fail fallthrough false fixtures fn for free here if implements import inherits internal is join join_all let none parallel protected provides pub recv return select self send singleton size_of static struct super switch sync tests true try type undo union use variant while worker yield`. The type names are keywords as well: `bool byte char f16 f32 f64 float i8 i16 i32 i64 int str u8 u16 u32 u64 uint` and the C types `c_char c_uchar c_short c_ushort c_int c_uint c_long c_ulong c_longlong c_ulonglong c_size_t c_float c_double c_wchar`. `thread` is reserved, and no rule of the grammar accepts it. `null` is refused with a message that names `none`.
 
-Contextual words: `packed align by in final own transient operator mutable trace inject compatible simd`, `fatal` and `none` after `catch`, `may fail` after a signature and `never` after `->`. Round four adds `snapshot keep concurrent synchronized unchecked allow` and `guarded by`, and round five adds `lent`. `alloc` and `free` name a function of a class after `fn` and a member after `.`.
+Contextual words: `packed align by in final own transient operator mutable trace compatible simd snapshot keep concurrent synchronized unchecked allow lent`, `inject` and `inject final` before a field, `guarded by` after a field's type, `fatal` and `none` after `catch`, `may fail` after a signature, `never` after `->`, and `link framework` and `link linux` at module level. `alloc`, `free` and `union` name a function of a class after `fn` and a member after `.`.
+
+Tokens beside the operators of C: `:: => -> .. ... ?* ?? ?.`, `as?`, the wrapping forms `+% -% *% <<%`, the saturating forms `+| -| *|`, their compound assignments `+%= -%= *%= <<%= +|= -|= *|=`, `<` and `>` around type parameters and type arguments with `>>` closing two lists, `?` before any type, and `.{` of a direct import.
 
 String prefixes: `r b br f rf x re`.
 
-Types with the aliases: the sized numbers, `int uint float byte bool char str`, and the `c_` types. Built-in functions: `mul_high`.
+Built-in functions known by name: `mul_high`, `close(c)` on a channel unless a function `close` is in scope, `splat`, `load`, `store`, `shuffle`, `sum`, `min`, `max` and `dot` of a simd struct, and `select`, `any` and `all` of `anti.simd`.
 
-Built of round four: `keep`, `keep own`, `concurrent`, `snapshot`, `unchecked` and `allow`. `synchronized` and `guarded by` are built as well. Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names today. Built of round five: `constraint`, `type` and `lent`.
+Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names.
