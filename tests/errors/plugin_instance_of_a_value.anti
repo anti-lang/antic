@@ -1,0 +1,11 @@
+//! `instance` of a library takes the name of an interface, and `1 + 2` names
+//! none.
+
+import anti.plugin;
+
+fn main() -> int
+{
+	let lib = plugin.load("x") catch fatal;
+	let s = lib.instance(1 + 2);
+	return 0;
+}

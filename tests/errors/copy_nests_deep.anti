@@ -1,0 +1,13 @@
+//! A generic struct whose field names a copy of it five pointers deeper. The
+//! chain of copies passes 256 levels before it passes 64 copies.
+
+struct Grow<T>
+{
+	next: ?*Grow<*****T>,
+}
+
+fn main() -> int
+{
+	let g: ?*Grow<int> = none;
+	return 0;
+}

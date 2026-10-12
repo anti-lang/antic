@@ -1,0 +1,1 @@
+lang_trace_capture.anti:8:2: error: `fail` captures the frames with `anti.lang.StackTrace.capture`, which takes the count of frames to skip

@@ -1,0 +1,13 @@
+//! A call through a function value with one argument too few. The value has no
+//! name of a function, so the message names the call.
+
+fn add(a: int, b: int) -> int
+{
+	return a + b;
+}
+
+fn main() -> int
+{
+	let f: fn(int, int) -> int = add;
+	return f(1);
+}

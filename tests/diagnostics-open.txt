@@ -7,6 +7,10 @@
 # pieces of the literal joined. A line that starts with `#` names the file
 # that gives the messages after it, for the reader alone.
 #
+# A message no program can reach stays, with the lines `# Unreachable: ...`
+# before it that give the reason. The test reads a line as one message, so
+# the reason stands in lines of its own.
+#
 # A message leaves the list in the commit that adds its test. The test
 # fails for a line whose message a test expects, and for a message that no
 # test expects and no line names. A new message comes with its test and
@@ -31,53 +35,42 @@ an element of a tuple is a decimal number
 the message of an `assert` is a string literal
 
 # src/antic/sema.c
+# Unreachable: every list of type arguments goes through resolve_arg of
+# sema_generic.c, which takes a constant before it resolves a type, so
+# sema_resolve_type never reads one.
 expected a type, found a constant
-%s `%.*s.%s`, which this `%.*s` lacks
-`lent` marks a pointer result, and this one is `%s`
 
 # src/antic/sema_call.c
-`fail \"text\"` calls `anti.lang.Error.new`, which takes a code and a message
-`fail` captures the frames with `anti.lang.StackTrace.capture`, which takes the count of frames to skip
-`fail` writes `at` and `frames` of `anti.lang.Error`, which this `anti.lang` lacks
-the first argument names an interface
-`%s` is not a function
-the call takes %zu argument%s, found %zu
 
 # src/antic/sema_class.c
 
 # src/antic/sema_const.c
 
 # src/antic/sema_copies.c
+# Unreachable: the one caller that passes no name is ty, which reports for a
+# clone with a map alone, and make_body, which alone makes one, gives it the
+# generic whose name the other message of copy_failed takes.
 antic compiles no copy here yet, %s
 
 # src/antic/sema_expr.c
-a function that is not kept cannot be stored
-the function is not marked `concurrent`
-the call returns no value
-`operator fn iter` gives `%s`, which has no `operator fn next` and `operator fn value`
-%s calls `anti.text.Builder.%s`, which this `anti.text` lacks
 
 # src/antic/sema_generic.c
-a copy of `%s` nests deeper than %d levels
 
 # src/antic/sema_operator.c
 
 # src/antic/sema_pattern.c
-`patch` takes 2 to 5 arguments, found %zu
-`patch` finds a `[]byte` or a `ByteRegex`, found `%s`
+# Unreachable: the lexer refuses a number past u64 and the parser an element
+# that is no decimal number, so the name of a group a source writes always
+# reads. A damaged library file alone holds another.
 `%.*s` names no group of a match
 
 # src/antic/sema_safety.c
 
 # src/antic/sema_simd.c
-`%s` is not defined on the lanes of `%s`
 
 # src/antic/sema_stmt.c
-a `switch` on a `str` compares with `anti.text.equal`, which this `anti.text` lacks
-`setup` and `teardown` belong to `fixtures`, which runs them around every test
 
 # src/antic/sema_value.c
-`%.*s` was moved
 
 # src/anti/bind.c
 anti: bind wrote %s, and it does not lex\n

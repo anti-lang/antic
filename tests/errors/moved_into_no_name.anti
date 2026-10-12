@@ -1,0 +1,24 @@
+//! An `own` parameter stored through the pointer a call gives, and named after
+//! the move. The place has no name, so the message names none.
+
+class Box
+{
+	pub own data: ?*int = none,
+	pub n: int = 0,
+}
+
+fn slot(b: *Box) -> *Box
+{
+	return b;
+}
+
+fn store(own b: Box, to: *Box) -> int
+{
+	*slot(to) = b;
+	return b.n;
+}
+
+fn main() -> int
+{
+	return 0;
+}

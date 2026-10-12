@@ -1,0 +1,1 @@
+patch_finds_an_int.anti:8:21: error: `patch` finds a `[]byte` or a `ByteRegex`, found `int`

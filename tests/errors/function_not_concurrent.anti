@@ -1,0 +1,18 @@
+//! `f ?? g` of two parameters that are not marked `concurrent`, at a
+//! `concurrent` parameter. The value is no name and no closure, so the message
+//! names neither.
+
+fn run(concurrent f: fn(int))
+{
+	f(1);
+}
+
+fn pass(f: ?fn(int), g: fn(int))
+{
+	run(f ?? g);
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,17 @@
+//! `f ?? g` of two parameters that are not marked `keep`, at a `keep`
+//! parameter. The value is no name and no closure, so the message names
+//! neither.
+
+fn keep_it(keep f: fn(int))
+{
+}
+
+fn pass(f: ?fn(int), g: fn(int))
+{
+	keep_it(f ?? g);
+}
+
+fn main() -> int
+{
+	return 0;
+}

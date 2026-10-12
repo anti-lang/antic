@@ -1,0 +1,14 @@
+//! A function named `setup` in the `tests` block, which `fixtures` alone
+//! declares.
+
+tests
+{
+	fn setup()
+	{
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

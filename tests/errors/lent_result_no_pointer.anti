@@ -1,0 +1,17 @@
+//! `lent` before the result of `operator fn value` marks a pointer, and a
+//! `?int` is none.
+
+class Cell
+{
+	pub n: int = 3,
+
+	operator fn value(self) -> lent ?int
+	{
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

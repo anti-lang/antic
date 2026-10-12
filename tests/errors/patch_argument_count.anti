@@ -1,0 +1,9 @@
+//! `patch` with one argument, where it takes what it finds and what it writes.
+
+fn main() -> int
+{
+	let data: [3]byte = [1, 2, 3];
+	let part = data[0..3];
+	let n = part.patch(b"x");
+	return 0;
+}

@@ -1,0 +1,10 @@
+//! `patch` whose first argument is an `int`, where it finds bytes or a pattern
+//! of bytes.
+
+fn main() -> int
+{
+	let data: [3]byte = [1, 2, 3];
+	let part = data[0..3];
+	let n = part.patch(5, b"x");
+	return 0;
+}

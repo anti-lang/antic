@@ -1,0 +1,18 @@
+//! An `anti.text` of another version. `equal` gives an `int` where a `switch`
+//! on a `str` reads a `bool`, and `Builder` has `new` and none of the functions
+//! an `f"..."` calls after it.
+
+pub fn equal(a: str, b: str) -> int
+{
+	return a.len - b.len;
+}
+
+pub class Builder
+{
+	pub length: int = 0,
+
+	pub fn new() -> *Builder
+	{
+		return alloc Builder { };
+	}
+}

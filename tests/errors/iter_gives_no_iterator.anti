@@ -1,0 +1,20 @@
+//! `for x in b` over a class whose `operator fn iter` gives an `int`. The loop
+//! is refused where it stands, and the declaration of the hook after it.
+
+class Bag
+{
+	pub n: int = 3,
+
+	operator fn iter(self) -> int
+	{
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	let b = Bag { };
+	for x in b {
+	}
+	return 0;
+}

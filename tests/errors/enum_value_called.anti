@@ -1,0 +1,14 @@
+//! A value of an enum called as a function of its type. The message names the
+//! type of the value.
+
+enum Color
+{
+	Red,
+	Green,
+}
+
+fn main() -> int
+{
+	let c = Color.Red();
+	return 0;
+}

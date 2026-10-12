@@ -1,0 +1,1 @@
+lang_error_origin.anti:8:2: error: `fail` writes `at` and `frames` of `anti.lang.Error`, which this `anti.lang` lacks

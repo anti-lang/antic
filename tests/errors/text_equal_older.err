@@ -1,0 +1,1 @@
+text_equal_older.anti:8:9: error: a `switch` on a `str` compares with `anti.text.equal`, which this `anti.text` lacks

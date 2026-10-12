@@ -2626,6 +2626,46 @@ add_expect_test(error_regex_damaged STATUS 1
             -I "${CMAKE_CURRENT_BINARY_DIR}/damaged" regex_damaged.anti)
 set_tests_properties(error_regex_damaged PROPERTIES
     FIXTURES_REQUIRED regex_damaged)
+# A call the checker writes against a library of the language that lacks
+# what the call names, as an older library file would. The test `regex_older`
+# reads the library of regex_damaged, and every other one the library of
+# its own tree under tests/modules.
+#   <program>|<tree>|<module>
+foreach(case
+        "lang_error_maker|lang_code_alone|lang"
+        "lang_error_origin|lang_no_origin|lang"
+        "lang_trace_capture|lang_no_capture|lang"
+        "regex_older||"
+        "text_builder_older|text_older|text"
+        "text_equal_older|text_older|text")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 tree)
+    list(GET parts 2 module)
+    set(root "${CMAKE_CURRENT_BINARY_DIR}/damaged")
+    set(fixture regex_damaged)
+    if(tree)
+        set(root "${CMAKE_CURRENT_BINARY_DIR}/older/${tree}")
+        set(fixture ${tree}_antl)
+        if(NOT TEST antl_${tree})
+            file(MAKE_DIRECTORY "${root}/anti")
+            add_test(NAME antl_${tree}
+                COMMAND antic -c --anti-internal
+                        -I "${CMAKE_CURRENT_SOURCE_DIR}/modules/${tree}"
+                        -o "${root}/anti/${module}.antl"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/modules/${tree}/anti/${module}.anti")
+            set_tests_properties(antl_${tree} PROPERTIES
+                FIXTURES_SETUP ${fixture})
+        endif()
+    endif()
+    add_expect_test(error_${name} STATUS 1
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/${name}.err"
+        COMMAND "$<TARGET_FILE:antic>" --front-end
+                --runtime "${ANTIC_RUNTIME_DIR}" -I "${root}" ${name}.anti)
+    set_tests_properties(error_${name} PROPERTIES
+        FIXTURES_REQUIRED ${fixture})
+endforeach()
 # A group of `patch` is compared as the u64 its literal holds.
 add_expect_test(error_patch_group_wide STATUS 1
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
@@ -5424,6 +5464,20 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "copies_deep|-S,-o,${LISTINGS}/copies_deep.s,copies_deep.anti"
         "copies_many|-S,-o,${LISTINGS}/copies_many.s,copies_many.anti"
         "never_result|--front-end,never_result.anti"
+        "call_count_of_a_function_value|--front-end,call_count_of_a_function_value.anti"
+        "call_gives_no_value|--front-end,call_gives_no_value.anti"
+        "copy_nests_deep|--front-end,copy_nests_deep.anti"
+        "enum_value_called|--front-end,enum_value_called.anti"
+        "function_not_concurrent|--front-end,function_not_concurrent.anti"
+        "function_not_kept|--front-end,function_not_kept.anti"
+        "iter_gives_no_iterator|--front-end,iter_gives_no_iterator.anti"
+        "lent_result_no_pointer|--front-end,lent_result_no_pointer.anti"
+        "moved_into_no_name|--front-end,moved_into_no_name.anti"
+        "patch_argument_count|--front-end,patch_argument_count.anti"
+        "patch_finds_an_int|--front-end,patch_finds_an_int.anti"
+        "plugin_instance_of_a_value|--front-end,--runtime,${ANTIC_RUNTIME_DIR},plugin_instance_of_a_value.anti"
+        "simd_lanes_compared|--front-end,simd_lanes_compared.anti"
+        "tests_setup|--front-end,--tests,tests_setup.anti"
         "tests_may_fail|--front-end,--tests,--runtime,${ANTIC_RUNTIME_DIR},tests_may_fail.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)

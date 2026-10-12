@@ -1,0 +1,18 @@
+//! A `switch` on a `str` against an `anti.text` whose `equal` gives an `int`,
+//! as an older library file would give it.
+
+import anti.text;
+
+fn pick(s: str)
+{
+	switch s {
+		"a" => { },
+		else => { },
+	}
+}
+
+fn main() -> int
+{
+	pick("a");
+	return 0;
+}

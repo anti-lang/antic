@@ -1,0 +1,13 @@
+//! An `anti.lang` whose `Error` has no `at` and no `frames`, as an older
+//! library file would give it. A `fail` writes both.
+
+pub class Error
+{
+	pub code: int = 0,
+	pub message: str = "",
+
+	pub fn new(code: int, message: str) -> *Error
+	{
+		return alloc Error { code: code, message: message };
+	}
+}

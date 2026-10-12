@@ -1,0 +1,1 @@
+function_not_concurrent.anti:12:6: error: the function is not marked `concurrent`

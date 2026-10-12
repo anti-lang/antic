@@ -1,0 +1,1 @@
+tests_setup.anti:6:5: error: `setup` and `teardown` belong to `fixtures`, which runs them around every test

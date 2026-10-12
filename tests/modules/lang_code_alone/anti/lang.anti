@@ -1,0 +1,40 @@
+//! An `anti.lang` whose `Error.new` takes a code alone, as an older library
+//! file would give it. `fail "text"` calls it with a code and a message.
+
+pub struct SourceLocation
+{
+	file: str,
+	line: int,
+	column: int,
+	function: str,
+	module: str,
+}
+
+pub class StackTrace
+{
+	pub count: int = 0,
+
+	pub fn capture(skip: int = 0) -> *StackTrace
+	{
+		return alloc StackTrace { };
+	}
+}
+
+pub class Error
+{
+	pub code: int = 0,
+	pub message: str = "",
+	pub at: SourceLocation = SourceLocation {
+		file: "",
+		line: 0,
+		column: 0,
+		function: "",
+		module: "",
+	},
+	own frames: ?*StackTrace = none,
+
+	pub fn new(code: int) -> *Error
+	{
+		return alloc Error { code: code };
+	}
+}

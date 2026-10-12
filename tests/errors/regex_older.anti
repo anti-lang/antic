@@ -1,0 +1,12 @@
+//! `s.matches` against an `anti.regex` that has no `matched_literal`, as an
+//! older library file would give it.
+
+import anti.regex;
+
+fn main() -> int
+{
+	if "abc".matches(re"b") {
+		return 1;
+	}
+	return 0;
+}

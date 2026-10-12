@@ -1,0 +1,1 @@
+lang_error_maker.anti:8:2: error: `fail "text"` calls `anti.lang.Error.new`, which takes a code and a message

@@ -1,0 +1,35 @@
+//! An `anti.lang` whose `StackTrace` has no `capture`, as an older library file
+//! would give it. A `fail` calls it for the frames.
+
+pub struct SourceLocation
+{
+	file: str,
+	line: int,
+	column: int,
+	function: str,
+	module: str,
+}
+
+pub class StackTrace
+{
+	pub count: int = 0,
+}
+
+pub class Error
+{
+	pub code: int = 0,
+	pub message: str = "",
+	pub at: SourceLocation = SourceLocation {
+		file: "",
+		line: 0,
+		column: 0,
+		function: "",
+		module: "",
+	},
+	own frames: ?*StackTrace = none,
+
+	pub fn new(code: int, message: str) -> *Error
+	{
+		return alloc Error { code: code, message: message };
+	}
+}

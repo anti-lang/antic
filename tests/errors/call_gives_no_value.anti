@@ -1,0 +1,18 @@
+//! A call through a field of function type that returns nothing, where a value
+//! is expected.
+
+struct Hooks
+{
+	f: fn(),
+}
+
+fn nothing()
+{
+}
+
+fn main() -> int
+{
+	let h = Hooks { f: nothing };
+	let x: int = h.f();
+	return x;
+}

@@ -1,0 +1,10 @@
+//! `f"..."` against an `anti.text` whose `Builder` has `new` and nothing else,
+//! as an older library file would give it.
+
+import anti.text;
+
+fn main() -> int
+{
+	let s = f"n {1}";
+	return 0;
+}

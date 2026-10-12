@@ -1,0 +1,19 @@
+//! `==` on a `simd struct` whose lanes are `str`. The declaration is refused
+//! first, and the comparison then has no lanes it is defined on.
+
+simd struct Pair
+{
+	a: str,
+	b: str,
+}
+
+fn same(x: Pair, y: Pair) -> bool
+{
+	let m = x == y;
+	return true;
+}
+
+fn main() -> int
+{
+	return 0;
+}

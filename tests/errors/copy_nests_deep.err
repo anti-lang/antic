@@ -1,0 +1,1 @@
+copy_nests_deep.anti:4:13: error: a copy of `Grow` nests deeper than 256 levels
