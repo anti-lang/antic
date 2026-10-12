@@ -2320,28 +2320,42 @@ Not built yet: the modules over the other native libraries of the runtime archiv
 
 ## Tools
 
-The `anti` tool has twelve commands.
+The `anti` tool has twelve commands. `anti --help` and `anti -h` print the usage of all of them, and `anti --version` the version.
 
-| Command | What it does |
-|---|---|
-| `anti new <name>` | Writes a starter project: `anti.toml`, `src/` with one module and `test/`. |
-| `anti build` | Reads `anti.toml`, resolves the dependencies into `anti.lock`, fetches every library file and compiles the project. Dev mode writes one object per module, cached by digest, with `-g` on. `--release` compiles the whole program in one call and writes the symbols archive beside it. `--target`, `--cpu`, `--offline`, `--strip-docs`, `--lto`, `--memory-checks`, `--lib static\|shared`, `--bundle-runtime`, `--soname`, `--profile-generate` and `--profile-use`. It writes `NOTICE.txt` beside a program. |
-| `anti run` | Builds for the host and runs what it wrote, with the options of `build` that apply to the host. |
-| `anti sdk export` | Packs the stubs and the version of Apple's SDK into `apple-sdk-<version>.tar.xz`, on a Mac. |
-| `anti sdk import <bundle>` | Unpacks that bundle into the sysroot of Anti on any host, for a program that names a framework. |
-| `anti test` | Compiles each module with `--tests`, writes the runner, links it and runs it. `--release` and `--memory-checks`. |
-| `anti check` | The front end on every source, the `anti` blocks of the doc comments, the doc warnings and the formatting, in that order. `--targets all` and `--warn-undocumented`. |
-| `anti doc` | One page per module and an index, as HTML or with `--markdown`. `--dev` and `--private` read the syntax tree for the private items and the notes. |
-| `anti fmt` | Writes the canonical form of each file, and `--check` reports a file that differs. |
-| `anti bind` | `anti bind <api.json>` and `anti bind --clang <header>` write a binding module, with `--probe` the ABI probe. `anti bind --header <file.antl>` writes the C header of a library. |
-| `anti symbols` | `inventory`, `check` and `resolve` over the symbols archives of a deployment, see [Checks and debugging](#checks-and-debugging). |
-| `anti license` | Prints the licence texts of the package. `--project` and `--project --notice` print those of a project, `--from <binary>` reads a binary and `--from-archive <library>` a library. |
+| Command | What it does | Options |
+|---|---|---|
+| `anti new <name>` | Writes a starter project: `anti.toml`, `src/` with one module and `test/`. The name is a module path of two segments or more. | |
+| `anti build` | Reads `anti.toml`, resolves the dependencies into `anti.lock`, fetches every library file and compiles the project. Dev mode writes one object per module, cached by digest, with `-g` on. `--release` compiles the whole program in one call and writes the symbols archive beside it. It writes `NOTICE.txt` beside a program. | `--release`, `--target <t>` or `--target all`, `--cpu <level>`, `--offline`, `--strip-docs`, `--lto full\|thin\|none`, `--memory-checks`, `--lib static\|shared`, `--bundle-runtime`, `--soname`, `--profile-generate`, `--profile-use <file>`, `--runtime <dir>`, `--llvm-ar <path>`, `--llvm-mc <path>` |
+| `anti run` | Builds for the host and runs what it wrote. | `--release`, `--cpu <level>`, `--offline`, `--lto`, `--memory-checks`, `--profile-generate`, `--profile-use <file>`, `--runtime <dir>`, `--llvm-mc <path>` |
+| `anti sdk export` | Packs the stubs and the version of Apple's SDK into `apple-sdk-<version>.tar.xz`, on a Mac. | `--sdk <MacOSX.sdk>`, `-o <dir>` |
+| `anti sdk import <bundle>` | Unpacks that bundle into the sysroot of Anti on any host, for a program that names a framework. | `--sysroot <dir>` |
+| `anti test <file.anti>...` | Compiles each module with `--tests`, writes the runner, links it and runs it, see [Tests](#tests). | `--release`, `--memory-checks`, `--work <dir>`, `-I <dir>`, `--runtime <dir>`, `--llvm-mc <path>` |
+| `anti check [<file.anti>...]` | The front end on every source, the `anti` blocks of the doc comments, the doc warnings and the formatting, in that order. Without a file it takes the sources of `[layout]` in `anti.toml`. `--targets all` runs the front end once per target. | `--targets all`, `--warn-undocumented`, `--work <dir>`, `-I <dir>`, `--runtime <dir>` |
+| `anti doc [<file>...]` | One page per module and an index, as HTML or as Markdown, from a source or a library file. `--dev` and `--private` read the syntax tree for the private items and the notes. | `--dev`, `--private`, `--markdown`, `-o <dir>`, `--work <dir>`, `-I <dir>`, `--runtime <dir>` |
+| `anti fmt [<file.anti>...]` | Writes the canonical form of each file. `--check` writes nothing and lists the files that differ. | `--check` |
+| `anti bind` | `anti bind <api.json>` and `anti bind --clang <header>` write a binding module, with `--probe` the ABI probe. `anti bind --header <file.antl>` writes the C header of a library. | `--clang <header>`, `--header <file.antl>`, `--probe`, `-o <dir>`, `--module <path>`, `--target <t>`, `-I <dir>`, `-D <name>[=<value>]`, `--runtime <dir>` |
+| `anti symbols` | `inventory`, `check` and `resolve <trace.txt>` over the symbols archives of a deployment, see [Checks and debugging](#checks-and-debugging). | `--conf <config.toml>`, `--from <dir>`, `--out <symbols.zip>`, `--symbols <symbols.zip>` |
+| `anti license` | Prints the licence texts of the package. `--project` and `--project --notice` print those of a project, `--from <binary>` reads a binary and `--from-archive <library>` a library. | `--project`, `--notice`, `--from <binary>`, `--from-archive <library>`, `--runtime <dir>` |
 
-The options of `antic` that this page names, and the ones that decide how a program is built:
+`--runtime <dir>` names the runtime archive, and `--llvm-ar` and `--llvm-mc` a tool of LLVM. A build of the package needs none of the three, since `anti` finds all of it beside itself.
+
+```sh
+anti new net.example.hello
+cd hello
+anti run
+anti build --release --target linux-x86_64
+anti check --targets all
+anti fmt --check
+```
+
+`anti run` prints `hello`, and the release build writes `hello`, `hello-symbols.zip` and `NOTICE.txt` into `dist/linux-x86_64/release/`.
+
+The options of `antic`. `antic --help` prints them.
 
 | Option | Meaning |
 |---|---|
 | `-o <file>`, `-c`, `-S` | The output file, a library file, the assembly text. |
+| `-I <dir>` | A search root: module `a.b` is `a/b.anti` or `a/b.antl` under it. |
 | `-g` | The line of every statement, and the debug sections kept at the link. |
 | `--dev` | Dev mode: the module alone into its object, linked when it defines `main`. Without it a build is a release build. |
 | `--front-end`, `--tests` | The lexer, the parser and the checker alone, and the `tests` and `fixtures` blocks kept. |
@@ -2355,10 +2369,16 @@ The options of `antic` that this page names, and the ones that decide how a prog
 | `--lib static\|shared`, `--bundle-runtime`, `--soname`, `--no-runtime`, `--closed` | A library for C with its header, the runtime inside the static one, the major version as the soname of the shared one, a plugin without the runtime, and a program without the exports a plugin binds against. |
 | `--linker lld\|platform` | lld of the package, the default, or the linker of the platform. |
 | `--framework <name>`, `--linux-lib <name>` | What `link framework` and `link linux` pass. |
-| `--inject <I=P>`, `--package-name`, `--package-version` | The provider of an injectable interface, and the package of a library file. |
+| `--inject <I=P>` | The provider of an injectable interface. |
+| `--package-name <p>`, `--package-version <v>`, `--dependency <n,c,u>`, `--license <spdx>`, `--license-text <file>`, `--attribution <line>` | The package header of a library file: its name, its version, a dependency with name, constraint and URL, the licence identifier, the file of the licence text and one attribution line. |
+| `--anti-internal` | Allows `-c` for a module under `anti.`, for the build of the standard library. |
 | `--warnings-as-errors`, `--doc-warnings`, `--warn-undocumented`, `--strip-docs` | Every warning refused, the doc warnings on, every `pub` item without a `///` comment reported, and the doc text left out of a library file. |
+| `--runtime <dir>` | The runtime archive, the directory that holds `lib/<target>/`. |
+| `--opt <path>`, `--llc <path>`, `--llvm-ar <path>` | The opt, llc and llvm-ar executables, in place of those of the package. |
+| `--llvm-mc <path>` | Accepted for the tools that pass it and unused, since llc writes every object. |
+| `--keep-llvm` | Keeps `<output>.ll` and `<output>.bc`, the LLVM text and the module after opt. |
 | `--dump-tokens`, `--dump-ast`, `--dump-types`, `--dump-ir`, `--dump-opt`, `--dump-llvm` | Print one stage of the compiler and stop. |
-| `--print-host-target`, `--print-targets`, `--print-cpu-levels`, `--print-llvm-targets`, `--version` | Print the facts of the targets and the levels, or the version. |
+| `--print-host-target`, `--print-targets`, `--print-cpu-levels`, `--print-llvm-targets`, `--version`, `--help` | Print the facts of the targets and the levels, the version or the options. |
 
 ## Features not built
 
