@@ -254,6 +254,89 @@ for a reader's build and never for a release.
 The test `repo_layout` reads `git ls-files` and holds these lists and the
 directories of `tests/` and `docs/`. Adding to any list is Eddie's decision.
 
+## Tests
+
+A new construct, diagnostic or option comes with its test, in the commit that
+builds it. A construct is tested in every context it can stand in. A
+diagnostic is tested by a program that gets it, and an option by a run that
+passes it.
+
+Each test fails for one reason. A program prints what it checks, and a
+refusal holds the one message it expects. A test that needs a long program
+tests two things and becomes two tests.
+
+Where a test goes:
+
+- `tests/matrix/`: a construct in a context, as a program or as a refusal.
+  The next list holds its rules.
+- `tests/programs/`: a program whose subject is one feature. Each runs in
+  release mode as `program_<name>`, and a list of `tests/CMakeLists.txt`
+  names the ones that run in another mode as well.
+- `tests/std/`: a program whose subject is a module of the standard library,
+  `std_<name>`.
+- `tests/errors/`: a refusal that needs options of its own, `error_<name>`.
+  Its case stands in the list of `tests/CMakeLists.txt`, and the test
+  `errors_registered` refuses a program without one.
+- `tests/traps/`: a check of dev mode or of `--memory-checks` that stops a
+  program, `check_<name>`.
+- `tests/dump/`: what antic prints for a stage, `dump_<stage>_<subject>`.
+- `tests/modules/`: a program of more than one module, in release mode and
+  in dev mode.
+- `tests/abi/` and `tests/clib/`: Anti against C, as the caller and as the
+  library.
+- `tests/trace/`, `tests/conf/`, `tests/inject/` and `tests/plugin/`: stack
+  traces, the runtime configuration, injection and plugins. Their output
+  holds addresses or paths, so pattern files hold it.
+- `tests/anti-build/`, `tests/anti-test/`, `tests/anti-symbols/`,
+  `tests/check/`, `tests/fmt/`, `tests/doc/` and `tests/bind/`: the commands
+  of `anti`.
+- `tests/unit/`: the C unit tests, `unit_<file>` for `test_<file>.c`.
+- `tests/opt/`, `tests/emit-identity/`, `tests/link-identity/`, `tests/raw/`
+  and `tests/framework/`: the IR around the optimizer, the pinned bytes of
+  the output, the raw-bytes rule and a framework of Apple.
+- `tests/bench/`: the benchmarks, outside the suite.
+
+The matrix, by decision 28 of "Decisions of 2026-10-11":
+
+- `<name>.anti` with `<name>.expected` is a program. It runs as
+  `matrix_<name>_dev`, `matrix_<name>_release` and
+  `matrix_<name>_memory_checks`. Each compares the whole output with the one
+  expected file, so a program whose output differs between the three fails.
+- `<name>.anti` with `<name>.err` is a refusal, `matrix_<name>_refused`.
+  antic runs the whole build in `tests/matrix/`, exits with 1 and prints the
+  bytes of the `.err` file.
+- The file name registers the tests, and no list of `tests/CMakeLists.txt`
+  names a matrix file. A name holds small letters, digits and `_`.
+- The expected file starts with the line `exit N`, as in `tests/programs/`,
+  and `<name>.args` holds the arguments of a program.
+- The dev build links the dev object of every module of the standard library
+  that the program imports. The configure step reads them from the `import`
+  lines at the start of a line.
+- The runner stops antic and the program after 60 seconds each.
+- The test `matrix_files` refuses a file that registers no test.
+
+The known failures, by decision 30 of "Decisions of 2026-10-11":
+
+- A test that shows a defect stays in the suite, written as the rule says
+  the program must behave. No test is weakened to pass.
+- The defect gets the next free id and one row in
+  `docs/audit/tests-findings.md`, whose header describes the row.
+- The test gets one line in `tests/known-failures.txt`: its name, the id and
+  one sentence. A second test of the same defect names the same id.
+- `tests/CMakeLists.txt` sets `WILL_FAIL` on every listed test. A listed
+  test that passes fails the suite, so a fix removes the line. It also
+  writes `fixed` into the row.
+- A listed test passes for any failure. Read its output before listing it,
+  with `ctest --test-dir build/host -V -R '^<test>$'`. It must fail for the
+  reason its finding names.
+- ctest counts a test that its own time limit stops, or whose command
+  crashes, as failed whatever the list says. A listed test therefore runs
+  through a `cmake -P` runner, which reports both as an ordinary failure.
+- The list takes effect when the tree is configured, which a build does
+  after a change of it.
+- The test `known_failures` compares the list with the table and with the
+  tree. `tests/known_failures.cmake` reads the list for both.
+
 ## First sessions, in order
 
 1. Done. The LLVM tools are built for every host in `anti-lang/llvm-tools`,
