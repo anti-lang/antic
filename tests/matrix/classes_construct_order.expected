@@ -1,0 +1,60 @@
+exit 1
+a literal of a derived class, torn down at the end of its block
+  construct Wheel 20
+  construct Vehicle 2
+  construct Car 2 with wheel 20
+  destruct Car 2
+  destruct Vehicle 2
+  destruct Wheel 20
+an inline field that takes its default
+  construct Wheel 0
+  construct Vehicle 3
+  construct Car 3 with wheel 0
+  destruct Car 3
+  destruct Vehicle 3
+  destruct Wheel 0
+alloc, an owned object and delete
+  construct Wheel 40
+  construct Wheel 41
+  construct Vehicle 4
+  construct Car 4 with wheel 40
+  destruct Car 4
+  destruct Vehicle 4
+  destruct Wheel 41
+  destruct Wheel 40
+destroy of a local
+  construct Wheel 50
+  construct Vehicle 5
+  construct Car 5 with wheel 50
+  destruct Car 5
+  destruct Vehicle 5
+  destruct Wheel 50
+  after destroy
+an array, last to first
+  construct Wheel 60
+  construct Wheel 61
+  construct Wheel 62
+  destruct Wheel 62
+  destruct Wheel 61
+  destruct Wheel 60
+an assignment into a place that holds a value
+  construct Wheel 70
+  construct Wheel 71
+  destruct Wheel 70
+  after the assignment
+  destruct Wheel 71
+a construct with arguments
+  construct Wheel 0
+  construct Vehicle 1
+  construct Car 1 with wheel 0
+  construct Taxi 8
+  destruct Taxi 8
+  destruct Car 1
+  destruct Vehicle 1
+  destruct Wheel 0
+a construct that fails
+  construct Wheel 0
+  construct Vehicle 1
+  construct Car 1 with wheel 0
+  construct Taxi -9
+  no taxi

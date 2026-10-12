@@ -1,0 +1,11 @@
+exit 0
+one class: 1 0, another class: 0
+hash and ==: 1 1 1
+a chain: 1 0 0 0
+a transient field: 1 1
+a pointer it does not own: 1 0 1 0
+an own slice: 1 1 1
+an own slice that differs: 0 0
+inline values: 1 0 1 1 0
+equals and hash replaced: 1 0 1 1 0
+another class: 0

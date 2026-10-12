@@ -1,0 +1,722 @@
+//! A generic class, a generic function, a generic variant and a generic
+//! interface, each in a copy for every kind of value. A line holds the value of
+//! one kind after it went through a field and `dup`, through an `own` parameter
+//! and a result, through a case of the variant and through the table of the
+//! interface.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+packed struct Packed
+{
+	tag: u8,
+	wide: i64,
+}
+
+enum Color
+{
+	Red,
+	Green,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+class Point
+{
+	pub x: int = 0,
+}
+
+abstract class Named
+{
+	abstract fn name(self) -> int;
+}
+
+class Twenty
+{
+	implements nm: Named,
+
+	concrete fn name(self) -> int
+	{
+		return 20;
+	}
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn pass(p: *int) -> ?*int
+{
+	return p;
+}
+
+fn keep(p: *Point) -> *Point
+{
+	return p;
+}
+
+fn again(n: *Named) -> *Named
+{
+	return n;
+}
+
+fn radius(s: Shape) -> int
+{
+	let r = 0;
+	switch s {
+		Circle c => r = c.r,
+		Empty => r = 0,
+	}
+	return r;
+}
+
+class Box<T>
+{
+	pub v: T,
+
+	pub fn get(self) -> T
+	{
+		return dup(self.v);
+	}
+}
+
+variant Maybe<T>
+{
+	Some { value: T },
+	Nothing,
+}
+
+abstract class Source<T>
+{
+	abstract fn next(self) -> T;
+}
+
+class Fixed<T> inherits Source<T>
+{
+	pub v: T,
+
+	concrete fn next(self) -> T
+	{
+		return dup(self.v);
+	}
+}
+
+fn same<T>(own v: T) -> T
+{
+	return v;
+}
+
+fn kind_00(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<i8> { v: 0 - 3 };
+	let got = box.get();
+	let through = same<i8>(0 - 3);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<i8>.Some { value: 0 - 3 };
+	switch wrapped {
+		Some s => inside = s.value as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<i8> { v: 0 - 3 };
+	let source: *Source<i8> = &fixed;
+	let next = source.next();
+	printf("i8: %d %d %d %d\n".ptr, got as c_int, through as c_int, inside, next as c_int);
+}
+
+fn kind_01(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<i16> { v: 300 };
+	let got = box.get();
+	let through = same<i16>(300);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<i16>.Some { value: 300 };
+	switch wrapped {
+		Some s => inside = s.value as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<i16> { v: 300 };
+	let source: *Source<i16> = &fixed;
+	let next = source.next();
+	printf("i16: %d %d %d %d\n".ptr, got as c_int, through as c_int, inside, next as c_int);
+}
+
+fn kind_02(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<i32> { v: 70000 };
+	let got = box.get();
+	let through = same<i32>(70000);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<i32>.Some { value: 70000 };
+	switch wrapped {
+		Some s => inside = s.value as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<i32> { v: 70000 };
+	let source: *Source<i32> = &fixed;
+	let next = source.next();
+	printf("i32: %d %d %d %d\n".ptr, got as c_int, through as c_int, inside, next as c_int);
+}
+
+fn kind_03(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<i64> { v: 5 };
+	let got = box.get();
+	let through = same<i64>(5);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<i64>.Some { value: 5 };
+	switch wrapped {
+		Some s => inside = s.value as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<i64> { v: 5 };
+	let source: *Source<i64> = &fixed;
+	let next = source.next();
+	printf("i64: %d %d %d %d\n".ptr, got as c_int, through as c_int, inside, next as c_int);
+}
+
+fn kind_04(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<int> { v: 6 };
+	let got = box.get();
+	let through = same<int>(6);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<int>.Some { value: 6 };
+	switch wrapped {
+		Some s => inside = s.value as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<int> { v: 6 };
+	let source: *Source<int> = &fixed;
+	let next = source.next();
+	printf("int: %d %d %d %d\n".ptr, got as c_int, through as c_int, inside, next as c_int);
+}
+
+fn kind_05(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<u8> { v: 200 };
+	let got = box.get();
+	let through = same<u8>(200);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<u8>.Some { value: 200 };
+	switch wrapped {
+		Some s => inside = s.value as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<u8> { v: 200 };
+	let source: *Source<u8> = &fixed;
+	let next = source.next();
+	printf("u8: %d %d %d %d\n".ptr, got as c_int, through as c_int, inside, next as c_int);
+}
+
+fn kind_06(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<u16> { v: 60000 };
+	let got = box.get();
+	let through = same<u16>(60000);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<u16>.Some { value: 60000 };
+	switch wrapped {
+		Some s => inside = s.value as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<u16> { v: 60000 };
+	let source: *Source<u16> = &fixed;
+	let next = source.next();
+	printf("u16: %d %d %d %d\n".ptr, got as c_int, through as c_int, inside, next as c_int);
+}
+
+fn kind_07(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<u32> { v: 7 };
+	let got = box.get();
+	let through = same<u32>(7);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<u32>.Some { value: 7 };
+	switch wrapped {
+		Some s => inside = s.value as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<u32> { v: 7 };
+	let source: *Source<u32> = &fixed;
+	let next = source.next();
+	printf("u32: %d %d %d %d\n".ptr, got as c_int, through as c_int, inside, next as c_int);
+}
+
+fn kind_08(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<u64> { v: 8 };
+	let got = box.get();
+	let through = same<u64>(8);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<u64>.Some { value: 8 };
+	switch wrapped {
+		Some s => inside = s.value as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<u64> { v: 8 };
+	let source: *Source<u64> = &fixed;
+	let next = source.next();
+	printf("u64: %d %d %d %d\n".ptr, got as c_int, through as c_int, inside, next as c_int);
+}
+
+fn kind_09(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<uint> { v: 9 };
+	let got = box.get();
+	let through = same<uint>(9);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<uint>.Some { value: 9 };
+	switch wrapped {
+		Some s => inside = s.value as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<uint> { v: 9 };
+	let source: *Source<uint> = &fixed;
+	let next = source.next();
+	printf("uint: %d %d %d %d\n".ptr, got as c_int, through as c_int, inside, next as c_int);
+}
+
+fn kind_10(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<byte> { v: 10 };
+	let got = box.get();
+	let through = same<byte>(10);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<byte>.Some { value: 10 };
+	switch wrapped {
+		Some s => inside = s.value as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<byte> { v: 10 };
+	let source: *Source<byte> = &fixed;
+	let next = source.next();
+	printf("byte: %d %d %d %d\n".ptr, got as c_int, through as c_int, inside, next as c_int);
+}
+
+fn kind_11(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<f32> { v: 1.5 };
+	let got = box.get();
+	let through = same<f32>(1.5);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<f32>.Some { value: 1.5 };
+	switch wrapped {
+		Some s => inside = (s.value * 2.0) as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<f32> { v: 1.5 };
+	let source: *Source<f32> = &fixed;
+	let next = source.next();
+	printf("f32: %d %d %d %d\n".ptr, (got * 2.0) as c_int, (through * 2.0) as c_int, inside, (next * 2.0) as c_int);
+}
+
+fn kind_12(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<f64> { v: 2.5 };
+	let got = box.get();
+	let through = same<f64>(2.5);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<f64>.Some { value: 2.5 };
+	switch wrapped {
+		Some s => inside = (s.value * 2.0) as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<f64> { v: 2.5 };
+	let source: *Source<f64> = &fixed;
+	let next = source.next();
+	printf("f64: %d %d %d %d\n".ptr, (got * 2.0) as c_int, (through * 2.0) as c_int, inside, (next * 2.0) as c_int);
+}
+
+fn kind_13(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<bool> { v: true };
+	let got = box.get();
+	let through = same<bool>(true);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<bool>.Some { value: true };
+	switch wrapped {
+		Some s => inside = s.value as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<bool> { v: true };
+	let source: *Source<bool> = &fixed;
+	let next = source.next();
+	printf("bool: %d %d %d %d\n".ptr, got as c_int, through as c_int, inside, next as c_int);
+}
+
+fn kind_14(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<char> { v: 'a' };
+	let got = box.get();
+	let through = same<char>('a');
+	let inside = 0 as c_int;
+	let wrapped = Maybe<char>.Some { value: 'a' };
+	switch wrapped {
+		Some s => inside = (s.value == 'a') as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<char> { v: 'a' };
+	let source: *Source<char> = &fixed;
+	let next = source.next();
+	printf("char: %d %d %d %d\n".ptr, (got == 'a') as c_int, (through == 'a') as c_int, inside, (next == 'a') as c_int);
+}
+
+fn kind_15(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<str> { v: "four" };
+	let got = box.get();
+	let through = same<str>("four");
+	let inside = 0 as c_int;
+	let wrapped = Maybe<str>.Some { value: "four" };
+	switch wrapped {
+		Some s => inside = s.value.len as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<str> { v: "four" };
+	let source: *Source<str> = &fixed;
+	let next = source.next();
+	printf("str: %d %d %d %d\n".ptr, got.len as c_int, through.len as c_int, inside, next.len as c_int);
+}
+
+fn kind_16(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<[]int> { v: numbers[0..3] };
+	let got = box.get();
+	let through = same<[]int>(numbers[0..3]);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<[]int>.Some { value: numbers[0..3] };
+	switch wrapped {
+		Some s => inside = s.value.len as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<[]int> { v: numbers[0..3] };
+	let source: *Source<[]int> = &fixed;
+	let next = source.next();
+	printf("slice: %d %d %d %d\n".ptr, got.len as c_int, through.len as c_int, inside, next.len as c_int);
+}
+
+fn kind_17(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<[2]int> { v: [11, 12] };
+	let got = box.get();
+	let through = same<[2]int>([11, 12]);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<[2]int>.Some { value: [11, 12] };
+	switch wrapped {
+		Some s => inside = s.value[1] as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<[2]int> { v: [11, 12] };
+	let source: *Source<[2]int> = &fixed;
+	let next = source.next();
+	printf("fixed array: %d %d %d %d\n".ptr, got[1] as c_int, through[1] as c_int, inside, next[1] as c_int);
+}
+
+fn kind_18(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<*int> { v: &x };
+	let got = box.get();
+	let through = same<*int>(&x);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<*int>.Some { value: &x };
+	switch wrapped {
+		Some s => inside = *s.value as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<*int> { v: &x };
+	let source: *Source<*int> = &fixed;
+	let next = source.next();
+	printf("pointer: %d %d %d %d\n".ptr, *got as c_int, *through as c_int, inside, *next as c_int);
+}
+
+fn kind_19(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<?*int> { v: pass(&x) };
+	let got = box.get();
+	let through = same<?*int>(pass(&x));
+	let inside = 0 as c_int;
+	let wrapped = Maybe<?*int>.Some { value: pass(&x) };
+	switch wrapped {
+		Some s => inside = (s.value != none) as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<?*int> { v: pass(&x) };
+	let source: *Source<?*int> = &fixed;
+	let next = source.next();
+	printf("nullable pointer: %d %d %d %d\n".ptr, (got != none) as c_int, (through != none) as c_int, inside, (next != none) as c_int);
+}
+
+fn kind_20(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<?int> { v: some };
+	let got = box.get();
+	let through = same<?int>(some);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<?int>.Some { value: some };
+	switch wrapped {
+		Some s => inside = (s.value ?? 0) as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<?int> { v: some };
+	let source: *Source<?int> = &fixed;
+	let next = source.next();
+	printf("optional value: %d %d %d %d\n".ptr, (got ?? 0) as c_int, (through ?? 0) as c_int, inside, (next ?? 0) as c_int);
+}
+
+fn kind_21(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<(int, bool)> { v: (14, true) };
+	let got = box.get();
+	let through = same<(int, bool)>((14, true));
+	let inside = 0 as c_int;
+	let wrapped = Maybe<(int, bool)>.Some { value: (14, true) };
+	switch wrapped {
+		Some s => inside = s.value.0 as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<(int, bool)> { v: (14, true) };
+	let source: *Source<(int, bool)> = &fixed;
+	let next = source.next();
+	printf("tuple: %d %d %d %d\n".ptr, got.0 as c_int, through.0 as c_int, inside, next.0 as c_int);
+}
+
+fn kind_22(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<Pair> { v: Pair { a: 1, b: 15 } };
+	let got = box.get();
+	let through = same<Pair>(Pair { a: 1, b: 15 });
+	let inside = 0 as c_int;
+	let wrapped = Maybe<Pair>.Some { value: Pair { a: 1, b: 15 } };
+	switch wrapped {
+		Some s => inside = s.value.b as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<Pair> { v: Pair { a: 1, b: 15 } };
+	let source: *Source<Pair> = &fixed;
+	let next = source.next();
+	printf("struct: %d %d %d %d\n".ptr, got.b as c_int, through.b as c_int, inside, next.b as c_int);
+}
+
+fn kind_23(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<Packed> { v: Packed { tag: 1, wide: 16 } };
+	let got = box.get();
+	let through = same<Packed>(Packed { tag: 1, wide: 16 });
+	let inside = 0 as c_int;
+	let wrapped = Maybe<Packed>.Some { value: Packed { tag: 1, wide: 16 } };
+	switch wrapped {
+		Some s => inside = s.value.wide as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<Packed> { v: Packed { tag: 1, wide: 16 } };
+	let source: *Source<Packed> = &fixed;
+	let next = source.next();
+	printf("packed struct: %d %d %d %d\n".ptr, got.wide as c_int, through.wide as c_int, inside, next.wide as c_int);
+}
+
+fn kind_24(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<Color> { v: Color.Green };
+	let got = box.get();
+	let through = same<Color>(Color.Green);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<Color>.Some { value: Color.Green };
+	switch wrapped {
+		Some s => inside = s.value as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<Color> { v: Color.Green };
+	let source: *Source<Color> = &fixed;
+	let next = source.next();
+	printf("enum: %d %d %d %d\n".ptr, got as c_int, through as c_int, inside, next as c_int);
+}
+
+fn kind_25(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<Shape> { v: Shape.Circle { r: 17 } };
+	let got = box.get();
+	let through = same<Shape>(Shape.Circle { r: 17 });
+	let inside = 0 as c_int;
+	let wrapped = Maybe<Shape>.Some { value: Shape.Circle { r: 17 } };
+	switch wrapped {
+		Some s => inside = radius(s.value) as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<Shape> { v: Shape.Circle { r: 17 } };
+	let source: *Source<Shape> = &fixed;
+	let next = source.next();
+	printf("variant: %d %d %d %d\n".ptr, radius(got) as c_int, radius(through) as c_int, inside, radius(next) as c_int);
+}
+
+fn kind_26(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<Point> { v: Point { x: 18 } };
+	let got = box.get();
+	let through = same<Point>(Point { x: 18 });
+	let inside = 0 as c_int;
+	let wrapped = Maybe<Point>.Some { value: Point { x: 18 } };
+	switch wrapped {
+		Some s => inside = s.value.x as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<Point> { v: Point { x: 18 } };
+	let source: *Source<Point> = &fixed;
+	let next = source.next();
+	printf("class: %d %d %d %d\n".ptr, got.x as c_int, through.x as c_int, inside, next.x as c_int);
+}
+
+fn kind_27(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<*Point> { v: keep(point) };
+	let got = box.get();
+	let through = same<*Point>(keep(point));
+	let inside = 0 as c_int;
+	let wrapped = Maybe<*Point>.Some { value: keep(point) };
+	switch wrapped {
+		Some s => inside = s.value.x as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<*Point> { v: keep(point) };
+	let source: *Source<*Point> = &fixed;
+	let next = source.next();
+	printf("pointer to a class: %d %d %d %d\n".ptr, got.x as c_int, through.x as c_int, inside, next.x as c_int);
+}
+
+fn kind_28(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<*Named> { v: again(named) };
+	let got = box.get();
+	let through = same<*Named>(again(named));
+	let inside = 0 as c_int;
+	let wrapped = Maybe<*Named>.Some { value: again(named) };
+	switch wrapped {
+		Some s => inside = s.value.name() as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<*Named> { v: again(named) };
+	let source: *Source<*Named> = &fixed;
+	let next = source.next();
+	printf("interface: %d %d %d %d\n".ptr, got.name() as c_int, through.name() as c_int, inside, next.name() as c_int);
+}
+
+fn kind_29(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<fn(int) -> int> { v: twice };
+	let got = box.get();
+	let through = same<fn(int) -> int>(twice);
+	let inside = 0 as c_int;
+	let wrapped = Maybe<fn(int) -> int>.Some { value: twice };
+	switch wrapped {
+		Some s => inside = s.value(21) as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<fn(int) -> int> { v: twice };
+	let source: *Source<fn(int) -> int> = &fixed;
+	let next = source.next();
+	printf("function value: %d %d %d %d\n".ptr, got(21) as c_int, through(21) as c_int, inside, next(21) as c_int);
+}
+
+fn kind_30(x: int, numbers: []int, point: *Point, named: *Named)
+{
+	let some: ?int = 13;
+	let box = Box<Vec4> { v: Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 22.0 } };
+	let got = box.get();
+	let through = same<Vec4>(Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 22.0 });
+	let inside = 0 as c_int;
+	let wrapped = Maybe<Vec4>.Some { value: Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 22.0 } };
+	switch wrapped {
+		Some s => inside = s.value.w as c_int,
+		Nothing => inside = 0 - 1,
+	}
+	let fixed = Fixed<Vec4> { v: Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 22.0 } };
+	let source: *Source<Vec4> = &fixed;
+	let next = source.next();
+	printf("simd struct: %d %d %d %d\n".ptr, got.w as c_int, through.w as c_int, inside, next.w as c_int);
+}
+
+fn main() -> int
+{
+	let numbers = [1, 2, 3];
+	let point = Point { x: 19 };
+	let twenty = Twenty { };
+	kind_00(7, numbers[0..3], &point, &twenty);
+	kind_01(7, numbers[0..3], &point, &twenty);
+	kind_02(7, numbers[0..3], &point, &twenty);
+	kind_03(7, numbers[0..3], &point, &twenty);
+	kind_04(7, numbers[0..3], &point, &twenty);
+	kind_05(7, numbers[0..3], &point, &twenty);
+	kind_06(7, numbers[0..3], &point, &twenty);
+	kind_07(7, numbers[0..3], &point, &twenty);
+	kind_08(7, numbers[0..3], &point, &twenty);
+	kind_09(7, numbers[0..3], &point, &twenty);
+	kind_10(7, numbers[0..3], &point, &twenty);
+	kind_11(7, numbers[0..3], &point, &twenty);
+	kind_12(7, numbers[0..3], &point, &twenty);
+	kind_13(7, numbers[0..3], &point, &twenty);
+	kind_14(7, numbers[0..3], &point, &twenty);
+	kind_15(7, numbers[0..3], &point, &twenty);
+	kind_16(7, numbers[0..3], &point, &twenty);
+	kind_17(7, numbers[0..3], &point, &twenty);
+	kind_18(7, numbers[0..3], &point, &twenty);
+	kind_19(7, numbers[0..3], &point, &twenty);
+	kind_20(7, numbers[0..3], &point, &twenty);
+	kind_21(7, numbers[0..3], &point, &twenty);
+	kind_22(7, numbers[0..3], &point, &twenty);
+	kind_23(7, numbers[0..3], &point, &twenty);
+	kind_24(7, numbers[0..3], &point, &twenty);
+	kind_25(7, numbers[0..3], &point, &twenty);
+	kind_26(7, numbers[0..3], &point, &twenty);
+	kind_27(7, numbers[0..3], &point, &twenty);
+	kind_28(7, numbers[0..3], &point, &twenty);
+	kind_29(7, numbers[0..3], &point, &twenty);
+	kind_30(7, numbers[0..3], &point, &twenty);
+	return 0;
+}

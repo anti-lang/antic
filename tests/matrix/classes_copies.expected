@@ -1,0 +1,9 @@
+exit 0
+a new object: 1
+its fields: 2 3 4
+an own field in fresh memory: 1
+another pointer keeps its address: 1
+a transient field: 1 0
+through a base: 1 3 4
+through an interface: 102 1
+a value: 5 6

@@ -1,0 +1,196 @@
+//! Every operator of the table, on a struct through `operator fn` at module
+//! level and on a class through `operator fn` in its body. `!=` is the opposite
+//! of `eq`, `>` swaps the operands of `lt`, and `<=` and `>=` derive from it.
+//! Two structs of one module share the names of their operators, and an
+//! operator is a function that a call names as well.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Bits
+{
+	v: int,
+}
+
+struct Other
+{
+	w: int,
+}
+
+operator fn add(a: Bits, b: Bits) -> Bits
+{
+	return Bits { v: a.v + b.v };
+}
+
+operator fn sub(a: Bits, b: Bits) -> Bits
+{
+	return Bits { v: a.v - b.v };
+}
+
+operator fn mul(a: Bits, b: Bits) -> Bits
+{
+	return Bits { v: a.v * b.v };
+}
+
+operator fn div(a: Bits, b: Bits) -> Bits
+{
+	return Bits { v: a.v / b.v };
+}
+
+operator fn rem(a: Bits, b: Bits) -> Bits
+{
+	return Bits { v: a.v % b.v };
+}
+
+operator fn neg(a: Bits) -> Bits
+{
+	return Bits { v: 0 - a.v };
+}
+
+operator fn eq(a: Bits, b: Bits) -> bool
+{
+	return a.v == b.v;
+}
+
+operator fn lt(a: Bits, b: Bits) -> bool
+{
+	return a.v < b.v;
+}
+
+operator fn and(a: Bits, b: Bits) -> Bits
+{
+	return Bits { v: a.v & b.v };
+}
+
+operator fn or(a: Bits, b: Bits) -> Bits
+{
+	return Bits { v: a.v | b.v };
+}
+
+operator fn xor(a: Bits, b: Bits) -> Bits
+{
+	return Bits { v: a.v ^ b.v };
+}
+
+operator fn shl(a: Bits, b: Bits) -> Bits
+{
+	return Bits { v: a.v << b.v };
+}
+
+operator fn shr(a: Bits, b: Bits) -> Bits
+{
+	return Bits { v: a.v >> b.v };
+}
+
+operator fn not(a: Bits) -> Bits
+{
+	return Bits { v: ~a.v };
+}
+
+operator fn add(a: Other, b: Other) -> Other
+{
+	return Other { w: a.w + b.w + 1000 };
+}
+
+operator fn eq(a: Other, b: Other) -> bool
+{
+	return a.w % 10 == b.w % 10;
+}
+
+class Num
+{
+	pub v: int = 0,
+
+	operator fn add(self, other: Num) -> Num
+	{
+		return Num { v: self.v + other.v };
+	}
+
+	operator fn sub(self, other: Num) -> Num
+	{
+		return Num { v: self.v - other.v };
+	}
+
+	operator fn mul(self, other: Num) -> Num
+	{
+		return Num { v: self.v * other.v };
+	}
+
+	operator fn div(self, other: Num) -> Num
+	{
+		return Num { v: self.v / other.v };
+	}
+
+	operator fn rem(self, other: Num) -> Num
+	{
+		return Num { v: self.v % other.v };
+	}
+
+	operator fn neg(self) -> Num
+	{
+		return Num { v: 0 - self.v };
+	}
+
+	operator fn eq(self, other: Num) -> bool
+	{
+		return self.v == other.v;
+	}
+
+	operator fn lt(self, other: Num) -> bool
+	{
+		return self.v < other.v;
+	}
+
+	operator fn and(self, other: Num) -> Num
+	{
+		return Num { v: self.v & other.v };
+	}
+
+	operator fn or(self, other: Num) -> Num
+	{
+		return Num { v: self.v | other.v };
+	}
+
+	operator fn xor(self, other: Num) -> Num
+	{
+		return Num { v: self.v ^ other.v };
+	}
+
+	operator fn shl(self, other: Num) -> Num
+	{
+		return Num { v: self.v << other.v };
+	}
+
+	operator fn shr(self, other: Num) -> Num
+	{
+		return Num { v: self.v >> other.v };
+	}
+
+	operator fn not(self) -> Num
+	{
+		return Num { v: ~self.v };
+	}
+}
+
+fn main() -> int
+{
+	let a = Bits { v: 12 };
+	let b = Bits { v: 5 };
+	printf("struct + - * / %%: %d %d %d %d %d\n".ptr, (a + b).v as c_int, (a - b).v as c_int, (a * b).v as c_int, (a / b).v as c_int, (a % b).v as c_int);
+	printf("struct & | ^ << >>: %d %d %d %d %d\n".ptr, (a & b).v as c_int, (a | b).v as c_int, (a ^ b).v as c_int, (a << b).v as c_int, (a >> Bits { v: 2 }).v as c_int);
+	printf("struct - ~: %d %d\n".ptr, (-a).v as c_int, (~a).v as c_int);
+	printf("struct == != < > <= >=: %d %d %d %d %d %d\n".ptr, (a == b) as c_int, (a != b) as c_int, (a < b) as c_int, (a > b) as c_int, (a <= a) as c_int, (b >= a) as c_int);
+	let o = Other { w: 3 } + Other { w: 4 };
+	printf("another struct of the module: %d %d\n".ptr, o.w as c_int, (o == Other { w: 17 }) as c_int);
+	printf("an operator by its name: %d\n".ptr, add(a, b).v as c_int);
+
+	let x = Num { v: 12 };
+	let y = Num { v: 5 };
+	printf("class + - * / %%: %d %d %d %d %d\n".ptr, (x + y).v as c_int, (x - y).v as c_int, (x * y).v as c_int, (x / y).v as c_int, (x % y).v as c_int);
+	printf("class & | ^ << >>: %d %d %d %d %d\n".ptr, (x & y).v as c_int, (x | y).v as c_int, (x ^ y).v as c_int, (x << y).v as c_int, (x >> Num { v: 2 }).v as c_int);
+	printf("class - ~: %d %d\n".ptr, (-x).v as c_int, (~x).v as c_int);
+	printf("class == != < > <= >=: %d %d %d %d %d %d\n".ptr, (x == y) as c_int, (x != y) as c_int, (x < y) as c_int, (x > y) as c_int, (x <= x) as c_int, (y >= x) as c_int);
+	printf("an operator as a function of the class: %d %d\n".ptr, x.add(y).v as c_int, x.lt(y) as c_int);
+	let chained = x + y * y - -y;
+	printf("precedence: %d\n".ptr, chained.v as c_int);
+	return 0;
+}

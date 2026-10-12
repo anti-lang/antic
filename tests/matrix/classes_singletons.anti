@@ -1,0 +1,85 @@
+//! A singleton has one instance. `get()` makes it at the first call, from the
+//! defaults and from a `construct` without arguments, and gives the same object
+//! ever after. A field without a marker is fixed after `construct`, and a
+//! `mutable` field is written anywhere. A singleton inherits a class,
+//! implements an interface and is reached from a closure and from a function of
+//! a generic class.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Named
+{
+	abstract fn name(self) -> int;
+}
+
+class Base
+{
+	pub from_base: int = 3,
+
+	pub fn tripled(self) -> int
+	{
+		return self.from_base * 3;
+	}
+}
+
+singleton class Config inherits Base
+{
+	implements nm: Named,
+
+	pub level: int = 2,
+	mutable hits: int = 0,
+	pub static atomic made: int = 0;
+
+	fn construct(self)
+	{
+		self.level = 5;
+		Config.made.add(1);
+	}
+
+	pub fn hit(self) -> int
+	{
+		self.hits += 1;
+		return self.hits;
+	}
+
+	concrete fn name(self) -> int
+	{
+		return 40 + self.level;
+	}
+}
+
+singleton class Plain
+{
+	pub n: int = 8,
+}
+
+class Reader<T>
+{
+	pub v: T,
+
+	pub fn level(self) -> int
+	{
+		return Config.get().level;
+	}
+}
+
+fn main() -> int
+{
+	printf("before the first get: %d\n".ptr, Config.made.load() as c_int);
+	let c = Config.get();
+	let d = Config.get();
+	printf("one instance: %d, made %d\n".ptr, (c == d) as c_int, Config.made.load() as c_int);
+	printf("construct ran: %d, defaults alone: %d\n".ptr, c.level as c_int, Plain.get().n as c_int);
+	c.hit();
+	printf("a mutable field: %d %d\n".ptr, Config.get().hit() as c_int, d.hits as c_int);
+	printf("its base: %d %d\n".ptr, c.from_base as c_int, c.tripled() as c_int);
+	let named: *Named = Config.get();
+	printf("its interface: %d %d\n".ptr, named.name() as c_int, ((named as *Config) == c) as c_int);
+	let read = fn() -> int {
+		return Config.get().level + Plain.get().n;
+	};
+	let reader = Reader<u8> { v: 1 };
+	printf("from a closure: %d, from a generic class: %d\n".ptr, read() as c_int, reader.level() as c_int);
+	printf("made once: %d\n".ptr, Config.made.load() as c_int);
+	return 0;
+}

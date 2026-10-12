@@ -1,0 +1,147 @@
+//! A generic class with each thing a class has: a generic base, a generic
+//! interface, a static function, a function with a type parameter of its own,
+//! an `operator fn` under a constraint, the default `==` and `hash`,
+//! `construct` and `destruct`, and `is` and `as` between its copies. The copies
+//! take `int`, `str`, a struct and a pointer to a class.
+
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+class Tally
+{
+	pub n: int = 0,
+	pub static atomic made: int = 0;
+	pub static atomic gone: int = 0;
+}
+
+class Base<T>
+{
+	pub value: T,
+
+	pub fn get(self) -> T
+	{
+		return dup(self.value);
+	}
+}
+
+class Named<T> inherits Base<T>
+{
+	pub tag: int = 0,
+
+	pub fn of(own value: T, tag: int) -> Named<T>
+	{
+		return Named<T> { value: value, tag: tag };
+	}
+
+	pub fn apply<U>(self, f: fn(T) -> U) -> U
+	{
+		return f(self.value);
+	}
+}
+
+abstract class Reader<T>
+{
+	abstract fn read(self) -> T;
+}
+
+class Holder<T>
+{
+	implements rd: Reader<T>,
+
+	pub v: T,
+
+	concrete fn read(self) -> T
+	{
+		return dup(self.v);
+	}
+}
+
+class Sum<T: add>
+{
+	pub total: T,
+
+	operator fn add(self, other: Sum<T>) -> Sum<T>
+	{
+		return Sum<T> { total: self.total + other.total };
+	}
+}
+
+class Pair<A, B>
+{
+	pub first: A,
+	pub second: B,
+}
+
+class Counted<T>
+{
+	pub v: T,
+
+	fn construct(self)
+	{
+		Tally.made.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Tally.gone.add(1);
+	}
+}
+
+fn length(s: str) -> int
+{
+	return s.len;
+}
+
+fn doubled(n: int) -> int
+{
+	return n * 2;
+}
+
+fn read_all<T>(r: *Reader<T>) -> T
+{
+	return r.read();
+}
+
+fn main() -> int
+{
+	let number = Named<int>.of(4, 1);
+	let word = Named<str>.of("four", 2);
+	let point = Named<Point>.of(Point { x: 3, y: 4 }, 3);
+	let tally = Tally { n: 9 };
+	let pointer = Named<*Tally>.of(&tally, 4);
+	printf("a generic base: %d %d %d %d\n".ptr, number.get() as c_int, word.get().len as c_int, point.get().y as c_int, pointer.get().n as c_int);
+	printf("a function with a parameter of its own: %d %d\n".ptr, number.apply<int>(doubled) as c_int, word.apply<int>(length) as c_int);
+
+	let base: *Base<int> = &number;
+	let back = base as *Named<int>;
+	printf("is and as: %d %d\n".ptr, (base is *Named<int>) as c_int, back.tag as c_int);
+
+	let holder = Holder<int> { v: 6 };
+	let words = Holder<str> { v: "six" };
+	printf("a generic interface: %d %d\n".ptr, read_all<int>(&holder) as c_int, text.equal(read_all<str>(&words), "six") as c_int);
+
+	let sum = Sum<int> { total: 3 } + Sum<int> { total: 4 };
+	let wide = Sum<f64> { total: 1.5 } + Sum<f64> { total: 2.0 };
+	printf("an operator: %d %d\n".ptr, sum.total as c_int, (wide.total * 2.0) as c_int);
+
+	let p = Pair<int, str> { first: 1, second: "a" };
+	let q = Pair<int, str> { first: 1, second: "a" };
+	let r = Pair<int, str> { first: 1, second: "b" };
+	printf("the default == and hash: %d %d %d\n".ptr, (p == q) as c_int, (p == r) as c_int, (p.hash() == q.hash()) as c_int);
+
+	{
+		let one = Counted<int> { v: 1 };
+		let two = Counted<Point> { v: Point { x: 1, y: 2 } };
+		let three = alloc Counted<str> { v: "x" };
+		delete(three);
+	}
+	printf("construct and destruct: %d %d\n".ptr, Tally.made.load() as c_int, Tally.gone.load() as c_int);
+	return 0;
+}

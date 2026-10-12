@@ -1,0 +1,342 @@
+//! The default `equals` and `hash` of a class and the copy of `dup`, with a
+//! field of each kind of value. Two fresh objects are equal and hash alike, a
+//! change of one field makes them differ, and a copy equals what it was made
+//! from. A line holds the four answers for one kind: equal, equal after the
+//! change, the same hash, and the copy equal.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+packed struct Packed
+{
+	tag: u8,
+	wide: i64,
+}
+
+enum Color
+{
+	Red,
+	Green,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+class Point
+{
+	pub x: int = 0,
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+class Kinds
+{
+	pub k00: i8,
+	pub k01: i16,
+	pub k02: i32,
+	pub k03: i64,
+	pub k04: int,
+	pub k05: u8,
+	pub k06: u16,
+	pub k07: u32,
+	pub k08: u64,
+	pub k09: uint,
+	pub k10: byte,
+	pub k11: f32,
+	pub k12: f64,
+	pub k13: f16,
+	pub k14: bool,
+	pub k15: char,
+	pub k16: str,
+	pub k17: []int,
+	pub k18: [2]int,
+	pub k19: ?*int,
+	pub k20: ?int,
+	pub k21: (int, bool),
+	pub k22: Pair,
+	pub k23: Packed,
+	pub k24: Color,
+	pub k25: Shape,
+	pub k26: Point,
+	pub k27: ?fn(int) -> int,
+	pub k28: Vec4,
+}
+
+fn fresh(x: *int) -> Kinds
+{
+	return Kinds {
+		k00: 1,
+		k01: 1,
+		k02: 1,
+		k03: 1,
+		k04: 1,
+		k05: 1,
+		k06: 1,
+		k07: 1,
+		k08: 1,
+		k09: 1,
+		k10: 1,
+		k11: 1.5,
+		k12: 1.5,
+		k13: 1.5 as f16,
+		k14: false,
+		k15: 'a',
+		k16: "one",
+		k17: []int { ptr: x, len: 2 },
+		k18: [1, 2],
+		k19: x,
+		k20: none,
+		k21: (1, false),
+		k22: Pair { a: 1, b: 2 },
+		k23: Packed { tag: 1, wide: 2 },
+		k24: Color.Red,
+		k25: Shape.Empty,
+		k26: Point { x: 1 },
+		k27: none,
+		k28: Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 },
+	};
+}
+
+fn report(what: str, a: *Kinds, o: *Kinds, before: bool, hashed: bool)
+{
+	let copy = dup(o);
+	printf("%.*s: %d %d %d %d\n".ptr, what.len as c_int, what.ptr, before as c_int, a.equals(o) as c_int, hashed as c_int, copy.equals(o) as c_int);
+	delete(copy);
+}
+
+fn main() -> int
+{
+	let numbers = alloc(int, 2);
+	let x = numbers else {
+		return 1;
+	};
+	x[0] = 1;
+	x[1] = 2;
+	let a = fresh(x);
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k00 = 2;
+		report("i8", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k01 = 2;
+		report("i16", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k02 = 2;
+		report("i32", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k03 = 2;
+		report("i64", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k04 = 2;
+		report("int", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k05 = 2;
+		report("u8", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k06 = 2;
+		report("u16", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k07 = 2;
+		report("u32", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k08 = 2;
+		report("u64", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k09 = 2;
+		report("uint", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k10 = 2;
+		report("byte", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k11 = 2.5;
+		report("f32", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k12 = 2.5;
+		report("f64", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k13 = 2.5 as f16;
+		report("f16", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k14 = true;
+		report("bool", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k15 = 'b';
+		report("char", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k16 = "two";
+		report("str", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k17 = []int { ptr: x, len: 1 };
+		report("slice", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k18[1] = 3;
+		report("fixed array", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k19 = none;
+		report("nullable pointer", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k20 = 5;
+		report("optional value", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k21 = (1, true);
+		report("tuple", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k22.b = 3;
+		report("struct", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k23.wide = 3;
+		report("packed struct", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k24 = Color.Green;
+		report("enum", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k25 = Shape.Circle { r: 2 };
+		report("variant", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k26.x = 2;
+		report("class", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k27 = twice;
+		report("function value", &a, &o, before, hashed);
+	}
+	{
+		let o = fresh(x);
+		let before = a.equals(&o);
+		let hashed = a.hash() == o.hash();
+		o.k28 = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 5.0 };
+		report("simd struct", &a, &o, before, hashed);
+	}
+	free(x);
+	return 0;
+}

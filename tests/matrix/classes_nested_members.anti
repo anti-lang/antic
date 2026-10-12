@@ -1,0 +1,104 @@
+//! Every member of a class in a type that a class body declares: fields with
+//! each level, a constant, a static field, a static function, `construct` and
+//! `destruct`, an `abstract fn` and its `concrete fn`, an `operator fn`,
+//! `implements`, `use` and `inherits`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Garage
+{
+	abstract class Vehicle
+	{
+		protected wheels: int = 4,
+
+		abstract fn load(self) -> int;
+
+		pub fn twice(self) -> int
+		{
+			return self.load() * 2;
+		}
+	}
+
+	abstract class Tagged
+	{
+		abstract fn label(self) -> int;
+	}
+
+	struct Plate
+	{
+		digits: int,
+	}
+
+	class Engine
+	{
+		pub power: int = 90,
+	}
+
+	class Car inherits Vehicle
+	{
+		implements tag: Tagged,
+		use engine: Engine,
+
+		pub seats: int = 5,
+		pub plate: Plate,
+		pub const DOORS: int = 4;
+		pub static atomic built: int = 0;
+		pub static atomic scrapped: int = 0;
+
+		fn construct(self)
+		{
+			Car.built.add(1);
+		}
+
+		fn destruct(self)
+		{
+			Car.scrapped.add(1);
+		}
+
+		pub fn make(digits: int) -> Car
+		{
+			return Car { plate: Plate { digits: digits } };
+		}
+
+		concrete fn load(self) -> int
+		{
+			return self.seats * 70 + self.wheels;
+		}
+
+		concrete fn label(self) -> int
+		{
+			return self.plate.digits;
+		}
+
+		operator fn add(self, other: Car) -> Car
+		{
+			return Car { seats: self.seats + other.seats, plate: Plate { digits: self.plate.digits + other.plate.digits } };
+		}
+	}
+
+	pub fn run(self) -> int
+	{
+		let first = Car.make(100);
+		let second = Car.make(23);
+		let both = first + second;
+		let vehicle: *Vehicle = &both;
+		let tagged: *Tagged = &both;
+		printf("fields: %d %d %d\n".ptr, both.seats as c_int, both.plate.digits as c_int, both.power as c_int);
+		printf("tables: %d %d %d\n".ptr, vehicle.load() as c_int, tagged.label() as c_int, vehicle.twice() as c_int);
+		printf("constant and static: %d %d\n".ptr, Car.DOORS as c_int, Car.built.load() as c_int);
+		return Car.built.load();
+	}
+
+	pub fn scrapped(self) -> int
+	{
+		return Car.scrapped.load();
+	}
+}
+
+fn main() -> int
+{
+	let garage = Garage { };
+	let built = garage.run();
+	printf("construct and destruct: %d %d\n".ptr, built as c_int, garage.scrapped() as c_int);
+	return 0;
+}

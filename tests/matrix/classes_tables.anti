@@ -1,0 +1,178 @@
+//! Which body each table of a class holds. An unqualified `concrete fn` fills
+//! every table that has its name, a qualified one fills its own table and wins
+//! there, and the nearest body of a chain wins. A body qualified by a base
+//! fills the primary table, and a plain body beside it the table of an
+//! interface. An interface that inherits another converts to it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Reader
+{
+	abstract fn get(self) -> int;
+
+	pub fn twice(self) -> int
+	{
+		return self.get() * 2;
+	}
+}
+
+abstract class Writer
+{
+	abstract fn get(self) -> int;
+}
+
+abstract class Sized
+{
+	abstract fn size(self) -> int;
+}
+
+abstract class Deep inherits Sized
+{
+	abstract fn depth(self) -> int;
+}
+
+class Both
+{
+	implements r: Reader,
+	implements w: Writer,
+
+	concrete fn Reader::get(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn Writer::get(self) -> int
+	{
+		return 2;
+	}
+}
+
+class One
+{
+	implements r: Reader,
+	implements w: Writer,
+
+	concrete fn get(self) -> int
+	{
+		return 3;
+	}
+}
+
+class Mixed
+{
+	implements r: Reader,
+	implements w: Writer,
+
+	concrete fn get(self) -> int
+	{
+		return 4;
+	}
+
+	concrete fn Writer::get(self) -> int
+	{
+		return 5;
+	}
+}
+
+class Below inherits Both
+{
+	concrete fn get(self) -> int
+	{
+		return 6;
+	}
+}
+
+class Half inherits Both
+{
+	concrete fn Reader::get(self) -> int
+	{
+		return 7;
+	}
+}
+
+class Own inherits One
+{
+	concrete fn Own::get(self) -> int
+	{
+		return 8;
+	}
+}
+
+class Well
+{
+	implements d: Deep,
+
+	concrete fn size(self) -> int
+	{
+		return 9;
+	}
+
+	concrete fn depth(self) -> int
+	{
+		return 10;
+	}
+}
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+abstract class Named
+{
+	abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	implements n: Named,
+
+	concrete fn Shape::area(self) -> int
+	{
+		return 11;
+	}
+
+	concrete fn area(self) -> int
+	{
+		return 12;
+	}
+}
+
+fn show(what: str, r: *Reader, w: *Writer)
+{
+	printf("%.*s: reader %d, writer %d, twice %d\n".ptr, what.len as c_int, what.ptr, r.get() as c_int, w.get() as c_int, r.twice() as c_int);
+}
+
+fn main() -> int
+{
+	let both = Both { };
+	let one = One { };
+	let mixed = Mixed { };
+	let below = Below { };
+	let half = Half { };
+	let own = Own { };
+	show("two qualified bodies", &both, &both);
+	show("one unqualified body", &one, &one);
+	show("a qualified body beside an unqualified one", &mixed, &mixed);
+	show("an unqualified body below two qualified ones", &below, &below);
+	show("a qualified body below two qualified ones", &half, &half);
+	show("a body qualified by its own class", &own, &own);
+	printf("on the sub-objects: %d %d\n".ptr, both.r.get() as c_int, both.w.get() as c_int);
+	printf("on the class: %d %d %d %d\n".ptr, one.get() as c_int, mixed.get() as c_int, below.get() as c_int, own.get() as c_int);
+	printf("the body of the interface by name: %d\n".ptr, Reader.twice(&both.r) as c_int);
+	let bound = half.r.twice;
+	let reader: *Reader = &below;
+	let through = reader.get;
+	printf("bound functions: %d %d\n".ptr, bound() as c_int, through() as c_int);
+
+	let well = Well { };
+	let deep: *Deep = &well;
+	let sized: *Sized = deep;
+	printf("an interface that inherits another: %d %d %d\n".ptr, deep.depth() as c_int, deep.size() as c_int, sized.size() as c_int);
+
+	let square = Square { };
+	let shape: *Shape = &square;
+	let named: *Named = &square;
+	printf("a body qualified by the base: %d %d %d\n".ptr, shape.area() as c_int, named.area() as c_int, square.area() as c_int);
+	return 0;
+}

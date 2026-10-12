@@ -1,0 +1,6 @@
+exit 0
+filled before construct: 7
+a class below, on the heap: 8 7
+final, nested and generic: 17 27 37
+inline and in an array: 7 14
+calls of the provider's object: 10

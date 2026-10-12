@@ -1,0 +1,117 @@
+//! The order in which `construct` and `destruct` run. A literal and an `alloc`
+//! run `construct` base first down the chain, after the defaults and after the
+//! `construct` of every class value the object holds inline. `delete`,
+//! `destroy` and the end of a block run `destruct` the other way round, and
+//! then tear down what the object owns. An array goes last to first. A
+//! `construct` that fails leaves no object, so no `destruct` runs for it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Wheel
+{
+	pub id: int = 0,
+
+	fn construct(self)
+	{
+		printf("  construct Wheel %d\n".ptr, self.id as c_int);
+	}
+
+	fn destruct(self)
+	{
+		printf("  destruct Wheel %d\n".ptr, self.id as c_int);
+	}
+}
+
+class Vehicle
+{
+	pub name: int = 1,
+
+	fn construct(self)
+	{
+		printf("  construct Vehicle %d\n".ptr, self.name as c_int);
+	}
+
+	fn destruct(self)
+	{
+		printf("  destruct Vehicle %d\n".ptr, self.name as c_int);
+	}
+}
+
+class Car inherits Vehicle
+{
+	pub front: Wheel,
+	pub own spare: ?*Wheel = none,
+
+	fn construct(self)
+	{
+		printf("  construct Car %d with wheel %d\n".ptr, self.name as c_int, self.front.id as c_int);
+	}
+
+	fn destruct(self)
+	{
+		printf("  destruct Car %d\n".ptr, self.name as c_int);
+	}
+}
+
+class Taxi inherits Car
+{
+	pub fare: int,
+
+	fn construct(self, fare: int) may fail
+	{
+		printf("  construct Taxi %d\n".ptr, fare as c_int);
+		if fare < 0 {
+			fail "no fare";
+		}
+		self.fare = fare;
+	}
+
+	fn destruct(self)
+	{
+		printf("  destruct Taxi %d\n".ptr, self.fare as c_int);
+	}
+}
+
+fn main() -> int
+{
+	printf("a literal of a derived class, torn down at the end of its block\n".ptr);
+	{
+		let car = Car { name: 2, front: Wheel { id: 20 } };
+	}
+	printf("an inline field that takes its default\n".ptr);
+	{
+		let car = Car { name: 3 };
+	}
+	printf("alloc, an owned object and delete\n".ptr);
+	let heap = alloc Car { name: 4, front: Wheel { id: 40 }, spare: alloc Wheel { id: 41 } };
+	delete(heap);
+	printf("destroy of a local\n".ptr);
+	{
+		let car = Car { name: 5, front: Wheel { id: 50 } };
+		destroy(&car);
+		printf("  after destroy\n".ptr);
+	}
+	printf("an array, last to first\n".ptr);
+	{
+		let wheels = [Wheel { id: 60 }, Wheel { id: 61 }, Wheel { id: 62 }];
+	}
+	printf("an assignment into a place that holds a value\n".ptr);
+	{
+		let wheel = Wheel { id: 70 };
+		wheel = Wheel { id: 71 };
+		printf("  after the assignment\n".ptr);
+	}
+	printf("a construct with arguments\n".ptr);
+	{
+		let taxi = Taxi(8) catch fatal;
+	}
+	printf("a construct that fails\n".ptr);
+	let failed = alloc Taxi(0 - 9) catch {
+		printf("  no taxi\n".ptr);
+		return 1;
+	};
+	delete(failed);
+	return 0;
+}

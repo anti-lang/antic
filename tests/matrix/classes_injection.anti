@@ -1,0 +1,116 @@
+//! An `inject` field is filled by the provider of its interface before
+//! `construct` runs. The interface carries its default provider, so the program
+//! names none. The field stands in a class, in a class below it, in a nested
+//! class, in a generic class and in a class value held inline, and `inject
+//! final` marks one that no run replaces.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Greeter
+{
+	abstract fn greeting(self) -> int;
+
+	pub fn default() -> *Greeter
+	{
+		return Console.get();
+	}
+}
+
+singleton class Console inherits Greeter
+{
+	pub static atomic asked: int = 0;
+
+	concrete fn greeting(self) -> int
+	{
+		Console.asked.add(1);
+		return 7;
+	}
+}
+
+class Service
+{
+	inject out: *Greeter,
+	pub seen: int = 0,
+
+	fn construct(self)
+	{
+		self.seen = self.out.greeting();
+	}
+
+	pub fn run(self) -> int
+	{
+		return self.out.greeting();
+	}
+}
+
+class Derived inherits Service
+{
+	pub fn more(self) -> int
+	{
+		return self.run() + 1;
+	}
+}
+
+class Fixed
+{
+	inject final out: *Greeter,
+
+	pub fn run(self) -> int
+	{
+		return self.out.greeting() + 10;
+	}
+}
+
+class Outer
+{
+	class Inner
+	{
+		inject out: *Greeter,
+
+		pub fn run(self) -> int
+		{
+			return self.out.greeting() + 20;
+		}
+	}
+
+	pub fn go(self) -> int
+	{
+		let inner = Inner { };
+		return inner.run();
+	}
+}
+
+class Box<T>
+{
+	inject out: *Greeter,
+	pub v: T,
+
+	pub fn run(self) -> int
+	{
+		return self.out.greeting() + 30;
+	}
+}
+
+class Holder
+{
+	pub service: Service,
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let service = Service { };
+	printf("filled before construct: %d\n".ptr, service.seen as c_int);
+	let heap = alloc Derived { };
+	printf("a class below, on the heap: %d %d\n".ptr, heap.more() as c_int, heap.seen as c_int);
+	delete(heap);
+	let fixed = Fixed { };
+	let outer = Outer { };
+	let box = Box<u8> { v: 1 };
+	printf("final, nested and generic: %d %d %d\n".ptr, fixed.run() as c_int, outer.go() as c_int, box.run() as c_int);
+	let holder = Holder { service: Service { } };
+	let services = [Service { }, Service { }];
+	printf("inline and in an array: %d %d\n".ptr, holder.service.run() as c_int, (services[0].seen + services[1].seen) as c_int);
+	printf("calls of the provider's object: %d\n".ptr, Console.asked.load() as c_int);
+	return 0;
+}

@@ -1,0 +1,5 @@
+exit 0
+fields: 10 123 90
+tables: 704 123 1408
+constant and static: 4 3
+construct and destruct: 3 3

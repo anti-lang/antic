@@ -1,0 +1,13 @@
+exit 0
+two qualified bodies: reader 1, writer 2, twice 2
+one unqualified body: reader 3, writer 3, twice 6
+a qualified body beside an unqualified one: reader 4, writer 5, twice 8
+an unqualified body below two qualified ones: reader 6, writer 6, twice 12
+a qualified body below two qualified ones: reader 7, writer 2, twice 14
+a body qualified by its own class: reader 8, writer 8, twice 16
+on the sub-objects: 1 2
+on the class: 3 4 6 8
+the body of the interface by name: 2
+bound functions: 14 6
+an interface that inherits another: 10 9 9
+a body qualified by the base: 11 12 12

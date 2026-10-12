@@ -1,0 +1,8 @@
+exit 0
+a generic base: 4 4 4 9
+a function with a parameter of its own: 8 4
+is and as: 1 1
+a generic interface: 6 1
+an operator: 7 7
+the default == and hash: 1 0 1
+construct and destruct: 3 3

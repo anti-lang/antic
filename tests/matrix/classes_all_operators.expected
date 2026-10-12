@@ -1,0 +1,13 @@
+exit 0
+struct + - * / %: 17 7 60 2 2
+struct & | ^ << >>: 4 13 9 384 3
+struct - ~: -12 -13
+struct == != < > <= >=: 0 1 0 1 1 0
+another struct of the module: 1007 1
+an operator by its name: 17
+class + - * / %: 17 7 60 2 2
+class & | ^ << >>: 4 13 9 384 3
+class - ~: -12 -13
+class == != < > <= >=: 0 1 0 1 1 0
+an operator as a function of the class: 17 0
+precedence: 42

@@ -1,0 +1,97 @@
+//! What each level of a member lets through. A class reaches its private
+//! members, in a closure and in a literal as well. A class below reaches the
+//! protected members of its chain, on itself and on another object. An
+//! `operator fn` at module level reaches the private members of the classes of
+//! its module, and `use` promotes the public members of its type.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Shape
+{
+	secret: int = 1,
+	protected x: int = 4,
+	pub open: int = 16,
+
+	fn helper(self) -> int
+	{
+		return self.secret * 2;
+	}
+
+	protected fn guard(self) -> int
+	{
+		return self.helper() + self.x;
+	}
+
+	pub fn with(secret: int) -> Shape
+	{
+		return Shape { secret: secret };
+	}
+
+	pub fn through_a_closure(self) -> int
+	{
+		let read = fn() -> int {
+			return self.secret + self.helper();
+		};
+		return read();
+	}
+}
+
+class Circle inherits Shape
+{
+	pub fn own_chain(self) -> int
+	{
+		return self.x + self.guard() + self.open;
+	}
+
+	pub fn other_object(self, other: *Shape) -> int
+	{
+		return other.x + other.guard();
+	}
+}
+
+class Account
+{
+	cents: int = 0,
+
+	pub fn of(cents: int) -> Account
+	{
+		return Account { cents: cents };
+	}
+}
+
+operator fn eq(a: Account, b: Account) -> bool
+{
+	return a.cents == b.cents;
+}
+
+class Wheel
+{
+	pub size: int = 17,
+	inner: int = 3,
+
+	pub fn turn(self) -> int
+	{
+		return self.size + self.inner;
+	}
+}
+
+class Car
+{
+	use wheel: Wheel,
+	pub doors: int = 4,
+}
+
+fn main() -> int
+{
+	let shape = Shape.with(5);
+	let circle = Circle { open: 32 };
+	printf("its own class: %d\n".ptr, shape.through_a_closure() as c_int);
+	printf("a class below: %d %d\n".ptr, circle.own_chain() as c_int, circle.other_object(&shape) as c_int);
+	printf("public: %d %d\n".ptr, shape.open as c_int, circle.open as c_int);
+	let same = Account.of(5) == Account.of(5);
+	let other = Account.of(5) != Account.of(6);
+	printf("an operator of the module: %d %d\n".ptr, same as c_int, other as c_int);
+	let car = Car { };
+	printf("promoted: %d %d %d\n".ptr, car.size as c_int, car.turn() as c_int, car.wheel.size as c_int);
+	return 0;
+}

@@ -1,0 +1,132 @@
+//! The default `equals`, `hash` and `==` of a class. Two objects of one class
+//! are equal when their fields are, along the whole chain, and an object of
+//! another class is never equal. A `transient` field is passed over, an `own`
+//! slice compares by its elements, a pointer the object does not own by its
+//! address, and a class value held inline by its own fields. A class that
+//! replaces `equals` and `hash` decides both, and `==` on its values calls its
+//! `equals`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Point
+{
+	pub x: int = 0,
+	pub y: int = 0,
+}
+
+class Other
+{
+	pub x: int = 0,
+	pub y: int = 0,
+}
+
+class Named inherits Point
+{
+	pub name: str = "a",
+}
+
+class Cached
+{
+	pub n: int = 0,
+	transient note: ?*int = none,
+
+	pub fn mark(self, p: *int)
+	{
+		self.note = p;
+	}
+}
+
+class Seen
+{
+	pub seen: ?*Point = none,
+}
+
+class Slices
+{
+	pub own items: []int,
+}
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+class Inline
+{
+	pub at: Point,
+	pub pair: Pair,
+	pub name: str = "n",
+	pub ratio: f64 = 0.5,
+}
+
+class Key
+{
+	pub id: int = 0,
+	pub weight: int = 0,
+
+	concrete fn equals(self, other: *Object) -> bool
+	{
+		let key = other as? *Key;
+		if key == none {
+			return false;
+		}
+		return (other as *Key).id == self.id;
+	}
+
+	concrete fn hash(self) -> u64
+	{
+		return self.id as u64;
+	}
+}
+
+fn main() -> int
+{
+	let a = Point { x: 1, y: 2 };
+	let b = Point { x: 1, y: 2 };
+	let c = Point { x: 1, y: 3 };
+	let o = Other { x: 1, y: 2 };
+	printf("one class: %d %d, another class: %d\n".ptr, a.equals(&b) as c_int, a.equals(&c) as c_int, a.equals(&o) as c_int);
+	printf("hash and ==: %d %d %d\n".ptr, (a.hash() == b.hash()) as c_int, (a == b) as c_int, (a != c) as c_int);
+
+	let n = Named { x: 1, y: 2 };
+	let m = Named { x: 1, y: 2, name: "b" };
+	let same = Named { x: 1, y: 2 };
+	printf("a chain: %d %d %d %d\n".ptr, n.equals(&same) as c_int, n.equals(&m) as c_int, a.equals(&n) as c_int, n.equals(&a) as c_int);
+
+	let seven = 7;
+	let p = Cached { n: 1 };
+	let q = Cached { n: 1 };
+	p.mark(&seven);
+	printf("a transient field: %d %d\n".ptr, p.equals(&q) as c_int, (p.hash() == q.hash()) as c_int);
+
+	let s = Seen { seen: &a };
+	let t = Seen { seen: &a };
+	let u = Seen { seen: &b };
+	printf("a pointer it does not own: %d %d %d %d\n".ptr, s.equals(&t) as c_int, s.equals(&u) as c_int, (s.hash() == t.hash()) as c_int, (s == u) as c_int);
+
+	let x = Slices { items: []int { ptr: alloc(int, 2), len: 2 } };
+	let y = Slices { items: []int { ptr: alloc(int, 2), len: 2 } };
+	x.items[0] = 1;
+	x.items[1] = 2;
+	y.items[0] = 1;
+	y.items[1] = 2;
+	printf("an own slice: %d %d %d\n".ptr, x.equals(&y) as c_int, (x.hash() == y.hash()) as c_int, (x == y) as c_int);
+	y.items[1] = 3;
+	printf("an own slice that differs: %d %d\n".ptr, x.equals(&y) as c_int, (x == y) as c_int);
+
+	let i = Inline { at: Point { x: 1 }, pair: Pair { a: 1, b: 2 } };
+	let j = Inline { at: Point { x: 1 }, pair: Pair { a: 1, b: 2 } };
+	let k = Inline { at: Point { x: 2 }, pair: Pair { a: 1, b: 2 } };
+	printf("inline values: %d %d %d %d %d\n".ptr, i.equals(&j) as c_int, i.equals(&k) as c_int, (i.hash() == j.hash()) as c_int, (i == j) as c_int, (i == k) as c_int);
+
+	let first = Key { id: 1, weight: 5 };
+	let second = Key { id: 1, weight: 6 };
+	let third = Key { id: 2, weight: 5 };
+	let root: *Object = &first;
+	printf("equals and hash replaced: %d %d %d %d %d\n".ptr, root.equals(&second) as c_int, root.equals(&third) as c_int, (root.hash() == second.hash()) as c_int, (first == second) as c_int, (first == third) as c_int);
+	printf("another class: %d\n".ptr, root.equals(&a) as c_int);
+	return 0;
+}

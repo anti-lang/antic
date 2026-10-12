@@ -1,0 +1,32 @@
+exit 0
+i8: -3 -3 -3 -3
+i16: 300 300 300 300
+i32: 70000 70000 70000 70000
+i64: 5 5 5 5
+int: 6 6 6 6
+u8: 200 200 200 200
+u16: 60000 60000 60000 60000
+u32: 7 7 7 7
+u64: 8 8 8 8
+uint: 9 9 9 9
+byte: 10 10 10 10
+f32: 3 3 3 3
+f64: 5 5 5 5
+bool: 1 1 1 1
+char: 1 1 1 1
+str: 4 4 4 4
+slice: 3 3 3 3
+fixed array: 12 12 12 12
+pointer: 7 7 7 7
+nullable pointer: 1 1 1 1
+optional value: 13 13 13 13
+tuple: 14 14 14 14
+struct: 15 15 15 15
+packed struct: 16 16 16 16
+enum: 1 1 1 1
+variant: 17 17 17 17
+class: 18 18 18 18
+pointer to a class: 19 19 19 19
+interface: 20 20 20 20
+function value: 42 42 42 42
+simd struct: 22 22 22 22

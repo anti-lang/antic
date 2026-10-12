@@ -1,0 +1,9 @@
+exit 0
+before the first get: 0
+one instance: 1, made 1
+construct ran: 5, defaults alone: 8
+a mutable field: 2 2
+its base: 3 9
+its interface: 45 1
+from a closure: 13, from a generic class: 5
+made once: 1

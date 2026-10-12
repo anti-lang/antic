@@ -1,0 +1,93 @@
+//! `dup` gives the kind it is given: a value for a value and a new object for a
+//! pointer, with the static type of the pointer. An `own` field gets fresh
+//! memory with a copy of its contents, a class value held inline is copied in
+//! place, another pointer keeps its address, and a `transient` field is `none`
+//! in the copy. `dup` through a pointer to a base copies the whole object, and
+//! through a pointer to an interface it gives a pointer to the same interface
+//! of the copy. A class that replaces `copy` fills the copy itself.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Named
+{
+	abstract fn name(self) -> int;
+}
+
+class Part
+{
+	pub n: int = 0,
+}
+
+class Shape
+{
+	pub side: int = 0,
+}
+
+class Square inherits Shape
+{
+	implements nm: Named,
+
+	pub inside: Part,
+	pub own part: ?*Part = none,
+	pub seen: ?*Part = none,
+	transient note: ?*Part = none,
+
+	concrete fn name(self) -> int
+	{
+		return self.side + 100;
+	}
+
+	pub fn mark(self, p: *Part)
+	{
+		self.note = p;
+	}
+
+	pub fn marked(self) -> bool
+	{
+		return self.note != none;
+	}
+}
+
+fn owned(s: *Square) -> int
+{
+	if let p = s.part {
+		return p.n;
+	}
+	return 0 - 1;
+}
+
+fn main() -> int
+{
+	let shared = Part { n: 9 };
+	let first = alloc Square { side: 2, inside: Part { n: 3 }, part: alloc Part { n: 4 }, seen: &shared };
+	first.mark(&shared);
+
+	let second = dup(first);
+	printf("a new object: %d\n".ptr, (second != first) as c_int);
+	printf("its fields: %d %d %d\n".ptr, second.side as c_int, second.inside.n as c_int, owned(second) as c_int);
+	printf("an own field in fresh memory: %d\n".ptr, (second.part != first.part) as c_int);
+	printf("another pointer keeps its address: %d\n".ptr, (second.seen == first.seen) as c_int);
+	printf("a transient field: %d %d\n".ptr, first.marked() as c_int, second.marked() as c_int);
+
+	let base: *Shape = first;
+	let third = dup(base);
+	let whole = third as *Square;
+	printf("through a base: %d %d %d\n".ptr, (third is *Square) as c_int, whole.inside.n as c_int, owned(whole) as c_int);
+
+	let named: *Named = first;
+	let fourth = dup(named);
+	printf("through an interface: %d %d\n".ptr, fourth.name() as c_int, (fourth != named) as c_int);
+
+	let value = Part { n: 5 };
+	let copy = dup(value);
+	copy.n += 1;
+	printf("a value: %d %d\n".ptr, value.n as c_int, copy.n as c_int);
+
+	delete(fourth as *Square);
+	delete(third);
+	delete(second);
+	delete(first);
+	return 0;
+}
