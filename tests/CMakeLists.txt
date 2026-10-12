@@ -5015,3 +5015,49 @@ add_custom_target(bench
     DEPENDS antic anti_std ${bench_executables}
     USES_TERMINAL
     VERBATIM)
+
+# The known failures, by decision 30 of "Decisions of 2026-10-11" in
+# docs/decisions.md. tests/known-failures.txt lists the tests that show a
+# defect, each with the id of its finding in docs/audit/tests-findings.md.
+# Every listed test is expected to fail, so one that passes fails the
+# suite. This block stands after every add_test of this file, since a
+# line may name any of them.
+#
+# DESIGN: WILL_FAIL is set when the tree is configured, and the test
+# known_failures runs later. The list is an input of the configure step, so
+# a build configures again after a change of it. The configure step also
+# writes the names of the tests and of those it marked into the build tree,
+# and known_failures compares them with the list it reads, so a suite that
+# runs on a tree configured with another list fails and says why.
+include("${CMAKE_CURRENT_SOURCE_DIR}/known_failures.cmake")
+set(KNOWN_FAILURES "${CMAKE_CURRENT_SOURCE_DIR}/known-failures.txt")
+set(KNOWN_FAILURES_WORK "${CMAKE_CURRENT_BINARY_DIR}/known-failures")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${KNOWN_FAILURES}")
+add_test(NAME known_failures
+    COMMAND "${CMAKE_COMMAND}"
+        "-DLIST=${KNOWN_FAILURES}"
+        "-DFINDINGS=${PROJECT_SOURCE_DIR}/docs/audit/tests-findings.md"
+        "-DTESTS=${KNOWN_FAILURES_WORK}/tests.txt"
+        "-DMARKED=${KNOWN_FAILURES_WORK}/marked.txt"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_known_failures.cmake")
+# run_known_failures.cmake refuses every list that disagrees with the
+# table or with the tree.
+add_test(NAME known_failures_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${CMAKE_CURRENT_SOURCE_DIR}/run_known_failures.cmake"
+        "-DWORK=${KNOWN_FAILURES_WORK}/runner"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_known_failures_self.cmake")
+known_failures_read("${KNOWN_FAILURES}" known_names known_ids known_wrong)
+get_property(known_tests DIRECTORY PROPERTY TESTS)
+set(known_marked "")
+foreach(name IN LISTS known_names)
+    if(TEST ${name} AND NOT name IN_LIST known_marked)
+        set_tests_properties(${name} PROPERTIES WILL_FAIL TRUE)
+        list(APPEND known_marked ${name})
+    endif()
+endforeach()
+list(JOIN known_tests "\n" known_tests)
+list(JOIN known_marked "\n" known_marked)
+file(WRITE "${KNOWN_FAILURES_WORK}/tests.txt" "${known_tests}\n")
+file(WRITE "${KNOWN_FAILURES_WORK}/marked.txt" "${known_marked}\n")

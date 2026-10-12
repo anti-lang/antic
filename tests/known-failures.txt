@@ -1,0 +1,13 @@
+# The tests the suite expects to fail, by decision 30 of "Decisions of
+# 2026-10-11" in docs/decisions.md. Each shows a defect of antic or anti
+# and is written as the rule says the program must behave.
+#
+# One line per test: the name of the test, the id of its finding in
+# docs/audit/tests-findings.md and one sentence, separated by one space
+# each.
+#
+#   matrix_case_copy_dev T001 A field of a case reads 0 after a copy.
+#
+# tests/CMakeLists.txt sets WILL_FAIL on every listed test, so a listed
+# test that passes fails the suite. The fix of a finding removes its lines.
+# The test known_failures checks the list against the table of the findings.
