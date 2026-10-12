@@ -242,6 +242,8 @@ A number stands on the right of its field and every other value on the left. `{{
 
 `let` declares a mutable local with mandatory initialisation, and `let x: atomic int = 0;` an atomic local. `const` declares a constant expression at module level, in a block and in a class body, where `Name.NAME` reaches it. Shadowing in an inner block is allowed. `let (a, b) = e;` takes a tuple apart, see [Tuples](#tuples), and `let m = p else { }` binds a checked pointer, see [Pointers](#pointers). `undefined` opts one local out of initialisation.
 
+A `const` names its type, so `const N = 2;` is refused. It holds a number, a `bool`, a `char`, a `str`, an array, a struct or a tuple, and never a class. A second `let` of one name in one block is refused. An atomic local holds an integer, a `bool`, a `char` or a pointer. A parameter is assigned as a local is.
+
 ```anti
 class Limits
 {
@@ -254,6 +256,23 @@ const STEP: int = 2;
 let hits: atomic int = 0;
 let (lo, hi) = (1, 2);
 let m = Limits.MAX;
+```
+
+```anti
+struct Size { w: int, h: int }
+
+const LIMIT: int = 8;
+const MARK: char = '#';
+const NAME: str = "anti";
+const PRIMES: [3]int = [2, 3, 5];
+const UNIT: Size = Size { w: 1, h: 1 };
+const PAIR: (int, str) = (1, "one");
+
+fn clamp(n: int) -> int
+{
+	if n > LIMIT { n = LIMIT; }
+	return n;
+}
 ```
 
 ```anti not-built
