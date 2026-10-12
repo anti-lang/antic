@@ -1,0 +1,1 @@
+hex_escape_short.anti:5:11: error: `\xHH` needs two hexadecimal digits

@@ -1,0 +1,20 @@
+//! Two `tests` blocks in one module.
+
+tests
+{
+	fn first()
+	{
+	}
+}
+
+tests
+{
+	fn second()
+	{
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

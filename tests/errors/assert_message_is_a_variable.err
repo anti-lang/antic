@@ -1,0 +1,1 @@
+assert_message_is_a_variable.anti:6:16: error: the message of an `assert` is a string literal

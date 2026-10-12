@@ -1,0 +1,1 @@
+tests_block_twice.anti:10:1: error: a module has at most one `tests` block

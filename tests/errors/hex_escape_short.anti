@@ -1,0 +1,7 @@
+//! A `\x` escape with one hexadecimal digit before the end of its string.
+
+fn main() -> int
+{
+	let s = "\x4";
+	return s.len as int;
+}

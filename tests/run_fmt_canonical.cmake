@@ -14,6 +14,7 @@ set(SKIP
     "${TESTS}/check/format/src/com/example/loose.anti"
     "${TESTS}/errors/format_literal.anti"
     "${TESTS}/errors/hex_bytes.anti"
+    "${TESTS}/errors/hex_escape_short.anti"
     "${TESTS}/errors/lexical.anti"
     "${TESTS}/errors/syntax.anti"
     "${TESTS}/fmt/alias_of_function.anti"

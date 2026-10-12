@@ -5480,7 +5480,12 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "simd_lanes_compared|--front-end,simd_lanes_compared.anti"
         "switch_refused_returns|--front-end,switch_refused_returns.anti"
         "tests_setup|--front-end,--tests,tests_setup.anti"
-        "tests_may_fail|--front-end,--tests,--runtime,${ANTIC_RUNTIME_DIR},tests_may_fail.anti")
+        "tests_may_fail|--front-end,--tests,--runtime,${ANTIC_RUNTIME_DIR},tests_may_fail.anti"
+        "tests_block_holds_a_struct|--front-end,--tests,tests_block_holds_a_struct.anti"
+        "tests_block_twice|--front-end,--tests,tests_block_twice.anti"
+        "hex_escape_short|--front-end,hex_escape_short.anti"
+        "tuple_element_hexadecimal|--front-end,tuple_element_hexadecimal.anti"
+        "assert_message_is_a_variable|--front-end,assert_message_is_a_variable.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

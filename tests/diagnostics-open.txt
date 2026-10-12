@@ -19,22 +19,20 @@
 # never with a line here.
 
 # src/antic/lexer.c
-`\\xHH` needs two hexadecimal digits
 
 # src/antic/parser.c
-`%s` holds functions and nothing else
-a module has at most one `%s` block
 
 # src/antic/parser_decl.c
+# Stays: no program reaches it. parser_item.c reads a `compatible` line
+# only where an integer or a float follows the word, and that token is the
+# one the message tests.
 `compatible` names a version, as `compatible 1.1;`
 
 # src/antic/parser_expr.c
-an element of a tuple is a decimal number
 
 # src/antic/parser_item.c
 
 # src/antic/parser_stmt.c
-the message of an `assert` is a string literal
 
 # src/antic/sema.c
 # Stays: no program reaches it. Every list of type arguments goes through

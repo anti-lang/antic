@@ -1,0 +1,14 @@
+//! A `struct` in the `tests` block, which holds functions alone.
+
+tests
+{
+	struct Point
+	{
+		x: int,
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

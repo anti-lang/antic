@@ -1,0 +1,8 @@
+//! An `assert` whose message is a variable.
+
+fn main() -> int
+{
+	let n = 1;
+	assert(n > 0, n);
+	return 0;
+}

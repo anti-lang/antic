@@ -1,0 +1,7 @@
+//! An element of a tuple named by a hexadecimal number.
+
+fn main() -> int
+{
+	let t = (1, 2);
+	return t.0x1;
+}
