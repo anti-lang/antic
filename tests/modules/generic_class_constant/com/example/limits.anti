@@ -1,0 +1,13 @@
+//! A generic function of a library module that reads a constant of a class. The
+//! client compiles its copy from the library file.
+
+pub class Limits
+{
+	pub const STEP: int = 3;
+}
+
+/// Reads a constant of a class in a generic function.
+pub fn stepped<T>(k: int, extra: T) -> int
+{
+	return size_of(T) as int * 1000 + k * Limits.STEP;
+}

@@ -1,0 +1,15 @@
+//! A static function is called through the name of its class.
+
+class A
+{
+	pub fn make() -> int
+	{
+		return 3;
+	}
+}
+
+fn main() -> int
+{
+	let a = A { };
+	return a.make();
+}

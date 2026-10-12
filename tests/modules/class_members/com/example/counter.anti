@@ -1,0 +1,8 @@
+//! A class of a library module with a public static field and a public
+//! constant.
+
+pub class Counter
+{
+	pub static atomic total: int = 5;
+	pub const STEP: int = 3;
+}

@@ -1,0 +1,23 @@
+//! A `concrete fn` fills an entry of a table. One whose name no table of the
+//! class has is refused.
+
+class Shape
+{
+	pub fn area(self) -> int
+	{
+		return 0;
+	}
+}
+
+class Circle inherits Shape
+{
+	concrete fn aera(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

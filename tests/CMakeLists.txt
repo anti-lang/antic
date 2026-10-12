@@ -3542,6 +3542,24 @@ antic_modules_test(classes_modules
     STD lang mem reflect text
     WORK "${CMAKE_CURRENT_BINARY_DIR}/classes-modules")
 
+# A public static field and a public constant of a class of a library
+# module, reached from the client as `counter.Counter.total` and
+# `counter.Counter.STEP`. T076 of docs/audit/tests-findings.md.
+antic_modules_test(class_members_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/class_members"
+    LIBRARIES counter
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/class-members-modules")
+
+# A constant of a class read in a generic function of a library module,
+# whose copy the client compiles. T029 of docs/audit/tests-findings.md,
+# which generic_atomic_modules shows for a static field.
+antic_modules_test(generic_class_constant_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_class_constant"
+    LIBRARIES limits
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/generic-class-constant-modules")
+
 # `dispatch`, `join` and `join_all` in a generic function of a library
 # module, whose copy the client compiles. T061 of
 # docs/audit/tests-findings.md.
@@ -5469,6 +5487,24 @@ foreach(source IN LISTS matrix_sources)
         antic_matrix_refusal(${name})
     endif()
 endforeach()
+# Programs of the classes area once more under an option that takes a part
+# of the class away. --no-reflect drops the field lists, and the default
+# `equals` and `hash`, `is`, `as` and `dup` give what they give with them.
+# --no-hooks drops the hook sites, and `construct` and `destruct` run as
+# they run with them. Each takes the expected output of its matrix tests.
+foreach(name equality field_kinds conversions copies)
+    antic_program_test(matrix_classes_${name}_no_reflect
+        "${MATRIX}/classes_${name}.anti"
+        OPTIONS "--no-reflect"
+        WORK "${MATRIX_WORK}/no-reflect")
+endforeach()
+foreach(name objects construct_order)
+    antic_program_test(matrix_classes_${name}_no_hooks
+        "${MATRIX}/classes_${name}.anti"
+        OPTIONS "--no-hooks"
+        WORK "${MATRIX_WORK}/no-hooks")
+endforeach()
+
 # A source with neither file, or with both, registers nothing above.
 add_test(NAME matrix_files
     COMMAND "${CMAKE_COMMAND}" "-DMATRIX=${MATRIX}"

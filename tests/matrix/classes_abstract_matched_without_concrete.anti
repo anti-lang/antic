@@ -1,0 +1,21 @@
+//! A function that fills an abstract entry of an interface says `concrete`.
+
+abstract class Named
+{
+	abstract fn name(self) -> int;
+}
+
+class C
+{
+	implements a: Named,
+
+	pub fn name(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

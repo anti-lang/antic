@@ -1,0 +1,1 @@
+classes_super_destruct_called_directly.anti:18:14: error: `destruct` is never called directly, use `delete` or `destroy`

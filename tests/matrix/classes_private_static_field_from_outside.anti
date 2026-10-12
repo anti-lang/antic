@@ -1,0 +1,12 @@
+//! A static field without a marker is a field of its class, and the class alone
+//! reaches it.
+
+class Counter
+{
+	static atomic total: int = 0;
+}
+
+fn main() -> int
+{
+	return Counter.total.load();
+}

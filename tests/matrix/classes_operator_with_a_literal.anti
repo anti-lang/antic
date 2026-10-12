@@ -1,0 +1,35 @@
+//! `a op b` calls `operator fn` of the type of `a` with `b`. The second operand
+//! has the type of the second parameter, which a literal takes as a variable
+//! does.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Money
+{
+	pub cents: int = 0,
+
+	operator fn mul(self, times: int) -> Money
+	{
+		return Money { cents: self.cents * times };
+	}
+}
+
+struct Vec
+{
+	x: int,
+}
+
+operator fn shl(a: Vec, by: int) -> Vec
+{
+	return Vec { x: a.x << by };
+}
+
+fn main() -> int
+{
+	let m = Money { cents: 5 };
+	let twice = m * 2;
+	let v = Vec { x: 3 };
+	let moved = v << 2;
+	printf("%d %d\n".ptr, twice.cents as c_int, moved.x as c_int);
+	return 0;
+}

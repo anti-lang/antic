@@ -1,0 +1,13 @@
+//! Reaches a public static field and a public constant of a class of the
+//! library `com.example.counter` under the name of the class.
+
+import com.example.counter;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	counter.Counter.total.add(counter.Counter.STEP);
+	printf("%d %d\n".ptr, counter.Counter.total.load() as c_int, counter.Counter.STEP as c_int);
+	return 0;
+}

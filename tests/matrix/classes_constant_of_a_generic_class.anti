@@ -1,0 +1,26 @@
+//! A constant of a generic class belongs to the copy. Each copy computes it
+//! with its own type argument, inside the class and outside it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box<T>
+{
+	pub v: T,
+	pub const SIZE: int = size_of(T) as int;
+	pub const TWO: int = 2;
+
+	pub fn size(self) -> int
+	{
+		return Box<T>.SIZE + Box<T>.TWO;
+	}
+}
+
+fn main() -> int
+{
+	let a = Box<u8> { v: 1 };
+	let b = Box<i32> { v: 1 };
+	let c = Box<i64> { v: 1 };
+	printf("inside: %d %d %d\n".ptr, a.size() as c_int, b.size() as c_int, c.size() as c_int);
+	printf("outside: %d %d %d\n".ptr, Box<u8>.SIZE as c_int, Box<i32>.SIZE as c_int, Box<i64>.SIZE as c_int);
+	return 0;
+}

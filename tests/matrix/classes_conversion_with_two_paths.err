@@ -1,0 +1,1 @@
+classes_conversion_with_two_paths.anti:43:21: error: `&c` converts to `*Closable` through `ser` and through `w`, name one

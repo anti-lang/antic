@@ -1,0 +1,12 @@
+//! A constant without a marker is a member of its class, and the class alone
+//! reaches it.
+
+class Counter
+{
+	const STEP: int = 3;
+}
+
+fn main() -> int
+{
+	return Counter.STEP;
+}

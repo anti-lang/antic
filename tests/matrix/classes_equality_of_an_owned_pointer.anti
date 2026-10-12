@@ -1,0 +1,40 @@
+//! The default `equals`, `hash` and `==` compare the contents of an `own`
+//! pointer. Two objects that own equal objects are equal, whatever the
+//! addresses of what they own.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Point
+{
+	pub x: int = 0,
+}
+
+struct Spot
+{
+	x: int,
+}
+
+class Held
+{
+	pub own part: *Point,
+}
+
+class HeldStruct
+{
+	pub own part: *Spot,
+}
+
+fn main() -> int
+{
+	let h = Held { part: alloc Point { x: 5 } };
+	let i = Held { part: alloc Point { x: 5 } };
+	let j = Held { part: alloc Point { x: 6 } };
+	printf("an own pointer to a class: %d %d %d %d\n".ptr, h.equals(&i) as c_int, (h.hash() == i.hash()) as c_int, (h == i) as c_int, h.equals(&j) as c_int);
+	let s = HeldStruct { part: alloc Spot { x: 5 } };
+	let t = HeldStruct { part: alloc Spot { x: 5 } };
+	let u = HeldStruct { part: alloc Spot { x: 6 } };
+	printf("an own pointer to a struct: %d %d %d %d\n".ptr, s.equals(&t) as c_int, (s.hash() == t.hash()) as c_int, (s == t) as c_int, s.equals(&u) as c_int);
+	return 0;
+}

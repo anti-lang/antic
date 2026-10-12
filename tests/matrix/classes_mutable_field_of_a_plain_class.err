@@ -1,0 +1,1 @@
+classes_mutable_field_of_a_plain_class.anti:6:2: error: `mutable` marks a field of a singleton, and `Plain` is none

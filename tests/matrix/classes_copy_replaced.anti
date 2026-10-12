@@ -1,0 +1,30 @@
+//! A class replaces `copy` of `Object` with `concrete fn copy(self, to:
+//! *Object)`, which fills the fields of `to`. `dup` allocates `to` at the size
+//! of the class and then calls it, for a value and for a pointer.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Stamp
+{
+	pub n: int = 0,
+	pub copies: int = 0,
+
+	concrete fn copy(self, to: *Object)
+	{
+		let stamp = to as *Stamp;
+		stamp.n = self.n;
+		stamp.copies = self.copies + 1;
+	}
+}
+
+fn main() -> int
+{
+	let stamp = Stamp { n: 7 };
+	let again = dup(stamp);
+	let more = dup(&again);
+	printf("copy replaced: %d %d %d\n".ptr, again.n as c_int, again.copies as c_int, more.copies as c_int);
+	delete(more);
+	return 0;
+}

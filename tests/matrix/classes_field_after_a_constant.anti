@@ -1,0 +1,26 @@
+//! The members of a class body stand in any order: a field follows a constant,
+//! a static field and a function.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Mixed
+{
+	pub const STEP: int = 3;
+	pub first: int = 1,
+	pub static atomic made: int = 0;
+	pub second: int = 2,
+
+	pub fn sum(self) -> int
+	{
+		return self.first + self.second + self.third + Mixed.STEP;
+	}
+
+	pub third: int = 4,
+}
+
+fn main() -> int
+{
+	let m = Mixed { };
+	printf("%d\n".ptr, m.sum() as c_int);
+	return 0;
+}

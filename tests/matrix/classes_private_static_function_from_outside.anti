@@ -1,0 +1,15 @@
+//! A static function without a marker is a function of its class, and the class
+//! alone calls it.
+
+class Counter
+{
+	fn helper() -> int
+	{
+		return 4;
+	}
+}
+
+fn main() -> int
+{
+	return Counter.helper();
+}

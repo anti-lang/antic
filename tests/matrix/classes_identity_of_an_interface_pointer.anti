@@ -1,0 +1,54 @@
+//! `==` on two class pointers compares the identity of the objects. A pointer
+//! to an interface of an object equals a pointer to the object itself, to its
+//! base and to another interface of it, on the stack and on the heap.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Named
+{
+	abstract fn name(self) -> int;
+}
+
+abstract class Other
+{
+	abstract fn other(self) -> int;
+}
+
+class Base
+{
+	pub b: int = 3,
+}
+
+class Derived inherits Base
+{
+	implements nm: Named,
+	implements ot: Other,
+
+	concrete fn name(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn other(self) -> int
+	{
+		return 2;
+	}
+}
+
+fn main() -> int
+{
+	let d = Derived { };
+	let whole: *Derived = &d;
+	let base: *Base = &d;
+	let named: *Named = &d;
+	let other: *Other = &d;
+	printf("an interface and the object: %d %d\n".ptr, (named == whole) as c_int, (whole == named) as c_int);
+	printf("an interface and the base: %d %d\n".ptr, (named == base) as c_int, (base != named) as c_int);
+	printf("two interfaces: %d\n".ptr, (named == other) as c_int);
+	printf("the base and the object: %d\n".ptr, (base == whole) as c_int);
+	let heap = alloc Derived { };
+	let on_heap: *Other = heap;
+	printf("on the heap: %d %d\n".ptr, (on_heap == heap) as c_int, (heap != on_heap) as c_int);
+	delete(heap);
+	return 0;
+}

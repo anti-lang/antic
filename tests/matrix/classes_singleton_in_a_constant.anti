@@ -1,0 +1,13 @@
+//! `get()` of a singleton is no constant expression.
+
+singleton class Settings
+{
+	pub base: int = 7,
+}
+
+const BASE: int = Settings.get().base;
+
+fn main() -> int
+{
+	return BASE;
+}

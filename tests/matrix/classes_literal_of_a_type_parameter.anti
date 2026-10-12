@@ -1,0 +1,11 @@
+//! The body of a generic names no field of its type parameter.
+
+fn make<T>() -> T
+{
+	return T { };
+}
+
+fn main() -> int
+{
+	return make<int>();
+}

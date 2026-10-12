@@ -1,0 +1,18 @@
+//! The address of a field of a singleton that is fixed after creation lets no
+//! write through either.
+
+singleton class Config
+{
+	pub level: int = 2,
+}
+
+fn set(p: *int)
+{
+	*p = 3;
+}
+
+fn main() -> int
+{
+	set(&Config.get().level);
+	return Config.get().level;
+}

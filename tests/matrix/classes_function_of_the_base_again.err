@@ -1,0 +1,1 @@
+classes_function_of_the_base_again.anti:6:9: error: `Circle.area` replaces `Shape.area` and needs `concrete`

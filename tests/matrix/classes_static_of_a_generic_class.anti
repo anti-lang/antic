@@ -1,0 +1,25 @@
+//! A static field of a generic class belongs to the copy, as its functions do.
+//! Each copy counts its own objects.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box<T>
+{
+	pub v: T,
+	pub static atomic made: int = 0;
+
+	pub fn make(own v: T) -> Box<T>
+	{
+		Box<T>.made.add(1);
+		return Box<T> { v: v };
+	}
+}
+
+fn main() -> int
+{
+	let a = Box<int>.make(1);
+	let b = Box<int>.make(2);
+	let c = Box<u8>.make(3);
+	printf("made: %d %d %d\n".ptr, Box<int>.made.load() as c_int, Box<u8>.made.load() as c_int, Box<i16>.made.load() as c_int);
+	return 0;
+}

@@ -234,3 +234,66 @@ matrix_threads_pointer_into_fields_in_a_tuple_refused T062 A public function of 
 matrix_threads_pointer_into_fields_of_a_concurrent_class_in_a_tuple_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
 matrix_threads_pointer_into_fields_through_a_private_function_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
 lock_order_once T063 A pair of locks in opposite orders is reported once per order.
+matrix_classes_open_functions_without_abstract_refused T064 A class with an `abstract fn` that is not `abstract` compiles.
+matrix_classes_mutable_field_of_a_plain_class_refused T065 `mutable` on a field of a plain class compiles.
+matrix_classes_equal_pointers_of_unrelated_classes_refused T066 `==` and `!=` on pointers of two unrelated classes compile.
+matrix_classes_unequal_pointers_of_unrelated_classes_refused T066 `==` and `!=` on pointers of two unrelated classes compile.
+matrix_classes_equals_replaced_without_hash_refused T067 A class that replaces one of `equals` and `hash` without the other compiles.
+matrix_classes_hash_replaced_without_equals_refused T067 A class that replaces one of `equals` and `hash` without the other compiles.
+matrix_classes_super_destruct_called_directly_refused T068 `self.super.destruct()` compiles and calls nothing.
+matrix_classes_field_after_a_constant_dev T069 A field after a constant, a static field or a function of a class body is refused.
+matrix_classes_field_after_a_constant_release T069 A field after a constant, a static field or a function of a class body is refused.
+matrix_classes_field_after_a_constant_memory_checks T069 A field after a constant, a static field or a function of a class body is refused.
+matrix_classes_field_of_the_base_again_refused T070 A message of the class checker differs from the text the object model gives.
+matrix_classes_function_of_the_base_again_refused T070 A message of the class checker differs from the text the object model gives.
+matrix_classes_concrete_replaces_nothing_refused T070 A message of the class checker differs from the text the object model gives.
+matrix_classes_conversion_with_two_paths_refused T070 A message of the class checker differs from the text the object model gives.
+matrix_classes_two_constructs_refused T071 One mistake of a class declaration gets two messages.
+matrix_classes_abstract_matched_without_concrete_refused T071 One mistake of a class declaration gets two messages.
+matrix_classes_qualifier_names_no_base_refused T071 One mistake of a class declaration gets two messages.
+matrix_classes_own_class_qualifier_beside_a_plain_body_refused T071 One mistake of a class declaration gets two messages.
+matrix_classes_internal_on_a_class_member_refused T071 One mistake of a class declaration gets two messages.
+matrix_classes_constant_of_a_generic_class_dev T072 A constant and a static field of a generic class are one for every copy.
+matrix_classes_constant_of_a_generic_class_release T072 A constant and a static field of a generic class are one for every copy.
+matrix_classes_constant_of_a_generic_class_memory_checks T072 A constant and a static field of a generic class are one for every copy.
+matrix_classes_static_of_a_generic_class_dev T072 A constant and a static field of a generic class are one for every copy.
+matrix_classes_static_of_a_generic_class_release T072 A constant and a static field of a generic class are one for every copy.
+matrix_classes_static_of_a_generic_class_memory_checks T072 A constant and a static field of a generic class are one for every copy.
+matrix_classes_cast_from_an_interface_to_a_base_dev T073 `is` and `as` from a pointer to an interface to the abstract base of the object are refused.
+matrix_classes_cast_from_an_interface_to_a_base_release T073 `is` and `as` from a pointer to an interface to the abstract base of the object are refused.
+matrix_classes_cast_from_an_interface_to_a_base_memory_checks T073 `is` and `as` from a pointer to an interface to the abstract base of the object are refused.
+matrix_classes_operator_with_a_literal_dev T074 A literal as the second operand of an `operator fn` that takes another type is refused.
+matrix_classes_operator_with_a_literal_release T074 A literal as the second operand of an `operator fn` that takes another type is refused.
+matrix_classes_operator_with_a_literal_memory_checks T074 A literal as the second operand of an `operator fn` that takes another type is refused.
+matrix_classes_private_static_function_from_outside_refused T075 A static function, a static field and a constant without a marker are reached from outside their class.
+matrix_classes_private_static_field_from_outside_refused T075 A static function, a static field and a constant without a marker are reached from outside their class.
+matrix_classes_private_constant_from_outside_refused T075 A static function, a static field and a constant without a marker are reached from outside their class.
+class_members_modules_release T076 A public static field and a public constant of a class of another module are refused.
+class_members_modules_dev T076 A public static field and a public constant of a class of another module are refused.
+matrix_classes_static_field_through_self_refused T077 The message for a member of a class reached the wrong way names another kind or denies the member.
+matrix_classes_static_function_through_an_object_refused T077 The message for a member of a class reached the wrong way names another kind or denies the member.
+matrix_classes_singleton_in_a_constant_refused T077 The message for a member of a class reached the wrong way names another kind or denies the member.
+matrix_classes_abstract_class_as_a_parameter_refused T078 An abstract class compiles as the type of a value that is held in place.
+matrix_classes_abstract_class_as_a_result_refused T078 An abstract class compiles as the type of a value that is held in place.
+matrix_classes_abstract_class_in_a_slice_refused T078 An abstract class compiles as the type of a value that is held in place.
+matrix_classes_abstract_class_in_an_array_refused T078 An abstract class compiles as the type of a value that is held in place.
+matrix_classes_abstract_class_in_an_optional_refused T078 An abstract class compiles as the type of a value that is held in place.
+matrix_classes_abstract_class_in_a_tuple_refused T078 An abstract class compiles as the type of a value that is held in place.
+matrix_classes_abstract_class_as_a_type_argument_refused T078 An abstract class compiles as the type of a value that is held in place.
+matrix_classes_singleton_field_written_through_its_address_refused T079 The address of a field of a singleton that is fixed after creation lets a write through.
+matrix_classes_literal_of_a_type_parameter_refused T080 A literal of a type parameter ends in an error of the back end without a position.
+matrix_classes_equality_of_an_owned_pointer_dev T081 The default `equals`, `hash` and `==` compare an `own` pointer by its address.
+matrix_classes_equality_of_an_owned_pointer_release T081 The default `equals`, `hash` and `==` compare an `own` pointer by its address.
+matrix_classes_equality_of_an_owned_pointer_memory_checks T081 The default `equals`, `hash` and `==` compare an `own` pointer by its address.
+matrix_classes_copy_replaced_dev T082 `dup` hands a replaced `copy` an object without its table.
+matrix_classes_copy_replaced_release T082 `dup` hands a replaced `copy` an object without its table.
+matrix_classes_copy_replaced_memory_checks T082 `dup` hands a replaced `copy` an object without its table.
+matrix_classes_identity_of_an_interface_pointer_dev T083 `==` on a pointer to an interface and a pointer to the object or its base compares the addresses.
+matrix_classes_identity_of_an_interface_pointer_release T083 `==` on a pointer to an interface and a pointer to the object or its base compares the addresses.
+matrix_classes_identity_of_an_interface_pointer_memory_checks T083 `==` on a pointer to an interface and a pointer to the object or its base compares the addresses.
+matrix_classes_qualified_body_in_a_nested_class_dev T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.
+matrix_classes_qualified_body_in_a_nested_class_release T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.
+matrix_classes_qualified_body_in_a_nested_class_memory_checks T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.
+matrix_classes_call_as_the_default_of_a_field_refused T019 A call as the default of a field crashes antic.
+generic_class_constant_modules_release T029 The library file of a generic function that reads a constant of a class cannot be read.
+generic_class_constant_modules_dev T029 The library file of a generic function that reads a constant of a class cannot be read.

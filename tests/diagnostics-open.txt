@@ -20,55 +20,34 @@
 a module has at most one `%s` block
 
 # src/antic/parser_decl.c
-`internal` marks a module item, and a class member is `pub`, `protected` or neither
-a `::` qualifier belongs to a `concrete fn`
-a class has one `compatible` line
 `compatible` names a version, as `compatible 1.1;`
 
 # src/antic/parser_expr.c
 an element of a tuple is a decimal number
 
 # src/antic/parser_item.c
-`protected` marks a class member, and a module item is `pub`, `internal` or neither
-`trace` marks a class or a function of one
 
 # src/antic/parser_stmt.c
 the message of an `assert` is a string literal
 
 # src/antic/sema.c
-`%.*s.%.*s` is not generic
 expected a type, found a constant
 an `extern fn` takes plain C function pointers, and `keep own` holds a snapshot
 %s `%.*s.%s`, which this `%.*s` lacks
 `lent` marks a pointer result, and this one is `%s`
 `%.*s` is abstract, and a `provides` line names a complete class
-`compatible` names the versions a plugin may carry, and belongs to an abstract class
-`%.*s.%.*s` is not a class
-`%.*s` is abstract and no class fills it
 
 # src/antic/sema_call.c
-`%s` is abstract and has no complete value, and %s needs one
 a variadic function has no function pointer type
 `fail \"text\"` calls `anti.lang.Error.new`, which takes a code and a message
 `fail` captures the frames with `anti.lang.StackTrace.capture`, which takes the count of frames to skip
 `fail` writes `at` and `frames` of `anti.lang.Error`, which this `anti.lang` lacks
-`%s.construct` takes %s%zu argument%s, found %zu
 `%.*s` has no public class `%.*s`
 the first argument names an interface
 `%s` is not a function
 the call takes %zu argument%s, found %zu
-`%.*s` is a constant of `%s`, reached as `%s.%.*s`
 
 # src/antic/sema_class.c
-`%s` returns `never`, and `%s` returns
-`%s` returns, and `%s` returns `never`
-`%s` is not abstract and cannot be implemented
-`%.*s` implements `%s` twice
-`%.*s` implements `%s`, which `%.*s` implements already
-`%.*s` of `%.*s` matches an abstract function and needs `concrete`
-`%.*s` has one `construct`, and every other maker is a static function
-`construct` takes `self` as its first parameter
-`%.*s` is no base and no interface of `%.*s`
 
 # src/antic/sema_const.c
 
@@ -77,22 +56,16 @@ antic compiles no copy of `%.*s` yet, %s
 antic compiles no copy here yet, %s
 
 # src/antic/sema_expr.c
-`%s` converts to `%s` through `%.*s` and through `%.*s`, name one
 a function that is not kept cannot be stored
 the function is not marked `concurrent`
 the call returns no value
 `operator fn iter` gives `%s`, which has no `operator fn next` and `operator fn value`
-`%s` is never `%s`, the classes share no chain
 %s calls `anti.text.Builder.%s`, which this `anti.text` lacks
-`%s` is a singleton, and `%s.get()` gives its one instance
-`%s` is a singleton and outlives the program
 
 # src/antic/sema_generic.c
-`%.*s` names two type parameters `%.*s`
 a copy of `%s` nests deeper than %d levels
 
 # src/antic/sema_operator.c
-`operator fn %.*s` takes one operand beside its own
 
 # src/antic/sema_pattern.c
 `patch` takes 2 to 5 arguments, found %zu
@@ -105,7 +78,6 @@ a copy of `%s` nests deeper than %d levels
 `%s` is not defined on the lanes of `%s`
 
 # src/antic/sema_stmt.c
-`%.*s` of singleton `%s` is read-only after creation, and `mutable` marks a field the program writes
 a `switch` on a `str` compares with `anti.text.equal`, which this `anti.text` lacks
 `setup` and `teardown` belong to `fixtures`, which runs them around every test
 

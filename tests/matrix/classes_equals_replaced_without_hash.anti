@@ -1,0 +1,18 @@
+//! Decision 27: a class that replaces `equals` of `Object` replaces `hash` as
+//! well, so two equal objects have one hash.
+
+class Sprite
+{
+	pub n: int = 0,
+
+	concrete fn equals(self, other: *Object) -> bool
+	{
+		return true;
+	}
+}
+
+fn main() -> int
+{
+	let s = Sprite { };
+	return 0;
+}

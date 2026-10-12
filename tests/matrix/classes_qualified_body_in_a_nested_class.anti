@@ -1,0 +1,48 @@
+//! A `concrete fn` in a type that a class body declares is qualified by a base
+//! and by an interface that the same class body declares, each under the name
+//! the class knows it by.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Garage
+{
+	abstract class Vehicle
+	{
+		abstract fn load(self) -> int;
+	}
+
+	abstract class Tagged
+	{
+		abstract fn load(self) -> int;
+	}
+
+	class Car inherits Vehicle
+	{
+		implements tag: Tagged,
+
+		concrete fn Vehicle::load(self) -> int
+		{
+			return 350;
+		}
+
+		concrete fn Tagged::load(self) -> int
+		{
+			return 123;
+		}
+	}
+
+	pub fn run(self) -> int
+	{
+		let car = Car { };
+		let vehicle: *Vehicle = &car;
+		let tagged: *Tagged = &car;
+		return vehicle.load() + tagged.load();
+	}
+}
+
+fn main() -> int
+{
+	let garage = Garage { };
+	printf("%d\n".ptr, garage.run() as c_int);
+	return 0;
+}

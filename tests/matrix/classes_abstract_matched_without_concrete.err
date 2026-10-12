@@ -1,0 +1,1 @@
+classes_abstract_matched_without_concrete.anti:12:9: error: `name` of `C` matches an abstract function and needs `concrete`

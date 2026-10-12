@@ -1,0 +1,1 @@
+classes_concrete_replaces_nothing.anti:14:14: error: `Circle.aera` is `concrete` and replaces nothing

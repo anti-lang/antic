@@ -1,0 +1,26 @@
+//! Decision 27: a direct call of `destruct` is refused. The compiler chains the
+//! `destruct` of a base, so a class never calls it through `self.super`.
+
+class A
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		self.n = 0;
+	}
+}
+
+class B inherits A
+{
+	fn destruct(self)
+	{
+		self.super.destruct();
+	}
+}
+
+fn main() -> int
+{
+	let b = B { };
+	return 0;
+}

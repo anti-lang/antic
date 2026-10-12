@@ -1,0 +1,1 @@
+classes_equal_pointers_of_unrelated_classes.anti:20:8: error: `==` compares pointers of one chain, and `*A` and `*B` share none

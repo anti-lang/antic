@@ -1,0 +1,1 @@
+classes_literal_of_a_type_parameter.anti:5:9: error: `T` is a type parameter, and a literal names a type the body knows

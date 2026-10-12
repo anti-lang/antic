@@ -1,0 +1,24 @@
+//! Decision 27: `!=` on pointers of two classes that share no chain is a type
+//! error, as `==` is.
+
+class A
+{
+	pub n: int = 0,
+}
+
+class B
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let a = A { };
+	let b = B { };
+	let pa = &a;
+	let pb = &b;
+	if pa != pb {
+		return 1;
+	}
+	return 0;
+}

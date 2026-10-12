@@ -1,0 +1,1 @@
+classes_own_class_qualifier_beside_a_plain_body.anti:16:22: error: `Square` declares `area` twice

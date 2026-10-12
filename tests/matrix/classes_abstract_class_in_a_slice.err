@@ -1,0 +1,1 @@
+classes_abstract_class_in_a_slice.anti:16:18: error: `[]Shape` holds no complete values, use `[]*Shape`

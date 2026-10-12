@@ -1,0 +1,20 @@
+//! The default of a field is a constant expression.
+
+class Counter
+{
+	pub fn step(n: int) -> int
+	{
+		return n * 3;
+	}
+}
+
+class Holder
+{
+	pub n: int = Counter.step(1),
+}
+
+fn main() -> int
+{
+	let h = Holder { };
+	return h.n;
+}

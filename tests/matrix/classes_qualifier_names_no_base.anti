@@ -1,0 +1,41 @@
+//! The qualifier of a `concrete fn` names a base or an interface of its class.
+
+abstract class Named
+{
+	abstract fn name(self) -> int;
+}
+
+abstract class Other
+{
+	abstract fn label(self) -> int;
+}
+
+class Filled
+{
+	implements o: Other,
+
+	concrete fn label(self) -> int
+	{
+		return 2;
+	}
+}
+
+class C
+{
+	implements a: Named,
+
+	concrete fn name(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn Other::label(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

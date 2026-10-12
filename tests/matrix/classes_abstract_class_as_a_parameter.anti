@@ -1,0 +1,24 @@
+//! An abstract class is no parameter by value.
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn take(s: Shape) -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	return 0;
+}

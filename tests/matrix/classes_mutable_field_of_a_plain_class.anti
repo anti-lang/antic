@@ -1,0 +1,13 @@
+//! Decision 27: `mutable` is a word of a singleton alone. On a field of a plain
+//! class it is refused.
+
+class Plain
+{
+	mutable n: int = 0,
+}
+
+fn main() -> int
+{
+	let p = Plain { };
+	return 0;
+}

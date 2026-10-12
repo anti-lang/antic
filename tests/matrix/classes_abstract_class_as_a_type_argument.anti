@@ -1,0 +1,30 @@
+//! A copy of a generic class that holds its type argument in place takes no
+//! abstract class.
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return 1;
+	}
+}
+
+class Box<T>
+{
+	pub v: T,
+}
+
+fn take(b: *Box<Shape>) -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	return 0;
+}

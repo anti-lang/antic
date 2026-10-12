@@ -1,0 +1,1 @@
+classes_two_constructs.anti:12:5: error: `C` has one `construct`, and every other maker is a static function

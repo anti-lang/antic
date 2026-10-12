@@ -1,0 +1,21 @@
+//! A class has one `construct`.
+
+class C
+{
+	pub n: int = 0,
+
+	fn construct(self)
+	{
+		self.n = 1;
+	}
+
+	fn construct(self, n: int)
+	{
+		self.n = n;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

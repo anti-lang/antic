@@ -1,0 +1,19 @@
+//! Decision 27 names `equals` replaced without `hash`, and "The root class" of
+//! the object model names the reverse as well: a class that replaces `hash` of
+//! `Object` replaces `equals` too.
+
+class Sprite
+{
+	pub n: int = 0,
+
+	concrete fn hash(self) -> u64
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	let s = Sprite { };
+	return 0;
+}

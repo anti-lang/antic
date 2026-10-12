@@ -1,0 +1,1 @@
+classes_equals_replaced_without_hash.anti:4:7: error: `Sprite` replaces `equals` without `hash`

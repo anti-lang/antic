@@ -1,0 +1,41 @@
+//! `is`, `as` and `as?` work from any pointer to a base or to an interface. A
+//! pointer to an interface leads to the object, and so to the abstract base of
+//! its class, which the interface does not inherit.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Shape
+{
+	pub side: int = 0,
+
+	abstract fn area(self) -> int;
+}
+
+abstract class Named
+{
+	abstract fn name(self) -> int;
+}
+
+class Square inherits Shape
+{
+	implements nm: Named,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+
+	concrete fn name(self) -> int
+	{
+		return 7;
+	}
+}
+
+fn main() -> int
+{
+	let sq = Square { side: 3 };
+	let named: *Named = &sq;
+	let shape = named as *Shape;
+	printf("%d %d\n".ptr, (named is *Shape) as c_int, shape.area() as c_int);
+	return 0;
+}

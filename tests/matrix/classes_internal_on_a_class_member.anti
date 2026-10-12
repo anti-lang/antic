@@ -1,0 +1,19 @@
+//! `internal` is a level of a module item.
+
+class C
+{
+	pub fn g(self) -> int
+	{
+		return 2;
+	}
+
+	internal fn f(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

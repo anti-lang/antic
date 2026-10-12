@@ -1,0 +1,17 @@
+//! A static field is reached through the name of its class.
+
+class A
+{
+	pub static atomic n: int = 3;
+
+	pub fn get(self) -> int
+	{
+		return self.n.load();
+	}
+}
+
+fn main() -> int
+{
+	let a = A { };
+	return a.get();
+}

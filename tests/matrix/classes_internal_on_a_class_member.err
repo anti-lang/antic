@@ -1,0 +1,1 @@
+classes_internal_on_a_class_member.anti:10:2: error: `internal` marks a module item, and a class member is `pub`, `protected` or neither

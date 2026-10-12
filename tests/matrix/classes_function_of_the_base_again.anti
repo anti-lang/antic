@@ -1,0 +1,23 @@
+//! A function that takes `self` and has the name of a function of the base
+//! chain replaces it, and says so with `concrete`.
+
+class Circle inherits Shape
+{
+	pub fn area(self) -> int
+	{
+		return 1;
+	}
+}
+
+class Shape
+{
+	pub fn area(self) -> int
+	{
+		return 0;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

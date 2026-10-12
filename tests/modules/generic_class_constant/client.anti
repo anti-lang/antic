@@ -1,0 +1,12 @@
+//! Calls a generic function of the library `com.example.limits` that reads a
+//! constant of a class.
+
+import com.example.limits;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	printf("%d\n".ptr, limits.stepped<i16>(2, 7) as c_int);
+	return 0;
+}
