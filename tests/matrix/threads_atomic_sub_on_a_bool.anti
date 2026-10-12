@@ -1,0 +1,9 @@
+//! The atomic `sub` is arithmetic, which a bool has none of. `load`, `store`,
+//! `swap` and `compare_swap` are the operations of such an atomic.
+
+fn main() -> int
+{
+	let held: atomic bool = false;
+	let before = held.sub(true);
+	return 0;
+}

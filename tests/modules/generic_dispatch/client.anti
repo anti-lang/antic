@@ -1,0 +1,13 @@
+//! Calls a generic function of the library `com.example.jobs` that holds
+//! `dispatch`, `join` and `join_all`.
+
+import anti.lang;
+import com.example.jobs;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	printf("dispatch %d\n".ptr, jobs.generic_dispatch<i16>(2, 7) as c_int);
+	return 0;
+}

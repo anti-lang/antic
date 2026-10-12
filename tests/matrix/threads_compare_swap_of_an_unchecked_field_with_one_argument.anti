@@ -1,0 +1,17 @@
+//! `compare_swap` on a plain field that `unchecked` marks takes the expected
+//! value and the new one.
+
+concurrent class Slot
+{
+	next: int = 0 unchecked(unguarded-field, "swapped without a lock"),
+
+	pub fn take(self) -> bool
+	{
+		return self.next.compare_swap(0);
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,66 @@
+//! What a job may stand in and how it is joined: `join_all` of no job, of a
+//! part of an array and of a whole one, a worker without a result, a job in a
+//! tuple, a job that an anonymous function joins, and a `dispatch` of an object
+//! that is in flight, whose job starts nothing and gives zero. The workers
+//! write into their objects, so the output holds no order of events.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+	pub done: int = 0,
+}
+
+worker fn add(t: *Task, k: int) -> int
+{
+	return t.n + k;
+}
+
+worker fn mark(t: *Task, k: int)
+{
+	t.done += k;
+}
+
+worker fn again(t: *Task, k: int) -> int
+{
+	let inner = dispatch t -> add(k);
+	return join(inner) + 1000;
+}
+
+fn main() -> int
+{
+	let tasks = [alloc Task { n: 10 }, alloc Task { n: 20 }, alloc Task { n: 30 }];
+	let jobs = [dispatch tasks[0] -> mark(1), dispatch tasks[1] -> mark(2), dispatch tasks[2] -> mark(3)];
+	join_all(jobs[0..0]);
+	join_all(jobs[0..2]);
+	join_all(jobs[2..3]);
+	printf("join_all: %d %d %d\n".ptr, tasks[0].done as c_int, tasks[1].done as c_int, tasks[2].done as c_int);
+
+	let quiet = dispatch tasks[0] -> mark(5);
+	join(quiet);
+	printf("no result: %d\n".ptr, tasks[0].done as c_int);
+
+	let pair = (dispatch tasks[1] -> add(1), 7);
+	printf("in a tuple: %d\n".ptr, (join(pair.0) + pair.1) as c_int);
+
+	let later = dispatch tasks[2] -> add(2);
+	let wait = fn() -> int {
+		return join(later);
+	};
+	printf("in an anonymous function: %d\n".ptr, wait() as c_int);
+
+	let flying = dispatch tasks[0] -> again(4);
+	printf("in flight: %d\n".ptr, join(flying) as c_int);
+
+	let sum = 0;
+	for i in 0..3 {
+		let job = dispatch tasks[i] -> add(i);
+		sum += join(job);
+	}
+	printf("one after the other: %d\n".ptr, sum as c_int);
+	for i in 0..3 {
+		delete(tasks[i]);
+	}
+	return 0;
+}

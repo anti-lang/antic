@@ -1,0 +1,26 @@
+//! A guarded field is reached inside a `sync` on its lock, of the same function
+//! or of the same closure. An anonymous function inside the block may run after
+//! it, and is refused.
+
+concurrent class Tally
+{
+	lock: Mutex,
+	size: int = 0 guarded by lock,
+
+	pub fn bump(self) -> int
+	{
+		let got = 0;
+		sync self.lock {
+			let read = fn() {
+				got = self.size;
+			};
+			read();
+		}
+		return got;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,21 @@
+//! The worker of a `parallel` is a name, and a function of an object is
+//! refused.
+
+class Summer
+{
+	pub base: int = 0,
+
+	pub fn sum(self, chunk: []int) -> int
+	{
+		return chunk.len + self.base;
+	}
+}
+
+fn main() -> int
+{
+	let s = Summer { };
+	let items = [1, 2, 3];
+	let parts = parallel items[0..3] -> s.sum;
+	free(parts.ptr);
+	return 0;
+}

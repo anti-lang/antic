@@ -1,0 +1,1 @@
+threads_concurrent_closure_changes_through_its_address.anti:25:8: error: `total` is changed in a closure at a `concurrent` parameter, and `int` is not thread-safe, so a `snapshot fn` reads a copy of it instead

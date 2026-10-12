@@ -1,0 +1,97 @@
+//! The lock orders a dev build records, in one thread. Two locks taken in
+//! opposite orders are reported once, however often the two orders run. A ring
+//! of three locks holds each pair in one order and is not reported. A lock that
+//! `destroy` ended has no order left, and neither has the hidden lock of a
+//! synchronized object that its thread takes again.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Locks
+{
+	a: Mutex,
+	b: Mutex,
+	c: Mutex,
+	n: int,
+}
+
+synchronized class Box
+{
+	n: int = 0,
+
+	pub fn bump(self)
+	{
+		self.n += 1;
+	}
+
+	pub fn twice(self)
+	{
+		self.bump();
+		self.bump();
+	}
+}
+
+fn forward(l: *Locks)
+{
+	sync l.a {
+		sync l.b {
+			l.n += 1;
+		}
+	}
+}
+
+fn backward(l: *Locks)
+{
+	sync l.b {
+		sync l.a {
+			l.n += 1;
+		}
+	}
+}
+
+fn ring(l: *Locks)
+{
+	sync l.b {
+		sync l.c {
+			l.n += 1;
+		}
+	}
+	sync l.c {
+		sync l.a {
+			l.n += 1;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let l = Locks { n: 0 };
+	forward(&l);
+	backward(&l);
+	ring(&l);
+	let m = Mutex.new();
+	let n = Mutex.new();
+	sync m {
+		sync n {
+			l.n += 1;
+		}
+	}
+	m.destroy();
+	sync n {
+		sync m {
+			l.n += 1;
+		}
+	}
+	let box = alloc Box { };
+	sync box {
+		box.twice();
+		sync m {
+			box.bump();
+		}
+	}
+	sync m {
+		l.n += 1;
+	}
+	printf("%d\n".ptr, l.n as c_int);
+	delete(box);
+	return 0;
+}

@@ -1,0 +1,22 @@
+//! A `join` of a job that `join_all` waited for is a second `join` of it, which
+//! decision 23 of "Decisions of 2026-10-11" refuses where the checker sees it.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn add(t: *Task, k: int) -> int
+{
+	return t.n + k;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { n: 1 };
+	let jobs = [dispatch t -> add(2)];
+	join_all(jobs[0..1]);
+	let again = join(jobs[0]);
+	delete(t);
+	return again;
+}

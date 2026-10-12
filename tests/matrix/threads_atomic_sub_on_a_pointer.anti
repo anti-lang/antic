@@ -1,0 +1,10 @@
+//! The atomic `sub` is arithmetic, which a pointer has none of. `load`,
+//! `store`, `swap` and `compare_swap` are the operations of such an atomic.
+
+fn main() -> int
+{
+	let n = 5;
+	let held: atomic *int = &n;
+	let before = held.sub(&n);
+	return 0;
+}

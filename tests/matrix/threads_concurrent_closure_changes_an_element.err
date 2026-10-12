@@ -1,0 +1,1 @@
+threads_concurrent_closure_changes_an_element.anti:20:3: error: `xs` is changed in a closure at a `concurrent` parameter, and `[2]int` is not thread-safe, so a `snapshot fn` reads a copy of it instead

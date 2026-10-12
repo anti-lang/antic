@@ -1,0 +1,32 @@
+//! A closure at a `concurrent` parameter may run on more than one thread at
+//! once, so it changes no captured variable whose type is not thread-safe. Here
+//! it changes one through a field of a struct.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let p = Point { x: 0, y: 0 };
+	let job = dispatch t -> work(fn(n) {
+		p.x = n + 1;
+		return 1;
+	});
+	let got = join(job);
+	delete(t);
+	return got;
+}

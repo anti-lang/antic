@@ -1,0 +1,1 @@
+threads_atomic_sub_on_a_bool.anti:7:15: error: `sub` takes an atomic integer, and `held` holds `bool`

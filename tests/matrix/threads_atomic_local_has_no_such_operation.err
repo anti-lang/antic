@@ -1,0 +1,1 @@
+threads_atomic_local_has_no_such_operation.anti:6:2: error: an atomic local has no `increment`

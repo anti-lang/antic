@@ -3517,6 +3517,16 @@ antic_modules_test(threads_modules
     STD lang
     WORK "${CMAKE_CURRENT_BINARY_DIR}/threads-modules")
 
+# `dispatch`, `join` and `join_all` in a generic function of a library
+# module, whose copy the client compiles. T061 of
+# docs/audit/tests-findings.md.
+antic_modules_test(generic_dispatch_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_dispatch"
+    LIBRARIES jobs
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/generic-dispatch-modules")
+
 # The origin of a `fail` and the position of a `here` in a generic function
 # of a library module, whose copy the client compiles. T043 of
 # docs/audit/tests-findings.md.
@@ -3982,9 +3992,12 @@ add_test(NAME trap_table
 # that reaches the match limit stops with the pattern and the line.
 # pattern_group_count: a match whose `count` the program raised reads no
 # group past those of its pattern, and stops with the count of the
-# pattern.
+# pattern. chan_capacity: a channel made for no value stops the program.
+# send_closed and send_closed_waiting: a `send` on a closed channel stops
+# it, one that waits on a full channel included.
 foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
-        singleton_memory pattern_limit pattern_group_count)
+        singleton_memory pattern_limit pattern_group_count chan_capacity
+        send_closed send_closed_waiting)
     add_test(NAME trap_${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -4029,6 +4042,40 @@ add_test(NAME lock_order
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_lock_order.cmake")
 set_tests_properties(lock_order PROPERTIES TIMEOUT 120)
+
+# The lock orders of one thread: lock_orders holds a pair in opposite
+# orders, a ring of three locks, a lock that `destroy` ended and the hidden
+# lock of an object that its thread takes again. lock_order_once holds the
+# two orders of a pair more than once, which a dev build reports once.
+# check_join_twice: a second `join` of one job that the checker cannot see
+# traps in a dev build, by decision 23 of "Decisions of 2026-10-11".
+# DESIGN: run_dev_report.cmake stops a program after ANTIC_REPORT_SECONDS,
+# so a program that hangs fails its test as an ordinary failure, which
+# WILL_FAIL of tests/known-failures.txt expects.
+set(ANTIC_REPORT_SECONDS 20)
+foreach(name IN ITEMS lock_orders lock_order_once)
+    add_test(NAME ${name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+            "-DTIMEOUT=${ANTIC_REPORT_SECONDS}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dev_report.cmake")
+    set_tests_properties(${name} PROPERTIES TIMEOUT 120)
+endforeach()
+add_test(NAME check_join_twice
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/join_twice.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        "-DTIMEOUT=${ANTIC_REPORT_SECONDS}"
+        "-DPATTERN=join_twice\\.anti:[0-9]+: .*join"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dev_report.cmake")
+set_tests_properties(check_join_twice PROPERTIES TIMEOUT 120)
 
 # --memory-checks reports a read after free, a double free, a write past a
 # heap block and a leak on every host but windows-arm64, which has no

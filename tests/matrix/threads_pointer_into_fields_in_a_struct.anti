@@ -1,0 +1,22 @@
+//! A public function of a thread-safe class gives out no pointer into the
+//! fields of its object. A struct that holds one is such a pointer.
+
+struct View
+{
+	p: *int,
+}
+
+synchronized class Box
+{
+	n: int = 0,
+
+	pub fn view(self) -> View
+	{
+		return View { p: &self.n };
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

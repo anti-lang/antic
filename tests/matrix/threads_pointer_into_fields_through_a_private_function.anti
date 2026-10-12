@@ -1,0 +1,23 @@
+//! A public function of a thread-safe class gives out no pointer into the
+//! fields of its object. A private function may give one to the class, and a
+//! public one that returns it gives it out.
+
+synchronized class Box
+{
+	n: int = 0,
+
+	fn inner(self) -> *int
+	{
+		return &self.n;
+	}
+
+	pub fn view(self) -> *int
+	{
+		return self.inner();
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

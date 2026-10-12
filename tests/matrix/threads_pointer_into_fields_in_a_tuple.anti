@@ -1,0 +1,17 @@
+//! A public function of a thread-safe class gives out no pointer into the
+//! fields of its object. A tuple that holds one is such a pointer.
+
+synchronized class Box
+{
+	n: int = 0,
+
+	pub fn view(self) -> (*int, int)
+	{
+		return (&self.n, 1);
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

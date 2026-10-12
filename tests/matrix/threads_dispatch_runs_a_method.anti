@@ -1,0 +1,21 @@
+//! The worker of a `dispatch` is a name, and a function of the object is
+//! refused.
+
+class Task
+{
+	pub n: int = 0,
+
+	pub fn run(self) -> int
+	{
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let job = dispatch t -> t.run();
+	let got = join(job);
+	delete(t);
+	return got;
+}

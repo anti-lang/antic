@@ -1,0 +1,14 @@
+//! `sync` locks the word at an address, so it takes a Mutex that lives in a
+//! place. The result of a call is refused.
+
+fn make() -> Mutex
+{
+	return Mutex.new();
+}
+
+fn main() -> int
+{
+	sync make() {
+	}
+	return 0;
+}

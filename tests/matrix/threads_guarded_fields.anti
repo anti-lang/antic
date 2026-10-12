@@ -1,0 +1,220 @@
+//! A guarded field of a concurrent class, reached inside a `sync` on its lock
+//! in each place a function has: a loop, an arm of a `switch`, an `if let`, a
+//! `defer` inside the block, a handler, an anonymous function that holds the
+//! lock itself, an arm of a `select` and a type nested in the class. A worker
+//! reaches it through a pointer to the object, and a generic concurrent class
+//! guards a field of its type parameter.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn risky(n: int) -> int may fail
+{
+	if n > 2 {
+		fail "refused";
+	}
+	return n;
+}
+
+fn hold(n: int) -> ?int
+{
+	if n < 0 {
+		return none;
+	}
+	return n;
+}
+
+concurrent class Tally
+{
+	struct Part
+	{
+		lock: Mutex,
+		n: int guarded by lock,
+	}
+
+	lock: Mutex,
+	size: int = 0 guarded by lock,
+	part: Part = Part { n: 0 } guarded by lock,
+
+	pub fn in_loop(self, k: int) -> int
+	{
+		for turn in 0..k {
+			sync self.lock {
+				self.size += turn;
+			}
+		}
+		sync self.lock {
+			return self.size;
+		}
+	}
+
+	pub fn in_arm(self, k: int) -> int
+	{
+		switch k {
+			1 => {
+				sync self.lock {
+					self.size += 10;
+				}
+			},
+			else => {
+				sync self.lock {
+					self.size += 20;
+				}
+			},
+		}
+		sync self.lock {
+			return self.size;
+		}
+	}
+
+	pub fn in_if_let(self, k: int) -> int
+	{
+		sync self.lock {
+			if let n = hold(k) {
+				self.size += n;
+			} else {
+				self.size = -1;
+			}
+			return self.size;
+		}
+	}
+
+	pub fn in_defer(self, k: int) -> int
+	{
+		sync self.lock {
+			defer self.size += k;
+			return self.size;
+		}
+	}
+
+	pub fn in_catch(self, k: int) -> int
+	{
+		sync self.lock {
+			let got = risky(k) catch {
+				self.size += 1000;
+				yield self.size;
+			};
+			return got;
+		}
+	}
+
+	pub fn in_closure(self, k: int) -> int
+	{
+		let got = 0;
+		let add = fn(n: int) {
+			sync self.lock {
+				self.size += n;
+				got = self.size;
+			}
+		};
+		add(k);
+		add(k);
+		return got;
+	}
+
+	pub fn in_select(self, c: chan int, k: int) -> int
+	{
+		send(c, k);
+		let got = 0;
+		select {
+			c x => {
+				sync self.lock {
+					if let v = x {
+						self.size += *v;
+					}
+					got = self.size;
+				}
+			},
+		}
+		return got;
+	}
+
+	pub fn in_nested(self, k: int) -> int
+	{
+		sync self.lock {
+			sync self.part.lock {
+				self.part.n += k;
+				return self.part.n;
+			}
+		}
+	}
+
+	pub fn reset(self)
+	{
+		sync self.lock {
+			self.size = 0;
+		}
+	}
+}
+
+concurrent class Slot<T>
+{
+	lock: Mutex,
+	held: T guarded by lock,
+	writes: int = 0 guarded by lock,
+
+	fn construct(self, v: T)
+	{
+		self.held = dup(v);
+	}
+
+	pub fn put(self, v: T) -> int
+	{
+		sync self.lock {
+			self.held = dup(v);
+			self.writes += 1;
+			return self.writes;
+		}
+	}
+
+	pub fn get(self) -> T
+	{
+		sync self.lock {
+			return dup(self.held);
+		}
+	}
+}
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn in_worker(t: *Task, tally: *Tally) -> int
+{
+	return tally.in_loop(t.n);
+}
+
+fn main() -> int
+{
+	let tally = alloc Tally { };
+	let c = chan int(1);
+	printf("loop %d\n".ptr, tally.in_loop(4) as c_int);
+	tally.reset();
+	printf("arm %d %d\n".ptr, tally.in_arm(1) as c_int, tally.in_arm(2) as c_int);
+	tally.reset();
+	printf("if_let %d %d\n".ptr, tally.in_if_let(5) as c_int, tally.in_if_let(-5) as c_int);
+	tally.reset();
+	printf("defer %d %d\n".ptr, tally.in_defer(3) as c_int, tally.in_defer(4) as c_int);
+	tally.reset();
+	printf("catch %d %d\n".ptr, tally.in_catch(2) as c_int, tally.in_catch(3) as c_int);
+	tally.reset();
+	printf("closure %d\n".ptr, tally.in_closure(6) as c_int);
+	tally.reset();
+	printf("select %d\n".ptr, tally.in_select(c, 8) as c_int);
+	printf("nested %d %d\n".ptr, tally.in_nested(2) as c_int, tally.in_nested(3) as c_int);
+	tally.reset();
+	let task = alloc Task { n: 5 };
+	let job = dispatch task -> in_worker(tally);
+	printf("worker %d\n".ptr, join(job) as c_int);
+	let slot = alloc Slot<int>(0);
+	let first = slot.put(41);
+	let second = slot.put(42);
+	printf("generic %d %d %d\n".ptr, first as c_int, second as c_int, slot.get() as c_int);
+	delete(slot);
+	delete(task);
+	delete(c);
+	delete(tally);
+	return 0;
+}

@@ -1,0 +1,21 @@
+//! A channel carries values under the rule of `parallel`. A channel of a type
+//! parameter is checked in each copy, so the copy for a pointer is refused.
+
+fn through<T>(first: T) -> T
+{
+	let c = chan T(1);
+	send(c, dup(first));
+	let a = recv(c) else {
+		return dup(first);
+	};
+	let got = dup(*a);
+	delete(c);
+	return got;
+}
+
+fn main() -> int
+{
+	let n = 5;
+	let p = through<*int>(&n);
+	return *p;
+}

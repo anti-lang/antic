@@ -1,0 +1,1 @@
+threads_channel_of_a_type_parameter_that_is_a_pointer.anti:6:15: error: a channel carries values alone, and `*int` holds a pointer

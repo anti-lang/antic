@@ -1,0 +1,1 @@
+threads_atomic_and_on_a_nullable_pointer.anti:9:15: error: `and` takes an atomic integer, and `held` holds `?*int`

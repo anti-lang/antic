@@ -1,0 +1,17 @@
+//! The default of a static field is a constant expression. A call is refused,
+//! in a field that no code reads as well.
+
+fn five() -> int
+{
+	return 5;
+}
+
+class Counter
+{
+	static atomic next: int = five();
+}
+
+fn main() -> int
+{
+	return 0;
+}

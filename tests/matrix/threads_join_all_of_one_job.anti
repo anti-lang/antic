@@ -1,0 +1,20 @@
+//! `join_all` takes a slice of jobs, and one job is refused.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn read(t: *Task) -> int
+{
+	return t.n;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let job = dispatch t -> read;
+	join_all(job);
+	delete(t);
+	return 0;
+}

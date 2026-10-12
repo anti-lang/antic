@@ -1,0 +1,20 @@
+//! `atomic` applies to an integer, a `bool`, a `char` and a pointer, and to an
+//! `f16` field. An atomic field of an enum is refused.
+
+enum Level
+{
+	Low,
+	High,
+}
+
+class Gauge
+{
+	pub atomic level: Level = Level.Low,
+}
+
+fn main() -> int
+{
+	let g = Gauge { };
+	let seen = g.level.load();
+	return 0;
+}

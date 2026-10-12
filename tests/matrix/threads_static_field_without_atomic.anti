@@ -1,0 +1,12 @@
+//! A static field is a global every thread reaches, so it is written `static
+//! atomic`.
+
+class Counter
+{
+	static total: int = 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

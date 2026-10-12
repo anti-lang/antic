@@ -1,0 +1,45 @@
+//! A `dispatch` that stands once in a loop gives each job the arguments of its
+//! own turn, by decision 23 of "Decisions of 2026-10-11". The program runs with
+//! --anti.threads=1, so the pool has no thread and each job starts when it is
+//! joined, after the last turn of the loop.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+	pub got: int = 0,
+}
+
+struct Pair
+{
+	first: int,
+	second: int,
+}
+
+worker fn add(t: *Task, k: int, p: Pair) -> int
+{
+	t.got = k;
+	return t.n + k + p.first * p.second;
+}
+
+fn main() -> int
+{
+	let tasks = [alloc Task { n: 100 }, alloc Task { n: 200 }, alloc Task { n: 300 }, alloc Task { n: 400 }];
+	let idle = alloc Task { };
+	let none_yet = dispatch idle -> add(0, Pair { first: 0, second: 0 });
+	let jobs = [none_yet, none_yet, none_yet, none_yet];
+	join(none_yet);
+	for i in 0..4 {
+		jobs[i] = dispatch tasks[i] -> add(i * 10, Pair { first: i, second: 2 });
+	}
+	for i in 0..4 {
+		let sum = join(jobs[i]);
+		printf("job %d: %d, argument %d\n".ptr, i as c_int, sum as c_int, tasks[i].got as c_int);
+	}
+	for i in 0..4 {
+		delete(tasks[i]);
+	}
+	delete(idle);
+	return 0;
+}

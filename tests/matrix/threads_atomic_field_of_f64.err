@@ -1,0 +1,1 @@
+threads_atomic_field_of_f64.anti:6:13: error: an atomic field holds an integer, a `bool`, a `char` or a pointer, found `float`

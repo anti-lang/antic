@@ -1,0 +1,21 @@
+//! A guarded field is reached inside a `sync` on its lock, of the same function
+//! or of the same closure. A read after the block is refused.
+
+concurrent class Tally
+{
+	lock: Mutex,
+	size: int = 0 guarded by lock,
+
+	pub fn bump(self) -> int
+	{
+		sync self.lock {
+			self.size += 1;
+		}
+		return self.size;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+threads_worker_before_a_struct.anti:3:8: error: `worker` stands before `fn`

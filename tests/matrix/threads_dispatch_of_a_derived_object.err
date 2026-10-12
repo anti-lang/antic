@@ -1,0 +1,1 @@
+threads_dispatch_of_a_derived_object.anti:23:26: error: `read` takes `*Shape` as its object, and this is `*Circle`

@@ -1,0 +1,21 @@
+//! A public function of a concurrent class gives out no pointer into the fields
+//! of its object, as one of a synchronized class gives none. A tuple that holds
+//! one is such a pointer.
+
+concurrent class Box
+{
+	lock: Mutex,
+	n: int = 0 guarded by lock,
+
+	pub fn view(self) -> (*int, int)
+	{
+		sync self.lock {
+			return (&self.n, 1);
+		}
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

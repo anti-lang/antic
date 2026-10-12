@@ -1,0 +1,1 @@
+threads_concurrent_closure_changes_a_struct_with_a_mutex.anti:28:4: error: `g` is changed in a closure at a `concurrent` parameter, and `Guard` is not thread-safe, so a `snapshot fn` reads a copy of it instead

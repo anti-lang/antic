@@ -1,0 +1,24 @@
+//! A local that holds the function of a parameter without the mark is refused
+//! at a `concurrent` parameter.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn run(t: *Task, f: fn(int) -> int) -> int
+{
+	let second = f;
+	let job = dispatch t -> work(second);
+	return join(job);
+}
+
+fn main() -> int
+{
+	return 0;
+}

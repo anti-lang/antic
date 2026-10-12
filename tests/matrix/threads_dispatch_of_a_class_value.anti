@@ -1,0 +1,19 @@
+//! The object of a `dispatch` is a pointer to a class. A class value is
+//! refused.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn read(t: *Task) -> int
+{
+	return t.n;
+}
+
+fn main() -> int
+{
+	let t = Task { };
+	let job = dispatch t -> read;
+	return join(job);
+}

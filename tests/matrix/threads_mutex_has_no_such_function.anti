@@ -1,0 +1,7 @@
+//! `Mutex.new()` is the one function of the type.
+
+fn main() -> int
+{
+	let m = Mutex.make();
+	return 0;
+}

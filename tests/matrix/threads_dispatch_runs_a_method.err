@@ -1,0 +1,1 @@
+threads_dispatch_runs_a_method.anti:17:26: error: `dispatch` runs a worker named here

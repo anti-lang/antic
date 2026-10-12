@@ -1,0 +1,14 @@
+//! `atomic` applies to an integer, a `bool`, a `char` and a pointer, and to an
+//! `f16` field. An atomic field of `str` is refused.
+
+class Gauge
+{
+	pub atomic level: str = "a",
+}
+
+fn main() -> int
+{
+	let g = Gauge { };
+	let seen = g.level.load();
+	return 0;
+}

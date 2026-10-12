@@ -1,0 +1,10 @@
+exit 0
+by 0: 7 elements
+by -3: 7 elements
+no by: 7 elements
+by 20: 7 chunks, 7 elements
+by 3: 3 2 2
+first of each: 105 405 605
+empty: 0 chunks
+one element: 1 chunks, 3
+doubled: 2 8 14, 7 chunks

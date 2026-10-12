@@ -1,0 +1,8 @@
+//! `join_all` takes a slice of jobs, and a slice of numbers is refused.
+
+fn main() -> int
+{
+	let numbers = [1, 2, 3];
+	join_all(numbers[0..3]);
+	return 0;
+}

@@ -1,0 +1,1 @@
+threads_join_of_a_number.anti:6:14: error: `join` waits for a job of `dispatch`, and this is `int`

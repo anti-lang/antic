@@ -1,0 +1,20 @@
+//! A guarded field is reached inside a `sync` on the lock of the object it is
+//! reached through. The lock of another object of the class does not hold it.
+
+concurrent class Tally
+{
+	lock: Mutex,
+	size: int = 0 guarded by lock,
+
+	pub fn take(self, other: *Tally) -> int
+	{
+		sync self.lock {
+			return other.size;
+		}
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

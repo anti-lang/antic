@@ -1,0 +1,1 @@
+threads_sync_inside_sync_in_a_loop.anti:9:4: error: `sync m` inside `sync m` deadlocks

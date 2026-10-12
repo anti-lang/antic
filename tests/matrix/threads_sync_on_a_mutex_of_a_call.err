@@ -1,0 +1,1 @@
+threads_sync_on_a_mutex_of_a_call.anti:11:7: error: `sync` takes a `Mutex` that lives in a place, or a pointer to one

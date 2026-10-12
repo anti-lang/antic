@@ -1,0 +1,11 @@
+//! `worker` marks a function, and no other item takes it.
+
+worker struct Task
+{
+	n: int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

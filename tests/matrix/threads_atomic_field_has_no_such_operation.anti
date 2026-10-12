@@ -1,0 +1,13 @@
+//! An atomic field takes the eight atomic operations and no other call.
+
+class Counter
+{
+	pub atomic hits: int = 0,
+}
+
+fn main() -> int
+{
+	let c = Counter { };
+	c.hits.xor(1);
+	return c.hits.load();
+}

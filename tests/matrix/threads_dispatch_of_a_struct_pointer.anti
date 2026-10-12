@@ -1,0 +1,19 @@
+//! The object of a `dispatch` is a pointer to a class. A pointer to a struct is
+//! refused.
+
+struct Point
+{
+	x: int,
+}
+
+worker fn read(p: *Point) -> int
+{
+	return p.x;
+}
+
+fn main() -> int
+{
+	let p = Point { x: 1 };
+	let job = dispatch &p -> read;
+	return join(job);
+}

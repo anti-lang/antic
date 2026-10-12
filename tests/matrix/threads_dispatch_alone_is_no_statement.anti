@@ -1,0 +1,20 @@
+//! A `dispatch` gives a job, which a `let` or an assignment takes. A statement
+//! that is a `dispatch` alone is refused.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn bump(t: *Task)
+{
+	t.n += 1;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	dispatch t -> bump;
+	delete(t);
+	return 0;
+}

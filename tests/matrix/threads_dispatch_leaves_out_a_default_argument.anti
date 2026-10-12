@@ -1,0 +1,21 @@
+//! The arguments of a `dispatch` are written out. A parameter of the worker
+//! with a default value still takes its argument there.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn add(t: *Task, k: int = 5) -> int
+{
+	return t.n + k;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let job = dispatch t -> add;
+	let got = join(job);
+	delete(t);
+	return got;
+}

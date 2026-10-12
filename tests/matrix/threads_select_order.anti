@@ -1,0 +1,79 @@
+//! Which arm a `select` takes. It takes an arm whose channel holds a value or
+//! is closed, and among the arms that are ready it starts one arm further for
+//! each `select` of its thread. The program selects over two channels that both
+//! hold values, over one channel named by two arms, and over a closed channel
+//! beside an empty one.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn value(x: ?*int) -> int
+{
+	if let v = x {
+		return *v;
+	}
+	return -1;
+}
+
+fn main() -> int
+{
+	let a = chan int(4);
+	let b = chan int(4);
+	for i in 0..4 {
+		send(a, 10 + i);
+		send(b, 20 + i);
+	}
+	let from_a = 0;
+	let from_b = 0;
+	let sum = 0;
+	for turn in 0..8 {
+		select {
+			a x => {
+				from_a += 1;
+				sum += value(x);
+			},
+			b y => {
+				from_b += 1;
+				sum += value(y);
+			},
+		}
+	}
+	printf("two channels: %d from a, %d from b, sum %d\n".ptr, from_a as c_int, from_b as c_int, sum as c_int);
+	send(a, 1);
+	send(a, 2);
+	let low = 0;
+	let high = 0;
+	for turn in 0..2 {
+		select {
+			a x => low += value(x),
+			a y => high += value(y) * 10,
+		}
+	}
+	printf("one channel in two arms: %d\n".ptr, (low + high) as c_int);
+	close(b);
+	let closed = 0;
+	for turn in 0..3 {
+		select {
+			a x => closed += 100,
+			b y => {
+				if y == none {
+					closed += 1;
+				}
+			},
+		}
+	}
+	printf("closed beside empty: %d\n".ptr, closed as c_int);
+	send(a, 7);
+	close(a);
+	let last = 0;
+	select {
+		a x => last = value(x),
+	}
+	let after = 0;
+	select {
+		a x => after = value(x),
+	}
+	printf("closed with a value: %d, then %d\n".ptr, last as c_int, after as c_int);
+	delete(a);
+	delete(b);
+	return 0;
+}

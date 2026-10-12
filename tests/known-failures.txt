@@ -194,3 +194,43 @@ matrix_errors_unhandled_construct_refused T051 An unhandled `alloc T(args)` gets
 matrix_errors_derived_construct_fails_after_its_base_dev T052 A derived `construct` that fails leaves what its base took.
 matrix_errors_derived_construct_fails_after_its_base_release T052 A derived `construct` that fails leaves what its base took.
 matrix_errors_derived_construct_fails_after_its_base_memory_checks T052 A derived `construct` that fails leaves what its base took.
+matrix_threads_join_after_join_all_refused T053 A second `join` of one job compiles.
+matrix_threads_join_twice_refused T053 A second `join` of one job compiles.
+check_join_twice T054 A second `join` that the checker cannot see hangs in a dev build.
+matrix_threads_dispatch_in_a_loop_dev T055 Every job of a `dispatch` in a loop reads the arguments of the last turn.
+matrix_threads_dispatch_in_a_loop_memory_checks T055 Every job of a `dispatch` in a loop reads the arguments of the last turn.
+matrix_threads_dispatch_in_a_loop_release T055 Every job of a `dispatch` in a loop reads the arguments of the last turn.
+matrix_threads_return_before_the_join_dev T055 A job reads its arguments from a frame that returned.
+matrix_threads_return_before_the_join_memory_checks T055 A job reads its arguments from a frame that returned.
+matrix_threads_return_before_the_join_release T055 A job reads its arguments from a frame that returned.
+matrix_threads_const_of_a_struct_with_a_mutex_dev T056 antic crashes on a read of a constant of a struct that holds a Mutex.
+matrix_threads_const_of_a_struct_with_a_mutex_memory_checks T056 antic crashes on a read of a constant of a struct that holds a Mutex.
+matrix_threads_const_of_a_struct_with_a_mutex_release T056 antic crashes on a read of a constant of a struct that holds a Mutex.
+matrix_threads_static_default_is_a_call_refused T057 The default of a static field that no code reads is not checked.
+matrix_threads_channel_in_a_generic_struct_of_a_pointer_refused T058 A channel of a type parameter takes a pointer.
+matrix_threads_channel_of_a_type_parameter_that_is_a_pointer_refused T058 A channel of a type parameter takes a pointer.
+matrix_threads_atomic_field_of_a_str_refused T059 An atomic field of a `str` is not refused.
+matrix_threads_atomic_field_of_a_struct_refused T059 An atomic field of a struct is not refused.
+matrix_threads_atomic_field_of_a_type_parameter_that_is_f64_refused T059 An atomic field of a type parameter that is an `f64` is not refused.
+matrix_threads_atomic_field_of_an_enum_refused T059 An atomic field of an enum is not refused.
+matrix_threads_atomic_field_of_an_optional_refused T059 An atomic field of a `?int` is not refused.
+matrix_threads_atomic_field_of_f32_refused T059 An atomic field of an `f32` is not refused.
+matrix_threads_atomic_field_of_f64_refused T059 An atomic field of an `f64` is not refused.
+matrix_threads_static_atomic_of_f64_refused T059 A `static atomic` field of an `f64` compiles.
+matrix_threads_atomic_add_on_a_bool_refused T060 The atomic `add` on a `bool` compiles.
+matrix_threads_atomic_add_on_a_nullable_pointer_refused T060 The atomic `add` on a nullable pointer compiles.
+matrix_threads_atomic_add_on_a_pointer_refused T060 The atomic `add` on a pointer compiles.
+matrix_threads_atomic_and_on_a_nullable_pointer_refused T060 The atomic `and` on a nullable pointer compiles.
+matrix_threads_atomic_and_on_a_pointer_refused T060 The atomic `and` on a pointer compiles.
+matrix_threads_atomic_or_on_a_nullable_pointer_refused T060 The atomic `or` on a nullable pointer compiles.
+matrix_threads_atomic_or_on_a_pointer_refused T060 The atomic `or` on a pointer compiles.
+matrix_threads_atomic_sub_on_a_bool_refused T060 The atomic `sub` on a `bool` compiles.
+matrix_threads_atomic_sub_on_a_nullable_pointer_refused T060 The atomic `sub` on a nullable pointer compiles.
+matrix_threads_atomic_sub_on_a_pointer_refused T060 The atomic `sub` on a pointer compiles.
+generic_dispatch_modules_dev T061 The library file of a generic function that holds a `dispatch` cannot be read.
+generic_dispatch_modules_release T061 The library file of a generic function that holds a `dispatch` cannot be read.
+matrix_threads_pointer_into_fields_in_a_struct_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
+matrix_threads_pointer_into_fields_in_a_tuple_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
+matrix_threads_pointer_into_fields_of_a_concurrent_class_in_a_tuple_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
+matrix_threads_pointer_into_fields_through_a_private_function_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
+lock_order_once T063 A pair of locks in opposite orders is reported once per order.

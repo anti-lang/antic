@@ -1,0 +1,35 @@
+//! A generic function of a library module that holds `dispatch`, `join` and
+//! `join_all`. The client compiles its copy from the library file.
+
+import anti.lang;
+
+pub class Task
+{
+	pub n: int = 0,
+}
+
+pub worker fn add(t: *Task, k: int) -> int
+{
+	return t.n + k;
+}
+
+pub worker fn keep(t: *Task, k: int) -> int
+{
+	t.n = k;
+	return 0;
+}
+
+/// Holds `dispatch`, `join` and `join_all` in a generic function.
+pub fn generic_dispatch<T>(k: int, extra: T) -> int
+{
+	let acc = size_of(T) as int * 1000;
+	let a = alloc Task { n: 100 };
+	let b = alloc Task { };
+	let one = dispatch a -> add(k);
+	let jobs = [dispatch b -> keep(k + 1)];
+	join_all(jobs[0..1]);
+	acc += join(one) + b.n;
+	delete(a);
+	delete(b);
+	return acc;
+}

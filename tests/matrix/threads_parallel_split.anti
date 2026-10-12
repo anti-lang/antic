@@ -1,0 +1,71 @@
+//! How `parallel` splits a slice. A count of chunks above the count of elements
+//! becomes the count of elements, the first chunks take the one element more
+//! that an uneven split leaves, an empty slice gives no chunk, and the results
+//! stand in the order of the chunks. The arguments after the worker reach every
+//! chunk. `by 0` and a count below zero give the count of the machine, so the
+//! program prints the sum of their chunks alone.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+worker fn count(chunk: []int) -> int
+{
+	return chunk.len;
+}
+
+worker fn first(chunk: []int, scale: int, plus: int) -> int
+{
+	return chunk[0] * scale + plus;
+}
+
+worker fn double(chunk: []int) -> int
+{
+	for i in 0..chunk.len {
+		chunk[i] = chunk[i] * 2;
+	}
+	return chunk.len;
+}
+
+fn total(parts: []int) -> int
+{
+	let n = 0;
+	for part in parts {
+		n += part;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let items = [1, 2, 3, 4, 5, 6, 7];
+	let zero = 0;
+	let below = -3;
+	let by_zero = parallel items[0..7] by zero -> count;
+	printf("by 0: %d elements\n".ptr, total(by_zero) as c_int);
+	free(by_zero.ptr);
+	let by_below = parallel items[0..7] by below -> count;
+	printf("by -3: %d elements\n".ptr, total(by_below) as c_int);
+	free(by_below.ptr);
+	let plain = parallel items[0..7] -> count;
+	printf("no by: %d elements\n".ptr, total(plain) as c_int);
+	free(plain.ptr);
+	let above = parallel items[0..7] by 20 -> count;
+	printf("by 20: %d chunks, %d elements\n".ptr, above.len as c_int, total(above) as c_int);
+	free(above.ptr);
+	let uneven = parallel items[0..7] by 3 -> count;
+	printf("by 3: %d %d %d\n".ptr, uneven[0] as c_int, uneven[1] as c_int, uneven[2] as c_int);
+	free(uneven.ptr);
+	let ordered = parallel items[0..7] by 3 -> first(100, 5);
+	printf("first of each: %d %d %d\n".ptr, ordered[0] as c_int, ordered[1] as c_int, ordered[2] as c_int);
+	free(ordered.ptr);
+	let empty = parallel items[0..0] by 3 -> count;
+	printf("empty: %d chunks\n".ptr, empty.len as c_int);
+	free(empty.ptr);
+	let one = parallel items[2..3] by 4 -> first(1, 0);
+	printf("one element: %d chunks, %d\n".ptr, one.len as c_int, one[0] as c_int);
+	free(one.ptr);
+	let written = parallel items[0..7] by 7 -> double;
+	printf("doubled: %d %d %d, %d chunks\n".ptr, items[0] as c_int, items[3] as c_int, items[6] as c_int,
+		written.len as c_int);
+	free(written.ptr);
+	return 0;
+}

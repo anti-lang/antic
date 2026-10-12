@@ -1,0 +1,11 @@
+//! The atomic `add` is arithmetic, which a nullable pointer has none of.
+//! `load`, `store`, `swap` and `compare_swap` are the operations of such an
+//! atomic.
+
+fn main() -> int
+{
+	let n = 5;
+	let held: atomic ?*int = &n;
+	let before = held.add(&n);
+	return 0;
+}

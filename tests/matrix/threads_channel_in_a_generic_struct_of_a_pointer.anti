@@ -1,0 +1,18 @@
+//! A channel carries values under the rule of `parallel`. A field that is a
+//! channel of a type parameter is checked in each copy of its struct, so the
+//! copy for a pointer is refused.
+
+struct Pipe<T>
+{
+	c: chan T,
+	sent: int,
+}
+
+fn main() -> int
+{
+	let p: ?Pipe<*int> = none;
+	if p == none {
+		return 0;
+	}
+	return 1;
+}

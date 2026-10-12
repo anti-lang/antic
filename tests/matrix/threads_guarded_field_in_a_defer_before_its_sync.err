@@ -1,0 +1,1 @@
+threads_guarded_field_in_a_defer_before_its_sync.anti:12:9: error: `size` is guarded by `lock`, and no `sync` holds it here [unguarded-field]

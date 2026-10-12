@@ -1,0 +1,34 @@
+//! A second `join` of one job that the checker cannot see traps in a dev build,
+//! by decision 23 of "Decisions of 2026-10-11". The index of the job is a value
+//! of the run, so both joins name the first job.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn add(t: *Task, k: int) -> int
+{
+	return t.n + k;
+}
+
+fn first_of(count: int) -> int
+{
+	return count - count;
+}
+
+fn main() -> int
+{
+	let a = alloc Task { n: 1 };
+	let b = alloc Task { n: 2 };
+	let jobs = [dispatch a -> add(10), dispatch b -> add(20)];
+	let total = join(jobs[first_of(2)]);
+	total += join(jobs[first_of(1)]);
+	printf("%d\n".ptr, total as c_int);
+	total += join(jobs[1]);
+	delete(a);
+	delete(b);
+	return 7;
+}

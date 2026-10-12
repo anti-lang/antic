@@ -1,0 +1,1 @@
+threads_guarded_field_of_another_object.anti:12:11: error: `size` is guarded by `lock`, and no `sync` holds it here [unguarded-field]

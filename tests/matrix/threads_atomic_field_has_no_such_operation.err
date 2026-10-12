@@ -1,0 +1,1 @@
+threads_atomic_field_has_no_such_operation.anti:11:2: error: an atomic field has no `xor`

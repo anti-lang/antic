@@ -1,0 +1,23 @@
+//! A second `join` of one job is refused where the checker sees it, by decision
+//! 23 of "Decisions of 2026-10-11". `join` ends the job, so the second one
+//! would wait for a job that is gone.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn add(t: *Task, k: int) -> int
+{
+	return t.n + k;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { n: 1 };
+	let job = dispatch t -> add(2);
+	let first = join(job);
+	let second = join(job);
+	delete(t);
+	return first + second;
+}

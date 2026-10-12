@@ -1,0 +1,30 @@
+//! A `send` that waits on a full channel stops the program when the channel is
+//! closed, as one that starts after the `close` does. The worker fills the
+//! channel of one and sends again, and `main` closes the channel. On a machine
+//! whose pool has no thread the worker runs in the `join` and meets the closed
+//! channel there.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn fill(t: *Task, out: chan int) -> int
+{
+	send(out, 1);
+	send(out, 2);
+	send(out, 3);
+	return 0;
+}
+
+fn main() -> int
+{
+	let c = chan int(1);
+	let t = alloc Task { };
+	let job = dispatch t -> fill(c);
+	close(c);
+	join(job);
+	delete(c);
+	delete(t);
+	return 0;
+}

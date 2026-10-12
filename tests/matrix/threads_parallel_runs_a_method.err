@@ -1,0 +1,1 @@
+threads_parallel_runs_a_method.anti:18:38: error: `parallel` runs a worker named here

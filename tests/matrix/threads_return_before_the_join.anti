@@ -1,0 +1,35 @@
+//! An anonymous function dispatches a job and returns before the job is joined.
+//! The arguments of a `dispatch` are stored per job, by decision 23 of
+//! "Decisions of 2026-10-11", so the job reads them after the frame that wrote
+//! them is gone and after a second call used that frame again. The program runs
+//! with --anti.threads=1, so each job starts when it is joined.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn add(t: *Task, k: int) -> int
+{
+	return t.n + k;
+}
+
+fn main() -> int
+{
+	let tasks = [alloc Task { n: 100 }, alloc Task { n: 200 }];
+	let jobs = [dispatch tasks[0] -> add(0), dispatch tasks[1] -> add(0)];
+	join_all(jobs[0..2]);
+	let launch = fn(i: int, k: int) {
+		jobs[i] = dispatch tasks[i] -> add(k);
+	};
+	launch(0, 7);
+	launch(1, 8);
+	let first = join(jobs[0]);
+	let second = join(jobs[1]);
+	printf("%d %d\n".ptr, first as c_int, second as c_int);
+	delete(tasks[0]);
+	delete(tasks[1]);
+	return 0;
+}

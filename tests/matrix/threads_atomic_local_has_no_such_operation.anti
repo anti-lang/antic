@@ -1,0 +1,8 @@
+//! An atomic local takes the eight atomic operations and no other call.
+
+fn main() -> int
+{
+	let n: atomic int = 0;
+	n.increment();
+	return n.load();
+}

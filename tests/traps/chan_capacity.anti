@@ -1,0 +1,10 @@
+//! A channel holds one value or more. A capacity below 1 that the run computes
+//! stops the program with a message.
+
+fn main() -> int
+{
+	let room = 3;
+	let c = chan int(room - 3);
+	delete(c);
+	return 0;
+}

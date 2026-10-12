@@ -1,0 +1,1 @@
+threads_dispatch_of_a_class_value.anti:17:21: error: `dispatch` submits a class pointer, and this is `Task`

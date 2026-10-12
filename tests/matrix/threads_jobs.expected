@@ -1,0 +1,7 @@
+exit 0
+join_all: 1 2 3
+no result: 6
+in a tuple: 28
+in an anonymous function: 32
+in flight: 1000
+one after the other: 63

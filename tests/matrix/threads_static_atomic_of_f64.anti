@@ -1,0 +1,14 @@
+//! `atomic` applies to an integer, a `bool`, a `char` and a pointer, and to an
+//! `f16` field. A `static atomic` field of `f64`, by decision 27 of "Decisions
+//! of 2026-10-11", is refused.
+
+class Gauge
+{
+	static atomic level: f64 = 0.0;
+}
+
+fn main() -> int
+{
+	let seen = Gauge.level.load();
+	return 0;
+}

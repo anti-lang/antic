@@ -1,0 +1,14 @@
+//! A `sync` on the Mutex that an enclosing `sync` of the function holds is
+//! refused, in a loop inside the outer block as well.
+
+fn main() -> int
+{
+	let m = Mutex.new();
+	sync m {
+		for i in 0..2 {
+			sync m {
+			}
+		}
+	}
+	return 0;
+}

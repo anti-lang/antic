@@ -1,0 +1,13 @@
+//! A `send` on a closed channel stops the program with a message, since the
+//! value would never be received.
+
+fn main() -> int
+{
+	let c = chan int(2);
+	send(c, 1);
+	close(c);
+	close(c);
+	send(c, 2);
+	delete(c);
+	return 0;
+}

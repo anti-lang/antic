@@ -1,0 +1,1 @@
+threads_static_field_without_atomic.anti:6:14: error: `total` is `static` and must be `atomic`

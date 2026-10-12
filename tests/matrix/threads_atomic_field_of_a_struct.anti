@@ -1,0 +1,20 @@
+//! `atomic` applies to an integer, a `bool`, a `char` and a pointer, and to an
+//! `f16` field. An atomic field of a struct is refused.
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+class Gauge
+{
+	pub atomic level: Point = Point { x: 0, y: 0 },
+}
+
+fn main() -> int
+{
+	let g = Gauge { };
+	let seen = g.level.load();
+	return 0;
+}

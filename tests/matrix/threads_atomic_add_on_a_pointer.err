@@ -1,0 +1,1 @@
+threads_atomic_add_on_a_pointer.anti:8:15: error: `add` takes an atomic integer, and `held` holds `*int`

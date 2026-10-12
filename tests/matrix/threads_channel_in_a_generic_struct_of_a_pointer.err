@@ -1,0 +1,1 @@
+threads_channel_in_a_generic_struct_of_a_pointer.anti:7:10: error: a channel carries values alone, and `*int` holds a pointer

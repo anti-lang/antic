@@ -1,0 +1,16 @@
+//! An arm of a `select` is a call, an assignment or a block, as an arm of a
+//! `switch` is. A name alone is refused.
+
+fn first(c: chan int) -> int
+{
+	let seen = 0;
+	select {
+		c x => seen,
+	}
+	return seen;
+}
+
+fn main() -> int
+{
+	return 0;
+}

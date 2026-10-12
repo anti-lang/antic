@@ -1,0 +1,15 @@
+//! `atomic` applies to an integer, a `bool`, a `char` and a pointer. An atomic
+//! field of a type parameter is checked in each copy of its class, so the copy
+//! for `f64` is refused.
+
+class Cell<T>
+{
+	pub atomic v: T,
+}
+
+fn main() -> int
+{
+	let c = Cell<f64> { v: 4.5 };
+	c.v.store(1.5);
+	return 0;
+}

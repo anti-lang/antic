@@ -1,0 +1,1 @@
+threads_compare_swap_of_an_unchecked_field_with_one_argument.anti:10:10: error: `compare_swap` takes 2 arguments

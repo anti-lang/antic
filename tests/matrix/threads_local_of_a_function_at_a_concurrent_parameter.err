@@ -1,0 +1,1 @@
+threads_local_of_a_function_at_a_concurrent_parameter.anti:17:31: error: `second` holds a function that is not marked `concurrent`

@@ -1,0 +1,55 @@
+//! An atomic local that an anonymous function captures. A closure changes the
+//! local itself, at a `concurrent` parameter as well, since an atomic is
+//! thread-safe. A `snapshot fn` copies it, so its operations change the copy
+//! and the local keeps its value. The chunks of a `parallel` add to one atomic
+//! local and to one static atomic field.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counter
+{
+	static atomic total: int = 0;
+}
+
+fn run(f: fn() -> int) -> int
+{
+	return f();
+}
+
+worker fn each(chunk: []int, concurrent f: fn(int)) -> int
+{
+	for v in chunk {
+		f(v);
+		Counter.total.add(v);
+	}
+	return chunk.len;
+}
+
+fn main() -> int
+{
+	let hits: atomic int = 3;
+	let bump = fn() -> int {
+		return hits.add(1);
+	};
+	let first = run(bump);
+	let second = run(bump);
+	printf("closure: %d %d, local %d\n".ptr, first as c_int, second as c_int, hits.load() as c_int);
+
+	let copied = snapshot fn() -> int {
+		return hits.add(10);
+	};
+	let third = run(copied);
+	let fourth = run(copied);
+	printf("snapshot: %d %d, local %d\n".ptr, third as c_int, fourth as c_int, hits.load() as c_int);
+
+	let items = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+	let sum: atomic int = 0;
+	let seen: atomic bool = false;
+	let parts = parallel items[0..10] by 5 -> each(fn(v) {
+		sum.add(v);
+		seen.store(true);
+	});
+	free(parts.ptr);
+	printf("parallel: %d %d %d\n".ptr, sum.load() as c_int, seen.load() as c_int, Counter.total.load() as c_int);
+	return 0;
+}

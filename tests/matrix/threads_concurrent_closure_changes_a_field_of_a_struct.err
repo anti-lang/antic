@@ -1,0 +1,1 @@
+threads_concurrent_closure_changes_a_field_of_a_struct.anti:26:3: error: `p` is changed in a closure at a `concurrent` parameter, and `Point` is not thread-safe, so a `snapshot fn` reads a copy of it instead

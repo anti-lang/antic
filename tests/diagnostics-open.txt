@@ -21,7 +21,6 @@ a module has at most one `%s` block
 
 # src/antic/parser_decl.c
 `internal` marks a module item, and a class member is `pub`, `protected` or neither
-`%.*s` is `static` and must be `atomic`
 a `::` qualifier belongs to a `concrete fn`
 a class has one `compatible` line
 `compatible` names a version, as `compatible 1.1;`
@@ -32,12 +31,9 @@ an element of a tuple is a decimal number
 # src/antic/parser_item.c
 `protected` marks a class member, and a module item is `pub`, `internal` or neither
 `trace` marks a class or a function of one
-`worker` stands before `fn`
 
 # src/antic/parser_stmt.c
 the message of an `assert` is a string literal
-an arm of a `select` is a call, an assignment or a block
-expected a call or an assignment
 
 # src/antic/sema.c
 `%.*s.%.*s` is not generic
@@ -83,7 +79,6 @@ antic compiles no copy here yet, %s
 # src/antic/sema_expr.c
 `%s` converts to `%s` through `%.*s` and through `%.*s`, name one
 a function that is not kept cannot be stored
-`%.*s` holds a function that is not marked `concurrent`
 the function is not marked `concurrent`
 the call returns no value
 `operator fn iter` gives `%s`, which has no `operator fn next` and `operator fn value`
@@ -105,7 +100,6 @@ a copy of `%s` nests deeper than %d levels
 `%.*s` names no group of a match
 
 # src/antic/sema_safety.c
-`%.*s` is atomic and needs no lock
 
 # src/antic/sema_simd.c
 `%s` is not defined on the lanes of `%s`
@@ -114,16 +108,6 @@ a copy of `%s` nests deeper than %d levels
 `%.*s` of singleton `%s` is read-only after creation, and `mutable` marks a field the program writes
 a `switch` on a `str` compares with `anti.text.equal`, which this `anti.text` lacks
 `setup` and `teardown` belong to `fixtures`, which runs them around every test
-
-# src/antic/sema_thread.c
-`compare_swap` takes 2 arguments
-an atomic %s has no `%.*s`
-`Mutex` has no function `%.*s`
-`%s` runs a worker named here
-`dispatch` submits a class pointer, and this is `%s`
-`%.*s` takes `%s` as its object, and this is `%s`
-`join_all` waits for a slice of jobs, and this is `%s`
-`%s` waits for a job of `dispatch`, and this is `%s`
 
 # src/antic/sema_value.c
 `%.*s` was moved

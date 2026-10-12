@@ -1,0 +1,1 @@
+threads_dispatch_of_a_struct_pointer.anti:17:21: error: `dispatch` submits a class pointer, and this is `*Point`

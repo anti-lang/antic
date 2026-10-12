@@ -1,0 +1,1 @@
+threads_atomic_field_guarded_by_a_lock.anti:7:23: error: `hits` is atomic and needs no lock

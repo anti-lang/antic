@@ -1,0 +1,1 @@
+threads_pointer_into_fields_in_a_struct.anti:15:10: error: `view` of the thread-safe class `Box` gives out a pointer into its fields, return a copy

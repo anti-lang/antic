@@ -1,0 +1,22 @@
+//! A guarded field is reached inside a `sync` on its lock, of the same function
+//! or of the same closure. A `defer` written before the block runs after it,
+//! and is refused.
+
+concurrent class Tally
+{
+	lock: Mutex,
+	size: int = 0 guarded by lock,
+
+	pub fn bump(self) -> int
+	{
+		defer self.size += 1;
+		sync self.lock {
+			return self.size;
+		}
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

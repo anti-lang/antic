@@ -1,0 +1,1 @@
+threads_join_of_an_array_of_jobs.anti:17:17: error: `join` waits for a job of `dispatch`, and this is `[1]Job`

@@ -1,0 +1,20 @@
+//! `join` takes one job, and an array of jobs is refused.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn read(t: *Task) -> int
+{
+	return t.n;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let jobs = [dispatch t -> read];
+	let got = join(jobs);
+	delete(t);
+	return got;
+}

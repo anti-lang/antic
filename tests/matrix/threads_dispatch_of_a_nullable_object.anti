@@ -1,0 +1,23 @@
+//! The object of a `dispatch` is a pointer that holds an object. One that may
+//! be `none` is refused until the program has tested it.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn add(t: *Task, k: int) -> int
+{
+	return t.n + k;
+}
+
+fn run(t: ?*Task) -> int
+{
+	let job = dispatch t -> add(1);
+	return join(job);
+}
+
+fn main() -> int
+{
+	return 0;
+}

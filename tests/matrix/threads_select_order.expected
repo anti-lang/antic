@@ -1,0 +1,5 @@
+exit 0
+two channels: 4 from a, 4 from b, sum 132
+one channel in two arms: 21
+closed beside empty: 3
+closed with a value: 7, then -1

@@ -1,0 +1,27 @@
+//! The object of a `dispatch` has the type of the first parameter of the
+//! worker. A pointer to a derived class is refused where the worker names the
+//! base.
+
+class Shape
+{
+	pub n: int = 0,
+}
+
+class Circle inherits Shape
+{
+	pub r: int = 0,
+}
+
+worker fn read(s: *Shape) -> int
+{
+	return s.n;
+}
+
+fn main() -> int
+{
+	let c = alloc Circle { };
+	let job = dispatch c -> read;
+	let got = join(job);
+	delete(c);
+	return got;
+}

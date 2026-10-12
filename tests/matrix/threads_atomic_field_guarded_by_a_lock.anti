@@ -1,0 +1,18 @@
+//! An atomic field is read and written by atomic operations alone, so `guarded
+//! by` on one is refused.
+
+concurrent class Counter
+{
+	lock: Mutex,
+	atomic hits: int = 0 guarded by lock,
+
+	pub fn seen(self) -> int
+	{
+		return self.hits.load();
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

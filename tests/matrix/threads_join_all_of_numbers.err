@@ -1,0 +1,1 @@
+threads_join_all_of_numbers.anti:6:11: error: `join_all` waits for a job of `dispatch`, and this is `[]int`
