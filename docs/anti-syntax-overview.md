@@ -1915,6 +1915,9 @@ class Stack
 ```anti
 fixtures
 {
+	fn setup() { }
+	fn teardown() { }
+
 	fn full_stack() -> *Stack
 	{
 		let s = Stack.new(4);
@@ -1927,14 +1930,15 @@ tests
 {
 	fn push_grows()
 	{
-		let s = Stack.new(4);
-		s.push(1);
-		assert(s.top == 1);
+		let s = full_stack();
+		defer delete(s);
+		s.push(2);
+		assert(s.top == 2);
 	}
 }
 ```
 
-`setup` and `teardown` in `fixtures` run before and after every test of the module. `anti test` compiles each module with `--tests`, writes a runner that calls its tests, links it and runs it. The dev run links an object of every module the one under test imports, so a module of the standard library carries a `tests` block too. It prints `ok <module>.<test>` for a test that returned, and a failed assertion prints `FAIL <module>.<test>` and then the file and the line. `anti test --release` runs the same tests with the checks and the assertions off.
+A function of `tests` is one test: it takes no parameters and returns nothing. `setup` and `teardown` in `fixtures` run before and after every test of the module. `anti test <file.anti>...` takes the modules to test, with `-I <dir>` for a search root and `--work <dir>` for what it writes. It compiles each module with `--tests`, writes a runner that calls its tests, links it and runs it. The dev run links an object of every module the one under test imports, so a module of the standard library carries a `tests` block too. It prints `ok <module>.<test>` for a test that returned, and a failed assertion prints `FAIL <module>.<test>` and then the file and the line. `anti test --release` runs the same tests with the checks and the assertions off.
 
 ## C interop
 
