@@ -103,6 +103,10 @@ not re-open a settled decision without asking Eddie.
   The step of the checker's messages measured `host` 439 s, and the same
   two parts up to test 3533: `asan` 463 s and 397 s, `ubsan` 429 s and
   254 s.
+  The step of the other messages measured `host` 435 s. It ran each
+  sanitizer suite as `ctest -I 1,1000`, `ctest -I 1001,2000` and
+  `ctest -I 2001,3654`: `asan` 251 s, 367 s and 215 s, `ubsan` 213 s,
+  347 s and 172 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -319,7 +323,15 @@ Where a test goes:
 - `tests/anti-build/`, `tests/anti-test/`, `tests/anti-symbols/`,
   `tests/check/`, `tests/fmt/`, `tests/doc/` and `tests/bind/`: the commands
   of `anti`.
+- `messages.cmake` in each of those seven directories: one case per message
+  of the command, `anti_<command>_message_<case>`. A case writes its files,
+  runs anti and holds the whole standard error. `tests/anti_messages.cmake`
+  holds the cases of `anti new`, `anti license` and `anti sdk`, which have
+  no directory. The name of a case registers its test, and the header of
+  `tests/run_anti_messages.cmake` states the form.
 - `tests/unit/`: the C unit tests, `unit_<file>` for `test_<file>.c`.
+  `unit_<file>_messages` compares the standard error of a group with
+  `tests/unit/<file>.err`, for `zip` and `syms`.
 - `tests/opt/`, `tests/emit-identity/`, `tests/link-identity/`, `tests/raw/`
   and `tests/framework/`: the IR around the optimizer, the pinned bytes of
   the output, the raw-bytes rule and a framework of Apple.
@@ -390,9 +402,11 @@ The two guards and the lists of the matrix:
   test on 2026-10-12. A line leaves its list in the commit that adds the
   test. A new message or option comes with its test and never with a line.
 - A message that stays in `tests/diagnostics-open.txt` for good has the
-  lines `# Stays: ...` before it, which give the reason. Either no program
-  reaches it, or antic gives it as the second message of one mistake
-  alone, and a finding holds that.
+  lines `# Stays: ...` before it, which give the reason. One reason is
+  that no program and no input a test can write reaches it. The other is
+  that antic gives it as the second message of one mistake alone, and a
+  finding holds that. Every line of the list has such a reason since
+  2026-10-12.
 - Each guard fails for a line whose message or option a test covers, and for
   a line that names nothing of the sources.
 - The diagnostics guard reads the functions its runner names. A new function
@@ -626,10 +640,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 3534 ctest tests pass on the development Mac, and two of them, the
+- 3655 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  323 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 3533 each with the same skips, without
+  324 of them are the expected failures of `tests/known-failures.txt`.
+  The ASan and the UBSan builds run 3654 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
