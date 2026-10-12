@@ -107,6 +107,10 @@ not re-open a settled decision without asking Eddie.
   sanitizer suite as `ctest -I 1,1000`, `ctest -I 1001,2000` and
   `ctest -I 2001,3654`: `asan` 251 s, 367 s and 215 s, `ubsan` 213 s,
   347 s and 172 s.
+  The step of the options measured `host` 437 s. It ran each sanitizer
+  suite as `ctest -I 1,1100`, `ctest -I 1101,2100` and
+  `ctest -I 2101,3793`: `asan` 250 s, 361 s and 221 s, `ubsan` 241 s,
+  346 s and 172 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -335,6 +339,13 @@ Where a test goes:
 - `tests/opt/`, `tests/emit-identity/`, `tests/link-identity/`, `tests/raw/`
   and `tests/framework/`: the IR around the optimizer, the pinned bytes of
   the output, the raw-bytes rule and a framework of Apple.
+- `tests/run_antic_options.cmake` and `tests/run_anti_options.cmake`: an
+  option beside the run without it, `antic_option_<case>` and
+  `anti_option_<case>`. A case runs the tool twice and names what differs,
+  so it fails for an option the tool takes and ignores. The header of
+  each runner lists its cases.
+- `tests/run_usage.cmake`: the usage, and a command line a tool refuses
+  with it, `antic_usage_<case>` and `anti_usage_<case>`.
 - `tests/bench/`: the benchmarks, outside the suite.
 
 The matrix, by decision 28 of "Decisions of 2026-10-11":
@@ -401,6 +412,7 @@ The two guards and the lists of the matrix:
 - `tests/diagnostics-open.txt` and `tests/options-open.txt` list what had no
   test on 2026-10-12. A line leaves its list in the commit that adds the
   test. A new message or option comes with its test and never with a line.
+  `tests/options-open.txt` holds no line since 2026-10-12.
 - A message that stays in `tests/diagnostics-open.txt` for good has the
   lines `# Stays: ...` before it, which give the reason. One reason is
   that no program and no input a test can write reaches it. The other is
@@ -640,10 +652,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 3655 ctest tests pass on the development Mac, and two of them, the
+- 3794 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  324 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 3654 each with the same skips, without
+  325 of them are the expected failures of `tests/known-failures.txt`.
+  The ASan and the UBSan builds run 3793 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
