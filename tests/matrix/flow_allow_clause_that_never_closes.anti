@@ -1,0 +1,7 @@
+//! The parentheses of an `allow` clause before a statement close.
+
+fn main() -> int
+{
+	allow(unused, "a reason"
+		return 0;
+}

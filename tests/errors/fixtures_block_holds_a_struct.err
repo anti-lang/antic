@@ -1,0 +1,1 @@
+fixtures_block_holds_a_struct.anti:5:2: error: `fixtures` holds functions and nothing else

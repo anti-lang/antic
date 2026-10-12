@@ -1,0 +1,8 @@
+//! A tuple of values after `let` is no list of names.
+
+fn main() -> int
+{
+	let n = 1;
+	let (5, a) = (1, 2);
+	return 0;
+}

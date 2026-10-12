@@ -1,0 +1,8 @@
+//! A `provides` line names an interface after the word.
+
+provides 5 as Local;
+
+fn main() -> int
+{
+	return 0;
+}

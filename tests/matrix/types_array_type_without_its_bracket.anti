@@ -1,0 +1,7 @@
+//! The length of an array type closes with `]`.
+
+fn main() -> int
+{
+	let a: [3 int = [1, 2, 3];
+		return 0;
+}

@@ -1,0 +1,10 @@
+//! A statement follows the `=>` of an arm.
+
+fn main() -> int
+{
+	let n = 1;
+	switch n {
+		1 =>;
+	}
+	return 0;
+}

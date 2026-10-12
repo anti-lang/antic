@@ -1,0 +1,98 @@
+//! Forms the parser reads in one place each: a note of the module, a `transient
+//! atomic` field, `trace` before `synchronized class`, the marks `keep` and
+//! `keep own` before a function type in a list of types, `else if let` after a
+//! plain `if`, a `<` before a parenthesis and before a bracket, a precision of
+//! two digits and a `compatible` line of three numbers. The program prints one
+//! line per form.
+//#! The forms stand in one program, since each needs no more than a line.
+
+import anti.lang;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counter
+{
+	pub n: int = 0,
+	pub transient atomic link: ?*int = none,
+}
+
+trace synchronized class Gauge
+{
+	pub n: int = 7,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+abstract class Shape
+{
+	compatible 1.1.2;
+
+	abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return 4;
+	}
+}
+
+fn call_kept(keep f: ?fn(int) -> int) -> int
+{
+	if let g = f {
+		return g(1);
+	}
+	return 0;
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn held(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n;
+}
+
+fn chain(n: int) -> int
+{
+	if n > 5 {
+		return 1;
+	} else if let v = held(n) {
+		return v + 10;
+	}
+	return -1;
+}
+
+fn main() -> int
+{
+	let a = 1;
+	let b = 2;
+	let c = 3;
+	let counter = Counter { };
+	let gauge = Gauge { };
+	let square = Square { };
+	let kept: fn(keep ?fn(int) -> int) -> int = call_kept;
+	let owned: ?fn(keep own fn(int) -> int) -> int = none;
+	let maybe: ?fn(keep own ?fn(int) -> int) -> int = none;
+	let third = 1.0 / 3.0;
+	let digits = f"{third:.12}";
+	printf("fields %d %d\n".ptr, counter.n as c_int, (counter.link.load() == none) as c_int);
+	printf("trace synchronized %d\n".ptr, gauge.get() as c_int);
+	printf("compatible %d\n".ptr, square.area() as c_int);
+	printf("marks %d %d %d\n".ptr, kept(twice) as c_int, (owned == none) as c_int, (maybe == none) as c_int);
+	printf("else if let %d %d %d\n".ptr, chain(9) as c_int, chain(2) as c_int, chain(0) as c_int);
+	printf("less %d %d\n".ptr, (a < (b + c)) as c_int, (a < [1, 2, 3].len as int) as c_int);
+	printf("precision %.*s\n".ptr, digits.len as c_int, digits.ptr);
+	free(digits.ptr);
+	return 0;
+}

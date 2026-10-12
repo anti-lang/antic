@@ -1,0 +1,1 @@
+flow_tuple_let_without_its_parenthesis.anti:6:12: error: expected `)`

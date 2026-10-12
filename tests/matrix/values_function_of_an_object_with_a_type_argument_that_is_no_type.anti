@@ -1,0 +1,7 @@
+//! A type argument of a call after `.` is a type.
+
+fn main() -> int
+{
+	let n = b.pick < (own int) > (1);
+	return 0;
+}

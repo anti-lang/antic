@@ -1,0 +1,7 @@
+//! A call follows the `->` of `parallel`.
+
+fn main() -> int
+{
+	parallel items ->;
+	return 0;
+}

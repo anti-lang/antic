@@ -1,0 +1,9 @@
+//! A name follows the case of an `if let`.
+
+fn main() -> int
+{
+	let n = 1;
+	if let Circle 5 = shape() {
+	}
+	return 0;
+}

@@ -1,0 +1,1 @@
+types_struct_without_its_closing_brace.anti:5:8: error: expected `}`

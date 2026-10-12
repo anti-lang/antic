@@ -1,0 +1,7 @@
+//! A function type has its parameters in parentheses.
+
+fn main() -> int
+{
+	let f: ?fn int = none;
+	return 0;
+}

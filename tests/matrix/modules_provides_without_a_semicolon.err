@@ -1,0 +1,1 @@
+modules_provides_without_a_semicolon.anti:18:2: error: expected `;`

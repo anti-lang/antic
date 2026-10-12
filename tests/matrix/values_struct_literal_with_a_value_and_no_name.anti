@@ -1,0 +1,13 @@
+//! A field of a struct literal has a name.
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+fn main() -> int
+{
+	let p = Pair { 5 };
+	return 0;
+}

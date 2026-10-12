@@ -1,0 +1,7 @@
+//! An element of a tuple is an expression.
+
+fn main() -> int
+{
+	let t = (1,,);
+	return 0;
+}

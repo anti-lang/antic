@@ -1,0 +1,7 @@
+//! The reason of an `unchecked` clause holds text.
+
+fn main() -> int
+{
+	unchecked(exponential-pattern, "") let n = 1;
+	return 0;
+}

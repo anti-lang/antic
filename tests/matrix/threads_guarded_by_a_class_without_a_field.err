@@ -1,0 +1,1 @@
+threads_guarded_by_a_class_without_a_field.anti:6:32: error: expected identifier

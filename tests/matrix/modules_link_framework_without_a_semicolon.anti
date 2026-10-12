@@ -1,0 +1,8 @@
+//! A `link framework` line ends with `;`.
+
+link framework "Cocoa"
+
+	fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,11 @@
+//! An expression follows the `=` of a parameter.
+
+fn scale(n: int =) -> int
+{
+	return n;
+}
+
+fn main() -> int
+{
+	return 0;
+}

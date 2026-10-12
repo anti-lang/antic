@@ -1,0 +1,11 @@
+//! A type argument of a constraint is a type.
+
+fn pick < T: Into <, >> (a: T) -> T
+{
+	return a;
+}
+
+fn main() -> int
+{
+	return 0;
+}

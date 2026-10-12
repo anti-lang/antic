@@ -1,0 +1,10 @@
+//! The cases of a variant close with `}`.
+
+variant Shape
+{
+	Empty;
+
+	fn main() -> int
+	{
+		return 0;
+	}

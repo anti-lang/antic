@@ -1,0 +1,7 @@
+//! A type argument of a qualified struct literal is a type.
+
+fn main() -> int
+{
+	let b = geo.Box < (own int) > { v: 1 };
+	return 0;
+}

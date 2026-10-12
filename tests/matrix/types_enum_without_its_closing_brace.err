@@ -1,0 +1,1 @@
+types_enum_without_its_closing_brace.anti:16:1: error: expected `}`

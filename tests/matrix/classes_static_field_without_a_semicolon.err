@@ -1,0 +1,1 @@
+classes_static_field_without_a_semicolon.anti:8:1: error: expected `;`

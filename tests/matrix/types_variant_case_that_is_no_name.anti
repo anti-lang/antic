@@ -1,0 +1,11 @@
+//! A case of a variant is a name.
+
+variant Shape
+{
+	5,
+}
+
+fn main() -> int
+{
+	return 0;
+}

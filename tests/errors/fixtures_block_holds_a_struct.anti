@@ -1,0 +1,14 @@
+//! A `fixtures` block holds functions and nothing else.
+
+fixtures
+{
+	struct Pair
+	{
+		a: int,
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

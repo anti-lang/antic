@@ -1,0 +1,8 @@
+//! An expression follows the `=` of a `let` that takes a tuple apart.
+
+fn main() -> int
+{
+	let n = 1;
+	let (a, b) =;
+	return 0;
+}

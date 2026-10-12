@@ -1,0 +1,13 @@
+//! A `fallthrough` ends with `;`.
+
+fn main() -> int
+{
+	let n = 1;
+	switch n {
+		1 => {
+			fallthrough 5;
+		},
+		else => { },
+	}
+	return 0;
+}

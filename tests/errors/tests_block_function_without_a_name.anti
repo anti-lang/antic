@@ -1,0 +1,13 @@
+//! A function of a `tests` block has a name.
+
+tests
+{
+	fn()
+	{
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

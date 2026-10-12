@@ -1,0 +1,1 @@
+classes_nested_class_after_four_words.anti:8:2: error: a type declared in a class is private to the class, and takes no `pub`, `export`, `internal` or `protected`

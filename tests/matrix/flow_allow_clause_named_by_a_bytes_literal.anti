@@ -1,0 +1,7 @@
+//! The name of an `allow` clause is a word, and a literal is none.
+
+fn main() -> int
+{
+	allow(b"x", "a reason") let n = 1;
+	return 0;
+}

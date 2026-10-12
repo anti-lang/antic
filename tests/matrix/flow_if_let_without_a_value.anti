@@ -1,0 +1,9 @@
+//! A `=` follows the name of an `if let`.
+
+fn main() -> int
+{
+	let n = 1;
+	if let v held() {
+	}
+	return 0;
+}

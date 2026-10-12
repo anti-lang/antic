@@ -1,0 +1,7 @@
+//! An `allow` clause closes after its reason.
+
+fn main() -> int
+{
+	allow(unused, "a reason" 5) let n = 1;
+	return 0;
+}

@@ -1,0 +1,14 @@
+//! An abstract function ends with `;` and has no body.
+
+abstract class Shape
+{
+	abstract fn area(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

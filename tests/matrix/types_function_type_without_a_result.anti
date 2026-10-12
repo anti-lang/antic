@@ -1,0 +1,7 @@
+//! A type follows the `->` of a function type.
+
+fn main() -> int
+{
+	let f: ?fn(int) -> = none;
+	return 0;
+}

@@ -1,0 +1,7 @@
+//! An `unchecked` clause takes a name and a reason.
+
+fn main() -> int
+{
+	unchecked(overflow) let n = 1;
+	return 0;
+}

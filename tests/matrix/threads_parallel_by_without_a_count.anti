@@ -1,0 +1,7 @@
+//! An expression follows the `by` of `parallel`.
+
+fn main() -> int
+{
+	parallel items by -> work(items);
+	return 0;
+}

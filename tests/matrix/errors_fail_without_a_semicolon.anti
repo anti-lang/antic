@@ -1,0 +1,8 @@
+//! A `fail` ends with `;`.
+
+fn main() -> int
+{
+	let n = 1;
+	fail "broken"
+		return 0;
+}

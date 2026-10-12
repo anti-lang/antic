@@ -1,0 +1,7 @@
+//! An expression follows the `,` of `alloc(T, n)`.
+
+fn main() -> int
+{
+	let p = alloc(int,);
+	return 0;
+}

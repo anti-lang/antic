@@ -1,0 +1,1 @@
+classes_inject_field_named_free_of_an_int.anti:7:2: error: `inject` needs a pointer to an abstract class, and `free` has type `int`

@@ -1,0 +1,10 @@
+//! A `catch` after a tuple that is no call guards no pointer.
+
+fn main() -> int
+{
+	let n = 1;
+	let (a, b) = (1, 2) catch {
+		return 1;
+	};
+	return 0;
+}

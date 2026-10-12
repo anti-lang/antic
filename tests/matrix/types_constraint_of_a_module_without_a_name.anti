@@ -1,0 +1,11 @@
+//! A name follows the `.` of a qualified constraint.
+
+fn pick<T: lang.5>(a: T) -> T
+{
+	return a;
+}
+
+fn main() -> int
+{
+	return 0;
+}

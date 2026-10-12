@@ -1,0 +1,12 @@
+//! A struct holds fields alone, and an interface belongs to a class.
+
+struct Pair
+{
+	a: int,
+	implements Shape;
+}
+
+fn main() -> int
+{
+	return 0;
+}

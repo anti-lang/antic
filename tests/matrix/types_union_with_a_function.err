@@ -1,0 +1,2 @@
+types_union_with_a_function.anti:8:2: error: a union holds fields alone, and a function belongs to a class
+types_union_with_a_function.anti:8:9: error: expected identifier

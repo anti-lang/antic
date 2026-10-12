@@ -1,0 +1,13 @@
+//! A field a provider fills may carry the name `free`, and its type is a
+//! pointer to an interface.
+
+class Counter
+{
+	pub n: int = 0,
+	inject free: int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,8 @@
+//! A block follows the header of a `for`.
+
+fn main() -> int
+{
+	let n = 1;
+	for i in 0..3 5
+		return 0;
+}

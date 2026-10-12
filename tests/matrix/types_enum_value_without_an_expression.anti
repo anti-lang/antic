@@ -1,0 +1,11 @@
+//! An expression follows the `=` of an enum value.
+
+enum Colour
+{
+	Red =,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,7 @@
+//! An expression stands in the brackets of an index.
+
+fn main() -> int
+{
+	let n = a[];
+	return 0;
+}

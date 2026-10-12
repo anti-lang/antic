@@ -1,0 +1,16 @@
+//! A function of an enum has a name.
+
+enum Colour
+{
+	Red,
+
+	fn(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

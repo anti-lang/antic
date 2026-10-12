@@ -1,0 +1,21 @@
+//! A `provides` line ends with `;`.
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return 1;
+	}
+}
+
+provides Shape as Square
+
+	fn main() -> int
+{
+	return 0;
+}

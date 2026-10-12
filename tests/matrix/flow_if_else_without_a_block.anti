@@ -1,0 +1,9 @@
+//! A block or an `if` follows `else`.
+
+fn main() -> int
+{
+	let n = 1;
+	if n == 1 {
+	} else 5
+		return 0;
+}

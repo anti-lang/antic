@@ -1,0 +1,17 @@
+//! A union holds fields alone, and a function belongs to a class.
+
+union Bits
+{
+	a: int,
+	b: f32,
+
+	fn get(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

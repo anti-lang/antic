@@ -1,0 +1,10 @@
+//! A name follows the `if let` after an `else`.
+
+fn main() -> int
+{
+	let n = 1;
+	if n == 1 {
+	} else if let 5 = held() {
+	}
+	return 0;
+}

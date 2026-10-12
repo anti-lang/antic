@@ -1,0 +1,13 @@
+//! A static field has a name.
+
+class Counter
+{
+	pub n: int = 0,
+
+	static atomic 5: int = 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

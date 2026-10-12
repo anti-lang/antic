@@ -1,0 +1,1 @@
+types_struct_with_use.anti:6:2: error: a struct holds fields alone, and a `use` field belongs to a class

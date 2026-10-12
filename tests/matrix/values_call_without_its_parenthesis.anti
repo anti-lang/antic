@@ -1,0 +1,12 @@
+//! The arguments of a call close with `)`.
+
+fn add(a: int, b: int) -> int
+{
+	return a + b;
+}
+
+fn main() -> int
+{
+	let n = add(1, 2;
+		return 0;
+}

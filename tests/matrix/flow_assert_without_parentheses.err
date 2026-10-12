@@ -1,0 +1,1 @@
+flow_assert_without_parentheses.anti:6:9: error: expected `(`

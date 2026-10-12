@@ -1,0 +1,1 @@
+flow_switch_without_a_brace.anti:6:11: error: expected `{`

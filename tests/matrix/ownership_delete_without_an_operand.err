@@ -1,0 +1,1 @@
+ownership_delete_without_an_operand.anti:5:9: error: expected an expression

@@ -1,0 +1,8 @@
+//! An expression as a statement ends with `;`.
+
+fn main() -> int
+{
+	let n = 1;
+	n 5;
+	return 0;
+}

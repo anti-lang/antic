@@ -1,0 +1,7 @@
+//! An expression follows `parallel`.
+
+fn main() -> int
+{
+	parallel;
+	return 0;
+}

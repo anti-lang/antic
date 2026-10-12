@@ -1,0 +1,7 @@
+//! A field of a slice literal has a name.
+
+fn main() -> int
+{
+	let s = []int { 5 };
+	return 0;
+}

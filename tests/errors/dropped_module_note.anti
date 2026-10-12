@@ -1,0 +1,8 @@
+//! A note of the module that stands after the first item documents nothing.
+
+fn main() -> int
+{
+	let n = 1;
+	//#! Stands in a function.
+	return n - 1;
+}

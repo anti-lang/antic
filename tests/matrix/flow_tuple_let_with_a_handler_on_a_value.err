@@ -1,0 +1,1 @@
+flow_tuple_let_with_a_handler_on_a_value.anti:6:22: error: `catch` here guards a `?*T`, found `(int, int)`

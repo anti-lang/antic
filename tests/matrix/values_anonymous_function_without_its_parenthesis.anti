@@ -1,0 +1,7 @@
+//! The parameters of an anonymous function close with `)`.
+
+fn main() -> int
+{
+	let f = fn(a: int;
+		return 0;
+}

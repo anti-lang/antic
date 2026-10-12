@@ -1,0 +1,11 @@
+//! A type parameter of a class is a name.
+
+class Box < 5 >
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	return 0;
+}

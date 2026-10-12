@@ -1,0 +1,1 @@
+flow_allow_clause_with_a_token_after_its_reason.anti:5:27: error: expected `)`

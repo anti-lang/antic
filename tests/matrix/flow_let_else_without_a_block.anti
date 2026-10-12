@@ -1,0 +1,8 @@
+//! A block follows the `else` of a `let`.
+
+fn main() -> int
+{
+	let n = 1;
+	let m = held() else 5;
+	return 0;
+}

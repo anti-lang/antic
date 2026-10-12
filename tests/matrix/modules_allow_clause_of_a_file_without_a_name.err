@@ -1,0 +1,1 @@
+modules_allow_clause_of_a_file_without_a_name.anti:3:7: error: `allow` takes a name and a reason, `allow(name, "reason")`

@@ -1,0 +1,7 @@
+//! An anonymous function has its parameters in parentheses.
+
+fn main() -> int
+{
+	let f = fn 5;
+	return 0;
+}

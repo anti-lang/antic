@@ -1,0 +1,10 @@
+//! An `allow` clause in the header of a function names a warning.
+
+fn idle() allow(5)
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

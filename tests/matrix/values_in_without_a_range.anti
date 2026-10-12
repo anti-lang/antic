@@ -1,0 +1,7 @@
+//! A range follows `in`.
+
+fn main() -> int
+{
+	let t = n in;
+	return 0;
+}

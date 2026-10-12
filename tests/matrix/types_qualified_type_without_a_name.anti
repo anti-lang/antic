@@ -1,0 +1,7 @@
+//! A name follows the `.` of a qualified type.
+
+fn main() -> int
+{
+	let a: lang.5 = none;
+	return 0;
+}

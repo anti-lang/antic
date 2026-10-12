@@ -1,0 +1,7 @@
+//! The `allow` clause at the top of a file names a warning.
+
+allow(;
+
+	fn main() -> int {
+	return 0;
+}

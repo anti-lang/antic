@@ -1,0 +1,8 @@
+//! The arms of a `select` stand in braces.
+
+fn main() -> int
+{
+	let n = 1;
+	select 5
+		return 0;
+}

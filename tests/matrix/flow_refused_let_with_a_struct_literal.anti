@@ -1,0 +1,13 @@
+//! A `let` whose type is refused gets one message, and the braces of the struct
+//! literal after it end no function.
+
+struct Pair
+{
+	a: int,
+}
+
+fn main() -> int
+{
+	let p: ?= Pair { a: 1 };
+	return 0;
+}

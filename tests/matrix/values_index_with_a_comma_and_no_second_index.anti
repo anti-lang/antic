@@ -1,0 +1,8 @@
+//! An expression follows the `,` of an index.
+
+fn main() -> int
+{
+	let n = 1;
+	let m = grid[1,];
+	return 0;
+}

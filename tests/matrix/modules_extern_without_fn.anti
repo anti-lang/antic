@@ -1,0 +1,8 @@
+//! An `extern` item is a function.
+
+extern puts(text: ?*byte) -> c_int;
+
+fn main() -> int
+{
+	return 0;
+}

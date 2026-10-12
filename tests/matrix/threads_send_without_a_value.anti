@@ -1,0 +1,7 @@
+//! An expression follows the `,` of `send(c, v)`.
+
+fn main() -> int
+{
+	send(c,);
+	return 0;
+}

@@ -1,0 +1,11 @@
+//! A type argument of a base is a type.
+
+class Square inherits Shape <, >
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	return 0;
+}

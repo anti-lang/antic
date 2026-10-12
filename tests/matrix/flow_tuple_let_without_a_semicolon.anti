@@ -1,0 +1,8 @@
+//! A `let` that takes a tuple apart ends with `;`.
+
+fn main() -> int
+{
+	let n = 1;
+	let (a, b) = (1, 2)
+		return 0;
+}

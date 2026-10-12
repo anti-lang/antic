@@ -1,0 +1,10 @@
+//! The fields of a struct close with `}`.
+
+struct Pair
+{
+	a: int;
+
+	fn main() -> int
+	{
+		return 0;
+	}

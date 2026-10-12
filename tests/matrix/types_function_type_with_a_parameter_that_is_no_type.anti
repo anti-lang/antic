@@ -1,0 +1,7 @@
+//! A parameter of a function type is a type.
+
+fn main() -> int
+{
+	let f: ?fn(+) = none;
+	return 0;
+}

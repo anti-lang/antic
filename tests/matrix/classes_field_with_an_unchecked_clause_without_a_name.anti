@@ -1,0 +1,11 @@
+//! An `unchecked` clause after the type of a field names a safety check.
+
+class Counter
+{
+	pub n: int unchecked(5),
+}
+
+fn main() -> int
+{
+	return 0;
+}

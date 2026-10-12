@@ -1,0 +1,11 @@
+//! A name follows the `.` of a qualified base.
+
+class Square inherits lang.5
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	return 0;
+}

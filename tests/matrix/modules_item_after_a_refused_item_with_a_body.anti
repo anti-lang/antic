@@ -1,0 +1,15 @@
+//! One refused item gives one message. The functions inside its braces start no
+//! item, and the function after it is checked again.
+
+class 5
+{
+	pub fn area(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

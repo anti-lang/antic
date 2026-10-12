@@ -1,0 +1,6 @@
+//! A `select` closes with `}` before the source ends.
+
+fn main() -> int
+{
+	let n = 1;
+	select {

@@ -1,0 +1,11 @@
+//! An expression stands in the parentheses of `align` of a struct.
+
+struct Wide align()
+{
+	a: int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

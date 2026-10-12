@@ -1,0 +1,7 @@
+//! An element of an array literal is an expression.
+
+fn main() -> int
+{
+	let a = [1,, 2];
+	return 0;
+}

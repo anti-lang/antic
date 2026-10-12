@@ -1,0 +1,7 @@
+//! A call follows the `->` of `dispatch`.
+
+fn main() -> int
+{
+	let j = dispatch w ->;
+	return 0;
+}

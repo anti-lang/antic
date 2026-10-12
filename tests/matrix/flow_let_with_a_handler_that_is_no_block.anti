@@ -1,0 +1,8 @@
+//! A block follows the `catch` of a `let`.
+
+fn main() -> int
+{
+	let n = 1;
+	let m = held() catch 5;
+	return 0;
+}

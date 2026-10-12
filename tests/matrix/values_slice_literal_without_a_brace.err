@@ -1,0 +1,1 @@
+values_slice_literal_without_a_brace.anti:5:16: error: expected `{`

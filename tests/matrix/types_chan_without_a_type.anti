@@ -1,0 +1,7 @@
+//! A type follows `chan`.
+
+fn main() -> int
+{
+	let c: chan = none;
+	return 0;
+}

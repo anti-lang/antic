@@ -1,0 +1,11 @@
+//! A type follows the `:` of an enum.
+
+enum Colour: +
+{
+	Red,
+}
+
+fn main() -> int
+{
+	return 0;
+}

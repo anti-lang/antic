@@ -1,0 +1,8 @@
+exit 0
+fields 0 1
+trace synchronized 7
+compatible 4
+marks 2 1 1
+else if let 1 12 -1
+less 1 1
+precision 0.333333333333

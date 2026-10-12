@@ -1,0 +1,10 @@
+//! An expression follows the `=` of an assignment in an arm.
+
+fn main() -> int
+{
+	let n = 1;
+	switch n {
+		1 => n =;
+	}
+	return 0;
+}

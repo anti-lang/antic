@@ -1,0 +1,12 @@
+//! A name follows the `.` of `guarded by`.
+
+concurrent class Counter
+{
+	lock: Mutex = Mutex.new(),
+	n: int = 0 guarded by Counter.5,
+}
+
+fn main() -> int
+{
+	return 0;
+}

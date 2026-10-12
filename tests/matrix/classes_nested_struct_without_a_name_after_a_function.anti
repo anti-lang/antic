@@ -1,0 +1,21 @@
+//! A struct nested in a class after its functions has a name.
+
+class Counter
+{
+	pub n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+
+	struct 5
+	{
+		a: int,
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

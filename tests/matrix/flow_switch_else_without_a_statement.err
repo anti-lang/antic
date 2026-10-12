@@ -1,0 +1,1 @@
+flow_switch_else_without_a_statement.anti:8:10: error: expected an expression

@@ -1,0 +1,15 @@
+//! The values and the functions of an enum close with `}`.
+
+fn main() -> int
+{
+	return 0;
+}
+
+enum Colour
+{
+	Red,
+
+	fn code(self) -> int
+	{
+		return 1;
+	}

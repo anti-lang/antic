@@ -1,0 +1,8 @@
+//! An assignment ends with `;` after its value.
+
+fn main() -> int
+{
+	let n = 1;
+	n = 2 5;
+	return 0;
+}

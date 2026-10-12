@@ -1,0 +1,8 @@
+//! A call as a statement ends with `;`.
+
+fn main() -> int
+{
+	let n = 1;
+	work()
+		return 0;
+}

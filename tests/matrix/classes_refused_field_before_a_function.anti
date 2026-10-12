@@ -1,0 +1,17 @@
+//! A refused field of a class gets one message, and the function after it stays
+//! a function of the class.
+
+class Counter
+{
+	pub n: int =,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

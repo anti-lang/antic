@@ -1,0 +1,7 @@
+//! A type follows `?`.
+
+fn main() -> int
+{
+	let a: ?= none;
+	return 0;
+}

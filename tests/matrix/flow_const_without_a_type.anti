@@ -1,0 +1,8 @@
+//! A `const` in a function names its type.
+
+fn main() -> int
+{
+	let n = 1;
+	const LIMIT = 8;
+	return 0;
+}

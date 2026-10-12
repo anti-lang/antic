@@ -1,0 +1,10 @@
+//! The word `tests` at module level opens a block.
+
+tests fn first()
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

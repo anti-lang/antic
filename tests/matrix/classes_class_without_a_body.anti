@@ -1,0 +1,8 @@
+//! A class has a body in braces.
+
+class Square;
+
+fn main() -> int
+{
+	return 0;
+}

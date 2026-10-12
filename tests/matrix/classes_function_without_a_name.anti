@@ -1,0 +1,16 @@
+//! A function of a class has a name.
+
+class Counter
+{
+	pub n: int = 0,
+
+	fn(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

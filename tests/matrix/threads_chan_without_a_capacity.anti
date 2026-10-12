@@ -1,0 +1,7 @@
+//! An expression stands in the parentheses of `chan T(n)`.
+
+fn main() -> int
+{
+	let c = chan int();
+	return 0;
+}

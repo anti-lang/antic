@@ -1,0 +1,8 @@
+//! A name stands in the parentheses of a `let` that takes a tuple apart.
+
+fn main() -> int
+{
+	let n = 1;
+	let (a, 5) = (1, 2);
+	return 0;
+}

@@ -1,0 +1,9 @@
+//! A condition follows the `while` of a `do`.
+
+fn main() -> int
+{
+	let n = 1;
+	do {
+	} while;
+	return 0;
+}

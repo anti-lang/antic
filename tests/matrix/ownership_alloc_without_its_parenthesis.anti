@@ -1,0 +1,7 @@
+//! The parentheses of `alloc(T, n)` close.
+
+fn main() -> int
+{
+	let p = alloc(int, 4;
+		return 0;
+}

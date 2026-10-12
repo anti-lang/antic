@@ -1,0 +1,16 @@
+//! An `allow` clause in the header of a function of a class names a warning.
+
+class Counter
+{
+	pub n: int = 0,
+
+	fn get(self) -> int allow(5)
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

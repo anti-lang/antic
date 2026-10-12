@@ -1,0 +1,17 @@
+//! A class nested in a class is private to it, and one with `pub` before three
+//! more words gets the message on `pub`.
+
+class Outer
+{
+	pub n: int = 0,
+
+	pub singleton final trace class Inner
+	{
+		pub m: int = 0,
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

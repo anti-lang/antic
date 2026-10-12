@@ -1,0 +1,11 @@
+//! An enum has a name.
+
+enum 5
+{
+	Red,
+}
+
+fn main() -> int
+{
+	return 0;
+}

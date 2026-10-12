@@ -1,0 +1,8 @@
+//! An expression or `;` follows `yield`.
+
+fn main() -> int
+{
+	let n = 1;
+	yield);
+	return 0;
+}

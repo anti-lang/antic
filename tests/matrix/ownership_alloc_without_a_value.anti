@@ -1,0 +1,7 @@
+//! A value or a type follows `alloc`.
+
+fn main() -> int
+{
+	let p = alloc;
+	return 0;
+}

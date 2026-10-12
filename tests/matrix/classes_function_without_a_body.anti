@@ -1,0 +1,13 @@
+//! A function of a class that is not abstract has a body.
+
+class Counter
+{
+	pub n: int = 0,
+
+	fn get(self) -> int;
+}
+
+fn main() -> int
+{
+	return 0;
+}

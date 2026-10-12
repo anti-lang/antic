@@ -1,0 +1,20 @@
+//! A class with a field that the provider of `anti.log.Logger` fills, in a
+//! program that calls no function of the logger.
+
+import anti.lang;
+import anti.log;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counter
+{
+	pub n: int = 3,
+	inject logger: *log.Logger,
+}
+
+fn main() -> int
+{
+	let counter = Counter { };
+	printf("counter %d\n".ptr, counter.n as c_int);
+	return 0;
+}

@@ -1,0 +1,1 @@
+errors_fail_without_a_semicolon.anti:7:3: error: expected `;`

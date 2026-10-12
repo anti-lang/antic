@@ -1,0 +1,9 @@
+//! A name stands in the parentheses of a `for` that takes a tuple apart.
+
+fn main() -> int
+{
+	let n = 1;
+	for (a, 5) in pairs() {
+	}
+	return 0;
+}

@@ -1,0 +1,7 @@
+//! The parentheses of `chan T(n)` close.
+
+fn main() -> int
+{
+	let c = chan int(4;
+		return 0;
+}

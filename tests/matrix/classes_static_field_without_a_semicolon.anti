@@ -1,0 +1,13 @@
+//! A static field ends with `;`.
+
+class Counter
+{
+	pub n: int = 0,
+
+	static atomic hits: int = 0
+}
+
+fn main() -> int
+{
+	return 0;
+}

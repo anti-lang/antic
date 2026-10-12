@@ -1,0 +1,1 @@
+tests_block_without_a_brace.anti:3:7: error: expected `{`

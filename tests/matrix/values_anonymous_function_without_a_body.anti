@@ -1,0 +1,7 @@
+//! An anonymous function has a body.
+
+fn main() -> int
+{
+	let f = fn(a: int) -> int;
+	return 0;
+}

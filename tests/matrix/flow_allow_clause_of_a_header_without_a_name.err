@@ -1,0 +1,1 @@
+flow_allow_clause_of_a_header_without_a_name.anti:3:17: error: `allow` takes a name and a reason, `allow(name, "reason")`

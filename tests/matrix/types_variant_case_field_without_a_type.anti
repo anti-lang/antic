@@ -1,0 +1,11 @@
+//! A field of a case has a type.
+
+variant Shape
+{
+	Circle { r: },
+}
+
+fn main() -> int
+{
+	return 0;
+}

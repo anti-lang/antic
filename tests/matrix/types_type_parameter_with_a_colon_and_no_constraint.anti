@@ -1,0 +1,11 @@
+//! A constraint follows the `:` of a type parameter.
+
+fn pick < T: > (a: T) -> T
+{
+	return a;
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,7 @@
+//! An expression stands in the parentheses of `delete`.
+
+fn main() -> int
+{
+	delete();
+	return 0;
+}

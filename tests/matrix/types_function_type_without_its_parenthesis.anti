@@ -1,0 +1,7 @@
+//! The parameters of a function type close with `)`.
+
+fn main() -> int
+{
+	let f: ?fn(int = none;
+		return 0;
+}

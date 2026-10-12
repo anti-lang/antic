@@ -1,0 +1,11 @@
+//! An expression stands in the parentheses of `align`.
+
+class Wide align()
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	return 0;
+}

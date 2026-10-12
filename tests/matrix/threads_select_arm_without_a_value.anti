@@ -1,0 +1,10 @@
+//! An expression starts an arm of a `select`.
+
+fn main() -> int
+{
+	let n = 1;
+	select {
+		=> n = 2;
+	}
+	return 0;
+}

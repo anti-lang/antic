@@ -1,0 +1,7 @@
+//! An expression stands in the parentheses of `join`.
+
+fn main() -> int
+{
+	join();
+	return 0;
+}

@@ -1,0 +1,11 @@
+//! An expression stands in the parentheses of `align` of a variant.
+
+variant Shape align()
+{
+	Empty,
+}
+
+fn main() -> int
+{
+	return 0;
+}

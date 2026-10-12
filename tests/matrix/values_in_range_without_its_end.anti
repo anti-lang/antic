@@ -1,0 +1,7 @@
+//! An expression follows the `..` of a range after `in`.
+
+fn main() -> int
+{
+	let t = n in 1..;
+	return 0;
+}

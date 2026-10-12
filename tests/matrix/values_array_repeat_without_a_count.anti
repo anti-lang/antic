@@ -1,0 +1,7 @@
+//! An expression follows the `;` of an array literal.
+
+fn main() -> int
+{
+	let a = [0;];
+	return 0;
+}

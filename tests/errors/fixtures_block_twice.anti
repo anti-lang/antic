@@ -1,0 +1,22 @@
+//! A module has at most one `fixtures` block.
+
+fixtures
+{
+	fn one() -> int
+	{
+		return 1;
+	}
+}
+
+fixtures
+{
+	fn two() -> int
+	{
+		return 2;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

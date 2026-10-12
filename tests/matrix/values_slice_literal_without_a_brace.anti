@@ -1,0 +1,7 @@
+//! A slice literal has its fields in braces.
+
+fn main() -> int
+{
+	let s = []int 5;
+	return 0;
+}

@@ -1,0 +1,14 @@
+//! The fields of a struct literal close with `}`.
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+fn main() -> int
+{
+	let p = Pair {
+		a: 1, b: 2;
+		return 0;
+	}

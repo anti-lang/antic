@@ -1,0 +1,7 @@
+//! An expression stands in the parentheses of `send`.
+
+fn main() -> int
+{
+	send();
+	return 0;
+}

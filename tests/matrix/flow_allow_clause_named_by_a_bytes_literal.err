@@ -1,0 +1,1 @@
+flow_allow_clause_named_by_a_bytes_literal.anti:5:8: error: `allow` takes a name and a reason, `allow(name, "reason")`

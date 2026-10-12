@@ -1,0 +1,1 @@
+flow_refused_let_with_a_struct_literal.anti:11:10: error: expected a type

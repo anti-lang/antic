@@ -1,0 +1,13 @@
+//! An expression follows the `:` of a field in a struct literal.
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+fn main() -> int
+{
+	let p = Pair { a:, b: 2 };
+	return 0;
+}

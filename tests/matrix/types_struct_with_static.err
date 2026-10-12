@@ -1,0 +1,1 @@
+types_struct_with_static.anti:6:2: error: a struct holds fields alone, and a static field belongs to a class

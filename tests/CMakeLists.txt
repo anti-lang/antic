@@ -3057,6 +3057,12 @@ add_expect_test(warning_dropped STATUS 0
             --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
             -o "${CMAKE_CURRENT_BINARY_DIR}/dropped.s"
             "${CMAKE_CURRENT_SOURCE_DIR}/errors/dropped.anti")
+# A `//#!` note that stands in a function is dropped like a doc comment.
+add_expect_test(warning_dropped_module_note STATUS 0
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/dropped_module_note.err"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
+            dropped_module_note.anti)
 add_test(NAME silent_dropped
     COMMAND antic -S --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
             -o "${CMAKE_CURRENT_BINARY_DIR}/dropped_silent.s"
@@ -5787,6 +5793,10 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "tests_may_fail|--front-end,--tests,--runtime,${ANTIC_RUNTIME_DIR},tests_may_fail.anti"
         "tests_block_holds_a_struct|--front-end,--tests,tests_block_holds_a_struct.anti"
         "tests_block_twice|--front-end,--tests,tests_block_twice.anti"
+        "tests_block_without_a_brace|--front-end,--tests,tests_block_without_a_brace.anti"
+        "tests_block_function_without_a_name|--front-end,--tests,tests_block_function_without_a_name.anti"
+        "fixtures_block_holds_a_struct|--front-end,--tests,fixtures_block_holds_a_struct.anti"
+        "fixtures_block_twice|--front-end,--tests,fixtures_block_twice.anti"
         "hex_escape_short|--front-end,hex_escape_short.anti"
         "tuple_element_hexadecimal|--front-end,tuple_element_hexadecimal.anti"
         "assert_message_is_a_variable|--front-end,assert_message_is_a_variable.anti")
@@ -5799,6 +5809,17 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/${name}.err"
         COMMAND "$<TARGET_FILE:antic>" ${arguments})
 endforeach()
+# An `if` whose statement stands at the last level the parser takes.
+# DESIGN: finding T103 of docs/audit/tests-findings.md. antic 0.2.0 never
+# ends on this source and takes about two gigabytes of memory per second,
+# so the test stops it after two seconds, where a matrix test would let it
+# run for sixty. An antic that refuses the source needs a few
+# milliseconds.
+add_expect_test(error_if_at_the_depth_limit STATUS 1
+    TIMEOUT 2
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/if_at_the_depth_limit.err"
+    COMMAND "$<TARGET_FILE:antic>" --front-end if_at_the_depth_limit.anti)
 # A program of tests/errors that no test reads is refused.
 add_test(NAME errors_registered
     COMMAND "${CMAKE_COMMAND}" "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}"

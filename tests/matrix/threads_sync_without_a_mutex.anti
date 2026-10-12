@@ -1,0 +1,8 @@
+//! An expression follows `sync`.
+
+fn main() -> int
+{
+	let n = 1;
+	sync;
+	return 0;
+}

@@ -1,0 +1,7 @@
+//! An expression follows a unary `-`.
+
+fn main() -> int
+{
+	let n = -;
+	return 0;
+}

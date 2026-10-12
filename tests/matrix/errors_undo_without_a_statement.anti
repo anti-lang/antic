@@ -1,0 +1,8 @@
+//! A statement follows `undo`.
+
+fn main() -> int
+{
+	let n = 1;
+	undo);
+	return 0;
+}

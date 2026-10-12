@@ -1,0 +1,7 @@
+//! A tuple type closes with `)`.
+
+fn main() -> int
+{
+	let t: (int, bool = (1, true);
+		return 0;
+}

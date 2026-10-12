@@ -1,0 +1,7 @@
+//! An element of a tuple type is a type.
+
+fn main() -> int
+{
+	let t: (int, +) = (1, 2);
+	return 0;
+}

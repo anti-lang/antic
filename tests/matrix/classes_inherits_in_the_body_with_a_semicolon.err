@@ -1,0 +1,1 @@
+classes_inherits_in_the_body_with_a_semicolon.anti:11:2: error: inherits belongs in the class header: class Square inherits Shape

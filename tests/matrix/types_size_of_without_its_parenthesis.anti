@@ -1,0 +1,7 @@
+//! The parentheses of `size_of` close.
+
+fn main() -> int
+{
+	let n = size_of(int;
+		return 0;
+}

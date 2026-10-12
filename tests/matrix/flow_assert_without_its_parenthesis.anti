@@ -1,0 +1,8 @@
+//! The parentheses of an `assert` close.
+
+fn main() -> int
+{
+	let n = 1;
+	assert(n == 1;
+		return 0;
+}

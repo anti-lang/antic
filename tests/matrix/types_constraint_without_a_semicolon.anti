@@ -1,0 +1,8 @@
+//! A `constraint` item ends with `;`.
+
+constraint Keyed = eq + hash
+
+	fn main() -> int
+{
+	return 0;
+}

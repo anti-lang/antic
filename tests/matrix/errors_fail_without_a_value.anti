@@ -1,0 +1,8 @@
+//! An error or a text follows `fail`.
+
+fn main() -> int
+{
+	let n = 1;
+	fail;
+	return 0;
+}

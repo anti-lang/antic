@@ -1,0 +1,8 @@
+//! A variant has its cases in braces.
+
+variant Shape;
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,12 @@
+//! A type argument is a type or an integer.
+
+struct Box<T>
+{
+	v: T,
+}
+
+fn main() -> int
+{
+	let b: ?*Box <, > = none;
+	return 0;
+}

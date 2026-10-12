@@ -1,0 +1,7 @@
+//! A call follows `try`.
+
+fn main() -> int
+{
+	let n = try;
+	return 0;
+}

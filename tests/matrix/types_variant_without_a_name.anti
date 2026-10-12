@@ -1,0 +1,11 @@
+//! A variant has a name.
+
+variant 5
+{
+	Empty,
+}
+
+fn main() -> int
+{
+	return 0;
+}

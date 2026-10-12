@@ -1,0 +1,11 @@
+//! A statement follows the `=>` of the `else` of a `switch`.
+
+fn main() -> int
+{
+	let n = 1;
+	switch n {
+		1 => n = 2,
+		else =>,
+	}
+	return 0;
+}

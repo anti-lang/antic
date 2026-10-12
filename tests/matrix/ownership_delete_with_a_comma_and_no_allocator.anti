@@ -1,0 +1,7 @@
+//! An expression follows the `,` of `delete(p, from)`.
+
+fn main() -> int
+{
+	delete(p,;
+		return 0;
+}

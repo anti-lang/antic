@@ -1,0 +1,7 @@
+//! A type follows the `[]` of a slice literal.
+
+fn main() -> int
+{
+	let s = [] + 5;
+	return 0;
+}

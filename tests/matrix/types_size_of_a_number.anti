@@ -1,0 +1,7 @@
+//! A type stands in the parentheses of `size_of`.
+
+fn main() -> int
+{
+	let n = size_of(5);
+	return 0;
+}

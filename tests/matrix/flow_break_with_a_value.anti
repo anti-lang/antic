@@ -1,0 +1,10 @@
+//! A `break` ends with `;`.
+
+fn main() -> int
+{
+	let n = 1;
+	while n < 3 do {
+		break 5;
+	}
+	return 0;
+}

@@ -1,0 +1,8 @@
+//! A `<` before `fn(int) ->` and no type opens no list of type arguments.
+
+fn main() -> int
+{
+	let n = 1;
+	let t = n < fn(int) -> 5;
+	return 0;
+}

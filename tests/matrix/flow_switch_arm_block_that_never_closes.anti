@@ -1,0 +1,8 @@
+//! The block of an arm closes with `}` before the source ends.
+
+fn main() -> int
+{
+	let n = 1;
+	switch n {
+		1 => {
+			return 1;

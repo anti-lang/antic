@@ -1,0 +1,16 @@
+//! An `if` in the block of an `if`, 128 times in a block: the last `if` stands
+//! at the depth limit of 256 levels, and antic refuses it with the message of
+//! the limit.
+
+fn deep(c: bool)
+{
+	{
+		if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { if c { } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } }
+	}
+}
+
+fn main() -> int
+{
+	deep(true);
+	return 0;
+}

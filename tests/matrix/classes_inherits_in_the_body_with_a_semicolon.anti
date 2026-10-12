@@ -1,0 +1,19 @@
+//! An `inherits` line in the body of a class that ends with `;` gets the one
+//! message on the header it belongs in.
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square
+{
+	inherits Shape;
+
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	return 0;
+}

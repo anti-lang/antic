@@ -1,0 +1,12 @@
+//! A struct holds fields alone, and a static field belongs to a class.
+
+struct Pair
+{
+	a: int,
+	static atomic hits: int = 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

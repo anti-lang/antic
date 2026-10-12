@@ -1,0 +1,7 @@
+//! The elements of an array literal close with `]`.
+
+fn main() -> int
+{
+	let a = [1, 2;
+		return 0;
+}

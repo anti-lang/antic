@@ -1,0 +1,1 @@
+fixtures_block_twice.anti:11:1: error: a module has at most one `fixtures` block

@@ -336,3 +336,26 @@ error_copy_nests_deep_field T096 A field of a copy that is refused gets a second
 error_switch_refused_returns T097 A function whose refused `switch` returns in every arm gets a second message.
 anti_bind_message_clang_static_without_a_body T098 A `static` function without a body gets a second warning, which names its result.
 anti_option_soname_linux_dist T099 `dist/` of a Linux library of `--soname` holds `libshapes.so` alone, without the file its soname names.
+matrix_flow_refused_let_with_a_struct_literal_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_values_struct_literal_field_without_a_value_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_values_struct_literal_with_a_value_and_no_name_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_values_qualified_struct_literal_with_an_argument_that_is_no_type_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_values_struct_literal_with_an_argument_that_is_no_type_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_values_slice_literal_with_a_value_and_no_name_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_values_slice_literal_in_a_condition_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_classes_refused_field_before_a_function_refused T101 The parser reads the rest of a class body after a refused member as items of the module.
+matrix_classes_inherits_in_the_body_with_a_semicolon_refused T101 The parser reads the rest of a class body after a refused member as items of the module.
+matrix_classes_nested_class_after_four_words_refused T102 `pub` before three more words and `class` in a class body gets `expected identifier`.
+matrix_flow_switch_arm_without_a_statement_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_flow_switch_arm_assignment_without_a_value_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_flow_if_let_with_a_number_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_flow_if_let_without_a_value_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_flow_else_if_let_with_a_number_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_flow_for_with_a_number_as_its_second_name_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_flow_switch_else_without_a_statement_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_threads_select_arm_without_a_value_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_flow_if_let_case_with_a_number_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+matrix_flow_for_tuple_pattern_with_a_number_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
+error_if_at_the_depth_limit T103 antic never ends on an `if` whose statement stands at the last level of the depth limit.
+matrix_classes_injected_logger_never_called_release T104 A program with an injected `log.Logger` that it never calls fails at the link.
+matrix_classes_injected_logger_never_called_memory_checks T104 A program with an injected `log.Logger` that it never calls fails at the link.
