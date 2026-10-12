@@ -122,3 +122,24 @@ The code won in each case. The first six are those of the gaps report.
 
 - Does a step whose one failure is fixed on `origin/main` count as done once
   the driver has merged?
+
+## Proof of the push
+
+The commit of this report was pushed before this section was written. The
+commit that adds the section follows it, so the last hash on `origin/docs`
+is one commit later than the one shown. `git log --oneline -3`:
+
+```text
+5a349d3c Report the update of the syntax overview
+8e83316e Free what the example of the patterns allocates
+625a77fa Show the commands that choose a processor level
+```
+
+`git status --short` printed nothing. `git rev-parse HEAD origin/docs`:
+
+```text
+5a349d3cc0f4db6f67db3625b19de750227a741f
+5a349d3cc0f4db6f67db3625b19de750227a741f
+```
+
+The host suite: 3507 of 3508 tests passed, and `fmt_canonical` failed.
