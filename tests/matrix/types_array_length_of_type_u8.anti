@@ -1,0 +1,13 @@
+//! The length of an array has the type `int`.
+
+const COUNT: u8 = 3;
+
+struct Row
+{
+	xs: [COUNT]int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,7 @@
+//! Two arrays of one element type and two lengths are two types.
+
+fn main() -> int
+{
+	let xs: [3]int = [1, 2];
+	return xs[0];
+}

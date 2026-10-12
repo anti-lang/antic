@@ -1,0 +1,1 @@
+types_as_to_type_arguments.anti:11:10: error: cannot convert `Box<int>` to `Box<i32>`

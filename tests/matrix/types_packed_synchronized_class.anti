@@ -1,0 +1,11 @@
+//! `packed` stands directly before `class`, so a synchronized class takes none.
+
+packed synchronized class Counter
+{
+	n: int = 0,
+}
+
+fn main() -> int
+{
+	return 0;
+}

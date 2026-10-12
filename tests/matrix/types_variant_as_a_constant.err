@@ -1,0 +1,1 @@
+types_variant_as_a_constant.anti:10:21: error: a variant is not a constant expression

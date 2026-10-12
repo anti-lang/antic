@@ -1,0 +1,16 @@
+//! `as` converts an enum to and from a numeric type, and `bool` is none.
+
+enum Kind: u8
+{
+	A,
+	B,
+}
+
+fn main() -> int
+{
+	let b = Kind.B as bool;
+	if b {
+		return 1;
+	}
+	return 0;
+}

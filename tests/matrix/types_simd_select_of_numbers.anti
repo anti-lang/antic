@@ -1,0 +1,22 @@
+//! `simd.select` chooses between two values of a simd struct.
+
+import anti.simd;
+
+simd struct Bits
+{
+	a: bool,
+	b: bool,
+	c: bool,
+	d: bool,
+	e: bool,
+	f: bool,
+	g: bool,
+	h: bool,
+}
+
+fn main() -> int
+{
+	let a = Bits.splat(true);
+	let n = simd.select(a, 1, 2);
+	return 0;
+}

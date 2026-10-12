@@ -1,0 +1,11 @@
+//! The N of `align(N)` is a power of two, and zero is none.
+
+struct Odd align(0)
+{
+	a: u8,
+}
+
+fn main() -> int
+{
+	return 0;
+}

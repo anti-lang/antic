@@ -1,0 +1,1 @@
+types_bitfield_wider_than_its_type.anti:5:11: error: a bitfield of `u16` has 1 to 16 bits

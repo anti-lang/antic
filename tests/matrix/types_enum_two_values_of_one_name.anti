@@ -1,0 +1,13 @@
+//! Two values of an enum have two names.
+
+enum Level
+{
+	Low,
+	High,
+	Low,
+}
+
+fn main() -> int
+{
+	return 0;
+}

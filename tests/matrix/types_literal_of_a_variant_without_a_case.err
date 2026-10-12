@@ -1,0 +1,1 @@
+types_literal_of_a_variant_without_a_case.anti:12:10: error: a literal of variant `Shape` names one of its cases

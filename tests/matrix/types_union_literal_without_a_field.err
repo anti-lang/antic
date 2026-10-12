@@ -1,0 +1,1 @@
+types_union_literal_without_a_field.anti:11:10: error: a literal of union `Word` names exactly one field

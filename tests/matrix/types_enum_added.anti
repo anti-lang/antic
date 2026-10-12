@@ -1,0 +1,13 @@
+//! An enum is no number: `as` converts it first.
+
+enum Kind: u8
+{
+	A,
+	B,
+}
+
+fn main() -> int
+{
+	let k = Kind.A + Kind.B;
+	return 0;
+}

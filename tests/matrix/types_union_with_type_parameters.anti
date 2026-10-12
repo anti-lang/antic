@@ -1,0 +1,13 @@
+//! A function, a struct, a class, a variant and an interface take type
+//! parameters, and a union takes none.
+
+union Either<T>
+{
+	v: T,
+	raw: [8]u8,
+}
+
+fn main() -> int
+{
+	return 0;
+}

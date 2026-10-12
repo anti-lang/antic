@@ -1,0 +1,12 @@
+//! A union holds no value of its own type.
+
+union Word
+{
+	n: int,
+	inner: Word,
+}
+
+fn main() -> int
+{
+	return 0;
+}

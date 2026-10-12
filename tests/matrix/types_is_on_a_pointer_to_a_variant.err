@@ -1,0 +1,1 @@
+types_is_on_a_pointer_to_a_variant.anti:12:9: error: `is` takes a variant as a value, found the pointer `*Shape`

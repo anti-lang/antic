@@ -1,0 +1,1 @@
+types_enum_as_a_for_range.anti:11:11: error: a `for` range counts over an integer, found `Kind`

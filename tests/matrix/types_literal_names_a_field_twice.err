@@ -1,0 +1,1 @@
+types_literal_names_a_field_twice.anti:11:30: error: the field `x` appears twice

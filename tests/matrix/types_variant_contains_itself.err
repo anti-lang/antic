@@ -1,0 +1,1 @@
+types_variant_contains_itself.anti:3:9: error: variant `List` contains itself

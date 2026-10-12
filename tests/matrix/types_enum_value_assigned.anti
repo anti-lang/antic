@@ -1,0 +1,13 @@
+//! A value of an enum is no place.
+
+enum Kind: u8
+{
+	A,
+	B,
+}
+
+fn main() -> int
+{
+	Kind.A = Kind.B;
+	return 0;
+}

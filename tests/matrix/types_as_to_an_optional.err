@@ -1,0 +1,1 @@
+types_as_to_an_optional.anti:6:10: error: `as` needs a class pointer on each side, found `int` and `int`

@@ -1,0 +1,8 @@
+//! An index has the type `int`.
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	let i: u8 = 1;
+	return xs[i];
+}

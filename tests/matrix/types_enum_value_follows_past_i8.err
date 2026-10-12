@@ -1,0 +1,1 @@
+types_enum_value_follows_past_i8.anti:6:2: error: `Higher` follows `High` and does not fit `i8`

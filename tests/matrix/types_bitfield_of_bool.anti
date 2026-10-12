@@ -1,0 +1,11 @@
+//! A bitfield has a sized integer type.
+
+struct Flags
+{
+	on: bool : 1,
+}
+
+fn main() -> int
+{
+	return 0;
+}

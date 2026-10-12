@@ -1,0 +1,11 @@
+//! A value of an enum has the underlying type.
+
+enum Level
+{
+	Low = 1.5,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+types_case_with_fields_without_braces.anti:12:10: error: `Shape.Circle` has fields, which its literal names in braces

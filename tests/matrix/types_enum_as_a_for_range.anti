@@ -1,0 +1,14 @@
+//! A `for` range counts over an integer.
+
+enum Kind: u8
+{
+	A,
+	B,
+}
+
+fn main() -> int
+{
+	for k in Kind.A..Kind.B {
+	}
+	return 0;
+}

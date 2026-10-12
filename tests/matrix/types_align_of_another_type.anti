@@ -1,0 +1,11 @@
+//! The N of `align(N)` has the type `int`.
+
+struct Odd align(true)
+{
+	a: u8,
+}
+
+fn main() -> int
+{
+	return 0;
+}

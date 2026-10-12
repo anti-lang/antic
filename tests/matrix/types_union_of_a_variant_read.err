@@ -1,0 +1,1 @@
+types_union_of_a_variant_read.anti:13:10: error: a variant has the field `tag` alone, and `switch` reads the fields of its cases

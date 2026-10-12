@@ -1,0 +1,11 @@
+//! A named bitfield has a width from 1 to the bits of its type.
+
+struct Flags
+{
+	n: u16 : 17,
+}
+
+fn main() -> int
+{
+	return 0;
+}

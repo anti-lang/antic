@@ -1,0 +1,1 @@
+types_bitfield_of_c_long.anti:6:5: error: a bitfield has a sized integer type, found `c_long`

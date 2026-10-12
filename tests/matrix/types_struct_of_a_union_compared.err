@@ -1,0 +1,1 @@
+types_struct_of_a_union_compared.anti:20:10: error: `==` is not defined on `Holder`, whose field `w` has no `eq`

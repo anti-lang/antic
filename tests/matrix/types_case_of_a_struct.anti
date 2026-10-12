@@ -1,0 +1,10 @@
+//! `a.B.C { }` names a case of the variant `B` of the module `a`, and a struct
+//! has no case.
+
+import anti.lang;
+
+fn main() -> int
+{
+	let at = lang.SourceLocation.Line { n: 1 };
+	return 0;
+}

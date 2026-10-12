@@ -1,0 +1,1 @@
+types_simd_load_with_one_argument.anti:14:10: error: `V4.load` takes 2 arguments, found 1

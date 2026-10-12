@@ -1,0 +1,1 @@
+types_enum_to_bool.anti:11:10: error: cannot convert `Kind` to `bool`

@@ -1,0 +1,14 @@
+//! An atomic local holds an integer, a `bool`, a `char` or a pointer, and an
+//! enum is none.
+
+enum Kind: u8
+{
+	A,
+	B,
+}
+
+fn main() -> int
+{
+	let k: atomic Kind = Kind.A;
+	return 0;
+}

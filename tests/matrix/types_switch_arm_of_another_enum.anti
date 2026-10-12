@@ -1,0 +1,25 @@
+//! An arm of a `switch` on an enum names a value of that enum.
+
+enum Kind: u8
+{
+	A,
+	B,
+}
+
+enum Other
+{
+	A,
+	B,
+}
+
+fn main() -> int
+{
+	let k = Kind.A;
+	let n = 0;
+	switch k {
+		Kind.A => n = 1,
+		Other.B => n = 2,
+		else => n = 3,
+	}
+	return n;
+}

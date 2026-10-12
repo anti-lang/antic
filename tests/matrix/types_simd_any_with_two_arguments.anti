@@ -1,0 +1,24 @@
+//! `simd.any` takes one mask.
+
+import anti.simd;
+
+simd struct Bits
+{
+	a: bool,
+	b: bool,
+	c: bool,
+	d: bool,
+	e: bool,
+	f: bool,
+	g: bool,
+	h: bool,
+}
+
+fn main() -> int
+{
+	let a = Bits.splat(true);
+	if simd.any(a, a) {
+		return 1;
+	}
+	return 0;
+}

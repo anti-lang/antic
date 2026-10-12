@@ -1,0 +1,11 @@
+//! The width of a bitfield is a number on every target.
+
+struct Flags
+{
+	n: u64 : size_of(int),
+}
+
+fn main() -> int
+{
+	return 0;
+}

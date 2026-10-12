@@ -1,0 +1,19 @@
+//! An arm of a `switch` on an enum names a value of that enum, and a number is
+//! none.
+
+enum Kind: u8
+{
+	A,
+	B,
+}
+
+fn main() -> int
+{
+	let k = Kind.A;
+	let n = 0;
+	switch k {
+		0 => n = 1,
+		else => n = 2,
+	}
+	return n;
+}

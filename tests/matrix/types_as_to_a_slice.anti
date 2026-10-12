@@ -1,0 +1,8 @@
+//! `as` gives no slice. `xs[lo..hi]` makes one of an array.
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	let s = xs as []int;
+	return s.len;
+}

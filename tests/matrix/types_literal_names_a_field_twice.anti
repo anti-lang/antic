@@ -1,0 +1,13 @@
+//! A literal names every field exactly once.
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn main() -> int
+{
+	let p = Point { x: 1, y: 2, x: 3 };
+	return p.x;
+}

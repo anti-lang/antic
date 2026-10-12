@@ -1,0 +1,1 @@
+types_simd_struct_with_align.anti:3:25: error: a `simd struct` takes its alignment from its size and has no `align(N)`

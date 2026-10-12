@@ -1,0 +1,13 @@
+//! `concurrent` marks a parameter, and a parameter of a function type. The type
+//! of a `let` takes no mark.
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	let f: concurrent fn(int) -> int = twice;
+	return f(2);
+}

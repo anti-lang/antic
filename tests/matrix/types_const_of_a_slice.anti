@@ -1,0 +1,9 @@
+//! A slice literal is no constant expression, so no constant has the type
+//! `[]T`.
+
+const NONE: []int = []int { ptr: none, len: 0 };
+
+fn main() -> int
+{
+	return NONE.len;
+}

@@ -1,0 +1,11 @@
+//! A declaration takes one `align(N)`.
+
+struct Odd align(8) align(16)
+{
+	a: u8,
+}
+
+fn main() -> int
+{
+	return 0;
+}

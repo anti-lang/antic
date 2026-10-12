@@ -1,0 +1,20 @@
+//! `<` on a simd struct needs lanes of numbers or `char`.
+
+simd struct Bits
+{
+	a: bool,
+	b: bool,
+	c: bool,
+	d: bool,
+	e: bool,
+	f: bool,
+	g: bool,
+	h: bool,
+}
+
+fn main() -> int
+{
+	let a = Bits.splat(true);
+	let m = a < a;
+	return 0;
+}

@@ -1,0 +1,24 @@
+//! Two values of an enum with one number are one value to a `switch`.
+
+enum Dup
+{
+	X = 3,
+	Y = 3,
+	Z,
+}
+
+fn name(d: Dup) -> int
+{
+	let n = 0;
+	switch d {
+		Dup.X => n = 1,
+		Dup.Y => n = 2,
+		Dup.Z => n = 3,
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	return name(Dup.Y);
+}

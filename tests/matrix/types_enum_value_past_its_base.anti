@@ -1,0 +1,11 @@
+//! Every value of an enum fits its underlying type.
+
+enum Level: u8
+{
+	High = 256,
+}
+
+fn main() -> int
+{
+	return 0;
+}

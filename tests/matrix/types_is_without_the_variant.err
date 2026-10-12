@@ -1,0 +1,1 @@
+types_is_without_the_variant.anti:12:9: error: `is` on `Shape` names one of its cases, as `Shape.Circle`

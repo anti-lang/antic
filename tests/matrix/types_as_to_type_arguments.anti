@@ -1,0 +1,13 @@
+//! `as` converts no struct, with type arguments or without.
+
+struct Box<T>
+{
+	v: T,
+}
+
+fn main() -> int
+{
+	let b = Box<int> { v: 2 };
+	let c = b as Box<i32>;
+	return c.v as int;
+}

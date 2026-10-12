@@ -1,0 +1,18 @@
+//! `v is V.Case` names the case with its variant.
+
+variant Shape
+{
+	Circle { r: int },
+	Rect { w: int, h: int },
+	Empty,
+}
+
+fn round(s: Shape) -> bool
+{
+	return s is Circle;
+}
+
+fn main() -> int
+{
+	return 0;
+}

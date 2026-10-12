@@ -1,0 +1,18 @@
+//! Method-call sugar does not apply to a union.
+
+union Word
+{
+	low: u8,
+	whole: u32,
+}
+
+fn low_of(w: *Word) -> int
+{
+	return w.low as int;
+}
+
+fn main() -> int
+{
+	let w = Word { whole: 0x105 };
+	return w.low_of();
+}

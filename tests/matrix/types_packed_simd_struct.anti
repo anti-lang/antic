@@ -1,0 +1,12 @@
+//! A `simd struct` takes no `packed`.
+
+packed simd struct Lanes
+{
+	x: f64,
+	y: f64,
+}
+
+fn main() -> int
+{
+	return 0;
+}

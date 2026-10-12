@@ -1,0 +1,1 @@
+types_enum_value_past_c_int.anti:5:9: error: `2147483648` does not fit `i32`

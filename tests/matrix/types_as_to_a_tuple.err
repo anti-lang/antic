@@ -1,0 +1,1 @@
+types_as_to_a_tuple.anti:6:10: error: cannot convert `(int, int)` to `(int, int)`

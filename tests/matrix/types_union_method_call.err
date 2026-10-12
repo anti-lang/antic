@@ -1,0 +1,1 @@
+types_union_method_call.anti:17:9: error: `Word` has no field `low_of`

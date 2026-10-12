@@ -1,0 +1,11 @@
+//! Every value of an enum fits its underlying type.
+
+enum Level: u8
+{
+	Low = -1,
+}
+
+fn main() -> int
+{
+	return 0;
+}

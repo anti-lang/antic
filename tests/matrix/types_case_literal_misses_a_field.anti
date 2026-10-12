@@ -1,0 +1,14 @@
+//! A literal of a case names every field.
+
+variant Shape
+{
+	Circle { r: int },
+	Rect { w: int, h: int },
+	Empty,
+}
+
+fn main() -> int
+{
+	let s = Shape.Rect { w: 1 };
+	return 0;
+}

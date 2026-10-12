@@ -1,0 +1,1 @@
+types_bitfield_width_from_size_of.anti:5:11: error: a bitfield of `u64` has 1 to 64 bits

@@ -1,0 +1,1 @@
+types_enum_over_an_enum.anti:9:13: error: the underlying type of an enum is an integer type, found `Kind`

@@ -1,0 +1,16 @@
+//! `x in lo..hi` takes numbers and `char`, and an enum is neither.
+
+enum Kind: u8
+{
+	A,
+	B,
+}
+
+fn main() -> int
+{
+	let k = Kind.A;
+	if k in Kind.A..Kind.B {
+		return 1;
+	}
+	return 0;
+}

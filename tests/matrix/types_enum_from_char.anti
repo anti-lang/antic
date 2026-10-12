@@ -1,0 +1,13 @@
+//! `as` converts an enum to and from a numeric type, and `char` is none.
+
+enum Kind: u8
+{
+	A,
+	B,
+}
+
+fn main() -> int
+{
+	let k = 'a' as Kind;
+	return k as int;
+}

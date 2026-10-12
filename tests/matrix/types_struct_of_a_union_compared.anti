@@ -1,0 +1,21 @@
+//! The default `==` of a struct needs `==` on every field, and a union has
+//! none.
+
+union Word
+{
+	low: u8,
+	whole: u32,
+}
+
+struct Holder
+{
+	w: Word,
+	n: int,
+}
+
+fn main() -> int
+{
+	let a = Holder { w: Word { low: 1 }, n: 1 };
+	let b = a;
+	return (a == b) as int;
+}

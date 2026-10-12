@@ -1,0 +1,11 @@
+//! `is` names a case on a variant alone, by the name of a module as well.
+
+fn round(n: int) -> bool
+{
+	return n is geo.Shape.Circle;
+}
+
+fn main() -> int
+{
+	return 0;
+}

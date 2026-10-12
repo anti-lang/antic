@@ -1,0 +1,9 @@
+//! `as` converts no channel.
+
+fn main() -> int
+{
+	let c = chan int(1);
+	let d = c as chan int;
+	delete(d);
+	return 0;
+}

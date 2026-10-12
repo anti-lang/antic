@@ -1,0 +1,12 @@
+//! A field of a case is a name and a type, with no bitfield width.
+
+variant Packet
+{
+	Head { kind: u8 : 3 },
+	End,
+}
+
+fn main() -> int
+{
+	return 0;
+}

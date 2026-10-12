@@ -1,0 +1,8 @@
+//! `as` converts between numbers, pointers, enums and the bytes of a simd
+//! struct, and a tuple is none of them.
+
+fn main() -> int
+{
+	let t = (1, 2) as (int, int);
+	return t.0;
+}

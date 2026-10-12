@@ -1,0 +1,13 @@
+//! `as` converts no struct whose type holds a constant argument.
+
+struct Buf<N: int>
+{
+	xs: [N]int,
+}
+
+fn main() -> int
+{
+	let b = Buf<2> { xs: [1, 2] };
+	let c = b as Buf<3>;
+	return c.xs[0];
+}

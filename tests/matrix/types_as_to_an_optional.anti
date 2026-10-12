@@ -1,0 +1,8 @@
+//! `as ?T` reads as the nullable downcast `as? T`, which takes a pointer to a
+//! class.
+
+fn main() -> int
+{
+	let o = 5 as? int;
+	return o ?? 1;
+}

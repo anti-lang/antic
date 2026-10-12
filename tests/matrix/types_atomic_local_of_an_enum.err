@@ -1,0 +1,1 @@
+types_atomic_local_of_an_enum.anti:12:6: error: an atomic local holds an integer, a `bool`, a `char` or a pointer, found `Kind`

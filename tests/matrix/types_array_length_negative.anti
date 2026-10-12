@@ -1,0 +1,11 @@
+//! The length of an array is at least 1.
+
+struct Row
+{
+	xs: [-1]int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,12 @@
+//! A `simd struct` takes its alignment from its size.
+
+simd struct Lanes align(32)
+{
+	x: f64,
+	y: f64,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+types_switch_arm_of_another_enum.anti:21:3: error: expected `Kind`, found `Other`

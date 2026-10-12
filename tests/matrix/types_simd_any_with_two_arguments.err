@@ -1,0 +1,1 @@
+types_simd_any_with_two_arguments.anti:20:5: error: `simd.any` takes 1 argument, found 2

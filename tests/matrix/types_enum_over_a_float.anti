@@ -1,0 +1,11 @@
+//! The underlying type of an enum is an integer type.
+
+enum Level: f32
+{
+	Low,
+}
+
+fn main() -> int
+{
+	return 0;
+}

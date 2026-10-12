@@ -1,0 +1,1 @@
+types_enum_value_of_a_float.anti:5:8: error: expected `i32`, found a float literal

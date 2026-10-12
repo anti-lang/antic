@@ -1,0 +1,13 @@
+//! A `type` alias takes no type parameters: its form is `type Name = T;`.
+
+struct Box<T>
+{
+	v: T,
+}
+
+type Wrap < T > = Box < T >;
+
+fn main() -> int
+{
+	return 0;
+}

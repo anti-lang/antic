@@ -1,0 +1,1 @@
+types_case_of_a_struct.anti:8:11: error: `SourceLocation` is not a variant

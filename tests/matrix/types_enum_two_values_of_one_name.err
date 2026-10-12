@@ -1,0 +1,1 @@
+types_enum_two_values_of_one_name.anti:7:2: error: enum `Level` has two values named `Low`

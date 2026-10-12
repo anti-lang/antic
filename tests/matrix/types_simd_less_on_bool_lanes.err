@@ -1,0 +1,1 @@
+types_simd_less_on_bool_lanes.anti:18:10: error: `<` needs lanes of numbers or `char`, and `Bits` has `bool`

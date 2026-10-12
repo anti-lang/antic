@@ -1,0 +1,11 @@
+//! The underlying type of an enum is an integer type, and `char` is none.
+
+enum Level: char
+{
+	Low,
+}
+
+fn main() -> int
+{
+	return 0;
+}

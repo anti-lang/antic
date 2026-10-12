@@ -1,0 +1,12 @@
+//! A field of a case is a name and a type, with no default.
+
+variant Packet
+{
+	Head { kind: u8 = 1 },
+	End,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+types_is_qualified_case_on_a_number.anti:5:9: error: `is` names a case on a variant alone, found `int`

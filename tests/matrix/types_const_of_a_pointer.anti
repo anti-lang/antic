@@ -1,0 +1,14 @@
+//! A constant holds no address, so no constant has the type `*T`.
+
+struct Point
+{
+	x: int,
+}
+
+const ORIGIN: Point = Point { x: 0 };
+const AT: *Point = &ORIGIN;
+
+fn main() -> int
+{
+	return 0;
+}

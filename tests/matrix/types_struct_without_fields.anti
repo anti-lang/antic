@@ -1,0 +1,10 @@
+//! A struct has at least one field.
+
+struct Nothing
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

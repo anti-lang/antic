@@ -1,0 +1,1 @@
+types_switch_on_a_tag_with_a_number.anti:16:3: error: expected `Shape.tag`, found an integer literal

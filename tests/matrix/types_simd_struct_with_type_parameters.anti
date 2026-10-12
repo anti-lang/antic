@@ -1,0 +1,13 @@
+//! A lane has a primitive type of one width on every target, and a type
+//! parameter is none.
+
+simd struct Lanes<T>
+{
+	x: T,
+	y: T,
+}
+
+fn main() -> int
+{
+	return 0;
+}

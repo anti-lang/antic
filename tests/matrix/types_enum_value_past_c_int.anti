@@ -1,0 +1,11 @@
+//! An enum without a base is over `c_int`.
+
+enum Level
+{
+	High = 2147483648,
+}
+
+fn main() -> int
+{
+	return 0;
+}

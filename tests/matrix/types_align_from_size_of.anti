@@ -1,0 +1,12 @@
+//! The N of `align(N)` is a number on every target, and `size_of` gives one per
+//! target.
+
+struct Odd align(size_of(int))
+{
+	a: u8,
+}
+
+fn main() -> int
+{
+	return 0;
+}

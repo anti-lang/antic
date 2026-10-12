@@ -1,0 +1,13 @@
+//! `packed` stands before `struct`, `union`, `class` or `variant`, and an enum
+//! takes none.
+
+packed enum Level
+{
+	Low,
+	High,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+types_simd_select_of_numbers.anti:20:25: error: `simd.select` chooses between values of a `simd struct`, found `int`

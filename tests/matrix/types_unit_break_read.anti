@@ -1,0 +1,13 @@
+//! The name `_` names no field, and no access mentions it.
+
+struct Flags
+{
+	a: u8 : 3,
+	_: u8 : 0,
+}
+
+fn main() -> int
+{
+	let f = Flags { a: 5 };
+	return f._ as int;
+}

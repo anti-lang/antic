@@ -1,0 +1,1 @@
+types_as_to_a_channel.anti:6:10: error: cannot convert `chan int` to `chan int`

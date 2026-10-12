@@ -1,0 +1,1 @@
+types_keep_fn_in_a_let.anti:11:14: error: expected `=`

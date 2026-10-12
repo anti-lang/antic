@@ -1,0 +1,1 @@
+types_bitfield_of_an_enum.anti:11:8: error: a bitfield has a sized integer type, found `Kind`

@@ -1,0 +1,23 @@
+//! An arm binds the fields of a case, and `Empty` has none.
+
+variant Shape
+{
+	Circle { r: int },
+	Rect { w: int, h: int },
+	Empty,
+}
+
+fn read(s: Shape) -> int
+{
+	let n = 0;
+	switch s {
+		Empty e => n = 1,
+		else => n = 2,
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,12 @@
+//! The field `_` is the zero-width bitfield, written with its width.
+
+struct Flags
+{
+	a: u8 : 3,
+	_: u8,
+}
+
+fn main() -> int
+{
+	return 0;
+}

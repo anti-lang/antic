@@ -1,0 +1,17 @@
+//! A bitfield has a sized integer type, and an enum is none.
+
+enum Kind: u8
+{
+	A,
+	B,
+}
+
+struct Flags
+{
+	kind: Kind : 1,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,12 @@
+//! A bitfield has a sized integer type, and the target gives `c_long` its
+//! width.
+
+struct Flags
+{
+	n: c_long : 3,
+}
+
+fn main() -> int
+{
+	return 0;
+}

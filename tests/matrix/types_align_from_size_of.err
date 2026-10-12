@@ -1,0 +1,1 @@
+types_align_from_size_of.anti:4:18: error: an alignment is a constant, not a value computed from `size_of`

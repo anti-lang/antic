@@ -1,0 +1,1 @@
+types_enum_over_a_float.anti:3:13: error: the underlying type of an enum is an integer type, found `f32`

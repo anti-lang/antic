@@ -1,0 +1,1 @@
+types_arm_binds_a_case_without_fields.anti:14:9: error: case `Empty` of `Shape` has no fields to bind

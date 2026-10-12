@@ -1,0 +1,17 @@
+//! The underlying type of an enum is an integer type, and an enum is none.
+
+enum Kind: u8
+{
+	A,
+	B,
+}
+
+enum Level: Kind
+{
+	Low,
+}
+
+fn main() -> int
+{
+	return 0;
+}

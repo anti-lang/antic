@@ -1,0 +1,1 @@
+types_array_literal_of_another_length.anti:5:19: error: expected `[3]int`, found `[2]int`

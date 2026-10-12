@@ -1,0 +1,1 @@
+types_is_unknown_case.anti:12:9: error: `Shape` has no case `Square`

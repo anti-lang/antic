@@ -1,0 +1,1 @@
+types_enum_over_char.anti:3:13: error: the underlying type of an enum is an integer type, found `char`

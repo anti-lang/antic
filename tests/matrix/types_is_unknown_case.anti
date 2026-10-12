@@ -1,0 +1,18 @@
+//! `v is V.Case` names a case of the variant.
+
+variant Shape
+{
+	Circle { r: int },
+	Rect { w: int, h: int },
+	Empty,
+}
+
+fn square(s: Shape) -> bool
+{
+	return s is Shape.Square;
+}
+
+fn main() -> int
+{
+	return 0;
+}

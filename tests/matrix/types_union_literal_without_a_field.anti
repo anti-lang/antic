@@ -1,0 +1,13 @@
+//! A literal of a union names exactly one field.
+
+union Word
+{
+	low: u8,
+	whole: u32,
+}
+
+fn main() -> int
+{
+	let w = Word { };
+	return w.low as int;
+}

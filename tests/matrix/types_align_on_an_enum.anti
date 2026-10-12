@@ -1,0 +1,13 @@
+//! `align(N)` follows the name of a struct, a union, a class or a variant, and
+//! an enum takes none.
+
+enum Level align(4)
+{
+	Low,
+	High,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+types_as_to_a_constant_argument.anti:11:10: error: cannot convert `Buf<2>` to `Buf<3>`

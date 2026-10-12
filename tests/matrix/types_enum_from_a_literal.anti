@@ -1,0 +1,13 @@
+//! No number converts to an enum without `as`.
+
+enum Kind: u8
+{
+	A,
+	B,
+}
+
+fn main() -> int
+{
+	let k: Kind = 1;
+	return k as int;
+}

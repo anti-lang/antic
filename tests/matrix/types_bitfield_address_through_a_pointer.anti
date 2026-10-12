@@ -1,0 +1,16 @@
+//! A bitfield has no address, through a pointer to its struct as well.
+
+struct Flags
+{
+	n: u8 : 3,
+}
+
+fn low(f: *Flags) -> *u8
+{
+	return &f.n;
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+types_unit_break_without_a_width.anti:6:2: error: the field `_` is a zero-width bitfield, written `_: T : 0`

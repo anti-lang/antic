@@ -1,0 +1,15 @@
+//! A variant has the field `tag` alone, and `v.u` is refused.
+
+variant Shape
+{
+	Circle { r: int },
+	Rect { w: int, h: int },
+	Empty,
+}
+
+fn main() -> int
+{
+	let s = Shape.Empty;
+	let u = s.u;
+	return 0;
+}

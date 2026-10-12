@@ -1,0 +1,12 @@
+//! A value without `=` follows the one before it and fits the underlying type.
+
+enum Level: i8
+{
+	High = 127,
+	Higher,
+}
+
+fn main() -> int
+{
+	return 0;
+}

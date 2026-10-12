@@ -1,0 +1,12 @@
+//! A variant holds no value of its own type. A case points to one with `?*T`.
+
+variant List
+{
+	Nil,
+	Cons { head: int, tail: List },
+}
+
+fn main() -> int
+{
+	return 0;
+}

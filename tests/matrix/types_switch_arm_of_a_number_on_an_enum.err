@@ -1,0 +1,1 @@
+types_switch_arm_of_a_number_on_an_enum.anti:15:3: error: expected `Kind`, found an integer literal

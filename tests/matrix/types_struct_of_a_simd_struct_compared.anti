@@ -1,0 +1,22 @@
+//! A comparison of a simd struct gives a mask, so the default `==` of a struct
+//! that holds one has no `==` to call.
+
+simd struct V4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+struct Holder
+{
+	v: V4,
+}
+
+fn main() -> int
+{
+	let a = Holder { v: V4.splat(1.0) };
+	let b = a;
+	return (a == b) as int;
+}

@@ -1,0 +1,12 @@
+//! A field of a union has no default, as a field of a struct has none.
+
+union Word
+{
+	low: u8 = 1,
+	whole: u32,
+}
+
+fn main() -> int
+{
+	return 0;
+}

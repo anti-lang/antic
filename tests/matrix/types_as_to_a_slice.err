@@ -1,0 +1,1 @@
+types_as_to_a_slice.anti:6:10: error: cannot convert `[3]int` to `[]int`

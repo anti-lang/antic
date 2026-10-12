@@ -42,7 +42,6 @@ an arm of a `select` is a call, an assignment or a block
 expected a call or an assignment
 
 # src/antic/sema.c
-an array length has type `int`, found `%s`
 `%.*s.%.*s` is not generic
 expected a type, found a constant
 an `extern fn` takes plain C function pointers, and `keep own` holds a snapshot
@@ -51,7 +50,6 @@ an `extern fn` takes plain C function pointers, and `keep own` holds a snapshot
 `%.*s` is abstract, and a `provides` line names a complete class
 `compatible` names the versions a plugin may carry, and belongs to an abstract class
 `%.*s.%.*s` is not a class
-enum `%.*s` has two values named `%.*s`
 `own` needs a pointer or a slice, and `%.*s` has type `%s`
 `%.*s` is abstract and no class fills it
 
@@ -70,7 +68,6 @@ the first argument names an interface
 `%s` is not a function
 the call takes %zu argument%s, found %zu
 `%.*s` is a constant of `%s`, reached as `%s.%.*s`
-the field `%.*s` appears twice
 
 # src/antic/sema_class.c
 `%s` returns `never`, and `%s` returns
@@ -97,12 +94,9 @@ a function that is not kept cannot be stored
 the function is not marked `concurrent`
 the call returns no value
 `operator fn iter` gives `%s`, which has no `operator fn next` and `operator fn value`
-`%s` needs a class pointer on each side, found `%s` and `%s`
 `%s` is never `%s`, the classes share no chain
-`is` names a case on a variant alone, found `%s`
 %s calls `anti.text.Builder.%s`, which this `anti.text` lacks
 cannot slice `%s`
-`%s` is not a variant
 `%s` is a singleton, and `%s.get()` gives its one instance
 `alloc` of one object takes a literal or a class with arguments
 `alloc` of one object takes a literal
@@ -125,10 +119,6 @@ a copy of `%s` nests deeper than %d levels
 
 # src/antic/sema_simd.c
 `%s` is not defined on the lanes of `%s`
-`%s` needs lanes of numbers or `char`, and `%s` has `%s`
-`simd.%.*s` takes %d argument%s, found %zu
-`simd.select` chooses between values of a `simd struct`, found `%s`
-`%s.load` takes 2 arguments, found %zu
 
 # src/antic/sema_stmt.c
 `%.*s` of singleton `%s` is read-only after creation, and `mutable` marks a field the program writes
