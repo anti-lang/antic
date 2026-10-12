@@ -1,0 +1,205 @@
+//! A library for C that takes and gives every C type Anti names: `c_char` to
+//! `c_wchar` with `c_float` and `c_double`. Each type crosses alone, among
+//! fourteen parameters, in a struct and a union by value, through a pointer,
+//! as an exported constant and through a function pointer of C.
+
+/// `v` and one more, as a `c_char`.
+export fn ctypes_char(v: c_char) -> c_char
+{
+	return v + 1;
+}
+
+/// `v` and one more, as a `c_uchar`.
+export fn ctypes_uchar(v: c_uchar) -> c_uchar
+{
+	return v + 1;
+}
+
+/// `v` and one more, as a `c_short`.
+export fn ctypes_short(v: c_short) -> c_short
+{
+	return v + 1;
+}
+
+/// `v` and one more, as a `c_ushort`.
+export fn ctypes_ushort(v: c_ushort) -> c_ushort
+{
+	return v + 1;
+}
+
+/// `v` and one more, as a `c_int`.
+export fn ctypes_int(v: c_int) -> c_int
+{
+	return v + 1;
+}
+
+/// `v` and one more, as a `c_uint`.
+export fn ctypes_uint(v: c_uint) -> c_uint
+{
+	return v + 1;
+}
+
+/// `v` and one more, as a `c_long`.
+export fn ctypes_long(v: c_long) -> c_long
+{
+	return v + 1;
+}
+
+/// `v` and one more, as a `c_ulong`.
+export fn ctypes_ulong(v: c_ulong) -> c_ulong
+{
+	return v + 1;
+}
+
+/// `v` and one more, as a `c_longlong`.
+export fn ctypes_longlong(v: c_longlong) -> c_longlong
+{
+	return v + 1;
+}
+
+/// `v` and one more, as a `c_ulonglong`.
+export fn ctypes_ulonglong(v: c_ulonglong) -> c_ulonglong
+{
+	return v + 1;
+}
+
+/// `v` and one more, as a `c_size_t`.
+export fn ctypes_size(v: c_size_t) -> c_size_t
+{
+	return v + 1;
+}
+
+/// `v` and one more, as a `c_wchar`.
+export fn ctypes_wchar(v: c_wchar) -> c_wchar
+{
+	return v + 1;
+}
+
+/// Whether `v` is below zero, which says whether `c_wchar` holds a sign.
+export fn ctypes_wchar_negative(v: c_wchar) -> bool
+{
+	return v < 0;
+}
+
+/// Twice `v`.
+export fn ctypes_float(v: c_float) -> c_float
+{
+	return v * 2.0;
+}
+
+/// Twice `v`.
+export fn ctypes_double(v: c_double) -> c_double
+{
+	return v * 2.0;
+}
+
+/// The size of each type as Anti lays it out, in the order of the header.
+export fn ctypes_size_of(which: c_int) -> c_int
+{
+	let sizes: [14]int = [size_of(c_char), size_of(c_uchar), size_of(c_short), size_of(c_ushort),
+		size_of(c_int), size_of(c_uint), size_of(c_long), size_of(c_ulong), size_of(c_longlong),
+		size_of(c_ulonglong), size_of(c_size_t), size_of(c_wchar), size_of(c_float), size_of(c_double)];
+	return sizes[which as int] as c_int;
+}
+
+/// The sum of fourteen parameters, one of each type.
+export fn ctypes_sum(a: c_char, b: c_uchar, c: c_short, d: c_ushort, e: c_int, f: c_uint, g: c_long,
+	h: c_ulong, i: c_longlong, j: c_ulonglong, k: c_size_t, l: c_wchar, m: c_float, n: c_double) -> c_double
+{
+	return a as f64 + b as f64 + c as f64 + d as f64 + e as f64 + f as f64 + g as f64 + h as f64
+		+ i as f64 + j as f64 + k as f64 + l as f64 + m as f64 + n;
+}
+
+/// One field of each type.
+export struct CtypesAll
+{
+	a: c_char,
+	b: c_uchar,
+	c: c_short,
+	d: c_ushort,
+	e: c_int,
+	f: c_uint,
+	g: c_long,
+	h: c_ulong,
+	i: c_longlong,
+	j: c_ulonglong,
+	k: c_size_t,
+	l: c_wchar,
+	m: c_float,
+	n: c_double,
+}
+
+/// The size of `CtypesAll` as Anti lays it out.
+export fn ctypes_all_size() -> c_int
+{
+	return size_of(CtypesAll) as c_int;
+}
+
+/// Every field of `v` and one more.
+export fn ctypes_all(v: CtypesAll) -> CtypesAll
+{
+	return CtypesAll { a: v.a + 1, b: v.b + 1, c: v.c + 1, d: v.d + 1, e: v.e + 1, f: v.f + 1,
+		g: v.g + 1, h: v.h + 1, i: v.i + 1, j: v.j + 1, k: v.k + 1, l: v.l + 1, m: v.m + 1.0,
+		n: v.n + 1.0 };
+}
+
+/// A `c_long`, a `c_double` and eight `c_char` in one place.
+export union CtypesWord
+{
+	whole: c_long,
+	real: c_double,
+	bytes: [8]c_char,
+}
+
+/// The first byte of `w`.
+export fn ctypes_first_byte(w: CtypesWord) -> c_char
+{
+	return w.bytes[0];
+}
+
+/// Write 1 to 14 through the fourteen pointers.
+export fn ctypes_out(a: *c_char, b: *c_uchar, c: *c_short, d: *c_ushort, e: *c_int, f: *c_uint,
+	g: *c_long, h: *c_ulong, i: *c_longlong, j: *c_ulonglong, k: *c_size_t, l: *c_wchar, m: *c_float,
+	n: *c_double)
+{
+	*a = 1;
+	*b = 2;
+	*c = 3;
+	*d = 4;
+	*e = 5;
+	*f = 6;
+	*g = 7;
+	*h = 8;
+	*i = 9;
+	*j = 10;
+	*k = 11;
+	*l = 12;
+	*m = 13.0;
+	*n = 14.0;
+}
+
+/// What the function of C `f` gives for `v`, and one more.
+export fn ctypes_call_long(keep f: fn(c_long) -> c_long, v: c_long) -> c_long
+{
+	return f(v) + 1;
+}
+
+/// What the function of C `f` gives for `v`, and one more.
+export fn ctypes_call_wchar(keep f: fn(c_wchar) -> c_wchar, v: c_wchar) -> c_wchar
+{
+	return f(v) + 1;
+}
+
+/// What the function of C `f` gives for `v`, and a half more.
+export fn ctypes_call_double(keep f: fn(c_double) -> c_double, v: c_double) -> c_double
+{
+	return f(v) + 0.5;
+}
+
+export const CTYPES_INT: c_int = -7;
+export const CTYPES_LONG: c_long = 70000;
+export const CTYPES_ULONG: c_ulong = 80000;
+export const CTYPES_SIZE: c_size_t = 9;
+export const CTYPES_WCHAR: c_wchar = 955;
+export const CTYPES_UCHAR: c_uchar = 200;
+export const CTYPES_DOUBLE: c_double = 2.5;

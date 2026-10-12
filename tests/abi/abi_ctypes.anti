@@ -1,0 +1,295 @@
+//! Every C type Anti names, across the boundary to C in both directions. The
+//! program passes each type to a function of tests/abi/ctypes.c and takes it
+//! back: alone, at the limits of the type, among fourteen arguments, in a
+//! struct by value, through a pointer and through a callback that C calls. C
+//! then calls the functions this program exports, one per type. A width or a
+//! sign that follows the target is compared with what C gives, so the output
+//! is the same on every target.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn ct_char(v: c_char) -> c_char;
+extern fn ct_char_max() -> c_char;
+extern fn ct_call_char(f: fn(c_char) -> c_char, v: c_char) -> c_char;
+extern fn ct_uchar(v: c_uchar) -> c_uchar;
+extern fn ct_uchar_max() -> c_uchar;
+extern fn ct_call_uchar(f: fn(c_uchar) -> c_uchar, v: c_uchar) -> c_uchar;
+extern fn ct_short(v: c_short) -> c_short;
+extern fn ct_short_max() -> c_short;
+extern fn ct_short_min() -> c_short;
+extern fn ct_call_short(f: fn(c_short) -> c_short, v: c_short) -> c_short;
+extern fn ct_ushort(v: c_ushort) -> c_ushort;
+extern fn ct_ushort_max() -> c_ushort;
+extern fn ct_call_ushort(f: fn(c_ushort) -> c_ushort, v: c_ushort) -> c_ushort;
+extern fn ct_int(v: c_int) -> c_int;
+extern fn ct_int_max() -> c_int;
+extern fn ct_int_min() -> c_int;
+extern fn ct_call_int(f: fn(c_int) -> c_int, v: c_int) -> c_int;
+extern fn ct_uint(v: c_uint) -> c_uint;
+extern fn ct_uint_max() -> c_uint;
+extern fn ct_call_uint(f: fn(c_uint) -> c_uint, v: c_uint) -> c_uint;
+extern fn ct_long(v: c_long) -> c_long;
+extern fn ct_long_max() -> c_long;
+extern fn ct_long_min() -> c_long;
+extern fn ct_call_long(f: fn(c_long) -> c_long, v: c_long) -> c_long;
+extern fn ct_ulong(v: c_ulong) -> c_ulong;
+extern fn ct_ulong_max() -> c_ulong;
+extern fn ct_call_ulong(f: fn(c_ulong) -> c_ulong, v: c_ulong) -> c_ulong;
+extern fn ct_longlong(v: c_longlong) -> c_longlong;
+extern fn ct_longlong_max() -> c_longlong;
+extern fn ct_longlong_min() -> c_longlong;
+extern fn ct_call_longlong(f: fn(c_longlong) -> c_longlong, v: c_longlong) -> c_longlong;
+extern fn ct_ulonglong(v: c_ulonglong) -> c_ulonglong;
+extern fn ct_ulonglong_max() -> c_ulonglong;
+extern fn ct_call_ulonglong(f: fn(c_ulonglong) -> c_ulonglong, v: c_ulonglong) -> c_ulonglong;
+extern fn ct_size(v: c_size_t) -> c_size_t;
+extern fn ct_size_max() -> c_size_t;
+extern fn ct_call_size(f: fn(c_size_t) -> c_size_t, v: c_size_t) -> c_size_t;
+extern fn ct_wchar(v: c_wchar) -> c_wchar;
+extern fn ct_wchar_max() -> c_wchar;
+extern fn ct_wchar_min() -> c_wchar;
+extern fn ct_call_wchar(f: fn(c_wchar) -> c_wchar, v: c_wchar) -> c_wchar;
+extern fn ct_float(v: c_float) -> c_float;
+extern fn ct_double(v: c_double) -> c_double;
+extern fn ct_call_float(f: fn(c_float) -> c_float, v: c_float) -> c_float;
+extern fn ct_call_double(f: fn(c_double) -> c_double, v: c_double) -> c_double;
+extern fn ct_size_of(which: c_int) -> c_int;
+extern fn ct_wchar_signed() -> c_int;
+extern fn ct_sum(a: c_char, b: c_uchar, c: c_short, d: c_ushort, e: c_int, f: c_uint, g: c_long,
+	h: c_ulong, i: c_longlong, j: c_ulonglong, k: c_size_t, l: c_wchar, m: c_float, n: c_double) -> c_double;
+extern fn ct_all_size() -> c_int;
+extern fn ct_all(v: CtAll) -> CtAll;
+extern fn ct_out(a: ?*c_char, b: ?*c_uchar, c: ?*c_short, d: ?*c_ushort, e: ?*c_int, f: ?*c_uint,
+	g: ?*c_long, h: ?*c_ulong, i: ?*c_longlong, j: ?*c_ulonglong, k: ?*c_size_t, l: ?*c_wchar,
+	m: ?*c_float, n: ?*c_double);
+extern fn ct_variadic(format: ?*byte, ...) -> c_double;
+extern fn ct_check_exports() -> c_int;
+
+struct CtAll
+{
+	a: c_char,
+	b: c_uchar,
+	c: c_short,
+	d: c_ushort,
+	e: c_int,
+	f: c_uint,
+	g: c_long,
+	h: c_ulong,
+	i: c_longlong,
+	j: c_ulonglong,
+	k: c_size_t,
+	l: c_wchar,
+	m: c_float,
+	n: c_double,
+}
+
+fn back_char(v: c_char) -> c_char
+{
+	return v + 2;
+}
+
+export fn anti_ct_char(v: c_char) -> c_char
+{
+	return v - 1;
+}
+
+fn back_uchar(v: c_uchar) -> c_uchar
+{
+	return v + 2;
+}
+
+export fn anti_ct_uchar(v: c_uchar) -> c_uchar
+{
+	return v - 1;
+}
+
+fn back_short(v: c_short) -> c_short
+{
+	return v + 2;
+}
+
+export fn anti_ct_short(v: c_short) -> c_short
+{
+	return v - 1;
+}
+
+fn back_ushort(v: c_ushort) -> c_ushort
+{
+	return v + 2;
+}
+
+export fn anti_ct_ushort(v: c_ushort) -> c_ushort
+{
+	return v - 1;
+}
+
+fn back_int(v: c_int) -> c_int
+{
+	return v + 2;
+}
+
+export fn anti_ct_int(v: c_int) -> c_int
+{
+	return v - 1;
+}
+
+fn back_uint(v: c_uint) -> c_uint
+{
+	return v + 2;
+}
+
+export fn anti_ct_uint(v: c_uint) -> c_uint
+{
+	return v - 1;
+}
+
+fn back_long(v: c_long) -> c_long
+{
+	return v + 2;
+}
+
+export fn anti_ct_long(v: c_long) -> c_long
+{
+	return v - 1;
+}
+
+fn back_ulong(v: c_ulong) -> c_ulong
+{
+	return v + 2;
+}
+
+export fn anti_ct_ulong(v: c_ulong) -> c_ulong
+{
+	return v - 1;
+}
+
+fn back_longlong(v: c_longlong) -> c_longlong
+{
+	return v + 2;
+}
+
+export fn anti_ct_longlong(v: c_longlong) -> c_longlong
+{
+	return v - 1;
+}
+
+fn back_ulonglong(v: c_ulonglong) -> c_ulonglong
+{
+	return v + 2;
+}
+
+export fn anti_ct_ulonglong(v: c_ulonglong) -> c_ulonglong
+{
+	return v - 1;
+}
+
+fn back_size(v: c_size_t) -> c_size_t
+{
+	return v + 2;
+}
+
+export fn anti_ct_size(v: c_size_t) -> c_size_t
+{
+	return v - 1;
+}
+
+fn back_wchar(v: c_wchar) -> c_wchar
+{
+	return v + 2;
+}
+
+export fn anti_ct_wchar(v: c_wchar) -> c_wchar
+{
+	return v - 1;
+}
+
+fn back_float(v: c_float) -> c_float
+{
+	return v + 2.0;
+}
+
+fn back_double(v: c_double) -> c_double
+{
+	return v + 2.0;
+}
+
+export fn anti_ct_float(v: c_float) -> c_float
+{
+	return v - 1.0;
+}
+
+export fn anti_ct_double(v: c_double) -> c_double
+{
+	return v - 1.0;
+}
+
+fn main() -> int
+{
+	printf("c_char size %d passed %lld at the end %d callback %lld\n".ptr,
+		(size_of(c_char) as c_int == ct_size_of(0)) as c_int, ct_char(41) as int,
+		(ct_char(ct_char_max() - 1) == ct_char_max()) as c_int, ct_call_char(back_char, 40) as int);
+	printf("c_uchar size %d passed %lld at the end %d callback %lld\n".ptr,
+		(size_of(c_uchar) as c_int == ct_size_of(1)) as c_int, ct_uchar(41) as int,
+		(ct_uchar(ct_uchar_max() - 1) == ct_uchar_max()) as c_int, ct_call_uchar(back_uchar, 40) as int);
+	printf("c_short size %d passed %lld at the end %d callback %lld\n".ptr,
+		(size_of(c_short) as c_int == ct_size_of(2)) as c_int, ct_short(41) as int,
+		(ct_short(ct_short_max() - 1) == ct_short_max()) as c_int, ct_call_short(back_short, 40) as int);
+	printf("c_ushort size %d passed %lld at the end %d callback %lld\n".ptr,
+		(size_of(c_ushort) as c_int == ct_size_of(3)) as c_int, ct_ushort(41) as int,
+		(ct_ushort(ct_ushort_max() - 1) == ct_ushort_max()) as c_int, ct_call_ushort(back_ushort, 40) as int);
+	printf("c_int size %d passed %lld at the end %d callback %lld\n".ptr,
+		(size_of(c_int) as c_int == ct_size_of(4)) as c_int, ct_int(41) as int,
+		(ct_int(ct_int_max() - 1) == ct_int_max()) as c_int, ct_call_int(back_int, 40) as int);
+	printf("c_uint size %d passed %lld at the end %d callback %lld\n".ptr,
+		(size_of(c_uint) as c_int == ct_size_of(5)) as c_int, ct_uint(41) as int,
+		(ct_uint(ct_uint_max() - 1) == ct_uint_max()) as c_int, ct_call_uint(back_uint, 40) as int);
+	printf("c_long size %d passed %lld at the end %d callback %lld\n".ptr,
+		(size_of(c_long) as c_int == ct_size_of(6)) as c_int, ct_long(41) as int,
+		(ct_long(ct_long_max() - 1) == ct_long_max()) as c_int, ct_call_long(back_long, 40) as int);
+	printf("c_ulong size %d passed %lld at the end %d callback %lld\n".ptr,
+		(size_of(c_ulong) as c_int == ct_size_of(7)) as c_int, ct_ulong(41) as int,
+		(ct_ulong(ct_ulong_max() - 1) == ct_ulong_max()) as c_int, ct_call_ulong(back_ulong, 40) as int);
+	printf("c_longlong size %d passed %lld at the end %d callback %lld\n".ptr,
+		(size_of(c_longlong) as c_int == ct_size_of(8)) as c_int, ct_longlong(41) as int,
+		(ct_longlong(ct_longlong_max() - 1) == ct_longlong_max()) as c_int, ct_call_longlong(back_longlong, 40) as int);
+	printf("c_ulonglong size %d passed %lld at the end %d callback %lld\n".ptr,
+		(size_of(c_ulonglong) as c_int == ct_size_of(9)) as c_int, ct_ulonglong(41) as int,
+		(ct_ulonglong(ct_ulonglong_max() - 1) == ct_ulonglong_max()) as c_int, ct_call_ulonglong(back_ulonglong, 40) as int);
+	printf("c_size_t size %d passed %lld at the end %d callback %lld\n".ptr,
+		(size_of(c_size_t) as c_int == ct_size_of(10)) as c_int, ct_size(41) as int,
+		(ct_size(ct_size_max() - 1) == ct_size_max()) as c_int, ct_call_size(back_size, 40) as int);
+	printf("c_wchar size %d passed %lld at the end %d callback %lld\n".ptr,
+		(size_of(c_wchar) as c_int == ct_size_of(11)) as c_int, ct_wchar(41) as int,
+		(ct_wchar(ct_wchar_max() - 1) == ct_wchar_max()) as c_int, ct_call_wchar(back_wchar, 40) as int);
+	printf("c_short least %d\n".ptr, (ct_short(ct_short_min()) == ct_short_min() + 1) as c_int);
+	printf("c_int least %d\n".ptr, (ct_int(ct_int_min()) == ct_int_min() + 1) as c_int);
+	printf("c_long least %d\n".ptr, (ct_long(ct_long_min()) == ct_long_min() + 1) as c_int);
+	printf("c_longlong least %d\n".ptr, (ct_longlong(ct_longlong_min()) == ct_longlong_min() + 1) as c_int);
+	printf("c_wchar sign and least %d %d\n".ptr, ((ct_wchar_min() < 0) as c_int == ct_wchar_signed()) as c_int,
+		(ct_wchar(ct_wchar_min()) == ct_wchar_min() + 1) as c_int);
+	printf("c_float size %d passed %.2f callback %.2f\n".ptr,
+		(size_of(c_float) as c_int == ct_size_of(12)) as c_int, ct_float(1.25) as f64,
+		ct_call_float(back_float, 1.5) as f64);
+	printf("c_double size %d passed %.2f callback %.2f\n".ptr,
+		(size_of(c_double) as c_int == ct_size_of(13)) as c_int, ct_double(1.25) as f64,
+		ct_call_double(back_double, 1.5) as f64);
+	printf("fourteen arguments %.2f\n".ptr, ct_sum(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13.5, 14.25));
+	let all = ct_all(CtAll { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, i: 9, j: 10, k: 11, l: 12,
+		m: 13.5, n: 14.25 });
+	printf("struct size %d fields %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %.2f %.2f\n".ptr,
+		(size_of(CtAll) as c_int == ct_all_size()) as c_int, all.a as int, all.b as int, all.c as int,
+		all.d as int, all.e as int, all.f as int, all.g as int, all.h as int, all.i as int, all.j as int,
+		all.k as int, all.l as int, all.m as f64, all.n as f64);
+	let out = CtAll { a: 0, b: 0, c: 0, d: 0, e: 0, f: 0, g: 0, h: 0, i: 0, j: 0, k: 0, l: 0, m: 0.0, n: 0.0 };
+	ct_out(&out.a, &out.b, &out.c, &out.d, &out.e, &out.f, &out.g, &out.h, &out.i, &out.j, &out.k, &out.l,
+		&out.m, &out.n);
+	printf("pointers %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %.2f %.2f\n".ptr,
+		out.a as int, out.b as int, out.c as int, out.d as int, out.e as int, out.f as int, out.g as int,
+		out.h as int, out.i as int, out.j as int, out.k as int, out.l as int, out.m as f64, out.n as f64);
+	let seven: c_int = 7;
+	let wide: c_long = 5;
+	printf("variadic %.2f\n".ptr, ct_variadic("ildpil".ptr, 1 as c_int, 2, 3.5, &seven,
+		(ct_int(9)) as c_int, wide as int));
+	printf("exports %x\n".ptr, ct_check_exports());
+	return 0;
+}

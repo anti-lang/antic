@@ -10,7 +10,8 @@
 #   WORK      a directory for the output
 #   CASE      static, shared, exports, two, loader, header, bundle, twice,
 #             simd, classes, failing, tuples, flags, ledger, variants,
-#             nested, names, handlers, generics or optional
+#             nested, names, handlers, generics, optional, ctypes,
+#             ctypes_shared or ctypes_bundle
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 #   CXX       the same compiler for C++, which checks the headers
@@ -380,6 +381,26 @@ elseif(CASE STREQUAL "nested")
     expect_output("${dir}/nested${EXE}" "${SOURCES}/nested.expected")
     run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only
         "${SOURCES}/nested.cpp")
+elseif(CASE MATCHES "^ctypes")
+    # Every C type Anti names, in a library built three ways: as an
+    # archive beside the runtime, as a shared library and as an archive
+    # that bundles the runtime. One C program calls each build and prints
+    # the same lines.
+    if(CASE STREQUAL "ctypes_shared")
+        library(ctypes shared "${dir}")
+        set(inputs "${library_link}")
+    elseif(CASE STREQUAL "ctypes_bundle")
+        library(ctypes static "${dir}" --bundle-runtime)
+        set(inputs "${library_file}")
+    else()
+        library(ctypes static "${dir}")
+        string(STRIP "${run_out}" line)
+        string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+        set(inputs "${library_file}" "${runtime_library}")
+    endif()
+    program("${dir}/ctypes${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/ctypes.c" INPUTS ${inputs})
+    expect_output("${dir}/ctypes${EXE}" "${SOURCES}/ctypes.expected")
 elseif(CASE STREQUAL "shared")
     library(geo shared "${dir}")
     program("${dir}/roundtrip${EXE}" OPTIONS -I "${dir}"

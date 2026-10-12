@@ -1,0 +1,25 @@
+exit 0
+c_char size 1 passed 42 at the end 1 callback 42
+c_uchar size 1 passed 42 at the end 1 callback 42
+c_short size 1 passed 42 at the end 1 callback 42
+c_ushort size 1 passed 42 at the end 1 callback 42
+c_int size 1 passed 42 at the end 1 callback 42
+c_uint size 1 passed 42 at the end 1 callback 42
+c_long size 1 passed 42 at the end 1 callback 42
+c_ulong size 1 passed 42 at the end 1 callback 42
+c_longlong size 1 passed 42 at the end 1 callback 42
+c_ulonglong size 1 passed 42 at the end 1 callback 42
+c_size_t size 1 passed 42 at the end 1 callback 42
+c_wchar size 1 passed 42 at the end 1 callback 42
+c_short least 1
+c_int least 1
+c_long least 1
+c_longlong least 1
+c_wchar sign and least 1 1
+c_float size 1 passed 2.50 callback 3.50
+c_double size 1 passed 2.50 callback 3.50
+fourteen arguments 105.75
+struct size 1 fields 2 3 4 5 6 7 8 9 10 11 12 13 14.50 15.25
+pointers 1 2 3 4 5 6 7 8 9 10 11 12 13.00 14.00
+variadic 28.50
+exports 3fff

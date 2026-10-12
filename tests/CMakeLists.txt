@@ -1777,6 +1777,39 @@ antic_program_test(program_abi_wchar
     EXPECTED "${abi_wchar_expected}"
     WORK "${CMAKE_CURRENT_BINARY_DIR}/abi")
 
+# Every C type against C, in both directions: the functions of
+# tests/abi/ctypes.c take and return each of `c_char` to `c_wchar`,
+# `c_float` and `c_double`, and call the functions the program exports. The
+# program runs as a release build, as a dev build and under
+# --memory-checks, with one expected output.
+add_library(abi_ctypes OBJECT abi/ctypes.c)
+set_target_properties(abi_ctypes PROPERTIES MSVC_RUNTIME_LIBRARY "")
+target_compile_options(abi_ctypes PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
+if(APPLE)
+    target_compile_options(abi_ctypes PRIVATE -mmacosx-version-min=11.0)
+endif()
+if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(abi_ctypes PRIVATE -fno-sanitize=all)
+endif()
+antic_program_test(program_abi_ctypes
+    "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_ctypes.anti"
+    OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_ctypes>,,>"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/abi")
+antic_program_test(program_abi_ctypes_dev
+    "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_ctypes.anti"
+    OPTIONS --dev
+    OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_ctypes>,,>"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/abi-dev")
+antic_program_test(program_abi_ctypes_memory_checks
+    "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_ctypes.anti"
+    OPTIONS --memory-checks
+    OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_ctypes>,,>"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/abi-memory-checks")
+if(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
+    set_tests_properties(program_abi_ctypes_memory_checks PROPERTIES
+        DISABLED TRUE)
+endif()
+
 # A user receives these files. None of them may name a directory of the
 # machine that built it.
 # An ordinary build maps its paths away with -ffile-prefix-map. A
@@ -3692,6 +3725,33 @@ antic_modules_test(exports_modules
     STD lang
     WORK "${CMAKE_CURRENT_BINARY_DIR}/exports-modules")
 
+# The constants of a library where the language takes a constant
+# expression: the length of an array, a constant, the value of an enum, the
+# width of a bitfield, `align(N)`, the defaults of a parameter and of a
+# field, and the arms of a `switch`.
+antic_modules_test(constants_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/constants"
+    LIBRARIES limits
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/constants-modules")
+
+# A constant of a library as the argument of a type parameter `N: int`.
+# T094 of docs/audit/tests-findings.md.
+antic_modules_test(constant_argument_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/constants"
+    LIBRARIES limits
+    PROGRAM argument
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/constant-argument-modules")
+
+# The items library once more, written with --strip-docs. A library file
+# without its doc text gives the client the same program.
+antic_modules_test(items_stripped_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/items"
+    LIBRARIES items
+    PROGRAM client
+    LIB_OPTIONS --strip-docs
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/items-stripped-modules")
+
 # The library files of the refusals below, each tree under its own
 # directory of ${LIBS}. The libraries of a tree compile in the order given,
 # each after the ones it imports.
@@ -3813,6 +3873,32 @@ add_expect_test(error_modules_missing_dependency STATUS 1
             "${LIBS}/diamond/com/example/left.antl")
 set_tests_properties(error_modules_missing_dependency PROPERTIES
     FIXTURES_REQUIRED diamond_antl)
+
+# What the driver refuses of a library for C: a module with `main`, a kind
+# of library that is neither `static` nor `shared`, and `--soname` without
+# the version it writes into the name. A wrong value of an option ends
+# antic with 2, as a wrong command line does.
+add_expect_test(error_modules_library_with_main STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "a library for C has no function `main`"
+    COMMAND "$<TARGET_FILE:antic>" --lib static
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/modules_library_with_main.a"
+            modules_library_with_main.anti)
+add_expect_test(error_modules_library_kind STATUS 2
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "--lib takes static or shared[^a-z]+not bundled"
+    COMMAND "$<TARGET_FILE:antic>" --lib bundled
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/modules_library_kind.a"
+            modules_library_options.anti)
+add_expect_test(error_modules_soname_without_a_version STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "--soname needs --package-version"
+    COMMAND "$<TARGET_FILE:antic>" --lib shared --soname
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/modules_soname${plugin_suffix}"
+            modules_library_options.anti)
 
 # An import that forms a cycle. The library file of `one` imports `two`,
 # which stood without an import when `one` was compiled, and `two` now
@@ -4818,6 +4904,62 @@ add_test(NAME plugin_host
         "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/host.expected"
         "-DPROVIDED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/provided.expected"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin.cmake")
+
+# A plugin whose interface takes and gives every kind of value: the host
+# calls each function through the table of the interface, hands the
+# library a closure and an object of its own, and ends an object the
+# library made.
+add_test(NAME plugin_kinds
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-kinds"
+        "-DHOST=kinds_host"
+        "-DLIBRARY=busy"
+        "-DINTERFACE=kinds"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/kinds_host.expected"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin_kinds.cmake")
+
+# The objects of a library that `live` counts and `unload` waits for: a
+# local object of a class of the library is gone when its function
+# returns, with a `destruct` and without one. T092 of
+# docs/audit/tests-findings.md.
+add_test(NAME plugin_locals
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-locals"
+        "-DHOST=locals_host"
+        "-DLIBRARY=locals"
+        "-DINTERFACE=tasks"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/locals_host.expected"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin_kinds.cmake")
+
+# A library that uses two modules of the standard library which its host
+# imports and does not use itself. The library resolves them against the
+# host. T093 of docs/audit/tests-findings.md.
+add_test(NAME plugin_unused
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-unused"
+        "-DHOST=stdlib_host"
+        "-DLIBRARY=stdlib"
+        "-DINTERFACE=tasks"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/stdlib_host.expected"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin_kinds.cmake")
 # The three checks of "Versions": the chain of the interface, the
 # fields it declares and the slots the program reaches through it.
 add_test(NAME plugin_versions
@@ -4944,7 +5086,7 @@ endif()
 if(ANTIC_LLVM_AR)
     foreach(case static shared exports two loader header bundle classes
             failing tuples flags variants nested simd names handlers ledger
-            generics optional)
+            generics optional ctypes ctypes_shared ctypes_bundle)
         # The C program of ledger starts its threads with pthreads.
         if(case STREQUAL "ledger" AND WIN32)
             continue()
