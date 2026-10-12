@@ -174,7 +174,9 @@ Not built yet: the refusal of a constant index past the end of a fixed array. Th
 
 ## Literals
 
-Integers in decimal and hex with `_` separators, and no `0b` or `0o` prefix. Floats with digits on both sides of `.` and an optional exponent, `1.0e9`, so `1e9` is no literal. Characters `'q'` with the escapes of a string. Strings `"..."` with the escapes `\n \r \t \\ \" \' \0 \xHH \u{H}`, where `\u{}` takes one to six hex digits. In a `str` or a `char` `\xHH` stops at 7F and `\0` is refused, and a byte string takes both. `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes. Hash delimiters `#"..."#` on every form but `x"..."`, for quotes inside. Interpolation `f"..."` with format specifications, and `rf"..."` for interpolation without escapes. The text of an `f"..."` is memory of the C library, freed with `free(s.ptr)`, and text that should live in an `ArenaAllocator` is built with `anti.text.Builder`, whose `take_in(from)` takes the allocator. Bytes in hex `x"00 AB CC"`. A pattern literal `re"..."`, see [Regular expressions](#regular-expressions). The prefixes are `r`, `b`, `br`, `f`, `rf`, `x` and `re`, one meaning each. Arrays `[1, 2, 3]` and the repeat `[v; n]`, which copies `v` into `n` elements. A slice from a pointer `[]T { ptr: p, len: n }`. `true`, `false`, `none`. Literals take their type from context.
+Integers in decimal and hex with `_` separators, and no `0b` or `0o` prefix. A decimal literal other than 0 does not start with 0, and `_` stands between two digits. Floats with digits on both sides of `.` and an optional exponent, `1.0e9`, so `1e9` is no literal. Characters `'q'` with the escapes of a string. Strings `"..."` with the escapes `\n \r \t \\ \" \' \0 \xHH \u{H}`, where `\u{}` takes one to six hex digits. In a `str` or a `char` `\xHH` stops at 7F and `\0` is refused, and a byte string takes both. `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes. Hash delimiters `#"..."#` on every form but `x"..."`, for quotes inside. Interpolation `f"..."` with format specifications, and `rf"..."` for interpolation without escapes. The text of an `f"..."` is memory of the C library, freed with `free(s.ptr)`, and text that should live in an `ArenaAllocator` is built with `anti.text.Builder`, whose `take_in(from)` takes the allocator. Bytes in hex `x"00 AB CC"`. A pattern literal `re"..."`, see [Regular expressions](#regular-expressions). The prefixes are `r`, `b`, `br`, `f`, `rf`, `x` and `re`, one meaning each, and `fr` is refused with a message that names `rf`. Arrays `[1, 2, 3]` and the repeat `[v; n]`, which copies `v` into `n` elements. A slice from a pointer `[]T { ptr: p, len: n }`. `true`, `false`, `none`.
+
+A literal takes its type from context among the types of its kind. An integer literal becomes any integer type that holds its value and never a float, so `let f: f32 = 1;` is refused and `1.0` is written.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -199,7 +201,42 @@ let j = br#"raw "bytes""#;
 let x: i8 = -128;
 let zeros = [0; 16];
 let pair = [1, 2];
+free(g.ptr);
+free(h.ptr);
 ```
+
+A format specification follows a colon inside the braces of an `f"..."`, as `[align][0][width][.precision][kind]`. Each part is optional, and the parts stand in that order.
+
+| Part | Written | Applies to |
+|---|---|---|
+| alignment | `<` left, `>` right, `^` centre | every value |
+| zero fill | `0` before a width, without an alignment | numbers |
+| width | one to nine digits, counted in characters | every value |
+| precision | `.` and the count of digits after the point | floats |
+| kind | `x`, `X`, `b` or `o` | integers |
+| kind | `e` or `f`, six digits without a precision | floats |
+
+```anti
+import anti.io;
+import anti.text;
+
+fn main() -> int
+{
+	let name = "tea";
+	let price = 2.5;
+	let n = 255;
+	let s = f"{name:>6}|{name:<6}|{name:^6}|{n:x}|{n:b}|{n:08}|{price:8.2f}|{price:e}|{{}}";
+	io.println(s);
+	free(s.ptr);
+	return 0;
+}
+```
+
+```text
+   tea|tea   | tea  |ff|11111111|00000255|    2.50|2.500000e+00|{}
+```
+
+A number stands on the right of its field and every other value on the left. `{{` and `}}` write a brace. An `f"..."` writes integers, floats, `bool`, `char`, `str` and objects, an object through its `to_text`. A specification that does not apply to the type of its value is an error, and so is an unknown one. A module that writes an `f"..."` imports `anti.text`.
 
 ## Variables and constants
 
