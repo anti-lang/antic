@@ -91,6 +91,8 @@ not re-open a settled decision without asking Eddie.
   `ownership` measured `host` 417 s. It ran each sanitizer suite in two
   parts, `ctest -I 1,1300` and `ctest -I 1301,2697`: `asan` 501 s and
   152 s, `ubsan` 448 s and 121 s. Both stand above 9 minutes as one run.
+  The step `errors` measured `host` 418 s, and the same two parts up to
+  test 2865: `asan` 526 s and 181 s, `ubsan` 462 s and 146 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -608,10 +610,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 2698 ctest tests pass on the development Mac, and two of them, the
+- 2866 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  142 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 2697 each with the same skips, without
+  183 of them are the expected failures of `tests/known-failures.txt`.
+  The ASan and the UBSan builds run 2865 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
