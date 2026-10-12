@@ -1,0 +1,26 @@
+exit 0
+bool 1 0
+char 1 0
+str 1 0
+str of other bytes 0 1
+enum 1 0
+pointer 1 0
+pointer to an equal value 0 1
+nullable pointer 0 1
+optional value 0 1
+function value 1 0
+other function 0 1
+channel 1 0
+other channel 0 1
+struct 1 0
+struct of another field 0 1
+packed struct 1 0
+tuple 1 0
+variant 1 0
+variant of another case 0 1
+fixed array 1 0
+class 1 0
+char 1 1 0 1
+str 1 1 1 0
+str by bytes 1 1
+struct with lt 1 0

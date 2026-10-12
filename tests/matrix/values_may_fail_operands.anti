@@ -1,0 +1,78 @@
+//! Two calls that may fail as the operands of one operator, as the two values
+//! of a tuple and as an index: the left one runs first, and when it fails the
+//! right one never runs. A compound assignment whose right side fails leaves
+//! its place unchanged.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn step(trail: *int, digit: int, fails: bool) -> int may fail
+{
+	*trail = *trail * 10 + digit;
+	if fails {
+		fail "refused";
+	}
+	return digit;
+}
+
+fn sum(trail: *int, first_fails: bool) -> int may fail
+{
+	return try step(trail, 1, first_fails) - try step(trail, 2, false);
+}
+
+fn pair(trail: *int, first_fails: bool) -> int may fail
+{
+	let t = (try step(trail, 3, first_fails), try step(trail, 4, false));
+	return t.0 * 10 + t.1;
+}
+
+fn add_to(trail: *int, total: *int, fails: bool) may fail
+{
+	*total += try step(trail, 5, fails);
+}
+
+fn at(trail: *int, fails: bool) -> int may fail
+{
+	let row = [10, 20, 30];
+	return row[try step(trail, 2, fails)];
+}
+
+fn main() -> int
+{
+	let trail = 0;
+	let got = sum(&trail, false) catch {
+		yield -9;
+	};
+	printf("operands %lld trail %lld\n".ptr, got, trail);
+	trail = 0;
+	got = sum(&trail, true) catch {
+		yield -9;
+	};
+	printf("left fails %lld trail %lld\n".ptr, got, trail);
+	trail = 0;
+	got = pair(&trail, false) catch {
+		yield -9;
+	};
+	printf("tuple %lld trail %lld\n".ptr, got, trail);
+	trail = 0;
+	got = pair(&trail, true) catch {
+		yield -9;
+	};
+	printf("tuple fails %lld trail %lld\n".ptr, got, trail);
+	let total = 100;
+	trail = 0;
+	add_to(&trail, &total, false) catch {
+		yield;
+	};
+	add_to(&trail, &total, true) catch {
+		yield;
+	};
+	printf("compound %lld trail %lld\n".ptr, total, trail);
+	trail = 0;
+	got = at(&trail, false) catch {
+		yield -9;
+	};
+	printf("index %lld trail %lld\n".ptr, got, trail);
+	return 0;
+}

@@ -1,0 +1,1 @@
+values_atomic_compound.anti:7:2: error: `hits` is atomic, so it is read with `load()` and written with `store(v)`

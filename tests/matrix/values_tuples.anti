@@ -1,0 +1,53 @@
+//! Tuples as values: a tuple of two kinds, one of four elements, one inside
+//! another, a write of one element, a copy that an assignment makes, a tuple as
+//! an argument and as a result, and a `let (a, b)` whose value is computed
+//! once. The layout is that of a C struct.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn divmod(a: int, b: int) -> (int, int)
+{
+	return (a / b, a % b);
+}
+
+fn swap(t: (int, str)) -> (str, int)
+{
+	return (t.1, t.0);
+}
+
+fn counted(calls: *int) -> (int, int)
+{
+	*calls += 1;
+	return (*calls, *calls * 10);
+}
+
+fn main() -> int
+{
+	let pair = (7, "seven");
+	printf("pair %lld %lld\n".ptr, pair.0, pair.1.len);
+	let four = (1, true, 'c', 2.5);
+	printf("four %lld %d %u %g\n".ptr, four.0, four.1 as c_int,
+		four.2 as u32, four.3);
+	let nested = ((1, 2), (3, "x"));
+	printf("nested %lld %lld %lld %lld\n".ptr, nested.0.0, nested.0.1,
+		nested.1.0, nested.1.1.len);
+	let copy = pair;
+	copy.0 = 8;
+	pair.1 = "eight!";
+	printf("copy %lld %lld %lld %lld\n".ptr, pair.0, pair.1.len, copy.0,
+		copy.1.len);
+	let (q, r) = divmod(-7, 2);
+	printf("divmod %lld %lld\n".ptr, q, r);
+	let swapped = swap((3, "three"));
+	printf("swap %lld %lld\n".ptr, swapped.0.len, swapped.1);
+	let calls = 0;
+	let (first, second) = counted(&calls);
+	printf("once %lld %lld %lld\n".ptr, calls, first, second);
+	let typed: (u8, i16) = (255, -32768);
+	printf("typed %d %d\n".ptr, typed.0 as c_int, typed.1 as c_int);
+	printf("size %lld %lld %lld %lld\n".ptr, size_of((u8, u8)),
+		size_of((u8, int)), size_of((int, u8)), size_of((u8, u16, u8)));
+	printf("equal %d %d\n".ptr, (pair == (7, "eight!")) as c_int,
+		(copy == pair) as c_int);
+	return 0;
+}

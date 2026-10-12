@@ -1,0 +1,55 @@
+//! Constants and what the checker folds: a constant that names another, at
+//! module level and in a block, a constant in an inner block that hides an
+//! outer one, a constant as the length of an array, an index and a field of a
+//! constant, `&&`, `||` and `!` on constants, and a constant computed from
+//! `size_of`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pt
+{
+	x: int,
+	y: int,
+}
+
+const STEP: int = 3;
+const TWICE: int = STEP * 2;
+const AREA: int = TWICE * TWICE + STEP;
+const TABLE: [4]int = [STEP, TWICE, AREA, AREA - 1];
+const THIRD: int = TABLE[2];
+const ORIGIN: Pt = Pt { x: STEP, y: -TWICE };
+const ORIGIN_Y: int = ORIGIN.y;
+const WIDE: bool = AREA > 30 && !(STEP == 4);
+const EITHER: bool = STEP > 5 || TWICE > 5;
+const NAME: str = "anti";
+const LETTER: char = 'a';
+const RATIO: f64 = 1.0 / 4.0;
+const BYTES_OF_PT: int = size_of(Pt) * 2;
+const SMALL: u8 = 200 + 100;
+const MASK: u16 = ~0;
+const SHIFTED: i8 = 1 <<% 7;
+const CLAMPED: i8 = 100 +| 100;
+const HIGH: u64 = mul_high(18446744073709551615, 18446744073709551615);
+
+fn main() -> int
+{
+	const STEP: int = 10;
+	let row: [TWICE]int = [STEP; TWICE];
+	printf("chain %lld %lld\n".ptr, TWICE, AREA);
+	printf("hidden %lld\n".ptr, STEP);
+	{
+		const STEP: int = 20;
+		printf("inner %lld\n".ptr, STEP);
+	}
+	printf("length %lld %lld\n".ptr, row.len, row[5]);
+	printf("index %lld %lld\n".ptr, THIRD, TABLE[3]);
+	printf("field %lld %lld\n".ptr, ORIGIN_Y, ORIGIN.x);
+	printf("logic %d %d\n".ptr, WIDE as c_int, EITHER as c_int);
+	printf("text %lld %u\n".ptr, NAME.len, LETTER as u32);
+	printf("float %g\n".ptr, RATIO);
+	printf("size_of %lld\n".ptr, BYTES_OF_PT);
+	printf("wrapped %d %d %d %d\n".ptr, SMALL as c_int, MASK as c_int,
+		SHIFTED as c_int, CLAMPED as c_int);
+	printf("high %llu\n".ptr, HIGH);
+	return 0;
+}

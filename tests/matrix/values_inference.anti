@@ -1,0 +1,64 @@
+//! Where a literal takes its type from: the declared type, a parameter, a
+//! result, a field, an element of an array and of a tuple, the other operand on
+//! either side, a comparison, a compound assignment, an optional type and a
+//! type argument. Without a context an integer literal is an `int` and a float
+//! literal an `f64`. Each line prints a value that only the right type gives.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Cell
+{
+	level: u8,
+	ratio: f32,
+}
+
+fn bump(n: u8) -> u8
+{
+	return n + 100;
+}
+
+fn least() -> i8
+{
+	return -128;
+}
+
+fn first<T>(a: T, b: T) -> T
+{
+	return dup(a);
+}
+
+fn main() -> int
+{
+	let plain = 255;
+	let ratio = 0.1;
+	printf("default %lld %lld %.17g\n".ptr, plain + 1, size_of(int), ratio);
+	let declared: u8 = 255;
+	printf("declared %d\n".ptr, (declared + 1) as c_int);
+	printf("parameter %d\n".ptr, bump(200) as c_int);
+	printf("result %d\n".ptr, least() as c_int);
+	let cell = Cell { level: 250, ratio: 0.1 };
+	printf("field %d %.9g\n".ptr, (cell.level + 10) as c_int,
+		cell.ratio as f64);
+	let row: [2]u16 = [65535, 1];
+	printf("element %d\n".ptr, (row[0] + row[1]) as c_int);
+	let pair: (u8, f32) = (255, 0.1);
+	printf("tuple %d %.9g\n".ptr, (pair.0 + 1) as c_int, pair.1 as f64);
+	printf("right operand %d\n".ptr, (declared + 2) as c_int);
+	printf("left operand %d\n".ptr, (2 + declared) as c_int);
+	printf("comparison %d %d\n".ptr, (declared == 255) as c_int,
+		(250 < declared) as c_int);
+	let small: u8 = 250;
+	small += 10;
+	small *= 2;
+	printf("compound %d\n".ptr, small as c_int);
+	let maybe: ?u8 = 250;
+	if let held = maybe {
+		printf("optional %d\n".ptr, (held + 10) as c_int);
+	}
+	printf("type argument %d\n".ptr, (first<u8>(250, 1) + 10) as c_int);
+	printf("inferred argument %d\n".ptr, (first(declared, 1) + 1) as c_int);
+	let half: f32 = 0.1 + 0.2;
+	let whole = 0.1 + 0.2;
+	printf("float operand %.9g %.17g\n".ptr, half as f64, whole);
+	return 0;
+}

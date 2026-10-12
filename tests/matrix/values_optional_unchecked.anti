@@ -1,0 +1,16 @@
+//! An operator on an optional value that no test has proved is refused.
+
+fn pick(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let maybe = pick(1);
+	let sum = maybe + 1;
+	return sum;
+}

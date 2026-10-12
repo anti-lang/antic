@@ -1,0 +1,137 @@
+//! `==` and `!=` on the kinds of value that are no numbers, and `<` to `>=` on
+//! the ones that have an order. A struct, a packed struct, a tuple, a variant,
+//! a fixed array and a class compare part by part. A pointer, a channel and a
+//! function value compare by identity. A `char` orders by its code point and a
+//! `str` by its bytes.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pt
+{
+	x: int,
+	y: int,
+}
+
+packed struct Pk
+{
+	a: u8,
+	b: i32,
+}
+
+enum Color
+{
+	Red,
+	Green,
+	Blue,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+class Counter
+{
+	pub n: int = 0,
+}
+
+struct Version
+{
+	major: int,
+	minor: int,
+}
+
+operator fn lt(a: Version, b: Version) -> bool
+{
+	return a.major < b.major || (a.major == b.major && a.minor < b.minor);
+}
+
+fn up(n: int) -> int
+{
+	return n + 1;
+}
+
+fn down(n: int) -> int
+{
+	return n - 1;
+}
+
+fn show(name: str, same: bool, differs: bool)
+{
+	printf("%s %d %d\n".ptr, name.ptr, same as c_int, differs as c_int);
+}
+
+fn equality(zero: int)
+{
+	let a = 1 + zero;
+	let b = 1 + zero;
+	let yes = zero == 0;
+	let letter = 'a';
+	let text = "one";
+	let color = Color.Green;
+	let pa = &a;
+	let maybe: ?*int = &a;
+	let held: ?int = a;
+	let f: fn(int) -> int = up;
+	let c1 = chan int(1);
+	let c2 = chan int(1);
+	let row = [a, 2, 3];
+	let counter = Counter { n: a };
+	show("bool", yes == true, yes != true);
+	show("char", letter == 'a', letter != 'a');
+	show("str", text == "one", text != "one");
+	show("str of other bytes", text == "two", text != "two");
+	show("enum", color == Color.Green, color != Color.Green);
+	show("pointer", pa == &a, pa != &a);
+	show("pointer to an equal value", pa == &b, pa != &b);
+	show("nullable pointer", maybe == none, maybe != none);
+	show("optional value", held == none, held != none);
+	show("function value", f == up, f != up);
+	show("other function", f == down, f != down);
+	show("channel", c1 == c1, c1 != c1);
+	show("other channel", c1 == c2, c1 != c2);
+	show("struct", Pt { x: a, y: 2 } == Pt { x: 1, y: 2 },
+		Pt { x: a, y: 2 } != Pt { x: 1, y: 2 });
+	show("struct of another field", Pt { x: a, y: 2 } == Pt { x: 1, y: 3 },
+		Pt { x: a, y: 2 } != Pt { x: 1, y: 3 });
+	show("packed struct", Pk { a: 1, b: -2 } == Pk { a: 1, b: -2 },
+		Pk { a: 1, b: -2 } != Pk { a: 1, b: -2 });
+	show("tuple", (a, true) == (1, true), (a, true) != (1, true));
+	show("variant", Shape.Circle { r: a } == Shape.Circle { r: 1 },
+		Shape.Circle { r: a } != Shape.Circle { r: 1 });
+	show("variant of another case", Shape.Circle { r: a } == Shape.Empty,
+		Shape.Circle { r: a } != Shape.Empty);
+	show("fixed array", row == [1, 2, 3], row != [1, 2, 3]);
+	show("class", counter == Counter { n: 1 }, counter != Counter { n: 1 });
+	delete(c1);
+	delete(c2);
+}
+
+fn order(zero: int)
+{
+	let b: char = 'b';
+	let last = '\u{10FFFF}';
+	let pear = "pear";
+	let v1 = Version { major: 1, minor: 9 + zero };
+	let v2 = Version { major: 2, minor: 0 };
+	printf("char %d %d %d %d\n".ptr, ('a' < b) as c_int, (b <= 'b') as c_int,
+		(b > last) as c_int, (last >= b) as c_int);
+	printf("str %d %d %d %d\n".ptr, (pear < "plum") as c_int,
+		(pear <= "pear") as c_int, (pear > "pea") as c_int,
+		("" >= pear) as c_int);
+	printf("str by bytes %d %d\n".ptr, ("Z" < "a") as c_int,
+		("z" < "\u{e9}") as c_int);
+	printf("struct with lt %d %d\n".ptr, (v1 < v2) as c_int,
+		(v2 < v1) as c_int);
+}
+
+fn main(args: []str) -> int
+{
+	let zero = args.len - 1;
+	equality(zero);
+	order(zero);
+	return 0;
+}

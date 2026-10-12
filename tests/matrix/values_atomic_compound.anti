@@ -1,0 +1,9 @@
+//! A compound assignment on an atomic local is refused: an atomic is read and
+//! written by its calls alone.
+
+fn main() -> int
+{
+	let hits: atomic int = 0;
+	hits += 1;
+	return hits.load();
+}

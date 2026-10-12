@@ -1,0 +1,12 @@
+exit 0
+signed 1 2 4 8 8
+unsigned 1 2 4 8 8 1
+floats 2 4 8 8
+bool char str 1 4 16
+pointers 8 8 8 8
+slice array 16 10 24
+optional 2 16 24
+tuple 2 16
+struct 24 5 8
+enum variant simd 4 1 16 16
+parameter 2 24
