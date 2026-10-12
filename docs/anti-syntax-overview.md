@@ -1263,6 +1263,24 @@ Not built yet: the cache of copies in a dev build. A library file carries no fun
 
 `transient` on a `?*T` or `?fn(...)` field marks derived state, such as a cache. `dup` gives the copy `none` there, and the default `equals`, `hash` and `serialize` pass over the field. The class frees it in its own `destruct`.
 
+```anti
+class Image
+{
+	pub own pixels: []byte,
+	transient cache: ?*byte = none,
+
+	concrete fn destruct(self) { free(self.cache); }
+}
+
+fn show(lent i: *Image) { }
+fn keep_image(own i: Image) { }
+
+let a = Image { pixels: []byte { ptr: alloc(byte, 16), len: 16 } };
+let b = dup(a);         // a second Image with pixels of its own
+show(&a);
+keep_image(a);          // a moves, and naming it again is refused
+```
+
 <!-- overview: context, docs-style:ignore
 ```anti
 class Texture
@@ -1281,6 +1299,8 @@ class Buffer
 ```
 
 A class value with `destruct`, an `own` field or an owning part owns something, and so does a collection. A struct or a tuple with a part that owns something follows the value rules of a class value: it is torn down part by part at the end of its block, `=` refuses it, `dup` copies it and it moves into an `own` parameter. A variant with a case that owns something follows the same rules and is torn down by its tag, the fields of the case it holds. One that owns nothing stays plain data. An owning local named in a tuple, struct, class or case literal moves into it, and naming it afterwards is refused. In generic code a local of a type parameter moves on `let` and `=` for every `T`, and `dup(x)` is the copy. `destroy(p)` tears down a value of any type in place, and `dup(x)` of a value of a type parameter copies the value. A parameter that is not `own` belongs to the caller: `let`, `=`, a literal, an `own` argument and `return` refuse one whose value owns something, or whose type is a type parameter. `own` takes it over and `dup(p)` copies it, and `dup(x)` of a class value gives a value. `*dup(p)` and `*alloc T { }` are refused, since nothing could free the new object, and `dup(*p)` copies the value instead. A value that owns nothing and holds no pointer is copied into an `own` parameter and stays with its caller. `own` before a parameter takes ownership of the argument, for a value of any type. Passing a local moves it, and naming the local again is refused. The function tears the value down at every exit unless it moves on by a call, `=`, `let` or `return`. `lent` before a pointer parameter says the pointer is valid only during the call. The function may read and change through it and pass it on to another `lent` parameter, and may not store it, return it, capture it in a closure that outlives the call or pass it to a `keep` or `own` place. `lent` before a slice parameter, `fn(lent []T)`, follows the same rules. A pointer or a slice derived from a lent one, `s.ptr`, `&p.field`, `&s[i]` or a part of a slice, is lent as well, and its one exit is an argument of an `extern fn`, whose contract decides whether C keeps it. `anti.mem.Shared<T>` gives an object more than one owner through an atomic count: `share()` gives another handle and counts it, `=` stays refused, `read(f)` and `modify(f)` lend the object, and the object is destroyed when its last handle is freed. Two shared objects that hold each other are never freed.
+
+A local does not move inside a loop, while a `defer` or an `undo` names it, or once a closure captured it. `[v; n]` refuses a `v` that owns something, since it would copy it. `return` of a field that owns something is refused by the rule of `let` and `=`, and `dup` gives the copy to return.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -1323,6 +1343,8 @@ let shapes = List<Shared<Circle>>.new();
 shapes.push(c.share());
 c.modify(fn(p) { p.r = 3.0; });
 ```
+
+Not built yet: the refusal of a `return` of a field that owns something. It compiles today, and both the caller and the object then tear the value down.
 
 ## Pointers
 
