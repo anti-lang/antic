@@ -2052,6 +2052,11 @@ A level is a code-generation setting, not a target. `--cpu` takes `v1`, `v2` or 
 
 x86-64-v3 writes the VEX forms of the scalar float instructions, and an atomic operation is one instruction at `armv8.2` and above. The runtime archive holds one runtime per target and level in `lib/<target>/<level>/`, so a program below the default links a runtime of its own level. Every program checks the processor at start against the level of the runtime it linked, and refuses a machine below it. The native libraries are built for the default level alone, and a program below it that imports one is refused at link. `antic --print-cpu-levels` prints the table.
 
+```sh
+antic --target linux-x86_64 --cpu v2 app.anti -o app
+anti build --release --cpu armv8.2
+```
+
 ## Warnings and safety checks
 
 The compiler reports four kinds of problem. An error stops every build and nothing silences it. A warning prints and carries on in a dev build and stops a release build, and `allow(name, "reason")` silences it. A safety check stops every build, and `unchecked(name, "reason")` overrules it. A run-time check traps with file and line in a dev build and is not compiled in release unless `--checks` asks.
