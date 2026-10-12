@@ -5177,6 +5177,7 @@ add_test(NAME options_covered
             "-DOPEN=${CMAKE_CURRENT_SOURCE_DIR}/options-open.txt"
             "-DANTIC=$<TARGET_FILE:antic>" "-DANTI=$<TARGET_FILE:anti>"
             "-DCTEST=${CMAKE_CTEST_COMMAND}" "-DTREE=${CMAKE_BINARY_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/options-covered/tree"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_options_covered.cmake")
 add_test(NAME options_covered_runner
     COMMAND "${CMAKE_COMMAND}"

@@ -6,8 +6,9 @@
 #   OPEN      tests/options-open.txt
 #   ANTIC     the path of antic in the build tree
 #   ANTI      the path of anti in the build tree
-#   CTEST     ctest, with TREE the build tree whose tests it lists
-#   COMMANDS  instead of CTEST and TREE, a file that holds what
+#   CTEST     ctest, with TREE the build tree whose tests it lists and
+#             WORK a directory for what it prints
+#   COMMANDS  instead of CTEST, TREE and WORK, a file that holds what
 #             `ctest -N -V` prints
 #
 # A unit is one line of OPEN: `antic <option>`, `anti <command>`,
@@ -147,16 +148,19 @@ endforeach()
 list(REMOVE_DUPLICATES units)
 
 # The command lines of the registered tests.
-if(DEFINED COMMANDS)
-    file(READ "${COMMANDS}" listing)
-else()
+if(NOT DEFINED COMMANDS)
+    # ctest writes into a file, as every program a test reads does.
+    file(MAKE_DIRECTORY "${WORK}")
+    set(COMMANDS "${WORK}/commands.txt")
     execute_process(COMMAND "${CTEST}" --test-dir "${TREE}" -N -V
-                    RESULT_VARIABLE status OUTPUT_VARIABLE listing
-                    ERROR_VARIABLE err)
+                    RESULT_VARIABLE status OUTPUT_FILE "${COMMANDS}"
+                    ERROR_FILE "${WORK}/ctest.err")
     if(NOT status EQUAL 0)
+        file(READ "${WORK}/ctest.err" err)
         message(FATAL_ERROR "ctest -N -V failed with ${status}\n${err}")
     endif()
 endif()
+file(READ "${COMMANDS}" listing)
 # antic first, since the path of anti starts the path of antic.
 string(REPLACE "${ANTIC}" "${IS_ANTIC}" listing "${listing}")
 string(REPLACE "${ANTI}" "${IS_ANTI}" listing "${listing}")
