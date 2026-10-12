@@ -356,10 +356,12 @@ foreach(refused "--profile-generate" "--release;--profile-generate;--lib;static"
     endif()
 endforeach()
 build("the instrumented build" build --release --profile-generate)
-set(ENV{LLVM_PROFILE_FILE} "${WORK}/app.profraw")
-program_expect("the instrumented program" COMMAND "${release}" STATUS 9
-               OUT "one\n")
-unset(ENV{LLVM_PROFILE_FILE})
+# The variable is set for the program alone, as tests/run_profile.cmake
+# sets it.
+program_expect("the instrumented program"
+               COMMAND "${CMAKE_COMMAND}" -E env
+                       "LLVM_PROFILE_FILE=${WORK}/app.profraw" "${release}"
+               STATUS 9 OUT "one\n")
 execute_process(COMMAND "${LLVM_BIN}/llvm-profdata${exe}" merge
                         -o "${WORK}/app.profdata" "${WORK}/app.profraw"
                 RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)

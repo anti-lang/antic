@@ -119,16 +119,22 @@ endfunction()
 set(generated "${WORK}/generated${exe}")
 built("${generated}" --profile-generate)
 expect_link("${generated}${object}")
-set(ENV{LLVM_PROFILE_FILE} "${WORK}/run.profraw")
-program_expect("${name} instrumented" COMMAND ${run} "${generated}"
+# DESIGN: the variable is set for the program alone and never for the
+# script. In a coverage tree antic writes a profile of its own to the file
+# the variable names, and a script that unset it sent the profile of every
+# later antic into the working directory.
+program_expect("${name} instrumented"
+               COMMAND "${CMAKE_COMMAND}" -E env
+                       "LLVM_PROFILE_FILE=${WORK}/run.profraw"
+                       ${run} "${generated}"
                EXPECTED "${expected}")
-unset(ENV{LLVM_PROFILE_FILE})
 if(NOT EXISTS "${WORK}/run.profraw")
     message(FATAL_ERROR "the run of ${generated} wrote no ${WORK}/run.profraw")
 endif()
 if("${REFUSALS}")
     file(MAKE_DIRECTORY "${WORK}/default")
-    execute_process(COMMAND ${run} "${generated}"
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env
+                            --unset=LLVM_PROFILE_FILE ${run} "${generated}"
                     WORKING_DIRECTORY "${WORK}/default"
                     RESULT_VARIABLE status OUTPUT_QUIET)
     file(GLOB default_profiles "${WORK}/default/default_*.profraw")
