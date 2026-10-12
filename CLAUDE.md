@@ -221,6 +221,7 @@ for a reader's build and never for a release.
 | `src/std/` | The standard library in Anti, 0BSD |
 | `src/native/` | The recipes that build the third-party C libraries of the runtime archive |
 | `tests/` | Test programs, expected outputs, the runner |
+| `tests/matrix/` | The matrix of constructs and contexts, by decision 28 of "Decisions of 2026-10-11" |
 | `tools/` | Helper scripts, the pins, the installers and the docs-style checker |
 | `tools/keys/` | `release.pem`, the public key that checks the LLVM tools, and the ignored `private/` |
 | `docs/` | The specifications, the decisions and the reports |
