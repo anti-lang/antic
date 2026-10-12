@@ -1101,7 +1101,39 @@ let s = &c as *Serializable;
 s.serialize(&b);
 ```
 
-`implements name: Iface,` places the interface's table pointer and fields inside the object at a named field. `&c` converts to `*Serializable` implicitly. A `concrete fn` without a qualifier fills every table with that name that no qualified body of its class fills, and the nearest body wins down the chain. Two qualified bodies of one name fill the tables of two interfaces whose signatures differ, and `c.f()` on the class is ambiguous when two or more interfaces have qualified bodies of `f` and no unqualified body exists. A single qualified body is reached through its interface's table. `use name: T,` is composition: `T`'s public names are reachable on the class and the class does not convert to `*T`. A program with an abstract class that no class fills gets the warning `unfilled-abstract`.
+`implements name: Iface,` places the interface's table pointer and fields inside the object at a named field. `&c` converts to `*Serializable` implicitly. A `concrete fn` without a qualifier fills every table with that name that no qualified body of its class fills, and the nearest body wins down the chain. Two qualified bodies of one name fill the tables of two interfaces whose signatures differ, and `c.f()` on the class is ambiguous when two or more interfaces have qualified bodies of `f` and no unqualified body exists. A single qualified body is reached through its interface's table. A program with an abstract class that no class fills gets the warning `unfilled-abstract`.
+
+Where two sub-objects of a class reach one interface, the object holds that interface twice. The conversion of `&c` to it is refused with a message that names both sub-objects, and the code names one.
+
+`use name: T,` is composition: `T`'s public names are reachable on the class and the class does not convert to `*T`. A generic interface is implemented with its type arguments, `implements src: Source<int>`.
+
+```anti
+class Rect
+{
+	pub w: int = 0,
+	pub h: int = 0,
+
+	pub fn area(self) -> int { return self.w * self.h; }
+}
+
+abstract class Source<T>
+{
+	abstract fn next(self) -> ?T;
+}
+
+class Sprite
+{
+	use rect: Rect,
+	implements src: Source<int>,
+
+	concrete fn next(self) -> ?int { return none; }
+}
+
+let s = Sprite { rect: Rect { w: 3, h: 4 } };
+let a = s.area();
+let w = s.w;
+let src: *Source<int> = &s;
+```
 
 ## Generics
 
