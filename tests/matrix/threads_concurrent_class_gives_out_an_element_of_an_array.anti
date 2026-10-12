@@ -1,0 +1,20 @@
+//! A public function of a concurrent class gives out no pointer into its
+//! fields, and an element of an array field is one.
+
+concurrent class Tally
+{
+	lock: Mutex,
+	cells: [4]int = [0; 4] guarded by lock,
+
+	pub fn first(self) -> *int
+	{
+		sync self.lock {
+			return &self.cells[0];
+		}
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+threads_equal_with_a_concurrent_class_in_a_variant_field.anti:23:9: error: `==` is not defined on `Holder`, whose field `part` has no `eq`

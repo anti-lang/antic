@@ -1,0 +1,1 @@
+threads_concurrent_class_gives_out_an_element_of_an_array.anti:12:11: error: `first` of the thread-safe class `Tally` gives out a pointer into its fields, return a copy

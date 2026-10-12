@@ -1,0 +1,1 @@
+modules_plugin_instance_without_an_interface.anti:11:10: error: `instance` of a library takes 1 argument, found 0

@@ -1,0 +1,1 @@
+modules_plugin_supports_with_one_argument.anti:24:10: error: `supports` of a library takes 2 arguments, found 1

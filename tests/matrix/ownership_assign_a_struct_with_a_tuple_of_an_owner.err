@@ -1,0 +1,1 @@
+ownership_assign_a_struct_with_a_tuple_of_an_owner.anti:16:7: error: `Rows` owns what its parts own, use `dup` instead of `=`

@@ -1,0 +1,1 @@
+values_call_of_a_field_that_is_no_function.anti:11:10: error: cannot call `int`

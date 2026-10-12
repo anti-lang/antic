@@ -1,0 +1,20 @@
+//! A public function of a concurrent class gives out no slice of an array
+//! field.
+
+concurrent class Tally
+{
+	lock: Mutex,
+	cells: [4]int = [0; 4] guarded by lock,
+
+	pub fn some(self) -> []int
+	{
+		sync self.lock {
+			return self.cells[0..2];
+		}
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

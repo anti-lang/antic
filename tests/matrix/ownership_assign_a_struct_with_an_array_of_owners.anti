@@ -1,0 +1,22 @@
+//! A struct whose field is an array of structs that own memory owns it too, and
+//! `=` copies no such value.
+
+class Node
+{
+	pub own p: ?*int = none,
+}
+
+struct Rows
+{
+	part: [2]Node,
+}
+
+fn copy(a: *Rows, b: *Rows)
+{
+	*a = *b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

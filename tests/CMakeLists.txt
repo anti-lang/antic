@@ -3079,6 +3079,26 @@ add_test(NAME silent_doc_declared
 set_tests_properties(silent_doc_declared PROPERTIES
     FAIL_REGULAR_EXPRESSION "warning")
 
+# A doc comment names an alias, a module path, a case and a field of a case
+# without a warning, and a star or a `<` that opens no markup gets none.
+add_expect_test(silent_doc_names STATUS 0
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
+            --runtime "${ANTIC_RUNTIME_DIR}" doc_names.anti)
+add_expect_test(silent_doc_plain_marks STATUS 0
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
+            doc_plain_marks.anti)
+# Emphasis before each character that may follow it, and the two forms of
+# an HTML tag that hold a `/`.
+add_expect_test(warning_doc_emphasis_closers STATUS 0
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/doc_emphasis_closers.err"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
+            doc_emphasis_closers.anti)
+
 # A doc comment inside `{ }` of `f"..."` is dropped with a warning, as one
 # inside any other expression is.
 add_test(NAME warning_format_doc

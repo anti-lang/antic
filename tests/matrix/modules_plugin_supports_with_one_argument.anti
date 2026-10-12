@@ -1,0 +1,26 @@
+//! `supports` of a library takes an interface and the name of a function.
+
+import anti.lang;
+import anti.plugin;
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	let lib = plugin.load("shapes") catch {
+		return 1;
+	};
+	let s = lib.supports(Shape);
+	return 0;
+}

@@ -1,0 +1,17 @@
+//! A field is guarded by a Mutex of its own class.
+
+class Other
+{
+	pub lock: Mutex,
+}
+
+concurrent class Tally
+{
+	lock: Mutex,
+	n: int = 0 guarded by Other.lock,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,12 @@
+//! A name after the name of a class is a function or a constant of the class.
+
+struct Pair
+{
+	a: int,
+}
+
+fn main() -> int
+{
+	let n = Pair.nothing();
+	return 0;
+}

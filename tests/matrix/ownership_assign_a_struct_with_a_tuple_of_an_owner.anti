@@ -1,0 +1,22 @@
+//! A struct whose field is a tuple with a struct that owns memory owns it too,
+//! and `=` copies no such value.
+
+class Node
+{
+	pub own p: ?*int = none,
+}
+
+struct Rows
+{
+	part: (Node, int),
+}
+
+fn copy(a: *Rows, b: *Rows)
+{
+	*a = *b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,19 @@
+//! A doc comment names what its module reaches without a warning: the alias of
+//! an import, the whole path of an imported module, the first part of that
+//! path, a case of a variant and a field of a case.
+import anti.lang;
+import anti.text as words;
+
+/// `Circle` and `Empty` are its cases, and `r` is the field of one.
+pub variant Shape
+{
+	Circle { r: f32 },
+	Empty,
+}
+
+/// Names `words.Builder` through the alias `words`, the module `anti.text` by
+/// its whole path and `anti` as the first part of it.
+pub fn zero() -> int
+{
+	return 0;
+}

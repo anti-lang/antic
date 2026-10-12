@@ -1,0 +1,13 @@
+//! A class without a `construct` that takes arguments is built by a literal,
+//! and a call of its name builds none.
+
+class Counter
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let c = Counter();
+	return 0;
+}

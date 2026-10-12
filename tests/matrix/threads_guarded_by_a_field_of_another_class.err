@@ -1,0 +1,1 @@
+threads_guarded_by_a_field_of_another_class.anti:11:13: error: `Other` is no class around `n`

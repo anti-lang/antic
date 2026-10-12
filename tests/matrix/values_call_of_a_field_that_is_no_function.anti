@@ -1,0 +1,13 @@
+//! A field that holds an `int` is not called.
+
+struct Pair
+{
+	a: int,
+}
+
+fn main() -> int
+{
+	let p = Pair { a: 1 };
+	let n = p.a();
+	return 0;
+}

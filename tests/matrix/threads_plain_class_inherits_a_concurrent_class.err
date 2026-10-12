@@ -1,0 +1,1 @@
+threads_plain_class_inherits_a_concurrent_class.anti:9:12: error: `More` inherits the concurrent class `Tally`, and is written `concurrent class`

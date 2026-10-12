@@ -1,0 +1,12 @@
+//! Marks of a doc comment that open no emphasis and no HTML tag: a star before
+//! inline code, a star that nothing closes, and a `<` before a digit or before
+//! a space.
+
+/// Reads *p before `first` is set.
+pub const first: int = 1;
+
+/// A lone *star closes nowhere in this line
+pub const second: int = 2;
+
+/// Holds for n <5 and for a < b alike.
+pub const third: int = 3;

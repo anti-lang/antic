@@ -1,0 +1,1 @@
+classes_field_of_two_use_fields.anti:17:2: error: `n` is provided by both `left` and `right`

@@ -1,0 +1,13 @@
+//! `instance` of a library takes the interface it builds.
+
+import anti.lang;
+import anti.plugin;
+
+fn main() -> int
+{
+	let lib = plugin.load("shapes") catch {
+		return 1;
+	};
+	let s = lib.instance();
+	return 0;
+}

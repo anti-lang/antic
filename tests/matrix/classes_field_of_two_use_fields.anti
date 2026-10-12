@@ -1,0 +1,25 @@
+//! A class with two `use` fields that both hold a field `n` is refused where it
+//! is declared.
+
+class Left
+{
+	pub n: int = 1,
+}
+
+class Right
+{
+	pub n: int = 2,
+}
+
+class Both
+{
+	use left: Left,
+	use right: Right,
+}
+
+fn main() -> int
+{
+	let b = Both { };
+	let n = b.n;
+	return 0;
+}

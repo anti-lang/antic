@@ -1,0 +1,18 @@
+//! A concurrent class inherits a class of its kind or an abstract class without
+//! fields.
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+concurrent class Tally inherits Plain
+{
+	lock: Mutex,
+	m: int = 0 guarded by lock,
+}
+
+fn main() -> int
+{
+	return 0;
+}

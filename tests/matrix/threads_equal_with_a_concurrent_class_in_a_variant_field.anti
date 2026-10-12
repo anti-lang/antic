@@ -1,0 +1,29 @@
+//! A class whose field is a variant with a concurrent class has no default
+//! `==`.
+
+concurrent class Tally
+{
+	pub atomic n: int = 0,
+}
+
+variant Slot
+{
+	Full { t: Tally },
+	Empty,
+}
+
+class Holder
+{
+	pub k: int = 0,
+	pub part: Slot,
+}
+
+fn same(a: Holder, b: Holder) -> bool
+{
+	return a == b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,16 @@
+//! A class that inherits a concurrent class is written `concurrent class`.
+
+concurrent class Tally
+{
+	lock: Mutex,
+	n: int = 0 guarded by lock,
+}
+
+class More inherits Tally
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -2,7 +2,7 @@
 
 concurrent class Counter
 {
-	lock: Mutex = Mutex.new(),
+	lock: Mutex,
 	n: int = 0 guarded by 5,
 }
 

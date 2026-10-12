@@ -1,0 +1,75 @@
+//! The default hash and the default `==` over parts that bring their own: two
+//! fields of one struct type with `operator fn hash` and `operator fn eq`, a
+//! variant with the two operators, twice in a struct, and a class with a Mutex,
+//! which both defaults pass over. The program prints one line per form.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Key
+{
+	id: int,
+	note: int,
+}
+
+operator fn hash(k: Key) -> u64
+{
+	return k.id as u64;
+}
+
+operator fn eq(a: Key, b: Key) -> bool
+{
+	return a.id == b.id;
+}
+
+struct Pair
+{
+	left: Key,
+	right: Key,
+}
+
+variant Mark
+{
+	Named { id: int, note: int },
+	Empty,
+}
+
+operator fn hash(m: Mark) -> u64
+{
+	return 7;
+}
+
+operator fn eq(a: Mark, b: Mark) -> bool
+{
+	return a.tag == b.tag;
+}
+
+struct Marks
+{
+	first: Mark,
+	second: Mark,
+}
+
+class Guarded
+{
+	pub lock: Mutex,
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let a = Pair { left: Key { id: 1, note: 5 }, right: Key { id: 2, note: 6 } };
+	let b = Pair { left: Key { id: 1, note: 8 }, right: Key { id: 2, note: 9 } };
+	let m = Marks { first: Mark.Named { id: 1, note: 2 }, second: Mark.Empty };
+	let n = Marks { first: Mark.Named { id: 3, note: 4 }, second: Mark.Empty };
+	let g = Guarded { lock: Mutex.new(), n: 4 };
+	let h = Guarded { lock: Mutex.new(), n: 4 };
+	let c = Pair { left: Key { id: 9, note: 5 }, right: Key { id: 2, note: 6 } };
+	let k = Marks { first: Mark.Empty, second: Mark.Empty };
+	let i = Guarded { lock: Mutex.new(), n: 5 };
+	printf("struct fields %d %d %d\n".ptr, (a == b) as c_int, (a == c) as c_int, (a.hash() == b.hash()) as c_int);
+	printf("variant fields %d %d %d\n".ptr, (m == n) as c_int, (m == k) as c_int, (m.hash() == n.hash()) as c_int);
+	printf("lock %d %d %d\n".ptr, (g == h) as c_int, (g == i) as c_int, (g.hash() == h.hash()) as c_int);
+	return 0;
+}

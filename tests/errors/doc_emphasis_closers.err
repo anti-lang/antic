@@ -1,0 +1,7 @@
+doc_emphasis_closers.anti:4:1: warning: the doc comment of `comma` holds emphasis, which the doc markup has not [doc-markup]
+doc_emphasis_closers.anti:7:1: warning: the doc comment of `parenthesis` holds emphasis, which the doc markup has not [doc-markup]
+doc_emphasis_closers.anti:10:1: warning: the doc comment of `colon` holds emphasis, which the doc markup has not [doc-markup]
+doc_emphasis_closers.anti:13:1: warning: the doc comment of `semicolon` holds emphasis, which the doc markup has not [doc-markup]
+doc_emphasis_closers.anti:16:1: warning: the doc comment of `quote` holds emphasis, which the doc markup has not [doc-markup]
+doc_emphasis_closers.anti:19:1: warning: the doc comment of `closing` holds HTML, which the doc markup has not [doc-markup]
+doc_emphasis_closers.anti:22:1: warning: the doc comment of `empty` holds HTML, which the doc markup has not [doc-markup]

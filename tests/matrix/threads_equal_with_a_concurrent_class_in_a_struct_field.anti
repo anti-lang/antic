@@ -1,0 +1,28 @@
+//! A class whose field is a struct with a concurrent class has no default `==`.
+
+concurrent class Tally
+{
+	pub atomic n: int = 0,
+}
+
+struct Wrap
+{
+	a: Tally,
+	b: Tally,
+}
+
+class Holder
+{
+	pub k: int = 0,
+	pub part: Wrap,
+}
+
+fn same(a: Holder, b: Holder) -> bool
+{
+	return a == b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

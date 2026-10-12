@@ -1,0 +1,1 @@
+threads_concurrent_class_inherits_a_class_with_fields.anti:9:24: error: the concurrent class `Tally` inherits `Plain`, which is neither of its kind nor an abstract class without fields

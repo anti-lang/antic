@@ -1,0 +1,23 @@
+//! Emphasis is outside the doc markup whatever follows its closing star, and so
+//! is an HTML tag that closes or that closes itself.
+
+/// With *one*, a comma follows.
+pub const comma: int = 1;
+
+/// With (*two*) a parenthesis follows.
+pub const parenthesis: int = 2;
+
+/// With *three*: a colon follows.
+pub const colon: int = 3;
+
+/// With *four*; a semicolon follows.
+pub const semicolon: int = 4;
+
+/// With "*five*" a quote follows.
+pub const quote: int = 5;
+
+/// A tag that closes, </b>, is HTML.
+pub const closing: int = 6;
+
+/// A tag that closes itself, <br/>, is HTML.
+pub const empty: int = 7;

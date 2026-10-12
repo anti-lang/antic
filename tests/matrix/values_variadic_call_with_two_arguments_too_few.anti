@@ -1,0 +1,9 @@
+//! A variadic function takes its fixed parameters at least.
+
+extern fn sum(first: c_int, second: c_int, ...) -> c_int;
+
+fn main() -> int
+{
+	let n = sum();
+	return 0;
+}
