@@ -1,0 +1,1 @@
+flow_fail_in_defer.anti:8:8: error: `fail` inside a `defer`

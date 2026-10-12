@@ -11,3 +11,30 @@
 # tests/CMakeLists.txt sets WILL_FAIL on every listed test, so a listed
 # test that passes fails the suite. The fix of a finding removes its lines.
 # The test known_failures checks the list against the table of the findings.
+matrix_flow_return_value_in_defer_refused T001 A `return` of a value inside a `defer` is not refused.
+matrix_flow_return_plain_in_defer_refused T001 A `return` without a value inside a `defer` is not refused.
+matrix_flow_return_value_in_undo_refused T001 A `return` of a value inside an `undo` is not refused.
+matrix_flow_return_plain_in_undo_refused T001 A `return` without a value inside an `undo` is not refused.
+matrix_flow_break_out_of_defer_refused T001 A `break` inside a `defer` is not refused.
+matrix_flow_continue_out_of_defer_refused T001 A `continue` inside a `defer` is not refused.
+matrix_flow_break_out_of_undo_refused T001 A `break` inside an `undo` is not refused.
+matrix_flow_continue_out_of_undo_refused T001 A `continue` inside an `undo` is not refused.
+matrix_flow_fail_in_defer_refused T001 A `fail` inside a `defer` is not refused.
+matrix_flow_fail_in_undo_refused T001 A `fail` inside an `undo` is not refused.
+matrix_flow_try_in_defer_refused T001 A `try` inside a `defer` is not refused.
+matrix_flow_try_in_undo_refused T001 A `try` inside an `undo` is not refused.
+matrix_flow_yield_in_defer_refused T002 antic crashes on a `yield` inside a `defer` of a handler.
+matrix_flow_defer_failing_call_in_try_dev T003 antic crashes on a failing call that a `defer` in a `try` block holds.
+matrix_flow_defer_failing_call_in_try_release T003 antic crashes on a failing call that a `defer` in a `try` block holds.
+matrix_flow_defer_failing_call_in_try_memory_checks T003 antic crashes on a failing call that a `defer` in a `try` block holds.
+matrix_flow_if_let_binding_in_closure_dev T004 A closure reads the name of an `if let` as a value that may be `none`.
+matrix_flow_if_let_binding_in_closure_release T004 A closure reads the name of an `if let` as a value that may be `none`.
+matrix_flow_if_let_binding_in_closure_memory_checks T004 A closure reads the name of an `if let` as a value that may be `none`.
+matrix_flow_closure_reads_caught_error_dev T005 A closure in a handler reads another word for the error the handler binds.
+matrix_flow_closure_reads_caught_error_release T005 A closure in a handler reads another word for the error the handler binds.
+matrix_flow_closure_reads_caught_error_memory_checks T005 A closure in a handler reads another word for the error the handler binds.
+matrix_flow_closure_reads_try_error_dev T005 A closure in a handler reads another word for the error the handler binds.
+matrix_flow_closure_reads_try_error_release T005 A closure in a handler reads another word for the error the handler binds.
+matrix_flow_closure_reads_try_error_memory_checks T005 A closure in a handler reads another word for the error the handler binds.
+matrix_flow_defer_directly_in_defer_refused T006 The refusal of a `defer` in a `defer` stands at the next statement.
+matrix_flow_undo_directly_in_undo_refused T006 The refusal of an `undo` in an `undo` stands at the next statement.

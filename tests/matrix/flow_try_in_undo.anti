@@ -1,0 +1,26 @@
+//! A `try` inside an `undo` is refused, by decision 19 of the decisions of
+//! 2026-10-11.
+
+import anti.lang;
+
+fn step(n: int) may fail
+{
+	if n > 2 {
+		fail "too large";
+	}
+}
+
+fn run(n: int) -> int may fail
+{
+	undo try step(n);
+	try step(n);
+	return n;
+}
+
+fn main() -> int
+{
+	let got = run(3) catch {
+		yield 0;
+	};
+	return got;
+}

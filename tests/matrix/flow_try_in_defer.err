@@ -1,0 +1,1 @@
+flow_try_in_defer.anti:15:8: error: `try` inside a `defer`

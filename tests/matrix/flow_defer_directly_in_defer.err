@@ -1,0 +1,1 @@
+flow_defer_directly_in_defer.anti:6:8: error: a `defer` holds one statement, not another `defer`

@@ -1,0 +1,1 @@
+flow_continue_out_of_defer.anti:8:9: error: `continue` inside a `defer`

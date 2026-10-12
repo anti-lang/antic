@@ -1,0 +1,38 @@
+//! The name an `if let` binds holds the value without `none` in its block, and
+//! a closure in that block reads it as such.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn each(count: int, f: fn(int))
+{
+	for i in 0..count {
+		f(i);
+	}
+}
+
+fn half(n: int) -> ?int
+{
+	if n % 2 == 0 {
+		return n / 2;
+	}
+	return none;
+}
+
+fn run(n: int) -> int
+{
+	let acc = 0;
+	if let h = half(n) {
+		each(2, fn(k) {
+			acc += h * 10;
+		});
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	printf("%d %d\n".ptr, run(4) as c_int, run(3) as c_int);
+	return 0;
+}

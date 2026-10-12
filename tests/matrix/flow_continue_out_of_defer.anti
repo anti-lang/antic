@@ -1,0 +1,17 @@
+//! A `continue` inside a `defer` that would go on with the loop around the
+//! `defer` is refused, by decision 19 of the decisions of 2026-10-11.
+
+fn run(n: int) -> int
+{
+	let acc = 0;
+	for i in 0..n {
+		defer continue;
+		acc += 1;
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	return run(3);
+}

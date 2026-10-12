@@ -1,0 +1,32 @@
+//! A failing call as the statement of a `defer` in a `try` block is a call of
+//! the block, and the handler of the block takes its error.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn step(n: int) may fail
+{
+	if n > 2 {
+		fail "too large";
+	}
+}
+
+fn run(n: int, log: *int)
+{
+	try {
+		defer step(9);
+		step(n);
+		*log += 1;
+	} catch {
+		*log += 10;
+	}
+}
+
+fn main() -> int
+{
+	let log = 0;
+	run(1, &log);
+	printf("%d\n".ptr, log as c_int);
+	return 0;
+}

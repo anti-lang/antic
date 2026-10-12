@@ -1,0 +1,18 @@
+//! A `fail` inside a `defer` is refused, by decision 19 of the decisions of
+//! 2026-10-11.
+
+import anti.lang;
+
+fn run(n: int) -> int may fail
+{
+	defer fail "late";
+	return n;
+}
+
+fn main() -> int
+{
+	let got = run(1) catch {
+		yield 0;
+	};
+	return got;
+}

@@ -1,0 +1,38 @@
+//! A closure in a `catch` handler reads the error the handler binds.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn each(count: int, f: fn(int))
+{
+	for i in 0..count {
+		f(i);
+	}
+}
+
+fn risky(n: int) -> int may fail
+{
+	if n == 2 {
+		fail lang.Error.new(5, "refused");
+	}
+	return n * 10;
+}
+
+fn run(n: int) -> int
+{
+	let acc = 0;
+	let v = risky(n) catch e {
+		each(2, fn(k) {
+			acc += e.code;
+		});
+		yield 1000;
+	};
+	return acc + v;
+}
+
+fn main() -> int
+{
+	printf("%d %d\n".ptr, run(1) as c_int, run(2) as c_int);
+	return 0;
+}

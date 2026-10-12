@@ -1,0 +1,1 @@
+flow_fail_in_undo.anti:8:7: error: `fail` inside an `undo`

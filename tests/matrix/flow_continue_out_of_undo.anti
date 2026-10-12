@@ -1,0 +1,25 @@
+//! A `continue` inside an `undo` that would go on with the loop around the
+//! `undo` is refused, by decision 19 of the decisions of 2026-10-11.
+
+import anti.lang;
+
+fn run(n: int) -> int may fail
+{
+	let acc = 0;
+	for i in 0..n {
+		undo continue;
+		acc += 1;
+		if acc > 1 {
+			fail "refused";
+		}
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	let got = run(3) catch {
+		yield 0;
+	};
+	return got;
+}

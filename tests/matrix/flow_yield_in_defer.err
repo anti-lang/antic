@@ -1,0 +1,1 @@
+flow_yield_in_defer.anti:18:9: error: `yield` inside a `defer`

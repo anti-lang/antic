@@ -1,0 +1,26 @@
+//! A `yield` inside a `defer` of a `catch` handler would leave the deferred
+//! statement before its end, as the five exits of decision 19 of the decisions
+//! of 2026-10-11 do, and is refused.
+
+import anti.lang;
+
+fn risky(n: int) -> int may fail
+{
+	if n == 2 || n == 3 {
+		fail "refused";
+	}
+	return n * 10;
+}
+
+fn run(n: int) -> int
+{
+	let got = risky(n) catch {
+		defer yield 7;
+	};
+	return got;
+}
+
+fn main() -> int
+{
+	return run(2);
+}

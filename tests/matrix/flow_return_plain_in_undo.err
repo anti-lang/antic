@@ -1,0 +1,1 @@
+flow_return_plain_in_undo.anti:10:4: error: `return` inside an `undo`

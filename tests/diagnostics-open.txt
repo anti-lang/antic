@@ -39,8 +39,6 @@ an element of a tuple is a decimal number
 expected `catch`
 the message of an `assert` is a string literal
 an arm of a `select` is a call, an assignment or a block
-a `defer` holds one statement, not another `defer`
-an `undo` holds one statement, not another `undo`
 expected a call or an assignment
 
 # src/antic/sema.c

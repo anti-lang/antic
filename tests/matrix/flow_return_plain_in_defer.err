@@ -1,0 +1,1 @@
+flow_return_plain_in_defer.anti:8:4: error: `return` inside a `defer`

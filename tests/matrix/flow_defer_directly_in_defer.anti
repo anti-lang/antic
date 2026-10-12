@@ -1,0 +1,8 @@
+//! A `defer` whose statement is a `defer` is refused.
+
+fn main() -> int
+{
+	let acc = 0;
+	defer defer acc += 1;
+	return acc;
+}

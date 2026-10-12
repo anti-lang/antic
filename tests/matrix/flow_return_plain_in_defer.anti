@@ -1,0 +1,20 @@
+//! A `return` without a value inside a `defer` is refused, by decision 19 of
+//! the decisions of 2026-10-11.
+
+fn run(out: *int)
+{
+	defer {
+		if *out > 0 {
+			return;
+		}
+		*out = 1;
+	}
+	*out = 2;
+}
+
+fn main() -> int
+{
+	let got = 0;
+	run(&got);
+	return got;
+}

@@ -1,0 +1,21 @@
+//! A `return` of a value inside an `undo` is refused, by decision 19 of the
+//! decisions of 2026-10-11.
+
+import anti.lang;
+
+fn run(n: int) -> int may fail
+{
+	undo return n + 1;
+	if n > 0 {
+		fail "refused";
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let got = run(1) catch {
+		yield 0;
+	};
+	return got;
+}

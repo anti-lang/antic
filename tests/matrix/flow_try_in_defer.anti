@@ -1,0 +1,26 @@
+//! A `try` inside a `defer` is refused, by decision 19 of the decisions of
+//! 2026-10-11.
+
+import anti.lang;
+
+fn step(n: int) may fail
+{
+	if n > 2 {
+		fail "too large";
+	}
+}
+
+fn run(n: int) -> int may fail
+{
+	defer try step(n + 2);
+	try step(n);
+	return n;
+}
+
+fn main() -> int
+{
+	let got = run(1) catch {
+		yield 0;
+	};
+	return got;
+}
