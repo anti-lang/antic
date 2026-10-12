@@ -1,0 +1,1 @@
+ownership_move_of_a_captured_local.anti:30:7: error: `a` is captured by a closure, which may read it after it moves into `take`

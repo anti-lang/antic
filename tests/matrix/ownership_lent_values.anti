@@ -62,6 +62,7 @@ fn with_a_pointer(lent p: *Node, lent q: ?*Node, other: *Node)
 	if q != none {
 		printf("test for none: %d\n".ptr, q.n as c_int);
 	}
+	printf("??: %d\n".ptr, (q ?? p).n as c_int);
 	p.n = 20;
 	let field = &p.n;
 	*field += 1;

@@ -1,0 +1,1 @@
+ownership_move_while_a_defer_names_it.anti:23:7: error: `a` moves into `take` while a `defer` or an `undo` names it

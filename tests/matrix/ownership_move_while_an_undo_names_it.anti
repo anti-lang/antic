@@ -1,0 +1,31 @@
+//! A local moves into an `own` parameter while an `undo` names it. The `undo`
+//! runs on the fail path, after the function tore the value down.
+
+import anti.lang;
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn take(own k: Key) -> int
+{
+	return k.n;
+}
+
+fn run(seen: *int) -> int may fail
+{
+	let a = Key { n: 1 };
+	undo *seen = a.n;
+	take(a);
+	fail "refused";
+}
+
+fn main() -> int
+{
+	return 0;
+}

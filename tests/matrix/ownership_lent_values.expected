@@ -4,6 +4,7 @@ lent parameter: 1 1
 object of a call: 11
 comparison: 0 1
 test for none: 5
+??: 5
 field and its address: 21
 array literal: 42
 closure: 42

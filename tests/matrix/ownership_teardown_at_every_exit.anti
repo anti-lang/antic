@@ -1,0 +1,241 @@
+//! An owning local is torn down once on every exit of its block: the closing
+//! brace, `return`, `break`, `continue`, `fail`, `try`, the handler of a
+//! `catch` that leaves, the end of a `sync` block, an arm of a `switch` and the
+//! body of a closure. A `defer` and an `undo` still read the local, a move on
+//! one path of an `if` leaves the other path to tear it down, and an `if let`
+//! and a `let ... else` take a fresh value over. Each line prints the keys
+//! alive after the exit, which is 0 where every teardown ran once.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+struct Guard
+{
+	lock: Mutex,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn maybe(n: int) -> ?Key
+{
+	if n == 0 {
+		return none;
+	}
+	return key(n);
+}
+
+fn alive() -> c_int
+{
+	return Key.live.load() as c_int;
+}
+
+fn take(own k: Key) -> int
+{
+	return k.n;
+}
+
+fn failing(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "refused";
+	}
+	return n;
+}
+
+fn by_return(n: int) -> int
+{
+	let a = key(1);
+	{
+		let b = key(2);
+		if n > 0 {
+			let c = key(3);
+			return a.n + b.n + c.n;
+		}
+	}
+	return a.n;
+}
+
+fn by_break_and_continue(n: int) -> int
+{
+	let sum = 0;
+	for i in 0..n {
+		let a = key(i);
+		if i == 1 {
+			continue;
+		}
+		let b = key(i + 10);
+		if i == 3 {
+			break;
+		}
+		sum += a.n + b.n;
+	}
+	return sum;
+}
+
+fn by_fail(n: int, seen: *int) -> int may fail
+{
+	let a = key(1);
+	undo *seen = a.n + 100;
+	defer *seen += a.n;
+	let b = key(2);
+	if n > 0 {
+		fail "refused";
+	}
+	return a.n + b.n;
+}
+
+fn by_try(n: int) -> int may fail
+{
+	let a = key(1);
+	let m = try failing(n);
+	let b = key(2);
+	return a.n + b.n + m;
+}
+
+fn by_handler(n: int) -> int
+{
+	let a = key(1);
+	let m = failing(n) catch e {
+		let b = key(2);
+		return a.n + b.n;
+	};
+	return a.n + m;
+}
+
+fn by_sync(g: *Guard, n: int) -> int
+{
+	sync g.lock {
+		let a = key(1);
+		if n > 0 {
+			return a.n;
+		}
+	}
+	return 0;
+}
+
+fn by_arm(n: int) -> int
+{
+	switch n {
+		0 => {
+			let a = key(1);
+			return a.n;
+		},
+		1 => {
+			let b = key(2);
+		},
+		else => {
+		},
+	}
+	return 0;
+}
+
+fn call(f: fn(int) -> int, n: int) -> int
+{
+	return f(n);
+}
+
+fn by_closure(n: int) -> int
+{
+	return call(fn(v) {
+		let a = key(v);
+		if v > 1 {
+			return a.n;
+		}
+		let b = key(v + 1);
+		return b.n;
+	}, n);
+}
+
+fn by_a_move_on_one_path(n: int) -> int
+{
+	let a = key(1);
+	if n > 0 {
+		return take(a);
+	}
+	return 0;
+}
+
+fn by_if_let(n: int) -> int
+{
+	if let k = maybe(n) {
+		return k.n;
+	}
+	let other = maybe(n + 1) else {
+		return -1;
+	};
+	return other.n;
+}
+
+fn main() -> int
+{
+	let seen = 0;
+	let r1 = by_return(1);
+	let r2 = by_return(0);
+	printf("return: %d %d, alive %d\n".ptr, r1 as c_int, r2 as c_int, alive());
+	printf("break and continue: %d, alive %d\n".ptr, by_break_and_continue(5) as c_int, alive());
+	let f1 = by_fail(1, &seen) catch e {
+		yield -1;
+	};
+	printf("fail: %d, seen %d, alive %d\n".ptr, f1 as c_int, seen as c_int, alive());
+	let f2 = by_fail(0, &seen) catch e {
+		yield -1;
+	};
+	printf("no fail: %d, seen %d, alive %d\n".ptr, f2 as c_int, seen as c_int, alive());
+	let t1 = by_try(1) catch e {
+		yield -1;
+	};
+	let t2 = by_try(0) catch e {
+		yield -1;
+	};
+	printf("try: %d %d, alive %d\n".ptr, t1 as c_int, t2 as c_int, alive());
+	let h1 = by_handler(1);
+	let h2 = by_handler(0);
+	printf("handler: %d %d, alive %d\n".ptr, h1 as c_int, h2 as c_int, alive());
+	let g = Guard { lock: Mutex.new() };
+	let s1 = by_sync(&g, 1);
+	let s2 = by_sync(&g, 0);
+	printf("sync: %d %d, alive %d\n".ptr, s1 as c_int, s2 as c_int, alive());
+	let a1 = by_arm(0);
+	let a2 = by_arm(1);
+	let a3 = by_arm(2);
+	printf("switch arm: %d %d %d, alive %d\n".ptr, a1 as c_int, a2 as c_int, a3 as c_int, alive());
+	let c1 = by_closure(1);
+	let c2 = by_closure(2);
+	printf("closure: %d %d, alive %d\n".ptr, c1 as c_int, c2 as c_int, alive());
+	let m1 = by_a_move_on_one_path(1);
+	let m2 = by_a_move_on_one_path(0);
+	printf("move on one path: %d %d, alive %d\n".ptr, m1 as c_int, m2 as c_int, alive());
+	let i1 = by_if_let(4);
+	let i2 = by_if_let(0);
+	let i3 = by_if_let(-1);
+	printf("if let and let else: %d %d %d, alive %d\n".ptr, i1 as c_int, i2 as c_int, i3 as c_int,
+		alive());
+	return 0;
+}

@@ -1,0 +1,29 @@
+//! `destroy` of a field of a local. The block would tear the whole value down
+//! again, the part included.
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn take(own k: Key) -> int
+{
+	return k.n;
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+fn main() -> int
+{
+	let p = Pair { k: Key { n: 1 }, n: 2 };
+	destroy(&p.k);
+	return 0;
+}

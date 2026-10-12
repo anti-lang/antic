@@ -1,0 +1,23 @@
+//! A tuple literal names an owning local twice. The local moves into the tuple
+//! once, and the second element would be a second owner.
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn take(own k: Key) -> int
+{
+	return k.n;
+}
+
+fn main() -> int
+{
+	let a = Key { n: 1 };
+	let t = (a, a);
+	return 0;
+}

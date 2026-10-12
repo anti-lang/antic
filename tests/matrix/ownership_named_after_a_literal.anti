@@ -1,0 +1,29 @@
+//! An owning local named after it moved into a struct literal. The struct holds
+//! the only owner.
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn take(own k: Key) -> int
+{
+	return k.n;
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+fn main() -> int
+{
+	let a = Key { n: 1 };
+	let p = Pair { k: a, n: 2 };
+	return a.n;
+}

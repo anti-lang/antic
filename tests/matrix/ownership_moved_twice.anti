@@ -1,0 +1,23 @@
+//! A local moves into an `own` parameter twice. The first call took the value
+//! over and tore it down.
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn take(own k: Key) -> int
+{
+	return k.n;
+}
+
+fn main() -> int
+{
+	let a = Key { n: 1 };
+	take(a);
+	return take(a);
+}

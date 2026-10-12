@@ -1,0 +1,25 @@
+//! A local declared before a loop moves into an `own` parameter inside it. The
+//! next turn would move it again.
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn take(own k: Key) -> int
+{
+	return k.n;
+}
+
+fn main() -> int
+{
+	let a = Key { n: 1 };
+	for i in 0..2 {
+		take(a);
+	}
+	return 0;
+}

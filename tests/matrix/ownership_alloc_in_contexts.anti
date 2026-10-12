@@ -72,15 +72,21 @@ fn failing(k: int) -> int may fail
 	return k;
 }
 
-/// The sum of three numbers in memory of `alloc(int, 3)`, or -1 without it.
+/// Write `k`, `k + 1` and `k + 2` into the three numbers at `q`.
+fn fill(q: *int, k: int)
+{
+	q[0] = k;
+	q[1] = k + 1;
+	q[2] = k + 2;
+}
+
+/// Memory of `alloc(int, 3)` with `k`, `k + 1` and `k + 2`, or `none`.
 fn three(k: int) -> ?*int
 {
 	let q = alloc(int, 3) else {
 		return none;
 	};
-	q[0] = k;
-	q[1] = k + 1;
-	q[2] = k + 2;
+	fill(q, k);
 	return q;
 }
 
@@ -225,7 +231,8 @@ fn in_if_let(k: int, m: *Marks)
 		m.literal = p.n;
 		let b = alloc Built(v);
 		m.built = b.n;
-		if let q = three(v) {
+		if let q = alloc(int, 3) {
+			fill(q, v);
 			m.many = q[0] + q[1] + q[2];
 			free(q);
 			m.freed = 1;
@@ -323,9 +330,10 @@ fn in_catch(k: int, m: *Marks)
 	let got = failing(k) catch e {
 		let p = alloc Node { n: e.message.len + k };
 		m.literal = p.n;
-		let q = three(k) else {
+		let q = alloc(int, 3) else {
 			yield -1;
 		};
+		fill(q, k);
 		m.many = q[0] + q[1] + q[2];
 		let b = alloc Built(k);
 		m.built = b.n;
@@ -350,9 +358,10 @@ fn in_closure(k: int, m: *Marks)
 	call(fn(v) {
 		let p = alloc Node { n: v };
 		m.literal = p.n;
-		let q = three(v) else {
+		let q = alloc(int, 3) else {
 			return;
 		};
+		fill(q, v);
 		m.many = q[0] + q[1] + q[2];
 		let b = alloc Built(v);
 		m.built = b.n;
@@ -373,9 +382,10 @@ worker fn tally(part: []int) -> int
 	for x in part {
 		let p = alloc Node { n: x };
 		sum += p.n;
-		let q = three(x) else {
+		let q = alloc(int, 3) else {
 			return -1;
 		};
+		fill(q, x);
 		sum += q[0] + q[1] + q[2];
 		let b = alloc Built(x);
 		sum += b.n;
@@ -430,9 +440,10 @@ fn in_dispatch(k: int, m: *Marks)
 	});
 	m.literal = join(literal);
 	let many = dispatch t -> work(fn(v) {
-		let q = three(v) else {
+		let q = alloc(int, 3) else {
 			return -1;
 		};
+		fill(q, v);
 		let n = q[0] + q[1] + q[2];
 		free(q);
 		return n;
@@ -462,9 +473,10 @@ fn in_sync(g: *Guard, k: int, m: *Marks)
 	sync g.lock {
 		let p = alloc Node { n: k };
 		m.literal = p.n;
-		let q = three(k) else {
+		let q = alloc(int, 3) else {
 			return;
 		};
+		fill(q, k);
 		m.many = q[0] + q[1] + q[2];
 		let b = alloc Built(k);
 		m.built = b.n;
@@ -488,9 +500,10 @@ fn in_select(c: chan int, k: int, m: *Marks)
 			};
 			let p = alloc Node { n: *v };
 			m.literal = p.n;
-			let q = three(*v) else {
+			let q = alloc(int, 3) else {
 				return;
 			};
+			fill(q, *v);
 			m.many = q[0] + q[1] + q[2];
 			let b = alloc Built(*v);
 			m.built = b.n;

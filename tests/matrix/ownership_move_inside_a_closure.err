@@ -1,0 +1,1 @@
+ownership_move_inside_a_closure.anti:27:8: error: `a` is captured, and a closure does not move what it captures

@@ -1,0 +1,25 @@
+//! A local moves into an `own` parameter while a `defer` names it. The `defer`
+//! runs at the end of the block, after the function tore the value down.
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn take(own k: Key) -> int
+{
+	return k.n;
+}
+
+fn main() -> int
+{
+	let a = Key { n: 1 };
+	let seen = 0;
+	defer seen = a.n;
+	take(a);
+	return 0;
+}

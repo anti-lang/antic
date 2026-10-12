@@ -1,0 +1,22 @@
+//! `*` applied to the result of `alloc`. The object has no other pointer, so
+//! nothing could free it.
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn take(own k: Key) -> int
+{
+	return k.n;
+}
+
+fn main() -> int
+{
+	let v = *alloc Key { n: 1 };
+	return v.n;
+}

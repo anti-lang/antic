@@ -1,0 +1,30 @@
+//! A closure moves a local it captures into an `own` parameter. The closure may
+//! run more than once, and the local belongs to the function around it.
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn take(own k: Key) -> int
+{
+	return k.n;
+}
+
+fn call(f: fn())
+{
+	f();
+}
+
+fn main() -> int
+{
+	let a = Key { n: 1 };
+	call(fn() {
+		take(a);
+	});
+	return 0;
+}
