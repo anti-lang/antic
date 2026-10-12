@@ -48,7 +48,6 @@ the call takes %zu argument%s, found %zu
 # src/antic/sema_const.c
 
 # src/antic/sema_copies.c
-antic compiles no copy of `%.*s` yet, %s
 antic compiles no copy here yet, %s
 
 # src/antic/sema_expr.c

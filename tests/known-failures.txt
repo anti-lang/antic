@@ -329,3 +329,4 @@ plugin_locals T092 A local object without `destruct` in a plugin stays counted a
 plugin_unused T093 A plugin cannot load when its host imports a module of the standard library and does not use it.
 constant_argument_modules_release T094 A constant of another module is refused as the argument of `N: int`.
 constant_argument_modules_dev T094 A constant of another module is refused as the argument of `N: int`.
+error_modules_type_nested_in_a_generic_class T095 A message on a copy of a library generic names a line of the library in the file of the client.

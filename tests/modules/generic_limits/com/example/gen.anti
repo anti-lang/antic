@@ -1,0 +1,37 @@
+//! Two forms of a generic that a library file does not carry yet: a function
+//! of a class with a type parameter of its own, in a generic class and in a
+//! plain one, and a type nested in a generic class.
+
+pub class Stack<T>
+{
+	struct Node
+	{
+		value: T,
+	}
+
+	pub top: T,
+
+	pub fn map<U>(self, f: fn(T) -> U) -> U
+	{
+		return f(self.top);
+	}
+
+	pub fn boxed(self) -> int
+	{
+		let n = Node { value: self.top };
+		return size_of(Node) as int;
+	}
+}
+
+pub class Plain
+{
+	pub n: int = 0,
+
+	pub fn pick<U>(self, own a: U, own b: U) -> U
+	{
+		if self.n > 0 {
+			return a;
+		}
+		return b;
+	}
+}

@@ -1,0 +1,15 @@
+//! A library file carries no function of a class with a type parameter of its
+//! own yet, so a module that imports the class does not see the function.
+
+import com.example.gen;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	let s = gen.Stack<int> { top: 4 };
+	return s.map(twice) - 8;
+}

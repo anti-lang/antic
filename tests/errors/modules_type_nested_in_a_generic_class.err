@@ -1,0 +1,1 @@
+modules_type_nested_in_a_generic_class.anti:11:9: error: antic compiles no copy of `Stack` yet, which names a type its arguments do not settle

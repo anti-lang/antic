@@ -1,0 +1,10 @@
+//! A library file carries no function of a class with a type parameter of its
+//! own yet, in a class without type parameters either.
+
+import com.example.gen;
+
+fn main() -> int
+{
+	let p = gen.Plain { n: 1 };
+	return p.pick(0, 5);
+}

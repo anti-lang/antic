@@ -3788,6 +3788,7 @@ antic_library_files(levels OPTIONS --package-name com.example
 antic_library_files(diamond LIBRARIES base left right)
 antic_library_files(items LIBRARIES items)
 antic_library_files(exports LIBRARIES exports)
+antic_library_files(generic_limits LIBRARIES gen)
 
 # The refusals at the boundary of a module, one message each. A case names
 # the program of tests/errors, the tree of its library files and the
@@ -3798,6 +3799,8 @@ foreach(case
         "modules_direct_import_clash|diamond|"
         "modules_export_symbol_twice|exports|"
         "modules_function_as_a_type|items|"
+        "modules_generic_function_of_a_class|generic_limits|"
+        "modules_generic_function_of_a_generic_class|generic_limits|"
         "modules_internal_alias|levels|org.other"
         "modules_internal_class|levels|org.other"
         "modules_internal_class_as_a_base|levels|org.other"
@@ -3842,7 +3845,8 @@ foreach(case
         "modules_private_struct_as_a_type|levels|"
         "modules_private_union|levels|"
         "modules_private_variant|levels|"
-        "modules_type_called|items|")
+        "modules_type_called|items|"
+        "modules_type_nested_in_a_generic_class|generic_limits|")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 tree)

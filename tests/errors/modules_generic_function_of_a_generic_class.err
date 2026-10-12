@@ -1,0 +1,1 @@
+modules_generic_function_of_a_generic_class.anti:14:9: error: `Stack<int>` has no function `map`
