@@ -4059,6 +4059,24 @@ if(NOT WIN32)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_probe.cmake")
 endif()
 
+# The same probe over the types of the area types of
+# docs/notes/test-matrix.md: packed and aligned types with fields at odd
+# offsets, unions, the tag and the union of a variant, an enum, an array
+# of arrays, an optional value, a tuple and a slice.
+if(NOT WIN32)
+    add_test(NAME abi_probe_types
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/abi"
+            "-DNAME=probe_types"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/probe-types"
+            "-DCC=${ANTIC_TEST_CC}"
+            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_probe.cmake")
+endif()
+
 # A linked program holds the licence notice of its packages.
 if(NOT WIN32)
     add_test(NAME program_licenses

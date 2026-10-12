@@ -1,0 +1,300 @@
+//! The ABI probe of the types area in Anti. It prints what probe_types.c prints
+//! for the same types, so any difference in layout shows as a difference in the
+//! output. See the design note at the head of probe.c.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+// The types of the area types of docs/notes/test-matrix.md, as probe_types.c
+// declares them.
+
+packed struct OddFields
+{
+	tag: u8,
+	wide: u64,
+	mid: u16,
+	real: f64,
+	half: f32,
+	p: ?*byte,
+	xs: [3]i32,
+}
+
+struct OddFieldsBox
+{
+	c: u8,
+	t: OddFields,
+}
+
+struct In align(8)
+{
+	a: u8,
+	b: u16,
+}
+
+struct InBox
+{
+	c: u8,
+	t: In,
+}
+
+packed struct Out
+{
+	lead: u8,
+	in: In,
+	tail: u32,
+}
+
+struct OutBox
+{
+	c: u8,
+	t: Out,
+}
+
+packed union Bytes
+{
+	a: u8,
+	b: u32,
+	c: [5]u8,
+}
+
+struct BytesBox
+{
+	c: u8,
+	t: Bytes,
+}
+
+struct Norm
+{
+	lead: u8,
+	out: Out,
+	in: In,
+}
+
+struct NormBox
+{
+	c: u8,
+	t: Norm,
+}
+
+union Sixteen align(16)
+{
+	a: u8,
+	b: u32,
+}
+
+struct SixteenBox
+{
+	c: u8,
+	t: Sixteen,
+}
+
+variant Shape
+{
+	Circle { r: i64 },
+	Rect { w: i32, h: i32, on: u8 },
+}
+
+struct ShapeBox
+{
+	c: u8,
+	t: Shape,
+}
+
+packed variant Dense
+{
+	A { x: u64 },
+	B { y: u16, z: u32 },
+}
+
+struct DenseBox
+{
+	c: u8,
+	t: Dense,
+}
+
+enum Plain
+{
+	A,
+	B,
+}
+
+struct PlainBox
+{
+	c: u8,
+	t: Plain,
+}
+
+struct Rows
+{
+	lead: u8,
+	g: [2][3]i16,
+	tail: u8,
+}
+
+struct RowsBox
+{
+	c: u8,
+	t: Rows,
+}
+
+struct OptIntBox
+{
+	c: u8,
+	t: ?int,
+}
+
+struct OptByteBox
+{
+	c: u8,
+	t: ?u8,
+}
+
+struct PairBox
+{
+	c: u8,
+	t: (u8, int),
+}
+
+struct SliceBox
+{
+	c: u8,
+	t: []int,
+}
+
+// The n bytes of p from the offset from.
+fn dump_from(name: str, p: *byte, from: int, n: int)
+{
+	printf("%s".ptr, name.ptr);
+	let i = 0;
+	while i < n do {
+		printf(" %02x".ptr, p[from + i] as c_int);
+		i += 1;
+	}
+	printf("\n".ptr);
+}
+
+fn clear(p: *byte, n: int)
+{
+	let i = 0;
+	while i < n do {
+		p[i] = 0;
+		i += 1;
+	}
+}
+
+fn dump(name: str, p: *byte, n: int)
+{
+	printf("%s".ptr, name.ptr);
+	let i = 0;
+	while i < n do {
+		printf(" %02x".ptr, p[i] as c_int);
+		i += 1;
+	}
+	printf("\n".ptr);
+}
+
+fn size(name: str, n: int, box: int)
+{
+	printf("%s size %d align %d\n".ptr, name.ptr, n as c_int,
+		(box - n) as c_int);
+}
+
+fn main() -> int
+{
+	size("OddFields", size_of(OddFields), size_of(OddFieldsBox));
+	let oddFields = alloc(OddFields, 1) else { return 1; };
+	clear(oddFields as *byte, size_of(OddFields));
+	oddFields.tag = 1;
+	dump("OddFields.tag", oddFields as *byte, size_of(OddFields));
+	clear(oddFields as *byte, size_of(OddFields));
+	oddFields.wide = 1;
+	dump("OddFields.wide", oddFields as *byte, size_of(OddFields));
+	clear(oddFields as *byte, size_of(OddFields));
+	oddFields.mid = 1;
+	dump("OddFields.mid", oddFields as *byte, size_of(OddFields));
+	clear(oddFields as *byte, size_of(OddFields));
+	oddFields.real = 1.0;
+	dump("OddFields.real", oddFields as *byte, size_of(OddFields));
+	clear(oddFields as *byte, size_of(OddFields));
+	oddFields.half = 1.0;
+	dump("OddFields.half", oddFields as *byte, size_of(OddFields));
+	clear(oddFields as *byte, size_of(OddFields));
+	oddFields.xs[2] = 1;
+	dump("OddFields.xs[2]", oddFields as *byte, size_of(OddFields));
+	free(oddFields);
+	size("In", size_of(In), size_of(InBox));
+	let in = alloc(In, 1) else { return 1; };
+	clear(in as *byte, size_of(In));
+	in.a = 1;
+	dump("In.a", in as *byte, size_of(In));
+	clear(in as *byte, size_of(In));
+	in.b = 1;
+	dump("In.b", in as *byte, size_of(In));
+	free(in);
+	size("Out", size_of(Out), size_of(OutBox));
+	let out = alloc(Out, 1) else { return 1; };
+	clear(out as *byte, size_of(Out));
+	out.lead = 1;
+	dump("Out.lead", out as *byte, size_of(Out));
+	clear(out as *byte, size_of(Out));
+	out.in.b = 1;
+	dump("Out.in.b", out as *byte, size_of(Out));
+	clear(out as *byte, size_of(Out));
+	out.tail = 1;
+	dump("Out.tail", out as *byte, size_of(Out));
+	free(out);
+	size("Bytes", size_of(Bytes), size_of(BytesBox));
+	let bytes = alloc(Bytes, 1) else { return 1; };
+	clear(bytes as *byte, size_of(Bytes));
+	bytes.b = 1;
+	dump("Bytes.b", bytes as *byte, size_of(Bytes));
+	clear(bytes as *byte, size_of(Bytes));
+	bytes.c[4] = 1;
+	dump("Bytes.c[4]", bytes as *byte, size_of(Bytes));
+	free(bytes);
+	size("Norm", size_of(Norm), size_of(NormBox));
+	let norm = alloc(Norm, 1) else { return 1; };
+	clear(norm as *byte, size_of(Norm));
+	norm.lead = 1;
+	dump("Norm.lead", norm as *byte, size_of(Norm));
+	clear(norm as *byte, size_of(Norm));
+	norm.out.tail = 1;
+	dump("Norm.out.tail", norm as *byte, size_of(Norm));
+	clear(norm as *byte, size_of(Norm));
+	norm.in.a = 1;
+	dump("Norm.in.a", norm as *byte, size_of(Norm));
+	free(norm);
+	size("Sixteen", size_of(Sixteen), size_of(SixteenBox));
+	let sixteen = alloc(Sixteen, 1) else { return 1; };
+	clear(sixteen as *byte, size_of(Sixteen));
+	sixteen.b = 1;
+	dump("Sixteen.b", sixteen as *byte, size_of(Sixteen));
+	free(sixteen);
+	size("Rows", size_of(Rows), size_of(RowsBox));
+	let rows = alloc(Rows, 1) else { return 1; };
+	clear(rows as *byte, size_of(Rows));
+	rows.lead = 1;
+	dump("Rows.lead", rows as *byte, size_of(Rows));
+	clear(rows as *byte, size_of(Rows));
+	rows.g[1][2] = 1;
+	dump("Rows.g[1][2]", rows as *byte, size_of(Rows));
+	clear(rows as *byte, size_of(Rows));
+	rows.tail = 1;
+	dump("Rows.tail", rows as *byte, size_of(Rows));
+	free(rows);
+	size("Shape", size_of(Shape), size_of(ShapeBox));
+	size("Dense", size_of(Dense), size_of(DenseBox));
+	size("Plain", size_of(Plain), size_of(PlainBox));
+	size("OptInt", size_of(?int), size_of(OptIntBox));
+	size("OptByte", size_of(?u8), size_of(OptByteBox));
+	size("Pair", size_of((u8, int)), size_of(PairBox));
+	size("Slice", size_of([]int), size_of(SliceBox));
+	// A case of each variant, by its tag and the bytes of its fields. The
+	// union of Shape stands at its alignment, 8, and that of Dense at 1.
+	let shape = Shape.Rect { w: 0x01020304, h: 0x05060708, on: 9 };
+	dump("Shape.Rect.tag", &shape as *byte, 1);
+	dump_from("Shape.Rect.u", &shape as *byte, 8, 9);
+	let dense = Dense.B { y: 7, z: 9 };
+	dump("Dense.B.tag", &dense as *byte, 1);
+	dump_from("Dense.B.u", &dense as *byte, 1, 6);
+	return 0;
+}
