@@ -1157,6 +1157,82 @@ foreach(case
         ARGS ${words} ${option})
 endforeach()
 
+# A wrong value of an option of antic, and an option that takes a value as
+# the last word. antic writes one line and ends with 2.
+function(add_antic_refusal name line)
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_option_${name}"
+         "${line}\n")
+    add_expect_test(antic_option_${name} STATUS 2
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/programs"
+        EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_option_${name}"
+        COMMAND "$<TARGET_FILE:antic>" ${ARGN})
+endfunction()
+add_antic_refusal(linker_value "antic: --linker takes lld or platform"
+    --linker gold return42.anti)
+add_antic_refusal(inject_value
+    "antic: --inject takes an interface and its provider, as --inject Interface=Provider, found Logger"
+    --inject Logger return42.anti)
+add_antic_refusal(target_value "antic: unknown target plan9"
+    --runtime "${ANTIC_RUNTIME_DIR}" --target plan9 return42.anti)
+add_antic_refusal(input_suffix "antic: return42.expected: expected a .anti file"
+    --runtime "${ANTIC_RUNTIME_DIR}" return42.expected)
+add_antic_refusal(lto_memory_checks_macos
+    "antic: --lto links no macOS program of --memory-checks"
+    --runtime "${ANTIC_RUNTIME_DIR}" --target macos-arm64 --lto full
+    --memory-checks -o "${CMAKE_CURRENT_BINARY_DIR}/lto_memory_checks"
+    return42.anti)
+foreach(option --lib --linker --lto --framework --linux-lib --inject
+        --dependency --attribution -I --llvm-ar --profile-use
+        --package-name --package-version --license --license-text -o
+        --target --cpu --llvm-mc --opt --llc --runtime)
+    string(REGEX REPLACE "^-+" "" word "${option}")
+    string(REPLACE "-" "_" word "${word}")
+    if(option STREQUAL "-o")
+        set(word "output")
+    elseif(option STREQUAL "-I")
+        set(word "root")
+    endif()
+    add_antic_refusal(${word}_without_a_value
+        "antic: ${option} needs a value" return42.anti ${option})
+endforeach()
+
+# Options of antic that the driver reads together, one test per case of
+# tests/run_antic_options.cmake, whose header names what each shows.
+set(antic_option_cases checks_by_mode asserts_by_mode warn_undocumented
+    strict_library strict_front_end strict_dev bundle_static bundle_shared
+    soname_static output_assembly output_library output_program keep_llvm)
+if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64")
+    list(APPEND antic_option_cases soname_linux)
+endif()
+foreach(case IN LISTS antic_option_cases)
+    add_test(NAME antic_option_${case}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            -DCASE=${case}
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DLLVM_AR=${ANTIC_LLVM_AR}"
+            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DEXE=${CMAKE_EXECUTABLE_SUFFIX}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/antic-options/${case}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_antic_options.cmake")
+endforeach()
+# --cpu beside --target, for each target: its three levels, its default
+# and the three levels of the other architecture, which it refuses.
+foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
+        windows-x86_64 windows-arm64)
+    add_test(NAME antic_option_target_cpu_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            -DCASE=target_cpu
+            -DTARGET=${target}
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/antic-options/target_cpu_${target}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_antic_options.cmake")
+endforeach()
+
 # The host target name has two spellings: ANTIC_HOST_TARGET here and the
 # detection in src/antic/target.c. This test fails when they disagree.
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_host_target"
@@ -1396,11 +1472,14 @@ endforeach()
 # The option --no-hooks drops every hook site, the always-on ones as
 # well. Bare --trace turns the code marked `trace` on. The value writes
 # adds the `changed` hook after a write. A pattern reaches a class that
-# did not ask, and leaves the marked code alone.
+# did not ask, and leaves the marked code alone. --no-hooks beside --trace
+# drops the call hooks that --trace turned on, which gives the output of
+# release.
 foreach(case "hooks|no_hooks|--no-hooks|hooks.no-hooks.expected"
         "hook_trace|trace|--trace|hook_trace.trace.expected"
         "hook_trace|writes|--trace,--trace,writes|hook_trace.writes.expected"
         "hook_trace|pattern|--trace,Quiet|hook_trace.pattern.expected"
+        "hook_trace|trace_no_hooks|--trace,--no-hooks|hook_trace.expected"
         "trace_handlers|traced|--trace,--trace,writes|trace_handlers.traced.expected")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 source)
@@ -3204,7 +3283,7 @@ add_expect_test(lto_mode STATUS 2
     COMMAND $<TARGET_FILE:antic> --runtime "${ANTIC_RUNTIME_DIR}"
             --lto fast -o "${CMAKE_CURRENT_BINARY_DIR}/lto_mode"
             "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
-foreach(case "dev|--dev" "assembly|-S" "lib|--lib|static"
+foreach(case "dev|--dev" "assembly|-S" "library|-c" "lib|--lib|static"
         "platform|--linker|platform")
     string(REPLACE "|" ";" parts "${case}")
     list(POP_FRONT parts what)
