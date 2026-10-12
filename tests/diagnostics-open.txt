@@ -7,9 +7,11 @@
 # pieces of the literal joined. A line that starts with `#` names the file
 # that gives the messages after it, for the reader alone.
 #
-# A message no program can reach stays, with the lines `# Unreachable: ...`
-# before it that give the reason. The test reads a line as one message, so
-# the reason stands in lines of its own.
+# A message that stays for good has the lines `# Stays: ...` before it,
+# which give the reason. Either no program can reach it, or antic gives it
+# as the second message of one mistake alone, and a finding of
+# docs/audit/tests-findings.md holds that. The test reads a line as one
+# message, so the reason stands in lines of its own.
 #
 # A message leaves the list in the commit that adds its test. The test
 # fails for a line whose message a test expects, and for a message that no
@@ -35,9 +37,9 @@ an element of a tuple is a decimal number
 the message of an `assert` is a string literal
 
 # src/antic/sema.c
-# Unreachable: every list of type arguments goes through resolve_arg of
-# sema_generic.c, which takes a constant before it resolves a type, so
-# sema_resolve_type never reads one.
+# Stays: no program reaches it. Every list of type arguments goes through
+# resolve_arg of sema_generic.c, which takes a constant before it resolves
+# a type, so sema_resolve_type never reads one.
 expected a type, found a constant
 
 # src/antic/sema_call.c
@@ -47,26 +49,35 @@ expected a type, found a constant
 # src/antic/sema_const.c
 
 # src/antic/sema_copies.c
-# Unreachable: the one caller that passes no name is ty, which reports for a
-# clone with a map alone, and make_body, which alone makes one, gives it the
-# generic whose name the other message of copy_failed takes.
+# Stays: no program reaches it. The one caller that passes no name is ty,
+# which reports for a clone with a map alone. make_body alone makes one,
+# and gives it the generic whose name the other message of copy_failed
+# takes.
 antic compiles no copy here yet, %s
 
 # src/antic/sema_expr.c
+# Stays: antic gives it as a second message alone, before the refusal of
+# the declaration of the hook. T096, and error_iter_gives_no_iterator holds
+# the one message.
+`operator fn iter` gives `%s`, which has no `operator fn next` and `operator fn value`
 
 # src/antic/sema_generic.c
 
 # src/antic/sema_operator.c
 
 # src/antic/sema_pattern.c
-# Unreachable: the lexer refuses a number past u64 and the parser an element
-# that is no decimal number, so the name of a group a source writes always
-# reads. A damaged library file alone holds another.
+# Stays: no program reaches it. The lexer refuses a number past u64 and
+# the parser an element that is no decimal number, so the name of a group
+# that a source writes always reads. A damaged library file alone holds
+# another.
 `%.*s` names no group of a match
 
 # src/antic/sema_safety.c
 
 # src/antic/sema_simd.c
+# Stays: antic gives it as a second message alone, after the refusal of the
+# lanes it names. T096, and error_simd_lanes_compared holds the one message.
+`%s` is not defined on the lanes of `%s`
 
 # src/antic/sema_stmt.c
 

@@ -5467,6 +5467,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "call_count_of_a_function_value|--front-end,call_count_of_a_function_value.anti"
         "call_gives_no_value|--front-end,call_gives_no_value.anti"
         "copy_nests_deep|--front-end,copy_nests_deep.anti"
+        "copy_nests_deep_field|--front-end,copy_nests_deep_field.anti"
         "enum_value_called|--front-end,enum_value_called.anti"
         "function_not_concurrent|--front-end,function_not_concurrent.anti"
         "function_not_kept|--front-end,function_not_kept.anti"
@@ -5477,6 +5478,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "patch_finds_an_int|--front-end,patch_finds_an_int.anti"
         "plugin_instance_of_a_value|--front-end,--runtime,${ANTIC_RUNTIME_DIR},plugin_instance_of_a_value.anti"
         "simd_lanes_compared|--front-end,simd_lanes_compared.anti"
+        "switch_refused_returns|--front-end,switch_refused_returns.anti"
         "tests_setup|--front-end,--tests,tests_setup.anti"
         "tests_may_fail|--front-end,--tests,--runtime,${ANTIC_RUNTIME_DIR},tests_may_fail.anti")
     string(REPLACE "|" ";" parts "${case}")

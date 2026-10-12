@@ -1,5 +1,5 @@
-//! `for x in b` over a class whose `operator fn iter` gives an `int`. The loop
-//! is refused where it stands, and the declaration of the hook after it.
+//! `for x in b` over a class whose `operator fn iter` gives an `int`. The
+//! declaration of the hook is the mistake and gets the one message.
 
 class Bag
 {

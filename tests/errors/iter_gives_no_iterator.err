@@ -1,2 +1,1 @@
-iter_gives_no_iterator.anti:17:11: error: `operator fn iter` gives `int`, which has no `operator fn next` and `operator fn value`
 iter_gives_no_iterator.anti:8:14: error: `operator fn iter` is written `operator fn iter(self) -> I`, where `I` has `operator fn next` and `operator fn value`

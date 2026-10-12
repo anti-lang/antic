@@ -1,0 +1,13 @@
+//! A literal of a copy of a generic struct that nests deeper than 256 levels.
+//! The copy is the mistake and gets the one message.
+
+struct Grow<T>
+{
+	next: ?*Grow<*****T>,
+}
+
+fn main() -> int
+{
+	let g = Grow<int> { next: none };
+	return 0;
+}

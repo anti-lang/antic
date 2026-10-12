@@ -1,5 +1,5 @@
-//! `==` on a `simd struct` whose lanes are `str`. The declaration is refused
-//! first, and the comparison then has no lanes it is defined on.
+//! `==` on a `simd struct` whose lanes are `str`. The declaration of the lanes
+//! is the mistake and gets the one message.
 
 simd struct Pair
 {

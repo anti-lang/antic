@@ -1,0 +1,15 @@
+//! A `switch` on a `str` in a module that does not import `anti.text`, whose
+//! arms all return. The `switch` is the mistake and gets the one message.
+
+fn pick(s: str) -> int
+{
+	switch s {
+		"a" => { return 1; },
+		else => { return 0; },
+	}
+}
+
+fn main() -> int
+{
+	return pick("a");
+}
