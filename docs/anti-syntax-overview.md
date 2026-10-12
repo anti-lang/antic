@@ -1477,9 +1477,9 @@ let v = a + b;
 if a == b { }
 ```
 
-The names: `add sub mul div rem neg eq lt and or xor shl shr not`. `!=`, `>`, `<=`, `>=` and compound assignments derive. For a struct the operator is a free function in the declaring module. Two such functions may share a name when their first parameters name different types, and the operator picks one by the type of its left operand, so one module gives `Point` and `Rect` each its own `==`. A bare call `eq(a, b)` picks by its first argument in the same way. Ordinary functions keep one function per name.
+The names: `add sub mul div rem neg eq lt and or xor shl shr not`. `!=`, `>`, `<=` and `>=` derive. No compound assignment does: `a += b` is refused on a type whose `+` is an `operator fn add`. For a struct the operator is a free function in the declaring module. Two such functions may share a name when their first parameters name different types, and the operator picks one by the type of its left operand, so one module gives `Point` and `Rect` each its own `==`. A bare call `eq(a, b)` picks by its first argument in the same way. Ordinary functions keep one function per name.
 
-The same table holds the language hooks: `iter`, `next` and `value` for `for x in e`, `index` and `set_index` for `e[i]` and `e[i] = v`, and `hash` for a key of a hashing collection. `index` and `set_index` take any number of indices, each with its own type, so `g[x, y]` reads and `g[x, y] = v` writes. A name outside the table is an error that lists the valid names, and a hook with the wrong signature is an error that states the right one. An `operator fn` is also an ordinary method, so `a.add(b)` is `a + b`. `f"..."` writes a class through `to_text`. `operator fn hash(self) -> u64` is the hook of a key of a hashing collection, and the built-in types have it. `x.hash()` gives a `u64` on every type: a scalar through the finalizer of MurmurHash3 with zero of either sign as one value, a `str` by its bytes, a pointer by its address, and a struct, a tuple, a variant, a `?T`, an array and a slice through the default over their parts in order. A struct or class gets a default that hashes its fields in order, and two values equal by `eq` have the same `hash`. A struct or class also gets a default `==` that compares its fields in order, and a class value compares through `equals`. Both defaults take each field by its kind: a `str` by its bytes, an `own` slice element by element, a plain slice or a pointer by address, and an inline struct, class or array field by these rules again, so a class and a struct with the same fields compare alike. A class with a union or a `Match` field has no default `==`. A lock is left out of `==` and `hash`, a channel and an `own fn` compare by identity, and a `Regex` by its pattern text. The compiler writes the default `==` and `hash` of each class as code, so both work under `--no-reflect`, which refuses a call of the default `serialize`, of `deserialize` and of `anti.reflect`. A tuple, a variant and a `?T` get the default `==` when every part has one, so a tuple can be the key of a map. Two arrays of one type compare element by element. Neither gets a default `<`, since what order means is the type's own choice, so a type used where `Ordered` is needed declares `operator fn lt`. A class replaces the default with `concrete fn hash(self) -> u64`, as it replaces every function of `Object`.
+The same table holds the language hooks: `iter`, `next` and `value` for `for x in e`, `index` and `set_index` for `e[i]` and `e[i] = v`, and `hash` for a key of a hashing collection. `index` and `set_index` take any number of indices, each with its own type, so `g[x, y]` reads and `g[x, y] = v` writes. A name outside the table is an error that lists the valid names, and a hook with the wrong signature is an error that states the right one. An `operator fn` is also an ordinary method, so `a.add(b)` is `a + b`. `f"..."` writes a class through `to_text`. `operator fn hash(self) -> u64` is the hook of a key of a hashing collection, and the built-in types have it. `x.hash()` gives a `u64` on every type: a scalar through the finalizer of MurmurHash3 with zero of either sign as one value, a `str` by its bytes, a pointer by its address, and a struct, a tuple, a variant, a `?T`, an array and a slice through the default over their parts in order. A struct or class gets a default that hashes its fields in order, and two values equal by `eq` have the same `hash`. A struct or class also gets a default `==` that compares its fields in order, and a class value compares through `equals`. Both defaults take each field by its kind: a `str` by its bytes, an `own` slice element by element, a plain slice or a pointer by address, and an inline struct, class or array field by these rules again, so a class and a struct with the same fields compare alike. A class with a union or a `Match` field has no default `==`. A lock is left out of `==` and `hash`, a channel and an `own fn` compare by identity, and a `Regex` by its pattern text. The compiler writes the default `==` and `hash` of each class as code, so both work under `--no-reflect`, which refuses a call of the default `serialize`, of `deserialize` and of `anti.reflect`. A tuple, a variant and a `?T` get the default `==` when every part has one, so a tuple can be the key of a map. Two arrays of one type compare element by element. Neither gets a default `<`, since what order means is the type's own choice, so a type used where `Ordered` is needed declares `operator fn lt`. A class replaces the default with `concrete fn hash(self) -> u64`, as it replaces every function of `Object`. It replaces `equals` and `hash` together, and one without the other is refused.
 
 ```anti
 class Name
@@ -1492,6 +1492,34 @@ class Name
 	}
 }
 ```
+
+Two structs of one module each get their own `+`, and a class with `index` and `set_index` is read and written with brackets:
+
+```anti
+struct Point { x: int, y: int }
+struct Size { w: int, h: int }
+
+operator fn add(a: Point, b: Point) -> Point { return Point { x: a.x + b.x, y: a.y + b.y }; }
+operator fn add(a: Size, b: Size) -> Size { return Size { w: a.w + b.w, h: a.h + b.h }; }
+
+class Board
+{
+	cells: [9]int = [0; 9],
+
+	operator fn index(self, x: int, y: int) -> int { return self.cells[3 * y + x]; }
+	operator fn set_index(self, x: int, y: int, v: int) { self.cells[3 * y + x] = v; }
+}
+
+let p = Point { x: 1, y: 2 } + Point { x: 3, y: 4 };
+let s = Size { w: 1, h: 1 } + Size { w: 2, h: 2 };
+let moved = p != Point { x: 0, y: 0 };
+
+let board = Board { };
+board[1, 2] = 7;
+let cell = board[1, 2];
+```
+
+Not built yet: the refusal of a class that replaces `equals` without `hash`, or `hash` without `equals`.
 
 ## Static fields and singletons
 
