@@ -615,7 +615,7 @@ let a = g();
 let h = fs.open("x", mode: fs.Mode.Write) catch fatal;
 ```
 
-Positional arguments first, named ones after in any order. No overloading by signature.
+Positional arguments first, named ones after in any order. No overloading by signature. A parameter with a default stands after every parameter without one. A function body declares no function and no type, and an anonymous function is the one function written inside another, see [Anonymous functions and closures](#anonymous-functions-and-closures). A generic function is no value, and a variadic function has no function pointer type.
 
 `-> never` refuses a reachable end and a `return` in the body, and no value has the type. Its call ends the path of the caller as `return` does.
 
