@@ -2271,33 +2271,33 @@ io.println(s);
 free(s.ptr);
 ```
 
-The 23 modules, with their public items and the functions among them that may fail:
+The 23 modules, with their public items, the public members of their classes and the functions that may fail. A member is named with its class where the name alone would be unclear.
 
-| Module | Public items | May fail |
-|---|---|---|
-| `anti.lang` | `Error`, `NoneDereference`, `SourceLocation`, `StackTrace`, `RawFrame`, `Frame`, `Changes`, `Watch`, `Trace`, `TraceHandler`, `Ordered`, `hash_seed`, `seeded`, and the names the compiler declares, see [Types](#types) | |
-| `anti.io` | `print`, `println`, `eprint`, `eprintln`, `exit` | |
-| `anti.text` | `equal`, `from_c`, `from_bytes`, `to_bytes`, `to_text`, `byte_count`, `char_count`, `slice`, `find_byte`, `parse_int`, `Align`, `Builder` with `append`, `append_byte`, `append_int`, `append_uint`, `append_float`, `append_f32`, `append_bool`, `append_char`, `append_text`, `text`, `len`, `clear`, `take` and `take_in` | `to_text`, `parse_int` |
-| `anti.license` | `text` | |
-| `anti.error` | `SystemError` with `from_errno` and `from_win32`, `on_fatal`, `check` | |
-| `anti.time` | `Duration` with `nanoseconds`, `microseconds`, `milliseconds`, `seconds`, `as_milliseconds`, `as_seconds`, `add` and `between`, `now`, `wall`, `sleep`, `Clock`, `SystemClock` | |
-| `anti.os` | `INTERRUPT`, `BREAK`, `TERMINATE`, `on_signal`, `signal_pending`, `user_config_dir`, `user_data_dir`, `user_cache_dir` | the three directories |
-| `anti.fs` | `Mode`, `File`, `open` with `Mode.Read` as its default, `read`, `write`, `flush`, `size`, `close`, `list`, `remove`, `rename`, `read_file`, `write_file`, `FileSystem`, `SystemFileSystem` | every function |
-| `anti.reflect` | `TypeId`, `Field`, `Function`, `describe`, `parent`, `name`, `field_count`, `field`, `function_count`, `function`, `get`, `set`, `new`, `call`, `ValueKind`, `Value`, `nothing`, `of_int`, `of_uint`, `of_float`, `of_bool`, `of_char`, `of_str`, `of_ptr`, `BAD_INDEX`, `NOT_CARRIED`, `WRONG_KIND`, `WRONG_COUNT` | `set`, `call` |
-| `anti.random` | `Source`, `Random`, `SharedRandom` | |
-| `anti.collection` | `Iterable<T>`, `Iterator<T>`, `Collection<T>`, `Indexed<T>`, `IndexedWalk<T>`, `Copies<T>`, `NotOne`, `allocator`, `equal`, the hashing helpers `hash_in_order`, `hash_in_order_by`, `hash_in_any_order`, `hash_sum` and `hash_of_sum`, and the writers of the text of a collection | `find_one`, `update_one` and `remove_one` of every collection |
-| `anti.toml` | `Document`, `int_value`, `bool_value` | `Document.read` |
-| `anti.config` | `Config`, `FileConfig`, `current`, `read` | `read` |
-| `anti.args` | `Parser` | `Parser.parse` |
-| `anti.json` | `write`, `write_text`, `write_int`, `write_bool`, `member`, `unquote` | `unquote` |
-| `anti.log` | `Level`, `Format`, `Sink`, `StderrSink`, `FileSink`, `CallbackSink`, `Logger`, `SinkLogger`, `Log`, `logger`, `set`, `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `level_name`, `level_of`, `register` | `FileSink.new` |
-| `anti.debug` | `backtrace` | |
-| `anti.mem` | `Allocator`, `LibcAllocator`, `ArenaAllocator`, `Shared<T>` | |
-| `anti.runtime` | `configure`, `get` | |
-| `anti.simd` | nothing of its own: the compiler knows `select`, `any` and `all` by name | |
-| `anti.trace` | `LeakTracker`, `Profiler`, `CallLogger`, `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal`, `Composite`, `start`, `install`, `PROFILE_SLOTS`, `JOURNAL_SLOTS`, `MESSAGE_BYTES`, `COMPOSITE_SLOTS` | |
-| `anti.plugin` | `Library` with `instance`, `supports`, `live` and `unload`, `load`, `NOT_LOADED`, `IN_USE` | `load`, `instance`, `unload` |
-| `anti.regex` | `Error`, `BadPattern`, `TooExpensive`, `MissingGroup`, `LengthMismatch`, `compile`, `compile_bytes`, `Cursor`, `Matches`, `Pieces`, `ByteMatches`, `BytePieces`, and the functions behind the methods of `str` and `[]byte` | `compile`, `compile_bytes`, and a method with a compiled pattern |
+| Module | Public items | Members of its classes | May fail |
+|---|---|---|---|
+| `anti.lang` | `Error`, `NoneDereference`, `SourceLocation`, `StackTrace`, `RawFrame`, `Frame`, `Changes`, `Watch`, `Trace`, `TraceHandler`, `Ordered`, `hash_seed`, `seeded`, and the names the compiler declares, see [Types](#types) | `Error`: `code`, `message`, `at`, `new`, `wrap`, `text`, `print`, `fatal`. `StackTrace`: `frames`, `capture`, `text`, `symbolize`. `Trace`: `install`. `TraceHandler`: the nine hooks | |
+| `anti.io` | `print`, `println`, `eprint`, `eprintln`, `exit` | | |
+| `anti.text` | `equal`, `from_c`, `from_bytes`, `to_bytes`, `to_text`, `byte_count`, `char_count`, `slice`, `find_byte`, `parse_int`, `Align`, `Builder` | `Builder`: `new`, `append`, `append_byte`, `append_int`, `append_uint`, `append_float`, `append_f32`, `append_bool`, `append_char`, `append_text`, `text`, `len`, `clear`, `take`, `take_in` | `to_text`, `parse_int` |
+| `anti.license` | `text` | | |
+| `anti.error` | `SystemError`, `on_fatal`, `check` | `SystemError`: `errno`, `from_errno`, `from_win32` | |
+| `anti.time` | `Duration`, `nanoseconds`, `microseconds`, `milliseconds`, `seconds`, `as_milliseconds`, `as_seconds`, `add`, `between`, `now`, `wall`, `sleep`, `Clock`, `SystemClock` | `Clock`: `now`, `wall`, `sleep`, `since`, `default` | |
+| `anti.os` | `INTERRUPT`, `BREAK`, `TERMINATE`, `on_signal`, `signal_pending`, `user_config_dir`, `user_data_dir`, `user_cache_dir` | | the three directories |
+| `anti.fs` | `Mode`, `File`, `open` with `Mode.Read` as its default, `read`, `write`, `flush`, `size`, `close`, `list`, `remove`, `rename`, `read_file`, `write_file`, `FileSystem`, `SystemFileSystem` | `FileSystem`: `read_file`, `write_file`, `list`, `remove`, `rename`, `default` | every function |
+| `anti.reflect` | `TypeId`, `Field`, `Function`, `describe`, `parent`, `name`, `field_count`, `field`, `function_count`, `function`, `get`, `set`, `new`, `call`, `ValueKind`, `Value`, `Payload`, `nothing`, `of_int`, `of_uint`, `of_float`, `of_bool`, `of_char`, `of_str`, `of_ptr`, `BAD_INDEX`, `NOT_CARRIED`, `WRONG_KIND`, `WRONG_COUNT` | `Field`: `name`, `offset`, `type_id`, `element`, `owned`. `Function`: `name`, `slot`, `param_count`. `Payload` is the union of the bytes of a `Value` | `set`, `call` |
+| `anti.random` | `Source`, `Random`, `SharedRandom` | `Source`: `next`, `below`, `between`, `boolean`, `fraction`, `default`. `Random`: `new`, `reseed` | |
+| `anti.collection` | `Iterable<T>`, `Iterator<T>`, `Collection<T>`, `Indexed<T>`, `IndexedWalk<T>`, `Copies<T>`, `NotOne`, `allocator`, `equal`, the hashing helpers `hash_in_order`, `hash_in_order_by`, `hash_in_any_order`, `hash_sum` and `hash_of_sum`, and the writers of the text of a collection | `Collection<T>`: see [Collections](#collections). `NotOne`: `count`, `found` | `find_one`, `update_one` and `remove_one` of every collection |
+| `anti.toml` | `Document`, `int_value`, `bool_value` | `Document`: `read`, `open`, `len`, `key`, `value`, `line`, `has`, `text_of`, `int_of`, `bool_of` | `Document.read`, `Document.open` |
+| `anti.config` | `Config`, `FileConfig`, `current`, `read` | `Config`: `has`, `text_of`, `int_of`, `bool_of`, `default`. `FileConfig`: `read` | `read`, `FileConfig.read` |
+| `anti.args` | `Parser` | `Parser`: `new`, `flag`, `value`, `parse`, `given`, `text_of`, `int_of`, `len`, `at`, `help` | `Parser.parse` |
+| `anti.json` | `write`, `write_text`, `write_int`, `write_bool`, `member`, `unquote` | | `unquote` |
+| `anti.log` | `Level`, `Format`, `Sink`, `StderrSink`, `FileSink`, `CallbackSink`, `Logger`, `SinkLogger`, `Log`, `logger`, `set`, `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `level_name`, `level_of`, `register` | `Logger`: `name`, `level`, `format`, `log`, `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `default`. Each sink: `new`, `write`. `SinkLogger`: `new`. `Log`: `current` | `FileSink.new` |
+| `anti.debug` | `backtrace` | | |
+| `anti.mem` | `Allocator`, `LibcAllocator`, `ArenaAllocator`, `Shared<T>` | `Allocator`: `alloc`, `free`, `default`. `ArenaAllocator`: `new`, `free_all`. `Shared<T>`: `new`, `share`, `count`, `read`, `modify` | |
+| `anti.runtime` | `configure`, `get` | | |
+| `anti.simd` | nothing of its own: the compiler knows `select`, `any` and `all` by name | | |
+| `anti.trace` | `LeakTracker`, `Profiler`, `CallLogger`, `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal`, `Composite`, `start`, `install`, `PROFILE_SLOTS`, `JOURNAL_SLOTS`, `MESSAGE_BYTES`, `COMPOSITE_SLOTS` | Every handler: `new` and the nine hooks. `LeakTracker`: `made`, `freed`, `live`, `report`. `Profiler`: `len`, `name`, `calls`, `nanoseconds`, `missed`, `report`. `CallLogger`: `quiet`, `lines`. `ErrorMonitor`: `failures`, `last_code`, `last_message`, `last_function`, `report`. `ThreadMonitor`: `sent`, `taken`, `running`, `peak`, `report`. `ChangeJournal`: `writes`, `len`, `class_of`, `field_of`, `report`. `Composite`: `add`, `len`, `at` | |
+| `anti.plugin` | `Library`, `load`, `NOT_LOADED`, `IN_USE` | `Library`: `instance_at`, `supports_at`, `live`, `unload`. `lib.instance(I)` and `lib.supports(I, "f")` are the forms that take a type | `load`, `Library.unload` |
+| `anti.regex` | `Error`, `BadPattern`, `TooExpensive`, `MissingGroup`, `LengthMismatch`, `compile`, `compile_bytes`, `Cursor`, `Matches`, `Pieces`, `ByteMatches`, `BytePieces`, and the functions behind the methods of `str` and `[]byte` | `BadPattern`: `position`. The four walks: `next`, `value` | `compile`, `compile_bytes`, and a method with a compiled pattern |
 
 The 12 modules under `anti.collection`, each with the `operator fn eq` and `operator fn hash` of its classes:
 
@@ -2316,7 +2316,7 @@ The 12 modules under `anti.collection`, each with the `operator fn eq` and `oper
 | `anti.collection.synchronized` | `SyncList<T>`, `SyncMap<K, V>`, `SyncSet<T>`, `SyncPool<T>`, `sort`, `sort_by`, `map` |
 | `anti.collection.concurrent` | `ConcurrentMap<K, V>`, `SpscRing<T, N>`, `Snapshot<T>` |
 
-Not built yet: the modules over the other native libraries of the runtime archive, `anti.net`, `anti.raylib` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses.
+Not built yet: the modules over the other native libraries of the runtime archive, `anti.net`, `anti.raylib` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses. `Parser.text_of` and `Parser.at` of `anti.args` give a `str`, empty for what is absent. Decision 12 of 2026-10-11 makes both a `?str`.
 
 ## Tools
 
