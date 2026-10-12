@@ -441,9 +441,9 @@ column means that no source holds the row at all.
 | Ownership | 18 | 248 | 1 | 125 | 0 |
 | Errors | 15 | 173 | 0 | 41 | 0 |
 | Threads | 29 | 402 | 4 | 189 | 7 |
-| Classes | 26 | 47 | 9 | 0 | 0 |
+| Classes | 26 | 59 | 0 | 0 | 0 |
 | Modules | 19 | 29 | 1 | 0 | 0 |
-| All | 206 | 2300 | 36 | 1484 | 8 |
+| All | 206 | 2312 | 27 | 1484 | 8 |
 
 ### Flow
 
@@ -1292,26 +1292,126 @@ Where two rules meet, and where three do:
 | `final class` | module level `programs/classes`, library module `modules/sealed/com/example/sealed` | none |
 | `inherits` | `programs/alias_class_pointers` | none |
 | function with `self` | class body `programs/alias_class_pointers`, nested type `programs/generic_nested`, generic `programs/generic_constants`, library module `modules/access/com/example/ledger` | none |
-| static function of a class | class body `programs/catch_exits`, generic `programs/generic_static`, library module `modules/access/com/example/ledger` | nested type |
+| static function of a class | class body `programs/catch_exits`, generic `programs/generic_static`, library module `modules/access/com/example/ledger`, nested type `matrix/classes_nested_members` | none |
 | `abstract fn` | class body `programs/alias_class_pointers`, generic `programs/generic_copies`, library module `modules/direct/com/example/shapes` | none |
 | `concrete fn` | class body `programs/alias_class_pointers`, generic `programs/generic_copies`, library module `modules/chain/com/example/dog` | none |
-| `concrete fn Base::f` | class body `errors/concrete_signature` | library module |
-| `operator fn` | class body `programs/caller_params`, generic `programs/generic_hooks`, library module `modules/generic_hooks/com/example/row` | module level |
-| `construct` | class body `programs/class_bitfields`, generic `programs/generic_constants`, library module `modules/chain/com/example/animal` | nested type |
-| `destruct` | class body `programs/alloc_owning`, generic `programs/generic_copies`, library module `modules/chain/com/example/animal` | nested type |
-| constant of a class | class body `programs/alloc_owning` | nested type, generic, library module |
+| `concrete fn Base::f` | class body `matrix/classes_tables`, library module `modules/classes/com/example/classes`, nested type `matrix/classes_qualified_body_in_a_nested_class` T084 | none |
+| `operator fn` | class body `programs/caller_params`, generic `programs/generic_hooks`, library module `modules/generic_hooks/com/example/row`, module level `matrix/classes_all_operators`, nested type `matrix/classes_nested_members` | none |
+| `construct` | class body `programs/class_bitfields`, generic `programs/generic_constants`, library module `modules/chain/com/example/animal`, nested type `matrix/classes_nested_members` | none |
+| `destruct` | class body `programs/alloc_owning`, generic `programs/generic_copies`, library module `modules/chain/com/example/animal`, nested type `matrix/classes_nested_members` | none |
+| constant of a class | class body `programs/alloc_owning`, nested type `matrix/classes_nested_members`, generic `matrix/classes_constant_of_a_generic_class` T072, library module `modules/class_members/com/example/counter` T076 | none |
 | field with `implements` | `programs/alias_class_pointers` | none |
 | field with `use` | `programs/checked_once` | none |
 | `mutable` field | `programs/inherits_header` | none |
 | `pub` member | `programs/alias_class_pointers` | none |
 | `protected` member | `programs/protected_calls` | none |
 | `self.super.f()` | `programs/construct_base` | none |
-| `static` member | none | open |
+| `static` member | `matrix/classes_statics` | none |
 | `inject` field | `programs/inject_default` | none |
 | `inject final` field | `inject/service` | none |
 | `transient` field | `programs/transient` | none |
 | `trace class` and `trace fn` | `programs/hook_trace` | none |
 | `compatible` line | `plugin/versions/floor/net/example/greet` | none |
+
+The step `classes` filled the table above on 2026-10-12. `tests/matrix/`
+holds its sources under the names `classes_*`. The rows of the table are
+items. The constructs of the area that stand in a function have no row.
+The programs below hold them in the places of "The contexts".
+
+- `matrix/classes_calls`, `classes_objects`, `classes_conversions`,
+  `classes_statics`, `classes_operators`, `classes_generics` and
+  `classes_root` hold their constructs in fifteen places each, one
+  function `in_<context>` and one line of output per place and input, as
+  `matrix/flow_<construct>` does. The first three hold the calls through
+  the tables with `self.super.f()` and a bound function, the ways an
+  object is made and torn down, and `is`, `as`, `as?` and `==` on pointers
+  of a chain. The other four hold the static members and a singleton, the
+  operators with the default `==` and the hash, the generics, and the
+  functions and hooks of the root.
+- A worker deletes no object and reaches no `mutable` field of a
+  singleton. The place "worker" of `classes_objects` therefore holds the
+  values alone, and that of `classes_statics` the field that is fixed.
+- `anti-test/com/example/classes` is the module of the test
+  `anti_test_classes`. It holds the `tests` block and the `fixtures`
+  block. A block holds functions alone, so no row of the table has a cell
+  there.
+- `modules/classes/com/example/classes` is the library of the test
+  `classes_modules`. It holds each construct in a plain function and in a
+  generic one. The client inherits a class of it and implements an
+  interface of it. A static field or a constant of a class in a generic
+  function of a library stands in `generic_atomic_modules` and
+  `generic_class_constant_modules`, T029. A library file carries no type
+  nested in a generic class yet, so that cell cannot exist.
+- A construct that gives a value is refused in a constant: six refusals
+  `matrix/classes_*_in_a_constant` and
+  `matrix/classes_call_as_the_default_of_a_field`, T019.
+- `matrix/classes_field_kinds` takes a field of each of 29 kinds through
+  the default `equals`, the hash and `dup`. `matrix/classes_generic_kinds`
+  takes each of 31 kinds through a copy of a generic class, function,
+  variant and interface. Neither has a row in a kinds table.
+- `matrix_classes_equality_no_reflect`, `_field_kinds_no_reflect`,
+  `_conversions_no_reflect` and `_copies_no_reflect` run four programs
+  under `--no-reflect`, and `matrix_classes_objects_no_hooks` and
+  `_construct_order_no_hooks` two under `--no-hooks`.
+
+The rules of the area, each in a program of its own:
+
+- The tables: `matrix/classes_tables` holds an unqualified body for two
+  interfaces, two qualified ones, both, and the nearest body of a chain.
+  It holds a body qualified by its own class and by its base as well, and
+  an interface that inherits another.
+- `construct` and `destruct`: `matrix/classes_construct_order` holds the
+  order along a chain, an inline field, an owned object, an array, an
+  assignment and a `construct` that fails.
+- Decision 27 and the default `equals` and hash: `matrix/classes_equality`
+  and `matrix/classes_equality_of_an_owned_pointer`, T081.
+- The levels of a member: `matrix/classes_visibility`, twelve refusals
+  `matrix/classes_private_*`, `_protected_*` and `_internal_*`, and T075.
+- A singleton: `matrix/classes_singletons` and seven refusals
+  `matrix/classes_singleton_*`, T079 among them.
+- `dup` and `copy`: `matrix/classes_copies` and
+  `matrix/classes_copy_replaced`, T082.
+- An abstract class where a complete value stands: thirteen refusals
+  `matrix/classes_abstract_class_*`, seven of them T078.
+- Injection with the default provider: `matrix/classes_injection`.
+- Every operator of the table on a struct and on a class:
+  `matrix/classes_all_operators`.
+- Every member in a nested type: `matrix/classes_nested_members`.
+- A generic class with a generic base, a generic interface, a function
+  with a parameter of its own, an operator, the default `==`, `construct`
+  and `destruct`: `matrix/classes_generic_classes`, and twelve refusals of
+  the forms of a generic.
+
+Where two rules meet, and where three do:
+
+- A generic class, a constant or a static field and the type argument:
+  `matrix/classes_constant_of_a_generic_class` and
+  `matrix/classes_static_of_a_generic_class`, T072.
+- A nested class, a qualified `concrete fn` and a base of the same class
+  body: `matrix/classes_qualified_body_in_a_nested_class`, T084.
+- A pointer to an interface, a pointer to the object or to its base and
+  `==`: `matrix/classes_identity_of_an_interface_pointer`, T083.
+- A pointer to an interface, the abstract base of the object and `as`:
+  `matrix/classes_cast_from_an_interface_to_a_base`, T073.
+- An `operator fn`, a second parameter of another type and a literal:
+  `matrix/classes_operator_with_a_literal`, T074.
+- A generic function, a library file and a constant of a class:
+  `generic_class_constant_modules`, T029.
+- A class of another module, `pub` and a static member:
+  `class_members_modules`, T076.
+- A class, `dup` and a replaced `copy`: `matrix/classes_copy_replaced`,
+  T082.
+- A singleton, a field that is fixed and its address:
+  `matrix/classes_singleton_field_written_through_its_address`, T079.
+- An `inject` field in a nested class, in a generic class and in a class
+  value held inline: `matrix/classes_injection`.
+- Two interfaces, a chain and the qualified and unqualified bodies of
+  one name: `matrix/classes_tables` and
+  `matrix/classes_call_of_two_qualified_bodies`.
+- A `construct` that fails, a chain and the `destruct` of each level:
+  `matrix/classes_construct_order`.
+- A type parameter, a literal and the back end:
+  `matrix/classes_literal_of_a_type_parameter`, T080.
 
 ### Modules
 
@@ -1357,12 +1457,12 @@ antic 0.2.0 does otherwise, the test becomes an expected failure by decision
 | 24 | values, ownership | `xs[lo..hi]` past the length, trapped in dev mode | T017, the test `check_slice_range` of `traps/slice_range`, and `check_slice_of_slice_range`, `check_slice_range_reversed` and `check_slice_range_negative` for a slice of a slice, a low bound above the high one and one below zero |
 | 25 | modules | a write of `count` of a collection outside its module | open |
 | 26 | modules | a `str` in the signature of an `extern fn` | open |
-| 27 | classes | a class with an `abstract fn` that is not `abstract` | open |
-| 27 | classes | a direct call of `destruct` | the refusal `matrix/ownership_destruct_called_directly` |
-| 27 | classes | `mutable` on a field of a plain class | open |
+| 27 | classes | a class with an `abstract fn` that is not `abstract` | T064, the refusal `matrix/classes_open_functions_without_abstract` |
+| 27 | classes | a direct call of `destruct` | the refusal `matrix/ownership_destruct_called_directly`, and T068, the refusal `matrix/classes_super_destruct_called_directly` for `self.super.destruct()` |
+| 27 | classes | `mutable` on a field of a plain class | T065, the refusal `matrix/classes_mutable_field_of_a_plain_class` |
 | 27 | classes | `static atomic` on an `f64` | T059, the refusal `matrix/threads_static_atomic_of_f64`, which the step `threads` wrote with the atomic fields |
-| 27 | classes | `==` on pointers of two unrelated classes | open |
-| 27 | classes | `equals` replaced without `hash` | open |
+| 27 | classes | `==` on pointers of two unrelated classes | T066, the refusals `matrix/classes_equal_pointers_of_unrelated_classes` and `matrix/classes_unequal_pointers_of_unrelated_classes` |
+| 27 | classes | `equals` replaced without `hash` | T067, the refusals `matrix/classes_equals_replaced_without_hash` and `matrix/classes_hash_replaced_without_equals` |
 | 27 | values | `<` on an enum, which stays refused | the refusal `matrix/values_less_on_enum` |
 | 27 | values | `+=` on a type with `operator fn add`, which is not derived | the refusals `matrix/values_compound_on_operator_add` and `matrix/values_compound_on_generic` |
 
@@ -1448,7 +1548,7 @@ On 2026-10-12, at antic 0.2.0:
   contextual words.
 - 10 item kinds, 22 statement kinds, 38 expression kinds and 10 type kinds
   in `src/antic/ast.h`.
-- 206 rows in the matrix. 2300 cells are held and 36 are
+- 206 rows in the matrix. 2312 cells are held and 27 are
   open. Of the kinds, 1484 are held and 8 are open. The step `flow` filled
   its area after the count of 840 held cells and 578 held kinds. The step
   `values` filled its area after the count of 1157 held cells and 622 held
@@ -1459,8 +1559,10 @@ On 2026-10-12, at antic 0.2.0:
   `errors` filled its area after the count of 1845 held cells and 1317
   held kinds. The step `threads` filled its area after the count of 1969
   held cells and 1347 held kinds. Its 4 open cells and its 7 open kinds
-  cannot exist, and each states why.
-- 6 open cells for the rules of decisions 19 to 27.
-- 748 messages: 548 expected by a test and 200 open. antic gives 598 with
-  62 open, and anti 150 with 138 open.
+  cannot exist, and each states why. The step `classes` filled its area
+  after the count of 2300 held cells, and no cell of it stays open.
+- 2 open cells for the rules of decisions 19 to 27, both of the area
+  modules.
+- 748 messages: 576 expected by a test and 172 open. antic gives 598 with
+  34 open, and anti 150 with 138 open.
 - 134 options and commands: 124 passed by a test and 10 open.
