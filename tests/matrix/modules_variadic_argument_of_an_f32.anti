@@ -1,0 +1,11 @@
+//! A variadic argument is an integer of 32 or 64 bits, an `f64` or a pointer.
+//! An `f32` needs `as`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let value: f32 = 1.5;
+	printf("%f\n".ptr, value);
+	return 0;
+}

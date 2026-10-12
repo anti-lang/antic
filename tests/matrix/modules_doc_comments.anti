@@ -1,0 +1,151 @@
+//! The four comments of documentation: `//!` for the module and `///` for the
+//! item that follows, `//#!` and `//#` the same for the developers of a
+//! library. Each `///` and `//#` stands before an item of every kind and
+//! before the members of a class, and changes nothing a program does.
+//#! A note on the module for its developers.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A constant.
+//# A note on the constant.
+const LIMIT: int = 3;
+
+/// A struct.
+//# A note on the struct.
+struct Point
+{
+	/// A field of a struct.
+	x: int,
+	//# A note on a field of a struct.
+	y: int,
+}
+
+/// A union.
+union Word
+{
+	/// A field of a union.
+	whole: u32,
+	low: u8,
+}
+
+/// An enum.
+enum Level
+{
+	/// A value of an enum.
+	Low,
+	//# A note on a value of an enum.
+	High,
+}
+
+/// A variant.
+variant Shape
+{
+	/// A case of a variant.
+	Dot { r: int },
+	//# A note on a case of a variant.
+	Empty,
+}
+
+/// An alias.
+//# A note on the alias.
+type Row = [2]int;
+
+/// A constraint.
+constraint Key = eq + hash;
+
+/// An interface.
+abstract class Named
+{
+	/// An abstract function.
+	//# A note on an abstract function.
+	abstract fn name(self) -> int;
+}
+
+/// A class.
+//# A note on the class.
+class Counter
+{
+	/// An interface a class implements.
+	implements named: Named,
+	/// A field of a class.
+	//# A note on a field of a class.
+	pub n: int = 0,
+
+	/// A constant of a class.
+	pub const STEP: int = 2;
+
+	/// A static field of a class.
+	pub static atomic made: int = 0;
+
+	/// A nested type.
+	struct Pair
+	{
+		a: int,
+	}
+
+	/// A function that builds the object.
+	fn construct(self)
+	{
+		self.n = Counter.STEP;
+	}
+
+	/// A function of a class.
+	//# A note on a function of a class.
+	pub fn bump(self) -> int
+	{
+		let p = Pair { a: self.n };
+		self.n = p.a + Counter.STEP;
+		return self.n;
+	}
+
+	/// A function that fills an entry.
+	pub concrete fn name(self) -> int
+	{
+		return self.n * 10;
+	}
+
+	/// A static function of a class.
+	pub fn zero() -> int
+	{
+		return 0;
+	}
+}
+
+/// An `extern fn`.
+//# A note on an `extern fn`.
+extern fn abs(n: c_int) -> c_int;
+
+/// An operator at module level.
+operator fn add(a: Point, b: Point) -> Point
+{
+	return Point { x: a.x + b.x, y: a.y + b.y };
+}
+
+/// A generic function.
+//# A note on a generic function.
+fn pick<K: Key>(own a: K, own b: K, first: bool) -> K
+{
+	if first {
+		return a;
+	}
+	return b;
+}
+
+/// A function.
+//# A note on a function.
+fn main() -> int
+{
+	let p = Point { x: 1, y: 2 } + Point { x: 10, y: 20 };
+	let w = Word { whole: 0x0102 };
+	let l = Level.High;
+	let s = Shape.Dot { r: 4 };
+	let row: Row = [5, 6];
+	let c = Counter { };
+	let named: *Named = &c.named;
+	printf("%lld %lld %lld %d %d %d %lld %lld %lld %d %lld %lld\n".ptr, LIMIT, p.x, p.y,
+		w.low as c_int, (l == Level.High) as c_int, (s is Shape.Dot) as c_int, row[1], c.bump(),
+		named.name(), abs(-9), pick(7, 8, false), Counter.zero());
+	return 0;
+}

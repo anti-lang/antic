@@ -1,0 +1,7 @@
+exit 0
+i32 -32 u32 4000000000 int -6400000000 u64 18000000000000000000
+f64 2.50 f32 1.25
+c_int -7 c_uint 7
+after as 1234 200 1 c_size_t 5678
+pointer 12 42 pointer x
+no argument

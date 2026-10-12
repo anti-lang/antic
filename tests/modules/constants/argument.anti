@@ -1,0 +1,19 @@
+//! A constant of a library as the argument of a type parameter `N: int`, as
+//! a constant of the module itself stands there. T094 of
+//! docs/audit/tests-findings.md.
+
+import com.example.limits;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Ring<T, N: int>
+{
+	items: [N]T,
+}
+
+fn main() -> int
+{
+	let r = Ring<u8, limits.COUNT> { items: [1, 2, 3, 4] };
+	printf("type argument %lld %d\n".ptr, r.items.len, r.items[3] as c_int);
+	return 0;
+}

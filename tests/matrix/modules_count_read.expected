@@ -1,0 +1,13 @@
+exit 0
+list 3 3 1
+deque 1
+ring 2
+priority queue 3
+map 2
+hash map 1
+sorted map 2
+set 2
+hash set 1
+bit set 2
+sorted set 3
+pool 2

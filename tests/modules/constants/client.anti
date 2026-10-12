@@ -1,0 +1,67 @@
+//! The client of the limits library. Each constant of the library stands where
+//! the language takes a constant expression, and the program prints what the
+//! compiler made of it.
+
+import com.example.limits;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const MINE: int = limits.COUNT * 10 + limits.TOTAL;
+const LABEL: str = limits.NAME;
+const SCALED: f64 = limits.HALF * 4.0;
+
+enum Step
+{
+	First = limits.FIRST,
+	Second = limits.SECOND,
+}
+
+struct Flags
+{
+	low: u8 : limits.BITS,
+	high: u8 : 5,
+}
+
+struct Wide align(limits.ALIGN)
+{
+	a: u8,
+}
+
+class Holder
+{
+	pub rows: [limits.COUNT]int = [7; limits.COUNT],
+	pub start: u8 = limits.START,
+}
+
+fn stepped(n: int = limits.COUNT) -> int
+{
+	return n + 1;
+}
+
+fn named(n: int) -> int
+{
+	let got = 0;
+	switch n {
+		limits.COUNT => got = 1,
+		limits.TOTAL => got = 2,
+		else => got = 3,
+	}
+	return got;
+}
+
+fn main() -> int
+{
+	let xs: [limits.COUNT]int = [1, 2, 3, 4];
+	printf("length of an array %lld %lld\n".ptr, xs.len, xs[limits.COUNT - 1]);
+	printf("constants %lld %.*s %.1f\n".ptr, MINE, LABEL.len as c_int, LABEL.ptr, SCALED);
+	printf("values of an enum %lld %lld\n".ptr, Step.First as int, Step.Second as int);
+	let f = Flags { low: 7, high: 1 };
+	printf("width of a bitfield %d %lld\n".ptr, f.low as c_int, size_of(Flags));
+	printf("alignment %lld\n".ptr, size_of(Wide));
+	let h = Holder { };
+	printf("defaults of fields %lld %lld %d\n".ptr, h.rows.len, h.rows[3], h.start as c_int);
+	printf("default of a parameter %lld %lld\n".ptr, stepped(), stepped(1));
+	printf("arms of a switch %lld %lld %lld\n".ptr, named(4), named(13), named(5));
+	printf("value of a library enum %lld\n".ptr, limits.Level.High as int);
+	return 0;
+}

@@ -1,0 +1,33 @@
+//! The arguments a variadic `extern fn` takes after its named parameters: an
+//! `i32`, a `u32`, an `int`, a `u64`, an `f64`, a pointer, a `c_int`, a
+//! `c_uint` and a `c_size_t`. An `f32`, a `c_long`, a `u8` and a `bool` pass
+//! after `as`.
+
+extern fn snprintf(buffer: ?*byte, size: c_size_t, format: ?*byte, ...) -> c_int;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let small: i32 = -32;
+	let unsigned: u32 = 4000000000;
+	let whole: int = -6400000000;
+	let wide: u64 = 18000000000000000000;
+	let real: f64 = 2.5;
+	let single: f32 = 1.25;
+	let c: c_int = -7;
+	let cu: c_uint = 7;
+	let longer: c_long = 1234;
+	let size: c_size_t = 5678;
+	let tiny: u8 = 200;
+	let flag = true;
+	let text: [64]byte = [0; 64];
+	printf("i32 %d u32 %u int %lld u64 %llu\n".ptr, small, unsigned, whole, wide);
+	printf("f64 %.2f f32 %.2f\n".ptr, real, single as f64);
+	printf("c_int %d c_uint %u\n".ptr, c, cu);
+	printf("after as %lld %d %d c_size_t %llu\n".ptr, longer as int, tiny as c_int, flag as c_int, size);
+	let wrote = snprintf(&text[0], 64, "%d %s %c".ptr, 42 as c_int, "pointer".ptr, 'x' as u32);
+	printf("pointer %d %s\n".ptr, wrote, &text[0]);
+	printf("no argument\n".ptr);
+	return 0;
+}

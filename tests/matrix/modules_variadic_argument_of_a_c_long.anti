@@ -1,0 +1,11 @@
+//! A variadic argument is an integer of 32 or 64 bits, an `f64` or a pointer.
+//! A `c_long`, whose width follows the target, needs `as`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let value: c_long = 7;
+	printf("%ld\n".ptr, value);
+	return 0;
+}

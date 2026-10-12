@@ -1,0 +1,20 @@
+//! Constants of a library that another module reads where the language takes
+//! a constant expression: the length of an array, a constant of its own, the
+//! value of an enum, the width of a bitfield, the N of `align(N)`, the default
+//! of a parameter and of a field, an arm of a `switch` and a type argument.
+
+pub const COUNT: int = 4;
+pub const BITS: int = 3;
+pub const ALIGN: int = 16;
+pub const START: u8 = 10;
+pub const NAME: str = "limits";
+pub const HALF: f64 = 0.5;
+pub const TOTAL: int = COUNT * BITS + 1;
+pub const FIRST: i32 = 4;
+pub const SECOND: i32 = FIRST + 9;
+
+pub enum Level
+{
+	Low = 2,
+	High = 9,
+}

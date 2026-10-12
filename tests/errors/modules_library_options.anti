@@ -1,0 +1,7 @@
+//! A library for C that the option tests build: `--lib` takes `static` or
+//! `shared`, and `--soname` needs `--package-version`.
+
+export fn library_two() -> c_int
+{
+	return 2;
+}

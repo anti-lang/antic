@@ -14,8 +14,6 @@
 # line here.
 
 antic --help
-antic --soname
-antic --strip-docs
 anti --help
 anti -h
 anti symbols --from

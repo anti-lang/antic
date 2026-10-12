@@ -1,0 +1,11 @@
+//! A library for C has no function `main`.
+
+export fn library_one() -> c_int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	return 0;
+}

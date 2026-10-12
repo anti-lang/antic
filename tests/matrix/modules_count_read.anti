@@ -1,0 +1,76 @@
+//! `count` of a collection is read from every module: of a `List`, a `Deque`,
+//! a `Ring`, a `PriorityQueue`, a `Map`, a `HashMap`, a `SortedMap`, a `Set`,
+//! a `HashSet`, a `BitSet`, a `SortedSet` and a `Pool`, in an expression, in a
+//! condition and as the bound of a loop.
+
+import anti.collection.deque.{Deque};
+import anti.collection.list.{List};
+import anti.collection.map.{HashMap, Map};
+import anti.collection.pool.{Pool};
+import anti.collection.queue.{PriorityQueue};
+import anti.collection.ring.{Ring};
+import anti.collection.set.{BitSet, HashSet, Set};
+import anti.collection.sorted.{SortedMap, SortedSet};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let numbers = List<int>.new();
+	for i in 0..3 {
+		numbers.push(i);
+	}
+	let turns = 0;
+	for i in 0..numbers.count {
+		turns += 1;
+	}
+	printf("list %lld %lld %d\n".ptr, numbers.count, turns, (numbers.count > 2) as c_int);
+	let deque = Deque<int>.new();
+	deque.push_back(1);
+	printf("deque %lld\n".ptr, deque.count);
+	let ring = Ring<int, 4>.new();
+	ring.push(1);
+	ring.push(2);
+	printf("ring %lld\n".ptr, ring.count);
+	let queue = PriorityQueue<int>.new();
+	queue.push(5);
+	queue.push(3);
+	queue.push(4);
+	printf("priority queue %lld\n".ptr, queue.count);
+	let ages = Map<int, int>.new();
+	ages.set(1, 10);
+	ages.set(2, 20);
+	ages.set(1, 30);
+	printf("map %lld\n".ptr, ages.count);
+	let hashed = HashMap<int, int>.new();
+	hashed.set(1, 10);
+	printf("hash map %lld\n".ptr, hashed.count);
+	let ordered = SortedMap<int, int>.new();
+	ordered.set(2, 20);
+	ordered.set(1, 10);
+	printf("sorted map %lld\n".ptr, ordered.count);
+	let seen = Set<int>.new();
+	seen.add(7);
+	seen.add(7);
+	seen.add(8);
+	printf("set %lld\n".ptr, seen.count);
+	let hash_set = HashSet<int>.new();
+	hash_set.add(7);
+	printf("hash set %lld\n".ptr, hash_set.count);
+	let bits = BitSet.new();
+	bits.add(3);
+	bits.add(40);
+	bits.add(3);
+	printf("bit set %lld\n".ptr, bits.count);
+	let sorted = SortedSet<int>.new();
+	sorted.add(9);
+	sorted.add(1);
+	sorted.add(5);
+	sorted.add(1);
+	printf("sorted set %lld\n".ptr, sorted.count);
+	let pool = Pool<int>.new();
+	let first = pool.add(1);
+	let second = pool.add(2);
+	printf("pool %lld\n".ptr, pool.count);
+	return 0;
+}
