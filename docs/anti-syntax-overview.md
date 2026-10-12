@@ -2454,8 +2454,19 @@ Contextual words: `packed align by in final own transient operator mutable trace
 
 Tokens beside the operators of C: `:: => -> .. ... ?* ?? ?.`, `as?`, the wrapping forms `+% -% *% <<%`, the saturating forms `+| -| *|`, their compound assignments `+%= -%= *%= <<%= +|= -|= *|=`, `<` and `>` around type parameters and type arguments with `>>` closing two lists, `?` before any type, and `.{` of a direct import.
 
-String prefixes: `r b br f rf x re`.
+String prefixes: `r b br f rf x re`. The lexer knows `fr` as well and refuses it with a message that names `rf`.
 
-Built-in functions known by name: `mul_high`, `close(c)` on a channel unless a function `close` is in scope, `splat`, `load`, `store`, `shuffle`, `sum`, `min`, `max` and `dot` of a simd struct, and `select`, `any` and `all` of `anti.simd`.
+Names with a meaning that are no words of the lexer:
+
+| Kind | Names |
+|---|---|
+| functions the compiler calls | `main`, `construct` and `destruct` of a class, `get` of a singleton, `setup` and `teardown` of a `fixtures` block |
+| built-in functions | `mul_high`, and `close(c)` on a channel unless a function `close` is in scope |
+| members of every value | `.len` and `.ptr` of a slice and a `str`, `.len` of an array, `.tag` of a variant, `x.hash()`, `to_slice()` of an iterator |
+| methods of `str` and `[]byte` | `matches`, `find_all`, `replace`, `split`, `patch`, `to_bytes` and `to_text` |
+| locks and atomics | `Mutex.new()`, `m.destroy()`, and `load`, `store`, `add`, `sub`, `and`, `or`, `swap` and `compare_swap` of an atomic |
+| simd | `splat`, `load`, `store`, `shuffle`, `sum`, `min`, `max` and `dot` of a simd struct, and `select`, `any` and `all` of `anti.simd` |
+| patterns and objects | `Regex.compile`, `ByteRegex.compile` and `Object.deserialize` |
+| calls that take a type | `lib.instance(Interface)` and `lib.supports(Interface, "f")` of `anti.plugin` |
 
 Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names.
