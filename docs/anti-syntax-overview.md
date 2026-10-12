@@ -117,6 +117,8 @@ out.println("renamed");
 
 `pub` exports to every module, `internal` to modules under the same package root, none to the file. `internal` marks an item of a module, and `protected` a member of a class. `import x as y` renames the local name. The `import` lines come first in a file, after an `allow` or `unchecked` clause for the whole file. Paths under `anti.` are the language's. Third parties use a root they own.
 
+An import that closes a cycle is refused, and so are a module that imports itself and an import written twice. A module holds no variable: `let` at module level is refused. A `const` stands there, and state that outlives a call stands in a `static atomic` field or in a singleton, see [Static fields and singletons](#static-fields-and-singletons).
+
 `import anti.collection.map.{Map, HashMap};` makes the listed names of a module visible in the file without the module's name, so code writes `Map<str, int>` rather than `map.Map<str, int>`. Each listed name is a public item of that module, and one that clashes with a name already visible in the file is refused, naming both. The module stays reachable by its name, as with a plain `import`. `anti fmt` keeps the list sorted. `import anti.regex.{Regex};` is refused, since `Regex` is declared in `anti.lang` and is no item of `anti.regex`.
 
 ```anti
