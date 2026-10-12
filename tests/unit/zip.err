@@ -1,0 +1,136 @@
+anti test: the messages below are expected
+anti: packed.txt is packed with method 12, and the reader takes stored and deflate
+anti: the data of bomb.txt is broken
+anti: the data of stored.txt is broken
+anti: the data of reserved is broken
+anti: the data of cut is broken
+anti: the data of early is broken
+anti: the data of early is broken
+anti: the data of complement is broken
+anti: the data of oversubscribed is broken
+anti: the data of short is broken
+anti: the data of crc is broken
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip is no zip archive
+anti: test_zip.zip: the data of a.txt runs past its end
+anti: test_zip.zip has a broken central directory
+anti: test_zip.zip has a broken central directory
+anti: test_zip.zip has a broken entry
+anti: test_zip.zip has a broken entry
+anti: test_zip.zip: the data of a.txt runs past its end
+anti: test_zip.zip has entries whose data overlap
+anti: test_zip.zip has entries whose data overlap
+anti: test_zip.zip unpacks to more than one archive holds
+anti: test_zip.zip: entry 0 is too large for a zip archive
+anti: test_zip.zip: 65536 entries are more than a zip archive holds

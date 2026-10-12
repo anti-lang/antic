@@ -8,10 +8,10 @@
 # that gives the messages after it, for the reader alone.
 #
 # A message that stays for good has the lines `# Stays: ...` before it,
-# which give the reason. Either no program can reach it, or antic gives it
-# as the second message of one mistake alone, and a finding of
-# docs/audit/tests-findings.md holds that. The test reads a line as one
-# message, so the reason stands in lines of its own.
+# which give the reason. Either no program and no input a test can write
+# reaches it, or antic gives it as the second message of one mistake alone,
+# and a finding of docs/audit/tests-findings.md holds that. The test reads
+# a line as one message, so the reason stands in lines of its own.
 #
 # A message leaves the list in the commit that adds its test. The test
 # fails for a line whose message a test expects, and for a message that no
@@ -82,183 +82,77 @@ antic compiles no copy here yet, %s
 # src/antic/sema_value.c
 
 # src/anti/bind.c
+# Stays: no description and no header the tests hold reaches it. It tells
+# of a binding that bindwrite.c wrote and the lexer of antic refuses, which
+# would be a defect of the writer.
 anti: bind wrote %s, and it does not lex\n
 
 # src/anti/bindapi.c
-the type `%s` names itself
-the type `%s` does not parse
-anti: %s names the %s `%s`, which is no C identifier\n
-anti: %s names the struct `%s` twice\n
-a value of the enum `%s` is no integer
-`%s` is left out: a type does not parse
-anti: %s is not JSON: %s\n
-anti: %s holds no API description of rlparser\n
 
 # src/anti/bindclang.c
-bind --clang needs clang %d. Get clang-%s-%s.tar.xz from %s, or another clang %d, and put it first on PATH.\n
-anti: `%s --version` failed.
-anti: %s is clang %d, and
-anti: the runtime archive holds no sysroot for %s, whose headers clang reads. Pass --runtime.\n
-anti: %s -print-resource-dir failed\n
-an anonymous member of `%s` is the field `%s`
-`%s` aligns a field other than its first, which Anti has no form for
-`%s` is packed to more than one byte, which Anti has no form for
-`%s` is aligned without a value
-`%s` is left out: its type `%s` does not parse
-`%s` is static without a body and is left out
-the macro `%s` is a word of Anti and is skipped
-the macro `%s` is no constant and is skipped
-anti: clang could not %s, status %d\n
-anti: unknown target %s\n
-anti: the AST of clang is not JSON: %s\n
-the variable `%s` is skipped
 
 # src/anti/bindwrite.c
-`%s` has no field and is left out
-`%s` is left out: Anti has no form for the type of its field `%s`
-`%s` is left out: its struct is left out
 
 # src/anti/build.c
-anti: cannot write %s\n
+# Stays: no build reaches it. Every Windows link passes /DEBUG, so
+# lld-link writes the PDB or the link fails first.
 anti: the link of %s wrote no %s\n
-anti: %s: the path dependencies of this project are more than %d deep, so one of them is a cycle\n
-anti: %s is no target of Anti\n
+# Stays: no host of the suite reaches the next two. target_host fails on
+# a system or a processor that is no target of Anti, and anti is built for
+# the six targets alone.
 anti: this host is no target of Anti, so the build needs --target\n
-anti: %s: [targets] names more than the six targets of Anti\n
-anti: %s: [targets] names %s, which is no target of Anti\n
-anti: %s holds no %s file, so this project has no module\n
 anti: this host is no target of Anti\n
-anti: %s was not built, so there is nothing to run\n
-anti: %s asks for antic %s and this one is %s\n
-anti: the system does not say where the runtime archive is, so the build needs --runtime\n
-anti: %s is no processor level of %s\n
 
 # src/anti/check.c
-anti: the `anti` block of `%s` at %s:%d failed, and its module is %s\n
+# Stays: no project reaches it. The front-end class runs before the
+# formatting class and ends the run for a file the lexer refuses.
 %s:1:1: error: the file does not lex, so it has no canonical form\n
-anti: no %s file under %s or %s\n
 
 # src/anti/deps.c
-anti: %s holds no library file of the package %s\n
-anti: %s holds %s %s, which no constraint on the package takes\n
-anti: %s names the version %s of %s, which is no version\n
-anti: %s names the module %s, which is no module path\n
-anti: %s names the digest %s of %s, which is no SHA-256 digest\n
-anti: %s names the dependency %s, which is no package name\n
-anti: %s names the version %s of %s, which is no constraint\n
-anti: %s is no index that anti reads\n
-anti: %s names no module of %s %s\n
-anti: %s has no version of %s that satisfies every constraint on it\n
-anti: %s gave no index of %s that anti reads, so the build cannot tell which repository holds it\n
-anti: %s and %s both hold %s, so the dependency names which one\n
-anti: no repository of the manifest has a version of %s that satisfies every constraint on it\n
-anti: %s names %s, which is no %s, so %s is not read\n
-anti: %s names %s, which is no module path, so %s is not read\n
-anti: %s names %s, which is no SHA-256 digest, so %s is not read\n
-anti: %s cannot hold the %s %s, which holds a double quote or a control byte\n
-anti: the lock file names %s of %s with no repository and no path\n
-anti: the dependencies of this project do not settle on one version each\n
 
 # src/anti/doc.c
-anti: doc takes a source or a library file\n
-anti: %s: %s needs the source\n
 
 # src/anti/files.c
-anti: out of memory\n
+# Stays: no test reaches it. files_replace gives it when the file it has
+# just written cannot take the place of the one it read, and sdk.c when
+# the directory it has just unpacked cannot take its name. Both need a file
+# system that fails between two steps.
 anti: cannot replace %s\n
 
 # src/anti/fmt.c
-anti: %s does not lex and stays as it is\n
 
 # src/anti/jsontree.c
-a malformed string
-a string that holds a NUL
-no `:` after a member name
-an object without its `}`
-an array without its `]`
-values nested too deep
-the end of the input where a value belongs
-no JSON value
-bytes after the value
 
 # src/anti/licensing.c
-anti: %s holds no licence text, so %s is no runtime archive\n
-anti: %s is no archive\n
-anti: %s carries no package header, so it is no static library of `--lib static`\n
 
 # src/anti/main.c
-anti: --profile-generate and --profile-use build a program with --release, without --lib\n
-anti: license --project prints the notice of one target, so it takes --target <os>-<cpu> and not all\n
-anti: the build of a static library prints the line that links it, so license --project --lib static takes --notice\n
+# Stays: no host of the suite reaches it, as the two of build.c.
 anti: this host is no target of Anti, so license --project needs --target\n
-anti: the system does not say where the runtime archive is, so license needs --runtime\n
-anti: the system does not say where anti is, so pass --sysroot\n
 
 # src/anti/manifest.c
-anti: %s is no TOML that anti reads\n
-anti: %s: the dependency %s needs a table, as { version = \"1.0.0\" }\n
-anti: %s: a dependency has no %s field\n
-anti: %s: no manifest here, so there is no project. `anti new <name>` writes one\n
-anti: %s: [package] names no `name`, the root module path of the package\n
-anti: %s: [package] version `%s` is no version of one to three parts of digits, as `1.2.0`\n
-anti: %s: the dependency %s names a repository and a path\n
-anti: %s: the dependency %s names no version\n
-anti: %s: the dependency %s names the repository %s, which [repositories] does not\n
 
 # src/anti/project.c
-anti: `%s` is one segment, and a package name is a module path of at least two, as com.example.%s\n
-anti: %s is there already\n
 
 # src/anti/repo.c
-anti: the environment does not say where the cache of the user is\n
-anti: %s: http:// names a repository of 127.0.0.1 or localhost alone\n
-anti: %s: a repository URL is https:// or file://\n
-anti: %s: a file:// URL names an absolute path\n
-anti: %s: cannot read %s\n
-anti: %s: curl fetched nothing\n
-anti: %s names the package %s, which is no package name\n
-anti: --offline and no cached index of %s from %s\n
-anti: %s names %s %s, which is no version\n
+# Stays: no input reaches it. deps.c refuses the module path of an index
+# and of a lock file before repo_module reads it.
 anti: %s names the module %s of %s, which is no module path\n
-anti: --offline and no cached %s of %s %s\n
-anti: %s: the repository holds no such file\n
-anti: %s of %s %s has the digest %s and the index names %s\n
 
 # src/anti/sdk.c
-anti: sdk export runs on a Mac, which holds Apple's SDK. Run it on a Mac you own and anti sdk import here.\n
-anti: %s holds no SDKSettings.json with a Version, so it is no MacOSX.sdk\n
+# Stays: a Mac without the Command Line Tools gives it. The development
+# Mac holds them, and no test removes them.
 anti: /Library/Developer/CommandLineTools/SDKs holds no SDK. Run xcode-select --install, or name one with --sdk\n
-anti: %s names the Version %s, which is no version\n
-anti: cannot make %s\n
-anti: cannot copy the stubs of %s/%s\n
-anti: tar could not write %s\n
-anti: tar could not unpack %s\n
-anti: %s holds no %s, so anti sdk export did not write it\n
 
 # src/anti/symmap.c
-anti: %s carries no licence notice\n
-anti: %s carries no build id\n
 
 # src/anti/syms.c
-anti: %s is no runtime configuration\n
-anti: %s holds a broken %s\n
-anti: %s holds no build id\n
 
 # src/anti/test.c
-anti: test takes one or more .anti files\n
 
 # src/anti/units.c
+# Stays: no host of the suite reaches it, as the two of build.c.
 anti: unknown host target\n
 
 # src/anti/zip.c
-anti: %s: %zu entries are more than a zip archive holds\n
-anti: %s: entry %zu is too large for a zip archive\n
+# Stays: it takes an archive past 4 GiB, which no test writes.
 anti: %s: the entries are too large for a zip archive\n
-anti: %s has entries whose data overlap\n
-anti: %s is no zip archive\n
-anti: %s has a broken central directory\n
-anti: %s has a broken entry\n
-anti: %s: the data of %.*s runs past its end\n
-anti: %s unpacks to more than one archive holds\n
-anti: %s is packed with method %u, and the reader takes stored and deflate\n
-anti: the data of %s is broken\n

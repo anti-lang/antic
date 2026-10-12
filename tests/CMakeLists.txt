@@ -97,6 +97,18 @@ foreach(source IN LISTS unit_sources)
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/unit/${group}")
     endif()
 endforeach()
+# The messages two groups write to the standard error, which the group
+# itself does not read: the zip reader and writer, and the build id of a
+# program.
+foreach(group zip syms)
+    add_test(NAME unit_${group}_messages
+        COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAM=$<TARGET_FILE:antic_unit_tests>"
+            "-DGROUP=${group}"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/unit/${group}.err"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/unit-messages/${group}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_unit_messages.cmake")
+endforeach()
 
 # The allocation helpers of anti when the memory is refused, in a program
 # of its own, since each ends the process.
@@ -2235,6 +2247,55 @@ add_test(NAME anti_build_inputs
         "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-inputs"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build_inputs.cmake")
+
+# The messages of anti, one test per message. A table of the directory of
+# its command holds the cases of each, and anti_messages.cmake those of
+# `anti new`, `anti license` and `anti sdk`, which have no directory.
+# run_anti_messages.cmake states the form of a case and prints the names
+# of a table, so a case is registered by standing in its table.
+foreach(pair "anti_build|anti-build/messages.cmake"
+             "anti_test|anti-test/messages.cmake"
+             "anti_symbols|anti-symbols/messages.cmake"
+             "anti_check|check/messages.cmake"
+             "anti_fmt|fmt/messages.cmake"
+             "anti_doc|doc/messages.cmake"
+             "anti_bind|bind/messages.cmake"
+             "anti|anti_messages.cmake")
+    string(REPLACE "|" ";" pair "${pair}")
+    list(GET pair 0 command)
+    list(GET pair 1 table)
+    set(table "${CMAKE_CURRENT_SOURCE_DIR}/${table}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${table}"
+                 "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_messages.cmake")
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -DLIST=ON "-DTABLE=${table}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_messages.cmake"
+        RESULT_VARIABLE status
+        OUTPUT_VARIABLE names
+        ERROR_VARIABLE errors)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "${table} gives no names:\n${errors}")
+    endif()
+    string(STRIP "${names}" names)
+    string(REPLACE "\n" ";" names "${names}")
+    foreach(name IN LISTS names)
+        add_test(NAME ${command}_message_${name}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DANTI=$<TARGET_FILE:anti>"
+                "-DTABLE=${table}"
+                "-DCASE=${name}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/messages/${command}-${name}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DLLVM_MC=${ANTIC_LLVM_MC}"
+                "-DHOST=${ANTIC_HOST_TARGET}"
+                "-DEXE=${CMAKE_EXECUTABLE_SUFFIX}"
+                "-DVERSION=${PROJECT_VERSION}"
+                "-DCLANG_VERSION=${ANTI_CLANG_VERSION}"
+                "-DCLANG_TAG=${ANTI_CLANG_TAG}"
+                "-DCLANG_PAGE=${ANTI_CLANG_PAGE}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_messages.cmake")
+    endforeach()
+endforeach()
 
 # A program run from dist/ and built again at once, fifteen times. Windows
 # maps a program that just ran for a moment, and the copy into dist/

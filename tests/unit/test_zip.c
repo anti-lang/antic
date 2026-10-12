@@ -285,6 +285,26 @@ static void stored_and_deflate(void)
     }
 }
 
+/* An entry packed with bzip2, method 12 of the format. The reader takes
+   stored and deflate, refuses the entry and leaves nothing behind. */
+static void other_method(void)
+{
+    static const unsigned char hello[] = "hello";
+    struct entry e;
+    struct text out = {0};
+
+    e.name = "packed.txt";
+    e.data = hello;
+    e.packed = 5;
+    e.size = 5;
+    e.crc = crc_of(hello, 5);
+    e.method = 12;
+    write_archive(&e, 1);
+    CHECK(!unpack_one(&out));
+    CHECK(out.length == 0);
+    text_free(&out);
+}
+
 /* M11: a stream that unpacks to far more than its entry declares stops
    at the declared size, rather than growing until memory runs out. */
 static void deflate_bound(void)
@@ -628,6 +648,7 @@ void test_zip(void)
 {
     fputs("anti test: the messages below are expected\n", stderr);
     stored_and_deflate();
+    other_method();
     deflate_bound();
     broken_deflate();
     broken_archives();

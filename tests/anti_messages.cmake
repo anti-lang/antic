@@ -1,0 +1,106 @@
+# The messages of the commands of `anti` that have no directory under
+# tests/: `anti new`, `anti license` and `anti sdk`. One case each.
+# tests/run_anti_messages.cmake states the form of a case.
+
+# anti new.
+anti_message(new_one_segment
+    ARGS new app
+    ERR "anti: `app` is one segment, and a package name is a module path of at least two, as com.example.app")
+anti_message(new_there_already
+    FILES app/notes.txt "The directory of an older project.\n"
+    ARGS new com.example.app
+    ERR "anti: app is there already")
+
+# anti license.
+anti_message(license_runtime_unknown
+    ENV "XDG_DATA_HOME=${WORK}/data"
+    ARGS license
+    ERR "anti: the system does not say where the runtime archive is, so license needs --runtime")
+anti_message(license_no_text
+    DIRECTORIES archive/licenses
+    ARGS license --runtime archive
+    ERR "anti: archive/licenses holds no licence text, so archive is no runtime archive")
+anti_message(license_from_no_notice
+    FILES program "A file that no link of antic wrote.\n"
+    ARGS license --from program --runtime "${RUNTIME}"
+    ERR "anti: program carries no licence notice")
+anti_message(license_from_archive_no_archive
+    FILES library.a "A text where the archive belongs.\n"
+    ARGS license --from-archive library.a
+    ERR "anti: library.a is no archive")
+anti_message(license_from_archive_no_header
+    FILES library.a "!<arch>\n"
+    ARGS license --from-archive library.a
+    ERR "anti: library.a carries no package header, so it is no static library of `--lib static`")
+anti_message(license_project_all_targets STATUS 2
+    ARGS license --project --target all
+    ERR "anti: license --project prints the notice of one target, so it takes --target <os>-<cpu> and not all")
+anti_message(license_project_static_library STATUS 2
+    ARGS license --project --lib static
+    ERR "anti: the build of a static library prints the line that links it, so license --project --lib static takes --notice")
+
+# anti sdk import.
+function(pack_bundle)
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E tar cJf
+                            "${PROJECT}/bundle.tar.xz" notes.txt
+                    WORKING_DIRECTORY "${PROJECT}/stubs"
+                    RESULT_VARIABLE status)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "the bundle was not written")
+    endif()
+endfunction()
+anti_message(sdk_import_sysroot_unknown
+    FILES bundle.tar.xz "A text where the bundle belongs.\n"
+    ENV "XDG_DATA_HOME=${WORK}/data"
+    ARGS sdk import bundle.tar.xz
+    ERR "anti: the system does not say where anti is, so pass --sysroot")
+# The import cannot make the directory of a target, exits with 1 and
+# writes nothing. No document states a message for it.
+anti_message(sdk_import_sysroot_is_a_file
+    FILES bundle.tar.xz "A text where the bundle belongs.\n"
+          sysroot "A file where the directory of the sysroots belongs.\n"
+    ARGS sdk import bundle.tar.xz --sysroot sysroot)
+# tar writes its own lines on the bundle before the one of anti.
+anti_message(sdk_import_no_bundle
+    FILES bundle.tar.xz "A text where the bundle belongs.\n"
+    ARGS sdk import bundle.tar.xz --sysroot sysroot
+    ERR_MATCH "(.*\n)*anti: tar could not unpack bundle\\.tar\\.xz\n")
+anti_message(sdk_import_no_version
+    FILES stubs/notes.txt "No stub and no version.\n"
+    SETUP pack_bundle
+    ARGS sdk import bundle.tar.xz --sysroot sysroot
+    ERR "anti: bundle.tar.xz holds no sdk-version, so anti sdk export did not write it")
+
+# anti sdk export, which reads the SDK of a Mac.
+if(CMAKE_HOST_APPLE)
+    set(settings "{\"Version\": \"14.0\"}\n")
+    anti_message(sdk_export_no_settings
+        FILES MacOSX.sdk/notes.txt "No settings.\n"
+        ARGS sdk export --sdk MacOSX.sdk -o out
+        ERR "anti: MacOSX.sdk holds no SDKSettings.json with a Version, so it is no MacOSX.sdk")
+    anti_message(sdk_export_version
+        FILES MacOSX.sdk/SDKSettings.json "{\"Version\": \"../14\"}\n"
+        ARGS sdk export --sdk MacOSX.sdk -o out
+        ERR "anti: MacOSX.sdk names the Version ../14, which is no version")
+    anti_message(sdk_export_out_is_a_file
+        FILES MacOSX.sdk/SDKSettings.json "${settings}"
+              out "A file where the directory of the bundle belongs.\n"
+        ARGS sdk export --sdk MacOSX.sdk -o out
+        ERR "anti: cannot make out/.apple-sdk-14.0")
+    anti_message(sdk_export_no_stubs
+        FILES MacOSX.sdk/SDKSettings.json "${settings}"
+        ARGS sdk export --sdk MacOSX.sdk -o out
+        ERR "anti: cannot copy the stubs of MacOSX.sdk/usr/lib")
+    anti_message(sdk_export_no_tar
+        FILES MacOSX.sdk/SDKSettings.json "${settings}"
+        DIRECTORIES MacOSX.sdk/usr/lib MacOSX.sdk/System/Library/Frameworks
+                    empty
+        ENV "PATH=${PROJECT}/empty"
+        ARGS sdk export --sdk MacOSX.sdk -o out
+        ERR "antic: cannot run tar: No such file or directory"
+            "anti: tar could not write out/apple-sdk-14.0.tar.xz")
+else()
+    anti_message(sdk_export_no_mac
+        ARGS sdk export -o out
+        ERR "anti: sdk export runs on a Mac, which holds Apple's SDK. Run it on a Mac you own and anti sdk import here.")
+endif()

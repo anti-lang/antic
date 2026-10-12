@@ -12,7 +12,10 @@ include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
+# The message stands whole in its own value, which is the form the test
+# diagnostics_covered reads.
+set(message "anti: out of memory")
 foreach(helper array resize grow)
     program_expect("files_${helper}" COMMAND "${PROGRAM}" ${helper}
-                   STATUS 70 ERR_MATCH "anti: out of memory\n$")
+                   STATUS 70 ERR_MATCH "${message}\n$")
 endforeach()

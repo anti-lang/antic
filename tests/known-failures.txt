@@ -334,3 +334,4 @@ error_iter_gives_no_iterator T096 A loop over a class whose `operator fn iter` i
 error_simd_lanes_compared T096 `==` on a `simd struct` whose lanes are refused gets a second message.
 error_copy_nests_deep_field T096 A field of a copy that is refused gets a second message.
 error_switch_refused_returns T097 A function whose refused `switch` returns in every arm gets a second message.
+anti_bind_message_clang_static_without_a_body T098 A `static` function without a body gets a second warning, which names its result.
