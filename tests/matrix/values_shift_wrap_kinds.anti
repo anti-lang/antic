@@ -1,0 +1,392 @@
+//! `<<%` on every integer type. A count at or above the width gives 0, and no
+//! build checks it. Each line holds the value the checker folds in a constant
+//! and the value the program computes from operands it cannot know before it
+//! runs. `none` stands where the checker refuses the constant, and `checked`
+//! where a dev build stops, so the program does not run the case.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn on_i8(z: i8)
+{
+	const F0: i8 = 1 <<% 7;
+	let r0: i8 = (1 ^ z) <<% (7 ^ z);
+	printf("shl_wrap i8 1 7 = %lld %lld\n".ptr, F0 as int, r0 as int);
+	const F1: i8 = 127 <<% 1;
+	let r1: i8 = (127 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i8 127 1 = %lld %lld\n".ptr, F1 as int, r1 as int);
+	const F2: i8 = 127 <<% 7;
+	let r2: i8 = (127 ^ z) <<% (7 ^ z);
+	printf("shl_wrap i8 127 7 = %lld %lld\n".ptr, F2 as int, r2 as int);
+	const F3: i8 = 3 <<% 0;
+	let r3: i8 = (3 ^ z) <<% (0 ^ z);
+	printf("shl_wrap i8 3 0 = %lld %lld\n".ptr, F3 as int, r3 as int);
+	const F4: i8 = 1 <<% 1;
+	let r4: i8 = (1 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i8 1 1 = %lld %lld\n".ptr, F4 as int, r4 as int);
+	const F5: i8 = -128 <<% 7;
+	let r5: i8 = (-128 ^ z) <<% (7 ^ z);
+	printf("shl_wrap i8 -128 7 = %lld %lld\n".ptr, F5 as int, r5 as int);
+	const F6: i8 = -8 <<% 1;
+	let r6: i8 = (-8 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i8 -8 1 = %lld %lld\n".ptr, F6 as int, r6 as int);
+	const F7: i8 = -1 <<% 7;
+	let r7: i8 = (-1 ^ z) <<% (7 ^ z);
+	printf("shl_wrap i8 -1 7 = %lld %lld\n".ptr, F7 as int, r7 as int);
+	const F8: i8 = -128 <<% 1;
+	let r8: i8 = (-128 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i8 -128 1 = %lld %lld\n".ptr, F8 as int, r8 as int);
+	const F9: i8 = 1 <<% 8;
+	let r9: i8 = (1 ^ z) <<% (8 ^ z);
+	printf("shl_wrap i8 1 8 = %lld %lld\n".ptr, F9 as int, r9 as int);
+	const F10: i8 = 3 <<% 9;
+	let r10: i8 = (3 ^ z) <<% (9 ^ z);
+	printf("shl_wrap i8 3 9 = %lld %lld\n".ptr, F10 as int, r10 as int);
+	const F11: i8 = 127 <<% 8;
+	let r11: i8 = (127 ^ z) <<% (8 ^ z);
+	printf("shl_wrap i8 127 8 = %lld %lld\n".ptr, F11 as int, r11 as int);
+}
+
+fn on_i16(z: i16)
+{
+	const F0: i16 = 1 <<% 15;
+	let r0: i16 = (1 ^ z) <<% (15 ^ z);
+	printf("shl_wrap i16 1 15 = %lld %lld\n".ptr, F0 as int, r0 as int);
+	const F1: i16 = 32767 <<% 1;
+	let r1: i16 = (32767 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i16 32767 1 = %lld %lld\n".ptr, F1 as int, r1 as int);
+	const F2: i16 = 32767 <<% 15;
+	let r2: i16 = (32767 ^ z) <<% (15 ^ z);
+	printf("shl_wrap i16 32767 15 = %lld %lld\n".ptr, F2 as int, r2 as int);
+	const F3: i16 = 3 <<% 0;
+	let r3: i16 = (3 ^ z) <<% (0 ^ z);
+	printf("shl_wrap i16 3 0 = %lld %lld\n".ptr, F3 as int, r3 as int);
+	const F4: i16 = 1 <<% 1;
+	let r4: i16 = (1 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i16 1 1 = %lld %lld\n".ptr, F4 as int, r4 as int);
+	const F5: i16 = -32768 <<% 15;
+	let r5: i16 = (-32768 ^ z) <<% (15 ^ z);
+	printf("shl_wrap i16 -32768 15 = %lld %lld\n".ptr, F5 as int, r5 as int);
+	const F6: i16 = -8 <<% 1;
+	let r6: i16 = (-8 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i16 -8 1 = %lld %lld\n".ptr, F6 as int, r6 as int);
+	const F7: i16 = -1 <<% 15;
+	let r7: i16 = (-1 ^ z) <<% (15 ^ z);
+	printf("shl_wrap i16 -1 15 = %lld %lld\n".ptr, F7 as int, r7 as int);
+	const F8: i16 = -32768 <<% 1;
+	let r8: i16 = (-32768 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i16 -32768 1 = %lld %lld\n".ptr, F8 as int, r8 as int);
+	const F9: i16 = 1 <<% 16;
+	let r9: i16 = (1 ^ z) <<% (16 ^ z);
+	printf("shl_wrap i16 1 16 = %lld %lld\n".ptr, F9 as int, r9 as int);
+	const F10: i16 = 3 <<% 17;
+	let r10: i16 = (3 ^ z) <<% (17 ^ z);
+	printf("shl_wrap i16 3 17 = %lld %lld\n".ptr, F10 as int, r10 as int);
+	const F11: i16 = 32767 <<% 16;
+	let r11: i16 = (32767 ^ z) <<% (16 ^ z);
+	printf("shl_wrap i16 32767 16 = %lld %lld\n".ptr, F11 as int, r11 as int);
+}
+
+fn on_i32(z: i32)
+{
+	const F0: i32 = 1 <<% 31;
+	let r0: i32 = (1 ^ z) <<% (31 ^ z);
+	printf("shl_wrap i32 1 31 = %lld %lld\n".ptr, F0 as int, r0 as int);
+	const F1: i32 = 2147483647 <<% 1;
+	let r1: i32 = (2147483647 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i32 2147483647 1 = %lld %lld\n".ptr, F1 as int, r1 as int);
+	const F2: i32 = 2147483647 <<% 31;
+	let r2: i32 = (2147483647 ^ z) <<% (31 ^ z);
+	printf("shl_wrap i32 2147483647 31 = %lld %lld\n".ptr, F2 as int, r2 as int);
+	const F3: i32 = 3 <<% 0;
+	let r3: i32 = (3 ^ z) <<% (0 ^ z);
+	printf("shl_wrap i32 3 0 = %lld %lld\n".ptr, F3 as int, r3 as int);
+	const F4: i32 = 1 <<% 1;
+	let r4: i32 = (1 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i32 1 1 = %lld %lld\n".ptr, F4 as int, r4 as int);
+	const F5: i32 = -2147483648 <<% 31;
+	let r5: i32 = (-2147483648 ^ z) <<% (31 ^ z);
+	printf("shl_wrap i32 -2147483648 31 = %lld %lld\n".ptr, F5 as int, r5 as int);
+	const F6: i32 = -8 <<% 1;
+	let r6: i32 = (-8 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i32 -8 1 = %lld %lld\n".ptr, F6 as int, r6 as int);
+	const F7: i32 = -1 <<% 31;
+	let r7: i32 = (-1 ^ z) <<% (31 ^ z);
+	printf("shl_wrap i32 -1 31 = %lld %lld\n".ptr, F7 as int, r7 as int);
+	const F8: i32 = -2147483648 <<% 1;
+	let r8: i32 = (-2147483648 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i32 -2147483648 1 = %lld %lld\n".ptr, F8 as int, r8 as int);
+	const F9: i32 = 1 <<% 32;
+	let r9: i32 = (1 ^ z) <<% (32 ^ z);
+	printf("shl_wrap i32 1 32 = %lld %lld\n".ptr, F9 as int, r9 as int);
+	const F10: i32 = 3 <<% 33;
+	let r10: i32 = (3 ^ z) <<% (33 ^ z);
+	printf("shl_wrap i32 3 33 = %lld %lld\n".ptr, F10 as int, r10 as int);
+	const F11: i32 = 2147483647 <<% 32;
+	let r11: i32 = (2147483647 ^ z) <<% (32 ^ z);
+	printf("shl_wrap i32 2147483647 32 = %lld %lld\n".ptr, F11 as int, r11 as int);
+}
+
+fn on_i64(z: i64)
+{
+	const F0: i64 = 1 <<% 63;
+	let r0: i64 = (1 ^ z) <<% (63 ^ z);
+	printf("shl_wrap i64 1 63 = %lld %lld\n".ptr, F0 as int, r0 as int);
+	const F1: i64 = 9223372036854775807 <<% 1;
+	let r1: i64 = (9223372036854775807 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i64 9223372036854775807 1 = %lld %lld\n".ptr, F1 as int, r1 as int);
+	const F2: i64 = 9223372036854775807 <<% 63;
+	let r2: i64 = (9223372036854775807 ^ z) <<% (63 ^ z);
+	printf("shl_wrap i64 9223372036854775807 63 = %lld %lld\n".ptr, F2 as int, r2 as int);
+	const F3: i64 = 3 <<% 0;
+	let r3: i64 = (3 ^ z) <<% (0 ^ z);
+	printf("shl_wrap i64 3 0 = %lld %lld\n".ptr, F3 as int, r3 as int);
+	const F4: i64 = 1 <<% 1;
+	let r4: i64 = (1 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i64 1 1 = %lld %lld\n".ptr, F4 as int, r4 as int);
+	const F5: i64 = -9223372036854775808 <<% 63;
+	let r5: i64 = (-9223372036854775808 ^ z) <<% (63 ^ z);
+	printf("shl_wrap i64 -9223372036854775808 63 = %lld %lld\n".ptr, F5 as int, r5 as int);
+	const F6: i64 = -8 <<% 1;
+	let r6: i64 = (-8 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i64 -8 1 = %lld %lld\n".ptr, F6 as int, r6 as int);
+	const F7: i64 = -1 <<% 63;
+	let r7: i64 = (-1 ^ z) <<% (63 ^ z);
+	printf("shl_wrap i64 -1 63 = %lld %lld\n".ptr, F7 as int, r7 as int);
+	const F8: i64 = -9223372036854775808 <<% 1;
+	let r8: i64 = (-9223372036854775808 ^ z) <<% (1 ^ z);
+	printf("shl_wrap i64 -9223372036854775808 1 = %lld %lld\n".ptr, F8 as int, r8 as int);
+	const F9: i64 = 1 <<% 64;
+	let r9: i64 = (1 ^ z) <<% (64 ^ z);
+	printf("shl_wrap i64 1 64 = %lld %lld\n".ptr, F9 as int, r9 as int);
+	const F10: i64 = 3 <<% 65;
+	let r10: i64 = (3 ^ z) <<% (65 ^ z);
+	printf("shl_wrap i64 3 65 = %lld %lld\n".ptr, F10 as int, r10 as int);
+	const F11: i64 = 9223372036854775807 <<% 64;
+	let r11: i64 = (9223372036854775807 ^ z) <<% (64 ^ z);
+	printf("shl_wrap i64 9223372036854775807 64 = %lld %lld\n".ptr, F11 as int, r11 as int);
+}
+
+fn on_int(z: int)
+{
+	const F0: int = 1 <<% 63;
+	let r0: int = (1 ^ z) <<% (63 ^ z);
+	printf("shl_wrap int 1 63 = %lld %lld\n".ptr, F0 as int, r0 as int);
+	const F1: int = 9223372036854775807 <<% 1;
+	let r1: int = (9223372036854775807 ^ z) <<% (1 ^ z);
+	printf("shl_wrap int 9223372036854775807 1 = %lld %lld\n".ptr, F1 as int, r1 as int);
+	const F2: int = 9223372036854775807 <<% 63;
+	let r2: int = (9223372036854775807 ^ z) <<% (63 ^ z);
+	printf("shl_wrap int 9223372036854775807 63 = %lld %lld\n".ptr, F2 as int, r2 as int);
+	const F3: int = 3 <<% 0;
+	let r3: int = (3 ^ z) <<% (0 ^ z);
+	printf("shl_wrap int 3 0 = %lld %lld\n".ptr, F3 as int, r3 as int);
+	const F4: int = 1 <<% 1;
+	let r4: int = (1 ^ z) <<% (1 ^ z);
+	printf("shl_wrap int 1 1 = %lld %lld\n".ptr, F4 as int, r4 as int);
+	const F5: int = -9223372036854775808 <<% 63;
+	let r5: int = (-9223372036854775808 ^ z) <<% (63 ^ z);
+	printf("shl_wrap int -9223372036854775808 63 = %lld %lld\n".ptr, F5 as int, r5 as int);
+	const F6: int = -8 <<% 1;
+	let r6: int = (-8 ^ z) <<% (1 ^ z);
+	printf("shl_wrap int -8 1 = %lld %lld\n".ptr, F6 as int, r6 as int);
+	const F7: int = -1 <<% 63;
+	let r7: int = (-1 ^ z) <<% (63 ^ z);
+	printf("shl_wrap int -1 63 = %lld %lld\n".ptr, F7 as int, r7 as int);
+	const F8: int = -9223372036854775808 <<% 1;
+	let r8: int = (-9223372036854775808 ^ z) <<% (1 ^ z);
+	printf("shl_wrap int -9223372036854775808 1 = %lld %lld\n".ptr, F8 as int, r8 as int);
+	const F9: int = 1 <<% 64;
+	let r9: int = (1 ^ z) <<% (64 ^ z);
+	printf("shl_wrap int 1 64 = %lld %lld\n".ptr, F9 as int, r9 as int);
+	const F10: int = 3 <<% 65;
+	let r10: int = (3 ^ z) <<% (65 ^ z);
+	printf("shl_wrap int 3 65 = %lld %lld\n".ptr, F10 as int, r10 as int);
+	const F11: int = 9223372036854775807 <<% 64;
+	let r11: int = (9223372036854775807 ^ z) <<% (64 ^ z);
+	printf("shl_wrap int 9223372036854775807 64 = %lld %lld\n".ptr, F11 as int, r11 as int);
+}
+
+fn on_u8(z: u8)
+{
+	const F0: u8 = 1 <<% 7;
+	let r0: u8 = (1 ^ z) <<% (7 ^ z);
+	printf("shl_wrap u8 1 7 = %llu %llu\n".ptr, F0 as u64, r0 as u64);
+	const F1: u8 = 255 <<% 1;
+	let r1: u8 = (255 ^ z) <<% (1 ^ z);
+	printf("shl_wrap u8 255 1 = %llu %llu\n".ptr, F1 as u64, r1 as u64);
+	const F2: u8 = 255 <<% 7;
+	let r2: u8 = (255 ^ z) <<% (7 ^ z);
+	printf("shl_wrap u8 255 7 = %llu %llu\n".ptr, F2 as u64, r2 as u64);
+	const F3: u8 = 3 <<% 0;
+	let r3: u8 = (3 ^ z) <<% (0 ^ z);
+	printf("shl_wrap u8 3 0 = %llu %llu\n".ptr, F3 as u64, r3 as u64);
+	const F4: u8 = 1 <<% 1;
+	let r4: u8 = (1 ^ z) <<% (1 ^ z);
+	printf("shl_wrap u8 1 1 = %llu %llu\n".ptr, F4 as u64, r4 as u64);
+	const F5: u8 = 1 <<% 8;
+	let r5: u8 = (1 ^ z) <<% (8 ^ z);
+	printf("shl_wrap u8 1 8 = %llu %llu\n".ptr, F5 as u64, r5 as u64);
+	const F6: u8 = 3 <<% 9;
+	let r6: u8 = (3 ^ z) <<% (9 ^ z);
+	printf("shl_wrap u8 3 9 = %llu %llu\n".ptr, F6 as u64, r6 as u64);
+	const F7: u8 = 255 <<% 8;
+	let r7: u8 = (255 ^ z) <<% (8 ^ z);
+	printf("shl_wrap u8 255 8 = %llu %llu\n".ptr, F7 as u64, r7 as u64);
+}
+
+fn on_u16(z: u16)
+{
+	const F0: u16 = 1 <<% 15;
+	let r0: u16 = (1 ^ z) <<% (15 ^ z);
+	printf("shl_wrap u16 1 15 = %llu %llu\n".ptr, F0 as u64, r0 as u64);
+	const F1: u16 = 65535 <<% 1;
+	let r1: u16 = (65535 ^ z) <<% (1 ^ z);
+	printf("shl_wrap u16 65535 1 = %llu %llu\n".ptr, F1 as u64, r1 as u64);
+	const F2: u16 = 65535 <<% 15;
+	let r2: u16 = (65535 ^ z) <<% (15 ^ z);
+	printf("shl_wrap u16 65535 15 = %llu %llu\n".ptr, F2 as u64, r2 as u64);
+	const F3: u16 = 3 <<% 0;
+	let r3: u16 = (3 ^ z) <<% (0 ^ z);
+	printf("shl_wrap u16 3 0 = %llu %llu\n".ptr, F3 as u64, r3 as u64);
+	const F4: u16 = 1 <<% 1;
+	let r4: u16 = (1 ^ z) <<% (1 ^ z);
+	printf("shl_wrap u16 1 1 = %llu %llu\n".ptr, F4 as u64, r4 as u64);
+	const F5: u16 = 1 <<% 16;
+	let r5: u16 = (1 ^ z) <<% (16 ^ z);
+	printf("shl_wrap u16 1 16 = %llu %llu\n".ptr, F5 as u64, r5 as u64);
+	const F6: u16 = 3 <<% 17;
+	let r6: u16 = (3 ^ z) <<% (17 ^ z);
+	printf("shl_wrap u16 3 17 = %llu %llu\n".ptr, F6 as u64, r6 as u64);
+	const F7: u16 = 65535 <<% 16;
+	let r7: u16 = (65535 ^ z) <<% (16 ^ z);
+	printf("shl_wrap u16 65535 16 = %llu %llu\n".ptr, F7 as u64, r7 as u64);
+}
+
+fn on_u32(z: u32)
+{
+	const F0: u32 = 1 <<% 31;
+	let r0: u32 = (1 ^ z) <<% (31 ^ z);
+	printf("shl_wrap u32 1 31 = %llu %llu\n".ptr, F0 as u64, r0 as u64);
+	const F1: u32 = 4294967295 <<% 1;
+	let r1: u32 = (4294967295 ^ z) <<% (1 ^ z);
+	printf("shl_wrap u32 4294967295 1 = %llu %llu\n".ptr, F1 as u64, r1 as u64);
+	const F2: u32 = 4294967295 <<% 31;
+	let r2: u32 = (4294967295 ^ z) <<% (31 ^ z);
+	printf("shl_wrap u32 4294967295 31 = %llu %llu\n".ptr, F2 as u64, r2 as u64);
+	const F3: u32 = 3 <<% 0;
+	let r3: u32 = (3 ^ z) <<% (0 ^ z);
+	printf("shl_wrap u32 3 0 = %llu %llu\n".ptr, F3 as u64, r3 as u64);
+	const F4: u32 = 1 <<% 1;
+	let r4: u32 = (1 ^ z) <<% (1 ^ z);
+	printf("shl_wrap u32 1 1 = %llu %llu\n".ptr, F4 as u64, r4 as u64);
+	const F5: u32 = 1 <<% 32;
+	let r5: u32 = (1 ^ z) <<% (32 ^ z);
+	printf("shl_wrap u32 1 32 = %llu %llu\n".ptr, F5 as u64, r5 as u64);
+	const F6: u32 = 3 <<% 33;
+	let r6: u32 = (3 ^ z) <<% (33 ^ z);
+	printf("shl_wrap u32 3 33 = %llu %llu\n".ptr, F6 as u64, r6 as u64);
+	const F7: u32 = 4294967295 <<% 32;
+	let r7: u32 = (4294967295 ^ z) <<% (32 ^ z);
+	printf("shl_wrap u32 4294967295 32 = %llu %llu\n".ptr, F7 as u64, r7 as u64);
+}
+
+fn on_u64(z: u64)
+{
+	const F0: u64 = 1 <<% 63;
+	let r0: u64 = (1 ^ z) <<% (63 ^ z);
+	printf("shl_wrap u64 1 63 = %llu %llu\n".ptr, F0 as u64, r0 as u64);
+	const F1: u64 = 18446744073709551615 <<% 1;
+	let r1: u64 = (18446744073709551615 ^ z) <<% (1 ^ z);
+	printf("shl_wrap u64 18446744073709551615 1 = %llu %llu\n".ptr, F1 as u64, r1 as u64);
+	const F2: u64 = 18446744073709551615 <<% 63;
+	let r2: u64 = (18446744073709551615 ^ z) <<% (63 ^ z);
+	printf("shl_wrap u64 18446744073709551615 63 = %llu %llu\n".ptr, F2 as u64, r2 as u64);
+	const F3: u64 = 3 <<% 0;
+	let r3: u64 = (3 ^ z) <<% (0 ^ z);
+	printf("shl_wrap u64 3 0 = %llu %llu\n".ptr, F3 as u64, r3 as u64);
+	const F4: u64 = 1 <<% 1;
+	let r4: u64 = (1 ^ z) <<% (1 ^ z);
+	printf("shl_wrap u64 1 1 = %llu %llu\n".ptr, F4 as u64, r4 as u64);
+	const F5: u64 = 1 <<% 64;
+	let r5: u64 = (1 ^ z) <<% (64 ^ z);
+	printf("shl_wrap u64 1 64 = %llu %llu\n".ptr, F5 as u64, r5 as u64);
+	const F6: u64 = 3 <<% 65;
+	let r6: u64 = (3 ^ z) <<% (65 ^ z);
+	printf("shl_wrap u64 3 65 = %llu %llu\n".ptr, F6 as u64, r6 as u64);
+	const F7: u64 = 18446744073709551615 <<% 64;
+	let r7: u64 = (18446744073709551615 ^ z) <<% (64 ^ z);
+	printf("shl_wrap u64 18446744073709551615 64 = %llu %llu\n".ptr, F7 as u64, r7 as u64);
+}
+
+fn on_uint(z: uint)
+{
+	const F0: uint = 1 <<% 63;
+	let r0: uint = (1 ^ z) <<% (63 ^ z);
+	printf("shl_wrap uint 1 63 = %llu %llu\n".ptr, F0 as u64, r0 as u64);
+	const F1: uint = 18446744073709551615 <<% 1;
+	let r1: uint = (18446744073709551615 ^ z) <<% (1 ^ z);
+	printf("shl_wrap uint 18446744073709551615 1 = %llu %llu\n".ptr, F1 as u64, r1 as u64);
+	const F2: uint = 18446744073709551615 <<% 63;
+	let r2: uint = (18446744073709551615 ^ z) <<% (63 ^ z);
+	printf("shl_wrap uint 18446744073709551615 63 = %llu %llu\n".ptr, F2 as u64, r2 as u64);
+	const F3: uint = 3 <<% 0;
+	let r3: uint = (3 ^ z) <<% (0 ^ z);
+	printf("shl_wrap uint 3 0 = %llu %llu\n".ptr, F3 as u64, r3 as u64);
+	const F4: uint = 1 <<% 1;
+	let r4: uint = (1 ^ z) <<% (1 ^ z);
+	printf("shl_wrap uint 1 1 = %llu %llu\n".ptr, F4 as u64, r4 as u64);
+	const F5: uint = 1 <<% 64;
+	let r5: uint = (1 ^ z) <<% (64 ^ z);
+	printf("shl_wrap uint 1 64 = %llu %llu\n".ptr, F5 as u64, r5 as u64);
+	const F6: uint = 3 <<% 65;
+	let r6: uint = (3 ^ z) <<% (65 ^ z);
+	printf("shl_wrap uint 3 65 = %llu %llu\n".ptr, F6 as u64, r6 as u64);
+	const F7: uint = 18446744073709551615 <<% 64;
+	let r7: uint = (18446744073709551615 ^ z) <<% (64 ^ z);
+	printf("shl_wrap uint 18446744073709551615 64 = %llu %llu\n".ptr, F7 as u64, r7 as u64);
+}
+
+fn on_byte(z: byte)
+{
+	const F0: byte = 1 <<% 7;
+	let r0: byte = (1 ^ z) <<% (7 ^ z);
+	printf("shl_wrap byte 1 7 = %llu %llu\n".ptr, F0 as u64, r0 as u64);
+	const F1: byte = 255 <<% 1;
+	let r1: byte = (255 ^ z) <<% (1 ^ z);
+	printf("shl_wrap byte 255 1 = %llu %llu\n".ptr, F1 as u64, r1 as u64);
+	const F2: byte = 255 <<% 7;
+	let r2: byte = (255 ^ z) <<% (7 ^ z);
+	printf("shl_wrap byte 255 7 = %llu %llu\n".ptr, F2 as u64, r2 as u64);
+	const F3: byte = 3 <<% 0;
+	let r3: byte = (3 ^ z) <<% (0 ^ z);
+	printf("shl_wrap byte 3 0 = %llu %llu\n".ptr, F3 as u64, r3 as u64);
+	const F4: byte = 1 <<% 1;
+	let r4: byte = (1 ^ z) <<% (1 ^ z);
+	printf("shl_wrap byte 1 1 = %llu %llu\n".ptr, F4 as u64, r4 as u64);
+	const F5: byte = 1 <<% 8;
+	let r5: byte = (1 ^ z) <<% (8 ^ z);
+	printf("shl_wrap byte 1 8 = %llu %llu\n".ptr, F5 as u64, r5 as u64);
+	const F6: byte = 3 <<% 9;
+	let r6: byte = (3 ^ z) <<% (9 ^ z);
+	printf("shl_wrap byte 3 9 = %llu %llu\n".ptr, F6 as u64, r6 as u64);
+	const F7: byte = 255 <<% 8;
+	let r7: byte = (255 ^ z) <<% (8 ^ z);
+	printf("shl_wrap byte 255 8 = %llu %llu\n".ptr, F7 as u64, r7 as u64);
+}
+
+fn main(args: []str) -> int
+{
+	let zero = args.len - 1;
+	on_i8(zero as i8);
+	on_i16(zero as i16);
+	on_i32(zero as i32);
+	on_i64(zero as i64);
+	on_int(zero as int);
+	on_u8(zero as u8);
+	on_u16(zero as u16);
+	on_u32(zero as u32);
+	on_u64(zero as u64);
+	on_uint(zero as uint);
+	on_byte(zero as byte);
+	return 0;
+}

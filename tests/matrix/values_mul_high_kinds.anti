@@ -1,0 +1,443 @@
+//! `mul_high` on every integer type at its limits: the upper half of the full
+//! product. Each line holds the value the checker folds in a constant and the
+//! value the program computes from operands it cannot know before it runs.
+//! `none` stands where the checker refuses the constant, and `checked` where a
+//! dev build stops, so the program does not run the case.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn on_i8(z: i8)
+{
+	const F0: i8 = mul_high(127, 1);
+	let r0: i8 = mul_high((127 ^ z), (1 ^ z));
+	printf("mul_high i8 127 1 = %lld %lld\n".ptr, F0 as int, r0 as int);
+	const F1: i8 = mul_high(127, 127);
+	let r1: i8 = mul_high((127 ^ z), (127 ^ z));
+	printf("mul_high i8 127 127 = %lld %lld\n".ptr, F1 as int, r1 as int);
+	const F2: i8 = mul_high(-128, 1);
+	let r2: i8 = mul_high((-128 ^ z), (1 ^ z));
+	printf("mul_high i8 -128 1 = %lld %lld\n".ptr, F2 as int, r2 as int);
+	const F3: i8 = mul_high(-128, 127);
+	let r3: i8 = mul_high((-128 ^ z), (127 ^ z));
+	printf("mul_high i8 -128 127 = %lld %lld\n".ptr, F3 as int, r3 as int);
+	const F4: i8 = mul_high(127, 2);
+	let r4: i8 = mul_high((127 ^ z), (2 ^ z));
+	printf("mul_high i8 127 2 = %lld %lld\n".ptr, F4 as int, r4 as int);
+	const F5: i8 = mul_high(7, 2);
+	let r5: i8 = mul_high((7 ^ z), (2 ^ z));
+	printf("mul_high i8 7 2 = %lld %lld\n".ptr, F5 as int, r5 as int);
+	const F6: i8 = mul_high(-128, -128);
+	let r6: i8 = mul_high((-128 ^ z), (-128 ^ z));
+	printf("mul_high i8 -128 -128 = %lld %lld\n".ptr, F6 as int, r6 as int);
+	const F7: i8 = mul_high(-128, -1);
+	let r7: i8 = mul_high((-128 ^ z), (-1 ^ z));
+	printf("mul_high i8 -128 -1 = %lld %lld\n".ptr, F7 as int, r7 as int);
+	const F8: i8 = mul_high(127, -1);
+	let r8: i8 = mul_high((127 ^ z), (-1 ^ z));
+	printf("mul_high i8 127 -1 = %lld %lld\n".ptr, F8 as int, r8 as int);
+	const F9: i8 = mul_high(-7, 2);
+	let r9: i8 = mul_high((-7 ^ z), (2 ^ z));
+	printf("mul_high i8 -7 2 = %lld %lld\n".ptr, F9 as int, r9 as int);
+	const F10: i8 = mul_high(7, -2);
+	let r10: i8 = mul_high((7 ^ z), (-2 ^ z));
+	printf("mul_high i8 7 -2 = %lld %lld\n".ptr, F10 as int, r10 as int);
+	const F11: i8 = mul_high(-1, -1);
+	let r11: i8 = mul_high((-1 ^ z), (-1 ^ z));
+	printf("mul_high i8 -1 -1 = %lld %lld\n".ptr, F11 as int, r11 as int);
+	const F12: i8 = mul_high(-127, -1);
+	let r12: i8 = mul_high((-127 ^ z), (-1 ^ z));
+	printf("mul_high i8 -127 -1 = %lld %lld\n".ptr, F12 as int, r12 as int);
+}
+
+fn on_i16(z: i16)
+{
+	const F0: i16 = mul_high(32767, 1);
+	let r0: i16 = mul_high((32767 ^ z), (1 ^ z));
+	printf("mul_high i16 32767 1 = %lld %lld\n".ptr, F0 as int, r0 as int);
+	const F1: i16 = mul_high(32767, 32767);
+	let r1: i16 = mul_high((32767 ^ z), (32767 ^ z));
+	printf("mul_high i16 32767 32767 = %lld %lld\n".ptr, F1 as int, r1 as int);
+	const F2: i16 = mul_high(-32768, 1);
+	let r2: i16 = mul_high((-32768 ^ z), (1 ^ z));
+	printf("mul_high i16 -32768 1 = %lld %lld\n".ptr, F2 as int, r2 as int);
+	const F3: i16 = mul_high(-32768, 32767);
+	let r3: i16 = mul_high((-32768 ^ z), (32767 ^ z));
+	printf("mul_high i16 -32768 32767 = %lld %lld\n".ptr, F3 as int, r3 as int);
+	const F4: i16 = mul_high(32767, 2);
+	let r4: i16 = mul_high((32767 ^ z), (2 ^ z));
+	printf("mul_high i16 32767 2 = %lld %lld\n".ptr, F4 as int, r4 as int);
+	const F5: i16 = mul_high(7, 2);
+	let r5: i16 = mul_high((7 ^ z), (2 ^ z));
+	printf("mul_high i16 7 2 = %lld %lld\n".ptr, F5 as int, r5 as int);
+	const F6: i16 = mul_high(-32768, -32768);
+	let r6: i16 = mul_high((-32768 ^ z), (-32768 ^ z));
+	printf("mul_high i16 -32768 -32768 = %lld %lld\n".ptr, F6 as int, r6 as int);
+	const F7: i16 = mul_high(-32768, -1);
+	let r7: i16 = mul_high((-32768 ^ z), (-1 ^ z));
+	printf("mul_high i16 -32768 -1 = %lld %lld\n".ptr, F7 as int, r7 as int);
+	const F8: i16 = mul_high(32767, -1);
+	let r8: i16 = mul_high((32767 ^ z), (-1 ^ z));
+	printf("mul_high i16 32767 -1 = %lld %lld\n".ptr, F8 as int, r8 as int);
+	const F9: i16 = mul_high(-7, 2);
+	let r9: i16 = mul_high((-7 ^ z), (2 ^ z));
+	printf("mul_high i16 -7 2 = %lld %lld\n".ptr, F9 as int, r9 as int);
+	const F10: i16 = mul_high(7, -2);
+	let r10: i16 = mul_high((7 ^ z), (-2 ^ z));
+	printf("mul_high i16 7 -2 = %lld %lld\n".ptr, F10 as int, r10 as int);
+	const F11: i16 = mul_high(-1, -1);
+	let r11: i16 = mul_high((-1 ^ z), (-1 ^ z));
+	printf("mul_high i16 -1 -1 = %lld %lld\n".ptr, F11 as int, r11 as int);
+	const F12: i16 = mul_high(-32767, -1);
+	let r12: i16 = mul_high((-32767 ^ z), (-1 ^ z));
+	printf("mul_high i16 -32767 -1 = %lld %lld\n".ptr, F12 as int, r12 as int);
+}
+
+fn on_i32(z: i32)
+{
+	const F0: i32 = mul_high(2147483647, 1);
+	let r0: i32 = mul_high((2147483647 ^ z), (1 ^ z));
+	printf("mul_high i32 2147483647 1 = %lld %lld\n".ptr, F0 as int, r0 as int);
+	const F1: i32 = mul_high(2147483647, 2147483647);
+	let r1: i32 = mul_high((2147483647 ^ z), (2147483647 ^ z));
+	printf("mul_high i32 2147483647 2147483647 = %lld %lld\n".ptr, F1 as int, r1 as int);
+	const F2: i32 = mul_high(-2147483648, 1);
+	let r2: i32 = mul_high((-2147483648 ^ z), (1 ^ z));
+	printf("mul_high i32 -2147483648 1 = %lld %lld\n".ptr, F2 as int, r2 as int);
+	const F3: i32 = mul_high(-2147483648, 2147483647);
+	let r3: i32 = mul_high((-2147483648 ^ z), (2147483647 ^ z));
+	printf("mul_high i32 -2147483648 2147483647 = %lld %lld\n".ptr, F3 as int, r3 as int);
+	const F4: i32 = mul_high(2147483647, 2);
+	let r4: i32 = mul_high((2147483647 ^ z), (2 ^ z));
+	printf("mul_high i32 2147483647 2 = %lld %lld\n".ptr, F4 as int, r4 as int);
+	const F5: i32 = mul_high(7, 2);
+	let r5: i32 = mul_high((7 ^ z), (2 ^ z));
+	printf("mul_high i32 7 2 = %lld %lld\n".ptr, F5 as int, r5 as int);
+	const F6: i32 = mul_high(-2147483648, -2147483648);
+	let r6: i32 = mul_high((-2147483648 ^ z), (-2147483648 ^ z));
+	printf("mul_high i32 -2147483648 -2147483648 = %lld %lld\n".ptr, F6 as int, r6 as int);
+	const F7: i32 = mul_high(-2147483648, -1);
+	let r7: i32 = mul_high((-2147483648 ^ z), (-1 ^ z));
+	printf("mul_high i32 -2147483648 -1 = %lld %lld\n".ptr, F7 as int, r7 as int);
+	const F8: i32 = mul_high(2147483647, -1);
+	let r8: i32 = mul_high((2147483647 ^ z), (-1 ^ z));
+	printf("mul_high i32 2147483647 -1 = %lld %lld\n".ptr, F8 as int, r8 as int);
+	const F9: i32 = mul_high(-7, 2);
+	let r9: i32 = mul_high((-7 ^ z), (2 ^ z));
+	printf("mul_high i32 -7 2 = %lld %lld\n".ptr, F9 as int, r9 as int);
+	const F10: i32 = mul_high(7, -2);
+	let r10: i32 = mul_high((7 ^ z), (-2 ^ z));
+	printf("mul_high i32 7 -2 = %lld %lld\n".ptr, F10 as int, r10 as int);
+	const F11: i32 = mul_high(-1, -1);
+	let r11: i32 = mul_high((-1 ^ z), (-1 ^ z));
+	printf("mul_high i32 -1 -1 = %lld %lld\n".ptr, F11 as int, r11 as int);
+	const F12: i32 = mul_high(-2147483647, -1);
+	let r12: i32 = mul_high((-2147483647 ^ z), (-1 ^ z));
+	printf("mul_high i32 -2147483647 -1 = %lld %lld\n".ptr, F12 as int, r12 as int);
+}
+
+fn on_i64(z: i64)
+{
+	const F0: i64 = mul_high(9223372036854775807, 1);
+	let r0: i64 = mul_high((9223372036854775807 ^ z), (1 ^ z));
+	printf("mul_high i64 9223372036854775807 1 = %lld %lld\n".ptr, F0 as int, r0 as int);
+	const F1: i64 = mul_high(9223372036854775807, 9223372036854775807);
+	let r1: i64 = mul_high((9223372036854775807 ^ z), (9223372036854775807 ^ z));
+	printf("mul_high i64 9223372036854775807 9223372036854775807 = %lld %lld\n".ptr, F1 as int, r1 as int);
+	const F2: i64 = mul_high(-9223372036854775808, 1);
+	let r2: i64 = mul_high((-9223372036854775808 ^ z), (1 ^ z));
+	printf("mul_high i64 -9223372036854775808 1 = %lld %lld\n".ptr, F2 as int, r2 as int);
+	const F3: i64 = mul_high(-9223372036854775808, 9223372036854775807);
+	let r3: i64 = mul_high((-9223372036854775808 ^ z), (9223372036854775807 ^ z));
+	printf("mul_high i64 -9223372036854775808 9223372036854775807 = %lld %lld\n".ptr, F3 as int, r3 as int);
+	const F4: i64 = mul_high(9223372036854775807, 2);
+	let r4: i64 = mul_high((9223372036854775807 ^ z), (2 ^ z));
+	printf("mul_high i64 9223372036854775807 2 = %lld %lld\n".ptr, F4 as int, r4 as int);
+	const F5: i64 = mul_high(7, 2);
+	let r5: i64 = mul_high((7 ^ z), (2 ^ z));
+	printf("mul_high i64 7 2 = %lld %lld\n".ptr, F5 as int, r5 as int);
+	const F6: i64 = mul_high(-9223372036854775808, -9223372036854775808);
+	let r6: i64 = mul_high((-9223372036854775808 ^ z), (-9223372036854775808 ^ z));
+	printf("mul_high i64 -9223372036854775808 -9223372036854775808 = %lld %lld\n".ptr, F6 as int, r6 as int);
+	const F7: i64 = mul_high(-9223372036854775808, -1);
+	let r7: i64 = mul_high((-9223372036854775808 ^ z), (-1 ^ z));
+	printf("mul_high i64 -9223372036854775808 -1 = %lld %lld\n".ptr, F7 as int, r7 as int);
+	const F8: i64 = mul_high(9223372036854775807, -1);
+	let r8: i64 = mul_high((9223372036854775807 ^ z), (-1 ^ z));
+	printf("mul_high i64 9223372036854775807 -1 = %lld %lld\n".ptr, F8 as int, r8 as int);
+	const F9: i64 = mul_high(-7, 2);
+	let r9: i64 = mul_high((-7 ^ z), (2 ^ z));
+	printf("mul_high i64 -7 2 = %lld %lld\n".ptr, F9 as int, r9 as int);
+	const F10: i64 = mul_high(7, -2);
+	let r10: i64 = mul_high((7 ^ z), (-2 ^ z));
+	printf("mul_high i64 7 -2 = %lld %lld\n".ptr, F10 as int, r10 as int);
+	const F11: i64 = mul_high(-1, -1);
+	let r11: i64 = mul_high((-1 ^ z), (-1 ^ z));
+	printf("mul_high i64 -1 -1 = %lld %lld\n".ptr, F11 as int, r11 as int);
+	const F12: i64 = mul_high(-9223372036854775807, -1);
+	let r12: i64 = mul_high((-9223372036854775807 ^ z), (-1 ^ z));
+	printf("mul_high i64 -9223372036854775807 -1 = %lld %lld\n".ptr, F12 as int, r12 as int);
+}
+
+fn on_int(z: int)
+{
+	const F0: int = mul_high(9223372036854775807, 1);
+	let r0: int = mul_high((9223372036854775807 ^ z), (1 ^ z));
+	printf("mul_high int 9223372036854775807 1 = %lld %lld\n".ptr, F0 as int, r0 as int);
+	const F1: int = mul_high(9223372036854775807, 9223372036854775807);
+	let r1: int = mul_high((9223372036854775807 ^ z), (9223372036854775807 ^ z));
+	printf("mul_high int 9223372036854775807 9223372036854775807 = %lld %lld\n".ptr, F1 as int, r1 as int);
+	const F2: int = mul_high(-9223372036854775808, 1);
+	let r2: int = mul_high((-9223372036854775808 ^ z), (1 ^ z));
+	printf("mul_high int -9223372036854775808 1 = %lld %lld\n".ptr, F2 as int, r2 as int);
+	const F3: int = mul_high(-9223372036854775808, 9223372036854775807);
+	let r3: int = mul_high((-9223372036854775808 ^ z), (9223372036854775807 ^ z));
+	printf("mul_high int -9223372036854775808 9223372036854775807 = %lld %lld\n".ptr, F3 as int, r3 as int);
+	const F4: int = mul_high(9223372036854775807, 2);
+	let r4: int = mul_high((9223372036854775807 ^ z), (2 ^ z));
+	printf("mul_high int 9223372036854775807 2 = %lld %lld\n".ptr, F4 as int, r4 as int);
+	const F5: int = mul_high(7, 2);
+	let r5: int = mul_high((7 ^ z), (2 ^ z));
+	printf("mul_high int 7 2 = %lld %lld\n".ptr, F5 as int, r5 as int);
+	const F6: int = mul_high(-9223372036854775808, -9223372036854775808);
+	let r6: int = mul_high((-9223372036854775808 ^ z), (-9223372036854775808 ^ z));
+	printf("mul_high int -9223372036854775808 -9223372036854775808 = %lld %lld\n".ptr, F6 as int, r6 as int);
+	const F7: int = mul_high(-9223372036854775808, -1);
+	let r7: int = mul_high((-9223372036854775808 ^ z), (-1 ^ z));
+	printf("mul_high int -9223372036854775808 -1 = %lld %lld\n".ptr, F7 as int, r7 as int);
+	const F8: int = mul_high(9223372036854775807, -1);
+	let r8: int = mul_high((9223372036854775807 ^ z), (-1 ^ z));
+	printf("mul_high int 9223372036854775807 -1 = %lld %lld\n".ptr, F8 as int, r8 as int);
+	const F9: int = mul_high(-7, 2);
+	let r9: int = mul_high((-7 ^ z), (2 ^ z));
+	printf("mul_high int -7 2 = %lld %lld\n".ptr, F9 as int, r9 as int);
+	const F10: int = mul_high(7, -2);
+	let r10: int = mul_high((7 ^ z), (-2 ^ z));
+	printf("mul_high int 7 -2 = %lld %lld\n".ptr, F10 as int, r10 as int);
+	const F11: int = mul_high(-1, -1);
+	let r11: int = mul_high((-1 ^ z), (-1 ^ z));
+	printf("mul_high int -1 -1 = %lld %lld\n".ptr, F11 as int, r11 as int);
+	const F12: int = mul_high(-9223372036854775807, -1);
+	let r12: int = mul_high((-9223372036854775807 ^ z), (-1 ^ z));
+	printf("mul_high int -9223372036854775807 -1 = %lld %lld\n".ptr, F12 as int, r12 as int);
+}
+
+fn on_u8(z: u8)
+{
+	const F0: u8 = mul_high(255, 1);
+	let r0: u8 = mul_high((255 ^ z), (1 ^ z));
+	printf("mul_high u8 255 1 = %llu %llu\n".ptr, F0 as u64, r0 as u64);
+	const F1: u8 = mul_high(255, 255);
+	let r1: u8 = mul_high((255 ^ z), (255 ^ z));
+	printf("mul_high u8 255 255 = %llu %llu\n".ptr, F1 as u64, r1 as u64);
+	const F2: u8 = mul_high(0, 1);
+	let r2: u8 = mul_high((0 ^ z), (1 ^ z));
+	printf("mul_high u8 0 1 = %llu %llu\n".ptr, F2 as u64, r2 as u64);
+	const F3: u8 = mul_high(0, 255);
+	let r3: u8 = mul_high((0 ^ z), (255 ^ z));
+	printf("mul_high u8 0 255 = %llu %llu\n".ptr, F3 as u64, r3 as u64);
+	const F4: u8 = mul_high(255, 2);
+	let r4: u8 = mul_high((255 ^ z), (2 ^ z));
+	printf("mul_high u8 255 2 = %llu %llu\n".ptr, F4 as u64, r4 as u64);
+	const F5: u8 = mul_high(7, 2);
+	let r5: u8 = mul_high((7 ^ z), (2 ^ z));
+	printf("mul_high u8 7 2 = %llu %llu\n".ptr, F5 as u64, r5 as u64);
+	const F6: u8 = mul_high(0, 0);
+	let r6: u8 = mul_high((0 ^ z), (0 ^ z));
+	printf("mul_high u8 0 0 = %llu %llu\n".ptr, F6 as u64, r6 as u64);
+	const F7: u8 = mul_high(0, 1);
+	let r7: u8 = mul_high((0 ^ z), (1 ^ z));
+	printf("mul_high u8 0 1 = %llu %llu\n".ptr, F7 as u64, r7 as u64);
+	const F8: u8 = mul_high(1, 255);
+	let r8: u8 = mul_high((1 ^ z), (255 ^ z));
+	printf("mul_high u8 1 255 = %llu %llu\n".ptr, F8 as u64, r8 as u64);
+	const F9: u8 = mul_high(254, 255);
+	let r9: u8 = mul_high((254 ^ z), (255 ^ z));
+	printf("mul_high u8 254 255 = %llu %llu\n".ptr, F9 as u64, r9 as u64);
+}
+
+fn on_u16(z: u16)
+{
+	const F0: u16 = mul_high(65535, 1);
+	let r0: u16 = mul_high((65535 ^ z), (1 ^ z));
+	printf("mul_high u16 65535 1 = %llu %llu\n".ptr, F0 as u64, r0 as u64);
+	const F1: u16 = mul_high(65535, 65535);
+	let r1: u16 = mul_high((65535 ^ z), (65535 ^ z));
+	printf("mul_high u16 65535 65535 = %llu %llu\n".ptr, F1 as u64, r1 as u64);
+	const F2: u16 = mul_high(0, 1);
+	let r2: u16 = mul_high((0 ^ z), (1 ^ z));
+	printf("mul_high u16 0 1 = %llu %llu\n".ptr, F2 as u64, r2 as u64);
+	const F3: u16 = mul_high(0, 65535);
+	let r3: u16 = mul_high((0 ^ z), (65535 ^ z));
+	printf("mul_high u16 0 65535 = %llu %llu\n".ptr, F3 as u64, r3 as u64);
+	const F4: u16 = mul_high(65535, 2);
+	let r4: u16 = mul_high((65535 ^ z), (2 ^ z));
+	printf("mul_high u16 65535 2 = %llu %llu\n".ptr, F4 as u64, r4 as u64);
+	const F5: u16 = mul_high(7, 2);
+	let r5: u16 = mul_high((7 ^ z), (2 ^ z));
+	printf("mul_high u16 7 2 = %llu %llu\n".ptr, F5 as u64, r5 as u64);
+	const F6: u16 = mul_high(0, 0);
+	let r6: u16 = mul_high((0 ^ z), (0 ^ z));
+	printf("mul_high u16 0 0 = %llu %llu\n".ptr, F6 as u64, r6 as u64);
+	const F7: u16 = mul_high(0, 1);
+	let r7: u16 = mul_high((0 ^ z), (1 ^ z));
+	printf("mul_high u16 0 1 = %llu %llu\n".ptr, F7 as u64, r7 as u64);
+	const F8: u16 = mul_high(1, 65535);
+	let r8: u16 = mul_high((1 ^ z), (65535 ^ z));
+	printf("mul_high u16 1 65535 = %llu %llu\n".ptr, F8 as u64, r8 as u64);
+	const F9: u16 = mul_high(65534, 65535);
+	let r9: u16 = mul_high((65534 ^ z), (65535 ^ z));
+	printf("mul_high u16 65534 65535 = %llu %llu\n".ptr, F9 as u64, r9 as u64);
+}
+
+fn on_u32(z: u32)
+{
+	const F0: u32 = mul_high(4294967295, 1);
+	let r0: u32 = mul_high((4294967295 ^ z), (1 ^ z));
+	printf("mul_high u32 4294967295 1 = %llu %llu\n".ptr, F0 as u64, r0 as u64);
+	const F1: u32 = mul_high(4294967295, 4294967295);
+	let r1: u32 = mul_high((4294967295 ^ z), (4294967295 ^ z));
+	printf("mul_high u32 4294967295 4294967295 = %llu %llu\n".ptr, F1 as u64, r1 as u64);
+	const F2: u32 = mul_high(0, 1);
+	let r2: u32 = mul_high((0 ^ z), (1 ^ z));
+	printf("mul_high u32 0 1 = %llu %llu\n".ptr, F2 as u64, r2 as u64);
+	const F3: u32 = mul_high(0, 4294967295);
+	let r3: u32 = mul_high((0 ^ z), (4294967295 ^ z));
+	printf("mul_high u32 0 4294967295 = %llu %llu\n".ptr, F3 as u64, r3 as u64);
+	const F4: u32 = mul_high(4294967295, 2);
+	let r4: u32 = mul_high((4294967295 ^ z), (2 ^ z));
+	printf("mul_high u32 4294967295 2 = %llu %llu\n".ptr, F4 as u64, r4 as u64);
+	const F5: u32 = mul_high(7, 2);
+	let r5: u32 = mul_high((7 ^ z), (2 ^ z));
+	printf("mul_high u32 7 2 = %llu %llu\n".ptr, F5 as u64, r5 as u64);
+	const F6: u32 = mul_high(0, 0);
+	let r6: u32 = mul_high((0 ^ z), (0 ^ z));
+	printf("mul_high u32 0 0 = %llu %llu\n".ptr, F6 as u64, r6 as u64);
+	const F7: u32 = mul_high(0, 1);
+	let r7: u32 = mul_high((0 ^ z), (1 ^ z));
+	printf("mul_high u32 0 1 = %llu %llu\n".ptr, F7 as u64, r7 as u64);
+	const F8: u32 = mul_high(1, 4294967295);
+	let r8: u32 = mul_high((1 ^ z), (4294967295 ^ z));
+	printf("mul_high u32 1 4294967295 = %llu %llu\n".ptr, F8 as u64, r8 as u64);
+	const F9: u32 = mul_high(4294967294, 4294967295);
+	let r9: u32 = mul_high((4294967294 ^ z), (4294967295 ^ z));
+	printf("mul_high u32 4294967294 4294967295 = %llu %llu\n".ptr, F9 as u64, r9 as u64);
+}
+
+fn on_u64(z: u64)
+{
+	const F0: u64 = mul_high(18446744073709551615, 1);
+	let r0: u64 = mul_high((18446744073709551615 ^ z), (1 ^ z));
+	printf("mul_high u64 18446744073709551615 1 = %llu %llu\n".ptr, F0 as u64, r0 as u64);
+	const F1: u64 = mul_high(18446744073709551615, 18446744073709551615);
+	let r1: u64 = mul_high((18446744073709551615 ^ z), (18446744073709551615 ^ z));
+	printf("mul_high u64 18446744073709551615 18446744073709551615 = %llu %llu\n".ptr, F1 as u64, r1 as u64);
+	const F2: u64 = mul_high(0, 1);
+	let r2: u64 = mul_high((0 ^ z), (1 ^ z));
+	printf("mul_high u64 0 1 = %llu %llu\n".ptr, F2 as u64, r2 as u64);
+	const F3: u64 = mul_high(0, 18446744073709551615);
+	let r3: u64 = mul_high((0 ^ z), (18446744073709551615 ^ z));
+	printf("mul_high u64 0 18446744073709551615 = %llu %llu\n".ptr, F3 as u64, r3 as u64);
+	const F4: u64 = mul_high(18446744073709551615, 2);
+	let r4: u64 = mul_high((18446744073709551615 ^ z), (2 ^ z));
+	printf("mul_high u64 18446744073709551615 2 = %llu %llu\n".ptr, F4 as u64, r4 as u64);
+	const F5: u64 = mul_high(7, 2);
+	let r5: u64 = mul_high((7 ^ z), (2 ^ z));
+	printf("mul_high u64 7 2 = %llu %llu\n".ptr, F5 as u64, r5 as u64);
+	const F6: u64 = mul_high(0, 0);
+	let r6: u64 = mul_high((0 ^ z), (0 ^ z));
+	printf("mul_high u64 0 0 = %llu %llu\n".ptr, F6 as u64, r6 as u64);
+	const F7: u64 = mul_high(0, 1);
+	let r7: u64 = mul_high((0 ^ z), (1 ^ z));
+	printf("mul_high u64 0 1 = %llu %llu\n".ptr, F7 as u64, r7 as u64);
+	const F8: u64 = mul_high(1, 18446744073709551615);
+	let r8: u64 = mul_high((1 ^ z), (18446744073709551615 ^ z));
+	printf("mul_high u64 1 18446744073709551615 = %llu %llu\n".ptr, F8 as u64, r8 as u64);
+	const F9: u64 = mul_high(18446744073709551614, 18446744073709551615);
+	let r9: u64 = mul_high((18446744073709551614 ^ z), (18446744073709551615 ^ z));
+	printf("mul_high u64 18446744073709551614 18446744073709551615 = %llu %llu\n".ptr, F9 as u64, r9 as u64);
+}
+
+fn on_uint(z: uint)
+{
+	const F0: uint = mul_high(18446744073709551615, 1);
+	let r0: uint = mul_high((18446744073709551615 ^ z), (1 ^ z));
+	printf("mul_high uint 18446744073709551615 1 = %llu %llu\n".ptr, F0 as u64, r0 as u64);
+	const F1: uint = mul_high(18446744073709551615, 18446744073709551615);
+	let r1: uint = mul_high((18446744073709551615 ^ z), (18446744073709551615 ^ z));
+	printf("mul_high uint 18446744073709551615 18446744073709551615 = %llu %llu\n".ptr, F1 as u64, r1 as u64);
+	const F2: uint = mul_high(0, 1);
+	let r2: uint = mul_high((0 ^ z), (1 ^ z));
+	printf("mul_high uint 0 1 = %llu %llu\n".ptr, F2 as u64, r2 as u64);
+	const F3: uint = mul_high(0, 18446744073709551615);
+	let r3: uint = mul_high((0 ^ z), (18446744073709551615 ^ z));
+	printf("mul_high uint 0 18446744073709551615 = %llu %llu\n".ptr, F3 as u64, r3 as u64);
+	const F4: uint = mul_high(18446744073709551615, 2);
+	let r4: uint = mul_high((18446744073709551615 ^ z), (2 ^ z));
+	printf("mul_high uint 18446744073709551615 2 = %llu %llu\n".ptr, F4 as u64, r4 as u64);
+	const F5: uint = mul_high(7, 2);
+	let r5: uint = mul_high((7 ^ z), (2 ^ z));
+	printf("mul_high uint 7 2 = %llu %llu\n".ptr, F5 as u64, r5 as u64);
+	const F6: uint = mul_high(0, 0);
+	let r6: uint = mul_high((0 ^ z), (0 ^ z));
+	printf("mul_high uint 0 0 = %llu %llu\n".ptr, F6 as u64, r6 as u64);
+	const F7: uint = mul_high(0, 1);
+	let r7: uint = mul_high((0 ^ z), (1 ^ z));
+	printf("mul_high uint 0 1 = %llu %llu\n".ptr, F7 as u64, r7 as u64);
+	const F8: uint = mul_high(1, 18446744073709551615);
+	let r8: uint = mul_high((1 ^ z), (18446744073709551615 ^ z));
+	printf("mul_high uint 1 18446744073709551615 = %llu %llu\n".ptr, F8 as u64, r8 as u64);
+	const F9: uint = mul_high(18446744073709551614, 18446744073709551615);
+	let r9: uint = mul_high((18446744073709551614 ^ z), (18446744073709551615 ^ z));
+	printf("mul_high uint 18446744073709551614 18446744073709551615 = %llu %llu\n".ptr, F9 as u64, r9 as u64);
+}
+
+fn on_byte(z: byte)
+{
+	const F0: byte = mul_high(255, 1);
+	let r0: byte = mul_high((255 ^ z), (1 ^ z));
+	printf("mul_high byte 255 1 = %llu %llu\n".ptr, F0 as u64, r0 as u64);
+	const F1: byte = mul_high(255, 255);
+	let r1: byte = mul_high((255 ^ z), (255 ^ z));
+	printf("mul_high byte 255 255 = %llu %llu\n".ptr, F1 as u64, r1 as u64);
+	const F2: byte = mul_high(0, 1);
+	let r2: byte = mul_high((0 ^ z), (1 ^ z));
+	printf("mul_high byte 0 1 = %llu %llu\n".ptr, F2 as u64, r2 as u64);
+	const F3: byte = mul_high(0, 255);
+	let r3: byte = mul_high((0 ^ z), (255 ^ z));
+	printf("mul_high byte 0 255 = %llu %llu\n".ptr, F3 as u64, r3 as u64);
+	const F4: byte = mul_high(255, 2);
+	let r4: byte = mul_high((255 ^ z), (2 ^ z));
+	printf("mul_high byte 255 2 = %llu %llu\n".ptr, F4 as u64, r4 as u64);
+	const F5: byte = mul_high(7, 2);
+	let r5: byte = mul_high((7 ^ z), (2 ^ z));
+	printf("mul_high byte 7 2 = %llu %llu\n".ptr, F5 as u64, r5 as u64);
+	const F6: byte = mul_high(0, 0);
+	let r6: byte = mul_high((0 ^ z), (0 ^ z));
+	printf("mul_high byte 0 0 = %llu %llu\n".ptr, F6 as u64, r6 as u64);
+	const F7: byte = mul_high(0, 1);
+	let r7: byte = mul_high((0 ^ z), (1 ^ z));
+	printf("mul_high byte 0 1 = %llu %llu\n".ptr, F7 as u64, r7 as u64);
+	const F8: byte = mul_high(1, 255);
+	let r8: byte = mul_high((1 ^ z), (255 ^ z));
+	printf("mul_high byte 1 255 = %llu %llu\n".ptr, F8 as u64, r8 as u64);
+	const F9: byte = mul_high(254, 255);
+	let r9: byte = mul_high((254 ^ z), (255 ^ z));
+	printf("mul_high byte 254 255 = %llu %llu\n".ptr, F9 as u64, r9 as u64);
+}
+
+fn main(args: []str) -> int
+{
+	let zero = args.len - 1;
+	on_i8(zero as i8);
+	on_i16(zero as i16);
+	on_i32(zero as i32);
+	on_i64(zero as i64);
+	on_int(zero as int);
+	on_u8(zero as u8);
+	on_u16(zero as u16);
+	on_u32(zero as u32);
+	on_u64(zero as u64);
+	on_uint(zero as uint);
+	on_byte(zero as byte);
+	return 0;
+}
