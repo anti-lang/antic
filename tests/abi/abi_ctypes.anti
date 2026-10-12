@@ -3,8 +3,8 @@
 //! back: alone, at the limits of the type, among fourteen arguments, in a
 //! struct by value, through a pointer and through a callback that C calls. C
 //! then calls the functions this program exports, one per type. A width or a
-//! sign that follows the target is compared with what C gives, so the output
-//! is the same on every target.
+//! sign that follows the target is compared with what C gives, so the output is
+//! the same on every target.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -274,8 +274,10 @@ fn main() -> int
 		(size_of(c_double) as c_int == ct_size_of(13)) as c_int, ct_double(1.25) as f64,
 		ct_call_double(back_double, 1.5) as f64);
 	printf("fourteen arguments %.2f\n".ptr, ct_sum(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13.5, 14.25));
-	let all = ct_all(CtAll { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, i: 9, j: 10, k: 11, l: 12,
-		m: 13.5, n: 14.25 });
+	let all = ct_all(CtAll {
+		a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, i: 9, j: 10, k: 11, l: 12,
+			m: 13.5, n: 14.25
+	});
 	printf("struct size %d fields %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %.2f %.2f\n".ptr,
 		(size_of(CtAll) as c_int == ct_all_size()) as c_int, all.a as int, all.b as int, all.c as int,
 		all.d as int, all.e as int, all.f as int, all.g as int, all.h as int, all.i as int, all.j as int,

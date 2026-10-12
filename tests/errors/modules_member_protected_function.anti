@@ -1,4 +1,5 @@
-//! A protected function of a class of a library is not called from a function of another module.
+//! A protected function of a class of a library is not called from a function
+//! of another module.
 
 import com.example.levels;
 

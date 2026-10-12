@@ -1,6 +1,6 @@
 //! A class whose fields carry a default of every kind a default takes. The
-//! library file carries each default, and a client that builds the class
-//! with no field named reads them all.
+//! library file carries each default, and a client that builds the class with
+//! no field named reads them all.
 
 pub struct Point
 {

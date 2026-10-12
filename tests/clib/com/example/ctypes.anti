@@ -1,7 +1,7 @@
 //! A library for C that takes and gives every C type Anti names: `c_char` to
 //! `c_wchar` with `c_float` and `c_double`. Each type crosses alone, among
-//! fourteen parameters, in a struct and a union by value, through a pointer,
-//! as an exported constant and through a function pointer of C.
+//! fourteen parameters, in a struct and a union by value, through a pointer, as
+//! an exported constant and through a function pointer of C.
 
 /// `v` and one more, as a `c_char`.
 export fn ctypes_char(v: c_char) -> c_char
@@ -107,7 +107,7 @@ export fn ctypes_sum(a: c_char, b: c_uchar, c: c_short, d: c_ushort, e: c_int, f
 	h: c_ulong, i: c_longlong, j: c_ulonglong, k: c_size_t, l: c_wchar, m: c_float, n: c_double) -> c_double
 {
 	return a as f64 + b as f64 + c as f64 + d as f64 + e as f64 + f as f64 + g as f64 + h as f64
-		+ i as f64 + j as f64 + k as f64 + l as f64 + m as f64 + n;
+		+i as f64 + j as f64 + k as f64 + l as f64 + m as f64 + n;
 }
 
 /// One field of each type.
@@ -138,9 +138,11 @@ export fn ctypes_all_size() -> c_int
 /// Every field of `v` and one more.
 export fn ctypes_all(v: CtypesAll) -> CtypesAll
 {
-	return CtypesAll { a: v.a + 1, b: v.b + 1, c: v.c + 1, d: v.d + 1, e: v.e + 1, f: v.f + 1,
+	return CtypesAll {
+		a: v.a + 1, b: v.b + 1, c: v.c + 1, d: v.d + 1, e: v.e + 1, f: v.f + 1,
 		g: v.g + 1, h: v.h + 1, i: v.i + 1, j: v.j + 1, k: v.k + 1, l: v.l + 1, m: v.m + 1.0,
-		n: v.n + 1.0 };
+		n: v.n + 1.0
+	};
 }
 
 /// A `c_long`, a `c_double` and eight `c_char` in one place.

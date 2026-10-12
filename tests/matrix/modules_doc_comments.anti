@@ -1,7 +1,7 @@
 //! The four comments of documentation: `//!` for the module and `///` for the
 //! item that follows, `//#!` and `//#` the same for the developers of a
-//! library. Each `///` and `//#` stands before an item of every kind and
-//! before the members of a class, and changes nothing a program does.
+//! library. Each `///` and `//#` stands before an item of every kind and before
+//! the members of a class, and changes nothing a program does.
 //#! A note on the module for its developers.
 
 import anti.lang;

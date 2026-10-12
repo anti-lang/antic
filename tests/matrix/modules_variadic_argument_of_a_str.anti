@@ -1,5 +1,5 @@
-//! A variadic argument is an integer of 32 or 64 bits, an `f64` or a pointer.
-//! A `str` is two words and is none of them.
+//! A variadic argument is an integer of 32 or 64 bits, an `f64` or a pointer. A
+//! `str` is two words and is none of them.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

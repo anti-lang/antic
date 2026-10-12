@@ -1,6 +1,6 @@
 //! A library that provides a `Worker`, built with `antic --lib shared
-//! --no-runtime`. Every function takes a kind of value from the host and
-//! gives one back.
+//! --no-runtime`. Every function takes a kind of value from the host and gives
+//! one back.
 
 import anti.lang;
 import net.example.kinds;

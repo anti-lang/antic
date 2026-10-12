@@ -1,7 +1,7 @@
 //! Generics whose bodies reach what their module keeps private: a function, a
-//! constant, a struct, an enum, a class, a generic function, an `extern fn`,
-//! an operator and an internal function. Another module compiles the copies,
-//! and each copy reaches the private items of this module.
+//! constant, a struct, an enum, a class, a generic function, an `extern fn`, an
+//! operator and an internal function. Another module compiles the copies, and
+//! each copy reaches the private items of this module.
 
 const SECRET: int = 7;
 

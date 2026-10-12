@@ -112,7 +112,7 @@ fn main() -> int
 	if let Dot dot = kinds.pass_variant(kinds.Shape.Dot { r: 5 }) {
 		r1 = dot.r;
 	}
-	let r2 = 0;
+		let r2 = 0;
 	if let Dot dot = kinds.pass_variant(kinds.Shape.Empty) {
 		r2 = dot.r;
 	}

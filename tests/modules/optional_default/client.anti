@@ -1,5 +1,5 @@
-//! The client of the holder library. It builds the class without naming a
-//! field and reads the three defaults.
+//! The client of the holder library. It builds the class without naming a field
+//! and reads the three defaults.
 
 import com.example.holder;
 

@@ -1,5 +1,5 @@
-//! A clause of the whole file stands at the top of the module, before the
-//! first item.
+//! A clause of the whole file stands at the top of the module, before the first
+//! item.
 
 import anti.lang;
 

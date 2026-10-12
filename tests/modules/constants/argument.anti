@@ -1,5 +1,5 @@
-//! A constant of a library as the argument of a type parameter `N: int`, as
-//! a constant of the module itself stands there. T094 of
+//! A constant of a library as the argument of a type parameter `N: int`, as a
+//! constant of the module itself stands there. T094 of
 //! docs/audit/tests-findings.md.
 
 import com.example.limits;

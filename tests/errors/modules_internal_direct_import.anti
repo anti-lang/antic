@@ -1,4 +1,5 @@
-//! An internal function of a library of another package is not reached by a direct import.
+//! An internal function of a library of another package is not reached by a
+//! direct import.
 
 import com.example.levels.{near};
 

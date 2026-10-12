@@ -1,10 +1,10 @@
-//! Every kind of item a module may make public, each `pub`: constants of
-//! every type a constant takes, a function, a generic function, an `extern fn`
-//! and a variadic one, a struct, a generic struct, a union, an enum, a variant,
-//! a generic variant, a class, an interface, a class that implements it, a
+//! Every kind of item a module may make public, each `pub`: constants of every
+//! type a constant takes, a function, a generic function, an `extern fn` and a
+//! variadic one, a struct, a generic struct, a union, an enum, a variant, a
+//! generic variant, a class, an interface, a class that implements it, a
 //! singleton, a generic class, a generic interface, two aliases, a constraint
-//! and an operator at module level. The client reaches each one by the name
-//! of the module, by an alias of the module and by a direct import.
+//! and an operator at module level. The client reaches each one by the name of
+//! the module, by an alias of the module and by a direct import.
 
 pub const LIMIT: int = 40;
 pub const RATIO: f64 = 1.5;

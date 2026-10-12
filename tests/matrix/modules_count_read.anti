@@ -1,6 +1,6 @@
-//! `count` of a collection is read from every module: of a `List`, a `Deque`,
-//! a `Ring`, a `PriorityQueue`, a `Map`, a `HashMap`, a `SortedMap`, a `Set`,
-//! a `HashSet`, a `BitSet`, a `SortedSet` and a `Pool`, in an expression, in a
+//! `count` of a collection is read from every module: of a `List`, a `Deque`, a
+//! `Ring`, a `PriorityQueue`, a `Map`, a `HashMap`, a `SortedMap`, a `Set`, a
+//! `HashSet`, a `BitSet`, a `SortedSet` and a `Pool`, in an expression, in a
 //! condition and as the bound of a loop.
 
 import anti.collection.deque.{Deque};

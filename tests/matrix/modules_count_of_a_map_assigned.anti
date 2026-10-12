@@ -1,5 +1,5 @@
-//! Decision 25: `count` of a collection is read-only outside its module.
-//! An assignment to it is refused.
+//! Decision 25: `count` of a collection is read-only outside its module. An
+//! assignment to it is refused.
 
 import anti.collection.map.{Map};
 

@@ -1,6 +1,6 @@
-//! A library file carries no type nested in a generic class yet, so a copy
-//! of a function that names one cannot be made. The message stands where
-//! this module asks for the copy. T095 of docs/audit/tests-findings.md.
+//! A library file carries no type nested in a generic class yet, so a copy of a
+//! function that names one cannot be made. The message stands where this module
+//! asks for the copy. T095 of docs/audit/tests-findings.md.
 
 import com.example.gen;
 

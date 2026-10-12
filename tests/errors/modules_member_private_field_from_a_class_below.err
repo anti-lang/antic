@@ -1,1 +1,1 @@
-modules_member_private_field_from_a_class_below.anti:9:10: error: `secret` is private to `Account`
+modules_member_private_field_from_a_class_below.anti:10:10: error: `secret` is private to `Account`

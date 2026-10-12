@@ -1,5 +1,4 @@
-//! A variadic `extern fn` names at least one parameter before `...`, as C
-//! does.
+//! A variadic `extern fn` names at least one parameter before `...`, as C does.
 
 extern fn odd(...) -> c_int;
 

@@ -1,4 +1,5 @@
-//! An internal struct of a library of another package is not reached as the type of a local.
+//! An internal struct of a library of another package is not reached as the
+//! type of a local.
 
 import com.example.levels;
 

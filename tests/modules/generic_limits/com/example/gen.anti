@@ -1,6 +1,6 @@
-//! Two forms of a generic that a library file does not carry yet: a function
-//! of a class with a type parameter of its own, in a generic class and in a
-//! plain one, and a type nested in a generic class.
+//! Two forms of a generic that a library file does not carry yet: a function of
+//! a class with a type parameter of its own, in a generic class and in a plain
+//! one, and a type nested in a generic class.
 
 pub class Stack<T>
 {

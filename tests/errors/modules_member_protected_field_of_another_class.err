@@ -1,1 +1,1 @@
-modules_member_protected_field_of_another_class.anti:9:10: error: `balance` is protected in `Account`
+modules_member_protected_field_of_another_class.anti:10:10: error: `balance` is protected in `Account`

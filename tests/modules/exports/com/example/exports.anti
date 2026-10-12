@@ -1,7 +1,7 @@
 //! Every kind of item that `export` marks: a function, a function that may
-//! fail, a struct, a union, constants, a class with a function, and a copy of
-//! a generic named by `export type`. `export` implies `pub`, so another module
-//! of Anti reaches each one as it reaches a public item.
+//! fail, a struct, a union, constants, a class with a function, and a copy of a
+//! generic named by `export type`. `export` implies `pub`, so another module of
+//! Anti reaches each one as it reaches a public item.
 
 import anti.lang;
 

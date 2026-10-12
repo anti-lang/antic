@@ -1,5 +1,5 @@
-//! Decision 26: a `str` in a callback of an `extern fn` is in its signature
-//! and is refused.
+//! Decision 26: a `str` in a callback of an `extern fn` is in its signature and
+//! is refused.
 
 extern fn each(f: fn(str) -> c_int) -> c_int;
 

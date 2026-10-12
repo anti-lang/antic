@@ -1,4 +1,5 @@
-//! A private field of a class of a library is not named in a literal of another module.
+//! A private field of a class of a library is not named in a literal of another
+//! module.
 
 import com.example.levels;
 

@@ -1,6 +1,6 @@
-//! The client of the defaults library. It builds the class and the class
-//! below it without naming a field, on the stack and on the heap, and prints
-//! every default the library file carried.
+//! The client of the defaults library. It builds the class and the class below
+//! it without naming a field, on the stack and on the heap, and prints every
+//! default the library file carried.
 
 import com.example.defaults;
 

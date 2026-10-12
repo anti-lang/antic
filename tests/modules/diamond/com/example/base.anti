@@ -1,7 +1,7 @@
 //! The module at the top of a diamond: two libraries import it, and a program
 //! imports those two. It holds a class, a singleton, a static field, a struct,
-//! a generic struct, a generic function and a constant, each of which the
-//! whole program must hold once.
+//! a generic struct, a generic function and a constant, each of which the whole
+//! program must hold once.
 
 import anti.lang;
 

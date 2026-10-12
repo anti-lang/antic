@@ -1,1 +1,1 @@
-modules_member_protected_function.anti:8:2: error: `add` is protected in `Account`
+modules_member_protected_function.anti:9:2: error: `add` is protected in `Account`

@@ -1,5 +1,5 @@
-//! Constants of a library that another module reads where the language takes
-//! a constant expression: the length of an array, a constant of its own, the
+//! Constants of a library that another module reads where the language takes a
+//! constant expression: the length of an array, a constant of its own, the
 //! value of an enum, the width of a bitfield, the N of `align(N)`, the default
 //! of a parameter and of a field, an arm of a `switch` and a type argument.
 

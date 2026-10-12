@@ -1,6 +1,6 @@
-//! The client of the maybe library. It writes a literal of a case with
-//! fields under the name of the module and with the type arguments written
-//! out, `maybe.Maybe<int>.Some { value: 5 }`.
+//! The client of the maybe library. It writes a literal of a case with fields
+//! under the name of the module and with the type arguments written out,
+//! `maybe.Maybe<int>.Some { value: 5 }`.
 
 import com.example.maybe;
 

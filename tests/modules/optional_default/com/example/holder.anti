@@ -1,5 +1,5 @@
-//! A class whose fields are optional values with a default: `none`, a value
-//! and `none` for a struct. T085 of docs/audit/tests-findings.md.
+//! A class whose fields are optional values with a default: `none`, a value and
+//! `none` for a struct. T085 of docs/audit/tests-findings.md.
 
 pub struct Point
 {
