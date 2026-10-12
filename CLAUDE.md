@@ -100,6 +100,9 @@ not re-open a settled decision without asking Eddie.
   `ubsan` 437 s and 237 s.
   The step `modules` measured `host` 451 s, and the same two parts up to
   test 3507: `asan` 532 s and 396 s, `ubsan` 477 s and 266 s.
+  The step of the checker's messages measured `host` 439 s, and the same
+  two parts up to test 3533: `asan` 463 s and 397 s, `ubsan` 429 s and
+  254 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -386,6 +389,10 @@ The two guards and the lists of the matrix:
 - `tests/diagnostics-open.txt` and `tests/options-open.txt` list what had no
   test on 2026-10-12. A line leaves its list in the commit that adds the
   test. A new message or option comes with its test and never with a line.
+- A message that stays in `tests/diagnostics-open.txt` for good has the
+  lines `# Stays: ...` before it, which give the reason. Either no program
+  reaches it, or antic gives it as the second message of one mistake
+  alone, and a finding holds that.
 - Each guard fails for a line whose message or option a test covers, and for
   a line that names nothing of the sources.
 - The diagnostics guard reads the functions its runner names. A new function
@@ -619,10 +626,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 3508 ctest tests pass on the development Mac, and two of them, the
+- 3534 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  319 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 3507 each with the same skips, without
+  323 of them are the expected failures of `tests/known-failures.txt`.
+  The ASan and the UBSan builds run 3533 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
