@@ -161,17 +161,40 @@ The target stands under "Binary distribution" in `docs/decisions.md`.
 ./c            # Debug build in build/host
 ./c release    # Release build in build/release
 ./c test       # the Debug build, then its suite
+./c coverage   # the coverage build, its suite and the coverage report
 ```
 
 `./c` is a link to `tools/compile.sh`. It configures a tree on its first
-build and takes `asan`, `ubsan`, `test` and `fresh` as well. The long form is
+build and takes `asan`, `ubsan`, `coverage`, `test` and `fresh` as well. The long form is
 `cmake --preset host && cmake --build build/host -j8 && ctest --test-dir
 build/host -j8`.
 
-`CMakePresets.json` carries four configurations, each in `build/<preset>`:
-`host`, the Debug build, `release`, and the sanitizer configurations `asan`
-and `ubsan`. The suite runs in every tree. The three builds a step of a
-driver proves are `host`, `asan` and `ubsan`.
+`CMakePresets.json` carries five configurations, each in `build/<preset>`:
+`host`, the Debug build, `release`, the sanitizer configurations `asan`
+and `ubsan`, and `coverage`. The suite runs in every tree. The three builds
+a step of a driver proves are `host`, `asan` and `ubsan`.
+
+`./c coverage` measures what the suite reaches. The preset `coverage` is a
+Debug build in which the pinned clang compiles antic, anti and the C unit
+tests with `-fprofile-instr-generate -fcoverage-mapping`. Every test of
+that tree runs with `LLVM_PROFILE_FILE` set, so its suite leaves raw
+profiles in `build/coverage/profiles/`. llvm-profdata merges them, and
+llvm-cov writes `build/coverage/summary.txt` and the annotated sources in
+`build/coverage/html/`. The summary holds one row per file of `src/antic/`,
+`src/anti/` and `src/rt/`, with its lines, functions, regions and branches.
+Of `src/rt/` it holds the files that antic, anti and the unit tests
+compile. The runtime inside an Anti program is not instrumented.
+
+- `./c coverage part 1/3` runs one part of the suite per call, for a
+  session whose command ends after ten minutes. The first part removes the
+  profiles of the run before, and the last writes the report from the
+  profiles of every part.
+- `./c coverage report` writes the report again from the profiles on disk.
+- The measurement is no gate. A step runs it when its task says so.
+- `tools/coverage.cmake` holds the flags and the directory of the profiles,
+  and `tools/coverage-report.cmake` writes the report.
+- The measurement was built and run on the development Mac alone.
+  `docs/reports/2026-10-12-tests-coverage-baseline.md` holds the first one.
 
 The pinned downloads lie in `build/deps/`, one copy for all three trees. A
 release adds the LLVM tools of the other five hosts in
@@ -455,9 +478,9 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1703 ctest tests pass on the development Mac, and two of them, the
+- 1704 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  The ASan and the UBSan builds run 1702 each with the same skips, without
+  The ASan and the UBSan builds run 1703 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.

@@ -36,6 +36,16 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all"
             }
+        },
+        {
+            "name": "coverage",
+            "displayName": "Coverage measurement",
+            "description": "Debug build with antic, anti and the unit tests instrumented for llvm-cov",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "ANTIC_COVERAGE": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -43,13 +53,15 @@
         { "name": "release", "configurePreset": "release" },
         { "name": "asan", "configurePreset": "asan",
           "environment": { "ASAN_OPTIONS": "detect_leaks=1" } },
-        { "name": "ubsan", "configurePreset": "ubsan" }
+        { "name": "ubsan", "configurePreset": "ubsan" },
+        { "name": "coverage", "configurePreset": "coverage" }
     ],
     "testPresets": [
         { "name": "host", "configurePreset": "host", "output": { "outputOnFailure": true } },
         { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } },
         { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true },
           "environment": { "ASAN_OPTIONS": "detect_leaks=1" } },
-        { "name": "ubsan", "configurePreset": "ubsan", "output": { "outputOnFailure": true } }
+        { "name": "ubsan", "configurePreset": "ubsan", "output": { "outputOnFailure": true } },
+        { "name": "coverage", "configurePreset": "coverage", "output": { "outputOnFailure": true } }
     ]
 }

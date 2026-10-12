@@ -148,6 +148,10 @@ target_include_directories(anti_core PUBLIC ${ANTI_INCLUDE_DIRS})
 add_executable(anti ${ANTI_MAIN_SOURCES})
 target_link_libraries(anti PRIVATE anti_core)
 
+# A coverage tree instruments the four. See tools/coverage.cmake.
+include(tools/coverage.cmake)
+antic_coverage(antic_core antic anti_core anti)
+
 target_compile_definitions(antic PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")
 target_compile_definitions(antic_core PRIVATE
@@ -688,3 +692,7 @@ enable_testing()
 add_subdirectory(tests)
 # The native libraries of the runtime archive and their tests.
 add_subdirectory(src/native)
+
+# The targets and the test environment of a coverage tree, after the last
+# directory that instruments a program.
+antic_coverage_finish()

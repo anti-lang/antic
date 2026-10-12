@@ -119,6 +119,8 @@ add_test(NAME alloc_oom
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/alloc-oom"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_alloc_oom.cmake")
 
+antic_coverage(antic_unit_tests files_oom_tests alloc_oom_tests)
+
 # antic allocates through src/antic/alloc.c alone, and the front end
 # includes no header of the IR for its memory.
 # The programs of tests/ that link antic_core take their memory from
@@ -452,6 +454,10 @@ target_compile_definitions(rt_plugin_table_tests PRIVATE
     "PLUGIN_BAD=\"$<TARGET_FILE:plugin_bad>\"")
 add_dependencies(rt_plugin_table_tests plugin_bad)
 add_test(NAME rt_plugin_table COMMAND rt_plugin_table_tests)
+# The programs of the runtime above compile its files themselves, so a
+# coverage tree measures src/rt/ through them.
+antic_coverage(rt_signal_tests rt_conf_tests rt_plugin_tests
+    rt_platform_tests rt_plugin_table_tests)
 
 # add_expect_test(<name> STATUS <status> [DIRECTORY <dir>]
 #                 EXPECTED <file> | PATTERN <regex>
@@ -1820,6 +1826,30 @@ add_test(NAME no_llvm_cov_packed
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/no-llvm-cov-packed"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_no_llvm_cov_packed.cmake")
+
+# The report of the coverage measurement: tools/coverage-report.cmake
+# merges the profiles of two runs of a small program and writes the
+# summary and the annotated sources of the three directories it measures.
+# The program takes the flags of tools/coverage.cmake, as a coverage tree
+# gives them to antic.
+# DESIGN: the test stands on a Mac alone. The measurement runs on the
+# development Mac, and the script that links a program of the host here,
+# as release_dry_run does, names the Apple SDK.
+if(APPLE)
+    set(coverage_work "${CMAKE_CURRENT_BINARY_DIR}/coverage-report")
+    antic_coverage_compile_flags(coverage_flags "${coverage_work}/root")
+    add_test(NAME coverage_report
+        COMMAND "${CMAKE_COMMAND}"
+                "-DCC=${CMAKE_C_COMPILER}"
+                "-DSDK=${ANTIC_MACOS_SDK}"
+                "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+                "-DCOMPILE_FLAGS=${coverage_flags}"
+                "-DLINK_FLAGS=${ANTIC_COVERAGE_LINK_FLAGS}"
+                "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+                "-DSCRIPT=${CMAKE_SOURCE_DIR}/tools/coverage-report.cmake"
+                "-DWORK=${coverage_work}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_coverage_report.cmake")
+endif()
 
 # A Linux program of a release names no glibc symbol above the pinned
 # 2.35, which tools/pack-anti.cmake reads before it writes a package
@@ -4244,6 +4274,7 @@ antic_rt_sources(probe_sources symbols)
 add_executable(symbols_probe unit/symbols_probe.c ${probe_sources})
 target_link_libraries(symbols_probe PRIVATE antic_core)
 target_include_directories(symbols_probe PRIVATE ../src/rt)
+antic_coverage(symbols_probe)
 foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64)
     add_test(NAME trace_symbols_${target}
         COMMAND "${CMAKE_COMMAND}"
