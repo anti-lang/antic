@@ -698,9 +698,12 @@ let t = divmod(7, 2);
 let q = t.0;
 let (d, r) = divmod(7, 2);
 for i, x in items { }
+
+let nested = (1, ("one", true));
+let word = nested.1.0;
 ```
 
-Elements are `t.0`, `t.1` and on. Destructuring is `let (a, b) = e;` and `for i, x in items`, and nowhere else: not in a parameter list and not nested. Two tuple types are the same when their element types are the same in order. A tuple of more than three elements, or one that crosses a module boundary, is a struct that has not been named yet.
+A tuple has two elements or more. Elements are `t.0`, `t.1` and on, and `t.1.0` reads an element of an element. Destructuring is `let (a, b) = e;` and `for i, x in items`, and nowhere else: not in a parameter list and not nested. Two tuple types are the same when their element types are the same in order. A tuple of any length compiles and crosses a module boundary. A named struct reads better than a tuple of more than three elements, and than one in a public signature.
 
 ## Errors
 
