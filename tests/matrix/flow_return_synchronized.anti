@@ -1,0 +1,34 @@
+//! A `return` of a pointer to an object of a synchronized class.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+synchronized class Counter
+{
+	total: int = 0,
+
+	pub fn add(self, n: int)
+	{
+		self.total += n;
+	}
+
+	pub fn get(self) -> int
+	{
+		return self.total;
+	}
+}
+
+fn make(n: int) -> *Counter
+{
+	let c = alloc Counter { };
+	c.add(n);
+	return c;
+}
+
+fn main() -> int
+{
+	let c = make(5);
+	c.add(2);
+	printf("%d\n".ptr, c.get() as c_int);
+	delete(c);
+	return 0;
+}

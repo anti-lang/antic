@@ -1,0 +1,1 @@
+flow_yield_takes_no_value.anti:15:3: error: the call writes no result, so `yield` takes no value

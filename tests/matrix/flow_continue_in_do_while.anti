@@ -1,0 +1,19 @@
+//! A `continue` in a `do ... while` goes to the test, so the turn that skips is
+//! the last one when the test fails.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let i = 0;
+	let acc = 0;
+	do {
+		i += 1;
+		if i == 3 {
+			continue;
+		}
+		acc += i;
+	} while i < 3
+	printf("%d %d\n".ptr, acc as c_int, i as c_int);
+	return 0;
+}

@@ -1,0 +1,26 @@
+//! A `return` without a value in an arm of a `switch` ends the function.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn run(n: int, out: *int)
+{
+	*out = 1;
+	switch n {
+		2 => {
+			return;
+		},
+		else => *out = 5,
+	}
+	*out += n * 10;
+}
+
+fn main() -> int
+{
+	let got = 0;
+	for n in 1..4 {
+		got = 0;
+		run(n, &got);
+		printf("%d\n".ptr, got as c_int);
+	}
+	return 0;
+}

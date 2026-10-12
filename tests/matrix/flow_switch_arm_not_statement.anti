@@ -1,0 +1,12 @@
+//! An arm of a `switch` that is neither a call, an assignment nor a block is
+//! refused.
+
+fn main() -> int
+{
+	let acc = 0;
+	switch acc {
+		1 => acc,
+		else => acc = 2,
+	}
+	return acc;
+}

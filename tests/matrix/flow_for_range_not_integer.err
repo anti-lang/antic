@@ -1,0 +1,1 @@
+flow_for_range_not_integer.anti:6:11: error: a `for` range counts over an integer, found `float`

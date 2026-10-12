@@ -1,0 +1,29 @@
+//! The `else` of a `let` that leaves by `continue` and by `break` runs the
+//! `defer` of the turn.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn half(n: int) -> ?int
+{
+	if n % 2 == 0 {
+		return n / 2;
+	}
+	return none;
+}
+
+fn main() -> int
+{
+	let acc = 0;
+	for i in 0..9 {
+		defer acc += 1000;
+		let h = half(i) else {
+			if i == 5 {
+				break;
+			}
+			continue;
+		};
+		acc += h;
+	}
+	printf("%d\n".ptr, acc as c_int);
+	return 0;
+}

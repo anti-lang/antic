@@ -1,0 +1,83 @@
+//! A `for` over a range of each integer type that the other tests leave out,
+//! with the high end at the largest value of the type.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn walk_i32(lo: i32, hi: i32) -> int
+{
+	let acc = 0;
+	let turns = 0;
+	for i in lo..hi {
+		acc += (i - lo) as int;
+		turns += 1;
+	}
+	return acc * 10 + turns;
+}
+
+fn walk_i64(lo: i64, hi: i64) -> int
+{
+	let acc = 0;
+	let turns = 0;
+	for i in lo..hi {
+		acc += (i - lo) as int;
+		turns += 1;
+	}
+	return acc * 10 + turns;
+}
+
+fn walk_u8(lo: u8, hi: u8) -> int
+{
+	let acc = 0;
+	let turns = 0;
+	for i in lo..hi {
+		acc += (i - lo) as int;
+		turns += 1;
+	}
+	return acc * 10 + turns;
+}
+
+fn walk_u16(lo: u16, hi: u16) -> int
+{
+	let acc = 0;
+	let turns = 0;
+	for i in lo..hi {
+		acc += (i - lo) as int;
+		turns += 1;
+	}
+	return acc * 10 + turns;
+}
+
+fn walk_u32(lo: u32, hi: u32) -> int
+{
+	let acc = 0;
+	let turns = 0;
+	for i in lo..hi {
+		acc += (i - lo) as int;
+		turns += 1;
+	}
+	return acc * 10 + turns;
+}
+
+fn walk_uint(lo: uint, hi: uint) -> int
+{
+	let acc = 0;
+	let turns = 0;
+	for i in lo..hi {
+		acc += (i - lo) as int;
+		turns += 1;
+	}
+	return acc * 10 + turns;
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, walk_i32(-2147483648, -2147483643) as c_int);
+	printf("%d\n".ptr,
+		walk_i64(9223372036854775802, 9223372036854775807) as c_int);
+	printf("%d\n".ptr, walk_u8(250, 255) as c_int);
+	printf("%d\n".ptr, walk_u16(65530, 65535) as c_int);
+	printf("%d\n".ptr, walk_u32(4294967290, 4294967295) as c_int);
+	printf("%d\n".ptr,
+		walk_uint(0xFFFFFFFFFFFFFFFA, 0xFFFFFFFFFFFFFFFF) as c_int);
+	return 0;
+}

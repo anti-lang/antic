@@ -1,0 +1,36 @@
+//! A closure in an arm of a `switch` reads the fields of the case the arm
+//! binds.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn each(count: int, f: fn(int))
+{
+	for i in 0..count {
+		f(i);
+	}
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+fn run(n: int) -> int
+{
+	let acc = 0;
+	let shape = Shape.Circle { r: n };
+	switch shape {
+		Circle c => each(2, fn(k) {
+			acc += c.r * 10;
+		}),
+		Empty => acc = -1,
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, run(2) as c_int);
+	return 0;
+}

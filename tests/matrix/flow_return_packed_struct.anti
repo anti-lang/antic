@@ -1,0 +1,22 @@
+//! A `return` of a packed struct.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+packed struct Header
+{
+	tag: u8,
+	size: u32,
+}
+
+fn header(n: int) -> Header
+{
+	return Header { tag: n as u8, size: (n * 1000) as u32 };
+}
+
+fn main() -> int
+{
+	let h = header(7);
+	printf("%d %d %d\n".ptr, h.tag as c_int, h.size as c_int,
+		size_of(Header) as c_int);
+	return 0;
+}

@@ -1,0 +1,52 @@
+//! A `worker fn` handles the error of a failing call with a `catch` handler and
+//! with a `try` block.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn risky(n: int) -> int may fail
+{
+	if n == 2 || n == 3 {
+		fail "refused";
+	}
+	return n * 10;
+}
+
+fn step(n: int) may fail
+{
+	if n > 2 {
+		fail "too large";
+	}
+}
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn run(t: *Task) -> int
+{
+	let acc = risky(t.n) catch {
+		yield -1;
+	};
+	try {
+		step(t.n);
+		acc += 100;
+	} catch {
+		acc += 1000;
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	for n in 1..5 {
+		t.n = n;
+		let job = dispatch t -> run();
+		printf("%d\n".ptr, join(job) as c_int);
+	}
+	delete(t);
+	return 0;
+}

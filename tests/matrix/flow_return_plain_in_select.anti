@@ -1,0 +1,33 @@
+//! A `return` without a value in an arm of a `select` ends the function.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn run(c: chan int, n: int, out: *int)
+{
+	*out = 1;
+	send(c, n);
+	select {
+		c x => {
+			if x == none {
+				return;
+			}
+			if n == 2 {
+				return;
+			}
+			*out = n * 10;
+		},
+	}
+	*out += 5;
+}
+
+fn main() -> int
+{
+	let c = chan int(1);
+	let got = 0;
+	for n in 1..4 {
+		run(c, n, &got);
+		printf("%d\n".ptr, got as c_int);
+	}
+	delete(c);
+	return 0;
+}

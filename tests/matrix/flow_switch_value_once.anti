@@ -1,0 +1,27 @@
+//! The value of a `switch` is computed once, whatever the number of arms it is
+//! compared with.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn next(count: *int) -> int
+{
+	*count += 1;
+	return *count;
+}
+
+fn main() -> int
+{
+	let calls = 0;
+	let acc = 0;
+	switch next(&calls) {
+		3 => acc = 3,
+		2 => acc = 2,
+		1 => {
+			acc = 1;
+			fallthrough;
+		},
+		else => acc += 10,
+	}
+	printf("%d %d\n".ptr, acc as c_int, calls as c_int);
+	return 0;
+}

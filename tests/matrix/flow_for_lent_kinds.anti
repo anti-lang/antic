@@ -1,0 +1,32 @@
+//! A `for x in &e` over a slice of integers, over an array of structs and over
+//! a slice of structs changes the elements in place.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn main() -> int
+{
+	let items = [1, 2, 3];
+	let all = items[0..3];
+	for p in &all {
+		*p *= 2;
+	}
+	printf("%d %d %d\n".ptr, items[0] as c_int, items[1] as c_int,
+		items[2] as c_int);
+	let points = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }];
+	for p in &points {
+		p.x += 10;
+	}
+	let both = points[0..2];
+	for p in &both {
+		p.y += 100;
+	}
+	printf("%d %d %d %d\n".ptr, points[0].x as c_int, points[0].y as c_int,
+		points[1].x as c_int, points[1].y as c_int);
+	return 0;
+}

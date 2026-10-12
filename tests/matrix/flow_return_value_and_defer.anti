@@ -1,0 +1,49 @@
+//! A `return` of a scalar computes its value before the deferred statements
+//! run. A `return` that names a struct local reads the local after they ran, as
+//! "Memory model as in C" in docs/decisions.md says.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+fn scalar(n: int) -> int
+{
+	let v = n;
+	defer v += 100;
+	return v;
+}
+
+fn sum(n: int) -> int
+{
+	let v = n;
+	defer v += 100;
+	return v + 1;
+}
+
+fn named(n: int) -> Pair
+{
+	let p = Pair { a: n, b: n };
+	defer p.a += 100;
+	return p;
+}
+
+fn built(n: int) -> Pair
+{
+	let p = Pair { a: n, b: n };
+	defer p.a += 100;
+	return Pair { a: p.a, b: p.b + 1 };
+}
+
+fn main() -> int
+{
+	printf("%d %d\n".ptr, scalar(1) as c_int, sum(1) as c_int);
+	let p = named(1);
+	printf("%d %d\n".ptr, p.a as c_int, p.b as c_int);
+	let q = built(1);
+	printf("%d %d\n".ptr, q.a as c_int, q.b as c_int);
+	return 0;
+}

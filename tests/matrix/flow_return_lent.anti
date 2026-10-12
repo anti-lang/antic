@@ -1,0 +1,42 @@
+//! A `return` of a `lent` pointer from the `operator fn value` of an iterator,
+//! which a `for x in &e` binds and the body changes in place.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Row
+{
+	pub cells: [3]int = [1, 2, 3],
+
+	operator fn iter(self) -> RowIter
+	{
+		return RowIter { row: self, at: -1 };
+	}
+}
+
+class RowIter
+{
+	pub row: *Row,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < 3;
+	}
+
+	operator fn value(self) -> lent *int
+	{
+		return &self.row.cells[self.at];
+	}
+}
+
+fn main() -> int
+{
+	let row = Row { };
+	for cell in &row {
+		*cell += 40;
+	}
+	printf("%d %d %d\n".ptr, row.cells[0] as c_int, row.cells[1] as c_int,
+		row.cells[2] as c_int);
+	return 0;
+}

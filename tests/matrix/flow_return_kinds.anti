@@ -1,0 +1,32 @@
+//! A `return` of an `i64`, a `u8`, a `uint` and an `f64`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn wide(n: int) -> i64
+{
+	return 9000000000 + n as i64;
+}
+
+fn narrow(n: int) -> u8
+{
+	return (n + 250) as u8;
+}
+
+fn top() -> uint
+{
+	return 0xFFFFFFFFFFFFFFFF;
+}
+
+fn ratio(n: int) -> f64
+{
+	return n as f64 / 4.0;
+}
+
+fn main() -> int
+{
+	printf("%lld\n".ptr, wide(1));
+	printf("%d\n".ptr, narrow(5) as c_int);
+	printf("%llu\n".ptr, top());
+	printf("%.2f\n".ptr, ratio(10));
+	return 0;
+}

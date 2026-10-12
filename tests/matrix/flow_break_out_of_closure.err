@@ -1,0 +1,1 @@
+flow_break_out_of_closure.anti:16:5: error: `break` outside a loop

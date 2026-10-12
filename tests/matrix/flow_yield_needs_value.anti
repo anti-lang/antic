@@ -1,0 +1,20 @@
+//! A `yield` without a value in the handler of a call that gives a value is
+//! refused.
+
+import anti.lang;
+
+fn risky(n: int) -> int may fail
+{
+	if n == 2 {
+		fail "refused";
+	}
+	return n * 10;
+}
+
+fn main() -> int
+{
+	let got = risky(2) catch {
+		yield;
+	};
+	return got;
+}

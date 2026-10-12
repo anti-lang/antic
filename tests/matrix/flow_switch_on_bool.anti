@@ -1,0 +1,16 @@
+//! A `switch` on a `bool` is refused.
+
+fn run(b: bool) -> int
+{
+	let acc = 0;
+	switch b {
+		true => acc = 1,
+		else => acc = 2,
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	return run(true);
+}

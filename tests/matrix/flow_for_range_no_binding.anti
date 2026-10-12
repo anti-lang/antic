@@ -1,0 +1,23 @@
+//! A `for` over a range without a binding, over an empty range and over a range
+//! whose low end is above its high end.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let turns = 0;
+	for 0..3 {
+		turns += 1;
+	}
+	for 4..4 {
+		turns += 10;
+	}
+	for i in 5..2 {
+		turns += 100 + i;
+	}
+	for i in 5..2 by -1 {
+		turns += 1000 + i;
+	}
+	printf("%d\n".ptr, turns as c_int);
+	return 0;
+}

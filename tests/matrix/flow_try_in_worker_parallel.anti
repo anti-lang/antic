@@ -1,0 +1,29 @@
+//! A `worker fn` that may fail and holds a `try` is refused at its `parallel`.
+//! No document states the rule, and the test holds what antic 0.2.0 prints.
+
+import anti.lang;
+
+fn step(n: int) may fail
+{
+	if n > 2 {
+		fail "too large";
+	}
+}
+
+worker fn total(chunk: []int) -> int may fail
+{
+	let sum = 0;
+	for x in chunk {
+		try step(x);
+		sum += x;
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	let items = [1, 2, 3, 4];
+	let parts = parallel items[0..4] by 2 -> total;
+	free(parts.ptr);
+	return 0;
+}

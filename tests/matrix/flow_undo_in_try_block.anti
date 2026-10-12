@@ -1,0 +1,38 @@
+//! An `undo` in a `try` block runs when the block leaves through an error,
+//! before the `defer` of the block and before the handler. The `undo` of the
+//! function around the block does not run, since the function does not fail.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn step(n: int) may fail
+{
+	if n > 2 {
+		fail "too large";
+	}
+}
+
+fn run(n: int, log: *int)
+{
+	undo *log = *log * 10 + 9;
+	try {
+		undo *log = *log * 10 + 7;
+		defer *log = *log * 10 + 1;
+		step(n);
+		*log = *log * 10 + 3;
+	} catch {
+		*log = *log * 10 + 5;
+	}
+}
+
+fn main() -> int
+{
+	let log = 0;
+	run(1, &log);
+	printf("%d\n".ptr, log as c_int);
+	log = 0;
+	run(3, &log);
+	printf("%d\n".ptr, log as c_int);
+	return 0;
+}

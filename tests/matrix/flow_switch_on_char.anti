@@ -1,0 +1,16 @@
+//! A `switch` on a `char` is refused.
+
+fn run(c: char) -> int
+{
+	let acc = 0;
+	switch c {
+		'a' => acc = 1,
+		else => acc = 2,
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	return run('a');
+}

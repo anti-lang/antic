@@ -1,0 +1,37 @@
+//! A `break` and a `continue` in a `catch` handler leave through the `defer` of
+//! the turn of the loop.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn risky(n: int) -> int may fail
+{
+	if n == 2 || n == 3 {
+		fail "refused";
+	}
+	return n * 10;
+}
+
+fn main() -> int
+{
+	let acc = 0;
+	for i in 0..5 {
+		defer acc += 1;
+		let v = risky(i) catch {
+			break;
+		};
+		acc += v;
+	}
+	printf("%d\n".ptr, acc as c_int);
+	let all = 0;
+	for i in 0..5 {
+		defer all += 1;
+		let v = risky(i) catch {
+			continue;
+		};
+		all += v;
+	}
+	printf("%d\n".ptr, all as c_int);
+	return 0;
+}

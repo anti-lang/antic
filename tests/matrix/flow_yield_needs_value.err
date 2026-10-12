@@ -1,0 +1,1 @@
+flow_yield_needs_value.anti:17:3: error: `yield` gives a value of type `int`

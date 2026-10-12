@@ -1,0 +1,10 @@
+//! A `for` over a range of floats is refused.
+
+fn main() -> int
+{
+	let acc = 0;
+	for i in 0.5..3.5 {
+		acc += 1;
+	}
+	return acc;
+}

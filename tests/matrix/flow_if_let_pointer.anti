@@ -1,0 +1,28 @@
+//! An `if let` that binds a `?*int`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn pick(slot: *int, n: int) -> ?*int
+{
+	if n > 0 {
+		return slot;
+	}
+	return none;
+}
+
+fn run(n: int) -> int
+{
+	let slot = 40;
+	if let p = pick(&slot, n) {
+		*p += n;
+	} else {
+		return -1;
+	}
+	return slot;
+}
+
+fn main() -> int
+{
+	printf("%d %d\n".ptr, run(2) as c_int, run(0) as c_int);
+	return 0;
+}

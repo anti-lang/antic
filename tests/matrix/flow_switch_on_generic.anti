@@ -1,0 +1,17 @@
+//! A `switch` on a value of a type parameter is refused, whatever the type
+//! argument.
+
+fn run<T>(x: T) -> int
+{
+	let acc = 0;
+	switch x {
+		1 => acc = 1,
+		else => acc = 2,
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	return run(1);
+}

@@ -1,0 +1,42 @@
+//! A `try` in a `catch` handler forwards the error of its own call, and the
+//! error of the handler is deleted.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn risky(n: int) -> int may fail
+{
+	if n == 2 || n == 3 {
+		fail "refused";
+	}
+	return n * 10;
+}
+
+fn step(n: int) may fail
+{
+	if n > 2 {
+		fail "too large";
+	}
+}
+
+fn run(n: int) -> int may fail
+{
+	let v = risky(n) catch {
+		try step(n);
+		yield 5;
+	};
+	return v;
+}
+
+fn main() -> int
+{
+	for n in 1..4 {
+		let got = run(n) catch e {
+			printf("%s\n".ptr, e.message.ptr);
+			yield -1;
+		};
+		printf("%d\n".ptr, got as c_int);
+	}
+	return 0;
+}

@@ -1,0 +1,1 @@
+flow_return_f16.anti:3:20: error: a result cannot be `f16`, which is storage only

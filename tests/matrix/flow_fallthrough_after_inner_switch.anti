@@ -1,0 +1,39 @@
+//! A `fallthrough` of an arm that holds a `switch` with a `fallthrough` of its
+//! own. Each belongs to its own `switch`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn run(n: int, m: int) -> int
+{
+	let acc = 0;
+	switch n {
+		1 => {
+			switch m {
+				1 => {
+					acc += 1;
+					fallthrough;
+				},
+				else => {
+					acc += 10;
+				},
+			}
+			fallthrough;
+		},
+		2 => {
+			acc += 100;
+		},
+		else => {
+			acc += 1000;
+		},
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, run(1, 1) as c_int);
+	printf("%d\n".ptr, run(1, 2) as c_int);
+	printf("%d\n".ptr, run(2, 1) as c_int);
+	printf("%d\n".ptr, run(3, 1) as c_int);
+	return 0;
+}

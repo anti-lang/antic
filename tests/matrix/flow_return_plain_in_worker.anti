@@ -1,0 +1,31 @@
+//! A `return` without a value in a `worker fn` ends the worker.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+	pub out: int = 0,
+}
+
+worker fn run(t: *Task)
+{
+	t.out = 1;
+	if t.n == 2 {
+		return;
+	}
+	t.out = t.n * 10;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	for n in 1..4 {
+		t.n = n;
+		let job = dispatch t -> run();
+		join(job);
+		printf("%d\n".ptr, t.out as c_int);
+	}
+	delete(t);
+	return 0;
+}

@@ -1,0 +1,32 @@
+//! A `fail` in a closure that may fail leaves the closure, and the caller of
+//! the closure handles the error.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn apply(n: int, f: fn(int) -> int may fail) -> int may fail
+{
+	return try f(n);
+}
+
+fn run(n: int) -> int
+{
+	let base = 100;
+	let got = apply(n, fn(m) {
+		if m > 2 {
+			fail "too large";
+		}
+		return base + m;
+	}) catch {
+		yield -1;
+	};
+	return got;
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, run(1) as c_int);
+	printf("%d\n".ptr, run(3) as c_int);
+	return 0;
+}

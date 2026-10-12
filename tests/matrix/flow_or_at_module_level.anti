@@ -1,0 +1,28 @@
+//! An `||` in a constant, in the default of a field and in the default of a
+//! parameter.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const EITHER: bool = 3 > 2 || 1 > 2;
+const NEITHER: bool = 2 > 3 || 1 > 2;
+
+class Options
+{
+	pub loose: bool = NEITHER || 4 > 3,
+}
+
+fn pick(flag: bool = 1 > 2 || NEITHER) -> int
+{
+	if flag {
+		return 1;
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let o = Options { };
+	printf("%d %d %d %d\n".ptr, EITHER as c_int, NEITHER as c_int,
+		o.loose as c_int, pick() as c_int);
+	return 0;
+}

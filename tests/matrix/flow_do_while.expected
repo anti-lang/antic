@@ -1,0 +1,62 @@
+exit 0
+function 1
+function 1
+function 6
+function 15
+method 1001
+method 1001
+method 1006
+method 1015
+loop 3
+loop 3
+loop 13
+loop 31
+arm -1
+arm 1
+arm 6
+arm 15
+if_let -1
+if_let 1
+if_let 6
+if_let 15
+defer 6
+defer 6
+defer 11
+defer 20
+undo -1
+undo 6
+undo 11
+undo 20
+catch -1
+catch 1
+catch 6
+catch 15
+closure 2
+closure 2
+closure 12
+closure 30
+worker 1
+worker 1
+worker 6
+worker 15
+dispatch 1
+dispatch 1
+dispatch 6
+dispatch 15
+sync 1
+sync 1
+sync 6
+sync 15
+sync entered 4
+select 1
+select 1
+select 6
+select 15
+generic 9 117
+generic 9 117
+generic 14 122
+generic 23 131
+nested 1001
+nested 1001
+nested 1006
+nested 1015

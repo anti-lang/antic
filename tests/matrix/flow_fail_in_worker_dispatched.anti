@@ -1,0 +1,26 @@
+//! A `worker fn` that may fail and holds a `fail` is refused at its `dispatch`.
+//! No document states the rule, and the test holds what antic 0.2.0 prints.
+
+import anti.lang;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn run(t: *Task) -> int may fail
+{
+	if t.n > 2 {
+		fail "too large";
+	}
+	return t.n;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let job = dispatch t -> run();
+	let got = join(job);
+	delete(t);
+	return got;
+}

@@ -1,0 +1,31 @@
+//! A `fallthrough` leaves the block of its arm, so the `defer` of that block
+//! runs before the next arm.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn run(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		1 => {
+			defer acc *= 2;
+			acc += 5;
+			fallthrough;
+		},
+		2 => {
+			acc += 1;
+		},
+		else => {
+			acc = -1;
+		},
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, run(1) as c_int);
+	printf("%d\n".ptr, run(2) as c_int);
+	printf("%d\n".ptr, run(3) as c_int);
+	return 0;
+}

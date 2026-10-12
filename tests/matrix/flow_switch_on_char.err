@@ -1,0 +1,1 @@
+flow_switch_on_char.anti:6:9: error: `switch` takes an enum, an integer, a `str` or a variant, found `char`

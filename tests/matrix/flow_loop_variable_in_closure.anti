@@ -1,0 +1,49 @@
+//! A closure in the body of a loop reads the variable of each form of `for`,
+//! with a step, with an index, in place and beside a `defer` and a `continue`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn each(count: int, f: fn(int))
+{
+	for i in 0..count {
+		f(i);
+	}
+}
+
+fn main() -> int
+{
+	let acc = 0;
+	for i in 0..6 by 2 {
+		each(1, fn(k) {
+			acc += i + k;
+		});
+		if i == 2 {
+			continue;
+		}
+		acc += 100;
+	}
+	printf("%d\n".ptr, acc as c_int);
+	let items = [5, 6, 7];
+	for i, x in items {
+		each(1, fn(k) {
+			acc += i * x;
+		});
+	}
+	printf("%d\n".ptr, acc as c_int);
+	for p in &items {
+		each(1, fn(k) {
+			*p += 1;
+		});
+	}
+	for x in items {
+		defer acc += x;
+		if x == 7 {
+			continue;
+		}
+		each(2, fn(k) {
+			acc += x;
+		});
+	}
+	printf("%d %d\n".ptr, acc as c_int, items[2] as c_int);
+	return 0;
+}

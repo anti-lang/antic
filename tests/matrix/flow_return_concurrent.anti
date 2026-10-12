@@ -1,0 +1,34 @@
+//! A `return` of a pointer to an object of a concurrent class.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+concurrent class Hits
+{
+	atomic count: int = 0,
+
+	pub fn bump(self, n: int)
+	{
+		self.count.add(n);
+	}
+
+	pub fn get(self) -> int
+	{
+		return self.count.load();
+	}
+}
+
+fn make(n: int) -> *Hits
+{
+	let h = alloc Hits { };
+	h.bump(n);
+	return h;
+}
+
+fn main() -> int
+{
+	let h = make(5);
+	h.bump(2);
+	printf("%d\n".ptr, h.get() as c_int);
+	delete(h);
+	return 0;
+}

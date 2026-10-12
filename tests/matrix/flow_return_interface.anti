@@ -1,0 +1,31 @@
+//! A `return` of a pointer to an interface, and a call through it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Shape
+{
+	pub abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	pub side: int = 0,
+
+	pub concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+fn make(n: int) -> *Shape
+{
+	return alloc Square { side: n };
+}
+
+fn main() -> int
+{
+	let s = make(4);
+	printf("%d\n".ptr, s.area() as c_int);
+	delete(s);
+	return 0;
+}

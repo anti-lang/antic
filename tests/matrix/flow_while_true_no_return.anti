@@ -1,0 +1,16 @@
+//! A function that ends in a `while true` still needs a `return` after it. No
+//! document states the rule, and the test holds what antic 0.2.0 does.
+
+fn forever(n: int) -> int
+{
+	while true do {
+		if n > 0 {
+			return n;
+		}
+	}
+}
+
+fn main() -> int
+{
+	return forever(1);
+}

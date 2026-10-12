@@ -1,0 +1,11 @@
+//! A function cannot return an `f16`, which is storage only.
+
+fn half(n: int) -> f16
+{
+	return n as f16;
+}
+
+fn main() -> int
+{
+	return 0;
+}

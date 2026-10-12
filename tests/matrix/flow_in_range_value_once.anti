@@ -1,0 +1,19 @@
+//! The value of `x in lo..hi` is computed once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn next(count: *int) -> int
+{
+	*count += 1;
+	return *count;
+}
+
+fn main() -> int
+{
+	let calls = 0;
+	if next(&calls) in 1..3 {
+		printf("inside\n".ptr);
+	}
+	printf("%d\n".ptr, calls as c_int);
+	return 0;
+}

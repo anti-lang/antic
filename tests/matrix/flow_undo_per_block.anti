@@ -1,0 +1,43 @@
+//! An `undo` belongs to its block. A turn of a loop that ends by `continue`, by
+//! `break` or at its brace runs the `defer` alone. The turn that fails runs its
+//! `undo` first, then its `defer`, then the `undo` of the function.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn build(stop: int, log: *int) -> int may fail
+{
+	undo *log = *log * 10 + 9;
+	let acc = 0;
+	for i in 0..4 {
+		undo *log = *log * 10 + 7;
+		defer *log = *log * 10 + 1;
+		if i == 1 {
+			continue;
+		}
+		if i == stop {
+			fail "stopped";
+		}
+		if i == 3 {
+			break;
+		}
+		acc += i;
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	let log = 0;
+	let got = build(2, &log) catch {
+		yield -1;
+	};
+	printf("%d %d\n".ptr, got as c_int, log as c_int);
+	log = 0;
+	got = build(9, &log) catch {
+		yield -1;
+	};
+	printf("%d %d\n".ptr, got as c_int, log as c_int);
+	return 0;
+}

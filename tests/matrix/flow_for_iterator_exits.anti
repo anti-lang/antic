@@ -1,0 +1,65 @@
+//! A `for` over a collection with an iterator of its own. A `continue`, a
+//! `break` and a `return` in the body each run the `defer` of the turn.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Count
+{
+	pub limit: int = 0,
+
+	operator fn iter(self) -> CountIter
+	{
+		return CountIter { limit: self.limit, at: -1 };
+	}
+}
+
+class CountIter
+{
+	pub limit: int,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.limit;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.at;
+	}
+}
+
+fn walk(stop: int, log: *int) -> int
+{
+	let c = Count { limit: 6 };
+	let acc = 0;
+	for x in c {
+		defer *log += 1;
+		if x == 1 {
+			continue;
+		}
+		if x == stop {
+			break;
+		}
+		if x == 4 {
+			return acc + 1000;
+		}
+		acc += x;
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	let log = 0;
+	printf("%d".ptr, walk(3, &log) as c_int);
+	printf(" %d\n".ptr, log as c_int);
+	log = 0;
+	printf("%d".ptr, walk(9, &log) as c_int);
+	printf(" %d\n".ptr, log as c_int);
+	log = 0;
+	printf("%d".ptr, walk(4, &log) as c_int);
+	printf(" %d\n".ptr, log as c_int);
+	return 0;
+}

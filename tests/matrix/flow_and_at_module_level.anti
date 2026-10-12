@@ -1,0 +1,28 @@
+//! An `&&` in a constant, in the default of a field and in the default of a
+//! parameter.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const BOTH: bool = 3 > 2 && 2 > 1;
+const ONE: bool = 3 > 2 && 1 > 2;
+
+class Options
+{
+	pub strict: bool = BOTH && 4 > 3,
+}
+
+fn pick(flag: bool = 2 > 1 && ONE) -> int
+{
+	if flag {
+		return 1;
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let o = Options { };
+	printf("%d %d %d %d\n".ptr, BOTH as c_int, ONE as c_int,
+		o.strict as c_int, pick() as c_int);
+	return 0;
+}

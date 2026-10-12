@@ -1,0 +1,22 @@
+//! A `break` in a closure does not reach the loop around the closure.
+
+fn each(count: int, f: fn(int))
+{
+	for i in 0..count {
+		f(i);
+	}
+}
+
+fn main() -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		each(3, fn(i) {
+			if i == 1 {
+				break;
+			}
+			acc += i;
+		});
+	}
+	return acc;
+}

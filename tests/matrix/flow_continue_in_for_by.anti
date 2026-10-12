@@ -1,0 +1,24 @@
+//! A `continue` in a `for` with a step goes on with the next value of the step,
+//! forwards and with `by -3`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let up = 0;
+	for i in 0..10 by 3 {
+		if i == 3 {
+			continue;
+		}
+		up += i;
+	}
+	let down = 0;
+	for i in 0..10 by -3 {
+		if i == 6 {
+			continue;
+		}
+		down = down * 10 + i;
+	}
+	printf("%d %d\n".ptr, up as c_int, down as c_int);
+	return 0;
+}

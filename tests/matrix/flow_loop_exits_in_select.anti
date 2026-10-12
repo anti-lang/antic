@@ -1,0 +1,33 @@
+//! A `break` and a `continue` in an arm of a `select` leave and go on with the
+//! loop around the `select`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let c = chan int(8);
+	for i in 0..8 {
+		send(c, i);
+	}
+	let acc = 0;
+	for turn in 0..8 {
+		select {
+			c x => {
+				let v = x else {
+					break;
+				};
+				if *v == 1 {
+					continue;
+				}
+				if *v == 4 {
+					break;
+				}
+				acc += *v;
+			},
+		}
+		acc += 100;
+	}
+	printf("%d\n".ptr, acc as c_int);
+	delete(c);
+	return 0;
+}

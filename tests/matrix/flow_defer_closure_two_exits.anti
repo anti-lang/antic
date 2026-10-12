@@ -1,0 +1,35 @@
+//! A `defer` whose statement holds a closure, in a function with two exits. The
+//! deferred statement stands at both, and each runs the closure once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn each(count: int, f: fn(int))
+{
+	for i in 0..count {
+		f(i);
+	}
+}
+
+fn run(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer each(3, fn(i) {
+		acc += i + n;
+	});
+	if n == 2 {
+		acc = 100;
+		return;
+	}
+	acc = 10;
+}
+
+fn main() -> int
+{
+	let got = 0;
+	for n in 1..4 {
+		run(n, &got);
+		printf("%d\n".ptr, got as c_int);
+	}
+	return 0;
+}

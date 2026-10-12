@@ -1,0 +1,129 @@
+//! A `switch` on each integer type that the other tests leave out, with an arm
+//! at the smallest or the largest value of the type.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn on_i8(x: i8) -> int
+{
+	let acc = 0;
+	switch x {
+		-128 => acc = 1,
+		127 => acc = 2,
+	}
+	return acc;
+}
+
+fn on_i16(x: i16) -> int
+{
+	let acc = 0;
+	switch x {
+		-32768 => acc = 1,
+		32767 => acc = 2,
+	}
+	return acc;
+}
+
+fn on_i32(x: i32) -> int
+{
+	let acc = 0;
+	switch x {
+		-2147483648 => acc = 1,
+		2147483647 => acc = 2,
+	}
+	return acc;
+}
+
+fn on_i64(x: i64) -> int
+{
+	let acc = 0;
+	switch x {
+		-9223372036854775807 => acc = 1,
+		9223372036854775807 => acc = 2,
+	}
+	return acc;
+}
+
+fn on_u8(x: u8) -> int
+{
+	let acc = 0;
+	switch x {
+		0 => acc = 1,
+		255 => acc = 2,
+	}
+	return acc;
+}
+
+fn on_u16(x: u16) -> int
+{
+	let acc = 0;
+	switch x {
+		1 => acc = 1,
+		65535 => acc = 2,
+	}
+	return acc;
+}
+
+fn on_u32(x: u32) -> int
+{
+	let acc = 0;
+	switch x {
+		1 => acc = 1,
+		4294967295 => acc = 2,
+	}
+	return acc;
+}
+
+fn on_u64(x: u64) -> int
+{
+	let acc = 0;
+	switch x {
+		1 => acc = 1,
+		0xFFFFFFFFFFFFFFFF => acc = 2,
+	}
+	return acc;
+}
+
+fn on_uint(x: uint) -> int
+{
+	let acc = 0;
+	switch x {
+		1 => acc = 1,
+		0xFFFFFFFFFFFFFFFF => acc = 2,
+	}
+	return acc;
+}
+
+fn on_byte(x: byte) -> int
+{
+	let acc = 0;
+	switch x {
+		1 => acc = 1,
+		0xFF => acc = 2,
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	printf("%d %d %d\n".ptr, on_i8(-128) as c_int, on_i8(127) as c_int,
+		on_i8(5) as c_int);
+	printf("%d %d %d\n".ptr, on_i16(-32768) as c_int, on_i16(32767) as c_int,
+		on_i16(5) as c_int);
+	printf("%d %d %d\n".ptr, on_i32(-2147483648) as c_int, on_i32(2147483647) as c_int,
+		on_i32(5) as c_int);
+	printf("%d %d %d\n".ptr, on_i64(-9223372036854775807) as c_int, on_i64(9223372036854775807) as c_int,
+		on_i64(5) as c_int);
+	printf("%d %d %d\n".ptr, on_u8(0) as c_int, on_u8(255) as c_int,
+		on_u8(5) as c_int);
+	printf("%d %d %d\n".ptr, on_u16(1) as c_int, on_u16(65535) as c_int,
+		on_u16(5) as c_int);
+	printf("%d %d %d\n".ptr, on_u32(1) as c_int, on_u32(4294967295) as c_int,
+		on_u32(5) as c_int);
+	printf("%d %d %d\n".ptr, on_u64(1) as c_int, on_u64(0xFFFFFFFFFFFFFFFF) as c_int,
+		on_u64(5) as c_int);
+	printf("%d %d %d\n".ptr, on_uint(1) as c_int, on_uint(0xFFFFFFFFFFFFFFFF) as c_int,
+		on_uint(5) as c_int);
+	printf("%d %d %d\n".ptr, on_byte(1) as c_int, on_byte(0xFF) as c_int,
+		on_byte(5) as c_int);
+	return 0;
+}

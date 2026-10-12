@@ -1,0 +1,260 @@
+//! A `break` that leaves a loop, in each of these places: switch arm, if let,
+//! defer, undo, closure, dispatch or parallel, select arm, generic body, nested
+//! type. Each place is a function of its own, and the program prints one line
+//! per place and input.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+fn in_arm(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			for i in 0..10 {
+				if i == n {
+					break;
+				}
+				acc += 1;
+			}
+		},
+	}
+	return acc;
+}
+
+fn held(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let(n: int) -> int
+{
+	let acc = 0;
+	if let v = held(n) {
+		acc += v - n * 3;
+		for i in 0..10 {
+			if i == n {
+				break;
+			}
+			acc += 1;
+		}
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		for i in 0..10 {
+			if i == n {
+				break;
+			}
+			acc += 1;
+		}
+	}
+	acc = 5;
+}
+
+fn in_undo(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		for i in 0..10 {
+			if i == n {
+				break;
+			}
+			acc += 1;
+		}
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn apply(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure(start: int) -> int
+{
+	let acc = 0;
+	let got = apply(start, fn(n) {
+		for i in 0..10 {
+			if i == n {
+				break;
+			}
+			acc += 1;
+		}
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work(fn(n) {
+		let acc = 0;
+		for i in 0..10 {
+			if i == n {
+				break;
+			}
+			acc += 1;
+		}
+		return acc;
+	});
+	return join(job);
+}
+
+fn in_select(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			for i in 0..10 {
+				if i == n {
+					break;
+				}
+				acc += 1;
+			}
+		},
+	}
+	return acc;
+}
+
+fn in_generic<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	for i in 0..10 {
+		if i == n {
+			break;
+		}
+		acc += 1;
+	}
+	return acc;
+}
+
+class Outer
+{
+	class Inner
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			for i in 0..10 {
+				if i == n {
+					break;
+				}
+				acc += 1;
+			}
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn main() -> int
+{
+	let task = alloc Task { };
+	printf("arm %d\n".ptr, in_arm(0) as c_int);
+	printf("arm %d\n".ptr, in_arm(1) as c_int);
+	printf("arm %d\n".ptr, in_arm(4) as c_int);
+	printf("arm %d\n".ptr, in_arm(12) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(0) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(1) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(4) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(12) as c_int);
+	let deferred = 0;
+	in_defer(0, &deferred);
+	printf("defer %d\n".ptr, deferred as c_int);
+	in_defer(1, &deferred);
+	printf("defer %d\n".ptr, deferred as c_int);
+	in_defer(4, &deferred);
+	printf("defer %d\n".ptr, deferred as c_int);
+	in_defer(12, &deferred);
+	printf("defer %d\n".ptr, deferred as c_int);
+	let undone = 0;
+	in_undo(0, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	in_undo(1, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	in_undo(4, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	in_undo(12, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	printf("closure %d\n".ptr, in_closure(0) as c_int);
+	printf("closure %d\n".ptr, in_closure(1) as c_int);
+	printf("closure %d\n".ptr, in_closure(4) as c_int);
+	printf("closure %d\n".ptr, in_closure(12) as c_int);
+	printf("dispatch %d\n".ptr, in_dispatch(task, 0) as c_int);
+	printf("dispatch %d\n".ptr, in_dispatch(task, 1) as c_int);
+	printf("dispatch %d\n".ptr, in_dispatch(task, 4) as c_int);
+	printf("dispatch %d\n".ptr, in_dispatch(task, 12) as c_int);
+	let c = chan int(1);
+	printf("select %d\n".ptr, in_select(c, 0) as c_int);
+	printf("select %d\n".ptr, in_select(c, 1) as c_int);
+	printf("select %d\n".ptr, in_select(c, 4) as c_int);
+	printf("select %d\n".ptr, in_select(c, 12) as c_int);
+	delete(c);
+	printf("generic %d %d\n".ptr, in_generic<int>(0) as c_int,
+		in_generic<str>(0) as c_int);
+	printf("generic %d %d\n".ptr, in_generic<int>(1) as c_int,
+		in_generic<str>(1) as c_int);
+	printf("generic %d %d\n".ptr, in_generic<int>(4) as c_int,
+		in_generic<str>(4) as c_int);
+	printf("generic %d %d\n".ptr, in_generic<int>(12) as c_int,
+		in_generic<str>(12) as c_int);
+	let outer = Outer { };
+	printf("nested %d\n".ptr, outer.go(0) as c_int);
+	printf("nested %d\n".ptr, outer.go(1) as c_int);
+	printf("nested %d\n".ptr, outer.go(4) as c_int);
+	printf("nested %d\n".ptr, outer.go(12) as c_int);
+	delete(task);
+	return 0;
+}

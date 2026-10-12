@@ -1,0 +1,1 @@
+flow_yield_outside_handler.anti:27:5: error: `yield` stands in a `catch` handler

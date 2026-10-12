@@ -1,0 +1,26 @@
+//! A `return` in a `worker fn` computes its value before the `defer` of the
+//! worker runs.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+	pub out: int = 0,
+}
+
+worker fn run(t: *Task) -> int
+{
+	defer t.out = t.n + 100;
+	return t.out + t.n;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { n: 1, out: 5 };
+	let job = dispatch t -> run();
+	let got = join(job);
+	printf("%d %d\n".ptr, got as c_int, t.out as c_int);
+	delete(t);
+	return 0;
+}

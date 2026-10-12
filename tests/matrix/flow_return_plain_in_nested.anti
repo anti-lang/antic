@@ -1,0 +1,36 @@
+//! A `return` without a value in a function of a class nested in a class.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Outer
+{
+	class Inner
+	{
+		pub out: int = 0,
+
+		pub fn run(self, n: int)
+		{
+			self.out = 1;
+			if n == 2 {
+				return;
+			}
+			self.out = n * 10;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner { };
+		inner.run(n);
+		return inner.out;
+	}
+}
+
+fn main() -> int
+{
+	let outer = Outer { };
+	for n in 1..4 {
+		printf("%d\n".ptr, outer.go(n) as c_int);
+	}
+	return 0;
+}

@@ -1,0 +1,23 @@
+//! A `break` and a `continue` in an arm of a `switch` leave and go on with the
+//! loop around the `switch`, since a `switch` has no `break` of its own.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let acc = 0;
+	for i in 0..10 {
+		switch i {
+			1 => {
+				continue;
+			},
+			4 => {
+				break;
+			},
+			else => acc += 1,
+		}
+		acc += i * 10;
+	}
+	printf("%d\n".ptr, acc as c_int);
+	return 0;
+}

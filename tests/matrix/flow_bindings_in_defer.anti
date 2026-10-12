@@ -1,0 +1,57 @@
+//! A `defer` reads the name an arm of a `switch` binds, the name an `if let`
+//! binds and the error a `catch` binds, each at the end of the block that binds
+//! it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn half(n: int) -> ?int
+{
+	if n % 2 == 0 {
+		return n / 2;
+	}
+	return none;
+}
+
+fn risky(n: int) -> int may fail
+{
+	if n == 2 {
+		fail lang.Error.new(5, "refused");
+	}
+	return n * 10;
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+fn run(n: int) -> int
+{
+	let acc = 0;
+	let shape = Shape.Circle { r: n };
+	switch shape {
+		Circle c => {
+			defer acc += c.r;
+			acc += 100;
+		},
+		Empty => acc = -1,
+	}
+	if let h = half(n) {
+		defer acc += h * 1000;
+		acc *= 2;
+	}
+	let v = risky(n) catch e {
+		defer acc += e.code;
+		yield 50000;
+	};
+	return acc + v;
+}
+
+fn main() -> int
+{
+	printf("%d %d\n".ptr, run(1) as c_int, run(2) as c_int);
+	return 0;
+}

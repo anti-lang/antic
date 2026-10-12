@@ -1,0 +1,32 @@
+//! A `return` without a value in the arm of an `if let` ends the function.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn half(n: int) -> ?int
+{
+	if n % 2 == 0 {
+		return n / 2;
+	}
+	return none;
+}
+
+fn run(n: int, out: *int)
+{
+	*out = 1;
+	if let h = half(n) {
+		*out = h + 100;
+		return;
+	}
+	*out += n * 10;
+}
+
+fn main() -> int
+{
+	let got = 0;
+	for n in 1..4 {
+		got = 0;
+		run(n, &got);
+		printf("%d\n".ptr, got as c_int);
+	}
+	return 0;
+}

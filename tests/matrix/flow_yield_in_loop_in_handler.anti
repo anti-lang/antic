@@ -1,0 +1,36 @@
+//! A `yield` in a loop in a `catch` handler leaves the loop and the handler.
+//! Its value is computed before the `defer` of the turn runs.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn risky(n: int) -> int may fail
+{
+	if n == 2 || n == 3 {
+		fail "refused";
+	}
+	return n * 10;
+}
+
+fn run(n: int) -> int
+{
+	let trace = 0;
+	let got = risky(n) catch {
+		for i in 0..5 {
+			defer trace += 1;
+			if i == 2 {
+				yield i * 100 + trace;
+			}
+		}
+		yield -1;
+	};
+	return got * 10 + trace;
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, run(1) as c_int);
+	printf("%d\n".ptr, run(2) as c_int);
+	return 0;
+}

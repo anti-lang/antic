@@ -1,0 +1,1 @@
+flow_while_true_no_return.anti:4:4: error: `forever` can reach its end without `return`

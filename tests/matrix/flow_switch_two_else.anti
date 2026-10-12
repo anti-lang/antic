@@ -1,0 +1,12 @@
+//! A `switch` with two `else` arms is refused.
+
+fn main() -> int
+{
+	let acc = 0;
+	switch acc {
+		1 => acc = 1,
+		else => acc = 2,
+		else => acc = 3,
+	}
+	return acc;
+}

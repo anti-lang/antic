@@ -1,0 +1,26 @@
+//! A `return` in a closure computes its value before the `defer` of the closure
+//! changes the captured local.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn apply(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn run(n: int) -> int
+{
+	let acc = n;
+	let got = apply(n, fn(m) {
+		defer acc += 100;
+		return acc + m;
+	});
+	return got * 1000 + acc;
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, run(1) as c_int);
+	printf("%d\n".ptr, run(4) as c_int);
+	return 0;
+}

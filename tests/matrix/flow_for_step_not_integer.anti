@@ -1,0 +1,12 @@
+//! A `for` whose step is no integer is refused.
+
+const STEP: f64 = 1.5;
+
+fn main() -> int
+{
+	let acc = 0;
+	for i in 0..10 by STEP {
+		acc += i;
+	}
+	return acc;
+}

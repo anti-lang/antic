@@ -1,0 +1,39 @@
+//! A `return` without a value in an anonymous function that is an argument of a
+//! `dispatch` ends that function.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn work(t: *Task, concurrent f: fn(int))
+{
+	f(t.n);
+}
+
+fn run(t: *Task, start: int) -> int
+{
+	let seen: atomic int = 0;
+	t.n = start;
+	let job = dispatch t -> work(fn(n) {
+		seen.store(1);
+		if n == 2 {
+			return;
+		}
+		seen.store(n * 10);
+	});
+	join(job);
+	return seen.load();
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	for n in 1..4 {
+		printf("%d\n".ptr, run(t, n) as c_int);
+	}
+	delete(t);
+	return 0;
+}

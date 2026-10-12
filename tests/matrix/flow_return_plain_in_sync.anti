@@ -1,0 +1,38 @@
+//! A `return` without a value in a `sync` block unlocks the mutex, so the next
+//! call takes it again.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Guarded
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn run(g: *Guarded, n: int, out: *int)
+{
+	*out = 1;
+	sync g.lock {
+		g.entered += 1;
+		if n == 2 {
+			return;
+		}
+		*out = n * 10;
+	}
+	*out += 5;
+}
+
+fn main() -> int
+{
+	let g = Guarded { lock: Mutex.new(), entered: 0 };
+	let got = 0;
+	for n in 1..4 {
+		run(&g, n, &got);
+		printf("%d\n".ptr, got as c_int);
+	}
+	printf("entered %d\n".ptr, g.entered as c_int);
+	g.lock.destroy();
+	return 0;
+}

@@ -1,0 +1,33 @@
+//! A `yield` gives its value to the handler it stands in, and a handler inside
+//! a handler has a `yield` of its own.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn risky(n: int) -> int may fail
+{
+	if n == 2 || n == 3 {
+		fail "refused";
+	}
+	return n * 10;
+}
+
+fn run(n: int) -> int
+{
+	let a = risky(n) catch {
+		let b = risky(n + 1) catch {
+			yield 1;
+		};
+		yield b + 10;
+	};
+	return a;
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, run(1) as c_int);
+	printf("%d\n".ptr, run(2) as c_int);
+	printf("%d\n".ptr, run(3) as c_int);
+	return 0;
+}

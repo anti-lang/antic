@@ -1,0 +1,37 @@
+//! A `try` in a closure that may fail forwards the error to the caller of the
+//! closure.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn step(n: int) may fail
+{
+	if n > 2 {
+		fail "too large";
+	}
+}
+
+fn apply(n: int, f: fn(int) -> int may fail) -> int may fail
+{
+	return try f(n);
+}
+
+fn run(n: int) -> int
+{
+	let base = 100;
+	let got = apply(n, fn(m) {
+		try step(m);
+		return base + m;
+	}) catch {
+		yield -1;
+	};
+	return got;
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, run(1) as c_int);
+	printf("%d\n".ptr, run(3) as c_int);
+	return 0;
+}

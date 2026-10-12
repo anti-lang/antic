@@ -1,0 +1,2 @@
+flow_switch_arm_not_statement.anti:8:11: error: an arm of a `switch` is a call, an assignment or a block
+flow_switch_arm_not_statement.anti:11:2: error: expected an item

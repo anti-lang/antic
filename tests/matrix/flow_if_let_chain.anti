@@ -1,0 +1,44 @@
+//! An `if let` chain: `else if let` on a variant, `else if` and `else` follow
+//! an `if let` on a `?int`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+fn half(n: int) -> ?int
+{
+	if n % 2 == 0 {
+		return n / 2;
+	}
+	return none;
+}
+
+fn run(n: int) -> int
+{
+	let shape = Shape.Empty;
+	if n == 3 {
+		shape = Shape.Circle { r: 30 };
+	}
+	let acc = 0;
+	if let h = half(n) {
+		acc = h;
+	} else if let Circle c = shape {
+		acc = c.r;
+	} else if n > 4 {
+		acc = 500;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	printf("%d %d %d %d\n".ptr, run(1) as c_int, run(2) as c_int,
+		run(3) as c_int, run(5) as c_int);
+	return 0;
+}

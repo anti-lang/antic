@@ -1,0 +1,25 @@
+//! A function whose `if let` returns in its arm and in its `else` still needs a
+//! `return` after it. No document states the rule, and the test holds what
+//! antic 0.2.0 does.
+
+fn half(n: int) -> ?int
+{
+	if n % 2 == 0 {
+		return n / 2;
+	}
+	return none;
+}
+
+fn run(n: int) -> int
+{
+	if let h = half(n) {
+		return h;
+	} else {
+		return -1;
+	}
+}
+
+fn main() -> int
+{
+	return run(2);
+}

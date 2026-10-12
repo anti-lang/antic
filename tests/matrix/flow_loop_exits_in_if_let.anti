@@ -1,0 +1,33 @@
+//! A `break` and a `continue` in the arm and in the `else` of an `if let` leave
+//! and go on with the loop around it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn pick(i: int) -> ?int
+{
+	if i % 2 == 0 {
+		return i;
+	}
+	return none;
+}
+
+fn main() -> int
+{
+	let acc = 0;
+	for i in 0..10 {
+		if let v = pick(i) {
+			if v == 6 {
+				break;
+			}
+			acc += v;
+		} else {
+			if i == 3 {
+				continue;
+			}
+			acc += 100;
+		}
+		acc += 1000;
+	}
+	printf("%d\n".ptr, acc as c_int);
+	return 0;
+}

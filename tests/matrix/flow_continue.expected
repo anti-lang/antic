@@ -1,0 +1,41 @@
+exit 0
+method 1010
+method 1009
+method 1006
+method 1010
+arm -1
+arm 9
+arm 6
+arm 10
+if_let -1
+if_let 9
+if_let 6
+if_let 10
+defer 15
+defer 14
+defer 11
+defer 15
+undo -1
+undo 14
+undo 11
+undo 15
+closure 20
+closure 18
+closure 12
+closure 20
+dispatch 10
+dispatch 9
+dispatch 6
+dispatch 10
+select 10
+select 9
+select 6
+select 10
+generic 18 126
+generic 17 125
+generic 14 122
+generic 18 126
+nested 1010
+nested 1009
+nested 1006
+nested 1010

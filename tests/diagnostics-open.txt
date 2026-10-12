@@ -38,8 +38,6 @@ an element of a tuple is a decimal number
 # src/antic/parser_stmt.c
 expected `catch`
 the message of an `assert` is a string literal
-a `switch` has one `else`
-an arm of a `switch` is a call, an assignment or a block
 an arm of a `select` is a call, an assignment or a block
 a `defer` holds one statement, not another `defer`
 an `undo` holds one statement, not another `undo`
@@ -144,10 +142,6 @@ a copy of `%s` nests deeper than %d levels
 `%s` holds a `Mutex` and cannot be assigned
 `%.*s` of singleton `%s` is read-only after creation, and `mutable` marks a field the program writes
 a `switch` on a `str` compares with `anti.text.equal`, which this `anti.text` lacks
-a `for` step is an integer, found `%s`
-a `for` range counts over an integer, found `%s`
-`yield` gives a value of type `%s`
-the call writes no result, so `yield` takes no value
 the anonymous function returns `never` and can reach its end
 the anonymous function may fail and never does
 a `tests` function takes no parameters and returns nothing, because the runner calls it

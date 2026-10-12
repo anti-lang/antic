@@ -1,0 +1,100 @@
+//! An `x in lo..hi` test on each integer type that the other tests leave out:
+//! the low end is inside, the high end and the value below the low end are
+//! outside.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn in_i8(x: i8) -> int
+{
+	if x in -3..3 {
+		return 1;
+	}
+	return 0;
+}
+
+fn in_i16(x: i16) -> int
+{
+	if x in -300..300 {
+		return 1;
+	}
+	return 0;
+}
+
+fn in_i32(x: i32) -> int
+{
+	if x in -70000..70000 {
+		return 1;
+	}
+	return 0;
+}
+
+fn in_i64(x: i64) -> int
+{
+	if x in -5000000000..5000000000 {
+		return 1;
+	}
+	return 0;
+}
+
+fn in_u8(x: u8) -> int
+{
+	if x in 250..255 {
+		return 1;
+	}
+	return 0;
+}
+
+fn in_u16(x: u16) -> int
+{
+	if x in 65000..65535 {
+		return 1;
+	}
+	return 0;
+}
+
+fn in_u32(x: u32) -> int
+{
+	if x in 4000000000..4294967295 {
+		return 1;
+	}
+	return 0;
+}
+
+fn in_u64(x: u64) -> int
+{
+	if x in 0xFFFFFFFFFFFFFFF0..0xFFFFFFFFFFFFFFFF {
+		return 1;
+	}
+	return 0;
+}
+
+fn in_uint(x: uint) -> int
+{
+	if x in 0xFFFFFFFFFFFFFFF0..0xFFFFFFFFFFFFFFFF {
+		return 1;
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	printf("%d %d %d\n".ptr, in_i8(-3) as c_int, in_i8(3) as c_int,
+		in_i8(-4) as c_int);
+	printf("%d %d %d\n".ptr, in_i16(-300) as c_int, in_i16(300) as c_int,
+		in_i16(-301) as c_int);
+	printf("%d %d %d\n".ptr, in_i32(-70000) as c_int, in_i32(70000) as c_int,
+		in_i32(-70001) as c_int);
+	printf("%d %d %d\n".ptr, in_i64(-5000000000) as c_int, in_i64(5000000000) as c_int,
+		in_i64(-5000000001) as c_int);
+	printf("%d %d %d\n".ptr, in_u8(250) as c_int, in_u8(255) as c_int,
+		in_u8(249) as c_int);
+	printf("%d %d %d\n".ptr, in_u16(65000) as c_int, in_u16(65535) as c_int,
+		in_u16(64999) as c_int);
+	printf("%d %d %d\n".ptr, in_u32(4000000000) as c_int, in_u32(4294967295) as c_int,
+		in_u32(3999999999) as c_int);
+	printf("%d %d %d\n".ptr, in_u64(0xFFFFFFFFFFFFFFF0) as c_int, in_u64(0xFFFFFFFFFFFFFFFF) as c_int,
+		in_u64(0xFFFFFFFFFFFFFFEF) as c_int);
+	printf("%d %d %d\n".ptr, in_uint(0xFFFFFFFFFFFFFFF0) as c_int, in_uint(0xFFFFFFFFFFFFFFFF) as c_int,
+		in_uint(0xFFFFFFFFFFFFFFEF) as c_int);
+	return 0;
+}

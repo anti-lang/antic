@@ -1,0 +1,36 @@
+//! A `defer` in the body of a loop whose statement holds a loop with a
+//! `continue` of its own. It runs at the `continue`, at the `break` and at the
+//! brace of every turn.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn run(n: int) -> int
+{
+	let acc = 0;
+	for i in 0..4 {
+		defer {
+			for j in 0..3 {
+				if j == 1 {
+					continue;
+				}
+				acc += 1;
+			}
+		}
+		if i == n {
+			continue;
+		}
+		if i == 3 {
+			break;
+		}
+		acc += 100;
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, run(1) as c_int);
+	printf("%d\n".ptr, run(3) as c_int);
+	printf("%d\n".ptr, run(5) as c_int);
+	return 0;
+}
