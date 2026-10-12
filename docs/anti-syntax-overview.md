@@ -1952,20 +1952,37 @@ struct Color { r: u8, g: u8, b: u8, a: u8 }
 -->
 ```anti
 extern fn printf(fmt: ?*byte, ...) -> c_int;
+extern fn strlen(s: ?*c_char) -> c_size_t;
 extern fn DrawCircleV(center: Vector2, radius: c_float, color: Color);
 
 export fn dot(a: Vec2, b: Vec2) -> c_int { return a.x * b.x + a.y * b.y; }
 export struct Vec2 { x: c_int, y: c_int }
 export union Bits { whole: u32, parts: [4]u8 }
 export const LIMIT: c_int = 8;
+export enum Mode: u8 { Read = 1, Write = 2 }
+export variant Token { Number { value: c_int }, End }
+export class Counter
+{
+	pub n: c_int = 0,
+
+	pub fn bump(self) { self.n += 1; }
+}
 
 link framework "CoreAudio";
 link linux "X11";
+
+let n: c_int = 3;
+printf("%d of %s\n".ptr, n, "three".ptr);
+let len = strlen("three".ptr as ?*c_char);
 ```
 
-`extern fn` declares a C function. Every pointer of one is `?*T`, `...` declares a variadic one, and `may fail` and `export` are refused on it. `export` on `fn`, `struct`, `union`, `const` and `type` implies `pub` and puts the item into the C header, a function under its unmangled name. The signature of an `export fn` and the fields of an `export struct` or `export union` use sized integers, `int`, `uint`, `float`, `bool`, the C types, pointers to such types, exported structs and unions, and function pointers of such signatures. `char`, `str`, slices, arrays by value and non-exported structs are refused, and a field may be a fixed array of an allowed type. An `export const` has a numeric type, `bool` or `str`. An `export fn` of a class body is `pub` as well, and `export type` writes a copy of a generic, see [Generics](#generics). `link framework "Name";` links a macOS program against a framework of Apple's SDK, and `link linux "Name";` a Linux program against a library of the glibc sysroot. A Linux program that reaches a `link linux` line links dynamically against glibc 2.35, and every other one statically against musl.
+`extern fn` declares a C function. Every pointer of one is `?*T`, `...` declares a variadic one, and `may fail` and `export` are refused on it. It takes no default value, no `lent` parameter and no closure. A `str` in its signature is refused, since C takes a pointer to `c_char`, and `s.ptr` gives the bytes of a `str` with their NUL. A variadic argument has the type `i32`, `u32`, `int`, `u64`, `float` or a pointer, and an `f32` is refused.
 
-`anti bind raylib_api.json` and `anti bind --clang header.h` generate bindings. `anti build --lib static|shared` builds a library with a header. A class is exported with its layout, tables, `anti_<Class>_init`, `anti_<Class>_construct` for a `construct` with arguments, and the dispatch wrappers. `embed("file")` puts a file's bytes in the binary. Not built yet: `embed`.
+`export` on `fn`, `struct`, `union`, `const`, `type`, `class`, `enum` and `variant` implies `pub` and puts the item into the C header, a function under its unmangled name. `main` is never exported, and two `export fn` of one symbol are refused. The signature of an `export fn` and the fields of an `export struct` or `export union` use sized integers, `int`, `uint`, `float`, `bool`, the C types, pointers to such types, exported structs and unions, and function pointers of such signatures. `char`, `str`, slices, arrays by value and non-exported structs are refused, and a field may be a fixed array of an allowed type. An `export const` has a numeric type, `bool` or `str`. An `export fn` of a class body is `pub` as well, and `export type` writes a copy of a generic, see [Generics](#generics). `link framework "Name";` links a macOS program against a framework of Apple's SDK, and `link linux "Name";` a Linux program against a library of the glibc sysroot. A Linux program that reaches a `link linux` line links dynamically against glibc 2.35, and every other one statically against musl.
+
+`anti bind raylib_api.json` and `anti bind --clang header.h` generate bindings. `anti build --lib static|shared` builds a library with a header. A class is exported with its layout, tables, `anti_<Class>_init`, `anti_<Class>_construct` for a `construct` with arguments, and the dispatch wrappers. `embed("file")` puts a file's bytes in the binary.
+
+Not built yet: `embed`, and the refusal of a `str` in the signature of an `extern fn`, which compiles today.
 
 ## Compile-time targets
 
