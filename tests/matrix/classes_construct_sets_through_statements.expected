@@ -1,0 +1,6 @@
+exit 0
+let 2 -1
+call -2
+try -3
+loops 3 4 7
+blocks 2 4 20

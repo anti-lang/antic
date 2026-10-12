@@ -1,0 +1,1 @@
+classes_construct_try_handler_that_sets_nothing.anti:27:2: error: `construct` of `Box` returns `none` before it sets `a`

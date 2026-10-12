@@ -1,0 +1,157 @@
+//! A `construct` that may fail sets every field without a default on each path
+//! that succeeds. Each class sets its field through another statement: a `let`
+//! and a call with a handler, a `try` block, a `while`, a `do`, a `for`, a
+//! block and a `switch`. The program prints the field of each for an input that
+//! succeeds and the outcome of one that fails.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn step(x: int) -> int may fail
+{
+	if x > 100 {
+		fail "too large";
+	}
+	return x + 1;
+}
+
+class ByLet
+{
+	pub a: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x > 1000 {
+			fail "far too large";
+		}
+		let v = step(x) catch {
+			self.a = -1;
+			return;
+		};
+		self.a = v;
+	}
+}
+
+class ByCall
+{
+	pub a: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x > 1000 {
+			fail "far too large";
+		}
+		self.a = x;
+		step(x) catch {
+			self.a = -2;
+		};
+	}
+}
+
+class ByTry
+{
+	pub a: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x > 1000 {
+			fail "far too large";
+		}
+		try {
+			self.a = step(x);
+		} catch e {
+			self.a = -3;
+		}
+	}
+}
+
+class ByLoops
+{
+	pub a: int,
+	pub b: int,
+	pub c: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x > 1000 {
+			fail "far too large";
+		}
+		let i = 5;
+		i = 0;
+		while i < x do {
+			i += 1;
+		}
+		self.a = i;
+		do {
+			i += 1;
+		} while i < x
+		self.b = i;
+		for k in 0..x {
+			i += k;
+		}
+		self.c = i;
+	}
+}
+
+class ByBlocks
+{
+	pub a: int,
+	pub b: int,
+	pub c: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x > 1000 {
+			fail "far too large";
+		}
+		{
+			self.a = x;
+		}
+		{
+			{
+				self.b = x * 2;
+			}
+		}
+		switch x {
+			1 => self.c = 10,
+			2 => {
+				self.c = 20;
+			},
+			else => self.c = 30,
+		}
+	}
+}
+
+fn main() -> int
+{
+	let by_let = ByLet(1) catch {
+		return 1;
+	};
+	let by_let_caught = ByLet(200) catch {
+		return 2;
+	};
+	let by_call = ByCall(200) catch {
+		return 3;
+	};
+	let by_try = ByTry(200) catch {
+		return 4;
+	};
+	let by_loops = ByLoops(3) catch {
+		return 5;
+	};
+	let by_blocks = ByBlocks(2) catch {
+		return 6;
+	};
+	printf("let %d %d\n".ptr, by_let.a as c_int, by_let_caught.a as c_int);
+	printf("call %d\n".ptr, by_call.a as c_int);
+	printf("try %d\n".ptr, by_try.a as c_int);
+	printf("loops %d %d %d\n".ptr, by_loops.a as c_int, by_loops.b as c_int, by_loops.c as c_int);
+	printf("blocks %d %d %d\n".ptr, by_blocks.a as c_int, by_blocks.b as c_int, by_blocks.c as c_int);
+	let failed = 0;
+	let late = ByBlocks(2000) catch {
+		failed = 1;
+		return failed - 1;
+	};
+	return 9;
+}

@@ -1,0 +1,1 @@
+flow_let_else_that_leaves_through_a_switch.anti:11:24: error: the `else` of a `let` leaves the block it stands in

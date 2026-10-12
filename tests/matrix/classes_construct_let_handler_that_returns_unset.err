@@ -1,0 +1,1 @@
+classes_construct_let_handler_that_returns_unset.anti:24:4: error: `construct` of `Box` returns `none` before it sets `a`

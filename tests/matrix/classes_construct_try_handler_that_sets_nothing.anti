@@ -1,0 +1,33 @@
+//! A `construct` sets a field without a default in the handler of a `try` as
+//! well.
+
+import anti.lang;
+
+fn step(x: int) -> int may fail
+{
+	if x > 100 {
+		fail "too large";
+	}
+	return x + 1;
+}
+
+class Box
+{
+	pub a: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x > 1000 {
+			fail "far too large";
+		}
+		try {
+			self.a = step(x);
+		} catch e {
+		}
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

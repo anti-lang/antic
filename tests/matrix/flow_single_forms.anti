@@ -95,6 +95,18 @@ fn declared(n: int) -> int
 	return *p;
 }
 
+fn left_by_if_let(n: int) -> int
+{
+	let p: *int = maybe(n) else {
+		if let v = held(n) {
+			return v;
+		} else {
+			return -2;
+		}
+	};
+	return *p;
+}
+
 fn declared_function(n: int) -> int
 {
 	let f: fn(int) -> int = maybe_function(n) else
@@ -124,7 +136,7 @@ fn main() -> int
 	printf("else if let %d %d %d\n".ptr, chain(9) as c_int, chain(2) as c_int, chain(0) as c_int);
 	printf("less %d %d\n".ptr, (a < (b + c)) as c_int, (a < [1, 2, 3].len as int) as c_int);
 	printf("precision %.*s\n".ptr, digits.len as c_int, digits.ptr);
-	printf("let else %d %d %d\n".ptr, declared(1) as c_int, declared_function(0) as c_int, declared_function(4) as c_int);
+	printf("let else %d %d %d %d\n".ptr, declared(1) as c_int, left_by_if_let(2) as c_int, declared_function(0) as c_int, declared_function(4) as c_int);
 	printf("functions %d %d\n".ptr, (twice == twice) as c_int, (twice == chain) as c_int);
 	free(digits.ptr);
 	return 0;

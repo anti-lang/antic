@@ -1,0 +1,33 @@
+//! A `construct` that returns from the handler of a `let` has set its fields
+//! before.
+
+import anti.lang;
+
+fn step(x: int) -> int may fail
+{
+	if x > 100 {
+		fail "too large";
+	}
+	return x + 1;
+}
+
+class Box
+{
+	pub a: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x > 1000 {
+			fail "far too large";
+		}
+		let v = step(x) catch {
+			return;
+		};
+		self.a = v;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

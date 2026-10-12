@@ -1,0 +1,27 @@
+//! The `else` of a `let` leaves the block it stands in, and a `switch` whose
+//! arms all return counts as no such statement.
+
+fn maybe(n: int) -> ?*int
+{
+	return none;
+}
+
+fn pick(n: int) -> int
+{
+	let p = maybe(n) else {
+		switch n {
+			1 => {
+				return -1;
+			},
+			else => {
+				return -2;
+			},
+		}
+	};
+	return *p;
+}
+
+fn main() -> int
+{
+	return pick(1) + 1;
+}
