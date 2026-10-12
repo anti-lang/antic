@@ -2174,6 +2174,28 @@ for (k, v) in &ages {
 }
 ```
 
+Every collection has the operations of `Collection<T>`, and each adds its own. `xs.count` is the number of elements, read-only outside the module of the collection.
+
+| Family | Collection | Operations |
+|---|---|---|
+| all | `Collection<T>` | `count`, `is_empty`, `clear`, `find_all`, `find_first`, `find_one`, `update_all`, `update_first`, `update_one`, `remove_all`, `remove_first`, `remove_one`, `equal_by`, `to_text`, `serialize` |
+| sequences | `List<T>` | `push`, `pop`, `insert`, `remove_at`, `get`, `first`, `last`, `read`, `modify`, `lend_slice`, `reverse`, `filter`, `sort_with`, `reserve`, `shrink`, `xs[i]` |
+| | `Deque<T>` | `push_front`, `push_back`, `pop_front`, `pop_back`, `front`, `back`, `reserve`, `shrink` |
+| | `Ring<T, N>` | `push`, `pop`, `peek`, `is_full` |
+| | `Grid<T>` | `width`, `height`, `get`, `lend_slice`, `g[x, y]` |
+| maps | `Map<K, V>`, `HashMap<K, V>` | `get`, `contains`, `set`, `add`, `remove`, `update`, `read`, `modify`, `keys`, `values`, `capacity`, `reserve`, `shrink` |
+| | `SortedMap<K, V>` | those of a map without `capacity`, and `range`, `floor`, `ceiling`, `first`, `last`, `pop_first`, `pop_last` |
+| sets | `Set<T>`, `HashSet<T>`, `BitSet` | `add`, `remove`, `contains`, `union`, `intersect`, `minus`, `is_subset`, `capacity`, `reserve`, `shrink` |
+| | `SortedSet<T>` | those of a set without `capacity`, and `range`, `floor`, `ceiling`, `first`, `last` |
+| handles | `Pool<T>` | `add`, `remove`, `contains`, `get`, `set`, `get_versioned`, `set_if_version`, `read`, `modify` |
+| | `Tree<T>` | those of a pool without `add`, and `add_root`, `add_child`, `parent`, `children`, `depth_first`, `breadth_first` |
+| queue | `PriorityQueue<T>` | `push`, `pop`, `peek` |
+| thread-safe | `SyncList<T>` | `from_list`, `push`, `pop`, `first`, `last`, `find_first_versioned`, `find_one_versioned`, `set_if_version`, `reverse`, `filter`, `sort_with`, `reserve`, `shrink` |
+| | `SyncMap<K, V>`, `ConcurrentMap<K, V>` | those of a map, and `get_versioned`, `set_if_version` |
+| | `SyncSet<T>` | those of a set, and `version_of`, `set_if_version`, `to_set` |
+| | `SyncPool<T>` | those of a pool |
+| | `SpscRing<T, N>` | `push`, `pop`, `peek`, `is_full` |
+
 Criteria come in three forms: `_all` acts on every match and gives the count, `_first` on the first match in the collection's order, and `_one` on the one match, failing with `NotOne`, which carries the count, when none or more than one matches. `find_all` gives a `Copies<T>`. Every collection takes an optional allocator, `from`, and one that grows takes an initial `capacity`, with `reserve(n)` and `shrink()`. Until named arguments are built, `new` takes both by position, `capacity` first, as the example above does. The named form is the one the specification gives:
 
 ```anti not-built
@@ -2233,7 +2255,7 @@ let pushed = samples.push(0.5);
 let s = samples.pop() ?? 0.0;
 ```
 
-Not built yet: named arguments, which the not-built example above writes, `deserialize` of a collection, and the versioned `set` of `SpscRing`, since the ring has no `set`.
+Not built yet: named arguments, which the not-built example above writes, `deserialize` of a collection, and the versioned `set` of `SpscRing`, since the ring has no `set`. `count` is a `pub` field today, so a write of it from another module compiles.
 
 ## Standard library
 
