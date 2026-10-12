@@ -312,13 +312,13 @@ check. The forms that file reads:
 | `int`, `u8`, `f32`, `str`, `c_int` and the other built-in names | `TYPEX_BUILTIN` |
 | `Name`, `module.Name`, `Name<A, B>` | `TYPEX_NAMED` |
 | `*T`, `?*T` | `TYPEX_POINTER` |
-| `[N]T` | `TYPEX_ARRAY` |
-| `[]T` | `TYPEX_SLICE` |
+| `[N]T` | `TYPEX_ARRAY` |, slice literal `matrix/types_forms`, call `matrix/types_forms`, `type` alias `matrix/types_forms`, case of a variant `matrix/types_forms` | none |
+| `[]T` | `TYPEX_SLICE` |, `as` `matrix/types_as_to_a_slice`, `size_of` `matrix/types_forms`, `const` `matrix/values_const_slice`, `type` alias `matrix/types_forms`, case of a variant `matrix/types_forms` | none |
 | `fn(A) -> R`, `fn(A) -> R may fail`, `?fn(A)`, `keep fn`, `concurrent fn` | `TYPEX_FN` |
 | `(A, B)` | `TYPEX_TUPLE` |
-| `chan T` | `TYPEX_CHAN` |
+| `chan T` | `TYPEX_CHAN` |, `let` `matrix/types_forms`, `as` `matrix/types_as_to_a_channel`, `alloc` `matrix/types_forms`, `size_of` `matrix/types_forms`, `const` `matrix/values_const_channel`, slice literal `matrix/types_forms`, call `matrix/types_forms`, `type` alias `matrix/types_forms`, case of a variant `matrix/types_forms` | none |
 | a constant as a type argument, `Ring<int, 8>` | `TYPEX_CONST` |
-| `?T` | `TYPEX_OPTIONAL` |
+| `?T` | `TYPEX_OPTIONAL` |, `as` `matrix/types_as_to_an_optional`, `const` `matrix/values_const_optional` T012, call `matrix/types_forms`, `type` alias `matrix/types_forms`, case of a variant `matrix/types_forms` | none |
 
 The marks `own` and `lent` stand before a type, and `atomic` before the type
 of a field or a local.
@@ -437,13 +437,13 @@ column means that no source holds the row at all.
 |---|---|---|---|---|---|
 | Flow | 27 | 454 | 1 | 91 | 0 |
 | Values | 40 | 753 | 0 | 1038 | 1 |
-| Types | 32 | 131 | 83 | 0 | 0 |
+| Types | 32 | 194 | 20 | 0 | 0 |
 | Ownership | 18 | 79 | 170 | 45 | 80 |
 | Errors | 15 | 49 | 124 | 11 | 30 |
 | Threads | 29 | 71 | 335 | 52 | 144 |
 | Classes | 26 | 47 | 9 | 0 | 0 |
 | Modules | 19 | 29 | 1 | 0 | 0 |
-| All | 206 | 1613 | 723 | 1237 | 255 |
+| All | 206 | 1676 | 660 | 1237 | 255 |
 
 ### Flow
 
@@ -800,29 +800,29 @@ has no test here.
 
 | Construct | Held, with the first source that holds it | Open |
 |---|---|---|
-| named or built-in type | `let` `programs/alias_bytes`, parameter `programs/alias_access`, result `programs/alias_access`, field `programs/alias_access`, `as` `programs/alias_access`, `alloc` `programs/alias_integers`, `size_of` `programs/alias_view_passed`, `const` `programs/alloc_owning`, slice literal `programs/assign_owned`, call `programs/caller_params`, `type` alias `programs/generic_unused`, library module `modules/access/com/example/ledger`, base of an enum `programs/alias_integers`, literal `programs/eq_default`, `inherits` `programs/generic_copies`, `chan` `programs/channel_workers`, constraint `std/collection_deque` | case of a variant |
-| `*T` | `let` `programs/class_is`, parameter `programs/alias_access`, result `programs/alias_access`, field `programs/alias_pointers`, `as` `programs/alias_access`, `alloc` `programs/generic_copies`, slice literal `programs/generic_copies`, call `std/collection`, library module `modules/access/com/example/ledger`, literal `programs/generic_copies` | `size_of`, `const`, `type` alias, case of a variant |
-| `?*T` | `let` `programs/catch_none`, parameter `programs/alias_access`, result `programs/alias_access`, field `programs/alloc_owning`, `as` `programs/alias_c_functions`, `alloc` `std/builder_take_in`, `size_of` `programs/optional_values`, library module `modules/chain/com/example/animal` | `const`, slice literal, call, `type` alias, case of a variant |
-| `?T` | `let` `programs/argument_order`, parameter `programs/optional_values`, result `programs/argument_order`, field `programs/optional_values`, `alloc` `programs/alloc_owning`, `size_of` `programs/alloc_owning`, slice literal `programs/owned_buffers`, library module `modules/generics/com/example/gen` | `as`, `const`, call, `type` alias, case of a variant |
-| `[]T` | `let` `programs/lent_slices`, parameter `programs/alias_arrays`, result `programs/eq_kinds`, field `programs/alias_pointers`, `alloc` `std/serialize_null`, slice literal `programs/assign_owned`, call `errors/copies_many`, library module `modules/closures/com/example/walk` | `as`, `size_of`, `const`, `type` alias, case of a variant |
-| `[N]T` | `let` `programs/alias_pointers`, parameter `programs/alias_arrays`, result `programs/generic_constants`, field `programs/alias_arrays`, `as` `programs/alias_arrays`, `alloc` `programs/concurrent`, `size_of` `programs/half`, `const` `programs/const_data`, library module `modules/generic_hooks/com/example/row` | slice literal, call, `type` alias, case of a variant |
-| `fn(A) -> R` | `let` `programs/callbacks`, parameter `programs/alias_c_functions`, result `programs/closures`, field `programs/alias_pointers`, `as` `programs/alias_pointers`, call `programs/generic_fn_args`, library module `modules/closures/com/example/walk`, literal `programs/generic_fn_args` | `alloc`, `size_of`, `const`, slice literal, `type` alias, case of a variant |
-| `keep fn` | none | `let`, parameter, result, field, `as`, `alloc`, `size_of`, `const`, slice literal, call, `type` alias, case of a variant, library module |
-| `concurrent fn` | none | `let`, parameter, result, field, `as`, `alloc`, `size_of`, `const`, slice literal, call, `type` alias, case of a variant, library module |
-| tuple type `(A, B)` | `let` `programs/for_patterns`, parameter `programs/for_patterns`, result `programs/caller_params`, field `programs/for_patterns`, `alloc` `programs/alloc_owning`, `size_of` `programs/alloc_owning`, call `std/collection_parts`, library module `modules/generics/com/example/gen` | `as`, `const`, slice literal, `type` alias, case of a variant |
-| `chan T` | parameter `programs/channel_workers`, result `modules/sync/com/example/queue`, field `programs/eq_handles`, library module `modules/sync/com/example/queue` | `let`, `as`, `alloc`, `size_of`, `const`, slice literal, call, `type` alias, case of a variant |
-| constant as a type argument | `let` `dump/generics`, parameter `std/spsc_ring_threads`, field `std/collection_dup`, `size_of` `programs/generic_constants`, call `programs/checker_context`, `type` alias `doc/src/com/example/app`, library module `doc/src/com/example/shapes`, literal `programs/generic_constants` | result, `as`, `alloc`, `const`, slice literal, case of a variant |
-| type arguments `Name<A>` | `let` `std/shared`, parameter `programs/generic_constants`, result `programs/generic_copies`, field `programs/generic_hooks`, `as` `modules/generics/client`, `size_of` `programs/generic_constants`, call `programs/caller_params`, `type` alias `modules/direct/com/example/shapes`, library module `modules/access/com/example/ledger`, literal `programs/eq_default`, `inherits` `programs/generic_copies`, constraint `std/collection_deque` | `alloc`, `const`, slice literal, case of a variant |
+| named or built-in type | `let` `programs/alias_bytes`, parameter `programs/alias_access`, result `programs/alias_access`, field `programs/alias_access`, `as` `programs/alias_access`, `alloc` `programs/alias_integers`, `size_of` `programs/alias_view_passed`, `const` `programs/alloc_owning`, slice literal `programs/assign_owned`, call `programs/caller_params`, `type` alias `programs/generic_unused`, library module `modules/access/com/example/ledger`, base of an enum `programs/alias_integers`, literal `programs/eq_default`, `inherits` `programs/generic_copies`, `chan` `programs/channel_workers`, constraint `std/collection_deque`, case of a variant `matrix/types_forms` | none |
+| `*T` | `let` `programs/class_is`, parameter `programs/alias_access`, result `programs/alias_access`, field `programs/alias_pointers`, `as` `programs/alias_access`, `alloc` `programs/generic_copies`, slice literal `programs/generic_copies`, call `std/collection`, library module `modules/access/com/example/ledger`, literal `programs/generic_copies`, `size_of` `matrix/types_forms`, `const` `matrix/types_const_of_a_pointer`, `type` alias `matrix/types_forms`, case of a variant `matrix/types_forms` | none |
+| `?*T` | `let` `programs/catch_none`, parameter `programs/alias_access`, result `programs/alias_access`, field `programs/alloc_owning`, `as` `programs/alias_c_functions`, `alloc` `std/builder_take_in`, `size_of` `programs/optional_values`, library module `modules/chain/com/example/animal`, `const` `matrix/types_forms`, slice literal `matrix/types_forms`, call `matrix/types_forms`, `type` alias `matrix/types_forms`, case of a variant `matrix/types_forms` | none |
+| `?T` | `let` `programs/argument_order`, parameter `programs/optional_values`, result `programs/argument_order`, field `programs/optional_values`, `alloc` `programs/alloc_owning`, `size_of` `programs/alloc_owning`, slice literal `programs/owned_buffers`, library module `modules/generics/com/example/gen`, `as` `matrix/types_as_to_an_optional`, `const` `matrix/values_const_optional` T012, call `matrix/types_forms`, `type` alias `matrix/types_forms`, case of a variant `matrix/types_forms` | none |
+| `[]T` | `let` `programs/lent_slices`, parameter `programs/alias_arrays`, result `programs/eq_kinds`, field `programs/alias_pointers`, `alloc` `std/serialize_null`, slice literal `programs/assign_owned`, call `errors/copies_many`, library module `modules/closures/com/example/walk`, `as` `matrix/types_as_to_a_slice`, `size_of` `matrix/types_forms`, `const` `matrix/values_const_slice`, `type` alias `matrix/types_forms`, case of a variant `matrix/types_forms` | none |
+| `[N]T` | `let` `programs/alias_pointers`, parameter `programs/alias_arrays`, result `programs/generic_constants`, field `programs/alias_arrays`, `as` `programs/alias_arrays`, `alloc` `programs/concurrent`, `size_of` `programs/half`, `const` `programs/const_data`, library module `modules/generic_hooks/com/example/row`, slice literal `matrix/types_forms`, call `matrix/types_forms`, `type` alias `matrix/types_forms`, case of a variant `matrix/types_forms` | none |
+| `fn(A) -> R` | `let` `programs/callbacks`, parameter `programs/alias_c_functions`, result `programs/closures`, field `programs/alias_pointers`, `as` `programs/alias_pointers`, call `programs/generic_fn_args`, library module `modules/closures/com/example/walk`, literal `programs/generic_fn_args`, `alloc` `matrix/types_forms`, `size_of` `matrix/types_forms`, `const` `matrix/values_const_fn` T014, slice literal `matrix/types_forms`, `type` alias `matrix/types_forms`, case of a variant `matrix/types_forms` | none |
+| `keep fn` | parameter `matrix/types_forms`, library module `modules/types/com/example/types`, `let` `matrix/types_keep_fn_in_a_let` | `keep` marks a parameter and a parameter of a function type, and the parser reads it in no other place: result, field, `as`, `alloc`, `size_of`, `const`, slice literal, call, `type` alias, case of a variant |
+| `concurrent fn` | parameter `matrix/types_forms`, library module `modules/types/com/example/types`, `let` `matrix/types_concurrent_fn_in_a_let` | `concurrent` marks a parameter and a parameter of a function type, and the parser reads it in no other place: result, field, `as`, `alloc`, `size_of`, `const`, slice literal, call, `type` alias, case of a variant |
+| tuple type `(A, B)` | `let` `programs/for_patterns`, parameter `programs/for_patterns`, result `programs/caller_params`, field `programs/for_patterns`, `alloc` `programs/alloc_owning`, `size_of` `programs/alloc_owning`, call `std/collection_parts`, library module `modules/generics/com/example/gen`, `as` `matrix/types_as_to_a_tuple`, `const` `matrix/types_forms`, slice literal `matrix/types_forms`, `type` alias `matrix/types_forms`, case of a variant `matrix/types_forms` | none |
+| `chan T` | parameter `programs/channel_workers`, result `modules/sync/com/example/queue`, field `programs/eq_handles`, library module `modules/sync/com/example/queue`, `let` `matrix/types_forms`, `as` `matrix/types_as_to_a_channel`, `alloc` `matrix/types_forms`, `size_of` `matrix/types_forms`, `const` `matrix/values_const_channel`, slice literal `matrix/types_forms`, call `matrix/types_forms`, `type` alias `matrix/types_forms`, case of a variant `matrix/types_forms` | none |
+| constant as a type argument | `let` `dump/generics`, parameter `std/spsc_ring_threads`, field `std/collection_dup`, `size_of` `programs/generic_constants`, call `programs/checker_context`, `type` alias `doc/src/com/example/app`, library module `doc/src/com/example/shapes`, literal `programs/generic_constants`, result `matrix/types_forms`, `as` `matrix/types_as_to_a_constant_argument`, `alloc` `matrix/types_forms`, `const` `matrix/types_forms`, slice literal `matrix/types_forms`, case of a variant `matrix/types_forms` | none |
+| type arguments `Name<A>` | `let` `std/shared`, parameter `programs/generic_constants`, result `programs/generic_copies`, field `programs/generic_hooks`, `as` `modules/generics/client`, `size_of` `programs/generic_constants`, call `programs/caller_params`, `type` alias `modules/direct/com/example/shapes`, library module `modules/access/com/example/ledger`, literal `programs/eq_default`, `inherits` `programs/generic_copies`, constraint `std/collection_deque`, `alloc` `matrix/types_forms`, `const` `matrix/types_forms`, slice literal `matrix/types_forms`, case of a variant `matrix/types_forms` | none |
 | `struct` | module level `programs/alias_access`, nested type `errors/concurrent_forms`, generic `programs/eq_default`, library module `modules/blocks/com/example/geo` | none |
-| `packed struct` | module level `abi/abi_structs`, library module `clib/com/example/shapes` | nested type |
-| `simd struct` | module level `programs/alias_simd`, library module `modules/generics/com/example/gen` | nested type |
+| `packed struct` | module level `abi/abi_structs`, library module `clib/com/example/shapes`, nested type `matrix/types_nested_and_simd` | none |
+| `simd struct` | module level `programs/alias_simd`, library module `modules/generics/com/example/gen`, nested type `matrix/types_nested_and_simd` | none |
 | `align(n)` on a type | `programs/inherits_header` | none |
 | `union` | module level `programs/alias_unions`, library module `clib/com/example/geo` | none |
 | `enum` | module level `programs/alias_integers`, nested type `programs/generic_nested`, library module `modules/classlib/com/example/shapes` | none |
 | `enum` with a base type | `programs/alias_integers` | none |
 | `enum` value with a number | `programs/alias_integers` | none |
 | `variant` | module level `programs/alias_unions`, generic `programs/generic_copies`, library module `modules/direct/com/example/shapes` | none |
-| `type` alias | module level `programs/generic_unused`, library module `modules/direct/com/example/shapes` | generic |
+| `type` alias | module level `programs/generic_unused`, library module `modules/direct/com/example/shapes`, generic `matrix/types_alias_with_type_parameters` | none |
 | `constraint` | module level `programs/generic_unused`, library module `modules/direct/com/example/shapes` | none |
 | type parameter `<T>` | `programs/caller_params` | none |
 | constant parameter `<N: int>` | `programs/checker_context` | none |
@@ -832,6 +832,78 @@ has no test here.
 | default of a parameter | `programs/class_literal_defaults` | none |
 | `e is Type.Case` | `programs/generic_variants` | none |
 | `static atomic` field | `programs/alloc_owning` | none |
+
+The step `types` filled the table above and wrote the tests of the types
+themselves. `tests/matrix/` holds its sources under the names `types_*`.
+
+- `matrix/types_forms` holds each form of type in the places the table
+  names. A line of its output names the form and the place.
+- `matrix/types_packed_and_aligned` holds `packed` and `align(N)` on a
+  struct, a union, a variant, a class and a generic struct. A packed struct
+  puts a field of every kind at an odd offset, and each is read, written,
+  passed and addressed there. An aligned type is checked by its size and
+  by the address of a local, an element, a field and memory of `alloc`.
+- `matrix/types_bitfields_and_unions` holds bitfields of each width and
+  sign in a struct, a packed struct and a union. It holds a union of every
+  kind of field as well, read through another field.
+- `matrix/types_enums_and_variants` holds enums over every base, with and
+  without values, and every pattern on a variant: an arm that binds its
+  case, one that does not, `else`, `if let`, `is` and the `tag`.
+- `matrix/types_arrays` holds a fixed array of each kind of element. It is
+  read and written with a constant index and with one the program
+  computes, as decision 24 names both. The arrays of packed structs, of
+  unions, of enums and of variants stand in the programs of those types.
+- `matrix/types_nested_and_simd` holds the types a class body declares,
+  each with a layout word, and simd structs in every type that holds one.
+- `modules/types/com/example/types` is the library of the test
+  `types_modules`. `client` reads, writes and measures each type across
+  the module boundary, and both modules print the same sizes.
+- `abi/probe_types` is the pair of the test `abi_probe_types`. A C source
+  and an Anti source print the size, the alignment and the bytes of a
+  field for the same types, so the layout of `size_of` is the C layout of
+  the host. `abi/probe` held structs, unions and bitfields before.
+- 103 sources are refusals of one message each. They hold what `as`,
+  `const` and a `type` alias refuse, the words `packed` and `align` where
+  they do not stand, the types and widths of a bitfield, the values and
+  bases of an enum, and every pattern on a variant that the checker
+  refuses.
+- An `align(N)` below the alignment of the fields is an error of the back
+  end that names the target. So is a bitfield whose unit is larger than
+  its struct. `errors/layout` and `errors/layout_unit` hold them for
+  linux-x86_64, and a matrix refusal has no option for a target.
+
+Where two rules meet, and where three do:
+
+- A packed struct and a failing call: the call writes its result into a
+  field at offset 1, in `types_packed_and_aligned`.
+- A packed struct, a lent element and a compound assignment: the line
+  `lent elements` of `types_packed_and_aligned`.
+- A packed struct and a simd struct: a vector of 16 and one of 32 bytes at
+  offsets 1 and 17, in `types_nested_and_simd`.
+- A packed class and an atomic field, and a packed class and a Mutex:
+  `types_atomic_in_packed_class` and `types_mutex_in_packed_class`, T022.
+- A bitfield and a failing call, the flags form, a closure, a lent element,
+  `==` and the hash: the part `other_rules` of
+  `types_bitfields_and_unions`.
+- A bitfield, a value past its width and the wrapping and saturating
+  forms: the part `values_past_the_width` of the same program.
+- An enum, two names of one number and a `switch`: the line `switch on one
+  number twice` of `types_enums_and_variants`, and the refusal
+  `types_switch_on_one_number_twice`.
+- A variant, an arm that binds its case and an assignment to the variant
+  in that arm: the line `variant changed in its arm`.
+- A variant without fields and a field of a struct or of a class:
+  `types_variant_without_fields_as_a_field`, T023.
+- A declaration, a constant expression and a call:
+  `types_enum_value_from_a_call` and the three refusals beside it, T020.
+- An array of arrays, a row assigned and an index the program computes: the
+  part `arrays_of_arrays` of `types_arrays`.
+- A nested type, a layout word and an array of the type:
+  `types_nested_and_simd`.
+
+Three more refusals show T016, a constant index past the end of an array
+in a field, in an inner array and in a write. `fmt/alias_of_function` is
+the source of the test `fmt_alias_of_function`, T025.
 
 ### Ownership
 
@@ -1016,7 +1088,7 @@ antic 0.2.0 does otherwise, the test becomes an expected failure by decision
 | 22 | ownership | `return` of a field that owns something | open |
 | 23 | threads | a second `join` of one job, refused where the checker sees it and trapped in dev mode otherwise | open |
 | 23 | threads | the arguments of a `dispatch` in a loop, stored per job | open |
-| 24 | values | a constant index past the end of a fixed array | T016, the refusal `matrix/values_index_past_end` |
+| 24 | values, types | a constant index past the end of a fixed array | T016, the refusal `matrix/values_index_past_end`, and `matrix/types_array_field_index_past_end`, `matrix/types_array_inner_index_past_end` and `matrix/types_array_write_past_end` for a field, an inner array and a write |
 | 24 | values | `xs[lo..hi]` past the length, trapped in dev mode | T017, the test `check_slice_range` of `traps/slice_range` |
 | 25 | modules | a write of `count` of a collection outside its module | open |
 | 26 | modules | a `str` in the signature of an `extern fn` | open |
@@ -1111,12 +1183,13 @@ On 2026-10-12, at antic 0.2.0:
   contextual words.
 - 10 item kinds, 22 statement kinds, 38 expression kinds and 10 type kinds
   in `src/antic/ast.h`.
-- 206 rows in the matrix. 1613 cells are held and 723 are
+- 206 rows in the matrix. 1676 cells are held and 660 are
   open. Of the kinds, 1237 are held and 255 are open. The step `flow` filled
   its area after the count of 840 held cells and 578 held kinds. The step
   `values` filled its area after the count of 1157 held cells and 622 held
-  kinds.
+  kinds. The step `types` filled its area after the count of 1613 held
+  cells. Its 20 open cells cannot exist, and each states why.
 - 13 open cells for the rules of decisions 19 to 27.
-- 748 messages: 509 expected by a test and 239 open. antic gives 598 with
-  101 open, and anti 150 with 138 open.
+- 748 messages: 519 expected by a test and 229 open. antic gives 598 with
+  91 open, and anti 150 with 138 open.
 - 134 options and commands: 124 passed by a test and 10 open.
