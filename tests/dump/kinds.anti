@@ -1,0 +1,10 @@
+//! A float literal, a character literal and the reserved word `thread`, for the
+//! token listing alone: no grammar rule takes the reserved word.
+
+fn kinds() -> int
+{
+	let half = 0.5;
+	let letter = 'a';
+	thread;
+	return 0;
+}

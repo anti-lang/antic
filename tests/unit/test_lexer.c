@@ -306,6 +306,10 @@ void test_lexer(void)
     docs("/" "** */\nfn f() {}", "doc:\n");
     docs("//! Guide.\n//#! Build notes.\n//# Invariant.\nstruct S { a: int }",
          "module_doc:Guide.\nmodule_note:Build notes.\nnote:Invariant.\n");
+    /* A line of a doc comment that ends with CR and LF holds no CR. */
+    docs("/// Dot\r\n/// product.\r\nfn f() {}", "doc:Dot|product.\n");
+    /* The last line of a source is a doc comment without a line end. */
+    docs("fn f() {}\n/// Last.", "doc:Last.\n");
     /* Split the openers so that a comment scanner does not read them as
        comments. */
     docs("/" "*!\n  Guide.\n*/\n/" "*#!\n  Notes.\n*/\n/" "*#\n  Keep.\n*/\n"
@@ -555,10 +559,29 @@ void test_lexer(void)
     error("42abc", 1, 1, "invalid character in numeric literal");
     error("1e9", 1, 1, "invalid character in numeric literal");
     error("1.0e", 1, 1, "expected digits in the exponent");
+    error("1.5_", 1, 1, "`_` must stand between two digits");
+    error("1.5e1_", 1, 1, "`_` must stand between two digits");
+    error("1.5x", 1, 1, "invalid character in numeric literal");
+    {
+        /* The fraction after a refused literal belongs to it, so the
+           source gets one message and no float after it. */
+        struct lexed l;
+        lex_s(&l, "1_.5 + 2");
+        CHECK(l.diags.count == 1);
+        if (l.diags.count == 1) {
+            CHECK_STR(l.diags.items[0].message,
+                      "`_` must stand between two digits");
+        }
+        done(&l);
+    }
 
     error("''", 1, 1, "empty character literal");
     error("'ab'", 1, 1, "a character literal holds one character");
     error("'a", 1, 1, "unterminated character literal");
+    error("'", 1, 1, "unterminated character literal");
+    error("'\n'", 1, 1, "unterminated character literal");
+    error("'\\x00'", 1, 2, "NUL is not allowed here");
+    error("'\\u41'", 1, 2, "`\\u{}` needs 1 to 6 hexadecimal digits");
     error("'\\x80'", 1, 2, "`\\xHH` stops at `\\x7F` outside byte strings");
     error("'\\0'", 1, 2, "NUL is not allowed here");
     error("'\\u{0}'", 1, 2, "NUL is not allowed here");
@@ -567,6 +590,11 @@ void test_lexer(void)
     error("'\\u{110000}'", 1, 2, "`\\u{110000}` is not a Unicode scalar value");
     error("'\\u{}'", 1, 2, "`\\u{}` needs 1 to 6 hexadecimal digits");
     error("\"\\q\"", 1, 2, "unknown escape `\\q`");
+    /* A byte above ASCII after the backslash is written as `?`. */
+    error("\"\\\xC3\xA9\"", 1, 2, "unknown escape `\\?`");
+    /* The source ends after the backslash of an escape. */
+    error("\"a\\", 1, 1, "unterminated string literal");
+    error("/" "**\n    text", 1, 1, "unterminated block comment");
     error("\"\\x80\"", 1, 2, "`\\xHH` stops at `\\x7F` outside byte strings");
     error("\"a\\0\"", 1, 3, "NUL is not allowed here");
     error_n("\"a\0b\"", 5, 1, 3, "NUL is not allowed here");
