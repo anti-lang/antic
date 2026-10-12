@@ -442,8 +442,8 @@ column means that no source holds the row at all.
 | Errors | 15 | 173 | 0 | 41 | 0 |
 | Threads | 29 | 402 | 4 | 189 | 7 |
 | Classes | 26 | 59 | 0 | 0 | 0 |
-| Modules | 19 | 29 | 1 | 0 | 0 |
-| All | 206 | 2312 | 27 | 1484 | 8 |
+| Modules | 19 | 30 | 0 | 0 | 0 |
+| All | 206 | 2313 | 26 | 1484 | 8 |
 
 ### Flow
 
@@ -1435,7 +1435,170 @@ Where two rules meet, and where three do:
 | `link linux` | `anti-build/window/src/com/example/xlib` | none |
 | `tests` block | `programs/test_blocks` | none |
 | `fixtures` block | `programs/test_blocks` | none |
-| clause at the top of the file | none | open |
+| clause at the top of the file | `matrix/modules_file_clauses` | none |
+
+The step `modules` filled the table above on 2026-10-12. `tests/matrix/`
+holds its sources of one file under the names `modules_*`. What crosses
+a library file stands in `tests/modules/`. The refusals at that boundary
+stand in `tests/errors/` under the names `modules_*`. C stands in
+`tests/abi/` and `tests/clib/`, and the plugins in `tests/plugin/`. The
+rows of the table are items and lines of a module, and the programs below
+hold what stands in a function.
+
+- `matrix/modules_qualified_names`, `modules_extern_calls` and
+  `modules_export_calls` hold their constructs in fifteen places each, one
+  function `in_<context>` and one line of output per place and input, as
+  `matrix/flow_<construct>` does. The first holds a function by the name of
+  its module, by an alias and by a direct import, with a class and a type
+  of a module. The second holds the calls of an `extern fn`, a variadic one
+  and one held as a function value. The third holds the exported items of
+  a module used by the module itself.
+- A worker builds no `text.Builder` in these programs. The places "worker"
+  and "dispatch" of `modules_qualified_names` therefore hold the three
+  functions alone.
+- The standard library in dev and release: `matrix/modules_std_plain`,
+  `modules_std_aliases` and `modules_std_direct`. They import the 23
+  modules under `anti.` and the 12 under `anti.collection.`, by path,
+  under an alias and with a direct import. Each reaches an item of eight
+  of the modules.
+- `matrix/modules_file_clauses` holds the clause of the whole file, an
+  `allow` before the imports and an `unchecked` among them, and six
+  refusals `matrix/modules_file_*` hold its forms.
+- `matrix/modules_count_read` holds `count` of twelve collections, and
+  `modules_variadic_arguments` every type a variadic argument takes.
+  `modules_doc_comments` holds the four comments of documentation before
+  every kind of item.
+- A block `tests` and a block `fixtures` hold functions alone. No build of
+  the matrix reads a library file either. No row of the table therefore
+  has a cell in one of the two blocks.
+
+Across a library file, each as `<name>_modules_release` and `_dev`:
+
+- `items_modules`: every kind of item a module makes public, reached by
+  the name of the module, by an alias and by a direct import.
+  `items_stripped_modules` runs it with a library file written with
+  `--strip-docs`.
+- `levels_modules`: every kind of item at the level `internal`, from a
+  module of the same package. A class below a class of the library reaches
+  its protected members.
+- `kinds_modules`: one function per kind of value, which takes the kind
+  and gives it back. The scalars are the eleven integers, twelve C types,
+  the floats, `f16`, `bool`, `char` and `str`. The parts are a slice, an
+  array, a pointer, a nullable pointer, an optional value and a tuple. The
+  functions are a function value, a closure, and a result and a function
+  value that may fail. The types are a struct, a packed struct, a simd
+  struct, a union, an enum, a variant and an interface. The classes are a
+  class by pointer and by value, a synchronized and a concurrent one. The
+  rest is a channel, a Mutex, an owning value, a lent value, a type
+  parameter, an error and `never`.
+- `field_defaults_modules`: the default of a field of a class of a
+  library, one field per kind of value a default takes.
+  `optional_default_modules` holds the optional value, T085.
+- `diamond_modules`: two libraries import a third and the program imports
+  the two. It holds one descriptor per class, one static field, one
+  singleton and one copy of a generic per type argument. Three modules
+  declare a struct and a class of one name.
+- `generic_private_modules`: generics of a library whose bodies reach
+  the private items of their module, in copies the client compiles. The
+  items are a function, a constant, a struct, an enum, a class, a generic,
+  an `extern fn`, an operator and an internal function.
+- `exports_modules`: the items that `export` marks, reached from Anti.
+- `constants_modules`: the constants of a library where a constant
+  expression stands. The places are the length of an array, a constant,
+  the value of an enum, the width of a bitfield and the N of `align(N)`.
+  The default of a parameter and of a field and the arm of a `switch` are
+  the others. `constant_argument_modules` holds one as the argument of
+  `N: int`, T094.
+- `generic_variant_modules`: a case of a generic variant named in full
+  under the name of a module, T091.
+
+The refusals at the boundary, `error_modules_*`, one message each:
+
+- A private item and an internal item from another package, sixteen kinds
+  each. They are a constant, a function, a generic function and an
+  `extern fn`. A struct as a literal and as a type, a generic struct, a
+  union, an enum and a variant follow. A class as a literal and as a base,
+  an interface, an alias, a constraint and a name of a direct import
+  complete them. An internal singleton makes the thirty-third. Two of
+  them are T087.
+- The members of a class of a library: ten refusals
+  `error_modules_member_*`. They hold a private and a protected field and
+  function, in a literal, from a class below and from another class. A
+  protected static function is T086.
+- `error_modules_direct_import_clash`, `_module_of_a_dependency`,
+  `_constant_assigned`, `_function_as_a_type`, `_type_called`,
+  `_export_symbol_twice`, `_missing_dependency` and `_import_cycle`, T088.
+- A library file carries no function of a class with a type parameter of
+  its own yet, and no type nested in a generic class. Those two cells
+  cannot exist. `error_modules_generic_function_of_a_class`,
+  `_generic_function_of_a_generic_class` and
+  `_type_nested_in_a_generic_class` hold what antic says of each, the last
+  as T095.
+- `error_modules_library_with_main`, `_library_kind` and
+  `_soname_without_a_version` hold what the driver refuses of `--lib`.
+
+In one file, the refusals of `tests/matrix/`:
+
+- Thirty for the forms of an `import`, of a name of a module and of a
+  direct import, `matrix/modules_import_*`, `modules_module_*` and
+  `modules_direct_import_*`.
+- The visibility words: `matrix/modules_pub_*`, `modules_protected_item`,
+  `modules_internal_field` and eight `modules_export_*` for what `export`
+  does not mark.
+- An exported signature per kind of value C cannot hold: seventeen
+  `matrix/modules_export_function_takes_*` and two `_gives_*`. Fifteen
+  more hold a field of an exported struct, union, variant and class, a
+  function of an exported class and an exported constant.
+- An `extern fn`: its forms, its pointers and its function pointers in
+  eighteen `matrix/modules_extern_function_*`, four of them T089. Six
+  `matrix/modules_variadic_argument_*` hold the types of a variadic
+  argument.
+- The `provides` line and the `link` line: seven
+  `matrix/modules_provides_*` and `modules_link_*`.
+
+C in both directions:
+
+- `program_abi_ctypes`, with `_dev` and `_memory_checks`: each of `c_char`
+  to `c_wchar`, `c_float` and `c_double` to a function of C and back. A
+  type crosses alone, at its limits, among fourteen arguments and in a
+  struct by value. It crosses through a pointer, through a callback and as
+  a variadic argument as well. C then calls fourteen functions the program
+  exports.
+- `clib_ctypes`, `clib_ctypes_shared` and `clib_ctypes_bundle`: one C
+  program calls a library that takes and gives every C type, built with
+  `--lib static`, with `--lib shared` and with `--bundle-runtime`.
+
+Plugins:
+
+- `plugin_kinds`: a function of a library per kind of value, called
+  through the table of the interface.
+- `plugin_locals`, T092, and `plugin_unused`, T093.
+
+Where two rules meet, and where three do:
+
+- A class of a library, a field of type `?T` and its default:
+  `optional_default_modules`, T085.
+- A class of a library, `protected` and a function without `self`:
+  `error_modules_member_protected_static_function`, T086.
+- A generic variant, the name of a module and the type arguments of a
+  case: `generic_variant_modules`, T091.
+- A type parameter `N: int`, a constant and the name of a module:
+  `constant_argument_modules`, T094.
+- A generic of a library, a private item of its module and a copy the
+  client compiles: `generic_private_modules`.
+- A generic class of a library, a type nested in it and a copy the client
+  asks for: `error_modules_type_nested_in_a_generic_class`, T095.
+- Two libraries, a generic of a third and one type argument:
+  `diamond_modules`.
+- A plugin, a local object and a class without `destruct`:
+  `plugin_locals`, T092.
+- A plugin, a module of the standard library and a host that imports and
+  does not use it: `plugin_unused`, T093.
+- An `extern fn`, a function pointer and a closure:
+  `matrix/modules_extern_function_takes_a_closure` and
+  `modules_extern_function_takes_a_snapshot`.
+- An exported class, a `construct` with arguments and a type C cannot
+  hold: `matrix/modules_export_class_construct_takes_a_str`.
 
 ### The rules of decisions 19 to 27
 
@@ -1455,8 +1618,8 @@ antic 0.2.0 does otherwise, the test becomes an expected failure by decision
 | 23 | threads | the arguments of a `dispatch` in a loop, stored per job | T055, the programs `matrix/threads_dispatch_in_a_loop` and `matrix/threads_return_before_the_join` |
 | 24 | values, types | a constant index past the end of a fixed array | T016, the refusal `matrix/values_index_past_end`, and `matrix/types_array_field_index_past_end`, `matrix/types_array_inner_index_past_end` and `matrix/types_array_write_past_end` for a field, an inner array and a write |
 | 24 | values, ownership | `xs[lo..hi]` past the length, trapped in dev mode | T017, the test `check_slice_range` of `traps/slice_range`, and `check_slice_of_slice_range`, `check_slice_range_reversed` and `check_slice_range_negative` for a slice of a slice, a low bound above the high one and one below zero |
-| 25 | modules | a write of `count` of a collection outside its module | open |
-| 26 | modules | a `str` in the signature of an `extern fn` | open |
+| 25 | modules | a write of `count` of a collection outside its module | T090, the ten refusals `matrix/modules_count_of_*`, and the program `matrix/modules_count_read` for a read |
+| 26 | modules | a `str` in the signature of an `extern fn` | T089, the five refusals `matrix/modules_extern_function_takes_a_str`, `_gives_a_str`, `_callback_takes_a_str`, `_takes_a_pointer_to_a_str` and `matrix/modules_variadic_extern_function_takes_a_str` |
 | 27 | classes | a class with an `abstract fn` that is not `abstract` | T064, the refusal `matrix/classes_open_functions_without_abstract` |
 | 27 | classes | a direct call of `destruct` | the refusal `matrix/ownership_destruct_called_directly`, and T068, the refusal `matrix/classes_super_destruct_called_directly` for `self.super.destruct()` |
 | 27 | classes | `mutable` on a field of a plain class | T065, the refusal `matrix/classes_mutable_field_of_a_plain_class` |
@@ -1548,7 +1711,7 @@ On 2026-10-12, at antic 0.2.0:
   contextual words.
 - 10 item kinds, 22 statement kinds, 38 expression kinds and 10 type kinds
   in `src/antic/ast.h`.
-- 206 rows in the matrix. 2312 cells are held and 27 are
+- 206 rows in the matrix. 2313 cells are held and 26 are
   open. Of the kinds, 1484 are held and 8 are open. The step `flow` filled
   its area after the count of 840 held cells and 578 held kinds. The step
   `values` filled its area after the count of 1157 held cells and 622 held
@@ -1560,9 +1723,10 @@ On 2026-10-12, at antic 0.2.0:
   held kinds. The step `threads` filled its area after the count of 1969
   held cells and 1347 held kinds. Its 4 open cells and its 7 open kinds
   cannot exist, and each states why. The step `classes` filled its area
-  after the count of 2300 held cells, and no cell of it stays open.
-- 2 open cells for the rules of decisions 19 to 27, both of the area
-  modules.
-- 748 messages: 576 expected by a test and 172 open. antic gives 598 with
-  34 open, and anti 150 with 138 open.
-- 134 options and commands: 124 passed by a test and 10 open.
+  after the count of 2300 held cells, and no cell of it stays open. The
+  step `modules` filled its area after the count of 2312 held cells, and
+  no cell of it stays open.
+- No open cell for the rules of decisions 19 to 27.
+- 748 messages: 581 expected by a test and 167 open. antic gives 598 with
+  29 open, and anti 150 with 138 open.
+- 134 options and commands: 126 passed by a test and 8 open.
