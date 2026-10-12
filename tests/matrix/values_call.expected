@@ -1,9 +1,0 @@
-exit 0
-select 6
-select 8
-select 10
-select 12
-nested 1006
-nested 1008
-nested 1010
-nested 1012

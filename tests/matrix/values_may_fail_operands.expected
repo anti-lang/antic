@@ -1,7 +1,0 @@
-exit 0
-operands -1 trail 12
-left fails -9 trail 1
-tuple 34 trail 34
-tuple fails -9 trail 3
-compound 105 trail 55
-index 30 trail 2

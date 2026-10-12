@@ -1,0 +1,1330 @@
+//! Each kind of value in the literals that hold one: an array literal `[a, b]`
+//! with an index into it, an array repeat `[v; n]`, a slice literal over an
+//! array and the elements `t.0` and `t.1` of a tuple. Each construct with each
+//! kind is a function of its own, named after both, which prints the two values
+//! it holds.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn risky_up(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "negative";
+	}
+	return n + 1;
+}
+
+fn risky_down(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "positive";
+	}
+	return n - 1;
+}
+
+fn settle(f: fn(int) -> int may fail) -> int
+{
+	let got = f(10) catch {
+		yield -1;
+	};
+	return got;
+}
+
+fn up(n: int) -> int
+{
+	return n + 1;
+}
+
+fn down(n: int) -> int
+{
+	return n - 1;
+}
+
+struct Pt
+{
+	x: int,
+	y: int,
+}
+
+packed struct Pk
+{
+	a: u8,
+	b: i32,
+}
+
+simd struct I32x4
+{
+	a: i32,
+	b: i32,
+	c: i32,
+	d: i32,
+}
+
+union Bits
+{
+	i: i32,
+	f: f32,
+}
+
+enum Color
+{
+	Red,
+	Green,
+	Blue,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+class Counter
+{
+	pub n: int = 0,
+}
+
+synchronized class Tally
+{
+	pub n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+concurrent class Hits
+{
+	pub atomic n: int = 0,
+}
+
+abstract class Named
+{
+	abstract fn id(self) -> int;
+}
+
+class One inherits Named
+{
+	concrete fn id(self) -> int
+	{
+		return 1;
+	}
+}
+
+class Two inherits Named
+{
+	concrete fn id(self) -> int
+	{
+		return 2;
+	}
+}
+
+fn same(n: int) -> int
+{
+	return n;
+}
+
+fn array_on_i8()
+{
+	let xs: [2]i8 = [127, -128];
+	printf("array i8 %lld %lld\n".ptr, xs[0] as int, xs[1] as int);
+}
+
+fn array_on_i16()
+{
+	let xs: [2]i16 = [32767, -32768];
+	printf("array i16 %lld %lld\n".ptr, xs[0] as int, xs[1] as int);
+}
+
+fn array_on_i32()
+{
+	let xs: [2]i32 = [2147483647, -2147483648];
+	printf("array i32 %lld %lld\n".ptr, xs[0] as int, xs[1] as int);
+}
+
+fn array_on_i64()
+{
+	let xs: [2]i64 = [9223372036854775807, -9223372036854775808];
+	printf("array i64 %lld %lld\n".ptr, xs[0] as int, xs[1] as int);
+}
+
+fn array_on_int()
+{
+	let xs: [2]int = [9223372036854775807, -9223372036854775808];
+	printf("array int %lld %lld\n".ptr, xs[0] as int, xs[1] as int);
+}
+
+fn array_on_u8()
+{
+	let xs: [2]u8 = [255, 1];
+	printf("array u8 %llu %llu\n".ptr, xs[0] as u64, xs[1] as u64);
+}
+
+fn array_on_u16()
+{
+	let xs: [2]u16 = [65535, 1];
+	printf("array u16 %llu %llu\n".ptr, xs[0] as u64, xs[1] as u64);
+}
+
+fn array_on_u32()
+{
+	let xs: [2]u32 = [4294967295, 1];
+	printf("array u32 %llu %llu\n".ptr, xs[0] as u64, xs[1] as u64);
+}
+
+fn array_on_u64()
+{
+	let xs: [2]u64 = [18446744073709551615, 1];
+	printf("array u64 %llu %llu\n".ptr, xs[0] as u64, xs[1] as u64);
+}
+
+fn array_on_uint()
+{
+	let xs: [2]uint = [18446744073709551615, 1];
+	printf("array uint %llu %llu\n".ptr, xs[0] as u64, xs[1] as u64);
+}
+
+fn array_on_byte()
+{
+	let xs: [2]byte = [255, 1];
+	printf("array byte %llu %llu\n".ptr, xs[0] as u64, xs[1] as u64);
+}
+
+fn array_on_f32()
+{
+	let xs: [2]f32 = [1.5, -0.25];
+	printf("array f32 %g %g\n".ptr, xs[0] as f64, xs[1] as f64);
+}
+
+fn array_on_f64()
+{
+	let xs: [2]f64 = [1.5, -0.25];
+	printf("array f64 %g %g\n".ptr, xs[0], xs[1]);
+}
+
+fn array_on_f16()
+{
+	let xs: [2]f16 = [1.5 as f16, -0.25 as f16];
+	printf("array f16 %g %g\n".ptr, xs[0] as f64, xs[1] as f64);
+}
+
+fn array_on_bool()
+{
+	let xs: [2]bool = [true, false];
+	printf("array bool %d %d\n".ptr, xs[0] as c_int, xs[1] as c_int);
+}
+
+fn array_on_char()
+{
+	let xs: [2]char = ['a', '\u{10FFFF}'];
+	printf("array char %u %u\n".ptr, xs[0] as u32, xs[1] as u32);
+}
+
+fn array_on_str()
+{
+	let xs: [2]str = ["one", "three"];
+	printf("array str %lld %lld\n".ptr, xs[0].len, xs[1].len);
+}
+
+fn array_on_slice()
+{
+	let base = [1, 2, 3];
+	let xs: [2][]int = [base[0..1], base[0..3]];
+	printf("array slice %lld %lld\n".ptr, xs[0].len, xs[1].len);
+}
+
+fn array_on_fixed_array()
+{
+	let xs: [2][2]int = [[1, 2], [3, 4]];
+	printf("array fixed_array %lld %lld\n".ptr, xs[0][1], xs[1][1]);
+}
+
+fn array_on_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let xs: [2]*int = [&a, &b];
+	printf("array pointer %lld %lld\n".ptr, *xs[0], *xs[1]);
+}
+
+fn array_on_nullable_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let xs: [2]?*int = [&a, none];
+	printf("array nullable_pointer %lld %lld\n".ptr, *(xs[0] ?? &b), *(xs[1] ?? &b));
+}
+
+fn array_on_optional()
+{
+	let xs: [2] ?int = [5, none];
+	printf("array optional %lld %lld\n".ptr, (xs[0] ?? -1), (xs[1] ?? -1));
+}
+
+fn array_on_may_fail_fn()
+{
+	let xs: [2] fn(int) -> int may fail = [risky_up, risky_down];
+	printf("array may_fail_fn %lld %lld\n".ptr, settle(xs[0]), settle(xs[1]));
+}
+
+fn array_on_fn()
+{
+	let xs: [2] fn(int) -> int = [up, down];
+	printf("array fn %lld %lld\n".ptr, xs[0](10), xs[1](10));
+}
+
+fn array_on_tuple()
+{
+	let xs: [2](int, bool) = [(1, true), (2, false)];
+	printf("array tuple %lld %lld\n".ptr, xs[0].0, xs[1].0);
+}
+
+fn array_on_channel()
+{
+	let c1 = chan int(1);
+	let c2 = chan int(1);
+	let xs: [2] chan int = [c1, c2];
+	printf("array channel %d %d\n".ptr, (xs[0] == c1) as c_int, (xs[1] == c1) as c_int);
+	delete(c1);
+	delete(c2);
+}
+
+fn array_on_struct()
+{
+	let xs: [2]Pt = [Pt { x: 1, y: 2 }, Pt { x: 3, y: 4 }];
+	printf("array struct %lld %lld\n".ptr, xs[0].y, xs[1].y);
+}
+
+fn array_on_packed_struct()
+{
+	let xs: [2]Pk = [Pk { a: 1, b: 2 }, Pk { a: 3, b: 4 }];
+	printf("array packed_struct %lld %lld\n".ptr, xs[0].b as int, xs[1].b as int);
+}
+
+fn array_on_simd_struct()
+{
+	let xs: [2]I32x4 = [I32x4 { a: 1, b: 2, c: 3, d: 4 }, I32x4 { a: 5, b: 6, c: 7, d: 8 }];
+	printf("array simd_struct %lld %lld\n".ptr, xs[0].c as int, xs[1].c as int);
+}
+
+fn array_on_union()
+{
+	let xs: [2]Bits = [Bits { i: 7 }, Bits { i: 9 }];
+	printf("array union %lld %lld\n".ptr, xs[0].i as int, xs[1].i as int);
+}
+
+fn array_on_enum()
+{
+	let xs: [2]Color = [Color.Green, Color.Blue];
+	printf("array enum %lld %lld\n".ptr, xs[0] as int, xs[1] as int);
+}
+
+fn array_on_variant()
+{
+	let xs: [2]Shape = [Shape.Circle { r: 2 }, Shape.Empty];
+	printf("array variant %d %d\n".ptr, (xs[0] is Shape.Circle) as c_int, (xs[1] is Shape.Circle) as c_int);
+}
+
+fn array_on_class()
+{
+	let xs: [2]Counter = [Counter { n: 5 }, Counter { n: 6 }];
+	printf("array class %lld %lld\n".ptr, xs[0].n, xs[1].n);
+}
+
+fn array_on_synchronized_class()
+{
+	let xs: [2]Tally = [Tally { n: 5 }, Tally { n: 6 }];
+	printf("array synchronized_class %lld %lld\n".ptr, xs[0].get(), xs[1].get());
+}
+
+fn array_on_concurrent_class()
+{
+	let xs: [2]Hits = [Hits { n: 5 }, Hits { n: 6 }];
+	printf("array concurrent_class %lld %lld\n".ptr, xs[0].n.load(), xs[1].n.load());
+}
+
+fn array_on_interface()
+{
+	let one = One { };
+	let two = Two { };
+	let xs: [2]*Named = [&one, &two];
+	printf("array interface %lld %lld\n".ptr, xs[0].id(), xs[1].id());
+}
+
+fn array_on_generic<T>(a: T, b: T, read: fn(T) -> int)
+{
+	let xs: [2]T = [dup(a), dup(b)];
+	printf("array generic %lld %lld\n".ptr, read(xs[0]), read(xs[1]));
+}
+
+fn array_repeat_on_i8()
+{
+	let xs: [3]i8 = [127; 3];
+	let ys: [2]i8 = [-128; 2];
+	printf("array_repeat i8 %lld %lld\n".ptr, xs[2] as int, ys[0] as int);
+}
+
+fn array_repeat_on_i16()
+{
+	let xs: [3]i16 = [32767; 3];
+	let ys: [2]i16 = [-32768; 2];
+	printf("array_repeat i16 %lld %lld\n".ptr, xs[2] as int, ys[0] as int);
+}
+
+fn array_repeat_on_i32()
+{
+	let xs: [3]i32 = [2147483647; 3];
+	let ys: [2]i32 = [-2147483648; 2];
+	printf("array_repeat i32 %lld %lld\n".ptr, xs[2] as int, ys[0] as int);
+}
+
+fn array_repeat_on_i64()
+{
+	let xs: [3]i64 = [9223372036854775807; 3];
+	let ys: [2]i64 = [-9223372036854775808; 2];
+	printf("array_repeat i64 %lld %lld\n".ptr, xs[2] as int, ys[0] as int);
+}
+
+fn array_repeat_on_int()
+{
+	let xs: [3]int = [9223372036854775807; 3];
+	let ys: [2]int = [-9223372036854775808; 2];
+	printf("array_repeat int %lld %lld\n".ptr, xs[2] as int, ys[0] as int);
+}
+
+fn array_repeat_on_u8()
+{
+	let xs: [3]u8 = [255; 3];
+	let ys: [2]u8 = [1; 2];
+	printf("array_repeat u8 %llu %llu\n".ptr, xs[2] as u64, ys[0] as u64);
+}
+
+fn array_repeat_on_u16()
+{
+	let xs: [3]u16 = [65535; 3];
+	let ys: [2]u16 = [1; 2];
+	printf("array_repeat u16 %llu %llu\n".ptr, xs[2] as u64, ys[0] as u64);
+}
+
+fn array_repeat_on_u32()
+{
+	let xs: [3]u32 = [4294967295; 3];
+	let ys: [2]u32 = [1; 2];
+	printf("array_repeat u32 %llu %llu\n".ptr, xs[2] as u64, ys[0] as u64);
+}
+
+fn array_repeat_on_u64()
+{
+	let xs: [3]u64 = [18446744073709551615; 3];
+	let ys: [2]u64 = [1; 2];
+	printf("array_repeat u64 %llu %llu\n".ptr, xs[2] as u64, ys[0] as u64);
+}
+
+fn array_repeat_on_uint()
+{
+	let xs: [3]uint = [18446744073709551615; 3];
+	let ys: [2]uint = [1; 2];
+	printf("array_repeat uint %llu %llu\n".ptr, xs[2] as u64, ys[0] as u64);
+}
+
+fn array_repeat_on_byte()
+{
+	let xs: [3]byte = [255; 3];
+	let ys: [2]byte = [1; 2];
+	printf("array_repeat byte %llu %llu\n".ptr, xs[2] as u64, ys[0] as u64);
+}
+
+fn array_repeat_on_f32()
+{
+	let xs: [3]f32 = [1.5; 3];
+	let ys: [2]f32 = [-0.25; 2];
+	printf("array_repeat f32 %g %g\n".ptr, xs[2] as f64, ys[0] as f64);
+}
+
+fn array_repeat_on_f64()
+{
+	let xs: [3]f64 = [1.5; 3];
+	let ys: [2]f64 = [-0.25; 2];
+	printf("array_repeat f64 %g %g\n".ptr, xs[2], ys[0]);
+}
+
+fn array_repeat_on_f16()
+{
+	let xs: [3]f16 = [1.5 as f16; 3];
+	let ys: [2]f16 = [-0.25 as f16; 2];
+	printf("array_repeat f16 %g %g\n".ptr, xs[2] as f64, ys[0] as f64);
+}
+
+fn array_repeat_on_bool()
+{
+	let xs: [3]bool = [true; 3];
+	let ys: [2]bool = [false; 2];
+	printf("array_repeat bool %d %d\n".ptr, xs[2] as c_int, ys[0] as c_int);
+}
+
+fn array_repeat_on_char()
+{
+	let xs: [3]char = ['a'; 3];
+	let ys: [2]char = ['\u{10FFFF}'; 2];
+	printf("array_repeat char %u %u\n".ptr, xs[2] as u32, ys[0] as u32);
+}
+
+fn array_repeat_on_str()
+{
+	let xs: [3]str = ["one"; 3];
+	let ys: [2]str = ["three"; 2];
+	printf("array_repeat str %lld %lld\n".ptr, xs[2].len, ys[0].len);
+}
+
+fn array_repeat_on_slice()
+{
+	let base = [1, 2, 3];
+	let xs: [3][]int = [base[0..1]; 3];
+	let ys: [2][]int = [base[0..3]; 2];
+	printf("array_repeat slice %lld %lld\n".ptr, xs[2].len, ys[0].len);
+}
+
+fn array_repeat_on_fixed_array()
+{
+	let xs: [3][2]int = [[1, 2]; 3];
+	let ys: [2][2]int = [[3, 4]; 2];
+	printf("array_repeat fixed_array %lld %lld\n".ptr, xs[2][1], ys[0][1]);
+}
+
+fn array_repeat_on_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let xs: [3]*int = [&a; 3];
+	let ys: [2]*int = [&b; 2];
+	printf("array_repeat pointer %lld %lld\n".ptr, *xs[2], *ys[0]);
+}
+
+fn array_repeat_on_nullable_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let some: ?*int = &a;
+	let nothing: ?*int = none;
+	let xs: [3]?*int = [some; 3];
+	let ys: [2]?*int = [nothing; 2];
+	printf("array_repeat nullable_pointer %lld %lld\n".ptr, *(xs[2] ?? &b), *(ys[0] ?? &b));
+}
+
+fn array_repeat_on_optional()
+{
+	let some: ?int = 5;
+	let nothing: ?int = none;
+	let xs: [3] ?int = [some; 3];
+	let ys: [2] ?int = [nothing; 2];
+	printf("array_repeat optional %lld %lld\n".ptr, (xs[2] ?? -1), (ys[0] ?? -1));
+}
+
+fn array_repeat_on_may_fail_fn()
+{
+	let xs: [3] fn(int) -> int may fail = [risky_up; 3];
+	let ys: [2] fn(int) -> int may fail = [risky_down; 2];
+	printf("array_repeat may_fail_fn %lld %lld\n".ptr, settle(xs[2]), settle(ys[0]));
+}
+
+fn array_repeat_on_fn()
+{
+	let xs: [3] fn(int) -> int = [up; 3];
+	let ys: [2] fn(int) -> int = [down; 2];
+	printf("array_repeat fn %lld %lld\n".ptr, xs[2](10), ys[0](10));
+}
+
+fn array_repeat_on_tuple()
+{
+	let xs: [3](int, bool) = [(1, true); 3];
+	let ys: [2](int, bool) = [(2, false); 2];
+	printf("array_repeat tuple %lld %lld\n".ptr, xs[2].0, ys[0].0);
+}
+
+fn array_repeat_on_channel()
+{
+	let c1 = chan int(1);
+	let c2 = chan int(1);
+	let xs: [3] chan int = [c1; 3];
+	let ys: [2] chan int = [c2; 2];
+	printf("array_repeat channel %d %d\n".ptr, (xs[2] == c1) as c_int, (ys[0] == c1) as c_int);
+	delete(c1);
+	delete(c2);
+}
+
+fn array_repeat_on_struct()
+{
+	let xs: [3]Pt = [Pt { x: 1, y: 2 }; 3];
+	let ys: [2]Pt = [Pt { x: 3, y: 4 }; 2];
+	printf("array_repeat struct %lld %lld\n".ptr, xs[2].y, ys[0].y);
+}
+
+fn array_repeat_on_packed_struct()
+{
+	let xs: [3]Pk = [Pk { a: 1, b: 2 }; 3];
+	let ys: [2]Pk = [Pk { a: 3, b: 4 }; 2];
+	printf("array_repeat packed_struct %lld %lld\n".ptr, xs[2].b as int, ys[0].b as int);
+}
+
+fn array_repeat_on_simd_struct()
+{
+	let xs: [3]I32x4 = [I32x4 { a: 1, b: 2, c: 3, d: 4 }; 3];
+	let ys: [2]I32x4 = [I32x4 { a: 5, b: 6, c: 7, d: 8 }; 2];
+	printf("array_repeat simd_struct %lld %lld\n".ptr, xs[2].c as int, ys[0].c as int);
+}
+
+fn array_repeat_on_union()
+{
+	let xs: [3]Bits = [Bits { i: 7 }; 3];
+	let ys: [2]Bits = [Bits { i: 9 }; 2];
+	printf("array_repeat union %lld %lld\n".ptr, xs[2].i as int, ys[0].i as int);
+}
+
+fn array_repeat_on_enum()
+{
+	let xs: [3]Color = [Color.Green; 3];
+	let ys: [2]Color = [Color.Blue; 2];
+	printf("array_repeat enum %lld %lld\n".ptr, xs[2] as int, ys[0] as int);
+}
+
+fn array_repeat_on_variant()
+{
+	let xs: [3]Shape = [Shape.Circle { r: 2 }; 3];
+	let ys: [2]Shape = [Shape.Empty; 2];
+	printf("array_repeat variant %d %d\n".ptr, (xs[2] is Shape.Circle) as c_int, (ys[0] is Shape.Circle) as c_int);
+}
+
+fn array_repeat_on_class()
+{
+	let xs: [3]Counter = [Counter { n: 5 }; 3];
+	let ys: [2]Counter = [Counter { n: 6 }; 2];
+	printf("array_repeat class %lld %lld\n".ptr, xs[2].n, ys[0].n);
+}
+
+fn array_repeat_on_synchronized_class()
+{
+	let xs: [3]Tally = [Tally { n: 5 }; 3];
+	let ys: [2]Tally = [Tally { n: 6 }; 2];
+	printf("array_repeat synchronized_class %lld %lld\n".ptr, xs[2].get(), ys[0].get());
+}
+
+fn array_repeat_on_concurrent_class()
+{
+	let xs: [3]Hits = [Hits { n: 5 }; 3];
+	let ys: [2]Hits = [Hits { n: 6 }; 2];
+	printf("array_repeat concurrent_class %lld %lld\n".ptr, xs[2].n.load(), ys[0].n.load());
+}
+
+fn array_repeat_on_interface()
+{
+	let one = One { };
+	let two = Two { };
+	let first: *Named = &one;
+	let second: *Named = &two;
+	let xs: [3]*Named = [first; 3];
+	let ys: [2]*Named = [second; 2];
+	printf("array_repeat interface %lld %lld\n".ptr, xs[2].id(), ys[0].id());
+}
+
+fn array_repeat_on_generic<T>(a: T, b: T, read: fn(T) -> int)
+{
+	let xs: [3]T = [dup(a); 3];
+	let ys: [2]T = [dup(b); 2];
+	printf("array_repeat generic %lld %lld\n".ptr, read(xs[2]), read(ys[0]));
+}
+
+fn slice_literal_on_i8()
+{
+	let xs: [2]i8 = [127, -128];
+	let s = []i8 { ptr: &xs[0], len: 2 };
+	printf("slice_literal i8 %lld %lld\n".ptr, s[0] as int, s[1] as int);
+}
+
+fn slice_literal_on_i16()
+{
+	let xs: [2]i16 = [32767, -32768];
+	let s = []i16 { ptr: &xs[0], len: 2 };
+	printf("slice_literal i16 %lld %lld\n".ptr, s[0] as int, s[1] as int);
+}
+
+fn slice_literal_on_i32()
+{
+	let xs: [2]i32 = [2147483647, -2147483648];
+	let s = []i32 { ptr: &xs[0], len: 2 };
+	printf("slice_literal i32 %lld %lld\n".ptr, s[0] as int, s[1] as int);
+}
+
+fn slice_literal_on_i64()
+{
+	let xs: [2]i64 = [9223372036854775807, -9223372036854775808];
+	let s = []i64 { ptr: &xs[0], len: 2 };
+	printf("slice_literal i64 %lld %lld\n".ptr, s[0] as int, s[1] as int);
+}
+
+fn slice_literal_on_int()
+{
+	let xs: [2]int = [9223372036854775807, -9223372036854775808];
+	let s = []int { ptr: &xs[0], len: 2 };
+	printf("slice_literal int %lld %lld\n".ptr, s[0] as int, s[1] as int);
+}
+
+fn slice_literal_on_u8()
+{
+	let xs: [2]u8 = [255, 1];
+	let s = []u8 { ptr: &xs[0], len: 2 };
+	printf("slice_literal u8 %llu %llu\n".ptr, s[0] as u64, s[1] as u64);
+}
+
+fn slice_literal_on_u16()
+{
+	let xs: [2]u16 = [65535, 1];
+	let s = []u16 { ptr: &xs[0], len: 2 };
+	printf("slice_literal u16 %llu %llu\n".ptr, s[0] as u64, s[1] as u64);
+}
+
+fn slice_literal_on_u32()
+{
+	let xs: [2]u32 = [4294967295, 1];
+	let s = []u32 { ptr: &xs[0], len: 2 };
+	printf("slice_literal u32 %llu %llu\n".ptr, s[0] as u64, s[1] as u64);
+}
+
+fn slice_literal_on_u64()
+{
+	let xs: [2]u64 = [18446744073709551615, 1];
+	let s = []u64 { ptr: &xs[0], len: 2 };
+	printf("slice_literal u64 %llu %llu\n".ptr, s[0] as u64, s[1] as u64);
+}
+
+fn slice_literal_on_uint()
+{
+	let xs: [2]uint = [18446744073709551615, 1];
+	let s = []uint { ptr: &xs[0], len: 2 };
+	printf("slice_literal uint %llu %llu\n".ptr, s[0] as u64, s[1] as u64);
+}
+
+fn slice_literal_on_byte()
+{
+	let xs: [2]byte = [255, 1];
+	let s = []byte { ptr: &xs[0], len: 2 };
+	printf("slice_literal byte %llu %llu\n".ptr, s[0] as u64, s[1] as u64);
+}
+
+fn slice_literal_on_f32()
+{
+	let xs: [2]f32 = [1.5, -0.25];
+	let s = []f32 { ptr: &xs[0], len: 2 };
+	printf("slice_literal f32 %g %g\n".ptr, s[0] as f64, s[1] as f64);
+}
+
+fn slice_literal_on_f64()
+{
+	let xs: [2]f64 = [1.5, -0.25];
+	let s = []f64 { ptr: &xs[0], len: 2 };
+	printf("slice_literal f64 %g %g\n".ptr, s[0], s[1]);
+}
+
+fn slice_literal_on_f16()
+{
+	let xs: [2]f16 = [1.5 as f16, -0.25 as f16];
+	let s = []f16 { ptr: &xs[0], len: 2 };
+	printf("slice_literal f16 %g %g\n".ptr, s[0] as f64, s[1] as f64);
+}
+
+fn slice_literal_on_bool()
+{
+	let xs: [2]bool = [true, false];
+	let s = []bool { ptr: &xs[0], len: 2 };
+	printf("slice_literal bool %d %d\n".ptr, s[0] as c_int, s[1] as c_int);
+}
+
+fn slice_literal_on_char()
+{
+	let xs: [2]char = ['a', '\u{10FFFF}'];
+	let s = []char { ptr: &xs[0], len: 2 };
+	printf("slice_literal char %u %u\n".ptr, s[0] as u32, s[1] as u32);
+}
+
+fn slice_literal_on_str()
+{
+	let xs: [2]str = ["one", "three"];
+	let s = []str { ptr: &xs[0], len: 2 };
+	printf("slice_literal str %lld %lld\n".ptr, s[0].len, s[1].len);
+}
+
+fn slice_literal_on_slice()
+{
+	let base = [1, 2, 3];
+	let xs: [2][]int = [base[0..1], base[0..3]];
+	let s = [][]int { ptr: &xs[0], len: 2 };
+	printf("slice_literal slice %lld %lld\n".ptr, s[0].len, s[1].len);
+}
+
+fn slice_literal_on_fixed_array()
+{
+	let xs: [2][2]int = [[1, 2], [3, 4]];
+	let s = [][2]int { ptr: &xs[0], len: 2 };
+	printf("slice_literal fixed_array %lld %lld\n".ptr, s[0][1], s[1][1]);
+}
+
+fn slice_literal_on_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let xs: [2]*int = [&a, &b];
+	let s = []*int { ptr: &xs[0], len: 2 };
+	printf("slice_literal pointer %lld %lld\n".ptr, *s[0], *s[1]);
+}
+
+fn slice_literal_on_nullable_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let xs: [2]?*int = [&a, none];
+	let s = []?*int { ptr: &xs[0], len: 2 };
+	printf("slice_literal nullable_pointer %lld %lld\n".ptr, *(s[0] ?? &b), *(s[1] ?? &b));
+}
+
+fn slice_literal_on_optional()
+{
+	let xs: [2] ?int = [5, none];
+	let s = [] ?int { ptr: &xs[0], len: 2 };
+	printf("slice_literal optional %lld %lld\n".ptr, (s[0] ?? -1), (s[1] ?? -1));
+}
+
+fn slice_literal_on_may_fail_fn()
+{
+	let xs: [2] fn(int) -> int may fail = [risky_up, risky_down];
+	let s = [] fn(int) -> int may fail { ptr: &xs[0], len: 2 };
+	printf("slice_literal may_fail_fn %lld %lld\n".ptr, settle(s[0]), settle(s[1]));
+}
+
+fn slice_literal_on_fn()
+{
+	let xs: [2] fn(int) -> int = [up, down];
+	let s = [] fn(int) -> int { ptr: &xs[0], len: 2 };
+	printf("slice_literal fn %lld %lld\n".ptr, s[0](10), s[1](10));
+}
+
+fn slice_literal_on_tuple()
+{
+	let xs: [2](int, bool) = [(1, true), (2, false)];
+	let s = [](int, bool) { ptr: &xs[0], len: 2 };
+	printf("slice_literal tuple %lld %lld\n".ptr, s[0].0, s[1].0);
+}
+
+fn slice_literal_on_channel()
+{
+	let c1 = chan int(1);
+	let c2 = chan int(1);
+	let xs: [2] chan int = [c1, c2];
+	let s = [] chan int { ptr: &xs[0], len: 2 };
+	printf("slice_literal channel %d %d\n".ptr, (s[0] == c1) as c_int, (s[1] == c1) as c_int);
+	delete(c1);
+	delete(c2);
+}
+
+fn slice_literal_on_struct()
+{
+	let xs: [2]Pt = [Pt { x: 1, y: 2 }, Pt { x: 3, y: 4 }];
+	let s = []Pt { ptr: &xs[0], len: 2 };
+	printf("slice_literal struct %lld %lld\n".ptr, s[0].y, s[1].y);
+}
+
+fn slice_literal_on_packed_struct()
+{
+	let xs: [2]Pk = [Pk { a: 1, b: 2 }, Pk { a: 3, b: 4 }];
+	let s = []Pk { ptr: &xs[0], len: 2 };
+	printf("slice_literal packed_struct %lld %lld\n".ptr, s[0].b as int, s[1].b as int);
+}
+
+fn slice_literal_on_simd_struct()
+{
+	let xs: [2]I32x4 = [I32x4 { a: 1, b: 2, c: 3, d: 4 }, I32x4 { a: 5, b: 6, c: 7, d: 8 }];
+	let s = []I32x4 { ptr: &xs[0], len: 2 };
+	printf("slice_literal simd_struct %lld %lld\n".ptr, s[0].c as int, s[1].c as int);
+}
+
+fn slice_literal_on_union()
+{
+	let xs: [2]Bits = [Bits { i: 7 }, Bits { i: 9 }];
+	let s = []Bits { ptr: &xs[0], len: 2 };
+	printf("slice_literal union %lld %lld\n".ptr, s[0].i as int, s[1].i as int);
+}
+
+fn slice_literal_on_enum()
+{
+	let xs: [2]Color = [Color.Green, Color.Blue];
+	let s = []Color { ptr: &xs[0], len: 2 };
+	printf("slice_literal enum %lld %lld\n".ptr, s[0] as int, s[1] as int);
+}
+
+fn slice_literal_on_variant()
+{
+	let xs: [2]Shape = [Shape.Circle { r: 2 }, Shape.Empty];
+	let s = []Shape { ptr: &xs[0], len: 2 };
+	printf("slice_literal variant %d %d\n".ptr, (s[0] is Shape.Circle) as c_int, (s[1] is Shape.Circle) as c_int);
+}
+
+fn slice_literal_on_class()
+{
+	let xs: [2]Counter = [Counter { n: 5 }, Counter { n: 6 }];
+	let s = []Counter { ptr: &xs[0], len: 2 };
+	printf("slice_literal class %lld %lld\n".ptr, s[0].n, s[1].n);
+}
+
+fn slice_literal_on_synchronized_class()
+{
+	let xs: [2]Tally = [Tally { n: 5 }, Tally { n: 6 }];
+	let s = []Tally { ptr: &xs[0], len: 2 };
+	printf("slice_literal synchronized_class %lld %lld\n".ptr, s[0].get(), s[1].get());
+}
+
+fn slice_literal_on_concurrent_class()
+{
+	let xs: [2]Hits = [Hits { n: 5 }, Hits { n: 6 }];
+	let s = []Hits { ptr: &xs[0], len: 2 };
+	printf("slice_literal concurrent_class %lld %lld\n".ptr, s[0].n.load(), s[1].n.load());
+}
+
+fn slice_literal_on_interface()
+{
+	let one = One { };
+	let two = Two { };
+	let xs: [2]*Named = [&one, &two];
+	let s = []*Named { ptr: &xs[0], len: 2 };
+	printf("slice_literal interface %lld %lld\n".ptr, s[0].id(), s[1].id());
+}
+
+fn slice_literal_on_generic<T>(a: T, b: T, read: fn(T) -> int)
+{
+	let xs: [2]T = [dup(a), dup(b)];
+	let s = []T { ptr: &xs[0], len: 2 };
+	printf("slice_literal generic %lld %lld\n".ptr, read(s[0]), read(s[1]));
+}
+
+fn tuple_element_on_i8()
+{
+	let t: (i8, int) = (127, 7);
+	let u: (int, i8) = (7, -128);
+	printf("tuple_element i8 %lld %lld\n".ptr, t.0 as int, u.1 as int);
+}
+
+fn tuple_element_on_i16()
+{
+	let t: (i16, int) = (32767, 7);
+	let u: (int, i16) = (7, -32768);
+	printf("tuple_element i16 %lld %lld\n".ptr, t.0 as int, u.1 as int);
+}
+
+fn tuple_element_on_i32()
+{
+	let t: (i32, int) = (2147483647, 7);
+	let u: (int, i32) = (7, -2147483648);
+	printf("tuple_element i32 %lld %lld\n".ptr, t.0 as int, u.1 as int);
+}
+
+fn tuple_element_on_i64()
+{
+	let t: (i64, int) = (9223372036854775807, 7);
+	let u: (int, i64) = (7, -9223372036854775808);
+	printf("tuple_element i64 %lld %lld\n".ptr, t.0 as int, u.1 as int);
+}
+
+fn tuple_element_on_int()
+{
+	let t: (int, int) = (9223372036854775807, 7);
+	let u: (int, int) = (7, -9223372036854775808);
+	printf("tuple_element int %lld %lld\n".ptr, t.0 as int, u.1 as int);
+}
+
+fn tuple_element_on_u8()
+{
+	let t: (u8, int) = (255, 7);
+	let u: (int, u8) = (7, 1);
+	printf("tuple_element u8 %llu %llu\n".ptr, t.0 as u64, u.1 as u64);
+}
+
+fn tuple_element_on_u16()
+{
+	let t: (u16, int) = (65535, 7);
+	let u: (int, u16) = (7, 1);
+	printf("tuple_element u16 %llu %llu\n".ptr, t.0 as u64, u.1 as u64);
+}
+
+fn tuple_element_on_u32()
+{
+	let t: (u32, int) = (4294967295, 7);
+	let u: (int, u32) = (7, 1);
+	printf("tuple_element u32 %llu %llu\n".ptr, t.0 as u64, u.1 as u64);
+}
+
+fn tuple_element_on_u64()
+{
+	let t: (u64, int) = (18446744073709551615, 7);
+	let u: (int, u64) = (7, 1);
+	printf("tuple_element u64 %llu %llu\n".ptr, t.0 as u64, u.1 as u64);
+}
+
+fn tuple_element_on_uint()
+{
+	let t: (uint, int) = (18446744073709551615, 7);
+	let u: (int, uint) = (7, 1);
+	printf("tuple_element uint %llu %llu\n".ptr, t.0 as u64, u.1 as u64);
+}
+
+fn tuple_element_on_byte()
+{
+	let t: (byte, int) = (255, 7);
+	let u: (int, byte) = (7, 1);
+	printf("tuple_element byte %llu %llu\n".ptr, t.0 as u64, u.1 as u64);
+}
+
+fn tuple_element_on_f32()
+{
+	let t: (f32, int) = (1.5, 7);
+	let u: (int, f32) = (7, -0.25);
+	printf("tuple_element f32 %g %g\n".ptr, t.0 as f64, u.1 as f64);
+}
+
+fn tuple_element_on_f64()
+{
+	let t: (f64, int) = (1.5, 7);
+	let u: (int, f64) = (7, -0.25);
+	printf("tuple_element f64 %g %g\n".ptr, t.0, u.1);
+}
+
+fn tuple_element_on_f16()
+{
+	let t: (f16, int) = (1.5 as f16, 7);
+	let u: (int, f16) = (7, -0.25 as f16);
+	printf("tuple_element f16 %g %g\n".ptr, t.0 as f64, u.1 as f64);
+}
+
+fn tuple_element_on_bool()
+{
+	let t: (bool, int) = (true, 7);
+	let u: (int, bool) = (7, false);
+	printf("tuple_element bool %d %d\n".ptr, t.0 as c_int, u.1 as c_int);
+}
+
+fn tuple_element_on_char()
+{
+	let t: (char, int) = ('a', 7);
+	let u: (int, char) = (7, '\u{10FFFF}');
+	printf("tuple_element char %u %u\n".ptr, t.0 as u32, u.1 as u32);
+}
+
+fn tuple_element_on_str()
+{
+	let t: (str, int) = ("one", 7);
+	let u: (int, str) = (7, "three");
+	printf("tuple_element str %lld %lld\n".ptr, t.0.len, u.1.len);
+}
+
+fn tuple_element_on_slice()
+{
+	let base = [1, 2, 3];
+	let t: ([]int, int) = (base[0..1], 7);
+	let u: (int, []int) = (7, base[0..3]);
+	printf("tuple_element slice %lld %lld\n".ptr, t.0.len, u.1.len);
+}
+
+fn tuple_element_on_fixed_array()
+{
+	let t: ([2]int, int) = ([1, 2], 7);
+	let u: (int, [2]int) = (7, [3, 4]);
+	printf("tuple_element fixed_array %lld %lld\n".ptr, t.0[1], u.1[1]);
+}
+
+fn tuple_element_on_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let t: (*int, int) = (&a, 7);
+	let u: (int, *int) = (7, &b);
+	printf("tuple_element pointer %lld %lld\n".ptr, *t.0, *u.1);
+}
+
+fn tuple_element_on_nullable_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let t: (?*int, int) = (&a, 7);
+	let u: (int, ?*int) = (7, none);
+	printf("tuple_element nullable_pointer %lld %lld\n".ptr, *(t.0 ?? &b), *(u.1 ?? &b));
+}
+
+fn tuple_element_on_optional()
+{
+	let t: (?int, int) = (5, 7);
+	let u: (int, ?int) = (7, none);
+	printf("tuple_element optional %lld %lld\n".ptr, (t.0 ?? -1), (u.1 ?? -1));
+}
+
+fn tuple_element_on_may_fail_fn()
+{
+	let t: (fn(int) -> int may fail, int) = (risky_up, 7);
+	let u: (int, fn(int) -> int may fail) = (7, risky_down);
+	printf("tuple_element may_fail_fn %lld %lld\n".ptr, settle(t.0), settle(u.1));
+}
+
+fn tuple_element_on_fn()
+{
+	let t: (fn(int) -> int, int) = (up, 7);
+	let u: (int, fn(int) -> int) = (7, down);
+	printf("tuple_element fn %lld %lld\n".ptr, t.0(10), u.1(10));
+}
+
+fn tuple_element_on_tuple()
+{
+	let t: ((int, bool), int) = ((1, true), 7);
+	let u: (int, (int, bool)) = (7, (2, false));
+	printf("tuple_element tuple %lld %lld\n".ptr, t.0.0, u.1.0);
+}
+
+fn tuple_element_on_channel()
+{
+	let c1 = chan int(1);
+	let c2 = chan int(1);
+	let t: (chan int, int) = (c1, 7);
+	let u: (int, chan int) = (7, c2);
+	printf("tuple_element channel %d %d\n".ptr, (t.0 == c1) as c_int, (u.1 == c1) as c_int);
+	delete(c1);
+	delete(c2);
+}
+
+fn tuple_element_on_struct()
+{
+	let t: (Pt, int) = (Pt { x: 1, y: 2 }, 7);
+	let u: (int, Pt) = (7, Pt { x: 3, y: 4 });
+	printf("tuple_element struct %lld %lld\n".ptr, t.0.y, u.1.y);
+}
+
+fn tuple_element_on_packed_struct()
+{
+	let t: (Pk, int) = (Pk { a: 1, b: 2 }, 7);
+	let u: (int, Pk) = (7, Pk { a: 3, b: 4 });
+	printf("tuple_element packed_struct %lld %lld\n".ptr, t.0.b as int, u.1.b as int);
+}
+
+fn tuple_element_on_simd_struct()
+{
+	let t: (I32x4, int) = (I32x4 { a: 1, b: 2, c: 3, d: 4 }, 7);
+	let u: (int, I32x4) = (7, I32x4 { a: 5, b: 6, c: 7, d: 8 });
+	printf("tuple_element simd_struct %lld %lld\n".ptr, t.0.c as int, u.1.c as int);
+}
+
+fn tuple_element_on_union()
+{
+	let t: (Bits, int) = (Bits { i: 7 }, 7);
+	let u: (int, Bits) = (7, Bits { i: 9 });
+	printf("tuple_element union %lld %lld\n".ptr, t.0.i as int, u.1.i as int);
+}
+
+fn tuple_element_on_enum()
+{
+	let t: (Color, int) = (Color.Green, 7);
+	let u: (int, Color) = (7, Color.Blue);
+	printf("tuple_element enum %lld %lld\n".ptr, t.0 as int, u.1 as int);
+}
+
+fn tuple_element_on_variant()
+{
+	let t: (Shape, int) = (Shape.Circle { r: 2 }, 7);
+	let u: (int, Shape) = (7, Shape.Empty);
+	printf("tuple_element variant %d %d\n".ptr, (t.0 is Shape.Circle) as c_int, (u.1 is Shape.Circle) as c_int);
+}
+
+fn tuple_element_on_class()
+{
+	let t: (Counter, int) = (Counter { n: 5 }, 7);
+	let u: (int, Counter) = (7, Counter { n: 6 });
+	printf("tuple_element class %lld %lld\n".ptr, t.0.n, u.1.n);
+}
+
+fn tuple_element_on_synchronized_class()
+{
+	let t: (Tally, int) = (Tally { n: 5 }, 7);
+	let u: (int, Tally) = (7, Tally { n: 6 });
+	printf("tuple_element synchronized_class %lld %lld\n".ptr, t.0.get(), u.1.get());
+}
+
+fn tuple_element_on_concurrent_class()
+{
+	let t: (Hits, int) = (Hits { n: 5 }, 7);
+	let u: (int, Hits) = (7, Hits { n: 6 });
+	printf("tuple_element concurrent_class %lld %lld\n".ptr, t.0.n.load(), u.1.n.load());
+}
+
+fn tuple_element_on_interface()
+{
+	let one = One { };
+	let two = Two { };
+	let t: (*Named, int) = (&one, 7);
+	let u: (int, *Named) = (7, &two);
+	printf("tuple_element interface %lld %lld\n".ptr, t.0.id(), u.1.id());
+}
+
+fn tuple_element_on_generic<T>(a: T, b: T, read: fn(T) -> int)
+{
+	let t: (T, int) = (dup(a), 7);
+	let u: (int, T) = (7, dup(b));
+	printf("tuple_element generic %lld %lld\n".ptr, read(t.0), read(u.1));
+}
+
+fn main() -> int
+{
+	array_on_i8();
+	array_on_i16();
+	array_on_i32();
+	array_on_i64();
+	array_on_int();
+	array_on_u8();
+	array_on_u16();
+	array_on_u32();
+	array_on_u64();
+	array_on_uint();
+	array_on_byte();
+	array_on_f32();
+	array_on_f64();
+	array_on_f16();
+	array_on_bool();
+	array_on_char();
+	array_on_str();
+	array_on_slice();
+	array_on_fixed_array();
+	array_on_pointer();
+	array_on_nullable_pointer();
+	array_on_optional();
+	array_on_may_fail_fn();
+	array_on_fn();
+	array_on_tuple();
+	array_on_channel();
+	array_on_struct();
+	array_on_packed_struct();
+	array_on_simd_struct();
+	array_on_union();
+	array_on_enum();
+	array_on_variant();
+	array_on_class();
+	array_on_synchronized_class();
+	array_on_concurrent_class();
+	array_on_interface();
+	array_on_generic<int>(11, 22, same);
+	array_repeat_on_i8();
+	array_repeat_on_i16();
+	array_repeat_on_i32();
+	array_repeat_on_i64();
+	array_repeat_on_int();
+	array_repeat_on_u8();
+	array_repeat_on_u16();
+	array_repeat_on_u32();
+	array_repeat_on_u64();
+	array_repeat_on_uint();
+	array_repeat_on_byte();
+	array_repeat_on_f32();
+	array_repeat_on_f64();
+	array_repeat_on_f16();
+	array_repeat_on_bool();
+	array_repeat_on_char();
+	array_repeat_on_str();
+	array_repeat_on_slice();
+	array_repeat_on_fixed_array();
+	array_repeat_on_pointer();
+	array_repeat_on_nullable_pointer();
+	array_repeat_on_optional();
+	array_repeat_on_may_fail_fn();
+	array_repeat_on_fn();
+	array_repeat_on_tuple();
+	array_repeat_on_channel();
+	array_repeat_on_struct();
+	array_repeat_on_packed_struct();
+	array_repeat_on_simd_struct();
+	array_repeat_on_union();
+	array_repeat_on_enum();
+	array_repeat_on_variant();
+	array_repeat_on_class();
+	array_repeat_on_synchronized_class();
+	array_repeat_on_concurrent_class();
+	array_repeat_on_interface();
+	array_repeat_on_generic<int>(11, 22, same);
+	slice_literal_on_i8();
+	slice_literal_on_i16();
+	slice_literal_on_i32();
+	slice_literal_on_i64();
+	slice_literal_on_int();
+	slice_literal_on_u8();
+	slice_literal_on_u16();
+	slice_literal_on_u32();
+	slice_literal_on_u64();
+	slice_literal_on_uint();
+	slice_literal_on_byte();
+	slice_literal_on_f32();
+	slice_literal_on_f64();
+	slice_literal_on_f16();
+	slice_literal_on_bool();
+	slice_literal_on_char();
+	slice_literal_on_str();
+	slice_literal_on_slice();
+	slice_literal_on_fixed_array();
+	slice_literal_on_pointer();
+	slice_literal_on_nullable_pointer();
+	slice_literal_on_optional();
+	slice_literal_on_may_fail_fn();
+	slice_literal_on_fn();
+	slice_literal_on_tuple();
+	slice_literal_on_channel();
+	slice_literal_on_struct();
+	slice_literal_on_packed_struct();
+	slice_literal_on_simd_struct();
+	slice_literal_on_union();
+	slice_literal_on_enum();
+	slice_literal_on_variant();
+	slice_literal_on_class();
+	slice_literal_on_synchronized_class();
+	slice_literal_on_concurrent_class();
+	slice_literal_on_interface();
+	slice_literal_on_generic<int>(11, 22, same);
+	tuple_element_on_i8();
+	tuple_element_on_i16();
+	tuple_element_on_i32();
+	tuple_element_on_i64();
+	tuple_element_on_int();
+	tuple_element_on_u8();
+	tuple_element_on_u16();
+	tuple_element_on_u32();
+	tuple_element_on_u64();
+	tuple_element_on_uint();
+	tuple_element_on_byte();
+	tuple_element_on_f32();
+	tuple_element_on_f64();
+	tuple_element_on_f16();
+	tuple_element_on_bool();
+	tuple_element_on_char();
+	tuple_element_on_str();
+	tuple_element_on_slice();
+	tuple_element_on_fixed_array();
+	tuple_element_on_pointer();
+	tuple_element_on_nullable_pointer();
+	tuple_element_on_optional();
+	tuple_element_on_may_fail_fn();
+	tuple_element_on_fn();
+	tuple_element_on_tuple();
+	tuple_element_on_channel();
+	tuple_element_on_struct();
+	tuple_element_on_packed_struct();
+	tuple_element_on_simd_struct();
+	tuple_element_on_union();
+	tuple_element_on_enum();
+	tuple_element_on_variant();
+	tuple_element_on_class();
+	tuple_element_on_synchronized_class();
+	tuple_element_on_concurrent_class();
+	tuple_element_on_interface();
+	tuple_element_on_generic<int>(11, 22, same);
+	return 0;
+}

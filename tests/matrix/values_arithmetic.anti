@@ -1,0 +1,1390 @@
+//! The arithmetic operators of the values area, each in every place its row of
+//! docs/notes/test-matrix.md left open: arith, wrapping, saturating, mul_high,
+//! unary, as. Each construct in each place is a function of its own, named
+//! after both, and the program prints one line per construct, place and input.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+fn in_undo_arith(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		acc += (n + 3) * 2 - n / 2 + n % 3;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn in_select_arith(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			acc += (n + 3) * 2 - n / 2 + n % 3;
+		},
+	}
+	return acc;
+}
+
+fn in_arm_wrapping(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let big: int = 9223372036854775807;
+			let w = big +% n;
+			let back = w -% big;
+			let m = big *% 2;
+			let gone = n <<% 64;
+			acc += back + m + gone + (n <<% 2);
+		},
+	}
+	return acc;
+}
+
+fn held_wrapping(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_wrapping(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_wrapping(n) {
+		acc += v - n * 3;
+		let big: int = 9223372036854775807;
+		let w = big +% n;
+		let back = w -% big;
+		let m = big *% 2;
+		let gone = n <<% 64;
+		acc += back + m + gone + (n <<% 2);
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_wrapping(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let big: int = 9223372036854775807;
+		let w = big +% n;
+		let back = w -% big;
+		let m = big *% 2;
+		let gone = n <<% 64;
+		acc += back + m + gone + (n <<% 2);
+	}
+	acc = 5;
+}
+
+fn in_undo_wrapping(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let big: int = 9223372036854775807;
+		let w = big +% n;
+		let back = w -% big;
+		let m = big *% 2;
+		let gone = n <<% 64;
+		acc += back + m + gone + (n <<% 2);
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_wrapping(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_wrapping(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_wrapping(n) catch {
+		let big: int = 9223372036854775807;
+		let w = big +% n;
+		let back = w -% big;
+		let m = big *% 2;
+		let gone = n <<% 64;
+		acc += back + m + gone + (n <<% 2);
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_wrapping(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_wrapping(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_wrapping(start, fn(n) {
+		let big: int = 9223372036854775807;
+		let w = big +% n;
+		let back = w -% big;
+		let m = big *% 2;
+		let gone = n <<% 64;
+		acc += back + m + gone + (n <<% 2);
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_wrapping(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let big: int = 9223372036854775807;
+	let w = big +% n;
+	let back = w -% big;
+	let m = big *% 2;
+	let gone = n <<% 64;
+	acc += back + m + gone + (n <<% 2);
+	return acc;
+}
+
+worker fn work_wrapping(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_wrapping(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_wrapping(fn(n) {
+		let acc = 0;
+		let big: int = 9223372036854775807;
+		let w = big +% n;
+		let back = w -% big;
+		let m = big *% 2;
+		let gone = n <<% 64;
+		acc += back + m + gone + (n <<% 2);
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_wrapping
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_wrapping(g: *Guarded_wrapping, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let big: int = 9223372036854775807;
+		let w = big +% n;
+		let back = w -% big;
+		let m = big *% 2;
+		let gone = n <<% 64;
+		acc += back + m + gone + (n <<% 2);
+	}
+	return acc;
+}
+
+fn in_select_wrapping(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let big: int = 9223372036854775807;
+			let w = big +% n;
+			let back = w -% big;
+			let m = big *% 2;
+			let gone = n <<% 64;
+			acc += back + m + gone + (n <<% 2);
+		},
+	}
+	return acc;
+}
+
+fn in_generic_wrapping<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	let big: int = 9223372036854775807;
+	let w = big +% n;
+	let back = w -% big;
+	let m = big *% 2;
+	let gone = n <<% 64;
+	acc += back + m + gone + (n <<% 2);
+	return acc;
+}
+
+class Outer_wrapping
+{
+	class Inner_wrapping
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let big: int = 9223372036854775807;
+			let w = big +% n;
+			let back = w -% big;
+			let m = big *% 2;
+			let gone = n <<% 64;
+			acc += back + m + gone + (n <<% 2);
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_wrapping { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+class Box_saturating
+{
+	pub base: int = 0,
+
+	pub fn run(self, n: int) -> int
+	{
+		let acc = self.base;
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+		return acc;
+	}
+}
+
+fn in_loop_saturating(n: int) -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		acc += turn;
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+	}
+	return acc;
+}
+
+fn in_arm_saturating(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let small: i8 = 100;
+			let up = small +| (n as i8 * 10);
+			let down = (0 - small) -| (n as i8 * 10);
+			let times = small *| (n as i8);
+			acc += up as int - down as int + times as int;
+		},
+	}
+	return acc;
+}
+
+fn held_saturating(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_saturating(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_saturating(n) {
+		acc += v - n * 3;
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_saturating(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+	}
+	acc = 5;
+}
+
+fn in_undo_saturating(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_saturating(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_saturating(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_saturating(n) catch {
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_saturating(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_saturating(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_saturating(start, fn(n) {
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_saturating(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let small: i8 = 100;
+	let up = small +| (n as i8 * 10);
+	let down = (0 - small) -| (n as i8 * 10);
+	let times = small *| (n as i8);
+	acc += up as int - down as int + times as int;
+	return acc;
+}
+
+worker fn work_saturating(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_saturating(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_saturating(fn(n) {
+		let acc = 0;
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_saturating
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_saturating(g: *Guarded_saturating, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+	}
+	return acc;
+}
+
+fn in_select_saturating(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let small: i8 = 100;
+			let up = small +| (n as i8 * 10);
+			let down = (0 - small) -| (n as i8 * 10);
+			let times = small *| (n as i8);
+			acc += up as int - down as int + times as int;
+		},
+	}
+	return acc;
+}
+
+fn in_generic_saturating<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	let small: i8 = 100;
+	let up = small +| (n as i8 * 10);
+	let down = (0 - small) -| (n as i8 * 10);
+	let times = small *| (n as i8);
+	acc += up as int - down as int + times as int;
+	return acc;
+}
+
+class Outer_saturating
+{
+	class Inner_saturating
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let small: i8 = 100;
+			let up = small +| (n as i8 * 10);
+			let down = (0 - small) -| (n as i8 * 10);
+			let times = small *| (n as i8);
+			acc += up as int - down as int + times as int;
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_saturating { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+class Box_mul_high
+{
+	pub base: int = 0,
+
+	pub fn run(self, n: int) -> int
+	{
+		let acc = self.base;
+		let wide = (n as u64) << 60;
+		acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+		return acc;
+	}
+}
+
+fn in_loop_mul_high(n: int) -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		acc += turn;
+		let wide = (n as u64) << 60;
+		acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+	}
+	return acc;
+}
+
+fn in_arm_mul_high(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let wide = (n as u64) << 60;
+			acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+		},
+	}
+	return acc;
+}
+
+fn held_mul_high(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_mul_high(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_mul_high(n) {
+		acc += v - n * 3;
+		let wide = (n as u64) << 60;
+		acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_mul_high(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let wide = (n as u64) << 60;
+		acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+	}
+	acc = 5;
+}
+
+fn in_undo_mul_high(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let wide = (n as u64) << 60;
+		acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_mul_high(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_mul_high(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_mul_high(n) catch {
+		let wide = (n as u64) << 60;
+		acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_mul_high(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_mul_high(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_mul_high(start, fn(n) {
+		let wide = (n as u64) << 60;
+		acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_mul_high(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let wide = (n as u64) << 60;
+	acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+	return acc;
+}
+
+worker fn work_mul_high(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_mul_high(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_mul_high(fn(n) {
+		let acc = 0;
+		let wide = (n as u64) << 60;
+		acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_mul_high
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_mul_high(g: *Guarded_mul_high, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let wide = (n as u64) << 60;
+		acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+	}
+	return acc;
+}
+
+fn in_select_mul_high(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let wide = (n as u64) << 60;
+			acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+		},
+	}
+	return acc;
+}
+
+fn in_generic_mul_high<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	let wide = (n as u64) << 60;
+	acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+	return acc;
+}
+
+class Outer_mul_high
+{
+	class Inner_mul_high
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let wide = (n as u64) << 60;
+			acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_mul_high { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn in_arm_unary(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let neg = -n;
+			let no = !(n > 2);
+			acc += neg * neg - -3;
+			if no {
+				acc += 100;
+			}
+		},
+	}
+	return acc;
+}
+
+fn held_unary(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_unary(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_unary(n) {
+		acc += v - n * 3;
+		let neg = -n;
+		let no = !(n > 2);
+		acc += neg * neg - -3;
+		if no {
+			acc += 100;
+		}
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_unary(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let neg = -n;
+		let no = !(n > 2);
+		acc += neg * neg - -3;
+		if no {
+			acc += 100;
+		}
+	}
+	acc = 5;
+}
+
+fn in_undo_unary(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let neg = -n;
+		let no = !(n > 2);
+		acc += neg * neg - -3;
+		if no {
+			acc += 100;
+		}
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn in_select_unary(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let neg = -n;
+			let no = !(n > 2);
+			acc += neg * neg - -3;
+			if no {
+				acc += 100;
+			}
+		},
+	}
+	return acc;
+}
+
+class Outer_unary
+{
+	class Inner_unary
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let neg = -n;
+			let no = !(n > 2);
+			acc += neg * neg - -3;
+			if no {
+				acc += 100;
+			}
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_unary { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn in_defer_as(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let small = (n + 250) as u8;
+		let f = n as f64;
+		let wide = small as u32;
+		acc += small as int + (f * 1.5) as int + wide as int;
+	}
+	acc = 5;
+}
+
+fn in_undo_as(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let small = (n + 250) as u8;
+		let f = n as f64;
+		let wide = small as u32;
+		acc += small as int + (f * 1.5) as int + wide as int;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+worker fn work_as(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_as(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_as(fn(n) {
+		let acc = 0;
+		let small = (n + 250) as u8;
+		let f = n as f64;
+		let wide = small as u32;
+		acc += small as int + (f * 1.5) as int + wide as int;
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_as
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_as(g: *Guarded_as, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let small = (n + 250) as u8;
+		let f = n as f64;
+		let wide = small as u32;
+		acc += small as int + (f * 1.5) as int + wide as int;
+	}
+	return acc;
+}
+
+fn in_select_as(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let small = (n + 250) as u8;
+			let f = n as f64;
+			let wide = small as u32;
+			acc += small as int + (f * 1.5) as int + wide as int;
+		},
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	let task = alloc Task { };
+	{
+		let undone = 0;
+		in_undo_arith(0, &undone) catch {
+			yield;
+		};
+		printf("arith undo %d\n".ptr, undone as c_int);
+		in_undo_arith(1, &undone) catch {
+			yield;
+		};
+		printf("arith undo %d\n".ptr, undone as c_int);
+		in_undo_arith(2, &undone) catch {
+			yield;
+		};
+		printf("arith undo %d\n".ptr, undone as c_int);
+		in_undo_arith(3, &undone) catch {
+			yield;
+		};
+		printf("arith undo %d\n".ptr, undone as c_int);
+		in_undo_arith(4, &undone) catch {
+			yield;
+		};
+		printf("arith undo %d\n".ptr, undone as c_int);
+		let c = chan int(1);
+		printf("arith select %d\n".ptr, in_select_arith(c, 1) as c_int);
+		printf("arith select %d\n".ptr, in_select_arith(c, 2) as c_int);
+		printf("arith select %d\n".ptr, in_select_arith(c, 3) as c_int);
+		printf("arith select %d\n".ptr, in_select_arith(c, 4) as c_int);
+		delete(c);
+	}
+	{
+		printf("wrapping arm %d\n".ptr, in_arm_wrapping(0) as c_int);
+		printf("wrapping arm %d\n".ptr, in_arm_wrapping(1) as c_int);
+		printf("wrapping arm %d\n".ptr, in_arm_wrapping(2) as c_int);
+		printf("wrapping arm %d\n".ptr, in_arm_wrapping(3) as c_int);
+		printf("wrapping arm %d\n".ptr, in_arm_wrapping(4) as c_int);
+		printf("wrapping if_let %d\n".ptr, in_if_let_wrapping(0) as c_int);
+		printf("wrapping if_let %d\n".ptr, in_if_let_wrapping(1) as c_int);
+		printf("wrapping if_let %d\n".ptr, in_if_let_wrapping(2) as c_int);
+		printf("wrapping if_let %d\n".ptr, in_if_let_wrapping(3) as c_int);
+		printf("wrapping if_let %d\n".ptr, in_if_let_wrapping(4) as c_int);
+		let deferred = 0;
+		in_defer_wrapping(1, &deferred);
+		printf("wrapping defer %d\n".ptr, deferred as c_int);
+		in_defer_wrapping(2, &deferred);
+		printf("wrapping defer %d\n".ptr, deferred as c_int);
+		in_defer_wrapping(3, &deferred);
+		printf("wrapping defer %d\n".ptr, deferred as c_int);
+		in_defer_wrapping(4, &deferred);
+		printf("wrapping defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_wrapping(0, &undone) catch {
+			yield;
+		};
+		printf("wrapping undo %d\n".ptr, undone as c_int);
+		in_undo_wrapping(1, &undone) catch {
+			yield;
+		};
+		printf("wrapping undo %d\n".ptr, undone as c_int);
+		in_undo_wrapping(2, &undone) catch {
+			yield;
+		};
+		printf("wrapping undo %d\n".ptr, undone as c_int);
+		in_undo_wrapping(3, &undone) catch {
+			yield;
+		};
+		printf("wrapping undo %d\n".ptr, undone as c_int);
+		in_undo_wrapping(4, &undone) catch {
+			yield;
+		};
+		printf("wrapping undo %d\n".ptr, undone as c_int);
+		printf("wrapping catch %d\n".ptr, in_catch_wrapping(0) as c_int);
+		printf("wrapping catch %d\n".ptr, in_catch_wrapping(1) as c_int);
+		printf("wrapping catch %d\n".ptr, in_catch_wrapping(2) as c_int);
+		printf("wrapping catch %d\n".ptr, in_catch_wrapping(3) as c_int);
+		printf("wrapping catch %d\n".ptr, in_catch_wrapping(4) as c_int);
+		printf("wrapping closure %d\n".ptr, in_closure_wrapping(1) as c_int);
+		printf("wrapping closure %d\n".ptr, in_closure_wrapping(2) as c_int);
+		printf("wrapping closure %d\n".ptr, in_closure_wrapping(3) as c_int);
+		printf("wrapping closure %d\n".ptr, in_closure_wrapping(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_wrapping();
+		printf("wrapping worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_wrapping();
+		printf("wrapping worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_wrapping();
+		printf("wrapping worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_wrapping();
+		printf("wrapping worker %d\n".ptr, join(job3) as c_int);
+		printf("wrapping dispatch %d\n".ptr, in_dispatch_wrapping(task, 1) as c_int);
+		printf("wrapping dispatch %d\n".ptr, in_dispatch_wrapping(task, 2) as c_int);
+		printf("wrapping dispatch %d\n".ptr, in_dispatch_wrapping(task, 3) as c_int);
+		printf("wrapping dispatch %d\n".ptr, in_dispatch_wrapping(task, 4) as c_int);
+		let g = Guarded_wrapping { lock: Mutex.new(), entered: 0 };
+		printf("wrapping sync %d\n".ptr, in_sync_wrapping(&g, 1) as c_int);
+		printf("wrapping sync %d\n".ptr, in_sync_wrapping(&g, 2) as c_int);
+		printf("wrapping sync %d\n".ptr, in_sync_wrapping(&g, 3) as c_int);
+		printf("wrapping sync %d\n".ptr, in_sync_wrapping(&g, 4) as c_int);
+		printf("wrapping sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("wrapping select %d\n".ptr, in_select_wrapping(c, 1) as c_int);
+		printf("wrapping select %d\n".ptr, in_select_wrapping(c, 2) as c_int);
+		printf("wrapping select %d\n".ptr, in_select_wrapping(c, 3) as c_int);
+		printf("wrapping select %d\n".ptr, in_select_wrapping(c, 4) as c_int);
+		delete(c);
+		printf("wrapping generic %d %d\n".ptr, in_generic_wrapping<int>(1) as c_int,
+			in_generic_wrapping<str>(1) as c_int);
+		printf("wrapping generic %d %d\n".ptr, in_generic_wrapping<int>(2) as c_int,
+			in_generic_wrapping<str>(2) as c_int);
+		printf("wrapping generic %d %d\n".ptr, in_generic_wrapping<int>(3) as c_int,
+			in_generic_wrapping<str>(3) as c_int);
+		printf("wrapping generic %d %d\n".ptr, in_generic_wrapping<int>(4) as c_int,
+			in_generic_wrapping<str>(4) as c_int);
+		let outer = Outer_wrapping { };
+		printf("wrapping nested %d\n".ptr, outer.go(1) as c_int);
+		printf("wrapping nested %d\n".ptr, outer.go(2) as c_int);
+		printf("wrapping nested %d\n".ptr, outer.go(3) as c_int);
+		printf("wrapping nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		let box = Box_saturating { base: 1000 };
+		printf("saturating method %d\n".ptr, box.run(1) as c_int);
+		printf("saturating method %d\n".ptr, box.run(2) as c_int);
+		printf("saturating method %d\n".ptr, box.run(3) as c_int);
+		printf("saturating method %d\n".ptr, box.run(4) as c_int);
+		printf("saturating loop %d\n".ptr, in_loop_saturating(1) as c_int);
+		printf("saturating loop %d\n".ptr, in_loop_saturating(2) as c_int);
+		printf("saturating loop %d\n".ptr, in_loop_saturating(3) as c_int);
+		printf("saturating loop %d\n".ptr, in_loop_saturating(4) as c_int);
+		printf("saturating arm %d\n".ptr, in_arm_saturating(0) as c_int);
+		printf("saturating arm %d\n".ptr, in_arm_saturating(1) as c_int);
+		printf("saturating arm %d\n".ptr, in_arm_saturating(2) as c_int);
+		printf("saturating arm %d\n".ptr, in_arm_saturating(3) as c_int);
+		printf("saturating arm %d\n".ptr, in_arm_saturating(4) as c_int);
+		printf("saturating if_let %d\n".ptr, in_if_let_saturating(0) as c_int);
+		printf("saturating if_let %d\n".ptr, in_if_let_saturating(1) as c_int);
+		printf("saturating if_let %d\n".ptr, in_if_let_saturating(2) as c_int);
+		printf("saturating if_let %d\n".ptr, in_if_let_saturating(3) as c_int);
+		printf("saturating if_let %d\n".ptr, in_if_let_saturating(4) as c_int);
+		let deferred = 0;
+		in_defer_saturating(1, &deferred);
+		printf("saturating defer %d\n".ptr, deferred as c_int);
+		in_defer_saturating(2, &deferred);
+		printf("saturating defer %d\n".ptr, deferred as c_int);
+		in_defer_saturating(3, &deferred);
+		printf("saturating defer %d\n".ptr, deferred as c_int);
+		in_defer_saturating(4, &deferred);
+		printf("saturating defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_saturating(0, &undone) catch {
+			yield;
+		};
+		printf("saturating undo %d\n".ptr, undone as c_int);
+		in_undo_saturating(1, &undone) catch {
+			yield;
+		};
+		printf("saturating undo %d\n".ptr, undone as c_int);
+		in_undo_saturating(2, &undone) catch {
+			yield;
+		};
+		printf("saturating undo %d\n".ptr, undone as c_int);
+		in_undo_saturating(3, &undone) catch {
+			yield;
+		};
+		printf("saturating undo %d\n".ptr, undone as c_int);
+		in_undo_saturating(4, &undone) catch {
+			yield;
+		};
+		printf("saturating undo %d\n".ptr, undone as c_int);
+		printf("saturating catch %d\n".ptr, in_catch_saturating(0) as c_int);
+		printf("saturating catch %d\n".ptr, in_catch_saturating(1) as c_int);
+		printf("saturating catch %d\n".ptr, in_catch_saturating(2) as c_int);
+		printf("saturating catch %d\n".ptr, in_catch_saturating(3) as c_int);
+		printf("saturating catch %d\n".ptr, in_catch_saturating(4) as c_int);
+		printf("saturating closure %d\n".ptr, in_closure_saturating(1) as c_int);
+		printf("saturating closure %d\n".ptr, in_closure_saturating(2) as c_int);
+		printf("saturating closure %d\n".ptr, in_closure_saturating(3) as c_int);
+		printf("saturating closure %d\n".ptr, in_closure_saturating(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_saturating();
+		printf("saturating worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_saturating();
+		printf("saturating worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_saturating();
+		printf("saturating worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_saturating();
+		printf("saturating worker %d\n".ptr, join(job3) as c_int);
+		printf("saturating dispatch %d\n".ptr, in_dispatch_saturating(task, 1) as c_int);
+		printf("saturating dispatch %d\n".ptr, in_dispatch_saturating(task, 2) as c_int);
+		printf("saturating dispatch %d\n".ptr, in_dispatch_saturating(task, 3) as c_int);
+		printf("saturating dispatch %d\n".ptr, in_dispatch_saturating(task, 4) as c_int);
+		let g = Guarded_saturating { lock: Mutex.new(), entered: 0 };
+		printf("saturating sync %d\n".ptr, in_sync_saturating(&g, 1) as c_int);
+		printf("saturating sync %d\n".ptr, in_sync_saturating(&g, 2) as c_int);
+		printf("saturating sync %d\n".ptr, in_sync_saturating(&g, 3) as c_int);
+		printf("saturating sync %d\n".ptr, in_sync_saturating(&g, 4) as c_int);
+		printf("saturating sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("saturating select %d\n".ptr, in_select_saturating(c, 1) as c_int);
+		printf("saturating select %d\n".ptr, in_select_saturating(c, 2) as c_int);
+		printf("saturating select %d\n".ptr, in_select_saturating(c, 3) as c_int);
+		printf("saturating select %d\n".ptr, in_select_saturating(c, 4) as c_int);
+		delete(c);
+		printf("saturating generic %d %d\n".ptr, in_generic_saturating<int>(1) as c_int,
+			in_generic_saturating<str>(1) as c_int);
+		printf("saturating generic %d %d\n".ptr, in_generic_saturating<int>(2) as c_int,
+			in_generic_saturating<str>(2) as c_int);
+		printf("saturating generic %d %d\n".ptr, in_generic_saturating<int>(3) as c_int,
+			in_generic_saturating<str>(3) as c_int);
+		printf("saturating generic %d %d\n".ptr, in_generic_saturating<int>(4) as c_int,
+			in_generic_saturating<str>(4) as c_int);
+		let outer = Outer_saturating { };
+		printf("saturating nested %d\n".ptr, outer.go(1) as c_int);
+		printf("saturating nested %d\n".ptr, outer.go(2) as c_int);
+		printf("saturating nested %d\n".ptr, outer.go(3) as c_int);
+		printf("saturating nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		let box = Box_mul_high { base: 1000 };
+		printf("mul_high method %d\n".ptr, box.run(1) as c_int);
+		printf("mul_high method %d\n".ptr, box.run(2) as c_int);
+		printf("mul_high method %d\n".ptr, box.run(3) as c_int);
+		printf("mul_high method %d\n".ptr, box.run(4) as c_int);
+		printf("mul_high loop %d\n".ptr, in_loop_mul_high(1) as c_int);
+		printf("mul_high loop %d\n".ptr, in_loop_mul_high(2) as c_int);
+		printf("mul_high loop %d\n".ptr, in_loop_mul_high(3) as c_int);
+		printf("mul_high loop %d\n".ptr, in_loop_mul_high(4) as c_int);
+		printf("mul_high arm %d\n".ptr, in_arm_mul_high(0) as c_int);
+		printf("mul_high arm %d\n".ptr, in_arm_mul_high(1) as c_int);
+		printf("mul_high arm %d\n".ptr, in_arm_mul_high(2) as c_int);
+		printf("mul_high arm %d\n".ptr, in_arm_mul_high(3) as c_int);
+		printf("mul_high arm %d\n".ptr, in_arm_mul_high(4) as c_int);
+		printf("mul_high if_let %d\n".ptr, in_if_let_mul_high(0) as c_int);
+		printf("mul_high if_let %d\n".ptr, in_if_let_mul_high(1) as c_int);
+		printf("mul_high if_let %d\n".ptr, in_if_let_mul_high(2) as c_int);
+		printf("mul_high if_let %d\n".ptr, in_if_let_mul_high(3) as c_int);
+		printf("mul_high if_let %d\n".ptr, in_if_let_mul_high(4) as c_int);
+		let deferred = 0;
+		in_defer_mul_high(1, &deferred);
+		printf("mul_high defer %d\n".ptr, deferred as c_int);
+		in_defer_mul_high(2, &deferred);
+		printf("mul_high defer %d\n".ptr, deferred as c_int);
+		in_defer_mul_high(3, &deferred);
+		printf("mul_high defer %d\n".ptr, deferred as c_int);
+		in_defer_mul_high(4, &deferred);
+		printf("mul_high defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_mul_high(0, &undone) catch {
+			yield;
+		};
+		printf("mul_high undo %d\n".ptr, undone as c_int);
+		in_undo_mul_high(1, &undone) catch {
+			yield;
+		};
+		printf("mul_high undo %d\n".ptr, undone as c_int);
+		in_undo_mul_high(2, &undone) catch {
+			yield;
+		};
+		printf("mul_high undo %d\n".ptr, undone as c_int);
+		in_undo_mul_high(3, &undone) catch {
+			yield;
+		};
+		printf("mul_high undo %d\n".ptr, undone as c_int);
+		in_undo_mul_high(4, &undone) catch {
+			yield;
+		};
+		printf("mul_high undo %d\n".ptr, undone as c_int);
+		printf("mul_high catch %d\n".ptr, in_catch_mul_high(0) as c_int);
+		printf("mul_high catch %d\n".ptr, in_catch_mul_high(1) as c_int);
+		printf("mul_high catch %d\n".ptr, in_catch_mul_high(2) as c_int);
+		printf("mul_high catch %d\n".ptr, in_catch_mul_high(3) as c_int);
+		printf("mul_high catch %d\n".ptr, in_catch_mul_high(4) as c_int);
+		printf("mul_high closure %d\n".ptr, in_closure_mul_high(1) as c_int);
+		printf("mul_high closure %d\n".ptr, in_closure_mul_high(2) as c_int);
+		printf("mul_high closure %d\n".ptr, in_closure_mul_high(3) as c_int);
+		printf("mul_high closure %d\n".ptr, in_closure_mul_high(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_mul_high();
+		printf("mul_high worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_mul_high();
+		printf("mul_high worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_mul_high();
+		printf("mul_high worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_mul_high();
+		printf("mul_high worker %d\n".ptr, join(job3) as c_int);
+		printf("mul_high dispatch %d\n".ptr, in_dispatch_mul_high(task, 1) as c_int);
+		printf("mul_high dispatch %d\n".ptr, in_dispatch_mul_high(task, 2) as c_int);
+		printf("mul_high dispatch %d\n".ptr, in_dispatch_mul_high(task, 3) as c_int);
+		printf("mul_high dispatch %d\n".ptr, in_dispatch_mul_high(task, 4) as c_int);
+		let g = Guarded_mul_high { lock: Mutex.new(), entered: 0 };
+		printf("mul_high sync %d\n".ptr, in_sync_mul_high(&g, 1) as c_int);
+		printf("mul_high sync %d\n".ptr, in_sync_mul_high(&g, 2) as c_int);
+		printf("mul_high sync %d\n".ptr, in_sync_mul_high(&g, 3) as c_int);
+		printf("mul_high sync %d\n".ptr, in_sync_mul_high(&g, 4) as c_int);
+		printf("mul_high sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("mul_high select %d\n".ptr, in_select_mul_high(c, 1) as c_int);
+		printf("mul_high select %d\n".ptr, in_select_mul_high(c, 2) as c_int);
+		printf("mul_high select %d\n".ptr, in_select_mul_high(c, 3) as c_int);
+		printf("mul_high select %d\n".ptr, in_select_mul_high(c, 4) as c_int);
+		delete(c);
+		printf("mul_high generic %d %d\n".ptr, in_generic_mul_high<int>(1) as c_int,
+			in_generic_mul_high<str>(1) as c_int);
+		printf("mul_high generic %d %d\n".ptr, in_generic_mul_high<int>(2) as c_int,
+			in_generic_mul_high<str>(2) as c_int);
+		printf("mul_high generic %d %d\n".ptr, in_generic_mul_high<int>(3) as c_int,
+			in_generic_mul_high<str>(3) as c_int);
+		printf("mul_high generic %d %d\n".ptr, in_generic_mul_high<int>(4) as c_int,
+			in_generic_mul_high<str>(4) as c_int);
+		let outer = Outer_mul_high { };
+		printf("mul_high nested %d\n".ptr, outer.go(1) as c_int);
+		printf("mul_high nested %d\n".ptr, outer.go(2) as c_int);
+		printf("mul_high nested %d\n".ptr, outer.go(3) as c_int);
+		printf("mul_high nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		printf("unary arm %d\n".ptr, in_arm_unary(0) as c_int);
+		printf("unary arm %d\n".ptr, in_arm_unary(1) as c_int);
+		printf("unary arm %d\n".ptr, in_arm_unary(2) as c_int);
+		printf("unary arm %d\n".ptr, in_arm_unary(3) as c_int);
+		printf("unary arm %d\n".ptr, in_arm_unary(4) as c_int);
+		printf("unary if_let %d\n".ptr, in_if_let_unary(0) as c_int);
+		printf("unary if_let %d\n".ptr, in_if_let_unary(1) as c_int);
+		printf("unary if_let %d\n".ptr, in_if_let_unary(2) as c_int);
+		printf("unary if_let %d\n".ptr, in_if_let_unary(3) as c_int);
+		printf("unary if_let %d\n".ptr, in_if_let_unary(4) as c_int);
+		let deferred = 0;
+		in_defer_unary(1, &deferred);
+		printf("unary defer %d\n".ptr, deferred as c_int);
+		in_defer_unary(2, &deferred);
+		printf("unary defer %d\n".ptr, deferred as c_int);
+		in_defer_unary(3, &deferred);
+		printf("unary defer %d\n".ptr, deferred as c_int);
+		in_defer_unary(4, &deferred);
+		printf("unary defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_unary(0, &undone) catch {
+			yield;
+		};
+		printf("unary undo %d\n".ptr, undone as c_int);
+		in_undo_unary(1, &undone) catch {
+			yield;
+		};
+		printf("unary undo %d\n".ptr, undone as c_int);
+		in_undo_unary(2, &undone) catch {
+			yield;
+		};
+		printf("unary undo %d\n".ptr, undone as c_int);
+		in_undo_unary(3, &undone) catch {
+			yield;
+		};
+		printf("unary undo %d\n".ptr, undone as c_int);
+		in_undo_unary(4, &undone) catch {
+			yield;
+		};
+		printf("unary undo %d\n".ptr, undone as c_int);
+		let c = chan int(1);
+		printf("unary select %d\n".ptr, in_select_unary(c, 1) as c_int);
+		printf("unary select %d\n".ptr, in_select_unary(c, 2) as c_int);
+		printf("unary select %d\n".ptr, in_select_unary(c, 3) as c_int);
+		printf("unary select %d\n".ptr, in_select_unary(c, 4) as c_int);
+		delete(c);
+		let outer = Outer_unary { };
+		printf("unary nested %d\n".ptr, outer.go(1) as c_int);
+		printf("unary nested %d\n".ptr, outer.go(2) as c_int);
+		printf("unary nested %d\n".ptr, outer.go(3) as c_int);
+		printf("unary nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		let deferred = 0;
+		in_defer_as(1, &deferred);
+		printf("as defer %d\n".ptr, deferred as c_int);
+		in_defer_as(2, &deferred);
+		printf("as defer %d\n".ptr, deferred as c_int);
+		in_defer_as(3, &deferred);
+		printf("as defer %d\n".ptr, deferred as c_int);
+		in_defer_as(4, &deferred);
+		printf("as defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_as(0, &undone) catch {
+			yield;
+		};
+		printf("as undo %d\n".ptr, undone as c_int);
+		in_undo_as(1, &undone) catch {
+			yield;
+		};
+		printf("as undo %d\n".ptr, undone as c_int);
+		in_undo_as(2, &undone) catch {
+			yield;
+		};
+		printf("as undo %d\n".ptr, undone as c_int);
+		in_undo_as(3, &undone) catch {
+			yield;
+		};
+		printf("as undo %d\n".ptr, undone as c_int);
+		in_undo_as(4, &undone) catch {
+			yield;
+		};
+		printf("as undo %d\n".ptr, undone as c_int);
+		printf("as dispatch %d\n".ptr, in_dispatch_as(task, 1) as c_int);
+		printf("as dispatch %d\n".ptr, in_dispatch_as(task, 2) as c_int);
+		printf("as dispatch %d\n".ptr, in_dispatch_as(task, 3) as c_int);
+		printf("as dispatch %d\n".ptr, in_dispatch_as(task, 4) as c_int);
+		let g = Guarded_as { lock: Mutex.new(), entered: 0 };
+		printf("as sync %d\n".ptr, in_sync_as(&g, 1) as c_int);
+		printf("as sync %d\n".ptr, in_sync_as(&g, 2) as c_int);
+		printf("as sync %d\n".ptr, in_sync_as(&g, 3) as c_int);
+		printf("as sync %d\n".ptr, in_sync_as(&g, 4) as c_int);
+		printf("as sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("as select %d\n".ptr, in_select_as(c, 1) as c_int);
+		printf("as select %d\n".ptr, in_select_as(c, 2) as c_int);
+		printf("as select %d\n".ptr, in_select_as(c, 3) as c_int);
+		printf("as select %d\n".ptr, in_select_as(c, 4) as c_int);
+		delete(c);
+	}
+	delete(task);
+	return 0;
+}

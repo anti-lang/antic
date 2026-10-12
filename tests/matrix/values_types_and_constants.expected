@@ -1,0 +1,53 @@
+exit 0
+-- tuples
+pair 7 5
+four 1 1 99 2.5
+nested 1 2 3 1
+copy 7 6 8 5
+divmod -3 -1
+swap 5 3
+once 1 1 10
+typed 255 -32768
+size 2 16 16 6
+equal 1 0
+-- folding
+chain 6 39
+hidden 10
+inner 20
+length 6 10
+index 39 38
+field -6 3
+logic 1 1
+text 4 97
+float 0.25
+size_of 32
+wrapped 44 65535 -128 127
+high 18446744073709551614
+-- inference
+default 256 8 0.10000000000000001
+declared 0
+parameter 44
+result -128
+field 4 0.100000001
+element 0
+tuple 0 0.100000001
+right operand 1
+left operand 1
+comparison 1 1
+compound 8
+optional 4
+type argument 4
+inferred argument 0
+float operand 0.300000012 0.30000000000000004
+-- sizes
+signed 1 2 4 8 8
+unsigned 1 2 4 8 8 1
+floats 2 4 8 8
+bool char str 1 4 16
+pointers 8 8 8 8
+slice array 16 10 24
+optional 2 16 24
+tuple 2 16
+struct 24 5 8
+enum variant simd 4 1 16 16
+parameter 2 24

@@ -1,0 +1,123 @@
+//! The literals of text and of bytes, and the text `f"..."` writes for each
+//! kind of value. The parts are `str_bytes`, `format`. Each is a function with
+//! the comment of its subject before it, and a line `-- <part>` stands before
+//! its output.
+
+import anti.lang;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+// The literals of text and of bytes, and what a `str` and a `[]byte` give: the
+// escapes, a character past ASCII as its UTF-8 bytes, the hash delimiters, a
+// literal over two lines, the length in bytes, an index, a slice and the NUL
+// after the bytes of a literal.
+
+fn sum(bytes: []byte) -> int
+{
+	let total = 0;
+	for b in bytes {
+		total += b as int;
+	}
+	return total;
+}
+
+fn str_bytes_part() -> int
+{
+	let escapes = "\n\r\t\\\"\'";
+	printf("escapes %lld %d %d %d %d %d %d\n".ptr, escapes.len,
+		escapes[0] as c_int, escapes[1] as c_int, escapes[2] as c_int,
+		escapes[3] as c_int, escapes[4] as c_int, escapes[5] as c_int);
+	let hex = "\x41\x7f";
+	printf("hex escape %lld %d %d\n".ptr, hex.len, hex[0] as c_int,
+		hex[1] as c_int);
+	let accent = "\u{e9}";
+	let last = "\u{10FFFF}";
+	printf("unicode escape %lld %d %d %lld %d\n".ptr, accent.len,
+		accent[0] as c_int, accent[1] as c_int, last.len, last[0] as c_int);
+	let written = "é€";
+	printf("utf-8 in the source %lld %lld\n".ptr, written.len,
+		sum(written[0..written.len]));
+	printf("char %u %u %u %u %u %u\n".ptr, 'A' as u32, '\x41' as u32,
+		'\u{e9}' as u32, 'é' as u32, '\'' as u32, '\\' as u32);
+	let empty = "";
+	printf("empty %lld %d\n".ptr, empty.len, (empty == "") as c_int);
+	let hashed = #"a "quoted" b"#;
+	let raw = r"\n\x41";
+	let raw_hashed = r#"\"#;
+	printf("hash %lld %d\n".ptr, hashed.len, hashed[2] as c_int);
+	printf("raw %lld %d %lld\n".ptr, raw.len, raw[0] as c_int,
+		raw_hashed.len);
+	let two = "one
+two";
+	printf("two lines %lld %d\n".ptr, two.len, two[3] as c_int);
+	let bytes = b"\x00\xff\0A";
+	printf("bytes %lld %d %d %d %d\n".ptr, bytes.len, bytes[0] as c_int,
+		bytes[1] as c_int, bytes[2] as c_int, bytes[3] as c_int);
+	let utf = b"é";
+	let raw_bytes = br"\xff";
+	let hashed_bytes = b#"""#;
+	let raw_hashed_bytes = br#"\"\"#;
+	printf("bytes of utf-8 %lld %d %d\n".ptr, utf.len, utf[0] as c_int,
+		utf[1] as c_int);
+	printf("raw bytes %lld %lld %lld\n".ptr, raw_bytes.len, hashed_bytes.len,
+		raw_hashed_bytes.len);
+	let nothing = x"";
+	let spaced = x"de ad
+		BE Ef 0 1";
+	printf("hex string %lld %lld %d %d %d\n".ptr, nothing.len, spaced.len,
+		spaced[0] as c_int, spaced[3] as c_int, spaced[4] as c_int);
+	let word = "tea time";
+	let part = word[4..8];
+	printf("slice %lld %d %lld\n".ptr, part.len, part[0] as c_int,
+		sum(word[0..3]));
+	printf("c string %s\n".ptr, word.ptr);
+	return 0;
+}
+
+// `f"..."` writes each kind of value it takes: every integer type at its
+// limits, in decimal and in hex, an `f32` and an `f64` with the fewest digits
+// that read back, a NaN, the infinities and the negative zero, a half read as
+// an `f32`, a `bool`, a `char` and a `str`.
+
+fn put(line: str)
+{
+	printf("%s\n".ptr, line.ptr);
+	free(line.ptr);
+}
+
+fn format_part(args: []str) -> int
+{
+	let one = args.len as f64;
+	let zero = one - one;
+	let i8_low: i8 = -128;
+	let i16_low: i16 = -32768;
+	let i32_low: i32 = -2147483648;
+	let i64_low: i64 = -9223372036854775808;
+	let u8_high: u8 = 255;
+	let u16_high: u16 = 65535;
+	let u32_high: u32 = 4294967295;
+	let u64_high: u64 = 18446744073709551615;
+	put(f"signed {i8_low} {i16_low} {i32_low} {i64_low}");
+	put(f"unsigned {u8_high} {u16_high} {u32_high} {u64_high}");
+	put(f"hex {i8_low:x} {u8_high:X} {u64_high:x} {i64_low:x}");
+	put(f"binary {u8_high:b} {i8_low:b}");
+	let tenth32: f32 = 0.1;
+	let half: f16 = 0.5 as f16;
+	put(f"float {0.1 * one} {tenth32} {1.0e15 * one} {1.0e16 * one}");
+	put(f"small {1.0e-4 * one} {1.0e-5 * one} {half}");
+	put(f"special {zero / zero} {one / zero} {-one / zero} {-0.0 * one}");
+	put(f"fixed {2.5 * one:.0f} {3.5 * one:.0f} {0.125 * one:.2f}");
+	let word = "text";
+	put(f"other {one == 1.0} {'é'} {word:>6}|");
+	return 0;
+}
+
+fn main(args: []str) -> int
+{
+	printf("-- str_bytes\n".ptr);
+	str_bytes_part();
+	printf("-- format\n".ptr);
+	format_part(args);
+	return 0;
+}

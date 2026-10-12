@@ -1,0 +1,46 @@
+exit 0
+-- compare
+bool 1 0
+char 1 0
+str 1 0
+str of other bytes 0 1
+enum 1 0
+pointer 1 0
+pointer to an equal value 0 1
+nullable pointer 0 1
+optional value 0 1
+function value 1 0
+other function 0 1
+channel 1 0
+other channel 0 1
+struct 1 0
+struct of another field 0 1
+packed struct 1 0
+tuple 1 0
+variant 1 0
+variant of another case 0 1
+fixed array 1 0
+class 1 0
+char 1 1 0 1
+str 1 1 1 0
+str by bytes 1 1
+struct with lt 1 0
+derived from lt 0 1 0 1
+-- simd
+sub 6 -9 0 3
+div 4 -2 1 -2
+and 0 2 4 2
+or 10 -5 4 -1
+xor 10 -7 0 -3
+not -9 5 -5 -3
+neg -8 6 -4 -2
+eq 0 0 1 0
+ne 1 1 0 1
+lt 0 1 0 0
+le 0 1 1 0
+gt 1 0 0 1
+ge 1 0 1 1
+float sub 1 -6 -1 10
+float div 3 -0.5 0 -4
+float neg -1.5 2 -0 -8
+float lt 0 1 1 0

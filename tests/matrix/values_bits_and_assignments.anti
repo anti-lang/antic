@@ -1,0 +1,1391 @@
+//! The shifts, the bitwise operators, the comparisons and the assignments of
+//! the values area, each in every place its row of docs/notes/test-matrix.md
+//! left open: shift, bitwise, compare, assign, compound, compound_wrapping.
+//! Each construct in each place is a function of its own, named after both, and
+//! the program prints one line per construct, place and input.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+class Box_shift
+{
+	pub base: int = 0,
+
+	pub fn run(self, n: int) -> int
+	{
+		let acc = self.base;
+		let neg = 0 - 256;
+		acc += (n << 3) + (256 >> n) + (neg >> n);
+		return acc;
+	}
+}
+
+fn in_arm_shift(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let neg = 0 - 256;
+			acc += (n << 3) + (256 >> n) + (neg >> n);
+		},
+	}
+	return acc;
+}
+
+fn held_shift(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_shift(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_shift(n) {
+		acc += v - n * 3;
+		let neg = 0 - 256;
+		acc += (n << 3) + (256 >> n) + (neg >> n);
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_shift(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let neg = 0 - 256;
+		acc += (n << 3) + (256 >> n) + (neg >> n);
+	}
+	acc = 5;
+}
+
+fn in_undo_shift(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let neg = 0 - 256;
+		acc += (n << 3) + (256 >> n) + (neg >> n);
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_shift(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_shift(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_shift(n) catch {
+		let neg = 0 - 256;
+		acc += (n << 3) + (256 >> n) + (neg >> n);
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_shift(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_shift(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_shift(start, fn(n) {
+		let neg = 0 - 256;
+		acc += (n << 3) + (256 >> n) + (neg >> n);
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_shift(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let neg = 0 - 256;
+	acc += (n << 3) + (256 >> n) + (neg >> n);
+	return acc;
+}
+
+worker fn work_shift(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_shift(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_shift(fn(n) {
+		let acc = 0;
+		let neg = 0 - 256;
+		acc += (n << 3) + (256 >> n) + (neg >> n);
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_shift
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_shift(g: *Guarded_shift, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let neg = 0 - 256;
+		acc += (n << 3) + (256 >> n) + (neg >> n);
+	}
+	return acc;
+}
+
+fn in_select_shift(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let neg = 0 - 256;
+			acc += (n << 3) + (256 >> n) + (neg >> n);
+		},
+	}
+	return acc;
+}
+
+class Outer_shift
+{
+	class Inner_shift
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let neg = 0 - 256;
+			acc += (n << 3) + (256 >> n) + (neg >> n);
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_shift { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn in_arm_bitwise(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+		},
+	}
+	return acc;
+}
+
+fn held_bitwise(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_bitwise(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_bitwise(n) {
+		acc += v - n * 3;
+		acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_bitwise(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+	}
+	acc = 5;
+}
+
+fn in_undo_bitwise(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_bitwise(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_bitwise(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_bitwise(n) catch {
+		acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_bitwise(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_bitwise(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_bitwise(start, fn(n) {
+		acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_bitwise(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+	return acc;
+}
+
+worker fn work_bitwise(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_bitwise(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_bitwise(fn(n) {
+		let acc = 0;
+		acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_bitwise
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_bitwise(g: *Guarded_bitwise, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+	}
+	return acc;
+}
+
+fn in_select_bitwise(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+		},
+	}
+	return acc;
+}
+
+fn in_generic_bitwise<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+	return acc;
+}
+
+class Outer_bitwise
+{
+	class Inner_bitwise
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_bitwise { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn held_compare(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_compare(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_compare(n) {
+		acc += v - n * 3;
+		acc += (n == 2) as int + (n != 2) as int * 2 + (n < 3) as int * 4 + (n <= 3) as int * 8 + (n > 1) as int * 16 + (n >= 4) as int * 32;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_compare(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		acc += (n == 2) as int + (n != 2) as int * 2 + (n < 3) as int * 4 + (n <= 3) as int * 8 + (n > 1) as int * 16 + (n >= 4) as int * 32;
+	}
+	acc = 5;
+}
+
+fn in_undo_compare(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		acc += (n == 2) as int + (n != 2) as int * 2 + (n < 3) as int * 4 + (n <= 3) as int * 8 + (n > 1) as int * 16 + (n >= 4) as int * 32;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+worker fn work_compare(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_compare(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_compare(fn(n) {
+		let acc = 0;
+		acc += (n == 2) as int + (n != 2) as int * 2 + (n < 3) as int * 4 + (n <= 3) as int * 8 + (n > 1) as int * 16 + (n >= 4) as int * 32;
+		return acc;
+	});
+	return join(job);
+}
+
+fn in_select_compare(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			acc += (n == 2) as int + (n != 2) as int * 2 + (n < 3) as int * 4 + (n <= 3) as int * 8 + (n > 1) as int * 16 + (n >= 4) as int * 32;
+		},
+	}
+	return acc;
+}
+
+fn held_assign(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_assign(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_assign(n) {
+		acc += v - n * 3;
+		let x = 0;
+		x = n * 3;
+		let p = &x;
+		*p = x + 1;
+		acc = acc + x;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_assign(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let x = 0;
+		x = n * 3;
+		let p = &x;
+		*p = x + 1;
+		acc = acc + x;
+	}
+	acc = 5;
+}
+
+fn in_undo_assign(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let x = 0;
+		x = n * 3;
+		let p = &x;
+		*p = x + 1;
+		acc = acc + x;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+worker fn work_assign(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_assign(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_assign(fn(n) {
+		let acc = 0;
+		let x = 0;
+		x = n * 3;
+		let p = &x;
+		*p = x + 1;
+		acc = acc + x;
+		return acc;
+	});
+	return join(job);
+}
+
+fn in_select_assign(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let x = 0;
+			x = n * 3;
+			let p = &x;
+			*p = x + 1;
+			acc = acc + x;
+		},
+	}
+	return acc;
+}
+
+fn held_compound(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_compound(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_compound(n) {
+		acc += v - n * 3;
+		let x = n;
+		x += 5;
+		x -= 1;
+		x *= 3;
+		x /= 2;
+		x %= 7;
+		x <<= 2;
+		x >>= 1;
+		x |= 8;
+		x &= 0xff;
+		x ^= 1;
+		acc += x;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_undo_compound(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let x = n;
+		x += 5;
+		x -= 1;
+		x *= 3;
+		x /= 2;
+		x %= 7;
+		x <<= 2;
+		x >>= 1;
+		x |= 8;
+		x &= 0xff;
+		x ^= 1;
+		acc += x;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+worker fn work_compound(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_compound(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_compound(fn(n) {
+		let acc = 0;
+		let x = n;
+		x += 5;
+		x -= 1;
+		x *= 3;
+		x /= 2;
+		x %= 7;
+		x <<= 2;
+		x >>= 1;
+		x |= 8;
+		x &= 0xff;
+		x ^= 1;
+		acc += x;
+		return acc;
+	});
+	return join(job);
+}
+
+class Outer_compound
+{
+	class Inner_compound
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let x = n;
+			x += 5;
+			x -= 1;
+			x *= 3;
+			x /= 2;
+			x %= 7;
+			x <<= 2;
+			x >>= 1;
+			x |= 8;
+			x &= 0xff;
+			x ^= 1;
+			acc += x;
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_compound { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+class Box_compound_wrapping
+{
+	pub base: int = 0,
+
+	pub fn run(self, n: int) -> int
+	{
+		let acc = self.base;
+		let w: u8 = 250;
+		w +%= n as u8 * 3;
+		w -%= 10;
+		w *%= 3;
+		w <<%= 1;
+		let s: i8 = 120;
+		s +|= n as i8 * 3;
+		s -|= 100;
+		s *|= 5;
+		acc += w as int + s as int;
+		return acc;
+	}
+}
+
+fn in_arm_compound_wrapping(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let w: u8 = 250;
+			w +%= n as u8 * 3;
+			w -%= 10;
+			w *%= 3;
+			w <<%= 1;
+			let s: i8 = 120;
+			s +|= n as i8 * 3;
+			s -|= 100;
+			s *|= 5;
+			acc += w as int + s as int;
+		},
+	}
+	return acc;
+}
+
+fn held_compound_wrapping(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_compound_wrapping(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_compound_wrapping(n) {
+		acc += v - n * 3;
+		let w: u8 = 250;
+		w +%= n as u8 * 3;
+		w -%= 10;
+		w *%= 3;
+		w <<%= 1;
+		let s: i8 = 120;
+		s +|= n as i8 * 3;
+		s -|= 100;
+		s *|= 5;
+		acc += w as int + s as int;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_compound_wrapping(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let w: u8 = 250;
+		w +%= n as u8 * 3;
+		w -%= 10;
+		w *%= 3;
+		w <<%= 1;
+		let s: i8 = 120;
+		s +|= n as i8 * 3;
+		s -|= 100;
+		s *|= 5;
+		acc += w as int + s as int;
+	}
+	acc = 5;
+}
+
+fn in_undo_compound_wrapping(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let w: u8 = 250;
+		w +%= n as u8 * 3;
+		w -%= 10;
+		w *%= 3;
+		w <<%= 1;
+		let s: i8 = 120;
+		s +|= n as i8 * 3;
+		s -|= 100;
+		s *|= 5;
+		acc += w as int + s as int;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_compound_wrapping(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_compound_wrapping(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_compound_wrapping(n) catch {
+		let w: u8 = 250;
+		w +%= n as u8 * 3;
+		w -%= 10;
+		w *%= 3;
+		w <<%= 1;
+		let s: i8 = 120;
+		s +|= n as i8 * 3;
+		s -|= 100;
+		s *|= 5;
+		acc += w as int + s as int;
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_compound_wrapping(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_compound_wrapping(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_compound_wrapping(start, fn(n) {
+		let w: u8 = 250;
+		w +%= n as u8 * 3;
+		w -%= 10;
+		w *%= 3;
+		w <<%= 1;
+		let s: i8 = 120;
+		s +|= n as i8 * 3;
+		s -|= 100;
+		s *|= 5;
+		acc += w as int + s as int;
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_compound_wrapping(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let w: u8 = 250;
+	w +%= n as u8 * 3;
+	w -%= 10;
+	w *%= 3;
+	w <<%= 1;
+	let s: i8 = 120;
+	s +|= n as i8 * 3;
+	s -|= 100;
+	s *|= 5;
+	acc += w as int + s as int;
+	return acc;
+}
+
+worker fn work_compound_wrapping(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_compound_wrapping(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_compound_wrapping(fn(n) {
+		let acc = 0;
+		let w: u8 = 250;
+		w +%= n as u8 * 3;
+		w -%= 10;
+		w *%= 3;
+		w <<%= 1;
+		let s: i8 = 120;
+		s +|= n as i8 * 3;
+		s -|= 100;
+		s *|= 5;
+		acc += w as int + s as int;
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_compound_wrapping
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_compound_wrapping(g: *Guarded_compound_wrapping, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let w: u8 = 250;
+		w +%= n as u8 * 3;
+		w -%= 10;
+		w *%= 3;
+		w <<%= 1;
+		let s: i8 = 120;
+		s +|= n as i8 * 3;
+		s -|= 100;
+		s *|= 5;
+		acc += w as int + s as int;
+	}
+	return acc;
+}
+
+fn in_select_compound_wrapping(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let w: u8 = 250;
+			w +%= n as u8 * 3;
+			w -%= 10;
+			w *%= 3;
+			w <<%= 1;
+			let s: i8 = 120;
+			s +|= n as i8 * 3;
+			s -|= 100;
+			s *|= 5;
+			acc += w as int + s as int;
+		},
+	}
+	return acc;
+}
+
+fn in_generic_compound_wrapping<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	let w: u8 = 250;
+	w +%= n as u8 * 3;
+	w -%= 10;
+	w *%= 3;
+	w <<%= 1;
+	let s: i8 = 120;
+	s +|= n as i8 * 3;
+	s -|= 100;
+	s *|= 5;
+	acc += w as int + s as int;
+	return acc;
+}
+
+class Outer_compound_wrapping
+{
+	class Inner_compound_wrapping
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let w: u8 = 250;
+			w +%= n as u8 * 3;
+			w -%= 10;
+			w *%= 3;
+			w <<%= 1;
+			let s: i8 = 120;
+			s +|= n as i8 * 3;
+			s -|= 100;
+			s *|= 5;
+			acc += w as int + s as int;
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_compound_wrapping { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn main() -> int
+{
+	let task = alloc Task { };
+	{
+		let box = Box_shift { base: 1000 };
+		printf("shift method %d\n".ptr, box.run(1) as c_int);
+		printf("shift method %d\n".ptr, box.run(2) as c_int);
+		printf("shift method %d\n".ptr, box.run(3) as c_int);
+		printf("shift method %d\n".ptr, box.run(4) as c_int);
+		printf("shift arm %d\n".ptr, in_arm_shift(0) as c_int);
+		printf("shift arm %d\n".ptr, in_arm_shift(1) as c_int);
+		printf("shift arm %d\n".ptr, in_arm_shift(2) as c_int);
+		printf("shift arm %d\n".ptr, in_arm_shift(3) as c_int);
+		printf("shift arm %d\n".ptr, in_arm_shift(4) as c_int);
+		printf("shift if_let %d\n".ptr, in_if_let_shift(0) as c_int);
+		printf("shift if_let %d\n".ptr, in_if_let_shift(1) as c_int);
+		printf("shift if_let %d\n".ptr, in_if_let_shift(2) as c_int);
+		printf("shift if_let %d\n".ptr, in_if_let_shift(3) as c_int);
+		printf("shift if_let %d\n".ptr, in_if_let_shift(4) as c_int);
+		let deferred = 0;
+		in_defer_shift(1, &deferred);
+		printf("shift defer %d\n".ptr, deferred as c_int);
+		in_defer_shift(2, &deferred);
+		printf("shift defer %d\n".ptr, deferred as c_int);
+		in_defer_shift(3, &deferred);
+		printf("shift defer %d\n".ptr, deferred as c_int);
+		in_defer_shift(4, &deferred);
+		printf("shift defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_shift(0, &undone) catch {
+			yield;
+		};
+		printf("shift undo %d\n".ptr, undone as c_int);
+		in_undo_shift(1, &undone) catch {
+			yield;
+		};
+		printf("shift undo %d\n".ptr, undone as c_int);
+		in_undo_shift(2, &undone) catch {
+			yield;
+		};
+		printf("shift undo %d\n".ptr, undone as c_int);
+		in_undo_shift(3, &undone) catch {
+			yield;
+		};
+		printf("shift undo %d\n".ptr, undone as c_int);
+		in_undo_shift(4, &undone) catch {
+			yield;
+		};
+		printf("shift undo %d\n".ptr, undone as c_int);
+		printf("shift catch %d\n".ptr, in_catch_shift(0) as c_int);
+		printf("shift catch %d\n".ptr, in_catch_shift(1) as c_int);
+		printf("shift catch %d\n".ptr, in_catch_shift(2) as c_int);
+		printf("shift catch %d\n".ptr, in_catch_shift(3) as c_int);
+		printf("shift catch %d\n".ptr, in_catch_shift(4) as c_int);
+		printf("shift closure %d\n".ptr, in_closure_shift(1) as c_int);
+		printf("shift closure %d\n".ptr, in_closure_shift(2) as c_int);
+		printf("shift closure %d\n".ptr, in_closure_shift(3) as c_int);
+		printf("shift closure %d\n".ptr, in_closure_shift(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_shift();
+		printf("shift worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_shift();
+		printf("shift worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_shift();
+		printf("shift worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_shift();
+		printf("shift worker %d\n".ptr, join(job3) as c_int);
+		printf("shift dispatch %d\n".ptr, in_dispatch_shift(task, 1) as c_int);
+		printf("shift dispatch %d\n".ptr, in_dispatch_shift(task, 2) as c_int);
+		printf("shift dispatch %d\n".ptr, in_dispatch_shift(task, 3) as c_int);
+		printf("shift dispatch %d\n".ptr, in_dispatch_shift(task, 4) as c_int);
+		let g = Guarded_shift { lock: Mutex.new(), entered: 0 };
+		printf("shift sync %d\n".ptr, in_sync_shift(&g, 1) as c_int);
+		printf("shift sync %d\n".ptr, in_sync_shift(&g, 2) as c_int);
+		printf("shift sync %d\n".ptr, in_sync_shift(&g, 3) as c_int);
+		printf("shift sync %d\n".ptr, in_sync_shift(&g, 4) as c_int);
+		printf("shift sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("shift select %d\n".ptr, in_select_shift(c, 1) as c_int);
+		printf("shift select %d\n".ptr, in_select_shift(c, 2) as c_int);
+		printf("shift select %d\n".ptr, in_select_shift(c, 3) as c_int);
+		printf("shift select %d\n".ptr, in_select_shift(c, 4) as c_int);
+		delete(c);
+		let outer = Outer_shift { };
+		printf("shift nested %d\n".ptr, outer.go(1) as c_int);
+		printf("shift nested %d\n".ptr, outer.go(2) as c_int);
+		printf("shift nested %d\n".ptr, outer.go(3) as c_int);
+		printf("shift nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		printf("bitwise arm %d\n".ptr, in_arm_bitwise(0) as c_int);
+		printf("bitwise arm %d\n".ptr, in_arm_bitwise(1) as c_int);
+		printf("bitwise arm %d\n".ptr, in_arm_bitwise(2) as c_int);
+		printf("bitwise arm %d\n".ptr, in_arm_bitwise(3) as c_int);
+		printf("bitwise arm %d\n".ptr, in_arm_bitwise(4) as c_int);
+		printf("bitwise if_let %d\n".ptr, in_if_let_bitwise(0) as c_int);
+		printf("bitwise if_let %d\n".ptr, in_if_let_bitwise(1) as c_int);
+		printf("bitwise if_let %d\n".ptr, in_if_let_bitwise(2) as c_int);
+		printf("bitwise if_let %d\n".ptr, in_if_let_bitwise(3) as c_int);
+		printf("bitwise if_let %d\n".ptr, in_if_let_bitwise(4) as c_int);
+		let deferred = 0;
+		in_defer_bitwise(1, &deferred);
+		printf("bitwise defer %d\n".ptr, deferred as c_int);
+		in_defer_bitwise(2, &deferred);
+		printf("bitwise defer %d\n".ptr, deferred as c_int);
+		in_defer_bitwise(3, &deferred);
+		printf("bitwise defer %d\n".ptr, deferred as c_int);
+		in_defer_bitwise(4, &deferred);
+		printf("bitwise defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_bitwise(0, &undone) catch {
+			yield;
+		};
+		printf("bitwise undo %d\n".ptr, undone as c_int);
+		in_undo_bitwise(1, &undone) catch {
+			yield;
+		};
+		printf("bitwise undo %d\n".ptr, undone as c_int);
+		in_undo_bitwise(2, &undone) catch {
+			yield;
+		};
+		printf("bitwise undo %d\n".ptr, undone as c_int);
+		in_undo_bitwise(3, &undone) catch {
+			yield;
+		};
+		printf("bitwise undo %d\n".ptr, undone as c_int);
+		in_undo_bitwise(4, &undone) catch {
+			yield;
+		};
+		printf("bitwise undo %d\n".ptr, undone as c_int);
+		printf("bitwise catch %d\n".ptr, in_catch_bitwise(0) as c_int);
+		printf("bitwise catch %d\n".ptr, in_catch_bitwise(1) as c_int);
+		printf("bitwise catch %d\n".ptr, in_catch_bitwise(2) as c_int);
+		printf("bitwise catch %d\n".ptr, in_catch_bitwise(3) as c_int);
+		printf("bitwise catch %d\n".ptr, in_catch_bitwise(4) as c_int);
+		printf("bitwise closure %d\n".ptr, in_closure_bitwise(1) as c_int);
+		printf("bitwise closure %d\n".ptr, in_closure_bitwise(2) as c_int);
+		printf("bitwise closure %d\n".ptr, in_closure_bitwise(3) as c_int);
+		printf("bitwise closure %d\n".ptr, in_closure_bitwise(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_bitwise();
+		printf("bitwise worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_bitwise();
+		printf("bitwise worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_bitwise();
+		printf("bitwise worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_bitwise();
+		printf("bitwise worker %d\n".ptr, join(job3) as c_int);
+		printf("bitwise dispatch %d\n".ptr, in_dispatch_bitwise(task, 1) as c_int);
+		printf("bitwise dispatch %d\n".ptr, in_dispatch_bitwise(task, 2) as c_int);
+		printf("bitwise dispatch %d\n".ptr, in_dispatch_bitwise(task, 3) as c_int);
+		printf("bitwise dispatch %d\n".ptr, in_dispatch_bitwise(task, 4) as c_int);
+		let g = Guarded_bitwise { lock: Mutex.new(), entered: 0 };
+		printf("bitwise sync %d\n".ptr, in_sync_bitwise(&g, 1) as c_int);
+		printf("bitwise sync %d\n".ptr, in_sync_bitwise(&g, 2) as c_int);
+		printf("bitwise sync %d\n".ptr, in_sync_bitwise(&g, 3) as c_int);
+		printf("bitwise sync %d\n".ptr, in_sync_bitwise(&g, 4) as c_int);
+		printf("bitwise sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("bitwise select %d\n".ptr, in_select_bitwise(c, 1) as c_int);
+		printf("bitwise select %d\n".ptr, in_select_bitwise(c, 2) as c_int);
+		printf("bitwise select %d\n".ptr, in_select_bitwise(c, 3) as c_int);
+		printf("bitwise select %d\n".ptr, in_select_bitwise(c, 4) as c_int);
+		delete(c);
+		printf("bitwise generic %d %d\n".ptr, in_generic_bitwise<int>(1) as c_int,
+			in_generic_bitwise<str>(1) as c_int);
+		printf("bitwise generic %d %d\n".ptr, in_generic_bitwise<int>(2) as c_int,
+			in_generic_bitwise<str>(2) as c_int);
+		printf("bitwise generic %d %d\n".ptr, in_generic_bitwise<int>(3) as c_int,
+			in_generic_bitwise<str>(3) as c_int);
+		printf("bitwise generic %d %d\n".ptr, in_generic_bitwise<int>(4) as c_int,
+			in_generic_bitwise<str>(4) as c_int);
+		let outer = Outer_bitwise { };
+		printf("bitwise nested %d\n".ptr, outer.go(1) as c_int);
+		printf("bitwise nested %d\n".ptr, outer.go(2) as c_int);
+		printf("bitwise nested %d\n".ptr, outer.go(3) as c_int);
+		printf("bitwise nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		printf("compare if_let %d\n".ptr, in_if_let_compare(0) as c_int);
+		printf("compare if_let %d\n".ptr, in_if_let_compare(1) as c_int);
+		printf("compare if_let %d\n".ptr, in_if_let_compare(2) as c_int);
+		printf("compare if_let %d\n".ptr, in_if_let_compare(3) as c_int);
+		printf("compare if_let %d\n".ptr, in_if_let_compare(4) as c_int);
+		let deferred = 0;
+		in_defer_compare(1, &deferred);
+		printf("compare defer %d\n".ptr, deferred as c_int);
+		in_defer_compare(2, &deferred);
+		printf("compare defer %d\n".ptr, deferred as c_int);
+		in_defer_compare(3, &deferred);
+		printf("compare defer %d\n".ptr, deferred as c_int);
+		in_defer_compare(4, &deferred);
+		printf("compare defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_compare(0, &undone) catch {
+			yield;
+		};
+		printf("compare undo %d\n".ptr, undone as c_int);
+		in_undo_compare(1, &undone) catch {
+			yield;
+		};
+		printf("compare undo %d\n".ptr, undone as c_int);
+		in_undo_compare(2, &undone) catch {
+			yield;
+		};
+		printf("compare undo %d\n".ptr, undone as c_int);
+		in_undo_compare(3, &undone) catch {
+			yield;
+		};
+		printf("compare undo %d\n".ptr, undone as c_int);
+		in_undo_compare(4, &undone) catch {
+			yield;
+		};
+		printf("compare undo %d\n".ptr, undone as c_int);
+		printf("compare dispatch %d\n".ptr, in_dispatch_compare(task, 1) as c_int);
+		printf("compare dispatch %d\n".ptr, in_dispatch_compare(task, 2) as c_int);
+		printf("compare dispatch %d\n".ptr, in_dispatch_compare(task, 3) as c_int);
+		printf("compare dispatch %d\n".ptr, in_dispatch_compare(task, 4) as c_int);
+		let c = chan int(1);
+		printf("compare select %d\n".ptr, in_select_compare(c, 1) as c_int);
+		printf("compare select %d\n".ptr, in_select_compare(c, 2) as c_int);
+		printf("compare select %d\n".ptr, in_select_compare(c, 3) as c_int);
+		printf("compare select %d\n".ptr, in_select_compare(c, 4) as c_int);
+		delete(c);
+	}
+	{
+		printf("assign if_let %d\n".ptr, in_if_let_assign(0) as c_int);
+		printf("assign if_let %d\n".ptr, in_if_let_assign(1) as c_int);
+		printf("assign if_let %d\n".ptr, in_if_let_assign(2) as c_int);
+		printf("assign if_let %d\n".ptr, in_if_let_assign(3) as c_int);
+		printf("assign if_let %d\n".ptr, in_if_let_assign(4) as c_int);
+		let deferred = 0;
+		in_defer_assign(1, &deferred);
+		printf("assign defer %d\n".ptr, deferred as c_int);
+		in_defer_assign(2, &deferred);
+		printf("assign defer %d\n".ptr, deferred as c_int);
+		in_defer_assign(3, &deferred);
+		printf("assign defer %d\n".ptr, deferred as c_int);
+		in_defer_assign(4, &deferred);
+		printf("assign defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_assign(0, &undone) catch {
+			yield;
+		};
+		printf("assign undo %d\n".ptr, undone as c_int);
+		in_undo_assign(1, &undone) catch {
+			yield;
+		};
+		printf("assign undo %d\n".ptr, undone as c_int);
+		in_undo_assign(2, &undone) catch {
+			yield;
+		};
+		printf("assign undo %d\n".ptr, undone as c_int);
+		in_undo_assign(3, &undone) catch {
+			yield;
+		};
+		printf("assign undo %d\n".ptr, undone as c_int);
+		in_undo_assign(4, &undone) catch {
+			yield;
+		};
+		printf("assign undo %d\n".ptr, undone as c_int);
+		printf("assign dispatch %d\n".ptr, in_dispatch_assign(task, 1) as c_int);
+		printf("assign dispatch %d\n".ptr, in_dispatch_assign(task, 2) as c_int);
+		printf("assign dispatch %d\n".ptr, in_dispatch_assign(task, 3) as c_int);
+		printf("assign dispatch %d\n".ptr, in_dispatch_assign(task, 4) as c_int);
+		let c = chan int(1);
+		printf("assign select %d\n".ptr, in_select_assign(c, 1) as c_int);
+		printf("assign select %d\n".ptr, in_select_assign(c, 2) as c_int);
+		printf("assign select %d\n".ptr, in_select_assign(c, 3) as c_int);
+		printf("assign select %d\n".ptr, in_select_assign(c, 4) as c_int);
+		delete(c);
+	}
+	{
+		printf("compound if_let %d\n".ptr, in_if_let_compound(0) as c_int);
+		printf("compound if_let %d\n".ptr, in_if_let_compound(1) as c_int);
+		printf("compound if_let %d\n".ptr, in_if_let_compound(2) as c_int);
+		printf("compound if_let %d\n".ptr, in_if_let_compound(3) as c_int);
+		printf("compound if_let %d\n".ptr, in_if_let_compound(4) as c_int);
+		let undone = 0;
+		in_undo_compound(0, &undone) catch {
+			yield;
+		};
+		printf("compound undo %d\n".ptr, undone as c_int);
+		in_undo_compound(1, &undone) catch {
+			yield;
+		};
+		printf("compound undo %d\n".ptr, undone as c_int);
+		in_undo_compound(2, &undone) catch {
+			yield;
+		};
+		printf("compound undo %d\n".ptr, undone as c_int);
+		in_undo_compound(3, &undone) catch {
+			yield;
+		};
+		printf("compound undo %d\n".ptr, undone as c_int);
+		in_undo_compound(4, &undone) catch {
+			yield;
+		};
+		printf("compound undo %d\n".ptr, undone as c_int);
+		printf("compound dispatch %d\n".ptr, in_dispatch_compound(task, 1) as c_int);
+		printf("compound dispatch %d\n".ptr, in_dispatch_compound(task, 2) as c_int);
+		printf("compound dispatch %d\n".ptr, in_dispatch_compound(task, 3) as c_int);
+		printf("compound dispatch %d\n".ptr, in_dispatch_compound(task, 4) as c_int);
+		let outer = Outer_compound { };
+		printf("compound nested %d\n".ptr, outer.go(1) as c_int);
+		printf("compound nested %d\n".ptr, outer.go(2) as c_int);
+		printf("compound nested %d\n".ptr, outer.go(3) as c_int);
+		printf("compound nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		let box = Box_compound_wrapping { base: 1000 };
+		printf("compound_wrapping method %d\n".ptr, box.run(1) as c_int);
+		printf("compound_wrapping method %d\n".ptr, box.run(2) as c_int);
+		printf("compound_wrapping method %d\n".ptr, box.run(3) as c_int);
+		printf("compound_wrapping method %d\n".ptr, box.run(4) as c_int);
+		printf("compound_wrapping arm %d\n".ptr, in_arm_compound_wrapping(0) as c_int);
+		printf("compound_wrapping arm %d\n".ptr, in_arm_compound_wrapping(1) as c_int);
+		printf("compound_wrapping arm %d\n".ptr, in_arm_compound_wrapping(2) as c_int);
+		printf("compound_wrapping arm %d\n".ptr, in_arm_compound_wrapping(3) as c_int);
+		printf("compound_wrapping arm %d\n".ptr, in_arm_compound_wrapping(4) as c_int);
+		printf("compound_wrapping if_let %d\n".ptr, in_if_let_compound_wrapping(0) as c_int);
+		printf("compound_wrapping if_let %d\n".ptr, in_if_let_compound_wrapping(1) as c_int);
+		printf("compound_wrapping if_let %d\n".ptr, in_if_let_compound_wrapping(2) as c_int);
+		printf("compound_wrapping if_let %d\n".ptr, in_if_let_compound_wrapping(3) as c_int);
+		printf("compound_wrapping if_let %d\n".ptr, in_if_let_compound_wrapping(4) as c_int);
+		let deferred = 0;
+		in_defer_compound_wrapping(1, &deferred);
+		printf("compound_wrapping defer %d\n".ptr, deferred as c_int);
+		in_defer_compound_wrapping(2, &deferred);
+		printf("compound_wrapping defer %d\n".ptr, deferred as c_int);
+		in_defer_compound_wrapping(3, &deferred);
+		printf("compound_wrapping defer %d\n".ptr, deferred as c_int);
+		in_defer_compound_wrapping(4, &deferred);
+		printf("compound_wrapping defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_compound_wrapping(0, &undone) catch {
+			yield;
+		};
+		printf("compound_wrapping undo %d\n".ptr, undone as c_int);
+		in_undo_compound_wrapping(1, &undone) catch {
+			yield;
+		};
+		printf("compound_wrapping undo %d\n".ptr, undone as c_int);
+		in_undo_compound_wrapping(2, &undone) catch {
+			yield;
+		};
+		printf("compound_wrapping undo %d\n".ptr, undone as c_int);
+		in_undo_compound_wrapping(3, &undone) catch {
+			yield;
+		};
+		printf("compound_wrapping undo %d\n".ptr, undone as c_int);
+		in_undo_compound_wrapping(4, &undone) catch {
+			yield;
+		};
+		printf("compound_wrapping undo %d\n".ptr, undone as c_int);
+		printf("compound_wrapping catch %d\n".ptr, in_catch_compound_wrapping(0) as c_int);
+		printf("compound_wrapping catch %d\n".ptr, in_catch_compound_wrapping(1) as c_int);
+		printf("compound_wrapping catch %d\n".ptr, in_catch_compound_wrapping(2) as c_int);
+		printf("compound_wrapping catch %d\n".ptr, in_catch_compound_wrapping(3) as c_int);
+		printf("compound_wrapping catch %d\n".ptr, in_catch_compound_wrapping(4) as c_int);
+		printf("compound_wrapping closure %d\n".ptr, in_closure_compound_wrapping(1) as c_int);
+		printf("compound_wrapping closure %d\n".ptr, in_closure_compound_wrapping(2) as c_int);
+		printf("compound_wrapping closure %d\n".ptr, in_closure_compound_wrapping(3) as c_int);
+		printf("compound_wrapping closure %d\n".ptr, in_closure_compound_wrapping(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_compound_wrapping();
+		printf("compound_wrapping worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_compound_wrapping();
+		printf("compound_wrapping worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_compound_wrapping();
+		printf("compound_wrapping worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_compound_wrapping();
+		printf("compound_wrapping worker %d\n".ptr, join(job3) as c_int);
+		printf("compound_wrapping dispatch %d\n".ptr, in_dispatch_compound_wrapping(task, 1) as c_int);
+		printf("compound_wrapping dispatch %d\n".ptr, in_dispatch_compound_wrapping(task, 2) as c_int);
+		printf("compound_wrapping dispatch %d\n".ptr, in_dispatch_compound_wrapping(task, 3) as c_int);
+		printf("compound_wrapping dispatch %d\n".ptr, in_dispatch_compound_wrapping(task, 4) as c_int);
+		let g = Guarded_compound_wrapping { lock: Mutex.new(), entered: 0 };
+		printf("compound_wrapping sync %d\n".ptr, in_sync_compound_wrapping(&g, 1) as c_int);
+		printf("compound_wrapping sync %d\n".ptr, in_sync_compound_wrapping(&g, 2) as c_int);
+		printf("compound_wrapping sync %d\n".ptr, in_sync_compound_wrapping(&g, 3) as c_int);
+		printf("compound_wrapping sync %d\n".ptr, in_sync_compound_wrapping(&g, 4) as c_int);
+		printf("compound_wrapping sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("compound_wrapping select %d\n".ptr, in_select_compound_wrapping(c, 1) as c_int);
+		printf("compound_wrapping select %d\n".ptr, in_select_compound_wrapping(c, 2) as c_int);
+		printf("compound_wrapping select %d\n".ptr, in_select_compound_wrapping(c, 3) as c_int);
+		printf("compound_wrapping select %d\n".ptr, in_select_compound_wrapping(c, 4) as c_int);
+		delete(c);
+		printf("compound_wrapping generic %d %d\n".ptr, in_generic_compound_wrapping<int>(1) as c_int,
+			in_generic_compound_wrapping<str>(1) as c_int);
+		printf("compound_wrapping generic %d %d\n".ptr, in_generic_compound_wrapping<int>(2) as c_int,
+			in_generic_compound_wrapping<str>(2) as c_int);
+		printf("compound_wrapping generic %d %d\n".ptr, in_generic_compound_wrapping<int>(3) as c_int,
+			in_generic_compound_wrapping<str>(3) as c_int);
+		printf("compound_wrapping generic %d %d\n".ptr, in_generic_compound_wrapping<int>(4) as c_int,
+			in_generic_compound_wrapping<str>(4) as c_int);
+		let outer = Outer_compound_wrapping { };
+		printf("compound_wrapping nested %d\n".ptr, outer.go(1) as c_int);
+		printf("compound_wrapping nested %d\n".ptr, outer.go(2) as c_int);
+		printf("compound_wrapping nested %d\n".ptr, outer.go(3) as c_int);
+		printf("compound_wrapping nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	delete(task);
+	return 0;
+}

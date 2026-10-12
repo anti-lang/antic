@@ -1,0 +1,268 @@
+//! Tuples as values, what the checker folds, where a literal takes its type
+//! from, and `size_of` of each form of type. The parts are `tuples`, `folding`,
+//! `inference`, `sizes`. Each is a function with the comment of its subject
+//! before it, and a line `-- <part>` stands before its output.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+// Tuples as values: a tuple of two kinds, one of four elements, one inside
+// another, a write of one element, a copy that an assignment makes, a tuple as
+// an argument and as a result, and a `let (a, b)` whose value is computed
+// once. The layout is that of a C struct.
+
+fn divmod(a: int, b: int) -> (int, int)
+{
+	return (a / b, a % b);
+}
+
+fn swap(t: (int, str)) -> (str, int)
+{
+	return (t.1, t.0);
+}
+
+fn counted(calls: *int) -> (int, int)
+{
+	*calls += 1;
+	return (*calls, *calls * 10);
+}
+
+fn tuples_part() -> int
+{
+	let pair = (7, "seven");
+	printf("pair %lld %lld\n".ptr, pair.0, pair.1.len);
+	let four = (1, true, 'c', 2.5);
+	printf("four %lld %d %u %g\n".ptr, four.0, four.1 as c_int,
+		four.2 as u32, four.3);
+	let nested = ((1, 2), (3, "x"));
+	printf("nested %lld %lld %lld %lld\n".ptr, nested.0.0, nested.0.1,
+		nested.1.0, nested.1.1.len);
+	let copy = pair;
+	copy.0 = 8;
+	pair.1 = "eight!";
+	printf("copy %lld %lld %lld %lld\n".ptr, pair.0, pair.1.len, copy.0,
+		copy.1.len);
+	let (q, r) = divmod(-7, 2);
+	printf("divmod %lld %lld\n".ptr, q, r);
+	let swapped = swap((3, "three"));
+	printf("swap %lld %lld\n".ptr, swapped.0.len, swapped.1);
+	let calls = 0;
+	let (first, second) = counted(&calls);
+	printf("once %lld %lld %lld\n".ptr, calls, first, second);
+	let typed: (u8, i16) = (255, -32768);
+	printf("typed %d %d\n".ptr, typed.0 as c_int, typed.1 as c_int);
+	printf("size %lld %lld %lld %lld\n".ptr, size_of((u8, u8)),
+		size_of((u8, int)), size_of((int, u8)), size_of((u8, u16, u8)));
+	printf("equal %d %d\n".ptr, (pair == (7, "eight!")) as c_int,
+		(copy == pair) as c_int);
+	return 0;
+}
+
+// Constants and what the checker folds: a constant that names another, at
+// module level and in a block, a constant in an inner block that hides an
+// outer one, a constant as the length of an array, an index and a field of a
+// constant, `&&`, `||` and `!` on constants, and a constant computed from
+// `size_of`.
+
+struct Pt
+{
+	x: int,
+	y: int,
+}
+
+const STEP: int = 3;
+const TWICE: int = STEP * 2;
+const AREA: int = TWICE * TWICE + STEP;
+const TABLE: [4]int = [STEP, TWICE, AREA, AREA - 1];
+const THIRD: int = TABLE[2];
+const ORIGIN: Pt = Pt { x: STEP, y: -TWICE };
+const ORIGIN_Y: int = ORIGIN.y;
+const WIDE: bool = AREA > 30 && !(STEP == 4);
+const EITHER: bool = STEP > 5 || TWICE > 5;
+const NAME: str = "anti";
+const LETTER: char = 'a';
+const RATIO: f64 = 1.0 / 4.0;
+const BYTES_OF_PT: int = size_of(Pt) * 2;
+const SMALL: u8 = 200 + 100;
+const MASK: u16 = ~0;
+const SHIFTED: i8 = 1 <<% 7;
+const CLAMPED: i8 = 100 +| 100;
+const HIGH: u64 = mul_high(18446744073709551615, 18446744073709551615);
+
+fn folding_part() -> int
+{
+	const STEP: int = 10;
+	let row: [TWICE]int = [STEP; TWICE];
+	printf("chain %lld %lld\n".ptr, TWICE, AREA);
+	printf("hidden %lld\n".ptr, STEP);
+	{
+		const STEP: int = 20;
+		printf("inner %lld\n".ptr, STEP);
+	}
+	printf("length %lld %lld\n".ptr, row.len, row[5]);
+	printf("index %lld %lld\n".ptr, THIRD, TABLE[3]);
+	printf("field %lld %lld\n".ptr, ORIGIN_Y, ORIGIN.x);
+	printf("logic %d %d\n".ptr, WIDE as c_int, EITHER as c_int);
+	printf("text %lld %u\n".ptr, NAME.len, LETTER as u32);
+	printf("float %g\n".ptr, RATIO);
+	printf("size_of %lld\n".ptr, BYTES_OF_PT);
+	printf("wrapped %d %d %d %d\n".ptr, SMALL as c_int, MASK as c_int,
+		SHIFTED as c_int, CLAMPED as c_int);
+	printf("high %llu\n".ptr, HIGH);
+	return 0;
+}
+
+// Where a literal takes its type from: the declared type, a parameter, a
+// result, a field, an element of an array and of a tuple, the other operand on
+// either side, a comparison, a compound assignment, an optional type and a
+// type argument. Without a context an integer literal is an `int` and a float
+// literal an `f64`. Each line prints a value that only the right type gives.
+
+struct Cell
+{
+	level: u8,
+	ratio: f32,
+}
+
+fn bump(n: u8) -> u8
+{
+	return n + 100;
+}
+
+fn least() -> i8
+{
+	return -128;
+}
+
+fn first<T>(a: T, b: T) -> T
+{
+	return dup(a);
+}
+
+fn inference_part() -> int
+{
+	let plain = 255;
+	let ratio = 0.1;
+	printf("default %lld %lld %.17g\n".ptr, plain + 1, size_of(int), ratio);
+	let declared: u8 = 255;
+	printf("declared %d\n".ptr, (declared + 1) as c_int);
+	printf("parameter %d\n".ptr, bump(200) as c_int);
+	printf("result %d\n".ptr, least() as c_int);
+	let cell = Cell { level: 250, ratio: 0.1 };
+	printf("field %d %.9g\n".ptr, (cell.level + 10) as c_int,
+		cell.ratio as f64);
+	let row: [2]u16 = [65535, 1];
+	printf("element %d\n".ptr, (row[0] + row[1]) as c_int);
+	let pair: (u8, f32) = (255, 0.1);
+	printf("tuple %d %.9g\n".ptr, (pair.0 + 1) as c_int, pair.1 as f64);
+	printf("right operand %d\n".ptr, (declared + 2) as c_int);
+	printf("left operand %d\n".ptr, (2 + declared) as c_int);
+	printf("comparison %d %d\n".ptr, (declared == 255) as c_int,
+		(250 < declared) as c_int);
+	let small: u8 = 250;
+	small += 10;
+	small *= 2;
+	printf("compound %d\n".ptr, small as c_int);
+	let maybe: ?u8 = 250;
+	if let held = maybe {
+		printf("optional %d\n".ptr, (held + 10) as c_int);
+	}
+	printf("type argument %d\n".ptr, (first<u8>(250, 1) + 10) as c_int);
+	printf("inferred argument %d\n".ptr, (first(declared, 1) + 1) as c_int);
+	let half: f32 = 0.1 + 0.2;
+	let whole = 0.1 + 0.2;
+	printf("float operand %.9g %.17g\n".ptr, half as f64, whole);
+	return 0;
+}
+
+// `size_of` of every built-in type and of each form of type whose size is the
+// same on all six targets, with the padding of a struct, of a tuple and of an
+// optional value, and of a type parameter in two copies.
+
+struct Mixed
+{
+	a: u8,
+	b: int,
+	c: u8,
+}
+
+packed struct Tight
+{
+	a: u8,
+	b: i32,
+}
+
+union Bits
+{
+	i: i32,
+	f: f64,
+}
+
+enum Color
+{
+	Red,
+	Green,
+}
+
+enum Mode: u8
+{
+	Read = 1,
+	Write = 2,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+simd struct I32x4
+{
+	a: i32,
+	b: i32,
+	c: i32,
+	d: i32,
+}
+
+fn size<T>() -> int
+{
+	return size_of(T);
+}
+
+fn sizes_part() -> int
+{
+	printf("signed %lld %lld %lld %lld %lld\n".ptr, size_of(i8), size_of(i16),
+		size_of(i32), size_of(i64), size_of(int));
+	printf("unsigned %lld %lld %lld %lld %lld %lld\n".ptr, size_of(u8),
+		size_of(u16), size_of(u32), size_of(u64), size_of(uint),
+		size_of(byte));
+	printf("floats %lld %lld %lld %lld\n".ptr, size_of(f16), size_of(f32),
+		size_of(f64), size_of(float));
+	printf("bool char str %lld %lld %lld\n".ptr, size_of(bool), size_of(char),
+		size_of(str));
+	printf("pointers %lld %lld %lld %lld\n".ptr, size_of(*int),
+		size_of(?*int), size_of(fn(int) -> int), size_of(chan int));
+	printf("slice array %lld %lld %lld\n".ptr, size_of([]u8),
+		size_of([5]u16), size_of([2][3]i32));
+	printf("optional %lld %lld %lld\n".ptr, size_of(?u8), size_of(?int),
+		size_of(?str));
+	printf("tuple %lld %lld\n".ptr, size_of((u8, u8)), size_of((u8, int)));
+	printf("struct %lld %lld %lld\n".ptr, size_of(Mixed), size_of(Tight),
+		size_of(Bits));
+	printf("enum variant simd %lld %lld %lld %lld\n".ptr, size_of(Color),
+		size_of(Mode), size_of(Shape), size_of(I32x4));
+	printf("parameter %lld %lld\n".ptr, size<u16>(), size<Mixed>());
+	return 0;
+}
+
+fn main(args: []str) -> int
+{
+	printf("-- tuples\n".ptr);
+	tuples_part();
+	printf("-- folding\n".ptr);
+	folding_part();
+	printf("-- inference\n".ptr);
+	inference_part();
+	printf("-- sizes\n".ptr);
+	sizes_part();
+	return 0;
+}

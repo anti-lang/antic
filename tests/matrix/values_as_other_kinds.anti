@@ -1,0 +1,215 @@
+//! `as` on the kinds that are no plain numbers, and the half that only `as`
+//! makes. The parts are `bool_char_enum`, `f16`. Each is a function with the
+//! comment of its subject before it, and a line `-- <part>` stands before its
+//! output.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+// `as` on a `bool`, a `char` and an enum. A `bool` converts to every integer
+// type as 0 or 1. A `char` converts to `u32` and back. An enum converts to and
+// from every numeric type as its underlying type does. The first value of a
+// line is folded in a constant, and the second is computed.
+
+enum Kind
+{
+	Circle,
+	Square,
+	Empty,
+}
+
+enum Mode: u8
+{
+	Read = 1,
+	Write = 200,
+}
+
+enum Level: i16
+{
+	Low = 100,
+	High = 300,
+}
+
+const YES: bool = true;
+const NO: bool = false;
+const YES_I8: i8 = YES as i8;
+const YES_I16: i16 = YES as i16;
+const YES_I32: i32 = YES as i32;
+const YES_I64: i64 = YES as i64;
+const YES_INT: int = YES as int;
+const YES_U8: u8 = YES as u8;
+const YES_U16: u16 = YES as u16;
+const YES_U32: u32 = YES as u32;
+const YES_U64: u64 = YES as u64;
+const YES_UINT: uint = YES as uint;
+const YES_BYTE: byte = YES as byte;
+const NO_I8: i8 = NO as i8;
+const NO_U64: u64 = NO as u64;
+
+const LETTER: char = 'a';
+const LAST: char = '\u{10FFFF}';
+const LETTER_U32: u32 = LETTER as u32;
+const LAST_U32: u32 = LAST as u32;
+const BACK: char = 0x1F600 as u32 as char;
+
+const EMPTY_INT: int = Kind.Empty as int;
+const EMPTY_U8: u8 = Kind.Empty as u8;
+const EMPTY_F64: f64 = Kind.Empty as f64;
+const WRITE_INT: int = Mode.Write as int;
+const WRITE_I8_WIDE: i16 = Mode.Write as i16;
+const LOW_INT: int = Level.Low as int;
+const LOW_F32: f32 = Level.Low as f32;
+
+fn truth(zero: int) -> bool
+{
+	return zero == 0;
+}
+
+fn bool_char_enum_part(args: []str) -> int
+{
+	let zero = args.len - 1;
+	let yes = truth(zero);
+	let no = !yes;
+	printf("bool i8 %d %d\n".ptr, YES_I8 as c_int, yes as i8 as c_int);
+	printf("bool i16 %d %d\n".ptr, YES_I16 as c_int, yes as i16 as c_int);
+	printf("bool i32 %d %d\n".ptr, YES_I32 as c_int, yes as i32 as c_int);
+	printf("bool i64 %lld %lld\n".ptr, YES_I64, yes as i64);
+	printf("bool int %lld %lld\n".ptr, YES_INT, yes as int);
+	printf("bool u8 %d %d\n".ptr, YES_U8 as c_int, yes as u8 as c_int);
+	printf("bool u16 %d %d\n".ptr, YES_U16 as c_int, yes as u16 as c_int);
+	printf("bool u32 %u %u\n".ptr, YES_U32, yes as u32);
+	printf("bool u64 %llu %llu\n".ptr, YES_U64, yes as u64);
+	printf("bool uint %llu %llu\n".ptr, YES_UINT, yes as uint);
+	printf("bool byte %d %d\n".ptr, YES_BYTE as c_int, yes as byte as c_int);
+	printf("false i8 %d %d\n".ptr, NO_I8 as c_int, no as i8 as c_int);
+	printf("false u64 %llu %llu\n".ptr, NO_U64, no as u64);
+
+	let letter = 'a';
+	let last = '\u{10FFFF}';
+	let code: u32 = 0x1F600 ^ (zero as u32);
+	printf("char a %u %u\n".ptr, LETTER_U32, letter as u32);
+	printf("char last %u %u\n".ptr, LAST_U32, last as u32);
+	printf("u32 char %u %u\n".ptr, BACK as u32, code as char as u32);
+
+	let empty = Kind.Empty;
+	let write = Mode.Write;
+	let low = Level.Low;
+	printf("enum int %lld %lld\n".ptr, EMPTY_INT, empty as int);
+	printf("enum u8 %d %d\n".ptr, EMPTY_U8 as c_int, empty as u8 as c_int);
+	printf("enum f64 %g %g\n".ptr, EMPTY_F64, empty as f64);
+	printf("enum of u8 int %lld %lld\n".ptr, WRITE_INT, write as int);
+	printf("enum of u8 i16 %d %d\n".ptr, WRITE_I8_WIDE as c_int,
+		write as i16 as c_int);
+	printf("enum of i16 int %lld %lld\n".ptr, LOW_INT, low as int);
+	printf("enum of i16 f32 %g %g\n".ptr, LOW_F32 as f64, low as f32 as f64);
+
+	let two = 2 + zero;
+	let square = (two - 1) as Kind;
+	let read = (two as u8 - 1) as Mode;
+	let high = (300.0 * (two as f64 - 1.0)) as Level;
+	printf("int enum %d\n".ptr, (square == Kind.Square) as c_int);
+	printf("u8 enum %d\n".ptr, (read == Mode.Read) as c_int);
+	printf("f64 enum %d\n".ptr, (high == Level.High) as c_int);
+	return 0;
+}
+
+// An `f16` is storage: a local, a field, an element of an array, of a slice
+// and of a tuple, and the value behind a pointer. A read gives an `f32` and
+// `as f16` makes the value a write takes. The conversion rounds to the nearest
+// half, a tie to the even one. Past the greatest half it gives an infinity and
+// below the smallest it gives zero. The first value of a rounding line is
+// folded in a constant, and the second is computed.
+
+struct Sample
+{
+	level: f16,
+	count: int,
+}
+
+const EXACT: f16 = 1.5 as f16;
+const TIE_DOWN: f16 = 1.00048828125 as f16;
+const TIE_UP: f16 = 1.00146484375 as f16;
+const GREATEST: f16 = 65504.0 as f16;
+const BELOW_INF: f16 = 65519.0 as f16;
+const TO_INF: f16 = 65520.0 as f16;
+const TO_NEG_INF: f16 = -65520.0 as f16;
+const SMALLEST: f16 = 5.9604645e-8 as f16;
+const TIE_TO_ZERO: f16 = 2.9802322e-8 as f16;
+const ABOVE_THE_TIE: f16 = 3.0e-8 as f16;
+const TO_ZERO: f16 = 1.0e-8 as f16;
+const NEG_ZERO: f16 = -0.0 as f16;
+const TENTH: f16 = 0.1 as f16;
+
+fn rounding(one: f32)
+{
+	let exact: f16 = (1.5 * one) as f16;
+	let tie_down: f16 = (1.00048828125 * one) as f16;
+	let tie_up: f16 = (1.00146484375 * one) as f16;
+	let greatest: f16 = (65504.0 * one) as f16;
+	let below_inf: f16 = (65519.0 * one) as f16;
+	let to_inf: f16 = (65520.0 * one) as f16;
+	let to_neg_inf: f16 = (-65520.0 * one) as f16;
+	let smallest: f16 = (5.9604645e-8 * one) as f16;
+	let tie_to_zero: f16 = (2.9802322e-8 * one) as f16;
+	let above_the_tie: f16 = (3.0e-8 * one) as f16;
+	let to_zero: f16 = (1.0e-8 * one) as f16;
+	let neg_zero: f16 = (-0.0 * one) as f16;
+	let tenth: f16 = (0.1 * one) as f16;
+	let nan: f16 = ((one - one) / (one - one)) as f16;
+	printf("exact %.17g %.17g\n".ptr, EXACT as f64, exact as f64);
+	printf("tie down %.17g %.17g\n".ptr, TIE_DOWN as f64, tie_down as f64);
+	printf("tie up %.17g %.17g\n".ptr, TIE_UP as f64, tie_up as f64);
+	printf("greatest %.17g %.17g\n".ptr, GREATEST as f64, greatest as f64);
+	printf("below inf %.17g %.17g\n".ptr, BELOW_INF as f64,
+		below_inf as f64);
+	printf("to inf %.17g %.17g\n".ptr, TO_INF as f64, to_inf as f64);
+	printf("to -inf %.17g %.17g\n".ptr, TO_NEG_INF as f64,
+		to_neg_inf as f64);
+	printf("smallest %.17g %.17g\n".ptr, SMALLEST as f64, smallest as f64);
+	printf("tie to zero %.17g %.17g\n".ptr, TIE_TO_ZERO as f64,
+		tie_to_zero as f64);
+	printf("above the tie %.17g %.17g\n".ptr, ABOVE_THE_TIE as f64,
+		above_the_tie as f64);
+	printf("to zero %.17g %.17g\n".ptr, TO_ZERO as f64, to_zero as f64);
+	printf("-0 %.17g %.17g\n".ptr, NEG_ZERO as f64, neg_zero as f64);
+	printf("tenth %.17g %.17g\n".ptr, TENTH as f64, tenth as f64);
+	let read = nan;
+	printf("nan %d\n".ptr, (read != read) as c_int);
+}
+
+fn storage(one: f32)
+{
+	let local: f16 = (0.25 * one) as f16;
+	let sample = Sample { level: (0.5 * one) as f16, count: 2 };
+	let row: [3]f16 = [1.0 as f16, 2.0 as f16, (4.0 * one) as f16];
+	let part = row[1..3];
+	let pair: (f16, int) = (8.0 as f16, 1);
+	let p = &local;
+	*p = (*p * 3.0) as f16;
+	sample.level = (sample.level + 1.0) as f16;
+	row[0] = (row[2] * row[1]) as f16;
+	printf("local %g\n".ptr, local as f64);
+	printf("field %g\n".ptr, sample.level as f64);
+	printf("array %g %g %g\n".ptr, row[0] as f64, row[1] as f64,
+		row[2] as f64);
+	printf("slice %g %lld\n".ptr, part[1] as f64, part.len);
+	printf("tuple %g\n".ptr, pair.0 as f64);
+	printf("pointer %g\n".ptr, *p as f64);
+	printf("size %lld %lld\n".ptr, size_of(f16), size_of(Sample));
+}
+
+fn f16_part(args: []str) -> int
+{
+	let one = args.len as f32;
+	rounding(one);
+	storage(one);
+	return 0;
+}
+
+fn main(args: []str) -> int
+{
+	printf("-- bool_char_enum\n".ptr);
+	bool_char_enum_part(args);
+	printf("-- f16\n".ptr);
+	f16_part(args);
+	return 0;
+}

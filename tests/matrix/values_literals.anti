@@ -1,0 +1,1170 @@
+//! The literals of numbers and of text of the values area, each in every place
+//! its row of docs/notes/test-matrix.md left open: literal_int, literal_float,
+//! literal_char, literal_str, bool, here. Each construct in each place is a
+//! function of its own, named after both, and the program prints one line per
+//! construct, place and input.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+class Outer_literal_int
+{
+	class Inner_literal_int
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			acc += 42 + 0x1F + 1_000 * n;
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_literal_int { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn in_defer_literal_float(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let x = 2.5;
+		let y = 1.0e2;
+		acc += (x * (n as float)) as int + (y as int);
+	}
+	acc = 5;
+}
+
+fn in_undo_literal_float(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let x = 2.5;
+		let y = 1.0e2;
+		acc += (x * (n as float)) as int + (y as int);
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+worker fn in_worker_literal_float(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let x = 2.5;
+	let y = 1.0e2;
+	acc += (x * (n as float)) as int + (y as int);
+	return acc;
+}
+
+worker fn work_literal_float(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_literal_float(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_literal_float(fn(n) {
+		let acc = 0;
+		let x = 2.5;
+		let y = 1.0e2;
+		acc += (x * (n as float)) as int + (y as int);
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_literal_float
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_literal_float(g: *Guarded_literal_float, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let x = 2.5;
+		let y = 1.0e2;
+		acc += (x * (n as float)) as int + (y as int);
+	}
+	return acc;
+}
+
+fn in_select_literal_float(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let x = 2.5;
+			let y = 1.0e2;
+			acc += (x * (n as float)) as int + (y as int);
+		},
+	}
+	return acc;
+}
+
+fn in_generic_literal_float<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	let x = 2.5;
+	let y = 1.0e2;
+	acc += (x * (n as float)) as int + (y as int);
+	return acc;
+}
+
+class Outer_literal_float
+{
+	class Inner_literal_float
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let x = 2.5;
+			let y = 1.0e2;
+			acc += (x * (n as float)) as int + (y as int);
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_literal_float { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+class Box_literal_char
+{
+	pub base: int = 0,
+
+	pub fn run(self, n: int) -> int
+	{
+		let acc = self.base;
+		let c = 'a';
+		let tab = '\t';
+		acc += (c as u32) as int + (tab as u32) as int + n;
+		return acc;
+	}
+}
+
+fn in_arm_literal_char(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let c = 'a';
+			let tab = '\t';
+			acc += (c as u32) as int + (tab as u32) as int + n;
+		},
+	}
+	return acc;
+}
+
+fn held_literal_char(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_literal_char(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_literal_char(n) {
+		acc += v - n * 3;
+		let c = 'a';
+		let tab = '\t';
+		acc += (c as u32) as int + (tab as u32) as int + n;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_literal_char(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let c = 'a';
+		let tab = '\t';
+		acc += (c as u32) as int + (tab as u32) as int + n;
+	}
+	acc = 5;
+}
+
+fn in_undo_literal_char(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let c = 'a';
+		let tab = '\t';
+		acc += (c as u32) as int + (tab as u32) as int + n;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_literal_char(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_literal_char(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_literal_char(n) catch {
+		let c = 'a';
+		let tab = '\t';
+		acc += (c as u32) as int + (tab as u32) as int + n;
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_literal_char(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_literal_char(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_literal_char(start, fn(n) {
+		let c = 'a';
+		let tab = '\t';
+		acc += (c as u32) as int + (tab as u32) as int + n;
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_literal_char(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let c = 'a';
+	let tab = '\t';
+	acc += (c as u32) as int + (tab as u32) as int + n;
+	return acc;
+}
+
+worker fn work_literal_char(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_literal_char(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_literal_char(fn(n) {
+		let acc = 0;
+		let c = 'a';
+		let tab = '\t';
+		acc += (c as u32) as int + (tab as u32) as int + n;
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_literal_char
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_literal_char(g: *Guarded_literal_char, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let c = 'a';
+		let tab = '\t';
+		acc += (c as u32) as int + (tab as u32) as int + n;
+	}
+	return acc;
+}
+
+fn in_select_literal_char(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let c = 'a';
+			let tab = '\t';
+			acc += (c as u32) as int + (tab as u32) as int + n;
+		},
+	}
+	return acc;
+}
+
+fn in_generic_literal_char<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	let c = 'a';
+	let tab = '\t';
+	acc += (c as u32) as int + (tab as u32) as int + n;
+	return acc;
+}
+
+class Outer_literal_char
+{
+	class Inner_literal_char
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let c = 'a';
+			let tab = '\t';
+			acc += (c as u32) as int + (tab as u32) as int + n;
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_literal_char { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+worker fn in_worker_literal_str(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let s = "four\n";
+	acc += s.len * n + (s[4] as int);
+	return acc;
+}
+
+worker fn work_literal_str(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_literal_str(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_literal_str(fn(n) {
+		let acc = 0;
+		let s = "four\n";
+		acc += s.len * n + (s[4] as int);
+		return acc;
+	});
+	return join(job);
+}
+
+fn in_select_literal_str(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let s = "four\n";
+			acc += s.len * n + (s[4] as int);
+		},
+	}
+	return acc;
+}
+
+class Outer_literal_str
+{
+	class Inner_literal_str
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let s = "four\n";
+			acc += s.len * n + (s[4] as int);
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_literal_str { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn in_arm_bool(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let on = true;
+			let off = false;
+			if on {
+				acc += n;
+			}
+			if off {
+				acc += 100;
+			}
+		},
+	}
+	return acc;
+}
+
+fn in_defer_bool(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let on = true;
+		let off = false;
+		if on {
+			acc += n;
+		}
+		if off {
+			acc += 100;
+		}
+	}
+	acc = 5;
+}
+
+fn in_undo_bool(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let on = true;
+		let off = false;
+		if on {
+			acc += n;
+		}
+		if off {
+			acc += 100;
+		}
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+worker fn work_bool(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_bool(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_bool(fn(n) {
+		let acc = 0;
+		let on = true;
+		let off = false;
+		if on {
+			acc += n;
+		}
+		if off {
+			acc += 100;
+		}
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_bool
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_bool(g: *Guarded_bool, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let on = true;
+		let off = false;
+		if on {
+			acc += n;
+		}
+		if off {
+			acc += 100;
+		}
+	}
+	return acc;
+}
+
+fn in_select_bool(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let on = true;
+			let off = false;
+			if on {
+				acc += n;
+			}
+			if off {
+				acc += 100;
+			}
+		},
+	}
+	return acc;
+}
+
+class Outer_bool
+{
+	class Inner_bool
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let on = true;
+			let off = false;
+			if on {
+				acc += n;
+			}
+			if off {
+				acc += 100;
+			}
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_bool { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn in_loop_here(n: int) -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		acc += turn;
+		let at = here;
+		if at.line > 0 && at.file.len > 0 {
+			acc += n;
+		}
+	}
+	return acc;
+}
+
+fn in_arm_here(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let at = here;
+			if at.line > 0 && at.file.len > 0 {
+				acc += n;
+			}
+		},
+	}
+	return acc;
+}
+
+fn held_here(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_here(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_here(n) {
+		acc += v - n * 3;
+		let at = here;
+		if at.line > 0 && at.file.len > 0 {
+			acc += n;
+		}
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_here(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let at = here;
+		if at.line > 0 && at.file.len > 0 {
+			acc += n;
+		}
+	}
+	acc = 5;
+}
+
+fn in_undo_here(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let at = here;
+		if at.line > 0 && at.file.len > 0 {
+			acc += n;
+		}
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_here(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_here(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_here(n) catch {
+		let at = here;
+		if at.line > 0 && at.file.len > 0 {
+			acc += n;
+		}
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_here(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_here(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_here(start, fn(n) {
+		let at = here;
+		if at.line > 0 && at.file.len > 0 {
+			acc += n;
+		}
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_here(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let at = here;
+	if at.line > 0 && at.file.len > 0 {
+		acc += n;
+	}
+	return acc;
+}
+
+worker fn work_here(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_here(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_here(fn(n) {
+		let acc = 0;
+		let at = here;
+		if at.line > 0 && at.file.len > 0 {
+			acc += n;
+		}
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_here
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_here(g: *Guarded_here, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let at = here;
+		if at.line > 0 && at.file.len > 0 {
+			acc += n;
+		}
+	}
+	return acc;
+}
+
+fn in_select_here(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let at = here;
+			if at.line > 0 && at.file.len > 0 {
+				acc += n;
+			}
+		},
+	}
+	return acc;
+}
+
+class Outer_here
+{
+	class Inner_here
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let at = here;
+			if at.line > 0 && at.file.len > 0 {
+				acc += n;
+			}
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_here { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn main() -> int
+{
+	let task = alloc Task { };
+	{
+		let outer = Outer_literal_int { };
+		printf("literal_int nested %d\n".ptr, outer.go(1) as c_int);
+		printf("literal_int nested %d\n".ptr, outer.go(2) as c_int);
+		printf("literal_int nested %d\n".ptr, outer.go(3) as c_int);
+		printf("literal_int nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		let deferred = 0;
+		in_defer_literal_float(1, &deferred);
+		printf("literal_float defer %d\n".ptr, deferred as c_int);
+		in_defer_literal_float(2, &deferred);
+		printf("literal_float defer %d\n".ptr, deferred as c_int);
+		in_defer_literal_float(3, &deferred);
+		printf("literal_float defer %d\n".ptr, deferred as c_int);
+		in_defer_literal_float(4, &deferred);
+		printf("literal_float defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_literal_float(0, &undone) catch {
+			yield;
+		};
+		printf("literal_float undo %d\n".ptr, undone as c_int);
+		in_undo_literal_float(1, &undone) catch {
+			yield;
+		};
+		printf("literal_float undo %d\n".ptr, undone as c_int);
+		in_undo_literal_float(2, &undone) catch {
+			yield;
+		};
+		printf("literal_float undo %d\n".ptr, undone as c_int);
+		in_undo_literal_float(3, &undone) catch {
+			yield;
+		};
+		printf("literal_float undo %d\n".ptr, undone as c_int);
+		in_undo_literal_float(4, &undone) catch {
+			yield;
+		};
+		printf("literal_float undo %d\n".ptr, undone as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_literal_float();
+		printf("literal_float worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_literal_float();
+		printf("literal_float worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_literal_float();
+		printf("literal_float worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_literal_float();
+		printf("literal_float worker %d\n".ptr, join(job3) as c_int);
+		printf("literal_float dispatch %d\n".ptr, in_dispatch_literal_float(task, 1) as c_int);
+		printf("literal_float dispatch %d\n".ptr, in_dispatch_literal_float(task, 2) as c_int);
+		printf("literal_float dispatch %d\n".ptr, in_dispatch_literal_float(task, 3) as c_int);
+		printf("literal_float dispatch %d\n".ptr, in_dispatch_literal_float(task, 4) as c_int);
+		let g = Guarded_literal_float { lock: Mutex.new(), entered: 0 };
+		printf("literal_float sync %d\n".ptr, in_sync_literal_float(&g, 1) as c_int);
+		printf("literal_float sync %d\n".ptr, in_sync_literal_float(&g, 2) as c_int);
+		printf("literal_float sync %d\n".ptr, in_sync_literal_float(&g, 3) as c_int);
+		printf("literal_float sync %d\n".ptr, in_sync_literal_float(&g, 4) as c_int);
+		printf("literal_float sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("literal_float select %d\n".ptr, in_select_literal_float(c, 1) as c_int);
+		printf("literal_float select %d\n".ptr, in_select_literal_float(c, 2) as c_int);
+		printf("literal_float select %d\n".ptr, in_select_literal_float(c, 3) as c_int);
+		printf("literal_float select %d\n".ptr, in_select_literal_float(c, 4) as c_int);
+		delete(c);
+		printf("literal_float generic %d %d\n".ptr, in_generic_literal_float<int>(1) as c_int,
+			in_generic_literal_float<str>(1) as c_int);
+		printf("literal_float generic %d %d\n".ptr, in_generic_literal_float<int>(2) as c_int,
+			in_generic_literal_float<str>(2) as c_int);
+		printf("literal_float generic %d %d\n".ptr, in_generic_literal_float<int>(3) as c_int,
+			in_generic_literal_float<str>(3) as c_int);
+		printf("literal_float generic %d %d\n".ptr, in_generic_literal_float<int>(4) as c_int,
+			in_generic_literal_float<str>(4) as c_int);
+		let outer = Outer_literal_float { };
+		printf("literal_float nested %d\n".ptr, outer.go(1) as c_int);
+		printf("literal_float nested %d\n".ptr, outer.go(2) as c_int);
+		printf("literal_float nested %d\n".ptr, outer.go(3) as c_int);
+		printf("literal_float nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		let box = Box_literal_char { base: 1000 };
+		printf("literal_char method %d\n".ptr, box.run(1) as c_int);
+		printf("literal_char method %d\n".ptr, box.run(2) as c_int);
+		printf("literal_char method %d\n".ptr, box.run(3) as c_int);
+		printf("literal_char method %d\n".ptr, box.run(4) as c_int);
+		printf("literal_char arm %d\n".ptr, in_arm_literal_char(0) as c_int);
+		printf("literal_char arm %d\n".ptr, in_arm_literal_char(1) as c_int);
+		printf("literal_char arm %d\n".ptr, in_arm_literal_char(2) as c_int);
+		printf("literal_char arm %d\n".ptr, in_arm_literal_char(3) as c_int);
+		printf("literal_char arm %d\n".ptr, in_arm_literal_char(4) as c_int);
+		printf("literal_char if_let %d\n".ptr, in_if_let_literal_char(0) as c_int);
+		printf("literal_char if_let %d\n".ptr, in_if_let_literal_char(1) as c_int);
+		printf("literal_char if_let %d\n".ptr, in_if_let_literal_char(2) as c_int);
+		printf("literal_char if_let %d\n".ptr, in_if_let_literal_char(3) as c_int);
+		printf("literal_char if_let %d\n".ptr, in_if_let_literal_char(4) as c_int);
+		let deferred = 0;
+		in_defer_literal_char(1, &deferred);
+		printf("literal_char defer %d\n".ptr, deferred as c_int);
+		in_defer_literal_char(2, &deferred);
+		printf("literal_char defer %d\n".ptr, deferred as c_int);
+		in_defer_literal_char(3, &deferred);
+		printf("literal_char defer %d\n".ptr, deferred as c_int);
+		in_defer_literal_char(4, &deferred);
+		printf("literal_char defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_literal_char(0, &undone) catch {
+			yield;
+		};
+		printf("literal_char undo %d\n".ptr, undone as c_int);
+		in_undo_literal_char(1, &undone) catch {
+			yield;
+		};
+		printf("literal_char undo %d\n".ptr, undone as c_int);
+		in_undo_literal_char(2, &undone) catch {
+			yield;
+		};
+		printf("literal_char undo %d\n".ptr, undone as c_int);
+		in_undo_literal_char(3, &undone) catch {
+			yield;
+		};
+		printf("literal_char undo %d\n".ptr, undone as c_int);
+		in_undo_literal_char(4, &undone) catch {
+			yield;
+		};
+		printf("literal_char undo %d\n".ptr, undone as c_int);
+		printf("literal_char catch %d\n".ptr, in_catch_literal_char(0) as c_int);
+		printf("literal_char catch %d\n".ptr, in_catch_literal_char(1) as c_int);
+		printf("literal_char catch %d\n".ptr, in_catch_literal_char(2) as c_int);
+		printf("literal_char catch %d\n".ptr, in_catch_literal_char(3) as c_int);
+		printf("literal_char catch %d\n".ptr, in_catch_literal_char(4) as c_int);
+		printf("literal_char closure %d\n".ptr, in_closure_literal_char(1) as c_int);
+		printf("literal_char closure %d\n".ptr, in_closure_literal_char(2) as c_int);
+		printf("literal_char closure %d\n".ptr, in_closure_literal_char(3) as c_int);
+		printf("literal_char closure %d\n".ptr, in_closure_literal_char(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_literal_char();
+		printf("literal_char worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_literal_char();
+		printf("literal_char worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_literal_char();
+		printf("literal_char worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_literal_char();
+		printf("literal_char worker %d\n".ptr, join(job3) as c_int);
+		printf("literal_char dispatch %d\n".ptr, in_dispatch_literal_char(task, 1) as c_int);
+		printf("literal_char dispatch %d\n".ptr, in_dispatch_literal_char(task, 2) as c_int);
+		printf("literal_char dispatch %d\n".ptr, in_dispatch_literal_char(task, 3) as c_int);
+		printf("literal_char dispatch %d\n".ptr, in_dispatch_literal_char(task, 4) as c_int);
+		let g = Guarded_literal_char { lock: Mutex.new(), entered: 0 };
+		printf("literal_char sync %d\n".ptr, in_sync_literal_char(&g, 1) as c_int);
+		printf("literal_char sync %d\n".ptr, in_sync_literal_char(&g, 2) as c_int);
+		printf("literal_char sync %d\n".ptr, in_sync_literal_char(&g, 3) as c_int);
+		printf("literal_char sync %d\n".ptr, in_sync_literal_char(&g, 4) as c_int);
+		printf("literal_char sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("literal_char select %d\n".ptr, in_select_literal_char(c, 1) as c_int);
+		printf("literal_char select %d\n".ptr, in_select_literal_char(c, 2) as c_int);
+		printf("literal_char select %d\n".ptr, in_select_literal_char(c, 3) as c_int);
+		printf("literal_char select %d\n".ptr, in_select_literal_char(c, 4) as c_int);
+		delete(c);
+		printf("literal_char generic %d %d\n".ptr, in_generic_literal_char<int>(1) as c_int,
+			in_generic_literal_char<str>(1) as c_int);
+		printf("literal_char generic %d %d\n".ptr, in_generic_literal_char<int>(2) as c_int,
+			in_generic_literal_char<str>(2) as c_int);
+		printf("literal_char generic %d %d\n".ptr, in_generic_literal_char<int>(3) as c_int,
+			in_generic_literal_char<str>(3) as c_int);
+		printf("literal_char generic %d %d\n".ptr, in_generic_literal_char<int>(4) as c_int,
+			in_generic_literal_char<str>(4) as c_int);
+		let outer = Outer_literal_char { };
+		printf("literal_char nested %d\n".ptr, outer.go(1) as c_int);
+		printf("literal_char nested %d\n".ptr, outer.go(2) as c_int);
+		printf("literal_char nested %d\n".ptr, outer.go(3) as c_int);
+		printf("literal_char nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_literal_str();
+		printf("literal_str worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_literal_str();
+		printf("literal_str worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_literal_str();
+		printf("literal_str worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_literal_str();
+		printf("literal_str worker %d\n".ptr, join(job3) as c_int);
+		printf("literal_str dispatch %d\n".ptr, in_dispatch_literal_str(task, 1) as c_int);
+		printf("literal_str dispatch %d\n".ptr, in_dispatch_literal_str(task, 2) as c_int);
+		printf("literal_str dispatch %d\n".ptr, in_dispatch_literal_str(task, 3) as c_int);
+		printf("literal_str dispatch %d\n".ptr, in_dispatch_literal_str(task, 4) as c_int);
+		let c = chan int(1);
+		printf("literal_str select %d\n".ptr, in_select_literal_str(c, 1) as c_int);
+		printf("literal_str select %d\n".ptr, in_select_literal_str(c, 2) as c_int);
+		printf("literal_str select %d\n".ptr, in_select_literal_str(c, 3) as c_int);
+		printf("literal_str select %d\n".ptr, in_select_literal_str(c, 4) as c_int);
+		delete(c);
+		let outer = Outer_literal_str { };
+		printf("literal_str nested %d\n".ptr, outer.go(1) as c_int);
+		printf("literal_str nested %d\n".ptr, outer.go(2) as c_int);
+		printf("literal_str nested %d\n".ptr, outer.go(3) as c_int);
+		printf("literal_str nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		printf("bool arm %d\n".ptr, in_arm_bool(0) as c_int);
+		printf("bool arm %d\n".ptr, in_arm_bool(1) as c_int);
+		printf("bool arm %d\n".ptr, in_arm_bool(2) as c_int);
+		printf("bool arm %d\n".ptr, in_arm_bool(3) as c_int);
+		printf("bool arm %d\n".ptr, in_arm_bool(4) as c_int);
+		let deferred = 0;
+		in_defer_bool(1, &deferred);
+		printf("bool defer %d\n".ptr, deferred as c_int);
+		in_defer_bool(2, &deferred);
+		printf("bool defer %d\n".ptr, deferred as c_int);
+		in_defer_bool(3, &deferred);
+		printf("bool defer %d\n".ptr, deferred as c_int);
+		in_defer_bool(4, &deferred);
+		printf("bool defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_bool(0, &undone) catch {
+			yield;
+		};
+		printf("bool undo %d\n".ptr, undone as c_int);
+		in_undo_bool(1, &undone) catch {
+			yield;
+		};
+		printf("bool undo %d\n".ptr, undone as c_int);
+		in_undo_bool(2, &undone) catch {
+			yield;
+		};
+		printf("bool undo %d\n".ptr, undone as c_int);
+		in_undo_bool(3, &undone) catch {
+			yield;
+		};
+		printf("bool undo %d\n".ptr, undone as c_int);
+		in_undo_bool(4, &undone) catch {
+			yield;
+		};
+		printf("bool undo %d\n".ptr, undone as c_int);
+		printf("bool dispatch %d\n".ptr, in_dispatch_bool(task, 1) as c_int);
+		printf("bool dispatch %d\n".ptr, in_dispatch_bool(task, 2) as c_int);
+		printf("bool dispatch %d\n".ptr, in_dispatch_bool(task, 3) as c_int);
+		printf("bool dispatch %d\n".ptr, in_dispatch_bool(task, 4) as c_int);
+		let g = Guarded_bool { lock: Mutex.new(), entered: 0 };
+		printf("bool sync %d\n".ptr, in_sync_bool(&g, 1) as c_int);
+		printf("bool sync %d\n".ptr, in_sync_bool(&g, 2) as c_int);
+		printf("bool sync %d\n".ptr, in_sync_bool(&g, 3) as c_int);
+		printf("bool sync %d\n".ptr, in_sync_bool(&g, 4) as c_int);
+		printf("bool sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("bool select %d\n".ptr, in_select_bool(c, 1) as c_int);
+		printf("bool select %d\n".ptr, in_select_bool(c, 2) as c_int);
+		printf("bool select %d\n".ptr, in_select_bool(c, 3) as c_int);
+		printf("bool select %d\n".ptr, in_select_bool(c, 4) as c_int);
+		delete(c);
+		let outer = Outer_bool { };
+		printf("bool nested %d\n".ptr, outer.go(1) as c_int);
+		printf("bool nested %d\n".ptr, outer.go(2) as c_int);
+		printf("bool nested %d\n".ptr, outer.go(3) as c_int);
+		printf("bool nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		printf("here loop %d\n".ptr, in_loop_here(1) as c_int);
+		printf("here loop %d\n".ptr, in_loop_here(2) as c_int);
+		printf("here loop %d\n".ptr, in_loop_here(3) as c_int);
+		printf("here loop %d\n".ptr, in_loop_here(4) as c_int);
+		printf("here arm %d\n".ptr, in_arm_here(0) as c_int);
+		printf("here arm %d\n".ptr, in_arm_here(1) as c_int);
+		printf("here arm %d\n".ptr, in_arm_here(2) as c_int);
+		printf("here arm %d\n".ptr, in_arm_here(3) as c_int);
+		printf("here arm %d\n".ptr, in_arm_here(4) as c_int);
+		printf("here if_let %d\n".ptr, in_if_let_here(0) as c_int);
+		printf("here if_let %d\n".ptr, in_if_let_here(1) as c_int);
+		printf("here if_let %d\n".ptr, in_if_let_here(2) as c_int);
+		printf("here if_let %d\n".ptr, in_if_let_here(3) as c_int);
+		printf("here if_let %d\n".ptr, in_if_let_here(4) as c_int);
+		let deferred = 0;
+		in_defer_here(1, &deferred);
+		printf("here defer %d\n".ptr, deferred as c_int);
+		in_defer_here(2, &deferred);
+		printf("here defer %d\n".ptr, deferred as c_int);
+		in_defer_here(3, &deferred);
+		printf("here defer %d\n".ptr, deferred as c_int);
+		in_defer_here(4, &deferred);
+		printf("here defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_here(0, &undone) catch {
+			yield;
+		};
+		printf("here undo %d\n".ptr, undone as c_int);
+		in_undo_here(1, &undone) catch {
+			yield;
+		};
+		printf("here undo %d\n".ptr, undone as c_int);
+		in_undo_here(2, &undone) catch {
+			yield;
+		};
+		printf("here undo %d\n".ptr, undone as c_int);
+		in_undo_here(3, &undone) catch {
+			yield;
+		};
+		printf("here undo %d\n".ptr, undone as c_int);
+		in_undo_here(4, &undone) catch {
+			yield;
+		};
+		printf("here undo %d\n".ptr, undone as c_int);
+		printf("here catch %d\n".ptr, in_catch_here(0) as c_int);
+		printf("here catch %d\n".ptr, in_catch_here(1) as c_int);
+		printf("here catch %d\n".ptr, in_catch_here(2) as c_int);
+		printf("here catch %d\n".ptr, in_catch_here(3) as c_int);
+		printf("here catch %d\n".ptr, in_catch_here(4) as c_int);
+		printf("here closure %d\n".ptr, in_closure_here(1) as c_int);
+		printf("here closure %d\n".ptr, in_closure_here(2) as c_int);
+		printf("here closure %d\n".ptr, in_closure_here(3) as c_int);
+		printf("here closure %d\n".ptr, in_closure_here(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_here();
+		printf("here worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_here();
+		printf("here worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_here();
+		printf("here worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_here();
+		printf("here worker %d\n".ptr, join(job3) as c_int);
+		printf("here dispatch %d\n".ptr, in_dispatch_here(task, 1) as c_int);
+		printf("here dispatch %d\n".ptr, in_dispatch_here(task, 2) as c_int);
+		printf("here dispatch %d\n".ptr, in_dispatch_here(task, 3) as c_int);
+		printf("here dispatch %d\n".ptr, in_dispatch_here(task, 4) as c_int);
+		let g = Guarded_here { lock: Mutex.new(), entered: 0 };
+		printf("here sync %d\n".ptr, in_sync_here(&g, 1) as c_int);
+		printf("here sync %d\n".ptr, in_sync_here(&g, 2) as c_int);
+		printf("here sync %d\n".ptr, in_sync_here(&g, 3) as c_int);
+		printf("here sync %d\n".ptr, in_sync_here(&g, 4) as c_int);
+		printf("here sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("here select %d\n".ptr, in_select_here(c, 1) as c_int);
+		printf("here select %d\n".ptr, in_select_here(c, 2) as c_int);
+		printf("here select %d\n".ptr, in_select_here(c, 3) as c_int);
+		printf("here select %d\n".ptr, in_select_here(c, 4) as c_int);
+		delete(c);
+		let outer = Outer_here { };
+		printf("here nested %d\n".ptr, outer.go(1) as c_int);
+		printf("here nested %d\n".ptr, outer.go(2) as c_int);
+		printf("here nested %d\n".ptr, outer.go(3) as c_int);
+		printf("here nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	delete(task);
+	return 0;
+}

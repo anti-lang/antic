@@ -1,0 +1,244 @@
+//! The constructs of the values area with the kinds of value that have rules of
+//! their own: a lent pointer, a value of a type parameter, an optional value
+//! and a call that may fail. The parts are `lent`, `generic`, `optional`,
+//! `may_fail`. Each is a function with the comment of its subject before it,
+//! and a line `-- <part>` stands before its output.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+// A lent pointer in the constructs of the values area that take one: an array
+// literal, an array repeat, a slice literal over such an array, a `let` and an
+// assignment to a local. Each is a function of its own.
+
+fn in_array(lent p: *int, lent q: *int) -> int
+{
+	let xs = [p, q];
+	return *xs[0] * 10 + *xs[1];
+}
+
+fn in_repeat(lent p: *int) -> int
+{
+	let xs = [p; 3];
+	*xs[2] += 1;
+	return *xs[0];
+}
+
+fn in_let(lent p: *int) -> int
+{
+	let kept = p;
+	return *kept + 1;
+}
+
+fn in_assign(lent p: *int, lent q: *int) -> int
+{
+	let kept = p;
+	kept = q;
+	*kept += 5;
+	return *p * 10 + *q;
+}
+
+fn lent_part() -> int
+{
+	let a = 1;
+	let b = 2;
+	printf("array %lld\n".ptr, in_array(&a, &b));
+	printf("array_repeat %lld\n".ptr, in_repeat(&a));
+	printf("let %lld\n".ptr, in_let(&a));
+	printf("assign %lld\n".ptr, in_assign(&a, &b));
+	return 0;
+}
+
+// A value of a type parameter in an assignment, as the argument and the result
+// of a call, and under the operators its constraint gives it. `Number` gives
+// `+ - * /` and unary `-`, and `Ordered` gives `==` and `<`.
+
+fn same(n: int) -> int
+{
+	return n;
+}
+
+fn pass<T>(v: T) -> T
+{
+	return dup(v);
+}
+
+fn take<T>(own v: T) -> T
+{
+	return v;
+}
+
+fn assign<T>(a: T, b: T, read: fn(T) -> int) -> int
+{
+	let first: T = dup(a);
+	first = dup(b);
+	return read(first);
+}
+
+fn arith<T: Number>(a: T, b: T) -> T
+{
+	return (a + b) * a - b / a + -b;
+}
+
+fn least<T: Ordered>(a: T, b: T) -> T
+{
+	if a < b || a == b {
+		return dup(a);
+	}
+	return dup(b);
+}
+
+fn generic_part() -> int
+{
+	printf("call %lld %lld\n".ptr, pass<int>(4), take<int>(5));
+	printf("assign %lld\n".ptr, assign<int>(1, 2, same));
+	let small: i8 = 5;
+	printf("arith i8 %d\n".ptr, arith<i8>(small, 10) as c_int);
+	printf("arith int %lld\n".ptr, arith<int>(5, 10));
+	printf("arith f32 %g\n".ptr, arith<f32>(0.5, 2.0) as f64);
+	printf("arith f64 %g\n".ptr, arith<f64>(0.5, 2.0));
+	let big: u64 = 18446744073709551615;
+	printf("least u64 %llu\n".ptr, least<u64>(big, 1));
+	printf("least i8 %d\n".ptr, least<i8>(-128, 127) as c_int);
+	printf("least f64 %g\n".ptr, least<f64>(-0.5, -0.25));
+	printf("least str %lld\n".ptr, least<str>("pear", "apple").len);
+	printf("least char %u\n".ptr, least<char>('b', 'a') as u32);
+	return 0;
+}
+
+// The operators on an optional value that a test has proved: a name narrowed
+// from a `?u8` reads its value, the compound assignments change that value and
+// keep the narrowing, and a literal beside it takes the type of the value.
+// `??` gives the value or its right side, whose literal takes the same type.
+
+fn pick(n: int) -> ?u8
+{
+	if n == 0 {
+		return none;
+	}
+	return 250;
+}
+
+fn narrowed(n: int) -> int
+{
+	let maybe = pick(n);
+	if maybe != none {
+		maybe += 10;
+		maybe *= 2;
+		let wide = maybe + 1;
+		return wide as int;
+	}
+	return -1;
+}
+
+fn bound(n: int) -> int
+{
+	if let held = pick(n) {
+		let twice = held +| held;
+		return twice as int + (held >> 1) as int;
+	}
+	return -1;
+}
+
+fn defaulted(n: int) -> int
+{
+	let value = pick(n) ?? 255;
+	return (value + 1) as int;
+}
+
+fn optional_part() -> int
+{
+	printf("narrowed %lld %lld\n".ptr, narrowed(1), narrowed(0));
+	printf("bound %lld %lld\n".ptr, bound(1), bound(0));
+	printf("defaulted %lld %lld\n".ptr, defaulted(1), defaulted(0));
+	return 0;
+}
+
+// Two calls that may fail as the operands of one operator, as the two values
+// of a tuple and as an index: the left one runs first, and when it fails the
+// right one never runs. A compound assignment whose right side fails leaves
+// its place unchanged.
+
+fn step(trail: *int, digit: int, fails: bool) -> int may fail
+{
+	*trail = *trail * 10 + digit;
+	if fails {
+		fail "refused";
+	}
+	return digit;
+}
+
+fn sum(trail: *int, first_fails: bool) -> int may fail
+{
+	return try step(trail, 1, first_fails) - try step(trail, 2, false);
+}
+
+fn pair(trail: *int, first_fails: bool) -> int may fail
+{
+	let t = (try step(trail, 3, first_fails), try step(trail, 4, false));
+	return t.0 * 10 + t.1;
+}
+
+fn add_to(trail: *int, total: *int, fails: bool) may fail
+{
+	*total += try step(trail, 5, fails);
+}
+
+fn at(trail: *int, fails: bool) -> int may fail
+{
+	let row = [10, 20, 30];
+	return row[try step(trail, 2, fails)];
+}
+
+fn may_fail_part() -> int
+{
+	let trail = 0;
+	let got = sum(&trail, false) catch {
+		yield -9;
+	};
+	printf("operands %lld trail %lld\n".ptr, got, trail);
+	trail = 0;
+	got = sum(&trail, true) catch {
+		yield -9;
+	};
+	printf("left fails %lld trail %lld\n".ptr, got, trail);
+	trail = 0;
+	got = pair(&trail, false) catch {
+		yield -9;
+	};
+	printf("tuple %lld trail %lld\n".ptr, got, trail);
+	trail = 0;
+	got = pair(&trail, true) catch {
+		yield -9;
+	};
+	printf("tuple fails %lld trail %lld\n".ptr, got, trail);
+	let total = 100;
+	trail = 0;
+	add_to(&trail, &total, false) catch {
+		yield;
+	};
+	add_to(&trail, &total, true) catch {
+		yield;
+	};
+	printf("compound %lld trail %lld\n".ptr, total, trail);
+	trail = 0;
+	got = at(&trail, false) catch {
+		yield -9;
+	};
+	printf("index %lld trail %lld\n".ptr, got, trail);
+	return 0;
+}
+
+fn main(args: []str) -> int
+{
+	printf("-- lent\n".ptr);
+	lent_part();
+	printf("-- generic\n".ptr);
+	generic_part();
+	printf("-- optional\n".ptr);
+	optional_part();
+	printf("-- may_fail\n".ptr);
+	may_fail_part();
+	return 0;
+}

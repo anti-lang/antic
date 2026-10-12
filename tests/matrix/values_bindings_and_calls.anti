@@ -1,0 +1,1794 @@
+//! The bindings and the calls of the values area, each in every place its row
+//! of docs/notes/test-matrix.md left open: let, let_typed, let_tuple, const,
+//! call, size_of, fn, simd. Each construct in each place is a function of its
+//! own, named after both, and the program prints one line per construct, place
+//! and input.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+struct Pt
+{
+	x: int,
+	y: int,
+}
+
+fn call_with(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+simd struct I32x4
+{
+	a: i32,
+	b: i32,
+	c: i32,
+	d: i32,
+}
+
+class Task
+{
+	pub n: int = 0,
+}
+
+fn held_let(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_let(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_let(n) {
+		acc += v - n * 3;
+		let x = n * 2;
+		let y = x;
+		acc += y;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+worker fn work_let(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_let(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_let(fn(n) {
+		let acc = 0;
+		let x = n * 2;
+		let y = x;
+		acc += y;
+		return acc;
+	});
+	return join(job);
+}
+
+fn in_arm_let_typed(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let x: i32 = 5;
+			let y: u8 = 200;
+			let z: f32 = 0.5;
+			acc += x as int + y as int + (z * 4.0) as int + n;
+		},
+	}
+	return acc;
+}
+
+fn held_let_typed(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_let_typed(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_let_typed(n) {
+		acc += v - n * 3;
+		let x: i32 = 5;
+		let y: u8 = 200;
+		let z: f32 = 0.5;
+		acc += x as int + y as int + (z * 4.0) as int + n;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_let_typed(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let x: i32 = 5;
+		let y: u8 = 200;
+		let z: f32 = 0.5;
+		acc += x as int + y as int + (z * 4.0) as int + n;
+	}
+	acc = 5;
+}
+
+fn in_undo_let_typed(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let x: i32 = 5;
+		let y: u8 = 200;
+		let z: f32 = 0.5;
+		acc += x as int + y as int + (z * 4.0) as int + n;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_let_typed(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_let_typed(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_let_typed(n) catch {
+		let x: i32 = 5;
+		let y: u8 = 200;
+		let z: f32 = 0.5;
+		acc += x as int + y as int + (z * 4.0) as int + n;
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_let_typed(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_let_typed(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_let_typed(start, fn(n) {
+		let x: i32 = 5;
+		let y: u8 = 200;
+		let z: f32 = 0.5;
+		acc += x as int + y as int + (z * 4.0) as int + n;
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_let_typed(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let x: i32 = 5;
+	let y: u8 = 200;
+	let z: f32 = 0.5;
+	acc += x as int + y as int + (z * 4.0) as int + n;
+	return acc;
+}
+
+worker fn work_let_typed(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_let_typed(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_let_typed(fn(n) {
+		let acc = 0;
+		let x: i32 = 5;
+		let y: u8 = 200;
+		let z: f32 = 0.5;
+		acc += x as int + y as int + (z * 4.0) as int + n;
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_let_typed
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_let_typed(g: *Guarded_let_typed, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let x: i32 = 5;
+		let y: u8 = 200;
+		let z: f32 = 0.5;
+		acc += x as int + y as int + (z * 4.0) as int + n;
+	}
+	return acc;
+}
+
+fn in_select_let_typed(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let x: i32 = 5;
+			let y: u8 = 200;
+			let z: f32 = 0.5;
+			acc += x as int + y as int + (z * 4.0) as int + n;
+		},
+	}
+	return acc;
+}
+
+class Outer_let_typed
+{
+	class Inner_let_typed
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let x: i32 = 5;
+			let y: u8 = 200;
+			let z: f32 = 0.5;
+			acc += x as int + y as int + (z * 4.0) as int + n;
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_let_typed { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+class Box_let_tuple
+{
+	pub base: int = 0,
+
+	pub fn run(self, n: int) -> int
+	{
+		let acc = self.base;
+		let (q, r) = (n / 2, n % 2);
+		acc += q * 10 + r;
+		return acc;
+	}
+}
+
+fn in_arm_let_tuple(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let (q, r) = (n / 2, n % 2);
+			acc += q * 10 + r;
+		},
+	}
+	return acc;
+}
+
+fn held_let_tuple(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_let_tuple(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_let_tuple(n) {
+		acc += v - n * 3;
+		let (q, r) = (n / 2, n % 2);
+		acc += q * 10 + r;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_let_tuple(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let (q, r) = (n / 2, n % 2);
+		acc += q * 10 + r;
+	}
+	acc = 5;
+}
+
+fn in_undo_let_tuple(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let (q, r) = (n / 2, n % 2);
+		acc += q * 10 + r;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_let_tuple(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_let_tuple(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_let_tuple(n) catch {
+		let (q, r) = (n / 2, n % 2);
+		acc += q * 10 + r;
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_let_tuple(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_let_tuple(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_let_tuple(start, fn(n) {
+		let (q, r) = (n / 2, n % 2);
+		acc += q * 10 + r;
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn work_let_tuple(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_let_tuple(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_let_tuple(fn(n) {
+		let acc = 0;
+		let (q, r) = (n / 2, n % 2);
+		acc += q * 10 + r;
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_let_tuple
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_let_tuple(g: *Guarded_let_tuple, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let (q, r) = (n / 2, n % 2);
+		acc += q * 10 + r;
+	}
+	return acc;
+}
+
+fn in_select_let_tuple(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let (q, r) = (n / 2, n % 2);
+			acc += q * 10 + r;
+		},
+	}
+	return acc;
+}
+
+fn in_generic_let_tuple<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	let (q, r) = (n / 2, n % 2);
+	acc += q * 10 + r;
+	return acc;
+}
+
+class Outer_let_tuple
+{
+	class Inner_let_tuple
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let (q, r) = (n / 2, n % 2);
+			acc += q * 10 + r;
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_let_tuple { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn in_function_const(n: int) -> int
+{
+	let acc = 0;
+	const STEP: int = 3;
+	const TWICE: int = STEP * 2;
+	acc += TWICE * n;
+	return acc;
+}
+
+class Box_const
+{
+	pub base: int = 0,
+
+	pub fn run(self, n: int) -> int
+	{
+		let acc = self.base;
+		const STEP: int = 3;
+		const TWICE: int = STEP * 2;
+		acc += TWICE * n;
+		return acc;
+	}
+}
+
+fn in_loop_const(n: int) -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		acc += turn;
+		const STEP: int = 3;
+		const TWICE: int = STEP * 2;
+		acc += TWICE * n;
+	}
+	return acc;
+}
+
+fn in_arm_const(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			const STEP: int = 3;
+			const TWICE: int = STEP * 2;
+			acc += TWICE * n;
+		},
+	}
+	return acc;
+}
+
+fn held_const(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_const(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_const(n) {
+		acc += v - n * 3;
+		const STEP: int = 3;
+		const TWICE: int = STEP * 2;
+		acc += TWICE * n;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_const(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		const STEP: int = 3;
+		const TWICE: int = STEP * 2;
+		acc += TWICE * n;
+	}
+	acc = 5;
+}
+
+fn in_undo_const(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		const STEP: int = 3;
+		const TWICE: int = STEP * 2;
+		acc += TWICE * n;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_const(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_const(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_const(n) catch {
+		const STEP: int = 3;
+		const TWICE: int = STEP * 2;
+		acc += TWICE * n;
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_const(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_const(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_const(start, fn(n) {
+		const STEP: int = 3;
+		const TWICE: int = STEP * 2;
+		acc += TWICE * n;
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_const(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	const STEP: int = 3;
+	const TWICE: int = STEP * 2;
+	acc += TWICE * n;
+	return acc;
+}
+
+worker fn work_const(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_const(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_const(fn(n) {
+		let acc = 0;
+		const STEP: int = 3;
+		const TWICE: int = STEP * 2;
+		acc += TWICE * n;
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_const
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_const(g: *Guarded_const, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		const STEP: int = 3;
+		const TWICE: int = STEP * 2;
+		acc += TWICE * n;
+	}
+	return acc;
+}
+
+fn in_select_const(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			const STEP: int = 3;
+			const TWICE: int = STEP * 2;
+			acc += TWICE * n;
+		},
+	}
+	return acc;
+}
+
+fn in_generic_const<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	const STEP: int = 3;
+	const TWICE: int = STEP * 2;
+	acc += TWICE * n;
+	return acc;
+}
+
+class Outer_const
+{
+	class Inner_const
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			const STEP: int = 3;
+			const TWICE: int = STEP * 2;
+			acc += TWICE * n;
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_const { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn in_select_call(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			acc += twice(n) + twice(twice(1));
+		},
+	}
+	return acc;
+}
+
+class Outer_call
+{
+	class Inner_call
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			acc += twice(n) + twice(twice(1));
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_call { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn in_loop_size_of(n: int) -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		acc += turn;
+		acc += size_of(i32) * n + size_of(Pt) + size_of([3]u16);
+	}
+	return acc;
+}
+
+fn in_arm_size_of(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			acc += size_of(i32) * n + size_of(Pt) + size_of([3]u16);
+		},
+	}
+	return acc;
+}
+
+fn held_size_of(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_size_of(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_size_of(n) {
+		acc += v - n * 3;
+		acc += size_of(i32) * n + size_of(Pt) + size_of([3]u16);
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_size_of(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		acc += size_of(i32) * n + size_of(Pt) + size_of([3]u16);
+	}
+	acc = 5;
+}
+
+fn in_undo_size_of(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		acc += size_of(i32) * n + size_of(Pt) + size_of([3]u16);
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_size_of(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_size_of(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_size_of(n) catch {
+		acc += size_of(i32) * n + size_of(Pt) + size_of([3]u16);
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_size_of(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_size_of(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_size_of(start, fn(n) {
+		acc += size_of(i32) * n + size_of(Pt) + size_of([3]u16);
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_size_of(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	acc += size_of(i32) * n + size_of(Pt) + size_of([3]u16);
+	return acc;
+}
+
+worker fn work_size_of(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_size_of(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_size_of(fn(n) {
+		let acc = 0;
+		acc += size_of(i32) * n + size_of(Pt) + size_of([3]u16);
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_size_of
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_size_of(g: *Guarded_size_of, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		acc += size_of(i32) * n + size_of(Pt) + size_of([3]u16);
+	}
+	return acc;
+}
+
+fn in_select_size_of(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			acc += size_of(i32) * n + size_of(Pt) + size_of([3]u16);
+		},
+	}
+	return acc;
+}
+
+fn in_arm_fn(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let k = n + 1;
+			acc += call_with(n, fn(v) {
+				return v * k;
+			});
+		},
+	}
+	return acc;
+}
+
+fn held_fn(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_fn(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_fn(n) {
+		acc += v - n * 3;
+		let k = n + 1;
+		acc += call_with(n, fn(v) {
+			return v * k;
+		});
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_undo_fn(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let k = n + 1;
+		acc += call_with(n, fn(v) {
+			return v * k;
+		});
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_fn(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_fn(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_fn(n) catch {
+		let k = n + 1;
+		acc += call_with(n, fn(v) {
+			return v * k;
+		});
+		yield acc;
+	};
+	return got;
+}
+
+struct Guarded_fn
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_fn(g: *Guarded_fn, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let k = n + 1;
+		acc += call_with(n, fn(v) {
+			return v * k;
+		});
+	}
+	return acc;
+}
+
+fn in_select_fn(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let k = n + 1;
+			acc += call_with(n, fn(v) {
+				return v * k;
+			});
+		},
+	}
+	return acc;
+}
+
+class Outer_fn
+{
+	class Inner_fn
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let k = n + 1;
+			acc += call_with(n, fn(v) {
+				return v * k;
+			});
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_fn { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+class Box_simd
+{
+	pub base: int = 0,
+
+	pub fn run(self, n: int) -> int
+	{
+		let acc = self.base;
+		let lanes = I32x4.splat(n as i32);
+		let twice = lanes + lanes;
+		acc += twice.sum() as int + twice.max() as int;
+		return acc;
+	}
+}
+
+fn in_arm_simd(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let lanes = I32x4.splat(n as i32);
+			let twice = lanes + lanes;
+			acc += twice.sum() as int + twice.max() as int;
+		},
+	}
+	return acc;
+}
+
+fn held_simd(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_simd(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_simd(n) {
+		acc += v - n * 3;
+		let lanes = I32x4.splat(n as i32);
+		let twice = lanes + lanes;
+		acc += twice.sum() as int + twice.max() as int;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_simd(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let lanes = I32x4.splat(n as i32);
+		let twice = lanes + lanes;
+		acc += twice.sum() as int + twice.max() as int;
+	}
+	acc = 5;
+}
+
+fn in_undo_simd(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let lanes = I32x4.splat(n as i32);
+		let twice = lanes + lanes;
+		acc += twice.sum() as int + twice.max() as int;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_simd(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_simd(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_simd(n) catch {
+		let lanes = I32x4.splat(n as i32);
+		let twice = lanes + lanes;
+		acc += twice.sum() as int + twice.max() as int;
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_simd(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_simd(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_simd(start, fn(n) {
+		let lanes = I32x4.splat(n as i32);
+		let twice = lanes + lanes;
+		acc += twice.sum() as int + twice.max() as int;
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_simd(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let lanes = I32x4.splat(n as i32);
+	let twice = lanes + lanes;
+	acc += twice.sum() as int + twice.max() as int;
+	return acc;
+}
+
+worker fn work_simd(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_simd(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_simd(fn(n) {
+		let acc = 0;
+		let lanes = I32x4.splat(n as i32);
+		let twice = lanes + lanes;
+		acc += twice.sum() as int + twice.max() as int;
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_simd
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_simd(g: *Guarded_simd, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let lanes = I32x4.splat(n as i32);
+		let twice = lanes + lanes;
+		acc += twice.sum() as int + twice.max() as int;
+	}
+	return acc;
+}
+
+fn in_select_simd(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let lanes = I32x4.splat(n as i32);
+			let twice = lanes + lanes;
+			acc += twice.sum() as int + twice.max() as int;
+		},
+	}
+	return acc;
+}
+
+fn in_generic_simd<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	let lanes = I32x4.splat(n as i32);
+	let twice = lanes + lanes;
+	acc += twice.sum() as int + twice.max() as int;
+	return acc;
+}
+
+class Outer_simd
+{
+	class Inner_simd
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let lanes = I32x4.splat(n as i32);
+			let twice = lanes + lanes;
+			acc += twice.sum() as int + twice.max() as int;
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_simd { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn main() -> int
+{
+	let task = alloc Task { };
+	{
+		printf("let if_let %d\n".ptr, in_if_let_let(0) as c_int);
+		printf("let if_let %d\n".ptr, in_if_let_let(1) as c_int);
+		printf("let if_let %d\n".ptr, in_if_let_let(2) as c_int);
+		printf("let if_let %d\n".ptr, in_if_let_let(3) as c_int);
+		printf("let if_let %d\n".ptr, in_if_let_let(4) as c_int);
+		printf("let dispatch %d\n".ptr, in_dispatch_let(task, 1) as c_int);
+		printf("let dispatch %d\n".ptr, in_dispatch_let(task, 2) as c_int);
+		printf("let dispatch %d\n".ptr, in_dispatch_let(task, 3) as c_int);
+		printf("let dispatch %d\n".ptr, in_dispatch_let(task, 4) as c_int);
+	}
+	{
+		printf("let_typed arm %d\n".ptr, in_arm_let_typed(0) as c_int);
+		printf("let_typed arm %d\n".ptr, in_arm_let_typed(1) as c_int);
+		printf("let_typed arm %d\n".ptr, in_arm_let_typed(2) as c_int);
+		printf("let_typed arm %d\n".ptr, in_arm_let_typed(3) as c_int);
+		printf("let_typed arm %d\n".ptr, in_arm_let_typed(4) as c_int);
+		printf("let_typed if_let %d\n".ptr, in_if_let_let_typed(0) as c_int);
+		printf("let_typed if_let %d\n".ptr, in_if_let_let_typed(1) as c_int);
+		printf("let_typed if_let %d\n".ptr, in_if_let_let_typed(2) as c_int);
+		printf("let_typed if_let %d\n".ptr, in_if_let_let_typed(3) as c_int);
+		printf("let_typed if_let %d\n".ptr, in_if_let_let_typed(4) as c_int);
+		let deferred = 0;
+		in_defer_let_typed(1, &deferred);
+		printf("let_typed defer %d\n".ptr, deferred as c_int);
+		in_defer_let_typed(2, &deferred);
+		printf("let_typed defer %d\n".ptr, deferred as c_int);
+		in_defer_let_typed(3, &deferred);
+		printf("let_typed defer %d\n".ptr, deferred as c_int);
+		in_defer_let_typed(4, &deferred);
+		printf("let_typed defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_let_typed(0, &undone) catch {
+			yield;
+		};
+		printf("let_typed undo %d\n".ptr, undone as c_int);
+		in_undo_let_typed(1, &undone) catch {
+			yield;
+		};
+		printf("let_typed undo %d\n".ptr, undone as c_int);
+		in_undo_let_typed(2, &undone) catch {
+			yield;
+		};
+		printf("let_typed undo %d\n".ptr, undone as c_int);
+		in_undo_let_typed(3, &undone) catch {
+			yield;
+		};
+		printf("let_typed undo %d\n".ptr, undone as c_int);
+		in_undo_let_typed(4, &undone) catch {
+			yield;
+		};
+		printf("let_typed undo %d\n".ptr, undone as c_int);
+		printf("let_typed catch %d\n".ptr, in_catch_let_typed(0) as c_int);
+		printf("let_typed catch %d\n".ptr, in_catch_let_typed(1) as c_int);
+		printf("let_typed catch %d\n".ptr, in_catch_let_typed(2) as c_int);
+		printf("let_typed catch %d\n".ptr, in_catch_let_typed(3) as c_int);
+		printf("let_typed catch %d\n".ptr, in_catch_let_typed(4) as c_int);
+		printf("let_typed closure %d\n".ptr, in_closure_let_typed(1) as c_int);
+		printf("let_typed closure %d\n".ptr, in_closure_let_typed(2) as c_int);
+		printf("let_typed closure %d\n".ptr, in_closure_let_typed(3) as c_int);
+		printf("let_typed closure %d\n".ptr, in_closure_let_typed(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_let_typed();
+		printf("let_typed worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_let_typed();
+		printf("let_typed worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_let_typed();
+		printf("let_typed worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_let_typed();
+		printf("let_typed worker %d\n".ptr, join(job3) as c_int);
+		printf("let_typed dispatch %d\n".ptr, in_dispatch_let_typed(task, 1) as c_int);
+		printf("let_typed dispatch %d\n".ptr, in_dispatch_let_typed(task, 2) as c_int);
+		printf("let_typed dispatch %d\n".ptr, in_dispatch_let_typed(task, 3) as c_int);
+		printf("let_typed dispatch %d\n".ptr, in_dispatch_let_typed(task, 4) as c_int);
+		let g = Guarded_let_typed { lock: Mutex.new(), entered: 0 };
+		printf("let_typed sync %d\n".ptr, in_sync_let_typed(&g, 1) as c_int);
+		printf("let_typed sync %d\n".ptr, in_sync_let_typed(&g, 2) as c_int);
+		printf("let_typed sync %d\n".ptr, in_sync_let_typed(&g, 3) as c_int);
+		printf("let_typed sync %d\n".ptr, in_sync_let_typed(&g, 4) as c_int);
+		printf("let_typed sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("let_typed select %d\n".ptr, in_select_let_typed(c, 1) as c_int);
+		printf("let_typed select %d\n".ptr, in_select_let_typed(c, 2) as c_int);
+		printf("let_typed select %d\n".ptr, in_select_let_typed(c, 3) as c_int);
+		printf("let_typed select %d\n".ptr, in_select_let_typed(c, 4) as c_int);
+		delete(c);
+		let outer = Outer_let_typed { };
+		printf("let_typed nested %d\n".ptr, outer.go(1) as c_int);
+		printf("let_typed nested %d\n".ptr, outer.go(2) as c_int);
+		printf("let_typed nested %d\n".ptr, outer.go(3) as c_int);
+		printf("let_typed nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		let box = Box_let_tuple { base: 1000 };
+		printf("let_tuple method %d\n".ptr, box.run(1) as c_int);
+		printf("let_tuple method %d\n".ptr, box.run(2) as c_int);
+		printf("let_tuple method %d\n".ptr, box.run(3) as c_int);
+		printf("let_tuple method %d\n".ptr, box.run(4) as c_int);
+		printf("let_tuple arm %d\n".ptr, in_arm_let_tuple(0) as c_int);
+		printf("let_tuple arm %d\n".ptr, in_arm_let_tuple(1) as c_int);
+		printf("let_tuple arm %d\n".ptr, in_arm_let_tuple(2) as c_int);
+		printf("let_tuple arm %d\n".ptr, in_arm_let_tuple(3) as c_int);
+		printf("let_tuple arm %d\n".ptr, in_arm_let_tuple(4) as c_int);
+		printf("let_tuple if_let %d\n".ptr, in_if_let_let_tuple(0) as c_int);
+		printf("let_tuple if_let %d\n".ptr, in_if_let_let_tuple(1) as c_int);
+		printf("let_tuple if_let %d\n".ptr, in_if_let_let_tuple(2) as c_int);
+		printf("let_tuple if_let %d\n".ptr, in_if_let_let_tuple(3) as c_int);
+		printf("let_tuple if_let %d\n".ptr, in_if_let_let_tuple(4) as c_int);
+		let deferred = 0;
+		in_defer_let_tuple(1, &deferred);
+		printf("let_tuple defer %d\n".ptr, deferred as c_int);
+		in_defer_let_tuple(2, &deferred);
+		printf("let_tuple defer %d\n".ptr, deferred as c_int);
+		in_defer_let_tuple(3, &deferred);
+		printf("let_tuple defer %d\n".ptr, deferred as c_int);
+		in_defer_let_tuple(4, &deferred);
+		printf("let_tuple defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_let_tuple(0, &undone) catch {
+			yield;
+		};
+		printf("let_tuple undo %d\n".ptr, undone as c_int);
+		in_undo_let_tuple(1, &undone) catch {
+			yield;
+		};
+		printf("let_tuple undo %d\n".ptr, undone as c_int);
+		in_undo_let_tuple(2, &undone) catch {
+			yield;
+		};
+		printf("let_tuple undo %d\n".ptr, undone as c_int);
+		in_undo_let_tuple(3, &undone) catch {
+			yield;
+		};
+		printf("let_tuple undo %d\n".ptr, undone as c_int);
+		in_undo_let_tuple(4, &undone) catch {
+			yield;
+		};
+		printf("let_tuple undo %d\n".ptr, undone as c_int);
+		printf("let_tuple catch %d\n".ptr, in_catch_let_tuple(0) as c_int);
+		printf("let_tuple catch %d\n".ptr, in_catch_let_tuple(1) as c_int);
+		printf("let_tuple catch %d\n".ptr, in_catch_let_tuple(2) as c_int);
+		printf("let_tuple catch %d\n".ptr, in_catch_let_tuple(3) as c_int);
+		printf("let_tuple catch %d\n".ptr, in_catch_let_tuple(4) as c_int);
+		printf("let_tuple closure %d\n".ptr, in_closure_let_tuple(1) as c_int);
+		printf("let_tuple closure %d\n".ptr, in_closure_let_tuple(2) as c_int);
+		printf("let_tuple closure %d\n".ptr, in_closure_let_tuple(3) as c_int);
+		printf("let_tuple closure %d\n".ptr, in_closure_let_tuple(4) as c_int);
+		printf("let_tuple dispatch %d\n".ptr, in_dispatch_let_tuple(task, 1) as c_int);
+		printf("let_tuple dispatch %d\n".ptr, in_dispatch_let_tuple(task, 2) as c_int);
+		printf("let_tuple dispatch %d\n".ptr, in_dispatch_let_tuple(task, 3) as c_int);
+		printf("let_tuple dispatch %d\n".ptr, in_dispatch_let_tuple(task, 4) as c_int);
+		let g = Guarded_let_tuple { lock: Mutex.new(), entered: 0 };
+		printf("let_tuple sync %d\n".ptr, in_sync_let_tuple(&g, 1) as c_int);
+		printf("let_tuple sync %d\n".ptr, in_sync_let_tuple(&g, 2) as c_int);
+		printf("let_tuple sync %d\n".ptr, in_sync_let_tuple(&g, 3) as c_int);
+		printf("let_tuple sync %d\n".ptr, in_sync_let_tuple(&g, 4) as c_int);
+		printf("let_tuple sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("let_tuple select %d\n".ptr, in_select_let_tuple(c, 1) as c_int);
+		printf("let_tuple select %d\n".ptr, in_select_let_tuple(c, 2) as c_int);
+		printf("let_tuple select %d\n".ptr, in_select_let_tuple(c, 3) as c_int);
+		printf("let_tuple select %d\n".ptr, in_select_let_tuple(c, 4) as c_int);
+		delete(c);
+		printf("let_tuple generic %d %d\n".ptr, in_generic_let_tuple<int>(1) as c_int,
+			in_generic_let_tuple<str>(1) as c_int);
+		printf("let_tuple generic %d %d\n".ptr, in_generic_let_tuple<int>(2) as c_int,
+			in_generic_let_tuple<str>(2) as c_int);
+		printf("let_tuple generic %d %d\n".ptr, in_generic_let_tuple<int>(3) as c_int,
+			in_generic_let_tuple<str>(3) as c_int);
+		printf("let_tuple generic %d %d\n".ptr, in_generic_let_tuple<int>(4) as c_int,
+			in_generic_let_tuple<str>(4) as c_int);
+		let outer = Outer_let_tuple { };
+		printf("let_tuple nested %d\n".ptr, outer.go(1) as c_int);
+		printf("let_tuple nested %d\n".ptr, outer.go(2) as c_int);
+		printf("let_tuple nested %d\n".ptr, outer.go(3) as c_int);
+		printf("let_tuple nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		printf("const function %d\n".ptr, in_function_const(1) as c_int);
+		printf("const function %d\n".ptr, in_function_const(2) as c_int);
+		printf("const function %d\n".ptr, in_function_const(3) as c_int);
+		printf("const function %d\n".ptr, in_function_const(4) as c_int);
+		let box = Box_const { base: 1000 };
+		printf("const method %d\n".ptr, box.run(1) as c_int);
+		printf("const method %d\n".ptr, box.run(2) as c_int);
+		printf("const method %d\n".ptr, box.run(3) as c_int);
+		printf("const method %d\n".ptr, box.run(4) as c_int);
+		printf("const loop %d\n".ptr, in_loop_const(1) as c_int);
+		printf("const loop %d\n".ptr, in_loop_const(2) as c_int);
+		printf("const loop %d\n".ptr, in_loop_const(3) as c_int);
+		printf("const loop %d\n".ptr, in_loop_const(4) as c_int);
+		printf("const arm %d\n".ptr, in_arm_const(0) as c_int);
+		printf("const arm %d\n".ptr, in_arm_const(1) as c_int);
+		printf("const arm %d\n".ptr, in_arm_const(2) as c_int);
+		printf("const arm %d\n".ptr, in_arm_const(3) as c_int);
+		printf("const arm %d\n".ptr, in_arm_const(4) as c_int);
+		printf("const if_let %d\n".ptr, in_if_let_const(0) as c_int);
+		printf("const if_let %d\n".ptr, in_if_let_const(1) as c_int);
+		printf("const if_let %d\n".ptr, in_if_let_const(2) as c_int);
+		printf("const if_let %d\n".ptr, in_if_let_const(3) as c_int);
+		printf("const if_let %d\n".ptr, in_if_let_const(4) as c_int);
+		let deferred = 0;
+		in_defer_const(1, &deferred);
+		printf("const defer %d\n".ptr, deferred as c_int);
+		in_defer_const(2, &deferred);
+		printf("const defer %d\n".ptr, deferred as c_int);
+		in_defer_const(3, &deferred);
+		printf("const defer %d\n".ptr, deferred as c_int);
+		in_defer_const(4, &deferred);
+		printf("const defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_const(0, &undone) catch {
+			yield;
+		};
+		printf("const undo %d\n".ptr, undone as c_int);
+		in_undo_const(1, &undone) catch {
+			yield;
+		};
+		printf("const undo %d\n".ptr, undone as c_int);
+		in_undo_const(2, &undone) catch {
+			yield;
+		};
+		printf("const undo %d\n".ptr, undone as c_int);
+		in_undo_const(3, &undone) catch {
+			yield;
+		};
+		printf("const undo %d\n".ptr, undone as c_int);
+		in_undo_const(4, &undone) catch {
+			yield;
+		};
+		printf("const undo %d\n".ptr, undone as c_int);
+		printf("const catch %d\n".ptr, in_catch_const(0) as c_int);
+		printf("const catch %d\n".ptr, in_catch_const(1) as c_int);
+		printf("const catch %d\n".ptr, in_catch_const(2) as c_int);
+		printf("const catch %d\n".ptr, in_catch_const(3) as c_int);
+		printf("const catch %d\n".ptr, in_catch_const(4) as c_int);
+		printf("const closure %d\n".ptr, in_closure_const(1) as c_int);
+		printf("const closure %d\n".ptr, in_closure_const(2) as c_int);
+		printf("const closure %d\n".ptr, in_closure_const(3) as c_int);
+		printf("const closure %d\n".ptr, in_closure_const(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_const();
+		printf("const worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_const();
+		printf("const worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_const();
+		printf("const worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_const();
+		printf("const worker %d\n".ptr, join(job3) as c_int);
+		printf("const dispatch %d\n".ptr, in_dispatch_const(task, 1) as c_int);
+		printf("const dispatch %d\n".ptr, in_dispatch_const(task, 2) as c_int);
+		printf("const dispatch %d\n".ptr, in_dispatch_const(task, 3) as c_int);
+		printf("const dispatch %d\n".ptr, in_dispatch_const(task, 4) as c_int);
+		let g = Guarded_const { lock: Mutex.new(), entered: 0 };
+		printf("const sync %d\n".ptr, in_sync_const(&g, 1) as c_int);
+		printf("const sync %d\n".ptr, in_sync_const(&g, 2) as c_int);
+		printf("const sync %d\n".ptr, in_sync_const(&g, 3) as c_int);
+		printf("const sync %d\n".ptr, in_sync_const(&g, 4) as c_int);
+		printf("const sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("const select %d\n".ptr, in_select_const(c, 1) as c_int);
+		printf("const select %d\n".ptr, in_select_const(c, 2) as c_int);
+		printf("const select %d\n".ptr, in_select_const(c, 3) as c_int);
+		printf("const select %d\n".ptr, in_select_const(c, 4) as c_int);
+		delete(c);
+		printf("const generic %d %d\n".ptr, in_generic_const<int>(1) as c_int,
+			in_generic_const<str>(1) as c_int);
+		printf("const generic %d %d\n".ptr, in_generic_const<int>(2) as c_int,
+			in_generic_const<str>(2) as c_int);
+		printf("const generic %d %d\n".ptr, in_generic_const<int>(3) as c_int,
+			in_generic_const<str>(3) as c_int);
+		printf("const generic %d %d\n".ptr, in_generic_const<int>(4) as c_int,
+			in_generic_const<str>(4) as c_int);
+		let outer = Outer_const { };
+		printf("const nested %d\n".ptr, outer.go(1) as c_int);
+		printf("const nested %d\n".ptr, outer.go(2) as c_int);
+		printf("const nested %d\n".ptr, outer.go(3) as c_int);
+		printf("const nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		let c = chan int(1);
+		printf("call select %d\n".ptr, in_select_call(c, 1) as c_int);
+		printf("call select %d\n".ptr, in_select_call(c, 2) as c_int);
+		printf("call select %d\n".ptr, in_select_call(c, 3) as c_int);
+		printf("call select %d\n".ptr, in_select_call(c, 4) as c_int);
+		delete(c);
+		let outer = Outer_call { };
+		printf("call nested %d\n".ptr, outer.go(1) as c_int);
+		printf("call nested %d\n".ptr, outer.go(2) as c_int);
+		printf("call nested %d\n".ptr, outer.go(3) as c_int);
+		printf("call nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		printf("size_of loop %d\n".ptr, in_loop_size_of(1) as c_int);
+		printf("size_of loop %d\n".ptr, in_loop_size_of(2) as c_int);
+		printf("size_of loop %d\n".ptr, in_loop_size_of(3) as c_int);
+		printf("size_of loop %d\n".ptr, in_loop_size_of(4) as c_int);
+		printf("size_of arm %d\n".ptr, in_arm_size_of(0) as c_int);
+		printf("size_of arm %d\n".ptr, in_arm_size_of(1) as c_int);
+		printf("size_of arm %d\n".ptr, in_arm_size_of(2) as c_int);
+		printf("size_of arm %d\n".ptr, in_arm_size_of(3) as c_int);
+		printf("size_of arm %d\n".ptr, in_arm_size_of(4) as c_int);
+		printf("size_of if_let %d\n".ptr, in_if_let_size_of(0) as c_int);
+		printf("size_of if_let %d\n".ptr, in_if_let_size_of(1) as c_int);
+		printf("size_of if_let %d\n".ptr, in_if_let_size_of(2) as c_int);
+		printf("size_of if_let %d\n".ptr, in_if_let_size_of(3) as c_int);
+		printf("size_of if_let %d\n".ptr, in_if_let_size_of(4) as c_int);
+		let deferred = 0;
+		in_defer_size_of(1, &deferred);
+		printf("size_of defer %d\n".ptr, deferred as c_int);
+		in_defer_size_of(2, &deferred);
+		printf("size_of defer %d\n".ptr, deferred as c_int);
+		in_defer_size_of(3, &deferred);
+		printf("size_of defer %d\n".ptr, deferred as c_int);
+		in_defer_size_of(4, &deferred);
+		printf("size_of defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_size_of(0, &undone) catch {
+			yield;
+		};
+		printf("size_of undo %d\n".ptr, undone as c_int);
+		in_undo_size_of(1, &undone) catch {
+			yield;
+		};
+		printf("size_of undo %d\n".ptr, undone as c_int);
+		in_undo_size_of(2, &undone) catch {
+			yield;
+		};
+		printf("size_of undo %d\n".ptr, undone as c_int);
+		in_undo_size_of(3, &undone) catch {
+			yield;
+		};
+		printf("size_of undo %d\n".ptr, undone as c_int);
+		in_undo_size_of(4, &undone) catch {
+			yield;
+		};
+		printf("size_of undo %d\n".ptr, undone as c_int);
+		printf("size_of catch %d\n".ptr, in_catch_size_of(0) as c_int);
+		printf("size_of catch %d\n".ptr, in_catch_size_of(1) as c_int);
+		printf("size_of catch %d\n".ptr, in_catch_size_of(2) as c_int);
+		printf("size_of catch %d\n".ptr, in_catch_size_of(3) as c_int);
+		printf("size_of catch %d\n".ptr, in_catch_size_of(4) as c_int);
+		printf("size_of closure %d\n".ptr, in_closure_size_of(1) as c_int);
+		printf("size_of closure %d\n".ptr, in_closure_size_of(2) as c_int);
+		printf("size_of closure %d\n".ptr, in_closure_size_of(3) as c_int);
+		printf("size_of closure %d\n".ptr, in_closure_size_of(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_size_of();
+		printf("size_of worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_size_of();
+		printf("size_of worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_size_of();
+		printf("size_of worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_size_of();
+		printf("size_of worker %d\n".ptr, join(job3) as c_int);
+		printf("size_of dispatch %d\n".ptr, in_dispatch_size_of(task, 1) as c_int);
+		printf("size_of dispatch %d\n".ptr, in_dispatch_size_of(task, 2) as c_int);
+		printf("size_of dispatch %d\n".ptr, in_dispatch_size_of(task, 3) as c_int);
+		printf("size_of dispatch %d\n".ptr, in_dispatch_size_of(task, 4) as c_int);
+		let g = Guarded_size_of { lock: Mutex.new(), entered: 0 };
+		printf("size_of sync %d\n".ptr, in_sync_size_of(&g, 1) as c_int);
+		printf("size_of sync %d\n".ptr, in_sync_size_of(&g, 2) as c_int);
+		printf("size_of sync %d\n".ptr, in_sync_size_of(&g, 3) as c_int);
+		printf("size_of sync %d\n".ptr, in_sync_size_of(&g, 4) as c_int);
+		printf("size_of sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("size_of select %d\n".ptr, in_select_size_of(c, 1) as c_int);
+		printf("size_of select %d\n".ptr, in_select_size_of(c, 2) as c_int);
+		printf("size_of select %d\n".ptr, in_select_size_of(c, 3) as c_int);
+		printf("size_of select %d\n".ptr, in_select_size_of(c, 4) as c_int);
+		delete(c);
+	}
+	{
+		printf("fn arm %d\n".ptr, in_arm_fn(0) as c_int);
+		printf("fn arm %d\n".ptr, in_arm_fn(1) as c_int);
+		printf("fn arm %d\n".ptr, in_arm_fn(2) as c_int);
+		printf("fn arm %d\n".ptr, in_arm_fn(3) as c_int);
+		printf("fn arm %d\n".ptr, in_arm_fn(4) as c_int);
+		printf("fn if_let %d\n".ptr, in_if_let_fn(0) as c_int);
+		printf("fn if_let %d\n".ptr, in_if_let_fn(1) as c_int);
+		printf("fn if_let %d\n".ptr, in_if_let_fn(2) as c_int);
+		printf("fn if_let %d\n".ptr, in_if_let_fn(3) as c_int);
+		printf("fn if_let %d\n".ptr, in_if_let_fn(4) as c_int);
+		let undone = 0;
+		in_undo_fn(0, &undone) catch {
+			yield;
+		};
+		printf("fn undo %d\n".ptr, undone as c_int);
+		in_undo_fn(1, &undone) catch {
+			yield;
+		};
+		printf("fn undo %d\n".ptr, undone as c_int);
+		in_undo_fn(2, &undone) catch {
+			yield;
+		};
+		printf("fn undo %d\n".ptr, undone as c_int);
+		in_undo_fn(3, &undone) catch {
+			yield;
+		};
+		printf("fn undo %d\n".ptr, undone as c_int);
+		in_undo_fn(4, &undone) catch {
+			yield;
+		};
+		printf("fn undo %d\n".ptr, undone as c_int);
+		printf("fn catch %d\n".ptr, in_catch_fn(0) as c_int);
+		printf("fn catch %d\n".ptr, in_catch_fn(1) as c_int);
+		printf("fn catch %d\n".ptr, in_catch_fn(2) as c_int);
+		printf("fn catch %d\n".ptr, in_catch_fn(3) as c_int);
+		printf("fn catch %d\n".ptr, in_catch_fn(4) as c_int);
+		let g = Guarded_fn { lock: Mutex.new(), entered: 0 };
+		printf("fn sync %d\n".ptr, in_sync_fn(&g, 1) as c_int);
+		printf("fn sync %d\n".ptr, in_sync_fn(&g, 2) as c_int);
+		printf("fn sync %d\n".ptr, in_sync_fn(&g, 3) as c_int);
+		printf("fn sync %d\n".ptr, in_sync_fn(&g, 4) as c_int);
+		printf("fn sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("fn select %d\n".ptr, in_select_fn(c, 1) as c_int);
+		printf("fn select %d\n".ptr, in_select_fn(c, 2) as c_int);
+		printf("fn select %d\n".ptr, in_select_fn(c, 3) as c_int);
+		printf("fn select %d\n".ptr, in_select_fn(c, 4) as c_int);
+		delete(c);
+		let outer = Outer_fn { };
+		printf("fn nested %d\n".ptr, outer.go(1) as c_int);
+		printf("fn nested %d\n".ptr, outer.go(2) as c_int);
+		printf("fn nested %d\n".ptr, outer.go(3) as c_int);
+		printf("fn nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		let box = Box_simd { base: 1000 };
+		printf("simd method %d\n".ptr, box.run(1) as c_int);
+		printf("simd method %d\n".ptr, box.run(2) as c_int);
+		printf("simd method %d\n".ptr, box.run(3) as c_int);
+		printf("simd method %d\n".ptr, box.run(4) as c_int);
+		printf("simd arm %d\n".ptr, in_arm_simd(0) as c_int);
+		printf("simd arm %d\n".ptr, in_arm_simd(1) as c_int);
+		printf("simd arm %d\n".ptr, in_arm_simd(2) as c_int);
+		printf("simd arm %d\n".ptr, in_arm_simd(3) as c_int);
+		printf("simd arm %d\n".ptr, in_arm_simd(4) as c_int);
+		printf("simd if_let %d\n".ptr, in_if_let_simd(0) as c_int);
+		printf("simd if_let %d\n".ptr, in_if_let_simd(1) as c_int);
+		printf("simd if_let %d\n".ptr, in_if_let_simd(2) as c_int);
+		printf("simd if_let %d\n".ptr, in_if_let_simd(3) as c_int);
+		printf("simd if_let %d\n".ptr, in_if_let_simd(4) as c_int);
+		let deferred = 0;
+		in_defer_simd(1, &deferred);
+		printf("simd defer %d\n".ptr, deferred as c_int);
+		in_defer_simd(2, &deferred);
+		printf("simd defer %d\n".ptr, deferred as c_int);
+		in_defer_simd(3, &deferred);
+		printf("simd defer %d\n".ptr, deferred as c_int);
+		in_defer_simd(4, &deferred);
+		printf("simd defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_simd(0, &undone) catch {
+			yield;
+		};
+		printf("simd undo %d\n".ptr, undone as c_int);
+		in_undo_simd(1, &undone) catch {
+			yield;
+		};
+		printf("simd undo %d\n".ptr, undone as c_int);
+		in_undo_simd(2, &undone) catch {
+			yield;
+		};
+		printf("simd undo %d\n".ptr, undone as c_int);
+		in_undo_simd(3, &undone) catch {
+			yield;
+		};
+		printf("simd undo %d\n".ptr, undone as c_int);
+		in_undo_simd(4, &undone) catch {
+			yield;
+		};
+		printf("simd undo %d\n".ptr, undone as c_int);
+		printf("simd catch %d\n".ptr, in_catch_simd(0) as c_int);
+		printf("simd catch %d\n".ptr, in_catch_simd(1) as c_int);
+		printf("simd catch %d\n".ptr, in_catch_simd(2) as c_int);
+		printf("simd catch %d\n".ptr, in_catch_simd(3) as c_int);
+		printf("simd catch %d\n".ptr, in_catch_simd(4) as c_int);
+		printf("simd closure %d\n".ptr, in_closure_simd(1) as c_int);
+		printf("simd closure %d\n".ptr, in_closure_simd(2) as c_int);
+		printf("simd closure %d\n".ptr, in_closure_simd(3) as c_int);
+		printf("simd closure %d\n".ptr, in_closure_simd(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_simd();
+		printf("simd worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_simd();
+		printf("simd worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_simd();
+		printf("simd worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_simd();
+		printf("simd worker %d\n".ptr, join(job3) as c_int);
+		printf("simd dispatch %d\n".ptr, in_dispatch_simd(task, 1) as c_int);
+		printf("simd dispatch %d\n".ptr, in_dispatch_simd(task, 2) as c_int);
+		printf("simd dispatch %d\n".ptr, in_dispatch_simd(task, 3) as c_int);
+		printf("simd dispatch %d\n".ptr, in_dispatch_simd(task, 4) as c_int);
+		let g = Guarded_simd { lock: Mutex.new(), entered: 0 };
+		printf("simd sync %d\n".ptr, in_sync_simd(&g, 1) as c_int);
+		printf("simd sync %d\n".ptr, in_sync_simd(&g, 2) as c_int);
+		printf("simd sync %d\n".ptr, in_sync_simd(&g, 3) as c_int);
+		printf("simd sync %d\n".ptr, in_sync_simd(&g, 4) as c_int);
+		printf("simd sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("simd select %d\n".ptr, in_select_simd(c, 1) as c_int);
+		printf("simd select %d\n".ptr, in_select_simd(c, 2) as c_int);
+		printf("simd select %d\n".ptr, in_select_simd(c, 3) as c_int);
+		printf("simd select %d\n".ptr, in_select_simd(c, 4) as c_int);
+		delete(c);
+		printf("simd generic %d %d\n".ptr, in_generic_simd<int>(1) as c_int,
+			in_generic_simd<str>(1) as c_int);
+		printf("simd generic %d %d\n".ptr, in_generic_simd<int>(2) as c_int,
+			in_generic_simd<str>(2) as c_int);
+		printf("simd generic %d %d\n".ptr, in_generic_simd<int>(3) as c_int,
+			in_generic_simd<str>(3) as c_int);
+		printf("simd generic %d %d\n".ptr, in_generic_simd<int>(4) as c_int,
+			in_generic_simd<str>(4) as c_int);
+		let outer = Outer_simd { };
+		printf("simd nested %d\n".ptr, outer.go(1) as c_int);
+		printf("simd nested %d\n".ptr, outer.go(2) as c_int);
+		printf("simd nested %d\n".ptr, outer.go(3) as c_int);
+		printf("simd nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	delete(task);
+	return 0;
+}

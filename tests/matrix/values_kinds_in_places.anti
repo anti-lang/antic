@@ -1,0 +1,2042 @@
+//! Each kind of value in the places that hold one: a `let` with its type
+//! inferred and written, a `const` in a body, an assignment to a local and
+//! through a pointer, a field read and written, and a call that takes the value
+//! and gives it back. Each construct with each kind is a function of its own,
+//! named after both, which prints the two values it holds. A kind that a place
+//! does not take has a refusal of its own.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn risky_up(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "negative";
+	}
+	return n + 1;
+}
+
+fn risky_down(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "positive";
+	}
+	return n - 1;
+}
+
+fn settle(f: fn(int) -> int may fail) -> int
+{
+	let got = f(10) catch {
+		yield -1;
+	};
+	return got;
+}
+
+fn up(n: int) -> int
+{
+	return n + 1;
+}
+
+fn down(n: int) -> int
+{
+	return n - 1;
+}
+
+struct Pt
+{
+	x: int,
+	y: int,
+}
+
+packed struct Pk
+{
+	a: u8,
+	b: i32,
+}
+
+simd struct I32x4
+{
+	a: i32,
+	b: i32,
+	c: i32,
+	d: i32,
+}
+
+union Bits
+{
+	i: i32,
+	f: f32,
+}
+
+enum Color
+{
+	Red,
+	Green,
+	Blue,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+class Counter
+{
+	pub n: int = 0,
+}
+
+concurrent class Hits
+{
+	pub atomic n: int = 0,
+}
+
+abstract class Named
+{
+	abstract fn id(self) -> int;
+}
+
+class One inherits Named
+{
+	concrete fn id(self) -> int
+	{
+		return 1;
+	}
+}
+
+class Two inherits Named
+{
+	concrete fn id(self) -> int
+	{
+		return 2;
+	}
+}
+
+fn same(n: int) -> int
+{
+	return n;
+}
+
+struct Hold_i8
+{
+	f: i8,
+	tag: int,
+}
+
+struct Hold_i16
+{
+	f: i16,
+	tag: int,
+}
+
+struct Hold_i32
+{
+	f: i32,
+	tag: int,
+}
+
+struct Hold_i64
+{
+	f: i64,
+	tag: int,
+}
+
+struct Hold_int
+{
+	f: int,
+	tag: int,
+}
+
+struct Hold_u8
+{
+	f: u8,
+	tag: int,
+}
+
+struct Hold_u16
+{
+	f: u16,
+	tag: int,
+}
+
+struct Hold_u32
+{
+	f: u32,
+	tag: int,
+}
+
+struct Hold_u64
+{
+	f: u64,
+	tag: int,
+}
+
+struct Hold_uint
+{
+	f: uint,
+	tag: int,
+}
+
+struct Hold_byte
+{
+	f: byte,
+	tag: int,
+}
+
+struct Hold_f32
+{
+	f: f32,
+	tag: int,
+}
+
+struct Hold_f64
+{
+	f: f64,
+	tag: int,
+}
+
+struct Hold_f16
+{
+	f: f16,
+	tag: int,
+}
+
+struct Hold_bool
+{
+	f: bool,
+	tag: int,
+}
+
+struct Hold_char
+{
+	f: char,
+	tag: int,
+}
+
+struct Hold_str
+{
+	f: str,
+	tag: int,
+}
+
+struct Hold_slice
+{
+	f: []int,
+	tag: int,
+}
+
+struct Hold_fixed_array
+{
+	f: [2]int,
+	tag: int,
+}
+
+struct Hold_pointer
+{
+	f: *int,
+	tag: int,
+}
+
+struct Hold_nullable_pointer
+{
+	f: ?*int,
+	tag: int,
+}
+
+struct Hold_optional
+{
+	f: ?int,
+	tag: int,
+}
+
+struct Hold_may_fail_fn
+{
+	f: fn(int) -> int may fail,
+	tag: int,
+}
+
+struct Hold_fn
+{
+	f: fn(int) -> int,
+	tag: int,
+}
+
+struct Hold_tuple
+{
+	f: (int, bool),
+	tag: int,
+}
+
+struct Hold_channel
+{
+	f: chan int,
+	tag: int,
+}
+
+struct Hold_struct
+{
+	f: Pt,
+	tag: int,
+}
+
+struct Hold_packed_struct
+{
+	f: Pk,
+	tag: int,
+}
+
+struct Hold_simd_struct
+{
+	f: I32x4,
+	tag: int,
+}
+
+struct Hold_union
+{
+	f: Bits,
+	tag: int,
+}
+
+struct Hold_enum
+{
+	f: Color,
+	tag: int,
+}
+
+struct Hold_variant
+{
+	f: Shape,
+	tag: int,
+}
+
+struct Hold_class
+{
+	f: Counter,
+	tag: int,
+}
+
+struct Hold_concurrent_class
+{
+	f: Hits,
+	tag: int,
+}
+
+struct Hold_interface
+{
+	f: *Named,
+	tag: int,
+}
+
+struct Hold_generic<T>
+{
+	f: T,
+	tag: int,
+}
+
+fn pass_i8(v: i8) -> i8
+{
+	return v;
+}
+
+fn pass_i16(v: i16) -> i16
+{
+	return v;
+}
+
+fn pass_i32(v: i32) -> i32
+{
+	return v;
+}
+
+fn pass_i64(v: i64) -> i64
+{
+	return v;
+}
+
+fn pass_int(v: int) -> int
+{
+	return v;
+}
+
+fn pass_u8(v: u8) -> u8
+{
+	return v;
+}
+
+fn pass_u16(v: u16) -> u16
+{
+	return v;
+}
+
+fn pass_u32(v: u32) -> u32
+{
+	return v;
+}
+
+fn pass_u64(v: u64) -> u64
+{
+	return v;
+}
+
+fn pass_uint(v: uint) -> uint
+{
+	return v;
+}
+
+fn pass_byte(v: byte) -> byte
+{
+	return v;
+}
+
+fn pass_f32(v: f32) -> f32
+{
+	return v;
+}
+
+fn pass_f64(v: f64) -> f64
+{
+	return v;
+}
+
+fn pass_bool(v: bool) -> bool
+{
+	return v;
+}
+
+fn pass_char(v: char) -> char
+{
+	return v;
+}
+
+fn pass_str(v: str) -> str
+{
+	return v;
+}
+
+fn pass_slice(v: []int) -> []int
+{
+	return v;
+}
+
+fn pass_fixed_array(v: [2]int) -> [2]int
+{
+	return v;
+}
+
+fn pass_pointer(v: *int) -> *int
+{
+	return v;
+}
+
+fn pass_nullable_pointer(v: ?*int) -> ?*int
+{
+	return v;
+}
+
+fn pass_optional(v: ?int) -> ?int
+{
+	return v;
+}
+
+fn pass_may_fail_fn(keep v: fn(int) -> int may fail) -> fn(int) -> int may fail
+{
+	return v;
+}
+
+fn pass_fn(keep v: fn(int) -> int) -> fn(int) -> int
+{
+	return v;
+}
+
+fn pass_tuple(v: (int, bool)) -> (int, bool)
+{
+	return v;
+}
+
+fn pass_channel(v: chan int) -> chan int
+{
+	return v;
+}
+
+fn pass_struct(v: Pt) -> Pt
+{
+	return v;
+}
+
+fn pass_packed_struct(v: Pk) -> Pk
+{
+	return v;
+}
+
+fn pass_simd_struct(v: I32x4) -> I32x4
+{
+	return v;
+}
+
+fn pass_union(v: Bits) -> Bits
+{
+	return v;
+}
+
+fn pass_enum(v: Color) -> Color
+{
+	return v;
+}
+
+fn pass_variant(v: Shape) -> Shape
+{
+	return v;
+}
+
+fn pass_class(v: Counter) -> Counter
+{
+	return v;
+}
+
+fn pass_concurrent_class(v: Hits) -> Hits
+{
+	return v;
+}
+
+fn pass_interface(v: *Named) -> *Named
+{
+	return v;
+}
+
+fn let_on_i8()
+{
+	let first: i8 = 127;
+	let second = first;
+	let third: i8 = -128;
+	printf("let i8 %lld %lld\n".ptr, second as int, third as int);
+}
+
+fn let_on_i16()
+{
+	let first: i16 = 32767;
+	let second = first;
+	let third: i16 = -32768;
+	printf("let i16 %lld %lld\n".ptr, second as int, third as int);
+}
+
+fn let_on_i32()
+{
+	let first: i32 = 2147483647;
+	let second = first;
+	let third: i32 = -2147483648;
+	printf("let i32 %lld %lld\n".ptr, second as int, third as int);
+}
+
+fn let_on_i64()
+{
+	let first: i64 = 9223372036854775807;
+	let second = first;
+	let third: i64 = -9223372036854775808;
+	printf("let i64 %lld %lld\n".ptr, second as int, third as int);
+}
+
+fn let_on_int()
+{
+	let first: int = 9223372036854775807;
+	let second = first;
+	let third: int = -9223372036854775808;
+	printf("let int %lld %lld\n".ptr, second as int, third as int);
+}
+
+fn let_on_u8()
+{
+	let first: u8 = 255;
+	let second = first;
+	let third: u8 = 1;
+	printf("let u8 %llu %llu\n".ptr, second as u64, third as u64);
+}
+
+fn let_on_u16()
+{
+	let first: u16 = 65535;
+	let second = first;
+	let third: u16 = 1;
+	printf("let u16 %llu %llu\n".ptr, second as u64, third as u64);
+}
+
+fn let_on_u32()
+{
+	let first: u32 = 4294967295;
+	let second = first;
+	let third: u32 = 1;
+	printf("let u32 %llu %llu\n".ptr, second as u64, third as u64);
+}
+
+fn let_on_u64()
+{
+	let first: u64 = 18446744073709551615;
+	let second = first;
+	let third: u64 = 1;
+	printf("let u64 %llu %llu\n".ptr, second as u64, third as u64);
+}
+
+fn let_on_uint()
+{
+	let first: uint = 18446744073709551615;
+	let second = first;
+	let third: uint = 1;
+	printf("let uint %llu %llu\n".ptr, second as u64, third as u64);
+}
+
+fn let_on_byte()
+{
+	let first: byte = 255;
+	let second = first;
+	let third: byte = 1;
+	printf("let byte %llu %llu\n".ptr, second as u64, third as u64);
+}
+
+fn let_on_f32()
+{
+	let first: f32 = 1.5;
+	let second = first;
+	let third: f32 = -0.25;
+	printf("let f32 %g %g\n".ptr, second as f64, third as f64);
+}
+
+fn let_on_f64()
+{
+	let first: f64 = 1.5;
+	let second = first;
+	let third: f64 = -0.25;
+	printf("let f64 %g %g\n".ptr, second, third);
+}
+
+fn let_on_f16()
+{
+	let first: f16 = 1.5 as f16;
+	let second = first;
+	let third: f16 = -0.25 as f16;
+	printf("let f16 %g %g\n".ptr, second as f64, third as f64);
+}
+
+fn let_on_bool()
+{
+	let first: bool = true;
+	let second = first;
+	let third: bool = false;
+	printf("let bool %d %d\n".ptr, second as c_int, third as c_int);
+}
+
+fn let_on_char()
+{
+	let first: char = 'a';
+	let second = first;
+	let third: char = '\u{10FFFF}';
+	printf("let char %u %u\n".ptr, second as u32, third as u32);
+}
+
+fn let_on_str()
+{
+	let first: str = "one";
+	let second = first;
+	let third: str = "three";
+	printf("let str %lld %lld\n".ptr, second.len, third.len);
+}
+
+fn let_on_slice()
+{
+	let base = [1, 2, 3];
+	let first: []int = base[0..1];
+	let second = first;
+	let third: []int = base[0..3];
+	printf("let slice %lld %lld\n".ptr, second.len, third.len);
+}
+
+fn let_on_fixed_array()
+{
+	let first: [2]int = [1, 2];
+	let second = first;
+	let third: [2]int = [3, 4];
+	printf("let fixed_array %lld %lld\n".ptr, second[1], third[1]);
+}
+
+fn let_on_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let first: *int = &a;
+	let second = first;
+	let third: *int = &b;
+	printf("let pointer %lld %lld\n".ptr, *second, *third);
+}
+
+fn let_on_nullable_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let first: ?*int = &a;
+	let second = first;
+	let third: ?*int = none;
+	printf("let nullable_pointer %lld %lld\n".ptr, *(second ?? &b), *(third ?? &b));
+}
+
+fn let_on_optional()
+{
+	let first: ?int = 5;
+	let second = first;
+	let third: ?int = none;
+	printf("let optional %lld %lld\n".ptr, (second ?? -1), (third ?? -1));
+}
+
+fn let_on_may_fail_fn()
+{
+	let first: fn(int) -> int may fail = risky_up;
+	let second = first;
+	let third: fn(int) -> int may fail = risky_down;
+	printf("let may_fail_fn %lld %lld\n".ptr, settle(second), settle(third));
+}
+
+fn let_on_fn()
+{
+	let first: fn(int) -> int = up;
+	let second = first;
+	let third: fn(int) -> int = down;
+	printf("let fn %lld %lld\n".ptr, second(10), third(10));
+}
+
+fn let_on_tuple()
+{
+	let first: (int, bool) = (1, true);
+	let second = first;
+	let third: (int, bool) = (2, false);
+	printf("let tuple %lld %lld\n".ptr, second.0, third.0);
+}
+
+fn let_on_channel()
+{
+	let c1 = chan int(1);
+	let c2 = chan int(1);
+	let first: chan int = c1;
+	let second = first;
+	let third: chan int = c2;
+	printf("let channel %d %d\n".ptr, (second == c1) as c_int, (third == c1) as c_int);
+	delete(c1);
+	delete(c2);
+}
+
+fn let_on_struct()
+{
+	let first: Pt = Pt { x: 1, y: 2 };
+	let second = first;
+	let third: Pt = Pt { x: 3, y: 4 };
+	printf("let struct %lld %lld\n".ptr, second.y, third.y);
+}
+
+fn let_on_packed_struct()
+{
+	let first: Pk = Pk { a: 1, b: 2 };
+	let second = first;
+	let third: Pk = Pk { a: 3, b: 4 };
+	printf("let packed_struct %lld %lld\n".ptr, second.b as int, third.b as int);
+}
+
+fn let_on_simd_struct()
+{
+	let first: I32x4 = I32x4 { a: 1, b: 2, c: 3, d: 4 };
+	let second = first;
+	let third: I32x4 = I32x4 { a: 5, b: 6, c: 7, d: 8 };
+	printf("let simd_struct %lld %lld\n".ptr, second.c as int, third.c as int);
+}
+
+fn let_on_union()
+{
+	let first: Bits = Bits { i: 7 };
+	let second = first;
+	let third: Bits = Bits { i: 9 };
+	printf("let union %lld %lld\n".ptr, second.i as int, third.i as int);
+}
+
+fn let_on_enum()
+{
+	let first: Color = Color.Green;
+	let second = first;
+	let third: Color = Color.Blue;
+	printf("let enum %lld %lld\n".ptr, second as int, third as int);
+}
+
+fn let_on_variant()
+{
+	let first: Shape = Shape.Circle { r: 2 };
+	let second = first;
+	let third: Shape = Shape.Empty;
+	printf("let variant %d %d\n".ptr, (second is Shape.Circle) as c_int, (third is Shape.Circle) as c_int);
+}
+
+fn let_on_class()
+{
+	let first: Counter = Counter { n: 5 };
+	let second = first;
+	let third: Counter = Counter { n: 6 };
+	printf("let class %lld %lld\n".ptr, second.n, third.n);
+}
+
+fn let_on_concurrent_class()
+{
+	let first: Hits = Hits { n: 5 };
+	let second = first;
+	let third: Hits = Hits { n: 6 };
+	printf("let concurrent_class %lld %lld\n".ptr, second.n.load(), third.n.load());
+}
+
+fn let_on_interface()
+{
+	let one = One { };
+	let two = Two { };
+	let first: *Named = &one;
+	let second = first;
+	let third: *Named = &two;
+	printf("let interface %lld %lld\n".ptr, second.id(), third.id());
+}
+
+fn let_on_generic<T>(a: T, b: T, read: fn(T) -> int)
+{
+	let first: T = dup(a);
+	let second = first;
+	let third: T = dup(b);
+	printf("let generic %lld %lld\n".ptr, read(second), read(third));
+}
+
+fn const_on_i8()
+{
+	const FIRST: i8 = 127;
+	const SECOND: i8 = -128;
+	printf("const i8 %lld %lld\n".ptr, FIRST as int, SECOND as int);
+}
+
+fn const_on_i16()
+{
+	const FIRST: i16 = 32767;
+	const SECOND: i16 = -32768;
+	printf("const i16 %lld %lld\n".ptr, FIRST as int, SECOND as int);
+}
+
+fn const_on_i32()
+{
+	const FIRST: i32 = 2147483647;
+	const SECOND: i32 = -2147483648;
+	printf("const i32 %lld %lld\n".ptr, FIRST as int, SECOND as int);
+}
+
+fn const_on_i64()
+{
+	const FIRST: i64 = 9223372036854775807;
+	const SECOND: i64 = -9223372036854775808;
+	printf("const i64 %lld %lld\n".ptr, FIRST as int, SECOND as int);
+}
+
+fn const_on_int()
+{
+	const FIRST: int = 9223372036854775807;
+	const SECOND: int = -9223372036854775808;
+	printf("const int %lld %lld\n".ptr, FIRST as int, SECOND as int);
+}
+
+fn const_on_u8()
+{
+	const FIRST: u8 = 255;
+	const SECOND: u8 = 1;
+	printf("const u8 %llu %llu\n".ptr, FIRST as u64, SECOND as u64);
+}
+
+fn const_on_u16()
+{
+	const FIRST: u16 = 65535;
+	const SECOND: u16 = 1;
+	printf("const u16 %llu %llu\n".ptr, FIRST as u64, SECOND as u64);
+}
+
+fn const_on_u32()
+{
+	const FIRST: u32 = 4294967295;
+	const SECOND: u32 = 1;
+	printf("const u32 %llu %llu\n".ptr, FIRST as u64, SECOND as u64);
+}
+
+fn const_on_u64()
+{
+	const FIRST: u64 = 18446744073709551615;
+	const SECOND: u64 = 1;
+	printf("const u64 %llu %llu\n".ptr, FIRST as u64, SECOND as u64);
+}
+
+fn const_on_uint()
+{
+	const FIRST: uint = 18446744073709551615;
+	const SECOND: uint = 1;
+	printf("const uint %llu %llu\n".ptr, FIRST as u64, SECOND as u64);
+}
+
+fn const_on_byte()
+{
+	const FIRST: byte = 255;
+	const SECOND: byte = 1;
+	printf("const byte %llu %llu\n".ptr, FIRST as u64, SECOND as u64);
+}
+
+fn const_on_f32()
+{
+	const FIRST: f32 = 1.5;
+	const SECOND: f32 = -0.25;
+	printf("const f32 %g %g\n".ptr, FIRST as f64, SECOND as f64);
+}
+
+fn const_on_f64()
+{
+	const FIRST: f64 = 1.5;
+	const SECOND: f64 = -0.25;
+	printf("const f64 %g %g\n".ptr, FIRST, SECOND);
+}
+
+fn const_on_f16()
+{
+	const FIRST: f16 = 1.5 as f16;
+	const SECOND: f16 = -0.25 as f16;
+	printf("const f16 %g %g\n".ptr, FIRST as f64, SECOND as f64);
+}
+
+fn const_on_bool()
+{
+	const FIRST: bool = true;
+	const SECOND: bool = false;
+	printf("const bool %d %d\n".ptr, FIRST as c_int, SECOND as c_int);
+}
+
+fn const_on_char()
+{
+	const FIRST: char = 'a';
+	const SECOND: char = '\u{10FFFF}';
+	printf("const char %u %u\n".ptr, FIRST as u32, SECOND as u32);
+}
+
+fn const_on_str()
+{
+	const FIRST: str = "one";
+	const SECOND: str = "three";
+	printf("const str %lld %lld\n".ptr, FIRST.len, SECOND.len);
+}
+
+fn const_on_fixed_array()
+{
+	const FIRST: [2]int = [1, 2];
+	const SECOND: [2]int = [3, 4];
+	printf("const fixed_array %lld %lld\n".ptr, FIRST[1], SECOND[1]);
+}
+
+fn const_on_nullable_pointer()
+{
+	let a = 11;
+	let b = 22;
+	const FIRST: ?*int = none;
+	const SECOND: ?*int = none;
+	printf("const nullable_pointer %lld %lld\n".ptr, *(FIRST ?? &b), *(SECOND ?? &b));
+}
+
+fn const_on_tuple()
+{
+	const FIRST: (int, bool) = (1, true);
+	const SECOND: (int, bool) = (2, false);
+	printf("const tuple %lld %lld\n".ptr, FIRST.0, SECOND.0);
+}
+
+fn const_on_struct()
+{
+	const FIRST: Pt = Pt { x: 1, y: 2 };
+	const SECOND: Pt = Pt { x: 3, y: 4 };
+	printf("const struct %lld %lld\n".ptr, FIRST.y, SECOND.y);
+}
+
+fn const_on_packed_struct()
+{
+	const FIRST: Pk = Pk { a: 1, b: 2 };
+	const SECOND: Pk = Pk { a: 3, b: 4 };
+	printf("const packed_struct %lld %lld\n".ptr, FIRST.b as int, SECOND.b as int);
+}
+
+fn const_on_simd_struct()
+{
+	const FIRST: I32x4 = I32x4 { a: 1, b: 2, c: 3, d: 4 };
+	const SECOND: I32x4 = I32x4 { a: 5, b: 6, c: 7, d: 8 };
+	printf("const simd_struct %lld %lld\n".ptr, FIRST.c as int, SECOND.c as int);
+}
+
+fn const_on_enum()
+{
+	const FIRST: Color = Color.Green;
+	const SECOND: Color = Color.Blue;
+	printf("const enum %lld %lld\n".ptr, FIRST as int, SECOND as int);
+}
+
+fn assign_on_i8()
+{
+	let first: i8 = 127;
+	let second: i8 = -128;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign i8 %lld %lld\n".ptr, second as int, first as int);
+}
+
+fn assign_on_i16()
+{
+	let first: i16 = 32767;
+	let second: i16 = -32768;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign i16 %lld %lld\n".ptr, second as int, first as int);
+}
+
+fn assign_on_i32()
+{
+	let first: i32 = 2147483647;
+	let second: i32 = -2147483648;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign i32 %lld %lld\n".ptr, second as int, first as int);
+}
+
+fn assign_on_i64()
+{
+	let first: i64 = 9223372036854775807;
+	let second: i64 = -9223372036854775808;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign i64 %lld %lld\n".ptr, second as int, first as int);
+}
+
+fn assign_on_int()
+{
+	let first: int = 9223372036854775807;
+	let second: int = -9223372036854775808;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign int %lld %lld\n".ptr, second as int, first as int);
+}
+
+fn assign_on_u8()
+{
+	let first: u8 = 255;
+	let second: u8 = 1;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign u8 %llu %llu\n".ptr, second as u64, first as u64);
+}
+
+fn assign_on_u16()
+{
+	let first: u16 = 65535;
+	let second: u16 = 1;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign u16 %llu %llu\n".ptr, second as u64, first as u64);
+}
+
+fn assign_on_u32()
+{
+	let first: u32 = 4294967295;
+	let second: u32 = 1;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign u32 %llu %llu\n".ptr, second as u64, first as u64);
+}
+
+fn assign_on_u64()
+{
+	let first: u64 = 18446744073709551615;
+	let second: u64 = 1;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign u64 %llu %llu\n".ptr, second as u64, first as u64);
+}
+
+fn assign_on_uint()
+{
+	let first: uint = 18446744073709551615;
+	let second: uint = 1;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign uint %llu %llu\n".ptr, second as u64, first as u64);
+}
+
+fn assign_on_byte()
+{
+	let first: byte = 255;
+	let second: byte = 1;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign byte %llu %llu\n".ptr, second as u64, first as u64);
+}
+
+fn assign_on_f32()
+{
+	let first: f32 = 1.5;
+	let second: f32 = -0.25;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign f32 %g %g\n".ptr, second as f64, first as f64);
+}
+
+fn assign_on_f64()
+{
+	let first: f64 = 1.5;
+	let second: f64 = -0.25;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign f64 %g %g\n".ptr, second, first);
+}
+
+fn assign_on_bool()
+{
+	let first: bool = true;
+	let second: bool = false;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign bool %d %d\n".ptr, second as c_int, first as c_int);
+}
+
+fn assign_on_char()
+{
+	let first: char = 'a';
+	let second: char = '\u{10FFFF}';
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign char %u %u\n".ptr, second as u32, first as u32);
+}
+
+fn assign_on_str()
+{
+	let first: str = "one";
+	let second: str = "three";
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign str %lld %lld\n".ptr, second.len, first.len);
+}
+
+fn assign_on_slice()
+{
+	let base = [1, 2, 3];
+	let first: []int = base[0..1];
+	let second: []int = base[0..3];
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign slice %lld %lld\n".ptr, second.len, first.len);
+}
+
+fn assign_on_fixed_array()
+{
+	let first: [2]int = [1, 2];
+	let second: [2]int = [3, 4];
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign fixed_array %lld %lld\n".ptr, second[1], first[1]);
+}
+
+fn assign_on_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let first: *int = &a;
+	let second: *int = &b;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign pointer %lld %lld\n".ptr, *second, *first);
+}
+
+fn assign_on_nullable_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let first: ?*int = &a;
+	let second: ?*int = none;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign nullable_pointer %lld %lld\n".ptr, *(second ?? &b), *(first ?? &b));
+}
+
+fn assign_on_optional()
+{
+	let first: ?int = 5;
+	let second: ?int = none;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign optional %lld %lld\n".ptr, (second ?? -1), (first ?? -1));
+}
+
+fn assign_on_may_fail_fn()
+{
+	let first: fn(int) -> int may fail = risky_up;
+	let second: fn(int) -> int may fail = risky_down;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign may_fail_fn %lld %lld\n".ptr, settle(second), settle(first));
+}
+
+fn assign_on_fn()
+{
+	let first: fn(int) -> int = up;
+	let second: fn(int) -> int = down;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign fn %lld %lld\n".ptr, second(10), first(10));
+}
+
+fn assign_on_tuple()
+{
+	let first: (int, bool) = (1, true);
+	let second: (int, bool) = (2, false);
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign tuple %lld %lld\n".ptr, second.0, first.0);
+}
+
+fn assign_on_channel()
+{
+	let c1 = chan int(1);
+	let c2 = chan int(1);
+	let first: chan int = c1;
+	let second: chan int = c2;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign channel %d %d\n".ptr, (second == c1) as c_int, (first == c1) as c_int);
+	delete(c1);
+	delete(c2);
+}
+
+fn assign_on_struct()
+{
+	let first: Pt = Pt { x: 1, y: 2 };
+	let second: Pt = Pt { x: 3, y: 4 };
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign struct %lld %lld\n".ptr, second.y, first.y);
+}
+
+fn assign_on_packed_struct()
+{
+	let first: Pk = Pk { a: 1, b: 2 };
+	let second: Pk = Pk { a: 3, b: 4 };
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign packed_struct %lld %lld\n".ptr, second.b as int, first.b as int);
+}
+
+fn assign_on_simd_struct()
+{
+	let first: I32x4 = I32x4 { a: 1, b: 2, c: 3, d: 4 };
+	let second: I32x4 = I32x4 { a: 5, b: 6, c: 7, d: 8 };
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign simd_struct %lld %lld\n".ptr, second.c as int, first.c as int);
+}
+
+fn assign_on_union()
+{
+	let first: Bits = Bits { i: 7 };
+	let second: Bits = Bits { i: 9 };
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign union %lld %lld\n".ptr, second.i as int, first.i as int);
+}
+
+fn assign_on_enum()
+{
+	let first: Color = Color.Green;
+	let second: Color = Color.Blue;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign enum %lld %lld\n".ptr, second as int, first as int);
+}
+
+fn assign_on_variant()
+{
+	let first: Shape = Shape.Circle { r: 2 };
+	let second: Shape = Shape.Empty;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign variant %d %d\n".ptr, (second is Shape.Circle) as c_int, (first is Shape.Circle) as c_int);
+}
+
+fn assign_on_class()
+{
+	let first: Counter = Counter { n: 5 };
+	let second: Counter = Counter { n: 6 };
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign class %lld %lld\n".ptr, second.n, first.n);
+}
+
+fn assign_on_concurrent_class()
+{
+	let first: Hits = Hits { n: 5 };
+	let second: Hits = Hits { n: 6 };
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign concurrent_class %lld %lld\n".ptr, second.n.load(), first.n.load());
+}
+
+fn assign_on_interface()
+{
+	let one = One { };
+	let two = Two { };
+	let first: *Named = &one;
+	let second: *Named = &two;
+	let kept = first;
+	first = second;
+	let p = &second;
+	*p = kept;
+	printf("assign interface %lld %lld\n".ptr, second.id(), first.id());
+}
+
+fn field_on_i8()
+{
+	let h = Hold_i8 { f: 127, tag: 1 };
+	let i = Hold_i8 { tag: 2, f: 127 };
+	i.f = -128;
+	printf("field i8 %lld %lld\n".ptr, h.f as int, i.f as int);
+}
+
+fn field_on_i16()
+{
+	let h = Hold_i16 { f: 32767, tag: 1 };
+	let i = Hold_i16 { tag: 2, f: 32767 };
+	i.f = -32768;
+	printf("field i16 %lld %lld\n".ptr, h.f as int, i.f as int);
+}
+
+fn field_on_i32()
+{
+	let h = Hold_i32 { f: 2147483647, tag: 1 };
+	let i = Hold_i32 { tag: 2, f: 2147483647 };
+	i.f = -2147483648;
+	printf("field i32 %lld %lld\n".ptr, h.f as int, i.f as int);
+}
+
+fn field_on_i64()
+{
+	let h = Hold_i64 { f: 9223372036854775807, tag: 1 };
+	let i = Hold_i64 { tag: 2, f: 9223372036854775807 };
+	i.f = -9223372036854775808;
+	printf("field i64 %lld %lld\n".ptr, h.f as int, i.f as int);
+}
+
+fn field_on_int()
+{
+	let h = Hold_int { f: 9223372036854775807, tag: 1 };
+	let i = Hold_int { tag: 2, f: 9223372036854775807 };
+	i.f = -9223372036854775808;
+	printf("field int %lld %lld\n".ptr, h.f as int, i.f as int);
+}
+
+fn field_on_u8()
+{
+	let h = Hold_u8 { f: 255, tag: 1 };
+	let i = Hold_u8 { tag: 2, f: 255 };
+	i.f = 1;
+	printf("field u8 %llu %llu\n".ptr, h.f as u64, i.f as u64);
+}
+
+fn field_on_u16()
+{
+	let h = Hold_u16 { f: 65535, tag: 1 };
+	let i = Hold_u16 { tag: 2, f: 65535 };
+	i.f = 1;
+	printf("field u16 %llu %llu\n".ptr, h.f as u64, i.f as u64);
+}
+
+fn field_on_u32()
+{
+	let h = Hold_u32 { f: 4294967295, tag: 1 };
+	let i = Hold_u32 { tag: 2, f: 4294967295 };
+	i.f = 1;
+	printf("field u32 %llu %llu\n".ptr, h.f as u64, i.f as u64);
+}
+
+fn field_on_u64()
+{
+	let h = Hold_u64 { f: 18446744073709551615, tag: 1 };
+	let i = Hold_u64 { tag: 2, f: 18446744073709551615 };
+	i.f = 1;
+	printf("field u64 %llu %llu\n".ptr, h.f as u64, i.f as u64);
+}
+
+fn field_on_uint()
+{
+	let h = Hold_uint { f: 18446744073709551615, tag: 1 };
+	let i = Hold_uint { tag: 2, f: 18446744073709551615 };
+	i.f = 1;
+	printf("field uint %llu %llu\n".ptr, h.f as u64, i.f as u64);
+}
+
+fn field_on_byte()
+{
+	let h = Hold_byte { f: 255, tag: 1 };
+	let i = Hold_byte { tag: 2, f: 255 };
+	i.f = 1;
+	printf("field byte %llu %llu\n".ptr, h.f as u64, i.f as u64);
+}
+
+fn field_on_f32()
+{
+	let h = Hold_f32 { f: 1.5, tag: 1 };
+	let i = Hold_f32 { tag: 2, f: 1.5 };
+	i.f = -0.25;
+	printf("field f32 %g %g\n".ptr, h.f as f64, i.f as f64);
+}
+
+fn field_on_f64()
+{
+	let h = Hold_f64 { f: 1.5, tag: 1 };
+	let i = Hold_f64 { tag: 2, f: 1.5 };
+	i.f = -0.25;
+	printf("field f64 %g %g\n".ptr, h.f, i.f);
+}
+
+fn field_on_f16()
+{
+	let h = Hold_f16 { f: 1.5 as f16, tag: 1 };
+	let i = Hold_f16 { tag: 2, f: 1.5 as f16 };
+	i.f = -0.25 as f16;
+	printf("field f16 %g %g\n".ptr, h.f as f64, i.f as f64);
+}
+
+fn field_on_bool()
+{
+	let h = Hold_bool { f: true, tag: 1 };
+	let i = Hold_bool { tag: 2, f: true };
+	i.f = false;
+	printf("field bool %d %d\n".ptr, h.f as c_int, i.f as c_int);
+}
+
+fn field_on_char()
+{
+	let h = Hold_char { f: 'a', tag: 1 };
+	let i = Hold_char { tag: 2, f: 'a' };
+	i.f = '\u{10FFFF}';
+	printf("field char %u %u\n".ptr, h.f as u32, i.f as u32);
+}
+
+fn field_on_str()
+{
+	let h = Hold_str { f: "one", tag: 1 };
+	let i = Hold_str { tag: 2, f: "one" };
+	i.f = "three";
+	printf("field str %lld %lld\n".ptr, h.f.len, i.f.len);
+}
+
+fn field_on_slice()
+{
+	let base = [1, 2, 3];
+	let h = Hold_slice { f: base[0..1], tag: 1 };
+	let i = Hold_slice { tag: 2, f: base[0..1] };
+	i.f = base[0..3];
+	printf("field slice %lld %lld\n".ptr, h.f.len, i.f.len);
+}
+
+fn field_on_fixed_array()
+{
+	let h = Hold_fixed_array { f: [1, 2], tag: 1 };
+	let i = Hold_fixed_array { tag: 2, f: [1, 2] };
+	i.f = [3, 4];
+	printf("field fixed_array %lld %lld\n".ptr, h.f[1], i.f[1]);
+}
+
+fn field_on_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let h = Hold_pointer { f: &a, tag: 1 };
+	let i = Hold_pointer { tag: 2, f: &a };
+	i.f = &b;
+	printf("field pointer %lld %lld\n".ptr, *h.f, *i.f);
+}
+
+fn field_on_nullable_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let h = Hold_nullable_pointer { f: &a, tag: 1 };
+	let i = Hold_nullable_pointer { tag: 2, f: &a };
+	i.f = none;
+	printf("field nullable_pointer %lld %lld\n".ptr, *(h.f ?? &b), *(i.f ?? &b));
+}
+
+fn field_on_optional()
+{
+	let h = Hold_optional { f: 5, tag: 1 };
+	let i = Hold_optional { tag: 2, f: 5 };
+	i.f = none;
+	printf("field optional %lld %lld\n".ptr, (h.f ?? -1), (i.f ?? -1));
+}
+
+fn field_on_may_fail_fn()
+{
+	let h = Hold_may_fail_fn { f: risky_up, tag: 1 };
+	let i = Hold_may_fail_fn { tag: 2, f: risky_up };
+	i.f = risky_down;
+	printf("field may_fail_fn %lld %lld\n".ptr, settle(h.f), settle(i.f));
+}
+
+fn field_on_fn()
+{
+	let h = Hold_fn { f: up, tag: 1 };
+	let i = Hold_fn { tag: 2, f: up };
+	i.f = down;
+	printf("field fn %lld %lld\n".ptr, h.f(10), i.f(10));
+}
+
+fn field_on_tuple()
+{
+	let h = Hold_tuple { f: (1, true), tag: 1 };
+	let i = Hold_tuple { tag: 2, f: (1, true) };
+	i.f = (2, false);
+	printf("field tuple %lld %lld\n".ptr, h.f.0, i.f.0);
+}
+
+fn field_on_channel()
+{
+	let c1 = chan int(1);
+	let c2 = chan int(1);
+	let h = Hold_channel { f: c1, tag: 1 };
+	let i = Hold_channel { tag: 2, f: c1 };
+	i.f = c2;
+	printf("field channel %d %d\n".ptr, (h.f == c1) as c_int, (i.f == c1) as c_int);
+	delete(c1);
+	delete(c2);
+}
+
+fn field_on_struct()
+{
+	let h = Hold_struct { f: Pt { x: 1, y: 2 }, tag: 1 };
+	let i = Hold_struct { tag: 2, f: Pt { x: 1, y: 2 } };
+	i.f = Pt { x: 3, y: 4 };
+	printf("field struct %lld %lld\n".ptr, h.f.y, i.f.y);
+}
+
+fn field_on_packed_struct()
+{
+	let h = Hold_packed_struct { f: Pk { a: 1, b: 2 }, tag: 1 };
+	let i = Hold_packed_struct { tag: 2, f: Pk { a: 1, b: 2 } };
+	i.f = Pk { a: 3, b: 4 };
+	printf("field packed_struct %lld %lld\n".ptr, h.f.b as int, i.f.b as int);
+}
+
+fn field_on_simd_struct()
+{
+	let h = Hold_simd_struct { f: I32x4 { a: 1, b: 2, c: 3, d: 4 }, tag: 1 };
+	let i = Hold_simd_struct { tag: 2, f: I32x4 { a: 1, b: 2, c: 3, d: 4 } };
+	i.f = I32x4 { a: 5, b: 6, c: 7, d: 8 };
+	printf("field simd_struct %lld %lld\n".ptr, h.f.c as int, i.f.c as int);
+}
+
+fn field_on_union()
+{
+	let h = Hold_union { f: Bits { i: 7 }, tag: 1 };
+	let i = Hold_union { tag: 2, f: Bits { i: 7 } };
+	i.f = Bits { i: 9 };
+	printf("field union %lld %lld\n".ptr, h.f.i as int, i.f.i as int);
+}
+
+fn field_on_enum()
+{
+	let h = Hold_enum { f: Color.Green, tag: 1 };
+	let i = Hold_enum { tag: 2, f: Color.Green };
+	i.f = Color.Blue;
+	printf("field enum %lld %lld\n".ptr, h.f as int, i.f as int);
+}
+
+fn field_on_variant()
+{
+	let h = Hold_variant { f: Shape.Circle { r: 2 }, tag: 1 };
+	let i = Hold_variant { tag: 2, f: Shape.Circle { r: 2 } };
+	i.f = Shape.Empty;
+	printf("field variant %d %d\n".ptr, (h.f is Shape.Circle) as c_int, (i.f is Shape.Circle) as c_int);
+}
+
+fn field_on_class()
+{
+	let h = Hold_class { f: Counter { n: 5 }, tag: 1 };
+	let i = Hold_class { tag: 2, f: Counter { n: 5 } };
+	i.f = Counter { n: 6 };
+	printf("field class %lld %lld\n".ptr, h.f.n, i.f.n);
+}
+
+fn field_on_concurrent_class()
+{
+	let h = Hold_concurrent_class { f: Hits { n: 5 }, tag: 1 };
+	let i = Hold_concurrent_class { tag: 2, f: Hits { n: 5 } };
+	i.f = Hits { n: 6 };
+	printf("field concurrent_class %lld %lld\n".ptr, h.f.n.load(), i.f.n.load());
+}
+
+fn field_on_interface()
+{
+	let one = One { };
+	let two = Two { };
+	let h = Hold_interface { f: &one, tag: 1 };
+	let i = Hold_interface { tag: 2, f: &one };
+	i.f = &two;
+	printf("field interface %lld %lld\n".ptr, h.f.id(), i.f.id());
+}
+
+fn field_on_generic<T>(a: T, b: T, read: fn(T) -> int)
+{
+	let h = Hold_generic<T> { f: dup(a), tag: 1 };
+	let i = Hold_generic<T> { tag: 2, f: dup(a) };
+	i.f = dup(b);
+	printf("field generic %lld %lld\n".ptr, read(h.f), read(i.f));
+}
+
+fn call_on_i8()
+{
+	let first = pass_i8(127);
+	printf("call i8 %lld %lld\n".ptr, first as int, pass_i8(-128) as int);
+}
+
+fn call_on_i16()
+{
+	let first = pass_i16(32767);
+	printf("call i16 %lld %lld\n".ptr, first as int, pass_i16(-32768) as int);
+}
+
+fn call_on_i32()
+{
+	let first = pass_i32(2147483647);
+	printf("call i32 %lld %lld\n".ptr, first as int, pass_i32(-2147483648) as int);
+}
+
+fn call_on_i64()
+{
+	let first = pass_i64(9223372036854775807);
+	printf("call i64 %lld %lld\n".ptr, first as int, pass_i64(-9223372036854775808) as int);
+}
+
+fn call_on_int()
+{
+	let first = pass_int(9223372036854775807);
+	printf("call int %lld %lld\n".ptr, first as int, pass_int(-9223372036854775808) as int);
+}
+
+fn call_on_u8()
+{
+	let first = pass_u8(255);
+	printf("call u8 %llu %llu\n".ptr, first as u64, pass_u8(1) as u64);
+}
+
+fn call_on_u16()
+{
+	let first = pass_u16(65535);
+	printf("call u16 %llu %llu\n".ptr, first as u64, pass_u16(1) as u64);
+}
+
+fn call_on_u32()
+{
+	let first = pass_u32(4294967295);
+	printf("call u32 %llu %llu\n".ptr, first as u64, pass_u32(1) as u64);
+}
+
+fn call_on_u64()
+{
+	let first = pass_u64(18446744073709551615);
+	printf("call u64 %llu %llu\n".ptr, first as u64, pass_u64(1) as u64);
+}
+
+fn call_on_uint()
+{
+	let first = pass_uint(18446744073709551615);
+	printf("call uint %llu %llu\n".ptr, first as u64, pass_uint(1) as u64);
+}
+
+fn call_on_byte()
+{
+	let first = pass_byte(255);
+	printf("call byte %llu %llu\n".ptr, first as u64, pass_byte(1) as u64);
+}
+
+fn call_on_f32()
+{
+	let first = pass_f32(1.5);
+	printf("call f32 %g %g\n".ptr, first as f64, pass_f32(-0.25) as f64);
+}
+
+fn call_on_f64()
+{
+	let first = pass_f64(1.5);
+	printf("call f64 %g %g\n".ptr, first, pass_f64(-0.25));
+}
+
+fn call_on_bool()
+{
+	let first = pass_bool(true);
+	printf("call bool %d %d\n".ptr, first as c_int, pass_bool(false) as c_int);
+}
+
+fn call_on_char()
+{
+	let first = pass_char('a');
+	printf("call char %u %u\n".ptr, first as u32, pass_char('\u{10FFFF}') as u32);
+}
+
+fn call_on_str()
+{
+	let first = pass_str("one");
+	printf("call str %lld %lld\n".ptr, first.len, pass_str("three").len);
+}
+
+fn call_on_slice()
+{
+	let base = [1, 2, 3];
+	let first = pass_slice(base[0..1]);
+	printf("call slice %lld %lld\n".ptr, first.len, pass_slice(base[0..3]).len);
+}
+
+fn call_on_fixed_array()
+{
+	let first = pass_fixed_array([1, 2]);
+	printf("call fixed_array %lld %lld\n".ptr, first[1], pass_fixed_array([3, 4])[1]);
+}
+
+fn call_on_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let first = pass_pointer(&a);
+	printf("call pointer %lld %lld\n".ptr, *first, *pass_pointer(&b));
+}
+
+fn call_on_nullable_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let first = pass_nullable_pointer(&a);
+	printf("call nullable_pointer %lld %lld\n".ptr, *(first ?? &b), *(pass_nullable_pointer(none) ?? &b));
+}
+
+fn call_on_optional()
+{
+	let first = pass_optional(5);
+	printf("call optional %lld %lld\n".ptr, (first ?? -1), (pass_optional(none) ?? -1));
+}
+
+fn call_on_may_fail_fn()
+{
+	let first = pass_may_fail_fn(risky_up);
+	printf("call may_fail_fn %lld %lld\n".ptr, settle(first), settle(pass_may_fail_fn(risky_down)));
+}
+
+fn call_on_fn()
+{
+	let first = pass_fn(up);
+	printf("call fn %lld %lld\n".ptr, first(10), pass_fn(down)(10));
+}
+
+fn call_on_tuple()
+{
+	let first = pass_tuple((1, true));
+	printf("call tuple %lld %lld\n".ptr, first.0, pass_tuple((2, false)).0);
+}
+
+fn call_on_channel()
+{
+	let c1 = chan int(1);
+	let c2 = chan int(1);
+	let first = pass_channel(c1);
+	printf("call channel %d %d\n".ptr, (first == c1) as c_int, (pass_channel(c2) == c1) as c_int);
+	delete(c1);
+	delete(c2);
+}
+
+fn call_on_struct()
+{
+	let first = pass_struct(Pt { x: 1, y: 2 });
+	printf("call struct %lld %lld\n".ptr, first.y, pass_struct(Pt { x: 3, y: 4 }).y);
+}
+
+fn call_on_packed_struct()
+{
+	let first = pass_packed_struct(Pk { a: 1, b: 2 });
+	printf("call packed_struct %lld %lld\n".ptr, first.b as int, pass_packed_struct(Pk { a: 3, b: 4 }).b as int);
+}
+
+fn call_on_simd_struct()
+{
+	let first = pass_simd_struct(I32x4 { a: 1, b: 2, c: 3, d: 4 });
+	printf("call simd_struct %lld %lld\n".ptr, first.c as int, pass_simd_struct(I32x4 { a: 5, b: 6, c: 7, d: 8 }).c as int);
+}
+
+fn call_on_union()
+{
+	let first = pass_union(Bits { i: 7 });
+	printf("call union %lld %lld\n".ptr, first.i as int, pass_union(Bits { i: 9 }).i as int);
+}
+
+fn call_on_enum()
+{
+	let first = pass_enum(Color.Green);
+	printf("call enum %lld %lld\n".ptr, first as int, pass_enum(Color.Blue) as int);
+}
+
+fn call_on_variant()
+{
+	let first = pass_variant(Shape.Circle { r: 2 });
+	printf("call variant %d %d\n".ptr, (first is Shape.Circle) as c_int, (pass_variant(Shape.Empty) is Shape.Circle) as c_int);
+}
+
+fn call_on_class()
+{
+	let first = pass_class(Counter { n: 5 });
+	printf("call class %lld %lld\n".ptr, first.n, pass_class(Counter { n: 6 }).n);
+}
+
+fn call_on_concurrent_class()
+{
+	let first = pass_concurrent_class(Hits { n: 5 });
+	printf("call concurrent_class %lld %lld\n".ptr, first.n.load(), pass_concurrent_class(Hits { n: 6 }).n.load());
+}
+
+fn call_on_interface()
+{
+	let one = One { };
+	let two = Two { };
+	let first = pass_interface(&one);
+	printf("call interface %lld %lld\n".ptr, first.id(), pass_interface(&two).id());
+}
+
+fn main() -> int
+{
+	let_on_i8();
+	let_on_i16();
+	let_on_i32();
+	let_on_i64();
+	let_on_int();
+	let_on_u8();
+	let_on_u16();
+	let_on_u32();
+	let_on_u64();
+	let_on_uint();
+	let_on_byte();
+	let_on_f32();
+	let_on_f64();
+	let_on_f16();
+	let_on_bool();
+	let_on_char();
+	let_on_str();
+	let_on_slice();
+	let_on_fixed_array();
+	let_on_pointer();
+	let_on_nullable_pointer();
+	let_on_optional();
+	let_on_may_fail_fn();
+	let_on_fn();
+	let_on_tuple();
+	let_on_channel();
+	let_on_struct();
+	let_on_packed_struct();
+	let_on_simd_struct();
+	let_on_union();
+	let_on_enum();
+	let_on_variant();
+	let_on_class();
+	let_on_concurrent_class();
+	let_on_interface();
+	let_on_generic<int>(11, 22, same);
+	const_on_i8();
+	const_on_i16();
+	const_on_i32();
+	const_on_i64();
+	const_on_int();
+	const_on_u8();
+	const_on_u16();
+	const_on_u32();
+	const_on_u64();
+	const_on_uint();
+	const_on_byte();
+	const_on_f32();
+	const_on_f64();
+	const_on_f16();
+	const_on_bool();
+	const_on_char();
+	const_on_str();
+	const_on_fixed_array();
+	const_on_nullable_pointer();
+	const_on_tuple();
+	const_on_struct();
+	const_on_packed_struct();
+	const_on_simd_struct();
+	const_on_enum();
+	assign_on_i8();
+	assign_on_i16();
+	assign_on_i32();
+	assign_on_i64();
+	assign_on_int();
+	assign_on_u8();
+	assign_on_u16();
+	assign_on_u32();
+	assign_on_u64();
+	assign_on_uint();
+	assign_on_byte();
+	assign_on_f32();
+	assign_on_f64();
+	assign_on_bool();
+	assign_on_char();
+	assign_on_str();
+	assign_on_slice();
+	assign_on_fixed_array();
+	assign_on_pointer();
+	assign_on_nullable_pointer();
+	assign_on_optional();
+	assign_on_may_fail_fn();
+	assign_on_fn();
+	assign_on_tuple();
+	assign_on_channel();
+	assign_on_struct();
+	assign_on_packed_struct();
+	assign_on_simd_struct();
+	assign_on_union();
+	assign_on_enum();
+	assign_on_variant();
+	assign_on_class();
+	assign_on_concurrent_class();
+	assign_on_interface();
+	field_on_i8();
+	field_on_i16();
+	field_on_i32();
+	field_on_i64();
+	field_on_int();
+	field_on_u8();
+	field_on_u16();
+	field_on_u32();
+	field_on_u64();
+	field_on_uint();
+	field_on_byte();
+	field_on_f32();
+	field_on_f64();
+	field_on_f16();
+	field_on_bool();
+	field_on_char();
+	field_on_str();
+	field_on_slice();
+	field_on_fixed_array();
+	field_on_pointer();
+	field_on_nullable_pointer();
+	field_on_optional();
+	field_on_may_fail_fn();
+	field_on_fn();
+	field_on_tuple();
+	field_on_channel();
+	field_on_struct();
+	field_on_packed_struct();
+	field_on_simd_struct();
+	field_on_union();
+	field_on_enum();
+	field_on_variant();
+	field_on_class();
+	field_on_concurrent_class();
+	field_on_interface();
+	field_on_generic<int>(11, 22, same);
+	call_on_i8();
+	call_on_i16();
+	call_on_i32();
+	call_on_i64();
+	call_on_int();
+	call_on_u8();
+	call_on_u16();
+	call_on_u32();
+	call_on_u64();
+	call_on_uint();
+	call_on_byte();
+	call_on_f32();
+	call_on_f64();
+	call_on_bool();
+	call_on_char();
+	call_on_str();
+	call_on_slice();
+	call_on_fixed_array();
+	call_on_pointer();
+	call_on_nullable_pointer();
+	call_on_optional();
+	call_on_may_fail_fn();
+	call_on_fn();
+	call_on_tuple();
+	call_on_channel();
+	call_on_struct();
+	call_on_packed_struct();
+	call_on_simd_struct();
+	call_on_union();
+	call_on_enum();
+	call_on_variant();
+	call_on_class();
+	call_on_concurrent_class();
+	call_on_interface();
+	return 0;
+}

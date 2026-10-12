@@ -1,0 +1,1567 @@
+//! The raw, byte, hex, interpolated and pattern literals of the values area,
+//! each in every place its row of docs/notes/test-matrix.md left open:
+//! literal_raw, literal_bytes, literal_hex, format, pattern. Each construct in
+//! each place is a function of its own, named after both, and the program
+//! prints one line per construct, place and input.
+
+import anti.lang;
+import anti.regex;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+class Box_literal_raw
+{
+	pub base: int = 0,
+
+	pub fn run(self, n: int) -> int
+	{
+		let acc = self.base;
+		let s = r"a\nb";
+		acc += s.len * n + (s[1] as int);
+		return acc;
+	}
+}
+
+fn in_arm_literal_raw(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let s = r"a\nb";
+			acc += s.len * n + (s[1] as int);
+		},
+	}
+	return acc;
+}
+
+fn held_literal_raw(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_literal_raw(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_literal_raw(n) {
+		acc += v - n * 3;
+		let s = r"a\nb";
+		acc += s.len * n + (s[1] as int);
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_literal_raw(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let s = r"a\nb";
+		acc += s.len * n + (s[1] as int);
+	}
+	acc = 5;
+}
+
+fn in_undo_literal_raw(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let s = r"a\nb";
+		acc += s.len * n + (s[1] as int);
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_literal_raw(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_literal_raw(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_literal_raw(n) catch {
+		let s = r"a\nb";
+		acc += s.len * n + (s[1] as int);
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_literal_raw(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_literal_raw(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_literal_raw(start, fn(n) {
+		let s = r"a\nb";
+		acc += s.len * n + (s[1] as int);
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_literal_raw(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let s = r"a\nb";
+	acc += s.len * n + (s[1] as int);
+	return acc;
+}
+
+worker fn work_literal_raw(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_literal_raw(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_literal_raw(fn(n) {
+		let acc = 0;
+		let s = r"a\nb";
+		acc += s.len * n + (s[1] as int);
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_literal_raw
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_literal_raw(g: *Guarded_literal_raw, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let s = r"a\nb";
+		acc += s.len * n + (s[1] as int);
+	}
+	return acc;
+}
+
+fn in_select_literal_raw(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let s = r"a\nb";
+			acc += s.len * n + (s[1] as int);
+		},
+	}
+	return acc;
+}
+
+fn in_generic_literal_raw<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	let s = r"a\nb";
+	acc += s.len * n + (s[1] as int);
+	return acc;
+}
+
+class Outer_literal_raw
+{
+	class Inner_literal_raw
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let s = r"a\nb";
+			acc += s.len * n + (s[1] as int);
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_literal_raw { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+class Box_literal_bytes
+{
+	pub base: int = 0,
+
+	pub fn run(self, n: int) -> int
+	{
+		let acc = self.base;
+		let b = b"\x00\xff";
+		let raw = br"\x00";
+		acc += b.len * n + (b[1] as int) + raw.len;
+		return acc;
+	}
+}
+
+fn in_arm_literal_bytes(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let b = b"\x00\xff";
+			let raw = br"\x00";
+			acc += b.len * n + (b[1] as int) + raw.len;
+		},
+	}
+	return acc;
+}
+
+fn held_literal_bytes(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_literal_bytes(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_literal_bytes(n) {
+		acc += v - n * 3;
+		let b = b"\x00\xff";
+		let raw = br"\x00";
+		acc += b.len * n + (b[1] as int) + raw.len;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_literal_bytes(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let b = b"\x00\xff";
+		let raw = br"\x00";
+		acc += b.len * n + (b[1] as int) + raw.len;
+	}
+	acc = 5;
+}
+
+fn in_undo_literal_bytes(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let b = b"\x00\xff";
+		let raw = br"\x00";
+		acc += b.len * n + (b[1] as int) + raw.len;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_literal_bytes(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_literal_bytes(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_literal_bytes(n) catch {
+		let b = b"\x00\xff";
+		let raw = br"\x00";
+		acc += b.len * n + (b[1] as int) + raw.len;
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_literal_bytes(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_literal_bytes(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_literal_bytes(start, fn(n) {
+		let b = b"\x00\xff";
+		let raw = br"\x00";
+		acc += b.len * n + (b[1] as int) + raw.len;
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_literal_bytes(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let b = b"\x00\xff";
+	let raw = br"\x00";
+	acc += b.len * n + (b[1] as int) + raw.len;
+	return acc;
+}
+
+worker fn work_literal_bytes(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_literal_bytes(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_literal_bytes(fn(n) {
+		let acc = 0;
+		let b = b"\x00\xff";
+		let raw = br"\x00";
+		acc += b.len * n + (b[1] as int) + raw.len;
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_literal_bytes
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_literal_bytes(g: *Guarded_literal_bytes, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let b = b"\x00\xff";
+		let raw = br"\x00";
+		acc += b.len * n + (b[1] as int) + raw.len;
+	}
+	return acc;
+}
+
+fn in_select_literal_bytes(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let b = b"\x00\xff";
+			let raw = br"\x00";
+			acc += b.len * n + (b[1] as int) + raw.len;
+		},
+	}
+	return acc;
+}
+
+fn in_generic_literal_bytes<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	let b = b"\x00\xff";
+	let raw = br"\x00";
+	acc += b.len * n + (b[1] as int) + raw.len;
+	return acc;
+}
+
+class Outer_literal_bytes
+{
+	class Inner_literal_bytes
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let b = b"\x00\xff";
+			let raw = br"\x00";
+			acc += b.len * n + (b[1] as int) + raw.len;
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_literal_bytes { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+class Box_literal_hex
+{
+	pub base: int = 0,
+
+	pub fn run(self, n: int) -> int
+	{
+		let acc = self.base;
+		let h = x"00 AB CC";
+		acc += h.len * n + (h[1] as int);
+		return acc;
+	}
+}
+
+fn in_loop_literal_hex(n: int) -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		acc += turn;
+		let h = x"00 AB CC";
+		acc += h.len * n + (h[1] as int);
+	}
+	return acc;
+}
+
+fn in_arm_literal_hex(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let h = x"00 AB CC";
+			acc += h.len * n + (h[1] as int);
+		},
+	}
+	return acc;
+}
+
+fn held_literal_hex(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_literal_hex(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_literal_hex(n) {
+		acc += v - n * 3;
+		let h = x"00 AB CC";
+		acc += h.len * n + (h[1] as int);
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_literal_hex(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let h = x"00 AB CC";
+		acc += h.len * n + (h[1] as int);
+	}
+	acc = 5;
+}
+
+fn in_undo_literal_hex(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let h = x"00 AB CC";
+		acc += h.len * n + (h[1] as int);
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_literal_hex(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_literal_hex(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_literal_hex(n) catch {
+		let h = x"00 AB CC";
+		acc += h.len * n + (h[1] as int);
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_literal_hex(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_literal_hex(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_literal_hex(start, fn(n) {
+		let h = x"00 AB CC";
+		acc += h.len * n + (h[1] as int);
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_literal_hex(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let h = x"00 AB CC";
+	acc += h.len * n + (h[1] as int);
+	return acc;
+}
+
+worker fn work_literal_hex(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_literal_hex(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_literal_hex(fn(n) {
+		let acc = 0;
+		let h = x"00 AB CC";
+		acc += h.len * n + (h[1] as int);
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_literal_hex
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_literal_hex(g: *Guarded_literal_hex, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let h = x"00 AB CC";
+		acc += h.len * n + (h[1] as int);
+	}
+	return acc;
+}
+
+fn in_select_literal_hex(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let h = x"00 AB CC";
+			acc += h.len * n + (h[1] as int);
+		},
+	}
+	return acc;
+}
+
+fn in_generic_literal_hex<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	let h = x"00 AB CC";
+	acc += h.len * n + (h[1] as int);
+	return acc;
+}
+
+class Outer_literal_hex
+{
+	class Inner_literal_hex
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let h = x"00 AB CC";
+			acc += h.len * n + (h[1] as int);
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_literal_hex { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn in_arm_format(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let s = f"n={n:>4}";
+			let raw = rf"\d{n}";
+			acc += s.len * 10 + raw.len + n;
+			free(s.ptr);
+			free(raw.ptr);
+		},
+	}
+	return acc;
+}
+
+fn held_format(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_format(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_format(n) {
+		acc += v - n * 3;
+		let s = f"n={n:>4}";
+		let raw = rf"\d{n}";
+		acc += s.len * 10 + raw.len + n;
+		free(s.ptr);
+		free(raw.ptr);
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_format(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let s = f"n={n:>4}";
+		let raw = rf"\d{n}";
+		acc += s.len * 10 + raw.len + n;
+		free(s.ptr);
+		free(raw.ptr);
+	}
+	acc = 5;
+}
+
+fn in_undo_format(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let s = f"n={n:>4}";
+		let raw = rf"\d{n}";
+		acc += s.len * 10 + raw.len + n;
+		free(s.ptr);
+		free(raw.ptr);
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn apply_format(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_format(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_format(start, fn(n) {
+		let s = f"n={n:>4}";
+		let raw = rf"\d{n}";
+		acc += s.len * 10 + raw.len + n;
+		free(s.ptr);
+		free(raw.ptr);
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_format(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let s = f"n={n:>4}";
+	let raw = rf"\d{n}";
+	acc += s.len * 10 + raw.len + n;
+	free(s.ptr);
+	free(raw.ptr);
+	return acc;
+}
+
+worker fn work_format(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_format(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_format(fn(n) {
+		let acc = 0;
+		let s = f"n={n:>4}";
+		let raw = rf"\d{n}";
+		acc += s.len * 10 + raw.len + n;
+		free(s.ptr);
+		free(raw.ptr);
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_format
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_format(g: *Guarded_format, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let s = f"n={n:>4}";
+		let raw = rf"\d{n}";
+		acc += s.len * 10 + raw.len + n;
+		free(s.ptr);
+		free(raw.ptr);
+	}
+	return acc;
+}
+
+fn in_select_format(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let s = f"n={n:>4}";
+			let raw = rf"\d{n}";
+			acc += s.len * 10 + raw.len + n;
+			free(s.ptr);
+			free(raw.ptr);
+		},
+	}
+	return acc;
+}
+
+class Outer_format
+{
+	class Inner_format
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let s = f"n={n:>4}";
+			let raw = rf"\d{n}";
+			acc += s.len * 10 + raw.len + n;
+			free(s.ptr);
+			free(raw.ptr);
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_format { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+class Box_pattern
+{
+	pub base: int = 0,
+
+	pub fn run(self, n: int) -> int
+	{
+		let acc = self.base;
+		if "a12".matches(re"[0-9]+") {
+			acc += n;
+		}
+		if "abc".matches(re"[0-9]+") {
+			acc += 100;
+		}
+		return acc;
+	}
+}
+
+fn in_arm_pattern(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			if "a12".matches(re"[0-9]+") {
+				acc += n;
+			}
+			if "abc".matches(re"[0-9]+") {
+				acc += 100;
+			}
+		},
+	}
+	return acc;
+}
+
+fn held_pattern(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let_pattern(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_pattern(n) {
+		acc += v - n * 3;
+		if "a12".matches(re"[0-9]+") {
+			acc += n;
+		}
+		if "abc".matches(re"[0-9]+") {
+			acc += 100;
+		}
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer_pattern(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		if "a12".matches(re"[0-9]+") {
+			acc += n;
+		}
+		if "abc".matches(re"[0-9]+") {
+			acc += 100;
+		}
+	}
+	acc = 5;
+}
+
+fn in_undo_pattern(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		if "a12".matches(re"[0-9]+") {
+			acc += n;
+		}
+		if "abc".matches(re"[0-9]+") {
+			acc += 100;
+		}
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky_pattern(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch_pattern(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_pattern(n) catch {
+		if "a12".matches(re"[0-9]+") {
+			acc += n;
+		}
+		if "abc".matches(re"[0-9]+") {
+			acc += 100;
+		}
+		yield acc;
+	};
+	return got;
+}
+
+fn apply_pattern(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure_pattern(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_pattern(start, fn(n) {
+		if "a12".matches(re"[0-9]+") {
+			acc += n;
+		}
+		if "abc".matches(re"[0-9]+") {
+			acc += 100;
+		}
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker_pattern(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	if "a12".matches(re"[0-9]+") {
+		acc += n;
+	}
+	if "abc".matches(re"[0-9]+") {
+		acc += 100;
+	}
+	return acc;
+}
+
+worker fn work_pattern(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch_pattern(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_pattern(fn(n) {
+		let acc = 0;
+		if "a12".matches(re"[0-9]+") {
+			acc += n;
+		}
+		if "abc".matches(re"[0-9]+") {
+			acc += 100;
+		}
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded_pattern
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync_pattern(g: *Guarded_pattern, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		if "a12".matches(re"[0-9]+") {
+			acc += n;
+		}
+		if "abc".matches(re"[0-9]+") {
+			acc += 100;
+		}
+	}
+	return acc;
+}
+
+fn in_select_pattern(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			if "a12".matches(re"[0-9]+") {
+				acc += n;
+			}
+			if "abc".matches(re"[0-9]+") {
+				acc += 100;
+			}
+		},
+	}
+	return acc;
+}
+
+fn in_generic_pattern<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	if "a12".matches(re"[0-9]+") {
+		acc += n;
+	}
+	if "abc".matches(re"[0-9]+") {
+		acc += 100;
+	}
+	return acc;
+}
+
+class Outer_pattern
+{
+	class Inner_pattern
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			if "a12".matches(re"[0-9]+") {
+				acc += n;
+			}
+			if "abc".matches(re"[0-9]+") {
+				acc += 100;
+			}
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_pattern { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn main() -> int
+{
+	let task = alloc Task { };
+	{
+		let box = Box_literal_raw { base: 1000 };
+		printf("literal_raw method %d\n".ptr, box.run(1) as c_int);
+		printf("literal_raw method %d\n".ptr, box.run(2) as c_int);
+		printf("literal_raw method %d\n".ptr, box.run(3) as c_int);
+		printf("literal_raw method %d\n".ptr, box.run(4) as c_int);
+		printf("literal_raw arm %d\n".ptr, in_arm_literal_raw(0) as c_int);
+		printf("literal_raw arm %d\n".ptr, in_arm_literal_raw(1) as c_int);
+		printf("literal_raw arm %d\n".ptr, in_arm_literal_raw(2) as c_int);
+		printf("literal_raw arm %d\n".ptr, in_arm_literal_raw(3) as c_int);
+		printf("literal_raw arm %d\n".ptr, in_arm_literal_raw(4) as c_int);
+		printf("literal_raw if_let %d\n".ptr, in_if_let_literal_raw(0) as c_int);
+		printf("literal_raw if_let %d\n".ptr, in_if_let_literal_raw(1) as c_int);
+		printf("literal_raw if_let %d\n".ptr, in_if_let_literal_raw(2) as c_int);
+		printf("literal_raw if_let %d\n".ptr, in_if_let_literal_raw(3) as c_int);
+		printf("literal_raw if_let %d\n".ptr, in_if_let_literal_raw(4) as c_int);
+		let deferred = 0;
+		in_defer_literal_raw(1, &deferred);
+		printf("literal_raw defer %d\n".ptr, deferred as c_int);
+		in_defer_literal_raw(2, &deferred);
+		printf("literal_raw defer %d\n".ptr, deferred as c_int);
+		in_defer_literal_raw(3, &deferred);
+		printf("literal_raw defer %d\n".ptr, deferred as c_int);
+		in_defer_literal_raw(4, &deferred);
+		printf("literal_raw defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_literal_raw(0, &undone) catch {
+			yield;
+		};
+		printf("literal_raw undo %d\n".ptr, undone as c_int);
+		in_undo_literal_raw(1, &undone) catch {
+			yield;
+		};
+		printf("literal_raw undo %d\n".ptr, undone as c_int);
+		in_undo_literal_raw(2, &undone) catch {
+			yield;
+		};
+		printf("literal_raw undo %d\n".ptr, undone as c_int);
+		in_undo_literal_raw(3, &undone) catch {
+			yield;
+		};
+		printf("literal_raw undo %d\n".ptr, undone as c_int);
+		in_undo_literal_raw(4, &undone) catch {
+			yield;
+		};
+		printf("literal_raw undo %d\n".ptr, undone as c_int);
+		printf("literal_raw catch %d\n".ptr, in_catch_literal_raw(0) as c_int);
+		printf("literal_raw catch %d\n".ptr, in_catch_literal_raw(1) as c_int);
+		printf("literal_raw catch %d\n".ptr, in_catch_literal_raw(2) as c_int);
+		printf("literal_raw catch %d\n".ptr, in_catch_literal_raw(3) as c_int);
+		printf("literal_raw catch %d\n".ptr, in_catch_literal_raw(4) as c_int);
+		printf("literal_raw closure %d\n".ptr, in_closure_literal_raw(1) as c_int);
+		printf("literal_raw closure %d\n".ptr, in_closure_literal_raw(2) as c_int);
+		printf("literal_raw closure %d\n".ptr, in_closure_literal_raw(3) as c_int);
+		printf("literal_raw closure %d\n".ptr, in_closure_literal_raw(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_literal_raw();
+		printf("literal_raw worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_literal_raw();
+		printf("literal_raw worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_literal_raw();
+		printf("literal_raw worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_literal_raw();
+		printf("literal_raw worker %d\n".ptr, join(job3) as c_int);
+		printf("literal_raw dispatch %d\n".ptr, in_dispatch_literal_raw(task, 1) as c_int);
+		printf("literal_raw dispatch %d\n".ptr, in_dispatch_literal_raw(task, 2) as c_int);
+		printf("literal_raw dispatch %d\n".ptr, in_dispatch_literal_raw(task, 3) as c_int);
+		printf("literal_raw dispatch %d\n".ptr, in_dispatch_literal_raw(task, 4) as c_int);
+		let g = Guarded_literal_raw { lock: Mutex.new(), entered: 0 };
+		printf("literal_raw sync %d\n".ptr, in_sync_literal_raw(&g, 1) as c_int);
+		printf("literal_raw sync %d\n".ptr, in_sync_literal_raw(&g, 2) as c_int);
+		printf("literal_raw sync %d\n".ptr, in_sync_literal_raw(&g, 3) as c_int);
+		printf("literal_raw sync %d\n".ptr, in_sync_literal_raw(&g, 4) as c_int);
+		printf("literal_raw sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("literal_raw select %d\n".ptr, in_select_literal_raw(c, 1) as c_int);
+		printf("literal_raw select %d\n".ptr, in_select_literal_raw(c, 2) as c_int);
+		printf("literal_raw select %d\n".ptr, in_select_literal_raw(c, 3) as c_int);
+		printf("literal_raw select %d\n".ptr, in_select_literal_raw(c, 4) as c_int);
+		delete(c);
+		printf("literal_raw generic %d %d\n".ptr, in_generic_literal_raw<int>(1) as c_int,
+			in_generic_literal_raw<str>(1) as c_int);
+		printf("literal_raw generic %d %d\n".ptr, in_generic_literal_raw<int>(2) as c_int,
+			in_generic_literal_raw<str>(2) as c_int);
+		printf("literal_raw generic %d %d\n".ptr, in_generic_literal_raw<int>(3) as c_int,
+			in_generic_literal_raw<str>(3) as c_int);
+		printf("literal_raw generic %d %d\n".ptr, in_generic_literal_raw<int>(4) as c_int,
+			in_generic_literal_raw<str>(4) as c_int);
+		let outer = Outer_literal_raw { };
+		printf("literal_raw nested %d\n".ptr, outer.go(1) as c_int);
+		printf("literal_raw nested %d\n".ptr, outer.go(2) as c_int);
+		printf("literal_raw nested %d\n".ptr, outer.go(3) as c_int);
+		printf("literal_raw nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		let box = Box_literal_bytes { base: 1000 };
+		printf("literal_bytes method %d\n".ptr, box.run(1) as c_int);
+		printf("literal_bytes method %d\n".ptr, box.run(2) as c_int);
+		printf("literal_bytes method %d\n".ptr, box.run(3) as c_int);
+		printf("literal_bytes method %d\n".ptr, box.run(4) as c_int);
+		printf("literal_bytes arm %d\n".ptr, in_arm_literal_bytes(0) as c_int);
+		printf("literal_bytes arm %d\n".ptr, in_arm_literal_bytes(1) as c_int);
+		printf("literal_bytes arm %d\n".ptr, in_arm_literal_bytes(2) as c_int);
+		printf("literal_bytes arm %d\n".ptr, in_arm_literal_bytes(3) as c_int);
+		printf("literal_bytes arm %d\n".ptr, in_arm_literal_bytes(4) as c_int);
+		printf("literal_bytes if_let %d\n".ptr, in_if_let_literal_bytes(0) as c_int);
+		printf("literal_bytes if_let %d\n".ptr, in_if_let_literal_bytes(1) as c_int);
+		printf("literal_bytes if_let %d\n".ptr, in_if_let_literal_bytes(2) as c_int);
+		printf("literal_bytes if_let %d\n".ptr, in_if_let_literal_bytes(3) as c_int);
+		printf("literal_bytes if_let %d\n".ptr, in_if_let_literal_bytes(4) as c_int);
+		let deferred = 0;
+		in_defer_literal_bytes(1, &deferred);
+		printf("literal_bytes defer %d\n".ptr, deferred as c_int);
+		in_defer_literal_bytes(2, &deferred);
+		printf("literal_bytes defer %d\n".ptr, deferred as c_int);
+		in_defer_literal_bytes(3, &deferred);
+		printf("literal_bytes defer %d\n".ptr, deferred as c_int);
+		in_defer_literal_bytes(4, &deferred);
+		printf("literal_bytes defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_literal_bytes(0, &undone) catch {
+			yield;
+		};
+		printf("literal_bytes undo %d\n".ptr, undone as c_int);
+		in_undo_literal_bytes(1, &undone) catch {
+			yield;
+		};
+		printf("literal_bytes undo %d\n".ptr, undone as c_int);
+		in_undo_literal_bytes(2, &undone) catch {
+			yield;
+		};
+		printf("literal_bytes undo %d\n".ptr, undone as c_int);
+		in_undo_literal_bytes(3, &undone) catch {
+			yield;
+		};
+		printf("literal_bytes undo %d\n".ptr, undone as c_int);
+		in_undo_literal_bytes(4, &undone) catch {
+			yield;
+		};
+		printf("literal_bytes undo %d\n".ptr, undone as c_int);
+		printf("literal_bytes catch %d\n".ptr, in_catch_literal_bytes(0) as c_int);
+		printf("literal_bytes catch %d\n".ptr, in_catch_literal_bytes(1) as c_int);
+		printf("literal_bytes catch %d\n".ptr, in_catch_literal_bytes(2) as c_int);
+		printf("literal_bytes catch %d\n".ptr, in_catch_literal_bytes(3) as c_int);
+		printf("literal_bytes catch %d\n".ptr, in_catch_literal_bytes(4) as c_int);
+		printf("literal_bytes closure %d\n".ptr, in_closure_literal_bytes(1) as c_int);
+		printf("literal_bytes closure %d\n".ptr, in_closure_literal_bytes(2) as c_int);
+		printf("literal_bytes closure %d\n".ptr, in_closure_literal_bytes(3) as c_int);
+		printf("literal_bytes closure %d\n".ptr, in_closure_literal_bytes(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_literal_bytes();
+		printf("literal_bytes worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_literal_bytes();
+		printf("literal_bytes worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_literal_bytes();
+		printf("literal_bytes worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_literal_bytes();
+		printf("literal_bytes worker %d\n".ptr, join(job3) as c_int);
+		printf("literal_bytes dispatch %d\n".ptr, in_dispatch_literal_bytes(task, 1) as c_int);
+		printf("literal_bytes dispatch %d\n".ptr, in_dispatch_literal_bytes(task, 2) as c_int);
+		printf("literal_bytes dispatch %d\n".ptr, in_dispatch_literal_bytes(task, 3) as c_int);
+		printf("literal_bytes dispatch %d\n".ptr, in_dispatch_literal_bytes(task, 4) as c_int);
+		let g = Guarded_literal_bytes { lock: Mutex.new(), entered: 0 };
+		printf("literal_bytes sync %d\n".ptr, in_sync_literal_bytes(&g, 1) as c_int);
+		printf("literal_bytes sync %d\n".ptr, in_sync_literal_bytes(&g, 2) as c_int);
+		printf("literal_bytes sync %d\n".ptr, in_sync_literal_bytes(&g, 3) as c_int);
+		printf("literal_bytes sync %d\n".ptr, in_sync_literal_bytes(&g, 4) as c_int);
+		printf("literal_bytes sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("literal_bytes select %d\n".ptr, in_select_literal_bytes(c, 1) as c_int);
+		printf("literal_bytes select %d\n".ptr, in_select_literal_bytes(c, 2) as c_int);
+		printf("literal_bytes select %d\n".ptr, in_select_literal_bytes(c, 3) as c_int);
+		printf("literal_bytes select %d\n".ptr, in_select_literal_bytes(c, 4) as c_int);
+		delete(c);
+		printf("literal_bytes generic %d %d\n".ptr, in_generic_literal_bytes<int>(1) as c_int,
+			in_generic_literal_bytes<str>(1) as c_int);
+		printf("literal_bytes generic %d %d\n".ptr, in_generic_literal_bytes<int>(2) as c_int,
+			in_generic_literal_bytes<str>(2) as c_int);
+		printf("literal_bytes generic %d %d\n".ptr, in_generic_literal_bytes<int>(3) as c_int,
+			in_generic_literal_bytes<str>(3) as c_int);
+		printf("literal_bytes generic %d %d\n".ptr, in_generic_literal_bytes<int>(4) as c_int,
+			in_generic_literal_bytes<str>(4) as c_int);
+		let outer = Outer_literal_bytes { };
+		printf("literal_bytes nested %d\n".ptr, outer.go(1) as c_int);
+		printf("literal_bytes nested %d\n".ptr, outer.go(2) as c_int);
+		printf("literal_bytes nested %d\n".ptr, outer.go(3) as c_int);
+		printf("literal_bytes nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		let box = Box_literal_hex { base: 1000 };
+		printf("literal_hex method %d\n".ptr, box.run(1) as c_int);
+		printf("literal_hex method %d\n".ptr, box.run(2) as c_int);
+		printf("literal_hex method %d\n".ptr, box.run(3) as c_int);
+		printf("literal_hex method %d\n".ptr, box.run(4) as c_int);
+		printf("literal_hex loop %d\n".ptr, in_loop_literal_hex(1) as c_int);
+		printf("literal_hex loop %d\n".ptr, in_loop_literal_hex(2) as c_int);
+		printf("literal_hex loop %d\n".ptr, in_loop_literal_hex(3) as c_int);
+		printf("literal_hex loop %d\n".ptr, in_loop_literal_hex(4) as c_int);
+		printf("literal_hex arm %d\n".ptr, in_arm_literal_hex(0) as c_int);
+		printf("literal_hex arm %d\n".ptr, in_arm_literal_hex(1) as c_int);
+		printf("literal_hex arm %d\n".ptr, in_arm_literal_hex(2) as c_int);
+		printf("literal_hex arm %d\n".ptr, in_arm_literal_hex(3) as c_int);
+		printf("literal_hex arm %d\n".ptr, in_arm_literal_hex(4) as c_int);
+		printf("literal_hex if_let %d\n".ptr, in_if_let_literal_hex(0) as c_int);
+		printf("literal_hex if_let %d\n".ptr, in_if_let_literal_hex(1) as c_int);
+		printf("literal_hex if_let %d\n".ptr, in_if_let_literal_hex(2) as c_int);
+		printf("literal_hex if_let %d\n".ptr, in_if_let_literal_hex(3) as c_int);
+		printf("literal_hex if_let %d\n".ptr, in_if_let_literal_hex(4) as c_int);
+		let deferred = 0;
+		in_defer_literal_hex(1, &deferred);
+		printf("literal_hex defer %d\n".ptr, deferred as c_int);
+		in_defer_literal_hex(2, &deferred);
+		printf("literal_hex defer %d\n".ptr, deferred as c_int);
+		in_defer_literal_hex(3, &deferred);
+		printf("literal_hex defer %d\n".ptr, deferred as c_int);
+		in_defer_literal_hex(4, &deferred);
+		printf("literal_hex defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_literal_hex(0, &undone) catch {
+			yield;
+		};
+		printf("literal_hex undo %d\n".ptr, undone as c_int);
+		in_undo_literal_hex(1, &undone) catch {
+			yield;
+		};
+		printf("literal_hex undo %d\n".ptr, undone as c_int);
+		in_undo_literal_hex(2, &undone) catch {
+			yield;
+		};
+		printf("literal_hex undo %d\n".ptr, undone as c_int);
+		in_undo_literal_hex(3, &undone) catch {
+			yield;
+		};
+		printf("literal_hex undo %d\n".ptr, undone as c_int);
+		in_undo_literal_hex(4, &undone) catch {
+			yield;
+		};
+		printf("literal_hex undo %d\n".ptr, undone as c_int);
+		printf("literal_hex catch %d\n".ptr, in_catch_literal_hex(0) as c_int);
+		printf("literal_hex catch %d\n".ptr, in_catch_literal_hex(1) as c_int);
+		printf("literal_hex catch %d\n".ptr, in_catch_literal_hex(2) as c_int);
+		printf("literal_hex catch %d\n".ptr, in_catch_literal_hex(3) as c_int);
+		printf("literal_hex catch %d\n".ptr, in_catch_literal_hex(4) as c_int);
+		printf("literal_hex closure %d\n".ptr, in_closure_literal_hex(1) as c_int);
+		printf("literal_hex closure %d\n".ptr, in_closure_literal_hex(2) as c_int);
+		printf("literal_hex closure %d\n".ptr, in_closure_literal_hex(3) as c_int);
+		printf("literal_hex closure %d\n".ptr, in_closure_literal_hex(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_literal_hex();
+		printf("literal_hex worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_literal_hex();
+		printf("literal_hex worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_literal_hex();
+		printf("literal_hex worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_literal_hex();
+		printf("literal_hex worker %d\n".ptr, join(job3) as c_int);
+		printf("literal_hex dispatch %d\n".ptr, in_dispatch_literal_hex(task, 1) as c_int);
+		printf("literal_hex dispatch %d\n".ptr, in_dispatch_literal_hex(task, 2) as c_int);
+		printf("literal_hex dispatch %d\n".ptr, in_dispatch_literal_hex(task, 3) as c_int);
+		printf("literal_hex dispatch %d\n".ptr, in_dispatch_literal_hex(task, 4) as c_int);
+		let g = Guarded_literal_hex { lock: Mutex.new(), entered: 0 };
+		printf("literal_hex sync %d\n".ptr, in_sync_literal_hex(&g, 1) as c_int);
+		printf("literal_hex sync %d\n".ptr, in_sync_literal_hex(&g, 2) as c_int);
+		printf("literal_hex sync %d\n".ptr, in_sync_literal_hex(&g, 3) as c_int);
+		printf("literal_hex sync %d\n".ptr, in_sync_literal_hex(&g, 4) as c_int);
+		printf("literal_hex sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("literal_hex select %d\n".ptr, in_select_literal_hex(c, 1) as c_int);
+		printf("literal_hex select %d\n".ptr, in_select_literal_hex(c, 2) as c_int);
+		printf("literal_hex select %d\n".ptr, in_select_literal_hex(c, 3) as c_int);
+		printf("literal_hex select %d\n".ptr, in_select_literal_hex(c, 4) as c_int);
+		delete(c);
+		printf("literal_hex generic %d %d\n".ptr, in_generic_literal_hex<int>(1) as c_int,
+			in_generic_literal_hex<str>(1) as c_int);
+		printf("literal_hex generic %d %d\n".ptr, in_generic_literal_hex<int>(2) as c_int,
+			in_generic_literal_hex<str>(2) as c_int);
+		printf("literal_hex generic %d %d\n".ptr, in_generic_literal_hex<int>(3) as c_int,
+			in_generic_literal_hex<str>(3) as c_int);
+		printf("literal_hex generic %d %d\n".ptr, in_generic_literal_hex<int>(4) as c_int,
+			in_generic_literal_hex<str>(4) as c_int);
+		let outer = Outer_literal_hex { };
+		printf("literal_hex nested %d\n".ptr, outer.go(1) as c_int);
+		printf("literal_hex nested %d\n".ptr, outer.go(2) as c_int);
+		printf("literal_hex nested %d\n".ptr, outer.go(3) as c_int);
+		printf("literal_hex nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		printf("format arm %d\n".ptr, in_arm_format(0) as c_int);
+		printf("format arm %d\n".ptr, in_arm_format(1) as c_int);
+		printf("format arm %d\n".ptr, in_arm_format(2) as c_int);
+		printf("format arm %d\n".ptr, in_arm_format(3) as c_int);
+		printf("format arm %d\n".ptr, in_arm_format(4) as c_int);
+		printf("format if_let %d\n".ptr, in_if_let_format(0) as c_int);
+		printf("format if_let %d\n".ptr, in_if_let_format(1) as c_int);
+		printf("format if_let %d\n".ptr, in_if_let_format(2) as c_int);
+		printf("format if_let %d\n".ptr, in_if_let_format(3) as c_int);
+		printf("format if_let %d\n".ptr, in_if_let_format(4) as c_int);
+		let deferred = 0;
+		in_defer_format(1, &deferred);
+		printf("format defer %d\n".ptr, deferred as c_int);
+		in_defer_format(2, &deferred);
+		printf("format defer %d\n".ptr, deferred as c_int);
+		in_defer_format(3, &deferred);
+		printf("format defer %d\n".ptr, deferred as c_int);
+		in_defer_format(4, &deferred);
+		printf("format defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_format(0, &undone) catch {
+			yield;
+		};
+		printf("format undo %d\n".ptr, undone as c_int);
+		in_undo_format(1, &undone) catch {
+			yield;
+		};
+		printf("format undo %d\n".ptr, undone as c_int);
+		in_undo_format(2, &undone) catch {
+			yield;
+		};
+		printf("format undo %d\n".ptr, undone as c_int);
+		in_undo_format(3, &undone) catch {
+			yield;
+		};
+		printf("format undo %d\n".ptr, undone as c_int);
+		in_undo_format(4, &undone) catch {
+			yield;
+		};
+		printf("format undo %d\n".ptr, undone as c_int);
+		printf("format closure %d\n".ptr, in_closure_format(1) as c_int);
+		printf("format closure %d\n".ptr, in_closure_format(2) as c_int);
+		printf("format closure %d\n".ptr, in_closure_format(3) as c_int);
+		printf("format closure %d\n".ptr, in_closure_format(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_format();
+		printf("format worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_format();
+		printf("format worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_format();
+		printf("format worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_format();
+		printf("format worker %d\n".ptr, join(job3) as c_int);
+		printf("format dispatch %d\n".ptr, in_dispatch_format(task, 1) as c_int);
+		printf("format dispatch %d\n".ptr, in_dispatch_format(task, 2) as c_int);
+		printf("format dispatch %d\n".ptr, in_dispatch_format(task, 3) as c_int);
+		printf("format dispatch %d\n".ptr, in_dispatch_format(task, 4) as c_int);
+		let g = Guarded_format { lock: Mutex.new(), entered: 0 };
+		printf("format sync %d\n".ptr, in_sync_format(&g, 1) as c_int);
+		printf("format sync %d\n".ptr, in_sync_format(&g, 2) as c_int);
+		printf("format sync %d\n".ptr, in_sync_format(&g, 3) as c_int);
+		printf("format sync %d\n".ptr, in_sync_format(&g, 4) as c_int);
+		printf("format sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("format select %d\n".ptr, in_select_format(c, 1) as c_int);
+		printf("format select %d\n".ptr, in_select_format(c, 2) as c_int);
+		printf("format select %d\n".ptr, in_select_format(c, 3) as c_int);
+		printf("format select %d\n".ptr, in_select_format(c, 4) as c_int);
+		delete(c);
+		let outer = Outer_format { };
+		printf("format nested %d\n".ptr, outer.go(1) as c_int);
+		printf("format nested %d\n".ptr, outer.go(2) as c_int);
+		printf("format nested %d\n".ptr, outer.go(3) as c_int);
+		printf("format nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		let box = Box_pattern { base: 1000 };
+		printf("pattern method %d\n".ptr, box.run(1) as c_int);
+		printf("pattern method %d\n".ptr, box.run(2) as c_int);
+		printf("pattern method %d\n".ptr, box.run(3) as c_int);
+		printf("pattern method %d\n".ptr, box.run(4) as c_int);
+		printf("pattern arm %d\n".ptr, in_arm_pattern(0) as c_int);
+		printf("pattern arm %d\n".ptr, in_arm_pattern(1) as c_int);
+		printf("pattern arm %d\n".ptr, in_arm_pattern(2) as c_int);
+		printf("pattern arm %d\n".ptr, in_arm_pattern(3) as c_int);
+		printf("pattern arm %d\n".ptr, in_arm_pattern(4) as c_int);
+		printf("pattern if_let %d\n".ptr, in_if_let_pattern(0) as c_int);
+		printf("pattern if_let %d\n".ptr, in_if_let_pattern(1) as c_int);
+		printf("pattern if_let %d\n".ptr, in_if_let_pattern(2) as c_int);
+		printf("pattern if_let %d\n".ptr, in_if_let_pattern(3) as c_int);
+		printf("pattern if_let %d\n".ptr, in_if_let_pattern(4) as c_int);
+		let deferred = 0;
+		in_defer_pattern(1, &deferred);
+		printf("pattern defer %d\n".ptr, deferred as c_int);
+		in_defer_pattern(2, &deferred);
+		printf("pattern defer %d\n".ptr, deferred as c_int);
+		in_defer_pattern(3, &deferred);
+		printf("pattern defer %d\n".ptr, deferred as c_int);
+		in_defer_pattern(4, &deferred);
+		printf("pattern defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_pattern(0, &undone) catch {
+			yield;
+		};
+		printf("pattern undo %d\n".ptr, undone as c_int);
+		in_undo_pattern(1, &undone) catch {
+			yield;
+		};
+		printf("pattern undo %d\n".ptr, undone as c_int);
+		in_undo_pattern(2, &undone) catch {
+			yield;
+		};
+		printf("pattern undo %d\n".ptr, undone as c_int);
+		in_undo_pattern(3, &undone) catch {
+			yield;
+		};
+		printf("pattern undo %d\n".ptr, undone as c_int);
+		in_undo_pattern(4, &undone) catch {
+			yield;
+		};
+		printf("pattern undo %d\n".ptr, undone as c_int);
+		printf("pattern catch %d\n".ptr, in_catch_pattern(0) as c_int);
+		printf("pattern catch %d\n".ptr, in_catch_pattern(1) as c_int);
+		printf("pattern catch %d\n".ptr, in_catch_pattern(2) as c_int);
+		printf("pattern catch %d\n".ptr, in_catch_pattern(3) as c_int);
+		printf("pattern catch %d\n".ptr, in_catch_pattern(4) as c_int);
+		printf("pattern closure %d\n".ptr, in_closure_pattern(1) as c_int);
+		printf("pattern closure %d\n".ptr, in_closure_pattern(2) as c_int);
+		printf("pattern closure %d\n".ptr, in_closure_pattern(3) as c_int);
+		printf("pattern closure %d\n".ptr, in_closure_pattern(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_pattern();
+		printf("pattern worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_pattern();
+		printf("pattern worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_pattern();
+		printf("pattern worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_pattern();
+		printf("pattern worker %d\n".ptr, join(job3) as c_int);
+		printf("pattern dispatch %d\n".ptr, in_dispatch_pattern(task, 1) as c_int);
+		printf("pattern dispatch %d\n".ptr, in_dispatch_pattern(task, 2) as c_int);
+		printf("pattern dispatch %d\n".ptr, in_dispatch_pattern(task, 3) as c_int);
+		printf("pattern dispatch %d\n".ptr, in_dispatch_pattern(task, 4) as c_int);
+		let g = Guarded_pattern { lock: Mutex.new(), entered: 0 };
+		printf("pattern sync %d\n".ptr, in_sync_pattern(&g, 1) as c_int);
+		printf("pattern sync %d\n".ptr, in_sync_pattern(&g, 2) as c_int);
+		printf("pattern sync %d\n".ptr, in_sync_pattern(&g, 3) as c_int);
+		printf("pattern sync %d\n".ptr, in_sync_pattern(&g, 4) as c_int);
+		printf("pattern sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("pattern select %d\n".ptr, in_select_pattern(c, 1) as c_int);
+		printf("pattern select %d\n".ptr, in_select_pattern(c, 2) as c_int);
+		printf("pattern select %d\n".ptr, in_select_pattern(c, 3) as c_int);
+		printf("pattern select %d\n".ptr, in_select_pattern(c, 4) as c_int);
+		delete(c);
+		printf("pattern generic %d %d\n".ptr, in_generic_pattern<int>(1) as c_int,
+			in_generic_pattern<str>(1) as c_int);
+		printf("pattern generic %d %d\n".ptr, in_generic_pattern<int>(2) as c_int,
+			in_generic_pattern<str>(2) as c_int);
+		printf("pattern generic %d %d\n".ptr, in_generic_pattern<int>(3) as c_int,
+			in_generic_pattern<str>(3) as c_int);
+		printf("pattern generic %d %d\n".ptr, in_generic_pattern<int>(4) as c_int,
+			in_generic_pattern<str>(4) as c_int);
+		let outer = Outer_pattern { };
+		printf("pattern nested %d\n".ptr, outer.go(1) as c_int);
+		printf("pattern nested %d\n".ptr, outer.go(2) as c_int);
+		printf("pattern nested %d\n".ptr, outer.go(3) as c_int);
+		printf("pattern nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	delete(task);
+	return 0;
+}
