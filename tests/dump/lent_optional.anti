@@ -1,0 +1,23 @@
+//! An iterator whose `operator fn value` gives a `lent ?*int`.
+
+class Row
+{
+	pub cells: [3]int = [1, 2, 3],
+}
+
+class Walk
+{
+	pub row: *Row,
+	pub at: int = -1,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < 3;
+	}
+
+	operator fn value(self) -> lent ?*int
+	{
+		return &self.row.cells[self.at];
+	}
+}

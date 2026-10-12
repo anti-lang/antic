@@ -1,0 +1,20 @@
+module_doc "A simd struct whose lanes are characters, four bytes each."
+struct_decl Text4
+  simd
+  field a                  char
+    type char
+  field b                  char
+    type char
+  field c                  char
+    type char
+  field d                  char
+    type char
+function first             fn(Text4) -> char
+  param t                  Text4
+    type Text4
+  result
+    type char
+  block
+    return_stmt
+      field a              char
+        ident t            Text4

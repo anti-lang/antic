@@ -5829,6 +5829,8 @@ set(DUMP "${CMAKE_CURRENT_SOURCE_DIR}/dump")
 # file under tests/dump and the other arguments of antic.
 foreach(case "types|symbolic||symbolic.types|${DUMP}/symbolic.anti"
         "types|symbolic_operators||symbolic_operators.types|${DUMP}/symbolic_operators.anti"
+        "types|char_lanes||char_lanes.types|${DUMP}/char_lanes.anti"
+        "types|lent_optional||lent_optional.types|${DUMP}/lent_optional.anti"
         "types|generics||generics.types|${DUMP}/generics.anti"
         "types|constraints||constraints.types|${DUMP}/constraints.anti"
         "ir|header_main||header/main.ir|${DUMP}/header/main.anti"

@@ -1,0 +1,53 @@
+module_doc "An iterator whose `operator fn value` gives a `lent ?*int`."
+class_decl Row             Row
+  field cells
+    type [N]
+      int_lit 3            int
+      type int
+    pub
+    default
+      array_lit            [3]int
+        int_lit 1          int
+        int_lit 2          int
+        int_lit 3          int
+class_decl Walk            Walk
+  field row
+    type *
+      type Row
+    pub
+  field at
+    type int
+    pub
+    default
+      unary -              int
+        int_lit 1          int
+  pub function next        fn(*Walk) -> bool
+    operator
+    self
+    result
+      type bool
+    block
+      simple_stmt +=
+        field at           int
+          ident self       *Walk
+        int_lit 1          int
+      return_stmt
+        relation <         bool
+          field at         int
+            ident self     *Walk
+          int_lit 3        int
+  pub function value       fn(*Walk) -> lent ?*int
+    operator
+    self
+    result
+      type ?*
+        type int
+    block
+      return_stmt
+        unary &            *int
+          index            int
+            field cells    [3]int
+              field row    *Row
+                ident self *Walk
+            field at       int
+              ident self   *Walk
