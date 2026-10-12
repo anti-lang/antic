@@ -438,12 +438,12 @@ column means that no source holds the row at all.
 | Flow | 27 | 454 | 1 | 91 | 0 |
 | Values | 40 | 753 | 0 | 1038 | 1 |
 | Types | 32 | 194 | 20 | 0 | 0 |
-| Ownership | 18 | 79 | 170 | 45 | 80 |
+| Ownership | 18 | 248 | 1 | 125 | 0 |
 | Errors | 15 | 49 | 124 | 11 | 30 |
 | Threads | 29 | 71 | 335 | 52 | 144 |
 | Classes | 26 | 47 | 9 | 0 | 0 |
 | Modules | 19 | 29 | 1 | 0 | 0 |
-| All | 206 | 1676 | 660 | 1237 | 255 |
+| All | 206 | 1845 | 491 | 1317 | 175 |
 
 ### Flow
 
@@ -909,23 +909,23 @@ the source of the test `fmt_alias_of_function`, T025.
 
 | Construct | Held, with the first source that holds it | Open |
 |---|---|---|
-| `alloc` of a literal | function `programs/alias_access`, method `programs/catch_exits`, loop body `programs/parallel_join`, catch handler `errors/worker_walk`, worker `programs/parallel_join`, `tests` block `inject/project/src/com/example/app`, generic body `programs/generic_nested`, library module `modules/chain/com/example/dog` | module level, switch arm, `if let`, `defer`, `undo`, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `fixtures` block, nested type |
-| `alloc(T, n)` | function `programs/alias_integers`, method `programs/generic_copies`, generic body `programs/generic_copies`, library module `modules/generics/com/example/gen` | module level, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type |
-| `alloc` of a class with arguments | function `programs/concurrent` | module level, method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `free` | function `programs/alias_integers`, method `programs/concurrent`, loop body `programs/concurrent`, worker `programs/parallel_join`, `tests` block `traps/memory_checks_tests`, generic body `programs/generic_copies`, library module `modules/closures/com/example/walk` | switch arm, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `fixtures` block, nested type |
-| `delete` | function `programs/alias_class_pointers`, loop body `std/collection`, `defer` `programs/may_fail_table`, catch handler `programs/catch_moves`, worker `errors/worker_walk`, `tests` block `inject/project/src/com/example/app` | method, switch arm, `if let`, `undo`, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `fixtures` block, generic body, nested type, library module |
-| `destroy` | function `programs/alloc_owning`, generic body `programs/owning_values` | method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type, library module |
-| `dup` | function `programs/caller_params`, method `programs/generic_constants`, loop body `programs/generic_copies`, switch arm `programs/generic_variants`, `sync` block `programs/generic_sync`, generic body `programs/caller_params`, library module `modules/direct/com/example/frame` | module level, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `select` arm, `tests` block, `fixtures` block, nested type |
-| address `&x` | function `programs/alias_access`, method `programs/caller_params`, loop body `programs/arith_facts`, switch arm `programs/nested_locals`, `if let` `programs/variant_owning`, `defer` `programs/nested_locals`, `undo` `programs/nested_locals`, catch handler `programs/catch_moves`, closure `std/collection_deque`, worker `std/shared`, `dispatch` or `parallel` `programs/sync_workers`, `sync` block `errors/pointer_leak`, generic body `programs/generic_nested`, library module `modules/defaults/com/example/greeter` | module level, `select` arm, `tests` block, `fixtures` block, nested type |
-| read through `*p` | function `programs/alias_access`, method `programs/table_rewrite`, loop body `programs/channel_workers`, closure `std/collection_deque`, worker `programs/channel_workers`, `dispatch` or `parallel` `programs/concurrent`, `sync` block `programs/eq_handles`, `select` arm `programs/channel_workers`, generic body `programs/generic_variants`, library module `modules/generics/com/example/gen` | module level, switch arm, `if let`, `defer`, `undo`, catch handler, `tests` block, `fixtures` block, nested type |
-| `none` | module level `programs/alloc_owning`, function `programs/alias_access`, method `programs/concurrent`, loop body `programs/concurrent`, switch arm `programs/generic_variants`, catch handler `programs/catch_none`, worker `std/spsc_ring_threads`, `sync` block `programs/concurrent`, generic body `programs/generic_nested`, nested type `programs/generic_nested`, library module `modules/generics/com/example/gen` | `if let`, `defer`, `undo`, closure, `dispatch` or `parallel`, `select` arm, `tests` block, `fixtures` block |
-| `??` | function `programs/closures`, loop body `std/collection_queue`, worker `std/concurrent_map_threads` | module level, method, switch arm, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `p?.x` | function `errors/optional_values` | module level, method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
+| `alloc` of a literal | function `programs/alias_access`, method `programs/catch_exits`, loop body `programs/parallel_join`, catch handler `errors/worker_walk`, worker `programs/parallel_join`, `tests` block `inject/project/src/com/example/app`, generic body `programs/generic_nested`, library module `modules/chain/com/example/dog`, module level `matrix/ownership_alloc_of_a_literal_at_module_level`, switch arm `matrix/ownership_alloc_in_contexts`, `if let` `matrix/ownership_alloc_in_contexts`, `defer` `matrix/ownership_alloc_in_contexts`, `undo` `matrix/ownership_alloc_in_contexts`, closure `matrix/ownership_alloc_in_contexts`, `dispatch` or `parallel` `matrix/ownership_alloc_in_contexts`, `sync` block `matrix/ownership_alloc_in_contexts`, `select` arm `matrix/ownership_alloc_in_contexts`, `fixtures` block `anti-test/com/example/ownership`, nested type `matrix/ownership_alloc_in_contexts` | none |
+| `alloc(T, n)` | function `programs/alias_integers`, method `programs/generic_copies`, generic body `programs/generic_copies`, library module `modules/generics/com/example/gen`, module level `matrix/ownership_alloc_of_many_at_module_level`, loop body `matrix/ownership_alloc_in_contexts`, switch arm `matrix/ownership_alloc_in_contexts`, `if let` `matrix/ownership_alloc_in_contexts`, `defer` `matrix/ownership_alloc_in_contexts`, `undo` `matrix/ownership_alloc_in_contexts`, catch handler `matrix/ownership_alloc_in_contexts`, closure `matrix/ownership_alloc_in_contexts`, worker `matrix/ownership_alloc_in_contexts`, `dispatch` or `parallel` `matrix/ownership_alloc_in_contexts`, `sync` block `matrix/ownership_alloc_in_contexts`, `select` arm `matrix/ownership_alloc_in_contexts`, `tests` block `anti-test/com/example/ownership`, `fixtures` block `anti-test/com/example/ownership`, nested type `matrix/ownership_alloc_in_contexts` | none |
+| `alloc` of a class with arguments | function `programs/concurrent`, module level `matrix/ownership_alloc_with_arguments_at_module_level`, method `matrix/ownership_alloc_in_contexts`, loop body `matrix/ownership_alloc_in_contexts`, switch arm `matrix/ownership_alloc_in_contexts`, `if let` `matrix/ownership_alloc_in_contexts`, `defer` `matrix/ownership_alloc_in_contexts`, `undo` `matrix/ownership_alloc_in_contexts`, catch handler `matrix/ownership_alloc_in_contexts`, closure `matrix/ownership_alloc_in_contexts`, worker `matrix/ownership_alloc_in_contexts`, `dispatch` or `parallel` `matrix/ownership_alloc_in_contexts`, `sync` block `matrix/ownership_alloc_in_contexts`, `select` arm `matrix/ownership_alloc_in_contexts`, `tests` block `anti-test/com/example/ownership`, `fixtures` block `anti-test/com/example/ownership`, generic body `matrix/ownership_alloc_in_contexts`, nested type `matrix/ownership_alloc_in_contexts`, library module `modules/ownership/com/example/ownership` | none |
+| `free` | function `programs/alias_integers`, method `programs/concurrent`, loop body `programs/concurrent`, worker `programs/parallel_join`, `tests` block `traps/memory_checks_tests`, generic body `programs/generic_copies`, library module `modules/closures/com/example/walk`, switch arm `matrix/ownership_alloc_in_contexts`, `if let` `matrix/ownership_alloc_in_contexts`, `defer` `matrix/ownership_alloc_in_contexts`, `undo` `matrix/ownership_alloc_in_contexts`, catch handler `matrix/ownership_alloc_in_contexts`, closure `matrix/ownership_alloc_in_contexts`, `dispatch` or `parallel` `matrix/ownership_alloc_in_contexts`, `sync` block `matrix/ownership_alloc_in_contexts`, `select` arm `matrix/ownership_alloc_in_contexts`, `fixtures` block `anti-test/com/example/ownership`, nested type `matrix/ownership_alloc_in_contexts` | none |
+| `delete` | function `programs/alias_class_pointers`, loop body `std/collection`, `defer` `programs/may_fail_table`, catch handler `programs/catch_moves`, worker `errors/worker_walk`, `tests` block `inject/project/src/com/example/app`, method `matrix/ownership_alloc_in_contexts`, switch arm `matrix/ownership_alloc_in_contexts`, `if let` `matrix/ownership_alloc_in_contexts`, `undo` `matrix/ownership_alloc_in_contexts`, closure `matrix/ownership_alloc_in_contexts`, `dispatch` or `parallel` `matrix/ownership_delete_in_a_dispatch`, `sync` block `matrix/ownership_alloc_in_contexts`, `select` arm `matrix/ownership_alloc_in_contexts`, `fixtures` block `anti-test/com/example/ownership`, generic body `matrix/ownership_alloc_in_contexts`, nested type `matrix/ownership_alloc_in_contexts`, library module `modules/ownership/com/example/ownership` | none |
+| `destroy` | function `programs/alloc_owning`, generic body `programs/owning_values`, method `matrix/ownership_alloc_in_contexts`, loop body `matrix/ownership_alloc_in_contexts`, switch arm `matrix/ownership_alloc_in_contexts`, `if let` `matrix/ownership_alloc_in_contexts`, `defer` `matrix/ownership_alloc_in_contexts`, `undo` `matrix/ownership_alloc_in_contexts`, catch handler `matrix/ownership_alloc_in_contexts`, closure `matrix/ownership_alloc_in_contexts`, worker `matrix/ownership_alloc_in_contexts`, `dispatch` or `parallel` `matrix/ownership_alloc_in_contexts`, `sync` block `matrix/ownership_alloc_in_contexts`, `select` arm `matrix/ownership_alloc_in_contexts`, `tests` block `anti-test/com/example/ownership`, `fixtures` block `anti-test/com/example/ownership`, nested type `matrix/ownership_alloc_in_contexts`, library module `modules/ownership/com/example/ownership` | none |
+| `dup` | function `programs/caller_params`, method `programs/generic_constants`, loop body `programs/generic_copies`, switch arm `programs/generic_variants`, `sync` block `programs/generic_sync`, generic body `programs/caller_params`, library module `modules/direct/com/example/frame`, module level `matrix/ownership_dup_at_module_level`, `if let` `matrix/ownership_pointers_in_contexts`, `defer` `matrix/ownership_pointers_in_contexts`, `undo` `matrix/ownership_pointers_in_contexts`, catch handler `matrix/ownership_pointers_in_contexts`, closure `matrix/ownership_pointers_in_contexts`, worker `matrix/ownership_pointers_in_contexts`, `dispatch` or `parallel` `matrix/ownership_pointers_in_contexts`, `select` arm `matrix/ownership_pointers_in_contexts`, `tests` block `anti-test/com/example/ownership`, `fixtures` block `anti-test/com/example/ownership`, nested type `matrix/ownership_pointers_in_contexts` | none |
+| address `&x` | function `programs/alias_access`, method `programs/caller_params`, loop body `programs/arith_facts`, switch arm `programs/nested_locals`, `if let` `programs/variant_owning`, `defer` `programs/nested_locals`, `undo` `programs/nested_locals`, catch handler `programs/catch_moves`, closure `std/collection_deque`, worker `std/shared`, `dispatch` or `parallel` `programs/sync_workers`, `sync` block `errors/pointer_leak`, generic body `programs/generic_nested`, library module `modules/defaults/com/example/greeter`, module level `matrix/ownership_address_at_module_level`, `select` arm `matrix/ownership_pointers_in_contexts`, `tests` block `anti-test/com/example/ownership`, `fixtures` block `anti-test/com/example/ownership`, nested type `matrix/ownership_pointers_in_contexts` | none |
+| read through `*p` | function `programs/alias_access`, method `programs/table_rewrite`, loop body `programs/channel_workers`, closure `std/collection_deque`, worker `programs/channel_workers`, `dispatch` or `parallel` `programs/concurrent`, `sync` block `programs/eq_handles`, `select` arm `programs/channel_workers`, generic body `programs/generic_variants`, library module `modules/generics/com/example/gen`, switch arm `matrix/ownership_pointers_in_contexts`, `if let` `matrix/ownership_pointers_in_contexts`, `defer` `matrix/ownership_pointers_in_contexts`, `undo` `matrix/ownership_pointers_in_contexts`, catch handler `matrix/ownership_pointers_in_contexts`, `tests` block `anti-test/com/example/ownership`, `fixtures` block `anti-test/com/example/ownership`, nested type `matrix/ownership_pointers_in_contexts` | module level: a constant holds no pointer but `none`, since `&` of a constant and `alloc` are no constant expressions, so `*p` has nothing to read there |
+| `none` | module level `programs/alloc_owning`, function `programs/alias_access`, method `programs/concurrent`, loop body `programs/concurrent`, switch arm `programs/generic_variants`, catch handler `programs/catch_none`, worker `std/spsc_ring_threads`, `sync` block `programs/concurrent`, generic body `programs/generic_nested`, nested type `programs/generic_nested`, library module `modules/generics/com/example/gen`, `if let` `matrix/ownership_pointers_in_contexts`, `defer` `matrix/ownership_pointers_in_contexts`, `undo` `matrix/ownership_pointers_in_contexts`, closure `matrix/ownership_pointers_in_contexts`, `dispatch` or `parallel` `matrix/ownership_pointers_in_contexts`, `select` arm `matrix/ownership_pointers_in_contexts`, `tests` block `anti-test/com/example/ownership`, `fixtures` block `anti-test/com/example/ownership` | none |
+| `??` | function `programs/closures`, loop body `std/collection_queue`, worker `std/concurrent_map_threads`, module level `matrix/ownership_none_or_of_a_value_at_module_level` and `matrix/ownership_none_or_of_none_at_module_level` T028, method `matrix/ownership_pointers_in_contexts`, switch arm `matrix/ownership_pointers_in_contexts`, `if let` `matrix/ownership_pointers_in_contexts`, `defer` `matrix/ownership_pointers_in_contexts`, `undo` `matrix/ownership_pointers_in_contexts`, catch handler `matrix/ownership_pointers_in_contexts`, closure `matrix/ownership_pointers_in_contexts`, `dispatch` or `parallel` `matrix/ownership_pointers_in_contexts`, `sync` block `matrix/ownership_pointers_in_contexts`, `select` arm `matrix/ownership_pointers_in_contexts`, `tests` block `anti-test/com/example/ownership`, `fixtures` block `anti-test/com/example/ownership`, generic body `matrix/ownership_pointers_in_contexts`, nested type `matrix/ownership_pointers_in_contexts`, library module `modules/ownership/com/example/ownership` | none |
+| `p?.x` | function `errors/optional_values`, module level `matrix/ownership_chain_at_module_level`, method `matrix/ownership_pointers_in_contexts`, loop body `matrix/ownership_pointers_in_contexts`, switch arm `matrix/ownership_pointers_in_contexts`, `if let` `matrix/ownership_pointers_in_contexts`, `defer` `matrix/ownership_pointers_in_contexts`, `undo` `matrix/ownership_pointers_in_contexts`, catch handler `matrix/ownership_pointers_in_contexts`, closure `matrix/ownership_pointers_in_contexts`, worker `matrix/ownership_pointers_in_contexts`, `dispatch` or `parallel` `matrix/ownership_pointers_in_contexts`, `sync` block `matrix/ownership_pointers_in_contexts`, `select` arm `matrix/ownership_pointers_in_contexts`, `tests` block `anti-test/com/example/ownership`, `fixtures` block `anti-test/com/example/ownership`, generic body `matrix/ownership_pointers_in_contexts`, nested type `matrix/ownership_pointers_in_contexts`, library module `modules/ownership/com/example/ownership` | none |
 | `lent` parameter | `programs/lent_derived` | none |
 | `lent` result | `programs/lent_params` | none |
 | `keep` parameter | `programs/closures` | none |
-| iterator to slice, `to_slice` | function `programs/effects_edges` | module level, method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `own` field or parameter | none | open |
+| iterator to slice, `to_slice` | function `programs/effects_edges`, module level `matrix/ownership_to_slice_at_module_level`, method `matrix/ownership_pointers_in_contexts`, loop body `matrix/ownership_pointers_in_contexts`, switch arm `matrix/ownership_pointers_in_contexts`, `if let` `matrix/ownership_pointers_in_contexts`, `defer` `matrix/ownership_pointers_in_contexts`, `undo` `matrix/ownership_pointers_in_contexts`, catch handler `matrix/ownership_pointers_in_contexts`, closure `matrix/ownership_pointers_in_contexts`, worker `matrix/ownership_pointers_in_contexts`, `dispatch` or `parallel` `matrix/ownership_pointers_in_contexts`, `sync` block `matrix/ownership_pointers_in_contexts`, `select` arm `matrix/ownership_pointers_in_contexts`, `tests` block `anti-test/com/example/ownership`, `fixtures` block `anti-test/com/example/ownership`, generic body `matrix/ownership_pointers_in_contexts`, nested type `matrix/ownership_pointers_in_contexts`, library module `modules/ownership/com/example/ownership` | none |
+| `own` field or parameter | `matrix/ownership_own_fields_and_parameters`, and `matrix/ownership_values_in_an_argument` for an `own` parameter of each kind of owning value | none |
 | `delete(p, from)` and `destroy(p, from)` | `std/deserialize_alloc` | none |
 
 The kinds of ownership:
@@ -933,13 +933,92 @@ The kinds of ownership:
 | Construct | Kinds held | Kinds open |
 |---|---|---|
 | `alloc` of a literal | pointer `programs/alias_access` | none |
-| `alloc(T, n)` | nullable pointer `programs/alias_integers` | slice, pointer |
-| `free` | pointer `programs/alias_integers`, nullable pointer `programs/channels` | slice |
-| `delete` | pointer `programs/alias_class_pointers`, channel `programs/channel_workers` | nullable pointer |
-| `dup` | pointer `programs/delete_owned`, lent value `programs/lent_params`, function value `programs/snapshots`, tuple `programs/owning_values`, variant `programs/variant_owning`, class `programs/caller_params`, generic parameter `programs/caller_params` | i8, i16, i32, i64, int, u8, u16, u32, u64, uint, byte, f32, f64, f16, bool, char, str, slice, fixed array, nullable pointer, optional value, may-fail function value, channel, struct, packed struct, simd struct, union, enum, synchronized class, concurrent class, interface |
+| `alloc(T, n)` | nullable pointer `programs/alias_integers`, slice `matrix/ownership_alloc_and_free_kinds`, pointer `matrix/ownership_alloc_and_free_kinds` | none |
+| `free` | pointer `programs/alias_integers`, nullable pointer `programs/channels`, slice `matrix/ownership_free_of_a_slice` | none |
+| `delete` | pointer `programs/alias_class_pointers`, channel `programs/channel_workers`, nullable pointer `matrix/ownership_alloc_and_free_kinds` | none |
+| `dup` | pointer `programs/delete_owned`, lent value `programs/lent_params`, function value `programs/snapshots`, tuple `programs/owning_values`, variant `programs/variant_owning`, class `programs/caller_params`, generic parameter `programs/caller_params`, i8 `matrix/ownership_dup_of_an_i8`, i16 `matrix/ownership_dup_of_an_i16`, i32 `matrix/ownership_dup_of_an_i32`, i64 `matrix/ownership_dup_of_an_i64`, int `matrix/ownership_dup_of_an_int`, u8 `matrix/ownership_dup_of_a_u8`, u16 `matrix/ownership_dup_of_a_u16`, u32 `matrix/ownership_dup_of_a_u32`, u64 `matrix/ownership_dup_of_a_u64`, uint `matrix/ownership_dup_of_a_uint`, byte `matrix/ownership_dup_of_a_byte`, f32 `matrix/ownership_dup_of_an_f32`, f64 `matrix/ownership_dup_of_an_f64`, f16 `matrix/ownership_dup_of_an_f16`, bool `matrix/ownership_dup_of_a_bool`, char `matrix/ownership_dup_of_a_char`, str `matrix/ownership_dup_of_a_str`, slice `matrix/ownership_dup_of_a_slice`, fixed array `matrix/ownership_dup_of_a_plain_array`, nullable pointer `matrix/ownership_dup_of_a_pointer_that_may_be_none`, optional value `matrix/ownership_dup_of_a_value_that_may_be_none` T035, may-fail function value `matrix/ownership_dup_of_a_failing_function`, channel `matrix/ownership_dup_of_a_channel`, struct `matrix/ownership_dup_kinds`, packed struct `matrix/ownership_dup_kinds`, simd struct `matrix/ownership_dup_kinds`, union `matrix/ownership_dup_of_a_union`, enum `matrix/ownership_dup_of_an_enum`, synchronized class `matrix/ownership_dup_kinds`, concurrent class `matrix/ownership_dup_kinds`, interface `matrix/ownership_dup_kinds` | none |
 | address `&x` | pointer `programs/alias_access` | none |
-| read through `*p` | i8 `programs/alias_bytes`, i16 `programs/alias_integers`, i32 `programs/alias_c_functions`, int `programs/alias_access`, u16 `programs/alias_integers`, u32 `programs/alias_integers`, u64 `programs/alias_integers`, byte `programs/alias_bytes`, f32 `programs/alias_view_local`, f16 `programs/half`, char `programs/alias_integers`, str `programs/alias_pointers`, slice `programs/alias_pointers`, fixed array `programs/alias_arrays`, pointer `programs/alias_access`, nullable pointer `programs/alias_pointers`, lent value `programs/for_loop`, enum `programs/alias_integers`, variant `programs/alias_unions`, class `programs/eq_compiled`, synchronized class `programs/sync_operators`, concurrent class `std/concurrent_map`, generic parameter `programs/owning_values` | i64, u8, uint, f64, bool, optional value, may-fail function value, function value, tuple, channel, struct, packed struct, simd struct, union, interface |
-| `??` | int `programs/optional_values`, str `programs/optional_values`, pointer `programs/none_operators`, nullable pointer `programs/closures`, optional value `programs/optional_values`, function value `programs/closures`, tuple `std/concurrent_map`, class `std/collection_deque` | i8, i16, i32, i64, u8, u16, u32, u64, uint, byte, f32, f64, f16, bool, char, slice, fixed array, lent value, may-fail function value, channel, struct, packed struct, simd struct, union, enum, variant, synchronized class, concurrent class, interface, generic parameter |
+| read through `*p` | i8 `programs/alias_bytes`, i16 `programs/alias_integers`, i32 `programs/alias_c_functions`, int `programs/alias_access`, u16 `programs/alias_integers`, u32 `programs/alias_integers`, u64 `programs/alias_integers`, byte `programs/alias_bytes`, f32 `programs/alias_view_local`, f16 `programs/half`, char `programs/alias_integers`, str `programs/alias_pointers`, slice `programs/alias_pointers`, fixed array `programs/alias_arrays`, pointer `programs/alias_access`, nullable pointer `programs/alias_pointers`, lent value `programs/for_loop`, enum `programs/alias_integers`, variant `programs/alias_unions`, class `programs/eq_compiled`, synchronized class `programs/sync_operators`, concurrent class `std/concurrent_map`, generic parameter `programs/owning_values`, i64 `matrix/ownership_read_kinds`, u8 `matrix/ownership_read_kinds`, uint `matrix/ownership_read_kinds`, f64 `matrix/ownership_read_kinds`, bool `matrix/ownership_read_kinds`, optional value `matrix/ownership_read_kinds`, may-fail function value `matrix/ownership_read_kinds`, function value `matrix/ownership_read_kinds`, tuple `matrix/ownership_read_kinds`, channel `matrix/ownership_read_kinds`, struct `matrix/ownership_read_kinds`, packed struct `matrix/ownership_read_kinds`, simd struct `matrix/ownership_read_kinds`, union `matrix/ownership_read_kinds`, interface `matrix/ownership_read_kinds` | none |
+| `??` | int `programs/optional_values`, str `programs/optional_values`, pointer `programs/none_operators`, nullable pointer `programs/closures`, optional value `programs/optional_values`, function value `programs/closures`, tuple `std/concurrent_map`, class `std/collection_deque`, i8 `matrix/ownership_none_or_kinds`, i16 `matrix/ownership_none_or_kinds`, i32 `matrix/ownership_none_or_kinds`, i64 `matrix/ownership_none_or_kinds`, u8 `matrix/ownership_none_or_kinds`, u16 `matrix/ownership_none_or_kinds`, u32 `matrix/ownership_none_or_kinds`, u64 `matrix/ownership_none_or_kinds`, uint `matrix/ownership_none_or_kinds`, byte `matrix/ownership_none_or_kinds`, f32 `matrix/ownership_none_or_kinds`, f64 `matrix/ownership_none_or_kinds`, f16 `matrix/ownership_none_or_kinds`, bool `matrix/ownership_none_or_kinds`, char `matrix/ownership_none_or_kinds`, slice `matrix/ownership_none_or_kinds`, fixed array `matrix/ownership_none_or_kinds`, lent value `matrix/ownership_lent_values`, may-fail function value `matrix/ownership_none_or_kinds`, channel `matrix/ownership_none_or_kinds`, struct `matrix/ownership_none_or_kinds`, packed struct `matrix/ownership_none_or_kinds`, simd struct `matrix/ownership_none_or_kinds`, union `matrix/ownership_none_or_kinds`, enum `matrix/ownership_none_or_kinds`, variant `matrix/ownership_none_or_kinds`, synchronized class `matrix/ownership_none_or_kinds`, concurrent class `matrix/ownership_none_or_kinds`, interface `matrix/ownership_none_or_kinds`, generic parameter `matrix/ownership_pointers_in_contexts` | none |
+
+The step `ownership` filled the two tables above and wrote the tests of the
+places a value goes. `tests/matrix/` holds its sources under the names
+`ownership_*`.
+
+- `matrix/ownership_alloc_in_contexts` holds `alloc` of a literal,
+  `alloc(T, n)`, `alloc` of a class with arguments, `free`, `delete` and
+  `destroy` in each place, and `matrix/ownership_pointers_in_contexts` holds
+  `dup`, `&x`, `*p`, `none`, `??`, `p?.x` and `to_slice` there. A line of
+  their output names the construct and the place.
+- `anti-test/com/example/ownership` is the module of the test
+  `anti_test_ownership`. It holds the `tests` block and the `fixtures`
+  block.
+- `modules/ownership/com/example/ownership` is the library of the test
+  `ownership_modules`. It holds each construct in a plain function and in a
+  generic one. `client` makes, copies and deletes an object of a class of
+  the library.
+- `matrix/ownership_dup_kinds`, `matrix/ownership_read_kinds`,
+  `matrix/ownership_none_or_kinds` and `matrix/ownership_alloc_and_free_kinds`
+  hold the kinds. 26 refusals `matrix/ownership_dup_of_*` hold the kinds
+  that `dup` does not copy.
+- Eleven programs `matrix/ownership_values_in_*` hold the places a value
+  goes: a `let`, an assignment, a `return`, an argument, a field, an
+  element, a capture, a dispatch, a channel, a `yield` and a temporary. Each
+  takes seven kinds of owning value through its place: a class with a
+  `destruct`, a class with an `own` field, an owning struct, tuple, variant,
+  `?T` and array. Each counts the values alive, so a teardown that is
+  missed or runs twice shows.
+- 98 refusals hold the places the rules refuse, 14 forms for each of the
+  seven kinds: `matrix/ownership_let_copies_*`, `_assignment_copies_*`,
+  `_read_through_a_pointer_copies_*`, `_return_of_a_field_copies_*`,
+  `_return_of_a_parameter_*`, `_let_of_a_parameter_*`,
+  `_own_argument_of_a_field_*`, `_named_after_a_move_*`,
+  `_field_of_a_literal_copies_*`, `_element_of_a_literal_copies_*`,
+  `_element_assignment_copies_*`, `_snapshot_captures_*`, `_send_copies_*`
+  and `_yield_copies_*`.
+- `matrix/ownership_lent_values` holds a lent pointer and a lent slice in
+  the places that take one, and 30 refusals `matrix/ownership_lent_*` hold
+  the places that do not.
+- `matrix/ownership_own_fields_and_parameters` holds `own` pointers and
+  `own` slices with their teardown order and their copy.
+- `matrix/ownership_teardown_at_every_exit` holds each way out of a block,
+  and eleven refusals hold the four moves the checker refuses and what
+  follows a move, a literal and `destroy`.
+- `matrix/ownership_slices_and_views` holds slices and views by `as`. Three
+  trap tests of `tests/traps/` hold the bounds of decision 24.
+- `matrix/ownership_allocators` holds `anti.mem` with `delete(p, from)` and
+  `destroy(p, from)`. `matrix/ownership_shared_handles` holds a handle of
+  `Shared<T>`, `matrix/ownership_generic_values` a value of a type
+  parameter and `matrix/ownership_collection_values` a `List` of owning
+  values, each in every place a value goes.
+
+Where two rules meet, and where three do:
+
+- A `may fail` function, a variant with an owning case and a release build:
+  `matrix/ownership_failing_function_gives_an_owning_variant`, T042.
+- A `dispatch`, an `own` parameter and a local that owns memory:
+  `matrix/ownership_dispatch_moves_a_local`, T040.
+- A `dispatch`, a parameter that is not `own` and a fresh owning value:
+  `matrix/ownership_dispatch_of_a_fresh_owning_value`, T039.
+- A `catch` handler, `yield` and an existing owning value: the seven
+  refusals `matrix/ownership_yield_copies_*`, T038.
+- A temporary, an owning value and a read by `is`, by a test for `none`
+  or by an index: `matrix/ownership_temporary_read_by_is`,
+  `_tested_for_none` and `_read_by_an_index`, T041.
+- A closure, a captured owning local and `=` inside the closure:
+  `matrix/ownership_values_in_a_capture`.
+- `alloc(T, n)`, a class and `=` into memory that holds no value yet:
+  `matrix/ownership_values_in_an_element`.
+- A type parameter, an `own` parameter and a `let`:
+  `matrix/ownership_generic_values`.
+- An `undo`, a `defer` and an owning local on the fail path:
+  `matrix/ownership_teardown_at_every_exit`.
+- A generic of a library module and a `static atomic` field: the test
+  `generic_atomic_modules`, T029.
+- `if let`, `let ... else` and the result of `as?`:
+  `matrix/ownership_downcast_in_an_if_let` and `_in_a_let_else`, T036.
+- `alloc(T, n)`, a count that fails and the optimizer of a release build:
+  `matrix/ownership_alloc_of_a_negative_count`, T033 and T034.
 
 ### Errors
 
@@ -1085,15 +1164,15 @@ antic 0.2.0 does otherwise, the test becomes an expected failure by decision
 | 19 | flow, errors | `return`, `break`, `continue`, `fail` and `try`, each inside a `defer` and inside an `undo` | T001, the twelve refusals `matrix/flow_*_in_defer`, `_in_undo`, `_out_of_defer` and `_out_of_undo` that "Flow" names |
 | 20 | errors | a `catch` handler of a value that can reach its end | open |
 | 21 | errors | `try` on an optional, with a message that names `let ... else` and `??` | open |
-| 22 | ownership | `return` of a field that owns something | open |
+| 22 | ownership | `return` of a field that owns something | T037, the seven refusals `matrix/ownership_return_of_a_field_copies_*`, one per kind of owning value, and `matrix/ownership_return_through_a_pointer_copies` and `matrix/ownership_return_of_an_element_copies` for `*p` and an element |
 | 23 | threads | a second `join` of one job, refused where the checker sees it and trapped in dev mode otherwise | open |
 | 23 | threads | the arguments of a `dispatch` in a loop, stored per job | open |
 | 24 | values, types | a constant index past the end of a fixed array | T016, the refusal `matrix/values_index_past_end`, and `matrix/types_array_field_index_past_end`, `matrix/types_array_inner_index_past_end` and `matrix/types_array_write_past_end` for a field, an inner array and a write |
-| 24 | values | `xs[lo..hi]` past the length, trapped in dev mode | T017, the test `check_slice_range` of `traps/slice_range` |
+| 24 | values, ownership | `xs[lo..hi]` past the length, trapped in dev mode | T017, the test `check_slice_range` of `traps/slice_range`, and `check_slice_of_slice_range`, `check_slice_range_reversed` and `check_slice_range_negative` for a slice of a slice, a low bound above the high one and one below zero |
 | 25 | modules | a write of `count` of a collection outside its module | open |
 | 26 | modules | a `str` in the signature of an `extern fn` | open |
 | 27 | classes | a class with an `abstract fn` that is not `abstract` | open |
-| 27 | classes | a direct call of `destruct` | open |
+| 27 | classes | a direct call of `destruct` | the refusal `matrix/ownership_destruct_called_directly` |
 | 27 | classes | `mutable` on a field of a plain class | open |
 | 27 | classes | `static atomic` on an `f64` | open |
 | 27 | classes | `==` on pointers of two unrelated classes | open |
@@ -1101,8 +1180,8 @@ antic 0.2.0 does otherwise, the test becomes an expected failure by decision
 | 27 | values | `<` on an enum, which stays refused | the refusal `matrix/values_less_on_enum` |
 | 27 | values | `+=` on a type with `operator fn add`, which is not derived | the refusals `matrix/values_compound_on_operator_add` and `matrix/values_compound_on_generic` |
 
-antic has a message for the direct call of `destruct` already.
-`tests/diagnostics-open.txt` lists it, since no test expects it.
+antic has a message for the direct call of `destruct` already, and the
+step `ownership` wrote the refusal that expects it.
 
 ## The two guards
 
@@ -1183,13 +1262,15 @@ On 2026-10-12, at antic 0.2.0:
   contextual words.
 - 10 item kinds, 22 statement kinds, 38 expression kinds and 10 type kinds
   in `src/antic/ast.h`.
-- 206 rows in the matrix. 1676 cells are held and 660 are
-  open. Of the kinds, 1237 are held and 255 are open. The step `flow` filled
+- 206 rows in the matrix. 1845 cells are held and 491 are
+  open. Of the kinds, 1317 are held and 175 are open. The step `flow` filled
   its area after the count of 840 held cells and 578 held kinds. The step
   `values` filled its area after the count of 1157 held cells and 622 held
   kinds. The step `types` filled its area after the count of 1613 held
-  cells. Its 20 open cells cannot exist, and each states why.
-- 13 open cells for the rules of decisions 19 to 27.
-- 748 messages: 519 expected by a test and 229 open. antic gives 598 with
-  91 open, and anti 150 with 138 open.
+  cells. Its 20 open cells cannot exist, and each states why. The step
+  `ownership` filled its area after the count of 1676 held cells and 1237
+  held kinds. Its one open cell cannot exist, and it states why.
+- 11 open cells for the rules of decisions 19 to 27.
+- 748 messages: 528 expected by a test and 220 open. antic gives 598 with
+  82 open, and anti 150 with 138 open.
 - 134 options and commands: 124 passed by a test and 10 open.
