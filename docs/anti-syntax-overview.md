@@ -917,7 +917,7 @@ let round = s is Shape.Circle;
 let n = s.tag as int;
 ```
 
-A declaration takes `packed` and `align(N)`. A literal of a variant of another module is `geo.Shape.Circle { r: 2.0 }`, and the test of its case `v is geo.Shape.Circle`. A `switch` names every case or has `else`, and `fallthrough` never enters an arm that binds a case's fields. The C header writes the enum of the tags. A variant with an owning case is torn down by its tag and follows the value rules of an owning struct, and an arm that binds such a case gets a copy that the arm tears down.
+A variant has one case or more. `v.tag` is its one field and is read-only. A declaration takes `packed` and `align(N)`, and `export variant` writes the variant into the C header, see [C interop](#c-interop). A literal of a variant of another module is `geo.Shape.Circle { r: 2.0 }`, and the test of its case `v is geo.Shape.Circle`. A `switch` names every case or has `else`, and `fallthrough` never enters an arm that binds a case's fields. The C header writes the enum of the tags. A variant with an owning case is torn down by its tag and follows the value rules of an owning struct, and an arm that binds such a case gets a copy that the arm tears down.
 
 ## Classes
 
