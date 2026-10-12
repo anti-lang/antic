@@ -1374,7 +1374,7 @@ let k = n ?? &default_node;
 
 ## Optional values
 
-`?T` is a `T` or `none`, for a value of any type, and follows every rule of `?*T`. It compares with `none`, narrows after a test, and works with `if let`, `let ... else`, `??`, `?.` and the guards of `catch`, and it is used as a `T` only after a test proves it holds one. `none` means that nothing is there, which is normal, and a failure is `may fail`: `map.get(key)` gives `?V`, and `text.parse_int(s)` stays `may fail`. A `?T` of a value type is the value and one flag byte, padded to the type's alignment, and `?*T` and `?fn(...)` stay one pointer. `?Match` is a `?T` of `Match`. The C header writes `?T` as `struct anti_opt_<T>` with `value` and `has`.
+`?T` is a `T` or `none`, for a value of any type, and follows every rule of `?*T`. It compares with `none`, narrows after a test, and works with `if let`, `let ... else`, `??` and the guards of `catch`, and it is used as a `T` only after a test proves it holds one. `none` means that nothing is there, which is normal, and a failure is `may fail`: `map.get(key)` gives `?V`, and `text.parse_int(s)` stays `may fail`. A `?T` of a value type is the value and one flag byte, padded to the type's alignment, and `?*T` and `?fn(...)` stay one pointer. `?Match` is a `?T` of `Match`. The C header writes `?T` as `struct anti_opt_<T>` with `value` and `has`.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -1392,6 +1392,19 @@ fn find_user(id: int) -> ?User { return none; }
 let age = ages.get("Ann") ?? 0;
 if let a = ages.get("Ann") { }
 let first = queue.first() else { return 1; };
+```
+
+`p?.x` reads the field `x` when `p` holds a value and gives `none` when it does not, and `p?.f(args)` calls in the same way. What `?.` gives is a `?*T` or a `?fn(...)`, so the field or the result is a pointer or a function value. A field of another type, such as an `int`, is refused. A chain goes on with `?.` after each step.
+
+```anti
+struct Node { value: int, next: ?*Node }
+
+let tail = Node { value: 2, next: none };
+let head = Node { value: 1, next: &tail };
+let p: ?*Node = &head;
+let second = p?.next;
+let third = p?.next?.next;
+let v = (p?.next ?? &head).value;
 ```
 
 ## Reflection
