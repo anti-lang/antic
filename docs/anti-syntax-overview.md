@@ -1593,17 +1593,32 @@ worker fn sum(chunk: []int) -> int
 	for x in chunk { total += x; }
 	return total;
 }
-let parts = parallel data -> sum;
-let parts2 = parallel data by 4 -> sum;
+worker fn scaled(chunk: []int, by: int) -> int
+{
+	let total = 0;
+	for x in chunk { total += x * by; }
+	return total;
+}
 
-worker fn render(s: *Sprite, frame: int) { }
+let parts = parallel data -> sum;
+let four = parallel data by 4 -> sum;
+let tripled = parallel data -> scaled(3);
+free(parts.ptr);
+free(four.ptr);
+free(tripled.ptr);
+
+worker fn render(s: *Sprite, frame: int) -> int { return s.x + frame; }
 let job = dispatch sprite -> render(frame);
-join(job);
+let width = join(job);
 let jobs = [dispatch sprite -> render(frame + 1)];
 join_all(jobs[0..1]);
 ```
 
-Worker parameters are pointer-free. The table pointer and `own` fields do not count. `[]Circle` chunks like any array, `[]*Shape` is refused and points at `dispatch`. `--anti.threads` and the key `threads` of the configuration file set the pool size.
+`parallel` splits its array into chunks, runs the worker on each and waits for all of them. It gives a `[]R` with one result per chunk in the order of the chunks, heap memory that the program frees with `free(r.ptr)`. `by N` sets the count of chunks and never the count of threads, and the first chunks take the remainder. Without it the count is that of the workers. The arguments after the worker's name reach every chunk after the chunk itself.
+
+`dispatch p -> f(args)` runs one worker on one object and gives a `Job`. `join(job)` waits for it and gives the result of the worker, and `join_all` waits for a slice of jobs. A job is joined once, and a second `join` of it is refused.
+
+Worker parameters are pointer-free, and a `str` counts as pointer-free. The table pointer and `own` fields do not count. `[]Circle` chunks like any array, `[]*Shape` is refused and points at `dispatch`. A worker cannot `delete` an object that another worker may hold. `--anti.threads` and the key `threads` of the configuration file set the pool size, see [Runtime configuration](#runtime-configuration).
 
 `sync m { }` holds a `Mutex` for its block and unlocks it on every exit. `chan T` is a bounded queue of pointer-free values, and `select` waits on more than one channel, written like `switch` over them.
 
@@ -1634,7 +1649,9 @@ select {
 delete(c);
 ```
 
-A `sync` on the mutex of an enclosing `sync` in the same function is refused. `close` stops what a channel takes, and what it holds is still received. `delete(c)` ends a channel. An arm of a `select` is a call, an assignment or a block, as an arm of a `switch` is, and may leave the binding out. A worker takes a `chan T` beside its values, and a pointer to a `Mutex`, which cannot be copied. Not built yet: the warning on a field written inside `sync` and read outside it.
+A `sync` on the mutex of an enclosing `sync` in the same function is refused. `close` stops what a channel takes, and what it holds is still received. `delete(c)` ends a channel. An arm of a `select` is a call, an assignment or a block, as an arm of a `switch` is, and may leave the binding out. A worker takes a `chan T` beside its values, and a pointer to a `Mutex`, which cannot be copied.
+
+Not built yet: the warning on a field written inside `sync` and read outside it, and the refusal of a second `join` of one job. A second `join` compiles today and reads a job that the first one freed.
 
 ## Concurrent classes
 
