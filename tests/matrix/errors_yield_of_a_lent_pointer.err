@@ -1,0 +1,1 @@
+errors_yield_of_a_lent_pointer.anti:18:9: error: `spare` is lent for the call and cannot be stored

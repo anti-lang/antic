@@ -1,0 +1,20 @@
+//! `yield` gives a value of the type its call writes, and a `str` for an `int`
+//! is refused.
+
+import anti.lang;
+
+fn value(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "refused";
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let v = value(1) catch {
+		yield "text";
+	};
+	return v;
+}

@@ -1,0 +1,1 @@
+errors_fail_of_a_pointer_that_may_be_none.anti:7:7: error: `e` may be `none`, check it or use `?*T`

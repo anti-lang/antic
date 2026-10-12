@@ -1,0 +1,14 @@
+//! `fail` takes a `*Error`, and a `?*Error` that no test has proved is refused.
+
+import anti.lang;
+
+fn run(e: ?*lang.Error) may fail
+{
+	fail e;
+}
+
+fn main() -> int
+{
+	run(lang.Error.new(1, "made")) catch { };
+	return 0;
+}

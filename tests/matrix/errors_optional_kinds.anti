@@ -1,0 +1,1282 @@
+//! A `may fail` function that gives a `?T`, for each kind of `T`. Its call
+//! fails, gives `none` or gives a value. A handler yields another value for the
+//! failure and `if let` binds what is there. `catch none` counts the failure as
+//! `none`, and `let ... else` binds the value or leaves. Each line prints both
+//! for one of the three outcomes.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+packed struct Record
+{
+	tag: u8,
+	n: int,
+}
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+union Word
+{
+	n: int,
+	f: f32,
+}
+
+enum Level
+{
+	Low,
+	High,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+synchronized class Counter
+{
+	pub n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+concurrent class Gauge
+{
+	pub atomic n: int = 0,
+}
+
+abstract class Named
+{
+	pub abstract fn id(self) -> int;
+}
+
+class Tag inherits Named
+{
+	pub n: int = 0,
+
+	pub concrete fn id(self) -> int
+	{
+		return self.n;
+	}
+}
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn thrice(n: int) -> int
+{
+	return n * 3;
+}
+
+fn failing(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "refused";
+	}
+	return n + 100;
+}
+
+fn passing(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "refused";
+	}
+	return n + 200;
+}
+
+fn result_of(f: fn(int) -> int may fail) -> int
+{
+	let got = f(0) catch {
+		yield -1;
+	};
+	return got;
+}
+
+fn mark_of(c: chan int) -> int
+{
+	let p = recv(c) else {
+		return -1;
+	};
+	let mark = *p;
+	send(c, mark);
+	return mark;
+}
+
+fn pointee(p: ?*int) -> int
+{
+	if let q = p {
+		return *q;
+	}
+	return -7;
+}
+
+fn opt_i8(k: int, v: i8) -> ?i8 may fail
+{
+	if k == 0 {
+		fail "no i8";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_i8(k: int, a: i8, b: i8)
+{
+	let o = opt_i8(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_i8(k, a) catch none;
+	let w = p else {
+		printf("i8 %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w as c_int) as int;
+	printf("i8 %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_i16(k: int, v: i16) -> ?i16 may fail
+{
+	if k == 0 {
+		fail "no i16";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_i16(k: int, a: i16, b: i16)
+{
+	let o = opt_i16(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_i16(k, a) catch none;
+	let w = p else {
+		printf("i16 %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w as c_int) as int;
+	printf("i16 %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_i32(k: int, v: i32) -> ?i32 may fail
+{
+	if k == 0 {
+		fail "no i32";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_i32(k: int, a: i32, b: i32)
+{
+	let o = opt_i32(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_i32(k, a) catch none;
+	let w = p else {
+		printf("i32 %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w as c_int) as int;
+	printf("i32 %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_i64(k: int, v: i64) -> ?i64 may fail
+{
+	if k == 0 {
+		fail "no i64";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_i64(k: int, a: i64, b: i64)
+{
+	let o = opt_i64(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = ((v / 1000000) as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_i64(k, a) catch none;
+	let w = p else {
+		printf("i64 %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = ((w / 1000000) as c_int) as int;
+	printf("i64 %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_int(k: int, v: int) -> ?int may fail
+{
+	if k == 0 {
+		fail "no int";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_int(k: int, a: int, b: int)
+{
+	let o = opt_int(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_int(k, a) catch none;
+	let w = p else {
+		printf("int %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w as c_int) as int;
+	printf("int %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_u8(k: int, v: u8) -> ?u8 may fail
+{
+	if k == 0 {
+		fail "no u8";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_u8(k: int, a: u8, b: u8)
+{
+	let o = opt_u8(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_u8(k, a) catch none;
+	let w = p else {
+		printf("u8 %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w as c_int) as int;
+	printf("u8 %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_u16(k: int, v: u16) -> ?u16 may fail
+{
+	if k == 0 {
+		fail "no u16";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_u16(k: int, a: u16, b: u16)
+{
+	let o = opt_u16(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_u16(k, a) catch none;
+	let w = p else {
+		printf("u16 %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w as c_int) as int;
+	printf("u16 %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_u32(k: int, v: u32) -> ?u32 may fail
+{
+	if k == 0 {
+		fail "no u32";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_u32(k: int, a: u32, b: u32)
+{
+	let o = opt_u32(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = ((v / 1000000) as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_u32(k, a) catch none;
+	let w = p else {
+		printf("u32 %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = ((w / 1000000) as c_int) as int;
+	printf("u32 %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_u64(k: int, v: u64) -> ?u64 may fail
+{
+	if k == 0 {
+		fail "no u64";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_u64(k: int, a: u64, b: u64)
+{
+	let o = opt_u64(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_u64(k, a) catch none;
+	let w = p else {
+		printf("u64 %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w as c_int) as int;
+	printf("u64 %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_uint(k: int, v: uint) -> ?uint may fail
+{
+	if k == 0 {
+		fail "no uint";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_uint(k: int, a: uint, b: uint)
+{
+	let o = opt_uint(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_uint(k, a) catch none;
+	let w = p else {
+		printf("uint %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w as c_int) as int;
+	printf("uint %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_byte(k: int, v: byte) -> ?byte may fail
+{
+	if k == 0 {
+		fail "no byte";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_byte(k: int, a: byte, b: byte)
+{
+	let o = opt_byte(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_byte(k, a) catch none;
+	let w = p else {
+		printf("byte %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w as c_int) as int;
+	printf("byte %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_f32(k: int, v: f32) -> ?f32 may fail
+{
+	if k == 0 {
+		fail "no f32";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_f32(k: int, a: f32, b: f32)
+{
+	let o = opt_f32(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = ((v * 2.0) as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_f32(k, a) catch none;
+	let w = p else {
+		printf("f32 %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = ((w * 2.0) as c_int) as int;
+	printf("f32 %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_f64(k: int, v: f64) -> ?f64 may fail
+{
+	if k == 0 {
+		fail "no f64";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_f64(k: int, a: f64, b: f64)
+{
+	let o = opt_f64(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = ((v * 4.0) as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_f64(k, a) catch none;
+	let w = p else {
+		printf("f64 %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = ((w * 4.0) as c_int) as int;
+	printf("f64 %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_bool(k: int, v: bool) -> ?bool may fail
+{
+	if k == 0 {
+		fail "no bool";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_bool(k: int, a: bool, b: bool)
+{
+	let o = opt_bool(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_bool(k, a) catch none;
+	let w = p else {
+		printf("bool %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w as c_int) as int;
+	printf("bool %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_char(k: int, v: char) -> ?char may fail
+{
+	if k == 0 {
+		fail "no char";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_char(k: int, a: char, b: char)
+{
+	let o = opt_char(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = ((v == 'x') as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_char(k, a) catch none;
+	let w = p else {
+		printf("char %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = ((w == 'x') as c_int) as int;
+	printf("char %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_str(k: int, v: str) -> ?str may fail
+{
+	if k == 0 {
+		fail "no str";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_str(k: int, a: str, b: str)
+{
+	let o = opt_str(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v.len as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_str(k, a) catch none;
+	let w = p else {
+		printf("str %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w.len as c_int) as int;
+	printf("str %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_slice(k: int, v: []int) -> ?[]int may fail
+{
+	if k == 0 {
+		fail "no slice";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_slice(k: int, a: []int, b: []int)
+{
+	let o = opt_slice(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v.len as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_slice(k, a) catch none;
+	let w = p else {
+		printf("slice %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w.len as c_int) as int;
+	printf("slice %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_array(k: int, v: [3]int) -> ?[3]int may fail
+{
+	if k == 0 {
+		fail "no fixed array";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_array(k: int, a: [3]int, b: [3]int)
+{
+	let o = opt_array(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v[2] as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_array(k, a) catch none;
+	let w = p else {
+		printf("fixed array %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w[2] as c_int) as int;
+	printf("fixed array %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_pointer(k: int, v: *int) -> ?*int may fail
+{
+	if k == 0 {
+		fail "no pointer";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_pointer(k: int, a: *int, b: *int)
+{
+	let o = opt_pointer(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (*v as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_pointer(k, a) catch none;
+	let w = p else {
+		printf("pointer %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (*w as c_int) as int;
+	printf("pointer %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_tuple(k: int, v: (int, int)) -> ?(int, int) may fail
+{
+	if k == 0 {
+		fail "no tuple";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_tuple(k: int, a: (int, int), b: (int, int))
+{
+	let o = opt_tuple(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v.1 as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_tuple(k, a) catch none;
+	let w = p else {
+		printf("tuple %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w.1 as c_int) as int;
+	printf("tuple %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_struct(k: int, v: Point) -> ?Point may fail
+{
+	if k == 0 {
+		fail "no struct";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_struct(k: int, a: Point, b: Point)
+{
+	let o = opt_struct(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v.y as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_struct(k, a) catch none;
+	let w = p else {
+		printf("struct %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w.y as c_int) as int;
+	printf("struct %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_packed(k: int, v: Record) -> ?Record may fail
+{
+	if k == 0 {
+		fail "no packed struct";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_packed(k: int, a: Record, b: Record)
+{
+	let o = opt_packed(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v.n as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_packed(k, a) catch none;
+	let w = p else {
+		printf("packed struct %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w.n as c_int) as int;
+	printf("packed struct %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_simd(k: int, v: Vec4) -> ?Vec4 may fail
+{
+	if k == 0 {
+		fail "no simd struct";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_simd(k: int, a: Vec4, b: Vec4)
+{
+	let o = opt_simd(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v.w as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_simd(k, a) catch none;
+	let w = p else {
+		printf("simd struct %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w.w as c_int) as int;
+	printf("simd struct %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_union(k: int, v: Word) -> ?Word may fail
+{
+	if k == 0 {
+		fail "no union";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_union(k: int, a: Word, b: Word)
+{
+	let o = opt_union(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v.n as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_union(k, a) catch none;
+	let w = p else {
+		printf("union %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w.n as c_int) as int;
+	printf("union %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_enum(k: int, v: Level) -> ?Level may fail
+{
+	if k == 0 {
+		fail "no enum";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_enum(k: int, a: Level, b: Level)
+{
+	let o = opt_enum(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_enum(k, a) catch none;
+	let w = p else {
+		printf("enum %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w as c_int) as int;
+	printf("enum %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_variant(k: int, v: Shape) -> ?Shape may fail
+{
+	if k == 0 {
+		fail "no variant";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_variant(k: int, a: Shape, b: Shape)
+{
+	let o = opt_variant(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = ((v is Shape.Circle) as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_variant(k, a) catch none;
+	let w = p else {
+		printf("variant %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = ((w is Shape.Circle) as c_int) as int;
+	printf("variant %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_function(k: int, keep v: Op) -> ?Op may fail
+{
+	if k == 0 {
+		fail "no function value";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_function(k: int, keep a: Op, keep b: Op)
+{
+	let o = opt_function(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v(5) as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_function(k, a) catch none;
+	let w = p else {
+		printf("function value %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w(5) as c_int) as int;
+	printf("function value %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_failing(k: int, keep v: Risky) -> ?Risky may fail
+{
+	if k == 0 {
+		fail "no may-fail function value";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_failing(k: int, keep a: Risky, keep b: Risky)
+{
+	let o = opt_failing(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (result_of(v) as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_failing(k, a) catch none;
+	let w = p else {
+		printf("may-fail function value %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (result_of(w) as c_int) as int;
+	printf("may-fail function value %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_channel(k: int, v: chan int) -> ?chan int may fail
+{
+	if k == 0 {
+		fail "no channel";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_channel(k: int, a: chan int, b: chan int)
+{
+	let o = opt_channel(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (mark_of(v) as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_channel(k, a) catch none;
+	let w = p else {
+		printf("channel %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (mark_of(w) as c_int) as int;
+	printf("channel %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_class(k: int, v: Plain) -> ?Plain may fail
+{
+	if k == 0 {
+		fail "no class";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_class(k: int, a: Plain, b: Plain)
+{
+	let o = opt_class(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v.n as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_class(k, a) catch none;
+	let w = p else {
+		printf("class %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w.n as c_int) as int;
+	printf("class %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_synchronized(k: int, v: *Counter) -> ?*Counter may fail
+{
+	if k == 0 {
+		fail "no synchronized class";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_synchronized(k: int, a: *Counter, b: *Counter)
+{
+	let o = opt_synchronized(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v.get() as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_synchronized(k, a) catch none;
+	let w = p else {
+		printf("synchronized class %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w.get() as c_int) as int;
+	printf("synchronized class %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_concurrent(k: int, v: *Gauge) -> ?*Gauge may fail
+{
+	if k == 0 {
+		fail "no concurrent class";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_concurrent(k: int, a: *Gauge, b: *Gauge)
+{
+	let o = opt_concurrent(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v.n.load() as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_concurrent(k, a) catch none;
+	let w = p else {
+		printf("concurrent class %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w.n.load() as c_int) as int;
+	printf("concurrent class %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn opt_interface(k: int, v: *Named) -> ?*Named may fail
+{
+	if k == 0 {
+		fail "no interface";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn seen_interface(k: int, a: *Named, b: *Named)
+{
+	let o = opt_interface(k, a) catch {
+		yield b;
+	};
+	let first = -99;
+	if let v = o {
+		first = (v.id() as c_int) as int;
+	}
+	let second = -99;
+	let p = opt_interface(k, a) catch none;
+	let w = p else {
+		printf("interface %d: %d none\n".ptr, k as c_int, first as c_int);
+		return;
+	};
+	second = (w.id() as c_int) as int;
+	printf("interface %d: %d %d\n".ptr, k as c_int, first as c_int,
+		second as c_int);
+}
+
+fn main() -> int
+{
+	let one = 1;
+	let two = 2;
+	let numbers = [1, 2, 3, 4];
+	let c1 = chan int(1);
+	let c2 = chan int(1);
+	send(c1, 31);
+	send(c2, 32);
+	let counter_a = alloc Counter { n: 3 };
+	let counter_b = alloc Counter { n: 4 };
+	let gauge_a = alloc Gauge { };
+	let gauge_b = alloc Gauge { };
+	gauge_a.n.store(5);
+	gauge_b.n.store(6);
+	let tag_a = alloc Tag { n: 7 };
+	let tag_b = alloc Tag { n: 8 };
+	seen_i8(0, -3, 5);
+	seen_i8(1, -3, 5);
+	seen_i8(2, -3, 5);
+	seen_i16(0, -300, 500);
+	seen_i16(1, -300, 500);
+	seen_i16(2, -300, 500);
+	seen_i32(0, 70000, -5);
+	seen_i32(1, 70000, -5);
+	seen_i32(2, 70000, -5);
+	seen_i64(0, 5000000000, 6);
+	seen_i64(1, 5000000000, 6);
+	seen_i64(2, 5000000000, 6);
+	seen_int(0, 6, 7);
+	seen_int(1, 6, 7);
+	seen_int(2, 6, 7);
+	seen_u8(0, 200, 5);
+	seen_u8(1, 200, 5);
+	seen_u8(2, 200, 5);
+	seen_u16(0, 60000, 5);
+	seen_u16(1, 60000, 5);
+	seen_u16(2, 60000, 5);
+	seen_u32(0, 4000000000, 5);
+	seen_u32(1, 4000000000, 5);
+	seen_u32(2, 4000000000, 5);
+	seen_u64(0, 8, 9);
+	seen_u64(1, 8, 9);
+	seen_u64(2, 8, 9);
+	seen_uint(0, 9, 10);
+	seen_uint(1, 9, 10);
+	seen_uint(2, 9, 10);
+	seen_byte(0, 10, 11);
+	seen_byte(1, 10, 11);
+	seen_byte(2, 10, 11);
+	seen_f32(0, 1.5, 2.5);
+	seen_f32(1, 1.5, 2.5);
+	seen_f32(2, 1.5, 2.5);
+	seen_f64(0, 2.25, 3.5);
+	seen_f64(1, 2.25, 3.5);
+	seen_f64(2, 2.25, 3.5);
+	seen_bool(0, true, false);
+	seen_bool(1, true, false);
+	seen_bool(2, true, false);
+	seen_char(0, 'x', 'y');
+	seen_char(1, 'x', 'y');
+	seen_char(2, 'x', 'y');
+	seen_str(0, "four", "sevens");
+	seen_str(1, "four", "sevens");
+	seen_str(2, "four", "sevens");
+	seen_slice(0, numbers[0..2], numbers[0..3]);
+	seen_slice(1, numbers[0..2], numbers[0..3]);
+	seen_slice(2, numbers[0..2], numbers[0..3]);
+	seen_array(0, [1, 2, 3], [4, 5, 6]);
+	seen_array(1, [1, 2, 3], [4, 5, 6]);
+	seen_array(2, [1, 2, 3], [4, 5, 6]);
+	seen_pointer(0, &one, &two);
+	seen_pointer(1, &one, &two);
+	seen_pointer(2, &one, &two);
+	seen_tuple(0, (1, 2), (3, 4));
+	seen_tuple(1, (1, 2), (3, 4));
+	seen_tuple(2, (1, 2), (3, 4));
+	seen_struct(0, Point { x: 1, y: 2 }, Point { x: 3, y: 4 });
+	seen_struct(1, Point { x: 1, y: 2 }, Point { x: 3, y: 4 });
+	seen_struct(2, Point { x: 1, y: 2 }, Point { x: 3, y: 4 });
+	seen_packed(0, Record { tag: 1, n: 2 }, Record { tag: 3, n: 4 });
+	seen_packed(1, Record { tag: 1, n: 2 }, Record { tag: 3, n: 4 });
+	seen_packed(2, Record { tag: 1, n: 2 }, Record { tag: 3, n: 4 });
+	seen_simd(0, Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 }, Vec4 { x: 5.0, y: 6.0, z: 7.0, w: 8.0 });
+	seen_simd(1, Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 }, Vec4 { x: 5.0, y: 6.0, z: 7.0, w: 8.0 });
+	seen_simd(2, Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 }, Vec4 { x: 5.0, y: 6.0, z: 7.0, w: 8.0 });
+	seen_union(0, Word { n: 7 }, Word { n: 8 });
+	seen_union(1, Word { n: 7 }, Word { n: 8 });
+	seen_union(2, Word { n: 7 }, Word { n: 8 });
+	seen_enum(0, Level.High, Level.Low);
+	seen_enum(1, Level.High, Level.Low);
+	seen_enum(2, Level.High, Level.Low);
+	seen_variant(0, Shape.Circle { r: 3 }, Shape.Empty);
+	seen_variant(1, Shape.Circle { r: 3 }, Shape.Empty);
+	seen_variant(2, Shape.Circle { r: 3 }, Shape.Empty);
+	seen_function(0, twice, thrice);
+	seen_function(1, twice, thrice);
+	seen_function(2, twice, thrice);
+	seen_failing(0, failing, passing);
+	seen_failing(1, failing, passing);
+	seen_failing(2, failing, passing);
+	seen_channel(0, c1, c2);
+	seen_channel(1, c1, c2);
+	seen_channel(2, c1, c2);
+	seen_class(0, Plain { n: 11 }, Plain { n: 12 });
+	seen_class(1, Plain { n: 11 }, Plain { n: 12 });
+	seen_class(2, Plain { n: 11 }, Plain { n: 12 });
+	seen_synchronized(0, counter_a, counter_b);
+	seen_synchronized(1, counter_a, counter_b);
+	seen_synchronized(2, counter_a, counter_b);
+	seen_concurrent(0, gauge_a, gauge_b);
+	seen_concurrent(1, gauge_a, gauge_b);
+	seen_concurrent(2, gauge_a, gauge_b);
+	seen_interface(0, tag_a, tag_b);
+	seen_interface(1, tag_a, tag_b);
+	seen_interface(2, tag_a, tag_b);
+	delete(tag_b);
+	delete(tag_a);
+	delete(gauge_b);
+	delete(gauge_a);
+	delete(counter_b);
+	delete(counter_a);
+	delete(c2);
+	delete(c1);
+	return 0;
+}
+
+type Op = fn(int) -> int;
+
+type Risky = fn(int) -> int may fail;

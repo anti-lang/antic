@@ -1,0 +1,17 @@
+//! A function that may fail cannot give an `f16`, which is storage only, so no
+//! handler yields one.
+
+import anti.lang;
+
+fn half(n: int) -> f16 may fail
+{
+	if n > 2 {
+		fail "refused";
+	}
+	return n as f16;
+}
+
+fn main() -> int
+{
+	return 0;
+}

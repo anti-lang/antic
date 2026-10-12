@@ -1,0 +1,100 @@
+exit 0
+i8 0: 5 none
+i8 1: -99 none
+i8 2: -3 -3
+i16 0: 500 none
+i16 1: -99 none
+i16 2: -300 -300
+i32 0: -5 none
+i32 1: -99 none
+i32 2: 70000 70000
+i64 0: 0 none
+i64 1: -99 none
+i64 2: 5000 5000
+int 0: 7 none
+int 1: -99 none
+int 2: 6 6
+u8 0: 5 none
+u8 1: -99 none
+u8 2: 200 200
+u16 0: 5 none
+u16 1: -99 none
+u16 2: 60000 60000
+u32 0: 0 none
+u32 1: -99 none
+u32 2: 4000 4000
+u64 0: 9 none
+u64 1: -99 none
+u64 2: 8 8
+uint 0: 10 none
+uint 1: -99 none
+uint 2: 9 9
+byte 0: 11 none
+byte 1: -99 none
+byte 2: 10 10
+f32 0: 5 none
+f32 1: -99 none
+f32 2: 3 3
+f64 0: 14 none
+f64 1: -99 none
+f64 2: 9 9
+bool 0: 0 none
+bool 1: -99 none
+bool 2: 1 1
+char 0: 0 none
+char 1: -99 none
+char 2: 1 1
+str 0: 6 none
+str 1: -99 none
+str 2: 4 4
+slice 0: 3 none
+slice 1: -99 none
+slice 2: 2 2
+fixed array 0: 6 none
+fixed array 1: -99 none
+fixed array 2: 3 3
+pointer 0: 2 none
+pointer 1: -99 none
+pointer 2: 1 1
+tuple 0: 4 none
+tuple 1: -99 none
+tuple 2: 2 2
+struct 0: 4 none
+struct 1: -99 none
+struct 2: 2 2
+packed struct 0: 4 none
+packed struct 1: -99 none
+packed struct 2: 2 2
+simd struct 0: 8 none
+simd struct 1: -99 none
+simd struct 2: 4 4
+union 0: 8 none
+union 1: -99 none
+union 2: 7 7
+enum 0: 0 none
+enum 1: -99 none
+enum 2: 1 1
+variant 0: 0 none
+variant 1: -99 none
+variant 2: 1 1
+function value 0: 15 none
+function value 1: -99 none
+function value 2: 10 10
+may-fail function value 0: 200 none
+may-fail function value 1: -99 none
+may-fail function value 2: 100 100
+channel 0: 32 none
+channel 1: -99 none
+channel 2: 31 31
+class 0: 12 none
+class 1: -99 none
+class 2: 11 11
+synchronized class 0: 4 none
+synchronized class 1: -99 none
+synchronized class 2: 3 3
+concurrent class 0: 6 none
+concurrent class 1: -99 none
+concurrent class 2: 5 5
+interface 0: 8 none
+interface 1: -99 none
+interface 2: 7 7

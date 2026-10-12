@@ -1,0 +1,788 @@
+//! `yield` of a value of each kind. A function per kind may fail and gives a
+//! value of the kind, and the handler of its call yields another one. Each line
+//! prints the value the call gave and the value the handler gave.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+packed struct Record
+{
+	tag: u8,
+	n: int,
+}
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+union Word
+{
+	n: int,
+	f: f32,
+}
+
+enum Level
+{
+	Low,
+	High,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+synchronized class Counter
+{
+	pub n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+concurrent class Gauge
+{
+	pub atomic n: int = 0,
+}
+
+abstract class Named
+{
+	pub abstract fn id(self) -> int;
+}
+
+class Tag inherits Named
+{
+	pub n: int = 0,
+
+	pub concrete fn id(self) -> int
+	{
+		return self.n;
+	}
+}
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn thrice(n: int) -> int
+{
+	return n * 3;
+}
+
+fn failing(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "refused";
+	}
+	return n + 100;
+}
+
+fn passing(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "refused";
+	}
+	return n + 200;
+}
+
+fn result_of(f: fn(int) -> int may fail) -> int
+{
+	let got = f(0) catch {
+		yield -1;
+	};
+	return got;
+}
+
+fn mark_of(c: chan int) -> int
+{
+	let p = recv(c) else {
+		return -1;
+	};
+	let mark = *p;
+	send(c, mark);
+	return mark;
+}
+
+fn pointee(p: ?*int) -> int
+{
+	if let q = p {
+		return *q;
+	}
+	return -7;
+}
+
+fn give_i8(ok: bool, v: i8) -> i8 may fail
+{
+	if !ok {
+		fail "no i8";
+	}
+	return v;
+}
+
+fn kind_i8(ok: bool, a: i8, b: i8) -> int
+{
+	let got = give_i8(ok, a) catch {
+		yield b;
+	};
+	return (got as c_int) as int;
+}
+
+fn give_i16(ok: bool, v: i16) -> i16 may fail
+{
+	if !ok {
+		fail "no i16";
+	}
+	return v;
+}
+
+fn kind_i16(ok: bool, a: i16, b: i16) -> int
+{
+	let got = give_i16(ok, a) catch {
+		yield b;
+	};
+	return (got as c_int) as int;
+}
+
+fn give_i32(ok: bool, v: i32) -> i32 may fail
+{
+	if !ok {
+		fail "no i32";
+	}
+	return v;
+}
+
+fn kind_i32(ok: bool, a: i32, b: i32) -> int
+{
+	let got = give_i32(ok, a) catch {
+		yield b;
+	};
+	return (got as c_int) as int;
+}
+
+fn give_i64(ok: bool, v: i64) -> i64 may fail
+{
+	if !ok {
+		fail "no i64";
+	}
+	return v;
+}
+
+fn kind_i64(ok: bool, a: i64, b: i64) -> int
+{
+	let got = give_i64(ok, a) catch {
+		yield b;
+	};
+	return ((got / 1000000) as c_int) as int;
+}
+
+fn give_int(ok: bool, v: int) -> int may fail
+{
+	if !ok {
+		fail "no int";
+	}
+	return v;
+}
+
+fn kind_int(ok: bool, a: int, b: int) -> int
+{
+	let got = give_int(ok, a) catch {
+		yield b;
+	};
+	return (got as c_int) as int;
+}
+
+fn give_u8(ok: bool, v: u8) -> u8 may fail
+{
+	if !ok {
+		fail "no u8";
+	}
+	return v;
+}
+
+fn kind_u8(ok: bool, a: u8, b: u8) -> int
+{
+	let got = give_u8(ok, a) catch {
+		yield b;
+	};
+	return (got as c_int) as int;
+}
+
+fn give_u16(ok: bool, v: u16) -> u16 may fail
+{
+	if !ok {
+		fail "no u16";
+	}
+	return v;
+}
+
+fn kind_u16(ok: bool, a: u16, b: u16) -> int
+{
+	let got = give_u16(ok, a) catch {
+		yield b;
+	};
+	return (got as c_int) as int;
+}
+
+fn give_u32(ok: bool, v: u32) -> u32 may fail
+{
+	if !ok {
+		fail "no u32";
+	}
+	return v;
+}
+
+fn kind_u32(ok: bool, a: u32, b: u32) -> int
+{
+	let got = give_u32(ok, a) catch {
+		yield b;
+	};
+	return ((got / 1000000) as c_int) as int;
+}
+
+fn give_u64(ok: bool, v: u64) -> u64 may fail
+{
+	if !ok {
+		fail "no u64";
+	}
+	return v;
+}
+
+fn kind_u64(ok: bool, a: u64, b: u64) -> int
+{
+	let got = give_u64(ok, a) catch {
+		yield b;
+	};
+	return (got as c_int) as int;
+}
+
+fn give_uint(ok: bool, v: uint) -> uint may fail
+{
+	if !ok {
+		fail "no uint";
+	}
+	return v;
+}
+
+fn kind_uint(ok: bool, a: uint, b: uint) -> int
+{
+	let got = give_uint(ok, a) catch {
+		yield b;
+	};
+	return (got as c_int) as int;
+}
+
+fn give_byte(ok: bool, v: byte) -> byte may fail
+{
+	if !ok {
+		fail "no byte";
+	}
+	return v;
+}
+
+fn kind_byte(ok: bool, a: byte, b: byte) -> int
+{
+	let got = give_byte(ok, a) catch {
+		yield b;
+	};
+	return (got as c_int) as int;
+}
+
+fn give_f32(ok: bool, v: f32) -> f32 may fail
+{
+	if !ok {
+		fail "no f32";
+	}
+	return v;
+}
+
+fn kind_f32(ok: bool, a: f32, b: f32) -> int
+{
+	let got = give_f32(ok, a) catch {
+		yield b;
+	};
+	return ((got * 2.0) as c_int) as int;
+}
+
+fn give_f64(ok: bool, v: f64) -> f64 may fail
+{
+	if !ok {
+		fail "no f64";
+	}
+	return v;
+}
+
+fn kind_f64(ok: bool, a: f64, b: f64) -> int
+{
+	let got = give_f64(ok, a) catch {
+		yield b;
+	};
+	return ((got * 4.0) as c_int) as int;
+}
+
+fn give_bool(ok: bool, v: bool) -> bool may fail
+{
+	if !ok {
+		fail "no bool";
+	}
+	return v;
+}
+
+fn kind_bool(ok: bool, a: bool, b: bool) -> int
+{
+	let got = give_bool(ok, a) catch {
+		yield b;
+	};
+	return (got as c_int) as int;
+}
+
+fn give_char(ok: bool, v: char) -> char may fail
+{
+	if !ok {
+		fail "no char";
+	}
+	return v;
+}
+
+fn kind_char(ok: bool, a: char, b: char) -> int
+{
+	let got = give_char(ok, a) catch {
+		yield b;
+	};
+	return ((got == 'x') as c_int) as int;
+}
+
+fn give_str(ok: bool, v: str) -> str may fail
+{
+	if !ok {
+		fail "no str";
+	}
+	return v;
+}
+
+fn kind_str(ok: bool, a: str, b: str) -> int
+{
+	let got = give_str(ok, a) catch {
+		yield b;
+	};
+	return (got.len as c_int) as int;
+}
+
+fn give_slice(ok: bool, v: []int) -> []int may fail
+{
+	if !ok {
+		fail "no slice";
+	}
+	return v;
+}
+
+fn kind_slice(ok: bool, a: []int, b: []int) -> int
+{
+	let got = give_slice(ok, a) catch {
+		yield b;
+	};
+	return (got.len as c_int) as int;
+}
+
+fn give_array(ok: bool, v: [3]int) -> [3]int may fail
+{
+	if !ok {
+		fail "no fixed array";
+	}
+	return v;
+}
+
+fn kind_array(ok: bool, a: [3]int, b: [3]int) -> int
+{
+	let got = give_array(ok, a) catch {
+		yield b;
+	};
+	return (got[2] as c_int) as int;
+}
+
+fn give_pointer(ok: bool, v: *int) -> *int may fail
+{
+	if !ok {
+		fail "no pointer";
+	}
+	return v;
+}
+
+fn kind_pointer(ok: bool, a: *int, b: *int) -> int
+{
+	let got = give_pointer(ok, a) catch {
+		yield b;
+	};
+	return (*got as c_int) as int;
+}
+
+fn give_tuple(ok: bool, v: (int, int)) -> (int, int) may fail
+{
+	if !ok {
+		fail "no tuple";
+	}
+	return v;
+}
+
+fn kind_tuple(ok: bool, a: (int, int), b: (int, int)) -> int
+{
+	let got = give_tuple(ok, a) catch {
+		yield b;
+	};
+	return (got.1 as c_int) as int;
+}
+
+fn give_struct(ok: bool, v: Point) -> Point may fail
+{
+	if !ok {
+		fail "no struct";
+	}
+	return v;
+}
+
+fn kind_struct(ok: bool, a: Point, b: Point) -> int
+{
+	let got = give_struct(ok, a) catch {
+		yield b;
+	};
+	return (got.y as c_int) as int;
+}
+
+fn give_packed(ok: bool, v: Record) -> Record may fail
+{
+	if !ok {
+		fail "no packed struct";
+	}
+	return v;
+}
+
+fn kind_packed(ok: bool, a: Record, b: Record) -> int
+{
+	let got = give_packed(ok, a) catch {
+		yield b;
+	};
+	return (got.n as c_int) as int;
+}
+
+fn give_simd(ok: bool, v: Vec4) -> Vec4 may fail
+{
+	if !ok {
+		fail "no simd struct";
+	}
+	return v;
+}
+
+fn kind_simd(ok: bool, a: Vec4, b: Vec4) -> int
+{
+	let got = give_simd(ok, a) catch {
+		yield b;
+	};
+	return (got.w as c_int) as int;
+}
+
+fn give_union(ok: bool, v: Word) -> Word may fail
+{
+	if !ok {
+		fail "no union";
+	}
+	return v;
+}
+
+fn kind_union(ok: bool, a: Word, b: Word) -> int
+{
+	let got = give_union(ok, a) catch {
+		yield b;
+	};
+	return (got.n as c_int) as int;
+}
+
+fn give_enum(ok: bool, v: Level) -> Level may fail
+{
+	if !ok {
+		fail "no enum";
+	}
+	return v;
+}
+
+fn kind_enum(ok: bool, a: Level, b: Level) -> int
+{
+	let got = give_enum(ok, a) catch {
+		yield b;
+	};
+	return (got as c_int) as int;
+}
+
+fn give_variant(ok: bool, v: Shape) -> Shape may fail
+{
+	if !ok {
+		fail "no variant";
+	}
+	return v;
+}
+
+fn kind_variant(ok: bool, a: Shape, b: Shape) -> int
+{
+	let got = give_variant(ok, a) catch {
+		yield b;
+	};
+	return ((got is Shape.Circle) as c_int) as int;
+}
+
+fn give_function(ok: bool, keep v: Op) -> Op may fail
+{
+	if !ok {
+		fail "no function value";
+	}
+	return v;
+}
+
+fn kind_function(ok: bool, keep a: Op, keep b: Op) -> int
+{
+	let got = give_function(ok, a) catch {
+		yield b;
+	};
+	return (got(5) as c_int) as int;
+}
+
+fn give_failing(ok: bool, keep v: Risky) -> Risky may fail
+{
+	if !ok {
+		fail "no may-fail function value";
+	}
+	return v;
+}
+
+fn kind_failing(ok: bool, keep a: Risky, keep b: Risky) -> int
+{
+	let got = give_failing(ok, a) catch {
+		yield b;
+	};
+	return (result_of(got) as c_int) as int;
+}
+
+fn give_channel(ok: bool, v: chan int) -> chan int may fail
+{
+	if !ok {
+		fail "no channel";
+	}
+	return v;
+}
+
+fn kind_channel(ok: bool, a: chan int, b: chan int) -> int
+{
+	let got = give_channel(ok, a) catch {
+		yield b;
+	};
+	return (mark_of(got) as c_int) as int;
+}
+
+fn give_class(ok: bool, v: Plain) -> Plain may fail
+{
+	if !ok {
+		fail "no class";
+	}
+	return v;
+}
+
+fn kind_class(ok: bool, a: Plain, b: Plain) -> int
+{
+	let got = give_class(ok, a) catch {
+		yield b;
+	};
+	return (got.n as c_int) as int;
+}
+
+fn give_synchronized(ok: bool, v: *Counter) -> *Counter may fail
+{
+	if !ok {
+		fail "no synchronized class";
+	}
+	return v;
+}
+
+fn kind_synchronized(ok: bool, a: *Counter, b: *Counter) -> int
+{
+	let got = give_synchronized(ok, a) catch {
+		yield b;
+	};
+	return (got.get() as c_int) as int;
+}
+
+fn give_concurrent(ok: bool, v: *Gauge) -> *Gauge may fail
+{
+	if !ok {
+		fail "no concurrent class";
+	}
+	return v;
+}
+
+fn kind_concurrent(ok: bool, a: *Gauge, b: *Gauge) -> int
+{
+	let got = give_concurrent(ok, a) catch {
+		yield b;
+	};
+	return (got.n.load() as c_int) as int;
+}
+
+fn give_interface(ok: bool, v: *Named) -> *Named may fail
+{
+	if !ok {
+		fail "no interface";
+	}
+	return v;
+}
+
+fn kind_interface(ok: bool, a: *Named, b: *Named) -> int
+{
+	let got = give_interface(ok, a) catch {
+		yield b;
+	};
+	return (got.id() as c_int) as int;
+}
+
+fn give_nullable(ok: bool, v: ?*int) -> ?*int may fail
+{
+	if !ok {
+		fail "no nullable pointer";
+	}
+	return v;
+}
+
+fn kind_nullable(ok: bool, a: ?*int, b: ?*int) -> int
+{
+	let got = give_nullable(ok, a) catch {
+		yield b;
+	};
+	return (pointee(got) as c_int) as int;
+}
+
+fn give_optional(ok: bool, v: ?int) -> ?int may fail
+{
+	if !ok {
+		fail "no optional value";
+	}
+	return v;
+}
+
+fn kind_optional(ok: bool, a: ?int, b: ?int) -> int
+{
+	let got = give_optional(ok, a) catch {
+		yield b;
+	};
+	return ((got ?? -7) as c_int) as int;
+}
+
+fn main() -> int
+{
+	let one = 1;
+	let two = 2;
+	let numbers = [1, 2, 3, 4];
+	let c1 = chan int(1);
+	let c2 = chan int(1);
+	send(c1, 31);
+	send(c2, 32);
+	let counter_a = alloc Counter { n: 3 };
+	let counter_b = alloc Counter { n: 4 };
+	let gauge_a = alloc Gauge { };
+	let gauge_b = alloc Gauge { };
+	gauge_a.n.store(5);
+	gauge_b.n.store(6);
+	let tag_a = alloc Tag { n: 7 };
+	let tag_b = alloc Tag { n: 8 };
+	printf("i8: %d %d\n".ptr, kind_i8(true, -3, 5) as c_int,
+		kind_i8(false, -3, 5) as c_int);
+	printf("i16: %d %d\n".ptr, kind_i16(true, -300, 500) as c_int,
+		kind_i16(false, -300, 500) as c_int);
+	printf("i32: %d %d\n".ptr, kind_i32(true, 70000, -5) as c_int,
+		kind_i32(false, 70000, -5) as c_int);
+	printf("i64: %d %d\n".ptr, kind_i64(true, 5000000000, 6) as c_int,
+		kind_i64(false, 5000000000, 6) as c_int);
+	printf("int: %d %d\n".ptr, kind_int(true, 6, 7) as c_int,
+		kind_int(false, 6, 7) as c_int);
+	printf("u8: %d %d\n".ptr, kind_u8(true, 200, 5) as c_int,
+		kind_u8(false, 200, 5) as c_int);
+	printf("u16: %d %d\n".ptr, kind_u16(true, 60000, 5) as c_int,
+		kind_u16(false, 60000, 5) as c_int);
+	printf("u32: %d %d\n".ptr, kind_u32(true, 4000000000, 5) as c_int,
+		kind_u32(false, 4000000000, 5) as c_int);
+	printf("u64: %d %d\n".ptr, kind_u64(true, 8, 9) as c_int,
+		kind_u64(false, 8, 9) as c_int);
+	printf("uint: %d %d\n".ptr, kind_uint(true, 9, 10) as c_int,
+		kind_uint(false, 9, 10) as c_int);
+	printf("byte: %d %d\n".ptr, kind_byte(true, 10, 11) as c_int,
+		kind_byte(false, 10, 11) as c_int);
+	printf("f32: %d %d\n".ptr, kind_f32(true, 1.5, 2.5) as c_int,
+		kind_f32(false, 1.5, 2.5) as c_int);
+	printf("f64: %d %d\n".ptr, kind_f64(true, 2.25, 3.5) as c_int,
+		kind_f64(false, 2.25, 3.5) as c_int);
+	printf("bool: %d %d\n".ptr, kind_bool(true, true, false) as c_int,
+		kind_bool(false, true, false) as c_int);
+	printf("char: %d %d\n".ptr, kind_char(true, 'x', 'y') as c_int,
+		kind_char(false, 'x', 'y') as c_int);
+	printf("str: %d %d\n".ptr, kind_str(true, "four", "sevens") as c_int,
+		kind_str(false, "four", "sevens") as c_int);
+	printf("slice: %d %d\n".ptr, kind_slice(true, numbers[0..2], numbers[0..3]) as c_int,
+		kind_slice(false, numbers[0..2], numbers[0..3]) as c_int);
+	printf("fixed array: %d %d\n".ptr, kind_array(true, [1, 2, 3], [4, 5, 6]) as c_int,
+		kind_array(false, [1, 2, 3], [4, 5, 6]) as c_int);
+	printf("pointer: %d %d\n".ptr, kind_pointer(true, &one, &two) as c_int,
+		kind_pointer(false, &one, &two) as c_int);
+	printf("tuple: %d %d\n".ptr, kind_tuple(true, (1, 2), (3, 4)) as c_int,
+		kind_tuple(false, (1, 2), (3, 4)) as c_int);
+	printf("struct: %d %d\n".ptr, kind_struct(true, Point { x: 1, y: 2 }, Point { x: 3, y: 4 }) as c_int,
+		kind_struct(false, Point { x: 1, y: 2 }, Point { x: 3, y: 4 }) as c_int);
+	printf("packed struct: %d %d\n".ptr, kind_packed(true, Record { tag: 1, n: 2 }, Record { tag: 3, n: 4 }) as c_int,
+		kind_packed(false, Record { tag: 1, n: 2 }, Record { tag: 3, n: 4 }) as c_int);
+	printf("simd struct: %d %d\n".ptr, kind_simd(true, Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 }, Vec4 { x: 5.0, y: 6.0, z: 7.0, w: 8.0 }) as c_int,
+		kind_simd(false, Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 }, Vec4 { x: 5.0, y: 6.0, z: 7.0, w: 8.0 }) as c_int);
+	printf("union: %d %d\n".ptr, kind_union(true, Word { n: 7 }, Word { n: 8 }) as c_int,
+		kind_union(false, Word { n: 7 }, Word { n: 8 }) as c_int);
+	printf("enum: %d %d\n".ptr, kind_enum(true, Level.High, Level.Low) as c_int,
+		kind_enum(false, Level.High, Level.Low) as c_int);
+	printf("variant: %d %d\n".ptr, kind_variant(true, Shape.Circle { r: 3 }, Shape.Empty) as c_int,
+		kind_variant(false, Shape.Circle { r: 3 }, Shape.Empty) as c_int);
+	printf("function value: %d %d\n".ptr, kind_function(true, twice, thrice) as c_int,
+		kind_function(false, twice, thrice) as c_int);
+	printf("may-fail function value: %d %d\n".ptr, kind_failing(true, failing, passing) as c_int,
+		kind_failing(false, failing, passing) as c_int);
+	printf("channel: %d %d\n".ptr, kind_channel(true, c1, c2) as c_int,
+		kind_channel(false, c1, c2) as c_int);
+	printf("class: %d %d\n".ptr, kind_class(true, Plain { n: 11 }, Plain { n: 12 }) as c_int,
+		kind_class(false, Plain { n: 11 }, Plain { n: 12 }) as c_int);
+	printf("synchronized class: %d %d\n".ptr, kind_synchronized(true, counter_a, counter_b) as c_int,
+		kind_synchronized(false, counter_a, counter_b) as c_int);
+	printf("concurrent class: %d %d\n".ptr, kind_concurrent(true, gauge_a, gauge_b) as c_int,
+		kind_concurrent(false, gauge_a, gauge_b) as c_int);
+	printf("interface: %d %d\n".ptr, kind_interface(true, tag_a, tag_b) as c_int,
+		kind_interface(false, tag_a, tag_b) as c_int);
+	printf("nullable pointer: %d %d\n".ptr, kind_nullable(true, &one, none) as c_int,
+		kind_nullable(false, &one, none) as c_int);
+	printf("optional value: %d %d\n".ptr, kind_optional(true, 5, none) as c_int,
+		kind_optional(false, 5, none) as c_int);
+	delete(tag_b);
+	delete(tag_a);
+	delete(gauge_b);
+	delete(gauge_a);
+	delete(counter_b);
+	delete(counter_a);
+	delete(c2);
+	delete(c1);
+	return 0;
+}
+
+type Op = fn(int) -> int;
+
+type Risky = fn(int) -> int may fail;

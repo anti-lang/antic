@@ -1,0 +1,16 @@
+//! `fail "text"` takes a literal. An `f"..."` is memory of its own that no
+//! error owns, and is refused.
+
+import anti.lang;
+import anti.text;
+
+fn run(n: int) may fail
+{
+	fail f"n is {n}";
+}
+
+fn main() -> int
+{
+	run(3) catch { };
+	return 0;
+}

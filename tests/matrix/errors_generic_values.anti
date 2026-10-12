@@ -1,0 +1,303 @@
+//! A generic function that may fail, with each kind of aggregate, pointer and
+//! function as its type argument. `settle` yields its second value where `give`
+//! fails. `chosen` counts the failure of `maybe` as `none` and takes its second
+//! value with `??` where there is none. Each line prints both outcomes of
+//! `settle` and the three of `chosen`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+packed struct Record
+{
+	tag: u8,
+	n: int,
+}
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+union Word
+{
+	n: int,
+	f: f32,
+}
+
+enum Level
+{
+	Low,
+	High,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+synchronized class Counter
+{
+	pub n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+concurrent class Gauge
+{
+	pub atomic n: int = 0,
+}
+
+abstract class Named
+{
+	pub abstract fn id(self) -> int;
+}
+
+class Tag inherits Named
+{
+	pub n: int = 0,
+
+	pub concrete fn id(self) -> int
+	{
+		return self.n;
+	}
+}
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn thrice(n: int) -> int
+{
+	return n * 3;
+}
+
+fn failing(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "refused";
+	}
+	return n + 100;
+}
+
+fn passing(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "refused";
+	}
+	return n + 200;
+}
+
+fn result_of(f: fn(int) -> int may fail) -> int
+{
+	let got = f(0) catch {
+		yield -1;
+	};
+	return got;
+}
+
+fn mark_of(c: chan int) -> int
+{
+	let p = recv(c) else {
+		return -1;
+	};
+	let mark = *p;
+	send(c, mark);
+	return mark;
+}
+
+fn pointee(p: ?*int) -> int
+{
+	if let q = p {
+		return *q;
+	}
+	return -7;
+}
+
+fn give<T>(ok: bool, own v: T) -> T may fail
+{
+	if !ok {
+		fail "nothing given";
+	}
+	return v;
+}
+
+fn settle<T>(ok: bool, own a: T, own b: T) -> T
+{
+	let got = give<T>(ok, a) catch {
+		yield b;
+	};
+	return got;
+}
+
+fn maybe<T>(k: int, own v: T) -> ?T may fail
+{
+	if k == 0 {
+		fail "nothing";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn chosen<T>(k: int, own a: T, own b: T) -> T
+{
+	let o = maybe<T>(k, a) catch none;
+	return o ?? b;
+}
+
+fn main() -> int
+{
+	let one = 1;
+	let two = 2;
+	let numbers = [1, 2, 3, 4];
+	let r1 = settle<[]int>(true, numbers[0..2], numbers[0..3]);
+	let r2 = settle<[]int>(false, numbers[0..2], numbers[0..3]);
+	let r3 = chosen<[]int>(0, numbers[0..2], numbers[0..3]);
+	let r4 = chosen<[]int>(1, numbers[0..2], numbers[0..3]);
+	let r5 = chosen<[]int>(2, numbers[0..2], numbers[0..3]);
+	printf("slice: %d %d, %d %d %d\n".ptr, r1.len as c_int,
+		r2.len as c_int,
+		r3.len as c_int,
+		r4.len as c_int,
+		r5.len as c_int);
+	let r6 = settle<[3]int>(true, [1, 2, 3], [4, 5, 6]);
+	let r7 = settle<[3]int>(false, [1, 2, 3], [4, 5, 6]);
+	let r8 = chosen<[3]int>(0, [1, 2, 3], [4, 5, 6]);
+	let r9 = chosen<[3]int>(1, [1, 2, 3], [4, 5, 6]);
+	let r10 = chosen<[3]int>(2, [1, 2, 3], [4, 5, 6]);
+	printf("fixed array: %d %d, %d %d %d\n".ptr, r6[2] as c_int,
+		r7[2] as c_int,
+		r8[2] as c_int,
+		r9[2] as c_int,
+		r10[2] as c_int);
+	let r11 = settle<*int>(true, &one, &two);
+	let r12 = settle<*int>(false, &one, &two);
+	let r13 = chosen<*int>(0, &one, &two);
+	let r14 = chosen<*int>(1, &one, &two);
+	let r15 = chosen<*int>(2, &one, &two);
+	printf("pointer: %d %d, %d %d %d\n".ptr, *r11 as c_int,
+		*r12 as c_int,
+		*r13 as c_int,
+		*r14 as c_int,
+		*r15 as c_int);
+	let r16 = settle<(int, int)>(true, (1, 2), (3, 4));
+	let r17 = settle<(int, int)>(false, (1, 2), (3, 4));
+	let r18 = chosen<(int, int)>(0, (1, 2), (3, 4));
+	let r19 = chosen<(int, int)>(1, (1, 2), (3, 4));
+	let r20 = chosen<(int, int)>(2, (1, 2), (3, 4));
+	printf("tuple: %d %d, %d %d %d\n".ptr, r16.1 as c_int,
+		r17.1 as c_int,
+		r18.1 as c_int,
+		r19.1 as c_int,
+		r20.1 as c_int);
+	let r21 = settle<Point>(true, Point { x: 1, y: 2 }, Point { x: 3, y: 4 });
+	let r22 = settle<Point>(false, Point { x: 1, y: 2 }, Point { x: 3, y: 4 });
+	let r23 = chosen<Point>(0, Point { x: 1, y: 2 }, Point { x: 3, y: 4 });
+	let r24 = chosen<Point>(1, Point { x: 1, y: 2 }, Point { x: 3, y: 4 });
+	let r25 = chosen<Point>(2, Point { x: 1, y: 2 }, Point { x: 3, y: 4 });
+	printf("struct: %d %d, %d %d %d\n".ptr, r21.y as c_int,
+		r22.y as c_int,
+		r23.y as c_int,
+		r24.y as c_int,
+		r25.y as c_int);
+	let r26 = settle<Record>(true, Record { tag: 1, n: 2 }, Record { tag: 3, n: 4 });
+	let r27 = settle<Record>(false, Record { tag: 1, n: 2 }, Record { tag: 3, n: 4 });
+	let r28 = chosen<Record>(0, Record { tag: 1, n: 2 }, Record { tag: 3, n: 4 });
+	let r29 = chosen<Record>(1, Record { tag: 1, n: 2 }, Record { tag: 3, n: 4 });
+	let r30 = chosen<Record>(2, Record { tag: 1, n: 2 }, Record { tag: 3, n: 4 });
+	printf("packed struct: %d %d, %d %d %d\n".ptr, r26.n as c_int,
+		r27.n as c_int,
+		r28.n as c_int,
+		r29.n as c_int,
+		r30.n as c_int);
+	let r31 = settle<Vec4>(true, Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 }, Vec4 { x: 5.0, y: 6.0, z: 7.0, w: 8.0 });
+	let r32 = settle<Vec4>(false, Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 }, Vec4 { x: 5.0, y: 6.0, z: 7.0, w: 8.0 });
+	let r33 = chosen<Vec4>(0, Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 }, Vec4 { x: 5.0, y: 6.0, z: 7.0, w: 8.0 });
+	let r34 = chosen<Vec4>(1, Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 }, Vec4 { x: 5.0, y: 6.0, z: 7.0, w: 8.0 });
+	let r35 = chosen<Vec4>(2, Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 }, Vec4 { x: 5.0, y: 6.0, z: 7.0, w: 8.0 });
+	printf("simd struct: %d %d, %d %d %d\n".ptr, r31.w as c_int,
+		r32.w as c_int,
+		r33.w as c_int,
+		r34.w as c_int,
+		r35.w as c_int);
+	let r36 = settle<Word>(true, Word { n: 7 }, Word { n: 8 });
+	let r37 = settle<Word>(false, Word { n: 7 }, Word { n: 8 });
+	let r38 = chosen<Word>(0, Word { n: 7 }, Word { n: 8 });
+	let r39 = chosen<Word>(1, Word { n: 7 }, Word { n: 8 });
+	let r40 = chosen<Word>(2, Word { n: 7 }, Word { n: 8 });
+	printf("union: %d %d, %d %d %d\n".ptr, r36.n as c_int,
+		r37.n as c_int,
+		r38.n as c_int,
+		r39.n as c_int,
+		r40.n as c_int);
+	let r41 = settle<Level>(true, Level.High, Level.Low);
+	let r42 = settle<Level>(false, Level.High, Level.Low);
+	let r43 = chosen<Level>(0, Level.High, Level.Low);
+	let r44 = chosen<Level>(1, Level.High, Level.Low);
+	let r45 = chosen<Level>(2, Level.High, Level.Low);
+	printf("enum: %d %d, %d %d %d\n".ptr, r41 as c_int,
+		r42 as c_int,
+		r43 as c_int,
+		r44 as c_int,
+		r45 as c_int);
+	let r46 = settle<Shape>(true, Shape.Circle { r: 3 }, Shape.Empty);
+	let r47 = settle<Shape>(false, Shape.Circle { r: 3 }, Shape.Empty);
+	let r48 = chosen<Shape>(0, Shape.Circle { r: 3 }, Shape.Empty);
+	let r49 = chosen<Shape>(1, Shape.Circle { r: 3 }, Shape.Empty);
+	let r50 = chosen<Shape>(2, Shape.Circle { r: 3 }, Shape.Empty);
+	printf("variant: %d %d, %d %d %d\n".ptr, (r46 is Shape.Circle) as c_int,
+		(r47 is Shape.Circle) as c_int,
+		(r48 is Shape.Circle) as c_int,
+		(r49 is Shape.Circle) as c_int,
+		(r50 is Shape.Circle) as c_int);
+	let r51 = settle<Op>(true, twice, thrice);
+	let r52 = settle<Op>(false, twice, thrice);
+	let r53 = chosen<Op>(0, twice, thrice);
+	let r54 = chosen<Op>(1, twice, thrice);
+	let r55 = chosen<Op>(2, twice, thrice);
+	printf("function value: %d %d, %d %d %d\n".ptr, r51(5) as c_int,
+		r52(5) as c_int,
+		r53(5) as c_int,
+		r54(5) as c_int,
+		r55(5) as c_int);
+	let r56 = settle<Risky>(true, failing, passing);
+	let r57 = settle<Risky>(false, failing, passing);
+	let r58 = chosen<Risky>(0, failing, passing);
+	let r59 = chosen<Risky>(1, failing, passing);
+	let r60 = chosen<Risky>(2, failing, passing);
+	printf("may-fail function value: %d %d, %d %d %d\n".ptr, result_of(r56) as c_int,
+		result_of(r57) as c_int,
+		result_of(r58) as c_int,
+		result_of(r59) as c_int,
+		result_of(r60) as c_int);
+	let r61 = settle<Plain>(true, Plain { n: 11 }, Plain { n: 12 });
+	let r62 = settle<Plain>(false, Plain { n: 11 }, Plain { n: 12 });
+	let r63 = chosen<Plain>(0, Plain { n: 11 }, Plain { n: 12 });
+	let r64 = chosen<Plain>(1, Plain { n: 11 }, Plain { n: 12 });
+	let r65 = chosen<Plain>(2, Plain { n: 11 }, Plain { n: 12 });
+	printf("class: %d %d, %d %d %d\n".ptr, r61.n as c_int,
+		r62.n as c_int,
+		r63.n as c_int,
+		r64.n as c_int,
+		r65.n as c_int);
+	return 0;
+}
+
+type Op = fn(int) -> int;
+
+type Risky = fn(int) -> int may fail;

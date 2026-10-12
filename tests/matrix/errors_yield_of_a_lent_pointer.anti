@@ -1,0 +1,27 @@
+//! A handler that yields a lent pointer stores it in the binding of its `let`,
+//! which is refused.
+
+import anti.lang;
+
+fn pick(n: int, at: *int) -> *int may fail
+{
+	if n > 2 {
+		fail "no such cell";
+	}
+	return at;
+}
+
+fn read(lent spare: *int, n: int) -> int
+{
+	let seven = 7;
+	let p = pick(n, &seven) catch {
+		yield spare;
+	};
+	return *p;
+}
+
+fn main() -> int
+{
+	let minus = -1;
+	return read(&minus, 5) + 1;
+}

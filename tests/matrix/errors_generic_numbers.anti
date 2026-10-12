@@ -1,0 +1,327 @@
+//! A generic function that may fail, with each kind of number and of text as
+//! its type argument. `settle` yields its second value where `give` fails.
+//! `chosen` counts the failure of `maybe` as `none` and takes its second value
+//! with `??` where there is none. Each line prints both outcomes of `settle`
+//! and the three of `chosen`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+packed struct Record
+{
+	tag: u8,
+	n: int,
+}
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+union Word
+{
+	n: int,
+	f: f32,
+}
+
+enum Level
+{
+	Low,
+	High,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+synchronized class Counter
+{
+	pub n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+concurrent class Gauge
+{
+	pub atomic n: int = 0,
+}
+
+abstract class Named
+{
+	pub abstract fn id(self) -> int;
+}
+
+class Tag inherits Named
+{
+	pub n: int = 0,
+
+	pub concrete fn id(self) -> int
+	{
+		return self.n;
+	}
+}
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn thrice(n: int) -> int
+{
+	return n * 3;
+}
+
+fn failing(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "refused";
+	}
+	return n + 100;
+}
+
+fn passing(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "refused";
+	}
+	return n + 200;
+}
+
+fn result_of(f: fn(int) -> int may fail) -> int
+{
+	let got = f(0) catch {
+		yield -1;
+	};
+	return got;
+}
+
+fn mark_of(c: chan int) -> int
+{
+	let p = recv(c) else {
+		return -1;
+	};
+	let mark = *p;
+	send(c, mark);
+	return mark;
+}
+
+fn pointee(p: ?*int) -> int
+{
+	if let q = p {
+		return *q;
+	}
+	return -7;
+}
+
+fn give<T>(ok: bool, own v: T) -> T may fail
+{
+	if !ok {
+		fail "nothing given";
+	}
+	return v;
+}
+
+fn settle<T>(ok: bool, own a: T, own b: T) -> T
+{
+	let got = give<T>(ok, a) catch {
+		yield b;
+	};
+	return got;
+}
+
+fn maybe<T>(k: int, own v: T) -> ?T may fail
+{
+	if k == 0 {
+		fail "nothing";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn chosen<T>(k: int, own a: T, own b: T) -> T
+{
+	let o = maybe<T>(k, a) catch none;
+	return o ?? b;
+}
+
+fn main() -> int
+{
+
+	let r1 = settle<i8>(true, -3, 5);
+	let r2 = settle<i8>(false, -3, 5);
+	let r3 = chosen<i8>(0, -3, 5);
+	let r4 = chosen<i8>(1, -3, 5);
+	let r5 = chosen<i8>(2, -3, 5);
+	printf("i8: %d %d, %d %d %d\n".ptr, r1 as c_int,
+		r2 as c_int,
+		r3 as c_int,
+		r4 as c_int,
+		r5 as c_int);
+	let r6 = settle<i16>(true, -300, 500);
+	let r7 = settle<i16>(false, -300, 500);
+	let r8 = chosen<i16>(0, -300, 500);
+	let r9 = chosen<i16>(1, -300, 500);
+	let r10 = chosen<i16>(2, -300, 500);
+	printf("i16: %d %d, %d %d %d\n".ptr, r6 as c_int,
+		r7 as c_int,
+		r8 as c_int,
+		r9 as c_int,
+		r10 as c_int);
+	let r11 = settle<i32>(true, 70000, -5);
+	let r12 = settle<i32>(false, 70000, -5);
+	let r13 = chosen<i32>(0, 70000, -5);
+	let r14 = chosen<i32>(1, 70000, -5);
+	let r15 = chosen<i32>(2, 70000, -5);
+	printf("i32: %d %d, %d %d %d\n".ptr, r11 as c_int,
+		r12 as c_int,
+		r13 as c_int,
+		r14 as c_int,
+		r15 as c_int);
+	let r16 = settle<i64>(true, 5000000000, 6);
+	let r17 = settle<i64>(false, 5000000000, 6);
+	let r18 = chosen<i64>(0, 5000000000, 6);
+	let r19 = chosen<i64>(1, 5000000000, 6);
+	let r20 = chosen<i64>(2, 5000000000, 6);
+	printf("i64: %d %d, %d %d %d\n".ptr, (r16 / 1000000) as c_int,
+		(r17 / 1000000) as c_int,
+		(r18 / 1000000) as c_int,
+		(r19 / 1000000) as c_int,
+		(r20 / 1000000) as c_int);
+	let r21 = settle<int>(true, 6, 7);
+	let r22 = settle<int>(false, 6, 7);
+	let r23 = chosen<int>(0, 6, 7);
+	let r24 = chosen<int>(1, 6, 7);
+	let r25 = chosen<int>(2, 6, 7);
+	printf("int: %d %d, %d %d %d\n".ptr, r21 as c_int,
+		r22 as c_int,
+		r23 as c_int,
+		r24 as c_int,
+		r25 as c_int);
+	let r26 = settle<u8>(true, 200, 5);
+	let r27 = settle<u8>(false, 200, 5);
+	let r28 = chosen<u8>(0, 200, 5);
+	let r29 = chosen<u8>(1, 200, 5);
+	let r30 = chosen<u8>(2, 200, 5);
+	printf("u8: %d %d, %d %d %d\n".ptr, r26 as c_int,
+		r27 as c_int,
+		r28 as c_int,
+		r29 as c_int,
+		r30 as c_int);
+	let r31 = settle<u16>(true, 60000, 5);
+	let r32 = settle<u16>(false, 60000, 5);
+	let r33 = chosen<u16>(0, 60000, 5);
+	let r34 = chosen<u16>(1, 60000, 5);
+	let r35 = chosen<u16>(2, 60000, 5);
+	printf("u16: %d %d, %d %d %d\n".ptr, r31 as c_int,
+		r32 as c_int,
+		r33 as c_int,
+		r34 as c_int,
+		r35 as c_int);
+	let r36 = settle<u32>(true, 4000000000, 5);
+	let r37 = settle<u32>(false, 4000000000, 5);
+	let r38 = chosen<u32>(0, 4000000000, 5);
+	let r39 = chosen<u32>(1, 4000000000, 5);
+	let r40 = chosen<u32>(2, 4000000000, 5);
+	printf("u32: %d %d, %d %d %d\n".ptr, (r36 / 1000000) as c_int,
+		(r37 / 1000000) as c_int,
+		(r38 / 1000000) as c_int,
+		(r39 / 1000000) as c_int,
+		(r40 / 1000000) as c_int);
+	let r41 = settle<u64>(true, 8, 9);
+	let r42 = settle<u64>(false, 8, 9);
+	let r43 = chosen<u64>(0, 8, 9);
+	let r44 = chosen<u64>(1, 8, 9);
+	let r45 = chosen<u64>(2, 8, 9);
+	printf("u64: %d %d, %d %d %d\n".ptr, r41 as c_int,
+		r42 as c_int,
+		r43 as c_int,
+		r44 as c_int,
+		r45 as c_int);
+	let r46 = settle<uint>(true, 9, 10);
+	let r47 = settle<uint>(false, 9, 10);
+	let r48 = chosen<uint>(0, 9, 10);
+	let r49 = chosen<uint>(1, 9, 10);
+	let r50 = chosen<uint>(2, 9, 10);
+	printf("uint: %d %d, %d %d %d\n".ptr, r46 as c_int,
+		r47 as c_int,
+		r48 as c_int,
+		r49 as c_int,
+		r50 as c_int);
+	let r51 = settle<byte>(true, 10, 11);
+	let r52 = settle<byte>(false, 10, 11);
+	let r53 = chosen<byte>(0, 10, 11);
+	let r54 = chosen<byte>(1, 10, 11);
+	let r55 = chosen<byte>(2, 10, 11);
+	printf("byte: %d %d, %d %d %d\n".ptr, r51 as c_int,
+		r52 as c_int,
+		r53 as c_int,
+		r54 as c_int,
+		r55 as c_int);
+	let r56 = settle<f32>(true, 1.5, 2.5);
+	let r57 = settle<f32>(false, 1.5, 2.5);
+	let r58 = chosen<f32>(0, 1.5, 2.5);
+	let r59 = chosen<f32>(1, 1.5, 2.5);
+	let r60 = chosen<f32>(2, 1.5, 2.5);
+	printf("f32: %d %d, %d %d %d\n".ptr, (r56 * 2.0) as c_int,
+		(r57 * 2.0) as c_int,
+		(r58 * 2.0) as c_int,
+		(r59 * 2.0) as c_int,
+		(r60 * 2.0) as c_int);
+	let r61 = settle<f64>(true, 2.25, 3.5);
+	let r62 = settle<f64>(false, 2.25, 3.5);
+	let r63 = chosen<f64>(0, 2.25, 3.5);
+	let r64 = chosen<f64>(1, 2.25, 3.5);
+	let r65 = chosen<f64>(2, 2.25, 3.5);
+	printf("f64: %d %d, %d %d %d\n".ptr, (r61 * 4.0) as c_int,
+		(r62 * 4.0) as c_int,
+		(r63 * 4.0) as c_int,
+		(r64 * 4.0) as c_int,
+		(r65 * 4.0) as c_int);
+	let r66 = settle<bool>(true, true, false);
+	let r67 = settle<bool>(false, true, false);
+	let r68 = chosen<bool>(0, true, false);
+	let r69 = chosen<bool>(1, true, false);
+	let r70 = chosen<bool>(2, true, false);
+	printf("bool: %d %d, %d %d %d\n".ptr, r66 as c_int,
+		r67 as c_int,
+		r68 as c_int,
+		r69 as c_int,
+		r70 as c_int);
+	let r71 = settle<char>(true, 'x', 'y');
+	let r72 = settle<char>(false, 'x', 'y');
+	let r73 = chosen<char>(0, 'x', 'y');
+	let r74 = chosen<char>(1, 'x', 'y');
+	let r75 = chosen<char>(2, 'x', 'y');
+	printf("char: %d %d, %d %d %d\n".ptr, (r71 == 'x') as c_int,
+		(r72 == 'x') as c_int,
+		(r73 == 'x') as c_int,
+		(r74 == 'x') as c_int,
+		(r75 == 'x') as c_int);
+	let r76 = settle<str>(true, "four", "sevens");
+	let r77 = settle<str>(false, "four", "sevens");
+	let r78 = chosen<str>(0, "four", "sevens");
+	let r79 = chosen<str>(1, "four", "sevens");
+	let r80 = chosen<str>(2, "four", "sevens");
+	printf("str: %d %d, %d %d %d\n".ptr, r76.len as c_int,
+		r77.len as c_int,
+		r78.len as c_int,
+		r79.len as c_int,
+		r80.len as c_int);
+	return 0;
+}

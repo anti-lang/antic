@@ -1,0 +1,14 @@
+exit 0
+slice: 2 3, 3 3 2
+fixed array: 3 6, 6 6 3
+pointer: 1 2, 2 2 1
+tuple: 2 4, 4 4 2
+struct: 2 4, 4 4 2
+packed struct: 2 4, 4 4 2
+simd struct: 4 8, 8 8 4
+union: 7 8, 8 8 7
+enum: 1 0, 0 0 1
+variant: 1 0, 0 0 1
+function value: 10 15, 15 15 10
+may-fail function value: 100 200, 200 200 100
+class: 11 12, 12 12 11

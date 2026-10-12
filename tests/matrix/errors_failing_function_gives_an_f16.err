@@ -1,0 +1,1 @@
+errors_failing_function_gives_an_f16.anti:6:20: error: a result cannot be `f16`, which is storage only
