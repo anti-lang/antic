@@ -1984,23 +1984,6 @@ let len = strlen("three".ptr as ?*c_char);
 
 Not built yet: `embed`, and the refusal of a `str` in the signature of an `extern fn`, which compiles today.
 
-## Compile-time targets
-
-`target.os`, `target.cpu` and `target.mode` are constants. A `switch` on them is allowed at module level and must cover every value or carry `else`. The back end keeps one arm.
-
-```anti not-built
-switch target.os {
-	Os.Windows => {
-		extern fn GetTickCount64() -> u64;
-	},
-	else => {
-		extern fn clock_gettime(id: c_int, ts: *Timespec) -> c_int;
-	},
-}
-```
-
-`anti check --targets all` runs the front end of every source once per target. Not built yet: `target.os`, `target.cpu` and `target.mode`, and the `switch` on one of them.
-
 ## Source locations
 
 `here` is the position it is written at, as a `SourceLocation` with `file`, `line`, `column`, `function` and `module`. As a default parameter value it is evaluated at the call site, which is how a logger reads its caller's line without a macro.
@@ -2088,51 +2071,6 @@ The five `doc-` warnings and `undocumented` come with `--doc-warnings`, which `a
 |---|---|
 | `unguarded-field` | A field of a concurrent class is not guarded, atomic or fixed. |
 | `exponential-pattern` | A pattern literal nests repeats over text that overlaps, which can take exponential time. |
-
-## Wire formats
-
-A description of bytes in a `.fmt` file, from which `anti format` generates a parser, a writer and the classes. Not part of the language.
-
-```text
-format Packet endian big
-{
-	magic: str : 4 = "ANTI",
-	length: u16,
-	flags: u8
-	{
-		compressed: bit 0,
-		_: bits 1..8,
-	},
-	body: length bytes Body
-	{
-		name: str until 0x00,
-	},
-}
-```
-
-```anti not-built
-let p = alloc Packet(data) catch fatal;
-let name = p.body.name;
-```
-
-Not built yet.
-
-## Script mode
-
-A file with `#!/usr/bin/env anti` runs directly. `anti file.anti` compiles into a cache keyed by digest and runs.
-
-```anti not-built
-#!/usr/bin/env anti
-import anti.io;
-
-fn main(args: []str) -> int
-{
-	for a in args { io.println(a); }
-	return 0;
-}
-```
-
-Not built yet.
 
 ## Regular expressions
 
@@ -2395,6 +2333,72 @@ The options of `antic` that this page names, and the ones that decide how a prog
 | `--warnings-as-errors`, `--doc-warnings`, `--warn-undocumented`, `--strip-docs` | Every warning refused, the doc warnings on, every `pub` item without a `///` comment reported, and the doc text left out of a library file. |
 | `--dump-tokens`, `--dump-ast`, `--dump-types`, `--dump-ir`, `--dump-opt`, `--dump-llvm` | Print one stage of the compiler and stop. |
 | `--print-host-target`, `--print-targets`, `--print-cpu-levels`, `--print-llvm-targets`, `--version` | Print the facts of the targets and the levels, or the version. |
+
+## Features not built
+
+Three features of the specifications have no part built. A feature of which a part is built stands in its own section above. That section names what is missing in a sentence that opens with "Not built yet".
+
+### Compile-time targets
+
+`target.os`, `target.cpu` and `target.mode` are constants. A `switch` on them is allowed at module level and must cover every value or carry `else`. The back end keeps one arm.
+
+```anti not-built
+switch target.os {
+	Os.Windows => {
+		extern fn GetTickCount64() -> u64;
+	},
+	else => {
+		extern fn clock_gettime(id: c_int, ts: *Timespec) -> c_int;
+	},
+}
+```
+
+Not built yet: `target.os`, `target.cpu` and `target.mode`, and the `switch` on one of them.
+
+### Wire formats
+
+A description of bytes in a `.fmt` file, from which `anti format` generates a parser, a writer and the classes. Not part of the language.
+
+```text
+format Packet endian big
+{
+	magic: str : 4 = "ANTI",
+	length: u16,
+	flags: u8
+	{
+		compressed: bit 0,
+		_: bits 1..8,
+	},
+	body: length bytes Body
+	{
+		name: str until 0x00,
+	},
+}
+```
+
+```anti not-built
+let p = alloc Packet(data) catch fatal;
+let name = p.body.name;
+```
+
+Not built yet: the `.fmt` file, `anti format` and `anti.binary`, which the generated code uses.
+
+### Script mode
+
+A file with `#!/usr/bin/env anti` runs directly. `anti file.anti` compiles into a cache keyed by digest and runs.
+
+```anti not-built
+#!/usr/bin/env anti
+import anti.io;
+
+fn main(args: []str) -> int
+{
+	for a in args { io.println(a); }
+	return 0;
+}
+```
+
+Not built yet: the `#!` line, which the lexer refuses, and `anti <file>`, which the tool answers with its usage text.
 
 ## Reserved words
 
