@@ -1,0 +1,12 @@
+//! A parameter of an `export fn` has a type that C can hold, and an array by
+//! value is none.
+
+export fn take(xs: [4]c_int) -> c_int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

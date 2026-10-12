@@ -1,0 +1,8 @@
+//! An import names a module that no search root holds.
+
+import anti.nothing;
+
+fn main() -> int
+{
+	return 0;
+}

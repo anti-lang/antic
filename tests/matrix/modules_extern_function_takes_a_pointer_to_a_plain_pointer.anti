@@ -1,0 +1,9 @@
+//! Every pointer of an `extern fn` is `?*T`, the one a pointer points to
+//! included.
+
+extern fn fill(out: ?**c_char) -> c_int;
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+modules_direct_import_of_no_item.anti:3:19: error: `anti.text` has no public item `missing_one`

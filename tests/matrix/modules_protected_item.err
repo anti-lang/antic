@@ -1,0 +1,1 @@
+modules_protected_item.anti:3:1: error: `protected` marks a class member, and a module item is `pub`, `internal` or neither

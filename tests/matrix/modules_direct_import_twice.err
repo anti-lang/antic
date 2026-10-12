@@ -1,0 +1,1 @@
+modules_direct_import_twice.anti:3:26: error: `equal` of `anti.text` is listed twice

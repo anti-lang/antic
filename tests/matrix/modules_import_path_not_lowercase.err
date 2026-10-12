@@ -1,0 +1,1 @@
+modules_import_path_not_lowercase.anti:3:8: error: the module path `anti.Text` is not lowercase

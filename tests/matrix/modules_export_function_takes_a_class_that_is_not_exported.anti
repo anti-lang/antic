@@ -1,0 +1,17 @@
+//! A parameter of an `export fn` has a type that C can hold, and a pointer to a
+//! class without `export` is none.
+
+class Hidden
+{
+	pub a: c_int = 0,
+}
+
+export fn take(h: *Hidden) -> c_int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

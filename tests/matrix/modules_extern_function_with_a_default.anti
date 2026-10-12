@@ -1,0 +1,8 @@
+//! A parameter of an `extern fn` has no default value, since C has none.
+
+extern fn abs(n: c_int = 3) -> c_int;
+
+fn main() -> int
+{
+	return 0;
+}

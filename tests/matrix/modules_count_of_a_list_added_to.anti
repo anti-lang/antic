@@ -1,0 +1,11 @@
+//! Decision 25: `count` of a collection is read-only outside its module.
+//! A compound assignment to it is refused.
+
+import anti.collection.list.{List};
+
+fn main() -> int
+{
+	let xs = List<int>.new();
+	xs.count += 1;
+	return 0;
+}

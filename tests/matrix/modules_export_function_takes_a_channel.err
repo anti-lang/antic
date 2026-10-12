@@ -1,0 +1,1 @@
+modules_export_function_takes_a_channel.anti:4:16: error: the parameter `c` of export fn `take` has type `chan int`, which C cannot represent

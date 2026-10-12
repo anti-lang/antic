@@ -1,0 +1,1 @@
+modules_export_of_main.anti:3:11: error: `main` is the entry of the program and cannot be exported

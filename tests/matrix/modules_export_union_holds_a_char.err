@@ -1,0 +1,1 @@
+modules_export_union_holds_a_char.anti:6:2: error: the field `c` of export union `Either` has type `char`, which C cannot represent

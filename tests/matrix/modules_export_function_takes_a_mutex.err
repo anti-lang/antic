@@ -1,0 +1,1 @@
+modules_export_function_takes_a_mutex.anti:6:16: error: the parameter `m` of export fn `take` has type `*Mutex`, which C cannot represent

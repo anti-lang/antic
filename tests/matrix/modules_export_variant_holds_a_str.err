@@ -1,0 +1,1 @@
+modules_export_variant_holds_a_str.anti:6:10: error: the field `name` of case `Named` of export variant `Shape` has type `str`, which C cannot represent

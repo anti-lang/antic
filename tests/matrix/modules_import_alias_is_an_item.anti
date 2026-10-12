@@ -1,0 +1,10 @@
+//! An alias of a module and an item of the file share no name.
+
+import anti.text as helper;
+
+const helper: int = 1;
+
+fn main() -> int
+{
+	return 0;
+}

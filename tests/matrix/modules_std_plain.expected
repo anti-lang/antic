@@ -1,0 +1,9 @@
+exit 0
+text 1
+lang 3
+trace 1
+plugin 1
+reflect 1
+list 2
+map 1
+set 1

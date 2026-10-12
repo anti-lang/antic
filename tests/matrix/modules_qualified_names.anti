@@ -1,0 +1,384 @@
+//! The names an import gives: a function by the name of its module, by an alias
+//! of the module and by the bare name of a direct import, a class of a direct
+//! import and a type by the name of its module, in each of these places:
+//! function, method, loop body, switch arm, if let, defer, undo, catch handler,
+//! closure, worker, dispatch or parallel, sync block, select arm, generic body,
+//! nested type. Each place is a function of its own, and the program prints one
+//! line per place and input.
+
+import anti.lang;
+import anti.text as tx;
+import anti.text.{Builder, char_count};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+	pub env: ?*Env = none,
+}
+
+struct Env
+{
+	lock: Mutex,
+	gate: chan int,
+	task: *Task,
+}
+
+
+
+fn in_function(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	if text.equal("ab", "ab") {
+		acc += k;
+	}
+	acc += tx.byte_count("abc") * 10;
+	acc += char_count("abcd") * 100;
+	let b = Builder.new();
+	b.append_int(k);
+	b.append("xy");
+	let whole: *text.Builder = &b;
+	acc += whole.len() * 1000;
+	return acc;
+}
+
+class Host
+{
+	pub base: int = 0,
+
+	pub fn in_method(self, e: *Env, k: int) -> int
+	{
+		let acc = self.base;
+		if text.equal("ab", "ab") {
+			acc += k;
+		}
+		acc += tx.byte_count("abc") * 10;
+		acc += char_count("abcd") * 100;
+		let b = Builder.new();
+		b.append_int(k);
+		b.append("xy");
+		let whole: *text.Builder = &b;
+		acc += whole.len() * 1000;
+		return acc;
+	}
+}
+
+fn in_loop(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		acc += turn;
+		if text.equal("ab", "ab") {
+			acc += k;
+		}
+		acc += tx.byte_count("abc") * 10;
+		acc += char_count("abcd") * 100;
+		let b = Builder.new();
+		b.append_int(k);
+		b.append("xy");
+		let whole: *text.Builder = &b;
+		acc += whole.len() * 1000;
+	}
+	return acc;
+}
+
+fn in_arm(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	switch k {
+		100 => acc = -5,
+		else => {
+			if text.equal("ab", "ab") {
+				acc += k;
+			}
+			acc += tx.byte_count("abc") * 10;
+			acc += char_count("abcd") * 100;
+			let b = Builder.new();
+			b.append_int(k);
+			b.append("xy");
+			let whole: *text.Builder = &b;
+			acc += whole.len() * 1000;
+		},
+	}
+	return acc;
+}
+
+fn hold(k: int) -> ?int
+{
+	if k < 0 {
+		return none;
+	}
+	return k;
+}
+
+fn in_if_let(e: *Env, start: int) -> int
+{
+	let acc = 0;
+	if let k = hold(start) {
+		if text.equal("ab", "ab") {
+			acc += k;
+		}
+		acc += tx.byte_count("abc") * 10;
+		acc += char_count("abcd") * 100;
+		let b = Builder.new();
+		b.append_int(k);
+		b.append("xy");
+		let whole: *text.Builder = &b;
+		acc += whole.len() * 1000;
+	} else {
+		acc = -9;
+	}
+	return acc;
+}
+
+fn in_defer(e: *Env, k: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		if text.equal("ab", "ab") {
+			acc += k;
+		}
+		acc += tx.byte_count("abc") * 10;
+		acc += char_count("abcd") * 100;
+		let b = Builder.new();
+		b.append_int(k);
+		b.append("xy");
+		let whole: *text.Builder = &b;
+		acc += whole.len() * 1000;
+	}
+	acc = 1;
+}
+
+fn in_undo(e: *Env, k: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		if text.equal("ab", "ab") {
+			acc += k;
+		}
+		acc += tx.byte_count("abc") * 10;
+		acc += char_count("abcd") * 100;
+		let b = Builder.new();
+		b.append_int(k);
+		b.append("xy");
+		let whole: *text.Builder = &b;
+		acc += whole.len() * 1000;
+	}
+	acc = 2;
+	fail "undone";
+}
+
+fn always() may fail
+{
+	fail "always";
+}
+
+fn in_catch(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	always() catch {
+		if text.equal("ab", "ab") {
+			acc += k;
+		}
+		acc += tx.byte_count("abc") * 10;
+		acc += char_count("abcd") * 100;
+		let b = Builder.new();
+		b.append_int(k);
+		b.append("xy");
+		let whole: *text.Builder = &b;
+		acc += whole.len() * 1000;
+	};
+	return acc;
+}
+
+fn apply(n: int, f: fn(int))
+{
+	f(n);
+}
+
+fn in_closure(e: *Env, start: int) -> int
+{
+	let acc = 0;
+	apply(start, fn(k) {
+		if text.equal("ab", "ab") {
+			acc += k;
+		}
+		acc += tx.byte_count("abc") * 10;
+		acc += char_count("abcd") * 100;
+		let b = Builder.new();
+		b.append_int(k);
+		b.append("xy");
+		let whole: *text.Builder = &b;
+		acc += whole.len() * 1000;
+	});
+	return acc;
+}
+
+worker fn in_worker(t: *Task) -> int
+{
+	let k = t.n;
+	let acc = 0;
+	if text.equal("ab", "ab") {
+		acc += k;
+	}
+	acc += tx.byte_count("abc") * 10;
+	acc += char_count("abcd") * 100;
+	return acc;
+}
+
+fn run_worker(e: *Env, k: int) -> int
+{
+	e.task.n = k;
+	let job = dispatch e.task -> in_worker;
+	let got = join(job);
+
+	return got;
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch(e: *Env, start: int) -> int
+{
+	e.task.n = start;
+	let job = dispatch e.task -> work(fn(k) {
+		let acc = 0;
+		if text.equal("ab", "ab") {
+			acc += k;
+		}
+		acc += tx.byte_count("abc") * 10;
+		acc += char_count("abcd") * 100;
+		return acc;
+	});
+	return join(job);
+}
+
+fn in_sync(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	sync e.lock {
+		if text.equal("ab", "ab") {
+			acc += k;
+		}
+		acc += tx.byte_count("abc") * 10;
+		acc += char_count("abcd") * 100;
+		let b = Builder.new();
+		b.append_int(k);
+		b.append("xy");
+		let whole: *text.Builder = &b;
+		acc += whole.len() * 1000;
+	}
+	return acc;
+}
+
+fn in_select(e: *Env, start: int) -> int
+{
+	let acc = 0;
+	send(e.gate, start);
+	select {
+		e.gate x => {
+			let v = x else {
+				return -9;
+			};
+			let k = *v;
+			if text.equal("ab", "ab") {
+				acc += k;
+			}
+			acc += tx.byte_count("abc") * 10;
+			acc += char_count("abcd") * 100;
+			let b = Builder.new();
+			b.append_int(k);
+			b.append("xy");
+			let whole: *text.Builder = &b;
+			acc += whole.len() * 1000;
+		},
+	}
+	return acc;
+}
+
+fn in_generic<T>(e: *Env, k: int) -> int
+{
+	let acc = size_of(T) as int * 10000;
+	if text.equal("ab", "ab") {
+		acc += k;
+	}
+	acc += tx.byte_count("abc") * 10;
+	acc += char_count("abcd") * 100;
+	let b = Builder.new();
+	b.append_int(k);
+	b.append("xy");
+	let whole: *text.Builder = &b;
+	acc += whole.len() * 1000;
+	return acc;
+}
+
+class Outer
+{
+	class Inner
+	{
+		pub base: int = 0,
+
+		pub fn run(self, e: *Env, k: int) -> int
+		{
+			let acc = self.base;
+			if text.equal("ab", "ab") {
+				acc += k;
+			}
+			acc += tx.byte_count("abc") * 10;
+			acc += char_count("abcd") * 100;
+			let b = Builder.new();
+			b.append_int(k);
+			b.append("xy");
+			let whole: *text.Builder = &b;
+			acc += whole.len() * 1000;
+			return acc;
+		}
+	}
+
+	pub fn go(self, e: *Env, k: int) -> int
+	{
+		let inner = Inner { base: 0 };
+		return inner.run(e, k);
+	}
+}
+
+fn main() -> int
+{
+	let task = alloc Task { };
+	let e = alloc Env { lock: Mutex.new(), gate: chan int(1), task: task };
+	task.env = e;
+	let host = Host { base: 0 };
+	let outer = Outer { };
+	for k in 1..3 {
+		printf("function %d %d\n".ptr, k as c_int, in_function(e, k) as c_int);
+		printf("method %d %d\n".ptr, k as c_int, host.in_method(e, k) as c_int);
+		printf("loop %d %d\n".ptr, k as c_int, in_loop(e, k) as c_int);
+		printf("arm %d %d\n".ptr, k as c_int, in_arm(e, k) as c_int);
+		printf("if_let %d %d\n".ptr, k as c_int, in_if_let(e, k) as c_int);
+		let deferred = 0;
+		in_defer(e, k, &deferred);
+		printf("defer %d %d\n".ptr, k as c_int, deferred as c_int);
+		let undone = 0;
+		in_undo(e, k, &undone) catch {
+			yield;
+		};
+		printf("undo %d %d\n".ptr, k as c_int, undone as c_int);
+		printf("catch %d %d\n".ptr, k as c_int, in_catch(e, k) as c_int);
+		printf("closure %d %d\n".ptr, k as c_int, in_closure(e, k) as c_int);
+		printf("worker %d %d\n".ptr, k as c_int, run_worker(e, k) as c_int);
+		printf("dispatch %d %d\n".ptr, k as c_int, in_dispatch(e, k) as c_int);
+		printf("sync %d %d\n".ptr, k as c_int, in_sync(e, k) as c_int);
+		printf("select %d %d\n".ptr, k as c_int, in_select(e, k) as c_int);
+		printf("generic %d %d\n".ptr, k as c_int, in_generic<i32>(e, k) as c_int);
+		printf("nested %d %d\n".ptr, k as c_int, outer.go(e, k) as c_int);
+	}
+	delete(e.gate);
+	free(e);
+	delete(task);
+	return 0;
+}

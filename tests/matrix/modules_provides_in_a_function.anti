@@ -1,0 +1,9 @@
+//! A `provides` line stands at module level.
+
+import anti.log;
+
+fn main() -> int
+{
+	provides anti.log.Logger as Mine;
+	return 0;
+}

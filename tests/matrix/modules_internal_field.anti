@@ -1,0 +1,11 @@
+//! `internal` marks an item of a module, never a field of a class.
+
+class Counter
+{
+	internal n: int = 0,
+}
+
+fn main() -> int
+{
+	return 0;
+}

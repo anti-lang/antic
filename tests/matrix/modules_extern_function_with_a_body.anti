@@ -1,0 +1,11 @@
+//! An `extern fn` declares a function of C and has no body.
+
+extern fn abs(n: c_int) -> c_int
+{
+	return n;
+}
+
+fn main() -> int
+{
+	return 0;
+}

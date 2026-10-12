@@ -1,0 +1,1 @@
+modules_count_of_a_deque_assigned.anti:9:2: error: `count` of `Deque<int>` is read-only outside its module

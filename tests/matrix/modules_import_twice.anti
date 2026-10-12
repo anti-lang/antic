@@ -1,0 +1,9 @@
+//! One module is imported twice under one name.
+
+import anti.text;
+import anti.text;
+
+fn main() -> int
+{
+	return 0;
+}

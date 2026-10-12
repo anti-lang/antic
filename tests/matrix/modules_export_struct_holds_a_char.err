@@ -1,0 +1,1 @@
+modules_export_struct_holds_a_char.anti:6:2: error: the field `c` of export struct `Letter` has type `char`, which C cannot represent

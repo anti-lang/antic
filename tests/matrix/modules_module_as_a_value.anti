@@ -1,0 +1,9 @@
+//! The name of a module is no value.
+
+import anti.text;
+
+fn main() -> int
+{
+	let m = text;
+	return 0;
+}

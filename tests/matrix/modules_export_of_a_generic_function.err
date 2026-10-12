@@ -1,0 +1,1 @@
+modules_export_of_a_generic_function.anti:3:11: error: an `export fn` cannot be generic. Export a named copy with `export type`

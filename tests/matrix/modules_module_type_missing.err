@@ -1,0 +1,1 @@
+modules_module_type_missing.anti:7:11: error: `text` has no public struct `Missing`

@@ -1,0 +1,16 @@
+//! A variadic argument is an integer of 32 or 64 bits, an `f64` or a pointer.
+//! A struct is none of them.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, Point { x: 1, y: 2 });
+	return 0;
+}

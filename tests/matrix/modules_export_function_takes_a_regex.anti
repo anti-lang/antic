@@ -1,0 +1,15 @@
+//! A parameter of an `export fn` has a type that C can hold, and a `Regex` is
+//! none.
+
+import anti.lang;
+import anti.regex;
+
+export fn take(r: Regex) -> c_int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

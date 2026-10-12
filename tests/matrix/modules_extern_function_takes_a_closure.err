@@ -1,0 +1,1 @@
+modules_extern_function_takes_a_closure.anti:9:20: error: a closure is never kept, and this one captures `calls`, so a `snapshot fn` at a `keep own` parameter or an `own` field takes its value

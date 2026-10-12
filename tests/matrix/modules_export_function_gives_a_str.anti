@@ -1,0 +1,12 @@
+//! The result of an `export fn` has a type that C can hold, and a `str` is
+//! none.
+
+export fn name() -> str
+{
+	return "name";
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,13 @@
+//! The C header aligns an `export struct` on its first field, and C refuses the
+//! alignment on a bitfield.
+
+export struct Flags8 align(8)
+{
+	low: u8 : 3,
+	high: u8 : 5,
+}
+
+fn main() -> int
+{
+	return 0;
+}

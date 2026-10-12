@@ -1,0 +1,1 @@
+modules_export_function_takes_a_pointer_to_a_slice.anti:4:16: error: the parameter `xs` of export fn `take` has type `*[]i32`, which C cannot represent

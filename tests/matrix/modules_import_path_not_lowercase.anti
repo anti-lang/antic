@@ -1,0 +1,8 @@
+//! A module path is lowercase.
+
+import anti.Text;
+
+fn main() -> int
+{
+	return 0;
+}

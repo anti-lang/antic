@@ -1,0 +1,8 @@
+//! `module.name` names a public item of the module.
+
+import anti.text;
+
+fn main() -> int
+{
+	return text.missing();
+}

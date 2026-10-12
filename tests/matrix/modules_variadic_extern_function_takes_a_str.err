@@ -1,0 +1,1 @@
+modules_variadic_extern_function_takes_a_str.anti:3:20: error: the parameter `format` of `extern fn log_line` is a `str`, and C takes `?*c_char`

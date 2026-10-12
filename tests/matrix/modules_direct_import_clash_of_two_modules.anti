@@ -1,0 +1,9 @@
+//! Two direct imports list one name of two modules.
+
+import anti.lang.{Error};
+import anti.regex.{Error};
+
+fn main() -> int
+{
+	return 0;
+}

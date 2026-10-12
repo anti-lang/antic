@@ -1,0 +1,8 @@
+//! A direct import takes no alias.
+
+import anti.text.{Builder} as t;
+
+fn main() -> int
+{
+	return 0;
+}

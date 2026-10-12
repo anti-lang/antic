@@ -1,0 +1,8 @@
+//! An `export const` is a number, a `bool` or a `str`, and an array is none.
+
+export const ROW: [2]c_int = [1, 2];
+
+fn main() -> int
+{
+	return 0;
+}

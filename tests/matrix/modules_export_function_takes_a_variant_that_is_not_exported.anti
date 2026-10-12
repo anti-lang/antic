@@ -1,0 +1,18 @@
+//! A parameter of an `export fn` has a type that C can hold, and a variant
+//! without `export` is none.
+
+variant Hidden
+{
+	One { a: c_int },
+	None,
+}
+
+export fn take(h: Hidden) -> c_int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

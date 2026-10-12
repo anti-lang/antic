@@ -1,0 +1,11 @@
+//! An `extern fn` is an item of a module and no member of a class.
+
+class Holder
+{
+	extern fn abs(n: c_int) -> c_int;
+}
+
+fn main() -> int
+{
+	return 0;
+}

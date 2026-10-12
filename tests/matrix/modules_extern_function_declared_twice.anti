@@ -1,0 +1,9 @@
+//! One module declares an `extern fn` once.
+
+extern fn abs(n: c_int) -> c_int;
+extern fn abs(n: c_int) -> c_int;
+
+fn main() -> int
+{
+	return 0;
+}

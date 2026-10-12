@@ -1,0 +1,9 @@
+//! `may fail` belongs to a function of Anti. An `extern fn` writes its error
+//! result by hand.
+
+extern fn abs(n: c_int) -> c_int may fail;
+
+fn main() -> int
+{
+	return 0;
+}

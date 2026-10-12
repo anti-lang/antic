@@ -1,0 +1,1 @@
+modules_file_clause_that_silences_nothing.anti:4:1: error: `allow(shadowed-catch)` silences nothing [unused-allow]

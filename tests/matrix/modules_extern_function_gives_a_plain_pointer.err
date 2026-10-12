@@ -1,0 +1,1 @@
+modules_extern_function_gives_a_plain_pointer.anti:3:37: error: every pointer of the result of `extern fn getenv` is `?*T`

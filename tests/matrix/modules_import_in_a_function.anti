@@ -1,0 +1,7 @@
+//! An `import` stands at module level alone.
+
+fn main() -> int
+{
+	import anti.text;
+	return 0;
+}

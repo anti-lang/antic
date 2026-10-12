@@ -1,0 +1,1 @@
+modules_export_type_of_no_generic.anti:3:21: error: `export type` names a copy of a generic struct or class, and `i32` is none

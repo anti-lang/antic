@@ -1,0 +1,12 @@
+//! `inherits module.Name` names a public class of the module.
+
+import anti.text;
+
+class Mine inherits text.Missing
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

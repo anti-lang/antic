@@ -1,0 +1,8 @@
+//! An `extern fn` is a function of C already and is not exported.
+
+export extern fn abs(n: c_int) -> c_int;
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,8 @@
+//! A module imports itself.
+
+import modules_import_of_itself;
+
+fn main() -> int
+{
+	return 0;
+}

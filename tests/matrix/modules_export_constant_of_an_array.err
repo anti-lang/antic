@@ -1,0 +1,1 @@
+modules_export_constant_of_an_array.anti:3:19: error: export const `ROW` has type `[2]i32`, and an export const is a number, a bool or a str

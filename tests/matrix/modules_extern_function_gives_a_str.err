@@ -1,0 +1,1 @@
+modules_extern_function_gives_a_str.anti:3:37: error: the result of `extern fn getenv` is a `str`, and C gives `?*c_char`

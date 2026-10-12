@@ -1,0 +1,12 @@
+//! An expression reaches a module by the last segment of its path or by its
+//! alias, never by the whole path.
+
+import anti.text;
+
+fn main() -> int
+{
+	if anti.text.equal("a", "a") {
+		return 1;
+	}
+	return 0;
+}

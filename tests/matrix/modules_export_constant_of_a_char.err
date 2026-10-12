@@ -1,0 +1,1 @@
+modules_export_constant_of_a_char.anti:3:20: error: export const `MARK` has type `char`, and an export const is a number, a bool or a str

@@ -1,0 +1,8 @@
+//! An `import` line ends with `;`.
+
+import anti.text
+
+fn main() -> int
+{
+	return 0;
+}

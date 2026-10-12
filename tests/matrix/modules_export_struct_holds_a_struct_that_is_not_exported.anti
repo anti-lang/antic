@@ -1,0 +1,17 @@
+//! A field of an `export struct` has a type that C can hold, and a struct
+//! without `export` is none.
+
+struct Hidden
+{
+	a: c_int,
+}
+
+export struct Outer
+{
+	h: Hidden,
+}
+
+fn main() -> int
+{
+	return 0;
+}

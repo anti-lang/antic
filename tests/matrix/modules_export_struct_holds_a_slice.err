@@ -1,0 +1,1 @@
+modules_export_struct_holds_a_slice.anti:6:2: error: the field `xs` of export struct `Row` has type `[]i32`, which C cannot represent

@@ -1,0 +1,11 @@
+//! `protected` marks a member of a class, never an item of a module.
+
+protected fn guarded() -> int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	return guarded();
+}

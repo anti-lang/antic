@@ -1,0 +1,13 @@
+//! The `import` lines come first in a file.
+
+fn helper() -> int
+{
+	return 0;
+}
+
+import anti.text;
+
+fn main() -> int
+{
+	return helper();
+}

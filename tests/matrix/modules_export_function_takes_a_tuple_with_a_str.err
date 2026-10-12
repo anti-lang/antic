@@ -1,0 +1,1 @@
+modules_export_function_takes_a_tuple_with_a_str.anti:4:16: error: the parameter `t` of export fn `take` has type `(i32, str)`, which C cannot represent

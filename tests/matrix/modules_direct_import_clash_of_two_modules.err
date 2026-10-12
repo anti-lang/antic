@@ -1,0 +1,1 @@
+modules_direct_import_clash_of_two_modules.anti:4:20: error: `Error` of `anti.regex` clashes with `Error` of `anti.lang`

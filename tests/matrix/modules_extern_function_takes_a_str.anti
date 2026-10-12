@@ -1,0 +1,9 @@
+//! Decision 26: a `str` in the signature of an `extern fn` is refused. C takes
+//! `*c_char`.
+
+extern fn puts(s: str) -> c_int;
+
+fn main() -> int
+{
+	return 0;
+}

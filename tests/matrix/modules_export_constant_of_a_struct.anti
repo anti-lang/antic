@@ -1,0 +1,13 @@
+//! An `export const` is a number, a `bool` or a `str`, and a struct is none.
+
+export struct Point
+{
+	x: c_int,
+}
+
+export const ORIGIN: Point = Point { x: 0 };
+
+fn main() -> int
+{
+	return 0;
+}

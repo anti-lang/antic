@@ -1,0 +1,1 @@
+modules_extern_function_callback_takes_a_plain_pointer.anti:3:16: error: every pointer of the parameter `f` of `extern fn each` is `?*T`

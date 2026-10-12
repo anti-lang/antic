@@ -1,0 +1,13 @@
+//! The result of an `export fn` has a type that C can hold, and a slice is
+//! none.
+
+export fn none_of() -> []c_int
+{
+	let xs: []c_int = []c_int { ptr: none, len: 0 };
+	return xs;
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,64 @@
+//! A direct import of an item of every module of the standard library that has
+//! one to list. The program reaches the items of eight of them by their bare
+//! names. `anti.simd` has no item to list, and `text` of `anti.license` would
+//! clash with the module `anti.text`, so those two are plain imports.
+
+import anti.args.{Parser};
+import anti.collection.{Iterable};
+import anti.collection.concurrent.{ConcurrentMap};
+import anti.collection.deque.{Deque};
+import anti.collection.grid.{Grid};
+import anti.collection.list.{List};
+import anti.collection.map.{HashMap, Map};
+import anti.collection.pool.{Pool};
+import anti.collection.queue.{PriorityQueue};
+import anti.collection.ring.{Ring};
+import anti.collection.set.{BitSet, Set};
+import anti.collection.sorted.{SortedMap};
+import anti.collection.synchronized.{SyncList};
+import anti.collection.tree.{Tree};
+import anti.config.{Config};
+import anti.debug.{backtrace};
+import anti.error.{SystemError};
+import anti.fs.{File};
+import anti.io.{println};
+import anti.json.{write_int};
+import anti.lang.{Error};
+import anti.license;
+import anti.log.{Level};
+import anti.mem.{Allocator};
+import anti.os.{INTERRUPT};
+import anti.plugin.{IN_USE, NOT_LOADED};
+import anti.random.{Random};
+import anti.reflect.{BAD_INDEX, NOT_CARRIED};
+import anti.regex.{BadPattern};
+import anti.runtime.{get};
+import anti.simd;
+import anti.text.{equal};
+import anti.time.{Duration};
+import anti.toml.{Document};
+import anti.trace.{PROFILE_SLOTS};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	printf("text %d\n".ptr, equal("a", "a") as c_int);
+	let e = Error.new(3, "three");
+	printf("lang %lld\n".ptr, e.code);
+	delete(e);
+	printf("trace %d\n".ptr, (PROFILE_SLOTS > 0) as c_int);
+	printf("plugin %d\n".ptr, (NOT_LOADED != IN_USE) as c_int);
+	printf("reflect %d\n".ptr, (BAD_INDEX != NOT_CARRIED) as c_int);
+	let numbers = List<int>.new();
+	numbers.push(4);
+	numbers.push(5);
+	printf("list %lld\n".ptr, numbers.count);
+	let ages = Map<int, int>.new();
+	ages.set(1, 2);
+	printf("map %lld\n".ptr, ages.count);
+	let seen = Set<int>.new();
+	seen.add(3);
+	printf("set %lld\n".ptr, seen.count);
+	return 0;
+}

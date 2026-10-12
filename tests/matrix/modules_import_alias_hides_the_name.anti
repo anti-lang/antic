@@ -1,0 +1,12 @@
+//! `import x as y` renames the local name, so the last segment of the path
+//! names nothing.
+
+import anti.text as t;
+
+fn main() -> int
+{
+	if text.equal("a", "a") {
+		return 1;
+	}
+	return 0;
+}

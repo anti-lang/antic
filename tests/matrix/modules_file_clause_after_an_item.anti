@@ -1,0 +1,16 @@
+//! A clause of the whole file stands at the top of the module, before the
+//! first item.
+
+import anti.lang;
+
+fn helper() -> int
+{
+	return 0;
+}
+
+allow(shadowed-catch, "after the first item");
+
+fn main() -> int
+{
+	return helper();
+}

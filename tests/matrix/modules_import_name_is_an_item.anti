@@ -1,0 +1,10 @@
+//! The name an import declares and an item of the file share no name.
+
+import anti.text;
+
+const text: int = 1;
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,8 @@
+//! A direct import lists at least one name.
+
+import anti.text.{};
+
+fn main() -> int
+{
+	return 0;
+}

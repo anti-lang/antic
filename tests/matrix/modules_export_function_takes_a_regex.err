@@ -1,0 +1,1 @@
+modules_export_function_takes_a_regex.anti:7:16: error: the parameter `r` of export fn `take` has type `Regex`, which C cannot represent

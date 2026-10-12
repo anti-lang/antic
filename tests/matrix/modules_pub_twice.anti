@@ -1,0 +1,11 @@
+//! An item takes one visibility word.
+
+pub pub fn twice() -> int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	return twice();
+}

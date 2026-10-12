@@ -1,0 +1,7 @@
+//! A `link` line stands at module level.
+
+fn main() -> int
+{
+	link framework "CoreAudio";
+	return 0;
+}

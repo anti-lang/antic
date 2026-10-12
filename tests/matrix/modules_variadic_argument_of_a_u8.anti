@@ -1,0 +1,11 @@
+//! A variadic argument is an integer of 32 or 64 bits, an `f64` or a pointer.
+//! A `u8` needs `as`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let small: u8 = 7;
+	printf("%d\n".ptr, small);
+	return 0;
+}

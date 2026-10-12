@@ -1,0 +1,1 @@
+modules_extern_function_takes_a_pointer_to_a_str.anti:4:16: error: the parameter `out` of `extern fn fill` holds a `str`, and C takes `?*c_char`

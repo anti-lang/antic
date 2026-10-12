@@ -1,0 +1,1 @@
+modules_export_function_gives_a_slice.anti:4:24: error: the result of export fn `none_of` has type `[]i32`, which C cannot represent

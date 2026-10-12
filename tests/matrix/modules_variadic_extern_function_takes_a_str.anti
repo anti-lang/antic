@@ -1,0 +1,8 @@
+//! Decision 26: a `str` in the signature of a variadic `extern fn` is refused.
+
+extern fn log_line(format: str, ...) -> c_int;
+
+fn main() -> int
+{
+	return 0;
+}

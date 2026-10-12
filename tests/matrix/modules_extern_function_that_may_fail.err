@@ -1,0 +1,1 @@
+modules_extern_function_that_may_fail.anti:4:34: error: `may fail` belongs to an Anti function, and an `extern fn` writes `-> ?*Error` by hand

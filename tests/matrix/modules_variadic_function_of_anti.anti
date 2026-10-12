@@ -1,0 +1,11 @@
+//! `...` belongs to an `extern fn`. A function of Anti takes none.
+
+fn odd(n: c_int, ...) -> c_int
+{
+	return n;
+}
+
+fn main() -> int
+{
+	return 0;
+}

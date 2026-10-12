@@ -1,0 +1,11 @@
+//! An exported item is public, so `export` and `internal` do not meet.
+
+export internal fn both() -> c_int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

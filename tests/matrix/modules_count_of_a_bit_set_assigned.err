@@ -1,0 +1,1 @@
+modules_count_of_a_bit_set_assigned.anti:9:2: error: `count` of `BitSet` is read-only outside its module

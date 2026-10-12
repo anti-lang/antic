@@ -1,0 +1,8 @@
+//! A clause of the whole file names a warning or a safety check.
+
+allow(no-such-warning, "the name is none of the warnings");
+
+fn main() -> int
+{
+	return 0;
+}

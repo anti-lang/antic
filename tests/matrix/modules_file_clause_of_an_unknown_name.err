@@ -1,0 +1,1 @@
+modules_file_clause_of_an_unknown_name.anti:3:7: error: `no-such-warning` is no warning, and `allow` silences a warning alone

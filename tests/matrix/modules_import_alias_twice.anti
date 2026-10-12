@@ -1,0 +1,9 @@
+//! Two imports take one alias.
+
+import anti.text as t;
+import anti.io as t;
+
+fn main() -> int
+{
+	return 0;
+}

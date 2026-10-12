@@ -1,0 +1,9 @@
+//! A clause of the whole file ends with `;`.
+
+allow(shadowed-catch, "the clause of the whole file ends with a semicolon")
+import anti.lang;
+
+fn main() -> int
+{
+	return 0;
+}

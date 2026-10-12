@@ -1,0 +1,1 @@
+modules_direct_import_of_a_name_of_the_compiler.anti:4:19: error: `anti.lang` has no public item `Object`

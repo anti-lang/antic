@@ -1,0 +1,17 @@
+//! A public function of an `export class` crosses to C, so its parameters have
+//! types that C can hold, and a `str` is none.
+
+export class Named
+{
+	pub n: c_int = 0,
+
+	pub fn rename(self, name: str)
+	{
+		self.n = name.len as c_int;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

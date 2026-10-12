@@ -1,0 +1,1 @@
+modules_export_class_function_takes_a_str.anti:8:9: error: the parameter 1 of `Named.rename` has type `str`, which C cannot represent

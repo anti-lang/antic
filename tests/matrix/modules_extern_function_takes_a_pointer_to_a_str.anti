@@ -1,0 +1,9 @@
+//! Decision 26: a pointer to a `str` in the signature of an `extern fn` is a
+//! `str` there and is refused.
+
+extern fn fill(out: ?*str) -> c_int;
+
+fn main() -> int
+{
+	return 0;
+}

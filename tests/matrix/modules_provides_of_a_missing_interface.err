@@ -1,0 +1,1 @@
+modules_provides_of_a_missing_interface.anti:14:10: error: `anti.log` has no public class `Missing`

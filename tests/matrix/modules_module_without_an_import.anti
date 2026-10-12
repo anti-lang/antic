@@ -1,0 +1,10 @@
+//! A module is reached by the name its import declares, and a module that no
+//! line imports has no name.
+
+fn main() -> int
+{
+	if text.equal("a", "a") {
+		return 1;
+	}
+	return 0;
+}

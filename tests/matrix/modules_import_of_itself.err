@@ -1,0 +1,1 @@
+modules_import_of_itself.anti:3:8: error: `modules_import_of_itself` cannot import itself

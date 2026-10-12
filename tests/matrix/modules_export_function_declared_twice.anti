@@ -1,0 +1,16 @@
+//! One module exports a function once.
+
+export fn twice() -> c_int
+{
+	return 0;
+}
+
+export fn twice() -> c_int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	return 0;
+}

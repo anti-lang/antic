@@ -1,0 +1,63 @@
+//! Every module of the standard library, imported under an alias. The program
+//! reaches an item of eight of them by the alias, and the last segment of no
+//! path names a module.
+
+import anti.lang as a_lang;
+import anti.io as a_io;
+import anti.text as a_text;
+import anti.license as a_license;
+import anti.error as a_error;
+import anti.time as a_time;
+import anti.os as a_os;
+import anti.fs as a_fs;
+import anti.reflect as a_reflect;
+import anti.random as a_random;
+import anti.collection as a_collection;
+import anti.toml as a_toml;
+import anti.config as a_config;
+import anti.args as a_args;
+import anti.json as a_json;
+import anti.log as a_log;
+import anti.debug as a_debug;
+import anti.mem as a_mem;
+import anti.runtime as a_runtime;
+import anti.simd as a_simd;
+import anti.trace as a_trace;
+import anti.plugin as a_plugin;
+import anti.regex as a_regex;
+import anti.collection.list as c_list;
+import anti.collection.deque as c_deque;
+import anti.collection.grid as c_grid;
+import anti.collection.ring as c_ring;
+import anti.collection.pool as c_pool;
+import anti.collection.queue as c_queue;
+import anti.collection.tree as c_tree;
+import anti.collection.sorted as c_sorted;
+import anti.collection.synchronized as c_synchronized;
+import anti.collection.concurrent as c_concurrent;
+import anti.collection.map as c_map;
+import anti.collection.set as c_set;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	printf("text %d\n".ptr, a_text.equal("a", "a") as c_int);
+	let e = a_lang.Error.new(3, "three");
+	printf("lang %lld\n".ptr, e.code);
+	delete(e);
+	printf("trace %d\n".ptr, (a_trace.PROFILE_SLOTS > 0) as c_int);
+	printf("plugin %d\n".ptr, (a_plugin.NOT_LOADED != a_plugin.IN_USE) as c_int);
+	printf("reflect %d\n".ptr, (a_reflect.BAD_INDEX != a_reflect.NOT_CARRIED) as c_int);
+	let numbers = c_list.List<int>.new();
+	numbers.push(4);
+	numbers.push(5);
+	printf("list %lld\n".ptr, numbers.count);
+	let ages = c_map.Map<int, int>.new();
+	ages.set(1, 2);
+	printf("map %lld\n".ptr, ages.count);
+	let seen = c_set.Set<int>.new();
+	seen.add(3);
+	printf("set %lld\n".ptr, seen.count);
+	return 0;
+}

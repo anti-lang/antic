@@ -1,0 +1,8 @@
+//! Every pointer of an `extern fn` is `?*T`, the result included.
+
+extern fn getenv(name: ?*c_char) -> *c_char;
+
+fn main() -> int
+{
+	return 0;
+}

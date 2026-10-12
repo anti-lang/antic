@@ -1,0 +1,9 @@
+//! A name of a direct import and the name of an imported module share no name.
+
+import anti.text as equal;
+import anti.text.{equal};
+
+fn main() -> int
+{
+	return 0;
+}

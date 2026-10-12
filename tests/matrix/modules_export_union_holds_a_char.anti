@@ -1,0 +1,13 @@
+//! A field of an `export union` has a type that C can hold, and a `char` is
+//! none.
+
+export union Either
+{
+	c: char,
+	n: c_int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

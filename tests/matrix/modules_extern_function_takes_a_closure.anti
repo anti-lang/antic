@@ -1,0 +1,11 @@
+//! A closure never reaches C: the function pointer of an `extern fn` is one
+//! word and holds no context.
+
+extern fn qsort(base: ?*byte, n: c_size_t, size: c_size_t, order: fn(?*byte, ?*byte) -> c_int);
+
+fn main() -> int
+{
+	let calls = 0;
+	qsort(none, 0, 0, fn(a, b) { calls += 1; return 0; });
+	return calls;
+}

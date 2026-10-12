@@ -1,0 +1,20 @@
+//! `is` on a generic variant names one of its cases, and the message of the
+//! checker for a bare case writes the form with the type arguments,
+//! `Maybe<int>.Some`. The parser reads that form after `is`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+variant Maybe<T>
+{
+	Some { value: T },
+	Nothing,
+}
+
+fn main() -> int
+{
+	let some = Maybe<int>.Some { value: 5 };
+	let nothing = Maybe<int>.Nothing;
+	printf("is %d %d %d\n".ptr, (some is Maybe<int>.Some) as c_int,
+		(nothing is Maybe<int>.Some) as c_int, (nothing is Maybe<int>.Nothing) as c_int);
+	return 0;
+}

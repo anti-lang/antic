@@ -1,0 +1,1 @@
+modules_export_function_gives_a_str.anti:4:21: error: the result of export fn `name` has type `str`, which C cannot represent

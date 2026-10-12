@@ -1,0 +1,19 @@
+//! A `provides` line names a public class of the module it names.
+
+import anti.log;
+
+class Mine
+{
+	implements logger: log.Logger,
+
+	pub concrete fn log(self, level: log.Level, message: str)
+	{
+	}
+}
+
+provides anti.log.Missing as Mine;
+
+fn main() -> int
+{
+	return 0;
+}

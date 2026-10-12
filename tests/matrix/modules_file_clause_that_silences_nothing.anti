@@ -1,0 +1,9 @@
+//! A clause of the whole file that silences nothing is the warning
+//! `unused-allow`, which a release build refuses.
+
+allow(shadowed-catch, "no catch of this file shadows a variable");
+
+fn main() -> int
+{
+	return 0;
+}

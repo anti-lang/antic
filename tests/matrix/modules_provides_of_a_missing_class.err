@@ -1,0 +1,1 @@
+modules_provides_of_a_missing_class.anti:5:29: error: the module declares no class `Missing`

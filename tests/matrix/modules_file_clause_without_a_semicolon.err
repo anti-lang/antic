@@ -1,0 +1,1 @@
+modules_file_clause_without_a_semicolon.anti:4:1: error: expected `;`

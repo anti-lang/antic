@@ -1,0 +1,8 @@
+//! A module path ends with a name.
+
+import anti.;
+
+fn main() -> int
+{
+	return 0;
+}

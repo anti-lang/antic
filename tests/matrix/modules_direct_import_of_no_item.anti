@@ -1,0 +1,8 @@
+//! A direct import lists public items of its module.
+
+import anti.text.{missing_one};
+
+fn main() -> int
+{
+	return 0;
+}

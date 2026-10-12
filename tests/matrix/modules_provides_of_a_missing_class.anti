@@ -1,0 +1,10 @@
+//! A `provides` line names a class of its own module.
+
+import anti.log;
+
+provides anti.log.Logger as Missing;
+
+fn main() -> int
+{
+	return 0;
+}

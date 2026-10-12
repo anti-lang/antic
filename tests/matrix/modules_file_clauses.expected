@@ -1,0 +1,4 @@
+exit 0
+shadowed catch 1 -1 -2
+unguarded field 5
+text 1

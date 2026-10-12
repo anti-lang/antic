@@ -1,0 +1,1 @@
+modules_export_struct_holds_an_array_of_a_str.anti:6:2: error: the field `names` of export struct `Names` has type `[2]str`, which C cannot represent

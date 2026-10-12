@@ -1,0 +1,8 @@
+//! A segment of a module path is an identifier, and a keyword is none.
+
+import anti.fn;
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+modules_file_allow_of_a_safety_check.anti:3:7: error: `unguarded-field` is no warning, and `allow` silences a warning alone

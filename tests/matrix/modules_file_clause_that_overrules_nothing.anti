@@ -1,0 +1,9 @@
+//! A clause of the whole file that overrules no safety check is the warning
+//! `unused-unchecked`, which a release build refuses.
+
+unchecked(unguarded-field, "this file holds no concurrent class");
+
+fn main() -> int
+{
+	return 0;
+}

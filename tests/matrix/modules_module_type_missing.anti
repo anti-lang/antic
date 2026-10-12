@@ -1,0 +1,9 @@
+//! `module.Name` in a type names a public type of the module.
+
+import anti.text;
+
+fn main() -> int
+{
+	let b: ?*text.Missing = none;
+	return 0;
+}

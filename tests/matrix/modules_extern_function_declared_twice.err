@@ -1,0 +1,1 @@
+modules_extern_function_declared_twice.anti:4:11: error: `abs` is already declared

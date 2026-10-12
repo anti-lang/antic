@@ -1,0 +1,64 @@
+//! Every module of the standard library, imported by its path: the 23 modules
+//! under `anti.` and the 12 under `anti.collection.`. The program reaches an
+//! item of eight of them by the name of the module. A dev build links the dev
+//! object of each module, and a release build reads each library file.
+
+import anti.lang;
+import anti.io;
+import anti.text;
+import anti.license;
+import anti.error;
+import anti.time;
+import anti.os;
+import anti.fs;
+import anti.reflect;
+import anti.random;
+import anti.collection;
+import anti.toml;
+import anti.config;
+import anti.args;
+import anti.json;
+import anti.log;
+import anti.debug;
+import anti.mem;
+import anti.runtime;
+import anti.simd;
+import anti.trace;
+import anti.plugin;
+import anti.regex;
+import anti.collection.list;
+import anti.collection.deque;
+import anti.collection.grid;
+import anti.collection.ring;
+import anti.collection.pool;
+import anti.collection.queue;
+import anti.collection.tree;
+import anti.collection.sorted;
+import anti.collection.synchronized;
+import anti.collection.concurrent;
+import anti.collection.map;
+import anti.collection.set;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	printf("text %d\n".ptr, text.equal("a", "a") as c_int);
+	let e = lang.Error.new(3, "three");
+	printf("lang %lld\n".ptr, e.code);
+	delete(e);
+	printf("trace %d\n".ptr, (trace.PROFILE_SLOTS > 0) as c_int);
+	printf("plugin %d\n".ptr, (plugin.NOT_LOADED != plugin.IN_USE) as c_int);
+	printf("reflect %d\n".ptr, (reflect.BAD_INDEX != reflect.NOT_CARRIED) as c_int);
+	let numbers = list.List<int>.new();
+	numbers.push(4);
+	numbers.push(5);
+	printf("list %lld\n".ptr, numbers.count);
+	let ages = map.Map<int, int>.new();
+	ages.set(1, 2);
+	printf("map %lld\n".ptr, ages.count);
+	let seen = set.Set<int>.new();
+	seen.add(3);
+	printf("set %lld\n".ptr, seen.count);
+	return 0;
+}

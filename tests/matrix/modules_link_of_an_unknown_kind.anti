@@ -1,0 +1,8 @@
+//! A `link` line names a framework of Apple or a library of Linux.
+
+link windows "user32";
+
+fn main() -> int
+{
+	return 0;
+}

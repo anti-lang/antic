@@ -1,0 +1,12 @@
+//! A parameter of an `export fn` has a type that C can hold, and a `char` is
+//! none.
+
+export fn take(c: char) -> c_int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

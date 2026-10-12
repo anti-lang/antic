@@ -1,0 +1,1 @@
+modules_export_function_takes_a_char.anti:4:16: error: the parameter `c` of export fn `take` has type `char`, which C cannot represent

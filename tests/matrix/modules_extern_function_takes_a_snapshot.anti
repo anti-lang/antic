@@ -1,0 +1,9 @@
+//! An `extern fn` takes plain C function pointers, and `keep own` holds a
+//! snapshot.
+
+extern fn later(keep own f: fn() -> c_int) -> c_int;
+
+fn main() -> int
+{
+	return 0;
+}

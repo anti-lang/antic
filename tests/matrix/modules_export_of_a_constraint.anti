@@ -1,0 +1,8 @@
+//! A `constraint` is not exported, since C has no generics.
+
+export constraint Key = eq + hash;
+
+fn main() -> int
+{
+	return 0;
+}

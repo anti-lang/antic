@@ -1,0 +1,8 @@
+//! An `export const` is a number, a `bool` or a `str`, and a `char` is none.
+
+export const MARK: char = 'm';
+
+fn main() -> int
+{
+	return 0;
+}

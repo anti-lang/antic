@@ -1,0 +1,1 @@
+modules_provides_of_an_abstract_class.anti:17:29: error: `Half` is abstract, and a `provides` line names a complete class

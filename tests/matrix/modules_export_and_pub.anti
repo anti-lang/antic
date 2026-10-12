@@ -1,0 +1,11 @@
+//! `export` implies `pub`, and an item takes one of the two.
+
+pub export fn both() -> c_int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

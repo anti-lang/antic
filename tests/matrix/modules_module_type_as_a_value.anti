@@ -1,0 +1,9 @@
+//! A type of a module is no value.
+
+import anti.text;
+
+fn main() -> int
+{
+	let b = text.Builder;
+	return 0;
+}

@@ -1,0 +1,18 @@
+//! A `construct` with arguments crosses to C as `anti_<Class>_construct`
+//! whatever its level, so its parameters have types that C can hold, and a
+//! `str` is none.
+
+export class Named
+{
+	pub n: c_int = 0,
+
+	fn construct(self, name: str)
+	{
+		self.n = name.len as c_int;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

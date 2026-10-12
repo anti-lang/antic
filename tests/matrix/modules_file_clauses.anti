@@ -1,0 +1,61 @@
+//! A clause of the whole file stands at the top of the module, among the
+//! imports and before the first item. It covers every line of the file. The
+//! `allow` silences the warning of a `catch` that shadows a variable, twice,
+//! and the `unchecked` overrules the safety check on two fields of a concurrent
+//! class. A release build refuses every warning, so the program compiles there
+//! because the clauses hold.
+
+allow(shadowed-catch, "the clause of the whole file stands before the imports");
+import anti.lang;
+unchecked(unguarded-field, "a second clause stands among the imports");
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+concurrent class Tally
+{
+	plain: int = 0,
+	other: int = 0,
+	atomic safe: int = 0,
+
+	pub fn add(self, n: int) -> int
+	{
+		self.plain = n;
+		self.other = self.plain + 1;
+		self.safe.add(self.other);
+		return self.safe.load();
+	}
+}
+
+fn fails(n: int) -> int may fail
+{
+	if n > 1 {
+		fail "too large";
+	}
+	return n;
+}
+
+fn first(e: int) -> int
+{
+	let got = fails(e) catch e {
+		yield e.code - 1;
+	};
+	return got;
+}
+
+fn second(e: int) -> int
+{
+	let got = fails(e) catch e {
+		yield e.code - 2;
+	};
+	return got;
+}
+
+fn main() -> int
+{
+	let t = Tally { };
+	printf("shadowed catch %lld %lld %lld\n".ptr, first(1), first(2), second(3));
+	printf("unguarded field %lld\n".ptr, t.add(4));
+	printf("text %d\n".ptr, text.equal("a", "a") as c_int);
+	return 0;
+}

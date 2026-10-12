@@ -1,0 +1,1 @@
+modules_export_constant_of_a_struct.anti:8:22: error: export const `ORIGIN` has type `Point`, and an export const is a number, a bool or a str

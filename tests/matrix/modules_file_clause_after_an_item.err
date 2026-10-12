@@ -1,0 +1,1 @@
+modules_file_clause_after_an_item.anti:11:1: error: a clause of the whole file stands at the top of the module, and one of a declaration last in its header

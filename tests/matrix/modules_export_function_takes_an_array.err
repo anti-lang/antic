@@ -1,0 +1,1 @@
+modules_export_function_takes_an_array.anti:4:16: error: the parameter `xs` of export fn `take` has type `[4]i32`, which C cannot represent

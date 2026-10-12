@@ -1,0 +1,8 @@
+//! Decision 26: a `str` as the result of an `extern fn` is refused.
+
+extern fn getenv(name: ?*c_char) -> str;
+
+fn main() -> int
+{
+	return 0;
+}

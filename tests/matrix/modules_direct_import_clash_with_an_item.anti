@@ -1,0 +1,13 @@
+//! A name of a direct import and an item of the file share no name.
+
+import anti.text.{equal};
+
+fn equal(a: int, b: int) -> bool
+{
+	return a == b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

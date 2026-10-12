@@ -1,0 +1,8 @@
+//! An `extern fn` takes no type parameter.
+
+extern fn pick<T>(n: T) -> T;
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,12 @@
+//! Decision 25: `count` of a collection is read-only outside its module.
+//! An assignment through a pointer to the collection is refused.
+
+import anti.collection.list.{List};
+
+fn main() -> int
+{
+	let xs = List<int>.new();
+	let p = &xs;
+	p.count = 5;
+	return 0;
+}

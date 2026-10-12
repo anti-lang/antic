@@ -1,0 +1,1 @@
+modules_extern_function_takes_a_snapshot.anti:4:26: error: an `extern fn` takes plain C function pointers, and `keep own` holds a snapshot

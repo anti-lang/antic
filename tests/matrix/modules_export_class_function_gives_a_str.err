@@ -1,0 +1,1 @@
+modules_export_class_function_gives_a_str.anti:8:9: error: the result of `Named.name` has type `str`, which C cannot represent

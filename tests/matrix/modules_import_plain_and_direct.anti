@@ -1,0 +1,10 @@
+//! A direct import declares the name of its module as a plain import does, so
+//! the two forms of one module in one file declare the name twice.
+
+import anti.text;
+import anti.text.{equal};
+
+fn main() -> int
+{
+	return 0;
+}

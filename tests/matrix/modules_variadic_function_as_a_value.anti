@@ -1,0 +1,9 @@
+//! A variadic function has no function pointer type.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let f = printf;
+	return 0;
+}

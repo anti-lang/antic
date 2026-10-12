@@ -1,0 +1,1 @@
+modules_export_function_declared_twice.anti:8:11: error: `twice` is already declared

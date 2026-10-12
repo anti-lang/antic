@@ -1,0 +1,8 @@
+//! Every pointer of an `extern fn` is `?*T`, those of a callback included.
+
+extern fn each(f: fn(*c_int) -> c_int) -> c_int;
+
+fn main() -> int
+{
+	return 0;
+}

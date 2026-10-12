@@ -1,0 +1,1 @@
+modules_extern_function_with_a_default.anti:3:26: error: an `extern fn` declares what C declares, and C has no default values

@@ -1,0 +1,1 @@
+modules_import_twice.anti:4:8: error: `text` is already declared

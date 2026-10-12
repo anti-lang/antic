@@ -1,0 +1,1 @@
+modules_provides_of_a_class_without_the_interface.anti:10:29: error: `Plain` neither inherits `Logger` nor implements it

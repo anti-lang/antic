@@ -1,0 +1,1 @@
+modules_module_without_an_import.anti:6:5: error: unknown name `text`

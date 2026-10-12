@@ -1,0 +1,9 @@
+//! `Object` is a name the compiler declares in `anti.lang` and no item of its
+//! library file, so a direct import refuses it.
+
+import anti.lang.{Object};
+
+fn main() -> int
+{
+	return 0;
+}

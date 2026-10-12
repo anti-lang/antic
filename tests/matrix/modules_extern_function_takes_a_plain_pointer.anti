@@ -1,0 +1,8 @@
+//! Every pointer of an `extern fn` is `?*T`, a parameter included.
+
+extern fn strlen(s: *c_char) -> c_size_t;
+
+fn main() -> int
+{
+	return 0;
+}

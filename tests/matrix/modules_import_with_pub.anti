@@ -1,0 +1,8 @@
+//! `pub` marks an item, and an `import` is none.
+
+pub import anti.text;
+
+fn main() -> int
+{
+	return 0;
+}

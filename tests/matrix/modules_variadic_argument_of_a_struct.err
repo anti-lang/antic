@@ -1,0 +1,1 @@
+modules_variadic_argument_of_a_struct.anti:14:21: error: a variadic argument has type i32, u32, int, u64, float or a pointer, found `Point`

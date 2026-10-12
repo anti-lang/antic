@@ -1,0 +1,1 @@
+modules_module_type_as_a_value.anti:7:10: error: `text.Builder` is a type, not a value

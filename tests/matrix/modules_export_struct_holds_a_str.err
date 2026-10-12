@@ -1,0 +1,1 @@
+modules_export_struct_holds_a_str.anti:6:2: error: the field `name` of export struct `Named` has type `str`, which C cannot represent

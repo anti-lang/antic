@@ -1,0 +1,1 @@
+modules_export_of_a_constraint.anti:3:8: error: a `constraint` is not exported, since C has no generics

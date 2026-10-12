@@ -1,0 +1,13 @@
+//! An `extern fn` and a function of the module share no name.
+
+extern fn abs(n: c_int) -> c_int;
+
+fn abs(n: c_int) -> c_int
+{
+	return n;
+}
+
+fn main() -> int
+{
+	return 0;
+}

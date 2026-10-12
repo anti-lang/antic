@@ -1,0 +1,13 @@
+//! A field of a case of an `export variant` has a type that C can hold, and a
+//! `str` is none.
+
+export variant Shape
+{
+	Named { name: str },
+	Empty,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,15 @@
+//! The class of a `provides` line implements the interface the line names.
+
+import anti.log;
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+provides anti.log.Logger as Plain;
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,12 @@
+//! A field of an `export struct` has a type that C can hold, and a slice is
+//! none.
+
+export struct Row
+{
+	xs: []c_int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

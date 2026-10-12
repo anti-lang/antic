@@ -1,0 +1,6 @@
+//! `main` is the entry of the program and is not exported.
+
+export fn main() -> int
+{
+	return 0;
+}

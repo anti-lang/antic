@@ -1,0 +1,11 @@
+//! An item is `pub` or `internal`, never both.
+
+pub internal fn both() -> int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	return both();
+}

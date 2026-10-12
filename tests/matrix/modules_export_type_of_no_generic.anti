@@ -1,0 +1,8 @@
+//! `export type` names a copy of a generic struct or class.
+
+export type Count = c_int;
+
+fn main() -> int
+{
+	return 0;
+}

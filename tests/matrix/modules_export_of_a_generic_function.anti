@@ -1,0 +1,11 @@
+//! An `export fn` is not generic. `export type` names a copy.
+
+export fn pick<T>(a: T, first: bool) -> bool
+{
+	return first;
+}
+
+fn main() -> int
+{
+	return 0;
+}

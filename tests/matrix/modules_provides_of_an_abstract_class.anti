@@ -1,0 +1,22 @@
+//! A `provides` line names a complete class, and an abstract class is none.
+
+import anti.log;
+
+abstract class Half
+{
+	implements logger: log.Logger,
+}
+
+class Full inherits Half
+{
+	pub concrete fn log(self, level: log.Level, message: str)
+	{
+	}
+}
+
+provides anti.log.Logger as Half;
+
+fn main() -> int
+{
+	return 0;
+}

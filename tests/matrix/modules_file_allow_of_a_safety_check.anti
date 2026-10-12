@@ -1,0 +1,13 @@
+//! `allow` silences a warning, and a safety check takes `unchecked`.
+
+allow(unguarded-field, "a safety check takes unchecked");
+
+concurrent class Tally
+{
+	plain: int = 0,
+}
+
+fn main() -> int
+{
+	return 0;
+}

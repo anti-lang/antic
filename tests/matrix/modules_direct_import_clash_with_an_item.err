@@ -1,0 +1,1 @@
+modules_direct_import_clash_with_an_item.anti:3:19: error: `equal` of `anti.text` clashes with `equal` declared on line 5
