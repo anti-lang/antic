@@ -960,16 +960,84 @@ let a = c.area();
 c.move(1.0, 1.0);
 ```
 
-- `class Name inherits Base` names the base in the header, after the name and after `align(N)` when the class has one. One base, `anti.lang.Object` when absent, and `module.Class` for a base of another module. The base is no member, so `inherits` in the body is refused, and `implements` and `use` stay there as named sub-objects. `self.super` is the base part and `self.super.f()` the base's function, which is refused when that function is abstract.
-- `pub fn` goes into the table and is visible everywhere, `protected fn` to the class and its chain, `fn` to the class only. A function without `self` is static: `Circle.new(...)`. A `const` of the body is reached as `Shape.MAX`. An `operator fn` at module level reaches the private and protected fields and functions of the classes of its own module. An ordinary function of the module and an operator of another module do not.
+- A body holds its fields first, then its constants, its static fields and its functions. A field after one of those is refused.
+- `class Name inherits Base` names the base in the header, after the name and after `align(N)` when the class has one. One base, `anti.lang.Object` when absent, and `module.Class` for a base of another module. A base takes type arguments, `class IntBox inherits Box<int>`. The base is no member, so `inherits` in the body is refused, and `implements` and `use` stay there as named sub-objects. `self.super` is the base part and `self.super.f()` the base's function, which is refused when that function is abstract.
+- `pub fn` goes into the table and is visible everywhere, `protected fn` to the class and its chain, `fn` to the class only. A function without `self` is static: `Circle.new(...)`, and it may share its name with a static function of the chain. A `const` of the body is reached as `Shape.MAX`. An `operator fn` at module level reaches the private and protected fields and functions of the classes of its own module. An ordinary function of the module and an operator of another module do not.
 - `abstract class` is required when any function has no body. `final class` and `final fn` forbid inheritance and replacement.
-- `concrete fn` replaces an inherited entry, `concrete fn Base::f` documents which, `concrete fn Iface::f` fills one interface's table only.
+- `concrete fn` replaces an inherited entry, `concrete fn Base::f` documents which, `concrete fn Iface::f` fills one interface's table only. A function that matches an abstract one needs `concrete`.
 - Fields are private unless `pub` or `protected`, and a field may be a bitfield as in a struct. A literal outside the class names `pub` fields only, and names a class of another module as `shapes.Circle { }`. Defaults fill the rest, then `construct` runs. An inline class field without a default takes `T { }` when every field of `T` has a default or `T` has none, and `construct` runs on it. Otherwise the literal must name it.
 - `alloc T { fields }` and `alloc T(args)` create on the heap and return `*T`. `T { fields }` and `T(args)` are values. A `construct` with arguments that can fail is written `may fail`, leaves with `fail` and succeeds at its end. Every path that succeeds assigns every field without a default, which the compiler checks. `T(args)` carries the error of `construct` to the handler at the call, and a failed `alloc` frees the object.
-- A `construct` below that wants its base initialised calls `self.super.construct(args)` as the first statement of its body, and `try` forwards a failure of the base. One that leaves the call out keeps the defaults of the base's fields.
+- A class has one `construct`, and one without arguments cannot fail. A `construct` below that wants its base initialised calls `self.super.construct(args)` as the first statement of its body, and `try` forwards a failure of the base. One that leaves the call out keeps the defaults of the base's fields.
+- No code calls `construct` or `destruct` by name, apart from `self.super.construct(args)`. `alloc`, a literal and `T(args)` run the first. `delete`, `destroy` and the end of a block run the second, which the compiler chains up the bases.
 - `delete(p)` runs `destruct` up the chain, frees owned fields, frees the object. `destroy(&v)` does the same without the free. `destroy(&v)` of a local moves `v` out, so its block skips its teardown and naming `v` again is refused, and `destroy` of a part of a local is refused. `delete(p, from)` and `destroy(p, from)` give every piece of owned memory back to the `anti.mem.Allocator` `from`, and `delete` the object as well. Memory goes back to the allocator it came from. A value is destroyed at the end of its block, and so is each element of a local array of them, last to first.
 - `dup(p)` is a deep copy through ownership. `=` that copies an existing value with owned fields is refused. A fresh value on the right, a literal, `T(args)` or the result of `dup`, moves, and `=` destroys the value it replaces first.
-- `p is *T`, `p as *T` checked, `p as? *T` gives `none` on a mismatch. `==` on class pointers is object identity.
+- `p is *T`, `p as *T` checked, `p as? *T` gives `none` on a mismatch. `==` on class pointers is object identity, and on pointers of two classes that share no chain it is refused.
+
+```anti
+import anti.io;
+
+class Account
+{
+	pub balance: int = 0,
+
+	fn construct(self, balance: int) may fail
+	{
+		if balance < 0 { fail "a negative balance"; }
+		self.balance = balance;
+	}
+
+	protected fn add(self, n: int) { self.balance += n; }
+
+	pub fn describe(self) -> str { return "account"; }
+}
+
+class Savings inherits Account
+{
+	pub rate: int = 1,
+
+	fn construct(self, balance: int, rate: int) may fail
+	{
+		try self.super.construct(balance);
+		self.rate = rate;
+	}
+
+	pub fn percent(of: int, rate: int) -> int { return of * rate / 100; }
+
+	pub fn pay(self) { self.add(Savings.percent(self.balance, self.rate)); }
+
+	concrete fn Account::describe(self) -> str
+	{
+		if self.rate == 0 { return self.super.describe(); }
+		return "savings";
+	}
+}
+
+fn main() -> int
+{
+	let s = Savings(200, 5) catch fatal;
+	s.pay();
+	if s.balance == 210 { io.println("210"); }
+
+	let a: *Account = &s;
+	io.println(a.describe());
+	if a is *Savings { io.println("a is a Savings"); }
+	let back = a as? *Savings;
+	if back != none { io.println("and converts to one"); }
+
+	let spare = Savings(0, 0) catch fatal;
+	io.println(spare.describe());
+	destroy(&spare);
+	return 0;
+}
+```
+
+```text
+210
+savings
+a is a Savings
+and converts to one
+account
+```
 
 A class may declare a `struct`, `enum` or `class` inside its body. The nested type is private: only the enclosing class names it, and a public signature that names it is a compile error. Its full name is `PeopleList.Node` in the symbols and `PeopleList_Node` in the header, where one that the layout of an `export class` reaches stands before the class with its layout alone. A type that users work with directly stays at module level.
 
@@ -990,6 +1058,8 @@ class PeopleList
 	head: ?*Node = none,
 }
 ```
+
+Not built yet: three refusals of the checker. A class with an `abstract fn` whose header does not say `abstract` compiles, and so does `self.super.destruct()`. `==` on pointers of two classes that share no chain compiles and is always false.
 
 ## Interfaces
 
