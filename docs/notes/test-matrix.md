@@ -440,10 +440,10 @@ column means that no source holds the row at all.
 | Types | 32 | 194 | 20 | 0 | 0 |
 | Ownership | 18 | 248 | 1 | 125 | 0 |
 | Errors | 15 | 173 | 0 | 41 | 0 |
-| Threads | 29 | 71 | 335 | 52 | 144 |
+| Threads | 29 | 402 | 4 | 189 | 7 |
 | Classes | 26 | 47 | 9 | 0 | 0 |
 | Modules | 19 | 29 | 1 | 0 | 0 |
-| All | 206 | 1969 | 367 | 1347 | 145 |
+| All | 206 | 2300 | 36 | 1484 | 8 |
 
 ### Flow
 
@@ -1137,27 +1137,27 @@ Where two rules meet, and where three do:
 | Construct | Held, with the first source that holds it | Open |
 |---|---|---|
 | `worker fn` | module level `programs/channel_workers`, generic `programs/generic_fn_args`, library module `modules/closures/com/example/walk` | none |
-| `parallel` | function `programs/parallel_sum` | module level, method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `parallel ... by` | function `programs/channels`, loop body `programs/parallel_join`, library module `modules/closures/com/example/walk` | module level, method, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type |
-| `dispatch` | function `programs/channel_workers`, loop body `programs/parallel_join`, worker `programs/dispatch_job` | module level, method, switch arm, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `join` | function `programs/channel_workers`, loop body `programs/parallel_join`, worker `programs/dispatch_job` | module level, method, switch arm, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `join_all` | function `programs/dispatch_job` | module level, method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `sync m { }` | function `programs/closures`, method `programs/concurrent`, loop body `programs/concurrent`, closure `programs/closures`, worker `programs/sync_pairs`, `sync` block `programs/concurrent`, generic body `programs/generic_sync`, library module `modules/sync/com/example/queue` | switch arm, `if let`, `defer`, `undo`, catch handler, `dispatch` or `parallel`, `select` arm, `tests` block, `fixtures` block, nested type |
-| `Mutex.new()` | function `programs/closures`, library module `modules/sync/com/example/queue` | module level, method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type |
-| `m.destroy()` of a Mutex | function `programs/closures` | module level, method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `chan T(n)` | function `programs/channel_workers`, library module `modules/sync/com/example/queue` | module level, method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type |
-| `send` | function `programs/channel_workers`, loop body `programs/channel_workers`, worker `programs/channel_workers` | method, switch arm, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `recv` | function `programs/channel_workers`, loop body `programs/channel_workers`, worker `programs/channel_workers`, library module `modules/sync/com/example/queue` | module level, method, switch arm, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type |
-| `close` | function `programs/channel_workers`, worker `programs/channel_workers` | module level, method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `select` | function `programs/channel_workers`, loop body `programs/channel_workers`, library module `modules/sync/com/example/queue` | method, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type |
-| atomic `load` | function `programs/alloc_owning`, method `programs/concurrent`, loop body `programs/parallel_join`, worker `programs/parallel_join`, generic body `programs/generic_sync` | module level, switch arm, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type, library module |
-| atomic `store` | function `programs/atomic_widths`, loop body `programs/parallel_join`, worker `programs/parallel_join` | module level, method, switch arm, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| atomic `swap` | function `programs/atomic_widths` | module level, method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| atomic `add` | function `programs/alloc_owning`, method `programs/atomics`, loop body `programs/sync_pairs`, switch arm `programs/variant_owning`, `if let` `programs/variant_owning`, closure `programs/concurrent`, worker `programs/dispatch_job`, generic body `programs/generic_sync`, library module `modules/sync/com/example/queue` | module level, `defer`, `undo`, catch handler, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type |
-| atomic `sub` | function `programs/atomic_widths`, method `programs/alloc_owning` | module level, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| atomic `and` | function `programs/atomic_widths` | module level, method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| atomic `or` | function `programs/atomic_widths` | module level, method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| atomic `compare_swap` | function `programs/atomic_widths`, method `programs/lock_free_queue`, loop body `programs/lock_free_queue` | module level, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
+| `parallel` | function `programs/parallel_sum`, module level the refusal `matrix/threads_parallel_at_module_level`, method `matrix/threads_parallel`, loop body `matrix/threads_parallel`, switch arm `matrix/threads_parallel`, `if let` `matrix/threads_parallel`, `defer` `matrix/threads_parallel`, `undo` `matrix/threads_parallel`, catch handler `matrix/threads_parallel`, closure `matrix/threads_parallel`, worker `matrix/threads_parallel`, `dispatch` or `parallel` `matrix/threads_parallel`, `sync` block `matrix/threads_parallel`, `select` arm `matrix/threads_parallel`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_parallel`, nested type `matrix/threads_parallel`, library module `modules/threads/com/example/threads` | none |
+| `parallel ... by` | function `programs/channels`, loop body `programs/parallel_join`, library module `modules/closures/com/example/walk`, module level the refusal `matrix/threads_parallel_by_at_module_level`, method `matrix/threads_parallel`, switch arm `matrix/threads_parallel`, `if let` `matrix/threads_parallel`, `defer` `matrix/threads_parallel`, `undo` `matrix/threads_parallel`, catch handler `matrix/threads_parallel`, closure `matrix/threads_parallel`, worker `matrix/threads_parallel`, `dispatch` or `parallel` `matrix/threads_parallel`, `sync` block `matrix/threads_parallel`, `select` arm `matrix/threads_parallel`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_parallel`, nested type `matrix/threads_parallel` | none |
+| `dispatch` | function `programs/channel_workers`, loop body `programs/parallel_join`, worker `programs/dispatch_job`, module level the refusal `matrix/threads_dispatch_at_module_level`, method `matrix/threads_dispatch`, switch arm `matrix/threads_dispatch`, `if let` `matrix/threads_dispatch`, `defer` `matrix/threads_dispatch`, `undo` `matrix/threads_dispatch`, catch handler `matrix/threads_dispatch`, closure `matrix/threads_dispatch`, `dispatch` or `parallel` `matrix/threads_dispatch`, `sync` block `matrix/threads_dispatch`, `select` arm `matrix/threads_dispatch`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_dispatch`, nested type `matrix/threads_dispatch`, library module `modules/threads/com/example/threads` | none |
+| `join` | function `programs/channel_workers`, loop body `programs/parallel_join`, worker `programs/dispatch_job`, module level the refusal `matrix/threads_join_at_module_level`, method `matrix/threads_dispatch`, switch arm `matrix/threads_dispatch`, `if let` `matrix/threads_dispatch`, `defer` `matrix/threads_dispatch`, `undo` `matrix/threads_dispatch`, catch handler `matrix/threads_dispatch`, closure `matrix/threads_dispatch`, `dispatch` or `parallel` `matrix/threads_dispatch`, `sync` block `matrix/threads_dispatch`, `select` arm `matrix/threads_dispatch`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_dispatch`, nested type `matrix/threads_dispatch`, library module `modules/threads/com/example/threads` | none |
+| `join_all` | function `programs/dispatch_job`, method `matrix/threads_dispatch`, loop body `matrix/threads_dispatch`, switch arm `matrix/threads_dispatch`, `if let` `matrix/threads_dispatch`, `defer` `matrix/threads_dispatch`, `undo` `matrix/threads_dispatch`, catch handler `matrix/threads_dispatch`, closure `matrix/threads_dispatch`, worker `matrix/threads_dispatch`, `dispatch` or `parallel` `matrix/threads_dispatch`, `sync` block `matrix/threads_dispatch`, `select` arm `matrix/threads_dispatch`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_dispatch`, nested type `matrix/threads_dispatch`, library module `modules/threads/com/example/threads` | module level: the call gives no value, and a constant or a default takes one |
+| `sync m { }` | function `programs/closures`, method `programs/concurrent`, loop body `programs/concurrent`, closure `programs/closures`, worker `programs/sync_pairs`, `sync` block `programs/concurrent`, generic body `programs/generic_sync`, library module `modules/sync/com/example/queue`, switch arm `matrix/threads_mutex`, `if let` `matrix/threads_mutex`, `defer` `matrix/threads_mutex`, `undo` `matrix/threads_mutex`, catch handler `matrix/threads_mutex`, `dispatch` or `parallel` `matrix/threads_mutex`, `select` arm `matrix/threads_mutex`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, nested type `matrix/threads_mutex` | none |
+| `Mutex.new()` | function `programs/closures`, library module `modules/sync/com/example/queue`, module level the refusal `matrix/threads_mutex_new_at_module_level`, method `matrix/threads_mutex`, loop body `matrix/threads_mutex`, switch arm `matrix/threads_mutex`, `if let` `matrix/threads_mutex`, `defer` `matrix/threads_mutex`, `undo` `matrix/threads_mutex`, catch handler `matrix/threads_mutex`, closure `matrix/threads_mutex`, worker `matrix/threads_mutex`, `dispatch` or `parallel` `matrix/threads_mutex`, `sync` block `matrix/threads_mutex`, `select` arm `matrix/threads_mutex`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_mutex`, nested type `matrix/threads_mutex` | none |
+| `m.destroy()` of a Mutex | function `programs/closures`, method `matrix/threads_mutex`, loop body `matrix/threads_mutex`, switch arm `matrix/threads_mutex`, `if let` `matrix/threads_mutex`, `defer` `matrix/threads_mutex`, `undo` `matrix/threads_mutex`, catch handler `matrix/threads_mutex`, closure `matrix/threads_mutex`, worker `matrix/threads_mutex`, `dispatch` or `parallel` `matrix/threads_mutex`, `sync` block `matrix/threads_mutex`, `select` arm `matrix/threads_mutex`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_mutex`, nested type `matrix/threads_mutex`, library module `modules/threads/com/example/threads` | module level: the call gives no value, and a constant or a default takes one |
+| `chan T(n)` | function `programs/channel_workers`, library module `modules/sync/com/example/queue`, module level the refusal `matrix/threads_chan_at_module_level`, method `matrix/threads_channel`, loop body `matrix/threads_channel`, switch arm `matrix/threads_channel`, `if let` `matrix/threads_channel`, `defer` `matrix/threads_channel`, `undo` `matrix/threads_channel`, catch handler `matrix/threads_channel`, closure `matrix/threads_channel`, worker `matrix/threads_channel`, `dispatch` or `parallel` `matrix/threads_channel`, `sync` block `matrix/threads_channel`, `select` arm `matrix/threads_channel`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_channel`, nested type `matrix/threads_channel` | none |
+| `send` | function `programs/channel_workers`, loop body `programs/channel_workers`, worker `programs/channel_workers`, method `matrix/threads_channel`, switch arm `matrix/threads_channel`, `if let` `matrix/threads_channel`, `defer` `matrix/threads_channel`, `undo` `matrix/threads_channel`, catch handler `matrix/threads_channel`, closure `matrix/threads_channel`, `dispatch` or `parallel` `matrix/threads_channel`, `sync` block `matrix/threads_channel`, `select` arm `matrix/threads_channel`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_channel`, nested type `matrix/threads_channel`, library module `modules/threads/com/example/threads` | none |
+| `recv` | function `programs/channel_workers`, loop body `programs/channel_workers`, worker `programs/channel_workers`, library module `modules/sync/com/example/queue`, module level the refusal `matrix/threads_recv_at_module_level`, method `matrix/threads_channel`, switch arm `matrix/threads_channel`, `if let` `matrix/threads_channel`, `defer` `matrix/threads_channel`, `undo` `matrix/threads_channel`, catch handler `matrix/threads_channel`, closure `matrix/threads_channel`, `dispatch` or `parallel` `matrix/threads_channel`, `sync` block `matrix/threads_channel`, `select` arm `matrix/threads_channel`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_channel`, nested type `matrix/threads_channel` | none |
+| `close` | function `programs/channel_workers`, worker `programs/channel_workers`, method `matrix/threads_channel`, loop body `matrix/threads_channel`, switch arm `matrix/threads_channel`, `if let` `matrix/threads_channel`, `defer` `matrix/threads_channel`, `undo` `matrix/threads_channel`, catch handler `matrix/threads_channel`, closure `matrix/threads_channel`, `dispatch` or `parallel` `matrix/threads_channel`, `sync` block `matrix/threads_channel`, `select` arm `matrix/threads_channel`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_channel`, nested type `matrix/threads_channel`, library module `modules/threads/com/example/threads` | module level: the call gives no value, and a constant or a default takes one |
+| `select` | function `programs/channel_workers`, loop body `programs/channel_workers`, library module `modules/sync/com/example/queue`, method `matrix/threads_select`, switch arm `matrix/threads_select`, `if let` `matrix/threads_select`, `defer` `matrix/threads_select`, `undo` `matrix/threads_select`, catch handler `matrix/threads_select`, closure `matrix/threads_select`, worker `matrix/threads_select`, `dispatch` or `parallel` `matrix/threads_select`, `sync` block `matrix/threads_select`, `select` arm `matrix/threads_select`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_select`, nested type `matrix/threads_select` | none |
+| atomic `load` | function `programs/alloc_owning`, method `programs/concurrent`, loop body `programs/parallel_join`, worker `programs/parallel_join`, generic body `programs/generic_sync`, module level the refusal `matrix/threads_atomic_load_at_module_level`, switch arm `matrix/threads_atomic_places`, `if let` `matrix/threads_atomic_places`, `defer` `matrix/threads_atomic_places`, `undo` `matrix/threads_atomic_places`, catch handler `matrix/threads_atomic_places`, closure `matrix/threads_atomic_places`, `dispatch` or `parallel` `matrix/threads_atomic_places`, `sync` block `matrix/threads_atomic_places`, `select` arm `matrix/threads_atomic_places`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, nested type `matrix/threads_atomic_places`, library module `modules/threads/com/example/threads` | none |
+| atomic `store` | function `programs/atomic_widths`, loop body `programs/parallel_join`, worker `programs/parallel_join`, method `matrix/threads_atomic_places`, switch arm `matrix/threads_atomic_places`, `if let` `matrix/threads_atomic_places`, `defer` `matrix/threads_atomic_places`, `undo` `matrix/threads_atomic_places`, catch handler `matrix/threads_atomic_places`, closure `matrix/threads_atomic_places`, `dispatch` or `parallel` `matrix/threads_atomic_places`, `sync` block `matrix/threads_atomic_places`, `select` arm `matrix/threads_atomic_places`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_atomic_places`, nested type `matrix/threads_atomic_places`, library module `modules/threads/com/example/threads` | module level: the call gives no value, and a constant or a default takes one |
+| atomic `swap` | function `programs/atomic_widths`, module level the refusal `matrix/threads_atomic_swap_at_module_level`, method `matrix/threads_atomic_places`, loop body `matrix/threads_atomic_places`, switch arm `matrix/threads_atomic_places`, `if let` `matrix/threads_atomic_places`, `defer` `matrix/threads_atomic_places`, `undo` `matrix/threads_atomic_places`, catch handler `matrix/threads_atomic_places`, closure `matrix/threads_atomic_places`, worker `matrix/threads_atomic_places`, `dispatch` or `parallel` `matrix/threads_atomic_places`, `sync` block `matrix/threads_atomic_places`, `select` arm `matrix/threads_atomic_places`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_atomic_places`, nested type `matrix/threads_atomic_places`, library module `modules/threads/com/example/threads` | none |
+| atomic `add` | function `programs/alloc_owning`, method `programs/atomics`, loop body `programs/sync_pairs`, switch arm `programs/variant_owning`, `if let` `programs/variant_owning`, closure `programs/concurrent`, worker `programs/dispatch_job`, generic body `programs/generic_sync`, library module `modules/sync/com/example/queue`, module level the refusal `matrix/threads_atomic_add_at_module_level`, `defer` `matrix/threads_atomic_arithmetic`, `undo` `matrix/threads_atomic_arithmetic`, catch handler `matrix/threads_atomic_arithmetic`, `dispatch` or `parallel` `matrix/threads_atomic_arithmetic`, `sync` block `matrix/threads_atomic_arithmetic`, `select` arm `matrix/threads_atomic_arithmetic`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, nested type `matrix/threads_atomic_arithmetic` | none |
+| atomic `sub` | function `programs/atomic_widths`, method `programs/alloc_owning`, module level the refusal `matrix/threads_atomic_sub_at_module_level`, loop body `matrix/threads_atomic_arithmetic`, switch arm `matrix/threads_atomic_arithmetic`, `if let` `matrix/threads_atomic_arithmetic`, `defer` `matrix/threads_atomic_arithmetic`, `undo` `matrix/threads_atomic_arithmetic`, catch handler `matrix/threads_atomic_arithmetic`, closure `matrix/threads_atomic_arithmetic`, worker `matrix/threads_atomic_arithmetic`, `dispatch` or `parallel` `matrix/threads_atomic_arithmetic`, `sync` block `matrix/threads_atomic_arithmetic`, `select` arm `matrix/threads_atomic_arithmetic`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_atomic_arithmetic`, nested type `matrix/threads_atomic_arithmetic`, library module `modules/threads/com/example/threads` | none |
+| atomic `and` | function `programs/atomic_widths`, module level the refusal `matrix/threads_atomic_and_at_module_level`, method `matrix/threads_atomic_arithmetic`, loop body `matrix/threads_atomic_arithmetic`, switch arm `matrix/threads_atomic_arithmetic`, `if let` `matrix/threads_atomic_arithmetic`, `defer` `matrix/threads_atomic_arithmetic`, `undo` `matrix/threads_atomic_arithmetic`, catch handler `matrix/threads_atomic_arithmetic`, closure `matrix/threads_atomic_arithmetic`, worker `matrix/threads_atomic_arithmetic`, `dispatch` or `parallel` `matrix/threads_atomic_arithmetic`, `sync` block `matrix/threads_atomic_arithmetic`, `select` arm `matrix/threads_atomic_arithmetic`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_atomic_arithmetic`, nested type `matrix/threads_atomic_arithmetic`, library module `modules/threads/com/example/threads` | none |
+| atomic `or` | function `programs/atomic_widths`, module level the refusal `matrix/threads_atomic_or_at_module_level`, method `matrix/threads_atomic_arithmetic`, loop body `matrix/threads_atomic_arithmetic`, switch arm `matrix/threads_atomic_arithmetic`, `if let` `matrix/threads_atomic_arithmetic`, `defer` `matrix/threads_atomic_arithmetic`, `undo` `matrix/threads_atomic_arithmetic`, catch handler `matrix/threads_atomic_arithmetic`, closure `matrix/threads_atomic_arithmetic`, worker `matrix/threads_atomic_arithmetic`, `dispatch` or `parallel` `matrix/threads_atomic_arithmetic`, `sync` block `matrix/threads_atomic_arithmetic`, `select` arm `matrix/threads_atomic_arithmetic`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_atomic_arithmetic`, nested type `matrix/threads_atomic_arithmetic`, library module `modules/threads/com/example/threads` | none |
+| atomic `compare_swap` | function `programs/atomic_widths`, method `programs/lock_free_queue`, loop body `programs/lock_free_queue`, module level the refusal `matrix/threads_atomic_compare_swap_at_module_level`, switch arm `matrix/threads_atomic_places`, `if let` `matrix/threads_atomic_places`, `defer` `matrix/threads_atomic_places`, `undo` `matrix/threads_atomic_places`, catch handler `matrix/threads_atomic_places`, closure `matrix/threads_atomic_places`, worker `matrix/threads_atomic_places`, `dispatch` or `parallel` `matrix/threads_atomic_places`, `sync` block `matrix/threads_atomic_places`, `select` arm `matrix/threads_atomic_places`, `tests` block `anti-test/com/example/threads`, `fixtures` block `anti-test/com/example/threads`, generic body `matrix/threads_atomic_places`, nested type `matrix/threads_atomic_places`, library module `modules/threads/com/example/threads` | none |
 | `concurrent` parameter | `programs/closures` | none |
 | `synchronized class` | `programs/generic_methods` | none |
 | `concurrent class` | `programs/concurrent` | none |
@@ -1170,16 +1170,117 @@ The kinds of threads:
 
 | Construct | Kinds held | Kinds open |
 |---|---|---|
-| `chan T(n)` | int `programs/channel_workers`, channel `programs/channel_workers` | i8, i16, i32, i64, u8, u16, u32, u64, uint, byte, f32, f64, f16, bool, char, str, slice, fixed array, pointer, nullable pointer, optional value, lent value, may-fail function value, function value, tuple, struct, packed struct, simd struct, union, enum, variant, class, synchronized class, concurrent class, interface, generic parameter |
-| `send` | int `programs/channel_workers`, pointer `programs/channels`, channel `programs/channel_workers` | i8, i16, i32, i64, u8, u16, u32, u64, uint, byte, f32, f64, f16, bool, char, str, slice, fixed array, nullable pointer, optional value, lent value, may-fail function value, function value, tuple, struct, packed struct, simd struct, union, enum, variant, class, synchronized class, concurrent class, interface, generic parameter |
-| atomic `load` | i8 `programs/atomic_widths`, i16 `programs/atomic_widths`, i32 `programs/atomic_widths`, int `programs/alloc_owning`, byte `programs/atomic_widths`, bool `programs/atomic_widths`, nullable pointer `programs/atomic_widths` | i64, u8, u16, u32, u64, uint, pointer, enum |
-| atomic `store` | i8 `programs/atomic_widths`, i16 `programs/atomic_widths`, i32 `programs/atomic_widths`, int `programs/atomic_widths`, byte `programs/atomic_widths`, bool `programs/atomic_widths`, pointer `programs/atomic_widths`, nullable pointer `programs/atomic_widths` | i64, u8, u16, u32, u64, uint, enum |
-| atomic `swap` | i8 `programs/atomic_widths`, i16 `programs/atomic_widths`, i32 `dump/atomics`, int `programs/atomic_widths`, bool `programs/atomic_widths`, pointer `programs/atomic_widths`, nullable pointer `programs/atomic_widths` | i64, u8, u16, u32, u64, uint, byte, enum |
-| atomic `add` | i8 `programs/atomic_widths`, i16 `programs/atomic_widths`, i32 `programs/atomic_widths`, int `programs/alloc_owning`, byte `programs/atomic_widths` | i64, u8, u16, u32, u64, uint, bool, pointer, nullable pointer, enum |
-| atomic `sub` | i8 `programs/atomic_widths`, i16 `dump/atomics`, i32 `programs/atomic_widths`, int `programs/alloc_owning`, byte `programs/atomic_widths` | i64, u8, u16, u32, u64, uint, bool, pointer, nullable pointer, enum |
-| atomic `and` | i8 `programs/atomic_widths`, i16 `dump/atomics`, i32 `dump/atomics`, int `programs/atomic_widths` | i64, u8, u16, u32, u64, uint, byte, bool, pointer, nullable pointer, enum |
-| atomic `or` | i8 `programs/atomic_widths`, i16 `dump/atomics`, i32 `dump/atomics`, int `programs/atomic_widths` | i64, u8, u16, u32, u64, uint, byte, bool, pointer, nullable pointer, enum |
-| atomic `compare_swap` | i8 `dump/atomics`, i16 `programs/atomic_widths`, i32 `programs/atomic_widths`, int `programs/atomic_widths`, bool `programs/atomic_widths`, pointer `programs/atomic_widths`, nullable pointer `programs/atomic_widths` | i64, u8, u16, u32, u64, uint, byte, enum |
+| `chan T(n)` | int `programs/channel_workers`, channel `programs/channel_workers`, i8 `matrix/threads_channel_kinds`, i16 `matrix/threads_channel_kinds`, i32 `matrix/threads_channel_kinds`, i64 `matrix/threads_channel_kinds`, u8 `matrix/threads_channel_kinds`, u16 `matrix/threads_channel_kinds`, u32 `matrix/threads_channel_kinds`, u64 `matrix/threads_channel_kinds`, uint `matrix/threads_channel_kinds`, byte `matrix/threads_channel_kinds`, f32 `matrix/threads_channel_kinds`, f64 `matrix/threads_channel_kinds`, f16 `matrix/threads_channel_kinds`, bool `matrix/threads_channel_kinds`, char `matrix/threads_channel_kinds`, str `matrix/threads_channel_kinds`, slice the refusal `matrix/threads_channel_of_slices`, fixed array `matrix/threads_channel_kinds`, pointer the refusal `matrix/threads_channel_of_pointers`, nullable pointer the refusal `matrix/threads_channel_of_nullable_pointers`, optional value `matrix/threads_channel_kinds`, may-fail function value the refusal `matrix/threads_channel_of_failing_functions`, function value the refusal `matrix/threads_channel_of_functions`, tuple `matrix/threads_channel_kinds`, struct `matrix/threads_channel_kinds`, packed struct `matrix/threads_channel_kinds`, simd struct `matrix/threads_channel_kinds`, union `matrix/threads_channel_kinds`, enum `matrix/threads_channel_kinds`, variant `matrix/threads_channel_kinds`, class `matrix/threads_channel_kinds`, synchronized class `matrix/threads_channel_kinds`, concurrent class `matrix/threads_channel_kinds`, interface the refusal `matrix/threads_channel_of_interface_pointers`, generic parameter `matrix/threads_channel_kinds` | lent value: `lent` marks a parameter and the result of `operator fn value`, and the type of a channel is written without it |
+| `send` | int `programs/channel_workers`, pointer `programs/channels`, channel `programs/channel_workers`, i8 `matrix/threads_channel_kinds`, i16 `matrix/threads_channel_kinds`, i32 `matrix/threads_channel_kinds`, i64 `matrix/threads_channel_kinds`, u8 `matrix/threads_channel_kinds`, u16 `matrix/threads_channel_kinds`, u32 `matrix/threads_channel_kinds`, u64 `matrix/threads_channel_kinds`, uint `matrix/threads_channel_kinds`, byte `matrix/threads_channel_kinds`, f32 `matrix/threads_channel_kinds`, f64 `matrix/threads_channel_kinds`, f16 `matrix/threads_channel_kinds`, bool `matrix/threads_channel_kinds`, char `matrix/threads_channel_kinds`, str `matrix/threads_channel_kinds`, fixed array `matrix/threads_channel_kinds`, optional value `matrix/threads_channel_kinds`, tuple `matrix/threads_channel_kinds`, struct `matrix/threads_channel_kinds`, packed struct `matrix/threads_channel_kinds`, simd struct `matrix/threads_channel_kinds`, union `matrix/threads_channel_kinds`, enum `matrix/threads_channel_kinds`, variant `matrix/threads_channel_kinds`, class `matrix/threads_channel_kinds`, synchronized class `matrix/threads_channel_kinds`, concurrent class `matrix/threads_channel_kinds`, generic parameter `matrix/threads_channel_kinds` | slice, nullable pointer, lent value, may-fail function value, function value, interface: no channel carries the kind, so no `send` takes it |
+| atomic `load` | i8 `programs/atomic_widths`, i16 `programs/atomic_widths`, i32 `programs/atomic_widths`, int `programs/alloc_owning`, byte `programs/atomic_widths`, bool `programs/atomic_widths`, nullable pointer `programs/atomic_widths`, i64 `matrix/threads_atomic_kinds`, u8 `matrix/threads_atomic_kinds`, u16 `matrix/threads_atomic_kinds`, u32 `matrix/threads_atomic_kinds`, u64 `matrix/threads_atomic_kinds`, uint `matrix/threads_atomic_kinds`, pointer `matrix/threads_atomic_kinds`, enum the refusal `matrix/threads_atomic_field_of_an_enum` T059 | none |
+| atomic `store` | i8 `programs/atomic_widths`, i16 `programs/atomic_widths`, i32 `programs/atomic_widths`, int `programs/atomic_widths`, byte `programs/atomic_widths`, bool `programs/atomic_widths`, pointer `programs/atomic_widths`, nullable pointer `programs/atomic_widths`, i64 `matrix/threads_atomic_kinds`, u8 `matrix/threads_atomic_kinds`, u16 `matrix/threads_atomic_kinds`, u32 `matrix/threads_atomic_kinds`, u64 `matrix/threads_atomic_kinds`, uint `matrix/threads_atomic_kinds`, enum the refusal `matrix/threads_atomic_field_of_an_enum` T059 | none |
+| atomic `swap` | i8 `programs/atomic_widths`, i16 `programs/atomic_widths`, i32 `dump/atomics`, int `programs/atomic_widths`, bool `programs/atomic_widths`, pointer `programs/atomic_widths`, nullable pointer `programs/atomic_widths`, i64 `matrix/threads_atomic_kinds`, u8 `matrix/threads_atomic_kinds`, u16 `matrix/threads_atomic_kinds`, u32 `matrix/threads_atomic_kinds`, u64 `matrix/threads_atomic_kinds`, uint `matrix/threads_atomic_kinds`, byte `matrix/threads_atomic_kinds`, enum the refusal `matrix/threads_atomic_field_of_an_enum` T059 | none |
+| atomic `add` | i8 `programs/atomic_widths`, i16 `programs/atomic_widths`, i32 `programs/atomic_widths`, int `programs/alloc_owning`, byte `programs/atomic_widths`, i64 `matrix/threads_atomic_kinds`, u8 `matrix/threads_atomic_kinds`, u16 `matrix/threads_atomic_kinds`, u32 `matrix/threads_atomic_kinds`, u64 `matrix/threads_atomic_kinds`, uint `matrix/threads_atomic_kinds`, bool the refusal `matrix/threads_atomic_add_on_a_bool` T060, pointer the refusal `matrix/threads_atomic_add_on_a_pointer` T060, nullable pointer the refusal `matrix/threads_atomic_add_on_a_nullable_pointer` T060, enum the refusal `matrix/threads_atomic_field_of_an_enum` T059 | none |
+| atomic `sub` | i8 `programs/atomic_widths`, i16 `dump/atomics`, i32 `programs/atomic_widths`, int `programs/alloc_owning`, byte `programs/atomic_widths`, i64 `matrix/threads_atomic_kinds`, u8 `matrix/threads_atomic_kinds`, u16 `matrix/threads_atomic_kinds`, u32 `matrix/threads_atomic_kinds`, u64 `matrix/threads_atomic_kinds`, uint `matrix/threads_atomic_kinds`, bool the refusal `matrix/threads_atomic_sub_on_a_bool` T060, pointer the refusal `matrix/threads_atomic_sub_on_a_pointer` T060, nullable pointer the refusal `matrix/threads_atomic_sub_on_a_nullable_pointer` T060, enum the refusal `matrix/threads_atomic_field_of_an_enum` T059 | none |
+| atomic `and` | i8 `programs/atomic_widths`, i16 `dump/atomics`, i32 `dump/atomics`, int `programs/atomic_widths`, i64 `matrix/threads_atomic_kinds`, u8 `matrix/threads_atomic_kinds`, u16 `matrix/threads_atomic_kinds`, u32 `matrix/threads_atomic_kinds`, u64 `matrix/threads_atomic_kinds`, uint `matrix/threads_atomic_kinds`, byte `matrix/threads_atomic_kinds`, bool `matrix/threads_atomic_kinds`, pointer the refusal `matrix/threads_atomic_and_on_a_pointer` T060, nullable pointer the refusal `matrix/threads_atomic_and_on_a_nullable_pointer` T060, enum the refusal `matrix/threads_atomic_field_of_an_enum` T059 | none |
+| atomic `or` | i8 `programs/atomic_widths`, i16 `dump/atomics`, i32 `dump/atomics`, int `programs/atomic_widths`, i64 `matrix/threads_atomic_kinds`, u8 `matrix/threads_atomic_kinds`, u16 `matrix/threads_atomic_kinds`, u32 `matrix/threads_atomic_kinds`, u64 `matrix/threads_atomic_kinds`, uint `matrix/threads_atomic_kinds`, byte `matrix/threads_atomic_kinds`, bool `matrix/threads_atomic_kinds`, pointer the refusal `matrix/threads_atomic_or_on_a_pointer` T060, nullable pointer the refusal `matrix/threads_atomic_or_on_a_nullable_pointer` T060, enum the refusal `matrix/threads_atomic_field_of_an_enum` T059 | none |
+| atomic `compare_swap` | i8 `dump/atomics`, i16 `programs/atomic_widths`, i32 `programs/atomic_widths`, int `programs/atomic_widths`, bool `programs/atomic_widths`, pointer `programs/atomic_widths`, nullable pointer `programs/atomic_widths`, i64 `matrix/threads_atomic_kinds`, u8 `matrix/threads_atomic_kinds`, u16 `matrix/threads_atomic_kinds`, u32 `matrix/threads_atomic_kinds`, u64 `matrix/threads_atomic_kinds`, uint `matrix/threads_atomic_kinds`, byte `matrix/threads_atomic_kinds`, enum the refusal `matrix/threads_atomic_field_of_an_enum` T059 | none |
+
+The step `threads` filled the two tables above on 2026-10-12.
+`tests/matrix/` holds its sources under the names `threads_*`.
+
+- `matrix/threads_dispatch`, `threads_parallel`, `threads_mutex`,
+  `threads_channel`, `threads_select`, `threads_atomic_places` and
+  `threads_atomic_arithmetic` hold their constructs in fifteen places
+  each, one function `in_<context>` and one line of output per place and
+  input, as `matrix/flow_<construct>` does. The place "`dispatch` or
+  `parallel`" is the anonymous function at a `concurrent` parameter of a
+  worker that a `dispatch` runs. The place "worker" is a worker that a
+  `dispatch` runs.
+- `anti-test/com/example/threads` is the module of the test
+  `anti_test_threads`. It holds the `tests` block and the `fixtures` block.
+- `modules/threads/com/example/threads` is the library of the test
+  `threads_modules`. It holds each construct in a plain function and in a
+  generic one. `dispatch`, `join` and `join_all` in a generic function of
+  a library stand in `generic_dispatch_modules`, T061. The client runs two
+  workers of the library. A worker is named alone after the arrow, so a
+  direct import brings each name.
+- A construct that gives a value is refused in a constant: fourteen
+  refusals `matrix/threads_*_at_module_level`, and two for the default of
+  a field and of a parameter. `join_all`, `m.destroy()`, `close` and
+  `store` give no value, so those four cells cannot exist.
+- `matrix/threads_channel_kinds` sends and receives each kind a channel
+  carries. `matrix/threads_atomic_kinds` runs the operations on each kind
+  an atomic holds, on a field and on a local.
+  `matrix/threads_worker_kinds` passes each kind through a `dispatch` and
+  a `parallel`, which have no row in the kinds table.
+- Six kinds of `chan T(n)` hold a refusal, since a channel carries no
+  pointer. The same kinds of `send` cannot exist, and neither can a lent
+  value in either row.
+- An atomic holds no enum. `matrix/types_atomic_local_of_an_enum` refuses
+  the local, and the field compiles, T059.
+
+The constructs of the area that have no row of their own:
+
+- Decision 23: `matrix/threads_join_twice` and
+  `matrix/threads_join_after_join_all`, T053, the test `check_join_twice`
+  of `traps/join_twice`, T054, and `matrix/threads_dispatch_in_a_loop`
+  and `matrix/threads_return_before_the_join`, T055. The two programs run
+  with `--anti.threads=1`, so each job starts at its `join`.
+- What a job stands in: `matrix/threads_jobs`. It holds `join_all` of no
+  job and of a part of an array, a worker without a result and a job in a
+  tuple. It holds a `dispatch` of an object in flight as well.
+- The split of `parallel`: `matrix/threads_parallel_split`. The order of
+  `select`: `matrix/threads_select_order`.
+- Guarded fields: `matrix/threads_guarded_fields` holds a reach inside
+  its `sync` in ten places, and four refusals
+  `matrix/threads_guarded_field_*` a reach outside it.
+- The lock orders of a dev build in one thread: the tests `lock_orders`
+  and `lock_order_once` of `tests/traps/`, T063.
+- The stops of the runtime: `trap_chan_capacity`, `trap_send_closed` and
+  `trap_send_closed_waiting`.
+- The rules of a worker: nine refusals `matrix/threads_worker_argument_*`
+  for an argument that holds a pointer, and one each for a result and a
+  chunk.
+- Eighteen refusals hold the thirteen messages of the area that no test
+  expected. They name what `dispatch` and `join` take, the name after the
+  arrow and the atomic operations that do not exist. The others name the
+  forms of `static`, of `worker` and of an arm of a `select`.
+
+Where two rules meet, and where three do:
+
+- A `dispatch`, a loop and the arguments of a job:
+  `matrix/threads_dispatch_in_a_loop`, T055.
+- A `dispatch`, an anonymous function and a `join` after its return:
+  `matrix/threads_return_before_the_join`, T055.
+- A generic function, a channel and a type argument that is a pointer:
+  `matrix/threads_channel_of_a_type_parameter_that_is_a_pointer` and
+  `matrix/threads_channel_in_a_generic_struct_of_a_pointer`, T058.
+- A generic class, an atomic field and its type argument:
+  `matrix/threads_atomic_field_of_a_type_parameter_that_is_f64`, T059.
+  `matrix/threads_atomic_local_of_a_type_parameter` holds the local.
+- A generic function, a library file and a `dispatch`:
+  `generic_dispatch_modules`, T061.
+- A generic worker, a `dispatch` and a type argument that is a pointer:
+  `matrix/threads_worker_argument_of_a_type_parameter_is_a_pointer`.
+- A closure, a `concurrent` parameter and each way to change a captured
+  variable: seven refusals `matrix/threads_concurrent_closure_changes_*`.
+- A closure, a guarded field and a `sync`: `in_closure` of
+  `matrix/threads_guarded_fields` and
+  `matrix/threads_guarded_field_in_a_closure_inside_its_sync`.
+- A `defer`, a guarded field and a `sync`: `in_defer` of
+  `matrix/threads_guarded_fields` and
+  `matrix/threads_guarded_field_in_a_defer_before_its_sync`.
+- A thread-safe class, a public function and a pointer inside a tuple, a
+  struct or the result of a private function: four refusals
+  `matrix/threads_pointer_into_fields_*`, T062.
+- An atomic local, a `snapshot fn` and a `parallel`:
+  `matrix/threads_atomic_captures`.
+- An atomic, an arithmetic operation and a `bool` or a pointer: ten
+  refusals `matrix/threads_atomic_*_on_a_*`, T060.
+- A worker, a default value of a parameter and a `dispatch`:
+  `matrix/threads_dispatch_leaves_out_a_default_argument`.
+- A constant, a struct and a Mutex:
+  `matrix/threads_const_of_a_struct_with_a_mutex`, T056.
+- A static field, its default and a call:
+  `matrix/threads_static_default_is_a_call`, T057.
+- Two locks, their two orders and a second run of each: `lock_order_once`,
+  T063.
 
 ### Classes
 
@@ -1250,8 +1351,8 @@ antic 0.2.0 does otherwise, the test becomes an expected failure by decision
 | 20 | errors | a `catch` handler of a value that can reach its end | T044, the nine refusals `matrix/errors_handler_reaches_its_end_*`, `matrix/errors_handler_of_*_reaches_its_end` and `matrix/errors_handler_without_a_name_reaches_its_end`, and the program `matrix/errors_handler_exits` for the ways a handler may end |
 | 21 | errors | `try` on an optional, with a message that names `let ... else` and `??` | T045 for a call that the checker takes and T046 for the message of the others, the five refusals `matrix/errors_try_on_an_optional_*` |
 | 22 | ownership | `return` of a field that owns something | T037, the seven refusals `matrix/ownership_return_of_a_field_copies_*`, one per kind of owning value, and `matrix/ownership_return_through_a_pointer_copies` and `matrix/ownership_return_of_an_element_copies` for `*p` and an element |
-| 23 | threads | a second `join` of one job, refused where the checker sees it and trapped in dev mode otherwise | open |
-| 23 | threads | the arguments of a `dispatch` in a loop, stored per job | open |
+| 23 | threads | a second `join` of one job, refused where the checker sees it and trapped in dev mode otherwise | T053, the refusals `matrix/threads_join_twice` and `matrix/threads_join_after_join_all`, and T054, the test `check_join_twice` of `traps/join_twice` |
+| 23 | threads | the arguments of a `dispatch` in a loop, stored per job | T055, the programs `matrix/threads_dispatch_in_a_loop` and `matrix/threads_return_before_the_join` |
 | 24 | values, types | a constant index past the end of a fixed array | T016, the refusal `matrix/values_index_past_end`, and `matrix/types_array_field_index_past_end`, `matrix/types_array_inner_index_past_end` and `matrix/types_array_write_past_end` for a field, an inner array and a write |
 | 24 | values, ownership | `xs[lo..hi]` past the length, trapped in dev mode | T017, the test `check_slice_range` of `traps/slice_range`, and `check_slice_of_slice_range`, `check_slice_range_reversed` and `check_slice_range_negative` for a slice of a slice, a low bound above the high one and one below zero |
 | 25 | modules | a write of `count` of a collection outside its module | open |
@@ -1259,7 +1360,7 @@ antic 0.2.0 does otherwise, the test becomes an expected failure by decision
 | 27 | classes | a class with an `abstract fn` that is not `abstract` | open |
 | 27 | classes | a direct call of `destruct` | the refusal `matrix/ownership_destruct_called_directly` |
 | 27 | classes | `mutable` on a field of a plain class | open |
-| 27 | classes | `static atomic` on an `f64` | open |
+| 27 | classes | `static atomic` on an `f64` | T059, the refusal `matrix/threads_static_atomic_of_f64`, which the step `threads` wrote with the atomic fields |
 | 27 | classes | `==` on pointers of two unrelated classes | open |
 | 27 | classes | `equals` replaced without `hash` | open |
 | 27 | values | `<` on an enum, which stays refused | the refusal `matrix/values_less_on_enum` |
@@ -1347,8 +1448,8 @@ On 2026-10-12, at antic 0.2.0:
   contextual words.
 - 10 item kinds, 22 statement kinds, 38 expression kinds and 10 type kinds
   in `src/antic/ast.h`.
-- 206 rows in the matrix. 1969 cells are held and 367 are
-  open. Of the kinds, 1347 are held and 145 are open. The step `flow` filled
+- 206 rows in the matrix. 2300 cells are held and 36 are
+  open. Of the kinds, 1484 are held and 8 are open. The step `flow` filled
   its area after the count of 840 held cells and 578 held kinds. The step
   `values` filled its area after the count of 1157 held cells and 622 held
   kinds. The step `types` filled its area after the count of 1613 held
@@ -1356,8 +1457,10 @@ On 2026-10-12, at antic 0.2.0:
   `ownership` filled its area after the count of 1676 held cells and 1237
   held kinds. Its one open cell cannot exist, and it states why. The step
   `errors` filled its area after the count of 1845 held cells and 1317
-  held kinds.
-- 9 open cells for the rules of decisions 19 to 27.
-- 748 messages: 534 expected by a test and 214 open. antic gives 598 with
-  76 open, and anti 150 with 138 open.
+  held kinds. The step `threads` filled its area after the count of 1969
+  held cells and 1347 held kinds. Its 4 open cells and its 7 open kinds
+  cannot exist, and each states why.
+- 6 open cells for the rules of decisions 19 to 27.
+- 748 messages: 548 expected by a test and 200 open. antic gives 598 with
+  62 open, and anti 150 with 138 open.
 - 134 options and commands: 124 passed by a test and 10 open.
