@@ -1,0 +1,16 @@
+//! A simd built-in is a call, and no constant expression.
+
+simd struct I32x4
+{
+	a: i32,
+	b: i32,
+	c: i32,
+	d: i32,
+}
+
+const LANES: I32x4 = I32x4.splat(2);
+
+fn main() -> int
+{
+	return LANES.a as int;
+}

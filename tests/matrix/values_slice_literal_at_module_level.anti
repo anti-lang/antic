@@ -1,0 +1,8 @@
+//! A slice literal is no constant expression.
+
+const NOTHING: []int = []int { ptr: none, len: 0 };
+
+fn main() -> int
+{
+	return NOTHING.len;
+}

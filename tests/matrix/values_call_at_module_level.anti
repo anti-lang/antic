@@ -1,0 +1,19 @@
+//! A call is no constant expression, in a constant and in the default of a
+//! parameter.
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+const FOUR: int = twice(2);
+
+fn add(n: int, by: int = twice(2)) -> int
+{
+	return n + by;
+}
+
+fn main() -> int
+{
+	return add(FOUR, 1);
+}

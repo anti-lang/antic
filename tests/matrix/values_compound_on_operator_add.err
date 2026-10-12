@@ -1,0 +1,1 @@
+values_compound_on_operator_add.anti:19:2: error: `+=` does not apply to `Money`

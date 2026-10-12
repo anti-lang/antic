@@ -1,0 +1,10 @@
+//! `here` is no constant expression, so a `const` cannot hold it.
+
+import anti.lang;
+
+const AT: lang.SourceLocation = here;
+
+fn main() -> int
+{
+	return AT.line;
+}

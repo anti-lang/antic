@@ -1,0 +1,1 @@
+values_simd_at_module_level.anti:11:22: error: a call is not a constant expression

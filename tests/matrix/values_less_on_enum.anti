@@ -1,0 +1,18 @@
+//! `<` on an enum stays refused, by decision 27 of "Decisions of 2026-10-11".
+//! The values compare with `==` and `!=` alone.
+
+enum Level
+{
+	Low,
+	High,
+}
+
+fn main() -> int
+{
+	let a = Level.Low;
+	let b = Level.High;
+	if a < b {
+		return 1;
+	}
+	return 0;
+}

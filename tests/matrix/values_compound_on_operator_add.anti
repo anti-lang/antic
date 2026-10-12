@@ -1,0 +1,21 @@
+//! `+=` is not derived from an `operator fn add`, by decision 27 of "Decisions
+//! of 2026-10-11".
+
+class Money
+{
+	pub cents: int = 0,
+
+	operator fn add(self, other: Money) -> Money
+	{
+		return Money { cents: self.cents + other.cents };
+	}
+}
+
+fn main() -> int
+{
+	let total = Money { cents: 100 };
+	let more = Money { cents: 50 };
+	let sum = total + more;
+	total += more;
+	return sum.cents + total.cents;
+}

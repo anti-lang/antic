@@ -1,0 +1,10 @@
+//! A slice of a constant array is no constant expression: the slice points into
+//! its array, and a constant has no address.
+
+const TABLE: [3]int = [10, 20, 30];
+const PART: []int = TABLE[0..2];
+
+fn main() -> int
+{
+	return PART.len;
+}

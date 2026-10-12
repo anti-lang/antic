@@ -1,0 +1,39 @@
+//! The constructs of the values area that stand at module level, each in a
+//! constant: a raw string, a byte string, a hex string, an element of a tuple,
+//! the bitwise operators and an index. `here` stands as the default of a
+//! parameter, the one place at module level that takes it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const RAW: str = r"a\nb";
+const BYTES: []byte = b"\x00\xff";
+const RAW_BYTES: []byte = br"\x00";
+const HEX: []byte = x"00 AB CC";
+const PAIR: (int, int) = (4, 5);
+const SECOND_OF_PAIR: int = PAIR.1;
+const BITS: int = (6 & 3) | (8 ^ 1) | (~0 & 16);
+const TABLE: [3]int = [10, 20, 30];
+const SECOND_OF_TABLE: int = TABLE[1];
+
+fn line_of(at: lang.SourceLocation = here) -> int
+{
+	return at.line;
+}
+
+fn main() -> int
+{
+	printf("raw %d %d\n".ptr, RAW.len as c_int, RAW[1] as c_int);
+	printf("bytes %d %d\n".ptr, BYTES.len as c_int, BYTES[1] as c_int);
+	printf("raw_bytes %d %d\n".ptr, RAW_BYTES.len as c_int,
+		RAW_BYTES[0] as c_int);
+	printf("hex %d %d\n".ptr, HEX.len as c_int, HEX[1] as c_int);
+	printf("tuple_element %d\n".ptr, SECOND_OF_PAIR as c_int);
+	printf("bitwise %d\n".ptr, BITS as c_int);
+	printf("index %d\n".ptr, SECOND_OF_TABLE as c_int);
+	let first = line_of();
+	let second = line_of();
+	printf("here %d\n".ptr, (second - first) as c_int);
+	return 0;
+}
