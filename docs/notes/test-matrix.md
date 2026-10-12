@@ -549,7 +549,8 @@ of lowering meet:
 | `flow_fail_in_catch`, `flow_try_in_catch`, `flow_fail_in_closure`, `flow_try_in_closure`, `flow_catch_in_worker` | `fail` and `try` in a handler and in a closure, and a handler in a worker | |
 | `flow_fail_in_worker_dispatched`, `flow_try_in_worker_parallel` | a worker that may fail is refused at `dispatch` and at `parallel` | |
 | `flow_loop_variable_in_closure`, `flow_arm_binding_in_closure`, `flow_bindings_in_defer` | the names a `for`, an arm, an `if let` and a `catch` bind, read by a closure or a `defer` | |
-| `flow_switch_arms_all_return`, `flow_if_let_arms_all_return`, `flow_while_true_no_return` | a `switch`, an `if let` and a `while true` do not end the path of a function | |
+| `flow_switch_arms_all_return`, `flow_while_true_no_return` | a `switch` whose arms all return and a `while true` do not end the path of a function | |
+| `flow_if_let_case_arms_all_return`, `flow_if_let_arms_all_return` | an `if let` whose arm and `else` return ends the path, on a case of a variant and on a `?T` | T007, the second |
 | `flow_switch_two_else`, `flow_switch_arm_not_statement`, `flow_for_step_not_integer`, `flow_for_range_not_integer` | four refusals of the parser and the checker | |
 | `flow_yield_needs_value`, `flow_yield_takes_no_value`, `flow_yield_outside_handler` | three refusals of `yield` | |
 

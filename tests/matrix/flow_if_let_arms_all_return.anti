@@ -1,6 +1,8 @@
-//! A function whose `if let` returns in its arm and in its `else` still needs a
-//! `return` after it. No document states the rule, and the test holds what
-//! antic 0.2.0 does.
+//! An `if let` on a `?int` whose arm and whose `else` both return ends the path
+//! of its function, since the missing-return rule reads an `if let` as an `if`
+//! with an `else`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 fn half(n: int) -> ?int
 {
@@ -21,5 +23,6 @@ fn run(n: int) -> int
 
 fn main() -> int
 {
-	return run(2);
+	printf("%d %d\n".ptr, run(4) as c_int, run(3) as c_int);
+	return 0;
 }

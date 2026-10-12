@@ -38,3 +38,6 @@ matrix_flow_closure_reads_try_error_release T005 A closure in a handler reads an
 matrix_flow_closure_reads_try_error_memory_checks T005 A closure in a handler reads another word for the error the handler binds.
 matrix_flow_defer_directly_in_defer_refused T006 The refusal of a `defer` in a `defer` stands at the next statement.
 matrix_flow_undo_directly_in_undo_refused T006 The refusal of an `undo` in an `undo` stands at the next statement.
+matrix_flow_if_let_arms_all_return_dev T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
+matrix_flow_if_let_arms_all_return_release T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
+matrix_flow_if_let_arms_all_return_memory_checks T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
