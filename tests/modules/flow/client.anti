@@ -1,0 +1,215 @@
+//! The client of the flow library: every construct of the flow area in a
+//! function of a library module, and in a generic one that this module compiles
+//! a copy of.
+
+import com.example.flow;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	printf("if %d %d\n".ptr, flow.run_if(1) as c_int,
+		flow.gen_if<str>(1) as c_int);
+	printf("if %d %d\n".ptr, flow.run_if(2) as c_int,
+		flow.gen_if<str>(2) as c_int);
+	printf("if %d %d\n".ptr, flow.run_if(3) as c_int,
+		flow.gen_if<str>(3) as c_int);
+	printf("if %d %d\n".ptr, flow.run_if(4) as c_int,
+		flow.gen_if<str>(4) as c_int);
+	printf("else %d %d\n".ptr, flow.run_else(1) as c_int,
+		flow.gen_else<str>(1) as c_int);
+	printf("else %d %d\n".ptr, flow.run_else(2) as c_int,
+		flow.gen_else<str>(2) as c_int);
+	printf("else %d %d\n".ptr, flow.run_else(3) as c_int,
+		flow.gen_else<str>(3) as c_int);
+	printf("else %d %d\n".ptr, flow.run_else(4) as c_int,
+		flow.gen_else<str>(4) as c_int);
+	printf("while %d %d\n".ptr, flow.run_while(0) as c_int,
+		flow.gen_while<str>(0) as c_int);
+	printf("while %d %d\n".ptr, flow.run_while(1) as c_int,
+		flow.gen_while<str>(1) as c_int);
+	printf("while %d %d\n".ptr, flow.run_while(3) as c_int,
+		flow.gen_while<str>(3) as c_int);
+	printf("while %d %d\n".ptr, flow.run_while(5) as c_int,
+		flow.gen_while<str>(5) as c_int);
+	printf("do_while %d %d\n".ptr, flow.run_do_while(0) as c_int,
+		flow.gen_do_while<str>(0) as c_int);
+	printf("do_while %d %d\n".ptr, flow.run_do_while(1) as c_int,
+		flow.gen_do_while<str>(1) as c_int);
+	printf("do_while %d %d\n".ptr, flow.run_do_while(3) as c_int,
+		flow.gen_do_while<str>(3) as c_int);
+	printf("do_while %d %d\n".ptr, flow.run_do_while(5) as c_int,
+		flow.gen_do_while<str>(5) as c_int);
+	printf("for_range %d %d\n".ptr, flow.run_for_range(0) as c_int,
+		flow.gen_for_range<str>(0) as c_int);
+	printf("for_range %d %d\n".ptr, flow.run_for_range(1) as c_int,
+		flow.gen_for_range<str>(1) as c_int);
+	printf("for_range %d %d\n".ptr, flow.run_for_range(3) as c_int,
+		flow.gen_for_range<str>(3) as c_int);
+	printf("for_range %d %d\n".ptr, flow.run_for_range(5) as c_int,
+		flow.gen_for_range<str>(5) as c_int);
+	printf("for_each %d %d\n".ptr, flow.run_for_each(1) as c_int,
+		flow.gen_for_each<str>(1) as c_int);
+	printf("for_each %d %d\n".ptr, flow.run_for_each(2) as c_int,
+		flow.gen_for_each<str>(2) as c_int);
+	printf("for_each %d %d\n".ptr, flow.run_for_each(3) as c_int,
+		flow.gen_for_each<str>(3) as c_int);
+	printf("for_each %d %d\n".ptr, flow.run_for_each(4) as c_int,
+		flow.gen_for_each<str>(4) as c_int);
+	printf("for_lent %d %d\n".ptr, flow.run_for_lent(1) as c_int,
+		flow.gen_for_lent<str>(1) as c_int);
+	printf("for_lent %d %d\n".ptr, flow.run_for_lent(2) as c_int,
+		flow.gen_for_lent<str>(2) as c_int);
+	printf("for_lent %d %d\n".ptr, flow.run_for_lent(3) as c_int,
+		flow.gen_for_lent<str>(3) as c_int);
+	printf("for_lent %d %d\n".ptr, flow.run_for_lent(4) as c_int,
+		flow.gen_for_lent<str>(4) as c_int);
+	printf("for_index %d %d\n".ptr, flow.run_for_index(1) as c_int,
+		flow.gen_for_index<str>(1) as c_int);
+	printf("for_index %d %d\n".ptr, flow.run_for_index(2) as c_int,
+		flow.gen_for_index<str>(2) as c_int);
+	printf("for_index %d %d\n".ptr, flow.run_for_index(3) as c_int,
+		flow.gen_for_index<str>(3) as c_int);
+	printf("for_index %d %d\n".ptr, flow.run_for_index(4) as c_int,
+		flow.gen_for_index<str>(4) as c_int);
+	printf("break %d %d\n".ptr, flow.run_break(0) as c_int,
+		flow.gen_break<str>(0) as c_int);
+	printf("break %d %d\n".ptr, flow.run_break(1) as c_int,
+		flow.gen_break<str>(1) as c_int);
+	printf("break %d %d\n".ptr, flow.run_break(4) as c_int,
+		flow.gen_break<str>(4) as c_int);
+	printf("break %d %d\n".ptr, flow.run_break(12) as c_int,
+		flow.gen_break<str>(12) as c_int);
+	printf("continue %d %d\n".ptr, flow.run_continue(0) as c_int,
+		flow.gen_continue<str>(0) as c_int);
+	printf("continue %d %d\n".ptr, flow.run_continue(1) as c_int,
+		flow.gen_continue<str>(1) as c_int);
+	printf("continue %d %d\n".ptr, flow.run_continue(4) as c_int,
+		flow.gen_continue<str>(4) as c_int);
+	printf("continue %d %d\n".ptr, flow.run_continue(12) as c_int,
+		flow.gen_continue<str>(12) as c_int);
+	printf("return_value %d %d\n".ptr, flow.run_return_value(1) as c_int,
+		flow.gen_return_value<str>(1) as c_int);
+	printf("return_value %d %d\n".ptr, flow.run_return_value(2) as c_int,
+		flow.gen_return_value<str>(2) as c_int);
+	printf("return_value %d %d\n".ptr, flow.run_return_value(3) as c_int,
+		flow.gen_return_value<str>(3) as c_int);
+	printf("return_value %d %d\n".ptr, flow.run_return_value(4) as c_int,
+		flow.gen_return_value<str>(4) as c_int);
+	printf("switch %d %d\n".ptr, flow.run_switch(1) as c_int,
+		flow.gen_switch<str>(1) as c_int);
+	printf("switch %d %d\n".ptr, flow.run_switch(2) as c_int,
+		flow.gen_switch<str>(2) as c_int);
+	printf("switch %d %d\n".ptr, flow.run_switch(3) as c_int,
+		flow.gen_switch<str>(3) as c_int);
+	printf("switch %d %d\n".ptr, flow.run_switch(4) as c_int,
+		flow.gen_switch<str>(4) as c_int);
+	printf("switch_else %d %d\n".ptr, flow.run_switch_else(1) as c_int,
+		flow.gen_switch_else<str>(1) as c_int);
+	printf("switch_else %d %d\n".ptr, flow.run_switch_else(2) as c_int,
+		flow.gen_switch_else<str>(2) as c_int);
+	printf("switch_else %d %d\n".ptr, flow.run_switch_else(3) as c_int,
+		flow.gen_switch_else<str>(3) as c_int);
+	printf("switch_else %d %d\n".ptr, flow.run_switch_else(4) as c_int,
+		flow.gen_switch_else<str>(4) as c_int);
+	printf("arm_binds %d %d\n".ptr, flow.run_arm_binds(1) as c_int,
+		flow.gen_arm_binds<str>(1) as c_int);
+	printf("arm_binds %d %d\n".ptr, flow.run_arm_binds(2) as c_int,
+		flow.gen_arm_binds<str>(2) as c_int);
+	printf("arm_binds %d %d\n".ptr, flow.run_arm_binds(3) as c_int,
+		flow.gen_arm_binds<str>(3) as c_int);
+	printf("arm_binds %d %d\n".ptr, flow.run_arm_binds(4) as c_int,
+		flow.gen_arm_binds<str>(4) as c_int);
+	printf("arm_call %d %d\n".ptr, flow.run_arm_call(1) as c_int,
+		flow.gen_arm_call<str>(1) as c_int);
+	printf("arm_call %d %d\n".ptr, flow.run_arm_call(2) as c_int,
+		flow.gen_arm_call<str>(2) as c_int);
+	printf("arm_call %d %d\n".ptr, flow.run_arm_call(3) as c_int,
+		flow.gen_arm_call<str>(3) as c_int);
+	printf("arm_call %d %d\n".ptr, flow.run_arm_call(4) as c_int,
+		flow.gen_arm_call<str>(4) as c_int);
+	printf("fallthrough %d %d\n".ptr, flow.run_fallthrough(1) as c_int,
+		flow.gen_fallthrough<str>(1) as c_int);
+	printf("fallthrough %d %d\n".ptr, flow.run_fallthrough(2) as c_int,
+		flow.gen_fallthrough<str>(2) as c_int);
+	printf("fallthrough %d %d\n".ptr, flow.run_fallthrough(3) as c_int,
+		flow.gen_fallthrough<str>(3) as c_int);
+	printf("fallthrough %d %d\n".ptr, flow.run_fallthrough(4) as c_int,
+		flow.gen_fallthrough<str>(4) as c_int);
+	printf("if_let %d %d\n".ptr, flow.run_if_let(1) as c_int,
+		flow.gen_if_let<str>(1) as c_int);
+	printf("if_let %d %d\n".ptr, flow.run_if_let(2) as c_int,
+		flow.gen_if_let<str>(2) as c_int);
+	printf("if_let %d %d\n".ptr, flow.run_if_let(3) as c_int,
+		flow.gen_if_let<str>(3) as c_int);
+	printf("if_let %d %d\n".ptr, flow.run_if_let(4) as c_int,
+		flow.gen_if_let<str>(4) as c_int);
+	printf("if_let_else %d %d\n".ptr, flow.run_if_let_else(1) as c_int,
+		flow.gen_if_let_else<str>(1) as c_int);
+	printf("if_let_else %d %d\n".ptr, flow.run_if_let_else(2) as c_int,
+		flow.gen_if_let_else<str>(2) as c_int);
+	printf("if_let_else %d %d\n".ptr, flow.run_if_let_else(3) as c_int,
+		flow.gen_if_let_else<str>(3) as c_int);
+	printf("if_let_else %d %d\n".ptr, flow.run_if_let_else(4) as c_int,
+		flow.gen_if_let_else<str>(4) as c_int);
+	printf("defer %d %d\n".ptr, flow.run_defer(1) as c_int,
+		flow.gen_defer<str>(1) as c_int);
+	printf("defer %d %d\n".ptr, flow.run_defer(2) as c_int,
+		flow.gen_defer<str>(2) as c_int);
+	printf("defer %d %d\n".ptr, flow.run_defer(3) as c_int,
+		flow.gen_defer<str>(3) as c_int);
+	printf("defer %d %d\n".ptr, flow.run_defer(4) as c_int,
+		flow.gen_defer<str>(4) as c_int);
+	printf("assert %d %d\n".ptr, flow.run_assert(1) as c_int,
+		flow.gen_assert<str>(1) as c_int);
+	printf("assert %d %d\n".ptr, flow.run_assert(2) as c_int,
+		flow.gen_assert<str>(2) as c_int);
+	printf("assert %d %d\n".ptr, flow.run_assert(3) as c_int,
+		flow.gen_assert<str>(3) as c_int);
+	printf("assert %d %d\n".ptr, flow.run_assert(4) as c_int,
+		flow.gen_assert<str>(4) as c_int);
+	printf("block %d %d\n".ptr, flow.run_block(1) as c_int,
+		flow.gen_block<str>(1) as c_int);
+	printf("block %d %d\n".ptr, flow.run_block(2) as c_int,
+		flow.gen_block<str>(2) as c_int);
+	printf("block %d %d\n".ptr, flow.run_block(3) as c_int,
+		flow.gen_block<str>(3) as c_int);
+	printf("block %d %d\n".ptr, flow.run_block(4) as c_int,
+		flow.gen_block<str>(4) as c_int);
+	printf("and %d %d\n".ptr, flow.run_and(1) as c_int,
+		flow.gen_and<str>(1) as c_int);
+	printf("and %d %d\n".ptr, flow.run_and(2) as c_int,
+		flow.gen_and<str>(2) as c_int);
+	printf("and %d %d\n".ptr, flow.run_and(3) as c_int,
+		flow.gen_and<str>(3) as c_int);
+	printf("and %d %d\n".ptr, flow.run_and(4) as c_int,
+		flow.gen_and<str>(4) as c_int);
+	printf("or %d %d\n".ptr, flow.run_or(1) as c_int,
+		flow.gen_or<str>(1) as c_int);
+	printf("or %d %d\n".ptr, flow.run_or(2) as c_int,
+		flow.gen_or<str>(2) as c_int);
+	printf("or %d %d\n".ptr, flow.run_or(3) as c_int,
+		flow.gen_or<str>(3) as c_int);
+	printf("or %d %d\n".ptr, flow.run_or(4) as c_int,
+		flow.gen_or<str>(4) as c_int);
+	printf("in_range %d %d\n".ptr, flow.run_in_range(1) as c_int,
+		flow.gen_in_range<str>(1) as c_int);
+	printf("in_range %d %d\n".ptr, flow.run_in_range(2) as c_int,
+		flow.gen_in_range<str>(2) as c_int);
+	printf("in_range %d %d\n".ptr, flow.run_in_range(3) as c_int,
+		flow.gen_in_range<str>(3) as c_int);
+	printf("in_range %d %d\n".ptr, flow.run_in_range(4) as c_int,
+		flow.gen_in_range<str>(4) as c_int);
+	let got = 0;
+	let copy = 0;
+	flow.run_return_plain(1, &got);
+	flow.gen_return_plain<str>(1, &copy);
+	printf("return_plain %d %d\n".ptr, got as c_int, copy as c_int);
+	flow.run_return_plain(2, &got);
+	flow.gen_return_plain<str>(2, &copy);
+	printf("return_plain %d %d\n".ptr, got as c_int, copy as c_int);
+	flow.run_return_plain(3, &got);
+	flow.gen_return_plain<str>(3, &copy);
+	printf("return_plain %d %d\n".ptr, got as c_int, copy as c_int);
+	return 0;
+}

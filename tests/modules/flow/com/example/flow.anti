@@ -1,0 +1,639 @@
+//! One function per construct of the flow area, plain and generic, in a library
+//! module. The client calls each across the module boundary, and the library
+//! file carries the checked tree of every generic one.
+
+variant Shape
+{
+	Circle { r: int },
+	Square { side: int },
+	Empty,
+}
+
+fn shape_of(n: int) -> Shape
+{
+	if n == 1 {
+		return Shape.Circle { r: n };
+	}
+	if n == 2 {
+		return Shape.Square { side: n };
+	}
+	return Shape.Empty;
+}
+
+fn add_to(total: *int, by: int)
+{
+	*total += by;
+}
+
+fn half(n: int) -> ?int
+{
+	if n % 2 == 0 {
+		return n / 2;
+	}
+	return none;
+}
+
+fn seen(count: *int, answer: bool) -> bool
+{
+	*count += 1;
+	return answer;
+}
+
+/// An `if` without an `else`.
+pub fn run_if(n: int) -> int
+{
+	let acc = 0;
+	if n > 2 {
+		acc += n;
+	}
+	return acc;
+}
+
+/// An `if` without an `else`, in a generic function.
+pub fn gen_if<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if n > 2 {
+		acc += n;
+	}
+	return acc;
+}
+
+/// An `if` with an `else if` and an `else`.
+pub fn run_else(n: int) -> int
+{
+	let acc = 0;
+	if n > 2 {
+		acc += n;
+	} else if n == 2 {
+		acc += 20;
+	} else {
+		acc += 100;
+	}
+	return acc;
+}
+
+/// An `if` with an `else if` and an `else`, in a generic function.
+pub fn gen_else<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if n > 2 {
+		acc += n;
+	} else if n == 2 {
+		acc += 20;
+	} else {
+		acc += 100;
+	}
+	return acc;
+}
+
+/// A `while` loop.
+pub fn run_while(n: int) -> int
+{
+	let acc = 0;
+	let i = 0;
+	while i < n do {
+		acc += i;
+		i += 1;
+	}
+	return acc;
+}
+
+/// A `while` loop, in a generic function.
+pub fn gen_while<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let i = 0;
+	while i < n do {
+		acc += i;
+		i += 1;
+	}
+	return acc;
+}
+
+/// A `do ... while` loop, whose body runs once before the first test.
+pub fn run_do_while(n: int) -> int
+{
+	let acc = 0;
+	let i = 0;
+	do {
+		acc += i + 1;
+		i += 1;
+	} while i < n
+	return acc;
+}
+
+/// A `do ... while` loop, whose body runs once before the first test, in a
+/// generic function.
+pub fn gen_do_while<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let i = 0;
+	do {
+		acc += i + 1;
+		i += 1;
+	} while i < n
+	return acc;
+}
+
+/// A `for` over a range.
+pub fn run_for_range(n: int) -> int
+{
+	let acc = 0;
+	for i in 0..n {
+		acc += i * 2;
+	}
+	return acc;
+}
+
+/// A `for` over a range, in a generic function.
+pub fn gen_for_range<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	for i in 0..n {
+		acc += i * 2;
+	}
+	return acc;
+}
+
+/// A `for` over the elements of an array.
+pub fn run_for_each(n: int) -> int
+{
+	let acc = 0;
+	let items = [n, 20, 300];
+	for x in items {
+		acc += x;
+	}
+	return acc;
+}
+
+/// A `for` over the elements of an array, in a generic function.
+pub fn gen_for_each<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let items = [n, 20, 300];
+	for x in items {
+		acc += x;
+	}
+	return acc;
+}
+
+/// A `for` that takes each element of an array in place.
+pub fn run_for_lent(n: int) -> int
+{
+	let acc = 0;
+	let items = [n, 20, 300];
+	for p in &items {
+		*p += 1;
+	}
+	acc += items[0] + items[1] + items[2];
+	return acc;
+}
+
+/// A `for` that takes each element of an array in place, in a generic function.
+pub fn gen_for_lent<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let items = [n, 20, 300];
+	for p in &items {
+		*p += 1;
+	}
+	acc += items[0] + items[1] + items[2];
+	return acc;
+}
+
+/// A `for` that binds the index and the element.
+pub fn run_for_index(n: int) -> int
+{
+	let acc = 0;
+	let items = [n, 20, 300];
+	for i, x in items {
+		acc += (i + 1) * x;
+	}
+	return acc;
+}
+
+/// A `for` that binds the index and the element, in a generic function.
+pub fn gen_for_index<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let items = [n, 20, 300];
+	for i, x in items {
+		acc += (i + 1) * x;
+	}
+	return acc;
+}
+
+/// A `break` that leaves a loop.
+pub fn run_break(n: int) -> int
+{
+	let acc = 0;
+	for i in 0..10 {
+		if i == n {
+			break;
+		}
+		acc += 1;
+	}
+	return acc;
+}
+
+/// A `break` that leaves a loop, in a generic function.
+pub fn gen_break<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	for i in 0..10 {
+		if i == n {
+			break;
+		}
+		acc += 1;
+	}
+	return acc;
+}
+
+/// A `continue` that skips one turn of a loop.
+pub fn run_continue(n: int) -> int
+{
+	let acc = 0;
+	for i in 0..5 {
+		if i == n {
+			continue;
+		}
+		acc += i;
+	}
+	return acc;
+}
+
+/// A `continue` that skips one turn of a loop, in a generic function.
+pub fn gen_continue<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	for i in 0..5 {
+		if i == n {
+			continue;
+		}
+		acc += i;
+	}
+	return acc;
+}
+
+/// A `return` of a value.
+pub fn run_return_value(n: int) -> int
+{
+	let acc = 0;
+	if n == 2 {
+		return 50;
+	}
+	acc += n;
+	return acc;
+}
+
+/// A `return` of a value, in a generic function.
+pub fn gen_return_value<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if n == 2 {
+		return 50;
+	}
+	acc += n;
+	return acc;
+}
+
+/// A `switch` on an integer without an `else`.
+pub fn run_switch(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		1 => acc += 10,
+		3 => {
+			acc += 20;
+		},
+	}
+	return acc;
+}
+
+/// A `switch` on an integer without an `else`, in a generic function.
+pub fn gen_switch<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	switch n {
+		1 => acc += 10,
+		3 => {
+			acc += 20;
+		},
+	}
+	return acc;
+}
+
+/// A `switch` whose `else` takes every other value.
+pub fn run_switch_else(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		1 => acc += 10,
+		else => acc += 7,
+	}
+	return acc;
+}
+
+/// A `switch` whose `else` takes every other value, in a generic function.
+pub fn gen_switch_else<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	switch n {
+		1 => acc += 10,
+		else => acc += 7,
+	}
+	return acc;
+}
+
+/// A `switch` whose arms bind the fields of a case.
+pub fn run_arm_binds(n: int) -> int
+{
+	let acc = 0;
+	let shape = shape_of(n);
+	switch shape {
+		Circle c => acc += c.r,
+		Square s => {
+			acc += s.side * 2;
+		},
+		Empty => acc += 1,
+	}
+	return acc;
+}
+
+/// A `switch` whose arms bind the fields of a case, in a generic function.
+pub fn gen_arm_binds<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let shape = shape_of(n);
+	switch shape {
+		Circle c => acc += c.r,
+		Square s => {
+			acc += s.side * 2;
+		},
+		Empty => acc += 1,
+	}
+	return acc;
+}
+
+/// A `switch` with an arm that is a call and one that is an assignment.
+pub fn run_arm_call(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		1 => add_to(&acc, 10),
+		else => acc = acc + 3,
+	}
+	return acc;
+}
+
+/// A `switch` with an arm that is a call and one that is an assignment, in a
+/// generic function.
+pub fn gen_arm_call<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	switch n {
+		1 => add_to(&acc, 10),
+		else => acc = acc + 3,
+	}
+	return acc;
+}
+
+/// A `fallthrough` that enters the next arm of a `switch`.
+pub fn run_fallthrough(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		1 => {
+			acc += 10;
+			fallthrough;
+		},
+		2 => {
+			acc += 20;
+		},
+		else => {
+			acc += 1;
+		},
+	}
+	return acc;
+}
+
+/// A `fallthrough` that enters the next arm of a `switch`, in a generic
+/// function.
+pub fn gen_fallthrough<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	switch n {
+		1 => {
+			acc += 10;
+			fallthrough;
+		},
+		2 => {
+			acc += 20;
+		},
+		else => {
+			acc += 1;
+		},
+	}
+	return acc;
+}
+
+/// An `if let` that binds the value of a `?int`.
+pub fn run_if_let(n: int) -> int
+{
+	let acc = 0;
+	let maybe = half(n);
+	if let h = maybe {
+		acc += h;
+	}
+	return acc;
+}
+
+/// An `if let` that binds the value of a `?int`, in a generic function.
+pub fn gen_if_let<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let maybe = half(n);
+	if let h = maybe {
+		acc += h;
+	}
+	return acc;
+}
+
+/// An `if let` with an `else` for `none`.
+pub fn run_if_let_else(n: int) -> int
+{
+	let acc = 0;
+	let maybe = half(n);
+	if let h = maybe {
+		acc += h;
+	} else {
+		acc += 100;
+	}
+	return acc;
+}
+
+/// An `if let` with an `else` for `none`, in a generic function.
+pub fn gen_if_let_else<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let maybe = half(n);
+	if let h = maybe {
+		acc += h;
+	} else {
+		acc += 100;
+	}
+	return acc;
+}
+
+/// A `defer` that runs at the end of its block.
+pub fn run_defer(n: int) -> int
+{
+	let acc = 0;
+	{
+		defer acc += n;
+		acc *= 2;
+	}
+	return acc;
+}
+
+/// A `defer` that runs at the end of its block, in a generic function.
+pub fn gen_defer<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	{
+		defer acc += n;
+		acc *= 2;
+	}
+	return acc;
+}
+
+/// An `assert` that holds.
+pub fn run_assert(n: int) -> int
+{
+	let acc = 0;
+	assert(n > 0, "n is positive");
+	acc += n;
+	return acc;
+}
+
+/// An `assert` that holds, in a generic function.
+pub fn gen_assert<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	assert(n > 0, "n is positive");
+	acc += n;
+	return acc;
+}
+
+/// A block as a statement, with a local of its own.
+pub fn run_block(n: int) -> int
+{
+	let acc = 0;
+	{
+		let twice = n * 2;
+		acc += twice;
+	}
+	{
+		let twice = n + 1;
+		acc += twice;
+	}
+	return acc;
+}
+
+/// A block as a statement, with a local of its own, in a generic function.
+pub fn gen_block<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	{
+		let twice = n * 2;
+		acc += twice;
+	}
+	{
+		let twice = n + 1;
+		acc += twice;
+	}
+	return acc;
+}
+
+/// An `&&` that skips its right side when the left is false.
+pub fn run_and(n: int) -> int
+{
+	let acc = 0;
+	if n > 2 && seen(&acc, true) {
+		acc += 10;
+	}
+	return acc;
+}
+
+/// An `&&` that skips its right side when the left is false, in a generic
+/// function.
+pub fn gen_and<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if n > 2 && seen(&acc, true) {
+		acc += 10;
+	}
+	return acc;
+}
+
+/// An `||` that skips its right side when the left is true.
+pub fn run_or(n: int) -> int
+{
+	let acc = 0;
+	if n > 2 || seen(&acc, false) {
+		acc += 10;
+	}
+	return acc;
+}
+
+/// An `||` that skips its right side when the left is true, in a generic
+/// function.
+pub fn gen_or<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if n > 2 || seen(&acc, false) {
+		acc += 10;
+	}
+	return acc;
+}
+
+/// An `x in lo..hi` test.
+pub fn run_in_range(n: int) -> int
+{
+	let acc = 0;
+	if n in 2..4 {
+		acc += 10;
+	}
+	return acc;
+}
+
+/// An `x in lo..hi` test, in a generic function.
+pub fn gen_in_range<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if n in 2..4 {
+		acc += 10;
+	}
+	return acc;
+}
+
+/// A `return` without a value.
+pub fn run_return_plain(n: int, out: *int)
+{
+	*out = 1;
+	if n == 2 {
+		return;
+	}
+	*out = n * 10;
+}
+
+/// A `return` without a value, in a generic function.
+pub fn gen_return_plain<T>(n: int, out: *int)
+{
+	*out = size_of(T) as int;
+	if n == 2 {
+		return;
+	}
+	*out += n * 10;
+}

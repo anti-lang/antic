@@ -1899,6 +1899,19 @@ add_test(NAME anti_test
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test.cmake")
 
+# The constructs of the flow area in a `tests` block and in a `fixtures`
+# block, which no program of tests/matrix reaches: every build but
+# `anti test` drops both blocks. docs/notes/test-matrix.md names the cells.
+add_test(NAME anti_test_flow
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DMODULE=com/example/flow"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-flow"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test_module.cmake")
+
 # `anti run --memory-checks` and `anti test --memory-checks` put the report
 # of each memory error through Anti's symbolizer, and the dev cache keeps
 # the objects with and without the checks apart.
@@ -3379,6 +3392,16 @@ antic_modules_test(closures_modules
     LIBRARIES walk
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/closures")
+
+# The constructs of the flow area in the functions of a library module,
+# plain and generic. The library file carries the checked tree of each
+# generic one, and the client compiles its copy.
+# docs/notes/test-matrix.md names the cells.
+antic_modules_test(flow_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/flow"
+    LIBRARIES flow
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/flow")
 
 # A Mutex in a struct of a library and channels that pass between the
 # program and a library, which drains one and selects over two.
