@@ -1,0 +1,208 @@
+//! `anti.mem`: the `Allocator` of the C library, an `ArenaAllocator` over a
+//! counting allocator, and `delete(p, from)` and `destroy(p, from)`, which give
+//! every piece of an object back to the allocator it came from. `alloc` gives
+//! `none` for a size below zero and for an `align` that is no power of two, a
+//! size of zero gives an address that `free` takes, and `free(none)` does
+//! nothing. A request of the arena at an `align` above 16 takes a block of its
+//! own. A block stands at a multiple of its `align`, which a union reads from
+//! the address. The counting allocator prints the blocks it has out, so a piece
+//! that goes back to the wrong allocator shows.
+
+import anti.lang;
+import anti.mem;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// An allocator over the C library that counts the blocks it lends.
+class Counting inherits mem.Allocator
+{
+	pub out: int = 0,
+	pub taken: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		let p = mem.LibcAllocator.get().alloc(size, align) else {
+			return none;
+		};
+		self.out += 1;
+		self.taken += 1;
+		return p;
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.out -= 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+union Address
+{
+	p: ?*byte,
+	n: u64,
+}
+
+/// What is left of the address of `p` after a division by `align`.
+fn past(p: *byte, align: int) -> int
+{
+	let a = Address { p: p };
+	return (a.n % (align as u64)) as int;
+}
+
+/// A block of `from` for one `T`, filled with zeros, so it holds no value.
+fn room<T>(from: *mem.Allocator) -> ?*T
+{
+	let raw = from.alloc(size_of(T), 16) else {
+		return none;
+	};
+	for i in 0..size_of(T) {
+		raw[i] = 0;
+	}
+	return raw as *T;
+}
+
+/// A key and its leaf, both in memory of `from`.
+fn key_in(from: *mem.Allocator, n: int) -> ?*Key
+{
+	let leaf = room<Leaf>(from) else {
+		return none;
+	};
+	*leaf = Leaf { n: n + 1 };
+	let k = room<Key>(from) else {
+		return none;
+	};
+	*k = Key { n: n, leaf: leaf };
+	return k;
+}
+
+fn the_c_library() -> int
+{
+	let libc = mem.Allocator.default();
+	let aligns = [1, 2, 4, 8, 16, 32, 64, 128];
+	let off = 0;
+	for align in aligns {
+		let p = libc.alloc(24, align) else {
+			return 1;
+		};
+		p[0] = 1;
+		p[23] = 2;
+		off += past(p, align) + (p[0] + p[23] - 3) as int;
+		libc.free(p);
+	}
+	printf("eight aligned blocks: %d bytes off\n".ptr, off as c_int);
+	let below = libc.alloc(-1, 8);
+	let odd = libc.alloc(8, 3);
+	let zero = libc.alloc(8, 0);
+	let empty = libc.alloc(0, 8);
+	printf("none for a size below zero %d, for an align of 3 %d, for an align of 0 %d\n".ptr,
+		(below == none) as c_int, (odd == none) as c_int, (zero == none) as c_int);
+	printf("an address for a size of zero: %d\n".ptr, (empty != none) as c_int);
+	libc.free(empty);
+	libc.free(none);
+	return 0;
+}
+
+fn a_counting_allocator() -> int
+{
+	let counting = Counting { };
+	let k = key_in(&counting, 1) else {
+		return 1;
+	};
+	printf("a key and its leaf: %d %d, blocks out %d, alive %d\n".ptr, k.n as c_int,
+		(k.leaf != none) as c_int, counting.out as c_int, Key.live.load() as c_int);
+	delete(k, &counting);
+	printf("after delete(p, from): blocks out %d, alive %d\n".ptr, counting.out as c_int,
+		Key.live.load() as c_int);
+	let other = key_in(&counting, 3) else {
+		return 1;
+	};
+	destroy(other, &counting);
+	printf("after destroy(p, from): blocks out %d, alive %d\n".ptr, counting.out as c_int,
+		Key.live.load() as c_int);
+	counting.free(other as *byte);
+	printf("after free of the object: blocks out %d, taken %d\n".ptr, counting.out as c_int,
+		counting.taken as c_int);
+	return 0;
+}
+
+fn an_arena() -> int
+{
+	let counting = Counting { };
+	{
+		let arena = mem.ArenaAllocator.new(&counting, 512);
+		let a = arena.alloc(40, 8) else {
+			return 1;
+		};
+		let b = arena.alloc(40, 16) else {
+			return 1;
+		};
+		printf("two pieces of one block: apart %d, bytes off %d, blocks out %d\n".ptr,
+			(a != b) as c_int, (past(a, 8) + past(b, 16)) as c_int, counting.out as c_int);
+		let wide = arena.alloc(40, 64) else {
+			return 1;
+		};
+		printf("a piece at an align of 64: bytes off %d, blocks out %d\n".ptr,
+			past(wide, 64) as c_int, counting.out as c_int);
+		let large = arena.alloc(4000, 16) else {
+			return 1;
+		};
+		large[3999] = 7;
+		printf("a piece larger than a block: %d, blocks out %d\n".ptr, large[3999] as c_int,
+			counting.out as c_int);
+		arena.free(a);
+		printf("after free of one piece: blocks out %d\n".ptr, counting.out as c_int);
+		let k = key_in(&arena, 5) else {
+			return 1;
+		};
+		printf("a key in the arena: %d, alive %d\n".ptr, k.n as c_int, Key.live.load() as c_int);
+		destroy(k, &arena);
+		printf("after destroy(p, from): alive %d, blocks out %d\n".ptr, Key.live.load() as c_int,
+			counting.out as c_int);
+		arena.free_all();
+		printf("after free_all: blocks out %d\n".ptr, counting.out as c_int);
+		let again = arena.alloc(8, 8) else {
+			return 1;
+		};
+		again[0] = 9;
+		printf("a piece after free_all: %d, blocks out %d\n".ptr, again[0] as c_int,
+			counting.out as c_int);
+	}
+	printf("after the arena: blocks out %d\n".ptr, counting.out as c_int);
+	return 0;
+}
+
+fn main() -> int
+{
+	if the_c_library() != 0 {
+		return 1;
+	}
+	if a_counting_allocator() != 0 {
+		return 1;
+	}
+	return an_arena();
+}

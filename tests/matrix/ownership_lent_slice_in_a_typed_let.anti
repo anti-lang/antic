@@ -1,0 +1,19 @@
+//! A `let` with a type takes a lent slice. The local could outlive the call,
+//! and a `let` without a type makes a lent local.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn run(lent s: []int) -> int
+{
+	let t: []int = s;
+	return t.len;
+}
+
+fn main() -> int
+{
+	let numbers = [1, 2];
+	return run(numbers[0..2]);
+}

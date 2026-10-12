@@ -1,0 +1,21 @@
+//! A slice whose low bound lies above its high bound, by decision 24 of
+//! "Decisions of 2026-10-11": a dev build checks the bounds of `xs[lo..hi]` as
+//! it checks an index. Both bounds lie inside the array, and the slice would
+//! have a length below zero.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: int)
+{
+}
+
+fn main() -> int
+{
+	let xs = [1, 2, 3, 4];
+	let part = xs[opaque(3)..opaque(1)];
+	sink(part.len);
+	return 7;
+}

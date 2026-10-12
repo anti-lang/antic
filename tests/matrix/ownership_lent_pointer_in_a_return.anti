@@ -1,0 +1,18 @@
+//! `return` gives a lent pointer to the caller, which could keep it past the
+//! call.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn keep(lent p: *Node) -> *Node
+{
+	return p;
+}
+
+fn main() -> int
+{
+	let node = Node { n: 7 };
+	return keep(&node).n;
+}

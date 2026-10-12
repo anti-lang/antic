@@ -1,0 +1,20 @@
+//! `=` stores a lent pointer in a local that is not lent.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn run(lent p: *Node) -> int
+{
+	let other = Node { n: 2 };
+	let q = &other;
+	q = p;
+	return q.n;
+}
+
+fn main() -> int
+{
+	let node = Node { n: 7 };
+	return run(&node);
+}

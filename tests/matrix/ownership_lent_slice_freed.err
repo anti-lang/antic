@@ -1,0 +1,1 @@
+ownership_lent_slice_freed.anti:6:7: error: `free` needs a pointer, found `lent []int`

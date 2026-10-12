@@ -150,3 +150,6 @@ matrix_ownership_temporary_read_by_an_index_release T041 A call result read by a
 matrix_ownership_temporary_read_by_an_index_memory_checks T041 A call result read by an index alone is never torn down.
 matrix_ownership_failing_function_gives_an_owning_variant_release T042 A failing function that gives an owning variant traps in a release build.
 matrix_ownership_failing_function_gives_an_owning_variant_memory_checks T042 A failing function that gives an owning variant traps in a release build.
+check_slice_of_slice_range T017 A dev build does not check the bounds of a slice of a slice.
+check_slice_range_reversed T017 A dev build does not check a slice whose low bound lies above its high bound.
+check_slice_range_negative T017 A dev build does not check a slice whose low bound lies below zero.

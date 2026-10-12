@@ -1,0 +1,28 @@
+//! A lent pointer passed to an `own` parameter, which takes over what it is
+//! given. The lender still owns it.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn take_it(own p: *Node) -> int
+{
+	return p.n;
+}
+
+fn take_all(own s: []int) -> int
+{
+	return s.len;
+}
+
+fn run(lent p: *Node) -> int
+{
+	return take_it(p);
+}
+
+fn main() -> int
+{
+	let node = Node { n: 7 };
+	return run(&node);
+}

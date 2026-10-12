@@ -1,0 +1,28 @@
+//! A lent slice passed to a parameter that is not `lent`, which may keep what
+//! it takes.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn keep_it(p: *Node) -> int
+{
+	return p.n;
+}
+
+fn keep_all(s: []int) -> int
+{
+	return s.len;
+}
+
+fn run(lent s: []int) -> int
+{
+	return keep_all(s);
+}
+
+fn main() -> int
+{
+	let numbers = [1, 2];
+	return run(numbers[0..2]);
+}

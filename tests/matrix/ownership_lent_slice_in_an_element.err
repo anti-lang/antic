@@ -1,0 +1,1 @@
+ownership_lent_slice_in_an_element.anti:12:10: error: `s` is lent for the call and cannot be stored

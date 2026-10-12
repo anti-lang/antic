@@ -1,0 +1,12 @@
+exit 0
+let: handles 3, number 1, alive 1
+=: handles 2 1, alive 2
+return: number 2, alive 2
+argument: 2 2, handles 1
+field: handles 2 then 1, number 3, alive 3
+element: handles 3 then 2, alive 4
+capture: handles 2
+channel: handles 3 then 2
+temporary: handles 2, alive 4
+modify: 10 10
+after the block: alive 0

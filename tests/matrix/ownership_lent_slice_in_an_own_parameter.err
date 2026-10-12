@@ -1,0 +1,1 @@
+ownership_lent_slice_in_an_own_parameter.anti:21:18: error: `s` is lent for the call and passes on to a `lent` parameter alone

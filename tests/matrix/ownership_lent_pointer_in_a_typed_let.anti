@@ -1,0 +1,19 @@
+//! A `let` with a type takes a lent pointer. The local could outlive the call,
+//! and a `let` without a type makes a lent local.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn run(lent p: *Node) -> int
+{
+	let q: *Node = p;
+	return q.n;
+}
+
+fn main() -> int
+{
+	let node = Node { n: 7 };
+	return run(&node);
+}

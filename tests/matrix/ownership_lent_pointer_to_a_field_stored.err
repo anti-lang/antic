@@ -1,0 +1,1 @@
+ownership_lent_pointer_to_a_field_stored.anti:11:16: error: the pointer is lent for the call and cannot be stored

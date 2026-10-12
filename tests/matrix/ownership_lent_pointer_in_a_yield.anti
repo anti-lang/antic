@@ -1,0 +1,28 @@
+//! `yield` gives a lent pointer as the value of a `catch`, which a local then
+//! holds.
+
+import anti.lang;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn failing(n: int) -> *Node may fail
+{
+	fail "refused";
+}
+
+fn run(lent p: *Node) -> int
+{
+	let q = failing(1) catch e {
+		yield p;
+	};
+	return q.n;
+}
+
+fn main() -> int
+{
+	let node = Node { n: 7 };
+	return run(&node);
+}

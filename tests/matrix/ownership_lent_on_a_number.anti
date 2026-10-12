@@ -1,0 +1,12 @@
+//! `lent` before a parameter that is a number. A number is copied, and nothing
+//! of the caller is lent.
+
+fn run(lent n: int) -> int
+{
+	return n;
+}
+
+fn main() -> int
+{
+	return run(1);
+}

@@ -1,0 +1,19 @@
+//! A `let` of type `?*T` takes a lent pointer. The local could outlive the
+//! call.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn run(lent p: *Node) -> int
+{
+	let q: ?*Node = p;
+	return 0;
+}
+
+fn main() -> int
+{
+	let node = Node { n: 7 };
+	return run(&node);
+}

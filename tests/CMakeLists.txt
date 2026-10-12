@@ -3828,6 +3828,18 @@ if(ANTIC_LLVM_MC)
     antic_check_test(slice_range "out of bounds"
         "slice_range\\.anti:[0-9]+: .*out of bounds.*length 3"
         ON)
+    # The same check on a slice of a slice, against the length of the
+    # slice, and on bounds that give no slice: the low one above the high
+    # one, and the low one below zero.
+    antic_check_test(slice_of_slice_range "out of bounds"
+        "slice_of_slice_range\\.anti:[0-9]+: .*out of bounds.*length 2"
+        ON)
+    antic_check_test(slice_range_reversed "out of bounds"
+        "slice_range_reversed\\.anti:[0-9]+: .*out of bounds"
+        ON)
+    antic_check_test(slice_range_negative "out of bounds"
+        "slice_range_negative\\.anti:[0-9]+: .*out of bounds"
+        ON)
     antic_check_test(walk_changed "was changed while"
         "walk_changed\\.anti:68: `bag` was changed while `for` walked it: changed at walk_changed\\.anti:70"
         ON DEV lang)

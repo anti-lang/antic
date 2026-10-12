@@ -1,0 +1,20 @@
+//! A tuple literal names a lent pointer. The tuple would carry the pointer past
+//! the call, and the one tuple that holds a lent pointer is the element a walk
+//! gives.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn run(lent p: *Node) -> int
+{
+	let t = (p, 1);
+	return t.1;
+}
+
+fn main() -> int
+{
+	let node = Node { n: 7 };
+	return run(&node);
+}

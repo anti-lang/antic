@@ -1,0 +1,10 @@
+exit 0
+let of a T: 1, alive 1
+= of a T: 3, alive 2
+dup of a T: 30 3, a leaf of its own 1, alive 3
+field of a T: 4, alive 4
+element of a T: 5, alive 5
+argument of a T: 6, alive 5
+tuple and optional of a T: 8 1 0, alive 7
+after the block: alive 0
+the same with int: 7 3 7 4 5 7 8 9, n 7

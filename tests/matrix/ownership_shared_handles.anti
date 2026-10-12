@@ -1,0 +1,127 @@
+//! A handle of `anti.mem.Shared<T>` in every place a value goes: `let` of a
+//! fresh handle, of `share()` and of `dup`, `=`, `return`, an argument to a
+//! parameter that takes the value and to an `own` parameter, a field, an
+//! element, a capture of a closure, a channel and a temporary. Each line prints
+//! the handles of the first object and the keys alive: the handle that takes
+//! the count to zero tears its object down, and no other one does.
+
+import anti.lang;
+import anti.mem.{Shared};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Key
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+class Holder
+{
+	pub held: Shared<Key>,
+}
+
+fn alive() -> c_int
+{
+	return Key.live.load() as c_int;
+}
+
+fn shared(n: int) -> Shared<Key>
+{
+	return Shared<Key>.new(Key { n: n });
+}
+
+/// The number of the key that `h` shares.
+fn number(h: *Shared<Key>) -> int
+{
+	let n = 0;
+	h.read(fn(p) {
+		n = p.n;
+	});
+	return n;
+}
+
+fn take(own h: Shared<Key>) -> int
+{
+	return h.count();
+}
+
+fn peek(h: Shared<Key>) -> int
+{
+	return h.count();
+}
+
+fn back(own h: Shared<Key>) -> Shared<Key>
+{
+	return h;
+}
+
+fn call(f: fn())
+{
+	f();
+}
+
+fn run()
+{
+	let a = shared(1);
+	let b = a.share();
+	let c = dup(a);
+	printf("let: handles %d, number %d, alive %d\n".ptr, a.count() as c_int, number(&c) as c_int,
+		alive());
+	c = shared(2);
+	printf("=: handles %d %d, alive %d\n".ptr, a.count() as c_int, c.count() as c_int, alive());
+	let d = back(c);
+	printf("return: number %d, alive %d\n".ptr, number(&d) as c_int, alive());
+	let n1 = peek(a);
+	let n2 = take(b);
+	printf("argument: %d %d, handles %d\n".ptr, n1 as c_int, n2 as c_int, a.count() as c_int);
+	let h = Holder { held: a.share() };
+	let in_the_field = a.count();
+	h.held = shared(3);
+	printf("field: handles %d then %d, number %d, alive %d\n".ptr, in_the_field as c_int,
+		a.count() as c_int, number(&h.held) as c_int, alive());
+	let xs = [a.share(), a.share()];
+	let in_the_array = a.count();
+	xs[0] = shared(4);
+	printf("element: handles %d then %d, alive %d\n".ptr, in_the_array as c_int,
+		a.count() as c_int, alive());
+	let seen = 0;
+	call(fn() {
+		seen = a.count();
+	});
+	printf("capture: handles %d\n".ptr, seen as c_int);
+	let ch = chan Shared<Key>(1);
+	send(ch, a.share());
+	let got = recv(ch) else {
+		return;
+	};
+	let in_the_channel = got.count();
+	destroy(got);
+	delete(ch);
+	printf("channel: handles %d then %d\n".ptr, in_the_channel as c_int, a.count() as c_int);
+	shared(5);
+	a.share();
+	printf("temporary: handles %d, alive %d\n".ptr, a.count() as c_int, alive());
+	a.modify(fn(p) {
+		p.n = 10;
+	});
+	printf("modify: %d %d\n".ptr, number(&a) as c_int, number(&xs[1]) as c_int);
+}
+
+fn main() -> int
+{
+	run();
+	printf("after the block: alive %d\n".ptr, alive());
+	return 0;
+}

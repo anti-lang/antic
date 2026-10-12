@@ -1,0 +1,18 @@
+//! `destroy` of a lent pointer. The lender owns the object and tears it down.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn run(lent p: *Node) -> int
+{
+	destroy(p);
+	return 0;
+}
+
+fn main() -> int
+{
+	let node = Node { n: 7 };
+	return run(&node);
+}

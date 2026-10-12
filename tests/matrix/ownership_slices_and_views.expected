@@ -1,0 +1,16 @@
+exit 0
+slice of an array: 15 9 0 5 5
+lengths: 5 3 0 2 1
+slice of a slice: 7 4, at the array 1 1
+a write through a slice: 30 40
+a walk in place: 2 4 30
+a lent slice: 45
+slice of a str: bcd cd
+slice literal: 14 13 9
+slice of structs: 3 2 60
+slice of arrays: 4 11
+slice of owning values: 2 20, alive 3
+after the block: alive 0
+view of a number: 1 2 3 4
+a write through the view: 197121
+slice of the view: 2 3

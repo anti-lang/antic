@@ -1,0 +1,27 @@
+//! `=` stores a lent pointer in a field of an object, which could outlive the
+//! call.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Holder
+{
+	pub p: ?*Node = none,
+	pub s: []int,
+}
+
+fn run(lent p: *Node, h: *Holder) -> int
+{
+	h.p = p;
+	return 0;
+}
+
+fn main() -> int
+{
+	let node = Node { n: 7 };
+	let numbers = [1, 2];
+	let h = Holder { s: numbers[0..2] };
+	return run(&node, &h);
+}

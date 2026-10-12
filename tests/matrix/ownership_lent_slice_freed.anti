@@ -1,0 +1,14 @@
+//! `free` of a lent slice. `free` takes a pointer, and the lender owns the
+//! memory.
+
+fn run(lent s: []int) -> int
+{
+	free(s);
+	return 0;
+}
+
+fn main() -> int
+{
+	let numbers = [1, 2];
+	return run(numbers[0..2]);
+}

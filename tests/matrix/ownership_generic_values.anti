@@ -1,0 +1,158 @@
+//! A value of a type parameter in every place a value goes, in generic
+//! functions that run with a class that owns something and with `int`. A local
+//! of a `T` moves on `let` and `=`, an `own` parameter moves into a literal, an
+//! element and a `return`, `=` destroys the value its place held, and `dup` is
+//! the copy. Each line prints the number of the value and the keys alive.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+class Slot<T>
+{
+	pub held: T,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn alive() -> c_int
+{
+	return Key.live.load() as c_int;
+}
+
+fn through_let<T>(own x: T) -> T
+{
+	let a = x;
+	let b = a;
+	return b;
+}
+
+fn assigned<T>(own x: T, own y: T) -> T
+{
+	let a = x;
+	a = y;
+	return a;
+}
+
+fn copied<T>(p: *T) -> T
+{
+	return dup(*p);
+}
+
+fn in_a_field<T>(own x: T) -> Slot<T>
+{
+	return Slot<T> { held: x };
+}
+
+fn in_an_element<T>(own x: T) -> ?*T
+{
+	let q = alloc(T, 2) else {
+		return none;
+	};
+	q[1] = x;
+	return q;
+}
+
+fn passed_on<T>(own x: T) -> T
+{
+	return through_let<T>(x);
+}
+
+fn dropped<T>(own x: T)
+{
+}
+
+fn in_a_tuple<T>(own x: T) -> (T, int)
+{
+	return (x, 1);
+}
+
+fn in_an_optional<T>(own x: T, yes: bool) -> ?T
+{
+	if yes {
+		return x;
+	}
+	return none;
+}
+
+fn with_a_class() -> int
+{
+	let a = through_let<Key>(key(1));
+	printf("let of a T: %d, alive %d\n".ptr, a.n as c_int, alive());
+	let b = assigned<Key>(key(2), key(3));
+	printf("= of a T: %d, alive %d\n".ptr, b.n as c_int, alive());
+	let c = copied<Key>(&b);
+	Key.live.add(1);
+	c.n = 30;
+	printf("dup of a T: %d %d, a leaf of its own %d, alive %d\n".ptr, c.n as c_int, b.n as c_int,
+		(c.leaf != b.leaf) as c_int, alive());
+	let s = in_a_field<Key>(key(4));
+	printf("field of a T: %d, alive %d\n".ptr, s.held.n as c_int, alive());
+	let q = in_an_element<Key>(key(5)) else {
+		return 1;
+	};
+	printf("element of a T: %d, alive %d\n".ptr, q[1].n as c_int, alive());
+	destroy(&q[1]);
+	free(q);
+	let e = passed_on<Key>(key(6));
+	dropped<Key>(key(7));
+	printf("argument of a T: %d, alive %d\n".ptr, e.n as c_int, alive());
+	let t = in_a_tuple<Key>(key(8));
+	let held = in_an_optional<Key>(key(9), true);
+	let empty = in_an_optional<Key>(key(10), false);
+	printf("tuple and optional of a T: %d %d %d, alive %d\n".ptr, t.0.n as c_int,
+		(held != none) as c_int, (empty != none) as c_int, alive());
+	return 0;
+}
+
+fn with_a_number() -> int
+{
+	let n = 7;
+	let a = through_let<int>(n);
+	let b = assigned<int>(2, 3);
+	let c = copied<int>(&n);
+	let s = in_a_field<int>(4);
+	let q = in_an_element<int>(5) else {
+		return 1;
+	};
+	let e = passed_on<int>(n);
+	dropped<int>(n);
+	let t = in_a_tuple<int>(8);
+	let held = in_an_optional<int>(9, true);
+	printf("the same with int: %d %d %d %d %d %d %d %d, n %d\n".ptr, a as c_int, b as c_int,
+		c as c_int, s.held as c_int, q[1] as c_int, e as c_int, t.0 as c_int,
+		(held ?? -1) as c_int, n as c_int);
+	free(q);
+	return 0;
+}
+
+fn main() -> int
+{
+	let status = with_a_class();
+	printf("after the block: alive %d\n".ptr, alive());
+	return status + with_a_number();
+}

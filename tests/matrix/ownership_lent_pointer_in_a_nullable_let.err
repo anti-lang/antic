@@ -1,0 +1,1 @@
+ownership_lent_pointer_in_a_nullable_let.anti:11:18: error: `p` is lent for the call and cannot be stored

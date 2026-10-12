@@ -1,0 +1,24 @@
+//! `as` of a lent pointer gives a lent pointer, so the cast does not make it
+//! pass to a parameter that is not `lent`.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn keep_it(p: *Node) -> int
+{
+	return p.n;
+}
+
+fn run(lent p: *Node) -> int
+{
+	let q = p as *Node;
+	return keep_it(q);
+}
+
+fn main() -> int
+{
+	let node = Node { n: 7 };
+	return run(&node);
+}

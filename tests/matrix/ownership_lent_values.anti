@@ -1,0 +1,109 @@
+//! A lent pointer and a lent slice in the places that take one: a `let` without
+//! a type, which makes a lent local, a `lent` parameter, the object of a call,
+//! a comparison, a test for `none`, a field read and written through it, the
+//! address of a field, an array literal in a `let` without a type, a closure,
+//! `dup`, which gives a copy that belongs to no lender, and an argument of an
+//! `extern fn`. A part of a lent slice is lent, and a walk of a slice lends
+//! each element for one turn. Each line prints what the function reads through
+//! what it was lent.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn strlen(s: ?*byte) -> c_long;
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Node
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+
+	pub fn add(self, by: int)
+	{
+		self.n += by;
+	}
+}
+
+fn call(f: fn())
+{
+	f();
+}
+
+fn read(lent p: *Node) -> int
+{
+	return p.n;
+}
+
+fn total(lent s: []int) -> int
+{
+	let sum = 0;
+	for x in s {
+		sum += x;
+	}
+	return sum;
+}
+
+fn with_a_pointer(lent p: *Node, lent q: ?*Node, other: *Node)
+{
+	let local = p;
+	printf("let without a type: %d\n".ptr, local.n as c_int);
+	printf("lent parameter: %d %d\n".ptr, read(p) as c_int, read(local) as c_int);
+	p.add(10);
+	printf("object of a call: %d\n".ptr, p.get() as c_int);
+	printf("comparison: %d %d\n".ptr, (p == other) as c_int, (p == local) as c_int);
+	if q != none {
+		printf("test for none: %d\n".ptr, q.n as c_int);
+	}
+	p.n = 20;
+	let field = &p.n;
+	*field += 1;
+	printf("field and its address: %d\n".ptr, p.n as c_int);
+	let both = [p, local];
+	printf("array literal: %d\n".ptr, (both[0].n + both[1].n) as c_int);
+	let seen = 0;
+	call(fn() {
+		seen = p.n + read(p);
+	});
+	printf("closure: %d\n".ptr, seen as c_int);
+	let copy = dup(p);
+	copy.n = 99;
+	printf("dup: %d %d, a leaf of its own %d\n".ptr, copy.n as c_int, p.n as c_int,
+		(copy.leaf != p.leaf) as c_int);
+	delete(copy);
+}
+
+fn with_a_slice(lent s: []int, lent text: []byte)
+{
+	let local = s;
+	printf("slice in a let without a type: %d\n".ptr, local.len as c_int);
+	printf("slice to a lent parameter: %d %d\n".ptr, total(s) as c_int, total(local) as c_int);
+	let part = s[1..3];
+	printf("part of a lent slice: %d\n".ptr, total(part) as c_int);
+	s[0] = 10;
+	for x in &s {
+		*x += 1;
+	}
+	printf("elements written: %d\n".ptr, total(s) as c_int);
+	printf("extern fn: %d\n".ptr, strlen(text.ptr) as c_int);
+}
+
+fn main() -> int
+{
+	let node = Node { n: 1, leaf: alloc Leaf { n: 2 } };
+	let other = Node { n: 5 };
+	with_a_pointer(&node, &other, &other);
+	printf("the lender: %d\n".ptr, node.n as c_int);
+	let numbers = [1, 2, 3, 4];
+	let bytes = [104 as byte, 105 as byte, 0 as byte];
+	with_a_slice(numbers[0..4], bytes[0..3]);
+	printf("the array: %d %d\n".ptr, numbers[0] as c_int, numbers[3] as c_int);
+	return 0;
+}

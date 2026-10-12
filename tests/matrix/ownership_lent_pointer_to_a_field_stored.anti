@@ -1,0 +1,19 @@
+//! `&p.n` through a lent pointer is lent as well, and a `let` with a type does
+//! not take it.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn run(lent p: *Node) -> int
+{
+	let q: *int = &p.n;
+	return *q;
+}
+
+fn main() -> int
+{
+	let node = Node { n: 7 };
+	return run(&node);
+}

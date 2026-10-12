@@ -1,0 +1,21 @@
+//! A `snapshot fn` captures a lent pointer. A snapshot may outlive the call,
+//! and it holds values that copy fully.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn run(lent p: *Node) -> int
+{
+	let f = snapshot fn() -> int {
+		return p.n;
+	};
+	return f();
+}
+
+fn main() -> int
+{
+	let node = Node { n: 7 };
+	return run(&node);
+}

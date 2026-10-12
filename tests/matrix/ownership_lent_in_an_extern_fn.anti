@@ -1,0 +1,9 @@
+//! `lent` before a parameter of an `extern fn`. C may keep the pointer, and no
+//! checker reads its code.
+
+extern fn strlen(lent s: ?*byte) -> c_long;
+
+fn main() -> int
+{
+	return 0;
+}

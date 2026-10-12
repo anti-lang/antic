@@ -1,0 +1,1 @@
+ownership_lent_with_own.anti:9:17: error: `own` and `lent` do not stand together, since a lent pointer stays with its owner

@@ -1,0 +1,1 @@
+ownership_lent_pointer_after_a_cast.anti:17:17: error: `q` is lent for the call and passes on to a `lent` parameter alone

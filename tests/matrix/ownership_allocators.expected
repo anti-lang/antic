@@ -1,0 +1,17 @@
+exit 0
+eight aligned blocks: 0 bytes off
+none for a size below zero 1, for an align of 3 1, for an align of 0 1
+an address for a size of zero: 1
+a key and its leaf: 1 1, blocks out 2, alive 1
+after delete(p, from): blocks out 0, alive 0
+after destroy(p, from): blocks out 1, alive 0
+after free of the object: blocks out 0, taken 4
+two pieces of one block: apart 1, bytes off 0, blocks out 1
+a piece at an align of 64: bytes off 0, blocks out 2
+a piece larger than a block: 7, blocks out 3
+after free of one piece: blocks out 3
+a key in the arena: 5, alive 1
+after destroy(p, from): alive 0, blocks out 4
+after free_all: blocks out 0
+a piece after free_all: 9, blocks out 1
+after the arena: blocks out 0

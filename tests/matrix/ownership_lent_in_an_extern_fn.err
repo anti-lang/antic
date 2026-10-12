@@ -1,0 +1,1 @@
+ownership_lent_in_an_extern_fn.anti:4:23: error: an `extern fn` takes no `lent` parameter, since C may keep the pointer

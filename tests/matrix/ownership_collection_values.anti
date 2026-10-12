@@ -1,0 +1,112 @@
+//! A collection of owning values, `List<Key>`, in every place a value goes:
+//! `let` of a fresh list and of `dup`, which copies each element, `=`, which
+//! destroys the list its place held with every element, `return`, an `own`
+//! argument, a field, an element of an array and a temporary. `pop` and
+//! `remove_at` move an element out to the caller. Each line prints the counts
+//! and the keys alive.
+
+import anti.collection;
+import anti.collection.list.{List};
+import anti.lang;
+import anti.mem;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+class Holder
+{
+	pub held: List<Key>,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn alive() -> c_int
+{
+	return Key.live.load() as c_int;
+}
+
+/// A list of `n` keys numbered from `first`.
+fn keys(first: int, n: int) -> List<Key>
+{
+	let l = List<Key>.new();
+	for i in 0..n {
+		l.push(key(first + i));
+	}
+	return l;
+}
+
+/// The number of the key at `i`, read in place.
+fn number(l: *List<Key>, i: int) -> int
+{
+	let n = -1;
+	l.read(i, fn(p) {
+		n = p.n;
+	});
+	return n;
+}
+
+fn take(own l: List<Key>) -> int
+{
+	return l.count;
+}
+
+fn back(own l: List<Key>) -> List<Key>
+{
+	return l;
+}
+
+fn run()
+{
+	let a = keys(1, 2);
+	let b = dup(a);
+	Key.live.add(2);
+	printf("let: %d %d, alive %d\n".ptr, a.count as c_int, number(&b, 1) as c_int, alive());
+	b = keys(10, 3);
+	printf("=: %d, alive %d\n".ptr, b.count as c_int, alive());
+	let c = back(b);
+	let n = take(c);
+	printf("return and argument: %d, alive %d\n".ptr, n as c_int, alive());
+	let h = Holder { held: a };
+	h.held = keys(20, 1);
+	printf("field: %d, alive %d\n".ptr, number(&h.held, 0) as c_int, alive());
+	let xs = [keys(30, 1), keys(40, 2)];
+	xs[0] = keys(50, 3);
+	printf("element: %d %d, alive %d\n".ptr, xs[0].count as c_int, xs[1].count as c_int, alive());
+	keys(60, 4);
+	let popped = xs[1].pop();
+	let removed = xs[0].remove_at(0);
+	printf("temporary and taken out: %d %d %d, alive %d\n".ptr, (popped != none) as c_int,
+		removed.n as c_int, xs[0].count as c_int, alive());
+}
+
+fn main() -> int
+{
+	run();
+	printf("after the block: alive %d\n".ptr, alive());
+	return 0;
+}

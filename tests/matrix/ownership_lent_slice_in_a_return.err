@@ -1,0 +1,1 @@
+ownership_lent_slice_in_a_return.anti:6:9: error: `s` is lent for the call and cannot be returned

@@ -1,0 +1,8 @@
+exit 0
+let: 2 2, alive 4
+=: 3, alive 5
+return and argument: 3, alive 2
+field: 20, alive 1
+element: 3 2, alive 6
+temporary and taken out: 1 50 2, alive 6
+after the block: alive 0

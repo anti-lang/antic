@@ -1,0 +1,1 @@
+ownership_lent_on_a_number.anti:4:13: error: `lent` marks a pointer or slice parameter, and this one is `int`

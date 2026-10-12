@@ -1,0 +1,1 @@
+ownership_lent_pointer_destroyed.anti:10:10: error: the object is lent for the call and stays with its owner, so `destroy` does not take it

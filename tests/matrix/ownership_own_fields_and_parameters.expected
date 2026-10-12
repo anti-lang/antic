@@ -1,0 +1,31 @@
+exit 0
+an object with own fields:
+alive 7
+  teardown of key 1
+after the own pointer is replaced: alive 7
+  teardown of key 40
+  teardown of key 30
+  teardown of key 20
+  teardown of key 12
+  teardown of key 11
+  teardown of key 10
+  teardown of key 2
+after delete: alive 0
+a copy of an object with own fields:
+own pointer 1, own slice 1, interface 1 70
+  teardown of key 70
+  teardown of key 61
+  teardown of key 60
+  teardown of key 50
+after delete of the copy: alive 4
+  teardown of key 70
+  teardown of key 61
+  teardown of key 60
+  teardown of key 50
+after the block: alive 0
+own parameters:
+  teardown of key 80
+own pointer: 80, alive 0
+  teardown of key 91
+  teardown of key 90
+own slice: 2, alive 0

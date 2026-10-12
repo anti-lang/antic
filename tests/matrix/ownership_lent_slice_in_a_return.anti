@@ -1,0 +1,13 @@
+//! `return` gives a lent slice to the caller, which could keep it past the
+//! call.
+
+fn keep(lent s: []int) -> []int
+{
+	return s;
+}
+
+fn main() -> int
+{
+	let numbers = [1, 2];
+	return keep(numbers[0..2]).len;
+}

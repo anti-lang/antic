@@ -1,0 +1,145 @@
+//! `own` before a field and before a parameter. An object deletes what its
+//! `own` pointer names, tears the elements of its `own` slice down last to
+//! first and frees the buffer, and deletes an object behind an `own` pointer to
+//! an interface from the start of that object. `dup` copies each of them. A
+//! function with an `own` parameter of a pointer or a slice takes the memory
+//! over and gives it back itself. A local moves into one and is not named
+//! again. Each `Key` prints its teardown, so the order shows: the fields of an
+//! object go last to first, as the elements of a slice do.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Key
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+		printf("  teardown of key %d\n".ptr, self.n as c_int);
+	}
+}
+
+abstract class Named
+{
+	pub abstract fn id(self) -> int;
+}
+
+class Tag inherits Named
+{
+	pub first: int = 0,
+	pub key: Key,
+
+	pub concrete fn id(self) -> int
+	{
+		return self.key.n;
+	}
+}
+
+class Box
+{
+	pub own one: ?*Key = none,
+	pub own many: []Key,
+	pub own named: ?*Named = none,
+	pub own next: ?*Box = none,
+}
+
+fn keys(first: int, n: int) -> []Key
+{
+	let q = alloc(Key, n) else {
+		return []Key { ptr: none, len: 0 };
+	};
+	for i in 0..n {
+		q[i] = Key { n: first + i };
+	}
+	return []Key { ptr: q, len: n };
+}
+
+fn alive() -> c_int
+{
+	return Key.live.load() as c_int;
+}
+
+fn drop(own p: *Key) -> int
+{
+	let n = p.n;
+	delete(p);
+	return n;
+}
+
+fn drop_all(own s: []Key) -> int
+{
+	let n = s.len;
+	for i in 0..s.len by -1 {
+		destroy(&s[i]);
+	}
+	free(s.ptr);
+	return n;
+}
+
+fn store(b: *Box, own p: *Key)
+{
+	let old = b.one;
+	if old != none {
+		delete(old);
+	}
+	b.one = p;
+}
+
+fn fields()
+{
+	printf("an object with own fields:\n".ptr);
+	let b = alloc Box {
+		one: alloc Key { n: 1 },
+		many: keys(10, 3),
+		named: alloc Tag { first: 7, key: Key { n: 20 } },
+		next: alloc Box { one: alloc Key { n: 30 }, many: keys(40, 1) },
+	};
+	printf("alive %d\n".ptr, alive());
+	store(b, alloc Key { n: 2 });
+	printf("after the own pointer is replaced: alive %d\n".ptr, alive());
+	delete(b);
+	printf("after delete: alive %d\n".ptr, alive());
+}
+
+fn copies()
+{
+	printf("a copy of an object with own fields:\n".ptr);
+	let b = Box { one: alloc Key { n: 50 }, many: keys(60, 2), named: alloc Tag { key: Key { n: 70 } } };
+	let c = dup(&b);
+	Key.live.add(4);
+	let named = c.named else {
+		return;
+	};
+	printf("own pointer %d, own slice %d, interface %d %d\n".ptr, (c.one != b.one) as c_int,
+		(c.many.ptr != b.many.ptr) as c_int, (c.named != b.named) as c_int, named.id() as c_int);
+	delete(c);
+	printf("after delete of the copy: alive %d\n".ptr, alive());
+}
+
+fn parameters()
+{
+	printf("own parameters:\n".ptr);
+	let p = alloc Key { n: 80 };
+	let n = drop(p);
+	printf("own pointer: %d, alive %d\n".ptr, n as c_int, alive());
+	let s = keys(90, 2);
+	let count = drop_all(s);
+	printf("own slice: %d, alive %d\n".ptr, count as c_int, alive());
+}
+
+fn main() -> int
+{
+	fields();
+	copies();
+	printf("after the block: alive %d\n".ptr, alive());
+	parameters();
+	return 0;
+}

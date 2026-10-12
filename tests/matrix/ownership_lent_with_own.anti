@@ -1,0 +1,18 @@
+//! `own lent` before a parameter. `own` takes the value over, and `lent` leaves
+//! it with the caller.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn run(own lent p: *Node) -> int
+{
+	return p.n;
+}
+
+fn main() -> int
+{
+	let node = Node { n: 7 };
+	return run(&node);
+}

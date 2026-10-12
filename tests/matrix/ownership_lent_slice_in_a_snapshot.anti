@@ -1,0 +1,21 @@
+//! A `snapshot fn` captures a lent slice. A snapshot may outlive the call, and
+//! it holds values that copy fully.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn run(lent s: []int) -> int
+{
+	let f = snapshot fn() -> int {
+		return s.len;
+	};
+	return f();
+}
+
+fn main() -> int
+{
+	let numbers = [1, 2];
+	return run(numbers[0..2]);
+}

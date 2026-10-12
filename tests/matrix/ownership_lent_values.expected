@@ -1,0 +1,17 @@
+exit 0
+let without a type: 1
+lent parameter: 1 1
+object of a call: 11
+comparison: 0 1
+test for none: 5
+field and its address: 21
+array literal: 42
+closure: 42
+dup: 99 21, a leaf of its own 1
+the lender: 21
+slice in a let without a type: 4
+slice to a lent parameter: 10 10
+part of a lent slice: 5
+elements written: 23
+extern fn: 2
+the array: 11 5

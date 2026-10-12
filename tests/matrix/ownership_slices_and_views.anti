@@ -1,0 +1,153 @@
+//! Slices and views: a slice of an array with constant bounds and with bounds
+//! the program computes, a slice of a slice, an empty slice, a slice of a
+//! `str`, a slice literal over memory of `alloc`, a `lent` slice and a slice of
+//! owning values, which stay with their array. A write through a slice reaches
+//! the array, and a view by `as` reads the bytes of a number. Each line prints
+//! what it reads through the slice.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sum(s: []int) -> int
+{
+	let total = 0;
+	for x in s {
+		total += x;
+	}
+	return total;
+}
+
+fn sum_lent(lent s: []int) -> int
+{
+	let total = 0;
+	for i in 0..s.len {
+		total += s[i];
+	}
+	return total;
+}
+
+fn double_all(s: []int)
+{
+	for x in &s {
+		*x *= 2;
+	}
+}
+
+fn of_an_array()
+{
+	let a = [1, 2, 3, 4, 5];
+	let whole = a[0..5];
+	let part = a[1..4];
+	let empty = a[2..2];
+	let lo = opaque(1);
+	let hi = opaque(3);
+	let computed = a[lo..hi];
+	let last = a[opaque(4)..a.len];
+	printf("slice of an array: %d %d %d %d %d\n".ptr, sum(whole) as c_int, sum(part) as c_int,
+		sum(empty) as c_int, sum(computed) as c_int, sum(last) as c_int);
+	printf("lengths: %d %d %d %d %d\n".ptr, whole.len as c_int, part.len as c_int,
+		empty.len as c_int, computed.len as c_int, last.len as c_int);
+	let inner = part[1..3];
+	let innermost = inner[opaque(1)..opaque(2)];
+	printf("slice of a slice: %d %d, at the array %d %d\n".ptr, sum(inner) as c_int,
+		sum(innermost) as c_int, (inner.ptr == &a[2]) as c_int,
+		(innermost.ptr == &a[3]) as c_int);
+	inner[0] = 30;
+	innermost[0] = 40;
+	printf("a write through a slice: %d %d\n".ptr, a[2] as c_int, a[3] as c_int);
+	double_all(a[0..2]);
+	printf("a walk in place: %d %d %d\n".ptr, a[0] as c_int, a[1] as c_int, a[2] as c_int);
+	printf("a lent slice: %d\n".ptr, sum_lent(a[3..5]) as c_int);
+}
+
+fn of_other_things()
+{
+	let text = "abcdef";
+	let mid = text[1..4];
+	let tail = mid[opaque(1)..mid.len];
+	printf("slice of a str: %.*s %.*s\n".ptr, mid.len as c_int, mid.ptr, tail.len as c_int,
+		tail.ptr);
+	let q = alloc(int, 4) else {
+		return;
+	};
+	let s = []int { ptr: q, len: 4 };
+	for i in 0..s.len {
+		s[i] = i * i;
+	}
+	let half = s[2..4];
+	printf("slice literal: %d %d %d\n".ptr, sum(s) as c_int, sum(half) as c_int, half[1] as c_int);
+	free(s.ptr);
+	let points = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }, Point { x: 5, y: 6 }];
+	let two = points[1..3];
+	two[1].y = 60;
+	printf("slice of structs: %d %d %d\n".ptr, two[0].x as c_int, two.len as c_int,
+		points[2].y as c_int);
+	let rows = [[1, 2], [3, 4], [5, 6]];
+	let lower = rows[1..3];
+	let cells = lower[1][0..2];
+	printf("slice of arrays: %d %d\n".ptr, lower[0][1] as c_int, sum(cells) as c_int);
+}
+
+fn of_owning_values()
+{
+	let keys = [Key { n: 1 }, Key { n: 2 }, Key { n: 3 }];
+	let some = keys[1..3];
+	some[0].n = 20;
+	printf("slice of owning values: %d %d, alive %d\n".ptr, some.len as c_int, keys[1].n as c_int,
+		Key.live.load() as c_int);
+}
+
+fn views()
+{
+	let word: u32 = 0x04030201;
+	let bytes = &word as *[4]byte;
+	printf("view of a number: %d %d %d %d\n".ptr, (*bytes)[0] as c_int, (*bytes)[1] as c_int,
+		(*bytes)[2] as c_int, (*bytes)[3] as c_int);
+	(*bytes)[3] = 0;
+	printf("a write through the view: %d\n".ptr, word as c_int);
+	let slice = (*bytes)[1..3];
+	printf("slice of the view: %d %d\n".ptr, slice[0] as c_int, slice[1] as c_int);
+}
+
+fn main() -> int
+{
+	of_an_array();
+	of_other_things();
+	of_owning_values();
+	printf("after the block: alive %d\n".ptr, Key.live.load() as c_int);
+	views();
+	return 0;
+}
