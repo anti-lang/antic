@@ -143,6 +143,8 @@ Sized numbers `i8 i16 i32 i64 u8 u16 u32 u64 f32 f64`, with `int` for `i64`, `ui
 
 A slice and a `str` have `.len`, an `int`, and `.ptr`, a `?*T` or a `?*byte`, both read-only. An array has `.len` alone. `s[i]` on a `str` is a `byte`, and `s[lo..hi]` is a `[]byte`. `a[lo..hi]` on an array or a slice is a `[]T`, and both bounds are required.
 
+An array has one element or more. A length written with `size_of(T)` stands in a struct field or a local alone. A struct that holds itself by value is refused, and it holds a `?*T` to itself instead. A constant index past the end of a fixed array is refused. A dev build checks every other index and both bounds of `a[lo..hi]`, see [Checks and debugging](#checks-and-debugging).
+
 The compiler declares `Object`, `Job`, `Flags`, `Mutex`, `chan T`, `Regex`, `ByteRegex`, `Match`, `ByteMatch`, `FieldDescriptor` and the constraint `Number` in `anti.lang`, and the source of `anti.lang` declares the rest of the root. The C types for bindings are `c_char c_uchar c_short c_ushort c_int c_uint c_long c_ulong c_longlong c_ulonglong c_size_t c_float c_double c_wchar`. `c_long`, `c_ulong` and `c_wchar` take the width of the target.
 
 <!-- overview: context, docs-style:ignore
@@ -167,6 +169,8 @@ let rest = name[1..3];
 let again = []int { ptr: s.ptr, len: s.len };
 let twice: ??int = none;
 ```
+
+Not built yet: the refusal of a constant index past the end of a fixed array. The check of the bounds of `a[lo..hi]` in a dev build is not built either. Both compile today, and a dev build stops at the index alone.
 
 ## Literals
 
