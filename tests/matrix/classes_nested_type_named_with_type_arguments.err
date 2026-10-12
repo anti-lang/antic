@@ -1,0 +1,1 @@
+classes_nested_type_named_with_type_arguments.anti:15:10: error: `Box.Node` is not generic

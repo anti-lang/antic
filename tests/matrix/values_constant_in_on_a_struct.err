@@ -1,0 +1,1 @@
+values_constant_in_on_a_struct.anti:16:22: error: a call is not a constant expression

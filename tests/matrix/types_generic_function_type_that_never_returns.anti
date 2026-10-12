@@ -1,0 +1,21 @@
+//! A function type `fn(T) -> never` in a generic function, whose copy keeps the
+//! mark.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn exit(code: c_int) -> never;
+
+fn stop(code: int) -> never
+{
+	printf("stop %d\n".ptr, code as c_int);
+	exit(0);
+}
+
+fn run<T>(f: fn(T) -> never, own x: T) -> int
+{
+	f(x);
+}
+
+fn main() -> int
+{
+	return run<int>(stop, 7);
+}

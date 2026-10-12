@@ -1,0 +1,1 @@
+ownership_moved_into_a_call_on_a_result.anti:33:9: error: `c` was moved into `take`

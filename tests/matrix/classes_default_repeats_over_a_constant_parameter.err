@@ -1,0 +1,1 @@
+classes_default_repeats_over_a_constant_parameter.anti:6:22: error: an array with a length from `size_of` is not a constant expression

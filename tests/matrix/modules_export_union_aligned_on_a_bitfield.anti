@@ -1,0 +1,13 @@
+//! The C header aligns an `export union` on its first field, and C refuses the
+//! alignment on a bitfield.
+
+export union Flags8 align(8)
+{
+	low: u8 : 3,
+	all: u8,
+}
+
+fn main() -> int
+{
+	return 0;
+}

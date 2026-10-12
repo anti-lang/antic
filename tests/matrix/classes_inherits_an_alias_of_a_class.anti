@@ -1,0 +1,22 @@
+//! `inherits` names a class through an alias of it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Base
+{
+	pub n: int = 3,
+}
+
+type Root = Base;
+
+class Leaf inherits Root
+{
+	pub m: int = 4,
+}
+
+fn main() -> int
+{
+	let l = Leaf { };
+	printf("%d %d\n".ptr, l.n as c_int, l.m as c_int);
+	return 0;
+}

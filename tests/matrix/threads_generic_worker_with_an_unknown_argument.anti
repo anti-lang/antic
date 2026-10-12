@@ -1,0 +1,21 @@
+//! An argument of a dispatch of a generic worker that names nothing gets its
+//! one message.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn read<T>(t: *Task, v: T) -> int
+{
+	return t.n;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let job = dispatch t -> read(missing);
+	let got = join(job);
+	delete(t);
+	return got;
+}

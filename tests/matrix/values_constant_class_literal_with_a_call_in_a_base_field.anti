@@ -1,0 +1,27 @@
+//! The default of a field is a constant expression, and so is each field of a
+//! class literal there, a field of its base among them.
+
+class Base
+{
+	pub n: int = 0,
+}
+
+class Leaf inherits Base
+{
+	pub m: int = 0,
+}
+
+fn seven() -> int
+{
+	return 7;
+}
+
+class Holder
+{
+	pub leaf: Leaf = Leaf { n: seven(), m: 1 },
+}
+
+fn main() -> int
+{
+	return 0;
+}

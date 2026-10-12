@@ -1,0 +1,10 @@
+//! A match that may be none is tested before a group of it is read, and the
+//! message names the match where the value has no name.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let n = "abc".matches(re"b").start;
+	return 0;
+}

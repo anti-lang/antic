@@ -1,0 +1,21 @@
+//! `x in lo..hi` on a struct with `operator fn lt` is a call, and a constant
+//! expression holds none.
+
+struct Key
+{
+	id: int,
+}
+
+operator fn lt(a: Key, b: Key) -> bool
+{
+	return a.id < b.id;
+}
+
+const low: Key = Key { id: 1 };
+const high: Key = Key { id: 3 };
+const inside: bool = low in low..high;
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,18 @@
+//! A function without `self` of a generic class is called on a copy of the
+//! class. Nothing in the arguments of a call on the bare name gives the
+//! parameter of the class.
+
+class Box<T>
+{
+	pub n: int = 0,
+
+	pub fn empty() -> int
+	{
+		return 0;
+	}
+}
+
+fn main() -> int
+{
+	return Box.empty();
+}

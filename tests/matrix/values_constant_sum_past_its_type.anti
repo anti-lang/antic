@@ -1,0 +1,13 @@
+//! A sum of two constants that leaves the range of its type wraps in the
+//! constant, in every mode.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const top: i32 = 2147483647;
+const past: i32 = top + 1;
+
+fn main() -> int
+{
+	printf("%d\n".ptr, past as c_int);
+	return 0;
+}

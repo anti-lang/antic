@@ -1,0 +1,1 @@
+types_struct_with_two_fields_of_one_name.anti:6:2: error: struct `Pair` has two fields named `left`

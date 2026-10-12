@@ -1,0 +1,15 @@
+//! `v.name()` calls a function of the module, and a constant of that name is
+//! none.
+
+struct Vec
+{
+	x: int,
+}
+
+const size: int = 3;
+
+fn main() -> int
+{
+	let a = Vec { x: 1 };
+	return a.size();
+}

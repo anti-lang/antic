@@ -1,0 +1,1 @@
+classes_bodies_qualified_by_an_interface_and_its_base.anti:24:22: error: `Both` declares `get` twice

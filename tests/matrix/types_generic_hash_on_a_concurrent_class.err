@@ -1,0 +1,1 @@
+types_generic_hash_on_a_concurrent_class.anti:17:9: error: `Counter` has no `hash`, which `of` needs for `T`

@@ -1,0 +1,31 @@
+//! A constraint that names one interface twice holds it once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square
+{
+	implements shape: Shape,
+	pub side: int = 3,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+fn area_of<T: Shape + Shape>(x: *T) -> int
+{
+	return x.area();
+}
+
+fn main() -> int
+{
+	let s = Square { };
+	printf("%d\n".ptr, area_of<Square>(&s) as c_int);
+	return 0;
+}

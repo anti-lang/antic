@@ -1,0 +1,22 @@
+//! A `concrete fn` takes no `self` where the abstract function it fills takes
+//! none.
+
+abstract class Shape
+{
+	abstract fn sides() -> int;
+}
+
+class Square inherits Shape
+{
+	pub n: int = 0,
+
+	concrete fn sides(self) -> int
+	{
+		return 4;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

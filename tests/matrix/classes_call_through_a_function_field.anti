@@ -1,0 +1,23 @@
+//! A call through a function that a field holds and through one that a local
+//! holds. Neither names a function of the program, and `--no-reflect` takes
+//! both.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+class Holder
+{
+	pub f: fn(int) -> int = twice,
+}
+
+fn main() -> int
+{
+	let h = Holder { };
+	let g = h.f;
+	printf("%d %d\n".ptr, h.f(3) as c_int, g(4) as c_int);
+	return 0;
+}

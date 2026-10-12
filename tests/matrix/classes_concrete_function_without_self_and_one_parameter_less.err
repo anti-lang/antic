@@ -1,0 +1,1 @@
+classes_concrete_function_without_self_and_one_parameter_less.anti:13:14: error: `concrete fn sides` takes 1 parameter, and `Shape.sides` takes 2

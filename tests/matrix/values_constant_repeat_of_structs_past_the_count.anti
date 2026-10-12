@@ -1,0 +1,20 @@
+//! A repeated array in a constant expression holds at most 2^20 elements, and
+//! the count goes through the fields of a struct without wrapping.
+
+struct Wide
+{
+	rows: [4294967296][4294967296]int,
+	last: int,
+}
+
+fn wide() -> Wide
+{
+	return wide();
+}
+
+const pair: [2]Wide = [wide(); 2];
+
+fn main() -> int
+{
+	return 0;
+}

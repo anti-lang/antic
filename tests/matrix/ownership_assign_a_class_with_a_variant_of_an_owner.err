@@ -1,0 +1,1 @@
+ownership_assign_a_class_with_a_variant_of_an_owner.anti:23:7: error: `Rows` holds `Slot` in `part`, which owns what its parts own, use `dup` instead of `=`

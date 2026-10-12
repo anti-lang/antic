@@ -1,0 +1,1 @@
+types_nullable_pointer_to_a_class_for_its_interface.anti:27:14: error: `q` may be `none`, check it or use `?*T`

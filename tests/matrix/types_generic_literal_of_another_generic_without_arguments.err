@@ -1,0 +1,1 @@
+types_generic_literal_of_another_generic_without_arguments.anti:11:10: error: `Pair` is generic, and nothing gives its type arguments here. Write them out after its name

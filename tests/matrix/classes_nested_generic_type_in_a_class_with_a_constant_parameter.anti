@@ -1,0 +1,28 @@
+//! A generic type nested in a generic class with a constant parameter. Its copy
+//! in the body of the class keeps the parameters of the class, the type and the
+//! constant, and takes its own.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Row<T, N: int>
+{
+	struct Cell<U>
+	{
+		v: U,
+	}
+
+	pub cells: [N]int,
+
+	pub fn first(self) -> int
+	{
+		let c = Cell<int> { v: self.cells[0] + N };
+		return c.v;
+	}
+}
+
+fn main() -> int
+{
+	let r = Row<int, 3> { cells: [5, 6, 7] };
+	printf("%d\n".ptr, r.first() as c_int);
+	return 0;
+}

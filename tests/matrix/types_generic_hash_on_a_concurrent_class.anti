@@ -1,0 +1,18 @@
+//! A concurrent class has no default hash, so it meets the constraint `hash`
+//! with a `hash` of its own alone.
+
+concurrent class Counter
+{
+	pub atomic n: int = 0,
+}
+
+fn of<T: hash>(x: *T) -> int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	let c = Counter { };
+	return of<Counter>(&c);
+}

@@ -1,0 +1,20 @@
+//! The tag of a variant changes with the whole value alone, so it is no place
+//! to take the address of.
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+fn set(p: *u8)
+{
+	*p = 0;
+}
+
+fn main() -> int
+{
+	let s: Shape = Shape.Empty;
+	set(&s.tag);
+	return 0;
+}

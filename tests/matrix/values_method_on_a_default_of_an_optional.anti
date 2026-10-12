@@ -1,0 +1,20 @@
+//! A function whose first parameter is a pointer takes the address of its
+//! receiver, and the value of `??` is no place.
+
+struct Vec
+{
+	x: int,
+}
+
+fn grow(v: *Vec)
+{
+	v.x += 1;
+}
+
+fn main() -> int
+{
+	let a = Vec { x: 1 };
+	let o: ?Vec = none;
+	(o ?? a).grow();
+	return 0;
+}

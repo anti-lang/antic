@@ -1,0 +1,13 @@
+//! `s.0` reads an element of a tuple, and a struct is none.
+
+struct Pair
+{
+	left: int,
+	right: int,
+}
+
+fn main() -> int
+{
+	let p = Pair { left: 1, right: 2 };
+	return p.0;
+}

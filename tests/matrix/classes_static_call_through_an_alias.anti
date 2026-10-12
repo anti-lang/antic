@@ -1,0 +1,22 @@
+//! A function without `self` is called on the name of its class, and on an
+//! alias of the class as well.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Maker
+{
+	pub n: int = 0,
+
+	pub fn seven() -> int
+	{
+		return 7;
+	}
+}
+
+type Other = Maker;
+
+fn main() -> int
+{
+	printf("%d\n".ptr, Other.seven() as c_int);
+	return 0;
+}

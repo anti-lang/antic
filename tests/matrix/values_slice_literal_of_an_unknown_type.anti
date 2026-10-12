@@ -1,0 +1,7 @@
+//! The element type of a slice literal is a type of the program.
+
+fn main() -> int
+{
+	let s = []Missing { ptr: none, len: 0 };
+	return 0;
+}

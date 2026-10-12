@@ -1,0 +1,13 @@
+//! A generic class of a library is named with its arguments, as one of the
+//! module is.
+import anti.collection.list;
+
+fn count(items: *list.List) -> int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

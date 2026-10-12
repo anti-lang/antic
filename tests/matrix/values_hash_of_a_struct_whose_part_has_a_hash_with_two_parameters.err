@@ -1,0 +1,1 @@
+values_hash_of_a_struct_whose_part_has_a_hash_with_two_parameters.anti:8:13: error: `operator fn hash` is written `operator fn hash(k: Key) -> u64`

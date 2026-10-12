@@ -1,0 +1,29 @@
+//! `p?.f() catch fatal` on a function that cannot fail. The handler guards the
+//! pointer that `?.` gives.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+
+	pub fn itself(self) -> *Node
+	{
+		return self;
+	}
+}
+
+fn read(p: ?*Node) -> int
+{
+	let v = p?.itself() catch fatal;
+	return v.n;
+}
+
+fn main() -> int
+{
+	let n = Node { n: 5 };
+	printf("%d\n".ptr, read(&n) as c_int);
+	return 0;
+}

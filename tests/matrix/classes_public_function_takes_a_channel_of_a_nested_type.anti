@@ -1,0 +1,21 @@
+//! A type nested in a class is private to it, and a public function of the
+//! class names none, as the element of a channel either.
+
+class People
+{
+	struct Node
+	{
+		n: int,
+	}
+
+	pub count: int = 0,
+
+	pub fn feed(self, c: chan Node)
+	{
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

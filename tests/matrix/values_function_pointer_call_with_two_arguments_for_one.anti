@@ -1,0 +1,13 @@
+//! A call through a function pointer passes as many arguments as the type has
+//! parameters.
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	let f: fn(int) -> int = twice;
+	return f(1, 2);
+}

@@ -1,0 +1,1 @@
+modules_export_generic_class.anti:3:14: error: an `export class` cannot be generic. Export a named copy with `export type`

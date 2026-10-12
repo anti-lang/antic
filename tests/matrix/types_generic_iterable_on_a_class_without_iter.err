@@ -1,0 +1,1 @@
+types_generic_iterable_on_a_class_without_iter.anti:19:9: error: `Plain` has no `iter`, which `total` needs for `C`

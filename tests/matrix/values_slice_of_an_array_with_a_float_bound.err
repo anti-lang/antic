@@ -1,0 +1,1 @@
+values_slice_of_an_array_with_a_float_bound.anti:6:19: error: expected `int`, found a float literal

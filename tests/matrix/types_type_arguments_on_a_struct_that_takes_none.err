@@ -1,0 +1,1 @@
+types_type_arguments_on_a_struct_that_takes_none.anti:10:15: error: `Point` is not generic. Put the comparison in parentheses

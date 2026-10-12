@@ -1,0 +1,27 @@
+//! A type nested in a generic class with a constant parameter is named in the
+//! body of the class, where the parameters stand for themselves.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Row<T, N: int>
+{
+	struct Cell
+	{
+		n: int,
+	}
+
+	pub cells: [N]int,
+
+	pub fn first(self) -> int
+	{
+		let c = Cell { n: self.cells[0] + N };
+		return c.n;
+	}
+}
+
+fn main() -> int
+{
+	let r = Row<int, 3> { cells: [5, 6, 7] };
+	printf("%d\n".ptr, r.first() as c_int);
+	return 0;
+}

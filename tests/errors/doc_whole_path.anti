@@ -1,0 +1,9 @@
+//! A doc comment names the whole path of the one module its file imports
+//! without a warning.
+import anti.text;
+
+/// Reads `anti.text` and nothing else.
+pub fn zero() -> int
+{
+	return 0;
+}

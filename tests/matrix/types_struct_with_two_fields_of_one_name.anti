@@ -1,0 +1,12 @@
+//! A struct names each field once.
+
+struct Pair
+{
+	left: int,
+	left: int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

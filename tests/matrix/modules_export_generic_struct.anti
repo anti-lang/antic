@@ -1,0 +1,11 @@
+//! An `export struct` has one layout for C and cannot be generic.
+
+export struct Box<T>
+{
+	value: T,
+}
+
+fn main() -> int
+{
+	return 0;
+}

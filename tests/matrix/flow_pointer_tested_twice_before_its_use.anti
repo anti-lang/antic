@@ -1,0 +1,22 @@
+//! Two guards in one block that each leave where a nullable pointer is `none`.
+//! The second narrows a name that the first narrowed already.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn read(p: ?*int) -> int
+{
+	if p == none {
+		return -1;
+	}
+	if p == none {
+		return -2;
+	}
+	return *p;
+}
+
+fn main() -> int
+{
+	let n = 7;
+	printf("%d %d\n".ptr, read(&n) as c_int, read(none) as c_int);
+	return 0;
+}

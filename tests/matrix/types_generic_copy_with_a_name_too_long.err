@@ -1,0 +1,1 @@
+types_generic_copy_with_a_name_too_long.anti:24:8: error: a copy of `two` has a name longer than 65536 bytes

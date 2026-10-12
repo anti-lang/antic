@@ -1,0 +1,15 @@
+//! A parameter `?T` takes a plain value, which gives `T`, and `none` beside a
+//! written type argument.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn or_zero<T: add>(x: ?T, zero: T) -> T
+{
+	return x ?? zero;
+}
+
+fn main() -> int
+{
+	printf("%d %d\n".ptr, or_zero(5, 0) as c_int, or_zero<int>(none, 9) as c_int);
+	return 0;
+}

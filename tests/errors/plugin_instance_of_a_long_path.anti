@@ -1,0 +1,11 @@
+//! `instance` of a library takes the name of an interface, and a path of ten
+//! names is longer than any.
+
+import anti.plugin;
+
+fn main() -> int
+{
+	let lib = plugin.load("x") catch fatal;
+	let s = lib.instance(a.b.c.d.e.f.g.h.i.j);
+	return 0;
+}

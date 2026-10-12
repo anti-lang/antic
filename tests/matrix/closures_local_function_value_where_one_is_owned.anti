@@ -1,0 +1,17 @@
+//! A local that holds the function of a parameter is no snapshot, and a `keep
+//! own` parameter keeps a `snapshot fn`.
+
+fn own_it(keep own f: fn(int))
+{
+}
+
+fn pass(f: fn(int))
+{
+	let g = f;
+	own_it(g);
+}
+
+fn main() -> int
+{
+	return 0;
+}

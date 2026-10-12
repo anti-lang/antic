@@ -1,0 +1,28 @@
+//! An abstract class has no value, with a `construct` that takes arguments as
+//! without one.
+
+abstract class Shape
+{
+	pub side: int = 0,
+
+	fn construct(self, side: int)
+	{
+		self.side = side;
+	}
+
+	abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+fn main() -> int
+{
+	let s = Shape(3);
+	return 0;
+}

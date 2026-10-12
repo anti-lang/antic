@@ -1,0 +1,1 @@
+types_generic_with_two_arguments_for_one.anti:8:13: error: `Box` takes 1 type argument, found 2

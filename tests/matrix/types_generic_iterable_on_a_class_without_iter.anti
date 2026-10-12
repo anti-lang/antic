@@ -1,0 +1,20 @@
+//! A class meets `Iterable<int>` through its `iter` hook, and one without the
+//! hook does not.
+
+import anti.collection;
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+fn total<C: collection.Iterable<int>>(c: *C) -> int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	let p = Plain { };
+	return total(&p);
+}

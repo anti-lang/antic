@@ -1,0 +1,9 @@
+//! An anonymous function is no constant expression.
+
+fn main() -> int
+{
+	const twice: fn(int) -> int = fn(n: int) -> int {
+		return n * 2;
+	};
+	return 0;
+}

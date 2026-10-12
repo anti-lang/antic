@@ -1,0 +1,26 @@
+//! A class whose field is a `?T` of a class with a `destruct`. The refusal of
+//! `=` names the class inside the `?T`.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+class Rows
+{
+	pub part: ?Counted = none,
+}
+
+fn copy(a: *Rows, b: *Rows)
+{
+	*a = *b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

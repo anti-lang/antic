@@ -1,0 +1,18 @@
+//! A case of a variant is named on the variant and on an alias of it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+type Form = Shape;
+
+fn main() -> int
+{
+	let s: Shape = Form.Empty;
+	printf("%d\n".ptr, (s is Shape.Empty) as c_int);
+	return 0;
+}

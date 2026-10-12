@@ -1,0 +1,12 @@
+//! A call of a generic function writes as many type arguments as the function
+//! has parameters.
+
+fn first<A, B>(own a: A, own b: B) -> A
+{
+	return a;
+}
+
+fn main() -> int
+{
+	return first<int>(1, 2);
+}

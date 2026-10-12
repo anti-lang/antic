@@ -1,0 +1,39 @@
+//! A class with two bodies of one name, each qualified by another class of its
+//! chain. The class declares the name twice.
+
+class Low
+{
+	pub n: int = 0,
+
+	pub fn code(self) -> int
+	{
+		return 1;
+	}
+}
+
+class Middle inherits Low
+{
+	concrete fn code(self) -> int
+	{
+		return 2;
+	}
+}
+
+class Top inherits Middle
+{
+	concrete fn Low::code(self) -> int
+	{
+		return 3;
+	}
+
+	concrete fn Middle::code(self) -> int
+	{
+		return 4;
+	}
+}
+
+fn main() -> int
+{
+	let t = Top { };
+	return t.code();
+}

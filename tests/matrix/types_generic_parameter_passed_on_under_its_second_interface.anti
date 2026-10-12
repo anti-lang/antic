@@ -1,0 +1,48 @@
+//! A type parameter with two interfaces passes on to a generic function that
+//! asks for the second of them.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Named
+{
+	abstract fn code(self) -> int;
+}
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square
+{
+	implements named: Named,
+	implements shape: Shape,
+	pub side: int = 3,
+
+	concrete fn code(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+fn inner<A: Shape>(a: *A) -> int
+{
+	return a.area();
+}
+
+fn outer<B: Named + Shape>(b: *B) -> int
+{
+	return inner<B>(b) + b.code();
+}
+
+fn main() -> int
+{
+	let s = Square { };
+	printf("%d\n".ptr, outer<Square>(&s) as c_int);
+	return 0;
+}

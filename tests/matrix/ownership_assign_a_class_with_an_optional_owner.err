@@ -1,0 +1,1 @@
+ownership_assign_a_class_with_an_optional_owner.anti:20:7: error: `Rows` holds `Counted` in `part`, which has a `destruct`, use `dup` instead of `=`

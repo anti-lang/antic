@@ -1,0 +1,8 @@
+//! The bounds of `a[lo..hi]` are integers.
+
+fn main() -> int
+{
+	let items: [3]int = [1, 2, 3];
+	let part = items[1.5..2];
+	return part.len;
+}

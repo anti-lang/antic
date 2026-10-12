@@ -1,0 +1,36 @@
+//! `to_slice` collects what an iterator gives, through a pointer to the
+//! iterator as on the iterator itself.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Count
+{
+	at: int,
+	end: int,
+}
+
+operator fn next(c: *Count) -> bool
+{
+	c.at += 1;
+	return c.at <= c.end;
+}
+
+operator fn value(c: *Count) -> int
+{
+	return c.at;
+}
+
+fn all(c: *Count) -> int
+{
+	let items = c.to_slice();
+	let n = items.len;
+	free(items.ptr);
+	return n;
+}
+
+fn main() -> int
+{
+	let c = Count { at: 0, end: 3 };
+	printf("%d\n".ptr, all(&c) as c_int);
+	return 0;
+}

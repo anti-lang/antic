@@ -1,0 +1,1 @@
+closures_owned_parameter_moved_inside_a_closure.anti:16:10: error: `f` is captured, and a closure does not move what it captures

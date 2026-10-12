@@ -1,0 +1,12 @@
+//! An argument of a generic call that names nothing gets its one message, and
+//! the call asks for no type argument beside it.
+
+fn same<T>(own x: T) -> T
+{
+	return x;
+}
+
+fn main() -> int
+{
+	return same(missing);
+}

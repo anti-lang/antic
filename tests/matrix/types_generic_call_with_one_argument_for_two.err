@@ -1,0 +1,1 @@
+types_generic_call_with_one_argument_for_two.anti:11:14: error: `first` takes 2 type arguments, found 1

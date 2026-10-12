@@ -1,0 +1,26 @@
+//! A class whose field is an array of a class with a `destruct` owns what the
+//! elements own. The refusal of `=` names the class of the elements.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+class Rows
+{
+	pub parts: [2]Counted,
+}
+
+fn copy(a: *Rows, b: *Rows)
+{
+	*a = *b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

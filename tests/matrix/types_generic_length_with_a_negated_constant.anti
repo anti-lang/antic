@@ -1,0 +1,16 @@
+//! An array length of a generic struct that negates its constant parameter
+//! twice, which each copy computes.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Row<N: int>
+{
+	cells: [-(-N)]int,
+}
+
+fn main() -> int
+{
+	let r = Row<3> { cells: [1, 2, 3] };
+	printf("%d %d\n".ptr, r.cells.len as c_int, r.cells[2] as c_int);
+	return 0;
+}

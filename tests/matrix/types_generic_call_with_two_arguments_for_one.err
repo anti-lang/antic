@@ -1,0 +1,1 @@
+types_generic_call_with_two_arguments_for_one.anti:11:13: error: `same` takes 1 type argument, found 2

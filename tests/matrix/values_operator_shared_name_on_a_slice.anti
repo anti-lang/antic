@@ -1,0 +1,29 @@
+//! Two `operator fn eq` at module level share the name by the types of their
+//! first parameters. A slice has no name to share under, so its operator keeps
+//! the bare name, and `==` of the struct calls the other.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Key
+{
+	id: int,
+	note: int,
+}
+
+operator fn eq(a: Key, b: Key) -> bool
+{
+	return a.id == b.id;
+}
+
+operator fn eq(a: []int, b: []int) -> bool
+{
+	return a.len == b.len;
+}
+
+fn main() -> int
+{
+	let a = Key { id: 1, note: 2 };
+	let b = Key { id: 1, note: 3 };
+	printf("%d\n".ptr, (a == b) as c_int);
+	return 0;
+}

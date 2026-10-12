@@ -1,0 +1,12 @@
+//! The default of a field is a constant expression, and a repeated array whose
+//! length is a constant parameter of the class has no one value.
+
+class Row<N: int>
+{
+	pub cells: [N]int = [0; N],
+}
+
+fn main() -> int
+{
+	return 0;
+}

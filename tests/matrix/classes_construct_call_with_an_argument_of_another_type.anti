@@ -1,0 +1,19 @@
+//! An argument of a `construct` has the type of its parameter.
+
+class Point
+{
+	pub x: int = 0,
+	pub y: int = 0,
+
+	fn construct(self, x: int, y: int)
+	{
+		self.x = x;
+		self.y = y;
+	}
+}
+
+fn main() -> int
+{
+	let p = Point(1, "two");
+	return 0;
+}

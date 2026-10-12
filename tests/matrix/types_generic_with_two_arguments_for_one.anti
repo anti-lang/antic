@@ -1,0 +1,16 @@
+//! A generic type takes as many type arguments as it has parameters.
+
+struct Box<T>
+{
+	value: T,
+}
+
+fn read(b: *Box<int, int>) -> int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

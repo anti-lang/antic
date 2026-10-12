@@ -1,0 +1,31 @@
+//! A class that declares no field of its own and inherits one that holds a
+//! class with a `destruct`. The refusal of `=` finds the field in the base.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+class Base
+{
+	pub counted: Counted,
+}
+
+class Rows inherits Base
+{
+	pub n: int = 0,
+}
+
+fn copy(a: *Rows, b: *Rows)
+{
+	*a = *b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

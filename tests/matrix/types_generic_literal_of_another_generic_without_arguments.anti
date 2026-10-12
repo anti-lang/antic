@@ -1,0 +1,18 @@
+//! A literal of a generic struct inside a generic function names the struct
+//! with its arguments, since nothing else gives them.
+
+struct Pair<A>
+{
+	left: A,
+}
+
+fn make<T>(own x: T) -> int
+{
+	let p = Pair { left: 1 };
+	return 0;
+}
+
+fn main() -> int
+{
+	return make<int>(1);
+}

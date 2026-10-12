@@ -1,0 +1,1 @@
+types_generic_parameter_passed_on_without_the_interface.anti:26:9: error: `B` has no `Shape`, which `inner` needs for `A`

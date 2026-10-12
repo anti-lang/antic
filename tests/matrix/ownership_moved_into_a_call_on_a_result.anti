@@ -1,0 +1,34 @@
+//! An `own` parameter of a function of a class takes a local, which moves. The
+//! receiver is the result of a call and has no name, so the refusal of the next
+//! use names the function alone.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+class Shelf
+{
+	pub n: int = 0,
+
+	pub fn take(self, own c: Counted)
+	{
+	}
+}
+
+fn same(s: *Shelf) -> *Shelf
+{
+	return s;
+}
+
+fn main() -> int
+{
+	let s = Shelf { n: 0 };
+	let c = Counted { n: 1 };
+	same(&s).take(c);
+	return c.n;
+}

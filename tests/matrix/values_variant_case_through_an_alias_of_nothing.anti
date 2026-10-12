@@ -1,0 +1,10 @@
+//! A case named on an alias whose type no declaration names gets the one
+//! message of the alias.
+
+type Form = Missing;
+
+fn main() -> int
+{
+	let s = Form.Empty;
+	return 0;
+}

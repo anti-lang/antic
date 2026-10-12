@@ -1,0 +1,37 @@
+//! A value of a type parameter whose constraint is an interface passes on to a
+//! generic function that asks for the same interface.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square
+{
+	implements shape: Shape,
+	pub side: int = 3,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+fn inner<A: Shape>(a: *A) -> int
+{
+	return a.area();
+}
+
+fn outer<B: Shape>(b: *B) -> int
+{
+	return inner<B>(b);
+}
+
+fn main() -> int
+{
+	let s = Square { };
+	printf("%d\n".ptr, outer<Square>(&s) as c_int);
+	return 0;
+}

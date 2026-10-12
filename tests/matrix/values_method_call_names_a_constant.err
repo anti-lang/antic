@@ -1,0 +1,1 @@
+values_method_call_names_a_constant.anti:14:9: error: `Vec` has no function `size`

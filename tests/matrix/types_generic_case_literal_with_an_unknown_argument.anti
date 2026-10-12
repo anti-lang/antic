@@ -1,0 +1,14 @@
+//! The type argument of a generic variant that a case literal names is a type
+//! of the program.
+
+variant Slot<T>
+{
+	Full { value: T },
+	Empty,
+}
+
+fn main() -> int
+{
+	let s = Slot<Missing>.Full { value: 1 };
+	return 0;
+}

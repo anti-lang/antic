@@ -1,0 +1,27 @@
+//! A `?*Leaf` passes where a `*Base` is expected once it is tested, and the
+//! message says so where it is not.
+
+class Base
+{
+	pub n: int = 0,
+}
+
+class Leaf inherits Base
+{
+	pub m: int = 0,
+}
+
+fn read(b: *Base) -> int
+{
+	return b.n;
+}
+
+fn pass(l: ?*Leaf) -> int
+{
+	return read(l);
+}
+
+fn main() -> int
+{
+	return 0;
+}

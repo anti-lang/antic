@@ -1,0 +1,20 @@
+//! `Collection<int>` of `anti.collection` as a constraint is an interface as
+//! any other: a class meets it by inheriting it, and no hook stands for it.
+
+import anti.collection;
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+fn count<C: collection.Collection<int>>(c: *C) -> int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	let p = Plain { };
+	return count(&p);
+}

@@ -1,0 +1,33 @@
+//! A `?*Square` passes where a pointer to an interface of the class is expected
+//! once it is tested, and the message says so where it is not.
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square
+{
+	implements shape: Shape,
+	pub side: int = 2,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+fn read(s: *Shape) -> int
+{
+	return s.area();
+}
+
+fn pass(q: ?*Square) -> int
+{
+	return read(q);
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,22 @@
+//! `operator fn hash` takes the value alone.
+
+struct Key
+{
+	id: int,
+}
+
+operator fn hash(k: Key, seed: int) -> u64
+{
+	return k.id as u64;
+}
+
+struct Pair
+{
+	left: Key,
+}
+
+fn main() -> int
+{
+	let a = Pair { left: Key { id: 1 } };
+	return a.hash() as int;
+}

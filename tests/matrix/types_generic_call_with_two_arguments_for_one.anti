@@ -1,0 +1,12 @@
+//! A call of a generic function writes as many type arguments as the function
+//! has parameters.
+
+fn same<T>(own x: T) -> T
+{
+	return x;
+}
+
+fn main() -> int
+{
+	return same<int, int>(1);
+}

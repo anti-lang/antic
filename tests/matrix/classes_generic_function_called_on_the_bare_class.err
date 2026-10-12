@@ -1,0 +1,1 @@
+classes_generic_function_called_on_the_bare_class.anti:17:9: error: nothing in the arguments gives `T` of `Box`, so the call writes it out after the name

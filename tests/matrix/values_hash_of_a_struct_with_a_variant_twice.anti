@@ -1,0 +1,25 @@
+//! The default hash of a struct with two fields of one variant type, which has
+//! no `operator fn hash`. The walk reads the cases of the variant once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+variant Mark
+{
+	Named { id: int },
+	Empty,
+}
+
+struct Marks
+{
+	first: Mark,
+	second: Mark,
+}
+
+fn main() -> int
+{
+	let m = Marks { first: Mark.Named { id: 1 }, second: Mark.Empty };
+	let n = Marks { first: Mark.Named { id: 1 }, second: Mark.Empty };
+	let k = Marks { first: Mark.Empty, second: Mark.Empty };
+	printf("same %d other %d\n".ptr, (m.hash() == n.hash()) as c_int, (m.hash() == k.hash()) as c_int);
+	return 0;
+}

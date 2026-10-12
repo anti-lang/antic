@@ -1,0 +1,23 @@
+//! A type nested in a generic class has the parameters of the class and takes
+//! no type argument of its own.
+
+class Box<T>
+{
+	struct Node
+	{
+		n: int,
+	}
+
+	pub n: int = 0,
+
+	pub fn first(self) -> int
+	{
+		let c: Node<int> = Node { n: 1 };
+		return c.n;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

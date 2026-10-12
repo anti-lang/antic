@@ -1,0 +1,12 @@
+//! An `export variant` has one layout for C and cannot be generic.
+
+export variant Slot<T>
+{
+	Full { value: T },
+	Empty,
+}
+
+fn main() -> int
+{
+	return 0;
+}

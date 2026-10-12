@@ -1,0 +1,32 @@
+//! A type parameter passes on to a generic function that asks for an interface
+//! where its own constraints name that interface.
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square
+{
+	implements shape: Shape,
+
+	concrete fn area(self) -> int
+	{
+		return 4;
+	}
+}
+
+fn inner<A: Shape>(a: *A) -> int
+{
+	return a.area();
+}
+
+fn outer<B>(b: *B) -> int
+{
+	return inner<B>(b);
+}
+
+fn main() -> int
+{
+	return 0;
+}

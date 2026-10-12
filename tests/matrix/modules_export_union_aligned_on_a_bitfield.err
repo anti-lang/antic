@@ -1,0 +1,1 @@
+modules_export_union_aligned_on_a_bitfield.anti:6:2: error: the first field `low` of export union `Flags8` is a bitfield, and the C header aligns the union on its first field

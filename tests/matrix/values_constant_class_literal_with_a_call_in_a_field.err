@@ -1,0 +1,1 @@
+values_constant_class_literal_with_a_call_in_a_field.anti:16:29: error: a call is not a constant expression

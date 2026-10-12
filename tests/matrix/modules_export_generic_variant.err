@@ -1,0 +1,1 @@
+modules_export_generic_variant.anti:3:16: error: an `export variant` cannot be generic. Export a named copy with `export type`

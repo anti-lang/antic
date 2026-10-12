@@ -1,0 +1,42 @@
+//! Two bodies of one name, one qualified by the class itself and one by an
+//! interface. A call on the class reaches the first, and a call through the
+//! interface the second.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Reader
+{
+	abstract fn get(self) -> int;
+}
+
+abstract class Source
+{
+	abstract fn get(self) -> int;
+}
+
+class Both inherits Source
+{
+	implements r: Reader,
+
+	concrete fn Both::get(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn Reader::get(self) -> int
+	{
+		return 2;
+	}
+}
+
+fn through(r: *Reader) -> int
+{
+	return r.get();
+}
+
+fn main() -> int
+{
+	let b = Both { };
+	printf("%d %d\n".ptr, b.get() as c_int, through(&b.r) as c_int);
+	return 0;
+}

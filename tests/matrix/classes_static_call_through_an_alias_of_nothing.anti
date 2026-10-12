@@ -1,0 +1,9 @@
+//! A call on an alias whose type no declaration names gets the one message of
+//! the alias.
+
+type Other = Missing;
+
+fn main() -> int
+{
+	return Other.seven();
+}

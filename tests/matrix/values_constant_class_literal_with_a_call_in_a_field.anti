@@ -1,0 +1,22 @@
+//! The default of a field is a constant expression, and so is each field of a
+//! class literal there.
+
+class Leaf
+{
+	pub m: int = 0,
+}
+
+fn seven() -> int
+{
+	return 7;
+}
+
+class Holder
+{
+	pub leaf: Leaf = Leaf { m: seven() },
+}
+
+fn main() -> int
+{
+	return 0;
+}

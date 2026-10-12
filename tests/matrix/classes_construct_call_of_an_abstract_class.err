@@ -1,0 +1,1 @@
+classes_construct_call_of_an_abstract_class.anti:26:10: error: `Shape` is abstract and has no complete value, and a value needs one

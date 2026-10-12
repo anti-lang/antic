@@ -1,0 +1,29 @@
+//! A class whose field is a variant with a case that owns memory owns it too.
+//! The refusal of `=` names the field and says the variant owns what its parts
+//! own.
+
+class Node
+{
+	pub own p: ?*int = none,
+}
+
+variant Slot
+{
+	Full { node: Node },
+	Empty,
+}
+
+class Rows
+{
+	pub part: Slot,
+}
+
+fn copy(a: *Rows, b: *Rows)
+{
+	*a = *b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

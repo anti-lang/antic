@@ -1,0 +1,1 @@
+types_generic_collection_as_a_constraint.anti:19:9: error: `Plain` has no `Collection<int>`, which `count` needs for `C`

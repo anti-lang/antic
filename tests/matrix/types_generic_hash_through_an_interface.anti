@@ -1,0 +1,31 @@
+//! `x.hash()` on a value of a type parameter whose constraint is an interface
+//! that declares `hash`. The call goes to the function of the interface.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Hashed
+{
+	abstract fn hash(self) -> u64;
+}
+
+class Seven
+{
+	implements hashed: Hashed,
+	pub n: int = 0,
+
+	concrete fn hash(self) -> u64
+	{
+		return 7;
+	}
+}
+
+fn of<T: Hashed>(x: T) -> u64
+{
+	return x.hash();
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, of<Seven>(Seven { n: 1 }) as c_int);
+	return 0;
+}

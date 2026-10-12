@@ -1,0 +1,43 @@
+//! A class and its base each have a body qualified by one interface, and the
+//! class has one qualified by a second. The message names each interface once.
+
+abstract class Reader
+{
+	abstract fn get(self) -> int;
+}
+
+abstract class Writer
+{
+	abstract fn get(self) -> int;
+}
+
+class Base
+{
+	implements r: Reader,
+
+	concrete fn Reader::get(self) -> int
+	{
+		return 1;
+	}
+}
+
+class Both inherits Base
+{
+	implements w: Writer,
+
+	concrete fn Reader::get(self) -> int
+	{
+		return 3;
+	}
+
+	concrete fn Writer::get(self) -> int
+	{
+		return 2;
+	}
+}
+
+fn main() -> int
+{
+	let b = Both { };
+	return b.get();
+}

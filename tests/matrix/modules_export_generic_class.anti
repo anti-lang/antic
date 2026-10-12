@@ -1,0 +1,11 @@
+//! An `export class` has one layout for C and cannot be generic.
+
+export class Box<T>
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	return 0;
+}

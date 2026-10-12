@@ -1,0 +1,16 @@
+//! `v is m.Shape.Circle` names a variant of a module the file imports.
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+fn main() -> int
+{
+	let s: Shape = Shape.Empty;
+	if s is geo.Shape.Circle {
+		return 1;
+	}
+	return 0;
+}

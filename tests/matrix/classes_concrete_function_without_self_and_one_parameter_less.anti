@@ -1,0 +1,22 @@
+//! A `concrete fn` without `self` takes as many parameters as the abstract
+//! function it fills.
+
+abstract class Shape
+{
+	abstract fn sides(scale: int, more: int) -> int;
+}
+
+class Square inherits Shape
+{
+	pub n: int = 0,
+
+	concrete fn sides(scale: int) -> int
+	{
+		return 4;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

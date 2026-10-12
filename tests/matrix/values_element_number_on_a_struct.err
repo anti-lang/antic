@@ -1,0 +1,1 @@
+values_element_number_on_a_struct.anti:12:9: error: `Pair` is not a tuple, so it has no element `0`

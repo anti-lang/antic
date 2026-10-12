@@ -3086,6 +3086,13 @@ add_expect_test(silent_doc_names STATUS 0
     PATTERN "^$"
     COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
             --runtime "${ANTIC_RUNTIME_DIR}" doc_names.anti)
+# The whole path of the one module a file imports. No other import stands
+# before it whose first part answers for the name.
+add_expect_test(silent_doc_whole_path STATUS 0
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
+            --runtime "${ANTIC_RUNTIME_DIR}" doc_whole_path.anti)
 add_expect_test(silent_doc_plain_marks STATUS 0
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
     PATTERN "^$"
@@ -5807,6 +5814,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "patch_argument_count|--front-end,patch_argument_count.anti"
         "patch_finds_an_int|--front-end,patch_finds_an_int.anti"
         "plugin_instance_of_a_value|--front-end,--runtime,${ANTIC_RUNTIME_DIR},plugin_instance_of_a_value.anti"
+        "plugin_instance_of_a_long_path|--front-end,--runtime,${ANTIC_RUNTIME_DIR},plugin_instance_of_a_long_path.anti"
         "simd_lanes_compared|--front-end,simd_lanes_compared.anti"
         "switch_refused_returns|--front-end,switch_refused_returns.anti"
         "tests_setup|--front-end,--tests,tests_setup.anti"
@@ -6281,7 +6289,8 @@ endforeach()
 # `equals` and `hash`, `is`, `as` and `dup` give what they give with them.
 # --no-hooks drops the hook sites, and `construct` and `destruct` run as
 # they run with them. Each takes the expected output of its matrix tests.
-foreach(name equality field_kinds conversions copies)
+foreach(name equality field_kinds conversions copies
+        call_through_a_function_field)
     antic_program_test(matrix_classes_${name}_no_reflect
         "${MATRIX}/classes_${name}.anti"
         OPTIONS "--no-reflect"

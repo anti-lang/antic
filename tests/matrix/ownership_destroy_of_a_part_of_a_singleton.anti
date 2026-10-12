@@ -1,0 +1,26 @@
+//! `destroy(&x.part)` of a part of a local is refused, and a part of a
+//! singleton is no part of a local. The `destruct` of the part runs.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Part
+{
+	pub n: int = 4,
+
+	fn destruct(self)
+	{
+		printf("destruct %d\n".ptr, self.n as c_int);
+	}
+}
+
+singleton class Config
+{
+	pub part: Part,
+}
+
+fn main() -> int
+{
+	destroy(&Config.get().part);
+	printf("done\n".ptr);
+	return 0;
+}

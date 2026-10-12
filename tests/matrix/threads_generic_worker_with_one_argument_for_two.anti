@@ -1,0 +1,21 @@
+//! A dispatch of a generic worker writes as many type arguments as the worker
+//! has parameters.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn read<A, B>(t: *Task, a: A, b: B) -> int
+{
+	return t.n;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let job = dispatch t -> read<int>(5, 6);
+	let got = join(job);
+	delete(t);
+	return got;
+}

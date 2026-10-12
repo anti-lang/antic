@@ -1,0 +1,30 @@
+//! The default `==` of a class with a field of a struct that holds another
+//! struct twice. The check that no part is a concurrent class without `==`
+//! reads the inner struct once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Inner
+{
+	n: int,
+}
+
+struct Twice
+{
+	a: Inner,
+	b: Inner,
+}
+
+class Holder
+{
+	pub t: Twice,
+}
+
+fn main() -> int
+{
+	let x = Holder { t: Twice { a: Inner { n: 1 }, b: Inner { n: 2 } } };
+	let y = Holder { t: Twice { a: Inner { n: 1 }, b: Inner { n: 2 } } };
+	let z = Holder { t: Twice { a: Inner { n: 1 }, b: Inner { n: 3 } } };
+	printf("same %d other %d\n".ptr, (x == y) as c_int, (x == z) as c_int);
+	return 0;
+}

@@ -1,0 +1,11 @@
+//! An index that names nothing gets its one message in a generic function.
+
+fn read<C: index>(c: C) -> int
+{
+	return c[missing];
+}
+
+fn main() -> int
+{
+	return 0;
+}

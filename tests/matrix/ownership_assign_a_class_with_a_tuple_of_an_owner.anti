@@ -1,0 +1,26 @@
+//! A class whose field is a tuple that holds a class with a `destruct`. The
+//! refusal of `=` follows the field into the tuple.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+class Rows
+{
+	pub part: (Counted, int),
+}
+
+fn copy(a: *Rows, b: *Rows)
+{
+	*a = *b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

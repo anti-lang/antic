@@ -1,0 +1,1 @@
+classes_public_function_takes_a_channel_of_a_nested_type.anti:13:9: error: the public function `feed` of `People` names `People.Node`, which is private to `People`

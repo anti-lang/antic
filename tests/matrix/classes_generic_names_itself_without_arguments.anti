@@ -1,0 +1,23 @@
+//! Inside a generic class its bare name is the class with its own parameters,
+//! in a literal that nothing else gives a type.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box<T>
+{
+	pub value: int = 0,
+
+	pub fn twin(self) -> Box<T>
+	{
+		let made = Box { value: self.value + 1 };
+		return made;
+	}
+}
+
+fn main() -> int
+{
+	let b = Box<int> { value: 4 };
+	let t = b.twin();
+	printf("%d\n".ptr, t.value as c_int);
+	return 0;
+}

@@ -1,0 +1,36 @@
+//! The name of a copy holds the names of its type arguments. A copy of a
+//! function whose two arguments have names of 45048 bytes each has a name
+//! longer than 65536 bytes and is refused.
+
+struct Pair<A, B>
+{
+	left: A,
+	right: B,
+}
+
+type P0 = Pair<int, int>;
+type P1 = Pair<P0, P0>;
+type P2 = Pair<P1, P1>;
+type P3 = Pair<P2, P2>;
+type P4 = Pair<P3, P3>;
+type P5 = Pair<P4, P4>;
+type P6 = Pair<P5, P5>;
+type P7 = Pair<P6, P6>;
+type P8 = Pair<P7, P7>;
+type P9 = Pair<P8, P8>;
+type P10 = Pair<P9, P9>;
+type P11 = Pair<P10, P10>;
+
+fn two<A, B>(a: *A, b: *B) -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	let p: ?*P11 = none;
+	if p != none {
+		return two<P11, P11>(p, p);
+	}
+	return 0;
+}

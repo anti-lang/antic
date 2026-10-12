@@ -1,0 +1,1 @@
+classes_call_of_qualified_bodies_at_two_levels.anti:42:9: error: `Both` fills `get` only for `Reader` and `Writer`, so the call is ambiguous, reach it through an interface

@@ -1,0 +1,14 @@
+//! `<<%` and `+|` on constants of `c_long`, whose width the target gives.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const one: c_long = 1;
+const shifted: c_long = one <<% 3;
+const far: c_long = one <<% 64;
+const sum: c_long = one +| 2;
+
+fn main() -> int
+{
+	printf("%d %d %d\n".ptr, shifted as c_int, far as c_int, sum as c_int);
+	return 0;
+}

@@ -1,0 +1,23 @@
+//! A `keep own` parameter moves into an owner in its own function, and a
+//! closure does not move what it captures.
+
+fn own_it(keep own f: fn(int))
+{
+}
+
+fn call(f: fn(int))
+{
+	f(1);
+}
+
+fn outer(keep own f: fn(int))
+{
+	call(fn(k) {
+		own_it(f);
+	});
+}
+
+fn main() -> int
+{
+	return 0;
+}

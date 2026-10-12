@@ -1,0 +1,60 @@
+//! A walk in a generic function whose constraints name an interface of the
+//! program before `Iterable<int>`. The element comes from the second.
+
+import anti.collection;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Named
+{
+	abstract fn code(self) -> int;
+}
+
+struct Count
+{
+	at: int,
+	end: int,
+}
+
+operator fn next(c: *Count) -> bool
+{
+	c.at += 1;
+	return c.at <= c.end;
+}
+
+operator fn value(c: *Count) -> int
+{
+	return c.at;
+}
+
+class Three
+{
+	implements named: Named,
+	pub n: int = 3,
+
+	concrete fn code(self) -> int
+	{
+		return 40;
+	}
+
+	operator fn iter(self) -> Count
+	{
+		return Count { at: 0, end: self.n };
+	}
+}
+
+fn total<C: Named + collection.Iterable<int>>(c: *C) -> int
+{
+	let n = c.code();
+	for x in c {
+		n += x;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let t = Three { };
+	printf("%d\n".ptr, total(&t) as c_int);
+	return 0;
+}

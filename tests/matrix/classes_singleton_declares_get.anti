@@ -1,0 +1,20 @@
+//! A singleton class that declares a function `get` of its own. The compiler
+//! writes none beside it, and `Config.get()` calls the one of the class.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+singleton class Config
+{
+	pub n: int = 0,
+
+	pub fn get() -> int
+	{
+		return 41;
+	}
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, Config.get() as c_int);
+	return 0;
+}

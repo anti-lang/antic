@@ -1,0 +1,38 @@
+//! Two bodies of one name, one qualified by an interface and one by the
+//! interface that one inherits, fill one table. The class declares the name
+//! twice.
+
+abstract class Source
+{
+	abstract fn get(self) -> int;
+}
+
+abstract class Reader inherits Source
+{
+	abstract fn more(self) -> int;
+}
+
+class Both
+{
+	implements r: Reader,
+
+	concrete fn Reader::get(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn Source::get(self) -> int
+	{
+		return 2;
+	}
+
+	concrete fn more(self) -> int
+	{
+		return 3;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

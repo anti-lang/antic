@@ -1,0 +1,1 @@
+threads_generic_worker_with_two_arguments_for_one.anti:17:30: error: `read` takes 1 type argument, found 2

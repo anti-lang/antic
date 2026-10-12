@@ -1,0 +1,9 @@
+//! A repeated array in a constant expression holds at most 2^20 elements, and
+//! the count goes through an array of arrays without wrapping.
+
+const rows: [4294967296][4294967296]int = [[0; 4294967296]; 4294967296];
+
+fn main() -> int
+{
+	return 0;
+}
