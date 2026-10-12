@@ -298,10 +298,10 @@ C precedence, with the differences below. Arithmetic `+ - * / %`, comparison `==
 | | `<< >> <<%` |
 | | `+ - +% -% +\| -\|` |
 | | `* / % *% *\|` |
-| | `as` |
+| | `as`, `as?` and `is` |
 | tightest | `- ! ~ & *` before an operand |
 
-`as` binds tighter than every binary operator and looser than the unary ones, so `-x as u8` is `(-x) as u8`. `??` groups from the right, `a ?? b ?? c` is `a ?? (b ?? c)`. `in` binds as `<` does, and each bound takes the operators that bind tighter, so `i + 1 in 0..n * 2` needs no parentheses.
+`as`, `as?` and `is` bind tighter than every binary operator and looser than the unary ones, so `-x as u8` is `(-x) as u8`. `??` groups from the right, `a ?? b ?? c` is `a ?? (b ?? c)`. `in` binds as `<` does, and each bound takes the operators that bind tighter, so `i + 1 in 0..n * 2` needs no parentheses.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -331,7 +331,65 @@ if f.carry { }
 let round = shape is Shape.Circle;
 ```
 
-`let (result, flags) = e;` binds the wrapped result and a `Flags` struct with `overflow`, `carry`, `zero` and `negative`. A carry in is `a + b + f.carry`. `mul_high(a, b)` gives the upper half of the full product.
+`%` and the shifts take integers. `+` takes no `str`, and text is joined with `f"..."` or a `text.Builder`. `<` and the other three take numbers, `char` and `str`, and `==` takes every type that has a default `==`, see [Operators on classes](#operators-on-classes).
+
+`as` converts between the pairs of this table and no other. `65 as char` and `'a' as int` are refused, since a `char` converts to `u32` alone.
+
+| From | To | Note |
+|---|---|---|
+| a number or an enum | a number or an enum | every pair |
+| `bool` | an integer | one way |
+| `char` | `u32` | and back |
+| a pointer | a pointer | a view, or the checked cast of a class pointer |
+| `f32` | `f16` | and back |
+| a `simd struct` | an array or a struct of the same bytes | and back |
+
+`p is *T` tests the class of an object, `p as *T` converts and stops the program on a mismatch, in every build, and `p as? *T` gives a `?*T` that is `none` on a mismatch.
+
+<!-- overview: context, docs-style:ignore
+```anti
+abstract class Shape { abstract fn area(self) -> f32; }
+class Circle inherits Shape
+{
+	pub r: f32 = 1.0,
+	concrete fn area(self) -> f32 { return 3.14 * self.r * self.r; }
+}
+class Square inherits Shape
+{
+	pub side: f32 = 1.0,
+	concrete fn area(self) -> f32 { return self.side * self.side; }
+}
+enum Kind { Circle, Square }
+let circle = Circle { };
+let shape: *Shape = &circle;
+```
+-->
+```anti
+if shape is *Circle { }
+let c = shape as *Circle;
+let q = shape as? *Square;
+if q == none { }
+
+let wide = 300 as i64;
+let low = wide as u8;
+let ratio = wide as f64;
+let code = 'a' as u32;
+let letter = code as char;
+let one = true as int;
+let k = 1 as Kind;
+let n = Kind.Square as u8;
+```
+
+`let (result, flags) = e;` binds the wrapped result and a `Flags` struct with `overflow`, `carry`, `zero` and `negative`. The expression is one `+`, `-`, `*`, `<<`, `>>` or unary `-` on integers, and `a / b` is refused there. A carry in is `a + b + f.carry`. `mul_high(a, b)` gives the upper half of the full product.
+
+```anti
+let a: u8 = 200;
+let b: u8 = 100;
+let (sum, f) = a + b;
+let (next, g) = sum + 1 + f.carry;
+let high = mul_high(a, b);
+if f.carry && !g.overflow { }
+```
 
 ## Statements
 
