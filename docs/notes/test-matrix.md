@@ -177,7 +177,7 @@ The parts of a signature, from `parser_decl.c`:
 | `do { } while c` | `STMT_DO_WHILE` |
 | `for i in lo..hi { }`, with `by k` | `STMT_FOR` |
 | `for x in e { }`, `for x in &e { }`, `for i, x in e { }` | `STMT_FOR` |
-| `switch e { A, B => s, Case c => { }, else => { } }` | `STMT_SWITCH` |
+| `switch e { A => s, Case c => { }, else => { } }` | `STMT_SWITCH` |
 | `fallthrough;` | `STMT_FALLTHROUGH` |
 | `sync m { }`, `sync a, b { }` | `STMT_SYNC` |
 | `select { c x => { } }` | `STMT_SELECT` |
@@ -231,7 +231,7 @@ A call takes a handler, from `enum handler_kind`:
 | `dup(e)`, `delete(p)`, `destroy(p)`, each with `from` | `EXPR_OBJECT` |
 | `size_of(T)` | `EXPR_SIZE_OF` |
 | `parallel xs -> f(a)`, `parallel xs by n -> f(a)` | `EXPR_PARALLEL` |
-| `dispatch f(a)`, `dispatch p -> f(a)` | `EXPR_DISPATCH` |
+| `dispatch p -> f`, `dispatch p -> f(a)` | `EXPR_DISPATCH` |
 | `join(j)`, `join_all(js)` | `EXPR_JOIN` |
 | `chan T(n)`, `send(c, v)`, `recv(c)` | `EXPR_SYNC_OP` |
 | `fn(x) { }`, `fn(x: T) -> R { }`, `snapshot fn` | `EXPR_FN` |
@@ -283,7 +283,7 @@ The other operators of `parser_expr.c`:
 Anti has two things called a pattern. The first is what an arm of a `switch`
 or an `if let` matches, from `parser_stmt.c`:
 
-- A constant, a list of constants `A, B` and a string.
+- A constant and a string, one value per arm.
 - A case of a variant, `Circle`, and a case with a binding, `Circle c`.
 - `else`, which takes every other value.
 - The tuple pattern of `let (a, b) = e;` and of `for i, x in e`.
@@ -435,7 +435,7 @@ column means that no source holds the row at all.
 
 | Area | Rows | Cells held | Cells open | Kinds held | Kinds open |
 |---|---|---|---|---|---|
-| Flow | 27 | 137 | 318 | 47 | 44 |
+| Flow | 27 | 454 | 1 | 91 | 0 |
 | Values | 40 | 297 | 456 | 423 | 617 |
 | Types | 32 | 131 | 83 | 0 | 0 |
 | Ownership | 18 | 79 | 170 | 45 | 80 |
@@ -443,37 +443,37 @@ column means that no source holds the row at all.
 | Threads | 29 | 71 | 335 | 52 | 144 |
 | Classes | 26 | 47 | 9 | 0 | 0 |
 | Modules | 19 | 29 | 1 | 0 | 0 |
-| All | 206 | 840 | 1496 | 578 | 915 |
+| All | 206 | 1157 | 1179 | 622 | 871 |
 
 ### Flow
 
 | Construct | Held, with the first source that holds it | Open |
 |---|---|---|
-| `if` | function `programs/alias_access`, method `programs/construct_args`, loop body `programs/args`, switch arm `programs/generic_variants`, catch handler `programs/catch_exits`, closure `programs/closures`, worker `programs/parallel_join`, `sync` block `programs/sync_exits`, generic body `programs/caller_params`, library module `modules/chain/com/example/animal` | `if let`, `defer`, `undo`, `dispatch` or `parallel`, `select` arm, `tests` block, `fixtures` block, nested type |
-| `else` of an `if` | function `programs/argument_order`, method `programs/lock_free_queue`, loop body `programs/lock_free_queue`, worker `std/spsc_ring_threads` | switch arm, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `while` | function `programs/alloc_owning`, method `programs/concurrent`, loop body `programs/handler_exit_temps`, switch arm `errors/switch_fallthrough`, catch handler `errors/own_moves`, worker `programs/channel_workers`, `sync` block `programs/concurrent`, generic body `programs/generic_nested`, library module `modules/defaults/com/example/greeter` | `if let`, `defer`, `undo`, closure, `dispatch` or `parallel`, `select` arm, `tests` block, `fixtures` block, nested type |
-| `do ... while` | function `fmt/loose` | method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `for i in lo..hi` | function `programs/arith_facts`, method `programs/generic_copies`, loop body `programs/generic_nested`, worker `programs/channel_workers`, generic body `programs/generic_constants`, library module `modules/closures/com/example/walk` | switch arm, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type |
-| `for x in e` | function `programs/channels`, loop body `programs/iteration`, closure `std/collection_grid`, worker `programs/channels`, generic body `programs/for_patterns`, library module `modules/closures/com/example/walk` | method, switch arm, `if let`, `defer`, `undo`, catch handler, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type |
-| `for x in &e` | function `programs/for_loop`, worker `std/shared`, generic body `programs/walk_generic`, library module `modules/generics/com/example/gen` | method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type |
-| `for i, x in e` | function `programs/for_patterns` | method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `break` | function `programs/by_ends`, method `programs/lock_free_queue`, loop body `programs/by_ends`, catch handler `programs/catch_exits`, closure `errors/closures`, worker `std/spsc_ring_threads`, `sync` block `programs/sync_exits` | switch arm, `if let`, `defer`, `undo`, `dispatch` or `parallel`, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `continue` | function `programs/arith_facts`, loop body `programs/arith_facts`, catch handler `programs/catch_exits`, worker `std/concurrent_map_threads`, `sync` block `programs/sync_exits` | method, switch arm, `if let`, `defer`, `undo`, closure, `dispatch` or `parallel`, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `return` of a value | function `programs/alias_access`, method `programs/atomics`, loop body `programs/args`, switch arm `programs/switch_stmt`, `if let` `programs/generic_variants`, catch handler `programs/catch_exits`, closure `programs/closures`, worker `programs/channel_workers`, `dispatch` or `parallel` `programs/closures`, `sync` block `programs/concurrent`, `fixtures` block `programs/test_blocks`, generic body `programs/caller_params`, nested type `programs/generic_nested`, library module `modules/access/com/example/ledger` | `defer`, `undo`, `select` arm, `tests` block |
-| `return` alone | function `programs/catch_none`, method `std/builder_take_in`, loop body `std/builder_take_in`, catch handler `programs/pattern_walk`, `tests` block `errors/allow_levels`, generic body `std/collection_parts` | switch arm, `if let`, `defer`, `undo`, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `fixtures` block, nested type, library module |
-| `switch` | function `programs/alias_unions`, method `programs/nested_types`, loop body `programs/select_two`, worker `programs/select_two`, generic body `programs/generic_variants`, library module `modules/variants/com/example/geo` | switch arm, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type |
-| `else` of a `switch` | function `programs/nested_locals`, method `programs/switch_fallthrough`, loop body `programs/select_two`, worker `programs/select_two` | switch arm, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| arm that binds a case, `Circle c =>` | function `programs/alias_unions`, switch arm `programs/alias_unions`, generic body `programs/generic_variants`, library module `modules/variants/com/example/geo` | method, loop body, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type |
-| arm that is a call or an assignment | function `programs/alias_unions`, method `programs/nested_types`, loop body `programs/select_two`, switch arm `programs/alias_unions`, worker `programs/select_two`, generic body `programs/generic_variants`, library module `modules/variants/com/example/geo` | `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type |
-| `fallthrough` | function `programs/switch_fallthrough`, method `programs/switch_fallthrough`, loop body `errors/switch_fallthrough`, switch arm `programs/switch_fallthrough`, `defer` `errors/switch_fallthrough` | `if let`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `if let` | function `programs/generic_variants`, `if let` `programs/variants`, generic body `programs/generic_variants`, library module `modules/generics/com/example/gen` | method, loop body, switch arm, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type |
-| `else` of an `if let` | function `programs/generic_variants`, `if let` `programs/generic_variants`, generic body `programs/generic_variants`, library module `modules/generics/com/example/gen` | method, loop body, switch arm, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type |
-| `defer` | function `programs/closures`, loop body `programs/defer_stmt`, switch arm `programs/switch_fallthrough`, catch handler `errors/own_moves`, `sync` block `programs/sync_exits` | method, `if let`, `defer`, `undo`, closure, worker, `dispatch` or `parallel`, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `assert` | function `programs/asserts`, `tests` block `programs/test_blocks` | method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `fixtures` block, generic body, nested type, library module |
-| block as a statement | function `programs/argument_order`, loop body `std/collection_tree`, switch arm `errors/switch_fallthrough`, worker `std/spsc_ring_threads` | method, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `&&` | function `programs/eq_parts`, method `programs/operators`, loop body `programs/pattern_bytes`, closure `std/concurrent_map_threads`, worker `programs/sync_pairs`, generic body `programs/eq_parts`, library module `modules/access/com/example/ledger` | module level, switch arm, `if let`, `defer`, `undo`, catch handler, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type |
-| `\|\|` | function `programs/channel_workers`, method `std/sorted_order`, loop body `programs/channel_workers`, closure `bench/ablate/mixed_work`, worker `std/sync_list_threads`, generic body `programs/hash_generic`, library module `modules/sync/com/example/queue` | module level, switch arm, `if let`, `defer`, `undo`, catch handler, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type |
-| `x in lo..hi` | module level `programs/in_range`, function `programs/in_range`, loop body `programs/in_range` | method, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
+| `if` | function `programs/alias_access`, method `programs/construct_args`, loop body `programs/args`, switch arm `programs/generic_variants`, `if let` `matrix/flow_if`, `defer` `matrix/flow_if`, `undo` `matrix/flow_if`, catch handler `programs/catch_exits`, closure `programs/closures`, worker `programs/parallel_join`, `dispatch` or `parallel` `matrix/flow_if`, `sync` block `programs/sync_exits`, `select` arm `matrix/flow_if`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `programs/caller_params`, nested type `matrix/flow_if`, library module `modules/chain/com/example/animal` | none |
+| `else` of an `if` | function `programs/argument_order`, method `programs/lock_free_queue`, loop body `programs/lock_free_queue`, switch arm `matrix/flow_else`, `if let` `matrix/flow_else`, `defer` `matrix/flow_else`, `undo` `matrix/flow_else`, catch handler `matrix/flow_else`, closure `matrix/flow_else`, worker `std/spsc_ring_threads`, `dispatch` or `parallel` `matrix/flow_else`, `sync` block `matrix/flow_else`, `select` arm `matrix/flow_else`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `matrix/flow_else`, nested type `matrix/flow_else`, library module `modules/flow/com/example/flow` | none |
+| `while` | function `programs/alloc_owning`, method `programs/concurrent`, loop body `programs/handler_exit_temps`, switch arm `matrix/flow_while`, `if let` `matrix/flow_while`, `defer` `matrix/flow_while`, `undo` `matrix/flow_while`, catch handler `matrix/flow_while`, closure `matrix/flow_while`, worker `programs/channel_workers`, `dispatch` or `parallel` `matrix/flow_while`, `sync` block `programs/concurrent`, `select` arm `matrix/flow_while`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `programs/generic_nested`, nested type `matrix/flow_while`, library module `modules/defaults/com/example/greeter` | none |
+| `do ... while` | function `matrix/flow_do_while`, method `matrix/flow_do_while`, loop body `matrix/flow_do_while`, switch arm `matrix/flow_do_while`, `if let` `matrix/flow_do_while`, `defer` `matrix/flow_do_while`, `undo` `matrix/flow_do_while`, catch handler `matrix/flow_do_while`, closure `matrix/flow_do_while`, worker `matrix/flow_do_while`, `dispatch` or `parallel` `matrix/flow_do_while`, `sync` block `matrix/flow_do_while`, `select` arm `matrix/flow_do_while`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `matrix/flow_do_while`, nested type `matrix/flow_do_while`, library module `modules/flow/com/example/flow` | none |
+| `for i in lo..hi` | function `programs/arith_facts`, method `programs/generic_copies`, loop body `programs/generic_nested`, switch arm `matrix/flow_for_range`, `if let` `matrix/flow_for_range`, `defer` `matrix/flow_for_range`, `undo` `matrix/flow_for_range`, catch handler `matrix/flow_for_range`, closure `matrix/flow_for_range`, worker `programs/channel_workers`, `dispatch` or `parallel` `matrix/flow_for_range`, `sync` block `matrix/flow_for_range`, `select` arm `matrix/flow_for_range`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `programs/generic_constants`, nested type `matrix/flow_for_range`, library module `modules/closures/com/example/walk` | none |
+| `for x in e` | function `programs/channels`, method `matrix/flow_for_each`, loop body `programs/iteration`, switch arm `matrix/flow_for_each`, `if let` `matrix/flow_for_each`, `defer` `matrix/flow_for_each`, `undo` `matrix/flow_for_each`, catch handler `matrix/flow_for_each`, closure `std/collection_grid`, worker `programs/channels`, `dispatch` or `parallel` `matrix/flow_for_each`, `sync` block `matrix/flow_for_each`, `select` arm `matrix/flow_for_each`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `programs/for_patterns`, nested type `matrix/flow_for_each`, library module `modules/closures/com/example/walk` | none |
+| `for x in &e` | function `programs/for_loop`, method `matrix/flow_for_lent`, loop body `matrix/flow_for_lent`, switch arm `matrix/flow_for_lent`, `if let` `matrix/flow_for_lent`, `defer` `matrix/flow_for_lent`, `undo` `matrix/flow_for_lent`, catch handler `matrix/flow_for_lent`, closure `matrix/flow_for_lent`, worker `std/shared`, `dispatch` or `parallel` `matrix/flow_for_lent`, `sync` block `matrix/flow_for_lent`, `select` arm `matrix/flow_for_lent`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `programs/walk_generic`, nested type `matrix/flow_for_lent`, library module `modules/generics/com/example/gen` | none |
+| `for i, x in e` | function `programs/for_patterns`, method `matrix/flow_for_index`, loop body `matrix/flow_for_index`, switch arm `matrix/flow_for_index`, `if let` `matrix/flow_for_index`, `defer` `matrix/flow_for_index`, `undo` `matrix/flow_for_index`, catch handler `matrix/flow_for_index`, closure `matrix/flow_for_index`, worker `matrix/flow_for_index`, `dispatch` or `parallel` `matrix/flow_for_index`, `sync` block `matrix/flow_for_index`, `select` arm `matrix/flow_for_index`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `matrix/flow_for_index`, nested type `matrix/flow_for_index`, library module `modules/flow/com/example/flow` | none |
+| `break` | function `programs/by_ends`, method `programs/lock_free_queue`, loop body `programs/by_ends`, switch arm `matrix/flow_break`, `if let` `matrix/flow_break`, `defer` `matrix/flow_break`, `undo` `matrix/flow_break`, catch handler `programs/catch_exits`, closure `matrix/flow_break`, worker `std/spsc_ring_threads`, `dispatch` or `parallel` `matrix/flow_break`, `sync` block `programs/sync_exits`, `select` arm `matrix/flow_break`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `matrix/flow_break`, nested type `matrix/flow_break`, library module `modules/flow/com/example/flow` | none |
+| `continue` | function `programs/arith_facts`, method `matrix/flow_continue`, loop body `programs/arith_facts`, switch arm `matrix/flow_continue`, `if let` `matrix/flow_continue`, `defer` `matrix/flow_continue`, `undo` `matrix/flow_continue`, catch handler `programs/catch_exits`, closure `matrix/flow_continue`, worker `std/concurrent_map_threads`, `dispatch` or `parallel` `matrix/flow_continue`, `sync` block `programs/sync_exits`, `select` arm `matrix/flow_continue`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `matrix/flow_continue`, nested type `matrix/flow_continue`, library module `modules/flow/com/example/flow` | none |
+| `return` of a value | function `programs/alias_access`, method `programs/atomics`, loop body `programs/args`, switch arm `programs/switch_stmt`, `if let` `programs/generic_variants`, `defer` `matrix/flow_return_value_in_defer` T001, `undo` `matrix/flow_return_value_in_undo` T001, catch handler `programs/catch_exits`, closure `programs/closures`, worker `programs/channel_workers`, `dispatch` or `parallel` `programs/closures`, `sync` block `programs/concurrent`, `select` arm `matrix/flow_return_value`, `fixtures` block `programs/test_blocks`, generic body `programs/caller_params`, nested type `programs/generic_nested`, library module `modules/access/com/example/ledger` | `tests` block: a function of a `tests` block returns nothing, so no `return` of a value stands in one |
+| `return` alone | function `programs/catch_none`, method `std/builder_take_in`, loop body `std/builder_take_in`, switch arm `matrix/flow_return_plain_in_arm`, `if let` `matrix/flow_return_plain_in_if_let`, `defer` `matrix/flow_return_plain_in_defer` T001, `undo` `matrix/flow_return_plain_in_undo` T001, catch handler `programs/pattern_walk`, closure `matrix/flow_return_plain_in_closure`, worker `matrix/flow_return_plain_in_worker`, `dispatch` or `parallel` `matrix/flow_return_plain_in_dispatch`, `sync` block `matrix/flow_return_plain_in_sync`, `select` arm `matrix/flow_return_plain_in_select`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `std/collection_parts`, nested type `matrix/flow_return_plain_in_nested`, library module `modules/flow/com/example/flow` | none |
+| `switch` | function `programs/alias_unions`, method `programs/nested_types`, loop body `programs/select_two`, switch arm `matrix/flow_switch`, `if let` `matrix/flow_switch`, `defer` `matrix/flow_switch`, `undo` `matrix/flow_switch`, catch handler `matrix/flow_switch`, closure `matrix/flow_switch`, worker `programs/select_two`, `dispatch` or `parallel` `matrix/flow_switch`, `sync` block `matrix/flow_switch`, `select` arm `matrix/flow_switch`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `programs/generic_variants`, nested type `matrix/flow_switch`, library module `modules/variants/com/example/geo` | none |
+| `else` of a `switch` | function `programs/nested_locals`, method `programs/switch_fallthrough`, loop body `programs/select_two`, switch arm `matrix/flow_switch_else`, `if let` `matrix/flow_switch_else`, `defer` `matrix/flow_switch_else`, `undo` `matrix/flow_switch_else`, catch handler `matrix/flow_switch_else`, closure `matrix/flow_switch_else`, worker `programs/select_two`, `dispatch` or `parallel` `matrix/flow_switch_else`, `sync` block `matrix/flow_switch_else`, `select` arm `matrix/flow_switch_else`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `matrix/flow_switch_else`, nested type `matrix/flow_switch_else`, library module `modules/flow/com/example/flow` | none |
+| arm that binds a case, `Circle c =>` | function `programs/alias_unions`, method `matrix/flow_arm_binds`, loop body `matrix/flow_arm_binds`, switch arm `programs/alias_unions`, `if let` `matrix/flow_arm_binds`, `defer` `matrix/flow_arm_binds`, `undo` `matrix/flow_arm_binds`, catch handler `matrix/flow_arm_binds`, closure `matrix/flow_arm_binds`, worker `matrix/flow_arm_binds`, `dispatch` or `parallel` `matrix/flow_arm_binds`, `sync` block `matrix/flow_arm_binds`, `select` arm `matrix/flow_arm_binds`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `programs/generic_variants`, nested type `matrix/flow_arm_binds`, library module `modules/variants/com/example/geo` | none |
+| arm that is a call or an assignment | function `programs/alias_unions`, method `programs/nested_types`, loop body `programs/select_two`, switch arm `programs/alias_unions`, `if let` `matrix/flow_arm_call`, `defer` `matrix/flow_arm_call`, `undo` `matrix/flow_arm_call`, catch handler `matrix/flow_arm_call`, closure `matrix/flow_arm_call`, worker `programs/select_two`, `dispatch` or `parallel` `matrix/flow_arm_call`, `sync` block `matrix/flow_arm_call`, `select` arm `matrix/flow_arm_call`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `programs/generic_variants`, nested type `matrix/flow_arm_call`, library module `modules/variants/com/example/geo` | none |
+| `fallthrough` | function `programs/switch_fallthrough`, method `programs/switch_fallthrough`, loop body `matrix/flow_fallthrough`, switch arm `programs/switch_fallthrough`, `if let` `matrix/flow_fallthrough`, `defer` `matrix/flow_fallthrough`, `undo` `matrix/flow_fallthrough`, catch handler `matrix/flow_fallthrough`, closure `matrix/flow_fallthrough`, worker `matrix/flow_fallthrough`, `dispatch` or `parallel` `matrix/flow_fallthrough`, `sync` block `matrix/flow_fallthrough`, `select` arm `matrix/flow_fallthrough`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `matrix/flow_fallthrough`, nested type `matrix/flow_fallthrough`, library module `modules/flow/com/example/flow` | none |
+| `if let` | function `programs/generic_variants`, method `matrix/flow_if_let`, loop body `matrix/flow_if_let`, switch arm `matrix/flow_if_let`, `if let` `programs/variants`, `defer` `matrix/flow_if_let`, `undo` `matrix/flow_if_let`, catch handler `matrix/flow_if_let`, closure `matrix/flow_if_let`, worker `matrix/flow_if_let`, `dispatch` or `parallel` `matrix/flow_if_let`, `sync` block `matrix/flow_if_let`, `select` arm `matrix/flow_if_let`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `programs/generic_variants`, nested type `matrix/flow_if_let`, library module `modules/generics/com/example/gen` | none |
+| `else` of an `if let` | function `programs/generic_variants`, method `matrix/flow_if_let_else`, loop body `matrix/flow_if_let_else`, switch arm `matrix/flow_if_let_else`, `if let` `programs/generic_variants`, `defer` `matrix/flow_if_let_else`, `undo` `matrix/flow_if_let_else`, catch handler `matrix/flow_if_let_else`, closure `matrix/flow_if_let_else`, worker `matrix/flow_if_let_else`, `dispatch` or `parallel` `matrix/flow_if_let_else`, `sync` block `matrix/flow_if_let_else`, `select` arm `matrix/flow_if_let_else`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `programs/generic_variants`, nested type `matrix/flow_if_let_else`, library module `modules/generics/com/example/gen` | none |
+| `defer` | function `programs/closures`, method `matrix/flow_defer`, loop body `programs/defer_stmt`, switch arm `programs/switch_fallthrough`, `if let` `matrix/flow_defer`, `defer` `matrix/flow_defer`, `undo` `matrix/flow_defer`, catch handler `matrix/flow_defer`, closure `matrix/flow_defer`, worker `matrix/flow_defer`, `dispatch` or `parallel` `matrix/flow_defer`, `sync` block `programs/sync_exits`, `select` arm `matrix/flow_defer`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `matrix/flow_defer`, nested type `matrix/flow_defer`, library module `modules/flow/com/example/flow` | none |
+| `assert` | function `programs/asserts`, method `matrix/flow_assert`, loop body `matrix/flow_assert`, switch arm `matrix/flow_assert`, `if let` `matrix/flow_assert`, `defer` `matrix/flow_assert`, `undo` `matrix/flow_assert`, catch handler `matrix/flow_assert`, closure `matrix/flow_assert`, worker `matrix/flow_assert`, `dispatch` or `parallel` `matrix/flow_assert`, `sync` block `matrix/flow_assert`, `select` arm `matrix/flow_assert`, `tests` block `programs/test_blocks`, `fixtures` block `anti-test/com/example/flow`, generic body `matrix/flow_assert`, nested type `matrix/flow_assert`, library module `modules/flow/com/example/flow` | none |
+| block as a statement | function `programs/argument_order`, method `matrix/flow_block`, loop body `std/collection_tree`, switch arm `matrix/flow_block`, `if let` `matrix/flow_block`, `defer` `matrix/flow_block`, `undo` `matrix/flow_block`, catch handler `matrix/flow_block`, closure `matrix/flow_block`, worker `std/spsc_ring_threads`, `dispatch` or `parallel` `matrix/flow_block`, `sync` block `matrix/flow_block`, `select` arm `matrix/flow_block`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `matrix/flow_block`, nested type `matrix/flow_block`, library module `modules/flow/com/example/flow` | none |
+| `&&` | module level `matrix/flow_and_at_module_level`, function `programs/eq_parts`, method `programs/operators`, loop body `programs/pattern_bytes`, switch arm `matrix/flow_and`, `if let` `matrix/flow_and`, `defer` `matrix/flow_and`, `undo` `matrix/flow_and`, catch handler `matrix/flow_and`, closure `std/concurrent_map_threads`, worker `programs/sync_pairs`, `dispatch` or `parallel` `matrix/flow_and`, `sync` block `matrix/flow_and`, `select` arm `matrix/flow_and`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `programs/eq_parts`, nested type `matrix/flow_and`, library module `modules/access/com/example/ledger` | none |
+| `\|\|` | module level `matrix/flow_or_at_module_level`, function `programs/channel_workers`, method `std/sorted_order`, loop body `programs/channel_workers`, switch arm `matrix/flow_or`, `if let` `matrix/flow_or`, `defer` `matrix/flow_or`, `undo` `matrix/flow_or`, catch handler `matrix/flow_or`, closure `bench/ablate/mixed_work`, worker `std/sync_list_threads`, `dispatch` or `parallel` `matrix/flow_or`, `sync` block `matrix/flow_or`, `select` arm `matrix/flow_or`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `programs/hash_generic`, nested type `matrix/flow_or`, library module `modules/sync/com/example/queue` | none |
+| `x in lo..hi` | module level `programs/in_range`, function `programs/in_range`, method `matrix/flow_in_range`, loop body `programs/in_range`, switch arm `matrix/flow_in_range`, `if let` `matrix/flow_in_range`, `defer` `matrix/flow_in_range`, `undo` `matrix/flow_in_range`, catch handler `matrix/flow_in_range`, closure `matrix/flow_in_range`, worker `matrix/flow_in_range`, `dispatch` or `parallel` `matrix/flow_in_range`, `sync` block `matrix/flow_in_range`, `select` arm `matrix/flow_in_range`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `matrix/flow_in_range`, nested type `matrix/flow_in_range`, library module `modules/flow/com/example/flow` | none |
 | `for ... by k` | `programs/arith_facts` | none |
 | `let x = e else { }` | `programs/alias_integers` | none |
 
@@ -481,13 +481,92 @@ The kinds of flow:
 
 | Construct | Kinds held | Kinds open |
 |---|---|---|
-| `for i in lo..hi` | i8 `programs/arith_facts`, i16 `programs/by_ends`, int `programs/arith_facts`, u64 `programs/by_ends`, byte `programs/arith_facts` | i32, i64, u8, u16, u32, uint |
-| `for x in e` | slice `programs/pattern_bytes`, class `programs/parallel_classes`, struct `programs/pattern_walk`, str `programs/for_patterns`, generic parameter `programs/for_patterns` | fixed array |
-| `for x in &e` | class `programs/walk_owned_parts` | slice, fixed array, struct |
-| `return` of a value | i8 `programs/param_facts`, i16 `programs/alias_integers`, i32 `programs/alias_c_functions`, int `programs/alias_access`, u16 `programs/alias_integers`, u32 `programs/alias_integers`, u64 `programs/eq_compiled`, byte `programs/param_facts`, f32 `programs/classes`, bool `programs/alias_pointers`, char `std/reflect_call`, str `programs/effects_edges`, slice `programs/eq_kinds`, fixed array `programs/generic_constants`, pointer `programs/alias_access`, nullable pointer `programs/catch_exits`, optional value `programs/argument_order`, may-fail function value `programs/fn_may_fail`, function value `programs/closures`, tuple `programs/caller_params`, channel `modules/sync/com/example/queue`, struct `programs/flags`, simd struct `clib/com/example/simdlib`, union `clib/com/example/geo`, enum `dump/arith`, variant `programs/generic_copies`, class `programs/alloc_owning`, generic parameter `programs/caller_params` | i64, u8, uint, f64, f16, lent value, packed struct, synchronized class, concurrent class, interface |
-| `switch` | int `programs/select_two`, str `programs/switch_str`, enum `programs/arith_facts`, variant `programs/alias_unions` | i8, i16, i32, i64, u8, u16, u32, u64, uint, byte, char, bool, generic parameter |
-| `if let` | variant `programs/generic_variants` | optional value, nullable pointer |
-| `x in lo..hi` | int `programs/in_range`, byte `programs/in_range`, char `programs/in_range` | i8, i16, i32, i64, u8, u16, u32, u64, uint |
+| `for i in lo..hi` | i8 `programs/arith_facts`, i16 `programs/by_ends`, int `programs/arith_facts`, u64 `programs/by_ends`, byte `programs/arith_facts`, i32 `matrix/flow_for_range_kinds`, i64 `matrix/flow_for_range_kinds`, u8 `matrix/flow_for_range_kinds`, u16 `matrix/flow_for_range_kinds`, u32 `matrix/flow_for_range_kinds`, uint `matrix/flow_for_range_kinds` | none |
+| `for x in e` | slice `programs/pattern_bytes`, class `programs/parallel_classes`, struct `programs/pattern_walk`, str `programs/for_patterns`, generic parameter `programs/for_patterns`, fixed array `matrix/flow_for_each` | none |
+| `for x in &e` | class `programs/walk_owned_parts`, slice `matrix/flow_for_lent_kinds`, fixed array `matrix/flow_for_lent_kinds`, struct `matrix/flow_for_lent_kinds` | none |
+| `return` of a value | i8 `programs/param_facts`, i16 `programs/alias_integers`, i32 `programs/alias_c_functions`, int `programs/alias_access`, u16 `programs/alias_integers`, u32 `programs/alias_integers`, u64 `programs/eq_compiled`, byte `programs/param_facts`, f32 `programs/classes`, bool `programs/alias_pointers`, char `std/reflect_call`, str `programs/effects_edges`, slice `programs/eq_kinds`, fixed array `programs/generic_constants`, pointer `programs/alias_access`, nullable pointer `programs/catch_exits`, optional value `programs/argument_order`, may-fail function value `programs/fn_may_fail`, function value `programs/closures`, tuple `programs/caller_params`, channel `modules/sync/com/example/queue`, struct `programs/flags`, simd struct `clib/com/example/simdlib`, union `clib/com/example/geo`, enum `dump/arith`, variant `programs/generic_copies`, class `programs/alloc_owning`, generic parameter `programs/caller_params`, i64 `matrix/flow_return_kinds`, u8 `matrix/flow_return_kinds`, uint `matrix/flow_return_kinds`, f64 `matrix/flow_return_kinds`, f16 `matrix/flow_return_f16`, lent value `matrix/flow_return_lent`, packed struct `matrix/flow_return_packed_struct`, synchronized class `matrix/flow_return_synchronized`, concurrent class `matrix/flow_return_concurrent`, interface `matrix/flow_return_interface` | none |
+| `switch` | int `programs/select_two`, str `programs/switch_str`, enum `programs/arith_facts`, variant `programs/alias_unions`, i8 `matrix/flow_switch_kinds`, i16 `matrix/flow_switch_kinds`, i32 `matrix/flow_switch_kinds`, i64 `matrix/flow_switch_kinds`, u8 `matrix/flow_switch_kinds`, u16 `matrix/flow_switch_kinds`, u32 `matrix/flow_switch_kinds`, u64 `matrix/flow_switch_kinds`, uint `matrix/flow_switch_kinds`, byte `matrix/flow_switch_kinds`, char `matrix/flow_switch_on_char`, bool `matrix/flow_switch_on_bool`, generic parameter `matrix/flow_switch_on_generic` | none |
+| `if let` | variant `programs/generic_variants`, optional value `matrix/flow_if_let`, nullable pointer `matrix/flow_if_let_pointer` | none |
+| `x in lo..hi` | int `programs/in_range`, byte `programs/in_range`, char `programs/in_range`, i8 `matrix/flow_in_range_kinds`, i16 `matrix/flow_in_range_kinds`, i32 `matrix/flow_in_range_kinds`, i64 `matrix/flow_in_range_kinds`, u8 `matrix/flow_in_range_kinds`, u16 `matrix/flow_in_range_kinds`, u32 `matrix/flow_in_range_kinds`, u64 `matrix/flow_in_range_kinds`, uint `matrix/flow_in_range_kinds` | none |
+
+The step `flow` of the test run filled both tables on 2026-10-12. How to
+read a cell it wrote:
+
+- `matrix/flow_<construct>` is a program of `tests/matrix/` that holds the
+  construct in every place its row names it for. Each place is a function
+  `in_<context>` of its own, and the program prints one line per place and
+  input, so the line that differs names the cell. One program per row
+  keeps the suite inside its 9 minutes, by "Repository layout" in
+  `docs/decisions.md`. A cell that shows a defect gets a program of its
+  own.
+- `anti-test/com/example/flow` is the module of the test `anti_test_flow`.
+  It holds each construct in a function of a `tests` block and in one of a
+  `fixtures` block, since every build but `anti test` drops both blocks.
+- `modules/flow/com/example/flow` is the library of the test
+  `flow_modules`. It holds each construct in a plain function and in a
+  generic one, and `client` calls both across the module boundary.
+- A cell that the rules refuse names a refusal, a source with an `.err`
+  file. `flow_switch_on_char`, `flow_switch_on_bool`,
+  `flow_switch_on_generic` and `flow_return_f16` are refusals.
+- An id after a source, as `T001`, names the finding of
+  `docs/audit/tests-findings.md` that the test shows. The suite expects
+  that test to fail.
+- The step replaced a cell that a source of `errors/` or of `fmt/` held
+  with a program, since that source never ran the construct.
+
+A `break` and a `continue` in a `defer`, an `undo` or a closure have two
+tests each. `in_defer` of `flow_break` holds a loop that stands inside the
+`defer` with its `break`. `flow_break_out_of_defer` holds a `break` whose
+loop stands around the `defer`, which decision 19 refuses.
+
+The tests of the step beside the cells, where two rules of the checker or
+of lowering meet:
+
+| Test | What it holds | Finding |
+|---|---|---|
+| `flow_break_out_of_defer`, `flow_continue_out_of_defer`, `flow_break_out_of_undo`, `flow_continue_out_of_undo` | decision 19: a `break` or a `continue` that leaves a `defer` or an `undo` | T001 |
+| `flow_fail_in_defer`, `flow_fail_in_undo`, `flow_try_in_defer`, `flow_try_in_undo` | decision 19: a `fail` and a `try` inside a `defer` and an `undo` | T001 |
+| `flow_yield_in_defer` | a `yield` inside a `defer` of a handler | T002 |
+| `flow_defer_failing_call_in_try` | a failing call as the statement of a `defer` in a `try` block | T003 |
+| `flow_if_let_binding_in_closure` | the name of an `if let` read by a closure in its block | T004 |
+| `flow_closure_reads_caught_error`, `flow_closure_reads_try_error` | the error of a handler read by a closure | T005 |
+| `flow_defer_directly_in_defer`, `flow_undo_directly_in_undo` | the refusal of a `defer` in a `defer` and of an `undo` in an `undo` | T006 |
+| `flow_break_out_of_closure`, `flow_continue_out_of_closure` | a `break` and a `continue` do not reach the loop around a closure | |
+| `flow_loop_exits_in_arm`, `flow_loop_exits_in_if_let`, `flow_loop_exits_in_select` | a `break` and a `continue` in an arm leave the loop around the statement | |
+| `flow_defer_closure_two_exits` | a `defer` with a closure, written out at two exits | |
+| `flow_defer_loop_at_loop_exits` | a `defer` with a loop of its own at the `continue`, the `break` and the brace of a turn | |
+| `flow_return_value_and_defer` | a scalar result is fixed before the deferred statements, and a struct local is read after them | |
+| `flow_closure_return_and_defer`, `flow_worker_return_and_defer` | the same order in a closure and in a worker | |
+| `flow_handler_leaves_loop_with_defer`, `flow_let_else_leaves_loop_with_defer` | a handler and the `else` of a `let` leave a loop through the `defer` of the turn | |
+| `flow_yield_in_loop_in_handler`, `flow_yield_in_nested_handler` | a `yield` in a loop of a handler, and in a handler inside a handler | |
+| `flow_fallthrough_runs_defer`, `flow_fallthrough_after_inner_switch` | a `fallthrough` runs the `defer` of its arm, and two nested ones each belong to their `switch` | |
+| `flow_continue_in_do_while`, `flow_continue_in_for_by` | a `continue` goes to the test of a `do ... while` and to the step of a `for` | |
+| `flow_undo_per_block`, `flow_undo_in_try_block` | an `undo` belongs to its block, in a loop and in a `try` block | |
+| `flow_for_iterator_exits` | the exits of a `for` over an iterator of the program, with a `defer` | |
+| `flow_switch_value_once`, `flow_in_range_value_once` | the value of a `switch` and of `x in lo..hi` is computed once | |
+| `flow_for_range_no_binding` | a range without a binding, an empty one and one that runs backwards | |
+| `flow_if_let_chain` | `else if let`, `else if` and `else` after an `if let` | |
+| `flow_fail_in_catch`, `flow_try_in_catch`, `flow_fail_in_closure`, `flow_try_in_closure`, `flow_catch_in_worker` | `fail` and `try` in a handler and in a closure, and a handler in a worker | |
+| `flow_fail_in_worker_dispatched`, `flow_try_in_worker_parallel` | a worker that may fail is refused at `dispatch` and at `parallel` | |
+| `flow_loop_variable_in_closure`, `flow_arm_binding_in_closure`, `flow_bindings_in_defer` | the names a `for`, an arm, an `if let` and a `catch` bind, read by a closure or a `defer` | |
+| `flow_switch_arms_all_return`, `flow_if_let_arms_all_return`, `flow_while_true_no_return` | a `switch`, an `if let` and a `while true` do not end the path of a function | |
+| `flow_switch_two_else`, `flow_switch_arm_not_statement`, `flow_for_step_not_integer`, `flow_for_range_not_integer` | four refusals of the parser and the checker | |
+| `flow_yield_needs_value`, `flow_yield_takes_no_value`, `flow_yield_outside_handler` | three refusals of `yield` | |
+
+The triples among them, each a rule that reads three things at once:
+
+- `return`, `defer` and the kind of the result: `flow_return_value_and_defer`.
+- A loop, a handler and a `defer`: `flow_handler_leaves_loop_with_defer`
+  and `flow_yield_in_loop_in_handler`.
+- A `defer`, a closure and the number of exits:
+  `flow_defer_closure_two_exits`.
+- A construct, a generic function and a library file: every function
+  `gen_<construct>` of `modules/flow/com/example/flow`.
+- A `for` with a step, a closure and a `continue`:
+  `flow_loop_variable_in_closure`.
+- An `undo`, a `try` block and a `defer`: `flow_undo_in_try_block`.
+
+Anti 0.2.0 has no labels and no `unreachable`, so neither has a row.
 
 ### Values
 
@@ -811,12 +890,13 @@ The kinds of threads:
 
 "Language rules" under "Decisions of 2026-10-11" in `docs/decisions.md`
 holds nine rules that the test run tests. No expected output under `tests/`
-holds a refusal of any of them today, so every cell is open. Where antic
-0.2.0 does otherwise, the test becomes an expected failure by decision 30.
+held a refusal of any of them on 2026-10-12, so every cell was open. Where
+antic 0.2.0 does otherwise, the test becomes an expected failure by decision
+30. A matrix step writes its tests into the last column.
 
 | Decision | Area | The refusal or the check | State |
 |---|---|---|---|
-| 19 | flow, errors | `return`, `break`, `continue`, `fail` and `try`, each inside a `defer` and inside an `undo` | open |
+| 19 | flow, errors | `return`, `break`, `continue`, `fail` and `try`, each inside a `defer` and inside an `undo` | T001, the twelve refusals `matrix/flow_*_in_defer`, `_in_undo`, `_out_of_defer` and `_out_of_undo` that "Flow" names |
 | 20 | errors | a `catch` handler of a value that can reach its end | open |
 | 21 | errors | `try` on an optional, with a message that names `let ... else` and `??` | open |
 | 22 | ownership | `return` of a field that owns something | open |
@@ -917,9 +997,10 @@ On 2026-10-12, at antic 0.2.0:
   contextual words.
 - 10 item kinds, 22 statement kinds, 38 expression kinds and 10 type kinds
   in `src/antic/ast.h`.
-- 206 rows in the matrix. 840 cells are held and 1496 are
-  open. Of the kinds, 578 are held and 915 are open.
-- 18 open cells for the rules of decisions 19 to 27.
+- 206 rows in the matrix. 1157 cells are held and 1179 are
+  open. Of the kinds, 622 are held and 871 are open. The step `flow` filled
+  its area after the count of 840 held cells and 578 held kinds.
+- 17 open cells for the rules of decisions 19 to 27.
 - 748 messages: 494 expected by a test and 254 open. antic gives 598 with
   116 open, and anti 150 with 138 open.
 - 134 options and commands: 124 passed by a test and 10 open.
