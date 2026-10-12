@@ -1800,6 +1800,11 @@ import anti.plugin;
 ```anti
 let lib = plugin.load("plugins/fancy.so") catch fatal;
 let logger = lib.instance(log.Logger) catch fatal;
+if lib.supports(log.Logger, "log") {
+	logger.log(log.Level.Info, "loaded");
+}
+delete(logger);
+lib.unload() catch e { e.print(); };
 ```
 
 ```toml
@@ -1807,11 +1812,20 @@ let logger = lib.instance(log.Logger) catch fatal;
 "anti.log.Logger" = "lib/CISOLogger.so"
 ```
 
-`provides Interface as Class;` stands at module level, and `antic --lib shared --no-runtime` writes the library: the object of its own module alone, linked without the runtime and bound against the host that loads it. `plugin.load` gives a `Library`, `lib.instance(Interface)` builds the class it provides, `lib.supports(Interface, "f")` reads its functions, and `lib.unload()` refuses while an object of the library is alive. The load checks the runtime version exactly and that every interface is the host's. The classes of a library join the registry, so `reflect.new` finds one by name. antic writes `anti-plugins.toml` beside a library, with the interfaces, the runtime version and the digest of each library of the directory. `"plugin:path"` and `"discover"` of the manifest take a provider from a library, discovery reads the index and checks the digest, and `[injections]` and `--anti.inject` replace a provider at start. `--closed` builds a program without the exports a plugin binds against. A program loads a library on macOS, Linux and Windows. On Linux a program that can load one links dynamically against glibc. On Windows its link writes an import library, and a plugin links against the import library of the program that loads it.
+`provides Interface as Class;` stands at module level, and `antic --lib shared --no-runtime` writes the library: the object of its own module alone, linked without the runtime and bound against the host that loads it. `plugin.load` gives a `Library`, `lib.instance(Interface)` builds the class it provides, `lib.supports(Interface, "f")` reads its functions, and `lib.unload()` refuses while an object of the library is alive. The load checks the runtime version exactly and that every interface is the host's. The classes of a library join the registry, so `reflect.new` finds one by name. antic writes `anti-plugins.toml` beside a library, with the interfaces, the runtime version and the digest of each library of the directory. `"plugin:path"` and `"discover"` of the manifest take a provider from a library, discovery reads the index and checks the digest, and `[injections]` and `--anti.inject` replace a provider at start. `--closed` builds a program without the exports a plugin binds against. A program loads a library on macOS, Linux and Windows. On Linux a program that can load one links dynamically against glibc. On Windows its link writes an import library, and a plugin links against the import library of the program that loads it. `lib.instance` and `lib.supports` take a type as their first argument, which the checker turns into calls of `instance_at` and `supports_at` of `Library`.
 
 Versions are checked at load. Every class descriptor carries the version of the package that declared it, `--package-version` and `0.0.0` without one. An abstract class carries the chain of its structural hashes and the floor a `compatible <version>;` line names, and a plugin carries the chain, the fields, the size and the version of each interface it was built against. The load compares the two chains at the length of the shorter, refuses a field added between the two versions, refuses a slot the program's calls reach and the library lacks, and fills a slot that `reflect.call` alone may reach with a stub that names the plugin.
 
-`--anti.conf=<path>`, `ANTI_CONF` and `rt.configure(path)` of `anti.runtime` name the configuration file, which holds `include`, `[runtime]` and `[injections]`. The includes run first and in order, so the including file wins per key. Every key of `[runtime]` is an option of the same name, `--anti.inspect` prints the effective value of each with the layer it came from and the version and the used slots of each injectable interface, and `--anti.help` lists the options. Precedence per key is the command line, the file, the build. The `--anti.` options are the runtime's and are consumed before `main`, and `rt.get(key)` gives the effective value of a key. Injections are fixed at start, so `rt.configure` refuses a table `[injections]`, in its file and in every file that file includes, and names `--anti.conf` and `ANTI_CONF` instead.
+```anti
+pub abstract class Greeter
+{
+	compatible 1.1;
+
+	pub abstract fn words(self) -> str;
+}
+```
+
+`compatible 1.1;` in the body of an abstract class is the floor of the interface. A plugin built against a version below it is refused, whatever its chain says. The table `[injections]` and the directories of `plugins` stand in the configuration file, see [Runtime configuration](#runtime-configuration).
 
 ## Tests
 
