@@ -1,6 +1,6 @@
 # Anti syntax overview
 
-Every feature of the language in one place, each with what it does and an example where one helps. The rules are in `docs/decisions.md`, `docs/anti-object-model.md` and `docs/anti-language-additions.md`. This overview follows them and adds nothing. Where a feature is not built yet, its section says so.
+Every feature of the language in one place, each with what it does and an example where one helps. The rules are in `docs/decisions.md`, `docs/anti-object-model.md` and `docs/anti-language-additions.md`. This overview follows them and adds nothing. Where a part of a feature is not built yet, its section says so in a sentence that opens with "Not built yet". [Features not built](#features-not-built) holds the features of which no part is built.
 
 The test `overview_examples` runs every `anti` block of this page through the front end of antic, so an example that stops compiling fails the suite. A block that declares `main` is built and run as well, and the `text` block after it holds what the program prints. A block that opens with `anti not-built` shows a feature that is not built yet, and the test passes over it. The last sentence of its section names that feature. A hidden block before an example declares the names the example uses without showing them.
 
