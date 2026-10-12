@@ -439,11 +439,11 @@ column means that no source holds the row at all.
 | Values | 40 | 753 | 0 | 1038 | 1 |
 | Types | 32 | 194 | 20 | 0 | 0 |
 | Ownership | 18 | 248 | 1 | 125 | 0 |
-| Errors | 15 | 49 | 124 | 11 | 30 |
+| Errors | 15 | 173 | 0 | 41 | 0 |
 | Threads | 29 | 71 | 335 | 52 | 144 |
 | Classes | 26 | 47 | 9 | 0 | 0 |
 | Modules | 19 | 29 | 1 | 0 | 0 |
-| All | 206 | 1845 | 491 | 1317 | 175 |
+| All | 206 | 1969 | 367 | 1347 | 145 |
 
 ### Flow
 
@@ -1024,17 +1024,17 @@ Where two rules meet, and where three do:
 
 | Construct | Held, with the first source that holds it | Open |
 |---|---|---|
-| `may fail` function | module level `programs/catch_exits`, class body `programs/construct_args`, generic `programs/generic_may_fail`, library module `modules/chain/com/example/animal` | `tests` block |
-| `fail` | function `programs/catch_exits`, method `programs/construct_args`, loop body `programs/walk_owned_parts`, catch handler `programs/catch_exits`, closure `programs/closures`, `sync` block `programs/sync_exits`, generic body `programs/generic_may_fail`, library module `modules/chain/com/example/animal` | switch arm, `if let`, `defer`, `undo`, worker, `dispatch` or `parallel`, `select` arm, `tests` block, `fixtures` block, nested type |
-| `try` on a call | function `programs/closures`, method `programs/construct_base`, loop body `programs/pattern_walk`, `sync` block `programs/sync_exits`, generic body `programs/generic_may_fail`, library module `modules/failing/com/example/counter` | switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `select` arm, `tests` block, `fixtures` block, nested type |
-| `try { } catch` | function `programs/catch_exits`, loop body `programs/catch_exits` | method, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `catch e { }` on a call | function `programs/catch_exits`, method `errors/allow_levels`, loop body `programs/catch_exits`, worker `std/concurrent_map_threads`, `sync` block `programs/sync_exits`, `tests` block `errors/allow_levels` | switch arm, `if let`, `defer`, `undo`, catch handler, closure, `dispatch` or `parallel`, `select` arm, `fixtures` block, generic body, nested type, library module |
-| `catch { }` without a name | function `programs/catch_exits`, loop body `programs/catch_exits` | method, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `catch fatal` | function `programs/construct_args`, method `std/interfaces`, loop body `std/sync_equal`, switch arm `programs/nested_locals`, `defer` `programs/nested_locals`, `undo` `programs/nested_locals`, catch handler `programs/nested_locals`, worker `std/sync_equal` | `if let`, closure, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `yield` | function `programs/catch_exits`, catch handler `programs/catch_exits` | method, loop body, switch arm, `if let`, `defer`, `undo`, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, generic body, nested type, library module |
-| `undo` | function `programs/generic_may_fail`, generic body `programs/generic_may_fail` | method, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type, library module |
+| `may fail` function | module level `programs/catch_exits`, class body `programs/construct_args`, generic `programs/generic_may_fail`, library module `modules/chain/com/example/animal`, `tests` block the refusal `errors/tests_may_fail` | none |
+| `fail` | function `programs/catch_exits`, method `programs/construct_args`, loop body `programs/walk_owned_parts`, catch handler `programs/catch_exits`, closure `programs/closures`, `sync` block `programs/sync_exits`, generic body `programs/generic_may_fail`, library module `modules/chain/com/example/animal`, switch arm `matrix/errors_fail`, `if let` `matrix/errors_fail`, `defer` `matrix/flow_fail_in_defer` T001, `undo` `matrix/flow_fail_in_undo` T001, worker `matrix/errors_fail`, `dispatch` or `parallel` `matrix/errors_fail`, `select` arm `matrix/errors_fail`, `tests` block `anti-test/com/example/errors`, `fixtures` block `anti-test/com/example/errors`, nested type `matrix/errors_fail` | none |
+| `try` on a call | function `programs/closures`, method `programs/construct_base`, loop body `programs/pattern_walk`, `sync` block `programs/sync_exits`, generic body `programs/generic_may_fail`, library module `modules/failing/com/example/counter`, switch arm `matrix/errors_try`, `if let` `matrix/errors_try`, `defer` `matrix/flow_try_in_defer` T001, `undo` `matrix/flow_try_in_undo` T001, catch handler `matrix/errors_try`, closure `matrix/errors_try`, worker `matrix/errors_try`, `dispatch` or `parallel` `matrix/errors_try`, `select` arm `matrix/errors_try`, `tests` block `anti-test/com/example/errors`, `fixtures` block `anti-test/com/example/errors`, nested type `matrix/errors_try` | none |
+| `try { } catch` | function `programs/catch_exits`, loop body `programs/catch_exits`, method `matrix/errors_try_block`, switch arm `matrix/errors_try_block`, `if let` `matrix/errors_try_block`, `defer` `matrix/errors_try_block`, `undo` `matrix/errors_try_block`, catch handler `matrix/errors_try_block`, closure `matrix/errors_try_block`, worker `matrix/errors_try_block`, `dispatch` or `parallel` `matrix/errors_try_block`, `sync` block `matrix/errors_try_block`, `select` arm `matrix/errors_try_block`, `tests` block `anti-test/com/example/errors`, `fixtures` block `anti-test/com/example/errors`, generic body `matrix/errors_try_block`, nested type `matrix/errors_try_block`, library module `modules/errors/com/example/errors` | none |
+| `catch e { }` on a call | function `programs/catch_exits`, method `errors/allow_levels`, loop body `programs/catch_exits`, worker `std/concurrent_map_threads`, `sync` block `programs/sync_exits`, `tests` block `errors/allow_levels`, switch arm `matrix/errors_catch_named`, `if let` `matrix/errors_catch_named`, `defer` `matrix/errors_catch_named`, `undo` `matrix/errors_catch_named`, catch handler `matrix/errors_catch_named`, closure `matrix/errors_catch_named`, `dispatch` or `parallel` `matrix/errors_catch_named`, `select` arm `matrix/errors_catch_named`, `fixtures` block `anti-test/com/example/errors`, generic body `matrix/errors_catch_named`, nested type `matrix/errors_catch_named`, library module `modules/errors/com/example/errors` | none |
+| `catch { }` without a name | function `programs/catch_exits`, loop body `programs/catch_exits`, method `matrix/errors_catch_unnamed`, switch arm `matrix/errors_catch_unnamed`, `if let` `matrix/errors_catch_unnamed`, `defer` `matrix/errors_catch_unnamed`, `undo` `matrix/errors_catch_unnamed`, catch handler `matrix/errors_catch_unnamed`, closure `matrix/errors_catch_unnamed`, worker `matrix/errors_catch_unnamed`, `dispatch` or `parallel` `matrix/errors_catch_unnamed`, `sync` block `matrix/errors_catch_unnamed`, `select` arm `matrix/errors_catch_unnamed`, `tests` block `anti-test/com/example/errors`, `fixtures` block `anti-test/com/example/errors`, generic body `matrix/errors_catch_unnamed`, nested type `matrix/errors_catch_unnamed`, library module `modules/errors/com/example/errors` | none |
+| `catch fatal` | function `programs/construct_args`, method `std/interfaces`, loop body `std/sync_equal`, switch arm `programs/nested_locals`, `defer` `programs/nested_locals`, `undo` `programs/nested_locals`, catch handler `programs/nested_locals`, worker `std/sync_equal`, `if let` `matrix/errors_catch_fatal`, closure `matrix/errors_catch_fatal`, `dispatch` or `parallel` `matrix/errors_catch_fatal`, `sync` block `matrix/errors_catch_fatal`, `select` arm `matrix/errors_catch_fatal`, `tests` block `anti-test/com/example/errors`, `fixtures` block `anti-test/com/example/errors`, generic body `matrix/errors_catch_fatal`, nested type `matrix/errors_catch_fatal`, library module `modules/errors/com/example/errors` | none |
+| `yield` | function `programs/catch_exits`, catch handler `programs/catch_exits`, method `matrix/errors_yield`, loop body `matrix/errors_yield`, switch arm `matrix/errors_yield`, `if let` `matrix/errors_yield`, `defer` `matrix/errors_yield`, `undo` `matrix/errors_yield`, closure `matrix/errors_yield`, worker `matrix/errors_yield`, `dispatch` or `parallel` `matrix/errors_yield`, `sync` block `matrix/errors_yield`, `select` arm `matrix/errors_yield`, `tests` block `anti-test/com/example/errors`, `fixtures` block `anti-test/com/example/errors`, generic body `matrix/errors_yield`, nested type `matrix/errors_yield`, library module `modules/errors/com/example/errors` | none |
+| `undo` | function `programs/generic_may_fail`, generic body `programs/generic_may_fail`, method `matrix/errors_undo`, loop body `matrix/errors_undo`, switch arm `matrix/errors_undo`, `if let` `matrix/errors_undo`, `defer` `matrix/errors_undo`, `undo` `matrix/errors_undo`, catch handler `matrix/errors_undo`, closure `matrix/errors_undo`, worker `matrix/errors_undo`, `dispatch` or `parallel` `matrix/errors_undo`, `sync` block `matrix/errors_undo`, `select` arm `matrix/errors_undo`, `tests` block `anti-test/com/example/errors`, `fixtures` block `anti-test/com/example/errors`, nested type `matrix/errors_undo`, library module `modules/errors/com/example/errors` | none |
 | `-> never` | `programs/never_paths` | none |
-| `here` as an argument | function `programs/location`, method `programs/location`, generic body `programs/walk_generic`, library module `modules/defaults/com/example/greeter` | module level, loop body, switch arm, `if let`, `defer`, `undo`, catch handler, closure, worker, `dispatch` or `parallel`, `sync` block, `select` arm, `tests` block, `fixtures` block, nested type |
+| `here` as an argument | function `programs/location`, method `programs/location`, generic body `programs/walk_generic`, library module `modules/defaults/com/example/greeter`, module level the refusal `matrix/errors_here_at_module_level`, loop body `matrix/errors_here`, switch arm `matrix/errors_here`, `if let` `matrix/errors_here`, `defer` `matrix/errors_here`, `undo` `matrix/errors_here`, catch handler `matrix/errors_here`, closure `matrix/errors_here`, worker `matrix/errors_here`, `dispatch` or `parallel` `matrix/errors_here`, `sync` block `matrix/errors_here`, `select` arm `matrix/errors_here`, `tests` block `anti-test/com/example/errors`, `fixtures` block `anti-test/com/example/errors`, nested type `matrix/errors_here` | none |
 | `catch none` | `programs/catch_none` | none |
 | `allow(name, "reason")` | `programs/simd_big` | none |
 | `unchecked(name, "reason")` | `programs/lock_free_queue` | none |
@@ -1044,8 +1044,93 @@ The kinds of errors:
 
 | Construct | Kinds held | Kinds open |
 |---|---|---|
-| `fail` | str `programs/closures`, pointer `programs/catch_exits` | nullable pointer |
-| `yield` | int `programs/catch_exits`, str `programs/handled_operand`, slice `std/fs`, pointer `programs/none_operators`, nullable pointer `programs/catch_none`, optional value `programs/optional_values`, tuple `programs/generic_may_fail`, struct `std/reflect_call`, class `programs/construct_args` | i8, i16, i32, i64, u8, u16, u32, u64, uint, byte, f32, f64, f16, bool, char, fixed array, lent value, may-fail function value, function value, channel, packed struct, simd struct, union, enum, variant, synchronized class, concurrent class, interface, generic parameter |
+| `fail` | str `programs/closures`, pointer `programs/catch_exits`, nullable pointer the refusal `matrix/errors_fail_of_a_pointer_that_may_be_none` | none |
+| `yield` | int `programs/catch_exits`, str `programs/handled_operand`, slice `std/fs`, pointer `programs/none_operators`, nullable pointer `programs/catch_none`, optional value `programs/optional_values`, tuple `programs/generic_may_fail`, struct `std/reflect_call`, class `programs/construct_args`, i8 `matrix/errors_yield_kinds`, i16 `matrix/errors_yield_kinds`, i32 `matrix/errors_yield_kinds`, i64 `matrix/errors_yield_kinds`, u8 `matrix/errors_yield_kinds`, u16 `matrix/errors_yield_kinds`, u32 `matrix/errors_yield_kinds`, u64 `matrix/errors_yield_kinds`, uint `matrix/errors_yield_kinds`, byte `matrix/errors_yield_kinds`, f32 `matrix/errors_yield_kinds`, f64 `matrix/errors_yield_kinds`, f16 the refusal `matrix/errors_failing_function_gives_an_f16`, bool `matrix/errors_yield_kinds`, char `matrix/errors_yield_kinds`, fixed array `matrix/errors_yield_kinds`, lent value the refusal `matrix/errors_yield_of_a_lent_pointer`, may-fail function value `matrix/errors_yield_kinds`, function value `matrix/errors_yield_kinds`, channel `matrix/errors_yield_kinds`, packed struct `matrix/errors_yield_kinds`, simd struct `matrix/errors_yield_kinds`, union `matrix/errors_yield_kinds`, enum `matrix/errors_yield_kinds`, variant `matrix/errors_yield_kinds`, synchronized class `matrix/errors_yield_kinds`, concurrent class `matrix/errors_yield_kinds`, interface `matrix/errors_yield_kinds`, generic parameter `matrix/errors_generic_numbers` | none |
+
+The step `errors` filled the two tables above on 2026-10-12.
+`tests/matrix/` holds its sources under the names `errors_*`.
+
+- `matrix/errors_<construct>` holds the construct in every place of its
+  row, one function `in_<context>` and one line of output per place and
+  input, as `matrix/flow_<construct>` does. `matrix/errors_undo` and
+  `matrix/errors_fail` are written by hand, since each place needs a
+  function that may fail.
+- `anti-test/com/example/errors` is the module of the test
+  `anti_test_errors`. It holds the `tests` block and the `fixtures` block.
+  A test takes no `may fail`, so a `fail`, a `try` on a call and an `undo`
+  of the `tests` block stand in an anonymous function of a test.
+- `modules/errors/com/example/errors` is the library of the test
+  `errors_modules`. It holds each construct in a plain function and in a
+  generic one. `client` handles the errors of the library and tests the
+  class of one with `is`.
+- `matrix/errors_yield_kinds` takes each kind through a function that may
+  fail and through the `yield` of its handler. `matrix/errors_optional_kinds`
+  takes each kind as the `T` of a `?T` that a failing function gives, with
+  a handler, `catch none`, `if let` and `let ... else`.
+  `matrix/errors_generic_numbers` and `matrix/errors_generic_values` pass
+  each kind as the type argument of a generic function that may fail.
+- Four cells hold a refusal. A function of a `tests` block takes no
+  `may fail`, a constant holds no `here`, a function gives no `f16`, and a
+  handler yields no lent pointer.
+
+The constructs of the area that have no row of their own:
+
+- A handler that can reach its end, by decision 20: nine refusals
+  `matrix/errors_handler_*`, T044. `matrix/errors_handler_exits` holds the
+  ways a handler of a value may end.
+- `try` on an optional, by decision 21: five refusals
+  `matrix/errors_try_on_an_optional_*`, T045 and T046.
+- The error a handler binds: six refusals `matrix/errors_caught_error_*`
+  where `=`, `yield` and a literal store it, T047, and two where a `let`
+  binds it.
+- `-> never`: `matrix/errors_never` holds a call of such a function in
+  eleven places, and four refusals hold the function types and the
+  anonymous function.
+- `catch fatal` that ends the program: five programs
+  `matrix/errors_fatal_*`. They hold it on a call, on an error without a
+  code, on a pointer and a value that hold `none`, and in a worker.
+- The origin of an error: `matrix/errors_origins`, and the test
+  `generic_origin_modules` for a generic of a library, T043.
+- 21 refusals hold messages of the area that antic gives. Some hold a
+  handler and a `try` on a call that cannot fail. Some hold a failing call
+  without a handler, in a handler and in an anonymous function. The others
+  hold `fail` and `try` where the function cannot fail, and the function
+  types that do not convert.
+
+Where two rules meet, and where three do:
+
+- A generic function, `may fail` and a `?T` whose type argument may be
+  `none`: `matrix/errors_generic_optional_of_a_nullable_pointer` and
+  `_of_an_optional_value`, T049, and
+  `matrix/errors_generic_failing_gives_an_optional_of_an_optional`.
+- A generic function, an `own` parameter and the `yield` of a handler:
+  `matrix/errors_generic_yield_of_an_own_parameter`, T038, and
+  `matrix/errors_generic_owning` for the teardown on the fail path.
+- A generic function, a library file and the origin of a `fail`:
+  `generic_origin_modules`, T043.
+- A function that may fail, a `?T` result and each kind of value:
+  `matrix/errors_optional_kinds`.
+- A `?T`, a `??T` and a conversion: `matrix/errors_optional_of_an_optional`,
+  T048.
+- `p?.f()`, a function that may fail and a handler or `try`:
+  `matrix/errors_optional_results`.
+- A handler, a guard and one binding: `handler_then_guard` of
+  `matrix/errors_optional_results`.
+- A handler, a `try` block inside it and `yield`:
+  `matrix/errors_yield_in_a_try_handler_of_a_handler`.
+- A `try` block, a handler inside it and a failing call in that handler:
+  `matrix/errors_nested_handlers`, which counts the errors alive.
+- `fail`, `undo` and `defer` and the order they run in:
+  `matrix/errors_values_before_the_defers`.
+- A `construct` that may fail, `alloc` and `try`:
+  `matrix/errors_try_before_an_alloc`, T050.
+- A `construct` that may fail, a base and an `own` field:
+  `matrix/errors_derived_construct_fails_after_its_base`, T052.
+- A synchronized class, a function that may fail and a worker:
+  `matrix/errors_synchronized_method_fails`.
+- An atomic, `try` as an operand and `undo`: `matrix/errors_atomics`.
+- A function type, `may fail` written twice and a call through a value:
+  `matrix/errors_function_types`.
 
 ### Threads
 
@@ -1162,8 +1247,8 @@ antic 0.2.0 does otherwise, the test becomes an expected failure by decision
 | Decision | Area | The refusal or the check | State |
 |---|---|---|---|
 | 19 | flow, errors | `return`, `break`, `continue`, `fail` and `try`, each inside a `defer` and inside an `undo` | T001, the twelve refusals `matrix/flow_*_in_defer`, `_in_undo`, `_out_of_defer` and `_out_of_undo` that "Flow" names |
-| 20 | errors | a `catch` handler of a value that can reach its end | open |
-| 21 | errors | `try` on an optional, with a message that names `let ... else` and `??` | open |
+| 20 | errors | a `catch` handler of a value that can reach its end | T044, the nine refusals `matrix/errors_handler_reaches_its_end_*`, `matrix/errors_handler_of_*_reaches_its_end` and `matrix/errors_handler_without_a_name_reaches_its_end`, and the program `matrix/errors_handler_exits` for the ways a handler may end |
+| 21 | errors | `try` on an optional, with a message that names `let ... else` and `??` | T045 for a call that the checker takes and T046 for the message of the others, the five refusals `matrix/errors_try_on_an_optional_*` |
 | 22 | ownership | `return` of a field that owns something | T037, the seven refusals `matrix/ownership_return_of_a_field_copies_*`, one per kind of owning value, and `matrix/ownership_return_through_a_pointer_copies` and `matrix/ownership_return_of_an_element_copies` for `*p` and an element |
 | 23 | threads | a second `join` of one job, refused where the checker sees it and trapped in dev mode otherwise | open |
 | 23 | threads | the arguments of a `dispatch` in a loop, stored per job | open |
@@ -1262,15 +1347,17 @@ On 2026-10-12, at antic 0.2.0:
   contextual words.
 - 10 item kinds, 22 statement kinds, 38 expression kinds and 10 type kinds
   in `src/antic/ast.h`.
-- 206 rows in the matrix. 1845 cells are held and 491 are
-  open. Of the kinds, 1317 are held and 175 are open. The step `flow` filled
+- 206 rows in the matrix. 1969 cells are held and 367 are
+  open. Of the kinds, 1347 are held and 145 are open. The step `flow` filled
   its area after the count of 840 held cells and 578 held kinds. The step
   `values` filled its area after the count of 1157 held cells and 622 held
   kinds. The step `types` filled its area after the count of 1613 held
   cells. Its 20 open cells cannot exist, and each states why. The step
   `ownership` filled its area after the count of 1676 held cells and 1237
-  held kinds. Its one open cell cannot exist, and it states why.
-- 11 open cells for the rules of decisions 19 to 27.
-- 748 messages: 528 expected by a test and 220 open. antic gives 598 with
-  82 open, and anti 150 with 138 open.
+  held kinds. Its one open cell cannot exist, and it states why. The step
+  `errors` filled its area after the count of 1845 held cells and 1317
+  held kinds.
+- 9 open cells for the rules of decisions 19 to 27.
+- 748 messages: 534 expected by a test and 214 open. antic gives 598 with
+  76 open, and anti 150 with 138 open.
 - 134 options and commands: 124 passed by a test and 10 open.
