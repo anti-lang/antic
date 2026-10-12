@@ -1,0 +1,332 @@
+//! The client of the values library: every construct of the values area in a
+//! function of a library module, and in a generic one that this module compiles
+//! a copy of.
+
+import com.example.values;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	printf("literal_int %d %d\n".ptr, values.run_literal_int(1) as c_int,
+		values.gen_literal_int<str>(1) as c_int);
+	printf("literal_int %d %d\n".ptr, values.run_literal_int(2) as c_int,
+		values.gen_literal_int<str>(2) as c_int);
+	printf("literal_int %d %d\n".ptr, values.run_literal_int(3) as c_int,
+		values.gen_literal_int<str>(3) as c_int);
+	printf("literal_int %d %d\n".ptr, values.run_literal_int(4) as c_int,
+		values.gen_literal_int<str>(4) as c_int);
+	printf("literal_float %d %d\n".ptr, values.run_literal_float(1) as c_int,
+		values.gen_literal_float<str>(1) as c_int);
+	printf("literal_float %d %d\n".ptr, values.run_literal_float(2) as c_int,
+		values.gen_literal_float<str>(2) as c_int);
+	printf("literal_float %d %d\n".ptr, values.run_literal_float(3) as c_int,
+		values.gen_literal_float<str>(3) as c_int);
+	printf("literal_float %d %d\n".ptr, values.run_literal_float(4) as c_int,
+		values.gen_literal_float<str>(4) as c_int);
+	printf("literal_char %d %d\n".ptr, values.run_literal_char(1) as c_int,
+		values.gen_literal_char<str>(1) as c_int);
+	printf("literal_char %d %d\n".ptr, values.run_literal_char(2) as c_int,
+		values.gen_literal_char<str>(2) as c_int);
+	printf("literal_char %d %d\n".ptr, values.run_literal_char(3) as c_int,
+		values.gen_literal_char<str>(3) as c_int);
+	printf("literal_char %d %d\n".ptr, values.run_literal_char(4) as c_int,
+		values.gen_literal_char<str>(4) as c_int);
+	printf("literal_str %d %d\n".ptr, values.run_literal_str(1) as c_int,
+		values.gen_literal_str<str>(1) as c_int);
+	printf("literal_str %d %d\n".ptr, values.run_literal_str(2) as c_int,
+		values.gen_literal_str<str>(2) as c_int);
+	printf("literal_str %d %d\n".ptr, values.run_literal_str(3) as c_int,
+		values.gen_literal_str<str>(3) as c_int);
+	printf("literal_str %d %d\n".ptr, values.run_literal_str(4) as c_int,
+		values.gen_literal_str<str>(4) as c_int);
+	printf("literal_raw %d %d\n".ptr, values.run_literal_raw(1) as c_int,
+		values.gen_literal_raw<str>(1) as c_int);
+	printf("literal_raw %d %d\n".ptr, values.run_literal_raw(2) as c_int,
+		values.gen_literal_raw<str>(2) as c_int);
+	printf("literal_raw %d %d\n".ptr, values.run_literal_raw(3) as c_int,
+		values.gen_literal_raw<str>(3) as c_int);
+	printf("literal_raw %d %d\n".ptr, values.run_literal_raw(4) as c_int,
+		values.gen_literal_raw<str>(4) as c_int);
+	printf("literal_bytes %d %d\n".ptr, values.run_literal_bytes(1) as c_int,
+		values.gen_literal_bytes<str>(1) as c_int);
+	printf("literal_bytes %d %d\n".ptr, values.run_literal_bytes(2) as c_int,
+		values.gen_literal_bytes<str>(2) as c_int);
+	printf("literal_bytes %d %d\n".ptr, values.run_literal_bytes(3) as c_int,
+		values.gen_literal_bytes<str>(3) as c_int);
+	printf("literal_bytes %d %d\n".ptr, values.run_literal_bytes(4) as c_int,
+		values.gen_literal_bytes<str>(4) as c_int);
+	printf("literal_hex %d %d\n".ptr, values.run_literal_hex(1) as c_int,
+		values.gen_literal_hex<str>(1) as c_int);
+	printf("literal_hex %d %d\n".ptr, values.run_literal_hex(2) as c_int,
+		values.gen_literal_hex<str>(2) as c_int);
+	printf("literal_hex %d %d\n".ptr, values.run_literal_hex(3) as c_int,
+		values.gen_literal_hex<str>(3) as c_int);
+	printf("literal_hex %d %d\n".ptr, values.run_literal_hex(4) as c_int,
+		values.gen_literal_hex<str>(4) as c_int);
+	printf("format %d %d\n".ptr, values.run_format(1) as c_int,
+		values.gen_format<str>(1) as c_int);
+	printf("format %d %d\n".ptr, values.run_format(2) as c_int,
+		values.gen_format<str>(2) as c_int);
+	printf("format %d %d\n".ptr, values.run_format(3) as c_int,
+		values.gen_format<str>(3) as c_int);
+	printf("format %d %d\n".ptr, values.run_format(4) as c_int,
+		values.gen_format<str>(4) as c_int);
+	printf("pattern %d %d\n".ptr, values.run_pattern(1) as c_int,
+		values.gen_pattern<str>(1) as c_int);
+	printf("pattern %d %d\n".ptr, values.run_pattern(2) as c_int,
+		values.gen_pattern<str>(2) as c_int);
+	printf("pattern %d %d\n".ptr, values.run_pattern(3) as c_int,
+		values.gen_pattern<str>(3) as c_int);
+	printf("pattern %d %d\n".ptr, values.run_pattern(4) as c_int,
+		values.gen_pattern<str>(4) as c_int);
+	printf("bool %d %d\n".ptr, values.run_bool(1) as c_int,
+		values.gen_bool<str>(1) as c_int);
+	printf("bool %d %d\n".ptr, values.run_bool(2) as c_int,
+		values.gen_bool<str>(2) as c_int);
+	printf("bool %d %d\n".ptr, values.run_bool(3) as c_int,
+		values.gen_bool<str>(3) as c_int);
+	printf("bool %d %d\n".ptr, values.run_bool(4) as c_int,
+		values.gen_bool<str>(4) as c_int);
+	printf("here %d %d\n".ptr, values.run_here(1) as c_int,
+		values.gen_here<str>(1) as c_int);
+	printf("here %d %d\n".ptr, values.run_here(2) as c_int,
+		values.gen_here<str>(2) as c_int);
+	printf("here %d %d\n".ptr, values.run_here(3) as c_int,
+		values.gen_here<str>(3) as c_int);
+	printf("here %d %d\n".ptr, values.run_here(4) as c_int,
+		values.gen_here<str>(4) as c_int);
+	printf("array %d %d\n".ptr, values.run_array(1) as c_int,
+		values.gen_array<str>(1) as c_int);
+	printf("array %d %d\n".ptr, values.run_array(2) as c_int,
+		values.gen_array<str>(2) as c_int);
+	printf("array %d %d\n".ptr, values.run_array(3) as c_int,
+		values.gen_array<str>(3) as c_int);
+	printf("array %d %d\n".ptr, values.run_array(4) as c_int,
+		values.gen_array<str>(4) as c_int);
+	printf("array_repeat %d %d\n".ptr, values.run_array_repeat(1) as c_int,
+		values.gen_array_repeat<str>(1) as c_int);
+	printf("array_repeat %d %d\n".ptr, values.run_array_repeat(2) as c_int,
+		values.gen_array_repeat<str>(2) as c_int);
+	printf("array_repeat %d %d\n".ptr, values.run_array_repeat(3) as c_int,
+		values.gen_array_repeat<str>(3) as c_int);
+	printf("array_repeat %d %d\n".ptr, values.run_array_repeat(4) as c_int,
+		values.gen_array_repeat<str>(4) as c_int);
+	printf("slice_literal %d %d\n".ptr, values.run_slice_literal(1) as c_int,
+		values.gen_slice_literal<str>(1) as c_int);
+	printf("slice_literal %d %d\n".ptr, values.run_slice_literal(2) as c_int,
+		values.gen_slice_literal<str>(2) as c_int);
+	printf("slice_literal %d %d\n".ptr, values.run_slice_literal(3) as c_int,
+		values.gen_slice_literal<str>(3) as c_int);
+	printf("slice_literal %d %d\n".ptr, values.run_slice_literal(4) as c_int,
+		values.gen_slice_literal<str>(4) as c_int);
+	printf("struct_literal %d %d\n".ptr, values.run_struct_literal(1) as c_int,
+		values.gen_struct_literal<str>(1) as c_int);
+	printf("struct_literal %d %d\n".ptr, values.run_struct_literal(2) as c_int,
+		values.gen_struct_literal<str>(2) as c_int);
+	printf("struct_literal %d %d\n".ptr, values.run_struct_literal(3) as c_int,
+		values.gen_struct_literal<str>(3) as c_int);
+	printf("struct_literal %d %d\n".ptr, values.run_struct_literal(4) as c_int,
+		values.gen_struct_literal<str>(4) as c_int);
+	printf("tuple %d %d\n".ptr, values.run_tuple(1) as c_int,
+		values.gen_tuple<str>(1) as c_int);
+	printf("tuple %d %d\n".ptr, values.run_tuple(2) as c_int,
+		values.gen_tuple<str>(2) as c_int);
+	printf("tuple %d %d\n".ptr, values.run_tuple(3) as c_int,
+		values.gen_tuple<str>(3) as c_int);
+	printf("tuple %d %d\n".ptr, values.run_tuple(4) as c_int,
+		values.gen_tuple<str>(4) as c_int);
+	printf("tuple_element %d %d\n".ptr, values.run_tuple_element(1) as c_int,
+		values.gen_tuple_element<str>(1) as c_int);
+	printf("tuple_element %d %d\n".ptr, values.run_tuple_element(2) as c_int,
+		values.gen_tuple_element<str>(2) as c_int);
+	printf("tuple_element %d %d\n".ptr, values.run_tuple_element(3) as c_int,
+		values.gen_tuple_element<str>(3) as c_int);
+	printf("tuple_element %d %d\n".ptr, values.run_tuple_element(4) as c_int,
+		values.gen_tuple_element<str>(4) as c_int);
+	printf("let %d %d\n".ptr, values.run_let(1) as c_int,
+		values.gen_let<str>(1) as c_int);
+	printf("let %d %d\n".ptr, values.run_let(2) as c_int,
+		values.gen_let<str>(2) as c_int);
+	printf("let %d %d\n".ptr, values.run_let(3) as c_int,
+		values.gen_let<str>(3) as c_int);
+	printf("let %d %d\n".ptr, values.run_let(4) as c_int,
+		values.gen_let<str>(4) as c_int);
+	printf("let_typed %d %d\n".ptr, values.run_let_typed(1) as c_int,
+		values.gen_let_typed<str>(1) as c_int);
+	printf("let_typed %d %d\n".ptr, values.run_let_typed(2) as c_int,
+		values.gen_let_typed<str>(2) as c_int);
+	printf("let_typed %d %d\n".ptr, values.run_let_typed(3) as c_int,
+		values.gen_let_typed<str>(3) as c_int);
+	printf("let_typed %d %d\n".ptr, values.run_let_typed(4) as c_int,
+		values.gen_let_typed<str>(4) as c_int);
+	printf("let_tuple %d %d\n".ptr, values.run_let_tuple(1) as c_int,
+		values.gen_let_tuple<str>(1) as c_int);
+	printf("let_tuple %d %d\n".ptr, values.run_let_tuple(2) as c_int,
+		values.gen_let_tuple<str>(2) as c_int);
+	printf("let_tuple %d %d\n".ptr, values.run_let_tuple(3) as c_int,
+		values.gen_let_tuple<str>(3) as c_int);
+	printf("let_tuple %d %d\n".ptr, values.run_let_tuple(4) as c_int,
+		values.gen_let_tuple<str>(4) as c_int);
+	printf("const %d %d\n".ptr, values.run_const(1) as c_int,
+		values.gen_const<str>(1) as c_int);
+	printf("const %d %d\n".ptr, values.run_const(2) as c_int,
+		values.gen_const<str>(2) as c_int);
+	printf("const %d %d\n".ptr, values.run_const(3) as c_int,
+		values.gen_const<str>(3) as c_int);
+	printf("const %d %d\n".ptr, values.run_const(4) as c_int,
+		values.gen_const<str>(4) as c_int);
+	printf("assign %d %d\n".ptr, values.run_assign(1) as c_int,
+		values.gen_assign<str>(1) as c_int);
+	printf("assign %d %d\n".ptr, values.run_assign(2) as c_int,
+		values.gen_assign<str>(2) as c_int);
+	printf("assign %d %d\n".ptr, values.run_assign(3) as c_int,
+		values.gen_assign<str>(3) as c_int);
+	printf("assign %d %d\n".ptr, values.run_assign(4) as c_int,
+		values.gen_assign<str>(4) as c_int);
+	printf("compound %d %d\n".ptr, values.run_compound(1) as c_int,
+		values.gen_compound<str>(1) as c_int);
+	printf("compound %d %d\n".ptr, values.run_compound(2) as c_int,
+		values.gen_compound<str>(2) as c_int);
+	printf("compound %d %d\n".ptr, values.run_compound(3) as c_int,
+		values.gen_compound<str>(3) as c_int);
+	printf("compound %d %d\n".ptr, values.run_compound(4) as c_int,
+		values.gen_compound<str>(4) as c_int);
+	printf("compound_wrapping %d %d\n".ptr, values.run_compound_wrapping(1) as c_int,
+		values.gen_compound_wrapping<str>(1) as c_int);
+	printf("compound_wrapping %d %d\n".ptr, values.run_compound_wrapping(2) as c_int,
+		values.gen_compound_wrapping<str>(2) as c_int);
+	printf("compound_wrapping %d %d\n".ptr, values.run_compound_wrapping(3) as c_int,
+		values.gen_compound_wrapping<str>(3) as c_int);
+	printf("compound_wrapping %d %d\n".ptr, values.run_compound_wrapping(4) as c_int,
+		values.gen_compound_wrapping<str>(4) as c_int);
+	printf("arith %d %d\n".ptr, values.run_arith(1) as c_int,
+		values.gen_arith<str>(1) as c_int);
+	printf("arith %d %d\n".ptr, values.run_arith(2) as c_int,
+		values.gen_arith<str>(2) as c_int);
+	printf("arith %d %d\n".ptr, values.run_arith(3) as c_int,
+		values.gen_arith<str>(3) as c_int);
+	printf("arith %d %d\n".ptr, values.run_arith(4) as c_int,
+		values.gen_arith<str>(4) as c_int);
+	printf("wrapping %d %d\n".ptr, values.run_wrapping(1) as c_int,
+		values.gen_wrapping<str>(1) as c_int);
+	printf("wrapping %d %d\n".ptr, values.run_wrapping(2) as c_int,
+		values.gen_wrapping<str>(2) as c_int);
+	printf("wrapping %d %d\n".ptr, values.run_wrapping(3) as c_int,
+		values.gen_wrapping<str>(3) as c_int);
+	printf("wrapping %d %d\n".ptr, values.run_wrapping(4) as c_int,
+		values.gen_wrapping<str>(4) as c_int);
+	printf("saturating %d %d\n".ptr, values.run_saturating(1) as c_int,
+		values.gen_saturating<str>(1) as c_int);
+	printf("saturating %d %d\n".ptr, values.run_saturating(2) as c_int,
+		values.gen_saturating<str>(2) as c_int);
+	printf("saturating %d %d\n".ptr, values.run_saturating(3) as c_int,
+		values.gen_saturating<str>(3) as c_int);
+	printf("saturating %d %d\n".ptr, values.run_saturating(4) as c_int,
+		values.gen_saturating<str>(4) as c_int);
+	printf("shift %d %d\n".ptr, values.run_shift(1) as c_int,
+		values.gen_shift<str>(1) as c_int);
+	printf("shift %d %d\n".ptr, values.run_shift(2) as c_int,
+		values.gen_shift<str>(2) as c_int);
+	printf("shift %d %d\n".ptr, values.run_shift(3) as c_int,
+		values.gen_shift<str>(3) as c_int);
+	printf("shift %d %d\n".ptr, values.run_shift(4) as c_int,
+		values.gen_shift<str>(4) as c_int);
+	printf("bitwise %d %d\n".ptr, values.run_bitwise(1) as c_int,
+		values.gen_bitwise<str>(1) as c_int);
+	printf("bitwise %d %d\n".ptr, values.run_bitwise(2) as c_int,
+		values.gen_bitwise<str>(2) as c_int);
+	printf("bitwise %d %d\n".ptr, values.run_bitwise(3) as c_int,
+		values.gen_bitwise<str>(3) as c_int);
+	printf("bitwise %d %d\n".ptr, values.run_bitwise(4) as c_int,
+		values.gen_bitwise<str>(4) as c_int);
+	printf("compare %d %d\n".ptr, values.run_compare(1) as c_int,
+		values.gen_compare<str>(1) as c_int);
+	printf("compare %d %d\n".ptr, values.run_compare(2) as c_int,
+		values.gen_compare<str>(2) as c_int);
+	printf("compare %d %d\n".ptr, values.run_compare(3) as c_int,
+		values.gen_compare<str>(3) as c_int);
+	printf("compare %d %d\n".ptr, values.run_compare(4) as c_int,
+		values.gen_compare<str>(4) as c_int);
+	printf("unary %d %d\n".ptr, values.run_unary(1) as c_int,
+		values.gen_unary<str>(1) as c_int);
+	printf("unary %d %d\n".ptr, values.run_unary(2) as c_int,
+		values.gen_unary<str>(2) as c_int);
+	printf("unary %d %d\n".ptr, values.run_unary(3) as c_int,
+		values.gen_unary<str>(3) as c_int);
+	printf("unary %d %d\n".ptr, values.run_unary(4) as c_int,
+		values.gen_unary<str>(4) as c_int);
+	printf("mul_high %d %d\n".ptr, values.run_mul_high(1) as c_int,
+		values.gen_mul_high<str>(1) as c_int);
+	printf("mul_high %d %d\n".ptr, values.run_mul_high(2) as c_int,
+		values.gen_mul_high<str>(2) as c_int);
+	printf("mul_high %d %d\n".ptr, values.run_mul_high(3) as c_int,
+		values.gen_mul_high<str>(3) as c_int);
+	printf("mul_high %d %d\n".ptr, values.run_mul_high(4) as c_int,
+		values.gen_mul_high<str>(4) as c_int);
+	printf("as %d %d\n".ptr, values.run_as(1) as c_int,
+		values.gen_as<str>(1) as c_int);
+	printf("as %d %d\n".ptr, values.run_as(2) as c_int,
+		values.gen_as<str>(2) as c_int);
+	printf("as %d %d\n".ptr, values.run_as(3) as c_int,
+		values.gen_as<str>(3) as c_int);
+	printf("as %d %d\n".ptr, values.run_as(4) as c_int,
+		values.gen_as<str>(4) as c_int);
+	printf("index %d %d\n".ptr, values.run_index(1) as c_int,
+		values.gen_index<str>(1) as c_int);
+	printf("index %d %d\n".ptr, values.run_index(2) as c_int,
+		values.gen_index<str>(2) as c_int);
+	printf("index %d %d\n".ptr, values.run_index(3) as c_int,
+		values.gen_index<str>(3) as c_int);
+	printf("index %d %d\n".ptr, values.run_index(4) as c_int,
+		values.gen_index<str>(4) as c_int);
+	printf("slice %d %d\n".ptr, values.run_slice(1) as c_int,
+		values.gen_slice<str>(1) as c_int);
+	printf("slice %d %d\n".ptr, values.run_slice(2) as c_int,
+		values.gen_slice<str>(2) as c_int);
+	printf("slice %d %d\n".ptr, values.run_slice(3) as c_int,
+		values.gen_slice<str>(3) as c_int);
+	printf("slice %d %d\n".ptr, values.run_slice(4) as c_int,
+		values.gen_slice<str>(4) as c_int);
+	printf("field %d %d\n".ptr, values.run_field(1) as c_int,
+		values.gen_field<str>(1) as c_int);
+	printf("field %d %d\n".ptr, values.run_field(2) as c_int,
+		values.gen_field<str>(2) as c_int);
+	printf("field %d %d\n".ptr, values.run_field(3) as c_int,
+		values.gen_field<str>(3) as c_int);
+	printf("field %d %d\n".ptr, values.run_field(4) as c_int,
+		values.gen_field<str>(4) as c_int);
+	printf("call %d %d\n".ptr, values.run_call(1) as c_int,
+		values.gen_call<str>(1) as c_int);
+	printf("call %d %d\n".ptr, values.run_call(2) as c_int,
+		values.gen_call<str>(2) as c_int);
+	printf("call %d %d\n".ptr, values.run_call(3) as c_int,
+		values.gen_call<str>(3) as c_int);
+	printf("call %d %d\n".ptr, values.run_call(4) as c_int,
+		values.gen_call<str>(4) as c_int);
+	printf("size_of %d %d\n".ptr, values.run_size_of(1) as c_int,
+		values.gen_size_of<str>(1) as c_int);
+	printf("size_of %d %d\n".ptr, values.run_size_of(2) as c_int,
+		values.gen_size_of<str>(2) as c_int);
+	printf("size_of %d %d\n".ptr, values.run_size_of(3) as c_int,
+		values.gen_size_of<str>(3) as c_int);
+	printf("size_of %d %d\n".ptr, values.run_size_of(4) as c_int,
+		values.gen_size_of<str>(4) as c_int);
+	printf("fn %d %d\n".ptr, values.run_fn(1) as c_int,
+		values.gen_fn<str>(1) as c_int);
+	printf("fn %d %d\n".ptr, values.run_fn(2) as c_int,
+		values.gen_fn<str>(2) as c_int);
+	printf("fn %d %d\n".ptr, values.run_fn(3) as c_int,
+		values.gen_fn<str>(3) as c_int);
+	printf("fn %d %d\n".ptr, values.run_fn(4) as c_int,
+		values.gen_fn<str>(4) as c_int);
+	printf("simd %d %d\n".ptr, values.run_simd(1) as c_int,
+		values.gen_simd<str>(1) as c_int);
+	printf("simd %d %d\n".ptr, values.run_simd(2) as c_int,
+		values.gen_simd<str>(2) as c_int);
+	printf("simd %d %d\n".ptr, values.run_simd(3) as c_int,
+		values.gen_simd<str>(3) as c_int);
+	printf("simd %d %d\n".ptr, values.run_simd(4) as c_int,
+		values.gen_simd<str>(4) as c_int);
+	return 0;
+}

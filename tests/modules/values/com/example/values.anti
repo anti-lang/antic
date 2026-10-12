@@ -1,0 +1,869 @@
+//! One function per construct of the values area, plain and generic, in a
+//! library module. The client calls each across the module boundary, and the
+//! library file carries the checked tree of every generic one.
+
+import anti.lang;
+import anti.regex;
+import anti.text;
+
+struct Pt
+{
+	x: int,
+	y: int,
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn call_with(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+simd struct I32x4
+{
+	a: i32,
+	b: i32,
+	c: i32,
+	d: i32,
+}
+
+/// An integer literal, decimal, hex and with separators.
+pub fn run_literal_int(n: int) -> int
+{
+	let acc = 0;
+	acc += 42 + 0x1F + 1_000 * n;
+	return acc;
+}
+
+/// An integer literal, decimal, hex and with separators, in a generic function.
+pub fn gen_literal_int<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	acc += 42 + 0x1F + 1_000 * n;
+	return acc;
+}
+
+/// A float literal, plain and with an exponent.
+pub fn run_literal_float(n: int) -> int
+{
+	let acc = 0;
+	let x = 2.5;
+	let y = 1.0e2;
+	acc += (x * (n as float)) as int + (y as int);
+	return acc;
+}
+
+/// A float literal, plain and with an exponent, in a generic function.
+pub fn gen_literal_float<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let x = 2.5;
+	let y = 1.0e2;
+	acc += (x * (n as float)) as int + (y as int);
+	return acc;
+}
+
+/// A character literal, plain and escaped.
+pub fn run_literal_char(n: int) -> int
+{
+	let acc = 0;
+	let c = 'a';
+	let tab = '\t';
+	acc += (c as u32) as int + (tab as u32) as int + n;
+	return acc;
+}
+
+/// A character literal, plain and escaped, in a generic function.
+pub fn gen_literal_char<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let c = 'a';
+	let tab = '\t';
+	acc += (c as u32) as int + (tab as u32) as int + n;
+	return acc;
+}
+
+/// A string literal with an escape.
+pub fn run_literal_str(n: int) -> int
+{
+	let acc = 0;
+	let s = "four\n";
+	acc += s.len * n + (s[4] as int);
+	return acc;
+}
+
+/// A string literal with an escape, in a generic function.
+pub fn gen_literal_str<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let s = "four\n";
+	acc += s.len * n + (s[4] as int);
+	return acc;
+}
+
+/// A raw string, whose backslash is a byte.
+pub fn run_literal_raw(n: int) -> int
+{
+	let acc = 0;
+	let s = r"a\nb";
+	acc += s.len * n + (s[1] as int);
+	return acc;
+}
+
+/// A raw string, whose backslash is a byte, in a generic function.
+pub fn gen_literal_raw<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let s = r"a\nb";
+	acc += s.len * n + (s[1] as int);
+	return acc;
+}
+
+/// A byte string and a raw byte string.
+pub fn run_literal_bytes(n: int) -> int
+{
+	let acc = 0;
+	let b = b"\x00\xff";
+	let raw = br"\x00";
+	acc += b.len * n + (b[1] as int) + raw.len;
+	return acc;
+}
+
+/// A byte string and a raw byte string, in a generic function.
+pub fn gen_literal_bytes<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let b = b"\x00\xff";
+	let raw = br"\x00";
+	acc += b.len * n + (b[1] as int) + raw.len;
+	return acc;
+}
+
+/// A hex string.
+pub fn run_literal_hex(n: int) -> int
+{
+	let acc = 0;
+	let h = x"00 AB CC";
+	acc += h.len * n + (h[1] as int);
+	return acc;
+}
+
+/// A hex string, in a generic function.
+pub fn gen_literal_hex<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let h = x"00 AB CC";
+	acc += h.len * n + (h[1] as int);
+	return acc;
+}
+
+/// An `f"..."` and an `rf"..."`.
+pub fn run_format(n: int) -> int
+{
+	let acc = 0;
+	let s = f"n={n:>4}";
+	let raw = rf"\d{n}";
+	acc += s.len * 10 + raw.len + n;
+	free(s.ptr);
+	free(raw.ptr);
+	return acc;
+}
+
+/// An `f"..."` and an `rf"..."`, in a generic function.
+pub fn gen_format<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let s = f"n={n:>4}";
+	let raw = rf"\d{n}";
+	acc += s.len * 10 + raw.len + n;
+	free(s.ptr);
+	free(raw.ptr);
+	return acc;
+}
+
+/// A pattern literal that matches and one that does not.
+pub fn run_pattern(n: int) -> int
+{
+	let acc = 0;
+	if "a12".matches(re"[0-9]+") {
+		acc += n;
+	}
+	if "abc".matches(re"[0-9]+") {
+		acc += 100;
+	}
+	return acc;
+}
+
+/// A pattern literal that matches and one that does not, in a generic function.
+pub fn gen_pattern<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if "a12".matches(re"[0-9]+") {
+		acc += n;
+	}
+	if "abc".matches(re"[0-9]+") {
+		acc += 100;
+	}
+	return acc;
+}
+
+/// `true` and `false`.
+pub fn run_bool(n: int) -> int
+{
+	let acc = 0;
+	let on = true;
+	let off = false;
+	if on {
+		acc += n;
+	}
+	if off {
+		acc += 100;
+	}
+	return acc;
+}
+
+/// `true` and `false`, in a generic function.
+pub fn gen_bool<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let on = true;
+	let off = false;
+	if on {
+		acc += n;
+	}
+	if off {
+		acc += 100;
+	}
+	return acc;
+}
+
+/// `here`, the position it is written at.
+pub fn run_here(n: int) -> int
+{
+	let acc = 0;
+	let at = here;
+	if at.line > 0 && at.file.len > 0 {
+		acc += n;
+	}
+	return acc;
+}
+
+/// `here`, the position it is written at, in a generic function.
+pub fn gen_here<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let at = here;
+	if at.line > 0 && at.file.len > 0 {
+		acc += n;
+	}
+	return acc;
+}
+
+/// An array literal.
+pub fn run_array(n: int) -> int
+{
+	let acc = 0;
+	let xs = [n, 20, 300];
+	acc += xs[0] + xs[1] + xs[2] + xs.len;
+	return acc;
+}
+
+/// An array literal, in a generic function.
+pub fn gen_array<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let xs = [n, 20, 300];
+	acc += xs[0] + xs[1] + xs[2] + xs.len;
+	return acc;
+}
+
+/// An array repeat, which copies one value into every element.
+pub fn run_array_repeat(n: int) -> int
+{
+	let acc = 0;
+	let xs = [n * 2; 4];
+	acc += xs[0] + xs[3] + xs.len;
+	return acc;
+}
+
+/// An array repeat, which copies one value into every element, in a generic
+/// function.
+pub fn gen_array_repeat<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let xs = [n * 2; 4];
+	acc += xs[0] + xs[3] + xs.len;
+	return acc;
+}
+
+/// A slice literal over the first elements of an array.
+pub fn run_slice_literal(n: int) -> int
+{
+	let acc = 0;
+	let xs = [n, 20, 300];
+	let s = []int { ptr: &xs[0], len: 2 };
+	acc += s[0] + s[1] + s.len;
+	return acc;
+}
+
+/// A slice literal over the first elements of an array, in a generic function.
+pub fn gen_slice_literal<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let xs = [n, 20, 300];
+	let s = []int { ptr: &xs[0], len: 2 };
+	acc += s[0] + s[1] + s.len;
+	return acc;
+}
+
+/// A struct literal.
+pub fn run_struct_literal(n: int) -> int
+{
+	let acc = 0;
+	let p = Pt { y: 2, x: n };
+	acc += p.x * 10 + p.y;
+	return acc;
+}
+
+/// A struct literal, in a generic function.
+pub fn gen_struct_literal<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let p = Pt { y: 2, x: n };
+	acc += p.x * 10 + p.y;
+	return acc;
+}
+
+/// A tuple.
+pub fn run_tuple(n: int) -> int
+{
+	let acc = 0;
+	let t = (n, 7, n * 2);
+	acc += t.0 + t.1 + t.2;
+	return acc;
+}
+
+/// A tuple, in a generic function.
+pub fn gen_tuple<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let t = (n, 7, n * 2);
+	acc += t.0 + t.1 + t.2;
+	return acc;
+}
+
+/// An element of a tuple, read and written.
+pub fn run_tuple_element(n: int) -> int
+{
+	let acc = 0;
+	let t = (n, 7);
+	t.1 = t.0 * 10;
+	acc += t.1 + t.0;
+	return acc;
+}
+
+/// An element of a tuple, read and written, in a generic function.
+pub fn gen_tuple_element<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let t = (n, 7);
+	t.1 = t.0 * 10;
+	acc += t.1 + t.0;
+	return acc;
+}
+
+/// A `let` that takes its type from its value.
+pub fn run_let(n: int) -> int
+{
+	let acc = 0;
+	let x = n * 2;
+	let y = x;
+	acc += y;
+	return acc;
+}
+
+/// A `let` that takes its type from its value, in a generic function.
+pub fn gen_let<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let x = n * 2;
+	let y = x;
+	acc += y;
+	return acc;
+}
+
+/// A `let` with a type, which its literal takes.
+pub fn run_let_typed(n: int) -> int
+{
+	let acc = 0;
+	let x: i32 = 5;
+	let y: u8 = 200;
+	let z: f32 = 0.5;
+	acc += x as int + y as int + (z * 4.0) as int + n;
+	return acc;
+}
+
+/// A `let` with a type, which its literal takes, in a generic function.
+pub fn gen_let_typed<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let x: i32 = 5;
+	let y: u8 = 200;
+	let z: f32 = 0.5;
+	acc += x as int + y as int + (z * 4.0) as int + n;
+	return acc;
+}
+
+/// A `let` that takes a tuple apart.
+pub fn run_let_tuple(n: int) -> int
+{
+	let acc = 0;
+	let (q, r) = (n / 2, n % 2);
+	acc += q * 10 + r;
+	return acc;
+}
+
+/// A `let` that takes a tuple apart, in a generic function.
+pub fn gen_let_tuple<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let (q, r) = (n / 2, n % 2);
+	acc += q * 10 + r;
+	return acc;
+}
+
+/// A `const` in a block.
+pub fn run_const(n: int) -> int
+{
+	let acc = 0;
+	const STEP: int = 3;
+	const TWICE: int = STEP * 2;
+	acc += TWICE * n;
+	return acc;
+}
+
+/// A `const` in a block, in a generic function.
+pub fn gen_const<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	const STEP: int = 3;
+	const TWICE: int = STEP * 2;
+	acc += TWICE * n;
+	return acc;
+}
+
+/// An assignment to a local and through a pointer.
+pub fn run_assign(n: int) -> int
+{
+	let acc = 0;
+	let x = 0;
+	x = n * 3;
+	let p = &x;
+	*p = x + 1;
+	acc = acc + x;
+	return acc;
+}
+
+/// An assignment to a local and through a pointer, in a generic function.
+pub fn gen_assign<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let x = 0;
+	x = n * 3;
+	let p = &x;
+	*p = x + 1;
+	acc = acc + x;
+	return acc;
+}
+
+/// Every compound assignment of `+=` to `>>=`.
+pub fn run_compound(n: int) -> int
+{
+	let acc = 0;
+	let x = n;
+	x += 5;
+	x -= 1;
+	x *= 3;
+	x /= 2;
+	x %= 7;
+	x <<= 2;
+	x >>= 1;
+	x |= 8;
+	x &= 0xff;
+	x ^= 1;
+	acc += x;
+	return acc;
+}
+
+/// Every compound assignment of `+=` to `>>=`, in a generic function.
+pub fn gen_compound<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let x = n;
+	x += 5;
+	x -= 1;
+	x *= 3;
+	x /= 2;
+	x %= 7;
+	x <<= 2;
+	x >>= 1;
+	x |= 8;
+	x &= 0xff;
+	x ^= 1;
+	acc += x;
+	return acc;
+}
+
+/// Every wrapping and every saturating assignment.
+pub fn run_compound_wrapping(n: int) -> int
+{
+	let acc = 0;
+	let w: u8 = 250;
+	w +%= n as u8 * 3;
+	w -%= 10;
+	w *%= 3;
+	w <<%= 1;
+	let s: i8 = 120;
+	s +|= n as i8 * 3;
+	s -|= 100;
+	s *|= 5;
+	acc += w as int + s as int;
+	return acc;
+}
+
+/// Every wrapping and every saturating assignment, in a generic function.
+pub fn gen_compound_wrapping<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let w: u8 = 250;
+	w +%= n as u8 * 3;
+	w -%= 10;
+	w *%= 3;
+	w <<%= 1;
+	let s: i8 = 120;
+	s +|= n as i8 * 3;
+	s -|= 100;
+	s *|= 5;
+	acc += w as int + s as int;
+	return acc;
+}
+
+/// The five arithmetic operators.
+pub fn run_arith(n: int) -> int
+{
+	let acc = 0;
+	acc += (n + 3) * 2 - n / 2 + n % 3;
+	return acc;
+}
+
+/// The five arithmetic operators, in a generic function.
+pub fn gen_arith<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	acc += (n + 3) * 2 - n / 2 + n % 3;
+	return acc;
+}
+
+/// The four wrapping operators, past the greatest `int`.
+pub fn run_wrapping(n: int) -> int
+{
+	let acc = 0;
+	let big: int = 9223372036854775807;
+	let w = big +% n;
+	let back = w -% big;
+	let m = big *% 2;
+	let gone = n <<% 64;
+	acc += back + m + gone + (n <<% 2);
+	return acc;
+}
+
+/// The four wrapping operators, past the greatest `int`, in a generic function.
+pub fn gen_wrapping<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let big: int = 9223372036854775807;
+	let w = big +% n;
+	let back = w -% big;
+	let m = big *% 2;
+	let gone = n <<% 64;
+	acc += back + m + gone + (n <<% 2);
+	return acc;
+}
+
+/// The three saturating operators, at the limits of `i8`.
+pub fn run_saturating(n: int) -> int
+{
+	let acc = 0;
+	let small: i8 = 100;
+	let up = small +| (n as i8 * 10);
+	let down = (0 - small) -| (n as i8 * 10);
+	let times = small *| (n as i8);
+	acc += up as int - down as int + times as int;
+	return acc;
+}
+
+/// The three saturating operators, at the limits of `i8`, in a generic
+/// function.
+pub fn gen_saturating<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let small: i8 = 100;
+	let up = small +| (n as i8 * 10);
+	let down = (0 - small) -| (n as i8 * 10);
+	let times = small *| (n as i8);
+	acc += up as int - down as int + times as int;
+	return acc;
+}
+
+/// A shift to the left and one to the right, signed.
+pub fn run_shift(n: int) -> int
+{
+	let acc = 0;
+	let neg = 0 - 256;
+	acc += (n << 3) + (256 >> n) + (neg >> n);
+	return acc;
+}
+
+/// A shift to the left and one to the right, signed, in a generic function.
+pub fn gen_shift<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let neg = 0 - 256;
+	acc += (n << 3) + (256 >> n) + (neg >> n);
+	return acc;
+}
+
+/// The four bitwise operators.
+pub fn run_bitwise(n: int) -> int
+{
+	let acc = 0;
+	acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+	return acc;
+}
+
+/// The four bitwise operators, in a generic function.
+pub fn gen_bitwise<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+	return acc;
+}
+
+/// The six comparisons.
+pub fn run_compare(n: int) -> int
+{
+	let acc = 0;
+	acc += (n == 2) as int + (n != 2) as int * 2 + (n < 3) as int * 4 + (n <= 3) as int * 8 + (n > 1) as int * 16 + (n >= 4) as int * 32;
+	return acc;
+}
+
+/// The six comparisons, in a generic function.
+pub fn gen_compare<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	acc += (n == 2) as int + (n != 2) as int * 2 + (n < 3) as int * 4 + (n <= 3) as int * 8 + (n > 1) as int * 16 + (n >= 4) as int * 32;
+	return acc;
+}
+
+/// Unary `-` and `!`.
+pub fn run_unary(n: int) -> int
+{
+	let acc = 0;
+	let neg = -n;
+	let no = !(n > 2);
+	acc += neg * neg - -3;
+	if no {
+		acc += 100;
+	}
+	return acc;
+}
+
+/// Unary `-` and `!`, in a generic function.
+pub fn gen_unary<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let neg = -n;
+	let no = !(n > 2);
+	acc += neg * neg - -3;
+	if no {
+		acc += 100;
+	}
+	return acc;
+}
+
+/// `mul_high`, the upper half of a product.
+pub fn run_mul_high(n: int) -> int
+{
+	let acc = 0;
+	let wide = (n as u64) << 60;
+	acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+	return acc;
+}
+
+/// `mul_high`, the upper half of a product, in a generic function.
+pub fn gen_mul_high<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let wide = (n as u64) << 60;
+	acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+	return acc;
+}
+
+/// `as` between integers and floats.
+pub fn run_as(n: int) -> int
+{
+	let acc = 0;
+	let small = (n + 250) as u8;
+	let f = n as f64;
+	let wide = small as u32;
+	acc += small as int + (f * 1.5) as int + wide as int;
+	return acc;
+}
+
+/// `as` between integers and floats, in a generic function.
+pub fn gen_as<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let small = (n + 250) as u8;
+	let f = n as f64;
+	let wide = small as u32;
+	acc += small as int + (f * 1.5) as int + wide as int;
+	return acc;
+}
+
+/// An index into an array, read and written.
+pub fn run_index(n: int) -> int
+{
+	let acc = 0;
+	let xs = [10, 20, 30, 40, 50];
+	xs[n] = xs[n] + 1;
+	acc += xs[n] + xs[0];
+	return acc;
+}
+
+/// An index into an array, read and written, in a generic function.
+pub fn gen_index<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let xs = [10, 20, 30, 40, 50];
+	xs[n] = xs[n] + 1;
+	acc += xs[n] + xs[0];
+	return acc;
+}
+
+/// A slice of an array.
+pub fn run_slice(n: int) -> int
+{
+	let acc = 0;
+	let xs = [10, 20, 30, 40, 50];
+	let s = xs[1..n + 1];
+	acc += s.len * 100 + s[0] + s[n - 1];
+	return acc;
+}
+
+/// A slice of an array, in a generic function.
+pub fn gen_slice<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let xs = [10, 20, 30, 40, 50];
+	let s = xs[1..n + 1];
+	acc += s.len * 100 + s[0] + s[n - 1];
+	return acc;
+}
+
+/// A field of a struct, read and written.
+pub fn run_field(n: int) -> int
+{
+	let acc = 0;
+	let p = Pt { x: n, y: 2 };
+	p.y = p.x * 3;
+	acc += p.x + p.y;
+	return acc;
+}
+
+/// A field of a struct, read and written, in a generic function.
+pub fn gen_field<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let p = Pt { x: n, y: 2 };
+	p.y = p.x * 3;
+	acc += p.x + p.y;
+	return acc;
+}
+
+/// A call of a function.
+pub fn run_call(n: int) -> int
+{
+	let acc = 0;
+	acc += twice(n) + twice(twice(1));
+	return acc;
+}
+
+/// A call of a function, in a generic function.
+pub fn gen_call<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	acc += twice(n) + twice(twice(1));
+	return acc;
+}
+
+/// `size_of` of a built-in type and of a struct.
+pub fn run_size_of(n: int) -> int
+{
+	let acc = 0;
+	acc += size_of(i32) * n + size_of(Pt) + size_of([3]u16);
+	return acc;
+}
+
+/// `size_of` of a built-in type and of a struct, in a generic function.
+pub fn gen_size_of<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	acc += size_of(i32) * n + size_of(Pt) + size_of([3]u16);
+	return acc;
+}
+
+/// An anonymous function that reads a local.
+pub fn run_fn(n: int) -> int
+{
+	let acc = 0;
+	let k = n + 1;
+	acc += call_with(n, fn(v) {
+		return v * k;
+	});
+	return acc;
+}
+
+/// An anonymous function that reads a local, in a generic function.
+pub fn gen_fn<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let k = n + 1;
+	acc += call_with(n, fn(v) {
+		return v * k;
+	});
+	return acc;
+}
+
+/// The simd built-ins `splat`, `sum` and `max`.
+pub fn run_simd(n: int) -> int
+{
+	let acc = 0;
+	let lanes = I32x4.splat(n as i32);
+	let twice = lanes + lanes;
+	acc += twice.sum() as int + twice.max() as int;
+	return acc;
+}
+
+/// The simd built-ins `splat`, `sum` and `max`, in a generic function.
+pub fn gen_simd<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	let lanes = I32x4.splat(n as i32);
+	let twice = lanes + lanes;
+	acc += twice.sum() as int + twice.max() as int;
+	return acc;
+}

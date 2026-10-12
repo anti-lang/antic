@@ -1912,6 +1912,18 @@ add_test(NAME anti_test_flow
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-flow"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test_module.cmake")
 
+# The constructs of the values area in a `tests` block and in a `fixtures`
+# block, as anti_test_flow holds those of the flow area.
+add_test(NAME anti_test_values
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DMODULE=com/example/values"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-values"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test_module.cmake")
+
 # `anti run --memory-checks` and `anti test --memory-checks` put the report
 # of each memory error through Anti's symbolizer, and the dev cache keeps
 # the objects with and without the checks apart.
@@ -3402,6 +3414,17 @@ antic_modules_test(flow_modules
     LIBRARIES flow
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/flow")
+
+# The constructs of the values area in the functions of a library module,
+# plain and generic, as flow_modules holds those of the flow area. The
+# library writes `f"..."` and a pattern literal, so its dev link takes the
+# dev objects of anti.text and anti.regex.
+antic_modules_test(values_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/values"
+    LIBRARIES values
+    PROGRAM client
+    STD lang mem text regex
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/values")
 
 # A Mutex in a struct of a library and channels that pass between the
 # program and a library, which drains one and selects over two.

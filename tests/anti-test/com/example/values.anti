@@ -1,0 +1,1313 @@
+//! Every construct of the values area in a function of a `tests` block and in a
+//! function of a `fixtures` block. `anti test` compiles both, and each test
+//! asserts what its construct computes.
+
+import anti.lang;
+import anti.regex;
+import anti.text;
+
+struct Pt
+{
+	x: int,
+	y: int,
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn call_with(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+simd struct I32x4
+{
+	a: i32,
+	b: i32,
+	c: i32,
+	d: i32,
+}
+
+fixtures
+{
+	fn fix_literal_int(n: int) -> int
+	{
+		let acc = 0;
+		acc += 42 + 0x1F + 1_000 * n;
+		return acc;
+	}
+
+	fn fix_literal_float(n: int) -> int
+	{
+		let acc = 0;
+		let x = 2.5;
+		let y = 1.0e2;
+		acc += (x * (n as float)) as int + (y as int);
+		return acc;
+	}
+
+	fn fix_literal_char(n: int) -> int
+	{
+		let acc = 0;
+		let c = 'a';
+		let tab = '\t';
+		acc += (c as u32) as int + (tab as u32) as int + n;
+		return acc;
+	}
+
+	fn fix_literal_str(n: int) -> int
+	{
+		let acc = 0;
+		let s = "four\n";
+		acc += s.len * n + (s[4] as int);
+		return acc;
+	}
+
+	fn fix_literal_raw(n: int) -> int
+	{
+		let acc = 0;
+		let s = r"a\nb";
+		acc += s.len * n + (s[1] as int);
+		return acc;
+	}
+
+	fn fix_literal_bytes(n: int) -> int
+	{
+		let acc = 0;
+		let b = b"\x00\xff";
+		let raw = br"\x00";
+		acc += b.len * n + (b[1] as int) + raw.len;
+		return acc;
+	}
+
+	fn fix_literal_hex(n: int) -> int
+	{
+		let acc = 0;
+		let h = x"00 AB CC";
+		acc += h.len * n + (h[1] as int);
+		return acc;
+	}
+
+	fn fix_format(n: int) -> int
+	{
+		let acc = 0;
+		let s = f"n={n:>4}";
+		let raw = rf"\d{n}";
+		acc += s.len * 10 + raw.len + n;
+		free(s.ptr);
+		free(raw.ptr);
+		return acc;
+	}
+
+	fn fix_pattern(n: int) -> int
+	{
+		let acc = 0;
+		if "a12".matches(re"[0-9]+") {
+			acc += n;
+		}
+		if "abc".matches(re"[0-9]+") {
+			acc += 100;
+		}
+		return acc;
+	}
+
+	fn fix_bool(n: int) -> int
+	{
+		let acc = 0;
+		let on = true;
+		let off = false;
+		if on {
+			acc += n;
+		}
+		if off {
+			acc += 100;
+		}
+		return acc;
+	}
+
+	fn fix_here(n: int) -> int
+	{
+		let acc = 0;
+		let at = here;
+		if at.line > 0 && at.file.len > 0 {
+			acc += n;
+		}
+		return acc;
+	}
+
+	fn fix_array(n: int) -> int
+	{
+		let acc = 0;
+		let xs = [n, 20, 300];
+		acc += xs[0] + xs[1] + xs[2] + xs.len;
+		return acc;
+	}
+
+	fn fix_array_repeat(n: int) -> int
+	{
+		let acc = 0;
+		let xs = [n * 2; 4];
+		acc += xs[0] + xs[3] + xs.len;
+		return acc;
+	}
+
+	fn fix_slice_literal(n: int) -> int
+	{
+		let acc = 0;
+		let xs = [n, 20, 300];
+		let s = []int { ptr: &xs[0], len: 2 };
+		acc += s[0] + s[1] + s.len;
+		return acc;
+	}
+
+	fn fix_struct_literal(n: int) -> int
+	{
+		let acc = 0;
+		let p = Pt { y: 2, x: n };
+		acc += p.x * 10 + p.y;
+		return acc;
+	}
+
+	fn fix_tuple(n: int) -> int
+	{
+		let acc = 0;
+		let t = (n, 7, n * 2);
+		acc += t.0 + t.1 + t.2;
+		return acc;
+	}
+
+	fn fix_tuple_element(n: int) -> int
+	{
+		let acc = 0;
+		let t = (n, 7);
+		t.1 = t.0 * 10;
+		acc += t.1 + t.0;
+		return acc;
+	}
+
+	fn fix_let(n: int) -> int
+	{
+		let acc = 0;
+		let x = n * 2;
+		let y = x;
+		acc += y;
+		return acc;
+	}
+
+	fn fix_let_typed(n: int) -> int
+	{
+		let acc = 0;
+		let x: i32 = 5;
+		let y: u8 = 200;
+		let z: f32 = 0.5;
+		acc += x as int + y as int + (z * 4.0) as int + n;
+		return acc;
+	}
+
+	fn fix_let_tuple(n: int) -> int
+	{
+		let acc = 0;
+		let (q, r) = (n / 2, n % 2);
+		acc += q * 10 + r;
+		return acc;
+	}
+
+	fn fix_const(n: int) -> int
+	{
+		let acc = 0;
+		const STEP: int = 3;
+		const TWICE: int = STEP * 2;
+		acc += TWICE * n;
+		return acc;
+	}
+
+	fn fix_assign(n: int) -> int
+	{
+		let acc = 0;
+		let x = 0;
+		x = n * 3;
+		let p = &x;
+		*p = x + 1;
+		acc = acc + x;
+		return acc;
+	}
+
+	fn fix_compound(n: int) -> int
+	{
+		let acc = 0;
+		let x = n;
+		x += 5;
+		x -= 1;
+		x *= 3;
+		x /= 2;
+		x %= 7;
+		x <<= 2;
+		x >>= 1;
+		x |= 8;
+		x &= 0xff;
+		x ^= 1;
+		acc += x;
+		return acc;
+	}
+
+	fn fix_compound_wrapping(n: int) -> int
+	{
+		let acc = 0;
+		let w: u8 = 250;
+		w +%= n as u8 * 3;
+		w -%= 10;
+		w *%= 3;
+		w <<%= 1;
+		let s: i8 = 120;
+		s +|= n as i8 * 3;
+		s -|= 100;
+		s *|= 5;
+		acc += w as int + s as int;
+		return acc;
+	}
+
+	fn fix_arith(n: int) -> int
+	{
+		let acc = 0;
+		acc += (n + 3) * 2 - n / 2 + n % 3;
+		return acc;
+	}
+
+	fn fix_wrapping(n: int) -> int
+	{
+		let acc = 0;
+		let big: int = 9223372036854775807;
+		let w = big +% n;
+		let back = w -% big;
+		let m = big *% 2;
+		let gone = n <<% 64;
+		acc += back + m + gone + (n <<% 2);
+		return acc;
+	}
+
+	fn fix_saturating(n: int) -> int
+	{
+		let acc = 0;
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+		return acc;
+	}
+
+	fn fix_shift(n: int) -> int
+	{
+		let acc = 0;
+		let neg = 0 - 256;
+		acc += (n << 3) + (256 >> n) + (neg >> n);
+		return acc;
+	}
+
+	fn fix_bitwise(n: int) -> int
+	{
+		let acc = 0;
+		acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+		return acc;
+	}
+
+	fn fix_compare(n: int) -> int
+	{
+		let acc = 0;
+		acc += (n == 2) as int + (n != 2) as int * 2 + (n < 3) as int * 4 + (n <= 3) as int * 8 + (n > 1) as int * 16 + (n >= 4) as int * 32;
+		return acc;
+	}
+
+	fn fix_unary(n: int) -> int
+	{
+		let acc = 0;
+		let neg = -n;
+		let no = !(n > 2);
+		acc += neg * neg - -3;
+		if no {
+			acc += 100;
+		}
+		return acc;
+	}
+
+	fn fix_mul_high(n: int) -> int
+	{
+		let acc = 0;
+		let wide = (n as u64) << 60;
+		acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+		return acc;
+	}
+
+	fn fix_as(n: int) -> int
+	{
+		let acc = 0;
+		let small = (n + 250) as u8;
+		let f = n as f64;
+		let wide = small as u32;
+		acc += small as int + (f * 1.5) as int + wide as int;
+		return acc;
+	}
+
+	fn fix_index(n: int) -> int
+	{
+		let acc = 0;
+		let xs = [10, 20, 30, 40, 50];
+		xs[n] = xs[n] + 1;
+		acc += xs[n] + xs[0];
+		return acc;
+	}
+
+	fn fix_slice(n: int) -> int
+	{
+		let acc = 0;
+		let xs = [10, 20, 30, 40, 50];
+		let s = xs[1..n + 1];
+		acc += s.len * 100 + s[0] + s[n - 1];
+		return acc;
+	}
+
+	fn fix_field(n: int) -> int
+	{
+		let acc = 0;
+		let p = Pt { x: n, y: 2 };
+		p.y = p.x * 3;
+		acc += p.x + p.y;
+		return acc;
+	}
+
+	fn fix_call(n: int) -> int
+	{
+		let acc = 0;
+		acc += twice(n) + twice(twice(1));
+		return acc;
+	}
+
+	fn fix_size_of(n: int) -> int
+	{
+		let acc = 0;
+		acc += size_of(i32) * n + size_of(Pt) + size_of([3]u16);
+		return acc;
+	}
+
+	fn fix_fn(n: int) -> int
+	{
+		let acc = 0;
+		let k = n + 1;
+		acc += call_with(n, fn(v) {
+			return v * k;
+		});
+		return acc;
+	}
+
+	fn fix_simd(n: int) -> int
+	{
+		let acc = 0;
+		let lanes = I32x4.splat(n as i32);
+		let twice = lanes + lanes;
+		acc += twice.sum() as int + twice.max() as int;
+		return acc;
+	}
+}
+
+tests
+{
+	fn literal_int_in_fixtures()
+	{
+		let got0 = fix_literal_int(1);
+		assert(got0 == 1073);
+		let got1 = fix_literal_int(2);
+		assert(got1 == 2073);
+		let got2 = fix_literal_int(3);
+		assert(got2 == 3073);
+		let got3 = fix_literal_int(4);
+		assert(got3 == 4073);
+	}
+
+	fn literal_int_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		acc += 42 + 0x1F + 1_000 * n;
+		assert(acc == 3073);
+	}
+
+	fn literal_float_in_fixtures()
+	{
+		let got0 = fix_literal_float(1);
+		assert(got0 == 102);
+		let got1 = fix_literal_float(2);
+		assert(got1 == 105);
+		let got2 = fix_literal_float(3);
+		assert(got2 == 107);
+		let got3 = fix_literal_float(4);
+		assert(got3 == 110);
+	}
+
+	fn literal_float_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let x = 2.5;
+		let y = 1.0e2;
+		acc += (x * (n as float)) as int + (y as int);
+		assert(acc == 107);
+	}
+
+	fn literal_char_in_fixtures()
+	{
+		let got0 = fix_literal_char(1);
+		assert(got0 == 107);
+		let got1 = fix_literal_char(2);
+		assert(got1 == 108);
+		let got2 = fix_literal_char(3);
+		assert(got2 == 109);
+		let got3 = fix_literal_char(4);
+		assert(got3 == 110);
+	}
+
+	fn literal_char_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let c = 'a';
+		let tab = '\t';
+		acc += (c as u32) as int + (tab as u32) as int + n;
+		assert(acc == 109);
+	}
+
+	fn literal_str_in_fixtures()
+	{
+		let got0 = fix_literal_str(1);
+		assert(got0 == 15);
+		let got1 = fix_literal_str(2);
+		assert(got1 == 20);
+		let got2 = fix_literal_str(3);
+		assert(got2 == 25);
+		let got3 = fix_literal_str(4);
+		assert(got3 == 30);
+	}
+
+	fn literal_str_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let s = "four\n";
+		acc += s.len * n + (s[4] as int);
+		assert(acc == 25);
+	}
+
+	fn literal_raw_in_fixtures()
+	{
+		let got0 = fix_literal_raw(1);
+		assert(got0 == 96);
+		let got1 = fix_literal_raw(2);
+		assert(got1 == 100);
+		let got2 = fix_literal_raw(3);
+		assert(got2 == 104);
+		let got3 = fix_literal_raw(4);
+		assert(got3 == 108);
+	}
+
+	fn literal_raw_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let s = r"a\nb";
+		acc += s.len * n + (s[1] as int);
+		assert(acc == 104);
+	}
+
+	fn literal_bytes_in_fixtures()
+	{
+		let got0 = fix_literal_bytes(1);
+		assert(got0 == 261);
+		let got1 = fix_literal_bytes(2);
+		assert(got1 == 263);
+		let got2 = fix_literal_bytes(3);
+		assert(got2 == 265);
+		let got3 = fix_literal_bytes(4);
+		assert(got3 == 267);
+	}
+
+	fn literal_bytes_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let b = b"\x00\xff";
+		let raw = br"\x00";
+		acc += b.len * n + (b[1] as int) + raw.len;
+		assert(acc == 265);
+	}
+
+	fn literal_hex_in_fixtures()
+	{
+		let got0 = fix_literal_hex(1);
+		assert(got0 == 174);
+		let got1 = fix_literal_hex(2);
+		assert(got1 == 177);
+		let got2 = fix_literal_hex(3);
+		assert(got2 == 180);
+		let got3 = fix_literal_hex(4);
+		assert(got3 == 183);
+	}
+
+	fn literal_hex_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let h = x"00 AB CC";
+		acc += h.len * n + (h[1] as int);
+		assert(acc == 180);
+	}
+
+	fn format_in_fixtures()
+	{
+		let got0 = fix_format(1);
+		assert(got0 == 64);
+		let got1 = fix_format(2);
+		assert(got1 == 65);
+		let got2 = fix_format(3);
+		assert(got2 == 66);
+		let got3 = fix_format(4);
+		assert(got3 == 67);
+	}
+
+	fn format_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let s = f"n={n:>4}";
+		let raw = rf"\d{n}";
+		acc += s.len * 10 + raw.len + n;
+		free(s.ptr);
+		free(raw.ptr);
+		assert(acc == 66);
+	}
+
+	fn pattern_in_fixtures()
+	{
+		let got0 = fix_pattern(1);
+		assert(got0 == 1);
+		let got1 = fix_pattern(2);
+		assert(got1 == 2);
+		let got2 = fix_pattern(3);
+		assert(got2 == 3);
+		let got3 = fix_pattern(4);
+		assert(got3 == 4);
+	}
+
+	fn pattern_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		if "a12".matches(re"[0-9]+") {
+			acc += n;
+		}
+		if "abc".matches(re"[0-9]+") {
+			acc += 100;
+		}
+		assert(acc == 3);
+	}
+
+	fn bool_in_fixtures()
+	{
+		let got0 = fix_bool(1);
+		assert(got0 == 1);
+		let got1 = fix_bool(2);
+		assert(got1 == 2);
+		let got2 = fix_bool(3);
+		assert(got2 == 3);
+		let got3 = fix_bool(4);
+		assert(got3 == 4);
+	}
+
+	fn bool_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let on = true;
+		let off = false;
+		if on {
+			acc += n;
+		}
+		if off {
+			acc += 100;
+		}
+		assert(acc == 3);
+	}
+
+	fn here_in_fixtures()
+	{
+		let got0 = fix_here(1);
+		assert(got0 == 1);
+		let got1 = fix_here(2);
+		assert(got1 == 2);
+		let got2 = fix_here(3);
+		assert(got2 == 3);
+		let got3 = fix_here(4);
+		assert(got3 == 4);
+	}
+
+	fn here_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let at = here;
+		if at.line > 0 && at.file.len > 0 {
+			acc += n;
+		}
+		assert(acc == 3);
+	}
+
+	fn array_in_fixtures()
+	{
+		let got0 = fix_array(1);
+		assert(got0 == 324);
+		let got1 = fix_array(2);
+		assert(got1 == 325);
+		let got2 = fix_array(3);
+		assert(got2 == 326);
+		let got3 = fix_array(4);
+		assert(got3 == 327);
+	}
+
+	fn array_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let xs = [n, 20, 300];
+		acc += xs[0] + xs[1] + xs[2] + xs.len;
+		assert(acc == 326);
+	}
+
+	fn array_repeat_in_fixtures()
+	{
+		let got0 = fix_array_repeat(1);
+		assert(got0 == 8);
+		let got1 = fix_array_repeat(2);
+		assert(got1 == 12);
+		let got2 = fix_array_repeat(3);
+		assert(got2 == 16);
+		let got3 = fix_array_repeat(4);
+		assert(got3 == 20);
+	}
+
+	fn array_repeat_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let xs = [n * 2; 4];
+		acc += xs[0] + xs[3] + xs.len;
+		assert(acc == 16);
+	}
+
+	fn slice_literal_in_fixtures()
+	{
+		let got0 = fix_slice_literal(1);
+		assert(got0 == 23);
+		let got1 = fix_slice_literal(2);
+		assert(got1 == 24);
+		let got2 = fix_slice_literal(3);
+		assert(got2 == 25);
+		let got3 = fix_slice_literal(4);
+		assert(got3 == 26);
+	}
+
+	fn slice_literal_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let xs = [n, 20, 300];
+		let s = []int { ptr: &xs[0], len: 2 };
+		acc += s[0] + s[1] + s.len;
+		assert(acc == 25);
+	}
+
+	fn struct_literal_in_fixtures()
+	{
+		let got0 = fix_struct_literal(1);
+		assert(got0 == 12);
+		let got1 = fix_struct_literal(2);
+		assert(got1 == 22);
+		let got2 = fix_struct_literal(3);
+		assert(got2 == 32);
+		let got3 = fix_struct_literal(4);
+		assert(got3 == 42);
+	}
+
+	fn struct_literal_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let p = Pt { y: 2, x: n };
+		acc += p.x * 10 + p.y;
+		assert(acc == 32);
+	}
+
+	fn tuple_in_fixtures()
+	{
+		let got0 = fix_tuple(1);
+		assert(got0 == 10);
+		let got1 = fix_tuple(2);
+		assert(got1 == 13);
+		let got2 = fix_tuple(3);
+		assert(got2 == 16);
+		let got3 = fix_tuple(4);
+		assert(got3 == 19);
+	}
+
+	fn tuple_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let t = (n, 7, n * 2);
+		acc += t.0 + t.1 + t.2;
+		assert(acc == 16);
+	}
+
+	fn tuple_element_in_fixtures()
+	{
+		let got0 = fix_tuple_element(1);
+		assert(got0 == 11);
+		let got1 = fix_tuple_element(2);
+		assert(got1 == 22);
+		let got2 = fix_tuple_element(3);
+		assert(got2 == 33);
+		let got3 = fix_tuple_element(4);
+		assert(got3 == 44);
+	}
+
+	fn tuple_element_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let t = (n, 7);
+		t.1 = t.0 * 10;
+		acc += t.1 + t.0;
+		assert(acc == 33);
+	}
+
+	fn let_in_fixtures()
+	{
+		let got0 = fix_let(1);
+		assert(got0 == 2);
+		let got1 = fix_let(2);
+		assert(got1 == 4);
+		let got2 = fix_let(3);
+		assert(got2 == 6);
+		let got3 = fix_let(4);
+		assert(got3 == 8);
+	}
+
+	fn let_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let x = n * 2;
+		let y = x;
+		acc += y;
+		assert(acc == 6);
+	}
+
+	fn let_typed_in_fixtures()
+	{
+		let got0 = fix_let_typed(1);
+		assert(got0 == 208);
+		let got1 = fix_let_typed(2);
+		assert(got1 == 209);
+		let got2 = fix_let_typed(3);
+		assert(got2 == 210);
+		let got3 = fix_let_typed(4);
+		assert(got3 == 211);
+	}
+
+	fn let_typed_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let x: i32 = 5;
+		let y: u8 = 200;
+		let z: f32 = 0.5;
+		acc += x as int + y as int + (z * 4.0) as int + n;
+		assert(acc == 210);
+	}
+
+	fn let_tuple_in_fixtures()
+	{
+		let got0 = fix_let_tuple(1);
+		assert(got0 == 1);
+		let got1 = fix_let_tuple(2);
+		assert(got1 == 10);
+		let got2 = fix_let_tuple(3);
+		assert(got2 == 11);
+		let got3 = fix_let_tuple(4);
+		assert(got3 == 20);
+	}
+
+	fn let_tuple_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let (q, r) = (n / 2, n % 2);
+		acc += q * 10 + r;
+		assert(acc == 11);
+	}
+
+	fn const_in_fixtures()
+	{
+		let got0 = fix_const(1);
+		assert(got0 == 6);
+		let got1 = fix_const(2);
+		assert(got1 == 12);
+		let got2 = fix_const(3);
+		assert(got2 == 18);
+		let got3 = fix_const(4);
+		assert(got3 == 24);
+	}
+
+	fn const_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		const STEP: int = 3;
+		const TWICE: int = STEP * 2;
+		acc += TWICE * n;
+		assert(acc == 18);
+	}
+
+	fn assign_in_fixtures()
+	{
+		let got0 = fix_assign(1);
+		assert(got0 == 4);
+		let got1 = fix_assign(2);
+		assert(got1 == 7);
+		let got2 = fix_assign(3);
+		assert(got2 == 10);
+		let got3 = fix_assign(4);
+		assert(got3 == 13);
+	}
+
+	fn assign_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let x = 0;
+		x = n * 3;
+		let p = &x;
+		*p = x + 1;
+		acc = acc + x;
+		assert(acc == 10);
+	}
+
+	fn compound_in_fixtures()
+	{
+		let got0 = fix_compound(1);
+		assert(got0 == 9);
+		let got1 = fix_compound(2);
+		assert(got1 == 13);
+		let got2 = fix_compound(3);
+		assert(got2 == 15);
+		let got3 = fix_compound(4);
+		assert(got3 == 11);
+	}
+
+	fn compound_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let x = n;
+		x += 5;
+		x -= 1;
+		x *= 3;
+		x /= 2;
+		x %= 7;
+		x <<= 2;
+		x >>= 1;
+		x |= 8;
+		x &= 0xff;
+		x ^= 1;
+		acc += x;
+		assert(acc == 15);
+	}
+
+	fn compound_wrapping_in_fixtures()
+	{
+		let got0 = fix_compound_wrapping(1);
+		assert(got0 == 293);
+		let got1 = fix_compound_wrapping(2);
+		assert(got1 == 323);
+		let got2 = fix_compound_wrapping(3);
+		assert(got2 == 341);
+		let got3 = fix_compound_wrapping(4);
+		assert(got3 == 359);
+	}
+
+	fn compound_wrapping_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let w: u8 = 250;
+		w +%= n as u8 * 3;
+		w -%= 10;
+		w *%= 3;
+		w <<%= 1;
+		let s: i8 = 120;
+		s +|= n as i8 * 3;
+		s -|= 100;
+		s *|= 5;
+		acc += w as int + s as int;
+		assert(acc == 341);
+	}
+
+	fn arith_in_fixtures()
+	{
+		let got0 = fix_arith(1);
+		assert(got0 == 9);
+		let got1 = fix_arith(2);
+		assert(got1 == 11);
+		let got2 = fix_arith(3);
+		assert(got2 == 11);
+		let got3 = fix_arith(4);
+		assert(got3 == 13);
+	}
+
+	fn arith_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		acc += (n + 3) * 2 - n / 2 + n % 3;
+		assert(acc == 11);
+	}
+
+	fn wrapping_in_fixtures()
+	{
+		let got0 = fix_wrapping(1);
+		assert(got0 == 3);
+		let got1 = fix_wrapping(2);
+		assert(got1 == 8);
+		let got2 = fix_wrapping(3);
+		assert(got2 == 13);
+		let got3 = fix_wrapping(4);
+		assert(got3 == 18);
+	}
+
+	fn wrapping_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let big: int = 9223372036854775807;
+		let w = big +% n;
+		let back = w -% big;
+		let m = big *% 2;
+		let gone = n <<% 64;
+		acc += back + m + gone + (n <<% 2);
+		assert(acc == 13);
+	}
+
+	fn saturating_in_fixtures()
+	{
+		let got0 = fix_saturating(1);
+		assert(got0 == 320);
+		let got1 = fix_saturating(2);
+		assert(got1 == 367);
+		let got2 = fix_saturating(3);
+		assert(got2 == 382);
+		let got3 = fix_saturating(4);
+		assert(got3 == 382);
+	}
+
+	fn saturating_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+		assert(acc == 382);
+	}
+
+	fn shift_in_fixtures()
+	{
+		let got0 = fix_shift(1);
+		assert(got0 == 8);
+		let got1 = fix_shift(2);
+		assert(got1 == 16);
+		let got2 = fix_shift(3);
+		assert(got2 == 24);
+		let got3 = fix_shift(4);
+		assert(got3 == 32);
+	}
+
+	fn shift_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let neg = 0 - 256;
+		acc += (n << 3) + (256 >> n) + (neg >> n);
+		assert(acc == 24);
+	}
+
+	fn bitwise_in_fixtures()
+	{
+		let got0 = fix_bitwise(1);
+		assert(got0 == 27);
+		let got1 = fix_bitwise(2);
+		assert(got1 == 32);
+		let got2 = fix_bitwise(3);
+		assert(got2 == 31);
+		let got3 = fix_bitwise(4);
+		assert(got3 == 28);
+	}
+
+	fn bitwise_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		acc += (n & 6) + (n | 8) + (n ^ 5) + (~n & 0xf);
+		assert(acc == 31);
+	}
+
+	fn compare_in_fixtures()
+	{
+		let got0 = fix_compare(1);
+		assert(got0 == 14);
+		let got1 = fix_compare(2);
+		assert(got1 == 29);
+		let got2 = fix_compare(3);
+		assert(got2 == 26);
+		let got3 = fix_compare(4);
+		assert(got3 == 50);
+	}
+
+	fn compare_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		acc += (n == 2) as int + (n != 2) as int * 2 + (n < 3) as int * 4 + (n <= 3) as int * 8 + (n > 1) as int * 16 + (n >= 4) as int * 32;
+		assert(acc == 26);
+	}
+
+	fn unary_in_fixtures()
+	{
+		let got0 = fix_unary(1);
+		assert(got0 == 104);
+		let got1 = fix_unary(2);
+		assert(got1 == 107);
+		let got2 = fix_unary(3);
+		assert(got2 == 12);
+		let got3 = fix_unary(4);
+		assert(got3 == 19);
+	}
+
+	fn unary_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let neg = -n;
+		let no = !(n > 2);
+		acc += neg * neg - -3;
+		if no {
+			acc += 100;
+		}
+		assert(acc == 12);
+	}
+
+	fn mul_high_in_fixtures()
+	{
+		let got0 = fix_mul_high(1);
+		assert(got0 == 1);
+		let got1 = fix_mul_high(2);
+		assert(got1 == 3);
+		let got2 = fix_mul_high(3);
+		assert(got2 == 5);
+		let got3 = fix_mul_high(4);
+		assert(got3 == 7);
+	}
+
+	fn mul_high_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let wide = (n as u64) << 60;
+		acc += mul_high(wide, 32) as int + mul_high(0 - n, 2);
+		assert(acc == 5);
+	}
+
+	fn as_in_fixtures()
+	{
+		let got0 = fix_as(1);
+		assert(got0 == 503);
+		let got1 = fix_as(2);
+		assert(got1 == 507);
+		let got2 = fix_as(3);
+		assert(got2 == 510);
+		let got3 = fix_as(4);
+		assert(got3 == 514);
+	}
+
+	fn as_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let small = (n + 250) as u8;
+		let f = n as f64;
+		let wide = small as u32;
+		acc += small as int + (f * 1.5) as int + wide as int;
+		assert(acc == 510);
+	}
+
+	fn index_in_fixtures()
+	{
+		let got0 = fix_index(1);
+		assert(got0 == 31);
+		let got1 = fix_index(2);
+		assert(got1 == 41);
+		let got2 = fix_index(3);
+		assert(got2 == 51);
+		let got3 = fix_index(4);
+		assert(got3 == 61);
+	}
+
+	fn index_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let xs = [10, 20, 30, 40, 50];
+		xs[n] = xs[n] + 1;
+		acc += xs[n] + xs[0];
+		assert(acc == 51);
+	}
+
+	fn slice_in_fixtures()
+	{
+		let got0 = fix_slice(1);
+		assert(got0 == 140);
+		let got1 = fix_slice(2);
+		assert(got1 == 250);
+		let got2 = fix_slice(3);
+		assert(got2 == 360);
+		let got3 = fix_slice(4);
+		assert(got3 == 470);
+	}
+
+	fn slice_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let xs = [10, 20, 30, 40, 50];
+		let s = xs[1..n + 1];
+		acc += s.len * 100 + s[0] + s[n - 1];
+		assert(acc == 360);
+	}
+
+	fn field_in_fixtures()
+	{
+		let got0 = fix_field(1);
+		assert(got0 == 4);
+		let got1 = fix_field(2);
+		assert(got1 == 8);
+		let got2 = fix_field(3);
+		assert(got2 == 12);
+		let got3 = fix_field(4);
+		assert(got3 == 16);
+	}
+
+	fn field_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let p = Pt { x: n, y: 2 };
+		p.y = p.x * 3;
+		acc += p.x + p.y;
+		assert(acc == 12);
+	}
+
+	fn call_in_fixtures()
+	{
+		let got0 = fix_call(1);
+		assert(got0 == 6);
+		let got1 = fix_call(2);
+		assert(got1 == 8);
+		let got2 = fix_call(3);
+		assert(got2 == 10);
+		let got3 = fix_call(4);
+		assert(got3 == 12);
+	}
+
+	fn call_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		acc += twice(n) + twice(twice(1));
+		assert(acc == 10);
+	}
+
+	fn size_of_in_fixtures()
+	{
+		let got0 = fix_size_of(1);
+		assert(got0 == 26);
+		let got1 = fix_size_of(2);
+		assert(got1 == 30);
+		let got2 = fix_size_of(3);
+		assert(got2 == 34);
+		let got3 = fix_size_of(4);
+		assert(got3 == 38);
+	}
+
+	fn size_of_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		acc += size_of(i32) * n + size_of(Pt) + size_of([3]u16);
+		assert(acc == 34);
+	}
+
+	fn fn_in_fixtures()
+	{
+		let got0 = fix_fn(1);
+		assert(got0 == 2);
+		let got1 = fix_fn(2);
+		assert(got1 == 6);
+		let got2 = fix_fn(3);
+		assert(got2 == 12);
+		let got3 = fix_fn(4);
+		assert(got3 == 20);
+	}
+
+	fn fn_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let k = n + 1;
+		acc += call_with(n, fn(v) {
+			return v * k;
+		});
+		assert(acc == 12);
+	}
+
+	fn simd_in_fixtures()
+	{
+		let got0 = fix_simd(1);
+		assert(got0 == 10);
+		let got1 = fix_simd(2);
+		assert(got1 == 20);
+		let got2 = fix_simd(3);
+		assert(got2 == 30);
+		let got3 = fix_simd(4);
+		assert(got3 == 40);
+	}
+
+	fn simd_in_tests()
+	{
+		let n = 3;
+		let acc = 0;
+		let lanes = I32x4.splat(n as i32);
+		let twice = lanes + lanes;
+		acc += twice.sum() as int + twice.max() as int;
+		assert(acc == 30);
+	}
+}
