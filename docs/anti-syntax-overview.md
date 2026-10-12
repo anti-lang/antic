@@ -817,6 +817,11 @@ union Word
 	halves: [2]u32,
 }
 
+struct Lane align(64)
+{
+	hits: u64,
+}
+
 fn area(r: *Rect) -> f32 { return r.w * r.h; }
 
 let r = Rect { x: 0.0, y: 0.0, w: 8.0, h: 4.0 };
@@ -827,7 +832,7 @@ let bytes = size_of(Rect);
 let at = lang.SourceLocation { file: "a.anti", line: 1, column: 1, function: "main", module: "app" };
 ```
 
-`packed` before `struct`, `union`, `class` or `variant` removes padding, and `align(N)` after the name of any of the four raises its alignment. `union` has C layout, and a literal of one names exactly one field. Bitfields `flags: u32 : 4`. `_: T : 0` is a zero-width bitfield, a unit break as in C, and a union holds none. A trailing comma is allowed in every comma-separated list. `size_of(T)` is the size on the target.
+A literal names every field, since a struct field has no default. `packed` before `struct`, `union`, `class` or `variant` removes padding, and `align(N)` after the name of any of the four raises its alignment, so a `Lane` fills a cache line of 64 bytes. `union` has C layout, and a literal of one names exactly one field. Bitfields `flags: u32 : 4`. `_: T : 0` is a zero-width bitfield, a unit break as in C, and a union holds none. A trailing comma is allowed in every comma-separated list. `size_of(T)` is the size on the target.
 
 ## Simd structs
 
