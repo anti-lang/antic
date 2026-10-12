@@ -855,7 +855,7 @@ Arithmetic, the bitwise operators on integer lanes, comparisons and unary minus 
 
 ## Enums
 
-A named integer type with C layout, over `c_int` unless the declaration names the type. A value without `=` follows the one before it, and every value fits the underlying type. `as` converts an enum to and from any numeric type, and a dev build checks a conversion to an enum. `==` and `!=` compare two values, and `switch` takes them with their type.
+A named integer type with C layout, over `c_int` unless the declaration names the type. A value without `=` follows the one before it, and every value fits the underlying type. `as` converts an enum to and from any numeric type, and a dev build checks a conversion to an enum. `==` and `!=` compare two values, and `switch` takes them with their type. `<` and the other comparisons of order are refused on an enum, and `as` gives the numbers to compare.
 
 ```anti
 enum Kind { Circle, Square, Empty }
@@ -865,6 +865,27 @@ let k = Kind.Circle;
 let n = k as int;
 let m = 2 as Kind;
 if k != m { }
+```
+
+A value is a constant expression and names no other value of its enum, so `B = E.A + 1` is refused. After its values the body takes constants and functions without `self`. `Level.COUNT` and `Level.label(l)` reach them, and `l.label()` is refused. `export enum` writes the enum into the C header, see [C interop](#c-interop).
+
+```anti
+enum Level: u8
+{
+	Low = 1,
+	High = 2 * 4,
+
+	const COUNT: int = 2;
+
+	fn label(l: Level) -> str
+	{
+		if l == Level.Low { return "low"; }
+		return "high";
+	}
+}
+
+let s = Level.label(Level.High);
+let n = Level.COUNT;
 ```
 
 ## Variants
