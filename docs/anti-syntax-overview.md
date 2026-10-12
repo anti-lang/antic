@@ -518,6 +518,8 @@ outer: for a in xs {
 
 `by` takes a constant expression. `by -k` visits the same values as `by k` in reverse order. `by 0` is a compile error, the Heederik guardrail.
 
+A range counts over integers, so `for c in 'a'..'e'` is refused, and so is a `for` over a `str`. `for i, x in items` binds the index and the element of a slice or an array alone. The variable of a range is read-only, as the variable of every `for` is.
+
 `for x in e` also walks a collection. The collection has `operator fn iter(self)`, which gives a new iterator on every call, and the iterator has `operator fn next(self) -> bool` and `operator fn value(self) -> T`. Nothing allocates, and nested loops each keep their own position. `for x in it` walks an iterator in its place. `while` calls the same hooks by name when the iterator is needed after the loop. `.to_slice()` collects what an iterator gives into a new slice, freed with `free(s.ptr)`.
 
 <!-- overview: context, docs-style:ignore
