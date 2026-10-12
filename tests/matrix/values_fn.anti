@@ -1,0 +1,210 @@
+//! An anonymous function that reads a local, in each of these places: switch
+//! arm, if let, undo, catch handler, sync block, select arm, nested type. Each
+//! place is a function of its own, and the program prints one line per place
+//! and input.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn call_with(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_arm(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let k = n + 1;
+			acc += call_with(n, fn(v) {
+				return v * k;
+			});
+		},
+	}
+	return acc;
+}
+
+fn held(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let(n: int) -> int
+{
+	let acc = 0;
+	if let v = held(n) {
+		acc += v - n * 3;
+		let k = n + 1;
+		acc += call_with(n, fn(v) {
+			return v * k;
+		});
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_undo(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let k = n + 1;
+		acc += call_with(n, fn(v) {
+			return v * k;
+		});
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch(n: int) -> int
+{
+	let acc = 0;
+	let got = risky(n) catch {
+		let k = n + 1;
+		acc += call_with(n, fn(v) {
+			return v * k;
+		});
+		yield acc;
+	};
+	return got;
+}
+
+struct Guarded
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync(g: *Guarded, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let k = n + 1;
+		acc += call_with(n, fn(v) {
+			return v * k;
+		});
+	}
+	return acc;
+}
+
+fn in_select(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let k = n + 1;
+			acc += call_with(n, fn(v) {
+				return v * k;
+			});
+		},
+	}
+	return acc;
+}
+
+class Outer
+{
+	class Inner
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let k = n + 1;
+			acc += call_with(n, fn(v) {
+				return v * k;
+			});
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn main() -> int
+{
+	printf("arm %d\n".ptr, in_arm(0) as c_int);
+	printf("arm %d\n".ptr, in_arm(1) as c_int);
+	printf("arm %d\n".ptr, in_arm(2) as c_int);
+	printf("arm %d\n".ptr, in_arm(3) as c_int);
+	printf("arm %d\n".ptr, in_arm(4) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(0) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(1) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(2) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(3) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(4) as c_int);
+	let undone = 0;
+	in_undo(0, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	in_undo(1, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	in_undo(2, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	in_undo(3, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	in_undo(4, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	printf("catch %d\n".ptr, in_catch(0) as c_int);
+	printf("catch %d\n".ptr, in_catch(1) as c_int);
+	printf("catch %d\n".ptr, in_catch(2) as c_int);
+	printf("catch %d\n".ptr, in_catch(3) as c_int);
+	printf("catch %d\n".ptr, in_catch(4) as c_int);
+	let g = Guarded { lock: Mutex.new(), entered: 0 };
+	printf("sync %d\n".ptr, in_sync(&g, 1) as c_int);
+	printf("sync %d\n".ptr, in_sync(&g, 2) as c_int);
+	printf("sync %d\n".ptr, in_sync(&g, 3) as c_int);
+	printf("sync %d\n".ptr, in_sync(&g, 4) as c_int);
+	printf("sync entered %d\n".ptr, g.entered as c_int);
+	g.lock.destroy();
+	let c = chan int(1);
+	printf("select %d\n".ptr, in_select(c, 1) as c_int);
+	printf("select %d\n".ptr, in_select(c, 2) as c_int);
+	printf("select %d\n".ptr, in_select(c, 3) as c_int);
+	printf("select %d\n".ptr, in_select(c, 4) as c_int);
+	delete(c);
+	let outer = Outer { };
+	printf("nested %d\n".ptr, outer.go(1) as c_int);
+	printf("nested %d\n".ptr, outer.go(2) as c_int);
+	printf("nested %d\n".ptr, outer.go(3) as c_int);
+	printf("nested %d\n".ptr, outer.go(4) as c_int);
+	return 0;
+}

@@ -1,0 +1,5 @@
+exit 0
+select 4
+select 8
+select 12
+select 16

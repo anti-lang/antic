@@ -1,0 +1,375 @@
+//! The three saturating operators, at the limits of `i8`, in each of these
+//! places: method, loop body, switch arm, if let, defer, undo, catch handler,
+//! closure, worker, dispatch or parallel, sync block, select arm, generic body,
+//! nested type. Each place is a function of its own, and the program prints one
+//! line per place and input.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+class Box
+{
+	pub base: int = 0,
+
+	pub fn run(self, n: int) -> int
+	{
+		let acc = self.base;
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+		return acc;
+	}
+}
+
+fn in_loop(n: int) -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		acc += turn;
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+	}
+	return acc;
+}
+
+fn in_arm(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let small: i8 = 100;
+			let up = small +| (n as i8 * 10);
+			let down = (0 - small) -| (n as i8 * 10);
+			let times = small *| (n as i8);
+			acc += up as int - down as int + times as int;
+		},
+	}
+	return acc;
+}
+
+fn held(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let(n: int) -> int
+{
+	let acc = 0;
+	if let v = held(n) {
+		acc += v - n * 3;
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+	}
+	acc = 5;
+}
+
+fn in_undo(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch(n: int) -> int
+{
+	let acc = 0;
+	let got = risky(n) catch {
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+		yield acc;
+	};
+	return got;
+}
+
+fn apply(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure(start: int) -> int
+{
+	let acc = 0;
+	let got = apply(start, fn(n) {
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn in_worker(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let small: i8 = 100;
+	let up = small +| (n as i8 * 10);
+	let down = (0 - small) -| (n as i8 * 10);
+	let times = small *| (n as i8);
+	acc += up as int - down as int + times as int;
+	return acc;
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work(fn(n) {
+		let acc = 0;
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync(g: *Guarded, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let small: i8 = 100;
+		let up = small +| (n as i8 * 10);
+		let down = (0 - small) -| (n as i8 * 10);
+		let times = small *| (n as i8);
+		acc += up as int - down as int + times as int;
+	}
+	return acc;
+}
+
+fn in_select(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let small: i8 = 100;
+			let up = small +| (n as i8 * 10);
+			let down = (0 - small) -| (n as i8 * 10);
+			let times = small *| (n as i8);
+			acc += up as int - down as int + times as int;
+		},
+	}
+	return acc;
+}
+
+fn in_generic<T>(n: int) -> int
+{
+	let acc = size_of(T) as int;
+	if size_of(T) > 8 {
+		acc += 100;
+	}
+	let small: i8 = 100;
+	let up = small +| (n as i8 * 10);
+	let down = (0 - small) -| (n as i8 * 10);
+	let times = small *| (n as i8);
+	acc += up as int - down as int + times as int;
+	return acc;
+}
+
+class Outer
+{
+	class Inner
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let small: i8 = 100;
+			let up = small +| (n as i8 * 10);
+			let down = (0 - small) -| (n as i8 * 10);
+			let times = small *| (n as i8);
+			acc += up as int - down as int + times as int;
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn main() -> int
+{
+	let task = alloc Task { };
+	let box = Box { base: 1000 };
+	printf("method %d\n".ptr, box.run(1) as c_int);
+	printf("method %d\n".ptr, box.run(2) as c_int);
+	printf("method %d\n".ptr, box.run(3) as c_int);
+	printf("method %d\n".ptr, box.run(4) as c_int);
+	printf("loop %d\n".ptr, in_loop(1) as c_int);
+	printf("loop %d\n".ptr, in_loop(2) as c_int);
+	printf("loop %d\n".ptr, in_loop(3) as c_int);
+	printf("loop %d\n".ptr, in_loop(4) as c_int);
+	printf("arm %d\n".ptr, in_arm(0) as c_int);
+	printf("arm %d\n".ptr, in_arm(1) as c_int);
+	printf("arm %d\n".ptr, in_arm(2) as c_int);
+	printf("arm %d\n".ptr, in_arm(3) as c_int);
+	printf("arm %d\n".ptr, in_arm(4) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(0) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(1) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(2) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(3) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(4) as c_int);
+	let deferred = 0;
+	in_defer(1, &deferred);
+	printf("defer %d\n".ptr, deferred as c_int);
+	in_defer(2, &deferred);
+	printf("defer %d\n".ptr, deferred as c_int);
+	in_defer(3, &deferred);
+	printf("defer %d\n".ptr, deferred as c_int);
+	in_defer(4, &deferred);
+	printf("defer %d\n".ptr, deferred as c_int);
+	let undone = 0;
+	in_undo(0, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	in_undo(1, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	in_undo(2, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	in_undo(3, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	in_undo(4, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	printf("catch %d\n".ptr, in_catch(0) as c_int);
+	printf("catch %d\n".ptr, in_catch(1) as c_int);
+	printf("catch %d\n".ptr, in_catch(2) as c_int);
+	printf("catch %d\n".ptr, in_catch(3) as c_int);
+	printf("catch %d\n".ptr, in_catch(4) as c_int);
+	printf("closure %d\n".ptr, in_closure(1) as c_int);
+	printf("closure %d\n".ptr, in_closure(2) as c_int);
+	printf("closure %d\n".ptr, in_closure(3) as c_int);
+	printf("closure %d\n".ptr, in_closure(4) as c_int);
+	task.n = 1;
+	let job0 = dispatch task -> in_worker();
+	printf("worker %d\n".ptr, join(job0) as c_int);
+	task.n = 2;
+	let job1 = dispatch task -> in_worker();
+	printf("worker %d\n".ptr, join(job1) as c_int);
+	task.n = 3;
+	let job2 = dispatch task -> in_worker();
+	printf("worker %d\n".ptr, join(job2) as c_int);
+	task.n = 4;
+	let job3 = dispatch task -> in_worker();
+	printf("worker %d\n".ptr, join(job3) as c_int);
+	printf("dispatch %d\n".ptr, in_dispatch(task, 1) as c_int);
+	printf("dispatch %d\n".ptr, in_dispatch(task, 2) as c_int);
+	printf("dispatch %d\n".ptr, in_dispatch(task, 3) as c_int);
+	printf("dispatch %d\n".ptr, in_dispatch(task, 4) as c_int);
+	let g = Guarded { lock: Mutex.new(), entered: 0 };
+	printf("sync %d\n".ptr, in_sync(&g, 1) as c_int);
+	printf("sync %d\n".ptr, in_sync(&g, 2) as c_int);
+	printf("sync %d\n".ptr, in_sync(&g, 3) as c_int);
+	printf("sync %d\n".ptr, in_sync(&g, 4) as c_int);
+	printf("sync entered %d\n".ptr, g.entered as c_int);
+	g.lock.destroy();
+	let c = chan int(1);
+	printf("select %d\n".ptr, in_select(c, 1) as c_int);
+	printf("select %d\n".ptr, in_select(c, 2) as c_int);
+	printf("select %d\n".ptr, in_select(c, 3) as c_int);
+	printf("select %d\n".ptr, in_select(c, 4) as c_int);
+	delete(c);
+	printf("generic %d %d\n".ptr, in_generic<int>(1) as c_int,
+		in_generic<str>(1) as c_int);
+	printf("generic %d %d\n".ptr, in_generic<int>(2) as c_int,
+		in_generic<str>(2) as c_int);
+	printf("generic %d %d\n".ptr, in_generic<int>(3) as c_int,
+		in_generic<str>(3) as c_int);
+	printf("generic %d %d\n".ptr, in_generic<int>(4) as c_int,
+		in_generic<str>(4) as c_int);
+	let outer = Outer { };
+	printf("nested %d\n".ptr, outer.go(1) as c_int);
+	printf("nested %d\n".ptr, outer.go(2) as c_int);
+	printf("nested %d\n".ptr, outer.go(3) as c_int);
+	printf("nested %d\n".ptr, outer.go(4) as c_int);
+	delete(task);
+	return 0;
+}

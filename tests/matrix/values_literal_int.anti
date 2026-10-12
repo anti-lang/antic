@@ -1,0 +1,36 @@
+//! An integer literal, decimal, hex and with separators, in each of these
+//! places: nested type. Each place is a function of its own, and the program
+//! prints one line per place and input.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Outer
+{
+	class Inner
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			acc += 42 + 0x1F + 1_000 * n;
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn main() -> int
+{
+	let outer = Outer { };
+	printf("nested %d\n".ptr, outer.go(1) as c_int);
+	printf("nested %d\n".ptr, outer.go(2) as c_int);
+	printf("nested %d\n".ptr, outer.go(3) as c_int);
+	printf("nested %d\n".ptr, outer.go(4) as c_int);
+	return 0;
+}

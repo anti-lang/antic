@@ -1,0 +1,63 @@
+//! A call of a function, in each of these places: select arm, nested type. Each
+//! place is a function of its own, and the program prints one line per place
+//! and input.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn in_select(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			acc += twice(n) + twice(twice(1));
+		},
+	}
+	return acc;
+}
+
+class Outer
+{
+	class Inner
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			acc += twice(n) + twice(twice(1));
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn main() -> int
+{
+	let c = chan int(1);
+	printf("select %d\n".ptr, in_select(c, 1) as c_int);
+	printf("select %d\n".ptr, in_select(c, 2) as c_int);
+	printf("select %d\n".ptr, in_select(c, 3) as c_int);
+	printf("select %d\n".ptr, in_select(c, 4) as c_int);
+	delete(c);
+	let outer = Outer { };
+	printf("nested %d\n".ptr, outer.go(1) as c_int);
+	printf("nested %d\n".ptr, outer.go(2) as c_int);
+	printf("nested %d\n".ptr, outer.go(3) as c_int);
+	printf("nested %d\n".ptr, outer.go(4) as c_int);
+	return 0;
+}

@@ -1,0 +1,10 @@
+exit 0
+undo -1
+undo 14
+undo 16
+undo 16
+undo 18
+select 9
+select 11
+select 11
+select 13
