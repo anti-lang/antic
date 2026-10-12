@@ -337,6 +337,23 @@ The known failures, by decision 30 of "Decisions of 2026-10-11":
 - The test `known_failures` compares the list with the table and with the
   tree. `tests/known_failures.cmake` reads the list for both.
 
+The two guards and the lists of the matrix:
+
+- `diagnostics_covered` reads every message of `src/antic/` and of
+  `src/anti/` and fails for one that no expected output under `tests/`
+  holds. `options_covered` reads the options of antic and the commands and
+  options of anti and fails for one that no test passes.
+- `tests/diagnostics-open.txt` and `tests/options-open.txt` list what had no
+  test on 2026-10-12. A line leaves its list in the commit that adds the
+  test. A new message or option comes with its test and never with a line.
+- Each guard fails for a line whose message or option a test covers, and for
+  a line that names nothing of the sources.
+- The diagnostics guard reads the functions its runner names. A new function
+  that hands a format on to `diagnostics_add` goes into `TEXTS_ANTIC` of
+  `tests/run_diagnostics_covered.cmake`.
+- `docs/notes/test-matrix.md` holds the constructs, the contexts, the kinds
+  of value and the matrix, with each cell open or held by a source.
+
 ## First sessions, in order
 
 1. Done. The LLVM tools are built for every host in `anti-lang/llvm-tools`,
@@ -562,9 +579,9 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1707 ctest tests pass on the development Mac, and two of them, the
+- 1711 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  The ASan and the UBSan builds run 1706 each with the same skips, without
+  The ASan and the UBSan builds run 1710 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
