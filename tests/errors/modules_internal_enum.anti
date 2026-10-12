@@ -1,0 +1,9 @@
+//! An internal enum of a library of another package is not reached.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let l = levels.NearLevel.Low;
+	return 0;
+}

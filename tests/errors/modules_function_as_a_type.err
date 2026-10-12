@@ -1,0 +1,1 @@
+modules_function_as_a_type.anti:7:9: error: `items` has no public struct `twice`

@@ -1,0 +1,47 @@
+//! The left side of the diamond. It makes copies of the generics of the base
+//! for `int` and for `Point`, and builds a class of the base.
+
+import anti.lang;
+import com.example.base;
+
+pub struct Point
+{
+	a: u8,
+}
+
+pub class Thing
+{
+	pub n: int = 100,
+}
+
+pub fn boxed(n: int) -> base.Box<int>
+{
+	return base.wrap(n + 1);
+}
+
+pub fn boxed_point(n: int) -> base.Box<base.Point>
+{
+	return base.wrap(base.Point { x: n, y: n + 1 });
+}
+
+pub fn make(n: int) -> *base.Thing
+{
+	base.Settings.get().last += 1;
+	base.count();
+	return alloc base.Thing { n: n };
+}
+
+pub fn own_thing() -> Thing
+{
+	return Thing { };
+}
+
+pub fn is_base_thing(o: *Object) -> bool
+{
+	return base.is_thing(o);
+}
+
+pub fn state() -> (int, int)
+{
+	return (base.count(), base.Settings.get().last);
+}

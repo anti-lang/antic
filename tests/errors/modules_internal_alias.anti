@@ -1,0 +1,9 @@
+//! An internal `type` alias of a library of another package is not reached.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let row: levels.NearRow = [1, 2];
+	return 0;
+}

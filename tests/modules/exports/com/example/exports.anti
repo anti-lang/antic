@@ -1,0 +1,71 @@
+//! Every kind of item that `export` marks: a function, a function that may
+//! fail, a struct, a union, constants, a class with a function, and a copy of
+//! a generic named by `export type`. `export` implies `pub`, so another module
+//! of Anti reaches each one as it reaches a public item.
+
+import anti.lang;
+
+export const EXPORT_LIMIT: c_int = 8;
+export const EXPORT_NAME: str = "exports";
+export const EXPORT_READY: bool = true;
+export const EXPORT_RATIO: f64 = 0.5;
+
+export struct Vec2
+{
+	x: c_int,
+	y: c_int,
+}
+
+export union Bits
+{
+	whole: u32,
+	parts: [4]u8,
+}
+
+export fn export_dot(a: Vec2, b: Vec2) -> c_int
+{
+	return a.x * b.x + a.y * b.y;
+}
+
+export fn export_half(n: c_int) -> c_int may fail
+{
+	if n % 2 != 0 {
+		fail "odd";
+	}
+	return n / 2;
+}
+
+export fn export_fill(out: *Vec2, n: c_int)
+{
+	out.x = n;
+	out.y = n + 1;
+}
+
+export class Meter
+{
+	pub total: c_int = 0,
+
+	pub fn add(self, n: c_int) -> c_int
+	{
+		self.total += n;
+		return self.total;
+	}
+
+	export fn export_meter_reset(self)
+	{
+		self.total = 0;
+	}
+}
+
+pub struct Span<T>
+{
+	low: T,
+	high: T,
+}
+
+export type IntSpan = Span<c_int>;
+
+export fn export_width(s: IntSpan) -> c_int
+{
+	return s.high - s.low;
+}

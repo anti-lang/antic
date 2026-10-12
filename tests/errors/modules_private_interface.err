@@ -1,0 +1,1 @@
+modules_private_interface.anti:7:20: error: `levels` has no public struct `HiddenNamed`

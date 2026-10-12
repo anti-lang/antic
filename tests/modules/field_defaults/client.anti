@@ -1,0 +1,41 @@
+//! The client of the defaults library. It builds the class and the class
+//! below it without naming a field, on the stack and on the heap, and prints
+//! every default the library file carried.
+
+import com.example.defaults;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Mine inherits defaults.Below
+{
+	pub own_field: int = 17,
+}
+
+fn show(label: str, d: *defaults.Defaults)
+{
+	printf("%.*s %lld %d %d %llu %.2f %.2f %.2f %d %c %.*s\n".ptr, label.len as c_int,
+		label.ptr, d.whole, d.small as c_int, d.negative as c_int, d.wide, d.real,
+		d.single as f64, d.half as f64, d.yes as c_int, d.letter as u32,
+		d.text.len as c_int, d.text.ptr);
+	printf("%.*s %d %lld %lld %lld %lld %d %lld %d %d %d %lld %lld %lld\n".ptr,
+		label.len as c_int, label.ptr, (d.level == defaults.Level.High) as c_int,
+		d.point.x, d.point.y, d.row[0] + d.row[1] + d.row[2], d.filled.len,
+		d.filled[3] as c_int, d.pair.0, d.pair.1 as c_int, (d.next == none) as c_int,
+		(d.call == none) as c_int, d.computed, d.sized, d.long as int);
+}
+
+fn main() -> int
+{
+	let a = defaults.Defaults { };
+	show("stack", &a);
+	let b = alloc defaults.Defaults { whole: 8 };
+	show("heap", b);
+	delete(b);
+	let c = defaults.Below { };
+	show("below", &c);
+	printf("below %lld %.*s\n".ptr, c.extra, c.more.len as c_int, c.more.ptr);
+	let d = Mine { };
+	show("mine", &d);
+	printf("mine %lld %lld\n".ptr, d.extra, d.own_field);
+	return 0;
+}

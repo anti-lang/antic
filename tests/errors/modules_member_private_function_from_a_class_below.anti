@@ -1,0 +1,16 @@
+//! A private function of a class of a library is not called from a class below it in another module.
+
+import com.example.levels;
+
+class Savings inherits levels.Account
+{
+	pub fn peek(self) -> int
+	{
+		return self.fee();
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

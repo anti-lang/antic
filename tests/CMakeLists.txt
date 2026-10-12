@@ -3607,6 +3607,240 @@ antic_modules_test(sync_modules
     TIMEOUT 120
     WORK "${CMAKE_CURRENT_BINARY_DIR}/sync")
 
+# The area modules of docs/notes/test-matrix.md: what crosses the boundary
+# of a module. Each test below holds one side of that boundary, and the
+# note names the test of each cell.
+
+# Every kind of item a module makes public, reached by the name of the
+# module, by an alias of the module and by a direct import.
+antic_modules_test(items_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/items"
+    LIBRARIES items
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/items-modules")
+
+# Every kind of item at the level `internal`, reached from a module of the
+# same package, and the protected members of a class of the library from a
+# class below it.
+antic_modules_test(levels_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/levels"
+    LIBRARIES levels
+    PROGRAM near
+    OPTIONS --package-name com.example
+    LIB_OPTIONS --package-name com.example
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/levels-modules")
+
+# One function of a library per kind of value, which takes the kind and
+# gives it back to another module.
+antic_modules_test(kinds_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/kinds"
+    LIBRARIES kinds
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/kinds-modules")
+
+# The default of a field of a class of a library, one field per kind of
+# value a default takes, read by a client that names no field.
+antic_modules_test(field_defaults_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/field_defaults"
+    LIBRARIES defaults
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/field-defaults-modules")
+
+# The default of a field whose type is an optional value, in a class of a
+# library. T085 of docs/audit/tests-findings.md.
+antic_modules_test(optional_default_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/optional_default"
+    LIBRARIES holder
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/optional-default-modules")
+
+# A literal of a case of a generic variant of a library, written under the
+# name of the module with its type arguments. T091 of
+# docs/audit/tests-findings.md.
+antic_modules_test(generic_variant_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_variant"
+    LIBRARIES maybe
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/generic-variant-modules")
+
+# A diamond of four modules: two libraries import a third, and the program
+# imports the two. The program holds one descriptor per class, one static
+# field, one singleton and one copy of a generic per type argument, and
+# three modules declare a struct and a class of one name.
+antic_modules_test(diamond_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/diamond"
+    LIBRARIES base left right
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/diamond-modules")
+
+# Generics of a library whose bodies reach the private items of their
+# module. The client compiles the copies.
+antic_modules_test(generic_private_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_private"
+    LIBRARIES hidden
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/generic-private-modules")
+
+# Every kind of item that `export` marks, reached from a module of Anti as
+# a public item of the library.
+antic_modules_test(exports_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/exports"
+    LIBRARIES exports
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/exports-modules")
+
+# The library files of the refusals below, each tree under its own
+# directory of ${LIBS}. The libraries of a tree compile in the order given,
+# each after the ones it imports.
+#   antic_library_files(<tree> [OPTIONS <option>...] LIBRARIES <module>...)
+# The fixture <tree>_antl stands when the last one is written.
+function(antic_library_files tree)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "LIBRARIES;OPTIONS")
+    file(MAKE_DIRECTORY "${LIBS}/${tree}/com/example")
+    set(before "")
+    list(LENGTH arg_LIBRARIES count)
+    set(at 0)
+    foreach(library IN LISTS arg_LIBRARIES)
+        math(EXPR at "${at} + 1")
+        add_test(NAME antl_${tree}_${library}
+            COMMAND antic -c -I "${MODULES}/${tree}" -I "${LIBS}/${tree}"
+                    --runtime "${ANTIC_RUNTIME_DIR}" ${arg_OPTIONS}
+                    -o "${LIBS}/${tree}/com/example/${library}.antl"
+                    "${MODULES}/${tree}/com/example/${library}.anti")
+        set(fixture ${tree}_antl_${library})
+        if(at EQUAL count)
+            set(fixture ${tree}_antl)
+        endif()
+        set_tests_properties(antl_${tree}_${library} PROPERTIES
+            FIXTURES_SETUP ${fixture})
+        if(before)
+            set_tests_properties(antl_${tree}_${library} PROPERTIES
+                FIXTURES_REQUIRED ${before})
+        endif()
+        set(before ${fixture})
+    endforeach()
+endfunction()
+antic_library_files(levels OPTIONS --package-name com.example
+    LIBRARIES levels)
+antic_library_files(diamond LIBRARIES base left right)
+antic_library_files(items LIBRARIES items)
+antic_library_files(exports LIBRARIES exports)
+
+# The refusals at the boundary of a module, one message each. A case names
+# the program of tests/errors, the tree of its library files and the
+# package of the build. An internal item is asked for from the package
+# org.other, and every other case names no package.
+foreach(case
+        "modules_constant_assigned|items|"
+        "modules_direct_import_clash|diamond|"
+        "modules_export_symbol_twice|exports|"
+        "modules_function_as_a_type|items|"
+        "modules_internal_alias|levels|org.other"
+        "modules_internal_class|levels|org.other"
+        "modules_internal_class_as_a_base|levels|org.other"
+        "modules_internal_constant|levels|org.other"
+        "modules_internal_constraint|levels|org.other"
+        "modules_internal_direct_import|levels|org.other"
+        "modules_internal_enum|levels|org.other"
+        "modules_internal_extern_function|levels|org.other"
+        "modules_internal_function|levels|org.other"
+        "modules_internal_generic_function|levels|org.other"
+        "modules_internal_generic_struct|levels|org.other"
+        "modules_internal_interface|levels|org.other"
+        "modules_internal_singleton|levels|org.other"
+        "modules_internal_struct|levels|org.other"
+        "modules_internal_struct_as_a_type|levels|org.other"
+        "modules_internal_union|levels|org.other"
+        "modules_internal_variant|levels|org.other"
+        "modules_member_private_field|levels|"
+        "modules_member_private_field_from_a_class_below|levels|"
+        "modules_member_private_field_in_a_literal|levels|"
+        "modules_member_private_function|levels|"
+        "modules_member_private_function_from_a_class_below|levels|"
+        "modules_member_protected_field|levels|"
+        "modules_member_protected_field_in_a_literal|levels|"
+        "modules_member_protected_field_of_another_class|levels|"
+        "modules_member_protected_function|levels|"
+        "modules_member_protected_static_function|levels|"
+        "modules_module_of_a_dependency|diamond|"
+        "modules_private_alias|levels|"
+        "modules_private_class|levels|"
+        "modules_private_class_as_a_base|levels|"
+        "modules_private_constant|levels|"
+        "modules_private_constraint|levels|"
+        "modules_private_direct_import|levels|"
+        "modules_private_enum|levels|"
+        "modules_private_extern_function|levels|"
+        "modules_private_function|levels|"
+        "modules_private_generic_function|levels|"
+        "modules_private_generic_struct|levels|"
+        "modules_private_interface|levels|"
+        "modules_private_struct|levels|"
+        "modules_private_struct_as_a_type|levels|"
+        "modules_private_union|levels|"
+        "modules_private_variant|levels|"
+        "modules_type_called|items|")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 tree)
+    list(GET parts 2 package)
+    set(options "")
+    if(package)
+        set(options --package-name ${package})
+    endif()
+    add_expect_test(error_${name} STATUS 1
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/${name}.err"
+        COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/${tree}"
+                --runtime "${ANTIC_RUNTIME_DIR}" ${options}
+                -o "${CMAKE_CURRENT_BINARY_DIR}/${name}.s" ${name}.anti)
+    set_tests_properties(error_${name} PROPERTIES
+        FIXTURES_REQUIRED ${tree}_antl)
+endforeach()
+
+# A library file whose own import no search root holds. The command names
+# the file of the left side of the diamond and no root, so the base is
+# missing, and the driver says which module the file needs.
+add_expect_test(error_modules_missing_dependency STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "left\\.antl needs module `com\\.example\\.base`"
+    COMMAND "$<TARGET_FILE:antic>" -S --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/modules_missing_dependency.s"
+            modules_missing_dependency.anti
+            "${LIBS}/diamond/com/example/left.antl")
+set_tests_properties(error_modules_missing_dependency PROPERTIES
+    FIXTURES_REQUIRED diamond_antl)
+
+# An import that forms a cycle. The library file of `one` imports `two`,
+# which stood without an import when `one` was compiled, and `two` now
+# imports `one`. The message stands at the import. T088 of
+# docs/audit/tests-findings.md.
+file(MAKE_DIRECTORY "${LIBS}/cycle/first/com/example"
+     "${LIBS}/cycle/second/com/example")
+add_test(NAME antl_cycle_two
+    COMMAND antic -c -I "${MODULES}/cycle/first"
+            -o "${LIBS}/cycle/first/com/example/two.antl"
+            "${MODULES}/cycle/first/com/example/two.anti")
+set_tests_properties(antl_cycle_two PROPERTIES FIXTURES_SETUP cycle_two)
+add_test(NAME antl_cycle_one
+    COMMAND antic -c -I "${MODULES}/cycle" -I "${LIBS}/cycle/first"
+            -o "${LIBS}/cycle/second/com/example/one.antl"
+            "${MODULES}/cycle/com/example/one.anti")
+set_tests_properties(antl_cycle_one PROPERTIES
+    FIXTURES_REQUIRED cycle_two FIXTURES_SETUP cycle_one)
+add_expect_test(error_modules_import_cycle STATUS 1
+    DIRECTORY "${MODULES}/cycle"
+    EXPECTED "${MODULES}/cycle/two.err"
+    COMMAND "$<TARGET_FILE:antic>" -c -I "${MODULES}/cycle"
+            -I "${LIBS}/cycle/second"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/cycle_two.antl"
+            com/example/two.anti)
+set_tests_properties(error_modules_import_cycle PROPERTIES
+    FIXTURES_REQUIRED cycle_one)
+
 # The internal level: a module of the same package sees an internal item
 # of a library, and a module of another package does not.
 add_test(NAME internal_package

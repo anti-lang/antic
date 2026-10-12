@@ -1,0 +1,9 @@
+//! A private field of a class of a library is not named in a literal of another module.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let a = levels.Account { secret: 1 };
+	return 0;
+}

@@ -1,0 +1,9 @@
+//! An internal struct of a library of another package is not reached as the type of a local.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let p: ?*levels.NearPoint = none;
+	return 0;
+}

@@ -1,0 +1,6 @@
+//! The second module of the cycle as it stood before it imported the first.
+
+pub fn two() -> int
+{
+	return 2;
+}

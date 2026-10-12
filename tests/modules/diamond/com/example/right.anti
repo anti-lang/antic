@@ -1,0 +1,54 @@
+//! The right side of the diamond. It makes the same copies as the left side,
+//! and a class below the class of the base.
+
+import anti.lang;
+import com.example.base;
+
+pub struct Point
+{
+	a: u8,
+	b: u8,
+	c: u8,
+}
+
+pub class Thing inherits base.Thing
+{
+	pub extra: int = 200,
+
+	pub fn label(self) -> str
+	{
+		return "right thing";
+	}
+}
+
+pub fn boxed(n: int) -> base.Box<int>
+{
+	return base.wrap(n + 2);
+}
+
+pub fn boxed_point(n: int) -> base.Box<base.Point>
+{
+	return base.wrap(base.Point { x: n, y: n + 2 });
+}
+
+pub fn make(n: int) -> *Thing
+{
+	base.Settings.get().last += 10;
+	base.count();
+	return alloc Thing { n: n };
+}
+
+pub fn unwrap(b: base.Box<int>) -> int
+{
+	return b.value * b.count;
+}
+
+pub fn is_right_thing(o: *Object) -> bool
+{
+	return o is *Thing;
+}
+
+pub fn state() -> (int, int)
+{
+	return (base.count(), base.Settings.get().last);
+}

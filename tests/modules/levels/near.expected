@@ -1,0 +1,15 @@
+const 1 2
+fn 31 32 32
+generic fn 1 2
+extern fn 4 5
+struct and operator 11 22 7
+generic struct 6 1
+union 2
+enum 2
+variant 8 0
+class 2 12 9
+interface mine
+alias 8
+constraint 1
+singleton 5
+members 1 107 115 108

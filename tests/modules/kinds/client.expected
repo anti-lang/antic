@@ -1,0 +1,57 @@
+i8 42
+i16 42
+i32 42
+i64 42
+int 42
+u8 42
+u16 42
+u32 42
+u64 42
+uint 42
+byte 42
+c_char 42
+c_uchar 42
+c_short 42
+c_ushort 42
+c_int 42
+c_uint 42
+c_long 42
+c_ulong 42
+c_longlong 42
+c_ulonglong 42
+c_size_t 42
+c_wchar 42
+i8 below zero -1 u8 at its end 255
+f32 1.50 f64 1.25 c_float 3.00 c_double 6.00
+f16 3.50 5.50
+bool 0 1
+char b z
+str ab long
+slice 2 2 3
+array 3 2 1
+pointer 11 1
+nullable pointer 13 1 1
+optional 4 -1
+tuple one 5
+function 5 9
+closure 206
+may fail 7 -50
+failing function 2 -1
+struct 2 1
+packed struct 2 42
+simd struct 2.0 4.0 6.0 8.0
+union 303 3
+enum 1 1
+variant 10 1
+class 6 1
+class value 13 6
+interface mine
+synchronized class 5
+concurrent class 7
+channel 8
+Mutex 11
+owning value 12
+lent value 36
+generic parameter 13 8 text 200
+error 14
+never 13

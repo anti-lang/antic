@@ -1,0 +1,56 @@
+//! The module at the top of a diamond: two libraries import it, and a program
+//! imports those two. It holds a class, a singleton, a static field, a struct,
+//! a generic struct, a generic function and a constant, each of which the
+//! whole program must hold once.
+
+import anti.lang;
+
+pub const STEP: int = 3;
+
+pub struct Point
+{
+	x: int,
+	y: int,
+}
+
+pub struct Box<T>
+{
+	value: T,
+	count: int,
+}
+
+pub fn wrap<T>(own v: T) -> Box<T>
+{
+	return Box<T> { value: v, count: STEP };
+}
+
+pub class Thing
+{
+	pub n: int = 0,
+
+	pub fn kind(self) -> str
+	{
+		return "thing";
+	}
+}
+
+pub class Registry
+{
+	pub static atomic made: int = 0;
+}
+
+pub singleton class Settings
+{
+	pub mutable last: int = 0,
+}
+
+pub fn is_thing(o: *Object) -> bool
+{
+	return o is *Thing;
+}
+
+pub fn count() -> int
+{
+	Registry.made.add(1);
+	return Registry.made.load();
+}

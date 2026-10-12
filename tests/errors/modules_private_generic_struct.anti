@@ -1,0 +1,9 @@
+//! A private generic struct of a library is not reached.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let p = levels.HiddenPair<int, int> { first: 1, second: 2 };
+	return 0;
+}

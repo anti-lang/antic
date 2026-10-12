@@ -1,0 +1,14 @@
+//! A module exports a function under the C symbol that a library it imports
+//! exports already.
+
+import com.example.exports;
+
+export fn export_dot(a: c_int, b: c_int) -> c_int
+{
+	return a * b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

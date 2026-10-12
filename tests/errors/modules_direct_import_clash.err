@@ -1,0 +1,1 @@
+modules_direct_import_clash.anti:4:27: error: `Point` of `com.example.right` clashes with `Point` of `com.example.left`

@@ -1,0 +1,9 @@
+//! A private variant of a library is not reached.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let s = levels.HiddenShape.Empty;
+	return 0;
+}

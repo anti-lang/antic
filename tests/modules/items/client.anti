@@ -1,0 +1,147 @@
+//! The client of the items library. It reaches every kind of public item three
+//! ways: as `items.name` through the name of the module, as `it.name` through
+//! an alias of the module, and by the bare name a direct import lists.
+
+import com.example.items as it;
+import com.example.items.{Counter, IntPair, Key, LIMIT, Level, Maybe, Named, Pair, Point, Points, Settings, Shape, Source, Stack, Tag, Word, abs, pick, snprintf, twice};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Evens
+{
+	implements source: Source<int>,
+	at: int = 0,
+
+	pub concrete fn next(self) -> ?int
+	{
+		if self.at >= 4 {
+			return none;
+		}
+		self.at += 2;
+		return self.at;
+	}
+}
+
+class Mine
+{
+	implements named: it.Named,
+
+	pub concrete fn name(self) -> str
+	{
+		return "mine";
+	}
+}
+
+fn both<K: Key>(k: K) -> u64
+{
+	return k.hash() % 2 + items.keyed(k);
+}
+
+fn level_number(l: Level) -> int
+{
+	let n = 0;
+	switch l {
+		Level.Low => n = 1,
+		items.Level.Mid => n = 2,
+		it.Level.High => n = 3,
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	printf("const %lld %lld %lld\n".ptr, items.LIMIT, it.LIMIT, LIMIT);
+	printf("const f64 %.1f bool %d char %c u8 %d\n".ptr, items.RATIO,
+		it.READY as c_int, items.MARK as u32, it.SMALL as c_int);
+	printf("const str %.*s u64 %llu product %lld\n".ptr, items.NAME.len as c_int,
+		items.NAME.ptr, it.WIDE, items.DOUBLE);
+	printf("fn %lld %lld %lld\n".ptr, items.twice(1), it.twice(2), twice(3));
+	printf("generic fn %lld %lld %lld\n".ptr, items.pick(1, 2, true),
+		it.pick<int>(3, 4, false), pick(5, 6, true));
+	printf("extern fn %d %d %d\n".ptr, items.abs(-1), it.abs(-2), abs(-3));
+	let text: [16]byte = [0; 16];
+	let wrote = snprintf(&text[0], 16, "%d-%d".ptr, 4 as c_int, 5 as c_int);
+	let again = items.snprintf(&text[0], 16, "%d+%d".ptr, 6 as c_int, 7 as c_int);
+	let third = it.snprintf(&text[0], 16, "%d*%d".ptr, 8 as c_int, 9 as c_int);
+	printf("variadic extern fn %d %d %d %s\n".ptr, wrote, again, third, &text[0]);
+
+	let a = items.Point { x: 1, y: 2 };
+	let b = it.Point { x: 10, y: 20 };
+	let c = Point { x: 100, y: 200 };
+	let sum = a + b + c;
+	printf("struct and operator %lld %lld\n".ptr, sum.x, sum.y);
+	let p = items.Pair<int, bool> { first: 1, second: true };
+	let q = it.Pair<u8, f64> { first: 2, second: 2.5 };
+	let r = Pair<str, int> { first: "three", second: 3 };
+	printf("generic struct %lld %d %d %.1f %.*s %lld\n".ptr, p.first,
+		p.second as c_int, q.first as c_int, q.second, r.first.len as c_int,
+		r.first.ptr, r.second);
+	let w = items.Word { whole: 0x1234 };
+	let w2 = it.Word { low: 7 };
+	let w3 = Word { whole: 0xFF01 };
+	printf("union %x %d %d\n".ptr, w.whole, w2.low as c_int, w3.low as c_int);
+	printf("enum %lld %lld %lld\n".ptr, level_number(items.Level.Low),
+		level_number(it.Level.Mid), level_number(Level.High));
+	printf("variant %lld %lld %lld\n".ptr, items.area(items.Shape.Circle { r: 2 }),
+		it.area(it.Shape.Rect { w: 3, h: 4 }), items.area(Shape.Empty));
+	let some = Maybe<int>.Some { value: 5 };
+	let nothing = it.Maybe<int>.Nothing;
+	let direct = Maybe<str>.Some { value: "six" };
+	let got = 0;
+	if let Some s = some {
+		got = s.value;
+	}
+	printf("generic variant %lld %d %d\n".ptr, got,
+		(nothing is items.Maybe.Nothing) as c_int,
+		(direct is Maybe.Some) as c_int);
+
+	let k1 = items.Counter { };
+	let k2 = it.Counter { n: 10 };
+	let k3 = Counter { n: 100 };
+	printf("class %lld %lld %lld\n".ptr, k1.bump(), k2.bump(), k3.bump());
+	let tag = items.Tag { };
+	let tag2 = it.Tag { text: "second" };
+	let tag3 = Tag { text: "third" };
+	let mine = Mine { };
+	let n1 = items.name_of(&tag.named);
+	let n2 = it.name_of(&tag2.named);
+	let n3: *Named = &tag3.named;
+	let n4 = items.name_of(&mine.named);
+	printf("interface %.*s %.*s %.*s %.*s\n".ptr, n1.len as c_int, n1.ptr,
+		n2.len as c_int, n2.ptr, n3.name().len as c_int, n3.name().ptr,
+		n4.len as c_int, n4.ptr);
+	items.Settings.get().last = 1;
+	it.Settings.get().last += 10;
+	Settings.get().last += 100;
+	printf("singleton %lld %lld\n".ptr, Settings.get().base,
+		items.Settings.get().last);
+	let s1 = items.Stack<int> { top: none };
+	let s2 = it.Stack<str> { top: none };
+	let s3 = Stack<Point> { top: none };
+	s1.push(4);
+	s2.push("top");
+	s3.push(c);
+	s3.push(a);
+	printf("generic class %lld %lld %lld %lld\n".ptr, s1.top ?? 0, s1.depth,
+		s2.depth, s3.depth);
+	let evens = Evens { };
+	let src: *items.Source<int> = &evens.source;
+	let total = 0;
+	while true do {
+		let v = src.next() else {
+			break;
+		};
+		total += v;
+	}
+	printf("generic interface %lld\n".ptr, total);
+	let pts: items.Points = [a, b];
+	let pts2: it.Points = [b, c];
+	let pts3: Points = [c, a];
+	printf("alias %lld %lld %lld\n".ptr, pts[1].x, pts2[1].x, pts3[1].x);
+	let ip: items.IntPair = items.Pair<int, int> { first: 1, second: 2 };
+	let ip2: it.IntPair = it.IntPair { first: 3, second: 4 };
+	let ip3 = IntPair { first: 5, second: 6 };
+	printf("alias of a copy %lld %lld %lld\n".ptr, ip.second, ip2.second, ip3.second);
+	printf("constraint %d\n".ptr, (both(7) <= 2) as c_int);
+	return 0;
+}

@@ -1,0 +1,10 @@
+//! A library file is given whose own import no search root holds.
+
+import com.example.left;
+
+fn main() -> int
+{
+	let t = left.make(1);
+	delete(t);
+	return 0;
+}

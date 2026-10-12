@@ -1,0 +1,9 @@
+//! A private constant of a library is not reached.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let n = levels.HIDDEN;
+	return 0;
+}

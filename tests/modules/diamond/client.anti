@@ -1,0 +1,56 @@
+//! The program at the bottom of the diamond. It imports the two sides and not
+//! the base, reads values of the types of the base through them, and hands a
+//! copy of a generic made on one side to the other side. Three modules declare
+//! a `Point` and three a `Thing`, each a type of its own.
+
+import anti.lang;
+import com.example.left;
+import com.example.right;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	a: u8,
+	b: u8,
+	c: u8,
+	d: u8,
+	e: u8,
+}
+
+class Thing
+{
+	pub n: int = 300,
+}
+
+fn main() -> int
+{
+	let l = left.boxed(1);
+	let r = right.boxed(1);
+	printf("copies of one generic %lld %lld %lld %lld\n".ptr, l.value, l.count, r.value, r.count);
+	printf("a copy of the left side on the right side %lld\n".ptr, right.unwrap(l));
+	let lp = left.boxed_point(5);
+	let rp = right.boxed_point(5);
+	printf("a struct of the base %lld %lld %lld %lld\n".ptr, lp.value.x, lp.value.y,
+		rp.value.x, rp.value.y);
+	let a = left.make(1);
+	let b = right.make(2);
+	let kind_a = a.kind();
+	let kind_b = b.label();
+	printf("classes %lld %lld %lld %.*s %.*s\n".ptr, a.n, b.n, b.extra,
+		kind_a.len as c_int, kind_a.ptr, kind_b.len as c_int, kind_b.ptr);
+	let mine = Thing { };
+	let theirs = left.own_thing();
+	printf("three classes of one name %lld %lld %lld\n".ptr, mine.n, theirs.n, b.n);
+	printf("three structs of one name %lld %lld %lld\n".ptr, size_of(Point),
+		size_of(left.Point), size_of(right.Point));
+	printf("is across the diamond %d %d %d %d %d\n".ptr, left.is_base_thing(a) as c_int,
+		left.is_base_thing(b) as c_int, right.is_right_thing(a) as c_int,
+		right.is_right_thing(b) as c_int, left.is_base_thing(&mine) as c_int);
+	let ls = left.state();
+	let rs = right.state();
+	printf("one static field and one singleton %lld %lld %lld %lld\n".ptr, ls.0, ls.1, rs.0, rs.1);
+	delete(a);
+	delete(b);
+	return 0;
+}

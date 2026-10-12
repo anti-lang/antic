@@ -1,0 +1,47 @@
+//! A class whose fields carry a default of every kind a default takes. The
+//! library file carries each default, and a client that builds the class
+//! with no field named reads them all.
+
+pub struct Point
+{
+	x: int,
+	y: int,
+}
+
+pub enum Level
+{
+	Low,
+	High,
+}
+
+pub const BASE: int = 40;
+
+pub class Defaults
+{
+	pub whole: int = 7,
+	pub small: u8 = 200,
+	pub negative: i16 = -300,
+	pub wide: u64 = 0xFFFF_FFFF_FFFF_FFFF,
+	pub real: f64 = 2.5,
+	pub single: f32 = 0.25,
+	pub half: f16 = 1.5 as f16,
+	pub yes: bool = true,
+	pub letter: char = 'q',
+	pub text: str = "default",
+	pub level: Level = Level.High,
+	pub point: Point = Point { x: 3, y: 4 },
+	pub row: [3]int = [1, 2, 3],
+	pub filled: [4]u8 = [9; 4],
+	pub pair: (int, bool) = (5, true),
+	pub next: ?*Defaults = none,
+	pub call: ?fn(int) -> int = none,
+	pub computed: int = BASE * 2 + 1,
+	pub sized: int = size_of(Point) as int,
+	pub long: c_long = 11,
+}
+
+pub class Below inherits Defaults
+{
+	pub extra: int = 13,
+	pub more: str = "below",
+}

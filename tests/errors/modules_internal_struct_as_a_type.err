@@ -1,0 +1,1 @@
+modules_internal_struct_as_a_type.anti:7:11: error: `levels` has no public struct `NearPoint`

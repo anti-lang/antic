@@ -1,0 +1,153 @@
+//! Every kind of item a module may make public, each `pub`: constants of
+//! every type a constant takes, a function, a generic function, an `extern fn`
+//! and a variadic one, a struct, a generic struct, a union, an enum, a variant,
+//! a generic variant, a class, an interface, a class that implements it, a
+//! singleton, a generic class, a generic interface, two aliases, a constraint
+//! and an operator at module level. The client reaches each one by the name
+//! of the module, by an alias of the module and by a direct import.
+
+pub const LIMIT: int = 40;
+pub const RATIO: f64 = 1.5;
+pub const NAME: str = "items";
+pub const READY: bool = true;
+pub const MARK: char = 'm';
+pub const SMALL: u8 = 200;
+pub const WIDE: u64 = 0xFFFF_FFFF_FFFF_FFFF;
+pub const DOUBLE: int = LIMIT * 2;
+
+pub fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+pub fn pick<T>(own a: T, own b: T, first: bool) -> T
+{
+	if first {
+		return a;
+	}
+	return b;
+}
+
+pub extern fn abs(n: c_int) -> c_int;
+
+pub extern fn snprintf(buffer: ?*byte, size: c_size_t, format: ?*byte, ...) -> c_int;
+
+pub struct Point
+{
+	x: int,
+	y: int,
+}
+
+pub struct Pair<A, B>
+{
+	first: A,
+	second: B,
+}
+
+pub union Word
+{
+	whole: u32,
+	low: u8,
+}
+
+pub enum Level
+{
+	Low,
+	Mid,
+	High,
+}
+
+pub variant Shape
+{
+	Circle { r: int },
+	Rect { w: int, h: int },
+	Empty,
+}
+
+pub variant Maybe<T>
+{
+	Some { value: T },
+	Nothing,
+}
+
+pub class Counter
+{
+	pub n: int = 0,
+
+	pub fn bump(self) -> int
+	{
+		self.n += 1;
+		return self.n;
+	}
+}
+
+pub abstract class Named
+{
+	abstract fn name(self) -> str;
+}
+
+pub class Tag
+{
+	implements named: Named,
+	pub text: str = "tag",
+
+	pub concrete fn name(self) -> str
+	{
+		return self.text;
+	}
+}
+
+pub singleton class Settings
+{
+	pub base: int = 7,
+	pub mutable last: int = 0,
+}
+
+pub class Stack<T>
+{
+	pub top: ?T,
+	pub depth: int = 0,
+
+	pub fn push(self, own v: T)
+	{
+		self.top = v;
+		self.depth += 1;
+	}
+}
+
+pub abstract class Source<T>
+{
+	abstract fn next(self) -> ?T;
+}
+
+pub type Points = [2]Point;
+
+pub type IntPair = Pair<int, int>;
+
+pub constraint Key = eq + hash;
+
+pub operator fn add(a: Point, b: Point) -> Point
+{
+	return Point { x: a.x + b.x, y: a.y + b.y };
+}
+
+pub fn area(s: Shape) -> int
+{
+	let n = 0;
+	switch s {
+		Circle c => n = 3 * c.r * c.r,
+		Rect r => n = r.w * r.h,
+		Empty => n = 0,
+	}
+	return n;
+}
+
+pub fn name_of(n: *Named) -> str
+{
+	return n.name();
+}
+
+pub fn keyed<K: Key>(k: K) -> u64
+{
+	return k.hash() % 2;
+}

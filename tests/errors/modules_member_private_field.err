@@ -1,0 +1,1 @@
+modules_member_private_field.anti:8:10: error: `secret` is private to `Account`

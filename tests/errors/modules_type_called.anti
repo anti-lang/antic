@@ -1,0 +1,9 @@
+//! A struct of a library is called as a function.
+
+import com.example.items;
+
+fn main() -> int
+{
+	let k = items.Point(3);
+	return 0;
+}

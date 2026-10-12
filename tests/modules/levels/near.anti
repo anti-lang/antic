@@ -1,0 +1,72 @@
+//! A module of the package of the levels library. It reaches every internal
+//! item of the library, and the protected members of `Account` from a class
+//! below it.
+
+import com.example.levels.{NearCounter, NearPoint, near};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Mine
+{
+	implements named: levels.NearNamed,
+
+	pub concrete fn name(self) -> str
+	{
+		return "mine";
+	}
+}
+
+class Savings inherits levels.Account
+{
+	pub fn deposit(self, n: int) -> int
+	{
+		self.add(n * levels.Account.rate());
+		return self.balance;
+	}
+}
+
+fn level_number(l: levels.NearLevel) -> int
+{
+	let n = 0;
+	switch l {
+		levels.NearLevel.Low => n = 1,
+		levels.NearLevel.High => n = 2,
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	printf("const %lld %lld\n".ptr, levels.OPEN, levels.NEAR);
+	printf("fn %lld %lld %lld\n".ptr, levels.open(), levels.near(), near());
+	printf("generic fn %lld %lld\n".ptr, levels.open_pick(1, 2), levels.near_pick(1, 2));
+	printf("extern fn %lld %lld\n".ptr, levels.labs(-4) as int, levels.open_abs(-5));
+	let p = levels.NearPoint { x: 1, y: 2 } + NearPoint { x: 10, y: 20 };
+	printf("struct and operator %lld %lld %lld\n".ptr, p.x, p.y, levels.open_point_sum(3, 4));
+	let pair = levels.NearPair<int, bool> { first: 6, second: true };
+	printf("generic struct %lld %d\n".ptr, pair.first, pair.second as c_int);
+	let w = levels.NearWord { whole: 0x0102 };
+	printf("union %d\n".ptr, w.low as c_int);
+	printf("enum %lld\n".ptr, level_number(levels.NearLevel.High));
+	let s = levels.NearShape.Dot { r: 8 };
+	let r = 0;
+	if let Dot d = s {
+		r = d.r;
+	}
+	printf("variant %lld %d\n".ptr, r, (s is levels.NearShape.Empty) as c_int);
+	let c = levels.NearCounter { };
+	let c2 = NearCounter { n: 10 };
+	printf("class %lld %lld %lld\n".ptr, c.bump(), c2.bump(), levels.open_count(3));
+	let mine = Mine { };
+	let name = levels.near_name(&mine.named);
+	printf("interface %.*s\n".ptr, name.len as c_int, name.ptr);
+	let row: levels.NearRow = [7, 8];
+	printf("alias %lld\n".ptr, row[1]);
+	printf("constraint %d\n".ptr, levels.near_keyed(9) as c_int);
+	printf("singleton %lld\n".ptr, levels.NearSettings.get().base);
+	let account = levels.Account.make(1);
+	let savings = Savings { id: 2 };
+	printf("members %lld %lld %lld %lld\n".ptr, account.id, account.total(),
+		savings.deposit(5), levels.audit(&account));
+	return 0;
+}

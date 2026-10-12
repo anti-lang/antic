@@ -1,0 +1,12 @@
+//! A private class of a library is not reached as a base.
+
+import com.example.levels;
+
+class Mine inherits levels.HiddenCounter
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

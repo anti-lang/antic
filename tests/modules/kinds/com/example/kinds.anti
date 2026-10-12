@@ -1,0 +1,434 @@
+//! One public function per kind of value, each of which takes the kind and
+//! gives it back across the boundary of the module: the integers, the C types,
+//! the floats, `bool`, `char`, `str`, a slice, an array, a pointer, a nullable
+//! pointer, an optional value, a tuple, a function value, a closure, a function
+//! that may fail, the structs, a union, an enum, a variant, the classes, an
+//! interface, a channel, a Mutex, an owning and a lent value and a type
+//! parameter. The client calls each one and prints what comes back.
+
+import anti.lang;
+
+pub struct Point
+{
+	x: int,
+	y: int,
+}
+
+pub packed struct Dense
+{
+	tag: u8,
+	wide: u64,
+}
+
+pub simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+pub union Word
+{
+	whole: u32,
+	low: u8,
+}
+
+pub enum Level
+{
+	Low,
+	High,
+}
+
+pub variant Shape
+{
+	Dot { r: int },
+	Empty,
+}
+
+pub struct Halves
+{
+	a: f16,
+	b: f16,
+}
+
+pub class Counter
+{
+	pub n: int = 0,
+
+	pub fn bump(self) -> int
+	{
+		self.n += 1;
+		return self.n;
+	}
+}
+
+pub synchronized class Safe
+{
+	n: int = 0,
+
+	pub fn add(self, k: int) -> int
+	{
+		self.n += k;
+		return self.n;
+	}
+}
+
+pub concurrent class Tally
+{
+	atomic n: int = 0,
+
+	pub fn add(self, k: int) -> int
+	{
+		self.n.add(k);
+		return self.n.load();
+	}
+}
+
+pub abstract class Named
+{
+	abstract fn name(self) -> str;
+}
+
+pub fn pass_i8(v: i8) -> i8
+{
+	return v + 1;
+}
+
+pub fn pass_i16(v: i16) -> i16
+{
+	return v + 1;
+}
+
+pub fn pass_i32(v: i32) -> i32
+{
+	return v + 1;
+}
+
+pub fn pass_i64(v: i64) -> i64
+{
+	return v + 1;
+}
+
+pub fn pass_int(v: int) -> int
+{
+	return v + 1;
+}
+
+pub fn pass_u8(v: u8) -> u8
+{
+	return v + 1;
+}
+
+pub fn pass_u16(v: u16) -> u16
+{
+	return v + 1;
+}
+
+pub fn pass_u32(v: u32) -> u32
+{
+	return v + 1;
+}
+
+pub fn pass_u64(v: u64) -> u64
+{
+	return v + 1;
+}
+
+pub fn pass_uint(v: uint) -> uint
+{
+	return v + 1;
+}
+
+pub fn pass_byte(v: byte) -> byte
+{
+	return v + 1;
+}
+
+pub fn pass_c_char(v: c_char) -> c_char
+{
+	return v + 1;
+}
+
+pub fn pass_c_uchar(v: c_uchar) -> c_uchar
+{
+	return v + 1;
+}
+
+pub fn pass_c_short(v: c_short) -> c_short
+{
+	return v + 1;
+}
+
+pub fn pass_c_ushort(v: c_ushort) -> c_ushort
+{
+	return v + 1;
+}
+
+pub fn pass_c_int(v: c_int) -> c_int
+{
+	return v + 1;
+}
+
+pub fn pass_c_uint(v: c_uint) -> c_uint
+{
+	return v + 1;
+}
+
+pub fn pass_c_long(v: c_long) -> c_long
+{
+	return v + 1;
+}
+
+pub fn pass_c_ulong(v: c_ulong) -> c_ulong
+{
+	return v + 1;
+}
+
+pub fn pass_c_longlong(v: c_longlong) -> c_longlong
+{
+	return v + 1;
+}
+
+pub fn pass_c_ulonglong(v: c_ulonglong) -> c_ulonglong
+{
+	return v + 1;
+}
+
+pub fn pass_c_size_t(v: c_size_t) -> c_size_t
+{
+	return v + 1;
+}
+
+pub fn pass_c_wchar(v: c_wchar) -> c_wchar
+{
+	return v + 1;
+}
+
+pub fn pass_f32(v: f32) -> f32
+{
+	return v + 0.5;
+}
+
+pub fn pass_f64(v: f64) -> f64
+{
+	return v + 0.25;
+}
+
+pub fn pass_c_float(v: c_float) -> c_float
+{
+	return v * 2.0;
+}
+
+pub fn pass_c_double(v: c_double) -> c_double
+{
+	return v * 4.0;
+}
+
+pub fn pass_f16(h: Halves) -> Halves
+{
+	return Halves { a: (h.b + 1.0) as f16, b: (h.a + 4.0) as f16 };
+}
+
+pub fn pass_bool(v: bool) -> bool
+{
+	return !v;
+}
+
+pub fn pass_char(v: char) -> char
+{
+	if v == 'a' {
+		return 'b';
+	}
+	return 'z';
+}
+
+pub fn pass_str(v: str) -> str
+{
+	if v.len > 2 {
+		return "long";
+	}
+	return v;
+}
+
+pub fn pass_slice(xs: []int) -> []int
+{
+	return xs[1..xs.len];
+}
+
+pub fn pass_array(xs: [3]int) -> [3]int
+{
+	return [xs[2], xs[1], xs[0]];
+}
+
+pub fn pass_pointer(p: *int) -> *int
+{
+	*p += 1;
+	return p;
+}
+
+pub fn pass_nullable(p: ?*int) -> ?*int
+{
+	if let q = p {
+		*q += 2;
+	}
+	return p;
+}
+
+pub fn pass_optional(v: ?int) -> ?int
+{
+	if let n = v {
+		return n + 3;
+	}
+	return none;
+}
+
+pub fn pass_tuple(t: (int, str)) -> (str, int)
+{
+	return (t.1, t.0 + 4);
+}
+
+fn add_five(n: int) -> int
+{
+	return n + 5;
+}
+
+pub fn pass_function(keep f: fn(int) -> int) -> fn(int) -> int
+{
+	if f(0) == 0 {
+		return add_five;
+	}
+	return f;
+}
+
+pub fn pass_closure(n: int, f: fn(int) -> int) -> int
+{
+	return f(n) + f(n);
+}
+
+pub fn pass_may_fail(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "negative";
+	}
+	return n + 6;
+}
+
+pub fn pass_failing_function(n: int, f: fn(int) -> int may fail) -> int
+{
+	let got = f(n) catch {
+		yield -1;
+	};
+	return got;
+}
+
+pub fn pass_struct(p: Point) -> Point
+{
+	return Point { x: p.y, y: p.x };
+}
+
+pub fn pass_packed(d: Dense) -> Dense
+{
+	return Dense { tag: d.tag + 1, wide: d.wide * 2 };
+}
+
+pub fn pass_simd(v: Vec4) -> Vec4
+{
+	return v + v;
+}
+
+pub fn pass_union(w: Word) -> Word
+{
+	return Word { whole: w.whole + 0x100 };
+}
+
+pub fn pass_enum(l: Level) -> Level
+{
+	if l == Level.Low {
+		return Level.High;
+	}
+	return Level.Low;
+}
+
+pub fn pass_variant(s: Shape) -> Shape
+{
+	if let Dot d = s {
+		return Shape.Dot { r: d.r * 2 };
+	}
+	return Shape.Dot { r: 1 };
+}
+
+pub fn pass_class(c: *Counter) -> *Counter
+{
+	c.bump();
+	return c;
+}
+
+pub fn pass_class_value(c: Counter) -> Counter
+{
+	return Counter { n: c.n + 7 };
+}
+
+pub fn pass_interface(n: *Named) -> *Named
+{
+	return n;
+}
+
+pub fn pass_synchronized(s: *Safe, k: int) -> *Safe
+{
+	s.add(k);
+	return s;
+}
+
+pub fn pass_concurrent(t: *Tally, k: int) -> *Tally
+{
+	t.add(k);
+	return t;
+}
+
+pub fn pass_channel(c: chan int) -> chan int
+{
+	send(c, 8);
+	return c;
+}
+
+pub fn pass_mutex(m: *Mutex, n: *int) -> *Mutex
+{
+	sync m {
+		*n += 9;
+	}
+	return m;
+}
+
+pub fn make_owned(n: int) -> *Counter
+{
+	return alloc Counter { n: n };
+}
+
+pub fn pass_own(own c: *Counter) -> int
+{
+	let n = c.n;
+	delete(c);
+	return n;
+}
+
+pub fn pass_lent(c: *Counter, f: fn(lent *Counter)) -> int
+{
+	f(c);
+	return c.n;
+}
+
+pub fn pass_generic<T>(own v: T) -> T
+{
+	return v;
+}
+
+pub fn pass_error(e: *lang.Error) -> int
+{
+	return e.code;
+}
+
+pub fn pass_never(code: int) -> never
+{
+	lang.Error.fatal(lang.Error.new(code, "never"));
+}

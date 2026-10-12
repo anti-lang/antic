@@ -1,0 +1,10 @@
+//! A protected field of a class of a library is not read from a function of another module.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let a = levels.Account.make(1);
+	let n = a.balance;
+	return 0;
+}

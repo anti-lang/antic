@@ -1,0 +1,11 @@
+//! A module names a type of a module that a library imports and it does not.
+
+import com.example.left;
+
+fn main() -> int
+{
+	let t = left.make(1);
+	let p: ?*base.Thing = t;
+	delete(t);
+	return 0;
+}

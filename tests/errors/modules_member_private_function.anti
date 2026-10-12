@@ -1,0 +1,10 @@
+//! A private function of a class of a library is not called from another module.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let a = levels.Account.make(1);
+	let n = a.fee();
+	return 0;
+}

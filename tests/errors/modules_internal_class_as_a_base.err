@@ -1,0 +1,1 @@
+modules_internal_class_as_a_base.anti:5:12: error: `levels` has no public struct `NearCounter`

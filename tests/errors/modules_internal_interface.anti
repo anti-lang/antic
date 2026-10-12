@@ -1,0 +1,18 @@
+//! An internal interface of a library of another package is not reached.
+
+import com.example.levels;
+
+class Mine
+{
+	implements named: levels.NearNamed,
+
+	pub concrete fn name(self) -> str
+	{
+		return "mine";
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

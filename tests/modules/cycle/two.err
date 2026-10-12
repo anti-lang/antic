@@ -1,0 +1,1 @@
+com/example/two.anti:3:8: error: `com.example.one` depends on `com.example.two`, so the import forms a cycle

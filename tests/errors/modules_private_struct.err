@@ -1,0 +1,1 @@
+modules_private_struct.anti:7:10: error: `levels` has no public struct `HiddenPoint`

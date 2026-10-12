@@ -1,0 +1,9 @@
+function 1 14 21
+constant 4 7
+struct and operator 17
+enum 12 7
+class 14
+generic function 8 63
+extern fn 10
+internal function 1 12
+function of a generic class 21

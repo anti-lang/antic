@@ -1,0 +1,1 @@
+modules_export_symbol_twice.anti:6:11: error: export fn `export_dot` has the symbol of export fn `export_dot` in module `com.example.exports`

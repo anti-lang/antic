@@ -1,0 +1,15 @@
+//! The client of the maybe library. It writes a literal of a case with
+//! fields under the name of the module and with the type arguments written
+//! out, `maybe.Maybe<int>.Some { value: 5 }`.
+
+import com.example.maybe;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let some = maybe.Maybe<int>.Some { value: 5 };
+	let nothing = maybe.Maybe<int>.Nothing;
+	printf("literal %lld %lld\n".ptr, maybe.value_of(some), maybe.value_of(nothing));
+	return 0;
+}

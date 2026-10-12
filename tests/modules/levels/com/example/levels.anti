@@ -1,0 +1,224 @@
+//! Every kind of item at the three levels of a module: `pub`, `internal` and
+//! none. A module of the package `com.example` reaches the first two, a module
+//! of another package the first alone, and the functions of this module reach
+//! all three. The class `Account` holds a member of each level of a class.
+
+pub const OPEN: int = 1;
+internal const NEAR: int = 2;
+const HIDDEN: int = 3;
+
+pub fn open() -> int
+{
+	return hidden() + OPEN;
+}
+
+internal fn near() -> int
+{
+	return hidden() + NEAR;
+}
+
+fn hidden() -> int
+{
+	return HIDDEN * 10;
+}
+
+pub fn open_pick<T>(own a: T, own b: T) -> T
+{
+	return hidden_pick(a, b);
+}
+
+internal fn near_pick<T>(own a: T, own b: T) -> T
+{
+	return hidden_pick(b, a);
+}
+
+fn hidden_pick<T>(own a: T, own b: T) -> T
+{
+	return a;
+}
+
+internal extern fn labs(n: c_long) -> c_long;
+
+extern fn llabs(n: c_longlong) -> c_longlong;
+
+pub fn open_abs(n: int) -> int
+{
+	return llabs(n as c_longlong) as int;
+}
+
+internal struct NearPoint
+{
+	x: int,
+	y: int,
+}
+
+struct HiddenPoint
+{
+	x: int,
+	y: int,
+}
+
+pub fn open_point_sum(x: int, y: int) -> int
+{
+	let p = HiddenPoint { x: x, y: y };
+	return p.x + p.y;
+}
+
+internal struct NearPair<A, B>
+{
+	first: A,
+	second: B,
+}
+
+struct HiddenPair<A, B>
+{
+	first: A,
+	second: B,
+}
+
+internal union NearWord
+{
+	whole: u32,
+	low: u8,
+}
+
+union HiddenWord
+{
+	whole: u32,
+	low: u8,
+}
+
+internal enum NearLevel
+{
+	Low,
+	High,
+}
+
+enum HiddenLevel
+{
+	Low,
+	High,
+}
+
+internal variant NearShape
+{
+	Dot { r: int },
+	Empty,
+}
+
+variant HiddenShape
+{
+	Dot { r: int },
+	Empty,
+}
+
+internal class NearCounter
+{
+	pub n: int = 0,
+
+	pub fn bump(self) -> int
+	{
+		self.n += NEAR;
+		return self.n;
+	}
+}
+
+class HiddenCounter
+{
+	pub n: int = 0,
+
+	pub fn bump(self) -> int
+	{
+		self.n += HIDDEN;
+		return self.n;
+	}
+}
+
+pub fn open_count(times: int) -> int
+{
+	let c = HiddenCounter { };
+	for 0..times {
+		c.bump();
+	}
+	return c.n;
+}
+
+internal abstract class NearNamed
+{
+	abstract fn name(self) -> str;
+}
+
+abstract class HiddenNamed
+{
+	abstract fn name(self) -> str;
+}
+
+internal fn near_name(n: *NearNamed) -> str
+{
+	return n.name();
+}
+
+internal type NearRow = [2]int;
+
+type HiddenRow = [2]int;
+
+internal constraint NearKey = eq + hash;
+
+constraint HiddenKey = eq + hash;
+
+internal fn near_keyed<K: NearKey>(k: K) -> bool
+{
+	return hidden_keyed(k);
+}
+
+fn hidden_keyed<K: HiddenKey>(k: K) -> bool
+{
+	return k == k && k.hash() == k.hash();
+}
+
+internal operator fn add(a: NearPoint, b: NearPoint) -> NearPoint
+{
+	return NearPoint { x: a.x + b.x, y: a.y + b.y };
+}
+
+internal singleton class NearSettings
+{
+	pub base: int = 5,
+}
+
+pub class Account
+{
+	pub id: int = 0,
+	protected balance: int = 100,
+	secret: int = 7,
+
+	pub fn total(self) -> int
+	{
+		return self.balance + self.fee();
+	}
+
+	protected fn add(self, n: int)
+	{
+		self.balance += n;
+	}
+
+	fn fee(self) -> int
+	{
+		return self.secret;
+	}
+
+	pub fn make(id: int) -> Account
+	{
+		return Account { id: id };
+	}
+
+	protected fn rate() -> int
+	{
+		return 3;
+	}
+}
+
+pub fn audit(a: *Account) -> int
+{
+	return a.total() + a.id;
+}

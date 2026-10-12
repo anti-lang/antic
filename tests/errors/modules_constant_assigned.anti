@@ -1,0 +1,9 @@
+//! A constant of a library is assigned to.
+
+import com.example.items;
+
+fn main() -> int
+{
+	items.LIMIT = 3;
+	return 0;
+}

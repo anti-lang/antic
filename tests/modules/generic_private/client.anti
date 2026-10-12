@@ -1,0 +1,38 @@
+//! The client of the hidden library. It makes copies of the generics for `int`,
+//! for `str` and for a struct of its own, and each copy reaches a private item
+//! of the library.
+
+import com.example.hidden;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Mine
+{
+	a: u8,
+}
+
+fn main() -> int
+{
+	let f = hidden.with_function(1, 2);
+	let fs = hidden.with_function("s", 3);
+	printf("function %lld %lld %lld\n".ptr, f.0, f.1, fs.1);
+	let c = hidden.with_constant(Mine { a: 4 });
+	printf("constant %d %lld\n".ptr, c.0.a as c_int, c.1);
+	let s = hidden.with_struct(1, 5);
+	printf("struct and operator %lld\n".ptr, s.1);
+	let e = hidden.with_enum("e", 6);
+	let e2 = hidden.with_enum(1.5, 7);
+	printf("enum %lld %lld\n".ptr, e.1, e2.1);
+	let k = hidden.with_class(1);
+	printf("class %lld\n".ptr, k.1);
+	let g = hidden.with_generic(Mine { a: 8 }, 9);
+	printf("generic function %d %lld\n".ptr, g.0.a as c_int, g.1);
+	let x = hidden.with_extern(1, -10);
+	printf("extern fn %lld\n".ptr, x.1);
+	let i = hidden.with_internal(true, 11);
+	printf("internal function %d %lld\n".ptr, i.0 as c_int, i.1);
+	let keeper = hidden.Keeper<Mine> { value: Mine { a: 12 } };
+	keeper.look();
+	printf("function of a generic class %lld\n".ptr, keeper.look());
+	return 0;
+}

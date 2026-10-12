@@ -1,0 +1,9 @@
+//! A private struct of a library is not reached as the type of a local.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let p: ?*levels.HiddenPoint = none;
+	return 0;
+}

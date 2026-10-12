@@ -1,0 +1,19 @@
+//! The client of the holder library. It builds the class without naming a
+//! field and reads the three defaults.
+
+import com.example.holder;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let h = holder.Holder { };
+	printf("limit %lld\n".ptr, h.limit ?? -1);
+	printf("start %lld\n".ptr, h.start ?? -1);
+	let x = 0;
+	if let p = h.at {
+		x = p.x + 1;
+	}
+	printf("point %lld\n".ptr, x);
+	return 0;
+}

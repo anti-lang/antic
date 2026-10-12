@@ -1,0 +1,8 @@
+//! A private function of a library is not reached by a direct import.
+
+import com.example.levels.{hidden};
+
+fn main() -> int
+{
+	return 0;
+}

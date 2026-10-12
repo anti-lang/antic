@@ -1,0 +1,18 @@
+//! A private interface of a library is not reached.
+
+import com.example.levels;
+
+class Mine
+{
+	implements named: levels.HiddenNamed,
+
+	pub concrete fn name(self) -> str
+	{
+		return "mine";
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

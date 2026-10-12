@@ -1,0 +1,15 @@
+//! A class whose fields are optional values with a default: `none`, a value
+//! and `none` for a struct. T085 of docs/audit/tests-findings.md.
+
+pub struct Point
+{
+	x: int,
+	y: int,
+}
+
+pub class Holder
+{
+	pub limit: ?int = none,
+	pub start: ?int = 3,
+	pub at: ?Point = none,
+}

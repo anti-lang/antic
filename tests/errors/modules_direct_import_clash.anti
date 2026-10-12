@@ -1,0 +1,9 @@
+//! Two direct imports list one name of two libraries.
+
+import com.example.left.{Point};
+import com.example.right.{Point};
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,10 @@
+//! A protected function of a class of a library is not called from a function of another module.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let a = levels.Account.make(1);
+	a.add(1);
+	return 0;
+}

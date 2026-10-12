@@ -1,0 +1,10 @@
+//! A private field of a class of a library is not read from another module.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let a = levels.Account.make(1);
+	let n = a.secret;
+	return 0;
+}

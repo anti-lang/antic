@@ -1,0 +1,164 @@
+//! The client of the kinds library: one call per kind of value, each of which
+//! hands a value of the kind to a function of another module and prints what
+//! comes back.
+
+import anti.lang;
+import com.example.kinds;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Mine
+{
+	implements named: kinds.Named,
+
+	pub concrete fn name(self) -> str
+	{
+		return "mine";
+	}
+}
+
+fn next(n: int) -> int
+{
+	return n + 1;
+}
+
+fn zero(n: int) -> int
+{
+	return 0;
+}
+
+fn positive(n: int) -> int may fail
+{
+	if n <= 0 {
+		fail "not positive";
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	printf("i8 %lld\n".ptr, kinds.pass_i8(41) as int);
+	printf("i16 %lld\n".ptr, kinds.pass_i16(41) as int);
+	printf("i32 %lld\n".ptr, kinds.pass_i32(41) as int);
+	printf("i64 %lld\n".ptr, kinds.pass_i64(41) as int);
+	printf("int %lld\n".ptr, kinds.pass_int(41) as int);
+	printf("u8 %lld\n".ptr, kinds.pass_u8(41) as int);
+	printf("u16 %lld\n".ptr, kinds.pass_u16(41) as int);
+	printf("u32 %lld\n".ptr, kinds.pass_u32(41) as int);
+	printf("u64 %lld\n".ptr, kinds.pass_u64(41) as int);
+	printf("uint %lld\n".ptr, kinds.pass_uint(41) as int);
+	printf("byte %lld\n".ptr, kinds.pass_byte(41) as int);
+	printf("c_char %lld\n".ptr, kinds.pass_c_char(41) as int);
+	printf("c_uchar %lld\n".ptr, kinds.pass_c_uchar(41) as int);
+	printf("c_short %lld\n".ptr, kinds.pass_c_short(41) as int);
+	printf("c_ushort %lld\n".ptr, kinds.pass_c_ushort(41) as int);
+	printf("c_int %lld\n".ptr, kinds.pass_c_int(41) as int);
+	printf("c_uint %lld\n".ptr, kinds.pass_c_uint(41) as int);
+	printf("c_long %lld\n".ptr, kinds.pass_c_long(41) as int);
+	printf("c_ulong %lld\n".ptr, kinds.pass_c_ulong(41) as int);
+	printf("c_longlong %lld\n".ptr, kinds.pass_c_longlong(41) as int);
+	printf("c_ulonglong %lld\n".ptr, kinds.pass_c_ulonglong(41) as int);
+	printf("c_size_t %lld\n".ptr, kinds.pass_c_size_t(41) as int);
+	printf("c_wchar %lld\n".ptr, kinds.pass_c_wchar(41) as int);
+	printf("i8 below zero %lld u8 at its end %lld\n".ptr, kinds.pass_i8(-2) as int, kinds.pass_u8(254) as int);
+	printf("f32 %.2f f64 %.2f c_float %.2f c_double %.2f\n".ptr, kinds.pass_f32(1.0) as f64,
+		kinds.pass_f64(1.0), kinds.pass_c_float(1.5) as f64, kinds.pass_c_double(1.5) as f64);
+	let h = kinds.pass_f16(kinds.Halves { a: 1.5 as f16, b: 2.5 as f16 });
+	printf("f16 %.2f %.2f\n".ptr, h.a as f64, h.b as f64);
+	printf("bool %d %d\n".ptr, kinds.pass_bool(true) as c_int, kinds.pass_bool(false) as c_int);
+	printf("char %c %c\n".ptr, kinds.pass_char('a') as u32, kinds.pass_char('q') as u32);
+	let s1 = kinds.pass_str("ab");
+	let s2 = kinds.pass_str("abc");
+	printf("str %.*s %.*s\n".ptr, s1.len as c_int, s1.ptr, s2.len as c_int, s2.ptr);
+	let numbers: [3]int = [1, 2, 3];
+	let rest = kinds.pass_slice(numbers[0..3]);
+	printf("slice %lld %lld %lld\n".ptr, rest.len, rest[0], rest[1]);
+	let turned = kinds.pass_array(numbers);
+	printf("array %lld %lld %lld\n".ptr, turned[0], turned[1], turned[2]);
+	let n = 10;
+	let p = kinds.pass_pointer(&n);
+	printf("pointer %lld %d\n".ptr, *p, (p == &n) as c_int);
+	let q = kinds.pass_nullable(&n);
+	let empty = kinds.pass_nullable(none);
+	printf("nullable pointer %lld %d %d\n".ptr, n, (q != none) as c_int, (empty == none) as c_int);
+	printf("optional %lld %lld\n".ptr, kinds.pass_optional(1) ?? -1, kinds.pass_optional(none) ?? -1);
+	let t = kinds.pass_tuple((1, "one"));
+	printf("tuple %.*s %lld\n".ptr, t.0.len as c_int, t.0.ptr, t.1);
+	let f = kinds.pass_function(next);
+	let g = kinds.pass_function(zero);
+	printf("function %lld %lld\n".ptr, f(4), g(4));
+	let base = 100;
+	printf("closure %lld\n".ptr, kinds.pass_closure(3, fn(k) { return k + base; }));
+	let ok = kinds.pass_may_fail(1) catch {
+		yield -1;
+	};
+	let failed = kinds.pass_may_fail(-1) catch e {
+		yield e.code - 50;
+	};
+	printf("may fail %lld %lld\n".ptr, ok, failed);
+	printf("failing function %lld %lld\n".ptr, kinds.pass_failing_function(2, positive),
+		kinds.pass_failing_function(-2, positive));
+	let pt = kinds.pass_struct(kinds.Point { x: 1, y: 2 });
+	printf("struct %lld %lld\n".ptr, pt.x, pt.y);
+	let d = kinds.pass_packed(kinds.Dense { tag: 1, wide: 21 });
+	printf("packed struct %d %llu\n".ptr, d.tag as c_int, d.wide);
+	let v = kinds.pass_simd(kinds.Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 });
+	printf("simd struct %.1f %.1f %.1f %.1f\n".ptr, v.x as f64, v.y as f64, v.z as f64, v.w as f64);
+	let w = kinds.pass_union(kinds.Word { whole: 0x0203 });
+	printf("union %x %d\n".ptr, w.whole, w.low as c_int);
+	printf("enum %d %d\n".ptr, (kinds.pass_enum(kinds.Level.Low) == kinds.Level.High) as c_int,
+		(kinds.pass_enum(kinds.Level.High) == kinds.Level.Low) as c_int);
+	let r1 = 0;
+	if let Dot dot = kinds.pass_variant(kinds.Shape.Dot { r: 5 }) {
+		r1 = dot.r;
+	}
+	let r2 = 0;
+	if let Dot dot = kinds.pass_variant(kinds.Shape.Empty) {
+		r2 = dot.r;
+	}
+	printf("variant %lld %lld\n".ptr, r1, r2);
+	let counter = kinds.Counter { n: 5 };
+	let same = kinds.pass_class(&counter);
+	printf("class %lld %d\n".ptr, same.n, (same == &counter) as c_int);
+	let copy = kinds.pass_class_value(counter);
+	printf("class value %lld %lld\n".ptr, copy.n, counter.n);
+	let mine = Mine { };
+	let named = kinds.pass_interface(&mine.named);
+	let name = named.name();
+	printf("interface %.*s\n".ptr, name.len as c_int, name.ptr);
+	let safe = kinds.Safe { };
+	printf("synchronized class %lld\n".ptr, kinds.pass_synchronized(&safe, 4).add(1));
+	let tally = kinds.Tally { };
+	printf("concurrent class %lld\n".ptr, kinds.pass_concurrent(&tally, 6).add(1));
+	let gate = chan int(2);
+	let back = kinds.pass_channel(gate);
+	let got = recv(back);
+	let sent = 0;
+	if let x = got {
+		sent = *x;
+	}
+	printf("channel %lld\n".ptr, sent);
+	delete(gate);
+	let lock = Mutex.new();
+	let held = 1;
+	let again = kinds.pass_mutex(&lock, &held);
+	sync again {
+		held += 1;
+	}
+	printf("Mutex %lld\n".ptr, held);
+	let owned = kinds.make_owned(12);
+	printf("owning value %lld\n".ptr, kinds.pass_own(owned));
+	printf("lent value %lld\n".ptr, kinds.pass_lent(&counter, fn(c) { c.n += 30; }));
+	let gp = kinds.pass_generic(kinds.Point { x: 7, y: 8 });
+	printf("generic parameter %lld %lld %.*s %d\n".ptr, kinds.pass_generic(13), gp.y,
+		kinds.pass_generic("text").len as c_int, kinds.pass_generic("text").ptr,
+		kinds.pass_generic<u8>(200) as c_int);
+	let e = lang.Error.new(14, "fourteen");
+	printf("error %lld\n".ptr, kinds.pass_error(e));
+	delete(e);
+	if n < 0 {
+		kinds.pass_never(3);
+	}
+	printf("never %lld\n".ptr, n);
+	return 0;
+}

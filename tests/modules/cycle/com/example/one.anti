@@ -1,0 +1,8 @@
+//! The first module of a cycle. It imports the second, which comes to import it.
+
+import com.example.two;
+
+pub fn one() -> int
+{
+	return two.two() + 1;
+}

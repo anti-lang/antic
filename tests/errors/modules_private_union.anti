@@ -1,0 +1,9 @@
+//! A private union of a library is not reached.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let w = levels.HiddenWord { whole: 1 };
+	return 0;
+}

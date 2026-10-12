@@ -1,0 +1,9 @@
+//! An internal function of a library of another package is not reached.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let n = levels.near();
+	return 0;
+}

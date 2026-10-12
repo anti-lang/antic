@@ -1,0 +1,9 @@
+//! An internal union of a library of another package is not reached.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let w = levels.NearWord { whole: 1 };
+	return 0;
+}

@@ -1,0 +1,9 @@
+//! A function of a library stands where a type is expected.
+
+import com.example.items;
+
+fn main() -> int
+{
+	let k: items.twice = 3;
+	return 0;
+}

@@ -1,0 +1,38 @@
+//! The client of the exports library: a module of Anti that reaches the
+//! exported items of another module by the name of the module and by a direct
+//! import.
+
+import anti.lang;
+import com.example.exports.{Bits, EXPORT_LIMIT, IntSpan, Meter, Vec2, export_dot};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	printf("export const %d %.*s %d %.1f\n".ptr, EXPORT_LIMIT, exports.EXPORT_NAME.len as c_int,
+		exports.EXPORT_NAME.ptr, exports.EXPORT_READY as c_int, exports.EXPORT_RATIO);
+	let a = Vec2 { x: 1, y: 2 };
+	let b = exports.Vec2 { x: 3, y: 4 };
+	printf("export fn and export struct %d %d\n".ptr, export_dot(a, b), exports.export_dot(b, b));
+	let bits = Bits { whole: 0x04030201 };
+	printf("export union %d %d\n".ptr, bits.parts[0] as c_int, bits.parts[3] as c_int);
+	let half = exports.export_half(10) catch {
+		yield -1;
+	};
+	let odd = exports.export_half(9) catch {
+		yield -1;
+	};
+	printf("export fn that may fail %d %d\n".ptr, half, odd);
+	let out = Vec2 { x: 0, y: 0 };
+	exports.export_fill(&out, 6);
+	printf("export fn with a pointer %d %d\n".ptr, out.x, out.y);
+	let meter = Meter { };
+	meter.add(5);
+	let before = meter.add(6);
+	meter.export_meter_reset();
+	printf("export class %d %d\n".ptr, before, meter.total);
+	let span = IntSpan { low: 3, high: 10 };
+	let other: exports.Span<c_int> = span;
+	printf("export type %d %d\n".ptr, exports.export_width(span), exports.export_width(other));
+	return 0;
+}

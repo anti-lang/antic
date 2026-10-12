@@ -1,0 +1,16 @@
+//! A generic variant of a library, whose cases another module names under the
+//! name of this module. T091 of docs/audit/tests-findings.md.
+
+pub variant Maybe<T>
+{
+	Some { value: T },
+	Nothing,
+}
+
+pub fn value_of(m: Maybe<int>) -> int
+{
+	if let Some s = m {
+		return s.value;
+	}
+	return -1;
+}

@@ -1,0 +1,119 @@
+//! Generics whose bodies reach what their module keeps private: a function, a
+//! constant, a struct, an enum, a class, a generic function, an `extern fn`,
+//! an operator and an internal function. Another module compiles the copies,
+//! and each copy reaches the private items of this module.
+
+const SECRET: int = 7;
+
+fn helper(n: int) -> int
+{
+	return n * SECRET;
+}
+
+internal fn near(n: int) -> int
+{
+	return n + 1;
+}
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+enum Mode
+{
+	Plain,
+	Doubled,
+}
+
+class Counter
+{
+	pub n: int = 0,
+
+	pub fn bump(self) -> int
+	{
+		self.n += SECRET;
+		return self.n;
+	}
+}
+
+fn inner<T>(own v: T, n: int) -> (T, int)
+{
+	return (v, helper(n));
+}
+
+extern fn llabs(n: c_longlong) -> c_longlong;
+
+operator fn add(a: Pair, b: Pair) -> Pair
+{
+	return Pair { a: a.a + b.a, b: a.b + b.b };
+}
+
+fn mode_of(n: int) -> Mode
+{
+	if n % 2 == 0 {
+		return Mode.Doubled;
+	}
+	return Mode.Plain;
+}
+
+pub fn with_function<T>(own v: T, n: int) -> (T, int)
+{
+	return (v, helper(n));
+}
+
+pub fn with_constant<T>(own v: T) -> (T, int)
+{
+	return (v, SECRET);
+}
+
+pub fn with_struct<T>(own v: T, n: int) -> (T, int)
+{
+	let p = Pair { a: n, b: n * 2 } + Pair { a: 1, b: 1 };
+	return (v, p.a + p.b);
+}
+
+pub fn with_enum<T>(own v: T, n: int) -> (T, int)
+{
+	let m = 1;
+	switch mode_of(n) {
+		Mode.Plain => m = 1,
+		Mode.Doubled => m = 2,
+	}
+	return (v, n * m);
+}
+
+pub fn with_class<T>(own v: T) -> (T, int)
+{
+	let c = Counter { };
+	c.bump();
+	return (v, c.bump());
+}
+
+pub fn with_generic<T>(own v: T, n: int) -> (T, int)
+{
+	return inner(v, n);
+}
+
+pub fn with_extern<T>(own v: T, n: int) -> (T, int)
+{
+	return (v, llabs(n as c_longlong) as int);
+}
+
+pub fn with_internal<T>(own v: T, n: int) -> (T, int)
+{
+	return (v, near(n));
+}
+
+pub class Keeper<T>
+{
+	pub value: T,
+	pub seen: int = 0,
+
+	pub fn look(self) -> int
+	{
+		self.seen += helper(1);
+		return self.seen + SECRET;
+	}
+}

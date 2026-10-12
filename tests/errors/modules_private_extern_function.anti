@@ -1,0 +1,9 @@
+//! A private `extern fn` of a library is not reached.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let n = levels.llabs(-1);
+	return 0;
+}

@@ -1,0 +1,21 @@
+const 40 40 40
+const f64 1.5 bool 1 char m u8 200
+const str items u64 18446744073709551615 product 80
+fn 2 4 6
+generic fn 1 4 5
+extern fn 1 2 3
+variadic extern fn 3 3 3 8*9
+struct and operator 111 222
+generic struct 1 1 2 2.5 three 3
+union 1234 7 1
+enum 1 2 3
+variant 12 12 0
+generic variant 5 1 1
+class 1 11 101
+interface tag second third mine
+singleton 7 111
+generic class 4 1 1 2
+generic interface 6
+alias 10 100 1
+alias of a copy 2 4 6
+constraint 1

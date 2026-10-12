@@ -1,0 +1,9 @@
+//! A private struct of a library is not reached.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let p = levels.HiddenPoint { x: 1, y: 2 };
+	return 0;
+}
