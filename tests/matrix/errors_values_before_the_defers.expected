@@ -1,0 +1,4 @@
+exit 0
+fail 7, trail 21
+return 8, trail 1
+yield 9, trail 213

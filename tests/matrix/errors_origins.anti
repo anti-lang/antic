@@ -1,0 +1,157 @@
+//! The origin of an error: the first `fail` writes the position of its
+//! statement into `at`, and a later `fail` and a `try` that forwards leave it.
+//! Each function that fails stores the line after its `here`, which is the line
+//! of its `fail`, so a line prints 1 where the origin names that line. The
+//! column, the function, the module and the file follow. An error that no
+//! `fail` gave has line 0.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn line_of(at: lang.SourceLocation) -> int
+{
+	return at.line;
+}
+
+fn show(what: str, e: *lang.Error, want: int)
+{
+	printf("%s: %d %d %s %s %s\n".ptr, what.ptr, (e.at.line == want) as c_int,
+		e.at.column as c_int, e.at.function.ptr, e.at.module.ptr,
+		e.at.file.ptr);
+}
+
+fn with_a_text(want: *int) may fail
+{
+	*want = line_of(here) + 1;
+	fail "a text";
+}
+
+fn with_an_error(want: *int) may fail
+{
+	let made = lang.Error.new(5, "made before");
+	*want = line_of(here) + 1;
+	fail made;
+}
+
+fn forwards(want: *int) may fail
+{
+	try with_a_text(want);
+}
+
+fn fails_again(want: *int) may fail
+{
+	with_a_text(want) catch e {
+		fail e;
+	};
+}
+
+fn wraps(want: *int) may fail
+{
+	let ignored = 0;
+	with_a_text(&ignored) catch e {
+		let outer = lang.Error.wrap(9, "wrapped", e);
+		*want = line_of(here) + 1;
+		fail outer;
+	};
+}
+
+class Host
+{
+	pub fn in_method(self, want: *int) may fail
+	{
+		*want = line_of(here) + 1;
+		fail "method";
+	}
+
+	class Inner
+	{
+		pub fn run(self, want: *int) may fail
+		{
+			*want = line_of(here) + 1;
+			fail "nested";
+		}
+	}
+
+	pub fn in_nested(self, want: *int) may fail
+	{
+		let inner = Inner { };
+		try inner.run(want);
+	}
+}
+
+fn in_generic<T>(want: *int) may fail
+{
+	*want = line_of(here) + 1;
+	fail "generic";
+}
+
+fn apply(want: *int, f: fn(*int) may fail) may fail
+{
+	try f(want);
+}
+
+fn in_closure(want: *int) may fail
+{
+	try apply(want, fn(w) {
+		*w = line_of(here) + 1;
+		fail "closure";
+	});
+}
+
+fn in_try_block(want: *int) -> int
+{
+	let same = 0;
+	try {
+		with_an_error(want);
+	} catch e {
+		same = (e.at.line == *want) as int;
+	}
+	return same;
+}
+
+fn main() -> int
+{
+	let want = 0;
+	let host = Host { };
+	with_a_text(&want) catch e {
+		show("text", e, want);
+	};
+	with_an_error(&want) catch e {
+		show("error", e, want);
+	};
+	forwards(&want) catch e {
+		show("try", e, want);
+	};
+	fails_again(&want) catch e {
+		show("fail e", e, want);
+	};
+	wraps(&want) catch e {
+		show("wrap", e, want);
+	};
+	host.in_method(&want) catch e {
+		show("method", e, want);
+	};
+	host.in_nested(&want) catch e {
+		show("nested", e, want);
+	};
+	in_generic<int>(&want) catch e {
+		show("generic", e, want);
+	};
+	in_closure(&want) catch e {
+		show("closure", e, want);
+	};
+	printf("try block: %d\n".ptr, in_try_block(&want) as c_int);
+	let made = lang.Error.new(1, "never failed");
+	printf("no fail: %d %d [%s] [%s]\n".ptr, made.at.line as c_int,
+		made.at.column as c_int, made.at.function.ptr, made.at.file.ptr);
+	delete(made);
+	let missing: ?*int = none;
+	let seven = 7;
+	let p = missing catch e {
+		printf("guard: %d %d %s\n".ptr, e.at.line as c_int, e.code as c_int,
+			e.message.ptr);
+		yield &seven;
+	};
+	return *p - 7;
+}

@@ -1,0 +1,1 @@
+errors_caught_error_of_a_try_block_assigned.anti:19:10: error: `e` outlives its `catch`, use `dup`

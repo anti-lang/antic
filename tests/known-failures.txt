@@ -153,3 +153,44 @@ matrix_ownership_failing_function_gives_an_owning_variant_memory_checks T042 A f
 check_slice_of_slice_range T017 A dev build does not check the bounds of a slice of a slice.
 check_slice_range_reversed T017 A dev build does not check a slice whose low bound lies above its high bound.
 check_slice_range_negative T017 A dev build does not check a slice whose low bound lies below zero.
+generic_origin_modules_release T043 The origin of a `fail` in a generic of a library names the client.
+generic_origin_modules_dev T043 The origin of a `fail` in a generic of a library names the client.
+matrix_errors_handler_reaches_its_end_in_a_let_refused T044 The handler of a `let` that reaches its end is not refused.
+matrix_errors_handler_reaches_its_end_in_an_assignment_refused T044 The handler of an assignment that reaches its end is not refused.
+matrix_errors_handler_reaches_its_end_on_one_path_refused T044 A handler that reaches its end on one path is not refused.
+matrix_errors_handler_without_a_name_reaches_its_end_refused T044 An empty handler without a name on a value is not refused.
+matrix_errors_handler_of_a_pointer_guard_reaches_its_end_refused T044 The handler of a pointer guard that reaches its end is not refused.
+matrix_errors_handler_of_a_value_guard_reaches_its_end_refused T044 The handler of a value guard that reaches its end is not refused.
+matrix_errors_handler_reaches_its_end_after_a_loop_refused T044 A handler that reaches its end after a loop is not refused.
+matrix_errors_handler_reaches_its_end_in_a_generic_refused T044 A handler that reaches its end in a generic function is not refused.
+matrix_errors_handler_of_a_destructuring_reaches_its_end_refused T044 The handler of a destructuring `let` that reaches its end is not refused.
+matrix_errors_try_on_an_optional_call_refused T045 `try` on a call that gives a `?T` and cannot fail is not refused.
+matrix_errors_try_on_an_optional_pointer_call_refused T045 `try` on a call that gives a `?*T` and cannot fail is not refused.
+matrix_errors_try_on_an_optional_name_refused T046 The refusal of `try` on a `?T` name names neither `let ... else` nor `??`.
+matrix_errors_try_on_an_optional_field_refused T046 The refusal of `try` on a `?T` field names neither `let ... else` nor `??`.
+matrix_errors_try_on_an_optional_operand_refused T046 The refusal of `try` on a `?T` operand names neither `let ... else` nor `??`.
+matrix_errors_caught_error_assigned_to_a_local_refused T047 A caught error assigned to a local is not refused.
+matrix_errors_caught_error_assigned_to_a_field_refused T047 A caught error assigned to a field is not refused.
+matrix_errors_caught_error_yielded_refused T047 `yield` of a caught error is not refused.
+matrix_errors_caught_error_yielded_by_a_guard_refused T047 `yield` of the error of a guard is not refused.
+matrix_errors_caught_error_in_a_literal_refused T047 A caught error as a field of a literal is not refused.
+matrix_errors_caught_error_of_a_try_block_assigned_refused T047 The error of a `try` block assigned to a local is not refused.
+matrix_errors_optional_of_an_optional_dev T048 A `?int` is refused where a `??int` is expected.
+matrix_errors_optional_of_an_optional_release T048 A `?int` is refused where a `??int` is expected.
+matrix_errors_optional_of_an_optional_memory_checks T048 A `?int` is refused where a `??int` is expected.
+matrix_errors_generic_optional_of_a_nullable_pointer_dev T049 `??` in a generic over a `?*int` gives wrong values.
+matrix_errors_generic_optional_of_a_nullable_pointer_release T049 `??` in a generic over a `?*int` gives wrong values.
+matrix_errors_generic_optional_of_a_nullable_pointer_memory_checks T049 `??` in a generic over a `?*int` gives wrong values.
+matrix_errors_generic_optional_of_an_optional_value_dev T049 `??` in a generic over a `?int` is refused in the copy.
+matrix_errors_generic_optional_of_an_optional_value_release T049 `??` in a generic over a `?int` is refused in the copy.
+matrix_errors_generic_optional_of_an_optional_value_memory_checks T049 `??` in a generic over a `?int` is refused in the copy.
+matrix_errors_generic_yield_of_an_own_parameter_dev T038 `yield` of an `own` parameter of a type parameter tears the value down twice.
+matrix_errors_generic_yield_of_an_own_parameter_release T038 `yield` of an `own` parameter of a type parameter tears the value down twice.
+matrix_errors_generic_yield_of_an_own_parameter_memory_checks T038 `yield` of an `own` parameter of a type parameter tears the value down twice.
+matrix_errors_try_before_an_alloc_dev T050 `try` before `alloc T(args)` is refused.
+matrix_errors_try_before_an_alloc_release T050 `try` before `alloc T(args)` is refused.
+matrix_errors_try_before_an_alloc_memory_checks T050 `try` before `alloc T(args)` is refused.
+matrix_errors_unhandled_construct_refused T051 An unhandled `alloc T(args)` gets a second message.
+matrix_errors_derived_construct_fails_after_its_base_dev T052 A derived `construct` that fails leaves what its base took.
+matrix_errors_derived_construct_fails_after_its_base_release T052 A derived `construct` that fails leaves what its base took.
+matrix_errors_derived_construct_fails_after_its_base_memory_checks T052 A derived `construct` that fails leaves what its base took.

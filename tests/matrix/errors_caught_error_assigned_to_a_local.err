@@ -1,0 +1,1 @@
+errors_caught_error_assigned_to_a_local.anti:19:10: error: `e` outlives its `catch`, use `dup`

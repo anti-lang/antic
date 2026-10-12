@@ -1,0 +1,21 @@
+//! The handler of a `try` block stands outside the block, so a failing call in
+//! it reaches no handler and is refused.
+
+import anti.lang;
+
+fn step(n: int) may fail
+{
+	if n == 0 {
+		fail "no step";
+	}
+}
+
+fn main() -> int
+{
+	try {
+		step(0);
+	} catch {
+		step(0);
+	}
+	return 0;
+}

@@ -1,0 +1,30 @@
+//! Decision 21: `try` on a call that cannot fail and gives a `?*T` is refused,
+//! with a message that names `let ... else` and `??`.
+
+import anti.lang;
+
+fn find(n: int, at: *int) -> ?*int
+{
+	if n > 0 {
+		return at;
+	}
+	return none;
+}
+
+fn get(n: int) -> int may fail
+{
+	if n > 5 {
+		fail "too much";
+	}
+	let seven = 7;
+	let p = try find(n, &seven);
+	return *p;
+}
+
+fn main() -> int
+{
+	let v = get(0) catch {
+		yield -1;
+	};
+	return v;
+}

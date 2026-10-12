@@ -1,0 +1,23 @@
+//! Decision 20 in a generic function: the handler of a call that gives a value
+//! of a type parameter reaches its end, and is refused.
+
+import anti.lang;
+
+fn pick<T>(ok: bool, own v: T) -> T may fail
+{
+	if !ok {
+		fail "nothing picked";
+	}
+	return v;
+}
+
+fn settle<T>(ok: bool, own v: T) -> T
+{
+	let got = pick<T>(ok, v) catch { };
+	return got;
+}
+
+fn main() -> int
+{
+	return settle<int>(false, 3);
+}

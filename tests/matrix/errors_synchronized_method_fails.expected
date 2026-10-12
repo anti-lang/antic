@@ -1,0 +1,4 @@
+exit 0
+take fails -4, then a worker 4
+try fails -2, then a worker 0
+sync fails -5 -80, then a worker 1

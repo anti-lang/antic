@@ -1,0 +1,63 @@
+//! A `yield` in the handler of a `try` block that stands inside the handler of
+//! a `let` gives the value of the `let`: the `try` block has no value of its
+//! own. No document states the rule, and the test holds what antic 0.2.0 does.
+//! Both errors are deleted, which the count of the errors alive shows.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counted inherits lang.Error
+{
+	static atomic live: int = 0;
+
+	/// An error that counts itself alive until it is deleted.
+	pub fn make(code: int) -> *Counted
+	{
+		let e = alloc Counted { };
+		e.code = code;
+		e.message = "counted";
+		Counted.live.add(1);
+		return e;
+	}
+
+	concrete fn destruct(self)
+	{
+		Counted.live.sub(1);
+	}
+}
+
+fn value(code: int) -> int may fail
+{
+	if code > 0 {
+		fail Counted.make(code);
+	}
+	return 0;
+}
+
+fn plain(code: int) may fail
+{
+	if code > 0 {
+		fail Counted.make(code);
+	}
+}
+
+fn run(a: int, b: int) -> int
+{
+	let got = value(a) catch first {
+		try {
+			plain(b);
+		} catch second {
+			yield first.code * 10 + second.code;
+		}
+		yield first.code;
+	};
+	return got;
+}
+
+fn main() -> int
+{
+	printf("%d %d %d, alive %d\n".ptr, run(0, 5) as c_int, run(3, 0) as c_int,
+		run(3, 5) as c_int, Counted.live.load() as c_int);
+	return 0;
+}

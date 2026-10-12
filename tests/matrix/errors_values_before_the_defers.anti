@@ -1,0 +1,70 @@
+//! What leaves a block is built before its deferred statements run: the error
+//! of a `fail`, the value of a `return` in a function that may fail and the
+//! value of a `yield`. A `defer` and an `undo` that change what the expression
+//! read change nothing of what the caller gets. The `undo` runs before the
+//! `defer` of its block, which the order of the digits shows.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn fails(n: int, trail: *int) may fail
+{
+	let code = n;
+	defer {
+		code = 500;
+		*trail = *trail * 10 + 1;
+	}
+	undo {
+		code = 600;
+		*trail = *trail * 10 + 2;
+	}
+	fail lang.Error.new(code, "built first");
+}
+
+fn returns(n: int, trail: *int) -> int may fail
+{
+	let value = n;
+	defer {
+		value = 500;
+		*trail = *trail * 10 + 1;
+	}
+	undo {
+		value = 600;
+		*trail = *trail * 10 + 2;
+	}
+	if n < 0 {
+		fail "negative";
+	}
+	return value;
+}
+
+fn yields(n: int, trail: *int) -> int
+{
+	let got = returns(-1, trail) catch {
+		let value = n;
+		defer {
+			value = 500;
+			*trail = *trail * 10 + 3;
+		}
+		yield value;
+	};
+	return got;
+}
+
+fn main() -> int
+{
+	let trail = 0;
+	fails(7, &trail) catch e {
+		printf("fail %d, trail %d\n".ptr, e.code as c_int, trail as c_int);
+	};
+	trail = 0;
+	let r = returns(8, &trail) catch {
+		yield -1;
+	};
+	printf("return %d, trail %d\n".ptr, r as c_int, trail as c_int);
+	trail = 0;
+	let y = yields(9, &trail);
+	printf("yield %d, trail %d\n".ptr, y as c_int, trail as c_int);
+	return 0;
+}

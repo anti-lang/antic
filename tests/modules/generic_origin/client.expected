@@ -1,0 +1,4 @@
+plain fail com/example/origin.anti:10:3 com.example.origin.run_fail com.example.origin
+generic fail com/example/origin.anti:19:3 com.example.origin.gen_fail<int> com.example.origin
+plain here com/example/origin.anti:33:12 com.example.origin.run_here com.example.origin
+generic here com/example/origin.anti:39:12 com.example.origin.gen_here<int> com.example.origin

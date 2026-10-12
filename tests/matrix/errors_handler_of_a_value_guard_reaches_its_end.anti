@@ -1,0 +1,22 @@
+//! Decision 20: the handler that guards a `?T` of a value reaches its end, and
+//! its binding would hold no value. It is refused.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn maybe(n: int) -> ?int
+{
+	if n > 0 {
+		return none;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let v = maybe(1) catch e {
+		printf("%s\n".ptr, e.message.ptr);
+	};
+	return v;
+}

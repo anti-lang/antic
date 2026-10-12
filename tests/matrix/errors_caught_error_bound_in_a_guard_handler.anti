@@ -1,0 +1,24 @@
+//! A `let` of the bare `NoneDereference` that the guard of a `?*T` binds is
+//! refused.
+
+import anti.lang;
+
+fn find(n: int, at: *int) -> ?*int
+{
+	if n > 0 {
+		return none;
+	}
+	return at;
+}
+
+fn main() -> int
+{
+	let seven = 7;
+	let code = 0;
+	let p = find(1, &seven) catch e {
+		let mine = e;
+		code = mine.code;
+		yield &seven;
+	};
+	return *p + code;
+}

@@ -1,0 +1,25 @@
+//! `try` on a call of a function that cannot fail is refused.
+
+import anti.lang;
+
+fn sure(n: int) -> int
+{
+	return n;
+}
+
+fn get(n: int) -> int may fail
+{
+	if n > 5 {
+		fail "too much";
+	}
+	let v = try sure(n);
+	return v;
+}
+
+fn main() -> int
+{
+	let v = get(1) catch {
+		yield -1;
+	};
+	return v;
+}

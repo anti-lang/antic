@@ -1,0 +1,28 @@
+//! Decision 21: `try` on a call that gives a `?T`, as an operand, is refused
+//! with a message that names `let ... else` and `??`.
+
+import anti.lang;
+
+fn maybe(n: int) -> ?int
+{
+	if n > 0 {
+		return n;
+	}
+	return none;
+}
+
+fn get(n: int) -> int may fail
+{
+	if n > 5 {
+		fail "too much";
+	}
+	return 1 + try maybe(n);
+}
+
+fn main() -> int
+{
+	let v = get(0) catch {
+		yield -1;
+	};
+	return v;
+}

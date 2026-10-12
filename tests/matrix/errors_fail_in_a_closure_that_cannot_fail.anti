@@ -1,0 +1,25 @@
+//! An anonymous function that cannot fail takes no `fail`, although the
+//! function around it may fail.
+
+import anti.lang;
+
+fn apply(f: fn(int))
+{
+	f(1);
+}
+
+fn outer(n: int) may fail
+{
+	if n > 5 {
+		fail "outer";
+	}
+	apply(fn(m) {
+		fail "inner";
+	});
+}
+
+fn main() -> int
+{
+	outer(0) catch { };
+	return 0;
+}

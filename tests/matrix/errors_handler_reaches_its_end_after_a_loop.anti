@@ -1,0 +1,22 @@
+//! Decision 20: a handler whose `yield` stands in a loop that may run no turn
+//! can reach its end, and is refused.
+
+import anti.lang;
+
+fn value(n: int) -> int may fail
+{
+	if n > 0 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let v = value(1) catch e {
+		for i in 0..e.code - 1 {
+			yield i;
+		}
+	};
+	return v;
+}

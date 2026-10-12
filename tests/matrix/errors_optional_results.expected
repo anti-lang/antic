@@ -1,0 +1,6 @@
+exit 0
+0: try -40 -40 -40, none -2, guard -40, test -3
+1: try -1 -1 -41, none -2, guard -1, test -1
+2: try 20 20 20, none 20, guard 20, test 20
+chain caught -1 -50 -1 7
+chain forwarded -1 -50 -1 7

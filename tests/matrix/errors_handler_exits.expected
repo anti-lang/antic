@@ -1,0 +1,15 @@
+exit 4
+yield 10 -3
+return 10 103
+fail 10 203
+fail e 10 3
+break 10 30
+continue 30
+yield on every path 10 2 1
+yield in every arm 10 30 40
+assignment 10 -3
+pointer guard 7 8
+value guard 10 -1
+dropped 0 3
+never 10
+the program ends with 4

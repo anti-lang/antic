@@ -1,0 +1,210 @@
+//! A call of a function that returns `never` ends its path, in each of these
+//! places: function, method, loop body, switch arm, if let, the `else` of a
+//! `let`, catch handler, closure, worker, generic body and nested type. A
+//! function with a result may end in such a call, and a name tested for `none`
+//! before one is proved after it. Every call here takes the path that returns,
+//! and the last statement of `main` takes the one that does not: a generic
+//! function that returns `never` ends the program with status 8.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn fflush(stream: ?*byte) -> c_int;
+
+extern fn exit(code: c_int) -> never;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+fn die(code: int) -> never
+{
+	printf("die %d\n".ptr, code as c_int);
+	fflush(none);
+	exit(code as c_int);
+}
+
+fn stop<T>(times: int) -> never
+{
+	die(size_of(T) as int * times);
+}
+
+fn in_function(n: int) -> int
+{
+	if n < 9 {
+		return n;
+	}
+	die(10);
+}
+
+class Host
+{
+	pub fn halt(self, code: int) -> never
+	{
+		die(code);
+	}
+
+	pub fn in_method(self, n: int) -> int
+	{
+		if n < 9 {
+			return n;
+		}
+		self.halt(11);
+	}
+
+	class Inner
+	{
+		pub fn run(self, n: int) -> int
+		{
+			if n < 9 {
+				return n;
+			}
+			die(12);
+		}
+	}
+
+	pub fn in_nested(self, n: int) -> int
+	{
+		let inner = Inner { };
+		return inner.run(n);
+	}
+}
+
+fn in_loop(n: int) -> int
+{
+	for i in 0..9 {
+		if i == n {
+			return i;
+		}
+	}
+	die(13);
+}
+
+fn in_arm(n: int) -> int
+{
+	switch n {
+		9 => die(14),
+		else => { },
+	}
+	return n;
+}
+
+fn hold(k: int) -> ?int
+{
+	if k > 8 {
+		return none;
+	}
+	return k;
+}
+
+fn in_if_let(n: int) -> int
+{
+	if let v = hold(n) {
+		return v;
+	}
+	die(15);
+}
+
+fn in_let_else(n: int) -> int
+{
+	let v = hold(n) else {
+		die(16);
+	};
+	return v;
+}
+
+fn risky(n: int) -> int may fail
+{
+	if n > 8 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n;
+}
+
+fn in_catch(n: int) -> int
+{
+	let v = risky(n) catch {
+		die(17);
+	};
+	return v;
+}
+
+fn apply(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure(n: int) -> int
+{
+	return apply(n, fn(m) {
+		if m < 9 {
+			return m;
+		}
+		die(18);
+	});
+}
+
+fn check(n: int, f: fn(int) -> never) -> int
+{
+	if n < 9 {
+		return n;
+	}
+	f(19);
+}
+
+fn in_never_closure(n: int) -> int
+{
+	return check(n, fn(code) {
+		die(code);
+	});
+}
+
+worker fn in_worker(t: *Task) -> int
+{
+	if t.n < 9 {
+		return t.n;
+	}
+	die(20);
+}
+
+fn in_generic<T>(n: int) -> int
+{
+	if n < 9 {
+		return n + size_of(T) as int;
+	}
+	stop<T>(3);
+}
+
+fn proved(p: ?*int) -> int
+{
+	if p == none {
+		die(21);
+	}
+	return *p;
+}
+
+fn main() -> int
+{
+	let host = Host { };
+	let task = alloc Task { n: 3 };
+	let three = 3;
+	printf("function %d\n".ptr, in_function(3) as c_int);
+	printf("method %d\n".ptr, host.in_method(3) as c_int);
+	printf("nested %d\n".ptr, host.in_nested(3) as c_int);
+	printf("loop %d\n".ptr, in_loop(3) as c_int);
+	printf("arm %d\n".ptr, in_arm(3) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(3) as c_int);
+	printf("let_else %d\n".ptr, in_let_else(3) as c_int);
+	printf("catch %d\n".ptr, in_catch(3) as c_int);
+	printf("closure %d\n".ptr, in_closure(3) as c_int);
+	printf("never closure %d\n".ptr, in_never_closure(3) as c_int);
+	let job = dispatch task -> in_worker();
+	printf("worker %d\n".ptr, join(job) as c_int);
+	printf("generic %d\n".ptr, in_generic<bool>(3) as c_int);
+	printf("proved %d\n".ptr, proved(&three) as c_int);
+	delete(task);
+	fflush(none);
+	stop<int>(1);
+}

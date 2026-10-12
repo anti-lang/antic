@@ -1,0 +1,26 @@
+//! `catch fatal` on a `?T` of a value that holds `none` ends the program with
+//! the code of `anti.lang.NoneDereference`, which is 1.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn fflush(stream: ?*byte) -> c_int;
+
+fn maybe(n: int) -> ?int
+{
+	if n > 2 {
+		return none;
+	}
+	return n * 10;
+}
+
+fn main() -> int
+{
+	let v = maybe(1) catch fatal;
+	printf("held %d\n".ptr, v as c_int);
+	fflush(none);
+	let w = maybe(3) catch fatal;
+	printf("after fatal %d\n".ptr, w as c_int);
+	return 0;
+}

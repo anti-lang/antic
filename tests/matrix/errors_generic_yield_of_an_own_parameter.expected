@@ -1,0 +1,4 @@
+exit 0
+given 1, alive 1
+yielded 2, alive 2
+after the values, alive 0

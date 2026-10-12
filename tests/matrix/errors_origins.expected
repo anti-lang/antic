@@ -1,0 +1,13 @@
+exit 0
+text: 1 2 errors_origins.with_a_text errors_origins errors_origins.anti
+error: 1 2 errors_origins.with_an_error errors_origins errors_origins.anti
+try: 1 2 errors_origins.with_a_text errors_origins errors_origins.anti
+fail e: 1 2 errors_origins.with_a_text errors_origins errors_origins.anti
+wrap: 1 3 errors_origins.wraps errors_origins errors_origins.anti
+method: 1 3 errors_origins.Host.in_method errors_origins errors_origins.anti
+nested: 1 4 errors_origins.Host.Inner.run errors_origins errors_origins.anti
+generic: 1 2 errors_origins.in_generic<int> errors_origins errors_origins.anti
+closure: 1 3 errors_origins.in_closure.0 errors_origins errors_origins.anti
+try block: 1
+no fail: 0 0 [] []
+guard: 0 1 the pointer is none

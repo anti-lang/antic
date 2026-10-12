@@ -1,0 +1,40 @@
+//! `try` stands before `alloc T(args)` of a class whose `construct` may fail,
+//! as it stands before any failing call, and forwards the error of the
+//! `construct`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Machine
+{
+	pub n: int = 0,
+
+	fn construct(self, n: int) may fail
+	{
+		if n > 2 {
+			fail lang.Error.new(n, "too big");
+		}
+		self.n = n;
+	}
+}
+
+fn make(n: int) -> int may fail
+{
+	let m = try alloc Machine(n);
+	let got = m.n;
+	delete(m);
+	return got;
+}
+
+fn main() -> int
+{
+	let a = make(1) catch e {
+		yield -e.code;
+	};
+	let b = make(3) catch e {
+		yield -e.code;
+	};
+	printf("%d %d\n".ptr, a as c_int, b as c_int);
+	return 0;
+}

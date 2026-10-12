@@ -1,0 +1,39 @@
+//! A generic function that may fail and gives a `?T`, with `?int` as its type
+//! argument. Its result is a `??int`: the call fails, gives the outer `none`,
+//! or gives the `?int` it was passed, which may be the inner `none`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn maybe<T>(k: int, own v: T) -> ?T may fail
+{
+	if k == 0 {
+		fail "nothing";
+	}
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn layers(k: int, v: ?int) -> int
+{
+	let o = maybe<?int>(k, v) catch {
+		return -3;
+	};
+	if let inner = o {
+		if let n = inner {
+			return n;
+		}
+		return -1;
+	}
+	return -2;
+}
+
+fn main() -> int
+{
+	printf("%d %d %d %d\n".ptr, layers(0, 5) as c_int, layers(1, 5) as c_int,
+		layers(2, none) as c_int, layers(2, 5) as c_int);
+	return 0;
+}

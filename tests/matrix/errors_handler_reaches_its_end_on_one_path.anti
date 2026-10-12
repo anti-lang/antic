@@ -1,0 +1,22 @@
+//! Decision 20: a handler that yields on one path and reaches its end on the
+//! other is refused.
+
+import anti.lang;
+
+fn value(n: int) -> int may fail
+{
+	if n > 0 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let v = value(1) catch e {
+		if e.code > 1 {
+			yield 7;
+		}
+	};
+	return v;
+}

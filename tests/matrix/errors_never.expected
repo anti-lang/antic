@@ -1,0 +1,15 @@
+exit 8
+function 3
+method 3
+nested 3
+loop 3
+arm 3
+if_let 3
+let_else 3
+catch 3
+closure 3
+never closure 3
+worker 3
+generic 4
+proved 3
+die 8

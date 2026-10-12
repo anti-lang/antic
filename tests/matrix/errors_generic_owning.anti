@@ -1,0 +1,78 @@
+//! A generic function that may fail, with a class that has a `destruct` as its
+//! type argument, by value. `settle` yields a copy of its second value where
+//! `give` fails, and `forward` hands the error of `give` on with `try`. Every
+//! value a function took over and did not give back is torn down: the `own`
+//! parameter of a `give` that fails, and both parameters of `settle`. `Node`
+//! counts itself alive, so each line prints the value and the nodes alive after
+//! the call, and a teardown that is missed or runs twice shows.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Node.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Node.live.sub(1);
+	}
+}
+
+fn give<T>(ok: bool, own v: T) -> T may fail
+{
+	if !ok {
+		fail "nothing given";
+	}
+	return v;
+}
+
+fn alive() -> int
+{
+	return Node.live.load();
+}
+
+fn settle<T>(ok: bool, own a: T) -> ?T
+{
+	let got = give<T>(ok, a) catch {
+		return none;
+	};
+	return got;
+}
+
+fn forward<T>(ok: bool, own v: T) -> T may fail
+{
+	let got = try give<T>(ok, v);
+	return got;
+}
+
+fn by_value()
+{
+	let a = settle<Node>(true, Node { n: 1 });
+	printf("given %d, alive %d\n".ptr, (a != none) as c_int, alive() as c_int);
+	let b = settle<Node>(false, Node { n: 2 });
+	printf("failed %d, alive %d\n".ptr, (b != none) as c_int, alive() as c_int);
+	let c = forward<Node>(true, Node { n: 3 }) catch {
+		yield Node { n: 4 };
+	};
+	printf("forwarded %d, alive %d\n".ptr, c.n as c_int, alive() as c_int);
+	let d = forward<Node>(false, Node { n: 3 }) catch {
+		yield Node { n: 4 };
+	};
+	printf("yielded %d, alive %d\n".ptr, d.n as c_int, alive() as c_int);
+}
+
+fn main() -> int
+{
+	by_value();
+	printf("after the values, alive %d\n".ptr, alive() as c_int);
+	return 0;
+}

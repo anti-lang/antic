@@ -1,0 +1,18 @@
+//! A `try` block without its handler is refused.
+
+import anti.lang;
+
+fn step(n: int) may fail
+{
+	if n == 0 {
+		fail "no step";
+	}
+}
+
+fn main() -> int
+{
+	try {
+		step(0);
+	}
+		return 0;
+}

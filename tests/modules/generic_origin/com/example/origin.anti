@@ -1,0 +1,40 @@
+//! A plain function and a generic function of a library module, each with a
+//! `fail` and with `here`. The client prints the position each writes.
+
+import anti.lang;
+
+/// Fails with a text.
+pub fn run_fail(n: int) -> int may fail
+{
+	if n == 0 {
+		fail "plain";
+	}
+	return n;
+}
+
+/// Fails with a text, in a generic function.
+pub fn gen_fail<T>(n: int, own v: T) -> T may fail
+{
+	if n == 0 {
+		fail "generic";
+	}
+	return v;
+}
+
+/// The position it is given.
+pub fn at(place: lang.SourceLocation) -> lang.SourceLocation
+{
+	return place;
+}
+
+/// The position of a `here` in a plain function.
+pub fn run_here() -> lang.SourceLocation
+{
+	return at(here);
+}
+
+/// The position of a `here` in a generic function.
+pub fn gen_here<T>() -> lang.SourceLocation
+{
+	return at(here);
+}

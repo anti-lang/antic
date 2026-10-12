@@ -1,0 +1,25 @@
+//! The error a `catch` binds is deleted when the handler exits, so a bare `e`
+//! assigned to a local of the function is refused.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn step(n: int) may fail
+{
+	if n == 0 {
+		fail "no step";
+	}
+}
+
+fn main() -> int
+{
+	let keep: ?*lang.Error = none;
+	step(0) catch e {
+		keep = e;
+	};
+	if let k = keep {
+		printf("%s\n".ptr, k.message.ptr);
+	}
+	return 0;
+}

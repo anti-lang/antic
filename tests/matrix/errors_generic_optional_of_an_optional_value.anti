@@ -1,0 +1,31 @@
+//! A `?T` whose type parameter takes a `?int` is a `??int`, so its `none` and
+//! the `none` of the `?int` are two values. `maybe` gives the outer `none` or
+//! the `?int`, and `??` takes the second value where the first is the outer
+//! `none`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn maybe<T>(k: int, own v: T) -> ?T
+{
+	if k == 1 {
+		return none;
+	}
+	return v;
+}
+
+fn chosen<T>(k: int, own a: T, own b: T) -> T
+{
+	let o = maybe<T>(k, a);
+	return o ?? b;
+}
+
+fn main() -> int
+{
+	let r1 = chosen<?int>(1, 1, 2);
+	let r2 = chosen<?int>(2, 1, 2);
+	let r3 = chosen<?int>(1, 1, none);
+	let r4 = chosen<?int>(2, none, 2);
+	printf("%d %d %d %d\n".ptr, (r1 ?? -7) as c_int, (r2 ?? -7) as c_int,
+		(r3 ?? -7) as c_int, (r4 ?? -7) as c_int);
+	return 0;
+}

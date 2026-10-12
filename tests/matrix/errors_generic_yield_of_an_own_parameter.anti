@@ -1,0 +1,61 @@
+//! `yield` of an `own` parameter of a type parameter moves the value into the
+//! binding of the `let`, so one owner is left. With a class that has a
+//! `destruct` as the type argument, the nodes alive after each call show a
+//! teardown that runs twice.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Node.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Node.live.sub(1);
+	}
+}
+
+fn give<T>(ok: bool, own v: T) -> T may fail
+{
+	if !ok {
+		fail "nothing given";
+	}
+	return v;
+}
+
+fn alive() -> int
+{
+	return Node.live.load();
+}
+
+fn settle<T>(ok: bool, own a: T, own b: T) -> T
+{
+	let got = give<T>(ok, a) catch {
+		yield b;
+	};
+	return got;
+}
+
+fn by_value()
+{
+	let a = settle<Node>(true, Node { n: 1 }, Node { n: 2 });
+	printf("given %d, alive %d\n".ptr, a.n as c_int, alive() as c_int);
+	let b = settle<Node>(false, Node { n: 1 }, Node { n: 2 });
+	printf("yielded %d, alive %d\n".ptr, b.n as c_int, alive() as c_int);
+}
+
+fn main() -> int
+{
+	by_value();
+	printf("after the values, alive %d\n".ptr, alive() as c_int);
+	return 0;
+}

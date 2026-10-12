@@ -3493,6 +3493,16 @@ antic_modules_test(errors_modules
     STD lang
     WORK "${CMAKE_CURRENT_BINARY_DIR}/errors-modules")
 
+# The origin of a `fail` and the position of a `here` in a generic function
+# of a library module, whose copy the client compiles. T043 of
+# docs/audit/tests-findings.md.
+antic_modules_test(generic_origin_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_origin"
+    LIBRARIES origin
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/generic-origin")
+
 # A generic function and a generic class of a library module that change
 # a `static atomic` field. The client makes its copies from the library
 # file. T029 of docs/audit/tests-findings.md.

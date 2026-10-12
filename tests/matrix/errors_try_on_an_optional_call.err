@@ -1,0 +1,1 @@
+errors_try_on_an_optional_call.anti:19:10: error: `try` forwards an error, and a value that may be `none` has none: use `let ... else` or `??`

@@ -1,0 +1,1 @@
+errors_never_fails_with_a_fail_in_a_closure.anti:12:18: error: `outer` may fail and never does [never-fails]

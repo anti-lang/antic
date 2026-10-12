@@ -1,0 +1,24 @@
+//! The error a `catch` binds is deleted when the handler exits, so `yield e` is
+//! refused: the binding of the `let` would hold a deleted error.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn make(n: int) -> *lang.Error may fail
+{
+	if n > 0 {
+		fail "refused";
+	}
+	return lang.Error.new(1, "made");
+}
+
+fn main() -> int
+{
+	let r = make(1) catch e {
+		yield e;
+	};
+	printf("%s\n".ptr, r.message.ptr);
+	delete(r);
+	return 0;
+}

@@ -1,0 +1,1 @@
+errors_failing_function_as_a_plain_function_value.anti:21:13: error: expected `fn(int) -> int`, found `fn(int) -> int may fail`

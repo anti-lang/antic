@@ -1,0 +1,1 @@
+errors_catch_fatal_on_a_call_that_cannot_fail.anti:11:10: error: this call cannot fail, so it has no error to handle

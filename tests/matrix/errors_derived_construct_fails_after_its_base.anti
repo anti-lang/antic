@@ -1,0 +1,74 @@
+//! A derived `construct` that fails after the `construct` of its base succeeded
+//! leaves no object behind, and what the base took is given back: the part of
+//! the `Machine` does not stay alive, although the `Robot` was never made.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Part
+{
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Part.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Part.live.sub(1);
+	}
+}
+
+class Machine
+{
+	pub n: int = 0,
+	own part: ?*Part = none,
+
+	fn construct(self, n: int) may fail
+	{
+		let part = alloc Part { };
+		undo delete(part);
+		if n > 2 {
+			fail lang.Error.new(n, "too big");
+		}
+		self.part = part;
+		self.n = n;
+	}
+}
+
+class Robot inherits Machine
+{
+	pub arms: int = 0,
+
+	fn construct(self, n: int, arms: int) may fail
+	{
+		try self.super.construct(n);
+		if arms > 2 {
+			fail lang.Error.new(70 + arms, "too many arms");
+		}
+		self.arms = arms;
+	}
+}
+
+fn alive() -> int
+{
+	return Part.live.load();
+}
+
+fn derived(n: int, arms: int) -> int
+{
+	let r = alloc Robot(n, arms) catch e {
+		return -e.code;
+	};
+	let got = r.n * 10 + r.arms;
+	delete(r);
+	return got;
+}
+
+fn main() -> int
+{
+	printf("%d, alive %d\n".ptr, derived(2, 3) as c_int, alive() as c_int);
+	return 0;
+}

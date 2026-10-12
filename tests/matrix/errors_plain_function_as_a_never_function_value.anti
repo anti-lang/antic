@@ -1,0 +1,17 @@
+//! A function that returns does not convert to a function type that returns
+//! `never`.
+
+fn live(n: int)
+{
+}
+
+fn run(f: fn(int) -> never)
+{
+	f(1);
+}
+
+fn main() -> int
+{
+	run(live);
+	return 0;
+}

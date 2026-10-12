@@ -1,0 +1,28 @@
+//! A `yield` in an anonymous function gives no value to the handler around the
+//! function, and is refused.
+
+import anti.lang;
+
+fn value(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "refused";
+	}
+	return n;
+}
+
+fn apply(f: fn(int))
+{
+	f(1);
+}
+
+fn main() -> int
+{
+	let v = value(1) catch {
+		apply(fn(n) {
+			yield 4;
+		});
+		yield 5;
+	};
+	return v;
+}

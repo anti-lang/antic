@@ -1,0 +1,200 @@
+//! The ways a handler of a value may end, by decision 20: `yield`, `return`,
+//! `fail`, `break`, `continue` and a call that never returns. Each stands in
+//! the handler of a `let`, and the handler of an assignment, of a pointer guard
+//! and of a value guard end with `yield`. The handler of a call statement may
+//! reach its end, since the statement drops the value. The last handler ends
+//! the program with status 4.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn exit(code: c_int) -> never;
+
+fn risky(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n * 10;
+}
+
+fn find(n: int, at: *int) -> ?*int
+{
+	if n > 2 {
+		return none;
+	}
+	return at;
+}
+
+fn maybe(n: int) -> ?int
+{
+	if n > 2 {
+		return none;
+	}
+	return n * 10;
+}
+
+fn by_yield(n: int) -> int
+{
+	let v = risky(n) catch e {
+		yield -e.code;
+	};
+	return v;
+}
+
+fn by_return(n: int) -> int
+{
+	let v = risky(n) catch e {
+		return 100 + e.code;
+	};
+	return v;
+}
+
+fn by_fail(n: int) -> int may fail
+{
+	let v = risky(n) catch e {
+		fail lang.Error.new(200 + e.code, "failed again");
+	};
+	return v;
+}
+
+fn by_fail_of_the_error(n: int) -> int may fail
+{
+	let v = risky(n) catch e {
+		fail e;
+	};
+	return v;
+}
+
+fn by_break(limit: int) -> int
+{
+	let sum = 0;
+	for n in 0..limit {
+		let v = risky(n) catch {
+			break;
+		};
+		sum += v;
+	}
+	return sum;
+}
+
+fn by_continue(limit: int) -> int
+{
+	let sum = 0;
+	for n in 0..limit {
+		let v = risky(5 - n) catch {
+			continue;
+		};
+		sum += v;
+	}
+	return sum;
+}
+
+fn by_yield_on_every_path(n: int) -> int
+{
+	let v = risky(n) catch e {
+		if e.code > 3 {
+			yield 1;
+		} else {
+			yield 2;
+		}
+	};
+	return v;
+}
+
+fn by_yield_in_every_arm(n: int) -> int
+{
+	let v = risky(n) catch e {
+		switch e.code {
+			3 => {
+				yield 30;
+			},
+			else => {
+				yield 40;
+			},
+		}
+	};
+	return v;
+}
+
+fn assigned(n: int) -> int
+{
+	let v = -5;
+	v = risky(n) catch e {
+		yield -e.code;
+	};
+	return v;
+}
+
+fn guarded_pointer(n: int) -> int
+{
+	let seven = 7;
+	let eight = 8;
+	let p = find(n, &seven) catch e {
+		yield &eight;
+	};
+	return *p;
+}
+
+fn guarded_value(n: int) -> int
+{
+	let v = maybe(n) catch e {
+		yield -1;
+	};
+	return v;
+}
+
+fn dropped(n: int) -> int
+{
+	let seen = 0;
+	risky(n) catch e {
+		seen = e.code;
+	};
+	return seen;
+}
+
+fn by_never(n: int) -> int
+{
+	let v = risky(n) catch e {
+		printf("the program ends with %d\n".ptr, e.code as c_int);
+		exit(e.code as c_int);
+	};
+	return v;
+}
+
+fn main() -> int
+{
+	printf("yield %d %d\n".ptr, by_yield(1) as c_int, by_yield(3) as c_int);
+	printf("return %d %d\n".ptr, by_return(1) as c_int, by_return(3) as c_int);
+	let a = by_fail(3) catch e {
+		yield e.code;
+	};
+	let b = by_fail(1) catch e {
+		yield e.code;
+	};
+	printf("fail %d %d\n".ptr, b as c_int, a as c_int);
+	let c = by_fail_of_the_error(3) catch e {
+		yield e.code;
+	};
+	let d = by_fail_of_the_error(1) catch e {
+		yield e.code;
+	};
+	printf("fail e %d %d\n".ptr, d as c_int, c as c_int);
+	printf("break %d %d\n".ptr, by_break(2) as c_int, by_break(6) as c_int);
+	printf("continue %d\n".ptr, by_continue(6) as c_int);
+	printf("yield on every path %d %d %d\n".ptr,
+		by_yield_on_every_path(1) as c_int, by_yield_on_every_path(3) as c_int,
+		by_yield_on_every_path(4) as c_int);
+	printf("yield in every arm %d %d %d\n".ptr,
+		by_yield_in_every_arm(1) as c_int, by_yield_in_every_arm(3) as c_int,
+		by_yield_in_every_arm(4) as c_int);
+	printf("assignment %d %d\n".ptr, assigned(1) as c_int, assigned(3) as c_int);
+	printf("pointer guard %d %d\n".ptr, guarded_pointer(1) as c_int,
+		guarded_pointer(3) as c_int);
+	printf("value guard %d %d\n".ptr, guarded_value(1) as c_int,
+		guarded_value(3) as c_int);
+	printf("dropped %d %d\n".ptr, dropped(1) as c_int, dropped(3) as c_int);
+	printf("never %d\n".ptr, by_never(1) as c_int);
+	return by_never(4);
+}

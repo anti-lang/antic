@@ -1,0 +1,1 @@
+errors_fail_in_a_destruct.anti:9:3: error: `fail` outside a function that may fail

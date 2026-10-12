@@ -1,0 +1,34 @@
+//! `catch fatal` on a call that fails ends the program with the code of the
+//! error, and nothing after the call runs: neither the statements nor the
+//! `defer` of the function.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn fflush(stream: ?*byte) -> c_int;
+
+fn risky(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n * 10;
+}
+
+fn run(n: int) -> int
+{
+	defer printf("the defer of run(%d)\n".ptr, n as c_int);
+	let v = risky(n) catch fatal;
+	printf("got %d\n".ptr, v as c_int);
+	fflush(none);
+	return v;
+}
+
+fn main() -> int
+{
+	run(1);
+	run(6);
+	printf("after fatal\n".ptr);
+	return 0;
+}

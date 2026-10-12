@@ -1,0 +1,1 @@
+errors_main_that_may_fail.anti:5:4: error: `main` must be fn main() -> int, fn main(args: []str) -> int or fn main(args: []str, env: []str) -> int

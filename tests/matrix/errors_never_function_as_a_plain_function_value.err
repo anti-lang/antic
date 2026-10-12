@@ -1,0 +1,1 @@
+errors_never_function_as_a_plain_function_value.anti:18:6: error: expected `fn(int)`, found `fn(int) -> never`

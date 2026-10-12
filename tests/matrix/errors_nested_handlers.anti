@@ -1,0 +1,166 @@
+//! A handler inside a handler, and a `try` block inside a `try` block. A
+//! `yield` gives the value of the handler it stands in. A `try` block binds
+//! inward, and a failing call in the handler of the inner block reaches the
+//! handler of the outer one. Every error is deleted once, whichever handler
+//! ends it, which the count of the errors alive shows after each function.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counted inherits lang.Error
+{
+	static atomic live: int = 0;
+
+	/// An error that counts itself alive until it is deleted.
+	pub fn make(code: int) -> *Counted
+	{
+		let e = alloc Counted { };
+		e.code = code;
+		e.message = "counted";
+		Counted.live.add(1);
+		return e;
+	}
+
+	concrete fn destruct(self)
+	{
+		Counted.live.sub(1);
+	}
+}
+
+fn value(code: int) -> int may fail
+{
+	if code > 0 {
+		fail Counted.make(code);
+	}
+	return 0;
+}
+
+fn plain(code: int) may fail
+{
+	if code > 0 {
+		fail Counted.make(code);
+	}
+}
+
+fn handler_in_handler(a: int, b: int) -> int
+{
+	let outer = value(a) catch first {
+		let inner = value(b) catch second {
+			yield first.code * 10 + second.code;
+		};
+		yield 100 + inner;
+	};
+	return outer;
+}
+
+fn inner_handler_fails(a: int, b: int) -> int may fail
+{
+	let outer = value(a) catch first {
+		let inner = value(b) catch second {
+			fail second;
+		};
+		yield first.code + inner;
+	};
+	return outer;
+}
+
+fn inner_handler_fails_the_outer(a: int, b: int) -> int may fail
+{
+	let outer = value(a) catch first {
+		plain(b) catch {
+			fail first;
+		};
+		yield first.code;
+	};
+	return outer;
+}
+
+fn try_in_try(a: int, b: int, c: int) -> int
+{
+	let acc = 0;
+	try {
+		plain(a);
+		acc += 1;
+		try {
+			plain(b);
+			acc += 10;
+		} catch inner {
+			acc += inner.code * 100;
+			plain(c);
+			acc += 1000;
+		}
+		acc += 10000;
+	} catch outer {
+		acc += outer.code * 100000;
+	}
+	return acc;
+}
+
+fn try_in_handler(a: int, b: int) -> int
+{
+	let acc = 0;
+	let got = value(a) catch first {
+		try {
+			plain(b);
+			acc += 1;
+		} catch second {
+			acc += second.code * 10;
+		}
+		yield first.code * 100;
+	};
+	return acc + got;
+}
+
+fn handler_in_try(a: int, b: int) -> int
+{
+	let acc = 0;
+	try {
+		let got = value(a) catch first {
+			plain(b);
+			yield first.code;
+		};
+		acc += got + 1;
+	} catch outer {
+		acc += outer.code * 100;
+	}
+	return acc;
+}
+
+fn alive() -> int
+{
+	return Counted.live.load();
+}
+
+fn main() -> int
+{
+	printf("handler in handler %d %d %d, alive %d\n".ptr,
+		handler_in_handler(0, 5) as c_int, handler_in_handler(3, 0) as c_int,
+		handler_in_handler(3, 5) as c_int, alive() as c_int);
+	let a = inner_handler_fails(3, 0) catch e {
+		yield -e.code;
+	};
+	let b = inner_handler_fails(3, 5) catch e {
+		yield -e.code;
+	};
+	printf("inner handler fails %d %d, alive %d\n".ptr, a as c_int, b as c_int,
+		alive() as c_int);
+	let c = inner_handler_fails_the_outer(3, 0) catch e {
+		yield -e.code;
+	};
+	let d = inner_handler_fails_the_outer(3, 5) catch e {
+		yield -e.code;
+	};
+	printf("inner handler fails the outer %d %d, alive %d\n".ptr, c as c_int,
+		d as c_int, alive() as c_int);
+	printf("try in try %d %d %d %d, alive %d\n".ptr, try_in_try(0, 0, 0) as c_int,
+		try_in_try(2, 0, 0) as c_int, try_in_try(0, 3, 0) as c_int,
+		try_in_try(0, 3, 4) as c_int, alive() as c_int);
+	printf("try in handler %d %d %d, alive %d\n".ptr,
+		try_in_handler(0, 5) as c_int, try_in_handler(2, 0) as c_int,
+		try_in_handler(2, 5) as c_int, alive() as c_int);
+	printf("handler in try %d %d %d, alive %d\n".ptr,
+		handler_in_try(0, 5) as c_int, handler_in_try(2, 0) as c_int,
+		handler_in_try(2, 5) as c_int, alive() as c_int);
+	return 0;
+}

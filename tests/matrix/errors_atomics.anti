@@ -1,0 +1,45 @@
+//! Atomics beside failing calls: a `try` as the operand of an atomic `add`, an
+//! `undo` and a handler that change an atomic, and a `yield` of an atomic
+//! `load`. `seen` adds what `risky` gave, `bad` counts the calls that failed
+//! and `local` holds the last value or the sum of the codes.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn risky(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n * 10;
+}
+
+class Tally
+{
+	static atomic seen: int = 0;
+	static atomic bad: int = 0;
+}
+
+fn add(n: int) may fail
+{
+	undo Tally.bad.add(1);
+	Tally.seen.add(try risky(n));
+}
+
+fn main() -> int
+{
+	let local: atomic int = 0;
+	for n in 0..5 {
+		add(n) catch e {
+			local.add(e.code);
+		};
+		let v = risky(n) catch {
+			yield local.load();
+		};
+		local.store(v);
+	}
+	printf("%d %d %d\n".ptr, Tally.seen.load() as c_int,
+		Tally.bad.load() as c_int, local.load() as c_int);
+	return 0;
+}

@@ -1,0 +1,1 @@
+errors_handler_without_a_name_reaches_its_end.anti:16:19: error: the handler of a value can reach its end without `yield`

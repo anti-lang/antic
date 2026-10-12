@@ -1,0 +1,1 @@
+errors_anonymous_never_function_reaches_its_end.anti:13:6: error: the anonymous function returns `never` and can reach its end

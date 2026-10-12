@@ -1,0 +1,1 @@
+errors_caught_error_yielded.anti:19:9: error: `e` outlives its `catch`, use `dup`

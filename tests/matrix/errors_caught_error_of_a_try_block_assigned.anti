@@ -1,0 +1,22 @@
+//! The error the handler of a `try` block binds is deleted when the handler
+//! exits, so a bare `e` assigned to a local of the function is refused.
+
+import anti.lang;
+
+fn step(n: int) may fail
+{
+	if n == 0 {
+		fail "no step";
+	}
+}
+
+fn main() -> int
+{
+	let keep: ?*lang.Error = none;
+	try {
+		step(0);
+	} catch e {
+		keep = e;
+	}
+	return 0;
+}

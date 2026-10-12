@@ -1,0 +1,23 @@
+//! A `fail` in an anonymous function belongs to that function. The function
+//! around it holds no `fail` of its own and gets the warning `never-fails`,
+//! which a release build refuses.
+
+import anti.lang;
+
+fn apply(f: fn(int) may fail)
+{
+	f(1) catch { };
+}
+
+fn outer(n: int) may fail
+{
+	apply(fn(m) {
+		fail "inner";
+	});
+}
+
+fn main() -> int
+{
+	outer(0) catch { };
+	return 0;
+}

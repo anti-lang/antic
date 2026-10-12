@@ -1,0 +1,151 @@
+//! A call that may fail and gives a value that may be `none`: the handler takes
+//! the failure and the test takes the `none`. `try` forwards the error and
+//! leaves the `?T` to `if let`, to `??` and to `let ... else`, whose `else` may
+//! leave with `fail`. A handler on the call and a guard on its result are two
+//! handlers. `p?.f()` of a function that may fail takes a handler or `try` for
+//! the error of `f`, and makes no call where `p` is `none`. Each line prints
+//! one function for a failure, a `none` and a value.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+	pub next: ?*Node = none,
+
+	pub fn child(self) -> ?*Node may fail
+	{
+		if self.n == 0 {
+			fail lang.Error.new(50, "no children at zero");
+		}
+		return self.next;
+	}
+}
+
+fn opt(k: int) -> ?int may fail
+{
+	if k == 0 {
+		fail lang.Error.new(40, "nothing asked");
+	}
+	if k == 1 {
+		return none;
+	}
+	return k * 10;
+}
+
+fn try_in_if_let(k: int) -> int may fail
+{
+	if let v = try opt(k) {
+		return v;
+	}
+	return -1;
+}
+
+fn try_before_or(k: int) -> int may fail
+{
+	let o = try opt(k);
+	return o ?? -1;
+}
+
+fn else_fails(k: int) -> int may fail
+{
+	let o = try opt(k);
+	let v = o else {
+		fail lang.Error.new(41, "none");
+	};
+	return v;
+}
+
+fn counted_as_none(k: int) -> int
+{
+	let o = opt(k) catch none;
+	return o ?? -2;
+}
+
+fn handler_then_guard(k: int) -> int
+{
+	let o = opt(k) catch e {
+		yield -e.code;
+	};
+	let v = o catch e {
+		yield -e.code;
+	};
+	return v;
+}
+
+fn handler_then_test(k: int) -> int
+{
+	let o = opt(k) catch {
+		return -3;
+	};
+	if o == none {
+		return -1;
+	}
+	return o;
+}
+
+fn chain_caught(p: ?*Node) -> int
+{
+	let c = p?.child() catch e {
+		return -e.code;
+	};
+	if let found = c {
+		return found.n;
+	}
+	return -1;
+}
+
+fn chain_forwarded(p: ?*Node) -> int may fail
+{
+	let c = try p?.child();
+	if let found = c {
+		return found.n;
+	}
+	return -1;
+}
+
+fn code_of(e: *lang.Error) -> int
+{
+	return -e.code;
+}
+
+fn main() -> int
+{
+	for k in 0..3 {
+		let a = try_in_if_let(k) catch e {
+			yield code_of(e);
+		};
+		let b = try_before_or(k) catch e {
+			yield code_of(e);
+		};
+		let c = else_fails(k) catch e {
+			yield code_of(e);
+		};
+		printf("%d: try %d %d %d, none %d, guard %d, test %d\n".ptr, k as c_int,
+			a as c_int, b as c_int, c as c_int, counted_as_none(k) as c_int,
+			handler_then_guard(k) as c_int, handler_then_test(k) as c_int);
+	}
+	let leaf = Node { n: 7 };
+	let root = Node { n: 3, next: &leaf };
+	let zero = Node { n: 0, next: &leaf };
+	printf("chain caught %d %d %d %d\n".ptr, chain_caught(none) as c_int,
+		chain_caught(&zero) as c_int, chain_caught(&leaf) as c_int,
+		chain_caught(&root) as c_int);
+	let f0 = chain_forwarded(none) catch e {
+		yield code_of(e);
+	};
+	let f1 = chain_forwarded(&zero) catch e {
+		yield code_of(e);
+	};
+	let f2 = chain_forwarded(&leaf) catch e {
+		yield code_of(e);
+	};
+	let f3 = chain_forwarded(&root) catch e {
+		yield code_of(e);
+	};
+	printf("chain forwarded %d %d %d %d\n".ptr, f0 as c_int, f1 as c_int,
+		f2 as c_int, f3 as c_int);
+	return 0;
+}

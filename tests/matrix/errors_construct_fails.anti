@@ -1,0 +1,149 @@
+//! A `construct` that may fail, on the heap and as a value, with a handler,
+//! `try`, `fail e`, `catch fatal` and `catch none`. A `construct` that fails
+//! leaves no object behind: `destruct` does not run on it, and the `undo` of
+//! the `construct` frees what it had taken. A derived `construct` forwards the
+//! error of its base, and the test
+//! `errors_derived_construct_fails_after_its_base` holds one that fails itself.
+//! `Part` counts itself alive, so each line prints what the call gave and the
+//! parts alive after it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Part
+{
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Part.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Part.live.sub(1);
+	}
+}
+
+class Machine
+{
+	pub n: int = 0,
+	own part: ?*Part = none,
+
+	fn construct(self, n: int) may fail
+	{
+		let part = alloc Part { };
+		undo delete(part);
+		if n > 2 {
+			fail lang.Error.new(n, "too big");
+		}
+		self.part = part;
+		self.n = n;
+	}
+}
+
+class Robot inherits Machine
+{
+	pub arms: int = 0,
+
+	fn construct(self, n: int, arms: int) may fail
+	{
+		try self.super.construct(n);
+		if arms > 2 {
+			fail lang.Error.new(70 + arms, "too many arms");
+		}
+		self.arms = arms;
+	}
+}
+
+fn alive() -> int
+{
+	return Part.live.load();
+}
+
+fn on_the_heap(n: int) -> int
+{
+	let m = alloc Machine(n) catch e {
+		return -e.code;
+	};
+	let got = m.n;
+	delete(m);
+	return got;
+}
+
+fn as_a_value(n: int) -> int
+{
+	let m = Machine(n) catch e {
+		return -e.code;
+	};
+	return m.n;
+}
+
+fn forwarded(n: int) -> int may fail
+{
+	let m = try Machine(n);
+	return m.n;
+}
+
+fn failed_again(n: int) -> int may fail
+{
+	let m = alloc Machine(n) catch e {
+		fail e;
+	};
+	let got = m.n;
+	delete(m);
+	return got;
+}
+
+fn counted_as_none(n: int) -> int
+{
+	let m: ?*Machine = alloc Machine(n) catch none;
+	if let made = m {
+		let got = made.n;
+		delete(made);
+		return got;
+	}
+	return -1;
+}
+
+fn derived(n: int, arms: int) -> int
+{
+	let r = alloc Robot(n, arms) catch e {
+		return -e.code;
+	};
+	let got = r.n * 10 + r.arms;
+	delete(r);
+	return got;
+}
+
+fn main() -> int
+{
+	printf("heap %d %d, alive %d\n".ptr, on_the_heap(1) as c_int,
+		on_the_heap(3) as c_int, alive() as c_int);
+	printf("value %d %d, alive %d\n".ptr, as_a_value(2) as c_int,
+		as_a_value(4) as c_int, alive() as c_int);
+	let a = forwarded(1) catch e {
+		yield -e.code;
+	};
+	let b = forwarded(5) catch e {
+		yield -e.code;
+	};
+	let c = failed_again(1) catch e {
+		yield -e.code;
+	};
+	let d = failed_again(5) catch e {
+		yield -e.code;
+	};
+	printf("try %d %d, fail e %d %d, alive %d\n".ptr, a as c_int, b as c_int,
+		c as c_int, d as c_int, alive() as c_int);
+	printf("none %d %d, alive %d\n".ptr, counted_as_none(2) as c_int,
+		counted_as_none(6) as c_int, alive() as c_int);
+	printf("derived %d %d, alive %d\n".ptr, derived(1, 2) as c_int,
+		derived(3, 1) as c_int, alive() as c_int);
+	let sure = alloc Machine(2) catch fatal;
+	printf("fatal %d, alive %d\n".ptr, sure.n as c_int, alive() as c_int);
+	delete(sure);
+	printf("deleted, alive %d\n".ptr, alive() as c_int);
+	return 0;
+}

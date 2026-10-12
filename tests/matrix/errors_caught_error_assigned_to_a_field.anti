@@ -1,0 +1,25 @@
+//! The error a `catch` binds is deleted when the handler exits, so a bare `e`
+//! assigned to a field is refused.
+
+import anti.lang;
+
+struct Holder
+{
+	held: ?*lang.Error,
+}
+
+fn step(n: int) may fail
+{
+	if n == 0 {
+		fail "no step";
+	}
+}
+
+fn main() -> int
+{
+	let h = Holder { held: none };
+	step(0) catch e {
+		h.held = e;
+	};
+	return 0;
+}

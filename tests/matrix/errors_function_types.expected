@@ -1,0 +1,14 @@
+exit 0
+0: handler 0 -60, try 1, try block 10
+0: local 0, field -60, element -60, result 0, bound -62
+1: handler 10 -1, try 11, try block 30
+1: local 10, field -1, element -1, result 10, bound 100
+2: handler 20 -2, try 21, try block 17
+2: local 20, field -2, element -2, result 20, bound 101
+3: handler -3 -3, try -3, try block -3
+3: local -3, field -3, element -3, result -3, bound 102
+fatal -4
+choose 0: 20
+choose 1: -2
+choose 2 failed: 61
+choose 2: 20

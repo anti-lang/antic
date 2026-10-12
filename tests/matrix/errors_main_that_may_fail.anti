@@ -1,0 +1,8 @@
+//! `main` has three forms and none of them may fail.
+
+import anti.lang;
+
+fn main() -> int may fail
+{
+	fail lang.Error.new(3, "main failed");
+}

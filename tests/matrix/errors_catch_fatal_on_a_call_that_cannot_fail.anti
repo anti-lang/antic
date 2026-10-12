@@ -1,0 +1,13 @@
+//! `catch fatal` on a call of a function that cannot fail is refused.
+
+import anti.lang;
+
+fn sure(n: int)
+{
+}
+
+fn main() -> int
+{
+	sure(1) catch fatal;
+	return 0;
+}

@@ -1,0 +1,28 @@
+//! The origin of an error and the position of `here` name the source that holds
+//! the statement. A `fail` and a `here` of a generic function of a library name
+//! the file, the module and the function of the library, as those of a plain
+//! function do, although the client compiles the copy.
+
+import anti.lang;
+import com.example.origin;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(what: str, at: lang.SourceLocation)
+{
+	printf("%s %s:%d:%d %s %s\n".ptr, what.ptr, at.file.ptr, at.line as c_int,
+		at.column as c_int, at.function.ptr, at.module.ptr);
+}
+
+fn main() -> int
+{
+	origin.run_fail(0) catch e {
+		show("plain fail", e.at);
+	};
+	origin.gen_fail<int>(0, 1) catch e {
+		show("generic fail", e.at);
+	};
+	show("plain here", origin.run_here());
+	show("generic here", origin.gen_here<int>());
+	return 0;
+}

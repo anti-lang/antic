@@ -1,0 +1,83 @@
+//! A function of a synchronized class that may fail gives its hidden lock back
+//! where it fails, and so does a `sync` block that a `fail` leaves. A
+//! dispatched worker then takes the lock of the same object. A lock that stayed
+//! taken would keep the worker waiting and the test would not end.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+synchronized class Account
+{
+	balance: int = 0,
+
+	pub fn put(self, n: int)
+	{
+		self.balance += n;
+	}
+
+	pub fn take(self, n: int) -> int may fail
+	{
+		if n > self.balance {
+			fail lang.Error.new(n - self.balance, "not enough");
+		}
+		self.balance -= n;
+		return self.balance;
+	}
+
+	pub fn take_twice(self, n: int) -> int may fail
+	{
+		try self.take(n);
+		return try self.take(n);
+	}
+}
+
+fn held(a: *Account, n: int) -> int may fail
+{
+	sync a {
+		let left = try a.take(n);
+		if left == 0 {
+			fail lang.Error.new(80, "emptied");
+		}
+		return left;
+	}
+}
+
+worker fn draw(a: *Account) -> int
+{
+	let left = a.take(1) catch e {
+		yield -e.code;
+	};
+	return left;
+}
+
+fn main() -> int
+{
+	let a = alloc Account { };
+	a.put(5);
+	let first = a.take(9) catch e {
+		yield -e.code;
+	};
+	let job1 = dispatch a -> draw();
+	printf("take fails %d, then a worker %d\n".ptr, first as c_int,
+		join(job1) as c_int);
+	let second = a.take_twice(3) catch e {
+		yield -e.code;
+	};
+	let job2 = dispatch a -> draw();
+	printf("try fails %d, then a worker %d\n".ptr, second as c_int,
+		join(job2) as c_int);
+	a.put(4);
+	let third = held(a, 9) catch e {
+		yield -e.code;
+	};
+	let fourth = held(a, 4) catch e {
+		yield -e.code;
+	};
+	a.put(2);
+	let job3 = dispatch a -> draw();
+	printf("sync fails %d %d, then a worker %d\n".ptr, third as c_int,
+		fourth as c_int, join(job3) as c_int);
+	delete(a);
+	return 0;
+}

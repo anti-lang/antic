@@ -1,0 +1,17 @@
+//! An anonymous function that takes `-> never` from its parameter and can reach
+//! its end is refused.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn run(f: fn(int) -> never)
+{
+	f(1);
+}
+
+fn main() -> int
+{
+	run(fn(n) {
+		printf("%d\n".ptr, n as c_int);
+	});
+	return 0;
+}

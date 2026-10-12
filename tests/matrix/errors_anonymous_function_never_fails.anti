@@ -1,0 +1,19 @@
+//! An anonymous function written `may fail` that holds no `fail` and no `try`
+//! gets the warning `never-fails`, which a release build refuses.
+
+import anti.lang;
+
+fn apply(f: fn(int) -> int may fail) -> int
+{
+	let v = f(1) catch {
+		yield 0;
+	};
+	return v;
+}
+
+fn main() -> int
+{
+	return apply(fn(m: int) -> int may fail {
+		return m;
+	});
+}

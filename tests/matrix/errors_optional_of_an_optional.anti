@@ -1,0 +1,28 @@
+//! A `?int` passes where a `??int` is expected, as an `int` passes where a
+//! `?int` is. `??int` is `?` twice, so the outer `none` and the inner one are
+//! two values, and `if let` takes one layer at a time.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn layers(o: ?? int) -> int
+{
+	if let inner = o {
+		if let v = inner {
+			return v;
+		}
+		return -1;
+	}
+	return -2;
+}
+
+fn main() -> int
+{
+	let full: ?int = 5;
+	let empty: ?int = none;
+	let a: ?? int = full;
+	let b: ?? int = empty;
+	let c: ?? int = none;
+	printf("%d %d %d\n".ptr, layers(a) as c_int, layers(b) as c_int,
+		layers(c) as c_int);
+	return 0;
+}

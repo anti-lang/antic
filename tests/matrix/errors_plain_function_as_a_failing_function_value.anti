@@ -1,0 +1,22 @@
+//! A function that cannot fail does not convert to a function type that may
+//! fail.
+
+import anti.lang;
+
+fn safe(n: int) -> int
+{
+	return n;
+}
+
+fn run(f: fn(int) -> int may fail) -> int
+{
+	let v = f(1) catch {
+		yield 0;
+	};
+	return v;
+}
+
+fn main() -> int
+{
+	return run(safe);
+}

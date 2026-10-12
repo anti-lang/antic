@@ -1,0 +1,24 @@
+//! `alloc T(args)` of a class whose `construct` may fail carries its error, and
+//! without a handler it is refused with the one message of a failing call.
+
+import anti.lang;
+
+class Machine
+{
+	pub n: int = 0,
+
+	fn construct(self, n: int) may fail
+	{
+		if n > 2 {
+			fail lang.Error.new(n, "too big");
+		}
+		self.n = n;
+	}
+}
+
+fn main() -> int
+{
+	let m = alloc Machine(1);
+	delete(m);
+	return 0;
+}

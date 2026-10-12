@@ -1,0 +1,17 @@
+//! `destruct` has no error channel, and a `fail` in it is refused.
+
+import anti.lang;
+
+class Held
+{
+	fn destruct(self)
+	{
+		fail "late";
+	}
+}
+
+fn main() -> int
+{
+	let h = Held { };
+	return 0;
+}

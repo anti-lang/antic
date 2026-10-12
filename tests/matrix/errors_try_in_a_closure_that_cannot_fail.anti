@@ -1,0 +1,32 @@
+//! An anonymous function takes its type from the parameter it is passed to. One
+//! that cannot fail takes no `try`, although the function around it may fail.
+
+import anti.lang;
+
+fn step(n: int) may fail
+{
+	if n == 0 {
+		fail "no step";
+	}
+}
+
+fn apply(f: fn(int))
+{
+	f(1);
+}
+
+fn outer(n: int) may fail
+{
+	if n > 5 {
+		fail "outer";
+	}
+	apply(fn(m) {
+		try step(m);
+	});
+}
+
+fn main() -> int
+{
+	outer(0) catch { };
+	return 0;
+}

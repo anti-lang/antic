@@ -1,0 +1,1 @@
+errors_yield_in_a_closure_in_a_handler.anti:23:4: error: `yield` stands in a `catch` handler

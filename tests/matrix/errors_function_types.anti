@@ -1,0 +1,146 @@
+//! A function type that may fail, and a call through a value of it. `may fail`
+//! after a function type belongs to that type, so `choose` gives a failing
+//! function and cannot fail, and `choose_or_fail` writes the words twice. A
+//! call through a local, a parameter, a field, an element, a call result and a
+//! bound function is handled as a direct call is: by a handler, by `try`, by
+//! `catch fatal` and by a `try` block.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn risky(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n * 10;
+}
+
+fn negated(n: int) -> int may fail
+{
+	if n == 0 {
+		fail lang.Error.new(60, "zero");
+	}
+	return -n;
+}
+
+fn choose(k: int) -> fn(int) -> int may fail
+{
+	if k == 0 {
+		return risky;
+	}
+	return negated;
+}
+
+fn choose_or_fail(k: int) -> fn(int) -> int may fail may fail
+{
+	if k > 1 {
+		fail lang.Error.new(61, "no such function");
+	}
+	return choose(k);
+}
+
+struct Table
+{
+	first: fn(int) -> int may fail,
+	second: fn(int) -> int may fail,
+}
+
+class Calc
+{
+	pub base: int = 0,
+
+	pub fn add(self, n: int) -> int may fail
+	{
+		if n < 0 {
+			fail lang.Error.new(62, "negative");
+		}
+		return self.base + n;
+	}
+}
+
+fn code_of(e: *lang.Error) -> int
+{
+	return -e.code;
+}
+
+fn by_handler(f: fn(int) -> int may fail, n: int) -> int
+{
+	let v = f(n) catch e {
+		yield code_of(e);
+	};
+	return v;
+}
+
+fn by_try(f: fn(int) -> int may fail, n: int) -> int may fail
+{
+	return 1 + try f(n);
+}
+
+fn by_fatal(f: fn(int) -> int may fail, n: int) -> int
+{
+	let v = f(n) catch fatal;
+	return v;
+}
+
+fn by_try_block(f: fn(int) -> int may fail, n: int) -> int
+{
+	let acc = 0;
+	try {
+		acc += f(n);
+		acc += f(n + 1);
+	} catch e {
+		acc += code_of(e);
+	}
+	return acc;
+}
+
+fn through_values(n: int)
+{
+	let local: fn(int) -> int may fail = risky;
+	let table = Table { first: risky, second: negated };
+	let both: [2] fn(int) -> int may fail = [risky, negated];
+	let calc = Calc { base: 100 };
+	let a = local(n) catch e {
+		yield code_of(e);
+	};
+	let b = table.second(n) catch e {
+		yield code_of(e);
+	};
+	let c = both[1](n) catch e {
+		yield code_of(e);
+	};
+	let d = choose(0)(n) catch e {
+		yield code_of(e);
+	};
+	let bound = calc.add;
+	let e2 = bound(n - 1) catch e {
+		yield code_of(e);
+	};
+	printf("%d: local %d, field %d, element %d, result %d, bound %d\n".ptr,
+		n as c_int, a as c_int, b as c_int, c as c_int, d as c_int,
+		e2 as c_int);
+}
+
+fn main() -> int
+{
+	for n in 0..4 {
+		let t = by_try(risky, n) catch e {
+			yield code_of(e);
+		};
+		printf("%d: handler %d %d, try %d, try block %d\n".ptr, n as c_int,
+			by_handler(risky, n) as c_int, by_handler(negated, n) as c_int,
+			t as c_int, by_try_block(risky, n) as c_int);
+		through_values(n);
+	}
+	printf("fatal %d\n".ptr, by_fatal(negated, 4) as c_int);
+	for k in 0..3 {
+		let f = choose_or_fail(k) catch e {
+			printf("choose %d failed: %d\n".ptr, k as c_int, e.code as c_int);
+			yield risky;
+		};
+		printf("choose %d: %d\n".ptr, k as c_int, by_handler(f, 2) as c_int);
+	}
+	return 0;
+}

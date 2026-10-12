@@ -1,0 +1,16 @@
+//! The `NoneDereference` that the guard of a `?*T` binds is deleted when the
+//! handler exits, so `yield e` is refused there as well.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let missing: ?*lang.Error = none;
+	let p: *lang.Error = missing catch e {
+		yield e;
+	};
+	printf("%s\n".ptr, p.message.ptr);
+	return 0;
+}

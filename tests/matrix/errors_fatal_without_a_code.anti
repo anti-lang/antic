@@ -1,0 +1,38 @@
+//! `catch fatal` on an error whose code is 0, as `fail "text"` gives, ends the
+//! program with status 1. The handler stands in a `try` block, in a loop and in
+//! an anonymous function.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn fflush(stream: ?*byte) -> c_int;
+
+fn step(n: int) may fail
+{
+	if n == 0 {
+		fail "no step";
+	}
+}
+
+fn apply(n: int, f: fn(int))
+{
+	f(n);
+}
+
+fn main() -> int
+{
+	for n in 0..3 {
+		try {
+			apply(2 - n, fn(m) {
+				step(m) catch fatal;
+				printf("step %d\n".ptr, m as c_int);
+				fflush(none);
+			});
+		} catch {
+			printf("no handler runs\n".ptr);
+		}
+	}
+	printf("after fatal\n".ptr);
+	return 0;
+}

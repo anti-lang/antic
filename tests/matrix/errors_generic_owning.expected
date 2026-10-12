@@ -1,0 +1,6 @@
+exit 0
+given 1, alive 1
+failed 0, alive 1
+forwarded 3, alive 2
+yielded 4, alive 3
+after the values, alive 0

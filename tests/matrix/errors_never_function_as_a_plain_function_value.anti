@@ -1,0 +1,20 @@
+//! A function that returns `never` does not convert to a function type that
+//! returns.
+
+extern fn exit(code: c_int) -> never;
+
+fn die(n: int) -> never
+{
+	exit(n as c_int);
+}
+
+fn run(f: fn(int))
+{
+	f(1);
+}
+
+fn main() -> int
+{
+	run(die);
+	return 0;
+}

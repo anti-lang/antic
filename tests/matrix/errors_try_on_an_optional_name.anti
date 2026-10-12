@@ -1,0 +1,21 @@
+//! Decision 21: `try` on a name of type `?T` is refused, with a message that
+//! names `let ... else` and `??`.
+
+import anti.lang;
+
+fn get(o: ?int) -> int may fail
+{
+	if o == none {
+		fail "nothing";
+	}
+	let v = try o;
+	return v;
+}
+
+fn main() -> int
+{
+	let v = get(1) catch {
+		yield -1;
+	};
+	return v;
+}

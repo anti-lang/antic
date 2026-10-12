@@ -1,0 +1,22 @@
+//! Decision 20: the handler of a `let` that takes a tuple apart reaches its end
+//! and gives neither name a value. It is refused.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn divide(a: int, b: int) -> (int, int) may fail
+{
+	if b == 0 {
+		fail "division by zero";
+	}
+	return (a / b, a % b);
+}
+
+fn main() -> int
+{
+	let (q, r) = divide(7, 0) catch e {
+		printf("%s\n".ptr, e.message.ptr);
+	};
+	return q + r;
+}

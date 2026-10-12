@@ -1,0 +1,1 @@
+errors_try_block_without_a_catch.anti:17:3: error: expected `catch`

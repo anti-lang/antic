@@ -1,0 +1,18 @@
+//! A failing call in a handler needs a handler of its own.
+
+import anti.lang;
+
+fn step(n: int) may fail
+{
+	if n == 0 {
+		fail "no step";
+	}
+}
+
+fn main() -> int
+{
+	step(0) catch {
+		step(0);
+	};
+	return 0;
+}

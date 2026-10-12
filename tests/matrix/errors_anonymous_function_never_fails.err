@@ -1,0 +1,1 @@
+errors_anonymous_function_never_fails.anti:16:33: error: the anonymous function may fail and never does [never-fails]

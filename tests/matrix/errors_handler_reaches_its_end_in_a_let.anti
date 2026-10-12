@@ -1,0 +1,22 @@
+//! Decision 20: the handler of a `let` reaches its end and gives its binding no
+//! value, which is refused.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn value(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "refused";
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let v = value(1) catch e {
+		printf("%s\n".ptr, e.message.ptr);
+	};
+	return v;
+}

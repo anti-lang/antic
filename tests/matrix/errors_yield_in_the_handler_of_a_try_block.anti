@@ -1,0 +1,21 @@
+//! The handler of a `try` block gives no value, and a `yield` in it is refused.
+//! No document states the rule, and the test holds what antic 0.2.0 prints.
+
+import anti.lang;
+
+fn step(n: int) may fail
+{
+	if n == 0 {
+		fail "no step";
+	}
+}
+
+fn main() -> int
+{
+	try {
+		step(0);
+	} catch {
+		yield;
+	}
+	return 0;
+}

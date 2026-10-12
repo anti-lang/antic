@@ -1,0 +1,27 @@
+//! Decision 21: `try` on a field of type `?T` is refused, with a message that
+//! names `let ... else` and `??`.
+
+import anti.lang;
+
+struct Box
+{
+	held: ?int,
+}
+
+fn get(b: *Box) -> int may fail
+{
+	if b.held == none {
+		fail "nothing";
+	}
+	let v = try b.held;
+	return v;
+}
+
+fn main() -> int
+{
+	let b = Box { held: 1 };
+	let v = get(&b) catch {
+		yield -1;
+	};
+	return v;
+}

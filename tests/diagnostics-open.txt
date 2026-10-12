@@ -28,7 +28,6 @@ a class has one `compatible` line
 
 # src/antic/parser_expr.c
 an element of a tuple is a decimal number
-`try` stands before a call
 
 # src/antic/parser_item.c
 `protected` marks a class member, and a module item is `pub`, `internal` or neither
@@ -36,7 +35,6 @@ an element of a tuple is a decimal number
 `worker` stands before `fn`
 
 # src/antic/parser_stmt.c
-expected `catch`
 the message of an `assert` is a string literal
 an arm of a `select` is a call, an assignment or a block
 expected a call or an assignment
@@ -59,7 +57,6 @@ a variadic function has no function pointer type
 `fail` captures the frames with `anti.lang.StackTrace.capture`, which takes the count of frames to skip
 `fail` writes `at` and `frames` of `anti.lang.Error`, which this `anti.lang` lacks
 `%s.construct` takes %s%zu argument%s, found %zu
-this call cannot fail, so it has no error to handle
 `%.*s` has no public class `%.*s`
 the first argument names an interface
 `%s` is not a function
@@ -116,8 +113,6 @@ a copy of `%s` nests deeper than %d levels
 # src/antic/sema_stmt.c
 `%.*s` of singleton `%s` is read-only after creation, and `mutable` marks a field the program writes
 a `switch` on a `str` compares with `anti.text.equal`, which this `anti.text` lacks
-the anonymous function returns `never` and can reach its end
-the anonymous function may fail and never does
 `setup` and `teardown` belong to `fixtures`, which runs them around every test
 
 # src/antic/sema_thread.c

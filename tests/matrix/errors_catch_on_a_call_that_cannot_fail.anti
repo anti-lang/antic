@@ -1,0 +1,16 @@
+//! A handler on a call of a function that cannot fail is refused.
+
+import anti.lang;
+
+fn sure(n: int) -> int
+{
+	return n;
+}
+
+fn main() -> int
+{
+	let v = sure(1) catch e {
+		yield e.code;
+	};
+	return v;
+}
