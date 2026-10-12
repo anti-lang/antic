@@ -14,6 +14,7 @@ dispatch code 0 -1
 sync 0 100
 select 0 100
 nested 0 100
+cannot fail 0 0
 method 1 1
 loop 1 101
 arm 1 5
@@ -29,6 +30,7 @@ dispatch code 1 0
 sync 1 1
 select 1 1
 nested 1 1
+cannot fail 1 1
 method 2 1
 loop 2 102
 arm 2 1
@@ -44,6 +46,7 @@ dispatch code 2 0
 sync 2 1
 select 2 1
 nested 2 1
+cannot fail 2 2
 method 3 100
 loop 3 3
 arm 3 100
@@ -59,4 +62,5 @@ dispatch code 3 -4
 sync 3 100
 select 3 100
 nested 3 100
+cannot fail 3 3
 sync entered 4

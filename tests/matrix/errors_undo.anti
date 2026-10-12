@@ -4,7 +4,9 @@
 //! fail. Its `undo` adds 100 where its block leaves through a `fail` or through
 //! a `try` that forwards, and the block adds 1 where it ends. An `undo` in the
 //! block of a `defer` or of another `undo` never runs, since neither block
-//! leaves through an error. The program prints one line per place and input.
+//! leaves through an error. An `undo` in a function that cannot fail compiles
+//! and never runs, which no document states. The program prints one line per
+//! place and input.
 
 import anti.lang;
 
@@ -239,6 +241,12 @@ class Outer
 	}
 }
 
+fn in_a_function_that_cannot_fail(n: int, out: *int)
+{
+	undo *out += 100;
+	*out += n;
+}
+
 fn show(place: str, n: int, out: int)
 {
 	printf("%s %d %d\n".ptr, place.ptr, n as c_int, out as c_int);
@@ -293,6 +301,9 @@ fn main() -> int
 		in_select(c, n, &out) catch { };
 		show("select", n, out);
 		show("nested", n, outer.go(n));
+		out = 0;
+		in_a_function_that_cannot_fail(n, &out);
+		show("cannot fail", n, out);
 	}
 	printf("sync entered %d\n".ptr, g.entered as c_int);
 	g.lock.destroy();
