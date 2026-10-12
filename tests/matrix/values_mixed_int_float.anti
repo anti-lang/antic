@@ -1,0 +1,9 @@
+//! `*` on an `int` and a `float` is refused.
+
+fn main() -> int
+{
+	let a = 2;
+	let b = 1.5;
+	let c = a * b;
+	return 0;
+}

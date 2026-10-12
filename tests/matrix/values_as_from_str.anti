@@ -1,0 +1,7 @@
+//! `as` from a `str` to a number is refused.
+
+fn main() -> int
+{
+	let n = "12" as int;
+	return 0;
+}

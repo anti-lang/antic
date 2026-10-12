@@ -1,0 +1,1 @@
+values_float_literal_above_f64.anti:5:15: error: `1.0e309` does not fit `float`

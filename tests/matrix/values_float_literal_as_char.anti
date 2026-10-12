@@ -1,0 +1,7 @@
+//! A float literal where a `char` is expected is refused.
+
+fn main() -> int
+{
+	let x: char = 1.5;
+	return 0;
+}

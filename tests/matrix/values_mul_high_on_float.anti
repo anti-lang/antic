@@ -1,0 +1,8 @@
+//! `mul_high` on two floats is refused.
+
+fn main() -> int
+{
+	let a = 1.5;
+	let b = mul_high(a, a);
+	return 0;
+}

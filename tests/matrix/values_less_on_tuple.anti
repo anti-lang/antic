@@ -1,0 +1,7 @@
+//! `<` on two tuples is refused: a tuple has no order.
+
+fn main() -> int
+{
+	let first = (1, 2) < (1, 3);
+	return 0;
+}

@@ -1,0 +1,1 @@
+values_literal_above_byte.anti:5:16: error: `256` does not fit `byte`

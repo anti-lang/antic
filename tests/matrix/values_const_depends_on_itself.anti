@@ -1,0 +1,9 @@
+//! A constant that names itself is refused.
+
+const LOOP: int = LOOP + 1;
+
+fn main() -> int
+{
+	let a = LOOP;
+	return 0;
+}

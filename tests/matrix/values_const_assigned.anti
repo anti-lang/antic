@@ -1,0 +1,9 @@
+//! An assignment to a constant is refused.
+
+const STEP: int = 3;
+
+fn main() -> int
+{
+	STEP = 4;
+	return 0;
+}

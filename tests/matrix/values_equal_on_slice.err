@@ -1,0 +1,1 @@
+values_equal_on_slice.anti:6:13: error: `==` is not defined on `[]int`

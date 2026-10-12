@@ -1,0 +1,8 @@
+//! A character literal where an `i16` is expected is refused: a `char` is no
+//! integer.
+
+fn main() -> int
+{
+	let x: i16 = 'a';
+	return 0;
+}

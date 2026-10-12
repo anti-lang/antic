@@ -1,0 +1,8 @@
+//! `as` from a slice to a number is refused.
+
+fn main() -> int
+{
+	let xs = [1, 2];
+	let n = xs[0..2] as int;
+	return 0;
+}

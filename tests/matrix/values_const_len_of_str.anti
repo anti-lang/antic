@@ -1,0 +1,10 @@
+//! The length of a constant `str` is no constant expression.
+
+const NAME: str = "anti";
+const NAME_LEN: int = NAME.len;
+
+fn main() -> int
+{
+	let a = NAME_LEN;
+	return 0;
+}

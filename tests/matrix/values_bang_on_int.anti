@@ -1,0 +1,8 @@
+//! `!` on an integer is refused: the operator of an integer is `~`.
+
+fn main() -> int
+{
+	let a = 1;
+	let b = !a;
+	return 0;
+}

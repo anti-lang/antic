@@ -1,0 +1,1 @@
+values_float_literal_as_u8.anti:6:14: error: expected `byte`, found a float literal

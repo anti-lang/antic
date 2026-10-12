@@ -1,0 +1,8 @@
+//! Unary `-` on a `uint` is refused: the type is unsigned.
+
+fn main() -> int
+{
+	let x: uint = 5;
+	let y = -x;
+	return 0;
+}

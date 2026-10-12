@@ -1,2 +1,1 @@
-values_call_at_module_level.anti:9:19: error: a call is not a constant expression
-values_call_at_module_level.anti:11:26: error: a call is not a constant expression
+values_call_at_module_level.anti:8:19: error: a call is not a constant expression

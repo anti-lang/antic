@@ -1,0 +1,7 @@
+//! `+` on two `str` values is refused: it joins no text, and `f"..."` does.
+
+fn main() -> int
+{
+	let both = "a" + "b";
+	return 0;
+}

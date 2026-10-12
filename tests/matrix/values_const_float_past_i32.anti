@@ -1,0 +1,7 @@
+//! A constant float past the range of `i32` is refused in a conversion to it.
+
+fn main() -> int
+{
+	let a = 30000000000.0 as i32;
+	return 0;
+}

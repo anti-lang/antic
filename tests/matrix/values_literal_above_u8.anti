@@ -1,0 +1,7 @@
+//! An integer literal one above the greatest `u8` is refused.
+
+fn main() -> int
+{
+	let x: u8 = 256;
+	return 0;
+}

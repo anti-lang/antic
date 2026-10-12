@@ -1,0 +1,7 @@
+//! An integer literal one above the greatest `int` is refused.
+
+fn main() -> int
+{
+	let x: int = 9223372036854775808;
+	return 0;
+}

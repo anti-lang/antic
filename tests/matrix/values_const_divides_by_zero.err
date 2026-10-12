@@ -1,0 +1,1 @@
+values_const_divides_by_zero.anti:6:10: error: `7 / 0` divides by zero

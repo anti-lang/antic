@@ -1,0 +1,8 @@
+//! `as f16` from an `f64` is refused: a half is made from an `f32` alone.
+
+fn main() -> int
+{
+	let x = 1.5;
+	let h = x as f16;
+	return 0;
+}

@@ -1,0 +1,8 @@
+//! A float literal where an `uint` is expected is refused: no literal changes
+//! its kind.
+
+fn main() -> int
+{
+	let x: uint = 1.5;
+	return 0;
+}

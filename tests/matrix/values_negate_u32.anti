@@ -1,0 +1,8 @@
+//! Unary `-` on a `u32` is refused: the type is unsigned.
+
+fn main() -> int
+{
+	let x: u32 = 5;
+	let y = -x;
+	return 0;
+}

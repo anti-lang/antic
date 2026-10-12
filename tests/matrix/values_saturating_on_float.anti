@@ -1,0 +1,8 @@
+//! `+|` on two floats is refused: the saturating operators take integers alone.
+
+fn main() -> int
+{
+	let a = 1.5;
+	let b = a +| a;
+	return 0;
+}

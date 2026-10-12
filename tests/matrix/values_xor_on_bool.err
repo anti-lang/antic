@@ -1,0 +1,1 @@
+values_xor_on_bool.anti:5:12: error: `^` needs integer operands, found `bool`

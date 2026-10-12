@@ -1,0 +1,7 @@
+//! `<` on two `bool` values is refused.
+
+fn main() -> int
+{
+	let first = true < false;
+	return 0;
+}

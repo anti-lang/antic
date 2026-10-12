@@ -1,0 +1,9 @@
+//! `as` from an `int` to a `char` is refused: a `char` converts from a `u32`
+//! alone.
+
+fn main() -> int
+{
+	let n = 65;
+	let c = n as char;
+	return 0;
+}

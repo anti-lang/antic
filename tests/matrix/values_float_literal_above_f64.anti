@@ -1,0 +1,7 @@
+//! A float literal past the greatest `f64` is refused.
+
+fn main() -> int
+{
+	let x: f64 = 1.0e309;
+	return 0;
+}

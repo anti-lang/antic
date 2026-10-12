@@ -1,0 +1,7 @@
+//! A remainder of two constants by zero is refused.
+
+fn main() -> int
+{
+	let a = 7 % 0;
+	return 0;
+}

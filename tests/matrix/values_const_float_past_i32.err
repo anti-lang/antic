@@ -1,0 +1,1 @@
+values_const_float_past_i32.anti:5:10: error: `30000000000.0 as i32` does not fit `i32`

@@ -1,0 +1,1 @@
+values_literal_below_u64.anti:5:15: error: `-1` does not fit `u64`

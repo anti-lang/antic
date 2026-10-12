@@ -1,0 +1,7 @@
+//! An integer literal below the least `i8` is refused.
+
+fn main() -> int
+{
+	let x: i8 = -129;
+	return 0;
+}

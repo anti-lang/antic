@@ -1,0 +1,15 @@
+//! A float literal where a simd struct is expected is refused.
+
+simd struct F32x4
+{
+	a: f32,
+	b: f32,
+	c: f32,
+	d: f32,
+}
+
+fn main() -> int
+{
+	let v: F32x4 = 1.5;
+	return 0;
+}

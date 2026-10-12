@@ -1,0 +1,7 @@
+//! A shift of a constant by the width of its type is refused.
+
+fn main() -> int
+{
+	let a = 1 << 64;
+	return 0;
+}

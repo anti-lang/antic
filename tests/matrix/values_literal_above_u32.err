@@ -1,0 +1,1 @@
+values_literal_above_u32.anti:5:15: error: `4294967296` does not fit `u32`

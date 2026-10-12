@@ -1,0 +1,1 @@
+values_literal_below_i8.anti:5:14: error: `-129` does not fit `i8`

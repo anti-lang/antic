@@ -1,0 +1,7 @@
+//! A shift of a constant by a negative count is refused.
+
+fn main() -> int
+{
+	let a = 1 >> -1;
+	return 0;
+}

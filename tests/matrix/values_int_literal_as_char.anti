@@ -1,0 +1,8 @@
+//! An integer literal where a `char` is expected is refused: an integer literal
+//! never becomes a `char`.
+
+fn main() -> int
+{
+	let x: char = 65;
+	return 0;
+}

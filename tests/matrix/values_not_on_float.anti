@@ -1,0 +1,8 @@
+//! `~` on a float is refused.
+
+fn main() -> int
+{
+	let a = 1.5;
+	let b = ~a;
+	return 0;
+}

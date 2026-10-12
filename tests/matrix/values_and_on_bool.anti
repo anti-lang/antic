@@ -1,0 +1,8 @@
+//! `&` on two `bool` values is refused: the bitwise operators take integers,
+//! and `&&` takes a `bool`.
+
+fn main() -> int
+{
+	let both = true & false;
+	return 0;
+}

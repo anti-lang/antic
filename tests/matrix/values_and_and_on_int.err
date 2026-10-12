@@ -1,0 +1,1 @@
+values_and_and_on_int.anti:6:10: error: `&&` needs `bool` operands, found `int`

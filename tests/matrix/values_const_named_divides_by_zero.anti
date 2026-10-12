@@ -1,0 +1,10 @@
+//! A division by a named constant that is zero is refused, and the message
+//! shows the value of the name.
+
+fn main() -> int
+{
+	const NONE: int = 0;
+	const SEVEN: int = 7;
+	let a = SEVEN / NONE;
+	return 0;
+}

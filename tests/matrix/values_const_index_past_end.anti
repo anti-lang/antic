@@ -1,0 +1,11 @@
+//! An index past the end of a constant array is refused where the checker folds
+//! it.
+
+const TABLE: [3]int = [1, 2, 3];
+const PAST: int = TABLE[5];
+
+fn main() -> int
+{
+	let a = PAST;
+	return 0;
+}

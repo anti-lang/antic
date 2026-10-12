@@ -1,0 +1,15 @@
+//! `|` on two values of an enum is refused: an enum is no integer until `as`
+//! makes it one.
+
+enum Color
+{
+	Red,
+	Green,
+	Blue,
+}
+
+fn main() -> int
+{
+	let both = Color.Red | Color.Blue;
+	return 0;
+}

@@ -1,0 +1,7 @@
+//! An integer literal one above the greatest `i16` is refused.
+
+fn main() -> int
+{
+	let x: i16 = 32768;
+	return 0;
+}

@@ -1,0 +1,8 @@
+//! `as` from an integer to a `bool` is refused: the test is `n != 0`.
+
+fn main() -> int
+{
+	let n = 1;
+	let yes = n as bool;
+	return 0;
+}

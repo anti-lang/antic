@@ -1,0 +1,1 @@
+values_saturating_on_float.anti:6:10: error: `+|` needs integer operands, found `float`

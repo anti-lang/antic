@@ -1,0 +1,1 @@
+values_const_inf_as_int.anti:7:10: error: `inf as int` does not fit `int`

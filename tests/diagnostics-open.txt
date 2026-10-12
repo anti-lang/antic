@@ -84,7 +84,6 @@ the field `%.*s` appears twice
 `%.*s` is no base and no interface of `%.*s`
 
 # src/antic/sema_const.c
-the index %lld is outside the constant array
 
 # src/antic/sema_copies.c
 antic compiles no copy of `%.*s` yet, %s
@@ -97,14 +96,11 @@ a function that is not kept cannot be stored
 `%.*s` holds a function that is not marked `concurrent`
 the function is not marked `concurrent`
 the call returns no value
-unary `!` needs a `bool`, found `%s`
-unary `~` needs an integer, found `%s`
 `operator fn iter` gives `%s`, which has no `operator fn next` and `operator fn value`
 `%s` needs a class pointer on each side, found `%s` and `%s`
 `%s` is never `%s`, the classes share no chain
 `is` names a case on a variant alone, found `%s`
 %s calls `anti.text.Builder.%s`, which this `anti.text` lacks
-slicing an array needs a place
 cannot slice `%s`
 `%s` is not a variant
 `%s` is a singleton, and `%s.get()` gives its one instance
@@ -118,8 +114,6 @@ a copy of `%s` nests deeper than %d levels
 
 # src/antic/sema_operator.c
 `operator fn %.*s` takes one operand beside its own
-`%s` needs `bool` operands, found `%s`
-`%s` needs numeric operands, found `%s`
 
 # src/antic/sema_pattern.c
 `patch` takes 2 to 5 arguments, found %zu
@@ -137,7 +131,6 @@ a copy of `%s` nests deeper than %d levels
 `%s.load` takes 2 arguments, found %zu
 
 # src/antic/sema_stmt.c
-`%s` holds a `Mutex` and cannot be assigned
 `%.*s` of singleton `%s` is read-only after creation, and `mutable` marks a field the program writes
 a `switch` on a `str` compares with `anti.text.equal`, which this `anti.text` lacks
 the anonymous function returns `never` and can reach its end

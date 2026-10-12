@@ -1,0 +1,9 @@
+//! `+` on an `i32` and an `int` is refused: no operand widens by itself.
+
+fn main() -> int
+{
+	let a: i32 = 1;
+	let b: int = 2;
+	let c = a + b;
+	return 0;
+}

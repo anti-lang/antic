@@ -1,0 +1,9 @@
+//! A constant NaN converted to an integer is refused, and the message shows the
+//! value as `nan`.
+
+fn main() -> int
+{
+	const NAN: float = 0.0 / 0.0;
+	let a = NAN as int;
+	return 0;
+}

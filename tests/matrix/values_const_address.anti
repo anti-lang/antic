@@ -1,0 +1,9 @@
+//! The address of a constant is refused: a constant takes no storage.
+
+const STEP: int = 3;
+
+fn main() -> int
+{
+	let p = &STEP;
+	return 0;
+}

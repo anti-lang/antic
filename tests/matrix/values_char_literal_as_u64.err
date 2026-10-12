@@ -1,0 +1,1 @@
+values_char_literal_as_u64.anti:6:15: error: expected `u64`, found `char`

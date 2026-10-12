@@ -1,0 +1,8 @@
+//! `+=` of a float literal into an `int` is refused.
+
+fn main() -> int
+{
+	let a = 1;
+	a += 1.5;
+	return 0;
+}

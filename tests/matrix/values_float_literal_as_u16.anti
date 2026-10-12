@@ -1,0 +1,8 @@
+//! A float literal where an `u16` is expected is refused: no literal changes
+//! its kind.
+
+fn main() -> int
+{
+	let x: u16 = 1.5;
+	return 0;
+}

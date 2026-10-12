@@ -1,0 +1,1 @@
+values_mixed_int_float.anti:7:10: error: the operands of `*` have the types `int` and `float`

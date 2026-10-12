@@ -1,0 +1,1 @@
+values_int_literal_as_f32.anti:6:15: error: expected `f32`, found an integer literal

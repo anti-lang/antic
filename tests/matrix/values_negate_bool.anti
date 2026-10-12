@@ -1,0 +1,8 @@
+//! Unary `-` on a `bool` is refused.
+
+fn main() -> int
+{
+	let a = true;
+	let b = -a;
+	return 0;
+}

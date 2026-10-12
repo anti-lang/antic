@@ -1,0 +1,10 @@
+//! `<` on an `int` and a `uint` is refused: no comparison mixes a signed and an
+//! unsigned type.
+
+fn main() -> int
+{
+	let a: int = 1;
+	let b: uint = 2;
+	let c = a < b;
+	return 0;
+}

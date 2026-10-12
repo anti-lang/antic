@@ -1,0 +1,7 @@
+//! A shift of a constant `u8` by 8 is refused: the width is that of the type.
+
+fn main() -> int
+{
+	let a: u8 = 1 << 8;
+	return 0;
+}

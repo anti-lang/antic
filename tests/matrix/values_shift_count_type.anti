@@ -1,0 +1,9 @@
+//! A shift whose count has another type than its value is refused.
+
+fn main() -> int
+{
+	let a: u8 = 1;
+	let n: int = 3;
+	let c = a << n;
+	return 0;
+}

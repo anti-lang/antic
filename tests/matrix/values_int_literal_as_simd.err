@@ -1,0 +1,1 @@
+values_int_literal_as_simd.anti:15:14: error: expected `I32x4`, found an integer literal

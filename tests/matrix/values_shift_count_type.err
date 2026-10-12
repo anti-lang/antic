@@ -1,0 +1,1 @@
+values_shift_count_type.anti:7:10: error: the operands of `<<` have the types `byte` and `int`

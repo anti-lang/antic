@@ -1,0 +1,7 @@
+//! An integer literal one above the greatest `u32` is refused.
+
+fn main() -> int
+{
+	let x: u32 = 4294967296;
+	return 0;
+}

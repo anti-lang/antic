@@ -1,0 +1,9 @@
+//! A constant infinity converted to an integer is refused, and the message
+//! shows the value as `inf`.
+
+fn main() -> int
+{
+	const INF: float = 1.0 / 0.0;
+	let a = INF as int;
+	return 0;
+}

@@ -1,0 +1,8 @@
+//! `&&` on two integers is refused.
+
+fn main() -> int
+{
+	let a = 1;
+	let b = a && a;
+	return 0;
+}

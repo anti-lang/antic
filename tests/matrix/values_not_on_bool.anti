@@ -1,0 +1,8 @@
+//! `~` on a `bool` is refused: the operator of a `bool` is `!`.
+
+fn main() -> int
+{
+	let a = true;
+	let b = ~a;
+	return 0;
+}

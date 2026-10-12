@@ -1,0 +1,1 @@
+values_less_on_tuple.anti:5:14: error: `<` needs numeric, `char` or `str` operands, found `(int, int)`

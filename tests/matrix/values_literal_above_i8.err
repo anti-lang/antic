@@ -1,0 +1,1 @@
+values_literal_above_i8.anti:5:14: error: `128` does not fit `i8`

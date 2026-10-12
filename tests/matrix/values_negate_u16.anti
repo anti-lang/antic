@@ -1,0 +1,8 @@
+//! Unary `-` on a `u16` is refused: the type is unsigned.
+
+fn main() -> int
+{
+	let x: u16 = 5;
+	let y = -x;
+	return 0;
+}

@@ -1,0 +1,1 @@
+values_const_nan_as_int.anti:7:10: error: `nan as int` does not fit `int`

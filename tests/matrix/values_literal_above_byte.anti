@@ -1,0 +1,7 @@
+//! An integer literal one above the greatest `byte` is refused.
+
+fn main() -> int
+{
+	let x: byte = 256;
+	return 0;
+}

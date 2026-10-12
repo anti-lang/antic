@@ -1,0 +1,8 @@
+//! An integer literal where an `f32` is expected is refused: an integer literal
+//! never becomes a float.
+
+fn main() -> int
+{
+	let x: f32 = 65;
+	return 0;
+}
