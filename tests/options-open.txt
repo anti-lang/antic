@@ -1,0 +1,25 @@
+# The options of antic and the commands and options of anti that no test
+# passes yet. The test options_covered reads this list beside
+# src/antic/main.c, src/anti/main.c, the command lines of the registered
+# tests and the runners under tests/. tests/run_options_covered.cmake
+# states how it reads each.
+#
+# One line per unit: `antic <option>`, `anti <command>`,
+# `anti <command> <option>`, `anti <command> <sub-command>` or
+# `anti <option>`.
+#
+# A unit leaves the list in the commit that adds its test. The test fails
+# for a line whose unit a test passes, and for a unit that no test passes
+# and no line names. A new option comes with its test and never with a
+# line here.
+
+antic --help
+antic --soname
+antic --strip-docs
+anti --help
+anti -h
+anti symbols --from
+anti build --strip-docs
+anti build --soname
+anti check -I
+anti bind -D

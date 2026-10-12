@@ -5156,6 +5156,34 @@ add_test(NAME matrix_files
     COMMAND "${CMAKE_COMMAND}" "-DMATRIX=${MATRIX}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_matrix_files.cmake")
 
+# The two guards of the test run. Every message of antic and of anti has
+# a test that expects it, and every option of antic and every command and
+# option of anti a test that passes it. What has none yet stands in
+# diagnostics-open.txt and options-open.txt, and a line leaves its list in
+# the commit that adds the test. docs/notes/test-matrix.md states both.
+add_test(NAME diagnostics_covered
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+            "-DOPEN=${CMAKE_CURRENT_SOURCE_DIR}/diagnostics-open.txt"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_diagnostics_covered.cmake")
+add_test(NAME diagnostics_covered_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${CMAKE_CURRENT_SOURCE_DIR}/run_diagnostics_covered.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/diagnostics-covered"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_diagnostics_covered_self.cmake")
+# options_covered reads the command line of every test of this tree, which
+# ctest prints, so it sees an option that a variable of this file holds.
+add_test(NAME options_covered
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+            "-DOPEN=${CMAKE_CURRENT_SOURCE_DIR}/options-open.txt"
+            "-DANTIC=$<TARGET_FILE:antic>" "-DANTI=$<TARGET_FILE:anti>"
+            "-DCTEST=${CMAKE_CTEST_COMMAND}" "-DTREE=${CMAKE_BINARY_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_options_covered.cmake")
+add_test(NAME options_covered_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${CMAKE_CURRENT_SOURCE_DIR}/run_options_covered.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/options-covered"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_options_covered_self.cmake")
+
 # The known failures, by decision 30 of "Decisions of 2026-10-11" in
 # docs/decisions.md. tests/known-failures.txt lists the tests that show a
 # defect, each with the id of its finding in docs/audit/tests-findings.md.

@@ -1,0 +1,351 @@
+# The messages of antic and of anti that no test expects yet. The test
+# diagnostics_covered reads this list beside the sources and the expected
+# outputs under tests/. tests/run_diagnostics_covered.cmake states how it
+# reads each.
+#
+# One line per message: its format as the C source writes it, with the
+# pieces of the literal joined. A line that starts with `#` names the file
+# that gives the messages after it, for the reader alone.
+#
+# A message leaves the list in the commit that adds its test. The test
+# fails for a line whose message a test expects, and for a message that no
+# test expects and no line names. A new message comes with its test and
+# never with a line here.
+
+# src/antic/lexer.c
+`\\xHH` needs two hexadecimal digits
+
+# src/antic/parser.c
+`%s` holds functions and nothing else
+a module has at most one `%s` block
+
+# src/antic/parser_decl.c
+`internal` marks a module item, and a class member is `pub`, `protected` or neither
+`%.*s` is `static` and must be `atomic`
+a `::` qualifier belongs to a `concrete fn`
+a class has one `compatible` line
+`compatible` names a version, as `compatible 1.1;`
+
+# src/antic/parser_expr.c
+an element of a tuple is a decimal number
+`try` stands before a call
+
+# src/antic/parser_item.c
+`protected` marks a class member, and a module item is `pub`, `internal` or neither
+`trace` marks a class or a function of one
+`worker` stands before `fn`
+
+# src/antic/parser_stmt.c
+expected `catch`
+the message of an `assert` is a string literal
+a `switch` has one `else`
+an arm of a `switch` is a call, an assignment or a block
+an arm of a `select` is a call, an assignment or a block
+a `defer` holds one statement, not another `defer`
+an `undo` holds one statement, not another `undo`
+expected a call or an assignment
+
+# src/antic/sema.c
+an array length has type `int`, found `%s`
+`%.*s.%.*s` is not generic
+expected a type, found a constant
+an `extern fn` takes plain C function pointers, and `keep own` holds a snapshot
+%s `%.*s.%s`, which this `%.*s` lacks
+`lent` marks a pointer result, and this one is `%s`
+`%.*s` is abstract, and a `provides` line names a complete class
+`compatible` names the versions a plugin may carry, and belongs to an abstract class
+`%.*s.%.*s` is not a class
+enum `%.*s` has two values named `%.*s`
+`own` needs a pointer or a slice, and `%.*s` has type `%s`
+`%.*s` is abstract and no class fills it
+
+# src/antic/sema_call.c
+`%s` is abstract and has no complete value, and %s needs one
+a variadic function has no function pointer type
+calling `%.*s` needs a place
+`destruct` is never called directly, use `delete` or `destroy`
+`fail \"text\"` calls `anti.lang.Error.new`, which takes a code and a message
+`fail` captures the frames with `anti.lang.StackTrace.capture`, which takes the count of frames to skip
+`fail` writes `at` and `frames` of `anti.lang.Error`, which this `anti.lang` lacks
+`%s.construct` takes %s%zu argument%s, found %zu
+this call cannot fail, so it has no error to handle
+`%.*s` has no public class `%.*s`
+the first argument names an interface
+`%s` is not a function
+the call takes %zu argument%s, found %zu
+`%.*s` is a constant of `%s`, reached as `%s.%.*s`
+the field `%.*s` appears twice
+
+# src/antic/sema_class.c
+`%s` returns `never`, and `%s` returns
+`%s` returns, and `%s` returns `never`
+`%s` is not abstract and cannot be implemented
+`%.*s` implements `%s` twice
+`%.*s` implements `%s`, which `%.*s` implements already
+`%.*s` of `%.*s` matches an abstract function and needs `concrete`
+`%.*s` has one `construct`, and every other maker is a static function
+`construct` takes `self` as its first parameter
+`%.*s` is no base and no interface of `%.*s`
+
+# src/antic/sema_const.c
+the index %lld is outside the constant array
+
+# src/antic/sema_copies.c
+antic compiles no copy of `%.*s` yet, %s
+antic compiles no copy here yet, %s
+
+# src/antic/sema_expr.c
+`%s` converts to `%s` through `%.*s` and through `%.*s`, name one
+the %s may be `none`, test it before reading it
+a function that is not kept cannot be stored
+`%.*s` holds a function that is not marked `concurrent`
+the function is not marked `concurrent`
+the call returns no value
+unary `!` needs a `bool`, found `%s`
+unary `~` needs an integer, found `%s`
+`operator fn iter` gives `%s`, which has no `operator fn next` and `operator fn value`
+`%s` needs a class pointer on each side, found `%s` and `%s`
+`%s` is never `%s`, the classes share no chain
+`is` names a case on a variant alone, found `%s`
+%s calls `anti.text.Builder.%s`, which this `anti.text` lacks
+slicing an array needs a place
+cannot slice `%s`
+`%s` is not a variant
+`%s` is a singleton, and `%s.get()` gives its one instance
+`alloc` of one object takes a literal or a class with arguments
+`alloc` of one object takes a literal
+`%s` is a singleton and outlives the program
+
+# src/antic/sema_generic.c
+`%.*s` names two type parameters `%.*s`
+a copy of `%s` nests deeper than %d levels
+
+# src/antic/sema_operator.c
+`operator fn %.*s` takes one operand beside its own
+`%s` needs `bool` operands, found `%s`
+`%s` needs numeric operands, found `%s`
+
+# src/antic/sema_pattern.c
+`patch` takes 2 to 5 arguments, found %zu
+`patch` finds a `[]byte` or a `ByteRegex`, found `%s`
+`%.*s` names no group of a match
+
+# src/antic/sema_safety.c
+`%.*s` is atomic and needs no lock
+
+# src/antic/sema_simd.c
+`%s` is not defined on the lanes of `%s`
+`%s` needs lanes of numbers or `char`, and `%s` has `%s`
+`simd.%.*s` takes %d argument%s, found %zu
+`simd.select` chooses between values of a `simd struct`, found `%s`
+`%s.load` takes 2 arguments, found %zu
+
+# src/antic/sema_stmt.c
+`%s` holds a `Mutex` and cannot be assigned
+`%.*s` of singleton `%s` is read-only after creation, and `mutable` marks a field the program writes
+a `switch` on a `str` compares with `anti.text.equal`, which this `anti.text` lacks
+a `for` step is an integer, found `%s`
+a `for` range counts over an integer, found `%s`
+`yield` gives a value of type `%s`
+the call writes no result, so `yield` takes no value
+the anonymous function returns `never` and can reach its end
+the anonymous function may fail and never does
+a `tests` function takes no parameters and returns nothing, because the runner calls it
+`setup` and `teardown` belong to `fixtures`, which runs them around every test
+
+# src/antic/sema_thread.c
+`compare_swap` takes 2 arguments
+an atomic %s has no `%.*s`
+`Mutex` has no function `%.*s`
+`destroy` takes no arguments
+calling `destroy` needs a place
+`%s` runs a worker named here
+`dispatch` submits a class pointer, and this is `%s`
+`%.*s` takes `%s` as its object, and this is `%s`
+`join_all` waits for a slice of jobs, and this is `%s`
+`%s` waits for a job of `dispatch`, and this is `%s`
+
+# src/antic/sema_value.c
+`%.*s` was moved
+
+# src/anti/bind.c
+anti: bind wrote %s, and it does not lex\n
+
+# src/anti/bindapi.c
+the type `%s` names itself
+the type `%s` does not parse
+anti: %s names the %s `%s`, which is no C identifier\n
+anti: %s names the struct `%s` twice\n
+a value of the enum `%s` is no integer
+`%s` is left out: a type does not parse
+anti: %s is not JSON: %s\n
+anti: %s holds no API description of rlparser\n
+
+# src/anti/bindclang.c
+bind --clang needs clang %d. Get clang-%s-%s.tar.xz from %s, or another clang %d, and put it first on PATH.\n
+anti: `%s --version` failed.
+anti: %s is clang %d, and
+anti: the runtime archive holds no sysroot for %s, whose headers clang reads. Pass --runtime.\n
+anti: %s -print-resource-dir failed\n
+an anonymous member of `%s` is the field `%s`
+`%s` aligns a field other than its first, which Anti has no form for
+`%s` is packed to more than one byte, which Anti has no form for
+`%s` is aligned without a value
+`%s` is left out: its type `%s` does not parse
+`%s` is static without a body and is left out
+the macro `%s` is a word of Anti and is skipped
+the macro `%s` is no constant and is skipped
+anti: clang could not %s, status %d\n
+anti: unknown target %s\n
+anti: the AST of clang is not JSON: %s\n
+the variable `%s` is skipped
+
+# src/anti/bindwrite.c
+`%s` has no field and is left out
+`%s` is left out: Anti has no form for the type of its field `%s`
+`%s` is left out: its struct is left out
+
+# src/anti/build.c
+anti: cannot write %s\n
+anti: the link of %s wrote no %s\n
+anti: %s: the path dependencies of this project are more than %d deep, so one of them is a cycle\n
+anti: %s is no target of Anti\n
+anti: this host is no target of Anti, so the build needs --target\n
+anti: %s: [targets] names more than the six targets of Anti\n
+anti: %s: [targets] names %s, which is no target of Anti\n
+anti: %s holds no %s file, so this project has no module\n
+anti: this host is no target of Anti\n
+anti: %s was not built, so there is nothing to run\n
+anti: %s asks for antic %s and this one is %s\n
+anti: the system does not say where the runtime archive is, so the build needs --runtime\n
+anti: %s is no processor level of %s\n
+
+# src/anti/check.c
+anti: the `anti` block of `%s` at %s:%d failed, and its module is %s\n
+%s:1:1: error: the file does not lex, so it has no canonical form\n
+anti: no %s file under %s or %s\n
+
+# src/anti/deps.c
+anti: %s holds no library file of the package %s\n
+anti: %s holds %s %s, which no constraint on the package takes\n
+anti: %s names the version %s of %s, which is no version\n
+anti: %s names the module %s, which is no module path\n
+anti: %s names the digest %s of %s, which is no SHA-256 digest\n
+anti: %s names the dependency %s, which is no package name\n
+anti: %s names the version %s of %s, which is no constraint\n
+anti: %s is no index that anti reads\n
+anti: %s names no module of %s %s\n
+anti: %s has no version of %s that satisfies every constraint on it\n
+anti: %s gave no index of %s that anti reads, so the build cannot tell which repository holds it\n
+anti: %s and %s both hold %s, so the dependency names which one\n
+anti: no repository of the manifest has a version of %s that satisfies every constraint on it\n
+anti: %s names %s, which is no %s, so %s is not read\n
+anti: %s names %s, which is no module path, so %s is not read\n
+anti: %s names %s, which is no SHA-256 digest, so %s is not read\n
+anti: %s cannot hold the %s %s, which holds a double quote or a control byte\n
+anti: the lock file names %s of %s with no repository and no path\n
+anti: the dependencies of this project do not settle on one version each\n
+
+# src/anti/doc.c
+anti: doc takes a source or a library file\n
+anti: %s: %s needs the source\n
+
+# src/anti/files.c
+anti: out of memory\n
+anti: cannot replace %s\n
+
+# src/anti/fmt.c
+anti: %s does not lex and stays as it is\n
+
+# src/anti/jsontree.c
+a malformed string
+a string that holds a NUL
+no `:` after a member name
+an object without its `}`
+an array without its `]`
+values nested too deep
+the end of the input where a value belongs
+no JSON value
+bytes after the value
+
+# src/anti/licensing.c
+anti: %s holds no licence text, so %s is no runtime archive\n
+anti: %s is no archive\n
+anti: %s carries no package header, so it is no static library of `--lib static`\n
+
+# src/anti/main.c
+anti: --profile-generate and --profile-use build a program with --release, without --lib\n
+anti: license --project prints the notice of one target, so it takes --target <os>-<cpu> and not all\n
+anti: the build of a static library prints the line that links it, so license --project --lib static takes --notice\n
+anti: this host is no target of Anti, so license --project needs --target\n
+anti: the system does not say where the runtime archive is, so license needs --runtime\n
+anti: the system does not say where anti is, so pass --sysroot\n
+
+# src/anti/manifest.c
+anti: %s is no TOML that anti reads\n
+anti: %s: the dependency %s needs a table, as { version = \"1.0.0\" }\n
+anti: %s: a dependency has no %s field\n
+anti: %s: no manifest here, so there is no project. `anti new <name>` writes one\n
+anti: %s: [package] names no `name`, the root module path of the package\n
+anti: %s: [package] version `%s` is no version of one to three parts of digits, as `1.2.0`\n
+anti: %s: the dependency %s names a repository and a path\n
+anti: %s: the dependency %s names no version\n
+anti: %s: the dependency %s names the repository %s, which [repositories] does not\n
+
+# src/anti/project.c
+anti: `%s` is one segment, and a package name is a module path of at least two, as com.example.%s\n
+anti: %s is there already\n
+
+# src/anti/repo.c
+anti: the environment does not say where the cache of the user is\n
+anti: %s: http:// names a repository of 127.0.0.1 or localhost alone\n
+anti: %s: a repository URL is https:// or file://\n
+anti: %s: a file:// URL names an absolute path\n
+anti: %s: cannot read %s\n
+anti: %s: curl fetched nothing\n
+anti: %s names the package %s, which is no package name\n
+anti: --offline and no cached index of %s from %s\n
+anti: %s names %s %s, which is no version\n
+anti: %s names the module %s of %s, which is no module path\n
+anti: --offline and no cached %s of %s %s\n
+anti: %s: the repository holds no such file\n
+anti: %s of %s %s has the digest %s and the index names %s\n
+
+# src/anti/sdk.c
+anti: sdk export runs on a Mac, which holds Apple's SDK. Run it on a Mac you own and anti sdk import here.\n
+anti: %s holds no SDKSettings.json with a Version, so it is no MacOSX.sdk\n
+anti: /Library/Developer/CommandLineTools/SDKs holds no SDK. Run xcode-select --install, or name one with --sdk\n
+anti: %s names the Version %s, which is no version\n
+anti: cannot make %s\n
+anti: cannot copy the stubs of %s/%s\n
+anti: tar could not write %s\n
+anti: tar could not unpack %s\n
+anti: %s holds no %s, so anti sdk export did not write it\n
+
+# src/anti/symmap.c
+anti: %s carries no licence notice\n
+anti: %s carries no build id\n
+
+# src/anti/syms.c
+anti: %s is no runtime configuration\n
+anti: %s holds a broken %s\n
+anti: %s holds no build id\n
+
+# src/anti/test.c
+anti: test takes one or more .anti files\n
+
+# src/anti/units.c
+anti: unknown host target\n
+
+# src/anti/zip.c
+anti: %s: %zu entries are more than a zip archive holds\n
+anti: %s: entry %zu is too large for a zip archive\n
+anti: %s: the entries are too large for a zip archive\n
+anti: %s has entries whose data overlap\n
+anti: %s is no zip archive\n
+anti: %s has a broken central directory\n
+anti: %s has a broken entry\n
+anti: %s: the data of %.*s runs past its end\n
+anti: %s unpacks to more than one archive holds\n
+anti: %s is packed with method %u, and the reader takes stored and deflate\n
+anti: the data of %s is broken\n
