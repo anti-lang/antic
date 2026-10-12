@@ -1,0 +1,15 @@
+ok com.example.threads.dispatch_in_fixtures
+ok com.example.threads.dispatch_in_tests
+ok com.example.threads.parallel_in_fixtures
+ok com.example.threads.parallel_in_tests
+ok com.example.threads.mutex_in_fixtures
+ok com.example.threads.mutex_in_tests
+ok com.example.threads.channel_in_fixtures
+ok com.example.threads.channel_in_tests
+ok com.example.threads.select_in_fixtures
+ok com.example.threads.select_in_tests
+ok com.example.threads.atomic_places_in_fixtures
+ok com.example.threads.atomic_places_in_tests
+ok com.example.threads.atomic_arithmetic_in_fixtures
+ok com.example.threads.atomic_arithmetic_in_tests
+anti test: 14 tests in 1 modules, 0 modules failed

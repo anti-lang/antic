@@ -1,0 +1,13 @@
+//! A constant takes no atomic `compare_swap`: it is no constant expression.
+
+class Counter
+{
+	static atomic total: int = 5;
+}
+
+const SWAPPED: bool = Counter.total.compare_swap(5, 1);
+
+fn main() -> int
+{
+	return 0;
+}

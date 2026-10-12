@@ -1,0 +1,1 @@
+threads_dispatch_at_module_level.anti:15:26: error: a call is not a constant expression

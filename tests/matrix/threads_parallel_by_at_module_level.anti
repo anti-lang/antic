@@ -1,0 +1,14 @@
+//! A constant takes no `parallel ... by`: it is no constant expression.
+
+worker fn count(chunk: []byte) -> int
+{
+	return chunk.len;
+}
+
+const ITEMS: []byte = b"abcd";
+const PARTS: []int = parallel ITEMS by 2 -> count;
+
+fn main() -> int
+{
+	return PARTS.len as int;
+}

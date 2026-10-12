@@ -1,0 +1,12 @@
+//! A constant takes no `recv`: it is no constant expression.
+
+fn run(c: chan int) -> int
+{
+	const FIRST: ?*int = recv(c);
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

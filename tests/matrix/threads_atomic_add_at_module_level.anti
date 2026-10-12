@@ -1,0 +1,13 @@
+//! A constant takes no atomic `add`: it is no constant expression.
+
+class Counter
+{
+	static atomic total: int = 5;
+}
+
+const SEEN: int = Counter.total.add(1);
+
+fn main() -> int
+{
+	return SEEN;
+}

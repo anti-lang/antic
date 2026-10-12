@@ -1,0 +1,11 @@
+//! The default of a field takes no `chan T(n)`: it is no constant expression.
+
+class Pipe
+{
+	pub c: chan int = chan int(2),
+}
+
+fn main() -> int
+{
+	return 0;
+}

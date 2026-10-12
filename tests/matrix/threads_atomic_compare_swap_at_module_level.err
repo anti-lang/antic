@@ -1,0 +1,1 @@
+threads_atomic_compare_swap_at_module_level.anti:8:23: error: a call is not a constant expression

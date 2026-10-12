@@ -1949,6 +1949,19 @@ add_test(NAME anti_test_errors
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-errors"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test_module.cmake")
 
+# The constructs of the threads area in a `tests` block and in a `fixtures`
+# block, as anti_test_flow holds those of the flow area. The workers stand
+# at module level.
+add_test(NAME anti_test_threads
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DMODULE=com/example/threads"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-threads"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test_module.cmake")
+
 # `anti run --memory-checks` and `anti test --memory-checks` put the report
 # of each memory error through Anti's symbolizer, and the dev cache keeps
 # the objects with and without the checks apart.
@@ -3492,6 +3505,17 @@ antic_modules_test(errors_modules
     PROGRAM client
     STD lang
     WORK "${CMAKE_CURRENT_BINARY_DIR}/errors-modules")
+
+# The constructs of the threads area in the functions of a library module,
+# plain and generic, as flow_modules holds those of the flow area. The
+# client runs two workers of the library, each named through a direct
+# import.
+antic_modules_test(threads_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/threads"
+    LIBRARIES threads
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/threads-modules")
 
 # The origin of a `fail` and the position of a `here` in a generic function
 # of a library module, whose copy the client compiles. T043 of

@@ -1,0 +1,8 @@
+//! A constant takes no `chan T(n)`: it is no constant expression.
+
+const PIPE: chan int = chan int(1);
+
+fn main() -> int
+{
+	return 0;
+}

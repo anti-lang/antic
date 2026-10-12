@@ -1,0 +1,12 @@
+//! The default of a parameter takes no `Mutex.new()`: it is no constant
+//! expression.
+
+fn held(m: Mutex = Mutex.new()) -> int
+{
+	return 5;
+}
+
+fn main() -> int
+{
+	return 0;
+}

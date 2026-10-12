@@ -1,0 +1,1 @@
+threads_parallel_at_module_level.anti:9:22: error: `parallel` is not a constant expression

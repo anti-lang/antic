@@ -1,0 +1,522 @@
+//! The atomic operations `add`, `sub`, `and` and `or`, on a local, on a field
+//! and on a static field, in each of these places: function, method, loop body,
+//! switch arm, if let, defer, undo, catch handler, closure, worker, dispatch or
+//! parallel, sync block, select arm, generic body, nested type. Each place is a
+//! function of its own, and the program prints one line per place and input.
+//! Each gives the value from before it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+	pub env: ?*Env = none,
+}
+
+struct Env
+{
+	lock: Mutex,
+	gate: chan int,
+	task: *Task,
+	counter: *Counter,
+}
+
+class Counter
+{
+	pub atomic hits: int = 0,
+
+	static atomic total: int = 0;
+}
+
+fn in_function(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	let n: atomic int = k;
+	acc += n.add(3);
+	acc += n.sub(1);
+	acc += n.or(8);
+	acc += n.and(12);
+	acc += n.load();
+	e.counter.hits.store(k);
+	acc += e.counter.hits.add(3);
+	acc += e.counter.hits.sub(1);
+	acc += e.counter.hits.or(8);
+	acc += e.counter.hits.and(12);
+	acc += e.counter.hits.load();
+	Counter.total.store(k);
+	acc += Counter.total.add(3);
+	acc += Counter.total.sub(1);
+	acc += Counter.total.or(8);
+	acc += Counter.total.and(12);
+	acc += Counter.total.load();
+	return acc;
+}
+
+class Host
+{
+	pub base: int = 0,
+
+	pub fn in_method(self, e: *Env, k: int) -> int
+	{
+		let acc = self.base;
+		let n: atomic int = k;
+		acc += n.add(3);
+		acc += n.sub(1);
+		acc += n.or(8);
+		acc += n.and(12);
+		acc += n.load();
+		e.counter.hits.store(k);
+		acc += e.counter.hits.add(3);
+		acc += e.counter.hits.sub(1);
+		acc += e.counter.hits.or(8);
+		acc += e.counter.hits.and(12);
+		acc += e.counter.hits.load();
+		Counter.total.store(k);
+		acc += Counter.total.add(3);
+		acc += Counter.total.sub(1);
+		acc += Counter.total.or(8);
+		acc += Counter.total.and(12);
+		acc += Counter.total.load();
+		return acc;
+	}
+}
+
+fn in_loop(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		acc += turn;
+		let n: atomic int = k;
+		acc += n.add(3);
+		acc += n.sub(1);
+		acc += n.or(8);
+		acc += n.and(12);
+		acc += n.load();
+		e.counter.hits.store(k);
+		acc += e.counter.hits.add(3);
+		acc += e.counter.hits.sub(1);
+		acc += e.counter.hits.or(8);
+		acc += e.counter.hits.and(12);
+		acc += e.counter.hits.load();
+		Counter.total.store(k);
+		acc += Counter.total.add(3);
+		acc += Counter.total.sub(1);
+		acc += Counter.total.or(8);
+		acc += Counter.total.and(12);
+		acc += Counter.total.load();
+	}
+	return acc;
+}
+
+fn in_arm(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	switch k {
+		100 => acc = -5,
+		else => {
+			let n: atomic int = k;
+			acc += n.add(3);
+			acc += n.sub(1);
+			acc += n.or(8);
+			acc += n.and(12);
+			acc += n.load();
+			e.counter.hits.store(k);
+			acc += e.counter.hits.add(3);
+			acc += e.counter.hits.sub(1);
+			acc += e.counter.hits.or(8);
+			acc += e.counter.hits.and(12);
+			acc += e.counter.hits.load();
+			Counter.total.store(k);
+			acc += Counter.total.add(3);
+			acc += Counter.total.sub(1);
+			acc += Counter.total.or(8);
+			acc += Counter.total.and(12);
+			acc += Counter.total.load();
+		},
+	}
+	return acc;
+}
+
+fn hold(k: int) -> ?int
+{
+	if k < 0 {
+		return none;
+	}
+	return k;
+}
+
+fn in_if_let(e: *Env, start: int) -> int
+{
+	let acc = 0;
+	if let k = hold(start) {
+		let n: atomic int = k;
+		acc += n.add(3);
+		acc += n.sub(1);
+		acc += n.or(8);
+		acc += n.and(12);
+		acc += n.load();
+		e.counter.hits.store(k);
+		acc += e.counter.hits.add(3);
+		acc += e.counter.hits.sub(1);
+		acc += e.counter.hits.or(8);
+		acc += e.counter.hits.and(12);
+		acc += e.counter.hits.load();
+		Counter.total.store(k);
+		acc += Counter.total.add(3);
+		acc += Counter.total.sub(1);
+		acc += Counter.total.or(8);
+		acc += Counter.total.and(12);
+		acc += Counter.total.load();
+	} else {
+		acc = -9;
+	}
+	return acc;
+}
+
+fn in_defer(e: *Env, k: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let n: atomic int = k;
+		acc += n.add(3);
+		acc += n.sub(1);
+		acc += n.or(8);
+		acc += n.and(12);
+		acc += n.load();
+		e.counter.hits.store(k);
+		acc += e.counter.hits.add(3);
+		acc += e.counter.hits.sub(1);
+		acc += e.counter.hits.or(8);
+		acc += e.counter.hits.and(12);
+		acc += e.counter.hits.load();
+		Counter.total.store(k);
+		acc += Counter.total.add(3);
+		acc += Counter.total.sub(1);
+		acc += Counter.total.or(8);
+		acc += Counter.total.and(12);
+		acc += Counter.total.load();
+	}
+	acc = 1;
+}
+
+fn in_undo(e: *Env, k: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let n: atomic int = k;
+		acc += n.add(3);
+		acc += n.sub(1);
+		acc += n.or(8);
+		acc += n.and(12);
+		acc += n.load();
+		e.counter.hits.store(k);
+		acc += e.counter.hits.add(3);
+		acc += e.counter.hits.sub(1);
+		acc += e.counter.hits.or(8);
+		acc += e.counter.hits.and(12);
+		acc += e.counter.hits.load();
+		Counter.total.store(k);
+		acc += Counter.total.add(3);
+		acc += Counter.total.sub(1);
+		acc += Counter.total.or(8);
+		acc += Counter.total.and(12);
+		acc += Counter.total.load();
+	}
+	acc = 2;
+	fail "undone";
+}
+
+fn always() may fail
+{
+	fail "always";
+}
+
+fn in_catch(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	always() catch {
+		let n: atomic int = k;
+		acc += n.add(3);
+		acc += n.sub(1);
+		acc += n.or(8);
+		acc += n.and(12);
+		acc += n.load();
+		e.counter.hits.store(k);
+		acc += e.counter.hits.add(3);
+		acc += e.counter.hits.sub(1);
+		acc += e.counter.hits.or(8);
+		acc += e.counter.hits.and(12);
+		acc += e.counter.hits.load();
+		Counter.total.store(k);
+		acc += Counter.total.add(3);
+		acc += Counter.total.sub(1);
+		acc += Counter.total.or(8);
+		acc += Counter.total.and(12);
+		acc += Counter.total.load();
+	};
+	return acc;
+}
+
+fn apply(n: int, f: fn(int))
+{
+	f(n);
+}
+
+fn in_closure(e: *Env, start: int) -> int
+{
+	let acc = 0;
+	apply(start, fn(k) {
+		let n: atomic int = k;
+		acc += n.add(3);
+		acc += n.sub(1);
+		acc += n.or(8);
+		acc += n.and(12);
+		acc += n.load();
+		e.counter.hits.store(k);
+		acc += e.counter.hits.add(3);
+		acc += e.counter.hits.sub(1);
+		acc += e.counter.hits.or(8);
+		acc += e.counter.hits.and(12);
+		acc += e.counter.hits.load();
+		Counter.total.store(k);
+		acc += Counter.total.add(3);
+		acc += Counter.total.sub(1);
+		acc += Counter.total.or(8);
+		acc += Counter.total.and(12);
+		acc += Counter.total.load();
+	});
+	return acc;
+}
+
+worker fn in_worker(t: *Task) -> int
+{
+	let e = t.env else {
+		return -9;
+	};
+	let k = t.n;
+	let acc = 0;
+	let n: atomic int = k;
+	acc += n.add(3);
+	acc += n.sub(1);
+	acc += n.or(8);
+	acc += n.and(12);
+	acc += n.load();
+	e.counter.hits.store(k);
+	acc += e.counter.hits.add(3);
+	acc += e.counter.hits.sub(1);
+	acc += e.counter.hits.or(8);
+	acc += e.counter.hits.and(12);
+	acc += e.counter.hits.load();
+	Counter.total.store(k);
+	acc += Counter.total.add(3);
+	acc += Counter.total.sub(1);
+	acc += Counter.total.or(8);
+	acc += Counter.total.and(12);
+	acc += Counter.total.load();
+	return acc;
+}
+
+fn run_worker(e: *Env, k: int) -> int
+{
+	e.task.n = k;
+	let job = dispatch e.task -> in_worker;
+	let got = join(job);
+
+	return got;
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch(e: *Env, start: int) -> int
+{
+	e.task.n = start;
+	let job = dispatch e.task -> work(fn(k) {
+		let acc = 0;
+		let n: atomic int = k;
+		acc += n.add(3);
+		acc += n.sub(1);
+		acc += n.or(8);
+		acc += n.and(12);
+		acc += n.load();
+		e.counter.hits.store(k);
+		acc += e.counter.hits.add(3);
+		acc += e.counter.hits.sub(1);
+		acc += e.counter.hits.or(8);
+		acc += e.counter.hits.and(12);
+		acc += e.counter.hits.load();
+		Counter.total.store(k);
+		acc += Counter.total.add(3);
+		acc += Counter.total.sub(1);
+		acc += Counter.total.or(8);
+		acc += Counter.total.and(12);
+		acc += Counter.total.load();
+		return acc;
+	});
+	return join(job);
+}
+
+fn in_sync(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	sync e.lock {
+		let n: atomic int = k;
+		acc += n.add(3);
+		acc += n.sub(1);
+		acc += n.or(8);
+		acc += n.and(12);
+		acc += n.load();
+		e.counter.hits.store(k);
+		acc += e.counter.hits.add(3);
+		acc += e.counter.hits.sub(1);
+		acc += e.counter.hits.or(8);
+		acc += e.counter.hits.and(12);
+		acc += e.counter.hits.load();
+		Counter.total.store(k);
+		acc += Counter.total.add(3);
+		acc += Counter.total.sub(1);
+		acc += Counter.total.or(8);
+		acc += Counter.total.and(12);
+		acc += Counter.total.load();
+	}
+	return acc;
+}
+
+fn in_select(e: *Env, start: int) -> int
+{
+	let acc = 0;
+	send(e.gate, start);
+	select {
+		e.gate x => {
+			let v = x else {
+				return -9;
+			};
+			let k = *v;
+			let n: atomic int = k;
+			acc += n.add(3);
+			acc += n.sub(1);
+			acc += n.or(8);
+			acc += n.and(12);
+			acc += n.load();
+			e.counter.hits.store(k);
+			acc += e.counter.hits.add(3);
+			acc += e.counter.hits.sub(1);
+			acc += e.counter.hits.or(8);
+			acc += e.counter.hits.and(12);
+			acc += e.counter.hits.load();
+			Counter.total.store(k);
+			acc += Counter.total.add(3);
+			acc += Counter.total.sub(1);
+			acc += Counter.total.or(8);
+			acc += Counter.total.and(12);
+			acc += Counter.total.load();
+		},
+	}
+	return acc;
+}
+
+fn in_generic<T>(e: *Env, k: int) -> int
+{
+	let acc = size_of(T) as int * 10000;
+	let n: atomic int = k;
+	acc += n.add(3);
+	acc += n.sub(1);
+	acc += n.or(8);
+	acc += n.and(12);
+	acc += n.load();
+	e.counter.hits.store(k);
+	acc += e.counter.hits.add(3);
+	acc += e.counter.hits.sub(1);
+	acc += e.counter.hits.or(8);
+	acc += e.counter.hits.and(12);
+	acc += e.counter.hits.load();
+	Counter.total.store(k);
+	acc += Counter.total.add(3);
+	acc += Counter.total.sub(1);
+	acc += Counter.total.or(8);
+	acc += Counter.total.and(12);
+	acc += Counter.total.load();
+	return acc;
+}
+
+class Outer
+{
+	class Inner
+	{
+		pub base: int = 0,
+
+		pub fn run(self, e: *Env, k: int) -> int
+		{
+			let acc = self.base;
+			let n: atomic int = k;
+			acc += n.add(3);
+			acc += n.sub(1);
+			acc += n.or(8);
+			acc += n.and(12);
+			acc += n.load();
+			e.counter.hits.store(k);
+			acc += e.counter.hits.add(3);
+			acc += e.counter.hits.sub(1);
+			acc += e.counter.hits.or(8);
+			acc += e.counter.hits.and(12);
+			acc += e.counter.hits.load();
+			Counter.total.store(k);
+			acc += Counter.total.add(3);
+			acc += Counter.total.sub(1);
+			acc += Counter.total.or(8);
+			acc += Counter.total.and(12);
+			acc += Counter.total.load();
+			return acc;
+		}
+	}
+
+	pub fn go(self, e: *Env, k: int) -> int
+	{
+		let inner = Inner { base: 0 };
+		return inner.run(e, k);
+	}
+}
+
+fn main() -> int
+{
+	let counter = alloc Counter { };
+	let task = alloc Task { };
+	let e = alloc Env { lock: Mutex.new(), gate: chan int(1), task: task, counter: counter };
+	task.env = e;
+	let host = Host { base: 0 };
+	let outer = Outer { };
+	for k in 1..3 {
+		printf("function %d %d\n".ptr, k as c_int, in_function(e, k) as c_int);
+		printf("method %d %d\n".ptr, k as c_int, host.in_method(e, k) as c_int);
+		printf("loop %d %d\n".ptr, k as c_int, in_loop(e, k) as c_int);
+		printf("arm %d %d\n".ptr, k as c_int, in_arm(e, k) as c_int);
+		printf("if_let %d %d\n".ptr, k as c_int, in_if_let(e, k) as c_int);
+		let deferred = 0;
+		in_defer(e, k, &deferred);
+		printf("defer %d %d\n".ptr, k as c_int, deferred as c_int);
+		let undone = 0;
+		in_undo(e, k, &undone) catch {
+			yield;
+		};
+		printf("undo %d %d\n".ptr, k as c_int, undone as c_int);
+		printf("catch %d %d\n".ptr, k as c_int, in_catch(e, k) as c_int);
+		printf("closure %d %d\n".ptr, k as c_int, in_closure(e, k) as c_int);
+		printf("worker %d %d\n".ptr, k as c_int, run_worker(e, k) as c_int);
+		printf("dispatch %d %d\n".ptr, k as c_int, in_dispatch(e, k) as c_int);
+		printf("sync %d %d\n".ptr, k as c_int, in_sync(e, k) as c_int);
+		printf("select %d %d\n".ptr, k as c_int, in_select(e, k) as c_int);
+		printf("generic %d %d\n".ptr, k as c_int, in_generic<i32>(e, k) as c_int);
+		printf("nested %d %d\n".ptr, k as c_int, outer.go(e, k) as c_int);
+	}
+	delete(counter);
+	delete(e.gate);
+	free(e);
+	delete(task);
+	return 0;
+}

@@ -1,0 +1,1 @@
+threads_atomic_sub_at_module_level.anti:8:19: error: a call is not a constant expression

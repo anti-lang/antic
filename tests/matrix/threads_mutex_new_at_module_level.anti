@@ -1,0 +1,8 @@
+//! A constant takes no `Mutex.new()`: it is no constant expression.
+
+const LOCK: Mutex = Mutex.new();
+
+fn main() -> int
+{
+	return 0;
+}

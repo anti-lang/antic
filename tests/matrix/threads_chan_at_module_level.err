@@ -1,0 +1,1 @@
+threads_chan_at_module_level.anti:3:24: error: a call is not a constant expression

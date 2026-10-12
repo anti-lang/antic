@@ -1,0 +1,23 @@
+//! A constant takes no `join`: it is no constant expression.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn add(t: *Task, k: int) -> int
+{
+	return t.n + k;
+}
+
+fn run(t: *Task) -> int
+{
+	let job = dispatch t -> add(1);
+	const GOT: int = join(job);
+	return GOT;
+}
+
+fn main() -> int
+{
+	return 0;
+}

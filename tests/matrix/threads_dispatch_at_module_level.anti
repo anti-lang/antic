@@ -1,0 +1,22 @@
+//! A constant takes no `dispatch`: it is no constant expression.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn add(t: *Task, k: int) -> int
+{
+	return t.n + k;
+}
+
+fn run(t: *Task) -> int
+{
+	const HANDLE: ?*byte = (dispatch t -> add(1)).handle;
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

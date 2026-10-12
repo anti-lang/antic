@@ -1,0 +1,301 @@
+//! Every construct of the threads area in a function of a library module, plain
+//! and generic. The client calls each function and prints what it computed.
+
+import anti.lang;
+
+pub class Task
+{
+	pub n: int = 0,
+}
+
+pub class Counter
+{
+	pub atomic hits: int = 0,
+}
+
+pub struct Guard
+{
+	lock: Mutex,
+	n: int,
+}
+
+pub worker fn add(t: *Task, k: int) -> int
+{
+	return t.n + k;
+}
+
+pub worker fn keep(t: *Task, k: int) -> int
+{
+	t.n = k;
+	return 0;
+}
+
+pub worker fn sum(chunk: []int, plus: int) -> int
+{
+	let total = plus;
+	for v in chunk {
+		total += v;
+	}
+	return total;
+}
+
+pub worker fn count(chunk: []int) -> int
+{
+	return chunk.len;
+}
+
+/// Holds `dispatch`, `join` and `join_all`.
+pub fn lib_dispatch(k: int) -> int
+{
+	let acc = 0;
+	let a = alloc Task { n: 100 };
+	let b = alloc Task { };
+	let one = dispatch a -> add(k);
+	let jobs = [dispatch b -> keep(k + 1)];
+	join_all(jobs[0..1]);
+	acc += join(one) + b.n;
+	delete(a);
+	delete(b);
+	return acc;
+}
+
+/// Holds `parallel` and `parallel ... by`.
+pub fn lib_parallel(k: int) -> int
+{
+	let acc = 0;
+	let numbers = [1, 2, 3, 4, 5, 6, 7, 8];
+	let parts = parallel numbers[0..8] by 4 -> sum(k);
+	for part in parts {
+		acc += part;
+	}
+	free(parts.ptr);
+	let lengths = parallel numbers[0..8] -> count;
+	for length in lengths {
+		acc += length;
+	}
+	free(lengths.ptr);
+	return acc;
+}
+
+/// Holds `parallel` and `parallel ... by` in a generic function.
+pub fn generic_parallel<T>(k: int, extra: T) -> int
+{
+	let acc = size_of(T) as int * 1000;
+	let numbers = [1, 2, 3, 4, 5, 6, 7, 8];
+	let parts = parallel numbers[0..8] by 4 -> sum(k);
+	for part in parts {
+		acc += part;
+	}
+	free(parts.ptr);
+	let lengths = parallel numbers[0..8] -> count;
+	for length in lengths {
+		acc += length;
+	}
+	free(lengths.ptr);
+	return acc;
+}
+
+/// Holds `Mutex.new()`, `sync m { }` and `m.destroy()`.
+pub fn lib_mutex(k: int) -> int
+{
+	let acc = 0;
+	let m = Mutex.new();
+	sync m {
+		acc += k;
+	}
+	m.destroy();
+	let g = Guard { lock: Mutex.new(), n: k * 10 };
+	sync g.lock {
+		g.n += 1;
+		acc += g.n;
+	}
+	g.lock.destroy();
+	return acc;
+}
+
+/// Holds `Mutex.new()`, `sync m { }` and `m.destroy()` in a generic function.
+pub fn generic_mutex<T>(k: int, extra: T) -> int
+{
+	let acc = size_of(T) as int * 1000;
+	let m = Mutex.new();
+	sync m {
+		acc += k;
+	}
+	m.destroy();
+	let g = Guard { lock: Mutex.new(), n: k * 10 };
+	sync g.lock {
+		g.n += 1;
+		acc += g.n;
+	}
+	g.lock.destroy();
+	return acc;
+}
+
+/// Holds `chan T(n)`, `send`, `recv` and `close`.
+pub fn lib_channel(k: int) -> int
+{
+	let acc = 0;
+	let c = chan int(2);
+	send(c, k);
+	send(c, k * 10);
+	close(c);
+	while true do {
+		let v = recv(c) else {
+			break;
+		};
+		acc += *v;
+	}
+	delete(c);
+	return acc;
+}
+
+/// Holds `chan T(n)`, `send`, `recv` and `close` in a generic function.
+pub fn generic_channel<T>(k: int, extra: T) -> int
+{
+	let acc = size_of(T) as int * 1000;
+	let c = chan int(2);
+	send(c, k);
+	send(c, k * 10);
+	close(c);
+	while true do {
+		let v = recv(c) else {
+			break;
+		};
+		acc += *v;
+	}
+	delete(c);
+	return acc;
+}
+
+/// Holds `select`.
+pub fn lib_select(k: int) -> int
+{
+	let acc = 0;
+	let c = chan int(1);
+	let d = chan int(1);
+	send(d, k);
+	select {
+		c x => acc -= 1000,
+		d y => {
+			if let v = y {
+				acc += *v;
+			}
+		},
+	}
+	close(c);
+	select {
+		c x => {
+			if x == none {
+				acc += 100;
+			}
+		},
+	}
+	delete(c);
+	delete(d);
+	return acc;
+}
+
+/// Holds `select` in a generic function.
+pub fn generic_select<T>(k: int, extra: T) -> int
+{
+	let acc = size_of(T) as int * 1000;
+	let c = chan int(1);
+	let d = chan int(1);
+	send(d, k);
+	select {
+		c x => acc -= 1000,
+		d y => {
+			if let v = y {
+				acc += *v;
+			}
+		},
+	}
+	close(c);
+	select {
+		c x => {
+			if x == none {
+				acc += 100;
+			}
+		},
+	}
+	delete(c);
+	delete(d);
+	return acc;
+}
+
+/// Holds the atomic `load`, `store`, `swap` and `compare_swap`.
+pub fn lib_atomic_places(k: int) -> int
+{
+	let acc = 0;
+	let n: atomic int = 0;
+	n.store(k);
+	acc += n.swap(k + 5);
+	if n.compare_swap(k + 5, 7) {
+		acc += n.load();
+	}
+	let counter = Counter { };
+	counter.hits.store(k * 2);
+	acc += counter.hits.swap(1);
+	if counter.hits.compare_swap(1, 3) {
+		acc += counter.hits.load();
+	}
+	return acc;
+}
+
+/// Holds the atomic `load`, `store`, `swap` and `compare_swap` in a generic
+/// function.
+pub fn generic_atomic_places<T>(k: int, extra: T) -> int
+{
+	let acc = size_of(T) as int * 1000;
+	let n: atomic int = 0;
+	n.store(k);
+	acc += n.swap(k + 5);
+	if n.compare_swap(k + 5, 7) {
+		acc += n.load();
+	}
+	let counter = Counter { };
+	counter.hits.store(k * 2);
+	acc += counter.hits.swap(1);
+	if counter.hits.compare_swap(1, 3) {
+		acc += counter.hits.load();
+	}
+	return acc;
+}
+
+/// Holds the atomic `add`, `sub`, `and` and `or`.
+pub fn lib_atomic_arithmetic(k: int) -> int
+{
+	let acc = 0;
+	let n: atomic int = k;
+	acc += n.add(3);
+	acc += n.sub(1);
+	acc += n.or(8);
+	acc += n.and(12);
+	acc += n.load();
+	let counter = Counter { hits: k };
+	acc += counter.hits.add(3);
+	acc += counter.hits.sub(1);
+	acc += counter.hits.or(8);
+	acc += counter.hits.and(12);
+	acc += counter.hits.load();
+	return acc;
+}
+
+/// Holds the atomic `add`, `sub`, `and` and `or` in a generic function.
+pub fn generic_atomic_arithmetic<T>(k: int, extra: T) -> int
+{
+	let acc = size_of(T) as int * 1000;
+	let n: atomic int = k;
+	acc += n.add(3);
+	acc += n.sub(1);
+	acc += n.or(8);
+	acc += n.and(12);
+	acc += n.load();
+	let counter = Counter { hits: k };
+	acc += counter.hits.add(3);
+	acc += counter.hits.sub(1);
+	acc += counter.hits.or(8);
+	acc += counter.hits.and(12);
+	acc += counter.hits.load();
+	return acc;
+}

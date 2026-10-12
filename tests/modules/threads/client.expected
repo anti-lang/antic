@@ -1,0 +1,9 @@
+dispatch 103
+parallel 48 2052
+mutex 12 2023
+channel 11 2022
+select 101 2102
+atomic_places 13 2016
+atomic_arithmetic 54 2070
+worker 42
+chunks 13 17

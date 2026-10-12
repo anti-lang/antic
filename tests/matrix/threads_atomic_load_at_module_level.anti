@@ -1,0 +1,13 @@
+//! A constant takes no atomic `load`: it is no constant expression.
+
+class Counter
+{
+	static atomic total: int = 5;
+}
+
+const SEEN: int = Counter.total.load();
+
+fn main() -> int
+{
+	return SEEN;
+}

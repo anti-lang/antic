@@ -1,0 +1,1 @@
+threads_mutex_new_as_a_default_of_a_parameter.anti:4:20: error: a call is not a constant expression

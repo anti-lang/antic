@@ -1,0 +1,29 @@
+//! Calls the functions of the library `com.example.threads`, which hold the
+//! constructs of the threads area, and runs two workers of the library from
+//! here. A worker is named alone after the arrow, so a direct import brings
+//! each name.
+
+import anti.lang;
+import com.example.threads.{add, sum};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	printf("dispatch %d\n".ptr, threads.lib_dispatch(1) as c_int);
+	printf("parallel %d %d\n".ptr, threads.lib_parallel(1) as c_int, threads.generic_parallel<i16>(2, 7) as c_int);
+	printf("mutex %d %d\n".ptr, threads.lib_mutex(1) as c_int, threads.generic_mutex<i16>(2, 7) as c_int);
+	printf("channel %d %d\n".ptr, threads.lib_channel(1) as c_int, threads.generic_channel<i16>(2, 7) as c_int);
+	printf("select %d %d\n".ptr, threads.lib_select(1) as c_int, threads.generic_select<i16>(2, 7) as c_int);
+	printf("atomic_places %d %d\n".ptr, threads.lib_atomic_places(1) as c_int, threads.generic_atomic_places<i16>(2, 7) as c_int);
+	printf("atomic_arithmetic %d %d\n".ptr, threads.lib_atomic_arithmetic(1) as c_int, threads.generic_atomic_arithmetic<i16>(2, 7) as c_int);
+	let t = alloc threads.Task { n: 40 };
+	let job = dispatch t -> add(2);
+	printf("worker %d\n".ptr, join(job) as c_int);
+	let numbers = [1, 2, 3, 4];
+	let parts = parallel numbers[0..4] by 2 -> sum(10);
+	printf("chunks %d %d\n".ptr, parts[0] as c_int, parts[1] as c_int);
+	free(parts.ptr);
+	delete(t);
+	return 0;
+}
