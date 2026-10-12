@@ -1,0 +1,81 @@
+//! The client of the types library: the types of the area types of a library
+//! module, read, written and laid out by another module.
+
+import com.example.types;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	let o = types.make_odd(7);
+	o.wide += 1;
+	let w = &o.wide;
+	*w += 10;
+	printf("packed struct %d %llu %llu %d\n".ptr, o.tag as c_int, o.wide,
+		types.wide_of(&o), o.mid as c_int);
+	let mine = types.Odd { tag: 1, wide: 2, mid: 3 };
+	printf("packed literal %llu\n".ptr, types.wide_of(&mine));
+	let s = types.sizes();
+	printf("sizes there %lld %lld %lld %lld %lld %lld\n".ptr, s.0, s.1, s.2,
+		s.3, s.4, s.5);
+	printf("sizes here %lld %lld %lld %lld %lld %lld\n".ptr,
+		size_of(types.Odd), size_of(types.Wide), size_of(types.Word),
+		size_of(types.Level), size_of(types.Shape), size_of(types.Dense));
+	let b = types.make_bits(29);
+	b.low += 1;
+	b.wide -= 1;
+	printf("bitfields %d %d %u\n".ptr, b.low as c_int, b.high as c_int, b.wide);
+	let u = types.Word { whole: 0x1234 };
+	u.nibble = 0xF;
+	printf("union %x %d\n".ptr, u.whole, u.low as c_int);
+	let l = types.level_of(150);
+	let n = 0;
+	switch l {
+		types.Level.Low => n = 1,
+		types.Level.High => n = 2,
+	}
+	printf("enum %lld %d %d\n".ptr, n, l as c_int,
+		(types.level_of(5) == types.Level.Low) as c_int);
+	let c = types.Shape.Circle { r: 2 };
+	let r = types.Shape.Rect { w: 3, h: 4 };
+	let e = types.Shape.Empty;
+	switch r {
+		Rect q => n = q.w + q.h,
+		else => n = -1,
+	}
+	if let Circle k = c {
+		n += k.r * 100;
+	}
+	printf("variant %lld %lld %lld %d %d\n".ptr, types.area(c), types.area(r), n,
+		(e is types.Shape.Empty) as c_int, r.tag as c_int);
+	let d = types.Dense.A { x: 0x1122334455667788 };
+	switch d {
+		A a => n = (a.x >> 56) as int,
+		B => n = 0,
+	}
+	printf("packed variant %lld\n".ptr, n);
+	let row: types.Row = [1, 2, 3];
+	let i = 2;
+	row[i] += 10;
+	printf("alias of an array %lld %lld\n".ptr, types.row_sum(row), row.len);
+	let maybe: types.Maybe = o;
+	n = 0;
+	if let v = maybe {
+		n = v.tag as int;
+	}
+	printf("alias of an optional %lld\n".ptr, n);
+	let p = types.Pressed<u32> { a: 1, v: 99 };
+	let at = &p.v;
+	*at += 1;
+	printf("generic packed struct %u %lld %lld %lld\n".ptr, p.v,
+		size_of(types.Pressed<u32>), types.pressed_size<u64>(1),
+		types.pressed_size<u16>(1));
+	printf("keep fn %lld\n".ptr, types.kept(twice));
+	printf("concurrent fn %lld\n".ptr, types.shared(twice));
+	return 0;
+}

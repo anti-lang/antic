@@ -1,0 +1,128 @@
+//! The types of the area types in a library module: a packed struct, an aligned
+//! one, a struct of bitfields, a union, an enum over a base, a variant, an
+//! alias, a generic packed struct, and functions whose parameters carry `keep`
+//! and `concurrent`. The client reads each across the module boundary, and the
+//! library file carries their layout words.
+
+pub packed struct Odd
+{
+	tag: u8,
+	wide: u64,
+	mid: u16,
+}
+
+pub struct Wide align(16)
+{
+	a: u8,
+}
+
+pub struct Bits
+{
+	low: u8 : 3,
+	high: u8 : 5,
+	wide: u32 : 20,
+}
+
+pub union Word
+{
+	whole: u32,
+	low: u8,
+	nibble: u32 : 4,
+}
+
+pub enum Level: u8
+{
+	Low = 1,
+	High = 200,
+}
+
+pub variant Shape
+{
+	Circle { r: int },
+	Rect { w: int, h: int },
+	Empty,
+}
+
+pub packed variant Dense
+{
+	A { x: u64 },
+	B,
+}
+
+pub type Row = [3]int;
+
+pub type Maybe = ?Odd;
+
+pub packed struct Pressed<T>
+{
+	a: u8,
+	v: T,
+}
+
+pub fn make_odd(n: int) -> Odd
+{
+	return Odd { tag: n as u8, wide: n as u64 * 1000, mid: (n * 3) as u16 };
+}
+
+pub fn wide_of(o: *Odd) -> u64
+{
+	return o.wide;
+}
+
+pub fn sizes() -> (int, int, int, int, int, int)
+{
+	return (size_of(Odd), size_of(Wide), size_of(Word), size_of(Level),
+		size_of(Shape), size_of(Dense));
+}
+
+pub fn make_bits(n: int) -> Bits
+{
+	return Bits {
+		low: (n & 7) as u8, high: (n & 31) as u8,
+		wide: (n * 1000) as u32
+	};
+}
+
+pub fn area(s: Shape) -> int
+{
+	switch s {
+		Circle c => {
+			return c.r * c.r * 3;
+		},
+		Rect q => {
+			return q.w * q.h;
+		},
+		Empty => {
+			return 0;
+		},
+	}
+	return -1;
+}
+
+pub fn level_of(n: int) -> Level
+{
+	if n > 100 {
+		return Level.High;
+	}
+	return Level.Low;
+}
+
+pub fn row_sum(r: Row) -> int
+{
+	return r[0] + r[1] + r[2];
+}
+
+pub fn kept(keep f: fn(int) -> int) -> int
+{
+	return f(2);
+}
+
+pub fn shared(concurrent f: fn(int) -> int) -> int
+{
+	return f(3);
+}
+
+pub fn pressed_size<T>(v: T) -> int
+{
+	return size_of(Pressed<T>);
+}

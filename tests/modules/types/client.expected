@@ -1,0 +1,14 @@
+packed struct 7 7011 7011 21
+packed literal 2
+sizes there 11 16 4 1 24 9
+sizes here 11 16 4 1 24 9
+bitfields 6 29 28999
+union 123f 63
+enum 2 200 1
+variant 12 12 207 1 1
+packed variant 17
+alias of an array 16 3
+alias of an optional 7
+generic packed struct 100 5 9 3
+keep fn 4
+concurrent fn 6
