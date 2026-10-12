@@ -1,0 +1,219 @@
+module_doc "A length of an array that holds `size_of`, with each operator of a constant\nexpression once. The checked tree prints the length as it was written."
+struct_decl H
+  field tag                byte
+    type u8
+  field n                  i32
+    type i32
+struct_decl Lengths
+  field plus               [size_of(H) + 1]byte
+    type [N]
+      additive +           int
+        size_of            int
+          type H
+        int_lit 1          int
+      type byte
+  field slash              [size_of(H) / 2]byte
+    type [N]
+      multiplicative /     int
+        size_of            int
+          type H
+        int_lit 2          int
+      type byte
+  field percent            [(size_of(H) % 3) + 1]byte
+    type [N]
+      additive +           int
+        multiplicative %   int
+          size_of          int
+            type H
+          int_lit 3        int
+        int_lit 1          int
+      type byte
+  field amp                [size_of(H) & 12]byte
+    type [N]
+      bit_and &            int
+        size_of            int
+          type H
+        int_lit 12         int
+      type byte
+  field pipe               [size_of(H) | 1]byte
+    type [N]
+      bit_or |             int
+        size_of            int
+          type H
+        int_lit 1          int
+      type byte
+  field caret              [size_of(H) ^ 1]byte
+    type [N]
+      bit_xor ^            int
+        size_of            int
+          type H
+        int_lit 1          int
+      type byte
+  field tilde              [~size_of(H) & 7]byte
+    type [N]
+      bit_and &            int
+        unary ~            int
+          size_of          int
+            type H
+        int_lit 7          int
+      type byte
+  field left               [size_of(H) << 1]byte
+    type [N]
+      shift <<             int
+        size_of            int
+          type H
+        int_lit 1          int
+      type byte
+  field right              [size_of(H) >> 1]byte
+    type [N]
+      shift >>             int
+        size_of            int
+          type H
+        int_lit 1          int
+      type byte
+  field minus              [--size_of(H)]byte
+    type [N]
+      unary -              int
+        unary -            int
+          size_of          int
+            type H
+      type byte
+  field narrowed           [(size_of(H) as byte) as int]byte
+    type [N]
+      cast                 int
+        cast               byte
+          size_of          int
+            type H
+          type u8
+        type int
+      type byte
+  field unsigned           [((size_of(H) as u64) + 2) as int]byte
+    type [N]
+      cast                 int
+        additive +         u64
+          cast             u64
+            size_of        int
+              type H
+            type u64
+          int_lit 2        u64
+        type int
+      type byte
+  field equal              [((size_of(H) == 8) as int) + 1]byte
+    type [N]
+      additive +           int
+        cast               int
+          equality ==      bool
+            size_of        int
+              type H
+            int_lit 8      int
+          type int
+        int_lit 1          int
+      type byte
+  field unequal            [((size_of(H) != 8) as int) + 1]byte
+    type [N]
+      additive +           int
+        cast               int
+          equality !=      bool
+            size_of        int
+              type H
+            int_lit 8      int
+          type int
+        int_lit 1          int
+      type byte
+  field less               [((size_of(H) < 8) as int) + 1]byte
+    type [N]
+      additive +           int
+        cast               int
+          relation <       bool
+            size_of        int
+              type H
+            int_lit 8      int
+          type int
+        int_lit 1          int
+      type byte
+  field at_most            [((size_of(H) <= 8) as int) + 1]byte
+    type [N]
+      additive +           int
+        cast               int
+          relation <=      bool
+            size_of        int
+              type H
+            int_lit 8      int
+          type int
+        int_lit 1          int
+      type byte
+  field greater            [((size_of(H) > 8) as int) + 1]byte
+    type [N]
+      additive +           int
+        cast               int
+          relation >       bool
+            size_of        int
+              type H
+            int_lit 8      int
+          type int
+        int_lit 1          int
+      type byte
+  field at_least           [((size_of(H) >= 8) as int) + 1]byte
+    type [N]
+      additive +           int
+        cast               int
+          relation >=      bool
+            size_of        int
+              type H
+            int_lit 8      int
+          type int
+        int_lit 1          int
+      type byte
+  field both               [(((size_of(H) > 4) && true) as int) + 1]byte
+    type [N]
+      additive +           int
+        cast               int
+          and_expr &&      bool
+            relation >     bool
+              size_of      int
+                type H
+              int_lit 4    int
+            true           bool
+          type int
+        int_lit 1          int
+      type byte
+  field either             [(((size_of(H) > 4) || false) as int) + 1]byte
+    type [N]
+      additive +           int
+        cast               int
+          or_expr ||       bool
+            relation >     bool
+              size_of      int
+                type H
+              int_lit 4    int
+            false          bool
+          type int
+        int_lit 1          int
+      type byte
+  field negated            [(!(size_of(H) > 4) as int) + 1]byte
+    type [N]
+      additive +           int
+        cast               int
+          unary !          bool
+            relation >     bool
+              size_of      int
+                type H
+              int_lit 4    int
+          type int
+        int_lit 1          int
+      type byte
+function total             fn(*Lengths) -> int
+  param l                  *Lengths
+    type *
+      type Lengths
+  result
+    type int
+  block
+    return_stmt
+      additive +           int
+        field len          int
+          field plus       [size_of(H) + 1]byte
+            ident l        *Lengths
+        field len          int
+          field negated    [(!(size_of(H) > 4) as int) + 1]byte
+            ident l        *Lengths

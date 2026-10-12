@@ -1,0 +1,1 @@
+types_function_with_marked_parameters_as_an_int.anti:12:15: error: expected `int`, found `fn(keep fn(int) -> int, keep own fn(int) -> int, concurrent fn(int) -> int, fn(int) -> int) ...`

@@ -1,0 +1,1 @@
+values_constant_mul_high_of_a_c_type.anti:4:23: error: `mul_high` of a type whose width the target decides is not a constant expression

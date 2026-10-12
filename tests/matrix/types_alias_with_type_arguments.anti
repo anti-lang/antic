@@ -1,0 +1,9 @@
+//! An alias without type parameters takes no type arguments.
+
+type Whole = int;
+
+fn main() -> int
+{
+	let n: Whole<int> = 1;
+	return 0;
+}

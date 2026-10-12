@@ -1,0 +1,13 @@
+//! A repeat inside a repeat of two rounds inside a repeat without an end: the
+//! second of the two rounds starts with the text the first took.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	if "aaab".matches(re"((a+){2}b)+") {
+		return 1;
+	}
+	return 0;
+}

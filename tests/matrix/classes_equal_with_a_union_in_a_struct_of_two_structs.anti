@@ -1,0 +1,36 @@
+//! A class whose field is a struct of two fields of one struct type, the second
+//! struct with a union, has no default `==`.
+
+union Bits
+{
+	a: int,
+	b: f32,
+}
+
+struct Inner
+{
+	n: int,
+}
+
+struct Outer
+{
+	a: Inner,
+	b: Inner,
+	bits: Bits,
+}
+
+class Holder
+{
+	pub n: int = 0,
+	pub part: Outer,
+}
+
+fn same(a: Holder, b: Holder) -> bool
+{
+	return a == b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

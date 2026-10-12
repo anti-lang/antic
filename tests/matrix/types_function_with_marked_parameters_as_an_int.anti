@@ -1,0 +1,14 @@
+//! The type of a function in a message names the mark of each parameter of
+//! function type: `keep`, `keep own`, `concurrent` and none.
+
+fn apply(keep kept: fn(int) -> int, keep own owned: fn(int) -> int,
+	concurrent shared: fn(int) -> int, plain: fn(int) -> int) -> int
+{
+	return plain(1);
+}
+
+fn main() -> int
+{
+	let n: int = apply;
+	return n;
+}

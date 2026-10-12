@@ -1,0 +1,12 @@
+//! A pattern literal that ends with a backslash is malformed.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	if "aaab".matches(re"a\") {
+		return 1;
+	}
+	return 0;
+}

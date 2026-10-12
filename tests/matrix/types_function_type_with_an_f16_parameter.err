@@ -1,0 +1,1 @@
+types_function_type_with_an_f16_parameter.anti:5:13: error: a parameter cannot be `f16`, which is storage only

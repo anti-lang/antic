@@ -1,0 +1,55 @@
+//! Each escape and each class a pattern literal takes, matched against one
+//! text. A line of the output names the form and says whether the text matched.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(label: str, hit: bool)
+{
+	printf("%.*s %d\n".ptr, label.len as c_int, label.ptr, hit as c_int);
+}
+
+fn main() -> int
+{
+	show("horizontal_space", "a\tb".matches(re"a\hb") != none);
+	show("vertical_space", "a\nb".matches(re"a\vb") != none);
+	show("not_horizontal", "a\tb".matches(re"a\Hb") != none);
+	show("not_vertical", "axb".matches(re"a\Vb") != none);
+	show("not_digit", "a1".matches(re"^\D\d$") != none);
+	show("not_word", "a b".matches(re"a\Wb") != none);
+	show("not_space", "a b".matches(re"a\Sb") != none);
+	show("hex_two_digits", "A".matches(re"^\x41$") != none);
+	show("hex_in_braces", "A".matches(re"^\x{41}$") != none);
+	show("hex_one_digit", "\x04G".matches(re"^\x4G$") != none);
+	show("octal_in_braces", "A".matches(re"^\o{101}$") != none);
+	show("octal_after_zero", "\t".matches(re"^\011$") != none);
+	show("class_newline", "\n".matches(re"^[\n]$") != none);
+	show("class_return", "\r".matches(re"^[\r]$") != none);
+	show("class_tab", "\t".matches(re"^[\t]$") != none);
+	show("class_form_feed", "\x0C".matches(re"^[\f]$") != none);
+	show("class_escape", "\x1B".matches(re"^[\e]$") != none);
+	show("class_bell", "\x07".matches(re"^[\a]$") != none);
+	show("class_backspace", "\x08".matches(re"^[\b]$") != none);
+	show("class_control", "\x01".matches(re"^[\cA]$") != none);
+	show("class_property", "k".matches(re"^[\pL]$") != none);
+	show("class_property_in_braces", "k".matches(re"^[\p{Lu}]$") != none);
+	show("class_escaped_letter", "é".matches(re"^[\é]$") != none);
+	show("class_digit", "7".matches(re"^[\d]$") != none);
+	show("class_range_past_ascii", "f".matches(re"^[a-é]$") != none);
+	show("class_quoted", "-".matches(re"^[\Qa-c\E]$") != none);
+	show("class_hex", "A".matches(re"^[\x41]$") != none);
+	show("posix_alpha", "k".matches(re"^[[:alpha:]]$") != none);
+	show("posix_digit", "k".matches(re"^[[:digit:]]$") != none);
+	show("posix_alnum", "7".matches(re"^[[:alnum:]]$") != none);
+	show("posix_upper", "k".matches(re"^[[:upper:]]$") != none);
+	show("posix_lower", "k".matches(re"^[[:lower:]]$") != none);
+	show("posix_space", " ".matches(re"^[[:space:]]$") != none);
+	show("posix_blank", "\n".matches(re"^[[:blank:]]$") != none);
+	show("posix_word", "_".matches(re"^[[:word:]]$") != none);
+	show("posix_xdigit", "f".matches(re"^[[:xdigit:]]$") != none);
+	show("posix_punct", "!".matches(re"^[[:punct:]]$") != none);
+	show("posix_not_alpha", "k".matches(re"^[[:^alpha:]]$") != none);
+	return 0;
+}

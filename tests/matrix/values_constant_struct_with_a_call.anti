@@ -1,0 +1,19 @@
+//! A field of a constant struct literal is a constant expression.
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+fn one() -> int
+{
+	return 1;
+}
+
+const PAIR: Pair = Pair { a: one(), b: 2 };
+
+fn main() -> int
+{
+	return 0;
+}

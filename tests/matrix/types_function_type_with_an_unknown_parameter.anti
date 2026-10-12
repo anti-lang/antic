@@ -1,0 +1,8 @@
+//! A function type whose parameter names no type gets the message on the type
+//! alone.
+
+fn main() -> int
+{
+	let f: ?fn(Nope) -> int = none;
+	return 0;
+}

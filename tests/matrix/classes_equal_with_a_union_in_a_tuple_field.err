@@ -1,0 +1,1 @@
+classes_equal_with_a_union_in_a_tuple_field.anti:18:9: error: `==` is not defined on `Holder`, whose field `part` has no `eq`

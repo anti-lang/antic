@@ -1,0 +1,1 @@
+types_function_type_with_an_f16_result.anti:5:21: error: a result cannot be `f16`, which is storage only

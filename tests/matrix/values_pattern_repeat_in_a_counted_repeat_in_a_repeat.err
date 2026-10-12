@@ -1,0 +1,1 @@
+values_pattern_repeat_in_a_counted_repeat_in_a_repeat.anti:9:25: error: the repeat `a+` inside `((a+){2}b)+` can take exponential time, write a possessive quantifier, `a++`, or an atomic group, `(?>...)` [exponential-pattern]

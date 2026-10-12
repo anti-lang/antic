@@ -1,0 +1,77 @@
+//! Each anchor, group, flag and repeat a pattern literal takes, matched against
+//! one text. A line of the output names the form and says whether the text
+//! matched.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(label: str, hit: bool)
+{
+	printf("%.*s %d\n".ptr, label.len as c_int, label.ptr, hit as c_int);
+}
+
+fn main() -> int
+{
+	show("word_boundary", "a cat".matches(re"\bcat\b") != none);
+	show("not_a_boundary", "scatter".matches(re"\Bcat\B") != none);
+	show("start_and_end", "cat".matches(re"\Acat\z") != none);
+	show("end_before_newline", "cat\n".matches(re"cat\Z") != none);
+	show("start_of_match", "cat".matches(re"\Gcat") != none);
+	show("keep_out", "concat".matches(re"con\Kcat") != none);
+	show("stray_end_of_quote", "ab".matches(re"^a\Eb$") != none);
+	show("quoted", "a.b".matches(re"^a\Q.\Eb$") != none);
+	show("not_newline", "ab".matches(re"^a\Nb$") != none);
+	show("line_break", "a\r\nb".matches(re"^a\Rb$") != none);
+	show("grapheme", "é".matches(re"^\X$") != none);
+	show("back_reference", "abab".matches(re"^(ab)\1$") != none);
+	show("back_reference_g", "abab".matches(re"^(ab)\g1$") != none);
+	show("back_reference_g_braces", "abab".matches(re"^(ab)\g{1}$") != none);
+	show("back_reference_g_relative", "abab".matches(re"^(ab)\g-1$") != none);
+	show("back_reference_k_angle", "abab".matches(re"^(?<w>ab)\k<w>$") != none);
+	show("back_reference_k_quote", "abab".matches(re"^(?<w>ab)\k'w'$") != none);
+	show("back_reference_k_braces", "abab".matches(re"^(?<w>ab)\k{w}$") != none);
+	show("lookahead", "ab".matches(re"a(?=b)") != none);
+	show("negative_lookahead", "ab".matches(re"a(?!b)") != none);
+	show("lookbehind", "ab".matches(re"(?<=a)b") != none);
+	show("negative_lookbehind", "ab".matches(re"(?<!a)b") != none);
+	show("lookahead_by_name", "ab".matches(re"a(*pla:b)") != none);
+	show("lookahead_by_long_name", "ab".matches(re"a(*positive_lookahead:b)") != none);
+	show("atomic_by_name", "aab".matches(re"(*atomic:a+)ab") != none);
+	show("atomic", "aab".matches(re"(?>a+)b") != none);
+	show("verb", "ab".matches(re"a(*COMMIT)b") != none);
+	show("group_named_in_quotes", "ab".matches(re"^(?'w'ab)$") != none);
+	show("group_named_with_p", "abab".matches(re"^(?P<w>ab)(?P=w)$") != none);
+	show("branch_reset", "b".matches(re"^(?|(a)|(b))$") != none);
+	show("comment", "ab".matches(re"^a(?#between)b$") != none);
+	show("callout", "ab".matches(re"^a(?C)b$") != none);
+	show("condition", "ab".matches(re"^(a)?(?(1)b|c)$") != none);
+	show("recursion", "(())".matches(re"^(\((?R)?\))$") != none);
+	show("call_by_number", "abab".matches(re"^(ab)(?1)$") != none);
+	show("call_relative", "abab".matches(re"^(ab)(?-1)$") != none);
+	show("call_forward", "abab".matches(re"^(?+1)(ab)$") != none);
+	show("call_by_name", "abab".matches(re"^(?<w>ab)(?&w)$") != none);
+	show("caseless_off", "aB".matches(re"(?i)a(?-i)b") != none);
+	show("flags_reset", "aB".matches(re"(?i)a(?^)b") != none);
+	show("flags_in_a_group", "AB".matches(re"^(?i:ab)$") != none);
+	show("no_auto_capture", "ab".matches(re"(?n)(a)b") != none);
+	show("extended", "abc".matches(re"(?x) a b c") != none);
+	show("extended_comment", "ab".matches(re"(?x)a b# the rest is a comment") != none);
+	show("extended_repeat", "aab".matches(re"(?x)^a + b$") != none);
+	show("count", "aa".matches(re"^a{2}$") != none);
+	show("count_range", "aaa".matches(re"^a{2,3}$") != none);
+	show("count_up_to", "aaa".matches(re"^a{,3}$") != none);
+	show("count_with_spaces", "aa".matches(re"^a{ 2 , 3 }$") != none);
+	show("braces_without_a_count", "a{,}".matches(re"^a{,}$") != none);
+	show("braces_without_an_end", "a{2".matches(re"^a{2$") != none);
+	show("braces_with_a_letter", "a{x}".matches(re"^a{x}$") != none);
+	show("lazy", "aab".matches(re"^a+?b$") != none);
+	show("possessive", "aab".matches(re"^a++b$") != none);
+	show("quote_to_the_end", "a.b".matches(re"^a\Q.b") != none);
+	show("condition_on_a_lookahead", "1".matches(re"^(?(?=\d)\d|b)$") != none);
+	show("condition_on_a_group_in_a_lookahead", "a".matches(re"^(?(?=(a))a|b)$") != none);
+	show("extended_class", "b".matches(re"^(?[ [a-z] - [aeiou] ])$") != none);
+	show("repeat_after_another_atom", "babaa".matches(re"^(ba+)+$") != none);
+	return 0;
+}

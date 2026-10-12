@@ -1,0 +1,38 @@
+//! A length of an array that holds `size_of`, with each operator of a constant
+//! expression once. The checked tree prints the length as it was written.
+
+struct H
+{
+	tag: u8,
+	n: i32,
+}
+
+struct Lengths
+{
+	plus: [size_of(H) + 1]byte,
+	slash: [size_of(H) / 2]byte,
+	percent: [size_of(H) % 3 + 1]byte,
+	amp: [size_of(H) & 12]byte,
+	pipe: [size_of(H) | 1]byte,
+	caret: [size_of(H) ^ 1]byte,
+	tilde: [~size_of(H) & 7]byte,
+	left: [size_of(H) << 1]byte,
+	right: [size_of(H) >> 1]byte,
+	minus: [-(-size_of(H))]byte,
+	narrowed: [size_of(H) as u8 as int]byte,
+	unsigned: [(size_of(H) as u64 + 2) as int]byte,
+	equal: [(size_of(H) == 8) as int + 1]byte,
+	unequal: [(size_of(H) != 8) as int + 1]byte,
+	less: [(size_of(H) < 8) as int + 1]byte,
+	at_most: [(size_of(H) <= 8) as int + 1]byte,
+	greater: [(size_of(H) > 8) as int + 1]byte,
+	at_least: [(size_of(H) >= 8) as int + 1]byte,
+	both: [(size_of(H) > 4 && true) as int + 1]byte,
+	either: [(size_of(H) > 4 || false) as int + 1]byte,
+	negated: [(!(size_of(H) > 4)) as int + 1]byte,
+}
+
+fn total(l: *Lengths) -> int
+{
+	return l.plus.len + l.negated.len;
+}

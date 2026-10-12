@@ -1,0 +1,1 @@
+values_constant_below_zero_as_an_int.anti:5:16: error: `-1.25e300 as int` does not fit `int`

@@ -1,0 +1,12 @@
+//! The shorter branch of an alternation is the match that `with` must fit, when
+//! it stands first as well.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	let n = data.patch(re"c|ab", b"xy");
+	return 0;
+}

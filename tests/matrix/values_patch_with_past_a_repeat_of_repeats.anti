@@ -1,0 +1,12 @@
+//! The fewest bytes of a counted repeat of a counted repeat are the product of
+//! the two counts.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	let n = data.patch(re"((?:a{3}){2})b", b"xxxxxxxx");
+	return 0;
+}

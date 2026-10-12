@@ -1,0 +1,10 @@
+//! A constant far below zero converts to no `int`, and the message writes its
+//! value with its sign and its digits.
+
+const LOW: f64 = -1.25e300;
+const N: int = LOW as int;
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,12 @@
+//! A condition with one branch may match nothing, so only an empty `with` fits
+//! its group.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	let n = data.patch(re"(a)?((?(1)bc))", b"x", 2);
+	return 0;
+}

@@ -1,0 +1,10 @@
+//! A constant of type `f32` past the range of `i32` converts to none, and the
+//! message writes its value.
+
+const WIDE: f32 = 3.0e38;
+const N: i32 = WIDE as i32;
+
+fn main() -> int
+{
+	return 0;
+}

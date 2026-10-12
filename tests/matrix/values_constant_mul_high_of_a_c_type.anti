@@ -1,0 +1,9 @@
+//! `mul_high` of a type whose width the target decides is no constant
+//! expression.
+
+const HIGH: c_ulong = mul_high(7 as c_ulong, 9 as c_ulong);
+
+fn main() -> int
+{
+	return 0;
+}

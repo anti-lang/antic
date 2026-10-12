@@ -1,0 +1,1 @@
+values_pattern_range_that_ends_with_a_class.anti:8:28: error: malformed pattern: invalid range in character class

@@ -1,0 +1,25 @@
+//! Constants whose value the checker computes, one per form: a signed C type
+//! and its shift, texts of two lengths, characters and flags that compare, a
+//! pointer constant against `none` and a character in a range. The program
+//! prints each value.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const LONG: c_long = -5;
+const SHIFTED: c_long = LONG << 2;
+const LONGER: bool = "abc" > "ab";
+const SHORTER: bool = "ab" > "abc";
+const LETTERS: bool = 'a' < 'b';
+const FLAGS: bool = true != false;
+const NOTHING: ?*int = none;
+const ABSENT: bool = NOTHING == none;
+const INSIDE: bool = 'k' in 'a'..'z';
+
+fn main() -> int
+{
+	printf("c_long %lld %lld\n".ptr, LONG as int, SHIFTED as int);
+	printf("texts %d %d\n".ptr, LONGER as c_int, SHORTER as c_int);
+	printf("letters %d flags %d\n".ptr, LETTERS as c_int, FLAGS as c_int);
+	printf("absent %d inside %d\n".ptr, ABSENT as c_int, INSIDE as c_int);
+	return 0;
+}

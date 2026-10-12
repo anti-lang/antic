@@ -1,0 +1,7 @@
+//! A parameter of a function type is no `f16`, which lives in memory alone.
+
+fn main() -> int
+{
+	let f: ?fn(f16) -> int = none;
+	return 0;
+}

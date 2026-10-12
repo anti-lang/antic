@@ -1,0 +1,8 @@
+//! A function type that may fail needs `Error` of `anti.lang`, which the module
+//! imports.
+
+fn main() -> int
+{
+	let f: ?fn(int) -> int may fail = none;
+	return 0;
+}

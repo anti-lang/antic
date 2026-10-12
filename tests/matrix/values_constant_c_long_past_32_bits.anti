@@ -1,0 +1,8 @@
+//! A constant of type `c_long` fits the `c_long` of every target.
+
+const WIDE: c_long = 5000000000;
+
+fn main() -> int
+{
+	return 0;
+}

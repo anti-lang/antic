@@ -1,0 +1,11 @@
+//! `concurrent` marks a parameter of function type.
+
+fn hold(concurrent n: int) -> int
+{
+	return n;
+}
+
+fn main() -> int
+{
+	return 0;
+}

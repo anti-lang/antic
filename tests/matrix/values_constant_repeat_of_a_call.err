@@ -1,0 +1,1 @@
+values_constant_repeat_of_a_call.anti:8:23: error: a call is not a constant expression

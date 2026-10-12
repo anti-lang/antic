@@ -1,0 +1,11 @@
+//! A back reference counts as no byte of the group that `with` must fit.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	let n = data.patch(re"((a)\2)", b"xx", 1);
+	return 0;
+}

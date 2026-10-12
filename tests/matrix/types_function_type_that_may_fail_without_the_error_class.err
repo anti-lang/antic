@@ -1,0 +1,1 @@
+types_function_type_that_may_fail_without_the_error_class.anti:6:9: error: `may fail` gives `?*anti.lang.Error`, so the module imports `anti.lang`

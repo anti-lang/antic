@@ -1,0 +1,11 @@
+//! A constant that is infinite converts to no `int`, and the message writes its
+//! value.
+
+const BIG: f64 = 1.0e300;
+const ENDLESS: f64 = BIG * BIG;
+const N: int = ENDLESS as int;
+
+fn main() -> int
+{
+	return 0;
+}

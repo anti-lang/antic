@@ -1,0 +1,24 @@
+//! A class with a tuple field that holds a union has no default `==`, since no
+//! default can read a union.
+
+union Bits
+{
+	a: int,
+	b: f32,
+}
+
+class Holder
+{
+	pub n: int = 0,
+	pub part: (int, Bits),
+}
+
+fn same(a: Holder, b: Holder) -> bool
+{
+	return a == b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,10 @@
+//! A constant of one digit and a large exponent converts to no `int`, and the
+//! message writes its value.
+
+const BIG: f64 = 1.0e300;
+const N: int = BIG as int;
+
+fn main() -> int
+{
+	return 0;
+}

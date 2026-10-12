@@ -1,0 +1,1 @@
+values_constant_minus_infinity_as_an_int.anti:6:16: error: `-inf as int` does not fit `int`

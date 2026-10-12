@@ -1,0 +1,7 @@
+//! A channel of a type that is not declared gets the message on the type alone.
+
+fn main() -> int
+{
+	let c: ?*chan Nope = none;
+	return 0;
+}

@@ -1,0 +1,13 @@
+//! An element of a constant array is a constant expression.
+
+fn one() -> int
+{
+	return 1;
+}
+
+const PAIR: [2]int = [1, one()];
+
+fn main() -> int
+{
+	return 0;
+}

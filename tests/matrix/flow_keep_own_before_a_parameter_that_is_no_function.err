@@ -1,0 +1,1 @@
+flow_keep_own_before_a_parameter_that_is_no_function.anti:3:18: error: `keep` marks a parameter of function type, and this one is `int`

@@ -1,0 +1,11 @@
+//! An `own` parameter of a type that is not declared gets the message on the
+//! type alone.
+
+fn take(own p: Nope)
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

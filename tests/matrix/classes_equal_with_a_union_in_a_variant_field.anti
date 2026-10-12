@@ -1,0 +1,29 @@
+//! A class with a variant field whose case holds a union has no default `==`.
+
+union Bits
+{
+	a: int,
+	b: f32,
+}
+
+variant Shape
+{
+	Raw { bits: Bits },
+	Empty,
+}
+
+class Holder
+{
+	pub n: int = 0,
+	pub part: Shape,
+}
+
+fn same(a: Holder, b: Holder) -> bool
+{
+	return a == b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

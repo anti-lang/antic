@@ -1,0 +1,19 @@
+//! A base whose type argument names no type gets the message on the type alone.
+
+abstract class Holder<T>
+{
+	abstract fn get(self) -> int;
+}
+
+class Square inherits Holder<Nope>
+{
+	concrete fn get(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

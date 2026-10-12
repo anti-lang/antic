@@ -1,0 +1,13 @@
+//! A bitfield of a type that is not declared gets the message on the type
+//! alone.
+
+struct Flags
+{
+	a: Nope : 3,
+	b: u8 : 5,
+}
+
+fn main() -> int
+{
+	return 0;
+}

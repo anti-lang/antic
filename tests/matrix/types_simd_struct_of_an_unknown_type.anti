@@ -1,0 +1,12 @@
+//! A simd struct whose lanes name no type gets the message on the type alone.
+
+simd struct Vec2
+{
+	x: Nope,
+	y: f32,
+}
+
+fn main() -> int
+{
+	return 0;
+}

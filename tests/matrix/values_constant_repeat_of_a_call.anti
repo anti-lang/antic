@@ -1,0 +1,13 @@
+//! The value of a constant array written `[v; n]` is a constant expression.
+
+fn one() -> int
+{
+	return 1;
+}
+
+const PAIR: [2]int = [one(); 2];
+
+fn main() -> int
+{
+	return 0;
+}

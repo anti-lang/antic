@@ -1,0 +1,5 @@
+exit 0
+c_long -5 -20
+texts 1 0
+letters 1 flags 1
+absent 1 inside 1

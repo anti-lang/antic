@@ -1,0 +1,8 @@
+//! A range after `in` holds numbers or characters.
+
+const INSIDE: bool = "b" in "a".."c";
+
+fn main() -> int
+{
+	return 0;
+}
