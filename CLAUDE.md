@@ -87,8 +87,11 @@ not re-open a settled decision without asking Eddie.
   every second of a test costs the suite a fourteenth. The 135 tests of
   `types` take 100 to 144 s there, 7 to 10 s of the suite. The ASan suite
   stands above its 9 minutes until tests get faster.
-  `docs/reports/2026-10-12-tests-types.md` names where. A suite past 9
-  minutes gets
+  `docs/reports/2026-10-12-tests-types.md` names where. The step
+  `ownership` measured `host` 417 s. It ran each sanitizer suite in two
+  parts, `ctest -I 1,1300` and `ctest -I 1301,2697`: `asan` 501 s and
+  152 s, `ubsan` 448 s and 121 s. Both stand above 9 minutes as one run.
+  A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
 - Every comment and every `.md` file follows the docs-style rules. The checker
@@ -605,10 +608,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 2369 ctest tests pass on the development Mac, and two of them, the
+- 2698 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  82 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 2368 each with the same skips, without
+  142 of them are the expected failures of `tests/known-failures.txt`.
+  The ASan and the UBSan builds run 2697 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
