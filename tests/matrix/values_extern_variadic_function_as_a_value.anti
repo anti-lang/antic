@@ -1,0 +1,9 @@
+//! A variadic `extern fn` is called by its name and is no value.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let f = printf;
+	return 0;
+}

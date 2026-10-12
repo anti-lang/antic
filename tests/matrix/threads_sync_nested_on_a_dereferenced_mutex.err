@@ -1,0 +1,1 @@
+threads_sync_nested_on_a_dereferenced_mutex.anti:10:3: error: `sync *p` inside `sync *p` deadlocks

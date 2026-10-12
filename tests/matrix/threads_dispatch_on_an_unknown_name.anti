@@ -1,0 +1,8 @@
+//! A `dispatch` on a name that is not declared gets the message on the name
+//! alone.
+
+fn main() -> int
+{
+	let j = dispatch nope -> nope.run();
+	return 0;
+}

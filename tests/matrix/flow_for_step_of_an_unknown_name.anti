@@ -1,0 +1,9 @@
+//! The step of a `for` that names nothing gets the message on the name alone.
+
+fn main() -> int
+{
+	let n = 1;
+	for i in 0..10 by nope {
+	}
+	return 0;
+}

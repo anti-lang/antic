@@ -1,0 +1,19 @@
+//! A `concrete fn` takes `self` where the abstract function it fills does.
+
+abstract class Shape
+{
+	abstract fn area(self, scale: int) -> int;
+}
+
+class Square inherits Shape
+{
+	concrete fn area(scale: int) -> int
+	{
+		return scale;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

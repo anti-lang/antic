@@ -1,0 +1,13 @@
+//! `with` of `patch` fits the bytes it replaces, and two bytes fit no span of
+//! one.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	let k = data.patch(b"a", b"xy");
+	return 0;
+}

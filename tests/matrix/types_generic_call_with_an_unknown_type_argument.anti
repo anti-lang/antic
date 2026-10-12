@@ -1,0 +1,12 @@
+//! A type argument that names no type gets the message on the type alone.
+
+fn pick<T>(own a: T) -> T
+{
+	return a;
+}
+
+fn main() -> int
+{
+	let n = pick<Nope>(1);
+	return 0;
+}

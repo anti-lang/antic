@@ -1,0 +1,10 @@
+//! An interpolated text that names nothing gets the message on the name alone.
+
+import anti.text;
+
+fn main() -> int
+{
+	let n = 1;
+	let text = f"{nope}";
+	return 0;
+}

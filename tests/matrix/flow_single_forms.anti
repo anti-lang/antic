@@ -2,8 +2,9 @@
 //! atomic` field, `trace` before `synchronized class`, the marks `keep` and
 //! `keep own` before a function type in a list of types, `else if let` after a
 //! plain `if`, a `<` before a parenthesis and before a bracket, a precision of
-//! two digits and a `compatible` line of three numbers. The program prints one
-//! line per form.
+//! two digits, a `compatible` line of three numbers, a `let` with `else`
+//! declared as `*T` and as a function type, and `==` on two functions. The
+//! program prints one line per form.
 //#! The forms stand in one program, since each needs no more than a line.
 
 import anti.lang;
@@ -73,6 +74,36 @@ fn chain(n: int) -> int
 	return -1;
 }
 
+fn maybe(n: int) -> ?*int
+{
+	return none;
+}
+
+fn maybe_function(n: int) -> ?fn(int) -> int
+{
+	if n == 0 {
+		return none;
+	}
+	return twice;
+}
+
+fn declared(n: int) -> int
+{
+	let p: *int = maybe(n) else {
+		return -1;
+	};
+	return *p;
+}
+
+fn declared_function(n: int) -> int
+{
+	let f: fn(int) -> int = maybe_function(n) else
+	{
+		return -1;
+	};
+	return f(n);
+}
+
 fn main() -> int
 {
 	let a = 1;
@@ -93,6 +124,8 @@ fn main() -> int
 	printf("else if let %d %d %d\n".ptr, chain(9) as c_int, chain(2) as c_int, chain(0) as c_int);
 	printf("less %d %d\n".ptr, (a < (b + c)) as c_int, (a < [1, 2, 3].len as int) as c_int);
 	printf("precision %.*s\n".ptr, digits.len as c_int, digits.ptr);
+	printf("let else %d %d %d\n".ptr, declared(1) as c_int, declared_function(0) as c_int, declared_function(4) as c_int);
+	printf("functions %d %d\n".ptr, (twice == twice) as c_int, (twice == chain) as c_int);
 	free(digits.ptr);
 	return 0;
 }

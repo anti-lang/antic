@@ -1,0 +1,1 @@
+types_generic_call_with_an_int_for_a_slice.anti:10:10: error: nothing in the arguments gives `T` of `first`, so the call writes it out after the name

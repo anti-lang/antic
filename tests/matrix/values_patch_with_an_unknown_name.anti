@@ -1,0 +1,12 @@
+//! `patch` with a name that is not declared gets the message on the name alone.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	let k = data.patch(nope, b"x");
+	return 0;
+}

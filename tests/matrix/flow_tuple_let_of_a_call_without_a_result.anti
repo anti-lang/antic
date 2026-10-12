@@ -1,0 +1,12 @@
+//! A `let` that takes a tuple apart needs a value.
+
+fn nothing()
+{
+}
+
+fn main() -> int
+{
+	let n = 1;
+	let (a, b) = nothing();
+	return 0;
+}

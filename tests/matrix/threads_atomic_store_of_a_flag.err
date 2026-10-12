@@ -1,0 +1,1 @@
+threads_atomic_store_of_a_flag.anti:6:10: error: expected `int`, found `bool`

@@ -1,0 +1,1 @@
+values_anonymous_function_that_can_reach_its_end.anti:10:15: error: the anonymous function can reach its end without `return`

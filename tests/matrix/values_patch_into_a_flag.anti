@@ -1,0 +1,12 @@
+//! `patch` names its group by number or by name.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	let k = data.patch(re"(a)(b)", b"x", true);
+	return 0;
+}

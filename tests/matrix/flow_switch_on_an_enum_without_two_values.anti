@@ -1,0 +1,19 @@
+//! A `switch` on an enum without `else` covers every value, and the message
+//! names each value it lacks.
+
+enum Colour
+{
+	Red,
+	Green,
+	Blue,
+}
+
+fn main() -> int
+{
+	let n = 1;
+	let c = Colour.Red;
+	switch c {
+		Colour.Red => n = 2,
+	}
+	return 0;
+}

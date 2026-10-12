@@ -1,0 +1,1 @@
+threads_mutex_new_with_a_handler.anti:5:22: error: this call cannot fail, so it has no error to handle

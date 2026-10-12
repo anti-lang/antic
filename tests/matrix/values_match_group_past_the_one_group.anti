@@ -1,0 +1,15 @@
+//! A pattern literal with one group has no group 5, and the message counts one
+//! group.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	if let m = "ab".matches(re"(a)") {
+		let g = m.5;
+	}
+	return 0;
+}

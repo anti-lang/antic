@@ -1,0 +1,1 @@
+types_generic_call_with_a_function_of_two_parameters.anti:15:16: error: expected `fn(int) -> int`, found `fn(int, int) -> int`

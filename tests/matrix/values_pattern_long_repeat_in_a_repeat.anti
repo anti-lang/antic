@@ -1,0 +1,14 @@
+//! The message on a repeat inside a repeat cuts a long repeat short.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	if "ab".matches(re"([abcdefghijklmnopqrstuvwxyz0123456789]+)+") {
+		return 1;
+	}
+	return 0;
+}

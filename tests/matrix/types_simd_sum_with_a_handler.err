@@ -1,0 +1,1 @@
+types_simd_sum_with_a_handler.anti:15:22: error: this call cannot fail, so it has no error to handle

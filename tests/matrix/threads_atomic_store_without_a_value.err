@@ -1,0 +1,1 @@
+threads_atomic_store_without_a_value.anti:6:2: error: `store` takes 1 argument

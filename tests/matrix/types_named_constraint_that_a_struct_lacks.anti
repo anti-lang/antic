@@ -1,0 +1,23 @@
+//! A struct without `operator fn lt` meets no constraint that gives `lt`, and
+//! the message names the constraint.
+
+constraint Sorted = eq + lt;
+
+struct Pair
+{
+	a: int,
+}
+
+fn larger<T: Sorted>(own a: T, own b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+fn main() -> int
+{
+	let p = larger(Pair { a: 1 }, Pair { a: 2 });
+	return 0;
+}

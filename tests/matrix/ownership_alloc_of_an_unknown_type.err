@@ -1,0 +1,1 @@
+ownership_alloc_of_an_unknown_type.anti:7:16: error: unknown type `Nope`

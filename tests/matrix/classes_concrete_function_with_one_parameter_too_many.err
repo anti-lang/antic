@@ -1,0 +1,1 @@
+classes_concrete_function_with_one_parameter_too_many.anti:10:14: error: `concrete fn area` takes 2 parameters besides `self`, and `Shape.area` takes 1

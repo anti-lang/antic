@@ -1,0 +1,1 @@
+types_interface_constraint_that_a_class_lacks.anti:29:10: error: `Circle` has no `Shape`, which `area_of` needs for `T`

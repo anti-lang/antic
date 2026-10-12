@@ -1,0 +1,12 @@
+//! A float has no `and`, so it meets no constraint that names the hook.
+
+fn mask<T: and>(own a: T, own b: T) -> T
+{
+	return a & b;
+}
+
+fn main() -> int
+{
+	let x = mask(1.5, 2.5);
+	return 0;
+}

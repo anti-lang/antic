@@ -1,0 +1,6 @@
+exit 0
+hooks -2
+interface 9
+interfaces 16
+optional 4 9
+field 42 8

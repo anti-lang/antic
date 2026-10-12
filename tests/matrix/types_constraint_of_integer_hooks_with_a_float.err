@@ -1,0 +1,1 @@
+types_constraint_of_integer_hooks_with_a_float.anti:10:10: error: `float` has no `and`, which `mask` needs for `T`

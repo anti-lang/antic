@@ -1,0 +1,8 @@
+//! A tuple of two has the elements 0 and 1.
+
+fn main() -> int
+{
+	let t = (1, 2);
+	let x = t.5;
+	return 0;
+}

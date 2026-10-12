@@ -1,0 +1,8 @@
+//! A `parallel` over a name that is not declared gets the message on the name
+//! alone.
+
+fn main() -> int
+{
+	let parts = parallel nope -> count;
+	return 0;
+}

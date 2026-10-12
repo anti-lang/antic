@@ -1,0 +1,1 @@
+types_named_constraint_that_a_struct_lacks.anti:21:10: error: `Pair` has no `lt`, which `larger` needs for `T`. A struct or a class has no default order and declares `operator fn lt`

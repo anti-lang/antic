@@ -1,0 +1,1 @@
+values_mul_high_with_a_handler.anti:6:25: error: this call cannot fail, so it has no error to handle

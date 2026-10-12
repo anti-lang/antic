@@ -1,0 +1,1 @@
+values_extern_variadic_function_as_a_value.anti:7:10: error: a variadic function has no function pointer type

@@ -1,0 +1,12 @@
+//! A call gives a generic function as many type arguments as it has parameters.
+
+fn pick<T>(own a: T) -> T
+{
+	return a;
+}
+
+fn main() -> int
+{
+	let n = pick<int, int>(1);
+	return 0;
+}

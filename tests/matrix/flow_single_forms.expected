@@ -6,3 +6,5 @@ marks 2 1 1
 else if let 1 12 -1
 less 1 1
 precision 0.333333333333
+let else -1 -1 8
+functions 1 0

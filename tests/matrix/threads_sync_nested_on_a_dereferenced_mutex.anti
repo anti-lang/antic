@@ -1,0 +1,15 @@
+//! A `sync` inside a `sync` on the same place is refused, and the message
+//! spells the place with its `*`.
+
+fn main() -> int
+{
+	let n = 1;
+	let m = Mutex.new();
+	let p = &m;
+	sync *p {
+		sync *p {
+			n = 2;
+		}
+	}
+	return 0;
+}

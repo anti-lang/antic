@@ -1,0 +1,18 @@
+//! The `else` of a `let` leaves in every branch of an `if` chain.
+
+fn held(n: int) -> ?*int
+{
+	return none;
+}
+
+fn main() -> int
+{
+	let n = 1;
+	let m = held(n) else {
+		if n == 1 {
+			return 1;
+		} else {
+		}
+	};
+	return 0;
+}

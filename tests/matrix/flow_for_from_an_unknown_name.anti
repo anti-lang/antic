@@ -1,0 +1,9 @@
+//! The start of a range that names nothing gets the message on the name alone.
+
+fn main() -> int
+{
+	let n = 1;
+	for i in nope..10 {
+	}
+	return 0;
+}

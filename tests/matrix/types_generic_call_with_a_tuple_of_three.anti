@@ -1,0 +1,13 @@
+//! A parameter of type `(T, T)` takes a tuple of two, and a tuple of three
+//! gives no `T`.
+
+fn left<T>(own pair: (T, T)) -> T
+{
+	return pair.0;
+}
+
+fn main() -> int
+{
+	let n = left((1, 2, 3));
+	return 0;
+}

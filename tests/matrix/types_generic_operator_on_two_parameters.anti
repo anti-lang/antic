@@ -1,0 +1,13 @@
+//! An operator in a generic body takes two operands of one type parameter.
+
+fn merge<T: add, U: add>(own a: T, own b: U) -> T
+{
+	return a + b;
+}
+
+fn main() -> int
+{
+	let n = 1;
+	let x = merge(1, 2);
+	return 0;
+}

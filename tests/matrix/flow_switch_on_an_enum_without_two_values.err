@@ -1,0 +1,1 @@
+flow_switch_on_an_enum_without_two_values.anti:15:2: error: this `switch` on `Colour` has no arm for `Green`, `Blue`

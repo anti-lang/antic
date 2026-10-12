@@ -1,0 +1,1 @@
+flow_tuple_let_of_a_call_without_a_result.anti:10:15: error: a destructuring takes a tuple, found `void`

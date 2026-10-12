@@ -1,0 +1,20 @@
+//! `simd.select` with a mask that names nothing gets the message on the name
+//! alone.
+
+import anti.simd;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn main() -> int
+{
+	let n = 1;
+	let v = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+	let w = simd.select(nope, v, v);
+	return 0;
+}

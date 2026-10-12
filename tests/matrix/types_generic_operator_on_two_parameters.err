@@ -1,0 +1,1 @@
+types_generic_operator_on_two_parameters.anti:5:9: error: the operands of `+` have the types `T` and `U`

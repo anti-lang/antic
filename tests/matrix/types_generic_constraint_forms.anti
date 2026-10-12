@@ -1,0 +1,86 @@
+//! Constraints and copies of generics in one place each: the hooks of the
+//! integer operators on a built-in type, an interface as a constraint, two
+//! interfaces, a `?T` parameter whose `T` the call infers, a field of function
+//! type that may hold `none` and a length that holds `size_of(T)`. The program
+//! prints one line per form.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+abstract class Named
+{
+	abstract fn code(self) -> int;
+}
+
+class Square
+{
+	implements shape: Shape,
+	implements named: Named,
+	pub side: int = 3,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+
+	concrete fn code(self) -> int
+	{
+		return 7;
+	}
+}
+
+struct Step<T>
+{
+	next: ?fn(T) -> T,
+	room: [size_of(T)]byte,
+}
+
+fn bits<T: rem + and + or + xor + shl + shr + not>(a: T, b: T) -> T
+{
+	return ((a % b) & (a | b)) ^ ((a << b) >> b) ^ ~a;
+}
+
+fn area_of<T: Shape>(s: *T) -> int
+{
+	return s.area();
+}
+
+fn both<T: Shape + Named>(s: *T) -> int
+{
+	return s.area() + s.code();
+}
+
+fn or_else<T>(own a: ?T, own b: T) -> T
+{
+	if let v = a {
+		return v;
+	}
+	return b;
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	let square = Square { };
+	let some: ?int = 4;
+	let nothing: ?int = none;
+	let step = Step<int> { next: twice, room: [0; size_of(int)] };
+	let n = 0;
+	if let f = step.next {
+		n = f(21);
+	}
+	printf("hooks %d\n".ptr, bits(13, 3) as c_int);
+	printf("interface %d\n".ptr, area_of(&square) as c_int);
+	printf("interfaces %d\n".ptr, both(&square) as c_int);
+	printf("optional %d %d\n".ptr, or_else(some, 9) as c_int, or_else(nothing, 9) as c_int);
+	printf("field %d %d\n".ptr, n as c_int, step.room.len as c_int);
+	return 0;
+}

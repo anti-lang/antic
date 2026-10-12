@@ -1,0 +1,15 @@
+//! An anonymous function with a result returns on every path.
+
+fn apply(f: fn(int) -> int) -> int
+{
+	return f(1);
+}
+
+fn main() -> int
+{
+	return apply(fn(n: int) -> int {
+		if n > 0 {
+			return 1;
+		}
+	});
+}

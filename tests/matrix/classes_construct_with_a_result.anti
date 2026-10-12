@@ -1,0 +1,16 @@
+//! A `construct` gives no result.
+
+class Counter
+{
+	pub n: int = 0,
+
+	fn construct(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

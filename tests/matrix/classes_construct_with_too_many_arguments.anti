@@ -1,0 +1,17 @@
+//! A `construct` with defaults takes all its parameters at most.
+
+class Box
+{
+	pub n: int = 0,
+
+	fn construct(self, a: int, b: int = 2, c: int = 3)
+	{
+		self.n = a + b + c;
+	}
+}
+
+fn main() -> int
+{
+	let b = Box(1, 2, 3, 4);
+	return 0;
+}

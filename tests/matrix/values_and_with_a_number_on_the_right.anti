@@ -1,0 +1,9 @@
+//! `&&` takes two `bool` operands, and the message names the type of the one
+//! that is none.
+
+fn main() -> int
+{
+	let n = 1;
+	let t = true && n;
+	return 0;
+}

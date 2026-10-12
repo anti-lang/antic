@@ -1,0 +1,1 @@
+classes_construct_with_too_few_arguments.anti:15:10: error: `Box.construct` takes at least 1 argument, found 0

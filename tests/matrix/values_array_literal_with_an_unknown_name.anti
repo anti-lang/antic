@@ -1,0 +1,9 @@
+//! An array literal with a name that is not declared gets the message on the
+//! name alone.
+
+fn main() -> int
+{
+	let n = 1;
+	let a = [nope, 1];
+	return 0;
+}

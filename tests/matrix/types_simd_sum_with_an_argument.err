@@ -1,0 +1,1 @@
+types_simd_sum_with_an_argument.anti:16:14: error: `sum` takes 0 arguments, found 1

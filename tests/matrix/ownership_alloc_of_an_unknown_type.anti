@@ -1,0 +1,9 @@
+//! An `alloc` of a type that is not declared gets the message on the type
+//! alone.
+
+fn main() -> int
+{
+	let n = 1;
+	let p = alloc(Nope, 3);
+	return 0;
+}

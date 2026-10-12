@@ -1,0 +1,1 @@
+values_pattern_long_repeat_in_a_repeat.anti:10:22: error: the repeat `[abcdefghijklmnopqrst...` inside `([abcdefghijklmnopqrs...` can take exponential time, write a possessive quantifier, `a++`, or an atomic group,... [exponential-pattern]

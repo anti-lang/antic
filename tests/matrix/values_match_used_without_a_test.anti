@@ -1,0 +1,12 @@
+//! A match that may be `none` is tested before its fields are read.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let n = 1;
+	let m = "ab".matches(re"a");
+	let all = m.all;
+	return 0;
+}

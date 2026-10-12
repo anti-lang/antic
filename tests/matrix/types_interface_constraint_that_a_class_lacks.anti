@@ -1,0 +1,31 @@
+//! A class that implements no `Shape` meets no constraint that names it.
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return 1;
+	}
+}
+
+class Circle
+{
+	pub r: int = 1,
+}
+
+fn area_of<T: Shape>(s: *T) -> int
+{
+	return s.area();
+}
+
+fn main() -> int
+{
+	let c = Circle { };
+	let n = area_of(&c);
+	return 0;
+}

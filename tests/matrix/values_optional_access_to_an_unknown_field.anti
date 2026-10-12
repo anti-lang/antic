@@ -1,0 +1,15 @@
+//! A `?.` that names no field of the struct gets the message on the field
+//! alone.
+
+struct Pair
+{
+	a: int,
+}
+
+fn main() -> int
+{
+	let n = 1;
+	let p: ?*Pair = none;
+	let x = p?.b;
+	return 0;
+}

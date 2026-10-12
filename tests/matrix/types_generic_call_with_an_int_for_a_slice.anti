@@ -1,0 +1,12 @@
+//! A parameter of type `[]T` takes a slice, and an `int` gives no `T`.
+
+fn first<T>(values: []T) -> int
+{
+	return values.len;
+}
+
+fn main() -> int
+{
+	let n = first(1);
+	return 0;
+}

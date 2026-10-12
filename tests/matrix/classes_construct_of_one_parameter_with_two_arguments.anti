@@ -1,0 +1,17 @@
+//! A `construct` of one parameter takes one argument.
+
+class Box
+{
+	pub n: int = 0,
+
+	fn construct(self, a: int)
+	{
+		self.n = a;
+	}
+}
+
+fn main() -> int
+{
+	let b = Box(1, 2);
+	return 0;
+}

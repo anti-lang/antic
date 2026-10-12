@@ -1,0 +1,13 @@
+//! `with` of `patch` fits the match from its offset on, and one byte at offset
+//! 1 fits no match of one byte.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	let k = data.patch(re"a", b"x", 0, 1);
+	return 0;
+}

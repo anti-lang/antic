@@ -1,0 +1,8 @@
+//! `store` of an atomic `int` takes an `int`.
+
+fn main() -> int
+{
+	let a: atomic int = 0;
+	a.store(true);
+	return 0;
+}

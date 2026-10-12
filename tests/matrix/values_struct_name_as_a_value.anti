@@ -1,0 +1,13 @@
+//! The name of a struct alone is no value.
+
+struct Pair
+{
+	a: int,
+}
+
+fn main() -> int
+{
+	let n = 1;
+	let x = Pair;
+	return 0;
+}
