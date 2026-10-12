@@ -50,14 +50,11 @@ an `extern fn` takes plain C function pointers, and `keep own` holds a snapshot
 `%.*s` is abstract, and a `provides` line names a complete class
 `compatible` names the versions a plugin may carry, and belongs to an abstract class
 `%.*s.%.*s` is not a class
-`own` needs a pointer or a slice, and `%.*s` has type `%s`
 `%.*s` is abstract and no class fills it
 
 # src/antic/sema_call.c
 `%s` is abstract and has no complete value, and %s needs one
 a variadic function has no function pointer type
-calling `%.*s` needs a place
-`destruct` is never called directly, use `delete` or `destroy`
 `fail \"text\"` calls `anti.lang.Error.new`, which takes a code and a message
 `fail` captures the frames with `anti.lang.StackTrace.capture`, which takes the count of frames to skip
 `fail` writes `at` and `frames` of `anti.lang.Error`, which this `anti.lang` lacks
@@ -88,7 +85,6 @@ antic compiles no copy here yet, %s
 
 # src/antic/sema_expr.c
 `%s` converts to `%s` through `%.*s` and through `%.*s`, name one
-the %s may be `none`, test it before reading it
 a function that is not kept cannot be stored
 `%.*s` holds a function that is not marked `concurrent`
 the function is not marked `concurrent`
@@ -96,10 +92,7 @@ the call returns no value
 `operator fn iter` gives `%s`, which has no `operator fn next` and `operator fn value`
 `%s` is never `%s`, the classes share no chain
 %s calls `anti.text.Builder.%s`, which this `anti.text` lacks
-cannot slice `%s`
 `%s` is a singleton, and `%s.get()` gives its one instance
-`alloc` of one object takes a literal or a class with arguments
-`alloc` of one object takes a literal
 `%s` is a singleton and outlives the program
 
 # src/antic/sema_generic.c
@@ -132,8 +125,6 @@ a `tests` function takes no parameters and returns nothing, because the runner c
 `compare_swap` takes 2 arguments
 an atomic %s has no `%.*s`
 `Mutex` has no function `%.*s`
-`destroy` takes no arguments
-calling `destroy` needs a place
 `%s` runs a worker named here
 `dispatch` submits a class pointer, and this is `%s`
 `%.*s` takes `%s` as its object, and this is `%s`

@@ -1,0 +1,14 @@
+//! `destroy` of a class value instead of a pointer to it. `destroy(&node)` is
+//! the form for a local.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let node = Node { };
+	destroy(node);
+	return 0;
+}

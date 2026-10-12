@@ -1,0 +1,1 @@
+ownership_dup_of_a_pointer_to_a_number.anti:9:14: error: `dup` needs a class pointer, found `*int`

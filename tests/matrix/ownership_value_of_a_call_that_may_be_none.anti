@@ -1,0 +1,19 @@
+//! A field read on the `?T` a call gives, before any test.
+
+struct Point
+{
+	x: int,
+}
+
+fn find(k: int) -> ?Point
+{
+	if k > 0 {
+		return Point { x: k };
+	}
+	return none;
+}
+
+fn main() -> int
+{
+	return find(1).x;
+}

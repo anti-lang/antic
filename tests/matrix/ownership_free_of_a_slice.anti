@@ -1,0 +1,12 @@
+//! `free` of a slice. `free` takes the pointer the memory came as, and
+//! `free(s.ptr)` is the form for a slice.
+
+fn main() -> int
+{
+	let q = alloc(int, 3) else {
+		return 1;
+	};
+	let s = []int { ptr: q, len: 3 };
+	free(s);
+	return 0;
+}

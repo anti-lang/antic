@@ -1,0 +1,19 @@
+//! `dup` of a value of a function type that may fail and owns no snapshot: it
+//! is one address, and `=` copies it.
+
+import anti.lang;
+
+fn failing(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "refused";
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let a: fn(int) -> int may fail = failing;
+	let b = dup(a);
+	return 0;
+}

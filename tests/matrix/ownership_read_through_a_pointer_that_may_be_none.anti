@@ -1,0 +1,16 @@
+//! `*q` on a `?*T` that no test has narrowed.
+
+fn find(p: *int, yes: bool) -> ?*int
+{
+	if yes {
+		return p;
+	}
+	return none;
+}
+
+fn main() -> int
+{
+	let x = 3;
+	let q = find(&x, true);
+	return *q;
+}

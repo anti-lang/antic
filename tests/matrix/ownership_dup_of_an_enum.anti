@@ -1,0 +1,15 @@
+//! `dup` of an enum. `dup` copies a class, a struct, a tuple and a variant, and
+//! a value of any other kind is copied by `=`.
+
+enum Level
+{
+	Low,
+	High,
+}
+
+fn main() -> int
+{
+	let a = Level.High;
+	let b = dup(a);
+	return 0;
+}

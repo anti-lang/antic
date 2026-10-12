@@ -1,0 +1,7 @@
+//! `&` before a literal. A literal stands at no address a program can name.
+
+fn main() -> int
+{
+	let p = &5;
+	return *p;
+}

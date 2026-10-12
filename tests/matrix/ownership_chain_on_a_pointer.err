@@ -1,0 +1,1 @@
+ownership_chain_on_a_pointer.anti:17:10: error: `?.` follows a value of type `?*T` or `?T`, found `*Node`

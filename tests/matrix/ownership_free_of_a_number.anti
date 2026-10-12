@@ -1,0 +1,8 @@
+//! `free` of a value that is no pointer.
+
+fn main() -> int
+{
+	let n = 3;
+	free(n);
+	return 0;
+}

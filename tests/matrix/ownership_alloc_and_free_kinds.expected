@@ -1,0 +1,15 @@
+exit 0
+slice: 2 3
+pointer: 5 3
+nullable pointer: 1 1
+struct: 4
+tuple: 6 1
+fixed array: 10 4
+function value: 22
+optional value: -1 12
+class: 13, alive 1
+class after destroy: alive 0
+delete after a comparison: alive 0
+delete in an if let: alive 0
+delete after let else: alive 0
+destroy and free of a ?*T: alive 0

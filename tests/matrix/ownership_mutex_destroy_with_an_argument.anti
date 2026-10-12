@@ -1,0 +1,11 @@
+//! `m.destroy(1)` on a Mutex. It releases the mutex the handle names and takes
+//! nothing.
+
+import anti.lang;
+
+fn main() -> int
+{
+	let m = Mutex.new();
+	m.destroy(1);
+	return 0;
+}

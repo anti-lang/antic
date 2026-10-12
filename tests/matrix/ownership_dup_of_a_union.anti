@@ -1,0 +1,15 @@
+//! `dup` of a union. `dup` copies a class, a struct, a tuple and a variant, and
+//! a value of any other kind is copied by `=`.
+
+union Word
+{
+	n: int,
+	f: f32,
+}
+
+fn main() -> int
+{
+	let a = Word { n: 7 };
+	let b = dup(a);
+	return 0;
+}

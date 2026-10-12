@@ -1,0 +1,12 @@
+//! `q[lo..hi]` on a pointer. A pointer has no length to check the bounds
+//! against, and a slice literal names the pointer and the length.
+
+fn main() -> int
+{
+	let q = alloc(int, 3) else {
+		return 1;
+	};
+	let s = q[0..3];
+	free(q);
+	return s.len;
+}

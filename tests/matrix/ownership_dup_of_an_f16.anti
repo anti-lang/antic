@@ -1,0 +1,15 @@
+//! `dup` of an `f16`, which a read gives as an `f32`. `dup` copies a class, a
+//! struct, a tuple and a variant, and a value of any other kind is copied by
+//! `=`.
+
+struct Half
+{
+	v: f16,
+}
+
+fn main() -> int
+{
+	let h = Half { v: 1.5 as f16 };
+	let b = dup(h.v);
+	return 0;
+}

@@ -1,0 +1,31 @@
+//! `dup` of a fixed array whose elements own something. `=` refuses to copy the
+//! array and names `dup`, and `dup` copies each element with its copy. A `Key`
+//! owns a `Leaf`, so a copy holds a leaf of its own.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n + 1 } };
+}
+
+fn main() -> int
+{
+	let keys = [key(1), key(2)];
+	let copy = dup(keys);
+	copy[1].n = 20;
+	printf("owning array: %d %d, own leaf %d\n".ptr, copy[1].n as c_int, keys[1].n as c_int,
+		(copy[1].leaf != keys[1].leaf) as c_int);
+	return 0;
+}

@@ -1,0 +1,14 @@
+//! `delete` of a pointer to a struct. A struct has no `destruct`, and `free`
+//! gives its memory back.
+
+struct Point
+{
+	x: int,
+}
+
+fn main() -> int
+{
+	let q = alloc Point { x: 1 };
+	delete(q);
+	return 0;
+}

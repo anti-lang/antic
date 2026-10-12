@@ -1,0 +1,18 @@
+//! A direct call of `destruct`, which decision 27 of "Decisions of 2026-10-11"
+//! refuses: `delete`, `destroy` and the end of a block run it.
+
+class Node
+{
+	pub n: int = 0,
+
+	pub fn destruct(self)
+	{
+	}
+}
+
+fn main() -> int
+{
+	let node = Node { };
+	node.destruct();
+	return 0;
+}

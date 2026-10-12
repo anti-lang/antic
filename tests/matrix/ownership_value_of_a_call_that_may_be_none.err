@@ -1,0 +1,1 @@
+ownership_value_of_a_call_that_may_be_none.anti:18:9: error: the value may be `none`, test it before reading it

@@ -1,0 +1,1 @@
+ownership_dup_of_a_pointer_that_may_be_none.anti:21:14: error: `a` may be `none`, check it or use `?*T`

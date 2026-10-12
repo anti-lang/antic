@@ -1,0 +1,10 @@
+//! `destroy` on the Mutex a call gives. It clears the handle, and a result has
+//! no place to clear.
+
+import anti.lang;
+
+fn main() -> int
+{
+	Mutex.new().destroy();
+	return 0;
+}

@@ -1,0 +1,45 @@
+//! `let ... else` on `p as? *T`. The downcast gives a `?*T`, `none` when the
+//! object is of another class, and the `let` binds the checked pointer.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Named
+{
+	pub abstract fn id(self) -> int;
+}
+
+class Tag inherits Named
+{
+	pub n: int = 0,
+
+	pub concrete fn id(self) -> int
+	{
+		return self.n;
+	}
+}
+
+class Other inherits Named
+{
+	pub concrete fn id(self) -> int
+	{
+		return -1;
+	}
+}
+
+fn show(named: *Named)
+{
+	let tag = named as? *Tag else {
+		printf("no tag: %d\n".ptr, named.id() as c_int);
+		return;
+	};
+	printf("a tag: %d\n".ptr, tag.n as c_int);
+}
+
+fn main() -> int
+{
+	let tag = Tag { n: 5 };
+	let other = Other { };
+	show(&tag);
+	show(&other);
+	return 0;
+}

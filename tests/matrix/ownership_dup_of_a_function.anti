@@ -1,0 +1,14 @@
+//! `dup` of a function value that owns no snapshot: it is one address, and `=`
+//! copies it.
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	let a: fn(int) -> int = twice;
+	let b = dup(a);
+	return b(1);
+}

@@ -1,0 +1,22 @@
+//! `alloc(T, n)` with a count whose size in bytes does not fit the address
+//! space gives `none`: 2^61 values of 8 bytes are 2^64 bytes. The program
+//! writes the first value when it gets memory.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn count(k: int) -> int
+{
+	return k * 2305843009213693952;
+}
+
+fn main() -> int
+{
+	let q = alloc(int, count(1)) else {
+		printf("a count of 2^61: none\n".ptr);
+		return 0;
+	};
+	q[0] = 7;
+	printf("a count of 2^61: memory, %d\n".ptr, q[0] as c_int);
+	free(q);
+	return 0;
+}

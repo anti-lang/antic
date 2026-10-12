@@ -1,0 +1,1 @@
+ownership_none_or_on_a_pointer.anti:9:10: error: `??` follows a value of type `?*T` or `?T`, found `*int`

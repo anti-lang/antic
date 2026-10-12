@@ -1,0 +1,1 @@
+ownership_chain_to_a_number.anti:21:10: error: `?.` on `q.n`, which is not a pointer

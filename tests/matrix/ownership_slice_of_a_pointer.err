@@ -1,0 +1,1 @@
+ownership_slice_of_a_pointer.anti:9:10: error: cannot slice `*int`

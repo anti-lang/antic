@@ -1,0 +1,7 @@
+//! `*n` on a value that is no pointer.
+
+fn main() -> int
+{
+	let n = 3;
+	return *n;
+}

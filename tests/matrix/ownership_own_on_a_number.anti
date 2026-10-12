@@ -1,0 +1,12 @@
+//! `own` before a field that is a number. `own` says the object owns the memory
+//! a pointer or a slice names, and a number names none.
+
+class Node
+{
+	pub own n: int = 0,
+}
+
+fn main() -> int
+{
+	return 0;
+}

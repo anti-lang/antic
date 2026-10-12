@@ -1,0 +1,306 @@
+//! `p ?? q` on a `?T` of each kind of value: the left side when it holds a
+//! value, and the right side when it is `none`. Each line prints both. The last
+//! lines hold `??` on a pointer to a synchronized class, to a concurrent class
+//! and to an interface, on a function type that may fail and on a channel, and
+//! the right side that runs only when the left is `none`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+packed struct Record
+{
+	tag: u8,
+	n: int,
+}
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+union Word
+{
+	n: int,
+	f: f32,
+}
+
+enum Level
+{
+	Low,
+	High,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+synchronized class Counter
+{
+	pub n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+concurrent class Gauge
+{
+	pub atomic n: int = 0,
+}
+
+abstract class Named
+{
+	pub abstract fn id(self) -> int;
+}
+
+class Tag inherits Named
+{
+	pub n: int = 0,
+
+	pub concrete fn id(self) -> int
+	{
+		return self.n;
+	}
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn thrice(n: int) -> int
+{
+	return n * 3;
+}
+
+fn failing(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "refused";
+	}
+	return n + 100;
+}
+
+fn passing(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "refused";
+	}
+	return n + 200;
+}
+
+fn counted(calls: *int, n: int) -> int
+{
+	*calls += 1;
+	return n;
+}
+
+fn kinds()
+{
+	let numbers = [1, 2, 3];
+	let one = 1;
+	let two = 2;
+	let full0: ?i8 = -3;
+	let empty0: ?i8 = none;
+	let a0 = full0 ?? 5;
+	let b0 = empty0 ?? 5;
+	printf("i8: %d %d\n".ptr, a0 as c_int, b0 as c_int);
+	let full1: ?i16 = -300;
+	let empty1: ?i16 = none;
+	let a1 = full1 ?? 500;
+	let b1 = empty1 ?? 500;
+	printf("i16: %d %d\n".ptr, a1 as c_int, b1 as c_int);
+	let full2: ?i32 = 70000;
+	let empty2: ?i32 = none;
+	let a2 = full2 ?? -5;
+	let b2 = empty2 ?? -5;
+	printf("i32: %d %d\n".ptr, a2 as c_int, b2 as c_int);
+	let full3: ?i64 = 5000000000;
+	let empty3: ?i64 = none;
+	let a3 = full3 ?? 6;
+	let b3 = empty3 ?? 6;
+	printf("i64: %d %d\n".ptr, (a3 / 1000000) as c_int, (b3 / 1000000) as c_int);
+	let full4: ?int = 6;
+	let empty4: ?int = none;
+	let a4 = full4 ?? 7;
+	let b4 = empty4 ?? 7;
+	printf("int: %d %d\n".ptr, a4 as c_int, b4 as c_int);
+	let full5: ?u8 = 200;
+	let empty5: ?u8 = none;
+	let a5 = full5 ?? 5;
+	let b5 = empty5 ?? 5;
+	printf("u8: %d %d\n".ptr, a5 as c_int, b5 as c_int);
+	let full6: ?u16 = 60000;
+	let empty6: ?u16 = none;
+	let a6 = full6 ?? 5;
+	let b6 = empty6 ?? 5;
+	printf("u16: %d %d\n".ptr, a6 as c_int, b6 as c_int);
+	let full7: ?u32 = 4000000000;
+	let empty7: ?u32 = none;
+	let a7 = full7 ?? 5;
+	let b7 = empty7 ?? 5;
+	printf("u32: %d %d\n".ptr, (a7 / 1000000) as c_int, (b7 / 1000000) as c_int);
+	let full8: ?u64 = 8;
+	let empty8: ?u64 = none;
+	let a8 = full8 ?? 9;
+	let b8 = empty8 ?? 9;
+	printf("u64: %d %d\n".ptr, a8 as c_int, b8 as c_int);
+	let full9: ?uint = 9;
+	let empty9: ?uint = none;
+	let a9 = full9 ?? 10;
+	let b9 = empty9 ?? 10;
+	printf("uint: %d %d\n".ptr, a9 as c_int, b9 as c_int);
+	let full10: ?byte = 10;
+	let empty10: ?byte = none;
+	let a10 = full10 ?? 11;
+	let b10 = empty10 ?? 11;
+	printf("byte: %d %d\n".ptr, a10 as c_int, b10 as c_int);
+	let full11: ?f32 = 1.5;
+	let empty11: ?f32 = none;
+	let a11 = full11 ?? 2.5;
+	let b11 = empty11 ?? 2.5;
+	printf("f32: %d %d\n".ptr, (a11 * 2.0) as c_int, (b11 * 2.0) as c_int);
+	let full12: ?f64 = 2.25;
+	let empty12: ?f64 = none;
+	let a12 = full12 ?? 3.5;
+	let b12 = empty12 ?? 3.5;
+	printf("f64: %d %d\n".ptr, (a12 * 4.0) as c_int, (b12 * 4.0) as c_int);
+	let full13: ?bool = true;
+	let empty13: ?bool = none;
+	let a13 = full13 ?? false;
+	let b13 = empty13 ?? false;
+	printf("bool: %d %d\n".ptr, a13 as c_int, b13 as c_int);
+	let full14: ?char = 'x';
+	let empty14: ?char = none;
+	let a14 = full14 ?? 'y';
+	let b14 = empty14 ?? 'y';
+	printf("char: %d %d\n".ptr, (a14 == 'x') as c_int, (b14 == 'x') as c_int);
+	let full15: ?str = "four";
+	let empty15: ?str = none;
+	let a15 = full15 ?? "sevens";
+	let b15 = empty15 ?? "sevens";
+	printf("str: %d %d\n".ptr, a15.len as c_int, b15.len as c_int);
+	let full16: ?[]int = numbers[0..2];
+	let empty16: ?[]int = none;
+	let a16 = full16 ?? numbers[0..3];
+	let b16 = empty16 ?? numbers[0..3];
+	printf("slice: %d %d\n".ptr, a16.len as c_int, b16.len as c_int);
+	let full17: ?[3]int = [1, 2, 3];
+	let empty17: ?[3]int = none;
+	let a17 = full17 ?? [4, 5, 6];
+	let b17 = empty17 ?? [4, 5, 6];
+	printf("fixed array: %d %d\n".ptr, a17[2] as c_int, b17[2] as c_int);
+	let full18: ?*int = &one;
+	let empty18: ?*int = none;
+	let a18 = full18 ?? &two;
+	let b18 = empty18 ?? &two;
+	printf("pointer: %d %d\n".ptr, *a18 as c_int, *b18 as c_int);
+	let full19: ?(int, int) = (1, 2);
+	let empty19: ?(int, int) = none;
+	let a19 = full19 ?? (3, 4);
+	let b19 = empty19 ?? (3, 4);
+	printf("tuple: %d %d\n".ptr, a19.1 as c_int, b19.1 as c_int);
+	let full20: ?Point = Point { x: 1, y: 2 };
+	let empty20: ?Point = none;
+	let a20 = full20 ?? Point { x: 3, y: 4 };
+	let b20 = empty20 ?? Point { x: 3, y: 4 };
+	printf("struct: %d %d\n".ptr, a20.y as c_int, b20.y as c_int);
+	let full21: ?Record = Record { tag: 1, n: 2 };
+	let empty21: ?Record = none;
+	let a21 = full21 ?? Record { tag: 3, n: 4 };
+	let b21 = empty21 ?? Record { tag: 3, n: 4 };
+	printf("packed struct: %d %d\n".ptr, a21.n as c_int, b21.n as c_int);
+	let full22: ?Vec4 = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+	let empty22: ?Vec4 = none;
+	let a22 = full22 ?? Vec4 { x: 5.0, y: 6.0, z: 7.0, w: 8.0 };
+	let b22 = empty22 ?? Vec4 { x: 5.0, y: 6.0, z: 7.0, w: 8.0 };
+	printf("simd struct: %d %d\n".ptr, a22.w as c_int, b22.w as c_int);
+	let full23: ?Word = Word { n: 7 };
+	let empty23: ?Word = none;
+	let a23 = full23 ?? Word { n: 8 };
+	let b23 = empty23 ?? Word { n: 8 };
+	printf("union: %d %d\n".ptr, a23.n as c_int, b23.n as c_int);
+	let full24: ?Level = Level.High;
+	let empty24: ?Level = none;
+	let a24 = full24 ?? Level.Low;
+	let b24 = empty24 ?? Level.Low;
+	printf("enum: %d %d\n".ptr, a24 as c_int, b24 as c_int);
+	let full25: ?Shape = Shape.Circle { r: 3 };
+	let empty25: ?Shape = none;
+	let a25 = full25 ?? Shape.Empty;
+	let b25 = empty25 ?? Shape.Empty;
+	printf("variant: %d %d\n".ptr, (a25 is Shape.Circle) as c_int, (b25 is Shape.Circle) as c_int);
+	let full26: ?fn(int) -> int = twice;
+	let empty26: ?fn(int) -> int = none;
+	let a26 = full26 ?? thrice;
+	let b26 = empty26 ?? thrice;
+	printf("function value: %d %d\n".ptr, a26(5) as c_int, b26(5) as c_int);
+}
+
+fn handles()
+{
+	let c = Counter { n: 3 };
+	let d = Counter { n: 4 };
+	let full_c: ?*Counter = &c;
+	let empty_c: ?*Counter = none;
+	printf("synchronized class: %d %d\n".ptr, (full_c ?? &d).get() as c_int,
+		(empty_c ?? &d).get() as c_int);
+	let g = Gauge { };
+	let h = Gauge { };
+	g.n.store(5);
+	h.n.store(6);
+	let full_g: ?*Gauge = &g;
+	let empty_g: ?*Gauge = none;
+	printf("concurrent class: %d %d\n".ptr, (full_g ?? &h).n.load() as c_int,
+		(empty_g ?? &h).n.load() as c_int);
+	let t = Tag { n: 7 };
+	let u = Tag { n: 8 };
+	let full_n: ?*Named = &t;
+	let empty_n: ?*Named = none;
+	printf("interface: %d %d\n".ptr, (full_n ?? &u).id() as c_int,
+		(empty_n ?? &u).id() as c_int);
+	let full_f: ?fn(int) -> int may fail = failing;
+	let empty_f: ?fn(int) -> int may fail = none;
+	let first = (full_f ?? passing)(0) catch e {
+		yield -1;
+	};
+	let second = (empty_f ?? passing)(0) catch e {
+		yield -1;
+	};
+	printf("function that may fail: %d %d\n".ptr, first as c_int, second as c_int);
+	let ch = chan int(1);
+	let other = chan int(1);
+	let full_ch: ?chan int = ch;
+	let empty_ch: ?chan int = none;
+	printf("channel: %d %d\n".ptr, ((full_ch ?? other) == ch) as c_int,
+		((empty_ch ?? other) == other) as c_int);
+	delete(ch);
+	delete(other);
+}
+
+fn right_side_runs_once()
+{
+	let calls = 0;
+	let full: ?int = 1;
+	let empty: ?int = none;
+	let a = full ?? counted(&calls, 2);
+	let b = empty ?? counted(&calls, 3);
+	let c = empty ?? empty ?? counted(&calls, 4);
+	printf("the right side: %d %d %d, calls %d\n".ptr, a as c_int, b as c_int, c as c_int,
+		calls as c_int);
+}
+
+fn main() -> int
+{
+	kinds();
+	handles();
+	right_side_runs_once();
+	return 0;
+}

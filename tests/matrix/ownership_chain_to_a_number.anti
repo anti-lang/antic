@@ -1,0 +1,23 @@
+//! `q?.n` where the field is a number. `?.` gives `none` or the field, and a
+//! number has no `none`.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn find(p: *Node, yes: bool) -> ?*Node
+{
+	if yes {
+		return p;
+	}
+	return none;
+}
+
+fn main() -> int
+{
+	let node = Node { };
+	let q = find(&node, true);
+	let n = q?.n;
+	return 0;
+}

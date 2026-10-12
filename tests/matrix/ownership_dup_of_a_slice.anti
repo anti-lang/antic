@@ -1,0 +1,10 @@
+//! `dup` of a slice. `dup` copies a class, a struct, a tuple and a variant, and
+//! a value of any other kind is copied by `=`.
+
+fn main() -> int
+{
+	let numbers = [1, 2, 3];
+	let a = numbers[0..3];
+	let b = dup(a);
+	return 0;
+}

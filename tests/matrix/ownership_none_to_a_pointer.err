@@ -1,0 +1,1 @@
+ownership_none_to_a_pointer.anti:8:6: error: `*int` cannot hold `none`

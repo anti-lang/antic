@@ -1,0 +1,1 @@
+ownership_destroy_of_a_pointer_that_may_be_none.anti:21:10: error: `q` may be `none`, check it or use `?*T`

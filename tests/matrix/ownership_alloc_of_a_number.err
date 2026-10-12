@@ -1,0 +1,1 @@
+ownership_alloc_of_a_number.anti:6:16: error: `alloc` of one object takes a literal

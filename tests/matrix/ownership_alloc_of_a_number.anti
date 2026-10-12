@@ -1,0 +1,8 @@
+//! `alloc` before a number. `alloc` of one object takes a literal of a struct
+//! or of a class, and `alloc(int, 1)` is the form for a number.
+
+fn main() -> int
+{
+	let q = alloc 5;
+	return 0;
+}

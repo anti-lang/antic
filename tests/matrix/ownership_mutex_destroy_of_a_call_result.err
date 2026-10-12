@@ -1,0 +1,1 @@
+ownership_mutex_destroy_of_a_call_result.anti:8:2: error: calling `destroy` needs a place

@@ -1,0 +1,253 @@
+//! `dup` of each kind it copies: a struct, a packed struct, a simd struct, a
+//! tuple, a variant, a value of a class, of a synchronized class and of a
+//! concurrent class, a pointer to each and a pointer to an interface. A copy is
+//! changed after `dup`, and each line prints the copy and the value it came
+//! from. Inside a generic function `dup` copies a value of any type, a number
+//! and an array among them. A `Key` owns a `Leaf` and counts itself alive, so
+//! the last line holds the keys alive at the end.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+packed struct Record
+{
+	tag: u8,
+	n: int,
+}
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Keyed { k: Key },
+	Empty,
+}
+
+synchronized class Counter
+{
+	pub n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+
+	pub fn set(self, n: int)
+	{
+		self.n = n;
+	}
+}
+
+concurrent class Gauge
+{
+	pub atomic n: int = 0,
+}
+
+abstract class Named
+{
+	pub abstract fn id(self) -> int;
+}
+
+class Tag inherits Named
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	pub concrete fn id(self) -> int
+	{
+		return self.n;
+	}
+}
+
+fn leaf_n(l: ?*Leaf) -> int
+{
+	let leaf = l else {
+		return -1;
+	};
+	return leaf.n;
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n + 1 } };
+}
+
+fn find(k: int) -> ?Point
+{
+	if k > 0 {
+		return Point { x: k, y: k };
+	}
+	return none;
+}
+
+/// A copy of the value at `p`, whatever `T` is.
+fn twin<T>(p: *T) -> T
+{
+	return dup(*p);
+}
+
+fn plain()
+{
+	let p = Point { x: 1, y: 2 };
+	let p2 = dup(p);
+	p2.y = 20;
+	printf("struct: %d %d\n".ptr, p2.y as c_int, p.y as c_int);
+	let r = Record { tag: 1, n: 2 };
+	let r2 = dup(r);
+	r2.n = 30;
+	printf("packed struct: %d %d\n".ptr, r2.n as c_int, r.n as c_int);
+	let v = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+	let v2 = dup(v);
+	v2.w = 40.0;
+	printf("simd struct: %d %d\n".ptr, v2.w as c_int, v.w as c_int);
+	let t = (1, 2);
+	let t2 = dup(t);
+	t2.1 = 50;
+	printf("tuple: %d %d\n".ptr, t2.1 as c_int, t.1 as c_int);
+	let s = Shape.Circle { r: 3 };
+	let s2 = dup(s);
+	if let Circle c = s2 {
+		printf("variant: %d\n".ptr, c.r as c_int);
+	}
+	let found = find(6);
+	if found != none {
+		let f2 = dup(found);
+		f2.x = 60;
+		printf("optional after its test: %d %d\n".ptr, f2.x as c_int, found.x as c_int);
+	}
+}
+
+fn owning()
+{
+	let k = key(1);
+	let k2 = dup(k);
+	Key.live.add(1);
+	k2.n = 10;
+	printf("class value: %d %d, leaf %d, own leaf %d\n".ptr, k2.n as c_int, k.n as c_int,
+		leaf_n(k2.leaf) as c_int, (k2.leaf != k.leaf) as c_int);
+	let kp = dup(&k);
+	Key.live.add(1);
+	kp.n = 11;
+	printf("class pointer: %d %d, leaf %d, own leaf %d\n".ptr, kp.n as c_int, k.n as c_int,
+		leaf_n(kp.leaf) as c_int, (kp.leaf != k.leaf) as c_int);
+	delete(kp);
+	let pair = Pair { k: key(2), n: 2 };
+	let pair2 = dup(pair);
+	Key.live.add(1);
+	pair2.k.n = 20;
+	printf("owning struct: %d %d, own leaf %d\n".ptr, pair2.k.n as c_int, pair.k.n as c_int,
+		(pair2.k.leaf != pair.k.leaf) as c_int);
+	let tuple = (key(3), 3);
+	let tuple2 = dup(tuple);
+	Key.live.add(1);
+	tuple2.0.n = 30;
+	printf("owning tuple: %d %d, own leaf %d\n".ptr, tuple2.0.n as c_int, tuple.0.n as c_int,
+		(tuple2.0.leaf != tuple.0.leaf) as c_int);
+	let shape = Shape.Keyed { k: key(4) };
+	let shape2 = dup(shape);
+	Key.live.add(1);
+	printf("owning variant: %d\n".ptr, (shape2 is Shape.Keyed) as c_int);
+	printf("alive before the end of the block: %d\n".ptr, Key.live.load() as c_int);
+}
+
+fn thread_safe()
+{
+	let c = Counter { n: 3 };
+	let c2 = dup(c);
+	c2.set(30);
+	printf("synchronized class value: %d %d\n".ptr, c2.get() as c_int, c.get() as c_int);
+	let cp = dup(&c);
+	cp.set(31);
+	printf("synchronized class pointer: %d %d\n".ptr, cp.get() as c_int, c.get() as c_int);
+	delete(cp);
+	let g = Gauge { };
+	g.n.store(4);
+	let g2 = dup(g);
+	g2.n.store(40);
+	printf("concurrent class value: %d %d\n".ptr, g2.n.load() as c_int, g.n.load() as c_int);
+	let gp = dup(&g);
+	gp.n.store(41);
+	printf("concurrent class pointer: %d %d\n".ptr, gp.n.load() as c_int, g.n.load() as c_int);
+	delete(gp);
+}
+
+fn through_an_interface()
+{
+	let tag = Tag { n: 5, leaf: alloc Leaf { n: 6 } };
+	let named: *Named = &tag;
+	let copy = dup(named);
+	printf("interface: %d, a tag %d\n".ptr, copy.id() as c_int, (copy is *Tag) as c_int);
+	let other = copy as? *Tag;
+	if other != none {
+		other.n = 50;
+		printf("interface: %d %d, own leaf %d\n".ptr, copy.id() as c_int, named.id() as c_int,
+			(other.leaf != tag.leaf) as c_int);
+	}
+	delete(copy);
+}
+
+fn generic()
+{
+	let n = 7;
+	let n2 = twin<int>(&n);
+	n2 += 70;
+	printf("number in a generic: %d %d\n".ptr, n2 as c_int, n as c_int);
+	let a = [1, 2, 3];
+	let a2 = twin<[3]int>(&a);
+	a2[2] = 80;
+	printf("array in a generic: %d %d\n".ptr, a2[2] as c_int, a[2] as c_int);
+	let k = key(9);
+	let k2 = twin<Key>(&k);
+	Key.live.add(1);
+	k2.n = 90;
+	printf("class in a generic: %d %d, own leaf %d\n".ptr, k2.n as c_int, k.n as c_int,
+		(k2.leaf != k.leaf) as c_int);
+}
+
+fn main() -> int
+{
+	plain();
+	owning();
+	thread_safe();
+	through_an_interface();
+	generic();
+	printf("alive: %d\n".ptr, Key.live.load() as c_int);
+	return 0;
+}

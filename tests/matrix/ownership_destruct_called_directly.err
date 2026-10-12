@@ -1,0 +1,1 @@
+ownership_destruct_called_directly.anti:16:2: error: `destruct` is never called directly, use `delete` or `destroy`

@@ -1,0 +1,1 @@
+ownership_free_of_a_slice.anti:10:7: error: `free` needs a pointer, found `[]int`

@@ -1,0 +1,25 @@
+//! `alloc(T, 0)` gives an address that `free` takes, and `free` takes `none`
+//! and does nothing.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn count(k: int) -> int
+{
+	return k - 1;
+}
+
+fn nothing() -> ?*int
+{
+	return none;
+}
+
+fn main() -> int
+{
+	let q = alloc(int, count(1));
+	printf("a count of 0: %d\n".ptr, (q != none) as c_int);
+	free(q);
+	let empty = nothing();
+	free(empty);
+	printf("free of none: %d\n".ptr, (empty == none) as c_int);
+	return 0;
+}

@@ -1,0 +1,1 @@
+ownership_address_of_a_literal.anti:5:11: error: unary `&` needs a place

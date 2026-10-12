@@ -1,0 +1,13 @@
+//! `alloc` before a call of a function. `alloc` of one object takes a literal
+//! of a type or a class with the arguments of its `construct`.
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	let q = alloc twice(3);
+	return 0;
+}

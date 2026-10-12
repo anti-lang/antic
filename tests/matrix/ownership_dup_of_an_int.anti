@@ -1,0 +1,9 @@
+//! `dup` of an `int`. `dup` copies a class, a struct, a tuple and a variant,
+//! and a value of any other kind is copied by `=`.
+
+fn main() -> int
+{
+	let a: int = 6;
+	let b = dup(a);
+	return 0;
+}

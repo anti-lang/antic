@@ -1,0 +1,22 @@
+//! `dup` of a `?T` that no test has narrowed: `dup` copies a value, and `none`
+//! holds none.
+
+struct Point
+{
+	x: int,
+}
+
+fn find(k: int) -> ?Point
+{
+	if k > 0 {
+		return Point { x: k };
+	}
+	return none;
+}
+
+fn main() -> int
+{
+	let a = find(1);
+	let b = dup(a);
+	return 0;
+}

@@ -1,0 +1,286 @@
+//! A read and a write through `*p` for each kind of value. Each line prints the
+//! value read through the pointer, and the value of the variable after a write
+//! through it. The last lines hold a pointer to an optional value, to a
+//! channel, to a function type that may fail and to a pointer to an interface,
+//! and a pointer to a pointer.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+packed struct Record
+{
+	tag: u8,
+	n: int,
+}
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+union Word
+{
+	n: int,
+	f: f32,
+}
+
+enum Level
+{
+	Low,
+	High,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+synchronized class Counter
+{
+	pub n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+concurrent class Gauge
+{
+	pub atomic n: int = 0,
+}
+
+abstract class Named
+{
+	pub abstract fn id(self) -> int;
+}
+
+class Tag inherits Named
+{
+	pub n: int = 0,
+
+	pub concrete fn id(self) -> int
+	{
+		return self.n;
+	}
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn thrice(n: int) -> int
+{
+	return n * 3;
+}
+
+fn failing(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "refused";
+	}
+	return n + 100;
+}
+
+fn passing(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "refused";
+	}
+	return n + 200;
+}
+
+fn kinds()
+{
+	let numbers = [1, 2, 3];
+	let one = 1;
+	let two = 2;
+	let x0: i8 = -3;
+	let p0 = &x0;
+	let r0 = *p0;
+	*p0 = 5;
+	printf("i8: %d %d\n".ptr, r0 as c_int, x0 as c_int);
+	let x1: i16 = -300;
+	let p1 = &x1;
+	let r1 = *p1;
+	*p1 = 500;
+	printf("i16: %d %d\n".ptr, r1 as c_int, x1 as c_int);
+	let x2: i32 = 70000;
+	let p2 = &x2;
+	let r2 = *p2;
+	*p2 = -5;
+	printf("i32: %d %d\n".ptr, r2 as c_int, x2 as c_int);
+	let x3: i64 = 5000000000;
+	let p3 = &x3;
+	let r3 = *p3;
+	*p3 = 6;
+	printf("i64: %d %d\n".ptr, (r3 / 1000000) as c_int, (x3 / 1000000) as c_int);
+	let x4: int = 6;
+	let p4 = &x4;
+	let r4 = *p4;
+	*p4 = 7;
+	printf("int: %d %d\n".ptr, r4 as c_int, x4 as c_int);
+	let x5: u8 = 200;
+	let p5 = &x5;
+	let r5 = *p5;
+	*p5 = 5;
+	printf("u8: %d %d\n".ptr, r5 as c_int, x5 as c_int);
+	let x6: u16 = 60000;
+	let p6 = &x6;
+	let r6 = *p6;
+	*p6 = 5;
+	printf("u16: %d %d\n".ptr, r6 as c_int, x6 as c_int);
+	let x7: u32 = 4000000000;
+	let p7 = &x7;
+	let r7 = *p7;
+	*p7 = 5;
+	printf("u32: %d %d\n".ptr, (r7 / 1000000) as c_int, (x7 / 1000000) as c_int);
+	let x8: u64 = 8;
+	let p8 = &x8;
+	let r8 = *p8;
+	*p8 = 9;
+	printf("u64: %d %d\n".ptr, r8 as c_int, x8 as c_int);
+	let x9: uint = 9;
+	let p9 = &x9;
+	let r9 = *p9;
+	*p9 = 10;
+	printf("uint: %d %d\n".ptr, r9 as c_int, x9 as c_int);
+	let x10: byte = 10;
+	let p10 = &x10;
+	let r10 = *p10;
+	*p10 = 11;
+	printf("byte: %d %d\n".ptr, r10 as c_int, x10 as c_int);
+	let x11: f32 = 1.5;
+	let p11 = &x11;
+	let r11 = *p11;
+	*p11 = 2.5;
+	printf("f32: %d %d\n".ptr, (r11 * 2.0) as c_int, (x11 * 2.0) as c_int);
+	let x12: f64 = 2.25;
+	let p12 = &x12;
+	let r12 = *p12;
+	*p12 = 3.5;
+	printf("f64: %d %d\n".ptr, (r12 * 4.0) as c_int, (x12 * 4.0) as c_int);
+	let x13: bool = true;
+	let p13 = &x13;
+	let r13 = *p13;
+	*p13 = false;
+	printf("bool: %d %d\n".ptr, r13 as c_int, x13 as c_int);
+	let x14: char = 'x';
+	let p14 = &x14;
+	let r14 = *p14;
+	*p14 = 'y';
+	printf("char: %d %d\n".ptr, (r14 == 'x') as c_int, (x14 == 'x') as c_int);
+	let x15: str = "four";
+	let p15 = &x15;
+	let r15 = *p15;
+	*p15 = "sevens";
+	printf("str: %d %d\n".ptr, r15.len as c_int, x15.len as c_int);
+	let x16: []int = numbers[0..2];
+	let p16 = &x16;
+	let r16 = *p16;
+	*p16 = numbers[0..3];
+	printf("slice: %d %d\n".ptr, r16.len as c_int, x16.len as c_int);
+	let x17: [3]int = [1, 2, 3];
+	let p17 = &x17;
+	let r17 = *p17;
+	*p17 = [4, 5, 6];
+	printf("fixed array: %d %d\n".ptr, r17[2] as c_int, x17[2] as c_int);
+	let x18: *int = &one;
+	let p18 = &x18;
+	let r18 = *p18;
+	*p18 = &two;
+	printf("pointer: %d %d\n".ptr, *r18 as c_int, *x18 as c_int);
+	let x19: (int, int) = (1, 2);
+	let p19 = &x19;
+	let r19 = *p19;
+	*p19 = (3, 4);
+	printf("tuple: %d %d\n".ptr, r19.1 as c_int, x19.1 as c_int);
+	let x20: Point = Point { x: 1, y: 2 };
+	let p20 = &x20;
+	let r20 = *p20;
+	*p20 = Point { x: 3, y: 4 };
+	printf("struct: %d %d\n".ptr, r20.y as c_int, x20.y as c_int);
+	let x21: Record = Record { tag: 1, n: 2 };
+	let p21 = &x21;
+	let r21 = *p21;
+	*p21 = Record { tag: 3, n: 4 };
+	printf("packed struct: %d %d\n".ptr, r21.n as c_int, x21.n as c_int);
+	let x22: Vec4 = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+	let p22 = &x22;
+	let r22 = *p22;
+	*p22 = Vec4 { x: 5.0, y: 6.0, z: 7.0, w: 8.0 };
+	printf("simd struct: %d %d\n".ptr, r22.w as c_int, x22.w as c_int);
+	let x23: Word = Word { n: 7 };
+	let p23 = &x23;
+	let r23 = *p23;
+	*p23 = Word { n: 8 };
+	printf("union: %d %d\n".ptr, r23.n as c_int, x23.n as c_int);
+	let x24: Level = Level.High;
+	let p24 = &x24;
+	let r24 = *p24;
+	*p24 = Level.Low;
+	printf("enum: %d %d\n".ptr, r24 as c_int, x24 as c_int);
+	let x25: Shape = Shape.Circle { r: 3 };
+	let p25 = &x25;
+	let r25 = *p25;
+	*p25 = Shape.Empty;
+	printf("variant: %d %d\n".ptr, (r25 is Shape.Circle) as c_int, (x25 is Shape.Circle) as c_int);
+	let x26: fn(int) -> int = twice;
+	let p26 = &x26;
+	let r26 = *p26;
+	*p26 = thrice;
+	printf("function value: %d %d\n".ptr, r26(5) as c_int, x26(5) as c_int);
+}
+
+fn handles()
+{
+	let o: ?int = 4;
+	let po = &o;
+	let ro = *po;
+	*po = none;
+	printf("optional value: %d %d\n".ptr, (ro ?? -1) as c_int, (o ?? -1) as c_int);
+	let ch = chan int(1);
+	let other = chan int(1);
+	let held = ch;
+	let pc = &held;
+	let rc = *pc;
+	*pc = other;
+	printf("channel: %d %d\n".ptr, (rc == ch) as c_int, (held == other) as c_int);
+	delete(ch);
+	delete(other);
+	let f: fn(int) -> int may fail = failing;
+	let pf = &f;
+	let rf = *pf;
+	*pf = passing;
+	let first = rf(0) catch e {
+		yield -1;
+	};
+	let second = f(0) catch e {
+		yield -1;
+	};
+	printf("function that may fail: %d %d\n".ptr, first as c_int, second as c_int);
+	let t = Tag { n: 7 };
+	let u = Tag { n: 8 };
+	let named: *Named = &t;
+	let pn = &named;
+	let rn = *pn;
+	*pn = &u;
+	printf("interface: %d %d\n".ptr, rn.id() as c_int, named.id() as c_int);
+	let c = Counter { n: 3 };
+	let pc2 = &c;
+	let ppc = &pc2;
+	printf("pointer to a pointer: %d\n".ptr, (*ppc).get() as c_int);
+}
+
+fn main() -> int
+{
+	kinds();
+	handles();
+	return 0;
+}

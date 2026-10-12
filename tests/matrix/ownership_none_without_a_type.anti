@@ -1,0 +1,8 @@
+//! `none` in a `let` without a type. `none` has no type of its own, and the
+//! place it goes to gives it one.
+
+fn main() -> int
+{
+	let p = none;
+	return 0;
+}

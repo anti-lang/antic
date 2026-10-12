@@ -1,0 +1,22 @@
+//! `alloc(T, n)` with a count below zero gives `none`, as `malloc` gives no
+//! memory for it. The program writes into the memory when it gets some, so no
+//! build may leave the `alloc` out.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn count(k: int) -> int
+{
+	return k - 2;
+}
+
+fn main() -> int
+{
+	let q = alloc(int, count(1)) else {
+		printf("a count of -1: none\n".ptr);
+		return 0;
+	};
+	q[0] = 7;
+	printf("a count of -1: memory, %d\n".ptr, q[0] as c_int);
+	free(q);
+	return 0;
+}

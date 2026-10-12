@@ -1,0 +1,23 @@
+//! `dup` of a `?*T` that no test has narrowed: `dup` copies an object, and
+//! `none` points at none.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn find(p: *Node, yes: bool) -> ?*Node
+{
+	if yes {
+		return p;
+	}
+	return none;
+}
+
+fn main() -> int
+{
+	let node = Node { n: 1 };
+	let a = find(&node, true);
+	let b = dup(a);
+	return 0;
+}

@@ -1,0 +1,14 @@
+//! `delete` of a class value held in a local. The end of its block tears the
+//! local down, and `delete` takes a pointer to an object of `alloc`.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let node = Node { };
+	delete(node);
+	return 0;
+}

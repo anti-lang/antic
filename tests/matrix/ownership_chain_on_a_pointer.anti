@@ -1,0 +1,19 @@
+//! `?.` after a `*T`. A `*T` is never `none`, so `.` reads the field.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Node
+{
+	pub own leaf: ?*Leaf = none,
+}
+
+fn main() -> int
+{
+	let node = Node { };
+	let p = &node;
+	let l = p?.leaf;
+	return 0;
+}

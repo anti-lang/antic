@@ -1,0 +1,9 @@
+//! `dup` of a `u8`. `dup` copies a class, a struct, a tuple and a variant, and
+//! a value of any other kind is copied by `=`.
+
+fn main() -> int
+{
+	let a: u8 = 200;
+	let b = dup(a);
+	return 0;
+}

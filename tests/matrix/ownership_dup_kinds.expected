@@ -1,0 +1,23 @@
+exit 0
+struct: 20 2
+packed struct: 30 2
+simd struct: 40 4
+tuple: 50 2
+variant: 3
+optional after its test: 60 6
+class value: 10 1, leaf 2, own leaf 1
+class pointer: 11 1, leaf 2, own leaf 1
+owning struct: 20 2, own leaf 1
+owning tuple: 30 3, own leaf 1
+owning variant: 1
+alive before the end of the block: 8
+synchronized class value: 30 3
+synchronized class pointer: 31 3
+concurrent class value: 40 4
+concurrent class pointer: 41 4
+interface: 5, a tag 1
+interface: 50 5, own leaf 1
+number in a generic: 77 7
+array in a generic: 80 3
+class in a generic: 90 9, own leaf 1
+alive: 0

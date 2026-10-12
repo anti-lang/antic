@@ -1,0 +1,24 @@
+//! `destroy` of a `?*T` that no test has narrowed. `destroy` tears an object
+//! down in place, and `none` points at none.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn find(p: *Node, yes: bool) -> ?*Node
+{
+	if yes {
+		return p;
+	}
+	return none;
+}
+
+fn main() -> int
+{
+	let p = alloc Node { };
+	let q = find(p, true);
+	destroy(q);
+	free(p);
+	return 0;
+}

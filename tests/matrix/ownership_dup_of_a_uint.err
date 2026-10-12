@@ -1,0 +1,1 @@
+ownership_dup_of_a_uint.anti:7:14: error: `dup` needs a class pointer, found `u64`
