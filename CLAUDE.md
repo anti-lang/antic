@@ -75,9 +75,11 @@ not re-open a settled decision without asking Eddie.
   defect on its first run here, a `bool` field read as 64 that the ordinary
   build passed over.
 - Each of the three suites finishes in under 9 minutes with `ctest -j14`,
-  the number of cores of the development Mac. Measured on 2026-10-04 in the
-  step `switch` of the LLVM back end: `host` 206 s, `asan` 402 s and `ubsan`
-  277 s. `emit_identity` alone takes 400 s under ASan and sets its time. A suite past 9 minutes gets faster tests, never fewer: see
+  the number of cores of the development Mac. Measured on 2026-10-12 in the
+  step `flow` of the test run: `host` 376 s, `asan` 503 s and `ubsan` 445 s.
+  `package_keys` alone takes 376 s on the host, 487 s under ASan and 445 s
+  under UBSan, and sets the time of all three. A suite past 9 minutes gets
+  faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
 - Every comment and every `.md` file follows the docs-style rules. The checker
   reads `.md` files alone. Run `python3 tools/docs-style/check_docs.py <files>`
@@ -314,6 +316,16 @@ The matrix, by decision 28 of "Decisions of 2026-10-11":
   lines at the start of a line.
 - The runner stops antic and the program after 60 seconds each.
 - The test `matrix_files` refuses a file that registers no test.
+- A program may hold one construct in every context of its row, one
+  function and one line of output per context. Every program is an
+  executable the suite builds three times, and `flow_<construct>` of the
+  area flow shows the form. A cell that shows a defect gets a program of
+  its own, so the list of the known failures names that cell alone.
+- No build of the matrix keeps a `tests` or a `fixtures` block, and none
+  reads a library file. `anti_test_flow` runs a module of
+  `tests/anti-test/` through `tests/run_anti_test_module.cmake` for the
+  first, and `flow_modules` holds a library of `tests/modules/` for the
+  second.
 
 The known failures, by decision 30 of "Decisions of 2026-10-11":
 
@@ -579,9 +591,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 1711 ctest tests pass on the development Mac, and two of them, the
+- 1992 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  The ASan and the UBSan builds run 1710 each with the same skips, without
+  30 of them are the expected failures of `tests/known-failures.txt`.
+  The ASan and the UBSan builds run 1991 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
