@@ -1545,7 +1545,30 @@ let n = Circle.count.load();
 Config.get().requests.add(1);
 ```
 
-Atomic operations: `load store add sub and or swap compare_swap`, sequentially consistent. `add`, `sub`, `and`, `or` and `swap` give the value the field held before. In a singleton a plain field is read-only after creation and `atomic` fields are atomic. `mutable` fields may be written anywhere except from a worker, which the compiler checks.
+Atomic operations: `load store add sub and or swap compare_swap`, sequentially consistent. `add`, `sub`, `and`, `or` and `swap` give the value the field held before, and `compare_swap(expected, new)` gives whether it stored. An atomic holds an integer, a `bool`, a `char` or a pointer.
+
+`Config.get()` gives the one instance of a singleton. A literal of a singleton is refused with a message that names `get()`, and so is a `delete` of one. In a singleton a plain field is read-only after creation and `atomic` fields are atomic. `mutable` marks a field of a singleton alone, which may be written anywhere except from a worker, and the compiler checks both.
+
+```anti
+class Ticket
+{
+	pub id: int = 0,
+	static atomic next: int = 1;
+
+	pub fn take() -> Ticket { return Ticket { id: Ticket.next.add(1) }; }
+}
+
+singleton class Settings
+{
+	atomic state: int = 0,
+}
+
+let t = Ticket.take();
+let was = Settings.get().state.swap(2);
+let won = Settings.get().state.compare_swap(2, 3);
+```
+
+Not built yet: the refusal of `mutable` in a class that is no singleton, where the word changes nothing today. The refusal of an atomic field of an `f64` or of another type that no atomic holds is not built either. The checker holds an atomic local to its types, and a field not yet.
 
 ## Threads
 
