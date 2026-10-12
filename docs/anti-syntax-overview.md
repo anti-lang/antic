@@ -1689,7 +1689,30 @@ pub concurrent class PeopleList
 let hits: atomic int = 0;
 ```
 
-A `synchronized class` gives each object a hidden lock that every public function runs under, released on every exit, and `sync obj { }` holds it for a block. `sync a, b { }` holds the locks of two synchronized objects, taken in the order of their addresses and once for one object, and the default `==` of a synchronized class runs under it, its default hash under `sync a`. An operator that takes a synchronized class through pointers receives the objects themselves, and one that takes it by value is refused. A `concurrent class` leaves the locking to the programmer, and every field is guarded by a `Mutex`, atomic, or fixed after `construct`. It has no default `==` or hash and declares the ones it needs. `unchecked(unguarded-field, "reason")` after a field's type or in the class header overrules the check, and `compare_swap` takes a field of one word that it marks. A public function of either never gives out a pointer or a slice into the object's fields. A worker may take a pointer to a thread-safe object, and `atomic` marks a local as well. A `Mutex` is one word of the program's memory and cannot be copied. A dev build records the order in which each thread takes locks and reports two orders that conflict. `size_of(Mutex)` is 4 on Linux and macOS and 8 on Windows.
+```anti
+synchronized class Account
+{
+	balance: int = 0,
+
+	pub fn add(self, n: int) { self.balance += n; }
+	pub fn take(self, n: int) { self.balance -= n; }
+}
+
+synchronized class Savings inherits Account
+{
+	rate: int = 1,
+}
+
+fn move(from: *Account, to: *Account, n: int)
+{
+	sync from, to {
+		from.take(n);
+		to.add(n);
+	}
+}
+```
+
+A `synchronized class` gives each object a hidden lock that every public function runs under, released on every exit, and `sync obj { }` holds it for a block. Its fields are reached by its own functions alone. A class below a synchronized or a concurrent class is written with the same word, and the base of either is of its kind or an abstract class without fields. `sync a, b { }` holds the locks of two synchronized objects, taken in the order of their addresses and once for one object, and the default `==` of a synchronized class runs under it, its default hash under `sync a`. An operator that takes a synchronized class through pointers receives the objects themselves, and one that takes it by value is refused. A `concurrent class` leaves the locking to the programmer, and every field is guarded by a `Mutex`, atomic, or fixed after `construct`. It has no default `==` or hash and declares the ones it needs. `unchecked(unguarded-field, "reason")` after a field's type or in the class header overrules the check, and `compare_swap` takes a field of one word that it marks. A public function of either never gives out a pointer or a slice into the object's fields. A worker may take a pointer to a thread-safe object, and `atomic` marks a local as well. A `Mutex` is one word of the program's memory and cannot be copied. A dev build records the order in which each thread takes locks and reports two orders that conflict. `size_of(Mutex)` is 4 on Linux and macOS and 8 on Windows.
 
 ## Hooks and tracing
 
