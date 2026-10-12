@@ -1,0 +1,11 @@
+//! A class of a library module whose `construct` takes an argument.
+
+pub class Built
+{
+	pub n: int = 0,
+
+	pub fn construct(self, n: int)
+	{
+		self.n = n * 2;
+	}
+}

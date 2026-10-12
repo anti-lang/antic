@@ -1,0 +1,108 @@
+//! The client of the ownership library: every construct of the ownership area
+//! in a function of a library module, and in a generic one that this module
+//! compiles a copy of. The last lines hold the same constructs on a class of
+//! the library, written in this module.
+
+import com.example.ownership;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn plain()
+{
+	let p = ownership.run_alloc_of_a_literal(1);
+	printf("alloc of a literal %d %d\n".ptr, p.n as c_int,
+		ownership.leaf_n(p.leaf) as c_int);
+	let q = ownership.run_alloc_of_many(2) else {
+		return;
+	};
+	printf("alloc(T, n) %d\n".ptr, (q[0] + q[1] + q[2]) as c_int);
+	let b = ownership.run_alloc_with_arguments(3);
+	printf("alloc with arguments %d\n".ptr, b.n as c_int);
+	delete(b);
+	printf("free %d\n".ptr, ownership.run_free(q) as c_int);
+	let copy = ownership.run_dup(p);
+	printf("dup %d %d %d\n".ptr, copy.n as c_int,
+		ownership.leaf_n(copy.leaf) as c_int, (copy.leaf != p.leaf) as c_int);
+	printf("none %d\n".ptr, ownership.run_none(p) as c_int);
+	printf("?? %d\n".ptr, ownership.run_none_or(p, copy) as c_int);
+	printf("p?.x %d\n".ptr, ownership.run_chain(p) as c_int);
+	printf("destroy %d\n".ptr, ownership.run_destroy(copy) as c_int);
+	free(copy);
+	printf("delete %d\n".ptr, ownership.run_delete(p) as c_int);
+	printf("&x and *p %d\n".ptr, ownership.run_address_and_read(4) as c_int);
+	let all = ownership.run_to_slice(5);
+	printf("to_slice %d %d\n".ptr, all.len as c_int,
+		(all[0] + all[1] + all[2]) as c_int);
+	free(all.ptr);
+}
+
+fn generic()
+{
+	let s = ownership.gen_alloc_of_a_literal<ownership.Node>(
+		ownership.Node { n: 11 });
+	printf("generic alloc of a literal %d %d\n".ptr, s.held.n as c_int,
+		ownership.Node.alive() as c_int);
+	let q = ownership.gen_alloc_of_many<ownership.Node>(
+		ownership.Node { n: 12 }) else {
+		return;
+	};
+	printf("generic alloc(T, n) %d %d\n".ptr, q[1].n as c_int,
+		ownership.Node.alive() as c_int);
+	printf("generic alloc with arguments %d\n".ptr,
+		ownership.gen_alloc_with_arguments<int>(0, 13) as c_int);
+	let twin = ownership.gen_dup<ownership.Node>(&q[1]);
+	ownership.Node.count_copy();
+	printf("generic dup %d %d\n".ptr, twin.n as c_int,
+		ownership.Node.alive() as c_int);
+	printf("generic none %d\n".ptr,
+		(ownership.gen_none<ownership.Node>(&twin) == none) as c_int);
+	printf("generic ?? %d %d\n".ptr,
+		ownership.gen_none_or<ownership.Node>(none, &twin).n as c_int,
+		ownership.gen_none_or<ownership.Node>(&q[1], &twin).n as c_int);
+	let far = ownership.Slot<*ownership.Node> { held: &twin };
+	let reached = ownership.gen_chain<ownership.Node>(&far);
+	let nothing = ownership.gen_chain<ownership.Node>(none);
+	printf("generic p?.x %d %d\n".ptr, (reached == &twin) as c_int,
+		(nothing == none) as c_int);
+	printf("generic destroy %d\n".ptr,
+		ownership.gen_destroy<ownership.Node>(&q[1]) as c_int);
+	printf("generic free %d\n".ptr,
+		ownership.gen_free<ownership.Node>(q) as c_int);
+	printf("generic delete %d\n".ptr,
+		ownership.gen_delete<ownership.Node>(s) as c_int);
+	printf("generic &x and *p %d\n".ptr,
+		ownership.gen_address_and_read<int>(1, 1) as c_int);
+	printf("generic to_slice %d\n".ptr,
+		ownership.gen_to_slice<int>(0, 6) as c_int);
+}
+
+/// The constructs on a class of the library, written in this module.
+fn here_on_a_class_of_the_library()
+{
+	let p = alloc ownership.Node {
+		n: 21,
+		leaf: alloc ownership.Leaf { n: 22 },
+	};
+	let copy = dup(p);
+	ownership.Node.count_copy();
+	printf("here dup %d %d %d\n".ptr, copy.n as c_int,
+		ownership.leaf_n(copy.leaf) as c_int, (copy.leaf != p.leaf) as c_int);
+	destroy(copy);
+	printf("here destroy %d\n".ptr, ownership.Node.alive() as c_int);
+	free(copy);
+	delete(p);
+	printf("here delete %d\n".ptr, ownership.Node.alive() as c_int);
+	let all = ownership.Count { at: 0, end: 4 }.to_slice();
+	printf("here to_slice %d\n".ptr, all.len as c_int);
+	free(all.ptr);
+}
+
+fn main() -> int
+{
+	plain();
+	printf("alive %d\n".ptr, ownership.Node.alive() as c_int);
+	generic();
+	printf("alive %d\n".ptr, ownership.Node.alive() as c_int);
+	here_on_a_class_of_the_library();
+	return 0;
+}

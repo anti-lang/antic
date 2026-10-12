@@ -1,0 +1,92 @@
+exit 0
+alloc of a literal in method: 101
+alloc(T, n) in method: 6
+alloc with arguments in method: 2
+free in method: 1
+delete in method: 10
+destroy in method: 10
+alloc of a literal in loop body: 5
+alloc(T, n) in loop body: 15
+alloc with arguments in loop body: 10
+free in loop body: 2
+delete in loop body: 20
+destroy in loop body: 20
+alloc of a literal in switch arm: 3
+alloc(T, n) in switch arm: 12
+alloc with arguments in switch arm: 6
+free in switch arm: 1
+delete in switch arm: 10
+destroy in switch arm: 10
+alloc of a literal in if let: 4
+alloc(T, n) in if let: 15
+alloc with arguments in if let: 8
+free in if let: 1
+delete in if let: 10
+destroy in if let: 10
+alloc of a literal in else of if let: -1
+alloc(T, n) in else of if let: 0
+alloc with arguments in else of if let: 0
+free in else of if let: 0
+delete in else of if let: 10
+destroy in else of if let: 0
+alloc of a literal in defer: 15
+alloc(T, n) in defer: 15
+alloc with arguments in defer: 30
+free in defer: 1
+delete in defer: 10
+destroy in defer: 10
+alloc of a literal in undo: 26
+alloc(T, n) in undo: 24
+alloc with arguments in undo: 52
+free in undo: 1
+delete in undo: 10
+destroy in undo: 10
+alloc of a literal in catch handler: 14
+alloc(T, n) in catch handler: 24
+alloc with arguments in catch handler: 14
+free in catch handler: 1
+delete in catch handler: 10
+destroy in catch handler: 10
+alloc of a literal in closure: 8
+alloc(T, n) in closure: 27
+alloc with arguments in closure: 16
+free in closure: 1
+delete in closure: 10
+destroy in closure: 10
+alloc of a literal in worker: 120
+alloc(T, n) in worker: 144
+alloc with arguments in worker: 2
+free in worker: 1
+delete in worker: 10
+destroy in worker: 10
+alloc of a literal in dispatch: 10
+alloc(T, n) in dispatch: 33
+alloc with arguments in dispatch: 20
+free in dispatch: 1
+delete in dispatch: 10
+destroy in dispatch: 10
+alloc of a literal in sync block: 11
+alloc(T, n) in sync block: 36
+alloc with arguments in sync block: 22
+free in sync block: 1
+delete in sync block: 10
+destroy in sync block: 10
+alloc of a literal in select arm: 12
+alloc(T, n) in select arm: 39
+alloc with arguments in select arm: 24
+free in select arm: 1
+delete in select arm: 10
+destroy in select arm: 10
+alloc of a literal in generic body: 13
+alloc(T, n) in generic body: 14
+alloc with arguments in generic body: 26
+free in generic body: 1
+delete in generic body: 10
+destroy in generic body: 11
+alloc of a literal in nested type: 115
+alloc(T, n) in nested type: 48
+alloc with arguments in nested type: 30
+free in nested type: 1
+delete in nested type: 10
+destroy in nested type: 10
+alive: 0 0

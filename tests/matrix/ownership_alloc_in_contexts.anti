@@ -1,0 +1,591 @@
+//! `alloc` of a literal, `alloc(T, n)`, `alloc` of a class with arguments,
+//! `free`, `delete` and `destroy`, each in these places: method, loop body,
+//! switch arm, if let, defer, undo, catch handler, closure, worker, dispatch or
+//! parallel, sync block, select arm, generic body, nested type. Each place is a
+//! function of its own that fills a `Marks`, and the program prints one line
+//! per construct and place. A `Node` and a `Built` count themselves alive, so
+//! the line of `delete` and of `destroy` holds the count after it. A worker
+//! deletes no object, so it tears each down in place and frees it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Node.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Node.live.sub(1);
+	}
+}
+
+class Built
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn construct(self, n: int)
+	{
+		self.n = n * 2;
+		Built.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Built.live.sub(1);
+	}
+}
+
+struct Marks
+{
+	literal: int,
+	many: int,
+	built: int,
+	freed: int,
+	deleted: int,
+	destroyed: int,
+}
+
+fn held(k: int) -> ?int
+{
+	if k == 0 {
+		return none;
+	}
+	return k;
+}
+
+fn failing(k: int) -> int may fail
+{
+	if k > 0 {
+		fail "refused";
+	}
+	return k;
+}
+
+/// The sum of three numbers in memory of `alloc(int, 3)`, or -1 without it.
+fn three(k: int) -> ?*int
+{
+	let q = alloc(int, 3) else {
+		return none;
+	};
+	q[0] = k;
+	q[1] = k + 1;
+	q[2] = k + 2;
+	return q;
+}
+
+class Places
+{
+	pub base: int = 0,
+
+	class Inner
+	{
+		pub base: int = 0,
+
+		pub fn run(self, k: int, m: *Marks)
+		{
+			let p = alloc Node { n: k + self.base };
+			m.literal = p.n;
+			let q = alloc(int, 3) else {
+				return;
+			};
+			q[0] = k;
+			q[1] = k + 1;
+			q[2] = k + 2;
+			m.many = q[0] + q[1] + q[2];
+			let b = alloc Built(k);
+			m.built = b.n;
+			free(q);
+			m.freed = 1;
+			delete(b);
+			m.deleted = 10 + Built.live.load();
+			destroy(p);
+			m.destroyed = 10 + Node.live.load();
+			free(p);
+		}
+	}
+
+	pub fn in_method(self, k: int, m: *Marks)
+	{
+		let p = alloc Node { n: k + self.base };
+		m.literal = p.n;
+		let q = alloc(int, 3) else {
+			return;
+		};
+		q[0] = k;
+		q[1] = k + 1;
+		q[2] = k + 2;
+		m.many = q[0] + q[1] + q[2];
+		let b = alloc Built(k);
+		m.built = b.n;
+		free(q);
+		m.freed = 1;
+		delete(b);
+		m.deleted = 10 + Built.live.load();
+		destroy(p);
+		m.destroyed = 10 + Node.live.load();
+		free(p);
+	}
+
+	pub fn in_nested(self, k: int, m: *Marks)
+	{
+		let inner = Inner { base: self.base };
+		inner.run(k, m);
+	}
+}
+
+fn in_loop(k: int, m: *Marks)
+{
+	for i in 0..2 {
+		let p = alloc Node { n: k + i };
+		m.literal += p.n;
+		let q = alloc(int, 3) else {
+			return;
+		};
+		q[0] = k;
+		q[1] = k + 1;
+		q[2] = k + i;
+		m.many += q[0] + q[1] + q[2];
+		let b = alloc Built(k + i);
+		m.built += b.n;
+		free(q);
+		m.freed += 1;
+		delete(b);
+		m.deleted += 10 + Built.live.load();
+		destroy(p);
+		m.destroyed += 10 + Node.live.load();
+		free(p);
+	}
+}
+
+fn in_switch(k: int, m: *Marks)
+{
+	let p: ?*Node = none;
+	let q: ?*int = none;
+	let b: ?*Built = none;
+	for step in 0..6 {
+		switch step {
+			0 => {
+				let made = alloc Node { n: k };
+				m.literal = made.n;
+				p = made;
+			},
+			1 => {
+				q = alloc(int, 3);
+				let room = q else {
+					return;
+				};
+				room[0] = k;
+				room[1] = k + 1;
+				room[2] = k + 2;
+				m.many = room[0] + room[1] + room[2];
+			},
+			2 => {
+				let made = alloc Built(k);
+				m.built = made.n;
+				b = made;
+			},
+			3 => {
+				free(q);
+				m.freed = 1;
+			},
+			4 => {
+				let made = b else {
+					return;
+				};
+				delete(made);
+				m.deleted = 10 + Built.live.load();
+			},
+			else => {
+				let node = p else {
+					return;
+				};
+				destroy(node);
+				m.destroyed = 10 + Node.live.load();
+				free(node);
+			},
+		}
+	}
+}
+
+fn in_if_let(k: int, m: *Marks)
+{
+	if let v = held(k) {
+		let p = alloc Node { n: v };
+		m.literal = p.n;
+		let b = alloc Built(v);
+		m.built = b.n;
+		if let q = three(v) {
+			m.many = q[0] + q[1] + q[2];
+			free(q);
+			m.freed = 1;
+		} else {
+			m.many = -1;
+		}
+		delete(b);
+		m.deleted = 10 + Built.live.load();
+		destroy(p);
+		m.destroyed = 10 + Node.live.load();
+		free(p);
+	} else {
+		let p = alloc Node { n: -1 };
+		m.literal = p.n;
+		delete(p);
+		m.deleted = 10 + Node.live.load();
+	}
+}
+
+fn in_defer(k: int, m: *Marks)
+{
+	let p = alloc Node { n: k };
+	let b = alloc Built(k);
+	let q = three(k) else {
+		return;
+	};
+	defer {
+		destroy(p);
+		m.destroyed = 10 + Node.live.load();
+		free(p);
+	}
+	defer {
+		delete(b);
+		m.deleted = 10 + Built.live.load();
+	}
+	defer {
+		free(q);
+		m.freed = 1;
+	}
+	defer {
+		let late = alloc Node { n: k + 10 };
+		m.literal = late.n;
+		delete(late);
+		if let more = alloc(int, 2) {
+			more[0] = k;
+			more[1] = k * 2;
+			m.many = more[0] + more[1];
+			free(more);
+		}
+		let other = alloc Built(k + 10);
+		m.built = other.n;
+		delete(other);
+	}
+}
+
+fn in_undo(k: int, m: *Marks) may fail
+{
+	let p = alloc Node { n: k };
+	let b = alloc Built(k);
+	let q = three(k) else {
+		return;
+	};
+	undo {
+		destroy(p);
+		m.destroyed = 10 + Node.live.load();
+		free(p);
+	}
+	undo {
+		delete(b);
+		m.deleted = 10 + Built.live.load();
+	}
+	undo {
+		free(q);
+		m.freed = 1;
+	}
+	undo {
+		let late = alloc Node { n: k + 20 };
+		m.literal = late.n;
+		delete(late);
+		if let more = alloc(int, 2) {
+			more[0] = k;
+			more[1] = k * 3;
+			m.many = more[0] + more[1];
+			free(more);
+		}
+		let other = alloc Built(k + 20);
+		m.built = other.n;
+		delete(other);
+	}
+	fail "undone";
+}
+
+fn in_catch(k: int, m: *Marks)
+{
+	let got = failing(k) catch e {
+		let p = alloc Node { n: e.message.len + k };
+		m.literal = p.n;
+		let q = three(k) else {
+			yield -1;
+		};
+		m.many = q[0] + q[1] + q[2];
+		let b = alloc Built(k);
+		m.built = b.n;
+		free(q);
+		m.freed = 1;
+		delete(b);
+		m.deleted = 10 + Built.live.load();
+		destroy(p);
+		m.destroyed = 10 + Node.live.load();
+		free(p);
+		yield 0;
+	};
+}
+
+fn call(f: fn(int), k: int)
+{
+	f(k);
+}
+
+fn in_closure(k: int, m: *Marks)
+{
+	call(fn(v) {
+		let p = alloc Node { n: v };
+		m.literal = p.n;
+		let q = three(v) else {
+			return;
+		};
+		m.many = q[0] + q[1] + q[2];
+		let b = alloc Built(v);
+		m.built = b.n;
+		free(q);
+		m.freed = 1;
+		delete(b);
+		m.deleted = 10 + Built.live.load();
+		destroy(p);
+		m.destroyed = 10 + Node.live.load();
+		free(p);
+	}, k);
+}
+
+/// A worker deletes no object, so it tears down in place and frees.
+worker fn tally(part: []int) -> int
+{
+	let sum = 0;
+	for x in part {
+		let p = alloc Node { n: x };
+		sum += p.n;
+		let q = three(x) else {
+			return -1;
+		};
+		sum += q[0] + q[1] + q[2];
+		let b = alloc Built(x);
+		sum += b.n;
+		free(q);
+		destroy(b);
+		free(b);
+		destroy(p);
+		free(p);
+	}
+	return sum;
+}
+
+fn in_worker(k: int, m: *Marks)
+{
+	let room = alloc([4]int, 1) else {
+		return;
+	};
+	(*room)[0] = k;
+	(*room)[1] = k + 1;
+	(*room)[2] = k + 2;
+	(*room)[3] = k + 3;
+	let sums = parallel (*room)[0..4] by 2 -> tally;
+	m.literal = sums[0];
+	m.many = sums[1];
+	m.built = sums.len;
+	free(sums.ptr);
+	free(room);
+	m.freed = 1;
+	m.deleted = 10 + Built.live.load();
+	m.destroyed = 10 + Node.live.load();
+}
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch(k: int, m: *Marks)
+{
+	let t = alloc Task { n: k };
+	let literal = dispatch t -> work(fn(v) {
+		let p = alloc Node { n: v };
+		let n = p.n;
+		destroy(p);
+		free(p);
+		return n;
+	});
+	m.literal = join(literal);
+	let many = dispatch t -> work(fn(v) {
+		let q = three(v) else {
+			return -1;
+		};
+		let n = q[0] + q[1] + q[2];
+		free(q);
+		return n;
+	});
+	m.many = join(many);
+	let built = dispatch t -> work(fn(v) {
+		let b = alloc Built(v);
+		let n = b.n;
+		destroy(b);
+		free(b);
+		return n;
+	});
+	m.built = join(built);
+	m.freed = 1;
+	m.deleted = 10 + Built.live.load();
+	m.destroyed = 10 + Node.live.load();
+	delete(t);
+}
+
+struct Guard
+{
+	lock: Mutex,
+}
+
+fn in_sync(g: *Guard, k: int, m: *Marks)
+{
+	sync g.lock {
+		let p = alloc Node { n: k };
+		m.literal = p.n;
+		let q = three(k) else {
+			return;
+		};
+		m.many = q[0] + q[1] + q[2];
+		let b = alloc Built(k);
+		m.built = b.n;
+		free(q);
+		m.freed = 1;
+		delete(b);
+		m.deleted = 10 + Built.live.load();
+		destroy(p);
+		m.destroyed = 10 + Node.live.load();
+		free(p);
+	}
+}
+
+fn in_select(c: chan int, k: int, m: *Marks)
+{
+	send(c, k);
+	select {
+		c x => {
+			let v = x else {
+				return;
+			};
+			let p = alloc Node { n: *v };
+			m.literal = p.n;
+			let q = three(*v) else {
+				return;
+			};
+			m.many = q[0] + q[1] + q[2];
+			let b = alloc Built(*v);
+			m.built = b.n;
+			free(q);
+			m.freed = 1;
+			delete(b);
+			m.deleted = 10 + Built.live.load();
+			destroy(p);
+			m.destroyed = 10 + Node.live.load();
+			free(p);
+		},
+	}
+}
+
+class Slot<T>
+{
+	pub held: T,
+}
+
+/// The generic body: a literal of a generic class, `alloc(T, n)` and the three
+/// ways to give the memory back.
+fn in_generic<T>(own x: T, own y: T, k: int, m: *Marks) -> ?*T
+{
+	let p = alloc Slot<T> { held: x };
+	m.literal = k;
+	let q = alloc(T, 2) else {
+		return none;
+	};
+	q[0] = y;
+	let b = alloc Built(k);
+	m.built = b.n;
+	delete(b);
+	m.deleted = 10 + Built.live.load();
+	destroy(p);
+	m.destroyed = 10 + Node.live.load();
+	free(p);
+	m.freed = 1;
+	return q;
+}
+
+fn show(place: str, m: *Marks)
+{
+	printf("alloc of a literal in %.*s: %d\n".ptr, place.len as c_int, place.ptr, m.literal as c_int);
+	printf("alloc(T, n) in %.*s: %d\n".ptr, place.len as c_int, place.ptr, m.many as c_int);
+	printf("alloc with arguments in %.*s: %d\n".ptr, place.len as c_int, place.ptr, m.built as c_int);
+	printf("free in %.*s: %d\n".ptr, place.len as c_int, place.ptr, m.freed as c_int);
+	printf("delete in %.*s: %d\n".ptr, place.len as c_int, place.ptr, m.deleted as c_int);
+	printf("destroy in %.*s: %d\n".ptr, place.len as c_int, place.ptr, m.destroyed as c_int);
+	*m = Marks { literal: 0, many: 0, built: 0, freed: 0, deleted: 0, destroyed: 0 };
+}
+
+fn main() -> int
+{
+	let m = Marks { literal: 0, many: 0, built: 0, freed: 0, deleted: 0, destroyed: 0 };
+	let places = Places { base: 100 };
+	places.in_method(1, &m);
+	show("method", &m);
+	in_loop(2, &m);
+	show("loop body", &m);
+	in_switch(3, &m);
+	show("switch arm", &m);
+	in_if_let(4, &m);
+	show("if let", &m);
+	in_if_let(0, &m);
+	show("else of if let", &m);
+	in_defer(5, &m);
+	show("defer", &m);
+	in_undo(6, &m) catch {
+		yield;
+	};
+	show("undo", &m);
+	in_catch(7, &m);
+	show("catch handler", &m);
+	in_closure(8, &m);
+	show("closure", &m);
+	in_worker(9, &m);
+	show("worker", &m);
+	in_dispatch(10, &m);
+	show("dispatch", &m);
+	let g = Guard { lock: Mutex.new() };
+	in_sync(&g, 11, &m);
+	show("sync block", &m);
+	let c = chan int(1);
+	in_select(c, 12, &m);
+	show("select arm", &m);
+	delete(c);
+	let kept = in_generic<Node>(Node { n: 13 }, Node { n: 14 }, 13, &m) else {
+		return 1;
+	};
+	m.many = kept[0].n;
+	destroy(&kept[0]);
+	free(kept);
+	show("generic body", &m);
+	places.in_nested(15, &m);
+	show("nested type", &m);
+	printf("alive: %d %d\n".ptr, Node.live.load() as c_int, Built.live.load() as c_int);
+	return 0;
+}

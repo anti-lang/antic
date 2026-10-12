@@ -1,0 +1,11 @@
+//! `&x` at module level, as the value of a constant: a constant is a value and
+//! stands at no address.
+
+const N: int = 4;
+
+const WHERE: *int = &N;
+
+fn main() -> int
+{
+	return *WHERE;
+}

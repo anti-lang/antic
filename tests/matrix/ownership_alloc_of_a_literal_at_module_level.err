@@ -1,0 +1,1 @@
+ownership_alloc_of_a_literal_at_module_level.anti:9:23: error: `alloc` is not a constant expression

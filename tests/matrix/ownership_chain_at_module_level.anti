@@ -1,0 +1,21 @@
+//! `p?.x` at module level, as the value of a constant: the read happens at run
+//! time, so it is no constant expression.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Node
+{
+	pub own leaf: ?*Leaf = none,
+}
+
+const NOTHING: ?*Node = none;
+
+const LEAF: ?*Leaf = NOTHING?.leaf;
+
+fn main() -> int
+{
+	return 0;
+}

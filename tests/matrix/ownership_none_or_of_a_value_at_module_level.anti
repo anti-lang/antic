@@ -1,0 +1,12 @@
+//! `??` at module level, as the value of a constant whose left side holds a
+//! value. The entry on `const` under "Declarations and statements" lists what a
+//! constant expression may use, and `??` is not among it.
+
+const HELD: ?int = 5;
+
+const CHOSEN: int = HELD ?? 7;
+
+fn main() -> int
+{
+	return CHOSEN;
+}

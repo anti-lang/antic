@@ -1,0 +1,16 @@
+//! The client names a class of the library through its module and builds it
+//! with arguments, as a value and with `alloc`.
+
+import com.example.built;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let v = built.Built(4);
+	printf("value %d\n".ptr, v.n as c_int);
+	let p = alloc built.Built(5);
+	printf("alloc %d\n".ptr, p.n as c_int);
+	delete(p);
+	return 0;
+}

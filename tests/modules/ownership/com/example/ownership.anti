@@ -1,0 +1,252 @@
+//! One function per construct of the ownership area, plain and generic, in a
+//! library module. The client calls each across the module boundary, and the
+//! library file carries the checked tree of every generic one. A `Node` owns a
+//! `Leaf` and counts itself alive, and the client makes, copies and deletes one
+//! of its own, so the teardown and the copy of a class of another module run
+//! from the client as well.
+
+pub class Leaf
+{
+	pub n: int = 0,
+}
+
+pub class Node
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Node.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Node.live.sub(1);
+	}
+
+	/// The nodes alive now.
+	pub fn alive() -> int
+	{
+		return Node.live.load();
+	}
+
+	/// Count one more node alive, for a copy that `dup` made.
+	pub fn count_copy()
+	{
+		Node.live.add(1);
+	}
+}
+
+pub class Built
+{
+	pub n: int = 0,
+
+	pub fn construct(self, n: int)
+	{
+		self.n = n * 2;
+	}
+}
+
+/// Counts from `at + 1` to `end`.
+pub class Count
+{
+	pub at: int = 0,
+	pub end: int = 0,
+
+	pub operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at <= self.end;
+	}
+
+	pub operator fn value(self) -> int
+	{
+		return self.at;
+	}
+}
+
+/// A place for one value of any type.
+pub class Slot<T>
+{
+	pub held: T,
+}
+
+pub fn maybe(p: *Node, yes: bool) -> ?*Node
+{
+	if yes {
+		return p;
+	}
+	return none;
+}
+
+/// The number of a leaf, or -1 without one.
+pub fn leaf_n(l: ?*Leaf) -> int
+{
+	let leaf = l else {
+		return -1;
+	};
+	return leaf.n;
+}
+
+pub fn run_alloc_of_a_literal(k: int) -> *Node
+{
+	return alloc Node { n: k, leaf: alloc Leaf { n: k + 1 } };
+}
+
+pub fn gen_alloc_of_a_literal<T>(own x: T) -> *Slot<T>
+{
+	return alloc Slot<T> { held: x };
+}
+
+pub fn run_alloc_of_many(k: int) -> ?*int
+{
+	let q = alloc(int, 3) else {
+		return none;
+	};
+	q[0] = k;
+	q[1] = k + 1;
+	q[2] = k + 2;
+	return q;
+}
+
+pub fn gen_alloc_of_many<T>(own x: T) -> ?*T
+{
+	let q = alloc(T, 2) else {
+		return none;
+	};
+	q[1] = x;
+	return q;
+}
+
+pub fn run_alloc_with_arguments(k: int) -> *Built
+{
+	return alloc Built(k);
+}
+
+pub fn gen_alloc_with_arguments<T>(own x: T, k: int) -> int
+{
+	let b = alloc Built(k);
+	let n = b.n;
+	delete(b);
+	return n;
+}
+
+pub fn run_free(q: ?*int) -> int
+{
+	free(q);
+	return 1;
+}
+
+pub fn gen_free<T>(q: ?*T) -> int
+{
+	free(q);
+	return 1;
+}
+
+/// The nodes alive after the `delete`.
+pub fn run_delete(own p: *Node) -> int
+{
+	delete(p);
+	return Node.live.load();
+}
+
+/// The nodes alive after the `delete` of a slot, which tears its value down.
+pub fn gen_delete<T>(own p: *Slot<T>) -> int
+{
+	delete(p);
+	return Node.alive();
+}
+
+/// The nodes alive after the `destroy`. The memory stays with the caller.
+pub fn run_destroy(p: *Node) -> int
+{
+	destroy(p);
+	return Node.live.load();
+}
+
+/// The nodes alive after the `destroy` of the value at `p`.
+pub fn gen_destroy<T>(p: *T) -> int
+{
+	destroy(p);
+	return Node.alive();
+}
+
+pub fn run_dup(p: *Node) -> *Node
+{
+	let copy = dup(p);
+	Node.live.add(1);
+	return copy;
+}
+
+pub fn gen_dup<T>(p: *T) -> T
+{
+	return dup(*p);
+}
+
+pub fn run_address_and_read(k: int) -> int
+{
+	let x = k;
+	let px = &x;
+	*px += 1;
+	return x * 100 + *px;
+}
+
+/// The value at `p` twice in a slot each, read back through `&` and `*`.
+pub fn gen_address_and_read<T>(own x: T, own y: T) -> bool
+{
+	let px = &x;
+	let py = &y;
+	return px != py && px == &*px;
+}
+
+pub fn run_none(p: *Node) -> int
+{
+	let empty: ?*Node = none;
+	let found = maybe(p, false);
+	return (empty == none) as int + (found == none) as int * 10;
+}
+
+pub fn gen_none<T>(p: *T) -> ?*T
+{
+	let empty: ?*T = none;
+	if p == empty {
+		return p;
+	}
+	return none;
+}
+
+pub fn run_none_or(p: *Node, other: *Node) -> int
+{
+	return (maybe(p, false) ?? other).n * 100 + (maybe(p, true) ?? other).n;
+}
+
+pub fn gen_none_or<T>(p: ?*T, other: *T) -> *T
+{
+	return p ?? other;
+}
+
+pub fn run_chain(p: *Node) -> int
+{
+	return leaf_n(maybe(p, true)?.leaf) * 100 + leaf_n(maybe(p, false)?.leaf);
+}
+
+pub fn gen_chain<T>(p: ?*Slot<*T>) -> ?*T
+{
+	return p?.held;
+}
+
+pub fn run_to_slice(k: int) -> []int
+{
+	return Count { at: k, end: k + 3 }.to_slice();
+}
+
+pub fn gen_to_slice<T>(own x: T, k: int) -> int
+{
+	let all = Count { at: k, end: k + 2 }.to_slice();
+	let n = all[0] + all[1] + all.len * 100;
+	free(all.ptr);
+	return n;
+}

@@ -1,0 +1,39 @@
+//! A generic function and a generic class of a library module that read and
+//! change a `static atomic` field. The library file carries the checked tree of
+//! each, and the client compiles its copies from it.
+
+pub class Tally
+{
+	static atomic seen: int = 0;
+
+	/// The number of calls of `note` and of `Slot.put` so far.
+	pub fn count() -> int
+	{
+		return Tally.seen.load();
+	}
+}
+
+/// Count one call and give `x` back.
+pub fn note<T>(own x: T) -> T
+{
+	Tally.seen.add(1);
+	return x;
+}
+
+/// The count as `note` of any `T` reads it.
+pub fn read<T>(p: *T) -> int
+{
+	return Tally.seen.load();
+}
+
+/// A place for one value, which counts each `put`.
+pub class Slot<T>
+{
+	pub held: T,
+
+	pub fn put(self, own x: T)
+	{
+		Tally.seen.add(1);
+		self.held = x;
+	}
+}

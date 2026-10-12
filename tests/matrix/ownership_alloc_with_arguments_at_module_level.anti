@@ -1,0 +1,24 @@
+//! `alloc` of a class with arguments at module level, as the default of a
+//! parameter: the object is built at run time, so it is no constant expression.
+
+class Built
+{
+	pub n: int = 0,
+
+	fn construct(self, n: int)
+	{
+		self.n = n;
+	}
+}
+
+fn take(own p: *Built = alloc Built(8)) -> int
+{
+	let n = p.n;
+	delete(p);
+	return n;
+}
+
+fn main() -> int
+{
+	return 0;
+}

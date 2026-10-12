@@ -1,0 +1,16 @@
+//! `dup` at module level, as the value of a constant: the copy is made at run
+//! time, so it is no constant expression.
+
+struct Point
+{
+	x: int,
+}
+
+const ORIGIN: Point = Point { x: 3 };
+
+const TWIN: Point = dup(ORIGIN);
+
+fn main() -> int
+{
+	return TWIN.x;
+}

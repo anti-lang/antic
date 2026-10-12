@@ -1,0 +1,21 @@
+//! `??` with a call on its left as the default of a field. A default is a
+//! constant expression, and a call is none.
+
+fn find(k: int) -> ?int
+{
+	if k > 0 {
+		return k;
+	}
+	return none;
+}
+
+class Holder
+{
+	pub n: int = find(0) ?? 7,
+}
+
+fn main() -> int
+{
+	let h = Holder { };
+	return h.n;
+}

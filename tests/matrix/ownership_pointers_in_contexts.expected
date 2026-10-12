@@ -1,0 +1,88 @@
+exit 0
+&x in method: 102
+*p in method: 204
+dup in method: 1203
+none in method: 1
+?? in method: 102
+p?.x in method: 101
+to_slice in method: 609
+&x in loop body: 7
+*p in loop body: 14
+dup in loop body: 2012
+none in loop body: 2
+?? in loop body: 7
+p?.x in loop body: 5
+to_slice in loop body: 627
+&x in switch arm: 4
+*p in switch arm: 8
+dup in switch arm: 1007
+none in switch arm: 1
+?? in switch arm: 4
+p?.x in switch arm: 3
+to_slice in switch arm: 315
+&x in if let: 5
+*p in if let: 10
+dup in if let: 1009
+none in if let: 1
+?? in if let: 5
+p?.x in if let: 4
+to_slice in if let: 318
+&x in defer: 6
+*p in defer: 12
+dup in defer: 1011
+none in defer: 1
+?? in defer: 6
+p?.x in defer: 5
+to_slice in defer: 321
+&x in undo: 7
+*p in undo: 14
+dup in undo: 1013
+none in undo: 1
+?? in undo: 7
+p?.x in undo: 6
+to_slice in undo: 324
+&x in catch handler: 15
+*p in catch handler: 30
+dup in catch handler: 1029
+none in catch handler: 1
+?? in catch handler: 15
+p?.x in catch handler: 14
+to_slice in catch handler: 348
+&x in closure: 9
+*p in closure: 18
+dup in closure: 1017
+none in closure: 1
+?? in closure: 9
+p?.x in closure: 8
+to_slice in closure: 330
+the seven in a worker: 281402854
+the seven in a dispatch: 1412
+&x in sync block: 12
+*p in sync block: 24
+dup in sync block: 1023
+none in sync block: 1
+?? in sync block: 12
+p?.x in sync block: 11
+to_slice in sync block: 339
+&x in select arm: 13
+*p in select arm: 26
+dup in select arm: 1025
+none in select arm: 1
+?? in select arm: 13
+p?.x in select arm: 12
+to_slice in select arm: 342
+&x in generic body: 14
+*p in generic body: 28
+dup in generic body: 1027
+none in generic body: 101
+?? in generic body: 14
+p?.x in generic body: 13
+to_slice in generic body: 345
+the value of the generic body: 50 51
+&x in nested type: 116
+*p in nested type: 232
+dup in nested type: 1231
+none in nested type: 1
+?? in nested type: 116
+p?.x in nested type: 115
+to_slice in nested type: 651

@@ -1,0 +1,588 @@
+//! `dup`, the address `&x`, a read through `*p`, `none`, `??`, `p?.x` and
+//! `to_slice`, each in these places: method, loop body, switch arm, if let,
+//! defer, undo, catch handler, closure, worker, dispatch or parallel, sync
+//! block, select arm, generic body, nested type. Each place is a function of
+//! its own that fills a `Marks`, and the program prints one line per construct
+//! and place. A worker and a dispatched closure give one number, the sum of the
+//! seven marks. A `Node` owns a `Leaf`, so `dup` copies both, and the line of
+//! `dup` adds 1000 when the copy holds a leaf of its own.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Node
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+/// Counts from `at + 1` to `end`.
+class Count
+{
+	pub at: int = 0,
+	pub end: int = 0,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at <= self.end;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.at;
+	}
+}
+
+struct Marks
+{
+	address: int,
+	read: int,
+	copied: int,
+	nothing: int,
+	other: int,
+	chained: int,
+	walked: int,
+}
+
+fn maybe(p: *Node, yes: bool) -> ?*Node
+{
+	if yes {
+		return p;
+	}
+	return none;
+}
+
+/// The number of a leaf, or -1 without one.
+fn leaf_n(l: ?*Leaf) -> int
+{
+	let leaf = l else {
+		return -1;
+	};
+	return leaf.n;
+}
+
+fn held(k: int) -> ?int
+{
+	if k == 0 {
+		return none;
+	}
+	return k;
+}
+
+fn failing(k: int) -> int may fail
+{
+	if k > 0 {
+		fail "refused";
+	}
+	return k;
+}
+
+fn sum(m: *Marks) -> int
+{
+	return m.address + m.read + m.copied + m.nothing + m.other + m.chained + m.walked;
+}
+
+fn clear() -> Marks
+{
+	return Marks { address: 0, read: 0, copied: 0, nothing: 0, other: 0, chained: 0, walked: 0 };
+}
+
+class Places
+{
+	pub base: int = 0,
+
+	class Inner
+	{
+		pub base: int = 0,
+
+		pub fn run(self, k: int, m: *Marks)
+		{
+			let x = k + self.base;
+			let px = &x;
+			*px += 1;
+			m.address = x;
+			m.read = *px * 2;
+			let node = Node { n: k + self.base, leaf: alloc Leaf { n: k + self.base + 1 } };
+			let copy = dup(&node);
+			m.copied = copy.n + leaf_n(copy.leaf);
+			if copy.leaf != node.leaf {
+				m.copied += 1000;
+			}
+			delete(copy);
+			let empty: ?*Node = none;
+			m.nothing = (empty == none) as int + (maybe(&node, true) == none) as int * 10;
+			m.other = (maybe(&node, false) ?? &node).n + 1;
+			m.chained = leaf_n(maybe(&node, true)?.leaf) + leaf_n(maybe(&node, false)?.leaf);
+			let all = Count { at: k + self.base, end: k + self.base + 3 }.to_slice();
+			m.walked = all[0] + all[1] + all[2] + all.len * 100;
+			free(all.ptr);
+		}
+	}
+
+	pub fn in_method(self, k: int, m: *Marks)
+	{
+		let x = k + self.base;
+		let px = &x;
+		*px += 1;
+		m.address = x;
+		m.read = *px * 2;
+		let node = Node { n: k + self.base, leaf: alloc Leaf { n: k + self.base + 1 } };
+		let copy = dup(&node);
+		m.copied = copy.n + leaf_n(copy.leaf);
+		if copy.leaf != node.leaf {
+			m.copied += 1000;
+		}
+		delete(copy);
+		let empty: ?*Node = none;
+		m.nothing = (empty == none) as int + (maybe(&node, true) == none) as int * 10;
+		m.other = (maybe(&node, false) ?? &node).n + 1;
+		m.chained = leaf_n(maybe(&node, true)?.leaf) + leaf_n(maybe(&node, false)?.leaf);
+		let all = Count { at: k + self.base, end: k + self.base + 3 }.to_slice();
+		m.walked = all[0] + all[1] + all[2] + all.len * 100;
+		free(all.ptr);
+	}
+
+	pub fn in_nested(self, k: int, m: *Marks)
+	{
+		let inner = Inner { base: self.base };
+		inner.run(k, m);
+	}
+}
+
+fn in_loop(k: int, m: *Marks)
+{
+	for i in 0..2 {
+		let x = k + i;
+		let px = &x;
+		*px += 1;
+		m.address += x;
+		m.read += *px * 2;
+		let node = Node { n: k + i, leaf: alloc Leaf { n: k + i + 1 } };
+		let copy = dup(&node);
+		m.copied += copy.n + leaf_n(copy.leaf);
+		if copy.leaf != node.leaf {
+			m.copied += 1000;
+		}
+		delete(copy);
+		let empty: ?*Node = none;
+		m.nothing += (empty == none) as int + (maybe(&node, true) == none) as int * 10;
+		m.other += (maybe(&node, false) ?? &node).n + 1;
+		m.chained += leaf_n(maybe(&node, true)?.leaf) + leaf_n(maybe(&node, false)?.leaf);
+		let all = Count { at: k + i, end: k + i + 3 }.to_slice();
+		m.walked += all[0] + all[1] + all[2] + all.len * 100;
+		free(all.ptr);
+	}
+}
+
+fn in_switch(k: int, m: *Marks)
+{
+	switch k {
+		0 => {
+			m.nothing = -1;
+		},
+		3 => {
+			let x = k;
+			let px = &x;
+			*px += 1;
+			m.address = x;
+			m.read = *px * 2;
+			let node = Node { n: k, leaf: alloc Leaf { n: k + 1 } };
+			let copy = dup(&node);
+			m.copied = copy.n + leaf_n(copy.leaf);
+			if copy.leaf != node.leaf {
+				m.copied += 1000;
+			}
+			delete(copy);
+			let empty: ?*Node = none;
+			m.nothing = (empty == none) as int + (maybe(&node, true) == none) as int * 10;
+			m.other = (maybe(&node, false) ?? &node).n + 1;
+			m.chained = leaf_n(maybe(&node, true)?.leaf) + leaf_n(maybe(&node, false)?.leaf);
+			let all = Count { at: k, end: k + 3 }.to_slice();
+			m.walked = all[0] + all[1] + all[2] + all.len * 100;
+			free(all.ptr);
+		},
+		else => {
+			m.nothing = -2;
+		},
+	}
+}
+
+fn in_if_let(k: int, m: *Marks)
+{
+	if let v = held(k) {
+		let x = v;
+		let px = &x;
+		*px += 1;
+		m.address = x;
+		m.read = *px * 2;
+		let node = Node { n: v, leaf: alloc Leaf { n: v + 1 } };
+		let copy = dup(&node);
+		m.copied = copy.n + leaf_n(copy.leaf);
+		if copy.leaf != node.leaf {
+			m.copied += 1000;
+		}
+		delete(copy);
+		let empty: ?*Node = none;
+		m.nothing = (empty == none) as int + (maybe(&node, true) == none) as int * 10;
+		m.other = (maybe(&node, false) ?? &node).n + 1;
+		m.chained = leaf_n(maybe(&node, true)?.leaf) + leaf_n(maybe(&node, false)?.leaf);
+		let all = Count { at: v, end: v + 3 }.to_slice();
+		m.walked = all[0] + all[1] + all[2] + all.len * 100;
+		free(all.ptr);
+	} else {
+		m.nothing = -1;
+	}
+}
+
+fn in_defer(k: int, m: *Marks)
+{
+	m.nothing = -1;
+	defer {
+		let x = k;
+		let px = &x;
+		*px += 1;
+		m.address = x;
+		m.read = *px * 2;
+		let node = Node { n: k, leaf: alloc Leaf { n: k + 1 } };
+		let copy = dup(&node);
+		m.copied = copy.n + leaf_n(copy.leaf);
+		if copy.leaf != node.leaf {
+			m.copied += 1000;
+		}
+		delete(copy);
+		let empty: ?*Node = none;
+		m.nothing = (empty == none) as int + (maybe(&node, true) == none) as int * 10;
+		m.other = (maybe(&node, false) ?? &node).n + 1;
+		m.chained = leaf_n(maybe(&node, true)?.leaf) + leaf_n(maybe(&node, false)?.leaf);
+		let all = Count { at: k, end: k + 3 }.to_slice();
+		m.walked = all[0] + all[1] + all[2] + all.len * 100;
+		free(all.ptr);
+	}
+	m.address = -1;
+}
+
+fn in_undo(k: int, m: *Marks) may fail
+{
+	m.nothing = -1;
+	undo {
+		let x = k;
+		let px = &x;
+		*px += 1;
+		m.address = x;
+		m.read = *px * 2;
+		let node = Node { n: k, leaf: alloc Leaf { n: k + 1 } };
+		let copy = dup(&node);
+		m.copied = copy.n + leaf_n(copy.leaf);
+		if copy.leaf != node.leaf {
+			m.copied += 1000;
+		}
+		delete(copy);
+		let empty: ?*Node = none;
+		m.nothing = (empty == none) as int + (maybe(&node, true) == none) as int * 10;
+		m.other = (maybe(&node, false) ?? &node).n + 1;
+		m.chained = leaf_n(maybe(&node, true)?.leaf) + leaf_n(maybe(&node, false)?.leaf);
+		let all = Count { at: k, end: k + 3 }.to_slice();
+		m.walked = all[0] + all[1] + all[2] + all.len * 100;
+		free(all.ptr);
+	}
+	fail "undone";
+}
+
+fn in_catch(k: int, m: *Marks)
+{
+	let got = failing(k) catch e {
+		let d = e.message.len;
+		let x = k + d;
+		let px = &x;
+		*px += 1;
+		m.address = x;
+		m.read = *px * 2;
+		let node = Node { n: k + d, leaf: alloc Leaf { n: k + d + 1 } };
+		let copy = dup(&node);
+		m.copied = copy.n + leaf_n(copy.leaf);
+		if copy.leaf != node.leaf {
+			m.copied += 1000;
+		}
+		delete(copy);
+		let empty: ?*Node = none;
+		m.nothing = (empty == none) as int + (maybe(&node, true) == none) as int * 10;
+		m.other = (maybe(&node, false) ?? &node).n + 1;
+		m.chained = leaf_n(maybe(&node, true)?.leaf) + leaf_n(maybe(&node, false)?.leaf);
+		let all = Count { at: k + d, end: k + d + 3 }.to_slice();
+		m.walked = all[0] + all[1] + all[2] + all.len * 100;
+		free(all.ptr);
+		yield 0;
+	};
+}
+
+fn call(f: fn(int), k: int)
+{
+	f(k);
+}
+
+fn in_closure(k: int, m: *Marks)
+{
+	call(fn(v) {
+		let x = v;
+		let px = &x;
+		*px += 1;
+		m.address = x;
+		m.read = *px * 2;
+		let node = Node { n: v, leaf: alloc Leaf { n: v + 1 } };
+		let copy = dup(&node);
+		m.copied = copy.n + leaf_n(copy.leaf);
+		if copy.leaf != node.leaf {
+			m.copied += 1000;
+		}
+		delete(copy);
+		let empty: ?*Node = none;
+		m.nothing = (empty == none) as int + (maybe(&node, true) == none) as int * 10;
+		m.other = (maybe(&node, false) ?? &node).n + 1;
+		m.chained = leaf_n(maybe(&node, true)?.leaf) + leaf_n(maybe(&node, false)?.leaf);
+		let all = Count { at: v, end: v + 3 }.to_slice();
+		m.walked = all[0] + all[1] + all[2] + all.len * 100;
+		free(all.ptr);
+	}, k);
+}
+
+/// A worker deletes no object, so the copy is torn down in place and freed.
+worker fn tally(part: []int) -> int
+{
+	let total = 0;
+	for v in part {
+		let local = clear();
+		let m = &local;
+		let x = v;
+		let px = &x;
+		*px += 1;
+		m.address = x;
+		m.read = *px * 2;
+		let node = Node { n: v, leaf: alloc Leaf { n: v + 1 } };
+		let copy = dup(&node);
+		m.copied = copy.n + leaf_n(copy.leaf);
+		if copy.leaf != node.leaf {
+			m.copied += 1000;
+		}
+		destroy(copy);
+		free(copy);
+		let empty: ?*Node = none;
+		m.nothing = (empty == none) as int + (maybe(&node, true) == none) as int * 10;
+		m.other = (maybe(&node, false) ?? &node).n + 1;
+		m.chained = leaf_n(maybe(&node, true)?.leaf) + leaf_n(maybe(&node, false)?.leaf);
+		let all = Count { at: v, end: v + 3 }.to_slice();
+		m.walked = all[0] + all[1] + all[2] + all.len * 100;
+		free(all.ptr);
+		total += sum(m);
+	}
+	return total;
+}
+
+fn in_worker(k: int) -> int
+{
+	let room = alloc([4]int, 1) else {
+		return -1;
+	};
+	(*room)[0] = k;
+	(*room)[1] = k + 1;
+	(*room)[2] = k + 2;
+	(*room)[3] = k + 3;
+	let sums = parallel (*room)[0..4] by 2 -> tally;
+	let n = sums[0] * 100000 + sums[1];
+	free(sums.ptr);
+	free(room);
+	return n;
+}
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch(k: int) -> int
+{
+	let t = alloc Task { n: k };
+	let job = dispatch t -> work(fn(v) {
+		let local = clear();
+		let m = &local;
+		let x = v;
+		let px = &x;
+		*px += 1;
+		m.address = x;
+		m.read = *px * 2;
+		let node = Node { n: v, leaf: alloc Leaf { n: v + 1 } };
+		let copy = dup(&node);
+		m.copied = copy.n + leaf_n(copy.leaf);
+		if copy.leaf != node.leaf {
+			m.copied += 1000;
+		}
+		destroy(copy);
+		free(copy);
+		let empty: ?*Node = none;
+		m.nothing = (empty == none) as int + (maybe(&node, true) == none) as int * 10;
+		m.other = (maybe(&node, false) ?? &node).n + 1;
+		m.chained = leaf_n(maybe(&node, true)?.leaf) + leaf_n(maybe(&node, false)?.leaf);
+		let all = Count { at: v, end: v + 3 }.to_slice();
+		m.walked = all[0] + all[1] + all[2] + all.len * 100;
+		free(all.ptr);
+		return sum(m);
+	});
+	let n = join(job);
+	delete(t);
+	return n;
+}
+
+struct Guard
+{
+	lock: Mutex,
+}
+
+fn in_sync(g: *Guard, k: int, m: *Marks)
+{
+	sync g.lock {
+		let x = k;
+		let px = &x;
+		*px += 1;
+		m.address = x;
+		m.read = *px * 2;
+		let node = Node { n: k, leaf: alloc Leaf { n: k + 1 } };
+		let copy = dup(&node);
+		m.copied = copy.n + leaf_n(copy.leaf);
+		if copy.leaf != node.leaf {
+			m.copied += 1000;
+		}
+		delete(copy);
+		let empty: ?*Node = none;
+		m.nothing = (empty == none) as int + (maybe(&node, true) == none) as int * 10;
+		m.other = (maybe(&node, false) ?? &node).n + 1;
+		m.chained = leaf_n(maybe(&node, true)?.leaf) + leaf_n(maybe(&node, false)?.leaf);
+		let all = Count { at: k, end: k + 3 }.to_slice();
+		m.walked = all[0] + all[1] + all[2] + all.len * 100;
+		free(all.ptr);
+	}
+}
+
+fn in_select(c: chan int, k: int, m: *Marks)
+{
+	send(c, k);
+	select {
+		c got => {
+			let v = got else {
+				return;
+			};
+			let x = *v;
+			let px = &x;
+			*px += 1;
+			m.address = x;
+			m.read = *px * 2;
+			let node = Node { n: *v, leaf: alloc Leaf { n: *v + 1 } };
+			let copy = dup(&node);
+			m.copied = copy.n + leaf_n(copy.leaf);
+			if copy.leaf != node.leaf {
+				m.copied += 1000;
+			}
+			delete(copy);
+			let empty: ?*Node = none;
+			m.nothing = (empty == none) as int + (maybe(&node, true) == none) as int * 10;
+			m.other = (maybe(&node, false) ?? &node).n + 1;
+			m.chained = leaf_n(maybe(&node, true)?.leaf) + leaf_n(maybe(&node, false)?.leaf);
+			let all = Count { at: *v, end: *v + 3 }.to_slice();
+			m.walked = all[0] + all[1] + all[2] + all.len * 100;
+			free(all.ptr);
+		},
+	}
+}
+
+/// The generic body holds the seven and the same of a `T`: the address of its
+/// parameter, a copy of what the address points at and `??` on `?*T`.
+fn in_generic<T>(own t: T, k: int, m: *Marks) -> T
+{
+	let x = k;
+	let px = &x;
+	*px += 1;
+	m.address = x;
+	m.read = *px * 2;
+	let node = Node { n: k, leaf: alloc Leaf { n: k + 1 } };
+	let copy = dup(&node);
+	m.copied = copy.n + leaf_n(copy.leaf);
+	if copy.leaf != node.leaf {
+		m.copied += 1000;
+	}
+	delete(copy);
+	let empty: ?*Node = none;
+	m.nothing = (empty == none) as int + (maybe(&node, true) == none) as int * 10;
+	m.other = (maybe(&node, false) ?? &node).n + 1;
+	m.chained = leaf_n(maybe(&node, true)?.leaf) + leaf_n(maybe(&node, false)?.leaf);
+	let all = Count { at: k, end: k + 3 }.to_slice();
+	m.walked = all[0] + all[1] + all[2] + all.len * 100;
+	free(all.ptr);
+	let pt = &t;
+	let twin = dup(*pt);
+	let no_t: ?*T = none;
+	if (no_t ?? pt) == pt && pt != &twin {
+		m.nothing += 100;
+	}
+	return t;
+}
+
+fn show(place: str, m: *Marks)
+{
+	printf("&x in %.*s: %d\n".ptr, place.len as c_int, place.ptr, m.address as c_int);
+	printf("*p in %.*s: %d\n".ptr, place.len as c_int, place.ptr, m.read as c_int);
+	printf("dup in %.*s: %d\n".ptr, place.len as c_int, place.ptr, m.copied as c_int);
+	printf("none in %.*s: %d\n".ptr, place.len as c_int, place.ptr, m.nothing as c_int);
+	printf("?? in %.*s: %d\n".ptr, place.len as c_int, place.ptr, m.other as c_int);
+	printf("p?.x in %.*s: %d\n".ptr, place.len as c_int, place.ptr, m.chained as c_int);
+	printf("to_slice in %.*s: %d\n".ptr, place.len as c_int, place.ptr, m.walked as c_int);
+	*m = clear();
+}
+
+fn main() -> int
+{
+	let m = clear();
+	let places = Places { base: 100 };
+	places.in_method(1, &m);
+	show("method", &m);
+	in_loop(2, &m);
+	show("loop body", &m);
+	in_switch(3, &m);
+	show("switch arm", &m);
+	in_if_let(4, &m);
+	show("if let", &m);
+	in_defer(5, &m);
+	show("defer", &m);
+	in_undo(6, &m) catch {
+		yield;
+	};
+	show("undo", &m);
+	in_catch(7, &m);
+	show("catch handler", &m);
+	in_closure(8, &m);
+	show("closure", &m);
+	printf("the seven in a worker: %d\n".ptr, in_worker(9) as c_int);
+	printf("the seven in a dispatch: %d\n".ptr, in_dispatch(10) as c_int);
+	let g = Guard { lock: Mutex.new() };
+	in_sync(&g, 11, &m);
+	show("sync block", &m);
+	let c = chan int(1);
+	in_select(c, 12, &m);
+	show("select arm", &m);
+	delete(c);
+	let back = in_generic<Node>(Node { n: 50, leaf: alloc Leaf { n: 51 } }, 13, &m);
+	show("generic body", &m);
+	printf("the value of the generic body: %d %d\n".ptr, back.n as c_int, leaf_n(back.leaf) as c_int);
+	places.in_nested(15, &m);
+	show("nested type", &m);
+	return 0;
+}

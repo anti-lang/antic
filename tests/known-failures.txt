@@ -93,3 +93,12 @@ matrix_types_if_let_on_a_pointer_to_a_variant_refused T024 An if let on a pointe
 fmt_alias_of_function T025 anti fmt moves the functions after a type alias of a function type.
 matrix_types_is_case_on_a_number_refused T026 is with a case on a value that is no variant names a module that is not there.
 matrix_types_enum_unknown_value_refused T027 An unknown value of an enum is refused as a function.
+matrix_ownership_none_or_of_none_at_module_level_refused T028 `??` whose left side is `none` compiles as the value of a constant.
+matrix_ownership_none_or_of_a_call_as_a_field_default_refused T028 antic crashes on `??` with a call on its left as the default of a field.
+matrix_ownership_none_as_the_default_of_an_optional_parameter_dev T012 antic crashes on `none` as the default of a parameter of type `?int`.
+matrix_ownership_none_as_the_default_of_an_optional_parameter_release T012 antic crashes on `none` as the default of a parameter of type `?int`.
+matrix_ownership_none_as_the_default_of_an_optional_parameter_memory_checks T012 antic crashes on `none` as the default of a parameter of type `?int`.
+generic_atomic_modules_release T029 antic cannot read back a library file whose generic changes a `static atomic` field.
+generic_atomic_modules_dev T029 antic cannot read back a library file whose generic changes a `static atomic` field.
+qualified_arguments_modules_release T030 A class built with arguments under the name of its module is refused as a type.
+qualified_arguments_modules_dev T030 A class built with arguments under the name of its module is refused as a type.

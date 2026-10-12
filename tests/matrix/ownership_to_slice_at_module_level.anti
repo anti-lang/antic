@@ -1,0 +1,25 @@
+//! `to_slice` at module level, as the value of a constant: the walk runs at run
+//! time, so it is no constant expression.
+
+class Count
+{
+	pub at: int = 0,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at <= 3;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.at;
+	}
+}
+
+const ALL: []int = Count { }.to_slice();
+
+fn main() -> int
+{
+	return 0;
+}

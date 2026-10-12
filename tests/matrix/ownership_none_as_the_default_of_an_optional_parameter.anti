@@ -1,0 +1,23 @@
+//! `none` at module level, as the default of a parameter of type `?int` beside
+//! one of type `?*Node`. A call that leaves both out passes `none` twice.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn take(p: ?*Node = none, v: ?int = none) -> int
+{
+	return (p == none) as int + (v == none) as int * 10;
+}
+
+fn main() -> int
+{
+	let node = Node { n: 1 };
+	printf("neither: %d\n".ptr, take() as c_int);
+	printf("the pointer: %d\n".ptr, take(&node) as c_int);
+	printf("both: %d\n".ptr, take(&node, 4) as c_int);
+	return 0;
+}

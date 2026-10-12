@@ -1,0 +1,1 @@
+ownership_to_slice_at_module_level.anti:20:20: error: `to_slice` is not a constant expression

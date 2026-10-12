@@ -1,0 +1,1 @@
+ownership_dup_at_module_level.anti:11:21: error: a call is not a constant expression

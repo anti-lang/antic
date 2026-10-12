@@ -1,0 +1,30 @@
+alloc of a literal 1 2
+alloc(T, n) 9
+alloc with arguments 6
+free 1
+dup 1 2 1
+none 11
+?? 101
+p?.x 199
+destroy 1
+delete 0
+&x and *p 505
+to_slice 3 21
+alive 0
+generic alloc of a literal 11 1
+generic alloc(T, n) 12 2
+generic alloc with arguments 26
+generic dup 12 3
+generic none 1
+generic ?? 12 12
+generic p?.x 1 1
+generic destroy 2
+generic free 1
+generic delete 1
+generic &x and *p 1
+generic to_slice 215
+alive 0
+here dup 21 22 1
+here destroy 1
+here delete 0
+here to_slice 4

@@ -1,0 +1,21 @@
+ok com.example.ownership.alloc_of_a_literal_in_fixtures
+ok com.example.ownership.alloc_of_many_in_fixtures
+ok com.example.ownership.alloc_of_many_in_tests
+ok com.example.ownership.alloc_with_arguments_in_fixtures
+ok com.example.ownership.alloc_with_arguments_in_tests
+ok com.example.ownership.free_and_delete_in_fixtures
+ok com.example.ownership.destroy_in_fixtures
+ok com.example.ownership.destroy_in_tests
+ok com.example.ownership.dup_in_fixtures
+ok com.example.ownership.dup_in_tests
+ok com.example.ownership.address_and_read_in_fixtures
+ok com.example.ownership.address_and_read_in_tests
+ok com.example.ownership.none_in_fixtures
+ok com.example.ownership.none_in_tests
+ok com.example.ownership.none_or_in_fixtures
+ok com.example.ownership.none_or_in_tests
+ok com.example.ownership.chain_in_fixtures
+ok com.example.ownership.chain_in_tests
+ok com.example.ownership.to_slice_in_fixtures
+ok com.example.ownership.to_slice_in_tests
+anti test: 20 tests in 1 modules, 0 modules failed

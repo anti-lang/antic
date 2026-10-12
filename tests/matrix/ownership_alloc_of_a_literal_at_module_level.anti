@@ -1,0 +1,14 @@
+//! `alloc` of a literal at module level, as the value of a constant: the memory
+//! is taken at run time, so it is no constant expression.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+const FIRST: ?*Node = alloc Node { n: 1 };
+
+fn main() -> int
+{
+	return 0;
+}

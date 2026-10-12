@@ -1,0 +1,11 @@
+//! `??` at module level, as the value of a constant whose left side is `none`.
+//! It is no constant expression, whatever its left side holds.
+
+const EMPTY: ?*int = none;
+
+const CHOSEN: ?*int = EMPTY ?? none;
+
+fn main() -> int
+{
+	return (CHOSEN == none) as int;
+}

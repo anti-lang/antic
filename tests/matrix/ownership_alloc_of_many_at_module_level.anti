@@ -1,0 +1,12 @@
+//! `alloc(T, n)` at module level, as the default of a field: the memory is
+//! taken at run time, so it is no constant expression.
+
+class Holder
+{
+	pub own room: ?*int = alloc(int, 3),
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,19 @@
+//! The client of the tally library: a copy of a generic function and of a
+//! generic class of the library, each of which changes a `static atomic` field
+//! of a class of the library.
+
+import com.example.tally;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let a = tally.note<int>(4);
+	let b = tally.note<int>(5);
+	printf("note %d %d\n".ptr, (a + b) as c_int, tally.Tally.count() as c_int);
+	printf("read %d\n".ptr, tally.read<int>(&a) as c_int);
+	let s = tally.Slot<int> { held: 0 };
+	s.put(6);
+	printf("put %d %d\n".ptr, s.held as c_int, tally.Tally.count() as c_int);
+	return 0;
+}

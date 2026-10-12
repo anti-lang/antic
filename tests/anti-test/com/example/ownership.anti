@@ -1,0 +1,341 @@
+//! Every construct of the ownership area in a function of a `tests` block and
+//! in a function of a `fixtures` block. `anti test` compiles both, and each
+//! test asserts what its construct computes. A `Node` owns a `Leaf` and counts
+//! itself alive, so a teardown that is missed or runs twice fails a test.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Node
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Node.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Node.live.sub(1);
+	}
+}
+
+class Built
+{
+	pub n: int = 0,
+
+	fn construct(self, n: int)
+	{
+		self.n = n * 2;
+	}
+}
+
+/// Counts from `at + 1` to `end`.
+class Count
+{
+	pub at: int = 0,
+	pub end: int = 0,
+
+	operator fn next(self) -> bool
+	{
+		self.at = self.at + 1;
+		return self.at <= self.end;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.at;
+	}
+}
+
+fn maybe(p: *Node, yes: bool) -> ?*Node
+{
+	if yes {
+		return p;
+	}
+	return none;
+}
+
+/// The number of a leaf, or -1 without one.
+fn leaf_n(l: ?*Leaf) -> int
+{
+	let leaf = l else {
+		return -1;
+	};
+	return leaf.n;
+}
+
+fixtures
+{
+	fn fix_alloc_of_a_literal(k: int) -> int
+	{
+		let p = alloc Node { n: k, leaf: alloc Leaf { n: k + 1 } };
+		let n = p.n + leaf_n(p.leaf);
+		delete(p);
+		return n;
+	}
+
+	fn fix_alloc_of_many(k: int) -> int
+	{
+		let q = alloc(int, 3) else {
+			return -1;
+		};
+		q[0] = k;
+		q[1] = k + 1;
+		q[2] = k + 2;
+		let n = q[0] + q[1] + q[2];
+		free(q);
+		return n;
+	}
+
+	fn fix_alloc_with_arguments(k: int) -> int
+	{
+		let b = alloc Built(k);
+		let n = b.n;
+		delete(b);
+		return n;
+	}
+
+	/// The count of the nodes alive after `delete`, which is 0.
+	fn fix_delete(k: int) -> int
+	{
+		let p = alloc Node { n: k };
+		let before = Node.live.load();
+		delete(p);
+		return before * 10 + Node.live.load();
+	}
+
+	/// The count of the nodes alive after `destroy`, which is 0, and the memory
+	/// goes back with `free`.
+	fn fix_destroy(k: int) -> int
+	{
+		let p = alloc Node { n: k, leaf: alloc Leaf { n: k } };
+		let before = Node.live.load();
+		destroy(p);
+		let after = Node.live.load();
+		free(p);
+		return before * 10 + after;
+	}
+
+	fn fix_dup(k: int) -> int
+	{
+		let node = Node { n: k, leaf: alloc Leaf { n: k + 1 } };
+		let copy = dup(&node);
+		let n = copy.n + leaf_n(copy.leaf);
+		if copy.leaf != node.leaf {
+			n += 1000;
+		}
+		Node.live.add(1);
+		delete(copy);
+		return n;
+	}
+
+	fn fix_address_and_read(k: int) -> int
+	{
+		let x = k;
+		let px = &x;
+		*px += 1;
+		return x * 100 + *px;
+	}
+
+	fn fix_none(k: int) -> int
+	{
+		let node = Node { n: k };
+		let empty: ?*Node = none;
+		let found = maybe(&node, false);
+		return (empty == none) as int + (found == none) as int * 10;
+	}
+
+	fn fix_none_or(k: int) -> int
+	{
+		let node = Node { n: k };
+		let other = Node { n: k + 1 };
+		return (maybe(&node, false) ?? &other).n * 100
+			+(maybe(&node, true) ?? &other).n;
+	}
+
+	fn fix_chain(k: int) -> int
+	{
+		let node = Node { n: k, leaf: alloc Leaf { n: k + 1 } };
+		return leaf_n(maybe(&node, true)?.leaf) * 100
+			+leaf_n(maybe(&node, false)?.leaf);
+	}
+
+	fn fix_to_slice(k: int) -> int
+	{
+		let all = Count { at: k, end: k + 3 }.to_slice();
+		let n = all[0] + all[1] + all[2] + all.len * 100;
+		free(all.ptr);
+		return n;
+	}
+}
+
+tests
+{
+	fn alloc_of_a_literal_in_fixtures()
+	{
+		let got1 = fix_alloc_of_a_literal(3);
+		assert(got1 == 7);
+		let got2 = Node.live.load();
+		assert(got2 == 0);
+	}
+
+	fn alloc_of_many_in_fixtures()
+	{
+		let got3 = fix_alloc_of_many(3);
+		assert(got3 == 12);
+	}
+
+	fn alloc_of_many_in_tests()
+	{
+		let q = alloc(int, 2) else {
+			assert(false);
+			return;
+		};
+		q[0] = 4;
+		q[1] = 5;
+		assert(q[0] + q[1] == 9);
+		free(q);
+	}
+
+	fn alloc_with_arguments_in_fixtures()
+	{
+		let got4 = fix_alloc_with_arguments(4);
+		assert(got4 == 8);
+	}
+
+	fn alloc_with_arguments_in_tests()
+	{
+		let b = alloc Built(5);
+		assert(b.n == 10);
+		delete(b);
+	}
+
+	fn free_and_delete_in_fixtures()
+	{
+		let got5 = fix_delete(1);
+		assert(got5 == 10);
+	}
+
+	fn destroy_in_fixtures()
+	{
+		let got6 = fix_destroy(2);
+		assert(got6 == 10);
+	}
+
+	fn destroy_in_tests()
+	{
+		let p = alloc Node { n: 6, leaf: alloc Leaf { n: 7 } };
+		let got7 = Node.live.load();
+		assert(got7 == 1);
+		destroy(p);
+		let got8 = Node.live.load();
+		assert(got8 == 0);
+		free(p);
+	}
+
+	fn dup_in_fixtures()
+	{
+		let got9 = fix_dup(5);
+		assert(got9 == 1011);
+		let got10 = Node.live.load();
+		assert(got10 == 0);
+	}
+
+	fn dup_in_tests()
+	{
+		let node = Node { n: 8, leaf: alloc Leaf { n: 9 } };
+		let copy = dup(&node);
+		assert(copy.n == 8);
+		let got11 = leaf_n(copy.leaf);
+		assert(got11 == 9);
+		assert(copy.leaf != node.leaf);
+		Node.live.add(1);
+		delete(copy);
+		let got12 = Node.live.load();
+		assert(got12 == 1);
+	}
+
+	fn address_and_read_in_fixtures()
+	{
+		let got13 = fix_address_and_read(6);
+		assert(got13 == 707);
+	}
+
+	fn address_and_read_in_tests()
+	{
+		let x = 20;
+		let px = &x;
+		*px += 2;
+		assert(x == 22);
+		assert(*px * 2 == 44);
+	}
+
+	fn none_in_fixtures()
+	{
+		let got14 = fix_none(1);
+		assert(got14 == 11);
+	}
+
+	fn none_in_tests()
+	{
+		let node = Node { n: 1 };
+		let empty: ?*Node = none;
+		assert(empty == none);
+		let got15 = maybe(&node, false);
+		assert(got15 == none);
+		let got16 = maybe(&node, true);
+		assert(got16 != none);
+	}
+
+	fn none_or_in_fixtures()
+	{
+		let got17 = fix_none_or(7);
+		assert(got17 == 807);
+	}
+
+	fn none_or_in_tests()
+	{
+		let node = Node { n: 30 };
+		let other = Node { n: 31 };
+		let got18 = (maybe(&node, false) ?? &other).n;
+		assert(got18 == 31);
+		let got19 = (maybe(&node, true) ?? &other).n;
+		assert(got19 == 30);
+	}
+
+	fn chain_in_fixtures()
+	{
+		let got20 = fix_chain(8);
+		assert(got20 == 899);
+	}
+
+	fn chain_in_tests()
+	{
+		let node = Node { n: 40, leaf: alloc Leaf { n: 41 } };
+		let got21 = leaf_n(maybe(&node, true)?.leaf);
+		assert(got21 == 41);
+		let got22 = leaf_n(maybe(&node, false)?.leaf);
+		assert(got22 == -1);
+	}
+
+	fn to_slice_in_fixtures()
+	{
+		let got23 = fix_to_slice(1);
+		assert(got23 == 309);
+	}
+
+	fn to_slice_in_tests()
+	{
+		let all = Count { at: 10, end: 12 }.to_slice();
+		assert(all.len == 2);
+		assert(all[0] + all[1] == 23);
+		free(all.ptr);
+	}
+}

@@ -1,0 +1,1 @@
+ownership_alloc_with_arguments_at_module_level.anti:14:25: error: `alloc` is not a constant expression

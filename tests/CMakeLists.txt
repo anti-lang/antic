@@ -1924,6 +1924,18 @@ add_test(NAME anti_test_values
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-values"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test_module.cmake")
 
+# The constructs of the ownership area in a `tests` block and in a
+# `fixtures` block, as anti_test_flow holds those of the flow area.
+add_test(NAME anti_test_ownership
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DMODULE=com/example/ownership"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-ownership"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test_module.cmake")
+
 # `anti run --memory-checks` and `anti test --memory-checks` put the report
 # of each memory error through Anti's symbolizer, and the dev cache keeps
 # the objects with and without the checks apart.
@@ -3445,6 +3457,35 @@ antic_modules_test(values_modules
     PROGRAM client
     STD lang mem text regex
     WORK "${CMAKE_CURRENT_BINARY_DIR}/values")
+
+# The constructs of the ownership area in the functions of a library
+# module, plain and generic, as flow_modules holds those of the flow area.
+# The client makes, copies and deletes an object of a class of the library
+# as well, so the teardown and the copy of that class run across the
+# module boundary.
+antic_modules_test(ownership_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/ownership"
+    LIBRARIES ownership
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/ownership")
+
+# A generic function and a generic class of a library module that change
+# a `static atomic` field. The client makes its copies from the library
+# file. T029 of docs/audit/tests-findings.md.
+antic_modules_test(generic_atomic_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_atomic"
+    LIBRARIES tally
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/generic_atomic")
+
+# A class of a library module built with arguments under the name of its
+# module, `built.Built(4)` and `alloc built.Built(5)`. T030 of
+# docs/audit/tests-findings.md.
+antic_modules_test(qualified_arguments_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/qualified_arguments"
+    LIBRARIES built
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/qualified_arguments")
 
 # A Mutex in a struct of a library and channels that pass between the
 # program and a library, which drains one and selects over two.
