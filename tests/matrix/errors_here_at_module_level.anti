@@ -1,0 +1,11 @@
+//! `here` is the position of a call or of a statement of a function, and a
+//! constant cannot hold it.
+
+import anti.lang;
+
+const AT: lang.SourceLocation = here;
+
+fn main() -> int
+{
+	return AT.line;
+}

@@ -1936,6 +1936,19 @@ add_test(NAME anti_test_ownership
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-ownership"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test_module.cmake")
 
+# The constructs of the errors area in a `tests` block and in a `fixtures`
+# block, as anti_test_flow holds those of the flow area. A test takes no
+# `may fail`, which error_tests_may_fail holds.
+add_test(NAME anti_test_errors
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DMODULE=com/example/errors"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-errors"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test_module.cmake")
+
 # `anti run --memory-checks` and `anti test --memory-checks` put the report
 # of each memory error through Anti's symbolizer, and the dev cache keeps
 # the objects with and without the checks apart.
@@ -3469,6 +3482,17 @@ antic_modules_test(ownership_modules
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/ownership")
 
+# The constructs of the errors area in the functions of a library module,
+# plain and generic, as flow_modules holds those of the flow area. The
+# client handles the errors of the library and tests the class of one that
+# the library declares.
+antic_modules_test(errors_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/errors"
+    LIBRARIES errors
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/errors-modules")
+
 # A generic function and a generic class of a library module that change
 # a `static atomic` field. The client makes its copies from the library
 # file. T029 of docs/audit/tests-findings.md.
@@ -4895,7 +4919,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "generic_copies|-S,-o,${LISTINGS}/generic_copies.s,generic_copies.anti"
         "copies_deep|-S,-o,${LISTINGS}/copies_deep.s,copies_deep.anti"
         "copies_many|-S,-o,${LISTINGS}/copies_many.s,copies_many.anti"
-        "never_result|--front-end,never_result.anti")
+        "never_result|--front-end,never_result.anti"
+        "tests_may_fail|--front-end,--tests,--runtime,${ANTIC_RUNTIME_DIR},tests_may_fail.anti")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 arguments)

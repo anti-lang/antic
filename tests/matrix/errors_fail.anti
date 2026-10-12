@@ -1,0 +1,170 @@
+//! `fail` in each of these places: switch arm, if let, worker, dispatch or
+//! parallel, select arm, nested type. Each place is a function of its own that
+//! fails for some inputs and returns for the others, with an error in hand and
+//! with a text. The program prints one line per place and input.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+fn failed(place: str, e: *lang.Error) -> int
+{
+	printf("%s failed: %d %s\n".ptr, place.ptr, e.code as c_int,
+		e.message.ptr);
+	return -1;
+}
+
+fn in_arm(n: int) -> int may fail
+{
+	switch n {
+		1 => {
+			fail "arm one";
+		},
+		2 => {
+			fail lang.Error.new(2, "arm two");
+		},
+		else => { },
+	}
+	return n * 10;
+}
+
+fn held(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let(n: int) -> int may fail
+{
+	let got = 0;
+	if let v = held(n) {
+		if v > 6 {
+			fail lang.Error.new(v, "held too much");
+		}
+		got = v;
+	} else {
+		fail "held nothing";
+	}
+	return got;
+}
+
+worker fn in_worker(t: *Task) -> int may fail
+{
+	if t.n > 2 {
+		fail lang.Error.new(t.n, "worker");
+	}
+	if t.n == 0 {
+		fail "worker without work";
+	}
+	return t.n * 10;
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int may fail) -> int
+{
+	let v = f(t.n) catch e {
+		yield failed("dispatch", e);
+	};
+	return v;
+}
+
+fn in_dispatch(t: *Task, n: int) -> int
+{
+	t.n = n;
+	let job = dispatch t -> work(fn(m) {
+		if m > 2 {
+			fail lang.Error.new(m, "dispatched");
+		}
+		if m == 0 {
+			fail "dispatched nothing";
+		}
+		return m * 10;
+	});
+	return join(job);
+}
+
+fn in_select(c: chan int, n: int) -> int may fail
+{
+	let got = 0;
+	send(c, n);
+	select {
+		c x => {
+			let v = x else {
+				fail "closed";
+			};
+			if *v > 2 {
+				fail lang.Error.new(*v, "selected");
+			}
+			if *v == 0 {
+				fail "selected nothing";
+			}
+			got = *v * 10;
+		},
+	}
+	return got;
+}
+
+class Outer
+{
+	class Inner
+	{
+		pub limit: int = 0,
+
+		pub fn check(self, n: int) -> int may fail
+		{
+			if n > self.limit {
+				fail lang.Error.new(n, "nested");
+			}
+			if n == 0 {
+				fail "nested nothing";
+			}
+			return n * 10;
+		}
+	}
+
+	pub fn go(self, n: int) -> int may fail
+	{
+		let inner = Inner { limit: 2 };
+		return try inner.check(n);
+	}
+}
+
+fn main() -> int
+{
+	let task = alloc Task { };
+	let c = chan int(1);
+	let outer = Outer { };
+	for n in 0..4 {
+		let a = in_arm(n) catch e {
+			yield failed("arm", e);
+		};
+		printf("arm %d\n".ptr, a as c_int);
+		let b = in_if_let(n) catch e {
+			yield failed("if_let", e);
+		};
+		printf("if_let %d\n".ptr, b as c_int);
+		task.n = n;
+		let w = in_worker(task) catch e {
+			yield failed("worker", e);
+		};
+		printf("worker %d\n".ptr, w as c_int);
+		printf("dispatch %d\n".ptr, in_dispatch(task, n) as c_int);
+		let s = in_select(c, n) catch e {
+			yield failed("select", e);
+		};
+		printf("select %d\n".ptr, s as c_int);
+		let o = outer.go(n) catch e {
+			yield failed("nested", e);
+		};
+		printf("nested %d\n".ptr, o as c_int);
+	}
+	delete(c);
+	delete(task);
+	return 0;
+}

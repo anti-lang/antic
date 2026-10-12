@@ -1,0 +1,47 @@
+exit 0
+function 0 7
+method 0 7
+loop 0 15
+arm 0 7
+if_let 0 7
+defer 0 8
+undo 0 9
+catch 0 7
+closure 0 7
+worker 0 7
+dispatch 0 7
+sync 0 7
+select 0 7
+generic 0 80007 10007
+nested 0 7
+function 1 17
+method 1 17
+loop 1 35
+arm 1 17
+if_let 1 17
+defer 1 18
+undo 1 19
+catch 1 17
+closure 1 17
+worker 1 17
+dispatch 1 17
+sync 1 17
+select 1 17
+generic 1 80017 10017
+nested 1 17
+function 2 27
+method 2 27
+loop 2 55
+arm 2 27
+if_let 2 27
+defer 2 28
+undo 2 29
+catch 2 27
+closure 2 27
+worker 2 27
+dispatch 2 27
+sync 2 27
+select 2 27
+generic 2 80027 10027
+nested 2 27
+sync entered 3

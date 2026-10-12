@@ -1,0 +1,1 @@
+errors_here_at_module_level.anti:6:33: error: `here` is not a constant expression

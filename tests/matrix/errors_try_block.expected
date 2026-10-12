@@ -1,0 +1,96 @@
+exit 0
+function failed: 0 no step
+function 0 -1
+method failed: 0 no step
+method 0 -1
+loop failed: 0 no step
+loop failed: 0 no step
+loop 0 -1
+arm failed: 0 no step
+arm 0 -1
+if_let failed: 0 no step
+if_let 0 -1
+defer failed: 0 no step
+defer 0 0
+undo failed: 0 no step
+undo 0 1
+catch failed: 0 no step
+catch 0 -1
+closure failed: 0 no step
+closure 0 -1
+worker failed: 0 no step
+worker 0 -1
+dispatch failed: 0 no step
+dispatch 0 -1
+sync failed: 0 no step
+sync 0 -1
+select failed: 0 no step
+select 0 -1
+generic failed: 0 no step
+generic failed: 0 no step
+generic 0 79999 9999
+nested failed: 0 no step
+nested 0 -1
+function 1 110
+method 1 110
+loop 1 221
+arm 1 110
+if_let 1 110
+defer 1 111
+undo 1 112
+catch 1 110
+closure 1 110
+worker 1 110
+dispatch 1 110
+sync 1 110
+select 1 110
+generic 1 80110 10110
+nested 1 110
+function 2 120
+method 2 120
+loop 2 241
+arm 2 120
+if_let 2 120
+defer 2 121
+undo 2 122
+catch 2 120
+closure 2 120
+worker 2 120
+dispatch 2 120
+sync 2 120
+select 2 120
+generic 2 80120 10120
+nested 2 120
+function failed: 3 refused
+function 3 -1
+method failed: 3 refused
+method 3 -1
+loop failed: 3 refused
+loop failed: 3 refused
+loop 3 -1
+arm failed: 3 refused
+arm 3 -1
+if_let failed: 3 refused
+if_let 3 -1
+defer failed: 3 refused
+defer 3 0
+undo failed: 3 refused
+undo 3 1
+catch failed: 3 refused
+catch 3 -1
+closure failed: 3 refused
+closure 3 -1
+worker failed: 3 refused
+worker 3 -1
+dispatch failed: 3 refused
+dispatch 3 -1
+sync failed: 3 refused
+sync 3 -1
+select failed: 3 refused
+select 3 -1
+generic failed: 3 refused
+generic failed: 3 refused
+generic 3 79999 9999
+nested failed: 3 refused
+nested 3 -1
+sync entered 4

@@ -1,0 +1,302 @@
+//! `undo` in each of these places: method, loop body, switch arm, if let,
+//! defer, undo, catch handler, closure, worker, dispatch or parallel, sync
+//! block, select arm, nested type. Each place is a function of its own that may
+//! fail. Its `undo` adds 100 where its block leaves through a `fail` or through
+//! a `try` that forwards, and the block adds 1 where it ends. An `undo` in the
+//! block of a `defer` or of another `undo` never runs, since neither block
+//! leaves through an error. The program prints one line per place and input.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+	pub out: int = 0,
+}
+
+fn risky(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n * 10;
+}
+
+class Host
+{
+	pub out: int = 0,
+
+	pub fn in_method(self, n: int) may fail
+	{
+		undo self.out += 100;
+		if n == 0 {
+			fail "method";
+		}
+		try risky(n);
+		self.out += 1;
+	}
+}
+
+fn in_loop(n: int, out: *int) may fail
+{
+	for turn in 0..3 {
+		undo *out += 100;
+		if n == turn {
+			fail "loop";
+		}
+		*out += 1;
+	}
+}
+
+fn in_arm(n: int, out: *int) may fail
+{
+	switch n {
+		1 => *out += 5,
+		else => {
+			undo *out += 100;
+			if n == 0 {
+				fail "arm";
+			}
+			try risky(n);
+			*out += 1;
+		},
+	}
+}
+
+fn hold(k: int) -> ?int
+{
+	if k < 0 {
+		return none;
+	}
+	return k;
+}
+
+fn in_if_let(k: int, out: *int) may fail
+{
+	if let n = hold(k) {
+		undo *out += 100;
+		if n == 0 {
+			fail "if let";
+		}
+		try risky(n);
+		*out += 1;
+	} else {
+		undo *out += 1000;
+		fail "nothing held";
+	}
+}
+
+fn in_defer(n: int, out: *int) may fail
+{
+	defer {
+		undo *out += 100;
+		*out += 1;
+	}
+	if n == 0 {
+		fail "defer";
+	}
+	try risky(n);
+}
+
+fn in_undo(n: int, out: *int) may fail
+{
+	undo {
+		undo *out += 100;
+		*out += 1;
+	}
+	if n == 0 {
+		fail "undo";
+	}
+	try risky(n);
+}
+
+fn always() may fail
+{
+	fail "always";
+}
+
+fn in_catch(n: int, out: *int) may fail
+{
+	always() catch e {
+		undo *out += 100;
+		if n == 0 {
+			fail e;
+		}
+		try risky(n);
+		*out += 1;
+	};
+}
+
+fn apply(n: int, f: fn(int) may fail) may fail
+{
+	try f(n);
+}
+
+fn in_closure(k: int, out: *int) may fail
+{
+	try apply(k, fn(n) {
+		undo *out += 100;
+		if n == 0 {
+			fail "closure";
+		}
+		try risky(n);
+		*out += 1;
+	});
+}
+
+worker fn in_worker(t: *Task) may fail
+{
+	undo t.out += 100;
+	if t.n == 0 {
+		fail "worker";
+	}
+	try risky(t.n);
+	t.out += 1;
+}
+
+worker fn work(t: *Task, concurrent f: fn(*Task) may fail) -> int
+{
+	f(t) catch e {
+		return -1 - e.code;
+	};
+	return 0;
+}
+
+fn in_dispatch(t: *Task) -> int
+{
+	let job = dispatch t -> work(fn(u) {
+		undo u.out += 100;
+		if u.n == 0 {
+			fail "dispatch";
+		}
+		try risky(u.n);
+		u.out += 1;
+	});
+	return join(job);
+}
+
+struct Guarded
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync(g: *Guarded, n: int, out: *int) may fail
+{
+	sync g.lock {
+		g.entered += 1;
+		undo *out += 100;
+		if n == 0 {
+			fail "sync";
+		}
+		try risky(n);
+		*out += 1;
+	}
+}
+
+fn in_select(c: chan int, k: int, out: *int) may fail
+{
+	send(c, k);
+	select {
+		c x => {
+			let v = x else {
+				return;
+			};
+			undo *out += 100;
+			if *v == 0 {
+				fail "select";
+			}
+			try risky(*v);
+			*out += 1;
+		},
+	}
+}
+
+class Outer
+{
+	class Inner
+	{
+		pub out: int = 0,
+
+		pub fn run(self, n: int) may fail
+		{
+			undo self.out += 100;
+			if n == 0 {
+				fail "nested";
+			}
+			try risky(n);
+			self.out += 1;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner { out: 0 };
+		inner.run(n) catch { };
+		return inner.out;
+	}
+}
+
+fn show(place: str, n: int, out: int)
+{
+	printf("%s %d %d\n".ptr, place.ptr, n as c_int, out as c_int);
+}
+
+fn main() -> int
+{
+	let task = alloc Task { };
+	let g = Guarded { lock: Mutex.new(), entered: 0 };
+	let c = chan int(1);
+	let outer = Outer { };
+	for n in 0..4 {
+		let host = Host { out: 0 };
+		host.in_method(n) catch { };
+		show("method", n, host.out);
+		let out = 0;
+		in_loop(n, &out) catch { };
+		show("loop", n, out);
+		out = 0;
+		in_arm(n, &out) catch { };
+		show("arm", n, out);
+		out = 0;
+		in_if_let(n, &out) catch { };
+		show("if_let", n, out);
+		out = 0;
+		in_if_let(-1 - n, &out) catch { };
+		show("if_let else", n, out);
+		out = 0;
+		in_defer(n, &out) catch { };
+		show("defer", n, out);
+		out = 0;
+		in_undo(n, &out) catch { };
+		show("undo", n, out);
+		out = 0;
+		in_catch(n, &out) catch { };
+		show("catch", n, out);
+		out = 0;
+		in_closure(n, &out) catch { };
+		show("closure", n, out);
+		task.n = n;
+		task.out = 0;
+		in_worker(task) catch { };
+		show("worker", n, task.out);
+		task.out = 0;
+		let code = in_dispatch(task);
+		show("dispatch", n, task.out);
+		show("dispatch code", n, code);
+		out = 0;
+		in_sync(&g, n, &out) catch { };
+		show("sync", n, out);
+		out = 0;
+		in_select(c, n, &out) catch { };
+		show("select", n, out);
+		show("nested", n, outer.go(n));
+	}
+	printf("sync entered %d\n".ptr, g.entered as c_int);
+	g.lock.destroy();
+	delete(c);
+	delete(task);
+	return 0;
+}

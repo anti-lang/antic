@@ -1,0 +1,19 @@
+//! A function of a `tests` block that may fail is refused, as one with a
+//! parameter or a result is: the runner calls a test and reads no error.
+
+import anti.lang;
+
+fn step(n: int) may fail
+{
+	if n == 0 {
+		fail "no step";
+	}
+}
+
+tests
+{
+	fn forwards() may fail
+	{
+		try step(0);
+	}
+}

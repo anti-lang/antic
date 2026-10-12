@@ -118,7 +118,6 @@ a copy of `%s` nests deeper than %d levels
 a `switch` on a `str` compares with `anti.text.equal`, which this `anti.text` lacks
 the anonymous function returns `never` and can reach its end
 the anonymous function may fail and never does
-a `tests` function takes no parameters and returns nothing, because the runner calls it
 `setup` and `teardown` belong to `fixtures`, which runs them around every test
 
 # src/antic/sema_thread.c

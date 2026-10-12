@@ -1,0 +1,62 @@
+exit 0
+function 0 1005
+method 0 1005
+loop 0 2011
+arm 0 1005
+if_let 0 1005
+defer 0 1006
+undo 0 1007
+catch 0 1005
+closure 0 1005
+worker 0 1005
+dispatch 0 1005
+sync 0 1005
+select 0 1005
+generic 0 81005 11005
+nested 0 1005
+function 1 15
+method 1 15
+loop 1 31
+arm 1 15
+if_let 1 15
+defer 1 16
+undo 1 17
+catch 1 15
+closure 1 15
+worker 1 15
+dispatch 1 15
+sync 1 15
+select 1 15
+generic 1 80015 10015
+nested 1 15
+function 2 25
+method 2 25
+loop 2 51
+arm 2 25
+if_let 2 25
+defer 2 26
+undo 2 27
+catch 2 25
+closure 2 25
+worker 2 25
+dispatch 2 25
+sync 2 25
+select 2 25
+generic 2 80025 10025
+nested 2 25
+function 3 4
+method 3 4
+loop 3 9
+arm 3 4
+if_let 3 4
+defer 3 5
+undo 3 6
+catch 3 4
+closure 3 4
+worker 3 4
+dispatch 3 4
+sync 3 4
+select 3 4
+generic 3 80004 10004
+nested 3 4
+sync entered 4

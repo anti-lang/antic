@@ -1,0 +1,96 @@
+//! The client of the errors library: every construct of the errors area in a
+//! function of a library module, and in a generic one that this module compiles
+//! a copy of. The client handles the errors of the library, tests their class
+//! with `is` and reads the origin that the library's `fail` wrote.
+
+import anti.lang;
+import com.example.errors;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn failed(e: *lang.Error) -> int
+{
+	printf("  failed: %d %s, refused %d, origin %d\n".ptr, e.code as c_int,
+		e.message.ptr, (e is *errors.Refused) as c_int,
+		(e.at.line > 0) as c_int);
+	return -1;
+}
+
+fn plain(n: int)
+{
+	let a = errors.run_fail(n) catch e {
+		yield failed(e);
+	};
+	printf("fail %d %d\n".ptr, n as c_int, a as c_int);
+	let b = errors.run_try(n) catch e {
+		yield failed(e);
+	};
+	printf("try %d %d\n".ptr, n as c_int, b as c_int);
+	printf("try block %d %d\n".ptr, n as c_int,
+		errors.run_try_block(n) as c_int);
+	printf("catch e %d %d\n".ptr, n as c_int,
+		errors.run_catch_named(n) as c_int);
+	printf("catch %d %d\n".ptr, n as c_int,
+		errors.run_catch_unnamed(n) as c_int);
+	printf("yield %d %d\n".ptr, n as c_int, errors.run_yield(n) as c_int);
+	let out = 0;
+	errors.run_undo(n, &out) catch e {
+		failed(e);
+	};
+	printf("undo %d %d\n".ptr, n as c_int, out as c_int);
+}
+
+fn generic(n: int)
+{
+	let a = errors.gen_fail<str>(n, "given") catch e {
+		failed(e);
+		yield "failed";
+	};
+	printf("generic fail %d %s\n".ptr, n as c_int, a.ptr);
+	let b = errors.gen_try<(int, int)>(n, (n, n + 1)) catch e {
+		failed(e);
+		yield (-1, -1);
+	};
+	printf("generic try %d %d %d\n".ptr, n as c_int, b.0 as c_int,
+		b.1 as c_int);
+	let c = errors.gen_try_block<f64>(n, 1.5, -1.5);
+	printf("generic try block %d %d\n".ptr, n as c_int, (c * 2.0) as c_int);
+	let code = 0;
+	let d = errors.gen_catch_named<str>(n, "good", "bad", &code);
+	printf("generic catch e %d %s %d\n".ptr, n as c_int, d.ptr, code as c_int);
+	let e = errors.gen_catch_unnamed<int>(n, 7, -7);
+	printf("generic catch %d %d\n".ptr, n as c_int, e as c_int);
+	let f = errors.gen_yield<?int>(n > 1, n, none);
+	printf("generic yield %d %d\n".ptr, n as c_int, (f ?? -1) as c_int);
+	let slot = "empty";
+	errors.gen_undo<str>(n, &slot, "done", "undone") catch err {
+		failed(err);
+	};
+	printf("generic undo %d %s\n".ptr, n as c_int, slot.ptr);
+}
+
+fn main() -> int
+{
+	for n in 0..5 {
+		plain(n);
+		generic(n);
+	}
+	let seven = 7;
+	printf("catch fatal %d\n".ptr, errors.run_catch_fatal(2, &seven) as c_int);
+	let kept = errors.gen_catch_fatal<str>(1, "kept");
+	printf("generic catch fatal %s\n".ptr, kept.ptr);
+	printf("here %d %d %d\n".ptr, errors.run_here() as c_int,
+		errors.gen_here<int>() as c_int, errors.gen_here<bool>() as c_int);
+	let first = errors.line_of(here);
+	let second = errors.line_here();
+	printf("here in the client %d\n".ptr, (second - first) as c_int);
+	let got = errors.risky(9) catch e {
+		let refused = e as? *errors.Refused;
+		if refused == none {
+			yield -1;
+		}
+		yield refused.asked;
+	};
+	printf("asked %d\n".ptr, got as c_int);
+	return 0;
+}

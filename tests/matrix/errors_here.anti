@@ -1,0 +1,277 @@
+//! `here` as an argument in each of these places: function, method, loop body,
+//! switch arm, if let, defer, undo, catch handler, closure, worker, dispatch or
+//! parallel, sync block, select arm, generic body, nested type. Each place is a
+//! function of its own that passes `here` to `note` and leaves the last
+//! parameter of `mark` to its default, which is `here` as well. Each line names
+//! the place, the line, the column and the function of the position.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+fn note(place: str, at: lang.SourceLocation) -> int
+{
+	printf("%s %d:%d %s %s %s\n".ptr, place.ptr, at.line as c_int,
+		at.column as c_int, at.function.ptr, at.module.ptr, at.file.ptr);
+	return 1;
+}
+
+fn mark(place: str, at: lang.SourceLocation = here) -> int
+{
+	printf("%s default %d:%d %s\n".ptr, place.ptr, at.line as c_int,
+		at.column as c_int, at.function.ptr);
+	return 10;
+}
+
+fn in_function(n: int) -> int
+{
+	let acc = 0;
+	acc += note("function", here);
+	acc += mark("function");
+	return acc;
+}
+
+class Host
+{
+	pub base: int = 0,
+
+	pub fn in_method(self, n: int) -> int
+	{
+		let acc = self.base;
+		acc += note("method", here);
+		acc += mark("method");
+		return acc;
+	}
+}
+
+fn in_loop(n: int) -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		acc += turn;
+		acc += note("loop", here);
+		acc += mark("loop");
+	}
+	return acc;
+}
+
+fn in_arm(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		100 => acc = -5,
+		else => {
+			acc += note("arm", here);
+			acc += mark("arm");
+		},
+	}
+	return acc;
+}
+
+fn hold(k: int) -> ?int
+{
+	if k < 0 {
+		return none;
+	}
+	return k;
+}
+
+fn in_if_let(k: int) -> int
+{
+	let acc = 0;
+	if let n = hold(k) {
+		acc += note("if_let", here);
+		acc += mark("if_let");
+	} else {
+		acc = -9;
+	}
+	return acc;
+}
+
+fn in_defer(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		acc += note("defer", here);
+		acc += mark("defer");
+	}
+	acc = 1;
+}
+
+fn in_undo(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		acc += note("undo", here);
+		acc += mark("undo");
+	}
+	acc = 2;
+	fail "undone";
+}
+
+fn always() may fail
+{
+	fail "always";
+}
+
+fn in_catch(n: int) -> int
+{
+	let acc = 0;
+	always() catch {
+		acc += note("catch", here);
+		acc += mark("catch");
+	};
+	return acc;
+}
+
+fn apply(n: int, f: fn(int))
+{
+	f(n);
+}
+
+fn in_closure(k: int) -> int
+{
+	let acc = 0;
+	apply(k, fn(n) {
+		acc += note("closure", here);
+		acc += mark("closure");
+	});
+	return acc;
+}
+
+worker fn in_worker(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	acc += note("worker", here);
+	acc += mark("worker");
+	return acc;
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch(t: *Task, k: int) -> int
+{
+	t.n = k;
+	let job = dispatch t -> work(fn(n) {
+		let acc = 0;
+		acc += note("dispatch", here);
+		acc += mark("dispatch");
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync(g: *Guarded, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		acc += note("sync", here);
+		acc += mark("sync");
+	}
+	return acc;
+}
+
+fn in_select(c: chan int, k: int) -> int
+{
+	let acc = 0;
+	send(c, k);
+	select {
+		c x => {
+			let v = x else {
+				return -9;
+			};
+			let n = *v;
+			acc += note("select", here);
+			acc += mark("select");
+		},
+	}
+	return acc;
+}
+
+fn in_generic<T>(n: int) -> int
+{
+	let acc = size_of(T) as int * 10000;
+	acc += note("generic", here);
+	acc += mark("generic");
+	return acc;
+}
+
+class Outer
+{
+	class Inner
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			acc += note("nested", here);
+			acc += mark("nested");
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner { base: 0 };
+		return inner.run(n);
+	}
+}
+
+fn main() -> int
+{
+	let task = alloc Task { };
+	let host = Host { base: 0 };
+	let g = Guarded { lock: Mutex.new(), entered: 0 };
+	let c = chan int(1);
+	let outer = Outer { };
+	for n in 1..2 {
+		printf("function %d %d\n".ptr, n as c_int, in_function(n) as c_int);
+		printf("method %d %d\n".ptr, n as c_int, host.in_method(n) as c_int);
+		printf("loop %d %d\n".ptr, n as c_int, in_loop(n) as c_int);
+		printf("arm %d %d\n".ptr, n as c_int, in_arm(n) as c_int);
+		printf("if_let %d %d\n".ptr, n as c_int, in_if_let(n) as c_int);
+		let deferred = 0;
+		in_defer(n, &deferred);
+		printf("defer %d %d\n".ptr, n as c_int, deferred as c_int);
+		let undone = 0;
+		in_undo(n, &undone) catch {
+			yield;
+		};
+		printf("undo %d %d\n".ptr, n as c_int, undone as c_int);
+		printf("catch %d %d\n".ptr, n as c_int, in_catch(n) as c_int);
+		printf("closure %d %d\n".ptr, n as c_int, in_closure(n) as c_int);
+		task.n = n;
+		let job = dispatch task -> in_worker();
+		printf("worker %d %d\n".ptr, n as c_int, join(job) as c_int);
+		printf("dispatch %d %d\n".ptr, n as c_int, in_dispatch(task, n) as c_int);
+		printf("sync %d %d\n".ptr, n as c_int, in_sync(&g, n) as c_int);
+		printf("select %d %d\n".ptr, n as c_int, in_select(c, n) as c_int);
+		printf("generic %d %d %d\n".ptr, n as c_int, in_generic<int>(n) as c_int,
+			in_generic<bool>(n) as c_int);
+		printf("nested %d %d\n".ptr, n as c_int, outer.go(n) as c_int);
+	}
+	printf("sync entered %d\n".ptr, g.entered as c_int);
+	g.lock.destroy();
+	delete(c);
+	delete(task);
+	return 0;
+}

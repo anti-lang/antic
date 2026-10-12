@@ -1,0 +1,245 @@
+//! One function per construct of the errors area, plain and generic, in a
+//! library module. The client calls each across the module boundary, and the
+//! library file carries the checked tree of every generic one. `Refused` is an
+//! error class of the library, which the client catches and tests with `is`.
+
+import anti.lang;
+
+pub class Refused inherits lang.Error
+{
+	pub asked: int = 0,
+}
+
+/// Fails with a `Refused` above 2, and gives ten times `n` otherwise.
+pub fn risky(n: int) -> int may fail
+{
+	if n > 2 {
+		let e = alloc Refused { };
+		e.code = n;
+		e.message = "refused";
+		e.asked = n;
+		fail e;
+	}
+	return n * 10;
+}
+
+/// Fails with a text at 0.
+pub fn step(n: int) may fail
+{
+	if n == 0 {
+		fail "no step";
+	}
+}
+
+/// Gives `v`, or fails when `ok` is false.
+pub fn pick<T>(ok: bool, own v: T) -> T may fail
+{
+	if !ok {
+		fail "nothing picked";
+	}
+	return v;
+}
+
+/// `fail` with an error and with a text.
+pub fn run_fail(n: int) -> int may fail
+{
+	if n == 0 {
+		fail "nothing";
+	}
+	if n > 2 {
+		fail lang.Error.new(n, "too much");
+	}
+	return n;
+}
+
+/// `fail` in a generic function.
+pub fn gen_fail<T>(n: int, own v: T) -> T may fail
+{
+	if n == 0 {
+		fail "nothing";
+	}
+	if n > 2 {
+		fail lang.Error.new(n, "too much");
+	}
+	return v;
+}
+
+/// `try` on a call, as a statement and inside an expression.
+pub fn run_try(n: int) -> int may fail
+{
+	try step(n);
+	return 1 + try risky(n);
+}
+
+/// `try` on a call in a generic function.
+pub fn gen_try<T>(n: int, own v: T) -> T may fail
+{
+	try step(n);
+	let ten = try risky(n);
+	if ten < 0 {
+		fail "never";
+	}
+	return try pick<T>(true, v);
+}
+
+/// A `try` block.
+pub fn run_try_block(n: int) -> int
+{
+	let acc = 0;
+	try {
+		step(n);
+		acc += risky(n);
+		acc += 100;
+	} catch e {
+		acc = -1 - e.code;
+	}
+	return acc;
+}
+
+/// A `try` block in a generic function.
+pub fn gen_try_block<T>(n: int, own good: T, own bad: T) -> T
+{
+	try {
+		step(n);
+		risky(n);
+	} catch {
+		return bad;
+	}
+	return good;
+}
+
+/// `catch e { }` on a call.
+pub fn run_catch_named(n: int) -> int
+{
+	let got = risky(n) catch e {
+		yield -e.code;
+	};
+	step(n) catch e {
+		got += 1000 + e.code;
+	};
+	return got;
+}
+
+/// `catch e { }` in a generic function.
+pub fn gen_catch_named<T>(n: int, own good: T, own bad: T, code: *int) -> T
+{
+	let got = pick<T>(n > 0, good) catch e {
+		*code = 1 + e.code;
+		yield bad;
+	};
+	risky(n) catch e {
+		*code = e.code;
+	};
+	return got;
+}
+
+/// `catch { }` without a name.
+pub fn run_catch_unnamed(n: int) -> int
+{
+	let got = 0;
+	got = risky(n) catch {
+		yield -1;
+	};
+	step(n) catch {
+		got += 1000;
+	};
+	step(n) catch { };
+	return got;
+}
+
+/// `catch { }` without a name in a generic function.
+pub fn gen_catch_unnamed<T>(n: int, own good: T, own bad: T) -> T
+{
+	let got = pick<T>(n > 0, good) catch {
+		yield bad;
+	};
+	step(n) catch { };
+	return got;
+}
+
+/// `catch fatal` on calls and on a pointer that do not fail.
+pub fn run_catch_fatal(n: int, at: ?*int) -> int
+{
+	let got = risky(n) catch fatal;
+	step(n + 1) catch fatal;
+	let p = at catch fatal;
+	return got + *p;
+}
+
+/// `catch fatal` in a generic function.
+pub fn gen_catch_fatal<T>(n: int, own v: T) -> T
+{
+	step(n + 1) catch fatal;
+	let got = pick<T>(true, v) catch fatal;
+	return got;
+}
+
+/// `yield` from inside an `if`, at the end of a handler and without a value.
+pub fn run_yield(n: int) -> int
+{
+	let got = risky(n) catch e {
+		if e.code > 3 {
+			yield e.code * 100;
+		}
+		let twice = e.code * 2;
+		yield twice;
+	};
+	step(n) catch {
+		got += 1000;
+		yield;
+	};
+	return got;
+}
+
+/// `yield` of a value of a type parameter.
+pub fn gen_yield<T>(ok: bool, own v: T, own other: T) -> T
+{
+	let got = pick<T>(ok, v) catch {
+		yield other;
+	};
+	return got;
+}
+
+/// `undo`, which runs where the function fails.
+pub fn run_undo(n: int, out: *int) may fail
+{
+	undo *out += 100;
+	if n == 0 {
+		fail "undone";
+	}
+	try risky(n);
+	*out += 1;
+}
+
+/// `undo` in a generic function.
+pub fn gen_undo<T>(n: int, slot: *T, own done: T, own undone: T) may fail
+{
+	undo *slot = dup(undone);
+	*slot = done;
+	try step(n);
+	try risky(n);
+}
+
+/// The line of a position.
+pub fn line_of(at: lang.SourceLocation) -> int
+{
+	return at.line;
+}
+
+/// The line of its call, since the default is `here`.
+pub fn line_here(at: lang.SourceLocation = here) -> int
+{
+	return at.line;
+}
+
+/// `here` as an argument: the difference of two positions of one line.
+pub fn run_here() -> int
+{
+	return line_here() - line_of(here);
+}
+
+/// `here` in a generic function.
+pub fn gen_here<T>() -> int
+{
+	return line_here() - line_of(here) + size_of(T) as int;
+}

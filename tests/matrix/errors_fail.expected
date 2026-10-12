@@ -1,0 +1,37 @@
+exit 0
+arm 0
+if_let failed: 0 held nothing
+if_let -1
+worker failed: 0 worker without work
+worker -1
+dispatch failed: 0 dispatched nothing
+dispatch -1
+select failed: 0 selected nothing
+select -1
+nested failed: 0 nested nothing
+nested -1
+arm failed: 0 arm one
+arm -1
+if_let 3
+worker 10
+dispatch 10
+select 10
+nested 10
+arm failed: 2 arm two
+arm -1
+if_let 6
+worker 20
+dispatch 20
+select 20
+nested 20
+arm 30
+if_let failed: 9 held too much
+if_let -1
+worker failed: 3 worker
+worker -1
+dispatch failed: 3 dispatched
+dispatch -1
+select failed: 3 selected
+select -1
+nested failed: 3 nested
+nested -1

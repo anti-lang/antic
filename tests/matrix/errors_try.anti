@@ -1,0 +1,193 @@
+//! `try` on a call in each of these places: switch arm, if let, catch handler,
+//! closure, worker, dispatch or parallel, select arm, nested type. Each place
+//! is a function of its own that forwards the error of `risky`, and the program
+//! prints one line per place and input. `try` stands after a `let`, after
+//! `return`, as a statement and inside an expression.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+fn failed(place: str, e: *lang.Error) -> int
+{
+	printf("%s failed: %d %s\n".ptr, place.ptr, e.code as c_int,
+		e.message.ptr);
+	return -1;
+}
+
+fn risky(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n * 10;
+}
+
+fn step(n: int) may fail
+{
+	if n == 0 {
+		fail "no step";
+	}
+}
+
+fn in_arm(n: int) -> int may fail
+{
+	let got = 0;
+	switch n {
+		0 => try step(n),
+		1 => got = try risky(n),
+		else => {
+			got = 1 + try risky(n);
+		},
+	}
+	return got;
+}
+
+fn held(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n;
+}
+
+fn in_if_let(n: int) -> int may fail
+{
+	if let v = held(n) {
+		return try risky(v);
+	} else {
+		try step(n);
+	}
+	return -2;
+}
+
+fn in_catch(n: int) -> int may fail
+{
+	let got = risky(n + 2) catch {
+		try step(n);
+		yield try risky(n);
+	};
+	return got;
+}
+
+fn apply(n: int, f: fn(int) -> int may fail) -> int may fail
+{
+	return try f(n);
+}
+
+fn in_closure(n: int) -> int may fail
+{
+	let base = 100;
+	return try apply(n, fn(m) {
+		try step(m);
+		let v = try risky(m);
+		return base + v;
+	});
+}
+
+worker fn in_worker(t: *Task) -> int may fail
+{
+	try step(t.n);
+	return 1 + try risky(t.n);
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int may fail) -> int
+{
+	let v = f(t.n) catch e {
+		yield failed("dispatch", e);
+	};
+	return v;
+}
+
+fn in_dispatch(t: *Task, n: int) -> int
+{
+	t.n = n;
+	let job = dispatch t -> work(fn(m) {
+		try step(m);
+		return try risky(m);
+	});
+	return join(job);
+}
+
+fn in_select(c: chan int, n: int) -> int may fail
+{
+	let got = 0;
+	send(c, n);
+	select {
+		c x => {
+			let v = x else {
+				return -2;
+			};
+			try step(*v);
+			got = try risky(*v);
+		},
+	}
+	return got;
+}
+
+class Outer
+{
+	class Inner
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int may fail
+		{
+			try step(n);
+			return self.base + try risky(n);
+		}
+	}
+
+	pub fn go(self, n: int) -> int may fail
+	{
+		let inner = Inner { base: 1000 };
+		return try inner.run(n);
+	}
+}
+
+fn main() -> int
+{
+	let task = alloc Task { };
+	let c = chan int(1);
+	let outer = Outer { };
+	for n in 0..4 {
+		let a = in_arm(n) catch e {
+			yield failed("arm", e);
+		};
+		printf("arm %d\n".ptr, a as c_int);
+		let b = in_if_let(n) catch e {
+			yield failed("if_let", e);
+		};
+		printf("if_let %d\n".ptr, b as c_int);
+		let h = in_catch(n) catch e {
+			yield failed("catch", e);
+		};
+		printf("catch %d\n".ptr, h as c_int);
+		let k = in_closure(n) catch e {
+			yield failed("closure", e);
+		};
+		printf("closure %d\n".ptr, k as c_int);
+		task.n = n;
+		let w = in_worker(task) catch e {
+			yield failed("worker", e);
+		};
+		printf("worker %d\n".ptr, w as c_int);
+		printf("dispatch %d\n".ptr, in_dispatch(task, n) as c_int);
+		let s = in_select(c, n) catch e {
+			yield failed("select", e);
+		};
+		printf("select %d\n".ptr, s as c_int);
+		let o = outer.go(n) catch e {
+			yield failed("nested", e);
+		};
+		printf("nested %d\n".ptr, o as c_int);
+	}
+	delete(c);
+	delete(task);
+	return 0;
+}

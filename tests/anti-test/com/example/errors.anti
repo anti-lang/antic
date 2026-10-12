@@ -1,0 +1,370 @@
+//! Every construct of the errors area in a function of a `tests` block and in a
+//! function of a `fixtures` block. `anti test` compiles both, and each test
+//! asserts what its construct computes. A test takes no `may fail`, so a
+//! `fail`, a `try` on a call and an `undo` of the `tests` block stand in an
+//! anonymous function of a test.
+
+import anti.lang;
+
+fn risky(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n * 10;
+}
+
+fn step(n: int) may fail
+{
+	if n == 0 {
+		fail "no step";
+	}
+}
+
+fn find(n: int, at: *int) -> ?*int
+{
+	if n < 0 {
+		return none;
+	}
+	return at;
+}
+
+fn line_of(at: lang.SourceLocation) -> int
+{
+	return at.line;
+}
+
+fn line_here(at: lang.SourceLocation = here) -> int
+{
+	return at.line;
+}
+
+fn apply(n: int, f: fn(int) -> int may fail) -> int
+{
+	let got = f(n) catch e {
+		yield -1 - e.code;
+	};
+	return got;
+}
+
+fixtures
+{
+	fn fix_fail(n: int) -> int may fail
+	{
+		if n == 0 {
+			fail "nothing";
+		}
+		if n > 2 {
+			fail lang.Error.new(n, "too much");
+		}
+		return n;
+	}
+
+	fn fix_try(n: int) -> int may fail
+	{
+		try step(n);
+		return 1 + try risky(n);
+	}
+
+	fn fix_try_block(n: int) -> int
+	{
+		let acc = 0;
+		try {
+			step(n);
+			acc += risky(n);
+			acc += 100;
+		} catch e {
+			acc = -1 - e.code;
+		}
+		return acc;
+	}
+
+	fn fix_catch_named(n: int) -> int
+	{
+		let got = risky(n) catch e {
+			yield -e.code;
+		};
+		step(n) catch e {
+			got += 1000 + e.code;
+		};
+		return got;
+	}
+
+	fn fix_catch_unnamed(n: int) -> int
+	{
+		let got = 0;
+		got = risky(n) catch {
+			yield -1;
+		};
+		step(n) catch {
+			got += 1000;
+		};
+		step(n) catch { };
+		return got;
+	}
+
+	fn fix_catch_fatal(n: int) -> int
+	{
+		let seven = 7;
+		let got = risky(n) catch fatal;
+		step(n + 1) catch fatal;
+		let p = find(n, &seven) catch fatal;
+		return got + *p;
+	}
+
+	fn fix_yield(n: int) -> int
+	{
+		let got = risky(n) catch e {
+			if e.code > 3 {
+				yield e.code * 100;
+			}
+			let twice = e.code * 2;
+			yield twice;
+		};
+		step(n) catch {
+			got += 1000;
+			yield;
+		};
+		return got;
+	}
+
+	fn fix_undo(n: int, out: *int) may fail
+	{
+		undo *out += 100;
+		if n == 0 {
+			fail "undone";
+		}
+		try risky(n);
+		*out += 1;
+	}
+
+	fn fix_here() -> int
+	{
+		return line_here() - line_of(here);
+	}
+}
+
+tests
+{
+	fn may_fail_function_in_fixtures()
+	{
+		let a = fix_fail(1) catch {
+			yield -1;
+		};
+		assert(a == 1);
+		let b = fix_fail(0) catch e {
+			yield -1 - e.code;
+		};
+		assert(b == -1);
+		let c = fix_fail(3) catch e {
+			yield -1 - e.code;
+		};
+		assert(c == -4);
+	}
+
+	fn fail_in_tests()
+	{
+		let got1 = apply(1, fn(n) {
+			if n > 2 {
+				fail lang.Error.new(n, "too much");
+			}
+			return n;
+		});
+		assert(got1 == 1);
+		let got2 = apply(3, fn(n) {
+			if n > 2 {
+				fail lang.Error.new(n, "too much");
+			}
+			return n;
+		});
+		assert(got2 == -4);
+		let got3 = apply(3, fn(n) {
+			fail "a text";
+		});
+		assert(got3 == -1);
+	}
+
+	fn try_in_fixtures()
+	{
+		let a = fix_try(0) catch e {
+			yield -1 - e.code;
+		};
+		assert(a == -1);
+		let b = fix_try(2) catch {
+			yield -1;
+		};
+		assert(b == 21);
+		let c = fix_try(3) catch e {
+			yield -1 - e.code;
+		};
+		assert(c == -4);
+	}
+
+	fn try_in_tests()
+	{
+		let got1 = apply(2, fn(n) {
+			try step(n);
+			return 1 + try risky(n);
+		});
+		assert(got1 == 21);
+		let got2 = apply(3, fn(n) {
+			try step(n);
+			return 1 + try risky(n);
+		});
+		assert(got2 == -4);
+	}
+
+	fn try_block_in_fixtures()
+	{
+		let r1 = fix_try_block(0);
+		assert(r1 == -1);
+		let r2 = fix_try_block(2);
+		assert(r2 == 120);
+		let r3 = fix_try_block(3);
+		assert(r3 == -4);
+	}
+
+	fn try_block_in_tests()
+	{
+		let acc = 0;
+		try {
+			step(1);
+			acc += risky(2);
+			acc += risky(3);
+			acc += 100;
+		} catch e {
+			acc += e.code;
+		}
+		assert(acc == 23);
+	}
+
+	fn catch_named_in_fixtures()
+	{
+		let r4 = fix_catch_named(0);
+		assert(r4 == 1000);
+		let r5 = fix_catch_named(2);
+		assert(r5 == 20);
+		let r6 = fix_catch_named(3);
+		assert(r6 == -3);
+	}
+
+	fn catch_named_in_tests()
+	{
+		let got = risky(4) catch e {
+			yield -e.code;
+		};
+		assert(got == -4);
+		step(0) catch e {
+			got += 1000 + e.code;
+		};
+		assert(got == 996);
+	}
+
+	fn catch_unnamed_in_fixtures()
+	{
+		let r7 = fix_catch_unnamed(0);
+		assert(r7 == 1000);
+		let r8 = fix_catch_unnamed(2);
+		assert(r8 == 20);
+		let r9 = fix_catch_unnamed(3);
+		assert(r9 == -1);
+	}
+
+	fn catch_unnamed_in_tests()
+	{
+		let got = 0;
+		got = risky(3) catch {
+			yield -1;
+		};
+		assert(got == -1);
+		step(0) catch {
+			got += 1000;
+		};
+		step(0) catch { };
+		assert(got == 999);
+	}
+
+	fn catch_fatal_in_fixtures()
+	{
+		let r10 = fix_catch_fatal(0);
+		assert(r10 == 7);
+		let r11 = fix_catch_fatal(2);
+		assert(r11 == 27);
+	}
+
+	fn catch_fatal_in_tests()
+	{
+		let seven = 7;
+		let got = risky(2) catch fatal;
+		step(1) catch fatal;
+		let p = find(0, &seven) catch fatal;
+		assert(got + *p == 27);
+	}
+
+	fn yield_in_fixtures()
+	{
+		let r12 = fix_yield(0);
+		assert(r12 == 1000);
+		let r13 = fix_yield(2);
+		assert(r13 == 20);
+		let r14 = fix_yield(3);
+		assert(r14 == 6);
+		let r15 = fix_yield(4);
+		assert(r15 == 400);
+	}
+
+	fn yield_in_tests()
+	{
+		let got = risky(4) catch e {
+			if e.code > 3 {
+				yield e.code * 100;
+			}
+			yield 0;
+		};
+		assert(got == 400);
+		step(0) catch {
+			got += 1000;
+			yield;
+		};
+		assert(got == 1400);
+	}
+
+	fn undo_in_fixtures()
+	{
+		let a = 0;
+		fix_undo(0, &a) catch { };
+		assert(a == 100);
+		let b = 0;
+		fix_undo(1, &b) catch { };
+		assert(b == 1);
+		let c = 0;
+		fix_undo(3, &c) catch { };
+		assert(c == 100);
+	}
+
+	fn undo_in_tests()
+	{
+		let out = 0;
+		let got = apply(3, fn(n) {
+			undo out += 100;
+			let v = try risky(n);
+			out += 1;
+			return v;
+		});
+		assert(got == -4);
+		assert(out == 100);
+	}
+
+	fn here_in_fixtures()
+	{
+		let r16 = fix_here();
+		assert(r16 == 0);
+	}
+
+	fn here_in_tests()
+	{
+		let first = line_of(here);
+		let second = line_here();
+		assert(second == first + 1);
+	}
+}

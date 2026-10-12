@@ -1,0 +1,79 @@
+exit 0
+function 0 1000
+method 0 1000
+loop 0 2001
+arm 0 1000
+if_let 0 1000
+defer 0 1001
+undo 0 1002
+catch 0 1000
+closure 0 1000
+worker 0 1000
+dispatch 0 1000
+sync 0 1000
+select 0 1000
+generic 0 81000 11000
+nested 0 1000
+function 1 10
+method 1 10
+loop 1 21
+arm 1 10
+if_let 1 10
+defer 1 11
+undo 1 12
+catch 1 10
+closure 1 10
+worker 1 10
+dispatch 1 10
+sync 1 10
+select 1 10
+generic 1 80010 10010
+nested 1 10
+function 2 20
+method 2 20
+loop 2 41
+arm 2 20
+if_let 2 20
+defer 2 21
+undo 2 22
+catch 2 20
+closure 2 20
+worker 2 20
+dispatch 2 20
+sync 2 20
+select 2 20
+generic 2 80020 10020
+nested 2 20
+function failed: 3 refused
+function 3 -1
+method failed: 3 refused
+method 3 -1
+loop failed: 3 refused
+loop failed: 3 refused
+loop 3 -1
+arm failed: 3 refused
+arm 3 -1
+if_let failed: 3 refused
+if_let 3 -1
+defer failed: 3 refused
+defer 3 0
+undo failed: 3 refused
+undo 3 1
+catch failed: 3 refused
+catch 3 -1
+closure failed: 3 refused
+closure 3 -1
+worker failed: 3 refused
+worker 3 -1
+dispatch failed: 3 refused
+dispatch 3 -1
+sync failed: 3 refused
+sync 3 -1
+select failed: 3 refused
+select 3 -1
+generic failed: 3 refused
+generic failed: 3 refused
+generic 3 79999 9999
+nested failed: 3 refused
+nested 3 -1
+sync entered 4

@@ -1,0 +1,51 @@
+exit 0
+function 34:26 errors_here.in_function errors_here errors_here.anti
+function default 35:9 errors_here.in_function
+function 1 11
+method 46:25 errors_here.Host.in_method errors_here errors_here.anti
+method default 47:10 errors_here.Host.in_method
+method 1 11
+loop 57:23 errors_here.in_loop errors_here errors_here.anti
+loop default 58:10 errors_here.in_loop
+loop 57:23 errors_here.in_loop errors_here errors_here.anti
+loop default 58:10 errors_here.in_loop
+loop 1 23
+arm 69:23 errors_here.in_arm errors_here errors_here.anti
+arm default 70:11 errors_here.in_arm
+arm 1 11
+if_let 88:25 errors_here.in_if_let errors_here errors_here.anti
+if_let default 89:10 errors_here.in_if_let
+if_let 1 11
+defer 101:24 errors_here.in_defer errors_here errors_here.anti
+defer default 102:10 errors_here.in_defer
+defer 1 12
+undo 112:23 errors_here.in_undo errors_here errors_here.anti
+undo default 113:10 errors_here.in_undo
+undo 1 13
+catch 128:24 errors_here.in_catch errors_here errors_here.anti
+catch default 129:10 errors_here.in_catch
+catch 1 11
+closure 143:26 errors_here.in_closure.0 errors_here errors_here.anti
+closure default 144:10 errors_here.in_closure.0
+closure 1 11
+worker 153:24 errors_here.in_worker errors_here errors_here.anti
+worker default 154:9 errors_here.in_worker
+worker 1 11
+dispatch 168:27 errors_here.in_dispatch.1 errors_here errors_here.anti
+dispatch default 169:10 errors_here.in_dispatch.1
+dispatch 1 11
+sync 186:23 errors_here.in_sync errors_here errors_here.anti
+sync default 187:10 errors_here.in_sync
+sync 1 11
+select 202:26 errors_here.in_select errors_here errors_here.anti
+select default 203:11 errors_here.in_select
+select 1 11
+generic 212:25 errors_here.in_generic<int> errors_here errors_here.anti
+generic default 213:9 errors_here.in_generic<int>
+generic 212:25 errors_here.in_generic<bool> errors_here errors_here.anti
+generic default 213:9 errors_here.in_generic<bool>
+generic 1 80011 10011
+nested 226:26 errors_here.Outer.Inner.run errors_here errors_here.anti
+nested default 227:11 errors_here.Outer.Inner.run
+nested 1 11
+sync entered 1

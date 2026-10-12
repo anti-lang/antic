@@ -1,0 +1,1 @@
+tests_may_fail.anti:15:5: error: a `tests` function takes no parameters and returns nothing, because the runner calls it

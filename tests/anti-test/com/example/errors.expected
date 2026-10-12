@@ -1,0 +1,19 @@
+ok com.example.errors.may_fail_function_in_fixtures
+ok com.example.errors.fail_in_tests
+ok com.example.errors.try_in_fixtures
+ok com.example.errors.try_in_tests
+ok com.example.errors.try_block_in_fixtures
+ok com.example.errors.try_block_in_tests
+ok com.example.errors.catch_named_in_fixtures
+ok com.example.errors.catch_named_in_tests
+ok com.example.errors.catch_unnamed_in_fixtures
+ok com.example.errors.catch_unnamed_in_tests
+ok com.example.errors.catch_fatal_in_fixtures
+ok com.example.errors.catch_fatal_in_tests
+ok com.example.errors.yield_in_fixtures
+ok com.example.errors.yield_in_tests
+ok com.example.errors.undo_in_fixtures
+ok com.example.errors.undo_in_tests
+ok com.example.errors.here_in_fixtures
+ok com.example.errors.here_in_tests
+anti test: 18 tests in 1 modules, 0 modules failed
