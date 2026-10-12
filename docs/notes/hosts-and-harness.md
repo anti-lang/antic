@@ -128,6 +128,12 @@ asked. The last run on real x86_64 hardware was the workflow run of 2026-10-08.
   of the whole file then asks for 2^63 bytes, which ASan refuses with a stop.
 - A race test on the slow ASan build of the VM sees orders the Mac never shows. A
   reader that stops at a flag reads once more after it.
+- ctest starts a test that failed in the last run before every other one. The
+  heaviest tests start then as well, and four of the 14 cores of the Mac are
+  efficiency cores. A large matrix program whose dev build takes antic 20 s under
+  UBSan then passes the 60 s of its runner, fails, and starts first again. Run
+  that test alone once with `ctest --preset ubsan -R '^<test>$'`. It passes, and
+  the next run of the suite starts it by its cost.
 - `MallocScribble=1` fills fresh memory of macOS `malloc` with `0xaa`. A test of memory
   that must be zeroed sets it, as `program_alloc_owning` does.
 - ctest and `cmake -P` on the Mac raise the stack limit of every child to the hard
