@@ -1,0 +1,1 @@
+types_enum_value_from_size_of.anti:6:9: error: a value of an enum is a constant, not a value computed from `size_of`

@@ -1,0 +1,13 @@
+//! `Kind.C` names a value of the enum `Kind`, and it has none of that name.
+
+enum Kind: u8
+{
+	A,
+	B,
+}
+
+fn main() -> int
+{
+	let k = Kind.C;
+	return k as int;
+}

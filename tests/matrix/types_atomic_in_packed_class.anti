@@ -1,0 +1,27 @@
+//! An atomic field of a packed class. `packed` removes the padding, so the
+//! field stands at offset 9, after the table of the class and one byte, and
+//! `align(16)` fixes where the object starts. The eight bytes of the field then
+//! cross a multiple of 16. Every atomic call still works on it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+packed class Counter align(16)
+{
+	pub tag: u8,
+	pub atomic n: u64,
+}
+
+fn main() -> int
+{
+	let c = Counter { tag: 1, n: 5 };
+	c.n.store(7);
+	printf("store and load %llu\n".ptr, c.n.load());
+	c.n.add(10);
+	printf("add %llu\n".ptr, c.n.load());
+	let old = c.n.swap(3);
+	printf("swap %llu %llu\n".ptr, old, c.n.load());
+	let done = c.n.compare_swap(3, 4);
+	printf("compare_swap %d %llu %d\n".ptr, done as c_int, c.n.load(),
+		c.tag as c_int);
+	return 0;
+}

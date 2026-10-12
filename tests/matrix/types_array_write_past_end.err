@@ -1,0 +1,1 @@
+types_array_write_past_end.anti:7:5: error: the index 3 is outside the array of length 3

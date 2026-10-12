@@ -71,3 +71,25 @@ matrix_values_class_constant_memory_checks T018 A constant of a class is refused
 matrix_values_class_constant_as_default_dev T019 antic crashes on a constant of a class as the default of a field.
 matrix_values_class_constant_as_default_release T019 antic crashes on a constant of a class as the default of a field.
 matrix_values_class_constant_as_default_memory_checks T019 antic crashes on a constant of a class as the default of a field.
+matrix_types_array_field_index_past_end_refused T016 A constant index past the end of an array in a field is not refused.
+matrix_types_array_inner_index_past_end_refused T016 A constant index past the end of an inner array is not refused.
+matrix_types_array_write_past_end_refused T016 A write through a constant index past the end of an array is not refused.
+matrix_types_enum_value_from_a_call_refused T020 A call as the value of an enum compiles, and the value is 0.
+matrix_types_bitfield_width_from_a_call_refused T020 A call as the width of a bitfield compiles, and the field is no bitfield.
+matrix_types_align_from_a_call_refused T020 A call as the N of align(N) compiles, and the type takes no alignment.
+matrix_types_field_array_length_from_a_call_refused T020 A call as the length of the array of a field compiles.
+matrix_types_enum_value_from_size_of_refused T021 A value of an enum computed from size_of compiles, and the value is 0.
+matrix_types_atomic_in_packed_class_dev T022 An atomic field that crosses a multiple of 16 in a packed class stops the program with a bus error.
+matrix_types_atomic_in_packed_class_release T022 An atomic field that crosses a multiple of 16 in a packed class stops the program with a bus error.
+matrix_types_atomic_in_packed_class_memory_checks T022 An atomic field that crosses a multiple of 16 in a packed class stops the program with a bus error.
+matrix_types_mutex_in_packed_class_dev T022 A Mutex that crosses a multiple of 16 in a packed class stops the program with a bus error.
+matrix_types_mutex_in_packed_class_release T022 A Mutex that crosses a multiple of 16 in a packed class stops the program with a bus error.
+matrix_types_mutex_in_packed_class_memory_checks T022 A Mutex that crosses a multiple of 16 in a packed class stops the program with a bus error.
+matrix_types_variant_without_fields_as_a_field_dev T023 antic crashes on a field whose type is a variant without fields.
+matrix_types_variant_without_fields_as_a_field_release T023 antic crashes on a field whose type is a variant without fields.
+matrix_types_variant_without_fields_as_a_field_memory_checks T023 antic crashes on a field whose type is a variant without fields.
+matrix_types_switch_on_a_pointer_to_a_variant_refused T024 A switch on a pointer to a variant gives three messages for one mistake.
+matrix_types_if_let_on_a_pointer_to_a_variant_refused T024 An if let on a pointer to a variant gives four messages for one mistake.
+fmt_alias_of_function T025 anti fmt moves the functions after a type alias of a function type.
+matrix_types_is_case_on_a_number_refused T026 is with a case on a value that is no variant names a module that is not there.
+matrix_types_enum_unknown_value_refused T027 An unknown value of an enum is refused as a function.

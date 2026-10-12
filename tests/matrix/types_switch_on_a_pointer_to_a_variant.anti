@@ -1,0 +1,23 @@
+//! `switch` takes a variant as a value, and a pointer `p` is written `*p`.
+
+variant Shape
+{
+	Circle { r: int },
+	Rect { w: int, h: int },
+	Empty,
+}
+
+fn read(s: *Shape) -> int
+{
+	let n = 0;
+	switch s {
+		Circle c => n = c.r,
+		else => n = 2,
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	return 0;
+}

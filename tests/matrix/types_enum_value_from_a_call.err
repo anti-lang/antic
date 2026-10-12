@@ -1,0 +1,1 @@
+types_enum_value_from_a_call.anti:10:8: error: a call is not a constant expression

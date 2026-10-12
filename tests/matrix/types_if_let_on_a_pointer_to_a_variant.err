@@ -1,0 +1,1 @@
+types_if_let_on_a_pointer_to_a_variant.anti:12:20: error: `if let` takes a variant or a value that may be `none`, found `*Shape`

@@ -16,6 +16,7 @@ set(SKIP
     "${TESTS}/errors/hex_bytes.anti"
     "${TESTS}/errors/lexical.anti"
     "${TESTS}/errors/syntax.anti"
+    "${TESTS}/fmt/alias_of_function.anti"
     "${TESTS}/fmt/loose.anti"
     "${TESTS}/modules/lines/com/example/geo.anti")
 

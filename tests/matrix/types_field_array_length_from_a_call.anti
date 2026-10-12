@@ -1,0 +1,16 @@
+//! The length of an array is a constant expression, and a call is none.
+
+fn one() -> int
+{
+	return 1;
+}
+
+struct Row
+{
+	xs: [one()]u8,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,15 @@
+//! A `type` alias of a function type with two functions after it, in the
+//! canonical form. `anti fmt` leaves the file as it stands.
+
+type Op = fn(int) -> int;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	let f: Op = twice;
+	return f(2) - 4;
+}

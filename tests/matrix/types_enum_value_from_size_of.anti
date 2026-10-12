@@ -1,0 +1,12 @@
+//! The value of an enum is a number on every target. `size_of` gives one per
+//! target, as the N of `align(N)` refuses it.
+
+enum Level: int
+{
+	Word = size_of(int),
+}
+
+fn main() -> int
+{
+	return Level.Word as int;
+}

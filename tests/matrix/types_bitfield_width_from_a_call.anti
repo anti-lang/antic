@@ -1,0 +1,16 @@
+//! The width of a bitfield is a constant expression, and a call is none.
+
+fn one() -> int
+{
+	return 1;
+}
+
+struct Flags
+{
+	n: u8 : one(),
+}
+
+fn main() -> int
+{
+	return 0;
+}

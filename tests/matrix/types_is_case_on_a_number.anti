@@ -1,0 +1,18 @@
+//! `is` names a case on a variant alone, and an `int` is none.
+
+variant Shape
+{
+	Circle { r: int },
+	Rect { w: int, h: int },
+	Empty,
+}
+
+fn round(n: int) -> bool
+{
+	return n is Shape.Circle;
+}
+
+fn main() -> int
+{
+	return 0;
+}

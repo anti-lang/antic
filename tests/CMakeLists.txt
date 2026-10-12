@@ -2211,6 +2211,14 @@ if(NOT WIN32)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_antic_stack.cmake")
 endif()
 
+# A `type` alias of a function type leaves the functions after it as they
+# stand. The source is in the canonical form, so fmt_canonical passes over
+# it until `anti fmt` agrees: finding T025 of docs/audit/tests-findings.md.
+add_expect_test(fmt_alias_of_function STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/alias_of_function.anti")
+
 # Every source of the standard library and of the tests stands in the
 # canonical form, so that `anti fmt` over the checkout writes nothing.
 add_test(NAME fmt_canonical
@@ -3414,6 +3422,18 @@ antic_modules_test(flow_modules
     LIBRARIES flow
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/flow")
+
+# The types of the area types in a library module: a packed struct, an
+# aligned one, bitfields, a union, an enum over a base, two variants, two
+# aliases, a generic packed struct and the marks `keep` and `concurrent`
+# of a parameter. The client reads, writes and measures each across the
+# module boundary. docs/notes/test-matrix.md names the cells.
+antic_modules_test(types_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/types"
+    LIBRARIES types
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/types")
 
 # The constructs of the values area in the functions of a library module,
 # plain and generic, as flow_modules holds those of the flow area. The

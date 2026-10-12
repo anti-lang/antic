@@ -1,0 +1,17 @@
+//! The value of an enum is a constant expression, and a call is none.
+
+fn five() -> i32
+{
+	return 5;
+}
+
+enum Level
+{
+	Low = five(),
+	High,
+}
+
+fn main() -> int
+{
+	return 0;
+}

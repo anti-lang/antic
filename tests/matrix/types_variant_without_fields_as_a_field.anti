@@ -1,0 +1,41 @@
+//! A variant whose cases have no fields is its tag alone. It is the type of a
+//! field of a struct and of a field of a class.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+variant Light
+{
+	Red,
+	Amber,
+	Green,
+}
+
+struct Crossing
+{
+	lead: u8,
+	light: Light,
+}
+
+class Signal
+{
+	pub lead: u8,
+	pub light: Light,
+}
+
+fn main() -> int
+{
+	let c = Crossing { lead: 1, light: Light.Amber };
+	c.light = Light.Green;
+	printf("field of a struct %d %lld\n".ptr, c.light.tag as c_int,
+		size_of(Crossing));
+	let s = Signal { lead: 1, light: Light.Red };
+	let n = 0;
+	switch s.light {
+		Red => n = 1,
+		Amber => n = 2,
+		Green => n = 3,
+	}
+	s.light = Light.Amber;
+	printf("field of a class %lld %d\n".ptr, n, (s.light is Light.Amber) as c_int);
+	return 0;
+}

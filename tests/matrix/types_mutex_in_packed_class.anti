@@ -1,0 +1,28 @@
+//! A Mutex in a packed class. `packed` removes the padding, so the word of the
+//! lock stands at offset 14, after the table of the class and six bytes, and
+//! `align(16)` fixes where the object starts. The word then crosses a multiple
+//! of 16. `sync` still takes and gives back the lock.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+packed class Guarded align(16)
+{
+	pub tag: [6]u8,
+	pub m: Mutex,
+	pub n: int,
+}
+
+fn main() -> int
+{
+	let g = Guarded { tag: [0; 6], m: Mutex.new(), n: 0 };
+	sync g.m {
+		g.n += 1;
+	}
+	sync g.m {
+		g.n += 10;
+	}
+	printf("sync %lld\n".ptr, g.n);
+	return 0;
+}

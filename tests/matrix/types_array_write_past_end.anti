@@ -1,0 +1,9 @@
+//! A write through a constant index past the end of a fixed array is refused,
+//! by decision 24 of "Decisions of 2026-10-11".
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	xs[3] = 1;
+	return xs[0];
+}

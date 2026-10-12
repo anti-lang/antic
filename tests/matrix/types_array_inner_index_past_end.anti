@@ -1,0 +1,8 @@
+//! A constant index past the end of the inner array of an array of arrays is
+//! refused, by decision 24 of "Decisions of 2026-10-11".
+
+fn main() -> int
+{
+	let g: [2][3]int = [[1, 2, 3], [4, 5, 6]];
+	return g[0][3];
+}
