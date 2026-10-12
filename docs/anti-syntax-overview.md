@@ -1719,9 +1719,13 @@ A `synchronized class` gives each object a hidden lock that every public functio
 `anti.lang.Object` declares nine hooks with empty bodies, and every class inherits them. `created`, `destroyed` and `copied` are the lifecycle, `dispatched` and `joined` are the threads, and every build compiles the five. `enter`, `leave` and `failed` need tracing, and `changed` needs `--trace writes`. `anti.lang.TraceHandler` declares the same nine with the object after `self`, and `anti.lang.Trace.install(h)` stores one handler.
 
 ```anti
+import anti.io;
+
 class Leaks inherits lang.TraceHandler
 {
 	atomic live: int = 0,
+
+	pub fn count(self) -> int { return self.live.load(); }
 
 	concrete fn created(self, o: *Object) { self.live.add(1); }
 	concrete fn destroyed(self, o: *Object) { self.live.sub(1); }
@@ -1738,9 +1742,27 @@ trace class Renderer
 {
 	pub fn draw(self) { }
 }
+
+fn main() -> int
+{
+	let leaks = Leaks { };
+	lang.Trace.install(&leaks);
+	let r = alloc Renderer { };
+	r.draw();
+	if leaks.count() == 1 { io.println("one object lives"); }
+	delete(r);
+	if leaks.count() == 0 { io.println("none lives"); }
+	lang.Trace.install(none);
+	return 0;
+}
 ```
 
-Every hook site calls the installed handler and then dispatches the object's own hook. `leave` reverses the two, so the handler and the object's hook nest around the call. A class that replaced a hook does not silence the handler, and the handler does not replace the class's hook. A hook site is one call of the runtime.
+```text
+one object lives
+none lives
+```
+
+The program owns its handler, and `Trace.install(none)` takes it out again. Every hook site calls the installed handler and then dispatches the object's own hook. `leave` reverses the two, so the handler and the object's hook nest around the call. A class that replaced a hook does not silence the handler, and the handler does not replace the class's hook. A hook site is one call of the runtime.
 
 `trace` is a contextual word before `class` and before `fn` in a class body. `--trace` and `--no-trace` decide instead of the mode, `--trace <pattern>` reaches a class that did not ask, and `--trace writes` turns `changed` on. `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger`, `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal` and `Composite`. `trace.start` reads the runtime key `trace` and installs the handler it names, and `trace.install` takes the same text from a program.
 
