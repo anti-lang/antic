@@ -98,6 +98,8 @@ not re-open a settled decision without asking Eddie.
   The step `classes` measured `host` 425 s. It ran each sanitizer suite as
   `ctest -I 1,1000` and `ctest -I 1001,3234`: `asan` 474 s and 376 s,
   `ubsan` 437 s and 237 s.
+  The step `modules` measured `host` 451 s, and the same two parts up to
+  test 3507: `asan` 532 s and 396 s, `ubsan` 477 s and 266 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -303,9 +305,11 @@ Where a test goes:
   program, `check_<name>`.
 - `tests/dump/`: what antic prints for a stage, `dump_<stage>_<subject>`.
 - `tests/modules/`: a program of more than one module, in release mode and
-  in dev mode.
+  in dev mode. A refusal at the boundary of a module is a program
+  `tests/errors/modules_<name>.anti`, whose case in `tests/CMakeLists.txt`
+  names the tree of its library files.
 - `tests/abi/` and `tests/clib/`: Anti against C, as the caller and as the
-  library.
+  library. `program_abi_ctypes` and `clib_ctypes` hold every C type.
 - `tests/trace/`, `tests/conf/`, `tests/inject/` and `tests/plugin/`: stack
   traces, the runtime configuration, injection and plugins. Their output
   holds addresses or paths, so pattern files hold it.
@@ -615,10 +619,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 3235 ctest tests pass on the development Mac, and two of them, the
+- 3508 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  286 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 3234 each with the same skips, without
+  319 of them are the expected failures of `tests/known-failures.txt`.
+  The ASan and the UBSan builds run 3507 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
