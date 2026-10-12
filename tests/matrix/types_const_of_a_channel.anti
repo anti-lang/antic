@@ -1,8 +1,0 @@
-//! `chan T(n)` makes a channel at run time, so no constant holds one.
-
-const PIPE: chan int = chan int(1);
-
-fn main() -> int
-{
-	return 0;
-}
