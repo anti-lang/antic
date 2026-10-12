@@ -2,7 +2,8 @@
 //! the ones that have an order. A struct, a packed struct, a tuple, a variant,
 //! a fixed array and a class compare part by part. A pointer, a channel and a
 //! function value compare by identity. A `char` orders by its code point and a
-//! `str` by its bytes.
+//! `str` by its bytes. A struct with `operator fn lt` takes `>`, `<=` and `>=`
+//! from it.
 
 import anti.lang;
 
@@ -126,6 +127,8 @@ fn order(zero: int)
 		("z" < "\u{e9}") as c_int);
 	printf("struct with lt %d %d\n".ptr, (v1 < v2) as c_int,
 		(v2 < v1) as c_int);
+	printf("derived from lt %d %d %d %d\n".ptr, (v1 > v2) as c_int,
+		(v1 <= v2) as c_int, (v1 >= v2) as c_int, (v2 >= v2) as c_int);
 }
 
 fn main(args: []str) -> int

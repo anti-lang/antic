@@ -1,0 +1,1 @@
+values_less_equal_on_class.anti:11:14: error: `<=` is not defined on `Rank`. A struct or a class has no default order and declares `operator fn lt`

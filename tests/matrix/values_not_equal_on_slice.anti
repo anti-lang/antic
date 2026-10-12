@@ -1,0 +1,8 @@
+//! `!=` on two slices is refused, as `==` is.
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	let differ = xs[0..2] != xs[0..2];
+	return 0;
+}

@@ -24,3 +24,4 @@ char 1 1 0 1
 str 1 1 1 0
 str by bytes 1 1
 struct with lt 1 0
+derived from lt 0 1 0 1

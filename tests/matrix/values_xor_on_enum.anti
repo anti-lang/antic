@@ -1,0 +1,14 @@
+//! `^` on two values of an enum is refused.
+
+enum Color
+{
+	Red,
+	Green,
+	Blue,
+}
+
+fn main() -> int
+{
+	let one = Color.Red ^ Color.Blue;
+	return 0;
+}

@@ -1,0 +1,1 @@
+values_xor_on_enum.anti:12:12: error: `^` needs integer operands, found `Color`

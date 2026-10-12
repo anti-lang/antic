@@ -1,0 +1,1 @@
+values_compound_sub_on_simd.anti:14:2: error: `-=` does not apply to `I32x4`

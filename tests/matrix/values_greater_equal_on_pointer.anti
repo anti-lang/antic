@@ -1,0 +1,9 @@
+//! `>=` on two pointers is refused: Anti has no order of addresses.
+
+fn main() -> int
+{
+	let a = 1;
+	let b = 2;
+	let first = &a >= &b;
+	return 0;
+}

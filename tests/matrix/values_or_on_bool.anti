@@ -1,0 +1,7 @@
+//! `|` on two `bool` values is refused: the operator of a `bool` is `||`.
+
+fn main() -> int
+{
+	let either = true | false;
+	return 0;
+}

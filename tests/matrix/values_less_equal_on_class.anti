@@ -1,0 +1,13 @@
+//! `<=` on a class without `operator fn lt` is refused, and the message names
+//! the operator.
+
+class Rank
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let first = Rank { n: 1 } <= Rank { n: 2 };
+	return 0;
+}

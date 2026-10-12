@@ -1,0 +1,14 @@
+//! `>=` on a struct without `operator fn lt` is refused, and the message names
+//! the operator.
+
+struct Pt
+{
+	x: int,
+	y: int,
+}
+
+fn main() -> int
+{
+	let first = Pt { x: 1, y: 2 } >= Pt { x: 1, y: 3 };
+	return 0;
+}
