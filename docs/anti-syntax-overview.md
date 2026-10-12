@@ -2121,17 +2121,21 @@ let m = line.matches(re"(?<year>\d{4})-(?<month>\d\d)");
 if m == none {
 	fail "no date";
 }
-io.println(f"{m.year} / {m.month}");
+let date = f"{m.year} / {m.month}";
+io.println(date);
+free(date.ptr);
 
 for m in line.find_all(re"\d+") { }
 let parts = line.split(re",\s*").to_slice();
+free(parts.ptr);
 let d = "2026-09-23".replace(re"(?<y>\d{4})-(?<m>\d\d)-(?<d>\d\d)", "${d}/${m}/${y}");
+free(d.ptr);
 
 let r = Regex.compile(input) catch fatal;
 let n = line.matches(r) catch none;
 ```
 
-`matches`, `find_all`, `replace` and `split` are methods of `str`. `find_all` and `split` are iterators, and `to_slice()` collects either. `limit` takes that many matches from the start, or from the end when negative. A match is a `?Match`, behaves as a `?*T` does and stands alone as a condition, in `if`, `while`, `&&`, `||` and `!`, and `if let` and `let ... else` bind one. Its fields are `all`, `group(n)`, `took_part(n)`, `count`, `pre` and `post`, and for a pattern literal a group is a field, `m.1` or `m.year`. A template names groups with `$1` and `${name}`, is checked at compile time for a literal, and a function may give each replacement. A call with a pattern literal never fails and stops at the match limit. A call with a compiled pattern may fail with `regex.TooExpensive` or `regex.MissingGroup`. Flags are PCRE2's inline flags, `(?i)`, and `\d`, `\w` and `\s` mean their ASCII sets, with `(*UCP)` for the Unicode ones. A pattern that can take exponential time fails the safety check `exponential-pattern`. No match reads or writes anything global.
+`matches`, `find_all`, `replace` and `split` are methods of `str`. `find_all` and `split` are iterators, and `to_slice()` collects either into a slice that the program frees. `replace` gives new text, freed with `free(s.ptr)` as well. `limit` takes that many matches from the start, or from the end when negative. A match is a `?Match`, behaves as a `?*T` does and stands alone as a condition, in `if`, `while`, `&&`, `||` and `!`, and `if let` and `let ... else` bind one. Its fields are `all`, `group(n)`, `took_part(n)`, `count`, `pre` and `post`, and for a pattern literal a group is a field, `m.1` or `m.year`. A template names groups with `$1` and `${name}`, is checked at compile time for a literal, and a function may give each replacement. A call with a pattern literal never fails and stops at the match limit. A call with a compiled pattern may fail with `regex.TooExpensive` or `regex.MissingGroup`. Flags are PCRE2's inline flags, `(?i)`, and `\d`, `\w` and `\s` mean their ASCII sets, with `(*UCP)` for the Unicode ones. A pattern that can take exponential time fails the safety check `exponential-pattern`. No match reads or writes anything global.
 
 ## Bytes
 
