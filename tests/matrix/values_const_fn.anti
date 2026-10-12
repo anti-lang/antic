@@ -1,0 +1,14 @@
+//! A `const` that names a function is refused, and the message says that the
+//! name is a function.
+
+fn up(n: int) -> int
+{
+	return n + 1;
+}
+
+const STEP: fn(int) -> int = up;
+
+fn main() -> int
+{
+	return STEP(1);
+}

@@ -1,0 +1,18 @@
+//! A `const` of an optional type, one that holds a value and one that holds
+//! `none`, read with `??` and with `if let`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const SOME: ?int = 5;
+const NOTHING: ?int = none;
+
+fn main() -> int
+{
+	printf("some %lld\n".ptr, SOME ?? -1);
+	printf("nothing %lld\n".ptr, NOTHING ?? -1);
+	let copy = SOME;
+	if let held = copy {
+		printf("held %lld\n".ptr, held);
+	}
+	return 0;
+}

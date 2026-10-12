@@ -1,0 +1,25 @@
+//! A `const` of a struct, of a tuple and of an array whose parts are of an
+//! optional type.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Reading
+{
+	value: ?int,
+	unit: int,
+}
+
+const READING: Reading = Reading { value: 5, unit: 2 };
+const PAIR: (?int, int) = (none, 2);
+const ROW: [2] ?int = [5, none];
+
+fn main() -> int
+{
+	let reading = READING;
+	let pair = PAIR;
+	let row = ROW;
+	printf("struct %lld %lld\n".ptr, reading.value ?? -1, reading.unit);
+	printf("tuple %lld %lld\n".ptr, pair.0 ?? -1, pair.1);
+	printf("array %lld %lld\n".ptr, row[0] ?? -1, row[1] ?? -1);
+	return 0;
+}

@@ -1,0 +1,16 @@
+//! A conversion of a number to an enum in a constant. antic folds no such
+//! conversion, and the message says what the conversion is.
+
+enum Kind
+{
+	Circle,
+	Square,
+	Empty,
+}
+
+const LAST: Kind = 2 as Kind;
+
+fn main() -> int
+{
+	return LAST as int;
+}

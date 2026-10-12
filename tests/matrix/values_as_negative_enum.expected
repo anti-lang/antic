@@ -1,0 +1,5 @@
+exit 0
+c_int enum int -1 -1
+c_int enum f64 -1 -1
+i16 enum int -300 -300
+i16 enum f32 -300 -300

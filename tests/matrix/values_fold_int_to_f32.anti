@@ -1,0 +1,19 @@
+//! An `int` that `f32` cannot hold converts to the nearest `f32` in one
+//! rounding. This one lies just above the middle of two neighbours, 2^60 and
+//! 2^60 + 2^37, so it rounds up. Rounded to an `f64` first it lands on the
+//! middle, and the tie then goes down to the even neighbour. The value the
+//! checker folds in a constant and the value the program computes must agree.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const ABOVE_THE_MIDDLE: int = 1152921573326323713;
+const FOLDED: f32 = ABOVE_THE_MIDDLE as f32;
+
+fn main(args: []str) -> int
+{
+	let zero = args.len - 1;
+	let computed = (ABOVE_THE_MIDDLE ^ zero) as f32;
+	printf("folded %.17g\n".ptr, FOLDED as f64);
+	printf("computed %.17g\n".ptr, computed as f64);
+	return 0;
+}

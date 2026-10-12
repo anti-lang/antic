@@ -41,3 +41,33 @@ matrix_flow_undo_directly_in_undo_refused T006 The refusal of an `undo` in an `u
 matrix_flow_if_let_arms_all_return_dev T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
 matrix_flow_if_let_arms_all_return_release T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
 matrix_flow_if_let_arms_all_return_memory_checks T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
+matrix_values_fold_int_to_f32_dev T008 A constant `int` as `f32` is rounded twice and differs from the computed value.
+matrix_values_fold_int_to_f32_release T008 A constant `int` as `f32` is rounded twice and differs from the computed value.
+matrix_values_fold_int_to_f32_memory_checks T008 A constant `int` as `f32` is rounded twice and differs from the computed value.
+matrix_values_fold_least_int_from_float_dev T009 The least `int` as a float is refused in a constant conversion to `int`.
+matrix_values_fold_least_int_from_float_release T009 The least `int` as a float is refused in a constant conversion to `int`.
+matrix_values_fold_least_int_from_float_memory_checks T009 The least `int` as a float is refused in a constant conversion to `int`.
+matrix_values_as_enum_in_constant_refused T010 The refusal of a number as an enum in a constant names a pointer conversion.
+matrix_values_as_negative_enum_dev T011 A negative value of an enum converts as an unsigned number.
+matrix_values_as_negative_enum_release T011 A negative value of an enum converts as an unsigned number.
+matrix_values_as_negative_enum_memory_checks T011 A negative value of an enum converts as an unsigned number.
+matrix_values_const_optional_dev T012 antic crashes on a constant of an optional type.
+matrix_values_const_optional_release T012 antic crashes on a constant of an optional type.
+matrix_values_const_optional_memory_checks T012 antic crashes on a constant of an optional type.
+matrix_values_const_optional_in_struct_dev T012 antic crashes on a constant whose part is of an optional type.
+matrix_values_const_optional_in_struct_release T012 antic crashes on a constant whose part is of an optional type.
+matrix_values_const_optional_in_struct_memory_checks T012 antic crashes on a constant whose part is of an optional type.
+matrix_values_array_repeat_widens_dev T013 An array repeat does not take the element type of its context.
+matrix_values_array_repeat_widens_release T013 An array repeat does not take the element type of its context.
+matrix_values_array_repeat_widens_memory_checks T013 An array repeat does not take the element type of its context.
+matrix_values_const_fn_refused T014 The refusal of a function in a constant names a variable.
+matrix_values_const_may_fail_fn_refused T014 The refusal of a function in a constant names a variable.
+matrix_values_is_after_error_refused T015 `is` on a value with an error adds a message about a module.
+matrix_values_index_past_end_refused T016 A constant index past the end of a fixed array is not refused.
+check_slice_range T017 A dev build does not check the bounds of a slice of an array.
+matrix_values_class_constant_dev T018 A constant of a class is refused in a constant expression.
+matrix_values_class_constant_release T018 A constant of a class is refused in a constant expression.
+matrix_values_class_constant_memory_checks T018 A constant of a class is refused in a constant expression.
+matrix_values_class_constant_as_default_dev T019 antic crashes on a constant of a class as the default of a field.
+matrix_values_class_constant_as_default_release T019 antic crashes on a constant of a class as the default of a field.
+matrix_values_class_constant_as_default_memory_checks T019 antic crashes on a constant of a class as the default of a field.

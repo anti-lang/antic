@@ -1,0 +1,33 @@
+//! The value of `[v; n]` takes the element type of its context, as each value
+//! of `[a, b]` does: an `int` where the element is a `?int`, a `*int` where it
+//! is a `?*int`, and a pointer to a class where it is a pointer to its
+//! interface.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Named
+{
+	abstract fn id(self) -> int;
+}
+
+class One inherits Named
+{
+	concrete fn id(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	let a = 11;
+	let b = 22;
+	let one = One { };
+	let values: [3] ?int = [5; 3];
+	let pointers: [3]?*int = [&a; 3];
+	let named: [2]*Named = [&one; 2];
+	printf("optional %lld\n".ptr, values[2] ?? -1);
+	printf("nullable pointer %lld\n".ptr, *(pointers[2] ?? &b));
+	printf("interface %lld\n".ptr, named[1].id());
+	return 0;
+}

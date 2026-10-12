@@ -1,0 +1,17 @@
+//! `v is Shape.Circle` on a value that has an error already adds no message of
+//! its own.
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+fn main() -> int
+{
+	let shape = missing;
+	if shape is Shape.Circle {
+		return 1;
+	}
+	return 0;
+}

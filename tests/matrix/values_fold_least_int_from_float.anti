@@ -1,0 +1,15 @@
+//! The least `int` is a float that `f64` holds exactly, so its conversion to
+//! `int` is inside the range of the type and folds in a constant.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const LEAST: int = -9223372036854775808.0 as int;
+
+fn main(args: []str) -> int
+{
+	let one = args.len as f64;
+	let computed = (-9223372036854775808.0 * one) as int;
+	printf("folded %lld\n".ptr, LEAST);
+	printf("computed %lld\n".ptr, computed);
+	return 0;
+}

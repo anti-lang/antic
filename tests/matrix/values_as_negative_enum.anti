@@ -1,0 +1,35 @@
+//! An enum converts as its underlying type does. `Sign` stands over `c_int` and
+//! `Level` over `i16`, both signed, so a negative value stays negative in a
+//! wider integer and in a float. The first value of a line is folded in a
+//! constant, and the second is computed.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+enum Sign
+{
+	Minus = -1,
+	Plus = 1,
+}
+
+enum Level: i16
+{
+	Low = -300,
+	High = 300,
+}
+
+const MINUS_INT: int = Sign.Minus as int;
+const MINUS_F64: f64 = Sign.Minus as f64;
+const LOW_INT: int = Level.Low as int;
+const LOW_F32: f32 = Level.Low as f32;
+
+fn main(args: []str) -> int
+{
+	let zero = args.len - 1;
+	let minus = (zero - 1) as Sign;
+	let low = (zero - 300) as Level;
+	printf("c_int enum int %lld %lld\n".ptr, MINUS_INT, minus as int);
+	printf("c_int enum f64 %g %g\n".ptr, MINUS_F64, minus as f64);
+	printf("i16 enum int %lld %lld\n".ptr, LOW_INT, low as int);
+	printf("i16 enum f32 %g %g\n".ptr, LOW_F32 as f64, low as f32 as f64);
+	return 0;
+}

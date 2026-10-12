@@ -1,0 +1,22 @@
+//! A `const` that names a function that may fail is refused, and the message
+//! says that the name is a function.
+
+import anti.lang;
+
+fn risky_up(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "negative";
+	}
+	return n + 1;
+}
+
+const STEP: fn(int) -> int may fail = risky_up;
+
+fn main() -> int
+{
+	let got = STEP(1) catch {
+		yield 0;
+	};
+	return got;
+}

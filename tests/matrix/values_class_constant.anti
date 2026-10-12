@@ -1,0 +1,21 @@
+//! A constant of a class is a constant expression, reached as `Name.NAME`:
+//! another constant names it, and it is the length of an array.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Limits
+{
+	pub used: int = 0,
+
+	const MAX: int = 64;
+}
+
+const HALF: int = Limits.MAX / 2;
+
+fn main() -> int
+{
+	let row: [Limits.MAX]u8 = [1; Limits.MAX];
+	printf("constant %lld\n".ptr, HALF);
+	printf("length %lld\n".ptr, row.len);
+	return 0;
+}

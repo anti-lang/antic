@@ -1,0 +1,1 @@
+values_as_enum_in_constant.anti:11:20: error: a conversion to an enum is not a constant expression

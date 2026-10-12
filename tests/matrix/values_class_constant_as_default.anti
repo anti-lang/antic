@@ -1,0 +1,18 @@
+//! The default of a field is a constant expression, and a constant of a class
+//! is one: a literal that omits the field takes the constant.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Limits
+{
+	pub used: int = Limits.MAX,
+
+	const MAX: int = 64;
+}
+
+fn main() -> int
+{
+	let limits = Limits { };
+	printf("default %lld\n".ptr, limits.used);
+	return 0;
+}
