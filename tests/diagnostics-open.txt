@@ -32,17 +32,13 @@ the message of an `assert` is a string literal
 
 # src/antic/sema.c
 expected a type, found a constant
-an `extern fn` takes plain C function pointers, and `keep own` holds a snapshot
 %s `%.*s.%s`, which this `%.*s` lacks
 `lent` marks a pointer result, and this one is `%s`
-`%.*s` is abstract, and a `provides` line names a complete class
 
 # src/antic/sema_call.c
-a variadic function has no function pointer type
 `fail \"text\"` calls `anti.lang.Error.new`, which takes a code and a message
 `fail` captures the frames with `anti.lang.StackTrace.capture`, which takes the count of frames to skip
 `fail` writes `at` and `frames` of `anti.lang.Error`, which this `anti.lang` lacks
-`%.*s` has no public class `%.*s`
 the first argument names an interface
 `%s` is not a function
 the call takes %zu argument%s, found %zu
