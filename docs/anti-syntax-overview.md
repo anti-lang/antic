@@ -712,7 +712,7 @@ Mark a function that can fail with `may fail`. It leaves on one of two channels:
 <!-- overview: context, docs-style:ignore
 ```anti
 import anti.fs;
-import anti.log;
+import anti.io;
 import anti.text;
 struct Config { size: int }
 fn parse(f: *fs.File) -> Config may fail { return Config { size: try fs.size(f) }; }
@@ -724,7 +724,9 @@ let path = "anti.toml";
 -->
 ```anti
 let n = text.parse_int(s) catch e {
-	log.warn(f"bad number {s}");
+	let message = f"bad number {s}";
+	io.eprintln(message);
+	free(message.ptr);
 	yield 0;
 };
 
@@ -747,11 +749,46 @@ try {
 }
 ```
 
-A handler ends with `yield v` or leaves the block. The name after `catch` is any identifier, scoped to the handler, and `catch { }` binds none. The error is deleted on every exit of the handler unless `return e` or `fail e` hands it on or a call moved it into an `own` parameter. `Error.wrap` takes its cause so. `fail "text"` is `fail Error.new(0, "text")`. `try` forwards the error and is refused outside a function that may fail. It stands wherever the call stands, after `return` and inside an expression as well. `undo` runs on the `fail` path and not on `return`. `Error` has `code`, `message`, an owned `cause`, the origin `at` that `fail` fills, and the frames of a trace when backtraces are on. It lives in `anti.lang`, the root of the standard library, which imports nothing. `e.text()` gives `error N: message`, or the message alone for code 0, with each cause on a line of its own, and the error keeps those bytes until it is deleted. `e.print()` writes that text to the standard error, and `e.fatal()` prints it and ends the program. Libraries subclass it and callers test with `is`. `anti.error` adds `SystemError`, with `from_errno()` and `from_win32()`, and `on_fatal` and `check`.
+A handler whose call gives a value ends with `yield v`, `fail`, `return` or a call that never returns, and one that can reach its end is refused. `try` takes a failing call alone. On an optional it is refused, and `let ... else` or `??` handles a `none`. The name after `catch` is any identifier, scoped to the handler, and `catch { }` binds none. The error is deleted on every exit of the handler unless `return e` or `fail e` hands it on or a call moved it into an `own` parameter. `Error.wrap` takes its cause so. `fail "text"` is `fail Error.new(0, "text")`. `try` forwards the error and is refused outside a function that may fail. It stands wherever the call stands, after `return` and inside an expression as well. `undo` runs on the `fail` path and not on `return`. `Error` has `code`, `message`, an owned `cause`, the origin `at` that `fail` fills, and the frames of a trace when backtraces are on. It lives in `anti.lang`, the root of the standard library, which imports nothing. `e.text()` gives `error N: message`, or the message alone for code 0, with each cause on a line of its own, and the error keeps those bytes until it is deleted. `e.print()` writes that text to the standard error, and `e.fatal()` prints it and ends the program. Libraries subclass it and callers test with `is`. `anti.error` adds `SystemError`, with `from_errno()` and `from_win32()`, and `on_fatal` and `check`.
 
 The ABI of a `may fail` function is `?*Error f(args, R *out)`, with the result through an out pointer. `fn(A) -> R may fail` is its type as a value, a call through it is handled as a direct call is, and the header writes the ABI form. The compiler supplies that pointer over storage whose table it zeroes. The binding is destroyed at the end of its block like any other local. `may fail` is the one failing form. A C binding returns its error as an ordinary value, and a `may fail` wrapper turns it into a `fail`.
 
 A function fails by its `may fail` marking alone, and one that returns `*Error` or `?*Error` without it gives the error as a value. A `construct` with arguments that can fail is written `may fail`, and one written `-> ?*Error` is refused. The first `fail` of an error writes its origin `at` and, when backtraces are on, its frames, and `e.text()` names the position, the causes and the trace. `--anti.backtrace` and `backtrace = true` of the runtime configuration turn the frames on in a release build. The checker warns where the name a `catch` binds shadows a variable in scope, `shadowed-catch`, and where a `may fail` function holds no `fail` and no `try`, `never-fails`. `catch none` deletes the error as every handler does. The failing functions of the standard library stand in the table of [Standard library](#standard-library).
+
+A library declares its own errors as classes below `Error`, and a handler tests the class with `is`. `catch none` gives the `none` of a result that may hold one, and `Error.wrap` takes over the error it wraps as the cause.
+
+<!-- overview: context, docs-style:ignore
+```anti
+import anti.io;
+```
+-->
+```anti
+class NotFound inherits lang.Error { }
+
+fn lookup(key: str) -> int may fail
+{
+	if key.len == 0 { fail alloc NotFound { code: 2, message: "no key" }; }
+	return 1;
+}
+
+fn first_word(line: str) -> ?str may fail
+{
+	if line.len == 0 { fail "an empty line"; }
+	return none;
+}
+
+let found = lookup("a") catch e {
+	if e is *NotFound { yield -1; }
+	yield 0;
+};
+let word = first_word("") catch none;
+
+let wrapped = lang.Error.wrap(3, "no configuration", lang.Error.new(2, "no file"));
+io.eprintln(wrapped.text());
+delete(wrapped);
+```
+
+Not built yet: the refusal of a handler that can reach its end where a value is expected, and the refusal of `try` on an optional. Both compile today.
 
 ## Structs
 
