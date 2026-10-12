@@ -325,3 +325,7 @@ generic_variant_modules_dev T091 A literal of a case of a generic variant under 
 matrix_modules_is_names_a_case_with_its_type_arguments_dev T091 `is` with the type arguments of a generic variant does not parse.
 matrix_modules_is_names_a_case_with_its_type_arguments_release T091 `is` with the type arguments of a generic variant does not parse.
 matrix_modules_is_names_a_case_with_its_type_arguments_memory_checks T091 `is` with the type arguments of a generic variant does not parse.
+plugin_locals T092 A local object without `destruct` in a plugin stays counted as alive, and `unload` refuses.
+plugin_unused T093 A plugin cannot load when its host imports a module of the standard library and does not use it.
+constant_argument_modules_release T094 A constant of another module is refused as the argument of `N: int`.
+constant_argument_modules_dev T094 A constant of another module is refused as the argument of `N: int`.
