@@ -69,7 +69,29 @@ fn main() -> int
 hello
 ```
 
-`main` has one of three signatures: `fn main() -> int`, `fn main(args: []str) -> int`, `fn main(args: []str, env: []str) -> int`. Comments are `//` to the end of the line and `/* */`, which do not nest. `///` documents the next item and `//!` the module, and `//#` and `//#!` do the same for the developers of a library. Source is UTF-8. Indentation is a tab. An item body opens `{` on its own line, a statement block opens `{` on the statement's line.
+`main` has one of three signatures: `fn main() -> int`, `fn main(args: []str) -> int`, `fn main(args: []str, env: []str) -> int`. Source is UTF-8, and indentation is a tab. `anti fmt` writes an item body with `{` on its own line and a statement block with `{` on the line of its statement, and it leaves an item that is written on one line there.
+
+Comments are `//` to the end of the line and `/* */`, which do not nest. A doc comment documents the item after it, or the module when it stands first in the file. Each kind has a line form and a block form.
+
+| Line form | Block form | Documents |
+|---|---|---|
+| `///` | `/** */` | the next item, for the users of a module |
+| `//!` | `/*! */` | the module, for its users |
+| `//#` | `/*# */` | the next item, for the developers of a library |
+| `//#!` | `/*#! */` | the module, for its developers |
+
+```anti
+/// The area of a window in pixels.
+pub fn area(w: int, h: int) -> int { return w * h; }
+
+/** A corner of a window. */
+pub struct Point { x: int, y: int }
+
+//# Kept for the callers of version 1.
+pub fn legacy() { }
+```
+
+A block doc of one line holds its text between the opener and the closer. Over more lines the text starts on the line after the opener and ends on the line before the closer. `anti doc` writes the pages from these comments, see [Tools](#tools).
 
 ## Modules
 
