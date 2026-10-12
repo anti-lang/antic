@@ -13,9 +13,6 @@
 # and no line names. A new option comes with its test and never with a
 # line here.
 
-antic --help
-anti --help
-anti -h
 anti symbols --from
 anti build --strip-docs
 anti build --soname

@@ -1047,6 +1047,116 @@ add_expect_test(anti_version STATUS 0
     EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_version"
     COMMAND "$<TARGET_FILE:anti>" --version)
 
+# The usage. `--help`, and `-h` of anti, print it on the standard output
+# and end with 0, and the tool without an argument prints the same bytes
+# on the standard error and ends with 2.
+add_test(NAME antic_help
+    COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:antic>,--help"
+            -DNAME=antic -P "${CMAKE_CURRENT_SOURCE_DIR}/run_usage.cmake")
+add_test(NAME anti_help
+    COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:anti>,--help"
+            -DNAME=anti -P "${CMAKE_CURRENT_SOURCE_DIR}/run_usage.cmake")
+add_test(NAME anti_help_short
+    COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:anti>,-h"
+            -DNAME=anti -P "${CMAKE_CURRENT_SOURCE_DIR}/run_usage.cmake")
+
+# A command line that a tool refuses with its usage: 2, nothing on the
+# standard output and the bytes of `--help` on the standard error. antic
+# names an option it does not know and a second input before the usage.
+# The name of a case is its test, and the words after it are the arguments.
+function(add_usage_test tool name)
+    cmake_parse_arguments(PARSE_ARGV 2 arg "" "FIRST" "ARGS")
+    list(JOIN arg_ARGS "," words)
+    set(values "-DCOMMAND=$<TARGET_FILE:${tool}>,${words}" -DNAME=${tool}
+        -DREFUSED=ON)
+    if(DEFINED arg_FIRST)
+        list(APPEND values "-DFIRST=${arg_FIRST}")
+    endif()
+    add_test(NAME ${tool}_usage_${name}
+        COMMAND "${CMAKE_COMMAND}" ${values}
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_usage.cmake")
+endfunction()
+set(usage_source "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+add_usage_test(antic option_unknown FIRST "antic: unknown option --bogus"
+    ARGS --bogus "${usage_source}")
+add_usage_test(antic second_input FIRST "antic: one input file only"
+    ARGS "${usage_source}" "${usage_source}")
+add_usage_test(antic options_without_an_input ARGS -S --dev)
+foreach(case
+        "command_unknown|bogus"
+        "option_unknown|--bogus"
+        "version_and_a_word|--version|extra"
+        "help_and_a_word|--help|extra"
+        "new_without_a_name|new"
+        "build_option_unknown|build|--bogus"
+        "build_word|build|extra"
+        "build_lib_kind|build|--lib|bundled"
+        "check_option_unknown|check|--bogus"
+        "check_targets_value|check|--targets|some"
+        "doc_option_unknown|doc|--bogus"
+        "fmt_option_unknown|fmt|--bogus"
+        "test_option_unknown|test|--bogus"
+        "bind_without_an_input|bind"
+        "bind_option_unknown|bind|--bogus|api.json"
+        "bind_two_inputs|bind|api.json|other.json"
+        "bind_header_and_an_input|bind|--header|api.antl|api.json"
+        "symbols_without_a_command|symbols"
+        "symbols_command_unknown|symbols|bogus|--conf|app.toml"
+        "symbols_option_unknown|symbols|check|--conf|app.toml|--bogus"
+        "symbols_inventory_without_conf|symbols|inventory"
+        "symbols_inventory_with_symbols|symbols|inventory|--conf|app.toml|--symbols|symbols.zip"
+        "symbols_check_with_from|symbols|check|--conf|app.toml|--from|archives"
+        "symbols_check_with_a_trace|symbols|check|--conf|app.toml|trace.txt"
+        "symbols_resolve_with_from|symbols|resolve|trace.txt|--symbols|symbols.zip|--from|archives"
+        "symbols_resolve_with_conf|symbols|resolve|trace.txt|--symbols|symbols.zip|--conf|app.toml"
+        "symbols_resolve_without_symbols|symbols|resolve|trace.txt"
+        "symbols_resolve_two_traces|symbols|resolve|trace.txt|other.txt|--symbols|symbols.zip"
+        "sdk_without_a_command|sdk"
+        "sdk_command_unknown|sdk|bogus"
+        "sdk_export_option_unknown|sdk|export|--bogus"
+        "sdk_import_without_a_bundle|sdk|import"
+        "license_option_unknown|license|--bogus")
+    string(REPLACE "|" ";" parts "${case}")
+    list(POP_FRONT parts name)
+    add_usage_test(anti ${name} ARGS ${parts})
+endforeach()
+# An option of anti that takes a value, as the last word.
+foreach(case
+        "build|--target" "build|--cpu" "build|--lto" "build|--lib"
+        "build|--profile-use" "build|--runtime" "build|--llvm-mc"
+        "build|--llvm-ar"
+        "check|--targets" "check|--work" "check|--runtime" "check|-I"
+        "doc|-o" "doc|--work" "doc|--runtime" "doc|-I"
+        "test|--work" "test|--runtime" "test|--llvm-mc" "test|-I"
+        "bind|--header" "bind|--clang" "bind|-o" "bind|--runtime"
+        "bind|--module" "bind|--target" "bind|-I" "bind|-D"
+        "symbols|--conf" "symbols|--from" "symbols|--out" "symbols|--symbols"
+        "sdk_export|--sdk" "sdk_export|-o" "sdk_import|--sysroot"
+        "license|--from" "license|--from-archive" "license|--runtime")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 command)
+    list(GET parts 1 option)
+    string(REGEX REPLACE "^-+" "" word "${option}")
+    string(REPLACE "-" "_" word "${word}")
+    if(option STREQUAL "-o")
+        set(word "output")
+    elseif(option STREQUAL "-I")
+        set(word "root")
+    elseif(option STREQUAL "-D")
+        set(word "define")
+    endif()
+    set(words ${command})
+    if(command STREQUAL "symbols")
+        set(words symbols inventory)
+    elseif(command STREQUAL "sdk_export")
+        set(words sdk export)
+    elseif(command STREQUAL "sdk_import")
+        set(words sdk import bundle.tar.xz)
+    endif()
+    add_usage_test(anti ${command}_${word}_without_a_value
+        ARGS ${words} ${option})
+endforeach()
+
 # The host target name has two spellings: ANTIC_HOST_TARGET here and the
 # detection in src/antic/target.c. This test fails when they disagree.
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_host_target"
