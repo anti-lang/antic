@@ -1,0 +1,16 @@
+//! A slice literal over an array of lent pointers is refused: the type of the
+//! slice is written, and `lent` stands before no type of a literal.
+
+fn second(lent p: *int, lent q: *int) -> int
+{
+	let xs = [p, q];
+	let s = []*int { ptr: &xs[0], len: 2 };
+	return *s[1];
+}
+
+fn main() -> int
+{
+	let a = 1;
+	let b = 2;
+	return second(&a, &b);
+}

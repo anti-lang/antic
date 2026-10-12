@@ -1,0 +1,447 @@
+//! An array repeat `[v; n]`, for each of these kinds of value: i8, i16, i32,
+//! i64, int, u8, u16, u32, u64, uint, byte, f32, f64, f16, bool, char, str,
+//! slice, fixed array, pointer, nullable pointer, optional, may fail fn, fn,
+//! tuple, channel, struct, packed struct, simd struct, union, enum, variant,
+//! class, synchronized class, concurrent class, interface, generic. Each kind
+//! is a function of its own, which prints the two values it holds.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn risky_up(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "negative";
+	}
+	return n + 1;
+}
+
+fn risky_down(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "positive";
+	}
+	return n - 1;
+}
+
+fn settle(f: fn(int) -> int may fail) -> int
+{
+	let got = f(10) catch {
+		yield -1;
+	};
+	return got;
+}
+
+fn up(n: int) -> int
+{
+	return n + 1;
+}
+
+fn down(n: int) -> int
+{
+	return n - 1;
+}
+
+struct Pt
+{
+	x: int,
+	y: int,
+}
+
+packed struct Pk
+{
+	a: u8,
+	b: i32,
+}
+
+simd struct I32x4
+{
+	a: i32,
+	b: i32,
+	c: i32,
+	d: i32,
+}
+
+union Bits
+{
+	i: i32,
+	f: f32,
+}
+
+enum Color
+{
+	Red,
+	Green,
+	Blue,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+class Counter
+{
+	pub n: int = 0,
+}
+
+synchronized class Tally
+{
+	pub n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+concurrent class Hits
+{
+	pub atomic n: int = 0,
+}
+
+abstract class Named
+{
+	abstract fn id(self) -> int;
+}
+
+class One inherits Named
+{
+	concrete fn id(self) -> int
+	{
+		return 1;
+	}
+}
+
+class Two inherits Named
+{
+	concrete fn id(self) -> int
+	{
+		return 2;
+	}
+}
+
+fn same(n: int) -> int
+{
+	return n;
+}
+
+fn on_i8()
+{
+	let xs: [3]i8 = [127; 3];
+	let ys: [2]i8 = [-128; 2];
+	printf("i8 %lld %lld\n".ptr, xs[2] as int, ys[0] as int);
+}
+
+fn on_i16()
+{
+	let xs: [3]i16 = [32767; 3];
+	let ys: [2]i16 = [-32768; 2];
+	printf("i16 %lld %lld\n".ptr, xs[2] as int, ys[0] as int);
+}
+
+fn on_i32()
+{
+	let xs: [3]i32 = [2147483647; 3];
+	let ys: [2]i32 = [-2147483648; 2];
+	printf("i32 %lld %lld\n".ptr, xs[2] as int, ys[0] as int);
+}
+
+fn on_i64()
+{
+	let xs: [3]i64 = [9223372036854775807; 3];
+	let ys: [2]i64 = [-9223372036854775808; 2];
+	printf("i64 %lld %lld\n".ptr, xs[2] as int, ys[0] as int);
+}
+
+fn on_int()
+{
+	let xs: [3]int = [9223372036854775807; 3];
+	let ys: [2]int = [-9223372036854775808; 2];
+	printf("int %lld %lld\n".ptr, xs[2] as int, ys[0] as int);
+}
+
+fn on_u8()
+{
+	let xs: [3]u8 = [255; 3];
+	let ys: [2]u8 = [1; 2];
+	printf("u8 %llu %llu\n".ptr, xs[2] as u64, ys[0] as u64);
+}
+
+fn on_u16()
+{
+	let xs: [3]u16 = [65535; 3];
+	let ys: [2]u16 = [1; 2];
+	printf("u16 %llu %llu\n".ptr, xs[2] as u64, ys[0] as u64);
+}
+
+fn on_u32()
+{
+	let xs: [3]u32 = [4294967295; 3];
+	let ys: [2]u32 = [1; 2];
+	printf("u32 %llu %llu\n".ptr, xs[2] as u64, ys[0] as u64);
+}
+
+fn on_u64()
+{
+	let xs: [3]u64 = [18446744073709551615; 3];
+	let ys: [2]u64 = [1; 2];
+	printf("u64 %llu %llu\n".ptr, xs[2] as u64, ys[0] as u64);
+}
+
+fn on_uint()
+{
+	let xs: [3]uint = [18446744073709551615; 3];
+	let ys: [2]uint = [1; 2];
+	printf("uint %llu %llu\n".ptr, xs[2] as u64, ys[0] as u64);
+}
+
+fn on_byte()
+{
+	let xs: [3]byte = [255; 3];
+	let ys: [2]byte = [1; 2];
+	printf("byte %llu %llu\n".ptr, xs[2] as u64, ys[0] as u64);
+}
+
+fn on_f32()
+{
+	let xs: [3]f32 = [1.5; 3];
+	let ys: [2]f32 = [-0.25; 2];
+	printf("f32 %g %g\n".ptr, xs[2] as f64, ys[0] as f64);
+}
+
+fn on_f64()
+{
+	let xs: [3]f64 = [1.5; 3];
+	let ys: [2]f64 = [-0.25; 2];
+	printf("f64 %g %g\n".ptr, xs[2], ys[0]);
+}
+
+fn on_f16()
+{
+	let xs: [3]f16 = [1.5 as f16; 3];
+	let ys: [2]f16 = [-0.25 as f16; 2];
+	printf("f16 %g %g\n".ptr, xs[2] as f64, ys[0] as f64);
+}
+
+fn on_bool()
+{
+	let xs: [3]bool = [true; 3];
+	let ys: [2]bool = [false; 2];
+	printf("bool %d %d\n".ptr, xs[2] as c_int, ys[0] as c_int);
+}
+
+fn on_char()
+{
+	let xs: [3]char = ['a'; 3];
+	let ys: [2]char = ['\u{10FFFF}'; 2];
+	printf("char %u %u\n".ptr, xs[2] as u32, ys[0] as u32);
+}
+
+fn on_str()
+{
+	let xs: [3]str = ["one"; 3];
+	let ys: [2]str = ["three"; 2];
+	printf("str %lld %lld\n".ptr, xs[2].len, ys[0].len);
+}
+
+fn on_slice()
+{
+	let base = [1, 2, 3];
+	let xs: [3][]int = [base[0..1]; 3];
+	let ys: [2][]int = [base[0..3]; 2];
+	printf("slice %lld %lld\n".ptr, xs[2].len, ys[0].len);
+}
+
+fn on_fixed_array()
+{
+	let xs: [3][2]int = [[1, 2]; 3];
+	let ys: [2][2]int = [[3, 4]; 2];
+	printf("fixed_array %lld %lld\n".ptr, xs[2][1], ys[0][1]);
+}
+
+fn on_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let xs: [3]*int = [&a; 3];
+	let ys: [2]*int = [&b; 2];
+	printf("pointer %lld %lld\n".ptr, *xs[2], *ys[0]);
+}
+
+fn on_nullable_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let some: ?*int = &a;
+	let nothing: ?*int = none;
+	let xs: [3]?*int = [some; 3];
+	let ys: [2]?*int = [nothing; 2];
+	printf("nullable_pointer %lld %lld\n".ptr, *(xs[2] ?? &b), *(ys[0] ?? &b));
+}
+
+fn on_optional()
+{
+	let some: ?int = 5;
+	let nothing: ?int = none;
+	let xs: [3] ?int = [some; 3];
+	let ys: [2] ?int = [nothing; 2];
+	printf("optional %lld %lld\n".ptr, (xs[2] ?? -1), (ys[0] ?? -1));
+}
+
+fn on_may_fail_fn()
+{
+	let xs: [3] fn(int) -> int may fail = [risky_up; 3];
+	let ys: [2] fn(int) -> int may fail = [risky_down; 2];
+	printf("may_fail_fn %lld %lld\n".ptr, settle(xs[2]), settle(ys[0]));
+}
+
+fn on_fn()
+{
+	let xs: [3] fn(int) -> int = [up; 3];
+	let ys: [2] fn(int) -> int = [down; 2];
+	printf("fn %lld %lld\n".ptr, xs[2](10), ys[0](10));
+}
+
+fn on_tuple()
+{
+	let xs: [3](int, bool) = [(1, true); 3];
+	let ys: [2](int, bool) = [(2, false); 2];
+	printf("tuple %lld %lld\n".ptr, xs[2].0, ys[0].0);
+}
+
+fn on_channel()
+{
+	let c1 = chan int(1);
+	let c2 = chan int(1);
+	let xs: [3] chan int = [c1; 3];
+	let ys: [2] chan int = [c2; 2];
+	printf("channel %d %d\n".ptr, (xs[2] == c1) as c_int, (ys[0] == c1) as c_int);
+	delete(c1);
+	delete(c2);
+}
+
+fn on_struct()
+{
+	let xs: [3]Pt = [Pt { x: 1, y: 2 }; 3];
+	let ys: [2]Pt = [Pt { x: 3, y: 4 }; 2];
+	printf("struct %lld %lld\n".ptr, xs[2].y, ys[0].y);
+}
+
+fn on_packed_struct()
+{
+	let xs: [3]Pk = [Pk { a: 1, b: 2 }; 3];
+	let ys: [2]Pk = [Pk { a: 3, b: 4 }; 2];
+	printf("packed_struct %lld %lld\n".ptr, xs[2].b as int, ys[0].b as int);
+}
+
+fn on_simd_struct()
+{
+	let xs: [3]I32x4 = [I32x4 { a: 1, b: 2, c: 3, d: 4 }; 3];
+	let ys: [2]I32x4 = [I32x4 { a: 5, b: 6, c: 7, d: 8 }; 2];
+	printf("simd_struct %lld %lld\n".ptr, xs[2].c as int, ys[0].c as int);
+}
+
+fn on_union()
+{
+	let xs: [3]Bits = [Bits { i: 7 }; 3];
+	let ys: [2]Bits = [Bits { i: 9 }; 2];
+	printf("union %lld %lld\n".ptr, xs[2].i as int, ys[0].i as int);
+}
+
+fn on_enum()
+{
+	let xs: [3]Color = [Color.Green; 3];
+	let ys: [2]Color = [Color.Blue; 2];
+	printf("enum %lld %lld\n".ptr, xs[2] as int, ys[0] as int);
+}
+
+fn on_variant()
+{
+	let xs: [3]Shape = [Shape.Circle { r: 2 }; 3];
+	let ys: [2]Shape = [Shape.Empty; 2];
+	printf("variant %d %d\n".ptr, (xs[2] is Shape.Circle) as c_int, (ys[0] is Shape.Circle) as c_int);
+}
+
+fn on_class()
+{
+	let xs: [3]Counter = [Counter { n: 5 }; 3];
+	let ys: [2]Counter = [Counter { n: 6 }; 2];
+	printf("class %lld %lld\n".ptr, xs[2].n, ys[0].n);
+}
+
+fn on_synchronized_class()
+{
+	let xs: [3]Tally = [Tally { n: 5 }; 3];
+	let ys: [2]Tally = [Tally { n: 6 }; 2];
+	printf("synchronized_class %lld %lld\n".ptr, xs[2].get(), ys[0].get());
+}
+
+fn on_concurrent_class()
+{
+	let xs: [3]Hits = [Hits { n: 5 }; 3];
+	let ys: [2]Hits = [Hits { n: 6 }; 2];
+	printf("concurrent_class %lld %lld\n".ptr, xs[2].n.load(), ys[0].n.load());
+}
+
+fn on_interface()
+{
+	let one = One { };
+	let two = Two { };
+	let first: *Named = &one;
+	let second: *Named = &two;
+	let xs: [3]*Named = [first; 3];
+	let ys: [2]*Named = [second; 2];
+	printf("interface %lld %lld\n".ptr, xs[2].id(), ys[0].id());
+}
+
+fn on_generic<T>(a: T, b: T, read: fn(T) -> int)
+{
+	let xs: [3]T = [dup(a); 3];
+	let ys: [2]T = [dup(b); 2];
+	printf("generic %lld %lld\n".ptr, read(xs[2]), read(ys[0]));
+}
+
+fn main() -> int
+{
+	on_i8();
+	on_i16();
+	on_i32();
+	on_i64();
+	on_int();
+	on_u8();
+	on_u16();
+	on_u32();
+	on_u64();
+	on_uint();
+	on_byte();
+	on_f32();
+	on_f64();
+	on_f16();
+	on_bool();
+	on_char();
+	on_str();
+	on_slice();
+	on_fixed_array();
+	on_pointer();
+	on_nullable_pointer();
+	on_optional();
+	on_may_fail_fn();
+	on_fn();
+	on_tuple();
+	on_channel();
+	on_struct();
+	on_packed_struct();
+	on_simd_struct();
+	on_union();
+	on_enum();
+	on_variant();
+	on_class();
+	on_synchronized_class();
+	on_concurrent_class();
+	on_interface();
+	on_generic<int>(11, 22, same);
+	return 0;
+}

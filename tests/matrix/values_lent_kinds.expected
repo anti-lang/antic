@@ -1,0 +1,5 @@
+exit 0
+array 12
+array_repeat 2
+let 3
+assign 27

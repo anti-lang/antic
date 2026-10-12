@@ -1,0 +1,16 @@
+//! A `const` of the kind slice is refused: its value is no constant expression.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn on_slice()
+{
+	let base = [1, 2, 3];
+	const FIRST: []int = base[0..1];
+	printf("slice %lld %lld\n".ptr, FIRST.len, FIRST.len);
+}
+
+fn main() -> int
+{
+	on_slice();
+	return 0;
+}

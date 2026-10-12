@@ -1,0 +1,18 @@
+//! A `const` of the kind pointer is refused: its value is no constant
+//! expression.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn on_pointer()
+{
+	let a = 11;
+	let b = 22;
+	const FIRST: *int = &a;
+	printf("pointer %lld %lld\n".ptr, *FIRST, *FIRST);
+}
+
+fn main() -> int
+{
+	on_pointer();
+	return 0;
+}

@@ -1,0 +1,538 @@
+//! A call that takes the value and gives it back, for each of these kinds of
+//! value: i8, i16, i32, i64, int, u8, u16, u32, u64, uint, byte, f32, f64,
+//! bool, char, str, slice, fixed array, pointer, nullable pointer, optional,
+//! may fail fn, fn, tuple, channel, struct, packed struct, simd struct, union,
+//! enum, variant, class, concurrent class, interface. Each kind is a function
+//! of its own, which prints the two values it holds.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn pass_i8(v: i8) -> i8
+{
+	return v;
+}
+
+fn pass_i16(v: i16) -> i16
+{
+	return v;
+}
+
+fn pass_i32(v: i32) -> i32
+{
+	return v;
+}
+
+fn pass_i64(v: i64) -> i64
+{
+	return v;
+}
+
+fn pass_int(v: int) -> int
+{
+	return v;
+}
+
+fn pass_u8(v: u8) -> u8
+{
+	return v;
+}
+
+fn pass_u16(v: u16) -> u16
+{
+	return v;
+}
+
+fn pass_u32(v: u32) -> u32
+{
+	return v;
+}
+
+fn pass_u64(v: u64) -> u64
+{
+	return v;
+}
+
+fn pass_uint(v: uint) -> uint
+{
+	return v;
+}
+
+fn pass_byte(v: byte) -> byte
+{
+	return v;
+}
+
+fn pass_f32(v: f32) -> f32
+{
+	return v;
+}
+
+fn pass_f64(v: f64) -> f64
+{
+	return v;
+}
+
+fn pass_bool(v: bool) -> bool
+{
+	return v;
+}
+
+fn pass_char(v: char) -> char
+{
+	return v;
+}
+
+fn pass_str(v: str) -> str
+{
+	return v;
+}
+
+fn pass_slice(v: []int) -> []int
+{
+	return v;
+}
+
+fn pass_fixed_array(v: [2]int) -> [2]int
+{
+	return v;
+}
+
+fn pass_pointer(v: *int) -> *int
+{
+	return v;
+}
+
+fn pass_nullable_pointer(v: ?*int) -> ?*int
+{
+	return v;
+}
+
+fn pass_optional(v: ?int) -> ?int
+{
+	return v;
+}
+
+fn risky_up(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "negative";
+	}
+	return n + 1;
+}
+
+fn risky_down(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "positive";
+	}
+	return n - 1;
+}
+
+fn settle(f: fn(int) -> int may fail) -> int
+{
+	let got = f(10) catch {
+		yield -1;
+	};
+	return got;
+}
+
+fn pass_may_fail_fn(keep v: fn(int) -> int may fail) -> fn(int) -> int may fail
+{
+	return v;
+}
+
+fn up(n: int) -> int
+{
+	return n + 1;
+}
+
+fn down(n: int) -> int
+{
+	return n - 1;
+}
+
+fn pass_fn(keep v: fn(int) -> int) -> fn(int) -> int
+{
+	return v;
+}
+
+fn pass_tuple(v: (int, bool)) -> (int, bool)
+{
+	return v;
+}
+
+fn pass_channel(v: chan int) -> chan int
+{
+	return v;
+}
+
+struct Pt
+{
+	x: int,
+	y: int,
+}
+
+fn pass_struct(v: Pt) -> Pt
+{
+	return v;
+}
+
+packed struct Pk
+{
+	a: u8,
+	b: i32,
+}
+
+fn pass_packed_struct(v: Pk) -> Pk
+{
+	return v;
+}
+
+simd struct I32x4
+{
+	a: i32,
+	b: i32,
+	c: i32,
+	d: i32,
+}
+
+fn pass_simd_struct(v: I32x4) -> I32x4
+{
+	return v;
+}
+
+union Bits
+{
+	i: i32,
+	f: f32,
+}
+
+fn pass_union(v: Bits) -> Bits
+{
+	return v;
+}
+
+enum Color
+{
+	Red,
+	Green,
+	Blue,
+}
+
+fn pass_enum(v: Color) -> Color
+{
+	return v;
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+fn pass_variant(v: Shape) -> Shape
+{
+	return v;
+}
+
+class Counter
+{
+	pub n: int = 0,
+}
+
+fn pass_class(v: Counter) -> Counter
+{
+	return v;
+}
+
+concurrent class Hits
+{
+	pub atomic n: int = 0,
+}
+
+fn pass_concurrent_class(v: Hits) -> Hits
+{
+	return v;
+}
+
+abstract class Named
+{
+	abstract fn id(self) -> int;
+}
+
+class One inherits Named
+{
+	concrete fn id(self) -> int
+	{
+		return 1;
+	}
+}
+
+class Two inherits Named
+{
+	concrete fn id(self) -> int
+	{
+		return 2;
+	}
+}
+
+fn pass_interface(v: *Named) -> *Named
+{
+	return v;
+}
+
+fn on_i8()
+{
+	let first = pass_i8(127);
+	printf("i8 %lld %lld\n".ptr, first as int, pass_i8(-128) as int);
+}
+
+fn on_i16()
+{
+	let first = pass_i16(32767);
+	printf("i16 %lld %lld\n".ptr, first as int, pass_i16(-32768) as int);
+}
+
+fn on_i32()
+{
+	let first = pass_i32(2147483647);
+	printf("i32 %lld %lld\n".ptr, first as int, pass_i32(-2147483648) as int);
+}
+
+fn on_i64()
+{
+	let first = pass_i64(9223372036854775807);
+	printf("i64 %lld %lld\n".ptr, first as int, pass_i64(-9223372036854775808) as int);
+}
+
+fn on_int()
+{
+	let first = pass_int(9223372036854775807);
+	printf("int %lld %lld\n".ptr, first as int, pass_int(-9223372036854775808) as int);
+}
+
+fn on_u8()
+{
+	let first = pass_u8(255);
+	printf("u8 %llu %llu\n".ptr, first as u64, pass_u8(1) as u64);
+}
+
+fn on_u16()
+{
+	let first = pass_u16(65535);
+	printf("u16 %llu %llu\n".ptr, first as u64, pass_u16(1) as u64);
+}
+
+fn on_u32()
+{
+	let first = pass_u32(4294967295);
+	printf("u32 %llu %llu\n".ptr, first as u64, pass_u32(1) as u64);
+}
+
+fn on_u64()
+{
+	let first = pass_u64(18446744073709551615);
+	printf("u64 %llu %llu\n".ptr, first as u64, pass_u64(1) as u64);
+}
+
+fn on_uint()
+{
+	let first = pass_uint(18446744073709551615);
+	printf("uint %llu %llu\n".ptr, first as u64, pass_uint(1) as u64);
+}
+
+fn on_byte()
+{
+	let first = pass_byte(255);
+	printf("byte %llu %llu\n".ptr, first as u64, pass_byte(1) as u64);
+}
+
+fn on_f32()
+{
+	let first = pass_f32(1.5);
+	printf("f32 %g %g\n".ptr, first as f64, pass_f32(-0.25) as f64);
+}
+
+fn on_f64()
+{
+	let first = pass_f64(1.5);
+	printf("f64 %g %g\n".ptr, first, pass_f64(-0.25));
+}
+
+fn on_bool()
+{
+	let first = pass_bool(true);
+	printf("bool %d %d\n".ptr, first as c_int, pass_bool(false) as c_int);
+}
+
+fn on_char()
+{
+	let first = pass_char('a');
+	printf("char %u %u\n".ptr, first as u32, pass_char('\u{10FFFF}') as u32);
+}
+
+fn on_str()
+{
+	let first = pass_str("one");
+	printf("str %lld %lld\n".ptr, first.len, pass_str("three").len);
+}
+
+fn on_slice()
+{
+	let base = [1, 2, 3];
+	let first = pass_slice(base[0..1]);
+	printf("slice %lld %lld\n".ptr, first.len, pass_slice(base[0..3]).len);
+}
+
+fn on_fixed_array()
+{
+	let first = pass_fixed_array([1, 2]);
+	printf("fixed_array %lld %lld\n".ptr, first[1], pass_fixed_array([3, 4])[1]);
+}
+
+fn on_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let first = pass_pointer(&a);
+	printf("pointer %lld %lld\n".ptr, *first, *pass_pointer(&b));
+}
+
+fn on_nullable_pointer()
+{
+	let a = 11;
+	let b = 22;
+	let first = pass_nullable_pointer(&a);
+	printf("nullable_pointer %lld %lld\n".ptr, *(first ?? &b), *(pass_nullable_pointer(none) ?? &b));
+}
+
+fn on_optional()
+{
+	let first = pass_optional(5);
+	printf("optional %lld %lld\n".ptr, (first ?? -1), (pass_optional(none) ?? -1));
+}
+
+fn on_may_fail_fn()
+{
+	let first = pass_may_fail_fn(risky_up);
+	printf("may_fail_fn %lld %lld\n".ptr, settle(first), settle(pass_may_fail_fn(risky_down)));
+}
+
+fn on_fn()
+{
+	let first = pass_fn(up);
+	printf("fn %lld %lld\n".ptr, first(10), pass_fn(down)(10));
+}
+
+fn on_tuple()
+{
+	let first = pass_tuple((1, true));
+	printf("tuple %lld %lld\n".ptr, first.0, pass_tuple((2, false)).0);
+}
+
+fn on_channel()
+{
+	let c1 = chan int(1);
+	let c2 = chan int(1);
+	let first = pass_channel(c1);
+	printf("channel %d %d\n".ptr, (first == c1) as c_int, (pass_channel(c2) == c1) as c_int);
+	delete(c1);
+	delete(c2);
+}
+
+fn on_struct()
+{
+	let first = pass_struct(Pt { x: 1, y: 2 });
+	printf("struct %lld %lld\n".ptr, first.y, pass_struct(Pt { x: 3, y: 4 }).y);
+}
+
+fn on_packed_struct()
+{
+	let first = pass_packed_struct(Pk { a: 1, b: 2 });
+	printf("packed_struct %lld %lld\n".ptr, first.b as int, pass_packed_struct(Pk { a: 3, b: 4 }).b as int);
+}
+
+fn on_simd_struct()
+{
+	let first = pass_simd_struct(I32x4 { a: 1, b: 2, c: 3, d: 4 });
+	printf("simd_struct %lld %lld\n".ptr, first.c as int, pass_simd_struct(I32x4 { a: 5, b: 6, c: 7, d: 8 }).c as int);
+}
+
+fn on_union()
+{
+	let first = pass_union(Bits { i: 7 });
+	printf("union %lld %lld\n".ptr, first.i as int, pass_union(Bits { i: 9 }).i as int);
+}
+
+fn on_enum()
+{
+	let first = pass_enum(Color.Green);
+	printf("enum %lld %lld\n".ptr, first as int, pass_enum(Color.Blue) as int);
+}
+
+fn on_variant()
+{
+	let first = pass_variant(Shape.Circle { r: 2 });
+	printf("variant %d %d\n".ptr, (first is Shape.Circle) as c_int, (pass_variant(Shape.Empty) is Shape.Circle) as c_int);
+}
+
+fn on_class()
+{
+	let first = pass_class(Counter { n: 5 });
+	printf("class %lld %lld\n".ptr, first.n, pass_class(Counter { n: 6 }).n);
+}
+
+fn on_concurrent_class()
+{
+	let first = pass_concurrent_class(Hits { n: 5 });
+	printf("concurrent_class %lld %lld\n".ptr, first.n.load(), pass_concurrent_class(Hits { n: 6 }).n.load());
+}
+
+fn on_interface()
+{
+	let one = One { };
+	let two = Two { };
+	let first = pass_interface(&one);
+	printf("interface %lld %lld\n".ptr, first.id(), pass_interface(&two).id());
+}
+
+fn main() -> int
+{
+	on_i8();
+	on_i16();
+	on_i32();
+	on_i64();
+	on_int();
+	on_u8();
+	on_u16();
+	on_u32();
+	on_u64();
+	on_uint();
+	on_byte();
+	on_f32();
+	on_f64();
+	on_bool();
+	on_char();
+	on_str();
+	on_slice();
+	on_fixed_array();
+	on_pointer();
+	on_nullable_pointer();
+	on_optional();
+	on_may_fail_fn();
+	on_fn();
+	on_tuple();
+	on_channel();
+	on_struct();
+	on_packed_struct();
+	on_simd_struct();
+	on_union();
+	on_enum();
+	on_variant();
+	on_class();
+	on_concurrent_class();
+	on_interface();
+	return 0;
+}

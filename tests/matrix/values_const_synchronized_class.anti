@@ -1,0 +1,28 @@
+//! A `const` of the kind synchronized class is refused: its value is no
+//! constant expression.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+synchronized class Tally
+{
+	pub n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+fn on_synchronized_class()
+{
+	const FIRST: Tally = Tally { n: 5 };
+	printf("synchronized_class %lld %lld\n".ptr, FIRST.get(), FIRST.get());
+}
+
+fn main() -> int
+{
+	on_synchronized_class();
+	return 0;
+}

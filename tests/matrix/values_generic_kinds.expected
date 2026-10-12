@@ -1,0 +1,12 @@
+exit 0
+call 4 5
+assign 2
+arith i8 63
+arith int 63
+arith f32 -4.75
+arith f64 -4.75
+least u64 1
+least i8 -128
+least f64 -0.5
+least str 5
+least char 97

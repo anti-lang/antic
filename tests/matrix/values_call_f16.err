@@ -1,0 +1,2 @@
+values_call_f16.anti:5:16: error: a parameter cannot be `f16`, which is storage only
+values_call_f16.anti:5:16: error: a parameter cannot be `f16`, which is storage only

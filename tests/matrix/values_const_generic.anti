@@ -1,0 +1,13 @@
+//! A `const` of the type of a type parameter has no value to take: no literal
+//! has that type, and a parameter of the function is no constant expression.
+
+fn first<T>(a: T) -> int
+{
+	const KEPT: T = a;
+	return size_of(T);
+}
+
+fn main() -> int
+{
+	return first<int>(1);
+}

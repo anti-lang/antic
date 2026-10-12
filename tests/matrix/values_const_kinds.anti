@@ -1,0 +1,232 @@
+//! A `const` in a body, for each of these kinds of value: i8, i16, i32, i64,
+//! int, u8, u16, u32, u64, uint, byte, f32, f64, f16, bool, char, str, fixed
+//! array, nullable pointer, tuple, struct, packed struct, simd struct, enum.
+//! Each kind is a function of its own, which prints the two values it holds.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pt
+{
+	x: int,
+	y: int,
+}
+
+packed struct Pk
+{
+	a: u8,
+	b: i32,
+}
+
+simd struct I32x4
+{
+	a: i32,
+	b: i32,
+	c: i32,
+	d: i32,
+}
+
+enum Color
+{
+	Red,
+	Green,
+	Blue,
+}
+
+fn on_i8()
+{
+	const FIRST: i8 = 127;
+	const SECOND: i8 = -128;
+	printf("i8 %lld %lld\n".ptr, FIRST as int, SECOND as int);
+}
+
+fn on_i16()
+{
+	const FIRST: i16 = 32767;
+	const SECOND: i16 = -32768;
+	printf("i16 %lld %lld\n".ptr, FIRST as int, SECOND as int);
+}
+
+fn on_i32()
+{
+	const FIRST: i32 = 2147483647;
+	const SECOND: i32 = -2147483648;
+	printf("i32 %lld %lld\n".ptr, FIRST as int, SECOND as int);
+}
+
+fn on_i64()
+{
+	const FIRST: i64 = 9223372036854775807;
+	const SECOND: i64 = -9223372036854775808;
+	printf("i64 %lld %lld\n".ptr, FIRST as int, SECOND as int);
+}
+
+fn on_int()
+{
+	const FIRST: int = 9223372036854775807;
+	const SECOND: int = -9223372036854775808;
+	printf("int %lld %lld\n".ptr, FIRST as int, SECOND as int);
+}
+
+fn on_u8()
+{
+	const FIRST: u8 = 255;
+	const SECOND: u8 = 1;
+	printf("u8 %llu %llu\n".ptr, FIRST as u64, SECOND as u64);
+}
+
+fn on_u16()
+{
+	const FIRST: u16 = 65535;
+	const SECOND: u16 = 1;
+	printf("u16 %llu %llu\n".ptr, FIRST as u64, SECOND as u64);
+}
+
+fn on_u32()
+{
+	const FIRST: u32 = 4294967295;
+	const SECOND: u32 = 1;
+	printf("u32 %llu %llu\n".ptr, FIRST as u64, SECOND as u64);
+}
+
+fn on_u64()
+{
+	const FIRST: u64 = 18446744073709551615;
+	const SECOND: u64 = 1;
+	printf("u64 %llu %llu\n".ptr, FIRST as u64, SECOND as u64);
+}
+
+fn on_uint()
+{
+	const FIRST: uint = 18446744073709551615;
+	const SECOND: uint = 1;
+	printf("uint %llu %llu\n".ptr, FIRST as u64, SECOND as u64);
+}
+
+fn on_byte()
+{
+	const FIRST: byte = 255;
+	const SECOND: byte = 1;
+	printf("byte %llu %llu\n".ptr, FIRST as u64, SECOND as u64);
+}
+
+fn on_f32()
+{
+	const FIRST: f32 = 1.5;
+	const SECOND: f32 = -0.25;
+	printf("f32 %g %g\n".ptr, FIRST as f64, SECOND as f64);
+}
+
+fn on_f64()
+{
+	const FIRST: f64 = 1.5;
+	const SECOND: f64 = -0.25;
+	printf("f64 %g %g\n".ptr, FIRST, SECOND);
+}
+
+fn on_f16()
+{
+	const FIRST: f16 = 1.5 as f16;
+	const SECOND: f16 = -0.25 as f16;
+	printf("f16 %g %g\n".ptr, FIRST as f64, SECOND as f64);
+}
+
+fn on_bool()
+{
+	const FIRST: bool = true;
+	const SECOND: bool = false;
+	printf("bool %d %d\n".ptr, FIRST as c_int, SECOND as c_int);
+}
+
+fn on_char()
+{
+	const FIRST: char = 'a';
+	const SECOND: char = '\u{10FFFF}';
+	printf("char %u %u\n".ptr, FIRST as u32, SECOND as u32);
+}
+
+fn on_str()
+{
+	const FIRST: str = "one";
+	const SECOND: str = "three";
+	printf("str %lld %lld\n".ptr, FIRST.len, SECOND.len);
+}
+
+fn on_fixed_array()
+{
+	const FIRST: [2]int = [1, 2];
+	const SECOND: [2]int = [3, 4];
+	printf("fixed_array %lld %lld\n".ptr, FIRST[1], SECOND[1]);
+}
+
+fn on_nullable_pointer()
+{
+	let a = 11;
+	let b = 22;
+	const FIRST: ?*int = none;
+	const SECOND: ?*int = none;
+	printf("nullable_pointer %lld %lld\n".ptr, *(FIRST ?? &b), *(SECOND ?? &b));
+}
+
+fn on_tuple()
+{
+	const FIRST: (int, bool) = (1, true);
+	const SECOND: (int, bool) = (2, false);
+	printf("tuple %lld %lld\n".ptr, FIRST.0, SECOND.0);
+}
+
+fn on_struct()
+{
+	const FIRST: Pt = Pt { x: 1, y: 2 };
+	const SECOND: Pt = Pt { x: 3, y: 4 };
+	printf("struct %lld %lld\n".ptr, FIRST.y, SECOND.y);
+}
+
+fn on_packed_struct()
+{
+	const FIRST: Pk = Pk { a: 1, b: 2 };
+	const SECOND: Pk = Pk { a: 3, b: 4 };
+	printf("packed_struct %lld %lld\n".ptr, FIRST.b as int, SECOND.b as int);
+}
+
+fn on_simd_struct()
+{
+	const FIRST: I32x4 = I32x4 { a: 1, b: 2, c: 3, d: 4 };
+	const SECOND: I32x4 = I32x4 { a: 5, b: 6, c: 7, d: 8 };
+	printf("simd_struct %lld %lld\n".ptr, FIRST.c as int, SECOND.c as int);
+}
+
+fn on_enum()
+{
+	const FIRST: Color = Color.Green;
+	const SECOND: Color = Color.Blue;
+	printf("enum %lld %lld\n".ptr, FIRST as int, SECOND as int);
+}
+
+fn main() -> int
+{
+	on_i8();
+	on_i16();
+	on_i32();
+	on_i64();
+	on_int();
+	on_u8();
+	on_u16();
+	on_u32();
+	on_u64();
+	on_uint();
+	on_byte();
+	on_f32();
+	on_f64();
+	on_f16();
+	on_bool();
+	on_char();
+	on_str();
+	on_fixed_array();
+	on_nullable_pointer();
+	on_tuple();
+	on_struct();
+	on_packed_struct();
+	on_simd_struct();
+	on_enum();
+	return 0;
+}

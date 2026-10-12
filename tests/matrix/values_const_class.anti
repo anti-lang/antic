@@ -1,0 +1,20 @@
+//! A `const` of the kind class is refused: its value is no constant expression.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counter
+{
+	pub n: int = 0,
+}
+
+fn on_class()
+{
+	const FIRST: Counter = Counter { n: 5 };
+	printf("class %lld %lld\n".ptr, FIRST.n, FIRST.n);
+}
+
+fn main() -> int
+{
+	on_class();
+	return 0;
+}

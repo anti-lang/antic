@@ -1,0 +1,2 @@
+values_const_pointer.anti:10:22: error: an address or a dereference is not a constant expression
+values_const_pointer.anti:10:22: error: an address or a dereference is not a constant expression

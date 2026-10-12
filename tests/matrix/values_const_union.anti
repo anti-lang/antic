@@ -1,0 +1,21 @@
+//! A `const` of the kind union is refused: its value is no constant expression.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+union Bits
+{
+	i: i32,
+	f: f32,
+}
+
+fn on_union()
+{
+	const FIRST: Bits = Bits { i: 7 };
+	printf("union %lld %lld\n".ptr, FIRST.i as int, FIRST.i as int);
+}
+
+fn main() -> int
+{
+	on_union();
+	return 0;
+}

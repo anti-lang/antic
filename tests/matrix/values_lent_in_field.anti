@@ -1,0 +1,19 @@
+//! A lent pointer is not stored in a field: the struct would keep it past the
+//! call that lent it.
+
+struct Holder
+{
+	p: *int,
+}
+
+fn keep(lent p: *int) -> int
+{
+	let h = Holder { p: p };
+	return *h.p;
+}
+
+fn main() -> int
+{
+	let a = 1;
+	return keep(&a);
+}

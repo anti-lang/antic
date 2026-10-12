@@ -1,0 +1,14 @@
+//! A `const` of a variant is refused.
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+const NOTHING: Shape = Shape.Empty;
+
+fn main() -> int
+{
+	return 0;
+}

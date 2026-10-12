@@ -1,0 +1,39 @@
+//! A `const` of the kind interface is refused: its value is no constant
+//! expression.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Named
+{
+	abstract fn id(self) -> int;
+}
+
+class One inherits Named
+{
+	concrete fn id(self) -> int
+	{
+		return 1;
+	}
+}
+
+class Two inherits Named
+{
+	concrete fn id(self) -> int
+	{
+		return 2;
+	}
+}
+
+fn on_interface()
+{
+	let one = One { };
+	let two = Two { };
+	const FIRST: *Named = &one;
+	printf("interface %lld %lld\n".ptr, FIRST.id(), FIRST.id());
+}
+
+fn main() -> int
+{
+	on_interface();
+	return 0;
+}

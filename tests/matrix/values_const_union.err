@@ -1,0 +1,2 @@
+values_const_union.anti:13:22: error: a union is not a constant expression
+values_const_union.anti:13:22: error: a union is not a constant expression

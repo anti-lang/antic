@@ -1,0 +1,60 @@
+//! A value of a type parameter in an assignment, as the argument and the result
+//! of a call, and under the operators its constraint gives it. `Number` gives
+//! `+ - * /` and unary `-`, and `Ordered` gives `==` and `<`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn same(n: int) -> int
+{
+	return n;
+}
+
+fn pass<T>(v: T) -> T
+{
+	return dup(v);
+}
+
+fn take<T>(own v: T) -> T
+{
+	return v;
+}
+
+fn assign<T>(a: T, b: T, read: fn(T) -> int) -> int
+{
+	let first: T = dup(a);
+	first = dup(b);
+	return read(first);
+}
+
+fn arith<T: Number>(a: T, b: T) -> T
+{
+	return (a + b) * a - b / a + -b;
+}
+
+fn least<T: Ordered>(a: T, b: T) -> T
+{
+	if a < b || a == b {
+		return dup(a);
+	}
+	return dup(b);
+}
+
+fn main() -> int
+{
+	printf("call %lld %lld\n".ptr, pass<int>(4), take<int>(5));
+	printf("assign %lld\n".ptr, assign<int>(1, 2, same));
+	let small: i8 = 5;
+	printf("arith i8 %d\n".ptr, arith<i8>(small, 10) as c_int);
+	printf("arith int %lld\n".ptr, arith<int>(5, 10));
+	printf("arith f32 %g\n".ptr, arith<f32>(0.5, 2.0) as f64);
+	printf("arith f64 %g\n".ptr, arith<f64>(0.5, 2.0));
+	let big: u64 = 18446744073709551615;
+	printf("least u64 %llu\n".ptr, least<u64>(big, 1));
+	printf("least i8 %d\n".ptr, least<i8>(-128, 127) as c_int);
+	printf("least f64 %g\n".ptr, least<f64>(-0.5, -0.25));
+	printf("least str %lld\n".ptr, least<str>("pear", "apple").len);
+	printf("least char %u\n".ptr, least<char>('b', 'a') as u32);
+	return 0;
+}

@@ -1,0 +1,16 @@
+//! A compound assignment on a value of a type parameter is refused: `+=` is not
+//! derived from the `+` that `Number` gives.
+
+import anti.lang;
+
+fn total<T: Number>(a: T, b: T) -> T
+{
+	let sum = a + b;
+	sum += a;
+	return sum;
+}
+
+fn main() -> int
+{
+	return total<int>(1, 2);
+}

@@ -1,0 +1,22 @@
+//! An assignment of a synchronized class is refused: the object holds its lock,
+//! and a lock is never copied.
+
+import anti.lang;
+
+synchronized class Tally
+{
+	pub n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	let first = Tally { n: 5 };
+	let second = Tally { n: 6 };
+	first = second;
+	return first.get();
+}

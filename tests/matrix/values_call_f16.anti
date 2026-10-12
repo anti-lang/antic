@@ -1,0 +1,20 @@
+//! x
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn pass_f16(v: f16) -> f16
+{
+	return v;
+}
+
+fn on_f16()
+{
+	let first = pass_f16(1.5 as f16);
+	printf("f16 %g %g\n".ptr, first as f64, pass_f16(-0.25 as f16) as f64);
+}
+
+fn main() -> int
+{
+	on_f16();
+	return 0;
+}
