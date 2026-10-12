@@ -1,0 +1,57 @@
+//! A host that loads the library its first argument names and asks it for a
+//! `Worker`. It hands each kind of value to a function of the library through
+//! the table of the interface and prints what comes back: integers, a float,
+//! texts, a slice, a struct, an enum, a variant, an optional value, a tuple, a
+//! result that may fail, a closure of the host, an object made on one side and
+//! ended on the other, and a write through a pointer.
+
+import anti.lang;
+import anti.plugin;
+import net.example.kinds;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch fatal;
+	let w = lib.instance(kinds.Worker) catch fatal;
+	printf("integers %lld\n".ptr, w.add(40, 2));
+	printf("float %.2f\n".ptr, w.scale(1.25));
+	let name = w.name();
+	let longer = w.longer("host", "library");
+	printf("texts %.*s %.*s\n".ptr, name.len as c_int, name.ptr, longer.len as c_int, longer.ptr);
+	let numbers: [4]int = [1, 2, 3, 4];
+	printf("slice %lld\n".ptr, w.total(numbers[0..4]));
+	let p = w.flip(kinds.Point { x: 1, y: 2 });
+	printf("struct %lld %lld\n".ptr, p.x, p.y);
+	printf("enum %d\n".ptr, (w.other(kinds.Level.Low) == kinds.Level.High) as c_int);
+	let r = 0;
+	if let Dot d = w.grow(kinds.Shape.Dot { r: 4 }) {
+		r = d.r;
+	}
+	printf("variant %lld\n".ptr, r);
+	printf("optional %lld %lld\n".ptr, w.find(numbers[0..4], 3) ?? -1, w.find(numbers[0..4], 9) ?? -1);
+	let t = w.pair(1);
+	printf("tuple %lld %.*s\n".ptr, t.0, t.1.len as c_int, t.1.ptr);
+	let half = w.half(10) catch {
+		yield -1;
+	};
+	let odd = w.half(7) catch e {
+		yield 0 - e.code;
+	};
+	printf("may fail %lld %lld\n".ptr, half, odd);
+	let base = 100;
+	printf("closure %lld\n".ptr, w.each(5, fn(n) { return n + base; }));
+	let made = w.make(11);
+	printf("an object of the library %lld\n".ptr, made.n);
+	delete(made);
+	let mine = alloc kinds.Note { n: 12 };
+	printf("an object of the host %lld\n".ptr, w.take(mine));
+	let out = kinds.Point { x: 0, y: 0 };
+	w.fill(&out);
+	printf("pointer %lld %lld\n".ptr, out.x, out.y);
+	delete(w);
+	lib.unload() catch fatal;
+	delete(lib);
+	return 0;
+}

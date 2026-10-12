@@ -1,0 +1,24 @@
+//! A host that calls two functions of a library, each of which holds a local
+//! object of a class of the library, and reads how many objects of the library
+//! are alive. After each call that is the one object the host holds, and after
+//! the host ended it the library unloads.
+
+import anti.lang;
+import anti.plugin;
+import net.example.tasks;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch fatal;
+	let t = lib.instance(tasks.Tasks) catch fatal;
+	printf("a local with destruct gives %lld, alive %lld\n".ptr, t.local(true), lib.live());
+	printf("a local without destruct gives %lld, alive %lld\n".ptr, t.local(false), lib.live());
+	delete(t);
+	printf("after the delete %lld\n".ptr, lib.live());
+	lib.unload() catch fatal;
+	printf("unloaded\n".ptr);
+	delete(lib);
+	return 0;
+}

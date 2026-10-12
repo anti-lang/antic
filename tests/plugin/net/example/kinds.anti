@@ -1,0 +1,82 @@
+//! The interface that the host of the test plugin_kinds and its library share.
+//! One function per kind of value takes the kind from the host and gives it
+//! back from the library.
+
+import anti.lang;
+
+/// A point of the plane.
+pub struct Point
+{
+	x: int,
+	y: int,
+}
+
+/// A level.
+pub enum Level
+{
+	Low,
+	High,
+}
+
+/// A shape.
+pub variant Shape
+{
+	Dot { r: int },
+	Empty,
+}
+
+/// A note that one side makes and the other side ends.
+pub class Note
+{
+	/// The number of the note.
+	pub n: int = 0,
+}
+
+/// What the library does with each kind of value.
+pub abstract class Worker
+{
+	/// The sum of two integers.
+	pub abstract fn add(self, a: int, b: int) -> int;
+
+	/// Twice a float.
+	pub abstract fn scale(self, v: f64) -> f64;
+
+	/// A text of the library.
+	pub abstract fn name(self) -> str;
+
+	/// The longer of two texts.
+	pub abstract fn longer(self, a: str, b: str) -> str;
+
+	/// The sum of a slice.
+	pub abstract fn total(self, xs: []int) -> int;
+
+	/// A point with its parts swapped.
+	pub abstract fn flip(self, p: Point) -> Point;
+
+	/// The other level.
+	pub abstract fn other(self, l: Level) -> Level;
+
+	/// A dot of twice the radius, or a dot of radius 1 for `Empty`.
+	pub abstract fn grow(self, s: Shape) -> Shape;
+
+	/// The index of `want` in `xs`, or `none`.
+	pub abstract fn find(self, xs: []int, want: int) -> ?int;
+
+	/// `n` and its name.
+	pub abstract fn pair(self, n: int) -> (int, str);
+
+	/// Half of an even `n`. An odd one fails.
+	pub abstract fn half(self, n: int) -> int may fail;
+
+	/// What `f` gives for `n`, twice.
+	pub abstract fn each(self, n: int, f: fn(int) -> int) -> int;
+
+	/// A new note, which the caller ends.
+	pub abstract fn make(self, n: int) -> *Note;
+
+	/// The number of a note, which the library ends.
+	pub abstract fn take(self, own note: *Note) -> int;
+
+	/// Write the calls so far through a pointer.
+	pub abstract fn fill(self, out: *Point);
+}

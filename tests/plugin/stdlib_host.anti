@@ -1,0 +1,22 @@
+//! A host that imports `anti.text` and `anti.collection.list` and uses neither
+//! itself. Its library uses both, and resolves them against this host.
+
+import anti.collection.list;
+import anti.lang;
+import anti.plugin;
+import anti.text;
+import net.example.tasks;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch fatal;
+	let t = lib.instance(tasks.Tasks) catch fatal;
+	let s = t.label(7);
+	printf("%.*s %lld\n".ptr, s.len as c_int, s.ptr, t.squares(4));
+	free(s.ptr);
+	delete(t);
+	delete(lib);
+	return 0;
+}

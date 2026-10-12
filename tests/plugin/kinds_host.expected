@@ -1,0 +1,14 @@
+integers 42
+float 2.50
+texts busy library
+slice 10
+struct 2 1
+enum 1
+variant 8
+optional 2 -1
+tuple 1 one
+may fail 5 -7
+closure 210
+an object of the library 11
+an object of the host 12
+pointer 17 -17

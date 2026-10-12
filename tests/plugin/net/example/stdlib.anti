@@ -1,0 +1,41 @@
+//! A library that uses two modules of the standard library, `anti.text` for an
+//! interpolated text and `anti.collection.list` for a list. It carries neither
+//! and resolves both against its host. T093 of docs/audit/tests-findings.md.
+
+import anti.collection.list.{List};
+import anti.text;
+import net.example.tasks;
+
+provides net.example.tasks.Tasks as Uses;
+
+/// The tasks of the library.
+pub class Uses
+{
+	implements t: tasks.Tasks,
+
+	/// The number a local object of the library holds.
+	pub concrete fn local(self, with_destruct: bool) -> int
+	{
+		return 0;
+	}
+
+	/// A text that names `n`, which the caller frees.
+	pub concrete fn label(self, n: int) -> str
+	{
+		return f"note {n}";
+	}
+
+	/// The sum of the squares below `n`.
+	pub concrete fn squares(self, n: int) -> int
+	{
+		let xs = List<int>.new();
+		for i in 0..n {
+			xs.push(i * i);
+		}
+		let sum = 0;
+		for i in 0..xs.count {
+			sum += xs[i];
+		}
+		return sum;
+	}
+}

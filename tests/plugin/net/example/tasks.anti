@@ -1,0 +1,15 @@
+//! The interface that the hosts of the tests plugin_locals and plugin_unused
+//! share with their libraries.
+
+/// Work a library does with values of its own.
+pub abstract class Tasks
+{
+	/// The number a local object of the library holds.
+	pub abstract fn local(self, with_destruct: bool) -> int;
+
+	/// A text that names `n`, which the caller frees.
+	pub abstract fn label(self, n: int) -> str;
+
+	/// The sum of the squares below `n`.
+	pub abstract fn squares(self, n: int) -> int;
+}

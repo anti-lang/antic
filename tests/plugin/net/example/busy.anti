@@ -1,0 +1,149 @@
+//! A library that provides a `Worker`, built with `antic --lib shared
+//! --no-runtime`. Every function takes a kind of value from the host and
+//! gives one back.
+
+import anti.lang;
+import net.example.kinds;
+
+provides net.example.kinds.Worker as Busy;
+
+/// The worker of the library, which counts its calls.
+pub class Busy
+{
+	implements w: kinds.Worker,
+
+	/// The calls so far.
+	calls: int = 0,
+
+	/// The sum of two integers.
+	pub concrete fn add(self, a: int, b: int) -> int
+	{
+		self.calls += 1;
+		return a + b;
+	}
+
+	/// Twice a float.
+	pub concrete fn scale(self, v: f64) -> f64
+	{
+		self.calls += 1;
+		return v * 2.0;
+	}
+
+	/// A text of the library.
+	pub concrete fn name(self) -> str
+	{
+		self.calls += 1;
+		return "busy";
+	}
+
+	/// The longer of two texts.
+	pub concrete fn longer(self, a: str, b: str) -> str
+	{
+		self.calls += 1;
+		if a.len >= b.len {
+			return a;
+		}
+		return b;
+	}
+
+	/// The sum of a slice.
+	pub concrete fn total(self, xs: []int) -> int
+	{
+		self.calls += 1;
+		let sum = 0;
+		for x in xs {
+			sum += x;
+		}
+		return sum;
+	}
+
+	/// A point with its parts swapped.
+	pub concrete fn flip(self, p: kinds.Point) -> kinds.Point
+	{
+		self.calls += 1;
+		return kinds.Point { x: p.y, y: p.x };
+	}
+
+	/// The other level.
+	pub concrete fn other(self, l: kinds.Level) -> kinds.Level
+	{
+		self.calls += 1;
+		if l == kinds.Level.Low {
+			return kinds.Level.High;
+		}
+		return kinds.Level.Low;
+	}
+
+	/// A dot of twice the radius, or a dot of radius 1 for `Empty`.
+	pub concrete fn grow(self, s: kinds.Shape) -> kinds.Shape
+	{
+		self.calls += 1;
+		if let Dot d = s {
+			return kinds.Shape.Dot { r: d.r * 2 };
+		}
+		return kinds.Shape.Dot { r: 1 };
+	}
+
+	/// The index of `want` in `xs`, or `none`.
+	pub concrete fn find(self, xs: []int, want: int) -> ?int
+	{
+		self.calls += 1;
+		for i, x in xs {
+			if x == want {
+				return i;
+			}
+		}
+		return none;
+	}
+
+	/// `n` and its name.
+	pub concrete fn pair(self, n: int) -> (int, str)
+	{
+		self.calls += 1;
+		if n == 1 {
+			return (n, "one");
+		}
+		return (n, "many");
+	}
+
+	/// Half of an even `n`. An odd one fails.
+	pub concrete fn half(self, n: int) -> int may fail
+	{
+		self.calls += 1;
+		if n % 2 != 0 {
+			fail lang.Error.new(n, "odd");
+		}
+		return n / 2;
+	}
+
+	/// What `f` gives for `n`, twice.
+	pub concrete fn each(self, n: int, f: fn(int) -> int) -> int
+	{
+		self.calls += 1;
+		return f(n) + f(n);
+	}
+
+	/// A new note, which the caller ends.
+	pub concrete fn make(self, n: int) -> *kinds.Note
+	{
+		self.calls += 1;
+		return alloc kinds.Note { n: n };
+	}
+
+	/// The number of a note, which the library ends.
+	pub concrete fn take(self, own note: *kinds.Note) -> int
+	{
+		self.calls += 1;
+		let n = note.n;
+		delete(note);
+		return n;
+	}
+
+	/// Write the calls so far through a pointer.
+	pub concrete fn fill(self, out: *kinds.Point)
+	{
+		self.calls += 1;
+		out.x = self.calls;
+		out.y = 0 - self.calls;
+	}
+}

@@ -1,0 +1,4 @@
+a local with destruct gives 2, alive 1
+a local without destruct gives 1, alive 1
+after the delete 0
+unloaded

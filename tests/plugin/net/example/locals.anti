@@ -1,0 +1,53 @@
+//! A library whose functions hold local objects of its own classes: one of a
+//! class without `destruct` and one of a class with it. Neither lives past its
+//! function. T092 of docs/audit/tests-findings.md.
+
+import net.example.tasks;
+
+provides net.example.tasks.Tasks as Locals;
+
+/// A class without `destruct`.
+class Plain
+{
+	pub n: int = 0,
+}
+
+/// A class with `destruct`.
+class Ended
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		self.n = 0;
+	}
+}
+
+/// The tasks of the library.
+pub class Locals
+{
+	implements t: tasks.Tasks,
+
+	/// The number a local object of the library holds.
+	pub concrete fn local(self, with_destruct: bool) -> int
+	{
+		if with_destruct {
+			let e = Ended { n: 2 };
+			return e.n;
+		}
+		let p = Plain { n: 1 };
+		return p.n;
+	}
+
+	/// A text that names `n`, which the caller frees.
+	pub concrete fn label(self, n: int) -> str
+	{
+		return "";
+	}
+
+	/// The sum of the squares below `n`.
+	pub concrete fn squares(self, n: int) -> int
+	{
+		return 0;
+	}
+}
