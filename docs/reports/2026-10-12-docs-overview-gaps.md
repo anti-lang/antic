@@ -476,3 +476,22 @@ rows of the findings table that are defects and no rule stay in
   `anti_rt_macos-arm64_armv8.5`, for the probes and the example runner.
 - `python3 tools/docs-style/check_docs.py` reports nothing on this report.
 - `git grep` finds none of the three marker words of the gates in it.
+
+## Proof of the push
+
+The commit of this report was pushed before this section was written. The
+commit that adds the section follows it, so the last hash on `origin/docs`
+is one commit later than the one shown. `git log --oneline -3`:
+
+```text
+99150b38 Report the second reading of the syntax overview against the code
+a8d6458f Mark the modules cells of the test matrix
+3de19163 Hold the generics a library file does not carry, with T095
+```
+
+`git status --short` printed nothing. `git rev-parse HEAD origin/docs`:
+
+```text
+99150b389685d928c31c8006d7ef46d28ba3893b
+99150b389685d928c31c8006d7ef46d28ba3893b
+```
