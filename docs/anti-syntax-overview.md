@@ -1242,6 +1242,19 @@ worker fn total<T: add>(chunk: []T, zero: T) -> T
 }
 ```
 
+`type Name = T;` gives a type a second name, for a function type, a tuple, a slice or a copy of a generic. An alias takes no type parameters of its own, so `type Same<T> = List<T>;` is refused.
+
+```anti
+type Handler = fn(int) -> int;
+type Span = []byte;
+type Entry = (str, int);
+
+fn twice(n: int) -> int { return 2 * n; }
+
+let h: Handler = twice;
+let e: Entry = ("one", 1);
+```
+
 Not built yet: the cache of copies in a dev build. A library file carries no function of a class with type parameters of its own and no type nested in a generic class.
 
 ## Ownership
