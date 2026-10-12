@@ -1,0 +1,24 @@
+//! A local that holds a class with a `destruct`, named in an array literal. An
+//! element of an array literal is a copy, and the local would stay a second
+//! owner.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+fn main() -> int
+{
+	let a = counted(1);
+	let xs = [a, counted(2)];
+	return 0;
+}

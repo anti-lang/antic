@@ -1,0 +1,41 @@
+//! `return` of a field that holds an array of owning values, which decision 22
+//! of "Decisions of 2026-10-11" refuses by the rule of `let` and `=`: the field
+//! keeps its value, and the caller would hold a second owner.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn row(n: int) -> [2]Key
+{
+	return [key(n), key(n + 100)];
+}
+
+class Holder
+{
+	pub held: [2]Key,
+}
+
+fn give(h: *Holder) -> [2]Key
+{
+	return h.held;
+}
+
+fn main() -> int
+{
+	let h = Holder { held: row(1) };
+	let b = give(&h);
+	return 0;
+}

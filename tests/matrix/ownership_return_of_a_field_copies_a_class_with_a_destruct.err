@@ -1,0 +1,1 @@
+ownership_return_of_a_field_copies_a_class_with_a_destruct.anti:26:9: error: `Counted` has a `destruct`, use `dup` instead of `=`

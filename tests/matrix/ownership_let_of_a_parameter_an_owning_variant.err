@@ -1,0 +1,1 @@
+ownership_let_of_a_parameter_an_owning_variant.anti:33:13: error: `x` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(x)`

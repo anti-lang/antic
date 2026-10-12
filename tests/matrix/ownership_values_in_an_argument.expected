@@ -1,0 +1,16 @@
+exit 0
+argument of a class with a destruct: 1 1 1 1, alive 1 then 0
+fresh argument of a class with a destruct: 2 3 4, alive 1
+argument of a class with an own field: 1 1 1 1, alive 1 then 0
+fresh argument of a class with an own field: 2 3 4, alive 1
+argument of an owning struct: 1 1 1 1, alive 1 then 0
+fresh argument of an owning struct: 2 3 4, alive 1
+argument of an owning tuple: 1 1 1 1, alive 1 then 0
+fresh argument of an owning tuple: 2 3 4, alive 1
+argument of an owning variant: 1 1 1 1, alive 1 then 0
+fresh argument of an owning variant: 1 1 1, alive 1
+argument of an owning optional: 1 1 1 1, alive 1 then 0
+fresh argument of an owning optional: 1 1 1, alive 1
+argument of an owning array: 1 1 1 1, alive 2 then 0
+fresh argument of an owning array: 2 3 4, alive 2
+at the end: alive 0

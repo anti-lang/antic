@@ -1,0 +1,24 @@
+//! `=` of a local that holds a class with a `destruct`. The copy would give
+//! what the value owns two owners, and `dup` is the copy.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+fn main() -> int
+{
+	let a = counted(1);
+	let b = counted(2);
+	b = a;
+	return 0;
+}

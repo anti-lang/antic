@@ -1,0 +1,1 @@
+ownership_return_of_a_field_copies_an_owning_variant.anti:39:9: error: `Shape` owns what its parts own, use `dup` instead of `=`

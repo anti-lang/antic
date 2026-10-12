@@ -1,0 +1,1 @@
+ownership_snapshot_captures_an_owning_tuple.anti:29:10: error: a snapshot holds values that copy fully, and `a` is `(Key, int)`

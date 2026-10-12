@@ -1,0 +1,289 @@
+//! Each kind of owning value as a field: a local moves into the literal of a
+//! class, `=` to the field destroys the value it held, a struct holds one, and
+//! `delete` of an object tears its field down. Each line prints the values and
+//! the values alive.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counted
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Counted.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Counted.live.sub(1);
+	}
+}
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+variant Shape
+{
+	Keyed { k: Key },
+	Empty,
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn pair(n: int) -> Pair
+{
+	return Pair { k: key(n), n: n };
+}
+
+fn tuple(n: int) -> (Key, int)
+{
+	return (key(n), n);
+}
+
+fn shape(n: int) -> Shape
+{
+	return Shape.Keyed { k: key(n) };
+}
+
+fn maybe(n: int) -> ?Key
+{
+	return key(n);
+}
+
+fn row(n: int) -> [2]Key
+{
+	return [key(n), key(n + 100)];
+}
+
+/// The values alive now. A copy that `dup` made runs no `construct`, so the
+/// program counts it with `copies`.
+fn alive() -> c_int
+{
+	return (Key.live.load() + Counted.live.load()) as c_int;
+}
+
+/// Count `n` more values alive, for a copy.
+fn copies(n: int)
+{
+	Key.live.add(n);
+}
+
+class Holder_counted
+{
+	pub held: Counted,
+}
+
+struct Wrap_counted
+{
+	held: Counted,
+}
+
+fn in_counted()
+{
+	let a = counted(1);
+	let h = Holder_counted { held: a };
+	printf("field of a class with a destruct: %d, alive %d\n".ptr, h.held.n as c_int, alive());
+	h.held = counted(2);
+	let s = Wrap_counted { held: counted(3) };
+	let p = alloc Holder_counted { held: counted(4) };
+	printf("field of a class with a destruct assigned: %d %d %d, alive %d\n".ptr, h.held.n as c_int,
+		s.held.n as c_int, p.held.n as c_int, alive());
+	delete(p);
+	printf("field of a class with a destruct after delete: alive %d\n".ptr, alive());
+}
+
+class Holder_key
+{
+	pub held: Key,
+}
+
+struct Wrap_key
+{
+	held: Key,
+}
+
+fn in_key()
+{
+	let a = key(1);
+	let h = Holder_key { held: a };
+	printf("field of a class with an own field: %d, alive %d\n".ptr, h.held.n as c_int, alive());
+	h.held = key(2);
+	let s = Wrap_key { held: key(3) };
+	let p = alloc Holder_key { held: key(4) };
+	printf("field of a class with an own field assigned: %d %d %d, alive %d\n".ptr, h.held.n as c_int,
+		s.held.n as c_int, p.held.n as c_int, alive());
+	delete(p);
+	printf("field of a class with an own field after delete: alive %d\n".ptr, alive());
+}
+
+class Holder_pair
+{
+	pub held: Pair,
+}
+
+struct Wrap_pair
+{
+	held: Pair,
+}
+
+fn in_pair()
+{
+	let a = pair(1);
+	let h = Holder_pair { held: a };
+	printf("field of an owning struct: %d, alive %d\n".ptr, h.held.k.n as c_int, alive());
+	h.held = pair(2);
+	let s = Wrap_pair { held: pair(3) };
+	let p = alloc Holder_pair { held: pair(4) };
+	printf("field of an owning struct assigned: %d %d %d, alive %d\n".ptr, h.held.k.n as c_int,
+		s.held.k.n as c_int, p.held.k.n as c_int, alive());
+	delete(p);
+	printf("field of an owning struct after delete: alive %d\n".ptr, alive());
+}
+
+class Holder_tuple
+{
+	pub held: (Key, int),
+}
+
+struct Wrap_tuple
+{
+	held: (Key, int),
+}
+
+fn in_tuple()
+{
+	let a = tuple(1);
+	let h = Holder_tuple { held: a };
+	printf("field of an owning tuple: %d, alive %d\n".ptr, h.held.0.n as c_int, alive());
+	h.held = tuple(2);
+	let s = Wrap_tuple { held: tuple(3) };
+	let p = alloc Holder_tuple { held: tuple(4) };
+	printf("field of an owning tuple assigned: %d %d %d, alive %d\n".ptr, h.held.0.n as c_int,
+		s.held.0.n as c_int, p.held.0.n as c_int, alive());
+	delete(p);
+	printf("field of an owning tuple after delete: alive %d\n".ptr, alive());
+}
+
+class Holder_shape
+{
+	pub held: Shape,
+}
+
+struct Wrap_shape
+{
+	held: Shape,
+}
+
+fn in_shape()
+{
+	let a = shape(1);
+	let h = Holder_shape { held: a };
+	printf("field of an owning variant: %d, alive %d\n".ptr, (h.held is Shape.Keyed) as int as c_int, alive());
+	h.held = shape(2);
+	let s = Wrap_shape { held: shape(3) };
+	let p = alloc Holder_shape { held: shape(4) };
+	printf("field of an owning variant assigned: %d %d %d, alive %d\n".ptr, (h.held is Shape.Keyed) as int as c_int,
+		(s.held is Shape.Keyed) as int as c_int, (p.held is Shape.Keyed) as int as c_int, alive());
+	delete(p);
+	printf("field of an owning variant after delete: alive %d\n".ptr, alive());
+}
+
+class Holder_maybe
+{
+	pub held: ?Key,
+}
+
+struct Wrap_maybe
+{
+	held: ?Key,
+}
+
+fn in_maybe()
+{
+	let a = maybe(1);
+	let h = Holder_maybe { held: a };
+	printf("field of an owning optional: %d, alive %d\n".ptr, (h.held != none) as int as c_int, alive());
+	h.held = maybe(2);
+	let s = Wrap_maybe { held: maybe(3) };
+	let p = alloc Holder_maybe { held: maybe(4) };
+	printf("field of an owning optional assigned: %d %d %d, alive %d\n".ptr, (h.held != none) as int as c_int,
+		(s.held != none) as int as c_int, (p.held != none) as int as c_int, alive());
+	delete(p);
+	printf("field of an owning optional after delete: alive %d\n".ptr, alive());
+}
+
+class Holder_row
+{
+	pub held: [2]Key,
+}
+
+struct Wrap_row
+{
+	held: [2]Key,
+}
+
+fn in_row()
+{
+	let a = row(1);
+	let h = Holder_row { held: a };
+	printf("field of an owning array: %d, alive %d\n".ptr, h.held[0].n as c_int, alive());
+	h.held = row(2);
+	let s = Wrap_row { held: row(3) };
+	let p = alloc Holder_row { held: row(4) };
+	printf("field of an owning array assigned: %d %d %d, alive %d\n".ptr, h.held[0].n as c_int,
+		s.held[0].n as c_int, p.held[0].n as c_int, alive());
+	delete(p);
+	printf("field of an owning array after delete: alive %d\n".ptr, alive());
+}
+
+fn main() -> int
+{
+	in_counted();
+	in_key();
+	in_pair();
+	in_tuple();
+	in_shape();
+	in_maybe();
+	in_row();
+	printf("at the end: alive %d\n".ptr, alive());
+	return 0;
+}

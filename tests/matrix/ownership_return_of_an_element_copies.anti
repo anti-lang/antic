@@ -1,0 +1,26 @@
+//! `return` of an element that owns something, which decision 22 of "Decisions
+//! of 2026-10-11" refuses by the rule of `let` and `=`: the element keeps its
+//! value, and the caller would hold a second owner.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn first(keys: *[2]Key) -> Key
+{
+	return (*keys)[0];
+}
+
+fn main() -> int
+{
+	let keys = [Key { n: 1 }, Key { n: 2 }];
+	let b = first(&keys);
+	return 0;
+}

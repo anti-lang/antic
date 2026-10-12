@@ -1,0 +1,46 @@
+//! A field that holds a variant with an owning case, passed to an `own`
+//! parameter. A value that stays where it is cannot move, and the copy would
+//! give what it owns two owners.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+variant Shape
+{
+	Keyed { k: Key },
+	Empty,
+}
+
+fn shape(n: int) -> Shape
+{
+	return Shape.Keyed { k: key(n) };
+}
+
+class Holder
+{
+	pub held: Shape,
+}
+
+fn take(own x: Shape) -> int
+{
+	return (x is Shape.Keyed) as int;
+}
+
+fn main() -> int
+{
+	let h = Holder { held: shape(1) };
+	return take(h.held);
+}

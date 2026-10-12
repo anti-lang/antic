@@ -1,0 +1,31 @@
+//! `let` of `*p` where `p` points at an array of owning values. The value stays
+//! where it is, and the copy would give what it owns two owners.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn row(n: int) -> [2]Key
+{
+	return [key(n), key(n + 100)];
+}
+
+fn main() -> int
+{
+	let a = row(1);
+	let p = &a;
+	let b = *p;
+	return 0;
+}

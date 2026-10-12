@@ -1,0 +1,41 @@
+//! A local that holds a struct that owns something, named after it moved into
+//! an `own` parameter. The function took the value over and tore it down.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+fn pair(n: int) -> Pair
+{
+	return Pair { k: key(n), n: n };
+}
+
+fn take(own x: Pair) -> int
+{
+	return x.n;
+}
+
+fn main() -> int
+{
+	let a = pair(1);
+	let n = take(a);
+	return n + take(a);
+}

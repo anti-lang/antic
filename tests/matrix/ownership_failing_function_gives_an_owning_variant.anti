@@ -1,0 +1,72 @@
+//! A function that may fail and gives a variant with an owning case. The call
+//! that succeeds gives its value, and the handler of the call that fails yields
+//! another.
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn alive() -> c_int
+{
+	return Key.live.load() as c_int;
+}
+
+variant Shape
+{
+	Keyed { k: Key },
+	Empty,
+}
+
+fn failing(n: int) -> Shape may fail
+{
+	if n > 0 {
+		fail "refused";
+	}
+	return Shape.Keyed { k: key(n) };
+}
+
+fn run()
+{
+	let given = failing(0) catch e {
+		yield Shape.Empty;
+	};
+	let yielded = failing(1) catch e {
+		yield Shape.Empty;
+	};
+	printf("given: %d, yielded: %d, alive %d\n".ptr, (given is Shape.Keyed) as c_int,
+		(yielded is Shape.Keyed) as c_int, alive());
+}
+
+fn main() -> int
+{
+	run();
+	printf("after the function: alive %d\n".ptr, alive());
+	return 0;
+}

@@ -1,0 +1,1 @@
+ownership_yield_copies_an_owning_variant.anti:45:9: error: `Shape` owns what its parts own, use `dup` instead of `=`

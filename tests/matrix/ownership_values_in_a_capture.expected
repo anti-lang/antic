@@ -1,0 +1,9 @@
+exit 0
+capture of a class with a destruct: 1 2, alive 1
+capture of a class with an own field: 1 2, alive 1
+capture of an owning struct: 1 2, alive 1
+capture of an owning tuple: 1 2, alive 1
+capture of an owning variant: 1 1, alive 1
+capture of an owning optional: 1 1, alive 1
+capture of an owning array: 1 2, alive 2
+at the end: alive 0

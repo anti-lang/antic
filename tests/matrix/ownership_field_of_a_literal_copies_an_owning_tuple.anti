@@ -1,0 +1,36 @@
+//! A field that holds a tuple that owns something, named in the literal of
+//! another object. The field keeps its value, and the literal would hold a
+//! second owner.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn tuple(n: int) -> (Key, int)
+{
+	return (key(n), n);
+}
+
+class Holder
+{
+	pub held: (Key, int),
+}
+
+fn main() -> int
+{
+	let h = Holder { held: tuple(1) };
+	let other = Holder { held: h.held };
+	return 0;
+}

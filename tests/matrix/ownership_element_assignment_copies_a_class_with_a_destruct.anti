@@ -1,0 +1,24 @@
+//! `=` of a local that holds a class with a `destruct` to an element of an
+//! array. The copy would give what the value owns two owners.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+fn main() -> int
+{
+	let a = counted(1);
+	let xs = [counted(2), counted(3)];
+	xs[0] = a;
+	return 0;
+}

@@ -1,0 +1,1 @@
+ownership_return_of_a_field_copies_a_class_with_an_own_field.anti:28:9: error: `Key` has `own` fields, use `dup` instead of `=`

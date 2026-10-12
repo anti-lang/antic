@@ -1,0 +1,41 @@
+//! A local that holds a variant with an owning case, named after it moved into
+//! an `own` parameter. The function took the value over and tore it down.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+variant Shape
+{
+	Keyed { k: Key },
+	Empty,
+}
+
+fn shape(n: int) -> Shape
+{
+	return Shape.Keyed { k: key(n) };
+}
+
+fn take(own x: Shape) -> int
+{
+	return (x is Shape.Keyed) as int;
+}
+
+fn main() -> int
+{
+	let a = shape(1);
+	let n = take(a);
+	return n + take(a);
+}

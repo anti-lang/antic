@@ -1,0 +1,9 @@
+exit 0
+let of a class with a destruct: 1 1 2, alive 3
+let of a class with an own field: 1 1 2, alive 3
+let of an owning struct: 1 1 2, alive 3
+let of an owning tuple: 1 1 2, alive 3
+let of an owning variant: 1 1 1, alive 3
+let of an owning optional: 1 1 1, alive 3
+let of an owning array: 1 1 2, alive 6
+at the end: alive 0

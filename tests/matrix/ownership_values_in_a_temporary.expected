@@ -1,0 +1,9 @@
+exit 0
+temporary of a class with a destruct: 2 3, alive 0 then 0
+temporary of a class with an own field: 2 3, alive 0 then 0
+temporary of an owning struct: 2 3, alive 0 then 0
+temporary of an owning tuple: 2 3, alive 0 then 0
+temporary of an owning variant: 1 1, alive 0 then 0
+temporary of an owning optional: 1 1, alive 0 then 0
+temporary of an owning array: 2 3, alive 0 then 0
+at the end: alive 0

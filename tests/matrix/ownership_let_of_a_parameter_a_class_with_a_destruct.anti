@@ -1,0 +1,28 @@
+//! `let` of a parameter that is not `own` and holds a class with a `destruct`.
+//! The value belongs to the caller, which tears it down.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+fn keep(x: Counted) -> int
+{
+	let mine = x;
+	return 0;
+}
+
+fn main() -> int
+{
+	let a = counted(1);
+	return keep(a);
+}

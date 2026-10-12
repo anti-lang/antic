@@ -1,0 +1,23 @@
+exit 0
+field of a class with a destruct: 1, alive 1
+field of a class with a destruct assigned: 2 3 4, alive 3
+field of a class with a destruct after delete: alive 2
+field of a class with an own field: 1, alive 1
+field of a class with an own field assigned: 2 3 4, alive 3
+field of a class with an own field after delete: alive 2
+field of an owning struct: 1, alive 1
+field of an owning struct assigned: 2 3 4, alive 3
+field of an owning struct after delete: alive 2
+field of an owning tuple: 1, alive 1
+field of an owning tuple assigned: 2 3 4, alive 3
+field of an owning tuple after delete: alive 2
+field of an owning variant: 1, alive 1
+field of an owning variant assigned: 1 1 1, alive 3
+field of an owning variant after delete: alive 2
+field of an owning optional: 1, alive 1
+field of an owning optional assigned: 1 1 1, alive 3
+field of an owning optional after delete: alive 2
+field of an owning array: 1, alive 2
+field of an owning array assigned: 2 3 4, alive 6
+field of an owning array after delete: alive 4
+at the end: alive 0

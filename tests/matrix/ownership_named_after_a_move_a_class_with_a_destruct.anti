@@ -1,0 +1,28 @@
+//! A local that holds a class with a `destruct`, named after it moved into an
+//! `own` parameter. The function took the value over and tore it down.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+fn take(own x: Counted) -> int
+{
+	return x.n;
+}
+
+fn main() -> int
+{
+	let a = counted(1);
+	let n = take(a);
+	return n + take(a);
+}

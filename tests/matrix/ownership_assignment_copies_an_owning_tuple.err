@@ -1,0 +1,1 @@
+ownership_assignment_copies_an_owning_tuple.anti:29:6: error: `(Key, int)` owns what its parts own, use `dup` instead of `=`

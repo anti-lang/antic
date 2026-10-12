@@ -1,0 +1,34 @@
+//! `return` of a field that holds a class with a `destruct`, which decision 22
+//! of "Decisions of 2026-10-11" refuses by the rule of `let` and `=`: the field
+//! keeps its value, and the caller would hold a second owner.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+class Holder
+{
+	pub held: Counted,
+}
+
+fn give(h: *Holder) -> Counted
+{
+	return h.held;
+}
+
+fn main() -> int
+{
+	let h = Holder { held: counted(1) };
+	let b = give(&h);
+	return 0;
+}

@@ -1,0 +1,29 @@
+//! A field that holds a class with a `destruct`, named in the literal of
+//! another object. The field keeps its value, and the literal would hold a
+//! second owner.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+class Holder
+{
+	pub held: Counted,
+}
+
+fn main() -> int
+{
+	let h = Holder { held: counted(1) };
+	let other = Holder { held: h.held };
+	return 0;
+}

@@ -1,0 +1,322 @@
+//! `return` of each kind of owning value: a local, which the caller takes over
+//! while the other local of the function is torn down, an `own` parameter, and
+//! a copy of the value a pointer names. Each line prints the three values and
+//! the values alive.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counted
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Counted.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Counted.live.sub(1);
+	}
+}
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+variant Shape
+{
+	Keyed { k: Key },
+	Empty,
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn pair(n: int) -> Pair
+{
+	return Pair { k: key(n), n: n };
+}
+
+fn tuple(n: int) -> (Key, int)
+{
+	return (key(n), n);
+}
+
+fn shape(n: int) -> Shape
+{
+	return Shape.Keyed { k: key(n) };
+}
+
+fn maybe(n: int) -> ?Key
+{
+	return key(n);
+}
+
+fn row(n: int) -> [2]Key
+{
+	return [key(n), key(n + 100)];
+}
+
+/// The values alive now. A copy that `dup` made runs no `construct`, so the
+/// program counts it with `copies`.
+fn alive() -> c_int
+{
+	return (Key.live.load() + Counted.live.load()) as c_int;
+}
+
+/// Count `n` more values alive, for a copy.
+fn copies(n: int)
+{
+	Key.live.add(n);
+}
+
+fn local_counted(n: int) -> Counted
+{
+	let a = counted(n);
+	let other = counted(n + 50);
+	return a;
+}
+
+fn own_counted(own x: Counted) -> Counted
+{
+	return x;
+}
+
+fn copy_counted(p: *Counted) -> Counted
+{
+	let c = dup(*p);
+	Counted.live.add(1);
+	return c;
+}
+
+fn in_counted()
+{
+	let a = local_counted(1);
+	let b = own_counted(counted(2));
+	let c = own_counted(a);
+	let d = copy_counted(&b);
+	printf("return of a class with a destruct: %d %d %d, alive %d\n".ptr, b.n as c_int, c.n as c_int,
+		d.n as c_int, alive());
+}
+
+fn local_key(n: int) -> Key
+{
+	let a = key(n);
+	let other = key(n + 50);
+	return a;
+}
+
+fn own_key(own x: Key) -> Key
+{
+	return x;
+}
+
+fn copy_key(p: *Key) -> Key
+{
+	let c = dup(*p);
+	copies(1);
+	return c;
+}
+
+fn in_key()
+{
+	let a = local_key(1);
+	let b = own_key(key(2));
+	let c = own_key(a);
+	let d = copy_key(&b);
+	printf("return of a class with an own field: %d %d %d, alive %d\n".ptr, b.n as c_int, c.n as c_int,
+		d.n as c_int, alive());
+}
+
+fn local_pair(n: int) -> Pair
+{
+	let a = pair(n);
+	let other = pair(n + 50);
+	return a;
+}
+
+fn own_pair(own x: Pair) -> Pair
+{
+	return x;
+}
+
+fn copy_pair(p: *Pair) -> Pair
+{
+	let c = dup(*p);
+	copies(1);
+	return c;
+}
+
+fn in_pair()
+{
+	let a = local_pair(1);
+	let b = own_pair(pair(2));
+	let c = own_pair(a);
+	let d = copy_pair(&b);
+	printf("return of an owning struct: %d %d %d, alive %d\n".ptr, b.k.n as c_int, c.k.n as c_int,
+		d.k.n as c_int, alive());
+}
+
+fn local_tuple(n: int) -> (Key, int)
+{
+	let a = tuple(n);
+	let other = tuple(n + 50);
+	return a;
+}
+
+fn own_tuple(own x: (Key, int)) -> (Key, int)
+{
+	return x;
+}
+
+fn copy_tuple(p: *(Key, int)) -> (Key, int)
+{
+	let c = dup(*p);
+	copies(1);
+	return c;
+}
+
+fn in_tuple()
+{
+	let a = local_tuple(1);
+	let b = own_tuple(tuple(2));
+	let c = own_tuple(a);
+	let d = copy_tuple(&b);
+	printf("return of an owning tuple: %d %d %d, alive %d\n".ptr, b.0.n as c_int, c.0.n as c_int,
+		d.0.n as c_int, alive());
+}
+
+fn local_shape(n: int) -> Shape
+{
+	let a = shape(n);
+	let other = shape(n + 50);
+	return a;
+}
+
+fn own_shape(own x: Shape) -> Shape
+{
+	return x;
+}
+
+fn copy_shape(p: *Shape) -> Shape
+{
+	let c = dup(*p);
+	copies(1);
+	return c;
+}
+
+fn in_shape()
+{
+	let a = local_shape(1);
+	let b = own_shape(shape(2));
+	let c = own_shape(a);
+	let d = copy_shape(&b);
+	printf("return of an owning variant: %d %d %d, alive %d\n".ptr, (b is Shape.Keyed) as int as c_int, (c is Shape.Keyed) as int as c_int,
+		(d is Shape.Keyed) as int as c_int, alive());
+}
+
+fn local_maybe(n: int) -> ?Key
+{
+	let a = maybe(n);
+	let other = maybe(n + 50);
+	return a;
+}
+
+fn own_maybe(own x: ?Key) -> ?Key
+{
+	return x;
+}
+
+fn copy_maybe(p: *?Key) -> ?Key
+{
+	let c = maybe(2);
+	return c;
+}
+
+fn in_maybe()
+{
+	let a = local_maybe(1);
+	let b = own_maybe(maybe(2));
+	let c = own_maybe(a);
+	let d = copy_maybe(&b);
+	printf("return of an owning optional: %d %d %d, alive %d\n".ptr, (b != none) as int as c_int, (c != none) as int as c_int,
+		(d != none) as int as c_int, alive());
+}
+
+fn local_row(n: int) -> [2]Key
+{
+	let a = row(n);
+	let other = row(n + 50);
+	return a;
+}
+
+fn own_row(own x: [2]Key) -> [2]Key
+{
+	return x;
+}
+
+fn copy_row(p: *[2]Key) -> [2]Key
+{
+	let c = row(2);
+	return c;
+}
+
+fn in_row()
+{
+	let a = local_row(1);
+	let b = own_row(row(2));
+	let c = own_row(a);
+	let d = copy_row(&b);
+	printf("return of an owning array: %d %d %d, alive %d\n".ptr, b[0].n as c_int, c[0].n as c_int,
+		d[0].n as c_int, alive());
+}
+
+fn main() -> int
+{
+	in_counted();
+	in_key();
+	in_pair();
+	in_tuple();
+	in_shape();
+	in_maybe();
+	in_row();
+	printf("at the end: alive %d\n".ptr, alive());
+	return 0;
+}

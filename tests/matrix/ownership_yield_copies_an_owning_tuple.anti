@@ -1,0 +1,42 @@
+//! `yield` of a local that holds a tuple that owns something. The value of the
+//! `catch` would be a copy, and the local would stay a second owner.
+
+import anti.lang;
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn tuple(n: int) -> (Key, int)
+{
+	return (key(n), n);
+}
+
+fn failing(n: int) -> (Key, int) may fail
+{
+	if n > 0 {
+		fail "refused";
+	}
+	return tuple(n);
+}
+
+fn main() -> int
+{
+	let a = tuple(1);
+	let b = failing(1) catch e {
+		yield a;
+	};
+	return 0;
+}

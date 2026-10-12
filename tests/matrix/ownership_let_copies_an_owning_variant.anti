@@ -1,0 +1,36 @@
+//! `let` of a local that holds a variant with an owning case. The copy would
+//! give what the value owns two owners, and `dup` is the copy.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+variant Shape
+{
+	Keyed { k: Key },
+	Empty,
+}
+
+fn shape(n: int) -> Shape
+{
+	return Shape.Keyed { k: key(n) };
+}
+
+fn main() -> int
+{
+	let a = shape(1);
+	let b = a;
+	return 0;
+}

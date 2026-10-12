@@ -1,0 +1,1 @@
+ownership_return_of_a_parameter_a_class_with_a_destruct.anti:20:9: error: `x` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(x)`

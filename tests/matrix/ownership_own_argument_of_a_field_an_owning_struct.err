@@ -1,0 +1,1 @@
+ownership_own_argument_of_a_field_an_owning_struct.anti:45:14: error: `Pair` owns what its parts own, and a value that stays where it is does not move into `take`, use `dup`

@@ -1,0 +1,14 @@
+exit 0
+yield of a class with a destruct: 5 0, alive 2
+yield of a class with a destruct dropped: alive 2
+yield of a class with an own field: 5 0, alive 2
+yield of a class with an own field dropped: alive 2
+yield of an owning struct: 5 0, alive 2
+yield of an owning struct dropped: alive 2
+yield of an owning tuple: 5 0, alive 2
+yield of an owning tuple dropped: alive 2
+yield of an owning optional: 1 1, alive 2
+yield of an owning optional dropped: alive 2
+yield of an owning array: 5 0, alive 4
+yield of an owning array dropped: alive 4
+at the end: alive 0

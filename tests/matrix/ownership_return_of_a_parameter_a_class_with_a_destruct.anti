@@ -1,0 +1,28 @@
+//! `return` of a parameter that is not `own` and holds a class with a
+//! `destruct`. The value belongs to the caller, which tears it down.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+fn back(x: Counted) -> Counted
+{
+	return x;
+}
+
+fn main() -> int
+{
+	let a = counted(1);
+	let b = back(a);
+	return 0;
+}

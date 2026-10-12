@@ -1,0 +1,46 @@
+//! A field that holds a struct that owns something, passed to an `own`
+//! parameter. A value that stays where it is cannot move, and the copy would
+//! give what it owns two owners.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+fn pair(n: int) -> Pair
+{
+	return Pair { k: key(n), n: n };
+}
+
+class Holder
+{
+	pub held: Pair,
+}
+
+fn take(own x: Pair) -> int
+{
+	return x.n;
+}
+
+fn main() -> int
+{
+	let h = Holder { held: pair(1) };
+	return take(h.held);
+}

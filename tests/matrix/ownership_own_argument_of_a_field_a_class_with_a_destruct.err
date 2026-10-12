@@ -1,0 +1,1 @@
+ownership_own_argument_of_a_field_a_class_with_a_destruct.anti:32:14: error: `Counted` has a `destruct`, and a value that stays where it is does not move into `take`, use `dup`

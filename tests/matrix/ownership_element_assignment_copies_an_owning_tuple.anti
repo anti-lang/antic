@@ -1,0 +1,31 @@
+//! `=` of a local that holds a tuple that owns something to an element of an
+//! array. The copy would give what the value owns two owners.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn tuple(n: int) -> (Key, int)
+{
+	return (key(n), n);
+}
+
+fn main() -> int
+{
+	let a = tuple(1);
+	let xs = [tuple(2), tuple(3)];
+	xs[0] = a;
+	return 0;
+}

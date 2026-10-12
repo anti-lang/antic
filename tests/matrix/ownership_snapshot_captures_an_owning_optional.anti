@@ -1,0 +1,33 @@
+//! A `snapshot fn` that captures a local that holds a `?T` of an owning value.
+//! A snapshot copies what it captures, and the copy would give what the value
+//! owns two owners.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn maybe(n: int) -> ?Key
+{
+	return key(n);
+}
+
+fn main() -> int
+{
+	let a = maybe(1);
+	let f = snapshot fn() -> int {
+		return (a != none) as int;
+	};
+	return f();
+}

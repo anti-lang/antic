@@ -1,0 +1,41 @@
+//! `let` of a parameter that is not `own` and holds a variant with an owning
+//! case. The value belongs to the caller, which tears it down.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+variant Shape
+{
+	Keyed { k: Key },
+	Empty,
+}
+
+fn shape(n: int) -> Shape
+{
+	return Shape.Keyed { k: key(n) };
+}
+
+fn keep(x: Shape) -> int
+{
+	let mine = x;
+	return 0;
+}
+
+fn main() -> int
+{
+	let a = shape(1);
+	return keep(a);
+}

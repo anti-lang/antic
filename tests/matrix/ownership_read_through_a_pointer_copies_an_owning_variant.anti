@@ -1,0 +1,37 @@
+//! `let` of `*p` where `p` points at a variant with an owning case. The value
+//! stays where it is, and the copy would give what it owns two owners.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+variant Shape
+{
+	Keyed { k: Key },
+	Empty,
+}
+
+fn shape(n: int) -> Shape
+{
+	return Shape.Keyed { k: key(n) };
+}
+
+fn main() -> int
+{
+	let a = shape(1);
+	let p = &a;
+	let b = *p;
+	return 0;
+}

@@ -1,0 +1,31 @@
+//! `let` of `*p` where `p` points at a `?T` of an owning value. The value stays
+//! where it is, and the copy would give what it owns two owners.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn maybe(n: int) -> ?Key
+{
+	return key(n);
+}
+
+fn main() -> int
+{
+	let a = maybe(1);
+	let p = &a;
+	let b = *p;
+	return 0;
+}

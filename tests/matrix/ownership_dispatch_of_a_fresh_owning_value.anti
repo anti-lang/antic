@@ -1,0 +1,65 @@
+//! A fresh owning value as an argument of a `dispatch`, to a parameter that is
+//! not `own`. The value has no owner but the caller, which tears it down once
+//! the job has run, as it tears down the argument of a call.
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn alive() -> c_int
+{
+	return Key.live.load() as c_int;
+}
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn work(t: *Task, k: Key) -> int
+{
+	return t.n + k.n;
+}
+
+fn run()
+{
+	let t = alloc Task { n: 100 };
+	let job = dispatch t -> work(key(5));
+	let n = join(job);
+	printf("the job: %d\n".ptr, n as c_int);
+	delete(t);
+}
+
+fn main() -> int
+{
+	run();
+	printf("after the function: alive %d\n".ptr, alive());
+	return 0;
+}

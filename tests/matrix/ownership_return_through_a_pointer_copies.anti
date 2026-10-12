@@ -1,0 +1,26 @@
+//! `return` of `*p` where `p` points at a value that owns something, which
+//! decision 22 of "Decisions of 2026-10-11" refuses by the rule of `let` and
+//! `=`: the value stays where it is, and the caller would hold a second owner.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn through(p: *Key) -> Key
+{
+	return *p;
+}
+
+fn main() -> int
+{
+	let k = Key { n: 1, leaf: alloc Leaf { n: 1 } };
+	let b = through(&k);
+	return 0;
+}

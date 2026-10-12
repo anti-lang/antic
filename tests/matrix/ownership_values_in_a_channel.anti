@@ -1,0 +1,254 @@
+//! Each kind of owning value through a channel: `send` of a fresh value hands
+//! it to the channel, `recv` gives a pointer to it in a slot of the frame, and
+//! the program tears it down there with `destroy`. Each line prints the value
+//! received and the values alive, before and after the teardown.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counted
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Counted.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Counted.live.sub(1);
+	}
+}
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+variant Shape
+{
+	Keyed { k: Key },
+	Empty,
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn pair(n: int) -> Pair
+{
+	return Pair { k: key(n), n: n };
+}
+
+fn tuple(n: int) -> (Key, int)
+{
+	return (key(n), n);
+}
+
+fn shape(n: int) -> Shape
+{
+	return Shape.Keyed { k: key(n) };
+}
+
+fn maybe(n: int) -> ?Key
+{
+	return key(n);
+}
+
+fn row(n: int) -> [2]Key
+{
+	return [key(n), key(n + 100)];
+}
+
+/// The values alive now. A copy that `dup` made runs no `construct`, so the
+/// program counts it with `copies`.
+fn alive() -> c_int
+{
+	return (Key.live.load() + Counted.live.load()) as c_int;
+}
+
+/// Count `n` more values alive, for a copy.
+fn copies(n: int)
+{
+	Key.live.add(n);
+}
+
+fn in_counted()
+{
+	let c = chan Counted(2);
+	send(c, counted(1));
+	send(c, counted(2));
+	let first = recv(c) else {
+		return;
+	};
+	printf("channel of a class with a destruct: %d, alive %d\n".ptr, (*first).n as c_int, alive());
+	destroy(first);
+	let second = recv(c) else {
+		return;
+	};
+	let n = (*second).n;
+	destroy(second);
+	delete(c);
+	printf("channel of a class with a destruct after destroy: %d, alive %d\n".ptr, n as c_int, alive());
+}
+
+fn in_key()
+{
+	let c = chan Key(2);
+	send(c, key(1));
+	send(c, key(2));
+	let first = recv(c) else {
+		return;
+	};
+	printf("channel of a class with an own field: %d, alive %d\n".ptr, (*first).n as c_int, alive());
+	destroy(first);
+	let second = recv(c) else {
+		return;
+	};
+	let n = (*second).n;
+	destroy(second);
+	delete(c);
+	printf("channel of a class with an own field after destroy: %d, alive %d\n".ptr, n as c_int, alive());
+}
+
+fn in_pair()
+{
+	let c = chan Pair(2);
+	send(c, pair(1));
+	send(c, pair(2));
+	let first = recv(c) else {
+		return;
+	};
+	printf("channel of an owning struct: %d, alive %d\n".ptr, (*first).k.n as c_int, alive());
+	destroy(first);
+	let second = recv(c) else {
+		return;
+	};
+	let n = (*second).k.n;
+	destroy(second);
+	delete(c);
+	printf("channel of an owning struct after destroy: %d, alive %d\n".ptr, n as c_int, alive());
+}
+
+fn in_tuple()
+{
+	let c = chan (Key, int)(2);
+	send(c, tuple(1));
+	send(c, tuple(2));
+	let first = recv(c) else {
+		return;
+	};
+	printf("channel of an owning tuple: %d, alive %d\n".ptr, (*first).0.n as c_int, alive());
+	destroy(first);
+	let second = recv(c) else {
+		return;
+	};
+	let n = (*second).0.n;
+	destroy(second);
+	delete(c);
+	printf("channel of an owning tuple after destroy: %d, alive %d\n".ptr, n as c_int, alive());
+}
+
+fn in_shape()
+{
+	let c = chan Shape(2);
+	send(c, shape(1));
+	send(c, shape(2));
+	let first = recv(c) else {
+		return;
+	};
+	printf("channel of an owning variant: %d, alive %d\n".ptr, ((*first) is Shape.Keyed) as int as c_int, alive());
+	destroy(first);
+	let second = recv(c) else {
+		return;
+	};
+	let n = ((*second) is Shape.Keyed) as int;
+	destroy(second);
+	delete(c);
+	printf("channel of an owning variant after destroy: %d, alive %d\n".ptr, n as c_int, alive());
+}
+
+fn in_maybe()
+{
+	let c = chan ?Key(2);
+	send(c, maybe(1));
+	send(c, maybe(2));
+	let first = recv(c) else {
+		return;
+	};
+	printf("channel of an owning optional: %d, alive %d\n".ptr, ((*first) != none) as int as c_int, alive());
+	destroy(first);
+	let second = recv(c) else {
+		return;
+	};
+	let n = ((*second) != none) as int;
+	destroy(second);
+	delete(c);
+	printf("channel of an owning optional after destroy: %d, alive %d\n".ptr, n as c_int, alive());
+}
+
+fn in_row()
+{
+	let c = chan [2]Key(2);
+	send(c, row(1));
+	send(c, row(2));
+	let first = recv(c) else {
+		return;
+	};
+	printf("channel of an owning array: %d, alive %d\n".ptr, (*first)[0].n as c_int, alive());
+	destroy(first);
+	let second = recv(c) else {
+		return;
+	};
+	let n = (*second)[0].n;
+	destroy(second);
+	delete(c);
+	printf("channel of an owning array after destroy: %d, alive %d\n".ptr, n as c_int, alive());
+}
+
+fn main() -> int
+{
+	in_counted();
+	in_key();
+	in_pair();
+	in_tuple();
+	in_shape();
+	in_maybe();
+	in_row();
+	printf("at the end: alive %d\n".ptr, alive());
+	return 0;
+}

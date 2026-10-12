@@ -1,0 +1,31 @@
+//! A local that holds a tuple that owns something, named in an array literal.
+//! An element of an array literal is a copy, and the local would stay a second
+//! owner.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn tuple(n: int) -> (Key, int)
+{
+	return (key(n), n);
+}
+
+fn main() -> int
+{
+	let a = tuple(1);
+	let xs = [a, tuple(2)];
+	return 0;
+}

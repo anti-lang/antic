@@ -1,0 +1,39 @@
+//! A `snapshot fn` that captures a local that holds a variant with an owning
+//! case. A snapshot copies what it captures, and the copy would give what the
+//! value owns two owners.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+variant Shape
+{
+	Keyed { k: Key },
+	Empty,
+}
+
+fn shape(n: int) -> Shape
+{
+	return Shape.Keyed { k: key(n) };
+}
+
+fn main() -> int
+{
+	let a = shape(1);
+	let f = snapshot fn() -> int {
+		return (a is Shape.Keyed) as int;
+	};
+	return f();
+}

@@ -1,0 +1,16 @@
+exit 0
+channel of a class with a destruct: 1, alive 2
+channel of a class with a destruct after destroy: 2, alive 0
+channel of a class with an own field: 1, alive 2
+channel of a class with an own field after destroy: 2, alive 0
+channel of an owning struct: 1, alive 2
+channel of an owning struct after destroy: 2, alive 0
+channel of an owning tuple: 1, alive 2
+channel of an owning tuple after destroy: 2, alive 0
+channel of an owning variant: 1, alive 2
+channel of an owning variant after destroy: 1, alive 0
+channel of an owning optional: 1, alive 2
+channel of an owning optional after destroy: 1, alive 0
+channel of an owning array: 1, alive 4
+channel of an owning array after destroy: 2, alive 0
+at the end: alive 0

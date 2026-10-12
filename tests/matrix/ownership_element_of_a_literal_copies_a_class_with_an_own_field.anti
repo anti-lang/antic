@@ -1,0 +1,26 @@
+//! A local that holds a class with an `own` field, named in an array literal.
+//! An element of an array literal is a copy, and the local would stay a second
+//! owner.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn main() -> int
+{
+	let a = key(1);
+	let xs = [a, key(2)];
+	return 0;
+}

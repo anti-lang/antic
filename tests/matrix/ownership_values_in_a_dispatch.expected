@@ -1,0 +1,9 @@
+exit 0
+dispatch of a class with a destruct: 101 102, alive 1
+dispatch of a class with an own field: 101 102, alive 1
+dispatch of an owning struct: 101 102, alive 1
+dispatch of an owning tuple: 101 102, alive 1
+dispatch of an owning variant: 101 101, alive 1
+dispatch of an owning optional: 101 101, alive 1
+dispatch of an owning array: 101 102, alive 2
+at the end: alive 0

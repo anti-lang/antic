@@ -1,0 +1,25 @@
+//! `send` of a local that holds a class with a `destruct`. The channel would
+//! hold a copy, and the local would stay a second owner.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+fn main() -> int
+{
+	let c = chan Counted(1);
+	let a = counted(1);
+	send(c, a);
+	delete(c);
+	return 0;
+}

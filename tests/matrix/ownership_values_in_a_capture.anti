@@ -1,0 +1,217 @@
+//! Each kind of owning value captured by a closure: the closure reads the local
+//! where it stands, and `=` inside the closure destroys the value the local
+//! held. Each line prints what the closure read, the value after the second
+//! closure and the values alive.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counted
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Counted.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Counted.live.sub(1);
+	}
+}
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+variant Shape
+{
+	Keyed { k: Key },
+	Empty,
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn pair(n: int) -> Pair
+{
+	return Pair { k: key(n), n: n };
+}
+
+fn tuple(n: int) -> (Key, int)
+{
+	return (key(n), n);
+}
+
+fn shape(n: int) -> Shape
+{
+	return Shape.Keyed { k: key(n) };
+}
+
+fn maybe(n: int) -> ?Key
+{
+	return key(n);
+}
+
+fn row(n: int) -> [2]Key
+{
+	return [key(n), key(n + 100)];
+}
+
+/// The values alive now. A copy that `dup` made runs no `construct`, so the
+/// program counts it with `copies`.
+fn alive() -> c_int
+{
+	return (Key.live.load() + Counted.live.load()) as c_int;
+}
+
+/// Count `n` more values alive, for a copy.
+fn copies(n: int)
+{
+	Key.live.add(n);
+}
+
+fn call(f: fn())
+{
+	f();
+}
+
+fn in_counted()
+{
+	let a = counted(1);
+	let seen = 0;
+	call(fn() {
+		seen = a.n;
+	});
+	call(fn() {
+		a = counted(2);
+	});
+	printf("capture of a class with a destruct: %d %d, alive %d\n".ptr, seen as c_int, a.n as c_int, alive());
+}
+
+fn in_key()
+{
+	let a = key(1);
+	let seen = 0;
+	call(fn() {
+		seen = a.n;
+	});
+	call(fn() {
+		a = key(2);
+	});
+	printf("capture of a class with an own field: %d %d, alive %d\n".ptr, seen as c_int, a.n as c_int, alive());
+}
+
+fn in_pair()
+{
+	let a = pair(1);
+	let seen = 0;
+	call(fn() {
+		seen = a.k.n;
+	});
+	call(fn() {
+		a = pair(2);
+	});
+	printf("capture of an owning struct: %d %d, alive %d\n".ptr, seen as c_int, a.k.n as c_int, alive());
+}
+
+fn in_tuple()
+{
+	let a = tuple(1);
+	let seen = 0;
+	call(fn() {
+		seen = a.0.n;
+	});
+	call(fn() {
+		a = tuple(2);
+	});
+	printf("capture of an owning tuple: %d %d, alive %d\n".ptr, seen as c_int, a.0.n as c_int, alive());
+}
+
+fn in_shape()
+{
+	let a = shape(1);
+	let seen = 0;
+	call(fn() {
+		seen = (a is Shape.Keyed) as int;
+	});
+	call(fn() {
+		a = shape(2);
+	});
+	printf("capture of an owning variant: %d %d, alive %d\n".ptr, seen as c_int, (a is Shape.Keyed) as int as c_int, alive());
+}
+
+fn in_maybe()
+{
+	let a = maybe(1);
+	let seen = 0;
+	call(fn() {
+		seen = (a != none) as int;
+	});
+	call(fn() {
+		a = maybe(2);
+	});
+	printf("capture of an owning optional: %d %d, alive %d\n".ptr, seen as c_int, (a != none) as int as c_int, alive());
+}
+
+fn in_row()
+{
+	let a = row(1);
+	let seen = 0;
+	call(fn() {
+		seen = a[0].n;
+	});
+	call(fn() {
+		a = row(2);
+	});
+	printf("capture of an owning array: %d %d, alive %d\n".ptr, seen as c_int, a[0].n as c_int, alive());
+}
+
+fn main() -> int
+{
+	in_counted();
+	in_key();
+	in_pair();
+	in_tuple();
+	in_shape();
+	in_maybe();
+	in_row();
+	printf("at the end: alive %d\n".ptr, alive());
+	return 0;
+}

@@ -1,0 +1,1 @@
+ownership_element_of_a_literal_copies_an_owning_optional.anti:29:12: error: `?Key` has `own` fields, use `dup` instead of `=`

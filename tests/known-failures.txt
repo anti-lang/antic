@@ -117,3 +117,36 @@ matrix_ownership_downcast_in_an_if_let_memory_checks T036 `if let` and `let ... 
 matrix_ownership_downcast_in_a_let_else_dev T036 `if let` and `let ... else` refuse the result of `as?` as a `*T`.
 matrix_ownership_downcast_in_a_let_else_release T036 `if let` and `let ... else` refuse the result of `as?` as a `*T`.
 matrix_ownership_downcast_in_a_let_else_memory_checks T036 `if let` and `let ... else` refuse the result of `as?` as a `*T`.
+matrix_ownership_return_of_a_field_copies_a_class_with_a_destruct_refused T037 `return` of a field that owns something is not refused.
+matrix_ownership_return_of_a_field_copies_a_class_with_an_own_field_refused T037 `return` of a field that owns something is not refused.
+matrix_ownership_return_of_a_field_copies_an_owning_struct_refused T037 `return` of a field that owns something is not refused.
+matrix_ownership_return_of_a_field_copies_an_owning_tuple_refused T037 `return` of a field that owns something is not refused.
+matrix_ownership_return_of_a_field_copies_an_owning_variant_refused T037 `return` of a field that owns something is not refused.
+matrix_ownership_return_of_a_field_copies_an_owning_optional_refused T037 `return` of a field that owns something is not refused.
+matrix_ownership_return_of_a_field_copies_an_owning_array_refused T037 `return` of a field that owns something is not refused.
+matrix_ownership_return_through_a_pointer_copies_refused T037 `return` of `*p` that owns something is not refused.
+matrix_ownership_return_of_an_element_copies_refused T037 `return` of an element that owns something is not refused.
+matrix_ownership_yield_copies_a_class_with_a_destruct_refused T038 `yield` of a local that owns something is not refused.
+matrix_ownership_yield_copies_a_class_with_an_own_field_refused T038 `yield` of a local that owns something is not refused.
+matrix_ownership_yield_copies_an_owning_struct_refused T038 `yield` of a local that owns something is not refused.
+matrix_ownership_yield_copies_an_owning_tuple_refused T038 `yield` of a local that owns something is not refused.
+matrix_ownership_yield_copies_an_owning_variant_refused T038 `yield` of a local that owns something is not refused.
+matrix_ownership_yield_copies_an_owning_optional_refused T038 `yield` of a local that owns something is not refused.
+matrix_ownership_yield_copies_an_owning_array_refused T038 `yield` of a local that owns something is not refused.
+matrix_ownership_dispatch_of_a_fresh_owning_value_dev T039 A fresh owning argument of a `dispatch` is never torn down.
+matrix_ownership_dispatch_of_a_fresh_owning_value_release T039 A fresh owning argument of a `dispatch` is never torn down.
+matrix_ownership_dispatch_of_a_fresh_owning_value_memory_checks T039 A fresh owning argument of a `dispatch` is never torn down.
+matrix_ownership_dispatch_moves_a_local_dev T040 A local moved into an `own` parameter of a `dispatch` stops the program.
+matrix_ownership_dispatch_moves_a_local_release T040 A local moved into an `own` parameter of a `dispatch` stops the program.
+matrix_ownership_dispatch_moves_a_local_memory_checks T040 A local moved into an `own` parameter of a `dispatch` stops the program.
+matrix_ownership_temporary_read_by_is_dev T041 A call result read by `is` alone is never torn down.
+matrix_ownership_temporary_read_by_is_release T041 A call result read by `is` alone is never torn down.
+matrix_ownership_temporary_read_by_is_memory_checks T041 A call result read by `is` alone is never torn down.
+matrix_ownership_temporary_tested_for_none_dev T041 A call result read by a test for `none` alone is never torn down.
+matrix_ownership_temporary_tested_for_none_release T041 A call result read by a test for `none` alone is never torn down.
+matrix_ownership_temporary_tested_for_none_memory_checks T041 A call result read by a test for `none` alone is never torn down.
+matrix_ownership_temporary_read_by_an_index_dev T041 A call result read by an index alone is never torn down.
+matrix_ownership_temporary_read_by_an_index_release T041 A call result read by an index alone is never torn down.
+matrix_ownership_temporary_read_by_an_index_memory_checks T041 A call result read by an index alone is never torn down.
+matrix_ownership_failing_function_gives_an_owning_variant_release T042 A failing function that gives an owning variant traps in a release build.
+matrix_ownership_failing_function_gives_an_owning_variant_memory_checks T042 A failing function that gives an owning variant traps in a release build.

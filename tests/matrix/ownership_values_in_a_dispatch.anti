@@ -1,0 +1,268 @@
+//! Each kind of owning value as an argument of a `dispatch`: a local to a
+//! parameter that is not `own`, which stays with the caller, and a fresh value
+//! to an `own` parameter, which the worker takes over and tears down. Each line
+//! prints what the two jobs give and the values alive.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counted
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Counted.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Counted.live.sub(1);
+	}
+}
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+variant Shape
+{
+	Keyed { k: Key },
+	Empty,
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn pair(n: int) -> Pair
+{
+	return Pair { k: key(n), n: n };
+}
+
+fn tuple(n: int) -> (Key, int)
+{
+	return (key(n), n);
+}
+
+fn shape(n: int) -> Shape
+{
+	return Shape.Keyed { k: key(n) };
+}
+
+fn maybe(n: int) -> ?Key
+{
+	return key(n);
+}
+
+fn row(n: int) -> [2]Key
+{
+	return [key(n), key(n + 100)];
+}
+
+/// The values alive now. A copy that `dup` made runs no `construct`, so the
+/// program counts it with `copies`.
+fn alive() -> c_int
+{
+	return (Key.live.load() + Counted.live.load()) as c_int;
+}
+
+/// Count `n` more values alive, for a copy.
+fn copies(n: int)
+{
+	Key.live.add(n);
+}
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn work_counted(t: *Task, x: Counted) -> int
+{
+	return t.n + x.n;
+}
+
+worker fn work_own_counted(t: *Task, own x: Counted) -> int
+{
+	return t.n + x.n;
+}
+
+fn in_counted(t: *Task)
+{
+	let a = counted(1);
+	let first = dispatch t -> work_counted(a);
+	let n1 = join(first);
+	let second = dispatch t -> work_own_counted(counted(2));
+	let n2 = join(second);
+	printf("dispatch of a class with a destruct: %d %d, alive %d\n".ptr, n1 as c_int, n2 as c_int, alive());
+}
+
+worker fn work_key(t: *Task, x: Key) -> int
+{
+	return t.n + x.n;
+}
+
+worker fn work_own_key(t: *Task, own x: Key) -> int
+{
+	return t.n + x.n;
+}
+
+fn in_key(t: *Task)
+{
+	let a = key(1);
+	let first = dispatch t -> work_key(a);
+	let n1 = join(first);
+	let second = dispatch t -> work_own_key(key(2));
+	let n2 = join(second);
+	printf("dispatch of a class with an own field: %d %d, alive %d\n".ptr, n1 as c_int, n2 as c_int, alive());
+}
+
+worker fn work_pair(t: *Task, x: Pair) -> int
+{
+	return t.n + x.k.n;
+}
+
+worker fn work_own_pair(t: *Task, own x: Pair) -> int
+{
+	return t.n + x.k.n;
+}
+
+fn in_pair(t: *Task)
+{
+	let a = pair(1);
+	let first = dispatch t -> work_pair(a);
+	let n1 = join(first);
+	let second = dispatch t -> work_own_pair(pair(2));
+	let n2 = join(second);
+	printf("dispatch of an owning struct: %d %d, alive %d\n".ptr, n1 as c_int, n2 as c_int, alive());
+}
+
+worker fn work_tuple(t: *Task, x: (Key, int)) -> int
+{
+	return t.n + x.0.n;
+}
+
+worker fn work_own_tuple(t: *Task, own x: (Key, int)) -> int
+{
+	return t.n + x.0.n;
+}
+
+fn in_tuple(t: *Task)
+{
+	let a = tuple(1);
+	let first = dispatch t -> work_tuple(a);
+	let n1 = join(first);
+	let second = dispatch t -> work_own_tuple(tuple(2));
+	let n2 = join(second);
+	printf("dispatch of an owning tuple: %d %d, alive %d\n".ptr, n1 as c_int, n2 as c_int, alive());
+}
+
+worker fn work_shape(t: *Task, x: Shape) -> int
+{
+	return t.n + (x is Shape.Keyed) as int;
+}
+
+worker fn work_own_shape(t: *Task, own x: Shape) -> int
+{
+	return t.n + (x is Shape.Keyed) as int;
+}
+
+fn in_shape(t: *Task)
+{
+	let a = shape(1);
+	let first = dispatch t -> work_shape(a);
+	let n1 = join(first);
+	let second = dispatch t -> work_own_shape(shape(2));
+	let n2 = join(second);
+	printf("dispatch of an owning variant: %d %d, alive %d\n".ptr, n1 as c_int, n2 as c_int, alive());
+}
+
+worker fn work_maybe(t: *Task, x: ?Key) -> int
+{
+	return t.n + (x != none) as int;
+}
+
+worker fn work_own_maybe(t: *Task, own x: ?Key) -> int
+{
+	return t.n + (x != none) as int;
+}
+
+fn in_maybe(t: *Task)
+{
+	let a = maybe(1);
+	let first = dispatch t -> work_maybe(a);
+	let n1 = join(first);
+	let second = dispatch t -> work_own_maybe(maybe(2));
+	let n2 = join(second);
+	printf("dispatch of an owning optional: %d %d, alive %d\n".ptr, n1 as c_int, n2 as c_int, alive());
+}
+
+worker fn work_row(t: *Task, x: [2]Key) -> int
+{
+	return t.n + x[0].n;
+}
+
+worker fn work_own_row(t: *Task, own x: [2]Key) -> int
+{
+	return t.n + x[0].n;
+}
+
+fn in_row(t: *Task)
+{
+	let a = row(1);
+	let first = dispatch t -> work_row(a);
+	let n1 = join(first);
+	let second = dispatch t -> work_own_row(row(2));
+	let n2 = join(second);
+	printf("dispatch of an owning array: %d %d, alive %d\n".ptr, n1 as c_int, n2 as c_int, alive());
+}
+
+fn main() -> int
+{
+	let t = alloc Task { n: 100 };
+	in_counted(t);
+	in_key(t);
+	in_pair(t);
+	in_tuple(t);
+	in_shape(t);
+	in_maybe(t);
+	in_row(t);
+	delete(t);
+	printf("at the end: alive %d\n".ptr, alive());
+	return 0;
+}

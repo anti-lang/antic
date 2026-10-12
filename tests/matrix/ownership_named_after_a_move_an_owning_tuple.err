@@ -1,0 +1,1 @@
+ownership_named_after_a_move_an_owning_tuple.anti:34:18: error: `a` was moved into `take`

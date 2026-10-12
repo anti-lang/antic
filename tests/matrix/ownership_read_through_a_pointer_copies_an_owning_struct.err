@@ -1,0 +1,1 @@
+ownership_read_through_a_pointer_copies_an_owning_struct.anti:35:10: error: `Pair` owns what its parts own, use `dup` instead of `=`

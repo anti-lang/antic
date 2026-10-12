@@ -1,0 +1,1 @@
+ownership_snapshot_captures_a_class_with_an_own_field.anti:24:10: error: a snapshot holds values that copy fully, and `a` is `Key`

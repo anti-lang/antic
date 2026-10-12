@@ -1,0 +1,1 @@
+ownership_own_argument_of_a_field_a_class_with_an_own_field.anti:34:14: error: `Key` has `own` fields, and a value that stays where it is does not move into `take`, use `dup`

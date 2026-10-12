@@ -1,0 +1,27 @@
+//! `send` of a local that holds a class with an `own` field. The channel would
+//! hold a copy, and the local would stay a second owner.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn main() -> int
+{
+	let c = chan Key(1);
+	let a = key(1);
+	send(c, a);
+	delete(c);
+	return 0;
+}

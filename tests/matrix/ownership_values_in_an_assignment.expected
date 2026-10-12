@@ -1,0 +1,16 @@
+exit 0
+= of a class with a destruct: 2, alive 1
+= of a copy of a class with a destruct: 3 3, alive 2
+= of a class with an own field: 2, alive 1
+= of a copy of a class with an own field: 3 3, alive 2
+= of an owning struct: 2, alive 1
+= of a copy of an owning struct: 3 3, alive 2
+= of an owning tuple: 2, alive 1
+= of a copy of an owning tuple: 3 3, alive 2
+= of an owning variant: 1, alive 1
+= of a copy of an owning variant: 1 1, alive 2
+= of an owning optional: 1, alive 1
+= of a copy of an owning optional: 1 1, alive 2
+= of an owning array: 2, alive 2
+= of a copy of an owning array: 3 3, alive 4
+at the end: alive 0

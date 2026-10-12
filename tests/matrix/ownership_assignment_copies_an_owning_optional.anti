@@ -1,0 +1,31 @@
+//! `=` of a local that holds a `?T` of an owning value. The copy would give
+//! what the value owns two owners, and `dup` is the copy.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn maybe(n: int) -> ?Key
+{
+	return key(n);
+}
+
+fn main() -> int
+{
+	let a = maybe(1);
+	let b = maybe(2);
+	b = a;
+	return 0;
+}

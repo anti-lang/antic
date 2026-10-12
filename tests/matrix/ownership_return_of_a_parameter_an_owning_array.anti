@@ -1,0 +1,35 @@
+//! `return` of a parameter that is not `own` and holds an array of owning
+//! values. The value belongs to the caller, which tears it down.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn row(n: int) -> [2]Key
+{
+	return [key(n), key(n + 100)];
+}
+
+fn back(x: [2]Key) -> [2]Key
+{
+	return x;
+}
+
+fn main() -> int
+{
+	let a = row(1);
+	let b = back(a);
+	return 0;
+}

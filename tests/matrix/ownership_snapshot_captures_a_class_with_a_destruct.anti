@@ -1,0 +1,26 @@
+//! A `snapshot fn` that captures a local that holds a class with a `destruct`.
+//! A snapshot copies what it captures, and the copy would give what the value
+//! owns two owners.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+fn main() -> int
+{
+	let a = counted(1);
+	let f = snapshot fn() -> int {
+		return a.n;
+	};
+	return f();
+}

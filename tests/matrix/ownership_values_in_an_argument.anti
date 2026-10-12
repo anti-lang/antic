@@ -1,0 +1,400 @@
+//! Each kind of owning value as an argument: to a parameter that takes the
+//! value, to a pointer, to a `lent` pointer and to an `own` parameter, which
+//! takes the local over and tears it down. A fresh value passed to a parameter
+//! that is not `own` is torn down when the call returns. Each line prints what
+//! the functions read and the values alive.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counted
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Counted.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Counted.live.sub(1);
+	}
+}
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+struct Pair
+{
+	k: Key,
+	n: int,
+}
+
+variant Shape
+{
+	Keyed { k: Key },
+	Empty,
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn pair(n: int) -> Pair
+{
+	return Pair { k: key(n), n: n };
+}
+
+fn tuple(n: int) -> (Key, int)
+{
+	return (key(n), n);
+}
+
+fn shape(n: int) -> Shape
+{
+	return Shape.Keyed { k: key(n) };
+}
+
+fn maybe(n: int) -> ?Key
+{
+	return key(n);
+}
+
+fn row(n: int) -> [2]Key
+{
+	return [key(n), key(n + 100)];
+}
+
+/// The values alive now. A copy that `dup` made runs no `construct`, so the
+/// program counts it with `copies`.
+fn alive() -> c_int
+{
+	return (Key.live.load() + Counted.live.load()) as c_int;
+}
+
+/// Count `n` more values alive, for a copy.
+fn copies(n: int)
+{
+	Key.live.add(n);
+}
+
+fn take_counted(own x: Counted) -> int
+{
+	return x.n;
+}
+
+fn peek_counted(x: Counted) -> int
+{
+	return x.n;
+}
+
+fn look_counted(p: *Counted) -> int
+{
+	return (*p).n;
+}
+
+fn lend_counted(lent p: *Counted) -> int
+{
+	return (*p).n;
+}
+
+fn in_counted()
+{
+	let a = counted(1);
+	let n1 = peek_counted(a);
+	let n2 = look_counted(&a);
+	let n3 = lend_counted(&a);
+	let before = alive();
+	let n4 = take_counted(a);
+	printf("argument of a class with a destruct: %d %d %d %d, alive %d then %d\n".ptr, n1 as c_int, n2 as c_int,
+		n3 as c_int, n4 as c_int, before, alive());
+	let n5 = take_counted(counted(2));
+	let n6 = peek_counted(counted(3));
+	let b = counted(4);
+	let c = dup(b);
+	Counted.live.add(1);
+	let n7 = take_counted(c);
+	printf("fresh argument of a class with a destruct: %d %d %d, alive %d\n".ptr, n5 as c_int, n6 as c_int,
+		n7 as c_int, alive());
+}
+
+fn take_key(own x: Key) -> int
+{
+	return x.n;
+}
+
+fn peek_key(x: Key) -> int
+{
+	return x.n;
+}
+
+fn look_key(p: *Key) -> int
+{
+	return (*p).n;
+}
+
+fn lend_key(lent p: *Key) -> int
+{
+	return (*p).n;
+}
+
+fn in_key()
+{
+	let a = key(1);
+	let n1 = peek_key(a);
+	let n2 = look_key(&a);
+	let n3 = lend_key(&a);
+	let before = alive();
+	let n4 = take_key(a);
+	printf("argument of a class with an own field: %d %d %d %d, alive %d then %d\n".ptr, n1 as c_int, n2 as c_int,
+		n3 as c_int, n4 as c_int, before, alive());
+	let n5 = take_key(key(2));
+	let n6 = peek_key(key(3));
+	let b = key(4);
+	let c = dup(b);
+	copies(1);
+	let n7 = take_key(c);
+	printf("fresh argument of a class with an own field: %d %d %d, alive %d\n".ptr, n5 as c_int, n6 as c_int,
+		n7 as c_int, alive());
+}
+
+fn take_pair(own x: Pair) -> int
+{
+	return x.k.n;
+}
+
+fn peek_pair(x: Pair) -> int
+{
+	return x.k.n;
+}
+
+fn look_pair(p: *Pair) -> int
+{
+	return (*p).k.n;
+}
+
+fn lend_pair(lent p: *Pair) -> int
+{
+	return (*p).k.n;
+}
+
+fn in_pair()
+{
+	let a = pair(1);
+	let n1 = peek_pair(a);
+	let n2 = look_pair(&a);
+	let n3 = lend_pair(&a);
+	let before = alive();
+	let n4 = take_pair(a);
+	printf("argument of an owning struct: %d %d %d %d, alive %d then %d\n".ptr, n1 as c_int, n2 as c_int,
+		n3 as c_int, n4 as c_int, before, alive());
+	let n5 = take_pair(pair(2));
+	let n6 = peek_pair(pair(3));
+	let b = pair(4);
+	let c = dup(b);
+	copies(1);
+	let n7 = take_pair(c);
+	printf("fresh argument of an owning struct: %d %d %d, alive %d\n".ptr, n5 as c_int, n6 as c_int,
+		n7 as c_int, alive());
+}
+
+fn take_tuple(own x: (Key, int)) -> int
+{
+	return x.0.n;
+}
+
+fn peek_tuple(x: (Key, int)) -> int
+{
+	return x.0.n;
+}
+
+fn look_tuple(p: *(Key, int)) -> int
+{
+	return (*p).0.n;
+}
+
+fn lend_tuple(lent p: *(Key, int)) -> int
+{
+	return (*p).0.n;
+}
+
+fn in_tuple()
+{
+	let a = tuple(1);
+	let n1 = peek_tuple(a);
+	let n2 = look_tuple(&a);
+	let n3 = lend_tuple(&a);
+	let before = alive();
+	let n4 = take_tuple(a);
+	printf("argument of an owning tuple: %d %d %d %d, alive %d then %d\n".ptr, n1 as c_int, n2 as c_int,
+		n3 as c_int, n4 as c_int, before, alive());
+	let n5 = take_tuple(tuple(2));
+	let n6 = peek_tuple(tuple(3));
+	let b = tuple(4);
+	let c = dup(b);
+	copies(1);
+	let n7 = take_tuple(c);
+	printf("fresh argument of an owning tuple: %d %d %d, alive %d\n".ptr, n5 as c_int, n6 as c_int,
+		n7 as c_int, alive());
+}
+
+fn take_shape(own x: Shape) -> int
+{
+	return (x is Shape.Keyed) as int;
+}
+
+fn peek_shape(x: Shape) -> int
+{
+	return (x is Shape.Keyed) as int;
+}
+
+fn look_shape(p: *Shape) -> int
+{
+	return ((*p) is Shape.Keyed) as int;
+}
+
+fn lend_shape(lent p: *Shape) -> int
+{
+	return ((*p) is Shape.Keyed) as int;
+}
+
+fn in_shape()
+{
+	let a = shape(1);
+	let n1 = peek_shape(a);
+	let n2 = look_shape(&a);
+	let n3 = lend_shape(&a);
+	let before = alive();
+	let n4 = take_shape(a);
+	printf("argument of an owning variant: %d %d %d %d, alive %d then %d\n".ptr, n1 as c_int, n2 as c_int,
+		n3 as c_int, n4 as c_int, before, alive());
+	let n5 = take_shape(shape(2));
+	let n6 = peek_shape(shape(3));
+	let b = shape(4);
+	let c = dup(b);
+	copies(1);
+	let n7 = take_shape(c);
+	printf("fresh argument of an owning variant: %d %d %d, alive %d\n".ptr, n5 as c_int, n6 as c_int,
+		n7 as c_int, alive());
+}
+
+fn take_maybe(own x: ?Key) -> int
+{
+	return (x != none) as int;
+}
+
+fn peek_maybe(x: ?Key) -> int
+{
+	return (x != none) as int;
+}
+
+fn look_maybe(p: *?Key) -> int
+{
+	return ((*p) != none) as int;
+}
+
+fn lend_maybe(lent p: *?Key) -> int
+{
+	return ((*p) != none) as int;
+}
+
+fn in_maybe()
+{
+	let a = maybe(1);
+	let n1 = peek_maybe(a);
+	let n2 = look_maybe(&a);
+	let n3 = lend_maybe(&a);
+	let before = alive();
+	let n4 = take_maybe(a);
+	printf("argument of an owning optional: %d %d %d %d, alive %d then %d\n".ptr, n1 as c_int, n2 as c_int,
+		n3 as c_int, n4 as c_int, before, alive());
+	let n5 = take_maybe(maybe(2));
+	let n6 = peek_maybe(maybe(3));
+	let b = maybe(4);
+	let c = maybe(4);
+	let n7 = take_maybe(c);
+	printf("fresh argument of an owning optional: %d %d %d, alive %d\n".ptr, n5 as c_int, n6 as c_int,
+		n7 as c_int, alive());
+}
+
+fn take_row(own x: [2]Key) -> int
+{
+	return x[0].n;
+}
+
+fn peek_row(x: [2]Key) -> int
+{
+	return x[0].n;
+}
+
+fn look_row(p: *[2]Key) -> int
+{
+	return (*p)[0].n;
+}
+
+fn lend_row(lent p: *[2]Key) -> int
+{
+	return (*p)[0].n;
+}
+
+fn in_row()
+{
+	let a = row(1);
+	let n1 = peek_row(a);
+	let n2 = look_row(&a);
+	let n3 = lend_row(&a);
+	let before = alive();
+	let n4 = take_row(a);
+	printf("argument of an owning array: %d %d %d %d, alive %d then %d\n".ptr, n1 as c_int, n2 as c_int,
+		n3 as c_int, n4 as c_int, before, alive());
+	let n5 = take_row(row(2));
+	let n6 = peek_row(row(3));
+	let b = row(4);
+	let c = row(4);
+	let n7 = take_row(c);
+	printf("fresh argument of an owning array: %d %d %d, alive %d\n".ptr, n5 as c_int, n6 as c_int,
+		n7 as c_int, alive());
+}
+
+fn main() -> int
+{
+	in_counted();
+	in_key();
+	in_pair();
+	in_tuple();
+	in_shape();
+	in_maybe();
+	in_row();
+	printf("at the end: alive %d\n".ptr, alive());
+	return 0;
+}

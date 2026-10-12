@@ -1,0 +1,1 @@
+ownership_element_of_a_literal_copies_an_owning_array.anti:29:12: error: `[2]Key` has `own` fields, use `dup` instead of `=`

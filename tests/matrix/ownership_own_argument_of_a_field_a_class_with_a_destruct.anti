@@ -1,0 +1,33 @@
+//! A field that holds a class with a `destruct`, passed to an `own` parameter.
+//! A value that stays where it is cannot move, and the copy would give what it
+//! owns two owners.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn counted(n: int) -> Counted
+{
+	return Counted { n: n };
+}
+
+class Holder
+{
+	pub held: Counted,
+}
+
+fn take(own x: Counted) -> int
+{
+	return x.n;
+}
+
+fn main() -> int
+{
+	let h = Holder { held: counted(1) };
+	return take(h.held);
+}

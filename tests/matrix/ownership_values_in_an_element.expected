@@ -1,0 +1,23 @@
+exit 0
+element of a class with a destruct: 3 4, alive 2
+element of alloc of a class with a destruct: 6, alive 3
+element of a class with a destruct after destroy: alive 2
+element of a class with an own field: 3 4, alive 2
+element of alloc of a class with an own field: 6, alive 3
+element of a class with an own field after destroy: alive 2
+element of an owning struct: 3 4, alive 2
+element of alloc of an owning struct: 6, alive 3
+element of an owning struct after destroy: alive 2
+element of an owning tuple: 3 4, alive 2
+element of alloc of an owning tuple: 6, alive 3
+element of an owning tuple after destroy: alive 2
+element of an owning variant: 1 1, alive 2
+element of alloc of an owning variant: 1, alive 3
+element of an owning variant after destroy: alive 2
+element of an owning optional: 1 1, alive 2
+element of alloc of an owning optional: 1, alive 3
+element of an owning optional after destroy: alive 2
+element of an owning array: 3 4, alive 4
+element of alloc of an owning array: 6, alive 6
+element of an owning array after destroy: alive 4
+at the end: alive 0

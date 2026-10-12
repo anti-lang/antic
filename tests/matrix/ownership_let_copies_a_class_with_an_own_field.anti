@@ -1,0 +1,25 @@
+//! `let` of a local that holds a class with an `own` field. The copy would give
+//! what the value owns two owners, and `dup` is the copy.
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn main() -> int
+{
+	let a = key(1);
+	let b = a;
+	return 0;
+}
