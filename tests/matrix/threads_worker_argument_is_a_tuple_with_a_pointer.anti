@@ -1,0 +1,23 @@
+//! An argument of a worker holds no pointer, so no two threads reach one piece
+//! of memory through it. A tuple with a pointer is refused.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn read(t: *Task, v: (int, *int)) -> int
+{
+	return t.n;
+}
+
+fn main() -> int
+{
+	let n = 5;
+	let numbers = [1, 2, 3];
+	let t = alloc Task { };
+	let job = dispatch t -> read((1, &n));
+	let got = join(job);
+	delete(t);
+	return got + n + numbers[0];
+}

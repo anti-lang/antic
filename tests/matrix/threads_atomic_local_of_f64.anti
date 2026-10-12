@@ -1,0 +1,8 @@
+//! An atomic local holds an integer, a `bool`, a `char` or a pointer. An `f64`
+//! is refused.
+
+fn main() -> int
+{
+	let level: atomic f64 = 0.0;
+	return 0;
+}

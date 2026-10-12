@@ -1,0 +1,1 @@
+threads_worker_argument_is_a_class_with_a_pointer.anti:24:31: error: an argument of a worker has type `Node`, which holds a pointer. A worker takes and returns values alone

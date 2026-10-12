@@ -1,0 +1,16 @@
+//! `parallel` splits a slice of values that hold no pointer, so no two chunks
+//! reach one piece of memory.
+
+worker fn count(chunk: []*int) -> int
+{
+	return chunk.len;
+}
+
+fn main() -> int
+{
+	let n = 5;
+	let items = [&n, &n];
+	let parts = parallel items[0..2] -> count;
+	free(parts.ptr);
+	return 0;
+}

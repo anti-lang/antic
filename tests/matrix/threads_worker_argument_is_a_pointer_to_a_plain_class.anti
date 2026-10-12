@@ -1,0 +1,29 @@
+//! An argument of a worker holds no pointer, so no two threads reach one piece
+//! of memory through it. A pointer to a class that is not thread-safe is
+//! refused.
+
+class Other
+{
+	pub n: int = 0,
+}
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn read(t: *Task, v: ?*Other) -> int
+{
+	return t.n;
+}
+
+fn main() -> int
+{
+	let n = 5;
+	let numbers = [1, 2, 3];
+	let t = alloc Task { };
+	let job = dispatch t -> read(none);
+	let got = join(job);
+	delete(t);
+	return got + n + numbers[0];
+}

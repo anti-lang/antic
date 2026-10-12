@@ -1,0 +1,1 @@
+threads_channel_of_interface_pointers.anti:19:15: error: a channel carries values alone, and `*Named` holds a pointer

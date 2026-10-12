@@ -1,0 +1,22 @@
+//! A channel carries values under the rule of `parallel`. An interface is
+//! reached through a pointer, which is refused.
+
+abstract class Named
+{
+	pub abstract fn id(self) -> int;
+}
+
+class Tag inherits Named
+{
+	pub concrete fn id(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	let c = chan *Named(1);
+	delete(c);
+	return 0;
+}

@@ -1,0 +1,14 @@
+//! An atomic local holds an integer, a `bool`, a `char` or a pointer. A type
+//! parameter may be any type, so the body of a generic function is refused for
+//! one.
+
+fn keep<T>(v: T) -> T
+{
+	let held: atomic T = dup(v);
+	return held.load();
+}
+
+fn main() -> int
+{
+	return keep<int>(4);
+}

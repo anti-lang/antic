@@ -1,0 +1,799 @@
+//! An argument and a result of a `dispatch`, and an element and a result of a
+//! `parallel`, with each kind of value that holds no pointer: the numbers,
+//! `f16`, `bool`, `char`, `str`, a fixed array, an optional value, a tuple, a
+//! struct, a packed struct, a simd struct, a union, an enum, a variant and a
+//! class value. A worker takes a pointer to a synchronized object, to a
+//! concurrent object and to a Mutex as well. Each kind is a worker of its own,
+//! which gives its argument back.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+packed struct Record
+{
+	tag: u8,
+	n: int,
+}
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+union Word
+{
+	n: int,
+	f: f32,
+}
+
+enum Level
+{
+	Low,
+	High,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+synchronized class Counter
+{
+	pub n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+concurrent class Gauge
+{
+	pub atomic n: int = 0,
+}
+
+fn area(s: Shape) -> int
+{
+	let size = -1;
+	switch s {
+		Circle c => size = c.r * 3,
+		Empty => size = -1,
+	}
+	return size;
+}
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn pass_i8(t: *Task, v: i8) -> i8
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_i8(chunk: []i8, v: i8) -> i8
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_i8(t: *Task)
+{
+	let first = dispatch t -> pass_i8(-8);
+	let a = join(first);
+	let pa = &a;
+	let items: [2]i8 = [-8, 7];
+	let parts = parallel items[0..2] by 1 -> last_i8(-8);
+	let pb = &parts[0];
+	printf("i8 %d %d\n".ptr, *pa as c_int, *pb as c_int);
+	free(parts.ptr);
+}
+
+worker fn pass_i16(t: *Task, v: i16) -> i16
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_i16(chunk: []i16, v: i16) -> i16
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_i16(t: *Task)
+{
+	let first = dispatch t -> pass_i16(-300);
+	let a = join(first);
+	let pa = &a;
+	let items: [2]i16 = [-300, 300];
+	let parts = parallel items[0..2] by 1 -> last_i16(-300);
+	let pb = &parts[0];
+	printf("i16 %d %d\n".ptr, *pa as c_int, *pb as c_int);
+	free(parts.ptr);
+}
+
+worker fn pass_i32(t: *Task, v: i32) -> i32
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_i32(chunk: []i32, v: i32) -> i32
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_i32(t: *Task)
+{
+	let first = dispatch t -> pass_i32(-70000);
+	let a = join(first);
+	let pa = &a;
+	let items: [2]i32 = [-70000, 70000];
+	let parts = parallel items[0..2] by 1 -> last_i32(-70000);
+	let pb = &parts[0];
+	printf("i32 %d %d\n".ptr, *pa as c_int, *pb as c_int);
+	free(parts.ptr);
+}
+
+worker fn pass_i64(t: *Task, v: i64) -> i64
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_i64(chunk: []i64, v: i64) -> i64
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_i64(t: *Task)
+{
+	let first = dispatch t -> pass_i64(-5000000000);
+	let a = join(first);
+	let pa = &a;
+	let items: [2]i64 = [-5000000000, 5000000000];
+	let parts = parallel items[0..2] by 1 -> last_i64(-5000000000);
+	let pb = &parts[0];
+	printf("i64 %lld %lld\n".ptr, *pa, *pb);
+	free(parts.ptr);
+}
+
+worker fn pass_u8(t: *Task, v: u8) -> u8
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_u8(chunk: []u8, v: u8) -> u8
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_u8(t: *Task)
+{
+	let first = dispatch t -> pass_u8(200);
+	let a = join(first);
+	let pa = &a;
+	let items: [2]u8 = [200, 255];
+	let parts = parallel items[0..2] by 1 -> last_u8(200);
+	let pb = &parts[0];
+	printf("u8 %d %d\n".ptr, *pa as c_int, *pb as c_int);
+	free(parts.ptr);
+}
+
+worker fn pass_u16(t: *Task, v: u16) -> u16
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_u16(chunk: []u16, v: u16) -> u16
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_u16(t: *Task)
+{
+	let first = dispatch t -> pass_u16(60000);
+	let a = join(first);
+	let pa = &a;
+	let items: [2]u16 = [60000, 65535];
+	let parts = parallel items[0..2] by 1 -> last_u16(60000);
+	let pb = &parts[0];
+	printf("u16 %d %d\n".ptr, *pa as c_int, *pb as c_int);
+	free(parts.ptr);
+}
+
+worker fn pass_u32(t: *Task, v: u32) -> u32
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_u32(chunk: []u32, v: u32) -> u32
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_u32(t: *Task)
+{
+	let first = dispatch t -> pass_u32(4000000000);
+	let a = join(first);
+	let pa = &a;
+	let items: [2]u32 = [4000000000, 1];
+	let parts = parallel items[0..2] by 1 -> last_u32(4000000000);
+	let pb = &parts[0];
+	printf("u32 %lld %lld\n".ptr, *pa as i64, *pb as i64);
+	free(parts.ptr);
+}
+
+worker fn pass_u64(t: *Task, v: u64) -> u64
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_u64(chunk: []u64, v: u64) -> u64
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_u64(t: *Task)
+{
+	let first = dispatch t -> pass_u64(18000000000000000000);
+	let a = join(first);
+	let pa = &a;
+	let items: [2]u64 = [18000000000000000000, 2];
+	let parts = parallel items[0..2] by 1 -> last_u64(18000000000000000000);
+	let pb = &parts[0];
+	printf("u64 %llu %llu\n".ptr, *pa, *pb);
+	free(parts.ptr);
+}
+
+worker fn pass_uint(t: *Task, v: uint) -> uint
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_uint(chunk: []uint, v: uint) -> uint
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_uint(t: *Task)
+{
+	let first = dispatch t -> pass_uint(3);
+	let a = join(first);
+	let pa = &a;
+	let items: [2]uint = [3, 4];
+	let parts = parallel items[0..2] by 1 -> last_uint(3);
+	let pb = &parts[0];
+	printf("uint %llu %llu\n".ptr, *pa as u64, *pb as u64);
+	free(parts.ptr);
+}
+
+worker fn pass_byte(t: *Task, v: byte) -> byte
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_byte(chunk: []byte, v: byte) -> byte
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_byte(t: *Task)
+{
+	let first = dispatch t -> pass_byte(65);
+	let a = join(first);
+	let pa = &a;
+	let items: [2]byte = [65, 250];
+	let parts = parallel items[0..2] by 1 -> last_byte(65);
+	let pb = &parts[0];
+	printf("byte %d %d\n".ptr, *pa as c_int, *pb as c_int);
+	free(parts.ptr);
+}
+
+worker fn pass_f32(t: *Task, v: f32) -> f32
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_f32(chunk: []f32, v: f32) -> f32
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_f32(t: *Task)
+{
+	let first = dispatch t -> pass_f32(1.5);
+	let a = join(first);
+	let pa = &a;
+	let items: [2]f32 = [1.5, -2.25];
+	let parts = parallel items[0..2] by 1 -> last_f32(1.5);
+	let pb = &parts[0];
+	printf("f32 %g %g\n".ptr, *pa as f64, *pb as f64);
+	free(parts.ptr);
+}
+
+worker fn pass_f64(t: *Task, v: f64) -> f64
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_f64(chunk: []f64, v: f64) -> f64
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_f64(t: *Task)
+{
+	let first = dispatch t -> pass_f64(0.125);
+	let a = join(first);
+	let pa = &a;
+	let items: [2]f64 = [0.125, 1024.5];
+	let parts = parallel items[0..2] by 1 -> last_f64(0.125);
+	let pb = &parts[0];
+	printf("f64 %g %g\n".ptr, *pa, *pb);
+	free(parts.ptr);
+}
+
+worker fn last_f16(chunk: []f16) -> f32
+{
+	return chunk[chunk.len - 1];
+}
+
+fn of_f16()
+{
+	let items: [2]f16 = [1.5 as f16, -0.5 as f16];
+	let whole = parallel items[0..2] by 1 -> last_f16;
+	let halves = parallel items[0..2] by 2 -> last_f16;
+	printf("f16 %g %g\n".ptr, halves[0] as f64, whole[0] as f64);
+	free(whole.ptr);
+	free(halves.ptr);
+}
+
+worker fn pass_bool(t: *Task, v: bool) -> bool
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_bool(chunk: []bool, v: bool) -> bool
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_bool(t: *Task)
+{
+	let first = dispatch t -> pass_bool(true);
+	let a = join(first);
+	let pa = &a;
+	let items: [2]bool = [true, false];
+	let parts = parallel items[0..2] by 1 -> last_bool(true);
+	let pb = &parts[0];
+	printf("bool %d %d\n".ptr, *pa as c_int, *pb as c_int);
+	free(parts.ptr);
+}
+
+worker fn pass_char(t: *Task, v: char) -> char
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_char(chunk: []char, v: char) -> char
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_char(t: *Task)
+{
+	let first = dispatch t -> pass_char('a');
+	let a = join(first);
+	let pa = &a;
+	let items: [2]char = ['a', '\u{e9}'];
+	let parts = parallel items[0..2] by 1 -> last_char('a');
+	let pb = &parts[0];
+	printf("char %u %u\n".ptr, *pa as u32, *pb as u32);
+	free(parts.ptr);
+}
+
+worker fn pass_str(t: *Task, v: str) -> str
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_str(chunk: []str, v: str) -> str
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_str(t: *Task)
+{
+	let first = dispatch t -> pass_str("one");
+	let a = join(first);
+	let pa = &a;
+	let items: [2]str = ["one", "two"];
+	let parts = parallel items[0..2] by 1 -> last_str("one");
+	let pb = &parts[0];
+	printf("str %s %s\n".ptr, (*pa).ptr, (*pb).ptr);
+	free(parts.ptr);
+}
+
+worker fn pass_fixed_array(t: *Task, v: [3]int) -> [3]int
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_fixed_array(chunk: [][3]int, v: [3]int) -> [3]int
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_fixed_array(t: *Task)
+{
+	let first = dispatch t -> pass_fixed_array([1, 2, 3]);
+	let a = join(first);
+	let pa = &a;
+	let items: [2][3]int = [[1, 2, 3], [4, 5, 6]];
+	let parts = parallel items[0..2] by 1 -> last_fixed_array([1, 2, 3]);
+	let pb = &parts[0];
+	printf("fixed_array %d %d\n".ptr, ((*pa)[0] * 10 + (*pa)[2]) as c_int, ((*pb)[0] * 10 + (*pb)[2]) as c_int);
+	free(parts.ptr);
+}
+
+worker fn pass_optional_value(t: *Task, v: ?int) -> ?int
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_optional_value(chunk: [] ?int, v: ?int) -> ?int
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_optional_value(t: *Task)
+{
+	let first = dispatch t -> pass_optional_value(none);
+	let a = join(first);
+	let pa = &a;
+	let items: [2] ?int = [none, 5];
+	let parts = parallel items[0..2] by 1 -> last_optional_value(none);
+	let pb = &parts[0];
+	printf("optional_value %d %d\n".ptr, (*pa ?? -1) as c_int, (*pb ?? -1) as c_int);
+	free(parts.ptr);
+}
+
+worker fn pass_tuple(t: *Task, v: (int, str)) -> (int, str)
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_tuple(chunk: [](int, str), v: (int, str)) -> (int, str)
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_tuple(t: *Task)
+{
+	let first = dispatch t -> pass_tuple((1, "x"));
+	let a = join(first);
+	let pa = &a;
+	let items: [2](int, str) = [(1, "x"), (2, "y")];
+	let parts = parallel items[0..2] by 1 -> last_tuple((1, "x"));
+	let pb = &parts[0];
+	printf("tuple %d%s %d%s\n".ptr, pa.0 as c_int, pa.1.ptr, pb.0 as c_int, pb.1.ptr);
+	free(parts.ptr);
+}
+
+worker fn pass_struct(t: *Task, v: Point) -> Point
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_struct(chunk: []Point, v: Point) -> Point
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_struct(t: *Task)
+{
+	let first = dispatch t -> pass_struct(Point { x: 1, y: 2 });
+	let a = join(first);
+	let pa = &a;
+	let items: [2]Point = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }];
+	let parts = parallel items[0..2] by 1 -> last_struct(Point { x: 1, y: 2 });
+	let pb = &parts[0];
+	printf("struct %d %d\n".ptr, (pa.x * 10 + pa.y) as c_int, (pb.x * 10 + pb.y) as c_int);
+	free(parts.ptr);
+}
+
+worker fn pass_packed_struct(t: *Task, v: Record) -> Record
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_packed_struct(chunk: []Record, v: Record) -> Record
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_packed_struct(t: *Task)
+{
+	let first = dispatch t -> pass_packed_struct(Record { tag: 1, n: 20 });
+	let a = join(first);
+	let pa = &a;
+	let items: [2]Record = [Record { tag: 1, n: 20 }, Record { tag: 3, n: 40 }];
+	let parts = parallel items[0..2] by 1 -> last_packed_struct(Record { tag: 1, n: 20 });
+	let pb = &parts[0];
+	printf("packed_struct %d %d\n".ptr, (pa.tag as int + pa.n) as c_int, (pb.tag as int + pb.n) as c_int);
+	free(parts.ptr);
+}
+
+worker fn pass_simd_struct(t: *Task, v: Vec4) -> Vec4
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_simd_struct(chunk: []Vec4, v: Vec4) -> Vec4
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_simd_struct(t: *Task)
+{
+	let first = dispatch t -> pass_simd_struct(Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 });
+	let a = join(first);
+	let pa = &a;
+	let items: [2]Vec4 = [Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 }, Vec4 { x: 0.5, y: 0.5, z: 0.5, w: 0.5 }];
+	let parts = parallel items[0..2] by 1 -> last_simd_struct(Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 });
+	let pb = &parts[0];
+	printf("simd_struct %g %g\n".ptr, (pa.x + pa.y + pa.z + pa.w) as f64, (pb.x + pb.y + pb.z + pb.w) as f64);
+	free(parts.ptr);
+}
+
+worker fn pass_union(t: *Task, v: Word) -> Word
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_union(chunk: []Word, v: Word) -> Word
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_union(t: *Task)
+{
+	let first = dispatch t -> pass_union(Word { n: 5 });
+	let a = join(first);
+	let pa = &a;
+	let items: [2]Word = [Word { n: 5 }, Word { n: 6 }];
+	let parts = parallel items[0..2] by 1 -> last_union(Word { n: 5 });
+	let pb = &parts[0];
+	printf("union %d %d\n".ptr, pa.n as c_int, pb.n as c_int);
+	free(parts.ptr);
+}
+
+worker fn pass_enum(t: *Task, v: Level) -> Level
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_enum(chunk: []Level, v: Level) -> Level
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_enum(t: *Task)
+{
+	let first = dispatch t -> pass_enum(Level.High);
+	let a = join(first);
+	let pa = &a;
+	let items: [2]Level = [Level.High, Level.Low];
+	let parts = parallel items[0..2] by 1 -> last_enum(Level.High);
+	let pb = &parts[0];
+	printf("enum %d %d\n".ptr, *pa as c_int, *pb as c_int);
+	free(parts.ptr);
+}
+
+worker fn pass_variant(t: *Task, v: Shape) -> Shape
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_variant(chunk: []Shape, v: Shape) -> Shape
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_variant(t: *Task)
+{
+	let first = dispatch t -> pass_variant(Shape.Circle { r: 2 });
+	let a = join(first);
+	let pa = &a;
+	let items: [2]Shape = [Shape.Circle { r: 2 }, Shape.Empty];
+	let parts = parallel items[0..2] by 1 -> last_variant(Shape.Circle { r: 2 });
+	let pb = &parts[0];
+	printf("variant %d %d\n".ptr, area(*pa) as c_int, area(*pb) as c_int);
+	free(parts.ptr);
+}
+
+worker fn pass_class(t: *Task, v: Plain) -> Plain
+{
+	t.n += 1;
+	return v;
+}
+
+worker fn last_class(chunk: []Plain, v: Plain) -> Plain
+{
+	if chunk.len == 2 {
+		return chunk[1];
+	}
+	return v;
+}
+
+fn of_class(t: *Task)
+{
+	let first = dispatch t -> pass_class(Plain { n: 3 });
+	let a = join(first);
+	let pa = &a;
+	let items: [2]Plain = [Plain { n: 3 }, Plain { n: 4 }];
+	let parts = parallel items[0..2] by 1 -> last_class(Plain { n: 3 });
+	let pb = &parts[0];
+	printf("class %d %d\n".ptr, pa.n as c_int, pb.n as c_int);
+	free(parts.ptr);
+}
+
+worker fn touch(t: *Task, c: *Counter, g: *Gauge, m: *Mutex) -> int
+{
+	sync *m {
+		t.n += 1;
+	}
+	g.n.add(c.get());
+	return g.n.load();
+}
+
+fn of_thread_safe(t: *Task)
+{
+	let c = alloc Counter { n: 5 };
+	let g = alloc Gauge { n: 7 };
+	let m = Mutex.new();
+	let job = dispatch t -> touch(c, g, &m);
+	printf("thread_safe %d\n".ptr, join(job) as c_int);
+	m.destroy();
+	delete(c);
+	delete(g);
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	of_i8(t);
+	of_i16(t);
+	of_i32(t);
+	of_i64(t);
+	of_u8(t);
+	of_u16(t);
+	of_u32(t);
+	of_u64(t);
+	of_uint(t);
+	of_byte(t);
+	of_f32(t);
+	of_f64(t);
+	of_f16();
+	of_bool(t);
+	of_char(t);
+	of_str(t);
+	of_fixed_array(t);
+	of_optional_value(t);
+	of_tuple(t);
+	of_struct(t);
+	of_packed_struct(t);
+	of_simd_struct(t);
+	of_union(t);
+	of_enum(t);
+	of_variant(t);
+	of_class(t);
+	of_thread_safe(t);
+	printf("jobs %d\n".ptr, t.n as c_int);
+	delete(t);
+	return 0;
+}

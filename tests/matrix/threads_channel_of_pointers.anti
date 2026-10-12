@@ -1,0 +1,9 @@
+//! A channel carries values under the rule of `parallel`, and a pointer is
+//! refused.
+
+fn main() -> int
+{
+	let c = chan *int(1);
+	delete(c);
+	return 0;
+}

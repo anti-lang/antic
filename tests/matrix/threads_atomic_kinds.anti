@@ -1,0 +1,439 @@
+//! The eight atomic operations on each kind of value an atomic holds, on a
+//! field and on a local: every integer type with all eight, at the highest
+//! value of its type, and a `bool`, a `char`, a pointer, a nullable pointer and
+//! an `f16` field with the ones that are no arithmetic. A `bool` takes `and`
+//! and `or` as well. Each line holds what the operations gave, in the order the
+//! program wrote them.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Cells
+{
+	pub atomic v_i8: i8 = 0,
+	pub atomic v_i16: i16 = 0,
+	pub atomic v_i32: i32 = 0,
+	pub atomic v_i64: i64 = 0,
+	pub atomic v_int: int = 0,
+	pub atomic v_u8: u8 = 0,
+	pub atomic v_u16: u16 = 0,
+	pub atomic v_u32: u32 = 0,
+	pub atomic v_u64: u64 = 0,
+	pub atomic v_uint: uint = 0,
+	pub atomic v_byte: byte = 0,
+	pub atomic on: bool = false,
+	pub atomic letter: char = 'a',
+	pub atomic half: f16 = 0.0 as f16,
+}
+
+class Links
+{
+	pub atomic p: *int,
+	pub atomic q: ?*int = none,
+}
+
+fn pointee(p: ?*int) -> int
+{
+	if let q = p {
+		return *q;
+	}
+	return -1;
+}
+
+fn of_i8(c: *Cells)
+{
+	let n: atomic i8 = 5;
+	let local_swapped = n.swap(100);
+	let local_added = n.add(27);
+	let local_subtracted = n.sub(7);
+	let local_masked = n.and(15);
+	let local_joined = n.or(3);
+	let local_first = n.compare_swap(11, -2);
+	let local_second = n.compare_swap(11, 0);
+	printf("i8 local %lld %lld %lld %lld %lld %d %d %lld\n".ptr, local_swapped as i64,
+		local_added as i64, local_subtracted as i64, local_masked as i64, local_joined as i64,
+		local_first as c_int, local_second as c_int, n.load() as i64);
+	c.v_i8.store(5);
+	let field_swapped = c.v_i8.swap(100);
+	let field_added = c.v_i8.add(27);
+	let field_subtracted = c.v_i8.sub(7);
+	let field_masked = c.v_i8.and(15);
+	let field_joined = c.v_i8.or(3);
+	let field_first = c.v_i8.compare_swap(11, -2);
+	let field_second = c.v_i8.compare_swap(11, 0);
+	printf("i8 field %lld %lld %lld %lld %lld %d %d %lld\n".ptr, field_swapped as i64,
+		field_added as i64, field_subtracted as i64, field_masked as i64, field_joined as i64,
+		field_first as c_int, field_second as c_int, c.v_i8.load() as i64);
+}
+
+fn of_i16(c: *Cells)
+{
+	let n: atomic i16 = 5;
+	let local_swapped = n.swap(32740);
+	let local_added = n.add(27);
+	let local_subtracted = n.sub(7);
+	let local_masked = n.and(15);
+	let local_joined = n.or(3);
+	let local_first = n.compare_swap(11, -2);
+	let local_second = n.compare_swap(11, 0);
+	printf("i16 local %lld %lld %lld %lld %lld %d %d %lld\n".ptr, local_swapped as i64,
+		local_added as i64, local_subtracted as i64, local_masked as i64, local_joined as i64,
+		local_first as c_int, local_second as c_int, n.load() as i64);
+	c.v_i16.store(5);
+	let field_swapped = c.v_i16.swap(32740);
+	let field_added = c.v_i16.add(27);
+	let field_subtracted = c.v_i16.sub(7);
+	let field_masked = c.v_i16.and(15);
+	let field_joined = c.v_i16.or(3);
+	let field_first = c.v_i16.compare_swap(11, -2);
+	let field_second = c.v_i16.compare_swap(11, 0);
+	printf("i16 field %lld %lld %lld %lld %lld %d %d %lld\n".ptr, field_swapped as i64,
+		field_added as i64, field_subtracted as i64, field_masked as i64, field_joined as i64,
+		field_first as c_int, field_second as c_int, c.v_i16.load() as i64);
+}
+
+fn of_i32(c: *Cells)
+{
+	let n: atomic i32 = 5;
+	let local_swapped = n.swap(2147483620);
+	let local_added = n.add(27);
+	let local_subtracted = n.sub(7);
+	let local_masked = n.and(15);
+	let local_joined = n.or(3);
+	let local_first = n.compare_swap(11, -2);
+	let local_second = n.compare_swap(11, 0);
+	printf("i32 local %lld %lld %lld %lld %lld %d %d %lld\n".ptr, local_swapped as i64,
+		local_added as i64, local_subtracted as i64, local_masked as i64, local_joined as i64,
+		local_first as c_int, local_second as c_int, n.load() as i64);
+	c.v_i32.store(5);
+	let field_swapped = c.v_i32.swap(2147483620);
+	let field_added = c.v_i32.add(27);
+	let field_subtracted = c.v_i32.sub(7);
+	let field_masked = c.v_i32.and(15);
+	let field_joined = c.v_i32.or(3);
+	let field_first = c.v_i32.compare_swap(11, -2);
+	let field_second = c.v_i32.compare_swap(11, 0);
+	printf("i32 field %lld %lld %lld %lld %lld %d %d %lld\n".ptr, field_swapped as i64,
+		field_added as i64, field_subtracted as i64, field_masked as i64, field_joined as i64,
+		field_first as c_int, field_second as c_int, c.v_i32.load() as i64);
+}
+
+fn of_i64(c: *Cells)
+{
+	let n: atomic i64 = 5;
+	let local_swapped = n.swap(9223372036854775780);
+	let local_added = n.add(27);
+	let local_subtracted = n.sub(7);
+	let local_masked = n.and(15);
+	let local_joined = n.or(3);
+	let local_first = n.compare_swap(11, -2);
+	let local_second = n.compare_swap(11, 0);
+	printf("i64 local %lld %lld %lld %lld %lld %d %d %lld\n".ptr, local_swapped as i64,
+		local_added as i64, local_subtracted as i64, local_masked as i64, local_joined as i64,
+		local_first as c_int, local_second as c_int, n.load() as i64);
+	c.v_i64.store(5);
+	let field_swapped = c.v_i64.swap(9223372036854775780);
+	let field_added = c.v_i64.add(27);
+	let field_subtracted = c.v_i64.sub(7);
+	let field_masked = c.v_i64.and(15);
+	let field_joined = c.v_i64.or(3);
+	let field_first = c.v_i64.compare_swap(11, -2);
+	let field_second = c.v_i64.compare_swap(11, 0);
+	printf("i64 field %lld %lld %lld %lld %lld %d %d %lld\n".ptr, field_swapped as i64,
+		field_added as i64, field_subtracted as i64, field_masked as i64, field_joined as i64,
+		field_first as c_int, field_second as c_int, c.v_i64.load() as i64);
+}
+
+fn of_int(c: *Cells)
+{
+	let n: atomic int = 5;
+	let local_swapped = n.swap(9223372036854775780);
+	let local_added = n.add(27);
+	let local_subtracted = n.sub(7);
+	let local_masked = n.and(15);
+	let local_joined = n.or(3);
+	let local_first = n.compare_swap(11, -2);
+	let local_second = n.compare_swap(11, 0);
+	printf("int local %lld %lld %lld %lld %lld %d %d %lld\n".ptr, local_swapped as i64,
+		local_added as i64, local_subtracted as i64, local_masked as i64, local_joined as i64,
+		local_first as c_int, local_second as c_int, n.load() as i64);
+	c.v_int.store(5);
+	let field_swapped = c.v_int.swap(9223372036854775780);
+	let field_added = c.v_int.add(27);
+	let field_subtracted = c.v_int.sub(7);
+	let field_masked = c.v_int.and(15);
+	let field_joined = c.v_int.or(3);
+	let field_first = c.v_int.compare_swap(11, -2);
+	let field_second = c.v_int.compare_swap(11, 0);
+	printf("int field %lld %lld %lld %lld %lld %d %d %lld\n".ptr, field_swapped as i64,
+		field_added as i64, field_subtracted as i64, field_masked as i64, field_joined as i64,
+		field_first as c_int, field_second as c_int, c.v_int.load() as i64);
+}
+
+fn of_u8(c: *Cells)
+{
+	let n: atomic u8 = 5;
+	let local_swapped = n.swap(228);
+	let local_added = n.add(27);
+	let local_subtracted = n.sub(7);
+	let local_masked = n.and(15);
+	let local_joined = n.or(3);
+	let local_first = n.compare_swap(11, 255);
+	let local_second = n.compare_swap(11, 0);
+	printf("u8 local %llu %llu %llu %llu %llu %d %d %llu\n".ptr, local_swapped as u64,
+		local_added as u64, local_subtracted as u64, local_masked as u64, local_joined as u64,
+		local_first as c_int, local_second as c_int, n.load() as u64);
+	c.v_u8.store(5);
+	let field_swapped = c.v_u8.swap(228);
+	let field_added = c.v_u8.add(27);
+	let field_subtracted = c.v_u8.sub(7);
+	let field_masked = c.v_u8.and(15);
+	let field_joined = c.v_u8.or(3);
+	let field_first = c.v_u8.compare_swap(11, 255);
+	let field_second = c.v_u8.compare_swap(11, 0);
+	printf("u8 field %llu %llu %llu %llu %llu %d %d %llu\n".ptr, field_swapped as u64,
+		field_added as u64, field_subtracted as u64, field_masked as u64, field_joined as u64,
+		field_first as c_int, field_second as c_int, c.v_u8.load() as u64);
+}
+
+fn of_u16(c: *Cells)
+{
+	let n: atomic u16 = 5;
+	let local_swapped = n.swap(65508);
+	let local_added = n.add(27);
+	let local_subtracted = n.sub(7);
+	let local_masked = n.and(15);
+	let local_joined = n.or(3);
+	let local_first = n.compare_swap(11, 65535);
+	let local_second = n.compare_swap(11, 0);
+	printf("u16 local %llu %llu %llu %llu %llu %d %d %llu\n".ptr, local_swapped as u64,
+		local_added as u64, local_subtracted as u64, local_masked as u64, local_joined as u64,
+		local_first as c_int, local_second as c_int, n.load() as u64);
+	c.v_u16.store(5);
+	let field_swapped = c.v_u16.swap(65508);
+	let field_added = c.v_u16.add(27);
+	let field_subtracted = c.v_u16.sub(7);
+	let field_masked = c.v_u16.and(15);
+	let field_joined = c.v_u16.or(3);
+	let field_first = c.v_u16.compare_swap(11, 65535);
+	let field_second = c.v_u16.compare_swap(11, 0);
+	printf("u16 field %llu %llu %llu %llu %llu %d %d %llu\n".ptr, field_swapped as u64,
+		field_added as u64, field_subtracted as u64, field_masked as u64, field_joined as u64,
+		field_first as c_int, field_second as c_int, c.v_u16.load() as u64);
+}
+
+fn of_u32(c: *Cells)
+{
+	let n: atomic u32 = 5;
+	let local_swapped = n.swap(4294967268);
+	let local_added = n.add(27);
+	let local_subtracted = n.sub(7);
+	let local_masked = n.and(15);
+	let local_joined = n.or(3);
+	let local_first = n.compare_swap(11, 4294967295);
+	let local_second = n.compare_swap(11, 0);
+	printf("u32 local %llu %llu %llu %llu %llu %d %d %llu\n".ptr, local_swapped as u64,
+		local_added as u64, local_subtracted as u64, local_masked as u64, local_joined as u64,
+		local_first as c_int, local_second as c_int, n.load() as u64);
+	c.v_u32.store(5);
+	let field_swapped = c.v_u32.swap(4294967268);
+	let field_added = c.v_u32.add(27);
+	let field_subtracted = c.v_u32.sub(7);
+	let field_masked = c.v_u32.and(15);
+	let field_joined = c.v_u32.or(3);
+	let field_first = c.v_u32.compare_swap(11, 4294967295);
+	let field_second = c.v_u32.compare_swap(11, 0);
+	printf("u32 field %llu %llu %llu %llu %llu %d %d %llu\n".ptr, field_swapped as u64,
+		field_added as u64, field_subtracted as u64, field_masked as u64, field_joined as u64,
+		field_first as c_int, field_second as c_int, c.v_u32.load() as u64);
+}
+
+fn of_u64(c: *Cells)
+{
+	let n: atomic u64 = 5;
+	let local_swapped = n.swap(18446744073709551588);
+	let local_added = n.add(27);
+	let local_subtracted = n.sub(7);
+	let local_masked = n.and(15);
+	let local_joined = n.or(3);
+	let local_first = n.compare_swap(11, 18446744073709551615);
+	let local_second = n.compare_swap(11, 0);
+	printf("u64 local %llu %llu %llu %llu %llu %d %d %llu\n".ptr, local_swapped as u64,
+		local_added as u64, local_subtracted as u64, local_masked as u64, local_joined as u64,
+		local_first as c_int, local_second as c_int, n.load() as u64);
+	c.v_u64.store(5);
+	let field_swapped = c.v_u64.swap(18446744073709551588);
+	let field_added = c.v_u64.add(27);
+	let field_subtracted = c.v_u64.sub(7);
+	let field_masked = c.v_u64.and(15);
+	let field_joined = c.v_u64.or(3);
+	let field_first = c.v_u64.compare_swap(11, 18446744073709551615);
+	let field_second = c.v_u64.compare_swap(11, 0);
+	printf("u64 field %llu %llu %llu %llu %llu %d %d %llu\n".ptr, field_swapped as u64,
+		field_added as u64, field_subtracted as u64, field_masked as u64, field_joined as u64,
+		field_first as c_int, field_second as c_int, c.v_u64.load() as u64);
+}
+
+fn of_uint(c: *Cells)
+{
+	let n: atomic uint = 5;
+	let local_swapped = n.swap(18446744073709551588);
+	let local_added = n.add(27);
+	let local_subtracted = n.sub(7);
+	let local_masked = n.and(15);
+	let local_joined = n.or(3);
+	let local_first = n.compare_swap(11, 18446744073709551615);
+	let local_second = n.compare_swap(11, 0);
+	printf("uint local %llu %llu %llu %llu %llu %d %d %llu\n".ptr, local_swapped as u64,
+		local_added as u64, local_subtracted as u64, local_masked as u64, local_joined as u64,
+		local_first as c_int, local_second as c_int, n.load() as u64);
+	c.v_uint.store(5);
+	let field_swapped = c.v_uint.swap(18446744073709551588);
+	let field_added = c.v_uint.add(27);
+	let field_subtracted = c.v_uint.sub(7);
+	let field_masked = c.v_uint.and(15);
+	let field_joined = c.v_uint.or(3);
+	let field_first = c.v_uint.compare_swap(11, 18446744073709551615);
+	let field_second = c.v_uint.compare_swap(11, 0);
+	printf("uint field %llu %llu %llu %llu %llu %d %d %llu\n".ptr, field_swapped as u64,
+		field_added as u64, field_subtracted as u64, field_masked as u64, field_joined as u64,
+		field_first as c_int, field_second as c_int, c.v_uint.load() as u64);
+}
+
+fn of_byte(c: *Cells)
+{
+	let n: atomic byte = 5;
+	let local_swapped = n.swap(228);
+	let local_added = n.add(27);
+	let local_subtracted = n.sub(7);
+	let local_masked = n.and(15);
+	let local_joined = n.or(3);
+	let local_first = n.compare_swap(11, 255);
+	let local_second = n.compare_swap(11, 0);
+	printf("byte local %llu %llu %llu %llu %llu %d %d %llu\n".ptr, local_swapped as u64,
+		local_added as u64, local_subtracted as u64, local_masked as u64, local_joined as u64,
+		local_first as c_int, local_second as c_int, n.load() as u64);
+	c.v_byte.store(5);
+	let field_swapped = c.v_byte.swap(228);
+	let field_added = c.v_byte.add(27);
+	let field_subtracted = c.v_byte.sub(7);
+	let field_masked = c.v_byte.and(15);
+	let field_joined = c.v_byte.or(3);
+	let field_first = c.v_byte.compare_swap(11, 255);
+	let field_second = c.v_byte.compare_swap(11, 0);
+	printf("byte field %llu %llu %llu %llu %llu %d %d %llu\n".ptr, field_swapped as u64,
+		field_added as u64, field_subtracted as u64, field_masked as u64, field_joined as u64,
+		field_first as c_int, field_second as c_int, c.v_byte.load() as u64);
+}
+
+fn of_bool(c: *Cells)
+{
+	let on: atomic bool = false;
+	on.store(true);
+	let local_swapped = on.swap(false);
+	let local_joined = on.or(true);
+	let local_masked = on.and(false);
+	let local_first = on.compare_swap(false, true);
+	let local_second = on.compare_swap(false, true);
+	printf("bool local %d %d %d %d %d %d\n".ptr, local_swapped as c_int, local_joined as c_int,
+		local_masked as c_int, local_first as c_int, local_second as c_int, on.load() as c_int);
+	c.on.store(true);
+	let field_swapped = c.on.swap(false);
+	let field_joined = c.on.or(true);
+	let field_masked = c.on.and(false);
+	let field_first = c.on.compare_swap(false, true);
+	let field_second = c.on.compare_swap(false, true);
+	printf("bool field %d %d %d %d %d %d\n".ptr, field_swapped as c_int, field_joined as c_int,
+		field_masked as c_int, field_first as c_int, field_second as c_int, c.on.load() as c_int);
+}
+
+fn of_char(c: *Cells)
+{
+	let letter: atomic char = 'a';
+	letter.store('b');
+	let local_swapped = letter.swap('c');
+	let local_first = letter.compare_swap('c', 'd');
+	let local_second = letter.compare_swap('c', 'e');
+	printf("char local %u %d %d %u\n".ptr, local_swapped as u32, local_first as c_int,
+		local_second as c_int, letter.load() as u32);
+	c.letter.store('b');
+	let field_swapped = c.letter.swap('c');
+	let field_first = c.letter.compare_swap('c', 'd');
+	let field_second = c.letter.compare_swap('c', 'e');
+	printf("char field %u %d %d %u\n".ptr, field_swapped as u32, field_first as c_int,
+		field_second as c_int, c.letter.load() as u32);
+}
+
+fn of_f16(c: *Cells)
+{
+	c.half.store(1.5 as f16);
+	let swapped = c.half.swap(2.5 as f16);
+	let first = c.half.compare_swap(2.5 as f16, 0.25 as f16);
+	let second = c.half.compare_swap(2.5 as f16, 8.0 as f16);
+	printf("f16 field %g %d %d %g\n".ptr, swapped as f64, first as c_int, second as c_int,
+		c.half.load() as f64);
+}
+
+fn of_pointer(links: *Links, a: *int, b: *int)
+{
+	let p: atomic *int = a;
+	p.store(b);
+	let local_swapped = p.swap(a);
+	let local_first = p.compare_swap(a, b);
+	let local_second = p.compare_swap(a, b);
+	printf("pointer local %d %d %d %d\n".ptr, *local_swapped as c_int, local_first as c_int,
+		local_second as c_int, *p.load() as c_int);
+	links.p.store(b);
+	let field_swapped = links.p.swap(a);
+	let field_first = links.p.compare_swap(a, b);
+	let field_second = links.p.compare_swap(a, b);
+	printf("pointer field %d %d %d %d\n".ptr, *field_swapped as c_int, field_first as c_int,
+		field_second as c_int, *links.p.load() as c_int);
+}
+
+fn of_nullable_pointer(links: *Links, a: *int, b: *int)
+{
+	let q: atomic ?*int = none;
+	let local_empty = q.load();
+	q.store(b);
+	let local_swapped = q.swap(none);
+	let local_first = q.compare_swap(none, a);
+	let local_second = q.compare_swap(none, b);
+	printf("nullable_pointer local %d %d %d %d %d\n".ptr, pointee(local_empty) as c_int,
+		pointee(local_swapped) as c_int, local_first as c_int, local_second as c_int,
+		pointee(q.load()) as c_int);
+	let field_empty = links.q.load();
+	links.q.store(b);
+	let field_swapped = links.q.swap(none);
+	let field_first = links.q.compare_swap(none, a);
+	let field_second = links.q.compare_swap(none, b);
+	printf("nullable_pointer field %d %d %d %d %d\n".ptr, pointee(field_empty) as c_int,
+		pointee(field_swapped) as c_int, field_first as c_int, field_second as c_int,
+		pointee(links.q.load()) as c_int);
+}
+
+fn main() -> int
+{
+	let cells = alloc Cells { };
+	let a = 10;
+	let b = 20;
+	let links = alloc Links { p: &a };
+	of_i8(cells);
+	of_i16(cells);
+	of_i32(cells);
+	of_i64(cells);
+	of_int(cells);
+	of_u8(cells);
+	of_u16(cells);
+	of_u32(cells);
+	of_u64(cells);
+	of_uint(cells);
+	of_byte(cells);
+	of_bool(cells);
+	of_char(cells);
+	of_f16(cells);
+	of_pointer(links, &a, &b);
+	of_nullable_pointer(links, &a, &b);
+	delete(links);
+	delete(cells);
+	return 0;
+}

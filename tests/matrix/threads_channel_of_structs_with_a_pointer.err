@@ -1,0 +1,1 @@
+threads_channel_of_structs_with_a_pointer.anti:12:15: error: a channel carries values alone, and `Link` holds a pointer

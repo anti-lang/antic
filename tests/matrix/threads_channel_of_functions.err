@@ -1,0 +1,1 @@
+threads_channel_of_functions.anti:6:15: error: a channel carries values alone, and `fn(int) -> int` holds a pointer

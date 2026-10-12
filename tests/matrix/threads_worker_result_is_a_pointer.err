@@ -1,0 +1,1 @@
+threads_worker_result_is_a_pointer.anti:16:26: error: the result of a worker has type `*int`, which holds a pointer. A worker takes and returns values alone

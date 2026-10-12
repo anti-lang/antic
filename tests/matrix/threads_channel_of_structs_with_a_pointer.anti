@@ -1,0 +1,15 @@
+//! A channel carries values under the rule of `parallel`, and a struct with a
+//! pointer field is refused.
+
+struct Link
+{
+	next: ?*Link,
+	n: int,
+}
+
+fn main() -> int
+{
+	let c = chan Link(1);
+	delete(c);
+	return 0;
+}

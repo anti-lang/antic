@@ -1,0 +1,1 @@
+threads_worker_argument_is_a_pointer_to_a_plain_class.anti:25:31: error: an argument of a worker has type `?*Other`, which holds a pointer. A worker takes and returns values alone

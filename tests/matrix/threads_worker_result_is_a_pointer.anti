@@ -1,0 +1,20 @@
+//! The result of a worker holds no pointer.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn where(t: *Task) -> *int
+{
+	return &t.n;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let job = dispatch t -> where;
+	let got = join(job);
+	delete(t);
+	return *got;
+}

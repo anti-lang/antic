@@ -1,0 +1,544 @@
+//! `chan T(n)`, `send` and `recv` with each kind of value a channel carries:
+//! the numbers, `f16`, `bool`, `char`, `str`, a fixed array, an optional value,
+//! a tuple, a struct, a packed struct, a simd struct, a union, an enum, a
+//! variant, a class value, a synchronized and a concurrent class value and a
+//! generic parameter. Each kind is a function of its own, which sends two
+//! values and prints what `recv` gives for each.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+packed struct Record
+{
+	tag: u8,
+	n: int,
+}
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+union Word
+{
+	n: int,
+	f: f32,
+}
+
+enum Level
+{
+	Low,
+	High,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+synchronized class Counter
+{
+	pub n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+concurrent class Gauge
+{
+	pub atomic n: int = 0,
+}
+
+fn area(s: Shape) -> int
+{
+	let size = -1;
+	switch s {
+		Circle c => size = c.r * 3,
+		Empty => size = -1,
+	}
+	return size;
+}
+
+fn through<T>(first: T, second: T) -> T
+{
+	let c = chan T(2);
+	send(c, dup(first));
+	send(c, dup(second));
+	let a = recv(c) else {
+		return dup(first);
+	};
+	let b = recv(c) else {
+		return dup(first);
+	};
+	let last = dup(*b);
+	delete(c);
+	return last;
+}
+
+fn of_i8()
+{
+	let c = chan i8(2);
+	send(c, -8);
+	send(c, 7);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("i8 %d %d\n".ptr, *a as c_int, *b as c_int);
+	delete(c);
+}
+
+fn of_i16()
+{
+	let c = chan i16(2);
+	send(c, -300);
+	send(c, 300);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("i16 %d %d\n".ptr, *a as c_int, *b as c_int);
+	delete(c);
+}
+
+fn of_i32()
+{
+	let c = chan i32(2);
+	send(c, -70000);
+	send(c, 70000);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("i32 %d %d\n".ptr, *a as c_int, *b as c_int);
+	delete(c);
+}
+
+fn of_i64()
+{
+	let c = chan i64(2);
+	send(c, -5000000000);
+	send(c, 5000000000);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("i64 %lld %lld\n".ptr, *a, *b);
+	delete(c);
+}
+
+fn of_u8()
+{
+	let c = chan u8(2);
+	send(c, 200);
+	send(c, 255);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("u8 %d %d\n".ptr, *a as c_int, *b as c_int);
+	delete(c);
+}
+
+fn of_u16()
+{
+	let c = chan u16(2);
+	send(c, 60000);
+	send(c, 65535);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("u16 %d %d\n".ptr, *a as c_int, *b as c_int);
+	delete(c);
+}
+
+fn of_u32()
+{
+	let c = chan u32(2);
+	send(c, 4000000000);
+	send(c, 1);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("u32 %lld %lld\n".ptr, *a as i64, *b as i64);
+	delete(c);
+}
+
+fn of_u64()
+{
+	let c = chan u64(2);
+	send(c, 18000000000000000000);
+	send(c, 2);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("u64 %llu %llu\n".ptr, *a, *b);
+	delete(c);
+}
+
+fn of_uint()
+{
+	let c = chan uint(2);
+	send(c, 3);
+	send(c, 4);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("uint %llu %llu\n".ptr, *a as u64, *b as u64);
+	delete(c);
+}
+
+fn of_byte()
+{
+	let c = chan byte(2);
+	send(c, 65);
+	send(c, 250);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("byte %d %d\n".ptr, *a as c_int, *b as c_int);
+	delete(c);
+}
+
+fn of_f32()
+{
+	let c = chan f32(2);
+	send(c, 1.5);
+	send(c, -2.25);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("f32 %g %g\n".ptr, *a as f64, *b as f64);
+	delete(c);
+}
+
+fn of_f64()
+{
+	let c = chan f64(2);
+	send(c, 0.125);
+	send(c, 1024.5);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("f64 %g %g\n".ptr, *a, *b);
+	delete(c);
+}
+
+fn of_f16()
+{
+	let c = chan f16(2);
+	send(c, 1.5 as f16);
+	send(c, -0.5 as f16);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("f16 %g %g\n".ptr, *a as f64, *b as f64);
+	delete(c);
+}
+
+fn of_bool()
+{
+	let c = chan bool(2);
+	send(c, true);
+	send(c, false);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("bool %d %d\n".ptr, *a as c_int, *b as c_int);
+	delete(c);
+}
+
+fn of_char()
+{
+	let c = chan char(2);
+	send(c, 'a');
+	send(c, '\u{e9}');
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("char %u %u\n".ptr, *a as u32, *b as u32);
+	delete(c);
+}
+
+fn of_str()
+{
+	let c = chan str(2);
+	send(c, "one");
+	send(c, "two");
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("str %s %s\n".ptr, (*a).ptr, (*b).ptr);
+	delete(c);
+}
+
+fn of_fixed_array()
+{
+	let c = chan [3]int(2);
+	send(c, [1, 2, 3]);
+	send(c, [4, 5, 6]);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("fixed_array %d %d\n".ptr, ((*a)[0] * 10 + (*a)[2]) as c_int, ((*b)[0] * 10 + (*b)[2]) as c_int);
+	delete(c);
+}
+
+fn of_optional_value()
+{
+	let c = chan ?int(2);
+	send(c, none);
+	send(c, 5);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("optional_value %d %d\n".ptr, (*a ?? -1) as c_int, (*b ?? -1) as c_int);
+	delete(c);
+}
+
+fn of_tuple()
+{
+	let c = chan (int, str)(2);
+	send(c, (1, "x"));
+	send(c, (2, "y"));
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("tuple %d%s %d%s\n".ptr, a.0 as c_int, a.1.ptr, b.0 as c_int, b.1.ptr);
+	delete(c);
+}
+
+fn of_struct()
+{
+	let c = chan Point(2);
+	send(c, Point { x: 1, y: 2 });
+	send(c, Point { x: 3, y: 4 });
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("struct %d %d\n".ptr, (a.x * 10 + a.y) as c_int, (b.x * 10 + b.y) as c_int);
+	delete(c);
+}
+
+fn of_packed_struct()
+{
+	let c = chan Record(2);
+	send(c, Record { tag: 1, n: 20 });
+	send(c, Record { tag: 3, n: 40 });
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("packed_struct %d %d\n".ptr, (a.tag as int + a.n) as c_int, (b.tag as int + b.n) as c_int);
+	delete(c);
+}
+
+fn of_simd_struct()
+{
+	let c = chan Vec4(2);
+	send(c, Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 });
+	send(c, Vec4 { x: 0.5, y: 0.5, z: 0.5, w: 0.5 });
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("simd_struct %g %g\n".ptr, (a.x + a.y + a.z + a.w) as f64, (b.x + b.y + b.z + b.w) as f64);
+	delete(c);
+}
+
+fn of_union()
+{
+	let c = chan Word(2);
+	send(c, Word { n: 5 });
+	send(c, Word { n: 6 });
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("union %d %d\n".ptr, a.n as c_int, b.n as c_int);
+	delete(c);
+}
+
+fn of_enum()
+{
+	let c = chan Level(2);
+	send(c, Level.High);
+	send(c, Level.Low);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("enum %d %d\n".ptr, *a as c_int, *b as c_int);
+	delete(c);
+}
+
+fn of_variant()
+{
+	let c = chan Shape(2);
+	send(c, Shape.Circle { r: 2 });
+	send(c, Shape.Empty);
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("variant %d %d\n".ptr, area(*a) as c_int, area(*b) as c_int);
+	delete(c);
+}
+
+fn of_class()
+{
+	let c = chan Plain(2);
+	send(c, Plain { n: 3 });
+	send(c, Plain { n: 4 });
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("class %d %d\n".ptr, a.n as c_int, b.n as c_int);
+	delete(c);
+}
+
+fn of_synchronized_class()
+{
+	let c = chan Counter(2);
+	send(c, Counter { n: 5 });
+	send(c, Counter { n: 6 });
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("synchronized_class %d %d\n".ptr, a.get() as c_int, b.get() as c_int);
+	delete(c);
+}
+
+fn of_concurrent_class()
+{
+	let c = chan Gauge(2);
+	send(c, Gauge { n: 7 });
+	send(c, Gauge { n: 8 });
+	let a = recv(c) else {
+		return;
+	};
+	let b = recv(c) else {
+		return;
+	};
+	printf("concurrent_class %d %d\n".ptr, a.n.load() as c_int, b.n.load() as c_int);
+	delete(c);
+}
+
+fn main() -> int
+{
+	of_i8();
+	of_i16();
+	of_i32();
+	of_i64();
+	of_u8();
+	of_u16();
+	of_u32();
+	of_u64();
+	of_uint();
+	of_byte();
+	of_f32();
+	of_f64();
+	of_f16();
+	of_bool();
+	of_char();
+	of_str();
+	of_fixed_array();
+	of_optional_value();
+	of_tuple();
+	of_struct();
+	of_packed_struct();
+	of_simd_struct();
+	of_union();
+	of_enum();
+	of_variant();
+	of_class();
+	of_synchronized_class();
+	of_concurrent_class();
+	printf("generic_parameter %d %s %d\n".ptr, through<int>(1, 2) as c_int,
+		through<str>("first", "second").ptr,
+		through<Point>(Point { x: 1, y: 2 }, Point { x: 3, y: 4 }).y as c_int);
+	return 0;
+}

@@ -1,0 +1,1 @@
+threads_worker_argument_is_a_tuple_with_a_pointer.anti:19:31: error: an argument of a worker has type `(int, *int)`, which holds a pointer. A worker takes and returns values alone

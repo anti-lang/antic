@@ -1,0 +1,1 @@
+threads_channel_of_slices.anti:6:15: error: a channel carries values alone, and `[]int` holds a pointer

@@ -1,0 +1,1 @@
+threads_parallel_over_pointers.anti:13:38: error: the chunk has type `*int`, which holds a pointer. A worker takes and returns values alone

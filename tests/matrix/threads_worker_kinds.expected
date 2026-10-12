@@ -1,0 +1,29 @@
+exit 0
+i8 -8 7
+i16 -300 300
+i32 -70000 70000
+i64 -5000000000 5000000000
+u8 200 255
+u16 60000 65535
+u32 4000000000 1
+u64 18000000000000000000 2
+uint 3 4
+byte 65 250
+f32 1.5 -2.25
+f64 0.125 1024.5
+f16 1.5 -0.5
+bool 1 0
+char 97 233
+str one two
+fixed_array 13 46
+optional_value -1 5
+tuple 1x 2y
+struct 12 34
+packed_struct 21 43
+simd_struct 10 2
+union 5 6
+enum 1 0
+variant 6 -1
+class 3 4
+thread_safe 12
+jobs 26

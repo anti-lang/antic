@@ -1,0 +1,22 @@
+//! An argument of a generic worker is checked in the copy its call makes, so a
+//! pointer for the type parameter is refused.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn read<T>(t: *Task, v: T) -> int
+{
+	return t.n;
+}
+
+fn main() -> int
+{
+	let n = 5;
+	let t = alloc Task { };
+	let job = dispatch t -> read(&n);
+	let got = join(job);
+	delete(t);
+	return got;
+}
