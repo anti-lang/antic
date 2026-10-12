@@ -1,0 +1,22 @@
+exit 0
+exact 1.5 1.5
+tie down 1 1
+tie up 1.001953125 1.001953125
+greatest 65504 65504
+below inf 65504 65504
+to inf inf inf
+to -inf -inf -inf
+smallest 5.9604644775390625e-08 5.9604644775390625e-08
+tie to zero 0 0
+above the tie 5.9604644775390625e-08 5.9604644775390625e-08
+to zero 0 0
+-0 -0 -0
+tenth 0.0999755859375 0.0999755859375
+nan 1
+local 0.75
+field 1.5
+array 8 2 4
+slice 4 2
+tuple 8
+pointer 0.75
+size 2 16

@@ -1,0 +1,27 @@
+exit 0
+bool i8 1 1
+bool i16 1 1
+bool i32 1 1
+bool i64 1 1
+bool int 1 1
+bool u8 1 1
+bool u16 1 1
+bool u32 1 1
+bool u64 1 1
+bool uint 1 1
+bool byte 1 1
+false i8 0 0
+false u64 0 0
+char a 97 97
+char last 1114111 1114111
+u32 char 128512 128512
+enum int 2 2
+enum u8 2 2
+enum f64 2 2
+enum of u8 int 200 200
+enum of u8 i16 200 200
+enum of i16 int 100 100
+enum of i16 f32 100 100
+int enum 1
+u8 enum 1
+f64 enum 1

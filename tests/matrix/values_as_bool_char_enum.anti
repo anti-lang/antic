@@ -1,0 +1,108 @@
+//! `as` on a `bool`, a `char` and an enum. A `bool` converts to every integer
+//! type as 0 or 1. A `char` converts to `u32` and back. An enum converts to and
+//! from every numeric type as its underlying type does. The first value of a
+//! line is folded in a constant, and the second is computed.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+enum Kind
+{
+	Circle,
+	Square,
+	Empty,
+}
+
+enum Mode: u8
+{
+	Read = 1,
+	Write = 200,
+}
+
+enum Level: i16
+{
+	Low = 100,
+	High = 300,
+}
+
+const YES: bool = true;
+const NO: bool = false;
+const YES_I8: i8 = YES as i8;
+const YES_I16: i16 = YES as i16;
+const YES_I32: i32 = YES as i32;
+const YES_I64: i64 = YES as i64;
+const YES_INT: int = YES as int;
+const YES_U8: u8 = YES as u8;
+const YES_U16: u16 = YES as u16;
+const YES_U32: u32 = YES as u32;
+const YES_U64: u64 = YES as u64;
+const YES_UINT: uint = YES as uint;
+const YES_BYTE: byte = YES as byte;
+const NO_I8: i8 = NO as i8;
+const NO_U64: u64 = NO as u64;
+
+const LETTER: char = 'a';
+const LAST: char = '\u{10FFFF}';
+const LETTER_U32: u32 = LETTER as u32;
+const LAST_U32: u32 = LAST as u32;
+const BACK: char = 0x1F600 as u32 as char;
+
+const EMPTY_INT: int = Kind.Empty as int;
+const EMPTY_U8: u8 = Kind.Empty as u8;
+const EMPTY_F64: f64 = Kind.Empty as f64;
+const WRITE_INT: int = Mode.Write as int;
+const WRITE_I8_WIDE: i16 = Mode.Write as i16;
+const LOW_INT: int = Level.Low as int;
+const LOW_F32: f32 = Level.Low as f32;
+
+fn truth(zero: int) -> bool
+{
+	return zero == 0;
+}
+
+fn main(args: []str) -> int
+{
+	let zero = args.len - 1;
+	let yes = truth(zero);
+	let no = !yes;
+	printf("bool i8 %d %d\n".ptr, YES_I8 as c_int, yes as i8 as c_int);
+	printf("bool i16 %d %d\n".ptr, YES_I16 as c_int, yes as i16 as c_int);
+	printf("bool i32 %d %d\n".ptr, YES_I32 as c_int, yes as i32 as c_int);
+	printf("bool i64 %lld %lld\n".ptr, YES_I64, yes as i64);
+	printf("bool int %lld %lld\n".ptr, YES_INT, yes as int);
+	printf("bool u8 %d %d\n".ptr, YES_U8 as c_int, yes as u8 as c_int);
+	printf("bool u16 %d %d\n".ptr, YES_U16 as c_int, yes as u16 as c_int);
+	printf("bool u32 %u %u\n".ptr, YES_U32, yes as u32);
+	printf("bool u64 %llu %llu\n".ptr, YES_U64, yes as u64);
+	printf("bool uint %llu %llu\n".ptr, YES_UINT, yes as uint);
+	printf("bool byte %d %d\n".ptr, YES_BYTE as c_int, yes as byte as c_int);
+	printf("false i8 %d %d\n".ptr, NO_I8 as c_int, no as i8 as c_int);
+	printf("false u64 %llu %llu\n".ptr, NO_U64, no as u64);
+
+	let letter = 'a';
+	let last = '\u{10FFFF}';
+	let code: u32 = 0x1F600 ^ (zero as u32);
+	printf("char a %u %u\n".ptr, LETTER_U32, letter as u32);
+	printf("char last %u %u\n".ptr, LAST_U32, last as u32);
+	printf("u32 char %u %u\n".ptr, BACK as u32, code as char as u32);
+
+	let empty = Kind.Empty;
+	let write = Mode.Write;
+	let low = Level.Low;
+	printf("enum int %lld %lld\n".ptr, EMPTY_INT, empty as int);
+	printf("enum u8 %d %d\n".ptr, EMPTY_U8 as c_int, empty as u8 as c_int);
+	printf("enum f64 %g %g\n".ptr, EMPTY_F64, empty as f64);
+	printf("enum of u8 int %lld %lld\n".ptr, WRITE_INT, write as int);
+	printf("enum of u8 i16 %d %d\n".ptr, WRITE_I8_WIDE as c_int,
+		write as i16 as c_int);
+	printf("enum of i16 int %lld %lld\n".ptr, LOW_INT, low as int);
+	printf("enum of i16 f32 %g %g\n".ptr, LOW_F32 as f64, low as f32 as f64);
+
+	let two = 2 + zero;
+	let square = (two - 1) as Kind;
+	let read = (two as u8 - 1) as Mode;
+	let high = (300.0 * (two as f64 - 1.0)) as Level;
+	printf("int enum %d\n".ptr, (square == Kind.Square) as c_int);
+	printf("u8 enum %d\n".ptr, (read == Mode.Read) as c_int);
+	printf("f64 enum %d\n".ptr, (high == Level.High) as c_int);
+	return 0;
+}
