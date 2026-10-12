@@ -1,0 +1,23 @@
+//! A sum that leaves the range of `i8` in a copy of a generic function: the
+//! copy keeps the check of the operator.
+
+fn opaque(n: i8) -> i8
+{
+	return n;
+}
+
+fn sink(n: i8)
+{
+}
+
+fn sum<T: Number>(a: T, b: T) -> T
+{
+	return a + b;
+}
+
+fn main() -> int
+{
+	let x = opaque(127);
+	sink(sum<i8>(x, opaque(1)));
+	return 7;
+}

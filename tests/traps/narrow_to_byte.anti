@@ -1,0 +1,18 @@
+//! A negative `i16` converted to `byte`.
+
+fn opaque(n: i16) -> i16
+{
+	return n;
+}
+
+fn sink(n: i16)
+{
+}
+
+fn main() -> int
+{
+	let x = opaque(-1);
+	let y = x as byte;
+	sink(y as i16);
+	return 7;
+}

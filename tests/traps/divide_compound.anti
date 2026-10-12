@@ -1,0 +1,18 @@
+//! A `/=` by zero: the compound assignment is checked as the operator it holds.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: int)
+{
+}
+
+fn main() -> int
+{
+	let x = opaque(10);
+	x /= opaque(0);
+	sink(x);
+	return 7;
+}

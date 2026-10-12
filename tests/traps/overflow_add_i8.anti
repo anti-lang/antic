@@ -1,0 +1,18 @@
+//! A sum of two `i8` values that leaves the range of the type. The check works
+//! one width up, since the registers are wider than the type.
+
+fn opaque(n: i8) -> i8
+{
+	return n;
+}
+
+fn sink(n: i8)
+{
+}
+
+fn main() -> int
+{
+	let x = opaque(127);
+	sink(x + opaque(1));
+	return 7;
+}

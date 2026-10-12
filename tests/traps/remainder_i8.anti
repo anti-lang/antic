@@ -1,0 +1,17 @@
+//! A remainder of an `i8` by zero.
+
+fn opaque(n: i8) -> i8
+{
+	return n;
+}
+
+fn sink(n: i8)
+{
+}
+
+fn main() -> int
+{
+	let x = opaque(-7);
+	sink(x % opaque(0));
+	return 7;
+}

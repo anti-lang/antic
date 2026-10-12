@@ -1,0 +1,19 @@
+//! A `u8` above the greatest `i8` converted to `i8`: both types have one width,
+//! and the value changes its sign.
+
+fn opaque(n: u8) -> u8
+{
+	return n;
+}
+
+fn sink(n: u8)
+{
+}
+
+fn main() -> int
+{
+	let x = opaque(200);
+	let y = x as i8;
+	sink(y as u8 +% 0);
+	return 7;
+}

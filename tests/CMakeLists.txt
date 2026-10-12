@@ -3717,6 +3717,56 @@ if(ANTIC_LLVM_MC)
     antic_check_test(shift_negative "shift count out of range"
         "shift_negative\\.anti:[0-9]+: shift count out of range for >>: count -1, width 64"
         ON)
+    # The checks on the narrow types, in a compound assignment and in a copy
+    # of a generic function. docs/notes/test-matrix.md names them under
+    # "Values".
+    antic_check_test(overflow_add_i8 "overflow in"
+        "overflow_add_i8\\.anti:[0-9]+: overflow in \\+: left 127, right 1"
+        ON)
+    antic_check_test(overflow_sub_i16 "overflow in"
+        "overflow_sub_i16\\.anti:[0-9]+: overflow in -: left -32768, right 1"
+        ON)
+    antic_check_test(overflow_mul_i8 "overflow in"
+        "overflow_mul_i8\\.anti:[0-9]+: overflow in \\*: left 100, right 2"
+        ON)
+    antic_check_test(overflow_compound "overflow in"
+        "overflow_compound\\.anti:[0-9]+: overflow in \\+: left 9223372036854775807, right 1"
+        ON)
+    antic_check_test(overflow_generic "overflow in"
+        "overflow_generic\\.anti:[0-9]+: overflow in \\+: left 127, right 1"
+        ON)
+    antic_check_test(narrow_unsigned "out of range"
+        "narrow_unsigned\\.anti:[0-9]+: value out of range for i8: value 200"
+        ON)
+    antic_check_test(narrow_u64 "out of range"
+        "narrow_u64\\.anti:[0-9]+: value out of range for int: value 9223372036854775808"
+        ON)
+    antic_check_test(narrow_to_byte "out of range"
+        "narrow_to_byte\\.anti:[0-9]+: value out of range for byte: value -1"
+        ON)
+    antic_check_test(divide_byte "division by zero"
+        "divide_byte\\.anti:[0-9]+: division by zero in /: left 200"
+        ON)
+    antic_check_test(remainder_i8 "division by zero"
+        "remainder_i8\\.anti:[0-9]+: division by zero in %: left -7"
+        ON)
+    antic_check_test(divide_compound "division by zero"
+        "divide_compound\\.anti:[0-9]+: division by zero in /: left 10"
+        ON)
+    antic_check_test(shift_wide_byte "shift count out of range"
+        "shift_wide_byte\\.anti:[0-9]+: shift count out of range for <<: count 8, width 8"
+        ON)
+    antic_check_test(shift_right_wide_i16 "shift count out of range"
+        "shift_right_wide_i16\\.anti:[0-9]+: shift count out of range for >>: count 16, width 16"
+        ON)
+    antic_check_test(shift_compound "shift count out of range"
+        "shift_compound\\.anti:[0-9]+: shift count out of range for <<: count 64, width 64"
+        ON)
+    # Decision 24 of "Decisions of 2026-10-11": a dev build checks the
+    # bounds of `xs[lo..hi]` as it checks an index.
+    antic_check_test(slice_range "out of bounds"
+        "slice_range\\.anti:[0-9]+: .*out of bounds.*length 3"
+        ON)
     antic_check_test(walk_changed "was changed while"
         "walk_changed\\.anti:68: `bag` was changed while `for` walked it: changed at walk_changed\\.anti:70"
         ON DEV lang)

@@ -1,0 +1,17 @@
+//! A difference of two `i16` values below the least `i16`.
+
+fn opaque(n: i16) -> i16
+{
+	return n;
+}
+
+fn sink(n: i16)
+{
+}
+
+fn main() -> int
+{
+	let x = opaque(-32768);
+	sink(x - opaque(1));
+	return 7;
+}

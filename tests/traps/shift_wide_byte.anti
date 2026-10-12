@@ -1,0 +1,17 @@
+//! A shift of a `byte` by 8, the width of the type and not that of a register.
+
+fn opaque(n: byte) -> byte
+{
+	return n;
+}
+
+fn sink(n: byte)
+{
+}
+
+fn main() -> int
+{
+	let x = opaque(1);
+	sink(x << opaque(8));
+	return 7;
+}

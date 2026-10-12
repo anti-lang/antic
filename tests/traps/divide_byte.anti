@@ -1,0 +1,17 @@
+//! A division of a `byte` by zero.
+
+fn opaque(n: byte) -> byte
+{
+	return n;
+}
+
+fn sink(n: byte)
+{
+}
+
+fn main() -> int
+{
+	let x = opaque(200);
+	sink(x / opaque(0));
+	return 7;
+}

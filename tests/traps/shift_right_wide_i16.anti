@@ -1,0 +1,17 @@
+//! A shift of an `i16` to the right by 16, the width of the type.
+
+fn opaque(n: i16) -> i16
+{
+	return n;
+}
+
+fn sink(n: i16)
+{
+}
+
+fn main() -> int
+{
+	let x = opaque(-1);
+	sink(x >> opaque(16));
+	return 7;
+}

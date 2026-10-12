@@ -1,0 +1,20 @@
+//! A slice of a fixed array whose high bound lies past its length, by decision
+//! 24 of "Decisions of 2026-10-11": a dev build checks the bounds of
+//! `xs[lo..hi]` as it checks an index.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: int)
+{
+}
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	let part = xs[1..opaque(7)];
+	sink(part.len);
+	return 7;
+}
