@@ -393,7 +393,11 @@ if f.carry && !g.overflow { }
 
 ## Statements
 
-`if`, `else if`, `else`. `if let x = e { }` binds the value of a `?T`, or the fields of a variant case as `if let Circle c = s { }`, and `else if let` continues a chain. `switch` names one value per arm, and an enum value with its type, `Kind.Circle`. An arm is a call, an assignment or a block, and one `else` takes the rest. It falls through only where an arm ends in `fallthrough;`. Assignment is a statement, and `*p = f() catch e { }` handles the error of the call that fills a place. Blocks `{ }` are statements. `defer` and `undo` each hold one statement, and a `defer` inside a `defer` or an `undo` inside an `undo` is refused. `assert(cond)` and `assert(cond, "message")`, whose message is a string literal. `yield v;` and `yield;` end the handler of a `catch`, see [Errors](#errors).
+`if`, `else if`, `else`. `if let x = e { }` binds the value of a `?T` or a `?*T`, or the fields of a variant case as `if let Circle c = s { }`, and `else if let` continues a chain. Blocks `{ }` are statements. Assignment is a statement, and `*p = f() catch e { }` handles the error of the call that fills a place. An expression stands as a statement when it is a call, `free`, `delete`, `destroy`, `dup`, `join` or a channel operation.
+
+`switch` takes an enum, an integer, a `str` or a variant, and refuses a `char` and a `bool`. It names one value per arm, a constant expression, and an enum value with its type, `Kind.Circle`. A value named twice is refused. An arm is a call, an assignment or a block, `free(p)` and the other built-in statements among the calls, and one `else` takes the rest. It falls through only where an arm ends in `fallthrough;`.
+
+`defer` and `undo` each hold one statement, and a `defer` inside a `defer` or an `undo` inside an `undo` is refused. Neither holds a `return`, `break`, `continue`, `fail` or `try`. `assert(cond)` and `assert(cond, "message")`, whose message is a string literal. `yield v;` and `yield;` end the handler of a `catch` and stand nowhere else, see [Errors](#errors).
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -445,12 +449,40 @@ assert(n > 0, "n must be positive");
 fs.flush(f) catch { yield; };
 ```
 
+A `switch` on an enum without `else` covers every value, and one on an integer needs no `else`. A `switch` on a `str` is a chain of comparisons with `anti.text.equal`, so its module imports `anti.text`.
+
+<!-- overview: context, docs-style:ignore
+```anti
+import anti.text;
+let word = "stop";
+let code = 404;
+let speed = 0;
+let buf = alloc(byte, 16);
+```
+-->
+```anti
+switch word {
+	"go" => speed = 1,
+	"stop" => speed = 0,
+	else => speed = -1,
+}
+
+switch code {
+	200 => speed = 1,
+	404 => speed = 0,
+}
+
+free(buf);
+```
+
 ```anti not-built
 let v = show(compute(x));
 if x < 0 { unreachable; }
 ```
 
-`switch` on an enum without `else` must cover every value. `switch` on a `str` is a comparison chain. `fallthrough;` as an arm's last statement enters the next arm's body without testing its values, and is refused in the last arm and into an arm that binds a variant's fields. `defer` runs at every exit of the block, `undo` only on an error exit. `assert` and `show` vanish in release, and a call in the condition of an `assert` is the warning `assert-call`. `unreachable` traps in dev and is undefined in release. Not built yet: `show`, `unreachable` and labels on blocks.
+`fallthrough;` as an arm's last statement enters the next arm's body without testing its values, and is refused in the last arm and into an arm that binds a variant's fields. `defer` runs at every exit of the block, `undo` only on an error exit. `assert` and `show` vanish in release, and a call in the condition of an `assert` is the warning `assert-call`. `unreachable` traps in dev and is undefined in release.
+
+Not built yet: `show`, `unreachable` and labels on blocks. An arm that is `free(p)` is refused today and stands in a block. The checker does not refuse a `return`, `break`, `continue`, `fail` or `try` inside a `defer` or an `undo` yet.
 
 ## Loops
 
