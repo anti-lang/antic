@@ -12,9 +12,3 @@
 # for a line whose unit a test passes, and for a unit that no test passes
 # and no line names. A new option comes with its test and never with a
 # line here.
-
-anti symbols --from
-anti build --strip-docs
-anti build --soname
-anti check -I
-anti bind -D

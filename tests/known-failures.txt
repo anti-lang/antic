@@ -335,3 +335,4 @@ error_simd_lanes_compared T096 `==` on a `simd struct` whose lanes are refused g
 error_copy_nests_deep_field T096 A field of a copy that is refused gets a second message.
 error_switch_refused_returns T097 A function whose refused `switch` returns in every arm gets a second message.
 anti_bind_message_clang_static_without_a_body T098 A `static` function without a body gets a second warning, which names its result.
+anti_option_soname_linux_dist T099 `dist/` of a Linux library of `--soname` holds `libshapes.so` alone, without the file its soname names.

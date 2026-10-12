@@ -2486,6 +2486,55 @@ foreach(pair "anti_build|anti-build/messages.cmake"
     endforeach()
 endforeach()
 
+# An option of anti beside the run without it, one test per case of
+# tests/run_anti_options.cmake, whose header names what each shows.
+# --soname writes the version of a library of macOS and of Linux and
+# changes nothing of one of Windows. A Mac alone links for macOS, and the
+# other two link from every host whose runtime archive holds the sysroot.
+set(anti_option_cases strip_docs check_root_library check_root_source
+    bind_define_name bind_define_value bind_define_shim)
+if(ANTIC_HOST_OS STREQUAL "macos")
+    list(APPEND anti_option_cases soname_macos)
+endif()
+if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64")
+    list(APPEND anti_option_cases soname_linux soname_linux_dist)
+endif()
+if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
+    list(APPEND anti_option_cases soname_windows)
+endif()
+# --target all links a program for each of the six targets.
+set(anti_option_six ON)
+foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
+        windows-x86_64 windows-arm64)
+    if(NOT EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
+        set(anti_option_six OFF)
+    endif()
+endforeach()
+if(anti_option_six)
+    list(APPEND anti_option_cases target_all target_all_cpu)
+endif()
+# The inventory finds a program by the notice of its file, which
+# anti_symbols reads on the hosts other than Windows.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    list(APPEND anti_option_cases symbols_from)
+endif()
+foreach(case IN LISTS anti_option_cases)
+    add_test(NAME anti_option_${case}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            -DCASE=${case}
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DLLVM_AR=${ANTIC_LLVM_AR}"
+            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+            "-DFIXTURES=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-options/${case}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_options.cmake")
+endforeach()
+
 # A program run from dist/ and built again at once, fifteen times. Windows
 # maps a program that just ran for a moment, and the copy into dist/
 # failed there. A turn takes about two seconds on the Windows VM.
