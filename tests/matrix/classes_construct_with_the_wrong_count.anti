@@ -1,0 +1,17 @@
+//! `T(args)` passes the arguments of `construct` of `T`.
+
+class Box
+{
+	pub n: int,
+
+	fn construct(self, n: int)
+	{
+		self.n = n;
+	}
+}
+
+fn main() -> int
+{
+	let b = Box(1, 2);
+	return b.n;
+}

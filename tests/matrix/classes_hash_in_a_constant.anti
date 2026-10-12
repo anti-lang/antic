@@ -1,0 +1,13 @@
+//! `hash` is a call, and a constant takes none.
+
+struct Vec
+{
+	x: int,
+}
+
+const HASH: u64 = Vec { x: 1 }.hash();
+
+fn main() -> int
+{
+	return HASH as int;
+}

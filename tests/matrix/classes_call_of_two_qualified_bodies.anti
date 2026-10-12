@@ -1,0 +1,35 @@
+//! Two interfaces have a qualified body of one name each, and no unqualified
+//! body exists. A use of the name on the class is refused, and the message
+//! names the interfaces.
+
+abstract class Reader
+{
+	abstract fn get(self) -> int;
+}
+
+abstract class Writer
+{
+	abstract fn get(self) -> int;
+}
+
+class Both
+{
+	implements r: Reader,
+	implements w: Writer,
+
+	concrete fn Reader::get(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn Writer::get(self) -> int
+	{
+		return 2;
+	}
+}
+
+fn main() -> int
+{
+	let b = Both { };
+	return b.get();
+}

@@ -1,0 +1,1 @@
+classes_concrete_returns_never.anti:12:14: error: `concrete fn stop` returns `never`, and `Base.stop` returns

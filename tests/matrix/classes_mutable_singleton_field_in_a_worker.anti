@@ -1,0 +1,26 @@
+//! A worker reaches no `mutable` field of a singleton.
+
+singleton class Config
+{
+	mutable hits: int = 0,
+}
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn count(t: *Task) -> int
+{
+	Config.get().hits += 1;
+	return t.n;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let job = dispatch t -> count;
+	let n = join(job);
+	delete(t);
+	return n;
+}

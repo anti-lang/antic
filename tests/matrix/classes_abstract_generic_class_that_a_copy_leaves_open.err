@@ -1,0 +1,1 @@
+classes_abstract_generic_class_that_a_copy_leaves_open.anti:8:7: error: `Counter` lacks `concrete fn next`

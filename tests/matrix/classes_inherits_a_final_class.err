@@ -1,0 +1,1 @@
+classes_inherits_a_final_class.anti:8:14: error: `Circle` cannot inherit `final` class `Dot`

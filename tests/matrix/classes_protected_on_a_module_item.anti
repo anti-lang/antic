@@ -1,0 +1,11 @@
+//! `protected` is a level of a class member.
+
+protected fn helper() -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	return 0;
+}

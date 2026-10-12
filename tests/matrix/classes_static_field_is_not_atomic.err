@@ -1,0 +1,1 @@
+classes_static_field_is_not_atomic.anti:5:14: error: `count` is `static` and must be `atomic`

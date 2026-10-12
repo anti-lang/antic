@@ -1,0 +1,12 @@
+//! `inherits` names a class, in another module as well.
+
+import anti.lang;
+
+class C inherits lang.SourceLocation
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

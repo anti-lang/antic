@@ -1,0 +1,20 @@
+//! A field without a marker is visible to its class alone, and a class below
+//! does not reach it.
+
+class Shape
+{
+	r: int = 0,
+}
+
+class Circle inherits Shape
+{
+	pub fn radius(self) -> int
+	{
+		return self.r;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+classes_less_without_lt_on_a_class.anti:12:5: error: `<` is not defined on `N`. A struct or a class has no default order and declares `operator fn lt`

@@ -1,0 +1,1 @@
+classes_qualifier_on_a_plain_function.anti:5:10: error: a `::` qualifier belongs to a `concrete fn`

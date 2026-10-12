@@ -1,0 +1,1 @@
+classes_abstract_class_through_a_pointer.anti:20:6: error: `Shape` is abstract and has no complete value, and this local needs one

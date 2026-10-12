@@ -1,0 +1,1 @@
+classes_type_arguments_for_a_class_of_a_module_that_is_not_generic.anti:5:13: error: `lang.Error` is not generic

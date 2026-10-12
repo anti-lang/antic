@@ -1,0 +1,16 @@
+//! A concurrent class has no default `==`.
+
+concurrent class Tally
+{
+	pub atomic hits: int = 0,
+}
+
+fn main() -> int
+{
+	let a = Tally { };
+	let b = Tally { };
+	if a == b {
+		return 1;
+	}
+	return 0;
+}

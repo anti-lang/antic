@@ -1,0 +1,19 @@
+//! `=` between two values of a class with `own` fields would give two owners.
+
+class Part
+{
+	pub n: int = 0,
+}
+
+class Holder
+{
+	pub own part: ?*Part = none,
+}
+
+fn main() -> int
+{
+	let a = Holder { };
+	let b = Holder { };
+	b = a;
+	return 0;
+}

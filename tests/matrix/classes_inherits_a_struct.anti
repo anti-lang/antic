@@ -1,0 +1,15 @@
+//! `inherits` names a class.
+
+struct Point
+{
+	x: int,
+}
+
+class C inherits Point
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

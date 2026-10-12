@@ -1,0 +1,1 @@
+classes_singleton_alloc.anti:10:16: error: `Config` is a singleton, and `Config.get()` gives its one instance

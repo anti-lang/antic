@@ -1,0 +1,1 @@
+classes_private_function_from_a_derived_class.anti:15:10: error: `helper` is private to `Shape`

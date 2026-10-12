@@ -1,0 +1,13 @@
+//! A constant holds no class value.
+
+class Money
+{
+	pub cents: int = 0,
+}
+
+const PRICE: Money = Money { cents: 5 };
+
+fn main() -> int
+{
+	return PRICE.cents;
+}

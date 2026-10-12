@@ -1,0 +1,18 @@
+//! Only the type of the left operand is looked up for an operator.
+
+struct V
+{
+	x: int,
+}
+
+operator fn mul(a: V, k: int) -> V
+{
+	return V { x: a.x * k };
+}
+
+fn main() -> int
+{
+	let v = V { x: 2 };
+	let w = 3 * v;
+	return w.x;
+}

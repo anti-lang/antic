@@ -1,0 +1,1 @@
+classes_deserialize_declared_again.anti:5:9: error: `Object` already has `deserialize`

@@ -1,0 +1,17 @@
+//! A function with `self` called through the name of its class takes the object
+//! as its first argument.
+
+class A
+{
+	pub n: int = 3,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	return A.get();
+}

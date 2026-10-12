@@ -1,0 +1,1 @@
+classes_interface_constraint_not_met.anti:30:9: error: `Other` has no `Shape`, which `area_of` needs for `T`

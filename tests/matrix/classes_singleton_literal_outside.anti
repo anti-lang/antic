@@ -1,0 +1,12 @@
+//! A singleton has one instance, and the program writes no literal of it.
+
+singleton class Config
+{
+	pub level: int = 2,
+}
+
+fn main() -> int
+{
+	let c = Config { };
+	return c.level;
+}

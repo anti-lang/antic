@@ -1,0 +1,1 @@
+classes_hook_with_another_signature.anti:7:14: error: `concrete fn created` takes 1 parameter besides `self`, and `Object.created` takes 0

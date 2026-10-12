@@ -1,0 +1,1 @@
+classes_protected_field_from_outside.anti:11:9: error: `x` is protected in `Shape`

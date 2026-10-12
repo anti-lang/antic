@@ -1,0 +1,1 @@
+classes_compatible_on_a_complete_class.anti:5:13: error: `compatible` names the versions a plugin may carry, and belongs to an abstract class

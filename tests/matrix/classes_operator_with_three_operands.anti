@@ -1,0 +1,18 @@
+//! A binary operator calls a function of two operands.
+
+struct V
+{
+	x: int,
+}
+
+operator fn add(a: V, b: V, c: V) -> V
+{
+	return V { x: a.x + b.x + c.x };
+}
+
+fn main() -> int
+{
+	let v = V { x: 1 };
+	let w = v + v;
+	return w.x;
+}

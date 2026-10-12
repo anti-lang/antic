@@ -1,0 +1,12 @@
+//! `enter` and `leave` take the object, and a function at module level has
+//! none.
+
+trace fn helper() -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	return helper();
+}

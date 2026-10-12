@@ -1,0 +1,11 @@
+//! The type parameters of an item have a name each.
+
+fn pick<T, T>(a: T) -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	return pick<int, int>(1);
+}

@@ -1,0 +1,19 @@
+//! A `concrete fn` takes the signature of the entry of the copy it fills.
+
+abstract class Source<T>
+{
+	abstract fn next(self) -> T;
+}
+
+class Counter inherits Source<int>
+{
+	concrete fn next(self) -> i32
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

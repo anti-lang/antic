@@ -1,0 +1,20 @@
+//! The class around a nested type does not reach its private fields.
+
+class Outer
+{
+	class Inner
+	{
+		hidden: int = 5,
+	}
+
+	pub fn run(self) -> int
+	{
+		let i = Inner { };
+		return i.hidden;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

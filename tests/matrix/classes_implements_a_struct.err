@@ -1,0 +1,1 @@
+classes_implements_a_struct.anti:10:2: error: `Point` is not abstract and cannot be implemented

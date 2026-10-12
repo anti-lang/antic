@@ -1,0 +1,1 @@
+classes_function_with_self_through_the_class.anti:16:9: error: `A.get` takes 1 argument, found 0

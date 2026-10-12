@@ -1,0 +1,14 @@
+//! The argument of `N: int` is a constant the compiler knows, and a local is
+//! none.
+
+class Ring<T, N: int>
+{
+	pub items: [N]T,
+}
+
+fn main() -> int
+{
+	let n = 4;
+	let r = Ring<int, n> { items: [0; 4] };
+	return 0;
+}

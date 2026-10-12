@@ -1,0 +1,1 @@
+classes_constant_through_self.anti:10:10: error: `K` is a constant of `C`, reached as `C.K`

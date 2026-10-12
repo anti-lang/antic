@@ -1,0 +1,1 @@
+classes_arguments_for_a_class_without_a_construct.anti:20:10: error: `Heir` has no `construct` with arguments, so a literal builds it

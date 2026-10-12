@@ -1,0 +1,18 @@
+//! A `concrete fn` of an entry that never returns never returns itself.
+
+abstract class Base
+{
+	abstract fn stop(self) -> never;
+}
+
+class C inherits Base
+{
+	concrete fn stop(self)
+	{
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

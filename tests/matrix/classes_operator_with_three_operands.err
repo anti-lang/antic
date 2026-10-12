@@ -1,0 +1,1 @@
+classes_operator_with_three_operands.anti:16:10: error: `operator fn add` takes one operand beside its own

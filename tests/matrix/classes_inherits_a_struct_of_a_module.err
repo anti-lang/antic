@@ -1,0 +1,1 @@
+classes_inherits_a_struct_of_a_module.anti:5:9: error: `lang.SourceLocation` is not a class

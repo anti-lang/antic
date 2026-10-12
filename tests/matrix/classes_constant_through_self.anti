@@ -1,0 +1,18 @@
+//! A constant of a class is reached through the name of the class, and `self.K`
+//! is refused.
+
+class C
+{
+	const K: int = 1;
+
+	pub fn f(self) -> int
+	{
+		return self.K;
+	}
+}
+
+fn main() -> int
+{
+	let c = C { };
+	return c.f();
+}

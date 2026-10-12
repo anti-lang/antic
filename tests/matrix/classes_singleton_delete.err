@@ -1,0 +1,1 @@
+classes_singleton_delete.anti:10:2: error: `Config` is a singleton and outlives the program

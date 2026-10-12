@@ -1,0 +1,1 @@
+classes_operator_on_a_pointer_to_a_class.anti:18:10: error: the operands of `+` have the types `*N` and `N`

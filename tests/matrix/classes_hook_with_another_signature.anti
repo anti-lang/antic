@@ -1,0 +1,17 @@
+//! A class replaces a hook with the signature of `Object`.
+
+class Cell
+{
+	pub n: int = 0,
+
+	concrete fn created(self, extra: int)
+	{
+		self.n = extra;
+	}
+}
+
+fn main() -> int
+{
+	let c = Cell { };
+	return c.n;
+}

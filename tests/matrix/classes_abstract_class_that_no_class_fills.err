@@ -1,0 +1,1 @@
+classes_abstract_class_that_no_class_fills.anti:4:16: error: `Shape` is abstract and no class fills it [unfilled-abstract]

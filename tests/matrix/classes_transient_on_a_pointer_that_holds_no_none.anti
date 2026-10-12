@@ -1,0 +1,12 @@
+//! `transient` marks a field that `dup` sets to `none`, so its type can hold
+//! `none`.
+
+class Cached
+{
+	transient note: *int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

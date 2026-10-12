@@ -1,0 +1,20 @@
+//! A generic function that calls itself with a wider type argument has no last
+//! copy.
+
+struct Wrap<T>
+{
+	v: T,
+}
+
+fn deeper<T>(v: T, n: int) -> int
+{
+	if n == 0 {
+		return 0;
+	}
+	return deeper<Wrap<T>>(Wrap<T> { v: dup(v) }, n - 1);
+}
+
+fn main() -> int
+{
+	return deeper<int>(1, 3);
+}

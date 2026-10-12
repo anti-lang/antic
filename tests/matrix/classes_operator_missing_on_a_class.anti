@@ -1,0 +1,19 @@
+//! A class without `operator fn sub` has no `-`.
+
+class N
+{
+	pub v: int = 0,
+
+	operator fn add(self, other: N) -> N
+	{
+		return N { v: self.v + other.v };
+	}
+}
+
+fn main() -> int
+{
+	let a = N { v: 1 };
+	let b = N { v: 2 };
+	let c = a - b;
+	return c.v;
+}

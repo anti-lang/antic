@@ -1,0 +1,16 @@
+//! A parameter written `N: int` takes a constant.
+
+class Ring<T, N: int>
+{
+	pub items: [N]T,
+}
+
+fn take(r: *Ring<int, bool>) -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+classes_static_function_in_a_constant.anti:11:19: error: a call is not a constant expression

@@ -1,0 +1,15 @@
+//! `final class` stops the chain.
+
+final class Dot
+{
+	pub n: int = 0,
+}
+
+class Circle inherits Dot
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

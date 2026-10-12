@@ -1,0 +1,22 @@
+//! Values never convert. A `Circle` is no `Shape` by value.
+
+class Shape
+{
+	pub x: int = 0,
+}
+
+class Circle inherits Shape
+{
+	pub r: int = 0,
+}
+
+fn take(s: Shape) -> int
+{
+	return s.x;
+}
+
+fn main() -> int
+{
+	let c = Circle { };
+	return take(c);
+}

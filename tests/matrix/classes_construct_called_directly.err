@@ -1,0 +1,1 @@
+classes_construct_called_directly.anti:15:3: error: `construct` runs after a literal and after `alloc`, and is not called directly

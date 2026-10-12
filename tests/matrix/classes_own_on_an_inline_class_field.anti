@@ -1,0 +1,17 @@
+//! A field of class type is inline and owned by definition, so `own` on it is
+//! refused as redundant.
+
+class Part
+{
+	pub n: int = 0,
+}
+
+class Whole
+{
+	pub own part: Part,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+classes_singleton_field_written_outside_construct.anti:11:2: error: `level` of singleton `Config` is read-only after creation, and `mutable` marks a field the program writes

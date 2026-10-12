@@ -1,0 +1,11 @@
+//! A transient field is freed by the class itself, so `own` on it is refused.
+
+class Cached
+{
+	transient own note: ?*int = none,
+}
+
+fn main() -> int
+{
+	return 0;
+}

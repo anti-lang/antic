@@ -1,0 +1,1 @@
+classes_function_of_a_type_parameter_without_a_constraint.anti:6:9: error: `T` has no function `area`, since no interface of its constraints declares one

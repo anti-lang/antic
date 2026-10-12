@@ -1,0 +1,22 @@
+//! A `construct` with arguments is the one its class declares. A class that
+//! declares none is built by a literal, whatever its base declares.
+
+class Base
+{
+	pub n: int,
+
+	fn construct(self, n: int)
+	{
+		self.n = n;
+	}
+}
+
+class Heir inherits Base
+{
+}
+
+fn main() -> int
+{
+	let h = Heir(1);
+	return h.n;
+}

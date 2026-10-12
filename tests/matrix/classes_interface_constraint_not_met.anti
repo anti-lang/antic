@@ -1,0 +1,31 @@
+//! A constraint that names an interface takes a class that inherits or
+//! implements it.
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return 4;
+	}
+}
+
+class Other
+{
+	pub n: int = 0,
+}
+
+fn area_of<T: Shape>(s: *T) -> int
+{
+	return s.area();
+}
+
+fn main() -> int
+{
+	let o = Other { };
+	return area_of<Other>(&o);
+}

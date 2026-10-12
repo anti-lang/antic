@@ -1,0 +1,1 @@
+classes_private_field_in_a_literal_outside.anti:10:19: error: `r` is private to `Circle`

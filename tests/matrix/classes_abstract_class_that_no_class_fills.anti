@@ -1,0 +1,12 @@
+//! A program whose abstract class no class fills is refused in a release build,
+//! where every warning is an error.
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+fn main() -> int
+{
+	return 0;
+}

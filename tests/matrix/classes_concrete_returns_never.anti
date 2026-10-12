@@ -1,0 +1,21 @@
+//! A `concrete fn` takes the signature of the entry it fills, `never` included.
+
+extern fn abort() -> never;
+
+abstract class Base
+{
+	abstract fn stop(self);
+}
+
+class C inherits Base
+{
+	concrete fn stop(self) -> never
+	{
+		abort();
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

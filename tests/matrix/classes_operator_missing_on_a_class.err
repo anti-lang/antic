@@ -1,0 +1,1 @@
+classes_operator_missing_on_a_class.anti:17:10: error: `-` needs numeric operands, found `N`

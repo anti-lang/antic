@@ -1,0 +1,16 @@
+//! A call of a generic function is no constant expression.
+
+fn larger<T: lt>(own a: T, own b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+const MOST: int = larger<int>(1, 2);
+
+fn main() -> int
+{
+	return MOST;
+}

@@ -1,0 +1,1 @@
+classes_type_as_a_constant_argument.anti:8:23: error: `Ring` takes a constant for `N`, found a type

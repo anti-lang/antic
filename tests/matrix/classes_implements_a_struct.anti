@@ -1,0 +1,16 @@
+//! `implements` names an abstract class, and a struct is none.
+
+struct Point
+{
+	x: int,
+}
+
+class C
+{
+	implements p: Point,
+}
+
+fn main() -> int
+{
+	return 0;
+}

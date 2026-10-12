@@ -1,0 +1,14 @@
+//! `deserialize` is a member of the root, so a class does not declare its own.
+
+class A
+{
+	pub fn deserialize(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

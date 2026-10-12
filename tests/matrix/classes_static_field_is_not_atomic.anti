@@ -1,0 +1,11 @@
+//! A static field is a global the program writes, so it is `atomic`.
+
+class Counter
+{
+	static count: int = 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

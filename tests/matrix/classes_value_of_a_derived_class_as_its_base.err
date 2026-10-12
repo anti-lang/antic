@@ -1,0 +1,1 @@
+classes_value_of_a_derived_class_as_its_base.anti:21:14: error: expected `Shape`, found `Circle`

@@ -1,0 +1,20 @@
+//! `as` between two classes that share no chain always traps, and the checker
+//! refuses it.
+
+class A
+{
+	pub n: int = 0,
+}
+
+class B
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let a = A { };
+	let p = &a;
+	let q = p as *B;
+	return q.n;
+}

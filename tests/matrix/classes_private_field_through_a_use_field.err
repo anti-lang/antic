@@ -1,0 +1,1 @@
+classes_private_field_through_a_use_field.anti:17:9: error: `Car` has no field `r`

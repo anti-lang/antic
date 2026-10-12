@@ -1,0 +1,30 @@
+//! A name that two `use` fields provide is refused at the call, which names
+//! both.
+
+class Left
+{
+	pub fn size(self) -> int
+	{
+		return 1;
+	}
+}
+
+class Right
+{
+	pub fn size(self) -> int
+	{
+		return 2;
+	}
+}
+
+class Both
+{
+	use a: Left,
+	use b: Right,
+}
+
+fn main() -> int
+{
+	let x = Both { };
+	return x.size();
+}

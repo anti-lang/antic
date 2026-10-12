@@ -1,0 +1,1 @@
+classes_local_as_a_constant_argument.anti:12:20: error: `n` must be a constant for `N`

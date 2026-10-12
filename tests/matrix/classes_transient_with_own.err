@@ -1,0 +1,1 @@
+classes_transient_with_own.anti:5:2: error: `note` is `transient`, so its class frees it in `destruct` and it is not `own`

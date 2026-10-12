@@ -1,0 +1,1 @@
+classes_abstract_class_as_a_field.anti:18:2: error: `Shape` is abstract and has no complete value, and the field `s` needs one

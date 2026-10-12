@@ -1,0 +1,1 @@
+classes_name_of_two_sub_objects.anti:23:2: error: `size` is provided by both `a` and `b`

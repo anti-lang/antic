@@ -1,0 +1,16 @@
+//! `implements` names an abstract class.
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+class C
+{
+	implements p: Plain,
+}
+
+fn main() -> int
+{
+	return 0;
+}

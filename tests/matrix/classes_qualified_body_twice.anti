@@ -1,0 +1,26 @@
+//! Two qualifiers that reach one table are a name declared twice.
+
+abstract class Reader
+{
+	abstract fn get(self) -> int;
+}
+
+class Both
+{
+	implements r: Reader,
+
+	concrete fn Reader::get(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn Reader::get(self) -> int
+	{
+		return 2;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

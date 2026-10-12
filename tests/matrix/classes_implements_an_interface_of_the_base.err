@@ -1,0 +1,1 @@
+classes_implements_an_interface_of_the_base.anti:20:2: error: `D` implements `Named`, which `C` implements already

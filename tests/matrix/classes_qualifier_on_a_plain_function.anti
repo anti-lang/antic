@@ -1,0 +1,14 @@
+//! A qualifier names the table a `concrete fn` fills.
+
+class C
+{
+	pub fn C::f(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+classes_mutable_singleton_field_in_a_worker.anti:15:2: error: `hits` is `mutable` in singleton `Config` and `worker fn count` reaches it

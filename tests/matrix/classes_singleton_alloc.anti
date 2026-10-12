@@ -1,0 +1,12 @@
+//! A singleton has one instance, and the program allocates none.
+
+singleton class Config
+{
+	pub level: int = 2,
+}
+
+fn main() -> int
+{
+	let c = alloc Config { };
+	return c.level;
+}

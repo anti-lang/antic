@@ -1,0 +1,16 @@
+//! A generic class is named with its arguments.
+
+class Box<T>
+{
+	pub v: T,
+}
+
+fn take(b: *Box) -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	return 0;
+}

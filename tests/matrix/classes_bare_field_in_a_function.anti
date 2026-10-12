@@ -1,0 +1,17 @@
+//! A bare name in a function of a class is a local, a parameter or a module
+//! item, never a field.
+
+class A
+{
+	pub n: int = 3,
+
+	pub fn get(self) -> int
+	{
+		return n;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

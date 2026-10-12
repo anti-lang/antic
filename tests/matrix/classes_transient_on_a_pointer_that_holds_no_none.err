@@ -1,0 +1,1 @@
+classes_transient_on_a_pointer_that_holds_no_none.anti:6:2: error: `transient` needs a `?*T` or a `?fn(...)`, and `note` has type `*int`

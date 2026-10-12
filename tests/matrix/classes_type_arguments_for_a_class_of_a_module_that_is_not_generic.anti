@@ -1,0 +1,13 @@
+//! Type arguments follow the name of a generic, in another module as well.
+
+import anti.lang;
+
+fn take(e: *lang.Error<int>) -> int
+{
+	return e.code;
+}
+
+fn main() -> int
+{
+	return 0;
+}

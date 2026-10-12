@@ -1,0 +1,1 @@
+classes_is_between_unrelated_classes.anti:18:5: error: `*A` is never `*B`, the classes share no chain

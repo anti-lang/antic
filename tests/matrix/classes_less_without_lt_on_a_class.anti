@@ -1,0 +1,16 @@
+//! `<` has no default, so a class declares `operator fn lt`.
+
+class N
+{
+	pub v: int = 0,
+}
+
+fn main() -> int
+{
+	let a = N { v: 1 };
+	let b = N { v: 2 };
+	if a < b {
+		return 1;
+	}
+	return 0;
+}

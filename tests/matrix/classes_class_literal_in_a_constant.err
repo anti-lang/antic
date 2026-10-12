@@ -1,0 +1,1 @@
+classes_class_literal_in_a_constant.anti:8:22: error: a class is not a constant expression

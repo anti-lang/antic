@@ -1,0 +1,1 @@
+classes_implements_one_interface_twice.anti:11:2: error: `C` implements `Named` twice

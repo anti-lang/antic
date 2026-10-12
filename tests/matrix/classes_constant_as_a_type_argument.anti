@@ -1,0 +1,12 @@
+//! A type parameter without `: int` takes a type.
+
+class Box<T>
+{
+	pub v: T,
+}
+
+fn main() -> int
+{
+	let b = Box<3> { v: 1 };
+	return 0;
+}

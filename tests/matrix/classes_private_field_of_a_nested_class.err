@@ -1,0 +1,1 @@
+classes_private_field_of_a_nested_class.anti:13:10: error: `hidden` is private to `Outer.Inner`

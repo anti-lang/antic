@@ -1,0 +1,26 @@
+//! One interface has one sub-object in a chain.
+
+abstract class Named
+{
+	abstract fn name(self) -> int;
+}
+
+class C
+{
+	implements a: Named,
+
+	concrete fn name(self) -> int
+	{
+		return 1;
+	}
+}
+
+class D inherits C
+{
+	implements b: Named,
+}
+
+fn main() -> int
+{
+	return 0;
+}

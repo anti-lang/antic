@@ -1,0 +1,22 @@
+//! A function without a marker is called by its class alone.
+
+class Shape
+{
+	fn helper(self) -> int
+	{
+		return 1;
+	}
+}
+
+class Circle inherits Shape
+{
+	pub fn run(self) -> int
+	{
+		return self.helper();
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

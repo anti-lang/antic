@@ -1,0 +1,12 @@
+//! `compatible` names the floor of the versions of an interface.
+
+class Plain
+{
+	compatible 1.1;
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	return 0;
+}

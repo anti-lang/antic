@@ -1,0 +1,15 @@
+//! `construct` runs on the object a literal wrote, so it takes `self`.
+
+class C
+{
+	pub n: int = 0,
+
+	fn construct(n: int)
+	{
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

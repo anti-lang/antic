@@ -1,0 +1,1 @@
+classes_construct_without_self.anti:7:5: error: `construct` takes `self` as its first parameter

@@ -1,0 +1,1 @@
+classes_private_field_from_a_derived_class.anti:13:10: error: `r` is private to `Shape`

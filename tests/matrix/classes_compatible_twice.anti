@@ -1,0 +1,16 @@
+//! A class has one `compatible` line.
+
+abstract class Greeter
+{
+	compatible 1.1;
+	compatible 1.2;
+}
+
+class English inherits Greeter
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

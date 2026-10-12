@@ -1,0 +1,14 @@
+//! A class whose base descends from it is refused.
+
+class A inherits B
+{
+}
+
+class B inherits A
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

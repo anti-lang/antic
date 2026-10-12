@@ -1,0 +1,1 @@
+classes_assignment_of_a_class_with_own_fields.anti:17:6: error: `Holder` has `own` fields, use `dup` instead of `=`

@@ -1,0 +1,12 @@
+//! A protected field is visible to its class and to the classes below it.
+
+class Shape
+{
+	protected x: int = 0,
+}
+
+fn main() -> int
+{
+	let s = Shape { };
+	return s.x;
+}

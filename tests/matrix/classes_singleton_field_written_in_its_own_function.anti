@@ -1,0 +1,18 @@
+//! A function of the singleton that is not `construct` does not write a field
+//! without `mutable` either.
+
+singleton class Config
+{
+	pub level: int = 2,
+
+	pub fn raise(self)
+	{
+		self.level += 1;
+	}
+}
+
+fn main() -> int
+{
+	Config.get().raise();
+	return 0;
+}

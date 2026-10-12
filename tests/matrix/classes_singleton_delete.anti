@@ -1,0 +1,12 @@
+//! `delete` on a singleton is refused.
+
+singleton class Config
+{
+	pub level: int = 2,
+}
+
+fn main() -> int
+{
+	delete(Config.get());
+	return 0;
+}

@@ -1,0 +1,13 @@
+//! A field of a singleton without a marker is set in `construct` and nowhere
+//! else.
+
+singleton class Config
+{
+	pub level: int = 2,
+}
+
+fn main() -> int
+{
+	Config.get().level = 3;
+	return 0;
+}

@@ -1,0 +1,1 @@
+classes_two_type_parameters_of_one_name.anti:3:12: error: `pick` names two type parameters `T`

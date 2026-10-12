@@ -1,0 +1,12 @@
+//! A literal outside the class names its public fields alone.
+
+class Circle
+{
+	r: int = 0,
+}
+
+fn main() -> int
+{
+	let c = Circle { r: 2 };
+	return 0;
+}

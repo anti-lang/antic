@@ -1,0 +1,12 @@
+//! A type parameter without a constraint is stored, copied, passed on and
+//! measured alone, so no function is called on it.
+
+fn area_of<T>(s: *T) -> int
+{
+	return s.area();
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,16 @@
+//! A class does not declare a constant that its base chain has already.
+
+class Shape
+{
+	const MAX: int = 1;
+}
+
+class Circle inherits Shape
+{
+	const MAX: int = 2;
+}
+
+fn main() -> int
+{
+	return 0;
+}
