@@ -1999,13 +1999,17 @@ The value is constant data. `here` in an ordinary expression gives the position 
 
 ## Checks and debugging
 
-In dev mode every array, slice and `str` index is bounds-checked, signed arithmetic traps on overflow, a narrowing `as` checks its range, a conversion to `char` or to an enum checks the value, division and shifts are checked, `assert` and `show` are active, `-g` writes line information. In release none of it is emitted, and every target gives the result of ARM64: a division or a remainder by zero gives 0, the least value divided by minus one gives itself, a shift takes its count modulo the width, and a float out of the range of its integer type saturates, with 0 for NaN. `--checks` and `--no-checks`, `--asserts` and `--no-asserts`, `--trace` and `--no-trace` and `-g` override the mode.
+In dev mode every array, slice and `str` index is bounds-checked, signed arithmetic traps on overflow, a narrowing `as` checks its range, a conversion to `char` or to an enum checks the value, division and shifts are checked, `assert` and `show` are active, `-g` writes line information. In release none of it is emitted, and every target gives the result of ARM64: a division or a remainder by zero gives 0, the least value divided by minus one gives itself, a shift takes its count modulo the width, and a float out of the range of its integer type saturates, with 0 for NaN. `--checks` and `--no-checks`, `--asserts` and `--no-asserts`, `--trace` and `--no-trace` and `-g` override the mode. Tracing stands under [Hooks and tracing](#hooks-and-tracing).
 
 ```anti
-trace class Renderer { }
+fn third(xs: []int) -> int { return xs[2]; }
 ```
 
-`trace` marks a class or function whose `pub` functions call the `enter` and `leave` hooks in dev mode. `--trace <pattern>` instruments code that did not ask. `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger` and the rest, and `trace.start` installs the one that the runtime key `trace` names. [Hooks and tracing](#hooks-and-tracing) holds the nine hooks and the options that decide them.
+A dev build that calls `third` with a slice of two elements stops with exit status 134 and names the line of the index. A release build of the same program reads the memory after the slice.
+
+```text
+app.anti:1: index out of bounds: index 2, length 2
+```
 
 `-g` writes the line of every statement and an entry per function, and the link keeps the debug sections, so lldb and gdb stop by file and line and print a backtrace of Anti function names. Every executable and shared library carries a build id in `anti_licenses`. A release binary carries no symbol data. `anti build --release` writes a symbols archive beside it, `<program>-symbols.zip`, with the same link with its debug sections kept, the map of the program's functions and, on Windows, the PDB. `anti symbols inventory`, `check` and `resolve` read the runtime configuration and the build id of every binary it reaches, collect the archives of a deployment and turn a raw trace into names and lines. `resolve` names a frame from the debug link and fills what it lacks from the map. `StackTrace` has `capture`, `frames`, `text` and `symbolize`, which names the function of a frame in every build and its file and line in a `-g` build. `anti.debug.backtrace(skip)` captures one at run time, and `--anti.backtrace` turns the frames of an error on in a release build.
 
