@@ -8,6 +8,8 @@
 #              error must equal byte for byte
 #   PATTERN    instead of EXPECTED, a regular expression that the standard
 #              output followed by the standard error must match
+#   TIMEOUT    optional seconds the program may run. One that runs longer
+#              is stopped, and its status is then no number
 #
 # DESIGN: every test of a refusal or a warning runs here, and the status
 # is compared as a number. ctest ignores the exit status of a test with
@@ -37,7 +39,11 @@ set(where "")
 if(DEFINED DIRECTORY)
     set(where WORKING_DIRECTORY "${DIRECTORY}")
 endif()
-execute_process(COMMAND ${command} ${where}
+set(limit "")
+if(DEFINED TIMEOUT)
+    set(limit TIMEOUT "${TIMEOUT}")
+endif()
+execute_process(COMMAND ${command} ${where} ${limit}
     RESULT_VARIABLE status
     OUTPUT_VARIABLE out
     ERROR_VARIABLE err

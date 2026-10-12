@@ -17,7 +17,9 @@ foreach(rule "* text=auto eol=lf")
 endforeach()
 
 file(GLOB_RECURSE files "${ROOT}/tests/programs/*.expected"
-     "${ROOT}/tests/programs/*.anti" "${ROOT}/tests/std/*.expected")
+     "${ROOT}/tests/programs/*.anti" "${ROOT}/tests/std/*.expected"
+     "${ROOT}/tests/matrix/*.expected" "${ROOT}/tests/matrix/*.anti"
+     "${ROOT}/tests/matrix/*.err")
 foreach(file IN LISTS files)
     file(READ "${file}" text HEX)
     if(text MATCHES "0d0a")

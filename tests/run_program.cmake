@@ -18,6 +18,10 @@
 #             host runs under emulation alone
 #   SKIP_RUN  optional reason the program is linked and not run. The test
 #             then reports itself skipped with it
+#   TIMEOUT   optional seconds that antic may take, and that the program
+#             may take. Either one is stopped after them and fails the
+#             test, where a time limit of ctest fails it whatever
+#             WILL_FAIL says
 #
 # The expected file starts with the line "exit N", the process exit code.
 # Every byte after that line is the expected standard output. An optional
@@ -43,9 +47,14 @@ file(MAKE_DIRECTORY "${WORK}")
 
 string(REPLACE "," ";" objects "${OBJECTS}")
 string(REPLACE "," ";" options "${OPTIONS}")
+set(limit "")
+if(DEFINED TIMEOUT AND NOT TIMEOUT STREQUAL "")
+    set(limit TIMEOUT "${TIMEOUT}")
+endif()
 execute_process(
     COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" ${options}
             -o "${exe}" "${SOURCE}" ${objects}
+    ${limit}
     RESULT_VARIABLE status
     OUTPUT_VARIABLE out
     ERROR_VARIABLE err
@@ -84,4 +93,4 @@ endif()
 # The standard error of a test program is its own business: a program
 # that reports an error writes it there.
 program_expect("${name}" COMMAND ${runner} ${EMULATOR} "${exe}" ${program_args}
-               EXPECTED "${expected_file}" ANY_ERR)
+               EXPECTED "${expected_file}" ANY_ERR ${limit})

@@ -55,10 +55,16 @@ endfunction()
 #   EXPECTED <file>  an expected file: the line "exit N" with the status,
 #                    then every byte of the standard output
 #   ERR, ERR_FILE, ERR_MATCH and ANY_ERR the same for the standard error
+#   TIMEOUT <s>      the seconds the program may run. One that runs longer
+#                    is stopped, and its status is then no number
 function(program_expect label)
     cmake_parse_arguments(PARSE_ARGV 1 arg "ABORTS;ANY_OUT;ANY_ERR"
-        "STATUS;OUT;OUT_FILE;OUT_MATCH;ERR;ERR_FILE;ERR_MATCH;EXPECTED"
+        "STATUS;OUT;OUT_FILE;OUT_MATCH;ERR;ERR_FILE;ERR_MATCH;EXPECTED;TIMEOUT"
         "COMMAND")
+    set(limit "")
+    if(DEFINED arg_TIMEOUT)
+        set(limit TIMEOUT "${arg_TIMEOUT}")
+    endif()
     set(skip_OUT 0)
     set(skip_ERR 0)
     if(DEFINED arg_EXPECTED)
@@ -72,7 +78,7 @@ function(program_expect label)
     endif()
     string(MAKE_C_IDENTIFIER "${label}" name)
     set(base "${WORK}/${name}")
-    execute_process(COMMAND ${arg_COMMAND} RESULT_VARIABLE code
+    execute_process(COMMAND ${arg_COMMAND} RESULT_VARIABLE code ${limit}
                     OUTPUT_FILE "${base}.stdout" ERROR_FILE "${base}.stderr")
     file(READ "${base}.stdout" out)
     file(READ "${base}.stderr" err)

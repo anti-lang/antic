@@ -172,15 +172,14 @@ endif()
 # suite, each by the test dev_object_<name> into anti_<name>_dev of this
 # directory with the fixture <name>_dev_object. A test that links one names
 # the module alone, by its path under std/anti/ such as lang or
-# collection/list, and antic_dev_inputs gives the objects and the fixtures
-# from that one list, so the two cannot disagree.
-set(ANTIC_DEV_MODULES lang regex mem text reflect runtime collection
-    collection/pool collection/tree collection/queue collection/list
-    collection/deque collection/ring collection/grid collection/sorted
-    collection/map collection/set collection/concurrent
-    collection/synchronized)
-foreach(module IN LISTS ANTIC_DEV_MODULES)
+# collection/list. antic_dev_object registers the test of a module, and
+# antic_dev_inputs gives the objects and the fixtures of the modules that
+# have one, so the two cannot disagree.
+function(antic_dev_object module)
     string(REPLACE "/" "_" name "${module}")
+    if(TEST dev_object_${name})
+        return()
+    endif()
     add_test(NAME dev_object_${name}
         COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
                 --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
@@ -189,6 +188,13 @@ foreach(module IN LISTS ANTIC_DEV_MODULES)
                 "${ANTIC_RUNTIME_DIR}/std/anti/${module}.antl")
     set_tests_properties(dev_object_${name} PROPERTIES
         FIXTURES_SETUP ${name}_dev_object)
+endfunction()
+foreach(module lang regex mem text reflect runtime collection
+        collection/pool collection/tree collection/queue collection/list
+        collection/deque collection/ring collection/grid collection/sorted
+        collection/map collection/set collection/concurrent
+        collection/synchronized)
+    antic_dev_object(${module})
 endforeach()
 
 # Set objects to the dev objects of the modules after the two names, and
@@ -197,10 +203,10 @@ function(antic_dev_inputs objects fixtures)
     set(found_objects "")
     set(found_fixtures "")
     foreach(module IN LISTS ARGN)
-        if(NOT module IN_LIST ANTIC_DEV_MODULES)
+        string(REPLACE "/" "_" name "${module}")
+        if(NOT TEST dev_object_${name})
             message(FATAL_ERROR "no test compiles the dev object of ${module}")
         endif()
-        string(REPLACE "/" "_" name "${module}")
         list(APPEND found_objects
             "${CMAKE_CURRENT_BINARY_DIR}/anti_${name}_dev${anti_object}")
         list(APPEND found_fixtures ${name}_dev_object)
@@ -225,7 +231,7 @@ endif()
 function(antic_test_lto out)
     set(options ${ARGN})
     if(ANTIC_TEST_LTO AND NOT options MATCHES
-       "(^|[;,])(--dev|-S|-c|--lib|--linker|--lto)([;,]|$)")
+       "(^|[;,])(--dev|-S|-c|--lib|--linker|--lto|--memory-checks)([;,]|$)")
         list(APPEND options --lto ${ANTIC_TEST_LTO})
     endif()
     set(${out} ${options} PARENT_SCOPE)
@@ -237,12 +243,14 @@ endfunction()
 #   antic_program_test(<name> <source> WORK <dir> [EXPECTED <file>]
 #                      [OPTIONS <option>...] [DEV <module>...]
 #                      [OBJECTS <object>...] [UNSET <variable>...]
-#                      [EMULATOR <program>] [SKIP_RUN <reason>])
-# OPTIONS, OBJECTS, UNSET, EMULATOR and SKIP_RUN reach the script as
-# run_program.cmake names them. DEV names the modules whose dev objects the
-# link takes, which antic_dev_inputs resolves.
+#                      [EMULATOR <program>] [SKIP_RUN <reason>]
+#                      [TIMEOUT <seconds>])
+# OPTIONS, OBJECTS, UNSET, EMULATOR, SKIP_RUN and TIMEOUT reach the script
+# as run_program.cmake names them. DEV names the modules whose dev objects
+# the link takes, which antic_dev_inputs resolves.
 function(antic_program_test name source)
-    cmake_parse_arguments(PARSE_ARGV 2 arg "" "WORK;EXPECTED;EMULATOR;SKIP_RUN"
+    cmake_parse_arguments(PARSE_ARGV 2 arg ""
+                          "WORK;EXPECTED;EMULATOR;SKIP_RUN;TIMEOUT"
                           "OPTIONS;DEV;OBJECTS;UNSET")
     if(NOT arg_WORK)
         message(FATAL_ERROR "antic_program_test(${name}) names no WORK")
@@ -265,6 +273,9 @@ function(antic_program_test name source)
     endif()
     if(arg_SKIP_RUN)
         list(APPEND optional "-DSKIP_RUN=${arg_SKIP_RUN}")
+    endif()
+    if(arg_TIMEOUT)
+        list(APPEND optional "-DTIMEOUT=${arg_TIMEOUT}")
     endif()
     add_test(NAME ${name}
         COMMAND "${CMAKE_COMMAND}"
@@ -460,6 +471,7 @@ antic_coverage(rt_signal_tests rt_conf_tests rt_plugin_tests
     rt_platform_tests rt_plugin_table_tests)
 
 # add_expect_test(<name> STATUS <status> [DIRECTORY <dir>]
+#                 [TIMEOUT <seconds>]
 #                 EXPECTED <file> | PATTERN <regex>
 #                 COMMAND <program> <arguments>...)
 # registers a test of run_expect.cmake, which checks the exit status of
@@ -469,7 +481,8 @@ antic_coverage(rt_signal_tests rt_conf_tests rt_plugin_tests
 # no `,` inside an argument and no line break, so a pattern holds neither
 # and a test that needs one compares a file with EXPECTED.
 function(add_expect_test name)
-    cmake_parse_arguments(PARSE_ARGV 1 arg "" "STATUS;DIRECTORY;EXPECTED;PATTERN"
+    cmake_parse_arguments(PARSE_ARGV 1 arg ""
+                          "STATUS;DIRECTORY;TIMEOUT;EXPECTED;PATTERN"
                           "COMMAND")
     foreach(argument IN LISTS arg_COMMAND)
         if(argument MATCHES ",")
@@ -489,6 +502,9 @@ function(add_expect_test name)
     endif()
     if(DEFINED arg_PATTERN)
         list(APPEND values "-DPATTERN=${arg_PATTERN}")
+    endif()
+    if(DEFINED arg_TIMEOUT)
+        list(APPEND values "-DTIMEOUT=${arg_TIMEOUT}")
     endif()
     add_test(NAME ${name}
         COMMAND "${CMAKE_COMMAND}" ${values}
@@ -5015,6 +5031,130 @@ add_custom_target(bench
     DEPENDS antic anti_std ${bench_executables}
     USES_TERMINAL
     VERBATIM)
+
+# The matrix of constructs and contexts in tests/matrix, by decision 28 of
+# "Decisions of 2026-10-11" in docs/decisions.md. A file there registers
+# its tests by its name, and no list of this file names it.
+#   <name>.anti with <name>.expected is a program. It runs in dev mode, in
+#   release mode and with --memory-checks, as matrix_<name>_dev,
+#   matrix_<name>_release and matrix_<name>_memory_checks. Each compares
+#   the whole output with the one expected file, so the three agree.
+#   <name>.anti with <name>.err is a refusal, matrix_<name>_refused,
+#   through the runner of tests/errors: antic exits with 1 and prints the
+#   bytes of the .err file.
+# A <name>.args beside a program holds its arguments, as run_program.cmake
+# reads them. The test matrix_files refuses every other file.
+#
+# DESIGN: ctest counts a test that its own time limit stops as failed
+# whatever WILL_FAIL says, and a test that its runner fails as one that
+# WILL_FAIL expects. A matrix test may show a defect that keeps antic or
+# the program running, and tests/known-failures.txt must be able to list
+# it. The runner therefore stops antic and the program after
+# ANTIC_MATRIX_SECONDS each, and the limit of ctest stands above the two.
+set(ANTIC_MATRIX_SECONDS 60)
+math(EXPR matrix_program_limit "2 * ${ANTIC_MATRIX_SECONDS} + 30")
+math(EXPR matrix_refusal_limit "${ANTIC_MATRIX_SECONDS} + 30")
+set(MATRIX "${CMAKE_CURRENT_SOURCE_DIR}/matrix")
+set(MATRIX_WORK "${CMAKE_CURRENT_BINARY_DIR}/matrix")
+file(MAKE_DIRECTORY "${MATRIX_WORK}/refused")
+
+# Set out to the modules of the standard library whose dev objects a dev
+# build of source links: every module under `anti.` that source imports and
+# every module those import, each by its path under std/anti/.
+function(antic_dev_imports out source)
+    set(modules "")
+    set(pending "${source}")
+    while(pending)
+        list(POP_FRONT pending file)
+        file(STRINGS "${file}" imports REGEX "^import anti\\.")
+        foreach(line IN LISTS imports)
+            string(REGEX MATCH "^import anti((\\.[a-z0-9_]+)+)" found "${line}")
+            string(SUBSTRING "${CMAKE_MATCH_1}" 1 -1 module)
+            string(REPLACE "." "/" module "${module}")
+            if(module IN_LIST modules)
+                continue()
+            endif()
+            set(module_source "${PROJECT_SOURCE_DIR}/src/std/anti/${module}.anti")
+            if(NOT EXISTS "${module_source}")
+                message(FATAL_ERROR "${file} imports `${found}`, and "
+                                    "${module_source} does not exist")
+            endif()
+            list(APPEND modules "${module}")
+            list(APPEND pending "${module_source}")
+        endforeach()
+    endwhile()
+    set(${out} "${modules}" PARENT_SCOPE)
+endfunction()
+
+# The three tests of the program tests/matrix/<name>.anti.
+# DESIGN: the dev build links the dev object of every module of the
+# standard library the program imports, which antic_dev_imports reads from
+# the source when the tree is configured. The source is therefore an input
+# of the configure step, and a new import configures the tree again.
+function(antic_matrix_program name)
+    set(source "${MATRIX}/${name}.anti")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${source}")
+    antic_dev_imports(modules "${source}")
+    foreach(module IN LISTS modules)
+        antic_dev_object(${module})
+    endforeach()
+    antic_program_test(matrix_${name}_dev "${source}"
+        OPTIONS --dev
+        DEV ${modules}
+        TIMEOUT ${ANTIC_MATRIX_SECONDS}
+        WORK "${MATRIX_WORK}/dev")
+    antic_program_test(matrix_${name}_release "${source}"
+        TIMEOUT ${ANTIC_MATRIX_SECONDS}
+        WORK "${MATRIX_WORK}/release")
+    antic_program_test(matrix_${name}_memory_checks "${source}"
+        OPTIONS --memory-checks
+        TIMEOUT ${ANTIC_MATRIX_SECONDS}
+        WORK "${MATRIX_WORK}/memory-checks")
+    set_tests_properties(matrix_${name}_dev matrix_${name}_release
+        matrix_${name}_memory_checks PROPERTIES TIMEOUT ${matrix_program_limit})
+    # windows-arm64 has no runtime of AddressSanitizer and refuses the
+    # option, which the test memory_checks holds. The test stays
+    # registered there, so a line of tests/known-failures.txt names a test
+    # on every host.
+    if(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
+        set_tests_properties(matrix_${name}_memory_checks PROPERTIES
+            DISABLED TRUE)
+    endif()
+endfunction()
+
+# The refusal of tests/matrix/<name>.anti. A message names the file alone,
+# so antic runs in the directory of the program, and it runs the whole
+# build, so a refusal of any pass counts.
+function(antic_matrix_refusal name)
+    add_expect_test(matrix_${name}_refused STATUS 1
+        TIMEOUT ${ANTIC_MATRIX_SECONDS}
+        DIRECTORY "${MATRIX}"
+        EXPECTED "${MATRIX}/${name}.err"
+        COMMAND "$<TARGET_FILE:antic>" --runtime "${ANTIC_RUNTIME_DIR}"
+                -o "${MATRIX_WORK}/refused/${name}" "${name}.anti")
+    set_tests_properties(matrix_${name}_refused PROPERTIES
+        TIMEOUT ${matrix_refusal_limit})
+endfunction()
+
+file(GLOB matrix_sources CONFIGURE_DEPENDS "${MATRIX}/*.anti")
+# The expected files decide what a source registers, so a new one
+# configures the tree again as a new source does.
+file(GLOB matrix_results CONFIGURE_DEPENDS "${MATRIX}/*.expected"
+     "${MATRIX}/*.err")
+foreach(source IN LISTS matrix_sources)
+    get_filename_component(name "${source}" NAME_WE)
+    set(expected "${MATRIX}/${name}.expected")
+    set(refused "${MATRIX}/${name}.err")
+    if(expected IN_LIST matrix_results AND NOT refused IN_LIST matrix_results)
+        antic_matrix_program(${name})
+    elseif(refused IN_LIST matrix_results AND NOT expected IN_LIST matrix_results)
+        antic_matrix_refusal(${name})
+    endif()
+endforeach()
+# A source with neither file, or with both, registers nothing above.
+add_test(NAME matrix_files
+    COMMAND "${CMAKE_COMMAND}" "-DMATRIX=${MATRIX}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_matrix_files.cmake")
 
 # The known failures, by decision 30 of "Decisions of 2026-10-11" in
 # docs/decisions.md. tests/known-failures.txt lists the tests that show a
