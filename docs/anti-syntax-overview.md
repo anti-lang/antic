@@ -1827,6 +1827,76 @@ pub abstract class Greeter
 
 `compatible 1.1;` in the body of an abstract class is the floor of the interface. A plugin built against a version below it is refused, whatever its chain says. The table `[injections]` and the directories of `plugins` stand in the configuration file, see [Runtime configuration](#runtime-configuration).
 
+## Runtime configuration
+
+A program reads the configuration of its runtime at start, from the command line and from one TOML file. The file holds `include`, `[runtime]` and `[injections]`, and three places name it.
+
+| Place | Written | Rank |
+|---|---|---|
+| the command line | `--anti.conf=<path>` | first |
+| the environment | `ANTI_CONF=<path>` | second |
+| the program | `rt.configure(path)` of `anti.runtime` | third, and not read when a place above names a file |
+
+```toml
+include = ["base.conf"]
+
+[runtime]
+threads = 4
+backtrace = true
+plugins = ["plugins", "/opt/app/plugins"]
+logger = "log.toml"
+
+[injections]
+"anti.log.Logger" = "lib/CISOLogger.so"
+```
+
+Every key of `[runtime]` is an option of the same name, and the runtime takes its options before `main` sees the arguments.
+
+| Key | Option | Value |
+|---|---|---|
+| `backtrace` | `--anti.backtrace` | `true` or `false`: the frames of an error, see [Errors](#errors) |
+| `hash_seed` | `--anti.hash_seed=<number>` | the seed of the hashing collections, see [Collections](#collections) |
+| `logger` | `--anti.logger=<path>` | the configuration file of `anti.log` |
+| `plugins` | `--anti.plugins=<dir:dir>` | the directories a plugin is loaded from, an array in the file |
+| `threads` | `--anti.threads=<count>` | the threads of the worker pool, 1 or more |
+| `trace` | `--anti.trace=<what>` | the handlers of `anti.trace` to install, see [Hooks and tracing](#hooks-and-tracing) |
+
+Precedence per key is the command line, the file, the build. The includes run first and in order, so the including file wins per key. An unknown key, a value its key does not take and a cycle of includes are errors at start that name the file. `--anti.inject=<interface>=<path>` is the option form of a line of `[injections]`.
+
+`--anti.help` lists the options and ends. `--anti.inspect` prints the effective value of each key with the layer it came from, then the injectable interfaces and the loaded plugins, and ends. For the file above without its `[injections]`, and a `base.conf` that sets `hash_seed = 7`, it prints:
+
+```text
+anti runtime 0.2.0
+backtrace = true (app.conf)
+hash_seed = 7 (base.conf)
+logger = log.toml (app.conf)
+plugins = plugins:/opt/app/plugins (app.conf)
+threads = 4 (app.conf)
+trace =  (build)
+injectable interfaces: none
+loaded plugins: none
+```
+
+`rt.get(key)` gives the effective value of a key as a `?str`, and `none` where no layer set one.
+
+```anti
+import anti.io;
+import anti.runtime as rt;
+
+fn main() -> int
+{
+	let threads = rt.get("threads") ?? "the default";
+	io.println(threads);
+	return 0;
+}
+```
+
+```text
+the default
+```
+
+`rt.configure(path)` ends the program with a message when it cannot read its file. Injections are fixed at start, so `rt.configure` refuses a table `[injections]`, in its file and in every file that file includes, and names `--anti.conf` and `ANTI_CONF` instead. A line of `[injections]` that names no injectable interface of the program is an error at start, and so is one that names an `inject final` field.
+
 ## Tests
 
 A `tests` block per module holds tests, a `fixtures` block holds their helpers, and a module has at most one of each. Both see the module's private items and are compiled only by `anti test`.
