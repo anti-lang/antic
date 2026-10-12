@@ -1,0 +1,697 @@
+//! Every construct of the classes area in a library module: the classes and
+//! their members, and each construct in a function, plain and generic. The
+//! client calls each function, builds the classes and inherits two of them.
+
+import anti.lang;
+import anti.reflect;
+import anti.text;
+
+pub abstract class Shape
+{
+	pub side: int = 0,
+
+	abstract fn area(self) -> int;
+
+	pub fn twice(self) -> int
+	{
+		return self.area() * 2;
+	}
+}
+
+pub abstract class Named
+{
+	abstract fn name(self) -> int;
+}
+
+pub class Square inherits Shape
+{
+	implements nm: Named,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+
+	concrete fn name(self) -> int
+	{
+		return self.side + 100;
+	}
+}
+
+pub class Cube inherits Square
+{
+	concrete fn area(self) -> int
+	{
+		return self.super.area() * 6;
+	}
+}
+
+pub class Tally
+{
+	pub static atomic parts_made: int = 0;
+	pub static atomic parts_gone: int = 0;
+	pub static atomic wholes_made: int = 0;
+	pub static atomic wholes_gone: int = 0;
+}
+
+pub class Part
+{
+	pub n: int = 0,
+
+	fn construct(self)
+	{
+		Tally.parts_made.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Tally.parts_gone.add(1);
+	}
+}
+
+pub class Whole inherits Part
+{
+	pub m: int,
+
+	fn construct(self, m: int) may fail
+	{
+		if m < 0 {
+			fail "below zero";
+		}
+		self.m = m;
+		Tally.wholes_made.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Tally.wholes_gone.add(1);
+	}
+}
+
+pub class Circle inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return 3 * self.side;
+	}
+}
+
+pub class Counter
+{
+	pub static atomic total: int = 0;
+	pub const STEP: int = 3;
+
+	pub fn step(n: int) -> int
+	{
+		return n * Counter.STEP;
+	}
+}
+
+pub singleton class Settings
+{
+	pub base: int = 7,
+	mutable last: int = 0,
+
+	fn construct(self)
+	{
+		self.base = 9;
+	}
+}
+
+pub struct Vec
+{
+	x: int,
+	y: int,
+}
+
+pub operator fn add(a: Vec, b: Vec) -> Vec
+{
+	return Vec { x: a.x + b.x, y: a.y + b.y };
+}
+
+pub operator fn neg(a: Vec) -> Vec
+{
+	return Vec { x: 0 - a.x, y: 0 - a.y };
+}
+
+pub operator fn lt(a: Vec, b: Vec) -> bool
+{
+	return a.x + a.y < b.x + b.y;
+}
+
+pub class Money
+{
+	pub cents: int = 0,
+
+	operator fn add(self, other: Money) -> Money
+	{
+		return Money { cents: self.cents + other.cents };
+	}
+
+	operator fn mul(self, times: int) -> Money
+	{
+		return Money { cents: self.cents * times };
+	}
+
+	operator fn eq(self, other: Money) -> bool
+	{
+		return self.cents / 10 == other.cents / 10;
+	}
+
+	operator fn lt(self, other: Money) -> bool
+	{
+		return self.cents < other.cents;
+	}
+}
+
+pub class Plain
+{
+	pub a: int = 0,
+	pub b: int = 0,
+}
+
+pub constraint Summable = add;
+
+pub fn larger<T: lt>(own a: T, own b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+pub fn total<T: Summable>(items: []T, own zero: T) -> T
+{
+	let sum = zero;
+	for x in items {
+		sum = sum + x;
+	}
+	return sum;
+}
+
+pub fn checked<T: lt>(own v: T, own least: T) -> T may fail
+{
+	if v < least {
+		fail "too small";
+	}
+	return v;
+}
+
+pub class Stack<T, N: int>
+{
+	struct Slot
+	{
+		value: T,
+		at: int,
+	}
+
+	items: [N]T,
+	pub count: int = 0,
+
+	fn construct(self, fill: T)
+	{
+		self.items = [fill; N];
+	}
+
+	fn slot(self) -> Slot
+	{
+		return Slot { value: dup(self.items[self.count - 1]), at: self.count - 1 };
+	}
+
+	pub fn push(self, v: T)
+	{
+		self.items[self.count] = dup(v);
+		self.count += 1;
+	}
+
+	pub fn top(self) -> T
+	{
+		return self.slot().value;
+	}
+
+	pub fn room(self) -> int
+	{
+		return N - self.count;
+	}
+}
+
+pub variant Maybe<T>
+{
+	Some { value: T },
+	Nothing,
+}
+
+pub abstract class Source<T>
+{
+	abstract fn next(self) -> T;
+}
+
+pub class Steps inherits Source<int>
+{
+	pub at: int = 0,
+
+	concrete fn next(self) -> int
+	{
+		self.at += 1;
+		return self.at;
+	}
+}
+
+pub fn drain<T: add>(source: *Source<T>, turns: int, own start: T) -> T
+{
+	let sum = start;
+	for turn in 0..turns {
+		sum = sum + source.next();
+	}
+	return sum;
+}
+
+pub class Watched
+{
+	pub n: int = 0,
+	pub tag: str = "w",
+	pub static atomic made: int = 0;
+	pub static atomic copies: int = 0;
+	pub static atomic gone: int = 0;
+
+	concrete fn created(self)
+	{
+		Watched.made.add(1);
+	}
+
+	concrete fn copied(self, from: *Object)
+	{
+		Watched.copies.add(1);
+	}
+
+	concrete fn destroyed(self)
+	{
+		Watched.gone.add(1);
+	}
+
+	fn destruct(self)
+	{
+		self.n = 0;
+	}
+}
+
+pub abstract class Reader
+{
+	abstract fn read(self) -> int;
+}
+
+pub abstract class Writer
+{
+	abstract fn read(self) -> int;
+}
+
+/// Fills the two tables with two bodies of one name.
+pub class Both
+{
+	implements r: Reader,
+	implements w: Writer,
+
+	concrete fn Reader::read(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn Writer::read(self) -> int
+	{
+		return 2;
+	}
+}
+
+pub final class Sealed
+{
+	pub n: int = 4,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+/// A generic class without a type of its own, which a library file carries.
+pub class Cell<T, N: int>
+{
+	items: [N]T,
+
+	fn construct(self, fill: T)
+	{
+		self.items = [fill; N];
+	}
+
+	pub fn first(self) -> T
+	{
+		return dup(self.items[0]);
+	}
+
+	pub fn room(self) -> int
+	{
+		return N - 1;
+	}
+}
+
+/// Calls a function of a table that a class of another module may fill.
+pub fn measure(s: *Shape) -> int
+{
+	return s.twice();
+}
+
+/// Calls through the table of an interface.
+pub fn label(n: *Named) -> int
+{
+	return n.name();
+}
+
+/// Holds a call through a pointer to a base, a call through a pointer to an
+/// interface, a call on a sub-object, `self.super.f()` and a bound function.
+pub fn lib_calls(k: int) -> int
+{
+	let acc = 0;
+	let sq = Square { side: k };
+	let cu = Cube { side: k };
+	let shape: *Shape = &cu;
+	let named: *Named = &sq;
+	let bound = shape.twice;
+	acc += shape.area() + named.name() + bound() + sq.nm.name();
+	return acc;
+}
+
+/// Holds the same in a generic function.
+pub fn generic_calls<T>(k: int, extra: T) -> int
+{
+	let acc = size_of(T) as int * 10000000;
+	let sq = Square { side: k };
+	let cu = Cube { side: k };
+	let shape: *Shape = &cu;
+	let named: *Named = &sq;
+	let bound = shape.twice;
+	acc += shape.area() + named.name() + bound() + sq.nm.name();
+	return acc;
+}
+
+/// Holds a class literal, `alloc T { }`, `T(args)` and `alloc T(args)` with a
+/// `construct` that may fail, `delete`, `destroy` and the teardown at the end
+/// of a block.
+pub fn lib_objects(k: int) -> int
+{
+	let acc = 0;
+	let part = Part { n: k };
+	let heap = alloc Part { n: k + 1 };
+	let whole = alloc Whole(k + 2) catch fatal;
+	let local = Whole(k + 3) catch fatal;
+	let bad = alloc Whole(0 - k) catch {
+		acc += 1000;
+		yield alloc Whole { m: 0 };
+	};
+	acc += part.n + heap.n + whole.m + local.m + bad.m;
+	delete(heap);
+	delete(whole);
+	delete(bad);
+	destroy(&local);
+	return acc;
+}
+
+/// Holds the same in a generic function.
+pub fn generic_objects<T>(k: int, extra: T) -> int
+{
+	let acc = size_of(T) as int * 10000000;
+	let part = Part { n: k };
+	let heap = alloc Part { n: k + 1 };
+	let whole = alloc Whole(k + 2) catch fatal;
+	let local = Whole(k + 3) catch fatal;
+	let bad = alloc Whole(0 - k) catch {
+		acc += 1000;
+		yield alloc Whole { m: 0 };
+	};
+	acc += part.n + heap.n + whole.m + local.m + bad.m;
+	delete(heap);
+	delete(whole);
+	delete(bad);
+	destroy(&local);
+	return acc;
+}
+
+/// Holds `is`, `as` and `as?` on a pointer to a base and on a pointer to an
+/// interface, and `==` and `!=` on two pointers of one chain.
+pub fn lib_conversions(k: int) -> int
+{
+	let acc = 0;
+	let sq = Square { side: k };
+	let ci = Circle { side: k };
+	let shape: *Shape = &sq;
+	let other: *Shape = &ci;
+	let named: *Named = &sq;
+	if shape is *Square {
+		acc += 1;
+	}
+	if other is *Square {
+		acc += 10;
+	}
+	let back = shape as *Square;
+	acc += back.side * 100;
+	let found = other as? *Square;
+	if found == none {
+		acc += 2000;
+	}
+	let whole = named as *Square;
+	if whole == shape {
+		acc += 10000;
+	}
+	if named == shape {
+		acc += 100000;
+	}
+	if other != shape {
+		acc += 1000000;
+	}
+	return acc;
+}
+
+/// Holds the same in a generic function.
+pub fn generic_conversions<T>(k: int, extra: T) -> int
+{
+	let acc = size_of(T) as int * 10000000;
+	let sq = Square { side: k };
+	let ci = Circle { side: k };
+	let shape: *Shape = &sq;
+	let other: *Shape = &ci;
+	let named: *Named = &sq;
+	if shape is *Square {
+		acc += 1;
+	}
+	if other is *Square {
+		acc += 10;
+	}
+	let back = shape as *Square;
+	acc += back.side * 100;
+	let found = other as? *Square;
+	if found == none {
+		acc += 2000;
+	}
+	let whole = named as *Square;
+	if whole == shape {
+		acc += 10000;
+	}
+	if named == shape {
+		acc += 100000;
+	}
+	if other != shape {
+		acc += 1000000;
+	}
+	return acc;
+}
+
+/// Holds a static atomic field, a constant of a class, a static function and
+/// `get()` of a singleton.
+pub fn lib_statics(k: int) -> int
+{
+	let acc = 0;
+	Counter.total.add(k);
+	let settings = Settings.get();
+	settings.last = k;
+	acc += Counter.step(k) + Counter.STEP + settings.base + Settings.get().last - k;
+	return acc;
+}
+
+/// Holds the same in a generic function.
+pub fn generic_statics<T>(k: int, extra: T) -> int
+{
+	let acc = size_of(T) as int * 10000000;
+	let settings = Settings.get();
+	settings.last = k;
+	acc += Counter.step(k) + settings.base + Settings.get().last - k;
+	return acc;
+}
+
+/// Holds an `operator fn` of a struct at module level and of a class in its
+/// body, the comparisons that `eq` and `lt` give, the default `==` of a struct
+/// and of a class value, and `hash`.
+pub fn lib_operators(k: int) -> int
+{
+	let acc = 0;
+	let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+	let back = -vec;
+	let twice = 2;
+	let m = Money { cents: k } + Money { cents: 5 } * twice;
+	acc += vec.x + m.cents - back.y;
+	let above = vec > back;
+	let below = back <= vec;
+	let near = Money { cents: 31 } == Money { cents: 30 + k };
+	let far = Money { cents: 31 } != Money { cents: 41 };
+	let more = m >= Money { cents: k };
+	let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+	let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+	let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+	let called = m.add(m).cents == 2 * m.cents;
+	for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+		if flag {
+			acc += 1000 << i;
+		}
+	}
+	return acc;
+}
+
+/// Holds the same in a generic function.
+pub fn generic_operators<T>(k: int, extra: T) -> int
+{
+	let acc = size_of(T) as int * 10000000;
+	let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+	let back = -vec;
+	let twice = 2;
+	let m = Money { cents: k } + Money { cents: 5 } * twice;
+	acc += vec.x + m.cents - back.y;
+	let above = vec > back;
+	let below = back <= vec;
+	let near = Money { cents: 31 } == Money { cents: 30 + k };
+	let far = Money { cents: 31 } != Money { cents: 41 };
+	let more = m >= Money { cents: k };
+	let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+	let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+	let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+	let called = m.add(m).cents == 2 * m.cents;
+	for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+		if flag {
+			acc += 1000 << i;
+		}
+	}
+	return acc;
+}
+
+/// Holds a generic function with a hook as its constraint, one with a named
+/// constraint and one that may fail, a generic class with `N: int` and a nested
+/// type, a generic variant and a generic interface.
+pub fn lib_generics(k: int) -> int
+{
+	let acc = 0;
+	let big = larger<int>(k, 3);
+	let numbers = [k, 2, 3];
+	let sum = total<int>(numbers[0..3], 0);
+	let fits = checked<int>(k, 0) catch {
+		yield 0 - 1;
+	};
+	let low = checked<int>(k, 100) catch {
+		yield 0 - 1;
+	};
+	let stack = Stack<int, 4>(0);
+	stack.push(k);
+	stack.push(k + 1);
+	let maybe = Maybe<int>.Some { value: k };
+	let got = 0;
+	switch maybe {
+		Some s => got = s.value,
+		Nothing => got = 0 - 1,
+	}
+	let steps = Steps { };
+	let drained = drain<int>(&steps, 3, 0);
+	acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+	return acc;
+}
+
+/// Holds the same in a generic function.
+pub fn generic_generics<T>(k: int, extra: T) -> int
+{
+	let acc = size_of(T) as int * 10000000;
+	let big = larger<int>(k, 3);
+	let numbers = [k, 2, 3];
+	let sum = total<int>(numbers[0..3], 0);
+	let fits = checked<int>(k, 0) catch {
+		yield 0 - 1;
+	};
+	let low = checked<int>(k, 100) catch {
+		yield 0 - 1;
+	};
+	let maybe = Maybe<int>.Some { value: k };
+	let got = 0;
+	switch maybe {
+		Some s => got = s.value,
+		Nothing => got = 0 - 1,
+	}
+	let steps = Steps { };
+	let drained = drain<int>(&steps, 3, 0);
+	acc += big + sum + fits + low + got + drained;
+	return acc;
+}
+
+/// Holds `type_name`, `equals` and `hash` of `Object` through a `*Object`,
+/// `dup` of a class value, the hooks `created`, `copied` and `destroyed`, and
+/// the field list that `anti.reflect` reads.
+pub fn lib_root(k: int) -> int
+{
+	let acc = 0;
+	let first = Watched { n: k };
+	let second = dup(first);
+	let one: *Object = &first;
+	let two: *Object = &second;
+	let same = one.equals(two) && one.hash() == two.hash();
+	second.n += 1;
+	let differs = !one.equals(two);
+	let named = text.equal(one.type_name(), "Watched");
+	let fields = 0;
+	let read = 0;
+	if let d = reflect.describe(one as *byte) {
+		fields = reflect.field_count(d);
+		let value = reflect.get(one as *byte, d, 0);
+		if value.kind == reflect.ValueKind.Int {
+			read = value.data.i as int;
+		}
+	}
+	for i, flag in[same, differs, named] {
+		if flag {
+			acc += 100 << i;
+		}
+	}
+	acc += fields * 10 + read;
+	return acc;
+}
+
+/// Holds the same in a generic function.
+pub fn generic_root<T>(k: int, extra: T) -> int
+{
+	let acc = size_of(T) as int * 10000000;
+	let first = Watched { n: k };
+	let second = dup(first);
+	let one: *Object = &first;
+	let two: *Object = &second;
+	let same = one.equals(two) && one.hash() == two.hash();
+	second.n += 1;
+	let differs = !one.equals(two);
+	let named = text.equal(one.type_name(), "Watched");
+	let fields = 0;
+	let read = 0;
+	if let d = reflect.describe(one as *byte) {
+		fields = reflect.field_count(d);
+		let value = reflect.get(one as *byte, d, 0);
+		if value.kind == reflect.ValueKind.Int {
+			read = value.data.i as int;
+		}
+	}
+	for i, flag in[same, differs, named] {
+		if flag {
+			acc += 100 << i;
+		}
+	}
+	acc += fields * 10 + read;
+	return acc;
+}

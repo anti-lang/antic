@@ -1,0 +1,676 @@
+//! Every construct of the classes area in a function of a `tests` block and in
+//! a function of a `fixtures` block. `anti test` compiles both, and each test
+//! asserts what its constructs compute. The classes stand at module level,
+//! since a block holds functions and nothing else.
+
+import anti.lang;
+import anti.reflect;
+import anti.text;
+
+abstract class Shape
+{
+	pub side: int = 0,
+
+	abstract fn area(self) -> int;
+
+	pub fn twice(self) -> int
+	{
+		return self.area() * 2;
+	}
+}
+
+abstract class Named
+{
+	abstract fn name(self) -> int;
+}
+
+class Square inherits Shape
+{
+	implements nm: Named,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+
+	concrete fn name(self) -> int
+	{
+		return self.side + 100;
+	}
+}
+
+class Cube inherits Square
+{
+	concrete fn area(self) -> int
+	{
+		return self.super.area() * 6;
+	}
+}
+
+class Tally
+{
+	pub static atomic parts_made: int = 0;
+	pub static atomic parts_gone: int = 0;
+	pub static atomic wholes_made: int = 0;
+	pub static atomic wholes_gone: int = 0;
+}
+
+class Part
+{
+	pub n: int = 0,
+
+	fn construct(self)
+	{
+		Tally.parts_made.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Tally.parts_gone.add(1);
+	}
+}
+
+class Whole inherits Part
+{
+	pub m: int,
+
+	fn construct(self, m: int) may fail
+	{
+		if m < 0 {
+			fail "below zero";
+		}
+		self.m = m;
+		Tally.wholes_made.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Tally.wholes_gone.add(1);
+	}
+}
+
+class Circle inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return 3 * self.side;
+	}
+}
+
+class Counter
+{
+	pub static atomic total: int = 0;
+	pub const STEP: int = 3;
+
+	pub fn step(n: int) -> int
+	{
+		return n * Counter.STEP;
+	}
+}
+
+singleton class Settings
+{
+	pub base: int = 7,
+	mutable last: int = 0,
+
+	fn construct(self)
+	{
+		self.base = 9;
+	}
+}
+
+struct Vec
+{
+	x: int,
+	y: int,
+}
+
+operator fn add(a: Vec, b: Vec) -> Vec
+{
+	return Vec { x: a.x + b.x, y: a.y + b.y };
+}
+
+operator fn neg(a: Vec) -> Vec
+{
+	return Vec { x: 0 - a.x, y: 0 - a.y };
+}
+
+operator fn lt(a: Vec, b: Vec) -> bool
+{
+	return a.x + a.y < b.x + b.y;
+}
+
+class Money
+{
+	pub cents: int = 0,
+
+	operator fn add(self, other: Money) -> Money
+	{
+		return Money { cents: self.cents + other.cents };
+	}
+
+	operator fn mul(self, times: int) -> Money
+	{
+		return Money { cents: self.cents * times };
+	}
+
+	operator fn eq(self, other: Money) -> bool
+	{
+		return self.cents / 10 == other.cents / 10;
+	}
+
+	operator fn lt(self, other: Money) -> bool
+	{
+		return self.cents < other.cents;
+	}
+}
+
+class Plain
+{
+	pub a: int = 0,
+	pub b: int = 0,
+}
+
+constraint Summable = add;
+
+fn larger<T: lt>(own a: T, own b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+fn total<T: Summable>(items: []T, own zero: T) -> T
+{
+	let sum = zero;
+	for x in items {
+		sum = sum + x;
+	}
+	return sum;
+}
+
+fn checked<T: lt>(own v: T, own least: T) -> T may fail
+{
+	if v < least {
+		fail "too small";
+	}
+	return v;
+}
+
+class Stack<T, N: int>
+{
+	struct Slot
+	{
+		value: T,
+		at: int,
+	}
+
+	items: [N]T,
+	pub count: int = 0,
+
+	fn construct(self, fill: T)
+	{
+		self.items = [fill; N];
+	}
+
+	fn slot(self) -> Slot
+	{
+		return Slot { value: dup(self.items[self.count - 1]), at: self.count - 1 };
+	}
+
+	pub fn push(self, v: T)
+	{
+		self.items[self.count] = dup(v);
+		self.count += 1;
+	}
+
+	pub fn top(self) -> T
+	{
+		return self.slot().value;
+	}
+
+	pub fn room(self) -> int
+	{
+		return N - self.count;
+	}
+}
+
+variant Maybe<T>
+{
+	Some { value: T },
+	Nothing,
+}
+
+abstract class Source<T>
+{
+	abstract fn next(self) -> T;
+}
+
+class Steps inherits Source<int>
+{
+	pub at: int = 0,
+
+	concrete fn next(self) -> int
+	{
+		self.at += 1;
+		return self.at;
+	}
+}
+
+fn drain<T: add>(source: *Source<T>, turns: int, own start: T) -> T
+{
+	let sum = start;
+	for turn in 0..turns {
+		sum = sum + source.next();
+	}
+	return sum;
+}
+
+class Watched
+{
+	pub n: int = 0,
+	pub tag: str = "w",
+	pub static atomic made: int = 0;
+	pub static atomic copies: int = 0;
+	pub static atomic gone: int = 0;
+
+	concrete fn created(self)
+	{
+		Watched.made.add(1);
+	}
+
+	concrete fn copied(self, from: *Object)
+	{
+		Watched.copies.add(1);
+	}
+
+	concrete fn destroyed(self)
+	{
+		Watched.gone.add(1);
+	}
+
+	fn destruct(self)
+	{
+		self.n = 0;
+	}
+}
+
+fixtures
+{
+	fn fix_calls(k: int) -> int
+	{
+		let acc = 0;
+		let sq = Square { side: k };
+		let cu = Cube { side: k };
+		let shape: *Shape = &cu;
+		let named: *Named = &sq;
+		let bound = shape.twice;
+		acc += shape.area() + named.name() + bound() + sq.nm.name();
+		return acc;
+	}
+
+	fn fix_objects(k: int) -> int
+	{
+		let acc = 0;
+		let part = Part { n: k };
+		let heap = alloc Part { n: k + 1 };
+		let whole = alloc Whole(k + 2) catch fatal;
+		let local = Whole(k + 3) catch fatal;
+		let bad = alloc Whole(0 - k) catch {
+			acc += 1000;
+			yield alloc Whole { m: 0 };
+		};
+		acc += part.n + heap.n + whole.m + local.m + bad.m;
+		delete(heap);
+		delete(whole);
+		delete(bad);
+		destroy(&local);
+		return acc;
+	}
+
+	fn fix_conversions(k: int) -> int
+	{
+		let acc = 0;
+		let sq = Square { side: k };
+		let ci = Circle { side: k };
+		let shape: *Shape = &sq;
+		let other: *Shape = &ci;
+		let named: *Named = &sq;
+		if shape is *Square {
+			acc += 1;
+		}
+		if other is *Square {
+			acc += 10;
+		}
+		let back = shape as *Square;
+		acc += back.side * 100;
+		let found = other as? *Square;
+		if found == none {
+			acc += 2000;
+		}
+		let whole = named as *Square;
+		if whole == shape {
+			acc += 10000;
+		}
+		if named == shape {
+			acc += 100000;
+		}
+		if other != shape {
+			acc += 1000000;
+		}
+		return acc;
+	}
+
+	fn fix_statics(k: int) -> int
+	{
+		let acc = 0;
+		Counter.total.add(k);
+		let settings = Settings.get();
+		settings.last = k;
+		acc += Counter.step(k) + Counter.STEP + settings.base + Settings.get().last - k;
+		return acc;
+	}
+
+	fn fix_operators(k: int) -> int
+	{
+		let acc = 0;
+		let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+		let back = -vec;
+		let twice = 2;
+		let m = Money { cents: k } + Money { cents: 5 } * twice;
+		acc += vec.x + m.cents - back.y;
+		let above = vec > back;
+		let below = back <= vec;
+		let near = Money { cents: 31 } == Money { cents: 30 + k };
+		let far = Money { cents: 31 } != Money { cents: 41 };
+		let more = m >= Money { cents: k };
+		let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+		let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+		let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+		let called = m.add(m).cents == 2 * m.cents;
+		for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+			if flag {
+				acc += 1000 << i;
+			}
+		}
+		return acc;
+	}
+
+	fn fix_generics(k: int) -> int
+	{
+		let acc = 0;
+		let big = larger<int>(k, 3);
+		let numbers = [k, 2, 3];
+		let sum = total<int>(numbers[0..3], 0);
+		let fits = checked<int>(k, 0) catch {
+			yield 0 - 1;
+		};
+		let low = checked<int>(k, 100) catch {
+			yield 0 - 1;
+		};
+		let stack = Stack<int, 4>(0);
+		stack.push(k);
+		stack.push(k + 1);
+		let maybe = Maybe<int>.Some { value: k };
+		let got = 0;
+		switch maybe {
+			Some s => got = s.value,
+			Nothing => got = 0 - 1,
+		}
+		let steps = Steps { };
+		let drained = drain<int>(&steps, 3, 0);
+		acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+		return acc;
+	}
+
+	fn fix_root(k: int) -> int
+	{
+		let acc = 0;
+		let first = Watched { n: k };
+		let second = dup(first);
+		let one: *Object = &first;
+		let two: *Object = &second;
+		let same = one.equals(two) && one.hash() == two.hash();
+		second.n += 1;
+		let differs = !one.equals(two);
+		let named = text.equal(one.type_name(), "Watched");
+		let fields = 0;
+		let read = 0;
+		if let d = reflect.describe(one as *byte) {
+			fields = reflect.field_count(d);
+			let value = reflect.get(one as *byte, d, 0);
+			if value.kind == reflect.ValueKind.Int {
+				read = value.data.i as int;
+			}
+		}
+		for i, flag in[same, differs, named] {
+			if flag {
+				acc += 100 << i;
+			}
+		}
+		acc += fields * 10 + read;
+		return acc;
+	}
+}
+
+tests
+{
+	fn calls_in_fixtures()
+	{
+		let first = fix_calls(1);
+		assert(first == 220);
+		let second = fix_calls(2);
+		assert(second == 276);
+	}
+
+	fn calls_in_tests()
+	{
+		let k = 3;
+		let acc = 0;
+		let sq = Square { side: k };
+		let cu = Cube { side: k };
+		let shape: *Shape = &cu;
+		let named: *Named = &sq;
+		let bound = shape.twice;
+		acc += shape.area() + named.name() + bound() + sq.nm.name();
+		assert(acc == 368);
+	}
+
+	fn objects_in_fixtures()
+	{
+		let first = fix_objects(1);
+		assert(first == 1010);
+		let second = fix_objects(2);
+		assert(second == 1014);
+	}
+
+	fn objects_in_tests()
+	{
+		let k = 3;
+		let acc = 0;
+		let part = Part { n: k };
+		let heap = alloc Part { n: k + 1 };
+		let whole = alloc Whole(k + 2) catch fatal;
+		let local = Whole(k + 3) catch fatal;
+		let bad = alloc Whole(0 - k) catch {
+			acc += 1000;
+			yield alloc Whole { m: 0 };
+		};
+		acc += part.n + heap.n + whole.m + local.m + bad.m;
+		delete(heap);
+		delete(whole);
+		delete(bad);
+		destroy(&local);
+		assert(acc == 1018);
+	}
+
+	fn conversions_in_fixtures()
+	{
+		let first = fix_conversions(1);
+		assert(first == 1112101);
+		let second = fix_conversions(2);
+		assert(second == 1112201);
+	}
+
+	fn conversions_in_tests()
+	{
+		let k = 3;
+		let acc = 0;
+		let sq = Square { side: k };
+		let ci = Circle { side: k };
+		let shape: *Shape = &sq;
+		let other: *Shape = &ci;
+		let named: *Named = &sq;
+		if shape is *Square {
+			acc += 1;
+		}
+		if other is *Square {
+			acc += 10;
+		}
+		let back = shape as *Square;
+		acc += back.side * 100;
+		let found = other as? *Square;
+		if found == none {
+			acc += 2000;
+		}
+		let whole = named as *Square;
+		if whole == shape {
+			acc += 10000;
+		}
+		if named == shape {
+			acc += 100000;
+		}
+		if other != shape {
+			acc += 1000000;
+		}
+		assert(acc == 1112301);
+	}
+
+	fn statics_in_fixtures()
+	{
+		let first = fix_statics(1);
+		assert(first == 15);
+		let second = fix_statics(2);
+		assert(second == 18);
+	}
+
+	fn statics_in_tests()
+	{
+		let k = 3;
+		let acc = 0;
+		Counter.total.add(k);
+		let settings = Settings.get();
+		settings.last = k;
+		acc += Counter.step(k) + Counter.STEP + settings.base + Settings.get().last - k;
+		assert(acc == 21);
+	}
+
+	fn operators_in_fixtures()
+	{
+		let first = fix_operators(1);
+		assert(first == 511015);
+		let second = fix_operators(2);
+		assert(second == 511018);
+	}
+
+	fn operators_in_tests()
+	{
+		let k = 3;
+		let acc = 0;
+		let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+		let back = -vec;
+		let twice = 2;
+		let m = Money { cents: k } + Money { cents: 5 } * twice;
+		acc += vec.x + m.cents - back.y;
+		let above = vec > back;
+		let below = back <= vec;
+		let near = Money { cents: 31 } == Money { cents: 30 + k };
+		let far = Money { cents: 31 } != Money { cents: 41 };
+		let more = m >= Money { cents: k };
+		let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+		let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+		let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+		let called = m.add(m).cents == 2 * m.cents;
+		for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+			if flag {
+				acc += 1000 << i;
+			}
+		}
+		assert(acc == 511021);
+	}
+
+	fn generics_in_fixtures()
+	{
+		let first = fix_generics(1);
+		assert(first == 20);
+		let second = fix_generics(2);
+		assert(second == 24);
+	}
+
+	fn generics_in_tests()
+	{
+		let k = 3;
+		let acc = 0;
+		let big = larger<int>(k, 3);
+		let numbers = [k, 2, 3];
+		let sum = total<int>(numbers[0..3], 0);
+		let fits = checked<int>(k, 0) catch {
+			yield 0 - 1;
+		};
+		let low = checked<int>(k, 100) catch {
+			yield 0 - 1;
+		};
+		let stack = Stack<int, 4>(0);
+		stack.push(k);
+		stack.push(k + 1);
+		let maybe = Maybe<int>.Some { value: k };
+		let got = 0;
+		switch maybe {
+			Some s => got = s.value,
+			Nothing => got = 0 - 1,
+		}
+		let steps = Steps { };
+		let drained = drain<int>(&steps, 3, 0);
+		acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+		assert(acc == 28);
+	}
+
+	fn root_in_fixtures()
+	{
+		let first = fix_root(1);
+		assert(first == 721);
+		let second = fix_root(2);
+		assert(second == 722);
+	}
+
+	fn root_in_tests()
+	{
+		let k = 3;
+		let acc = 0;
+		let first = Watched { n: k };
+		let second = dup(first);
+		let one: *Object = &first;
+		let two: *Object = &second;
+		let same = one.equals(two) && one.hash() == two.hash();
+		second.n += 1;
+		let differs = !one.equals(two);
+		let named = text.equal(one.type_name(), "Watched");
+		let fields = 0;
+		let read = 0;
+		if let d = reflect.describe(one as *byte) {
+			fields = reflect.field_count(d);
+			let value = reflect.get(one as *byte, d, 0);
+			if value.kind == reflect.ValueKind.Int {
+				read = value.data.i as int;
+			}
+		}
+		for i, flag in[same, differs, named] {
+			if flag {
+				acc += 100 << i;
+			}
+		}
+		acc += fields * 10 + read;
+		assert(acc == 723);
+	}
+}

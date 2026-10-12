@@ -1962,6 +1962,19 @@ add_test(NAME anti_test_threads
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-threads"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test_module.cmake")
 
+# The constructs of the classes area in a `tests` block and in a
+# `fixtures` block, as anti_test_flow holds those of the flow area. The
+# classes stand at module level, since a block holds functions alone.
+add_test(NAME anti_test_classes
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DMODULE=com/example/classes"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-classes"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_test_module.cmake")
+
 # `anti run --memory-checks` and `anti test --memory-checks` put the report
 # of each memory error through Anti's symbolizer, and the dev cache keeps
 # the objects with and without the checks apart.
@@ -3516,6 +3529,18 @@ antic_modules_test(threads_modules
     PROGRAM client
     STD lang
     WORK "${CMAKE_CURRENT_BINARY_DIR}/threads-modules")
+
+# The constructs of the classes area in a library module: the classes with
+# their members, and each construct in a function, plain and generic, as
+# flow_modules holds those of the flow area. The client inherits a class
+# of the library and implements an interface of it, and reaches the
+# constants, the static fields, the operators and the generics from there.
+antic_modules_test(classes_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/classes"
+    LIBRARIES classes
+    PROGRAM client
+    STD lang mem reflect text
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/classes-modules")
 
 # `dispatch`, `join` and `join_all` in a generic function of a library
 # module, whose copy the client compiles. T061 of

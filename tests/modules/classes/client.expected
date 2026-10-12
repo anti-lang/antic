@@ -1,0 +1,15 @@
+calls 220 20000276
+objects 1010 20001014
+conversions 1112101 21112201
+statics 15 20000015
+operators 511015 20511018
+generics 20 20000019
+root 721 20000722
+inherits 24 5
+qualified 1 2
+final 6
+static 6
+singleton 9
+operators 4 6 7
+construct 8 1 3
+generic 9

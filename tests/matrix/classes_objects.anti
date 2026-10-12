@@ -1,0 +1,479 @@
+//! A class literal, `alloc T { }`, `T(args)` and `alloc T(args)` with a
+//! `construct` that may fail, `delete`, `destroy` and the teardown at the end
+//! of a block, in each of these places: function, method, loop body, switch
+//! arm, if let, defer, undo, catch handler, closure, worker, dispatch or
+//! parallel, sync block, select arm, generic body, nested type. Each place is a
+//! function of its own, and the program prints one line per place and input.
+//! Every `construct` and every `destruct` counts itself, and the last two lines
+//! hold the counts. A `construct` that fails leaves no object, so no `destruct`
+//! runs for it. A worker deletes no object, so the place worker holds the
+//! values alone, and a `defer` and an `undo` leave the teardown of their local
+//! to the end of the block.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+	pub env: ?*Env = none,
+}
+
+struct Env
+{
+	lock: Mutex,
+	gate: chan int,
+	task: *Task,
+}
+
+class Tally
+{
+	pub static atomic parts_made: int = 0;
+	pub static atomic parts_gone: int = 0;
+	pub static atomic wholes_made: int = 0;
+	pub static atomic wholes_gone: int = 0;
+}
+
+class Part
+{
+	pub n: int = 0,
+
+	fn construct(self)
+	{
+		Tally.parts_made.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Tally.parts_gone.add(1);
+	}
+}
+
+class Whole inherits Part
+{
+	pub m: int,
+
+	fn construct(self, m: int) may fail
+	{
+		if m < 0 {
+			fail "below zero";
+		}
+		self.m = m;
+		Tally.wholes_made.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Tally.wholes_gone.add(1);
+	}
+}
+
+fn in_function(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	let part = Part { n: k };
+	let heap = alloc Part { n: k + 1 };
+	let whole = alloc Whole(k + 2) catch fatal;
+	let local = Whole(k + 3) catch fatal;
+	let bad = alloc Whole(0 - k) catch {
+		acc += 1000;
+		yield alloc Whole { m: 0 };
+	};
+	acc += part.n + heap.n + whole.m + local.m + bad.m;
+	delete(heap);
+	delete(whole);
+	delete(bad);
+	destroy(&local);
+	return acc;
+}
+
+class Host
+{
+	pub base: int = 0,
+
+	pub fn in_method(self, e: *Env, k: int) -> int
+	{
+		let acc = self.base;
+		let part = Part { n: k };
+		let heap = alloc Part { n: k + 1 };
+		let whole = alloc Whole(k + 2) catch fatal;
+		let local = Whole(k + 3) catch fatal;
+		let bad = alloc Whole(0 - k) catch {
+			acc += 1000;
+			yield alloc Whole { m: 0 };
+		};
+		acc += part.n + heap.n + whole.m + local.m + bad.m;
+		delete(heap);
+		delete(whole);
+		delete(bad);
+		destroy(&local);
+		return acc;
+	}
+}
+
+fn in_loop(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		acc += turn;
+		let part = Part { n: k };
+		let heap = alloc Part { n: k + 1 };
+		let whole = alloc Whole(k + 2) catch fatal;
+		let local = Whole(k + 3) catch fatal;
+		let bad = alloc Whole(0 - k) catch {
+			acc += 1000;
+			yield alloc Whole { m: 0 };
+		};
+		acc += part.n + heap.n + whole.m + local.m + bad.m;
+		delete(heap);
+		delete(whole);
+		delete(bad);
+		destroy(&local);
+	}
+	return acc;
+}
+
+fn in_arm(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	switch k {
+		100 => acc = -5,
+		else => {
+			let part = Part { n: k };
+			let heap = alloc Part { n: k + 1 };
+			let whole = alloc Whole(k + 2) catch fatal;
+			let local = Whole(k + 3) catch fatal;
+			let bad = alloc Whole(0 - k) catch {
+				acc += 1000;
+				yield alloc Whole { m: 0 };
+			};
+			acc += part.n + heap.n + whole.m + local.m + bad.m;
+			delete(heap);
+			delete(whole);
+			delete(bad);
+			destroy(&local);
+		},
+	}
+	return acc;
+}
+
+fn hold(k: int) -> ?int
+{
+	if k < 0 {
+		return none;
+	}
+	return k;
+}
+
+fn in_if_let(e: *Env, start: int) -> int
+{
+	let acc = 0;
+	if let k = hold(start) {
+		let part = Part { n: k };
+		let heap = alloc Part { n: k + 1 };
+		let whole = alloc Whole(k + 2) catch fatal;
+		let local = Whole(k + 3) catch fatal;
+		let bad = alloc Whole(0 - k) catch {
+			acc += 1000;
+			yield alloc Whole { m: 0 };
+		};
+		acc += part.n + heap.n + whole.m + local.m + bad.m;
+		delete(heap);
+		delete(whole);
+		delete(bad);
+		destroy(&local);
+	} else {
+		acc = -9;
+	}
+	return acc;
+}
+
+fn in_defer(e: *Env, k: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let part = Part { n: k };
+		let heap = alloc Part { n: k + 1 };
+		let whole = alloc Whole(k + 2) catch fatal;
+		let local = Whole(k + 3) catch fatal;
+		let bad = alloc Whole(0 - k) catch {
+			acc += 1000;
+			yield alloc Whole { m: 0 };
+		};
+		acc += part.n + heap.n + whole.m + local.m + bad.m;
+		delete(heap);
+		delete(whole);
+		delete(bad);
+	}
+	acc = 1;
+}
+
+fn in_undo(e: *Env, k: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let part = Part { n: k };
+		let heap = alloc Part { n: k + 1 };
+		let whole = alloc Whole(k + 2) catch fatal;
+		let local = Whole(k + 3) catch fatal;
+		let bad = alloc Whole(0 - k) catch {
+			acc += 1000;
+			yield alloc Whole { m: 0 };
+		};
+		acc += part.n + heap.n + whole.m + local.m + bad.m;
+		delete(heap);
+		delete(whole);
+		delete(bad);
+	}
+	acc = 2;
+	fail "undone";
+}
+
+fn always() may fail
+{
+	fail "always";
+}
+
+fn in_catch(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	always() catch {
+		let part = Part { n: k };
+		let heap = alloc Part { n: k + 1 };
+		let whole = alloc Whole(k + 2) catch fatal;
+		let local = Whole(k + 3) catch fatal;
+		let bad = alloc Whole(0 - k) catch {
+			acc += 1000;
+			yield alloc Whole { m: 0 };
+		};
+		acc += part.n + heap.n + whole.m + local.m + bad.m;
+		delete(heap);
+		delete(whole);
+		delete(bad);
+		destroy(&local);
+	};
+	return acc;
+}
+
+fn apply(n: int, f: fn(int))
+{
+	f(n);
+}
+
+fn in_closure(e: *Env, start: int) -> int
+{
+	let acc = 0;
+	apply(start, fn(k) {
+		let part = Part { n: k };
+		let heap = alloc Part { n: k + 1 };
+		let whole = alloc Whole(k + 2) catch fatal;
+		let local = Whole(k + 3) catch fatal;
+		let bad = alloc Whole(0 - k) catch {
+			acc += 1000;
+			yield alloc Whole { m: 0 };
+		};
+		acc += part.n + heap.n + whole.m + local.m + bad.m;
+		delete(heap);
+		delete(whole);
+		delete(bad);
+		destroy(&local);
+	});
+	return acc;
+}
+
+worker fn in_worker(t: *Task) -> int
+{
+	let e = t.env else {
+		return -9;
+	};
+	let k = t.n;
+	let acc = 0;
+	let part = Part { n: k };
+	let local = Whole(k + 3) catch fatal;
+	let bad = Whole(0 - k) catch {
+		acc += 1000;
+		yield Whole { m: 0 };
+	};
+	acc += part.n + local.m + bad.m;
+	return acc;
+}
+
+fn run_worker(e: *Env, k: int) -> int
+{
+	e.task.n = k;
+	let job = dispatch e.task -> in_worker;
+	let got = join(job);
+
+	return got;
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch(e: *Env, start: int) -> int
+{
+	e.task.n = start;
+	let job = dispatch e.task -> work(fn(k) {
+		let acc = 0;
+		let part = Part { n: k };
+		let heap = alloc Part { n: k + 1 };
+		let whole = alloc Whole(k + 2) catch fatal;
+		let local = Whole(k + 3) catch fatal;
+		let bad = alloc Whole(0 - k) catch {
+			acc += 1000;
+			yield alloc Whole { m: 0 };
+		};
+		acc += part.n + heap.n + whole.m + local.m + bad.m;
+		delete(heap);
+		delete(whole);
+		delete(bad);
+		destroy(&local);
+		return acc;
+	});
+	return join(job);
+}
+
+fn in_sync(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	sync e.lock {
+		let part = Part { n: k };
+		let heap = alloc Part { n: k + 1 };
+		let whole = alloc Whole(k + 2) catch fatal;
+		let local = Whole(k + 3) catch fatal;
+		let bad = alloc Whole(0 - k) catch {
+			acc += 1000;
+			yield alloc Whole { m: 0 };
+		};
+		acc += part.n + heap.n + whole.m + local.m + bad.m;
+		delete(heap);
+		delete(whole);
+		delete(bad);
+		destroy(&local);
+	}
+	return acc;
+}
+
+fn in_select(e: *Env, start: int) -> int
+{
+	let acc = 0;
+	send(e.gate, start);
+	select {
+		e.gate x => {
+			let v = x else {
+				return -9;
+			};
+			let k = *v;
+			let part = Part { n: k };
+			let heap = alloc Part { n: k + 1 };
+			let whole = alloc Whole(k + 2) catch fatal;
+			let local = Whole(k + 3) catch fatal;
+			let bad = alloc Whole(0 - k) catch {
+				acc += 1000;
+				yield alloc Whole { m: 0 };
+			};
+			acc += part.n + heap.n + whole.m + local.m + bad.m;
+			delete(heap);
+			delete(whole);
+			delete(bad);
+			destroy(&local);
+		},
+	}
+	return acc;
+}
+
+fn in_generic<T>(e: *Env, k: int) -> int
+{
+	let acc = size_of(T) as int * 10000;
+	let part = Part { n: k };
+	let heap = alloc Part { n: k + 1 };
+	let whole = alloc Whole(k + 2) catch fatal;
+	let local = Whole(k + 3) catch fatal;
+	let bad = alloc Whole(0 - k) catch {
+		acc += 1000;
+		yield alloc Whole { m: 0 };
+	};
+	acc += part.n + heap.n + whole.m + local.m + bad.m;
+	delete(heap);
+	delete(whole);
+	delete(bad);
+	destroy(&local);
+	return acc;
+}
+
+class Outer
+{
+	class Inner
+	{
+		pub base: int = 0,
+
+		pub fn run(self, e: *Env, k: int) -> int
+		{
+			let acc = self.base;
+			let part = Part { n: k };
+			let heap = alloc Part { n: k + 1 };
+			let whole = alloc Whole(k + 2) catch fatal;
+			let local = Whole(k + 3) catch fatal;
+			let bad = alloc Whole(0 - k) catch {
+				acc += 1000;
+				yield alloc Whole { m: 0 };
+			};
+			acc += part.n + heap.n + whole.m + local.m + bad.m;
+			delete(heap);
+			delete(whole);
+			delete(bad);
+			destroy(&local);
+			return acc;
+		}
+	}
+
+	pub fn go(self, e: *Env, k: int) -> int
+	{
+		let inner = Inner { base: 0 };
+		return inner.run(e, k);
+	}
+}
+
+fn main() -> int
+{
+
+	let task = alloc Task { };
+	let e = alloc Env { lock: Mutex.new(), gate: chan int(1), task: task };
+	task.env = e;
+	let host = Host { base: 0 };
+	let outer = Outer { };
+	for k in 1..3 {
+		printf("function %d %d\n".ptr, k as c_int, in_function(e, k) as c_int);
+		printf("method %d %d\n".ptr, k as c_int, host.in_method(e, k) as c_int);
+		printf("loop %d %d\n".ptr, k as c_int, in_loop(e, k) as c_int);
+		printf("arm %d %d\n".ptr, k as c_int, in_arm(e, k) as c_int);
+		printf("if_let %d %d\n".ptr, k as c_int, in_if_let(e, k) as c_int);
+		let deferred = 0;
+		in_defer(e, k, &deferred);
+		printf("defer %d %d\n".ptr, k as c_int, deferred as c_int);
+		let undone = 0;
+		in_undo(e, k, &undone) catch {
+			yield;
+		};
+		printf("undo %d %d\n".ptr, k as c_int, undone as c_int);
+		printf("catch %d %d\n".ptr, k as c_int, in_catch(e, k) as c_int);
+		printf("closure %d %d\n".ptr, k as c_int, in_closure(e, k) as c_int);
+		printf("worker %d %d\n".ptr, k as c_int, run_worker(e, k) as c_int);
+		printf("dispatch %d %d\n".ptr, k as c_int, in_dispatch(e, k) as c_int);
+		printf("sync %d %d\n".ptr, k as c_int, in_sync(e, k) as c_int);
+		printf("select %d %d\n".ptr, k as c_int, in_select(e, k) as c_int);
+		printf("generic %d %d\n".ptr, k as c_int, in_generic<i32>(e, k) as c_int);
+		printf("nested %d %d\n".ptr, k as c_int, outer.go(e, k) as c_int);
+	}
+	printf("parts %d %d\n".ptr, Tally.parts_made.load() as c_int, Tally.parts_gone.load() as c_int);
+	printf("wholes %d %d\n".ptr, Tally.wholes_made.load() as c_int, Tally.wholes_gone.load() as c_int);
+	delete(e.gate);
+	free(e);
+	delete(task);
+	return 0;
+}

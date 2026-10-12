@@ -1,0 +1,32 @@
+exit 0
+function 1 15
+method 1 15
+loop 1 31
+arm 1 15
+if_let 1 15
+defer 1 16
+undo 1 17
+catch 1 15
+closure 1 15
+worker 1 15
+dispatch 1 15
+sync 1 15
+select 1 15
+generic 1 40015
+nested 1 15
+function 2 18
+method 2 18
+loop 2 37
+arm 2 18
+if_let 2 18
+defer 2 19
+undo 2 20
+catch 2 18
+closure 2 18
+worker 2 18
+dispatch 2 18
+sync 2 18
+select 2 18
+generic 2 40018
+nested 2 18
+total 48

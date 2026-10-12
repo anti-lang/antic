@@ -1,0 +1,655 @@
+//! A generic function with a hook as its constraint, one with a named
+//! constraint and one that may fail, a generic class with `N: int` and a nested
+//! type, a generic variant and a generic interface, in each of these places:
+//! function, method, loop body, switch arm, if let, defer, undo, catch handler,
+//! closure, worker, dispatch or parallel, sync block, select arm, generic body,
+//! nested type. Each place is a function of its own, and the program prints one
+//! line per place and input. Every copy is one of `int`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+	pub env: ?*Env = none,
+}
+
+struct Env
+{
+	lock: Mutex,
+	gate: chan int,
+	task: *Task,
+}
+
+constraint Summable = add;
+
+fn larger<T: lt>(own a: T, own b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+fn total<T: Summable>(items: []T, own zero: T) -> T
+{
+	let sum = zero;
+	for x in items {
+		sum = sum + x;
+	}
+	return sum;
+}
+
+fn checked<T: lt>(own v: T, own least: T) -> T may fail
+{
+	if v < least {
+		fail "too small";
+	}
+	return v;
+}
+
+class Stack<T, N: int>
+{
+	struct Slot
+	{
+		value: T,
+		at: int,
+	}
+
+	items: [N]T,
+	pub count: int = 0,
+
+	fn construct(self, fill: T)
+	{
+		self.items = [fill; N];
+	}
+
+	fn slot(self) -> Slot
+	{
+		return Slot { value: dup(self.items[self.count - 1]), at: self.count - 1 };
+	}
+
+	pub fn push(self, v: T)
+	{
+		self.items[self.count] = dup(v);
+		self.count += 1;
+	}
+
+	pub fn top(self) -> T
+	{
+		return self.slot().value;
+	}
+
+	pub fn room(self) -> int
+	{
+		return N - self.count;
+	}
+}
+
+variant Maybe<T>
+{
+	Some { value: T },
+	Nothing,
+}
+
+abstract class Source<T>
+{
+	abstract fn next(self) -> T;
+}
+
+class Steps inherits Source<int>
+{
+	pub at: int = 0,
+
+	concrete fn next(self) -> int
+	{
+		self.at += 1;
+		return self.at;
+	}
+}
+
+fn drain<T: add>(source: *Source<T>, turns: int, own start: T) -> T
+{
+	let sum = start;
+	for turn in 0..turns {
+		sum = sum + source.next();
+	}
+	return sum;
+}
+
+fn in_function(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	let big = larger<int>(k, 3);
+	let numbers = [k, 2, 3];
+	let sum = total<int>(numbers[0..3], 0);
+	let fits = checked<int>(k, 0) catch {
+		yield 0 - 1;
+	};
+	let low = checked<int>(k, 100) catch {
+		yield 0 - 1;
+	};
+	let stack = Stack<int, 4>(0);
+	stack.push(k);
+	stack.push(k + 1);
+	let maybe = Maybe<int>.Some { value: k };
+	let got = 0;
+	switch maybe {
+		Some s => got = s.value,
+		Nothing => got = 0 - 1,
+	}
+	let steps = Steps { };
+	let drained = drain<int>(&steps, 3, 0);
+	acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+	return acc;
+}
+
+class Host
+{
+	pub base: int = 0,
+
+	pub fn in_method(self, e: *Env, k: int) -> int
+	{
+		let acc = self.base;
+		let big = larger<int>(k, 3);
+		let numbers = [k, 2, 3];
+		let sum = total<int>(numbers[0..3], 0);
+		let fits = checked<int>(k, 0) catch {
+			yield 0 - 1;
+		};
+		let low = checked<int>(k, 100) catch {
+			yield 0 - 1;
+		};
+		let stack = Stack<int, 4>(0);
+		stack.push(k);
+		stack.push(k + 1);
+		let maybe = Maybe<int>.Some { value: k };
+		let got = 0;
+		switch maybe {
+			Some s => got = s.value,
+			Nothing => got = 0 - 1,
+		}
+		let steps = Steps { };
+		let drained = drain<int>(&steps, 3, 0);
+		acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+		return acc;
+	}
+}
+
+fn in_loop(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		acc += turn;
+		let big = larger<int>(k, 3);
+		let numbers = [k, 2, 3];
+		let sum = total<int>(numbers[0..3], 0);
+		let fits = checked<int>(k, 0) catch {
+			yield 0 - 1;
+		};
+		let low = checked<int>(k, 100) catch {
+			yield 0 - 1;
+		};
+		let stack = Stack<int, 4>(0);
+		stack.push(k);
+		stack.push(k + 1);
+		let maybe = Maybe<int>.Some { value: k };
+		let got = 0;
+		switch maybe {
+			Some s => got = s.value,
+			Nothing => got = 0 - 1,
+		}
+		let steps = Steps { };
+		let drained = drain<int>(&steps, 3, 0);
+		acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+	}
+	return acc;
+}
+
+fn in_arm(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	switch k {
+		100 => acc = -5,
+		else => {
+			let big = larger<int>(k, 3);
+			let numbers = [k, 2, 3];
+			let sum = total<int>(numbers[0..3], 0);
+			let fits = checked<int>(k, 0) catch {
+				yield 0 - 1;
+			};
+			let low = checked<int>(k, 100) catch {
+				yield 0 - 1;
+			};
+			let stack = Stack<int, 4>(0);
+			stack.push(k);
+			stack.push(k + 1);
+			let maybe = Maybe<int>.Some { value: k };
+			let got = 0;
+			switch maybe {
+				Some s => got = s.value,
+				Nothing => got = 0 - 1,
+			}
+			let steps = Steps { };
+			let drained = drain<int>(&steps, 3, 0);
+			acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+		},
+	}
+	return acc;
+}
+
+fn hold(k: int) -> ?int
+{
+	if k < 0 {
+		return none;
+	}
+	return k;
+}
+
+fn in_if_let(e: *Env, start: int) -> int
+{
+	let acc = 0;
+	if let k = hold(start) {
+		let big = larger<int>(k, 3);
+		let numbers = [k, 2, 3];
+		let sum = total<int>(numbers[0..3], 0);
+		let fits = checked<int>(k, 0) catch {
+			yield 0 - 1;
+		};
+		let low = checked<int>(k, 100) catch {
+			yield 0 - 1;
+		};
+		let stack = Stack<int, 4>(0);
+		stack.push(k);
+		stack.push(k + 1);
+		let maybe = Maybe<int>.Some { value: k };
+		let got = 0;
+		switch maybe {
+			Some s => got = s.value,
+			Nothing => got = 0 - 1,
+		}
+		let steps = Steps { };
+		let drained = drain<int>(&steps, 3, 0);
+		acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+	} else {
+		acc = -9;
+	}
+	return acc;
+}
+
+fn in_defer(e: *Env, k: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let big = larger<int>(k, 3);
+		let numbers = [k, 2, 3];
+		let sum = total<int>(numbers[0..3], 0);
+		let fits = checked<int>(k, 0) catch {
+			yield 0 - 1;
+		};
+		let low = checked<int>(k, 100) catch {
+			yield 0 - 1;
+		};
+		let stack = Stack<int, 4>(0);
+		stack.push(k);
+		stack.push(k + 1);
+		let maybe = Maybe<int>.Some { value: k };
+		let got = 0;
+		switch maybe {
+			Some s => got = s.value,
+			Nothing => got = 0 - 1,
+		}
+		let steps = Steps { };
+		let drained = drain<int>(&steps, 3, 0);
+		acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+	}
+	acc = 1;
+}
+
+fn in_undo(e: *Env, k: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let big = larger<int>(k, 3);
+		let numbers = [k, 2, 3];
+		let sum = total<int>(numbers[0..3], 0);
+		let fits = checked<int>(k, 0) catch {
+			yield 0 - 1;
+		};
+		let low = checked<int>(k, 100) catch {
+			yield 0 - 1;
+		};
+		let stack = Stack<int, 4>(0);
+		stack.push(k);
+		stack.push(k + 1);
+		let maybe = Maybe<int>.Some { value: k };
+		let got = 0;
+		switch maybe {
+			Some s => got = s.value,
+			Nothing => got = 0 - 1,
+		}
+		let steps = Steps { };
+		let drained = drain<int>(&steps, 3, 0);
+		acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+	}
+	acc = 2;
+	fail "undone";
+}
+
+fn always() may fail
+{
+	fail "always";
+}
+
+fn in_catch(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	always() catch {
+		let big = larger<int>(k, 3);
+		let numbers = [k, 2, 3];
+		let sum = total<int>(numbers[0..3], 0);
+		let fits = checked<int>(k, 0) catch {
+			yield 0 - 1;
+		};
+		let low = checked<int>(k, 100) catch {
+			yield 0 - 1;
+		};
+		let stack = Stack<int, 4>(0);
+		stack.push(k);
+		stack.push(k + 1);
+		let maybe = Maybe<int>.Some { value: k };
+		let got = 0;
+		switch maybe {
+			Some s => got = s.value,
+			Nothing => got = 0 - 1,
+		}
+		let steps = Steps { };
+		let drained = drain<int>(&steps, 3, 0);
+		acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+	};
+	return acc;
+}
+
+fn apply(n: int, f: fn(int))
+{
+	f(n);
+}
+
+fn in_closure(e: *Env, start: int) -> int
+{
+	let acc = 0;
+	apply(start, fn(k) {
+		let big = larger<int>(k, 3);
+		let numbers = [k, 2, 3];
+		let sum = total<int>(numbers[0..3], 0);
+		let fits = checked<int>(k, 0) catch {
+			yield 0 - 1;
+		};
+		let low = checked<int>(k, 100) catch {
+			yield 0 - 1;
+		};
+		let stack = Stack<int, 4>(0);
+		stack.push(k);
+		stack.push(k + 1);
+		let maybe = Maybe<int>.Some { value: k };
+		let got = 0;
+		switch maybe {
+			Some s => got = s.value,
+			Nothing => got = 0 - 1,
+		}
+		let steps = Steps { };
+		let drained = drain<int>(&steps, 3, 0);
+		acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+	});
+	return acc;
+}
+
+worker fn in_worker(t: *Task) -> int
+{
+	let e = t.env else {
+		return -9;
+	};
+	let k = t.n;
+	let acc = 0;
+	let big = larger<int>(k, 3);
+	let numbers = [k, 2, 3];
+	let sum = total<int>(numbers[0..3], 0);
+	let fits = checked<int>(k, 0) catch {
+		yield 0 - 1;
+	};
+	let low = checked<int>(k, 100) catch {
+		yield 0 - 1;
+	};
+	let stack = Stack<int, 4>(0);
+	stack.push(k);
+	stack.push(k + 1);
+	let maybe = Maybe<int>.Some { value: k };
+	let got = 0;
+	switch maybe {
+		Some s => got = s.value,
+		Nothing => got = 0 - 1,
+	}
+	let steps = Steps { };
+	let drained = drain<int>(&steps, 3, 0);
+	acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+	return acc;
+}
+
+fn run_worker(e: *Env, k: int) -> int
+{
+	e.task.n = k;
+	let job = dispatch e.task -> in_worker;
+	let got = join(job);
+
+	return got;
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch(e: *Env, start: int) -> int
+{
+	e.task.n = start;
+	let job = dispatch e.task -> work(fn(k) {
+		let acc = 0;
+		let big = larger<int>(k, 3);
+		let numbers = [k, 2, 3];
+		let sum = total<int>(numbers[0..3], 0);
+		let fits = checked<int>(k, 0) catch {
+			yield 0 - 1;
+		};
+		let low = checked<int>(k, 100) catch {
+			yield 0 - 1;
+		};
+		let stack = Stack<int, 4>(0);
+		stack.push(k);
+		stack.push(k + 1);
+		let maybe = Maybe<int>.Some { value: k };
+		let got = 0;
+		switch maybe {
+			Some s => got = s.value,
+			Nothing => got = 0 - 1,
+		}
+		let steps = Steps { };
+		let drained = drain<int>(&steps, 3, 0);
+		acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+		return acc;
+	});
+	return join(job);
+}
+
+fn in_sync(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	sync e.lock {
+		let big = larger<int>(k, 3);
+		let numbers = [k, 2, 3];
+		let sum = total<int>(numbers[0..3], 0);
+		let fits = checked<int>(k, 0) catch {
+			yield 0 - 1;
+		};
+		let low = checked<int>(k, 100) catch {
+			yield 0 - 1;
+		};
+		let stack = Stack<int, 4>(0);
+		stack.push(k);
+		stack.push(k + 1);
+		let maybe = Maybe<int>.Some { value: k };
+		let got = 0;
+		switch maybe {
+			Some s => got = s.value,
+			Nothing => got = 0 - 1,
+		}
+		let steps = Steps { };
+		let drained = drain<int>(&steps, 3, 0);
+		acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+	}
+	return acc;
+}
+
+fn in_select(e: *Env, start: int) -> int
+{
+	let acc = 0;
+	send(e.gate, start);
+	select {
+		e.gate x => {
+			let v = x else {
+				return -9;
+			};
+			let k = *v;
+			let big = larger<int>(k, 3);
+			let numbers = [k, 2, 3];
+			let sum = total<int>(numbers[0..3], 0);
+			let fits = checked<int>(k, 0) catch {
+				yield 0 - 1;
+			};
+			let low = checked<int>(k, 100) catch {
+				yield 0 - 1;
+			};
+			let stack = Stack<int, 4>(0);
+			stack.push(k);
+			stack.push(k + 1);
+			let maybe = Maybe<int>.Some { value: k };
+			let got = 0;
+			switch maybe {
+				Some s => got = s.value,
+				Nothing => got = 0 - 1,
+			}
+			let steps = Steps { };
+			let drained = drain<int>(&steps, 3, 0);
+			acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+		},
+	}
+	return acc;
+}
+
+fn in_generic<T>(e: *Env, k: int) -> int
+{
+	let acc = size_of(T) as int * 10000;
+	let big = larger<int>(k, 3);
+	let numbers = [k, 2, 3];
+	let sum = total<int>(numbers[0..3], 0);
+	let fits = checked<int>(k, 0) catch {
+		yield 0 - 1;
+	};
+	let low = checked<int>(k, 100) catch {
+		yield 0 - 1;
+	};
+	let stack = Stack<int, 4>(0);
+	stack.push(k);
+	stack.push(k + 1);
+	let maybe = Maybe<int>.Some { value: k };
+	let got = 0;
+	switch maybe {
+		Some s => got = s.value,
+		Nothing => got = 0 - 1,
+	}
+	let steps = Steps { };
+	let drained = drain<int>(&steps, 3, 0);
+	acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+	return acc;
+}
+
+class Outer
+{
+	class Inner
+	{
+		pub base: int = 0,
+
+		pub fn run(self, e: *Env, k: int) -> int
+		{
+			let acc = self.base;
+			let big = larger<int>(k, 3);
+			let numbers = [k, 2, 3];
+			let sum = total<int>(numbers[0..3], 0);
+			let fits = checked<int>(k, 0) catch {
+				yield 0 - 1;
+			};
+			let low = checked<int>(k, 100) catch {
+				yield 0 - 1;
+			};
+			let stack = Stack<int, 4>(0);
+			stack.push(k);
+			stack.push(k + 1);
+			let maybe = Maybe<int>.Some { value: k };
+			let got = 0;
+			switch maybe {
+				Some s => got = s.value,
+				Nothing => got = 0 - 1,
+			}
+			let steps = Steps { };
+			let drained = drain<int>(&steps, 3, 0);
+			acc += big + sum + fits + low + stack.top() + stack.room() + got + drained;
+			return acc;
+		}
+	}
+
+	pub fn go(self, e: *Env, k: int) -> int
+	{
+		let inner = Inner { base: 0 };
+		return inner.run(e, k);
+	}
+}
+
+fn main() -> int
+{
+
+	let task = alloc Task { };
+	let e = alloc Env { lock: Mutex.new(), gate: chan int(1), task: task };
+	task.env = e;
+	let host = Host { base: 0 };
+	let outer = Outer { };
+	for k in 1..3 {
+		printf("function %d %d\n".ptr, k as c_int, in_function(e, k) as c_int);
+		printf("method %d %d\n".ptr, k as c_int, host.in_method(e, k) as c_int);
+		printf("loop %d %d\n".ptr, k as c_int, in_loop(e, k) as c_int);
+		printf("arm %d %d\n".ptr, k as c_int, in_arm(e, k) as c_int);
+		printf("if_let %d %d\n".ptr, k as c_int, in_if_let(e, k) as c_int);
+		let deferred = 0;
+		in_defer(e, k, &deferred);
+		printf("defer %d %d\n".ptr, k as c_int, deferred as c_int);
+		let undone = 0;
+		in_undo(e, k, &undone) catch {
+			yield;
+		};
+		printf("undo %d %d\n".ptr, k as c_int, undone as c_int);
+		printf("catch %d %d\n".ptr, k as c_int, in_catch(e, k) as c_int);
+		printf("closure %d %d\n".ptr, k as c_int, in_closure(e, k) as c_int);
+		printf("worker %d %d\n".ptr, k as c_int, run_worker(e, k) as c_int);
+		printf("dispatch %d %d\n".ptr, k as c_int, in_dispatch(e, k) as c_int);
+		printf("sync %d %d\n".ptr, k as c_int, in_sync(e, k) as c_int);
+		printf("select %d %d\n".ptr, k as c_int, in_select(e, k) as c_int);
+		printf("generic %d %d\n".ptr, k as c_int, in_generic<i32>(e, k) as c_int);
+		printf("nested %d %d\n".ptr, k as c_int, outer.go(e, k) as c_int);
+	}
+	delete(e.gate);
+	free(e);
+	delete(task);
+	return 0;
+}

@@ -1,0 +1,59 @@
+//! Calls the functions of the library `com.example.classes`, which hold the
+//! constructs of the classes area. It then reaches the members of the classes
+//! of the library from here, and declares a class that inherits one of them and
+//! a class that implements another. A class is built with arguments under its
+//! own name, which a direct import brings.
+
+import anti.lang;
+import com.example.classes.{Cell, Whole};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Triangle inherits classes.Shape
+{
+	concrete fn area(self) -> int
+	{
+		return self.side * 3;
+	}
+}
+
+class Tag
+{
+	implements nm: classes.Named,
+
+	concrete fn name(self) -> int
+	{
+		return 5;
+	}
+}
+
+fn main() -> int
+{
+	printf("calls %d %d\n".ptr, classes.lib_calls(1) as c_int, classes.generic_calls<i16>(2, 7) as c_int);
+	printf("objects %d %d\n".ptr, classes.lib_objects(1) as c_int, classes.generic_objects<i16>(2, 7) as c_int);
+	printf("conversions %d %d\n".ptr, classes.lib_conversions(1) as c_int, classes.generic_conversions<i16>(2, 7) as c_int);
+	printf("statics %d %d\n".ptr, classes.lib_statics(1) as c_int, classes.generic_statics<i16>(2, 7) as c_int);
+	printf("operators %d %d\n".ptr, classes.lib_operators(1) as c_int, classes.generic_operators<i16>(2, 7) as c_int);
+	printf("generics %d %d\n".ptr, classes.lib_generics(1) as c_int, classes.generic_generics<i16>(2, 7) as c_int);
+	printf("root %d %d\n".ptr, classes.lib_root(1) as c_int, classes.generic_root<i16>(2, 7) as c_int);
+	let triangle = Triangle { side: 4 };
+	let tag = Tag { };
+	printf("inherits %d %d\n".ptr, classes.measure(&triangle) as c_int, classes.label(&tag) as c_int);
+	let both = classes.Both { };
+	let reader: *classes.Reader = &both;
+	let writer: *classes.Writer = &both;
+	printf("qualified %d %d\n".ptr, reader.read() as c_int, writer.read() as c_int);
+	let sealed = classes.Sealed { n: 6 };
+	printf("final %d\n".ptr, sealed.get() as c_int);
+	printf("static %d\n".ptr, classes.Counter.step(2) as c_int);
+	printf("singleton %d\n".ptr, classes.Settings.get().base as c_int);
+	let sum = classes.Vec { x: 1, y: 2 } + classes.Vec { x: 3, y: 4 };
+	let price = classes.Money { cents: 3 } + classes.Money { cents: 4 };
+	printf("operators %d %d %d\n".ptr, sum.x as c_int, sum.y as c_int, price.cents as c_int);
+	let cell = Cell<int, 2>(8);
+	let whole = alloc Whole(3) catch fatal;
+	printf("construct %d %d %d\n".ptr, cell.first() as c_int, cell.room() as c_int, whole.m as c_int);
+	delete(whole);
+	printf("generic %d\n".ptr, classes.larger<int>(3, 9) as c_int);
+	return 0;
+}

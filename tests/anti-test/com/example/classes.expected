@@ -1,0 +1,15 @@
+ok com.example.classes.calls_in_fixtures
+ok com.example.classes.calls_in_tests
+ok com.example.classes.objects_in_fixtures
+ok com.example.classes.objects_in_tests
+ok com.example.classes.conversions_in_fixtures
+ok com.example.classes.conversions_in_tests
+ok com.example.classes.statics_in_fixtures
+ok com.example.classes.statics_in_tests
+ok com.example.classes.operators_in_fixtures
+ok com.example.classes.operators_in_tests
+ok com.example.classes.generics_in_fixtures
+ok com.example.classes.generics_in_tests
+ok com.example.classes.root_in_fixtures
+ok com.example.classes.root_in_tests
+anti test: 14 tests in 1 modules, 0 modules failed

@@ -1,0 +1,582 @@
+//! An `operator fn` of a struct at module level and of a class in its body, the
+//! comparisons that `eq` and `lt` give, the default `==` of a struct and of a
+//! class value, and `hash`, in each of these places: function, method, loop
+//! body, switch arm, if let, defer, undo, catch handler, closure, worker,
+//! dispatch or parallel, sync block, select arm, generic body, nested type.
+//! Each place is a function of its own, and the program prints one line per
+//! place and input. `!=` is the opposite of `eq`, `>` swaps the operands of
+//! `lt`, and `<=` and `>=` derive from it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+	pub env: ?*Env = none,
+}
+
+struct Env
+{
+	lock: Mutex,
+	gate: chan int,
+	task: *Task,
+}
+
+struct Vec
+{
+	x: int,
+	y: int,
+}
+
+operator fn add(a: Vec, b: Vec) -> Vec
+{
+	return Vec { x: a.x + b.x, y: a.y + b.y };
+}
+
+operator fn neg(a: Vec) -> Vec
+{
+	return Vec { x: 0 - a.x, y: 0 - a.y };
+}
+
+operator fn lt(a: Vec, b: Vec) -> bool
+{
+	return a.x + a.y < b.x + b.y;
+}
+
+class Money
+{
+	pub cents: int = 0,
+
+	operator fn add(self, other: Money) -> Money
+	{
+		return Money { cents: self.cents + other.cents };
+	}
+
+	operator fn mul(self, times: int) -> Money
+	{
+		return Money { cents: self.cents * times };
+	}
+
+	operator fn eq(self, other: Money) -> bool
+	{
+		return self.cents / 10 == other.cents / 10;
+	}
+
+	operator fn lt(self, other: Money) -> bool
+	{
+		return self.cents < other.cents;
+	}
+}
+
+class Plain
+{
+	pub a: int = 0,
+	pub b: int = 0,
+}
+
+fn in_function(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+	let back = -vec;
+	let twice = 2;
+	let m = Money { cents: k } + Money { cents: 5 } * twice;
+	acc += vec.x + m.cents - back.y;
+	let above = vec > back;
+	let below = back <= vec;
+	let near = Money { cents: 31 } == Money { cents: 30 + k };
+	let far = Money { cents: 31 } != Money { cents: 41 };
+	let more = m >= Money { cents: k };
+	let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+	let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+	let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+	let called = m.add(m).cents == 2 * m.cents;
+	for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+		if flag {
+			acc += 1000 << i;
+		}
+	}
+	return acc;
+}
+
+class Host
+{
+	pub base: int = 0,
+
+	pub fn in_method(self, e: *Env, k: int) -> int
+	{
+		let acc = self.base;
+		let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+		let back = -vec;
+		let twice = 2;
+		let m = Money { cents: k } + Money { cents: 5 } * twice;
+		acc += vec.x + m.cents - back.y;
+		let above = vec > back;
+		let below = back <= vec;
+		let near = Money { cents: 31 } == Money { cents: 30 + k };
+		let far = Money { cents: 31 } != Money { cents: 41 };
+		let more = m >= Money { cents: k };
+		let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+		let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+		let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+		let called = m.add(m).cents == 2 * m.cents;
+		for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+			if flag {
+				acc += 1000 << i;
+			}
+		}
+		return acc;
+	}
+}
+
+fn in_loop(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		acc += turn;
+		let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+		let back = -vec;
+		let twice = 2;
+		let m = Money { cents: k } + Money { cents: 5 } * twice;
+		acc += vec.x + m.cents - back.y;
+		let above = vec > back;
+		let below = back <= vec;
+		let near = Money { cents: 31 } == Money { cents: 30 + k };
+		let far = Money { cents: 31 } != Money { cents: 41 };
+		let more = m >= Money { cents: k };
+		let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+		let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+		let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+		let called = m.add(m).cents == 2 * m.cents;
+		for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+			if flag {
+				acc += 1000 << i;
+			}
+		}
+	}
+	return acc;
+}
+
+fn in_arm(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	switch k {
+		100 => acc = -5,
+		else => {
+			let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+			let back = -vec;
+			let twice = 2;
+			let m = Money { cents: k } + Money { cents: 5 } * twice;
+			acc += vec.x + m.cents - back.y;
+			let above = vec > back;
+			let below = back <= vec;
+			let near = Money { cents: 31 } == Money { cents: 30 + k };
+			let far = Money { cents: 31 } != Money { cents: 41 };
+			let more = m >= Money { cents: k };
+			let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+			let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+			let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+			let called = m.add(m).cents == 2 * m.cents;
+			for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+				if flag {
+					acc += 1000 << i;
+				}
+			}
+		},
+	}
+	return acc;
+}
+
+fn hold(k: int) -> ?int
+{
+	if k < 0 {
+		return none;
+	}
+	return k;
+}
+
+fn in_if_let(e: *Env, start: int) -> int
+{
+	let acc = 0;
+	if let k = hold(start) {
+		let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+		let back = -vec;
+		let twice = 2;
+		let m = Money { cents: k } + Money { cents: 5 } * twice;
+		acc += vec.x + m.cents - back.y;
+		let above = vec > back;
+		let below = back <= vec;
+		let near = Money { cents: 31 } == Money { cents: 30 + k };
+		let far = Money { cents: 31 } != Money { cents: 41 };
+		let more = m >= Money { cents: k };
+		let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+		let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+		let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+		let called = m.add(m).cents == 2 * m.cents;
+		for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+			if flag {
+				acc += 1000 << i;
+			}
+		}
+	} else {
+		acc = -9;
+	}
+	return acc;
+}
+
+fn in_defer(e: *Env, k: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+		let back = -vec;
+		let twice = 2;
+		let m = Money { cents: k } + Money { cents: 5 } * twice;
+		acc += vec.x + m.cents - back.y;
+		let above = vec > back;
+		let below = back <= vec;
+		let near = Money { cents: 31 } == Money { cents: 30 + k };
+		let far = Money { cents: 31 } != Money { cents: 41 };
+		let more = m >= Money { cents: k };
+		let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+		let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+		let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+		let called = m.add(m).cents == 2 * m.cents;
+		for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+			if flag {
+				acc += 1000 << i;
+			}
+		}
+	}
+	acc = 1;
+}
+
+fn in_undo(e: *Env, k: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+		let back = -vec;
+		let twice = 2;
+		let m = Money { cents: k } + Money { cents: 5 } * twice;
+		acc += vec.x + m.cents - back.y;
+		let above = vec > back;
+		let below = back <= vec;
+		let near = Money { cents: 31 } == Money { cents: 30 + k };
+		let far = Money { cents: 31 } != Money { cents: 41 };
+		let more = m >= Money { cents: k };
+		let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+		let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+		let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+		let called = m.add(m).cents == 2 * m.cents;
+		for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+			if flag {
+				acc += 1000 << i;
+			}
+		}
+	}
+	acc = 2;
+	fail "undone";
+}
+
+fn always() may fail
+{
+	fail "always";
+}
+
+fn in_catch(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	always() catch {
+		let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+		let back = -vec;
+		let twice = 2;
+		let m = Money { cents: k } + Money { cents: 5 } * twice;
+		acc += vec.x + m.cents - back.y;
+		let above = vec > back;
+		let below = back <= vec;
+		let near = Money { cents: 31 } == Money { cents: 30 + k };
+		let far = Money { cents: 31 } != Money { cents: 41 };
+		let more = m >= Money { cents: k };
+		let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+		let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+		let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+		let called = m.add(m).cents == 2 * m.cents;
+		for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+			if flag {
+				acc += 1000 << i;
+			}
+		}
+	};
+	return acc;
+}
+
+fn apply(n: int, f: fn(int))
+{
+	f(n);
+}
+
+fn in_closure(e: *Env, start: int) -> int
+{
+	let acc = 0;
+	apply(start, fn(k) {
+		let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+		let back = -vec;
+		let twice = 2;
+		let m = Money { cents: k } + Money { cents: 5 } * twice;
+		acc += vec.x + m.cents - back.y;
+		let above = vec > back;
+		let below = back <= vec;
+		let near = Money { cents: 31 } == Money { cents: 30 + k };
+		let far = Money { cents: 31 } != Money { cents: 41 };
+		let more = m >= Money { cents: k };
+		let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+		let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+		let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+		let called = m.add(m).cents == 2 * m.cents;
+		for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+			if flag {
+				acc += 1000 << i;
+			}
+		}
+	});
+	return acc;
+}
+
+worker fn in_worker(t: *Task) -> int
+{
+	let e = t.env else {
+		return -9;
+	};
+	let k = t.n;
+	let acc = 0;
+	let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+	let back = -vec;
+	let twice = 2;
+	let m = Money { cents: k } + Money { cents: 5 } * twice;
+	acc += vec.x + m.cents - back.y;
+	let above = vec > back;
+	let below = back <= vec;
+	let near = Money { cents: 31 } == Money { cents: 30 + k };
+	let far = Money { cents: 31 } != Money { cents: 41 };
+	let more = m >= Money { cents: k };
+	let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+	let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+	let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+	let called = m.add(m).cents == 2 * m.cents;
+	for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+		if flag {
+			acc += 1000 << i;
+		}
+	}
+	return acc;
+}
+
+fn run_worker(e: *Env, k: int) -> int
+{
+	e.task.n = k;
+	let job = dispatch e.task -> in_worker;
+	let got = join(job);
+
+	return got;
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch(e: *Env, start: int) -> int
+{
+	e.task.n = start;
+	let job = dispatch e.task -> work(fn(k) {
+		let acc = 0;
+		let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+		let back = -vec;
+		let twice = 2;
+		let m = Money { cents: k } + Money { cents: 5 } * twice;
+		acc += vec.x + m.cents - back.y;
+		let above = vec > back;
+		let below = back <= vec;
+		let near = Money { cents: 31 } == Money { cents: 30 + k };
+		let far = Money { cents: 31 } != Money { cents: 41 };
+		let more = m >= Money { cents: k };
+		let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+		let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+		let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+		let called = m.add(m).cents == 2 * m.cents;
+		for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+			if flag {
+				acc += 1000 << i;
+			}
+		}
+		return acc;
+	});
+	return join(job);
+}
+
+fn in_sync(e: *Env, k: int) -> int
+{
+	let acc = 0;
+	sync e.lock {
+		let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+		let back = -vec;
+		let twice = 2;
+		let m = Money { cents: k } + Money { cents: 5 } * twice;
+		acc += vec.x + m.cents - back.y;
+		let above = vec > back;
+		let below = back <= vec;
+		let near = Money { cents: 31 } == Money { cents: 30 + k };
+		let far = Money { cents: 31 } != Money { cents: 41 };
+		let more = m >= Money { cents: k };
+		let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+		let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+		let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+		let called = m.add(m).cents == 2 * m.cents;
+		for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+			if flag {
+				acc += 1000 << i;
+			}
+		}
+	}
+	return acc;
+}
+
+fn in_select(e: *Env, start: int) -> int
+{
+	let acc = 0;
+	send(e.gate, start);
+	select {
+		e.gate x => {
+			let v = x else {
+				return -9;
+			};
+			let k = *v;
+			let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+			let back = -vec;
+			let twice = 2;
+			let m = Money { cents: k } + Money { cents: 5 } * twice;
+			acc += vec.x + m.cents - back.y;
+			let above = vec > back;
+			let below = back <= vec;
+			let near = Money { cents: 31 } == Money { cents: 30 + k };
+			let far = Money { cents: 31 } != Money { cents: 41 };
+			let more = m >= Money { cents: k };
+			let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+			let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+			let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+			let called = m.add(m).cents == 2 * m.cents;
+			for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+				if flag {
+					acc += 1000 << i;
+				}
+			}
+		},
+	}
+	return acc;
+}
+
+fn in_generic<T>(e: *Env, k: int) -> int
+{
+	let acc = size_of(T) as int * 10000;
+	let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+	let back = -vec;
+	let twice = 2;
+	let m = Money { cents: k } + Money { cents: 5 } * twice;
+	acc += vec.x + m.cents - back.y;
+	let above = vec > back;
+	let below = back <= vec;
+	let near = Money { cents: 31 } == Money { cents: 30 + k };
+	let far = Money { cents: 31 } != Money { cents: 41 };
+	let more = m >= Money { cents: k };
+	let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+	let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+	let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+	let called = m.add(m).cents == 2 * m.cents;
+	for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+		if flag {
+			acc += 1000 << i;
+		}
+	}
+	return acc;
+}
+
+class Outer
+{
+	class Inner
+	{
+		pub base: int = 0,
+
+		pub fn run(self, e: *Env, k: int) -> int
+		{
+			let acc = self.base;
+			let vec = Vec { x: k, y: 1 } + Vec { x: 1, y: k };
+			let back = -vec;
+			let twice = 2;
+			let m = Money { cents: k } + Money { cents: 5 } * twice;
+			acc += vec.x + m.cents - back.y;
+			let above = vec > back;
+			let below = back <= vec;
+			let near = Money { cents: 31 } == Money { cents: 30 + k };
+			let far = Money { cents: 31 } != Money { cents: 41 };
+			let more = m >= Money { cents: k };
+			let same = Plain { a: k, b: 2 } == Plain { a: k, b: 2 };
+			let other = Plain { a: k, b: 2 } != Plain { a: k, b: 3 };
+			let hashed = Vec { x: k, y: 2 }.hash() == Vec { x: k, y: 2 }.hash();
+			let called = m.add(m).cents == 2 * m.cents;
+			for i, flag in[above, below, near, far, more, same, other, hashed, called] {
+				if flag {
+					acc += 1000 << i;
+				}
+			}
+			return acc;
+		}
+	}
+
+	pub fn go(self, e: *Env, k: int) -> int
+	{
+		let inner = Inner { base: 0 };
+		return inner.run(e, k);
+	}
+}
+
+fn main() -> int
+{
+
+	let task = alloc Task { };
+	let e = alloc Env { lock: Mutex.new(), gate: chan int(1), task: task };
+	task.env = e;
+	let host = Host { base: 0 };
+	let outer = Outer { };
+	for k in 1..3 {
+		printf("function %d %d\n".ptr, k as c_int, in_function(e, k) as c_int);
+		printf("method %d %d\n".ptr, k as c_int, host.in_method(e, k) as c_int);
+		printf("loop %d %d\n".ptr, k as c_int, in_loop(e, k) as c_int);
+		printf("arm %d %d\n".ptr, k as c_int, in_arm(e, k) as c_int);
+		printf("if_let %d %d\n".ptr, k as c_int, in_if_let(e, k) as c_int);
+		let deferred = 0;
+		in_defer(e, k, &deferred);
+		printf("defer %d %d\n".ptr, k as c_int, deferred as c_int);
+		let undone = 0;
+		in_undo(e, k, &undone) catch {
+			yield;
+		};
+		printf("undo %d %d\n".ptr, k as c_int, undone as c_int);
+		printf("catch %d %d\n".ptr, k as c_int, in_catch(e, k) as c_int);
+		printf("closure %d %d\n".ptr, k as c_int, in_closure(e, k) as c_int);
+		printf("worker %d %d\n".ptr, k as c_int, run_worker(e, k) as c_int);
+		printf("dispatch %d %d\n".ptr, k as c_int, in_dispatch(e, k) as c_int);
+		printf("sync %d %d\n".ptr, k as c_int, in_sync(e, k) as c_int);
+		printf("select %d %d\n".ptr, k as c_int, in_select(e, k) as c_int);
+		printf("generic %d %d\n".ptr, k as c_int, in_generic<i32>(e, k) as c_int);
+		printf("nested %d %d\n".ptr, k as c_int, outer.go(e, k) as c_int);
+	}
+	delete(e.gate);
+	free(e);
+	delete(task);
+	return 0;
+}
