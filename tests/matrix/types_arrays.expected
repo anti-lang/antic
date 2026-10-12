@@ -1,0 +1,38 @@
+exit 0
+i8 10 2 30 5
+i16 10 2 30 5
+i32 10 2 30 5
+i64 10 2 30 5
+int 10 2 30 5
+u8 10 2 30 5
+u16 10 2 30 5
+u32 10 2 30 5
+u64 10 2 30 5
+uint 10 2 30 5
+byte 10 2 30 5
+f32 10 2.5 30 6
+f64 10 2.5 30 6
+f16 1.5 2.5 4 2.5
+bool 0 1 0 0
+char 100 98 122 100
+str 4 3 1 four
+slice 3 1 42 42
+pointer 1 112
+nullable pointer 115
+optional 1 5 -1
+function 15 6
+tuple 7 2 0
+struct 30 5 0 5
+argument 141 1 26 4
+result 21 10
+slice of an array and one element 99 2 6
+pointer to an array and to an element 26 99 13
+two levels 60 62 4 -1 2 3
+a row assigned 4 60 0
+three levels 70 6 14 8 48
+lengths 3 8 8 7 34 9
+constant parameter 6 9
+fields 9 22 2 50
+eq 1 0
+for 13 0
+other indices and holders 5 6 8

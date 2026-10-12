@@ -1,0 +1,21 @@
+exit 0
+nested packed struct 4209
+nested aligned struct 716
+nested enum over a base 271
+nested simd struct 2016
+nested packed class 4201
+nested generic struct 4528
+nested struct in an array 941
+as an array and as a struct 4 2 3 1
+array 5 14 18
+fields 10 48 19
+sizes 16 32 32 8 8 80
+mask 1 0 3
+one lane 4
+packed struct 38 4 36 36 5 8 8
+size 50
+optional 14
+case of a variant 8
+closure 3
+tuple 2
+hash 1 0

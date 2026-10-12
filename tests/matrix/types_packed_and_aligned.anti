@@ -1,0 +1,503 @@
+//! `packed` and `align(N)` on a struct, a union, a variant, a class and a
+//! generic struct. A packed struct puts a field of every kind at an odd offset,
+//! and each is read, written, passed and addressed there. An aligned type is
+//! checked by its size and by the address of a local, of an element, of a field
+//! and of memory from `alloc`. A line names its subject.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+// A field of each width at an odd offset: 1, 9, 11, 19, 23, 31 and 47.
+
+packed struct Odd
+{
+	tag: u8,
+	wide: u64,
+	mid: u16,
+	real: f64,
+	half: f32,
+	p: ?*int,
+	s: str,
+	xs: [3]i32,
+}
+
+fn read_wide(o: *Odd) -> u64
+{
+	return o.wide;
+}
+
+fn by_value(o: Odd) -> f64
+{
+	o.real += 1.0;
+	return o.real + o.half as f64;
+}
+
+fn sum(xs: *[3]i32) -> i32
+{
+	return (*xs)[0] + (*xs)[1] + (*xs)[2];
+}
+
+fn make(n: int) -> Odd
+{
+	return Odd {
+		tag: n as u8, wide: n as u64 * 3, mid: 7, real: 0.5,
+		half: 0.25, p: none, s: "abc", xs: [1, 2, 3]
+	};
+}
+
+fn make_or_fail(n: int) -> Odd may fail
+{
+	if n < 0 {
+		fail "negative";
+	}
+	return make(n);
+}
+
+fn nth<T>(xs: []T, i: int) -> T
+{
+	return xs[i];
+}
+
+fn loads_at_odd_offsets()
+{
+	let n = 5;
+	let o = Odd {
+		tag: 1, wide: 0x1122334455667788, mid: 0xBEEF, real: 2.5,
+		half: 1.5, p: &n, s: "hello", xs: [10, 20, 30]
+	};
+	printf("loads %d %llx %x %g %g %lld %lld %d\n".ptr, o.tag as c_int, o.wide,
+		o.mid as c_int, o.real, o.half as f64, *(o.p ?? &n), o.s.len, o.xs[1]);
+	printf("size %lld\n".ptr, size_of(Odd));
+	printf("through a pointer %llx\n".ptr, read_wide(&o));
+	printf("by value %g %g\n".ptr, by_value(o), o.real);
+	printf("array field by pointer %d\n".ptr, sum(&o.xs));
+	let q = &o.wide;
+	*q += 1;
+	let r = &o.real;
+	*r *= 2.0;
+	let h = &o.half;
+	*h += 0.25;
+	let m = &o.mid;
+	*m -= 0xBE00;
+	printf("address of a field %llx %g %g %x\n".ptr, o.wide, o.real,
+		o.half as f64, o.mid as c_int);
+	o.wide <<= 4;
+	o.mid += 1;
+	o.xs[2] -= 1;
+	o.p = none;
+	printf("writes %llx %x %d %d\n".ptr, o.wide, o.mid as c_int, o.xs[2],
+		(o.p == none) as c_int);
+}
+
+fn results_and_copies()
+{
+	let m = make(9);
+	printf("result %d %llu %lld %d\n".ptr, m.tag as c_int, m.wide, m.s.len,
+		m.xs[2]);
+	let c = m;
+	c.wide = 1;
+	printf("copy %llu %llu\n".ptr, m.wide, c.wide);
+	let arr: [3]Odd = [m, make(2), m];
+	let i = 1;
+	arr[i].wide += 5;
+	arr[i].xs[i] = 77;
+	arr[2].real = 8.0;
+	printf("array %llu %d %g %g %lld\n".ptr, arr[1].wide, arr[i].xs[1],
+		arr[2].real, arr[0].real, size_of([3]Odd));
+	for x in &arr {
+		x.mid += x.tag as u16;
+	}
+	printf("lent elements %d %d\n".ptr, arr[0].mid as c_int,
+		arr[1].mid as c_int);
+	let got = nth<Odd>(arr[0..3], 1);
+	printf("type argument %llu\n".ptr, got.wide);
+	let pair = (1 as u8, m);
+	pair.1.wide += 100;
+	printf("in a tuple %llu\n".ptr, pair.1.wide);
+	let maybe: ?Odd = m;
+	let nothing: ?Odd = none;
+	let n = 0;
+	if let v = maybe {
+		n = v.wide as int;
+	}
+	if nothing == none {
+		n += 1000;
+	}
+	printf("in an optional %lld\n".ptr, n);
+	let bump = fn() {
+		m.wide += 1;
+		m.real += 0.25;
+	};
+	bump();
+	bump();
+	printf("in a closure %llu %g\n".ptr, m.wide, m.real);
+}
+
+// A failing call that returns a packed struct writes into the place of the
+// assignment, which is a field at offset 1.
+
+struct Holder
+{
+	lead: u8,
+	odd: Odd,
+	over: Over,
+	po: PackedOver,
+}
+
+struct Over align(16)
+{
+	a: u8,
+}
+
+packed struct PackedOver align(4)
+{
+	a: u8,
+	b: u32,
+	c: u8,
+}
+
+fn failing_call_into_a_field()
+{
+	let h = Holder {
+		lead: 1, odd: make(1), over: Over { a: 2 },
+		po: PackedOver { a: 3, b: 4, c: 5 }
+	};
+	h.odd = make_or_fail(6) catch e {
+		yield make(0);
+	};
+	let first = h.odd.wide;
+	h.odd = make_or_fail(-1) catch e {
+		yield make(50);
+	};
+	printf("failing call into a field %llu %llu %d\n".ptr, first, h.odd.wide,
+		h.lead as c_int);
+	printf("sizes %lld %lld %lld\n".ptr, size_of(Holder), size_of(Over),
+		size_of(PackedOver));
+	h.po.b += 100;
+	let b = &h.po.b;
+	*b += 1000;
+	printf("packed and aligned %d %d %d\n".ptr, h.po.a as c_int, h.po.b,
+		h.po.c as c_int);
+}
+
+// A field of every other kind in a packed struct, each at an odd offset.
+
+struct Point
+{
+	x: i32,
+	y: i32,
+}
+
+enum Level: u32
+{
+	Low = 1,
+	High = 70000,
+}
+
+variant Shape
+{
+	Round { r: u64 },
+	Flat,
+}
+
+union Word
+{
+	whole: u32,
+	low: u8,
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+packed struct Kinds
+{
+	tag: u8,
+	c: chan int,
+	xs: []int,
+	f: fn(int) -> int,
+	o: ?int,
+	t: (u8, int),
+	e: Level,
+	v: Shape,
+	w: Word,
+	b: bool,
+	ch: char,
+	i: i16,
+	h: f16,
+	pt: Point,
+}
+
+fn kinds_at_odd_offsets()
+{
+	let data = [1, 2, 3];
+	let k = Kinds {
+		tag: 1, c: chan int(1), xs: data[0..3], f: twice, o: 5,
+		t: (1, 2), e: Level.High, v: Shape.Round { r: 9 }, w: Word { whole: 0x1FF },
+		b: true, ch: 'z', i: -300, h: 1.5 as f16, pt: Point { x: 3, y: 4 }
+	};
+	send(k.c, 4);
+	let v = recv(k.c) else {
+		return;
+	};
+	printf("channel %lld\n".ptr, *v);
+	delete(k.c);
+	printf("slice and function %lld %lld\n".ptr, k.xs[2], k.f(8));
+	let before = k.o ?? 0;
+	k.o = none;
+	printf("optional %lld %lld\n".ptr, before, k.o ?? 7);
+	k.t.1 += 40;
+	printf("tuple %d %lld\n".ptr, k.t.0 as c_int, k.t.1);
+	let n = 0;
+	switch k.e {
+		Level.Low => n = 1,
+		Level.High => n = 2,
+	}
+	printf("enum %lld %u\n".ptr, n, k.e as u32);
+	switch k.v {
+		Round r => n = r.r as int,
+		Flat => n = 0,
+	}
+	k.v = Shape.Flat;
+	printf("variant %lld %d\n".ptr, n, (k.v is Shape.Flat) as c_int);
+	k.w.low = 0;
+	printf("union %x\n".ptr, k.w.whole);
+	k.i -= 1;
+	k.pt.y += k.pt.x;
+	let y = &k.pt.y;
+	*y *= 2;
+	printf("scalars %d %u %d %g %d\n".ptr, k.b as c_int, k.ch as u32,
+		k.i as c_int, k.h as f64, k.pt.y);
+	printf("size %lld\n".ptr, size_of(Kinds));
+}
+
+// The address of a value of an aligned type, read as a number through a
+// union. `alloc` gives the memory of `malloc`, which is aligned to 16, so
+// the type it allocates asks for 16.
+
+union Address
+{
+	p: ?*byte,
+	n: u64,
+}
+
+struct Wide align(64)
+{
+	a: u8,
+}
+
+struct Inside
+{
+	lead: u8,
+	w: Wide,
+}
+
+fn at(p: ?*byte) -> int
+{
+	let a = Address { p: p };
+	return (a.n % 64) as int;
+}
+
+fn aligned_addresses()
+{
+	let l = Wide { a: 1 };
+	let pad: u8 = 3;
+	let m = Wide { a: pad };
+	let arr: [3]Wide = [l, m, l];
+	let i = 1;
+	let h = Inside { lead: 1, w: m };
+	printf("locals %lld %lld\n".ptr, at(&l as *byte), at(&m as *byte));
+	printf("element %lld %d\n".ptr, at(&arr[i] as *byte), arr[i].a as c_int);
+	printf("field %lld\n".ptr, at(&h.w as *byte));
+	let p = alloc(Over, 3) else {
+		return;
+	};
+	printf("alloc %lld\n".ptr, at(p as *byte) % 16);
+	free(p);
+	printf("sizes %lld %lld %lld\n".ptr, size_of(Wide), size_of([3]Wide),
+		size_of(Inside));
+}
+
+// An aligned struct inside a packed one stands at offset 1, and the packed
+// one inside a plain struct at offset 1 again.
+
+struct In align(8)
+{
+	a: u8,
+	b: u16,
+}
+
+packed struct Out
+{
+	lead: u8,
+	in: In,
+	tail: u32,
+}
+
+struct Norm
+{
+	lead: u8,
+	out: Out,
+	in: In,
+}
+
+fn aligned_in_packed()
+{
+	let n = Norm {
+		lead: 1, out: Out { lead: 2, in: In { a: 3, b: 4 }, tail: 5 },
+		in: In { a: 6, b: 7 }
+	};
+	let p = &n.out.in;
+	p.b += 100;
+	let q = &n.out.tail;
+	*q += 1000;
+	printf("aligned in packed %d %d %d\n".ptr, n.out.in.b as c_int, n.out.tail,
+		n.in.b as c_int);
+	printf("sizes %lld %lld %lld\n".ptr, size_of(In), size_of(Out), size_of(Norm));
+}
+
+// A class, a union and a variant take both words.
+
+packed class Tight
+{
+	pub a: u8,
+	pub b: u64,
+	pub c: u16,
+}
+
+class Spread align(32)
+{
+	pub a: u8,
+}
+
+packed union Bytes
+{
+	a: u8,
+	b: u32,
+	c: [5]u8,
+}
+
+union Sixteen align(16)
+{
+	a: u8,
+	b: u32,
+}
+
+packed variant Dense
+{
+	A { x: u64 },
+	B { y: u16, z: u32 },
+	C,
+}
+
+variant Loose align(16)
+{
+	A { x: u8 },
+	B,
+}
+
+struct HoldsDense
+{
+	lead: u8,
+	v: Dense,
+	w: Dense,
+}
+
+fn other_types()
+{
+	let t = Tight { a: 1, b: 2, c: 3 };
+	t.b += 40;
+	let b = &t.b;
+	*b += 100;
+	printf("packed class %llu %d %lld\n".ptr, t.b, t.c as c_int, size_of(Tight));
+	let s = Spread { a: 4 };
+	printf("aligned class %d %lld %lld\n".ptr, s.a as c_int,
+		at(&s as *byte) % 32, size_of(Spread));
+	let u = Bytes { b: 0x01020304 };
+	u.c[4] = 9;
+	printf("packed union %d %d %lld\n".ptr, u.a as c_int, u.c[4] as c_int,
+		size_of(Bytes));
+	let x = Sixteen { b: 0x0506 };
+	printf("aligned union %d %lld %lld\n".ptr, x.a as c_int,
+		at(&x as *byte) % 16, size_of(Sixteen));
+	let h = HoldsDense {
+		lead: 1, v: Dense.A { x: 0x1122334455667788 },
+		w: Dense.B { y: 7, z: 9 }
+	};
+	let n = 0;
+	switch h.v {
+		A a => n = (a.x & 0xFF) as int,
+		B b => n = 1,
+		C => n = 2,
+	}
+	switch h.w {
+		A a => n += 100,
+		B b => n += b.z as int * 1000 + b.y as int * 100000,
+		C => n += 2,
+	}
+	printf("packed variant %lld %lld %lld\n".ptr, n, size_of(Dense),
+		size_of(HoldsDense));
+	let l = Loose.A { x: 3 };
+	printf("aligned variant %d %lld %lld\n".ptr, (l is Loose.A) as c_int,
+		at(&l as *byte) % 16, size_of(Loose));
+}
+
+// A generic struct, an alignment the fields give already, one below a field
+// of a packed struct, and one from a constant expression.
+
+struct Raised<T> align(16)
+{
+	v: T,
+}
+
+packed struct Pressed<T>
+{
+	a: u8,
+	v: T,
+}
+
+struct Four align(4)
+{
+	a: u32,
+}
+
+packed struct Two align(2)
+{
+	a: u32,
+	b: u8,
+}
+
+const HALF: int = 4;
+
+struct Eight align(HALF * 2)
+{
+	a: u8,
+}
+
+fn other_alignments()
+{
+	let g = Raised<u8> { v: 1 };
+	let p = Pressed<u64> { a: 1, v: 99 };
+	let r = &p.v;
+	*r += 1;
+	printf("generic %d %llu %lld %lld %lld\n".ptr, g.v as c_int, p.v,
+		size_of(Raised<u8>), size_of(Pressed<u64>), size_of(Pressed<u16>));
+	printf("alignment the fields give %lld\n".ptr, size_of(Four));
+	printf("packed below a field %lld\n".ptr, size_of(Two));
+	printf("constant expression %lld\n".ptr, size_of(Eight));
+}
+
+fn main() -> int
+{
+	loads_at_odd_offsets();
+	results_and_copies();
+	failing_call_into_a_field();
+	kinds_at_odd_offsets();
+	aligned_addresses();
+	aligned_in_packed();
+	other_types();
+	other_alignments();
+	return 0;
+}

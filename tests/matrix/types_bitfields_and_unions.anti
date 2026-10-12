@@ -1,0 +1,382 @@
+//! Bitfields in a struct, in a packed struct and in a union, and unions of
+//! every kind of field. A bitfield is read, written and changed by a compound
+//! assignment at each width and sign, and where another rule meets it: a
+//! failing call, the flags form, a closure, a lent element, `==` and the hash.
+//! A union reads the bytes of one field through another. Every target of Anti
+//! stores the low byte first. A line names its subject.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Bits
+{
+	a: u8 : 3,
+	b: u8 : 5,
+	c: u16 : 9,
+	d: i32 : 31,
+	e: u64 : 64,
+	f: u64 : 33,
+	g: i64 : 40,
+	h: i8 : 1,
+	plain: u8,
+	i: u32 : 1,
+	_: u32 : 0,
+	j: u32 : 7,
+}
+
+fn show(name: str, b: *Bits)
+{
+	printf("%s %d %d %d %d %llu %llu %lld %d %d %u %u\n".ptr, name.ptr,
+		b.a as c_int, b.b as c_int, b.c as c_int, b.d, b.e, b.f, b.g,
+		b.h as c_int, b.plain as c_int, b.i, b.j);
+}
+
+fn write_all(b: *Bits, n: int)
+{
+	b.a = (n & 7) as u8;
+	b.b = (n & 31) as u8;
+	b.c = (n * 37 & 511) as u16;
+	b.d = (0 - n) as i32;
+	b.e = 0xFFFFFFFFFFFFFFFF;
+	b.f = (n as u64) << 20;
+	b.g = 0 - (n << 30);
+	b.h = -1;
+	b.plain = 200;
+	b.i = 1;
+	b.j = 100;
+}
+
+fn fields_of_a_struct()
+{
+	let n = 29;
+	let b = Bits {
+		a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 0, plain: 8,
+		i: 0, j: 9
+	};
+	show("literal", &b);
+	write_all(&b, n);
+	show("writes", &b);
+	b.a += 1;
+	b.d -= 5;
+	b.g *= 2;
+	b.c <<= 1;
+	b.f |= 1;
+	b.h = 0;
+	b.j ^= 0x7F;
+	b.e /= 3;
+	show("compound assignments", &b);
+}
+
+// A packed struct puts a bitfield across the bytes of its neighbours.
+
+packed struct PackedBits
+{
+	lead: u8,
+	a: u32 : 20,
+	b: u64 : 57,
+	c: i16 : 11,
+}
+
+fn fields_of_a_packed_struct()
+{
+	let n = 29;
+	let p = PackedBits { lead: 9, a: 0xFFFFF, b: 0x1FFFFFFFFFFFFFF, c: -1024 };
+	printf("packed literal %d %x %llx %d\n".ptr, p.lead as c_int, p.a, p.b,
+		p.c as c_int);
+	p.a = (n * 1000) as u32;
+	p.b -= 1;
+	p.c += 2047;
+	printf("packed writes %d %x %llx %d\n".ptr, p.lead as c_int, p.a, p.b,
+		p.c as c_int);
+}
+
+// Every bitfield of a union starts at bit 0.
+
+union UnionBits
+{
+	whole: u32,
+	low: u32 : 4,
+	mid: u32 : 12,
+	sign: i32 : 8,
+}
+
+fn fields_of_a_union()
+{
+	let u = UnionBits { whole: 0x12345FAB };
+	printf("union reads %x %x %d\n".ptr, u.low, u.mid, u.sign);
+	u.mid = 0xFFF;
+	u.sign = -2;
+	printf("union writes %x\n".ptr, u.whole);
+}
+
+// A width is a constant expression, and `_` breaks the unit.
+
+const WIDTH: int = 3;
+
+struct Computed
+{
+	a: u8 : WIDTH + 1,
+	b: u8 : 8 - WIDTH - 1,
+}
+
+struct Broken
+{
+	_: u32 : 0,
+	a: u8 : 3,
+	_: u16 : 0,
+	_: u32 : 0,
+	b: u8 : 2,
+}
+
+fn widths_and_breaks()
+{
+	let c = Computed { a: 15, b: 9 };
+	printf("constant widths %d %d %lld\n".ptr, c.a as c_int, c.b as c_int,
+		size_of(Computed));
+	let b = Broken { a: 5, b: 2 };
+	b.b += 1;
+	printf("unit breaks %d %d\n".ptr, b.a as c_int, b.b as c_int);
+}
+
+// A value that does not fit the width keeps its low bits, in a literal, in a
+// write and in a compound assignment. The wrapping and the saturating forms
+// compute in the type of the field and then keep the low bits.
+
+struct Narrow
+{
+	a: u8 : 3,
+	b: i8 : 3,
+}
+
+fn values_past_the_width()
+{
+	let n = 13;
+	let x = Narrow { a: 0, b: 0 };
+	x.a = n as u8;
+	x.b = n as i8;
+	printf("write past the width %d %d\n".ptr, x.a as c_int, x.b as c_int);
+	let y = Narrow { a: 9, b: 0 };
+	y.b = 7;
+	printf("literal past the width %d %d\n".ptr, y.a as c_int, y.b as c_int);
+	let z = Narrow { a: 7, b: 3 };
+	z.a += 1;
+	z.b += 1;
+	printf("compound past the width %d %d\n".ptr, z.a as c_int, z.b as c_int);
+	let w = Narrow { a: 7, b: 3 };
+	w.a +%= 1;
+	w.b +|= 100;
+	printf("wrapping and saturating %d %d\n".ptr, w.a as c_int, w.b as c_int);
+}
+
+// Where another rule meets a bitfield.
+
+struct Mixed
+{
+	a: u8 : 3,
+	b: u16 : 12,
+	c: u8,
+	d: i32 : 20,
+}
+
+fn tripled(n: int) -> i32 may fail
+{
+	if n < 0 {
+		fail "negative";
+	}
+	return (n * 3) as i32;
+}
+
+fn other_rules()
+{
+	let m = Mixed { a: 1, b: 2, c: 3, d: 4 };
+	m.d = tripled(5) catch e {
+		yield 0;
+	};
+	let first = m.d;
+	m.d = tripled(-1) catch e {
+		yield -7;
+	};
+	printf("failing call %d %d %d %d\n".ptr, first, m.d, m.a as c_int,
+		m.b as c_int);
+	let lo = Mixed { a: 7, b: 31, c: 250, d: 0 };
+	let (r, f) = lo.c + lo.a;
+	let (r2, f2) = lo.a + lo.a;
+	printf("flags form %d %d %d %d\n".ptr, r as c_int, f.carry as c_int,
+		r2 as c_int, f2.carry as c_int);
+	let ms: [3]Mixed = [Mixed { a: 1, b: 10, c: 0, d: 0 },
+		Mixed { a: 2, b: 20, c: 0, d: 0 }, Mixed { a: 3, b: 30, c: 0, d: 0 }];
+	for x in &ms {
+		x.b += x.a as u16;
+	}
+	let i = 2;
+	ms[i].d -= 9;
+	printf("lent elements %d %d %d %d\n".ptr, ms[0].b as c_int,
+		ms[1].b as c_int, ms[2].b as c_int, ms[i].d);
+	let k = Mixed { a: 4, b: 40, c: 0, d: 0 };
+	let bump = fn() {
+		k.a += 1;
+		k.b *= 2;
+	};
+	bump();
+	bump();
+	printf("closure %d %d\n".ptr, k.a as c_int, k.b as c_int);
+	let x = Mixed { a: 1, b: 10, c: 5, d: -6 };
+	let y = Mixed { a: 1, b: 10, c: 5, d: -6 };
+	let z = Mixed { a: 1, b: 11, c: 5, d: -6 };
+	printf("eq and hash %d %d %d %d\n".ptr, (x == y) as c_int,
+		(x == z) as c_int, (x.hash() == y.hash()) as c_int,
+		(x.hash() == z.hash()) as c_int);
+	let n = 0;
+	switch k.a {
+		6 => n = 1,
+		else => n = 2,
+	}
+	let o: ?u16 = k.b;
+	printf("switch, in and optional %lld %d %lld\n".ptr, n,
+		(k.a in 4..7) as c_int, (o ?? 0) as int);
+}
+
+// A union of every kind of field.
+
+struct Point
+{
+	x: i32,
+	y: i32,
+}
+
+enum Kind: u16
+{
+	A = 1,
+	B = 0x1234,
+}
+
+union Any
+{
+	i: i64,
+	u: u64,
+	f: f64,
+	g: f32,
+	b: [8]u8,
+	p: ?*int,
+	s: Point,
+	k: Kind,
+	c: char,
+	t: bool,
+	o: (u16, u16),
+	h: u16,
+}
+
+fn whole(u: Any) -> u64
+{
+	return u.u;
+}
+
+fn of_float(f: f64) -> Any
+{
+	return Any { f: f };
+}
+
+fn set_low(u: *Any, v: u16)
+{
+	u.h = v;
+}
+
+fn unions_of_every_kind()
+{
+	let u = Any { f: 1.0 };
+	printf("float as bytes %llx %d %d\n".ptr, u.u, u.b[7] as c_int,
+		u.b[6] as c_int);
+	u.i = -2;
+	printf("integer as parts %llx %x %d %d\n".ptr, u.u, u.s.y, u.b[0] as c_int,
+		u.h as c_int);
+	u.s = Point { x: 0x1234, y: 7 };
+	printf("struct as scalars %lld %x %d %d %u\n".ptr, u.i, u.k as c_int,
+		u.o.0 as c_int, u.o.1 as c_int, u.c as u32);
+	u.b[1] = 0;
+	u.b[0] = 1;
+	printf("bytes as scalars %d %d\n".ptr, u.t as c_int, u.s.x);
+	printf("by value and as a result %llx %llx\n".ptr, whole(u),
+		whole(of_float(2.0)));
+	printf("size %lld\n".ptr, size_of(Any));
+	let us: [2]Any = [Any { u: 5 }, Any { g: 1.5 }];
+	let i = 1;
+	us[i].b[3] += 1;
+	set_low(&us[i], 0xFFFF);
+	printf("elements %llu %g\n".ptr, us[0].u, us[1].g as f64);
+	let n = 5;
+	let q = Any { p: &n };
+	if let at = q.p {
+		*at += 1;
+	}
+	printf("pointer field %lld\n".ptr, n);
+}
+
+union Small
+{
+	a: u8,
+	b: u32,
+}
+
+union Inner
+{
+	a: u8,
+	b: u16,
+}
+
+union Outer
+{
+	i: Inner,
+	w: u32,
+}
+
+union Full
+{
+	a: u64,
+	b: [8]u8,
+}
+
+struct Holds
+{
+	u: Outer,
+	n: int,
+}
+
+fn unions_in_other_types()
+{
+	let u = Small { b: 0x102 };
+	let o: ?Small = u;
+	let n = 0;
+	switch u.a {
+		2 => n = 1,
+		else => n = 5,
+	}
+	if let w = o {
+		n += w.b as int;
+	}
+	let t: (Small, int) = (u, 3);
+	printf("optional, tuple and switch %lld\n".ptr, n + t.0.a as int + t.1);
+	let s = Holds { u: Outer { w: 0x10203 }, n: 1 };
+	let copy = s;
+	copy.u.i.a = 9;
+	printf("union in a union %d %x %x\n".ptr, s.u.i.b as c_int, s.u.w,
+		copy.u.w);
+	let a = Full { a: 5 };
+	let b = Full { b: [5, 0, 0, 0, 0, 0, 0, 0] };
+	let c = Full { a: 6 };
+	printf("hash of the bytes %d %d\n".ptr, (a.hash() == b.hash()) as c_int,
+		(a.hash() == c.hash()) as c_int);
+}
+
+fn main() -> int
+{
+	fields_of_a_struct();
+	fields_of_a_packed_struct();
+	fields_of_a_union();
+	widths_and_breaks();
+	values_past_the_width();
+	other_rules();
+	unions_of_every_kind();
+	unions_in_other_types();
+	return 0;
+}

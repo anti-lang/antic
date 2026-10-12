@@ -1,0 +1,31 @@
+exit 0
+literal 1 2 3 4 5 6 7 0 8 0 9
+writes 5 29 49 -29 18446744073709551615 30408704 -31138512896 -1 200 1 100
+compound assignments 6 29 98 -34 6148914691236517205 30408705 -62277025792 0 200 1 27
+packed literal 9 fffff 1ffffffffffffff -1024
+packed writes 9 7148 1fffffffffffffe 1023
+union reads b fab -85
+union writes 12345ffe
+constant widths 15 9 1
+unit breaks 5 3
+write past the width 5 -3
+literal past the width 1 -1
+compound past the width 0 -4
+wrapping and saturating 0 -1
+failing call 15 -7 1 2
+flags form 1 1 14 0
+lent elements 11 22 33 -9
+closure 6 160
+eq and hash 1 0 1 0
+switch, in and optional 1 1 160
+float as bytes 3ff0000000000000 63 240
+integer as parts fffffffffffffffe ffffffff 254 65534
+struct as scalars 30064775732 1234 4660 0 4660
+bytes as scalars 1 1
+by value and as a result 700000001 4000000000000000
+size 8
+elements 5 6.03125
+pointer field 6
+optional, tuple and switch 264
+union in a union 515 10203 10209
+hash of the bytes 1 0

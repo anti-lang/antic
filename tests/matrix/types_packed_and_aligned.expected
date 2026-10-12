@@ -1,0 +1,45 @@
+exit 0
+loads 1 1122334455667788 beef 2.5 1.5 5 5 20
+size 59
+through a pointer 1122334455667788
+by value 5 2.5
+array field by pointer 60
+address of a field 1122334455667789 5 1.75 ef
+writes 1223344556677890 f0 29 1
+result 9 27 3 3
+copy 27 1
+array 11 77 8 0.5 177
+lent elements 16 9
+type argument 11
+in a tuple 127
+in an optional 1027
+in a closure 29 1
+failing call into a field 18 150 1
+sizes 96 16 8
+packed and aligned 3 1104 5
+channel 4
+slice and function 3 16
+optional 5 7
+tuple 1 42
+enum 2 70000
+variant 9 1
+union 100
+scalars 1 122 -301 1.5 14
+size 106
+locals 0 0
+element 0 3
+field 0
+alloc 0
+sizes 64 192 128
+aligned in packed 104 1005 7
+sizes 8 13 24
+packed class 142 3 19
+aligned class 4 0 32
+packed union 4 9 5
+aligned union 6 0 16
+packed variant 709136 9 19
+aligned variant 1 0 16
+generic 1 100 16 9 3
+alignment the fields give 4
+packed below a field 6
+constant expression 8

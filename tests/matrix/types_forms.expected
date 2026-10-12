@@ -1,0 +1,51 @@
+exit 0
+pointer alias 42
+nullable pointer alias 31
+optional alias 4 9
+slice alias 2 7
+array alias 13 3 24
+function alias 42
+tuple alias 5 4
+channel alias 7
+type arguments alias 9
+constant argument alias 4 32
+case named 11
+case pointer 2
+case nullable pointer -1 1
+case optional -2 8
+case slice 25
+case array 6
+case function 42
+case tuple 7
+case channel 5
+case type arguments 8
+case constant argument 9
+size_of pointer 8
+size_of slice 16
+size_of function 8
+size_of channel 8
+slice literal of nullable pointers 1
+slice literal of arrays 6
+slice literal of functions 8
+slice literal of tuples 2
+slice literal of channels 1
+slice literal of constant arguments 3
+slice literal of type arguments 6
+call nullable pointer 3
+call optional 5
+call array 3
+call channel 3
+alloc function 8
+alloc channel 6
+alloc type arguments 6
+alloc constant argument 2
+const nullable pointer 1
+const tuple 1 3
+const type arguments 3
+const constant argument 2
+result constant argument 8
+let channel 4
+keep fn parameter 4
+concurrent fn parameter 6
+keep fn in a function type 4
+concurrent fn in a function type 6

@@ -1,0 +1,417 @@
+//! Each form of type in the places of the area types that no test held: a
+//! `type` alias of the form, a case of a variant that holds it, `size_of`, a
+//! slice literal of it, a call that names it as a type argument, `alloc`, a
+//! `const` and a result. A line names the form and the place. `keep` and
+//! `concurrent` mark a parameter and a parameter of a function type.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+struct Box<T>
+{
+	v: T,
+}
+
+struct Buf<N: int>
+{
+	xs: [N]int,
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn nth<T>(xs: []T, i: int) -> T
+{
+	return xs[i];
+}
+
+// The aliases, one per form.
+
+type PointPtr = *Point;
+type MaybePoint = ?*Point;
+type MaybeInt = ?int;
+type Ints = []int;
+type Three = [3]int;
+type Pair = (int, str);
+type Pipe = chan int;
+type IntBox = Box<int>;
+type Buf4 = Buf<4>;
+
+fn alias_of_pointer()
+{
+	let p = Point { x: 1, y: 2 };
+	let q: PointPtr = &p;
+	q.y += 40;
+	printf("pointer alias %lld\n".ptr, p.y);
+}
+
+fn alias_of_nullable_pointer()
+{
+	let p = Point { x: 3, y: 4 };
+	let none_yet: MaybePoint = none;
+	let some: MaybePoint = &p;
+	let n = 0;
+	if none_yet == none {
+		n = 1;
+	}
+	if let q = some {
+		n += q.x * 10;
+	}
+	printf("nullable pointer alias %lld\n".ptr, n);
+}
+
+fn alias_of_optional()
+{
+	let some: MaybeInt = 4;
+	let nothing: MaybeInt = none;
+	printf("optional alias %lld %lld\n".ptr, some ?? 0, nothing ?? 9);
+}
+
+fn alias_of_slice()
+{
+	let xs = [5, 6, 7];
+	let s: Ints = xs[1..3];
+	printf("slice alias %lld %lld\n".ptr, s.len, s[1]);
+}
+
+fn alias_of_array()
+{
+	let xs: Three = [1, 2, 3];
+	let i = 2;
+	xs[i] += 10;
+	printf("array alias %lld %lld %lld\n".ptr, xs[2], xs.len, size_of(Three));
+}
+
+fn alias_of_function()
+{
+	let f: Op = twice;
+	printf("function alias %lld\n".ptr, f(21));
+}
+
+fn alias_of_tuple()
+{
+	let t: Pair = (5, "five");
+	printf("tuple alias %lld %lld\n".ptr, t.0, t.1.len);
+}
+
+fn alias_of_channel()
+{
+	let c: Pipe = chan int(1);
+	send(c, 7);
+	let v = recv(c) else {
+		return;
+	};
+	printf("channel alias %lld\n".ptr, *v);
+	delete(c);
+}
+
+fn alias_of_type_arguments()
+{
+	let b: IntBox = IntBox { v: 9 };
+	let c: Box<int> = b;
+	printf("type arguments alias %lld\n".ptr, c.v);
+}
+
+fn alias_of_constant_argument()
+{
+	let b: Buf4 = Buf4 { xs: [1, 2, 3, 4] };
+	printf("constant argument alias %lld %lld\n".ptr, b.xs[3], size_of(Buf4));
+}
+
+// A case of a variant that holds each form.
+
+variant Held
+{
+	Named { p: Point, k: int },
+	Pointer { p: *Point },
+	Nullable { p: ?*Point },
+	Optional { v: ?int },
+	Slice { s: []int },
+	Array { a: [3]int },
+	Function { f: fn(int) -> int },
+	Tuple { t: (int, str) },
+	Channel { c: chan int },
+	Arguments { b: Box<int> },
+	Constant { b: Buf<2> },
+}
+
+fn read(h: Held) -> int
+{
+	switch h {
+		Named n => {
+			return n.p.x + n.k;
+		},
+		Pointer p => {
+			return p.p.y;
+		},
+		Nullable m => {
+			if let q = m.p {
+				return q.x;
+			}
+			return -1;
+		},
+		Optional o => {
+			return o.v ?? -2;
+		},
+		Slice s => {
+			return s.s.len * 10 + s.s[1];
+		},
+		Array a => {
+			return a.a[2];
+		},
+		Function f => {
+			return f.f(21);
+		},
+		Tuple t => {
+			return t.t.0 + t.t.1.len;
+		},
+		Channel c => {
+			send(c.c, 5);
+			let r = recv(c.c) else {
+				return -3;
+			};
+			return *r;
+		},
+		Arguments g => {
+			return g.b.v;
+		},
+		Constant c => {
+			return c.b.xs[1];
+		},
+	}
+	return -9;
+}
+
+fn cases_of_a_variant()
+{
+	let p = Point { x: 1, y: 2 };
+	let xs = [4, 5, 6];
+	let c = chan int(1);
+	printf("case named %lld\n".ptr, read(Held.Named { p: p, k: 10 }));
+	printf("case pointer %lld\n".ptr, read(Held.Pointer { p: &p }));
+	printf("case nullable pointer %lld %lld\n".ptr,
+		read(Held.Nullable { p: none }), read(Held.Nullable { p: &p }));
+	printf("case optional %lld %lld\n".ptr, read(Held.Optional { v: none }),
+		read(Held.Optional { v: 8 }));
+	printf("case slice %lld\n".ptr, read(Held.Slice { s: xs[0..2] }));
+	printf("case array %lld\n".ptr, read(Held.Array { a: xs }));
+	printf("case function %lld\n".ptr, read(Held.Function { f: twice }));
+	printf("case tuple %lld\n".ptr, read(Held.Tuple { t: (3, "abcd") }));
+	printf("case channel %lld\n".ptr, read(Held.Channel { c: c }));
+	printf("case type arguments %lld\n".ptr,
+		read(Held.Arguments { b: Box<int> { v: 8 } }));
+	printf("case constant argument %lld\n".ptr,
+		read(Held.Constant { b: Buf<2> { xs: [1, 9] } }));
+	delete(c);
+}
+
+// `size_of` of a pointer, a slice and a function, which are a word, two
+// words and a word on every target.
+
+fn sizes()
+{
+	printf("size_of pointer %lld\n".ptr, size_of(*Point));
+	printf("size_of slice %lld\n".ptr, size_of([]int));
+	printf("size_of function %lld\n".ptr, size_of(fn(int) -> int));
+	printf("size_of channel %lld\n".ptr, size_of(chan int));
+}
+
+// A slice literal whose element is each form.
+
+fn slice_literals()
+{
+	let p = Point { x: 1, y: 2 };
+	let a: [2]?*Point = [&p, none];
+	let s1 = []?*Point { ptr: &a[0], len: 2 };
+	let b: [2][3]int = [[1, 2, 3], [4, 5, 6]];
+	let s2 = [][3]int { ptr: &b[0], len: 2 };
+	let c: [2] fn(int) -> int = [twice, twice];
+	let s3 = [] fn(int) -> int { ptr: &c[0], len: 2 };
+	let d: [2](int, str) = [(1, "a"), (2, "bc")];
+	let s4 = [](int, str) { ptr: &d[0], len: 2 };
+	let e: [1] chan int = [chan int(1)];
+	let s5 = [] chan int { ptr: &e[0], len: 1 };
+	let f: [2]Buf<2> = [Buf<2> { xs: [1, 2] }, Buf<2> { xs: [3, 4] }];
+	let s6 = []Buf<2> { ptr: &f[0], len: 2 };
+	let g: [2]Box<int> = [Box<int> { v: 5 }, Box<int> { v: 6 }];
+	let s7 = []Box<int> { ptr: &g[0], len: 2 };
+	let n = 0;
+	if s1[1] == none {
+		n = 1;
+	}
+	printf("slice literal of nullable pointers %lld\n".ptr, n);
+	printf("slice literal of arrays %lld\n".ptr, s2[1][2]);
+	printf("slice literal of functions %lld\n".ptr, s3[1](4));
+	printf("slice literal of tuples %lld\n".ptr, s4[1].1.len);
+	printf("slice literal of channels %lld\n".ptr, s5.len);
+	printf("slice literal of constant arguments %lld\n".ptr, s6[1].xs[0]);
+	printf("slice literal of type arguments %lld\n".ptr, s7[1].v);
+	delete(e[0]);
+}
+
+// A call that names each form as its type argument.
+
+fn calls()
+{
+	let p = Point { x: 1, y: 2 };
+	let q = Point { x: 3, y: 4 };
+	let points: [2]?*Point = [none, &q];
+	let m = nth<?*Point>(points[0..2], 1);
+	printf("call nullable pointer %lld\n".ptr, (m ?? &p).x);
+	let numbers: [2] ?int = [none, 5];
+	let o = nth<?int>(numbers[0..2], 1);
+	printf("call optional %lld\n".ptr, o ?? 0);
+	let rows: [2][3]int = [[1, 2, 3], [4, 5, 6]];
+	let a = nth<[3]int>(rows[0..2], 0);
+	printf("call array %lld\n".ptr, a[2]);
+	let pipes: [1] chan int = [chan int(1)];
+	let c = nth<chan int>(pipes[0..1], 0);
+	send(c, 3);
+	let got = recv(pipes[0]) else {
+		return;
+	};
+	printf("call channel %lld\n".ptr, *got);
+	delete(c);
+}
+
+// `alloc` of a function, a channel, a type with type arguments and one with a
+// constant argument.
+
+fn allocs()
+{
+	let a = alloc(fn(int) -> int, 2) else {
+		return;
+	};
+	*a = twice;
+	printf("alloc function %lld\n".ptr, (*a)(4));
+	free(a);
+	let b = alloc(chan int, 1) else {
+		return;
+	};
+	*b = chan int(1);
+	send(*b, 6);
+	let v = recv(*b) else {
+		return;
+	};
+	printf("alloc channel %lld\n".ptr, *v);
+	delete(*b);
+	free(b);
+	let c = alloc(Box<int>, 1) else {
+		return;
+	};
+	c.v = 6;
+	printf("alloc type arguments %lld\n".ptr, c.v);
+	free(c);
+	let d = alloc(Buf<2>, 1) else {
+		return;
+	};
+	d.xs = [1, 2];
+	printf("alloc constant argument %lld\n".ptr, d.xs[1]);
+	free(d);
+}
+
+// A constant of a nullable pointer, of a tuple, of a type with type arguments
+// and of one with a constant argument.
+
+const NOWHERE: ?*Point = none;
+const PAIR: (int, str) = (1, "one");
+const BOXED: Box<int> = Box<int> { v: 3 };
+const BUFFER: Buf<2> = Buf<2> { xs: [1, 2] };
+
+fn constants()
+{
+	let n = 0;
+	if NOWHERE == none {
+		n = 1;
+	}
+	printf("const nullable pointer %lld\n".ptr, n);
+	printf("const tuple %lld %lld\n".ptr, PAIR.0, PAIR.1.len);
+	printf("const type arguments %lld\n".ptr, BOXED.v);
+	printf("const constant argument %lld\n".ptr, BUFFER.xs[1]);
+}
+
+// A result whose type holds a constant argument, and a `let` of a channel.
+
+fn made() -> Buf<2>
+{
+	return Buf<2> { xs: [7, 8] };
+}
+
+fn results()
+{
+	printf("result constant argument %lld\n".ptr, made().xs[1]);
+	let c: chan int = chan int(2);
+	send(c, 4);
+	let v = recv(c) else {
+		return;
+	};
+	printf("let channel %lld\n".ptr, *v);
+	delete(c);
+}
+
+// `keep` and `concurrent` before a parameter, and before the `fn` of a
+// parameter of a function type.
+
+fn kept(keep f: fn(int) -> int) -> int
+{
+	return f(2);
+}
+
+fn shared(concurrent f: fn(int) -> int) -> int
+{
+	return f(3);
+}
+
+fn takes_kept(run: fn(keep fn(int) -> int) -> int) -> int
+{
+	return run(twice);
+}
+
+fn takes_shared(run: fn(concurrent fn(int) -> int) -> int) -> int
+{
+	return run(twice);
+}
+
+fn marks()
+{
+	printf("keep fn parameter %lld\n".ptr, kept(twice));
+	printf("concurrent fn parameter %lld\n".ptr, shared(twice));
+	printf("keep fn in a function type %lld\n".ptr, takes_kept(kept));
+	printf("concurrent fn in a function type %lld\n".ptr, takes_shared(shared));
+}
+
+fn main() -> int
+{
+	alias_of_pointer();
+	alias_of_nullable_pointer();
+	alias_of_optional();
+	alias_of_slice();
+	alias_of_array();
+	alias_of_function();
+	alias_of_tuple();
+	alias_of_channel();
+	alias_of_type_arguments();
+	alias_of_constant_argument();
+	cases_of_a_variant();
+	sizes();
+	slice_literals();
+	calls();
+	allocs();
+	constants();
+	results();
+	marks();
+	return 0;
+}
+
+// The alias of a function type stands last in the file. `anti fmt` reads the
+// `fn` of such an alias as the start of a function and moves what follows
+// it, which is finding T025 of docs/audit/tests-findings.md.
+
+type Op = fn(int) -> int;

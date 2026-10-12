@@ -1,0 +1,49 @@
+exit 0
+no values 0 1 2
+u8 1 2 255
+i8 -128 -127 0 127
+u64 1 18446744073709551615
+i64 -9223372036854775807 9223372036854775807
+one number twice 3 3 4 1
+a value below the one before 5 2 3
+constant expressions 20 161 162
+base by an alias 300 2
+base c_long 1
+constant declared later 7 8
+value of another enum 6 7
+sizes 4 1 1 8 8 2 24 4
+switch 10 20 30
+switch with else 1 2
+switch on one number twice 1 1 3
+as an index 20 30
+elements 1 1
+optional 105
+tuple 1
+hash 1 0
+type argument 1 0
+fields 1 2 18446744073709551615 -128
+defaults 1 2
+constants 1 2
+to an enum 1 1 1 1
+from an enum 2 255 255 1
+arm binds a copy 100 12
+arm without a binding 2
+if let 42
+if let chain 142
+is and tag 1 0 1
+through a pointer 7 1 1
+another case assigned 0 2
+variant changed in its arm 16 2
+fallthrough 105 100 9
+eq, hash and tag 1 1 1 1 1 1
+case that points to its variant 3 0
+empty braces 2
+one case 5 16
+cases without fields 2 1
+elements 51
+optional 1
+variant in a case 18
+field 42 1
+result of a call 3 1
+256 cases 255 0 2
+sizes 24 40 40

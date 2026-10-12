@@ -1,0 +1,527 @@
+//! Enums with and without values, over every base, and variants with every
+//! pattern on them. An enum is read by `as`, compared, taken by `switch` and
+//! held by every type that can hold one. A variant is taken by an arm that
+//! binds its case, by one that does not, by `else`, by `if let`, by `is` and by
+//! its `tag`. A line names its subject.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+enum Plain
+{
+	A,
+	B,
+	C,
+}
+
+enum Small: u8
+{
+	Lo = 1,
+	Mid,
+	Hi = 255,
+}
+
+enum Signed: i8
+{
+	Neg = -128,
+	Next,
+	Zero = 0,
+	Max = 127,
+}
+
+enum Big: u64
+{
+	One = 1,
+	Top = 0xFFFFFFFFFFFFFFFF,
+}
+
+enum Long: i64
+{
+	Least = -9223372036854775807,
+	Most = 9223372036854775807,
+}
+
+enum Dup
+{
+	X = 3,
+	Y = 3,
+	Z,
+}
+
+enum Back
+{
+	P = 5,
+	Q = 2,
+	R,
+}
+
+const BASE: u16 = 10;
+
+enum Calc: u16
+{
+	First = BASE * 2,
+	Second = BASE << 4 | 1,
+	Third,
+}
+
+type Base = u16;
+
+enum Aliased: Base
+{
+	A,
+	B = 300,
+}
+
+enum CLong: c_long
+{
+	A,
+	B,
+}
+
+enum Later
+{
+	A = LATER,
+	B,
+}
+
+const LATER: i32 = 7;
+
+enum Derived
+{
+	Y = Back.P as i32 + 1,
+	Z,
+}
+
+enum Nothing
+{
+}
+
+struct Hold
+{
+	a: Small,
+	b: Plain,
+	c: Big,
+	d: Signed,
+}
+
+fn values_and_bases()
+{
+	printf("no values %d %d %d\n".ptr, Plain.A as c_int, Plain.B as c_int,
+		Plain.C as c_int);
+	printf("u8 %d %d %d\n".ptr, Small.Lo as c_int, Small.Mid as c_int,
+		Small.Hi as c_int);
+	printf("i8 %d %d %d %d\n".ptr, Signed.Neg as i8 as c_int,
+		Signed.Next as i8 as c_int, Signed.Zero as i8 as c_int,
+		Signed.Max as i8 as c_int);
+	printf("u64 %llu %llu\n".ptr, Big.One as u64, Big.Top as u64);
+	printf("i64 %lld %lld\n".ptr, Long.Least as i64, Long.Most as i64);
+	printf("one number twice %d %d %d %d\n".ptr, Dup.X as c_int,
+		Dup.Y as c_int, Dup.Z as c_int, (Dup.X == Dup.Y) as c_int);
+	printf("a value below the one before %d %d %d\n".ptr, Back.P as c_int,
+		Back.Q as c_int, Back.R as c_int);
+	printf("constant expressions %d %d %d\n".ptr, Calc.First as c_int,
+		Calc.Second as c_int, Calc.Third as c_int);
+	printf("base by an alias %d %lld\n".ptr, Aliased.B as c_int,
+		size_of(Aliased));
+	printf("base c_long %d\n".ptr, CLong.B as c_int);
+	printf("constant declared later %d %d\n".ptr, Later.A as c_int,
+		Later.B as c_int);
+	printf("value of another enum %d %d\n".ptr, Derived.Y as c_int,
+		Derived.Z as c_int);
+	printf("sizes %lld %lld %lld %lld %lld %lld %lld %lld\n".ptr,
+		size_of(Plain), size_of(Small), size_of(Signed), size_of(Big),
+		size_of(Long), size_of(Calc), size_of(Hold), size_of(Nothing));
+}
+
+fn name_of(p: Plain) -> int
+{
+	switch p {
+		Plain.A => {
+			return 10;
+		},
+		Plain.B => {
+			return 20;
+		},
+		Plain.C => {
+			return 30;
+		},
+	}
+	return -1;
+}
+
+fn name_or_else(s: Small) -> int
+{
+	let n = 0;
+	switch s {
+		Small.Hi => n = 1,
+		else => n = 2,
+	}
+	return n;
+}
+
+// One arm takes both names of the number 3.
+
+fn name_of_dup(d: Dup) -> int
+{
+	switch d {
+		Dup.X => {
+			return 1;
+		},
+		Dup.Z => {
+			return 3;
+		},
+	}
+	return 0;
+}
+
+fn same<T: eq>(a: T, b: T) -> bool
+{
+	return a == b;
+}
+
+class Config
+{
+	pub level: Small = Small.Mid,
+}
+
+fn picked(p: Plain = Plain.B) -> int
+{
+	return p as int;
+}
+
+const CHOSEN: Small = Small.Mid;
+const COUNT: int = Plain.C as int;
+
+struct Sized
+{
+	s: Small,
+	xs: [COUNT]int,
+}
+
+fn enums_in_use()
+{
+	printf("switch %lld %lld %lld\n".ptr, name_of(Plain.A), name_of(Plain.B),
+		name_of(Plain.C));
+	printf("switch with else %lld %lld\n".ptr, name_or_else(Small.Hi),
+		name_or_else(Small.Lo));
+	printf("switch on one number twice %lld %lld %lld\n".ptr,
+		name_of_dup(Dup.X), name_of_dup(Dup.Y), name_of_dup(Dup.Z));
+	let names: [3]int = [10, 20, 30];
+	let ps: [3]Plain = [Plain.C, Plain.A, Plain.B];
+	let i = 2;
+	printf("as an index %lld %lld\n".ptr, names[ps[i] as int],
+		names[Plain.C as int]);
+	ps[i] = Plain.C;
+	printf("elements %d %d\n".ptr, (ps[0] == ps[2]) as c_int,
+		(ps[1] != ps[2]) as c_int);
+	let o: ?Plain = ps[1];
+	let none_yet: ?Plain = none;
+	let n = 0;
+	if let p = o {
+		n = p as int + 5;
+	}
+	if none_yet == none {
+		n += 100;
+	}
+	printf("optional %lld\n".ptr, n);
+	let t = (Plain.B, 5);
+	printf("tuple %d\n".ptr, (t.0 == Plain.B) as c_int);
+	printf("hash %d %d\n".ptr, (ps[0].hash() == Plain.C.hash()) as c_int,
+		(Plain.A.hash() == Plain.B.hash()) as c_int);
+	printf("type argument %d %d\n".ptr, same<Plain>(Plain.A, Plain.A) as c_int,
+		same(Plain.B, Plain.C) as c_int);
+	let h = Hold { a: Small.Hi, b: Plain.B, c: Big.Top, d: Signed.Neg };
+	h.a = Small.Lo;
+	let field = &h.b;
+	*field = Plain.C;
+	printf("fields %d %d %llu %d\n".ptr, h.a as c_int, h.b as c_int,
+		h.c as u64, h.d as i8 as c_int);
+	let c = Config { };
+	printf("defaults %lld %d\n".ptr, picked(), c.level as c_int);
+	let s = Sized { s: CHOSEN, xs: [1, 2] };
+	printf("constants %d %lld\n".ptr, (s.s == Small.Mid) as c_int, s.xs.len);
+}
+
+fn conversions()
+{
+	let n = 2;
+	let from_int = n as Plain;
+	let x = 1.7;
+	let from_float = x as Plain;
+	let from_small = Small.Mid as Plain;
+	let wide = 255 as u8;
+	let hi = wide as Small;
+	printf("to an enum %d %d %d %d\n".ptr, (from_int == Plain.C) as c_int,
+		(from_float == Plain.B) as c_int, (from_small == Plain.C) as c_int,
+		(hi == Small.Hi) as c_int);
+	printf("from an enum %g %d %u %lld\n".ptr, Plain.C as f64,
+		Small.Hi as u8 as c_int, Small.Hi as u32, Plain.B as int);
+}
+
+// Variants.
+
+variant Shape
+{
+	Circle { r: int },
+	Rect { w: int, h: int },
+	Empty,
+}
+
+fn area(s: Shape) -> int
+{
+	switch s {
+		Circle c => {
+			return c.r * c.r * 3;
+		},
+		Rect q => {
+			return q.w * q.h;
+		},
+		Empty => {
+			return 0;
+		},
+	}
+	return -1;
+}
+
+fn patterns()
+{
+	let s = Shape.Rect { w: 3, h: 4 };
+	let n = 0;
+	switch s {
+		Rect q => {
+			q.w = 100;
+			n = q.w;
+		},
+		else => {
+			n = -1;
+		},
+	}
+	printf("arm binds a copy %lld %lld\n".ptr, n, area(s));
+	switch s {
+		Circle => n = 1,
+		Rect => n = 2,
+		Empty => n = 3,
+	}
+	printf("arm without a binding %lld\n".ptr, n);
+	if let Rect q = s {
+		n += q.h * 10;
+	} else {
+		n = -5;
+	}
+	printf("if let %lld\n".ptr, n);
+	if let Circle c = s {
+		n = -6;
+	} else if let Empty = s {
+		n = -7;
+	} else {
+		n += 100;
+	}
+	printf("if let chain %lld\n".ptr, n);
+	printf("is and tag %d %d %d\n".ptr, (s is Shape.Rect) as c_int,
+		(s is Shape.Empty) as c_int, s.tag as c_int);
+	let p = &s;
+	switch *p {
+		Rect q => {
+			n = q.w;
+		},
+		else => {
+			n = 0;
+		},
+	}
+	if let Rect q = *p {
+		n += q.h;
+	}
+	printf("through a pointer %lld %d %d\n".ptr, n,
+		(*p is Shape.Rect) as c_int, p.tag as c_int);
+	s = Shape.Empty;
+	printf("another case assigned %lld %d\n".ptr, area(s), s.tag as c_int);
+	s = Shape.Rect { w: 3, h: 4 };
+	switch s {
+		Rect q => {
+			s = Shape.Circle { r: 9 };
+			n = q.w + q.h;
+		},
+		else => {
+			n = -1;
+		},
+	}
+	if let Circle c = s {
+		s = Shape.Empty;
+		n += c.r;
+	}
+	printf("variant changed in its arm %lld %d\n".ptr, n, s.tag as c_int);
+}
+
+// `fallthrough` leaves an arm that binds a case and enters one that binds
+// nothing.
+
+fn fell(s: Shape) -> int
+{
+	let n = 0;
+	switch s {
+		Circle c => {
+			n = c.r;
+			fallthrough;
+		},
+		Empty => {
+			n += 100;
+		},
+		else => {
+			n = 9;
+		},
+	}
+	return n;
+}
+
+variant List
+{
+	Nil,
+	Cons { head: int, tail: ?*List },
+}
+
+fn total(l: List) -> int
+{
+	switch l {
+		Nil => {
+			return 0;
+		},
+		Cons c => {
+			if let t = c.tail {
+				return c.head + total(*t);
+			}
+			return c.head;
+		},
+	}
+	return 0;
+}
+
+variant One
+{
+	Only { v: int },
+}
+
+variant Tags
+{
+	A,
+	B,
+	C,
+}
+
+variant Wrap
+{
+	In { s: Shape, xs: [2]u8 },
+	Out,
+}
+
+variant Many
+{
+	C0, C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15,
+	C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31,
+	C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47,
+	C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63,
+	C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79,
+	C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C93, C94, C95,
+	C96, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110, C111,
+	C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127,
+	C128, C129, C130, C131, C132, C133, C134, C135, C136, C137, C138, C139, C140, C141, C142, C143,
+	C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C155, C156, C157, C158, C159,
+	C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170, C171, C172, C173, C174, C175,
+	C176, C177, C178, C179, C180, C181, C182, C183, C184, C185, C186, C187, C188, C189, C190, C191,
+	C192, C193, C194, C195, C196, C197, C198, C199, C200, C201, C202, C203, C204, C205, C206, C207,
+	C208, C209, C210, C211, C212, C213, C214, C215, C216, C217, C218, C219, C220, C221, C222, C223,
+	C224, C225, C226, C227, C228, C229, C230, C231, C232, C233, C234, C235, C236, C237, C238, C239,
+	C240, C241, C242, C243, C244, C245, C246, C247, C248, C249, C250, C251, C252, C253, C254, C255,
+}
+
+struct Scene
+{
+	lead: u8,
+	shape: Shape,
+	mode: Small,
+}
+
+fn made(n: int) -> Shape
+{
+	if n == 0 {
+		return Shape.Empty;
+	}
+	return Shape.Circle { r: n };
+}
+
+fn variants_in_use()
+{
+	printf("fallthrough %lld %lld %lld\n".ptr, fell(Shape.Circle { r: 5 }),
+		fell(Shape.Empty), fell(Shape.Rect { w: 1, h: 1 }));
+	let a = Shape.Rect { w: 1, h: 2 };
+	let b = Shape.Rect { w: 1, h: 2 };
+	let c = Shape.Circle { r: 1 };
+	printf("eq, hash and tag %d %d %d %d %d %d\n".ptr, (a == b) as c_int,
+		(a != c) as c_int, (a.hash() == b.hash()) as c_int,
+		(a.tag == b.tag) as c_int, (a.tag != c.tag) as c_int,
+		(c.tag as int == 0) as c_int);
+	let last = List.Cons { head: 1, tail: none };
+	let first = List.Cons { head: 2, tail: &last };
+	printf("case that points to its variant %lld %lld\n".ptr, total(first),
+		total(List.Nil));
+	let e = Shape.Empty { };
+	printf("empty braces %d\n".ptr, e.tag as c_int);
+	let o = One.Only { v: 5 };
+	let n = 0;
+	switch o {
+		Only x => n = x.v,
+	}
+	printf("one case %lld %lld\n".ptr, n, size_of(One));
+	let t = Tags.C;
+	printf("cases without fields %d %lld\n".ptr, t.tag as c_int, size_of(Tags));
+	let vs: [3]Shape = [Shape.Circle { r: 1 }, Shape.Rect { w: 2, h: 3 },
+		Shape.Empty];
+	let i = 1;
+	vs[i] = Shape.Circle { r: 4 };
+	printf("elements %lld\n".ptr, area(vs[0]) + area(vs[i]) + area(vs[2]));
+	let maybe: ?Shape = vs[0];
+	n = 0;
+	if let v = maybe {
+		if let Circle k = v {
+			n = k.r;
+		}
+	}
+	printf("optional %lld\n".ptr, n);
+	let w = Wrap.In { s: Shape.Rect { w: 2, h: 5 }, xs: [7, 8] };
+	switch w {
+		In inner => {
+			switch inner.s {
+				Rect q => n = q.w * q.h + inner.xs[1] as int,
+				else => n = -1,
+			}
+		},
+		Out => {
+			n = -2;
+		},
+	}
+	printf("variant in a case %lld\n".ptr, n);
+	let sc = Scene { lead: 1, shape: Shape.Circle { r: 2 }, mode: Small.Lo };
+	sc.shape = Shape.Rect { w: 5, h: 6 };
+	let held = &sc.shape;
+	*held = Shape.Rect { w: 7, h: 6 };
+	printf("field %lld %d\n".ptr, area(sc.shape), sc.mode as c_int);
+	switch made(3) {
+		Circle k => n = k.r,
+		else => n = -1,
+	}
+	printf("result of a call %lld %d\n".ptr, n, (made(0) is Shape.Empty) as c_int);
+	let m = Many.C255;
+	let low = Many.C0;
+	printf("256 cases %d %d %lld\n".ptr, m.tag as c_int, low.tag as c_int,
+		size_of(Many));
+	printf("sizes %lld %lld %lld\n".ptr, size_of(Shape), size_of(Wrap),
+		size_of(Scene));
+}
+
+fn main() -> int
+{
+	values_and_bases();
+	enums_in_use();
+	conversions();
+	patterns();
+	variants_in_use();
+	return 0;
+}

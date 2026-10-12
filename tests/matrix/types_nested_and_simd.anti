@@ -1,0 +1,301 @@
+//! Types declared in a class body with the layout words of the area: a packed
+//! struct, an aligned struct, an enum over a base, a simd struct, a packed
+//! class and a generic struct. Then simd structs as a kind of value: in an
+//! array, in a struct, at an odd offset of a packed struct, in an optional, a
+//! tuple, a case of a variant and a closure, and converted to an array and to a
+//! plain struct. A line names its subject.
+
+import anti.simd;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box
+{
+	packed struct Node
+	{
+		tag: u8,
+		v: u64,
+	}
+
+	struct Pair align(16)
+	{
+		a: u8,
+		b: u8,
+	}
+
+	enum Mode: u8
+	{
+		Off,
+		On = 7,
+	}
+
+	simd struct Lanes
+	{
+		x: f32,
+		y: f32,
+		z: f32,
+		w: f32,
+	}
+
+	packed class Inner
+	{
+		pub a: u8 = 1,
+		pub b: u32 = 2,
+	}
+
+	struct Slot<T>
+	{
+		v: T,
+	}
+
+	struct Cell
+	{
+		v: u8,
+		on: bool,
+	}
+
+	node: Node = Node { tag: 0, v: 0 },
+	pair: Pair = Pair { a: 0, b: 0 },
+	mode: Mode = Mode.Off,
+	inner: Inner = Inner { },
+	cells: [4]Cell = [Cell { v: 0, on: false }; 4],
+
+	pub fn packed_struct(self) -> int
+	{
+		self.node = Node { tag: 1, v: 40 };
+		let q = &self.node.v;
+		*q += 2;
+		return self.node.v as int * 100 + size_of(Node);
+	}
+
+	pub fn aligned_struct(self) -> int
+	{
+		self.pair = Pair { a: 2, b: 3 };
+		self.pair.b += 4;
+		return self.pair.b as int * 100 + size_of(Pair);
+	}
+
+	pub fn enum_over_a_base(self) -> int
+	{
+		self.mode = Mode.On;
+		let n = 0;
+		switch self.mode {
+			Mode.Off => n = 1,
+			Mode.On => n = 2,
+		}
+		return n * 100 + self.mode as int * 10 + size_of(Mode);
+	}
+
+	pub fn simd_struct(self) -> int
+	{
+		let v = Lanes.splat(2.0) * Lanes { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+		return v.sum() as int * 100 + size_of(Lanes);
+	}
+
+	pub fn packed_class(self) -> int
+	{
+		self.inner.b += 40;
+		return self.inner.b as int * 100 + self.inner.a as int;
+	}
+
+	pub fn generic_struct(self) -> int
+	{
+		let s = Slot<u16> { v: 4 };
+		let t = Slot<int> { v: 5 };
+		return s.v as int * 1000 + t.v * 100 + size_of(Slot<u16>) * 10 +
+			size_of(Slot<int>);
+	}
+
+	pub fn array_of_structs(self) -> int
+	{
+		let i = 2;
+		self.cells[i] = Cell { v: 9, on: true };
+		self.cells[3].v = 4;
+		self.cells[i + 1].on = self.cells[i].on;
+		return self.cells[2].v as int * 100 + self.cells[i + 1].v as int * 10 +
+			self.cells[3].on as int;
+	}
+}
+
+fn nested_types()
+{
+	let b = Box { };
+	printf("nested packed struct %lld\n".ptr, b.packed_struct());
+	printf("nested aligned struct %lld\n".ptr, b.aligned_struct());
+	printf("nested enum over a base %lld\n".ptr, b.enum_over_a_base());
+	printf("nested simd struct %lld\n".ptr, b.simd_struct());
+	printf("nested packed class %lld\n".ptr, b.packed_class());
+	printf("nested generic struct %lld\n".ptr, b.generic_struct());
+	printf("nested struct in an array %lld\n".ptr, b.array_of_structs());
+}
+
+// Simd structs.
+
+simd struct V4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+simd struct D4
+{
+	a: f64,
+	b: f64,
+	c: f64,
+	d: f64,
+}
+
+simd struct I8
+{
+	a: i32,
+	b: i32,
+	c: i32,
+	d: i32,
+	e: i32,
+	f: i32,
+	g: i32,
+	h: i32,
+}
+
+simd struct B8
+{
+	a: u8,
+	b: u8,
+	c: u8,
+	d: u8,
+	e: u8,
+	f: u8,
+	g: u8,
+	h: u8,
+}
+
+simd struct One
+{
+	x: f64,
+}
+
+struct Plain
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+struct Hold
+{
+	lead: u8,
+	v: V4,
+	i: I8,
+	b: B8,
+}
+
+packed struct Tight
+{
+	tag: u8,
+	v: V4,
+	d: D4,
+	end: u8,
+}
+
+variant Wrapped
+{
+	A { v: V4 },
+	B,
+}
+
+fn bump(p: *Tight)
+{
+	p.v = p.v + V4.splat(1.0);
+	p.d = p.d * D4.splat(2.0);
+}
+
+fn conversions_and_holders()
+{
+	let v = V4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+	let a = v as [4]f32;
+	let p = v as Plain;
+	let back = a as V4;
+	let again = p as V4;
+	printf("as an array and as a struct %g %g %g %g\n".ptr, a[3] as f64,
+		p.y as f64, back.z as f64, again.x as f64);
+	let vs: [3]V4 = [v, back, V4.splat(1.0)];
+	let i = 2;
+	vs[i] = vs[i] + vs[0];
+	vs[0].x = 9.0;
+	printf("array %g %g %g\n".ptr, vs[2].w as f64, vs[i].sum() as f64,
+		vs[0].sum() as f64);
+	let h = Hold { lead: 1, v: v, i: I8.splat(3), b: B8.splat(2) };
+	h.i = h.i + h.i;
+	h.b.c = 5;
+	printf("fields %g %d %d\n".ptr, h.v.sum() as f64, h.i.sum(),
+		h.b.sum() as c_int);
+	printf("sizes %lld %lld %lld %lld %lld %lld\n".ptr, size_of(V4),
+		size_of(D4), size_of(I8), size_of(B8), size_of(One), size_of(Hold));
+	let m = v < V4.splat(2.5);
+	let chosen = simd.select(m, v, V4.splat(0.0));
+	printf("mask %d %d %g\n".ptr, simd.any(m) as c_int, simd.all(m) as c_int,
+		chosen.sum() as f64);
+	let one = One { x: 2.0 };
+	let two = one + one;
+	printf("one lane %g\n".ptr, two.x);
+}
+
+fn at_an_odd_offset()
+{
+	let ps: [2]Tight = [Tight {
+		tag: 1, v: V4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 },
+			d: D4 { a: 1.0, b: 2.0, c: 3.0, d: 4.0 }, end: 9
+	},
+		Tight { tag: 2, v: V4.splat(5.0), d: D4.splat(0.5), end: 8 }];
+	let i = 1;
+	bump(&ps[i]);
+	bump(&ps[0]);
+	let s = ps[i].v + ps[0].v;
+	let q = &ps[i].v;
+	let t = *q * *q;
+	printf("packed struct %g %g %g %g %g %g %d\n".ptr, s.sum() as f64,
+		ps[1].d.sum(), t.x as f64, t.w as f64, ps[0].v.w as f64, ps[0].d.d,
+		ps[1].end as c_int);
+	printf("size %lld\n".ptr, size_of(Tight));
+}
+
+fn other_holders()
+{
+	let v = V4.splat(1.0);
+	let o: ?V4 = v;
+	let nothing: ?V4 = none;
+	let n = 0;
+	if let x = o {
+		n = x.sum() as int;
+	}
+	if nothing == none {
+		n += 10;
+	}
+	printf("optional %lld\n".ptr, n);
+	let w = Wrapped.A { v: v };
+	switch w {
+		A a => n = (a.v + a.v).sum() as int,
+		B => n = 0,
+	}
+	printf("case of a variant %lld\n".ptr, n);
+	let add = fn(k: V4) -> V4 {
+		return k + v;
+	};
+	printf("closure %g\n".ptr, add(add(v)).x as f64);
+	let t = (v, 1);
+	printf("tuple %g\n".ptr, (t.0 * t.0 + t.0).w as f64);
+	printf("hash %d %d\n".ptr, (v.hash() == V4.splat(1.0).hash()) as c_int,
+		(v.hash() == V4.splat(2.0).hash()) as c_int);
+}
+
+fn main() -> int
+{
+	nested_types();
+	conversions_and_holders();
+	at_an_odd_offset();
+	other_holders();
+	return 0;
+}

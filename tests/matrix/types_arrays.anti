@@ -1,0 +1,481 @@
+//! Fixed arrays of each kind of element, read and written with a constant index
+//! and with an index the program computes, and changed by a compound assignment
+//! through both. Then arrays of arrays, arrays as arguments, as results and as
+//! fields, and the lengths the checker takes. A line names its element or its
+//! subject. The arrays of packed structs, of unions, of enums and of variants
+//! stand in the programs of those types.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn array_of_i8()
+{
+	let xs: [4]i8 = [1, 2, 3, 4];
+	let i = 2;
+	xs[0] = 10;
+	xs[i] = 30;
+	xs[3] += xs[i - 1];
+	xs[i + 1] -= 1;
+	printf("i8 %lld %lld %lld %lld\n".ptr, xs[0] as int, xs[1] as int,
+		xs[i] as int, xs[3] as int);
+}
+
+fn array_of_i16()
+{
+	let xs: [4]i16 = [1, 2, 3, 4];
+	let i = 2;
+	xs[0] = 10;
+	xs[i] = 30;
+	xs[3] += xs[i - 1];
+	xs[i + 1] -= 1;
+	printf("i16 %lld %lld %lld %lld\n".ptr, xs[0] as int, xs[1] as int,
+		xs[i] as int, xs[3] as int);
+}
+
+fn array_of_i32()
+{
+	let xs: [4]i32 = [1, 2, 3, 4];
+	let i = 2;
+	xs[0] = 10;
+	xs[i] = 30;
+	xs[3] += xs[i - 1];
+	xs[i + 1] -= 1;
+	printf("i32 %lld %lld %lld %lld\n".ptr, xs[0] as int, xs[1] as int,
+		xs[i] as int, xs[3] as int);
+}
+
+fn array_of_i64()
+{
+	let xs: [4]i64 = [1, 2, 3, 4];
+	let i = 2;
+	xs[0] = 10;
+	xs[i] = 30;
+	xs[3] += xs[i - 1];
+	xs[i + 1] -= 1;
+	printf("i64 %lld %lld %lld %lld\n".ptr, xs[0] as int, xs[1] as int,
+		xs[i] as int, xs[3] as int);
+}
+
+fn array_of_int()
+{
+	let xs: [4]int = [1, 2, 3, 4];
+	let i = 2;
+	xs[0] = 10;
+	xs[i] = 30;
+	xs[3] += xs[i - 1];
+	xs[i + 1] -= 1;
+	printf("int %lld %lld %lld %lld\n".ptr, xs[0] as int, xs[1] as int,
+		xs[i] as int, xs[3] as int);
+}
+
+fn array_of_u8()
+{
+	let xs: [4]u8 = [1, 2, 3, 4];
+	let i = 2;
+	xs[0] = 10;
+	xs[i] = 30;
+	xs[3] += xs[i - 1];
+	xs[i + 1] -= 1;
+	printf("u8 %lld %lld %lld %lld\n".ptr, xs[0] as int, xs[1] as int,
+		xs[i] as int, xs[3] as int);
+}
+
+fn array_of_u16()
+{
+	let xs: [4]u16 = [1, 2, 3, 4];
+	let i = 2;
+	xs[0] = 10;
+	xs[i] = 30;
+	xs[3] += xs[i - 1];
+	xs[i + 1] -= 1;
+	printf("u16 %lld %lld %lld %lld\n".ptr, xs[0] as int, xs[1] as int,
+		xs[i] as int, xs[3] as int);
+}
+
+fn array_of_u32()
+{
+	let xs: [4]u32 = [1, 2, 3, 4];
+	let i = 2;
+	xs[0] = 10;
+	xs[i] = 30;
+	xs[3] += xs[i - 1];
+	xs[i + 1] -= 1;
+	printf("u32 %lld %lld %lld %lld\n".ptr, xs[0] as int, xs[1] as int,
+		xs[i] as int, xs[3] as int);
+}
+
+fn array_of_u64()
+{
+	let xs: [4]u64 = [1, 2, 3, 4];
+	let i = 2;
+	xs[0] = 10;
+	xs[i] = 30;
+	xs[3] += xs[i - 1];
+	xs[i + 1] -= 1;
+	printf("u64 %lld %lld %lld %lld\n".ptr, xs[0] as int, xs[1] as int,
+		xs[i] as int, xs[3] as int);
+}
+
+fn array_of_uint()
+{
+	let xs: [4]uint = [1, 2, 3, 4];
+	let i = 2;
+	xs[0] = 10;
+	xs[i] = 30;
+	xs[3] += xs[i - 1];
+	xs[i + 1] -= 1;
+	printf("uint %lld %lld %lld %lld\n".ptr, xs[0] as int, xs[1] as int,
+		xs[i] as int, xs[3] as int);
+}
+
+fn array_of_byte()
+{
+	let xs: [4]byte = [1, 2, 3, 4];
+	let i = 2;
+	xs[0] = 10;
+	xs[i] = 30;
+	xs[3] += xs[i - 1];
+	xs[i + 1] -= 1;
+	printf("byte %lld %lld %lld %lld\n".ptr, xs[0] as int, xs[1] as int,
+		xs[i] as int, xs[3] as int);
+}
+
+fn array_of_f32()
+{
+	let xs: [4]f32 = [1.5, 2.5, 3.5, 4.5];
+	let i = 2;
+	xs[0] = 10.0;
+	xs[i] = 30.0;
+	xs[3] += xs[i - 1];
+	xs[i + 1] -= 1.0;
+	printf("f32 %g %g %g %g\n".ptr, xs[0] as f64, xs[1] as f64, xs[i] as f64,
+		xs[3] as f64);
+}
+
+fn array_of_f64()
+{
+	let xs: [4]f64 = [1.5, 2.5, 3.5, 4.5];
+	let i = 2;
+	xs[0] = 10.0;
+	xs[i] = 30.0;
+	xs[3] += xs[i - 1];
+	xs[i + 1] -= 1.0;
+	printf("f64 %g %g %g %g\n".ptr, xs[0] as f64, xs[1] as f64, xs[i] as f64,
+		xs[3] as f64);
+}
+
+// An f16 is storage: a read gives an f32, and a write takes `as f16`.
+
+fn array_of_f16()
+{
+	let xs: [4]f16 = [1.5 as f16, 2.5 as f16, 3.5 as f16, 4.5 as f16];
+	let i = 2;
+	xs[i] = (xs[0] + xs[1]) as f16;
+	xs[3] = xs[i - 1] as f16;
+	printf("f16 %g %g %g %g\n".ptr, xs[0] as f64, xs[1] as f64, xs[i] as f64,
+		xs[3] as f64);
+}
+
+fn array_of_bool()
+{
+	let xs: [4]bool = [true, false, true, false];
+	let i = 2;
+	xs[i] = !xs[i];
+	xs[1] = xs[0] && !xs[i + 1];
+	xs[0] = xs[i] || xs[3];
+	printf("bool %d %d %d %d\n".ptr, xs[0] as c_int, xs[1] as c_int,
+		xs[i] as c_int, xs[3] as c_int);
+}
+
+fn array_of_char()
+{
+	let xs: [4]char = ['a', 'b', 'c', 'd'];
+	let i = 2;
+	xs[i] = 'z';
+	xs[0] = xs[i + 1];
+	printf("char %u %u %u %u\n".ptr, xs[0] as u32, xs[1] as u32, xs[i] as u32,
+		xs[3] as u32);
+}
+
+fn array_of_str()
+{
+	let xs: [4]str = ["one", "two", "three", "four"];
+	let i = 2;
+	xs[i] = "x";
+	xs[0] = xs[i + 1];
+	printf("str %lld %lld %lld %s\n".ptr, xs[0].len, xs[1].len, xs[i].len,
+		xs[3].ptr);
+}
+
+fn array_of_slice()
+{
+	let data = [1, 2, 3, 4, 5];
+	let xs: [2][]int = [data[0..2], data[2..5]];
+	let i = 1;
+	let before = xs[i].len;
+	xs[i] = data[1..2];
+	xs[0][1] += 40;
+	printf("slice %lld %lld %lld %lld\n".ptr, before, xs[i].len, xs[i][0],
+		data[1]);
+}
+
+fn array_of_pointer()
+{
+	let a = 1;
+	let b = 2;
+	let ps: [2]*int = [&a, &b];
+	let i = 1;
+	*ps[i] += 10;
+	ps[0] = ps[i];
+	*ps[0] += 100;
+	printf("pointer %lld %lld\n".ptr, a, b);
+}
+
+fn array_of_nullable_pointer()
+{
+	let a = 5;
+	let ps: [2]?*int = [none, &a];
+	let i = 1;
+	let n = 0;
+	if let p = ps[i] {
+		n = *p;
+	}
+	if ps[0] == none {
+		n += 10;
+	}
+	ps[i] = none;
+	if ps[1] == none {
+		n += 100;
+	}
+	printf("nullable pointer %lld\n".ptr, n);
+}
+
+fn array_of_optional()
+{
+	let xs: [3] ?int = [1, none, 3];
+	let i = 2;
+	xs[1] = 5;
+	xs[i] = none;
+	printf("optional %lld %lld %lld\n".ptr, xs[0] ?? -1, xs[i - 1] ?? -1,
+		xs[2] ?? -1);
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn thrice(n: int) -> int
+{
+	return n * 3;
+}
+
+fn array_of_function()
+{
+	let fs: [2] fn(int) -> int = [twice, thrice];
+	let i = 1;
+	let first = fs[i](5);
+	fs[0] = fs[i];
+	printf("function %lld %lld\n".ptr, first, fs[0](2));
+}
+
+fn array_of_tuple()
+{
+	let ts: [2](int, str) = [(1, "a"), (2, "bc")];
+	let i = 1;
+	ts[i].0 += 5;
+	ts[0] = ts[i];
+	ts[i].0 = 0;
+	printf("tuple %lld %lld %lld\n".ptr, ts[0].0, ts[0].1.len, ts[1].0);
+}
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn array_of_struct()
+{
+	let ps: [2]Point = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }];
+	let i = 1;
+	ps[i].y += ps[0].x;
+	let q = &ps[i];
+	q.x = 30;
+	ps[0] = ps[i];
+	ps[i].x = 0;
+	printf("struct %lld %lld %lld %lld\n".ptr, ps[0].x, ps[0].y, ps[1].x,
+		ps[1].y);
+}
+
+// An array is a value: an argument is a copy, and so is a result.
+
+fn total(xs: [4]int) -> int
+{
+	xs[0] = 100;
+	return xs[0] + xs[1] + xs[2] + xs[3];
+}
+
+fn made(n: int) -> [3]int
+{
+	return [n, n * 2, n * 3];
+}
+
+fn grid() -> [2][3]int
+{
+	return [[1, 2, 3], [4, 5, 6]];
+}
+
+fn arguments_and_results()
+{
+	let xs: [4]int = [1, 2, 3, 4];
+	let i = 2;
+	let j = 1;
+	xs[i] += 10;
+	xs[3] = xs[i] * 2;
+	printf("argument %lld %lld %lld %lld\n".ptr, total(xs), xs[0], xs[3],
+		xs.len);
+	let m = made(7);
+	printf("result %lld %lld\n".ptr, m[i], made(5)[j]);
+	let s = xs[1..3];
+	s[0] = 99;
+	let one: [1]int = [5];
+	one[0] += 1;
+	printf("slice of an array and one element %lld %lld %lld\n".ptr, xs[1],
+		s.len, one[i - 2]);
+	let p = &xs;
+	let q = &xs[1];
+	printf("pointer to an array and to an element %lld %lld %lld\n".ptr,
+		(*p)[i + 1], q[0], q[j]);
+}
+
+fn arrays_of_arrays()
+{
+	let i = 2;
+	let j = 1;
+	let g = grid();
+	g[j][i] = 60;
+	g[0][i - 1] += g[1][2];
+	let row = g[j];
+	row[0] = -1;
+	printf("two levels %lld %lld %lld %lld %lld %lld\n".ptr, g[1][2], g[0][1],
+		g[1][0], row[0], g.len, g[0].len);
+	g[0] = g[j];
+	g[j][0] = 0;
+	printf("a row assigned %lld %lld %lld\n".ptr, g[0][0], g[0][2], g[1][0]);
+	let a3: [2][2][2]u8 = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]];
+	a3[j][j][0] = 70;
+	a3[0][j][i - 1] += 10;
+	printf("three levels %d %d %d %lld %lld\n".ptr, a3[1][1][0] as c_int,
+		a3[i - 1][0][j] as c_int, a3[0][1][1] as c_int, size_of([2][2][2]u8),
+		size_of([2][3]int));
+}
+
+// The lengths the checker takes: a constant expression, the length and an
+// element of a constant array, `size_of` in a field and in a local, and a
+// constant parameter of a generic.
+
+const ROW: [3]int = [7, 8, 9];
+const LENGTH: int = ROW.len;
+const WIDTH: int = ROW[1];
+
+struct Lengths
+{
+	ys: [LENGTH]u8,
+	zs: [WIDTH]u8,
+	ws: [size_of(i64)]u8,
+	vs: [LENGTH * 2 + 1]u16,
+}
+
+fn sum<N: int>(xs: [N]int) -> int
+{
+	let t = 0;
+	for x in xs {
+		t += x;
+	}
+	return t;
+}
+
+struct Holder
+{
+	xs: [3]int,
+	rows: [2][2]int,
+}
+
+fn lengths_and_fields()
+{
+	let l = Lengths {
+		ys: [1; LENGTH], zs: [2; WIDTH], ws: [3; size_of(i64)],
+		vs: [4; LENGTH * 2 + 1]
+	};
+	let local: [size_of(i32) * 2]u8 = [1; size_of(i32) * 2];
+	let i = 6;
+	local[i + 1] = 9;
+	printf("lengths %lld %lld %lld %lld %lld %d\n".ptr, l.ys.len, l.zs.len,
+		l.ws.len, l.vs.len, size_of(Lengths), local[7] as c_int);
+	printf("constant parameter %lld %lld\n".ptr, sum<3>([1, 2, 3]),
+		sum([4, 5]));
+	let h = Holder { xs: [1, 2, 3], rows: [[1, 2], [3, 4]] };
+	let k = 1;
+	h.xs[k] += 20;
+	h.rows[k][0] = h.xs[1];
+	h.xs = [7, 8, 9];
+	let copy = h;
+	copy.rows[0][k] = 50;
+	printf("fields %lld %lld %lld %lld\n".ptr, h.xs[2], h.rows[1][0],
+		h.rows[0][1], copy.rows[0][1]);
+	let a = [[1, 2], [3, 4]];
+	let b = [[1, 2], [3, 4]];
+	let c = [[1, 2], [3, 5]];
+	printf("eq %d %d\n".ptr, (a == b) as c_int, (a == c) as c_int);
+	let ps: [3]Point = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 },
+		Point { x: 5, y: 6 }];
+	let n = 0;
+	for at, p in ps {
+		n += at * p.x;
+	}
+	for p in &ps {
+		p.y = 0;
+	}
+	printf("for %lld %lld\n".ptr, n, ps[2].y);
+	let small: u8 = 2;
+	let o: ?[2]int = [5, 6];
+	let t = ([7, 8], 1);
+	let got = 0;
+	if let pair = o {
+		got = pair[1];
+	}
+	printf("other indices and holders %lld %lld %lld\n".ptr,
+		ps[small as int].x, got, t.0[t.1]);
+}
+
+fn main() -> int
+{
+	array_of_i8();
+	array_of_i16();
+	array_of_i32();
+	array_of_i64();
+	array_of_int();
+	array_of_u8();
+	array_of_u16();
+	array_of_u32();
+	array_of_u64();
+	array_of_uint();
+	array_of_byte();
+	array_of_f32();
+	array_of_f64();
+	array_of_f16();
+	array_of_bool();
+	array_of_char();
+	array_of_str();
+	array_of_slice();
+	array_of_pointer();
+	array_of_nullable_pointer();
+	array_of_optional();
+	array_of_function();
+	array_of_tuple();
+	array_of_struct();
+	arguments_and_results();
+	arrays_of_arrays();
+	lengths_and_fields();
+	return 0;
+}
