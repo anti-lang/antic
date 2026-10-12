@@ -1,0 +1,153 @@
+//! `as` between a simd struct of sixteen bytes and a plain struct of the same
+//! bytes, one function per kind of field: pointers, a `str`, a slice,
+//! functions, an enum, a union inside, a struct and a tuple inside, a packed
+//! struct and an aligned one. The program prints one line per kind.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+simd struct Two
+{
+	a: i64,
+	b: i64,
+}
+
+struct Pointers
+{
+	p: ?*int,
+	q: ?*int,
+}
+
+struct Text
+{
+	s: str,
+}
+
+struct Slice
+{
+	items: []int,
+}
+
+struct Functions
+{
+	f: ?fn(int) -> int,
+	g: ?fn(int) -> int,
+}
+
+enum Kind: u64
+{
+	None,
+	Some,
+}
+
+struct Tagged
+{
+	kind: Kind,
+	n: i64,
+}
+
+union Bits
+{
+	whole: u64,
+	real: f64,
+}
+
+struct Mixed
+{
+	bits: Bits,
+	n: i64,
+}
+
+struct Inner
+{
+	a: i32,
+	b: i32,
+}
+
+struct Nested
+{
+	inner: Inner,
+	pair: (i32, i32),
+}
+
+packed struct Tight
+{
+	a: u8,
+	b: i64,
+	c: [7]u8,
+}
+
+struct Aligned align(16)
+{
+	a: i64,
+	b: i64,
+}
+
+fn pointers(v: Two)
+{
+	let s = v as Pointers;
+	printf("pointers %d %d\n".ptr, (s.p == none) as c_int, (s.q == none) as c_int);
+}
+
+fn text(v: Two)
+{
+	let s = v as Text;
+	printf("str %d\n".ptr, s.s.len as c_int);
+}
+
+fn slice(v: Two)
+{
+	let s = v as Slice;
+	printf("slice %d\n".ptr, s.items.len as c_int);
+}
+
+fn functions(v: Two)
+{
+	let s = v as Functions;
+	printf("functions %d %d\n".ptr, (s.f == none) as c_int, (s.g == none) as c_int);
+}
+
+fn tagged(v: Two)
+{
+	let s = v as Tagged;
+	printf("enum %d %d\n".ptr, (s.kind == Kind.None) as c_int, s.n as c_int);
+}
+
+fn mixed(v: Two)
+{
+	let s = v as Mixed;
+	printf("union %d %d\n".ptr, s.bits.whole as c_int, s.n as c_int);
+}
+
+fn nested(v: Two)
+{
+	let s = v as Nested;
+	printf("nested %d %d %d %d\n".ptr, s.inner.a as c_int, s.inner.b as c_int, s.pair.0 as c_int, s.pair.1 as c_int);
+}
+
+fn tight(v: Two)
+{
+	let s = v as Tight;
+	printf("packed %d %d\n".ptr, s.a as c_int, s.c[6] as c_int);
+}
+
+fn aligned(v: Two)
+{
+	let s = v as Aligned;
+	printf("aligned %d %d\n".ptr, s.a as c_int, s.b as c_int);
+}
+
+fn main() -> int
+{
+	let zero = Two { a: 0, b: 0 };
+	let v = Two { a: 7, b: 9 };
+	pointers(zero);
+	text(zero);
+	slice(zero);
+	functions(zero);
+	tagged(Two { a: 0, b: 5 });
+	mixed(v);
+	nested(Two { a: 1, b: 2 });
+	tight(v);
+	aligned(v);
+	return 0;
+}

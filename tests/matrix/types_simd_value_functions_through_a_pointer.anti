@@ -1,0 +1,23 @@
+//! `sum` and `dot` on a pointer to a simd struct read the value behind it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn total(p: *Vec4) -> f32
+{
+	return p.sum() + p.dot(*p);
+}
+
+fn main() -> int
+{
+	let v = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+	printf("%g\n".ptr, total(&v) as float);
+	return 0;
+}

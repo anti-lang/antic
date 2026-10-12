@@ -1,0 +1,1 @@
+threads_mutex_destroy_with_a_handler.anti:8:14: error: this call cannot fail, so it has no error to handle

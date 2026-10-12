@@ -1,0 +1,37 @@
+//! A statement that is a call after `?.` carries its handler, which runs where
+//! the call fails and not where the pointer is `none`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+
+	pub fn checked(self) -> *Node may fail
+	{
+		if self.n < 0 {
+			fail "negative";
+		}
+		return self;
+	}
+}
+
+fn run(p: ?*Node)
+{
+	p?.checked() catch e {
+		printf("failed\n".ptr);
+	};
+	printf("done\n".ptr);
+}
+
+fn main() -> int
+{
+	let good = Node { n: 1 };
+	let bad = Node { n: -1 };
+	run(&good);
+	run(&bad);
+	run(none);
+	return 0;
+}

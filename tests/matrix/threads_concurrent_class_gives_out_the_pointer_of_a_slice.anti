@@ -1,0 +1,22 @@
+//! A public function of a concurrent class gives out no pointer into its
+//! fields, and the `ptr` of an array field behind a slice is one.
+
+import anti.lang;
+
+concurrent class Tally
+{
+	lock: Mutex,
+	cells: [4]int = [0; 4] guarded by lock,
+
+	pub fn first(self) -> ?*int
+	{
+		sync self.lock {
+			return self.cells[0..4].ptr;
+		}
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,13 @@
+//! `replace` on bytes takes a template of bytes or a function of a match of
+//! bytes.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	let t = data.replace(re"(a)", 5);
+	return 0;
+}

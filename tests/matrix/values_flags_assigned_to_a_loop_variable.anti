@@ -1,0 +1,14 @@
+//! `(r, f) = a + b` assigns two variables, and the variable of a `for` is
+//! read-only.
+
+import anti.lang;
+
+fn main() -> int
+{
+	let a = 1;
+	let (r, f) = a + a;
+	for i in 0..3 {
+		(i, f) = a + a;
+	}
+	return 0;
+}

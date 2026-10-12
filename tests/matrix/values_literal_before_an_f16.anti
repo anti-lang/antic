@@ -1,0 +1,9 @@
+//! No operator takes an `f16`, and a literal on the left of one gets no message
+//! of its own.
+
+fn main() -> int
+{
+	let h: f32 = 1.5;
+	let x = 2.0 * (h as f16);
+	return 0;
+}

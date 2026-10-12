@@ -1,0 +1,1 @@
+types_simd_cast_to_a_struct_past_every_size.anti:19:9: error: cannot convert `Two` to `Vast`, a `simd struct` converts to an array or a plain struct of the same bytes

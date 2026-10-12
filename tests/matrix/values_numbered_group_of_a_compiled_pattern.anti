@@ -1,0 +1,16 @@
+//! The groups of a pattern literal are fields of its match. A match of a
+//! pattern that is no literal gives its groups by `group`, by number as by
+//! name.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let r = Regex.compile("(a)") catch fatal;
+	let m = "ab".matches(r) catch fatal;
+	if m {
+		let g = m.1;
+	}
+	return 0;
+}

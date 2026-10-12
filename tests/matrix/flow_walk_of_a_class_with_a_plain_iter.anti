@@ -1,0 +1,20 @@
+//! `for` walks a class through its `operator fn iter`, and a plain function of
+//! that name is no hook.
+
+class Bag
+{
+	pub n: int = 0,
+
+	pub fn iter(self) -> int
+	{
+		return 0;
+	}
+}
+
+fn main() -> int
+{
+	let b = Bag { };
+	for x in b {
+	}
+	return 0;
+}

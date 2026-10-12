@@ -1,0 +1,1 @@
+types_simd_select_with_an_unknown_second_value.anti:18:29: error: unknown name `nope`

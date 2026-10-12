@@ -1,0 +1,1 @@
+flow_walk_of_a_class_with_a_plain_iter.anti:17:11: error: `for` walks a range, a slice, an array, a collection or an iterator, found `Bag`

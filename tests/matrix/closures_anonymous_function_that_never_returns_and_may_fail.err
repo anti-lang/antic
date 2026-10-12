@@ -1,0 +1,1 @@
+closures_anonymous_function_that_never_returns_and_may_fail.anti:6:10: error: a function that returns `never` cannot fail

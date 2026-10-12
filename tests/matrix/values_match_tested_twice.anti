@@ -1,0 +1,17 @@
+//! A match stands as a condition, and one that `if let` bound already is a
+//! match that is there.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	if let m = "ab".matches(re"(a)") {
+		if m {
+			printf("there\n".ptr);
+		}
+	}
+	return 0;
+}

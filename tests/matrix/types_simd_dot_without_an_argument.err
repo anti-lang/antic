@@ -1,0 +1,1 @@
+types_simd_dot_without_an_argument.anti:17:10: error: `dot` takes 1 argument, found 0

@@ -1,0 +1,10 @@
+//! `x in lo..hi` whose first operand names nothing gets the one message of the
+//! name.
+
+fn main() -> int
+{
+	if missing in 1..3 {
+		return 1;
+	}
+	return 0;
+}

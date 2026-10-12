@@ -1,0 +1,16 @@
+//! A constant pointer is `none`, and a test of it against `none` narrows no
+//! local.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const nothing: ?*int = none;
+
+fn main() -> int
+{
+	if nothing != none {
+		printf("there\n".ptr);
+	} else {
+		printf("none\n".ptr);
+	}
+	return 0;
+}

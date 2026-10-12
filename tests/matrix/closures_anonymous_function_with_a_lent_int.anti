@@ -1,0 +1,10 @@
+//! `lent` marks a pointer parameter, in an anonymous function as in a named
+//! one.
+
+fn main() -> int
+{
+	let f = fn(lent n: int) -> int {
+		return n;
+	};
+	return 0;
+}

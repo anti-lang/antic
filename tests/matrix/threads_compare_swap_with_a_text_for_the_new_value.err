@@ -1,0 +1,1 @@
+threads_compare_swap_with_a_text_for_the_new_value.anti:6:23: error: expected `int`, found `str`

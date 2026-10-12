@@ -1,0 +1,25 @@
+//! `equals` of a class calls the `operator fn eq` its module gives it. One that
+//! takes the class by value copies a Mutex and is not called.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Guarded
+{
+	pub lock: Mutex,
+	pub n: int = 0,
+}
+
+operator fn eq(a: Guarded, b: Guarded) -> bool
+{
+	return true;
+}
+
+fn main() -> int
+{
+	let a = Guarded { lock: Mutex.new(), n: 1 };
+	let b = Guarded { lock: Mutex.new(), n: 2 };
+	printf("%d\n".ptr, a.equals(&b) as c_int);
+	return 0;
+}

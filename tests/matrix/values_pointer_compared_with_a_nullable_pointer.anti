@@ -1,0 +1,16 @@
+//! `==` compares a `*T` with a `?*T` of the same element.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn same(p: *int, q: ?*int) -> bool
+{
+	return p == q;
+}
+
+fn main() -> int
+{
+	let n = 1;
+	let m = 2;
+	printf("%d %d %d\n".ptr, same(&n, &n) as c_int, same(&n, &m) as c_int, same(&n, none) as c_int);
+	return 0;
+}

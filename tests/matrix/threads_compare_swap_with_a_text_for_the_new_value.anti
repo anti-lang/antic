@@ -1,0 +1,10 @@
+//! The new value of `compare_swap` has the type of the atomic.
+
+fn main() -> int
+{
+	let n: atomic int = 0;
+	if n.compare_swap(0, "one") {
+		return 1;
+	}
+	return 0;
+}

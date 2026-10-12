@@ -1,0 +1,20 @@
+//! A field of a type nested in a concurrent class is guarded by a Mutex of the
+//! class around it, and an `int` of that class is none.
+
+import anti.lang;
+
+concurrent class Tally
+{
+	struct Cell
+	{
+		n: int guarded by Tally.count,
+	}
+
+	lock: Mutex,
+	count: int = 0 guarded by lock,
+}
+
+fn main() -> int
+{
+	return 0;
+}

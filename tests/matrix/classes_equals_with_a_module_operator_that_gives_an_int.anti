@@ -1,0 +1,23 @@
+//! `equals` of a class calls the `operator fn eq` its module gives it, where
+//! that operator gives a `bool`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Pair
+{
+	pub left: int = 0,
+	pub note: int = 0,
+}
+
+operator fn eq(a: *Pair, b: *Pair) -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	let a = Pair { left: 1, note: 2 };
+	let b = Pair { left: 1, note: 3 };
+	printf("%d\n".ptr, a.equals(&b) as c_int);
+	return 0;
+}

@@ -1,0 +1,17 @@
+//! `compare_swap` of a field that `unchecked(unguarded-field)` marks takes two
+//! values of the type of the field.
+
+concurrent class Slot
+{
+	next: int = 0 unchecked(unguarded-field, "swapped without a lock"),
+
+	pub fn take(self) -> bool
+	{
+		return self.next.compare_swap("zero", 1);
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,21 @@
+//! `x in lo..hi` on a struct calls its `operator fn lt`, which gives a `bool`.
+
+struct Key
+{
+	id: int,
+}
+
+operator fn lt(a: Key, b: Key) -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	let a = Key { id: 1 };
+	let b = Key { id: 3 };
+	if a in a..b {
+		return 1;
+	}
+	return 0;
+}

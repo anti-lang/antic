@@ -1,0 +1,10 @@
+//! A function that never returns has no error to give, an anonymous one as a
+//! named one.
+
+fn main() -> int
+{
+	let f = fn(n: int) -> never may fail {
+		fail "no";
+	};
+	return 0;
+}

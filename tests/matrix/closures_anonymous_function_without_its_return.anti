@@ -1,0 +1,9 @@
+//! A function with a result returns a value on every path, an anonymous one as
+//! a named one.
+
+fn main() -> int
+{
+	let f = fn(n: int) -> int {
+	};
+	return 0;
+}

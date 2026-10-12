@@ -1,0 +1,10 @@
+exit 0
+pointers 1 1
+str 0
+slice 0
+functions 1 1
+enum 1 5
+union 7 9
+nested 1 0 2 0
+packed 7 0
+aligned 7 9

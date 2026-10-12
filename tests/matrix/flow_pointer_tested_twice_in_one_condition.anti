@@ -1,0 +1,19 @@
+//! A condition that tests one nullable pointer against `none` twice proves the
+//! name once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn read(p: ?*int) -> int
+{
+	if p != none && p != none {
+		return *p;
+	}
+	return -1;
+}
+
+fn main() -> int
+{
+	let n = 7;
+	printf("%d %d\n".ptr, read(&n) as c_int, read(none) as c_int);
+	return 0;
+}

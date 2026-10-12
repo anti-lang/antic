@@ -1,0 +1,10 @@
+//! `m.destroy()` cannot fail and takes no handler.
+
+import anti.lang;
+
+fn main() -> int
+{
+	let m = Mutex.new();
+	m.destroy() catch fatal;
+	return 0;
+}

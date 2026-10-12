@@ -1,0 +1,19 @@
+//! The two values of `simd.select` have one type.
+
+import anti.simd;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn main() -> int
+{
+	let v = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+	let room: [4]f32 = [0.0; 4];
+	let w = simd.select(v < v, v, 5);
+	return 0;
+}

@@ -1,0 +1,10 @@
+//! `compare_swap` of an atomic takes the expected value and the new one.
+
+fn main() -> int
+{
+	let n: atomic int = 0;
+	if n.compare_swap(0) {
+		return 1;
+	}
+	return 0;
+}

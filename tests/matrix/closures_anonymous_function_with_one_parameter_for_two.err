@@ -1,0 +1,1 @@
+closures_anonymous_function_with_one_parameter_for_two.anti:10:14: error: the anonymous function takes 1 parameter, and `fn(int, int) -> int` gives 2

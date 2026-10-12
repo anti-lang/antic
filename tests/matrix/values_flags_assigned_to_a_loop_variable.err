@@ -1,0 +1,1 @@
+values_flags_assigned_to_a_loop_variable.anti:11:4: error: `i` is the variable of a `for` and is read-only

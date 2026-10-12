@@ -1,0 +1,1 @@
+flow_let_else_whose_if_falls_through.anti:6:17: error: the `else` of a `let` leaves the block it stands in

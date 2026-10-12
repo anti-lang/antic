@@ -1,0 +1,29 @@
+//! The `else` of a `let` leaves. An `if let` of a case whose block and whose
+//! `else` both return is a statement that leaves.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+fn read(p: ?*int, s: Shape) -> int
+{
+	let v = p else {
+		if let Circle c = s {
+			return c.r;
+		} else {
+			return -1;
+		}
+	};
+	return *v + 100;
+}
+
+fn main() -> int
+{
+	let n = 7;
+	printf("%d %d %d\n".ptr, read(&n, Shape.Empty) as c_int, read(none, Shape.Circle { r: 3 }) as c_int, read(none, Shape.Empty) as c_int);
+	return 0;
+}

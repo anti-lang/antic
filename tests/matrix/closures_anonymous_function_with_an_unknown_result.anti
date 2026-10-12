@@ -1,0 +1,9 @@
+//! The result of an anonymous function is a type of the program.
+
+fn main() -> int
+{
+	let f = fn(n: int) -> Missing {
+		return n;
+	};
+	return 0;
+}

@@ -1,0 +1,1 @@
+values_replace_of_bytes_with_an_int.anti:11:32: error: `replace` takes a template `[]byte` or a `fn(ByteMatch) -> []byte`, found `int`

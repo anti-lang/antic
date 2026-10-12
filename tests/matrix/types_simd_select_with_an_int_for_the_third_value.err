@@ -1,0 +1,1 @@
+types_simd_select_with_an_int_for_the_third_value.anti:17:32: error: expected `Vec4`, found an integer literal

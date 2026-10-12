@@ -1,0 +1,20 @@
+//! A worker without type parameters is dispatched without type arguments.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn read(t: *Task, v: int) -> int
+{
+	return t.n;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let job = dispatch t -> read<int>(5);
+	let got = join(job);
+	delete(t);
+	return got;
+}

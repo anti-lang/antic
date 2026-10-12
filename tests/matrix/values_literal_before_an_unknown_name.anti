@@ -1,0 +1,8 @@
+//! A literal on the left of an operator beside a name that no declaration
+//! gives. The one message names the name.
+
+fn main() -> int
+{
+	let x: int = 1 + missing;
+	return x;
+}

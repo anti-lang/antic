@@ -1,0 +1,35 @@
+//! A field of a type nested in a concurrent class is guarded by a Mutex of the
+//! class around it, named with the class. A field of the class itself names its
+//! lock with the class as well.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+concurrent class Tally
+{
+	struct Cell
+	{
+		n: int guarded by Tally.lock,
+	}
+
+	pub lock: Mutex,
+	cell: Cell = Cell { n: 1 } guarded by lock,
+	count: int = 0 guarded by Tally.lock,
+
+	pub fn add(self, n: int) -> int
+	{
+		sync self.lock {
+			self.cell.n += n;
+			self.count += 1;
+			return self.cell.n + self.count;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let t = Tally { lock: Mutex.new() };
+	printf("%d\n".ptr, t.add(4) as c_int);
+	return 0;
+}

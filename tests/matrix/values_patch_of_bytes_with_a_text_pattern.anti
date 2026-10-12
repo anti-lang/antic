@@ -1,0 +1,14 @@
+//! `patch` on bytes takes a pattern of bytes, and a `Regex` that a variable
+//! holds is a pattern of text.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	let r = Regex.compile("(a)") catch fatal;
+	let n = data.patch(r, b"x");
+	return 0;
+}

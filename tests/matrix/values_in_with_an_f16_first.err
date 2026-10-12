@@ -1,0 +1,1 @@
+values_in_with_an_f16_first.anti:6:6: error: `f16` has no arithmetic, convert with `as f32`

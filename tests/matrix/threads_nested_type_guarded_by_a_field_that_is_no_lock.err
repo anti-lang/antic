@@ -1,0 +1,1 @@
+threads_nested_type_guarded_by_a_field_that_is_no_lock.anti:10:10: error: `count` is no `Mutex` field of `Tally`

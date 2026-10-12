@@ -1,0 +1,1 @@
+types_simd_splat_with_a_handler.anti:17:26: error: this call cannot fail, so it has no error to handle

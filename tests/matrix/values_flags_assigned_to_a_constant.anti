@@ -1,0 +1,13 @@
+//! `(r, f) = a + b` assigns two variables, and a constant is none.
+
+import anti.lang;
+
+const limit: int = 3;
+
+fn main() -> int
+{
+	let a = 1;
+	let (r, f) = a + a;
+	(limit, f) = a + a;
+	return 0;
+}

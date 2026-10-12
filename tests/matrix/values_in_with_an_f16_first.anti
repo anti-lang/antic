@@ -1,0 +1,10 @@
+//! No operator takes an `f16`, and `in` is one.
+
+fn main() -> int
+{
+	let h: f32 = 0.5;
+	if (h as f16) in 0.0..1.0 {
+		return 1;
+	}
+	return 0;
+}

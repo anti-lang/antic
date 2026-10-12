@@ -1,0 +1,1 @@
+types_simd_shuffle_with_a_float_lane.anti:17:20: error: expected `int`, found a float literal

@@ -1,0 +1,14 @@
+//! A local of function type holds a closure in the form of two words, where its
+//! declared type is the plain function type.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let n = 3;
+	let f: fn(int) -> int = fn(k) {
+		return n + k;
+	};
+	printf("%d\n".ptr, f(4) as c_int);
+	return 0;
+}

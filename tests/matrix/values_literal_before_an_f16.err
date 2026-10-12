@@ -1,0 +1,1 @@
+values_literal_before_an_f16.anti:7:10: error: `f16` has no arithmetic, convert with `as f32`

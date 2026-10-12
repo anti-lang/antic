@@ -1,0 +1,1 @@
+closures_anonymous_function_with_a_lent_int.anti:6:18: error: `lent` marks a pointer or slice parameter, and this one is `int`

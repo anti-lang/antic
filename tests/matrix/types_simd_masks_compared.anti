@@ -1,0 +1,24 @@
+//! A comparison of two simd structs gives a mask, and a comparison of two masks
+//! gives a mask of the same lanes.
+
+import anti.simd;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn main() -> int
+{
+	let a = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+	let b = Vec4 { x: 4.0, y: 3.0, z: 2.0, w: 1.0 };
+	let same = (a < b) == (a < b);
+	let other = (a < b) == (b < a);
+	printf("%d %d\n".ptr, simd.all(same) as c_int, simd.any(other) as c_int);
+	return 0;
+}

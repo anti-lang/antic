@@ -1,0 +1,50 @@
+//! A `construct` that may fail sets every field without a default on each path
+//! that succeeds, through a `sync` block and through the arms of a `select`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class BySync
+{
+	pub lock: Mutex,
+	pub a: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x > 100 {
+			fail "too large";
+		}
+		sync self.lock {
+			self.a = x + 1;
+		}
+	}
+}
+
+class BySelect
+{
+	pub a: int,
+
+	fn construct(self, gate: chan int) may fail
+	{
+		select {
+			gate x => {
+				let v = x else {
+					fail "closed";
+				};
+				self.a = *v;
+			}
+		}
+	}
+}
+
+fn main() -> int
+{
+	let s = BySync(4) catch fatal;
+	let gate = chan int(1);
+	send(gate, 9);
+	let t = BySelect(gate) catch fatal;
+	printf("%d %d\n".ptr, s.a as c_int, t.a as c_int);
+	delete(gate);
+	return 0;
+}

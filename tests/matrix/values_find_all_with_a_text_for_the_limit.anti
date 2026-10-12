@@ -1,0 +1,12 @@
+//! The limit of `find_all` is an integer.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	let all = "ab".find_all(re"(a)", "many");
+	return 0;
+}

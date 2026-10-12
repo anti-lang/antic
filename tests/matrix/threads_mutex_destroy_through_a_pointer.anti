@@ -1,0 +1,21 @@
+//! `m.destroy()` releases a Mutex in a place and one behind a pointer.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn release(m: *Mutex)
+{
+	m.destroy();
+}
+
+fn main() -> int
+{
+	let m = Mutex.new();
+	sync m {
+		printf("held\n".ptr);
+	}
+	release(&m);
+	printf("released\n".ptr);
+	return 0;
+}

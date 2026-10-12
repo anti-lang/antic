@@ -1,0 +1,25 @@
+//! A function value follows the pointer rule, so `==` compares a `fn` with a
+//! `?fn` of the same type.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn thrice(n: int) -> int
+{
+	return n * 3;
+}
+
+fn same(f: fn(int) -> int, g: ?fn(int) -> int) -> bool
+{
+	return f == g;
+}
+
+fn main() -> int
+{
+	printf("%d %d %d\n".ptr, same(twice, twice) as c_int, same(twice, thrice) as c_int, same(twice, none) as c_int);
+	return 0;
+}

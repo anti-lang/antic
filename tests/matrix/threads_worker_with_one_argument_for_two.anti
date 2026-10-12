@@ -1,0 +1,21 @@
+//! A dispatch passes as many arguments as the worker has parameters beside its
+//! task.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn read(t: *Task, v: int, w: int) -> int
+{
+	return t.n;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let job = dispatch t -> read(5);
+	let got = join(job);
+	delete(t);
+	return got;
+}

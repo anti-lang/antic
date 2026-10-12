@@ -1,0 +1,13 @@
+//! An anonymous function takes as many parameters as the type it is passed to.
+
+fn call(f: fn(int, int) -> int) -> int
+{
+	return f(1, 2);
+}
+
+fn main() -> int
+{
+	return call(fn(a) {
+		return a;
+	});
+}

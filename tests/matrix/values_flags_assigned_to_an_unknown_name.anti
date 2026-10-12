@@ -1,0 +1,11 @@
+//! `(r, f) = a + b` assigns two variables in scope.
+
+import anti.lang;
+
+fn main() -> int
+{
+	let a = 1;
+	let r = 0;
+	(r, nope) = a + a;
+	return 0;
+}

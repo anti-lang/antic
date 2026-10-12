@@ -1,0 +1,22 @@
+//! A concurrent class has no default `==`, and its module gives it one with
+//! `operator fn eq`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+concurrent class Counter
+{
+	pub atomic n: int = 0,
+}
+
+operator fn eq(a: *Counter, b: *Counter) -> bool
+{
+	return a.n.load() == b.n.load();
+}
+
+fn main() -> int
+{
+	let a = Counter { };
+	let b = Counter { };
+	printf("%d\n".ptr, (a == b) as c_int);
+	return 0;
+}

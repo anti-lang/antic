@@ -1,0 +1,24 @@
+//! A function of the module that takes the simd struct first and is named as a
+//! built-in is the one `v.sum()` calls.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn sum(v: *Vec4) -> f32
+{
+	return 100.0;
+}
+
+fn main() -> int
+{
+	let v = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+	printf("%g %g\n".ptr, v.sum() as float, v.max() as float);
+	return 0;
+}
