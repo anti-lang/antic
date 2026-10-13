@@ -1,0 +1,38 @@
+//! A float that the optimizer knows and the checker does not, converted to an
+//! unsigned type that cannot hold it. The result is the nearest value of the
+//! type, as it is for a float read at run time.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn high() -> u32
+{
+	let d: f64 = 5000000000.0;
+	return d as u32;
+}
+
+fn low() -> u32
+{
+	let d: f64 = -7.5;
+	return d as u32;
+}
+
+fn small() -> u8
+{
+	let d: f64 = 300.0;
+	return d as u8;
+}
+
+fn wide() -> u64
+{
+	let d: f64 = 1.0e30;
+	return d as u64;
+}
+
+fn main() -> int
+{
+	printf("high %llu\n".ptr, high() as u64);
+	printf("low %llu\n".ptr, low() as u64);
+	printf("small %llu\n".ptr, small() as u64);
+	printf("wide %llu\n".ptr, wide());
+	return 0;
+}
