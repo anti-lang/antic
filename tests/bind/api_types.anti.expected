@@ -1,0 +1,19 @@
+//! The binding of api_types, which `anti bind` wrote from `api_types.json`.
+//! Nothing in it is written by hand. Run `anti bind` again to change it.
+
+pub enum Mode
+{
+	MODE_A = 0,
+}
+
+pub extern fn t_longlong(p: c_longlong);
+
+pub extern fn t_slonglong(p: c_longlong);
+
+pub extern fn t_signed(p: c_int);
+
+pub extern fn t_unsigned(p: c_uint);
+
+pub extern fn t_const_after(p: Mode);
+
+pub extern fn t_no_params(p: ?fn() -> c_int);

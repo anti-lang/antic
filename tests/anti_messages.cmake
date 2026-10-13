@@ -27,6 +27,46 @@ anti_message(license_from_no_notice
 anti_message(license_from_absent
     ARGS license --from none --runtime "${RUNTIME}"
     ERR "anti: cannot read none")
+# A notice ends at its end marker, so the bytes of a program that lacks
+# the marker hold none.
+set(license_id "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+set(license_head "MZ\nANTI_LICENSES_BEGIN\nbuild ${license_id}\npackage com.example.app 1.0 MIT\n")
+anti_message(license_from_notice_without_its_end
+    FILES program "${license_head}text for com.example.app\nANTI_LICENSES_EN"
+    ARGS license --from program --runtime "${RUNTIME}"
+    ERR "anti: program carries no licence notice")
+# The last line of a notice and of the record of sources may lack its
+# newline. The record names `musl` with its URL and `mimalloc` without
+# one, and no `other`.
+set(license_sources "# The record.\nmusl 1.2.5 https://musl.libc.org/releases/musl-1.2.5.tar.gz\nmimalloc 2.1.7")
+anti_message(license_from_notice_without_a_last_newline
+    STATUS 0
+    FILES program "${license_head}text for musl other mimallocANTI_LICENSES_END\n"
+          archive/licenses/sources.txt "${license_sources}"
+    ARGS license --from program --runtime archive
+    OUT "package com.example.app 1.0 MIT"
+        "text for musl other mimallocsource musl 1.2.5 https://musl.libc.org/releases/musl-1.2.5.tar.gz"
+        "source mimalloc 2.1.7")
+# The plain form takes the version of a component from the record, where
+# the line of `mimalloc` ends the file and holds no URL.
+anti_message(license_sources_without_a_last_newline
+    STATUS 0
+    FILES archive/LICENSE "The licence of Anti.\n"
+          archive/licenses/anti_rt.txt "The licence of the runtime.\n"
+          archive/licenses/mimalloc.txt "The licence of mimalloc.\n"
+          archive/licenses/sources.txt "${license_sources}"
+    ARGS license --runtime archive
+    OUT "package antic ${VERSION} MIT"
+        "package anti ${VERSION} MIT"
+        "package anti.rt ${VERSION} 0BSD"
+        "package mimalloc 2.1.7 MIT"
+        "text for antic anti"
+        "The licence of Anti."
+        "text for anti.rt"
+        "The licence of the runtime."
+        "text for mimalloc"
+        "The licence of mimalloc."
+        "source mimalloc 2.1.7")
 anti_message(license_from_archive_no_archive
     FILES library.a "A text where the archive belongs.\n"
     ARGS license --from-archive library.a

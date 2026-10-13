@@ -1,0 +1,8 @@
+//! A paragraph that is long enough to pass the eightieth column holds [a link
+//! of five words](https://example.com/page).
+
+/// One.
+pub fn one() -> int
+{
+	return 1;
+}

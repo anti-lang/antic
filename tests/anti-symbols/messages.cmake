@@ -27,6 +27,28 @@ anti_message(check_no_program
     FILES conf.toml "[runtime]\nthreads = 2\n"
     ARGS symbols check --conf conf.toml
     OUT "missing the program: . holds no program of Anti")
+# A program is a file with the header of an executable and a notice that
+# names its build. The notice of the first ends in the line of its
+# package, without a newline, and that of the second in a line of an
+# attribution. The build id of the third holds a letter that is no digit
+# of base sixteen, so the file is no program of Anti.
+set(notice_id "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+set(notice_head "MZ\nANTI_LICENSES_BEGIN\nbuild ")
+anti_message(check_notice_ends_in_its_package_line
+    FILES conf.toml "[runtime]\nthreads = 2\n"
+          prog "${notice_head}${notice_id}\npackage com.example.app 1.0"
+    ARGS symbols check --conf conf.toml
+    OUT "missing ./prog ${notice_id}")
+anti_message(check_notice_ends_in_an_attribution_line
+    FILES conf.toml "[runtime]\nthreads = 2\n"
+          prog "${notice_head}${notice_id}\npackage com.example.app 1.0\nattribution Example"
+    ARGS symbols check --conf conf.toml
+    OUT "missing ./prog ${notice_id}")
+anti_message(check_build_id_with_another_letter
+    FILES conf.toml "[runtime]\nthreads = 2\n"
+          prog "${notice_head}0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeg\npackage com.example.app 1.0 MIT\n"
+    ARGS symbols check --conf conf.toml
+    OUT "missing the program: . holds no program of Anti")
 # A text of `plugins` holds its directories as `--anti.plugins` takes
 # them, with `:` between two, and an empty one names nothing.
 anti_message(inventory_plugins_as_a_text
