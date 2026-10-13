@@ -33,6 +33,8 @@
 #   bind_define_shim   `bind -D` reaches the shim
 #   symbols_from       `symbols inventory --from` reads the archives of
 #                      another directory
+#   symbols_target     `symbols inventory` finds a program that `build
+#                      --target` wrote for Linux and one for Windows
 #   targets_default    `default` of `[targets]` in the manifest builds for
 #                      the targets it names and not for the host
 #   release_path       `build --release` builds a path dependency in
@@ -424,6 +426,36 @@ if(CASE STREQUAL "symbols_from")
     if(NOT anti_stdout MATCHES "^present [^\n]*tracer[^\n]* [0-9a-f]+\nwrote option\\.zip with 1 of 1 modules\n$")
         message(FATAL_ERROR "the inventory with --from printed:\n"
                             "${anti_stdout}")
+    endif()
+    return()
+endif()
+
+if(CASE STREQUAL "symbols_target")
+    # The same project built for two targets, each program beside its
+    # archive in a directory of its own. The inventory reads an ELF file
+    # and a PE file on every host, and the two builds have two ids.
+    file(COPY "${FIXTURES}/anti-symbols/tracer" DESTINATION "${WORK}")
+    foreach(target linux-arm64 windows-x86_64)
+        anti_passes("anti build --release --target ${target}"
+                    "${WORK}/tracer" build --release --target ${target}
+                    --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+        set(dist "${WORK}/tracer/dist/${target}/release")
+        set(deploy "${WORK}/deploy-${target}")
+        file(GLOB built "${dist}/tracer" "${dist}/tracer.exe"
+             "${dist}/tracer-symbols.zip")
+        file(COPY ${built} DESTINATION "${deploy}")
+        file(WRITE "${deploy}/app.toml" "[runtime]\nthreads = 2\n")
+        anti_passes("anti symbols inventory for ${target}" "${deploy}"
+                    symbols inventory --conf app.toml --out out.zip)
+        if(NOT anti_stdout MATCHES "^present \\./tracer(\\.exe)? ([0-9a-f]+)\nwrote out\\.zip with 1 of 1 modules\n$")
+            message(FATAL_ERROR "the inventory of the program of ${target} "
+                                "printed:\n${anti_stdout}")
+        endif()
+        set(id_${target} "${CMAKE_MATCH_2}")
+    endforeach()
+    if(id_linux-arm64 STREQUAL id_windows-x86_64)
+        message(FATAL_ERROR "the programs of the two targets carry one "
+                            "build id, ${id_linux-arm64}")
     endif()
     return()
 endif()
