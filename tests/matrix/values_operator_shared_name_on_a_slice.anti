@@ -1,6 +1,7 @@
-//! Two `operator fn eq` at module level share the name by the types of their
+//! Two `operator fn lt` at module level share the name by the types of their
 //! first parameters. A slice has no name to share under, so its operator keeps
-//! the bare name, and `==` of the struct calls the other.
+//! the bare name, and `<` of the struct calls the other. R034 of "Rules of
+//! 2026-10-13" refuses an `operator fn eq` on a slice, so the pair is of `lt`.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -10,20 +11,20 @@ struct Key
 	note: int,
 }
 
-operator fn eq(a: Key, b: Key) -> bool
+operator fn lt(a: Key, b: Key) -> bool
 {
-	return a.id == b.id;
+	return a.id < b.id;
 }
 
-operator fn eq(a: []int, b: []int) -> bool
+operator fn lt(a: []int, b: []int) -> bool
 {
-	return a.len == b.len;
+	return a.len < b.len;
 }
 
 fn main() -> int
 {
 	let a = Key { id: 1, note: 2 };
-	let b = Key { id: 1, note: 3 };
-	printf("%d\n".ptr, (a == b) as c_int);
+	let b = Key { id: 2, note: 3 };
+	printf("%d\n".ptr, (a < b) as c_int);
 	return 0;
 }

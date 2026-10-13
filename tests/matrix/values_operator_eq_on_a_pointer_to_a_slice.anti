@@ -1,0 +1,12 @@
+//! `operator fn eq` whose first parameter is a pointer to a slice is refused as
+//! the one on the slice is, by R034 of "Rules of 2026-10-13".
+
+operator fn eq(a: *[]int, b: *[]int) -> bool
+{
+	return true;
+}
+
+fn main() -> int
+{
+	return 0;
+}

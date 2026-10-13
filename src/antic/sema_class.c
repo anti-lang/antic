@@ -722,6 +722,21 @@ static void check_operator_item(struct checker *c, const struct item *m,
                       "next value index set_index hash`");
         return;
     }
+    /* DESIGN: `==` on a slice is refused, and a slice inside a value
+       compares as a view, so an `operator fn eq` on one would never be
+       called, by R034 of "Rules of 2026-10-13". A union keeps its
+       operator: `==` on it and the default `==` of a struct that holds
+       it call the function. */
+    if (sema_name_is(&m->name, "eq") && owner != NULL) {
+        const struct type *first =
+            owner->kind == TYPE_POINTER ? owner->element : owner;
+        if (first->kind == TYPE_SLICE) {
+            sema_error_at(c, m->name_pos, "`==` is not defined on the "
+                          "slice `%s`, which takes no `operator fn eq`",
+                          sema_tn(first));
+            return;
+        }
+    }
     check_hook(c, m, owner);
 }
 

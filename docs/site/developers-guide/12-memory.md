@@ -325,7 +325,7 @@ A Java array is an object with its length, checked at every index. A C array dec
 
 A part of a slice **aliases** the slice it came from. Both refer to the same elements, and a write through one is read through the other. No form copies the elements of a slice. An array converts to a slice by `a[0..a.len]` alone, and a slice never converts to an array.
 
-`lo` and `hi` are both written. A slice has no `==`, and its length is not assigned.
+`lo` and `hi` are both written. A slice has no `==` and takes no `operator fn eq`, and its length is not assigned.
 
 A **view** is `p as *U`: the address of `p` read as another type. It reinterprets the bytes and converts nothing.
 

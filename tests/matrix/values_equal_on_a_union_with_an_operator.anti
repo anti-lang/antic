@@ -1,0 +1,35 @@
+//! A union with `operator fn eq` compares through it, alone and inside a
+//! struct. R034 of "Rules of 2026-10-13" refuses the operator on a slice, whose
+//! `==` nothing calls, and this program holds the union, whose `==` calls it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+union Word
+{
+	whole: u32,
+	half: u16,
+}
+
+operator fn eq(a: Word, b: Word) -> bool
+{
+	return a.whole == b.whole;
+}
+
+struct Boxed
+{
+	w: Word,
+	n: int,
+}
+
+fn main() -> int
+{
+	let x = Word { whole: 1 };
+	let y = Word { whole: 1 };
+	let z = Word { whole: 2 };
+	printf("union %d %d\n".ptr, (x == y) as c_int, (x == z) as c_int);
+	let a = Boxed { w: x, n: 1 };
+	let b = Boxed { w: y, n: 1 };
+	let c = Boxed { w: z, n: 1 };
+	printf("struct %d %d\n".ptr, (a == b) as c_int, (a == c) as c_int);
+	return 0;
+}

@@ -1,0 +1,13 @@
+//! `operator fn eq` on a slice is refused where it is declared, by R034 of
+//! "Rules of 2026-10-13": `==` on two slices is refused, so nothing would call
+//! it.
+
+operator fn eq(a: []int, b: []int) -> bool
+{
+	return a.len == b.len;
+}
+
+fn main() -> int
+{
+	return 0;
+}

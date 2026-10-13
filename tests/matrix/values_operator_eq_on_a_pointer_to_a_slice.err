@@ -1,0 +1,1 @@
+values_operator_eq_on_a_pointer_to_a_slice.anti:4:13: error: `==` is not defined on the slice `[]int`, which takes no `operator fn eq`
