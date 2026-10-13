@@ -2647,6 +2647,8 @@ The step of flow and of errors built the Change rules of this part and of "Error
 
 ### Values and constants
 
+The step of values and of constants built R026, R027, R029 to R034, R039, R046 and R047 on 2026-10-14. R043 and R045 are not built, and R034 keeps `operator fn eq` on a union. `docs/reports/2026-10-14-rules-values.md` names the test and the commit of each, and "What the rules run added" holds the readings the step took.
+
 - R026. Change. A narrowing `as` of a constant whose value does not fit the target type is refused. The same conversion stops a dev build at run time.
 - R027. Change. A constant conversion to `char` of a surrogate or of a value past `0x10FFFF` is refused. At run time a dev build checks it.
 - R028. Keep. A float divided by zero in a constant gives an infinity or a NaN.
