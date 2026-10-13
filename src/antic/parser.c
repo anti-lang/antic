@@ -314,7 +314,12 @@ struct doc_text parser_doc_before(struct parser *p, enum token_kind kind)
 }
 
 /* Skip to the start of the next statement. That is past a semicolon, or
-   up to a closing brace or a keyword that starts a statement. */
+   up to a closing brace or a keyword that starts a statement.
+
+   DESIGN: R012 of "Rules of 2026-10-13". The end of the source is no
+   place to go on from, so the parser stays in its error there. Every
+   block that is still open would report its missing `}` at that one
+   position, and the first report stands for all of them. */
 void parser_sync_statement(struct parser *p)
 {
     p->half = false;
@@ -325,8 +330,9 @@ void parser_sync_statement(struct parser *p)
             parser_next(p);
             p->panic = false;
             return;
-        case TOKEN_RBRACE:
         case TOKEN_EOF:
+            return;
+        case TOKEN_RBRACE:
         case TOKEN_LET:
         case TOKEN_CONST:
         case TOKEN_IF:
