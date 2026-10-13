@@ -71,7 +71,7 @@ struct_decl Lengths
           type H
         int_lit 1          int
       type byte
-  field minus              [--size_of(H)]byte
+  field minus              [-(-size_of(H))]byte
     type [N]
       unary -              int
         unary -            int

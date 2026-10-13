@@ -755,6 +755,7 @@ of lowering meet:
 | `values_operator_eq_on_a_slice`, `values_operator_eq_on_a_pointer_to_a_slice` | R034: `operator fn eq` on a slice is refused where it is declared. `values_operator_shared_name_on_a_slice` holds its pair of `lt` | |
 | `values_equal_on_a_union_with_an_operator` | a union with `operator fn eq` compares through it, alone and in a struct, which R034 leaves as it is | |
 | `values_assign_concurrent_class`, `values_let_copies_a_concurrent_class`, `values_assign_through_a_pointer_copies_a_concurrent_class`, `values_assign_a_struct_that_holds_a_concurrent_class`, `values_concurrent_class_takes_a_fresh_value` | R039: `=` and `let` copy no concurrent class, alone or in a struct, and a fresh value and `dup` are taken | |
+| `types_length_with_a_size_negated_twice` | R046: the length `-(-size_of(H))` prints with the parentheses of its unary minus | |
 | `check_overflow_divide_least`, `check_overflow_remainder_least_i8`, `check_overflow_divide_least_compound`, `check_overflow_negate_least`, `check_overflow_negate_least_i8` of `tests/traps/` | R031: the least value divided by -1, its remainder and unary `-` of it stop a dev build | |
 | `check_shift_wrap_negative`, `check_shift_wrap_negative_compound` of `tests/traps/` | R032: `<<%` by a count below zero stops a dev build | |
 | `values_constant_surrogate_as_char`, `values_constant_past_the_last_char`, `values_constant_as_char_at_the_ends` | R027: a constant conversion to `char` of a surrogate or of a value past `0x10FFFF` is refused, and the values beside them convert | |

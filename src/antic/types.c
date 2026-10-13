@@ -380,10 +380,21 @@ void types_symbolic_print(struct text *out, const struct symbolic *s,
         print_type(out, s->of, qualified);
         text_append(out, ")");
         break;
-    case SYMBOLIC_UNARY:
+    case SYMBOLIC_UNARY: {
+        /* DESIGN: `-` before a text that starts with `-` would read as
+           another token, so the operand keeps the parentheses the
+           program wrote, by R046 of "Rules of 2026-10-13". */
+        bool minus_again =
+            s->op == TOKEN_MINUS &&
+            ((s->a->kind == SYMBOLIC_UNARY && s->a->op == TOKEN_MINUS) ||
+             (s->a->kind == SYMBOLIC_INT && types_is_signed(s->a->type) &&
+              (s->a->value >> 63) != 0));
         text_append(out, operator_spelling(s->op));
+        text_append(out, minus_again ? "(" : "");
         print_operand(out, s->a, qualified);
+        text_append(out, minus_again ? ")" : "");
         break;
+    }
     case SYMBOLIC_BINARY:
         print_operand(out, s->a, qualified);
         text_appendf(out, " %s ", operator_spelling(s->op));
