@@ -1,0 +1,19 @@
+//! The default of a field that names a constant parameter of its class has the
+//! value of each copy: `N + 1` is 4 in `Row<3>` and 6 in `Row<5>`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Row<N: int>
+{
+	pub n: int = N + 1,
+}
+
+fn main() -> int
+{
+	let three = Row<3> { };
+	let five = Row<5> { };
+	printf("%lld %lld\n".ptr, three.n, five.n);
+	return 0;
+}

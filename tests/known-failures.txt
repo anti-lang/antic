@@ -384,3 +384,6 @@ dump_llvm_wchar_constant_macos-arm64 T122 A constant of `c_wchar` computed from 
 anti_doc_message_source_does_not_parse T123 `anti doc` prints the message of a source that does not parse twice.
 anti_doc_wrapped_link T124 A link of a doc comment whose text `anti fmt` wraps over two lines is written as text.
 matrix_classes_changed_hook_of_a_bitfield_trace_writes T114 The `changed` hook gets the record of the first field of the class for the write of a bitfield.
+matrix_classes_default_names_a_constant_parameter_dev T125 The default of a field that names a constant parameter of its class has one wrong value in every copy.
+matrix_classes_default_names_a_constant_parameter_release T125 The default of a field that names a constant parameter of its class has one wrong value in every copy.
+matrix_classes_default_names_a_constant_parameter_memory_checks T125 The default of a field that names a constant parameter of its class has one wrong value in every copy.
