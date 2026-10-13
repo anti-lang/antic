@@ -1,0 +1,18 @@
+//! An assignment through a pointer that copies a concurrent class is refused,
+//! by R039 of "Rules of 2026-10-13".
+
+import anti.lang;
+
+concurrent class Hits
+{
+	pub atomic n: int = 0,
+}
+
+fn main() -> int
+{
+	let first = Hits { n: 5 };
+	let second = Hits { n: 6 };
+	let p = &second;
+	*p = first;
+	return second.n.load();
+}

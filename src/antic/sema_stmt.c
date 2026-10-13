@@ -1440,6 +1440,7 @@ static void check_destructuring_let(struct checker *c, struct stmt *s)
         t = sema_builtin(c, TYPE_ERROR);
     } else {
         sema_refuse_owned_copy(c, s->as.let.value, t);
+        sema_refuse_concurrent_copy(c, s->as.let.value, t);
     }
     value = arena_alloc(c->arena, sizeof *value);
     value->kind = SYMBOL_LOCAL;

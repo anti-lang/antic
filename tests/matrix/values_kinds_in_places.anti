@@ -777,10 +777,11 @@ fn let_on_class()
 	printf("let class %lld %lld\n".ptr, second.n, third.n);
 }
 
+// R039 of "Rules of 2026-10-13": `=` and `let` copy no concurrent class, so each
+// place takes a fresh value.
 fn let_on_concurrent_class()
 {
-	let first: Hits = Hits { n: 5 };
-	let second = first;
+	let second = Hits { n: 5 };
 	let third: Hits = Hits { n: 6 };
 	printf("let concurrent_class %lld %lld\n".ptr, second.n.load(), third.n.load());
 }
@@ -1336,12 +1337,11 @@ fn assign_on_class()
 
 fn assign_on_concurrent_class()
 {
-	let first: Hits = Hits { n: 5 };
-	let second: Hits = Hits { n: 6 };
-	let kept = first;
-	first = second;
+	let first: Hits = Hits { n: 0 };
+	let second: Hits = Hits { n: 0 };
+	first = Hits { n: 6 };
 	let p = &second;
-	*p = kept;
+	*p = Hits { n: 5 };
 	printf("assign concurrent_class %lld %lld\n".ptr, second.n.load(), first.n.load());
 }
 

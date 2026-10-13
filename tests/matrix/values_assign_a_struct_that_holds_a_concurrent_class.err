@@ -1,0 +1,1 @@
+values_assign_a_struct_that_holds_a_concurrent_class.anti:21:10: error: `Hold` holds the concurrent class `Hits` and is not copied by `=`, pass a pointer to it

@@ -400,7 +400,7 @@ A field that is none of the three fails the safety check `unguarded-field`. A sa
 
 `compare_swap` takes a plain field of one word that `unchecked` marks. That is the form of a lock-free structure.
 
-A concurrent class has no default `==` and no default hash. It declares `concrete fn equals` and `concrete fn hash`, or `operator fn eq` and `operator fn hash`, when it needs them.
+A concurrent class has no default `==` and no default hash. It declares `concrete fn equals` and `concrete fn hash`, or `operator fn eq` and `operator fn hash`, when it needs them. `=` and `let` copy no object of a concurrent class, also when it holds atomic fields alone and no lock. A fresh value moves into a place, and `dup` copies one.
 
 It shares three rules with a synchronized class. A function that is not private gives out no pointer into the fields. The class inherits its own kind or an abstract class without fields. A worker takes a pointer to an object.
 

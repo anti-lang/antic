@@ -1,0 +1,23 @@
+//! An assignment that copies a struct with a concurrent class in a field is
+//! refused, by R039 of "Rules of 2026-10-13": the copy would copy the class.
+
+import anti.lang;
+
+concurrent class Hits
+{
+	pub atomic n: int = 0,
+}
+
+struct Hold
+{
+	f: Hits,
+	tag: int,
+}
+
+fn main() -> int
+{
+	let first = Hold { f: Hits { n: 5 }, tag: 1 };
+	let second = Hold { f: Hits { n: 6 }, tag: 2 };
+	first = second;
+	return first.tag;
+}

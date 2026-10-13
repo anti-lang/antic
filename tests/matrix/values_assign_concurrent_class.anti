@@ -1,0 +1,18 @@
+//! An assignment that copies a concurrent class is refused, by R039 of "Rules
+//! of 2026-10-13", also when the class holds atomic fields alone: an atomic is
+//! shared state, and a copy of it is not.
+
+import anti.lang;
+
+concurrent class Hits
+{
+	pub atomic n: int = 0,
+}
+
+fn main() -> int
+{
+	let first = Hits { n: 5 };
+	let second = Hits { n: 6 };
+	first = second;
+	return first.n.load();
+}

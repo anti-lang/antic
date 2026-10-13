@@ -1,0 +1,27 @@
+//! A fresh value of a concurrent class moves into a `let` and into an
+//! assignment, and `dup` copies one. R039 of "Rules of 2026-10-13" refuses the
+//! copy by `=` alone.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+concurrent class Hits
+{
+	pub atomic n: int = 0,
+}
+
+fn fresh(n: int) -> Hits
+{
+	return Hits { n: n };
+}
+
+fn main() -> int
+{
+	let first = Hits { n: 5 };
+	let second = fresh(6);
+	first = Hits { n: 7 };
+	let third = dup(second);
+	printf("%lld %lld %lld\n".ptr, first.n.load(), second.n.load(), third.n.load());
+	return 0;
+}

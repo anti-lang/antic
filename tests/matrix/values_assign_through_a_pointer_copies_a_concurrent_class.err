@@ -1,0 +1,1 @@
+values_assign_through_a_pointer_copies_a_concurrent_class.anti:16:7: error: `Hits` is a concurrent class and is not copied by `=`, pass a pointer to it

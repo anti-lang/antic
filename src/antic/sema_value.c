@@ -277,11 +277,70 @@ static bool moves_own_param(struct checker *c, struct expr *value,
     return true;
 }
 
+/* The concurrent class that a value of t is or holds in place, or NULL.
+   A pointer holds none. answered holds the types with fields met in this
+   walk, none of which holds one. */
+static const struct type *concurrent_in(const struct type *t,
+                                        struct ptr_set *answered)
+{
+    const struct type *found;
+    size_t i;
+
+    if (t == NULL) {
+        return NULL;
+    }
+    if (t->kind == TYPE_CLASS && t->safety == SAFETY_CONCURRENT) {
+        return t;
+    }
+    if (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL) {
+        return concurrent_in(t->element, answered);
+    }
+    if ((t->kind != TYPE_STRUCT && t->kind != TYPE_CLASS &&
+         t->kind != TYPE_TUPLE && t->kind != TYPE_VARIANT) ||
+        !ptr_set_add(answered, t)) {
+        return NULL;
+    }
+    for (i = 0; i < t->field_count; i++) {
+        found = concurrent_in(t->fields[i].type, answered);
+        if (found != NULL) {
+            return found;
+        }
+    }
+    return NULL;
+}
+
+/* DESIGN: a concurrent class is shared state, its atomic fields among
+   it, and a copy of it is not. By R039 of "Rules of 2026-10-13" `=` and
+   `let` never copy one out of the place it lives in, also when it holds
+   no Mutex. A fresh value moves, and `dup` copies. */
+void sema_refuse_concurrent_copy(struct checker *c, const struct expr *value,
+                                 const struct type *t)
+{
+    struct ptr_set answered;
+    const struct type *found;
+
+    if (sema_is_error(t) || !sema_reads_existing(value)) {
+        return;
+    }
+    memset(&answered, 0, sizeof answered);
+    found = concurrent_in(t, &answered);
+    free(answered.slots);
+    if (found == t) {
+        sema_error_at(c, value->pos, "`%s` is a concurrent class and is not "
+                      "copied by `=`, pass a pointer to it", sema_tn(t));
+    } else if (found != NULL) {
+        sema_error_at(c, value->pos, "`%s` holds the concurrent class `%s` "
+                      "and is not copied by `=`, pass a pointer to it",
+                      sema_tn(t), sema_tn(found));
+    }
+}
+
 void sema_bind_value(struct checker *c, struct expr *value, struct name into,
                      struct type *t)
 {
     if (!moves_own_param(c, value, into)) {
         sema_refuse_owned_copy(c, value, t);
+        sema_refuse_concurrent_copy(c, value, t);
     }
 }
 

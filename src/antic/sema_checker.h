@@ -578,6 +578,10 @@ bool sema_refuse_caller_value(struct checker *c, const struct expr *value);
 bool sema_holds_mutex(const struct type *t);
 void sema_refuse_lock_copy(struct checker *c, const struct expr *value,
                            const struct type *t);
+/* Refuse value where `=` or `let` would copy a concurrent class out of
+   the place it lives in. */
+void sema_refuse_concurrent_copy(struct checker *c, const struct expr *value,
+                                 const struct type *t);
 /* Refuse the name e of sym, which moved before it in the order of the
    text. */
 void sema_refuse_moved(struct checker *c, const struct expr *e,
