@@ -200,3 +200,9 @@ anti_message(clang_cast_of_a_negative_number STATUS 0
     OUT "bind: anti.api from api.h, 0 functions, 1 warning"
     ARGS ${clang_bind}
     ERR "anti: api.h: warning: the macro `API_H` has no value and is skipped")
+
+# `bind --header` reads a library file.
+anti_message(header_of_a_damaged_library
+    FILES one.antl "A text where the library file belongs.\n"
+    ARGS bind --header one.antl --runtime "${RUNTIME}"
+    ERR "anti: one.antl: is not a library file")
