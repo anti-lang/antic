@@ -435,7 +435,7 @@ column means that no source holds the row at all.
 
 | Area | Rows | Cells held | Cells open | Kinds held | Kinds open |
 |---|---|---|---|---|---|
-| Flow | 27 | 454 | 1 | 91 | 0 |
+| Flow | 27 | 455 | 0 | 91 | 0 |
 | Values | 40 | 753 | 0 | 1038 | 1 |
 | Types | 32 | 194 | 20 | 0 | 0 |
 | Ownership | 18 | 248 | 1 | 125 | 0 |
@@ -443,7 +443,7 @@ column means that no source holds the row at all.
 | Threads | 29 | 402 | 4 | 189 | 7 |
 | Classes | 26 | 59 | 0 | 0 | 0 |
 | Modules | 19 | 30 | 0 | 0 | 0 |
-| All | 206 | 2313 | 26 | 1484 | 8 |
+| All | 206 | 2314 | 25 | 1484 | 8 |
 
 ### Flow
 
@@ -459,7 +459,7 @@ column means that no source holds the row at all.
 | `for i, x in e` | function `programs/for_patterns`, method `matrix/flow_for_index`, loop body `matrix/flow_for_index`, switch arm `matrix/flow_for_index`, `if let` `matrix/flow_for_index`, `defer` `matrix/flow_for_index`, `undo` `matrix/flow_for_index`, catch handler `matrix/flow_for_index`, closure `matrix/flow_for_index`, worker `matrix/flow_for_index`, `dispatch` or `parallel` `matrix/flow_for_index`, `sync` block `matrix/flow_for_index`, `select` arm `matrix/flow_for_index`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `matrix/flow_for_index`, nested type `matrix/flow_for_index`, library module `modules/flow/com/example/flow` | none |
 | `break` | function `programs/by_ends`, method `programs/lock_free_queue`, loop body `programs/by_ends`, switch arm `matrix/flow_break`, `if let` `matrix/flow_break`, `defer` `matrix/flow_break`, `undo` `matrix/flow_break`, catch handler `programs/catch_exits`, closure `matrix/flow_break`, worker `std/spsc_ring_threads`, `dispatch` or `parallel` `matrix/flow_break`, `sync` block `programs/sync_exits`, `select` arm `matrix/flow_break`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `matrix/flow_break`, nested type `matrix/flow_break`, library module `modules/flow/com/example/flow` | none |
 | `continue` | function `programs/arith_facts`, method `matrix/flow_continue`, loop body `programs/arith_facts`, switch arm `matrix/flow_continue`, `if let` `matrix/flow_continue`, `defer` `matrix/flow_continue`, `undo` `matrix/flow_continue`, catch handler `programs/catch_exits`, closure `matrix/flow_continue`, worker `std/concurrent_map_threads`, `dispatch` or `parallel` `matrix/flow_continue`, `sync` block `programs/sync_exits`, `select` arm `matrix/flow_continue`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `matrix/flow_continue`, nested type `matrix/flow_continue`, library module `modules/flow/com/example/flow` | none |
-| `return` of a value | function `programs/alias_access`, method `programs/atomics`, loop body `programs/args`, switch arm `programs/switch_stmt`, `if let` `programs/generic_variants`, `defer` `matrix/flow_return_value_in_defer` T001, `undo` `matrix/flow_return_value_in_undo` T001, catch handler `programs/catch_exits`, closure `programs/closures`, worker `programs/channel_workers`, `dispatch` or `parallel` `programs/closures`, `sync` block `programs/concurrent`, `select` arm `matrix/flow_return_value`, `fixtures` block `programs/test_blocks`, generic body `programs/caller_params`, nested type `programs/generic_nested`, library module `modules/access/com/example/ledger` | `tests` block: a function of a `tests` block returns nothing, so no `return` of a value stands in one |
+| `return` of a value | function `programs/alias_access`, method `programs/atomics`, loop body `programs/args`, switch arm `programs/switch_stmt`, `if let` `programs/generic_variants`, `defer` `matrix/flow_return_value_in_defer` T001, `undo` `matrix/flow_return_value_in_undo` T001, catch handler `programs/catch_exits`, closure `programs/closures`, worker `programs/channel_workers`, `dispatch` or `parallel` `programs/closures`, `sync` block `programs/concurrent`, `select` arm `matrix/flow_return_value`, `fixtures` block `programs/test_blocks`, generic body `programs/caller_params`, nested type `programs/generic_nested`, library module `modules/access/com/example/ledger`, `tests` block `anti-test/com/example/flow` | none |
 | `return` alone | function `programs/catch_none`, method `std/builder_take_in`, loop body `std/builder_take_in`, switch arm `matrix/flow_return_plain_in_arm`, `if let` `matrix/flow_return_plain_in_if_let`, `defer` `matrix/flow_return_plain_in_defer` T001, `undo` `matrix/flow_return_plain_in_undo` T001, catch handler `programs/pattern_walk`, closure `matrix/flow_return_plain_in_closure`, worker `matrix/flow_return_plain_in_worker`, `dispatch` or `parallel` `matrix/flow_return_plain_in_dispatch`, `sync` block `matrix/flow_return_plain_in_sync`, `select` arm `matrix/flow_return_plain_in_select`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `std/collection_parts`, nested type `matrix/flow_return_plain_in_nested`, library module `modules/flow/com/example/flow` | none |
 | `switch` | function `programs/alias_unions`, method `programs/nested_types`, loop body `programs/select_two`, switch arm `matrix/flow_switch`, `if let` `matrix/flow_switch`, `defer` `matrix/flow_switch`, `undo` `matrix/flow_switch`, catch handler `matrix/flow_switch`, closure `matrix/flow_switch`, worker `programs/select_two`, `dispatch` or `parallel` `matrix/flow_switch`, `sync` block `matrix/flow_switch`, `select` arm `matrix/flow_switch`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `programs/generic_variants`, nested type `matrix/flow_switch`, library module `modules/variants/com/example/geo` | none |
 | `else` of a `switch` | function `programs/nested_locals`, method `programs/switch_fallthrough`, loop body `programs/select_two`, switch arm `matrix/flow_switch_else`, `if let` `matrix/flow_switch_else`, `defer` `matrix/flow_switch_else`, `undo` `matrix/flow_switch_else`, catch handler `matrix/flow_switch_else`, closure `matrix/flow_switch_else`, worker `programs/select_two`, `dispatch` or `parallel` `matrix/flow_switch_else`, `sync` block `matrix/flow_switch_else`, `select` arm `matrix/flow_switch_else`, `tests` block `anti-test/com/example/flow`, `fixtures` block `anti-test/com/example/flow`, generic body `matrix/flow_switch_else`, nested type `matrix/flow_switch_else`, library module `modules/flow/com/example/flow` | none |
@@ -1711,7 +1711,7 @@ On 2026-10-12, at antic 0.2.0:
   contextual words.
 - 10 item kinds, 22 statement kinds, 38 expression kinds and 10 type kinds
   in `src/antic/ast.h`.
-- 206 rows in the matrix. 2313 cells are held and 26 are
+- 206 rows in the matrix. 2314 cells are held and 25 are
   open. Of the kinds, 1484 are held and 8 are open. The step `flow` filled
   its area after the count of 840 held cells and 578 held kinds. The step
   `values` filled its area after the count of 1157 held cells and 622 held

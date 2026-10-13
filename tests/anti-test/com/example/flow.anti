@@ -159,6 +159,12 @@ fixtures
 		return acc;
 	}
 
+	/// The value of `f` for `n`, which gives a test a function with a result.
+	fn fix_apply(f: fn(int) -> int, n: int) -> int
+	{
+		return f(n);
+	}
+
 	fn fix_switch(n: int) -> int
 	{
 		let acc = 0;
@@ -564,6 +570,26 @@ tests
 		assert(got2 == 3);
 		let got3 = fix_return_value(4);
 		assert(got3 == 4);
+	}
+
+	/// A function of a `tests` block gives no value, so the `return` of one
+	/// stands in an anonymous function of the test.
+	fn return_value_in_tests()
+	{
+		let got0 = fix_apply(fn(n) {
+			if n == 2 {
+				return 50;
+			}
+			return n;
+		}, 2);
+		assert(got0 == 50);
+		let got1 = fix_apply(fn(n) {
+			if n == 2 {
+				return 50;
+			}
+			return n;
+		}, 3);
+		assert(got1 == 3);
 	}
 
 	fn switch_in_fixtures()

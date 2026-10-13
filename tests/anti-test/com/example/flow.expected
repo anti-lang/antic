@@ -19,6 +19,7 @@ ok com.example.flow.break_in_tests
 ok com.example.flow.continue_in_fixtures
 ok com.example.flow.continue_in_tests
 ok com.example.flow.return_value_in_fixtures
+ok com.example.flow.return_value_in_tests
 ok com.example.flow.switch_in_fixtures
 ok com.example.flow.switch_in_tests
 ok com.example.flow.switch_else_in_fixtures
@@ -47,4 +48,4 @@ ok com.example.flow.in_range_in_fixtures
 ok com.example.flow.in_range_in_tests
 ok com.example.flow.return_plain_in_fixtures
 ok com.example.flow.return_plain_in_tests
-anti test: 49 tests in 1 modules, 0 modules failed
+anti test: 50 tests in 1 modules, 0 modules failed
