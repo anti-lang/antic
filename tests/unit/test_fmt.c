@@ -1,7 +1,8 @@
 /* anti fmt over sources the parser would refuse. The formatter runs the
    lexer alone, so no bound of the parser guards it: an angle list nested
    past what the stack holds, and the body of an anonymous function that
-   the file ends inside. */
+   the file ends inside. The last group holds single rules, on sources
+   the parser takes and on ones it refuses. */
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
@@ -77,8 +78,58 @@ static void open_anonymous(void)
     }
 }
 
+/* One rule per source, and the form it gives. The parser would refuse
+   the last six, and the formatter writes each as far as its rules reach. */
+static void odd_sources(void)
+{
+    static const char *const cases[][2] = {
+        /* A comment in the list of a direct import keeps the list in the
+           order it was written, since a comment belongs to a name. */
+        {"import a.b.{z, /* c */ a};\n", "import a.b.{z, /* c */ a};\n"},
+        /* A comma before the first name stays there, and the names after
+           it are sorted. */
+        {"import a.c.{, y, x};\n", "import a.c.{, x, y};\n"},
+        /* The spaces at the end of a doc line go, and a doc line of
+           spaces alone is an empty one. */
+        {"/// text   \n///    \n/// more\nfn main()\n{\n}\n",
+         "/// text\n///\n/// more\nfn main()\n{\n}\n"},
+        /* A block comment of empty lines alone has no gutter to remove. */
+        {"/**\n\n\n*/\nfn main()\n{\n}\n", "/**\n\n\n*/\nfn main()\n{\n}\n"},
+        /* The gutter goes from a block comment that holds an empty line. */
+        {"/**\n * a\n\n * b\n */\nfn other()\n{\n}\n",
+         "/**\na\n\nb\n*/\nfn other()\n{\n}\n"},
+        /* `snapshot fn` as the first tokens of a file, and a `}` that
+           closes nothing. */
+        {"snapshot fn(a) { };\n}\n", "snapshot fn(a) { };\n}\n"},
+        /* A call with type arguments as the first tokens of a file. */
+        {"x<int>(y);\n", "x<int>(y);\n"},
+        /* `>>` closes two lists and never one and a half. */
+        {"fn main()\n{\n\tf<A<int>>, int>(x);\n}\n",
+         "fn main()\n{\n\tf < A < int >>, int > (x);\n}\n"},
+        {"fn main()\n{\n\tf<(A<int>>, int)>(x);\n}\n",
+         "fn main()\n{\n\tf < (A < int >>, int) > (x);\n}\n"},
+        {"fn main()\n{\n\tlet v: A<int>> = 1;\n}\n",
+         "fn main()\n{\n\tlet v: A < int >> = 1;\n}\n"},
+        /* `fn` without its parameters is no type, so its `<` is none of
+           a list. */
+        {"fn main()\n{\n\tf<fn int>(x);\n}\n",
+         "fn main()\n{\n\tf < fn int > (x);\n}\n"},
+        /* A file that ends after a `<`. */
+        {"fn main()\n{\n\tf<", "fn main()\n{\n\tf <\n"},
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+        struct text out = {0};
+        CHECK(fmt_source(cases[i][0], strlen(cases[i][0]), &out));
+        CHECK_STR(text_cstr(&out), cases[i][1]);
+        text_free(&out);
+    }
+}
+
 void test_fmt(void)
 {
     deep_angles();
     open_anonymous();
+    odd_sources();
 }

@@ -792,6 +792,67 @@ static void profile_links(void)
           "clang_rt.builtins.lib ucrtbase.lib ntdll.lib kernel32.lib");
 }
 
+/* `--linker platform` links with the linker of the host and its C
+   library. A program that hosts plugins exports its names there too, a
+   Windows program that writes a profile leaves the static C runtime out,
+   and a plugin of link.exe links the C runtime of Visual Studio without
+   the start of a program. The import library of a DLL takes the name of
+   the DLL up to its last dot, and the whole name of one without a dot. */
+static void platform_links(void)
+{
+    static const char *const host[] = {"host.lib"};
+    struct shared_options plugin = {"fancy.def", NULL, NULL, NULL, true};
+    struct shared_options none = {"geo.def", NULL, NULL, NULL, false};
+    struct link_inputs in = extra_inputs;
+    struct link_inputs win = extra_windows_inputs;
+
+    in.exports = true;
+    links(TARGET_LINUX_ARM64, &in,
+          "ld -pie --export-dynamic --strip-debug --gc-sections "
+          "--dynamic-linker=/lib/ld-linux-aarch64.so.1 -o prog "
+          "/usr/lib/aarch64-linux-gnu/Scrt1.o "
+          "/usr/lib/aarch64-linux-gnu/crti.o prog.o shapes.o libm.a "
+          "/rt/lib/linux-arm64/armv8.0/libanti_rt.a "
+          "-L/usr/lib/aarch64-linux-gnu -lc /usr/lib/aarch64-linux-gnu/crtn.o");
+    win.profile_generate = true;
+    links(TARGET_WINDOWS_X86_64, &win,
+          "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /OPT:REF "
+          "/OPT:NOICF /SUBSYSTEM:CONSOLE /MACHINE:X64 /OUT:prog.exe "
+          "/PDB:prog.pdb prog.obj shapes.obj "
+          "C:/rt/lib/windows-x86_64/v3/anti_rt.lib "
+          "C:/rt/lib/windows-x86_64/clang_rt.profile.lib "
+          "/NODEFAULTLIB:libcmt.lib msvcrt.lib libvcruntime.lib ucrt.lib "
+          "legacy_stdio_definitions.lib");
+    win = windows_inputs;
+    win.object = "fancy.obj";
+    win.executable = "fancy.dll";
+    win.extra = host;
+    win.extra_count = 1;
+    shared(TARGET_WINDOWS_X86_64, &win, &plugin,
+           "link.exe /NOLOGO /DEBUG /PDBALTPATH:%_PDB% /ignore:4099 /OPT:REF "
+           "/OPT:NOICF /DLL /NOENTRY /MACHINE:X64 /OUT:fancy.dll "
+           "/PDB:fancy.pdb /DEF:fancy.def fancy.obj host.lib "
+           "libvcruntime.lib ucrt.lib legacy_stdio_definitions.lib");
+    win = lld_windows_inputs;
+    win.object = "geo.obj";
+    win.executable = "geo";
+    shared(TARGET_WINDOWS_X86_64, &win, &none,
+           "/rt/bin/lld-link /NOLOGO /lldmingw /lldignoreenv /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:oldnames.lib /NODEFAULTLIB:uuid.lib /DEBUG /PDBALTPATH:%_PDB% "
+           "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF /DLL /MACHINE:X64 "
+           "/OUT:geo /PDB:geo.pdb /DEF:geo.def /IMPLIB:geo.lib "
+           "/LIBPATH:/rt/sysroot/t/lib geo.obj "
+           "/rt/lib/windows-x86_64/v3/anti_rt.lib clang_rt.builtins.lib "
+           "ucrtbase.lib ntdll.lib kernel32.lib");
+    win.executable = "out.d/geo";
+    shared(TARGET_WINDOWS_X86_64, &win, &none,
+           "/rt/bin/lld-link /NOLOGO /lldmingw /lldignoreenv /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:oldnames.lib /NODEFAULTLIB:uuid.lib /DEBUG /PDBALTPATH:%_PDB% "
+           "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF /DLL /MACHINE:X64 "
+           "/OUT:out.d/geo /PDB:out.d/geo.pdb /DEF:geo.def "
+           "/IMPLIB:out.d/geo.lib /LIBPATH:/rt/sysroot/t/lib geo.obj "
+           "/rt/lib/windows-x86_64/v3/anti_rt.lib clang_rt.builtins.lib "
+           "ucrtbase.lib ntdll.lib kernel32.lib");
+}
+
 /* A shared library takes the facts of a program of its module: the
    libraries of `link linux` in the glibc mode, and the runtime of
    AddressSanitizer under --memory-checks. A Linux library of the glibc
@@ -951,6 +1012,7 @@ void test_link(void)
     memory_checks_links();
     lto_links();
     profile_links();
+    platform_links();
     shared_modes();
     sysroot_names();
     strips_debug();
