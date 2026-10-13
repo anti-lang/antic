@@ -127,6 +127,10 @@ not re-open a settled decision without asking Eddie.
   measured `host` 482 s. It ran each sanitizer suite as `ctest -I 1,1150`,
   `ctest -I 1151,2200` and `ctest -I 2201,4514`: `asan` 271 s, 358 s and
   296 s, `ubsan` 249 s, 344 s and 222 s.
+  The second session of that step measured `host` 517 s. It ran each
+  sanitizer suite as `ctest -I 1,1150`, `ctest -I 1151,2250` and
+  `ctest -I 2251,4555`: `asan` 259 s, 364 s and 291 s, `ubsan` 329 s,
+  379 s and 233 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -347,7 +351,9 @@ Where a test goes:
   of the command, `anti_<command>_message_<case>`. A case writes its files,
   runs anti and holds the whole standard error. `tests/anti_messages.cmake`
   holds the cases of `anti new`, `anti license` and `anti sdk`, which have
-  no directory. The name of a case registers its test, and the header of
+  no directory. `tests/antic_messages.cmake` holds the messages of the
+  driver of antic that stand at no position of a source, as
+  `antic_message_<case>`, through the same runner. The name of a case registers its test, and the header of
   `tests/run_anti_messages.cmake` states the form.
 - `tests/unit/`: the C unit tests, `unit_<file>` for `test_<file>.c`.
   `unit_<file>_messages` compares the standard error of a group with
@@ -668,12 +674,13 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 4515 ctest tests pass on the development Mac, and two of them, the
+- 4557 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  369 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 4514 each with the same skips, without
+  372 of them are the expected failures of `tests/known-failures.txt`.
+  The ASan and the UBSan builds run 4555 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
-  into. `overview_examples` compiles every
+  into, and without `antic_message_license_text_with_a_nul_byte`, which
+  shows a leak of antic under AddressSanitizer. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built, and so are
