@@ -34,6 +34,15 @@
 #   output_library        -o beside -c
 #   output_program        -o of a program
 #   keep_llvm             --keep-llvm of a program
+#   output_static         -o beside --lib static, for Linux and Windows:
+#                         the name of the archive without it, and a name
+#                         without a directory
+#   output_shared         -o beside --lib shared, for the targets this
+#                         host links: the name of the library without it
+#   output_dev_library    -o beside --dev with a library file as the input
+#   output_plugin         -o of a plugin without a directory: the index
+#                         stands beside the library and names it
+#   linker_lld            --linker lld beside the default
 #
 # DESIGN: a case reads the LLVM text of --dump-llvm where the option
 # decides what the back end writes, so no case needs opt, llc and a link
@@ -453,6 +462,142 @@ if(CASE STREQUAL "keep_llvm")
     endif()
     file(READ "${WORK}/option/program${EXE}.ll" text)
     holds("${text}" "target triple = " "the file --keep-llvm left")
+    return()
+endif()
+
+# The library of the cases below, in a directory of its own under WORK.
+# antic runs in that directory and names the source without a directory.
+function(library_in directory)
+    file(MAKE_DIRECTORY "${WORK}/${directory}")
+    file(COPY_FILE "${library_source}" "${WORK}/${directory}/named.anti")
+endfunction()
+
+# Run antic in a directory under WORK. It must end with 0.
+function(antic_in directory)
+    execute_process(COMMAND "${ANTIC}" ${tools} ${ARGN}
+                    WORKING_DIRECTORY "${WORK}/${directory}"
+                    RESULT_VARIABLE status OUTPUT_VARIABLE out
+                    ERROR_VARIABLE err)
+    if(NOT status EQUAL 0)
+        string(REPLACE ";" " " line "${ARGN}")
+        message(FATAL_ERROR "antic ${line} ended with ${status}\n${out}${err}")
+    endif()
+endfunction()
+
+# Stop unless the directory under WORK holds the file.
+function(wrote directory file)
+    if(NOT EXISTS "${WORK}/${directory}/${file}")
+        files_of("${WORK}/${directory}" found)
+        message(FATAL_ERROR "${directory} holds no ${file}: ${found}")
+    endif()
+endfunction()
+
+if(CASE STREQUAL "output_static")
+    foreach(pair "linux-x86_64|libnamed.a" "windows-x86_64|named.lib")
+        string(REPLACE "|" ";" pair "${pair}")
+        list(GET pair 0 target)
+        list(GET pair 1 archive)
+        library_in(plain-${target})
+        library_in(option-${target})
+        antic_in(plain-${target} --lib static --target ${target} named.anti)
+        antic_in(option-${target} --lib static --target ${target} -o other.a
+                 named.anti)
+        wrote(plain-${target} ${archive})
+        wrote(option-${target} other.a)
+        if(EXISTS "${WORK}/option-${target}/${archive}")
+            message(FATAL_ERROR "-o other.a left ${archive} for ${target}")
+        endif()
+    endforeach()
+    return()
+endif()
+
+if(CASE STREQUAL "output_shared")
+    set(pairs "")
+    if(EXISTS "${RUNTIME}/sysroot/linux-x86_64")
+        list(APPEND pairs "linux-x86_64|libnamed.so")
+    endif()
+    if(EXISTS "${RUNTIME}/sysroot/windows-x86_64")
+        list(APPEND pairs "windows-x86_64|named.dll")
+    endif()
+    if(CMAKE_HOST_APPLE)
+        list(APPEND pairs "macos-arm64|libnamed.dylib")
+    endif()
+    if(pairs STREQUAL "")
+        message(FATAL_ERROR "this host links a shared library of no target")
+    endif()
+    foreach(pair IN LISTS pairs)
+        string(REPLACE "|" ";" pair "${pair}")
+        list(GET pair 0 target)
+        list(GET pair 1 shared)
+        library_in(plain-${target})
+        library_in(option-${target})
+        antic_in(plain-${target} --lib shared --target ${target} named.anti)
+        antic_in(option-${target} --lib shared --target ${target}
+                 -o other.so named.anti)
+        wrote(plain-${target} ${shared})
+        wrote(option-${target} other.so)
+        if(EXISTS "${WORK}/option-${target}/${shared}")
+            message(FATAL_ERROR "-o other.so left ${shared} for ${target}")
+        endif()
+    endforeach()
+    return()
+endif()
+
+if(CASE STREQUAL "output_dev_library")
+    foreach(copy plain option)
+        library_in(${copy})
+        antic_in(${copy} -c named.anti)
+        file(REMOVE "${WORK}/${copy}/named.anti")
+    endforeach()
+    antic_in(plain --dev named.antl)
+    antic_in(option --dev -o other named.antl)
+    files_of("${WORK}/plain" plain)
+    files_of("${WORK}/option" option)
+    string(REGEX REPLACE "\\.obj( |$)" ".o\\1" plain "${plain}")
+    string(REGEX REPLACE "\\.obj( |$)" ".o\\1" option "${option}")
+    expect_files("the directory of the build without -o" "${plain}"
+                 "named.antl named.o")
+    expect_files("the directory of the build with -o" "${option}"
+                 "named.antl other.o")
+    return()
+endif()
+
+if(CASE STREQUAL "output_plugin")
+    set(plugins "${SOURCES}/plugin")
+    file(MAKE_DIRECTORY "${WORK}/plugin" "${WORK}/net/example")
+    antic_in(plugin -c -I "${plugins}" -o "${WORK}/net/example/greet.antl"
+             "${plugins}/net/example/greet.anti")
+    set(host "")
+    if(CMAKE_HOST_WIN32)
+        # A plugin of Windows links against the import library of its host.
+        file(MAKE_DIRECTORY "${WORK}/host")
+        antic_in(host -I "${plugins}" -I "${WORK}" -o "${WORK}/host/host.exe"
+                 "${plugins}/host.anti" "${WORK}/net/example/greet.antl")
+        set(host "${WORK}/host/host.lib")
+    endif()
+    antic_in(plugin --lib shared --no-runtime -I "${plugins}" -I "${WORK}"
+             -o bare.so "${plugins}/net/example/fancy.anti" ${host})
+    wrote(plugin bare.so)
+    wrote(plugin anti-plugins.toml)
+    file(READ "${WORK}/plugin/anti-plugins.toml" index)
+    holds("${index}" "path = 'bare.so'" "the index beside the plugin")
+    return()
+endif()
+
+if(CASE STREQUAL "linker_lld")
+    set(source "${SOURCES}/programs/return42.anti")
+    foreach(copy plain option)
+        file(MAKE_DIRECTORY "${WORK}/${copy}")
+    endforeach()
+    antic_output(said ${tools} -o "${WORK}/plain/program${EXE}" "${source}")
+    antic_output(said ${tools} --linker lld
+                 -o "${WORK}/option/program${EXE}" "${source}")
+    file(SHA256 "${WORK}/plain/program${EXE}" plain)
+    file(SHA256 "${WORK}/option/program${EXE}" option)
+    if(NOT plain STREQUAL option)
+        message(FATAL_ERROR "--linker lld wrote another program than the "
+                            "default, which is lld")
+    endif()
     return()
 endif()
 
