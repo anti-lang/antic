@@ -299,6 +299,8 @@ generic_class_constant_modules_release T029 The library file of a generic functi
 generic_class_constant_modules_dev T029 The library file of a generic function that reads a constant of a class cannot be read.
 optional_default_modules_release T085 The library file of a class with a field `?int = none` cannot be read.
 optional_default_modules_dev T085 The library file of a class with a field `?int = none` cannot be read.
+function_default_modules_release T115 A literal of a library class omits a field whose default names a function and is refused.
+function_default_modules_dev T115 A literal of a library class omits a field whose default names a function and is refused.
 error_modules_member_protected_static_function T086 A protected static function of a class of a library is called from outside the class.
 matrix_modules_import_with_pub_refused T087 `pub` before an `import` gets one message twice.
 matrix_modules_extern_function_in_a_class_refused T087 An `extern fn` in a class body gets a second message.

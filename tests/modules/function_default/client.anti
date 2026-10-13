@@ -1,0 +1,13 @@
+//! The client of the handlers library. It builds the class without naming a
+//! field and calls the default the library gave the field.
+
+import com.example.handlers;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let h = handlers.Handler { };
+	printf("%lld %lld\n".ptr, h.call(4), h.after);
+	return 0;
+}

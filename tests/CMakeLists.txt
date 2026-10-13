@@ -4100,6 +4100,13 @@ antic_modules_test(bitfield_defaults_modules
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/bitfield-defaults-modules")
 
+# A function of a library as the default of a field of its class.
+antic_modules_test(function_default_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/function_default"
+    LIBRARIES handlers
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/function-default-modules")
+
 # The default of a field of a class of a library, one field per kind of
 # value a default takes, read by a client that names no field.
 antic_modules_test(field_defaults_modules
