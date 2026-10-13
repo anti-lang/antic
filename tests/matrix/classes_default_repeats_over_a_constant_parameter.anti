@@ -1,12 +1,28 @@
-//! The default of a field is a constant expression, and a repeated array whose
-//! length is a constant parameter of the class has no one value.
+//! A default `[v; N]` over a constant parameter `N` of the class is taken, by
+//! R045 of "Rules of 2026-10-13". Each copy fills the elements its own `N`
+//! gives: a repeated number, the parameter itself as the value, a repeated
+//! array and an array of repeated arrays.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Row<N: int>
 {
-	pub cells: [N]int = [0; N],
+	pub cells: [N]int = [7; N],
+	pub counts: [N]int = [N; N],
+	pub rows: [N][2]i8 = [[5; 2]; N],
+	pub columns: [2][N]i8 = [[6; N]; 2],
 }
 
 fn main() -> int
 {
+	let three = Row<3> { };
+	let five = Row<5> { };
+	printf("number %lld %lld %lld %lld\n".ptr, three.cells.len, three.cells[2], five.cells.len, five.cells[4]);
+	printf("parameter %lld %lld %lld %lld\n".ptr, three.counts[0], three.counts[2], five.counts[0],
+		five.counts[4]);
+	printf("repeated array %d %d\n".ptr, three.rows[2][1] as c_int, five.rows[4][0] as c_int);
+	printf("array of repeated %d %d\n".ptr, three.columns[1][2] as c_int, five.columns[0][4] as c_int);
 	return 0;
 }

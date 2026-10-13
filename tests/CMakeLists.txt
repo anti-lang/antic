@@ -4238,6 +4238,24 @@ antic_modules_test(field_defaults_modules
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/field-defaults-modules")
 
+# The defaults of a class of a library over a length computed from
+# `size_of`, by R043 of "Rules of 2026-10-13". The library file holds the
+# value once, and the client fills the elements of its target.
+antic_modules_test(default_lengths_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/default_lengths"
+    LIBRARIES rooms
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/default-lengths-modules")
+
+# The defaults of a generic class of a library that name its constant
+# parameter, by R045 of "Rules of 2026-10-13". Each copy of the client
+# takes them with its own number in place.
+antic_modules_test(generic_defaults_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_defaults"
+    LIBRARIES rows
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/generic-defaults-modules")
+
 # The default of a field whose type is an optional value, in a class of a
 # library. T085 of docs/audit/tests-findings.md.
 antic_modules_test(optional_default_modules

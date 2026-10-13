@@ -153,7 +153,8 @@ void antl_visit_value(struct writer *w, const struct const_value *v)
 
     if (v->kind == CONST_SYMBOLIC) {
         antl_visit_symbolic(w, v->as.symbolic);
-    } else if (v->kind == CONST_ARRAY || v->kind == CONST_STRUCT) {
+    } else if (v->kind == CONST_ARRAY || v->kind == CONST_STRUCT ||
+               v->kind == CONST_REPEAT) {
         for (i = 0; i < v->as.aggregate.count; i++) {
             antl_visit_value(w, &v->as.aggregate.items[i]);
         }
@@ -624,6 +625,10 @@ void antl_put_value(struct writer *w, const struct const_value *v)
         antl_put_symbolic(w, v->as.symbolic);
         break;
     case CONST_DEFAULT:
+        break;
+    /* The one value. The type of the field gives the count. */
+    case CONST_REPEAT:
+        antl_put_value(w, &v->as.aggregate.items[0]);
         break;
     }
 }

@@ -756,8 +756,12 @@ of lowering meet:
 | `values_equal_on_a_union_with_an_operator` | a union with `operator fn eq` compares through it, alone and in a struct, which R034 leaves as it is | |
 | `values_assign_concurrent_class`, `values_let_copies_a_concurrent_class`, `values_assign_through_a_pointer_copies_a_concurrent_class`, `values_assign_a_struct_that_holds_a_concurrent_class`, `values_concurrent_class_takes_a_fresh_value` | R039: `=` and `let` copy no concurrent class, alone or in a struct, and a fresh value and `dup` are taken | |
 | `types_length_with_a_size_negated_twice` | R046: the length `-(-size_of(H))` prints with the parentheses of its unary minus | |
-| `classes_field_length_from_size_of` | R043, the half that antic holds already: a field of a class takes a length computed from `size_of`. Its default with such a length is not built | |
-| `classes_default_names_a_constant_parameter` | the default of a field that names a constant parameter of its class, in two copies | T125 |
+| `classes_field_length_from_size_of` | R043: a field of a class takes a length computed from `size_of`, and a literal names the field | |
+| `classes_default_of_a_length_from_size_of` | R043: the default of a field of a class over a length computed from `size_of`, as a repeated number, a repeated array, an array of repeated arrays, a repeated struct and a struct that holds one. `default_lengths_modules` of `tests/modules/` holds it for a class of a library | |
+| `classes_default_repeats_over_a_constant_parameter` | R045: a default `[v; N]` over a constant parameter of the class, in two copies, with the parameter as the value and nested both ways. `generic_defaults_modules` of `tests/modules/` holds it for a generic class of a library | |
+| `classes_default_indexes_a_repeated_array_of_a_size_of_length` | an element of a repeated array of a length from `size_of` is no constant expression, so the default that reads one is refused | |
+| `classes_default_names_a_constant_parameter` | the default of a field that names a constant parameter of its class, in two copies, which R045 closed as T125 | |
+| `classes_default_is_a_copy_of_the_parameter` | the default of a field of a generic class that is a literal of another generic with the parameter as its argument | T126 |
 | `check_overflow_divide_least`, `check_overflow_remainder_least_i8`, `check_overflow_divide_least_compound`, `check_overflow_negate_least`, `check_overflow_negate_least_i8` of `tests/traps/` | R031: the least value divided by -1, its remainder and unary `-` of it stop a dev build | |
 | `check_shift_wrap_negative`, `check_shift_wrap_negative_compound` of `tests/traps/` | R032: `<<%` by a count below zero stops a dev build | |
 | `values_constant_surrogate_as_char`, `values_constant_past_the_last_char`, `values_constant_as_char_at_the_ends` | R027: a constant conversion to `char` of a surrogate or of a value past `0x10FFFF` is refused, and the values beside them convert | |

@@ -1184,6 +1184,43 @@ static struct type *copy_payload(struct checker *c, struct type *payload,
     return s;
 }
 
+/* DESIGN: the default of a field of a generic may name a constant
+   parameter, as `N + 1` and `[N; N]` do in `class Row<N: int>`. A copy
+   takes the value with its arguments in place, as it takes the types of
+   its fields, by R045 of "Rules of 2026-10-13". A repeated array holds
+   its value once and takes its count from the type of the field, which
+   the copy has substituted. The result says whether out differs from v:
+   a value that names no parameter is left to the expression its
+   declaration wrote. */
+static bool subst_value(struct checker *c, const struct const_value *v,
+                        const struct generic_map *map,
+                        struct const_value *out)
+{
+    bool changed = v->kind == CONST_REPEAT;
+    size_t i;
+
+    *out = *v;
+    out->type = subst(c, v->type, map);
+    if (v->kind == CONST_SYMBOLIC) {
+        out->as.symbolic = subst_symbolic(c, v->as.symbolic, map);
+        return out->as.symbolic != v->as.symbolic;
+    }
+    if (v->kind != CONST_ARRAY && v->kind != CONST_STRUCT &&
+        v->kind != CONST_REPEAT) {
+        return false;
+    }
+    out->as.aggregate.items =
+        types_alloc_array(c->arena, v->as.aggregate.count + 1,
+                          sizeof *out->as.aggregate.items);
+    for (i = 0; i < v->as.aggregate.count; i++) {
+        if (subst_value(c, &v->as.aggregate.items[i], map,
+                        &out->as.aggregate.items[i])) {
+            changed = true;
+        }
+    }
+    return changed;
+}
+
 /* Give the copy the fields, the base and the cases of its generic with
    the arguments in place. */
 static void fill_copy(struct checker *c, struct type *copy)
@@ -1215,6 +1252,13 @@ static void fill_copy(struct checker *c, struct type *copy)
     for (i = 0; i < g->field_count; i++) {
         fields[i] = g->fields[i];
         fields[i].type = subst(c, g->fields[i].type, &map);
+        if (g->fields[i].constant != NULL) {
+            struct const_value *v = arena_alloc(c->arena, sizeof *v);
+            if (subst_value(c, g->fields[i].constant, &map, v)) {
+                fields[i].constant = v;
+                fields[i].value = NULL;
+            }
+        }
     }
     types_set_fields(c->types, copy, fields, g->field_count);
 }

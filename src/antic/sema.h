@@ -34,7 +34,13 @@ enum const_kind {
     CONST_ARRAY,
     CONST_STRUCT,
     CONST_SYMBOLIC, /* an integer or bool computed from size_of */
-    CONST_DEFAULT   /* a field of a class value the literal leaves out */
+    CONST_DEFAULT,  /* a field of a class value the literal leaves out */
+    /* DESIGN: `[v; n]` of a length that the target or a copy of a generic
+       decides holds v once, as its one item. The type of its place gives
+       the count, so one value serves every target and every copy, and
+       lowering writes it in a loop. The default of a field of a class is
+       the one place that makes it. */
+    CONST_REPEAT
 };
 
 /* The value of a constant, computed at compile time. */

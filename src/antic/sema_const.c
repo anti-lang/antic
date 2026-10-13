@@ -824,6 +824,16 @@ static bool const_repeat(struct checker *c, struct expr *e,
     struct const_value a;
     size_t i;
 
+    /* The default of a field keeps the value once, by R043 and R045 of
+       "Rules of 2026-10-13". */
+    if (e->type->length_of != NULL && c->ctx.target_sized) {
+        out->kind = CONST_REPEAT;
+        out->as.aggregate.count = 1;
+        out->as.aggregate.items =
+            arena_alloc(c->arena, sizeof *out->as.aggregate.items);
+        return sema_eval_const(c, e->as.array_repeat.value,
+                               &out->as.aggregate.items[0]);
+    }
     if (e->type->length_of != NULL) {
         return fail_const(c, e, "an array with a length from `size_of`");
     }
@@ -984,6 +994,12 @@ static bool const_index(struct checker *c, struct expr *e,
     if (b.kind == CONST_SYMBOLIC) {
         return fail_const(c, e->as.index.index,
                           "an index computed from `size_of`");
+    }
+    /* A repeated array of a length that is no number holds its value
+       once, and no index is known to stand inside it. */
+    if (a.kind == CONST_REPEAT) {
+        return fail_const(c, e, "an element of an array whose length is no "
+                          "number");
     }
     if (b.as.integer >= a.as.aggregate.count) {
         sema_error_at(c, e->as.index.index->pos,

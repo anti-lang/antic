@@ -402,13 +402,73 @@ struct ir_operand lower_const_address(struct lowerer *l,
 
 }
 
+/* Whether v holds a repeated array that keeps its value once. */
+static bool holds_repeat(const struct const_value *v)
+{
+    size_t i;
+
+    if (v->kind == CONST_REPEAT) {
+        return true;
+    }
+    if (v->kind != CONST_ARRAY && v->kind != CONST_STRUCT) {
+        return false;
+    }
+    for (i = 0; i < v->as.aggregate.count; i++) {
+        if (holds_repeat(&v->as.aggregate.items[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* DESIGN: a repeated array that keeps its value once is written by a
+   loop over the elements of t, whose count is a number in a copy of a
+   generic and a value of the target for a length from `size_of`. The
+   body stores the one value, so an element of any kind is written as
+   lower_store_constant writes it elsewhere. */
+static void store_repeat(struct lowerer *l, const struct type *t,
+                         const struct const_value *v, struct ir_operand dest)
+{
+    struct ir_operand size = lower_size_operand(l, t->element);
+    struct ir_operand length =
+        t->length_of != NULL
+            ? ir_sym_operand(l->m, lower_sym_of(l, t->length_of))
+            : ir_int_op(IR_I64, t->length);
+    struct ir_block *test = lower_new_block(l);
+    struct ir_block *body = lower_new_block(l);
+    struct ir_block *done = lower_new_block(l);
+    uint32_t index =
+        ir_unary(l->f, l->b, IR_COPY, IR_I64, ir_int_op(IR_I64, 0));
+    uint32_t more;
+    uint32_t offset;
+    uint32_t next;
+    struct ir_operand at;
+
+    ir_jump(l->f, l->b, test);
+    l->b = test;
+    more = ir_binary(l->f, l->b, IR_SLT, IR_I8, lower_temp(l, index), length);
+    ir_branch(l->f, l->b, lower_temp(l, more), body, done);
+    l->b = body;
+    offset = ir_binary(l->f, l->b, IR_MUL, IR_I64, lower_temp(l, index), size);
+    at = lower_temp(l, ir_ptradd(l->f, l->b, dest, lower_temp(l, offset)));
+    lower_store_constant(l, t->element, &v->as.aggregate.items[0], at);
+    next = ir_binary(l->f, l->b, IR_ADD, IR_I64, lower_temp(l, index),
+                     ir_int_op(IR_I64, 1));
+    ir_assign(l->f, l->b, index, lower_temp(l, next));
+    ir_jump(l->f, l->b, test);
+    l->b = done;
+}
+
 /* DESIGN: a constant that holds a class value is written part by part.
    A class value needs its tables and the defaults its literal left out,
-   and runs `construct`, which read-only data cannot give. Every other
-   constant is one copy of its data or one store. */
+   and runs `construct`, which read-only data cannot give. A constant
+   that holds a repeated array kept once is written part by part as
+   well, down to the loop of that array. Every other constant is one copy
+   of its data or one store. */
 void lower_store_constant(struct lowerer *l, const struct type *t,
                           const struct const_value *v, struct ir_operand dest)
 {
+    bool parts = sema_holds_class(t) || holds_repeat(v);
     uint64_t i;
 
     if (t->kind == TYPE_CLASS) {
@@ -416,7 +476,11 @@ void lower_store_constant(struct lowerer *l, const struct type *t,
         lower_run_construct(l, t, dest);
         return;
     }
-    if (sema_holds_class(t) && t->kind == TYPE_ARRAY) {
+    if (v->kind == CONST_REPEAT) {
+        store_repeat(l, t, v, dest);
+        return;
+    }
+    if (parts && t->kind == TYPE_ARRAY) {
         for (i = 0; i < v->as.aggregate.count; i++) {
             lower_store_constant(
                 l, t->element, &v->as.aggregate.items[i],
@@ -425,7 +489,7 @@ void lower_store_constant(struct lowerer *l, const struct type *t,
         }
         return;
     }
-    if (sema_holds_class(t) && types_has_fields(t)) {
+    if (parts && types_has_fields(t)) {
         for (i = 0; i < t->field_count; i++) {
             const struct struct_field *f = &t->fields[i];
             if (types_field_is_unit_break(f)) {

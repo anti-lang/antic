@@ -1,0 +1,6 @@
+exit 0
+number 16 3 3
+repeated array 2 5 5
+array of repeated 4 6 6
+struct 2 7 8
+in a struct 4 9 9

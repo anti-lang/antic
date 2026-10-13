@@ -2529,20 +2529,25 @@ static void declare_fields(struct checker *c, struct item *it)
     /* A default is checked against the type of its field, so the
        value that lowering writes is complete and typed. It is a
        constant expression, and its value is kept for the library
-       file. */
+       file. It takes a length computed from `size_of`, as the type of
+       its field does, by R043 of "Rules of 2026-10-13". */
     for (j = 0; j < it->param_count; j++) {
         struct const_value *v;
-        if (it->params[j].value == NULL ||
-            !sema_require(c, it->params[j].value,
-                          sema_check_expr(c, it->params[j].value,
-                                          fields[j].type),
-                          fields[j].type)) {
+        struct context sized;
+        if (it->params[j].value == NULL) {
             continue;
         }
-        v = arena_alloc(c->arena, sizeof *v);
-        if (sema_eval_const(c, it->params[j].value, v)) {
-            fields[j].constant = v;
+        sema_enter_sized(c, &sized);
+        if (sema_require(c, it->params[j].value,
+                         sema_check_expr(c, it->params[j].value,
+                                         fields[j].type),
+                         fields[j].type)) {
+            v = arena_alloc(c->arena, sizeof *v);
+            if (sema_eval_const(c, it->params[j].value, v)) {
+                fields[j].constant = v;
+            }
         }
+        sema_leave(c, &sized);
     }
     /* The hidden lock of a synchronized class follows the fields the
        class declares. */

@@ -1,0 +1,22 @@
+//! A class whose defaults fill arrays of a length computed from `size_of`, by
+//! R043 of "Rules of 2026-10-13". The library file carries the value of each
+//! default once, and a client fills the elements its target gives.
+
+pub struct Pair
+{
+	a: i64,
+	b: i64,
+}
+
+pub struct Box
+{
+	bytes: [size_of(Pair) / 4]i8,
+}
+
+pub class Room
+{
+	pub cells: [size_of(Pair)]int = [3; size_of(Pair)],
+	pub columns: [2][size_of(Pair) / 4]i8 = [[6; size_of(Pair) / 4]; 2],
+	pub pairs: [size_of(Pair) / 8]Pair = [Pair { a: 7, b: 8 }; size_of(Pair) / 8],
+	pub box: Box = Box { bytes: [9; size_of(Pair) / 4] },
+}

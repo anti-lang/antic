@@ -1,0 +1,24 @@
+//! The default of a field of a generic class is a literal of another generic
+//! with the parameter of the class as its argument. Each copy of the class
+//! takes the default with its own argument in place.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Cell<T>
+{
+	pub n: int = 7,
+}
+
+class Outer<T>
+{
+	pub cell: Cell<T> = Cell<T> { },
+}
+
+fn main() -> int
+{
+	let o = Outer<i8> { };
+	printf("%lld\n".ptr, o.cell.n);
+	return 0;
+}

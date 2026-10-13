@@ -1,0 +1,5 @@
+exit 0
+number 3 7 5 7
+parameter 3 3 5 5
+repeated array 5 5
+array of repeated 6 6

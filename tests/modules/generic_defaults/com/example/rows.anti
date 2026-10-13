@@ -1,0 +1,11 @@
+//! A generic class whose defaults name its constant parameter, by R045 of
+//! "Rules of 2026-10-13". The library file carries each default with the
+//! parameter in it, and a client that makes a copy puts its number in place.
+
+pub class Row<N: int>
+{
+	pub cells: [N]int = [7; N],
+	pub counts: [N]int = [N; N],
+	pub columns: [2][N]i8 = [[6; N]; 2],
+	pub next: int = N + 1,
+}

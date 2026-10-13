@@ -1122,6 +1122,17 @@ bool antl_read_value(struct reader *r, struct type *t, struct const_value *v,
         return true;
     case CONST_DEFAULT:
         return depth > 0;
+    /* The one value of a repeated array, whose count its type gives. */
+    case CONST_REPEAT:
+        if (t->kind != TYPE_ARRAY) {
+            return false;
+        }
+        v->as.aggregate.count = 1;
+        v->as.aggregate.items =
+            antl_allocate(r, 1, sizeof *v->as.aggregate.items);
+        return antl_read_value(r, t->element, &v->as.aggregate.items[0],
+                               depth + 1) &&
+               v->as.aggregate.items[0].kind != CONST_DEFAULT;
     default:
         return false;
     }

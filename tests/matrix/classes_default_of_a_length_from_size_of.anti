@@ -1,0 +1,41 @@
+//! The default of a field of a class takes a length computed from `size_of`, by
+//! R043 of "Rules of 2026-10-13". The back end decides the length on each
+//! target, and the default fills every element: a repeated number, a repeated
+//! array, an array of repeated arrays, a repeated struct and a struct that
+//! holds a repeated array.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pair
+{
+	a: i64,
+	b: i64,
+}
+
+struct Box
+{
+	bytes: [size_of(Pair) / 4]i8,
+}
+
+class Room
+{
+	pub cells: [size_of(Pair)]int = [3; size_of(Pair)],
+	pub rows: [size_of(Pair) / 8][2]i8 = [[5; 2]; size_of(Pair) / 8],
+	pub columns: [2][size_of(Pair) / 4]i8 = [[6; size_of(Pair) / 4]; 2],
+	pub pairs: [size_of(Pair) / 8]Pair = [Pair { a: 7, b: 8 }; size_of(Pair) / 8],
+	pub box: Box = Box { bytes: [9; size_of(Pair) / 4] },
+}
+
+fn main() -> int
+{
+	let r = Room { };
+	printf("number %lld %lld %lld\n".ptr, r.cells.len, r.cells[0], r.cells[15]);
+	printf("repeated array %lld %d %d\n".ptr, r.rows.len, r.rows[0][0] as c_int, r.rows[1][1] as c_int);
+	printf("array of repeated %lld %d %d\n".ptr, r.columns[1].len, r.columns[0][0] as c_int,
+		r.columns[1][3] as c_int);
+	printf("struct %lld %lld %lld\n".ptr, r.pairs.len, r.pairs[0].a, r.pairs[1].b);
+	printf("in a struct %lld %d %d\n".ptr, r.box.bytes.len, r.box.bytes[0] as c_int, r.box.bytes[3] as c_int);
+	return 0;
+}

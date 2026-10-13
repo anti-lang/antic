@@ -1,0 +1,17 @@
+//! Builds a class of the library `com.example.rooms` with no field named and
+//! reads the defaults over a length computed from `size_of`.
+
+import com.example.rooms;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let r = rooms.Room { };
+	printf("number %lld %lld %lld\n".ptr, r.cells.len, r.cells[0], r.cells[15]);
+	printf("array of repeated %lld %d %d\n".ptr, r.columns[1].len, r.columns[0][0] as c_int,
+		r.columns[1][3] as c_int);
+	printf("struct %lld %lld %lld\n".ptr, r.pairs.len, r.pairs[0].a, r.pairs[1].b);
+	printf("in a struct %lld %d %d\n".ptr, r.box.bytes.len, r.box.bytes[0] as c_int, r.box.bytes[3] as c_int);
+	return 0;
+}

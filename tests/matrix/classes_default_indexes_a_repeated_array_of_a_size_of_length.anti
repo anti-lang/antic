@@ -1,0 +1,19 @@
+//! The default of a field is a constant expression. A repeated array of a
+//! length from `size_of` has no count before the target is known, so an element
+//! of it at a constant index is none.
+
+struct Pair
+{
+	a: i64,
+	b: i64,
+}
+
+class Room
+{
+	pub first: int = [3; size_of(Pair)][2],
+}
+
+fn main() -> int
+{
+	return 0;
+}

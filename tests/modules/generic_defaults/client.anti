@@ -1,0 +1,18 @@
+//! Makes two copies of a generic class of the library `com.example.rows` and
+//! reads the defaults that name the constant parameter.
+
+import com.example.rows;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let three = rows.Row<3> { };
+	let five = rows.Row<5> { };
+	printf("number %lld %lld %lld %lld\n".ptr, three.cells.len, three.cells[2], five.cells.len, five.cells[4]);
+	printf("parameter %lld %lld %lld %lld\n".ptr, three.counts[0], three.counts[2], five.counts[0],
+		five.counts[4]);
+	printf("array of repeated %d %d\n".ptr, three.columns[1][2] as c_int, five.columns[0][4] as c_int);
+	printf("sum %lld %lld\n".ptr, three.next, five.next);
+	return 0;
+}
