@@ -166,6 +166,10 @@ not re-open a settled decision without asking Eddie.
   233 s. It ran each sanitizer suite as `ctest -I 1,1150`,
   `ctest -I 1151,2250` and `ctest -I 2251,4756`: `asan` 266 s, 368 s and
   322 s, `ubsan` 246 s, 347 s and 240 s.
+  The second session of that step measured `host` as `ctest -I 1,2000`
+  and `ctest -I 2001,4774`: 377 s and 234 s. It ran each sanitizer suite
+  as `ctest -I 1,1150`, `ctest -I 1151,2250` and `ctest -I 2251,4772`:
+  `asan` 260 s, 371 s and 324 s, `ubsan` 245 s, 347 s and 247 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -709,10 +713,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 4758 ctest tests pass on the development Mac, and two of them, the
+- 4774 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   376 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 4756 each with the same skips, without
+  The ASan and the UBSan builds run 4772 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
   shows a leak of antic under AddressSanitizer. `overview_examples` compiles every
@@ -726,17 +730,20 @@ reports what it finished.
   `undo-never-runs` or refused. A `construct` that fails tears down what
   was built before it. `docs/reports/2026-10-13-rules-flow-errors.md`
   reports the step.
-- Of the rules of values and of constants, R026 to R047, the first session
-  built R026, R027, R029 to R034, R039, R046 and R047. A constant that
-  leaves the range of its type is refused: a narrowing `as`, a conversion
-  to `char`, `+`, `-`, `*` and unary `-`, a shift by a count below zero and
-  an index below zero on a fixed array. A dev build stops the least value
-  divided by -1, unary `-` of it and `<<%` by a count below zero. `.len` of
-  a constant `str` is a constant, `operator fn eq` on a slice is refused,
-  `=` copies no concurrent class, and no constant holds a Mutex. R043 and
-  R045 are not built: the default of a class field over a length from
-  `size_of` or from a constant parameter. R034 keeps the operator on a
-  union. `docs/reports/2026-10-14-rules-values.md` reports the session.
+- The rules of values and of constants are built, R026 to R047 apart from
+  R037, which waits for Eddie. A constant that leaves the range of its
+  type is refused: a narrowing `as`, a conversion to `char`, `+`, `-`, `*`
+  and unary `-`, a shift by a count below zero and an index below zero on
+  a fixed array. A dev build stops the least value divided by -1, unary
+  `-` of it and `<<%` by a count below zero. `.len` of a constant `str` is
+  a constant, `operator fn eq` on a slice is refused, `=` copies no
+  concurrent class, and no constant holds a Mutex. The default `[v; n]`
+  of a field of a class takes a length from `size_of` or from a constant
+  parameter of the class: the constant holds `v` once, and a loop writes
+  the elements. A copy of a generic class takes a default that names a
+  constant parameter with its argument in place. R034 keeps the operator
+  on a union. `docs/reports/2026-10-14-rules-values.md` and
+  `docs/reports/2026-10-14-rules-values-2.md` report the two sessions.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built, and so are
   the compound assignments `+%=` and `+|=` of each. A
