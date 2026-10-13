@@ -1,0 +1,69 @@
+//! One exported item per form of the C header that no other library of
+//! tests/clib holds.
+
+/// A flag that is set.
+export const ENABLED: bool = true;
+
+/// A flag that is clear.
+export const DISABLED: bool = false;
+
+/// A text with a bell and a tab in it.
+export const BELL: str = "ring\x07tab\there";
+
+/// Sixteen lanes of one byte, signed.
+export simd struct I8x16 { a: i8, b: i8, c: i8, d: i8, e: i8, f: i8, g: i8, h: i8, i: i8, j: i8, k: i8, l: i8, m: i8, n: i8, o: i8, p: i8 }
+
+/// Eight lanes of sixteen bits, signed.
+export simd struct I16x8 { a: i16, b: i16, c: i16, d: i16, e: i16, f: i16, g: i16, h: i16 }
+
+/// Eight lanes of sixteen bits, unsigned.
+export simd struct U16x8 { a: u16, b: u16, c: u16, d: u16, e: u16, f: u16, g: u16, h: u16 }
+
+/// Four lanes of thirty-two bits, unsigned.
+export simd struct U32x4 { a: u32, b: u32, c: u32, d: u32 }
+
+/// Two lanes of sixty-four bits, signed.
+export simd struct I64x2 { a: i64, b: i64 }
+
+/// Two lanes of sixty-four bits, unsigned.
+export simd struct U64x2 { a: u64, b: u64 }
+
+/// Two lanes of a double.
+export simd struct F64x2 { a: f64, b: f64 }
+
+/// A struct that is a union.
+export union Word
+{
+	whole: u32,
+	real: f32,
+}
+
+/// A pointer, a pointer that may be none and an array in one tuple.
+export fn parts(p: *int, q: ?*int) -> (*int, ?*int, [2]int)
+{
+	return (p, q, [1, 2]);
+}
+
+/// A function that takes a function and calls it.
+export fn apply(f: fn(int) -> int, x: int) -> int
+{
+	return f(x);
+}
+
+/// A function that takes a function of no parameter.
+export fn run(f: fn())
+{
+	f();
+}
+
+/// The sums of the vectors, lane by lane.
+export fn sums(a: I8x16, b: I16x8, c: U16x8, d: U32x4, e: I64x2, f: U64x2, g: F64x2) -> i64
+{
+	return a.a as i64 + b.a as i64 + c.a as i64 + d.a as i64 + e.a + f.a as i64 + g.a as i64;
+}
+
+/// The whole of a word.
+export fn whole(w: Word) -> u32
+{
+	return w.whole;
+}

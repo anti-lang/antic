@@ -10,8 +10,8 @@
 #   WORK      a directory for the output
 #   CASE      static, shared, exports, two, loader, header, bundle, twice,
 #             simd, classes, failing, tuples, flags, ledger, variants,
-#             nested, names, handlers, generics, optional, ctypes,
-#             ctypes_shared or ctypes_bundle
+#             nested, names, handlers, generics, optional, forms, never,
+#             never_cpp, ctypes, ctypes_shared or ctypes_bundle
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 #   CXX       the same compiler for C++, which checks the headers
@@ -306,6 +306,39 @@ elseif(CASE STREQUAL "simd")
             SOURCES "${SOURCES}/simd.c"
             INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/simd${EXE}" "${SOURCES}/simd.expected")
+elseif(CASE STREQUAL "forms")
+    # The forms of a header that no other library holds: a constant of
+    # bool, a text with a control character, a vector type per kind of
+    # lane, a union, a tuple with pointers and an array, and a parameter
+    # that is a function with its context. The header compiles as C++17
+    # as well.
+    library(forms static "${dir}")
+    expect_header("${dir}/forms.h" forms.h)
+    string(STRIP "${run_out}" line)
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    program("${dir}/forms${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/forms.c"
+            INPUTS "${library_file}" "${runtime_library}")
+    expect_output("${dir}/forms${EXE}" "${SOURCES}/forms.expected")
+    run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only "${SOURCES}/forms.cpp")
+elseif(CASE STREQUAL "never" OR CASE STREQUAL "never_cpp")
+    # An export function that never returns. The header declares it so,
+    # and a C program ends inside the call. never_cpp compiles the header
+    # as C++17.
+    library(never static "${dir}")
+    expect_header("${dir}/never.h" never.h)
+    if(CASE STREQUAL "never")
+        string(STRIP "${run_out}" line)
+        string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library
+               "${line}")
+        program("${dir}/never${EXE}" OPTIONS -std=c11 -I "${dir}"
+                SOURCES "${SOURCES}/never.c"
+                INPUTS "${library_file}" "${runtime_library}")
+        expect_output("${dir}/never${EXE}" "${SOURCES}/never.expected")
+    else()
+        run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only
+            "${SOURCES}/never.cpp")
+    endif()
 elseif(CASE STREQUAL "flags")
     # Flags crosses as the struct of four bools the header writes for it,
     # passed and returned by value and held as a field.

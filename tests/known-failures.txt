@@ -301,6 +301,7 @@ optional_default_modules_release T085 The library file of a class with a field `
 optional_default_modules_dev T085 The library file of a class with a field `?int = none` cannot be read.
 function_default_modules_release T115 A literal of a library class omits a field whose default names a function and is refused.
 function_default_modules_dev T115 A literal of a library class omits a field whose default names a function and is refused.
+clib_never_cpp T116 The header of an export function that never returns holds `_Noreturn`, which is no C++.
 error_modules_member_protected_static_function T086 A protected static function of a class of a library is called from outside the class.
 matrix_modules_import_with_pub_refused T087 `pub` before an `import` gets one message twice.
 matrix_modules_extern_function_in_a_class_refused T087 An `extern fn` in a class body gets a second message.

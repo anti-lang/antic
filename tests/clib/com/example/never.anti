@@ -1,0 +1,9 @@
+//! An export function that never returns, which the header declares so.
+
+extern fn exit(code: c_int) -> never;
+
+/// Leave the program with the code.
+export fn leave(code: c_int) -> never
+{
+	exit(code);
+}
