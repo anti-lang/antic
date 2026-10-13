@@ -1,0 +1,28 @@
+//! An atomic `add` past the highest value of its type wraps, in a dev build as
+//! in a release build. The overflow check of dev mode holds `+`, and an atomic
+//! operation has none.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Cells
+{
+	pub atomic small: i8 = 127,
+	pub atomic wide: i64 = 9223372036854775807,
+}
+
+fn main() -> int
+{
+	let n: atomic i8 = 127;
+	let before = n.add(1);
+	printf("i8 local: %d %d\n".ptr, before as c_int, n.load() as c_int);
+	let u: atomic u8 = 255;
+	let high = u.add(1);
+	printf("u8 local: %d %d\n".ptr, high as c_int, u.load() as c_int);
+	let cells = alloc Cells { };
+	let small = cells.small.add(1);
+	let wide = cells.wide.add(1);
+	printf("i8 field: %d %d\n".ptr, small as c_int, cells.small.load() as c_int);
+	printf("i64 field: %lld %lld\n".ptr, wide, cells.wide.load());
+	delete(cells);
+	return 0;
+}

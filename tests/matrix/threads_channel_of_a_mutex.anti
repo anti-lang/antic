@@ -1,0 +1,24 @@
+//! A fresh Mutex moves into a channel, as a fresh value of a synchronized and
+//! of a concurrent class does. `recv` gives a pointer to it, and `sync` holds
+//! the Mutex the channel carried.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let c = chan Mutex(1);
+	send(c, Mutex.new());
+	let m = recv(c) else {
+		return 1;
+	};
+	let n = 0;
+	sync m {
+		n = 7;
+	}
+	printf("held: %d\n".ptr, n as c_int);
+	m.destroy();
+	delete(c);
+	return 0;
+}

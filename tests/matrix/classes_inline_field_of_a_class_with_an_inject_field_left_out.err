@@ -1,0 +1,1 @@
+classes_inline_field_of_a_class_with_an_inject_field_left_out.anti:40:15: error: the literal of `Holder` misses the field `service`

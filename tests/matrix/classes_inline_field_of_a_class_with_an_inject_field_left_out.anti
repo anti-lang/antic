@@ -1,0 +1,42 @@
+//! A class with an `inject` field has no `T { }` default, so a literal of the
+//! class that holds one inline names the field.
+
+abstract class Greeter
+{
+	abstract fn greeting(self) -> int;
+
+	pub fn default() -> *Greeter
+	{
+		return Console.get();
+	}
+}
+
+singleton class Console inherits Greeter
+{
+	concrete fn greeting(self) -> int
+	{
+		return 7;
+	}
+}
+
+class Service
+{
+	inject out: *Greeter,
+
+	pub fn run(self) -> int
+	{
+		return self.out.greeting();
+	}
+}
+
+class Holder
+{
+	pub service: Service,
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let holder = Holder { };
+	return holder.service.run();
+}

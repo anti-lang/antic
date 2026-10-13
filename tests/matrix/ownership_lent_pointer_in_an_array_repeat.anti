@@ -1,0 +1,23 @@
+//! An array repeat takes a lent pointer, as an array literal does: `[p; 2]` in
+//! a `let` without a type makes an array of lent pointers.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn twice(lent p: *Node) -> int
+{
+	let both = [p; 2];
+	both[0].n += 1;
+	return both[0].n + both[1].n;
+}
+
+fn main() -> int
+{
+	let node = Node { n: 20 };
+	printf("array repeat: %d\n".ptr, twice(&node) as c_int);
+	return 0;
+}

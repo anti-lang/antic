@@ -1,0 +1,18 @@
+//! A case of a variant as the default of a parameter. A default is a constant
+//! expression, and a case of a variant is none.
+
+variant Shape
+{
+	Circle { r: f32 },
+	Empty,
+}
+
+fn area(s: Shape = Shape.Empty) -> int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	return area(Shape.Circle { r: 1.0 });
+}

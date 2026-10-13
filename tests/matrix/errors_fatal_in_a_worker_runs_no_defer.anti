@@ -1,0 +1,49 @@
+//! `catch fatal` in a dispatched worker ends the whole program where it stands,
+//! and no `defer` runs: not the one of the worker and not the one of `main`.
+//! The first job returns, so its `defer` runs once.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn fflush(stream: ?*byte) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+fn risky(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n * 10;
+}
+
+fn say(n: int)
+{
+	printf("the defer of %d\n".ptr, n as c_int);
+	fflush(none);
+}
+
+worker fn run(t: *Task) -> int
+{
+	defer say(t.n);
+	let v = risky(t.n) catch fatal;
+	return v;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { n: 2 };
+	defer say(0);
+	let first = dispatch t -> run();
+	printf("joined %d\n".ptr, join(first) as c_int);
+	fflush(none);
+	t.n = 5;
+	let second = dispatch t -> run();
+	printf("after fatal %d\n".ptr, join(second) as c_int);
+	delete(t);
+	return 0;
+}

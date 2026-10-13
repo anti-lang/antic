@@ -1,0 +1,6 @@
+exit 0
+str: 5
+slice: 2 2
+union: 7
+enum: 1
+channel: 9

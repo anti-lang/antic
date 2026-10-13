@@ -1,0 +1,18 @@
+//! `lent` before a result is read before `*`, `?` and `?*` alone, so `-> lent
+//! int` is refused.
+
+class Cell
+{
+	pub n: int = 0,
+
+	pub fn value(self) -> lent int
+	{
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	let c = Cell { n: 1 };
+	return c.value();
+}

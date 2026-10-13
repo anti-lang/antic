@@ -1,0 +1,48 @@
+//! Inside a generic function `dup` copies a value of any type. `=` copies a
+//! `str`, a slice, a union, an enum and a channel, and `dup(*p)` of each gives
+//! the value it was given. Outside a generic `dup` of each is refused.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+union Word
+{
+	n: int,
+	f: f32,
+}
+
+enum Level
+{
+	Low,
+	High,
+}
+
+fn twin<T>(p: *T) -> T
+{
+	return dup(*p);
+}
+
+fn main() -> int
+{
+	let text = "seven";
+	let text2 = twin<str>(&text);
+	printf("str: %d\n".ptr, text2.len as c_int);
+	let numbers = [1, 2, 3];
+	let part: []int = numbers[0..2];
+	let part2 = twin<[]int>(&part);
+	printf("slice: %d %d\n".ptr, part2.len as c_int, part2[1] as c_int);
+	let word = Word { n: 7 };
+	let word2 = twin<Word>(&word);
+	printf("union: %d\n".ptr, word2.n as c_int);
+	let level = Level.High;
+	let level2 = twin<Level>(&level);
+	printf("enum: %d\n".ptr, (level2 == Level.High) as c_int);
+	let line = chan int(1);
+	let line2 = twin<chan int>(&line);
+	send(line2, 9);
+	let got = recv(line) else {
+		return 1;
+	};
+	printf("channel: %d\n".ptr, *got as c_int);
+	delete(line);
+	return 0;
+}
