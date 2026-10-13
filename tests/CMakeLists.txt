@@ -2717,6 +2717,37 @@ foreach(pair "html||com.example.forms.html|forms.expected.html"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_doc_page.cmake")
 endforeach()
 
+# The pages of two modules of doc text. prose holds the forms of the doc
+# subset that no other page holds: an item of a list in two lines, an
+# empty code span, a bracket that starts no link, a link whose scheme
+# stands in capitals, a link to a page beside this one and a code block
+# that never closes. Its developer's page in Markdown holds the note of the
+# module and the note of an item. wrapped holds a link that anti fmt
+# breaks after a word of its text.
+foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
+             "prose_dev|--markdown\\|--dev|prose|com.example.prose.md|prose.dev.expected.md"
+             "wrapped_link||wrapped|com.example.wrapped.html|wrapped.expected.html")
+    string(REPLACE "\\|" "!" pair "${pair}")
+    string(REPLACE "|" ";" pair "${pair}")
+    list(GET pair 0 case)
+    list(GET pair 1 options)
+    list(GET pair 2 module)
+    list(GET pair 3 page)
+    list(GET pair 4 expected)
+    string(REPLACE "!" "|" options "${options}")
+    add_test(NAME anti_doc_${case}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/doc/src"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/doc/src/com/example/${module}.anti"
+            "-DPAGE=${page}"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/doc/${expected}"
+            "-DOPTIONS=${options}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/doc-${case}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_doc_page.cmake")
+endforeach()
+
 # anti bind --header writes the header that antic --lib writes for the
 # same module, from the library file alone. The other cases bind
 # tests/bind/layout.h and raymath through clang and a part of
