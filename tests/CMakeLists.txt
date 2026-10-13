@@ -2443,6 +2443,8 @@ add_test(NAME anti_build_inputs
 # The messages of anti, one test per message. A table of the directory of
 # its command holds the cases of each, and anti_messages.cmake those of
 # `anti new`, `anti license` and `anti sdk`, which have no directory.
+# antic_messages.cmake holds the messages of the driver of antic that
+# stand at no position of a source, as `antic_message_<case>`.
 # run_anti_messages.cmake states the form of a case and prints the names
 # of a table, so a case is registered by standing in its table.
 foreach(pair "anti_build|anti-build/messages.cmake"
@@ -2452,10 +2454,16 @@ foreach(pair "anti_build|anti-build/messages.cmake"
              "anti_fmt|fmt/messages.cmake"
              "anti_doc|doc/messages.cmake"
              "anti_bind|bind/messages.cmake"
-             "anti|anti_messages.cmake")
+             "anti|anti_messages.cmake"
+             "antic|antic_messages.cmake")
     string(REPLACE "|" ";" pair "${pair}")
     list(GET pair 0 command)
     list(GET pair 1 table)
+    # The table of antic runs antic, and every other one anti.
+    set(tool anti)
+    if(command STREQUAL "antic")
+        set(tool antic)
+    endif()
     set(table "${CMAKE_CURRENT_SOURCE_DIR}/${table}")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${table}"
                  "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_messages.cmake")
@@ -2473,7 +2481,7 @@ foreach(pair "anti_build|anti-build/messages.cmake"
     foreach(name IN LISTS names)
         add_test(NAME ${command}_message_${name}
             COMMAND "${CMAKE_COMMAND}"
-                "-DANTI=$<TARGET_FILE:anti>"
+                "-DANTI=$<TARGET_FILE:${tool}>"
                 "-DTABLE=${table}"
                 "-DCASE=${name}"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/messages/${command}-${name}"
