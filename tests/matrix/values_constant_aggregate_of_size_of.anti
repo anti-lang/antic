@@ -1,0 +1,36 @@
+//! A constant struct and a constant array whose parts are computed from
+//! `size_of`, read as a value and as the default of a parameter. The value of
+//! each part is known when the target is, so the constant holds it by name.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct P
+{
+	a: i64,
+	b: i64,
+}
+
+struct G
+{
+	n: int,
+	m: int,
+}
+
+const N: int = size_of(P) as int;
+const TABLE: G = G { n: N, m: 3 };
+const SIZES: [2]int = [N, N + 1];
+
+fn of_defaults(t: G = TABLE, s: [2]int = SIZES) -> int
+{
+	return t.n * 100 + s[1];
+}
+
+fn main() -> int
+{
+	let t = TABLE;
+	let s = SIZES;
+	printf("struct %d %d\n".ptr, t.n as c_int, t.m as c_int);
+	printf("array %d %d\n".ptr, s[0] as c_int, s[1] as c_int);
+	printf("defaults %d\n".ptr, of_defaults() as c_int);
+	return 0;
+}

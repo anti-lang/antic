@@ -1,0 +1,34 @@
+//! `for i in a..b` and the same with `by -2` over a `c_long`, whose width
+//! follows the target. The bounds are read at run time.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn opaque(v: int) -> c_long
+{
+	return v as c_long;
+}
+
+fn up(top: c_long) -> int
+{
+	let total = 0;
+	for i in(0 as c_long)..top {
+		total = total * 10 + (i as int);
+	}
+	return total;
+}
+
+fn down(top: c_long) -> int
+{
+	let total = 0;
+	for i in(0 as c_long)..top by -2 {
+		total = total * 10 + (i as int);
+	}
+	return total;
+}
+
+fn main() -> int
+{
+	printf("up %d\n".ptr, up(opaque(5)) as c_int);
+	printf("down %d\n".ptr, down(opaque(6)) as c_int);
+	return 0;
+}

@@ -1,0 +1,40 @@
+//! The flags form `let (r, f) = e;` and `(r, f) = e;` where the program takes
+//! the address of `r`. The result then lives in memory, and the form stores it
+//! there.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn opaque(v: int) -> int
+{
+	return v;
+}
+
+fn bump(p: *int)
+{
+	*p += 1;
+}
+
+fn declared(v: int) -> int
+{
+	let (r, f) = v + opaque(1);
+	bump(&r);
+	return r * 10 + (f.zero as int);
+}
+
+fn assigned(v: int) -> int
+{
+	let q = 0;
+	bump(&q);
+	let (r, f) = v + opaque(0);
+	(q, f) = r * opaque(3);
+	return q * 10 + (f.zero as int);
+}
+
+fn main() -> int
+{
+	printf("declared %d %d\n".ptr, declared(2) as c_int, declared(-1) as c_int);
+	printf("assigned %d %d\n".ptr, assigned(2) as c_int, assigned(0) as c_int);
+	return 0;
+}

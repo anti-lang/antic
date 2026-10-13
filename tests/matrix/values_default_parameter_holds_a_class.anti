@@ -1,0 +1,44 @@
+//! A default of a parameter whose type holds a class value: an array of
+//! classes, a struct with a class field and two bitfields, and a tuple with a
+//! class. The call writes the constant into a slot of its own, part by part,
+//! and runs the defaults of the class for the fields the literal left out. One
+//! function per type, and one line of output per call.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Pt
+{
+	pub x: int = 1,
+	pub y: int = 2,
+}
+
+struct Wrap
+{
+	c: Pt,
+	lo: u8 : 3,
+	hi: u8 : 5,
+	n: int,
+}
+
+fn of_array(row: [2]Pt = [Pt { x: 5 }, Pt { y: 6 }]) -> int {
+	return row[0].x * 1000 + row[0].y * 100 + row[1].x * 10 + row[1].y;
+}
+
+	fn of_struct(w: Wrap = Wrap { c: Pt { x: 7 }, lo: 3, hi: 9, n: 4 }) -> int {
+	return w.c.x * 10000 + w.c.y * 1000 + (w.lo as int) * 100 + (w.hi as int) * 10 + w.n;
+}
+
+	fn of_tuple(b: (Pt, int) = (Pt { x: 8 }, 9)) -> int {
+	return b.0.x * 100 + b.0.y * 10 + b.1;
+}
+
+	fn main() -> int
+{
+	printf("array %d\n".ptr, of_array() as c_int);
+	printf("array given %d\n".ptr, of_array([Pt { }, Pt { x: 3, y: 4 }]) as c_int);
+	printf("struct %d\n".ptr, of_struct() as c_int);
+	printf("tuple %d\n".ptr, of_tuple() as c_int);
+	return 0;
+}

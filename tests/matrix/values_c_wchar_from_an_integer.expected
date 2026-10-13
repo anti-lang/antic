@@ -1,0 +1,4 @@
+exit 0
+from_wide 65
+from_narrow 66
+to_narrow 67

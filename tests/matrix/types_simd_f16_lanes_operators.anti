@@ -1,0 +1,45 @@
+//! The element-wise operators, the comparisons, `-v`, `sum` and `dot` of a simd
+//! struct whose lanes are `f16`. Each is a loop over the lanes that reads a
+//! lane as an `f32`. The program prints one line per operator.
+
+import anti.simd;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+simd struct H4 { a: f16, b: f16, c: f16, d: f16 }
+
+fn opaque(v: f32) -> f32
+{
+	return v;
+}
+
+fn show(name: str, v: H4)
+{
+	printf("%s %g %g %g %g\n".ptr, name.ptr, v.a as float, v.b as float, v.c as float, v.d as float);
+}
+
+fn main() -> int
+{
+	let a = H4 { a: opaque(1.0) as f16, b: opaque(2.0) as f16, c: opaque(3.0) as f16, d: opaque(4.0) as f16 };
+	let b = H4.splat(opaque(2.0) as f16);
+	show("add", a + b);
+	show("sub", a - b);
+	show("mul", a * b);
+	show("div", a / b);
+	show("neg", -a);
+	let eq = a == b;
+	let ne = a != b;
+	let lt = a < b;
+	let le = a <= b;
+	let gt = a > b;
+	let ge = a >= b;
+	printf("eq %d%d%d%d\n".ptr, eq.a as c_int, eq.b as c_int, eq.c as c_int, eq.d as c_int);
+	printf("ne %d%d%d%d\n".ptr, ne.a as c_int, ne.b as c_int, ne.c as c_int, ne.d as c_int);
+	printf("lt %d%d%d%d\n".ptr, lt.a as c_int, lt.b as c_int, lt.c as c_int, lt.d as c_int);
+	printf("le %d%d%d%d\n".ptr, le.a as c_int, le.b as c_int, le.c as c_int, le.d as c_int);
+	printf("gt %d%d%d%d\n".ptr, gt.a as c_int, gt.b as c_int, gt.c as c_int, gt.d as c_int);
+	printf("ge %d%d%d%d\n".ptr, ge.a as c_int, ge.b as c_int, ge.c as c_int, ge.d as c_int);
+	printf("sum %g\n".ptr, a.sum() as float);
+	printf("dot %g\n".ptr, a.dot(b) as float);
+	return 0;
+}

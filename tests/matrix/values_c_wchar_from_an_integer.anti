@@ -1,0 +1,33 @@
+//! `as c_wchar` from an integer of 64 bits and from one of 16, and `as` back to
+//! each. A `c_wchar` is 16 or 32 bits by the target, so the first narrows on
+//! every target and the second on none.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn from_wide(n: i64) -> c_wchar
+{
+	return n as c_wchar;
+}
+
+fn from_narrow(n: u16) -> c_wchar
+{
+	return n as c_wchar;
+}
+
+fn to_wide(w: c_wchar) -> i64
+{
+	return w as i64;
+}
+
+fn to_narrow(w: c_wchar) -> u16
+{
+	return w as u16;
+}
+
+fn main() -> int
+{
+	printf("from_wide %d\n".ptr, to_wide(from_wide(65)) as c_int);
+	printf("from_narrow %d\n".ptr, to_wide(from_narrow(66)) as c_int);
+	printf("to_narrow %d\n".ptr, to_narrow(from_wide(67)) as c_int);
+	return 0;
+}

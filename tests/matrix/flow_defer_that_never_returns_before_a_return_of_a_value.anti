@@ -1,0 +1,28 @@
+//! A `defer` whose block calls a function that returns `never`, in a function
+//! that leaves with `return v;`. The value is computed, the defer ends the
+//! path, and the program ends inside the defer.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn exit(code: c_int) -> never;
+
+fn stop(code: int) -> never
+{
+	printf("stop %d\n".ptr, code as c_int);
+	exit(0);
+}
+
+fn gives(v: int) -> int
+{
+	defer {
+		stop(v);
+	}
+	printf("gives %d\n".ptr, v as c_int);
+	return v + 1;
+}
+
+fn main() -> int
+{
+	let got = gives(3);
+	printf("not reached %d\n".ptr, got as c_int);
+	return 1;
+}

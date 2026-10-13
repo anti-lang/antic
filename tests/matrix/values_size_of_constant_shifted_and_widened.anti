@@ -1,0 +1,21 @@
+//! A constant computed from `size_of` that `<<%` shifts by an unsigned count,
+//! and one that `as` widens from a signed type. The back end folds both once
+//! the target is known.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct P
+{
+	a: i64,
+	b: i64,
+}
+
+const SHIFTED: u32 = (size_of(P) as u32) <<% (1 as u32);
+const WIDENED: i64 = (size_of(P) as i32) as i64;
+
+fn main() -> int
+{
+	printf("shifted %d\n".ptr, SHIFTED as c_int);
+	printf("widened %d\n".ptr, WIDENED as c_int);
+	return 0;
+}

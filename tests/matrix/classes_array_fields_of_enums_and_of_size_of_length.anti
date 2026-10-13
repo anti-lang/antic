@@ -1,0 +1,49 @@
+//! A class with an array of an enum, an array of arrays of one, and a struct
+//! whose arrays have a length computed from `size_of`. The descriptor of the
+//! class names the base type of the enum for the first two and no count for the
+//! last. The default `==` compares each part.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct P
+{
+	a: i64,
+	b: i64,
+}
+
+struct Room
+{
+	cells: [size_of(P)]int,
+	rows: [2][size_of(P)]int,
+}
+
+enum Level
+{
+	Low,
+	High,
+}
+
+class Kinds
+{
+	pub levels: [2]Level = [Level.Low, Level.High],
+	pub grid: [2][2]Level = [[Level.Low, Level.High], [Level.High, Level.Low]],
+	pub room: Room,
+}
+
+fn main() -> int
+{
+	let k = Kinds { room: Room { cells: [0; size_of(P)], rows: [[0; size_of(P)]; 2] } };
+	let other = Kinds { room: Room { cells: [0; size_of(P)], rows: [[0; size_of(P)]; 2] } };
+	printf("same %d\n".ptr, (k == other) as c_int);
+	other.levels[1] = Level.Low;
+	printf("levels %d\n".ptr, (k == other) as c_int);
+	other.levels[1] = Level.High;
+	other.grid[1][0] = Level.Low;
+	printf("grid %d\n".ptr, (k == other) as c_int);
+	other.grid[1][0] = Level.High;
+	other.room.rows[1][15] = 4;
+	printf("room %d\n".ptr, (k == other) as c_int);
+	return 0;
+}

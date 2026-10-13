@@ -1,0 +1,29 @@
+//! A bound function whose parameter is a function with its context, called
+//! twice. The second call finds the signature the first one declared, which
+//! counts two words for that parameter.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Adder
+{
+	pub base: int = 0,
+
+	pub fn apply(self, f: fn(int) -> int, k: int) -> int
+	{
+		return f(k) + self.base;
+	}
+}
+
+fn main() -> int
+{
+	let a = Adder { base: 3 };
+	let bound = a.apply;
+	let step = 4;
+	let first = bound(fn(x) { return x + step; }, 10);
+	let second = bound(fn(x) { return x * step; }, 10);
+	printf("first %d\n".ptr, first as c_int);
+	printf("second %d\n".ptr, second as c_int);
+	return 0;
+}

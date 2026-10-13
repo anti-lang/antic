@@ -1,0 +1,124 @@
+//! `-v`, `~v`, `dot` and `simd.select` of a simd struct above the vector cap of
+//! 256 bytes, with lanes of `i32`, of `f32` and of `f64`. Each is a loop over
+//! the lanes, and the select of an integer lane and of a float lane choose by a
+//! mask of the width of the lane. One function per kind of lane.
+
+import anti.simd;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+simd struct I32x128
+	allow(above-vector-cap, "the loops over the lanes are the subject")
+{
+	l0: i32, l1: i32, l2: i32, l3: i32, l4: i32, l5: i32, l6: i32, l7: i32,
+	l8: i32, l9: i32, l10: i32, l11: i32, l12: i32, l13: i32, l14: i32, l15: i32,
+	l16: i32, l17: i32, l18: i32, l19: i32, l20: i32, l21: i32, l22: i32, l23: i32,
+	l24: i32, l25: i32, l26: i32, l27: i32, l28: i32, l29: i32, l30: i32, l31: i32,
+	l32: i32, l33: i32, l34: i32, l35: i32, l36: i32, l37: i32, l38: i32, l39: i32,
+	l40: i32, l41: i32, l42: i32, l43: i32, l44: i32, l45: i32, l46: i32, l47: i32,
+	l48: i32, l49: i32, l50: i32, l51: i32, l52: i32, l53: i32, l54: i32, l55: i32,
+	l56: i32, l57: i32, l58: i32, l59: i32, l60: i32, l61: i32, l62: i32, l63: i32,
+	l64: i32, l65: i32, l66: i32, l67: i32, l68: i32, l69: i32, l70: i32, l71: i32,
+	l72: i32, l73: i32, l74: i32, l75: i32, l76: i32, l77: i32, l78: i32, l79: i32,
+	l80: i32, l81: i32, l82: i32, l83: i32, l84: i32, l85: i32, l86: i32, l87: i32,
+	l88: i32, l89: i32, l90: i32, l91: i32, l92: i32, l93: i32, l94: i32, l95: i32,
+	l96: i32, l97: i32, l98: i32, l99: i32, l100: i32, l101: i32, l102: i32, l103: i32,
+	l104: i32, l105: i32, l106: i32, l107: i32, l108: i32, l109: i32, l110: i32, l111: i32,
+	l112: i32, l113: i32, l114: i32, l115: i32, l116: i32, l117: i32, l118: i32, l119: i32,
+	l120: i32, l121: i32, l122: i32, l123: i32, l124: i32, l125: i32, l126: i32, l127: i32,
+}
+
+simd struct F32x128
+	allow(above-vector-cap, "the loops over the lanes are the subject")
+{
+	l0: f32, l1: f32, l2: f32, l3: f32, l4: f32, l5: f32, l6: f32, l7: f32,
+	l8: f32, l9: f32, l10: f32, l11: f32, l12: f32, l13: f32, l14: f32, l15: f32,
+	l16: f32, l17: f32, l18: f32, l19: f32, l20: f32, l21: f32, l22: f32, l23: f32,
+	l24: f32, l25: f32, l26: f32, l27: f32, l28: f32, l29: f32, l30: f32, l31: f32,
+	l32: f32, l33: f32, l34: f32, l35: f32, l36: f32, l37: f32, l38: f32, l39: f32,
+	l40: f32, l41: f32, l42: f32, l43: f32, l44: f32, l45: f32, l46: f32, l47: f32,
+	l48: f32, l49: f32, l50: f32, l51: f32, l52: f32, l53: f32, l54: f32, l55: f32,
+	l56: f32, l57: f32, l58: f32, l59: f32, l60: f32, l61: f32, l62: f32, l63: f32,
+	l64: f32, l65: f32, l66: f32, l67: f32, l68: f32, l69: f32, l70: f32, l71: f32,
+	l72: f32, l73: f32, l74: f32, l75: f32, l76: f32, l77: f32, l78: f32, l79: f32,
+	l80: f32, l81: f32, l82: f32, l83: f32, l84: f32, l85: f32, l86: f32, l87: f32,
+	l88: f32, l89: f32, l90: f32, l91: f32, l92: f32, l93: f32, l94: f32, l95: f32,
+	l96: f32, l97: f32, l98: f32, l99: f32, l100: f32, l101: f32, l102: f32, l103: f32,
+	l104: f32, l105: f32, l106: f32, l107: f32, l108: f32, l109: f32, l110: f32, l111: f32,
+	l112: f32, l113: f32, l114: f32, l115: f32, l116: f32, l117: f32, l118: f32, l119: f32,
+	l120: f32, l121: f32, l122: f32, l123: f32, l124: f32, l125: f32, l126: f32, l127: f32,
+}
+
+simd struct F64x64
+	allow(above-vector-cap, "the loops over the lanes are the subject")
+{
+	l0: f64, l1: f64, l2: f64, l3: f64, l4: f64, l5: f64, l6: f64, l7: f64,
+	l8: f64, l9: f64, l10: f64, l11: f64, l12: f64, l13: f64, l14: f64, l15: f64,
+	l16: f64, l17: f64, l18: f64, l19: f64, l20: f64, l21: f64, l22: f64, l23: f64,
+	l24: f64, l25: f64, l26: f64, l27: f64, l28: f64, l29: f64, l30: f64, l31: f64,
+	l32: f64, l33: f64, l34: f64, l35: f64, l36: f64, l37: f64, l38: f64, l39: f64,
+	l40: f64, l41: f64, l42: f64, l43: f64, l44: f64, l45: f64, l46: f64, l47: f64,
+	l48: f64, l49: f64, l50: f64, l51: f64, l52: f64, l53: f64, l54: f64, l55: f64,
+	l56: f64, l57: f64, l58: f64, l59: f64, l60: f64, l61: f64, l62: f64, l63: f64,
+}
+
+fn iopaque(v: i32) -> i32
+{
+	return v;
+}
+
+fn fopaque(v: f32) -> f32
+{
+	return v;
+}
+
+fn dopaque(v: f64) -> f64
+{
+	return v;
+}
+
+fn on_i32()
+{
+	let a = I32x128.splat(iopaque(3));
+	let b = I32x128.splat(iopaque(5));
+	let negated = -a;
+	let inverted = ~a;
+	let low = simd.select(a < b, a, b);
+	let high = simd.select(a > b, a, b);
+	printf("i32 neg %d\n".ptr, negated.l127 as c_int);
+	printf("i32 not %d\n".ptr, inverted.l126 as c_int);
+	printf("i32 dot %d\n".ptr, a.dot(b) as c_int);
+	printf("i32 select %d %d\n".ptr, low.l9 as c_int, high.l64 as c_int);
+}
+
+fn on_f32()
+{
+	let a = F32x128.splat(fopaque(1.5));
+	let b = F32x128.splat(fopaque(2.0));
+	let negated = -a;
+	let low = simd.select(a < b, a, b);
+	let high = simd.select(a > b, a, b);
+	printf("f32 neg %g\n".ptr, negated.l5 as float);
+	printf("f32 dot %g\n".ptr, a.dot(b) as float);
+	printf("f32 select %g %g\n".ptr, low.l3 as float, high.l100 as float);
+}
+
+fn on_f64()
+{
+	let a = F64x64.splat(dopaque(0.5));
+	let b = F64x64.splat(dopaque(4.0));
+	let negated = -a;
+	let low = simd.select(a < b, a, b);
+	let high = simd.select(a > b, a, b);
+	printf("f64 neg %g\n".ptr, negated.l63);
+	printf("f64 dot %g\n".ptr, a.dot(b));
+	printf("f64 select %g %g\n".ptr, low.l0, high.l39);
+}
+
+fn main() -> int
+{
+	on_i32();
+	on_f32();
+	on_f64();
+	return 0;
+}

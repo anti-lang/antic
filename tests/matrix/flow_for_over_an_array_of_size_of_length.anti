@@ -1,0 +1,33 @@
+//! `for x in a` over an array whose length is computed from `size_of`. The loop
+//! takes its limit from the constant that the back end folds.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct P
+{
+	a: i64,
+	b: i64,
+}
+
+struct Acc
+{
+	total: int,
+	room: [size_of(P)]int,
+}
+
+fn walk(v: int) -> int
+{
+	let acc = Acc { total: 0, room: [v; size_of(P)] };
+	let turns = 0;
+	for x in acc.room {
+		acc.total += x;
+		turns += 1;
+	}
+	return acc.total * 100 + turns;
+}
+
+fn main() -> int
+{
+	printf("walk %d\n".ptr, walk(3) as c_int);
+	return 0;
+}

@@ -1,0 +1,14 @@
+exit 0
+add 3 4 5 6
+sub -1 0 1 2
+mul 2 4 6 8
+div 0.5 1 1.5 2
+neg -1 -2 -3 -4
+eq 0100
+ne 1011
+lt 1000
+le 1100
+gt 0011
+ge 0111
+sum 10
+dot 20

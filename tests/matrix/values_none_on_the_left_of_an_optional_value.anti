@@ -1,0 +1,31 @@
+//! `none == v` and `none != v` of a `?int`, with `none` on the left. The
+//! comparison reads the flag of the operand on the right.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn maybe(v: int) -> ?int
+{
+	if v > 0 {
+		return v;
+	}
+	return none;
+}
+
+fn is_none(v: int) -> bool
+{
+	let m = maybe(v);
+	return none == m;
+}
+
+fn is_some(v: int) -> bool
+{
+	let m = maybe(v);
+	return none != m;
+}
+
+fn main() -> int
+{
+	printf("eq %d %d\n".ptr, is_none(1) as c_int, is_none(0) as c_int);
+	printf("ne %d %d\n".ptr, is_some(1) as c_int, is_some(0) as c_int);
+	return 0;
+}
