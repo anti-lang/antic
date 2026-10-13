@@ -156,6 +156,11 @@ not re-open a settled decision without asking Eddie.
   sanitizer suite as `ctest -I 1,1150`, `ctest -I 1151,2250` and
   `ctest -I 2251,4669`: `asan` 301 s, 388 s and 318 s, `ubsan` 245 s,
   349 s and 236 s.
+  The step of the rules of flow and of errors measured `host` as
+  `ctest -I 1,2000` and `ctest -I 2001,4708`: 377 s and 228 s. It ran each
+  sanitizer suite as `ctest -I 1,1150`, `ctest -I 1151,2250` and
+  `ctest -I 2251,4706`: `asan` 266 s, 371 s and 321 s, `ubsan` 248 s,
+  355 s and 243 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -699,14 +704,23 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 4671 ctest tests pass on the development Mac, and two of them, the
+- 4708 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  381 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 4669 each with the same skips, without
+  376 of them are the expected failures of `tests/known-failures.txt`.
+  The ASan and the UBSan builds run 4706 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
   shows a leak of antic under AddressSanitizer. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
+- The rules of flow and of errors of 2026-10-13 are built, R001 to R025 of
+  "Rules of 2026-10-13" in `docs/decisions.md`, apart from R009 and R017,
+  which wait for Eddie. A `switch` whose every arm and `else` end the path
+  ends the path, and so does a `while true` without a `break` of its own.
+  The handler of a `try` block takes `yield;`, and a `try` in the block
+  forwards to it. An `undo` that cannot run is the warning
+  `undo-never-runs` or refused. A `construct` that fails tears down what
+  was built before it. `docs/reports/2026-10-13-rules-flow-errors.md`
+  reports the step.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built, and so are
   the compound assignments `+%=` and `+|=` of each. A

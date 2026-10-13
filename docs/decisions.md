@@ -2614,6 +2614,8 @@ A rule is of one of three kinds:
 
 ### Flow
 
+The step of flow and of errors built the Change rules of this part and of "Errors" on 2026-10-13. `docs/reports/2026-10-13-rules-flow-errors.md` names the test and the commit of each.
+
 - R001. Keep. A `break` or a `continue` whose loop stands inside the same `defer` or `undo` is allowed.
 - R002. Change. `yield` inside a `defer` or an `undo` is refused, with the message of decision 19.
 - R003. Change. A `switch` whose every arm and `else` end the path ends the path of the function. An arm ends the path with `return`, `fail`, a call that never returns, or a `break` or `continue` of an outer loop. A `while true` without a `break` of its own ends the path as well. The `else` of a `let` that ends with such a statement is taken.
