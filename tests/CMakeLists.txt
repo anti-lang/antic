@@ -5464,6 +5464,26 @@ add_test(NAME plugin_unused
         "-DINTERFACE=tasks"
         "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/stdlib_host.expected"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin_kinds.cmake")
+# A provided class that the loader cannot build without arguments: one
+# whose `construct` takes one, and one that holds such a class in a field
+# no default fills. `instance` gives `none` for each, and the link of the
+# library succeeds.
+foreach(library needy holder)
+    add_test(NAME plugin_refused_${library}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+            "-DSUFFIX=${plugin_suffix}"
+            "-DEXE=${plugin_exe}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-refused-${library}"
+            "-DHOST=refused_host"
+            "-DLIBRARY=${library}"
+            "-DINTERFACE=tasks"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/refused_host.expected"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin_kinds.cmake")
+endforeach()
 # The three checks of "Versions": the chain of the interface, the
 # fields it declares and the slots the program reaches through it.
 add_test(NAME plugin_versions

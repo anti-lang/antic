@@ -1,0 +1,37 @@
+//! A library whose provided class cannot be built without arguments: its
+//! `construct` takes one. The loader refuses it at `instance` and not at the
+//! link.
+
+import net.example.tasks;
+
+provides net.example.tasks.Tasks as Needy;
+
+/// The tasks of the library, which start from a number.
+pub class Needy
+{
+	implements t: tasks.Tasks,
+	start: int = 0,
+
+	fn construct(self, start: int)
+	{
+		self.start = start;
+	}
+
+	/// The number the object started from.
+	pub concrete fn local(self, with_destruct: bool) -> int
+	{
+		return self.start;
+	}
+
+	/// The text `none`, which the caller does not free.
+	pub concrete fn label(self, n: int) -> str
+	{
+		return "none";
+	}
+
+	/// The start and `n`.
+	pub concrete fn squares(self, n: int) -> int
+	{
+		return self.start + n;
+	}
+}

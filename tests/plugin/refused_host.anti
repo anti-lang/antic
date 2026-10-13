@@ -1,0 +1,23 @@
+//! A host that loads the library its first argument names and asks it for a
+//! `Tasks`. The class the library provides takes arguments the host has none
+//! of, so `instance` gives `none`.
+
+import anti.lang;
+import anti.plugin;
+import net.example.tasks;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch fatal;
+	if let made = lib.instance(tasks.Tasks) {
+		printf("made %lld\n".ptr, made.squares(1));
+		delete(made);
+	} else {
+		printf("no object\n".ptr);
+	}
+	lib.unload() catch fatal;
+	delete(lib);
+	return 0;
+}
