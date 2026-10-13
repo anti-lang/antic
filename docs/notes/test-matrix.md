@@ -714,7 +714,8 @@ read a cell it wrote:
   the checker folds in a constant and the value the program computes from
   operands it cannot know before it runs. `checked` stands where a dev
   build stops the case at run time, and `none` where the checker refuses
-  the constant.
+  the constant. R029 of "Rules of 2026-10-13" refuses a constant `+`, `-` or
+  `*` that leaves the range of its type, so those lines hold `none`.
 - `matrix/values_float_kinds` and `matrix/values_conversion_kinds` hold
   the floats and `as` between the numbers in the same form.
 - `matrix/values_kinds_in_literals` and `matrix/values_kinds_in_places`
@@ -746,6 +747,9 @@ of lowering meet:
 | `values_float_kinds` | `+ - * /`, unary `-` and the comparisons on `f32` and `f64` with a NaN, the infinities and both zeros, folded and computed, and the rounding of an `f64` to an `f32` | |
 | `values_conversion_kinds` | a float to every integer type, an integer to a float with its rounding, and every pair of integer types | |
 | `values_constant_as_past_u8`, `values_constant_as_below_zero_to_u32`, `values_constant_as_past_i8_from_u8`, `values_constant_as_below_i16`, `values_constant_as_at_the_ends` | R026 of "Rules of 2026-10-13": `as` of a constant that the target type cannot hold is refused, and the least and the largest value of each type convert | |
+| `values_constant_sum_past_its_type`, `values_constant_difference_below_zero_of_u8`, `values_constant_product_past_i8`, `values_constant_arithmetic_at_the_ends` | R029: a constant `+`, `-` or `*` that leaves the range of its type is refused, in an unsigned constant as well, and the wrapping and the saturating operators leave it | |
+| `values_constant_minus_of_the_least`, `values_constant_least_remainder_by_minus_one` | R031: unary `-` of a constant that is the least value, and its remainder by -1, are refused | |
+| `values_constant_wrapping_shift_by_negative`, `values_constant_shift_left_by_negative` | R032: a constant shift by a count below zero is refused, for `<<%` and for `<<` | |
 | `values_constant_surrogate_as_char`, `values_constant_past_the_last_char`, `values_constant_as_char_at_the_ends` | R027: a constant conversion to `char` of a surrogate or of a value past `0x10FFFF` is refused, and the values beside them convert | |
 | `values_fold_least_int_from_float` | the least `int` as a float converts to `int` in a constant | T009 |
 | `values_fold_int_to_f32` | an `int` that needs one rounding to an `f32` and gets two in a constant | T008 |

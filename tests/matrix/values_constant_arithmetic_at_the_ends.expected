@@ -1,0 +1,6 @@
+exit 0
+ends 127 -128 255 0
+negated -127
+wrapped -128 255
+saturated 127
+shifted 0

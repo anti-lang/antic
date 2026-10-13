@@ -1,0 +1,1 @@
+values_constant_sum_past_its_type.anti:5:19: error: `2147483647 + 1` does not fit `i32`

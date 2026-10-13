@@ -415,6 +415,11 @@ void test_sema(void)
             "the value does not fit `c_ulong` on every target");
     accepts("fn f() { let big = 5_000_000_000; let half: f32 = 0.5; }");
     accepts("fn f() { let x: u8 = 250 + 10; let p: ?*int = none; }");
+    /* An unsigned sum wraps where it runs. A constant leaves the range
+       of no type, by R029 of "Rules of 2026-10-13". */
+    rejects("const X: u8 = 250 + 10;", 1, 15, "`250 + 10` does not fit `byte`");
+    rejects("fn f() { let x: i8 = 100 + 100; }", 1, 22,
+            "`100 + 100` does not fit `i8`");
     accepts("fn f(p: *int) -> bool { return p == none; }");
     rejects("fn f() { let n: u8 = 300; }", 1, 22, "`300` does not fit `byte`");
     rejects("fn f() { let m: u8 = -1; }", 1, 22, "`-1` does not fit `byte`");
@@ -632,8 +637,10 @@ void test_sema(void)
             "    return a +% b -% a *% b +| a -| b *| (a <<% b);\n"
             "}\n"
             "const Z: int = 1 <<% 64;\n"
-            "const N: i32 = 1 <<% -1;\n"
             "const S: u8 = 200 +| 100;");
+    /* A count below zero is no count, by R032 of "Rules of 2026-10-13". */
+    rejects("const N: i32 = 1 <<% -1;", 1, 16,
+            "`1 <<% -1` shifts out of range");
     rejects("fn f(a: f64) -> f64 { return a +% a; }", 1, 30,
             "`+%` needs integer operands, found `float`");
     rejects("fn f(a: f32) -> f32 { return a *| a; }", 1, 30,

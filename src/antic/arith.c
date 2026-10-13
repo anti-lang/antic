@@ -173,6 +173,11 @@ static int direction(char op, uint64_t a, uint64_t b, int n, bool is_signed)
     return ((a ^ b) >> 63) != 0 ? -1 : 1;
 }
 
+bool arith_overflows(char op, uint64_t a, uint64_t b, int n, bool is_signed)
+{
+    return direction(op, a, b, n, is_signed) != 0;
+}
+
 uint64_t arith_saturate(char op, uint64_t a, uint64_t b, int n,
                         bool is_signed)
 {

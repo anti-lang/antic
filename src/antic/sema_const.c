@@ -291,14 +291,19 @@ static bool is_scalar_value(uint64_t v)
 
 /* Report an operation on the constant operands a and b that has no value.
    Integer division and remainder fail by zero and for the minimum value by
-   -1. A shift fails for a count outside the bits of the type. A
-   conversion fails for a value outside the range of the integer type,
-   and for a value that is no `char`. e is a binary expression or a
-   conversion to result, and b is NULL for a conversion. */
+   -1. A shift fails for a count outside the bits of the type, and `<<%`
+   for a count below zero alone. `+`, `-`, `*` and unary `-` fail for a
+   result outside the range of their type. A conversion fails for a value
+   outside the range of the integer type, and for a value that is no
+   `char`. e is a binary expression, a unary `-` or a conversion to
+   result, and b is NULL for the last two. in_constant is set where e is
+   computed as a constant, and clear where its operands are constants in
+   an expression that runs. An unsigned `+`, `-` or `*` wraps when it
+   runs, so it is reported in a constant alone. */
 static bool reports_undefined(struct checker *c, const struct expr *e,
                               const struct type *result,
                               const struct const_value *a,
-                              const struct const_value *b)
+                              const struct const_value *b, bool in_constant)
 {
     struct text x = {0};
     struct text y = {0};
@@ -323,6 +328,23 @@ static bool reports_undefined(struct checker *c, const struct expr *e,
                           text_cstr(&x));
             found = true;
         }
+    } else if (e->kind == EXPR_UNARY) {
+        /* DESIGN: unary `-` of the least value has no value in its
+           type, by R031 of "Rules of 2026-10-13". A literal under the
+           `-` is the least value itself, which integer_literal holds to
+           the range. */
+        int bits = types_is_target_sized(result) ? 64 : types_bits(result);
+        if (a->kind == CONST_INT && types_is_signed(result) &&
+            e->as.unary.operand->kind != EXPR_INT &&
+            arith_overflows('-', 0, a->as.integer, bits, true)) {
+            operand_text(&x, e->as.unary.operand, a);
+            sema_error_at(c, e->pos,
+                          text_cstr(&x)[0] == '-'
+                              ? "`-(%s)` does not fit `%s`"
+                              : "`-%s` does not fit `%s`",
+                          text_cstr(&x), sema_tn(result));
+            found = true;
+        }
     } else if (types_is_integer(e->as.binary.left->type) &&
                b->kind != CONST_SYMBOLIC) {
         enum token_kind op = e->as.binary.op;
@@ -331,6 +353,10 @@ static bool reports_undefined(struct checker *c, const struct expr *e,
         uint64_t mask = bits == 64 ? UINT64_MAX : ((uint64_t)1 << bits) - 1;
         bool divides = op == TOKEN_SLASH || op == TOKEN_PERCENT;
         const char *o = sema_op_text(op, spelling);
+        char sign = op == TOKEN_PLUS    ? '+'
+                    : op == TOKEN_MINUS ? '-'
+                    : op == TOKEN_STAR  ? '*'
+                                        : 0;
 
         operand_text(&x, e->as.binary.left, a);
         operand_text(&y, e->as.binary.right, b);
@@ -352,6 +378,27 @@ static bool reports_undefined(struct checker *c, const struct expr *e,
                     b->as.integer >= (uint64_t)bits)) {
             sema_error_at(c, e->pos, "`%s %s %s` shifts out of range",
                           text_cstr(&x), o, text_cstr(&y));
+            found = true;
+        } else if (op == TOKEN_SHL_WRAP && types_is_signed(t) &&
+                   sema_signed_bits(b->as.integer) < 0) {
+            /* DESIGN: `<<%` gives 0 for a count at or above the width,
+               and a count below zero is no count, by R032 of "Rules of
+               2026-10-13". */
+            sema_error_at(c, e->pos, "`%s %s %s` shifts out of range",
+                          text_cstr(&x), o, text_cstr(&y));
+            found = true;
+        } else if (sign != 0 && a->kind != CONST_SYMBOLIC &&
+                   (in_constant || types_is_signed(t)) &&
+                   arith_overflows(sign, a->as.integer, b->as.integer,
+                                   types_is_target_sized(t) ? 64 : bits,
+                                   types_is_signed(t))) {
+            /* DESIGN: a constant has the value the reader computes, by
+               R029 of "Rules of 2026-10-13", in an unsigned type as
+               well. `+%` and `+|` name a result outside the range. A
+               signed operation that runs stops a dev build, so it is
+               refused wherever its operands are constants. */
+            sema_error_at(c, e->pos, "`%s %s %s` does not fit `%s`",
+                          text_cstr(&x), o, text_cstr(&y), sema_tn(t));
             found = true;
         }
     }
@@ -377,6 +424,8 @@ bool sema_undefined_on_constants(struct checker *c, struct expr *e,
     sema_enter_quiet(c, &saved);
     if (e->kind == EXPR_CAST) {
         constant = sema_eval_const(c, e->as.cast.operand, &a);
+    } else if (e->kind == EXPR_UNARY) {
+        constant = sema_eval_const(c, e->as.unary.operand, &a);
     } else {
         constant = sema_eval_const(c, e->as.binary.left, &a) &&
                    sema_eval_const(c, e->as.binary.right, &b);
@@ -384,7 +433,7 @@ bool sema_undefined_on_constants(struct checker *c, struct expr *e,
     sema_leave(c, &saved);
     return constant &&
            reports_undefined(c, e, result, &a,
-                             e->kind == EXPR_CAST ? NULL : &b);
+                             e->kind == EXPR_BINARY ? &b : NULL, false);
 }
 
 /* DESIGN: a constant holds one value per element, and lowering writes
@@ -431,7 +480,7 @@ static bool const_as(struct checker *c, struct expr *e,
     }
     out->type = e->type;
     if (a.kind != CONST_SYMBOLIC &&
-        reports_undefined(c, e, e->type, &a, NULL)) {
+        reports_undefined(c, e, e->type, &a, NULL, true)) {
         return false;
     }
     if (a.kind == CONST_SYMBOLIC) {
@@ -497,6 +546,10 @@ static bool const_unary(struct checker *c, struct expr *e,
     if (a.kind == CONST_SYMBOLIC) {
         return symbolic_value(c, out, SYMBOLIC_UNARY, e->as.unary.op, &a,
                               NULL);
+    }
+    if (e->as.unary.op == TOKEN_MINUS &&
+        reports_undefined(c, e, e->type, &a, NULL, true)) {
+        return false;
     }
     *out = a;
     out->type = e->type;
@@ -676,7 +729,7 @@ static bool const_binary(struct checker *c, struct expr *e,
     if (!sema_eval_const(c, e->as.binary.right, &b)) {
         return false;
     }
-    if (reports_undefined(c, e, e->type, &a, &b)) {
+    if (reports_undefined(c, e, e->type, &a, &b, true)) {
         return false;
     }
     /* The upper half of a product of c_long has another value at

@@ -21,7 +21,6 @@ const u8 4
 const i8 127
 const u16 24464
 const out 0
-const neg 0
 const top -9223372036854775808
 const size 0
 const size neg 0

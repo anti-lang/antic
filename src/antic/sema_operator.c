@@ -699,7 +699,9 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
             return sema_builtin(c, TYPE_ERROR);
         }
         if ((op == TOKEN_SLASH || op == TOKEN_PERCENT || op == TOKEN_SHL ||
-             op == TOKEN_SHR) && types_is_integer(left) &&
+             op == TOKEN_SHR || op == TOKEN_SHL_WRAP || op == TOKEN_PLUS ||
+             op == TOKEN_MINUS || op == TOKEN_STAR) &&
+            types_is_integer(left) &&
             sema_undefined_on_constants(c, e, left)) {
             return sema_builtin(c, TYPE_ERROR);
         }

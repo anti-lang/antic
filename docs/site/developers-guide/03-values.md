@@ -516,7 +516,7 @@ A dev build inserts a check before each operation of the table. A failed check p
 
 Each message starts with the file and the line, as in `ints.anti:7: overflow in +`. Four cases have a defined result and no check in either mode. The least value divided by `-1` gives the least value, and its remainder is 0. Unary `-` of the least value gives the least value. `<<%` gives 0 for a count at or above the width. An unsigned `+`, `-` or `*` wraps.
 
-With constant operands the checker refuses a division by zero, a shift count out of range and both conversions of the table. `7 / 0`, `1 << 70`, `70000 as i16` and `0xD800 as u32 as char` are compile errors.
+With constant operands the checker refuses every operation of the table. `127 + 1` as an `i8`, `7 / 0`, `1 << 70`, `70000 as i16` and `0xD800 as u32 as char` are compile errors. So are the least value divided by `-1`, unary `-` of the least value and `<<%` by a count below zero. A `const` is held to the range of an unsigned type as well: `const N: u8 = 200 + 100;` is refused, and `200 +% 100` gives 44.
 
 The program runs each case in release mode.
 

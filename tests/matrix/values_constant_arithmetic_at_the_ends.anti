@@ -1,0 +1,25 @@
+//! A constant expression whose value is the least or the largest value of its
+//! type is taken, and the wrapping and the saturating operators leave the range
+//! in a constant, by R029 of "Rules of 2026-10-13".
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const TOP: i8 = 100 + 27;
+const LEAST: i8 = -100 - 28;
+const TOP_U8: u8 = 5 * 51;
+const ZERO_U8: u8 = 5 - 5;
+const NEGATED: i8 = -TOP;
+const WRAPPED: i8 = TOP +% 1;
+const SATURATED: i8 = TOP +| 1;
+const WRAPPED_U8: u8 = ZERO_U8 -% 1;
+const SHIFTED: u8 = 1 <<% 9;
+
+fn main() -> int
+{
+	printf("ends %d %d %d %d\n".ptr, TOP as c_int, LEAST as c_int, TOP_U8 as c_int, ZERO_U8 as c_int);
+	printf("negated %d\n".ptr, NEGATED as c_int);
+	printf("wrapped %d %d\n".ptr, WRAPPED as c_int, WRAPPED_U8 as c_int);
+	printf("saturated %d\n".ptr, SATURATED as c_int);
+	printf("shifted %d\n".ptr, SHIFTED as c_int);
+	return 0;
+}

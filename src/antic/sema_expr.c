@@ -874,6 +874,10 @@ static struct type *check_unary(struct checker *c, struct expr *e,
                           sema_tn(t));
             return sema_builtin(c, TYPE_ERROR);
         }
+        if (!sema_is_error(t) && types_is_integer(t) &&
+            sema_undefined_on_constants(c, e, t)) {
+            return sema_builtin(c, TYPE_ERROR);
+        }
         return t;
     case TOKEN_BANG:
         t = sema_check_test(c, operand);

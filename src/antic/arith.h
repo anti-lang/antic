@@ -35,6 +35,10 @@ double arith_divide(double a, double b);
 /* The upper half of the full product of a and b, which has 2n bits. */
 uint64_t arith_mul_high(uint64_t a, uint64_t b, int n, bool is_signed);
 
+/* Whether the exact result of a op b, for op '+', '-' or '*', leaves the
+   range of n bits. */
+bool arith_overflows(char op, uint64_t a, uint64_t b, int n, bool is_signed);
+
 /* a op b for op '+', '-' or '*', clamped at the minimum or the maximum
    of n bits. */
 uint64_t arith_saturate(char op, uint64_t a, uint64_t b, int n,
