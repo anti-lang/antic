@@ -155,7 +155,7 @@ about structs, enums, classes, interfaces and errors lives there, and
 - The root's `copy` is `copy(self, to: *Object)`. It fills `to`, which `dup` has already allocated at the concrete size from the descriptor. A `concrete fn copy` takes the same form, fills the fields of `to` and never allocates. Reason: the size of the copy comes from the descriptor of the concrete class, which the runtime reads before any body runs, and the runtime and the checker already used this form. The specification gave `copy(self) -> *Object` before.
 - The refusal of `=` on a class value with `own` fields applies to copying an existing value. A fresh value on the right, a literal, `T(args)` or the result of `dup`, is a move and stays allowed, so `shelf.items[0] = Item { ... }` compiles. The refusal covers `let` as well as an assignment.
 - A value is existing when the right side of `=` names a variable, a field, an element or the target of a pointer. The result of any call is fresh, as a `return` of a local hands it to the caller. An array whose elements own memory is refused as its element class is, since a byte copy of an array gives each element two owners.
-- `alloc(T, n)` for a class `T` zero-fills the memory with `calloc`, so an unfilled element has a zero table. For structs and primitives it stays `malloc`.
+- `alloc(T, n)` for a class `T` zero-fills the memory with `calloc`, so an unfilled element has a zero table. For structs and primitives it stays `malloc`. R050 of "Rules of 2026-10-13" replaces the plain `malloc`: the memory is aligned to the alignment of `T`, also above 16.
 - [provisional] `alloc(T, n)` zero-fills with `calloc` as well when `=` into an element tears the old value down: a struct, a tuple or an array holding a class value or an owned pointer, and a `?T` of one. Reason: `=` reads the table and the flag of the old value, and destroys nothing where they are zero. With `malloc` it destroyed whatever the heap held there, which crashed `programs/owning_values.anti` on the Linux VM. The object model already gives a zero table to every place a program can assign into before it holds a value. `programs/alloc_owning.anti` checks it under `MallocScribble` on the Mac.
 - A `transient` field holds derived state, such as the formatted text of an `Error`. `dup` gives the copy `none` there, and the default `equals`, `hash` and `serialize` skip the field. Reason: the state is rebuilt from the other fields, and it holds a heap address that differs between two equal objects.
 - `transient` is a contextual word before a class field of type `?*T` or `?fn(...)`, and it is refused together with `own`. The field list of the descriptor leaves a transient field out rather than carrying a bit in its record, so every walk of the list skips it, reflection included, and the runtime does not change. The library file carries the bit. Reason: `none` is the value the copy writes, and a `*T` has none. A class that frees the field in its `destruct` would free it twice under `own`. Leaving the record out is the smaller of the two forms of a flag.
@@ -214,7 +214,7 @@ about structs, enums, classes, interfaces and errors lives there, and
 - `let x: T = e;` and `let x = e;`. The type is optional. Without it the variable has the initialiser's type. `let` bindings and parameters are mutable.
 - `const N: T = e;` at module level and in blocks. The initialiser is a constant expression. It may use literals, other constants, every binary operator including `&&` and `||`, unary `-`, `!` and `~`, `as`, struct literals, array literals and `size_of(T)`. It may read a field of a const struct, `.len` of a const array or of a string literal, and an element of a const array at a constant index. Comparisons give `bool` constants. `none` is a constant, and `==` or `!=` against `none` is allowed. No other pointer value is constant. Calls, `alloc`, `&`, `*`, `.ptr`, slicing and indexing anything other than a const array are excluded. A constant has no address.
 - A function without `-> R` returns no value and uses `return;`. There is no `void` type name. In a function with `-> R`, reaching the end without `return` is a compile error. A body ends in `return` when its last statement is a `return`, or an `if` chain with a final `else` whose every branch ends that way. Loops never count, `while true` included. Code after `return` is allowed and produces no diagnostic in the core. A warning for it is a candidate for the closing guide.
-- `extern fn printf(fmt: *byte, ...) -> i32;` declares a C variadic function. Variadic arguments are 32-bit or 64-bit integers, `f64` or pointers. Other types need `as`.
+- `extern fn printf(fmt: *byte, ...) -> i32;` declares a C variadic function. Variadic arguments are 32-bit or 64-bit integers, `f64` or pointers. Other types need `as`. R128 of "Rules of 2026-10-13" adds `c_long` and `c_ulong` to them and refuses an `f32` with a message that names `f64`.
 - Assignment `=` and `+= -= *= /= %= &= |= ^= <<= >>=` are statements, not expressions. No `++`, `--`, `?:` or comma operator.
 - An expression statement is a call. A bare `{ }` block is a statement. Blocks hold statements, `let` and `const`. `fn`, `extern fn`, `struct`, `union` and `import` never appear in a block.
 - A type is declared at module level, or in a class body as a nested type. A class body may declare a `struct`, `enum` or `class`, which is private to that class, as "Nested types" in `docs/anti-language-additions.md` gives. No other kind of type nests. Eddie changed this on 2026-09-23 in round four, which reversed the rule that every type is declared at module level. Reason: what belongs to one class alone, such as the node of a list, then never leaves it, and in a thread-safe class such a node cannot leak by construction. The reason for the old rule still holds for a type that users work with directly, which stays at module level. The classes that `anti format` generates from a wire format are such types and stay there.
@@ -1450,7 +1450,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 ## Simd structs
 
 - Simd structs are built: the declaration, the element-wise operators, the masks of the comparisons, `simd.select`, `simd.any` and `simd.all` of the new module `anti.simd`, the built-ins `splat`, `load`, `store`, `shuffle`, `sum`, `min`, `max` and `dot`, `as` to an array or a plain struct of the same bytes, the vector types of C in the header and the split of a wide value into the native width of the target and the level. `docs/notes/simd.md` holds the choices of the passes. The library format is version 46.
-- A lane is `bool`, `char`, an integer of a fixed width, `f16`, `f32` or `f64`. `c_long`, `c_ulong` and `c_wchar` are refused. Reason: the section gives the size of a simd struct as a multiple of eight bytes up to the cap, which is a property of the declaration, and the target decides the width of those three.
+- A lane is `bool`, `char`, an integer of a fixed width, `f16`, `f32` or `f64`. `c_long`, `c_ulong` and `c_wchar` are refused. Reason: the section gives the size of a simd struct as a multiple of eight bytes up to the cap, which is a property of the declaration, and the target decides the width of those three. R062 of "Rules of 2026-10-13" replaces the list: a lane is an integer or a float type, and a `char` lane is refused.
 - A `simd struct` takes no `packed`, no `align(N)` and no bitfield. Reason: the section gives the alignment as the size or sixteen, whichever is smaller, and a lane is a whole value.
 - The mask of a comparison has no spelling. It is a simd struct of `bool` with the field names of the type compared, one per type, and a program names it through the value a comparison gives. `simd.select`, `simd.any` and `simd.all` take any simd struct of `bool`, `select` with the lane count of its two values, so a declared one serves where the section allows it. Reason: the section names the mask by its lanes alone and gives no form that writes the type.
 - The operators of a simd struct are the ones the section names: `+ - * /`, the bitwise `& | ^ << >>` and `~` on integer lanes, unary `-`, and the comparisons. `%`, the wrapping and saturating operators, `&&`, `||` and `!` are refused, and an `operator fn` whose first parameter is a simd struct is refused as well. Reason: the section lists the operators that apply element-wise, and an `operator fn` beside a built-in operator would never be called.
@@ -1685,7 +1685,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] A fixed field is one that no code writes outside `construct` and `destruct`. A write is an assignment, a compound assignment and `&` of the field or of a part of it held by value. A field of the module is reported at its declaration, and a field of another module at the write, unless its library says `unchecked`. The library file carries the guard, `unchecked` and the class header clause. Reason: the specification puts `unchecked` after the field's type for that field alone. A report at the declaration is what a clause there covers.
 - [provisional] A field of a type nested in a concurrent class is checked as the class's fields are, and a Mutex field counts as fixed. Reason: the specification guards the fields of `PeopleList.Node` and declares its Mutex fields without a mark.
 - [provisional] An `unchecked(unguarded-field)` on a field that code outside the class reaches is never `unused-unchecked`, since another module may write the field. On a class that is not concurrent it overrules nothing. Reason: the check of a public field ends in the modules that import it.
-- [provisional] A pointer into the fields is `&` of a place reached from `self` through fields and array elements, a slice or the `ptr` of one, a field of slice type, and a local whose `let` took one of those. A `return` of a function with `self` that is not private refuses it with `` `origin` of the thread-safe class `Shape` gives out a pointer into its fields, return a copy ``, and a call through a function value that is a local or a parameter refuses it as an argument. Reason: the specification names the result and a parameter of function type. A pointer a field holds points at an object of its own, and a nested type never leaves the class.
+- [provisional] A pointer into the fields is `&` of a place reached from `self` through fields and array elements, a slice or the `ptr` of one, a field of slice type, and a local whose `let` took one of those. A `return` of a function with `self` that is not private refuses it with `` `origin` of the thread-safe class `Shape` gives out a pointer into its fields, return a copy ``, and a call through a function value that is a local or a parameter refuses it as an argument. Reason: the specification names the result and a parameter of function type. A pointer a field holds points at an object of its own, and a nested type never leaves the class. R094 of "Rules of 2026-10-13" adds two ways out that are refused as well: an out parameter and a pointer stored in another object.
 - [provisional] An atomic local holds an integer, a `bool`, a `char` or a pointer, lives in memory and takes the operations of an atomic field. Reason: the runtime moves one scalar per operation, and the specification names no other type.
 - [provisional] A worker's argument `*T` passes the pointer-free rule when T is a Mutex, a synchronized class or a concurrent class. Reason: the specification gives the exception to a thread-safe object, and a Mutex cannot reach a worker any other way.
 - [provisional] A dev build passes the site of each lock, `file:line`, to the runtime. A thread keeps the locks it holds, and the runtime records one order per pair of locks. A pair taken in the other order is reported once on standard error with the four sites. The report comes before the thread waits, and the program goes on. `m.destroy()` forgets the orders of the lock. Reason: the specification reports the two orders with both call sites before they hang, and a dev build prints what it finds and carries on.
@@ -1734,7 +1734,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - The module that carries `main` is compiled from its source on every dev build, and every other module from its library file. Reason: antic stops a dev build of a library file at its object and never links one. That module is therefore the link, and `docs/tooling-addendum.md` says every build relinks.
 - A dev build writes an object of every module of the standard library that the program reaches. They stand under `build/<target>/dev/obj/`. Reason: a dev build compiles one module into its own object, so the link needs an object of each. `anti test` writes the same objects for the same reason, and `driver_libraries` gives the list from the imports.
 - The lock file never answers for a dependency of a path, so a project with one walks its graph on every build. Reason: the files under a path are the developer's own and carry no version of their own. A digest recorded for one would refuse the next build of it.
-- A dependency of a path whose directory holds a manifest is a project. It is built for the host first, in the mode of the build that names it, and its `dist/` is read. The chain of such builds stops after eight. Reason: `docs/tooling.md` gives that shape and names no depth. A cycle of path dependencies then reports rather than running out of stack.
+- A dependency of a path whose directory holds a manifest is a project. It is built for the host first, in the mode of the build that names it, and its `dist/` is read. The chain of such builds stops after eight. Reason: `docs/tooling.md` gives that shape and names no depth. A cycle of path dependencies then reports rather than running out of stack. R165 of "Rules of 2026-10-13" replaces the stop after eight: a cycle is refused at any depth, with the cycle named.
 - The cache key of a module carries the processor level and a mark for `-g` beside the three that `docs/tooling-addendum.md` names. Reason: both decide the instructions and the lines of the output, so an object of one level would otherwise stand for another. Decision 15 of "Decisions of 2026-10-11" adds the digests of the imports to the key of a library file.
 - `anti new` refuses a package name of one segment. Reason: antic warns on a module path of one segment, which is for a program's own files. The name of a package is the root of every module of it.
 - `anti build --release` writes `<program>-symbols.zip` beside the program in `dist/`. It holds `<program>.debug` and `<program>.map`. For Windows it holds the PDB of the release link that produced the shipped `<program>.exe`, whose GUID that program carries. The debug link is `<program>.debug.exe` in the build directory, so its own PDB takes another name. Eddie decided the PDB on 2026-09-27. Before, the debug link wrote `<program>.pdb` over the release link's, and `anti_build` now checks the GUIDs on Windows with `tools/check-pdb.cmake`. `src/anti/zip.c` writes it with stored entries and no compression, and every field that would carry a clock or a machine is fixed. Reason: "Symbols tooling" in `docs/anti-language-additions.md` asks for the archive and for zip. A stored archive needs no library and gives one file from one input on every host.
@@ -2361,7 +2361,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - A parameter that is not `own` belongs to the caller and cannot leave the function in any way that gives it a second owner: not by `let` or `=`, not in a tuple, struct, class or variant literal, not as an `own` argument and not by `return`. It holds for generic and non-generic parameters alike: for a parameter whose value owns something, and in generic code for one whose type is a type parameter. The message names both fixes: `` `p` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(p)` ``. Functions like `max<T>` become `fn max<T: lt>(own a: T, own b: T) -> T`, which returns one and tears down the other. `errors/caller_params.anti` holds the refusals, and `programs/caller_params.anti` runs the fixes with `T = Key` under a leak check.
 - At a call site the type is concrete, and a value that owns nothing is not moved. A caller that passes `int` locals to `max` keeps them.
 - `dup` returns the kind it is given. `dup(x)` of a value gives a value, for a class value as for a struct. `dup(p)` of a pointer gives a new object and a pointer, as before.
-- [provisional] The refusal also covers `if let` and a destructuring `let`, a parameter whose type holds a type parameter in place, such as `?T` or `(T, int)`, and an array literal. A parameter of an owning class type gets the same message. Reason: each is a copy of the value that belongs to the caller, and one message names both fixes.
+- [provisional] The refusal also covers `if let` and a destructuring `let`, a parameter whose type holds a type parameter in place, such as `?T` or `(T, int)`, and an array literal. A parameter of an owning class type gets the same message. Reason: each is a copy of the value that belongs to the caller, and one message names both fixes. R079 of "Rules of 2026-10-13" replaces the part on an array literal: it moves an owning local, as a tuple, a struct and a class literal do.
 - [provisional] A value moves into an `own` parameter when its type owns something, holds a type parameter or holds a pointer, and a channel and a Mutex move as well. Any other value is copied. `errors/own_params.anti` no longer refuses an `int` named after it went to an `own` parameter. Reason: a pointer passed to an `own` parameter hands over what it reaches, and a channel and a Mutex are handles.
 - `*` applied directly to the result of `dup` or `alloc` is refused, since the object it points at could never be freed. Nothing frees it implicitly. The message names the fix: `` `*` of a new object drops its only pointer, so nothing could free it. Copy the value with `dup(*p)` or `dup(x)`, or keep the pointer in a `let` ``. `errors/deref_new.anti` holds both forms, and `errors/own_copy.anti` writes `dup(*p)` where it wrote `*dup(p)`.
 - [provisional] `dup(x)` of a class value copies it as a class value held inline is copied and dispatches `copied`, as `dup(p)` does. Reason: the hook stands after the `dup` operator, whichever kind it gives.
@@ -2586,14 +2586,14 @@ The fix run builds these. Until it does, the code stands as the audit found it.
 
 The test run of 2026-10-11 tests each of these. Where antic 0.2.0 does otherwise, the test is an expected failure by decision 30 until the fix run.
 
-19. `return`, `break`, `continue`, `fail` and `try` inside a `defer` or an `undo` are refused by the checker.
+19. `return`, `break`, `continue`, `fail` and `try` inside a `defer` or an `undo` are refused by the checker. R001 of "Rules of 2026-10-13" allows a `break` or a `continue` whose loop stands inside the same `defer` or `undo`, and R002 adds `yield` to the refusals.
 20. A `catch` handler of a value that can reach its end without `yield`, `fail`, `return` or a call that never returns is refused.
 21. `try` on an optional is refused, with a message that names `let ... else` and `??`.
 22. `return` of a field that owns something is refused, by the rule of `let` and `=`. The entry on a type that owns something under "Generics and collections" holds that rule.
 23. A second `join` of one job is refused where the checker sees it and traps in dev mode otherwise. The arguments of a `dispatch` are stored per job. A later turn of a loop never changes the arguments of a job that has not started.
 24. A constant index past the end of a fixed array is refused. `xs[lo..hi]` is checked against the length in dev mode, as an index is.
 25. `count` of a collection is read-only outside its module.
-26. A `str` in the signature of an `extern fn` is refused. C takes `*c_char`.
+26. A `str` in the signature of an `extern fn` is refused. C takes `*c_char`. R126 of "Rules of 2026-10-13" refuses a slice, a tuple, an optional value and an `own` parameter there as well.
 27. The checker refuses the six forms that `docs/anti-object-model.md` forbids and antic 0.2.0 accepts: a class with an `abstract fn` that is not `abstract`, a direct call of `destruct`, `mutable` on a field of a plain class, `static atomic` on an `f64`, `==` on pointers of two unrelated classes, and `equals` replaced without `hash`. Where the code is narrower than the documents, the documents follow the code: `<` on an enum stays refused, and `+=` is not derived from an `operator fn add`.
 
 ### The test run
@@ -2602,7 +2602,280 @@ The test run of 2026-10-11 tests each of these. Where antic 0.2.0 does otherwise
 29. llvm-cov joins the tools of `anti-lang/llvm-tools` in `23.1.1-anti.8`, for the coverage measurement. It does not go into the package of Anti.
 30. A test that shows a defect stays in the suite as an expected failure, listed in `tests/known-failures.txt` with the id of its finding. The fix run removes each line with its fix. A listed test that passes fails the suite.
 
+## Rules of 2026-10-13
+
+Eddie took these decisions on 2026-10-13, after the test run. "Rules the documents do not state" in `docs/reports/2026-10-13-tests-summary.md` lists 197 cases that no document decided. Each case has an id here, R001 to R197, in the order of that list. The report holds what antic did with each case on that day. None is provisional. A number such as T052 names a finding of `docs/audit/tests-findings.md`, and a decision with a number stands under "Decisions of 2026-10-11". An older entry that said otherwise names the rule that replaces it.
+
+A rule is of one of three kinds:
+
+- Keep. antic did it on that day, and that is the rule. A test holds it, and `docs/reports/2026-10-13-rules-record.md` names the test of each.
+- Change. The rule replaces what antic did. Until a step of the rules run builds it, the code stands as the test run found it.
+- Eddie. The case waits for Eddie's answer and stands under "Open" with its id. antic stays as it is there, and so do its tests.
+
+### Flow
+
+- R001. Keep. A `break` or a `continue` whose loop stands inside the same `defer` or `undo` is allowed.
+- R002. Change. `yield` inside a `defer` or an `undo` is refused, with the message of decision 19.
+- R003. Change. A `switch` whose every arm and `else` end the path ends the path of the function. An arm ends the path with `return`, `fail`, a call that never returns, or a `break` or `continue` of an outer loop. A `while true` without a `break` of its own ends the path as well. The `else` of a `let` that ends with such a statement is taken.
+- R004. Keep. A deferred statement that holds a closure runs it at each exit.
+- R005. Change. An `undo` in a function that cannot fail gives the warning `undo-never-runs`. An `undo` inside a `defer` or inside another `undo` is refused, as `docs/anti-syntax-overview.md` states for an `undo` inside an `undo`.
+- R006. Keep. `yield v` computes `v` before the deferred statements of the handler run.
+- R007. Keep. A `defer` whose block calls a function that returns `never` is allowed, and the function ends inside the `defer`.
+- R008. Keep. A `for` whose low end is above its high end runs no turn, with `by -1` as well.
+- R009. Eddie. `switch` on a `char`.
+- R010. Change. Two arms of one `switch` whose values are equal constants are refused. That holds when one arm is written as `size_of(i64)` and the other as `8`.
+- R011. Keep. `for x in &c` over a parameter with `Iterable<int>` is refused.
+- R012. Change. A source that ends inside a block gives `` expected `}` `` once.
+
+### Errors
+
+- R013. Keep. A `worker fn` that may fail is called directly with a handler, and `dispatch` and `parallel` refuse it. The message changes: it counts the arguments the program writes and leaves the out pointer out.
+- R014. Change. `yield;` is taken in the handler of a `try` block, which is a handler.
+- R015. Change. `yield` belongs to the innermost `catch` handler that holds it. A `yield` in the handler of a `try` block inside the handler of a `let` ends the handler of the `try` block.
+- R016. Change. `try f()` inside a `try` block forwards to the handler of that block and never to the caller.
+- R017. Eddie. `fail` with a message that is not a literal.
+- R018. Keep. A `fail` in an anonymous function does not count for the warning `never-fails` of the function around it.
+- R019. Keep. The function of an origin is `m.f.0` for an anonymous function, `m.f<int>` for a copy and `m.Outer.Inner.f` for a nested type.
+- R020. Change. The `NoneDereference` of a guard keeps code 1. Its message is `the value is none` for a `?T` of a value, and `the pointer is none` for a nullable pointer.
+- R021. Keep. `catch fatal` in a worker ends the whole program, and no `defer` runs.
+- R022. Keep. A `let` takes a lent pointer, and a `yield` into that `let` refuses it.
+- R023. Keep. A function that may fail and gives a function that cannot fail needs a `type` alias.
+- R024. Keep. The handler of a call statement whose result is dropped may reach its end.
+- R025. Change. When a `construct` fails, the parts that were built before it are torn down in reverse order. The `destruct` of every base whose `construct` finished runs, and every field already set is torn down. T052 is the test.
+
+### Values and constants
+
+- R026. Change. A narrowing `as` of a constant whose value does not fit the target type is refused. The same conversion stops a dev build at run time.
+- R027. Change. A constant conversion to `char` of a surrogate or of a value past `0x10FFFF` is refused. At run time a dev build checks it.
+- R028. Keep. A float divided by zero in a constant gives an infinity or a NaN.
+- R029. Change. A constant expression whose value leaves the range of its type is refused, unless it uses the wrapping or the saturating operators.
+- R030. Change. A constant index below zero on a fixed array is refused, as decision 24 refuses one past the end.
+- R031. Change. The least value divided by -1, its remainder by -1 and unary `-` of the least value stop a dev build with the overflow check. A constant one is refused.
+- R032. Change. A shift by a count below zero is refused as a constant and stops a dev build at run time, for `<<`, `>>` and `<<%` alike. Eddie's text names a wrapping right shift as well, which is no operator of Anti.
+- R033. Change. `.len` of a constant `str` is a constant expression. `chan int(1)` in a constant stays refused.
+- R034. Change. `operator fn eq` on a slice or a union is refused where it is declared, since `==` on those is refused. `==` on both stays refused.
+- R035. Keep. `==` on a struct that holds a simd struct is refused.
+- R036. Keep. `>`, `<=` and `>=` on a struct come from its `operator fn lt`.
+- R037. Eddie. Compound assignment on a simd struct. On a value of a type parameter it stays refused, by decision 27.
+- R038. Keep. An array literal, an array repeat and a local take a lent pointer. A field, a tuple and a slice literal refuse one.
+- R039. Change. A concurrent class is never copied by `=`, also when it holds atomic fields alone.
+- R040. Keep. A case of a variant as the default of a parameter is refused. The message says that a default is a constant and a case is not one.
+- R041. Keep. `(r, f) = e` takes a name `r` whose address the program took.
+- R042. Keep. `as c_wchar` of an `i64` and of a `u16` is taken, and `as` back.
+- R043. Change. A length computed from `size_of` is taken in a field of a class and in its default, as in a field of a struct.
+- R044. Keep. A struct whose length names its own size is refused.
+- R045. Change. A default `[0; N]` over a constant parameter `N` of the class is taken.
+- R046. Change. `-(-size_of(H))` prints as `-(-size_of(H))`. The printer keeps the parentheses a unary minus needs.
+- R047. Change. A constant may not hold a Mutex, nor a type that holds one.
+
+### Types
+
+- R048. Change. A constant that does not fit the width of a bitfield is refused. A write and a compound assignment of a value that does not fit stop a dev build, as a narrowing does.
+- R049. Change. `+%=` and `+|=` on a bitfield wrap and saturate at the width of the bitfield.
+- R050. Change. `alloc(T, n)` gives memory aligned to the alignment of `T`, also above 16. This is a defect, and a test holds it.
+- R051. Eddie. The largest `align(N)`.
+- R052. Keep. An enum without values compiles, with the size of `c_int`.
+- R053. Keep. Two values of an enum may share a number. R010 refuses two arms of one `switch` that name them both.
+- R054. Eddie. A value of an enum that names an earlier value of its own enum.
+- R055. Change. `as` from a float to an enum and from an enum to another enum is refused. The program converts through an integer.
+- R056. Keep. `Shape.Empty { }` and a case declared as `A { }` compile.
+- R057. Keep. No arm names a value of the `tag` of a variant. `v.tag as int` gives the number.
+- R058. Change. `as ?T` is refused with a message that names `as? T`. `anti fmt` writes `as? T`.
+- R059. Change. `as` to the type a value has already is taken everywhere, as a conversion that does nothing. That holds for a tuple, a slice and a channel as well.
+- R060. Keep. `packed` before `enum`, `simd struct` and `synchronized class` is refused, and a union and a `type` alias take no type parameters. The message changes: it names what `packed` applies to, or that the item takes no type parameters.
+- R061. Change. The message of a field default in a union names the union.
+- R062. Change. A simd struct takes lanes of integer and float types alone. `char` lanes are refused. One lane stays allowed.
+- R063. Keep. `lent` before a result is read before `*`, `?` and `?*` alone. One part changes: the checker refuses `-> lent int` with the message of `-> lent ?int`, where the parser refused it.
+- R064. Keep. `operator fn value(self) -> lent ?*int` is taken.
+
+### Generics
+
+- R065. Change. A generic call whose argument has another shape than the parameter is refused. The message names the parameter and the shape it needs.
+- R066. Eddie. A literal of a generic struct inside a generic function infers its type arguments from its fields.
+- R067. Change. A type parameter of an `operator fn` that no operand names is refused where the operator is declared.
+- R068. Change. `--front-end` refuses a generic function that names a deeper copy of itself, as `-S` does.
+- R069. Keep. A receiver with two paths to the interface of a constraint is refused in the body of the generic.
+
+### Ownership
+
+- R070. Keep. `dup` of a number, a `str`, a slice, a plain array, a union, an enum and a channel is refused outside a generic. In a generic it copies each.
+- R071. Keep. `dup` of a `?T` before its test is refused, and gives a `T` after it.
+- R072. Keep. `dup` of a class value runs no `construct`. It runs the `copied` hook.
+- R073. Keep. `delete` tears down what an object owns from its last field to its first.
+- R074. Eddie. `=` to an `own` field, and the value `recv` fills.
+- R075. Change. `delete(c)` of a channel tears down every value it still holds. What `recv` gives waits for R074.
+- R076. Keep. A class value with an `own` pointer is an argument of a worker and an element of a channel, where a plain pointer is refused.
+- R077. Keep. A closure that a `dispatch` passes to its worker may `delete`.
+- R078. Keep. `let xs = [p, p];` of a lent pointer makes an array of lent pointers.
+- R079. Change. An array literal moves an owning local, as a tuple, a struct and a class literal do.
+- R080. Keep. A local passed to a value parameter that is not `own` is a copy of its bytes, which the function does not tear down.
+- R081. Change. An `own` parameter of a pointer type that a generic does not hand on is deleted at the end of the function, as every `own` parameter is. This is a defect, and a test holds it.
+- R082. Keep. An `own` parameter stored through `*slot(to) = b` moves. The message on a later use changes: it names the place of the move.
+- R083. Eddie. `delete` and `destroy` of a parameter without `own`, and of a part of a singleton.
+- R084. Change. `none` into an `own` field of type `?fn(...)`, as a default and with `=`, is taken.
+- R085. Keep. `f ?? g` of two function parameters is neither kept nor `concurrent`.
+
+### Threads
+
+- R086. Change. A worker of another module is named `m.f` after the arrow, as every other call names a function of a module. The direct import stays allowed.
+- R087. Keep. `by 0` of a `parallel` gives the chunk count of the machine. One part changes: a constant count below zero is refused, and a count below zero at run time stops a dev build.
+- R088. Change. A `dispatch` fills in the default value of a parameter of the worker that the call leaves out, as a call does.
+- R089. Keep. An atomic `add` wraps in a dev build as in release.
+- R090. Change. A `snapshot fn` that names an atomic local is refused. An atomic is shared state, and a copy of it is not.
+- R091. Keep. An atomic field takes a `char`, and an atomic `bool` takes `and` and `or`.
+- R092. Change. A pointer to a guarded field taken inside its `sync` may not be used after the block, and the checker refuses the use.
+- R093. Change. `sync` on a Mutex that the same thread already holds is refused where the checker sees it. That is a nested `sync` and an anonymous function inside the `sync`. A dev build traps it at run time otherwise.
+- R094. Change. A public function of a thread-safe class gives no pointer into its fields away, as `docs/anti-syntax-overview.md` states. An out parameter and a pointer stored in another object count as well. This is a defect, and a test holds it.
+- R095. Keep. A fresh value of a synchronized class, of a concurrent class and of a Mutex moves into a channel.
+- R096. Keep. A job stands in a tuple and in an array, and a closure joins one it captured.
+- R097. Change. An `own fn` field passes to a `concurrent` parameter only when its closure is `concurrent`.
+- R098. Keep. A `chan f16` carries an `f16`.
+- R099. Keep. The default `==` and hash of a struct that holds a Mutex pass over the lock.
+
+### Classes
+
+- R100. Eddie. A nested class and the class around it reach the private members of each other.
+- R101. Keep. A class below reaches a protected member on another object of its base.
+- R102. Keep. `T(args)` runs a `construct` without `pub` anywhere in its module.
+- R103. Keep. `==` on values of a class that replaces `equals` calls its `equals`.
+- R104. Keep. An object equals an object of its own class alone.
+- R105. Change. `operator fn eq` gives a `bool`. One that gives another type, or that takes by value a class with a Mutex, is refused where it is declared.
+- R106. Keep. `equals` of a copy of a generic class passes over an operator whose constraint the argument does not meet.
+- R107. Keep. A part of a concurrent class with `operator fn eq` compares through it in the default `==` of the class that holds it.
+- R108. Keep. `==` of a struct whose part has `eq(a: Key, b: int)` is refused at the `==` of the struct.
+- R109. Change. The `construct` of a singleton takes no parameters.
+- R110. Change. A singleton is never copied: `dup(Config.get())` and `*Config.get()` are refused.
+- R111. Change. No class inherits a singleton.
+- R112. Change. A singleton may not declare `get`. antic writes it.
+- R113. Keep. A class with an `inject` field has no `T { }` default as an inline field.
+- R114. Change. The rule of R025: a `construct` that fails tears down the base whose `construct` finished.
+- R115. Change. The `destroyed` hook runs at the end of the life of every value of a class that replaces it, as `created` runs at its start. That holds when the class has no `destruct` and owns nothing.
+- R116. Keep. Two bodies of one name, each qualified by another class of the chain, are refused as declaring the name twice.
+- R117. Change. An abstract function without `self` is refused.
+- R118. Keep. A class may have a name in small letters.
+- R119. Keep. A provider whose path is the `get` of a singleton is refused as naming more than one function.
+- R120. Keep. A write to a `transient` field calls no `changed` hook.
+
+### Modules and C
+
+- R121. Keep. A plain and a direct import of one module in one file are refused. An alias with a direct import compiles.
+- R122. Keep. A clause of the whole file stands among the imports as well.
+- R123. Keep. An expression reaches a module by its last segment or its alias.
+- R124. Keep. A module that names a type of a module it does not import is refused.
+- R125. Change. Two modules that import each other are refused with a message that names the cycle, `a -> b -> a`.
+- R126. Change. An `extern fn` takes C types alone, as decision 26 does for `str`. A slice, a tuple, an optional value and an `own` parameter are refused. `char` stays taken as a 32-bit integer.
+- R127. Change. Two declarations of one `extern fn` with two signatures in one program are refused.
+- R128. Change. `c_long` and `c_ulong` are variadic arguments. An `f32` is refused with a message that names `f64`, which C promotes it to.
+- R129. Change. `export` before an `operator fn` is refused. An `export fn` takes a function parameter without `keep`, as today.
+- R130. Change. An exported name that a header of the C standard library defines, as `SIZE_MAX`, is refused.
+- R131. Change. `--lib static` of a module without an exported item gives the warning `nothing-exported`.
+- R132. Change. `--lib shared --bundle-runtime`, `--lib static --no-runtime` and `--lib static --dev` are refused with a message each.
+- R133. Keep. A plugin that uses a module its host does not import fails to load. The message changes: it names the module.
+- R134. Eddie. A function of `anti.plugin` that gives the reason why `lib.instance` gave `none`.
+- R135. Keep. The plugin index refuses a library name with both kinds of quote.
+
+### Messages
+
+- R136. Change. A message names a type as the source spells it: `uint`, `int`, `byte` and `float` where the source says so.
+- R137. Change. `Color.Red()` of an enum is refused with a message that says an enum value is no function.
+- R138. Change. The message of `destroy` on a value says that `destroy` takes a pointer.
+- R139. Change. A private function of a class of a library is reported as private.
+- R140. Change. The check of exponential time takes `(a+\b)+` and `(a+(?=b))+`, whose backtracking is not exponential. A test holds the patterns that it must refuse.
+
+### The driver of antic
+
+- R141. Change. The usage of antic lists `--help`, `--no-reflect`, `--asserts`, `--no-asserts`, `--checks`, `--no-checks`, `--no-hooks`, `--trace` and `--no-trace`.
+- R142. Keep. `antic --help` among other arguments prints the usage and ends with 0.
+- R143. Keep. An option that lacks its value gives `needs a value`, and a wrong value of `--lib` ends antic with 2.
+- R144. Keep. Of `--checks` and `--no-checks` the last one decides. A test holds it.
+- R145. Change. `--dev --no-asserts` drops the text of the assertion with the call.
+- R146. Keep. A library of the language under `-I` is read before the one of the runtime archive.
+- R147. Change. The module path comes from the path of the source relative to the search root, after both are made absolute and normalised. `antic -I . -c com/example/lib.anti` gives `com.example.lib`, and `-I src` gives the path below `src`.
+- R148. Keep. A search root that holds the library file of the module antic compiles is refused.
+- R149. Change. `-o` into a directory that does not exist names the directory in its message.
+- R150. Change. `--soname` beside `--lib static` is refused.
+- R151. Change. A library of macOS without `--soname` gets the install name `@rpath/<file name>`.
+- R152. Change. The link of a Windows library is reproducible. lld-link runs with `/Brepro`, so two links of one input are equal.
+- R153. Change. `antic --tests --dump-ast` prints the functions of the `tests` and `fixtures` blocks.
+- R154. Keep. Under `--linker platform`, a Linux program that hosts plugins links with `--export-dynamic`.
+
+### `anti build`, `run` and `check`
+
+- R155. Change. `anti --help` with a second word prints the usage and ends with 0. An option without its value gives one line that names the option and ends with 2.
+- R156. Change. `anti build` and `anti sdk import` name the path that is a file where a directory belongs, and end with 1.
+- R157. Change. `anti build` refuses `--soname` and `--bundle-runtime` without `--lib`.
+- R158. Change. `anti build --target all --cpu <level>` checks every target against the level before it builds any, and refuses before it starts.
+- R159. Change. `anti run` refuses `--target`, `--lib` and the other options of `build` that make no program for this machine.
+- R160. Change. `anti run` of a library project refuses before it builds. A wrong use of a command ends with 2, as `anti doc` does.
+- R161. Keep. `anti check -I <dir>` finds an imported module as a library file under the root or as a source the command names.
+- R162. Keep. anti writes one line per layer of a failure, after the lines of `curl`, `tar` and `clang`.
+- R163. Change. A program anti cannot start is reported with the name anti.
+- R164. Change. The manifest reader refuses a dependency whose name is no package name.
+- R165. Change. A cycle of path dependencies is refused at any depth, with the cycle named.
+- R166. Change. The manifest reader refuses a path dependency whose path holds a control byte, before anything builds.
+- R167. Change. A lock file that is no TOML is an error that names the file. A lock file whose entries no longer answer the manifest is written again, with one line that says so.
+- R168. Change. A library project without the module whose path is the name of the package gives a warning.
+- R169. Keep. `anti run --memory-checks` writes a frame line as it went in when its module is no program of Anti.
+
+### `anti bind`
+
+- R170. Change. A type of an API description that does not parse gives one warning.
+- R171. Change. A function without its name or its result, a struct without its name and a field without its type give a warning each.
+- R172. Change. A struct of a description that lost a field is refused, since its layout would differ from that of C.
+- R173. Keep. `int (*)()` binds as `?fn() -> c_int`.
+- R174. Change. `docs/notes/bind.md` lists the macros and the escapes `anti bind` skips.
+- R175. Keep. A compound literal takes a comma after its last value. Two macros that name each other are skipped, and `#undef` drops a macro.
+- R176. Keep. An anonymous struct type of a field `plain` of `Outer` binds as `Outer_plain`. A signed bitfield of one bit is `c_int : 1`.
+- R177. Keep. A define of the kind `FLOAT` whose value is a whole number is written with `.0`.
+
+### `anti doc`, `fmt`, `symbols` and `license`
+
+- R178. Change. `anti doc` writes a type as the source spells it, and links `forms.Level` of the module's own last segment as it links other names.
+- R179. Change. A fence that nothing closes gives a warning of `anti check` and of `anti doc`.
+- R180. Change. The Markdown page of `anti doc` closes an open code block at the end of its comment.
+- R181. Keep. `anti fmt` writes `[2] fn(int) -> int`.
+- R182. Change. `anti fmt` drops a comma before the first name of a direct import.
+- R183. Change. `anti symbols resolve` answers frames from an archive that holds a map and no debug link, through the map.
+- R184. Change. The reader of a symbols index refuses a key outside its `module` tables.
+- R185. Keep. A program whose build id holds a letter outside the hex digits is no program of Anti for `anti symbols`.
+- R186. Keep. `anti symbols inventory` finds programs of Linux and Windows on a Mac by their build ids.
+- R187. Change. `anti license --from-archive` reports an archive with a member whose size holds no digit as damaged.
+- R188. Change. `anti license --runtime` of an archive without `licenses/anti_rt.txt` names anti and ends with 1.
+- R189. Change. `anti license --from` adds a newline after a last line that lacks one. This is a defect, and a test holds it.
+
+### Messages that the test run worded
+
+No document gave the text of these messages, and the test run chose it. Each is a Keep: the wording of the tests stands. Where another rule of this section changes a message, that rule wins.
+
+- R190. Keep. The refusals of decision 19 and of `yield` in a `defer`, T001 and T002.
+- R191. Keep. The refusal and the check of decision 24, T016 and T017.
+- R192. Keep. The refusals of decisions 20 and 21, T044 to T046, and of decision 23, T053.
+- R193. Keep. T010, T014, T021, T026, T027 and T028, each a message for a constant, an enum or a case.
+- R194. Keep. T038, the refusal of `=` for a `yield`.
+- R195. Keep. T059, T060, T065, T066, T080, the reverse of T067 and two tests of T077.
+- R196. Keep. T058 and T062, a message of antic at a position the test run chose.
+- R197. Keep. T086, T088, T089, T090 and T095, messages and positions at the boundary of a module.
+
+### The review of the test run
+
+"Questions" in `docs/reports/2026-10-13-tests-summary.md` asked these four.
+
+- Q1. The sentence on two grades in `docs/audit/tests-findings.md` stands. The five grades the review changed stand as well.
+- Q2. T019, T028 and T106 stay three rows. They hold one missing refusal and two kinds of crash, each with its own fix.
+- Q3. T043 is `severe` by that sentence, since the origin is a value of the program.
+- Q4. `CLAUDE.md` wins: the sanitizer suites run before a push with any change outside the documents.
+
 ## Open
 
+- R009 of "Rules of 2026-10-13". `switch` on a `char` is refused today, as on a `bool` and on a value of a type parameter. Does a `switch` take a `char`?
+- R017. `fail "text"` takes a literal alone today, and refuses a `str` in a variable and an `f"..."`. Does `fail` take a message that is not a literal?
+- R037. A compound assignment on a simd struct is refused today. Does `+=` on a simd struct compile, as its `+` does?
+- R051. `align(4294967296)` compiles today, and the type has that size. What is the largest `align(N)`?
+- R054. A value of an enum cannot name an earlier value of its own enum today. May it?
+- R066. `Pair { left: 1 }` of a generic struct inside a generic function is refused today, since nothing gives its type arguments. Does the literal infer them from its fields?
+- R074. `=` to an `own` pointer or an `own` slice field leaves the old memory alone today, and nothing tears down the slot that `recv` fills. Does antic tear down the old and the received value, or does the program?
+- R083. `delete(p)` and `destroy(p)` of a parameter `p: *T` without `own` are taken today, and so is `destroy(&Config.get().part)` on a part of a singleton. Are they refused?
+- R100. A nested class and the class around it reach no private member of each other today. Do they reach them?
+- R134. `lib.instance(Interface)` gives `none` for a class the loader cannot build, and no function of `anti.plugin` gives the reason. Does one give it?
 - Enums used as bit flags want a form of their own, to be designed later. A binding writes such a parameter with the integer type of C, and the caller converts each value with `as`.
 - The native libraries of `src/native/` are published "under `downloads/resources/<library>/<version>/`" by the entry above them. The site serves text alone since 2026-09-20, so that path no longer exists. Step 16 builds them now, and they follow the packages onto a GitHub release. The entry stays as Eddie wrote it until he says which release holds them. The same question stands for the mirror of the LLVM tools that the site serves today under `downloads/resources/llvm/`.
