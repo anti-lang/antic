@@ -379,3 +379,4 @@ matrix_classes_function_of_a_generic_copy_as_a_value_memory_checks T112 A functi
 matrix_flow_walk_with_an_iter_of_two_parameters_refused T096 A loop over a struct whose `operator fn iter` is refused gets a second message.
 matrix_flow_walk_with_a_next_of_two_parameters_refused T096 A loop over an iterator whose `operator fn next` is refused gets a second message.
 matrix_types_generic_receiver_with_two_paths_to_its_interface_refused T113 A receiver with two paths to the interface of a constraint gets a second message in the copy.
+program_hook_changed_fields_writes T114 The `changed` hook gets the record of the first field of the class for a write of any of its fields.

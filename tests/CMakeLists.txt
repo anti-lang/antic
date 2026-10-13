@@ -1475,11 +1475,16 @@ endforeach()
 # did not ask, and leaves the marked code alone. --no-hooks beside --trace
 # drops the call hooks that --trace turned on, which gives the output of
 # release.
+# The value of --trace names a module as well, which reaches every class
+# of it. hook_changed_fields writes the first and the second field of a
+# class and of its base under --trace writes.
 foreach(case "hooks|no_hooks|--no-hooks|hooks.no-hooks.expected"
         "hook_trace|trace|--trace|hook_trace.trace.expected"
         "hook_trace|writes|--trace,--trace,writes|hook_trace.writes.expected"
         "hook_trace|pattern|--trace,Quiet|hook_trace.pattern.expected"
         "hook_trace|trace_no_hooks|--trace,--no-hooks|hook_trace.expected"
+        "hook_trace|module|--trace,hook_trace|hook_trace.module.expected"
+        "hook_changed_fields|writes|--trace,--trace,writes|hook_changed_fields.writes.expected"
         "trace_handlers|traced|--trace,--trace,writes|trace_handlers.traced.expected")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 source)
@@ -3642,6 +3647,21 @@ antic_dump_test(ast generics_syntax
 antic_dump_test(ast format
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/format.ast"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/format.anti")
+
+# The nodes of the parsed tree that no other dump holds. The checker would
+# refuse nodes.anti, which the parser takes.
+antic_dump_test(ast nodes
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/nodes.ast"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/nodes.anti")
+
+# The nodes the checker writes into the tree: an atomic read and write,
+# `p?.x`, `to_slice`, the built-ins of a simd struct, `mul_high`, a call
+# whose error the `catch` of its block takes and the bound names of the
+# arms of a `switch` and of a `select`.
+antic_dump_test(types checked_nodes
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/checked_nodes.types"
+    ARGS -I "${ANTIC_RUNTIME_DIR}/std"
+         "${CMAKE_CURRENT_SOURCE_DIR}/dump/checked_nodes.anti")
 
 # `alloc T { }` holds its literal alone and `for 0..3` binds no name, in
 # the tree and in the typed tree.
@@ -6322,6 +6342,12 @@ foreach(name objects construct_order)
         OPTIONS "--no-hooks"
         WORK "${MATRIX_WORK}/no-hooks")
 endforeach()
+# `join` of a job without a result and `join_all` call the runtime without
+# the `joined` hook under --no-hooks.
+antic_program_test(matrix_threads_jobs_no_hooks
+    "${MATRIX}/threads_jobs.anti"
+    OPTIONS "--no-hooks"
+    WORK "${MATRIX_WORK}/no-hooks")
 
 # A source with neither file, or with both, registers nothing above.
 add_test(NAME matrix_files

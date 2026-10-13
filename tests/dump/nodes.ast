@@ -1,0 +1,335 @@
+module_doc "The nodes of the parsed tree that no other dump of it holds: `provides`, the\nmarks of a parameter and of a function type, the handlers of a failing call,\n`yield`, `try`, `assert`, `defer`, `undo`, `fail`, `dispatch`, `parallel`,\n`sync` on two objects, `select`, a walk by pointer, `here`, an anonymous\nfunction with a result, a pattern and `delete` and `destroy` with an\nallocator. The parser takes the file and the checker would refuse it, so\n`--dump-ast` is its one use."
+import anti.lang
+provides Named as Tagged
+provides lang.Named as Tagged
+type_decl Keeper
+  type fn
+    type keep fn
+      type int
+      result
+        type int
+    result
+      type int
+type_decl Runner
+  type fn
+    type concurrent fn
+      type int
+      result
+        type int
+    result
+      type int
+type_decl Lender
+  type fn
+    lent
+    type *
+      type int
+    result
+      type int
+type_decl Stopper
+  type fn
+    never
+type_decl Maybe
+  type ?
+    type int
+class_decl Named
+  abstract
+  pub function name
+    abstract
+    self
+    result
+      type int
+  pub function stop
+    abstract
+    self
+    never
+  pub function load
+    abstract
+    self
+    result
+      type int
+    may_fail
+class_decl Tagged
+  field nm
+    type Named
+    implements
+  field hits
+    type int
+    default
+      int_lit 0
+  export function shown
+    self
+    result
+      type int
+    block
+      return_stmt
+        int_lit 1
+  pub function name
+    concrete
+    self
+    result
+      type int
+    block
+      return_stmt
+        int_lit 2
+  function kept
+    self
+    param f
+      type fn
+        type int
+        result
+          type int
+      keep
+    param g
+      type fn
+        type int
+        result
+          type int
+      concurrent
+    param p
+      type *
+        type int
+      lent
+    result
+      type int
+    block
+      return_stmt
+        int_lit 3
+function stop
+  never
+  block
+    fail_stmt
+      string_lit "stop"
+function risky
+  param v
+    type int
+  result
+    type int
+  may_fail
+  block
+    undo_stmt
+      block
+        simple_stmt =
+          ident v
+          int_lit 0
+    defer_stmt
+      block
+        simple_stmt =
+          ident v
+          int_lit 1
+    assert_stmt
+      relation >
+        ident v
+        int_lit 0
+    if_stmt
+      branch
+        relation <
+          ident v
+          int_lit 0
+        block
+          fail_stmt
+            string_lit "negative"
+    return_stmt
+      ident v
+function handlers
+  param v
+    type int
+  result
+    type int
+  may_fail
+  block
+    let_stmt a
+      call
+        ident risky
+        ident v
+        try
+    let_stmt b
+      call
+        ident risky
+        ident v
+        catch_fatal
+    let_stmt c
+      call
+        ident risky
+        ident v
+        catch e
+          block
+            yield_stmt
+              int_lit 1
+    let_stmt d
+      call
+        ident risky
+        ident v
+        catch
+          block
+            yield_stmt
+    let_stmt e
+      call
+        ident risky
+        ident v
+        catch
+          block
+            yield_stmt
+              none
+    try_stmt
+      block
+        simple_stmt
+          call
+            ident risky
+            ident v
+      catch err
+        block
+          return_stmt
+            int_lit 0
+    return_stmt
+      ident a
+function threads
+  param t
+    type *
+      type Tagged
+  param xs
+    type []
+      type int
+  param m
+    type Mutex
+  param n
+    type Mutex
+  param c
+    type chan
+      type int
+  result
+    type int
+  block
+    let_stmt job
+      dispatch
+        ident t
+        call
+          ident work
+          int_lit 1
+    let_stmt got
+      join
+        ident job
+    let_stmt jobs
+      parallel by
+        ident xs
+        int_lit 2
+        call
+          ident work
+          int_lit 1
+    simple_stmt
+      join_all
+        ident jobs
+    simple_stmt
+      call
+        field store
+          field hits
+            ident t
+        int_lit 1
+    let_stmt seen
+      call
+        field load
+          field hits
+            ident t
+    let_stmt swapped
+      call
+        field compare_exchange
+          field hits
+            ident t
+        int_lit 1
+        int_lit 2
+    simple_stmt
+      call
+        field add
+          field hits
+            ident t
+        int_lit 1
+    sync_stmt
+      ident m
+      ident n
+      block
+        simple_stmt +=
+          ident seen
+          int_lit 1
+    select_stmt
+      arm
+        ident c
+        binds x
+        block
+          simple_stmt +=
+            ident seen
+            int_lit 1
+    for_stmt x
+      over_pointer
+        ident xs
+      block
+        simple_stmt +=
+          unary *
+            ident x
+          int_lit 1
+    return_stmt
+      ident seen
+function values
+  param p
+    type *
+      type Tagged
+  param from
+    type *
+      type Allocator
+  result
+    type int
+  block
+    let_stmt high
+      call
+        ident mul_high
+        int_lit 3
+        int_lit 4
+    let_stmt where
+      here
+    let_stmt f
+      fn_expr
+        param x
+          type int
+        result
+          type int
+        block
+          return_stmt
+            ident x
+    let_stmt d
+      call
+        ident descriptor_of
+        ident Tagged
+    let_stmt r
+      pattern_lit re"a+"
+    let_stmt o
+      type ?
+        type int
+      none
+    let_stmt v
+      call
+        field splat
+          ident Vec4
+        float_lit 1.0
+    let_stmt w
+      call
+        field shuffle
+          ident v
+        int_lit 3
+        int_lit 2
+        int_lit 1
+        int_lit 0
+    let_stmt s
+      call
+        field sum
+          ident v
+    simple_stmt
+      delete
+        ident p
+        ident from
+    simple_stmt
+      destroy
+        ident p
+        ident from
+    simple_stmt
+      delete
+        ident p
+    return_stmt
+      int_lit 0

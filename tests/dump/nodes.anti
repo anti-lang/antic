@@ -1,0 +1,125 @@
+//! The nodes of the parsed tree that no other dump of it holds: `provides`, the
+//! marks of a parameter and of a function type, the handlers of a failing call,
+//! `yield`, `try`, `assert`, `defer`, `undo`, `fail`, `dispatch`, `parallel`,
+//! `sync` on two objects, `select`, a walk by pointer, `here`, an anonymous
+//! function with a result, a pattern and `delete` and `destroy` with an
+//! allocator. The parser takes the file and the checker would refuse it, so
+//! `--dump-ast` is its one use.
+
+import anti.lang;
+
+provides Named as Tagged;
+provides lang.Named as Tagged;
+
+type Keeper = fn(keep fn(int) -> int) -> int;
+type Runner = fn(concurrent fn(int) -> int) -> int;
+type Lender = fn(lent *int) -> int;
+type Stopper = fn() -> never;
+type Maybe = ?int;
+
+abstract class Named {
+	abstract fn name(self) -> int;
+	abstract fn stop(self) -> never;
+	abstract fn load(self) -> int may fail;
+}
+
+	class Tagged
+{
+	implements nm: Named,
+	atomic hits: int = 0,
+
+	export fn shown(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn name(self) -> int
+	{
+		return 2;
+	}
+
+	fn kept(self, keep f: fn(int) -> int, concurrent g: fn(int) -> int, lent p: *int) -> int
+	{
+		return 3;
+	}
+}
+
+fn stop() -> never
+{
+	fail "stop";
+}
+
+fn risky(v: int) -> int may fail
+{
+	undo {
+		v = 0;
+	}
+	defer {
+		v = 1;
+	}
+	assert(v > 0);
+	if v < 0 {
+		fail "negative";
+	}
+	return v;
+}
+
+fn handlers(v: int) -> int may fail
+{
+	let a = try risky(v);
+	let b = risky(v) catch fatal;
+	let c = risky(v) catch e {
+		yield 1;
+	};
+	let d = risky(v) catch {
+		yield;
+	};
+	let e = risky(v) catch none;
+	try {
+		risky(v);
+	} catch err {
+		return 0;
+	}
+	return a;
+}
+
+fn threads(t: *Tagged, xs: []int, m: Mutex, n: Mutex, c: chan int) -> int
+{
+	let job = dispatch t -> work(1);
+	let got = join(job);
+	let jobs = parallel xs by 2 -> work(1);
+	join_all(jobs);
+	t.hits.store(1);
+	let seen = t.hits.load();
+	let swapped = t.hits.compare_exchange(1, 2);
+	t.hits.add(1);
+	sync m, n {
+		seen += 1;
+	}
+	select {
+		c x => {
+			seen += 1;
+		},
+	}
+	for x in &xs {
+		*x += 1;
+	}
+	return seen;
+}
+
+fn values(own p: *Tagged, from: *Allocator) -> int
+{
+	let high = mul_high(3, 4);
+	let where = here;
+	let f = fn(x: int) -> int { return x; };
+	let d = descriptor_of(Tagged);
+	let r = re"a+";
+	let o: ?int = none;
+	let v = Vec4.splat(1.0);
+	let w = v.shuffle(3, 2, 1, 0);
+	let s = v.sum();
+	delete(p, from);
+	destroy(p, from);
+	delete(p);
+	return 0;
+}

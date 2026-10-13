@@ -1,0 +1,123 @@
+//! The nodes the checker writes into the tree, which the dump of the parsed
+//! tree cannot hold: the read and the write of an atomic field, `p?.x`,
+//! `to_slice` of an iterator, the built-ins of a simd struct, `mul_high`, a
+//! call whose error the `catch` of its block takes, and the bound names of a
+//! `switch` on a variant and of a `select`.
+
+import anti.lang;
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+struct Node
+{
+	n: int,
+	next: ?*Node,
+}
+
+class CountIter
+{
+	pub limit: int,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.limit;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.at;
+	}
+}
+
+class Hits
+{
+	pub atomic count: int = 0,
+}
+
+fn risky(v: int) -> int may fail
+{
+	if v < 0 {
+		fail "negative";
+	}
+	return v;
+}
+
+fn atomics(h: *Hits) -> int
+{
+	h.count.store(1);
+	h.count.add(2);
+	if h.count.compare_swap(3, 4) {
+		return h.count.load();
+	}
+	return 0;
+}
+
+fn optional(p: ?*Node) -> int
+{
+	let next = p?.next else {
+		return -1;
+	};
+	return next.n;
+}
+
+fn collected(it: *CountIter) -> int
+{
+	let items = it.to_slice();
+	defer {
+		free(items.ptr);
+	}
+	return items.len;
+}
+
+fn lanes(k: f32) -> f32
+{
+	let v = Vec4.splat(k);
+	let w = v.shuffle(3, 2, 1, 0);
+	return w.sum() + v.dot(w) + v.min() + v.max();
+}
+
+fn high(a: int, b: int) -> int
+{
+	return mul_high(a, b);
+}
+
+fn enclosed(v: int) -> int
+{
+	let got = 0;
+	try {
+		got = risky(v);
+	} catch e {
+		return -1;
+	}
+	return got;
+}
+
+fn bound(s: Shape, c: chan int) -> int
+{
+	let acc = 0;
+	switch s {
+		Circle circle => acc = circle.r,
+		Empty => acc = 0,
+	}
+	select {
+		c x => {
+			if let v = x {
+				acc += *v;
+			}
+		},
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	return 0;
+}

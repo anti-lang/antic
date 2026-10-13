@@ -1,0 +1,256 @@
+module_doc "The nodes the checker writes into the tree, which the dump of the parsed\ntree cannot hold: the read and the write of an atomic field, `p?.x`,\n`to_slice` of an iterator, the built-ins of a simd struct, `mul_high`, a\ncall whose error the `catch` of its block takes, and the bound names of a\n`switch` on a variant and of a `select`."
+import anti.lang
+struct_decl Vec4
+  simd
+  field x                  f32
+    type f32
+  field y                  f32
+    type f32
+  field z                  f32
+    type f32
+  field w                  f32
+    type f32
+variant_decl Shape         Shape
+  case Circle
+    field r                int
+      type int
+  case Empty
+struct_decl Node
+  field n                  int
+    type int
+  field next               ?*Node
+    type ?*
+      type Node
+class_decl CountIter       CountIter
+  field limit
+    type int
+    pub
+  field at
+    type int
+    pub
+  pub function next        fn(*CountIter) -> bool
+    operator
+    self
+    result
+      type bool
+    block
+      simple_stmt +=
+        field at           int
+          ident self       *CountIter
+        int_lit 1          int
+      return_stmt
+        relation <         bool
+          field at         int
+            ident self     *CountIter
+          field limit      int
+            ident self     *CountIter
+  pub function value       fn(*CountIter) -> int
+    operator
+    self
+    result
+      type int
+    block
+      return_stmt
+        field at           int
+          ident self       *CountIter
+class_decl Hits            Hits
+  field count
+    type int
+    pub
+    default
+      int_lit 0            int
+function risky             fn(int) -> int may fail
+  param v                  int
+    type int
+  result
+    type int
+  may_fail
+  block
+    if_stmt
+      branch
+        relation <         bool
+          ident v          int
+          int_lit 0        int
+        block
+          fail_stmt
+            string_lit "negative" str
+    return_stmt
+      ident v              int
+function atomics           fn(*Hits) -> int
+  param h                  *Hits
+    type *
+      type Hits
+  result
+    type int
+  block
+    simple_stmt
+      atomic store         void
+        field count        int
+          ident h          *Hits
+        int_lit 1          int
+    simple_stmt
+      atomic add           int
+        field count        int
+          ident h          *Hits
+        int_lit 2          int
+    if_stmt
+      branch
+        atomic compare_swap bool
+          field count      int
+            ident h        *Hits
+          int_lit 3        int
+          int_lit 4        int
+        block
+          return_stmt
+            atomic load    int
+              field count  int
+                ident h    *Hits
+    return_stmt
+      int_lit 0            int
+function optional          fn(?*Node) -> int
+  param p                  ?*Node
+    type ?*
+      type Node
+  result
+    type int
+  block
+    let_stmt next          *Node
+      optional             ?*Node
+        ident p            ?*Node
+        field next         ?*Node
+          ident <object>   *Node
+    return_stmt
+      field n              int
+        ident next         *Node
+function collected         fn(*CountIter) -> int
+  param it                 *CountIter
+    type *
+      type CountIter
+  result
+    type int
+  block
+    let_stmt items         []int
+      to_slice             []int
+        ident it           *CountIter
+    defer_stmt
+      block
+        simple_stmt
+          free
+            field ptr      ?*int
+              ident items  []int
+    return_stmt
+      field len            int
+        ident items        []int
+function lanes             fn(f32) -> f32
+  param k                  f32
+    type f32
+  result
+    type f32
+  block
+    let_stmt v             Vec4
+      simd splat           Vec4
+        ident k            f32
+    let_stmt w             Vec4
+      simd shuffle 3 2 1 0 Vec4
+        ident v            Vec4
+    return_stmt
+      additive +           f32
+        additive +         f32
+          additive +       f32
+            simd sum       f32
+              ident w      Vec4
+            simd dot       f32
+              ident v      Vec4
+              ident w      Vec4
+          simd min         f32
+            ident v        Vec4
+        simd max           f32
+          ident v          Vec4
+function high              fn(int, int) -> int
+  param a                  int
+    type int
+  param b                  int
+    type int
+  result
+    type int
+  block
+    return_stmt
+      mul_high mul_high    int
+        ident a            int
+        ident b            int
+function enclosed          fn(int) -> int
+  param v                  int
+    type int
+  result
+    type int
+  block
+    let_stmt got           int
+      int_lit 0            int
+    try_stmt
+      block
+        simple_stmt =
+          ident got        int
+          call             int
+            ident risky    fn(int) -> int may fail
+            ident v        int
+            caught_by_block
+      catch e
+        block
+          return_stmt
+            unary -        int
+              int_lit 1    int
+    return_stmt
+      ident got            int
+function bound             fn(Shape, chan int) -> int
+  param s                  Shape
+    type Shape
+  param c                  chan int
+    type chan
+      type int
+  result
+    type int
+  block
+    let_stmt acc           int
+      int_lit 0            int
+    switch_stmt
+      ident s              Shape
+      arm
+        ident Circle       Shape.tag
+        binds circle       Shape.Circle
+        simple_stmt =
+          ident acc        int
+          field r          int
+            ident circle   Shape.Circle
+      arm
+        ident Empty        Shape.tag
+        simple_stmt =
+          ident acc        int
+          int_lit 0        int
+    select_stmt
+      arm
+        ident c            chan int
+        binds x            ?*int
+        block
+          block
+            let_stmt v     ?*int
+              ident x      ?*int
+            if_stmt
+              branch
+                equality != bool
+                  ident v  ?*int
+                  none     ?*int
+                block
+                  simple_stmt +=
+                    ident acc int
+                    unary * int
+                      ident v *int
+              else
+                block
+    return_stmt
+      ident acc            int
+function main              fn() -> int
+  result
+    type int
+  block
+    return_stmt
+      int_lit 0            int
