@@ -17,7 +17,8 @@
 #   WORK       a directory for the outputs
 #   OPTIONS    optional options of antic for the program, separated by
 #              commas
-#   LIB_OPTIONS  optional options of antic for the library modules
+#   LIB_OPTIONS  optional options of antic for the library modules, for
+#              the library file of each and for its object in dev mode
 #   OBJECT     the suffix antic gives an object of the host, .o or .obj
 
 cmake_minimum_required(VERSION 3.21)
@@ -47,7 +48,7 @@ foreach(library IN LISTS libraries)
     if(MODE STREQUAL "dev")
         execute_process(
             COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" -I "${ROOT}"
-                    -I "${WORK}" --runtime "${RUNTIME}"
+                    -I "${WORK}" --runtime "${RUNTIME}" ${lib_options}
                     -o "${WORK}/${library}" "${source}"
             RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
         if(NOT status EQUAL 0)

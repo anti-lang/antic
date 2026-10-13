@@ -1,0 +1,54 @@
+//! A program that installs a handler and uses a class of another module.
+//!
+//! `Plain` asks for no call hooks. The library is built with `--trace com`,
+//! which names the package above its module, so `enter` and `leave` of
+//! `Plain.put` reach the handler.
+
+import anti.lang;
+import com.example.plain;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A handler that names the call hooks and the writes.
+class Watch inherits lang.TraceHandler
+{
+	concrete fn created(self, o: *Object) { }
+
+	concrete fn destroyed(self, o: *Object) { }
+
+	concrete fn copied(self, o: *Object, from: *Object) { }
+
+	concrete fn dispatched(self, o: *Object) { }
+
+	concrete fn joined(self, o: *Object) { }
+
+	concrete fn enter(self, o: *Object, name: str)
+	{
+		printf("enter %.*s\n".ptr, name.len as c_int, name.ptr);
+	}
+
+	concrete fn leave(self, o: *Object, name: str)
+	{
+		printf("leave %.*s\n".ptr, name.len as c_int, name.ptr);
+	}
+
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error) { }
+
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor)
+	{
+		printf("changed %.*s\n".ptr, field.name.len as c_int, field.name.ptr);
+	}
+}
+
+fn main() -> int
+{
+	let w = alloc Watch { };
+	lang.Trace.install(w);
+	let s = alloc plain.Plain { };
+	printf("put %d\n".ptr, s.put(4) as c_int);
+	printf("n %d\n".ptr, s.n as c_int);
+	lang.Trace.install(none);
+	delete(s);
+	delete(w);
+	return 0;
+}

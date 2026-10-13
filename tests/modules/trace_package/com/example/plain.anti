@@ -1,0 +1,14 @@
+//! A class of a library that asks for no call hooks.
+//!
+//! The library is compiled with `--trace com`, the package above its module, so
+//! `enter` and `leave` stand in the body of `put`.
+pub class Plain
+{
+	pub n: int = 0,
+
+	pub fn put(self, v: int) -> int
+	{
+		self.n = v;
+		return self.n;
+	}
+}

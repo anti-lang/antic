@@ -3868,6 +3868,17 @@ antic_modules_test(hooks_modules
     LIB_OPTIONS --trace
     WORK "${CMAKE_CURRENT_BINARY_DIR}/hooks-modules")
 
+# The pattern of `--trace` names a package above the module of a class
+# that asks for no call hooks. The library is built with `--trace com`,
+# and the program without the option.
+antic_modules_test(trace_package_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/trace_package"
+    LIBRARIES plain
+    PROGRAM client
+    STD lang
+    LIB_OPTIONS --trace com
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/trace-package-modules")
+
 # A program of two modules holds one descriptor and one table per class,
 # so `is`, `==`, `equals` and `reflect.new` agree whichever module made
 # the object, in release mode and in dev mode
