@@ -1096,6 +1096,13 @@ add_usage_test(antic option_unknown FIRST "antic: unknown option --bogus"
 add_usage_test(antic second_input FIRST "antic: one input file only"
     ARGS "${usage_source}" "${usage_source}")
 add_usage_test(antic options_without_an_input ARGS -S --dev)
+# R142 of "Rules of 2026-10-13" in docs/decisions.md: `--help` of antic
+# among other arguments prints the usage and ends with 0, and antic
+# compiles nothing.
+add_test(NAME antic_help_among_arguments
+    COMMAND "${CMAKE_COMMAND}"
+            "-DCOMMAND=$<TARGET_FILE:antic>,-S,--dev,--help,${usage_source}"
+            -DNAME=antic -P "${CMAKE_CURRENT_SOURCE_DIR}/run_usage.cmake")
 foreach(case
         "command_unknown|bogus"
         "option_unknown|--bogus"
@@ -1214,7 +1221,8 @@ endforeach()
 
 # Options of antic that the driver reads together, one test per case of
 # tests/run_antic_options.cmake, whose header names what each shows.
-set(antic_option_cases checks_by_mode asserts_by_mode warn_undocumented
+set(antic_option_cases checks_by_mode checks_last_decides asserts_by_mode
+    warn_undocumented
     strict_library strict_front_end strict_dev bundle_static bundle_shared
     soname_static output_assembly output_library output_program keep_llvm
     output_static output_shared output_dev_library output_plugin linker_lld)
@@ -5518,6 +5526,27 @@ add_test(NAME plugin_unused
         "-DINTERFACE=tasks"
         "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/stdlib_host.expected"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin_kinds.cmake")
+# R133 of "Rules of 2026-10-13" in docs/decisions.md: a library that uses
+# two modules of the standard library which its host does not import fails
+# to load, and the host handles the failure. A Windows plugin links against
+# the import library of its host, where the same lack stops the link of
+# the library, so the test runs on the other hosts.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    add_test(NAME plugin_module_not_imported
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+            "-DSUFFIX=${plugin_suffix}"
+            "-DEXE=${plugin_exe}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-module-not-imported"
+            "-DHOST=bare_host"
+            "-DLIBRARY=stdlib"
+            "-DINTERFACE=tasks"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/bare_host.expected"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin_kinds.cmake")
+endif()
 # A provided class that the loader cannot build without arguments: one
 # whose `construct` takes one, and one that holds such a class in a field
 # no default fills. `instance` gives `none` for each, and the link of the

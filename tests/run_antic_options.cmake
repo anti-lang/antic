@@ -18,6 +18,8 @@
 #                         other architecture is refused
 #   checks_by_mode        --checks and --no-checks beside --dev and
 #                         without it
+#   checks_last_decides   --checks and --no-checks in one command: the
+#                         last of the two decides, in both modes
 #   asserts_by_mode       --asserts and --no-asserts beside --dev and
 #                         without it
 #   warn_undocumented     --warn-undocumented beside --doc-warnings and
@@ -197,6 +199,28 @@ if(CASE STREQUAL "checks_by_mode")
     by_mode("${SOURCES}/traps/bounds_array.anti"
             "call void (ptr, i64, i32, i64, i64) @anti_rt_check_failed("
             --checks --no-checks)
+    return()
+endif()
+
+# R144 of "Rules of 2026-10-13" in docs/decisions.md: of --checks and
+# --no-checks the last one decides, whatever the mode says.
+if(CASE STREQUAL "checks_last_decides")
+    set(source "${SOURCES}/traps/bounds_array.anti")
+    set(needle "call void (ptr, i64, i32, i64, i64) @anti_rt_check_failed(")
+    foreach(mode release dev)
+        set(arguments "")
+        if(mode STREQUAL "dev")
+            set(arguments --dev)
+        endif()
+        antic_output(text --runtime "${RUNTIME}" ${arguments} --checks
+                     --no-checks --dump-llvm "${source}")
+        lacks("${text}" "${needle}"
+              "the LLVM text of ${mode} --checks --no-checks")
+        antic_output(text --runtime "${RUNTIME}" ${arguments} --no-checks
+                     --checks --dump-llvm "${source}")
+        holds("${text}" "${needle}"
+              "the LLVM text of ${mode} --no-checks --checks")
+    endforeach()
     return()
 endif()
 

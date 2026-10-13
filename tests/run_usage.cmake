@@ -7,9 +7,10 @@
 #            usage, without its line break
 #
 # Without REFUSED the command is the tool and the option that asks for the
-# usage. The option prints it on the standard output and ends with 0. The
-# tool without an argument prints the same bytes on the standard error and
-# ends with 2, since it was given nothing to do.
+# usage, alone or among other arguments. The option prints it on the
+# standard output and ends with 0. The tool without an argument prints the
+# same bytes on the standard error and ends with 2, since it was given
+# nothing to do.
 #
 # With REFUSED the command ends with 2 and prints nothing on the standard
 # output. Its standard error is the line FIRST, when one is given, and
@@ -62,8 +63,9 @@ if(REFUSED)
 endif()
 
 list(LENGTH given count)
-if(NOT count EQUAL 2)
-    message(FATAL_ERROR "COMMAND holds ${count} words, and it takes two")
+if(count LESS 2)
+    message(FATAL_ERROR "COMMAND holds ${count} words, and it takes the "
+                        "tool and the option at least")
 endif()
 
 set(command ${given})

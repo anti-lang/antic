@@ -1,0 +1,21 @@
+//! A host that imports neither `anti.text` nor `anti.collection.list`. Its
+//! library uses both and finds neither in this host, so the load fails.
+
+import anti.lang;
+import anti.plugin;
+import net.example.tasks;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch {
+		printf("the load failed\n".ptr);
+		return 0;
+	};
+	let t = lib.instance(tasks.Tasks) catch fatal;
+	printf("loaded %lld\n".ptr, t.squares(4));
+	delete(t);
+	delete(lib);
+	return 0;
+}
