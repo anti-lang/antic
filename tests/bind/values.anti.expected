@@ -1,0 +1,32 @@
+//! The binding of values, which `anti bind` wrote from `values.h`. Nothing in
+//! it is written by hand. Run `anti bind` again to change it.
+
+pub const VALUES_SHORT: c_short = 4464;
+
+pub const VALUES_USHORT: c_ushort = 4464;
+
+pub const VALUES_LONG: c_long = 5;
+
+pub const VALUES_ULONG: c_ulong = 5;
+
+pub const VALUES_ESCAPES: str = "tab\t line\n return\r slash\\ quote\" tick'";
+
+pub const VALUES_FLOAT_OF_UNSIGNED: c_float = 3000000.0;
+
+pub const VALUES_FLOAT_OF_SIGNED: c_double = -3.0;
+
+pub const VALUES_FLOAT_SUM: c_double = 3.75;
+
+pub const VALUES_FLOAT_DIFFERENCE: c_double = -0.75;
+
+pub const VALUES_FLOAT_NEGATED: c_double = -1.5;
+
+pub const VALUES_WHOLE_FLOAT: c_double = 3.0;
+
+pub const VALUES_UNSIGNED_PRODUCT: c_uint = 1705032704;
+
+pub const VALUES_UNSIGNED_QUOTIENT: c_uint = 1333333333;
+
+pub const VALUES_UNSIGNED_REST: c_uint = 3;
+
+pub const VALUES_SHIFT_OF_NEGATIVE: c_int = -4;

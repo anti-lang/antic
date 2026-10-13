@@ -1,0 +1,10 @@
+anti: values.h: warning: the macro `VALUES_H` has no value and is skipped
+anti: values.h: warning: the macro `VALUES_BELL` is no constant and is skipped
+anti: values.h: warning: the macro `VALUES_NOT_ZERO` is no constant and is skipped
+anti: values.h: warning: the macro `VALUES_FLOAT_TOO_LARGE` is no constant and is skipped
+anti: values.h: warning: the macro `VALUES_FLOAT_REST` is no constant and is skipped
+anti: values.h: warning: the macro `VALUES_FLOAT_COMPLEMENT` is no constant and is skipped
+anti: values.h: warning: the macro `VALUES_INFINITE` is no constant and is skipped
+anti: values.h: warning: the macro `VALUES_SHIFT_TOO_FAR` is no constant and is skipped
+anti: values.h: warning: the macro `VALUES_TEXT_NEGATED` is no constant and is skipped
+anti: values.h: warning: the macro `VALUES_TEXT_IN_SUM` is no constant and is skipped

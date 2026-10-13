@@ -202,6 +202,16 @@ elseif(CASE STREQUAL "forms")
     expect_file("${WORK}/warnings" "${BIND}/forms.warnings")
     compile_binding(forms bindtest.forms)
     compare_probes(forms "${BIND}" -I "${BIND}/include")
+elseif(CASE STREQUAL "values")
+    # tests/bind/values.h holds macros alone: the values that layout.h
+    # leaves out, and the ones the evaluator skips. The module and the
+    # warnings are fixed, and the module compiles.
+    run("${ANTI}" bind --clang "${BIND}/values.h" --module bindtest.values
+        -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(WRITE "${WORK}/warnings" "${run_err}")
+    expect_file("${WORK}/out/values.anti" "${BIND}/values.anti.expected")
+    expect_file("${WORK}/warnings" "${BIND}/values.warnings")
+    compile_binding(values bindtest.values)
 elseif(CASE STREQUAL "huge_enum")
     # An enum with a value above the range of a signed 64-bit integer, in
     # a struct. The two probes agree on the layout of the struct. T117 of

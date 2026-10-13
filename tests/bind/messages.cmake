@@ -179,3 +179,18 @@ if(NOT CMAKE_HOST_WIN32)
         ARGS ${clang_bind}
         ERR "anti: the AST of clang is not JSON: the end of the input where a value belongs at line 2, column 1")
 endif()
+
+# A macro of one float whose value %g writes with an exponent above zero,
+# and a cast of a negative number. Each is a constant expression, so the
+# header binds without a warning. T119 and T120 of
+# docs/audit/tests-findings.md.
+anti_message(clang_float_with_a_large_exponent STATUS 0
+    FILES api.h "#define API_H\n#define BIG 1e20\n"
+    OUT "bind: anti.api from api.h, 0 functions, 1 warning"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: warning: the macro `API_H` has no value and is skipped")
+anti_message(clang_cast_of_a_negative_number STATUS 0
+    FILES api.h "#define API_H\n#define LOW ((int)-3)\n"
+    OUT "bind: anti.api from api.h, 0 functions, 1 warning"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: warning: the macro `API_H` has no value and is skipped")
