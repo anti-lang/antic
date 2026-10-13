@@ -1,0 +1,4 @@
+anti: api_callbacks.json: warning: the type `int (` does not parse
+anti: api_callbacks.json: warning: `set_a` is left out: Anti has no form for the type of a parameter
+anti: api_callbacks.json: warning: `set_b` is left out: Anti has no form for the type of a parameter
+anti: api_callbacks.json: warning: `set_c` is left out: Anti has no form for the type of a parameter

@@ -1,0 +1,12 @@
+{"functions": [{"name": "set_log", "returnType": "void", "params": [{"name": "f", "type": "LogCallback"}]},
+               {"name": "set_plain", "returnType": "void", "params": [{"name": "f", "type": "PlainCallback"}]},
+               {"name": "set_a", "returnType": "void", "params": [{"name": "f", "type": "NoResult"}]},
+               {"name": "set_b", "returnType": "void", "params": [{"name": "f", "type": "NoType"}]},
+               {"name": "set_c", "returnType": "void", "params": [{"name": "f", "type": "BadType"}]},
+               {"name": "set_mode", "returnType": "Mode", "params": [{"name": "m", "type": "Mode"}, {"name": "at", "type": "Mode *"}]}],
+ "enums": [{"name": "Mode", "values": [{"name": "MODE_A", "value": 0}]}],
+ "callbacks": [{"name": "LogCallback", "returnType": "void", "params": [{"name": "level", "type": "int"}, {"name": "args", "type": "..."}]},
+               {"name": "PlainCallback", "returnType": "int"},
+               {"name": "NoResult", "params": []},
+               {"name": "NoType", "returnType": "void", "params": [{"name": "p"}]},
+               {"name": "BadType", "returnType": "void", "params": [{"name": "p", "type": "int ("}]}]}

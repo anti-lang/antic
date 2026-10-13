@@ -1,0 +1,11 @@
+//! The binding of api_parts, which `anti bind` wrote from `api_parts.json`.
+//! Nothing in it is written by hand. Run `anti bind` again to change it.
+
+pub const WHOLE: c_float = 2.0;
+
+pub struct Half
+{
+	y: c_int,
+}
+
+pub extern fn plain() -> c_int;

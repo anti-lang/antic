@@ -2721,14 +2721,15 @@ endforeach()
 # raylib_api.json, and check the refusals. forms binds tests/bind/forms.h
 # and values the macros of tests/bind/values.h. functions binds the
 # functions of tests/bind/functions.h, and huge_enum and nested_enum each
-# bind a header of one enum.
+# bind a header of one enum. api_parts, api_callbacks and api_literals each
+# bind a description of tests/bind in the format of rlparser.
 set(anti_bind_cc ${ANTIC_TEST_CC})
 if(APPLE)
     list(APPEND anti_bind_cc -mmacosx-version-min=11.0)
 endif()
 set(anti_bind_cases header clang escaped_path raymath raylib api
     api_malformed clang_malformed forms values functions huge_enum
-    nested_enum)
+    nested_enum api_parts api_callbacks api_literals)
 if(NOT WIN32)
     # The cases refusals and ast_malformed stand a shell script in for
     # clang.

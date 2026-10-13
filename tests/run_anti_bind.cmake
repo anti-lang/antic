@@ -316,6 +316,22 @@ elseif(CASE STREQUAL "api")
     expect_refusal("raylib_api.json is not JSON: .* at line 4699, column 115"
         "${ANTI}" bind "${RAYLIB}/tools/rlparser/output/raylib_api.json"
         -o "${WORK}/pinned")
+elseif(CASE MATCHES "^api_(parts|callbacks|literals)$")
+    # Three descriptions in the format of rlparser. api_parts holds
+    # entries that lack a part: a function without its name, its result
+    # or its parameters, a struct without its name or its list of fields,
+    # a field and a parameter without a type, an enum without its values
+    # and a define without its name, its kind or its value. api_callbacks
+    # holds callbacks as the types of parameters, a variadic one and ones
+    # that lack a part among them, and an enum as a type. api_literals
+    # holds the forms of a struct literal that a define may have. The
+    # module and the warnings of each are fixed, and the module compiles.
+    run("${ANTI}" bind "${BIND}/${CASE}.json" --module bindtest.${CASE}
+        -o "${WORK}/out")
+    file(WRITE "${WORK}/warnings" "${run_err}")
+    expect_file("${WORK}/out/${CASE}.anti" "${BIND}/${CASE}.anti.expected")
+    expect_file("${WORK}/warnings" "${BIND}/${CASE}.warnings")
+    compile_binding(${CASE} bindtest.${CASE})
 elseif(CASE STREQUAL "refusals")
     # A pack of two bytes, C++ and a clang of a version the tool was not
     # tested against are refused. The copy of anti stands outside the

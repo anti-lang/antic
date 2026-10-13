@@ -1,0 +1,14 @@
+//! The binding of api_callbacks, which `anti bind` wrote from
+//! `api_callbacks.json`. Nothing in it is written by hand. Run `anti bind`
+//! again to change it.
+
+pub enum Mode
+{
+	MODE_A = 0,
+}
+
+pub extern fn set_log(f: ?*byte);
+
+pub extern fn set_plain(f: ?fn() -> c_int);
+
+pub extern fn set_mode(m: Mode, at: ?*Mode) -> Mode;

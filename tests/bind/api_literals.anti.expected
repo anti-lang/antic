@@ -1,0 +1,11 @@
+//! The binding of api_literals, which `anti bind` wrote from
+//! `api_literals.json`. Nothing in it is written by hand. Run `anti bind` again
+//! to change it.
+
+pub const GOOD: Pix = Pix { r: 1, g: 2 };
+
+pub struct Pix
+{
+	r: c_uchar,
+	g: c_uchar,
+}

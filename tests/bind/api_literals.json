@@ -1,0 +1,9 @@
+{"functions": [],
+ "structs": [{"name": "Pix", "fields": [{"name": "r", "type": "unsigned char"}, {"name": "g", "type": "unsigned char"}]}],
+ "defines": [{"name": "GOOD", "type": "COLOR", "value": "CLITERAL(Pix){ 1, 2 }"},
+             {"name": "NO_BRACE", "type": "COLOR", "value": "CLITERAL(Pix)"},
+             {"name": "UNKNOWN", "type": "COLOR", "value": "CLITERAL(Other){ 1, 2 }"},
+             {"name": "LONG_NAME", "type": "COLOR", "value": "CLITERAL(Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa){ 1, 2 }"},
+             {"name": "TOO_MANY", "type": "COLOR", "value": "CLITERAL(Pix){ 1, 2, 3 }"},
+             {"name": "TOO_FEW", "type": "COLOR", "value": "CLITERAL(Pix){ 1 }"},
+             {"name": "NO_NUMBER", "type": "COLOR", "value": "CLITERAL(Pix){ a, b }"}]}
