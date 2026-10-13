@@ -1,0 +1,18 @@
+//! `for x in &c` in a generic function whose constraint is `Iterable<int>`. The
+//! value of such a walk is a copy, and the form takes each element in place.
+
+import anti.collection;
+
+fn total<C: collection.Iterable<int>>(c: *C) -> int
+{
+	let n = 0;
+	for x in &c {
+		n += *x;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	return 0;
+}

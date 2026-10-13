@@ -1,0 +1,1 @@
+types_generic_receiver_with_two_paths_to_its_interface.anti:43:9: error: `*C` converts to `*Closable` through `ser` and through `w`, name one

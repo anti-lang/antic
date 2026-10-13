@@ -1,0 +1,1 @@
+types_generic_walk_in_place_over_a_copying_value.anti:9:12: error: `for x in &e` takes each element in place, and the `operator fn value` of `C` gives a copy of `int`

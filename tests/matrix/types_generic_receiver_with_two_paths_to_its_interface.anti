@@ -1,0 +1,50 @@
+//! A generic function calls a function of the interface that constrains its
+//! parameter. The class of the argument reaches that interface through two
+//! sub-objects, so the receiver has no one path to it.
+
+abstract class Closable
+{
+	abstract fn close(self) -> int;
+}
+
+abstract class Serializable inherits Closable
+{
+	abstract fn write(self) -> int;
+}
+
+abstract class Writer inherits Closable
+{
+	abstract fn flush(self) -> int;
+}
+
+class C
+{
+	implements ser: Serializable,
+	implements w: Writer,
+
+	concrete fn close(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn write(self) -> int
+	{
+		return 2;
+	}
+
+	concrete fn flush(self) -> int
+	{
+		return 3;
+	}
+}
+
+fn close_of<T: Closable>(t: *T) -> int
+{
+	return t.close();
+}
+
+fn main() -> int
+{
+	let c = C { };
+	return close_of(&c);
+}
