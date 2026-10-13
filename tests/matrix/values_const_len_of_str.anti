@@ -1,10 +1,23 @@
-//! The length of a constant `str` is no constant expression.
+//! The length of a constant `str` is a constant expression, by R033 of "Rules
+//! of 2026-10-13": it is the value of a constant and the length of an array. It
+//! counts the bytes of the text, so an escape is one and a letter of two bytes
+//! two.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 const NAME: str = "anti";
 const NAME_LEN: int = NAME.len;
+const ESCAPED: str = "a\n";
+const WIDE: str = "é";
+const BOTH: int = ESCAPED.len + WIDE.len;
 
 fn main() -> int
 {
-	let a = NAME_LEN;
+	let cells: [NAME_LEN]int = [7; NAME_LEN];
+	const EMPTY: str = "";
+	const NONE_OF_IT: int = EMPTY.len;
+	printf("name %lld\n".ptr, NAME_LEN);
+	printf("array %lld %lld\n".ptr, cells.len, cells[3]);
+	printf("bytes %lld %lld\n".ptr, BOTH, NONE_OF_IT);
 	return 0;
 }

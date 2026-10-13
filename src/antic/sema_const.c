@@ -888,7 +888,8 @@ static bool const_struct(struct checker *c, struct expr *e,
 }
 
 /* A field of a constant: a value of an enum, a field of a constant
-   struct, or the length of a constant array or a string literal. */
+   struct, or the length of a constant array, a string literal or a
+   constant `str`. */
 static bool const_field(struct checker *c, struct expr *e,
                         struct const_value *out)
 {
@@ -933,6 +934,20 @@ static bool const_field(struct checker *c, struct expr *e,
         base->kind == TYPE_ARRAY &&
         base->length_of != NULL) {
         return fail_const(c, e, "the length of an array from `size_of`");
+    }
+    /* The length of a constant `str` is the count of its bytes, by R033
+       of "Rules of 2026-10-13". */
+    if (sema_name_is(&e->as.field.name, "len") && base->kind == TYPE_STR &&
+        e->as.field.base->kind != EXPR_STRING) {
+        if (!sema_eval_const(c, e->as.field.base, &a)) {
+            return false;
+        }
+        if (a.kind != CONST_TEXT) {
+            return fail_const(c, e, "this field");
+        }
+        out->kind = CONST_INT;
+        out->as.integer = a.as.text.length;
+        return true;
     }
     /* The base of .len is a constant array or a string literal. */
     if (sema_name_is(&e->as.field.name, "len") &&

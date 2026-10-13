@@ -751,6 +751,7 @@ of lowering meet:
 | `values_constant_minus_of_the_least`, `values_constant_least_remainder_by_minus_one` | R031: unary `-` of a constant that is the least value, and its remainder by -1, are refused | |
 | `values_constant_wrapping_shift_by_negative`, `values_constant_shift_left_by_negative` | R032: a constant shift by a count below zero is refused, for `<<%` and for `<<` | |
 | `values_index_below_zero`, `values_index_of_a_constant_below_zero`, `types_array_field_index_below_zero`, `types_array_of_size_of_length_index_below_zero` | R030: a constant index below zero on a fixed array is refused, on a local, with a named constant, on a field and on an array whose length the target decides | |
+| `values_const_len_of_str` | R033: `.len` of a constant `str` is a constant expression, as a value and as the length of an array | |
 | `check_overflow_divide_least`, `check_overflow_remainder_least_i8`, `check_overflow_divide_least_compound`, `check_overflow_negate_least`, `check_overflow_negate_least_i8` of `tests/traps/` | R031: the least value divided by -1, its remainder and unary `-` of it stop a dev build | |
 | `check_shift_wrap_negative`, `check_shift_wrap_negative_compound` of `tests/traps/` | R032: `<<%` by a count below zero stops a dev build | |
 | `values_constant_surrogate_as_char`, `values_constant_past_the_last_char`, `values_constant_as_char_at_the_ends` | R027: a constant conversion to `char` of a surrogate or of a value past `0x10FFFF` is refused, and the values beside them convert | |

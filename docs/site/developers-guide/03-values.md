@@ -311,7 +311,7 @@ y = 2.0;
 
 A local is mutable. Its type never changes, so `x = "five"` after `let x = 5;` is an error. A local lives until the end of its block.
 
-`const` declares a constant. It names its type, and its value is a constant expression: literals, other constants, operators, `as` and `size_of`. A constant stands at module level, in a block or in a class body, where `Name.NAME` reaches it. `pub const` makes one of a module visible to importers.
+`const` declares a constant. It names its type, and its value is a constant expression: literals, other constants, operators, `as`, `size_of` and `.len` of a constant array or `str`. A constant stands at module level, in a block or in a class body, where `Name.NAME` reaches it. `pub const` makes one of a module visible to importers.
 
 ```anti
 class Limits
