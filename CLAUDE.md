@@ -147,6 +147,10 @@ not re-open a settled decision without asking Eddie.
   sanitizer suite as `ctest -I 1,1150`, `ctest -I 1151,2250` and
   `ctest -I 2251,4648`: `asan` 275 s, 369 s and 316 s, `ubsan` 257 s,
   357 s and 242 s.
+  The step of the summary measured `host` in two parts, `ctest -I 1,2000`
+  and `ctest -I 2001,4650`: 396 s and 216 s. It ran each sanitizer suite
+  in the three parts of the session before: `asan` 288 s, 406 s and
+  313 s, `ubsan` 245 s, 364 s and 237 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
