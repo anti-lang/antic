@@ -266,6 +266,19 @@ anti_message(path_holds_no_library
           ../libraries/notes.txt "No library file.\n"
     ARGS build ${tools}
     ERR "anti: ./../libraries holds no library file of the package com.example.units")
+# A path that starts at the root is taken as it stands.
+anti_message(path_from_the_root_holds_no_library
+    FILES anti.toml "${manifest_package}\n[dependencies]\n\"com.example.units\" = { path = \"${WORK}/libraries\" }\n"
+          ${app_source} "${app_text}"
+          ../libraries/notes.txt "No library file.\n"
+    ARGS build ${tools}
+    ERR "anti: ${WORK}/libraries holds no library file of the package com.example.units")
+anti_message(path_holds_a_damaged_library
+    FILES anti.toml "${manifest_package}\n[dependencies]\n\"com.example.units\" = { path = \"../libraries\" }\n"
+          ${app_source} "${app_text}"
+          ../libraries/com/example/units.antl "No library file.\n"
+    ARGS build ${tools}
+    ERR "anti: ./../libraries/com/example/units.antl: is not a library file")
 anti_message(path_holds_another_version
     FILES anti.toml "${manifest_package}\n[dependencies]\n\"com.example.units\" = { path = \"../units\", version = \"2.0.0\" }\n"
           ${app_source} "${app_text}"
@@ -382,6 +395,13 @@ anti_message(lock_repository_with_a_quote
 anti_message(lock_of_another_version
     FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
           anti.lock "${lock_head}name = \"com.example.units\"\nversion = \"1.1.0\"\nrepo = \"${repo_url}\"\nmodules = [\n    ${units_module},\n]\n"
+    ARGS build --offline ${tools}
+    ERR "anti: --offline and no cached index of com.example.units from ${repo_url}"
+        "${no_version}")
+# So is a lock file that is no TOML.
+anti_message(lock_that_is_no_toml
+    FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
+          anti.lock "][\n"
     ARGS build --offline ${tools}
     ERR "anti: --offline and no cached index of com.example.units from ${repo_url}"
         "${no_version}")
