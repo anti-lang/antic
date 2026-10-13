@@ -10,6 +10,22 @@ anti: the data of complement is broken
 anti: the data of oversubscribed is broken
 anti: the data of short is broken
 anti: the data of crc is broken
+anti: the data of stored-cut is broken
+anti: the data of empty is broken
+anti: the data of literal-past-size is broken
+anti: the data of length-286 is broken
+anti: the data of length-cut is broken
+anti: the data of distance-30 is broken
+anti: the data of distance-cut is broken
+anti: the data of head-cut is broken
+anti: the data of codes-287 is broken
+anti: the data of lengths-cut is broken
+anti: the data of no-code is broken
+anti: the data of repeat-first is broken
+anti: the data of zeros-cut is broken
+anti: the data of many-zeros-cut is broken
+anti: the data of zeros-past-count is broken
+anti: the data of lengths-oversubscribed is broken
 anti: test_zip.zip is no zip archive
 anti: test_zip.zip is no zip archive
 anti: test_zip.zip is no zip archive

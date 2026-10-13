@@ -451,6 +451,262 @@ static void broken_deflate(void)
     text_free(&out);
 }
 
+/* Write the stream of b as the one entry `name` of size bytes and give
+   whether it unpacks. */
+static bool unpacks(const char *name, struct bits *b, unsigned long size,
+                    unsigned long crc, struct text *out)
+{
+    struct entry e;
+
+    bits_flush(b);
+    e = deflated(name, b, size, crc);
+    write_archive(&e, 1);
+    return unpack_one(out);
+}
+
+/* The head of a last block of type 2: the counts of the literal and
+   length codes less 257, of the distance codes less 1 and of the lengths
+   of the code of code lengths less 4. */
+static void dynamic_head(struct bits *b, unsigned long nlen,
+                         unsigned long ndist, unsigned long ncode)
+{
+    memset(b, 0, sizeof *b);
+    bits_put(b, 1, 1);
+    bits_put(b, 2, 2);
+    bits_put(b, nlen, 5);
+    bits_put(b, ndist, 5);
+    bits_put(b, ncode, 4);
+}
+
+/* The four lengths a head with ncode 0 holds, of the symbols 16, 17, 18
+   and 0 in that order. A length 1 for 0 and for one of the others gives
+   the code `0` to the symbol 0 and `1` to the other. */
+static void code_lengths(struct bits *b, unsigned long of_16,
+                         unsigned long of_17, unsigned long of_18)
+{
+    bits_put(b, of_16, 3);
+    bits_put(b, of_17, 3);
+    bits_put(b, of_18, 3);
+    bits_put(b, 1, 3);
+}
+
+/* The fixed code of a literal from 144 on, nine bits. */
+static void fixed_literal_9(struct bits *b, unsigned char c)
+{
+    bits_code(b, 0x190u + (c - 144u), 9);
+}
+
+/* The refusals of the three kinds of block that broken_deflate leaves
+   out, and a stored block the reader takes. */
+static void broken_blocks(void)
+{
+    static const unsigned char hi[] = "hi";
+    struct bits b;
+    struct text out = {0};
+    int i;
+
+    /* A stored block of two bytes. */
+    memset(&b, 0, sizeof b);
+    bits_put(&b, 1, 1);
+    bits_put(&b, 0, 2);
+    bits_flush(&b);
+    b.data[b.length++] = 0x02;
+    b.data[b.length++] = 0x00;
+    b.data[b.length++] = 0xfd;
+    b.data[b.length++] = 0xff;
+    b.data[b.length++] = 'h';
+    b.data[b.length++] = 'i';
+    CHECK(unpacks("stored", &b, 2, crc_of(hi, 2), &out));
+    CHECK(out.length == 2 && memcmp(out.data, "hi", 2) == 0);
+    text_free(&out);
+
+    /* A stored block cut inside its two lengths. */
+    memset(&b, 0, sizeof b);
+    bits_put(&b, 1, 1);
+    bits_put(&b, 0, 2);
+    bits_flush(&b);
+    b.data[b.length++] = 0x02;
+    b.data[b.length++] = 0x00;
+    CHECK(!unpacks("stored-cut", &b, 2, 0, &out));
+    text_free(&out);
+
+    /* No byte at all, where the head of the first block belongs. */
+    memset(&b, 0, sizeof b);
+    CHECK(!unpacks("empty", &b, 1, 0, &out));
+    text_free(&out);
+
+    /* A fixed block of two literals in an entry of one byte. */
+    memset(&b, 0, sizeof b);
+    bits_put(&b, 1, 1);
+    bits_put(&b, 1, 2);
+    fixed_literal(&b, 'a');
+    fixed_literal(&b, 'b');
+    fixed_end(&b);
+    CHECK(!unpacks("literal-past-size", &b, 1, 0, &out));
+    text_free(&out);
+
+    /* The length symbol 286, which the fixed code holds and no length
+       uses. */
+    memset(&b, 0, sizeof b);
+    bits_put(&b, 1, 1);
+    bits_put(&b, 1, 2);
+    fixed_literal(&b, 'a');
+    bits_code(&b, 0xc6, 8);
+    CHECK(!unpacks("length-286", &b, 4, 0, &out));
+    text_free(&out);
+
+    /* The length symbol 265 takes one more bit, and the stream ends
+       before it: 3 bits, six literals of 9 and the symbol of 7 are 64. */
+    memset(&b, 0, sizeof b);
+    bits_put(&b, 1, 1);
+    bits_put(&b, 1, 2);
+    for (i = 0; i < 6; i++) {
+        fixed_literal_9(&b, 200);
+    }
+    bits_code(&b, 9, 7);
+    CHECK(b.count == 0);
+    CHECK(!unpacks("length-cut", &b, 20, 0, &out));
+    text_free(&out);
+
+    /* The distance symbol 30, which five bits hold and no distance
+       uses, after the length symbol 257. */
+    memset(&b, 0, sizeof b);
+    bits_put(&b, 1, 1);
+    bits_put(&b, 1, 2);
+    fixed_literal(&b, 'a');
+    bits_code(&b, 1, 7);
+    bits_code(&b, 30, 5);
+    CHECK(!unpacks("distance-30", &b, 4, 0, &out));
+    text_free(&out);
+
+    /* The distance symbol 4 takes one more bit, and the stream ends
+       before it: 3 bits, a literal of 9, 7 and 5 are 24. */
+    memset(&b, 0, sizeof b);
+    bits_put(&b, 1, 1);
+    bits_put(&b, 1, 2);
+    fixed_literal_9(&b, 200);
+    bits_code(&b, 1, 7);
+    bits_code(&b, 4, 5);
+    CHECK(b.count == 0);
+    CHECK(!unpacks("distance-cut", &b, 4, 0, &out));
+    text_free(&out);
+
+    /* A dynamic block cut after the first count of its head. */
+    memset(&b, 0, sizeof b);
+    bits_put(&b, 1, 1);
+    bits_put(&b, 2, 2);
+    bits_put(&b, 0, 5);
+    CHECK(b.count == 0);
+    CHECK(!unpacks("head-cut", &b, 1, 0, &out));
+    text_free(&out);
+
+    /* 287 literal and length codes, one more than the format holds. */
+    dynamic_head(&b, 30, 0, 0);
+    CHECK(!unpacks("codes-287", &b, 1, 0, &out));
+    text_free(&out);
+
+    /* A head that announces nineteen lengths of three bits and holds
+       two: 17 bits of the head and 6 leave one bit of the third byte. */
+    dynamic_head(&b, 0, 0, 15);
+    bits_put(&b, 1, 3);
+    bits_put(&b, 1, 3);
+    CHECK(!unpacks("lengths-cut", &b, 1, 0, &out));
+    text_free(&out);
+
+    /* The code of code lengths holds the one code `0`, and sixteen bits
+       of 1 follow, which no length of it matches. */
+    dynamic_head(&b, 0, 0, 0);
+    code_lengths(&b, 0, 0, 0);
+    bits_put(&b, 0xffff, 16);
+    CHECK(!unpacks("no-code", &b, 1, 0, &out));
+    text_free(&out);
+
+    /* The symbol 16 repeats the length before it, and none is before
+       the first. */
+    dynamic_head(&b, 0, 0, 0);
+    code_lengths(&b, 1, 0, 0);
+    bits_put(&b, 1, 1);
+    CHECK(!unpacks("repeat-first", &b, 1, 0, &out));
+    text_free(&out);
+
+    /* The symbols 17 and 18 take three and seven more bits, and each
+       stream ends two bits after the symbol: 17 bits of the head, 12
+       of the lengths and the symbol are 30. */
+    dynamic_head(&b, 0, 0, 0);
+    code_lengths(&b, 0, 1, 0);
+    bits_put(&b, 1, 1);
+    CHECK(!unpacks("zeros-cut", &b, 1, 0, &out));
+    text_free(&out);
+    dynamic_head(&b, 0, 0, 0);
+    code_lengths(&b, 0, 0, 1);
+    bits_put(&b, 1, 1);
+    CHECK(!unpacks("many-zeros-cut", &b, 1, 0, &out));
+    text_free(&out);
+
+    /* The symbol 18 with 127 gives 138 lengths of 0. Two of them pass
+       the 258 lengths the head announces. */
+    dynamic_head(&b, 0, 0, 0);
+    code_lengths(&b, 0, 0, 1);
+    bits_put(&b, 1, 1);
+    bits_put(&b, 127, 7);
+    bits_put(&b, 1, 1);
+    bits_put(&b, 127, 7);
+    CHECK(!unpacks("zeros-past-count", &b, 1, 0, &out));
+    text_free(&out);
+
+    /* Every one of the 258 lengths is 1, more than a code holds. The
+       head holds eighteen lengths, up to the one of the symbol 1, so
+       the code of code lengths is `0` for 0 and `1` for 1. */
+    dynamic_head(&b, 0, 0, 14);
+    for (i = 0; i < 18; i++) {
+        bits_put(&b, i == 3 || i == 17 ? 1 : 0, 3);
+    }
+    for (i = 0; i < 258; i++) {
+        bits_put(&b, 1, 1);
+    }
+    CHECK(!unpacks("lengths-oversubscribed", &b, 1, 0, &out));
+    text_free(&out);
+}
+
+/* A central directory that lists its two entries in the other order
+   than their local headers stand in. The reader sorts the entries by
+   where their bytes start and finds no overlap. Each local entry is
+   30 + 5 + 5 bytes and each central entry 46 + 5, with its offset at
+   byte 42. */
+static void directory_out_of_order(void)
+{
+    static const unsigned char hello[] = "hello";
+    static const unsigned char world[] = "world";
+    struct entry e[2];
+    struct text bytes = {0};
+    struct text out = {0};
+    struct zip_archive z;
+
+    e[0].name = "a.txt";
+    e[0].data = hello;
+    e[0].packed = 5;
+    e[0].size = 5;
+    e[0].crc = crc_of(hello, 5);
+    e[0].method = 0;
+    e[1] = e[0];
+    e[1].data = world;
+    e[1].crc = crc_of(world, 5);
+    write_archive(e, 2);
+    read_archive(&bytes);
+    bytes.data[2 * 40 + 42] = 40;
+    bytes.data[2 * 40 + 51 + 42] = 0;
+    /* The CRC of each entry stands at byte 16, and follows its data. */
+    memcpy(bytes.data + 2 * 40 + 16, bytes.data + 40 + 14, 4);
+    memcpy(bytes.data + 2 * 40 + 51 + 16, bytes.data + 14, 4);
+    write_bytes(bytes.data, bytes.length);
+    CHECK(zip_read(ARCHIVE, &z));
+    CHECK(z.count == 2 && zip_unpack(&z, 0, &out));
+    CHECK(out.length == 5 && memcmp(out.data, "world", 5) == 0);
+    zip_archive_free(&z);
+    text_free(&out);
+    text_free(&bytes);
+}
+
 /* Offsets of the central entry of a one-entry archive whose name is
    a.txt and whose data is five bytes: 30 + 5 + 5 = 40. */
 enum { CENTRAL = 40, END = CENTRAL + 46 + 5 };
@@ -651,6 +907,8 @@ void test_zip(void)
     other_method();
     deflate_bound();
     broken_deflate();
+    broken_blocks();
+    directory_out_of_order();
     broken_archives();
     archive_bounds();
     write_limits();
