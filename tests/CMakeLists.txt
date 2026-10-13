@@ -734,6 +734,20 @@ foreach(target windows-x86_64 windows-arm64)
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-coff-plugin/${target}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_coff_plugin.cmake")
 endforeach()
+# A library that keeps an `f16` converts it through two functions of the
+# runtime below x86-64-v3, and takes them from its host as it takes every
+# other one.
+add_test(NAME llvm_coff_plugin_f16
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DTARGET=windows-x86_64"
+        "-DCPU=v2"
+        "-DLIBRARY=halves"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-coff-plugin/f16"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_coff_plugin.cmake")
 
 # The archive holds a runtime per level, so that a program built with --cpu
 # below its target's default links a runtime of that level.

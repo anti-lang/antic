@@ -387,3 +387,4 @@ anti_bind_huge_enum T117 An enum with a value above the signed 64-bit range is b
 anti_bind_nested_enum T118 The enumerators of an enum without a name inside a struct are no constants of the binding.
 anti_bind_message_clang_float_with_a_large_exponent T119 `anti bind` writes a float with the exponent `e+20`, which does not lex, and ends with 1.
 anti_bind_message_clang_cast_of_a_negative_number T120 A macro that casts a negative number is skipped as no constant.
+llvm_coff_plugin_f16 T121 A plugin that converts an `f16` below x86-64-v3 finds the two conversions of the runtime in no host that converts none itself.

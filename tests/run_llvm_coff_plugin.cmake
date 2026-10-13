@@ -10,6 +10,10 @@
 #   SOURCES   tests/plugin
 #   TARGET    windows-x86_64 or windows-arm64
 #   WORK      a directory for the files
+#   LIBRARY   the module of SOURCES/net/example that is the library,
+#             `fancy` without it
+#   CPU       the level of the processor of both builds, the default of
+#             the target without it
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -30,16 +34,22 @@ set(dir "${WORK}")
 file(REMOVE_RECURSE "${dir}")
 file(MAKE_DIRECTORY "${dir}/net/example" "${dir}/lib")
 set(common --target ${TARGET})
+if(DEFINED CPU)
+    list(APPEND common --cpu ${CPU})
+endif()
+if(NOT DEFINED LIBRARY)
+    set(LIBRARY fancy)
+endif()
 run(${common} -c -I "${SOURCES}" -o "${dir}/net/example/greet.antl"
     "${SOURCES}/net/example/greet.anti")
 run(${common} --runtime "${RUNTIME}" --keep-llvm -I "${SOURCES}"
     -I "${dir}" -o "${dir}/host.exe" "${SOURCES}/host.anti")
 run(${common} --lib shared --no-runtime --runtime "${RUNTIME}"
-    --keep-llvm -I "${SOURCES}" -I "${dir}" -o "${dir}/lib/libfancy.dll"
-    "${SOURCES}/net/example/fancy.anti" "${dir}/host.lib")
+    --keep-llvm -I "${SOURCES}" -I "${dir}" -o "${dir}/lib/lib${LIBRARY}.dll"
+    "${SOURCES}/net/example/${LIBRARY}.anti" "${dir}/host.lib")
 
 file(STRINGS "${dir}/host.def" def)
-file(READ "${dir}/lib/libfancy.ll" llvm)
+file(READ "${dir}/lib/lib${LIBRARY}.ll" llvm)
 string(REGEX MATCHALL "@__imp_[^ ,)\n]+" imports "${llvm}")
 list(REMOVE_DUPLICATES imports)
 if(imports STREQUAL "")
@@ -53,7 +63,7 @@ foreach(import IN LISTS imports)
     endif()
 endforeach()
 
-execute_process(COMMAND "${READOBJ}" --coff-exports "${dir}/lib/libfancy.dll"
+execute_process(COMMAND "${READOBJ}" --coff-exports "${dir}/lib/lib${LIBRARY}.dll"
                 OUTPUT_VARIABLE exports ENCODING NONE)
 foreach(name anti_rt_imports anti_rt_provides)
     if(NOT exports MATCHES "Name: ${name}\n")

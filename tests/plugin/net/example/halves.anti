@@ -1,0 +1,29 @@
+//! A library that provides a `Greeter` and keeps its count in an `f16`. Below
+//! x86-64-v3 a read and a write of the count call the runtime, which a library
+//! built with `--no-runtime` takes from the program that loads it.
+
+import net.example.greet;
+
+provides net.example.greet.Greeter as Halves;
+
+/// A greeting that counts in halves.
+pub class Halves
+{
+	implements g: greet.Greeter,
+
+	/// The count, in sixteen bits.
+	count: f16 = 0.0 as f16,
+
+	/// The words of the greeting.
+	pub concrete fn words(self) -> str
+	{
+		self.count = (self.count + 0.5) as f16;
+		return "from the library";
+	}
+
+	/// Twice the count.
+	pub concrete fn asked(self) -> int
+	{
+		return (self.count * 2.0) as int;
+	}
+}
