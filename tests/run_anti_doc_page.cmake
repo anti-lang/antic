@@ -29,7 +29,8 @@ file(MAKE_DIRECTORY "${WORK}")
 execute_process(
     COMMAND "${ANTI}" doc --runtime "${RUNTIME}" ${options} -I "${ROOT}"
             --work "${WORK}/work" -o "${WORK}/out" ${sources}
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+    ENCODING NONE)
 if(NOT status EQUAL 0 OR NOT err STREQUAL "")
     message(FATAL_ERROR "anti doc ended with ${status}\n${out}${err}")
 endif()

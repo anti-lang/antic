@@ -13,7 +13,7 @@ function(antic_runs)
     execute_process(COMMAND "${ANTI}" ${tools} ${ARGN}
                     WORKING_DIRECTORY "${PROJECT}"
                     RESULT_VARIABLE status OUTPUT_VARIABLE out
-                    ERROR_VARIABLE err)
+                    ERROR_VARIABLE err ENCODING NONE)
     if(NOT status EQUAL 0)
         string(REPLACE ";" " " line "${ARGN}")
         message(FATAL_ERROR "antic ${line} ended with ${status}\n${out}${err}")
