@@ -52,7 +52,7 @@ The pool holds each object from its `dispatch` until its worker returns. That ti
 
 The checker walks every function a worker reaches. It refuses a `delete` of an object or a channel there, since another worker may hold it. It refuses a read or a write of a `mutable` field of a singleton as well.
 
-A worker cannot fail. `may fail` gives the result `?*Error`, which is a pointer.
+A worker that `parallel` or `dispatch` runs cannot fail, since a job has no handler. A `worker fn` that may fail is called directly, with a handler.
 
 The pool has one thread fewer than the machine has processors, since the thread that joins runs work as well. The key `threads` of the runtime configuration sets the count, as `--anti.threads=4` on the command line of the program. [Chapter 15]({{% relref "15-hooks" %}}) describes the configuration.
 
@@ -174,7 +174,7 @@ fn run(c: *Cell)
 ```
 
 ```anti refused
-//! error: the result of a worker has type `?*Error`, which holds a pointer. A worker takes and returns values alone
+//! error: `check` may fail, and `dispatch` runs a worker that cannot fail
 class Cell { pub n: int = 0, }
 
 worker fn check(c: *Cell) may fail { fail "empty"; }
