@@ -212,6 +212,21 @@ elseif(CASE STREQUAL "values")
     expect_file("${WORK}/out/values.anti" "${BIND}/values.anti.expected")
     expect_file("${WORK}/warnings" "${BIND}/values.warnings")
     compile_binding(values bindtest.values)
+elseif(CASE STREQUAL "functions")
+    # tests/bind/functions.h holds the forms of a function that layout.h
+    # leaves out. The module, the shim and the warnings are fixed, the
+    # module compiles and the two probes agree.
+    run("${ANTI}" bind --clang "${BIND}/functions.h"
+        --module bindtest.functions --probe -o "${WORK}/out"
+        --runtime "${RUNTIME}")
+    file(WRITE "${WORK}/warnings" "${run_err}")
+    expect_file("${WORK}/out/functions.anti"
+                "${BIND}/functions.anti.expected")
+    expect_file("${WORK}/out/shim_functions.c"
+                "${BIND}/shim_functions.c.expected")
+    expect_file("${WORK}/warnings" "${BIND}/functions.warnings")
+    compile_binding(functions bindtest.functions)
+    compare_probes(functions "${BIND}")
 elseif(CASE STREQUAL "huge_enum")
     # An enum with a value above the range of a signed 64-bit integer, in
     # a struct. The two probes agree on the layout of the struct. T117 of

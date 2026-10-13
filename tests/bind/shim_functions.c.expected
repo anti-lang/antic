@@ -1,0 +1,32 @@
+/* The shim of functions, which anti bind wrote from functions.h. It gives every
+   inline function of the header a symbol. Nothing in it is written by
+   hand. */
+#define fn_inline_none anti_inline_fn_inline_none
+#define fn_inline_void anti_inline_fn_inline_void
+#define fn_inline_array anti_inline_fn_inline_array
+#define fn_inline_function anti_inline_fn_inline_function
+#include "functions.h"
+#undef fn_inline_none
+#undef fn_inline_void
+#undef fn_inline_array
+#undef fn_inline_function
+
+int fn_inline_none(void)
+{
+    return anti_inline_fn_inline_none();
+}
+
+void fn_inline_void(int a0)
+{
+    anti_inline_fn_inline_void(a0);
+}
+
+int fn_inline_array(int *a0)
+{
+    return anti_inline_fn_inline_array(a0);
+}
+
+int fn_inline_function(int (*a0)(int))
+{
+    return anti_inline_fn_inline_function(a0);
+}

@@ -1,0 +1,3 @@
+anti: functions.h: warning: the macro `FUNCTIONS_H` has no value and is skipped
+anti: functions.h: warning: `defer` is left out: its name is a word of Anti
+anti: functions.h: warning: `fn_inline_variadic` is left out: a shim cannot pass on the arguments of `...`

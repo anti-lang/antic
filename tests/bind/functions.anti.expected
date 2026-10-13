@@ -1,0 +1,36 @@
+//! The binding of functions, which `anti bind` wrote from `functions.h`.
+//! Nothing in it is written by hand. Run `anti bind` again to change it.
+
+pub struct FnBits
+{
+	one: c_uint : 1,
+	signed_one: c_int : 1,
+	three: c_uint : 3,
+}
+
+pub struct FnHolder
+{
+	call: ?fn(c_int) -> c_int,
+	grid: [2][3]c_int,
+}
+
+pub extern fn fn_none();
+
+pub extern fn fn_variadic(format: ?*byte, ...) -> c_int;
+
+pub extern fn fn_gives_function(which: c_int) -> ?fn(c_int) -> c_int;
+
+pub extern fn fn_takes_function(call: ?fn(c_int, c_float) -> c_int, done: ?fn());
+
+pub extern fn fn_takes_array(values: ?*c_int, grid: ?*byte);
+
+// A parameter is volatile in C.
+pub extern fn fn_volatile(p: ?*c_int);
+
+pub extern fn fn_inline_none() -> c_int;
+
+pub extern fn fn_inline_void(x: c_int);
+
+pub extern fn fn_inline_array(values: ?*c_int) -> c_int;
+
+pub extern fn fn_inline_function(call: ?fn(c_int) -> c_int) -> c_int;
