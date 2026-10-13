@@ -1,0 +1,30 @@
+//! The `NoneDereference` of a guard has code 1. Its message is `the value is
+//! none` for a `?T` of a value and `the pointer is none` for a nullable
+//! pointer, by R020 of the rules of 2026-10-13.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn maybe(n: int) -> ?int
+{
+	if n > 2 {
+		return none;
+	}
+	return n * 10;
+}
+
+fn main() -> int
+{
+	let v = maybe(3) catch e {
+		printf("value: %d %s\n".ptr, e.code as c_int, e.message.ptr);
+		yield 0;
+	};
+	let missing: ?*int = none;
+	let seven = 7;
+	let p = missing catch e {
+		printf("pointer: %d %s\n".ptr, e.code as c_int, e.message.ptr);
+		yield &seven;
+	};
+	return v + *p - 7;
+}

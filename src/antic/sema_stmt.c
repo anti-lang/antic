@@ -1030,7 +1030,8 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
                       sema_tn(value));
         return sema_builtin(c, TYPE_ERROR);
     }
-    if ((s->as.let.guard_make = sema_null_pointer_maker(c, h->pos)) == NULL) {
+    s->as.let.guard_make = sema_null_pointer_maker(c, h->pos, value);
+    if (s->as.let.guard_make == NULL) {
         return sema_builtin(c, TYPE_ERROR);
     }
     error = s->as.let.guard_make->type->result;

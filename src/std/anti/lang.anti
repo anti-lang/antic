@@ -320,10 +320,11 @@ pub class Error
 	}
 }
 
-/// The error of a `?*T` that held `none` where a pointer was needed.
+/// The error of a `?*T` or a `?T` that held `none` where a value was needed.
 ///
-/// `p catch fatal` and `p catch e { }` on a `?*T` give one of these. It is an
-/// `Error` like any other, so a handler that takes an `*Error` takes it too.
+/// `p catch fatal` and `p catch e { }` on a `?*T` or a `?T` give one of these.
+/// It is an `Error` like any other, so a handler that takes an `*Error` takes
+/// it too.
 pub class NoneDereference inherits Error
 {
 	/// The error a `catch` on a `none` pointer gives.
@@ -332,6 +333,15 @@ pub class NoneDereference inherits Error
 		let e = alloc NoneDereference { };
 		e.code = 1;
 		e.message = "the pointer is none";
+		return e;
+	}
+
+	/// The error a `catch` on a `?T` of a value that holds `none` gives.
+	pub fn of_value() -> *NoneDereference
+	{
+		let e = alloc NoneDereference { };
+		e.code = 1;
+		e.message = "the value is none";
 		return e;
 	}
 }

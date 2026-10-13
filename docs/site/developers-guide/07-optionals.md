@@ -427,7 +427,7 @@ Five forms read a `?*T` or a `?T`. Each evaluates the optional once.
 
 `try` is no sixth form. antic 0.2.0 accepts `let x = try e;` on an optional and narrows `x` to the value, and the code it writes makes no test. A `none` then reaches the next statement as a value. A function that forwards a missing value writes `let x = e else { fail "missing"; };`.
 
-`e catch` on an optional turns `none` into an error of the class `anti.lang.NoneDereference`. `catch fatal` prints it and ends the program. `catch err { }` binds it, and the handler ends with `yield v` or leaves, as the handler of a failing call does.
+`e catch` on an optional turns `none` into an error of the class `anti.lang.NoneDereference`. Its code is 1, and its message is `the pointer is none` for a `?*T` and `the value is none` for a `?T` of a value. `catch fatal` prints it and ends the program. `catch err { }` binds it, and the handler ends with `yield v` or leaves, as the handler of a failing call does.
 
 ```anti
 //! name: rd

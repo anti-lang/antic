@@ -951,16 +951,22 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
 /* DESIGN: `p catch fatal` and `p catch e { }` on a `?*T` follow the
    error forms, and the error is `anti.lang.NoneDereference`. The class is
    an ordinary imported one, so the module that writes the form imports
-   `anti.lang` as it does for every other error it names. */
-struct symbol *sema_null_pointer_maker(struct checker *c, struct pos pos)
+   `anti.lang` as it does for every other error it names. The guard of a
+   `?T` of a value takes the maker `of_value`, whose message is `the value
+   is none`, by R020 of "Rules of 2026-10-13". */
+struct symbol *sema_null_pointer_maker(struct checker *c, struct pos pos,
+                                       const struct type *guarded)
 {
     static const struct name module = {LANG_MODULE, sizeof LANG_MODULE - 1};
     static const struct name class_name = {
         LANG_NONE_DEREFERENCE, sizeof LANG_NONE_DEREFERENCE - 1};
-    static const struct name maker = {"new", 3};
+    static const struct name of_pointer = {"new", 3};
+    static const struct name of_value = {"of_value", 8};
+    const struct name *maker =
+        guarded->kind == TYPE_OPTIONAL ? &of_value : &of_pointer;
     struct symbol *sym = sema_std_item(c, &module, &class_name, false);
     const struct item *m = sym != NULL ? sema_find_member(sym->type,
-                                                          &maker) : NULL;
+                                                          maker) : NULL;
 
     if (m == NULL || m->symbol == NULL || m->symbol->type == NULL) {
         sema_error_at(c, pos, "`catch` on a `?*T` gives an `" LANG_MODULE "."

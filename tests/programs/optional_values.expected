@@ -10,7 +10,7 @@ if let 2
 if let none
 let else 1 2
 guarded 0
-the pointer is none
+the value is none
 yielded 70
 parsed 42
 parsed empty none

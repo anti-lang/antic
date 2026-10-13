@@ -1117,6 +1117,9 @@ Where two rules meet, and where three do:
   `matrix/errors_optional_results`.
 - A handler, a guard and one binding: `handler_then_guard` of
   `matrix/errors_optional_results`.
+- A guard of a `?T` of a value and of a nullable pointer, and the message
+  of each: `matrix/errors_guard_of_a_value_and_of_a_pointer`, by R020 of
+  "Rules of 2026-10-13".
 - A handler, a `try` block inside it and `yield`:
   `matrix/errors_yield_in_a_try_handler_of_a_handler` and the refusal
   `matrix/errors_yield_of_a_value_in_the_handler_of_a_try_block`, by R015
