@@ -362,11 +362,13 @@ static void fills_access_types(void)
    and the `mutable` fields of a singleton. A `worker fn` keeps its mark.
    A call through a table names the class and the slot. */
 /* Lower source and check that every call of the failure routine names
-   kind. */
-static void checks_kind_of(const char *source, int kind)
+   kind or also, and that one names each. also is kind for a source with
+   one check. */
+static void checks_kinds_of(const char *source, int kind, int also)
 {
     struct lowered l;
     bool found = false;
+    bool found_also = false;
     size_t i;
     size_t b;
     size_t k;
@@ -384,13 +386,23 @@ static void checks_kind_of(const char *source, int kind)
                     continue;
                 }
                 CHECK(inst->arg_count == 5);
-                CHECK(inst->args[2].as.integer == (uint64_t)kind);
-                found = true;
+                CHECK(inst->args[2].as.integer == (uint64_t)kind ||
+                      inst->args[2].as.integer == (uint64_t)also);
+                found = found ||
+                        inst->args[2].as.integer == (uint64_t)kind;
+                found_also = found_also ||
+                             inst->args[2].as.integer == (uint64_t)also;
             }
         }
     }
     CHECK(found);
+    CHECK(found_also);
     lowered_release(&l);
+}
+
+static void checks_kind_of(const char *source, int kind)
+{
+    checks_kinds_of(source, kind, kind);
 }
 
 /* DESIGN: a failed check names the values it prints by the kind of enum
@@ -406,8 +418,13 @@ static void records_check_kinds(void)
                    ANTI_CHECK_VALUE);
     checks_kind_of("fn f(a: uint) -> i8 { return a as i8; }",
                    ANTI_CHECK_VALUE_U);
-    checks_kind_of("fn f(a: int, b: int) -> int { return a / b; }",
-                   ANTI_CHECK_LEFT);
+    /* A signed division checks its divisor, and the least value by -1
+       as an overflow, by R031 of "Rules of 2026-10-13". */
+    checks_kinds_of("fn f(a: int, b: int) -> int { return a / b; }",
+                    ANTI_CHECK_LEFT, ANTI_CHECK_OVERFLOW);
+    checks_kind_of("fn f(a: int) -> int { return -a; }", ANTI_CHECK_VALUE);
+    checks_kind_of("fn f(a: int, b: int) -> int { return a <<% b; }",
+                   ANTI_CHECK_SHIFT);
     checks_kind_of("fn f(a: uint, b: uint) -> uint { return a / b; }",
                    ANTI_CHECK_LEFT_U);
     checks_kind_of("fn f(a: int, b: int) -> int { return a << b; }",

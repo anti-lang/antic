@@ -1,13 +1,15 @@
 //! The arithmetic of every integer type at its limits: `+ - * / %`, the
 //! wrapping `+% -% *%`, the saturating `+| -| *|` and `mul_high`. At run time
 //! an unsigned result wraps in every build, and a signed `+ - *` that leaves
-//! its range stops a dev build. A constant `+ - *` that leaves the range of its
-//! type is refused, by R029 of "Rules of 2026-10-13". The wrapping and the
-//! saturating operators are never checked. A line names the operator, the type
-//! and the operands. It holds the value the checker folds in a constant and the
-//! value the program computes from operands it cannot know before it runs.
-//! `none` stands where the checker refuses the constant, and `checked` where a
-//! dev build stops, so the program does not run the case.
+//! its range stops a dev build, as the least value divided by -1 and its
+//! remainder do, by R031 of "Rules of 2026-10-13". A constant `+ - *` that
+//! leaves the range of its type is refused, by R029 of "Rules of 2026-10-13".
+//! The wrapping and the saturating operators are never checked. A line names
+//! the operator, the type and the operands. It holds the value the checker
+//! folds in a constant and the value the program computes from operands it
+//! cannot know before it runs. `none` stands where the checker refuses the
+//! constant, and `checked` where a dev build stops, so the program does not run
+//! the case.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -107,8 +109,7 @@ fn arith_on_i8(z: i8)
 	const F39: i8 = -128 / -128;
 	let r39: i8 = (-128 ^ z) / (-128 ^ z);
 	printf("div i8 -128 -128 = %lld %lld\n".ptr, F39 as int, r39 as int);
-	let r40: i8 = (-128 ^ z) / (-1 ^ z);
-	printf("div i8 -128 -1 = none %lld\n".ptr, r40 as int);
+	printf("div i8 -128 -1 = none checked\n".ptr);
 	const F41: i8 = 127 / -1;
 	let r41: i8 = (127 ^ z) / (-1 ^ z);
 	printf("div i8 127 -1 = %lld %lld\n".ptr, F41 as int, r41 as int);
@@ -139,8 +140,7 @@ fn arith_on_i8(z: i8)
 	const F50: i8 = -128 % -128;
 	let r50: i8 = (-128 ^ z) % (-128 ^ z);
 	printf("rem i8 -128 -128 = %lld %lld\n".ptr, F50 as int, r50 as int);
-	let r51: i8 = (-128 ^ z) % (-1 ^ z);
-	printf("rem i8 -128 -1 = none %lld\n".ptr, r51 as int);
+	printf("rem i8 -128 -1 = none checked\n".ptr);
 	const F52: i8 = 127 % -1;
 	let r52: i8 = (127 ^ z) % (-1 ^ z);
 	printf("rem i8 127 -1 = %lld %lld\n".ptr, F52 as int, r52 as int);
@@ -248,8 +248,7 @@ fn arith_on_i16(z: i16)
 	const F39: i16 = -32768 / -32768;
 	let r39: i16 = (-32768 ^ z) / (-32768 ^ z);
 	printf("div i16 -32768 -32768 = %lld %lld\n".ptr, F39 as int, r39 as int);
-	let r40: i16 = (-32768 ^ z) / (-1 ^ z);
-	printf("div i16 -32768 -1 = none %lld\n".ptr, r40 as int);
+	printf("div i16 -32768 -1 = none checked\n".ptr);
 	const F41: i16 = 32767 / -1;
 	let r41: i16 = (32767 ^ z) / (-1 ^ z);
 	printf("div i16 32767 -1 = %lld %lld\n".ptr, F41 as int, r41 as int);
@@ -280,8 +279,7 @@ fn arith_on_i16(z: i16)
 	const F50: i16 = -32768 % -32768;
 	let r50: i16 = (-32768 ^ z) % (-32768 ^ z);
 	printf("rem i16 -32768 -32768 = %lld %lld\n".ptr, F50 as int, r50 as int);
-	let r51: i16 = (-32768 ^ z) % (-1 ^ z);
-	printf("rem i16 -32768 -1 = none %lld\n".ptr, r51 as int);
+	printf("rem i16 -32768 -1 = none checked\n".ptr);
 	const F52: i16 = 32767 % -1;
 	let r52: i16 = (32767 ^ z) % (-1 ^ z);
 	printf("rem i16 32767 -1 = %lld %lld\n".ptr, F52 as int, r52 as int);
@@ -389,8 +387,7 @@ fn arith_on_i32(z: i32)
 	const F39: i32 = -2147483648 / -2147483648;
 	let r39: i32 = (-2147483648 ^ z) / (-2147483648 ^ z);
 	printf("div i32 -2147483648 -2147483648 = %lld %lld\n".ptr, F39 as int, r39 as int);
-	let r40: i32 = (-2147483648 ^ z) / (-1 ^ z);
-	printf("div i32 -2147483648 -1 = none %lld\n".ptr, r40 as int);
+	printf("div i32 -2147483648 -1 = none checked\n".ptr);
 	const F41: i32 = 2147483647 / -1;
 	let r41: i32 = (2147483647 ^ z) / (-1 ^ z);
 	printf("div i32 2147483647 -1 = %lld %lld\n".ptr, F41 as int, r41 as int);
@@ -421,8 +418,7 @@ fn arith_on_i32(z: i32)
 	const F50: i32 = -2147483648 % -2147483648;
 	let r50: i32 = (-2147483648 ^ z) % (-2147483648 ^ z);
 	printf("rem i32 -2147483648 -2147483648 = %lld %lld\n".ptr, F50 as int, r50 as int);
-	let r51: i32 = (-2147483648 ^ z) % (-1 ^ z);
-	printf("rem i32 -2147483648 -1 = none %lld\n".ptr, r51 as int);
+	printf("rem i32 -2147483648 -1 = none checked\n".ptr);
 	const F52: i32 = 2147483647 % -1;
 	let r52: i32 = (2147483647 ^ z) % (-1 ^ z);
 	printf("rem i32 2147483647 -1 = %lld %lld\n".ptr, F52 as int, r52 as int);
@@ -530,8 +526,7 @@ fn arith_on_i64(z: i64)
 	const F39: i64 = -9223372036854775808 / -9223372036854775808;
 	let r39: i64 = (-9223372036854775808 ^ z) / (-9223372036854775808 ^ z);
 	printf("div i64 -9223372036854775808 -9223372036854775808 = %lld %lld\n".ptr, F39 as int, r39 as int);
-	let r40: i64 = (-9223372036854775808 ^ z) / (-1 ^ z);
-	printf("div i64 -9223372036854775808 -1 = none %lld\n".ptr, r40 as int);
+	printf("div i64 -9223372036854775808 -1 = none checked\n".ptr);
 	const F41: i64 = 9223372036854775807 / -1;
 	let r41: i64 = (9223372036854775807 ^ z) / (-1 ^ z);
 	printf("div i64 9223372036854775807 -1 = %lld %lld\n".ptr, F41 as int, r41 as int);
@@ -562,8 +557,7 @@ fn arith_on_i64(z: i64)
 	const F50: i64 = -9223372036854775808 % -9223372036854775808;
 	let r50: i64 = (-9223372036854775808 ^ z) % (-9223372036854775808 ^ z);
 	printf("rem i64 -9223372036854775808 -9223372036854775808 = %lld %lld\n".ptr, F50 as int, r50 as int);
-	let r51: i64 = (-9223372036854775808 ^ z) % (-1 ^ z);
-	printf("rem i64 -9223372036854775808 -1 = none %lld\n".ptr, r51 as int);
+	printf("rem i64 -9223372036854775808 -1 = none checked\n".ptr);
 	const F52: i64 = 9223372036854775807 % -1;
 	let r52: i64 = (9223372036854775807 ^ z) % (-1 ^ z);
 	printf("rem i64 9223372036854775807 -1 = %lld %lld\n".ptr, F52 as int, r52 as int);
@@ -671,8 +665,7 @@ fn arith_on_int(z: int)
 	const F39: int = -9223372036854775808 / -9223372036854775808;
 	let r39: int = (-9223372036854775808 ^ z) / (-9223372036854775808 ^ z);
 	printf("div int -9223372036854775808 -9223372036854775808 = %lld %lld\n".ptr, F39 as int, r39 as int);
-	let r40: int = (-9223372036854775808 ^ z) / (-1 ^ z);
-	printf("div int -9223372036854775808 -1 = none %lld\n".ptr, r40 as int);
+	printf("div int -9223372036854775808 -1 = none checked\n".ptr);
 	const F41: int = 9223372036854775807 / -1;
 	let r41: int = (9223372036854775807 ^ z) / (-1 ^ z);
 	printf("div int 9223372036854775807 -1 = %lld %lld\n".ptr, F41 as int, r41 as int);
@@ -703,8 +696,7 @@ fn arith_on_int(z: int)
 	const F50: int = -9223372036854775808 % -9223372036854775808;
 	let r50: int = (-9223372036854775808 ^ z) % (-9223372036854775808 ^ z);
 	printf("rem int -9223372036854775808 -9223372036854775808 = %lld %lld\n".ptr, F50 as int, r50 as int);
-	let r51: int = (-9223372036854775808 ^ z) % (-1 ^ z);
-	printf("rem int -9223372036854775808 -1 = none %lld\n".ptr, r51 as int);
+	printf("rem int -9223372036854775808 -1 = none checked\n".ptr);
 	const F52: int = 9223372036854775807 % -1;
 	let r52: int = (9223372036854775807 ^ z) % (-1 ^ z);
 	printf("rem int 9223372036854775807 -1 = %lld %lld\n".ptr, F52 as int, r52 as int);

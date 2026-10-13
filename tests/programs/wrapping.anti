@@ -1,7 +1,8 @@
 //! The wrapping operators `+% -% *% <<%` give the result modulo 2^N in every
 //! build and never trap. Each one runs on values that the program reads at run
 //! time and again on constants. `<<%` gives 0 for a count at or above the
-//! width, and a negative count counts as one above it.
+//! width. A count below zero stops a dev build, which
+//! `check_shift_wrap_negative` holds.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -51,7 +52,6 @@ fn main() -> int
 	line("one <<% 63", one <<% 63);
 	line("one <<% 64", one <<% opaque(64));
 	line("3 <<% 70", opaque(3) <<% opaque(70));
-	line("one <<% -1", one <<% opaque(-1));
 	line("i8 1 <<% 7", ((one as i8) <<% (opaque(7) as i8)) as int);
 	line("i8 1 <<% 8", ((one as i8) <<% (opaque(8) as i8)) as int);
 	uline("u8 0x81 <<% 1", ((opaque(0x81) as u8) <<% (one as u8)) as u64);

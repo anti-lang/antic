@@ -1,0 +1,19 @@
+//! A `/=` of the least `i16` by -1: the compound assignment is checked as the
+//! operator it holds.
+
+fn opaque(n: i16) -> i16
+{
+	return n;
+}
+
+fn sink(n: i16)
+{
+}
+
+fn main() -> int
+{
+	let x = opaque(-32768);
+	x /= opaque(-1);
+	sink(x);
+	return 7;
+}

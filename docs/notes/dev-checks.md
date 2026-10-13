@@ -87,6 +87,27 @@ eight, a symbolic value the back end folds, so a target-sized type is right on
 every target. A negative count widens to a large unsigned value and fails the
 same comparison.
 
+The least value by -1, by R031 of "Rules of 2026-10-13". A signed `/` and `%`
+get a second check after the one of the divisor. It fails when the divisor is
+-1 and the left operand is the least value of its type. The least value is the
+one value that is below itself less one, since that difference wraps to the
+largest. The test therefore names no limit, and a target-sized type is right on
+every target. The failure prints `overflow in /` with both operands.
+
+Unary `-`, by the same rule. A signed negation is `subov` of 0 and the value
+with its `branchov`, so the least value is the one that fails. The failure
+prints `overflow in -` with the one value. A build without the checks turns the
+operation back into the subtraction that a negation emits, so its LLVM text
+keeps its bytes. The text of the check takes a number among the constants of
+the module, which moves the numbers after it.
+
+`<<%`, by R032. A signed count is compared against zero before the shift, and
+the failure prints `shift count out of range for <<%`. A count at or above the
+width gives 0 and is no failure.
+
+Not checked: unary `-` on a simd struct, `%` and `<<%` on its lanes, and the
+flags form, which never stops.
+
 ## Compound assignment
 
 `x += y` lowers its own operation, so `lower_assign` calls `binary_checks`

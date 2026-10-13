@@ -1,0 +1,16 @@
+//! Unary `-` of the least `i8`.
+
+fn opaque(n: i8) -> i8
+{
+	return n;
+}
+
+fn sink(n: i8)
+{
+}
+
+fn main() -> int
+{
+	sink(-opaque(-128));
+	return 7;
+}

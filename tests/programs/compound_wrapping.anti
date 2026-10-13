@@ -1,7 +1,8 @@
 //! The compound assignments of the wrapping and saturating operators, `+%= -%=
 //! *%= <<%=` and `+|= -|= *|=`. Each one gives what `x = x op e` gives, on a
 //! local, a field, an element and a place behind a pointer, and none of them
-//! traps in dev mode.
+//! traps in dev mode but `<<%=` by a count below zero, which
+//! `check_shift_wrap_negative_compound` holds.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -49,9 +50,6 @@ fn main() -> int
 	s = opaque(3);
 	s <<%= opaque(64);
 	line("s <<%= 64", s);
-	s = opaque(1);
-	s <<%= opaque(-1);
-	line("s <<%= -1", s);
 
 	let b = opaque(250) as u8;
 	b +|= opaque(10) as u8;

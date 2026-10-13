@@ -4820,6 +4820,32 @@ if(ANTIC_LLVM_MC)
     antic_check_test(shift_compound "shift count out of range"
         "shift_compound\\.anti:[0-9]+: shift count out of range for <<: count 64, width 64"
         ON)
+    # R031 of "Rules of 2026-10-13": the least value divided by -1, its
+    # remainder by -1 and unary `-` of it stop a dev build with the
+    # overflow check.
+    antic_check_test(overflow_divide_least "overflow in"
+        "overflow_divide_least\\.anti:[0-9]+: overflow in /: left -9223372036854775808, right -1"
+        ON)
+    antic_check_test(overflow_remainder_least_i8 "overflow in"
+        "overflow_remainder_least_i8\\.anti:[0-9]+: overflow in %: left -128, right -1"
+        ON)
+    antic_check_test(overflow_divide_least_compound "overflow in"
+        "overflow_divide_least_compound\\.anti:[0-9]+: overflow in /: left -32768, right -1"
+        ON)
+    antic_check_test(overflow_negate_least "overflow in"
+        "overflow_negate_least\\.anti:[0-9]+: overflow in -: value -9223372036854775808"
+        ON)
+    antic_check_test(overflow_negate_least_i8 "overflow in"
+        "overflow_negate_least_i8\\.anti:[0-9]+: overflow in -: value -128"
+        ON)
+    # R032: `<<%` by a count below zero stops a dev build. A count at or
+    # above the width gives 0 and is no failure.
+    antic_check_test(shift_wrap_negative "shift count out of range"
+        "shift_wrap_negative\\.anti:[0-9]+: shift count out of range for <<%: count -1, width 64"
+        ON)
+    antic_check_test(shift_wrap_negative_compound "shift count out of range"
+        "shift_wrap_negative_compound\\.anti:[0-9]+: shift count out of range for <<%: count -1, width 8"
+        ON)
     # Decision 24 of "Decisions of 2026-10-11": a dev build checks the
     # bounds of `xs[lo..hi]` as it checks an index.
     antic_check_test(slice_range "out of bounds"

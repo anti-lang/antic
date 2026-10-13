@@ -103,7 +103,14 @@ static enum ir_op overflow_op(enum token_kind op)
    The checks are overflow on a signed + - or *, a zero divisor of / and
    %, and a shift count outside the width of the type. Unsigned
    arithmetic wraps and is not checked. The width is the size of the type
-   in bits, which a target-sized type leaves to the back end. */
+   in bits, which a target-sized type leaves to the back end.
+
+   By R031 of "Rules of 2026-10-13" the least value of a signed type
+   divided by -1 is an overflow of / and of %. The least value is the one
+   value that is below itself less one, which wraps to the largest, so
+   the test names no limit and holds for a target-sized type. By R032
+   `<<%` checks its count against zero alone, since it gives 0 for a
+   count at or above the width. */
 struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
                                       const struct type *t,
                                       struct ir_operand left,
@@ -152,6 +159,42 @@ struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
         lower_check_branch(l, ok, false, lower_check_text(l, line, operation),
                            types_is_signed(t) ? CHECK_LEFT : CHECK_LEFT_U, left,
                            lower_none(), t);
+        if (types_is_signed(t)) {
+            enum ir_type type = lower_ir_type_of(t);
+            struct ir_operand by_minus_one =
+                lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, right,
+                                        ir_int_op(type, UINT64_MAX)));
+            struct ir_operand below =
+                lower_temp(l, ir_binary(l->f, l->b, IR_SUB, type, left,
+                                        ir_int_op(type, 1)));
+            struct ir_operand least =
+                lower_temp(l, ir_binary(l->f, l->b, IR_SGT, IR_I8, below,
+                                        left));
+            struct ir_operand bad =
+                lower_temp(l, ir_binary(l->f, l->b, IR_AND, IR_I8,
+                                        by_minus_one, least));
+            snprintf(operation, sizeof operation, "overflow in %s",
+                     op == TOKEN_SLASH ? "/" : "%");
+            lower_check_branch(l, bad, true,
+                               lower_check_text(l, line, operation),
+                               CHECK_OVERFLOW, left, right, t);
+        }
+        return lower_none();
+    case TOKEN_SHL_WRAP:
+        if (!types_is_signed(t)) {
+            return lower_none();
+        }
+        count = lower_widen_operand(l, right, t);
+        width = lower_temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
+                                        lower_size_operand(l, t),
+                                        ir_int_op(IR_I64, 8)));
+        ok = lower_temp(l, ir_binary(l->f, l->b, IR_SGE, IR_I8, count,
+                                     ir_int_op(IR_I64, 0)));
+        lower_check_branch(l, ok, false,
+                           lower_check_text(l, line,
+                                            "shift count out of range for "
+                                            "<<%"),
+                           CHECK_SHIFT, count, width, NULL);
         return lower_none();
     case TOKEN_SHL:
     case TOKEN_SHR:
@@ -169,6 +212,29 @@ struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
     default:
         return lower_none();
     }
+}
+
+/* DESIGN: unary `-` of a signed integer is 0 less the value, so its
+   overflow test is that of a subtraction, by R031 of "Rules of
+   2026-10-13". The least value is the one that fails it. A build without
+   the checks turns the operation back into the plain subtraction, which
+   is what a negation emits. */
+struct ir_operand lower_negate_checked(struct lowerer *l,
+                                       const struct type *t,
+                                       struct ir_operand v, int line)
+{
+    enum ir_type type = lower_ir_type_of(t);
+    const struct ir_global *text = lower_check_text(l, line, "overflow in -");
+    struct ir_operand result =
+        lower_temp(l, ir_binary_wrap(l->f, l->b, IR_SUB_OV, type,
+                                     ir_int_op(type, 0), v, IR_NSW));
+    struct ir_block *fail = lower_new_block(l);
+    struct ir_block *rest = lower_new_block(l);
+
+    fail->fail = IR_FAIL_CHECK;
+    ir_branch_ov(l->f, l->b, result, fail, rest);
+    check_call(l, fail, rest, text, CHECK_VALUE, v, lower_none(), t);
+    return result;
 }
 
 /* DESIGN: one unsigned comparison covers both ends. A negative index is

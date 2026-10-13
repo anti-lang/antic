@@ -89,9 +89,6 @@ fn compound_on_i8(z: i8)
 	let x26: i8 = -128 ^ z;
 	x26 /= -128 ^ z;
 	printf("div i8 -128 -128 = %lld\n".ptr, x26 as int);
-	let x27: i8 = -128 ^ z;
-	x27 /= -1 ^ z;
-	printf("div i8 -128 -1 = %lld\n".ptr, x27 as int);
 	let x28: i8 = 127 ^ z;
 	x28 /= -1 ^ z;
 	printf("div i8 127 -1 = %lld\n".ptr, x28 as int);
@@ -122,9 +119,6 @@ fn compound_on_i8(z: i8)
 	let x37: i8 = -128 ^ z;
 	x37 %= -128 ^ z;
 	printf("rem i8 -128 -128 = %lld\n".ptr, x37 as int);
-	let x38: i8 = -128 ^ z;
-	x38 %= -1 ^ z;
-	printf("rem i8 -128 -1 = %lld\n".ptr, x38 as int);
 	let x39: i8 = 127 ^ z;
 	x39 %= -1 ^ z;
 	printf("rem i8 127 -1 = %lld\n".ptr, x39 as int);
@@ -372,9 +366,6 @@ fn compound_on_i16(z: i16)
 	let x26: i16 = -32768 ^ z;
 	x26 /= -32768 ^ z;
 	printf("div i16 -32768 -32768 = %lld\n".ptr, x26 as int);
-	let x27: i16 = -32768 ^ z;
-	x27 /= -1 ^ z;
-	printf("div i16 -32768 -1 = %lld\n".ptr, x27 as int);
 	let x28: i16 = 32767 ^ z;
 	x28 /= -1 ^ z;
 	printf("div i16 32767 -1 = %lld\n".ptr, x28 as int);
@@ -405,9 +396,6 @@ fn compound_on_i16(z: i16)
 	let x37: i16 = -32768 ^ z;
 	x37 %= -32768 ^ z;
 	printf("rem i16 -32768 -32768 = %lld\n".ptr, x37 as int);
-	let x38: i16 = -32768 ^ z;
-	x38 %= -1 ^ z;
-	printf("rem i16 -32768 -1 = %lld\n".ptr, x38 as int);
 	let x39: i16 = 32767 ^ z;
 	x39 %= -1 ^ z;
 	printf("rem i16 32767 -1 = %lld\n".ptr, x39 as int);
@@ -655,9 +643,6 @@ fn compound_on_i32(z: i32)
 	let x26: i32 = -2147483648 ^ z;
 	x26 /= -2147483648 ^ z;
 	printf("div i32 -2147483648 -2147483648 = %lld\n".ptr, x26 as int);
-	let x27: i32 = -2147483648 ^ z;
-	x27 /= -1 ^ z;
-	printf("div i32 -2147483648 -1 = %lld\n".ptr, x27 as int);
 	let x28: i32 = 2147483647 ^ z;
 	x28 /= -1 ^ z;
 	printf("div i32 2147483647 -1 = %lld\n".ptr, x28 as int);
@@ -688,9 +673,6 @@ fn compound_on_i32(z: i32)
 	let x37: i32 = -2147483648 ^ z;
 	x37 %= -2147483648 ^ z;
 	printf("rem i32 -2147483648 -2147483648 = %lld\n".ptr, x37 as int);
-	let x38: i32 = -2147483648 ^ z;
-	x38 %= -1 ^ z;
-	printf("rem i32 -2147483648 -1 = %lld\n".ptr, x38 as int);
 	let x39: i32 = 2147483647 ^ z;
 	x39 %= -1 ^ z;
 	printf("rem i32 2147483647 -1 = %lld\n".ptr, x39 as int);
@@ -938,9 +920,6 @@ fn compound_on_i64(z: i64)
 	let x26: i64 = -9223372036854775808 ^ z;
 	x26 /= -9223372036854775808 ^ z;
 	printf("div i64 -9223372036854775808 -9223372036854775808 = %lld\n".ptr, x26 as int);
-	let x27: i64 = -9223372036854775808 ^ z;
-	x27 /= -1 ^ z;
-	printf("div i64 -9223372036854775808 -1 = %lld\n".ptr, x27 as int);
 	let x28: i64 = 9223372036854775807 ^ z;
 	x28 /= -1 ^ z;
 	printf("div i64 9223372036854775807 -1 = %lld\n".ptr, x28 as int);
@@ -971,9 +950,6 @@ fn compound_on_i64(z: i64)
 	let x37: i64 = -9223372036854775808 ^ z;
 	x37 %= -9223372036854775808 ^ z;
 	printf("rem i64 -9223372036854775808 -9223372036854775808 = %lld\n".ptr, x37 as int);
-	let x38: i64 = -9223372036854775808 ^ z;
-	x38 %= -1 ^ z;
-	printf("rem i64 -9223372036854775808 -1 = %lld\n".ptr, x38 as int);
 	let x39: i64 = 9223372036854775807 ^ z;
 	x39 %= -1 ^ z;
 	printf("rem i64 9223372036854775807 -1 = %lld\n".ptr, x39 as int);
@@ -1221,9 +1197,6 @@ fn compound_on_int(z: int)
 	let x26: int = -9223372036854775808 ^ z;
 	x26 /= -9223372036854775808 ^ z;
 	printf("div int -9223372036854775808 -9223372036854775808 = %lld\n".ptr, x26 as int);
-	let x27: int = -9223372036854775808 ^ z;
-	x27 /= -1 ^ z;
-	printf("div int -9223372036854775808 -1 = %lld\n".ptr, x27 as int);
 	let x28: int = 9223372036854775807 ^ z;
 	x28 /= -1 ^ z;
 	printf("div int 9223372036854775807 -1 = %lld\n".ptr, x28 as int);
@@ -1254,9 +1227,6 @@ fn compound_on_int(z: int)
 	let x37: int = -9223372036854775808 ^ z;
 	x37 %= -9223372036854775808 ^ z;
 	printf("rem int -9223372036854775808 -9223372036854775808 = %lld\n".ptr, x37 as int);
-	let x38: int = -9223372036854775808 ^ z;
-	x38 %= -1 ^ z;
-	printf("rem int -9223372036854775808 -1 = %lld\n".ptr, x38 as int);
 	let x39: int = 9223372036854775807 ^ z;
 	x39 %= -1 ^ z;
 	printf("rem int 9223372036854775807 -1 = %lld\n".ptr, x39 as int);

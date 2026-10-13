@@ -409,6 +409,11 @@ void lower_check_branch(struct lowerer *l, struct ir_operand cond, bool bad,
                         const struct ir_global *text, enum check_kind kind,
                         struct ir_operand a, struct ir_operand b,
                         const struct type *widen);
+/* Unary `-` of the signed integer v of type t, with the overflow check
+   of a dev build. */
+struct ir_operand lower_negate_checked(struct lowerer *l,
+                                       const struct type *t,
+                                       struct ir_operand v, int line);
 struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
                                       const struct type *t,
                                       struct ir_operand left,

@@ -814,10 +814,11 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
     if (s->as.assign.op != TOKEN_ASSIGN) {
         enum token_kind op = compound_op(s->as.assign.op);
         struct ir_operand checked =
-            op == TOKEN_SHL_WRAP
-                ? lower_shift_wrap(l, target->type, old, v)
-                : lower_binary_checks(l, op, target->type, old, v,
-                                      target->pos.line);
+            lower_binary_checks(l, op, target->type, old, v,
+                                target->pos.line);
+        if (op == TOKEN_SHL_WRAP) {
+            checked = lower_shift_wrap(l, target->type, old, v);
+        }
         v = checked.kind != IR_NONE
                 ? checked
                 : lower_temp(l, ir_binary(l->f, l->b,

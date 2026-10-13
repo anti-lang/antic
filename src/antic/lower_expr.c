@@ -728,6 +728,9 @@ static struct ir_operand lower_unary(struct lowerer *l, const struct expr *e)
             return ir_float_op(type, -lower_float_literal(operand, type));
         }
         v = lower_expr(l, operand);
+        if (types_is_integer(e->type) && types_is_signed(e->type)) {
+            return lower_negate_checked(l, e->type, v, e->pos.line);
+        }
         return lower_temp(l, ir_unary(l->f, l->b,
                                       type == IR_F32 || type == IR_F64 ? IR_FNEG
                                                                        : IR_NEG,
@@ -963,7 +966,9 @@ static struct ir_operand bool_as(struct lowerer *l, struct ir_operand v,
 /* DESIGN: `a <<% n` is the shift where the count is below the width and
    0 elsewhere. The count widens to 64 bits by its signedness and compares
    unsigned against the width, as the dev-mode check of `<<` does. A
-   negative count therefore counts as one above it. The comparison becomes
+   negative count therefore counts as one above it in a build without
+   the checks, and a dev build stops it before, by R032 of "Rules of
+   2026-10-13". The comparison becomes
    a mask of all ones or of zero, so no branch is taken. A constant count
    in the width leaves the shift alone after folding. */
 struct ir_operand lower_shift_wrap(struct lowerer *l, const struct type *t,
@@ -1168,10 +1173,10 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
         left = object_of(l, left);
         right = object_of(l, right);
     }
+    checked = lower_binary_checks(l, op, operands, left, right, e->pos.line);
     if (op == TOKEN_SHL_WRAP) {
         return lower_shift_wrap(l, operands, left, right);
     }
-    checked = lower_binary_checks(l, op, operands, left, right, e->pos.line);
     if (checked.kind != IR_NONE) {
         return checked;
     }

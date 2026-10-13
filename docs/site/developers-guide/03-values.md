@@ -510,11 +510,14 @@ A dev build inserts a check before each operation of the table. A failed check p
 |---|---|---|
 | signed `+ - *` out of range | `overflow in +: left 9223372036854775807, right 1` | the wrapped result |
 | `/` or `%` by zero | `division by zero in /: left 7` | 0 |
+| the least value divided by `-1`, or its remainder | `overflow in /: left -9223372036854775808, right -1` | the least value, and 0 for the remainder |
+| unary `-` of the least value | `overflow in -: value -9223372036854775808` | the least value |
 | shift count below 0 or at or above the width | `shift count out of range for <<: count 65, width 64` | the shift by the count modulo the width |
+| `<<%` by a count below 0 | `shift count out of range for <<%: count -1, width 64` | 0 |
 | `as` to an integer type that cannot hold the value | `value out of range for i16: value 70000` | the low bits |
 | `as` to `char` outside the Unicode scalar values | `value out of range for char: value 1114112` | the value, unchecked |
 
-Each message starts with the file and the line, as in `ints.anti:7: overflow in +`. Four cases have a defined result and no check in either mode. The least value divided by `-1` gives the least value, and its remainder is 0. Unary `-` of the least value gives the least value. `<<%` gives 0 for a count at or above the width. An unsigned `+`, `-` or `*` wraps.
+Each message starts with the file and the line, as in `ints.anti:7: overflow in +`. Two cases have a defined result and no check in either mode. `<<%` gives 0 for a count at or above the width. An unsigned `+`, `-` or `*` wraps.
 
 With constant operands the checker refuses every operation of the table. `127 + 1` as an `i8`, `7 / 0`, `1 << 70`, `70000 as i16` and `0xD800 as u32 as char` are compile errors. So are the least value divided by `-1`, unary `-` of the least value and `<<%` by a count below zero. A `const` is held to the range of an unsigned type as well: `const N: u8 = 200 + 100;` is refused, and `200 +% 100` gives 44.
 

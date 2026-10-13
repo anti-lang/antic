@@ -1,0 +1,19 @@
+//! A `<<%=` of an `i8` by a count below zero: the compound assignment is
+//! checked as the operator it holds.
+
+fn opaque(n: i8) -> i8
+{
+	return n;
+}
+
+fn sink(n: i8)
+{
+}
+
+fn main() -> int
+{
+	let x = opaque(1);
+	x <<%= opaque(-1);
+	sink(x);
+	return 7;
+}

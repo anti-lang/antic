@@ -25,6 +25,7 @@ b0:
 @anti.rt.main = alias i64 (), ptr @main.main
 
 @main.0 = hidden constant <{ [35 x i8] }> <{ [35 x i8] c"main.anti:5: division by zero in /\00" }>, align 1
+@main.1 = hidden constant <{ [27 x i8] }> <{ [27 x i8] c"main.anti:5: overflow in /\00" }>, align 1
 @anti_rt_registry = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
 @anti_rt_backtrace_default = dso_local constant <{ [8 x i8] }> <{ [8 x i8] c"\01\00\00\00\00\00\00\00" }>, align 8
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8

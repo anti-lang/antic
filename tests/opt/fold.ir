@@ -1,10 +1,13 @@
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never
 global fold.0 size 35 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 33 3a 20 64 69 76 69 73 69 6f 6e 20 62 79 20 7a 65 72 6f 20 69 6e 20 2f 00
-global fold.1 size 35 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 33 3a 20 64 69 76 69 73 69 6f 6e 20 62 79 20 7a 65 72 6f 20 69 6e 20 25 00
-global fold.2 size 27 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
-global fold.3 size 45 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 38 3a 20 73 68 69 66 74 20 63 6f 75 6e 74 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 3e 3e 00
-global fold.4 size 40 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 38 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00
-global fold.5 size 36 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 31 39 3a 20 64 69 76 69 73 69 6f 6e 20 62 79 20 7a 65 72 6f 20 69 6e 20 2f 00
+global fold.1 size 27 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2f 00
+global fold.2 size 35 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 33 3a 20 64 69 76 69 73 69 6f 6e 20 62 79 20 7a 65 72 6f 20 69 6e 20 25 00
+global fold.3 size 27 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 25 00
+global fold.4 size 27 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00
+global fold.5 size 45 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 38 3a 20 73 68 69 66 74 20 63 6f 75 6e 74 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 3e 3e 00
+global fold.6 size 40 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 38 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00
+global fold.7 size 36 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 31 39 3a 20 64 69 76 69 73 69 6f 6e 20 62 79 20 7a 65 72 6f 20 69 6e 20 2f 00
+global fold.8 size 28 align 1 bytes 66 6f 6c 64 2e 61 6e 74 69 3a 31 39 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2f 00
 fn fold.quotient() -> i64 {
 b0:
     %0 = ne i8 2, 0
@@ -14,23 +17,43 @@ b1:
     call void @anti_rt_check_failed(%1, 34, 4, -9, 0)
     unreachable
 b2:
-    %2 = sdiv i64 -9, 2
-    %3 = ne i8 2, 0
-    branch %3, b4, b3
+    %2 = eq i8 2, -1
+    %3 = sub i64 -9, 1
+    %4 = sgt i8 %3, -9
+    %5 = and i8 %2, %4
+    branch %5, b3, b4
 b3:
-    %4 = addr @fold.1
-    call void @anti_rt_check_failed(%4, 34, 4, -9, 0)
+    %6 = addr @fold.1
+    call void @anti_rt_check_failed(%6, 26, 1, -9, 2)
     unreachable
 b4:
-    %5 = srem i64 -9, 2
-    %6 = addov nsw i64 %2, %5
-    branchov %6, b5, b6
+    %7 = sdiv i64 -9, 2
+    %8 = ne i8 2, 0
+    branch %8, b6, b5
 b5:
-    %7 = addr @fold.2
-    call void @anti_rt_check_failed(%7, 26, 1, %2, %5)
+    %9 = addr @fold.2
+    call void @anti_rt_check_failed(%9, 34, 4, -9, 0)
     unreachable
 b6:
-    ret i64 %6
+    %10 = eq i8 2, -1
+    %11 = sub i64 -9, 1
+    %12 = sgt i8 %11, -9
+    %13 = and i8 %10, %12
+    branch %13, b7, b8
+b7:
+    %14 = addr @fold.3
+    call void @anti_rt_check_failed(%14, 26, 1, -9, 2)
+    unreachable
+b8:
+    %15 = srem i64 -9, 2
+    %16 = addov nsw i64 %7, %15
+    branchov %16, b9, b10
+b9:
+    %17 = addr @fold.4
+    call void @anti_rt_check_failed(%17, 26, 1, %7, %15)
+    unreachable
+b10:
+    ret i64 %16
 }
 fn fold.shifted() -> i32 {
 b0:
@@ -38,7 +61,7 @@ b0:
     %1 = ult i8 2, %0
     branch %1, b2, b1
 b1:
-    %2 = addr @fold.3
+    %2 = addr @fold.5
     call void @anti_rt_check_failed(%2, 44, 6, 2, %0)
     unreachable
 b2:
@@ -48,7 +71,7 @@ b2:
     %6 = eq i8 %5, %3
     branch %6, b4, b3
 b3:
-    %7 = addr @fold.4
+    %7 = addr @fold.6
     call void @anti_rt_check_failed(%7, 39, 2, %3, 0)
     unreachable
 b4:
@@ -73,10 +96,20 @@ b0:
     %1 = ne i8 %0, 0
     branch %1, b2, b1
 b1:
-    %2 = addr @fold.5
+    %2 = addr @fold.7
     call void @anti_rt_check_failed(%2, 35, 4, 1, 0)
     unreachable
 b2:
-    %3 = sdiv i64 1, %0
-    ret i64 %3
+    %3 = eq i8 %0, -1
+    %4 = sub i64 1, 1
+    %5 = sgt i8 %4, 1
+    %6 = and i8 %3, %5
+    branch %6, b3, b4
+b3:
+    %7 = addr @fold.8
+    call void @anti_rt_check_failed(%7, 27, 1, 1, %0)
+    unreachable
+b4:
+    %8 = sdiv i64 1, %0
+    ret i64 %8
 }
