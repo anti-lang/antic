@@ -1,1 +1,1 @@
-threads_mutex_new_at_module_level.anti:3:21: error: a call is not a constant expression
+threads_mutex_new_at_module_level.anti:4:21: error: a `Mutex` cannot be a constant

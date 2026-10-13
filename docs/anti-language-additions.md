@@ -891,7 +891,7 @@ pub concurrent class Queue
 
 `Mutex` is one word of the program's own memory, and the operating system keeps nothing for it until a thread has to wait: a `futex` word on Linux, `os_unfair_lock` on macOS, `SRWLOCK` on Windows. A lock in every node of a large structure therefore costs memory alone, four or eight bytes each, and `size_of(Mutex)` is documented per target. Where even that is too much, a fixed set of locks shared by address, lock striping, keeps the count constant.
 
-A `Mutex` cannot be copied or assigned. A class that holds one follows the ownership rules for values that cannot be copied.
+A `Mutex` cannot be copied or assigned. A class that holds one follows the ownership rules for values that cannot be copied. A constant is no `Mutex` and holds none, by R047 of "Rules of 2026-10-13" in `docs/decisions.md`.
 
 ### Operations that decide for themselves
 

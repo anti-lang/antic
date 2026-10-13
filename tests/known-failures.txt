@@ -199,9 +199,6 @@ matrix_threads_dispatch_in_a_loop_release T055 Every job of a `dispatch` in a lo
 matrix_threads_return_before_the_join_dev T055 A job reads its arguments from a frame that returned.
 matrix_threads_return_before_the_join_memory_checks T055 A job reads its arguments from a frame that returned.
 matrix_threads_return_before_the_join_release T055 A job reads its arguments from a frame that returned.
-matrix_threads_const_of_a_struct_with_a_mutex_dev T056 antic crashes on a read of a constant of a struct that holds a Mutex.
-matrix_threads_const_of_a_struct_with_a_mutex_memory_checks T056 antic crashes on a read of a constant of a struct that holds a Mutex.
-matrix_threads_const_of_a_struct_with_a_mutex_release T056 antic crashes on a read of a constant of a struct that holds a Mutex.
 matrix_threads_static_default_is_a_call_refused T057 The default of a static field that no code reads is not checked.
 matrix_threads_channel_in_a_generic_struct_of_a_pointer_refused T058 A channel of a type parameter takes a pointer.
 matrix_threads_channel_of_a_type_parameter_that_is_a_pointer_refused T058 A channel of a type parameter takes a pointer.

@@ -1,0 +1,1 @@
+threads_const_of_an_array_of_mutexes.anti:12:33: error: `[2](Guard, int)` holds a `Mutex` and cannot be a constant

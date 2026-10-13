@@ -1307,8 +1307,11 @@ Where two rules meet, and where three do:
   refusals `matrix/threads_atomic_*_on_a_*`, T060.
 - A worker, a default value of a parameter and a `dispatch`:
   `matrix/threads_dispatch_leaves_out_a_default_argument`.
-- A constant, a struct and a Mutex:
-  `matrix/threads_const_of_a_struct_with_a_mutex`, T056.
+- A constant, a struct and a Mutex: the refusals
+  `matrix/threads_const_of_a_struct_with_a_mutex`,
+  `matrix/threads_const_of_an_array_of_mutexes` and
+  `matrix/threads_mutex_new_at_module_level`, by R047 of "Rules of
+  2026-10-13".
 - A static field, its default and a call:
   `matrix/threads_static_default_is_a_call`, T057.
 - Two locks, their two orders and a second run of each: `lock_order_once`,

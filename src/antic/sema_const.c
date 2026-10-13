@@ -1342,6 +1342,20 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
         sema_error_at(c, value->pos, "a class is not a constant expression");
         ok = false;
     }
+    /* DESIGN: a constant is a value of the program text, which each use
+       reads as a literal, and a Mutex is a place that threads share. By
+       R047 of "Rules of 2026-10-13" a constant is no Mutex and holds
+       none. */
+    if (ok && sema_holds_mutex(t)) {
+        if (types_is_mutex(t)) {
+            sema_error_at(c, value->pos, "a `" LANG_MUTEX "` cannot be a "
+                          "constant");
+        } else {
+            sema_error_at(c, value->pos, "`%s` holds a `" LANG_MUTEX "` and "
+                          "cannot be a constant", sema_tn(t));
+        }
+        ok = false;
+    }
     ok = ok && sema_require(c, value, sema_check_expr(c, value, t), t);
     if (ok) {
         struct const_value *made = arena_alloc(c->arena, sizeof *made);

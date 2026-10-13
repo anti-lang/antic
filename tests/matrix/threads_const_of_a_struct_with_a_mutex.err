@@ -1,0 +1,1 @@
+threads_const_of_a_struct_with_a_mutex.anti:11:22: error: `Guard` holds a `Mutex` and cannot be a constant

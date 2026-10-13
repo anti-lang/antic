@@ -1,8 +1,6 @@
-//! A constant of a struct that holds a Mutex. The literal leaves the Mutex out,
-//! so the constant holds a free lock, and a read of another field gives the
-//! value of the literal.
-
-extern fn printf(format: ?*byte, ...) -> c_int;
+//! A constant of a struct that holds a Mutex is refused, by R047 of "Rules of
+//! 2026-10-13": a constant is a value of the program text, and a lock is a
+//! place that threads share.
 
 struct Guard
 {
@@ -14,6 +12,5 @@ const START: Guard = Guard { n: 7 };
 
 fn main() -> int
 {
-	printf("%d\n".ptr, START.n as c_int);
-	return 0;
+	return START.n;
 }
