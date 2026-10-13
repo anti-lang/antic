@@ -473,6 +473,49 @@ static void test_codeview(void)
     text_free(&error);
 }
 
+/* A type stream alone counts as the debug information of its object, so
+   the second object loses its own. A .debug$S whose one table runs past
+   its section holds no line table, and the object after it keeps its
+   debug sections. */
+static void test_codeview_kinds(void)
+{
+    static const char lines[] = "\4\0\0\0\xf3\0\0\0\4\0\0\0\0\0\0\0";
+    static const char cut[] = "\4\0\0\0\xf1\0\0\0\x40\0\0\0\0\0\0\0";
+    struct t_object types = {AMD64, {{".text", CODE, call, 8, {{0}}, 0},
+                                     {".debug$T", DEBUG, "\4\0\0\0", 4, {{0}}, 0}}, 2,
+                             {{"foo", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct t_object short_table = {AMD64, {{".text", CODE, call, 8, {{0}}, 0},
+                                           {".debug$S", DEBUG, cut, 16, {{0}}, 0}}, 2,
+                                   {{"foo", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct t_object b = {AMD64, {{".text", CODE, call, 8, {{0}}, 0},
+                                 {".debug$S", DEBUG, lines, 16, {{0}}, 0},
+                                 {".debug$T", DEBUG, "\4\0\0\0", 4, {{0}}, 0}}, 3,
+                         {{"bar", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    const struct t_object *firsts[2];
+    static const int kept[2] = {1, 3};
+    struct text out = {0};
+    struct text error = {0};
+    char name[NAME_SIZE];
+    size_t i;
+    int k;
+
+    firsts[0] = &types;
+    firsts[1] = &short_table;
+    for (k = 0; k < 2; k++) {
+        int debug = 0;
+        out.length = 0;
+        CHECK(join(firsts[k], &b, &out, &error));
+        CHECK_STR(text_cstr(&error), "");
+        for (i = 1; out.length > 0 && i <= sections_of(&out); i++) {
+            section_name(&out, i, name);
+            debug += strncmp(name, ".debug$", 7) == 0;
+        }
+        CHECK(debug == kept[k]);
+    }
+    text_free(&out);
+    text_free(&error);
+}
+
 /* The joins that would give another program than the objects do. */
 static void test_refusals(void)
 {
@@ -795,11 +838,75 @@ static void test_truncated(void)
     REFUSES(&first, &second, "a section number outside the object for foo");
     first.data[symbols + 18 * 4 + 12] = (char)0xFD;
     REFUSES(&first, &second, "a section number outside the object for foo");
+    /* The header of a big object and of an import object: no machine
+       and 0xFFFF sections. */
+    DAMAGED(0, 0xFFFF0000u, "is a big object or an import object");
+    /* A weak external names its default in its auxiliary record. The
+       record of .text holds the length 8 there, past the five symbols. */
+    first.length = 0;
+    text_append_bytes(&first, good.data, good.length);
+    first.data[symbols + 12] = 0;
+    first.data[symbols + 16] = 105;
+    REFUSES(&first, &second, "a weak external without its default");
     /* A relocation of a symbol past the table. */
     DAMAGED(get(&good, section_at(1) + 24, 4) + 4, 5, "names a symbol");
     DAMAGED(get(&good, section_at(1) + 24, 4) + 4, 0xFFFFFFFFu,
             "names a symbol");
 #undef DAMAGED
+    text_free(&good);
+    text_free(&first);
+    text_free(&second);
+    text_free(&error);
+}
+
+/* One byte of an object changed, at every position and to three values:
+   one bit turned, zero and all bits. The join takes the object or refuses
+   it with a reason, and the sanitizer builds catch a read outside it. The
+   object holds code with relocations, a section with a long name, a
+   COMDAT with its section symbol, directives and a line table. */
+static void test_damaged_bytes(void)
+{
+    static const char lines[] = "\4\0\0\0\xf3\0\0\0\4\0\0\0\0\0\0\0";
+    struct t_object a = {AMD64,
+                         {{".text", CODE, call, 8, {{1, 2}, {1, 3}}, 2},
+                          {".data$a_long_name", DATA, "u", 1, {{0}}, 0},
+                          {".rdata", RDATA | COMDAT, "u", 1, {{0}}, 0},
+                          {".drectve", INFO, " /EXPORT:foo \"/a b\"", 19, {{0}}, 0},
+                          {".debug$S", DEBUG, lines, 16, {{0}}, 0}}, 5,
+                         {{".text", 0, 1, STATIC, true, 0, 0},
+                          {"a_long_function_name", 0, 0, EXTERNAL, false, 0, 0},
+                          {"printf", 0, 0, EXTERNAL, false, 0, 0},
+                          {"foo", 0, 1, EXTERNAL, false, 0, 0},
+                          {".rdata", 0, 3, STATIC, true, ANY, 0},
+                          {"once", 0, 3, EXTERNAL, false, 0, 0}}, 6};
+    struct t_object b = {AMD64, {{".text", CODE, call, 8, {{0}}, 0}}, 1,
+                         {{"a_long_function_name", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct text good = {0};
+    struct text first = {0};
+    struct text second = {0};
+    struct text error = {0};
+    size_t at;
+    int value;
+
+    build(&a, &good);
+    build(&b, &second);
+    CHECK(join_cut(&good, good.length, &second, &error));
+    CHECK_STR(text_cstr(&error), "");
+    for (at = 0; at < good.length; at++) {
+        for (value = 0; value < 3; value++) {
+            char byte = value == 0 ? (char)(good.data[at] ^ 1)
+                        : value == 1 ? 0 : (char)0xFF;
+            if (byte == good.data[at]) {
+                continue;
+            }
+            first.length = 0;
+            text_append_bytes(&first, good.data, good.length);
+            first.data[at] = byte;
+            if (!join_cut(&first, first.length, &second, &error)) {
+                CHECK(error.length > 0);
+            }
+        }
+    }
     text_free(&good);
     text_free(&first);
     text_free(&second);
@@ -997,6 +1104,17 @@ static void test_archive_index(void)
     /* A member whose size cuts its object short. */
     DAMAGE(bar_at + 48, "40        ", 10);
     CHECK(!exports_of(&damaged, damaged.length, &out));
+    /* A member shorter than the header of an object. */
+    DAMAGE(bar_at + 48, "19        ", 10);
+    CHECK(!exports_of(&damaged, damaged.length, &out));
+    /* A long name of bar in the member of foo, at an offset inside the
+       size field of the string table and at one past the table. */
+    DAMAGE(foo_at + 60 + get(&archive, foo_at + 60 + 8, 4) + 18,
+           "\0\0\0\0\2\0\0\0", 8);
+    CHECK(!exports_of(&damaged, damaged.length, &out));
+    DAMAGE(foo_at + 60 + get(&archive, foo_at + 60 + 8, 4) + 18,
+           "\0\0\0\0\x40\0\0\0", 8);
+    CHECK(!exports_of(&damaged, damaged.length, &out));
 #undef DAMAGE
     text_free(&archive);
     text_free(&damaged);
@@ -1010,11 +1128,13 @@ void test_coff(void)
     test_comdat();
     test_features();
     test_codeview();
+    test_codeview_kinds();
     test_refusals();
     test_uninitialised();
     test_long_names();
     test_section_limit();
     test_truncated();
+    test_damaged_bytes();
     test_associative_parent();
     test_archive_index();
 }
