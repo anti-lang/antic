@@ -383,3 +383,5 @@ matrix_flow_walk_with_an_iter_of_two_parameters_refused T096 A loop over a struc
 matrix_flow_walk_with_a_next_of_two_parameters_refused T096 A loop over an iterator whose `operator fn next` is refused gets a second message.
 matrix_types_generic_receiver_with_two_paths_to_its_interface_refused T113 A receiver with two paths to the interface of a constraint gets a second message in the copy.
 matrix_classes_changed_hook_of_the_second_field_trace_writes T114 The `changed` hook gets the record of the first field of the class for a write of any of its fields.
+anti_bind_huge_enum T117 An enum with a value above the signed 64-bit range is bound with the base `c_int`, and its struct lays out wrong.
+anti_bind_nested_enum T118 The enumerators of an enum without a name inside a struct are no constants of the binding.

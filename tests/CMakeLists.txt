@@ -2704,13 +2704,14 @@ endforeach()
 # anti bind --header writes the header that antic --lib writes for the
 # same module, from the library file alone. The other cases bind
 # tests/bind/layout.h and raymath through clang and a part of
-# raylib_api.json, and check the refusals.
+# raylib_api.json, and check the refusals. forms binds tests/bind/forms.h,
+# and huge_enum and nested_enum each bind a header of one enum.
 set(anti_bind_cc ${ANTIC_TEST_CC})
 if(APPLE)
     list(APPEND anti_bind_cc -mmacosx-version-min=11.0)
 endif()
 set(anti_bind_cases header clang escaped_path raymath raylib api
-    api_malformed clang_malformed)
+    api_malformed clang_malformed forms huge_enum nested_enum)
 if(NOT WIN32)
     # The cases refusals and ast_malformed stand a shell script in for
     # clang.

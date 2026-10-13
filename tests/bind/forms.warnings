@@ -1,0 +1,10 @@
+anti: forms.h: warning: the macro `FORMS_LITERAL` takes arguments and is skipped
+anti: forms.h: warning: the variable `forms_counter` is skipped
+anti: forms.h: warning: the macro `FORMS_H` has no value and is skipped
+anti: forms.h: warning: the macro `FORMS_EMPTY` has no value and is skipped
+anti: forms.h: warning: the macro `FORMS_LOOP_A` is no constant and is skipped
+anti: forms.h: warning: the macro `FORMS_LOOP_B` is no constant and is skipped
+anti: forms.h: warning: the macro `FORMS_SHORT` is no constant and is skipped
+anti: forms.h: warning: the macro `FORMS_LONG` is no constant and is skipped
+anti: forms.h: warning: the macro `FORMS_TEXT` is no constant and is skipped
+anti: forms.h: warning: the macro `FORMS_FLOAT_IN_INT` is no constant and is skipped
