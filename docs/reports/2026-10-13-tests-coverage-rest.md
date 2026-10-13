@@ -1,6 +1,6 @@
 # The regions of the rest of antic and of anti that no test reached
 
-Five sessions of a step of the test run, all on 2026-10-13, on `main`. The
+Six sessions of a step of the test run, all on 2026-10-13, on `main`. The
 step does for the rest of `src/antic/` and for `src/anti/` what the step of
 `docs/reports/2026-10-13-tests-coverage-front-end.md` did for the front
 end. Each session ran `./c coverage` at its start and at its end, read the
@@ -149,123 +149,165 @@ rest.
 - The matrix program
   `values_float_the_optimizer_knows_out_of_unsigned_range`, three tests.
 
+## What the sixth session added
+
+- `anti_bind_api_types` with a description, a module and its warnings in
+  `tests/bind/`. The description holds one function per spelling of a C
+  type: `long long` with and without `signed`, a bare `signed` and a bare
+  `unsigned`, a qualifier after a typedef name, an empty parameter list
+  and nine spellings that do not parse.
+- `anti_doc_prose_html` and `anti_doc_prose_dev` with the module `prose`
+  of `tests/doc/src/`. Its doc text holds an item of a list in two lines,
+  an empty code span, a bracket that starts no link, a link whose scheme
+  stands in capitals, a link to a page beside this one and a code block
+  that never closes. `anti_doc_wrapped_link` with the module `wrapped`
+  shows T124.
+- Three cases of `tests/anti-symbols/messages.cmake`. Two hold a program
+  whose notice ends in the line of its package or of an attribution. The
+  third holds a build id with a letter that is no hex digit.
+- Three cases of `tests/anti_messages.cmake`. They hold a notice without
+  its end marker and a notice whose last line has no newline. The third
+  holds a record of sources whose last line has neither a newline nor a
+  URL.
+- `library_forms_modules` in `tests/modules/`, two tests. The library
+  holds a constant that is the negative and one that is the complement of
+  a size, a struct that names its own copy, a singleton, a `provides`
+  line and an `inject final` field.
+- `trace_package_modules`, two tests: the pattern of `--trace` names a
+  package above the module of a class that asks for no call hooks.
+  `tests/run_modules.cmake` now passes the options of a library to its
+  dev object as well as to its library file.
+- Two programs in `tests/matrix/`, six tests, each with a case under
+  `--trace writes`. `classes_changed_hook_of_a_transient_field` writes a
+  `transient` field of a traced class, and
+  `classes_changed_hook_of_a_bitfield` a bitfield, which shows T114 again.
+- `rows<T>` in `generics_copies_with_the_same_code`: two copies whose
+  array lengths differ in the second size of a product alone.
+- `error_layout_sum` and `error_layout_span` in `tests/errors/`. The
+  first holds a bitfield after two arrays whose sizes add up past 64
+  bits. The second holds a bitfield of 64 bits that starts at the second
+  bit of a packed struct.
+
 ## The coverage of each file
 
 The table holds every file of `src/antic/` outside the front end and every
 file of `src/anti/`, with the regions that no test reached at the start of
-the step and after each of the five sessions, and the share of regions
+the step and after each of the six sessions, and the share of regions
 and of lines the suite reaches. `build/drive/logs/` holds the rows in
-`c4-before-summary.txt` and in `c5-`, `c6-`, `c7-` and `c8-` with
+`c4-before-summary.txt` and in `c5-`, `c6-`, `c7-`, `c8-` and `c9-` with
 `before-summary.txt` and `after-summary.txt`. One list of unreached
-regions per file stands in the directories `c5-` to `c8-` with
+regions per file stands in the directories `c5-` to `c9-` with
 `before-missed/` and `after-missed/`.
 
-| File | Regions | Missed at the start | After session 1 | After session 2 | After session 3 | After session 4 | After session 5 | Regions at the start | Regions now | Lines at the start | Lines now |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| `anti/bind.c` | 91 | 12 | 12 | 12 | 8 | 8 | 7 | 86.81% | 92.31% | 88.68% | 93.71% |
-| `anti/bindapi.c` | 527 | 46 | 46 | 46 | 46 | 14 | 14 | 91.27% | 97.34% | 89.29% | 97.69% |
-| `anti/bindclang.c` | 1250 | 100 | 100 | 100 | 61 | 61 | 41 | 92.00% | 96.72% | 93.29% | 97.63% |
-| `anti/bindexpr.c` | 507 | 51 | 51 | 51 | 12 | 12 | 12 | 89.94% | 97.63% | 89.21% | 97.26% |
-| `anti/bindmodel.c` | 32 | 2 | 2 | 2 | 2 | 2 | 2 | 93.75% | 93.75% | 88.68% | 88.68% |
-| `anti/bindtype.c` | 462 | 24 | 24 | 24 | 24 | 24 | 24 | 94.81% | 94.81% | 93.44% | 93.44% |
-| `anti/bindwrite.c` | 501 | 48 | 48 | 48 | 35 | 35 | 35 | 90.42% | 93.01% | 92.56% | 94.46% |
-| `anti/build.c` | 563 | 39 | 39 | 39 | 39 | 39 | 26 | 93.07% | 95.38% | 94.82% | 95.86% |
-| `anti/check.c` | 271 | 22 | 22 | 18 | 18 | 18 | 18 | 91.88% | 93.36% | 90.31% | 91.84% |
-| `anti/cursor.c` | 63 | 2 | 2 | 2 | 1 | 1 | 1 | 96.83% | 98.41% | 96.61% | 96.61% |
-| `anti/deps.c` | 775 | 45 | 45 | 45 | 45 | 39 | 33 | 94.19% | 95.74% | 93.40% | 95.67% |
-| `anti/doc.c` | 550 | 75 | 75 | 24 | 24 | 24 | 19 | 86.36% | 96.55% | 85.74% | 94.99% |
-| `anti/files.c` | 259 | 21 | 21 | 21 | 21 | 21 | 21 | 91.89% | 91.89% | 91.53% | 91.53% |
-| `anti/fmt.c` | 1335 | 36 | 36 | 36 | 36 | 19 | 19 | 97.30% | 98.58% | 97.02% | 98.47% |
-| `anti/jsontree.c` | 223 | 13 | 13 | 13 | 13 | 13 | 10 | 94.17% | 95.52% | 91.63% | 94.14% |
-| `anti/licensing.c` | 251 | 6 | 6 | 6 | 6 | 6 | 3 | 97.61% | 98.80% | 98.00% | 99.33% |
-| `anti/main.c` | 759 | 19 | 19 | 17 | 17 | 17 | 17 | 97.50% | 97.76% | 96.43% | 96.68% |
-| `anti/manifest.c` | 237 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
-| `anti/memreport.c` | 151 | 12 | 12 | 12 | 12 | 12 | 2 | 92.05% | 98.68% | 92.72% | 99.34% |
-| `anti/platform.c` | 73 | 1 | 1 | 1 | 1 | 1 | 1 | 98.63% | 98.63% | 96.43% | 96.43% |
-| `anti/project.c` | 26 | 3 | 3 | 3 | 3 | 3 | 3 | 88.46% | 88.46% | 89.09% | 89.09% |
-| `anti/repo.c` | 287 | 20 | 20 | 20 | 20 | 19 | 19 | 93.03% | 93.38% | 89.73% | 90.33% |
-| `anti/sdk.c` | 154 | 15 | 15 | 15 | 15 | 15 | 13 | 90.26% | 91.56% | 92.24% | 93.10% |
-| `anti/symmap.c` | 271 | 26 | 26 | 26 | 26 | 26 | 20 | 90.41% | 92.62% | 94.93% | 96.42% |
-| `anti/syms.c` | 662 | 68 | 68 | 68 | 34 | 34 | 23 | 89.73% | 96.53% | 91.35% | 96.47% |
-| `anti/test.c` | 148 | 20 | 20 | 20 | 20 | 20 | 20 | 86.49% | 86.49% | 87.17% | 87.17% |
-| `anti/units.c` | 137 | 14 | 14 | 14 | 14 | 14 | 10 | 89.78% | 92.70% | 91.19% | 95.60% |
-| `anti/zip.c` | 391 | 35 | 35 | 35 | 3 | 3 | 3 | 91.05% | 99.23% | 93.44% | 99.23% |
-| `antic/abi.c` | 231 | 5 | 5 | 5 | 5 | 5 | 5 | 97.84% | 97.84% | 100.00% | 100.00% |
-| `antic/alloc.c` | 39 | 2 | 2 | 2 | 2 | 2 | 2 | 94.87% | 94.87% | 100.00% | 100.00% |
-| `antic/antic.c` | 112 | 4 | 4 | 4 | 4 | 4 | 0 | 96.43% | 100.00% | 97.24% | 100.00% |
-| `antic/antl.c` | 87 | 1 | 1 | 1 | 0 | 0 | 0 | 98.85% | 100.00% | 98.37% | 100.00% |
-| `antic/antl_io.c` | 91 | 3 | 3 | 3 | 3 | 3 | 3 | 96.70% | 96.70% | 96.88% | 96.88% |
-| `antic/antl_read.c` | 930 | 77 | 77 | 77 | 20 | 20 | 20 | 91.72% | 97.85% | 88.68% | 98.25% |
-| `antic/antl_read_ir.c` | 988 | 61 | 61 | 61 | 31 | 31 | 31 | 93.83% | 96.86% | 90.23% | 94.71% |
-| `antic/antl_tree.c` | 1117 | 82 | 82 | 82 | 41 | 41 | 41 | 92.66% | 96.33% | 94.42% | 97.70% |
-| `antic/antl_verify.c` | 776 | 37 | 37 | 37 | 19 | 19 | 19 | 95.23% | 97.55% | 94.66% | 97.33% |
-| `antic/antl_write.c` | 615 | 21 | 21 | 21 | 21 | 21 | 21 | 96.59% | 96.59% | 97.56% | 97.56% |
-| `antic/applesdk.c` | 59 | 3 | 3 | 3 | 3 | 3 | 3 | 94.92% | 94.92% | 96.15% | 96.15% |
-| `antic/arena.c` | 23 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
-| `antic/arith.c` | 228 | 6 | 6 | 6 | 6 | 6 | 6 | 97.37% | 97.37% | 100.00% | 100.00% |
-| `antic/ast_dump.c` | 685 | 105 | 9 | 9 | 9 | 9 | 9 | 84.67% | 98.69% | 81.40% | 98.78% |
-| `antic/ast_walk.c` | 134 | 3 | 3 | 3 | 3 | 3 | 3 | 97.76% | 97.76% | 98.79% | 98.79% |
-| `antic/coff.c` | 897 | 47 | 47 | 47 | 47 | 47 | 27 | 94.76% | 96.99% | 94.59% | 96.69% |
-| `antic/cpu.c` | 18 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
-| `antic/diagnostic.c` | 24 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
-| `antic/docpage.c` | 486 | 49 | 49 | 14 | 14 | 14 | 14 | 89.92% | 97.12% | 90.54% | 98.25% |
-| `antic/driver.c` | 1261 | 101 | 101 | 55 | 55 | 55 | 50 | 91.99% | 96.03% | 89.99% | 94.24% |
-| `antic/driver_index.c` | 103 | 10 | 10 | 4 | 4 | 4 | 4 | 90.29% | 96.12% | 93.15% | 97.26% |
-| `antic/driver_library.c` | 259 | 31 | 31 | 14 | 14 | 14 | 14 | 88.03% | 94.59% | 91.23% | 94.79% |
-| `antic/driver_link.c` | 328 | 57 | 57 | 56 | 56 | 56 | 56 | 82.62% | 82.93% | 85.33% | 85.33% |
-| `antic/driver_search.c` | 248 | 21 | 21 | 12 | 12 | 12 | 12 | 91.53% | 95.16% | 89.59% | 93.68% |
-| `antic/header.c` | 1068 | 63 | 63 | 45 | 45 | 45 | 29 | 94.10% | 97.28% | 95.88% | 98.28% |
-| `antic/ir.c` | 415 | 9 | 8 | 8 | 8 | 8 | 8 | 97.83% | 98.07% | 98.29% | 98.55% |
-| `antic/ir_fold.c` | 98 | 3 | 0 | 0 | 0 | 0 | 0 | 96.94% | 100.00% | 97.59% | 100.00% |
-| `antic/ir_print.c` | 368 | 6 | 6 | 6 | 6 | 6 | 6 | 98.37% | 98.37% | 99.63% | 99.63% |
-| `antic/ir_verify.c` | 724 | 30 | 30 | 30 | 23 | 23 | 1 | 95.86% | 99.86% | 91.69% | 99.71% |
-| `antic/layout.c` | 485 | 34 | 33 | 33 | 33 | 18 | 18 | 92.99% | 96.29% | 92.97% | 95.86% |
-| `antic/linker.c` | 407 | 12 | 12 | 12 | 12 | 3 | 3 | 97.05% | 99.26% | 97.90% | 99.44% |
-| `antic/llvm_debug.c` | 201 | 4 | 4 | 4 | 4 | 4 | 4 | 98.01% | 98.01% | 97.30% | 97.30% |
-| `antic/llvm_emit.c` | 1920 | 87 | 87 | 87 | 87 | 86 | 86 | 95.47% | 95.52% | 96.05% | 96.05% |
-| `antic/llvm_run.c` | 85 | 6 | 6 | 6 | 6 | 6 | 6 | 92.94% | 92.94% | 94.96% | 94.96% |
-| `antic/llvm_target.c` | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
-| `antic/lower.c` | 888 | 11 | 9 | 9 | 9 | 9 | 9 | 98.76% | 98.99% | 99.45% | 99.45% |
-| `antic/lower_check.c` | 88 | 3 | 3 | 3 | 3 | 3 | 3 | 96.59% | 96.59% | 100.00% | 100.00% |
-| `antic/lower_class.c` | 251 | 14 | 14 | 13 | 13 | 13 | 13 | 94.42% | 94.82% | 97.27% | 97.48% |
-| `antic/lower_desc.c` | 819 | 20 | 17 | 17 | 17 | 17 | 17 | 97.56% | 97.92% | 97.73% | 98.05% |
-| `antic/lower_eq.c` | 178 | 4 | 3 | 3 | 3 | 3 | 3 | 97.75% | 98.31% | 97.49% | 97.91% |
-| `antic/lower_error.c` | 114 | 3 | 3 | 3 | 3 | 3 | 3 | 97.37% | 97.37% | 97.87% | 97.87% |
-| `antic/lower_expr.c` | 1256 | 29 | 26 | 26 | 26 | 26 | 26 | 97.69% | 97.93% | 98.85% | 98.85% |
-| `antic/lower_function.c` | 225 | 1 | 1 | 1 | 1 | 1 | 1 | 99.56% | 99.56% | 99.02% | 99.02% |
-| `antic/lower_hash.c` | 160 | 8 | 7 | 7 | 7 | 7 | 7 | 95.00% | 95.62% | 96.08% | 96.64% |
-| `antic/lower_hook.c` | 120 | 14 | 10 | 10 | 10 | 10 | 10 | 88.33% | 91.67% | 88.60% | 92.98% |
-| `antic/lower_owning.c` | 330 | 11 | 10 | 9 | 9 | 9 | 9 | 96.67% | 97.27% | 97.15% | 98.10% |
-| `antic/lower_pattern.c` | 33 | 1 | 1 | 1 | 1 | 1 | 1 | 96.97% | 96.97% | 100.00% | 100.00% |
-| `antic/lower_place.c` | 331 | 29 | 13 | 13 | 13 | 13 | 13 | 91.24% | 96.07% | 88.43% | 95.37% |
-| `antic/lower_simd.c` | 202 | 25 | 6 | 6 | 6 | 6 | 6 | 87.62% | 97.03% | 91.22% | 97.23% |
-| `antic/lower_stmt.c` | 1053 | 18 | 12 | 12 | 12 | 12 | 12 | 98.29% | 98.86% | 97.94% | 98.51% |
-| `antic/lower_sync.c` | 118 | 3 | 2 | 2 | 2 | 2 | 2 | 97.46% | 98.31% | 100.00% | 100.00% |
-| `antic/lower_worker.c` | 127 | 5 | 3 | 3 | 3 | 3 | 3 | 96.06% | 97.64% | 100.00% | 100.00% |
-| `antic/main.c` | 400 | 6 | 6 | 5 | 5 | 5 | 5 | 98.50% | 98.75% | 98.59% | 98.80% |
-| `antic/memcheck.c` | 158 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
-| `antic/modpath.c` | 121 | 3 | 3 | 1 | 1 | 1 | 1 | 97.52% | 99.17% | 97.92% | 100.00% |
-| `antic/notice.c` | 58 | 1 | 1 | 1 | 1 | 1 | 1 | 98.28% | 98.28% | 100.00% | 100.00% |
-| `antic/optimize.c` | 1233 | 20 | 20 | 20 | 20 | 20 | 17 | 98.38% | 98.62% | 98.10% | 98.27% |
-| `antic/platform.c` | 274 | 49 | 49 | 47 | 47 | 47 | 46 | 82.12% | 83.21% | 84.32% | 84.59% |
-| `antic/ptrset.c` | 81 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
-| `antic/reach.c` | 160 | 1 | 1 | 1 | 1 | 1 | 0 | 99.38% | 100.00% | 98.75% | 100.00% |
-| `antic/rt_abi.c` | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
-| `antic/sha256.c` | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
-| `antic/target.c` | 54 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
-| `antic/text.c` | 72 | 6 | 6 | 6 | 6 | 6 | 6 | 91.67% | 91.67% | 91.94% | 91.94% |
-| `antic/userdirs.c` | 133 | 11 | 11 | 7 | 7 | 7 | 7 | 91.73% | 94.74% | 93.89% | 96.95% |
-| `antic/warnings.c` | 98 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
-| `antic/whole.c` | 767 | 42 | 42 | 42 | 42 | 37 | 37 | 94.52% | 95.18% | 95.26% | 96.02% |
-| `antic/whole_tables.c` | 997 | 46 | 46 | 46 | 46 | 41 | 39 | 95.39% | 96.09% | 96.28% | 97.25% |
-| All 96 | 37400 | 2139 | 1979 | 1779 | 1463 | 1372 | 1214 | 94.28% | 96.75% | 94.51% | 96.98% |
+| File | Regions | Missed at the start | After session 1 | After session 2 | After session 3 | After session 4 | After session 5 | After session 6 | Regions at the start | Regions now | Lines at the start | Lines now |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `anti/bind.c` | 91 | 12 | 12 | 12 | 8 | 8 | 7 | 7 | 86.81% | 92.31% | 88.68% | 93.71% |
+| `anti/bindapi.c` | 527 | 46 | 46 | 46 | 46 | 14 | 14 | 10 | 91.27% | 98.10% | 89.29% | 98.53% |
+| `anti/bindclang.c` | 1250 | 100 | 100 | 100 | 61 | 61 | 41 | 41 | 92.00% | 96.72% | 93.29% | 97.63% |
+| `anti/bindexpr.c` | 507 | 51 | 51 | 51 | 12 | 12 | 12 | 12 | 89.94% | 97.63% | 89.21% | 97.26% |
+| `anti/bindmodel.c` | 32 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 93.75% | 93.75% | 88.68% | 88.68% |
+| `anti/bindtype.c` | 462 | 24 | 24 | 24 | 24 | 24 | 24 | 3 | 94.81% | 99.35% | 93.44% | 99.77% |
+| `anti/bindwrite.c` | 501 | 48 | 48 | 48 | 35 | 35 | 35 | 35 | 90.42% | 93.01% | 92.56% | 94.46% |
+| `anti/build.c` | 563 | 39 | 39 | 39 | 39 | 39 | 26 | 26 | 93.07% | 95.38% | 94.82% | 95.86% |
+| `anti/check.c` | 271 | 22 | 22 | 18 | 18 | 18 | 18 | 18 | 91.88% | 93.36% | 90.31% | 91.84% |
+| `anti/cursor.c` | 63 | 2 | 2 | 2 | 1 | 1 | 1 | 1 | 96.83% | 98.41% | 96.61% | 96.61% |
+| `anti/deps.c` | 775 | 45 | 45 | 45 | 45 | 39 | 33 | 33 | 94.19% | 95.74% | 93.40% | 95.67% |
+| `anti/doc.c` | 550 | 75 | 75 | 24 | 24 | 24 | 19 | 7 | 86.36% | 98.73% | 85.74% | 98.33% |
+| `anti/files.c` | 259 | 21 | 21 | 21 | 21 | 21 | 21 | 21 | 91.89% | 91.89% | 91.53% | 91.53% |
+| `anti/fmt.c` | 1335 | 36 | 36 | 36 | 36 | 19 | 19 | 19 | 97.30% | 98.58% | 97.02% | 98.47% |
+| `anti/jsontree.c` | 223 | 13 | 13 | 13 | 13 | 13 | 10 | 10 | 94.17% | 95.52% | 91.63% | 94.14% |
+| `anti/licensing.c` | 251 | 6 | 6 | 6 | 6 | 6 | 3 | 3 | 97.61% | 98.80% | 98.00% | 99.33% |
+| `anti/main.c` | 759 | 19 | 19 | 17 | 17 | 17 | 17 | 17 | 97.50% | 97.76% | 96.43% | 96.68% |
+| `anti/manifest.c` | 237 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
+| `anti/memreport.c` | 151 | 12 | 12 | 12 | 12 | 12 | 2 | 2 | 92.05% | 98.68% | 92.72% | 99.34% |
+| `anti/platform.c` | 73 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 98.63% | 98.63% | 96.43% | 96.43% |
+| `anti/project.c` | 26 | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 88.46% | 88.46% | 89.09% | 89.09% |
+| `anti/repo.c` | 287 | 20 | 20 | 20 | 20 | 19 | 19 | 19 | 93.03% | 93.38% | 89.73% | 90.33% |
+| `anti/sdk.c` | 154 | 15 | 15 | 15 | 15 | 15 | 13 | 13 | 90.26% | 91.56% | 92.24% | 93.10% |
+| `anti/symmap.c` | 271 | 26 | 26 | 26 | 26 | 26 | 20 | 9 | 90.41% | 96.68% | 94.93% | 97.91% |
+| `anti/syms.c` | 662 | 68 | 68 | 68 | 34 | 34 | 23 | 23 | 89.73% | 96.53% | 91.35% | 96.47% |
+| `anti/test.c` | 148 | 20 | 20 | 20 | 20 | 20 | 20 | 20 | 86.49% | 86.49% | 87.17% | 87.17% |
+| `anti/units.c` | 137 | 14 | 14 | 14 | 14 | 14 | 10 | 10 | 89.78% | 92.70% | 91.19% | 95.60% |
+| `anti/zip.c` | 391 | 35 | 35 | 35 | 3 | 3 | 3 | 3 | 91.05% | 99.23% | 93.44% | 99.23% |
+| `antic/abi.c` | 231 | 5 | 5 | 5 | 5 | 5 | 5 | 5 | 97.84% | 97.84% | 100.00% | 100.00% |
+| `antic/alloc.c` | 39 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 94.87% | 94.87% | 100.00% | 100.00% |
+| `antic/antic.c` | 112 | 4 | 4 | 4 | 4 | 4 | 0 | 0 | 96.43% | 100.00% | 97.24% | 100.00% |
+| `antic/antl.c` | 87 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 98.85% | 100.00% | 98.37% | 100.00% |
+| `antic/antl_io.c` | 91 | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 96.70% | 96.70% | 96.88% | 96.88% |
+| `antic/antl_read.c` | 930 | 77 | 77 | 77 | 20 | 20 | 20 | 15 | 91.72% | 98.39% | 88.68% | 98.56% |
+| `antic/antl_read_ir.c` | 988 | 61 | 61 | 61 | 31 | 31 | 31 | 23 | 93.83% | 97.67% | 90.23% | 95.32% |
+| `antic/antl_tree.c` | 1117 | 82 | 82 | 82 | 41 | 41 | 41 | 41 | 92.66% | 96.33% | 94.42% | 97.70% |
+| `antic/antl_verify.c` | 776 | 37 | 37 | 37 | 19 | 19 | 19 | 19 | 95.23% | 97.55% | 94.66% | 97.33% |
+| `antic/antl_write.c` | 615 | 21 | 21 | 21 | 21 | 21 | 21 | 17 | 96.59% | 97.24% | 97.56% | 98.05% |
+| `antic/applesdk.c` | 59 | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 94.92% | 94.92% | 96.15% | 96.15% |
+| `antic/arena.c` | 23 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
+| `antic/arith.c` | 228 | 6 | 6 | 6 | 6 | 6 | 6 | 6 | 97.37% | 97.37% | 100.00% | 100.00% |
+| `antic/ast_dump.c` | 685 | 105 | 9 | 9 | 9 | 9 | 9 | 9 | 84.67% | 98.69% | 81.40% | 98.78% |
+| `antic/ast_walk.c` | 134 | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 97.76% | 97.76% | 98.79% | 98.79% |
+| `antic/coff.c` | 897 | 47 | 47 | 47 | 47 | 47 | 27 | 27 | 94.76% | 96.99% | 94.59% | 96.69% |
+| `antic/cpu.c` | 18 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
+| `antic/diagnostic.c` | 24 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
+| `antic/docpage.c` | 486 | 49 | 49 | 14 | 14 | 14 | 14 | 14 | 89.92% | 97.12% | 90.54% | 98.25% |
+| `antic/driver.c` | 1261 | 101 | 101 | 55 | 55 | 55 | 50 | 50 | 91.99% | 96.03% | 89.99% | 94.24% |
+| `antic/driver_index.c` | 103 | 10 | 10 | 4 | 4 | 4 | 4 | 4 | 90.29% | 96.12% | 93.15% | 97.26% |
+| `antic/driver_library.c` | 259 | 31 | 31 | 14 | 14 | 14 | 14 | 14 | 88.03% | 94.59% | 91.23% | 94.79% |
+| `antic/driver_link.c` | 328 | 57 | 57 | 56 | 56 | 56 | 56 | 56 | 82.62% | 82.93% | 85.33% | 85.33% |
+| `antic/driver_search.c` | 248 | 21 | 21 | 12 | 12 | 12 | 12 | 12 | 91.53% | 95.16% | 89.59% | 93.68% |
+| `antic/header.c` | 1068 | 63 | 63 | 45 | 45 | 45 | 29 | 29 | 94.10% | 97.28% | 95.88% | 98.28% |
+| `antic/ir.c` | 415 | 9 | 8 | 8 | 8 | 8 | 8 | 8 | 97.83% | 98.07% | 98.29% | 98.55% |
+| `antic/ir_fold.c` | 98 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 96.94% | 100.00% | 97.59% | 100.00% |
+| `antic/ir_print.c` | 368 | 6 | 6 | 6 | 6 | 6 | 6 | 6 | 98.37% | 98.37% | 99.63% | 99.63% |
+| `antic/ir_verify.c` | 724 | 30 | 30 | 30 | 23 | 23 | 1 | 1 | 95.86% | 99.86% | 91.69% | 99.71% |
+| `antic/layout.c` | 485 | 34 | 33 | 33 | 33 | 18 | 18 | 13 | 92.99% | 97.32% | 92.97% | 97.12% |
+| `antic/linker.c` | 407 | 12 | 12 | 12 | 12 | 3 | 3 | 3 | 97.05% | 99.26% | 97.90% | 99.44% |
+| `antic/llvm_debug.c` | 201 | 4 | 4 | 4 | 4 | 4 | 4 | 4 | 98.01% | 98.01% | 97.30% | 97.30% |
+| `antic/llvm_emit.c` | 1920 | 87 | 87 | 87 | 87 | 86 | 86 | 86 | 95.47% | 95.52% | 96.05% | 96.05% |
+| `antic/llvm_run.c` | 85 | 6 | 6 | 6 | 6 | 6 | 6 | 6 | 92.94% | 92.94% | 94.96% | 94.96% |
+| `antic/llvm_target.c` | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
+| `antic/lower.c` | 888 | 11 | 9 | 9 | 9 | 9 | 9 | 9 | 98.76% | 98.99% | 99.45% | 99.45% |
+| `antic/lower_check.c` | 88 | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 96.59% | 96.59% | 100.00% | 100.00% |
+| `antic/lower_class.c` | 251 | 14 | 14 | 13 | 13 | 13 | 13 | 13 | 94.42% | 94.82% | 97.27% | 97.48% |
+| `antic/lower_desc.c` | 819 | 20 | 17 | 17 | 17 | 17 | 17 | 17 | 97.56% | 97.92% | 97.73% | 98.05% |
+| `antic/lower_eq.c` | 178 | 4 | 3 | 3 | 3 | 3 | 3 | 3 | 97.75% | 98.31% | 97.49% | 97.91% |
+| `antic/lower_error.c` | 114 | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 97.37% | 97.37% | 97.87% | 97.87% |
+| `antic/lower_expr.c` | 1256 | 29 | 26 | 26 | 26 | 26 | 26 | 26 | 97.69% | 97.93% | 98.85% | 98.85% |
+| `antic/lower_function.c` | 225 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 99.56% | 99.56% | 99.02% | 99.02% |
+| `antic/lower_hash.c` | 160 | 8 | 7 | 7 | 7 | 7 | 7 | 7 | 95.00% | 95.62% | 96.08% | 96.64% |
+| `antic/lower_hook.c` | 120 | 14 | 10 | 10 | 10 | 10 | 10 | 3 | 88.33% | 97.50% | 88.60% | 96.49% |
+| `antic/lower_owning.c` | 330 | 11 | 10 | 9 | 9 | 9 | 9 | 9 | 96.67% | 97.27% | 97.15% | 98.10% |
+| `antic/lower_pattern.c` | 33 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 96.97% | 96.97% | 100.00% | 100.00% |
+| `antic/lower_place.c` | 331 | 29 | 13 | 13 | 13 | 13 | 13 | 13 | 91.24% | 96.07% | 88.43% | 95.37% |
+| `antic/lower_simd.c` | 202 | 25 | 6 | 6 | 6 | 6 | 6 | 6 | 87.62% | 97.03% | 91.22% | 97.23% |
+| `antic/lower_stmt.c` | 1053 | 18 | 12 | 12 | 12 | 12 | 12 | 12 | 98.29% | 98.86% | 97.94% | 98.51% |
+| `antic/lower_sync.c` | 118 | 3 | 2 | 2 | 2 | 2 | 2 | 2 | 97.46% | 98.31% | 100.00% | 100.00% |
+| `antic/lower_worker.c` | 127 | 5 | 3 | 3 | 3 | 3 | 3 | 3 | 96.06% | 97.64% | 100.00% | 100.00% |
+| `antic/main.c` | 400 | 6 | 6 | 5 | 5 | 5 | 5 | 5 | 98.50% | 98.75% | 98.59% | 98.80% |
+| `antic/memcheck.c` | 158 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
+| `antic/modpath.c` | 121 | 3 | 3 | 1 | 1 | 1 | 1 | 1 | 97.52% | 99.17% | 97.92% | 100.00% |
+| `antic/notice.c` | 58 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 98.28% | 98.28% | 100.00% | 100.00% |
+| `antic/optimize.c` | 1233 | 20 | 20 | 20 | 20 | 20 | 17 | 17 | 98.38% | 98.62% | 98.10% | 98.27% |
+| `antic/platform.c` | 274 | 49 | 49 | 47 | 47 | 47 | 46 | 46 | 82.12% | 83.21% | 84.32% | 84.59% |
+| `antic/ptrset.c` | 81 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
+| `antic/reach.c` | 160 | 1 | 1 | 1 | 1 | 1 | 0 | 0 | 99.38% | 100.00% | 98.75% | 100.00% |
+| `antic/rt_abi.c` | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
+| `antic/sha256.c` | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
+| `antic/target.c` | 54 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
+| `antic/text.c` | 72 | 6 | 6 | 6 | 6 | 6 | 6 | 6 | 91.67% | 91.67% | 91.94% | 91.94% |
+| `antic/userdirs.c` | 133 | 11 | 11 | 7 | 7 | 7 | 7 | 7 | 91.73% | 94.74% | 93.89% | 96.95% |
+| `antic/warnings.c` | 98 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
+| `antic/whole.c` | 767 | 42 | 42 | 42 | 42 | 37 | 37 | 36 | 94.52% | 95.31% | 95.26% | 96.18% |
+| `antic/whole_tables.c` | 997 | 46 | 46 | 46 | 46 | 41 | 39 | 39 | 95.39% | 96.09% | 96.28% | 97.25% |
+| All 96 | 37400 | 2139 | 1979 | 1779 | 1463 | 1372 | 1214 | 1136 | 94.28% | 96.96% | 94.51% | 97.16% |
 
 All files of the measurement, `src/rt/` and the front end included, went
-from 3685 unreached regions of 66919 to 3526, to 3324, to 3002, to 2913
-and then to 2752. That is 94.49%, 94.73%, 95.03%, 95.51%, 95.65% and
-95.89% of the regions, and 94.51%, 94.83%, 95.11%, 95.63%, 95.78% and
-96.02% of the lines. The start of the fifth session measured 2911, two
-regions of `rt/conf.c` fewer than the end of the fourth. The
+from 3685 unreached regions of 66919 to 3526, to 3324, to 3002, to 2913,
+to 2752 and then to 2675. That is 94.49%, 94.73%, 95.03%, 95.51%, 95.65%,
+95.89% and 96.00% of the regions, and 94.51%, 94.83%, 95.11%, 95.63%,
+95.78%, 96.02% and 96.13% of the lines. The start of the sixth session
+measured the 2752 of the end of the fifth. Its end counts two regions of
+`rt/conf.c` more than its start and one of `sema_const.c` fewer, so the
+96 files of the table lost 78. The start of the fifth session measured
+2911, two regions of `rt/conf.c` fewer than the end of the fourth. The
 start of the fourth session measured the 3002 of the end of the third.
 The start of the third measured the 3324 of the end of the second. The start of the second session measured 3526, and the end of
 the first had measured 3524. Nothing under `src/` or `tests/` changed
@@ -316,7 +358,13 @@ between the two.
   source that does not parse twice. The outline of the source reports it,
   and the front end of the driver reports it again.
 
-`docs/audit/tests-findings.md` holds the rows of the ten ids.
+- T124, major, of the sixth session. `anti fmt` wraps the text of a link
+  of a doc comment over two lines, and `anti doc` then writes the link as
+  text. The HTML page reads the inline markup of each line by itself.
+- The write of a bitfield under `--trace writes` gets the record of the
+  first field, which is T114. Its test names that id.
+
+`docs/audit/tests-findings.md` holds the rows of the eleven ids.
 
 ## Regions no input reaches
 
@@ -396,6 +444,21 @@ Of the fifth session:
   631 are internal errors.
 - `applesdk.c` 63 and 77 follow the SDKs the Mac holds.
 
+
+Of the sixth session:
+
+- `bindtype.c` 233: the words of a builtin type set a flag each, so a
+  list with a word and without a flag does not exist.
+- `doc.c` 362, 377 and 421: a list that is open holds an item. 434: the
+  caller passes no empty text.
+- `lower_hook.c` 77 and 93: both callers test the same two values first.
+- `antl_write.c` 833 to 836: layout writes the relocations of a global
+  after the library file is written.
+- `layout.c` 241: the checker refuses a struct that contains itself,
+  also through the length of an array.
+- `symmap.c` 54 to 56 need memory that runs out or a symbol that does
+  not unescape, and 116, 375 and 398 a file the system refuses.
+
 ## Probes that reached nothing new
 
 A later session need not repeat them.
@@ -429,6 +492,20 @@ A later session need not repeat them.
   `../14` reached the same line.
 - `anti doc` of a source that parses and names an unknown name, for
   `driver.c` 1491.
+
+
+Of the sixth session:
+
+- `alloc Part(n) catch e { }` as the value of an assignment, for
+  `lower_expr.c` 304. The checker takes the handler in a `let` alone.
+- `let (r, f) = -x;`, for `lower_expr.c` 993. It compiles and reaches no
+  flag operation of one operand.
+- `join(dispatch t -> add(5))`, for `lower_expr.c` 2097.
+- `let f = parts.abs;` of an `extern fn` of a library, for
+  `lower_expr.c` 2125, and a singleton of a library, for `lower_class.c`
+  207 and 362.
+- A struct of two arrays of 2^60 bytes without a bitfield after them, for
+  `layout.c` 71. The product of the offset and 8 overflows first.
 
 ## Rules the documents do not state
 
@@ -541,6 +618,27 @@ Of the fifth session:
   whose table runs past the section. The object after it keeps its debug
   sections.
 
+
+Of the sixth session:
+
+- `int (*)()` in an API description binds as `?fn() -> c_int`, a
+  function of no parameters. C leaves its parameters open.
+- A write to a `transient` field of a traced class calls no `changed`
+  hook under `--trace writes`. The field list of the descriptor holds no
+  record of the field.
+- The last line of a notice may lack its newline. `anti license --from`
+  then writes the first `source` line onto the end of that line.
+- A record of sources may end without a newline, and a line of it may
+  hold a name and a version without a URL.
+- `anti license --runtime <archive>` of an archive without
+  `licenses/anti_rt.txt` prints `antic: cannot open
+  archive/licenses/anti_rt.txt`, lists the package `anti.rt` without its
+  text and ends with 0. The message names antic, and anti wrote it.
+- A program whose build id holds a letter outside the hex digits is no
+  program of Anti for `anti symbols`.
+- In the Markdown page of `anti doc --dev`, a code block that never closes
+  takes the heading `### Internals` of its item into the block.
+
 ## Where the task and the code differ
 
 - `./c coverage` ran as `./c coverage part 1/2` and `part 2/2`, since one
@@ -588,6 +686,19 @@ Of the fifth session:
   under emulation.
 - No document states that one mistake gets one message. The row of T035
   holds it as the rule, and T123 follows that row.
+
+
+- The sixth session ran `./c coverage` in two parts at its start and at
+  its end.
+- `error_layout_sum` and `error_layout_span` hold a message of the layout
+  without a position, as `error_layout_divide` does, for the reason the
+  entry above on the fourth session gives.
+- `tests/run_modules.cmake` built the dev object of a library without the
+  options of `LIB_OPTIONS`. The pattern of `--trace` decides in the build
+  that holds the body, so the dev object now takes them. The three tests
+  that pass such options give the same output as before.
+- The line of `tests/known-failures.txt` for the bitfield stands in the
+  commit of T124, one commit before its test. The two lines are one hunk.
 
 ## Counts and checks of the second session
 
@@ -666,22 +777,40 @@ Of the fifth session:
 - The docs-style checker reports nothing on `CLAUDE.md`,
   `docs/audit/tests-findings.md` and this report.
 
+## Counts and checks of the sixth session
+
+- 4626 tests on the host before and 4650 after, 379 expected failures
+  before and 381 after.
+- Host suite: 4650 of 4650 passed, 381 of them expected failures, two
+  skipped, in 525 s, in `build/drive/logs/c9-suite-host.log`.
+- ASan and UBSan: 4648 tests each, in three parts, `ctest -I 1,1150`,
+  `-I 1151,2250` and `-I 2251,4648`. Every part passed. `asan` took 275 s,
+  369 s and 316 s, and `ubsan` 257 s, 357 s and 242 s. The counts of the
+  three parts are 1150, 1112 and 2417. The logs are `c9-suite-asan-1.log`
+  to `-3.log` and `c9-suite-ubsan-1.log` to `-3.log`.
+- Coverage: `c9-before-1.log` and `-2.log`, `c9-after-1.log` and `-2.log`.
+- Every tree built with zero warnings. `emit_identity` and
+  `link_identity_macos-arm64` pass, and no expected file of either changed.
+- The docs-style checker reports nothing on `CLAUDE.md`,
+  `docs/audit/tests-findings.md`, `tests/doc/prose.dev.expected.md` and
+  this report.
+
 ## Proof
 
 `git log --oneline -3` after the push of the tests and of the counts of
-the fifth session, before the commit of this report:
+the sixth session, before the commit of this report:
 
 ```text
-5f2b9022 State the counts of the fifth session on the rest of antic in CLAUDE.md
-48a920c1 Bind one header for Linux and for both targets of Windows
-13db037a Find a program of Linux and one of Windows in the symbols inventory
+d907b353 State the counts of the sixth session on the rest of antic in CLAUDE.md
+01793433 Refuse a sum of offsets past 64 bits and a bitfield across nine bytes
+712e9586 Compare two copies that differ in the second size of a product
 ```
 
 `git rev-parse HEAD origin/main` after that push:
 
 ```text
-5f2b902293bfd4723cffc49f4c5c544023c55085
-5f2b902293bfd4723cffc49f4c5c544023c55085
+d907b3538425bdc559ebb0e5de2c1d8fcb880472
+d907b3538425bdc559ebb0e5de2c1d8fcb880472
 ```
 
 `git status --short` printed this report alone then. The reply of the
@@ -690,14 +819,18 @@ this commit is not known inside it.
 
 ## Left for the next session
 
-The scripts stand in `build/cov8/`, copies of those of `build/cov7/`:
+The scripts stand in `build/cov9/`, copies of those of `build/cov8/`:
 `missed.py`, `ctx.py`, `hit.py`, `left.py`, `p.sh`, `pm.sh`, `pc.sh`,
 `mk.sh` and `unit.sh`. `hprobe.sh` builds a static library and names the
 regions of the header writer it reached, and `proj.sh` writes a starter
-project for `pc.sh`. `build/cov8/after/` holds the list of each file after
-this session, and `build/drive/logs/c8-after-missed/` a copy. The counts
-below are unreached regions after it, as `c8-after-summary.txt` counts
-them.
+project for `pc.sh`. `pm.sh` passes `LIBOPT` to the library file alone,
+not to the dev object. `build/cov9/after/` holds the list of each file
+after the sixth session, and `build/drive/logs/c9-after-missed/` a copy.
+The counts below are unreached regions after it, as
+`c9-after-summary.txt` counts them. The sixth session read `bindtype.c`,
+`doc.c`, `symmap.c`, `antl_write.c`, `lower_hook.c` and `layout.c`, and
+what is left of the first three and of `lower_hook.c` stands in "Regions
+no input reaches".
 
 Lowering, read in the first session and still open:
 
@@ -706,7 +839,6 @@ Lowering, read in the first session and still open:
 - `lower_class.c` 207 and 362 and `lower_desc.c` 1549: a singleton of a
   library, and a table entry that neither the class nor the interface
   fills.
-- `lower_hook.c` 45, 77, 93, 129, 142 and 165.
 - `lower_desc.c` 519, 746, 826 to 830, 929 to 934, 967, 1039, 1092 and
   1341: a second request for a global of a class, and `--no-reflect`.
 - `lower_expr.c` 304, 378, 592, 993, 1191, 1772, 1803, 1870, 1948, 2095,
@@ -730,35 +862,38 @@ The drivers and the header:
   1407 and 1629. 1171 is a synchronized export class with a `construct`.
   `attempt` of the library `views` takes a function that may fail and
   did not reach 141. `docpage.c` 14.
-- `doc.c` 19, `check.c` 18, `main.c` 17, `test.c` 20, `project.c` 3. What is left of
+- `doc.c` 7, `check.c` 18, `main.c` 17, `test.c` 20, `project.c` 3. What is left of
   `check.c`, `main.c`, `test.c` and `project.c` stands behind a file the
-  system refuses to write. `doc.c` was read again in no session.
+  system refuses to write. So do 812 and 821 of `doc.c`, and 767 needs a
+  host that is no target.
 
 The library file:
 
-- `antl_io.c` 3, `antl_read.c` 20, `antl_read_ir.c` 31, `antl_tree.c` 41, `antl_verify.c` 19, `antl_write.c` 21.
+- `antl_io.c` 3, `antl_read.c` 15, `antl_read_ir.c` 23, `antl_tree.c` 41, `antl_verify.c` 19, `antl_write.c` 17.
   The sweep changes one byte, so a refusal that needs two fields to
   disagree stays open. `antl_read.c` 113 to 133, 159, 460 and 499,
   `antl_read_ir.c` 193, 244, 387, 739 to 761 and 914 to 1188, and
   `antl_tree.c` 200 to 220, 376 to 397, 436, 533 to 570, 1113, 1121 and
   1272. A library with an interface and a `may fail` function in the
   sweep reaches ten more regions of `antl_read_ir.c` and costs 5 s.
-  `antl_write.c` was not read.
+  Open in `antl_write.c`: 232 and 261, a type found after its parts
+  were visited. 377 and 559 were not probed. 706 and 723 are a float and
+  an empty constant of the IR. 953 to 980 are a header without a package
+  or a doc text.
 
 The whole program, the IR and the back end:
 
-- `whole.c` 37: 54, 77, 147, 182, 303, 334 and 417 are guards. 320 and
-  322 need two symbolic operations that differ in their second operand
-  alone. 548 needs a global with a relocation of a function. 569 to 581
+- `whole.c` 36: 54, 77, 147, 182, 303, 334 and 417 are guards, and 322
+  follows a switch over every kind. 548 needs a global with a relocation of a function. 569 to 581
   need a symbolic operation as the offset of an address, which a unit
   test of `tests/unit/test_whole.c` can build.
 - `whole_tables.c` 39: 244 to 513 are guards of a signature and of a
   descriptor that a library file brought. 1454 is a class that provides
   an interface whose version records a library file lacks. 787, 862,
   1111, 1360 and 1593 were not probed.
-- `layout.c` 18: 421, a size expression of an operation that does not
+- `layout.c` 13: 421, a size expression of an operation that does not
   fold. 713 and 722, a constant of no value and an `f32` in the
-  aggregate of a global. 23, 71, 186, 241, 611 and 762 were not probed.
+  aggregate of a global. 23, 611 and 762 were not probed.
 - `llvm_emit.c` 86: most are tests for `e->failed`. Open beside them
   are a name that needs quotes at 189 to 220 and a pointer constant at
   276. So is a flag apart from its operation at 1716 and 1776. The last
@@ -789,9 +924,6 @@ The whole program, the IR and the back end:
 - `syms.c` 23: 77, 86, 182, 236, 539, 584, 672, 677, 774 to 790 and 840
   to 906. The ELF twin from 933 to 1001 needs the trace of a program of
   Linux and its debug link.
-- `symmap.c` 20: a notice or a list of sources whose last line has no
-  newline, at 213 to 230, 266 to 293 and 346. 54, 116, 163, 194, 375 and
-  398 were not probed.
 - `memreport.c` 2: 95, a universal file without the processor that the
   frame names.
 - `bindclang.c` 41: a typedef that names itself at 433, 461, 514, 539 to
@@ -799,9 +931,11 @@ The whole program, the IR and the back end:
   1282, 1439 and 1512.
 - `bindexpr.c` 12: 53, 345, 377, 530, 537, 542, 634 and 688.
   `bindwrite.c` 35: 105 to 145, 202, 245, 330, 425, 447 and 553 to 658.
-  `bind.c` 7, `bindtype.c` 24 and `bindmodel.c` 2 were not read.
-- `bindapi.c` 14: 138 to 162, the tag of an enum and a pointer to a
-  type that does not parse.
+  `bindmodel.c` 2: 85 and 99, a binding of the library `miniaudio`.
+  `bind.c` 7: 39 needs a host that is no target, 69 and 99 were not
+  probed, and 158 to 189 stand behind a file the system refuses.
+- `bindapi.c` 10: 138 to 161, a pointer to no type and the tag of an
+  enum, not probed again.
 - `fmt.c` 19: 122, 385, 905, 1124, 1154, 1189, 1227, 1272, 1293, 1394,
   1479 and 1615. 1884 and 1904 stand behind a file the system refuses.
 - `repo.c` 19: 180, the path of Windows in a `file://` URL. 237 to 270
