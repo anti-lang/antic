@@ -436,6 +436,38 @@ bool sema_undefined_on_constants(struct checker *c, struct expr *e,
                              e->kind == EXPR_BINARY ? &b : NULL, false);
 }
 
+/* DESIGN: a constant index below zero on a fixed array names no element,
+   by R030 of "Rules of 2026-10-13", as decision 24 of "Decisions of
+   2026-10-11" says of one past the end. The length is a number, or the
+   text of a length computed from `size_of`. e is the index expression
+   and array the type of its base. */
+bool sema_index_below_zero(struct checker *c, struct expr *e,
+                           const struct type *array)
+{
+    struct const_value v;
+    struct context saved;
+    struct text length = {0};
+    bool constant;
+
+    sema_enter_quiet(c, &saved);
+    constant = sema_eval_const(c, e, &v);
+    sema_leave(c, &saved);
+    if (!constant || v.kind != CONST_INT ||
+        sema_signed_bits(v.as.integer) >= 0) {
+        return false;
+    }
+    if (array->length_of != NULL) {
+        types_symbolic_print(&length, array->length_of, false);
+    } else {
+        text_appendf(&length, "%llu", (unsigned long long)array->length);
+    }
+    sema_error_at(c, e->pos, "the index %lld is outside the array of length "
+                  "%s", (long long)sema_signed_bits(v.as.integer),
+                  text_cstr(&length));
+    text_free(&length);
+    return true;
+}
+
 /* DESIGN: a constant holds one value per element, and lowering writes
    one item per element into the data of the module. A repeated array of
    more than 2^20 elements is refused before the checker allocates them.

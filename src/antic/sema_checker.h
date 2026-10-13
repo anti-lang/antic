@@ -510,6 +510,10 @@ void sema_chain_prepare(struct checker *c, struct symbol *root,
 
 bool sema_undefined_on_constants(struct checker *c, struct expr *e,
                                  const struct type *result);
+/* Report a constant index e below zero on a base of the fixed array type
+   array. True when it reported. */
+bool sema_index_below_zero(struct checker *c, struct expr *e,
+                           const struct type *array);
 bool sema_eval_const(struct checker *c, struct expr *e,
                      struct const_value *out);
 bool sema_const_symbol(struct checker *c, struct symbol *sym,

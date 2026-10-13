@@ -1,0 +1,14 @@
+//! A constant index below zero is refused on an array whose length the target
+//! decides, by R030 of "Rules of 2026-10-13".
+
+struct Pair
+{
+	a: c_long,
+	b: c_long,
+}
+
+fn main() -> int
+{
+	let xs: [size_of(Pair)]int = [0; size_of(Pair)];
+	return xs[-1];
+}

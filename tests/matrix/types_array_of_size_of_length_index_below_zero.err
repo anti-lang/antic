@@ -1,0 +1,1 @@
+types_array_of_size_of_length_index_below_zero.anti:13:12: error: the index -1 is outside the array of length size_of(Pair)

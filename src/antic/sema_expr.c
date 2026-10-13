@@ -2015,6 +2015,10 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         }
         switch (t->kind) {
         case TYPE_ARRAY:
+            if (sema_index_below_zero(c, e->as.index.index, t)) {
+                return sema_builtin(c, TYPE_ERROR);
+            }
+            return t->element;
         case TYPE_SLICE:
             return t->element;
         case TYPE_POINTER:

@@ -1,0 +1,1 @@
+values_index_of_a_constant_below_zero.anti:9:5: error: the index -2 is outside the array of length 3

@@ -1,0 +1,13 @@
+//! A constant index below zero on an array in a field is refused, by R030 of
+//! "Rules of 2026-10-13".
+
+struct Row
+{
+	cells: [4]int,
+}
+
+fn main() -> int
+{
+	let r = Row { cells: [1, 2, 3, 4] };
+	return r.cells[-1];
+}
