@@ -545,6 +545,7 @@ of lowering meet:
 | `flow_undo_in_defer`, `flow_undo_in_the_block_of_an_undo`, `flow_undo_in_a_function_that_cannot_fail`, `flow_undo_in_a_closure_that_cannot_fail` | R005 of "Rules of 2026-10-13": an `undo` in the block of a `defer` or of an `undo` is refused, and one in a function that cannot fail is the warning `undo-never-runs` | |
 | `flow_for_iterator_exits` | the exits of a `for` over an iterator of the program, with a `defer` | |
 | `flow_switch_value_once`, `flow_in_range_value_once` | the value of a `switch` and of `x in lo..hi` is computed once | |
+| `flow_switch_arm_of_a_size_beside_its_number`, `flow_switch_arm_of_a_number_beside_its_size`, `flow_switch_arms_of_two_sizes_that_are_equal`, `flow_switch_arm_of_a_size_the_target_decides` | R010 of "Rules of 2026-10-13": two arms of one value are refused where one or both are a size that no target decides, and a size the target decides keeps its arm | |
 | `flow_for_range_no_binding` | a range without a binding, an empty one and one that runs backwards | |
 | `flow_if_let_chain` | `else if let`, `else if` and `else` after an `if let` | |
 | `flow_fail_in_catch`, `flow_try_in_catch`, `flow_fail_in_closure`, `flow_try_in_closure`, `flow_catch_in_worker` | `fail` and `try` in a handler and in a closure, and a handler in a worker | |

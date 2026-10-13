@@ -868,20 +868,80 @@ static void check_cases_covered(struct checker *c, const struct stmt *s,
     text_free(&missing);
 }
 
+/* DESIGN: R010 of "Rules of 2026-10-13" refuses two arms of equal
+   constants, also where one is written as `size_of(i64)` and the other
+   as `8`. The checker knows no layout, so it reads a size that no target
+   decides: `size_of` of a type of fixed width, alone or converted with
+   `as`. A value computed from a size with an operator, and the size of a
+   type the target lays out, keep their arm, as the entry under "Rules of
+   2026-10-13" in docs/decisions.md records. True when s has the one
+   value out on every target. */
+static bool size_on_every_target(const struct symbolic *s, uint64_t *out)
+{
+    switch (s->kind) {
+    case SYMBOLIC_INT:
+        *out = s->value;
+        return true;
+    case SYMBOLIC_SIZE_OF:
+        if (s->of->kind == TYPE_BOOL) {
+            *out = 1;
+            return true;
+        }
+        if (s->of->kind == TYPE_CHAR) {
+            *out = 4;
+            return true;
+        }
+        if (s->of->kind == TYPE_F16) {
+            *out = 2;
+            return true;
+        }
+        if (types_is_target_sized(s->of) || types_bits(s->of) == 0) {
+            return false;
+        }
+        *out = (uint64_t)types_bits(s->of) / 8;
+        return true;
+    case SYMBOLIC_CAST:
+        /* A size of a fixed width is at most 8, which every integer type
+           holds, so the conversion keeps it. */
+        return s->a->kind == SYMBOLIC_SIZE_OF &&
+               size_on_every_target(s->a, out);
+    default:
+        return false;
+    }
+}
+
+/* The integer an arm of a `switch` names on every target. False for a
+   value that the target decides. */
+static bool arm_integer(const struct const_value *v, uint64_t *out)
+{
+    if (v->kind == CONST_SYMBOLIC) {
+        return size_on_every_target(v->as.symbolic, out);
+    }
+    *out = v->as.integer;
+    return true;
+}
+
 /* Whether two arms of a `switch` name one value. */
 static bool same_arm_value(const struct const_value *a,
                            const struct const_value *b)
 {
-    if (a->kind != b->kind) {
-        return false;
-    }
-    if (a->kind == CONST_TEXT) {
-        return a->as.text.length == b->as.text.length &&
+    uint64_t x;
+    uint64_t y;
+
+    if (a->kind == CONST_TEXT || b->kind == CONST_TEXT) {
+        return a->kind == b->kind &&
+               a->as.text.length == b->as.text.length &&
                (a->as.text.length == 0 ||
                 memcmp(a->as.text.bytes, b->as.text.bytes,
                        a->as.text.length) == 0);
     }
-    return a->as.integer == b->as.integer;
+    /* Two values that the target decides are one value where they are
+       one interned node. */
+    if (a->kind == CONST_SYMBOLIC && b->kind == CONST_SYMBOLIC &&
+        a->as.symbolic == b->as.symbolic) {
+        return true;
+    }
+    return arm_integer(a, &x) && arm_integer(b, &y) && x == y;
 }
 
 /* The function `anti.text.equal`, which a `switch` on a `str` calls for

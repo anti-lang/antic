@@ -2865,6 +2865,12 @@ No document gave the text of these messages, and the test run chose it. Each is 
 - Q3. T043 is `severe` by that sentence, since the origin is a value of the program.
 - Q4. `CLAUDE.md` wins: the sanitizer suites run before a push with any change outside the documents.
 
+### What the rules run added
+
+The steps that built the rules filled these gaps by the gap procedure of `CLAUDE.md`.
+
+- [provisional] R010 compares an arm written with `size_of` where no target decides its value: `size_of` of `bool`, `char`, an integer or a float of a fixed width, alone or converted with `as`. An arm computed from such a size with an operator, and the size of a type the target lays out, such as `c_long` or a struct, keep their arm, and the first arm of the value runs. Reason: the checker knows no layout, and the back end folds a size per target and reports without a position. `matrix/flow_switch_arm_of_a_size_the_target_decides` holds the arm that stays.
+
 ## Open
 
 - R009 of "Rules of 2026-10-13". `switch` on a `char` is refused today, as on a `bool` and on a value of a type parameter. Does a `switch` take a `char`?

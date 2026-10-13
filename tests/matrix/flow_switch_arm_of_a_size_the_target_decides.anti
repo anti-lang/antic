@@ -1,0 +1,22 @@
+//! A `switch` with the arm `8` before the arm `size_of(c_long)`. The target
+//! decides the size of a `c_long`, 4 on Windows and 8 elsewhere, so the checker
+//! compares the two arms on no target and takes both. The first arm runs for 8.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn kind(n: int) -> int
+{
+	let k = 0;
+	switch n {
+		8 => k = 1,
+		size_of(c_long) => k = 2,
+		else => k = 3,
+	}
+	return k;
+}
+
+fn main() -> int
+{
+	printf("%d %d\n".ptr, kind(8) as c_int, kind(9) as c_int);
+	return 0;
+}

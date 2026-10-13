@@ -1,0 +1,19 @@
+//! A `switch` on an integer with the arm `size_of(u32) as int` before the arm
+//! `4`. The size is 4 on every target, also after its conversion, so the second
+//! arm is refused, by R010 of the rules of 2026-10-13.
+
+fn kind(n: int) -> int
+{
+	let k = 0;
+	switch n {
+		size_of(u32) as int => k = 1,
+		4 => k = 2,
+		else => k = 3,
+	}
+	return k;
+}
+
+fn main() -> int
+{
+	return kind(4);
+}

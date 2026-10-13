@@ -1,0 +1,19 @@
+//! A `switch` with the arms `size_of(i64)` and `size_of(f64)`. Both sizes are 8
+//! on every target, so the second arm is refused, by R010 of the rules of
+//! 2026-10-13.
+
+fn kind(n: int) -> int
+{
+	let k = 0;
+	switch n {
+		size_of(i64) => k = 1,
+		size_of(f64) => k = 2,
+		else => k = 3,
+	}
+	return k;
+}
+
+fn main() -> int
+{
+	return kind(8);
+}

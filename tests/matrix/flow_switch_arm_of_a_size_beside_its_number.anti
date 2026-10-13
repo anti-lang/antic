@@ -1,5 +1,6 @@
 //! A `switch` on an integer with the arm `8` before the arm `size_of(i64)`. The
-//! checker knows no size, so it takes both arms, and the first one runs for 8.
+//! size of an `i64` is 8 on every target, so the two arms hold one value, and
+//! the second is refused, by R010 of the rules of 2026-10-13.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
