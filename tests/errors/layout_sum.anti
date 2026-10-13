@@ -1,0 +1,14 @@
+//! A bitfield after two arrays whose sizes add up to more than 64 bits hold.
+//! Each length is a size of the target, so the back end computes it.
+
+struct Half
+{
+	a: [(size_of(c_long) / 8) << 60]byte,
+	b: [(size_of(c_long) / 8) << 60]byte,
+	low: u32 : 4,
+}
+
+fn main() -> int
+{
+	return size_of(Half);
+}

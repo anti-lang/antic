@@ -5868,6 +5868,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "layout_size|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_size.s,layout_size.anti"
         "layout_shift|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_shift.s,layout_shift.anti"
         "layout_divide|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_divide.s,layout_divide.anti"
+        "layout_sum|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_sum.s,layout_sum.anti"
+        "layout_span|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_span.s,layout_span.anti"
         "sizeof|-S,-o,${LISTINGS}/sizeof.s,sizeof.anti"
         "modifiers|-S,-o,${LISTINGS}/modifiers.s,modifiers.anti"
         "geo|-S,-o,${LISTINGS}/geo.s,geo.anti"
