@@ -6,6 +6,52 @@ anti_message(configuration_no_toml
     ARGS symbols inventory --conf conf.toml
     ERR "anti: conf.toml is no runtime configuration")
 
+anti_message(configuration_not_there
+    ARGS symbols inventory --conf none.toml
+    ERR "anti: cannot read none.toml")
+anti_message(configuration_include_not_there
+    FILES conf.toml "include = [\"more.toml\"]\n"
+    ARGS symbols inventory --conf conf.toml
+    ERR "anti: cannot read ./more.toml")
+
+# The lines of `inventory` and `check` for a configuration that names what
+# is not there. They go to the standard output, and `inventory` writes its
+# archive all the same.
+anti_message(inventory_no_program
+    STATUS 0
+    FILES conf.toml "[runtime]\nthreads = 2\n"
+    ARGS symbols inventory --conf conf.toml
+    OUT "missing the program: . holds no program of Anti"
+        "wrote symbols.zip with 0 of 1 modules")
+anti_message(check_no_program
+    FILES conf.toml "[runtime]\nthreads = 2\n"
+    ARGS symbols check --conf conf.toml
+    OUT "missing the program: . holds no program of Anti")
+# A text of `plugins` holds its directories as `--anti.plugins` takes
+# them, with `:` between two, and an empty one names nothing.
+anti_message(inventory_plugins_as_a_text
+    STATUS 0
+    FILES conf.toml "[runtime]\nplugins = \"one:two::three\"\n"
+    ARGS symbols inventory --conf conf.toml
+    OUT "missing the program: . holds no program of Anti"
+        "missing ./one/anti-plugins.toml: no index of plugins"
+        "missing ./two/anti-plugins.toml: no index of plugins"
+        "missing ./three/anti-plugins.toml: no index of plugins"
+        "wrote symbols.zip with 0 of 4 modules")
+# The file that includes wins per interface, so `app.Logger` names one
+# library, and the line of the include alone names the other.
+anti_message(inventory_injection_of_an_include
+    STATUS 0
+    FILES conf.toml
+          "include = [\"more.toml\"]\n[injections]\n\"app.Logger\" = \"first.plugin\"\n"
+          more.toml
+          "[injections]\n\"app.Logger\" = \"second.plugin\"\n\"app.Clock\" = \"third.plugin\"\n"
+    ARGS symbols inventory --conf conf.toml
+    OUT "missing the program: . holds no program of Anti"
+        "missing ./first.plugin: no such file"
+        "missing ./third.plugin: no such file"
+        "wrote symbols.zip with 0 of 3 modules")
+
 # A symbols archive. The files of a case under archive/ are its entries.
 function(pack_archive)
     file(GLOB entries RELATIVE "${PROJECT}/archive" "${PROJECT}/archive/*")
