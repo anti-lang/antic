@@ -91,6 +91,50 @@ static void one_module(void)
     arena_free(&arena);
 }
 
+/* A global whose bytes hold the address of another global keeps that
+   global, and names it by its new index once the optimizer dropped the
+   global before it. */
+static void global_reloc(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_global *target;
+    struct ir_global *table;
+    struct ir_function *main_fn;
+    struct ir_block *b;
+    struct text out = {0};
+    static const uint8_t zero[8] = {0};
+    uint32_t at;
+    uint32_t v;
+
+    ir_module_init(&m, &arena, "main");
+    ir_global_add(&m, "main", "unused", zero, sizeof zero, 8);
+    target = ir_global_add(&m, "main", "target", zero, sizeof zero, 8);
+    table = ir_global_add(&m, "main", "table", zero, sizeof zero, 8);
+    ir_global_reloc(&m, table, 0, target->index);
+    main_fn = ir_function_add(&m, "main", "main", IR_PTR, IR_NO_AGG);
+    b = ir_block_add(main_fn);
+    at = ir_addr(main_fn, b, ir_global_op(table));
+    v = ir_load(main_fn, b, IR_PTR, ir_temp_op(main_fn, at));
+    ir_ret(main_fn, b, IR_PTR, ir_temp_op(main_fn, v));
+    optimize_program(&m, "main");
+    ir_print(&out, &m);
+    CHECK_STR(text_cstr(&out),
+              "global main.target size 8 align 8 bytes 00 00 00 00 00 00 00 "
+              "00\n"
+              "global main.table size 8 align 8 bytes 00 00 00 00 00 00 00 "
+              "00 reloc 0 @main.target\n"
+              "fn main.main() -> ptr {\n"
+              "b0:\n"
+              "    %0 = addr @main.table\n"
+              "    %1 = load ptr %0\n"
+              "    ret ptr %1\n"
+              "}\n");
+    text_free(&out);
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 /* Three blocks where b1 and b2 jump to each other. A search for the end
    of the jumps that stops after a fixed number of steps would alternate
    between b1 and b2 forever. */
@@ -305,6 +349,7 @@ void test_optimize(void)
     int which;
 
     one_module();
+    global_reloc();
     jump_cycle();
     deep_chain();
     for (which = 0; which < 5; which++) {
