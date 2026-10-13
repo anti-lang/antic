@@ -7,6 +7,7 @@ string(REPEAT "[" 1100 deep)
 foreach(case
         "string|{\"functions\": [\"abc\\q\"]}|a malformed string at line 1, column 16"
         "nul|{\"functions\": [\"a\\u0000b\"]}|a string that holds a NUL at line 1, column 26"
+        "key|{\"func\\qtions\": []}|a malformed string at line 1, column 2"
         "colon|{\"functions\" []}|no `:` after a member name at line 1, column 14"
         "brace|{\"functions\": [] |an object without its `}` at line 1, column 18"
         "bracket|{\"functions\": [1 2]}|an array without its `]` at line 1, column 18"
@@ -37,6 +38,11 @@ anti_message(api_struct_twice
     ERR "anti: api.json names the struct `A` twice")
 
 # An API description that binds with a warning.
+# A part that is `null` is a part the description lacks.
+anti_message(api_part_is_null STATUS 0
+    FILES api.json "{\"functions\": [], \"structs\": null}"
+    OUT "bind: anti.api from api.json, 0 functions, 0 warnings"
+    ARGS bind api.json -o "${WORK}/out")
 anti_message(api_enum_value STATUS 0
     FILES api.json "{\"functions\": [], \"enums\": [{\"name\": \"Mode\", \"values\": [{\"name\": \"MODE_A\", \"value\": \"first\"}, {\"name\": \"MODE_B\", \"value\": 1}]}]}"
     OUT "bind: anti.api from api.json, 0 functions, 1 warning"

@@ -274,6 +274,60 @@ anti_message(path_holds_another_version
     ARGS build ${tools}
     ERR "anti: ./../units/dist/${HOST}/dev holds com.example.units 0.1.0, which no constraint on the package takes")
 
+# The manifest of a path dependency is read as the one of the project.
+anti_message(path_manifest_no_toml
+    FILES anti.toml "${manifest_package}\n[dependencies]\n\"com.example.units\" = { path = \"../units\" }\n"
+          ${app_source} "${app_text}"
+          ../units/anti.toml "[package\n"
+          ../units/src/com/example/units.anti "${library_text}"
+    ARGS build ${tools}
+    ERR "anti: ./../units/anti.toml is no TOML that anti reads")
+# A module that does not parse ends the build before any module compiles.
+anti_message(source_does_not_parse
+    FILES anti.toml "${manifest_package}"
+          ${app_source} "fn main( -> int\n{\n\treturn 0;\n}\n"
+    ARGS build ${tools}
+    ERR "./src/com/example/app.anti:1:10: error: expected identifier")
+
+# The name of a source is the last part of the path of its module.
+anti_message(source_name_no_identifier
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+          src/com/example/bad-name.anti "${library_text}"
+    ARGS build ${tools}
+    ERR "anti: `bad-name` in ./src/com/example/bad-name.anti is not a lowercase identifier")
+# Two modules of a project that import each other have no order. The
+# first of them compiles before the library file of the second is there.
+anti_message(modules_import_each_other
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+          src/com/example/a.anti "//! The first.\n\nimport com.example.b;\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+          src/com/example/b.anti "//! The second.\n\nimport com.example.a;\n\n/// Two.\npub fn two() -> int\n{\n\treturn 2;\n}\n"
+    ARGS build ${tools}
+    ERR "./src/com/example/a.anti:3:8: error: cannot find module `com.example.b`")
+
+# `anti run --memory-checks` puts the standard error of the program through
+# Anti's symbolizer. A line that is no frame, a frame without its module in
+# brackets and a frame of a module that is no file or no program come out
+# as they went in. ASAN_OPTIONS of the caller stays before the option of
+# the run. On a Mac alone: Windows keeps the symbolizer of
+# AddressSanitizer, and the Linux VM skips the option under emulation.
+if(CMAKE_HOST_APPLE)
+    set(frame_lines "    #0 0x1 somewhere"
+                    "    #1 0x2 (/no/such/module+0x10)"
+                    "    #2 0x3 (/no/such/module:arm64+0x10)"
+                    "    #3 0x4 (anti.toml+0x10)"
+                    "    #4 0x5 (short)")
+    set(frame_text "//! A program that writes lines of the form of a frame.\n\nimport anti.io;\n\nfn main() -> int\n{\n")
+    foreach(line IN LISTS frame_lines)
+        string(APPEND frame_text "\tio.eprintln(\"${line}\");\n")
+    endforeach()
+    string(APPEND frame_text "\treturn 0;\n}\n")
+    anti_message(memory_checks_lines_that_are_no_frames STATUS 0
+        FILES anti.toml "${manifest_package}" ${app_source} "${frame_text}"
+        ENV ASAN_OPTIONS=detect_leaks=1
+        ARGS run --memory-checks ${tools}
+        ERR ${frame_lines})
+endif()
+
 # The lock file. One that answers the manifest is read in place of the
 # indexes.
 set(lock_head "version = 1\n\n[[package]]\n")

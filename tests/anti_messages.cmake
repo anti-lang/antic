@@ -24,10 +24,22 @@ anti_message(license_from_no_notice
     FILES program "A file that no link of antic wrote.\n"
     ARGS license --from program --runtime "${RUNTIME}"
     ERR "anti: program carries no licence notice")
+anti_message(license_from_absent
+    ARGS license --from none --runtime "${RUNTIME}"
+    ERR "anti: cannot read none")
 anti_message(license_from_archive_no_archive
     FILES library.a "A text where the archive belongs.\n"
     ARGS license --from-archive library.a
     ERR "anti: library.a is no archive")
+anti_message(license_from_archive_absent
+    ARGS license --from-archive none.a
+    ERR "anti: cannot read none.a")
+# The header of a member holds its size as digits. One with spaces there
+# ends the walk over the members.
+anti_message(license_from_archive_member_without_a_size
+    FILES library.a "!<arch>\nmember.o/       0           0     0     644               `\n"
+    ARGS license --from-archive library.a
+    ERR "anti: library.a carries no package header, so it is no static library of `--lib static`")
 anti_message(license_from_archive_no_header
     FILES library.a "!<arch>\n"
     ARGS license --from-archive library.a
@@ -82,6 +94,10 @@ if(CMAKE_HOST_APPLE)
         FILES MacOSX.sdk/SDKSettings.json "{\"Version\": \"../14\"}\n"
         ARGS sdk export --sdk MacOSX.sdk -o out
         ERR "anti: MacOSX.sdk names the Version ../14, which is no version")
+    anti_message(sdk_export_version_with_another_sign
+        FILES MacOSX.sdk/SDKSettings.json "{\"Version\": \"15_2\"}\n"
+        ARGS sdk export --sdk MacOSX.sdk -o out
+        ERR "anti: MacOSX.sdk names the Version 15_2, which is no version")
     anti_message(sdk_export_out_is_a_file
         FILES MacOSX.sdk/SDKSettings.json "${settings}"
               out "A file where the directory of the bundle belongs.\n"
