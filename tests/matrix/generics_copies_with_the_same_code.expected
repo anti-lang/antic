@@ -2,3 +2,4 @@ exit 0
 the same float: 0.5 0.5
 another float: 0.25 0.25
 a length of each: 32 48
+a product of two sizes: 16 24

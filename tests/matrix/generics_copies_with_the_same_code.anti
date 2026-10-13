@@ -1,7 +1,8 @@
 //! Two copies of a generic function whose code is the same are one function in
 //! a release build, and two whose code differs stay two. The copies hold a
 //! float constant or a length computed from `size_of`, and each call gives the
-//! value of its own copy.
+//! value of its own copy. The lengths of `rows` differ in the second size of
+//! their product alone.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -34,10 +35,17 @@ fn room<T>() -> int
 	return grid.len;
 }
 
+fn rows<T>() -> int
+{
+	let grid: [size_of(c_long) * size_of(T)]byte = [0; size_of(c_long) * size_of(T)];
+	return grid.len / size_of(c_long);
+}
+
 fn main() -> int
 {
 	printf("the same float: %g %g\n".ptr, half<int>(1), half<u64>(2));
 	printf("another float: %g %g\n".ptr, quarter<int>(1), quarter<u64>(2));
 	printf("a length of each: %d %d\n".ptr, room<Pair>() as c_int, room<Wide>() as c_int);
+	printf("a product of two sizes: %d %d\n".ptr, rows<Pair>() as c_int, rows<Wide>() as c_int);
 	return 0;
 }
