@@ -419,6 +419,17 @@ static struct type *worker_callee(struct checker *c, struct expr **slot,
                       (int)callee->as.name.length, callee->as.name.text);
         return NULL;
     }
+    /* DESIGN: R013 of "Rules of 2026-10-13". A worker that may fail is
+       called directly with a handler, and `parallel` and `dispatch`
+       refuse it, since a job has no handler. The refusal stands before
+       the count of the arguments, which would count the out pointer of
+       the error convention as one the program writes. */
+    if (fn->may_fail) {
+        sema_error_at(c, call->pos, "`%.*s` may fail, and `%s` runs a worker "
+                      "that cannot fail", (int)callee->as.name.length,
+                      callee->as.name.text, form);
+        return NULL;
+    }
     if (sym->item == NULL || sym->item->type_param_count == 0) {
         if (callee->type_arg_count > 0) {
             sema_refuse_type_args(c, callee, &callee->as.name);

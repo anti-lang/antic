@@ -1,1 +1,1 @@
-flow_fail_in_worker_dispatched.anti:22:26: error: `run` takes 1 argument beside the object, found 0
+flow_fail_in_worker_dispatched.anti:23:26: error: `run` may fail, and `dispatch` runs a worker that cannot fail

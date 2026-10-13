@@ -1,5 +1,6 @@
 //! A `worker fn` that may fail and holds a `fail` is refused at its `dispatch`.
-//! No document states the rule, and the test holds what antic 0.2.0 prints.
+//! R013 of the rules of 2026-10-13 keeps the refusal, and its message names the
+//! reason and counts no out pointer.
 
 import anti.lang;
 

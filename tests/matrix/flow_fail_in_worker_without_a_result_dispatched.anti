@@ -1,0 +1,26 @@
+//! A `worker fn` that may fail and gives no result is refused at its `dispatch`
+//! in the words of one that gives a result, by R013 of the rules of 2026-10-13.
+//! The message names no type the program did not write.
+
+import anti.lang;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn run(t: *Task) may fail
+{
+	if t.n > 2 {
+		fail "too large";
+	}
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let job = dispatch t -> run();
+	join(job);
+	delete(t);
+	return 0;
+}

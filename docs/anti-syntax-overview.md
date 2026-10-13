@@ -1161,7 +1161,7 @@ let jobs = [dispatch sprite -> render(frame + 1)];
 join_all(jobs[0..1]);
 ```
 
-Worker parameters are pointer-free. The table pointer and `own` fields do not count. `[]Circle` chunks like any array, `[]*Shape` is refused and points at `dispatch`. `--anti.threads` and the key `threads` of the configuration file set the pool size.
+Worker parameters are pointer-free. The table pointer and `own` fields do not count. A `worker fn` that may fail is called directly with a handler, and `parallel` and `dispatch` refuse it. `[]Circle` chunks like any array, `[]*Shape` is refused and points at `dispatch`. `--anti.threads` and the key `threads` of the configuration file set the pool size.
 
 `sync m { }` holds a `Mutex` for its block and unlocks it on every exit. `chan T` is a bounded queue of pointer-free values, and `select` waits on more than one channel, written like `switch` over them.
 

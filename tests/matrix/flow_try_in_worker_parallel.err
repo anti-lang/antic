@@ -1,1 +1,1 @@
-flow_try_in_worker_parallel.anti:26:43: error: `total` takes 1 argument beside the chunk, found 0
+flow_try_in_worker_parallel.anti:27:43: error: `total` may fail, and `parallel` runs a worker that cannot fail

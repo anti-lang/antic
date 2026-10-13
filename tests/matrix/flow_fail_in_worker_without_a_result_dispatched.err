@@ -1,0 +1,1 @@
+flow_fail_in_worker_without_a_result_dispatched.anti:22:26: error: `run` may fail, and `dispatch` runs a worker that cannot fail
