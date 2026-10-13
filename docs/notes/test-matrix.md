@@ -441,9 +441,9 @@ column means that no source holds the row at all.
 | Ownership | 18 | 248 | 1 | 125 | 0 |
 | Errors | 15 | 173 | 0 | 41 | 0 |
 | Threads | 29 | 402 | 4 | 189 | 7 |
-| Classes | 26 | 59 | 0 | 0 | 0 |
+| Classes | 26 | 58 | 0 | 0 | 0 |
 | Modules | 19 | 30 | 0 | 0 | 0 |
-| All | 206 | 2314 | 25 | 1484 | 8 |
+| All | 206 | 2313 | 25 | 1484 | 8 |
 
 ### Flow
 
@@ -1034,7 +1034,7 @@ Where two rules meet, and where three do:
 | `yield` | function `programs/catch_exits`, catch handler `programs/catch_exits`, method `matrix/errors_yield`, loop body `matrix/errors_yield`, switch arm `matrix/errors_yield`, `if let` `matrix/errors_yield`, `defer` `matrix/errors_yield`, `undo` `matrix/errors_yield`, closure `matrix/errors_yield`, worker `matrix/errors_yield`, `dispatch` or `parallel` `matrix/errors_yield`, `sync` block `matrix/errors_yield`, `select` arm `matrix/errors_yield`, `tests` block `anti-test/com/example/errors`, `fixtures` block `anti-test/com/example/errors`, generic body `matrix/errors_yield`, nested type `matrix/errors_yield`, library module `modules/errors/com/example/errors` | none |
 | `undo` | function `programs/generic_may_fail`, generic body `programs/generic_may_fail`, method `matrix/errors_undo`, loop body `matrix/errors_undo`, switch arm `matrix/errors_undo`, `if let` `matrix/errors_undo`, `defer` `matrix/errors_undo`, `undo` `matrix/errors_undo`, catch handler `matrix/errors_undo`, closure `matrix/errors_undo`, worker `matrix/errors_undo`, `dispatch` or `parallel` `matrix/errors_undo`, `sync` block `matrix/errors_undo`, `select` arm `matrix/errors_undo`, `tests` block `anti-test/com/example/errors`, `fixtures` block `anti-test/com/example/errors`, nested type `matrix/errors_undo`, library module `modules/errors/com/example/errors` | none |
 | `-> never` | `programs/never_paths` | none |
-| `here` as an argument | function `programs/location`, method `programs/location`, generic body `programs/walk_generic`, library module `modules/defaults/com/example/greeter`, module level the refusal `matrix/errors_here_at_module_level`, loop body `matrix/errors_here`, switch arm `matrix/errors_here`, `if let` `matrix/errors_here`, `defer` `matrix/errors_here`, `undo` `matrix/errors_here`, catch handler `matrix/errors_here`, closure `matrix/errors_here`, worker `matrix/errors_here`, `dispatch` or `parallel` `matrix/errors_here`, `sync` block `matrix/errors_here`, `select` arm `matrix/errors_here`, `tests` block `anti-test/com/example/errors`, `fixtures` block `anti-test/com/example/errors`, nested type `matrix/errors_here` | none |
+| `here` as an argument | function `programs/location`, method `matrix/errors_here`, generic body `matrix/errors_here`, library module `modules/errors/com/example/errors`, module level the refusal `matrix/errors_here_at_module_level`, loop body `matrix/errors_here`, switch arm `matrix/errors_here`, `if let` `matrix/errors_here`, `defer` `matrix/errors_here`, `undo` `matrix/errors_here`, catch handler `matrix/errors_here`, closure `matrix/errors_here`, worker `matrix/errors_here`, `dispatch` or `parallel` `matrix/errors_here`, `sync` block `matrix/errors_here`, `select` arm `matrix/errors_here`, `tests` block `anti-test/com/example/errors`, `fixtures` block `anti-test/com/example/errors`, nested type `matrix/errors_here` | none |
 | `catch none` | `programs/catch_none` | none |
 | `allow(name, "reason")` | `programs/simd_big` | none |
 | `unchecked(name, "reason")` | `programs/lock_free_queue` | none |
@@ -1344,7 +1344,7 @@ The programs below hold them in the places of "The contexts".
   nested in a generic class yet, so that cell cannot exist.
 - A construct that gives a value is refused in a constant: six refusals
   `matrix/classes_*_in_a_constant` and
-  `matrix/classes_call_as_the_default_of_a_field`, T019.
+  `matrix/classes_call_as_the_default_of_a_field`, T028.
 - `matrix/classes_field_kinds` takes a field of each of 29 kinds through
   the default `equals`, the hash and `dup`. `matrix/classes_generic_kinds`
   takes each of 31 kinds through a copy of a generic class, function,
@@ -1711,8 +1711,12 @@ On 2026-10-12, at antic 0.2.0:
   contextual words.
 - 10 item kinds, 22 statement kinds, 38 expression kinds and 10 type kinds
   in `src/antic/ast.h`.
-- 206 rows in the matrix. 2314 cells are held and 25 are
-  open. Of the kinds, 1484 are held and 8 are open. The step `flow` filled
+- 206 rows in the matrix. 2313 cells are held and 25 are
+  open. Of the kinds, 1484 are held and 8 are open. The review of
+  2026-10-13 counted the cells of every table again. It found 58 held cells
+  in the area classes, where the table of the areas said 59. It filled the
+  one open cell of the area flow: a `return` of a value in a `tests` block
+  stands in an anonymous function of a test. The step `flow` filled
   its area after the count of 840 held cells and 578 held kinds. The step
   `values` filled its area after the count of 1157 held cells and 622 held
   kinds. The step `types` filled its area after the count of 1613 held
@@ -1730,3 +1734,9 @@ On 2026-10-12, at antic 0.2.0:
 - 748 messages: 581 expected by a test and 167 open. antic gives 598 with
   29 open, and anti 150 with 138 open.
 - 134 options and commands: 126 passed by a test and 8 open.
+
+On 2026-10-13, after the last step of the test run:
+
+- 748 messages: 731 expected by a test and 17 open. antic gives 598 with 6
+  open, and anti 150 with 11 open. Each open line states why it stays.
+- 134 options and commands: 134 passed by a test and none open.
