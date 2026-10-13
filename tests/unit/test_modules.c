@@ -3197,6 +3197,100 @@ static void signed_numbers(void)
     close_session(&s);
 }
 
+/* A library of the records the sweep below damages: a constraint, a
+   generic that names it, a struct of a constant parameter, a simd struct,
+   a variant, an enum, a class with defaults, a `?T`, a tuple, a length of
+   `size_of` and a hook, and a default of a parameter. */
+static const char sweep_source[] =
+    "pub constraint Small = eq + lt;\n"
+    "pub struct Pair<T, N: int> { v: [N]T, n: int }\n"
+    "pub simd struct Lanes { x: f32, y: f32, z: f32, w: f32 }\n"
+    "pub variant Shape { Circle { r: int }, Empty }\n"
+    "pub enum Color: u8 { Red, Green }\n"
+    "pub class Box\n"
+    "{\n"
+    "    pub w: int = 3,\n"
+    "    pub at: (int, bool) = (1, true),\n"
+    "    pub maybe: ?int,\n"
+    "    pub bytes: [size_of(int)]u8,\n"
+    "    pub operator fn index(self, i: int) -> int\n"
+    "    {\n"
+    "        return self.w + i;\n"
+    "    }\n"
+    "}\n"
+    "pub fn least<T: Small>(own a: T, own b: T) -> T {\n"
+    "    if a < b {\n"
+    "        return a;\n"
+    "    }\n"
+    "    return b;\n"
+    "}\n"
+    "pub fn first<T, N: int>(p: Pair<T, N>) -> T {\n"
+    "    return p.v[0];\n"
+    "}\n"
+    "pub fn half(x: int, s: Shape, c: Color = Color.Green) -> ?int {\n"
+    "    if x < 0 {\n"
+    "        return none;\n"
+    "    }\n"
+    "    return x / 2;\n"
+    "}\n"
+    "pub fn sum(l: Lanes, c: Color) -> f32 {\n"
+    "    return l.x + l.w;\n"
+    "}\n";
+
+/* DESIGN: one byte of a library file changed, at every position, once to
+   the byte with its lowest bit turned and once to 0. The reader either
+   takes the file or refuses it with a message, and a file it takes goes
+   through the verifier as in the driver. The test holds no result per
+   byte. It checks that no change ends the process, and a sanitizer build
+   checks every read of memory on the way. Two values keep the test
+   short: 0xff and the byte plus 16 as well reached three more refusals of
+   the reader for twice the time. */
+static void sweep_file(const char *name, const char *source)
+{
+    struct session s;
+    struct text bytes = {0};
+    uint8_t *copy;
+    size_t at;
+    size_t pokes = 0;
+    size_t refused = 0;
+
+    open_session(&s);
+    if (!build_library(&s, name, source, &bytes)) {
+        close_session(&s);
+        return;
+    }
+    CHECK(reads_file(&bytes));
+    CHECK(verifies_file((const uint8_t *)bytes.data, bytes.length));
+    copy = alloc_zeroed(bytes.length, 1);
+    for (at = 0; at < bytes.length; at++) {
+        const uint8_t old = (uint8_t)bytes.data[at];
+        const uint8_t values[] = {(uint8_t)(old ^ 1), 0};
+        size_t k;
+
+        for (k = 0; k < sizeof values; k++) {
+            if (values[k] == old) {
+                continue;
+            }
+            memcpy(copy, bytes.data, bytes.length);
+            copy[at] = values[k];
+            pokes++;
+            if (!verifies_file(copy, bytes.length)) {
+                refused++;
+            }
+        }
+    }
+    CHECK(refused > 0 && refused < pokes);
+    free(copy);
+    text_free(&bytes);
+    close_session(&s);
+}
+
+static void damaged_bytes(void)
+{
+    sweep_file("sweep", sweep_source);
+    sweep_file("tt", tree_source);
+}
+
 static void damaged_trees(void)
 {
     void (*const damages[])(struct session *) = {
@@ -3223,6 +3317,7 @@ static void damaged_trees(void)
 void test_modules(void)
 {
     damaged_trees();
+    damaged_bytes();
     tree_counts();
     signed_numbers();
     truncated_trees();
