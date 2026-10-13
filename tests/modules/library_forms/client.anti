@@ -1,0 +1,22 @@
+//! Reads each form of the library `parts`.
+
+import anti.lang;
+import com.example.parts;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let b = parts.Node<int> { value: 2, next: none };
+	let a = parts.Node<int> { value: 1, next: &b };
+	let long = size_of(c_long);
+	printf("constants %d %d\n".ptr, (parts.LOW + long) as c_int, (parts.MASK + long) as c_int);
+	printf("chain %d\n".ptr, parts.length(&a) as c_int);
+	let s = parts.sizes();
+	printf("sizes %d %d\n".ptr, (s[0] + long) as c_int, (s[1] + long) as c_int);
+	let k = parts.Keeper { };
+	printf("keeper %d asked %d\n".ptr, k.run() as c_int, parts.asked() as c_int);
+	let p = parts.Plain { };
+	printf("plain %d\n".ptr, p.greeting() as c_int);
+	return 0;
+}

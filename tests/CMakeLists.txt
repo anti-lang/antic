@@ -4106,6 +4106,17 @@ antic_modules_test(generic_class_constant_modules
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/generic-class-constant-modules")
 
+# The forms of a library file that no other library holds: a constant that
+# is the negative and one that is the complement of a size, a struct that
+# names its own copy, a singleton, a `provides` line and an `inject final`
+# field.
+antic_modules_test(library_forms_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/library_forms"
+    LIBRARIES parts
+    PROGRAM client
+    STD lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/library-forms-modules")
+
 # `dispatch`, `join` and `join_all` in a generic function of a library
 # module, whose copy the client compiles. T061 of
 # docs/audit/tests-findings.md.

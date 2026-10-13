@@ -1,0 +1,91 @@
+//! The forms of a library file that no other library holds: a constant that is
+//! the negative and one that is the complement of a size, a struct that names
+//! its own copy, a singleton, a `provides` line and an `inject final` field.
+
+import anti.lang;
+
+/// The negative of a size.
+pub const LOW: int = -size_of(c_long);
+
+/// The complement of a size.
+pub const MASK: int = ~size_of(c_long);
+
+/// A node that names its own copy.
+pub struct Node<T>
+{
+	value: T,
+	next: ?*Node<T>,
+}
+
+/// What the library offers.
+pub abstract class Greeter
+{
+	/// The greeting.
+	pub abstract fn greeting(self) -> int;
+
+	/// The provider of a program that names none.
+	pub fn default() -> *Greeter
+	{
+		return Console.get();
+	}
+}
+
+/// The greeter of the library.
+pub singleton class Console inherits Greeter
+{
+	/// How often the greeting was asked for.
+	pub static atomic asked: int = 0;
+
+	pub concrete fn greeting(self) -> int
+	{
+		Console.asked.add(1);
+		return 7;
+	}
+}
+
+/// The class a host builds for a `Greeter`.
+pub class Plain inherits Greeter
+{
+	pub concrete fn greeting(self) -> int
+	{
+		return 9;
+	}
+}
+
+provides Greeter as Plain;
+
+/// A class whose greeter no run replaces.
+pub class Keeper
+{
+	inject final out: *Greeter,
+
+	/// The greeting of the greeter, and ten.
+	pub fn run(self) -> int
+	{
+		return self.out.greeting() + 10;
+	}
+}
+
+/// How often the greeter of the library was asked.
+pub fn asked() -> int
+{
+	return Console.asked.load();
+}
+
+/// The nodes of a chain.
+pub fn length(n: *Node<int>) -> int
+{
+	let count = 1;
+	let at = n.next;
+	while at != none do {
+		count += 1;
+		at = at.next;
+	}
+	return count;
+}
+
+/// The two constants, which the target decides.
+pub fn sizes() -> [2]int
+{
+	return [-size_of(c_long), ~size_of(c_long)];
+}
