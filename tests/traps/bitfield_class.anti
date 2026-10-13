@@ -1,0 +1,29 @@
+//! A write to a bitfield of a class through a pointer, of a value past its
+//! width.
+
+class Header
+{
+	pub kind: u16 : 9 = 0,
+}
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: u16)
+{
+}
+
+fn set(h: *Header, n: int)
+{
+	h.kind = n as u16;
+}
+
+fn main() -> int
+{
+	let h = Header { };
+	set(&h, opaque(512));
+	sink(h.kind);
+	return 7;
+}

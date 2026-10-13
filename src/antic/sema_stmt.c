@@ -814,6 +814,10 @@ static void check_assign(struct checker *c, struct stmt *s)
         return;
     }
     if (op == TOKEN_ASSIGN) {
+        const struct struct_field *bits = sema_bitfield_of(target);
+        if (bits != NULL) {
+            sema_bitfield_constant(c, s->as.assign.value, bits);
+        }
         sema_bind_value(c, s->as.assign.value, sema_place_name(target), t);
         check_closure_lifetime(c, target, s->as.assign.value);
         return;

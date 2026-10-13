@@ -46,18 +46,18 @@ bool sema_is_place(const struct expr *e)
     }
 }
 
-/* Whether e reads a bitfield, which has no address. */
-static bool is_bitfield(const struct expr *e)
+/* The bitfield that e reads, or NULL. A bitfield has no address. */
+const struct struct_field *sema_bitfield_of(const struct expr *e)
 {
     const struct type *s;
     const struct struct_field *f;
 
     if (e->kind != EXPR_FIELD || e->as.field.base->type == NULL) {
-        return false;
+        return NULL;
     }
     s = sema_struct_of(e->as.field.base->type);
     f = s != NULL ? types_find_field(s, &e->as.field.name) : NULL;
-    return f != NULL && f->bits != 0;
+    return f != NULL && f->bits != 0 ? f : NULL;
 }
 
 void sema_mark_address_taken(struct checker *c, struct expr *e)
@@ -934,7 +934,7 @@ static struct type *check_unary(struct checker *c, struct expr *e,
             sema_error_at(c, operand->pos, "unary `&` needs a place");
             return sema_builtin(c, TYPE_ERROR);
         }
-        if (is_bitfield(operand)) {
+        if (sema_bitfield_of(operand) != NULL) {
             sema_error_at(c, operand->pos, "a bitfield has no address");
             return sema_builtin(c, TYPE_ERROR);
         }

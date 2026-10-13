@@ -1,0 +1,54 @@
+//! The least and the largest constant of a bitfield, in a write, in a literal
+//! and in a default. R048 of "Rules of 2026-10-13" refuses the constants beyond
+//! them.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const HIGH: i8 = 3;
+
+struct Narrow
+{
+	a: u8 : 3,
+	b: i8 : 3,
+	c: i8 : 1,
+	d: u64 : 64,
+	e: i32 : 31,
+}
+
+class Header
+{
+	pub kind: u8 : 4 = 15,
+	pub level: i8 : 4 = -8,
+}
+
+union Bits
+{
+	whole: u32,
+	low: u32 : 4,
+}
+
+fn main() -> int
+{
+	let x = Narrow {
+		a: 7, b: -4, c: -1, d: 0xFFFFFFFFFFFFFFFF,
+		e: 1073741823
+	};
+	printf("literal %d %d %d %llu %d\n".ptr, x.a as c_int, x.b as c_int,
+		x.c as c_int, x.d, x.e);
+	x.a = 0;
+	x.b = HIGH;
+	x.c = 0;
+	x.d = 0;
+	x.e = -1073741824;
+	printf("write %d %d %d %llu %d\n".ptr, x.a as c_int, x.b as c_int,
+		x.c as c_int, x.d, x.e);
+	x.a = 3 + 4;
+	x.b = HIGH - 7;
+	printf("expression %d %d\n".ptr, x.a as c_int, x.b as c_int);
+	let h = Header { };
+	printf("default %d %d\n".ptr, h.kind as c_int, h.level as c_int);
+	let u = Bits { whole: 0 };
+	u.low = 15;
+	printf("union %u\n".ptr, u.whole);
+	return 0;
+}

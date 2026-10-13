@@ -8,10 +8,6 @@ union reads b fab -85
 union writes 12345ffe
 constant widths 15 9 1
 unit breaks 5 3
-write past the width 5 -3
-literal past the width 1 -1
-compound past the width 0 -4
-wrapping and saturating 0 -1
 failing call 15 -7 1 2
 flags form 1 1 14 0
 lent elements 11 22 33 -9

@@ -1,0 +1,6 @@
+exit 0
+literal 7 -4 -1 18446744073709551615 1073741823
+write 0 3 0 0 -1073741824
+expression 7 -4
+default 15 -8
+union 15

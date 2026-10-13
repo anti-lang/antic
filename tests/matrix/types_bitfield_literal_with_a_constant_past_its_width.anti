@@ -1,0 +1,14 @@
+//! A constant in a literal fits the width of the bitfield it fills, by R048 of
+//! "Rules of 2026-10-13".
+
+struct Narrow
+{
+	a: u8 : 3,
+	b: i8 : 3,
+}
+
+fn main() -> int
+{
+	let x = Narrow { a: 9, b: 0 };
+	return x.a as int;
+}

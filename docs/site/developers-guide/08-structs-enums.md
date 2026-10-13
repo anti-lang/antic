@@ -493,7 +493,8 @@ A union has no default `==`, since no field says which bytes hold the value. A s
 A bitfield is a field with a width in bits after its type, `kind: u8 : 4`. The type is an integer of a fixed width, and its signedness decides how a read widens. The width is from 1 to the bits of the type.
 
 - A read gives a value of the field's type. `mid: i32 : 5` holds -16 to 15 and reads as an `i32`.
-- A write keeps the low bits of the value and drops the rest, in dev mode as in release mode. No check reports a value that does not fit.
+- A write takes a value that fits the width. A constant that does not fit is refused, in a write, in a literal and in the default of a field. A dev build stops a write, a compound assignment and a literal whose value does not fit, as it stops a narrowing `as`. A release build keeps the low bits of the value.
+- `+%=`, `-%=`, `*%=` and `<<%=` wrap at the width of the field, and `+|=`, `-|=` and `*|=` saturate at its ends. None of them is checked.
 - A bitfield has no address. `&h.kind` is refused.
 - `_: u32 : 0` is the zero-width bitfield of C. It ends the unit, so the next field starts at the next multiple of the alignment of its type. The name `_` names nothing, and no literal mentions it.
 - A struct, a union and a class body hold bitfields. A union holds no zero-width one.
@@ -536,10 +537,10 @@ export fn wide_size() -> int
 fn main() -> int
 {
 	let h = Header { kind: 9, mode: 2, length: 7 };
-	h.kind = 0x1f as u8;
+	h.kind = 15;
 	let b = Bits { low: 7, mid: -3, high: 1000, last: 1 };
 	let before = mid(&b);
-	set_mid(&b, 21);
+	set_mid(&b, -11);
 	let w = Word { whole: 0x0000000100000002 };
 	let line = f"kind {h.kind}, mode {h.mode}, mid {before} {mid(&b)}, high {b.high}, halves {w.halves[0]} {high_half(&w)}, byte {w.small[0]}";
 	io.println(line);
@@ -556,7 +557,7 @@ kind 15, mode 2, mid -3 -11, high 1000, halves 2 1, byte 2
 sizes: Header 8, Bits 8, Wide 4, Word 8, Odd 3
 ```
 
-`h.kind = 0x1f as u8` stores four bits, so `kind` reads 15. `set_mid(&b, 21)` stores the five bits `10101`, which a signed field of five bits reads as -11. `Bits` holds 33 bits: the first three fields fill one `u32`, and `last` starts a second one.
+`h.kind = 15` is the largest value of four bits, and `h.kind = 16` is refused with `` `16` does not fit the 4 bits of `kind` ``. `set_mid(&b, -11)` stores the five bits `10101`. A dev build stops `set_mid(&b, 21)`, whose five low bits are the same, with `value out of range for the 5 bits of mid: value 21`. `Bits` holds 33 bits: the first three fields fill one `u32`, and `last` starts a second one.
 
 The checker refuses each of the following.
 
@@ -632,19 +633,24 @@ define dso_local noundef i32 @mid(ptr noundef nonnull dereferenceable(8) %p0) #0
 ...
 define dso_local void @set_mid(ptr noundef nonnull dereferenceable(8) %p0, i32 noundef %p1) #0 {
 ...
-  %v2 = load i8, ptr %v1, align 1
-  %v3 = trunc i32 %v0 to i8
-  %v4 = and i8 %v3, 31
-  %v5 = shl i8 %v4, 3
-  %v6 = and i8 %v2, 7
-  %v7 = or i8 %v6, %v5
-  store i8 %v7, ptr %v1, align 1
+  %v1 = add i32 %v0, 16
+...
+  %v3 = icmp ult i32 %v2, 32
+...
+  %v13 = load i8, ptr %v12, align 1
+  %v14 = trunc i32 %v11 to i8
+  %v15 = and i8 %v14, 31
+  %v16 = shl i8 %v15, 3
+  %v17 = and i8 %v13, 7
+  %v18 = or i8 %v17, %v16
+  store i8 %v18, ptr %v12, align 1
 ```
 
 `mid` takes bits 3 to 7 of the struct, which lie in its first byte, so its unit is an `i8`.
 
 - The read loads the byte. `ashr i8 %v1, 3` moves the field to the bottom and fills from its sign bit, and `sext` widens it to the `i32` of the field's type. An unsigned field shifts with `lshr` and masks.
-- The write loads the byte and truncates the new value. `and i8 %v3, 31` keeps five bits and `shl` moves them into place. `and i8 %v2, 7` clears the field in the old byte, `or` joins the two and the `store` writes the byte back.
+- The write of a dev build checks the value first. `add i32 %v0, 16` moves the range -16 to 15 of the field to 0 to 31, and `icmp ult i32 %v2, 32` holds both ends in one comparison. A value outside them branches to the block that calls `anti_rt_check_failed`.
+- The write loads the byte and truncates the new value. `and i8 %v14, 31` keeps five bits and `shl` moves them into place. `and i8 %v13, 7` clears the field in the old byte, `or` joins the two and the `store` writes the byte back.
 
 The write is a load and a store of the unit. Two threads that write two bitfields of one unit therefore race, as they do in C.
 
@@ -699,14 +705,14 @@ Where it lives: `compute` and `bit_unit` of `src/antic/layout.c`. `lower_place` 
 | A write of a bitfield | one load, two masks, one shift, one `or`, one store | five instructions in `set_mid` |
 | Heap allocations, calls into the runtime | 0 | 0 |
 | Atomic operations and locks | 0, the write is not atomic | 0 |
-| Checks inserted | none, a write truncates | none |
+| Checks inserted | one comparison and one branch per write of a value that is no constant | none, a write truncates |
 
 ### Pitfalls
 
 For a Java programmer:
 
 - A union does not know which field it holds. A variant of this chapter does.
-- A write to a bitfield drops the bits that do not fit and reports nothing.
+- A write to a bitfield of a value that does not fit stops a dev build. A release build drops the bits that do not fit and reports nothing.
 
 For a C programmer:
 

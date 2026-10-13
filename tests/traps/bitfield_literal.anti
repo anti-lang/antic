@@ -1,0 +1,23 @@
+//! A literal that fills a bitfield with a value past its width.
+
+struct Narrow
+{
+	a: u8 : 3,
+	b: i32 : 20,
+}
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: i32)
+{
+}
+
+fn main() -> int
+{
+	let x = Narrow { a: 1, b: opaque(524288) as i32 };
+	sink(x.b);
+	return 7;
+}

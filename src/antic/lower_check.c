@@ -214,6 +214,94 @@ struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
     }
 }
 
+/* DESIGN: a value stored into a bitfield fits its width, by R048 of
+   "Rules of 2026-10-13", as the value of a narrowing `as` fits its type.
+   The type of a bitfield is an integer of a fixed width, so both ends are
+   numbers of the IR. One unsigned comparison holds both ends of a signed
+   field of n bits: the value plus 2^(n-1) is below 2^n. The sum wraps for
+   no value that fits, and a value it wraps for lands at or above 2^n. A
+   field as wide as its type holds every value of the type. A number of
+   the IR that fits is one the checker held already and gets no test. */
+void lower_bitfield_check(struct lowerer *l, const struct struct_field *field,
+                          struct ir_operand v, int line)
+{
+    enum ir_type type = lower_ir_type_of(field->type);
+    bool is_signed = types_is_signed(field->type);
+    int bits = field->bits;
+    struct ir_operand moved = v;
+    struct ir_operand ok;
+    struct text operation = {0};
+
+    if (bits == 0 || bits >= types_bits(field->type)) {
+        return;
+    }
+    if (v.kind == IR_INT) {
+        int width = types_bits(field->type);
+        uint64_t half = is_signed ? (uint64_t)1 << (bits - 1) : 0;
+        uint64_t mask =
+            width == 64 ? UINT64_MAX : ((uint64_t)1 << width) - 1;
+        if (((v.as.integer + half) & mask) < (uint64_t)1 << bits) {
+            return;
+        }
+    }
+    if (is_signed) {
+        moved = lower_temp(l, ir_binary(l->f, l->b, IR_ADD, type, v,
+                                        ir_int_op(type,
+                                                  (uint64_t)1 << (bits - 1))));
+    }
+    ok = lower_temp(l, ir_binary(l->f, l->b, IR_ULT, IR_I8, moved,
+                                 ir_int_op(type, (uint64_t)1 << bits)));
+    text_appendf(&operation, "value out of range for the %d bit%s of %.*s",
+                 bits, bits == 1 ? "" : "s", (int)field->name.length,
+                 field->name.text);
+    lower_check_branch(l, ok, false,
+                       lower_check_text(l, line, text_cstr(&operation)),
+                       is_signed ? CHECK_VALUE : CHECK_VALUE_U, v,
+                       lower_none(), field->type);
+    text_free(&operation);
+}
+
+/* DESIGN: `+|=`, `-|=` and `*|=` on a bitfield saturate at its width, by
+   R049 of "Rules of 2026-10-13". The operator has saturated v at the type
+   of the field, and holding that to the ends of the narrower width gives
+   what the operator gives at the width. The IR has no smaller-of-two, so
+   each end is a saturating step of the type and its inverse: v plus the
+   distance from the largest value of the field to the largest of the
+   type saturates exactly where v is above the field, and less that
+   distance it is the smaller of v and the end. The least end of a signed
+   field is the same with `-`. */
+struct ir_operand lower_bitfield_saturate(struct lowerer *l,
+                                          const struct struct_field *field,
+                                          struct ir_operand v)
+{
+    enum ir_type type = lower_ir_type_of(field->type);
+    bool is_signed = types_is_signed(field->type);
+    int width = types_bits(field->type);
+    int bits = field->bits;
+    uint64_t all = width == 64 ? UINT64_MAX : ((uint64_t)1 << width) - 1;
+    uint64_t above;
+    struct ir_operand distance;
+
+    if (bits == 0 || bits >= width) {
+        return v;
+    }
+    /* Both ends of a signed field lie the same distance inside the ends
+       of its type. */
+    above = is_signed ? (all >> 1) - (((uint64_t)1 << (bits - 1)) - 1)
+                      : all - (((uint64_t)1 << bits) - 1);
+    distance = ir_int_op(type, above);
+    v = lower_temp(l, ir_binary(l->f, l->b,
+                                is_signed ? IR_ADD_SAT_S : IR_ADD_SAT_U, type,
+                                v, distance));
+    v = lower_temp(l, ir_binary(l->f, l->b, IR_SUB, type, v, distance));
+    if (is_signed) {
+        v = lower_temp(l, ir_binary(l->f, l->b, IR_SUB_SAT_S, type, v,
+                                    distance));
+        v = lower_temp(l, ir_binary(l->f, l->b, IR_ADD, type, v, distance));
+    }
+    return v;
+}
+
 /* DESIGN: unary `-` of a signed integer is 0 less the value, so its
    overflow test is that of a subtraction, by R031 of "Rules of
    2026-10-13". The least value is the one that fails it. A build without

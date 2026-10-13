@@ -139,36 +139,6 @@ fn widths_and_breaks()
 	printf("unit breaks %d %d\n".ptr, b.a as c_int, b.b as c_int);
 }
 
-// A value that does not fit the width keeps its low bits, in a literal, in a
-// write and in a compound assignment. The wrapping and the saturating forms
-// compute in the type of the field and then keep the low bits.
-
-struct Narrow
-{
-	a: u8 : 3,
-	b: i8 : 3,
-}
-
-fn values_past_the_width()
-{
-	let n = 13;
-	let x = Narrow { a: 0, b: 0 };
-	x.a = n as u8;
-	x.b = n as i8;
-	printf("write past the width %d %d\n".ptr, x.a as c_int, x.b as c_int);
-	let y = Narrow { a: 9, b: 0 };
-	y.b = 7;
-	printf("literal past the width %d %d\n".ptr, y.a as c_int, y.b as c_int);
-	let z = Narrow { a: 7, b: 3 };
-	z.a += 1;
-	z.b += 1;
-	printf("compound past the width %d %d\n".ptr, z.a as c_int, z.b as c_int);
-	let w = Narrow { a: 7, b: 3 };
-	w.a +%= 1;
-	w.b +|= 100;
-	printf("wrapping and saturating %d %d\n".ptr, w.a as c_int, w.b as c_int);
-}
-
 // Where another rule meets a bitfield.
 
 struct Mixed
@@ -374,7 +344,6 @@ fn main() -> int
 	fields_of_a_packed_struct();
 	fields_of_a_union();
 	widths_and_breaks();
-	values_past_the_width();
 	other_rules();
 	unions_of_every_kind();
 	unions_in_other_types();

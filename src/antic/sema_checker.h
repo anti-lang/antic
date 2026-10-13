@@ -341,6 +341,7 @@ bool sema_check_object_from(struct checker *c, struct expr *e,
 /* sema_expr.c */
 
 bool sema_is_place(const struct expr *e);
+const struct struct_field *sema_bitfield_of(const struct expr *e);
 void sema_mark_address_taken(struct checker *c, struct expr *e);
 bool sema_spell(struct text *out, const struct expr *e);
 struct type *sema_usable_pointer(struct checker *c, const struct expr *e,
@@ -514,6 +515,10 @@ bool sema_undefined_on_constants(struct checker *c, struct expr *e,
    array. True when it reported. */
 bool sema_index_below_zero(struct checker *c, struct expr *e,
                            const struct type *array);
+/* Report a constant value that does not fit the width of the bitfield
+   field. True when it reported. */
+bool sema_bitfield_constant(struct checker *c, struct expr *value,
+                            const struct struct_field *field);
 bool sema_eval_const(struct checker *c, struct expr *e,
                      struct const_value *out);
 bool sema_const_symbol(struct checker *c, struct symbol *sym,

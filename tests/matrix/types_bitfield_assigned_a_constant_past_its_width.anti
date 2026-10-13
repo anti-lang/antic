@@ -1,0 +1,14 @@
+//! A constant written to a bitfield fits its width, by R048 of "Rules of
+//! 2026-10-13". 8 needs four bits.
+
+struct Narrow
+{
+	a: u8 : 3,
+}
+
+fn main() -> int
+{
+	let x = Narrow { a: 0 };
+	x.a = 8;
+	return x.a as int;
+}

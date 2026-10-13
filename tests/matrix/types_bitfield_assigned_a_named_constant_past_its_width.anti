@@ -1,0 +1,16 @@
+//! A named constant and an expression of constants are constants as a literal
+//! is, by R048 of "Rules of 2026-10-13".
+
+const HIGH: i8 = 3;
+
+struct Narrow
+{
+	b: i8 : 3,
+}
+
+fn main() -> int
+{
+	let x = Narrow { b: 0 };
+	x.b = HIGH + 1;
+	return x.b as int;
+}

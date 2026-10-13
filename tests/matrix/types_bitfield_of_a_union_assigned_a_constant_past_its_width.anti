@@ -1,0 +1,15 @@
+//! A bitfield of a union takes a constant of its width alone, by R048 of "Rules
+//! of 2026-10-13".
+
+union Bits
+{
+	whole: u32,
+	low: u32 : 4,
+}
+
+fn main() -> int
+{
+	let u = Bits { whole: 0 };
+	u.low = 16;
+	return u.whole as int;
+}

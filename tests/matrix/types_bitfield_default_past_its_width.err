@@ -1,0 +1,1 @@
+types_bitfield_default_past_its_width.anti:6:21: error: `16` does not fit the 4 bits of `kind`

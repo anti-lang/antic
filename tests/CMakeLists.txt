@@ -4864,6 +4864,24 @@ if(ANTIC_LLVM_MC)
     antic_check_test(shift_wrap_negative_compound "shift count out of range"
         "shift_wrap_negative_compound\\.anti:[0-9]+: shift count out of range for <<%: count -1, width 8"
         ON)
+    # R048: a value that does not fit the width of a bitfield stops a dev
+    # build where it is stored, in a write, a compound assignment and a
+    # literal.
+    antic_check_test(bitfield_write "out of range"
+        "bitfield_write\\.anti:[0-9]+: value out of range for the 3 bits of a: value 13"
+        ON)
+    antic_check_test(bitfield_write_signed "out of range"
+        "bitfield_write_signed\\.anti:[0-9]+: value out of range for the 3 bits of b: value -5"
+        ON)
+    antic_check_test(bitfield_compound "out of range"
+        "bitfield_compound\\.anti:[0-9]+: value out of range for the 3 bits of a: value 8"
+        ON)
+    antic_check_test(bitfield_literal "out of range"
+        "bitfield_literal\\.anti:[0-9]+: value out of range for the 20 bits of b: value 524288"
+        ON)
+    antic_check_test(bitfield_class "out of range"
+        "bitfield_class\\.anti:[0-9]+: value out of range for the 9 bits of kind: value 512"
+        ON)
     # Decision 24 of "Decisions of 2026-10-11": a dev build checks the
     # bounds of `xs[lo..hi]` as it checks an index.
     antic_check_test(slice_range "out of bounds"

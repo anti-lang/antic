@@ -1,0 +1,14 @@
+//! A signed bitfield of three bits holds -4 to 3, by R048 of "Rules of
+//! 2026-10-13".
+
+struct Narrow
+{
+	b: i8 : 3,
+}
+
+fn main() -> int
+{
+	let x = Narrow { b: 0 };
+	x.b = -5;
+	return x.b as int;
+}

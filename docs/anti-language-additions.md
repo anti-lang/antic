@@ -171,6 +171,7 @@ The switch is the one `assert` uses: emitted in dev mode, absent in release, dec
 - Conversions. `char` and an enum are checked with the integers. A value converted to `char` must be a Unicode scalar value, and one converted to an enum must be a value the enum declares. Both are narrowing in the sense above, and the same routine reports them.
 - Overflow. `+`, `-` and `*` on signed integers are checked. The back end detects overflow with the target's cheapest sequence. Where the instruction sets the overflow flag the check branches on it, which covers `+` and `-` on both architectures and `*` on x86_64. Where no instruction sets it the check multiplies into twice the width and compares the halves against the sign of the result, which covers `*` on ARM64. A narrowing `as` checks the range. The least value divided by minus one, its remainder by minus one and unary `-` of the least value are overflows too, and the check reports them, by R031 of "Rules of 2026-10-13" in `docs/decisions.md`. Unsigned arithmetic wraps and is not checked.
 - Division and shifts. `/` and `%` by zero are checked on every target. ARM64 returns zero for them and x86_64 traps by itself. That trap is a signal with no message, and the check reports the file, the line and the values as every other check does. Release gives the ARM64 result on every target, the same result everywhere: `x / 0` and `x % 0` give 0, the least value divided by minus one gives itself with a remainder of 0, a shift takes its count modulo the width, and a float out of the range of the integer type saturates, with 0 for NaN. A shift count negative or at or above the width is checked on both. `<<%` checks its count against zero alone, by R032.
+- Bitfields. A value stored into a bitfield must fit its width, by R048 of "Rules of 2026-10-13". A write, a plain compound assignment and a field of a literal are checked as a narrowing `as` is. A constant that does not fit is refused. The wrapping and the saturating compound assignments are not checked.
 - None. Not needed. A dereference of `none` cannot be written without a check the compiler demanded.
 - A failed check calls the runtime's failure routine. It prints the file, the line, the operation and the values, then aborts.
 - Cost in a dev build: a compare and a not-taken branch per checked operation. Cost in release: none.
@@ -181,7 +182,7 @@ The switch is the one `assert` uses: emitted in dev mode, absent in release, dec
 - `+| -| *|` clamp at the type's minimum or maximum. Both CPUs have a two-instruction form.
 - Both families apply to integer types only, both operands of one type, and follow the precedence of the plain operator.
 - The plain operators keep their meaning: a trap on overflow in dev mode, a wrap in release.
-- Each has a compound assignment, `+%= -%= *%= <<%=` and `+|= -|= *|=`, which gives what `x = x op e` gives.
+- Each has a compound assignment, `+%= -%= *%= <<%=` and `+|= -|= *|=`, which gives what `x = x op e` gives. On a bitfield the first four wrap at the width of the field, by R049. The other three clamp at the ends of that width.
 - `mul_high(a, b) -> T` is a built-in like `size_of` and returns the upper half of the full product.
 
 ## Flags

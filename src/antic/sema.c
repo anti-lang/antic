@@ -2543,7 +2543,9 @@ static void declare_fields(struct checker *c, struct item *it)
                                          fields[j].type),
                          fields[j].type)) {
             v = arena_alloc(c->arena, sizeof *v);
-            if (sema_eval_const(c, it->params[j].value, v)) {
+            if (sema_eval_const(c, it->params[j].value, v) &&
+                !sema_bitfield_constant(c, it->params[j].value,
+                                        &fields[j])) {
                 fields[j].constant = v;
             }
         }

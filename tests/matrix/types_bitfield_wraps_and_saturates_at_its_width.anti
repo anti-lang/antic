@@ -1,0 +1,97 @@
+//! `+%=` wraps and `+|=` saturates at the width of a bitfield, by R049 of
+//! "Rules of 2026-10-13", and so do the forms of `-`, `*` and `<<%`. A line
+//! names its operator and its field.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Narrow
+{
+	a: u8 : 3,
+	b: i8 : 3,
+	c: u32 : 20,
+	d: i64 : 40,
+}
+
+class Counter
+{
+	pub n: u8 : 4 = 0,
+	pub s: i16 : 5 = 0,
+}
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn wrapping()
+{
+	let w = Narrow { a: 7, b: 3, c: 0xFFFFF, d: 0 };
+	w.a +%= 1;
+	w.b +%= 1;
+	w.c +%= 2;
+	printf("+%%= %d %d %u\n".ptr, w.a as c_int, w.b as c_int, w.c);
+	w.a -%= 1;
+	w.b -%= 1;
+	w.c -%= 3;
+	printf("-%%= %d %d %u\n".ptr, w.a as c_int, w.b as c_int, w.c);
+	w.a = 5;
+	w.b = 3;
+	w.a *%= 3;
+	w.b *%= 3;
+	printf("*%%= %d %d\n".ptr, w.a as c_int, w.b as c_int);
+	w.a = 5;
+	w.b = 1;
+	w.a <<%= 1;
+	w.b <<%= 2;
+	printf("<<%%= %d %d\n".ptr, w.a as c_int, w.b as c_int);
+}
+
+fn saturating()
+{
+	let s = Narrow { a: 6, b: 3, c: 0xFFFFE, d: 549755813887 };
+	s.a +|= 100;
+	s.b +|= 100;
+	s.c +|= 5;
+	s.d +|= 1;
+	printf("+|= %d %d %u %lld\n".ptr, s.a as c_int, s.b as c_int, s.c, s.d);
+	s.a = 2;
+	s.b = -3;
+	s.d = -549755813888;
+	s.a -|= 5;
+	s.b -|= 100;
+	s.d -|= 7;
+	printf("-|= %d %d %lld\n".ptr, s.a as c_int, s.b as c_int, s.d);
+	s.a = 3;
+	s.b = -3;
+	s.c = 1024;
+	s.a *|= 3;
+	s.b *|= 2;
+	s.c *|= 1024;
+	printf("*|= %d %d %u\n".ptr, s.a as c_int, s.b as c_int, s.c);
+	s.a = 2;
+	s.b = -2;
+	s.a +|= opaque(1) as u8;
+	s.b -|= opaque(1) as i8;
+	printf("inside the width %d %d\n".ptr, s.a as c_int, s.b as c_int);
+}
+
+fn fields_of_a_class()
+{
+	let c = Counter { n: 15, s: 15 };
+	c.n +%= 2;
+	c.s +%= 1;
+	printf("class +%%= %d %d\n".ptr, c.n as c_int, c.s as c_int);
+	c.n = 14;
+	c.s = -15;
+	c.n +|= 9;
+	c.s -|= 9;
+	printf("class +|= and -|= %d %d\n".ptr, c.n as c_int, c.s as c_int);
+}
+
+fn main() -> int
+{
+	wrapping();
+	saturating();
+	fields_of_a_class();
+	return 0;
+}

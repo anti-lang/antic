@@ -436,6 +436,47 @@ bool sema_undefined_on_constants(struct checker *c, struct expr *e,
                              e->kind == EXPR_BINARY ? &b : NULL, false);
 }
 
+/* DESIGN: a constant stored into a bitfield fits its width, by R048 of
+   "Rules of 2026-10-13", as a constant fits the type of a narrowing `as`.
+   A signed field of n bits holds -2^(n-1) to 2^(n-1) - 1, and an unsigned
+   one 0 to 2^n - 1. A value that is no constant is checked where a dev
+   build stores it. value is checked already and has the type of field. */
+bool sema_bitfield_constant(struct checker *c, struct expr *value,
+                            const struct struct_field *field)
+{
+    struct const_value v;
+    struct context saved;
+    struct text x = {0};
+    int bits = field->bits;
+    bool constant;
+    bool fits;
+
+    if (bits == 0 || bits >= 64 || !types_is_integer(field->type)) {
+        return false;
+    }
+    sema_enter_quiet(c, &saved);
+    constant = sema_eval_const(c, value, &v);
+    sema_leave(c, &saved);
+    if (!constant || v.kind != CONST_INT) {
+        return false;
+    }
+    fits = types_is_signed(field->type)
+               ? sema_signed_bits(v.as.integer) >=
+                         -((int64_t)1 << (bits - 1)) &&
+                     sema_signed_bits(v.as.integer) <
+                         ((int64_t)1 << (bits - 1))
+               : v.as.integer < ((uint64_t)1 << bits);
+    if (fits) {
+        return false;
+    }
+    operand_text(&x, value, &v);
+    sema_error_at(c, value->pos, "`%s` does not fit the %d bit%s of `%.*s`",
+                  text_cstr(&x), bits, bits == 1 ? "" : "s",
+                  (int)field->name.length, field->name.text);
+    text_free(&x);
+    return true;
+}
+
 /* DESIGN: a constant index below zero on a fixed array names no element,
    by R030 of "Rules of 2026-10-13", as decision 24 of "Decisions of
    2026-10-11" says of one past the end. The length is a number, or the

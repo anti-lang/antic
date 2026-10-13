@@ -1,0 +1,1 @@
+types_bitfield_literal_with_a_constant_past_its_width.anti:12:22: error: `9` does not fit the 3 bits of `a`

@@ -232,6 +232,7 @@ static bool place_address(struct lowerer *l, const struct expr *e,
     const struct type *owner = NULL;
 
     p->bitfield = false;
+    p->bits = NULL;
     p->in_temp = false;
     p->object = lower_none();
     p->owner = NULL;
@@ -268,6 +269,7 @@ static bool place_address(struct lowerer *l, const struct expr *e,
             /* Every class of a chain starts at the address of the
                object, so the unit is found from there. */
             p->bitfield = true;
+            p->bits = bits;
             p->agg = lower_agg_of(l, owner);
             p->field = (uint32_t)(bits - owner->fields);
             p->address = base->type->kind == TYPE_POINTER

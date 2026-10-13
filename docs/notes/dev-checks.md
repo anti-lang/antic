@@ -69,6 +69,18 @@ every width. An unsigned source and a signed target need it only where the
 target is no wider. A target-sized type needs no case of its own, because the
 round trip passes wherever the conversion turns into a copy.
 
+Bitfields. `lower_bitfield_check` in `src/antic/lower_check.c`, by R048 of "Rules of
+2026-10-13". The type of a bitfield is an integer of a fixed width, so the two ends
+of a field of n bits are numbers of the IR. An unsigned value is compared with 2^n.
+A signed value plus 2^(n-1) is compared with 2^n as unsigned, which holds both ends
+in one comparison. `lower_assign` calls it for `=` and for a plain compound
+assignment, and `prepare` of `lower_owning.c` for a field of a literal. A number
+of the IR that fits gets no test, since the checker held it. `+%=` and the other
+wrapping forms keep the low bits and need none. `lower_bitfield_saturate` holds the
+result of `+|=`, `-|=` and `*|=` to the ends of the field, by R049. The IR has no
+smaller-of-two, so each end is a saturating add or subtract of the type and its
+inverse.
+
 Conversions to `char` and to an enum replace the two tests with one of their
 own, in `scalar_check` and `enum_check`. A `char` must be at most `0x10FFFF`
 and outside the surrogates, which is one unsigned comparison and one more on

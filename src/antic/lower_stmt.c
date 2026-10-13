@@ -828,6 +828,25 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
     if (p.in_temp) {
         ir_assign(l->f, l->b, p.temp, v);
     } else if (p.bitfield) {
+        /* DESIGN: a wrapping operator keeps the low bits of its result,
+           which is the wrap at the width of the field, so the store
+           needs no check. A saturating one is held to the ends of the
+           field. Every other value is checked against the width. */
+        switch (s->as.assign.op) {
+        case TOKEN_PLUS_WRAP_ASSIGN:
+        case TOKEN_MINUS_WRAP_ASSIGN:
+        case TOKEN_STAR_WRAP_ASSIGN:
+        case TOKEN_SHL_WRAP_ASSIGN:
+            break;
+        case TOKEN_PLUS_SAT_ASSIGN:
+        case TOKEN_MINUS_SAT_ASSIGN:
+        case TOKEN_STAR_SAT_ASSIGN:
+            v = lower_bitfield_saturate(l, p.bits, v);
+            break;
+        default:
+            lower_bitfield_check(l, p.bits, v, target->pos.line);
+            break;
+        }
         ir_bitstore(l->f, l->b, p.type, v, p.address, p.agg, p.field);
     } else {
         ir_store(l->f, l->b, p.type, v, p.address);

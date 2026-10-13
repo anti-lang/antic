@@ -1200,7 +1200,9 @@ void test_lower(void)
     runtime_types();
     flag_reads();
     /* A bitfield is read and written through the address of its struct and
-       the field, and the back end lowers both to shifts and masks. */
+       the field, and the back end lowers both to shifts and masks. A value
+       that is no constant is checked against the width before its store,
+       by R048 of "Rules of 2026-10-13". */
     lowers("struct Flags { visible: u32 : 1, level: i8 : 3 }\n"
            "fn f(p: *Flags) -> i8 {\n"
            "    p.visible = 1;\n"
@@ -1217,6 +1219,7 @@ void test_lower(void)
            "global main.Flags.fields [2]anti.rt.Field { anti.rt.Field { @main.2, i64 7, offset_of main.Flags.visible, i64 0, i64 0, ptr 0 }, anti.rt.Field { @main.3, i64 5, offset_of main.Flags.level, i64 0, i64 0, ptr 0 } }\n"
            "global main.package.version size 6 align 1 bytes 30 2e 30 2e 30 00\n"
            "global main.6 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00\n"
+           "global main.7 size 51 align 1 bytes 6d 61 69 6e 3a 34 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 74 68 65 20 33 20 62 69 74 73 20 6f 66 20 6c 65 76 65 6c 00\n"
            "fn main.f(%0: ptr nonnull deref(size_of main.Flags)) -> i8 signext {\n"
            "b0:\n"
            "    bitstore i32 1, %0, main.Flags.visible\n"
@@ -1230,9 +1233,18 @@ void test_lower(void)
            "    call void @anti_rt_check_failed(%5, 21, 1, %3, %4)\n"
            "    unreachable\n"
            "b2:\n"
+           "    %6 = add i8 %2, 4\n"
+           "    %7 = ult i8 %6, 8\n"
+           "    branch %7, b4, b3\n"
+           "b3:\n"
+           "    %8 = sext i64 %2\n"
+           "    %9 = addr @main.7\n"
+           "    call void @anti_rt_check_failed(%9, 50, 2, %8, 0)\n"
+           "    unreachable\n"
+           "b4:\n"
            "    bitstore i8 %2, %0, main.Flags.level\n"
-           "    %6 = bitload i8 %0, main.Flags.level\n"
-           "    ret i8 %6\n"
+           "    %10 = bitload i8 %0, main.Flags.level\n"
+           "    ret i8 %10\n"
            "}\n");
     /* packed and align(N) reach the type table, and the back end lays the
        types out. */

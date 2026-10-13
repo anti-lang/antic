@@ -226,6 +226,7 @@ struct place {
     bool bitfield;
     uint32_t agg;                   /* bitfield */
     uint32_t field;                 /* bitfield */
+    const struct struct_field *bits; /* bitfield: its declaration */
     /* A field of a struct or a class: the start of the value that holds
        it and its type. The `changed` hook takes both. */
     struct ir_operand object;
@@ -420,6 +421,13 @@ struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
                                       struct ir_operand right, int line);
 void lower_bounds_check(struct lowerer *l, const struct expr *e,
                         struct ir_operand index, struct ir_operand length);
+/* The check of a dev build that v fits the width of the bitfield field,
+   and v held to the ends of that width. */
+void lower_bitfield_check(struct lowerer *l, const struct struct_field *field,
+                          struct ir_operand v, int line);
+struct ir_operand lower_bitfield_saturate(struct lowerer *l,
+                                          const struct struct_field *field,
+                                          struct ir_operand v);
 
 /* lower_hook.c */
 

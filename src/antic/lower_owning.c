@@ -787,6 +787,7 @@ static void prepare(struct lowerer *l, const struct type *t,
         const struct struct_field *field = types_find_field(at, &init->name);
         if (field->bits != 0) {
             struct ir_operand v = lower_expr(l, init->value);
+            lower_bitfield_check(l, field, v, init->value->pos.line);
             ir_bitstore(l->f, l->b, lower_ir_type_of(field->type), v, dest,
                         lower_agg_of(l, at), (uint32_t)(field - at->fields));
             continue;

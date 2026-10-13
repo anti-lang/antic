@@ -908,8 +908,13 @@ Where two rules meet, and where three do:
 - A bitfield and a failing call, the flags form, a closure, a lent element,
   `==` and the hash: the part `other_rules` of
   `types_bitfields_and_unions`.
-- A bitfield, a value past its width and the wrapping and saturating
-  forms: the part `values_past_the_width` of the same program.
+- A bitfield and a constant past its width, by R048: the six refusals
+  `types_bitfield_*_past_its_width` and
+  `types_bitfield_assigned_a_constant_below_its_range`, and the ends that
+  fit in `types_bitfield_constants_at_the_ends`. The checks of a dev
+  build are the five `check_bitfield_*` tests of `tests/traps/`.
+- A bitfield and the wrapping and saturating forms, by R049:
+  `types_bitfield_wraps_and_saturates_at_its_width`.
 - An enum, two names of one number and a `switch`: the line `switch on one
   number twice` of `types_enums_and_variants`, and the refusal
   `types_switch_on_one_number_twice`.

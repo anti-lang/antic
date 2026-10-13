@@ -2650,6 +2650,8 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
                           sema_check_expr(c, inits[i].value, f->type),
                           f->type)) {
             ok = false;
+        } else if (sema_bitfield_constant(c, inits[i].value, f)) {
+            ok = false;
         } else if (sema_literal_moves(inits[i].value)) {
             sema_refuse_lock_copy(c, inits[i].value, f->type);
         } else {

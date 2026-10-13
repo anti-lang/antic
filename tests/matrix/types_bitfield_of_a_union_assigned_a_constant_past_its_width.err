@@ -1,0 +1,1 @@
+types_bitfield_of_a_union_assigned_a_constant_past_its_width.anti:13:10: error: `16` does not fit the 4 bits of `low`

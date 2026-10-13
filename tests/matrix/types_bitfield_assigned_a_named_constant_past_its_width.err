@@ -1,0 +1,1 @@
+types_bitfield_assigned_a_named_constant_past_its_width.anti:14:8: error: `4` does not fit the 3 bits of `b`
