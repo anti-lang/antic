@@ -1088,6 +1088,8 @@ foreach(case
         "version_and_a_word|--version|extra"
         "help_and_a_word|--help|extra"
         "new_without_a_name|new"
+        "new_with_two_names|new|com.example.one|com.example.two"
+        "new_with_an_option|new|--bogus"
         "build_option_unknown|build|--bogus"
         "build_word|build|extra"
         "build_lib_kind|build|--lib|bundled"

@@ -17,3 +17,49 @@ anti_message(block_fails
     ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
     ERR "${WORK}/check/check/docs/com_example_hidden_0.anti:5:9: error: `hidden` has no public item `helper`"
         "anti: the `anti` block of `twice` at src/com/example/hidden.anti:3 failed, and its module is ${WORK}/check/check/docs/com_example_hidden_0.anti")
+
+# The formatting class. Two files that each hold a line `anti fmt` writes
+# otherwise are two findings.
+anti_message(format_two_files
+    FILES anti.toml "${check_manifest}"
+          src/com/example/first.anti "//! A module.\n\n/// One.\npub fn one() -> int\n{\n  return 1;\n}\n"
+          src/com/example/second.anti "//! A module.\n\n/// Two.\npub fn two() -> int\n{\n  return 2;\n}\n"
+    OUT "anti check: front end: 2 files, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 0"
+        "anti check: formatting: 2 files, 2 findings"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
+    ERR "src/com/example/first.anti:6:1: error: the line is not the one `anti fmt` writes"
+        "src/com/example/second.anti:6:1: error: the line is not the one `anti fmt` writes")
+# A file that goes on after the text `anti fmt` writes: the finding names
+# the first line past it.
+anti_message(format_empty_lines_at_the_end
+    FILES anti.toml "${check_manifest}"
+          src/com/example/long.anti "//! A module whose text ends with two empty lines.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n\n\n"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 0"
+        "anti check: formatting: 1 file, 1 finding"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
+    ERR "src/com/example/long.anti:8:1: error: the line is not the one `anti fmt` writes")
+
+# The fence of a block. A space after the tag `anti` belongs to no tag,
+# so the block compiles. A fence that no second one closes holds no block.
+anti_message(block_fence_with_a_space
+    STATUS 0
+    FILES anti.toml "${check_manifest}"
+          src/com/example/spaced.anti "//! A module.\n\n/// One.\n///\n/// ```anti \n/// let n = spaced.one();\n/// ```\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 1 block"
+        "anti check: doc warnings: 0"
+        "anti check: formatting: 1 file"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}")
+anti_message(block_fence_never_closed
+    STATUS 0
+    FILES anti.toml "${check_manifest}"
+          src/com/example/open.anti "//! A module.\n\n/// One.\n///\n/// ```anti\n/// let n = nothing_here();\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 0"
+        "anti check: formatting: 1 file"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}")
