@@ -1,0 +1,10 @@
+//! A class whose bitfields carry defaults. The library file carries each one,
+//! and a client writes them into the unit they share.
+
+pub class Bits
+{
+	pub low: u8 : 3 = 5,
+	pub flag: u8 : 1 = 1,
+	pub mid: i8 : 3 = -2,
+	pub whole: int = 7,
+}

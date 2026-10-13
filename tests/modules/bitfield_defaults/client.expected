@@ -1,0 +1,5 @@
+stack 5 1 -2 7
+named 2 1 -2 7
+heap 5 1 -2 7
+field 5 1 -2 7
+after 9

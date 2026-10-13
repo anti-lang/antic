@@ -1,0 +1,24 @@
+//! A class literal as the default of a parameter, where the literal names a
+//! bitfield of the class and leaves another one out. The call without the
+//! argument reads the named bitfield, the default of the other one and the
+//! field after the unit they share.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Bits
+{
+	pub low: u8 : 3 = 5,
+	pub flag: u8 : 1 = 1,
+	pub rest: int = 7,
+}
+
+fn show(b: Bits = Bits { low: 2, rest: 3 }) -> int {
+	return b.low as int * 100 + b.flag as int * 10 + b.rest;
+}
+
+	fn main() -> int
+{
+	printf("default %lld\n".ptr, show());
+	printf("given %lld\n".ptr, show(Bits { flag: 0 }));
+	return 0;
+}

@@ -1,0 +1,34 @@
+//! The client of the bitfields library. It builds the class without naming a
+//! field, alone and as a field of a class of its own, and prints every default
+//! the library file carried.
+
+import com.example.bits;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Holder
+{
+	pub inner: bits.Bits,
+	pub after: int = 9,
+}
+
+fn show(label: str, b: *bits.Bits)
+{
+	printf("%.*s %d %d %d %lld\n".ptr, label.len as c_int, label.ptr, b.low as c_int,
+		b.flag as c_int, b.mid as c_int, b.whole);
+}
+
+fn main() -> int
+{
+	let a = bits.Bits { };
+	show("stack", &a);
+	let b = bits.Bits { low: 2 };
+	show("named", &b);
+	let c = alloc bits.Bits { };
+	show("heap", c);
+	delete(c);
+	let h = Holder { };
+	show("field", &h.inner);
+	printf("after %lld\n".ptr, h.after);
+	return 0;
+}

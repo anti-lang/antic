@@ -4092,6 +4092,14 @@ antic_modules_test(kinds_modules
     STD lang
     WORK "${CMAKE_CURRENT_BINARY_DIR}/kinds-modules")
 
+# The default of a bitfield of a class of a library, which a client writes
+# into the unit the bitfields share.
+antic_modules_test(bitfield_defaults_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/bitfield_defaults"
+    LIBRARIES bits
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/bitfield-defaults-modules")
+
 # The default of a field of a class of a library, one field per kind of
 # value a default takes, read by a client that names no field.
 antic_modules_test(field_defaults_modules
