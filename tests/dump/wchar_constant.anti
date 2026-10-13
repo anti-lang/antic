@@ -1,0 +1,16 @@
+//! A constant of `c_wchar` computed from `size_of` folds with the sign of
+//! `wchar_t` on the target, as the same operation does at run time.
+
+const LOW: c_wchar = (8 - size_of(c_long) * 2) as c_wchar;
+const HALF: c_wchar = LOW / (2 as c_wchar);
+const REST: c_wchar = LOW % (3 as c_wchar);
+const SHIFTED: c_wchar = LOW >> (1 as c_wchar);
+const BELOW: bool = LOW < (1 as c_wchar);
+
+fn main() -> int
+{
+	if BELOW {
+		return HALF as int + REST as int + SHIFTED as int;
+	}
+	return 99;
+}
