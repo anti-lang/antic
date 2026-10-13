@@ -1,6 +1,8 @@
 //! Two forms of a generic that a library file does not carry yet: a function of
 //! a class with a type parameter of its own, in a generic class and in a plain
-//! one, and a type nested in a generic class.
+//! one, and a type nested in a generic class. `passed` hands a value of the
+//! nested type on to a generic function, and stands before `boxed`, so its copy
+//! is the first one that cannot be made.
 
 pub class Stack<T>
 {
@@ -14,6 +16,11 @@ pub class Stack<T>
 	pub fn map<U>(self, f: fn(T) -> U) -> U
 	{
 		return f(self.top);
+	}
+
+	pub fn passed(self) -> int
+	{
+		return held(Node { value: self.top });
 	}
 
 	pub fn boxed(self) -> int
@@ -34,4 +41,9 @@ pub class Plain
 		}
 		return b;
 	}
+}
+
+fn held<U>(own u: U) -> int
+{
+	return size_of(U) as int;
 }

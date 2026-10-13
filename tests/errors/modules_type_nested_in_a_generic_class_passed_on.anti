@@ -1,0 +1,12 @@
+//! A function of a generic class of a library that hands a value of a type
+//! nested in the class on to a generic function. A library file carries no such
+//! type yet, so the copy cannot be made, and the message stands where this
+//! module asks for it. T095 of docs/audit/tests-findings.md.
+
+import com.example.gen;
+
+fn main() -> int
+{
+	let s = gen.Stack<int> { top: 4 };
+	return s.passed() - 8;
+}
