@@ -87,6 +87,18 @@ static void call_fatal(struct lowerer *l, struct ir_operand err,
     l->b = NULL;
 }
 
+/* Send the error err to the handler of the `try` block around the call.
+   The error leaves every block between the call and that handler, and
+   each runs its `undo` and `defer` statements on the way. */
+static void forward_to_try_block(struct lowerer *l, struct ir_operand err)
+{
+    ir_assign(l->f, l->b, l->try_scope->error, err);
+    lower_run_defers_to(l, l->try_scope->defers_at, true);
+    if (l->b != NULL) {
+        ir_jump(l->f, l->b, l->try_scope->handler);
+    }
+}
+
 /* DESIGN: a call that can fail gives a pointer. A pointer of `none` is
    success, so the branch after the call is the whole of the error
    machinery. It is one compare and one branch, and nothing unwinds. */
@@ -115,20 +127,20 @@ void lower_handle_error(struct lowerer *l, const struct expr *call,
     switch (h->kind) {
     case HANDLE_NONE:
     case HANDLE_ENCLOSING:
-        /* The `try` block around the call holds the one handler. The
-           error leaves every block between the call and that handler,
-           and each runs its `undo` and `defer` statements on the way. */
+        /* The `try` block around the call holds the one handler. */
         if (l->try_scope != NULL) {
-            ir_assign(l->f, l->b, l->try_scope->error, err);
-            lower_run_defers_to(l, l->try_scope->defers_at, true);
-            if (l->b != NULL) {
-                ir_jump(l->f, l->b, l->try_scope->handler);
-            }
+            forward_to_try_block(l, err);
         } else {
             ir_jump(l->f, l->b, join);
         }
         break;
     case HANDLE_TRY:
+        /* R016 of "Rules of 2026-10-13": inside a `try` block a `try`
+           forwards to the handler of the block. */
+        if (l->try_scope != NULL) {
+            forward_to_try_block(l, err);
+            break;
+        }
         l->failing_error = err;
         lower_run_defers_to(l, NULL, true);
         l->failing_error = lower_none();

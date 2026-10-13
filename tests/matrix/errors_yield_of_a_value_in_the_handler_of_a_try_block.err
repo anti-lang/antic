@@ -1,0 +1,1 @@
+errors_yield_of_a_value_in_the_handler_of_a_try_block.anti:28:4: error: a `try` block gives no value, so `yield` takes no value

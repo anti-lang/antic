@@ -1515,6 +1515,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
        runs its deferred statements on the way out. */
     case STMT_TRY: {
         struct try_scope scope;
+        struct handling handling;
         struct ir_block *handler = lower_new_block(l);
         struct ir_block *join = lower_new_block(l);
         const struct handler *h = &s->as.try_block.handler;
@@ -1533,8 +1534,14 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
         if (h->symbol != NULL) {
             h->symbol->ir = scope.error;
         }
-        lower_handler(l, h, scope.error,
-                      h->symbol != NULL ? h->symbol->type : NULL, NULL);
+        /* R014 and R015 of "Rules of 2026-10-13": a `yield;` in the
+           handler ends this handler and goes on after the block. The
+           block gives no value, so the handling holds no place. */
+        memset(&handling, 0, sizeof handling);
+        handling.join = join;
+        handling.error = scope.error;
+        handling.error_type = h->symbol != NULL ? h->symbol->type : NULL;
+        lower_handler(l, h, scope.error, handling.error_type, &handling);
         if (l->b != NULL) {
             ir_jump(l->f, l->b, join);
         }

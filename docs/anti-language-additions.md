@@ -96,7 +96,7 @@ The compiler generates the ABI of a `may fail` function: a `?*Error` result and 
 
 - `fn divide(a: int, b: int) -> (int, int) may fail` declares a function with two channels. `return v;` leaves on the result channel. `fail e;` leaves on the error channel with `e`, a `*Error`. `fn close(f: *File) may fail` has no result and returns success at its closing brace.
 - `fail "text";` is sugar for `fail Error.new(0, "text");`. Code zero means "no code", and `fatal` turns it into exit status 1.
-- A call to a `may fail` function must be handled with `catch`, `try`, `catch fatal`, `catch none` or a `try` block, which is the existing rule. `try` inside a `may fail` function forwards the error. Inside any other function `try` is refused.
+- A call to a `may fail` function must be handled with `catch`, `try`, `catch fatal`, `catch none` or a `try` block, which is the existing rule. `try` inside a `may fail` function forwards the error. Inside a `try` block it forwards to the handler of that block and never to the caller, in any function. Inside any other function `try` is refused.
 - `catch none` stands beside `catch fatal`. It counts a failure as `none`, and applies where the result can be `none`. [Regular expressions](#regular-expressions) shows it on a match.
 - `fn(A) -> R may fail` is a function type of its own. A `may fail` function converts to it and to no other function type. A call through a value of it is handled as a direct call is, and the header writes it in the ABI form.
 - `undo` runs on the `fail` path and not on `return`.

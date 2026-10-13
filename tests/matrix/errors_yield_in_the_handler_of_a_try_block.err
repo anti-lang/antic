@@ -1,1 +1,0 @@
-errors_yield_in_the_handler_of_a_try_block.anti:18:3: error: `yield` stands in a `catch` handler

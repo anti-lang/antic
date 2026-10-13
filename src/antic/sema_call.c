@@ -1114,6 +1114,23 @@ static struct type *handled_result(struct checker *c, const struct expr *e,
                : sema_builtin(c, TYPE_VOID);
 }
 
+/* Check the block of the handler h, whose `yield` gives a value of type
+   yields. The handler of a `try` block gives none. The state of the
+   handler around it comes back afterwards, so each `yield` belongs to
+   the innermost handler that holds it. */
+void sema_check_handler(struct checker *c, struct handler *h,
+                        struct type *yields, bool of_try)
+{
+    struct handler_state outer = c->handler;
+
+    c->handler.yields = yields;
+    c->handler.depth = outer.depth + 1;
+    c->handler.deferring = c->deferring;
+    c->handler.of_try = of_try;
+    sema_check_block(c, h->body);
+    c->handler = outer;
+}
+
 /* Check the handler of a call that can fail. Every such call carries
    one, because an error that nothing reads is a bug the checker can
    see. */
@@ -1124,9 +1141,6 @@ static struct type *check_handled(struct checker *c, struct expr *e,
     struct type *result = handled_result(c, e, fn);
     const struct symbol *callee = function_symbol(e->as.call.callee);
     struct scope scope;
-    struct type *outer_yield = c->yields;
-    int outer_depth = c->handler_depth;
-    int outer_deferring = c->handler_deferring;
 
     /* DESIGN: `yield` gives the value that takes the place of the
        result, so it is checked against the type the binding holds. A
@@ -1141,9 +1155,18 @@ static struct type *check_handled(struct checker *c, struct expr *e,
        so it needs none of its own. */
     if (h->kind == HANDLE_NONE && c->ctx.in_try != NULL) {
         h->kind = HANDLE_ENCLOSING;
+    }
+    /* DESIGN: R016 of "Rules of 2026-10-13". A `try` before a call inside
+       a `try` block forwards to the handler of that block and never to
+       the caller, so it is the call without it. The function need not be
+       one that may fail, and the `try` is no answer to the warning
+       `never-fails`. Lowering sends both to the handler of the block. */
+    if ((h->kind == HANDLE_ENCLOSING || h->kind == HANDLE_TRY) &&
+        c->ctx.in_try != NULL) {
         if (c->ctx.in_try->error_type == NULL) {
             c->ctx.in_try->error_type = fn->result;
         }
+        return result;
     }
     switch (h->kind) {
     case HANDLE_ENCLOSING:
@@ -1189,13 +1212,7 @@ static struct type *check_handled(struct checker *c, struct expr *e,
            binds is the `*Error` of that result and needs no check of its
            own. */
         sema_declare_caught(c, h, sema_caught_error(c, fn->result));
-        c->yields = result;
-        c->handler_depth++;
-        c->handler_deferring = c->deferring;
-        sema_check_block(c, h->body);
-        c->handler_deferring = outer_deferring;
-        c->handler_depth = outer_depth;
-        c->yields = outer_yield;
+        sema_check_handler(c, h, result, false);
         sema_leave_scope(c, &scope);
         return result;
     }

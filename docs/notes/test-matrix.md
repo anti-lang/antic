@@ -1118,7 +1118,14 @@ Where two rules meet, and where three do:
 - A handler, a guard and one binding: `handler_then_guard` of
   `matrix/errors_optional_results`.
 - A handler, a `try` block inside it and `yield`:
-  `matrix/errors_yield_in_a_try_handler_of_a_handler`.
+  `matrix/errors_yield_in_a_try_handler_of_a_handler` and the refusal
+  `matrix/errors_yield_of_a_value_in_the_handler_of_a_try_block`, by R015
+  of "Rules of 2026-10-13".
+- The handler of a `try` block and `yield;`:
+  `matrix/errors_yield_in_the_handler_of_a_try_block`, by R014.
+- A `try` block and a `try` before a call in it: `try_in_a_try_block` of
+  `matrix/errors_nested_handlers` and the refusal
+  `matrix/errors_try_in_a_try_block_alone_never_fails`, by R016.
 - A `try` block, a handler inside it and a failing call in that handler:
   `matrix/errors_nested_handlers`, which counts the errors alive.
 - `fail`, `undo` and `defer` and the order they run in:

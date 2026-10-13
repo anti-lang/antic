@@ -1,0 +1,38 @@
+//! A `try` block gives no value, so a `yield` with a value in its handler is
+//! refused, also where the block stands in the handler of a `let`: the `yield`
+//! belongs to the innermost handler, by R015 of the rules of 2026-10-13.
+
+import anti.lang;
+
+fn value(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "no value";
+	}
+	return 0;
+}
+
+fn plain(n: int) may fail
+{
+	if n > 0 {
+		fail "no step";
+	}
+}
+
+fn run(a: int, b: int) -> int
+{
+	let got = value(a) catch {
+		try {
+			plain(b);
+		} catch {
+			yield 7;
+		}
+		yield 1;
+	};
+	return got;
+}
+
+fn main() -> int
+{
+	return run(1, 1);
+}

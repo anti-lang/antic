@@ -1,0 +1,33 @@
+//! A `try` inside a `try` block forwards to the handler of the block, by R016
+//! of the rules of 2026-10-13, so it does not make its function fail. A
+//! function that may fail and holds no other `try` and no `fail` is the warning
+//! `never-fails`.
+
+import anti.lang;
+
+fn plain(n: int) may fail
+{
+	if n > 0 {
+		fail "no step";
+	}
+}
+
+fn run(n: int) -> int may fail
+{
+	let acc = 0;
+	try {
+		try plain(n);
+		acc += 1;
+	} catch {
+		acc += 10;
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	let got = run(1) catch {
+		yield 0;
+	};
+	return got;
+}

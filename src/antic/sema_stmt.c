@@ -1016,9 +1016,6 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
     struct handler *h = &s->as.let.guard;
     struct type *error;
     struct scope scope;
-    struct type *outer_yield = c->yields;
-    int outer_depth = c->handler_depth;
-    int outer_deferring = c->handler_deferring;
 
     if (sema_is_error(value)) {
         return value;
@@ -1042,13 +1039,7 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
     }
     sema_enter_scope(c, &scope);
     sema_declare_caught(c, h, error);
-    c->yields = types_without_none(c->types, value);
-    c->handler_depth++;
-    c->handler_deferring = c->deferring;
-    sema_check_block(c, h->body);
-    c->handler_deferring = outer_deferring;
-    c->handler_depth = outer_depth;
-    c->yields = outer_yield;
+    sema_check_handler(c, h, types_without_none(c->types, value), false);
     sema_leave_scope(c, &scope);
     return types_without_none(c->types, value);
 }
@@ -1483,7 +1474,9 @@ static void check_try(struct checker *c, struct stmt *s)
                         record.error_type != NULL
                             ? sema_caught_error(c, record.error_type)
                             : sema_builtin(c, TYPE_ERROR));
-    sema_check_block(c, h->body);
+    /* R014 of "Rules of 2026-10-13": the handler of a `try` block is a
+       handler, and `yield;` ends it. */
+    sema_check_handler(c, h, sema_builtin(c, TYPE_VOID), true);
     sema_leave_scope(c, &try_scope);
 }
 
@@ -2098,7 +2091,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
     /* `yield v` gives the value that takes the place of the result the
        failing call would have written. */
     case STMT_YIELD:
-        if (c->handler_depth == 0) {
+        if (c->handler.depth == 0) {
             sema_error_at(c, s->pos, "`yield` stands in a `catch` handler");
             return;
         }
@@ -2107,28 +2100,29 @@ static void check_stmt(struct checker *c, struct stmt *s)
            of "Rules of 2026-10-13" refuses it as decision 19 refuses the
            other exits. A handler inside the statement takes its own
            `yield`. */
-        if (c->deferring > c->handler_deferring) {
+        if (c->deferring > c->handler.deferring) {
             sema_error_at(c, s->pos, "`yield` inside %s",
                           c->deferred->kind == STMT_DEFER ? "a `defer`"
                                                           : "an `undo`");
             return;
         }
         if (s->as.yielded == NULL) {
-            if (c->yields->kind != TYPE_VOID) {
+            if (c->handler.yields->kind != TYPE_VOID) {
                 sema_error_at(c, s->pos, "`yield` gives a value of type `%s`",
-                              sema_tn(c->yields));
+                              sema_tn(c->handler.yields));
             }
             return;
         }
-        if (c->yields->kind == TYPE_VOID) {
-            sema_error_at(c, s->pos,
-                          "the call writes no result, so `yield` takes "
-                          "no value");
+        if (c->handler.yields->kind == TYPE_VOID) {
+            sema_error_at(c, s->pos, "%s, so `yield` takes no value",
+                          c->handler.of_try ? "a `try` block gives no value"
+                                            : "the call writes no result");
             sema_check_expr(c, s->as.yielded, NULL);
             return;
         }
         sema_require(c, s->as.yielded,
-                     sema_check_expr(c, s->as.yielded, c->yields), c->yields);
+                     sema_check_expr(c, s->as.yielded, c->handler.yields),
+                     c->handler.yields);
         return;
     case STMT_TRY:
         check_try(c, s);
@@ -2812,13 +2806,11 @@ void sema_refuse_worker_closure(struct checker *c, const struct expr *arg,
 struct body_state {
     int loop_depth;
     struct stmt *fallthrough;
-    struct type *yields;
-    int handler_depth;
+    struct handler_state handler;
     bool saw_fail;
     const struct expr *top_call;
     int deferring;
     const struct stmt *deferred;
-    int handler_deferring;
     const struct expr *field_base;
     const struct held_mutex *held;
 };
@@ -2827,22 +2819,18 @@ static void set_aside(struct checker *c, struct body_state *s)
 {
     s->loop_depth = c->loop_depth;
     s->fallthrough = c->fallthrough;
-    s->yields = c->yields;
-    s->handler_depth = c->handler_depth;
+    s->handler = c->handler;
     s->saw_fail = c->saw_fail;
     s->top_call = c->top_call;
     s->deferring = c->deferring;
     s->deferred = c->deferred;
-    s->handler_deferring = c->handler_deferring;
     s->field_base = c->field_base;
     s->held = c->held;
     c->loop_depth = 0;
     c->fallthrough = NULL;
-    c->yields = NULL;
-    c->handler_depth = 0;
+    memset(&c->handler, 0, sizeof c->handler);
     c->deferring = 0;
     c->deferred = NULL;
-    c->handler_deferring = 0;
     c->field_base = NULL;
     c->held = NULL;
 }
@@ -2851,13 +2839,11 @@ static void take_back(struct checker *c, const struct body_state *s)
 {
     c->loop_depth = s->loop_depth;
     c->fallthrough = s->fallthrough;
-    c->yields = s->yields;
-    c->handler_depth = s->handler_depth;
+    c->handler = s->handler;
     c->saw_fail = s->saw_fail;
     c->top_call = s->top_call;
     c->deferring = s->deferring;
     c->deferred = s->deferred;
-    c->handler_deferring = s->handler_deferring;
     c->field_base = s->field_base;
     c->held = s->held;
 }

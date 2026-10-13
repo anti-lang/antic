@@ -1,7 +1,8 @@
-//! A `yield` in the handler of a `try` block that stands inside the handler of
-//! a `let` gives the value of the `let`: the `try` block has no value of its
-//! own. No document states the rule, and the test holds what antic 0.2.0 does.
-//! Both errors are deleted, which the count of the errors alive shows.
+//! A `yield` belongs to the innermost handler that holds it, by R015 of the
+//! rules of 2026-10-13. In the handler of a `try` block that stands inside the
+//! handler of a `let`, `yield;` ends the handler of the `try` block, and the
+//! handler of the `let` goes on after the block. Both errors are deleted, which
+//! the count of the errors alive shows.
 
 import anti.lang;
 
@@ -45,12 +46,17 @@ fn plain(code: int) may fail
 fn run(a: int, b: int) -> int
 {
 	let got = value(a) catch first {
+		let seen = 0;
 		try {
 			plain(b);
 		} catch second {
-			yield first.code * 10 + second.code;
+			seen = second.code;
+			if seen > 0 {
+				yield;
+			}
+			seen = 100;
 		}
-		yield first.code;
+		yield first.code * 10 + seen;
 	};
 	return got;
 }

@@ -1,0 +1,1 @@
+errors_try_in_a_try_block_alone_never_fails.anti:15:23: error: `run` may fail and never does [never-fails]

@@ -118,6 +118,15 @@ struct held_mutex {
    argument of an `extern fn`, where it is not refused. */
 enum lent_use { LENT_STORED, LENT_RETURNED, LENT_PASSED, LENT_TO_C };
 
+/* The handler a `yield` belongs to: the innermost `catch` handler that
+   holds it, by R015 of "Rules of 2026-10-13". */
+struct handler_state {
+    struct type *yields;    /* the type `yield` gives */
+    int depth;              /* above 0, a `yield` has a place to go */
+    int deferring;          /* the checker's deferring where it began */
+    bool of_try;            /* the handler of a `try` block */
+};
+
 struct checker {
     struct types *types;
     struct arena *arena;
@@ -133,13 +142,11 @@ struct checker {
     struct stmt *fallthrough;   /* the one that ends the arm checked now */
     bool atomic_place;          /* the place of an atomic operation */
     bool program;               /* the build writes a program, not a library */
-    struct type *yields;        /* the type `yield` gives in a handler */
-    int handler_depth;          /* above 0, a `yield` has a place to go */
+    struct handler_state handler;   /* the handler under check */
     bool saw_fail;              /* the body holds a `fail` or a `try` */
     const struct expr *top_call; /* the first statement's call, or NULL */
     int deferring;              /* above 0, a `defer` or `undo` is checked */
     const struct stmt *deferred;    /* the innermost of them, or NULL */
-    int handler_deferring;      /* deferring where the innermost handler began */
     const struct expr *field_base; /* the base of the field checked now */
     const struct held_mutex *held; /* the `sync` blocks around it */
     int const_depth;            /* constants evaluated inside each other */
@@ -431,6 +438,8 @@ struct symbol *sema_null_pointer_maker(struct checker *c, struct pos pos);
 struct symbol *sema_error_maker(struct checker *c, struct pos pos);
 void sema_resolve_origin(struct checker *c, struct stmt *s);
 struct type *sema_caught_error(struct checker *c, struct type *result);
+void sema_check_handler(struct checker *c, struct handler *h,
+                        struct type *yields, bool of_try);
 void sema_declare_caught(struct checker *c, struct handler *h,
                          struct type *t);
 bool sema_in_failing_function(const struct checker *c);

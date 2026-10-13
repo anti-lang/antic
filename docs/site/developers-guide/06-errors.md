@@ -342,7 +342,7 @@ A handler follows a `let`, an assignment or a call statement. It does not follow
 
 The error a handler binds is deleted at every exit of the handler. `fail e;` takes it away first by handing it to the caller. So does passing it to an `own` parameter, as `Error.wrap` does with its cause. The name of the error ends with the handler.
 
-A `try` block runs its statements until one fails. The rest of the block is skipped, its `defer` statements run, and the handler runs. A call inside the block needs no mark of its own.
+A `try` block runs its statements until one fails. The rest of the block is skipped, its `defer` statements run, and the handler runs. A call inside the block needs no mark of its own. A call there that carries `try` forwards to the handler of the block as well, and never to the caller. In that handler `yield;` ends the handler, and the program goes on after the block.
 
 ```anti
 //! name: hnd
