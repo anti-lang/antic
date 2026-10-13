@@ -163,6 +163,15 @@ anti_message(index_older_alone
           ${units_index} "${index_head}version = \"1.1.0\"\nmodules = [${units_module}]\n"
     ARGS build ${tools}
     ERR "${no_version}")
+# `file://localhost/tmp/repo` names the directory that `file:///tmp/repo`
+# names. The index is read, and it holds an older version alone.
+string(REPLACE "file://" "file://localhost" localhost_url "${repo_url}")
+anti_message(repository_of_localhost
+    FILES anti.toml "${manifest_package}\n[repositories]\nlocal = \"${localhost_url}\"\n\n[dependencies]\n\"com.example.units\" = { version = \"1.2.0\", repo = \"local\" }\n"
+          ${app_source} "${app_text}"
+          ${units_index} "${index_head}version = \"1.1.0\"\nmodules = [${units_module}]\n"
+    ARGS build ${tools}
+    ERR "anti: ${localhost_url} has no version of com.example.units that satisfies every constraint on it")
 anti_message(index_is_a_directory
     FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
           ${units_index}/notes.txt "A directory where the index belongs.\n"
